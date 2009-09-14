@@ -98,3 +98,8 @@ func (m Conn) SetWriteDeadline(t time.Time) (e error) {
 	}
 	return
 }
+
+// IsActive indicates whether the connection is active.
+func (m Conn) IsActive() bool {
+	return true
+}

@@ -20,14 +20,16 @@ import "time"
 
 // IdleConfig contains idle configuration for long-connection pool.
 type IdleConfig struct {
+	MinIdlePerAddress int
 	MaxIdlePerAddress int
 	MaxIdleGlobal     int
 	MaxIdleTimeout    time.Duration
 }
 
 const (
-	defaultMaxIdleTimeout = 30 * time.Second
-	minMaxIdleTimeout     = 2 * time.Second
+	defaultMaxIdleTimeout    = 30 * time.Second
+	minMaxIdleTimeout        = 2 * time.Second
+	defaultMinIdlePerAddress = 1
 )
 
 // CheckPoolConfig to check invalid param.
@@ -51,5 +53,12 @@ func CheckPoolConfig(config IdleConfig) *IdleConfig {
 		config.MaxIdleGlobal = config.MaxIdlePerAddress
 	}
 
+	// TODO: how to set a default config of minIdle
+	if config.MinIdlePerAddress > defaultMinIdlePerAddress {
+		config.MinIdlePerAddress = defaultMinIdlePerAddress
+	}
+	if config.MinIdlePerAddress >= config.MaxIdlePerAddress {
+		config.MinIdlePerAddress = 0
+	}
 	return &config
 }

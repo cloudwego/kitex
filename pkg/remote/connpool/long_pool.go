@@ -20,8 +20,8 @@ package connpool
 import (
 	"context"
 	"net"
-	"reflect"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/connpool"
@@ -57,7 +57,7 @@ type longConn struct {
 
 // Close implements the net.Conn interface.
 func (c *longConn) Close() error {
-	return nil
+	return c.Conn.Close()
 }
 
 // RawConn returns the real underlying net.Conn.
@@ -68,35 +68,49 @@ func (c *longConn) RawConn() net.Conn {
 // IsActive indicates whether the connection is active.
 func (c *longConn) IsActive() bool {
 	if conn, ok := c.Conn.(remote.IsActive); ok {
-		if !conn.IsActive() {
-			return false
+		if conn.IsActive() {
+			return true
 		}
 	}
-	return time.Now().Before(c.deadline)
+	return false
 }
 
-// Peer has one address, it manage all connections base on this address
+func (c *longConn) Expired() bool {
+	return time.Now().After(c.deadline)
+}
+
+func (c *longConn) SetDeadline(t time.Time) error {
+	c.deadline = t
+	return nil
+}
+
+func (c *longConn) Dump() interface{} {
+	return c.deadline
+}
+
+// peer has one address, it manages all connections base on this address
 type peer struct {
-	serviceName    string
-	addr           net.Addr
-	ring           *utils.Ring
-	globalIdle     *utils.MaxCounter
-	maxIdleTimeout time.Duration
+	// info
+	serviceName string
+	addr        net.Addr
+	globalIdle  *utils.MaxCounter
+	// pool
+	pool *utils.Pool
 }
 
 func newPeer(
 	serviceName string,
 	addr net.Addr,
+	minIdle int,
 	maxIdle int,
 	maxIdleTimeout time.Duration,
 	globalIdle *utils.MaxCounter,
 ) *peer {
 	return &peer{
-		serviceName:    serviceName,
-		addr:           addr,
-		ring:           utils.NewRing(maxIdle),
-		globalIdle:     globalIdle,
-		maxIdleTimeout: maxIdleTimeout,
+		serviceName: serviceName,
+		addr:        addr,
+		globalIdle:  globalIdle,
+		pool:        utils.NewPool(minIdle, maxIdle, maxIdleTimeout),
 	}
 }
 
@@ -106,56 +120,55 @@ func (p *peer) Reset(addr net.Addr) {
 	p.Close()
 }
 
-// Get picks up connection from ring or dial a new one.
 func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter, addr string) (net.Conn, error) {
-	for {
-		conn, _ := p.ring.Pop().(*longConn)
-		if conn == nil {
-			break
+	newer := func() (utils.PoolObject, error) {
+		conn, err := d.DialTimeout(p.addr.Network(), p.addr.String(), timeout)
+		if err != nil {
+			reporter.ConnFailed(Long, p.serviceName, p.addr)
+			return nil, err
 		}
-		p.globalIdle.Dec()
-		if conn.IsActive() {
-			reporter.ReuseSucceed(Long, p.serviceName, p.addr)
-			return conn, nil
-		}
-		_ = conn.Conn.Close()
+		reporter.ConnSucceed(Long, p.serviceName, p.addr)
+		return &longConn{
+			Conn:    conn,
+			address: addr,
+		}, nil
 	}
-	conn, err := d.DialTimeout(p.addr.Network(), p.addr.String(), timeout)
+	c, reused, err := p.pool.Get(newer)
 	if err != nil {
-		reporter.ConnFailed(Long, p.serviceName, p.addr)
 		return nil, err
 	}
-	reporter.ConnSucceed(Long, p.serviceName, p.addr)
-	return &longConn{
-		Conn:     conn,
-		deadline: time.Now().Add(p.maxIdleTimeout),
-		address:  addr,
-	}, nil
+	if reused {
+		p.globalIdle.Dec()
+	}
+	return c.(net.Conn), err
 }
 
-func (p *peer) put(c *longConn) error {
+func (p *peer) Put(c *longConn) error {
 	if !p.globalIdle.Inc() {
-		return c.Conn.Close()
+		return c.Close()
 	}
-	c.deadline = time.Now().Add(p.maxIdleTimeout)
-	err := p.ring.Push(c)
-	if err != nil {
+	if !p.pool.Put(c) {
 		p.globalIdle.Dec()
-		return c.Conn.Close()
+		return c.Close()
 	}
 	return nil
 }
 
+func (p *peer) Len() int {
+	return p.pool.Len()
+}
+
+func (p *peer) Evict() {
+	p.pool.Evict()
+}
+
 // Close closes the peer and all the connections in the ring.
 func (p *peer) Close() {
-	for {
-		conn, _ := p.ring.Pop().(*longConn)
-		if conn == nil {
-			break
-		}
+	n := p.pool.Len()
+	for i := 0; i < n; i++ {
 		p.globalIdle.Dec()
-		_ = conn.Conn.Close()
 	}
+	p.pool.Close()
 }
 
 // LongPool manages a pool of long connections.
@@ -163,6 +176,9 @@ type LongPool struct {
 	reporter Reporter
 	peerMap  sync.Map
 	newPeer  func(net.Addr) *peer
+
+	closeCh chan struct{}
+	closed  int32
 }
 
 func (lp *LongPool) getPeer(addr netAddr) *peer {
@@ -193,7 +209,7 @@ func (lp *LongPool) Put(conn net.Conn) error {
 	na := netAddr{addr.Network(), c.address}
 	p, ok := lp.peerMap.Load(na)
 	if ok {
-		p.(*peer).put(c)
+		p.(*peer).Put(c)
 		return nil
 	}
 	return c.Conn.Close()
@@ -221,11 +237,7 @@ func (lp *LongPool) Clean(network, address string) {
 func (lp *LongPool) Dump() interface{} {
 	m := make(map[string]interface{})
 	lp.peerMap.Range(func(key, value interface{}) bool {
-		t := value.(*peer).ring.Dump()
-		arr := reflect.ValueOf(t).Elem().FieldByName("Array").Interface().([]interface{})
-		for i := range arr {
-			arr[i] = arr[i].(*longConn).deadline
-		}
+		t := value.(*peer).pool.Dump()
 		m[key.(netAddr).String()] = t
 		return true
 	})
@@ -234,6 +246,9 @@ func (lp *LongPool) Dump() interface{} {
 
 // Close releases all peers in the pool, it is executed when client is closed.
 func (lp *LongPool) Close() error {
+	if atomic.CompareAndSwapInt32(&lp.closed, 0, 1) {
+		close(lp.closeCh)
+	}
 	lp.peerMap.Range(func(addr, value interface{}) bool {
 		lp.peerMap.Delete(addr)
 		v := value.(*peer)
@@ -254,18 +269,38 @@ func (lp *LongPool) WarmUp(eh warmup.ErrorHandling, wuo *warmup.PoolOption, co r
 	return h.WarmUp(wuo, lp, co)
 }
 
+func (lp *LongPool) Evict(frequency time.Duration) {
+	t := time.NewTicker(frequency)
+	select {
+	case <-t.C:
+		lp.peerMap.Range(func(key interface{}, value interface{}) bool {
+			p := value.(*peer)
+			p.Evict()
+			return true
+		})
+	case <-lp.closeCh:
+		return
+	}
+}
+
 // NewLongPool creates a long pool using the given IdleConfig.
 func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
 	limit := utils.NewMaxCounter(idlConfig.MaxIdleGlobal)
-	return &LongPool{
+	lp := &LongPool{
 		reporter: &DummyReporter{},
 		newPeer: func(addr net.Addr) *peer {
 			return newPeer(
 				serviceName,
 				addr,
+				idlConfig.MinIdlePerAddress,
 				idlConfig.MaxIdlePerAddress,
 				idlConfig.MaxIdleTimeout,
 				limit)
 		},
+		closeCh: make(chan struct{}),
+		closed:  0,
 	}
+
+	go lp.Evict(idlConfig.MaxIdleTimeout)
+	return lp
 }
