@@ -1,0 +1,25 @@
+name: Release Check
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Check Source Branch
+        run: python2 -c "exit(0 if '${{ github.head_ref }}'.startswith('release') or '${{ github.head_ref }}'.startswith('hotfix') else 1)"
+
+      - name: Check Version
+        run: |
+          # get version code, runner not support grep -E here
+          SOURCE_VERSION=`grep 'Version\s*=\s*\"v[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\"' *.go | awk -F '\"' '{print $(NF-1)}'`
+          git checkout main
+          MASTER_VERSION=`grep 'Version\s*=\s*\"v[0-9]\{1,\}\.[0-9]\{1,\}\.[0-9]\{1,\}\"' *.go | awk -F '\"' '{print $(NF-1)}'`
+          git checkout ${{Head.SHA}}
+          # check version update
+          python2 -c "exit(0 if list(map(int,'${SOURCE_VERSION#v}'.split('.')[:3])) > list(map(int,'${MASTER_VERSION#v}'.split('.')[:3])) else 1)"
