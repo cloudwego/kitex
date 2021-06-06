@@ -50,9 +50,10 @@ Before you submit your Pull Request (PR) consider the following guidelines:
 - Maybe you need familiar with [Actions](https://github.com/features/actions)(our default workflow tool).
 
 ## Code Style Guides
-Also see [Pingcap General advice](https://pingcap.github.io/style-guide/general.html).
+
+See [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments).
 
 Good resources:
 - [Effective Go](https://golang.org/doc/effective_go)
-- [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
+- [Pingcap General advice](https://pingcap.github.io/style-guide/general.html)
 - [Uber Go Style Guide](https://github.com/uber-go/guide/blob/master/style.md)
