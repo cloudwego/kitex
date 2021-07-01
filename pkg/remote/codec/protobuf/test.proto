@@ -1,0 +1,12 @@
+syntax="proto3";
+package protobuf;
+
+option go_package = "github.com/cloudwego/kitex/pkg/remote/codec/protobuf";
+
+message MockReq {
+	string msg = 1;
+	map<string, string> strMap = 2;
+	repeated string strList = 3;
+}
+
+// protoc --proto_path=. --go_out=$GOPATH/src test.proto

@@ -1,0 +1,12 @@
+syntax="proto3";
+package protobuf;
+
+option go_package = "github.com/cloudwego/kitex/pkg/remote/codec/protobuf";
+
+// Messages used for transporting error between server and client.
+message ErrorProto {
+    int32 TypeID = 1;
+    string Message = 2;
+}
+
+// protoc --go_out=$GOPATH/src kitex/pkg/remote/codec/protobuf/error.proto
