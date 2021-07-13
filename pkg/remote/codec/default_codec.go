@@ -243,8 +243,12 @@ func isThriftFramedBinary(flagBuf []byte) bool {
 }
 
 func checkRPCState(ctx context.Context) error {
-	if respOp, ok := ctx.Value(retry.CtxRespOp).(*int32); ok && atomic.LoadInt32(respOp) == retry.OpDone {
-		return kerrors.ErrRPCFinish
+	if respOp, ok := ctx.Value(retry.CtxRespOp).(*int32); ok {
+		if !atomic.CompareAndSwapInt32(respOp, retry.OpNo, retry.OpDoing) {
+			// previous call is being handling or done
+			// this flag is used to check request status in retry scene
+			return kerrors.ErrRPCFinish
+		}
 	}
 	return nil
 }
