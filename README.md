@@ -111,6 +111,8 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
     - 代码生成
     
       - [代码生成工具](docs/guide/basic-features/code_generation_cn.md)
+
+      - [Combine Service](docs/guide/basic-features/combine_service_cn.md)
     
     - 框架扩展
     
