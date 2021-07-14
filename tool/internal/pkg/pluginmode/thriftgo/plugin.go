@@ -67,7 +67,7 @@ func Run() int {
 			conv.Package.Namespace = conv.svc2ast[s].GetNamespaceOrReferenceName("go")
 			fs, err := gen.GenerateService(&conv.Package)
 			if err != nil {
-				conv.fail(err)
+				return conv.fail(err)
 			}
 			files = append(files, fs...)
 		}
@@ -75,12 +75,12 @@ func Run() int {
 
 	if conv.Config.GenerateMain {
 		if len(conv.Services) == 0 {
-			conv.fail(errors.New("No service defined in the IDL"))
+			return conv.fail(errors.New("No service defined in the IDL"))
 		}
 		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
 		fs, err := gen.GenerateMainPackage(&conv.Package)
 		if err != nil {
-			conv.fail(err)
+			return conv.fail(err)
 		}
 		files = append(files, fs...)
 	}
@@ -100,7 +100,7 @@ func Run() int {
 		if err == nil {
 			err = errors.New(TheUseOptionMessage)
 		}
-		conv.fail(err)
+		return conv.fail(err)
 	}
 
 	p := &patcher{
@@ -111,7 +111,7 @@ func Run() int {
 	}
 	patches, err := p.patch(req)
 	if err != nil {
-		conv.fail(fmt.Errorf("patch: %w", err))
+		return conv.fail(fmt.Errorf("patch: %w", err))
 	}
 	res.Contents = append(res.Contents, patches...)
 
