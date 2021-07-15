@@ -4,6 +4,12 @@
 
 ## 快速上手
 
+### 安装代码生成工具
+
+运行命令完成代码生成工具的安装 `go get github.com/cloudwego/kitex/tool/cmd/kitex`
+
+运行 `kitex -h` 查看命令支持的选项。
+
 ### 获取示例代码
 
 1. 你可以直接点击此处（TODO）下载示例仓库
