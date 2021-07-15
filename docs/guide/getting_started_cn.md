@@ -29,19 +29,22 @@ thriftgo 0.0.1
 
 ### 运行示例代码
 
-1. 进入示例仓库的 `hello` 目录
-
-`cd examples/hello`
-
-2. 运行server
-
-`go run .`
-
-3. 运行client
-
-另起一个终端后，`go run ./client`
-
-
+1. 进入示例仓库目录
+    ```bash
+    cd examples
+    ```
+2. 编译项目
+    ```bash
+    docker build -t kitex-examples .
+    ```
+3. 运行 server
+    ```bash
+    docker run --network host kitex-examples hello-server
+    ```
+4. 运行 client
+    ```bash
+    docker run --network host kitex-examples hello-client
+    ```
 
 恭喜你，你现在成功通过 Kitex 发起了 RPC 调用。
 
