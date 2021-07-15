@@ -407,3 +407,25 @@ log.Println(resp)
 `2021/05/20 16:51:35 Response({Message:my request})`
 
 恭喜你！至此你成功编写了一个 Kitex 的服务端和客户端，并完成了一次调用！
+
+## 手动安装kiteX
+## get kiteX工具失败
+如果get kiteX失败，可以手动build
+### 1.拉取源码
+```shell
+https://github.com/cloudwego/kitex.git
+```
+### 进入tool目录
+```shell
+cd tool/cmd
+```
+### 执行go build
+```shell
+go build
+会得到一个可执行的二进制文件
+```
+### 设置环境变量
+```shell
+打开 .bash_profile
+export PATH=$PATH:${KITEXPATH} #KITEXPATH 是二进制文件所在目录
+```
