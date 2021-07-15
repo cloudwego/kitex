@@ -85,7 +85,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	var abort int32 = 0
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes
 	done := make(chan error, 1)
-	cbKey := ""
+	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, request)
 	timer := time.NewTimer(r.retryDelay)
 	defer timer.Stop()
 	defer recoverFunc(ctx, firstRI, r.logger, done)
@@ -104,9 +104,6 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				_, err = rpcCall(ctx, r)
 				recordCost(ct, callStart, &recordCostDoing, &callCosts)
 				if r.cbContainer.cbStat {
-					if cbKey == "" {
-						cbKey, _ = r.cbContainer.cbCtl.GetKey(ctx, request)
-					}
 					circuitbreak.RecordStat(ctx, request, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 				}
 			})

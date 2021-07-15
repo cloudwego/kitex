@@ -93,13 +93,6 @@ func circuitBreakerStop(ctx context.Context, policy StopPolicy, cbC *cbContainer
 	if cbC.cbCtl == nil || cbC.cbPanel == nil {
 		return false, ""
 	}
-	if cbKey == "" {
-		key, enabled := cbC.cbCtl.GetKey(ctx, request)
-		if !enabled {
-			return false, ""
-		}
-		cbKey = key
-	}
 	metricer := cbC.cbPanel.GetMetricer(cbKey)
 	errRate := metricer.ErrorRate()
 	sample := metricer.Samples()

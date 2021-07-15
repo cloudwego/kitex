@@ -91,7 +91,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 	}
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes
 	var cRI rpcinfo.RPCInfo
-	cbKey := ""
+	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, request)
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
 			err = fmt.Errorf("KITEX: panic in retry, remote[to_psm=%s|method=%s], err=%v\n%s",
@@ -128,9 +128,6 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 		callCosts.WriteString(strconv.FormatInt(time.Since(callStart).Microseconds(), 10))
 
 		if r.cbContainer.cbStat {
-			if cbKey == "" {
-				cbKey, _ = r.cbContainer.cbCtl.GetKey(ctx, request)
-			}
 			circuitbreak.RecordStat(ctx, request, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 		}
 		if err == nil {
