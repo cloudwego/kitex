@@ -22,7 +22,7 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
 
 - **多交互方式**
 
-  支持 **PingPong**、**Oneway**、**双向 Streaming**。其中 Oneway 目前支对 Thrift 协议支持，双向 Streaming 只对 gRPC 支持，后续会考虑支持 Thrift 的双向 Streaming。
+  支持 **PingPong**、**Oneway**、**双向 Streaming**。其中 Oneway 目前只对 Thrift 协议支持，双向 Streaming 只对 gRPC 支持，后续会考虑支持 Thrift 的双向 Streaming。
 
 - **服务治理**
 
