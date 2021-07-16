@@ -56,12 +56,12 @@ func TestNewProtocolErrorWithType(t *testing.T) {
 	// check success
 	test.Assert(t, err2.Error() == msg)
 	test.Assert(t, IsProtocolError(err2))
-	test.Assert(t, err2.(ProtocolError).TypeId() == typeID)
+	test.Assert(t, err2.TypeId() == typeID)
 
 	err3 := NewProtocolErrorWithType(typeID, err2.Error())
 	test.Assert(t, err3.Error() == msg)
 	test.Assert(t, IsProtocolError(err3))
-	test.Assert(t, err3.(ProtocolError).TypeId() == typeID)
+	test.Assert(t, err3.TypeId() == typeID)
 }
 
 func TestNewProtocolErrorWithMsg(t *testing.T) {

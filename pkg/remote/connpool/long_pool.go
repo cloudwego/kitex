@@ -169,6 +169,7 @@ func (lp *LongPool) getPeer(addr netAddr) *peer {
 }
 
 // Get pick or generate a net.Conn and return
+// The context is not used but leave it for now.
 func (lp *LongPool) Get(ctx context.Context, network, address string, opt *remote.ConnOption) (net.Conn, error) {
 	addr := netAddr{network, address}
 	p := lp.getPeer(addr)

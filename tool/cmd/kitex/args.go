@@ -168,7 +168,7 @@ func (a *arguments) checkPath() {
 		os.Exit(1)
 	}
 
-	if filepath.HasPrefix(curpath, gosrc) {
+	if strings.HasPrefix(curpath, gosrc) {
 		if a.PackagePrefix, err = filepath.Rel(gosrc, curpath); err != nil {
 			log.Warn("Get GOPATH/src relpath failed:", err.Error())
 			os.Exit(1)

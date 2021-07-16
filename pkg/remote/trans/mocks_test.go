@@ -78,7 +78,6 @@ func (m *MockExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cfg r
 		m.SetReadTimeoutFunc(ctx, conn, cfg, role)
 		return
 	}
-	return
 }
 
 func (m *MockExtension) NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
@@ -176,7 +175,6 @@ func (m *MockMessage) SetMessageType(mt remote.MessageType) {
 	if m.SetMessageTypeFunc != nil {
 		m.SetMessageTypeFunc(mt)
 	}
-	return
 }
 
 func (m *MockMessage) RPCRole() (r remote.RPCRole) {
@@ -197,7 +195,6 @@ func (m *MockMessage) SetPayloadLen(size int) {
 	if m.SetPayloadLenFunc != nil {
 		m.SetPayloadLenFunc(size)
 	}
-	return
 }
 
 func (m *MockMessage) TransInfo() remote.TransInfo {
@@ -225,7 +222,6 @@ func (m *MockMessage) SetProtocolInfo(pi remote.ProtocolInfo) {
 	if m.SetProtocolInfoFunc != nil {
 		m.SetProtocolInfoFunc(pi)
 	}
-	return
 }
 
 func (m *MockMessage) PayloadCodec() remote.PayloadCodec {
@@ -239,12 +235,10 @@ func (m *MockMessage) SetPayloadCodec(pc remote.PayloadCodec) {
 	if m.SetPayloadCodecFunc != nil {
 		m.SetPayloadCodecFunc(pc)
 	}
-	return
 }
 
 func (m *MockMessage) Recycle() {
 	if m.RecycleFunc != nil {
 		m.RecycleFunc()
 	}
-	return
 }

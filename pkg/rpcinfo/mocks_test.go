@@ -78,7 +78,7 @@ func (m *MockRPCConfig) TransportProtocol() (r transport.Protocol) {
 
 type MockRPCStats struct{}
 
-func (m *MockRPCStats) Record(context.Context, stats.Event, stats.Status, string) { return }
+func (m *MockRPCStats) Record(context.Context, stats.Event, stats.Status, string) {}
 func (m *MockRPCStats) SendSize() uint64                                          { return 0 }
 func (m *MockRPCStats) RecvSize() uint64                                          { return 0 }
 func (m *MockRPCStats) Error() error                                              { return nil }

@@ -142,6 +142,7 @@ func TestServiceDeregisterFailed(t *testing.T) {
 		test.Assert(t, strings.Contains(err.Error(), mockDeregErr.Error()))
 	})
 	err = svr.Run()
+	test.Assert(t, err == nil, err)
 	test.Assert(t, rCount == 1)
 }
 
@@ -380,7 +381,6 @@ type mockExtension struct {
 }
 
 func (m mockExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cfg rpcinfo.RPCConfig, role remote.RPCRole) {
-	return
 }
 
 func (m mockExtension) NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
