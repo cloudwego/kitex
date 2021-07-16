@@ -17,6 +17,7 @@
 package netpollmux
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -57,10 +58,10 @@ func TestMuxConnPoolGetTimeout(t *testing.T) {
 	}
 	var err error
 
-	_, err = p.Get(nil, "tcp", mockAddr0, &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second})
+	_, err = p.Get(context.TODO(), "tcp", mockAddr0, &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil)
 
-	_, err = p.Get(nil, "tcp", mockAddr0, &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Millisecond})
+	_, err = p.Get(context.TODO(), "tcp", mockAddr0, &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Millisecond})
 	test.Assert(t, err != nil)
 }
 
@@ -87,7 +88,7 @@ func TestMuxConnPoolReuse(t *testing.T) {
 
 	count := make(map[net.Conn]int)
 	for i := 0; i < 10; i++ {
-		c, err := p.Get(nil, "tcp", addr1, opt)
+		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
 		count[c]++
 	}
@@ -95,7 +96,7 @@ func TestMuxConnPoolReuse(t *testing.T) {
 
 	count = make(map[net.Conn]int)
 	for i := 0; i < 10; i++ {
-		c, err := p.Get(nil, "tcp", addr1, opt)
+		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
 		err = p.Put(c)
 		test.Assert(t, err == nil)
@@ -105,13 +106,13 @@ func TestMuxConnPoolReuse(t *testing.T) {
 
 	count = make(map[net.Conn]int)
 	for i := 0; i < 10; i++ {
-		c, err := p.Get(nil, "tcp", addr1, opt)
+		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
 		err = p.Put(c)
 		test.Assert(t, err == nil)
 		count[c]++
 
-		c, err = p.Get(nil, "tcp", addr2, opt)
+		c, err = p.Get(context.TODO(), "tcp", addr2, opt)
 		test.Assert(t, err == nil)
 		err = p.Put(c)
 		test.Assert(t, err == nil)
@@ -143,7 +144,7 @@ func TestMuxConnPoolDiscardClean(t *testing.T) {
 	network, address := "tcp", mockAddr0
 	var conns []net.Conn
 	for i := 0; i < 1024; i++ {
-		conn, err := p.Get(nil, network, address, &dialer.ConnOption{Dialer: d})
+		conn, err := p.Get(context.TODO(), network, address, &dialer.ConnOption{Dialer: d})
 		test.Assert(t, err == nil)
 		conns = append(conns, conn)
 	}
@@ -175,11 +176,12 @@ func TestMuxConnPoolClose(t *testing.T) {
 	}
 
 	network, address := "tcp", mockAddr0
-	_, err := p.Get(nil, network, address, &dialer.ConnOption{Dialer: d})
+	_, err := p.Get(context.TODO(), network, address, &dialer.ConnOption{Dialer: d})
 	test.Assert(t, err == nil)
 
 	network, address = "tcp", mockAddr1
-	_, err = p.Get(nil, network, address, &dialer.ConnOption{Dialer: d})
+	_, err = p.Get(context.TODO(), network, address, &dialer.ConnOption{Dialer: d})
+	test.Assert(t, err == nil)
 
 	connCount := 0
 	p.connMap.Range(func(key, value interface{}) bool {
@@ -219,7 +221,7 @@ func BenchmarkMuxPoolGetOne(b *testing.B) {
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			p.Get(nil, "tcp", mockAddr1, opt)
+			p.Get(context.TODO(), "tcp", mockAddr1, opt)
 		}
 	})
 }
@@ -248,7 +250,7 @@ func BenchmarkMuxPoolGetRand2000(b *testing.B) {
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			p.Get(nil, "tcp", addrs[rand.Intn(2000)], opt)
+			p.Get(context.TODO(), "tcp", addrs[rand.Intn(2000)], opt)
 		}
 	})
 }
@@ -277,7 +279,7 @@ func BenchmarkMuxPoolGetRand2000Mesh(b *testing.B) {
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			p.Get(nil, "tcp", addrs[rand.Intn(2000)], opt)
+			p.Get(context.TODO(), "tcp", addrs[rand.Intn(2000)], opt)
 		}
 	})
 }

@@ -76,6 +76,7 @@ func TestCreateListener(t *testing.T) {
 	// uds
 	addrStr = "server.addr"
 	addr, err = net.ResolveUnixAddr("unix", addrStr)
+	test.Assert(t, err == nil, err)
 	ln, err = transSvr.CreateListener(addr)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ln.Addr().String() == addrStr)

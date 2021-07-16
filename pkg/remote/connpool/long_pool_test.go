@@ -17,6 +17,7 @@
 package connpool
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -70,10 +71,10 @@ func TestLongConnPoolGetTimeout(t *testing.T) {
 	}
 	var err error
 
-	_, err = p.Get(nil, "tcp", mockAddr0, &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second})
+	_, err = p.Get(context.TODO(), "tcp", mockAddr0, &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil)
 
-	_, err = p.Get(nil, "tcp", mockAddr0, &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Millisecond})
+	_, err = p.Get(context.TODO(), "tcp", mockAddr0, &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Millisecond})
 	test.Assert(t, err != nil)
 }
 
@@ -94,7 +95,7 @@ func TestLongConnPoolReuse(t *testing.T) {
 
 	count := make(map[net.Conn]int)
 	for i := 0; i < 10; i++ {
-		c, err := p.Get(nil, "tcp", addr1, opt)
+		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
 		count[c]++
 	}
@@ -102,7 +103,7 @@ func TestLongConnPoolReuse(t *testing.T) {
 
 	count = make(map[net.Conn]int)
 	for i := 0; i < 10; i++ {
-		c, err := p.Get(nil, "tcp", addr1, opt)
+		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
 		err = p.Put(c)
 		test.Assert(t, err == nil)
@@ -112,13 +113,13 @@ func TestLongConnPoolReuse(t *testing.T) {
 
 	count = make(map[net.Conn]int)
 	for i := 0; i < 10; i++ {
-		c, err := p.Get(nil, "tcp", addr1, opt)
+		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
 		err = p.Put(c)
 		test.Assert(t, err == nil)
 		count[c]++
 
-		c, err = p.Get(nil, "tcp", addr2, opt)
+		c, err = p.Get(context.TODO(), "tcp", addr2, opt)
 		test.Assert(t, err == nil)
 		err = p.Put(c)
 		test.Assert(t, err == nil)
@@ -129,7 +130,7 @@ func TestLongConnPoolReuse(t *testing.T) {
 	// test exceed idleTime
 	count = make(map[net.Conn]int)
 	for i := 0; i < 3; i++ {
-		c, err := p.Get(nil, "tcp", addr1, opt)
+		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
 		err = p.Put(c)
 		test.Assert(t, err == nil)
@@ -156,7 +157,7 @@ func TestLongConnPoolMaxIdle(t *testing.T) {
 	var conns []net.Conn
 	count := make(map[net.Conn]int)
 	for i := 0; i < 10; i++ {
-		c, err := p.Get(nil, "tcp", addr, opt)
+		c, err := p.Get(context.TODO(), "tcp", addr, opt)
 		test.Assert(t, err == nil)
 		count[c]++
 		conns = append(conns, c)
@@ -169,7 +170,7 @@ func TestLongConnPoolMaxIdle(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		c, err := p.Get(nil, "tcp", addr, opt)
+		c, err := p.Get(context.TODO(), "tcp", addr, opt)
 		test.Assert(t, err == nil)
 		count[c]++
 	}
@@ -193,12 +194,12 @@ func TestLongConnPoolGlobalMaxIdle(t *testing.T) {
 	var conns []net.Conn
 	count := make(map[net.Conn]int)
 	for i := 0; i < 10; i++ {
-		c, err := p.Get(nil, "tcp", addr1, opt)
+		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
 		count[c]++
 		conns = append(conns, c)
 
-		c, err = p.Get(nil, "tcp", addr2, opt)
+		c, err = p.Get(context.TODO(), "tcp", addr2, opt)
 		test.Assert(t, err == nil)
 		count[c]++
 		conns = append(conns, c)
@@ -211,11 +212,11 @@ func TestLongConnPoolGlobalMaxIdle(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		c, err := p.Get(nil, "tcp", addr1, opt)
+		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
 		count[c]++
 
-		c, err = p.Get(nil, "tcp", addr2, opt)
+		c, err = p.Get(context.TODO(), "tcp", addr2, opt)
 		test.Assert(t, err == nil)
 		count[c]++
 	}
@@ -247,7 +248,7 @@ func TestLongConnPoolCloseOnDiscard(t *testing.T) {
 	addr := mockAddr1
 	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
-	c, err := p.Get(nil, "tcp", addr, opt)
+	c, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
@@ -259,7 +260,7 @@ func TestLongConnPoolCloseOnDiscard(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
-	c2, err := p.Get(nil, "tcp", addr, opt)
+	c2, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, c == c2)
 	test.Assert(t, !closed)
@@ -268,7 +269,7 @@ func TestLongConnPoolCloseOnDiscard(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, closed)
 
-	c3, err := p.Get(nil, "tcp", addr, opt)
+	c3, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, c3 != c2)
 	test.Assert(t, closed)
@@ -307,7 +308,7 @@ func TestLongConnPoolCloseOnError(t *testing.T) {
 	addr := mockAddr1
 	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
-	c, err := p.Get(nil, "tcp", addr, opt)
+	c, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
@@ -320,7 +321,7 @@ func TestLongConnPoolCloseOnError(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
-	c2, err := p.Get(nil, "tcp", addr, opt)
+	c2, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, c == c2)
 	test.Assert(t, !closed)
@@ -329,7 +330,7 @@ func TestLongConnPoolCloseOnError(t *testing.T) {
 	test.Assert(t, err != nil)
 	test.Assert(t, !closed)
 
-	c3, err := p.Get(nil, "tcp", addr, opt)
+	c3, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, c2 != c3)
 }
@@ -356,7 +357,7 @@ func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
 	addr := mockAddr1
 	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
-	c, err := p.Get(nil, "tcp", addr, opt)
+	c, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
@@ -366,7 +367,7 @@ func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 2)
 
-	c2, err := p.Get(nil, "tcp", addr, opt)
+	c2, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, c != c2)
 	test.Assert(t, closed)
@@ -400,7 +401,7 @@ func TestLongConnPoolCloseOnClean(t *testing.T) {
 	addr := mockAddr1
 	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
-	c, err := p.Get(nil, "tcp", addr, opt)
+	c, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	mu.RLock()
 	test.Assert(t, !closed)
@@ -442,7 +443,7 @@ func TestLongConnPoolDiscardUnknownConnection(t *testing.T) {
 	}
 
 	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
-	c, err := p.Get(nil, network, address, opt)
+	c, err := p.Get(context.TODO(), network, address, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
@@ -477,12 +478,13 @@ func TestConnPoolClose(t *testing.T) {
 	}
 
 	network, address := "tcp", mockAddr0
-	conn, err := p.Get(nil, network, address, &dialer.ConnOption{Dialer: d})
+	conn, err := p.Get(context.TODO(), network, address, &dialer.ConnOption{Dialer: d})
 	test.Assert(t, err == nil)
 	p.Put(conn)
 
 	network, address = "tcp", mockAddr1
-	_, err = p.Get(nil, network, address, &dialer.ConnOption{Dialer: d})
+	_, err = p.Get(context.TODO(), network, address, &dialer.ConnOption{Dialer: d})
+	test.Assert(t, err == nil)
 	p.Put(conn)
 
 	connCount := 0
@@ -526,7 +528,7 @@ func TestLongConnPoolPutUnknownConnection(t *testing.T) {
 	}
 
 	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
-	c, err := p.Get(nil, network, address, opt)
+	c, err := p.Get(context.TODO(), network, address, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
@@ -559,7 +561,7 @@ func BenchmarkLongPoolGetOne(b *testing.B) {
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			p.Get(nil, "tcp", mockAddr1, opt)
+			p.Get(context.TODO(), "tcp", mockAddr1, opt)
 		}
 	})
 }
@@ -584,7 +586,7 @@ func BenchmarkLongPoolGetRand2000(b *testing.B) {
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			p.Get(nil, "tcp", addrs[rand.Intn(2000)], opt)
+			p.Get(context.TODO(), "tcp", addrs[rand.Intn(2000)], opt)
 		}
 	})
 }
@@ -609,7 +611,7 @@ func BenchmarkLongPoolGetRand2000Mesh(b *testing.B) {
 	b.ReportAllocs()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			p.Get(nil, "tcp", addrs[rand.Intn(2000)], opt)
+			p.Get(context.TODO(), "tcp", addrs[rand.Intn(2000)], opt)
 		}
 	})
 }

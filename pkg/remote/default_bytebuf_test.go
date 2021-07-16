@@ -37,6 +37,7 @@ func TestDefaultByteBuffer(t *testing.T) {
 
 	buf4 := NewReaderWriterBuffer(-1)
 	b, err := buf3.Bytes()
+	test.Assert(t, err == nil, err)
 	var n int
 	n, err = buf4.AppendBuffer(buf3)
 	test.Assert(t, err == nil)
@@ -75,6 +76,7 @@ func checkWritable(t *testing.T, buf ByteBuffer) {
 	test.Assert(t, l == len(msg))
 	l, err = buf.Write([]byte(msg))
 	test.Assert(t, err == nil, err)
+	test.Assert(t, l == len(msg))
 	err = buf.Flush()
 	test.Assert(t, err == nil, err)
 	var n int
@@ -113,6 +115,7 @@ func checkReadable(t *testing.T, buf ByteBuffer) {
 	n, err = buf.Read(p)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, string(p) == msg)
+	test.Assert(t, n == 11, n)
 }
 
 func checkUnwritable(t *testing.T, buf ByteBuffer) {
