@@ -14,5 +14,5 @@
  * limitations under the License.
  */
 
-// Package http2 transport powered by netpoll
+// Package nphttp2 transport powered by netpoll
 package nphttp2

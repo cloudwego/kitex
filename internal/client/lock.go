@@ -54,6 +54,7 @@ func (cl *ConfigLocks) Merge(c2 *ConfigLocks) {
 	}
 }
 
+// Zero ConfigLocks clear
 func (cl *ConfigLocks) Zero() {
 	cl.Bits = 0
 	for k := range cl.Tags {

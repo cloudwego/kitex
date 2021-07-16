@@ -200,11 +200,11 @@ func (p *MockReqArgs) Unmarshal(in []byte) error {
 	return nil
 }
 
-var STServiceTestObjReqArgs_Req_DEFAULT *MockReq
+var STServiceTestObjReqArgsReqDEFAULT *MockReq
 
 func (p *MockReqArgs) GetReq() *MockReq {
 	if !p.IsSetReq() {
-		return STServiceTestObjReqArgs_Req_DEFAULT
+		return STServiceTestObjReqArgsReqDEFAULT
 	}
 	return p.Req
 }

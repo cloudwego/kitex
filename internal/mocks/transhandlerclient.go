@@ -67,18 +67,18 @@ func (t *MockCliTransHandler) OnMessage(ctx context.Context, args, result remote
 	return nil
 }
 
-// 新连接建立时触发，主要用于服务端，对用netpoll onPrepare
+// OnActive 新连接建立时触发，主要用于服务端，对用netpoll onPrepare
 func (t *MockCliTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	// ineffective now and do nothing
 	return ctx, nil
 }
 
-// 连接关闭时回调
+// OnInactive 连接关闭时回调
 func (t *MockCliTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	// ineffective now and do nothing
 }
 
-// 传输层扩展中panic 回调
+// OnError 传输层扩展中panic 回调
 func (t *MockCliTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	if pe, ok := err.(*kerrors.DetailedError); ok {
 		t.opt.Logger.Errorf("KITEX: send request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
