@@ -72,7 +72,9 @@ type Retryer interface {
 //	  opts = append(opts, client.WithMiddleware(cbs.ServiceCBMW()))
 func NewRetryContainerWithCB(cc *circuitbreak.Control, cp circuitbreaker.Panel) *Container {
 	return &Container{
-		cbContainer: &cbContainer{cbCtl: cc, cbPanel: cp}, retryerMap: sync.Map{}}
+		cbContainer: &cbContainer{cbCtl: cc, cbPanel: cp}, retryerMap: sync.Map{},
+		logger: klog.DefaultLogger(),
+	}
 }
 
 // NewRetryContainerWithCBStat build Container that need to do circuit breaker statistic.
@@ -82,7 +84,9 @@ func NewRetryContainerWithCB(cc *circuitbreak.Control, cp circuitbreaker.Panel) 
 //    retry.NewRetryContainerWithCBStat(cbs.ServiceControl(), cbs.ServicePanel())
 func NewRetryContainerWithCBStat(cc *circuitbreak.Control, cp circuitbreaker.Panel) *Container {
 	return &Container{
-		cbContainer: &cbContainer{cbCtl: cc, cbPanel: cp, cbStat: true}, retryerMap: sync.Map{}}
+		cbContainer: &cbContainer{cbCtl: cc, cbPanel: cp, cbStat: true}, retryerMap: sync.Map{},
+		logger: klog.DefaultLogger(),
+	}
 }
 
 // NewRetryContainer build Container that need to build circuit breaker and do circuit breaker statistic.

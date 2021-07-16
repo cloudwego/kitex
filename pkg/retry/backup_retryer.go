@@ -115,6 +115,11 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 			}
 			timer.Reset(r.retryDelay)
 		case panicErr := <-done:
+			if err != nil && errors.Is(err, kerrors.ErrRPCFinish) {
+				// To ignore resp concurrent write, the later response won't do decode and return ErrRPCFinish.
+				// But if the cost of decode is long, ErrRPCFinish will return before previous normal call.
+				continue
+			}
 			atomic.StoreInt32(&abort, 1)
 			if panicErr != nil {
 				err = panicErr

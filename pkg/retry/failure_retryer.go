@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/circuitbreak"
@@ -122,6 +123,9 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			}
 			callStart = time.Now()
 			callCosts.WriteByte(',')
+			if respOp, ok := ctx.Value(CtxRespOp).(*int32); ok {
+				atomic.StoreInt32(respOp, OpNo)
+			}
 		}
 		callTimes++
 		cRI, err = rpcCall(ctx, r)

@@ -246,7 +246,7 @@ func checkRPCState(ctx context.Context) error {
 	if respOp, ok := ctx.Value(retry.CtxRespOp).(*int32); ok {
 		if !atomic.CompareAndSwapInt32(respOp, retry.OpNo, retry.OpDoing) {
 			// previous call is being handling or done
-			// this flag is used to check request status in retry scene
+			// this flag is used to check request status in retry(backup request) scene
 			return kerrors.ErrRPCFinish
 		}
 	}
