@@ -75,7 +75,7 @@ func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implements the Retryer interface.
-func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request interface{}) (recycleRI bool, err error) {
+func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request interface{}) (bool, error) {
 	r.RLock()
 	defer r.RUnlock()
 	var callTimes int32 = 0
@@ -93,12 +93,22 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	doCall := true
 	for i := 0; ; {
 		if doCall {
+			doCall = false
 			i++
 			gofunc.GoFunc(ctx, func() {
 				if atomic.LoadInt32(&abort) == 1 {
 					return
 				}
-				defer recoverFunc(ctx, firstRI, r.logger, done)
+				var err error
+				defer func() {
+					if panicInfo := recover(); panicInfo != nil {
+						err = panicToErr(ctx, panicInfo, firstRI, r.logger)
+					}
+					select {
+					case done <- err:
+					default:
+					}
+				}()
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
 				_, err = rpcCall(ctx, r)
@@ -110,20 +120,17 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 		}
 		select {
 		case <-timer.C:
-			if _, ok := r.ShouldRetry(ctx, err, i, request, cbKey); !ok || i > retryTimes {
-				doCall = false
+			if _, ok := r.ShouldRetry(ctx, nil, i, request, cbKey); ok && i <= retryTimes {
+				doCall = true
+				timer.Reset(r.retryDelay)
 			}
-			timer.Reset(r.retryDelay)
-		case panicErr := <-done:
+		case err := <-done:
 			if err != nil && errors.Is(err, kerrors.ErrRPCFinish) {
 				// To ignore resp concurrent write, the later response won't do decode and return ErrRPCFinish.
 				// But if the cost of decode is long, ErrRPCFinish will return before previous normal call.
 				continue
 			}
 			atomic.StoreInt32(&abort, 1)
-			if panicErr != nil {
-				err = panicErr
-			}
 			recordRetryInfo(firstRI, atomic.LoadInt32(&callTimes), callCosts.String())
 			return false, err
 		}
