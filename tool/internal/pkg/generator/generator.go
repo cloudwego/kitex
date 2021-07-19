@@ -35,7 +35,6 @@ const (
 
 	BuildFileName     = "build.sh"
 	BootstrapFileName = "bootstrap.sh"
-	ConfigFileName    = "kitex.yml"
 	HandlerFileName   = "handler.go"
 	MainFileName      = "main.go"
 	ClientFileName    = "client.go"
@@ -223,11 +222,6 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 			Name: BootstrapFileName,
 			Path: filepath.Join(g.OutputPath, "script", BootstrapFileName),
 			Text: tpl.BootstrapTpl,
-		},
-		{
-			Name: ConfigFileName,
-			Path: filepath.Join(g.OutputPath, "conf", ConfigFileName),
-			Text: tpl.ConfigTpl,
 		},
 	}
 	if !g.Config.GenerateInvoker {
