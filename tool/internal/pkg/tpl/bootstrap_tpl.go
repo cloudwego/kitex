@@ -26,7 +26,6 @@ else
 fi
 
 export KITEX_RUNTIME_ROOT=$RUNTIME_ROOT
-export KITEX_CONF_DIR="$CURDIR/conf"
 export KITEX_LOG_DIR="$RUNTIME_ROOT/log"
 
 if [ ! -d "$KITEX_LOG_DIR/app" ]; then
