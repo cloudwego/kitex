@@ -102,7 +102,7 @@ func NewOptions(opts []Option) *Options {
 		Events: event.NewQueue(event.MaxEventNum),
 
 		TracerCtl:  &internal_stats.Controller{},
-		StatsLevel: stats.LevelDetailed,
+		StatsLevel: stats.LevelDisabled,
 		Registry:   registry.NoopRegistry,
 	}
 	ApplyOptions(opts, o)
