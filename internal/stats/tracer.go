@@ -61,6 +61,10 @@ func (c *Controller) DoFinish(ctx context.Context, ri rpcinfo.RPCInfo, err error
 	}
 }
 
+func (c *Controller) HasTracer() bool {
+	return c != nil && len(c.tracers) > 0
+}
+
 func (c *Controller) tryRecover(logger klog.FormatLogger) {
 	if err := recover(); err != nil {
 		logger.Warnf("Panic happened during tracer call. This doesn't affect the rpc call, but may lead to lack of monitor data such as metrics and logs: %s, %s", err, string(debug.Stack()))
