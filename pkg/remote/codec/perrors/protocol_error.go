@@ -37,14 +37,14 @@ const (
 var InvalidDataLength = NewProtocolErrorWithType(InvalidData, "Invalid data length")
 
 type protocolException struct {
-	typeId  int
+	typeID  int
 	message string
 	rawErr  error
 }
 
 // TypeId implements the ProtocolError interface.
 func (p *protocolException) TypeId() int {
-	return p.typeId
+	return p.typeID
 }
 
 // String implements the ProtocolError interface.
@@ -75,7 +75,7 @@ func NewProtocolError(err error) error {
 	if e, ok := err.(ProtocolError); ok {
 		return e
 	}
-	return &protocolException{typeId: UnknownProtocolError, message: err.Error(), rawErr: err}
+	return &protocolException{typeID: UnknownProtocolError, message: err.Error(), rawErr: err}
 }
 
 // NewProtocolErrorWithErrMsg to build protocolException with rawErr and errMsg
@@ -86,17 +86,17 @@ func NewProtocolErrorWithErrMsg(err error, errMsg string) error {
 	if e, ok := err.(ProtocolError); ok {
 		return e
 	}
-	return &protocolException{typeId: UnknownProtocolError, message: errMsg, rawErr: err}
+	return &protocolException{typeID: UnknownProtocolError, message: errMsg, rawErr: err}
 }
 
 // NewProtocolErrorWithMsg to build protocolException with errMsg
 func NewProtocolErrorWithMsg(errMsg string) error {
-	return &protocolException{typeId: UnknownProtocolError, message: errMsg}
+	return &protocolException{typeID: UnknownProtocolError, message: errMsg}
 }
 
 // NewProtocolErrorWithType to build protocolException with errType and errMsg
 func NewProtocolErrorWithType(errType int, errMsg string) ProtocolError {
-	return &protocolException{typeId: errType, message: errMsg}
+	return &protocolException{typeID: errType, message: errMsg}
 }
 
 // IsProtocolError to assert if the err is ProtocolError which has TypeId() func

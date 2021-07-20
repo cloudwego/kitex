@@ -208,9 +208,8 @@ func getValidData(methodName string, message remote.Message) (interface{}, error
 		if err, isError := data.(error); isError {
 			encodeErr := thrift.NewTApplicationException(remote.InternalError, err.Error())
 			return encodeErr, nil
-		} else {
-			return nil, errors.New("exception relay need error type data")
 		}
+		return nil, errors.New("exception relay need error type data")
 	}
 	encodeErr := thrift.NewTApplicationException(transErr.TypeID(), transErr.Error())
 	return encodeErr, nil

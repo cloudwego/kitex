@@ -144,7 +144,7 @@ func WithErrorHandler(f func(error) error) Option {
 	}}
 }
 
-// AddBoundHandler adds remote.BoundHandler for server.
+// WithBoundHandler adds remote.BoundHandler for server.
 func WithBoundHandler(h remote.BoundHandler) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("AddBoundHandler(%T)", h))

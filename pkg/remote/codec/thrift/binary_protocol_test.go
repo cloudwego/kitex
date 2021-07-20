@@ -195,10 +195,10 @@ func TestConst(t *testing.T) {
 
 	n := 0
 	err := prot.WriteBool(false)
-	n += 1
+	n++
 	test.Assert(t, err == nil, err)
 	err = prot.WriteByte(0x1)
-	n += 1
+	n++
 	test.Assert(t, err == nil, err)
 	err = prot.WriteI16(0x2)
 	n += 2

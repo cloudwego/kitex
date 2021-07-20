@@ -16,7 +16,7 @@
 
 package server
 
-// RegisterRunHook add hook which is executed after the server starts.
+// RegisterStartHook add hook which is executed after the server starts.
 func RegisterStartHook(h func()) {
 	onServerStart.add(h)
 }
