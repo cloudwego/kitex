@@ -64,7 +64,7 @@ func (t *MockSvrTransHandler) Write(ctx context.Context, conn net.Conn, send rem
 	return
 }
 
-// 阻塞等待
+// Read 阻塞等待
 func (t *MockSvrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
 	if t.ReadFunc != nil {
 		return t.ReadFunc(ctx, conn, msg)
@@ -77,18 +77,18 @@ func (t *MockSvrTransHandler) OnMessage(ctx context.Context, args, result remote
 	return nil
 }
 
-// 新连接建立时触发，主要用于服务端，对用netpoll onPrepare
+// OnActive 新连接建立时触发，主要用于服务端，对用netpoll onPrepare
 func (t *MockSvrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	// ineffective now and do nothing
 	return ctx, nil
 }
 
-// 连接关闭时回调
+// OnInactive 连接关闭时回调
 func (t *MockSvrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	// ineffective now and do nothing
 }
 
-// 传输层扩展中panic 回调
+// OnError 传输层扩展中panic 回调
 func (t *MockSvrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	if pe, ok := err.(*kerrors.DetailedError); ok {
 		t.Opt.Logger.Errorf("KITEX: send request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())

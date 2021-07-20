@@ -43,7 +43,7 @@ func TestTTHeaderCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode
-	var recvMsg = initRecvMsg()
+	recvMsg := initRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
@@ -68,7 +68,7 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode
-	var recvMsg = initRecvMsg()
+	recvMsg := initRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
@@ -98,7 +98,7 @@ func BenchmarkTTHeaderCodec(b *testing.B) {
 		test.Assert(b, err == nil, err)
 
 		// decode
-		var recvMsg = initRecvMsg()
+		recvMsg := initRecvMsg()
 		buf, err := out.Bytes()
 		test.Assert(b, err == nil, err)
 		in := remote.NewReaderBuffer(buf)
@@ -128,7 +128,7 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 			test.Assert(b, err == nil, err)
 
 			// decode
-			var recvMsg = initRecvMsg()
+			recvMsg := initRecvMsg()
 			buf, err := out.Bytes()
 			test.Assert(b, err == nil, err)
 			in := remote.NewReaderBuffer(buf)
@@ -161,7 +161,7 @@ func BenchmarkTTHeaderCodecParallel(b *testing.B) {
 			test.Assert(b, err == nil, err)
 
 			// decode
-			var recvMsg = initRecvMsg()
+			recvMsg := initRecvMsg()
 			buf, err := out.Bytes()
 			test.Assert(b, err == nil, err)
 			in := remote.NewReaderBuffer(buf)
@@ -185,7 +185,7 @@ func initSendMsg(tp transport.Protocol) remote.Message {
 	svcInfo := mocks.ServiceInfo()
 	ink := rpcinfo.NewInvocation("", "mock")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	var msg = remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
+	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
 }
@@ -216,6 +216,7 @@ func prepareStrKVInfo() map[string]string {
 
 //// TODO 是否提供buf.writeInt8/16/32方法，否则得先计算，然后malloc，最后write，待确认频繁malloc是否有影响
 // 暂时不删除，测试一次malloc, 和多次malloc差异
+//lint:ignore U1000 until encode2 is used
 func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBuf remote.ByteBuffer, out remote.ByteBuffer) error {
 	tm := message.TransInfo()
 

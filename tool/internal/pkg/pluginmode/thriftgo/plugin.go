@@ -75,7 +75,7 @@ func Run() int {
 
 	if conv.Config.GenerateMain {
 		if len(conv.Services) == 0 {
-			return conv.fail(errors.New("No service defined in the IDL"))
+			return conv.fail(errors.New("no service defined in the IDL"))
 		}
 		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
 		fs, err := gen.GenerateMainPackage(&conv.Package)

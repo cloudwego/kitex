@@ -23,7 +23,10 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
+// WithFramedTransport to use framed transport
+//
 // Deprecated: Use WithTransportProtocol(transport.Framed) instead.
+//
 // IMPORTANT: this option will be deleted in the future!!!
 func WithFramedTransport() Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
@@ -33,6 +36,7 @@ func WithFramedTransport() Option {
 }
 
 // WithConnMetric to enable reporting connection pool stats.
+//
 // Deprecated: Use WithConnReporterEnabled instead.
 func WithConnMetric() Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {

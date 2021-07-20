@@ -49,7 +49,7 @@ type converter struct {
 
 func (c *converter) init(req *plugin.Request) error {
 	if req.Language != "go" {
-		return fmt.Errorf("Expect language to be 'go'. Encountered '%s'", req.Language)
+		return fmt.Errorf("expect language to be 'go'. Encountered '%s'", req.Language)
 	}
 
 	// resotre the arguments for kitex
@@ -64,7 +64,7 @@ func (c *converter) init(req *plugin.Request) error {
 }
 
 func (c *converter) initLogs() backend.LogFunc {
-	var lf = backend.LogFunc{
+	lf := backend.LogFunc{
 		Info: func(v ...interface{}) {},
 		Warn: func(v ...interface{}) {
 			c.Warnings = append(c.Warnings, fmt.Sprint(v...))
@@ -104,7 +104,7 @@ func (c *converter) avoidIncludeConfliction(ast *parser.Thrift, ref string) (*pa
 	for _, inc := range ast.Includes {
 		if filepath.Base(inc.Path) == fn { // will cause include confliction
 			ref = "kitex_faked_idl"
-			var faked = *ast
+			faked := *ast
 			faked.Filename = filepath.Join(filepath.Dir(faked.Filename), ref+".thrift")
 			_, hasNamespace := ast.GetNamespace("go")
 			if !hasNamespace {

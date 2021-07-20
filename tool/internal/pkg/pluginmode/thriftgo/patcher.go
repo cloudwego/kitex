@@ -34,6 +34,7 @@ const kitexUnusedProtection = `
 var KitexUnusedProtection = struct{}{}
 `
 
+//lint:ignore U1000 until protectionInsertionPoint is used
 var protectionInsertionPoint = "KitexUnusedProtection"
 
 type patcher struct {

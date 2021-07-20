@@ -46,7 +46,7 @@ func (ss *StringSlice) Set(value string) error {
 func FormatCode(code []byte) ([]byte, error) {
 	formatCode, err := format.Source(code)
 	if err != nil {
-		return code, fmt.Errorf("Format code error: %s", err)
+		return code, fmt.Errorf("format code error: %s", err)
 	}
 	return formatCode, nil
 }
