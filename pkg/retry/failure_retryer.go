@@ -53,6 +53,8 @@ type failureRetryer struct {
 
 // ShouldRetry implements the Retryer interface.
 func (r *failureRetryer) ShouldRetry(ctx context.Context, err error, callTimes int, request interface{}, cbKey string) (string, bool) {
+	r.RLock()
+	defer r.RUnlock()
 	if !r.enable || !r.isRetryErr(err) {
 		return "", false
 	}
@@ -68,6 +70,8 @@ func (r *failureRetryer) ShouldRetry(ctx context.Context, err error, callTimes i
 
 // AllowRetry implements the Retryer interface.
 func (r *failureRetryer) AllowRetry(ctx context.Context) (string, bool) {
+	r.RLock()
+	defer r.RUnlock()
 	if !r.enable || r.policy.StopPolicy.MaxRetryTimes == 0 {
 		return "", false
 	}
@@ -83,14 +87,15 @@ func (r *failureRetryer) AllowRetry(ctx context.Context) (string, bool) {
 // Do implements the Retryer interface.
 func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request interface{}) (recycleRI bool, err error) {
 	r.RLock()
-	defer r.RUnlock()
-	var callTimes int32
-	var callCosts strings.Builder
 	var maxDuration time.Duration
 	if r.policy.StopPolicy.MaxDurationMS > 0 {
 		maxDuration = time.Duration(r.policy.StopPolicy.MaxDurationMS) * time.Millisecond
 	}
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes
+	r.RUnlock()
+
+	var callTimes int32
+	var callCosts strings.Builder
 	var cRI rpcinfo.RPCInfo
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, request)
 	defer func() {
@@ -155,40 +160,44 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 }
 
 // UpdatePolicy implements the Retryer interface.
-func (r *failureRetryer) UpdatePolicy(rp Policy) error {
-	r.enable = rp.Enable
-	if !r.enable {
+func (r *failureRetryer) UpdatePolicy(rp Policy) (err error) {
+	if !rp.Enable {
+		r.Lock()
+		r.enable = rp.Enable
+		r.Unlock()
 		return nil
 	}
-	r.errMsg = ""
+	var errMsg string
 	if rp.FailurePolicy == nil || rp.Type != FailureType {
-		errMsg := "FailurePolicy is nil or retry type not match, cannot do update in failureRetryer"
-		r.errMsg = errMsg
-		return errors.New(errMsg)
+		errMsg = "FailurePolicy is nil or retry type not match, cannot do update in failureRetryer"
+		err = errors.New(errMsg)
 	}
 	rt := rp.FailurePolicy.StopPolicy.MaxRetryTimes
-	if rt < 0 || rt > maxFailureRetryTimes {
-		errMsg := fmt.Sprintf("invalid failure MaxRetryTimes[%d]", rt)
-		r.errMsg = errMsg
-		return errors.New(errMsg)
+	if errMsg == "" && (rt < 0 || rt > maxFailureRetryTimes) {
+		errMsg = fmt.Sprintf("invalid failure MaxRetryTimes[%d]", rt)
+		err = errors.New(errMsg)
 	}
-	if err := checkCBErrorRate(&rp.FailurePolicy.StopPolicy.CBPolicy); err != nil {
-		rp.FailurePolicy.StopPolicy.CBPolicy.ErrorRate = defaultCBErrRate
-		errMsg := fmt.Sprintf("failureRetryer %s, use default %0.2f", err.Error(), defaultCBErrRate)
-		r.errMsg = errMsg
-		r.logger.Warnf(errMsg)
+	if errMsg == "" {
+		if e := checkCBErrorRate(&rp.FailurePolicy.StopPolicy.CBPolicy); e != nil {
+			rp.FailurePolicy.StopPolicy.CBPolicy.ErrorRate = defaultCBErrRate
+			errMsg = fmt.Sprintf("failureRetryer %s, use default %0.2f", e.Error(), defaultCBErrRate)
+			r.logger.Warnf(errMsg)
+		}
 	}
 	r.Lock()
-	r.policy = rp.FailurePolicy
-	bo, err := initBackOff(rp.FailurePolicy.BackOffPolicy)
+	defer r.Unlock()
+	r.enable = rp.Enable
 	if err != nil {
-		errMsg := fmt.Sprintf("failureRetryer update BackOffPolicy failed, err=%s", err.Error())
 		r.errMsg = errMsg
-		r.logger.Warnf(errMsg)
+		return err
+	}
+	r.policy = rp.FailurePolicy
+	if bo, e := initBackOff(rp.FailurePolicy.BackOffPolicy); e != nil {
+		r.errMsg = fmt.Sprintf("failureRetryer update BackOffPolicy failed, err=%s", e.Error())
+		r.logger.Warnf(r.errMsg)
 	} else {
 		r.backOff = bo
 	}
-	r.Unlock()
 	return nil
 }
 
@@ -207,8 +216,8 @@ func (r *failureRetryer) Prepare(ctx context.Context, prevRI, retryRI rpcinfo.RP
 
 // Dump implements the Retryer interface.
 func (r *failureRetryer) Dump() map[string]interface{} {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	if r.errMsg != "" {
 		return map[string]interface{}{
 			"enable":       r.enable,
