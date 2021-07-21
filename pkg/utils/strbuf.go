@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+//lint:file-ignore SA6002 allocations cannot be avoided
+
 package utils
 
 import (
@@ -22,13 +24,11 @@ import (
 	"sync"
 )
 
-var (
-	intBytesPool = sync.Pool{
-		New: func() interface{} {
-			return make([]byte, 0, 20)
-		},
-	}
-)
+var intBytesPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 0, 20)
+	},
+}
 
 // WriteInt64ToStringBuilder writes a int64 to a strings.Builder.
 func WriteInt64ToStringBuilder(sb *strings.Builder, value int64) {

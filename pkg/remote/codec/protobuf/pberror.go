@@ -48,7 +48,7 @@ func (p *pbError) IsSetError() bool {
 
 func (p *pbError) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetError() {
-		return out, fmt.Errorf("No errProto in pbError")
+		return out, fmt.Errorf("no errProto in pbError")
 	}
 	return proto.Marshal(p.errProto)
 }

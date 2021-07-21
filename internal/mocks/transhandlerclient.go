@@ -54,7 +54,7 @@ func (t *MockCliTransHandler) Write(ctx context.Context, conn net.Conn, send rem
 	return
 }
 
-// 阻塞等待
+// Read 阻塞等待
 func (t *MockCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
 	if t.ReadFunc != nil {
 		return t.ReadFunc(ctx, conn, msg)
@@ -62,6 +62,7 @@ func (t *MockCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remot
 	return
 }
 
+// OnMessage .
 func (t *MockCliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
 	// do nothing
 	return nil

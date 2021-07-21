@@ -109,8 +109,7 @@ const (
 	InfoIDACLToken    InfoIDType = 0x11
 )
 
-type ttHeader struct {
-}
+type ttHeader struct{}
 
 func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (totalLenField []byte, err error) {
 	// 1. header meta
@@ -278,20 +277,14 @@ func readKVInfo(idx int, buf []byte, message remote.Message) error {
 		case InfoIDPadding:
 			continue
 		case InfoIDKeyValue:
-			has, err := readStrKVInfo(&idx, buf, strInfo)
+			_, err := readStrKVInfo(&idx, buf, strInfo)
 			if err != nil {
 				return err
-			}
-			if !has {
-				continue
 			}
 		case InfoIDIntKeyValue:
-			has, err := readIntKVInfo(&idx, buf, intInfo)
+			_, err := readIntKVInfo(&idx, buf, intInfo)
 			if err != nil {
 				return err
-			}
-			if !has {
-				continue
 			}
 		case InfoIDACLToken:
 			err = skipACLToken(&idx, buf)
@@ -392,8 +385,8 @@ func getProtocolID(pi remote.ProtocolInfo) ProtocolID {
 func checkProtocalID(protoID uint8, message remote.Message) error {
 	switch protoID {
 	case uint8(ProtocolIDProtobufKitex):
-		//rpcCfg := internal.AsMutableRPCConfig(message.RPCInfo().Config())
-		//rpcCfg.SetCodecType(kitex.TTHeaderProtobufKitex)
+		// rpcCfg := internal.AsMutableRPCConfig(message.RPCInfo().Config())
+		// rpcCfg.SetCodecType(kitex.TTHeaderProtobufKitex)
 	case uint8(ProtocolIDThriftBinary):
 	default:
 		return fmt.Errorf("unsupport ProtocolID[%d]", protoID)
@@ -413,11 +406,11 @@ func checkProtocalID(protoID uint8, message remote.Message) error {
  * |                                                                |
  * +----------------------------------------------------------------+
  */
-type meshHeader struct {
-}
+type meshHeader struct{}
 
+//lint:ignore U1000 until encode is used
 func (m meshHeader) encode(ctx context.Context, message remote.Message, payloadBuf remote.ByteBuffer, out remote.ByteBuffer) error {
-	// do nothing, kitex just supprt decode meshHeader, encode protocol depend on the payload
+	// do nothing, kitex just support decode meshHeader, encode protocol depend on the payload
 	return nil
 }
 

@@ -37,9 +37,11 @@ import (
 	"github.com/cloudwego/kitex/server/genericserver"
 )
 
-var reqMsg = "Hello Kitex"
-var respMsg = "Hi, I am Kitex"
-var errResp = "Test Error"
+var (
+	reqMsg  = "Hello Kitex"
+	respMsg = "Hi, I am Kitex"
+	errResp = "Test Error"
+)
 
 func newGenericClient(psm string, g generic.Generic, targetIPPort string) genericclient.Client {
 	var opts []client.Option
@@ -63,8 +65,7 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 }
 
 // GenericServiceImpl ...
-type GenericServiceImpl struct {
-}
+type GenericServiceImpl struct{}
 
 // GenericCall ...
 func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
@@ -76,8 +77,7 @@ func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, req
 }
 
 // GenericServiceErrorImpl ...
-type GenericServiceErrorImpl struct {
-}
+type GenericServiceErrorImpl struct{}
 
 // GenericCall ...
 func (g *GenericServiceErrorImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
@@ -85,8 +85,7 @@ func (g *GenericServiceErrorImpl) GenericCall(ctx context.Context, method string
 }
 
 // GenericServiceMockImpl ...
-type GenericServiceMockImpl struct {
-}
+type GenericServiceMockImpl struct{}
 
 // GenericCall ...
 func (g *GenericServiceMockImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
@@ -103,7 +102,7 @@ func (g *GenericServiceMockImpl) GenericCall(ctx context.Context, method string,
 		return nil, fmt.Errorf("msg is not %s", reqMsg)
 	}
 
-	var resp = respMsg
+	resp := respMsg
 	result := kt.NewMockTestResult()
 	result.Success = &resp
 
@@ -111,7 +110,7 @@ func (g *GenericServiceMockImpl) GenericCall(ctx context.Context, method string,
 	return buf, err
 }
 
-// normal server
+// NewMockServer normal server
 func NewMockServer(handler kt.Mock, addr net.Addr, opts ...server.Option) server.Server {
 	var options []server.Option
 	opts = append(opts, server.WithServiceAddr(addr))
@@ -166,8 +165,7 @@ func testHandler(ctx context.Context, handler interface{}, arg, result interface
 }
 
 // MockImpl is used for test
-type MockImpl struct {
-}
+type MockImpl struct{}
 
 // Test ...
 func (m *MockImpl) Test(ctx context.Context, req *kt.MockReq) (r string, err error) {
@@ -179,7 +177,7 @@ func (m *MockImpl) Test(ctx context.Context, req *kt.MockReq) (r string, err err
 
 func genBinaryResp(method string) []byte {
 	idx := 0
-	var buf = make([]byte, 12+len(method)+len(respMsg))
+	buf := make([]byte, 12+len(method)+len(respMsg))
 	binary.BigEndian.PutUint32(buf, thrift.VERSION_1)
 	idx += 4
 	binary.BigEndian.PutUint32(buf[idx:idx+4], uint32(len(method)))
