@@ -178,7 +178,9 @@ func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Cont
 	rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, method)
 	ctx = kc.applyCallOptions(ctx, cfg.ImmutableView(), rmt)
 	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
-	rpcStats.SetLevel(kc.opt.StatsLevel)
+	if kc.opt.StatsLevel != nil {
+		rpcStats.SetLevel(*kc.opt.StatsLevel)
+	}
 
 	// Export read-only views to external users.
 	ri := rpcinfo.NewRPCInfo(

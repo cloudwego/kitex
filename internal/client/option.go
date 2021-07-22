@@ -84,7 +84,7 @@ type Options struct {
 	// Observability
 	Logger     klog.FormatLogger
 	TracerCtl  *internal_stats.Controller
-	StatsLevel stats.Level
+	StatsLevel *stats.Level
 
 	// retry policy
 	RetryPolicy    *retry.Policy
@@ -121,8 +121,7 @@ func NewOptions(opts []Option) *Options {
 		Bus:    event.NewEventBus(),
 		Events: event.NewQueue(event.MaxEventNum),
 
-		TracerCtl:  &internal_stats.Controller{},
-		StatsLevel: stats.LevelDetailed,
+		TracerCtl: &internal_stats.Controller{},
 	}
 	o.Apply(opts)
 
@@ -130,6 +129,14 @@ func NewOptions(opts []Option) *Options {
 
 	if o.RetryContainer != nil && o.DebugService != nil {
 		o.DebugService.RegisterProbeFunc(diagnosis.RetryPolicyKey, o.RetryContainer.Dump)
+	}
+
+	if o.StatsLevel == nil {
+		level := stats.LevelDisabled
+		if o.TracerCtl.HasTracer() {
+			level = stats.LevelDetailed
+		}
+		o.StatsLevel = &level
 	}
 	return o
 }
