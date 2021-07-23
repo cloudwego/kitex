@@ -19,6 +19,7 @@ import (
 	"go/build"
 	"go/format"
 	"io/ioutil"
+	logger "log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -87,11 +88,13 @@ func GetGOPATH() string {
 	}
 	// GOPATH not set through environment variables, try to get one by executing "go env GOPATH"
 	output, err := exec.Command("go", "env", "GOPATH").Output()
-	if err == nil {
-		goPath = strings.TrimSpace(string(output))
+	if err != nil {
+		logger.Fatalln(err)
 	}
 
-	if goPath == "" {
+	goPath = strings.TrimSpace(string(output))
+
+	if len(goPath) == 0 {
 		panic("GOPATH not found")
 	}
 	return goPath
