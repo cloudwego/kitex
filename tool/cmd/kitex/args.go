@@ -17,7 +17,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	logger "log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -159,7 +158,8 @@ func (a *arguments) checkServiceName() {
 func (a *arguments) checkPath() {
 	pathToGo, err := exec.LookPath("go")
 	if err != nil {
-		logger.Fatalln(err)
+		log.Warn(err)
+		os.Exit(1)
 	}
 
 	gosrc := filepath.Join(util.GetGOPATH(), "src")
