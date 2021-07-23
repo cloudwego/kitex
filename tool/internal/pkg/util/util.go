@@ -74,13 +74,7 @@ func WriteToFile(filename string, data []byte) {
 
 // GetGOPATH retrieves the GOPATH from environment variables or the `go env` command.
 func GetGOPATH() string {
-	buildContext := build.Default
-	goPath := buildContext.GOPATH
-	if len(goPath) > 0 {
-		return goPath
-	}
-
-	goPath = os.Getenv("GOPATH")
+	goPath := os.Getenv("GOPATH")
 	// If there are many path in GOPATH, pick up the first one.
 	if GoPaths := strings.Split(goPath, ":"); len(GoPaths) > 1 {
 		return GoPaths[0]
@@ -93,6 +87,10 @@ func GetGOPATH() string {
 	}
 
 	goPath = strings.TrimSpace(string(output))
+	if len(goPath) == 0 {
+		buildContext := build.Default
+		goPath = buildContext.GOPATH
+	}
 
 	if len(goPath) == 0 {
 		panic("GOPATH not found")
