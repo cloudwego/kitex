@@ -150,7 +150,7 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
 ## 相关项目
 - [Netpoll](https://github.com/cloudwego/netpoll): 自研的高性能网络库，Kitex 默认集成的。
 - [kitex-contrib](https://github.com/kitex-contrib)：Kitex 的部分扩展库，使用者可以根据需求通过 Option 集成进 Kitex 中。
-- [Example](TODO)：Kitex 的使用示例。
+- [Example](https://github.com/cloudwego/kitex-examples)：Kitex 的使用示例。
 
 ## 相关文章
 
