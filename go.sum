@@ -15,8 +15,8 @@ github.com/cloudwego/netpoll v0.0.2 h1:YIFcR1aN59/nof3KGqOnfjNWCiWr98xfD19J3QYpC
 github.com/cloudwego/netpoll v0.0.2/go.mod h1:rZOiNI0FYjuvNybXKKhAPUja03loJi/cdv2F55AE6E8=
 github.com/cloudwego/netpoll-http2 v0.0.4 h1:pN4uqjklPdvuALd3nFH5UFlmxB7vy7t8MkvKaV8HavU=
 github.com/cloudwego/netpoll-http2 v0.0.4/go.mod h1:iFr5SzJCXIYgBg0ubL0fZiCQ6W36s9p0KjXpV04lmoY=
-github.com/cloudwego/thriftgo v0.0.1 h1:anQDkYKoQVV14a451KBRX4YELXa5hUUUOtTFf0SW72c=
-github.com/cloudwego/thriftgo v0.0.1/go.mod h1:LzeafuLSiHA9JTiWC8TIMIq64iadeObgRUhmVG1OC/w=
+github.com/cloudwego/thriftgo v0.0.2-0.20210726073420-0145861fcd04 h1:xrb9zM079RW/DgxuOWF9/MdD0b3sM1W76BN7SxJW+vo=
+github.com/cloudwego/thriftgo v0.0.2-0.20210726073420-0145861fcd04/go.mod h1:LzeafuLSiHA9JTiWC8TIMIq64iadeObgRUhmVG1OC/w=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
