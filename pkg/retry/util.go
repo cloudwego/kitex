@@ -95,7 +95,7 @@ func circuitBreakerStop(ctx context.Context, policy StopPolicy, cbC *cbContainer
 	metricer := cbC.cbPanel.GetMetricer(cbKey)
 	errRate := metricer.ErrorRate()
 	sample := metricer.Samples()
-	if metricer.ErrorRate() < policy.CBPolicy.ErrorRate || sample < policy.CBPolicy.MinSample {
+	if metricer.ErrorRate() < policy.CBPolicy.ErrorRate  {
 		return false, ""
 	}
 	return true, fmt.Sprintf("retry circuit break, errRate=%0.2f, sample=%d", errRate, sample)
