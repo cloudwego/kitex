@@ -73,15 +73,11 @@ type StopPolicy struct {
 	CBPolicy         CBPolicy `json:"cb_policy"`
 }
 
-const (
-	defaultCBErrRate   = 0.1
-	defaultCBMinSample = 200
-)
+const defaultCBErrRate = 0.1
 
 // CBPolicy is the circuit breaker policy
 type CBPolicy struct {
 	ErrorRate float64 `json:"error_rate"`
-	MinSample int64   `json:"min_sample"`
 }
 
 // BackOffPolicy is the BackOff policy.
@@ -197,9 +193,6 @@ func (p *BackOffPolicy) Equals(np *BackOffPolicy) bool {
 func checkCBErrorRate(p *CBPolicy) error {
 	if p.ErrorRate <= 0 || p.ErrorRate > 0.3 {
 		return fmt.Errorf("invalid retry circuit breaker rate, errRate=%0.2f", p.ErrorRate)
-	}
-	if p.MinSample <= 0 {
-		p.MinSample = defaultCBMinSample
 	}
 	return nil
 }

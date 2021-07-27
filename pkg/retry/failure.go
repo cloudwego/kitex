@@ -33,7 +33,6 @@ func NewFailurePolicy() *FailurePolicy {
 			DisableChainStop: false,
 			CBPolicy: CBPolicy{
 				ErrorRate: defaultCBErrRate,
-				MinSample: defaultCBMinSample,
 			},
 		},
 		BackOffPolicy: &BackOffPolicy{BackOffType: NoneBackOffType},

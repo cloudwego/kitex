@@ -174,14 +174,13 @@ func TestRetryPolicyFailure(t *testing.T) {
 		Enable:        true,
 		FailurePolicy: NewFailurePolicy(),
 	}
-	jsonRet, err := jsoni.MarshalToString(p)
-	test.Assert(t, err == nil, err)
-
+	jsonRet := `{"enable":true,"type":0,"failure_policy":{"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1,"min_sample":200}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false}}`
 	var p2 Policy
-	err = jsoni.UnmarshalFromString(jsonRet, &p2)
+	err := jsoni.UnmarshalFromString(jsonRet, &p2)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, p2.Enable)
 	test.Assert(t, p.Equals(p2))
+	test.Assert(t, p.FailurePolicy.StopPolicy.CBPolicy.ErrorRate == 0.1)
 
 	ri := genRPCInfo()
 	rc := Container{}
