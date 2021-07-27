@@ -123,7 +123,7 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("default codec read failed: %s", err.Error()))
 	}
 
-	if err = checkRPCState(ctx); err != nil {
+	if err = checkRPCState(ctx, message); err != nil {
 		// there is one call has finished in retry task, it doesn't need to do decode for this call
 		return err
 	}
@@ -242,7 +242,10 @@ func isThriftFramedBinary(flagBuf []byte) bool {
 	return binary.BigEndian.Uint32(flagBuf[Size32:])&MagicMask == ThriftV1Magic
 }
 
-func checkRPCState(ctx context.Context) error {
+func checkRPCState(ctx context.Context, message remote.Message) error {
+	if message.RPCRole() == remote.Server {
+		return nil
+	}
 	if respOp, ok := ctx.Value(retry.CtxRespOp).(*int32); ok {
 		if !atomic.CompareAndSwapInt32(respOp, retry.OpNo, retry.OpDoing) {
 			// previous call is being handling or done

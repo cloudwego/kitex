@@ -95,7 +95,7 @@ func circuitBreakerStop(ctx context.Context, policy StopPolicy, cbC *cbContainer
 	metricer := cbC.cbPanel.GetMetricer(cbKey)
 	errRate := metricer.ErrorRate()
 	sample := metricer.Samples()
-	if metricer.ErrorRate() < policy.CBPolicy.ErrorRate  {
+	if metricer.ErrorRate() < policy.CBPolicy.ErrorRate {
 		return false, ""
 	}
 	return true, fmt.Sprintf("retry circuit break, errRate=%0.2f, sample=%d", errRate, sample)
@@ -133,17 +133,6 @@ func makeRetryErr(ctx context.Context, msg string, callTimes int32) error {
 		errMsg = fmt.Sprintf("%s, %s", errMsg, ctxErr)
 	}
 	return kerrors.ErrRetry.WithCause(errors.New(errMsg))
-}
-
-func recoverFunc(ctx context.Context, ri rpcinfo.RPCInfo, logger klog.FormatLogger, done chan error) {
-	var err error
-	if panicInfo := recover(); panicInfo != nil {
-		err = panicToErr(ctx, panicInfo, ri, logger)
-	}
-	select {
-	case done <- err:
-	default:
-	}
 }
 
 func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo, logger klog.FormatLogger) error {

@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -100,13 +99,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, request)
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
-			err = fmt.Errorf("KITEX: panic in retry, remote[to_psm=%s|method=%s], err=%v\n%s",
-				firstRI.To().ServiceName(), firstRI.To().Method(), panicInfo, debug.Stack())
-			if l, ok := r.logger.(klog.CtxLogger); ok {
-				l.CtxErrorf(ctx, "%s", err.Error())
-			} else {
-				r.logger.Errorf("%s", err.Error())
-			}
+			err = panicToErr(ctx, panicInfo, firstRI, r.logger)
 		}
 	}()
 	startTime := time.Now()
