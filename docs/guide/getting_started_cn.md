@@ -25,26 +25,40 @@ thriftgo 0.0.1
 ### 获取示例代码
 
 1. 你可以直接点击[此处](https://github.com/cloudwego/kitex-examples/archive/refs/heads/main.zip)下载示例仓库
-2. 也可以克隆该示例仓库到本地 `git clone -b v0.0.1 https://github.com/cloudwego/kitex-examples.git`
+2. 也可以克隆该示例仓库到本地 `git clone https://github.com/cloudwego/kitex-examples.git`
 
 ### 运行示例代码
 
+#### 直接启动
+
+1. 进入示例仓库的 `hello` 目录
+
+   `cd examples/hello`
+
+2. 运行server
+
+   `go run .`
+
+3. 运行client
+
+   另起一个终端后，`go run ./client`
+
+#### 使用 Docker 快速启动
+
 1. 进入示例仓库目录
-    ```bash
-    cd examples
-    ```
+   
+   `cd examples`
+   
 2. 编译项目
-    ```bash
-    docker build -t kitex-examples .
-    ```
+   
+   `docker build -t kitex-examples .`
 3. 运行 server
-    ```bash
-    docker run --network host kitex-examples hello-server
-    ```
+   
+   `docker run --network host kitex-examples ./hello-server`
+   
 4. 运行 client
-    ```bash
-    docker run --network host kitex-examples hello-client
-    ```
+
+   另起一个终端后，`docker run --network host kitex-examples ./hello-client`
 
 恭喜你，你现在成功通过 Kitex 发起了 RPC 调用。
 
