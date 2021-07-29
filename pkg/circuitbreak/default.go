@@ -31,16 +31,20 @@ func ErrorTypeOnServiceLevel(ctx context.Context, request, response interface{},
 			kerrors.ErrServiceDiscovery:  TypeIgnorable,
 			kerrors.ErrACL:               TypeIgnorable,
 			kerrors.ErrLoadbalance:       TypeIgnorable,
+			kerrors.ErrRPCFinish:         TypeIgnorable,
 			kerrors.ErrCircuitBreak:      TypeFailure,
 			kerrors.ErrGetConnection:     TypeFailure,
 			kerrors.ErrNoMoreInstance:    TypeFailure,
-			kerrors.ErrRemoteOrNetwork:   TypeFailure,
 			kerrors.ErrRPCTimeout:        TypeTimeout,
 		}
 		for e, t := range errTypes {
 			if errors.Is(err, e) {
 				return t
 			}
+		}
+		if errors.Is(err, kerrors.ErrRemoteOrNetwork) {
+			// ErrRemoteOrNetwork may wrap other errors, it need check as last one
+			return TypeFailure
 		}
 	}
 	return TypeSuccess
