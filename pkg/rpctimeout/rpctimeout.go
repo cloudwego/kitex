@@ -65,9 +65,10 @@ func MiddlewareBuilder(moreTimeout time.Duration) endpoint.MiddlewareBuilder {
 				gofunc.GoFunc(ctx, func() {
 					defer recoverFunc(ctx, logger, ri, done)
 					err = next(ctx, request, response)
-					if err != nil && ctx.Err() != nil {
+					if err != nil && ctx.Err() != nil && !errors.Is(err, kerrors.ErrRPCFinish) {
 						// error occurs after the wait goroutine returns,
 						// we should log this error or it will be discarded.
+						// Specially, ErrRPCFinish can be ignored, it happens in retry scene, previous call returns first.
 						var errMsg string
 						if ri.To().Address() != nil {
 							errMsg = fmt.Sprintf("KITEX: remote[to_psm=%s|method=%s|addr=%s]，err=%s",
