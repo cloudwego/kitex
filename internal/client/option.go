@@ -145,8 +145,16 @@ func NewOptions(opts []Option) *Options {
 
 func (o *Options) initConnectionPool() {
 	if o.RemoteOpt.ConnPool == nil {
-		o.RemoteOpt.ConnPool = connpool.NewLongPool(o.Svr.ServiceName,
-			connpool2.IdleConfig{MaxIdlePerAddress: 10, MaxIdleGlobal: 100, MaxIdleTimeout: time.Minute})
+		if o.PoolCfg != nil {
+			var zero connpool2.IdleConfig
+			if *o.PoolCfg == zero {
+				o.RemoteOpt.ConnPool = connpool.NewShortPool(o.Svr.ServiceName)
+			} else {
+				o.RemoteOpt.ConnPool = connpool.NewLongPool(o.Svr.ServiceName, *o.PoolCfg)
+			}
+		} else {
+			o.RemoteOpt.ConnPool = connpool.NewLongPool(o.Svr.ServiceName, connpool2.IdleConfig{MaxIdlePerAddress: 10, MaxIdleGlobal: 100, MaxIdleTimeout: time.Minute})
+		}
 	}
 	pool := o.RemoteOpt.ConnPool
 	o.CloseCallbacks = append(o.CloseCallbacks, pool.Close)
