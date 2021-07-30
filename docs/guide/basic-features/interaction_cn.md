@@ -2,21 +2,21 @@
 
 ## 协议支持
 
-目前 Kitex 支持的交互模式和协议列表
+目前 Kitex 支持的交互方式和协议列表
 
-|模式\支持|编码协议|传输层协议|
+|模式\支持|编码协议|传输协议|
 |--------|-------|--------|
-|Pingpong|thrift/protobuf|thrift/gRPC|
-|Oneway|thrift/protobuf|thrift|
-|Streaming|protobuf|gRPC|
+|PingPong|Thrift / Protobuf| None / [TTHeader](../extension/codec_cn.md) / HTTP2(gRPC)|
+|Oneway|Thrift| None / [TTHeader](../extension/codec_cn.md) |
+|Streaming|Protobuf|HTTP2(gRPC)|
 
-- Pingpong  发起一个请求等待一个响应
+- PingPong  发起一个请求等待一个响应
 - Oneway 发起一个请求不等待一个响应
 - Streaming 发起一个或多个请求, 等待一个或多个响应
 
 ## Thrift
 
-由于 thrift 协议的限制, 目前 thrift 协议只支持 pingpong 和 oneway, thrift streaming 正在设计和开发中, 不过由于对于 thrift 有侵入性, 需要谨慎考虑向后兼容性.
+目前 Thrift 支持 PingPong 和 Oneway 交互方式。Kitex 计划支持 Thrift Streaming。
 
 ### Example
 
@@ -81,7 +81,7 @@ func main() {
 }
 ```
 
-#### Pingpong
+#### PingPong
 
 Client 侧代码:
 
@@ -135,15 +135,16 @@ func main() {
 }
 ```
 
-### 总结
-
-Pingpong 和 Oneway 是 thrift rpc 中最常见的使用方式, 使用起来比较直观, Oneway 的时候只是没有 Response 返回.
-
 ## Protobuf
 
-Protobuf 的传输即可以在 thrift 传输层协议上使用, 同样的我们也支持 gRPC 传输协议.
+  Kitex 对 Protobuf 支持的协议有两种：
+  
+  - Kitex Protobuf - 只支持 PingPong，若 IDL 定义了 stream 方法，将默认使用 gRPC 协议
+        
+  - gRPC协议 - 可以与 gRPC 互通，与 gRPC service 定义相同，支持 Unary(PingPong)、 Streaming 调用
 
 ### Example
+以下给出 Streaming 的使用示例。
 
 idl 定义:
 
@@ -339,7 +340,3 @@ func main() {
     } 
 }
 ```
-
-## 总结
-
-Pingpong 和 Oneway 是我们经常使用的交互模式, Streaming 的使用场景相对较复杂.
