@@ -45,7 +45,7 @@ Kitex 大部分服务治理模块都是通过 middleware 集成，熔断也是�
 
 在进行 RPC 调用时，下游服务难免会出错；
 
-当下游出现问题时，如果上游继续对其进行调用，既妨碍gst了下游的恢复，也浪费了上游的资源；
+当下游出现问题时，如果上游继续对其进行调用，既妨碍了下游的恢复，也浪费了上游的资源；
 
 为了解决这个问题，你可以设置一些动态开关，当下游出错时，手动的关闭对下游的调用；
 
@@ -53,7 +53,7 @@ Kitex 大部分服务治理模块都是通过 middleware 集成，熔断也是�
 
 这里是一篇更详细的[熔断器介绍](https://msdn.microsoft.com/zh-cn/library/dn589784.aspx)。
 
-比较出名的熔断器当属 hystrix 了，这里是它的[设计文档](https：//github.com/Netflix/Hystrix/wiki)。
+比较出名的熔断器当属 hystrix 了，这里是它的[设计文档](https://github.com/Netflix/Hystrix/wiki)。
 
 ## 熔断策略
 

@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/thriftgo/generator/golang"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/plugin"
+	"github.com/cloudwego/thriftgo/semantic"
 
 	"github.com/cloudwego/kitex/tool/internal/pkg/generator"
 	internal_log "github.com/cloudwego/kitex/tool/internal/pkg/log"
@@ -49,7 +50,7 @@ type converter struct {
 
 func (c *converter) init(req *plugin.Request) error {
 	if req.Language != "go" {
-		return fmt.Errorf("Expect language to be 'go'. Encountered '%s'", req.Language)
+		return fmt.Errorf("expect language to be 'go'. Encountered '%s'", req.Language)
 	}
 
 	// resotre the arguments for kitex
@@ -64,7 +65,7 @@ func (c *converter) init(req *plugin.Request) error {
 }
 
 func (c *converter) initLogs() backend.LogFunc {
-	var lf = backend.LogFunc{
+	lf := backend.LogFunc{
 		Info: func(v ...interface{}) {},
 		Warn: func(v ...interface{}) {
 			c.Warnings = append(c.Warnings, fmt.Sprint(v...))
@@ -99,12 +100,12 @@ func (c *converter) fail(err error) int {
 	return exit(res)
 }
 
-func (c *converter) avoidIncludeConfliction(ast *parser.Thrift, ref string) (*parser.Thrift, string) {
+func (c *converter) avoidIncludeConflict(ast *parser.Thrift, ref string) (*parser.Thrift, string) {
 	fn := filepath.Base(ast.Filename)
 	for _, inc := range ast.Includes {
-		if filepath.Base(inc.Path) == fn { // will cause include confliction
+		if filepath.Base(inc.Path) == fn { // will cause include conflict
 			ref = "kitex_faked_idl"
-			var faked = *ast
+			faked := *ast
 			faked.Filename = filepath.Join(filepath.Dir(faked.Filename), ref+".thrift")
 			_, hasNamespace := ast.GetNamespace("go")
 			if !hasNamespace {
@@ -120,7 +121,7 @@ func (c *converter) avoidIncludeConfliction(ast *parser.Thrift, ref string) (*pa
 }
 
 func (c *converter) copyTreeWithRef(ast *parser.Thrift, ref string) *parser.Thrift {
-	ast, ref = c.avoidIncludeConfliction(ast, ref)
+	ast, ref = c.avoidIncludeConflict(ast, ref)
 
 	t := &parser.Thrift{
 		Filename: ast.Filename,
@@ -184,7 +185,12 @@ func (c *converter) copyTypeWithRef(t *parser.Type, ref string) (res *parser.Typ
 		}
 	default:
 		if strings.Contains(t.Name, ".") {
-			return t
+			return &parser.Type{
+				Name:        t.Name,
+				KeyType:     t.KeyType,
+				ValueType:   t.ValueType,
+				Annotations: t.Annotations,
+			}
 		}
 		return &parser.Type{
 			Name: ref + "." + t.Name,
@@ -205,14 +211,12 @@ func (c *converter) getImports(t *parser.Type) (res []generator.PkgInfo) {
 		res = append(res, c.getImports(t.ValueType)...)
 		return res
 	default:
-		if strings.Contains(t.Name, ".") {
-			ref := c.Utils.SearchReference(t.Name)
-			if ref != nil {
-				res = append(res, generator.PkgInfo{
-					PkgRefName: ref.Package,
-					ImportPath: ref.Import,
-				})
-			}
+		if ref := t.GetReference(); ref != nil {
+			inc := c.Utils.RootScope().Includes().ByIndex(int(ref.GetIndex()))
+			res = append(res, generator.PkgInfo{
+				PkgRefName: inc.PackageName,
+				ImportPath: inc.ImportPath,
+			})
 		}
 		return
 	}
@@ -293,11 +297,21 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 
 	c.svc2ast = make(map[*generator.ServiceInfo]*parser.Thrift)
 	for ast := range req.AST.DepthFirstSearch() {
-		ref, pkg, pth, _ := c.Utils.ParseNamespace(ast)
+		ref, pkg, pth := c.Utils.ParseNamespace(ast)
 
 		// make the current ast as an include to produce correct type references.
 		fake := c.copyTreeWithRef(ast, ref)
-		scope, err := c.Utils.BuildScope(fake)
+		fake.Name2Category = nil
+		if err := semantic.ResolveSymbols(fake); err != nil {
+			return fmt.Errorf("resolve fakse ast '%s': %w", ast.Filename, err)
+		}
+		used := true
+		fake.ForEachInclude(func(v *parser.Include) bool {
+			v.Used = &used // mark all includes used to force renaming for conflict IDLs in thriftgo
+			return true
+		})
+
+		scope, err := golang.BuildScope(c.Utils, fake)
 		if err != nil {
 			return fmt.Errorf("build scope for fake ast '%s': %w", ast.Filename, err)
 		}
@@ -308,8 +322,8 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 			ImportPath: filepath.Join(c.Config.PackagePrefix, pth),
 		}
 
-		for i, svc := range ast.Services {
-			si, err := c.makeService(pi, fake.Services[i])
+		for _, svc := range scope.Services() {
+			si, err := c.makeService(pi, svc)
 			if err != nil {
 				return fmt.Errorf("%s: makeService '%s': %w", ast.Filename, svc.Name, err)
 			}
@@ -320,7 +334,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 		for i, svc := range ast.Services {
 			if len(svc.Extends) > 0 {
 				si := all[ast.Filename][i]
-				parts := splitType(svc.Extends)
+				parts := semantic.SplitType(svc.Extends)
 				switch len(parts) {
 				case 1:
 					si.Base = all.findService(ast, parts[0])
@@ -370,20 +384,15 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 	return nil
 }
 
-func (c *converter) identify(name string) string {
-	name, _ = c.Utils.Identify(name)
-	return name
-}
-
-func (c *converter) makeService(pkg generator.PkgInfo, svc *parser.Service) (*generator.ServiceInfo, error) {
+func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*generator.ServiceInfo, error) {
 	si := &generator.ServiceInfo{
 		PkgInfo:        pkg,
-		ServiceName:    c.identify(svc.Name),
+		ServiceName:    svc.GoName().String(),
 		RawServiceName: svc.Name,
 	}
 	si.ServiceTypeName = func() string { return si.PkgRefName + "." + si.ServiceName }
 
-	for _, f := range svc.Functions {
+	for _, f := range svc.Functions() {
 		if strings.HasPrefix(f.Name, "_") {
 			continue
 		}
@@ -396,67 +405,49 @@ func (c *converter) makeService(pkg generator.PkgInfo, svc *parser.Service) (*ge
 	return si, nil
 }
 
-func (c *converter) makeMethod(si *generator.ServiceInfo, f *parser.Function) (*generator.MethodInfo, error) {
+func (c *converter) makeMethod(si *generator.ServiceInfo, f *golang.Function) (*generator.MethodInfo, error) {
 	mi := &generator.MethodInfo{
 		PkgInfo:            si.PkgInfo,
 		ServiceName:        si.ServiceName,
-		Name:               c.identify(f.Name),
+		Name:               f.GoName().String(),
 		RawName:            f.Name,
 		Oneway:             f.Oneway,
 		Void:               f.Void,
-		ArgStructName:      c.identify(c.Utils.GetArgTypeName(si.RawServiceName, f)),
-		ResStructName:      c.identify(c.Utils.GetResTypeName(si.RawServiceName, f)),
+		ArgStructName:      f.ArgType().GoName().String(),
 		GenArgResultStruct: false,
 	}
 
+	if !f.Oneway {
+		mi.ResStructName = f.ResType().GoName().String()
+	}
 	if !f.Void {
-		typeName, err := c.Utils.ResolveTypeName(f.FunctionType)
-		if err != nil {
-			return nil, fmt.Errorf("makeMethod '%s': %w", f.Name, err)
-		}
+		typeName := f.ResponseGoTypeName().String()
 		mi.Resp = &generator.Parameter{
 			Deps: c.getImports(f.FunctionType),
 			Type: typeName,
 		}
-		successTypeName, _ := c.Utils.ResolveFieldTypeName(&parser.Field{
-			ID:           0,
-			Name:         "success",
-			Requiredness: parser.FieldType_Optional,
-			Type:         f.FunctionType,
-		})
-		mi.IsResponseNeedRedirect = "*"+typeName == successTypeName
+		mi.IsResponseNeedRedirect = "*"+typeName == f.ResType().Fields()[0].GoTypeName().String()
 	}
 
-	for _, a := range f.Arguments {
-		arg, err := c.makeParameter(a.Name, a.Type)
-		if err != nil {
-			return nil, err
+	for _, a := range f.Arguments() {
+		arg := &generator.Parameter{
+			Deps:    c.getImports(a.Type),
+			Name:    f.ArgType().Field(a.Name).GoName().String(),
+			RawName: a.GoName().String(),
+			Type:    a.GoTypeName().String(),
 		}
 		mi.Args = append(mi.Args, arg)
 	}
-	for _, t := range f.Throws {
-		ex, err := c.makeParameter(t.Name, t.Type)
-		if err != nil {
-			return nil, err
+	for _, t := range f.Throws() {
+		ex := &generator.Parameter{
+			Deps:    c.getImports(t.Type),
+			Name:    f.ResType().Field(t.Name).GoName().String(),
+			RawName: t.GoName().String(),
+			Type:    t.GoTypeName().String(),
 		}
 		mi.Exceptions = append(mi.Exceptions, ex)
 	}
 	return mi, nil
-}
-
-func (c *converter) makeParameter(name string, t *parser.Type) (*generator.Parameter, error) {
-	typeName, err := c.Utils.ResolveTypeName(t)
-	if err != nil {
-		return nil, fmt.Errorf("makeParameter %s: %w", name, err)
-	}
-
-	param := &generator.Parameter{
-		Deps:    c.getImports(t),
-		Name:    c.identify(name),
-		RawName: c.Utils.ParamName(name),
-		Type:    typeName,
-	}
-	return param, nil
 }
 
 func (c *converter) persist(res *plugin.Response) error {
@@ -490,15 +481,4 @@ func (c *converter) getCombineServiceName(name string, svcs []*generator.Service
 		}
 	}
 	return name
-}
-
-func splitType(id string) []string {
-	if id == "" {
-		return []string{}
-	}
-	idx := strings.LastIndex(id, ".")
-	if idx == -1 {
-		return []string{id}
-	}
-	return []string{id[:idx], id[idx+1:]}
 }

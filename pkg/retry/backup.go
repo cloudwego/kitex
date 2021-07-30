@@ -35,7 +35,6 @@ func NewBackupPolicy(delayMS uint32) *BackupPolicy {
 			DisableChainStop: false,
 			CBPolicy: CBPolicy{
 				ErrorRate: defaultCBErrRate,
-				MinSample: defaultCBMinSample,
 			},
 		},
 	}

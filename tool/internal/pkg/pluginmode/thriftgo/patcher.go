@@ -19,10 +19,12 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
 
 	"github.com/cloudwego/thriftgo/generator/golang"
+	"github.com/cloudwego/thriftgo/generator/golang/common"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/plugin"
 
@@ -34,6 +36,7 @@ const kitexUnusedProtection = `
 var KitexUnusedProtection = struct{}{}
 `
 
+//lint:ignore U1000 until protectionInsertionPoint is used
 var protectionInsertionPoint = "KitexUnusedProtection"
 
 type patcher struct {
@@ -64,6 +67,12 @@ func (p *patcher) buildTemplates() error {
 		sort.Strings(res)
 		return
 	}
+	m["Str"] = func(id int32) string {
+		if id < 0 {
+			return "_" + strconv.Itoa(-int(id))
+		}
+		return strconv.Itoa(int(id))
+	}
 
 	tpl := template.New("kitex").Funcs(m)
 	for _, txt := range allTemplates {
@@ -80,7 +89,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 	protection := make(map[string]*plugin.Generated)
 
 	for ast := range req.AST.DepthFirstSearch() {
-		scope, err := p.utils.BuildScope(ast)
+		scope, err := golang.BuildScope(p.utils, ast)
 		if err != nil {
 			return nil, fmt.Errorf("build scope for ast %q: %w", ast.Filename, err)
 		}
@@ -89,10 +98,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		namespace := ast.GetNamespaceOrReferenceName("go")
 		pkgName := p.utils.NamespaceToPackage(namespace)
 
-		path, err := p.utils.GetFilePath(ast)
-		if err != nil {
-			return nil, err
-		}
+		path := p.utils.GetFilePath(ast)
 		full := filepath.Join(req.OutputPath, path)
 		dir, base := filepath.Split(full)
 		target := filepath.Join(dir, "k-"+base)
@@ -110,8 +116,12 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		}
 
 		buf.Reset()
-		data := &golang.Data{AST: ast, PkgName: pkgName}
-		data.Imports, err = p.utils.ResolveImports()
+		data := &struct {
+			Scope   *golang.Scope
+			PkgName string
+			Imports map[string]string
+		}{Scope: scope, PkgName: pkgName}
+		data.Imports, err = scope.ResolveImports()
 		if err != nil {
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
 		}
@@ -139,11 +149,11 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 	return
 }
 
-func (p *patcher) filterBase(ast *parser.Thrift) interface{} {
-	var req, res []*parser.StructLike
-	for _, s := range ast.GetStructLike() {
-		for _, f := range s.Fields {
-			fn, _ := p.utils.Unexport(f.Name)
+func (p *patcher) filterBase(ast *golang.Scope) interface{} {
+	var req, res []*golang.StructLike
+	for _, s := range ast.StructLikes() {
+		for _, f := range s.Fields() {
+			fn, _ := common.Unexport(f.Name)
 			tn := f.Type.Name
 			if fn == "base" && tn == "base.Base" {
 				req = append(req, s)
@@ -154,22 +164,18 @@ func (p *patcher) filterBase(ast *parser.Thrift) interface{} {
 		}
 	}
 	return &struct {
-		Requests  []*parser.StructLike
-		Responses []*parser.StructLike
+		Requests  []*golang.StructLike
+		Responses []*golang.StructLike
 	}{Requests: req, Responses: res}
 }
 
-func (p *patcher) reorderStructFields(fields []*parser.Field) ([]*parser.Field, error) {
-	fixedLengthFields := make(map[*parser.Field]bool, len(fields))
+func (p *patcher) reorderStructFields(fields []*golang.Field) ([]*golang.Field, error) {
+	fixedLengthFields := make(map[*golang.Field]bool, len(fields))
 	for _, field := range fields {
-		ok, err := p.utils.IsFixedLengthType(field.Type)
-		if err != nil {
-			return nil, err
-		}
-		fixedLengthFields[field] = ok
+		fixedLengthFields[field] = golang.IsFixedLengthType(field.Type)
 	}
 
-	sortedFields := make([]*parser.Field, 0, len(fields))
+	sortedFields := make([]*golang.Field, 0, len(fields))
 	for _, v := range fields {
 		if fixedLengthFields[v] {
 			sortedFields = append(sortedFields, v)
@@ -203,13 +209,8 @@ func (p *patcher) filterStdLib(imports map[string]string) {
 	}
 }
 
-func (p *patcher) isBinaryOrStringType(t *parser.Type) (ok bool, err error) {
-	ok, err = p.utils.IsBinaryType(t)
-	if err != nil || ok {
-		return
-	}
-	ok, err = p.utils.IsStringType(t)
-	return
+func (p *patcher) isBinaryOrStringType(t *parser.Type) bool {
+	return t.Category.IsBinary() || t.Category.IsString()
 }
 
 var typeIDToGoType = map[string]string{

@@ -160,8 +160,8 @@ func WithTracer(c stats.Tracer) Option {
 func WithStatsLevel(level stats.Level) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithStatsLevel(%+v)", level))
-
-		o.StatsLevel = level
+		l := level
+		o.StatsLevel = &l
 	}}
 }
 

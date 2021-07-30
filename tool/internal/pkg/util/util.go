@@ -16,6 +16,7 @@ package util
 
 import (
 	"fmt"
+	"go/build"
 	"go/format"
 	"io/ioutil"
 	"os"
@@ -46,7 +47,7 @@ func (ss *StringSlice) Set(value string) error {
 func FormatCode(code []byte) ([]byte, error) {
 	formatCode, err := format.Source(code)
 	if err != nil {
-		return code, fmt.Errorf("Format code error: %s", err)
+		return code, fmt.Errorf("format code error: %s", err)
 	}
 	return formatCode, nil
 }
@@ -73,20 +74,28 @@ func WriteToFile(filename string, data []byte) {
 
 // GetGOPATH retrieves the GOPATH from environment variables or the `go env` command.
 func GetGOPATH() string {
-	GoPath := os.Getenv("GOPATH")
+	goPath := os.Getenv("GOPATH")
 	// If there are many path in GOPATH, pick up the first one.
-	if GoPaths := strings.Split(GoPath, ":"); len(GoPaths) > 1 {
+	if GoPaths := strings.Split(goPath, ":"); len(GoPaths) > 1 {
 		return GoPaths[0]
 	}
 	// GOPATH not set through environment variables, try to get one by executing "go env GOPATH"
 	output, err := exec.Command("go", "env", "GOPATH").Output()
-	if err == nil {
-		GoPath = strings.TrimSpace(string(output))
+	if err != nil {
+		log.Warn(err)
+		os.Exit(1)
 	}
-	if GoPath == "" {
+
+	goPath = strings.TrimSpace(string(output))
+	if len(goPath) == 0 {
+		buildContext := build.Default
+		goPath = buildContext.GOPATH
+	}
+
+	if len(goPath) == 0 {
 		panic("GOPATH not found")
 	}
-	return GoPath
+	return goPath
 }
 
 // Exists reports whether a file exists.

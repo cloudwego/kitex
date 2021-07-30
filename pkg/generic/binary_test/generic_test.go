@@ -88,6 +88,7 @@ func TestRawThriftBinaryMockReq(t *testing.T) {
 	// encode
 	rc := utils.NewThriftMessageCodec()
 	buf, err := rc.Encode("Test", thrift.CALL, 100, args)
+	test.Assert(t, err == nil, err)
 
 	resp, err := cli.GenericCall(context.Background(), "Test", buf)
 	test.Assert(t, err == nil, err)
@@ -96,6 +97,7 @@ func TestRawThriftBinaryMockReq(t *testing.T) {
 	buf = resp.([]byte)
 	var result kt.MockTestResult
 	method, seqID, err := rc.Decode(buf, &result)
+	test.Assert(t, err == nil, err)
 	test.Assert(t, method == "Test", method)
 	test.Assert(t, seqID != 100, seqID)
 	test.Assert(t, *result.Success == respMsg)
@@ -121,6 +123,7 @@ func TestRawThriftBinary2NormalServer(t *testing.T) {
 	// encode
 	rc := utils.NewThriftMessageCodec()
 	buf, err := rc.Encode("Test", thrift.CALL, 100, args)
+	test.Assert(t, err == nil, err)
 
 	resp, err := cli.GenericCall(context.Background(), "Test", buf, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -129,6 +132,7 @@ func TestRawThriftBinary2NormalServer(t *testing.T) {
 	buf = resp.([]byte)
 	var result kt.MockTestResult
 	method, seqID, err := rc.Decode(buf, &result)
+	test.Assert(t, err == nil, err)
 	test.Assert(t, method == "Test", method)
 	// seqID会在kitex中覆盖，避免TTHeader和Payload codec 不一致问题
 	test.Assert(t, seqID != 100, seqID)

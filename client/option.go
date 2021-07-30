@@ -33,6 +33,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/remote"
+	connpool2 "github.com/cloudwego/kitex/pkg/remote/connpool"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/retry"
@@ -180,14 +181,22 @@ func WithHTTPResolver(r http.Resolver) Option {
 	}}
 }
 
+// WithShortConnection forces kitex to close connection after each call is finished.
+func WithShortConnection() Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push("WithShortConnection")
+
+		o.RemoteOpt.ConnPool = connpool2.NewShortPool(o.Svr.ServiceName)
+	}}
+}
+
 // WithLongConnection enables long connection with kitex's built-in pooling implementation.
 func WithLongConnection(cfg connpool.IdleConfig) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithLongConnection(%+v)", cfg))
 
-		if o.PoolCfg == nil {
-			o.PoolCfg = connpool.CheckPoolConfig(cfg)
-		}
+		o.PoolCfg = connpool.CheckPoolConfig(cfg)
+		o.RemoteOpt.ConnPool = connpool2.NewLongPool(o.Svr.ServiceName, *o.PoolCfg)
 	}}
 }
 
@@ -270,8 +279,8 @@ func WithTracer(c stats.Tracer) Option {
 func WithStatsLevel(level stats.Level) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithStatsLevel(%+v)", level))
-
-		o.StatsLevel = level
+		l := level
+		o.StatsLevel = &l
 	}}
 }
 

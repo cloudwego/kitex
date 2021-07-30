@@ -195,10 +195,10 @@ func TestConst(t *testing.T) {
 
 	n := 0
 	err := prot.WriteBool(false)
-	n += 1
+	n++
 	test.Assert(t, err == nil, err)
 	err = prot.WriteByte(0x1)
-	n += 1
+	n++
 	test.Assert(t, err == nil, err)
 	err = prot.WriteI16(0x2)
 	n += 2
@@ -235,20 +235,28 @@ func TestConst(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	_bool, err := prot.ReadBool()
+	test.Assert(t, err == nil, err)
 	test.Assert(t, _bool == false)
 	_byte, err := prot.ReadByte()
+	test.Assert(t, err == nil, err)
 	test.Assert(t, _byte == 0x1)
 	_i16, err := prot.ReadI16()
+	test.Assert(t, err == nil, err)
 	test.Assert(t, _i16 == 0x2)
 	_i32, err := prot.ReadI32()
+	test.Assert(t, err == nil, err)
 	test.Assert(t, _i32 == 0x3)
 	_i64, err := prot.ReadI64()
+	test.Assert(t, err == nil, err)
 	test.Assert(t, _i64 == 0x4)
 	_double, err := prot.ReadDouble()
+	test.Assert(t, err == nil, err)
 	test.Assert(t, _double == 5.0)
 	_string, err := prot.ReadString()
+	test.Assert(t, err == nil, err)
 	test.Assert(t, _string == "6")
 	_binary, err := prot.ReadBinary()
+	test.Assert(t, err == nil, err)
 	test.Assert(t, len(_binary) == 1)
 	test.Assert(t, _binary[0] == 0x7)
 }

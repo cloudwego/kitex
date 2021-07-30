@@ -54,6 +54,8 @@ type backupRetryer struct {
 
 // ShouldRetry implements the Retryer interface.
 func (r *backupRetryer) ShouldRetry(ctx context.Context, err error, callTimes int, request interface{}, cbKey string) (string, bool) {
+	r.RLock()
+	defer r.RUnlock()
 	if !r.enable {
 		return "", false
 	}
@@ -65,6 +67,8 @@ func (r *backupRetryer) ShouldRetry(ctx context.Context, err error, callTimes in
 
 // AllowRetry implements the Retryer interface.
 func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
+	r.RLock()
+	defer r.RUnlock()
 	if !r.enable || r.policy.StopPolicy.MaxRetryTimes == 0 {
 		return "", false
 	}
@@ -77,53 +81,65 @@ func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
 // Do implements the Retryer interface.
 func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request interface{}) (recycleRI bool, err error) {
 	r.RLock()
-	defer r.RUnlock()
+	retryTimes := r.policy.StopPolicy.MaxRetryTimes
+	retryDelay := r.retryDelay
+	r.RUnlock()
 	var callTimes int32 = 0
 	var callCosts strings.Builder
 	callCosts.Grow(16)
 	var recordCostDoing int32 = 0
 	var abort int32 = 0
-	retryTimes := r.policy.StopPolicy.MaxRetryTimes
-	done := make(chan error, 1)
-	cbKey := ""
-	timer := time.NewTimer(r.retryDelay)
-	defer timer.Stop()
-	defer recoverFunc(ctx, firstRI, r.logger, done)
+	// notice: buff num of chan is very important here, it cannot less than call times, or the below chan receive will block
+	done := make(chan error, retryTimes+1)
+	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, request)
+	timer := time.NewTimer(retryDelay)
+	defer func() {
+		if panicInfo := recover(); panicInfo != nil {
+			err = panicToErr(ctx, panicInfo, firstRI, r.logger)
+		}
+		timer.Stop()
+	}()
 	// include first call, max loop is retryTimes + 1
 	doCall := true
 	for i := 0; ; {
 		if doCall {
+			doCall = false
 			i++
 			gofunc.GoFunc(ctx, func() {
 				if atomic.LoadInt32(&abort) == 1 {
 					return
 				}
-				defer recoverFunc(ctx, firstRI, r.logger, done)
+				var e error
+				defer func() {
+					if panicInfo := recover(); panicInfo != nil {
+						e = panicToErr(ctx, panicInfo, firstRI, r.logger)
+					}
+					done <- e
+				}()
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
-				_, err = rpcCall(ctx, r)
+				_, e = rpcCall(ctx, r)
 				recordCost(ct, callStart, &recordCostDoing, &callCosts)
 				if r.cbContainer.cbStat {
-					if cbKey == "" {
-						cbKey, _ = r.cbContainer.cbCtl.GetKey(ctx, request)
-					}
-					circuitbreak.RecordStat(ctx, request, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
+					circuitbreak.RecordStat(ctx, request, nil, e, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 				}
 			})
 		}
 		select {
 		case <-timer.C:
-			if _, ok := r.ShouldRetry(ctx, err, i, request, cbKey); !ok || i > retryTimes {
-				doCall = false
+			if _, ok := r.ShouldRetry(ctx, nil, i, request, cbKey); ok && i <= retryTimes {
+				doCall = true
+				timer.Reset(retryDelay)
 			}
-			timer.Reset(r.retryDelay)
-		case panicErr := <-done:
+		case e := <-done:
+			if e != nil && errors.Is(e, kerrors.ErrRPCFinish) {
+				// To ignore resp concurrent write, the later response won't do decode and return ErrRPCFinish.
+				// But if the cost of decode is long, ErrRPCFinish will return before previous normal call.
+				continue
+			}
 			atomic.StoreInt32(&abort, 1)
-			if panicErr != nil {
-				err = panicErr
-			}
 			recordRetryInfo(firstRI, atomic.LoadInt32(&callTimes), callCosts.String())
-			return false, err
+			return false, e
 		}
 	}
 }
@@ -134,33 +150,40 @@ func (r *backupRetryer) Prepare(ctx context.Context, prevRI, retryRI rpcinfo.RPC
 }
 
 // UpdatePolicy implements the Retryer interface.
-func (r *backupRetryer) UpdatePolicy(rp Policy) error {
-	r.enable = rp.Enable
-	if !r.enable {
+func (r *backupRetryer) UpdatePolicy(rp Policy) (err error) {
+	if !rp.Enable {
+		r.Lock()
+		r.enable = rp.Enable
+		r.Unlock()
 		return nil
 	}
-	r.errMsg = ""
+	var errMsg string
 	if rp.BackupPolicy == nil || rp.Type != BackupType {
-		errMsg := "BackupPolicy is nil or retry type not match, cannot do update in backupRetryer"
-		r.errMsg = errMsg
-		return errors.New(errMsg)
+		errMsg = "BackupPolicy is nil or retry type not match, cannot do update in backupRetryer"
+		err = errors.New(errMsg)
 	}
-	if rp.BackupPolicy.RetryDelayMS == 0 || rp.BackupPolicy.StopPolicy.MaxRetryTimes < 0 ||
-		rp.BackupPolicy.StopPolicy.MaxRetryTimes > maxBackupRetryTimes {
-		errMsg := "invalid backup request delay duration or retryTimes"
-		r.errMsg = errMsg
-		return errors.New(errMsg)
+	if errMsg == "" && (rp.BackupPolicy.RetryDelayMS == 0 || rp.BackupPolicy.StopPolicy.MaxRetryTimes < 0 ||
+		rp.BackupPolicy.StopPolicy.MaxRetryTimes > maxBackupRetryTimes) {
+		errMsg = "invalid backup request delay duration or retryTimes"
+		err = errors.New(errMsg)
 	}
-	if err := checkCBErrorRate(&rp.BackupPolicy.StopPolicy.CBPolicy); err != nil {
-		rp.BackupPolicy.StopPolicy.CBPolicy.ErrorRate = defaultCBErrRate
-		errMsg := fmt.Sprintf("backupRetryer %s, use default %0.2f", err.Error(), defaultCBErrRate)
-		r.errMsg = errMsg
-		r.logger.Warnf(errMsg)
+	if errMsg == "" {
+		if e := checkCBErrorRate(&rp.BackupPolicy.StopPolicy.CBPolicy); e != nil {
+			rp.BackupPolicy.StopPolicy.CBPolicy.ErrorRate = defaultCBErrRate
+			errMsg = fmt.Sprintf("backupRetryer %s, use default %0.2f", e.Error(), defaultCBErrRate)
+			r.logger.Warnf(errMsg)
+		}
 	}
+
 	r.Lock()
+	defer r.Unlock()
+	r.enable = rp.Enable
+	if err != nil {
+		r.errMsg = errMsg
+		return err
+	}
 	r.policy = rp.BackupPolicy
 	r.retryDelay = time.Duration(rp.BackupPolicy.RetryDelayMS) * time.Millisecond
-	r.Unlock()
 	return nil
 }
 
@@ -174,8 +197,8 @@ func (r *backupRetryer) AppendErrMsgIfNeeded(err error, msg string) {
 
 // Dump implements the Retryer interface.
 func (r *backupRetryer) Dump() map[string]interface{} {
-	r.Lock()
-	defer r.Unlock()
+	r.RLock()
+	defer r.RUnlock()
 	if r.errMsg != "" {
 		return map[string]interface{}{
 			"enable":        r.enable,

@@ -156,11 +156,11 @@ func (b *BalancerFactory) Get(ctx context.Context, target rpcinfo.EndpointInfo) 
 			b:      b,
 			target: desc,
 		}
-		// add self into sharedTicker
-		bl.sharedTicker = getSharedTicker(bl, b.opts.RefreshInterval)
 		// store the res when init
 		bl.res.Store(res)
 		b.cache.Store(desc, bl)
+		// add self into sharedTicker
+		bl.sharedTicker = getSharedTicker(bl, b.opts.RefreshInterval)
 		return bl, nil
 	})
 	if err != nil {

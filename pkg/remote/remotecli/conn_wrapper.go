@@ -65,11 +65,11 @@ func (cm *ConnWrapper) GetConn(ctx context.Context, d remote.Dialer, ri rpcinfo.
 			return rawConn, nil
 		}
 		return cm.conn, nil
-	} else {
-		var err error
-		cm.conn, err = cm.getConnWithDialer(ctx, d, timeout, ri)
-		return cm.conn, err
 	}
+
+	var err error
+	cm.conn, err = cm.getConnWithDialer(ctx, d, timeout, ri)
+	return cm.conn, err
 }
 
 // ReleaseConn should notice that ri may nil when oneway

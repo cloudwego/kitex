@@ -62,37 +62,37 @@ const body = `
 {{define "body"}}
 
 {{if GenerateFastAPIs}}
-{{- range .AST.GetStructLike}}
+{{- range .Scope.StructLikes}}
 {{template "StructLike" .}}
 {{- end}}
 
-{{- range .AST.Services}}
+{{- range .Scope.Services}}
 {{template "Processor" .}}
 {{- end}}
 {{- end}}{{/* if GenerateFastAPIs */}}
 
 {{template "FirstAndResult" .}}
-{{template "GetOrSetBase" .AST}}
+{{template "GetOrSetBase" .Scope}}
 
 {{- end}}{{/* define "body" */}}
 `
 
 const patchFirstAndResult = `
 {{define "FirstAndResult"}}
-{{range $svc := .AST.Services}}
+{{range $svc := .Scope.Services}}
 {{range .Functions}}
-{{$arg := GetArgTypeName $svc.Name . | Identify}}
-{{$res := GetResTypeName $svc.Name . | Identify}}
-func (p *{{$arg}}) GetFirstArgument() interface{} {
-	return {{if .Arguments}}p.{{(index .Arguments 0).Name | Identify}}{{else}}nil{{end}}
+{{$argType := .ArgType}}
+{{$resType := .ResType}}
+func (p *{{$argType.GoName}}) GetFirstArgument() interface{} {
+	return {{if .Arguments}}p.{{(index $argType.Fields 0).GoName}}{{else}}nil{{end}}
 }
 {{if not .Oneway}}
-func (p *{{$res}}) GetResult() interface{} {
+func (p *{{$resType.GoName}}) GetResult() interface{} {
 	return {{if .Void}}nil{{else}}p.Success{{end}}
 }
 {{- end}}{{/* if not .Oneway */}}
 {{- end}}{{/* range Functions */}}
-{{- end}}{{/* range .AST.Service */}}
+{{- end}}{{/* range .Scope.Service */}}
 {{- end}}{{/* define "FristResult" */}}
 `
 
@@ -100,7 +100,7 @@ const patchBase = `
 {{define "GetOrSetBase"}}
 {{$RR := . | FilterBase}}
 {{range $RR.Requests }}
-{{- $TypeName := .Name | Identify}}
+{{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) GetOrSetBase() interface{} {
 	if p.Base == nil {
 		p.Base = base.NewBase()
@@ -110,7 +110,7 @@ func (p *{{$TypeName}}) GetOrSetBase() interface{} {
 {{- end}}{{/* range $RR.Requests */}}
 
 {{range $RR.Responses }}
-{{- $TypeName := .Name | Identify}}
+{{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) GetOrSetBaseResp() interface{} {
 	if p.BaseResp == nil {
 		p.BaseResp = base.NewBaseResp()
@@ -160,9 +160,6 @@ var allTemplates = []string{
 	templates.FieldDeepEqualBase,
 	templates.FieldDeepEqualStructLike,
 	templates.FieldDeepEqualContainer,
-	templates.FieldDeepEqualList,
-	templates.FieldDeepEqualSet,
-	templates.FieldDeepEqualMap,
 	validateSet,
 	processor,
 }

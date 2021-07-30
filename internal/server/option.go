@@ -85,7 +85,7 @@ type Options struct {
 	// Observability
 	Logger     klog.FormatLogger
 	TracerCtl  *internal_stats.Controller
-	StatsLevel stats.Level
+	StatsLevel *stats.Level
 }
 
 // NewOptions creates a default options.
@@ -101,12 +101,18 @@ func NewOptions(opts []Option) *Options {
 		Bus:    event.NewEventBus(),
 		Events: event.NewQueue(event.MaxEventNum),
 
-		TracerCtl:  &internal_stats.Controller{},
-		StatsLevel: stats.LevelDetailed,
-		Registry:   registry.NoopRegistry,
+		TracerCtl: &internal_stats.Controller{},
+		Registry:  registry.NoopRegistry,
 	}
 	ApplyOptions(opts, o)
 	rpcinfo.AsMutableRPCConfig(o.Configs).LockConfig(o.LockBits)
+	if o.StatsLevel == nil {
+		level := stats.LevelDisabled
+		if o.TracerCtl.HasTracer() {
+			level = stats.LevelDetailed
+		}
+		o.StatsLevel = &level
+	}
 	return o
 }
 

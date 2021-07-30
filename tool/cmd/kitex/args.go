@@ -156,8 +156,14 @@ func (a *arguments) checkServiceName() {
 }
 
 func (a *arguments) checkPath() {
+	pathToGo, err := exec.LookPath("go")
+	if err != nil {
+		log.Warn(err)
+		os.Exit(1)
+	}
+
 	gosrc := filepath.Join(util.GetGOPATH(), "src")
-	gosrc, err := filepath.Abs(gosrc)
+	gosrc, err = filepath.Abs(gosrc)
 	if err != nil {
 		log.Warn("Get GOPATH/src path failed:", err.Error())
 		os.Exit(1)
@@ -168,7 +174,7 @@ func (a *arguments) checkPath() {
 		os.Exit(1)
 	}
 
-	if filepath.HasPrefix(curpath, gosrc) {
+	if strings.HasPrefix(curpath, gosrc) {
 		if a.PackagePrefix, err = filepath.Rel(gosrc, curpath); err != nil {
 			log.Warn("Get GOPATH/src relpath failed:", err.Error())
 			os.Exit(1)
@@ -196,7 +202,7 @@ func (a *arguments) checkPath() {
 			}
 			a.PackagePrefix = filepath.Join(a.ModuleName, a.PackagePrefix, generator.KitexGenPath)
 		} else {
-			if err = initGoMod(a.ModuleName); err != nil {
+			if err = initGoMod(pathToGo, a.ModuleName); err != nil {
 				log.Warn("Init go mod failed:", err.Error())
 				os.Exit(1)
 			}
@@ -210,16 +216,13 @@ func (a *arguments) checkPath() {
 	a.OutputPath = curpath
 }
 
-func initGoMod(module string) error {
+func initGoMod(pathToGo, module string) error {
 	if util.Exists("go.mod") {
 		return nil
 	}
-	gg, err := exec.LookPath("go")
-	if err != nil {
-		return err
-	}
+
 	cmd := &exec.Cmd{
-		Path:   gg,
+		Path:   pathToGo,
 		Args:   []string{"go", "mod", "init", module},
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,

@@ -8,9 +8,6 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Check Branch
-        run: ./check_branch_name.sh ${{ github.head_ref }}
-
       - name: Set up Go
         uses: actions/setup-go@v2
         with:

@@ -206,7 +206,6 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 			t.OnError(ctx, err, muxSvrConn)
 			return
 		}
-		return
 	})
 	return nil
 }
@@ -304,7 +303,6 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg r
 	if err != nil {
 		t.opt.Logger.Errorf("KITEX: write error reply failed, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
 	}
-	return
 }
 
 func (t *svrTransHandler) tryRecover(ctx context.Context, conn net.Conn) {

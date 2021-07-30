@@ -119,11 +119,13 @@ func Parse(tree *parser.Thrift) (*descriptor.ServiceDescriptor, error) {
 			Response:       resp,
 			HasRequestBase: hasRequestBase,
 		}
-		for k, v := range fn.Annotations {
-			if handle, ok := descriptor.FindAnnotation(k, v); ok {
-				if nr, ok := handle.(descriptor.NewRoute); ok {
-					sDsc.Router.Handle(nr(v, fnDsc))
-					break
+		for _, ann := range fn.Annotations {
+			for _, v := range ann.GetValues() {
+				if handle, ok := descriptor.FindAnnotation(ann.GetKey(), v); ok {
+					if nr, ok := handle.(descriptor.NewRoute); ok {
+						sDsc.Router.Handle(nr(v, fnDsc))
+						break
+					}
 				}
 			}
 		}
@@ -232,21 +234,23 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 				Required: field.Requiredness == parser.FieldType_Required,
 			}
 
-			for k, v := range field.Annotations {
-				if handle, ok := descriptor.FindAnnotation(k, v); ok {
-					switch h := handle.(type) {
-					case descriptor.NewHTTPMapping:
-						_f.HTTPMapping = h(v)
-					case descriptor.NewValueMapping:
-						_f.ValueMapping = h(v)
-					case descriptor.NewFieldMapping:
-						// excute at compile time
-						h(v).Handle(_f)
-					case nil:
-						// none annotation
-					default:
-						// not supported annotation type
-						return nil, fmt.Errorf("not supported handle type: %T", handle)
+			for _, ann := range field.Annotations {
+				for _, v := range ann.GetValues() {
+					if handle, ok := descriptor.FindAnnotation(ann.GetKey(), v); ok {
+						switch h := handle.(type) {
+						case descriptor.NewHTTPMapping:
+							_f.HTTPMapping = h(v)
+						case descriptor.NewValueMapping:
+							_f.ValueMapping = h(v)
+						case descriptor.NewFieldMapping:
+							// excute at compile time
+							h(v).Handle(_f)
+						case nil:
+							// none annotation
+						default:
+							// not supported annotation type
+							return nil, fmt.Errorf("not supported handle type: %T", handle)
+						}
 					}
 				}
 			}

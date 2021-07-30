@@ -16,7 +16,7 @@
 
 package compress
 
-// zstd  zlib gzip sa
+// Compressor support zstd zlib gzip sa
 type Compressor interface {
 	// Compress writes the data written to wc to w after compressing it.  If an
 	// error occurs while initializing the compressor, that error is returned

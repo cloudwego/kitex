@@ -24,7 +24,6 @@ import (
 	"strconv"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
-
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -93,17 +92,10 @@ func circuitBreakerStop(ctx context.Context, policy StopPolicy, cbC *cbContainer
 	if cbC.cbCtl == nil || cbC.cbPanel == nil {
 		return false, ""
 	}
-	if cbKey == "" {
-		key, enabled := cbC.cbCtl.GetKey(ctx, request)
-		if !enabled {
-			return false, ""
-		}
-		cbKey = key
-	}
 	metricer := cbC.cbPanel.GetMetricer(cbKey)
 	errRate := metricer.ErrorRate()
 	sample := metricer.Samples()
-	if metricer.ErrorRate() < policy.CBPolicy.ErrorRate || sample < policy.CBPolicy.MinSample {
+	if errRate < policy.CBPolicy.ErrorRate {
 		return false, ""
 	}
 	return true, fmt.Sprintf("retry circuit break, errRate=%0.2f, sample=%d", errRate, sample)
@@ -143,25 +135,19 @@ func makeRetryErr(ctx context.Context, msg string, callTimes int32) error {
 	return kerrors.ErrRetry.WithCause(errors.New(errMsg))
 }
 
-func recoverFunc(ctx context.Context, ri rpcinfo.RPCInfo, logger klog.FormatLogger, done chan error) {
-	var e error
-	if panicInfo := recover(); panicInfo != nil {
-		remoteInfo := ""
-		if ri != nil {
-			remoteInfo = fmt.Sprintf(", remote[to_psm=%s|method=%s]", ri.To().ServiceName(), ri.To().Method())
-		}
-		e = fmt.Errorf("KITEX: panic in retry%s, err=%v\n%s",
-			remoteInfo, panicInfo, debug.Stack())
-		if l, ok := logger.(klog.CtxLogger); ok {
-			l.CtxErrorf(ctx, "%s", e.Error())
-		} else {
-			logger.Errorf("%s", e.Error())
-		}
+func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo, logger klog.FormatLogger) error {
+	remoteInfo := ""
+	if ri != nil {
+		remoteInfo = fmt.Sprintf(", remote[to_psm=%s|method=%s]", ri.To().ServiceName(), ri.To().Method())
 	}
-	select {
-	case done <- e:
-	default:
+	err := fmt.Errorf("KITEX: panic in retry%s, err=%v\n%s",
+		remoteInfo, panicInfo, debug.Stack())
+	if l, ok := logger.(klog.CtxLogger); ok {
+		l.CtxErrorf(ctx, "%s", err.Error())
+	} else {
+		logger.Errorf("%s", err.Error())
 	}
+	return err
 }
 
 func appendErrMsg(err error, msg string) {

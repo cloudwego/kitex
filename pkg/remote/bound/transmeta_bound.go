@@ -91,8 +91,7 @@ func getValidMsg(args remote.Message, result remote.Message) (msg remote.Message
 	if args != nil && args.RPCRole() == remote.Server {
 		// server side, read arg
 		return args, true
-	} else {
-		// client side, read result
-		return result, false
 	}
+	// client side, read result
+	return result, false
 }

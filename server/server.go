@@ -108,8 +108,10 @@ func (s *server) initRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCI
 		if ctx == nil {
 			ctx = context.Background()
 		}
-		stats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
-		stats.SetLevel(s.opt.StatsLevel)
+		rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
+		if s.opt.StatsLevel != nil {
+			rpcStats.SetLevel(*s.opt.StatsLevel)
+		}
 
 		// Export read-only views to external users and keep a mapping for internal users.
 		ri := rpcinfo.NewRPCInfo(
@@ -117,7 +119,7 @@ func (s *server) initRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCI
 			rpcinfo.FromBasicInfo(s.opt.Svr),
 			rpcinfo.NewServerInvocation(),
 			rpcinfo.AsMutableRPCConfig(s.opt.Configs).Clone().ImmutableView(),
-			stats.ImmutableView(),
+			rpcStats.ImmutableView(),
 		)
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(rAddr)
 		ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
