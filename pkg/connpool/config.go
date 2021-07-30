@@ -38,5 +38,13 @@ func CheckPoolConfig(config IdleConfig) *IdleConfig {
 	} else if config.MaxIdleTimeout < 3*time.Second {
 		config.MaxIdleTimeout = minMaxIdleTimeout
 	}
+
+	if config.MaxIdlePerAddress <= 0 {
+		config.MaxIdlePerAddress = 1
+	}
+
+	if config.MaxIdleGlobal <= 0 {
+		config.MaxIdleGlobal = 1
+	}
 	return &config
 }

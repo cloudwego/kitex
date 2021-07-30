@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
@@ -133,12 +134,19 @@ func WithDialer(d remote.Dialer) Option {
 	}}
 }
 
-// WithConnPool to set connection pool
+// WithConnPool sets the connection pool.
+// Note that this option can only be specified once. If more
+// than one pool is specified by this option, only the first
+// one will be used.
 func WithConnPool(pool remote.ConnPool) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithConnPool((%T)", pool))
 
-		o.RemoteOpt.ConnPool = pool
+		if o.RemoteOpt.ConnPool == nil {
+			o.RemoteOpt.ConnPool = pool
+		} else {
+			klog.Warnf("The connection pool has been initialized. The call to WithConnPool will not take effect.")
+		}
 	}}
 }
 
