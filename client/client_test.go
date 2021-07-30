@@ -32,6 +32,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 var (
@@ -43,6 +44,9 @@ var (
 		},
 		WriteFunc: func(b []byte) (n int, err error) {
 			return len(b), nil
+		},
+		RemoteAddrFunc: func() (r net.Addr) {
+			return utils.NewNetAddr("tcp", "mock")
 		},
 	}
 	dialer = &remote.SynthesizedDialer{

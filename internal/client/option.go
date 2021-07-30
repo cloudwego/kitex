@@ -18,6 +18,8 @@
 package client
 
 import (
+	"time"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -146,7 +148,8 @@ func (o *Options) initConnectionPool() {
 		if o.PoolCfg != nil {
 			o.RemoteOpt.ConnPool = connpool.NewLongPool(o.Svr.ServiceName, *o.PoolCfg)
 		} else {
-			o.RemoteOpt.ConnPool = connpool.NewShortPool(o.Svr.ServiceName)
+			o.RemoteOpt.ConnPool = connpool.NewLongPool(o.Svr.ServiceName,
+				connpool2.IdleConfig{MaxIdlePerAddress: 10, MaxIdleGlobal: 100, MaxIdleTimeout: time.Minute})
 		}
 	}
 	pool := o.RemoteOpt.ConnPool
