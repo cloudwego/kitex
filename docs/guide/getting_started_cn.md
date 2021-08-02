@@ -1,10 +1,10 @@
 # Getting Started
 
-## 准备Golang开发环境
+## 准备 Golang 开发环境
 
-1. 如果您之前未搭建Golang开发环境, 可以参考[Golang安装](https://golang.org/doc/install)
-2. 推荐使用最新版本的Golang, 或保证现有Golang版本 >= 1.15. 小于1.15版本, 可以自行尝试使用但不保障兼容性和稳定性
-3. 确保打开go mod支持(Golang >= 1.15时，默认开启)
+1. 如果您之前未搭建 Golang 开发环境， 可以参考 [Golang 安装](https://golang.org/doc/install)
+2. 推荐使用最新版本的 Golang， 或保证现有 Golang 版本 >= 1.15。小于1.15版本, 可以自行尝试使用但不保障兼容性和稳定性
+3. 确保打开 go mod 支持( Golang >= 1.15时，默认开启)
 
 ## 快速上手
 
@@ -27,7 +27,7 @@ v1.6.0
 $ thriftgo --version
 thriftgo 0.0.1
 ```
-4. 如果在安装阶段发生问题，可能主要是由于对Golang的不当使用造成，请依照报错信息进行检索
+4. 如果在安装阶段发生问题，可能主要是由于对 Golang 的不当使用造成，请依照报错信息进行检索
 
 ### 获取示例代码
 
