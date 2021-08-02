@@ -1,14 +1,20 @@
 # Getting Started
 
-在完成环境准备后，本章节讲帮助你快速上手 Kitex
+## 准备Golang开发环境
+
+1. 如果您之前未搭建Golang开发环境, 可以参考[Golang安装](https://golang.org/doc/install)
+2. 推荐使用最新版本的Golang, 或保证现有Golang版本 >= 1.15. 小于1.15版本, 可以自行尝试使用但不保障兼容性和稳定性
+3. 确保打开go mod支持(Golang >= 1.15时，默认开启)
 
 ## 快速上手
+
+在完成环境准备后，本章节将帮助你快速上手 Kitex
 
 ### 安装代码生成工具
 
 首先，我们需要安装使用本示例所需要的命令行代码生成工具：
 
-1. 确保 `GOPATH` 环境变量已经被正确地定义（例如 `export GOPATH=~/go`）并且添加到 `PATH` 环境变量之中（例如 `export PATH=$GOPATH/bin:$PATH`）；请勿将 `GOPATH` 设置为当前用户没有读写权限的目录
+1. 确保 `GOPATH` 环境变量已经被正确地定义（例如 `export GOPATH=~/go`）并且将`$GOPATH/bin`添加到 `PATH` 环境变量之中（例如 `export PATH=$GOPATH/bin:$PATH`）；请勿将 `GOPATH` 设置为当前用户没有读写权限的目录
 2. 安装 kitex：`go get github.com/cloudwego/kitex/tool/cmd/kitex@latest`
 3. 安装 thriftgo：`go get github.com/cloudwego/thriftgo@latest`
 
@@ -21,6 +27,7 @@ v1.6.0
 $ thriftgo --version
 thriftgo 0.0.1
 ```
+4. 如果在安装阶段发生问题，可能主要是由于对Golang的不当使用造成，请依照报错信息进行检索
 
 ### 获取示例代码
 
