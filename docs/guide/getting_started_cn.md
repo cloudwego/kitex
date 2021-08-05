@@ -18,14 +18,14 @@
 2. 安装 kitex：`go get github.com/cloudwego/kitex/tool/cmd/kitex@latest`
 3. 安装 thriftgo：`go get github.com/cloudwego/thriftgo@latest`
 
-安装成功后，执行 `kitex --version` 和 `thriftgo --version` 应该能够看到如下的输出（版本号可能有差异）：
+安装成功后，执行 `kitex --version` 和 `thriftgo --version` 应该能够看到具体版本号的输出（版本号有差异，以 x.x.x 示例）：
 
  ```shell
 $ kitex --version
-v1.6.0
+vx.x.x
 
 $ thriftgo --version
-thriftgo 0.0.1
+thriftgo x.x.x
 ```
 4. 如果在安装阶段发生问题，可能主要是由于对 Golang 的不当使用造成，请依照报错信息进行检索
 
