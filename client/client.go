@@ -271,7 +271,7 @@ func (kc *kClient) addBoundHandlers(opt *remote.ClientOption) {
 		// metaHandler needs to be called separately.
 		// (newClientStreamer: call WriteMeta before remotecli.NewClient)
 		transInfoHdlr := bound.NewTransMetaHandler(kc.opt.MetaHandlers)
-		doAddBoundHandler(transInfoHdlr, opt)
+		doAddBoundHandlerToHead(transInfoHdlr, opt)
 	}
 }
 
@@ -352,6 +352,23 @@ func (kc *kClient) Close() error {
 	return nil
 }
 
+func doAddBoundHandlerToHead(h remote.BoundHandler, opt *remote.ClientOption) {
+	add := false
+	if ih, ok := h.(remote.InboundHandler); ok {
+		handlers := []remote.InboundHandler{ih}
+		opt.Inbounds = append(handlers, opt.Inbounds...)
+		add = true
+	}
+	if oh, ok := h.(remote.OutboundHandler); ok {
+		handlers := []remote.OutboundHandler{oh}
+		opt.Outbounds = append(handlers, opt.Outbounds...)
+		add = true
+	}
+	if !add {
+		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
+	}
+}
+
 func doAddBoundHandler(h remote.BoundHandler, opt *remote.ClientOption) {
 	add := false
 	if ih, ok := h.(remote.InboundHandler); ok {
@@ -363,7 +380,7 @@ func doAddBoundHandler(h remote.BoundHandler, opt *remote.ClientOption) {
 		add = true
 	}
 	if !add {
-		panic("invalid BoundHandler: must implement InboundHandler or OuboundHandler")
+		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
 	}
 }
 

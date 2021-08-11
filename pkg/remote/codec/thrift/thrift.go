@@ -211,6 +211,11 @@ func getValidData(methodName string, message remote.Message) (interface{}, error
 		}
 		return nil, errors.New("exception relay need error type data")
 	}
-	encodeErr := thrift.NewTApplicationException(transErr.TypeID(), transErr.Error())
+	var encodeErr thrift.TApplicationException
+	if err, ok := errors.Unwrap(transErr).(thrift.TApplicationException); ok {
+		encodeErr = err
+	} else {
+		encodeErr = thrift.NewTApplicationException(transErr.TypeID(), transErr.Error())
+	}
 	return encodeErr, nil
 }
