@@ -18,6 +18,7 @@ package protobuf
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -96,6 +97,20 @@ func TestException(t *testing.T) {
 	test.Assert(t, pbErr.errProto.TypeID == remote.UnknownMethod)
 }
 
+func TestTransErrorUnwrap(t *testing.T) {
+	errMsg := "mock err"
+	transErr := remote.NewTransError(remote.InternalError, newPbError(1000, errMsg))
+	uwErr, ok := transErr.Unwrap().(PBError)
+	test.Assert(t, ok)
+	test.Assert(t, uwErr.TypeID() == 1000)
+	test.Assert(t, transErr.Error() == errMsg)
+
+	uwErr2, ok := errors.Unwrap(transErr).(PBError)
+	test.Assert(t, ok)
+	test.Assert(t, uwErr2.TypeID() == 1000)
+	test.Assert(t, uwErr2.Error() == errMsg)
+}
+
 func BenchmarkNormalParallel(b *testing.B) {
 	ctx := context.Background()
 
@@ -151,7 +166,7 @@ func initRecvMsg() remote.Message {
 	return msg
 }
 
-func initServerErrorMsg(tp transport.Protocol, ri rpcinfo.RPCInfo, transErr remote.TransError) remote.Message {
+func initServerErrorMsg(tp transport.Protocol, ri rpcinfo.RPCInfo, transErr *remote.TransError) remote.Message {
 	errMsg := remote.NewMessage(transErr, svcInfo, ri, remote.Exception, remote.Server)
 	errMsg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return errMsg

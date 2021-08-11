@@ -18,10 +18,10 @@ package thrift
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/internal/mocks"
 	mt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
@@ -183,6 +183,20 @@ func TestException(t *testing.T) {
 	test.Assert(t, thriftErr.TypeId() == remote.UnknownMethod)
 }
 
+func TestTransErrorUnwrap(t *testing.T) {
+	errMsg := "mock err"
+	transErr := remote.NewTransError(remote.InternalError, thrift.NewTApplicationException(1000, errMsg))
+	uwErr, ok := transErr.Unwrap().(thrift.TApplicationException)
+	test.Assert(t, ok)
+	test.Assert(t, uwErr.TypeId() == 1000)
+	test.Assert(t, transErr.Error() == errMsg)
+
+	uwErr2, ok := errors.Unwrap(transErr).(thrift.TApplicationException)
+	test.Assert(t, ok)
+	test.Assert(t, uwErr2.TypeId() == 1000)
+	test.Assert(t, uwErr2.Error() == errMsg)
+}
+
 func initSendMsg(tp transport.Protocol) remote.Message {
 	var _args mt.MockTestArgs
 	_args.Req = prepareReq()
@@ -201,7 +215,7 @@ func initRecvMsg() remote.Message {
 	return msg
 }
 
-func initServerErrorMsg(tp transport.Protocol, ri rpcinfo.RPCInfo, transErr remote.TransError) remote.Message {
+func initServerErrorMsg(tp transport.Protocol, ri rpcinfo.RPCInfo, transErr *remote.TransError) remote.Message {
 	errMsg := remote.NewMessage(transErr, svcInfo, ri, remote.Exception, remote.Server)
 	errMsg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return errMsg

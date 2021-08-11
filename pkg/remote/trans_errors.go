@@ -61,27 +61,27 @@ func (e TransError) Error() string {
 }
 
 // TypeID return err type id
-func (e *TransError) TypeID() int32 {
+func (e TransError) TypeID() int32 {
 	return e.typeID
 }
 
 // Unwrap the transError to expose raw error
-func (e *TransError) Unwrap() error {
+func (e TransError) Unwrap() error {
 	return e.rawErr
 }
 
 // Is to check if inner error that transError wrap is target error
-func (e *TransError) Is(target error) bool {
+func (e TransError) Is(target error) bool {
 	return e == target || e.rawErr == target
 }
 
 // NewTransErrorWithMsg to build TransError with typeID and errMsg
-func NewTransErrorWithMsg(typeID int32, message string) TransError {
-	return TransError{message: message, typeID: typeID}
+func NewTransErrorWithMsg(typeID int32, message string) *TransError {
+	return &TransError{message: message, typeID: typeID}
 }
 
 // NewTransError to build TransError with typeID and rawErr.
 // rawErr can be used by errors.Is(target) to check err type, like read timeout.
-func NewTransError(typeID int32, err error) TransError {
-	return TransError{message: err.Error(), typeID: typeID, rawErr: err}
+func NewTransError(typeID int32, err error) *TransError {
+	return &TransError{message: err.Error(), typeID: typeID, rawErr: err}
 }
