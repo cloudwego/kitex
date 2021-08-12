@@ -339,5 +339,8 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 		err = nil
 	}
 	t.opt.TracerCtl.DoFinish(ctx, ri, err, t.opt.Logger)
+	// for server side, rpcinfo is reused on connection, clear the rpc stats info but keep the level config
+	sl := ri.Stats().Level()
 	rpcStats.Reset()
+	rpcStats.SetLevel(sl)
 }
