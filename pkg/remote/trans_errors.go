@@ -16,8 +16,6 @@
 
 package remote
 
-import "errors"
-
 // corresponding with thrift TApplicationException, cannot change it
 const (
 	UnknownApplicationException = 0
@@ -85,10 +83,13 @@ func NewTransErrorWithMsg(typeID int32, message string) *TransError {
 // NewTransError to build TransError with typeID and rawErr.
 // rawErr can be used by errors.Is(target) to check err type, like read timeout.
 func NewTransError(typeID int32, err error) *TransError {
-	if tID, ok := errors.Unwrap(err).(TypeID); ok {
-		typeID = tID.TypeID()
-	} else if tID, ok := errors.Unwrap(err).(TypeId); ok {
-		typeID = tID.TypeId()
+	if typeID == InternalError {
+		// try to get more specific err type if typeID is InternalError
+		if tID, ok := err.(TypeId); ok {
+			typeID = tID.TypeId()
+		} else if tID, ok := err.(TypeID); ok {
+			typeID = tID.TypeID()
+		}
 	}
 	return &TransError{message: err.Error(), typeID: typeID, rawErr: err}
 }

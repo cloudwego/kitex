@@ -194,9 +194,9 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 		}
 		err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
 		if err != nil {
-			// error cannot be wrapped to print here, so it must exec before NewTransErrorWithMsg
+			// error cannot be wrapped to print here, so it must exec before NewTransError
 			t.OnError(ctx, err, muxSvrConn)
-			err = remote.NewTransErrorWithMsg(remote.InternalError, err.Error())
+			err = remote.NewTransError(remote.InternalError, err)
 			t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, false, false)
 			return
 		}
