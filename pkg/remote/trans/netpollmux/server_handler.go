@@ -289,7 +289,7 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg r
 			return
 		}
 	}
-	transErr, isTransErr := err.(remote.TransError)
+	transErr, isTransErr := err.(*remote.TransError)
 	if !isTransErr {
 		return
 	}
