@@ -73,8 +73,9 @@ func (b *bus) Unwatch(event string, callback Callback) {
 func (b *bus) Dispatch(event *Event) {
 	if actual, ok := b.callbacks.Load(event.Name); ok {
 		for _, h := range actual.([]Callback) {
+			f := h // assign the value to a new variable for the closure
 			gofunc.GoFunc(context.Background(), func() {
-				h(event)
+				f(event)
 			})
 		}
 	}

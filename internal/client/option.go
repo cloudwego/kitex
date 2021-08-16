@@ -153,7 +153,14 @@ func (o *Options) initConnectionPool() {
 				o.RemoteOpt.ConnPool = connpool.NewLongPool(o.Svr.ServiceName, *o.PoolCfg)
 			}
 		} else {
-			o.RemoteOpt.ConnPool = connpool.NewLongPool(o.Svr.ServiceName, connpool2.IdleConfig{MaxIdlePerAddress: 10, MaxIdleGlobal: 100, MaxIdleTimeout: time.Minute})
+			o.RemoteOpt.ConnPool = connpool.NewLongPool(
+				o.Svr.ServiceName,
+				connpool2.IdleConfig{
+					MaxIdlePerAddress: 10,
+					MaxIdleGlobal:     100,
+					MaxIdleTimeout:    time.Minute,
+				},
+			)
 		}
 	}
 	pool := o.RemoteOpt.ConnPool
@@ -164,6 +171,20 @@ func (o *Options) initConnectionPool() {
 	}
 	if r, ok := pool.(remote.ConnPoolReporter); ok && o.RemoteOpt.EnableConnPoolReporter {
 		r.EnableReporter()
+	}
+
+	if long, ok := pool.(remote.LongConnPool); ok {
+		o.Bus.Watch(discovery.ChangeEventName, func(ev *event.Event) {
+			ch, ok := ev.Extra.(*discovery.Change)
+			if !ok {
+				return
+			}
+			for _, inst := range ch.Removed {
+				if addr := inst.Address(); addr != nil {
+					long.Clean(addr.Network(), addr.String())
+				}
+			}
+		})
 	}
 }
 
