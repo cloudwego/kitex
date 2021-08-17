@@ -63,6 +63,9 @@ func NewClient(destService string, opts ...client.Option) (Client, error) {
 	var options []client.Option
 	options = append(options, client.WithDestService(destService))
 ` + strings.Join(clientOptionTpl, "\n") + `
+	{{if .HasStreaming}}
+	options = append(options, client.WithTransportProtocol(transport.GRPC))
+	{{end}}
 	options = append(options, opts...)
 
 	kc, err := client.NewClient(serviceInfo(), options...)
