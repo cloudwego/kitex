@@ -148,7 +148,7 @@ func (s *HelloImpl) Add(ctx context.Context, req *api.AddRequest) (resp *api.Add
 // Add implements the HelloImpl interface.
 func (s *HelloImpl) Add(ctx context.Context, req *api.AddRequest) (resp *api.AddResponse, err error) {
         // TODO: Your code here...
-        resp = &api.AddResponse{Result_: req.First + req.Second}
+        resp = &api.AddResponse{Sum: req.First + req.Second}
         return
 }
 ```
