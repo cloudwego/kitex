@@ -7,9 +7,11 @@ Kitex 提供了对 opentracing 的支持，也支持用户自定义链路跟踪�
 client 侧，默认使用 opentracing `GlobalTracer`
 
 ```go
-import "github.com/kitex-contrib/opentracing"
+import (
+	internal_opentracing "github.com/kitex-contrib/tracer-opentracing"
+)
 ...
-client, err := echo.NewClient("echo", opentracing.DefaultClientOption())
+client, err := echo.NewClient("echo", internal_opentracing.DefaultClientOption())
 if err != nil {
 	log.Fatal(err)
 }
@@ -18,9 +20,11 @@ if err != nil {
 server 侧，默认使用 opentracing `GlobalTracer`
 
 ```go
-import "github.com/kitex-contrib/opentracing"
+import (
+	internal_opentracing "github.com/kitex-contrib/tracer-opentracing"
+)
 ...
-svr, err := echo.NewServer(opentracing.DefaultServerOption())
+svr, err := echo.NewServer(internal_opentracing.DefaultServerOption())
 if err := svr.Run(); err != nil {
 	log.Println("server stopped with error:", err)
 } else {
