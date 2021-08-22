@@ -17,7 +17,12 @@
 // Package descriptor the idl descriptor for describe the idls with golang
 package descriptor
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
+
+var isGoTagAliasDisabled = os.Getenv("KITEX_GENERIC_GOTAG_ALIAS_DISABLED") == "True"
 
 // FieldDescriptor idl field descriptor
 type FieldDescriptor struct {
@@ -33,7 +38,7 @@ type FieldDescriptor struct {
 
 // FieldName return field name maybe with an alias
 func (d *FieldDescriptor) FieldName() string {
-	if d.Alias != "" {
+	if d.Alias != "" && !isGoTagAliasDisabled {
 		return d.Alias
 	}
 	return d.Name

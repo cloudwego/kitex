@@ -23,10 +23,10 @@ import (
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/tidwall/gjson"
 )
 
 func Test_writeVoid(t *testing.T) {
@@ -783,6 +783,64 @@ func Test_writeRequestBase(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := writeRequestBase(tt.args.ctx, tt.args.val, tt.args.out, tt.args.field, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeRequestBase() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_writeJSON(t *testing.T) {
+	type args struct {
+		val interface{}
+		out thrift.TProtocol
+		t   *descriptor.TypeDescriptor
+		opt *writerOption
+	}
+	mockTTransport := &mocks.MockThriftTTransport{
+		WriteStructBeginFunc: func(name string) error {
+			test.Assert(t, name == "Demo")
+			return nil
+		},
+		WriteFieldBeginFunc: func(name string, typeID thrift.TType, id int16) error {
+			test.Assert(t, name == "hello")
+			test.Assert(t, typeID == thrift.STRING)
+			test.Assert(t, id == 1)
+			return nil
+		},
+	}
+	data := gjson.Parse(`{"hello": "world"}`)
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+		{
+			"writeJSON",
+			args{
+				val: &data,
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"hello": {Name: "hello", ID: 1, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+						},
+						RequiredFields: map[int32]*descriptor.FieldDescriptor{
+							1: {Name: "hello", ID: 1, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+						},
+					},
+				},
+			},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := writeJSON(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+				t.Errorf("writeJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
