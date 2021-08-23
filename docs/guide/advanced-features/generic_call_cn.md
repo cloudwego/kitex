@@ -4,13 +4,13 @@
 
 ## 支持场景
 
-1. 二进制转发：用于流量中转场景
+1. 二进制泛化调用：用于流量中转场景
 2. HTTP映射泛化调用：用于API网关场景
 3. Map映射泛化调用
 
 ## 使用方式示例
 
-### 1. 二进制流转发
+### 1. 二进制泛化调用
 
 #### 调用端使用
 
@@ -41,7 +41,6 @@
   // generic call
   resp, err := genericCli.GenericCall(ctx, "actualMethod", buf)
   ```
-  
 
 #### 服务端使用
 
@@ -202,7 +201,7 @@ func main() {
 
 #### 注解扩展
 
-比如增加一个 xxx.source='not_body_struct' 注解，表示某个字段本身没有对 HTTP 请求字段的映射，需要遍历其子字段从 HTTP 请求中获取对应的值。使用方式如下：
+比如增加一个 `xxx.source='not_body_struct'` 注解，表示某个字段本身没有对 HTTP 请求字段的映射，需要遍历其子字段从 HTTP 请求中获取对应的值。使用方式如下：
 
 ```thrift
 struct Request {
@@ -261,7 +260,7 @@ Map 映射泛化调用是指用户可以直接按照规范构造 Map 请求参�
 
 Kitex 会根据给出的 IDL 严格校验用户构造的字段名和类型，字段名只支持字符串类型对应 Map Key，字段 Value 的类型映射见类型映射表。
 
-对于返回会校验 Response的 Field ID 和类型，并根据 IDL 的 Field Name 生成相应的 Map Key。
+对于Response会校验 Field ID 和类型，并根据 IDL 的 Field Name 生成相应的 Map Key。
 
 ##### 类型映射
 
@@ -491,9 +490,9 @@ func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, req
 
 HTTP/Map 映射的泛化调用虽然不需要生成代码，但需要使用者提供 IDL。
 
-目前 Kitex 有两种 IDLProvider 实现，使用者可以选择指定 IDL 路径，也可以选择传入 IDL 内容。当然也可以根据需求自行扩展 generci.DescriptorProvider。
+目前 Kitex 有两种 IDLProvider 实现，使用者可以选择指定 IDL 路径，也可以选择传入 IDL 内容。当然也可以根据需求自行扩展 `generci.DescriptorProvider`。
 
-### 解析本地文件
+### 基于本地文件解析 IDL
 
 ```go
 p, err := generic.NewThriftFileProvider("./YOUR_IDL_PATH")
@@ -502,7 +501,7 @@ p, err := generic.NewThriftFileProvider("./YOUR_IDL_PATH")
  }
 ```
 
-### 解析内存文件
+### 基于内存解析 IDL
 
 所有 IDL 需要构造成 Map ，Key 是 Path，Value 是 IDL 定义，使用方式如下：
 
@@ -546,7 +545,7 @@ p, err := NewThriftContentProvider(path, includes)
 
 #### 支持绝对路径的 include path 寻址
 
-若为方便构造 IDL Map，也可以通过 NewThriftContentWithAbsIncludePathProvider 使用绝对路径作为 Key。
+若为方便构造 IDL Map，也可以通过 `NewThriftContentWithAbsIncludePathProvider` 使用绝对路径作为 Key。
 
 ```go
 p, err := generic.NewThriftContentWithAbsIncludePathProvider("YOUR_MAIN_IDL_PATH", "YOUR_MAIN_IDL_CONTENT", map[string]string{"ABS_INCLUDE_PATH": "CONTENT"})
