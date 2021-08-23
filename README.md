@@ -105,9 +105,9 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
       
     - 高级特性
     
-      - [泛化调用](docs/guide/advanced-feature/TODO_cn.md)
+      - [泛化调用](docs/guide/advanced-features/generic_call_cn.md)
     
-      - [Server SDK 化](docs/guide/basic-features/invoker_cn.md)
+      - [Server SDK 化](docs/guide/advanced-features/invoker_cn.md)
     
     - 代码生成
     
