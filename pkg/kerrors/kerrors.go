@@ -38,8 +38,13 @@ var (
 	ErrBiz               = &basicError{"biz error"}
 
 	ErrRetry = &basicError{"retry error"}
-	// it happens when retry enabled and there is one call has finished
+	// ErrRPCFinish happens when retry enabled and there is one call has finished
 	ErrRPCFinish = &basicError{"rpc call finished"}
+
+	// ErrCircuitBreakerIgnore is used to ignore the caused errors which want be ignored in circuit breaker,
+	// the caused error won't be regarded as failed.
+	// eg: return kerrors.ErrCircuitBreakerIgnore.WithCause(causedErr) in customized middleware.
+	ErrCircuitBreakerIgnore = &basicError{"ignore error by circuit breaker"}
 )
 
 // More detailed error types

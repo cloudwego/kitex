@@ -25,11 +25,12 @@ import (
 
 // some types of error won't trigger circuit breaker
 var ignoreErrTypes = map[error]ErrorType{
-	kerrors.ErrInternalException: TypeIgnorable,
-	kerrors.ErrServiceDiscovery:  TypeIgnorable,
-	kerrors.ErrACL:               TypeIgnorable,
-	kerrors.ErrLoadbalance:       TypeIgnorable,
-	kerrors.ErrRPCFinish:         TypeIgnorable,
+	kerrors.ErrCircuitBreakerIgnore: TypeIgnorable,
+	kerrors.ErrInternalException:    TypeIgnorable,
+	kerrors.ErrServiceDiscovery:     TypeIgnorable,
+	kerrors.ErrACL:                  TypeIgnorable,
+	kerrors.ErrLoadbalance:          TypeIgnorable,
+	kerrors.ErrRPCFinish:            TypeIgnorable,
 }
 
 // ErrorTypeOnServiceLevel determines the error type with a service level criteria.
