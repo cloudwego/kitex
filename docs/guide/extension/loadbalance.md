@@ -5,7 +5,7 @@ Kitex provides two LoadBalancers:
 1. WeightedRandom
 2. ConsistentHash
 
-These two LoadBalancers can cover most of use cases, but you can also customize your own LoadBalancer if they doesn't meet your needs.
+These two LoadBalancers can cover most of the use cases, but you can also customize your own LoadBalancer if they doesn't meet your needs.
 
 ## Interface
 
@@ -56,10 +56,10 @@ if rlb, ok := balancer.(loadbalance.Rebalancer); ok && bus ! = nil {
 }
 ```
 
-## Attation
+## Attention
 
-1. If you are using dynamic service discovery, you should better to implement caching which can improve performance.
-2. If you are using cache, you should better to implement the Rebalancer interface, otherwise you will not be notified when discovery results changes.
+1. If you are using dynamic service discovery, you should be better to implement caching which can improve performance.
+2. If you are using cache, you should be better to implement the Rebalancer interface, otherwise you will not be notified when discovery results changes.
 3. Customize LoadBalancer is not supported in the case of Proxy.
 
 ## Example
