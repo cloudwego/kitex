@@ -58,7 +58,7 @@ func main() {
 
 ## 监控
 
-限流定义了 `LimitReporter` 接口，用于限流状态监控，例如连当前连接数过多、QPS 过大等。
+限流定义了 `LimitReporter` 接口，用于限流状态监控，例如当前连接数过多、QPS 过大等。
 
 如有需求，用户需要自行实现该接口，并通过 `WithLimitReporter` 注入。
 
