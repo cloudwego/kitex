@@ -98,7 +98,7 @@ func circuitBreakerStop(ctx context.Context, policy StopPolicy, cbC *cbContainer
 	if errRate < policy.CBPolicy.ErrorRate {
 		return false, ""
 	}
-	return true, fmt.Sprintf("retry circuit break, errRate=%0.2f, sample=%d", errRate, sample)
+	return true, fmt.Sprintf("retry circuit break, errRate=%0.3f, sample=%d", errRate, sample)
 }
 
 func handleRetryInstance(retrySameNode bool, prevRI, retryRI rpcinfo.RPCInfo) {
