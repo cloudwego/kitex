@@ -1,4 +1,4 @@
-# Extension of Codec(Protocol)
+# Extension of Codec (Protocol)
 
 
 ![remoteModule](../../images/remote_module.png)
