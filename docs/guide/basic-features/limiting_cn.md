@@ -9,7 +9,7 @@ import "github.com/cloudwego/kitex/pkg/limit"
 
 func main() {
 	svr := xxxservice.NewServer(handler, server.WithLimit(&limit.Option{MaxConnections: 10000, MaxQPS: 1000}))
-  _ = svr.Run()
+  	svr.Run()
 }
 ```
 
