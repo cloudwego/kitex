@@ -2,7 +2,7 @@
 
 Kitex supports user-defined registration module. Users can extend and integrate other registration centers by themselves. This extension is defined under pkg/registry.
 
-## Extension Api and Definition of Info Struct
+## Extension API and Definition of Info Struct
 - Extension Api
 
 ```go
@@ -35,7 +35,7 @@ type Info struct {
 }
 ```
 
-## Integrated into Kitex
+## Integrate into Kitex
 Specify your own registration module and customized registration information through `option`. Note that registration requires service information, which is also specified through option.
 
 - Specify Server Info
