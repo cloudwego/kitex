@@ -1,6 +1,6 @@
 # Service Discovery
 
-Currently in the Kitex open source release, only one service discovery extension is supported: DNS Resolver.
+Currently, only one service discovery extension is open-sourced: DNS Resolver.
 
 DNS Resolver is suitable for the clusters where DNS is used as a service discovery, commonly used for [Kubernetes](https://kubernetes.io/) clusters.
 

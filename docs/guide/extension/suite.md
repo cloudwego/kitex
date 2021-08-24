@@ -2,12 +2,12 @@
 
 Suite is a high-level abstraction of extensions, a combination and encapsulation of Option and Middleware.
 
-As mentioned in the middleware extensions document, there are two principles to remember during extensions:
+As mentioned in the middleware extensions document, there are two principles should be remembered in extensions:
 
 1. Middleware and Suit are only allowed to be set before initializing Server and Client, do not allow modified dynamically.
 2. Behind override ahead.
 
-This principle is also valid for Suite.
+These tow principle is also valid for Suite.
 
 Suite is defined as follows:
 
