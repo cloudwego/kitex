@@ -37,7 +37,7 @@ type InboundHandler interface {
 
 - MetaInfo Transparent Transmission Handler
 
-  Meta information transparent transmission is to transmit some RPC additional information to the downstream based on the transport protocol, and read the upstream transparent transmission information in the transport protocol. The implementation is in transmeta_bound.go.
+  Meta information transparent transmission is to transmit some RPC additional information to the downstream based on the transport protocol, and read the upstream transparent transmission information carried by transport protocol. The implementation is in transmeta_bound.go.
 
   - Write metainfo implements Write()
   - Read metainfo  implements OnMessage()
