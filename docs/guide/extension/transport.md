@@ -40,7 +40,7 @@ type ServerTransHandlerFactory interface {
 
 ### Extension to Netpoll
 
-Below picture is Kitex's extension to netpoll synchronous IO, which implements `Extension`, `ByteBuffer`, `TransServer` interfaces.
+Below figure is Kitex's extension to netpoll synchronous IO, which implements `Extension`, `ByteBuffer`, `TransServer` interfaces.
 
 ![netpoll_extension](../../images/netpoll_extension.png)
 
