@@ -16,6 +16,8 @@
 
 package remote
 
+import "errors"
+
 // corresponding with thrift TApplicationException, cannot change it
 const (
 	UnknownApplicationException = 0
@@ -72,7 +74,7 @@ func (e TransError) Unwrap() error {
 
 // Is to check if inner error that transError wrap is target error
 func (e TransError) Is(target error) bool {
-	return e == target || e.rawErr == target
+	return e == target || errors.Is(e.rawErr, target)
 }
 
 // NewTransErrorWithMsg to build TransError with typeID and errMsg
