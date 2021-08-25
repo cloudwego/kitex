@@ -96,7 +96,6 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 		if err := st.SendMsg(resp); err != nil {
 			return err
 		}
-		return nil
 	case *{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}}:
 		success, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, s.{{.Name}}{{end}})
 		if err != nil {
@@ -104,7 +103,6 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 		}
 		realResult := result.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ResStructName}})
 		realResult.Success = {{if .IsResponseNeedRedirect}}&{{end}}success
-		return nil
 	}
 	return nil
 	{{- else}}{{/* streaming logic */}}
