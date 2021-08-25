@@ -38,7 +38,7 @@ var (
 	ErrBiz               = &basicError{"biz error"}
 
 	ErrRetry = &basicError{"retry error"}
-	// it happens when retry enabled and there is one call has finished
+	// ErrRPCFinish happens when retry enabled and there is one call has finished
 	ErrRPCFinish = &basicError{"rpc call finished"}
 )
 
@@ -109,7 +109,7 @@ func (de *DetailedError) Unwrap() error {
 
 // Is returns if the given error matches the current error.
 func (de *DetailedError) Is(target error) bool {
-	return de == target || de.basic == target || de.cause == target
+	return de == target || de.basic == target || errors.Is(de.cause, target)
 }
 
 // As returns if the given target matches the current error, if so sets
