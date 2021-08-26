@@ -129,8 +129,6 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
     
       - [监控扩展](docs/guide/extension/monitoring_cn.md)
     
-      - [日志扩展](docs/guide/basic-features/logging_cn.md)
-    
       - [编解码(协议)扩展](docs/guide/extension/codec_cn.md)
     
       - [传输模块扩展](docs/guide/extension/transport_cn.md)
