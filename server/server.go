@@ -258,22 +258,23 @@ func (s *server) richRemoteOption() {
 }
 
 func (s *server) addBoundHandlers(opt *remote.ServerOption) {
-	// for server limiter, the handler should be added as first one
-	connLimit, qpsLimit, ok := s.buildLimiterWithOpt()
-	if ok {
-		limitHdlr := bound.NewServerLimiterHandler(connLimit, qpsLimit, s.opt.LimitReporter)
-		doAddFirstBoundHandler(limitHdlr, opt)
-	}
-
 	// for server trans info handler
 	if len(s.opt.MetaHandlers) > 0 {
 		transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
-		doAddBoundHandler(transInfoHdlr, opt)
+		// meta handler exec before boundHandlers which add with option
+		doAddBoundHandlerToHead(transInfoHdlr, opt)
 		for _, h := range s.opt.MetaHandlers {
 			if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
 				opt.StreamingMetaHandlers = append(opt.StreamingMetaHandlers, shdlr)
 			}
 		}
+	}
+
+	// for server limiter, the handler should be added as first one
+	connLimit, qpsLimit, ok := s.buildLimiterWithOpt()
+	if ok {
+		limitHdlr := bound.NewServerLimiterHandler(connLimit, qpsLimit, s.opt.LimitReporter)
+		doAddBoundHandlerToHead(limitHdlr, opt)
 	}
 }
 
@@ -310,7 +311,7 @@ func (s *server) check() error {
 	return nil
 }
 
-func doAddFirstBoundHandler(h remote.BoundHandler, opt *remote.ServerOption) {
+func doAddBoundHandlerToHead(h remote.BoundHandler, opt *remote.ServerOption) {
 	add := false
 	if ih, ok := h.(remote.InboundHandler); ok {
 		handlers := []remote.InboundHandler{ih}
@@ -323,7 +324,7 @@ func doAddFirstBoundHandler(h remote.BoundHandler, opt *remote.ServerOption) {
 		add = true
 	}
 	if !add {
-		panic("invalid BoundHandler: must implement InboundHandler or OuboundHandler")
+		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
 	}
 }
 
@@ -338,7 +339,7 @@ func doAddBoundHandler(h remote.BoundHandler, opt *remote.ServerOption) {
 		add = true
 	}
 	if !add {
-		panic("invalid BoundHandler: must implement InboundHandler or OuboundHandler")
+		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
 	}
 }
 

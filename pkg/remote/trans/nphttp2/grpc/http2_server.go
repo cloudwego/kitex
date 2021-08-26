@@ -34,15 +34,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"google.golang.org/protobuf/proto"
-
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-
 	"github.com/cloudwego/netpoll"
-
-	"github.com/cloudwego/netpoll-http2"
+	http2 "github.com/cloudwego/netpoll-http2"
 	"github.com/cloudwego/netpoll-http2/hpack"
+	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -335,7 +332,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				}
 				continue
 			}
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
+			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, netpoll.ErrEOF) {
 				t.Close()
 				return
 			}

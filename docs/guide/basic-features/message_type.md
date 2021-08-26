@@ -1,26 +1,26 @@
-# 交互模式
+# Message Types
 
-## 协议支持
+## Protocols
 
-目前 Kitex 支持的交互方式和协议列表
+The table below is message types, codecs and transports supported by Kitex.
 
-|模式\支持|编码协议|传输协议|
+|Message Types|Codec|Transport|
 |--------|-------|--------|
-|PingPong|Thrift / Protobuf| None / [TTHeader](../extension/codec_cn.md) / HTTP2(gRPC)|
-|Oneway|Thrift| None / [TTHeader](../extension/codec_cn.md) |
+|PingPong|Thrift / Protobuf| [TTHeader](../extension/codec.md) / HTTP2(gRPC)|
+|Oneway|Thrift| [TTHeader](../extension/codec.md) |
 |Streaming|Protobuf|HTTP2(gRPC)|
 
-- PingPong  发起一个请求等待一个响应
-- Oneway 发起一个请求不等待一个响应
-- Streaming 发起一个或多个请求, 等待一个或多个响应
+- PingPong: the client always waits for a response after sending a request
+- Oneway: the client does not expect any response after sending a request
+- Streaming: the client can send one or more requests while receiving one or more responses.
 
 ## Thrift
 
-目前 Thrift 支持 PingPong 和 Oneway 交互方式。Kitex 计划支持 Thrift Streaming。
+When the codec is thrift, Kitex supports PingPong and Oneway. The streaming on thrift is under development.
 
 ### Example
 
-idl 定义:
+Given an IDL:
 
 ```thrift
 namespace go echo
@@ -39,20 +39,22 @@ service EchoService {
 }
 ```
 
-生成的代码组织结构:
+The layout of generated code might be:
+
 ```
 .
-└── echo
-    ├── echo.go
-    ├── echoservice
-    │   ├── client.go
-    │   ├── echoservice.go
-    │   ├── invoker.go
-    │   └── server.go
-    └── k-echo.go
+└── kitex_gen
+    └── echo
+        ├── echo.go
+        ├── echoservice
+        │   ├── client.go
+        │   ├── echoservice.go
+        │   ├── invoker.go
+        │   └── server.go
+        └── k-echo.go
 ```
 
-Server 侧代码:
+The handler code in server side might be:
 
 ```go
 package main
@@ -83,7 +85,7 @@ func main() {
 
 #### PingPong
 
-Client 侧代码:
+The code in client side might be:
 
 ```go
 package main
@@ -110,7 +112,7 @@ func main() {
 
 #### Oneway
 
-Client 侧代码:
+The code in client side might be:
 
 ```go
 package main
@@ -137,16 +139,18 @@ func main() {
 
 ## Protobuf
 
-  Kitex 对 Protobuf 支持的协议有两种：
+Kitex supports two kind of protocols that carries Protobuf payload:
   
-  - Kitex Protobuf - 只支持 PingPong，若 IDL 定义了 stream 方法，将默认使用 gRPC 协议
-        
-  - gRPC协议 - 可以与 gRPC 互通，与 gRPC service 定义相同，支持 Unary(PingPong)、 Streaming 调用
+- Kitex Protobuf
+    - Only supports the PingPong type of messages. If any streaming method is defined in the IDL, the protocol will switch to gRPC.
+- The gRPC Protocol
+    - The protocol that shipped with gRPC.
 
 ### Example
-以下给出 Streaming 的使用示例。
 
-idl 定义:
+The following is an example showing how to use the streaming types.
+
+Given an IDL:
 
 ```protobuf
 syntax = "proto3";
@@ -164,31 +168,34 @@ message Response {
 }
 
 service EchoService {
-  rpc ClientSideStreaming(stream Request) returns (Response) {} // 客户端侧 streaming
-  rpc ServerSideStreaming(Request) returns (stream Response) {} // 服务端侧 streaming
-  rpc BidiSideStreaming(stream Request) returns (stream Response) {} // 双向流
+  rpc ClientSideStreaming(stream Request) returns (Response) {} // client streaming
+  rpc ServerSideStreaming(Request) returns (stream Response) {} // server streaming
+  rpc BidiSideStreaming(stream Request) returns (stream Response) {} // bidirectional streaming 
 }
 ```
 
-生成的代码组织结构:
+The generated code might be:
 
 ```
 .
-└── echo
-    ├── echo.pb.go
-    └── echoservice
-        ├── client.go
-        ├── echoservice.go
-        ├── invoker.go
-        └── server.go
+└── kitex_gen
+    └── echo
+        ├── echo.pb.go
+        └── echoservice
+            ├── client.go
+            ├── echoservice.go
+            ├── invoker.go
+            └── server.go
 ```
 
-Server 侧代码:
+The handler code in server side:
 
 ```go
 package main
 
 import (
+    "sync"
+
     "xx/echo"
     "xx/echo/echoservice"
 }
@@ -215,20 +222,29 @@ func (handler) ServerSideStreaming(req *echo.Request, stream echo.EchoService_Se
 }
 
 func (handler) BidiSideStreaming(stream echo.EchoService_BidiSideStreamingServer) (err error) {
-    go func() {
-        for {
-            req, err := stream.Recv()
-            if err != nil {
-                return err
-            }
-        }
-    }()
-    for {
-        resp := &echo.Response{Msg: "world"}
-        if err := stream.Send(resp); err != nil {
-            return err
-        }
-    }
+    var once sync.Once
+	go func() {
+		for {
+			req, err2 := stream.Recv()
+			log.Println("received:", req.GetMsg())
+			if err2 != nil {
+				once.Do(func() {
+					err = err2
+				})
+				break
+			}
+		}
+	}()
+	for {
+		resp := &echo.Response{Msg: "world"}
+		if err2 := stream.Send(resp); err2 != nil {
+			once.Do(func() {
+				err = err2
+			})
+			return
+		}
+	}
+	return
 }
 
 func main() {
@@ -340,3 +356,4 @@ func main() {
     } 
 }
 ```
+

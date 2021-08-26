@@ -1,25 +1,25 @@
-# 限流
+# Rate Limiting
 
-限流是一种保护 server 的措施，防止上游某个 client 流量突增导致 server 端过载。
+Rate limiting is an imperative technique to protect server, which prevents server from overloaded by sudden traffic increase from a client.
 
-目前 Kitex 支持限制最大连接数和最大 QPS，在初始化 server 的时候，增加一个 Option，举例：
+Kitex supports max connections limit and max QPS limit. You may add an `Option` during the `server` initialization, for example:
 
 ```go
 import "github.com/cloudwego/kitex/pkg/limit"
 
 func main() {
 	svr := xxxservice.NewServer(handler, server.WithLimit(&limit.Option{MaxConnections: 10000, MaxQPS: 1000}))
-  	svr.Run()
+        svr.Run()
 }
 ```
 
-参数说明：
+Parameter description：
 
-- `MaxConnections` 表示最大连接数
+- `MaxConnections`: max connections
 
-- `MaxQPS` 表示最大 QPS
+- `MaxQPS`: max QPS (Queries Per Second)
 
-- `UpdateControl` 提供动态修改限流阈值的能力，举例：
+- `UpdateControl`: provide the ability to modify the rate limit threshold dynamically, for example: 
 
   ```go
   import "github.com/cloudwego/kitex/pkg/limit"
@@ -49,18 +49,18 @@ func main() {
   svr := xxxservice.NewServer(handler, server.WithLimit(&limit.Option{MaxConnections: 10000, MaxQPS: 1000, UpdateControl: lu.UpdateControl}))
   ```
 
-## 实现
+## Implementation
 
-分别使用 ConcurrencyLimiter 和 RateLimiter 对最大连接数和最大 QPS 进行限流。
+ConcurrencyLimiter and RateLimiter are used respectively to limit max connection and max QPS.
 
-- ConcurrencyLimiter：简单的计数器；
-- RateLimiter：这里的限流算法采用了"滑动窗口法"，时间窗口为 1s，再把时间窗口划分成 10 个小窗口，每个小窗口为 100ms。
+- ConcurrencyLimiter：a simple counter；
+- RateLimiter：sliding window algorithm is used here. Time window is 1s, which is split into 10 small windows with each 100ms.
 
-## 监控
+## Monitoring
 
-限流定义了 `LimitReporter` 接口，用于限流状态监控，例如当前连接数过多、QPS 过大等。
+Rate limiting defines the `LimitReporter` interface, which is used by rate limiting status monitoring, e.g. connection overloaded, QPS overloaded, etc.
 
-如有需求，用户需要自行实现该接口，并通过 `WithLimitReporter` 注入。
+Users may implement this interface and inject this implementation by `WithLimitReporter` if required.
 
 ```go
 // LimitReporter is the interface define to report(metric or print log) when limit happen

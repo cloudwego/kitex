@@ -48,7 +48,7 @@ cli, err := service.NewClient(destService, client.WithTransportProtocol(transpor
 2. go_package 和 thrift 的 namespace 定义一样，不用写完整的路径，只需指定包名，相当于 thrift 的 namespace，如：go_package = "pbdemo"
 3. 提前下载好 protoc 二进制放在 $PATH 目录下
 
-生成代码时需要制定 protobuf 协议：
+生成代码时需要指定 protobuf ：
 
 - 客户端
 

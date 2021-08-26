@@ -80,32 +80,43 @@ func newServiceInfo() *kitex.ServiceInfo {
 {{- end}}
 
 func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	{{- if $.HasStreaming}}
-	{{- /* streaming logic */}}
-	st := arg.(*streaming.Args).Stream
-	{{- if $isStreaming}}
-	stream := &{{LowerFirst .ServiceName}}{{.RawName}}Server{st}
-	{{- end}}
-	{{- if or $unary $serverSide}}
-	req := new({{NotPtr $arg.Type}})
-	if err := st.RecvMsg(req); err != nil {
-		return err
-	}
-	{{- end}}
-	{{- if $isStreaming}}
-	return handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}({{if $serverSide}}req, {{end}}stream)
-	{{- else}}
-	resp, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx, req)	
-	if err != nil {
-		return err
-	}
-	if err := st.SendMsg(resp); err != nil {
-		return err
+	{{- if eq $.Codec "protobuf"}} {{/* protobuf logic */}}
+	{{- if $unary}} {{/* unary logic */}}
+	switch s := arg.(type) {
+	case *streaming.Args:
+		st := s.Stream
+		req := new({{NotPtr $arg.Type}})
+		if err := st.RecvMsg(req); err != nil {
+			return err
+		}
+		resp, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx, req)
+		if err != nil {
+			return err
+		}
+		if err := st.SendMsg(resp); err != nil {
+			return err
+		}
+	case *{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}}:
+		success, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, s.{{.Name}}{{end}})
+		if err != nil {
+			return err
+		}
+		realResult := result.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ResStructName}})
+		realResult.Success = {{if .IsResponseNeedRedirect}}&{{end}}success
 	}
 	return nil
-	{{- end}}
-	{{- else}}
-	{{- /* unary logic */}}
+	{{- else}}{{/* streaming logic */}}
+		st := arg.(*streaming.Args).Stream
+		stream := &{{LowerFirst .ServiceName}}{{.RawName}}Server{st}
+		{{- if $serverSide}}
+		req := new({{NotPtr $arg.Type}})
+		if err := st.RecvMsg(req); err != nil {
+			return err
+		}
+		{{- end}}
+		return handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}({{if $serverSide}}req, {{end}}stream)
+	{{- end}} {{/* $unary end */}}
+	{{- else}} {{/* thrift logic */}}
 	{{if .Args}}realArg := arg.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}}){{end}}
 	{{if or (not .Void) .Exceptions}}realResult := result.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ResStructName}}){{end}}
 	{{if .Void}}err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, realArg.{{.Name}}{{end}})
@@ -129,7 +140,7 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 	{{if not .Void}}realResult.Success = {{if .IsResponseNeedRedirect}}&{{end}}success{{end}}
 	{{- if .Exceptions}}}{{end}}
 	return nil
-	{{- end}} {{/* streaming end */}}
+	{{- end}} {{/* protobuf end */}}
 }
 
 {{- /* define streaming struct */}}

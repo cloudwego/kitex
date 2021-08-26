@@ -192,25 +192,16 @@ func initSendMsg(tp transport.Protocol) remote.Message {
 
 func prepareIntKVInfo() map[uint16]string {
 	kvInfo := map[uint16]string{
-		transmeta.WithMeshHeader: transmeta.MeshOrTTHeaderProtocol,
-		transmeta.Env:            "prod",
-		transmeta.FromService:    "mockFromService",
-		transmeta.FromCluster:    "mockCluster",
-		transmeta.FromIDC:        "mockIDC",
-		transmeta.FromMethod:     "mockFromMethod",
-		transmeta.ToService:      "mockToService",
-		transmeta.ToMethod:       "mockToMethod",
+		transmeta.FromService: "mockFromService",
+		transmeta.FromMethod:  "mockFromMethod",
+		transmeta.ToService:   "mockToService",
+		transmeta.ToMethod:    "mockToMethod",
 	}
 	return kvInfo
 }
 
 func prepareStrKVInfo() map[string]string {
-	kvInfo := map[string]string{
-		transmeta.HeaderTransRemoteAddr: "mockAddr",
-		transmeta.HeaderTransToCluster:  "mockCluster",
-		transmeta.HeaderTransToIDC:      "mockIDC",
-		transmeta.HeaderProcessAtTime:   "mockProcTime",
-	}
+	kvInfo := map[string]string{}
 	return kvInfo
 }
 

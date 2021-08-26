@@ -6,7 +6,7 @@ Kitex 提供了熔断器的实现，但是没有默认开启，需要用户主�
 
 ## 如何使用
 
-- 使用示例：
+### 使用示例：
 
 ```go
 // build a new CBSuite
@@ -21,13 +21,13 @@ opts = append(opts, client.WithInstanceMW(cbs.InstanceCBMW()))
 cli, err := xxxservice.NewClient(targetService, opts)
 ```
 
-- 使用说明
+### 使用说明
 
 Kitex 大部分服务治理模块都是通过 middleware 集成，熔断也是一样。Kitex 提供了一套 CBSuite，封装了服务粒度的熔断器和实例粒度的熔断器。
 
     - 服务粒度熔断：
 
-      按照服务粒度进行熔断统计，通过 WithMiddleware 添加。服务粒度的具体划分取决于 Circuit Breaker Key，既熔断统计的 key，初始化CBSuite时需要传入 **GenServiceCBKeyFunc**，默认提供的是circuitbreaker.RPCInfo2Key，改 key 的格式是 `fromServiceName/toServiceName/method`，既按照方法级别的异常做熔断统计。
+      按照服务粒度进行熔断统计，通过 WithMiddleware 添加。服务粒度的具体划分取决于 Circuit Breaker Key，既熔断统计的 key，初始化 CBSuite 时需要传入 **GenServiceCBKeyFunc**，默认提供的是 circuitbreaker.RPCInfo2Key ，该 key 的格式是 `fromServiceName/toServiceName/method`，即按照方法级别的异常做熔断统计。
 
     - 实例粒度熔断
 
@@ -37,7 +37,7 @@ Kitex 大部分服务治理模块都是通过 middleware 集成，熔断也是�
 
 - 熔断阈值及**阈值变更**
 
-  默认的熔断阈值是`ErrRate: 0.5, MinSample: 200`，错误率达到50%触发熔断，同时要求统计量>200。若要调整阈值，调用CBSuite的 `UpdateServiceCBConfig` 和 `UpdateInstanceCBConfig`来更新Key的阈值。
+  默认的熔断阈值是`ErrRate: 0.5, MinSample: 200`，错误率达到50%触发熔断，同时要求统计量>200。若要调整阈值，调用 CBSuite 的 `UpdateServiceCBConfig` 和 `UpdateInstanceCBConfig`来更新Key的阈值。
 
 ***
 
@@ -55,7 +55,7 @@ Kitex 大部分服务治理模块都是通过 middleware 集成，熔断也是�
 
 比较出名的熔断器当属 hystrix 了，这里是它的[设计文档](https://github.com/Netflix/Hystrix/wiki)。
 
-## 熔断策略
+### 熔断策略
 
 **熔断器的思路很简单：根据 RPC 的成功失败情况，限制对下游的访问；**
 
@@ -141,12 +141,14 @@ Options中的BucketTime和BucketNums，就分别对应了每个桶维护的时�
 
 - 在10.1S时，执行一次Succ，则circuitbreaker内会发生下述的操作；
 
-- (1)检测到0号桶已经过期，将其丢弃； (2)创建新的10号桶，对应[10S，11S)； (3)将该次Succ放入10号桶内；
+  - (1) 检测到0号桶已经过期，将其丢弃； 
+  - (2) 创建新的10号桶，对应[10S，11S)；
+  - (3) 将该次Succ放入10号桶内；
 
-- 在10.2S时，你执行Successes()查询窗口内成功数，则你得到的实际统计值是[1S，10.2S)的数据，而不是[0.2S，10.2S)；
+- 在10.2S时，你执行 Successes() 查询窗口内成功数，则你得到的实际统计值是[1S，10.2S)的数据，而不是[0.2S，10.2S)；
 
 如果使用分桶计数的办法，这样的抖动是无法避免的，比较折中的一个办法是将桶的个数增多，可以降低抖动的影响；
 
-如划分2000个桶，则抖动对整体的数据的影响最多也就1/2000； 在该包中，默认的桶个数也是2000，桶时间为5ms，总体窗口为10S；
+如划分2000个桶，则抖动对整体的数据的影响最多也就1/2000； 在该包中，默认的桶个数也是 2000，桶时间为 5ms，总体窗口为 10S；
 
-当时曾想过多种技术办法来避免这种问题，但是都会引入跟多其他的问题，如果你有好的思路，请issue或者MR.
+当时曾想过多种技术办法来避免这种问题，但是都会引入跟多其他的问题，如果你有好的思路，请 issue 或者 PR.

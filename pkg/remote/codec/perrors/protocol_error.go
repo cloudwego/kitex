@@ -16,6 +16,8 @@
 
 package perrors
 
+import "errors"
+
 // ProtocolError indicates an protocol error has occurred.
 type ProtocolError interface {
 	error
@@ -64,7 +66,7 @@ func (p *protocolException) Unwrap() error {
 
 // Is enables protocolException to use methods in errors lib.
 func (p *protocolException) Is(target error) bool {
-	return p == target || p.rawErr == target
+	return p == target || errors.Is(p.rawErr, target)
 }
 
 // NewProtocolError creates a new ProtocolError wrapping the given error.

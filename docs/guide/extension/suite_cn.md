@@ -21,9 +21,9 @@ type Suite interface {
 
 // TODO: 增加示例。
 
-Server 端和 Client 端都是通过`WithSuite`这个方法来增加套件的使用。
+Server 端和 Client 端都是通过`WithSuite`这个方法来启用新的套件。
 
-在初始化 Server 和 Client 的时候，Suite 是采用 DFS 方式进行设置。
+在初始化 Server 和 Client 的时候，Suite 是采用 DFS(Deep First Search) 方式进行设置。
 
 举个例子，假如我有以下代码：
 

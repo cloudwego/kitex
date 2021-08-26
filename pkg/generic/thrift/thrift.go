@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package thrift thrift parser and codec
+// Package thrift provides thrift idl parser and codec for generic call
 package thrift
 
 import (
