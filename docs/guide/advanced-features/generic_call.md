@@ -2,10 +2,10 @@
 
 Generic call is typically used for mid-platform services that do not need generated code, and only Thrift generic call is supported currently.
 
-## Support Scenes
+## Supported Scenarios
 
-1. Binary Generic Call: for traffic transit scenarios
-2. HTTP Mapping Generic Call: for API Gateway Scene
+1. Binary Generic Call: for traffic transit scenario
+2. HTTP Mapping Generic Call: for API Gateway scenario
 3. Map Mapping Generic Call
 
 ## Example of Usage
@@ -14,7 +14,7 @@ Generic call is typically used for mid-platform services that do not need genera
 
 #### Client Usage
 
-Application scene: mid-platform services can forward the received original Thrift protocol packets to the target misco-service through Binary Forwarding.
+Application scenario: mid-platform services can forward the received original Thrift protocol packets to the target misco-service through Binary Forwarding.
 
 - Client Initialization
 
