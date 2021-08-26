@@ -14,7 +14,7 @@ Generic call is typically used for mid-platform services that do not need genera
 
 #### Client Usage
 
-Application scenario: mid-platform services can forward the received original Thrift protocol packets to the target misco-service through Binary Forwarding.
+Application scenario: mid-platform services can forward the received original Thrift protocol packets to the target miscoservice through Binary Forwarding.
 
 - Client Initialization
 
@@ -44,9 +44,9 @@ Application scenario: mid-platform services can forward the received original Th
 
 #### Server Usage
 
-​	It is not nessersory that use Client and Server of Binary Generic Call together. Binary Generic Client can access normal Thrift Server if the correct Thrift encoded binary is passed.
+It is not necessary to use Client and Server of Binary Generic Call together. Binary Generic Client can access normal Thrift Server if the correct Thrift encoded binary is passed.
 
-​    The server just supports request with length header like Framed and TTheader, Bufferd Binary is not ok. So the client has to specify the transport protocol with option, eg: client.WithTransportProtocol(transport.Framed).
+The server just supports request with length header like Framed and TTheader, Bufferd Binary is not ok. So the client has to specify the transport protocol with option, eg: client.WithTransportProtocol(transport.Framed).
 
 ```go
 package main
