@@ -3,7 +3,7 @@
 
 ![remoteModule](../../images/remote_module.png)
 
-Kitex supports to extend protocols, including overall Codec and Payloadcodec. Generally, RPC protocol includes application layer transport protocol and payload protocol. For example, HTTP/HTTP2 belong to application layer transport protocol, payloads with different formats and protocols can be carried over HTTP/HTTP2. 
+Kitex supports extending protocols, including overall Codec and Payloadcodec. Generally, RPC protocol includes application layer transport protocol and payload protocol. For example, HTTP/HTTP2 belong to application layer transport protocol, payloads with different formats and protocols can be carried over HTTP/HTTP2. 
 
 Kitex supports built-in TTHeader as transport protocol, and supports Thrift, Kitex Protobuf, gRPC protocol as payload. In addition, Kitex integrates  [netpoll-http2](https://github.com/cloudwego/netpoll-http2) to support HTTP2. At present, it is mainly used for gRPC,  Thrift over HTTP2 is considered to support in the future.
 
