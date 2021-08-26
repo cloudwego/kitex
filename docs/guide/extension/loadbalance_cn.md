@@ -33,7 +33,7 @@ type Picker interface {
 
 如果说已经没有实例可以重试了，Next 方法应当返回 nil。
 
-除了以上接口之外，还有两个比较特殊的接口，定义如下：
+除了以上接口之外，还有一个比较特殊的接口，定义如下：
 
 ```go
 // Rebalancer is a kind of Loadbalancer that performs rebalancing when the result of service discovery changes.

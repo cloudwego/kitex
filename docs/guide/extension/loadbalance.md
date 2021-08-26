@@ -33,7 +33,7 @@ In a single rpc request, the selected instance may not be connected and should t
 
 If there are no more instances to retry, the Next method should return nil.
 
-There are another two special interfaces, defined as follows:
+There are another special interface, defined as follows:
 
 ```go
 // Rebalancer is a kind of Loadbalancer that performs rebalancing when the result of service discovery changes.
