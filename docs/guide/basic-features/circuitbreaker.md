@@ -157,5 +157,5 @@ Such jitter cannot be avoided if you use time-window-bucket statistics. A compro
 
 If 2000 buckets are divided, the impact of jitter on the overall data is at most 1/2000. In this package, the default number of buckets is 2000, the bucket time is 5ms, and the time window is 10S.
 
-There were various technical solutions to avoid this problem, but they all introduced other problems, so if you have good ideas, please create a issue or PR.
+There were various technical solutions to avoid this problem, but they all introduce other problems, so if you have good ideas, please create a issue or PR.
 
