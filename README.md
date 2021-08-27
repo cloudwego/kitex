@@ -95,13 +95,13 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
     
     - 治理特性
       
-      - [服务发现](docs/guide/service-government/discovery_cn.md)
+      - [服务发现](docs/guide/service-governance/discovery_cn.md)
       
-      - [监控](docs/guide/service-government/monitoring_cn.md)
+      - [监控](docs/guide/service-governance/monitoring_cn.md)
       
-      - [链路跟踪](docs/guide/service-government/tracing_cn.md)
+      - [链路跟踪](docs/guide/service-governance/tracing_cn.md)
       
-      - [自定义访问控制](docs/guide/service-government/access_control_cn.md)
+      - [自定义访问控制](docs/guide/service-governance/access_control_cn.md)
       
     - 高级特性
     
