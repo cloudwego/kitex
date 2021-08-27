@@ -1,6 +1,6 @@
 # Combine Service 的使用
 ## 使用场景
-有些服务提供了几十个方法，而对于调用方可能只请求其中1、2个方法，为了避免这种巨大的service带来的庞大的生成代码，Combine Service 可以让用户将原来一个 Service 的几十个方法拆分成多个 Service。比如原来的Service是：
+有些服务提供了几十个方法，而对于调用方可能只请求其中一两个方法，为了避免这种大型 Service 带来的庞大的生成代码，Combine Service 可以让用户将原来一个 Service 的几十个方法拆分成多个 Service。比如原来的 Service 是：
 ```thrift
 service ExampleService {
     ExampleResponse Method0(3: ExampleRequest req)
@@ -9,7 +9,7 @@ service ExampleService {
 }
 ```
 
-用户IDL定义可以拆分为三个Service：
+用户 IDL 定义可以拆分为三个 Service：
 ```thrift
 service ExampleService0 {
     ExampleResponse Method0(3: ExampleRequest req)
@@ -24,7 +24,7 @@ service ExampleService2 {
 }
 ```
 
-调用方可以只保留其中一个Service生成代码，方法名和参数保持一致不影响rpc调用。
+调用方可以只保留其中一个 Service 生成代码，方法名和参数保持一致不影响 RPC 调用。
 ## 具体描述
 当 root thrift 文件中存在形如下述定义时：
 ```thrift
@@ -55,7 +55,7 @@ service CombineService {
 注意： CombineService 只是 method 的聚合，因此当 method 名冲突时将无法生成 CombineService 。
 
 Tips：
-配合extends关键字，可以实现跨文件的CombineService
+配合 `extends` 关键字，可以实现跨文件的 CombineService
 如：
 ```
 service ExampleService0 extends thriftA.Service0 {
