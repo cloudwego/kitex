@@ -1,6 +1,6 @@
-# Extension of MetaInfo Transparent Transmission
+# Extension of Metadata Transparent Transmission
 
-MetaInfo transparently transmission transmits some additional RPC information to the downstream based on the transport protocol, and reads the upstream transparently transmitted information carried by transport protocol. The transparently transmitted field needs to be combined with the internal governance capability. It is recommended that users extend and implement it by themselves.
+Metadata transparently transmission transmits some additional RPC information to the downstream based on the transport protocol, and reads the upstream transparently transmitted information carried by transport protocol. The transparently transmitted field needs to be combined with the internal governance capability. It is recommended that users extend and implement it by themselves.
 
 ## Extension API
 
@@ -67,7 +67,7 @@ func (ch *clientTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 }
 ```
 
-- Use Customized ClientMetaHandler
+- Customized ClientMetaHandler Usage
 
   ```go
   cli, err := xxxservice.NewClient(targetService, client.WithMetaHandler(transmeta.ClientTTHeaderHandler))

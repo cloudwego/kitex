@@ -4,6 +4,6 @@ Kitex complies with [Semantic Versioning 2.0.0](https://semver.org/) release ver
 
 - Major Version: when Kitex provides incompatible API
 
-- Minor Version: when Kitex provides new features in a backwards compatible manner
+- Minor Version: when Kitex provides new features in a backward compatible manner
 
-- Patch Version: when Kitex provides small features or make backwards compatible optimization and bug fixes
+- Patch Version: when Kitex makes backward compatible changes includes small features or makes bug fixes

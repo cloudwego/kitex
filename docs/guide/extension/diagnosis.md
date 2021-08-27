@@ -1,6 +1,6 @@
-# Extension of Diagosis
+# Extension of Diagnosis
 
-The `Diagosis` module is used to visualize the information in the service to facilitate troubleshooting and confirm the service status. Kitex defines an interface to register the `diagnostic func,` and developers can implement this interface to present diagnostic information. Presentation way like: output with log and query display with debug port. The open source version of Kitex does not provide a default extension temporarily, but some information that can be used for diagnosis is registered by default. The developers can also register more information for troubleshooting.
+The `Diagnosis` module is used to visualize the information in the service to facilitate troubleshooting and confirm the service status. Kitex defines an interface to register the `diagnostic func,` and developers can implement this interface to present diagnostic information. Presentation way like: output with log and query display with debug port. The open source version of Kitex does not provide a default extension temporarily, but some information that can be used for diagnosis is registered by default. The developers can also register more information for troubleshooting.
 
 ## Extension API
 

@@ -46,7 +46,7 @@ Application scenario: mid-platform services can forward the received original Th
 
 It is not necessary to use Client and Server of Binary Generic Call together. Binary Generic Client can access normal Thrift Server if the correct Thrift encoded binary is passed.
 
-The server just supports request with length header like Framed and TTheader, Bufferd Binary is not ok. So the client has to specify the transport protocol with option, eg: client.WithTransportProtocol(transport.Framed).
+The server just supports request with a length header like Framed and TTheader, Bufferd Binary is not ok. So the client has to specify the transport protocol with an option, eg: client.WithTransportProtocol(transport.Framed).
 
 ```go
 package main
@@ -483,9 +483,9 @@ func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, req
 
 ## IDLProvider
 
-Generic Call of HTTP/Map mapping does not require generated code, but require IDL which need users provide.
+Generic Call of HTTP/Map mapping does not require generated code, but requires IDL which need users to provide.
 
-At present, Kitex has two IDLProvider implementations. Users can choose to specify the IDL path or pass in IDL content. Of course, you can also expand the `generci.DescriptorProvider` according to your needs.
+At present, Kitex has two IDLProvider implementations. Users can choose to specify the IDL path or pass in IDL content. Of course, you can also expand the `generic.DescriptorProvider` according to your needs.
 
 ### Parse IDL with Local Files
 

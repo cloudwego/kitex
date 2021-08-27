@@ -3,7 +3,7 @@
 Kitex supports user-defined registration module. Users can extend and integrate other registration centers by themselves. This extension is defined under pkg/registry.
 
 ## Extension API and Definition of Info Struct
-- Extension Api
+- Extension API
 
 ```go
 // Registry is extension interface of service registry.

@@ -7,7 +7,7 @@ Kitex supports extending protocols, including overall Codec and Payloadcodec. Ge
 
 Kitex supports built-in TTHeader as transport protocol, and supports Thrift, Kitex Protobuf, gRPC protocol as payload. In addition, Kitex integrates  [netpoll-http2](https://github.com/cloudwego/netpoll-http2) to support HTTP2. At present, it is mainly used for gRPC,  Thrift over HTTP2 is considered to support in the future.
 
-The TTHeader transport protocol is defined as follow, service information can be transparently transmitted through the TTHeader to do service governance.
+The definition of TTHeader transport protocol as follows, service information can be transparently transmitted through the TTHeader to do service governance.
 
 ```
 *  TTHeader Protocol
@@ -44,7 +44,7 @@ The TTHeader transport protocol is defined as follow, service information can be
 
 ## Extension API of Codec
 
-Codec API is defined as follow:
+Codec API is defined as follows:
 
 ```go
 // Codec is the abstraction of the codec layer of Kitex.
@@ -61,7 +61,7 @@ Codec is the overall codec interface, which is extended in combination with the 
 
 ## Extension API of PayloadCodec
 
-PayloadCodec API is defined as follow:
+PayloadCodec API is defined as follows:
 
 ```go
 // PayloadCodec is used to marshal and unmarshal payload.
@@ -80,7 +80,7 @@ In particular, generic call of Kitex is also implemented by extending payloadcod
 
 ![remoteModule](../../images/generic_codec_extension.png)
 
-## Use Customized Codec or PayloadCodec 
+## Customized Codec or PayloadCodec Usage
 
 Specify customized Codec and PayloadCodec through option.
 

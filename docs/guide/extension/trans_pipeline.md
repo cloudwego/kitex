@@ -30,7 +30,7 @@ type InboundHandler interface {
 
 - Traffic Limit Handler of Server Side
 
-  Kitex supports connection level and request level limiting. The purpose of limiting is to ensure service availability. When the threshold is reached, the request should be limited in time. And the purpose of implemention limit in transport layer is to limit traffic timely. The implementation is in limiter_inbound.go.
+  Kitex supports connection level and request level limiting. The purpose of limiting is to ensure service availability. When the threshold is reached, the request should be limited in time. And the purpose of implementing limit in transport layer is to limit traffic in a timely manner. The implementation is in limiter_inbound.go.
 
   - Limiting of Connection level implements OnActive(), OnInactive()
   - Limiting of Request level implements OnRead()
@@ -54,7 +54,7 @@ type InboundHandler interface {
   
   
 
-## Use Customized BoundHandler
+## Customized BoundHandler Usage
 
 - Server Side
 

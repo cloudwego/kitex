@@ -38,13 +38,13 @@ type ServerTransHandlerFactory interface {
 
 `TransServer` is the startup interface of the server, `ServerTransHandler` and `ClientTransHandler` are the message processing interfaces of the server and client respectively, `ByteBuffer` is the read-write interface. Under the same IO model, the code logic of the `TransHandler` is usually consistent, so Kitex provides the default implementation of `TransHandler` for synchronous IO and abstracts the extension interface for different parts. Therefore, in the scenario of synchronous IO, it is not necessary to implement the complete `TransHandler` interface, just implement the `Extension` API.
 
-### Extension to Netpoll
+### Netpoll Extension
 
 Below figure is Kitex's extension to netpoll synchronous IO, which implements `Extension`, `ByteBuffer`, `TransServer` interfaces.
 
 ![netpoll_extension](../../images/netpoll_extension.png)
 
-## Use Customized Transport Module
+## Customized Transport Module Usage
 
 - Server Side
 
