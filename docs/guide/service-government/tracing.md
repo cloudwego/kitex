@@ -1,6 +1,6 @@
 # Tracing
 
-Kitex supports opentracing, and also customized tracer.
+Kitex supports original opentracing tracer, and also customized tracer.
 
 ## opentracing
 
