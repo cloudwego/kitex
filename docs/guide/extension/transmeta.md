@@ -1,8 +1,8 @@
-# 元信息透传扩展
+# Extension of Metadata Transparent Transmission
 
-元信息透传是基于传输协议透传一些额外的 RPC 信息给下游，同时读取传输协议中上游透传的信息，透传字段需结合内部的治理能力，建议使用者自行扩展实现。
+Metadata transparently transmission transmits some additional RPC information to the downstream based on the transport protocol, and reads the upstream transparently transmitted information carried by transport protocol. The transparently transmitted field needs to be combined with the internal governance capability. It is recommended that users extend and implement it by themselves.
 
-## 接口定义
+## Extension API
 
 ```go
 // MetaHandler reads or writes metadata through certain protocol.
@@ -13,7 +13,7 @@ type MetaHandler interface {
 }
 ```
 
-## 扩展示例
+## Extension Example
 
 - ClientMetaHandler
 
@@ -67,8 +67,10 @@ func (ch *clientTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 }
 ```
 
-- 添加该 ClientMetaHandler
+- Customized ClientMetaHandler Usage
 
   ```go
   cli, err := xxxservice.NewClient(targetService, client.WithMetaHandler(transmeta.ClientTTHeaderHandler))
   ```
+
+  

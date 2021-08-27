@@ -1,11 +1,13 @@
-# 编解码 (协议) 扩展
+# Extension of Codec (Protocol)
+
+
 ![remoteModule](../../images/remote_module.png)
 
-Kitex 支持扩展协议，包括整体的 Codec 和 PayloadCodec。通常 RPC 协议中包含应用层传输协议和 Payload 协议，如 HTTP/HTTP2 属于应用层传输协议，基于 HTTP/HTTP2 可以承载不同格式和不同协议的 Payload。
+Kitex supports extending protocols, including overall Codec and Payloadcodec. Generally, RPC protocol includes application layer transport protocol and payload protocol. For example, HTTP/HTTP2 belong to application layer transport protocol, payloads with different formats and protocols can be carried over HTTP/HTTP2. 
 
-Kitex 默认支持内置的 TTHeader 传输协议，Payload 支持 Thrift 、KitexProtobuf、gRPC。另外，Kitex 集成 [netpoll-http2](https://github.com/cloudwego/netpoll-http2) 支持 HTTP2，目前主要用于 gRPC，后续会考虑基于 HTTP2 支持 Thrift。
+Kitex supports built-in TTHeader as transport protocol, and supports Thrift, Kitex Protobuf, gRPC protocol as payload. In addition, Kitex integrates  [netpoll-http2](https://github.com/cloudwego/netpoll-http2) to support HTTP2. At present, it is mainly used for gRPC,  Thrift over HTTP2 is considered to support in the future.
 
-TTHeader 协议定义如下，通过 TTHeader 可以透传服务信息，便于服务治理。
+The definition of TTHeader transport protocol as follows, service information can be transparently transmitted through the TTHeader to do service governance.
 
 ```
 *  TTHeader Protocol
@@ -40,9 +42,9 @@ TTHeader 协议定义如下，通过 TTHeader 可以透传服务信息，便于�
 *  +----------------------------------------------------------------+
 ```
 
-## Codec 定义
+## Extension API of Codec
 
-Codec 接口定义如下：
+Codec API is defined as follows:
 
 ```go
 // Codec is the abstraction of the codec layer of Kitex.
@@ -55,11 +57,11 @@ type Codec interface {
 }
 ```
 
-Codec 是整体的编解码接口，结合需要支持的传输协议和 Payload 进行扩展，根据协议类型调用 PayloadCodec 接口，其中 Decode 需要进行协议探测判断传输协议和 Payload。Kitex 默认提供 defaultCodec 扩展实现。
+Codec is the overall codec interface, which is extended in combination with the transmission protocol and payload to be supported. The PayloadCodec interface is called according to the protocol type. Decode needs to detect the protocol to judge the transmission protocol and payload. Kitex provides defaultCodec extension implementation by default.
 
-## PayloadCodec 定义
+## Extension API of PayloadCodec
 
-PayloadCodec 接口定义如下：
+PayloadCodec API is defined as follows:
 
 ```go
 // PayloadCodec is used to marshal and unmarshal payload.
@@ -72,17 +74,17 @@ type PayloadCodec interface {
 }
 ```
 
-Kitex 默认支持的 Payload 有 Thrift、Kitex Protobuf 以及 gRPC 协议。其中 Kitex Protobuf 是 Kitex 基本 Protobuf 定义的消息协议，协议定义与 Thrift Message 类似。
+By default, the payload supported by Kitex includes Thrift, Kitex Protobuf and gRPC protocols. Kitex Protobuf is the message protocol based Protobuf, the protocol definition is similar to Thrift message.
 
-特别地，Kitex 的泛化调用也是通过扩展 PayloadCodec 实现：
+In particular, generic call of Kitex is also implemented by extending payloadcodec:
 
 ![remoteModule](../../images/generic_codec_extension.png)
 
-## 指定自定义 Codec 和 PayloadCodec
+## Customized Codec or PayloadCodec Usage
 
-通过 option 指定 Codec 和 PayloadCodec。
+Specify customized Codec and PayloadCodec through option.
 
-- 指定 Codec
+- Specify Codec
   option: `WithCodec`
 
 ```go
@@ -94,7 +96,7 @@ cli, err := xxxservice.NewClient(targetService, client.WithCodec(yourCodec))
 
 ```
 
-- 指定 PayloadCodec
+-  Specify PayloadCodec
   option: `WithPayloadCodec`
 
 ```go
@@ -104,3 +106,4 @@ svr := stservice.NewServer(handler, server.WitWithPayloadCodechCodec(yourPayload
 // client side
 cli, err := xxxservice.NewClient(targetService, client.WithPayloadCodec(yourPayloadCodec))
 ```
+

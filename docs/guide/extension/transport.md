@@ -1,12 +1,12 @@
-# 传输模块扩展
+# Extension of Transport Module
 
 ![remote_module](../../images/remote_module.png)
 
-Kitex 默认集成了自研的高性能网络库 [Netpoll](https://github.com/cloudwego/netpoll)，但没有与 Netpoll 强绑定，同时也支持使用者扩展其他网络库按需选择。Kitex 还提供了 ShmIPC 进一步提升 IPC 性能，该扩展会在后续开源。
+By default, Kitex integrates the self-developed high-performance network library [Netpoll](https://github.com/cloudwego/netpoll). But Kitex is not strongly bound with Netpoll, it also supports users to extend other network libraries and choose one on demand. In addition, Kitex provides ShmIPC to further improve IPC performance, this extension will be open source later.
 
-## 扩展接口
+## Extension APIs
 
-传输模块主要的扩展接口如下：
+The main extension interfaces of transport module are as follows:
 
 ```go
 type TransServer interface {...}
@@ -36,17 +36,17 @@ type ServerTransHandlerFactory interface {
 }
 ```
 
-TransServer 是服务端的启动接口，ServerTransHandler  和 ClientTransHandler 分别是服务端和调用端对消息的处理接口，ByteBuffer 是读写接口。相同的 IO 模型下 TransHandler 的逻辑通常是一致的，Kitex 对同步 IO 提供了默认实现的 TransHandler，针对不一样的地方抽象出了 Extension 接口，所以在同步 IO 的场景下不需要实现完整的 TransHandler 接口，只需实现 Extension 即可。
+`TransServer` is the startup interface of the server, `ServerTransHandler` and `ClientTransHandler` are the message processing interfaces of the server and client respectively, `ByteBuffer` is the read-write interface. Under the same IO model, the code logic of the `TransHandler` is usually consistent, so Kitex provides the default implementation of `TransHandler` for synchronous IO and abstracts the extension interface for different parts. Therefore, in the scenario of synchronous IO, it is not necessary to implement the complete `TransHandler` interface, just implement the `Extension` API.
 
-### Netpoll 的扩展
+### Netpoll Extension
 
-如下是 Kitex 对 Netpoll 同步 IO 的扩展，分别实现了Extension、ByteBuffer、TransServer 接口。
+Below figure is Kitex's extension to netpoll synchronous IO, which implements `Extension`, `ByteBuffer`, `TransServer` interfaces.
 
 ![netpoll_extension](../../images/netpoll_extension.png)
 
-## 指定自定义的传输模块
+## Customized Transport Module Usage
 
-- 服务端
+- Server Side
 
   option: `WithTransServerFactory`,  `WithTransHandlerFactory`
 
@@ -54,11 +54,11 @@ TransServer 是服务端的启动接口，ServerTransHandler  和 ClientTransHan
   var opts []server.Option
   opts = append(opts, server.WithTransServerFactory(yourTransServerFactory)
   opts = append(opts, server.WithTransHandlerFactory(yourTransHandlerFactory)
-
+                
   svr := xxxservice.NewServer(handler, opts...)
   ```
 
-- 调用端
+- Client Side
 
   option: `WithTransHandlerFactory`
 
