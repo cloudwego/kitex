@@ -31,8 +31,8 @@ Application scenario: mid-platform services can forward the received original Th
 
 - Generic Call
 
-  If you encode by yourself, you need to use the Thrift encoding format [thrift/thrift-binary-protocol.md](https://github.com/apache/thrift/blob/master/doc/specs/thrift-binary-protocol.md#message). Note that the binary encoding is not the encoding of the original Thrift request parameter, but the **XXXArgs** encapsulated by the method parameter. You can refer to  github.com/cloudwego/kitex/generic/generic_test.go.
-
+  If you encode by yourself, you have to use Thrift serialization protocol [thrift/thrift-binary-protocol.md](https://github.com/apache/thrift/blob/master/doc/specs/thrift-binary-protocol.md#message). Note that you shouldn't encode original function parameter, but the **XXXArgs** which wraps function parameters. You can refer to github.com/cloudwego/kitex/generic/generic_test.go.
+  
   Kitex provides a thrift codec package `github.com/cloudwego/kitex/pkg/utils.NewThriftMessageCodec`.
   
   ```go
@@ -151,7 +151,7 @@ import (
 
 func main() {
     // Parse IDL with Local Files
- 		// YOUR_IDL_PATH thrift file path, eg: ./idl/example.thrift
+	// YOUR_IDL_PATH thrift file path, eg: ./idl/example.thrift
     // includeDirs: specify include path
     p, err := generic.NewThriftFileProvider("./YOUR_IDL_PATH")
     if err != nil {
@@ -166,18 +166,18 @@ func main() {
         panic(err)
     }
     body := map[string]interface{}{
+        "text": "text",
+        "some": map[string]interface{}{
+            "id":   1,
+            "text": "text",
+        },
+        "req_items_map": map[string]interface{}{
+            "1": map[string]interface{}{
+                "id":   1,
                 "text": "text",
-                "some": map[string]interface{}{
-                        "id":   1,
-                        "text": "text",
-                },
-                "req_items_map": map[string]interface{}{
-                        "1": map[string]interface{}{
-                                "id":   1,
-                                "text": "text",
-                        },
-                },
-        }
+            },
+        },
+    }
     data, err := json.Marshal(body)
     if err != nil {
         panic(err)

@@ -168,18 +168,18 @@ func main() {
     }
     // 构造request，或者从ginex获取
     body := map[string]interface{}{
+        "text": "text",
+        "some": map[string]interface{}{
+            "id":   1,
+            "text": "text",
+        },
+        "req_items_map": map[string]interface{}{
+            "1": map[string]interface{}{
+                "id":   1,
                 "text": "text",
-                "some": map[string]interface{}{
-                        "id":   1,
-                        "text": "text",
-                },
-                "req_items_map": map[string]interface{}{
-                        "1": map[string]interface{}{
-                                "id":   1,
-                                "text": "text",
-                        },
-                },
-        }
+            },
+        },
+    }
     data, err := json.Marshal(body)
     if err != nil {
         panic(err)
