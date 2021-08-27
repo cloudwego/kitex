@@ -21,7 +21,7 @@ type Suite interface {
 
 // TODO: 增加示例。
 
-Server 端和 Client 端都是通过`WithSuite`这个方法来启用新的套件。
+Server 端和 Client 端都是通过 `WithSuite` 这个方法来启用新的套件。
 
 在初始化 Server 和 Client 的时候，Suite 是采用 DFS(Deep First Search) 方式进行设置。
 
@@ -44,7 +44,7 @@ func (s2) Options() []client.Option {
 }
 ```
 
-那么如果我在创建 client 时传入`client.WithSuite(s2{}), client.WithRPCTimeout(3*time.Second)`，在初始化的时候，会先执行到`client.WithSuite(s1{})`，然后是`client.WithRPCTimeout(1*time.Second)`，接着是`client.WithRPCTimeout(2*time.Second)`，最后是`client.WithRPCTimeout(3*time.Second)`。这样初始化之后，RPCTimeout 的值会被设定为 3s（参见开头所说的原则）。
+那么如果我在创建 client 时传入 `client.WithSuite(s2{}), client.WithRPCTimeout(3*time.Second)`，在初始化的时候，会先执行到 `client.WithSuite(s1{})`，然后是 `client.WithRPCTimeout(1*time.Second)`，接着是 `client.WithRPCTimeout(2*time.Second)`，最后是 `client.WithRPCTimeout(3*time.Second)`。这样初始化之后，RPCTimeout 的值会被设定为 3s（参见开头所说的原则）。
 
 # 总结
 

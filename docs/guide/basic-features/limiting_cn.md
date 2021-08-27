@@ -23,12 +23,12 @@ func main() {
 
   ```go
   import "github.com/cloudwego/kitex/pkg/limit"
-  
+
   // define your limiter updater to update limit threshold
   type MyLimiterUpdater struct {
   	updater limit.Updater
   }
-  
+
   func (lu *MyLimiterUpdater) YourChange() {
   	// your logic: set new option as needed
   	newOpt := &limit.Option{
@@ -39,11 +39,11 @@ func main() {
   	isUpdated := lu.updater.UpdateLimit(newOpt)
   	// your logic
   }
-  
+
   func (lu *MyLimiterUpdater) UpdateControl(u limit.Updater) {
   	lu.updater = u
   }
-  
+
   //--- init server ---
   var lu  = MyLimiterUpdater{}
   svr := xxxservice.NewServer(handler, server.WithLimit(&limit.Option{MaxConnections: 10000, MaxQPS: 1000, UpdateControl: lu.UpdateControl}))
@@ -54,7 +54,7 @@ func main() {
 分别使用 ConcurrencyLimiter 和 RateLimiter 对最大连接数和最大 QPS 进行限流。
 
 - ConcurrencyLimiter：简单的计数器；
-- RateLimiter：这里的限流算法采用了"滑动窗口法"，时间窗口为 1s，再把时间窗口划分成 10 个小窗口，每个小窗口为 100ms。
+- RateLimiter：这里的限流算法采用了 " 滑动窗口法 "，时间窗口为 1s，再把时间窗口划分成 10 个小窗口，每个小窗口为 100ms。
 
 ## 监控
 

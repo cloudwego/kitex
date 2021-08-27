@@ -1,6 +1,6 @@
 # 诊断模块扩展
 
-诊断模块是用于将服务中的信息可视化出来，便于问题排查，确认服务状态。Kitex 定义了接口用来注册诊断 func，扩展者可实现该接口来呈现诊断信息。呈现的方式如：输出日志、debug端口查询展示。Kitex 开源版本暂未提供默认扩展，但默认注册了部分可用于诊断的信息，扩展者也可以注册更多的信息用于问题的排查。
+诊断模块是用于将服务中的信息可视化出来，便于问题排查，确认服务状态。Kitex 定义了接口用来注册诊断 func，扩展者可实现该接口来呈现诊断信息。呈现的方式如：输出日志、debug 端口查询展示。Kitex 开源版本暂未提供默认扩展，但默认注册了部分可用于诊断的信息，扩展者也可以注册更多的信息用于问题的排查。
 
 ## 扩展接口
 
@@ -52,11 +52,9 @@ const (
 )
 ```
 
-
-
 ## 集成到 Kitex
 
-通过option指定自己的诊断服务，option: `WithDiagnosisService`。
+通过 option 指定自己的诊断服务，option: `WithDiagnosisService`。
 
 ```go
 // server side
@@ -65,4 +63,3 @@ svr := stservice.NewServer(handler, server.WithDiagnosisService(yourDiagnosisSer
 // client side
 cli, err := xxxservice.NewClient(targetService, client.WithDiagnosisService(yourDiagnosisService))
 ```
-
