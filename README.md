@@ -69,13 +69,11 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
     
       - [消息类型（PingPong、Oneway、Streaming）](docs/guide/basic-features/message_type_cn.md)
     
-      - [支持协议（Thrift、Kitex Protobuf、gRPC protocol）](docs/guide/basic-features/protocols_cn.md)
-    
-      - [应用层传输协议 TTHeader](docs/guide/basic-features/ttheader_cn.md)
+      - [编解码协议](docs/guide/basic-features/serialization_protocol_cn.md)
     
       - [直连访问](docs/guide/basic-features/visit_directly_cn.md)
     
-      - [连接池](docs/guide/basic-features/connpool_cn.md)
+      - [连接池](docs/guide/basic-features/connection_pool_cn.md)
     
       - [超时控制](docs/guide/basic-features/timeout_cn.md)
     
@@ -123,7 +121,7 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
     
       - [服务注册扩展](docs/guide/extension/registry_cn.md)
     
-      - [服务发现扩展](docs/guide/extension/discovery_cn.md)
+      - [服务发现扩展](docs/guide/extension/service_discovery_cn.md)
     
       - [负载均衡扩展](docs/guide/extension/loadbalance_cn.md)
     
@@ -142,6 +140,8 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
       - [诊断模块扩展](docs/guide/extension/diagnosis_cn.md)
     
   - **参考**
+
+    - [应用层传输协议 TTHeader](docs/reference/transport_protocol_ttheader_cn.md)
 
     - [异常说明](docs/reference/exception_cn.md)
 
