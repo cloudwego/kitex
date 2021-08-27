@@ -35,14 +35,14 @@ type InboundHandler interface {
   - Limiting of Connection level implements OnActive(), OnInactive()
   - Limiting of Request level implements OnRead()
 
-- MetaInfo Transparent Transmission Handler
+- Metadata Transparent Transmission Handler
 
   Meta information transparent transmission is to transmit some RPC additional information to the downstream based on the transport protocol, and read the upstream transparent transmission information carried by transport protocol. The implementation is in transmeta_bound.go.
 
   - Write metainfo implements Write()
   - Read metainfo  implements OnMessage()
   
-  In order to make it more convenient to extend MetaInfo Transparent Transmission for users, Kitex defines the separately extension API `MetaHandler`.
+  In order to make it more convenient to extend Metadata Transparent Transmission for users, Kitex defines the separately extension API `MetaHandler`.
   
    ```go
    // MetaHandler reads or writes metadata through certain protocol.
