@@ -28,10 +28,10 @@ Kitex 支持了 Thrift 的 [Binary](https://github.com/apache/thrift/blob/master
 
 Kitex 对 protobuf 支持的协议有两种：
 
-1. 自定义的消息协议，理解为 Kitex Protobuf，使用方式与 thrift 一样
+1. 自定义的消息协议，可以理解为 Kitex Protobuf，使用方式与 thrift 一样
 2. gRPC 协议，可以与 gRPC 互通，并且支持 streaming 调用
 
-如果 idl 中定义了 streaming 方法默认走 gRPC 协议，没有定义默认走 Kitex Protobuf。没有 streaming 方法，若想指定 gRPC 协议，需要 client 初始化做如下配置（server 支持协议探测无需配置） ：
+如果 IDL 文件中定义了 streaming 方法则走 gRPC 协议，否则走 Kitex Protobuf。没有 streaming 方法，又想指定 gRPC 协议，需要 client 初始化做如下配置（server 支持协议探测无需配置） ：
 
 ```go
 // 使用 WithTransportProtocol 指定 transport
@@ -48,7 +48,7 @@ cli, err := service.NewClient(destService, client.WithTransportProtocol(transpor
 2. go_package 和 thrift 的 namespace 定义一样，不用写完整的路径，只需指定包名，相当于 thrift 的 namespace，如：go_package = "pbdemo"
 3. 提前下载好 protoc 二进制放在 $PATH 目录下
 
-生成代码时需要指定 protobuf ：
+生成代码时需要指定 protobuf 协议：
 
 - 客户端
 

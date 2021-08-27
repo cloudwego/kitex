@@ -1,6 +1,6 @@
 # 监控扩展
 
-用户如果需要更详细的打点，例如包大小；或更换其他数据源，例如 influxDB 的需求，用户可以根据需求实现 `Trace` 接口，并通过 `WithTracer` Option 来注入。
+用户如果需要更详细的打点，例如包大小，或者想要更换其他数据源，例如 influxDB，用户可以根据自己的需求实现 `Trace` 接口，并通过 `WithTracer` Option来注入。
 
 ```go
 // Tracer is executed at the start and finish of an RPC.
@@ -10,7 +10,7 @@ type Tracer interface {
 }
 ```
 
-从 ctx 中可以获得 RPCInfo，从而可以得到请求耗时、包大小和请求返回的错误信息等，举例：
+从 ctx 中可以获得 RPCInfo，进一步的从 RPCInfo 中获取请求耗时、包大小和请求返回的错误信息等，举例：
 
 ```go
 type clientTracer struct {
