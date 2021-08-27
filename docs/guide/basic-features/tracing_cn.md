@@ -39,8 +39,8 @@ if err := svr.Run(); err != nil {
 
 基本埋点：
 
-1. RPCStart，（客户端/服务端）RPC 调用开始
-2. RPCFinish，（客户端/服务端）RPC 调用结束
+1. RPCStart，（客户端 / 服务端）RPC 调用开始
+2. RPCFinish，（客户端 / 服务端）RPC 调用结束
 
 细粒度埋点（客户端）：
 
@@ -49,15 +49,15 @@ if err := svr.Run(); err != nil {
 3. WriteStart，请求发送（含编码）开始
 4. WriteFinish，请求发送（含编码）结束
 5. ReadStart，响应接收（含解码）开始
-6. WaitReadStart，响应二进制读取开始（仅适用于`Fast Codec`）
-7. WaitReadFinish，响应二进制读取完毕（仅适用于`Fast Codec`）
+6. WaitReadStart，响应二进制读取开始（仅适用于 `Fast Codec`）
+7. WaitReadFinish，响应二进制读取完毕（仅适用于 `Fast Codec`）
 8. ReadFinish，响应接收（含解码）完毕
 
 细粒度埋点（服务端）：
 
 1. ReadStart，请求接收（含解码）开始
-2. WaitReadStart，请求二进制读取开始（仅适用于`Fast Codec`）
-3. WaitReadFinish，请求二进制读取完毕（仅适用于`Fast Codec`）
+2. WaitReadStart，请求二进制读取开始（仅适用于 `Fast Codec`）
+3. WaitReadFinish，请求二进制读取完毕（仅适用于 `Fast Codec`）
 4. ReadFinish，请求接收（含解码）完毕
 5. ServerHandleStart，handler 处理开始
 6. ServerHandleFinish，handler 处理完毕

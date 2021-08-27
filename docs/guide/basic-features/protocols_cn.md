@@ -20,7 +20,7 @@ Kitex 支持了 Thrift 的 [Binary](https://github.com/apache/thrift/blob/master
   kitex -type thrift -service ${service_name} ${idl_name}.thrift
   ```
 
-我们针对 thrift 的 binary 协议编解码进行了优化，具体优化细节参考 "Reference - 高性能 Thrift 编解码" 篇章，假如想要关闭这些优化，生成代码时可以加上 `-no-fast-api` 参数。
+我们针对 thrift 的 binary 协议编解码进行了优化，具体优化细节参考 "Reference - 高性能 Thrift 编解码 " 篇章，假如想要关闭这些优化，生成代码时可以加上 `-no-fast-api` 参数。
 
 ## Protobuf
 
@@ -44,7 +44,7 @@ cli, err := service.NewClient(destService, client.WithTransportProtocol(transpor
 
 注意：
 
-1. 相较其他语言，必须定义 go_package ，以后pb官方也会将此作为必须约束
+1. 相较其他语言，必须定义 go_package ，以后 pb 官方也会将此作为必须约束
 2. go_package 和 thrift 的 namespace 定义一样，不用写完整的路径，只需指定包名，相当于 thrift 的 namespace，如：go_package = "pbdemo"
 3. 提前下载好 protoc 二进制放在 $PATH 目录下
 
@@ -61,4 +61,3 @@ cli, err := service.NewClient(destService, client.WithTransportProtocol(transpor
   ```shell
   kitex -type protobuf -service ${service_name} -I idl/ idl/${proto_name}.proto
   ```
-

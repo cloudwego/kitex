@@ -32,7 +32,7 @@ type Change struct {
 }
 ```
 
-Resolver 定义如下:
+Resolver 定义如下 :
 
 - `Target` 方法是从 Kitex 提供的对端 EndpointInfo 中解析出 `Resolve` 需要使用的唯一 target, 同时这个 target 将作为缓存的唯一 key
 - `Resolve` 方法作为 Resolver 的核心方法， 从 target key 中获取我们需要的服务发现结果 `Result`
@@ -43,7 +43,7 @@ Resolver 定义如下:
 
 首先需要实现 Resolver 接口需要的方法， 通过配置项指定 Resolver
 
-Kitex 提供了 Client 初始化配置项:
+Kitex 提供了 Client 初始化配置项 :
 
 ```go
 import (

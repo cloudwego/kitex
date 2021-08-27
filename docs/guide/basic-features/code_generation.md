@@ -1,4 +1,3 @@
-
 # kitex -- Code Generation Tool for Kitex
 
 **kitex** is a command line tool for code generation provided by the RPC framework **Kitex**. At present, kitex accepts both thrift and protobuf IDLs, and supports generating a skeleton of a server side project.
@@ -180,5 +179,3 @@ Pass an argument to protoc. The argument will be appended to the `-go_out` for p
 Pass an argument to thriftgo. The argument will be appended to the `-g go:` for thriftgo. See the documentation of thriftgo for available values.
 
 Kitex by default passes `naming_style=golint,ignore_initialisms,gen_setter,gen_deep_equal` to thriftgo and it can be overrided if you specify the same parameter in addition.
-
-

@@ -1,4 +1,4 @@
-# Server SDK化
+# Server SDK 化
 
 SDK 化（invoker）允许用户将 Kitex server 当作一个本地 SDK 调用。
 

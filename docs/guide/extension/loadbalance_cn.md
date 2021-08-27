@@ -9,7 +9,7 @@
 
 ## 接口
 
-LoadBalancer 接口在`pkg/loadbalance/loadbalancer.go`中，具体定义如下：
+LoadBalancer 接口在 `pkg/loadbalance/loadbalancer.go` 中，具体定义如下：
 
 ```go
 // Loadbalancer generates pickers for the given service discovery result.

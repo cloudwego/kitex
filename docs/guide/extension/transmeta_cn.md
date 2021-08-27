@@ -67,12 +67,8 @@ func (ch *clientTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 }
 ```
 
-
-
-- 添加该ClientMetaHandler
+- 添加该 ClientMetaHandler
 
   ```go
   cli, err := xxxservice.NewClient(targetService, client.WithMetaHandler(transmeta.ClientTTHeaderHandler))
   ```
-
-  

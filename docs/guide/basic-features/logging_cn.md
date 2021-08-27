@@ -14,7 +14,6 @@ client 和 server 都提供了一个 `WithLogger` 的选项，用于注入自定
 
 默认使用的是 `klog.DefaultLogger`。
 
-
 ## 在中间件里打日志
 
 如果你实现了一个中间件，并期望可以使用框架提供的 logger 来输出日志，并兼容 `WithLogger` 选项注入的自定义 logger 实现，那么你可以用 `WithMiddlewareBuilder` 而不是 `WithMiddleware` 来注入你实现的中间件。

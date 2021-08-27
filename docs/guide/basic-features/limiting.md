@@ -23,12 +23,12 @@ Parameter description：
 
   ```go
   import "github.com/cloudwego/kitex/pkg/limit"
-  
+
   // define your limiter updater to update limit threshold
   type MyLimiterUpdater struct {
   	updater limit.Updater
   }
-  
+
   func (lu *MyLimiterUpdater) YourChange() {
   	// your logic: set new option as needed
   	newOpt := &limit.Option{
@@ -39,11 +39,11 @@ Parameter description：
   	isUpdated := lu.updater.UpdateLimit(newOpt)
   	// your logic
   }
-  
+
   func (lu *MyLimiterUpdater) UpdateControl(u limit.Updater) {
   	lu.updater = u
   }
-  
+
   //--- init server ---
   var lu  = MyLimiterUpdater{}
   svr := xxxservice.NewServer(handler, server.WithLimit(&limit.Option{MaxConnections: 10000, MaxQPS: 1000, UpdateControl: lu.UpdateControl}))

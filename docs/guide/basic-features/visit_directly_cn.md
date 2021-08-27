@@ -8,4 +8,3 @@ client 可以有两种形式指定下游地址：
     - 普通 IP 地址，形式为 "host:port"，支持 IPv6
     - sock 文件地址，通过 UDS (Unix Domain Socket) 通信
 - 使用 `WithURL` Option，参数为合法的 HTTP URL 地址
-

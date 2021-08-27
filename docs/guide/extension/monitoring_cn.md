@@ -1,6 +1,6 @@
 # 监控扩展
 
-用户如果需要更详细的打点，例如包大小；或更换其他数据源，例如 influxDB 的需求，用户可以根据需求实现 `Trace` 接口，并通过 `WithTracer` Option来注入。
+用户如果需要更详细的打点，例如包大小；或更换其他数据源，例如 influxDB 的需求，用户可以根据需求实现 `Trace` 接口，并通过 `WithTracer` Option 来注入。
 
 ```go
 // Tracer is executed at the start and finish of an RPC.
