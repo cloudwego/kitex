@@ -130,7 +130,7 @@ Specially, you can use `IsTimeoutError` in `kerrors` to check whether it is a `t
 
 ### Get Detailed Error Message
 
-All detailed error is defined by `DetailedError` in `kerrors`, so you can use `errors.As` to get specified `DetailedError`, like:
+All detailed errors is defined by `DetailedError` in `kerrors`, so you can use `errors.As` to get specified `DetailedError`, like:
 
 ```go
 import "errors"
