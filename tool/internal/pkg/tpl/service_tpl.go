@@ -75,7 +75,7 @@ func newServiceInfo() *kitex.ServiceInfo {
 {{- $serverSide := and (not .ClientStreaming) .ServerStreaming}}
 {{- $bidiSide := and .ClientStreaming .ServerStreaming}}
 {{- $arg := "" }}
-{{- if $.HasStreaming }}
+{{- if eq $.Codec "protobuf" }}
 {{- $arg = index .Args 0}}
 {{- end}}
 
