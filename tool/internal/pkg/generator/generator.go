@@ -402,7 +402,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 					pkg.AddImport(dep.PkgRefName, dep.ImportPath)
 				}
 			}
-			if pkg.HasStreaming {
+			if pkg.Codec == "protobuf" {
 				pkg.AddImport("streaming", filepath.Join(KitexImportPath, "pkg/streaming"))
 			}
 			if !m.Void && m.Resp != nil {
