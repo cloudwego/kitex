@@ -1,6 +1,6 @@
 # CloudWeGo-Kitex
 
-Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、**强可扩展**的特点，针对字节内部做了定制扩展。如今越来越多的微服务选择使用 Golang，我们考虑将 Kitex 开源出来丰富开源社区。如果对微服务性能有要求，又希望定制扩展融入自己的治理体系，Kitex 会是一个不错的选择。
+Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、**强可扩展**的特点，在字节内部已广泛使用。如今越来越多的微服务选择使用 Golang，我们考虑将 Kitex 开源出来丰富开源社区。如果对微服务性能有要求，又希望定制扩展融入自己的治理体系，Kitex 会是一个不错的选择。
 
 ## 框架特点
 
@@ -20,7 +20,7 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
 
   传输协议封装消息协议进行 RPC 互通，传输协议可以额外透传元信息，用于服务治理，Kitex 支持的传输协议有 **TTHeader**、**HTTP2**。TTHeader 可以和 Thrift、Kitex Protobuf 结合使用；HTTP2 目前主要是结合 gRPC 协议使用，后续也会支持 Thrift。
 
-- **多种消息类型*
+- **多种消息类型**
 
   支持 **PingPong**、**Oneway**、**双向 Streaming**。其中 Oneway 目前只对 Thrift 协议支持，双向 Streaming 只对 gRPC 支持，后续会考虑支持 Thrift 的双向 Streaming。
 
@@ -61,6 +61,7 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
 | ![image](docs/images/performance_bodysize_qps.png) | ![image](docs/images/performance_bodysize_tp99.png) | ![image](docs/images/performance_bodysize_tp999.png) |
 
 ## 详细文档
+
   - [**快速开始**](docs/guide/getting_started_cn.md)
 
   - **用户指南**
@@ -148,7 +149,9 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
     - [版本管理](docs/reference/version_cn.md)   
 
   - **FAQ**
+
 ## 相关项目
+
 - [Netpoll](https://github.com/cloudwego/netpoll): 自研的高性能网络库，Kitex 默认集成的。
 - [kitex-contrib](https://github.com/kitex-contrib)：Kitex 的部分扩展库，使用者可以根据需求通过 Option 集成进 Kitex 中。
 - [Example](https://github.com/cloudwego/kitex-examples)：Kitex 的使用示例。
@@ -163,6 +166,7 @@ Kitex 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、
 [Contributing](CONTRIBUTING.md)。
 
 ## 开源许可
+
 Kitex 基于[Apache License 2.0](LICENSE) 许可证，其依赖的三方组件的开源许可见 [Licenses](licenses)。
 
 ## 联系我们
@@ -171,7 +175,4 @@ Kitex 基于[Apache License 2.0](LICENSE) 许可证，其依赖的三方组件�
 - 飞书用户群（[注册飞书](https://www.feishu.cn/)进群）
 
   ![LarkGroup](docs/images/LarkGroup.jpg) 
-
-
-
 
