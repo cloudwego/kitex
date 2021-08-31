@@ -1,4 +1,4 @@
-# Tracing stats level control
+# Instrumentation control
 
 Stats Level:
 1. LevelDisabled, disable all events

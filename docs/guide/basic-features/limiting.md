@@ -54,7 +54,7 @@ Parameter description：
 ConcurrencyLimiter and RateLimiter are used respectively to limit max connection and max QPS.
 
 - ConcurrencyLimiter：a simple counter；
-- RateLimiter：sliding window algorithm is used here. Time window is 1s, which is split into 10 small windows with each 100ms.
+- RateLimiter：token bucket algorithm is used here. 
 
 ## Monitoring
 
