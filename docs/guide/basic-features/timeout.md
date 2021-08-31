@@ -1,4 +1,4 @@
-# Timeout Control
+# Timeouts
 
 There are two types of timeout in Kitex, RPC timeout and connection timeout. Both can be specified by client option and call option.
 
