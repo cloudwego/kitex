@@ -54,7 +54,7 @@ func main() {
 分别使用 ConcurrencyLimiter 和 RateLimiter 对最大连接数和最大 QPS 进行限流。
 
 - ConcurrencyLimiter：简单的计数器；
-- RateLimiter：这里的限流算法采用了 " 令牌桶算法 "，时间窗口为 1s，再把时间窗口划分成 10 个小窗口，每个小窗口为 100ms。
+- RateLimiter：这里的限流算法采用了 " 令牌桶算法 "。
 
 ## 监控
 
