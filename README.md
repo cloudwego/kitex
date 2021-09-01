@@ -1,15 +1,15 @@
 # CloudWeGo-Kitex
 English | [中文](README_cn.md)
 
-Kitex [kaɪt'eks] is a high performance and scalable Golang RPC framework that can help developers build microservices. As more and more organizations are now choosing Golang, if you need high-performance microservices and want to do some customization, Kitex will be a good choice.
+Kitex [kaɪt'eks] is a **High-Performance** and **Strong-Extensibility** Golang RPC framework that can help developers build microservices. As more and more organizations are now choosing Golang, if you need high-performance microservices and want to do some customization, Kitex will be a good choice.
 
 ## Basic Features
 
 - **High Performance**
 
-Kitex supports [Netpoll](https://github.com/cloudwego/netpoll), a self-developed high-performance network library, which has significant performance advantages over [go net](https://pkg.go.dev/net).
+Kitex integrates [Netpoll](https://github.com/cloudwego/netpoll), a high-performance network library, which offers significant performance advantage over [go net](https://pkg.go.dev/net).
 
-- **Scalability**
+- **Extensibility**
 
 Kitex provides more extension interfaces and default extension implementations. Developers can also customize extensions according to their own needs (please refer to the framework extension section below).
 
