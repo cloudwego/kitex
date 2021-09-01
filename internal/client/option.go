@@ -75,9 +75,10 @@ type Options struct {
 
 	MWBs  []endpoint.MiddlewareBuilder
 	IMWBs []endpoint.MiddlewareBuilder
-	Bus   event.Bus
 
-	Events event.Queue
+	Bus          event.Bus
+	Events       event.Queue
+	ExtraTimeout time.Duration
 
 	// DebugInfo should only contains objects that are suitable for json serialization.
 	DebugInfo    utils.Slice

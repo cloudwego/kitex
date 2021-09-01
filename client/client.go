@@ -37,6 +37,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
@@ -123,6 +124,7 @@ func fillContext(opt *client.Options) context.Context {
 	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
 	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, opt.Events)
 	ctx = context.WithValue(ctx, endpoint.CtxLoggerKey, opt.Logger)
+	ctx = context.WithValue(ctx, rpctimeout.TimeoutAdjustKey, &opt.ExtraTimeout)
 	return ctx
 }
 
@@ -152,6 +154,7 @@ func (kc *kClient) checkOptions() (err error) {
 func (kc *kClient) initMiddlewares(ctx context.Context) {
 	kc.mws = richMWsWithBuilder(ctx, kc.opt.MWBs, kc)
 	// add new middlewares
+	kc.mws = append(kc.mws, rpcTimeoutMW(ctx))
 	kc.mws = append(kc.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
 	if kc.opt.Proxy == nil {
 		kc.mws = append(kc.mws, newResolveMWBuilder(kc.opt)(ctx))
