@@ -27,7 +27,7 @@ Kitex supports **PingPong**, **One-way**, and **two-way Streaming**. Among them,
 
 - **Service Governance**
 
-Kitex integrates service governance modules such as service registry, service discovery, load balancing, circuit breaker, current limiting, retry, monitoring, tracer, logging, diagnosis, etc. Most of these have been provided with default extensions, and users can choose to integrate.
+Kitex integrates service governance modules such as service registry, service discovery, load balancing, circuit breaker, rate limiting, retry, monitoring, tracing, logging, diagnosis, etc. Most of these have been provided with default extensions, and users can choose to integrate.
 
 - **Code Generation**
 
