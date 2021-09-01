@@ -1,25 +1,25 @@
 # CloudWeGo-Kitex
-Kitex [kaɪt'eks] is a Golang-based, scalable and performant RPC framework that can help developers build microservices. As more and more organizations are now choosing Golang, if you have requirements for microservice performance and want to do some customization, Kitex will be a good choice.
+Kitex [kaɪt'eks] is a Golang-based, scalable and performant RPC framework that can help developers build microservices. As more and more organizations are now choosing Golang, if you need high-performance microservices and want to do some customization, Kitex will be a good choice.
 
 ## Basic Features
 
-- **High performance**
+- **High Performance**
 
-Kitex supports [Netpoll](https://github.com/cloudwego/netpoll), a self-developed high-performance network library, which has significant performance advantages over go net.
+Kitex supports [Netpoll](https://github.com/cloudwego/netpoll), a self-developed high-performance network library, which has significant performance advantages over [go net](https://pkg.go.dev/net).
 
 - **Scalability**
 
 Kitex provides more extension interfaces and default extension implementations. Developers can also customize extensions according to their own needs (please refer to the framework extension section below).
 
-- **Multi-message protocol**
+- **Multi-message Protocol**
 
 Kitex is designed to be extensible to support multiple RPC messaging protocols. The initial release contains support for **Thrift**, **Kitex Protobuf** and **gRPC**, in which Kitex Protobuf is a Kitex custom Protobuf messaging protocol with a protocol format similar to Thrift. Kitex also supports developers extending their own messaging protocols.
 
-- **Multi-transport protocol**
+- **Multi-transport Protocol**
 
 For service governance, Kitex supports **TTHeader** and **HTTP2**. TTHeader can be used in conjunction with Thrift and Kitex Protobuf; HTTP2 is currently mainly used with the gRPC protocol, and it will support Thrift in the future.
 
-- **Multi-message Type*
+- **Multi-message Type**
 
 Kitex supports **PingPong**, **one-way**, and **two-way Streaming**. Among them, One-way currently only supports Thrift protocol, two-way Streaming only supports gRPC, and Kitex will support Thrift's two-way Streaming in the future.
 
@@ -27,7 +27,7 @@ Kitex supports **PingPong**, **one-way**, and **two-way Streaming**. Among them,
 
 Kitex integrates service governance modules such as service registry, service discovery, load balancing, circuit breaker, current limiting, retry, monitoring, tracer, logging, diagnosis, etc. Most of these have been provided with default extensions, and users can choose to integrate.
 
-- **Code generation**
+- **Code Generation**
 
 Kitex has built-in code generation tools that support generating **Thrift**, **Protobuf**, and scaffold code.
 
@@ -74,7 +74,7 @@ QPS|TP99|TP999
     - [LoadBalancer](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/loadbalance.md)
     - [Circuit Breaker](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/circuitbreaker.md)
     - [Rate Limiting](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/limiting.md)
-    - [Tracing stats level control](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/tracing.md)
+    - [Instrumentation Control](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/tracing.md)
     - [Logging](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/logging.md)
     - [HttpResolver](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/HTTP_resolver.md)
   - Governance Features
@@ -102,7 +102,7 @@ QPS|TP99|TP999
     - [Metadata Transparent Transmission](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/transmeta.md)
     - [Diagnosis Module](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/diagnosis.md)
 - **Reference**
-	- [Transport Protocol TTheader](https://github.com/cloudwego/kitex/blob/develop/docs/reference/transport_protocol_ttheader.md)
+	- [Transport Protocol - TTHeader](https://github.com/cloudwego/kitex/blob/develop/docs/reference/transport_protocol_ttheader.md)
 	- [Exception Instruction](https://github.com/cloudwego/kitex/blob/develop/docs/reference/exception.md)
 	- [Version Specification](https://github.com/cloudwego/kitex/blob/develop/docs/reference/version.md)
 - **FAQ**
