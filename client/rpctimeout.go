@@ -47,10 +47,9 @@ func recoverFunc(ctx context.Context, logger klog.FormatLogger, ri rpcinfo.RPCIn
 	close(done)
 }
 
-func makeTimeoutErr(ctx context.Context, start time.Time) error {
+func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration) error {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	to := ri.To()
-	timeout := ri.Config().RPCTimeout()
 
 	errMsg := fmt.Sprintf("timeout=%v, to=%s, method=%s", timeout, to.ServiceName(), to.Method())
 	target := to.Address()
@@ -84,10 +83,10 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 		return func(ctx context.Context, request, response interface{}) error {
 			var err error
 			ri := rpcinfo.GetRPCInfo(ctx)
-			tm := ri.Config().RPCTimeout() + moreTimeout
+			tm := ri.Config().RPCTimeout()
 
 			start := time.Now()
-			ctx, cancel := context.WithTimeout(ctx, tm)
+			ctx, cancel := context.WithTimeout(ctx, tm+moreTimeout)
 			defer cancel()
 
 			done := make(chan error, 1)
@@ -121,7 +120,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 				}
 				return err
 			case <-ctx.Done():
-				return makeTimeoutErr(ctx, start)
+				return makeTimeoutErr(ctx, start, tm)
 			}
 		}
 	}
