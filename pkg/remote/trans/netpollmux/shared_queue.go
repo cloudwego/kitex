@@ -30,10 +30,14 @@ type BufferGetter func() (buf remote.ByteBuffer, isNil bool)
 // DealBufferGetters is used to get deal of remote.ByteBuffer.
 type DealBufferGetters func(gts []BufferGetter)
 
-func newSharedQueue(size int32, deal DealBufferGetters) (queue *sharedQueue) {
+// FlushBufferGetters is used to flush remote.ByteBuffer.
+type FlushBufferGetters func()
+
+func newSharedQueue(size int32, deal DealBufferGetters, flush FlushBufferGetters) (queue *sharedQueue) {
 	queue = &sharedQueue{
 		size:    size,
 		deal:    deal,
+		flush:   flush,
 		getters: make([][]BufferGetter, size),
 		swap:    make([]BufferGetter, 0, 64),
 		locks:   make([]int32, size),
@@ -47,9 +51,10 @@ func newSharedQueue(size int32, deal DealBufferGetters) (queue *sharedQueue) {
 type sharedQueue struct {
 	idx, size       int32
 	deal            DealBufferGetters
-	getters         [][]BufferGetter // len(evs) = size
+	flush           FlushBufferGetters
+	getters         [][]BufferGetter // len(getters) = size
 	swap            []BufferGetter   // use for swap
-	locks           []int32
+	locks           []int32          // len(locks) = size
 	trigger, runNum int32
 }
 
@@ -97,6 +102,10 @@ func (q *sharedQueue) ForEach(shared int32) {
 			// deal
 			q.deal(q.swap)
 		}
+		if q.flush != nil {
+			q.flush()
+		}
+
 		// quit & check again
 		atomic.StoreInt32(&q.runNum, 0)
 		if atomic.LoadInt32(&q.trigger) > 0 {

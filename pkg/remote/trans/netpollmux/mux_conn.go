@@ -127,7 +127,8 @@ func newMuxConn(connection netpoll.Connection) muxConn {
 				}
 			}
 		}
-		err = writer.Flush()
+	}, func() {
+		err := writer.Flush()
 		if err != nil {
 			connection.Close()
 			return
