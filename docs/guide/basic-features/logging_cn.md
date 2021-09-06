@@ -43,3 +43,27 @@ func MyMiddlewareBuilder(mwCtx context.Context) endpoint.Middleware { // middlew
 可以使用 `klog.SetOutput` 来重定向 klog 提供的默认 logger 的输出。
 
 注意，该方法无法影响到使用 client 或者 server 的 `WithLogger` 选项注入的自定义 logger 实现。
+
+例如，要把默认 logger 的输出重定向到启动路径下的 `./output.log`，可以这样实现：
+
+```go
+package main
+
+import (
+    "os"
+
+    "github.com/cloudwego/kitex/pkg/klog"
+)
+
+func main() {
+    f, err := os.OpenFile("./output.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+    if err != nil {
+    	panic(err)
+    }
+    defer f.Close()
+    klog.SetOutput(f)
+
+    ... // continue to set up your server
+}
+```
+
