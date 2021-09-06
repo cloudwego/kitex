@@ -44,3 +44,28 @@ func MyMiddlewareBuilder(mwCtx context.Context) endpoint.Middleware { // middlew
 The `klog.SetOutput` can be used to redirect the output of the default logger provided by the pkg/klog package.
 
 Note that this function does not affect those customized implementations injected using `WithLogger` options.
+
+For example, to redirect the output of the default logger to a file name `./output.log` under the launch directory,
+a possible implementation might be:
+
+```go
+package main
+
+import (
+    "os"
+
+    "github.com/cloudwego/kitex/pkg/klog"
+)
+
+func main() {
+    f, err := os.OpenFile("./output.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+    if err != nil {
+    	panic(err)
+    }
+    defer f.Close()
+    klog.SetOutput(f)
+
+    ... // continue to set up your server
+}
+```
+
