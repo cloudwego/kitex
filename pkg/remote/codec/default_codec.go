@@ -22,13 +22,13 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	"github.com/cloudwego/kitex/pkg/retry"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/transport"
+	"github.com/jackedelic/kitex/internal/pkg/kerrors"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
+	"github.com/jackedelic/kitex/internal/pkg/remote/codec/perrors"
+	"github.com/jackedelic/kitex/internal/pkg/retry"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/serviceinfo"
+	"github.com/jackedelic/kitex/internal/transport"
 )
 
 // The byte count of 32 and 16 integer values.

@@ -22,7 +22,7 @@ import (
 
 	jsoniter "github.com/json-iterator/go"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 var jsoni = jsoniter.ConfigCompatibleWithStandardLibrary

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestWatch(t *testing.T) {

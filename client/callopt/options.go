@@ -24,12 +24,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/client"
-	"github.com/cloudwego/kitex/pkg/discovery"
-	"github.com/cloudwego/kitex/pkg/http"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
-	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/jackedelic/kitex/internal/client"
+	"github.com/jackedelic/kitex/internal/pkg/discovery"
+	"github.com/jackedelic/kitex/internal/pkg/http"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo/remoteinfo"
+	"github.com/jackedelic/kitex/internal/pkg/utils"
 )
 
 var (
@@ -68,6 +68,16 @@ func (co *callOptions) Recycle() {
 // Option is a series of options used at the beginning of a RPC call.
 type Option struct {
 	f func(o *callOptions, di *strings.Builder)
+}
+
+// WithDestService specifies the name of target service.
+func WithDestService(svr string) Option {
+	return Option{func(o *callOptions, di *strings.Builder) {
+		di.WriteString("WithDestService(")
+		di.WriteString(svr)
+		di.WriteString("),")
+		o.svr.SetServiceName(svr)
+	}}
 }
 
 // WithHostPort specifies the target address for a RPC call.

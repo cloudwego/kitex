@@ -10,7 +10,7 @@ Then call `Call` method of `invoker` to start a call. After call, you can use `G
 ```go
 import (
 	...
-	"github.com/cloudwego/kitex/sdk/message"
+	"github.com/jackedelic/kitex/internal/sdk/message"
   	...
 )
 

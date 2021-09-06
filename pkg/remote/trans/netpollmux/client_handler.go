@@ -24,14 +24,14 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
-	stats2 "github.com/cloudwego/kitex/internal/stats"
-	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/remote/trans"
-	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/jackedelic/kitex/internal/pkg/kerrors"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
+	"github.com/jackedelic/kitex/internal/pkg/remote/codec"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans"
+	np "github.com/jackedelic/kitex/internal/pkg/remote/trans/netpoll"
+	"github.com/jackedelic/kitex/internal/pkg/serviceinfo"
+	"github.com/jackedelic/kitex/internal/pkg/stats"
+	stats2 "github.com/jackedelic/kitex/internal/stats"
 )
 
 type cliTransHandlerFactory struct {

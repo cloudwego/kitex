@@ -41,8 +41,8 @@ import (
 	...
 	ko "github.com/kitex-contrib/opentracing"
 	"github.com/opentracing/opentracing-go"
-	"github.com/cloudwego/kitex/pkg/endpoint"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/endpoint"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
   ...
 )
 ...
@@ -65,8 +65,8 @@ import (
 	...
 	ko "github.com/kitex-contrib/opentracing"
 	"github.com/opentracing/opentracing-go"
-	"github.com/cloudwego/kitex/pkg/endpoint"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/endpoint"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
 	...
 )
 ...
@@ -100,7 +100,7 @@ type Tracer interface {
 client 侧
 
 ```go
-import "github.com/cloudwego/kitex/client"
+import "github.com/jackedelic/kitex/internal/client"
 ...
 type myTracer struct {}
 
@@ -123,7 +123,7 @@ if err != nil {
 server 侧
 
 ```go
-import "github.com/cloudwego/kitex/server"
+import "github.com/jackedelic/kitex/internal/server"
 ...
 type myTracer struct {}
 

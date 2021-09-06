@@ -19,7 +19,7 @@ package limit
 import (
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestValid(t *testing.T) {

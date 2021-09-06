@@ -5,7 +5,7 @@
 目前 Kitex 支持限制最大连接数和最大 QPS，在初始化 server 的时候，增加一个 Option，举例：
 
 ```go
-import "github.com/cloudwego/kitex/pkg/limit"
+import "github.com/jackedelic/kitex/internal/pkg/limit"
 
 func main() {
 	svr := xxxservice.NewServer(handler, server.WithLimit(&limit.Option{MaxConnections: 10000, MaxQPS: 1000}))
@@ -22,7 +22,7 @@ func main() {
 - `UpdateControl` 提供动态修改限流阈值的能力，举例：
 
   ```go
-  import "github.com/cloudwego/kitex/pkg/limit"
+  import "github.com/jackedelic/kitex/internal/pkg/limit"
 
   // define your limiter updater to update limit threshold
   type MyLimiterUpdater struct {

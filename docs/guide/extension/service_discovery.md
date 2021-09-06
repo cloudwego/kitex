@@ -35,7 +35,7 @@ type Change struct {
 
 - `Resolve`: as the core method of `Resolver`, it obtains the service discovery result from target key
 - `Target`:   it resolves the unique target endpoint that from the downstream endpoints provided by `Resolve`, and the result will be used as the unique key of the cache
-- `Diff`:  it is used to compare  the discovery results with the last time. The differences in results are used to notify other components, such as [loadbalancer](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/loadbalance.md) and circuitbreaker, etc
+- `Diff`:  it is used to compare  the discovery results with the last time. The differences in results are used to notify other components, such as [loadbalancer](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/loadbalance.md) and circuitbreaker, etc
 - `Name`:  it is used to specify a unique name for `Resolver`, and will use it to cache and reuse `Resolver`
 
 ## Usage Example

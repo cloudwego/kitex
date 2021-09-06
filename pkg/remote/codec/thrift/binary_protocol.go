@@ -24,8 +24,8 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
+	"github.com/jackedelic/kitex/internal/pkg/remote/codec/perrors"
 )
 
 // must be strict read & strict write

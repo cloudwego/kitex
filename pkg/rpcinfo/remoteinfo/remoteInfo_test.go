@@ -19,11 +19,11 @@ package remoteinfo_test
 import (
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/discovery"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
-	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/jackedelic/kitex/internal/pkg/discovery"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo/remoteinfo"
+	"github.com/jackedelic/kitex/internal/pkg/utils"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestRemoteInfo(t *testing.T) {

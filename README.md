@@ -35,54 +35,54 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
 
 ## Documentation
 
-- [**Getting Started**](https://github.com/cloudwego/kitex/blob/develop/docs/guide/getting_started.md)
+- [**Getting Started**](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/getting_started.md)
 - **User Guide**
   - Basic Features
-    - [Message Type](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/message_type.md)
-    - [Supported Protocols](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/serialization_protocol.md)
-    - [Directly Invoke](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/timeout.md)
-    - [Connection Pool](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/connection_pool.md)
-    - [Timeout Control](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/timeout.md)
-    - [Request Retry](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/retry.md)
-    - [LoadBalancer](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/loadbalance.md)
-    - [Circuit Breaker](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/circuitbreaker.md)
-    - [Rate Limiting](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/limiting.md)
-    - [Instrumentation Control](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/tracing.md)
-    - [Logging](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/logging.md)
-    - [HttpResolver](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/HTTP_resolver.md)
+    - [Message Type](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/message_type.md)
+    - [Supported Protocols](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/serialization_protocol.md)
+    - [Directly Invoke](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/timeout.md)
+    - [Connection Pool](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/connection_pool.md)
+    - [Timeout Control](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/timeout.md)
+    - [Request Retry](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/retry.md)
+    - [LoadBalancer](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/loadbalance.md)
+    - [Circuit Breaker](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/circuitbreaker.md)
+    - [Rate Limiting](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/limiting.md)
+    - [Instrumentation Control](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/tracing.md)
+    - [Logging](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/logging.md)
+    - [HttpResolver](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/HTTP_resolver.md)
   - Governance Features
-    - [Service Discovery](https://github.com/cloudwego/kitex/blob/develop/docs/guide/service-governance/discovery.md)
-    - [Monitoring](https://github.com/cloudwego/kitex/blob/develop/docs/guide/service-governance/monitoring.md)
-    - [Tracing](https://github.com/cloudwego/kitex/blob/develop/docs/guide/service-governance/tracing.md)
-    - [Customized Access Control](https://github.com/cloudwego/kitex/blob/develop/docs/guide/service-governance/access_control.md)
+    - [Service Discovery](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/service-governance/discovery.md)
+    - [Monitoring](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/service-governance/monitoring.md)
+    - [Tracing](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/service-governance/tracing.md)
+    - [Customized Access Control](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/service-governance/access_control.md)
   - Advanced Features
-    - [Generic Call](https://github.com/cloudwego/kitex/blob/develop/docs/guide/advanced-features/generic_call.md)
-    - [Server SDK Mode](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/invoker.md)
+    - [Generic Call](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/advanced-features/generic_call.md)
+    - [Server SDK Mode](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/invoker.md)
   - Code Generation
-    - [Code Generation Tool](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/code_generation.md)
-    - [Combined Service](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/combine_service.md)
+    - [Code Generation Tool](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/code_generation.md)
+    - [Combined Service](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/combine_service.md)
   - Framework Extension
-    - [Middleware Extensions](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/middleware.md)
-    - [Suite Extensions](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/suite.md)
-    - [Service Registry](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/registry.md)
-    - [Service Discovery](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/service_discovery.md)
-    - [Customize LoadBalancer](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/loadbalance.md)
-    - [Monitoring](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/monitoring.md)
-    - [Logging](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/logging.md)
-    - [Codec](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/codec.md)
-    - [Transport Module](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/transport.md)
-    - [Transport Pipeline](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/trans_pipeline.md)
-    - [Metadata Transparent Transmission](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/transmeta.md)
-    - [Diagnosis Module](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/diagnosis.md)
+    - [Middleware Extensions](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/middleware.md)
+    - [Suite Extensions](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/suite.md)
+    - [Service Registry](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/registry.md)
+    - [Service Discovery](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/service_discovery.md)
+    - [Customize LoadBalancer](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/loadbalance.md)
+    - [Monitoring](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/monitoring.md)
+    - [Logging](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/basic-features/logging.md)
+    - [Codec](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/codec.md)
+    - [Transport Module](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/transport.md)
+    - [Transport Pipeline](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/trans_pipeline.md)
+    - [Metadata Transparent Transmission](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/transmeta.md)
+    - [Diagnosis Module](https://github.com/jackedelic/kitex/internal/blob/develop/docs/guide/extension/diagnosis.md)
 - **Reference**
-	- [Transport Protocol - TTHeader](https://github.com/cloudwego/kitex/blob/develop/docs/reference/transport_protocol_ttheader.md)
-	- [Exception Instruction](https://github.com/cloudwego/kitex/blob/develop/docs/reference/exception.md)
-	- [Version Specification](https://github.com/cloudwego/kitex/blob/develop/docs/reference/version.md)
+	- [Transport Protocol - TTHeader](https://github.com/jackedelic/kitex/internal/blob/develop/docs/reference/transport_protocol_ttheader.md)
+	- [Exception Instruction](https://github.com/jackedelic/kitex/internal/blob/develop/docs/reference/exception.md)
+	- [Version Specification](https://github.com/jackedelic/kitex/internal/blob/develop/docs/reference/version.md)
 - **FAQ**
 
 ## Performance
 
-We compared the performance of Kitex with some popular RPC frameworks ([benchmark](https://github.com/cloudwego/kitex-benchmark)), such as [gRPC](https://github.com/grpc/grpc) and [RPCX](https://github.com/smallnest/rpcx), both using Protobuf. The test results show that [Kitex](https://github.com/cloudwego/kitex) performs better.
+We compared the performance of Kitex with some popular RPC frameworks ([benchmark](https://github.com/jackedelic/kitex/internal/-benchmark)), such as [gRPC](https://github.com/grpc/grpc) and [RPCX](https://github.com/smallnest/rpcx), both using Protobuf. The test results show that [Kitex](https://github.com/jackedelic/kitex/internal/) performs better.
 
 *Note: The performance benchmarks obtained from the experiment are for reference only, because there are many factors that can affect the actual performance in application scenarios.*
 
@@ -113,7 +113,7 @@ QPS|TP99|TP999
 
 - [Netpoll](https://github.com/cloudwego/netpoll): A high-performance network library.
 - [kitex-contrib](https://github.com/kitex-contrib): A partial extension library of Kitex, which users can integrate into Kitex through options according to their needs.
-- [Example](https://github.com/cloudwego/kitex/blob/develop/TODO): Use examples of Kitex.
+- [Example](https://github.com/jackedelic/kitex/internal/blob/develop/TODO): Use examples of Kitex.
 
 ## Blogs
 
@@ -122,15 +122,15 @@ QPS|TP99|TP999
 
 ## Contributing
 
-[Contributing](https://github.com/cloudwego/kitex/blob/develop/CONTRIBUTING.md).
+[Contributing](https://github.com/jackedelic/kitex/internal/blob/develop/CONTRIBUTING.md).
 
 ## License
 
-Kitex is distributed under the [Apache License, version 2.0](https://github.com/cloudwego/kitex/blob/develop/LICENSE). The licenses of third party dependencies of Kitex are explained [here](https://github.com/cloudwego/kitex/blob/develop/licenses).
+Kitex is distributed under the [Apache License, version 2.0](https://github.com/jackedelic/kitex/internal/blob/develop/LICENSE). The licenses of third party dependencies of Kitex are explained [here](https://github.com/jackedelic/kitex/internal/blob/develop/licenses).
 
 ## Community
 - Email: [conduct@cloudwego.io](conduct@cloudwego.io)
-- Issues: [Issues](https://github.com/cloudwego/kitex/issues)
+- Issues: [Issues](https://github.com/jackedelic/kitex/internal/issues)
 - Lark: Scan the QR code below with [Lark](https://www.larksuite.com/zh_cn/download) to join our CloudWeGo/kitex user group.
 
-![](https://github.com/cloudwego/kitex/blob/develop/docs/images/LarkGroup.jpg)
+![](https://github.com/jackedelic/kitex/internal/blob/develop/docs/images/LarkGroup.jpg)

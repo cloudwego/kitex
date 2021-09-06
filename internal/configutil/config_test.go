@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 type mockConfig struct {

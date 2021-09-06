@@ -20,8 +20,8 @@ import (
 	"context"
 	"net"
 
-	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/jackedelic/kitex/internal/pkg/kerrors"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
 )
 
 type mockCliTransHandlerFactory struct {

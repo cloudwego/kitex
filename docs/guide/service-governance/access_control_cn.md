@@ -7,7 +7,7 @@ package myaccesscontrol
 
 import (
     "math/rand"
-    "github.com/cloudwego/kitex/pkg/acl"
+    "github.com/jackedelic/kitex/internal/pkg/acl"
 )
 
 var errRejected = errors.New("1% rejected")

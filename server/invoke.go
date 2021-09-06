@@ -21,11 +21,11 @@ package server
 import (
 	"errors"
 
-	internal_server "github.com/cloudwego/kitex/internal/server"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/bound"
-	"github.com/cloudwego/kitex/pkg/remote/trans/invoke"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
+	"github.com/jackedelic/kitex/internal/pkg/remote/bound"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/invoke"
+	"github.com/jackedelic/kitex/internal/pkg/serviceinfo"
+	internal_server "github.com/jackedelic/kitex/internal/server"
 )
 
 // InvokeCaller is the abstraction for invoker call.

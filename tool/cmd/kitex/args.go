@@ -22,10 +22,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cloudwego/kitex"
-	"github.com/cloudwego/kitex/tool/internal/pkg/generator"
-	"github.com/cloudwego/kitex/tool/internal/pkg/log"
-	"github.com/cloudwego/kitex/tool/internal/pkg/util"
+	"github.com/jackedelic/kitex"
+	"github.com/jackedelic/kitex/internal/tool/internal/pkg/generator"
+	"github.com/jackedelic/kitex/internal/tool/internal/pkg/log"
+	"github.com/jackedelic/kitex/internal/tool/internal/pkg/util"
 )
 
 // extraFlag is designed for adding flags that is irrelevant to

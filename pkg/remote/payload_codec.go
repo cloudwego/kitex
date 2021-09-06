@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/jackedelic/kitex/internal/pkg/serviceinfo"
 )
 
 var (

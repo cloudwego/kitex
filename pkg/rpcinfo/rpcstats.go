@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/kitex/internal"
-	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/jackedelic/kitex/internal"
+	"github.com/jackedelic/kitex/pkg/stats"
 )
 
 var (

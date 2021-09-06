@@ -20,9 +20,9 @@ import (
 	"context"
 	"net"
 
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/trans"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
 )
 
 func newIvkConnExtension() trans.Extension {

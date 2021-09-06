@@ -20,10 +20,10 @@ package remotecli
 import (
 	"context"
 
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/streaming"
 )
 
 // NewStream create a client side stream

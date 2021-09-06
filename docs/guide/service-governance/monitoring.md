@@ -17,7 +17,7 @@ Client Side:
 ```go
 import (
     "github.com/kitex-contrib/monitor-prometheus"
-    kClient "github.com/cloudwego/kitex/client"
+    kClient "github.com/jackedelic/kitex/internal/client"
 )
 
 ...
@@ -36,7 +36,7 @@ Server Side:
 ```go
 import (
     "github.com/kitex-contrib/monitor-prometheus"
-    kServer "github.com/cloudwego/kitex/server"
+    kServer "github.com/jackedelic/kitex/internal/server"
 )
 func main() {...
     svr := xxxservice.NewServer(

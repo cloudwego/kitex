@@ -38,7 +38,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2/codes"
 )
 
 // Status represents an RPC status code, message, and details.  It is immutable

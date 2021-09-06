@@ -19,7 +19,7 @@ package thrift
 import (
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestSplitType(t *testing.T) {

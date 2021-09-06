@@ -17,9 +17,9 @@
 package nphttp2
 
 import (
-	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/jackedelic/kitex/internal/pkg/kerrors"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2/codes"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2/status"
 )
 
 var (

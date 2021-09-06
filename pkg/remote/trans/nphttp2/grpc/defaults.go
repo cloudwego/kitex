@@ -24,7 +24,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/cloudwego/kitex"
+	"github.com/jackedelic/kitex/internal/"
 )
 
 const (

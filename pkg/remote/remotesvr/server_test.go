@@ -22,11 +22,11 @@ import (
 	"net"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/mocks"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/jackedelic/kitex/internal/mocks"
+	"github.com/jackedelic/kitex/internal/pkg/klog"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
+	"github.com/jackedelic/kitex/internal/pkg/utils"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestServerStart(t *testing.T) {

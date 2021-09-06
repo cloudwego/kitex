@@ -30,8 +30,8 @@ import (
 	"github.com/cloudwego/thriftgo/plugin"
 	"github.com/cloudwego/thriftgo/semantic"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/generator"
-	internal_log "github.com/cloudwego/kitex/tool/internal/pkg/log"
+	"github.com/jackedelic/kitex/internal/tool/internal/pkg/generator"
+	internal_log "github.com/jackedelic/kitex/internal/tool/internal/pkg/log"
 )
 
 var (

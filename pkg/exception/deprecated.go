@@ -18,7 +18,7 @@
 package exception
 
 import (
-	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/jackedelic/kitex/internal/pkg/utils"
 )
 
 // MarshalError convert go error to thrift exception, and encode exception over buffered binary transport.

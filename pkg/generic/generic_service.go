@@ -22,9 +22,9 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 
-	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
-	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	gthrift "github.com/jackedelic/kitex/internal/pkg/generic/thrift"
+	codecThrift "github.com/jackedelic/kitex/internal/pkg/remote/codec/thrift"
+	"github.com/jackedelic/kitex/internal/pkg/serviceinfo"
 )
 
 // Service generic service interface

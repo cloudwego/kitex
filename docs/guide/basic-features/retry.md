@@ -51,7 +51,7 @@ Note: Dynamic configuration (see 3.3) cannot take effect if retry is enabled by 
 - Configuration e.g.
 
 ```go
-// import "github.com/cloudwego/kitex/pkg/retry"
+// import "github.com/jackedelic/kitex/internal/pkg/retry"
 fp := retry.NewFailurePolicy()
 fp.WithMaxRetryTimes(3) // set the maximum number of retries to 3
 xxxCli := xxxservice.NewClient("psm", client.WithFailureRetry(fp))

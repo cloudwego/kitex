@@ -25,8 +25,8 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/jackedelic/kitex/internal/pkg/remote/codec/perrors"
+	"github.com/jackedelic/kitex/internal/pkg/utils"
 )
 
 // Binary protocol for bthrift.

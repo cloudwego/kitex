@@ -17,8 +17,8 @@
 package client
 
 import (
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/jackedelic/kitex/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/pkg/rpcinfo/remoteinfo"
 )
 
 // ConfigLocks records changing made by options that are not allowed further modifications.

@@ -24,9 +24,9 @@ import (
 
 	"github.com/bytedance/gopkg/lang/fastrand"
 
-	"github.com/cloudwego/kitex/internal"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/discovery"
+	"github.com/jackedelic/kitex/internal/internal"
+	"github.com/jackedelic/kitex/internal/pkg/discovery"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 type testCtxKey int

@@ -19,7 +19,7 @@ package configutil
 import (
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestOnceOrPanic(t *testing.T) {

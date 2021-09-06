@@ -22,18 +22,18 @@ package client
 import (
 	"fmt"
 
-	"github.com/cloudwego/kitex/internal/client"
-	"github.com/cloudwego/kitex/pkg/acl"
-	"github.com/cloudwego/kitex/pkg/diagnosis"
-	"github.com/cloudwego/kitex/pkg/generic"
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/proxy"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
-	"github.com/cloudwego/kitex/pkg/retry"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/kitex/transport"
+	"github.com/jackedelic/kitex/internal/client"
+	"github.com/jackedelic/kitex/internal/pkg/acl"
+	"github.com/jackedelic/kitex/internal/pkg/diagnosis"
+	"github.com/jackedelic/kitex/internal/pkg/generic"
+	"github.com/jackedelic/kitex/internal/pkg/klog"
+	"github.com/jackedelic/kitex/internal/pkg/proxy"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/netpoll"
+	"github.com/jackedelic/kitex/internal/pkg/retry"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/utils"
+	"github.com/jackedelic/kitex/internal/transport"
 )
 
 // WithHTTPConnection specifies client use RPC over http.

@@ -23,9 +23,9 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/discovery"
+	"github.com/jackedelic/kitex/internal/internal"
+	"github.com/jackedelic/kitex/internal/pkg/discovery"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestWeightedBalancer_GetPicker(t *testing.T) {

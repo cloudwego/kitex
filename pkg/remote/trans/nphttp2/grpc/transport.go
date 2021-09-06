@@ -33,9 +33,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2/codes"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2/metadata"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2/status"
 
 	"github.com/cloudwego/netpoll"
 )

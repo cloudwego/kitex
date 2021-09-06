@@ -17,7 +17,7 @@
 package grpc
 
 import (
-	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/jackedelic/kitex/internal/pkg/klog"
 )
 
 func infof(format string, args ...interface{}) {

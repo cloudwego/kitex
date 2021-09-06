@@ -23,8 +23,8 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
-	"github.com/cloudwego/kitex/pkg/remote"
-	internal_netpoll "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
+	internal_netpoll "github.com/jackedelic/kitex/internal/pkg/remote/trans/netpoll"
 )
 
 var _ Message = &message{}

@@ -34,11 +34,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/netpoll"
 	http2 "github.com/cloudwego/netpoll-http2"
 	"github.com/cloudwego/netpoll-http2/hpack"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2/metadata"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2/status"
 	"google.golang.org/protobuf/proto"
 )
 

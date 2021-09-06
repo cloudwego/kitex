@@ -21,7 +21,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func Test_message_Addr(t *testing.T) {

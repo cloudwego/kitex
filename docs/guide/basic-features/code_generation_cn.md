@@ -5,13 +5,13 @@
 ## 安装
 
 ```
-go get github.com/cloudwego/kitex/tool/cmd/kitex
+go get github.com/jackedelic/kitex/internal/tool/cmd/kitex
 ```
 
 用 go 命令来安装是最简单的，你也可以选择自己从源码构建和安装。要查看 kitex 的安装位置，可以用：
 
 ```
-go list -f {{.Target}} github.com/cloudwego/kitex/tool/cmd/kitex
+go list -f {{.Target}} github.com/jackedelic/kitex/internal/tool/cmd/kitex
 ```
 
 **注意**，由于 kitex 会为自身的二进制文件创建软链接，因此请确保 kitex 的安装路径具有可写权限。

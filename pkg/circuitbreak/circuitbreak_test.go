@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	"github.com/bytedance/gopkg/cloud/circuitbreaker"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/jackedelic/kitex/internal/pkg/kerrors"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 type ctxKeyType int

@@ -20,9 +20,9 @@ import (
 	"context"
 	"runtime/debug"
 
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/jackedelic/kitex/internal/pkg/klog"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/stats"
 )
 
 // Controller controls tracers.

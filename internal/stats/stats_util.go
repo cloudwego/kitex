@@ -19,8 +19,8 @@ package stats
 import (
 	"context"
 
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/stats"
 )
 
 // Record records the event to RPCStats.

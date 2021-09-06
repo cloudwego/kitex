@@ -130,7 +130,7 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
 由于开源社区缺少支持 Thrift 的优秀 RPC 框架，当前对比项目为 [gRPC](https://github.com/grpc/grpc)、[RPCX](https://github.com/smallnest/rpcx)，均使用 Protobuf 。
 
-我们通过 [测试代码](https://github.com/cloudwego/kitex-benchmark) 比较了它们的性能，测试表明 [Kitex](https://github.com/cloudwego/kitex) 具有明显优势。
+我们通过 [测试代码](https://github.com/jackedelic/kitex/internal/-benchmark) 比较了它们的性能，测试表明 [Kitex](https://github.com/jackedelic/kitex/internal/) 具有明显优势。
 
 ### 测试环境
 
@@ -155,7 +155,7 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
 - [Netpoll](https://github.com/cloudwego/netpoll): 自研的高性能网络库，Kitex 默认集成的。
 - [kitex-contrib](https://github.com/kitex-contrib)：Kitex 的部分扩展库，使用者可以根据需求通过 Option 集成进 Kitex 中。
-- [Example](https://github.com/cloudwego/kitex-examples)：Kitex 的使用示例。
+- [Example](https://github.com/jackedelic/kitex/internal/-examples)：Kitex 的使用示例。
 
 ## 相关文章
 
@@ -172,7 +172,7 @@ Kitex 基于[Apache License 2.0](LICENSE) 许可证，其依赖的三方组件�
 
 ## 联系我们
 - Email: conduct@cloudwego.io
-- Issues: [Issues](https://github.com/cloudwego/kitex/issues)
+- Issues: [Issues](https://github.com/jackedelic/kitex/internal/issues)
 - 飞书用户群（[注册飞书](https://www.feishu.cn/)进群）
 
   ![LarkGroup](docs/images/LarkGroup.jpg) 

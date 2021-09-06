@@ -20,8 +20,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/test"
+	"github.com/jackedelic/kitex/pkg/rpcinfo"
 )
 
 func TestNewCtxWithRPCInfo(t *testing.T) {

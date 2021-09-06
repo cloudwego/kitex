@@ -19,7 +19,7 @@ package limiter
 import (
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/limit"
+	"github.com/jackedelic/kitex/internal/pkg/limit"
 )
 
 // ConcurrencyLimiter limits the number of concurrent access towards the protected resource.

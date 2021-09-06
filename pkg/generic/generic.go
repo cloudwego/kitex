@@ -18,9 +18,9 @@
 package generic
 
 import (
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
+	"github.com/jackedelic/kitex/internal/pkg/remote/codec/thrift"
+	"github.com/jackedelic/kitex/internal/pkg/serviceinfo"
 )
 
 // Generic ...

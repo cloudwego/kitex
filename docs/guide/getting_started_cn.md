@@ -15,7 +15,7 @@
 首先，我们需要安装使用本示例所需要的命令行代码生成工具：
 
 1. 确保 `GOPATH` 环境变量已经被正确地定义（例如 `export GOPATH=~/go`）并且将`$GOPATH/bin`添加到 `PATH` 环境变量之中（例如 `export PATH=$GOPATH/bin:$PATH`）；请勿将 `GOPATH` 设置为当前用户没有读写权限的目录
-2. 安装 kitex：`go get github.com/cloudwego/kitex/tool/cmd/kitex@latest`
+2. 安装 kitex：`go get github.com/jackedelic/kitex/internal/tool/cmd/kitex@latest`
 3. 安装 thriftgo：`go get github.com/cloudwego/thriftgo@latest`
 
 安装成功后，执行 `kitex --version` 和 `thriftgo --version` 应该能够看到具体版本号的输出（版本号有差异，以 x.x.x 示例）：
@@ -31,8 +31,8 @@ thriftgo x.x.x
 
 ### 获取示例代码
 
-1. 你可以直接点击 [此处](https://github.com/cloudwego/kitex-examples/archive/refs/heads/main.zip) 下载示例仓库
-2. 也可以克隆该示例仓库到本地 `git clone https://github.com/cloudwego/kitex-examples.git`
+1. 你可以直接点击 [此处](https://github.com/jackedelic/kitex/internal/-examples/archive/refs/heads/main.zip) 下载示例仓库
+2. 也可以克隆该示例仓库到本地 `git clone https://github.com/jackedelic/kitex/internal/-examples.git`
 
 ### 运行示例代码
 
@@ -242,7 +242,7 @@ Kitex 自带了一个同名的命令行工具 `kitex`，用来帮助大家很方
 
 可以使用以下命令来安装或者更新 kitex：   
 
-`$ go get github.com/cloudwego/kitex/tool/cmd/kitex`
+`$ go get github.com/jackedelic/kitex/internal/tool/cmd/kitex`
 
 完成后，可以通过执行 kitex 来检测是否安装成功。   
 
@@ -318,7 +318,7 @@ service Echo {
 
 由于 kitex 要求使用 go mod 进行依赖管理，所以我们要升级 kitex 框架会很容易，只需要执行以下命令即可：
 ```
-$ go get github.com/cloudwego/kitex
+$ go get github.com/jackedelic/kitex/internal/
 $ go mod tidy
 ```
 
@@ -403,7 +403,7 @@ kitex 工具已经帮我们生成好了编译和运行所需的脚本：
 
 ```go
 import "example/kitex_gen/api/echo"
-import "github.com/cloudwego/kitex/client"
+import "github.com/jackedelic/kitex/internal/client"
 ...
 c, err := echo.NewClient("example", client.WithHostPorts("0.0.0.0:8888"))
 if err != nil {

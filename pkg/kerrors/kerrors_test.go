@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestIsKitexError(t *testing.T) {

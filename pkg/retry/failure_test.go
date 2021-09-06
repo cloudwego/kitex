@@ -19,7 +19,7 @@ package retry
 import (
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func BenchmarkRandomBackOff_Wait(b *testing.B) {

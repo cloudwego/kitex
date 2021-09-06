@@ -19,7 +19,7 @@ package client
 import (
 	"context"
 
-	"github.com/cloudwego/kitex/client/callopt"
+	"github.com/jackedelic/kitex/internal/client/callopt"
 )
 
 type ctxKeyType int

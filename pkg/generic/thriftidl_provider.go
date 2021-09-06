@@ -22,8 +22,8 @@ import (
 
 	"github.com/cloudwego/thriftgo/parser"
 
-	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/jackedelic/kitex/internal/pkg/generic/descriptor"
+	"github.com/jackedelic/kitex/internal/pkg/generic/thrift"
 )
 
 type thriftFileProvider struct {

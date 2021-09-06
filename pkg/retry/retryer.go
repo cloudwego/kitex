@@ -26,9 +26,9 @@ import (
 
 	"github.com/bytedance/gopkg/cloud/circuitbreaker"
 
-	"github.com/cloudwego/kitex/pkg/circuitbreak"
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/circuitbreak"
+	"github.com/jackedelic/kitex/internal/pkg/klog"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
 )
 
 // RPCCallFunc is the definition with wrap rpc call

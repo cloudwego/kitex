@@ -11,7 +11,7 @@ We use [git-flow](https://nvie.com/posts/a-successful-git-branching-model/) as o
 
 ## Bugs
 ### 1. How to Find Known Issues
-We are using [Github Issues](https://github.com/cloudwego/kitex/issues) for our public bugs. We keep a close eye on this and try to make it clear when we have an internal fix in progress. Before filing a new task, try to make sure your problem doesn’t already exist.
+We are using [Github Issues](https://github.com/jackedelic/kitex/internal/issues) for our public bugs. We keep a close eye on this and try to make it clear when we have an internal fix in progress. Before filing a new task, try to make sure your problem doesn’t already exist.
 
 ### 2. Reporting New Issues
 Providing a reduced test code is a recommended way for reporting issues. Then can placed in:
@@ -26,7 +26,7 @@ Please do not report the safe disclosure of bugs to public issues. Contact us by
 
 ## Submit a Pull Request
 Before you submit your Pull Request (PR) consider the following guidelines:
-1. Search [GitHub](https://github.com/cloudwego/kitex/pulls) for an open or closed PR that relates to your submission. You don't want to duplicate existing efforts.
+1. Search [GitHub](https://github.com/jackedelic/kitex/internal/pulls) for an open or closed PR that relates to your submission. You don't want to duplicate existing efforts.
 2. Be sure that an issue describes the problem you're fixing, or documents the design for the feature you'd like to add. Discussing the design upfront helps to ensure that we're ready to accept your work.
 3. [Fork](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo) the cloudwego/kitex repo.
 4. In your forked repository, make your changes in a new git branch:

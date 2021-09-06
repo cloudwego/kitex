@@ -2,7 +2,7 @@
 
 ## 异常类型
 
-Kitex 框架定义在 `github.com/cloudwego/kitex/pkg/kerrors` 下
+Kitex 框架定义在 `github.com/jackedelic/kitex/internal/pkg/kerrors` 下
 
 ### Internal Exception
 
@@ -95,7 +95,7 @@ Kitex 框架定义在 `github.com/cloudwego/kitex/pkg/kerrors` 下
 可以通过 `kerrors` 包提供的 `IsKitexError` 直接进行判断
 
 ```go
-import "github.com/cloudwego/kitex/pkg/kerrors"
+import "github.com/jackedelic/kitex/internal/pkg/kerrors"
 ...
 isKitexErr := kerrors.IsKitexError(kerrors.ErrInternalException) // 返回 true
 ```
@@ -106,8 +106,8 @@ isKitexErr := kerrors.IsKitexError(kerrors.ErrInternalException) // 返回 true
 
 ```go
 import "errors"
-import "github.com/cloudwego/kitex/client"
-import "github.com/cloudwego/kitex/pkg/kerrors"
+import "github.com/jackedelic/kitex/internal/client"
+import "github.com/jackedelic/kitex/internal/pkg/kerrors"
 ...
 _, err := echo.NewClient("echo", client.WithResolver(nil)) // 返回 kerrors.ErrNoResolver
 ...
@@ -118,8 +118,8 @@ isKitexErr := errors.Is(err, kerrors.ErrNoResolver) // 返回 true
 
 ```go
 import "errors"
-import "github.com/cloudwego/kitex/client"
-import "github.com/cloudwego/kitex/pkg/kerrors"
+import "github.com/jackedelic/kitex/internal/client"
+import "github.com/jackedelic/kitex/internal/pkg/kerrors"
 ...
 _, err := echo.NewClient("echo", client.WithResolver(nil)) // 返回 kerrors.ErrNoResolver
 ...
@@ -134,8 +134,8 @@ isKitexErr := errors.Is(err, kerrors.ErrInternalException) // 返回 true
 
 ```go
 import "errors"
-import "github.com/cloudwego/kitex/client"
-import "github.com/cloudwego/kitex/pkg/kerrors"
+import "github.com/jackedelic/kitex/internal/client"
+import "github.com/jackedelic/kitex/internal/pkg/kerrors"
 ...
 _, err := echo.NewClient("echo", client.WithResolver(nil)) // 返回 kerrors.ErrNoResolver
 ...

@@ -19,7 +19,7 @@ package netpoll
 import (
 	"github.com/cloudwego/netpoll"
 
-	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/jackedelic/kitex/internal/pkg/remote"
 )
 
 // NewDialer returns the default netpoll dialer.

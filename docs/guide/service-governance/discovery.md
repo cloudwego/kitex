@@ -11,7 +11,7 @@ Extended repository: [Extended Repository](https://github.com/kitex-contrib)
 ```go
 import (
     "github.com/kitex-contrib/dns-resolver"
-    kClient "github.com/cloudwego/kitex/client"
+    kClient "github.com/jackedelic/kitex/internal/client"
 )
 
 ...

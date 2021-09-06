@@ -5,7 +5,7 @@ Rate limiting is an imperative technique to protect server, which prevents serve
 Kitex supports max connections limit and max QPS limit. You may add an `Option` during the `server` initialization, for example:
 
 ```go
-import "github.com/cloudwego/kitex/pkg/limit"
+import "github.com/jackedelic/kitex/internal/pkg/limit"
 
 func main() {
 	svr := xxxservice.NewServer(handler, server.WithLimit(&limit.Option{MaxConnections: 10000, MaxQPS: 1000}))
@@ -22,7 +22,7 @@ Parameter description：
 - `UpdateControl`: provide the ability to modify the rate limit threshold dynamically, for example: 
 
   ```go
-  import "github.com/cloudwego/kitex/pkg/limit"
+  import "github.com/jackedelic/kitex/internal/pkg/limit"
 
   // define your limiter updater to update limit threshold
   type MyLimiterUpdater struct {

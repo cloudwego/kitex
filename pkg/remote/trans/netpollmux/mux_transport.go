@@ -22,7 +22,7 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
-	"github.com/cloudwego/kitex/pkg/remote/codec"
+	"github.com/jackedelic/kitex/internal/pkg/remote/codec"
 )
 
 // 0-4Byte length, 4-8Byte version check, 8-12Byte seqID

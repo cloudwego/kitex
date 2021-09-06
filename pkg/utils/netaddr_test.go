@@ -20,7 +20,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestNetAddr(t *testing.T) {

@@ -1,7 +1,7 @@
 syntax="proto3";
 package protobuf;
 
-option go_package = "github.com/cloudwego/kitex/pkg/remote/codec/protobuf";
+option go_package = "github.com/jackedelic/kitex/internal/pkg/remote/codec/protobuf";
 
 message MockReq {
 	string msg = 1;

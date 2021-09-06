@@ -16,7 +16,7 @@
 
 package descriptor
 
-import "github.com/cloudwego/kitex/pkg/klog"
+import "github.com/jackedelic/kitex/internal/pkg/klog"
 
 // Annotation idl annotation interface
 type Annotation interface {

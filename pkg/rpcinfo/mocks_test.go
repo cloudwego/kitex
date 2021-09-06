@@ -20,9 +20,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/stats"
-	"github.com/cloudwego/kitex/transport"
+	"github.com/jackedelic/kitex/internal/transport"
+	"github.com/jackedelic/kitex/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/pkg/stats"
 )
 
 var _ rpcinfo.RPCConfig = &MockRPCConfig{}

@@ -22,17 +22,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloudwego/kitex/internal"
-	"github.com/cloudwego/kitex/internal/client"
-	"github.com/cloudwego/kitex/pkg/discovery"
-	"github.com/cloudwego/kitex/pkg/endpoint"
-	"github.com/cloudwego/kitex/pkg/event"
-	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/loadbalance"
-	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
-	"github.com/cloudwego/kitex/pkg/proxy"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/jackedelic/kitex/internal/client"
+	"github.com/jackedelic/kitex/internal/internal"
+	"github.com/jackedelic/kitex/internal/pkg/discovery"
+	"github.com/jackedelic/kitex/internal/pkg/endpoint"
+	"github.com/jackedelic/kitex/internal/pkg/event"
+	"github.com/jackedelic/kitex/internal/pkg/kerrors"
+	"github.com/jackedelic/kitex/internal/pkg/loadbalance"
+	"github.com/jackedelic/kitex/internal/pkg/loadbalance/lbcache"
+	"github.com/jackedelic/kitex/internal/pkg/proxy"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo/remoteinfo"
 )
 
 func newProxyMW(prx proxy.ForwardProxy) endpoint.Middleware {

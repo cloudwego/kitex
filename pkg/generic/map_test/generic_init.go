@@ -23,16 +23,16 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/cloudwego/kitex/client"
-	"github.com/cloudwego/kitex/client/genericclient"
-	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
-	"github.com/cloudwego/kitex/pkg/generic"
-	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/server"
-	"github.com/cloudwego/kitex/server/genericserver"
+	"github.com/jackedelic/kitex/internal/client"
+	"github.com/jackedelic/kitex/internal/client/genericclient"
+	kt "github.com/jackedelic/kitex/internal/mocks/thrift"
+	"github.com/jackedelic/kitex/internal/pkg/generic"
+	"github.com/jackedelic/kitex/internal/pkg/generic/descriptor"
+	"github.com/jackedelic/kitex/internal/pkg/klog"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/serviceinfo"
+	"github.com/jackedelic/kitex/internal/server"
+	"github.com/jackedelic/kitex/internal/server/genericserver"
 )
 
 var reqMsg = map[string]interface{}{

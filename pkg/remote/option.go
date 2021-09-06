@@ -21,10 +21,10 @@ import (
 	"net"
 	"time"
 
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/jackedelic/kitex/internal/pkg/klog"
+	"github.com/jackedelic/kitex/internal/pkg/rpcinfo"
+	"github.com/jackedelic/kitex/internal/pkg/serviceinfo"
+	internal_stats "github.com/jackedelic/kitex/internal/stats"
 )
 
 // Option is used to pack the inbound and outbound handlers.

@@ -28,7 +28,7 @@ import (
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/plugin"
 
-	"github.com/cloudwego/kitex"
+	"github.com/jackedelic/kitex/internal/"
 )
 
 const kitexUnusedProtection = `

@@ -21,7 +21,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestGetConfDir(t *testing.T) {

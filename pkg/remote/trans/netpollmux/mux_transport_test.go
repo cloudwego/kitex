@@ -22,8 +22,8 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
+	"github.com/jackedelic/kitex/internal/pkg/remote/codec"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestParseHeader(t *testing.T) {

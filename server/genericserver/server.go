@@ -18,9 +18,9 @@
 package genericserver
 
 import (
-	"github.com/cloudwego/kitex/pkg/generic"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/server"
+	"github.com/jackedelic/kitex/internal/pkg/generic"
+	"github.com/jackedelic/kitex/internal/pkg/serviceinfo"
+	"github.com/jackedelic/kitex/internal/server"
 )
 
 // NewServer creates a generic server with the given handler and options.

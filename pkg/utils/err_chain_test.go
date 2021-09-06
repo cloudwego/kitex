@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/jackedelic/kitex/internal/test"
 )
 
 func TestErrChain(t *testing.T) {

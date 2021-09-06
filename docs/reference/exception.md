@@ -2,7 +2,7 @@
 
 ## Exception Type
 
-Defined in `github.com/cloudwego/kitex/pkg/kerrors`
+Defined in `github.com/jackedelic/kitex/internal/pkg/kerrors`
 
 ### internal exception
 
@@ -95,7 +95,7 @@ These error is thrift Application Exception, usually these error will be wrapped
 Use  `IsKitexError` in `kerrors` package
 
 ```go
-import "github.com/cloudwego/kitex/pkg/kerrors"
+import "github.com/jackedelic/kitex/internal/pkg/kerrors"
 ...
 isKitexErr := kerrors.IsKitexError(kerrors.ErrInternalException) // return true
 ```
@@ -106,8 +106,8 @@ Use `errors.Is`, detailed error cloud use to check detailed error:
 
 ```go
 import "errors"
-import "github.com/cloudwego/kitex/client"
-import "github.com/cloudwego/kitex/pkg/kerrors"
+import "github.com/jackedelic/kitex/internal/client"
+import "github.com/jackedelic/kitex/internal/pkg/kerrors"
 ...
 _, err := echo.NewClient("echo", client.WithResolver(nil)) // return kerrors.ErrNoResolver
 ...
@@ -118,8 +118,8 @@ detailed error is also a basic error:
 
 ```go
 import "errors"
-import "github.com/cloudwego/kitex/client"
-import "github.com/cloudwego/kitex/pkg/kerrors"
+import "github.com/jackedelic/kitex/internal/client"
+import "github.com/jackedelic/kitex/internal/pkg/kerrors"
 ...
 _, err := echo.NewClient("echo", client.WithResolver(nil)) // return kerrors.ErrNoResolver
 ...
@@ -134,8 +134,8 @@ All detailed errors is defined by `DetailedError` in `kerrors`, so you can use `
 
 ```go
 import "errors"
-import "github.com/cloudwego/kitex/client"
-import "github.com/cloudwego/kitex/pkg/kerrors"
+import "github.com/jackedelic/kitex/internal/client"
+import "github.com/jackedelic/kitex/internal/pkg/kerrors"
 ...
 _, err := echo.NewClient("echo", client.WithResolver(nil)) // return kerrors.ErrNoResolver
 ...

@@ -22,7 +22,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 
-	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/jackedelic/kitex/internal/pkg/generic/descriptor"
 )
 
 type readerOption struct {

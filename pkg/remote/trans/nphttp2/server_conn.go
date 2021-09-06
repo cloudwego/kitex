@@ -21,9 +21,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2/codes"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2/grpc"
+	"github.com/jackedelic/kitex/internal/pkg/remote/trans/nphttp2/status"
 )
 
 type serverConn struct {

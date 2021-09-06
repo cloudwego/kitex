@@ -20,7 +20,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/util"
+	"github.com/jackedelic/kitex/internal/tool/internal/pkg/util"
 )
 
 // File .

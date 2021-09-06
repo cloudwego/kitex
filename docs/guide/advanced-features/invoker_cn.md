@@ -7,7 +7,7 @@ SDK 化（invoker）允许用户将 Kitex server 当作一个本地 SDK 调用�
 ```go
 import (
 		...
-    "github.com/cloudwego/kitex/sdk/message"
+    "github.com/jackedelic/kitex/internal/sdk/message"
   	...
 )
 
