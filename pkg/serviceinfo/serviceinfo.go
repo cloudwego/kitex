@@ -31,9 +31,9 @@ const (
 
 const (
 	// GenericService name
-	GenericService = "$GenericService" // private as "$"
+	GenericService = "_GenericService_" // private as "_xxx_"
 	// GenericMethod name
-	GenericMethod = "$GenericCall"
+	GenericMethod = "_GenericCall_"
 )
 
 // ServiceInfo to record meta info of service
