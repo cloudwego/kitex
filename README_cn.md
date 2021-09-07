@@ -175,5 +175,5 @@ Kitex 基于[Apache License 2.0](LICENSE) 许可证，其依赖的三方组件�
 - Issues: [Issues](https://github.com/cloudwego/kitex/issues)
 - 飞书用户群（[注册飞书](https://www.feishu.cn/)进群）
 
-  ![LarkGroup](docs/images/LarkGroup.jpg) 
+  ![LarkGroup](docs/images/LarkGroup.png)
 
