@@ -96,7 +96,7 @@ func newResolveMWBuilder(opt *client.Options) endpoint.MiddlewareBuilder {
 			balancer = loadbalance.NewWeightedBalancer()
 		}
 
-		var cacheOpts lbcache.Options
+		var cacheOpts = lbcache.Options{DiagnosisService: opt.DebugService}
 		if opt.BalancerCacheOpt != nil {
 			cacheOpts = *opt.BalancerCacheOpt
 		}

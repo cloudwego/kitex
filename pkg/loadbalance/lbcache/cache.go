@@ -26,6 +26,7 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
+	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
@@ -50,6 +51,9 @@ type Options struct {
 	// Balancer expire check interval
 	// we need remove idle Balancers for resource saving
 	ExpireInterval time.Duration
+
+	// DiagnosisService is used register info for diagnosis
+	DiagnosisService diagnosis.Service
 }
 
 func (v *Options) check() {
@@ -90,6 +94,7 @@ func cacheKey(resolver, balancer string, opts Options) string {
 // NewBalancerFactory get or create a balancer factory for balancer instance
 // cache key with resolver name, balancer name and options
 func NewBalancerFactory(resolver discovery.Resolver, balancer loadbalance.Loadbalancer, opts Options) *BalancerFactory {
+	diagnosis.RegisterProbeFunc(opts.DiagnosisService, diagnosis.LbCacheKey, Dump)
 	opts.check()
 	uniqueKey := cacheKey(resolver.Name(), balancer.Name(), opts)
 	val, ok := balancerFactories.Load(uniqueKey)
@@ -216,4 +221,44 @@ func (bl *Balancer) close() {
 	}
 	// delete from sharedTicker
 	bl.sharedTicker.delete(bl)
+}
+
+const unknown = "unknown"
+
+func Dump() interface{} {
+	type instInfo struct {
+		Address string
+		Weight  int
+	}
+	var cacheDump = make(map[string]interface{})
+	balancerFactories.Range(func(key, val interface{}) bool {
+		cacheKey := key.(string)
+		if bf, ok := val.(*BalancerFactory); ok {
+			var routeMap = make(map[string]interface{})
+			cacheDump[cacheKey] = routeMap
+			bf.cache.Range(func(k, v interface{}) bool {
+				routeKey := k.(string)
+				if bl, ok := v.(*Balancer); ok {
+					if dr, ok := bl.res.Load().(discovery.Result); ok {
+						var insts = make([]instInfo, 0, len(dr.Instances))
+						for i := range dr.Instances {
+							inst := dr.Instances[i]
+							addr := fmt.Sprintf("%s://%s", inst.Address().Network(), inst.Address().String())
+							insts = append(insts, instInfo{Address: addr, Weight: inst.Weight()})
+						}
+						routeMap[routeKey] = insts
+					} else {
+						routeMap[routeKey] = unknown
+					}
+				} else {
+					routeMap[routeKey] = unknown
+				}
+				return true
+			})
+		} else {
+			cacheDump[cacheKey] = unknown
+		}
+		return true
+	})
+	return cacheDump
 }
