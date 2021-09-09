@@ -230,17 +230,17 @@ func Dump() interface{} {
 		Address string
 		Weight  int
 	}
-	var cacheDump = make(map[string]interface{})
+	cacheDump := make(map[string]interface{})
 	balancerFactories.Range(func(key, val interface{}) bool {
 		cacheKey := key.(string)
 		if bf, ok := val.(*BalancerFactory); ok {
-			var routeMap = make(map[string]interface{})
+			routeMap := make(map[string]interface{})
 			cacheDump[cacheKey] = routeMap
 			bf.cache.Range(func(k, v interface{}) bool {
 				routeKey := k.(string)
 				if bl, ok := v.(*Balancer); ok {
 					if dr, ok := bl.res.Load().(discovery.Result); ok {
-						var insts = make([]instInfo, 0, len(dr.Instances))
+						insts := make([]instInfo, 0, len(dr.Instances))
 						for i := range dr.Instances {
 							inst := dr.Instances[i]
 							addr := fmt.Sprintf("%s://%s", inst.Address().Network(), inst.Address().String())

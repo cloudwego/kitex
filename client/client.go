@@ -23,7 +23,6 @@ import (
 	"strconv"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
-
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/acl"

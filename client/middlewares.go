@@ -62,11 +62,10 @@ func discoveryEventHandler(name string, bus event.Bus, queue event.Queue) func(d
 		queue.Push(&event.Event{
 			Name: name,
 			Time: now,
-			Extra: &discovery.Change{
-				// Result not set to avoid memory leaking in debug port
-				Added:   d.Added,
-				Updated: d.Updated,
-				Removed: d.Removed,
+			Extra: map[string]interface{}{
+				"Added":   wrapInstances(d.Added),
+				"Updated": wrapInstances(d.Updated),
+				"Removed": wrapInstances(d.Removed),
 			},
 		})
 	}
@@ -96,7 +95,7 @@ func newResolveMWBuilder(opt *client.Options) endpoint.MiddlewareBuilder {
 			balancer = loadbalance.NewWeightedBalancer()
 		}
 
-		var cacheOpts = lbcache.Options{DiagnosisService: opt.DebugService}
+		cacheOpts := lbcache.Options{DiagnosisService: opt.DebugService}
 		if opt.BalancerCacheOpt != nil {
 			cacheOpts = *opt.BalancerCacheOpt
 		}
@@ -195,4 +194,22 @@ func defaultErrorHandler(err error) error {
 		err = fmt.Errorf("[remote] %w", e)
 	}
 	return kerrors.ErrRemoteOrNetwork.WithCause(err)
+}
+
+type instInfo struct {
+	Address string
+	Weight  int
+}
+
+func wrapInstances(insts []discovery.Instance) []*instInfo {
+	if len(insts) == 0 {
+		return nil
+	}
+	instInfos := make([]*instInfo, 0, len(insts))
+	for i := range insts {
+		inst := insts[i]
+		addr := fmt.Sprintf("%s://%s", inst.Address().Network(), inst.Address().String())
+		instInfos = append(instInfos, &instInfo{Address: addr, Weight: inst.Weight()})
+	}
+	return instInfos
 }
