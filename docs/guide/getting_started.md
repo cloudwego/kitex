@@ -15,8 +15,8 @@ This chapter gonna get you started with Kitex with a simple executable example.
 First of all, let's install compilers we gonna work with. 
 
 1. Ensure `GOPATH` environment variable is defined properly (for example `export GOPATH=~/go`), then add `$GOPATH/bin` to `PATH` environment variable (for example `export PATH=$GOPATH/bin:$PATH`). Make sure `GOPATH` is accessible.
-2. Install kitex: `go get github.com/cloudwego/kitex/tool/cmd/kitex@latest`
-3. Install thriftgo: `go get github.com/cloudwego/thriftgo@latest`
+2. Install kitex: `go install github.com/cloudwego/kitex/tool/cmd/kitex@latest`
+3. Install thriftgo: `go install github.com/cloudwego/thriftgo@latest`
 
 Now you can run `kitex --version` and `thriftgo --version`, and you can see some outputs just like below if you setup compilers successfully.
 
@@ -240,7 +240,7 @@ enter directory
 
 You can use following command to install and upgrade `kitex`:
 
-`$ go get github.com/cloudwego/kitex/tool/cmd/kitex`
+`$ go install github.com/cloudwego/kitex/tool/cmd/kitex`
 
 After that, you can just run it to check whether it's installed successfully.
 完成后，可以通过执行kitex来检测是否安装成功。   
@@ -317,7 +317,7 @@ Generated project layout:
 
 Kitex expect project to use go module as dependency manager. It cloud be easy to upgrade Kitex:
 ```
-$ go get github.com/cloudwego/kitex
+$ go get github.com/cloudwego/kitex@latest
 $ go mod tidy
 ```
 
