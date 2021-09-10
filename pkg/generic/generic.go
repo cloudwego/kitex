@@ -69,8 +69,12 @@ func HTTPThriftGeneric(p DescriptorProvider) (Generic, error) {
 }
 
 // JSONThriftGeneric json mapping generic
-func JSONThriftGeneric() Generic {
-	return &jsonThriftGeneric{}
+func JSONThriftGeneric(p DescriptorProvider) (Generic, error) {
+	codec, err := newJsonThriftCodec(p, thriftCodec)
+	if err != nil {
+		return nil, err
+	}
+	return &jsonThriftGeneric{codec: codec}, nil
 }
 
 var thriftCodec = thrift.NewThriftCodec()
@@ -116,6 +120,7 @@ func (g *mapThriftGeneric) GetMethod(req interface{}, method string) (*Method, e
 }
 
 type jsonThriftGeneric struct {
+	codec *jsonThriftCodec
 }
 
 func (g *jsonThriftGeneric) Framed() bool {
@@ -127,11 +132,11 @@ func (g *jsonThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 }
 
 func (g *jsonThriftGeneric) PayloadCodec() remote.PayloadCodec {
-	return &jsonThriftCodec{}
+	return g.codec
 }
 
 func (g *jsonThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return &Method{method, false}, nil
+	return g.codec.getMethod(req, method)
 }
 
 type httpThriftGeneric struct {

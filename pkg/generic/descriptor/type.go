@@ -41,6 +41,7 @@ const (
 	UTF8   Type = 16
 	UTF16  Type = 17
 	//BINARY Type = 18   wrong and unusued
+	JSON Type = 19
 )
 
 var typeNames = map[Type]string{
