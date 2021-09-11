@@ -2,6 +2,10 @@ name: reviewdog
 on: [pull_request]
 jobs:
   staticcheck:
+    permissions:
+      checks: write
+      contents: read
+      pull-requests: write
     name: runner / staticcheck
     runs-on: ubuntu-latest
     steps:
