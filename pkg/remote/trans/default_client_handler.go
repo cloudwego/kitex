@@ -87,8 +87,10 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 		return err
 	}
 
-	if kvs := recvMsg.TransInfo().TransStrInfo(); len(kvs) > 0 {
-		metainfo.SetBackwardValuesFromMap(ctx, kvs)
+	if info := recvMsg.TransInfo(); info != nil {
+		if kvs := info.TransStrInfo(); len(kvs) > 0 {
+			metainfo.SetBackwardValuesFromMap(ctx, kvs)
+		}
 	}
 	return nil
 }
