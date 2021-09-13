@@ -20,6 +20,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"unsafe"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 )
@@ -174,4 +175,24 @@ func ReadString2BLen(bytes []byte, off int) (string, int, error) {
 
 	buf := bytes[off : off+strLen]
 	return string(buf), int(length) + 2, nil
+}
+
+func Bytes2String(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
+}
+
+// ReadString2BLenReadOnly ...
+func ReadString2BLenReadOnly(bytes []byte, off int) (string, int, error) {
+	length, err := Bytes2Uint16(bytes, off)
+	strLen := int(length)
+	if err != nil {
+		return "", 0, err
+	}
+	off += 2
+	if len(bytes)-off < strLen {
+		return "", 0, io.EOF
+	}
+
+	buf := bytes[off : off+strLen]
+	return Bytes2String(buf), int(length) + 2, nil
 }

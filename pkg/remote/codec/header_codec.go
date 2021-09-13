@@ -259,6 +259,48 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 	return
 }
 
+func readKVInfoReadOnly(idx int, origBuf []byte, message remote.Message) error {
+	intInfo := message.TransInfo().TransIntInfo()
+	strInfo := message.TransInfo().TransStrInfo()
+	buf := make([]byte, 0, len(origBuf))
+	copy(buf, origBuf)
+
+	for {
+		infoID, err := Bytes2Uint8(buf, idx)
+		idx++
+		if err != nil {
+			// this is the last field, read until there is no more padding
+			if err == io.EOF {
+				break
+			} else {
+				return err
+			}
+		}
+		switch InfoIDType(infoID) {
+		case InfoIDPadding:
+			continue
+		case InfoIDKeyValue:
+			_, err := readStrKVInfoReadOnly(&idx, buf, strInfo)
+			if err != nil {
+				return err
+			}
+		case InfoIDIntKeyValue:
+			_, err := readIntKVInfoReadOnly(&idx, buf, intInfo)
+			if err != nil {
+				return err
+			}
+		case InfoIDACLToken:
+			err = skipACLToken(&idx, buf)
+			if err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("invalid infoIDType[%#x]", infoID)
+		}
+	}
+	return nil
+}
+
 func readKVInfo(idx int, buf []byte, message remote.Message) error {
 	intInfo := message.TransInfo().TransIntInfo()
 	strInfo := message.TransInfo().TransStrInfo()
@@ -323,6 +365,31 @@ func readIntKVInfo(idx *int, buf []byte, info map[uint16]string) (has bool, err 
 	return true, nil
 }
 
+func readIntKVInfoReadOnly(idx *int, buf []byte, info map[uint16]string) (has bool, err error) {
+	kvSize, err := Bytes2Uint16(buf, *idx)
+	*idx += 2
+	if err != nil {
+		return false, fmt.Errorf("error reading int kv info size: %s", err.Error())
+	}
+	if kvSize <= 0 {
+		return false, nil
+	}
+	for i := uint16(0); i < kvSize; i++ {
+		key, err := Bytes2Uint16(buf, *idx)
+		*idx += 2
+		if err != nil {
+			return false, fmt.Errorf("error reading int kv info: %s", err.Error())
+		}
+		val, n, err := ReadString2BLenReadOnly(buf, *idx)
+		*idx += n
+		if err != nil {
+			return false, fmt.Errorf("error reading int kv info: %s", err.Error())
+		}
+		info[key] = val
+	}
+	return true, nil
+}
+
 func readStrKVInfo(idx *int, buf []byte, info map[string]string) (has bool, err error) {
 	kvSize, err := Bytes2Uint16(buf, *idx)
 	*idx += 2
@@ -339,6 +406,31 @@ func readStrKVInfo(idx *int, buf []byte, info map[string]string) (has bool, err 
 			return false, fmt.Errorf("error reading str kv info: %s", err.Error())
 		}
 		val, n, err := ReadString2BLen(buf, *idx)
+		*idx += n
+		if err != nil {
+			return false, fmt.Errorf("error reading str kv info: %s", err.Error())
+		}
+		info[key] = val
+	}
+	return true, nil
+}
+
+func readStrKVInfoReadOnly(idx *int, buf []byte, info map[string]string) (has bool, err error) {
+	kvSize, err := Bytes2Uint16(buf, *idx)
+	*idx += 2
+	if err != nil {
+		return false, fmt.Errorf("error reading str kv info size: %s", err.Error())
+	}
+	if kvSize <= 0 {
+		return false, nil
+	}
+	for i := uint16(0); i < kvSize; i++ {
+		key, n, err := ReadString2BLenReadOnly(buf, *idx)
+		*idx += n
+		if err != nil {
+			return false, fmt.Errorf("error reading str kv info: %s", err.Error())
+		}
+		val, n, err := ReadString2BLenReadOnly(buf, *idx)
 		*idx += n
 		if err != nil {
 			return false, fmt.Errorf("error reading str kv info: %s", err.Error())
