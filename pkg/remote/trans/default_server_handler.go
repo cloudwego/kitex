@@ -21,6 +21,8 @@ import (
 	"net"
 	"runtime/debug"
 
+	"github.com/bytedance/gopkg/cloud/metainfo"
+
 	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -64,6 +66,11 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 			return nil
 		}
 	}
+
+	if kvs := metainfo.AllBackwardValuesToSend(ctx); len(kvs) > 0 {
+		sendMsg.TransInfo().PutTransStrInfo(kvs)
+	}
+
 	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
@@ -139,6 +146,15 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		sendMsg = remote.NewMessage(nil, t.svcInfo, ri, remote.Reply, remote.Server)
 	} else {
 		sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, ri, remote.Reply, remote.Server)
+	}
+
+	if kvs := recvMsg.TransInfo().TransStrInfo(); len(kvs) > 0 {
+		ctx = metainfo.SetMetaInfoFromMap(ctx, kvs)
+		ctx = metainfo.TransferForward(ctx)
+	}
+
+	if recvMsg.ProtocolInfo().TransProto.WithMeta() {
+		ctx = metainfo.WithBackwardValuesToSend(ctx)
 	}
 
 	err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)

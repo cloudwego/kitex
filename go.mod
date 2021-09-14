@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/apache/thrift v0.13.0
-	github.com/bytedance/gopkg v0.0.0-20210709064845-3c00f9323f09
+	github.com/bytedance/gopkg v0.0.0-20210910103821-e4efae9c17c3
 	github.com/cespare/xxhash v1.1.0
 	github.com/cloudwego/netpoll v0.0.3
 	github.com/cloudwego/netpoll-http2 v0.0.4
