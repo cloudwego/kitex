@@ -37,6 +37,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
@@ -89,6 +90,9 @@ func (kc *kClient) init() error {
 	if err := kc.checkOptions(); err != nil {
 		return err
 	}
+	if err := kc.initCircuitBreaker(); err != nil {
+		return err
+	}
 	if err := kc.initRetryer(); err != nil {
 		return err
 	}
@@ -102,6 +106,13 @@ func (kc *kClient) init() error {
 	}
 	kc.richRemoteOption(ctx)
 	return kc.buildInvokeChain()
+}
+
+func (kc *kClient) initCircuitBreaker() error {
+	if kc.opt.CBSuite != nil {
+		kc.opt.CBSuite.SetEventBusAndQueue(kc.opt.Bus, kc.opt.Events)
+	}
+	return nil
 }
 
 func (kc *kClient) initRetryer() error {
@@ -123,6 +134,7 @@ func fillContext(opt *client.Options) context.Context {
 	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
 	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, opt.Events)
 	ctx = context.WithValue(ctx, endpoint.CtxLoggerKey, opt.Logger)
+	ctx = context.WithValue(ctx, rpctimeout.TimeoutAdjustKey, &opt.ExtraTimeout)
 	return ctx
 }
 
@@ -150,11 +162,14 @@ func (kc *kClient) checkOptions() (err error) {
 }
 
 func (kc *kClient) initMiddlewares(ctx context.Context) {
+	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW())
+	kc.mws = append(kc.mws, rpcTimeoutMW(ctx))
 	kc.mws = richMWsWithBuilder(ctx, kc.opt.MWBs, kc)
 	// add new middlewares
 	kc.mws = append(kc.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
 	if kc.opt.Proxy == nil {
 		kc.mws = append(kc.mws, newResolveMWBuilder(kc.opt)(ctx))
+		kc.mws = append(kc.mws, kc.opt.CBSuite.InstanceCBMW())
 		kc.mws = richMWsWithBuilder(ctx, kc.opt.IMWBs, kc)
 	} else {
 		if kc.opt.Resolver != nil { // customized service discovery
@@ -193,6 +208,14 @@ func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Cont
 
 	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
+	}
+
+	if p := kc.opt.Timeouts; p != nil {
+		if c := p.Timeouts(ri); c != nil {
+			_ = cfg.SetRPCTimeout(c.RPCTimeout())
+			_ = cfg.SetConnectTimeout(c.ConnectTimeout())
+			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
+		}
 	}
 
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
@@ -342,6 +365,11 @@ func (kc *kClient) Close() error {
 	var errs utils.ErrChain
 	for _, cb := range kc.opt.CloseCallbacks {
 		if err := cb(); err != nil {
+			errs.Append(err)
+		}
+	}
+	if kc.opt.CBSuite != nil {
+		if err := kc.opt.CBSuite.Close(); err != nil {
 			errs.Append(err)
 		}
 	}

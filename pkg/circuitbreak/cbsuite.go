@@ -66,9 +66,7 @@ type instanceCBConfig struct {
 // CBSuite is default wrapper of CircuitBreaker. If you don't have customize policy, you can specify CircuitBreaker
 // middlewares like this:
 //     cbs := NewCBSuite(GenServiceCBKeyFunc)
-//     opts = append(opts, client.WithMiddleware(cbs.ServiceCBMW()))
-// 	   opts = append(opts, client.WithInstanceMW(cbs.InstanceCBMW()))
-// Notice: when you build middlewares, ServiceCBMW is suggested to be the first mw and set before timeout mw especially.
+//     opts = append(opts, client.WithCircuitBreaker(cbs))
 type CBSuite struct {
 	servicePanel    circuitbreaker.Panel
 	serviceControl  *Control
@@ -93,12 +91,18 @@ func NewCBSuite(genKey GenServiceCBKeyFunc) *CBSuite {
 
 // ServiceCBMW return a new service level CircuitBreakerMW.
 func (s *CBSuite) ServiceCBMW() endpoint.Middleware {
+	if s == nil {
+		return endpoint.DummyMiddleware
+	}
 	s.initServiceCB()
 	return NewCircuitBreakerMW(*s.serviceControl, s.servicePanel)
 }
 
 // InstanceCBMW return a new instance level CircuitBreakerMW.
 func (s *CBSuite) InstanceCBMW() endpoint.Middleware {
+	if s == nil {
+		return endpoint.DummyMiddleware
+	}
 	s.initInstanceCB()
 	return NewCircuitBreakerMW(*s.instanceControl, s.instancePanel)
 }

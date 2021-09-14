@@ -23,6 +23,7 @@ import (
 	"github.com/cloudwego/kitex/internal/configutil"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
+	"github.com/cloudwego/kitex/pkg/circuitbreak"
 	connpool2 "github.com/cloudwego/kitex/pkg/connpool"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -70,14 +71,17 @@ type Options struct {
 	PoolCfg          *connpool2.IdleConfig
 	ErrHandle        func(error) error
 	Targets          string
+	CBSuite          *circuitbreak.CBSuite
+	Timeouts         rpcinfo.TimeoutProvider
 
 	ACLRules []acl.RejectFunc
 
 	MWBs  []endpoint.MiddlewareBuilder
 	IMWBs []endpoint.MiddlewareBuilder
-	Bus   event.Bus
 
-	Events event.Queue
+	Bus          event.Bus
+	Events       event.Queue
+	ExtraTimeout time.Duration
 
 	// DebugInfo should only contains objects that are suitable for json serialization.
 	DebugInfo    utils.Slice

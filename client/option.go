@@ -25,6 +25,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/client"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
+	"github.com/cloudwego/kitex/pkg/circuitbreak"
 	"github.com/cloudwego/kitex/pkg/connpool"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -251,6 +252,18 @@ func WithConnectTimeout(d time.Duration) Option {
 	}}
 }
 
+// WithTimeoutProvider adds a TimeoutProvider to the client.
+// Note that the timeout settings provided by the TimeoutProvider
+// will be applied before the other timeout options in this package
+// and those in the callopt pacakage. Thus it can not modify the
+// timeouts set by WithRPCTimeout or WithConnectTimeout.
+func WithTimeoutProvider(p rpcinfo.TimeoutProvider) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithTimeoutProvider(%T(%+v))", p, p))
+		o.Timeouts = p
+	}}
+}
+
 // WithTag sets the customize tag for service discovery, eg: idc, cluster.
 func WithTag(key, val string) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
@@ -344,5 +357,13 @@ func WithBackupRequest(p *retry.BackupPolicy) Option {
 		o.RetryPolicy.BackupPolicy = p
 		o.RetryPolicy.Enable = true
 		o.RetryPolicy.Type = retry.BackupType
+	}}
+}
+
+// WithCircuitBreaker adds a circuitbreaker suite for the client.
+func WithCircuitBreaker(s *circuitbreak.CBSuite) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithCircuitBreaker(%+v)", s))
+		o.CBSuite = s
 	}}
 }
