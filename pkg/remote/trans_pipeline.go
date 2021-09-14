@@ -22,8 +22,7 @@ import (
 )
 
 // BoundHandler is used to abstract the bound handler.
-type BoundHandler interface {
-}
+type BoundHandler interface{}
 
 // OutboundHandler is used to process write event.
 type OutboundHandler interface {
@@ -59,8 +58,10 @@ type TransPipeline struct {
 	outboundHdrls []OutboundHandler
 }
 
-var _ TransHandler = &TransPipeline{}
-var _ ServerTransHandler = &TransPipeline{}
+var (
+	_ TransHandler       = &TransPipeline{}
+	_ ServerTransHandler = &TransPipeline{}
+)
 
 func newTransPipeline() *TransPipeline {
 	return &TransPipeline{}

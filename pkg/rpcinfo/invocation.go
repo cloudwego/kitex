@@ -46,7 +46,7 @@ type invocation struct {
 }
 
 // NewInvocation creates a new Invocation with the given service, method and optional package.
-func NewInvocation(service string, method string, pkgOpt ...string) Invocation {
+func NewInvocation(service, method string, pkgOpt ...string) Invocation {
 	ivk := invocationPool.Get().(*invocation)
 	ivk.seqID = genSeqID()
 	ivk.serviceName = service

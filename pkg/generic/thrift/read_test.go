@@ -372,7 +372,7 @@ func Test_readMap(t *testing.T) {
 	}
 	count := 0
 	mockTTransport := &mocks.MockThriftTTransport{
-		ReadMapBeginFunc: func() (keyType thrift.TType, valueType thrift.TType, size int, err error) {
+		ReadMapBeginFunc: func() (keyType, valueType thrift.TType, size int, err error) {
 			return thrift.STRING, thrift.STRING, 1, nil
 		},
 		ReadStringFunc: func() (string, error) {

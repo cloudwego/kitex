@@ -36,7 +36,7 @@ type DefaultConfig interface {
 
 // RichTypeConfig provides typed get functions.
 type RichTypeConfig interface {
-	GetBool(key string) (val bool, ok bool)
+	GetBool(key string) (val, ok bool)
 	GetInt(key string) (val int, ok bool)
 	GetString(key string) (val string, ok bool)
 	GetInt64(key string) (val int64, ok bool)
@@ -48,7 +48,7 @@ type RichTypeConfig interface {
 type RichTypeDefaultConfig interface {
 	GetBool(key string, def bool) bool
 	GetInt(key string, def int) int
-	GetString(key string, def string) string
+	GetString(key, def string) string
 	GetInt64(key string, def int64) int64
 	GetFloat(key string, def float64) float64
 	GetDuration(key string, def time.Duration) time.Duration
@@ -116,7 +116,7 @@ func NewRichTypeConfig(c Config) RichTypeConfig {
 	return &richTypeConfig{NewDefaultConfig(c)}
 }
 
-func (rd *richTypeConfig) GetBool(key string) (val bool, ok bool) {
+func (rd *richTypeConfig) GetBool(key string) (val, ok bool) {
 	val, ok = rd.DefaultConfig.Get(key, nil).(bool)
 	return
 }
@@ -175,7 +175,7 @@ func (rd *richTypeDefaultConfig) GetInt(key string, def int) int {
 	return def
 }
 
-func (rd *richTypeDefaultConfig) GetString(key string, def string) string {
+func (rd *richTypeDefaultConfig) GetString(key, def string) string {
 	if val, exist := rd.RichTypeConfig.GetString(key); exist {
 		return val
 	}

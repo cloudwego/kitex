@@ -34,8 +34,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
-type cliTransHandlerFactory struct {
-}
+type cliTransHandlerFactory struct{}
 
 // NewCliTransHandlerFactory creates a new netpollmux client transport handler factory.
 func NewCliTransHandlerFactory() remote.ClientTransHandlerFactory {

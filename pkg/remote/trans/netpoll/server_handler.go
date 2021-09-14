@@ -21,8 +21,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 )
 
-type svrTransHandlerFactory struct {
-}
+type svrTransHandlerFactory struct{}
 
 // NewSvrTransHandlerFactory creates a default netpoll server transport handler factory.
 func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {

@@ -274,6 +274,7 @@ func (m *mockForwardProxy) Configure(cfg *proxy.Config) error {
 	}
 	return nil
 }
+
 func (m *mockForwardProxy) ResolveProxyInstance(ctx context.Context) error {
 	if m.ResolveProxyInstanceFunc != nil {
 		return m.ResolveProxyInstanceFunc(ctx)

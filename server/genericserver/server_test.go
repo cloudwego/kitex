@@ -61,8 +61,7 @@ func TestNewServerWithServiceInfo(t *testing.T) {
 }
 
 // GenericServiceImpl ...
-type mockImpl struct {
-}
+type mockImpl struct{}
 
 // GenericCall ...
 func (g *mockImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {

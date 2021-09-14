@@ -18,12 +18,13 @@ package test
 
 import (
 	"context"
-	"github.com/tidwall/gjson"
 	"net"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/client/genericclient"

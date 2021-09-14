@@ -136,7 +136,7 @@ func (de *DetailedError) WithExtraMsg(errMsg string) {
 	de.extraMsg = errMsg
 }
 
-func appendErrMsg(errMsg string, extra string) string {
+func appendErrMsg(errMsg, extra string) string {
 	if extra == "" {
 		return errMsg
 	}

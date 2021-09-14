@@ -81,7 +81,6 @@ func TestInitRPCInfo(t *testing.T) {
 	conn := new(mocks.Conn)
 	conn.RemoteAddrFunc = func() (r net.Addr) {
 		return remoteAddr
-
 	}
 	ctx := context.Background()
 	rpcInfoInitFunc := svr.initRPCInfoFunc()
@@ -151,7 +150,7 @@ func TestServiceRegistryInfo(t *testing.T) {
 		Weight: 100,
 		Tags:   map[string]string{"aa": "bb"},
 	}
-	var checkInfo = func(info *registry.Info) {
+	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
 		test.Assert(t, info.Weight == registryInfo.Weight, info.Addr)
 		test.Assert(t, info.Addr.String() == ":8888", info.Addr)
@@ -190,7 +189,7 @@ func TestServiceRegistryInfo(t *testing.T) {
 }
 
 func TestServiceRegistryNoInitInfo(t *testing.T) {
-	var checkInfo = func(info *registry.Info) {
+	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
 		test.Assert(t, info.Addr.String() == ":8888", info.Addr)
 	}
@@ -354,7 +353,6 @@ func TestInvokeHandlerPanic(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, mwExec)
 	test.Assert(t, serviceHandler)
-
 }
 
 type noopMetahandler struct{}
@@ -362,6 +360,7 @@ type noopMetahandler struct{}
 func (noopMetahandler) WriteMeta(ctx context.Context, msg remote.Message) (context.Context, error) {
 	return ctx, nil
 }
+
 func (noopMetahandler) ReadMeta(ctx context.Context, msg remote.Message) (context.Context, error) {
 	return ctx, nil
 }
@@ -377,8 +376,7 @@ func (f *mockSvrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (
 	return f.hdlr, nil
 }
 
-type mockExtension struct {
-}
+type mockExtension struct{}
 
 func (m mockExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cfg rpcinfo.RPCConfig, role remote.RPCRole) {
 }

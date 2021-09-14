@@ -21,9 +21,7 @@ import (
 	"time"
 )
 
-var (
-	fixedWindowTime = time.Second
-)
+var fixedWindowTime = time.Second
 
 // qpsLimiter implements the RateLimiter interface.
 type qpsLimiter struct {

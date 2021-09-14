@@ -42,7 +42,7 @@ func TestServerStart(t *testing.T) {
 			return nil
 		},
 	}
-	var opt = &remote.ServerOption{
+	opt := &remote.ServerOption{
 		Address:            utils.NewNetAddr("tcp", "test"),
 		TransServerFactory: mocks.NewMockTransServerFactory(transSvr),
 		Logger:             klog.DefaultLogger(),
@@ -70,7 +70,7 @@ func TestServerStartListenErr(t *testing.T) {
 			return nil, mockErr
 		},
 	}
-	var opt = &remote.ServerOption{
+	opt := &remote.ServerOption{
 		Address:            utils.NewNetAddr("tcp", "test"),
 		TransServerFactory: mocks.NewMockTransServerFactory(transSvr),
 		Logger:             klog.DefaultLogger(),

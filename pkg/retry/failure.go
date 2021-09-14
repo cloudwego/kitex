@@ -73,7 +73,7 @@ func (p *FailurePolicy) WithFixedBackOff(fixMS int) {
 }
 
 // WithRandomBackOff sets the random time.
-func (p *FailurePolicy) WithRandomBackOff(minMS int, maxMS int) {
+func (p *FailurePolicy) WithRandomBackOff(minMS, maxMS int) {
 	if err := checkRandomBackOff(minMS, maxMS); err != nil {
 		panic(err)
 	}
@@ -114,15 +114,14 @@ func newFixedBackOff(fixMS int) BackOff {
 	}
 }
 
-func newRandomBackOff(minMS int, maxMS int) BackOff {
+func newRandomBackOff(minMS, maxMS int) BackOff {
 	return &randomBackOff{
 		minMS: minMS,
 		maxMS: maxMS,
 	}
 }
 
-type noneBackOff struct {
-}
+type noneBackOff struct{}
 
 // String prints human readable information.
 func (p noneBackOff) String() string {
@@ -173,7 +172,7 @@ func checkFixedBackOff(fixMS int) error {
 	return nil
 }
 
-func checkRandomBackOff(minMS int, maxMS int) error {
+func checkRandomBackOff(minMS, maxMS int) error {
 	if maxMS <= minMS {
 		return fmt.Errorf("invalid RandomBackOff, minMS=%d, maxMS=%d", minMS, maxMS)
 	}

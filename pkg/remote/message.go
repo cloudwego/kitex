@@ -345,7 +345,7 @@ func (ti *transInfo) Recycle() {
 }
 
 // FillSendMsgFromRecvMsg is used to fill the transport information to the message to be sent.
-func FillSendMsgFromRecvMsg(recvMsg Message, sendMsg Message) {
+func FillSendMsgFromRecvMsg(recvMsg, sendMsg Message) {
 	sendMsg.SetProtocolInfo(recvMsg.ProtocolInfo())
 	sendMsg.SetPayloadCodec(recvMsg.PayloadCodec())
 

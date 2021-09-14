@@ -34,8 +34,7 @@ func NewNetpollConnExtension() trans.Extension {
 	return &netpollConnExtension{}
 }
 
-type netpollConnExtension struct {
-}
+type netpollConnExtension struct{}
 
 // SetReadTimeout implements the trans.Extension interface.
 func (e *netpollConnExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cfg rpcinfo.RPCConfig, role remote.RPCRole) {

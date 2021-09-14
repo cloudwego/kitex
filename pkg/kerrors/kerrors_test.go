@@ -27,7 +27,7 @@ import (
 )
 
 func TestIsKitexError(t *testing.T) {
-	var errs = []error{
+	errs := []error{
 		ErrInternalException,
 		ErrServiceDiscovery,
 		ErrGetConnection,

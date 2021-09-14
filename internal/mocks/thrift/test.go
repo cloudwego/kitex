@@ -262,7 +262,7 @@ func NewMockClientFactory(t thrift.TTransport, f thrift.TProtocolFactory) *MockC
 	}
 }
 
-func NewMockClientProtocol(t thrift.TTransport, iprot thrift.TProtocol, oprot thrift.TProtocol) *MockClient {
+func NewMockClientProtocol(t thrift.TTransport, iprot, oprot thrift.TProtocol) *MockClient {
 	return &MockClient{
 		c: thrift.NewTStandardClient(iprot, oprot),
 	}

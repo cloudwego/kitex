@@ -52,8 +52,7 @@ type Info struct {
 var NoopRegistry Registry = &noopRegistry{}
 
 // NoopRegistry
-type noopRegistry struct {
-}
+type noopRegistry struct{}
 
 func (e noopRegistry) Register(*Info) error {
 	return nil

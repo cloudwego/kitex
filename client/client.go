@@ -50,7 +50,7 @@ import (
 // or multiple arguments. So is response to the actual result type.
 // Response may be nil to address oneway calls.
 type Client interface {
-	Call(ctx context.Context, method string, request interface{}, response interface{}) error
+	Call(ctx context.Context, method string, request, response interface{}) error
 }
 
 type kClient struct {
@@ -234,7 +234,7 @@ func (kc *kClient) applyCallOptions(ctx context.Context, cfg rpcinfo.RPCConfig, 
 }
 
 // Call implements the Client interface .
-func (kc *kClient) Call(ctx context.Context, method string, request interface{}, response interface{}) error {
+func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) error {
 	if !kc.inited {
 		panic("client not initialized")
 	}

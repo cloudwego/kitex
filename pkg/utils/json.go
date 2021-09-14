@@ -112,7 +112,7 @@ func JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
 	data := []byte(jsonStr)
 	size := len(data)
 	lastIdx := size - 1
-	var idx = 0
+	idx := 0
 	var c byte
 	if c, idx, err = nextToken(data, idx, lastIdx); err != nil {
 		return
@@ -143,7 +143,7 @@ func JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
 	return mapInfo, err
 }
 
-func readString(buf []byte, idx int, lastIdx int) (string, int, error) {
+func readString(buf []byte, idx, lastIdx int) (string, int, error) {
 	var err error
 	var c byte
 	var isNull bool
@@ -153,7 +153,7 @@ func readString(buf []byte, idx int, lastIdx int) (string, int, error) {
 	var str []byte
 	if c == '"' {
 		start := idx
-		var noESC = true
+		noESC := true
 		for idx <= lastIdx {
 			if c, idx, err = readByte(buf, idx, lastIdx); err != nil {
 				return "", idx, err
@@ -192,7 +192,8 @@ func readString(buf []byte, idx int, lastIdx int) (string, int, error) {
 	err = fmt.Errorf("json str is invalid, expects '\"' or n, but found %s", string(c))
 	return *(*string)(unsafe.Pointer(&str)), idx, err
 }
-func readByte(buf []byte, idx int, lastIdx int) (byte, int, error) {
+
+func readByte(buf []byte, idx, lastIdx int) (byte, int, error) {
 	if lastIdx < idx {
 		return 0, -1, fmt.Errorf("readByte no more data")
 	}
@@ -201,7 +202,7 @@ func readByte(buf []byte, idx int, lastIdx int) (byte, int, error) {
 	return c, idx, nil
 }
 
-func nextToken(buf []byte, idx int, lastIdx int) (byte, int, error) {
+func nextToken(buf []byte, idx, lastIdx int) (byte, int, error) {
 	if lastIdx < idx {
 		return 0, -1, errors.New("nextToken no more data")
 	}
@@ -218,7 +219,7 @@ func nextToken(buf []byte, idx int, lastIdx int) (byte, int, error) {
 	return c, idx, nil
 }
 
-func checkNull(c byte, data []byte, idx int, lastIdx int) (int, bool) {
+func checkNull(c byte, data []byte, idx, lastIdx int) (int, bool) {
 	if c == 'n' {
 		ch, idx, _ := readByte(data, idx, lastIdx)
 		if ch != 'u' {
@@ -240,7 +241,7 @@ func checkNull(c byte, data []byte, idx int, lastIdx int) (int, bool) {
 	return idx, false
 }
 
-func readU4(buf []byte, idx int, lastIdx int) (rune, int, error) {
+func readU4(buf []byte, idx, lastIdx int) (rune, int, error) {
 	var err error
 	var ret rune
 	for i := 0; i < 4; i++ {

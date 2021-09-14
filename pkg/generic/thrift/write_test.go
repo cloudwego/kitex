@@ -532,7 +532,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 		opt *writerOption
 	}
 	mockTTransport := &mocks.MockThriftTTransport{
-		WriteMapBeginFunc: func(keyType thrift.TType, valueType thrift.TType, size int) error {
+		WriteMapBeginFunc: func(keyType, valueType thrift.TType, size int) error {
 			test.Assert(t, keyType == thrift.STRING)
 			test.Assert(t, valueType == thrift.STRING)
 			test.Assert(t, size == 1)
@@ -577,7 +577,7 @@ func Test_writeStringMap(t *testing.T) {
 		opt *writerOption
 	}
 	mockTTransport := &mocks.MockThriftTTransport{
-		WriteMapBeginFunc: func(keyType thrift.TType, valueType thrift.TType, size int) error {
+		WriteMapBeginFunc: func(keyType, valueType thrift.TType, size int) error {
 			test.Assert(t, keyType == thrift.STRING)
 			test.Assert(t, valueType == thrift.STRING)
 			test.Assert(t, size == 1)

@@ -55,7 +55,7 @@ func newServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
 	return svcInfo
 }
 
-func callHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+func callHandler(ctx context.Context, handler, arg, result interface{}) error {
 	realArg := arg.(*Args)
 	realResult := result.(*Result)
 	success, err := handler.(Service).GenericCall(ctx, realArg.Method, realArg.Request)

@@ -28,9 +28,7 @@ const (
 	TestYamlFile = "/tmp/test.yaml"
 )
 
-var (
-	cfg *YamlConfig
-)
+var cfg *YamlConfig
 
 func createTestYamlFile(t *testing.T, path string) {
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)

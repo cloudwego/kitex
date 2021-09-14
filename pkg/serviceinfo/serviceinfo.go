@@ -90,7 +90,7 @@ type MethodInfo interface {
 }
 
 // MethodHandler is corresponding to the handler wrapper func that in generated code
-type MethodHandler func(ctx context.Context, handler interface{}, args, result interface{}) error
+type MethodHandler func(ctx context.Context, handler, args, result interface{}) error
 
 // NewMethodInfo is called in generated code to build method info
 func NewMethodInfo(methodHandler MethodHandler, newArgsFunc, newResultFunc func() interface{}, oneWay bool) MethodInfo {

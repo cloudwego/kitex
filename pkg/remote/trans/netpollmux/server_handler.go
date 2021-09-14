@@ -38,8 +38,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
-type svrTransHandlerFactory struct {
-}
+type svrTransHandlerFactory struct{}
 
 // NewSvrTransHandlerFactory creates a default netpollmux remote.ServerTransHandlerFactory.
 func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
@@ -278,7 +277,7 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 	t.transPipe = p
 }
 
-func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, closeConn bool, doOnMessage bool) {
+func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, closeConn, doOnMessage bool) {
 	defer func() {
 		if closeConn {
 			conn.Close()

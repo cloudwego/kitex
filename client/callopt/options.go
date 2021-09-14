@@ -32,11 +32,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-var (
-	callOptionsPool = sync.Pool{
-		New: newOptions,
-	}
-)
+var callOptionsPool = sync.Pool{
+	New: newOptions,
+}
 
 type callOptions struct {
 	configs      rpcinfo.RPCConfig

@@ -49,8 +49,7 @@ func NewProtobufCodec() remote.PayloadCodec {
 }
 
 // protobufCodec implements  PayloadMarshaler
-type protobufCodec struct {
-}
+type protobufCodec struct{}
 
 // Len encode outside not here
 func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {

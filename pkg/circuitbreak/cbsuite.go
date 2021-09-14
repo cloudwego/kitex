@@ -38,9 +38,7 @@ const (
 	cbConfig      = "cb_config"
 )
 
-var (
-	defaultCBConfig = CBConfig{Enable: true, ErrRate: 0.5, MinSample: 200}
-)
+var defaultCBConfig = CBConfig{Enable: true, ErrRate: 0.5, MinSample: 200}
 
 // GetDefaultCBConfig return defaultConfig of CircuitBreaker.
 func GetDefaultCBConfig() CBConfig {

@@ -34,8 +34,7 @@ func NewTransServerFactory() remote.TransServerFactory {
 	return &netpollTransServerFactory{}
 }
 
-type netpollTransServerFactory struct {
-}
+type netpollTransServerFactory struct{}
 
 // NewTransServer implements the remote.TransServerFactory interface.
 func (f *netpollTransServerFactory) NewTransServer(opt *remote.ServerOption, transHdlr remote.ServerTransHandler) remote.TransServer {
