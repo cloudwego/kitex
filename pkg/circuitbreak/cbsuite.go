@@ -179,7 +179,9 @@ func (s *CBSuite) initServiceCB() {
 
 	svcKey := func(ctx context.Context, request interface{}) (serviceCBKey string, enabled bool) {
 		ri := rpcinfo.GetRPCInfo(ctx)
-		serviceCBKey = s.genServiceCBKey(ri)
+		if serviceCBKey = s.genServiceCBKey(ri); serviceCBKey == "" {
+			serviceCBKey = fmt.Sprintf("%s/%s/%s", ri.From().ServiceName(), ri.To().ServiceName(), ri.Invocation().MethodName())
+		}
 		cbConfig, _ := s.serviceCBConfig.LoadOrStore(serviceCBKey, defaultCBConfig)
 		enabled = cbConfig.(CBConfig).Enable
 		return
