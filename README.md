@@ -57,7 +57,7 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
     - [Customized Access Control](https://github.com/cloudwego/kitex/blob/develop/docs/guide/service-governance/access_control.md)
   - Advanced Features
     - [Generic Call](https://github.com/cloudwego/kitex/blob/develop/docs/guide/advanced-features/generic_call.md)
-    - [Server SDK Mode](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/invoker.md)
+    - [Server SDK Mode](https://github.com/cloudwego/kitex/blob/develop/docs/guide/advanced-features/invoker.md)
   - Code Generation
     - [Code Generation Tool](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/code_generation.md)
     - [Combined Service](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/combine_service.md)
