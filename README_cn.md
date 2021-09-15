@@ -177,3 +177,10 @@ Kitex 基于[Apache License 2.0](LICENSE) 许可证，其依赖的三方组件�
 
   ![LarkGroup](docs/images/lark_group_cn.png)
 
+## Landscapes
+
+<p align="center">
+<img src="https://landscape.cncf.io/images/left-logo.svg" width="150"/>&nbsp;&nbsp;<img src="https://landscape.cncf.io/images/right-logo.svg" width="200"/>
+<br/><br/>
+CloudWeGo 丰富了 <a href="https://landscape.cncf.io/">CNCF 云原生生态</a>。
+</p>
