@@ -115,7 +115,7 @@ func TestForwardProxy(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
 	opts = append(opts, WithDialer(dialer))
-	opts = append(opts, WithDestService("psm"))
+	opts = append(opts, WithDestService("serviceName"))
 	opts = append(opts, WithProxy(fp))
 
 	svcInfo := mocks.ServiceInfo()
@@ -151,7 +151,7 @@ func TestProxyWithResolver(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
 	opts = append(opts, WithDialer(dialer))
-	opts = append(opts, WithDestService("psm"))
+	opts = append(opts, WithDestService("serviceName"))
 	opts = append(opts, WithProxy(fp))
 	opts = append(opts, WithResolver(resolver404))
 
@@ -200,7 +200,7 @@ func TestProxyWithBalancer(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
 	opts = append(opts, WithDialer(dialer))
-	opts = append(opts, WithDestService("psm"))
+	opts = append(opts, WithDestService("serviceName"))
 	opts = append(opts, WithProxy(fp))
 	opts = append(opts, WithLoadBalancer(lb))
 
@@ -245,7 +245,7 @@ func TestProxyWithResolverAndBalancer(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
 	opts = append(opts, WithDialer(dialer))
-	opts = append(opts, WithDestService("psm"))
+	opts = append(opts, WithDestService("serviceName"))
 	opts = append(opts, WithProxy(fp))
 	opts = append(opts, WithResolver(resolver404))
 	opts = append(opts, WithLoadBalancer(lb))

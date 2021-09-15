@@ -33,7 +33,7 @@ import (
 
 func recoverFunc(ctx context.Context, logger klog.FormatLogger, ri rpcinfo.RPCInfo, done chan error) {
 	if err := recover(); err != nil {
-		e := fmt.Errorf("KITEX: panic, remote[to_psm=%s|method=%s], err=%v\n%s",
+		e := fmt.Errorf("KITEX: panic, remote[to_serviceName=%s|method=%s], err=%v\n%s",
 			ri.To().ServiceName(), ri.To().Method(), err, debug.Stack())
 		if l, ok := logger.(klog.CtxLogger); ok {
 			l.CtxErrorf(ctx, "%s", e.Error())
@@ -99,10 +99,10 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 					// Specially, ErrRPCFinish can be ignored, it happens in retry scene, previous call returns first.
 					var errMsg string
 					if ri.To().Address() != nil {
-						errMsg = fmt.Sprintf("KITEX: remote[to_psm=%s|method=%s|addr=%s]，err=%s",
+						errMsg = fmt.Sprintf("KITEX: remote[to_serviceName=%s|method=%s|addr=%s]，err=%s",
 							ri.To().ServiceName(), ri.To().Method(), ri.To().Address(), err.Error())
 					} else {
-						errMsg = fmt.Sprintf("KITEX: remote[to_psm=%s|method=%s], err=%s",
+						errMsg = fmt.Sprintf("KITEX: remote[to_serviceName=%s|method=%s], err=%s",
 							ri.To().ServiceName(), ri.To().Method(), err.Error())
 					}
 					if l, ok := logger.(klog.CtxLogger); ok {

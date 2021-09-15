@@ -138,7 +138,7 @@ func makeRetryErr(ctx context.Context, msg string, callTimes int32) error {
 func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo, logger klog.FormatLogger) error {
 	remoteInfo := ""
 	if ri != nil {
-		remoteInfo = fmt.Sprintf(", remote[to_psm=%s|method=%s]", ri.To().ServiceName(), ri.To().Method())
+		remoteInfo = fmt.Sprintf(", remote[to_serviceName=%s|method=%s]", ri.To().ServiceName(), ri.To().Method())
 	}
 	err := fmt.Errorf("KITEX: panic in retry%s, err=%v\n%s",
 		remoteInfo, panicInfo, debug.Stack())

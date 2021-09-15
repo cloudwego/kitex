@@ -42,10 +42,10 @@ var respMsgWithExtra = `{"Msg":"world","required_field":"required_field","extra_
 
 var errResp = "Test Error"
 
-func newGenericClient(psm string, g generic.Generic, targetIPPort string) genericclient.Client {
+func newGenericClient(serviceName string, g generic.Generic, targetIPPort string) genericclient.Client {
 	var opts []client.Option
 	opts = append(opts, client.WithHostPorts(targetIPPort))
-	genericCli, _ := genericclient.NewClient(psm, g, opts...)
+	genericCli, _ := genericclient.NewClient(serviceName, g, opts...)
 	return genericCli
 }
 

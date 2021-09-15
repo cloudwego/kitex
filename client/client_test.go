@@ -61,7 +61,7 @@ func newMockClient(tb testing.TB, opts ...Option) Client {
 	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
 	opts = append(opts, WithResolver(resolver404))
 	opts = append(opts, WithDialer(dialer))
-	opts = append(opts, WithDestService("psm"))
+	opts = append(opts, WithDestService("serviceName"))
 
 	svcInfo := mocks.ServiceInfo()
 	cli, err := NewClient(svcInfo, opts...)
