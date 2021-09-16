@@ -27,16 +27,16 @@ import (
 )
 
 // NewClient create a generic client
-func NewClient(serviceName string, g generic.Generic, opts ...client.Option) (Client, error) {
+func NewClient(destService string, g generic.Generic, opts ...client.Option) (Client, error) {
 	svcInfo := generic.ServiceInfo(g.PayloadCodecType())
-	return NewClientWithServiceInfo(serviceName, g, svcInfo, opts...)
+	return NewClientWithServiceInfo(destService, g, svcInfo, opts...)
 }
 
 // NewClientWithServiceInfo create a generic client with serviceInfo
-func NewClientWithServiceInfo(serviceName string, g generic.Generic, svcInfo *serviceinfo.ServiceInfo, opts ...client.Option) (Client, error) {
+func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *serviceinfo.ServiceInfo, opts ...client.Option) (Client, error) {
 	var options []client.Option
 	options = append(options, client.WithGeneric(g))
-	options = append(options, client.WithDestService(serviceName))
+	options = append(options, client.WithDestService(destService))
 	options = append(options, opts...)
 
 	kc, err := client.NewClient(svcInfo, options...)

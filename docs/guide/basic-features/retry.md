@@ -54,7 +54,7 @@ Note: Dynamic configuration (see 3.3) cannot take effect if retry is enabled by 
 // import "github.com/cloudwego/kitex/pkg/retry"
 fp := retry.NewFailurePolicy()
 fp.WithMaxRetryTimes(3) // set the maximum number of retries to 3
-xxxCli := xxxservice.NewClient("serviceName", client.WithFailureRetry(fp))
+xxxCli := xxxservice.NewClient("destServiceName", client.WithFailureRetry(fp))
 ```
 
 - Strategy selection:
@@ -96,7 +96,7 @@ It is recommended to configure as TP99, then 1% request will trigger `Backup Req
 ```go
 // If the first request is not returned after XXX ms, the backup request will be initiated and the `Chain Retry Stop` is enabled
 bp := retry.NewBackupPolicy(xxx)
-xxxCli := xxxservice.NewClient("serviceName", client.WithBackupRequest(bp))
+xxxCli := xxxservice.NewClient("destServiceName", client.WithBackupRequest(bp))
 ```
 
 - Strategy selection:

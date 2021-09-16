@@ -23,8 +23,8 @@ Application scenario: mid-platform services can forward the received original Th
      "github.com/cloudwego/kitex/client/genericclient"
      "github.com/cloudwego/kitex/pkg/generic"
   )
-  func NewGenericClient(serviceName string) genericclient.Client {
-      genericCli := genericclient.NewClient(serviceName, generic.BinaryThriftGeneric())
+  func NewGenericClient(destServiceName string) genericclient.Client {
+      genericCli := genericclient.NewClient(destServiceName, generic.BinaryThriftGeneric())
       return genericCli
   }
   ```
@@ -161,7 +161,7 @@ func main() {
     if err != nil {
         panic(err)
     }
-    cli, err := genericclient.NewClient("serviceName", g, opts...)
+    cli, err := genericclient.NewClient("destServiceName", g, opts...)
     if err != nil {
         panic(err)
     }
@@ -416,7 +416,7 @@ func main() {
     if err != nil {
         panic(err)
     }
-    cli, err := genericclient.NewClient("serviceName", g, opts...)
+    cli, err := genericclient.NewClient("destServiceName", g, opts...)
     if err != nil {
         panic(err)
     }

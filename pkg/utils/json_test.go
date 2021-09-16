@@ -181,7 +181,7 @@ func prepareMap() map[string]string {
 	mapInfo["bb"] = "bb"
 	mapInfo["ccc"] = "ccc"
 	mapInfo["env"] = "test"
-	mapInfo["serviceName"] = "kite.server"
+	mapInfo["destService"] = "kite.server"
 	mapInfo["remoteIP"] = "10.1.2.100"
 	mapInfo["hello"] = "hello"
 	mapInfo["fongojannfsoaigsang ojosaf"] = "fsdaufsdjagnji91nngnajjmfsaf"
