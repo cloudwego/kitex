@@ -123,7 +123,12 @@ When you complete it, `hello.thrift` should be just like above.
 
 Run below command, then `kitex` compiler will recompile `hello.thrift` and update generated code.
 
-`kitex -service a.b.c hello.thrift`
+```bash
+kitex -service a.b.c hello.thrift
+
+# If the current directory is not under $GOPATH/src, you need to add the -module parameter which usually is same as the module name in go.mod
+kitex -module "your_module_name" -service a.b.c hello.thrift
+```
 
 After you run the above command, `kitex` compiler will update these files:
 
