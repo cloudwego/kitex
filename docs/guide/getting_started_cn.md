@@ -123,7 +123,12 @@ service Hello {
 
 运行如下命令后，`kitex` 工具将根据 `hello.thrift` 更新代码文件。
 
-`kitex -service a.b.c hello.thrift`
+```bash
+kitex -service a.b.c hello.thrift
+
+# 若当前目录不在 $GOPATH/src 下，需要加上 -module 参数，一般为 go.mod 下的名字
+kitex -module "your_module_name" -service a.b.c hello.thrift
+```
 
 执行完上述命令后，`kitex` 工具将更新下述文件
 
