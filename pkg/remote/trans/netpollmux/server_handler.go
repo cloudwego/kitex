@@ -24,6 +24,7 @@ import (
 	"runtime/debug"
 	"sync"
 
+	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/netpoll"
 
 	stats2 "github.com/cloudwego/kitex/internal/stats"
@@ -82,6 +83,11 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 			return nil
 		}
 	}
+
+	if kvs := metainfo.AllBackwardValuesToSend(ctx); len(kvs) > 0 {
+		sendMsg.TransInfo().PutTransStrInfo(kvs)
+	}
+
 	bufWriter := np.NewWriterByteBuffer(netpoll.NewLinkBuffer())
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
@@ -191,6 +197,16 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 		} else {
 			sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, rpcInfo, remote.Reply, remote.Server)
 		}
+
+		if kvs := recvMsg.TransInfo().TransStrInfo(); len(kvs) > 0 {
+			ctx = metainfo.SetMetaInfoFromMap(ctx, kvs)
+			ctx = metainfo.TransferForward(ctx)
+		}
+
+		if recvMsg.ProtocolInfo().TransProto.WithMeta() {
+			ctx = metainfo.WithBackwardValuesToSend(ctx)
+		}
+
 		err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
 		if err != nil {
 			// error cannot be wrapped to print here, so it must exec before NewTransError
