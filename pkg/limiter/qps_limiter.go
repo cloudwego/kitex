@@ -96,16 +96,23 @@ func (l *qpsLimiter) stopTicker() {
 
 // Some deviation is allowed here to gain better performance.
 func (l *qpsLimiter) updateToken() {
-	var v int32
-	v = atomic.LoadInt32(&l.tokens)
-	if v < 0 {
-		v = atomic.LoadInt32(&l.once)
-	} else if v+atomic.LoadInt32(&l.once) > atomic.LoadInt32(&l.limit) {
-		v = atomic.LoadInt32(&l.limit)
-	} else {
-		v = v + atomic.LoadInt32(&l.once)
+
+	if atomic.LoadInt32(&l.limit) < atomic.LoadInt32(&l.tokens) {
+		return
 	}
-	atomic.StoreInt32(&l.tokens, v)
+
+	once := atomic.LoadInt32(&l.once)
+
+	delta := atomic.LoadInt32(&l.limit) - atomic.LoadInt32(&l.tokens)
+
+	if delta > once || delta < 0 {
+		delta = once
+	}
+
+	newTokens := atomic.AddInt32(&l.tokens, delta)
+	if newTokens < once {
+		atomic.StoreInt32(&l.tokens, once)
+	}
 }
 
 func calcOnce(interval time.Duration, limit int) int32 {
