@@ -27,21 +27,22 @@ Please do not report the safe disclosure of bugs to public issues. Contact us by
 ## Submit a Pull Request
 Before you submit your Pull Request (PR) consider the following guidelines:
 1. Search [GitHub](https://github.com/cloudwego/kitex/pulls) for an open or closed PR that relates to your submission. You don't want to duplicate existing efforts.
-2. Be sure that an issue describes the problem you're fixing, or documents the design for the feature you'd like to add. Discussing the design upfront helps to ensure that we're ready to accept your work.
-3. [Fork](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo) the cloudwego/kitex repo.
-4. In your forked repository, make your changes in a new git branch:
+2. Please submit an issue instead of PR if you have a better suggestion for format tools. We won't accept a lot of file changes only for formatting.
+3. Be sure that an issue describes the problem you're fixing, or documents the design for the feature you'd like to add. Discussing the design upfront helps to ensure that we're ready to accept your work.
+4. [Fork](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo) the cloudwego/kitex repo.
+5. In your forked repository, make your changes in a new git branch:
     ```
     git checkout -b my-fix-branch develop
     ```
-5. Create your patch, including appropriate test cases.
-6. Follow our [Style Guides](#code-style-guides).
-7. Commit your changes using a descriptive commit message that follows [AngularJS Git Commit Message Conventions](https://docs.google.com/document/d/1QrDFcIiPjSLDn3EL15IJygNPiHORgU1_OOAqWjiDU5Y/edit).
+6. Create your patch, including appropriate test cases.
+7. Follow our [Style Guides](#code-style-guides).
+8. Commit your changes using a descriptive commit message that follows [AngularJS Git Commit Message Conventions](https://docs.google.com/document/d/1QrDFcIiPjSLDn3EL15IJygNPiHORgU1_OOAqWjiDU5Y/edit).
    Adherence to these conventions is necessary because release notes are automatically generated from these messages.
-8. Push your branch to GitHub:
+9. Push your branch to GitHub:
     ```
     git push origin my-fix-branch
     ```
-9. In GitHub, send a pull request to `kitex:develop`
+10. In GitHub, send a pull request to `kitex:develop` and write clear and unambiguous title.
 
 ## Contribution Prerequisites
 - Our development environment keeps up with [Go Official](https://golang.org/project/).
