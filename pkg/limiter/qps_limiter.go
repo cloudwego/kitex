@@ -60,13 +60,13 @@ func (l *qpsLimiter) UpdateQPSLimit(interval time.Duration, limit int) {
 	atomic.StoreInt32(&l.limit, int32(limit))
 	once := calcOnce(interval, limit)
 	atomic.StoreInt32(&l.once, once)
+	l.resetTokens()
 	if interval != l.interval {
 		l.interval = interval
 		l.stopTicker()
 		l.ticker = time.NewTicker(interval)
 		go l.startTicker()
 	}
-	l.resetTokens()
 }
 
 // Acquire adds 1.
