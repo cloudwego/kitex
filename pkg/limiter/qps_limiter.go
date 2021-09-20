@@ -27,11 +27,12 @@ var (
 
 // qpsLimiter implements the RateLimiter interface.
 type qpsLimiter struct {
-	limit    int32
-	tokens   int32
-	interval time.Duration
-	once     int32
-	ticker   *time.Ticker
+	limit      int32
+	tokens     int32
+	interval   time.Duration
+	once       int32
+	ticker     *time.Ticker
+	tickerDone chan bool
 }
 
 // NewQPSLimiter creates qpsLimiter.
@@ -84,14 +85,28 @@ func (l *qpsLimiter) Status() (max, cur int, interval time.Duration) {
 }
 
 func (l *qpsLimiter) startTicker() {
-	ch := l.ticker.C
-	for range ch {
-		l.updateToken()
+	defer l.ticker.Stop()
+	if l.tickerDone == nil {
+		l.tickerDone = make(chan bool, 1)
+	}
+	for {
+		select {
+		case <-l.ticker.C:
+			l.updateToken()
+		case <-l.tickerDone:
+			return
+		}
 	}
 }
 
 func (l *qpsLimiter) stopTicker() {
-	l.ticker.Stop()
+	if l.tickerDone == nil {
+		return
+	}
+	select {
+	case l.tickerDone <- true:
+	default:
+	}
 }
 
 // Some deviation is allowed here to gain better performance.
