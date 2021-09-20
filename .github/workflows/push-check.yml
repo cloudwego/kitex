@@ -24,6 +24,8 @@ jobs:
         run: |
           test -z "$(gofmt -s -l .)"
           go vet -stdmethods=false $(go list ./...)
+          go install mvdan.cc/gofumpt@latest
+          test -z "$(gofumpt -s -l .)"
 
       - name: Unit Test
         run: go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
