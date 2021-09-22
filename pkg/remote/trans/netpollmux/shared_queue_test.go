@@ -54,11 +54,12 @@ func TestShareQueue(t *testing.T) {
 		}
 		queue.Add(getter)
 	}
-	// wait for deal all
-	for atomic.LoadInt32(&sum) > 0 {
+	// wait for flushed all
+	for atomic.LoadInt32(&flushed) == 0 {
 		runtime.Gosched()
 	}
-	test.Assert(t, atomic.LoadInt32(&flushed) == 1)
+	// check dealt all
+	test.Assert(t, atomic.LoadInt32(&sum) == 0)
 
 	// check fail
 	var deal2 DealBufferGetters = func(gts []BufferGetter) {
