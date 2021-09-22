@@ -119,7 +119,7 @@ func typeJSONOf(data *gjson.Result, tt descriptor.Type) (v interface{}, w writer
 		v = data.String()
 		w = writeString
 		return
-	//case descriptor.BINARY:
+	// case descriptor.BINARY:
 	//	return writeBinary, nil
 	case descriptor.LIST:
 		v = data.Array()

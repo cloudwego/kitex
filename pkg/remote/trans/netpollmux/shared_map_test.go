@@ -25,7 +25,7 @@ import (
 )
 
 func TestSharedMap(t *testing.T) {
-	var m = newSharedMap(32)
+	m := newSharedMap(32)
 	var key int32
 	var mod int32 = 1023
 	// check success
@@ -91,7 +91,7 @@ func BenchmarkSyncMap(b *testing.B) {
 }
 
 func BenchmarkSharedMap(b *testing.B) {
-	var m = newSharedMap(32)
+	m := newSharedMap(32)
 	var key int32
 	var mod int32 = 1023
 	for i := int32(0); i <= mod; i++ {

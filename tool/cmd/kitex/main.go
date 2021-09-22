@@ -31,9 +31,7 @@ import (
 	"github.com/cloudwego/kitex/tool/internal/pkg/util"
 )
 
-var (
-	args arguments
-)
+var args arguments
 
 func init() {
 	var queryVersion bool
@@ -154,7 +152,7 @@ func buildCmd(a *arguments, out io.Writer) *exec.Cmd {
 			cmd.Args = append(cmd.Args, "-I", inc)
 		}
 		outPath := filepath.Join(".", generator.KitexGenPath)
-		os.MkdirAll(outPath, 0755)
+		os.MkdirAll(outPath, 0o755)
 		cmd.Args = append(cmd.Args,
 			"--kitex_out="+outPath,
 			"--kitex_opt="+kas,

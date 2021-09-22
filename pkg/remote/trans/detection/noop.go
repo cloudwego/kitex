@@ -29,6 +29,7 @@ type noopSvrTransHandler struct{}
 func (noopSvrTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) error {
 	return nil
 }
+
 func (noopSvrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) error {
 	return nil
 }

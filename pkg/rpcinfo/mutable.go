@@ -29,7 +29,7 @@ type MutableEndpointInfo interface {
 	SetServiceName(service string) error
 	SetMethod(method string) error
 	SetAddress(addr net.Addr) error
-	SetTag(key string, value string) error
+	SetTag(key, value string) error
 	ImmutableView() EndpointInfo
 }
 

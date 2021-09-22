@@ -79,8 +79,7 @@ func JSONThriftGeneric(p DescriptorProvider) (Generic, error) {
 
 var thriftCodec = thrift.NewThriftCodec()
 
-type binaryThriftGeneric struct {
-}
+type binaryThriftGeneric struct{}
 
 func (g *binaryThriftGeneric) Framed() bool {
 	return true

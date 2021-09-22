@@ -47,16 +47,17 @@ const (
 	MagicMask = 0xffff0000
 )
 
-var ttHeaderCodec = ttHeader{}
-var meshHeaderCodec = meshHeader{}
+var (
+	ttHeaderCodec   = ttHeader{}
+	meshHeaderCodec = meshHeader{}
+)
 
 // NewDefaultCodec creates the default protocol sniffing codec supporting thrift and protobuf.
 func NewDefaultCodec() remote.Codec {
 	return &defaultCodec{}
 }
 
-type defaultCodec struct {
-}
+type defaultCodec struct{}
 
 // Encode implements the remote.Codec interface, it does complete message encode include header and payload.
 func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {

@@ -18,9 +18,7 @@ package utils
 
 import "net"
 
-var (
-	_ net.Addr = &NetAddr{}
-)
+var _ net.Addr = &NetAddr{}
 
 // NetAddr implements the net.Addr interface.
 type NetAddr struct {

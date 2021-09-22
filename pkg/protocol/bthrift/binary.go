@@ -80,7 +80,7 @@ func (binaryProtocol) WriteFieldStop(buf []byte) int {
 	return Binary.WriteByte(buf, thrift.STOP)
 }
 
-func (binaryProtocol) WriteMapBegin(buf []byte, keyType thrift.TType, valueType thrift.TType, size int) int {
+func (binaryProtocol) WriteMapBegin(buf []byte, keyType, valueType thrift.TType, size int) int {
 	return Binary.WriteByte(buf, int8(keyType)) +
 		Binary.WriteByte(buf[1:], int8(valueType)) +
 		Binary.WriteI32(buf[2:], int32(size))
@@ -145,7 +145,7 @@ func (binaryProtocol) WriteString(buf []byte, value string) int {
 	return l + len(value)
 }
 
-func (binaryProtocol) WriteBinary(buf []byte, value []byte) int {
+func (binaryProtocol) WriteBinary(buf, value []byte) int {
 	l := Binary.WriteI32(buf, int32(len(value)))
 	copy(buf[l:], value)
 	return l + len(value)
@@ -194,7 +194,7 @@ func (binaryProtocol) FieldStopLength() int {
 	return Binary.ByteLength(thrift.STOP)
 }
 
-func (binaryProtocol) MapBeginLength(keyType thrift.TType, valueType thrift.TType, size int) int {
+func (binaryProtocol) MapBeginLength(keyType, valueType thrift.TType, size int) int {
 	return Binary.ByteLength(int8(keyType)) +
 		Binary.ByteLength(int8(valueType)) +
 		Binary.I32Length(int32(size))
@@ -332,7 +332,7 @@ func (binaryProtocol) ReadFieldEnd(buf []byte) (int, error) {
 	return 0, nil
 }
 
-func (binaryProtocol) ReadMapBegin(buf []byte) (keyType thrift.TType, valueType thrift.TType, size int, length int, err error) {
+func (binaryProtocol) ReadMapBegin(buf []byte) (keyType, valueType thrift.TType, size, length int, err error) {
 	k, l, e := Binary.ReadByte(buf)
 	length += l
 	if e != nil {
@@ -365,7 +365,7 @@ func (binaryProtocol) ReadMapEnd(buf []byte) (int, error) {
 	return 0, nil
 }
 
-func (binaryProtocol) ReadListBegin(buf []byte) (elemType thrift.TType, size int, length int, err error) {
+func (binaryProtocol) ReadListBegin(buf []byte) (elemType thrift.TType, size, length int, err error) {
 	b, l, e := Binary.ReadByte(buf)
 	length += l
 	if e != nil {
@@ -392,7 +392,7 @@ func (binaryProtocol) ReadListEnd(buf []byte) (int, error) {
 	return 0, nil
 }
 
-func (binaryProtocol) ReadSetBegin(buf []byte) (elemType thrift.TType, size int, length int, err error) {
+func (binaryProtocol) ReadSetBegin(buf []byte) (elemType thrift.TType, size, length int, err error) {
 	b, l, e := Binary.ReadByte(buf)
 	length += l
 	if e != nil {
@@ -496,7 +496,6 @@ func SkipDefaultDepth(buf []byte, prot BTProtocol, typeID thrift.TType) (int, er
 
 // Skip skips over the next data element from the provided input TProtocol object.
 func Skip(buf []byte, self BTProtocol, fieldType thrift.TType, maxDepth int) (length int, err error) {
-
 	if maxDepth <= 0 {
 		return 0, thrift.NewTProtocolExceptionWithType(thrift.DEPTH_LIMIT, errors.New("depth limit exceeded"))
 	}

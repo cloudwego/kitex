@@ -137,8 +137,10 @@ func newMuxConn(connection netpoll.Connection) muxConn {
 	return c
 }
 
-var _ net.Conn = &muxConn{}
-var _ netpoll.Connection = &muxConn{}
+var (
+	_ net.Conn           = &muxConn{}
+	_ netpoll.Connection = &muxConn{}
+)
 
 type muxConn struct {
 	netpoll.Connection              // raw conn

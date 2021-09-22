@@ -313,7 +313,7 @@ func BenchmarkNewConsistPicker_NoCache(bb *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				picker := balancer.GetPicker(e)
-				//picker.Next(ctx, nil)
+				// picker.Next(ctx, nil)
 				if r, ok := picker.(internal.Reusable); ok {
 					r.Recycle()
 				}

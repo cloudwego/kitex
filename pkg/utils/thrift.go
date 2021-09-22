@@ -75,7 +75,7 @@ func (t *ThriftMessageCodec) Decode(b []byte, msg thrift.TStruct) (method string
 		return
 	}
 	if msgType == thrift.EXCEPTION {
-		var exception = thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
+		exception := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
 		if err = exception.Read(t.tProt); err != nil {
 			return
 		}

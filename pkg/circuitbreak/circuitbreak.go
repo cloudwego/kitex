@@ -76,7 +76,6 @@ type Control struct {
 func NewCircuitBreakerMW(control Control, panel circuitbreaker.Panel) endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response interface{}) (err error) {
-
 			key, enabled := control.GetKey(ctx, request)
 			if !enabled {
 				return next(ctx, request, response)

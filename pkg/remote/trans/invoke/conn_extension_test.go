@@ -37,7 +37,6 @@ func Test_ivkConnExtension_NewReadByteBuffer(t *testing.T) {
 	test.Assert(t, ext.NewReadByteBuffer(context.Background(), msg, nil) == nil)
 	msg.SetRequestBytes([]byte{})
 	test.Assert(t, ext.NewReadByteBuffer(context.Background(), msg, nil) != nil)
-
 }
 
 func Test_ivkConnExtension_ReleaseBuffer(t *testing.T) {

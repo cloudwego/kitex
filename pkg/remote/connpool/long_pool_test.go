@@ -242,7 +242,6 @@ func TestLongConnPoolCloseOnDiscard(t *testing.T) {
 			RemoteAddrFunc: func() net.Addr { return na },
 			CloseFunc:      closer,
 		}, nil
-
 	}
 
 	addr := mockAddr1
@@ -351,7 +350,8 @@ func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
 		na := utils.NewNetAddr(network, address)
 		return &mocks.Conn{
 			RemoteAddrFunc: func() net.Addr { return na },
-			CloseFunc:      closer}, nil
+			CloseFunc:      closer,
+		}, nil
 	}
 
 	addr := mockAddr1
@@ -395,7 +395,8 @@ func TestLongConnPoolCloseOnClean(t *testing.T) {
 		na := utils.NewNetAddr(network, address)
 		return &mocks.Conn{
 			RemoteAddrFunc: func() net.Addr { return na },
-			CloseFunc:      closer}, nil
+			CloseFunc:      closer,
+		}, nil
 	}
 
 	addr := mockAddr1
@@ -436,7 +437,8 @@ func TestLongConnPoolDiscardUnknownConnection(t *testing.T) {
 	na := utils.NewNetAddr(network, address)
 	mc := &mocks.Conn{
 		RemoteAddrFunc: func() net.Addr { return na },
-		CloseFunc:      closer}
+		CloseFunc:      closer,
+	}
 
 	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
 		return mc, nil
@@ -521,7 +523,8 @@ func TestLongConnPoolPutUnknownConnection(t *testing.T) {
 	na := utils.NewNetAddr(network, address)
 	mc := &mocks.Conn{
 		RemoteAddrFunc: func() net.Addr { return na },
-		CloseFunc:      closer}
+		CloseFunc:      closer,
+	}
 
 	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
 		return mc, nil

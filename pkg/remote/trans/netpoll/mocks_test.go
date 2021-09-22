@@ -26,9 +26,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-var (
-	_ netpoll.Connection = &MockNetpollConn{}
-)
+var _ netpoll.Connection = &MockNetpollConn{}
 
 type MockCodec struct {
 	EncodeFunc func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error

@@ -343,7 +343,7 @@ func TestTreeCatchAllConflictRoot(t *testing.T) {
 
 func TestTreeCatchMaxParams(t *testing.T) {
 	tree := &node{}
-	var route = "/cmd/*filepath"
+	route := "/cmd/*filepath"
 	tree.addRoute(route, fakeHandler(route))
 }
 

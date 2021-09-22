@@ -37,8 +37,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-var poolCfg = connpool2.IdleConfig{MaxIdlePerAddress: 100, MaxIdleGlobal: 100, MaxIdleTimeout: time.Second}
-var logger = klog.DefaultLogger()
+var (
+	poolCfg = connpool2.IdleConfig{MaxIdlePerAddress: 100, MaxIdleGlobal: 100, MaxIdleTimeout: time.Second}
+	logger  = klog.DefaultLogger()
+)
 
 func TestDialerMWNoAddr(t *testing.T) {
 	dialer := &remote.SynthesizedDialer{}

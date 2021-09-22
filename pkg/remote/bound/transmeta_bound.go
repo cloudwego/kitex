@@ -81,7 +81,7 @@ func (h *transMetaHandler) OnInactive(ctx context.Context, conn net.Conn) contex
 	return ctx
 }
 
-func getValidMsg(args remote.Message, result remote.Message) (msg remote.Message, isServer bool) {
+func getValidMsg(args, result remote.Message) (msg remote.Message, isServer bool) {
 	if args != nil && args.RPCRole() == remote.Server {
 		// server side, read arg
 		return args, true

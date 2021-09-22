@@ -40,7 +40,7 @@ type completer struct {
 	serviceName string
 }
 
-func newCompleter(allMethods []*MethodInfo, handlerPath string, serviceName string) *completer {
+func newCompleter(allMethods []*MethodInfo, handlerPath, serviceName string) *completer {
 	return &completer{
 		allMethods:  allMethods,
 		handlerPath: handlerPath,

@@ -21,8 +21,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/tidwall/gjson"
 	"net"
+
+	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/genericclient"
@@ -172,7 +173,7 @@ func newMockTestResult() interface{} {
 	return kt.NewMockTestResult()
 }
 
-func testHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+func testHandler(ctx context.Context, handler, arg, result interface{}) error {
 	realArg := arg.(*kt.MockTestArgs)
 	realResult := result.(*kt.MockTestResult)
 	success, err := handler.(kt.Mock).Test(ctx, realArg.Req)

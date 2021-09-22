@@ -78,7 +78,7 @@ func TestRawThriftBinaryMockReq(t *testing.T) {
 
 	req := kt.NewMockReq()
 	req.Msg = reqMsg
-	var strMap = make(map[string]string)
+	strMap := make(map[string]string)
 	strMap["aa"] = "aa"
 	strMap["bb"] = "bb"
 	req.StrMap = strMap
@@ -113,7 +113,7 @@ func TestRawThriftBinary2NormalServer(t *testing.T) {
 
 	req := kt.NewMockReq()
 	req.Msg = reqMsg
-	var strMap = make(map[string]string)
+	strMap := make(map[string]string)
 	strMap["aa"] = "aa"
 	strMap["bb"] = "bb"
 	req.StrMap = strMap
@@ -160,7 +160,7 @@ func initMockServer(handler kt.Mock) server.Server {
 
 func genBinaryReqBuf(method string) []byte {
 	idx := 0
-	var buf = make([]byte, 12+len(method)+len(reqMsg))
+	buf := make([]byte, 12+len(method)+len(reqMsg))
 	binary.BigEndian.PutUint32(buf, thrift.VERSION_1)
 	idx += 4
 	binary.BigEndian.PutUint32(buf[idx:idx+4], uint32(len(method)))

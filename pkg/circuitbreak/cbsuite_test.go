@@ -417,8 +417,7 @@ func prepareCtx() context.Context {
 
 var inst kd.Instance = &mockInst{}
 
-type mockInst struct {
-}
+type mockInst struct{}
 
 func (m mockInst) Address() net.Addr {
 	return addrMock

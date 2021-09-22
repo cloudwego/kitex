@@ -137,7 +137,7 @@ func TestJSONStr2Map(t *testing.T) {
 
 	unicodeMiexedStr := `{"aaa\u4f60\u597daaa": ":\\\u5468\u6770\u4f26"  ,  "加油 \u52a0\u6cb9" : "Come on \u52a0\u6cb9"}`
 	mapRet, err = JSONStr2Map(unicodeMiexedStr)
-	//err = json.Unmarshal([]byte(unicodeMiexedStr), &mapRet)
+	// err = json.Unmarshal([]byte(unicodeMiexedStr), &mapRet)
 	test.Assert(t, err == nil)
 	test.Assert(t, mapRet["aaa你好aaa"] == ":\\周杰伦")
 	test.Assert(t, mapRet["加油 加油"] == "Come on 加油")
@@ -162,7 +162,7 @@ func TestJSONUtil(t *testing.T) {
 		test.Assert(t, map2[k] == map3[k])
 	}
 
-	var mapRetIter = make(map[string]string)
+	mapRetIter := make(map[string]string)
 	jsoni.UnmarshalFromString(string(jsonRet1), &mapRetIter)
 	mapRet, err := JSONStr2Map(string(jsonRet1))
 	test.Assert(t, err == nil)

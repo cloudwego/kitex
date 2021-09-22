@@ -149,8 +149,7 @@ func (m *apiBody) Response(ctx context.Context, resp *HTTPResponse, field *Field
 	return nil
 }
 
-type apiHTTPCode struct {
-}
+type apiHTTPCode struct{}
 
 // NewAPIHTTPCode ...
 var NewAPIHTTPCode NewHTTPMapping = func(value string) HTTPMapping {
@@ -166,8 +165,7 @@ func (m *apiHTTPCode) Response(ctx context.Context, resp *HTTPResponse, field *F
 	return nil
 }
 
-type apiNone struct {
-}
+type apiNone struct{}
 
 // NewAPINone ...
 var NewAPINone NewHTTPMapping = func(value string) HTTPMapping {

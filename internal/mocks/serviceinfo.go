@@ -55,7 +55,7 @@ func newServiceInfo() *serviceinfo.ServiceInfo {
 	return svcInfo
 }
 
-func mockHandler(ctx context.Context, handler interface{}, args, result interface{}) error {
+func mockHandler(ctx context.Context, handler, args, result interface{}) error {
 	a := args.(*myServiceMockArgs)
 	r := result.(*myServiceMockResult)
 	reply, err := handler.(MyService).Mock(ctx, a.Req)
@@ -69,11 +69,12 @@ func mockHandler(ctx context.Context, handler interface{}, args, result interfac
 func NewMockArgs() interface{} {
 	return &myServiceMockArgs{}
 }
+
 func NewMockResult() interface{} {
 	return &myServiceMockResult{}
 }
 
-func mockExceptionHandler(ctx context.Context, handler interface{}, args, result interface{}) error {
+func mockExceptionHandler(ctx context.Context, handler, args, result interface{}) error {
 	a := args.(*myServiceMockArgs)
 	r := result.(*myServiceMockExceptionResult)
 	reply, err := handler.(MyService).MockException(ctx, a.Req)
@@ -94,7 +95,7 @@ func newMockExceptionResult() interface{} {
 	return &myServiceMockExceptionResult{}
 }
 
-func mockOnewayHandler(ctx context.Context, handler interface{}, args, result interface{}) error {
+func mockOnewayHandler(ctx context.Context, handler, args, result interface{}) error {
 	a := args.(*myServiceMockArgs)
 	err := handler.(MyService).MockOneway(ctx, a.Req)
 	if err != nil {

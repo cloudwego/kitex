@@ -116,7 +116,7 @@ func (p *BinaryProtocol) WriteFieldStop() error {
 }
 
 // WriteMapBegin ...
-func (p *BinaryProtocol) WriteMapBegin(keyType thrift.TType, valueType thrift.TType, size int) error {
+func (p *BinaryProtocol) WriteMapBegin(keyType, valueType thrift.TType, size int) error {
 	e := p.WriteByte(int8(keyType))
 	if e != nil {
 		return e

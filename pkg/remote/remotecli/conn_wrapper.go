@@ -131,7 +131,6 @@ func (cm *ConnWrapper) getConnWithDialer(ctx context.Context, d remote.Dialer,
 
 	ri.Stats().Record(ctx, stats.ClientConnStart, stats.StatusInfo, "")
 	conn, err := d.DialTimeout(addr.Network(), addr.String(), timeout)
-
 	if err != nil {
 		ri.Stats().Record(ctx, stats.ClientConnFinish, stats.StatusError, err.Error())
 		return nil, kerrors.ErrGetConnection.WithCause(err)

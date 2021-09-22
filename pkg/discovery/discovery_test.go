@@ -41,14 +41,16 @@ func TestDefaultDiff(t *testing.T) {
 				NewInstance("tcp", "2", 10, nil),
 				NewInstance("tcp", "3", 10, nil),
 				NewInstance("tcp", "4", 10, nil),
-			}}, Result{
+			},
+		}, Result{
 			Cacheable: true,
 			Instances: []Instance{
 				NewInstance("tcp", "1", 10, nil),
 				NewInstance("tcp", "2", 10, nil),
 				NewInstance("tcp", "3", 10, nil),
 				NewInstance("tcp", "5", 10, nil),
-			}}}, Change{
+			},
+		}}, Change{
 			Result: Result{Instances: []Instance{
 				NewInstance("tcp", "1", 10, nil),
 				NewInstance("tcp", "2", 10, nil),
