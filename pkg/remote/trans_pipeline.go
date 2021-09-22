@@ -148,16 +148,16 @@ func (p *TransPipeline) OnError(ctx context.Context, err error, conn net.Conn) {
 }
 
 // OnMessage implements the InboundHandler interface.
-func (p *TransPipeline) OnMessage(ctx context.Context, args, result Message) error {
+func (p *TransPipeline) OnMessage(ctx context.Context, args, result Message) (context.Context, error) {
 	var err error
 	for _, h := range p.inboundHdrls {
 		ctx, err = h.OnMessage(ctx, args, result)
 		if err != nil {
-			return err
+			return ctx, err
 		}
 	}
 	if result.MessageType() == Exception {
-		return nil
+		return ctx, nil
 	}
 	return p.netHdlr.OnMessage(ctx, args, result)
 }

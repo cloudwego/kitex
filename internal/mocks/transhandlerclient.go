@@ -28,6 +28,7 @@ type mockCliTransHandlerFactory struct {
 	hdlr *MockCliTransHandler
 }
 
+// NewMockCliTransHandlerFactory .
 func NewMockCliTransHandlerFactory(hdrl *MockCliTransHandler) remote.ClientTransHandlerFactory {
 	return &mockCliTransHandlerFactory{hdrl}
 }
@@ -37,6 +38,7 @@ func (f *mockCliTransHandlerFactory) NewTransHandler(opt *remote.ClientOption) (
 	return f.hdlr, nil
 }
 
+// MockCliTransHandler .
 type MockCliTransHandler struct {
 	opt       *remote.ClientOption
 	transPipe *remote.TransPipeline
@@ -63,9 +65,9 @@ func (t *MockCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remot
 }
 
 // OnMessage .
-func (t *MockCliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
+func (t *MockCliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	// do nothing
-	return nil
+	return ctx, nil
 }
 
 // OnActive 新连接建立时触发，主要用于服务端，对用netpoll onPrepare
@@ -88,6 +90,7 @@ func (t *MockCliTransHandler) OnError(ctx context.Context, err error, conn net.C
 	}
 }
 
+// SetPipeline .
 func (t *MockCliTransHandler) SetPipeline(p *remote.TransPipeline) {
 	t.transPipe = p
 }

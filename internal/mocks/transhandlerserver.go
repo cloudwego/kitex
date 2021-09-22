@@ -29,6 +29,7 @@ type mockSvrTransHandlerFactory struct {
 	hdlr *MockSvrTransHandler
 }
 
+// NewMockSvrTransHandlerFactory .
 func NewMockSvrTransHandlerFactory(hdrl *MockSvrTransHandler) remote.ServerTransHandlerFactory {
 	return &mockSvrTransHandlerFactory{hdrl}
 }
@@ -38,6 +39,7 @@ func (f *mockSvrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (
 	return f.hdlr, nil
 }
 
+// MockSvrTransHandler .
 type MockSvrTransHandler struct {
 	Opt       *remote.ServerOption
 	transPipe *remote.TransPipeline
@@ -50,6 +52,7 @@ type MockSvrTransHandler struct {
 	ReadFunc func(ctx context.Context, conn net.Conn, msg remote.Message) error
 }
 
+// OnRead .
 func (t *MockSvrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
 	if t.OnReadFunc != nil {
 		return t.OnReadFunc(ctx, conn)
@@ -72,9 +75,10 @@ func (t *MockSvrTransHandler) Read(ctx context.Context, conn net.Conn, msg remot
 	return
 }
 
-func (t *MockSvrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
+// OnMessage .
+func (t *MockSvrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	// do nothing
-	return nil
+	return ctx, nil
 }
 
 // OnActive 新连接建立时触发，主要用于服务端，对用netpoll onPrepare
@@ -97,24 +101,29 @@ func (t *MockSvrTransHandler) OnError(ctx context.Context, err error, conn net.C
 	}
 }
 
+// SetPipeline .
 func (t *MockSvrTransHandler) SetPipeline(p *remote.TransPipeline) {
 	t.transPipe = p
 }
 
+// MockTransServerFactory .
 type MockTransServerFactory struct {
 	transSvr *MockTransServer
 }
 
+// NewMockTransServerFactory .
 func NewMockTransServerFactory(transSvr *MockTransServer) remote.TransServerFactory {
 	return &MockTransServerFactory{transSvr}
 }
 
+// NewTransServer .
 func (t *MockTransServerFactory) NewTransServer(opt *remote.ServerOption, transHdlr remote.ServerTransHandler) remote.TransServer {
 	t.transSvr.opt = opt
 	t.transSvr.transHdlr = transHdlr
 	return t.transSvr
 }
 
+// MockTransServer .
 type MockTransServer struct {
 	opt       *remote.ServerOption
 	transHdlr remote.ServerTransHandler
@@ -125,6 +134,7 @@ type MockTransServer struct {
 	ConnCountFunc       func() utils.AtomicInt
 }
 
+// CreateListener .
 func (t *MockTransServer) CreateListener(addr net.Addr) (ln net.Listener, err error) {
 	if t.CreateListenerFunc != nil {
 		return t.CreateListenerFunc(addr)
@@ -132,6 +142,7 @@ func (t *MockTransServer) CreateListener(addr net.Addr) (ln net.Listener, err er
 	return
 }
 
+// BootstrapServer .
 func (t *MockTransServer) BootstrapServer() (err error) {
 	if t.BootstrapServerFunc != nil {
 		return t.BootstrapServerFunc()
@@ -139,6 +150,7 @@ func (t *MockTransServer) BootstrapServer() (err error) {
 	return
 }
 
+// Shutdown .
 func (t *MockTransServer) Shutdown() (err error) {
 	if t.ShutdownFunc != nil {
 		return t.ShutdownFunc()
@@ -146,6 +158,7 @@ func (t *MockTransServer) Shutdown() (err error) {
 	return
 }
 
+// ConnCount .
 func (t *MockTransServer) ConnCount() (r utils.AtomicInt) {
 	if t.ConnCountFunc != nil {
 		return t.ConnCountFunc()

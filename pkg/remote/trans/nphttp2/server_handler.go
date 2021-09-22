@@ -154,7 +154,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 }
 
 // msg 是解码后的实例，如 Arg 或 Result, 触发上层处理，用于异步 和 服务端处理
-func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
+func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	panic("unimplemented")
 }
 

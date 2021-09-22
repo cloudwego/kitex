@@ -89,9 +89,9 @@ func (h *cliTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 	panic("unimplemented")
 }
 
-func (h *cliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
+func (h *cliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	// do nothing
-	return nil
+	return ctx, nil
 }
 
 func (h *cliTransHandler) SetPipeline(pipeline *remote.TransPipeline) {

@@ -44,6 +44,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -131,6 +132,7 @@ func NewOptions(opts []Option) *Options {
 		TracerCtl: &internal_stats.Controller{},
 	}
 	o.Apply(opts)
+	o.MetaHandlers = append(o.MetaHandlers, transmeta.MetainfoClientHandler)
 
 	o.initConnectionPool()
 

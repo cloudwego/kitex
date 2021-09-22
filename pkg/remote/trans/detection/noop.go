@@ -36,8 +36,8 @@ func (noopSvrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.M
 func (noopSvrTransHandler) OnRead(ctx context.Context, conn net.Conn) error       { return nil }
 func (noopSvrTransHandler) OnInactive(ctx context.Context, conn net.Conn)         {}
 func (noopSvrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {}
-func (noopSvrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
-	return nil
+func (noopSvrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
+	return ctx, nil
 }
 func (noopSvrTransHandler) SetPipeline(pipeline *remote.TransPipeline)       {}
 func (noopSvrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {}
