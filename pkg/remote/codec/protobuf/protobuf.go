@@ -172,11 +172,11 @@ func getValidData(methodName string, message remote.Message) (interface{}, error
 	transErr, isTransErr := data.(*remote.TransError)
 	if !isTransErr {
 		if err, isError := data.(error); isError {
-			encodeErr := newPbError(remote.InternalError, err.Error())
+			encodeErr := NewPbError(remote.InternalError, err.Error())
 			return encodeErr, nil
 		}
 		return nil, errors.New("exception relay need error type data")
 	}
-	encodeErr := newPbError(transErr.TypeID(), transErr.Error())
+	encodeErr := NewPbError(transErr.TypeID(), transErr.Error())
 	return encodeErr, nil
 }

@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
+
 	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -183,15 +184,15 @@ func newIOErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
 }
 
 func defaultErrorHandler(err error) error {
-	if _, ok := err.(thrift.TApplicationException); ok {
+	switch e := err.(type) {
+	case thrift.TApplicationException:
 		// Add 'remote' prefix to distinguish with local err.
 		// Because it cannot make sure which side err when decode err happen
-		return kerrors.ErrRemoteOrNetwork.WithCause(fmt.Errorf("[remote] %w", err))
-	}
-	if _, ok := err.(protobuf.PBError); ok {
+		err = fmt.Errorf("[remote] %w", e)
+	case protobuf.PBError:
 		// Add 'remote' prefix to distinguish with local err.
 		// Because it cannot make sure which side err when decode err happen
-		return kerrors.ErrRemoteOrNetwork.WithCause(fmt.Errorf("[remote] %w", err))
+		err = fmt.Errorf("[remote] %w", e)
 	}
 	return kerrors.ErrRemoteOrNetwork.WithCause(err)
 }
