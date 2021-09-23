@@ -39,15 +39,25 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
 
 - **User Guide**
 
-  - **Basic Features**: including Message Type, Supported Protocols, Directly Invoke, Connection Pool, Timeout Control, Request Retry, LoadBalancer, Circuit Breaker, Rate Limiting, Instrumentation Control, Logging and HttpResolver, [learn more](https://www.cloudwego.io/docs/tutorials/basic-feature/)
+  - **Basic Features**
+  
+    Including Message Type, Supported Protocols, Directly Invoke, Connection Pool, Timeout Control, Request Retry, LoadBalancer, Circuit Breaker, Rate Limiting, Instrumentation Control, Logging and HttpResolver, [learn more](https://www.cloudwego.io/docs/tutorials/basic-feature/)
     
-  - **Governance Features**: supporting Service Discovery, Monitoring, Tracing and Customized Access Control, [learn more](https://www.cloudwego.io/docs/tutorials/service-governance/)
+  - **Governance Features**
+  
+    Supporting Service Discovery, Monitoring, Tracing and Customized Access Control, [learn more](https://www.cloudwego.io/docs/tutorials/service-governance/)
     
-  - **Advanced Features**: supporting Generic Call and Server SDK Mode, [learn more](https://www.cloudwego.io/docs/tutorials/advanced-feature/)
+  - **Advanced Features**
+  
+    Supporting Generic Call and Server SDK Mode, [learn more](https://www.cloudwego.io/docs/tutorials/advanced-feature/)
     
-  - **Code Generation**: including Code Generation Tool and Combined Service, [learn more](https://www.cloudwego.io/docs/tutorials/code-gen/)
+  - **Code Generation**
+  
+    Including Code Generation Tool and Combined Service, [learn more](https://www.cloudwego.io/docs/tutorials/code-gen/)
     
-  - **Framework Extension**: providing Middleware Extensions, Suite Extensions, Service Registry, Service Discovery, Customize LoadBalancer, Monitoring, Logging, Codec, Transport Module, Transport Pipeline, Metadata Transparent Transmission, Diagnosis Module, [learn more](https://www.cloudwego.io/docs/tutorials/framework-exten/)
+  - **Framework Extension**
+  
+    Providing Middleware Extensions, Suite Extensions, Service Registry, Service Discovery, Customize LoadBalancer, Monitoring, Logging, Codec, Transport Module, Transport Pipeline, Metadata Transparent Transmission, Diagnosis Module, [learn more](https://www.cloudwego.io/docs/tutorials/framework-exten/)
     
 - **Reference**
 
