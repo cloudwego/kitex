@@ -33,7 +33,7 @@ type pbError struct {
 	errProto *ErrorProto
 }
 
-func newPbError(typeID int32, message string) PBError {
+func NewPbError(typeID int32, message string) PBError {
 	err := &ErrorProto{TypeID: typeID, Message: message}
 	return &pbError{errProto: err}
 }

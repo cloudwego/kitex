@@ -102,7 +102,7 @@ func TestException(t *testing.T) {
 
 func TestTransErrorUnwrap(t *testing.T) {
 	errMsg := "mock err"
-	transErr := remote.NewTransError(remote.InternalError, newPbError(1000, errMsg))
+	transErr := remote.NewTransError(remote.InternalError, NewPbError(1000, errMsg))
 	uwErr, ok := transErr.Unwrap().(PBError)
 	test.Assert(t, ok)
 	test.Assert(t, uwErr.TypeID() == 1000)
