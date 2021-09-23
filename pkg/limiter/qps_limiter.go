@@ -42,9 +42,8 @@ func NewQPSLimiter(interval time.Duration, limit int) RateLimiter {
 		tokens:   int32(limit),
 		interval: interval,
 		once:     calcOnce(interval, limit),
-		ticker:   time.NewTicker(interval),
 	}
-	go l.startTicker()
+	go l.startTicker(interval)
 	return l
 }
 
@@ -63,8 +62,7 @@ func (l *qpsLimiter) UpdateQPSLimit(interval time.Duration, limit int) {
 	if interval != l.interval {
 		l.interval = interval
 		l.stopTicker()
-		l.ticker = time.NewTicker(interval)
-		go l.startTicker()
+		go l.startTicker(interval)
 	}
 }
 
@@ -84,16 +82,18 @@ func (l *qpsLimiter) Status() (max, cur int, interval time.Duration) {
 	return
 }
 
-func (l *qpsLimiter) startTicker() {
+func (l *qpsLimiter) startTicker(interval time.Duration) {
+	l.ticker = time.NewTicker(interval)
 	defer l.ticker.Stop()
-	if l.tickerDone == nil {
-		l.tickerDone = make(chan bool, 1)
-	}
+	l.tickerDone = make(chan bool, 1)
+	tc := l.ticker.C
+	td := l.tickerDone
+	// ticker and tickerDone can be reset, cannot use l.ticker or l.tickerDone directly
 	for {
 		select {
-		case <-l.ticker.C:
+		case <-tc:
 			l.updateToken()
-		case <-l.tickerDone:
+		case <-td:
 			return
 		}
 	}
