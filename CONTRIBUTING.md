@@ -27,7 +27,7 @@ Please do not report the safe disclosure of bugs to public issues. Contact us by
 ## Submit a Pull Request
 Before you submit your Pull Request (PR) consider the following guidelines:
 1. Search [GitHub](https://github.com/cloudwego/kitex/pulls) for an open or closed PR that relates to your submission. You don't want to duplicate existing efforts.
-2. Please submit an issue instead of PR if you have a better suggestion for format tools. We won't accept a lot of file changes only for formatting.
+2. Please submit an issue instead of PR if you have a better suggestion for format tools. We won't accept a lot of file changes directly without issue statement and assignment.
 3. Be sure that the issue describes the problem you're fixing, or documents the design for the feature you'd like to add. Before we accepting your work, we need to conduct some checks and evaluations. So, It will be better if you can discuss the design with us.
 4. [Fork](https://docs.github.com/en/github/getting-started-with-github/fork-a-repo) the cloudwego/kitex repo.
 5. In your forked repository, make your changes in a new git branch:
