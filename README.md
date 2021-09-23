@@ -35,49 +35,34 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
 
 ## Documentation
 
-- [**Getting Started**](https://github.com/cloudwego/kitex/blob/develop/docs/guide/getting_started.md)
+- [**Getting Started**](https://www.cloudwego.io/docs/getting-started/)
+
 - **User Guide**
-  - Basic Features
-    - [Message Type](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/message_type.md)
-    - [Supported Protocols](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/serialization_protocol.md)
-    - [Directly Invoke](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/timeout.md)
-    - [Connection Pool](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/connection_pool.md)
-    - [Timeout Control](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/timeout.md)
-    - [Request Retry](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/retry.md)
-    - [LoadBalancer](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/loadbalance.md)
-    - [Circuit Breaker](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/circuitbreaker.md)
-    - [Rate Limiting](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/limiting.md)
-    - [Instrumentation Control](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/tracing.md)
-    - [Logging](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/logging.md)
-    - [HttpResolver](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/HTTP_resolver.md)
-  - Governance Features
-    - [Service Discovery](https://github.com/cloudwego/kitex/blob/develop/docs/guide/service-governance/discovery.md)
-    - [Monitoring](https://github.com/cloudwego/kitex/blob/develop/docs/guide/service-governance/monitoring.md)
-    - [Tracing](https://github.com/cloudwego/kitex/blob/develop/docs/guide/service-governance/tracing.md)
-    - [Customized Access Control](https://github.com/cloudwego/kitex/blob/develop/docs/guide/service-governance/access_control.md)
-  - Advanced Features
-    - [Generic Call](https://github.com/cloudwego/kitex/blob/develop/docs/guide/advanced-features/generic_call.md)
-    - [Server SDK Mode](https://github.com/cloudwego/kitex/blob/develop/docs/guide/advanced-features/invoker.md)
-  - Code Generation
-    - [Code Generation Tool](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/code_generation.md)
-    - [Combined Service](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/combine_service.md)
-  - Framework Extension
-    - [Middleware Extensions](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/middleware.md)
-    - [Suite Extensions](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/suite.md)
-    - [Service Registry](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/registry.md)
-    - [Service Discovery](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/service_discovery.md)
-    - [Customize LoadBalancer](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/loadbalance.md)
-    - [Monitoring](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/monitoring.md)
-    - [Logging](https://github.com/cloudwego/kitex/blob/develop/docs/guide/basic-features/logging.md)
-    - [Codec](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/codec.md)
-    - [Transport Module](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/transport.md)
-    - [Transport Pipeline](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/trans_pipeline.md)
-    - [Metadata Transparent Transmission](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/transmeta.md)
-    - [Diagnosis Module](https://github.com/cloudwego/kitex/blob/develop/docs/guide/extension/diagnosis.md)
+
+  - **Basic Features**
+  
+    Including Message Type, Supported Protocols, Directly Invoke, Connection Pool, Timeout Control, Request Retry, LoadBalancer, Circuit Breaker, Rate Limiting, Instrumentation Control, Logging and HttpResolver, [learn more](https://www.cloudwego.io/docs/tutorials/basic-feature/)
+    
+  - **Governance Features**
+  
+    Supporting Service Discovery, Monitoring, Tracing and Customized Access Control, [learn more](https://www.cloudwego.io/docs/tutorials/service-governance/)
+    
+  - **Advanced Features**
+  
+    Supporting Generic Call and Server SDK Mode, [learn more](https://www.cloudwego.io/docs/tutorials/advanced-feature/)
+    
+  - **Code Generation**
+  
+    Including Code Generation Tool and Combined Service, [learn more](https://www.cloudwego.io/docs/tutorials/code-gen/)
+    
+  - **Framework Extension**
+  
+    Providing Middleware Extensions, Suite Extensions, Service Registry, Service Discovery, Customize LoadBalancer, Monitoring, Logging, Codec, Transport Module, Transport Pipeline, Metadata Transparent Transmission, Diagnosis Module, [learn more](https://www.cloudwego.io/docs/tutorials/framework-exten/)
+    
 - **Reference**
-	- [Transport Protocol - TTHeader](https://github.com/cloudwego/kitex/blob/develop/docs/reference/transport_protocol_ttheader.md)
-	- [Exception Instruction](https://github.com/cloudwego/kitex/blob/develop/docs/reference/exception.md)
-	- [Version Specification](https://github.com/cloudwego/kitex/blob/develop/docs/reference/version.md)
+
+  - For Transport Protocol, Exception Instruction and Version Specification, please refer to [doc](https://www.cloudwego.io/docs/reference/)
+    
 - **FAQ**
 
 ## Performance
@@ -117,7 +102,7 @@ QPS|TP99|TP999
 
 ## Blogs
 
-- [Performance Optimization Practice of Go RPC framework Kitex](https://mp.weixin.qq.com/s/Xoaoiotl7ZQoG2iXo9_DWg)
+- [Performance Optimization Practice of Go RPC framework Kitex](https://www.cloudwego.io/zh/blog/2021/09/23/%E5%AD%97%E8%8A%82%E8%B7%B3%E5%8A%A8-go-rpc-%E6%A1%86%E6%9E%B6-kitex-%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/)
 - [Practice of ByteDance on Go Network Library](https://mp.weixin.qq.com/s?__biz=MzI1MzYzMjE0MQ==&mid=2247485756&idx=1&sn=4d2712e4bfb9be27a790fa15159a7be1&chksm=e9d0c2dedea74bc8179af39888a5b2b99266587cad32744ad11092b91ec2e2babc74e69090e6&scene=21#wechat_redirect)
 
 ## Contributing

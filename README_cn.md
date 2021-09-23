@@ -36,91 +36,33 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
 ## 详细文档
 
-  - [**快速开始**](docs/guide/getting_started_cn.md)
+  - [**快速开始**](https://www.cloudwego.io/zh/docs/getting-started/)
 
   - **用户指南**
+  
+    - **基本特性**
     
-    - 基本特性
+      包含消息类型、编解码协议、直连访问、连接池、超时控制、请求重试、负载均衡、熔断、埋点粒度控制、日志以及 HttpResolver，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/basic-feature/) 
     
-      - [消息类型（PingPong、Oneway、Streaming）](docs/guide/basic-features/message_type_cn.md)
-    
-      - [编解码协议](docs/guide/basic-features/serialization_protocol_cn.md)
-    
-      - [直连访问](docs/guide/basic-features/visit_directly_cn.md)
-    
-      - [连接池](docs/guide/basic-features/connection_pool_cn.md)
-    
-      - [超时控制](docs/guide/basic-features/timeout_cn.md)
-    
-      - [请求重试](docs/guide/basic-features/retry_cn.md)
-    
-      - [负载均衡](docs/guide/basic-features/loadbalance_cn.md) 
-    
-      - [熔断](docs/guide/basic-features/circuitbreaker_cn.md)
-    
-      - [限流](docs/guide/basic-features/limiting_cn.md)
-    
-      - [埋点粒度控制](docs/guide/basic-features/tracing_cn.md)
-    
-      - [日志](docs/guide/basic-features/logging_cn.md)
+    - **治理特性**
       
-      - [HttpResolver](docs/guide/basic-features/HTTP_resolver_cn.md)
-    
-    - 治理特性
+      支持服务发现、监控、链路跟踪、自定义访问控制等治理特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/service-governance/)
       
-      - [服务发现](docs/guide/service-governance/discovery_cn.md)
-      
-      - [监控](docs/guide/service-governance/monitoring_cn.md)
-      
-      - [链路跟踪](docs/guide/service-governance/tracing_cn.md)
-      
-      - [自定义访问控制](docs/guide/service-governance/access_control_cn.md)
-      
-    - 高级特性
+    - **高级特性**
     
-      - [泛化调用](docs/guide/advanced-features/generic_call_cn.md)
+      支持泛化调用、Server SDK 化等高级特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/advanced-features/)
     
-      - [Server SDK 化](docs/guide/advanced-features/invoker_cn.md)
+    - **代码生成**
     
-    - 代码生成
+      提供代码生成工具与 Combine Service说明，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/code-gen/)
     
-      - [代码生成工具](docs/guide/basic-features/code_generation_cn.md)
-
-      - [Combine Service](docs/guide/basic-features/combine_service_cn.md)
+    - **框架扩展**
     
-    - 框架扩展
-    
-      - [基本扩展 - 自定义Middleware](docs/guide/extension/middleware_cn.md)
-    
-      - [Suite 扩展（封装自定义治理模块）](docs/guide/extension/suite_cn.md)
-    
-      - [服务注册扩展](docs/guide/extension/registry_cn.md)
-    
-      - [服务发现扩展](docs/guide/extension/service_discovery_cn.md)
-    
-      - [负载均衡扩展](docs/guide/extension/loadbalance_cn.md)
-    
-      - [监控扩展](docs/guide/extension/monitoring_cn.md)
-
-      - [日志扩展](docs/guide/basic-features/logging_cn.md)
-    
-      - [编解码(协议)扩展](docs/guide/extension/codec_cn.md)
-    
-      - [传输模块扩展](docs/guide/extension/transport_cn.md)
-    
-      - [Transport Pipeline-Bound扩展](docs/guide/extension/trans_pipeline_cn.md)
-    
-      - [元信息传递扩展](docs/guide/extension/transmeta_cn.md)
-    
-      - [诊断模块扩展](docs/guide/extension/diagnosis_cn.md)
+      提供基本扩展 - 自定义Middleware、Suite 扩展（封装自定义治理模块）、服务注册扩展、服务发现扩展、负载均衡扩展、监控扩展、日志扩展、编解码(协议)扩展、传输模块扩展、Transport Pipeline-Bound扩展、元信息传递扩展、诊断模块扩展等支持，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/framework-exten/)
     
   - **参考**
 
-    - [应用层传输协议 TTHeader](docs/reference/transport_protocol_ttheader_cn.md)
-
-    - [异常说明](docs/reference/exception_cn.md)
-
-    - [版本管理](docs/reference/version_cn.md)   
+    - 关于应用层传输协议 TTHeader、异常说明与版本管理，请参考[文档](https://www.cloudwego.io/zh/docs/reference/)
 
   - **FAQ**
 
@@ -159,7 +101,7 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
 ## 相关文章
 
-- [字节跳动 Go RPC 框架 Kitex 性能优化实践](https://mp.weixin.qq.com/s/Xoaoiotl7ZQoG2iXo9_DWg)
+- [字节跳动 Go RPC 框架 Kitex 性能优化实践](https://www.cloudwego.io/zh/blog/2021/09/23/%E5%AD%97%E8%8A%82%E8%B7%B3%E5%8A%A8-go-rpc-%E6%A1%86%E6%9E%B6-kitex-%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/)
 - [字节跳动在 Go 网络库上的实践](https://mp.weixin.qq.com/s?__biz=MzI1MzYzMjE0MQ==&mid=2247485756&idx=1&sn=4d2712e4bfb9be27a790fa15159a7be1&chksm=e9d0c2dedea74bc8179af39888a5b2b99266587cad32744ad11092b91ec2e2babc74e69090e6&scene=21#wechat_redirect)
 
 ## 贡献代码
