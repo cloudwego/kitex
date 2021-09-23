@@ -111,7 +111,6 @@ func (l *qpsLimiter) stopTicker() {
 
 // Some deviation is allowed here to gain better performance.
 func (l *qpsLimiter) updateToken() {
-
 	if atomic.LoadInt32(&l.limit) < atomic.LoadInt32(&l.tokens) {
 		return
 	}
