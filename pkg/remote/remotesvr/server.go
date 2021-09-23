@@ -30,6 +30,7 @@ import (
 type Server interface {
 	Start() chan error
 	Stop() error
+	Address() net.Addr
 }
 
 type server struct {
@@ -76,8 +77,12 @@ func (s *server) buildListener() (ln net.Listener, err error) {
 		os.Chmod(addr.String(), os.ModePerm)
 	}
 
-	s.opt.Logger.Infof("KITEX: server listen at: %s", addr.String())
-	return s.transSvr.CreateListener(addr)
+	if ln, err = s.transSvr.CreateListener(addr); err != nil {
+		s.opt.Logger.Errorf("KITEX: server listen at %s failed, err=%v", addr.String(), err)
+	} else {
+		s.opt.Logger.Infof("KITEX: server listen at %s", ln.Addr().String())
+	}
+	return
 }
 
 // Stop stops the server gracefully.
@@ -89,4 +94,11 @@ func (s *server) Stop() (err error) {
 		s.listener = nil
 	}
 	return
+}
+
+func (s *server) Address() net.Addr {
+	if s.listener != nil {
+		return s.listener.Addr()
+	}
+	return nil
 }

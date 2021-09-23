@@ -32,13 +32,21 @@ import (
 func TestServerStart(t *testing.T) {
 	isCreateListener := false
 	isBootstrapped := false
+	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
 		CreateListenerFunc: func(addr net.Addr) (listener net.Listener, err error) {
 			isCreateListener = true
-			return nil, nil
+			ln, err = net.Listen("tcp", ":8888")
+			return ln, err
 		},
 		BootstrapServerFunc: func() (err error) {
 			isBootstrapped = true
+			return nil
+		},
+		ShutdownFunc: func() (err error) {
+			if ln != nil {
+				ln.Close()
+			}
 			return nil
 		},
 	}

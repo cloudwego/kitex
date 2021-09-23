@@ -153,7 +153,7 @@ func TestServiceRegistryInfo(t *testing.T) {
 	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
 		test.Assert(t, info.Weight == registryInfo.Weight, info.Addr)
-		test.Assert(t, info.Addr.String() == ":8888", info.Addr)
+		test.Assert(t, info.Addr.String() == "[::]:8888", info.Addr)
 		test.Assert(t, len(info.Tags) == len(registryInfo.Tags), info.Tags)
 		test.Assert(t, info.Tags["aa"] == registryInfo.Tags["aa"], info.Tags)
 	}
@@ -191,7 +191,7 @@ func TestServiceRegistryInfo(t *testing.T) {
 func TestServiceRegistryNoInitInfo(t *testing.T) {
 	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
-		test.Assert(t, info.Addr.String() == ":8888", info.Addr)
+		test.Assert(t, info.Addr.String() == "[::]:8888", info.Addr)
 	}
 	var rCount int
 	var drCount int
@@ -260,6 +260,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 	transHdlrFact := &mockSvrTransHandlerFactory{}
 	svcInfo := mocks.ServiceInfo()
 	exitCh := make(chan bool)
+	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
 		BootstrapServerFunc: func() error {
 			{ // mock server call
@@ -276,8 +277,16 @@ func TestInvokeHandlerExec(t *testing.T) {
 			return nil
 		},
 		ShutdownFunc: func() error {
+			if ln != nil {
+				ln.Close()
+			}
 			exitCh <- true
 			return nil
+		},
+		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
+			var err error
+			ln, err = net.Listen("tcp", ":8888")
+			return ln, err
 		},
 	}
 	opts = append(opts, WithTransServerFactory(mocks.NewMockTransServerFactory(transSvr)))
@@ -314,6 +323,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 	transHdlrFact := &mockSvrTransHandlerFactory{}
 	svcInfo := mocks.ServiceInfo()
 	exitCh := make(chan bool)
+	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
 		BootstrapServerFunc: func() error {
 			{
@@ -331,8 +341,14 @@ func TestInvokeHandlerPanic(t *testing.T) {
 			return nil
 		},
 		ShutdownFunc: func() error {
+			ln.Close()
 			exitCh <- true
 			return nil
+		},
+		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
+			var err error
+			ln, err = net.Listen("tcp", ":8888")
+			return ln, err
 		},
 	}
 	opts = append(opts, WithTransServerFactory(mocks.NewMockTransServerFactory(transSvr)))
