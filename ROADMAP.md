@@ -10,7 +10,7 @@ This document shows key roadmap of Kitex development from the year of 2021 to 20
   - Support data packet compression.
 - Service Goverence
   - Support more extension for users. All devlopers are welcome to contribute your extension to https://github.com/kitex-contrib.
-  - Support dynamict config, expose api in Kitex.
+  - Support dynamict config, expose API in Kitex.
 - Codec
   - Support no serialization which references [Cap'n](https://capnproto.org/index.html) but is compatible with Thrift.
   - Support runtime serialization&deserialization without generating code (JIT) for Thrift.
@@ -21,10 +21,10 @@ This document shows key roadmap of Kitex development from the year of 2021 to 20
 ## Performance Optimization
 
 - Improve the throughput of client side.
-- Optimize Protobuf Streaming performance
+- Optimize Protobuf Streaming performance.
 - Kitex-Protobuf supports codec with NoCopy API to reduce memory copies.
 
 ## User Experience Optimization
 
-- Provide good development practices for users to make it esay that develop with Kitex
+- Provide good development practices for users to develop with Kitex more easily.
 - Improve Kitex Tool to provide more conveniences.
