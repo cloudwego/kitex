@@ -36,19 +36,19 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
 ## 详细文档
 
-  - [**快速开始**](docs/guide/getting_started_cn.md)
+  - [**快速开始**](https://www.cloudwego.io/zh/docs/getting-started/)
 
   - **用户指南**
+  
+    - **基本特性**：包含**消息类型**、**编解码协议**、**直连访问**、**连接池**、**超时控制**、**请求重试**、**负载均衡**、**熔断**、**埋点粒度控制**、**日志**以及 **HttpResolver**，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/basic-feature/) 
     
-    - 基本特性：包含**消息类型**、**编解码协议**、**直连访问**、**连接池**、**超时控制**、**请求重试**、**负载均衡**、**熔断**、**埋点粒度控制**、**日志**以及 **HttpResolver**，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/basic-feature/) 
-    
-    - 治理特性：支持**服务发现**、**监控**、**链路跟踪**、**自定义访问控制**等治理特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/service-governance/)
+    - **治理特性**：支持**服务发现**、**监控**、**链路跟踪**、**自定义访问控制**等治理特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/service-governance/)
       
-    - 高级特性：支持**泛化调用**、**Server SDK 化**等高级特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/advanced-features/)
+    - **高级特性**：支持**泛化调用**、**Server SDK 化**等高级特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/advanced-features/)
     
-    - 代码生成：提供**代码生成工具**与 **Combine Service**说明，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/code-gen/)
+    - **代码生成**：提供**代码生成工具**与 **Combine Service**说明，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/code-gen/)
     
-    - 框架扩展：提供**基本扩展 - 自定义Middleware**、**Suite 扩展（封装自定义治理模块）**、**服务注册扩展**、**服务发现扩展**、**负载均衡扩展**、**监控扩展**、**日志扩展**、**编解码(协议)扩展**、**传输模块扩展**、**Transport Pipeline-Bound扩展**、**元信息传递扩展**、**诊断模块扩展**等支持，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/framework-exten/)
+    - **框架扩展**：提供**基本扩展 - 自定义Middleware**、**Suite 扩展（封装自定义治理模块）**、**服务注册扩展**、**服务发现扩展**、**负载均衡扩展**、**监控扩展**、**日志扩展**、**编解码(协议)扩展**、**传输模块扩展**、**Transport Pipeline-Bound扩展**、**元信息传递扩展**、**诊断模块扩展**等支持，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/framework-exten/)
     
   - **参考**
 
