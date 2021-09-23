@@ -24,7 +24,6 @@ import (
 	"runtime/debug"
 	"sync"
 
-	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/netpoll"
 
 	stats2 "github.com/cloudwego/kitex/internal/stats"
@@ -82,10 +81,6 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		if methodInfo.OneWay() {
 			return nil
 		}
-	}
-
-	if kvs := metainfo.AllBackwardValuesToSend(ctx); len(kvs) > 0 {
-		sendMsg.TransInfo().PutTransStrInfo(kvs)
 	}
 
 	bufWriter := np.NewWriterByteBuffer(netpoll.NewLinkBuffer())
@@ -198,16 +193,7 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 			sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, rpcInfo, remote.Reply, remote.Server)
 		}
 
-		if kvs := recvMsg.TransInfo().TransStrInfo(); len(kvs) > 0 {
-			ctx = metainfo.SetMetaInfoFromMap(ctx, kvs)
-			ctx = metainfo.TransferForward(ctx)
-		}
-
-		if recvMsg.ProtocolInfo().TransProto.WithMeta() {
-			ctx = metainfo.WithBackwardValuesToSend(ctx)
-		}
-
-		err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
+		ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
 		if err != nil {
 			// error cannot be wrapped to print here, so it must exec before NewTransError
 			t.OnError(ctx, err, muxSvrConn)
@@ -228,9 +214,9 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 // OnMessage implements the remote.ServerTransHandler interface.
 // msg is the decoded instance, such as Arg or Result.
 // OnMessage notifies the higher level to process. It's used in async and server-side logic.
-func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
+func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	err := t.inkHdlFunc(ctx, args.Data(), result.Data())
-	return err
+	return ctx, err
 }
 
 type ctxKeyMuxSvrConn struct{}

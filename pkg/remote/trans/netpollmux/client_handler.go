@@ -22,7 +22,6 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/bytedance/gopkg/cloud/metainfo"
 	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -77,12 +76,6 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		}
 		stats2.Record(ctx, ri, stats.WriteFinish, nil)
 	}()
-
-	if metainfo.HasMetaInfo(ctx) {
-		kvs := make(map[string]string)
-		metainfo.SaveMetaInfoToMap(ctx, kvs)
-		sendMsg.TransInfo().PutTransStrInfo(kvs)
-	}
 
 	// Set header flag = 1
 	tags := sendMsg.Tags()
@@ -148,20 +141,14 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 		stats2.Record(ctx, ri, stats.ReadStart, nil)
 		err = t.codec.Decode(ctx, msg, callback.bufReader)
 		stats2.Record(ctx, ri, stats.ReadFinish, err)
-
-		if info := msg.TransInfo(); info != nil {
-			if kvs := info.TransStrInfo(); len(kvs) > 0 {
-				metainfo.SetBackwardValuesFromMap(ctx, kvs)
-			}
-		}
 		return err
 	}
 }
 
 // OnMessage implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
+func (t *cliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	// do nothing
-	return nil
+	return ctx, nil
 }
 
 // OnInactive implements the remote.ClientTransHandler interface.

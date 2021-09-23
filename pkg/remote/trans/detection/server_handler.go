@@ -127,7 +127,7 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 	t.which(ctx).OnError(ctx, err, conn)
 }
 
-func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
+func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	return t.which(ctx).OnMessage(ctx, args, result)
 }
 

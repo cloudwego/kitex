@@ -270,7 +270,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
-				err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
+				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
 				test.Assert(t, err == nil, err)
 			}
 			<-exitCh
@@ -334,7 +334,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
-				err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
+				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
 				test.Assert(t, strings.Contains(err.Error(), "happened in biz handler"))
 			}
 			<-exitCh

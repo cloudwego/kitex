@@ -38,6 +38,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -105,6 +106,7 @@ func NewOptions(opts []Option) *Options {
 		Registry:  registry.NoopRegistry,
 	}
 	ApplyOptions(opts, o)
+	o.MetaHandlers = append(o.MetaHandlers, transmeta.MetainfoServerHandler)
 	rpcinfo.AsMutableRPCConfig(o.Configs).LockConfig(o.LockBits)
 	if o.StatsLevel == nil {
 		level := stats.LevelDisabled
