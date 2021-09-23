@@ -23,8 +23,8 @@
      "github.com/cloudwego/kitex/client/genericclient"
      "github.com/cloudwego/kitex/pkg/generic"
   )
-  func NewGenericClient(psm string) genericclient.Client {
-      genericCli := genericclient.NewClient(psm, generic.BinaryThriftGeneric())
+  func NewGenericClient(destServiceName string) genericclient.Client {
+      genericCli := genericclient.NewClient(destServiceName, generic.BinaryThriftGeneric())
       return genericCli
   }
   ```
@@ -162,7 +162,7 @@ func main() {
     if err != nil {
         panic(err)
     }
-    cli, err := genericclient.NewClient("psm", g, opts...)
+    cli, err := genericclient.NewClient("destServiceName", g, opts...)
     if err != nil {
         panic(err)
     }
@@ -420,7 +420,7 @@ func main() {
     if err != nil {
         panic(err)
     }
-    cli, err := genericclient.NewClient("psm", g, opts...)
+    cli, err := genericclient.NewClient("destServiceName", g, opts...)
     if err != nil {
         panic(err)
     }
