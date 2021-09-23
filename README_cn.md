@@ -40,15 +40,25 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
   - **用户指南**
   
-    - **基本特性**：包含消息类型、编解码协议、直连访问、连接池、超时控制、请求重试、负载均衡、熔断、埋点粒度控制、日志以及 HttpResolver，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/basic-feature/) 
+    - **基本特性**
     
-    - **治理特性**：支持服务发现、监控、链路跟踪、自定义访问控制等治理特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/service-governance/)
+      包含消息类型、编解码协议、直连访问、连接池、超时控制、请求重试、负载均衡、熔断、埋点粒度控制、日志以及 HttpResolver，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/basic-feature/) 
+    
+    - **治理特性**
       
-    - **高级特性**：支持泛化调用、Server SDK 化等高级特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/advanced-features/)
+      支持服务发现、监控、链路跟踪、自定义访问控制等治理特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/service-governance/)
+      
+    - **高级特性**
     
-    - **代码生成**：提供代码生成工具与 Combine Service说明，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/code-gen/)
+      支持泛化调用、Server SDK 化等高级特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/advanced-features/)
     
-    - **框架扩展**：提供基本扩展 - 自定义Middleware、Suite 扩展（封装自定义治理模块）、服务注册扩展、服务发现扩展、负载均衡扩展、监控扩展、日志扩展、编解码(协议)扩展、传输模块扩展、Transport Pipeline-Bound扩展、元信息传递扩展、诊断模块扩展等支持，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/framework-exten/)
+    - **代码生成**
+    
+      提供代码生成工具与 Combine Service说明，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/code-gen/)
+    
+    - **框架扩展**
+    
+      提供基本扩展 - 自定义Middleware、Suite 扩展（封装自定义治理模块）、服务注册扩展、服务发现扩展、负载均衡扩展、监控扩展、日志扩展、编解码(协议)扩展、传输模块扩展、Transport Pipeline-Bound扩展、元信息传递扩展、诊断模块扩展等支持，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/framework-exten/)
     
   - **参考**
 
