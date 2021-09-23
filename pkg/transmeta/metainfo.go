@@ -40,11 +40,11 @@ func (mi *metainfoServerHandler) ReadMeta(ctx context.Context, recvMsg remote.Me
 	if recvMsg.ProtocolInfo().TransProto.WithMeta() {
 		if kvs := recvMsg.TransInfo().TransStrInfo(); len(kvs) > 0 {
 			ctx = metainfo.SetMetaInfoFromMap(ctx, kvs)
-			ctx = metainfo.TransferForward(ctx)
 		}
 		ctx = metainfo.WithBackwardValuesToSend(ctx)
 	}
 
+	ctx = metainfo.TransferForward(ctx)
 	return ctx, nil
 }
 
