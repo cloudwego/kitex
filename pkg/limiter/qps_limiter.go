@@ -50,6 +50,7 @@ func (l *qpsLimiter) UpdateLimit(limit int) {
 	once := calcOnce(l.interval, limit)
 	atomic.StoreInt32(&l.limit, int32(limit))
 	atomic.StoreInt32(&l.once, once)
+	l.resetTokens()
 }
 
 // UpdateQPSLimit update the interval and limit. It is **not** concurrent-safe.
@@ -57,6 +58,7 @@ func (l *qpsLimiter) UpdateQPSLimit(interval time.Duration, limit int) {
 	atomic.StoreInt32(&l.limit, int32(limit))
 	once := calcOnce(interval, limit)
 	atomic.StoreInt32(&l.once, once)
+	l.resetTokens()
 	if interval != l.interval {
 		l.interval = interval
 		l.stopTicker()
@@ -115,4 +117,11 @@ func calcOnce(interval time.Duration, limit int) int32 {
 		once = 0
 	}
 	return once
+}
+
+func (l *qpsLimiter) resetTokens() {
+	limit := atomic.LoadInt32(&l.limit)
+	if atomic.LoadInt32(&l.tokens) > limit {
+		atomic.StoreInt32(&l.tokens, l.limit)
+	}
 }
