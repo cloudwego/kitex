@@ -179,7 +179,7 @@ func (s *server) Run() (err error) {
 		go onServerStart[i]()
 	}
 	s.Lock()
-	s.buildRegistryInfo(s.svr.ListenAddr())
+	s.buildRegistryInfo(s.svr.Address())
 	s.Unlock()
 
 	if err = s.waitSignal(errCh); err != nil {

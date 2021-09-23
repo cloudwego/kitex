@@ -30,7 +30,7 @@ import (
 type Server interface {
 	Start() chan error
 	Stop() error
-	ListenAddr() net.Addr
+	Address() net.Addr
 }
 
 type server struct {
@@ -96,7 +96,7 @@ func (s *server) Stop() (err error) {
 	return
 }
 
-func (s *server) ListenAddr() net.Addr {
+func (s *server) Address() net.Addr {
 	if s.listener != nil {
 		return s.listener.Addr()
 	}
