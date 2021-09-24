@@ -7,6 +7,7 @@
 1. 二进制泛化调用：用于流量中转场景
 2. HTTP映射泛化调用：用于 API 网关场景
 3. Map映射泛化调用
+4. JSON映射泛化调用
 
 ## 使用方式示例
 
@@ -486,9 +487,232 @@ func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, req
 
 ```
 
+### 4. JSON 映射泛化调用
+
+JSON 映射泛化调用是指用户可以直接按照规范构造 JSON String 请求参数或返回，Kitex 会对应完成 Thrift 编解码。
+
+#### JSON 构造
+
+Kitex 与 MAP 泛化调用严格校验用户构造的字段名和类型不同，JSON 泛化调用会根据给出的 IDL 对用户的请求参数进行转化，无需用户指定明确的类型，如 int32 或 int64。
+
+对于 Response 会校验 Field ID 和类型，并根据 IDL 的 Field Name 生成相应的 JSON Field。
+
+##### 类型映射
+
+Golang 与 Thrift IDL 类型映射如下：
+
+| **Golang 类型**             | **Thrift IDL 类型** |
+| --------------------------- | ------------------- |
+| bool                        | bool                |
+| int8                        | i8                  |
+| int16                       | i16                 |
+| int32                       | i32                 |
+| int64                       | i64                 |
+| float64                     | double              |
+| string                      | string              |
+| ~~[]byte~~                  | ~~binary~~          |
+| []interface{}               | list/set            |
+| map[interface{}]interface{} | map                 |
+| map[string]interface{}      | struct              |
+| int32                       | enum                |
+
+##### 示例
+
+以下面的 IDL 为例：
+
+```thrift
+enum ErrorCode {
+    SUCCESS = 0
+    FAILURE = 1
+}
+
+struct Info {
+    1: map<string,string> Map
+    2: i64 ID
+}
+
+struct EchoRequest {
+    1: string Msg
+    2: i8 I8
+    3: i16 I16
+    4: i32 I32
+    5: i64 I64
+    6: map<string,string> Map
+    7: set<string> Set
+    8: list<string> List
+    9: ErrorCode ErrorCode
+   10: Info Info
+
+    255: optional Base Base
+}
+```
+
+构造请求如下：
+
+```go
+req := {
+  "Msg": "hello",
+  "I8": 1,
+  "I16": 1,
+  "I32": 1,
+  "I64": 1,
+  "Map": "{\"hello\":\"world\"}",
+  "Set": ["hello", "world"],
+  "List": ["hello", "world"],
+  "ErrorCode": 1,
+  "Info": "{\"Map\":\"{\"hello\":\"world\"}\", \"ID\":232324}"
+
+}
+```
+
+#### 泛化调用示例
+
+示例 IDL ：
+
+`base.thrift`
+
+```thrift
+namespace py base
+namespace go base
+namespace java com.xxx.thrift.base
+
+struct TrafficEnv {
+    1: bool Open = false,
+    2: string Env = "",
+}
+
+struct Base {
+    1: string LogID = "",
+    2: string Caller = "",
+    3: string Addr = "",
+    4: string Client = "",
+    5: optional TrafficEnv TrafficEnv,
+    6: optional map<string, string> Extra,
+}
+
+struct BaseResp {
+    1: string StatusMessage = "",
+    2: i32 StatusCode = 0,
+    3: optional map<string, string> Extra,
+}
+```
+
+`example_service.thrift`
+
+```go
+include "base.thrift"
+namespace go kitex.test.server
+
+struct ExampleReq {
+    1: required string Msg,
+    255: base.Base Base,
+}
+struct ExampleResp {
+    1: required string Msg,
+    255: base.BaseResp BaseResp,
+}
+service ExampleService {
+    ExampleResp ExampleMethod(1: ExampleReq req),
+}
+```
+
+##### 客户端使用
+
+- **Request**
+
+类型：JSON string
+
+- **Response**
+
+类型：JSON string
+
+```go
+package main
+
+import (
+    "github.com/cloudwego/kitex/pkg/generic"
+    "github.com/cloudwego/kitex/client/genericclient"
+)
+
+func main() {
+    // 本地文件idl解析
+    // YOUR_IDL_PATH thrift文件路径: 举例 ./idl/example.thrift
+    // includeDirs: 指定include路径，默认用当前文件的相对路径寻找include
+    p, err := generic.NewThriftFileProvider("./YOUR_IDL_PATH")
+    if err != nil {
+        panic(err)
+    }
+    // 构造JSON 请求和返回类型的泛化调用
+    g, err := generic.JSONThriftGeneric(p)
+    if err != nil {
+        panic(err)
+    }
+    cli, err := genericclient.NewClient("psm", g, opts...)
+    if err != nil {
+        panic(err)
+    }
+    // 'ExampleMethod' 方法名必须包含在idl定义中
+    resp, err := cli.GenericCall(ctx, "ExampleMethod", "{\"Msg\": \"hello\"}")
+    // resp is a JSON string
+}
+```
+
+##### 服务端使用
+
+- **Request**
+
+类型：JSON string
+
+- **Response**
+
+类型：JSON string
+
+```go
+package main
+
+import (
+    "github.com/cloudwego/kitex/pkg/generic"
+    "github.com/cloudwego/kitex/server/genericserver"
+)
+
+func main() {
+    // 本地文件idl解析
+    // YOUR_IDL_PATH thrift文件路径: e.g. ./idl/example.thrift
+    p, err := generic.NewThriftFileProvider("./YOUR_IDL_PATH")
+    if err != nil {
+        panic(err)
+    }
+    // 构造JSON请求和返回类型的泛化调用
+    g, err := generic.JSONThriftGeneric(p)
+    if err != nil {
+        panic(err)
+    }
+    svc := genericserver.NewServer(new(GenericServiceImpl), g, opts...)
+    if err != nil {
+        panic(err)
+    }
+    err := svr.Run()
+    if err != nil {
+        panic(err)
+    }
+    // resp is a JSON string
+}
+
+type GenericServiceImpl struct {
+}
+
+func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+        // use jsoniter or other json parse sdk to assert request 
+        m := request.(string)
+        fmt.Printf("Recv: %v\n", m)
+        return  "{\"Msg\": \"world\"}", nil
+}
+
+```
+
 ## IDLProvider
 
-HTTP/Map 映射的泛化调用虽然不需要生成代码，但需要使用者提供 IDL。
+HTTP/Map/JSON 映射的泛化调用虽然不需要生成代码，但需要使用者提供 IDL。
 
 目前 Kitex 有两种 IDLProvider 实现，使用者可以选择指定 IDL 路径，也可以选择传入 IDL 内容。当然也可以根据需求自行扩展 `generci.DescriptorProvider`。
 

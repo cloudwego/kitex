@@ -7,6 +7,7 @@ Generic call is typically used for mid-platform services that do not need genera
 1. Binary Generic Call: for traffic transit scenario
 2. HTTP Mapping Generic Call: for API Gateway scenario
 3. Map Mapping Generic Call
+4. JSON Mapping Generic Call
 
 ## Example of Usage
 
@@ -477,6 +478,228 @@ func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, req
         return  map[string]interface{}{
             "Msg": "world",
         }, nil
+}
+
+```
+### 4. JSON Mapping Generic Call
+
+JSON Mapping Generic Call means that the user can directly construct JSON string request or response according to the specification, and Kitex will do Thrift codec accordingly.
+
+#### Build JSON
+
+Kitex JSON Mapping Generic Call will convert the request parameters according to the given IDL, will not strictly verify the field name and type constructed.
+
+The field name only supports string type corresponding to the JSON Field. The type mapping of the field Value is shown in the Type Mapping Table below.
+
+Returns the Field ID and type that will verify the Response and generate the corresponding JSON Field based on the Field Name of the IDL.
+
+For response, the Field ID and Type will be verified, and return JSON string to user  corresponding to the IDL.
+##### Type Mapping Table
+
+The Mapping between Golang and Thrift:
+
+| **Golang Type**             | **Thrift IDL Type** |
+| --------------------------- | ------------------- |
+| bool                        | bool                |
+| int8                        | i8                  |
+| int16                       | i16                 |
+| int32                       | i32                 |
+| int64                       | i64                 |
+| float64                     | double              |
+| string                      | string              |
+| ~~[]byte~~                  | ~~binary~~          |
+| []interface{}               | list/set            |
+| map[interface{}]interface{} | map                 |
+| map[string]interface{}      | struct              |
+| int32                       | enum                |
+
+##### Example
+
+Take the following IDL as an example：
+
+```thrift
+enum ErrorCode {
+    SUCCESS = 0
+    FAILURE = 1
+}
+
+struct Info {
+    1: map<string,string> Map
+    2: i64 ID
+}
+
+struct EchoRequest {
+    1: string Msg
+    2: i8 I8
+    3: i16 I16
+    4: i32 I32
+    5: i64 I64
+    6: map<string,string> Map
+    7: set<string> Set
+    8: list<string> List
+    9: ErrorCode ErrorCode
+   10: Info Info
+
+    255: optional Base Base
+}
+```
+
+The request construction is as follows：
+
+```go
+req := {
+  "Msg": "hello",
+  "I8": 1,
+  "I16": 1,
+  "I32": 1,
+  "I64": 1,
+  "Map": "{\"hello\":\"world\"}",
+  "Set": ["hello", "world"],
+  "List": ["hello", "world"],
+  "ErrorCode": 1,
+  "Info": "{\"Map\":\"{\"hello\":\"world\"}\", \"ID\":232324}"
+
+}
+```
+
+#### Generic Call Example
+
+Example IDL ：
+
+`base.thrift`
+
+```thrift
+namespace py base
+namespace go base
+namespace java com.xxx.thrift.base
+
+struct TrafficEnv {
+    1: bool Open = false,
+    2: string Env = "",
+}
+
+struct Base {
+    1: string LogID = "",
+    2: string Caller = "",
+    3: string Addr = "",
+    4: string Client = "",
+    5: optional TrafficEnv TrafficEnv,
+    6: optional map<string, string> Extra,
+}
+
+struct BaseResp {
+    1: string StatusMessage = "",
+    2: i32 StatusCode = 0,
+    3: optional map<string, string> Extra,
+}
+```
+
+`example_service.thrift`
+
+```go
+include "base.thrift"
+namespace go kitex.test.server
+
+struct ExampleReq {
+    1: required string Msg,
+    255: base.Base Base,
+}
+struct ExampleResp {
+    1: required string Msg,
+    255: base.BaseResp BaseResp,
+}
+service ExampleService {
+    ExampleResp ExampleMethod(1: ExampleReq req),
+}
+```
+
+##### Client Usage
+
+- **Request**
+
+Type：JSON string
+
+- **Response**
+
+Type：JSON string
+
+```go
+package main
+
+import (
+    "github.com/cloudwego/kitex/pkg/generic"
+    "github.com/cloudwego/kitex/client/genericclient"
+)
+
+func main() {
+    // Parse IDL with Local Files
+    // YOUR_IDL_PATH thrift file path, eg:./idl/example.thrift
+    p, err := generic.NewThriftFileProvider("./YOUR_IDL_PATH")
+    if err != nil {
+        panic(err)
+    }
+    g, err := generic.JSONThriftGeneric(p)
+    if err != nil {
+        panic(err)
+    }
+    cli, err := genericclient.NewClient("psm", g, opts...)
+    if err != nil {
+        panic(err)
+    }
+    // 'ExampleMethod' method name must be passed as param
+    resp, err := cli.GenericCall(ctx, "ExampleMethod", "{\"Msg\": \"hello\"}")
+    // resp is a JSON string
+}
+```
+
+##### Server Usage
+
+- **Request**
+
+Type：JSON string
+
+- **Response**
+
+Type：JSON string
+
+```go
+package main
+
+import (
+    "github.com/cloudwego/kitex/pkg/generic"
+    "github.com/cloudwego/kitex/server/genericserver"
+)
+
+func main() {
+    // Parse IDL with Local Files
+    // YOUR_IDL_PATH thrift file path,eg: ./idl/example.thrift
+    p, err := generic.NewThriftFileProvider("./YOUR_IDL_PATH")
+    if err != nil {
+        panic(err)
+    }
+    g, err := generic.JSONThriftGeneric(p)
+    if err != nil {
+        panic(err)
+    }
+    svc := genericserver.NewServer(new(GenericServiceImpl), g, opts...)
+    if err != nil {
+        panic(err)
+    }
+    err := svr.Run()
+    if err != nil {
+        panic(err)
+    }
+    // resp is a JSON string
+}
+
+type GenericServiceImpl struct {
+}
+
+func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+        // use jsoniter or other json parse sdk to assert request 
+        m := request.(string)
+        fmt.Printf("Recv: %v\n", m)
+        return  "{\"Msg\": \"world\"}", nil
 }
 
 ```

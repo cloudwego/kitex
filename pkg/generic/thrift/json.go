@@ -27,7 +27,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-// NewWriteJSON ...
+// NewWriteJSON build WriteJSON according to ServiceDescriptor
 func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*WriteJSON, error) {
 	fnDsc, err := svc.LookupFunctionByMethod(method)
 	if err != nil {
@@ -52,7 +52,7 @@ type WriteJSON struct {
 
 var _ MessageWriter = (*WriteJSON)(nil)
 
-// Write ...
+// Write write json string to out thrift.TProtocol
 func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
 	if !m.hasRequestBase {
 		requestBase = nil
@@ -82,7 +82,7 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 	return wrapJSONWriter(ctx, &body, out, m.ty, &writerOption{requestBase: requestBase})
 }
 
-// NewReadJSON ...
+// NewReadJSON build ReadJSON according to ServiceDescriptor
 func NewReadJSON(svc *descriptor.ServiceDescriptor, isClient bool) *ReadJSON {
 	return &ReadJSON{
 		svc:      svc,
@@ -98,7 +98,7 @@ type ReadJSON struct {
 
 var _ MessageReader = (*ReadJSON)(nil)
 
-// Read ...
+// Read read data from in thrift.TProtocol and convert to json string
 func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
 	fnDsc, err := m.svc.LookupFunctionByMethod(method)
 	if err != nil {
