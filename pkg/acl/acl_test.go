@@ -25,9 +25,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 )
 
-var (
-	errFake = errors.New("fake error")
-)
+var errFake = errors.New("fake error")
 
 func invoke(ctx context.Context, request, response interface{}) error {
 	return errFake

@@ -58,7 +58,6 @@ var fieldIDToName_TrafficEnv = map[int16]string{
 }
 
 func (p *TrafficEnv) Read(iprot thrift.TProtocol) (err error) {
-
 	var fieldTypeId thrift.TType
 	var fieldId int16
 
@@ -318,7 +317,6 @@ func (p *Base) IsSetExtra() bool {
 }
 
 func (p *Base) Read(iprot thrift.TProtocol) (err error) {
-
 	var fieldTypeId thrift.TType
 	var fieldId int16
 
@@ -730,7 +728,6 @@ func (p *BaseResp) IsSetExtra() bool {
 }
 
 func (p *BaseResp) Read(iprot thrift.TProtocol) (err error) {
-
 	var fieldTypeId thrift.TType
 	var fieldId int16
 

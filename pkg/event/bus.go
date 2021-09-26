@@ -54,7 +54,7 @@ func (b *bus) Watch(event string, callback Callback) {
 	b.callbacks.Store(event, callbacks)
 }
 
-// Unwatch remove the given callback from the callback chain of a event.
+// Unwatch remove the given callback from the callback chain of an event.
 func (b *bus) Unwatch(event string, callback Callback) {
 	var filtered []Callback
 	// In go, functions are not comparable, so we use reflect.ValueOf(callback).Pointer() to reflect their address for comparison.
@@ -69,7 +69,7 @@ func (b *bus) Unwatch(event string, callback Callback) {
 	}
 }
 
-// Dispatch dispatches a event by invoking each callback asynchronously.
+// Dispatch dispatches an event by invoking each callback asynchronously.
 func (b *bus) Dispatch(event *Event) {
 	if actual, ok := b.callbacks.Load(event.Name); ok {
 		for _, h := range actual.([]Callback) {
@@ -81,7 +81,7 @@ func (b *bus) Dispatch(event *Event) {
 	}
 }
 
-// Dispatch dispatches a event by invoking callbacks concurrently and waits for them to finish.
+// DispatchAndWait dispatches an event by invoking callbacks concurrently and waits for them to finish.
 func (b *bus) DispatchAndWait(event *Event) {
 	if actual, ok := b.callbacks.Load(event.Name); ok {
 		var wg sync.WaitGroup

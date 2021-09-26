@@ -32,12 +32,15 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-var payloadCodec = &protobufCodec{}
-var svcInfo = mocks.ServiceInfo()
+var (
+	payloadCodec = &protobufCodec{}
+	svcInfo      = mocks.ServiceInfo()
+)
 
 func init() {
 	svcInfo.Methods["mock"] = serviceinfo.NewMethodInfo(nil, newMockReqArgs, nil, false)
 }
+
 func TestNormal(t *testing.T) {
 	ctx := context.Background()
 
@@ -48,7 +51,7 @@ func TestNormal(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode server side
-	var recvMsg = initRecvMsg()
+	recvMsg := initRecvMsg()
 	buf, err := out.Bytes()
 	recvMsg.SetPayloadLen(len(buf))
 	test.Assert(t, err == nil, err)
@@ -83,7 +86,7 @@ func TestException(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode client side
-	var recvMsg = initClientRecvMsg(ri)
+	recvMsg := initClientRecvMsg(ri)
 	buf, err := out.Bytes()
 	recvMsg.SetPayloadLen(len(buf))
 	test.Assert(t, err == nil, err)
@@ -99,7 +102,7 @@ func TestException(t *testing.T) {
 
 func TestTransErrorUnwrap(t *testing.T) {
 	errMsg := "mock err"
-	transErr := remote.NewTransError(remote.InternalError, newPbError(1000, errMsg))
+	transErr := remote.NewTransError(remote.InternalError, NewPbError(1000, errMsg))
 	uwErr, ok := transErr.Unwrap().(PBError)
 	test.Assert(t, ok)
 	test.Assert(t, uwErr.TypeID() == 1000)
@@ -124,7 +127,7 @@ func BenchmarkNormalParallel(b *testing.B) {
 			test.Assert(b, err == nil, err)
 
 			// decode server side
-			var recvMsg = initRecvMsg()
+			recvMsg := initRecvMsg()
 			buf, err := out.Bytes()
 			recvMsg.SetPayloadLen(len(buf))
 			test.Assert(b, err == nil, err)
@@ -153,7 +156,7 @@ func initSendMsg(tp transport.Protocol) remote.Message {
 	_args.Req = prepareReq()
 	ink := rpcinfo.NewInvocation("", "mock")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	var msg = remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Client)
+	msg := remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Client)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
 }
@@ -179,7 +182,7 @@ func initClientRecvMsg(ri rpcinfo.RPCInfo) remote.Message {
 }
 
 func prepareReq() *MockReq {
-	var strMap = make(map[string]string)
+	strMap := make(map[string]string)
 	strMap["key1"] = "val1"
 	strMap["key2"] = "val2"
 	strList := []string{"str1", "str2"}

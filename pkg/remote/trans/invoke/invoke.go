@@ -22,8 +22,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 )
 
-type ivkTransHandlerFactory struct {
-}
+type ivkTransHandlerFactory struct{}
 
 // NewIvkTransHandlerFactory creates a ServerTransHandlerFactory for invoker.
 func NewIvkTransHandlerFactory() remote.ServerTransHandlerFactory {

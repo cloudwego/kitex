@@ -59,10 +59,10 @@ var respMsgWithExtra = map[string]interface{}{
 }
 var errResp = "Test Error"
 
-func newGenericClient(psm string, g generic.Generic, targetIPPort string) genericclient.Client {
+func newGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
 	var opts []client.Option
 	opts = append(opts, client.WithHostPorts(targetIPPort))
-	genericCli, _ := genericclient.NewClient(psm, g, opts...)
+	genericCli, _ := genericclient.NewClient(destService, g, opts...)
 	return genericCli
 }
 
@@ -178,13 +178,13 @@ func newMockServer(handler kt.Mock, addr net.Addr, opts ...server.Option) server
 }
 
 func serviceInfo() *serviceinfo.ServiceInfo {
-	serviceName := "Mock"
+	destService := "Mock"
 	handlerType := (*kt.Mock)(nil)
 	methods := map[string]serviceinfo.MethodInfo{
 		"Test": serviceinfo.NewMethodInfo(testHandler, newMockTestArgs, newMockTestResult, false),
 	}
 	svcInfo := &serviceinfo.ServiceInfo{
-		ServiceName: serviceName,
+		ServiceName: destService,
 		HandlerType: handlerType,
 		Methods:     methods,
 		Extra:       make(map[string]interface{}),
@@ -200,7 +200,7 @@ func newMockTestResult() interface{} {
 	return kt.NewMockTestResult()
 }
 
-func testHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+func testHandler(ctx context.Context, handler, arg, result interface{}) error {
 	realArg := arg.(*kt.MockTestArgs)
 	realResult := result.(*kt.MockTestResult)
 	success, err := handler.(kt.Mock).Test(ctx, realArg.Req)

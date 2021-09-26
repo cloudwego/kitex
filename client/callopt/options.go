@@ -32,11 +32,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-var (
-	callOptionsPool = sync.Pool{
-		New: newOptions,
-	}
-)
+var callOptionsPool = sync.Pool{
+	New: newOptions,
+}
 
 type callOptions struct {
 	configs      rpcinfo.RPCConfig
@@ -123,6 +121,8 @@ func WithHTTPHost(host string) Option {
 }
 
 // WithRPCTimeout specifies the RPC timeout for a RPC call.
+// FIXME: callopt.WithRPCTimeout works only when client.WithRPCTimeout or
+// client.WithTimeoutProvider is specified.
 func WithRPCTimeout(d time.Duration) Option {
 	return Option{func(o *callOptions, di *strings.Builder) {
 		di.WriteString("WithRPCTimeout(")

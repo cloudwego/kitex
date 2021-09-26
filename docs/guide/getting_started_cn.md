@@ -15,8 +15,8 @@
 首先，我们需要安装使用本示例所需要的命令行代码生成工具：
 
 1. 确保 `GOPATH` 环境变量已经被正确地定义（例如 `export GOPATH=~/go`）并且将`$GOPATH/bin`添加到 `PATH` 环境变量之中（例如 `export PATH=$GOPATH/bin:$PATH`）；请勿将 `GOPATH` 设置为当前用户没有读写权限的目录
-2. 安装 kitex：`go get github.com/cloudwego/kitex/tool/cmd/kitex@latest`
-3. 安装 thriftgo：`go get github.com/cloudwego/thriftgo@latest`
+2. 安装 kitex：`go install github.com/cloudwego/kitex/tool/cmd/kitex@latest`
+3. 安装 thriftgo：`go install github.com/cloudwego/thriftgo@latest`
 
 安装成功后，执行 `kitex --version` 和 `thriftgo --version` 应该能够看到具体版本号的输出（版本号有差异，以 x.x.x 示例）：
 
@@ -31,7 +31,7 @@ thriftgo x.x.x
 
 ### 获取示例代码
 
-1. 你可以直接点击[此处](https://github.com/cloudwego/kitex-examples/archive/refs/heads/main.zip)下载示例仓库
+1. 你可以直接点击 [此处](https://github.com/cloudwego/kitex-examples/archive/refs/heads/main.zip) 下载示例仓库
 2. 也可以克隆该示例仓库到本地 `git clone https://github.com/cloudwego/kitex-examples.git`
 
 ### 运行示例代码
@@ -42,27 +42,27 @@ thriftgo x.x.x
 
    `cd examples/hello`
 
-2. 运行server
+2. 运行 server
 
    `go run .`
 
-3. 运行client
+3. 运行 client
 
    另起一个终端后，`go run ./client`
 
 #### 方式二：使用 Docker 快速启动
 
 1. 进入示例仓库目录
-   
+
    `cd examples`
-   
+
 2. 编译项目
-   
+
    `docker build -t kitex-examples .`
 3. 运行 server
-   
+
    `docker run --network host kitex-examples ./hello-server`
-   
+
 4. 运行 client
 
    另起一个终端后，`docker run --network host kitex-examples ./hello-client`
@@ -123,12 +123,17 @@ service Hello {
 
 运行如下命令后，`kitex` 工具将根据 `hello.thrift` 更新代码文件。
 
-`kitex -service a.b.c hello.thrift`
+```bash
+kitex -service a.b.c hello.thrift
+
+# 若当前目录不在 $GOPATH/src 下，需要加上 -module 参数，一般为 go.mod 下的名字
+kitex -module "your_module_name" -service a.b.c hello.thrift
+```
 
 执行完上述命令后，`kitex` 工具将更新下述文件
 
-	1. 更新`./handler.go`，在里面增加一个`Add`方法的基本实现
-	2. 更新`./kitex_gen`，里面有框架运行所必须的代码文件
+	1. 更新 `./handler.go`，在里面增加一个 `Add` 方法的基本实现
+	2. 更新 `./kitex_gen`，里面有框架运行所必须的代码文件
 
 ### 更新服务端处理逻辑
 
@@ -196,7 +201,7 @@ for {
 
 关闭之前运行的客户端和服务端之后
 
-1.运行 server
+1. 运行 server
 
 `go run .`
 
@@ -208,7 +213,7 @@ for {
 
 ## 基础教程
 
-### 关于Kitex
+### 关于 Kitex
 
 Kitex 是一个 RPC 框架，既然是 RPC，底层就需要两大功能：
 1. Serialization 序列化
@@ -242,9 +247,9 @@ Kitex 自带了一个同名的命令行工具 `kitex`，用来帮助大家很方
 
 可以使用以下命令来安装或者更新 kitex：   
 
-`$ go get github.com/cloudwego/kitex/tool/cmd/kitex`
+`$ go install github.com/cloudwego/kitex/tool/cmd/kitex`
 
-完成后，可以通过执行kitex来检测是否安装成功。   
+完成后，可以通过执行 kitex 来检测是否安装成功。   
 
 `$ kitex`   
 
@@ -253,7 +258,6 @@ Kitex 自带了一个同名的命令行工具 `kitex`，用来帮助大家很方
 `$ kitex`   
 
 `No IDL file found.`   
-
 
 如果出现 `command not found` 错误，可能是因为没有把 `$GOPATH/bin` 加入到 `$PATH` 中，详见环境准备一章。   
 
@@ -319,7 +323,7 @@ service Echo {
 
 由于 kitex 要求使用 go mod 进行依赖管理，所以我们要升级 kitex 框架会很容易，只需要执行以下命令即可：
 ```
-$ go get github.com/cloudwego/kitex
+$ go get github.com/cloudwego/kitex@latest
 $ go mod tidy
 ```
 
@@ -411,7 +415,7 @@ if err != nil {
 	log.Fatal(err)
 }
 ```
-上述代码中，`echo.NewClient` 用于创建 `client`，其第一个参数为调用的 *服务名*，第二个参数为 *options*，用于传入参数，此处的 `client.WithHostPorts` 用于指定服务端的地址，更多参数可参考 ***基本特性*** 一节。
+上述代码中，`echo.NewClient` 用于创建 `client`，其第一个参数为调用的 *服务名*，第二个参数为 *options*，用于传入参数，此处的 `client.WithHostPorts` 用于指定服务端的地址，更多参数可参考 *** 基本特性*** 一节。
 
 #### 发起调用
 
@@ -427,14 +431,14 @@ if err != nil {
 }
 log.Println(resp)
 ```
-上述代码中，我们首先创建了一个请求 `req` ,然后通过 `c.Echo` 发起了调用。   
+上述代码中，我们首先创建了一个请求 `req` , 然后通过 `c.Echo` 发起了调用。   
 
 其第一个参数为 `context.Context`，通过通常用其传递信息或者控制本次调用的一些行为，你可以在后续章节中找到如何使用它。   
 
 其第二个参数为本次调用的请求。   
 
 其第三个参数为本次调用的 `options` ，Kitex 提供了一种 `callopt` 机制，顾名思义——调用参数 ，有别于创建 client 时传入的参数，这里传入的参数仅对此次生效。   
-此处的 `callopt.WithRPCTimeout` 用于指定此次调用的超时（通常不需要指定，此处仅作演示之用）同样的，你可以在 ***基础特性*** 一节中找到更多的参数。
+此处的 `callopt.WithRPCTimeout` 用于指定此次调用的超时（通常不需要指定，此处仅作演示之用）同样的，你可以在 *** 基础特性*** 一节中找到更多的参数。
 
 ### 发起调用
 

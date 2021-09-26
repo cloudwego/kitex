@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -47,12 +46,6 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 	}
 
 	transInfo.PutTransIntInfo(hd)
-
-	if metainfo.HasMetaInfo(ctx) {
-		hd := make(map[string]string)
-		metainfo.SaveMetaInfoToMap(ctx, hd)
-		transInfo.PutTransStrInfo(hd)
-	}
 	return ctx, nil
 }
 
@@ -72,10 +65,8 @@ func (sh *serverTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 	}
 	ri := msg.RPCInfo()
 	transInfo := msg.TransInfo()
-	strInfo := transInfo.TransStrInfo()
 	intInfo := transInfo.TransIntInfo()
 
-	ctx = metainfo.SetMetaInfoFromMap(ctx, strInfo)
 	ci := rpcinfo.AsMutableEndpointInfo(ri.From())
 	if ci != nil {
 		if v := intInfo[transmeta.FromService]; v != "" {

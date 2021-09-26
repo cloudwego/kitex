@@ -2,7 +2,7 @@
 
 ## 指定 URL 进行调用
 
-在进行调用时，可以通过`callopt.WithURL`指定，通过该 option 指定的URL，会经过默认的 DNS resolver 解析后拿到 host 和 port，此时其等效于`callopt.WithHostPort`。
+在进行调用时，可以通过 `callopt.WithURL` 指定，通过该 option 指定的 URL，会经过默认的 DNS resolver 解析后拿到 host 和 port，此时其等效于 `callopt.WithHostPort`。
 
 ```go
 import "github.com/cloudwego/kitex/client/callopt"
@@ -18,7 +18,7 @@ if err != nil {
 
 此外也可以自定义 DNS resolver
 
-resolver定义如下(pkg/http)：
+resolver 定义如下 (pkg/http)：
 
 ```go
 type Resolver interface {
@@ -28,7 +28,7 @@ type Resolver interface {
 
 参数为 URL，返回值为访问的 server 的 "host:port"。
 
-通过`client.WithHTTPResolver`指定用于 DNS 解析的resolver。
+通过 `client.WithHTTPResolver` 指定用于 DNS 解析的 resolver。
 
 ```go
 import "github.com/cloudwego/kitex/client/callopt"

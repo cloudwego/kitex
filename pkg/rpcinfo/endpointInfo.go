@@ -90,7 +90,7 @@ func (ei *endpointInfo) SetAddress(addr net.Addr) error {
 }
 
 // SetTag implements the MutableEndpointInfo interface.
-func (ei *endpointInfo) SetTag(key string, value string) error {
+func (ei *endpointInfo) SetTag(key, value string) error {
 	if ei.tags == nil {
 		ei.tags = make(map[string]string)
 	}

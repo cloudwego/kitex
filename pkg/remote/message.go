@@ -54,10 +54,6 @@ const (
 )
 
 const (
-	// TransInfoRecv2Send load by message tag,
-	// it is recorded during receive phase but will be the part of trans info to send out
-	TransInfoRecv2Send string = "transInfoRecv2Send"
-
 	ReadFailed string = "RFailed"
 
 	// MeshHeader use in message.Tag to check MeshHeader
@@ -345,15 +341,7 @@ func (ti *transInfo) Recycle() {
 }
 
 // FillSendMsgFromRecvMsg is used to fill the transport information to the message to be sent.
-func FillSendMsgFromRecvMsg(recvMsg Message, sendMsg Message) {
+func FillSendMsgFromRecvMsg(recvMsg, sendMsg Message) {
 	sendMsg.SetProtocolInfo(recvMsg.ProtocolInfo())
 	sendMsg.SetPayloadCodec(recvMsg.PayloadCodec())
-
-	// Read transmissions recorded during the message phase
-	transInfoRecv2Send := recvMsg.Tags()[TransInfoRecv2Send]
-	if transInfoRecv2Send != nil {
-		if m, ok := transInfoRecv2Send.(map[string]string); ok {
-			sendMsg.TransInfo().PutTransStrInfo(m)
-		}
-	}
 }

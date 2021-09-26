@@ -140,7 +140,7 @@ func main() {
 ## Protobuf
 
 Kitex supports two kind of protocols that carries Protobuf payload:
-  
+
 - Kitex Protobuf
     - Only supports the PingPong type of messages. If any streaming method is defined in the IDL, the protocol will switch to gRPC.
 - The gRPC Protocol
@@ -356,4 +356,3 @@ func main() {
     } 
 }
 ```
-

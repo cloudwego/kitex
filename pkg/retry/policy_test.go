@@ -25,8 +25,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-var jsoni = jsoniter.ConfigCompatibleWithStandardLibrary
-var method = "test"
+var (
+	jsoni  = jsoniter.ConfigCompatibleWithStandardLibrary
+	method = "test"
+)
 
 func TestFailureRetryPolicy(t *testing.T) {
 	fp := NewFailurePolicy()
@@ -148,7 +150,6 @@ func TestRetryPolicyBothNotNil(t *testing.T) {
 	p2.Enable = false
 	rc.NotifyPolicyChange(ri.To().Method(), p2)
 	test.Assert(t, !fr.enable)
-
 }
 
 func TestRetryPolicyBothNil(t *testing.T) {

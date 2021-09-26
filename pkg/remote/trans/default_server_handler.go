@@ -64,6 +64,7 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 			return nil
 		}
 	}
+
 	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
@@ -141,7 +142,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, ri, remote.Reply, remote.Server)
 	}
 
-	err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
+	ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
 	if err != nil {
 		// error cannot be wrapped to print here, so it must exec before NewTransError
 		t.OnError(ctx, err, conn)
@@ -160,9 +161,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 
 // OnMessage implements the remote.ServerTransHandler interface.
 // msg is the decoded instance, such as Arg and Result.
-func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
+func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	err := t.inkHdlFunc(ctx, args.Data(), result.Data())
-	return err
+	return ctx, err
 }
 
 // OnActive implements the remote.ServerTransHandler interface.

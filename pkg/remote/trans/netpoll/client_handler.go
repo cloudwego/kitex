@@ -21,8 +21,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 )
 
-type cliTransHandlerFactory struct {
-}
+type cliTransHandlerFactory struct{}
 
 // NewCliTransHandlerFactory returns a new remote.ClientTransHandlerFactory for netpoll.
 func NewCliTransHandlerFactory() remote.ClientTransHandlerFactory {

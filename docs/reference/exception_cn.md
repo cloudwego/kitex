@@ -2,9 +2,9 @@
 
 ## 异常类型
 
-Kitex框架定义在 `github.com/cloudwego/kitex/pkg/kerrors` 下
+Kitex 框架定义在 `github.com/cloudwego/kitex/pkg/kerrors` 下
 
-### internal exception
+### Internal Exception
 
 `ErrInternalException`, 框架内部发生的错误，具体包括以下几种：
 
@@ -25,7 +25,7 @@ Kitex框架定义在 `github.com/cloudwego/kitex/pkg/kerrors` 下
 
 ### loadbalance error
 
-`ErrLoadbalance`, 复杂均衡错误
+`ErrLoadbalance`, 负载均衡错误
 
 ### no more instances to retry
 
@@ -50,7 +50,7 @@ Kitex框架定义在 `github.com/cloudwego/kitex/pkg/kerrors` 下
 
 `ErrRemoteOrNetwork`, 远端服务发生错误，或者出现网络错误。具体错误见报错信息
 
-当带有`[remote]`字样时，代表此错误为远端返回
+当带有`[remote]` 字样时，代表此错误为远端返回
 
 ### request over limit
 
@@ -63,7 +63,7 @@ Kitex框架定义在 `github.com/cloudwego/kitex/pkg/kerrors` 下
 
 `ErrPanic`, 服务发生 panic 。
 
-当带有`[happened in biz handler]`字样时，代表 panic 发生在服务端 handler 中，此时错误信息中会带上堆栈。
+当带有`[happened in biz handler]` 字样时，代表 panic 发生在服务端 handler 中，此时错误信息中会带上堆栈。
 
 ### biz error
 
@@ -75,18 +75,18 @@ Kitex框架定义在 `github.com/cloudwego/kitex/pkg/kerrors` 下
 
 ### THRIFT 错误码 
 
-该类别对应 thrift 框架原生的 Application Exception 错误，通常，这些错误会被 Kitex 框架包装成`remote or network error`。
+该类别对应 Thrift 框架原生的 Application Exception 错误，通常，这些错误会被 Kitex 框架包装成 `remote or network error` 。
 
-| 错误码 | 名称                                 | 含义           |
-| ------ | ------------------------------------ | -------------- |
-| 0      | UnknwonApllicationException          | 未知错误       |
-| 1      | UnknownMethod                        | 未知方法       |
-| 2      | InValidMessageTypeException          | 无效的消息类型 |
-| 3      | WrongMethodName                      | 错误的方法名字 |
-| 4      | BadSequenceID                        | 错误的包序号   |
-| 5      | MissingResult                        | 返回结果缺失   |
-| 6      | InternalErrorupstream request failed | 内部错误       |
-| 7      | ProtocolError                        | 协议错误       |
+| 错误码 | 名称                        | 含义           |
+| ------ | --------------------------- | -------------- |
+| 0      | UnknownApplicationException | 未知错误       |
+| 1      | UnknownMethod               | 未知方法       |
+| 2      | InValidMessageTypeException | 无效的消息类型 |
+| 3      | WrongMethodName             | 错误的方法名字 |
+| 4      | BadSequenceID               | 错误的包序号   |
+| 5      | MissingResult               | 返回结果缺失   |
+| 6      | InternalError               | 内部错误       |
+| 7      | ProtocolError               | 协议错误       |
 
 ## 异常判断
 
@@ -102,7 +102,7 @@ isKitexErr := kerrors.IsKitexError(kerrors.ErrInternalException) // 返回 true
 
 ### 判断具体的错误类型
 
-可以通过`errors.Is`进行判断，其中详细错误可以通过详细错误判断，如：
+可以通过 `errors.Is` 进行判断，其中详细错误可以通过详细错误判断，如：
 
 ```go
 import "errors"

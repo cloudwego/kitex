@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package rpctimeout
+package client
 
 import (
 	"context"
@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/rpctimeout"
 )
 
 var panicMsg = "hello world"
@@ -55,27 +56,39 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	m := rpcinfo.AsMutableRPCConfig(c)
 	m.SetRPCTimeout(time.Millisecond * 500)
 
+	var moreTimeout time.Duration
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), r)
 	mwCtx := context.Background()
 	mwCtx = context.WithValue(mwCtx, endpoint.CtxLoggerKey, klog.DefaultLogger())
+	mwCtx = context.WithValue(mwCtx, rpctimeout.TimeoutAdjustKey, &moreTimeout)
 
 	var err error
+	var mw1, mw2 endpoint.Middleware
+
 	// 1. normal
-	err = MiddlewareBuilder(0)(mwCtx)(pass)(ctx, nil, nil)
+	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
+	mw2 = rpcTimeoutMW(mwCtx)
+	err = mw1(mw2(pass))(ctx, nil, nil)
 	test.Assert(t, err == nil)
 
 	// 2. block to mock timeout
-	err = MiddlewareBuilder(0)(mwCtx)(block)(ctx, nil, nil)
+	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
+	mw2 = rpcTimeoutMW(mwCtx)
+	err = mw1(mw2(block))(ctx, nil, nil)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, err.(*kerrors.DetailedError).ErrorType() == kerrors.ErrRPCTimeout)
 
 	// 3. block, pass more timeout, timeout won't happen
-	err = MiddlewareBuilder(510*time.Millisecond)(mwCtx)(block)(ctx, nil, nil)
+	mw1 = rpctimeout.MiddlewareBuilder(510 * time.Millisecond)(mwCtx)
+	mw2 = rpcTimeoutMW(mwCtx)
+	err = mw1(mw2(block))(ctx, nil, nil)
 	test.Assert(t, err == nil)
 
 	// 4. mock panic happen
 	// < v1.1.* panic happen, >=v1.1* wrap panic to error
-	err = MiddlewareBuilder(0)(mwCtx)(ache)(ctx, nil, nil)
+	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
+	mw2 = rpcTimeoutMW(mwCtx)
+	err = mw1(mw2(ache))(ctx, nil, nil)
 	test.Assert(t, strings.Contains(err.Error(), panicMsg))
 
 	// 5. cancel
@@ -83,6 +96,8 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	time.AfterFunc(100*time.Millisecond, func() {
 		cancelFunc()
 	})
-	err = MiddlewareBuilder(0)(mwCtx)(block)(cancelCtx, nil, nil)
+	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
+	mw2 = rpcTimeoutMW(mwCtx)
+	err = mw1(mw2(block))(cancelCtx, nil, nil)
 	test.Assert(t, errors.Is(err, context.Canceled), err)
 }

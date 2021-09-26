@@ -36,7 +36,7 @@ type BTProtocol interface {
 	WriteFieldBegin(buf []byte, name string, typeID thrift.TType, id int16) int
 	WriteFieldEnd(buf []byte) int
 	WriteFieldStop(buf []byte) int
-	WriteMapBegin(buf []byte, keyType thrift.TType, valueType thrift.TType, size int) int
+	WriteMapBegin(buf []byte, keyType, valueType thrift.TType, size int) int
 	WriteMapEnd(buf []byte) int
 	WriteListBegin(buf []byte, elemType thrift.TType, size int) int
 	WriteListEnd(buf []byte) int
@@ -49,7 +49,7 @@ type BTProtocol interface {
 	WriteI64(buf []byte, value int64) int
 	WriteDouble(buf []byte, value float64) int
 	WriteString(buf []byte, value string) int
-	WriteBinary(buf []byte, value []byte) int
+	WriteBinary(buf, value []byte) int
 	WriteStringNocopy(buf []byte, binaryWriter BinaryWriter, value string) int
 	WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, value []byte) int
 	MessageBeginLength(name string, typeID thrift.TMessageType, seqid int32) int
@@ -59,7 +59,7 @@ type BTProtocol interface {
 	FieldBeginLength(name string, typeID thrift.TType, id int16) int
 	FieldEndLength() int
 	FieldStopLength() int
-	MapBeginLength(keyType thrift.TType, valueType thrift.TType, size int) int
+	MapBeginLength(keyType, valueType thrift.TType, size int) int
 	MapEndLength() int
 	ListBeginLength(elemType thrift.TType, size int) int
 	ListEndLength() int
@@ -81,11 +81,11 @@ type BTProtocol interface {
 	ReadStructEnd(buf []byte) (int, error)
 	ReadFieldBegin(buf []byte) (name string, typeID thrift.TType, id int16, length int, err error)
 	ReadFieldEnd(buf []byte) (int, error)
-	ReadMapBegin(buf []byte) (keyType thrift.TType, valueType thrift.TType, size int, length int, err error)
+	ReadMapBegin(buf []byte) (keyType, valueType thrift.TType, size, length int, err error)
 	ReadMapEnd(buf []byte) (int, error)
-	ReadListBegin(buf []byte) (elemType thrift.TType, size int, length int, err error)
+	ReadListBegin(buf []byte) (elemType thrift.TType, size, length int, err error)
 	ReadListEnd(buf []byte) (int, error)
-	ReadSetBegin(buf []byte) (elemType thrift.TType, size int, length int, err error)
+	ReadSetBegin(buf []byte) (elemType thrift.TType, size, length int, err error)
 	ReadSetEnd(buf []byte) (int, error)
 	ReadBool(buf []byte) (value bool, length int, err error)
 	ReadByte(buf []byte) (value int8, length int, err error)

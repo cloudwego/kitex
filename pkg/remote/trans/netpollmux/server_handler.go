@@ -38,8 +38,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
-type svrTransHandlerFactory struct {
-}
+type svrTransHandlerFactory struct{}
 
 // NewSvrTransHandlerFactory creates a default netpollmux remote.ServerTransHandlerFactory.
 func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
@@ -83,6 +82,7 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 			return nil
 		}
 	}
+
 	bufWriter := np.NewWriterByteBuffer(netpoll.NewLinkBuffer())
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
@@ -192,7 +192,8 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 		} else {
 			sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, rpcInfo, remote.Reply, remote.Server)
 		}
-		err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
+
+		ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
 		if err != nil {
 			// error cannot be wrapped to print here, so it must exec before NewTransError
 			t.OnError(ctx, err, muxSvrConn)
@@ -213,9 +214,9 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 // OnMessage implements the remote.ServerTransHandler interface.
 // msg is the decoded instance, such as Arg or Result.
 // OnMessage notifies the higher level to process. It's used in async and server-side logic.
-func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
+func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	err := t.inkHdlFunc(ctx, args.Data(), result.Data())
-	return err
+	return ctx, err
 }
 
 type ctxKeyMuxSvrConn struct{}
@@ -278,7 +279,7 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 	t.transPipe = p
 }
 
-func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, closeConn bool, doOnMessage bool) {
+func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, closeConn, doOnMessage bool) {
 	defer func() {
 		if closeConn {
 			conn.Close()

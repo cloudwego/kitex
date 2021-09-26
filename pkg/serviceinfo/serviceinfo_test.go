@@ -45,7 +45,7 @@ func TestMethodInfo(t *testing.T) {
 	mi := serviceinfo.NewMethodInfo(nil, nil, nil, false)
 	test.Assert(t, mi != nil)
 
-	mh := func(ctx context.Context, handler interface{}, args, result interface{}) error { return nil }
+	mh := func(ctx context.Context, handler, args, result interface{}) error { return nil }
 	af := func() interface{} { return "arg" }
 	rf := func() interface{} { return "res" }
 	mi = serviceinfo.NewMethodInfo(mh, af, rf, true)

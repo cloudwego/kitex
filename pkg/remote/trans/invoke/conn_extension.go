@@ -29,12 +29,11 @@ func newIvkConnExtension() trans.Extension {
 	return &ivkConnExtension{}
 }
 
-type ivkConnExtension struct {
-}
+type ivkConnExtension struct{}
 
 // SetReadTimeout implements the trans.Extension interface.
 func (e *ivkConnExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cfg rpcinfo.RPCConfig, role remote.RPCRole) {
-	//do nothing
+	// do nothing
 }
 
 // NewWriteByteBuffer implements the trans.Extension interface.

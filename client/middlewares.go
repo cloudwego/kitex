@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/apache/thrift/lib/go/thrift"
+
 	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -31,6 +33,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
+	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 )
@@ -167,7 +170,7 @@ func newResolveMWBuilder(opt *client.Options) endpoint.MiddlewareBuilder {
 // newIOErrorHandleMW provides a hook point for io error handling.
 func newIOErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
 	if errHandle == nil {
-		return endpoint.DummyMiddleware
+		errHandle = defaultErrorHandler
 	}
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response interface{}) (err error) {
@@ -178,4 +181,18 @@ func newIOErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
 			return errHandle(err)
 		}
 	}
+}
+
+func defaultErrorHandler(err error) error {
+	switch e := err.(type) {
+	case thrift.TApplicationException:
+		// Add 'remote' prefix to distinguish with local err.
+		// Because it cannot make sure which side err when decode err happen
+		err = fmt.Errorf("[remote] %w", e)
+	case protobuf.PBError:
+		// Add 'remote' prefix to distinguish with local err.
+		// Because it cannot make sure which side err when decode err happen
+		err = fmt.Errorf("[remote] %w", e)
+	}
+	return kerrors.ErrRemoteOrNetwork.WithCause(err)
 }

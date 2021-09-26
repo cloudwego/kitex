@@ -409,7 +409,7 @@ func checkProtocalID(protoID uint8, message remote.Message) error {
 type meshHeader struct{}
 
 //lint:ignore U1000 until encode is used
-func (m meshHeader) encode(ctx context.Context, message remote.Message, payloadBuf remote.ByteBuffer, out remote.ByteBuffer) error {
+func (m meshHeader) encode(ctx context.Context, message remote.Message, payloadBuf, out remote.ByteBuffer) error {
 	// do nothing, kitex just support decode meshHeader, encode protocol depend on the payload
 	return nil
 }

@@ -1,7 +1,6 @@
-
 # 自定义访问控制
 
-Kitex 框架提供了一个简单的中间件构造器，可以支持用户自定义访问控制的逻辑，在特定条件下拒绝请求。下面是一个简单的例子，随机拒绝1%的请求：
+Kitex 框架提供了一个简单的中间件构造器，可以支持用户自定义访问控制的逻辑，在特定条件下拒绝请求。下面是一个简单的例子，随机拒绝 1% 的请求：
 
 ```go
 package myaccesscontrol
@@ -25,4 +24,3 @@ var MyMiddleware = acl.NewACLMiddleware(reject1percent) // 创建中间件
 ```
 
 随后，你可以在创建 client 或者 server 的时候，通过 `WithMiddleware(myaccesscontrol.MyMiddleware)` 启用该中间件。
-

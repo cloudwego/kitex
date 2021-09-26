@@ -128,7 +128,6 @@ func (rc *Container) InitWithPolicies(methodPolicies map[string]Policy) {
 			rc.initRetryer(m, methodPolicies[m])
 		}
 	}
-
 }
 
 // NotifyPolicyChange to receive policy when it change
@@ -198,9 +197,9 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, rpcCall RPCCallFunc,
 
 	// case 3: retry
 	// reqOp is used to ignore req concurrent write
-	var reqOp = OpNo
+	reqOp := OpNo
 	// respOp is used to ignore resp concurrent write and read, especially in backup request
-	var respOp = OpNo
+	respOp := OpNo
 	ctx = context.WithValue(ctx, CtxReqOp, &reqOp)
 	ctx = context.WithValue(ctx, CtxRespOp, &respOp)
 

@@ -81,7 +81,6 @@ func TestInitRPCInfo(t *testing.T) {
 	conn := new(mocks.Conn)
 	conn.RemoteAddrFunc = func() (r net.Addr) {
 		return remoteAddr
-
 	}
 	ctx := context.Background()
 	rpcInfoInitFunc := svr.initRPCInfoFunc()
@@ -151,10 +150,10 @@ func TestServiceRegistryInfo(t *testing.T) {
 		Weight: 100,
 		Tags:   map[string]string{"aa": "bb"},
 	}
-	var checkInfo = func(info *registry.Info) {
+	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
 		test.Assert(t, info.Weight == registryInfo.Weight, info.Addr)
-		test.Assert(t, info.Addr.String() == ":8888", info.Addr)
+		test.Assert(t, info.Addr.String() == "[::]:8888", info.Addr)
 		test.Assert(t, len(info.Tags) == len(registryInfo.Tags), info.Tags)
 		test.Assert(t, info.Tags["aa"] == registryInfo.Tags["aa"], info.Tags)
 	}
@@ -190,9 +189,9 @@ func TestServiceRegistryInfo(t *testing.T) {
 }
 
 func TestServiceRegistryNoInitInfo(t *testing.T) {
-	var checkInfo = func(info *registry.Info) {
+	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
-		test.Assert(t, info.Addr.String() == ":8888", info.Addr)
+		test.Assert(t, info.Addr.String() == "[::]:8888", info.Addr)
 	}
 	var rCount int
 	var drCount int
@@ -261,6 +260,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 	transHdlrFact := &mockSvrTransHandlerFactory{}
 	svcInfo := mocks.ServiceInfo()
 	exitCh := make(chan bool)
+	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
 		BootstrapServerFunc: func() error {
 			{ // mock server call
@@ -270,15 +270,23 @@ func TestInvokeHandlerExec(t *testing.T) {
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
-				err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
+				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
 				test.Assert(t, err == nil, err)
 			}
 			<-exitCh
 			return nil
 		},
 		ShutdownFunc: func() error {
+			if ln != nil {
+				ln.Close()
+			}
 			exitCh <- true
 			return nil
+		},
+		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
+			var err error
+			ln, err = net.Listen("tcp", ":8888")
+			return ln, err
 		},
 	}
 	opts = append(opts, WithTransServerFactory(mocks.NewMockTransServerFactory(transSvr)))
@@ -315,6 +323,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 	transHdlrFact := &mockSvrTransHandlerFactory{}
 	svcInfo := mocks.ServiceInfo()
 	exitCh := make(chan bool)
+	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
 		BootstrapServerFunc: func() error {
 			{
@@ -325,15 +334,21 @@ func TestInvokeHandlerPanic(t *testing.T) {
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
-				err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
+				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
 				test.Assert(t, strings.Contains(err.Error(), "happened in biz handler"))
 			}
 			<-exitCh
 			return nil
 		},
 		ShutdownFunc: func() error {
+			ln.Close()
 			exitCh <- true
 			return nil
+		},
+		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
+			var err error
+			ln, err = net.Listen("tcp", ":8888")
+			return ln, err
 		},
 	}
 	opts = append(opts, WithTransServerFactory(mocks.NewMockTransServerFactory(transSvr)))
@@ -354,7 +369,6 @@ func TestInvokeHandlerPanic(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, mwExec)
 	test.Assert(t, serviceHandler)
-
 }
 
 type noopMetahandler struct{}
@@ -362,6 +376,7 @@ type noopMetahandler struct{}
 func (noopMetahandler) WriteMeta(ctx context.Context, msg remote.Message) (context.Context, error) {
 	return ctx, nil
 }
+
 func (noopMetahandler) ReadMeta(ctx context.Context, msg remote.Message) (context.Context, error) {
 	return ctx, nil
 }
@@ -377,8 +392,7 @@ func (f *mockSvrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (
 	return f.hdlr, nil
 }
 
-type mockExtension struct {
-}
+type mockExtension struct{}
 
 func (m mockExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cfg rpcinfo.RPCConfig, role remote.RPCRole) {
 }

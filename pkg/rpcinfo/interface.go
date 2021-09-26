@@ -56,11 +56,21 @@ type Event interface {
 	IsNil() bool
 }
 
-// RPCConfig contains configuration for RPC.
-type RPCConfig interface {
+// Timeouts contains settings of timeouts.
+type Timeouts interface {
 	RPCTimeout() time.Duration
 	ConnectTimeout() time.Duration
 	ReadWriteTimeout() time.Duration
+}
+
+// TimeoutProvider provides timeout settings.
+type TimeoutProvider interface {
+	Timeouts(ri RPCInfo) Timeouts
+}
+
+// RPCConfig contains configuration for RPC.
+type RPCConfig interface {
+	Timeouts
 	IOBufferSize() int
 	TransportProtocol() transport.Protocol
 }

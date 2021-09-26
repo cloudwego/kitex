@@ -179,7 +179,7 @@ func (s *server) Run() (err error) {
 		go onServerStart[i]()
 	}
 	s.Lock()
-	s.buildRegistryInfo()
+	s.buildRegistryInfo(s.svr.Address())
 	s.Unlock()
 
 	if err = s.waitSignal(errCh); err != nil {
@@ -363,12 +363,13 @@ func (s *server) newSvrTransHandler() (handler remote.ServerTransHandler, err er
 	return transPl, nil
 }
 
-func (s *server) buildRegistryInfo() {
+func (s *server) buildRegistryInfo(lAddr net.Addr) {
 	if s.opt.RegistryInfo == nil {
 		s.opt.RegistryInfo = &registry.Info{}
 	}
 	info := s.opt.RegistryInfo
-	info.Addr = s.opt.RemoteOpt.Address
+	// notice: lAddr may be nil when listen failed
+	info.Addr = lAddr
 	if info.ServiceName == "" {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}

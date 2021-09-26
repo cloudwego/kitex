@@ -31,7 +31,7 @@ func TestRPCCodec(t *testing.T) {
 
 	req1 := mt.NewMockReq()
 	req1.Msg = "Hello Kitex"
-	var strMap = make(map[string]string)
+	strMap := make(map[string]string)
 	strMap["aa"] = "aa"
 	strMap["bb"] = "bb"
 	req1.StrMap = strMap
@@ -88,7 +88,7 @@ func TestSerializer(t *testing.T) {
 
 	req := mt.NewMockReq()
 	req.Msg = "Hello Kitex"
-	var strMap = make(map[string]string)
+	strMap := make(map[string]string)
 	strMap["aa"] = "aa"
 	strMap["bb"] = "bb"
 	req.StrMap = strMap

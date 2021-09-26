@@ -32,7 +32,7 @@ import (
 type RemoteInfo interface {
 	rpcinfo.EndpointInfo
 	SetServiceName(name string)
-	SetTag(key string, value string) error
+	SetTag(key, value string) error
 
 	// SetTagLock freezes a key of the tags and refuses further modification on its value.
 	SetTagLock(key string)
@@ -156,7 +156,7 @@ func (ri *remoteInfo) SetTagLock(key string) {
 }
 
 // SetTag implements rpcinfo.MutableEndpointInfo.
-func (ri *remoteInfo) SetTag(key string, value string) error {
+func (ri *remoteInfo) SetTag(key, value string) error {
 	ri.Lock()
 	defer ri.Unlock()
 	if _, exist := ri.tagLocks[key]; exist {

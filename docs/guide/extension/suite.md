@@ -1,4 +1,6 @@
-# Suite Extensions - Encapsulating Custom Governance Modules
+# Suite Extensions
+
+## Encapsulating Custom Governance Modules
 
 Suite is a high-level abstraction of extensions, a combination and encapsulation of Option and Middleware.
 
@@ -44,6 +46,6 @@ func (s2) Options() []client.Option {
 
 Then if we use `client.WithSuite(s2{}), client.WithRPCTimeout(3*time.Second)`, it will execute `client.WithSuite(s1{})` first, followed by `client. WithRPCTimeout(1*time.Second)`, followed by `client.WithRPCTimeout(2*time.Second)`, and finally `client.WithRPCTimeout(3*time.Second)`. After this initialization, the value of RPCTimeout will be set to 3s (see the principle described at the beginning).
 
-# Summary
+## Summary
 
 Suite is a higher-level combination and encapsulation, and it is recommended that third-party developers provide Kitex extensions based on Suite. Suite allows dynamically injecting values at creation time, or dynamically specifying values in its own middleware at runtime, making it easier for users and third-party developers to use and develop without relying on global variables, and making it possible to use different configurations for each client.

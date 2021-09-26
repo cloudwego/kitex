@@ -21,7 +21,6 @@ import (
 )
 
 // MetaHandler reads or writes metadata through certain protocol.
-// The protocol will be a thrift.TProtocol usually.
 type MetaHandler interface {
 	WriteMeta(ctx context.Context, msg Message) (context.Context, error)
 	ReadMeta(ctx context.Context, msg Message) (context.Context, error)

@@ -49,7 +49,7 @@ type TransHandler interface {
 
 	OnError(ctx context.Context, err error, conn net.Conn)
 
-	OnMessage(ctx context.Context, args, result Message) error
+	OnMessage(ctx context.Context, args, result Message) (context.Context, error)
 
 	SetPipeline(pipeline *TransPipeline)
 }

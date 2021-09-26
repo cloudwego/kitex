@@ -73,7 +73,7 @@ func TestShortPoolPutClosed(t *testing.T) {
 	p := NewShortPool("test")
 
 	var closed bool
-	var cmto = errors.New("closed more than once")
+	cmto := errors.New("closed more than once")
 	c := &mocks.Conn{
 		CloseFunc: func() (err error) {
 			if closed {

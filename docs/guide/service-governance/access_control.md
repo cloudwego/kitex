@@ -1,4 +1,3 @@
-
 # Customized Access Control
 
 The Kitex framework provides a middleware builder to support adding customized access control that rejects requests under certain conditions. The belowing is a simple example that randomly rejects 1% of all requests:
@@ -25,4 +24,3 @@ var MyMiddleware = acl.NewACLMiddleware(reject1percent) // create the middleware
 ```
 
 Then, you can enable this middleware with `WithMiddleware(myaccesscontrol.MyMiddleware)` at the creation of a client or a server.
-

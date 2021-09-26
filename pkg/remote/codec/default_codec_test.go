@@ -36,7 +36,7 @@ func TestThriftProtocolCheck(t *testing.T) {
 	var ttheader bool
 	var flagBuf []byte
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
-	var msg = remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
 
 	// 1. ttheader
 	flagBuf = make([]byte, 8*2)
@@ -101,7 +101,7 @@ func TestProtobufProtocolCheck(t *testing.T) {
 	var ttheader bool
 	var flagBuf []byte
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
-	var msg = remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
 
 	// 1. ttheader framed
 	flagBuf = make([]byte, 8*2)
@@ -149,7 +149,7 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode
-	var recvMsg = initRecvMsg()
+	recvMsg := initRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
@@ -165,8 +165,7 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 
 var mpc remote.PayloadCodec = mockPayloadCodec{}
 
-type mockPayloadCodec struct {
-}
+type mockPayloadCodec struct{}
 
 func (m mockPayloadCodec) Marshal(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
 	WriteUint32(ThriftV1Magic+uint32(message.MessageType()), out)

@@ -27,7 +27,10 @@ import (
 
 func TestShareQueue(t *testing.T) {
 	// check success
-	var sum int32
+	var (
+		sum     int32
+		flushed int32
+	)
 	var deal DealBufferGetters = func(gts []BufferGetter) {
 		for _, gt := range gts {
 			buf, isNil := gt()
@@ -36,9 +39,12 @@ func TestShareQueue(t *testing.T) {
 		}
 		atomic.AddInt32(&sum, -int32(len(gts)))
 	}
+	var flush FlushBufferGetters = func() {
+		atomic.AddInt32(&flushed, 1)
+	}
 
 	var count int32 = 9
-	queue := newSharedQueue(4, deal)
+	queue := newSharedQueue(4, deal, flush)
 	atomic.AddInt32(&sum, count)
 	for i := 0; i < int(count); i++ {
 		var getter BufferGetter = func() (buf remote.ByteBuffer, isNil bool) {
@@ -48,8 +54,8 @@ func TestShareQueue(t *testing.T) {
 		}
 		queue.Add(getter)
 	}
-	// wait for deal all
-	for atomic.LoadInt32(&sum) > 0 {
+	// wait for deal and flush all
+	for !(atomic.LoadInt32(&sum) == 0 && atomic.LoadInt32(&flushed) >= 1) {
 		runtime.Gosched()
 	}
 
@@ -60,7 +66,7 @@ func TestShareQueue(t *testing.T) {
 		}
 		atomic.AddInt32(&sum, -int32(len(gts)))
 	}
-	queue2 := newSharedQueue(4, deal2)
+	queue2 := newSharedQueue(4, deal2, nil)
 	atomic.AddInt32(&sum, 1)
 	queue2.Add(nil)
 	for atomic.LoadInt32(&sum) > 0 {
@@ -70,6 +76,7 @@ func TestShareQueue(t *testing.T) {
 
 func BenchmarkShareQueue(b *testing.B) {
 	var sum int32
+	conn := remote.NewReaderWriterBuffer(0)
 	var testGetter BufferGetter = func() (buf remote.ByteBuffer, isNil bool) {
 		return remote.NewWriterBuffer(1024), false
 	}
@@ -77,12 +84,18 @@ func BenchmarkShareQueue(b *testing.B) {
 		for _, gt := range gts {
 			buf, isNil := gt()
 			if !isNil {
-				buf.Flush()
+				_, err := conn.AppendBuffer(buf)
+				if err != nil {
+					b.Fatal(err)
+				}
 			}
 		}
 		atomic.AddInt32(&sum, -int32(len(gts)))
 	}
-	queue := newSharedQueue(32, deal)
+	var flush FlushBufferGetters = func() {
+		conn.Flush()
+	}
+	queue := newSharedQueue(32, deal, flush)
 
 	// benchmark
 	b.ReportAllocs()

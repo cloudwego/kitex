@@ -33,7 +33,7 @@ import (
 var cliTransHdlr remote.ClientTransHandler
 
 func init() {
-	var opt = &remote.ClientOption{
+	opt := &remote.ClientOption{
 		Codec: &MockCodec{
 			EncodeFunc: nil,
 			DecodeFunc: nil,
@@ -58,7 +58,7 @@ func TestWrite(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
 	ctx := context.Background()
 	var req interface{}
-	var msg = remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
+	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
 	err := cliTransHdlr.Write(ctx, conn, msg)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, isWriteBufFlushed)
@@ -89,7 +89,7 @@ func TestRead(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	ctx := context.Background()
 	var req interface{}
-	var msg = remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
+	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
 	err := cliTransHdlr.Read(ctx, conn, msg)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, readTimeout == trans.GetReadTimeout(ri.Config()))

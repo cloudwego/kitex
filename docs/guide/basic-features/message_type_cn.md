@@ -4,7 +4,7 @@
 
 目前 Kitex 支持的消息类型、编解码协议和传输协议
 
-|消息类型|编码协议|传输协议|
+| 消息类型 | 编码协议 | 传输协议 |
 |--------|-------|--------|
 |PingPong|Thrift / Protobuf| [TTHeader](../extension/codec_cn.md) / HTTP2(gRPC)|
 |Oneway|Thrift| [TTHeader](../extension/codec_cn.md) |
@@ -12,7 +12,7 @@
 
 - PingPong：客户端发起一个请求后会等待一个响应才可以进行下一次请求
 - Oneway：客户端发起一个请求后不等待一个响应
-- Streaming：客户端发起一个或多个请求, 等待一个或多个响应
+- Streaming：客户端发起一个或多个请求 , 等待一个或多个响应
 
 ## Thrift
 
@@ -20,7 +20,7 @@
 
 ### Example
 
-IDL 定义:
+IDL 定义 :
 
 ```thrift
 namespace go echo
@@ -39,7 +39,7 @@ service EchoService {
 }
 ```
 
-生成的代码组织结构:
+生成的代码组织结构 :
 
 ```
 .
@@ -54,7 +54,7 @@ service EchoService {
         └── k-echo.go
 ```
 
-Server 的处理代码形如:
+Server 的处理代码形如 :
 
 ```go
 package main
@@ -85,7 +85,7 @@ func main() {
 
 #### PingPong
 
-Client 侧代码:
+Client 侧代码 :
 
 ```go
 package main
@@ -112,7 +112,7 @@ func main() {
 
 #### Oneway
 
-Client 侧代码:
+Client 侧代码 :
 
 ```go
 package main
@@ -140,17 +140,17 @@ func main() {
 ## Protobuf
 
 Kitex 支持两种承载 Protobuf 负载的协议：
-  
+
 - Kitex Protobuf
     - 只支持 PingPong，若 IDL 定义了 stream 方法，将默认使用 gRPC 协议
-- gRPC协议
+- gRPC 协议
     - 可以与 gRPC 互通，与 gRPC service 定义相同，支持 Unary(PingPong)、 Streaming 调用
 
 ### Example
 
 以下给出 Streaming 的使用示例。
 
-IDL 定义:
+IDL 定义 :
 
 ```protobuf
 syntax = "proto3";
@@ -174,7 +174,7 @@ service EchoService {
 }
 ```
 
-生成的代码组织结构:
+生成的代码组织结构 :
 
 ```
 .
@@ -188,7 +188,7 @@ service EchoService {
             └── server.go
 ```
 
-Server 侧代码:
+Server 侧代码 :
 
 ```go
 package main

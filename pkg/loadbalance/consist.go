@@ -97,10 +97,12 @@ func NewConsistentHashOption(f KeyFunc) ConsistentHashOption {
 	}
 }
 
-var consistPickerPool sync.Pool
-var consistBalancers []*consistBalancer
-var consistBalancersLock sync.RWMutex
-var consistBalancerDaemonOnce sync.Once
+var (
+	consistPickerPool         sync.Pool
+	consistBalancers          []*consistBalancer
+	consistBalancersLock      sync.RWMutex
+	consistBalancerDaemonOnce sync.Once
+)
 
 func init() {
 	consistPickerPool.New = newConsistPicker

@@ -118,7 +118,7 @@ func WithExitWaitTime(timeout time.Duration) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithExitWaitTime(%+v)", timeout))
 		if timeout > 0 {
-			o.RemoteOpt.MaxConnectionIdleTime = timeout
+			o.RemoteOpt.ExitWaitTime = timeout
 		}
 	}}
 }

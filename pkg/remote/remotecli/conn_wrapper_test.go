@@ -37,8 +37,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-var poolCfg = connpool2.IdleConfig{MaxIdlePerAddress: 100, MaxIdleGlobal: 100, MaxIdleTimeout: time.Second}
-var logger = klog.DefaultLogger()
+var (
+	poolCfg = connpool2.IdleConfig{MaxIdlePerAddress: 100, MaxIdleGlobal: 100, MaxIdleTimeout: time.Second}
+	logger  = klog.DefaultLogger()
+)
 
 func TestDialerMWNoAddr(t *testing.T) {
 	dialer := &remote.SynthesizedDialer{}
@@ -47,7 +49,7 @@ func TestDialerMWNoAddr(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
-	connW := NewConnWrapper(connpool.NewLongPool("psm", poolCfg), logger)
+	connW := NewConnWrapper(connpool.NewLongPool("destService", poolCfg), logger)
 	_, err := connW.GetConn(ctx, dialer, ri)
 	test.Assert(t, err != nil)
 	test.Assert(t, errors.Is(err, kerrors.ErrNoDestAddress))
@@ -98,7 +100,7 @@ func TestGetConnByPool(t *testing.T) {
 
 	conf := rpcinfo.NewRPCConfig()
 	ri := rpcinfo.NewRPCInfo(from, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
-	connPool := connpool.NewLongPool("psm", poolCfg)
+	connPool := connpool.NewLongPool("destService", poolCfg)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	// 释放连接, 连接复用
 	for i := 0; i < 10; i++ {
@@ -152,7 +154,7 @@ func BenchmarkGetConn(b *testing.B) {
 	conf := rpcinfo.NewRPCConfig()
 	ri := rpcinfo.NewRPCInfo(from, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	connPool := connpool.NewLongPool("psm", poolCfg)
+	connPool := connpool.NewLongPool("destService", poolCfg)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

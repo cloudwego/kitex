@@ -125,9 +125,9 @@ func (t *httpCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remot
 }
 
 // OnMessage implements the remote.ClientTransHandler interface.
-func (t *httpCliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) error {
+func (t *httpCliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	// do nothing
-	return nil
+	return ctx, nil
 }
 
 // OnInactive implements the remote.ClientTransHandler interface.

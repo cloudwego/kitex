@@ -18,7 +18,7 @@ package rpcinfo
 
 // Taggable is a type that supports setting tag.
 type Taggable interface {
-	SetTag(key string, value string) error
+	SetTag(key, value string) error
 }
 
 // AsTaggable converts an object into a Taggable. Returns nil if impossible.

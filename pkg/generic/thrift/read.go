@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
@@ -66,6 +65,8 @@ func nextReader(tt descriptor.Type, t *descriptor.TypeDescriptor) (reader, error
 		return readStruct, nil
 	case descriptor.VOID:
 		return readVoid, nil
+	case descriptor.JSON:
+		return readStruct, nil
 	default:
 		return nil, fmt.Errorf("unsupported type: %d", tt)
 	}

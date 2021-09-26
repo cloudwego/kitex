@@ -1,6 +1,6 @@
 # 元信息透传扩展
 
-元信息透传是基于传输协议透传一些 RPC 额外的信息给下游，同时读取传输协议中上游透传的信息，透传字段需结合内部的治理能力，建议使用者自行扩展实现。
+元信息透传是基于传输协议透传一些额外的 RPC 信息给下游，同时读取传输协议中上游透传的信息，透传字段需结合内部的治理能力，建议使用者自行扩展实现。
 
 ## 接口定义
 
@@ -67,12 +67,8 @@ func (ch *clientTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 }
 ```
 
-
-
-- 添加该ClientMetaHandler
+- 添加该 ClientMetaHandler
 
   ```go
   cli, err := xxxservice.NewClient(targetService, client.WithMetaHandler(transmeta.ClientTTHeaderHandler))
   ```
-
-  

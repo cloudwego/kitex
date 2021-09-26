@@ -75,7 +75,7 @@ func (t *ThriftMessageCodec) Decode(b []byte, msg thrift.TStruct) (method string
 		return
 	}
 	if msgType == thrift.EXCEPTION {
-		var exception = thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
+		exception := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
 		if err = exception.Read(t.tProt); err != nil {
 			return
 		}
@@ -92,7 +92,8 @@ func (t *ThriftMessageCodec) Decode(b []byte, msg thrift.TStruct) (method string
 	return
 }
 
-// Serialize serialize message into bytes.
+// Serialize serialize message into bytes. This is normal thrift serialize func.
+// Notice: Binary generic use Encode instead of Serialize.
 func (t *ThriftMessageCodec) Serialize(msg thrift.TStruct) (b []byte, err error) {
 	t.tb.Reset()
 
@@ -103,7 +104,8 @@ func (t *ThriftMessageCodec) Serialize(msg thrift.TStruct) (b []byte, err error)
 	return
 }
 
-// Deserialize deserialize bytes into message.
+// Deserialize deserialize bytes into message. This is normal thrift deserialize func.
+// Notice: Binary generic use Decode instead of Deserialize.
 func (t *ThriftMessageCodec) Deserialize(msg thrift.TStruct, b []byte) (err error) {
 	t.tb.Reset()
 	if _, err = t.tb.Write(b); err != nil {

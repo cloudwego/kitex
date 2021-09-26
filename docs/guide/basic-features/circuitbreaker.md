@@ -4,7 +4,6 @@ Kitex provides a default implementation of Circuit Breaker, but it's disabled by
 
 The following document will introduce that how to enable circuit breaker and configure the policy.
 
-
 ## How to use
 
 ### Example
@@ -40,7 +39,6 @@ Kitex provides a set of CBSuite that encapsulates both service-level breaker and
 
 	Note that the premise of retry is that you need to enable breaker with **WithInstanceMW**, which will be executed after load balancing.
 
-
 - Threshold and **Threshold Change**
 
 The default breaker threshold is `ErrRate: 0.5, MinSample: 200`, which means it's triggered by an error rate of 50% and requires the count of requests > 200. 
@@ -61,7 +59,6 @@ Here is a more detailed document [Circuit Breaker Pattern](https://docs.microsof
 
 One of the famous circuit breakers is hystrix, and here is its [design](https://github.com/Netflix/Hystrix/wiki).
 
-
 ## Breaker Strategy
 
 The idea of a Circuit Breaker is simple: restrict access to downstream based on successful failures of RPC Calls.
@@ -71,7 +68,6 @@ The Circuit Breaker is usually divided into three periods: CLOSED, OPEN, and HAL
 - CLOSED when the RPC is normal.
 - OPEN when RPC errors increase.
 - HALFOPEN after a certain cooling time after OPEN.
-
 
 HALFOPEN will make some strategic access to the downstream, and then decide whether to become CLOSED or OPEN according to the result.
 
@@ -146,11 +142,11 @@ As an example:
 - You divide 10 seconds into 10 buckets, bucket 0 corresponds to a time of [0S, 1S), bucket 1 corresponds to [1S, 2S), ... , and bucket 9 corresponds to [9S, 10S).
 
 - At 10.1S, a Succ is executed, and the following operations occur within the circuitbreaker.
-	
+
 	- (1) detects that bucket 0 has expired and discards it; 
 	- (2) creates a new bucket 10, corresponding to [10S, 11S); 
 	- (3) puts that Succ into bucket 10.
-	
+
 - At 10.2S, you execute Successes() to query the number of successes in the window, then you get the actual statistics for [1S, 10.2S), not [0.2S, 10.2S).
 
 Such jitter cannot be avoided if you use time-window-bucket statistics. A compromise approach is to increase the number of buckets, which can reduce the impact of jitter.
@@ -158,4 +154,3 @@ Such jitter cannot be avoided if you use time-window-bucket statistics. A compro
 If 2000 buckets are divided, the impact of jitter on the overall data is at most 1/2000. In this package, the default number of buckets is 2000, the bucket time is 5ms, and the time window is 10S.
 
 There are various technical solutions to avoid this problem, but they all introduce other problems, so if you have good ideas, please create a issue or PR.
-

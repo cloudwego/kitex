@@ -28,11 +28,11 @@ import (
 
 // Streaming client streaming interface for code generate
 type Streaming interface {
-	Stream(ctx context.Context, method string, request interface{}, response interface{}) error
+	Stream(ctx context.Context, method string, request, response interface{}) error
 }
 
 // Stream implements the Streaming interface
-func (kc *kClient) Stream(ctx context.Context, method string, request interface{}, response interface{}) error {
+func (kc *kClient) Stream(ctx context.Context, method string, request, response interface{}) error {
 	if !kc.inited {
 		panic("client not initialized")
 	}

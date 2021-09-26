@@ -1,6 +1,6 @@
-# 传输协议TTheader
+# 传输协议 TTheader
 
-参考 [Thrift THeader协议](https://github.com/apache/thrift/blob/master/doc/specs/HeaderFormat.md) ，我们设计了 TTheader 协议。
+参考 [Thrift THeader 协议](https://github.com/apache/thrift/blob/master/doc/specs/HeaderFormat.md) ，我们设计了 TTheader 协议。
 
 ## 协议编码
 
@@ -40,10 +40,10 @@
 其中：
 
 1. `LENGTH` 字段 32bits，包括数据包剩余部分的字节大小，不包含 `LENGTH` 自身长度
-2. `HEADER MAGIC` 字段16bits，值为：0x1000，用于标识 TTHeaderTransport
+2. `HEADER MAGIC` 字段 16bits，值为：0x1000，用于标识 TTHeaderTransport
 3. `FLAGS` 字段 16bits，为预留字段，暂未使用，默认值为 `0x0000`
 4. `SEQUENCE NUMBER` 字段 32bits，表示数据包的 seqId，可用于多路复用，最好确保单个连接内递增
-5. `HEADER SIZE` 字段 16bits，等于头部长度字节数/4，头部长度计算从第14个字节开始计算，一直到 `PAYLOAD` 前（备注：header 的最大长度为 64K）
+5. `HEADER SIZE` 字段 16bits，等于头部长度字节数 /4，头部长度计算从第 14 个字节开始计算，一直到 `PAYLOAD` 前（备注：header 的最大长度为 64K）
 6. `PROTOCOL ID` 字段 uint8 编码，取值有：
     - ProtocolIDBinary = 0
     - ProtocolIDCompact  = 2
@@ -52,7 +52,7 @@
 9. `INFO ID` 字段 uint8 编码，具体取值参考下文
 10. `PAYLOAD` 消息内容
 
-## PADDING填充
+## PADDING 填充
 
 Header 部分长度 bytes 数必须是 4 的倍数，不足部分用 `0x00` 填充
 

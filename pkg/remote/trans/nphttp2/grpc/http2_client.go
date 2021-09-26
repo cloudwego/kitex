@@ -528,7 +528,7 @@ func (t *http2Client) GracefulClose() {
 
 // Write formats the data into HTTP2 data frame(s) and sends it out. The caller
 // should proceed only if Write returns nil.
-func (t *http2Client) Write(s *Stream, hdr []byte, data []byte, opts *Options) error {
+func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	if opts.Last {
 		// If it's the last message, update stream state.
 		if !s.compareAndSwapState(streamActive, streamWriteDone) {

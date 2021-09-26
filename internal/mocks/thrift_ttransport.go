@@ -30,7 +30,7 @@ type MockThriftTTransport struct {
 	WriteFieldBeginFunc   func(name string, typeID thrift.TType, id int16) error
 	WriteFieldEndFunc     func() error
 	WriteFieldStopFunc    func() error
-	WriteMapBeginFunc     func(keyType thrift.TType, valueType thrift.TType, size int) error
+	WriteMapBeginFunc     func(keyType, valueType thrift.TType, size int) error
 	WriteMapEndFunc       func() error
 	WriteListBeginFunc    func(elemType thrift.TType, size int) error
 	WriteListEndFunc      func() error
@@ -50,7 +50,7 @@ type MockThriftTTransport struct {
 	ReadStructEndFunc     func() error
 	ReadFieldBeginFunc    func() (name string, typeID thrift.TType, id int16, err error)
 	ReadFieldEndFunc      func() error
-	ReadMapBeginFunc      func() (keyType thrift.TType, valueType thrift.TType, size int, err error)
+	ReadMapBeginFunc      func() (keyType, valueType thrift.TType, size int, err error)
 	ReadMapEndFunc        func() error
 	ReadListBeginFunc     func() (elemType thrift.TType, size int, err error)
 	ReadListEndFunc       func() error
@@ -118,7 +118,7 @@ func (m *MockThriftTTransport) WriteFieldStop() error {
 	return nil
 }
 
-func (m *MockThriftTTransport) WriteMapBegin(keyType thrift.TType, valueType thrift.TType, size int) error {
+func (m *MockThriftTTransport) WriteMapBegin(keyType, valueType thrift.TType, size int) error {
 	if m.WriteMapBeginFunc != nil {
 		return m.WriteMapBeginFunc(keyType, valueType, size)
 	}
@@ -258,7 +258,7 @@ func (m *MockThriftTTransport) ReadFieldEnd() error {
 	return nil
 }
 
-func (m *MockThriftTTransport) ReadMapBegin() (keyType thrift.TType, valueType thrift.TType, size int, err error) {
+func (m *MockThriftTTransport) ReadMapBegin() (keyType, valueType thrift.TType, size int, err error) {
 	if m.ReadMapBeginFunc != nil {
 		return m.ReadMapBeginFunc()
 	}

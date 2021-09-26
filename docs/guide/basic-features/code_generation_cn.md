@@ -1,4 +1,3 @@
-
 # kitex -- Kitex 框架的代码生成工具
 
 **kitex** 是 Kitex 框架提供的用于生成代码的一个命令行工具。目前，kitex 支持 thrift 和 protobuf 的 IDL，并支持生成一个服务端项目的骨架。
@@ -6,7 +5,7 @@
 ## 安装
 
 ```
-go get github.com/cloudwego/kitex/tool/cmd/kitex
+go install github.com/cloudwego/kitex/tool/cmd/kitex
 ```
 
 用 go 命令来安装是最简单的，你也可以选择自己从源码构建和安装。要查看 kitex 的安装位置，可以用：
@@ -73,7 +72,6 @@ option go_package = "hello.world"; // or hello/world
 ```
 
 生成的 import path 会是 `${当前目录的 import path}/kitex_gen/hello/world`。
-
 
 ## 使用
 
@@ -180,6 +178,3 @@ kitex -service service_name path_to_your_idl.thrift
 #### `-thrift value`
 
 传递给 thriftgo 的参数。会拼接在 `-g go:` 的参数后面。可用的值参考 `thriftgo` 的帮助文档。kitex 默认传递了 `naming_style=golint,ignore_initialisms,gen_setter,gen_deep_equal`，可以被覆盖。
-
-
-
