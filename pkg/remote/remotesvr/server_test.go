@@ -39,7 +39,7 @@ func TestServerStart(t *testing.T) {
 			ln, err = net.Listen("tcp", ":8888")
 			return ln, err
 		},
-		BootstrapServerFunc: func() (err error) {
+		BootstrapServerFunc: func(ln net.Listener) (err error) {
 			isBootstrapped = true
 			return nil
 		},

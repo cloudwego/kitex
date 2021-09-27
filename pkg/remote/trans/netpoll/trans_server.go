@@ -46,7 +46,7 @@ type transServer struct {
 	transHdlr remote.ServerTransHandler
 
 	evl       netpoll.EventLoop
-	ln        netpoll.Listener
+	ln        net.Listener
 	connCount utils.AtomicInt
 	sync.Mutex
 }
@@ -56,15 +56,16 @@ var _ remote.TransServer = &transServer{}
 // CreateListener implements the remote.TransServer interface.
 func (ts *transServer) CreateListener(addr net.Addr) (net.Listener, error) {
 	ln, err := netpoll.CreateListener(addr.Network(), addr.String())
-	ts.ln = ln
-	return ts.ln, err
+	return ln, err
 }
 
 // BootstrapServer implements the remote.TransServer interface.
-func (ts *transServer) BootstrapServer() (err error) {
-	if ts.ln == nil {
+func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
+	if ln == nil {
 		return errors.New("listener is nil in netpoll transport server")
 	}
+	ts.ln = ln
+
 	opts := []netpoll.Option{
 		netpoll.WithIdleTimeout(ts.opt.MaxConnectionIdleTime),
 		netpoll.WithReadTimeout(ts.opt.ReadWriteTimeout),
@@ -78,7 +79,7 @@ func (ts *transServer) BootstrapServer() (err error) {
 	if err != nil {
 		return err
 	}
-	return ts.evl.Serve(ts.ln)
+	return ts.evl.Serve(ln)
 }
 
 // Shutdown implements the remote.TransServer interface.

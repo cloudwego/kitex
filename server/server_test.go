@@ -262,7 +262,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 	exitCh := make(chan bool)
 	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
-		BootstrapServerFunc: func() error {
+		BootstrapServerFunc: func(ln net.Listener) error {
 			{ // mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
@@ -325,7 +325,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 	exitCh := make(chan bool)
 	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
-		BootstrapServerFunc: func() error {
+		BootstrapServerFunc: func(ln net.Listener) error {
 			{
 				// mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())

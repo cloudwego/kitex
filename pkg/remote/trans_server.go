@@ -31,7 +31,7 @@ type TransServerFactory interface {
 type TransServer interface {
 	CreateListener(net.Addr) (net.Listener, error)
 
-	BootstrapServer() (err error)
+	BootstrapServer(ln net.Listener) (err error)
 
 	Shutdown() error
 

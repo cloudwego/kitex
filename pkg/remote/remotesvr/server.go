@@ -66,7 +66,7 @@ func (s *server) Start() chan error {
 	s.listener = ln
 	s.Unlock()
 
-	go func() { errCh <- s.transSvr.BootstrapServer() }()
+	go func() { errCh <- s.transSvr.BootstrapServer(ln) }()
 	return errCh
 }
 

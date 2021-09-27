@@ -129,7 +129,7 @@ type MockTransServer struct {
 	transHdlr remote.ServerTransHandler
 
 	CreateListenerFunc  func(net.Addr) (net.Listener, error)
-	BootstrapServerFunc func() (err error)
+	BootstrapServerFunc func(ln net.Listener) (err error)
 	ShutdownFunc        func() (err error)
 	ConnCountFunc       func() utils.AtomicInt
 }
@@ -143,9 +143,9 @@ func (t *MockTransServer) CreateListener(addr net.Addr) (ln net.Listener, err er
 }
 
 // BootstrapServer .
-func (t *MockTransServer) BootstrapServer() (err error) {
+func (t *MockTransServer) BootstrapServer(ln net.Listener) (err error) {
 	if t.BootstrapServerFunc != nil {
-		return t.BootstrapServerFunc()
+		return t.BootstrapServerFunc(ln)
 	}
 	return
 }
