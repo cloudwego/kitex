@@ -145,7 +145,7 @@ func initThriftMockClient(t *testing.T) genericclient.Client {
 	test.Assert(t, err == nil)
 	g, err := generic.MapThriftGeneric(p)
 	test.Assert(t, err == nil)
-	cli := newGenericClient("p.s.m", g, "127.0.0.1:9019")
+	cli := newGenericClient("destServiceName", g, "127.0.0.1:9019")
 	test.Assert(t, err == nil)
 	return cli
 }
@@ -159,7 +159,7 @@ func initThriftClientByIDL(t *testing.T, addr, idl string) genericclient.Client 
 	test.Assert(t, err == nil)
 	g, err := generic.MapThriftGeneric(p)
 	test.Assert(t, err == nil)
-	cli := newGenericClient("p.s.m", g, addr)
+	cli := newGenericClient("destServiceName", g, addr)
 	test.Assert(t, err == nil)
 	return cli
 }
