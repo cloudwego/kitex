@@ -1,28 +1,42 @@
-# Connection Pool
+# Connection Type
 
-Kitex provides short connection pool and long connection pool for different business scenarios.
+Kitex provides **Short Connection**,  **Long Connection Pool** and **Connection Multiplexing** for different business scenarios. Kitex uses Long Connection Pool by default after >= v0.0.2, but it is still suggested to adjust Pool Config with your need.
 
-## Short Connection Pool
+## Short Connection
 
-Without any settings, Kitex choose using short connection pool.
+Every request need to create connection, the performance is bad, so it is not suggested normally. But sometimes Short Connection must be enabled, it depends on your need. For example, use Long Connection may block process if the server side is Python framework.
+
+Enable Short Connection：
+
+```go
+xxxCli := xxxservice.NewClient("destServiceName", client.WithShortConnection())
+```
 
 ## Long Connection Pool
 
-Initializing the client with an Option:
+Kitex enable Long Connection Pool after >= v0.0.2, default config params are as below：
 
-```go
-client.WithLongConnection(connpool.IdleConfig{
-    MaxIdlePerAddress: 10,
-    MaxIdleGlobal:     1000,
-    MaxIdleTimeout:    60 * time.Second,
-})
 ```
+connpool2.IdleConfig{
+   MaxIdlePerAddress: 10,
+   MaxIdleGlobal:     100,
+   MaxIdleTimeout:    time.Minute,
+}
+```
+
+But it is suggested to adjust the pool config with your need, you can config it as below:
+
+```
+xxxCli := xxxservice.NewClient("destServiceName", client.WithLongConnection(connpool.IdleConfig{10, 1000, time.Minute}))
+```
+
+Parameter description:
 
 - `MaxIdlePerAddress`: the maximum number of idle connections per downstream instance
 - `MaxIdleGlobal`: the global maximum number of idle connections
 - `MaxIdleTimeout`: the idle duration of the connection, connection that exceed this duration would be closed (minimum value is 3s, default value is 30s)
 
-## Internal Implementation
+### Internal Implementation
 
 Each downstream address corresponds to a connection pool, the connection pool is a ring composed of connections, and the size of the ring is `MaxIdlePerAddress`.
 
@@ -36,7 +50,7 @@ When the connection is ready to be returned after used, proceed as follows:
 2. Check whether the idle connection number exceeds  `MaxIdleGlobal`, and if yes, close it directly
 3. Check whether free space remained in the ring of the target connection pool, if yes, put it into the pool, otherwise close it directly
 
-## Parameter Setting
+### Parameter Setting Suggestion
 
 The setting of parameters is suggested as follows:
 - `MaxIdlePerAddress`: the minimum value is 1, otherwise long connections would degenerate to short connections
@@ -47,6 +61,34 @@ The setting of parameters is suggested as follows:
 - `MaxIdleGlobal`: should be larger than the total number of `downstream targets number * MaxIdlePerAddress`
   - Notice: this value is not very valuable, it is suggested to set it to a super large value. In subsequent versions, considers discarding this parameter and providing a new interface
 - `MaxIdleTimeout`: since the server will clean up inactive connections within 10min, the client also needs to clean up long-idle connections in time to avoid using invalid connections. This value cannot exceed 10min when the downstream is also a Kitex service
+
+## Connection Multiplexing
+
+Client invoke Server only need one connection normally when enable Connection Multiplexing. Connection Multiplexing not only reduces the number of connections, but also performs better than Connection Pool.
+
+Special Note:
+
+1. Connection Multiplexing here is just for Thrift and Kitex Protobuf protocol. If you choose gRPC protocol, it is Connection Multiplexing mode.
+2. When the client enable connection multiplexing, the server must also be enable, otherwise it will lead request timeout. The server side has no restrictions on the client to enable connection multiplexing, it can accept requests for short connection, long connection pool and connection multiplexing.
+
+- Server Side Enable:
+
+  option: `WithMuxTransport`
+
+  ```go
+  svr := xxxservice.NewServer(handler, server.WithMuxTransport())
+  ```
+
+- Client Side Enable:
+  option: `WithMuxConnection`
+
+  1-2 connection is enough normaly, it is no need to config more.
+
+  ```go
+  xxxCli := NewClient("destServiceName", client.WithMuxConnection(1))
+  ```
+
+## 
 
 ## Status Monitoring
 

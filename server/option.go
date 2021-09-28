@@ -64,8 +64,6 @@ func WithSuite(suite Suite) Option {
 }
 
 // WithMuxTransport specifies the transport type to be mux.
-// IMPORTANT: this option is not stable, and will be changed or removed in the future!!!
-// We don't promise compatibility for this option in future versions!!!
 func WithMuxTransport() Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push("WithMuxTransport()")
