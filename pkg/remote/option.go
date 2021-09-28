@@ -68,6 +68,8 @@ type ServerOption struct {
 	Logger klog.FormatLogger
 
 	Option
+
+	HotRestart HotRestart
 }
 
 // ClientOption is used to init the remote client.
@@ -89,4 +91,10 @@ type ClientOption struct {
 	Option
 
 	EnableConnPoolReporter bool
+}
+
+type HotRestart struct {
+	RestartTimes int
+
+	AdminAddr *net.UnixAddr
 }

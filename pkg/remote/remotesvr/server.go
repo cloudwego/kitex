@@ -23,6 +23,7 @@ import (
 	"syscall"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/hotrestart"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
@@ -34,11 +35,11 @@ type Server interface {
 }
 
 type server struct {
-	opt      *remote.ServerOption
-	listener net.Listener
-	transSvr remote.TransServer
-
+	opt        *remote.ServerOption
+	listener   net.Listener
+	transSvr   remote.TransServer
 	inkHdlFunc endpoint.Endpoint
+	launcher   hotrestart.Launcher
 	sync.Mutex
 }
 
@@ -49,6 +50,7 @@ func NewServer(opt *remote.ServerOption, inkHdlFunc endpoint.Endpoint, transHdlr
 		opt:        opt,
 		inkHdlFunc: inkHdlFunc,
 		transSvr:   transSvr,
+		launcher:   hotrestart.NewLauncher(),
 	}
 	return s, nil
 }
@@ -56,17 +58,42 @@ func NewServer(opt *remote.ServerOption, inkHdlFunc endpoint.Endpoint, transHdlr
 // Start starts the server and return chan, the chan receive means server shutdown or err happen
 func (s *server) Start() chan error {
 	errCh := make(chan error, 1)
+	opt := &s.opt.HotRestart
+
+	// hot restart
+	if opt.RestartTimes > 0 {
+		go func() {
+			s.opt.Logger.Infof("KITEX: server restart ...")
+			errCh <- s.launcher.Restart(opt.AdminAddr, s.transSvr.BootstrapServer, s.Stop)
+			s.opt.Logger.Infof("KITEX: server quit.")
+		}()
+		return errCh
+	}
+
+	// first time
 	ln, err := s.buildListener()
 	if err != nil {
 		errCh <- err
 		return errCh
 	}
-
-	s.Lock()
 	s.listener = ln
-	s.Unlock()
 
-	go func() { errCh <- s.transSvr.BootstrapServer(ln) }()
+	// common mod
+	if opt.AdminAddr == nil {
+		go func() {
+			s.opt.Logger.Infof("KITEX: server start ...")
+			errCh <- s.transSvr.BootstrapServer(ln)
+			s.opt.Logger.Infof("KITEX: server quit.")
+		}()
+		return errCh
+	}
+
+	// first with admin
+	go func() {
+		s.opt.Logger.Infof("KITEX: server start with admin ...")
+		errCh <- s.launcher.Start(opt.AdminAddr, ln, s.transSvr.BootstrapServer, s.Stop)
+		s.opt.Logger.Infof("KITEX: server start with admin quit.")
+	}()
 	return errCh
 }
 
@@ -93,6 +120,10 @@ func (s *server) Stop() (err error) {
 		err = s.transSvr.Shutdown()
 		s.listener = nil
 	}
+	if s.launcher != nil {
+		s.opt.Logger.Infof("KITEX: launcher shutdown now ...")
+		s.launcher.Shutdown()
+	}
 	return
 }
 
@@ -100,5 +131,5 @@ func (s *server) Address() net.Addr {
 	if s.listener != nil {
 		return s.listener.Addr()
 	}
-	return nil
+	return s.opt.Address
 }

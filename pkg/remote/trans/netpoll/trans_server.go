@@ -55,7 +55,7 @@ var _ remote.TransServer = &transServer{}
 
 // CreateListener implements the remote.TransServer interface.
 func (ts *transServer) CreateListener(addr net.Addr) (net.Listener, error) {
-	ln, err := netpoll.CreateListener(addr.Network(), addr.String())
+	ln, err := net.Listen(addr.Network(), addr.String())
 	return ln, err
 }
 

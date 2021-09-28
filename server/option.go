@@ -210,3 +210,11 @@ func WithRegistryInfo(info *registry.Info) Option {
 		o.RegistryInfo = info
 	}}
 }
+
+// WithHotRestart enable server run with hot restart.
+func WithHotRestart(opt remote.HotRestart) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithHotRestart(%+v)", opt))
+		o.RemoteOpt.HotRestart = opt
+	}}
+}
