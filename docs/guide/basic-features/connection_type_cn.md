@@ -4,7 +4,7 @@ Kitex 支持短连接、长连接池、连接多路复用，用户可以根据�
 
 ## 短连接
 
-每次请求都会创建一次连接，性能不佳，通常不建议使用。但部分场景必须使用短连接，比如，服务端是 Python 框架，长连接可能导致Block进程。
+每次请求都会创建一次连接，性能不佳，通常不建议使用。但部分场景必须使用短连接，如上游实例数过多时，会增加下游服务的负担，请根据情况来选择。
 
 配置短连接：
 
@@ -85,7 +85,7 @@ xxxCli := xxxservice.NewClient("destServiceName", client.WithLongConnection(conn
 - Client 配置
   option: `WithMuxConnection`
 
-  建议配置  **1-2 个连接即可**
+  建议配置**1-2 个连接**
   
   ```go
   xxxCli := NewClient("destServiceName", client.WithMuxConnection(1))
