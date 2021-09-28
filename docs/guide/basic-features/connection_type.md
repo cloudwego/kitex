@@ -34,7 +34,7 @@ Parameter description:
 
 - `MaxIdlePerAddress`: the maximum number of idle connections per downstream instance
 - `MaxIdleGlobal`: the global maximum number of idle connections
-- `MaxIdleTimeout`: the idle duration of the connection, a connection that exceeds this duration would be closed (minimum value is 3s, the default value is 30s)
+- `MaxIdleTimeout`: the idle duration of the connection. A connection that has been idle for more than MaxIdleTimeout will be closed (minimum value is 3s, the default value is 30s)
 
 ### Internal Implementation
 
@@ -42,7 +42,7 @@ Each downstream address corresponds to a connection pool, the connection pool is
 
 When getting a connection of downstream address, proceed as follows:
 1. Try to fetch a connection from the ring, if fetching failed (no idle connections remained), then try to establish a new connection. In other words, the number of connections may exceed `MaxIdlePerAddress`
-2. If fetching succeed, then checking whether the idle time of the connection (since the last time it was placed in the connection pool) has exceeded `MaxIdleTimeout`, if yes, would close this connection and create a new connection
+2. If fetching succeed, then check whether the idle time of the connection (since the last time it was placed in the connection pool) has exceeded MaxIdleTimeout. If yes, this connection will be closed and a new connection will be created.
 
 When the connection is ready to be returned after used, proceed as follows:
 
@@ -68,7 +68,7 @@ The client invokes the Server only need one connection normally when enabling Co
 
 Special Note:
 
-1. Connection Multiplexing here is just for Thrift and Kitex Protobuf protocol. If you choose the gRPC protocol, it is Connection Multiplexing mode.
+1. Connection Multiplexing here is just for Thrift and Kitex Protobuf protocol. If you choose the gRPC protocol, it utilizes Connection Multiplexing mode by default.
 2. When the client enables connection multiplexing, the server must also be enabled, otherwise, it will lead to request timeout. The server side has no restrictions on the client to enable connection multiplexing, it can accept requests for short connection, long connection pool, and connection multiplexing.
 
 - Server Side Enable:
