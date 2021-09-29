@@ -39,7 +39,7 @@ func init() {
 }
 
 func newEndpointInfo() interface{} {
-	return &endpointInfo{}
+	return &endpointInfo{tags: make(map[string]string)}
 }
 
 // ServiceName implements the EndpointInfo interface.
@@ -91,9 +91,6 @@ func (ei *endpointInfo) SetAddress(addr net.Addr) error {
 
 // SetTag implements the MutableEndpointInfo interface.
 func (ei *endpointInfo) SetTag(key, value string) error {
-	if ei.tags == nil {
-		ei.tags = make(map[string]string)
-	}
 	ei.tags[key] = value
 	return nil
 }
@@ -107,7 +104,9 @@ func (ei *endpointInfo) zero() {
 	ei.serviceName = ""
 	ei.method = ""
 	ei.address = nil
-	ei.tags = nil
+	for k := range ei.tags {
+		delete(ei.tags, k)
+	}
 }
 
 // Recycle is used to recycle the endpointInfo.
@@ -122,7 +121,9 @@ func NewMutableEndpointInfo(serviceName, method string, address net.Addr, tags m
 	ei.serviceName = serviceName
 	ei.method = method
 	ei.address = address
-	ei.tags = tags
+	for k, v := range tags {
+		ei.tags[k] = v
+	}
 	return ei
 }
 
@@ -133,14 +134,10 @@ func NewEndpointInfo(serviceName, method string, address net.Addr, tags map[stri
 
 // FromBasicInfo converts an EndpointBasicInfo into EndpointInfo.
 func FromBasicInfo(bi *EndpointBasicInfo) EndpointInfo {
-	tags := make(map[string]string)
-	for k, v := range bi.Tags {
-		tags[k] = v
-	}
-	return NewEndpointInfo(bi.ServiceName, bi.Method, nil, tags)
+	return NewEndpointInfo(bi.ServiceName, bi.Method, nil, bi.Tags)
 }
 
 // EmptyEndpointInfo creates an empty EndpointInfo.
 func EmptyEndpointInfo() EndpointInfo {
-	return NewEndpointInfo("", "", nil, make(map[string]string))
+	return NewEndpointInfo("", "", nil, nil)
 }

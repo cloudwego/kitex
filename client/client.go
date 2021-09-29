@@ -337,7 +337,8 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 			return
 		}
 		config := ri.Config()
-		if kc.svcInfo.MethodInfo(methodName).OneWay() {
+		m := kc.svcInfo.MethodInfo(methodName)
+		if m.OneWay() {
 			sendMsg = remote.NewMessage(req, kc.svcInfo, ri, remote.Oneway, remote.Client)
 		} else {
 			sendMsg = remote.NewMessage(req, kc.svcInfo, ri, remote.Call, remote.Client)
@@ -347,7 +348,7 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		if err = cli.Send(ctx, ri, sendMsg); err != nil {
 			return
 		}
-		if resp == nil || kc.svcInfo.MethodInfo(methodName).OneWay() {
+		if resp == nil || m.OneWay() {
 			cli.Recv(ctx, ri, nil)
 			return nil
 		}

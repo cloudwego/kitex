@@ -54,6 +54,7 @@ const (
 )
 
 const (
+	// ReadFailed .
 	ReadFailed string = "RFailed"
 
 	// MeshHeader use in message.Tag to check MeshHeader
@@ -277,7 +278,10 @@ type TransInfo interface {
 }
 
 func newTransInfo() interface{} {
-	return &transInfo{}
+	return &transInfo{
+		intInfo: make(map[uint16]string),
+		strInfo: make(map[string]string),
+	}
 }
 
 type transInfo struct {
@@ -286,15 +290,16 @@ type transInfo struct {
 }
 
 func (ti *transInfo) zero() {
-	ti.intInfo = nil
-	ti.strInfo = nil
+	for k := range ti.intInfo {
+		delete(ti.intInfo, k)
+	}
+	for k := range ti.strInfo {
+		delete(ti.strInfo, k)
+	}
 }
 
 // TransIntInfo implements the TransInfo interface.
 func (ti *transInfo) TransIntInfo() map[uint16]string {
-	if ti.intInfo == nil {
-		ti.intInfo = make(map[uint16]string)
-	}
 	return ti.intInfo
 }
 
@@ -314,9 +319,6 @@ func (ti *transInfo) PutTransIntInfo(kvInfo map[uint16]string) {
 
 // TransStrInfo implements the TransInfo interface.
 func (ti *transInfo) TransStrInfo() map[string]string {
-	if ti.strInfo == nil {
-		ti.strInfo = make(map[string]string)
-	}
 	return ti.strInfo
 }
 

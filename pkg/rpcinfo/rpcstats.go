@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
@@ -193,10 +192,10 @@ func (r *rpcStats) Reset() {
 	r.recvSize = 0
 	r.sendSize = 0
 	for i := range r.eventMap {
-		if t, ok := r.eventMap[i].(internal.Reusable); ok {
-			t.Recycle()
+		if r.eventMap[i] != nil {
+			r.eventMap[i].(*event).Recycle()
+			r.eventMap[i] = nil
 		}
-		r.eventMap[i] = nil
 	}
 }
 
