@@ -36,6 +36,7 @@ var (
 	defaultConnectTimeout   = time.Millisecond * 50
 	defaultReadWriteTimeout = time.Second * 5
 	defaultBufferSize       = 4096
+	defaultEnabledStreaming = false
 )
 
 // Mask bits.
@@ -54,6 +55,7 @@ type rpcConfig struct {
 	readWriteTimeout  time.Duration
 	ioBufferSize      int
 	transportProtocol transport.Protocol
+	enabledStreaming  bool
 }
 
 func init() {
@@ -156,6 +158,15 @@ func (r *rpcConfig) SetTransportProtocol(tp transport.Protocol) error {
 	return nil
 }
 
+func (r* rpcConfig) SetEnableStreaming(enabled bool) error {
+	r.enabledStreaming = enabled
+	return nil
+}
+
+func (r *rpcConfig) EnabledStreaming() bool {
+	return r.enabledStreaming
+}
+
 // Clone returns a copy of the current rpcConfig.
 func (r *rpcConfig) Clone() MutableRPCConfig {
 	r2 := rpcConfigPool.Get().(*rpcConfig)
@@ -185,5 +196,6 @@ func NewRPCConfig() RPCConfig {
 	r.connectTimeout = defaultConnectTimeout
 	r.readWriteTimeout = defaultReadWriteTimeout
 	r.ioBufferSize = defaultBufferSize
+	r.enabledStreaming = defaultEnabledStreaming
 	return r
 }

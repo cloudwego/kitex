@@ -45,6 +45,9 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	var ri rpcinfo.RPCInfo
 	ctx, ri = kc.initRPCInfo(ctx, method)
 
+	rpcinfo.AsMutableRPCConfig(ri.Config()).SetEnableStreaming(true)
+	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri, kc.opt.Logger)
 	return kc.sEps(ctx, request, response)
 }

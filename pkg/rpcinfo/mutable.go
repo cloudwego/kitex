@@ -46,6 +46,8 @@ type MutableRPCConfig interface {
 	LockConfig(bits int)
 	Clone() MutableRPCConfig
 	ImmutableView() RPCConfig
+
+	SetEnableStreaming(enabled bool) error
 }
 
 // MutableRPCStats is used to change the information in the RPCStats.
