@@ -34,6 +34,14 @@ type MockRPCConfig struct {
 	ReadWriteTimeoutFunc  func() (r time.Duration)
 	IOBufferSizeFunc      func() (r int)
 	TransportProtocolFunc func() transport.Protocol
+	EnabledStreamingFunc  func() (r bool)
+}
+
+func (m *MockRPCConfig) EnabledStreaming() (r bool) {
+	if m.RPCTimeoutFunc != nil {
+		return m.EnabledStreamingFunc()
+	}
+	return
 }
 
 // RPCTimeout implements the rpcinfo.RPCConfig interface.
