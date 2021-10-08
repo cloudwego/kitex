@@ -48,23 +48,24 @@ func (s *launcher) Shutdown() error {
 }
 
 func (s *launcher) Start(admin *net.UnixAddr, ln net.Listener, run Run, stop Stop) error {
+	fmt.Printf("DEBUG: run server addr=%s\n", ln.Addr().String())
+
 	// new admin
 	syscall.Unlink(admin.String())
 	os.Chmod(admin.String(), os.ModePerm)
-	l, err := net.Listen(admin.Network(), admin.String())
+	adminln, err := net.Listen(admin.Network(), admin.String())
 	if err != nil {
 		return err
 	}
-	s.adminln, _ = l.(*net.UnixListener)
-
-	// go run admin
-	fds := []int{s.listenFD(ln), s.listenFD(s.adminln)}
-	for i := range fds {
-		syscall.SetNonblock(fds[i], true)
-	}
-	go s.listenAdmin(fds, ln, stop)
+	fmt.Printf("DEBUG: run admin addr=%s\n", adminln.Addr().String())
+	go s.listenAdmin(ln, adminln, stop)
 
 	// run svr
+	switch svrln := ln.(type) {
+	case *net.UnixListener:
+		// if unix, not unlink
+		svrln.SetUnlinkOnClose(false)
+	}
 	return run(ln)
 }
 
@@ -81,26 +82,31 @@ func (s *launcher) Restart(admin *net.UnixAddr, run Run, stop Stop) error {
 		return err
 	}
 	if len(fds) != 2 {
-		return fmt.Errorf("hot restart rebuild fds[%d] != 2", len(fds))
+		panic(fmt.Errorf("hot restart rebuild fds[%d] != 2", len(fds)))
+	}
+	if fds[0] < 0 || fds[1] < 0 {
+		panic(fmt.Errorf("rebuild fds is invaild, fd[0]=%d, fd[1]=%d", fds[0], fds[1]))
 	}
 
-	// rebuild listener
+	// rebuild server listener
 	var ln net.Listener
 	ln, err = RebuildListener(fds[0])
 	if err != nil {
 		return err
 	}
+	fmt.Printf("DEBUG: rebuild server addr=%s\n", ln.Addr().String())
 	quit := make(chan error)
 	go func() { quit <- run(ln) }()
 
 	// rebuild admin
-	var l net.Listener
-	l, err = RebuildListener(fds[1])
+	var adminln net.Listener
+	adminln, err = RebuildListener(fds[1])
 	if err != nil {
-		return err
+		panic(fmt.Errorf("rebuild admin listener failed: %s", err.Error()))
 	}
-	s.adminln, _ = l.(*net.UnixListener)
-	go s.listenAdmin(fds, l, stop)
+	fmt.Printf("DEBUG: rebuild admin addr=%s\n", ln.Addr().String())
+
+	go s.listenAdmin(ln, adminln, stop)
 
 	// ack
 	err = s.rebuildAck(conn)
@@ -117,7 +123,7 @@ func (s *launcher) rebuildFDs(conn *net.UnixConn) (fds []int, err error) {
 	conn.SetDeadline(time.Now().Add(AdminTimeout))
 	readN, oobN, _, _, err := conn.ReadMsgUnix(buf[:], rightsBuf[:])
 	if err != nil {
-		return nil, fmt.Errorf("hot-restart client write fd message: %w", err)
+		return nil, fmt.Errorf("hot-restart client write fd message: %s", err.Error())
 	}
 	if readN != len(buf) {
 		return nil, fmt.Errorf("hot-restart client write fd message: writeN mismatch")
@@ -125,11 +131,11 @@ func (s *launcher) rebuildFDs(conn *net.UnixConn) (fds []int, err error) {
 	rights := rightsBuf[:oobN]
 	ctrlMsgs, err := syscall.ParseSocketControlMessage(rights)
 	if err != nil {
-		return nil, fmt.Errorf("hot-restart client parse socket control message: %w", err)
+		return nil, fmt.Errorf("hot-restart client parse socket control message: %s", err.Error())
 	}
 	fds, err = syscall.ParseUnixRights(&ctrlMsgs[0])
 	if err != nil {
-		return nil, fmt.Errorf("hot-restart client parse unix rights: %w", err)
+		return nil, fmt.Errorf("hot-restart client parse unix rights: %s", err.Error())
 	}
 	return fds, nil
 }
@@ -140,51 +146,58 @@ func (s *launcher) rebuildAck(conn *net.UnixConn) (err error) {
 	defer conn.Close()
 
 	if _, err = conn.Write(buf[:]); err != nil {
-		return fmt.Errorf("hot-restart client send termination: %w", err)
+		return fmt.Errorf("hot-restart client send termination: %s", err.Error())
 	}
 	return nil
 }
 
-func (s *launcher) listenAdmin(fds []int, svrln net.Listener, stop Stop) (err error) {
-	defer func() {
-		if err != nil {
-			panic(err)
-		}
-	}()
-	for {
-		var conn *net.UnixConn
-		conn, err = s.adminln.AcceptUnix()
-		if err != nil {
-			return err
-		}
-
-		// Send FDs
-		var buf [1]byte
-		rights := syscall.UnixRights(fds...)
-		conn.SetDeadline(time.Now().Add(AdminTimeout))
-		var writeN, oobN int
-		writeN, oobN, err = conn.WriteMsgUnix(buf[:], rights, nil)
-		if err != nil {
-			return fmt.Errorf("hot-restart server write fd message: %w", err)
-		}
-		if writeN != len(buf) {
-			return fmt.Errorf("hot-restart server write fd message: writeN mismatch")
-		}
-		if oobN != len(rights) {
-			return fmt.Errorf("hot-restart server write fd message: oobN mismatch")
-		}
-
-		// Wait for termination
-		_ = conn.SetDeadline(time.Now().Add(AdminTimeout))
-		_, err = conn.Read(buf[:])
-		if err != nil {
-			return fmt.Errorf("hot-restart server wait for termination: %w", err)
-		}
-
-		// quit
-		err = s.linkQuit(svrln, stop)
-		return err
+func (s *launcher) listenAdmin(svr, admin net.Listener, stop Stop) {
+	// init
+	adminln, ok := admin.(*net.UnixListener)
+	if !ok {
+		panic(fmt.Errorf("admin uds is not UnixListner, type=%T, l.Addr=%s", admin, admin.Addr()))
 	}
+	s.adminln = adminln
+	s.adminln.SetUnlinkOnClose(false)
+
+	fds := []int{s.listenFD(svr), s.listenFD(s.adminln)}
+	for i := range fds {
+		syscall.SetNonblock(fds[i], true)
+	}
+
+	// listen ...
+	conn, err := s.adminln.AcceptUnix()
+	if err != nil {
+		panic(fmt.Errorf("hot-restart admin accept conn failed: %s\n", err.Error()))
+	}
+
+	// Send FDs
+	var buf [1]byte
+	rights := syscall.UnixRights(fds...)
+	conn.SetDeadline(time.Now().Add(AdminTimeout))
+	var writeN, oobN int
+	writeN, oobN, err = conn.WriteMsgUnix(buf[:], rights, nil)
+	if err != nil {
+		panic(fmt.Errorf("hot-restart server write fd message: %s", err.Error()))
+	}
+	if writeN != len(buf) {
+		panic(fmt.Errorf("hot-restart server write fd message: writeN mismatch"))
+	}
+	if oobN != len(rights) {
+		panic(fmt.Errorf("hot-restart server write fd message: oobN mismatch"))
+	}
+
+	// Wait for termination
+	_ = conn.SetDeadline(time.Now().Add(AdminTimeout))
+	_, err = conn.Read(buf[:])
+	if err != nil {
+		panic(fmt.Errorf("hot-restart server wait for termination: %s", err.Error()))
+	}
+
+	// quit
+	stop()
+	s.Shutdown()
+	return
 }
 
 func (s *launcher) listenFD(ln net.Listener) (fd int) {
@@ -192,18 +205,4 @@ func (s *launcher) listenFD(ln net.Listener) (fd int) {
 	fd, f = ListenFD(ln)
 	s.files = append(s.files, f)
 	return fd
-}
-
-func (s *launcher) linkQuit(svrln net.Listener, stop Stop) error {
-	// if unix, not unlink
-	switch l := svrln.(type) {
-	case *net.UnixListener:
-		l.SetUnlinkOnClose(false)
-	}
-	if s.adminln != nil {
-		s.adminln.SetUnlinkOnClose(false)
-	}
-	stop()
-	s.Shutdown()
-	return nil
 }
