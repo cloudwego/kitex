@@ -18,6 +18,8 @@ package rpcinfo
 
 import (
 	"sync"
+
+	"github.com/cloudwego/kitex/internal"
 )
 
 var rpcInfoPool sync.Pool
@@ -55,6 +57,21 @@ func (r *rpcInfo) zero() {
 
 // Recycle reuses the rpcInfo.
 func (r *rpcInfo) Recycle() {
+	if v, ok := r.from.(internal.Reusable); ok {
+		v.Recycle()
+	}
+	if v, ok := r.to.(internal.Reusable); ok {
+		v.Recycle()
+	}
+	if v, ok := r.invocation.(internal.Reusable); ok {
+		v.Recycle()
+	}
+	if v, ok := r.config.(internal.Reusable); ok {
+		v.Recycle()
+	}
+	if v, ok := r.stats.(internal.Reusable); ok {
+		v.Recycle()
+	}
 	r.zero()
 	rpcInfoPool.Put(r)
 }
