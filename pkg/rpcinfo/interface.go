@@ -73,6 +73,7 @@ type RPCConfig interface {
 	Timeouts
 	IOBufferSize() int
 	TransportProtocol() transport.Protocol
+	EnabledStreaming() bool
 }
 
 // Invocation contains specific information about the call.

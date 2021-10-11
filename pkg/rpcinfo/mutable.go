@@ -43,6 +43,7 @@ type MutableRPCConfig interface {
 	IsReadWriteTimeoutLocked() bool
 	SetIOBufferSize(sz int) error
 	SetTransportProtocol(tp transport.Protocol) error
+	SetEnabledStreaming(enabled bool) error
 	LockConfig(bits int)
 	Clone() MutableRPCConfig
 	ImmutableView() RPCConfig
