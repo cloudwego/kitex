@@ -31,20 +31,17 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 )
 
-func recoverFunc(ctx context.Context, logger klog.FormatLogger, ri rpcinfo.RPCInfo, done chan error) {
-	if err := recover(); err != nil {
-		e := fmt.Errorf("KITEX: panic, remote[to_service=%s|method=%s], err=%v\n%s",
-			ri.To().ServiceName(), ri.To().Method(), err, debug.Stack())
-		if l, ok := logger.(klog.CtxLogger); ok {
-			l.CtxErrorf(ctx, "%s", e.Error())
-		} else {
-			logger.Errorf("%s", e.Error())
-		}
-		rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
-		rpcStats.SetPanicked(err)
-		done <- e
+func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo, logger klog.FormatLogger) error {
+	e := fmt.Errorf("KITEX: panic, remote[to_service=%s|method=%s], err=%v\n%s",
+		ri.To().ServiceName(), ri.To().Method(), panicInfo, debug.Stack())
+	if l, ok := logger.(klog.CtxLogger); ok {
+		l.CtxErrorf(ctx, "%s", e.Error())
+	} else {
+		logger.Errorf("%s", e.Error())
 	}
-	close(done)
+	rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
+	rpcStats.SetPanicked(e)
+	return e
 }
 
 func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration) error {
@@ -94,7 +91,17 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 
 			done := make(chan error, 1)
 			gofunc.GoFunc(ctx, func() {
-				defer recoverFunc(ctx, logger, ri, done)
+				defer func() {
+					if panicInfo := recover(); panicInfo != nil {
+						e := panicToErr(ctx, panicInfo, ri, logger)
+						done <- e
+					}
+					if !errors.Is(err, kerrors.ErrRPCFinish) {
+						// Don't regards ErrRPCFinish as normal error, it happens in retry scene,
+						// ErrRPCFinish means previous call returns first but is decoding.
+						close(done)
+					}
+				}()
 				err = next(ctx, request, response)
 				if err != nil && ctx.Err() != nil && !errors.Is(err, kerrors.ErrRPCFinish) {
 					// error occurs after the wait goroutine returns,
