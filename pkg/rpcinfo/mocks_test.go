@@ -34,12 +34,12 @@ type MockRPCConfig struct {
 	ReadWriteTimeoutFunc  func() (r time.Duration)
 	IOBufferSizeFunc      func() (r int)
 	TransportProtocolFunc func() transport.Protocol
-	EnabledStreamingFunc  func() (r bool)
+	InteractionModeFunc  func() (r rpcinfo.InteractionMode)
 }
 
-func (m *MockRPCConfig) EnabledStreaming() (r bool) {
-	if m.RPCTimeoutFunc != nil {
-		return m.EnabledStreamingFunc()
+func (m *MockRPCConfig) InteractionMode() (r rpcinfo.InteractionMode) {
+	if m.InteractionModeFunc != nil {
+		return m.InteractionModeFunc()
 	}
 	return
 }
