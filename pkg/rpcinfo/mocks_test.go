@@ -34,7 +34,7 @@ type MockRPCConfig struct {
 	ReadWriteTimeoutFunc  func() (r time.Duration)
 	IOBufferSizeFunc      func() (r int)
 	TransportProtocolFunc func() transport.Protocol
-	InteractionModeFunc  func() (r rpcinfo.InteractionMode)
+	InteractionModeFunc   func() (r rpcinfo.InteractionMode)
 }
 
 func (m *MockRPCConfig) InteractionMode() (r rpcinfo.InteractionMode) {
