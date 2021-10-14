@@ -81,10 +81,13 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 	logger := mwCtx.Value(endpoint.CtxLoggerKey).(klog.FormatLogger)
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response interface{}) error {
-			var err error
 			ri := rpcinfo.GetRPCInfo(ctx)
-			tm := ri.Config().RPCTimeout()
+			if ri.Config().InteractionMode() == rpcinfo.Streaming {
+				return next(ctx, request, response)
+			}
 
+			var err error
+			tm := ri.Config().RPCTimeout()
 			start := time.Now()
 			ctx, cancel := context.WithTimeout(ctx, tm+moreTimeout)
 			defer cancel()
