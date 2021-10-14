@@ -36,6 +36,7 @@ var (
 	defaultConnectTimeout   = time.Millisecond * 50
 	defaultReadWriteTimeout = time.Second * 5
 	defaultBufferSize       = 4096
+	defaultInteractionMode  = Unary
 )
 
 // Mask bits.
@@ -46,6 +47,14 @@ const (
 	BitIOBufferSize
 )
 
+type InteractionMode int32
+
+const (
+	Unary     InteractionMode = 0
+	Oneway    InteractionMode = 1
+	Streaming InteractionMode = 2
+)
+
 // rpcConfig is a set of configurations used during RPC calls.
 type rpcConfig struct {
 	readOnlyMask      int
@@ -54,6 +63,7 @@ type rpcConfig struct {
 	readWriteTimeout  time.Duration
 	ioBufferSize      int
 	transportProtocol transport.Protocol
+	interactionMode   InteractionMode
 }
 
 func init() {
@@ -156,6 +166,15 @@ func (r *rpcConfig) SetTransportProtocol(tp transport.Protocol) error {
 	return nil
 }
 
+func (r *rpcConfig) SetInteractionMode(mode InteractionMode) error {
+	r.interactionMode = mode
+	return nil
+}
+
+func (r *rpcConfig) InteractionMode() InteractionMode {
+	return r.interactionMode
+}
+
 // Clone returns a copy of the current rpcConfig.
 func (r *rpcConfig) Clone() MutableRPCConfig {
 	r2 := rpcConfigPool.Get().(*rpcConfig)
@@ -185,5 +204,6 @@ func NewRPCConfig() RPCConfig {
 	r.connectTimeout = defaultConnectTimeout
 	r.readWriteTimeout = defaultReadWriteTimeout
 	r.ioBufferSize = defaultBufferSize
+	r.interactionMode = defaultInteractionMode
 	return r
 }
