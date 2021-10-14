@@ -67,32 +67,9 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
 
 ## Performance
 
-We compared the performance of Kitex with some popular RPC frameworks ([benchmark](https://github.com/cloudwego/kitex-benchmark)), such as [gRPC](https://github.com/grpc/grpc) and [RPCX](https://github.com/smallnest/rpcx), both using Protobuf. The test results show that [Kitex](https://github.com/cloudwego/kitex) performs better.
+Performance benchmark can only provide limited reference. In production, there are many factors can affect actual performance.
 
-*Note: The performance benchmarks obtained from the experiment are for reference only, because there are many factors that can affect the actual performance in application scenarios.*
-
-### Test Environment
-
-- CPU: Intel(R) Xeon(R) Gold 5118 CPU @ 2.30GHz, 4 cores
-- Memory: 8GB
-- OS: Debian 5.4.56.bsk.1-amd64 x86_64 GNU/Linux
-- Go: 1.15.4
-
-### Concurrency Performance 
-
-Change the concurrency with a fixed packet size 1KB.
-
-QPS|TP99|TP999
-----|----|----
-| ![image](docs/images/performance_concurrent_qps.png) | ![image](docs/images/performance_concurrent_tp99.png) | ![image](docs/images/performance_concurrent_tp999.png) |
-
-### Throughput Performance
-
-Change packet size with a fixed concurrency of 100.
-
-QPS|TP99|TP999
-----|----|----
-|![image](docs/images/performance_bodysize_qps.png) | ![image](docs/images/performance_bodysize_tp99.png) | ![image](docs/images/performance_bodysize_tp999.png) |
+We provide the [kitex-benchmark](https://github.com/cloudwego/kitex-benchmark) project to track and compare the performance of Kitex and other frameworks under different conditions for reference.
 
 ## Related Projects
 
