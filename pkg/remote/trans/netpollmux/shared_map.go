@@ -56,7 +56,7 @@ func newSharedMap(size int32) *sharedMap {
 
 // getShard returns shard under given seq id
 func (m *sharedMap) getShard(seqID int32) *shared {
-	return m.shared[seqID%m.size]
+	return m.shared[abs(seqID)%m.size]
 }
 
 // store stores msg under given seq id.
@@ -103,4 +103,11 @@ func (m *sharedMap) rangeMap(fn func(seqID int32, msg EventHandler)) {
 		}
 		shard.Unlock()
 	}
+}
+
+func abs(n int32) int32 {
+	if n < 0 {
+		return -n
+	}
+	return n
 }
