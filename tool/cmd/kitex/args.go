@@ -74,6 +74,7 @@ func (a *arguments) buildFlags() *flag.FlagSet {
 	f.StringVar(&a.IDLType, "type", "thrift", "Specify the type of IDL: 'thrift' or 'protobuf'.")
 	f.Var(&a.Includes, "I", "Add an IDL search path for includes.")
 	f.Var(&a.ThriftOptions, "thrift", "Specify arguments for the thrift compiler.")
+	f.Var(&a.ThriftPlugins, "thrift-plugin", "Specify thrift plugin arguments for the thrift compiler.")
 	f.Var(&a.ProtobufOptions, "protobuf", "Specify arguments for the protobuf compiler.")
 	f.BoolVar(&a.CombineService, "combine-service", false,
 		"Combine services in root thrift file.")

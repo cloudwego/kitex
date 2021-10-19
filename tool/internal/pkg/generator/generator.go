@@ -92,6 +92,7 @@ type Config struct {
 	PackagePrefix   string
 	CombineService  bool // combine services to one service
 	CopyIDL         bool
+	ThriftPlugins   util.StringSlice
 	Features        []feature
 }
 
@@ -103,6 +104,11 @@ func (c *Config) Pack() (res []string) {
 		f := t.Field(i)
 		x := v.Field(i)
 		n := f.Name
+
+		// skip the plugin arguments to avoid the 'strings in strings' trouble
+		if f.Name == "ThriftPlugins" {
+			continue
+		}
 
 		switch x.Kind() {
 		case reflect.Bool:
