@@ -104,7 +104,7 @@ func TestLongConnPoolReuse(t *testing.T) {
 	count = make(map[net.Conn]int)
 	for i := 0; i < 10; i++ {
 		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
-		test.Assert(t, err == nil)
+		test.Assert(t, err == nil && c != nil, err, c)
 		err = p.Put(c)
 		test.Assert(t, err == nil)
 		count[c]++

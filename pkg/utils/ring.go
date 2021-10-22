@@ -18,19 +18,28 @@ package utils
 
 import (
 	"errors"
-	"sync"
+	"runtime"
+	"sync/atomic"
 )
 
 // ErrRingFull means the ring is full.
 var ErrRingFull = errors.New("ring is full")
 
+const (
+	patch = 1 << 32
+	lower = int64(0xFFFFFFFF)
+)
+
+type node struct {
+	data interface{}
+	next int64
+}
+
 // Ring implements a fixed size ring buffer to manage data
 type Ring struct {
-	l    sync.Mutex
-	arr  []interface{}
-	size int
-	tail int
-	head int
+	objs []node
+	free int64 // upper 32 bits for version stamp, lower bits for index
+	used int64 // upper 32 bits for version stamp, lower bits for index
 }
 
 // NewRing creates a ringbuffer with fixed size.
@@ -40,67 +49,65 @@ func NewRing(size int) *Ring {
 		// with zero-size to reduce error checks of the callers.
 		size = 0
 	}
-	return &Ring{
-		arr:  make([]interface{}, size+1),
-		size: size,
+
+	r := &Ring{
+		objs: make([]node, size),
+		free: int64(size - 1),
+		used: -1,
 	}
+
+	for i := 0; i < size; i++ {
+		r.objs[i].next = int64(i - 1)
+	}
+	return r
 }
 
 // Push appends item to the ring.
-func (r *Ring) Push(i interface{}) error {
-	r.l.Lock()
-	defer r.l.Unlock()
-	if r.isFull() {
-		return ErrRingFull
+func (r *Ring) Push(obj interface{}) error {
+	visit := func(n *node) { n.data = obj }
+	if r.move(&r.free, &r.used, visit) {
+		return nil
 	}
-	r.arr[r.head] = i
-	r.head = r.inc()
-	return nil
+	return ErrRingFull
 }
 
 // Pop returns the last item and removes it from the ring.
-func (r *Ring) Pop() interface{} {
-	r.l.Lock()
-	defer r.l.Unlock()
-	if r.isEmpty() {
-		return nil
+func (r *Ring) Pop() (result interface{}) {
+	visit := func(n *node) { result = n.data; n.data = nil }
+	if r.move(&r.used, &r.free, visit) {
+		return
 	}
-	c := r.arr[r.tail]
-	r.arr[r.tail] = nil
-	r.tail = r.dec()
-	return c
+	return nil
 }
 
-// Dump dumps the data in the ring.
-func (r *Ring) Dump() interface{} {
-	r.l.Lock()
-	defer r.l.Unlock()
-	m := struct {
-		Array []interface{} `json:"array"`
-		Len   int           `json:"len"`
-		Cap   int           `json:"cap"`
-	}{}
-	m.Cap = r.size + 1
-	m.Len = (r.head - r.tail + r.size + 1) / (r.size + 1)
-	m.Array = make([]interface{}, 0, m.Len)
-	for i := 0; i < m.Len; i++ {
-		m.Array = append(m.Array, r.arr[(r.tail+i)%(r.size+1)])
+func (r *Ring) move(src, dst *int64, visit func(n *node)) bool {
+	for {
+		idx := atomic.LoadInt64(src)
+		cur := int32(idx & lower)
+		if cur == -1 {
+			break
+		}
+		obj := &r.objs[cur]
+		nxt := atomic.LoadInt64(&obj.next)
+
+		tmp := ((idx &^ lower) | (nxt & lower)) + patch
+		// cut the link and seize the node
+		if atomic.CompareAndSwapInt64(src, idx, tmp) {
+			visit(obj)
+
+			// add to the other link
+			for {
+				idx = atomic.LoadInt64(dst)
+				atomic.StoreInt64(&obj.next, idx&lower)
+				tmp = ((idx &^ lower) | int64(cur)) + patch
+
+				if atomic.CompareAndSwapInt64(dst, idx, tmp) {
+					return true
+				}
+				runtime.Gosched()
+			}
+		}
+		runtime.Gosched()
 	}
-	return m
-}
-
-func (r *Ring) inc() int {
-	return (r.head + 1) % (r.size + 1)
-}
-
-func (r *Ring) dec() int {
-	return (r.tail + 1) % (r.size + 1)
-}
-
-func (r *Ring) isEmpty() bool {
-	return r.tail == r.head
-}
-
-func (r *Ring) isFull() bool {
-	return r.inc() == r.tail
+	return false
 }

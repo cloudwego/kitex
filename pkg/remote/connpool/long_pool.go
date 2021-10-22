@@ -20,7 +20,6 @@ package connpool
 import (
 	"context"
 	"net"
-	"reflect"
 	"sync"
 	"time"
 
@@ -215,12 +214,6 @@ func (lp *LongPool) Clean(network, address string) {
 func (lp *LongPool) Dump() interface{} {
 	m := make(map[string]interface{})
 	lp.peerMap.Range(func(key, value interface{}) bool {
-		t := value.(*peer).ring.Dump()
-		arr := reflect.ValueOf(t).FieldByName("Array").Interface().([]interface{})
-		for i := range arr {
-			arr[i] = arr[i].(*longConn).deadline
-		}
-		m[key.(netAddr).String()] = t
 		return true
 	})
 	return m
