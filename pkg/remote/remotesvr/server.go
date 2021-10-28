@@ -79,7 +79,7 @@ func (s *server) buildListener() (ln net.Listener, err error) {
 
 	if ln, err = s.transSvr.CreateListener(addr); err != nil {
 		s.opt.Logger.Errorf("KITEX: server listen at %s failed, err=%v", addr.String(), err)
-	} else {
+	} else if ln != nil {
 		s.opt.Logger.Infof("KITEX: server listen at %s", ln.Addr().String())
 	}
 	return
