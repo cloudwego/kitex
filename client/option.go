@@ -363,7 +363,7 @@ func WithBackupRequest(p *retry.BackupPolicy) Option {
 // WithCircuitBreaker adds a circuitbreaker suite for the client.
 func WithCircuitBreaker(s *circuitbreak.CBSuite) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithCircuitBreaker(%+v)", s))
+		di.Push(fmt.Sprintf("WithCircuitBreaker()"))
 		o.CBSuite = s
 	}}
 }
