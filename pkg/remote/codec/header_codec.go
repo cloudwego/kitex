@@ -25,7 +25,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 /**
@@ -191,7 +194,10 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 	}
 
 	if err := readKVInfo(hdIdx, headerInfo, message); err != nil {
-		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttTHeader read kv info failed, %s", err.Error()))
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader read kv info failed, %s", err.Error()))
+	}
+	if message.RPCRole() == remote.Server {
+		fillBasicFromInfoOfTTHeader(message)
 	}
 	message.SetPayloadLen(int(totalLen - uint32(headerInfoSize) + Size32 - TTHeaderMetaSize))
 	return err
@@ -433,4 +439,20 @@ func (m meshHeader) decode(ctx context.Context, message remote.Message, in remot
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("meshHeader read kv info failed, %s", err.Error()))
 	}
 	return nil
+}
+
+// Fill basic from_info(from service, from address) which carried by ttheader to rpcinfo.
+// It is better to fill rpcinfo in matahandlers in terms of design,
+// but metahandlers are executed after payloadDecode, we don't know from_info when error happen in payloadDecode.
+// So 'fillBasicFromInfoOfTTHeader' is just for getting more info to output log when decode error happen.
+func fillBasicFromInfoOfTTHeader(svrMsg remote.Message) {
+	fi := rpcinfo.AsMutableEndpointInfo(svrMsg.RPCInfo().From())
+	if fi != nil {
+		if v := svrMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr]; v != "" {
+			fi.SetAddress(utils.NewNetAddr("tcp", v))
+		}
+		if v := svrMsg.TransInfo().TransIntInfo()[transmeta.FromService]; v != "" {
+			fi.SetServiceName(v)
+		}
+	}
 }
