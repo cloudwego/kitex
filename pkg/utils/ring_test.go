@@ -26,13 +26,16 @@ import (
 
 func TestNewRing(t *testing.T) {
 	r := NewRing(10)
-	test.Assert(t, r != nil && r.size == 10)
 
-	r = NewRing(0)
-	test.Assert(t, r != nil && r.size == 0)
+	obj1 := r.Pop()
+	test.Assert(t, obj1 == nil)
 
-	r = NewRing(-1)
-	test.Assert(t, r != nil && r.size == 0)
+	obj2 := "test string"
+	err := r.Push(obj2)
+	test.Assert(t, err == nil)
+
+	obj3 := r.Pop()
+	test.Assert(t, obj3.(string) == obj2)
 }
 
 func TestRing_Push(t *testing.T) {
@@ -48,16 +51,6 @@ func TestRing_Push(t *testing.T) {
 			test.Assert(t, err != nil)
 		}
 	}
-
-	// size == 0
-	r = NewRing(0)
-	err = r.Push(1)
-	test.Assert(t, err == ErrRingFull)
-
-	// size < 0
-	r = NewRing(-1)
-	err = r.Push(1)
-	test.Assert(t, err == ErrRingFull)
 }
 
 func TestRing_Pop(t *testing.T) {
@@ -77,14 +70,6 @@ func TestRing_Pop(t *testing.T) {
 			test.Assert(t, elem == nil)
 		}
 	}
-
-	// size == 0
-	r = NewRing(0)
-	test.Assert(t, r.Pop() == nil)
-
-	// size < 0
-	r = NewRing(-1)
-	test.Assert(t, r.Pop() == nil)
 }
 
 func TestRing_Parallel(t *testing.T) {
@@ -119,4 +104,39 @@ func TestRing_Parallel(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
+
+func BenchmarkRing(b *testing.B) {
+	size := 1024
+	r := NewRing(size)
+	for i := 0; i < size; i++ {
+		r.Push(struct{}{})
+	}
+
+	// benchmark
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		obj := r.Pop()
+		r.Push(obj)
+	}
+}
+
+func BenchmarkRing_Parallel(b *testing.B) {
+	size := 1024
+	r := NewRing(size)
+	for i := 0; i < size; i++ {
+		r.Push(struct{}{})
+	}
+
+	// benchmark
+	b.ReportAllocs()
+	b.SetParallelism(128)
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			obj := r.Pop()
+			r.Push(obj)
+		}
+	})
 }

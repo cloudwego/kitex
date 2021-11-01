@@ -18,89 +18,84 @@ package utils
 
 import (
 	"errors"
-	"sync"
+	"runtime"
+
+	"github.com/choleraehyq/pid"
 )
 
 // ErrRingFull means the ring is full.
 var ErrRingFull = errors.New("ring is full")
 
-// Ring implements a fixed size ring buffer to manage data
-type Ring struct {
-	l    sync.Mutex
-	arr  []interface{}
-	size int
-	tail int
-	head int
-}
-
 // NewRing creates a ringbuffer with fixed size.
 func NewRing(size int) *Ring {
 	if size <= 0 {
-		// When size is an invalid number, we still return an instance
-		// with zero-size to reduce error checks of the callers.
-		size = 0
+		panic("new ring with size <=0")
 	}
-	return &Ring{
-		arr:  make([]interface{}, size+1),
-		size: size,
+	r := &Ring{}
+
+	// check len(rings):
+	// 1. len = P/4
+	// 2. len <= size
+	numP := runtime.GOMAXPROCS(0)
+	r.length = (numP + 3) / 4
+	if r.length > size {
+		r.length = size
 	}
+
+	// make rings
+	per := size / r.length
+	r.rings = make([]*ring, r.length)
+	for i := 0; i < r.length-1; i++ {
+		r.rings[i] = newRing(per)
+	}
+	r.rings[r.length-1] = newRing(size - per*(r.length-1))
+	return r
+}
+
+// Ring implements a fixed size hash list to manage data
+type Ring struct {
+	length int
+	rings  []*ring
 }
 
 // Push appends item to the ring.
-func (r *Ring) Push(i interface{}) error {
-	r.l.Lock()
-	defer r.l.Unlock()
-	if r.isFull() {
-		return ErrRingFull
+func (r *Ring) Push(obj interface{}) error {
+	if r.length == 1 {
+		return r.rings[0].Push(obj)
 	}
-	r.arr[r.head] = i
-	r.head = r.inc()
-	return nil
+
+	idx := goid.GetPid() % r.length
+	for i := 0; i < r.length; i, idx = i+1, (idx+1)%r.length {
+		err := r.rings[idx].Push(obj)
+		if err == nil {
+			return nil
+		}
+	}
+	return ErrRingFull
 }
 
 // Pop returns the last item and removes it from the ring.
 func (r *Ring) Pop() interface{} {
-	r.l.Lock()
-	defer r.l.Unlock()
-	if r.isEmpty() {
-		return nil
+	if r.length == 1 {
+		return r.rings[0].Pop()
 	}
-	c := r.arr[r.tail]
-	r.arr[r.tail] = nil
-	r.tail = r.dec()
-	return c
+
+	idx := goid.GetPid() % r.length
+	for i := 0; i < r.length; i, idx = i+1, (idx+1)%r.length {
+		obj := r.rings[idx].Pop()
+		if obj != nil {
+			return obj
+		}
+	}
+	return nil
 }
 
 // Dump dumps the data in the ring.
 func (r *Ring) Dump() interface{} {
-	r.l.Lock()
-	defer r.l.Unlock()
-	m := struct {
-		Array []interface{} `json:"array"`
-		Len   int           `json:"len"`
-		Cap   int           `json:"cap"`
-	}{}
-	m.Cap = r.size + 1
-	m.Len = (r.head - r.tail + r.size + 1) / (r.size + 1)
-	m.Array = make([]interface{}, 0, m.Len)
-	for i := 0; i < m.Len; i++ {
-		m.Array = append(m.Array, r.arr[(r.tail+i)%(r.size+1)])
+	m := &ringDump{}
+	idx := goid.GetPid() % r.length
+	for i := 0; i < r.length; i, idx = i+1, (idx+1)%r.length {
+		r.rings[idx].Dump(m)
 	}
 	return m
-}
-
-func (r *Ring) inc() int {
-	return (r.head + 1) % (r.size + 1)
-}
-
-func (r *Ring) dec() int {
-	return (r.tail + 1) % (r.size + 1)
-}
-
-func (r *Ring) isEmpty() bool {
-	return r.tail == r.head
-}
-
-func (r *Ring) isFull() bool {
-	return r.inc() == r.tail
 }
