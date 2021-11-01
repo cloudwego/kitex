@@ -44,6 +44,10 @@ func TestSharedMap(t *testing.T) {
 	msg, ok := m.load(key)
 	test.Assert(t, msg == nil)
 	test.Assert(t, ok == false)
+	// check key<0
+	msg, ok = m.load(-1)
+	test.Assert(t, msg == nil)
+	test.Assert(t, ok == false)
 	// check key>0
 	for i := int32(1); i <= mod; i++ {
 		key := i
