@@ -10,6 +10,8 @@ github.com/bytedance/gopkg v0.0.0-20210910103821-e4efae9c17c3/go.mod h1:birsdqRC
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/xxhash v1.1.0 h1:a6HrQnmkObjyL+Gs60czilIUGqrzKutQD6XZog3p+ko=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
+github.com/choleraehyq/pid v0.0.12 h1:JLiTCsz2gStQZ3YWet+p9hktRnWzk7VJigpzvGV+I2o=
+github.com/choleraehyq/pid v0.0.12/go.mod h1:uhzeFgxJZWQsZulelVQZwdASxQ9TIPZYL4TPkQMtL/U=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/cloudwego/netpoll v0.0.2/go.mod h1:rZOiNI0FYjuvNybXKKhAPUja03loJi/cdv2F55AE6E8=
 github.com/cloudwego/netpoll v0.0.4 h1:wN+N2JIQMjKOF1x9XaTQDJsEUx/exMBuSGD6YRsLFzg=
