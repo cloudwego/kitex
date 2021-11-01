@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -31,6 +32,13 @@ type Client interface {
 	// RPCInfo as param just avoid to get it from ctx
 	Send(ctx context.Context, ri rpcinfo.RPCInfo, req remote.Message) (err error)
 	Recv(ctx context.Context, ri rpcinfo.RPCInfo, resp remote.Message) (err error)
+	Recycle()
+}
+
+var clientPool = &sync.Pool{
+	New: func() interface{} {
+		return new(client)
+	},
 }
 
 type client struct {
@@ -57,11 +65,22 @@ func NewClient(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.TransHand
 		}
 		return nil, kerrors.ErrGetConnection.WithCause(err)
 	}
-	return &client{
-		transHdlr:   handler,
-		connManager: cm,
-		conn:        rawConn,
-	}, nil
+	cli := clientPool.Get().(*client)
+	cli.init(handler, cm, rawConn)
+	return cli, nil
+}
+
+func (c *client) Recycle() {
+	c.transHdlr = nil
+	c.connManager = nil
+	c.conn = nil
+	clientPool.Put(c)
+}
+
+func (c *client) init(handler remote.TransHandler, cm *ConnWrapper, conn net.Conn) {
+	c.transHdlr = handler
+	c.connManager = cm
+	c.conn = conn
 }
 
 // Send is blocked.

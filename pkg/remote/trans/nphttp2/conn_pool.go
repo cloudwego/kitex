@@ -100,7 +100,7 @@ func newTransport(dialer remote.Dialer, network, address string, connectTimeout 
 }
 
 // Get pick or generate a net.Conn and return
-func (p *connPool) Get(ctx context.Context, network, address string, opt *remote.ConnOption) (net.Conn, error) {
+func (p *connPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
 	var (
 		trans *transports
 		conn  *clientConn
