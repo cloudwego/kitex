@@ -4,7 +4,7 @@ import "sync"
 
 // ring implements a fixed size ring buffer to manage data
 type ring struct {
-	l    sync.Mutex
+	l    sync.RWMutex
 	arr  []interface{}
 	size int
 	tail int
@@ -57,8 +57,8 @@ type ringDump struct {
 
 // Dump dumps the data in the ring.
 func (r *ring) Dump(m *ringDump) {
-	r.l.Lock()
-	defer r.l.Unlock()
+	r.l.RLock()
+	defer r.l.RUnlock()
 	m.Cap = r.size + 1
 	m.Len = (r.head - r.tail + r.size + 1) / (r.size + 1)
 	m.Array = make([]interface{}, 0, m.Len)
