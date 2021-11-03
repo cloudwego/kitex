@@ -22,6 +22,7 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"syscall"
 
 	"github.com/cloudwego/netpoll"
 
@@ -55,6 +56,9 @@ var _ remote.TransServer = &transServer{}
 
 // CreateListener implements the remote.TransServer interface.
 func (ts *transServer) CreateListener(addr net.Addr) (net.Listener, error) {
+	if addr.Network() == "unix" {
+		syscall.Unlink(addr.String())
+	}
 	ln, err := netpoll.CreateListener(addr.Network(), addr.String())
 	ts.ln = ln
 	return ts.ln, err
