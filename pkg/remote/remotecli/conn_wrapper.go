@@ -55,12 +55,12 @@ func (cm *ConnWrapper) GetConn(ctx context.Context, d remote.Dialer, ri rpcinfo.
 	configs := ri.Config()
 	timeout := configs.ConnectTimeout()
 	if cm.connPool != nil {
-		longConn, err := cm.getConnWithPool(ctx, cm.connPool, d, timeout, ri)
+		conn, err := cm.getConnWithPool(ctx, cm.connPool, d, timeout, ri)
 		if err != nil {
 			return nil, err
 		}
-		cm.conn = longConn
-		if raw, ok := longConn.(remote.RawConn); ok {
+		cm.conn = conn
+		if raw, ok := conn.(remote.RawConn); ok {
 			rawConn := raw.RawConn()
 			return rawConn, nil
 		}
@@ -113,13 +113,13 @@ func (cm *ConnWrapper) getConnWithPool(ctx context.Context, cp remote.ConnPool, 
 	}
 	opt := &remote.ConnOption{Dialer: d, ConnectTimeout: timeout}
 	ri.Stats().Record(ctx, stats.ClientConnStart, stats.StatusInfo, "")
-	longConn, err := cp.Get(ctx, addr.Network(), addr.String(), opt)
+	conn, err := cp.Get(ctx, addr.Network(), addr.String(), opt)
 	if err != nil {
 		ri.Stats().Record(ctx, stats.ClientConnFinish, stats.StatusError, err.Error())
 		return nil, kerrors.ErrGetConnection.WithCause(err)
 	}
 	ri.Stats().Record(ctx, stats.ClientConnFinish, stats.StatusInfo, "")
-	return longConn, nil
+	return conn, nil
 }
 
 func (cm *ConnWrapper) getConnWithDialer(ctx context.Context, d remote.Dialer,
