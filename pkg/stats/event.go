@@ -97,7 +97,7 @@ var (
 )
 
 var (
-	lock        sync.Mutex
+	lock        sync.RWMutex
 	inited      int32
 	userDefined = make(map[string]Event)
 	maxEventNum = int(predefinedEventNum)
@@ -128,8 +128,8 @@ func DefineNewEvent(name string, level Level) (Event, error) {
 
 // MaxEventNum returns the number of event defined.
 func MaxEventNum() int {
-	lock.Lock()
-	defer lock.Unlock()
+	lock.RLock()
+	defer lock.RUnlock()
 	return maxEventNum
 }
 

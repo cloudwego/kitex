@@ -51,15 +51,11 @@ func newOptions() interface{} {
 	}
 }
 
-func (co *callOptions) zero() {
+// Recycle zeros the call option and put it to the pool.
+func (co *callOptions) Recycle() {
 	co.configs = nil
 	co.svr = nil
 	co.locks.Zero()
-}
-
-// Recycle zeros the call option and put it to the pool.
-func (co *callOptions) Recycle() {
-	co.zero()
 	callOptionsPool.Put(co)
 }
 

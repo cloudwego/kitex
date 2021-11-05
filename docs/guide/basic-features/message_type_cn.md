@@ -35,7 +35,7 @@ struct Response {
 
 service EchoService {
     Response Echo(1: Request req); // pingpong method
-    oneway void Echo(1: Request req); // oneway method
+    oneway void VisitOneway(1: Request req); // oneway method
 }
 ```
 
@@ -67,10 +67,12 @@ import (
 type handler struct {}
 
 func (handler) Echo(ctx context.Context, req *echo.Request) (r *echo.Response, err error) {
+    // ...
     return &echo.Response{ Msg: "world" }
 }
 
-func (handler) Echo1(ctx context.Context, req *echo.Request) (err error) {
+func (handler) VisitOneway(ctx context.Context, req *echo.Request) (err error) {
+    // ...
     return nil
 }
 
@@ -96,7 +98,7 @@ import (
 )
 
 func main() {
-    cli, err := echoservice.NewClient("p.s.m")
+    cli, err := echoservice.NewClient("destServiceName")
     if err != nil {
         panic(err)
     }
@@ -123,13 +125,13 @@ import (
 )
 
 func main() {
-    cli, err := echoservice.NewClient("p.s.m")
+    cli, err := echoservice.NewClient("destServiceName")
     if err != nil {
         panic(err)
     }
     req := echo.NewRequest()
     req.Msg = "hello"
-    err = cli.Echo1(req)
+    err = cli.VisitOneway(req)
     if err != nil {
         panic(err)
     }
@@ -269,7 +271,7 @@ import (
 }
 
 func main() {
-    cli, err := echoseervice.NewClient("p.s.m")
+    cli, err := echoseervice.NewClient("destServiceName")
     if err != nil {
         panic(err)
     }
@@ -298,7 +300,7 @@ import (
 }
 
 func main() {
-    cli, err := echoseervice.NewClient("p.s.m")
+    cli, err := echoseervice.NewClient("destServiceName")
     if err != nil {
         panic(err)
     }
@@ -329,7 +331,7 @@ import (
 }
 
 func main() {
-    cli, err := echoseervice.NewClient("p.s.m")
+    cli, err := echoseervice.NewClient("destServiceName")
     if err != nil {
         panic(err)
     }

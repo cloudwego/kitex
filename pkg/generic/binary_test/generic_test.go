@@ -141,7 +141,7 @@ func TestRawThriftBinary2NormalServer(t *testing.T) {
 
 func initRawThriftBinaryClient() genericclient.Client {
 	g := generic.BinaryThriftGeneric()
-	cli := newGenericClient("p.s.m", g, "127.0.0.1:9009")
+	cli := newGenericClient("destServiceName", g, "127.0.0.1:9009")
 	return cli
 }
 

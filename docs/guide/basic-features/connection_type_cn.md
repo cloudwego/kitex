@@ -1,21 +1,33 @@
-# 连接池
+# 连接类型
 
-Kitex 提供了短连接和长连接两种连接池，用户可以根据自己的业务场景来选择。
+Kitex 支持短连接、长连接池、连接多路复用，用户可以根据自己的业务场景来选择。>= v0.0.2 默认配置了连接池，但建议用户还是根据实际情况调整连接池的大小。
 
 ## 短连接
 
-在不做任何设置的情况下，默认就是短连接。
+每次请求都会创建一次连接，性能不佳，通常不建议使用。但部分场景必须使用短连接，如上游实例数过多时，会增加下游服务的负担，请根据情况来选择。
 
-## 长连接
+配置短连接：
 
-在初始化 client 的时候，增加一个 Option：
+```go
+xxxCli := xxxservice.NewClient("destServiceName", client.WithShortConnection())
+```
+
+## 长连接池
+
+Kitex >= v0.0.2 默认配置了连接池，配置参数如下：
 
 ```
-client.WithLongConnection(connpool.IdleConfig{
-    MaxIdlePerAddress: 10,
-    MaxIdleGlobal:     1000,
-    MaxIdleTimeout:    60 * time.Second,
-})
+connpool2.IdleConfig{
+   MaxIdlePerAddress: 10,
+   MaxIdleGlobal:     100,
+   MaxIdleTimeout:    time.Minute,
+}
+```
+
+建议用户根据实际情况调整连接池大小，配置方式如下：
+
+```
+xxxCli := xxxservice.NewClient("destServiceName", client.WithLongConnection(connpool.IdleConfig{10, 1000, time.Minute}))
 ```
 
 其中：
@@ -52,6 +64,33 @@ client.WithLongConnection(connpool.IdleConfig{
 - `MaxIdleGlobal` 表示总的空闲连接数应大于 `下游目标总数*MaxIdlePerAddress`，超出部分是为了限制未能从连接池中获取连接而主动新建连接的总数量
     - 注意：该值存在的价值不大，建议设置为一个较大的值，在后续版本中考虑废弃该参数并提供新的接口
 - `MaxIdleTimeout` 表示连接空闲时间，由于 server 在 10min 内会清理不活跃的连接，因此 client 端也需要及时清理空闲较久的连接，避免使用无效的连接，该值在下游也为 Kitex 时不可超过 10min
+
+## 连接多路复用
+
+开启连接多路复用，Client 访问 Server 常规只需要**1个连接**即可，相比连接池极限测试吞吐表现更好（目前的极限测试配置了2个连接），且能大大减少连接数量。
+
+特别说明：
+
+1. 这里的连接多路复用是针对于 Thrift 和 Kitex Protobuf，如果配置 gRPC 协议，默认是连接多路复用。
+2. Client 开启连接多路复用，Server 必须也开启，否则会导致请求超时；Server 开启连接多路复用对 Client 没有限制，可以接受短连接、长连接池、连接多路复用的请求。
+
+- Server 配置
+
+  option: `WithMuxTransport`
+
+  ```go
+  svr := xxxservice.NewServer(handler, server.WithMuxTransport())
+  ```
+  
+- Client 配置
+  option: `WithMuxConnection`
+
+  建议配置**1-2 个连接**
+  
+  ```go
+  xxxCli := NewClient("destServiceName", client.WithMuxConnection(1))
+  ```
+  
 
 ## 状态监控
 

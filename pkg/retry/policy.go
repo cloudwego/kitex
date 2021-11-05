@@ -73,7 +73,10 @@ type StopPolicy struct {
 	CBPolicy         CBPolicy `json:"cb_policy"`
 }
 
-const defaultCBErrRate = 0.1
+const (
+	defaultCBErrRate = 0.1
+	cbMinSample      = 10
+)
 
 // CBPolicy is the circuit breaker policy
 type CBPolicy struct {

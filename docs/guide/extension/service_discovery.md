@@ -51,7 +51,7 @@ func main() {
     opt := client.WithResolver(YOUR_RESOLVER)
 
     // new client
-    xxx.NewClient("p.s.m", opt)
+    xxx.NewClient("destServiceName", opt)
 }
 ```
 

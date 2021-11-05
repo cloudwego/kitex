@@ -56,6 +56,7 @@ func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 		opt:     opt,
 		codec:   opt.Codec,
 		svcInfo: opt.SvcInfo,
+		ext:     np.NewNetpollConnExtension(),
 	}, nil
 }
 
@@ -67,6 +68,7 @@ type svrTransHandler struct {
 	inkHdlFunc endpoint.Endpoint
 	codec      remote.Codec
 	transPipe  *remote.TransPipeline
+	ext        trans.Extension
 }
 
 // Write implements the remote.ServerTransHandler interface.
@@ -158,8 +160,10 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 			panicErr := recover()
 			if panicErr != nil {
 				if conn != nil {
+					ri := rpcinfo.GetRPCInfo(ctx)
+					rService, rAddr := getRemoteInfo(ri, conn)
+					t.opt.Logger.Errorf("KITEX: panic happened, close conn[%s], remoteService=%s, %v\n%s", rAddr, rService, panicErr, string(debug.Stack()))
 					conn.Close()
-					t.opt.Logger.Errorf("KITEX: panic happened, close conn[%s], %v\n%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
 				} else {
 					t.opt.Logger.Errorf("KITEX: panic happened, %v\n%s", panicErr, string(debug.Stack()))
 				}
@@ -247,25 +251,19 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 
 // OnError implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
-	rAddr := conn.RemoteAddr()
-	if rAddr.Network() == "unix" {
-		ri := rpcinfo.GetRPCInfo(ctx)
-		if ri.From().Address() != nil {
-			rAddr = ri.From().Address()
-		}
-	}
-	if errors.Is(err, netpoll.ErrConnClosed) {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	rService, rAddr := getRemoteInfo(ri, conn)
+	if t.ext.IsRemoteClosedErr(err) {
 		// it should not regard error which cause by remote connection closed as server error
-		ri := rpcinfo.GetRPCInfo(ctx)
 		if ri == nil {
 			return
 		}
 		remote := rpcinfo.AsMutableEndpointInfo(ri.From())
 		remote.SetTag(rpcinfo.RemoteClosedTag, "1")
 	} else if pe, ok := err.(*kerrors.DetailedError); ok {
-		t.opt.Logger.Errorf("KITEX: processing request error, remote=%v, err=%s\n%s", rAddr, err.Error(), pe.Stack())
+		t.opt.Logger.Errorf("KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s\n%s", rService, rAddr, err.Error(), pe.Stack())
 	} else {
-		t.opt.Logger.Errorf("KITEX: processing request error, remote=%v, err=%s", rAddr, err.Error())
+		t.opt.Logger.Errorf("KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s", rService, rAddr, err.Error())
 	}
 }
 
@@ -344,4 +342,17 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	sl := ri.Stats().Level()
 	rpcStats.Reset()
 	rpcStats.SetLevel(sl)
+}
+
+func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
+	rAddr := conn.RemoteAddr()
+	if ri == nil {
+		return "", rAddr
+	}
+	if rAddr.Network() == "unix" {
+		if ri.From().Address() != nil {
+			rAddr = ri.From().Address()
+		}
+	}
+	return ri.From().ServiceName(), rAddr
 }

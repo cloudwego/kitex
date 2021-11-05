@@ -141,8 +141,11 @@ func buildCmd(a *arguments, out io.Writer) *exec.Cmd {
 			"-o", generator.KitexGenPath,
 			"-g", gas,
 			"-p", "kitex:"+kas,
-			a.IDL,
 		)
+		for _, p := range a.ThriftPlugins {
+			cmd.Args = append(cmd.Args, "-p", p)
+		}
+		cmd.Args = append(cmd.Args, a.IDL)
 		log.Info(strings.Join(cmd.Args, " "))
 	} else {
 		a.ThriftOptions = a.ThriftOptions[:0]

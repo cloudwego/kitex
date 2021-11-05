@@ -44,6 +44,7 @@ func TestConfig_Pack(t *testing.T) {
 		PackagePrefix   string
 		CombineService  bool
 		CopyIDL         bool
+		ThriftPlugins   util.StringSlice
 		Features        []feature
 	}
 	tests := []struct {

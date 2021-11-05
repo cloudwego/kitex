@@ -53,9 +53,6 @@ func mockMW0(next Endpoint) Endpoint {
 		if err != nil {
 			return err
 		}
-		if err != nil {
-			return err
-		}
 		if ok {
 			val.str += afterMW0
 		}

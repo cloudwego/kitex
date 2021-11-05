@@ -45,25 +45,7 @@ func GetRPCInfo(ctx context.Context) RPCInfo {
 
 // PutRPCInfo recycles the RPCInfo. This function is for internal use only.
 func PutRPCInfo(ri RPCInfo) {
-	if ri == nil {
-		return
-	}
-	if r, ok := ri.From().(internal.Reusable); ok {
-		r.Recycle()
-	}
-	if r, ok := ri.To().(internal.Reusable); ok {
-		r.Recycle()
-	}
-	if r, ok := ri.Invocation().(internal.Reusable); ok {
-		r.Recycle()
-	}
-	if r, ok := ri.Config().(internal.Reusable); ok {
-		r.Recycle()
-	}
-	if r, ok := ri.Stats().(internal.Reusable); ok {
-		r.Recycle()
-	}
-	if r, ok := ri.(internal.Reusable); ok {
-		r.Recycle()
+	if v, ok := ri.(internal.Reusable); ok {
+		v.Recycle()
 	}
 }

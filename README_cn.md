@@ -70,28 +70,7 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
 性能测试只能提供相对参考，工业场景下，有诸多因素可以影响实际的性能表现。
 
-由于开源社区缺少支持 Thrift 的优秀 RPC 框架，当前对比项目为 [gRPC](https://github.com/grpc/grpc)、[RPCX](https://github.com/smallnest/rpcx)，均使用 Protobuf 。
-
-我们通过 [测试代码](https://github.com/cloudwego/kitex-benchmark) 比较了它们的性能，测试表明 [Kitex](https://github.com/cloudwego/kitex) 具有明显优势。
-
-### 测试环境
-
-* CPU:    Intel(R) Xeon(R) Gold 5118 CPU @ 2.30GHz, 4 cores
-* Memory: 8GB
-* OS:     Debian 5.4.56.bsk.1-amd64 x86_64 GNU/Linux
-* Go:     1.15.4
-
-### 并发表现 (Echo 1KB, 改变并发量)
-
-| QPS                                                  |                         TP99                          |                         TP999                          |
-| :--------------------------------------------------- | :---------------------------------------------------: | :----------------------------------------------------: |
-| ![image](docs/images/performance_concurrent_qps.png) | ![image](docs/images/performance_concurrent_tp99.png) | ![image](docs/images/performance_concurrent_tp999.png) |
-
-### 吞吐表现 (并发 100, 改变包大小)
-
-| QPS                                                |                        TP99                         |                        TP999                         |
-| :------------------------------------------------- | :-------------------------------------------------: | :--------------------------------------------------: |
-| ![image](docs/images/performance_bodysize_qps.png) | ![image](docs/images/performance_bodysize_tp99.png) | ![image](docs/images/performance_bodysize_tp999.png) |
+我们提供了 [kitex-benchmark](https://github.com/cloudwego/kitex-benchmark) 项目用来长期追踪和比较 Kitex 与其他框架在不同情况下的性能数据以供参考。
 
 ## 相关项目
 
