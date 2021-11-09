@@ -20,6 +20,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Check License Header
+        uses: apache/skywalking-eyes@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Lint
         run: |
           go vet -stdmethods=false $(go list ./...)
