@@ -37,7 +37,7 @@ type sharedMap struct {
 // A "thread" safe string to anything map.
 type shared struct {
 	msgs map[int32]EventHandler
-	sync.Mutex
+	sync.RWMutex
 }
 
 // Creates a new concurrent map.
@@ -77,9 +77,9 @@ func (m *sharedMap) load(seqID int32) (msg EventHandler, ok bool) {
 		return nil, false
 	}
 	shard := m.getShard(seqID)
-	shard.Lock()
+	shard.RLock()
 	msg, ok = shard.msgs[seqID]
-	shard.Unlock()
+	shard.RUnlock()
 	return msg, ok
 }
 

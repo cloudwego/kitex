@@ -77,8 +77,8 @@ func (q *queue) Push(e *Event) {
 // Dump dumps the previously pushed events out in a reversed order.
 func (q *queue) Dump() interface{} {
 	results := make([]*Event, 0, len(q.ring))
-	q.mu.Lock()
-	defer q.mu.Unlock()
+	q.mu.RLock()
+	defer q.mu.RUnlock()
 	pos := int32(q.tail)
 	for i := 0; i < len(q.ring); i++ {
 		pos--
