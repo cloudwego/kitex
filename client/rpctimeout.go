@@ -24,12 +24,21 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
-	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
+	"github.com/cloudwego/kitex/pkg/wpool"
 )
+
+var workerPool *wpool.Pool
+
+func init() {
+	workerPool = wpool.New(
+		128,
+		time.Minute,
+	)
+}
 
 func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo, logger klog.FormatLogger) error {
 	e := fmt.Errorf("KITEX: panic, remote[to_service=%s|method=%s], err=%v\n%s",
@@ -90,7 +99,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 			defer cancel()
 
 			done := make(chan error, 1)
-			gofunc.GoFunc(ctx, func() {
+			workerPool.GoCtx(ctx, func() {
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
 						e := panicToErr(ctx, panicInfo, ri, logger)
