@@ -8,20 +8,22 @@ header:
     - '**/*.s'
 
   paths-ignore:
-    - 'pkg/remote/trans/nhttp2/metadata/metadata.go'
-    - 'pkg/remote/trans/nhttp2/codes/codes.go'
-    - 'pkg/remote/trans/nhttp2/grpc/http2_client.go'
-    - 'pkg/remote/trans/nhttp2/grpc/defaults.go'
-    - 'pkg/remote/trans/nhttp2/grpc/transport.go'
-    - 'pkg/remote/trans/nhttp2/grpc/flowcontrol.go'
-    - 'pkg/remote/trans/nhttp2/grpc/keepalive.go'
-    - 'pkg/remote/trans/nhttp2/grpc/controlbuf.go'
-    - 'pkg/remote/trans/nhttp2/grpc/bdp_estimator.go'
-    - 'pkg/remote/trans/nhttp2/grpc/http2_server.go'
-    - 'pkg/remote/trans/nhttp2/grpc/http_util.go'
-    - 'pkg/remote/trans/nhttp2/status/status.go'
-    - 'pkg/remote/codec/protobuf/error.pb.go'
-    - 'pkg/remote/codec/protobuf/test.pb.go'
-    - 'pkg/remote/codec/thrift/test.go'
+    - internal/mocks/thrift/test.go
+    - pkg/remote/trans/nphttp2/codes/codes.go
+    - pkg/remote/trans/nphttp2/grpc/bdp_estimator.go
+    - pkg/remote/trans/nphttp2/grpc/controlbuf.go
+    - pkg/remote/trans/nphttp2/grpc/defaults.go
+    - pkg/remote/trans/nphttp2/grpc/flowcontrol.go
+    - pkg/remote/trans/nphttp2/grpc/http2_client.go
+    - pkg/remote/trans/nphttp2/grpc/http2_server.go
+    - pkg/remote/trans/nphttp2/grpc/http_util.go
+    - pkg/remote/trans/nphttp2/grpc/keepalive.go
+    - pkg/remote/trans/nphttp2/grpc/transport.go
+    - pkg/remote/trans/nphttp2/metadata/metadata.go
+    - pkg/remote/trans/nphttp2/status/status.go
+    - pkg/remote/codec/protobuf/error.pb.go
+    - pkg/remote/codec/protobuf/test.pb.go
+    - pkg/generic/descriptor/tree.go
+    - pkg/generic/descriptor/tree_test.go
 
   comment: on-failure
