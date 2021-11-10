@@ -33,7 +33,7 @@ func TestWPool(t *testing.T) {
 		wg   sync.WaitGroup
 		size = 10
 	)
-	test.Assert(t, p.size == 0)
+	test.Assert(t, p.Size() == 0)
 	for i := 0; i < size; i++ {
 		wg.Add(1)
 		p.GoCtx(context.Background(), func() {
@@ -41,9 +41,9 @@ func TestWPool(t *testing.T) {
 			atomic.AddInt32(&sum, 1)
 		})
 	}
-	test.Assert(t, p.size != 0)
+	test.Assert(t, p.Size() != 0)
 
 	wg.Wait()
-	test.Assert(t, sum == int32(size))
-	test.Assert(t, p.size == 1)
+	test.Assert(t, atomic.LoadInt32(&sum) == int32(size))
+	test.Assert(t, p.Size() == 1)
 }

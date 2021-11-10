@@ -45,6 +45,10 @@ func New(maxIdle int, maxIdleTime time.Duration) *Pool {
 	}
 }
 
+func (p *Pool) Size() int32 {
+	return atomic.LoadInt32(&p.size)
+}
+
 func (p *Pool) GoCtx(ctx context.Context, task Task) {
 	select {
 	case p.tasks <- task:
