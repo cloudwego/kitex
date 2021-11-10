@@ -99,7 +99,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 			defer cancel()
 
 			done := make(chan error, 1)
-			workerPool.GoCtx(ctx, func() {
+			workerPool.Go(func() {
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
 						e := panicToErr(ctx, panicInfo, ri, logger)

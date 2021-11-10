@@ -18,12 +18,11 @@ package wpool
 
 import (
 	"context"
-	"fmt"
 	"runtime/debug"
 	"sync/atomic"
 	"time"
 
-	"github.com/bytedance/gopkg/util/logger"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 type Task func()
@@ -49,7 +48,7 @@ func (p *Pool) Size() int32 {
 	return atomic.LoadInt32(&p.size)
 }
 
-func (p *Pool) GoCtx(ctx context.Context, task Task) {
+func (p *Pool) Go(task Task) {
 	select {
 	case p.tasks <- task:
 		// reuse exist goroutine
@@ -62,8 +61,7 @@ func (p *Pool) GoCtx(ctx context.Context, task Task) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				msg := fmt.Sprintf("panic in wpool: %v: %s", r, debug.Stack())
-				logger.CtxErrorf(ctx, msg)
+				klog.Errorf("panic in wpool: %v: %s", r, debug.Stack())
 			}
 			atomic.AddInt32(&p.size, -1)
 		}()
@@ -74,8 +72,7 @@ func (p *Pool) GoCtx(ctx context.Context, task Task) {
 		if atomic.LoadInt32(&p.size) > p.maxIdle {
 			return
 		}
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithDeadline(ctx, deadline)
+		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		defer cancel()
 		for {
 			select {

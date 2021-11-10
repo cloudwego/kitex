@@ -17,7 +17,6 @@
 package wpool
 
 import (
-	"context"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -36,7 +35,7 @@ func TestWPool(t *testing.T) {
 	test.Assert(t, p.Size() == 0)
 	for i := 0; i < size; i++ {
 		wg.Add(1)
-		p.GoCtx(context.Background(), func() {
+		p.Go(func() {
 			defer wg.Done()
 			atomic.AddInt32(&sum, 1)
 		})
