@@ -95,7 +95,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	tr.HandleStreams(func(s *grpcTransport.Stream) {
 		gofunc.GoFunc(ctx, func() {
 			ri, ctx := t.opt.InitRPCInfoFunc(s.Context(), tr.RemoteAddr())
-			// set grpc transport flag before excute metahandler
+			// set grpc transport flag before execute metahandler
 			rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(transport.GRPC)
 			var err error
 			for _, shdlr := range t.opt.StreamingMetaHandlers {

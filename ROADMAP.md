@@ -9,7 +9,7 @@ This document shows key roadmap of Kitex development from the year of 2021 to 20
   - Support ShmIPC to optimize IPC.
   - Support data packet compression.
 - Service Goverence
-  - Support more extension for users. All devlopers are welcome to contribute your extension to https://github.com/kitex-contrib.
+  - Support more extension for users. All developers are welcome to contribute your extension to https://github.com/kitex-contrib.
   - Support dynamict config, expose API in Kitex.
 - Codec
   - Support no serialization which references [Cap'n](https://capnproto.org/index.html) but is compatible with Thrift.

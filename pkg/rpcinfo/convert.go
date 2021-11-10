@@ -29,7 +29,7 @@ func AsTaggable(i interface{}) Taggable {
 	return nil
 }
 
-// AsMutableEndpointInfo converts an EnpointInfo into a MutableEndpointInfo. Returns nil if impossible.
+// AsMutableEndpointInfo converts an EndpointInfo into a MutableEndpointInfo. Returns nil if impossible.
 func AsMutableEndpointInfo(ei EndpointInfo) MutableEndpointInfo {
 	if v, ok := ei.(MutableEndpointInfo); ok {
 		return v
