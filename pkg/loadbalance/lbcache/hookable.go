@@ -24,7 +24,7 @@ import (
 )
 
 // intercept the rebalancer and call hooks
-// wrap the loadbalance.Rebalancer and excute registered hooks
+// wrap the loadbalance.Rebalancer and execute registered hooks
 type hookableRebalancer struct {
 	inner          loadbalance.Rebalancer
 	rebalanceL     sync.Mutex

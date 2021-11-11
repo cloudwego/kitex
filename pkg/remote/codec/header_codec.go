@@ -179,7 +179,7 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 	if headerInfo, err = in.Next(int(headerInfoSize)); err != nil {
 		return perrors.NewProtocolError(err)
 	}
-	if err = checkProtocalID(headerInfo[0], message); err != nil {
+	if err = checkProtocolID(headerInfo[0], message); err != nil {
 		return err
 	}
 	hdIdx := 2
@@ -388,7 +388,7 @@ func getProtocolID(pi remote.ProtocolInfo) ProtocolID {
 }
 
 // protoID just for ttheader
-func checkProtocalID(protoID uint8, message remote.Message) error {
+func checkProtocolID(protoID uint8, message remote.Message) error {
 	switch protoID {
 	case uint8(ProtocolIDProtobufKitex):
 		// rpcCfg := internal.AsMutableRPCConfig(message.RPCInfo().Config())

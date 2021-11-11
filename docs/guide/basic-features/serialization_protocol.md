@@ -26,7 +26,7 @@ We have optimized Thrift's Binary protocol codec. For details of the optimizatio
 
 ### Protocol Type
 
-There are two types suporting of protobuf:
+There are two types supporting of protobuf:
 
 1. **Custom message protocol**: it's been considered as kitex protobuf, the way of generated code is consistent with Thrift.
 2. **gRPC protocol**: it can communication with grpc directly, and support streaming.

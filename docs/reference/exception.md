@@ -79,7 +79,7 @@ These error is thrift Application Exception, usually these error will be wrapped
 
 | Code | Name                        | Meaning              |
 | ---- | --------------------------- | -------------------- |
-| 0    | UnknwonApllicationException | Unknown Error        |
+| 0    | UnknownApplicationException | Unknown Error        |
 | 1    | UnknownMethod               | Unknown Function     |
 | 2    | InValidMessageTypeException | Invalid Message Type |
 | 3    | WrongMethodName             | Wrong Method Name    |
