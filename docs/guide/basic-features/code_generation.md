@@ -178,4 +178,4 @@ Pass an argument to protoc. The argument will be appended to the `-go_out` for p
 
 Pass an argument to thriftgo. The argument will be appended to the `-g go:` for thriftgo. See the documentation of thriftgo for available values.
 
-Kitex by default passes `naming_style=golint,ignore_initialisms,gen_setter,gen_deep_equal` to thriftgo and it can be overridden if you specify the same parameter in addition.
+Kitex by default passes `naming_style=golint,ignore_initialisms,gen_setter,gen_deep_equal` to thriftgo and it can be overriden if you specify the same parameter in addition.
