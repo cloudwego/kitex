@@ -254,7 +254,7 @@ type consistBalancer struct {
 	cachedConsistInfo sync.Map
 	// The main purpose of this lock is to improve performance and prevent Change from being performed while expire
 	// which may cause Change to do a lot of extra computation and memory allocation
-	updateLock sync.RWMutex
+	updateLock sync.Mutex
 	opt        ConsistentHashOption
 	sfg        singleflight.Group
 }

@@ -65,10 +65,10 @@ func (q *queue) Push(e *Event) {
 		oldV := atomic.LoadUint32(q.tailVersion[old])
 		newV := oldV + 1
 		if atomic.CompareAndSwapUint32(&q.tail, old, new) && atomic.CompareAndSwapUint32(q.tailVersion[old], oldV, newV) {
-			q.mu.RLock()
+			q.mu.Lock()
 			p := (*unsafe.Pointer)(unsafe.Pointer(&q.ring[old]))
 			atomic.StorePointer(p, unsafe.Pointer(e))
-			q.mu.RUnlock()
+			q.mu.Unlock()
 			break
 		}
 	}
