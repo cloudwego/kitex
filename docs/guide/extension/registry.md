@@ -44,7 +44,7 @@ Specify your own registration module and customized registration information thr
 
   ```go
   ebi := &rpcinfo.EndpointBasicInfo{
-  		ServiceName: 'yourSerivceName',
+  		ServiceName: 'yourServiceName',
   		Tags:        make(map[string]string),
   }
   ebi.Tags[idc] = "xxx"
@@ -60,12 +60,11 @@ Specify your own registration module and customized registration information thr
   svr := xxxservice.NewServer(handler, server.WithServerBasicInfo(ebi), server.WithRegistry(yourRegistry))
   ```
   
-- Custom RegistyInfo 
+- Custom RegistryInfo 
   
   Kitex sets ServiceName, Addr and PayloadCodec by default. If other registration information is required, you need to inject it by yourself. option: `WithRegistryInfo`.
   
   ```go
   svr := xxxservice.NewServer(handler, server.WithRegistry(yourRegistry), server.WithRegistryInfo(yourRegistryInfo))
   ```
-  
   

@@ -243,7 +243,7 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 						case descriptor.NewValueMapping:
 							_f.ValueMapping = h(v)
 						case descriptor.NewFieldMapping:
-							// excute at compile time
+							// execute at compile time
 							h(v).Handle(_f)
 						case nil:
 							// none annotation

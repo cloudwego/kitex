@@ -4,7 +4,7 @@
  * in the LICENSE file.
  *
  * This file may have been modified by CloudWeGo authors. All CloudWeGo
- * Modifications are Copyright 2021 CloudWeGo Authors authors.
+ * Modifications are Copyright 2021 CloudWeGo Authors.
  */
 
 package descriptor
@@ -31,7 +31,7 @@ func longestCommonPrefix(a, b string) int {
 
 // Search for a wildcard segment and check the name for invalid characters.
 // Returns -1 as index, if no wildcard was found.
-func findWildcard(path string) (wilcard string, i int, valid bool) {
+func findWildcard(path string) (wildcard string, i int, valid bool) {
 	// Find start
 	for start, c := range []byte(path) {
 		// A wildcard starts with ':' (param) or '*' (catch-all)
@@ -221,7 +221,7 @@ func (n *node) insertChild(path, fullPath string, function *FunctionDescriptor) 
 	for {
 		// Find prefix until first wildcard
 		wildcard, i, valid := findWildcard(path)
-		if i < 0 { // No wilcard found
+		if i < 0 { // No wildcard found
 			break
 		}
 
