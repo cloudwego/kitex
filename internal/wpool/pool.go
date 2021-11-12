@@ -17,7 +17,6 @@
 package wpool
 
 import (
-	"context"
 	"runtime/debug"
 	"sync/atomic"
 	"time"
@@ -25,17 +24,22 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 
+// Task is the function that the worker will execute.
 type Task func()
 
+// Pool is a worker pool bind with some idle goroutines.
 type Pool struct {
 	size  int32
 	tasks chan Task
 
-	// settings
-	maxIdle     int32
+	// maxIdle is the number of max idle worker in the pool.
+	// if maxIdle too small, the pool works like a native 'go func()'.
+	maxIdle int32
+	// maxIdleTime is the max idle time the worker will wait for the new task.
 	maxIdleTime time.Duration
 }
 
+// New creates a new worker pool.
 func New(maxIdle int, maxIdleTime time.Duration) *Pool {
 	return &Pool{
 		tasks:       make(chan Task),
@@ -44,10 +48,12 @@ func New(maxIdle int, maxIdleTime time.Duration) *Pool {
 	}
 }
 
+// Size returns the number of the running workers.
 func (p *Pool) Size() int32 {
 	return atomic.LoadInt32(&p.size)
 }
 
+// Go creates/reuses a goroutine to run task.
 func (p *Pool) Go(task Task) {
 	select {
 	case p.tasks <- task:
@@ -56,7 +62,7 @@ func (p *Pool) Go(task Task) {
 	default:
 	}
 
-	// create new goroutine
+	// create new worker
 	atomic.AddInt32(&p.size, 1)
 	go func() {
 		defer func() {
@@ -65,20 +71,19 @@ func (p *Pool) Go(task Task) {
 			}
 			atomic.AddInt32(&p.size, -1)
 		}()
-
-		deadline := time.Now().Add(p.maxIdleTime)
 		task()
-
 		if atomic.LoadInt32(&p.size) > p.maxIdle {
 			return
 		}
-		ctx, cancel := context.WithDeadline(context.Background(), deadline)
-		defer cancel()
+
+		// waiting for new task
+		idleTimer := time.NewTimer(p.maxIdleTime)
 		for {
 			select {
 			case task = <-p.tasks:
 				task()
-			case <-ctx.Done():
+				idleTimer.Reset(p.maxIdleTime)
+			case <-idleTimer.C:
 				return
 			}
 		}

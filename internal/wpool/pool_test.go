@@ -26,11 +26,11 @@ import (
 )
 
 func TestWPool(t *testing.T) {
-	p := New(1, time.Second)
+	p := New(1, time.Millisecond*100)
 	var (
 		sum  int32
 		wg   sync.WaitGroup
-		size = 10
+		size = 100
 	)
 	test.Assert(t, p.Size() == 0)
 	for i := 0; i < size; i++ {
@@ -45,4 +45,6 @@ func TestWPool(t *testing.T) {
 	wg.Wait()
 	test.Assert(t, atomic.LoadInt32(&sum) == int32(size))
 	test.Assert(t, p.Size() == 1)
+	time.Sleep(time.Millisecond * 150)
+	test.Assert(t, p.Size() == 0)
 }
