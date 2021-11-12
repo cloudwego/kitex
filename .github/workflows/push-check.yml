@@ -25,6 +25,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: typos-action
+        uses: crate-ci/typos@v1.2.1
+
       - name: Lint
         run: |
           go vet -stdmethods=false $(go list ./...)
@@ -33,3 +36,6 @@ jobs:
 
       - name: Unit Test
         run: go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Benchmark
+        run: go test -bench=. -benchmem -run=none ./...

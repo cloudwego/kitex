@@ -56,7 +56,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 
 	nw, nwOk := out.(remote.NocopyWrite)
 	if msg, ok := data.(thriftMsgFastCodec); ok && nwOk {
-		// nocopy write is a special implement of linked buffer, only bytebuffer implement NocoyWrite do FastWrite
+		// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
 		msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
 		msgEndLen := bthrift.Binary.MessageEndLength()
 		buf, err := out.Malloc(msgBeginLen + msg.BLength() + msgEndLen)
