@@ -44,7 +44,8 @@ func TestWPool(t *testing.T) {
 
 	wg.Wait()
 	test.Assert(t, atomic.LoadInt32(&sum) == int32(size))
+	time.Sleep(time.Millisecond * 10) // waiting for workers finished
 	test.Assert(t, p.Size() == 1)
-	time.Sleep(time.Millisecond * 150)
+	time.Sleep(time.Millisecond * 100) // waiting for idle timeout
 	test.Assert(t, p.Size() == 0)
 }

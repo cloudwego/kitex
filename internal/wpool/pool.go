@@ -32,10 +32,10 @@ type Pool struct {
 	size  int32
 	tasks chan Task
 
-	// maxIdle is the number of max idle worker in the pool.
+	// maxIdle is the number of the max idle workers in the pool.
 	// if maxIdle too small, the pool works like a native 'go func()'.
 	maxIdle int32
-	// maxIdleTime is the max idle time the worker will wait for the new task.
+	// maxIdleTime is the max idle time that the worker will wait for the new task.
 	maxIdleTime time.Duration
 }
 
@@ -53,11 +53,11 @@ func (p *Pool) Size() int32 {
 	return atomic.LoadInt32(&p.size)
 }
 
-// Go creates/reuses a goroutine to run task.
+// Go creates/reuses a worker to run task.
 func (p *Pool) Go(task Task) {
 	select {
 	case p.tasks <- task:
-		// reuse exist goroutine
+		// reuse exist worker
 		return
 	default:
 	}
