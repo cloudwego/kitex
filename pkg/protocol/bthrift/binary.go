@@ -428,25 +428,40 @@ func (binaryProtocol) ReadBool(buf []byte) (value bool, length int, err error) {
 }
 
 func (binaryProtocol) ReadByte(buf []byte) (value int8, length int, err error) {
+	if len(buf) < 1 {
+		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadByte] buf length less than 1")
+	}
 	return int8(buf[0]), 1, err
 }
 
 func (binaryProtocol) ReadI16(buf []byte) (value int16, length int, err error) {
+	if len(buf) < 2 {
+		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadI16] buf length less than 2")
+	}
 	value = int16(binary.BigEndian.Uint16(buf))
 	return value, 2, err
 }
 
 func (binaryProtocol) ReadI32(buf []byte) (value int32, length int, err error) {
+	if len(buf) < 4 {
+		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadI32] buf length less than 4")
+	}
 	value = int32(binary.BigEndian.Uint32(buf))
 	return value, 4, err
 }
 
 func (binaryProtocol) ReadI64(buf []byte) (value int64, length int, err error) {
+	if len(buf) < 8 {
+		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadI64] buf length less than 8")
+	}
 	value = int64(binary.BigEndian.Uint64(buf))
 	return value, 8, err
 }
 
 func (binaryProtocol) ReadDouble(buf []byte) (value float64, length int, err error) {
+	if len(buf) < 8 {
+		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadDouble] buf length less than 8")
+	}
 	value = math.Float64frombits(binary.BigEndian.Uint64(buf))
 	return value, 8, err
 }
@@ -458,9 +473,8 @@ func (binaryProtocol) ReadString(buf []byte) (value string, length int, err erro
 		err = e
 		return
 	}
-	if size < 0 {
-		err = perrors.InvalidDataLength
-		return
+	if size < 0 || int(size) > len(buf) {
+		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadString] the string size greater than buf length")
 	}
 	value = string(buf[length : length+int(size)])
 	length += int(size)
@@ -474,9 +488,8 @@ func (binaryProtocol) ReadBinary(buf []byte) (value []byte, length int, err erro
 		err = e
 		return
 	}
-	if size < 0 {
-		err = perrors.InvalidDataLength
-		return
+	if size < 0 || int(size) > len(buf) {
+		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadBinary] the binary size greater than buf length")
 	}
 	value = make([]byte, size)
 	copy(value, buf[length:length+int(size)])
