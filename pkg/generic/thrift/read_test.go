@@ -18,6 +18,7 @@ package thrift
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"reflect"
 	"testing"
@@ -29,6 +30,7 @@ import (
 )
 
 var stringInput = "hello world"
+var binaryInput = []byte(stringInput)
 
 func Test_nextReader(t *testing.T) {
 	type args struct {
@@ -302,6 +304,9 @@ func Test_readString(t *testing.T) {
 		ReadStringFunc: func() (string, error) {
 			return stringInput, nil
 		},
+		ReadBinaryFunc: func() ([]byte, error) {
+			return binaryInput, nil
+		},
 	}
 	tests := []struct {
 		name    string
@@ -311,6 +316,7 @@ func Test_readString(t *testing.T) {
 	}{
 		// TODO: Add test cases.
 		{"readString", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.STRING}}, stringInput, false},
+		{"readBinary", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Name: "binary", Type: descriptor.STRING}}, base64.StdEncoding.EncodeToString(binaryInput), false}, // read base64 string from binary field
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
