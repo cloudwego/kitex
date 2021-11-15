@@ -82,10 +82,15 @@ func (p *Pool) Go(task Task) {
 			select {
 			case task = <-p.tasks:
 				task()
-				idleTimer.Reset(p.maxIdleTime)
 			case <-idleTimer.C:
+				// worker exits
 				return
 			}
+
+			if !idleTimer.Stop() {
+				<-idleTimer.C
+			}
+			idleTimer.Reset(p.maxIdleTime)
 		}
 	}()
 }
