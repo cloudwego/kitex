@@ -146,6 +146,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 
 	ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
 	if err != nil {
+		closeConn = true
 		// error cannot be wrapped to print here, so it must exec before NewTransError
 		t.OnError(ctx, err, conn)
 		err = remote.NewTransError(remote.InternalError, err)
@@ -155,6 +156,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 
 	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
 	if err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
+		closeConn = true
 		t.OnError(ctx, err, conn)
 		return nil
 	}
