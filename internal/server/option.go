@@ -18,6 +18,10 @@
 package server
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -61,9 +65,10 @@ type Options struct {
 
 	MetaHandlers []remote.MetaHandler
 
-	RemoteOpt *remote.ServerOption
-	ErrHandle func(error) error
-	Proxy     proxy.BackwardProxy
+	RemoteOpt  *remote.ServerOption
+	ErrHandle  func(error) error
+	ExitSignal func() <-chan error
+	Proxy      proxy.BackwardProxy
 
 	// Registry is used for service registry.
 	Registry registry.Registry
@@ -98,6 +103,7 @@ func NewOptions(opts []Option) *Options {
 		RemoteOpt:    newServerOption(),
 		Logger:       klog.DefaultLogger(),
 		DebugService: diagnosis.NoopService,
+		ExitSignal:   DefaultSysExitSignal,
 
 		Bus:    event.NewEventBus(),
 		Events: event.NewQueue(event.MaxEventNum),
@@ -135,4 +141,21 @@ func ApplyOptions(opts []Option, o *Options) {
 	for _, op := range opts {
 		op.F(o, &o.DebugInfo)
 	}
+}
+
+func DefaultSysExitSignal() <-chan error {
+	errCh := make(chan error, 1)
+	go func() {
+		sig := SysExitSignal()
+		defer signal.Stop(sig)
+		<-sig
+		errCh <- nil
+	}()
+	return errCh
+}
+
+func SysExitSignal() chan os.Signal {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
+	return signals
 }

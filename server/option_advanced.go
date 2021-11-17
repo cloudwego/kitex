@@ -152,3 +152,11 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 		doAddBoundHandler(h, o.RemoteOpt)
 	}}
 }
+
+// WithExitSignal adds ExitSignal for server.
+func WithExitSignal(f func() <-chan error) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("AddExitSignal(%+v)", utils.GetFuncName(f)))
+		o.ExitSignal = f
+	}}
+}
