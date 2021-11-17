@@ -254,7 +254,7 @@ type consistBalancer struct {
 	cachedConsistInfo sync.Map
 	// The main purpose of this lock is to improve performance and prevent Change from being performed while expire
 	// which may cause Change to do a lot of extra computation and memory allocation
-	updateLock sync.RWMutex
+	updateLock sync.Mutex
 	opt        ConsistentHashOption
 	sfg        singleflight.Group
 }
@@ -483,9 +483,9 @@ func (cb *consistBalancer) Rebalance(change discovery.Change) {
 	}
 	// TODO: Use TreeMap to optimize performance when updating.
 	// Now, due to the lack of a good red-black tree implementation, we can only build the full amount once per update.
-	cb.updateLock.RLock()
+	cb.updateLock.Lock()
 	cb.updateConsistInfo(change.Result)
-	cb.updateLock.RUnlock()
+	cb.updateLock.Unlock()
 }
 
 // Delete implements the Rebalancer interface.
