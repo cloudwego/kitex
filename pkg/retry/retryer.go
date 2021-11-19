@@ -45,19 +45,15 @@ type Retryer interface {
 	// ShouldRetry to check if retry request can be called, it is checked in retryer.Do.
 	// If not satisfy will return the reason message
 	ShouldRetry(ctx context.Context, err error, callTimes int, request interface{}, cbKey string) (msg string, ok bool)
-
 	UpdatePolicy(policy Policy) error
 
 	// Retry policy execute func. recycleRI is to decide if the firstRI can be recycled.
 	Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request interface{}) (recycleRI bool, err error)
-
 	AppendErrMsgIfNeeded(err error, msg string)
 
 	// Prepare to do something needed before retry call.
 	Prepare(ctx context.Context, prevRI, retryRI rpcinfo.RPCInfo)
-
 	Dump() map[string]interface{}
-
 	Type() Type
 }
 

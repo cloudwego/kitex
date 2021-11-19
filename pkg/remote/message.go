@@ -80,35 +80,20 @@ func NewProtocolInfo(tp transport.Protocol, ct serviceinfo.PayloadCodec) Protoco
 // Message is the core abstraction for Kitex message.
 type Message interface {
 	RPCInfo() rpcinfo.RPCInfo
-
 	ServiceInfo() *serviceinfo.ServiceInfo
-
 	Data() interface{}
-
 	NewData(method string) (ok bool)
-
 	MessageType() MessageType
-
 	SetMessageType(MessageType)
-
 	RPCRole() RPCRole
-
 	PayloadLen() int
-
 	SetPayloadLen(size int)
-
 	TransInfo() TransInfo
-
 	Tags() map[string]interface{}
-
 	ProtocolInfo() ProtocolInfo
-
 	SetProtocolInfo(ProtocolInfo)
-
 	PayloadCodec() PayloadCodec
-
 	SetPayloadCodec(pc PayloadCodec)
-
 	Recycle()
 }
 

@@ -18,8 +18,8 @@ package thrift
 
 import (
 	"context"
-	"encoding/json"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -304,7 +304,7 @@ func writeFloat64(ctx context.Context, val interface{}, out thrift.TProtocol, t 
 }
 
 func writeString(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
-        switch t.Name {
+	switch t.Name {
 	case "binary":
 		bytes, err := base64.StdEncoding.DecodeString(val.(string))
 		if err != nil {
