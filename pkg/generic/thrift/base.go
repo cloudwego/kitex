@@ -30,7 +30,6 @@ type TrafficEnv struct {
 
 func NewTrafficEnv() *TrafficEnv {
 	return &TrafficEnv{
-
 		Open: false,
 		Env:  "",
 	}
@@ -233,7 +232,6 @@ type Base struct {
 
 func NewBase() *Base {
 	return &Base{
-
 		LogID:  "",
 		Caller: "",
 		Addr:   "",
@@ -682,7 +680,6 @@ type BaseResp struct {
 
 func NewBaseResp() *BaseResp {
 	return &BaseResp{
-
 		StatusMessage: "",
 		StatusCode:    0,
 	}

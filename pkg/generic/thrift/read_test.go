@@ -29,8 +29,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
-var stringInput = "hello world"
-var binaryInput = []byte(stringInput)
+var (
+	stringInput = "hello world"
+	binaryInput = []byte(stringInput)
+)
 
 func Test_nextReader(t *testing.T) {
 	type args struct {

@@ -107,9 +107,7 @@ func mockOnewayHandler(ctx context.Context, handler, args, result interface{}) e
 // MyService .
 type MyService interface {
 	Mock(ctx context.Context, req *MyRequest) (r *MyResponse, err error)
-
 	MockException(ctx context.Context, req *MyRequest) (r *MyResponse, err error)
-
 	MockOneway(ctx context.Context, req *MyRequest) (err error)
 }
 
