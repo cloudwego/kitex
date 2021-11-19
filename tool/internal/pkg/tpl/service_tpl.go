@@ -37,9 +37,9 @@ func serviceInfo() *kitex.ServiceInfo {
 	return {{LowerFirst .ServiceName}}ServiceInfo
  }
 
-var {{LowerFirst .ServiceName}}ServiceInfo = newServiceInfo()
+var {{LowerFirst .ServiceName}}ServiceInfo = NewServiceInfo()
 
-func newServiceInfo() *kitex.ServiceInfo {
+func NewServiceInfo() *kitex.ServiceInfo {
 	serviceName := "{{.RawServiceName}}"
 	handlerType := (*{{call .ServiceTypeName}})(nil)
 	methods := map[string]kitex.MethodInfo{
