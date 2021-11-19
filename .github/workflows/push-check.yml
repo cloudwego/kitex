@@ -31,8 +31,8 @@ jobs:
       - name: Lint
         run: |
           go vet -stdmethods=false $(go list ./...)
-          go install mvdan.cc/gofumpt@latest
-          test -z "$(gofumpt -s -l -extra .)"  || echo "Please run 'gofumpt -l -w -extra .'"
+          go install mvdan.cc/gofumpt@v0.2.0
+          test -z "$(gofumpt -l -extra .)" 
 
       - name: Unit Test
         run: go test -v -race -covermode=atomic -coverprofile=coverage.out ./...
