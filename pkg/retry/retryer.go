@@ -20,6 +20,8 @@ package retry
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -143,13 +145,26 @@ func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 	if ok && r != nil {
 		retryer, ok := r.(Retryer)
 		if ok {
+			var str strings.Builder
 			if retryer.Type() == p.Type {
 				retryer.UpdatePolicy(p)
-				rc.msg = fmt.Sprintf("update retryer[%s-%s] at %s", method, retryer.Type(), time.Now())
+				str.WriteString("update retryer[")
+				str.WriteString(method)
+				str.WriteString("-")
+				str.WriteString(strconv.Itoa(int(retryer.Type())))
+				str.WriteString("] at ")
+				str.WriteString(time.Now().String())
+				rc.msg = str.String()
 				return
 			}
+			str.WriteString("delete retryer[")
+			str.WriteString(method)
+			str.WriteString("-")
+			str.WriteString(strconv.Itoa(int(retryer.Type())))
+			str.WriteString("] at ")
+			str.WriteString(time.Now().String())
 			rc.retryerMap.Delete(method)
-			rc.msg = fmt.Sprintf("delete retryer[%s-%s] at %s", method, retryer.Type(), time.Now())
+			rc.msg = str.String()
 		}
 	}
 	rc.initRetryer(method, p)

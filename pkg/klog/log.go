@@ -18,7 +18,8 @@ package klog
 
 import (
 	"context"
-	"fmt"
+	"strings"
+	"strconv"
 )
 
 // FormatLogger is a logger interface that output logs with a format.
@@ -93,5 +94,9 @@ func (lv Level) toString() string {
 	if lv >= LevelTrace && lv <= LevelFatal {
 		return strs[lv]
 	}
-	return fmt.Sprintf("[?%d] ", lv)
+	var strBuilder strings.Builder
+	strBuilder.WriteString("[?")
+	strBuilder.WriteString(strconv.Itoa(int(lv)))
+	strBuilder.WriteString("] ")
+	return strBuilder.String()
 }

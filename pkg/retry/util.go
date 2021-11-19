@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"runtime/debug"
 	"strconv"
+	"strings"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -89,6 +90,7 @@ func chainStop(ctx context.Context, policy StopPolicy) (bool, string) {
 }
 
 func circuitBreakerStop(ctx context.Context, policy StopPolicy, cbC *cbContainer, request interface{}, cbKey string) (bool, string) {
+	var str strings.Builder
 	if cbC.cbCtl == nil || cbC.cbPanel == nil {
 		return false, ""
 	}
@@ -98,7 +100,11 @@ func circuitBreakerStop(ctx context.Context, policy StopPolicy, cbC *cbContainer
 	if sample < cbMinSample || errRate < policy.CBPolicy.ErrorRate {
 		return false, ""
 	}
-	return true, fmt.Sprintf("retry circuit break, errRate=%0.3f, sample=%d", errRate, sample)
+	str.WriteString("retry circuit break, errRate=")
+	str.WriteString(strconv.FormatFloat(errRate, 'f', 3, 64))
+	str.WriteString(", sample=")
+	str.WriteString(strconv.FormatInt(sample, 10))
+	return true, str.String()
 }
 
 func handleRetryInstance(retrySameNode bool, prevRI, retryRI rpcinfo.RPCInfo) {

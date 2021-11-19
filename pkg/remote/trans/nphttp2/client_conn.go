@@ -18,9 +18,9 @@ package nphttp2
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
@@ -36,11 +36,18 @@ type clientConn struct {
 var _ net.Conn = (*clientConn)(nil)
 
 func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*clientConn, error) {
+	var str strings.Builder
 	ri := rpcinfo.GetRPCInfo(ctx)
+	str.WriteString("/")
+	str.WriteString(ri.Invocation().PackageName())
+	str.WriteString(".")
+	str.WriteString(ri.Invocation().ServiceName())
+	str.WriteString("/")
+	str.WriteString(ri.Invocation().MethodName())
 	s, err := tr.NewStream(ctx, &grpc.CallHdr{
 		Host: ri.To().ServiceName(),
 		// grpc method format /package.Service/Method
-		Method: fmt.Sprintf("/%s.%s/%s", ri.Invocation().PackageName(), ri.Invocation().ServiceName(), ri.Invocation().MethodName()),
+		Method: str.String(),
 	})
 	if err != nil {
 		return nil, err

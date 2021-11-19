@@ -19,7 +19,8 @@ package lbcache
 
 import (
 	"context"
-	"fmt"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -84,7 +85,16 @@ type BalancerFactory struct {
 }
 
 func cacheKey(resolver, balancer string, opts Options) string {
-	return fmt.Sprintf("%s|%s|{%s %s}", resolver, balancer, opts.RefreshInterval, opts.ExpireInterval)
+	var buffer strings.Builder
+	buffer.WriteString(resolver)
+	buffer.WriteString("|")
+	buffer.WriteString(balancer)
+	buffer.WriteString("|{")
+	buffer.WriteString(strconv.FormatInt(int64(opts.RefreshInterval), 10))
+	buffer.WriteString(" ")
+	buffer.WriteString(strconv.FormatInt(int64(opts.ExpireInterval), 10))
+	buffer.WriteString("}")
+	return buffer.String()
 }
 
 // NewBalancerFactory get or create a balancer factory for balancer instance
@@ -136,7 +146,11 @@ func (b *BalancerFactory) watcher() {
 
 // cache key with resolver name prefix avoid conflict for balancer
 func renameResultCacheKey(res *discovery.Result, resolverName string) {
-	res.CacheKey = resolverName + ":" + res.CacheKey
+	var buffer strings.Builder
+	buffer.WriteString(resolverName)
+	buffer.WriteString(":")
+	buffer.WriteString(res.CacheKey)
+	res.CacheKey = buffer.String()
 }
 
 // Get create a new balancer if not exists

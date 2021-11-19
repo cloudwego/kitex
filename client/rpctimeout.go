@@ -21,6 +21,8 @@ import (
 	"errors"
 	"fmt"
 	"runtime/debug"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/kitex/internal/wpool"
@@ -56,10 +58,17 @@ func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo, 
 }
 
 func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration) error {
+	var str strings.Builder
 	ri := rpcinfo.GetRPCInfo(ctx)
 	to := ri.To()
 
-	errMsg := fmt.Sprintf("timeout=%v, to=%s, method=%s", timeout, to.ServiceName(), to.Method())
+	str.WriteString("timeout=")
+	str.WriteString(strconv.FormatInt(int64(timeout), 10))
+	str.WriteString(", to=")
+	str.WriteString(to.ServiceName())
+	str.WriteString(", method=")
+	str.WriteString(to.Method())
+	errMsg:=str.String()
 	target := to.Address()
 	if target != nil {
 		errMsg = fmt.Sprintf("%s, remote=%s", errMsg, target.String())

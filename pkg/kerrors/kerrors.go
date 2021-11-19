@@ -92,7 +92,11 @@ type DetailedError struct {
 func (de *DetailedError) Error() string {
 	msg := appendErrMsg(de.basic.Error(), de.extraMsg)
 	if de.cause != nil {
-		return msg + ": " + de.cause.Error()
+		var strBuilder strings.Builder
+		strBuilder.WriteString(msg)
+		strBuilder.WriteString(": ")
+		strBuilder.WriteString(de.cause.Error())
+		return strBuilder.String()
 	}
 	return msg
 }

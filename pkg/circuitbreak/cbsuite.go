@@ -18,7 +18,7 @@ package circuitbreak
 
 import (
 	"context"
-	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -223,6 +223,10 @@ func (s *CBSuite) initInstanceCB() {
 }
 
 func (s *CBSuite) onStateChange(level, key string, oldState, newState circuitbreaker.State, m circuitbreaker.Metricer) {
+	var detailstr strings.Builder
+	var namestr strings.Builder
+	namestr.WriteString(level)
+	namestr.WriteString("_cb")
 	if s.events == nil {
 		return
 	}
@@ -231,11 +235,24 @@ func (s *CBSuite) onStateChange(level, key string, oldState, newState circuitbre
 	if sum := successes + failures + timeouts; sum > 0 {
 		errRate = float64(failures+timeouts) / float64(sum)
 	}
+	detailstr.WriteString(key)
+	detailstr.WriteString(": ")
+	detailstr.WriteString(strconv.Itoa(int(oldState)))
+	detailstr.WriteString(" -> ")
+	detailstr.WriteString(strconv.Itoa(int(newState)))
+	detailstr.WriteString(", (succ: ")
+	detailstr.WriteString(strconv.FormatInt(successes, 10))
+	detailstr.WriteString(", err: ")
+	detailstr.WriteString(strconv.FormatInt(failures, 10))
+	detailstr.WriteString(", timeout: ")
+	detailstr.WriteString(strconv.FormatInt(timeouts, 10))
+	detailstr.WriteString(", rate: ")
+	detailstr.WriteString(strconv.FormatFloat(errRate, 'E', -1, 64))
+	detailstr.WriteString(")")
 	s.events.Push(&event.Event{
-		Name: level + "_cb",
+		Name: namestr.String(),
 		Time: time.Now(),
-		Detail: fmt.Sprintf("%s: %s -> %s, (succ: %d, err: %d, timeout: %d, rate: %f)",
-			key, oldState, newState, successes, failures, timeouts, errRate),
+		Detail: detailstr.String(),
 	})
 }
 
