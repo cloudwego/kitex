@@ -148,13 +148,13 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 		readerDone:        make(chan struct{}),
 		writerDone:        make(chan struct{}),
 		maxStreams:        math.MaxUint32,
-		fc:                &trInFlow{limit: uint32(defaultWindowSize)},
+		fc:                &trInFlow{limit: defaultWindowSize},
 		state:             reachable,
 		activeStreams:     make(map[uint32]*Stream),
 		kp:                kp,
 		kep:               kep,
 		idle:              time.Now(),
-		initialWindowSize: defaultWindowSize,
+		initialWindowSize: int32(defaultWindowSize),
 		bufferPool:        newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.done)
