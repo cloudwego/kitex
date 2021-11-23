@@ -51,8 +51,11 @@ type cliTransHandler struct {
 }
 
 func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
-	buf := newBuffer(conn)
-	defer buf.Release(err)
+	buf := newByteBuffer(conn)
+	defer func() {
+		_ = buf.Release(err)
+		bufPool.Put(buf)
+	}()
 
 	if err = h.codec.Encode(ctx, msg, buf); err != nil {
 		return err
@@ -61,8 +64,12 @@ func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.M
 }
 
 func (h *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
-	buf := newBuffer(conn)
-	defer buf.Release(err)
+	buf := newByteBuffer(conn)
+	defer func() {
+		_ = buf.Release(err)
+		bufPool.Put(buf)
+	}()
+
 	err = h.codec.Decode(ctx, msg, buf)
 	return
 }
