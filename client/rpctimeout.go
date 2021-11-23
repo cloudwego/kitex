@@ -100,6 +100,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 				ctx, cancel = context.WithTimeout(ctx, tm+moreTimeout)
 				defer cancel()
 			}
+			// Fast path for ctx without timeout
 			if ctx.Done() == nil {
 				return next(ctx, request, response)
 			}
