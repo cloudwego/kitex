@@ -22,12 +22,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
-	"os/signal"
 	"reflect"
 	"runtime/debug"
 	"sync"
-	"syscall"
 	"time"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
@@ -182,7 +179,7 @@ func (s *server) Run() (err error) {
 	s.buildRegistryInfo(s.svr.Address())
 	s.Unlock()
 
-	if err = s.waitSignal(errCh); err != nil {
+	if err = s.waitExit(errCh); err != nil {
 		if s.opt.Logger != nil {
 			s.opt.Logger.Errorf("KITEX: received error and exit: %s", err.Error())
 		}
@@ -378,19 +375,15 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 	}
 }
 
-func (s *server) waitSignal(errCh chan error) error {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
+func (s *server) waitExit(errCh chan error) error {
+	exitSignal := s.opt.ExitSignal()
 
 	// service may not be available as soon as startup.
 	delayRegister := time.After(1 * time.Second)
 	for {
 		select {
-		case sig := <-signals:
-			switch sig {
-			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM:
-				return nil
-			}
+		case err := <-exitSignal:
+			return err
 		case err := <-errCh:
 			return err
 		case <-delayRegister:
