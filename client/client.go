@@ -162,10 +162,7 @@ func (kc *kClient) checkOptions() (err error) {
 }
 
 func (kc *kClient) initMiddlewares(ctx context.Context) {
-	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW())
-	if kc.opt.CheckRPCTimeout {
-		kc.mws = append(kc.mws, rpcTimeoutMW(ctx))
-	}
+	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW(), rpcTimeoutMW(ctx))
 	kc.mws = richMWsWithBuilder(ctx, kc.opt.MWBs, kc)
 	// add new middlewares
 	kc.mws = append(kc.mws, acl.NewACLMiddleware(kc.opt.ACLRules))

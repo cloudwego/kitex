@@ -88,18 +88,23 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 
 	logger := mwCtx.Value(endpoint.CtxLoggerKey).(klog.FormatLogger)
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
-		return func(ctx context.Context, request, response interface{}) error {
+		return func(ctx context.Context, request, response interface{}) (err error) {
 			ri := rpcinfo.GetRPCInfo(ctx)
 			if ri.Config().InteractionMode() == rpcinfo.Streaming {
 				return next(ctx, request, response)
 			}
 
-			var err error
 			tm := ri.Config().RPCTimeout()
-			start := time.Now()
-			ctx, cancel := context.WithTimeout(ctx, tm+moreTimeout)
-			defer cancel()
+			if tm > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tm+moreTimeout)
+				defer cancel()
+			}
+			if ctx.Done() == nil {
+				return next(ctx, request, response)
+			}
 
+			start := time.Now()
 			done := make(chan error, 1)
 			workerPool.Go(func() {
 				defer func() {

@@ -74,7 +74,6 @@ type Options struct {
 	Targets          string
 	CBSuite          *circuitbreak.CBSuite
 	Timeouts         rpcinfo.TimeoutProvider
-	CheckRPCTimeout  bool
 
 	ACLRules []acl.RejectFunc
 
