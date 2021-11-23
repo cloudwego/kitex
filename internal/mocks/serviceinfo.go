@@ -18,6 +18,7 @@ package mocks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -30,6 +31,7 @@ const (
 	MockServiceName            = "MockService"
 	MockMethod          string = "mock"
 	MockExceptionMethod string = "mockException"
+	MockErrorMethod     string = "mockError"
 	MockOnewayMethod    string = "mockOneway"
 )
 
@@ -44,6 +46,7 @@ func newServiceInfo() *serviceinfo.ServiceInfo {
 	methods := map[string]serviceinfo.MethodInfo{
 		"mock":          serviceinfo.NewMethodInfo(mockHandler, NewMockArgs, NewMockResult, false),
 		"mockException": serviceinfo.NewMethodInfo(mockExceptionHandler, NewMockArgs, newMockExceptionResult, false),
+		"mockError":     serviceinfo.NewMethodInfo(mockErrorHandler, NewMockArgs, NewMockResult, false),
 		"mockOneway":    serviceinfo.NewMethodInfo(mockOnewayHandler, NewMockArgs, nil, true),
 	}
 
@@ -91,6 +94,17 @@ func mockExceptionHandler(ctx context.Context, handler, args, result interface{}
 	return nil
 }
 
+func mockErrorHandler(ctx context.Context, handler, args, result interface{}) error {
+	a := args.(*myServiceMockArgs)
+	r := result.(*myServiceMockResult)
+	reply, err := handler.(MyService).MockError(ctx, a.Req)
+	if err != nil {
+		return err
+	}
+	r.Success = reply
+	return nil
+}
+
 func newMockExceptionResult() interface{} {
 	return &myServiceMockExceptionResult{}
 }
@@ -108,6 +122,7 @@ func mockOnewayHandler(ctx context.Context, handler, args, result interface{}) e
 type MyService interface {
 	Mock(ctx context.Context, req *MyRequest) (r *MyResponse, err error)
 	MockException(ctx context.Context, req *MyRequest) (r *MyResponse, err error)
+	MockError(ctx context.Context, req *MyRequest) (r *MyResponse, err error)
 	MockOneway(ctx context.Context, req *MyRequest) (err error)
 }
 
@@ -190,6 +205,10 @@ func (h *myServiceHandler) Mock(ctx context.Context, req *MyRequest) (r *MyRespo
 
 func (h *myServiceHandler) MockException(ctx context.Context, req *MyRequest) (r *MyResponse, err error) {
 	return &MyResponse{Name: MockExceptionMethod}, nil
+}
+
+func (h *myServiceHandler) MockError(ctx context.Context, req *MyRequest) (r *MyResponse, err error) {
+	return nil, errors.New(MockErrorMethod)
 }
 
 func (h *myServiceHandler) MockOneway(ctx context.Context, req *MyRequest) (err error) {

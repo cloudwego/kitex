@@ -75,7 +75,11 @@ func NewServer(ops ...Option) Server {
 
 func (s *server) init() {
 	ctx := fillContext(s.opt)
-	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)
+	if s.opt.ErrHandle != nil {
+		// ErrHandle function should be invoked after all middlewares finished
+		s.mws = append(s.mws, newErrorHandleMiddleware(s.opt.ErrHandle))
+	}
+	s.mws = append(s.mws, richMWsWithBuilder(ctx, s.opt.MWBs, s)...)
 	s.mws = append(s.mws, acl.NewACLMiddleware(s.opt.ACLRules))
 
 	if ds := s.opt.DebugService; ds != nil {
@@ -98,6 +102,18 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder, 
 		ks.mws = append(ks.mws, mwBs[i](ctx))
 	}
 	return ks.mws
+}
+
+func newErrorHandleMiddleware(handler func(error) error) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request, response interface{}) error {
+			err := next(ctx, request, response)
+			if err != nil {
+				err = handler(err)
+			}
+			return err
+		}
+	}
 }
 
 func (s *server) initRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context) {
