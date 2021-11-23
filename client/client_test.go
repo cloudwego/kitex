@@ -302,12 +302,12 @@ func TestTimeoutCtxCall(t *testing.T) {
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*10)
-	defer cancel()
 	req, res := new(MockTStruct), new(MockTStruct)
 	cli := newMockClient(t, WithMiddleware(md))
 	err := cli.Call(ctx, mtd, req, res)
 	test.Assert(t, errors.Is(err, kerrors.ErrRPCTimeout))
 	test.Assert(t, atomic.LoadInt32(&accessed) == 0)
+	cancel()
 
 	err = cli.Call(context.Background(), mtd, req, res)
 	test.Assert(t, err == nil)
