@@ -237,7 +237,6 @@ func WithRPCTimeout(d time.Duration) Option {
 
 		rpcinfo.AsMutableRPCConfig(o.Configs).SetRPCTimeout(d)
 		o.Locks.Bits |= rpcinfo.BitRPCTimeout
-		o.CheckRPCTimeout = true
 	}}
 }
 
@@ -260,7 +259,6 @@ func WithTimeoutProvider(p rpcinfo.TimeoutProvider) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithTimeoutProvider(%T(%+v))", p, p))
 		o.Timeouts = p
-		o.CheckRPCTimeout = true
 	}}
 }
 

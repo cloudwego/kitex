@@ -94,12 +94,19 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 				return next(ctx, request, response)
 			}
 
-			var err error
 			tm := ri.Config().RPCTimeout()
-			start := time.Now()
-			ctx, cancel := context.WithTimeout(ctx, tm+moreTimeout)
-			defer cancel()
+			if tm > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tm+moreTimeout)
+				defer cancel()
+			}
+			// Fast path for ctx without timeout
+			if ctx.Done() == nil {
+				return next(ctx, request, response)
+			}
 
+			var err error
+			start := time.Now()
 			done := make(chan error, 1)
 			workerPool.Go(func() {
 				defer func() {
