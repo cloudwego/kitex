@@ -75,13 +75,13 @@ func NewServer(ops ...Option) Server {
 
 func (s *server) init() {
 	ctx := fillContext(s.opt)
-	if s.opt.ErrHandle != nil {
-		// ErrHandle function should be invoked after all middlewares finished
-		s.mws = append(s.mws, newErrorHandleMiddleware(s.opt.ErrHandle))
-	}
-	s.mws = append(s.mws, richMWsWithBuilder(ctx, s.opt.MWBs, s)...)
+	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)
 	s.mws = append(s.mws, acl.NewACLMiddleware(s.opt.ACLRules))
-
+	if s.opt.ErrHandle != nil {
+		// errorHandleMW must be the last middleware,
+		// to ensure it only catches the server handler's error.
+		s.mws = append(s.mws, newErrorHandleMW(s.opt.ErrHandle))
+	}
 	if ds := s.opt.DebugService; ds != nil {
 		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(s.opt.DebugInfo))
 		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
@@ -104,14 +104,15 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder, 
 	return ks.mws
 }
 
-func newErrorHandleMiddleware(handler func(error) error) endpoint.Middleware {
+// newErrorHandleMW provides a hook point for server error handling.
+func newErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response interface{}) error {
 			err := next(ctx, request, response)
-			if err != nil {
-				err = handler(err)
+			if err == nil {
+				return nil
 			}
-			return err
+			return errHandle(err)
 		}
 	}
 }
