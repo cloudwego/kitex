@@ -17,10 +17,12 @@
 package klog
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"sync"
 )
 
 var (
@@ -110,23 +112,32 @@ func Tracef(format string, v ...interface{}) {
 
 var defaultLogger = &localLogger{
 	logger: log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile|log.Lmicroseconds),
+	pool: &sync.Pool{
+		New: func() interface{} {
+			return new(bytes.Buffer)
+		},
+	},
 }
 
 type localLogger struct {
 	logger *log.Logger
+	pool   *sync.Pool
 }
 
 func (ll *localLogger) logf(lv Level, format *string, v ...interface{}) {
 	if level > lv {
 		return
 	}
-	msg := lv.toString()
+	buf := ll.pool.Get().(*bytes.Buffer)
+	buf.WriteString(lv.toString())
 	if format != nil {
-		msg += fmt.Sprintf(*format, v...)
+		buf.WriteString(fmt.Sprintf(*format, v...))
 	} else {
-		msg += fmt.Sprint(v...)
+		buf.WriteString(fmt.Sprint(v...))
 	}
-	ll.logger.Output(3, msg)
+	ll.logger.Output(3, buf.String())
+	buf.Reset()
+	ll.pool.Put(buf)
 	if lv == LevelFatal {
 		os.Exit(1)
 	}

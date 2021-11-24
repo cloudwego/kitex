@@ -196,7 +196,7 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {
-	c := t.opt.TracerCtl.DoStart(ctx, ri, t.opt.Logger)
+	c := t.opt.TracerCtl.DoStart(ctx, ri)
 	return c
 }
 
@@ -208,6 +208,6 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	if panicErr != nil {
 		rpcStats.SetPanicked(panicErr)
 	}
-	t.opt.TracerCtl.DoFinish(ctx, ri, err, t.opt.Logger)
+	t.opt.TracerCtl.DoFinish(ctx, ri, err)
 	rpcStats.Reset()
 }

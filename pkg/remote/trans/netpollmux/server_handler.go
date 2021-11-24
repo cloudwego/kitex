@@ -321,7 +321,7 @@ func (t *svrTransHandler) tryRecover(ctx context.Context, conn net.Conn) {
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {
-	c := t.opt.TracerCtl.DoStart(ctx, ri, t.opt.Logger)
+	c := t.opt.TracerCtl.DoStart(ctx, ri)
 	return c
 }
 
@@ -337,7 +337,7 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 		// it should not regard error which cause by remote connection closed as server error
 		err = nil
 	}
-	t.opt.TracerCtl.DoFinish(ctx, ri, err, t.opt.Logger)
+	t.opt.TracerCtl.DoFinish(ctx, ri, err)
 	// for server side, rpcinfo is reused on connection, clear the rpc stats info but keep the level config
 	sl := ri.Stats().Level()
 	rpcStats.Reset()

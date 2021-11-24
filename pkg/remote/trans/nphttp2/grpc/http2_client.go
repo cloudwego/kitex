@@ -31,6 +31,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
@@ -187,7 +188,7 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 	go func() {
 		err := t.loopy.run()
 		if err != nil {
-			errorf("transport: loopyWriter.run returning. Err: %v", err)
+			klog.Errorf("transport: loopyWriter.run returning. Err: %v", err)
 		}
 		// If it's a connection error, let reader goroutine handle it
 		// since there might be data in the buffers.
@@ -653,7 +654,7 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 	}
 	statusCode, ok := http2ErrConvTab[f.ErrCode]
 	if !ok {
-		warningf("transport: http2Client.handleRSTStream found no mapped gRPC status for the received nhttp2 error %v", f.ErrCode)
+		klog.Warnf("transport: http2Client.handleRSTStream found no mapped gRPC status for the received nhttp2 error %v", f.ErrCode)
 		statusCode = codes.Unknown
 	}
 	if statusCode == codes.Canceled {
@@ -735,7 +736,7 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 		return
 	}
 	if f.ErrCode == http2.ErrCodeEnhanceYourCalm {
-		infof("Client received GoAway with http2.ErrCodeEnhanceYourCalm.")
+		klog.Infof("Client received GoAway with http2.ErrCodeEnhanceYourCalm.")
 	}
 	id := f.LastStreamID
 	if id > 0 && id%2 != 1 {
@@ -940,7 +941,7 @@ func (t *http2Client) reader() {
 		case *http2.WindowUpdateFrame:
 			t.handleWindowUpdate(frame)
 		default:
-			errorf("transport: http2Client.reader got unhandled frame type %v.", frame)
+			klog.Warnf("transport: http2Client.reader got unhandled frame type %v.", frame)
 		}
 	}
 }
