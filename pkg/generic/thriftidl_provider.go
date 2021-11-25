@@ -20,10 +20,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/cloudwego/thriftgo/parser"
-
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/thriftgo/parser"
 )
 
 type thriftFileProvider struct {
@@ -39,7 +38,7 @@ func NewThriftFileProvider(path string, includeDirs ...string) (DescriptorProvid
 	if err != nil {
 		return nil, err
 	}
-	svc, err := thrift.Parse(tree)
+	svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +72,7 @@ func NewThriftContentProvider(main string, includes map[string]string) (*ThriftC
 	if err != nil {
 		return nil, err
 	}
-	svc, err := thrift.Parse(tree)
+	svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +86,7 @@ func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]strin
 	if err != nil {
 		return err
 	}
-	svc, err := thrift.Parse(tree)
+	svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
 	if err != nil {
 		return err
 	}
@@ -174,7 +173,7 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	if err != nil {
 		return nil, err
 	}
-	svc, err := thrift.Parse(tree)
+	svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +191,7 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 	if err != nil {
 		return err
 	}
-	svc, err := thrift.Parse(tree)
+	svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
 	if err != nil {
 		return err
 	}
