@@ -31,7 +31,7 @@ type ConnOption struct {
 // ConnPool is used to get connections.
 type ConnPool interface {
 	// Get returns a connection to the given address.
-	Get(ctx context.Context, network, address string, opt *ConnOption) (net.Conn, error)
+	Get(ctx context.Context, network, address string, opt ConnOption) (net.Conn, error)
 
 	// Put puts the connection back to pool.
 	// Note that the Close method of conn may already be invoked.

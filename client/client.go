@@ -117,7 +117,11 @@ func (kc *kClient) initCircuitBreaker() error {
 
 func (kc *kClient) initRetryer() error {
 	if kc.opt.RetryContainer == nil {
-		kc.opt.RetryContainer = retry.NewRetryContainer()
+		if kc.opt.RetryPolicy == nil {
+			return nil
+		} else {
+			kc.opt.RetryContainer = retry.NewRetryContainer()
+		}
 	}
 	return kc.opt.RetryContainer.Init(kc.opt.RetryPolicy, kc.opt.Logger)
 }
@@ -246,37 +250,47 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	var ri rpcinfo.RPCInfo
 	ctx, ri = kc.initRPCInfo(ctx, method)
 
-	callTimes := 0
-	var prevRI rpcinfo.RPCInfo
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri, kc.opt.Logger)
-	recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, error) {
-		callTimes++
-		retryCtx := ctx
-		cRI := ri
-		if callTimes > 1 {
-			retryCtx, cRI = kc.initRPCInfo(ctx, method)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(callTimes-1))
-			if prevRI == nil {
-				prevRI = ri
-			}
-			r.Prepare(retryCtx, prevRI, cRI)
-			prevRI = cRI
-		}
-		err := kc.eps(retryCtx, request, response)
-		return cRI, err
-	}, ri, request)
-	kc.opt.TracerCtl.DoFinish(ctx, ri, err, kc.opt.Logger)
-	if recycleRI {
-		// why need check recycleRI to decide if recycle RPCInfo?
-		// 1. no retry, rpc timeout happen will cause panic when response return
-		// 2. retry success, will cause panic when first call return
-		// 3. backup request may cause panic, cannot recycle first RPCInfo
-		// RPCInfo will be recycled after rpc is finished,
-		// holding RPCInfo in a new goroutine is forbidden.
-		rpcinfo.PutRPCInfo(ri)
-	}
 
-	return err
+	if kc.opt.RetryContainer == nil {
+		err := kc.eps(ctx, request, response)
+		kc.opt.TracerCtl.DoFinish(ctx, ri, err, kc.opt.Logger)
+		if err == nil {
+			rpcinfo.PutRPCInfo(ri)
+		}
+		return err
+	} else {
+		callTimes := 0
+		var prevRI rpcinfo.RPCInfo
+		recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, error) {
+			callTimes++
+			retryCtx := ctx
+			cRI := ri
+			if callTimes > 1 {
+				retryCtx, cRI = kc.initRPCInfo(ctx, method)
+				retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(callTimes-1))
+				if prevRI == nil {
+					prevRI = ri
+				}
+				r.Prepare(retryCtx, prevRI, cRI)
+				prevRI = cRI
+			}
+			err := kc.eps(retryCtx, request, response)
+			return cRI, err
+		}, ri, request)
+
+		kc.opt.TracerCtl.DoFinish(ctx, ri, err, kc.opt.Logger)
+		if recycleRI {
+			// why need check recycleRI to decide if recycle RPCInfo?
+			// 1. no retry, rpc timeout happen will cause panic when response return
+			// 2. retry success, will cause panic when first call return
+			// 3. backup request may cause panic, cannot recycle first RPCInfo
+			// RPCInfo will be recycled after rpc is finished,
+			// holding RPCInfo in a new goroutine is forbidden.
+			rpcinfo.PutRPCInfo(ri)
+		}
+		return err
+	}
 }
 
 func (kc *kClient) richRemoteOption(ctx context.Context) {
@@ -333,6 +347,8 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		if err != nil {
 			return
 		}
+
+		defer cli.Recycle()
 		config := ri.Config()
 		m := kc.svcInfo.MethodInfo(methodName)
 		if m.OneWay() {

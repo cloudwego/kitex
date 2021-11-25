@@ -51,6 +51,7 @@ type longConn struct {
 	net.Conn
 	sync.RWMutex
 	deadline time.Time
+	address  string
 }
 
 // Close implements the net.Conn interface.
@@ -105,7 +106,7 @@ func (p *peer) Reset(addr net.Addr) {
 }
 
 // Get picks up connection from ring or dial a new one.
-func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter) (net.Conn, error) {
+func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter, addr string) (net.Conn, error) {
 	for {
 		conn, _ := p.ring.Pop().(*longConn)
 		if conn == nil {
@@ -124,7 +125,11 @@ func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter) (n
 		return nil, err
 	}
 	reporter.ConnSucceed(Long, p.serviceName, p.addr)
-	return &longConn{Conn: conn, deadline: time.Now().Add(p.maxIdleTimeout)}, nil
+	return &longConn{
+		Conn:     conn,
+		deadline: time.Now().Add(p.maxIdleTimeout),
+		address:  addr,
+	}, nil
 }
 
 func (p *peer) put(c *longConn) error {
@@ -170,10 +175,10 @@ func (lp *LongPool) getPeer(addr netAddr) *peer {
 
 // Get pick or generate a net.Conn and return
 // The context is not used but leave it for now.
-func (lp *LongPool) Get(ctx context.Context, network, address string, opt *remote.ConnOption) (net.Conn, error) {
+func (lp *LongPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
 	addr := netAddr{network, address}
 	p := lp.getPeer(addr)
-	return p.Get(opt.Dialer, opt.ConnectTimeout, lp.reporter)
+	return p.Get(opt.Dialer, opt.ConnectTimeout, lp.reporter, address)
 }
 
 // Put implements the ConnPool interface.
@@ -184,7 +189,7 @@ func (lp *LongPool) Put(conn net.Conn) error {
 	}
 
 	addr := conn.RemoteAddr()
-	na := netAddr{addr.Network(), addr.String()}
+	na := netAddr{addr.Network(), c.address}
 	p, ok := lp.peerMap.Load(na)
 	if ok {
 		p.(*peer).put(c)
