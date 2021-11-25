@@ -77,7 +77,11 @@ func (s *server) init() {
 	ctx := fillContext(s.opt)
 	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)
 	s.mws = append(s.mws, acl.NewACLMiddleware(s.opt.ACLRules))
-
+	if s.opt.ErrHandle != nil {
+		// errorHandleMW must be the last middleware,
+		// to ensure it only catches the server handler's error.
+		s.mws = append(s.mws, newErrorHandleMW(s.opt.ErrHandle))
+	}
 	if ds := s.opt.DebugService; ds != nil {
 		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(s.opt.DebugInfo))
 		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
@@ -98,6 +102,19 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder, 
 		ks.mws = append(ks.mws, mwBs[i](ctx))
 	}
 	return ks.mws
+}
+
+// newErrorHandleMW provides a hook point for server error handling.
+func newErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request, response interface{}) error {
+			err := next(ctx, request, response)
+			if err == nil {
+				return nil
+			}
+			return errHandle(err)
+		}
+	}
 }
 
 func (s *server) initRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context) {

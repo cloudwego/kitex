@@ -264,7 +264,7 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 	if ri == nil {
 		return "", rAddr
 	}
-	if rAddr.Network() == "unix" {
+	if rAddr != nil && rAddr.Network() == "unix" {
 		if ri.From().Address() != nil {
 			rAddr = ri.From().Address()
 		}
