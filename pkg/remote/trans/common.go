@@ -44,8 +44,11 @@ type Extension interface {
 	IsRemoteClosedErr(error) bool
 }
 
-// GetReadTimeout is to make the read timeout logger, it is better for proxy case to receive error resp.
+// GetReadTimeout is to make the read timeout longer, it is better for proxy case to receive error resp.
 func GetReadTimeout(cfg rpcinfo.RPCConfig) time.Duration {
+	if cfg.RPCTimeout() <= 0 {
+		return 0
+	}
 	return cfg.RPCTimeout() + readMoreTimeout
 }
 

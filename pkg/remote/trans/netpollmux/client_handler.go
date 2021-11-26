@@ -22,6 +22,8 @@ import (
 	"net"
 	"sync/atomic"
 
+	"github.com/cloudwego/netpoll"
+
 	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -30,7 +32,6 @@ import (
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
-	"github.com/cloudwego/netpoll"
 )
 
 type cliTransHandlerFactory struct{}
@@ -127,8 +128,12 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 	callback, _ := event.(*asyncCallback)
 	defer callback.Close()
 
-	ctx, cancel := context.WithTimeout(ctx, trans.GetReadTimeout(ri.Config()))
-	defer cancel()
+	readTimeout := trans.GetReadTimeout(ri.Config())
+	if readTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, readTimeout)
+		defer cancel()
+	}
 	select {
 	case <-ctx.Done():
 		// timeout
