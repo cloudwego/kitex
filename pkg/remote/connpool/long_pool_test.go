@@ -71,10 +71,10 @@ func TestLongConnPoolGetTimeout(t *testing.T) {
 	}
 	var err error
 
-	_, err = p.Get(context.TODO(), "tcp", mockAddr0, &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second})
+	_, err = p.Get(context.TODO(), "tcp", mockAddr0, dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil)
 
-	_, err = p.Get(context.TODO(), "tcp", mockAddr0, &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Millisecond})
+	_, err = p.Get(context.TODO(), "tcp", mockAddr0, dialer.ConnOption{Dialer: d, ConnectTimeout: time.Millisecond})
 	test.Assert(t, err != nil)
 }
 
@@ -91,7 +91,7 @@ func TestLongConnPoolReuse(t *testing.T) {
 	}
 
 	addr1, addr2 := mockAddr1, "127.0.0.1:8002"
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	count := make(map[net.Conn]int)
 	for i := 0; i < 10; i++ {
@@ -152,7 +152,7 @@ func TestLongConnPoolMaxIdle(t *testing.T) {
 	}
 
 	addr := mockAddr1
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	var conns []net.Conn
 	count := make(map[net.Conn]int)
@@ -189,7 +189,7 @@ func TestLongConnPoolGlobalMaxIdle(t *testing.T) {
 	}
 
 	addr1, addr2 := mockAddr1, "127.0.0.1:8002"
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	var conns []net.Conn
 	count := make(map[net.Conn]int)
@@ -245,7 +245,7 @@ func TestLongConnPoolCloseOnDiscard(t *testing.T) {
 	}
 
 	addr := mockAddr1
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	c, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
@@ -305,7 +305,7 @@ func TestLongConnPoolCloseOnError(t *testing.T) {
 	}
 
 	addr := mockAddr1
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	c, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
@@ -355,7 +355,7 @@ func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
 	}
 
 	addr := mockAddr1
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	c, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
@@ -400,7 +400,7 @@ func TestLongConnPoolCloseOnClean(t *testing.T) {
 	}
 
 	addr := mockAddr1
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	c, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
@@ -444,7 +444,7 @@ func TestLongConnPoolDiscardUnknownConnection(t *testing.T) {
 		return mc, nil
 	}
 
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 	c, err := p.Get(context.TODO(), network, address, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
@@ -480,12 +480,12 @@ func TestConnPoolClose(t *testing.T) {
 	}
 
 	network, address := "tcp", mockAddr0
-	conn, err := p.Get(context.TODO(), network, address, &dialer.ConnOption{Dialer: d})
+	conn, err := p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
 	test.Assert(t, err == nil)
 	p.Put(conn)
 
 	network, address = "tcp", mockAddr1
-	_, err = p.Get(context.TODO(), network, address, &dialer.ConnOption{Dialer: d})
+	_, err = p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
 	test.Assert(t, err == nil)
 	p.Put(conn)
 
@@ -530,7 +530,7 @@ func TestLongConnPoolPutUnknownConnection(t *testing.T) {
 		return mc, nil
 	}
 
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 	c, err := p.Get(context.TODO(), network, address, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
@@ -558,7 +558,7 @@ func BenchmarkLongPoolGetOne(b *testing.B) {
 		},
 	}
 	p := newLongPoolForTest(100000, 1<<20, time.Second)
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -579,7 +579,7 @@ func BenchmarkLongPoolGetRand2000(b *testing.B) {
 		},
 	}
 	p := newLongPoolForTest(50, 50, time.Second)
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	var addrs []string
 	for i := 0; i < 2000; i++ {
@@ -604,7 +604,7 @@ func BenchmarkLongPoolGetRand2000Mesh(b *testing.B) {
 		},
 	}
 	p := newLongPoolForTest(100000, 1<<20, time.Second)
-	opt := &dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	var addrs []string
 	for i := 0; i < 2000; i++ {

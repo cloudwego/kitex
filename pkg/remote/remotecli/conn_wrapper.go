@@ -39,14 +39,12 @@ func init() {
 type ConnWrapper struct {
 	connPool remote.ConnPool
 	conn     net.Conn
-	logger   klog.FormatLogger
 }
 
 // NewConnWrapper returns a new ConnWrapper using the given connPool and logger.
 func NewConnWrapper(connPool remote.ConnPool, logger klog.FormatLogger) *ConnWrapper {
 	cm := connWrapperPool.Get().(*ConnWrapper)
 	cm.connPool = connPool
-	cm.logger = logger
 	return cm
 }
 
@@ -82,7 +80,6 @@ func (cm *ConnWrapper) ReleaseConn(err error, ri rpcinfo.RPCInfo) {
 		if err == nil {
 			if _, ok := ri.To().Tag(rpcinfo.ConnResetTag); ok {
 				cm.connPool.Discard(cm.conn)
-				cm.logger.Debugf("discarding the connection because peer will shutdown later")
 			}
 			cm.connPool.Put(cm.conn)
 		} else {
@@ -111,7 +108,7 @@ func (cm *ConnWrapper) getConnWithPool(ctx context.Context, cp remote.ConnPool, 
 	if addr == nil {
 		return nil, kerrors.ErrNoDestAddress
 	}
-	opt := &remote.ConnOption{Dialer: d, ConnectTimeout: timeout}
+	opt := remote.ConnOption{Dialer: d, ConnectTimeout: timeout}
 	ri.Stats().Record(ctx, stats.ClientConnStart, stats.StatusInfo, "")
 	conn, err := cp.Get(ctx, addr.Network(), addr.String(), opt)
 	if err != nil {

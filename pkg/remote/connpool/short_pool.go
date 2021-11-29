@@ -64,7 +64,7 @@ func NewShortPool(serviceName string) *ShortPool {
 }
 
 // Get return a PoolConn instance which implement net.Conn interface.
-func (p *ShortPool) Get(ctx context.Context, network, address string, opt *remote.ConnOption) (net.Conn, error) {
+func (p *ShortPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
 	conn, err := opt.Dialer.DialTimeout(network, address, opt.ConnectTimeout)
 	addr := utils.NewNetAddr(network, address)
 	if err != nil {

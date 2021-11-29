@@ -27,7 +27,7 @@ import (
 func TestRPCConfig(t *testing.T) {
 	c := rpcinfo.NewRPCConfig()
 	test.Assert(t, c != nil)
-	test.Assert(t, c.RPCTimeout() == 0)
+	test.Assert(t, c.RPCTimeout() != 0)
 	test.Assert(t, c.ConnectTimeout() != 0)
 	test.Assert(t, c.ReadWriteTimeout() != 0)
 	test.Assert(t, c.IOBufferSize() != 0)

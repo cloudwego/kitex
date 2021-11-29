@@ -17,6 +17,7 @@
 package thrift
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/thriftgo/parser"
@@ -84,7 +85,7 @@ BizResponse BizMethod3(1: BizRequest req)(api.post = '/life/client/:action/:biz/
 func TestParseHttpIDL(t *testing.T) {
 	re, err := parser.ParseString("http.thrift", httpIDL)
 	test.Assert(t, err == nil, err)
-	svc, err := Parse(re)
+	svc, err := Parse(re, LastServiceOnly)
 	test.Assert(t, err == nil)
 	test.Assert(t, len(svc.Functions) == 3)
 	bizMethod1 := svc.Functions["BizMethod1"]
@@ -112,7 +113,7 @@ service B{
 func TestSelfReferenceParse(t *testing.T) {
 	re, err := parser.ParseString("a.thrift", selfReferenceIDL)
 	test.Assert(t, err == nil, err)
-	svc, err := Parse(re)
+	svc, err := Parse(re, LastServiceOnly)
 	test.Assert(t, err == nil, err)
 	for _, fn := range svc.Functions {
 		for _, i := range fn.Request.Struct.FieldsByID {
@@ -149,6 +150,42 @@ func TestNotSupportAnnotation(t *testing.T) {
 	descriptor.RegisterAnnotation(notSupportAnnotation{})
 	re, err := parser.ParseString("a.thrift", notSupportAnnotationIDL)
 	test.Assert(t, err == nil)
-	_, err = Parse(re)
+	_, err = Parse(re, LastServiceOnly)
 	test.Assert(t, err != nil)
+}
+
+var multiServicesIDL = `
+namespace go test
+
+service A {
+	string method1(1: string req)
+}
+
+service B {
+	string method2(1: string req)
+}
+`
+
+func TestCombineService(t *testing.T) {
+	content := multiServicesIDL
+	tree, err := parser.ParseString("a.thrift", content)
+	test.Assert(t, err == nil)
+
+	dp, err := Parse(tree, LastServiceOnly)
+	test.Assert(t, err == nil)
+	test.Assert(t, dp.Name == "B")
+	test.Assert(t, len(dp.Functions) == 1 && dp.Functions["method2"] != nil)
+
+	dp, err = Parse(tree, CombineServices)
+	test.Assert(t, err == nil)
+	test.Assert(t, dp.Name == "CombinedServices")
+	test.Assert(t, len(dp.Functions) == 2 && dp.Functions["method1"] != nil && dp.Functions["method2"] != nil)
+
+	content = strings.ReplaceAll(content, "method2", "method1")
+	tree, err = parser.ParseString("a.thrift", content)
+	test.Assert(t, err == nil)
+
+	dp, err = Parse(tree, CombineServices)
+	test.Assert(t, err != nil && dp == nil)
+	test.Assert(t, err.Error() == "duplicate method name: method1")
 }
