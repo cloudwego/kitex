@@ -68,7 +68,7 @@ type Options struct {
 	RemoteOpt  *remote.ServerOption
 	ErrHandle  func(error) error
 	ExitSignal func() <-chan error
-	Proxy      proxy.BackwardProxy
+	Proxy      proxy.ReverseProxy
 
 	// Registry is used for service registry.
 	Registry registry.Registry
