@@ -137,6 +137,7 @@ func (kc *kClient) proxyInit(ctx context.Context) (context.Context, error) {
 			Balancer:     kc.opt.Balancer,
 			Pool:         kc.opt.RemoteOpt.ConnPool,
 			FixedTargets: kc.opt.Targets,
+			RPCConfig:    kc.opt.Configs,
 		}
 		if err := kc.opt.Proxy.Configure(&cfg); err != nil {
 			return ctx, err
