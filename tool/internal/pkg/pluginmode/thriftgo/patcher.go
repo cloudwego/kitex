@@ -16,7 +16,7 @@ package thriftgo
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -135,7 +135,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		})
 
 		if p.copyIDL {
-			content, err := ioutil.ReadFile(ast.Filename)
+			content, err := os.ReadFile(ast.Filename)
 			if err != nil {
 				return nil, fmt.Errorf("read %q: %w", ast.Filename, err)
 			}

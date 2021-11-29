@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"go/build"
 	"go/format"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -61,11 +60,11 @@ func WriteToFile(filename string, data []byte) {
 		if err != nil {
 			log.Warnf("format %v code error: %v\n", filename, err)
 		}
-		err = ioutil.WriteFile(filename, data, 0o644)
+		err = os.WriteFile(filename, data, 0o644)
 	} else if strings.HasSuffix(filename, ".sh") {
-		err = ioutil.WriteFile(filename, data, 0o755)
+		err = os.WriteFile(filename, data, 0o755)
 	} else {
-		err = ioutil.WriteFile(filename, data, 0o644)
+		err = os.WriteFile(filename, data, 0o644)
 	}
 	if err != nil {
 		log.Warn("write to file err:", err.Error())
@@ -131,7 +130,7 @@ func NotPtr(s string) string {
 func SearchGoMod(cwd string) (moduleName, path string, found bool) {
 	for {
 		path = filepath.Join(cwd, "go.mod")
-		data, err := ioutil.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err == nil {
 			re := regexp.MustCompile(`^\s*module\s+(\S+)\s*`)
 			for _, line := range strings.Split(string(data), "\n") {

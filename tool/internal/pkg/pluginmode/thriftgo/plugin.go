@@ -17,7 +17,7 @@ package thriftgo
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
 	"github.com/cloudwego/thriftgo/plugin"
@@ -34,7 +34,7 @@ const TheUseOptionMessage = "kitex_gen is not generated due to the -use option"
 // Run is an entry of the plugin mode of kitex for thriftgo.
 // It reads a plugin request from the standard input and writes out a response.
 func Run() int {
-	data, err := ioutil.ReadAll(os.Stdin)
+	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		println("Failed to get input:", err.Error())
 		return 1
