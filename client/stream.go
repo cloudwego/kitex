@@ -48,7 +48,7 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.Streaming)
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 
-	ctx = kc.opt.TracerCtl.DoStart(ctx, ri, kc.opt.Logger)
+	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	return kc.sEps(ctx, request, response)
 }
 
@@ -95,6 +95,6 @@ func (s *stream) SendMsg(m interface{}) error {
 func (s *stream) Close() error {
 	ctx := s.stream.Context()
 	ri := rpcinfo.GetRPCInfo(ctx)
-	s.kc.opt.TracerCtl.DoFinish(ctx, ri, nil, s.kc.opt.Logger)
+	s.kc.opt.TracerCtl.DoFinish(ctx, ri, nil)
 	return s.stream.Close()
 }

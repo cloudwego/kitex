@@ -34,6 +34,7 @@ import (
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 
@@ -418,7 +419,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 		}
 		v, err := decodeMetadataHeader(f.Name, f.Value)
 		if err != nil {
-			errorf("Failed to decode metadata header (%q, %q): %v", f.Name, f.Value, err)
+			klog.Errorf("Failed to decode metadata header (%q, %q): %v", f.Name, f.Value, err)
 			return
 		}
 		d.addMetadata(f.Name, v)

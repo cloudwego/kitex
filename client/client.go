@@ -244,11 +244,11 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	var ri rpcinfo.RPCInfo
 	ctx, ri = kc.initRPCInfo(ctx, method)
 
-	ctx = kc.opt.TracerCtl.DoStart(ctx, ri, kc.opt.Logger)
+	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 
 	if kc.opt.RetryContainer == nil {
 		err := kc.eps(ctx, request, response)
-		kc.opt.TracerCtl.DoFinish(ctx, ri, err, kc.opt.Logger)
+		kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 		if err == nil {
 			rpcinfo.PutRPCInfo(ri)
 		}
@@ -273,7 +273,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 			return cRI, err
 		}, ri, request)
 
-		kc.opt.TracerCtl.DoFinish(ctx, ri, err, kc.opt.Logger)
+		kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 		if recycleRI {
 			// why need check recycleRI to decide if recycle RPCInfo?
 			// 1. no retry, rpc timeout happen will cause panic when response return
