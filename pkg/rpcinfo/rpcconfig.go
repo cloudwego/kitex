@@ -32,7 +32,7 @@ var (
 
 // default values.
 var (
-	defaultRPCTimeout       = time.Second
+	defaultRPCTimeout       = time.Duration(0)
 	defaultConnectTimeout   = time.Millisecond * 50
 	defaultReadWriteTimeout = time.Second * 5
 	defaultBufferSize       = 4096
