@@ -1,6 +1,6 @@
 module github.com/cloudwego/kitex
 
-go 1.13
+go 1.17
 
 require (
 	github.com/apache/thrift v0.13.0
@@ -17,4 +17,15 @@ require (
 	google.golang.org/genproto v0.0.0-20210513213006-bf773b8c8384
 	google.golang.org/protobuf v1.26.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
+)
+
+require (
+	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
+	github.com/modern-go/reflect2 v0.0.0-20180701023420-4b7aa43c6742 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.0 // indirect
+	golang.org/x/net v0.0.0-20210614182718-04defd469f4e // indirect
+	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect
+	golang.org/x/text v0.3.6 // indirect
 )
