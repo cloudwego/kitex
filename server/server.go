@@ -153,9 +153,7 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	}
 	s.svcInfo = svcInfo
 	s.handler = handler
-	if ds := s.opt.DebugService; ds != nil {
-		ds.RegisterProbeFunc(diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcInfo))
-	}
+	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcInfo))
 	return nil
 }
 

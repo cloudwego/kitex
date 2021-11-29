@@ -23,7 +23,6 @@ import (
 	"strconv"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
-
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -85,8 +84,12 @@ func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error)
 
 func (kc *kClient) init() error {
 	initTransportProtocol(kc.svcInfo, kc.opt.Configs)
-
 	ctx := fillContext(kc.opt)
+	if nCtx, err := kc.proxyInit(ctx); err != nil {
+		return err
+	} else {
+		ctx = nCtx
+	}
 	if err := kc.checkOptions(); err != nil {
 		return err
 	}
@@ -126,38 +129,29 @@ func (kc *kClient) initRetryer() error {
 	return kc.opt.RetryContainer.Init(kc.opt.RetryPolicy, kc.opt.Logger)
 }
 
-func initTransportProtocol(svcInfo *serviceinfo.ServiceInfo, cfg rpcinfo.RPCConfig) {
-	if svcInfo.PayloadCodec == serviceinfo.Protobuf && cfg.TransportProtocol() != transport.GRPC {
-		// pb use ttheader framed by default
-		rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
-	}
-}
-
-func fillContext(opt *client.Options) context.Context {
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
-	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, opt.Events)
-	ctx = context.WithValue(ctx, endpoint.CtxLoggerKey, opt.Logger)
-	ctx = context.WithValue(ctx, rpctimeout.TimeoutAdjustKey, &opt.ExtraTimeout)
-	return ctx
-}
-
-func (kc *kClient) checkOptions() (err error) {
-	if kc.opt.Svr.ServiceName == "" {
-		return errors.New("service name is required")
-	}
+func (kc *kClient) proxyInit(ctx context.Context) (context.Context, error) {
 	if kc.opt.Proxy != nil {
 		cfg := proxy.Config{
-			ServiceName:  kc.opt.Svr.ServiceName,
+			ServerInfo:   kc.opt.Svr,
 			Resolver:     kc.opt.Resolver,
 			Balancer:     kc.opt.Balancer,
 			Pool:         kc.opt.RemoteOpt.ConnPool,
 			FixedTargets: kc.opt.Targets,
 		}
-		if err = kc.opt.Proxy.Configure(&cfg); err != nil {
-			return err
+		if err := kc.opt.Proxy.Configure(&cfg); err != nil {
+			return ctx, err
+		}
+		if chr, ok := kc.opt.Proxy.(proxy.ContextHandler); ok {
+			ctx = chr.HandleContext(ctx)
 		}
 		updateOptWithProxyCfg(cfg, kc.opt)
+	}
+	return ctx, nil
+}
+
+func (kc *kClient) checkOptions() (err error) {
+	if kc.opt.Svr.ServiceName == "" {
+		return errors.New("service name is required")
 	}
 	if kc.opt.Logger == nil {
 		return errors.New("logger need to be initialized")
@@ -443,9 +437,25 @@ func newCliTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, er
 	return transPl, nil
 }
 
+func fillContext(opt *client.Options) context.Context {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
+	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, opt.Events)
+	ctx = context.WithValue(ctx, endpoint.CtxLoggerKey, opt.Logger)
+	ctx = context.WithValue(ctx, rpctimeout.TimeoutAdjustKey, &opt.ExtraTimeout)
+	return ctx
+}
+
 func updateOptWithProxyCfg(cfg proxy.Config, opt *client.Options) {
 	opt.Resolver = cfg.Resolver
 	opt.Balancer = cfg.Balancer
 	opt.RemoteOpt.ConnPool = cfg.Pool
 	opt.Targets = cfg.FixedTargets
+}
+
+func initTransportProtocol(svcInfo *serviceinfo.ServiceInfo, cfg rpcinfo.RPCConfig) {
+	if svcInfo.PayloadCodec == serviceinfo.Protobuf && cfg.TransportProtocol() != transport.GRPC {
+		// pb use ttheader framed by default
+		rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
+	}
 }
