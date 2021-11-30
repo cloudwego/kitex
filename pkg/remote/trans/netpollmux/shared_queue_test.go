@@ -84,7 +84,7 @@ func BenchmarkShareQueue(b *testing.B) {
 		for _, gt := range gts {
 			buf, isNil := gt()
 			if !isNil {
-				_, err := conn.AppendBuffer(buf)
+				err := conn.AppendBuffer(buf)
 				if err != nil {
 					b.Fatal(err)
 				}
