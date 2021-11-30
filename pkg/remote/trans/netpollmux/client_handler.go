@@ -26,6 +26,7 @@ import (
 
 	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
@@ -92,9 +93,6 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	}
 
 	mc, _ := conn.(*muxCliConn)
-	if mc.logger == nil {
-		mc.logger = t.opt.Logger
-	}
 
 	// if oneway
 	var methodInfo serviceinfo.MethodInfo
@@ -164,9 +162,9 @@ func (t *cliTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 // OnError implements the remote.ClientTransHandler interface.
 func (t *cliTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	if pe, ok := err.(*kerrors.DetailedError); ok {
-		t.opt.Logger.Errorf("KITEX: send request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+		klog.Errorf("KITEX: send request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
 	} else {
-		t.opt.Logger.Errorf("KITEX: send request error, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
+		klog.Errorf("KITEX: send request error, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 

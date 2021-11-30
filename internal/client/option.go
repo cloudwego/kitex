@@ -30,7 +30,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/http"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
@@ -89,7 +88,6 @@ type Options struct {
 	DebugService diagnosis.Service
 
 	// Observability
-	Logger     klog.FormatLogger
 	TracerCtl  *internal_stats.Controller
 	StatsLevel *stats.Level
 
@@ -121,7 +119,6 @@ func NewOptions(opts []Option) *Options {
 		Configs:      rpcinfo.NewRPCConfig(),
 		Locks:        NewConfigLocks(),
 		Once:         configutil.NewOptionOnce(),
-		Logger:       klog.DefaultLogger(),
 		HTTPResolver: http.NewDefaultResolver(),
 		DebugService: diagnosis.NoopService,
 

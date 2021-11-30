@@ -26,7 +26,6 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 )
@@ -59,7 +58,6 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	var moreTimeout time.Duration
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), r)
 	mwCtx := context.Background()
-	mwCtx = context.WithValue(mwCtx, endpoint.CtxLoggerKey, klog.DefaultLogger())
 	mwCtx = context.WithValue(mwCtx, rpctimeout.TimeoutAdjustKey, &moreTimeout)
 
 	var err error

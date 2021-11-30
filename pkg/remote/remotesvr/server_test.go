@@ -24,7 +24,6 @@ import (
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -53,7 +52,6 @@ func TestServerStart(t *testing.T) {
 	opt := &remote.ServerOption{
 		Address:            utils.NewNetAddr("tcp", "test"),
 		TransServerFactory: mocks.NewMockTransServerFactory(transSvr),
-		Logger:             klog.DefaultLogger(),
 	}
 	inkHdlrFunc := func(ctx context.Context, req, resp interface{}) (err error) {
 		return nil
@@ -81,7 +79,6 @@ func TestServerStartListenErr(t *testing.T) {
 	opt := &remote.ServerOption{
 		Address:            utils.NewNetAddr("tcp", "test"),
 		TransServerFactory: mocks.NewMockTransServerFactory(transSvr),
-		Logger:             klog.DefaultLogger(),
 	}
 	inkHdlrFunc := func(ctx context.Context, req, resp interface{}) (err error) {
 		return nil

@@ -47,7 +47,6 @@ func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 type muxCliConn struct {
 	muxConn
 	seqIDMap *sharedMap // (k,v) is (sequenceID, notify)
-	logger   klog.FormatLogger
 }
 
 // OnRequest is called when the connection creates.
@@ -91,7 +90,7 @@ func (c *muxCliConn) close() error {
 }
 
 func (c *muxCliConn) onError(err error, connection netpoll.Connection) error {
-	c.logger.Errorf("KITEX: %s", err.Error())
+	klog.Errorf("KITEX: %s", err.Error())
 	connection.Close()
 	return err
 }

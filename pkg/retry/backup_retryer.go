@@ -34,8 +34,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-func newBackupRetryer(policy Policy, cbC *cbContainer, logger klog.FormatLogger) (Retryer, error) {
-	br := &backupRetryer{cbContainer: cbC, logger: logger}
+func newBackupRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
+	br := &backupRetryer{cbContainer: cbC}
 	if err := br.UpdatePolicy(policy); err != nil {
 		return nil, fmt.Errorf("newBackupRetryer failed, err=%w", err)
 	}
@@ -47,7 +47,6 @@ type backupRetryer struct {
 	policy      *BackupPolicy
 	cbContainer *cbContainer
 	retryDelay  time.Duration
-	logger      klog.FormatLogger
 	sync.RWMutex
 	errMsg string
 }
@@ -95,7 +94,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	timer := time.NewTimer(retryDelay)
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
-			err = panicToErr(ctx, panicInfo, firstRI, r.logger)
+			err = panicToErr(ctx, panicInfo, firstRI)
 		}
 		timer.Stop()
 	}()
@@ -112,7 +111,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				var e error
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
-						e = panicToErr(ctx, panicInfo, firstRI, r.logger)
+						e = panicToErr(ctx, panicInfo, firstRI)
 					}
 					done <- e
 				}()
@@ -171,7 +170,7 @@ func (r *backupRetryer) UpdatePolicy(rp Policy) (err error) {
 		if e := checkCBErrorRate(&rp.BackupPolicy.StopPolicy.CBPolicy); e != nil {
 			rp.BackupPolicy.StopPolicy.CBPolicy.ErrorRate = defaultCBErrRate
 			errMsg = fmt.Sprintf("backupRetryer %s, use default %0.2f", e.Error(), defaultCBErrRate)
-			r.logger.Warnf(errMsg)
+			klog.Warnf(errMsg)
 		}
 	}
 

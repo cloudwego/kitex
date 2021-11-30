@@ -28,7 +28,7 @@ import (
 
 // NewStream create a client side stream
 func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTransHandler, opt *remote.ClientOption) (streaming.Stream, error) {
-	cm := NewConnWrapper(opt.ConnPool, opt.Logger)
+	cm := NewConnWrapper(opt.ConnPool)
 	var err error
 	for _, shdlr := range opt.StreamingMetaHandlers {
 		ctx, err = shdlr.OnConnectStream(ctx)

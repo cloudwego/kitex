@@ -67,12 +67,12 @@ func RegisterDDLStop(f DDLStopFunc) {
 // If Ingress is turned on in the current node, check whether RPC_PERSIST_DDL_REMAIN_TIME exists,
 // if it exists calculate handler time consumed by RPC_PERSIST_INGRESS_START_TIME and current time,
 // if handler cost > ddl remain time, then do not execute retry.
-func ddlStop(ctx context.Context, policy StopPolicy, logger klog.FormatLogger) (bool, string) {
+func ddlStop(ctx context.Context, policy StopPolicy) (bool, string) {
 	if !policy.DDLStop {
 		return false, ""
 	}
 	if ddlStopFunc == nil {
-		logger.Warnf("enable ddl stop for retry, but no ddlStopFunc is registered")
+		klog.Warnf("enable ddl stop for retry, but no ddlStopFunc is registered")
 		return false, ""
 	}
 	return ddlStopFunc(ctx, policy)
@@ -135,18 +135,14 @@ func makeRetryErr(ctx context.Context, msg string, callTimes int32) error {
 	return kerrors.ErrRetry.WithCause(errors.New(errMsg))
 }
 
-func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo, logger klog.FormatLogger) error {
+func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo) error {
 	remoteInfo := ""
 	if ri != nil {
 		remoteInfo = fmt.Sprintf(", remote[to_service=%s|method=%s]", ri.To().ServiceName(), ri.To().Method())
 	}
 	err := fmt.Errorf("KITEX: panic in retry%s, err=%v\n%s",
 		remoteInfo, panicInfo, debug.Stack())
-	if l, ok := logger.(klog.CtxLogger); ok {
-		l.CtxErrorf(ctx, "%s", err.Error())
-	} else {
-		logger.Errorf("%s", err.Error())
-	}
+	klog.CtxErrorf(ctx, "%s", err.Error())
 	return err
 }
 
