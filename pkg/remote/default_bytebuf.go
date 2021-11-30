@@ -259,9 +259,9 @@ func (b *defaultByteBuffer) Flush() (err error) {
 }
 
 // AppendBuffer appends buf to the original buffer.
-func (b *defaultByteBuffer) AppendBuffer(buf ByteBuffer) (n int, err error) {
+func (b *defaultByteBuffer) AppendBuffer(buf ByteBuffer) (err error) {
 	subBuf := buf.(*defaultByteBuffer)
-	n = subBuf.writeIdx
+	n := subBuf.writeIdx
 	b.ensureWritable(n)
 	copy(b.buff[b.writeIdx:b.writeIdx+n], subBuf.buff)
 	b.writeIdx += n
