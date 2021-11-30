@@ -74,8 +74,8 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	defer func() {
 		if err != nil {
 			buf.Close()
-			bufWriter.Release(err)
 		}
+		bufWriter.Release(err)
 		stats2.Record(ctx, ri, stats.WriteFinish, nil)
 	}()
 
@@ -100,15 +100,15 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		return err
 	}
 	if methodInfo.OneWay() {
-		mc.Put(func() (buf remote.ByteBuffer, isNil bool) {
-			return bufWriter, false
+		mc.Put(func() (netpoll.Writer, bool) {
+			return buf, false
 		})
 		return nil
 	}
 
 	// add notify
 	seqID := ri.Invocation().SeqID()
-	callback := newAsyncCallback(buf, bufWriter)
+	callback := newAsyncCallback(buf)
 	mc.seqIDMap.store(seqID, callback)
 	mc.Put(callback.getter)
 	return err
@@ -175,16 +175,14 @@ func (t *cliTransHandler) SetPipeline(p *remote.TransPipeline) {
 
 type asyncCallback struct {
 	wbuf       *netpoll.LinkBuffer
-	bufWriter  remote.ByteBuffer
 	bufReader  remote.ByteBuffer
 	notifyChan chan error
 	closed     int32 // 1 is closed, 2 means wbuf has been flush
 }
 
-func newAsyncCallback(wbuf *netpoll.LinkBuffer, bufWriter remote.ByteBuffer) *asyncCallback {
+func newAsyncCallback(wbuf *netpoll.LinkBuffer) *asyncCallback {
 	return &asyncCallback{
 		wbuf:       wbuf,
-		bufWriter:  bufWriter,
 		notifyChan: make(chan error, 1),
 	}
 }
@@ -200,7 +198,6 @@ func (c *asyncCallback) Recv(bufReader remote.ByteBuffer, err error) error {
 func (c *asyncCallback) Close() error {
 	if atomic.CompareAndSwapInt32(&c.closed, 0, 1) {
 		c.wbuf.Close()
-		c.bufWriter.Release(nil)
 	}
 	if c.bufReader != nil {
 		if l := c.bufReader.ReadableLen(); l > 0 {
@@ -218,9 +215,9 @@ func (c *asyncCallback) notify(err error) {
 	}
 }
 
-func (c *asyncCallback) getter() (w remote.ByteBuffer, isNil bool) {
+func (c *asyncCallback) getter() (w netpoll.Writer, isNil bool) {
 	if atomic.CompareAndSwapInt32(&c.closed, 0, 2) {
-		return c.bufWriter, false
+		return c.wbuf, false
 	}
 	return nil, true
 }
