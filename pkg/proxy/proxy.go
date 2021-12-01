@@ -33,6 +33,7 @@ type Config struct {
 	Balancer     loadbalance.Loadbalancer
 	Pool         remote.ConnPool
 	FixedTargets string // A comma separated list of host ports that user specify to use.
+	RPCConfig    rpcinfo.RPCConfig
 }
 
 // ForwardProxy manages the service discovery, load balance and connection pooling processes.
