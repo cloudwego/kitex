@@ -53,12 +53,17 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 }
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
-	return &svrTransHandler{
+	svrHdlr := &svrTransHandler{
 		opt:     opt,
 		codec:   opt.Codec,
 		svcInfo: opt.SvcInfo,
 		ext:     np.NewNetpollConnExtension(),
-	}, nil
+	}
+	if svrHdlr.opt.TracerCtl == nil {
+		// init TraceCtl when it is nil, or it will lead some unit tests panic
+		svrHdlr.opt.TracerCtl = &stats2.Controller{}
+	}
+	return svrHdlr, nil
 }
 
 var _ remote.ServerTransHandler = &svrTransHandler{}
