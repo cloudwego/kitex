@@ -45,10 +45,10 @@ func DefaultLogger() FullLogger {
 	return defaultLogger
 }
 
-// SetDefaultLogger sets the default logger.
+// SetLogger sets the default logger.
 // Note that this method is not concurrent-safe and must not be called
 // after the use of DefaultLogger and global functions in this package.
-func SetDefaultLogger(v FullLogger) {
+func SetLogger(v FullLogger) {
 	defaultLogger = v
 }
 
