@@ -32,8 +32,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-func newFailureRetryer(policy Policy, cbC *cbContainer, logger klog.FormatLogger) (Retryer, error) {
-	fr := &failureRetryer{cbContainer: cbC, logger: logger}
+func newFailureRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
+	fr := &failureRetryer{cbContainer: cbC}
 	if err := fr.UpdatePolicy(policy); err != nil {
 		return nil, fmt.Errorf("newfailureRetryer failed, err=%w", err)
 	}
@@ -45,7 +45,6 @@ type failureRetryer struct {
 	policy      *FailurePolicy
 	backOff     BackOff
 	cbContainer *cbContainer
-	logger      klog.FormatLogger
 	sync.RWMutex
 	errMsg string
 }
@@ -60,7 +59,7 @@ func (r *failureRetryer) ShouldRetry(ctx context.Context, err error, callTimes i
 	if stop, msg := circuitBreakerStop(ctx, r.policy.StopPolicy, r.cbContainer, request, cbKey); stop {
 		return msg, false
 	}
-	if stop, msg := ddlStop(ctx, r.policy.StopPolicy, r.logger); stop {
+	if stop, msg := ddlStop(ctx, r.policy.StopPolicy); stop {
 		return msg, false
 	}
 	r.backOff.Wait(callTimes)
@@ -77,7 +76,7 @@ func (r *failureRetryer) AllowRetry(ctx context.Context) (string, bool) {
 	if stop, msg := chainStop(ctx, r.policy.StopPolicy); stop {
 		return msg, false
 	}
-	if stop, msg := ddlStop(ctx, r.policy.StopPolicy, r.logger); stop {
+	if stop, msg := ddlStop(ctx, r.policy.StopPolicy); stop {
 		return msg, false
 	}
 	return "", true
@@ -99,7 +98,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, request)
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
-			err = panicToErr(ctx, panicInfo, firstRI, r.logger)
+			err = panicToErr(ctx, panicInfo, firstRI)
 		}
 	}()
 	startTime := time.Now()
@@ -174,7 +173,7 @@ func (r *failureRetryer) UpdatePolicy(rp Policy) (err error) {
 		if e := checkCBErrorRate(&rp.FailurePolicy.StopPolicy.CBPolicy); e != nil {
 			rp.FailurePolicy.StopPolicy.CBPolicy.ErrorRate = defaultCBErrRate
 			errMsg = fmt.Sprintf("failureRetryer %s, use default %0.2f", e.Error(), defaultCBErrRate)
-			r.logger.Warnf(errMsg)
+			klog.Warnf(errMsg)
 		}
 	}
 	r.Lock()
@@ -187,7 +186,7 @@ func (r *failureRetryer) UpdatePolicy(rp Policy) (err error) {
 	r.policy = rp.FailurePolicy
 	if bo, e := initBackOff(rp.FailurePolicy.BackOffPolicy); e != nil {
 		r.errMsg = fmt.Sprintf("failureRetryer update BackOffPolicy failed, err=%s", e.Error())
-		r.logger.Warnf(r.errMsg)
+		klog.Warnf(r.errMsg)
 	} else {
 		r.backOff = bo
 	}

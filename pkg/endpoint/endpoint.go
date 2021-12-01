@@ -63,5 +63,4 @@ type mwCtxKeyType int
 const (
 	CtxEventBusKey mwCtxKeyType = iota
 	CtxEventQueueKey
-	CtxLoggerKey
 )

@@ -24,6 +24,7 @@ import (
 	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -106,9 +107,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			if conn != nil {
 				ri := rpcinfo.GetRPCInfo(ctx)
 				rService, rAddr := getRemoteInfo(ri, conn)
-				t.opt.Logger.Errorf("KITEX: panic happened, close conn[%s], remoteService=%s, %v\n%s", rAddr, rService, panicErr, string(debug.Stack()))
+				klog.Errorf("KITEX: panic happened, close conn[%s], remoteService=%s, %v\n%s", rAddr, rService, panicErr, string(debug.Stack()))
 			} else {
-				t.opt.Logger.Errorf("KITEX: panic happened, %v\n%s", panicErr, string(debug.Stack()))
+				klog.Errorf("KITEX: panic happened, %v\n%s", panicErr, string(debug.Stack()))
 			}
 		}
 		if closeConn && conn != nil {
@@ -193,9 +194,9 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 		remote := rpcinfo.AsMutableEndpointInfo(ri.From())
 		remote.SetTag(rpcinfo.RemoteClosedTag, "1")
 	} else if pe, ok := err.(*kerrors.DetailedError); ok {
-		t.opt.Logger.Errorf("KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s\n%s", rService, rAddr, err.Error(), pe.Stack())
+		klog.Errorf("KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s\n%s", rService, rAddr, err.Error(), pe.Stack())
 	} else {
-		t.opt.Logger.Errorf("KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s", rService, rAddr, err.Error())
+		klog.Errorf("KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s", rService, rAddr, err.Error())
 	}
 }
 
@@ -231,7 +232,7 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg r
 	}
 	err = t.transPipe.Write(ctx, conn, errMsg)
 	if err != nil {
-		t.opt.Logger.Errorf("KITEX: write error reply failed, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
+		klog.Errorf("KITEX: write error reply failed, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 

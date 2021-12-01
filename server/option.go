@@ -103,12 +103,9 @@ func WithReadWriteTimeout(d time.Duration) Option {
 }
 
 // WithLogger sets the Logger for kitex server.
+// Deprecated: server uses the global klog.DefaultLogger.
 func WithLogger(logger klog.FormatLogger) Option {
-	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithLogger(%T)", logger))
-
-		o.Logger = logger
-	}}
+	panic("server.WithLogger is deprecated")
 }
 
 // WithExitWaitTime sets the wait duration for graceful shutdown.

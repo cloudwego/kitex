@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
@@ -117,9 +118,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				panicErr := recover()
 				if panicErr != nil {
 					if conn != nil {
-						t.opt.Logger.Errorf("KITEX: panic happened, close conn[%s], %v\n%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
+						klog.Errorf("KITEX: panic happened, close conn[%s], %v\n%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
 					} else {
-						t.opt.Logger.Errorf("KITEX: panic happened, %v\n%s", panicErr, string(debug.Stack()))
+						klog.Errorf("KITEX: panic happened, %v\n%s", panicErr, string(debug.Stack()))
 					}
 				}
 				t.finishTracer(ctx, ri, err, panicErr)
@@ -182,9 +183,9 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 // 传输层 error 回调
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	if pe, ok := err.(*kerrors.DetailedError); ok {
-		t.opt.Logger.Errorf("KITEX: processing request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+		klog.Errorf("KITEX: processing request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
 	} else {
-		t.opt.Logger.Errorf("KITEX: processing request error, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
+		klog.Errorf("KITEX: processing request error, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 

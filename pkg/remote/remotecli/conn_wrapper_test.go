@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -37,10 +36,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-var (
-	poolCfg = connpool2.IdleConfig{MaxIdlePerAddress: 100, MaxIdleGlobal: 100, MaxIdleTimeout: time.Second}
-	logger  = klog.DefaultLogger()
-)
+var poolCfg = connpool2.IdleConfig{MaxIdlePerAddress: 100, MaxIdleGlobal: 100, MaxIdleTimeout: time.Second}
 
 func TestDialerMWNoAddr(t *testing.T) {
 	dialer := &remote.SynthesizedDialer{}
@@ -49,7 +45,7 @@ func TestDialerMWNoAddr(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
-	connW := NewConnWrapper(connpool.NewLongPool("destService", poolCfg), logger)
+	connW := NewConnWrapper(connpool.NewLongPool("destService", poolCfg))
 	_, err := connW.GetConn(ctx, dialer, ri)
 	test.Assert(t, err != nil)
 	test.Assert(t, errors.Is(err, kerrors.ErrNoDestAddress))
@@ -72,7 +68,7 @@ func TestGetConnDial(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(from, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	connW := NewConnWrapper(nil, logger)
+	connW := NewConnWrapper(nil)
 	conn2, err := connW.GetConn(ctx, dialer, ri)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, conn == conn2)
@@ -104,7 +100,7 @@ func TestGetConnByPool(t *testing.T) {
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	// 释放连接, 连接复用
 	for i := 0; i < 10; i++ {
-		connW := NewConnWrapper(connPool, logger)
+		connW := NewConnWrapper(connPool)
 		conn2, err := connW.GetConn(ctx, dialer, ri)
 		test.Assert(t, err == nil, err)
 		test.Assert(t, conn == conn2)
@@ -117,7 +113,7 @@ func TestGetConnByPool(t *testing.T) {
 	connPool.Clean(addr.Network(), addr.String())
 	// 未释放连接, 连接重建
 	for i := 0; i < 10; i++ {
-		connW := NewConnWrapper(connPool, logger)
+		connW := NewConnWrapper(connPool)
 		conn2, err := connW.GetConn(ctx, dialer, ri)
 		test.Assert(t, err == nil, err)
 		test.Assert(t, conn == conn2)
@@ -158,13 +154,13 @@ func BenchmarkGetConn(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connW := NewConnWrapper(connPool, logger)
+		connW := NewConnWrapper(connPool)
 		conn2, err := connW.GetConn(ctx, longConnDialer, ri)
 		test.Assert(b, err == nil, err)
 		test.Assert(b, conn == conn2)
 		connW.ReleaseConn(nil, ri)
 
-		connW2 := NewConnWrapper(nil, logger)
+		connW2 := NewConnWrapper(nil)
 		conn2, err = connW2.GetConn(ctx, shortConnDialer, ri)
 		test.Assert(b, err == nil, err)
 		test.Assert(b, conn == conn2)

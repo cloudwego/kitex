@@ -33,6 +33,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -93,7 +94,6 @@ func fillContext(opt *internal_server.Options) context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
 	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, opt.Events)
-	ctx = context.WithValue(ctx, endpoint.CtxLoggerKey, opt.Logger)
 	return ctx
 }
 
@@ -195,9 +195,7 @@ func (s *server) Run() (err error) {
 	s.Unlock()
 
 	if err = s.waitExit(errCh); err != nil {
-		if s.opt.Logger != nil {
-			s.opt.Logger.Errorf("KITEX: received error and exit: %s", err.Error())
-		}
+		klog.Errorf("KITEX: received error and exit: %s", err.Error())
 	}
 	for i := range onShutdown {
 		onShutdown[i]()
@@ -205,9 +203,7 @@ func (s *server) Run() (err error) {
 	// stop server after user hooks
 	if e := s.Stop(); e != nil && err == nil {
 		err = e
-		if s.opt.Logger != nil {
-			s.opt.Logger.Errorf("KITEX: stop server error: %s", e.Error())
-		}
+		klog.Errorf("KITEX: stop server error: %s", e.Error())
 	}
 	return
 }
@@ -259,7 +255,6 @@ func (s *server) initBasicRemoteOption() {
 	remoteOpt.SvcInfo = s.svcInfo
 	remoteOpt.InitRPCInfoFunc = s.initRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
-	remoteOpt.Logger = s.opt.Logger
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
 }
 
