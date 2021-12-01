@@ -120,7 +120,7 @@ func newMuxConn(connection netpoll.Connection) muxConn {
 		for _, gt := range gts {
 			buf, isNil = gt()
 			if !isNil {
-				_, err = writer.AppendBuffer(buf)
+				err = writer.AppendBuffer(buf)
 				if err != nil {
 					connection.Close()
 					return

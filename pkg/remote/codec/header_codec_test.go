@@ -302,7 +302,7 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 		return perrors.NewProtocolErrorWithMsg("the size that header info write is not equal with malloc size")
 	}
 
-	if _, err := out.AppendBuffer(payloadBuf); err != nil {
+	if err := out.AppendBuffer(payloadBuf); err != nil {
 		return perrors.NewProtocolError(err)
 	}
 	return err

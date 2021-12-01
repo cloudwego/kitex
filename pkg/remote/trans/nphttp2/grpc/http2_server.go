@@ -34,6 +34,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/netpoll"
@@ -198,7 +199,7 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst)
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
 		if err := t.loopy.run(); err != nil {
-			errorf("transport: loopyWriter.run returning. Err: %v", err)
+			klog.Errorf("transport: loopyWriter.run returning. Err: %v", err)
 		}
 		t.conn.Close()
 		close(t.writerDone)
@@ -269,7 +270,7 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 	if streamID%2 != 1 || streamID <= t.maxStreamID {
 		t.mu.Unlock()
 		// illegal gRPC stream id.
-		errorf("transport: http2Server.HandleStreams received an illegal stream id: %v", streamID)
+		klog.Errorf("transport: http2Server.HandleStreams received an illegal stream id: %v", streamID)
 		s.cancel()
 		return true
 	}
@@ -316,7 +317,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 		atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
 		if err != nil {
 			if se, ok := err.(http2.StreamError); ok {
-				warningf("transport: http2Server.HandleStreams encountered http2.StreamError: %v", se)
+				klog.Warnf("transport: http2Server.HandleStreams encountered http2.StreamError: %v", se)
 				t.mu.Lock()
 				s := t.activeStreams[se.StreamID]
 				t.mu.Unlock()
@@ -336,7 +337,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				t.Close()
 				return
 			}
-			warningf("transport: http2Server.HandleStreams failed to read frame: %v", err)
+			klog.Warnf("transport: http2Server.HandleStreams failed to read frame: %v", err)
 			t.Close()
 			return
 		}
@@ -359,7 +360,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 		case *http2.GoAwayFrame:
 			// TODO: Handle GoAway from the client appropriately.
 		default:
-			errorf("transport: http2Server.HandleStreams found unhandled frame type %v.", frame)
+			klog.Errorf("transport: http2Server.HandleStreams found unhandled frame type %v.", frame)
 		}
 	}
 }
@@ -556,7 +557,7 @@ func (t *http2Server) handlePing(f *http2.PingFrame) {
 
 	if t.pingStrikes > maxPingStrikes {
 		// Send goaway and close the connection.
-		errorf("transport: Got too many pings from the client, closing the connection.")
+		klog.Errorf("transport: Got too many pings from the client, closing the connection.")
 		t.controlBuf.put(&goAway{code: http2.ErrCodeEnhanceYourCalm, debugData: []byte("too_many_pings"), closeConn: true})
 	}
 }
@@ -589,7 +590,7 @@ func (t *http2Server) checkForHeaderListSize(it interface{}) bool {
 	var sz int64
 	for _, f := range hdrFrame.hf {
 		if sz += int64(f.Size()); sz > int64(*t.maxSendHeaderListSize) {
-			errorf("header list size to send violates the maximum size (%d bytes) set by client", *t.maxSendHeaderListSize)
+			klog.Errorf("header list size to send violates the maximum size (%d bytes) set by client", *t.maxSendHeaderListSize)
 			return false
 		}
 	}
@@ -676,7 +677,7 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 		stBytes, err := proto.Marshal(p)
 		if err != nil {
 			// TODO: return error instead, when callers are able to handle it.
-			errorf("transport: failed to marshal rpc status: %v, error: %v", p, err)
+			klog.Errorf("transport: failed to marshal rpc status: %v, error: %v", p, err)
 		} else {
 			headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-status-details-bin", Value: encodeBinHeader(stBytes)})
 		}
@@ -796,7 +797,7 @@ func (t *http2Server) keepalive() {
 			select {
 			case <-ageTimer.C:
 				// Close the connection after grace period.
-				infof("transport: closing server transport due to maximum connection age.")
+				klog.Infof("transport: closing server transport due to maximum connection age.")
 				t.Close()
 			case <-t.done:
 			}
@@ -813,7 +814,7 @@ func (t *http2Server) keepalive() {
 				continue
 			}
 			if outstandingPing && kpTimeoutLeft <= 0 {
-				infof("transport: closing server transport due to idleness.")
+				klog.Infof("transport: closing server transport due to idleness.")
 				t.Close()
 				return
 			}
