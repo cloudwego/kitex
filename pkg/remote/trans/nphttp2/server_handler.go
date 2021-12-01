@@ -118,9 +118,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				panicErr := recover()
 				if panicErr != nil {
 					if conn != nil {
-						klog.Errorf("KITEX: panic happened, close conn[%s], %v\n%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
+						klog.Errorf("KITEX: panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
 					} else {
-						klog.Errorf("KITEX: panic happened, %v\n%s", panicErr, string(debug.Stack()))
+						klog.Errorf("KITEX: panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
 					}
 				}
 				t.finishTracer(ctx, ri, err, panicErr)
@@ -183,9 +183,9 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 // 传输层 error 回调
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.Errorf("KITEX: processing request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+		klog.Errorf("KITEX: processing request error, remote=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
 	} else {
-		klog.Errorf("KITEX: processing request error, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
+		klog.Errorf("KITEX: processing request error, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 
