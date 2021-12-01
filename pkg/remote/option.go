@@ -22,7 +22,6 @@ import (
 	"time"
 
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -65,8 +64,6 @@ type ServerOption struct {
 
 	TracerCtl *internal_stats.Controller
 
-	Logger klog.FormatLogger
-
 	Option
 }
 
@@ -83,8 +80,6 @@ type ClientOption struct {
 	ConnPool ConnPool
 
 	Dialer Dialer
-
-	Logger klog.FormatLogger
 
 	Option
 

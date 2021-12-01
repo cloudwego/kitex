@@ -27,7 +27,6 @@ import (
 	"github.com/cloudwego/kitex/internal/mocks"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -56,7 +55,6 @@ func init() {
 		},
 		SvcInfo:   mocks.ServiceInfo(),
 		TracerCtl: &internal_stats.Controller{},
-		Logger:    klog.DefaultLogger(),
 	}
 	svrTransHdlr, _ = newSvrTransHandler(opt)
 	transSvr = &transServer{opt: opt, transHdlr: svrTransHdlr}

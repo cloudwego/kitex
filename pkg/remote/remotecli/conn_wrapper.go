@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -42,7 +41,7 @@ type ConnWrapper struct {
 }
 
 // NewConnWrapper returns a new ConnWrapper using the given connPool and logger.
-func NewConnWrapper(connPool remote.ConnPool, logger klog.FormatLogger) *ConnWrapper {
+func NewConnWrapper(connPool remote.ConnPool) *ConnWrapper {
 	cm := connWrapperPool.Get().(*ConnWrapper)
 	cm.connPool = connPool
 	return cm

@@ -49,7 +49,7 @@ type client struct {
 
 // NewClient creates a new Client using the given params.
 func NewClient(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.TransHandler, opt *remote.ClientOption) (Client, error) {
-	cm := NewConnWrapper(opt.ConnPool, opt.Logger)
+	cm := NewConnWrapper(opt.ConnPool)
 	var err error
 	// used by streaming unary
 	for _, shdlr := range opt.StreamingMetaHandlers {

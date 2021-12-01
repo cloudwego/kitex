@@ -69,7 +69,6 @@ type Retryer interface {
 func NewRetryContainerWithCB(cc *circuitbreak.Control, cp circuitbreaker.Panel) *Container {
 	return &Container{
 		cbContainer: &cbContainer{cbCtl: cc, cbPanel: cp}, retryerMap: sync.Map{},
-		logger: klog.DefaultLogger(),
 	}
 }
 
@@ -81,7 +80,6 @@ func NewRetryContainerWithCB(cc *circuitbreak.Control, cp circuitbreaker.Panel) 
 func NewRetryContainerWithCBStat(cc *circuitbreak.Control, cp circuitbreaker.Panel) *Container {
 	return &Container{
 		cbContainer: &cbContainer{cbCtl: cc, cbPanel: cp, cbStat: true}, retryerMap: sync.Map{},
-		logger: klog.DefaultLogger(),
 	}
 }
 
@@ -96,7 +94,6 @@ type Container struct {
 	cliRetryer  Retryer
 	retryerMap  sync.Map // <method: retryer>
 	cbContainer *cbContainer
-	logger      klog.FormatLogger
 	msg         string
 	sync.Mutex
 }
@@ -152,15 +149,14 @@ func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 }
 
 // Init to build Retryer
-func (rc *Container) Init(p *Policy, logger klog.FormatLogger) error {
+func (rc *Container) Init(p *Policy) error {
 	rc.Lock()
 	defer rc.Unlock()
-	rc.logger = logger
 	if p == nil {
 		return nil
 	}
 	var err error
-	rc.cliRetryer, err = NewRetryer(*p, rc.cbContainer, logger)
+	rc.cliRetryer, err = NewRetryer(*p, rc.cbContainer)
 	if err != nil {
 		rc.msg = err.Error()
 		return fmt.Errorf("NewRetryer in Init failed, err=%w", err)
@@ -208,15 +204,15 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, rpcCall RPCCallFunc,
 }
 
 // NewRetryer build a retryer with policy
-func NewRetryer(p Policy, cbC *cbContainer, logger klog.FormatLogger) (retryer Retryer, err error) {
+func NewRetryer(p Policy, cbC *cbContainer) (retryer Retryer, err error) {
 	if !p.Enable {
 		return nil, nil
 	}
 	// just one retry policy can be enabled at same time
 	if p.Type == BackupType {
-		retryer, err = newBackupRetryer(p, cbC, logger)
+		retryer, err = newBackupRetryer(p, cbC)
 	} else {
-		retryer, err = newFailureRetryer(p, cbC, logger)
+		retryer, err = newFailureRetryer(p, cbC)
 	}
 	return
 }
@@ -256,11 +252,11 @@ func (rc *Container) Dump() interface{} {
 }
 
 func (rc *Container) initRetryer(method string, p Policy) {
-	retryer, err := NewRetryer(p, rc.cbContainer, rc.logger)
+	retryer, err := NewRetryer(p, rc.cbContainer)
 	if err != nil {
 		errMsg := fmt.Sprintf("new retryer[%s-%s] failed, err=%s, at %s", method, p.Type, err.Error(), time.Now())
 		rc.msg = errMsg
-		rc.logger.Warnf(errMsg)
+		klog.Warnf(errMsg)
 		return
 	}
 	// NewRetryer can return nil if policy is nil

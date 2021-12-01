@@ -42,14 +42,10 @@ func init() {
 	)
 }
 
-func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo, logger klog.FormatLogger) error {
+func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo) error {
 	e := fmt.Errorf("KITEX: panic, remote[to_service=%s|method=%s], err=%v\n%s",
 		ri.To().ServiceName(), ri.To().Method(), panicInfo, debug.Stack())
-	if l, ok := logger.(klog.CtxLogger); ok {
-		l.CtxErrorf(ctx, "%s", e.Error())
-	} else {
-		logger.Errorf("%s", e.Error())
-	}
+	klog.CtxErrorf(ctx, "%s", e.Error())
 	rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
 	rpcStats.SetPanicked(e)
 	return e
@@ -86,7 +82,6 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 		moreTimeout = *v
 	}
 
-	logger := mwCtx.Value(endpoint.CtxLoggerKey).(klog.FormatLogger)
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response interface{}) error {
 			ri := rpcinfo.GetRPCInfo(ctx)
@@ -111,7 +106,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 			workerPool.Go(func() {
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
-						e := panicToErr(ctx, panicInfo, ri, logger)
+						e := panicToErr(ctx, panicInfo, ri)
 						done <- e
 					}
 					if !errors.Is(err, kerrors.ErrRPCFinish) {
@@ -133,11 +128,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 						errMsg = fmt.Sprintf("KITEX: remote[to_service=%s|method=%s], err=%s",
 							ri.To().ServiceName(), ri.To().Method(), err.Error())
 					}
-					if l, ok := logger.(klog.CtxLogger); ok {
-						l.CtxErrorf(ctx, "%s", errMsg)
-					} else {
-						logger.Errorf("%s", errMsg)
-					}
+					klog.CtxErrorf(ctx, "%s", errMsg)
 				}
 			})
 

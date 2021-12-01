@@ -28,7 +28,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limit"
 	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/proxy"
@@ -89,7 +88,6 @@ type Options struct {
 	DebugService diagnosis.Service
 
 	// Observability
-	Logger     klog.FormatLogger
 	TracerCtl  *internal_stats.Controller
 	StatsLevel *stats.Level
 }
@@ -101,7 +99,6 @@ func NewOptions(opts []Option) *Options {
 		Configs:      rpcinfo.NewRPCConfig(),
 		Once:         configutil.NewOptionOnce(),
 		RemoteOpt:    newServerOption(),
-		Logger:       klog.DefaultLogger(),
 		DebugService: diagnosis.NoopService,
 		ExitSignal:   DefaultSysExitSignal,
 

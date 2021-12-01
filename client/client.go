@@ -126,7 +126,7 @@ func (kc *kClient) initRetryer() error {
 			kc.opt.RetryContainer = retry.NewRetryContainer()
 		}
 	}
-	return kc.opt.RetryContainer.Init(kc.opt.RetryPolicy, kc.opt.Logger)
+	return kc.opt.RetryContainer.Init(kc.opt.RetryPolicy)
 }
 
 func (kc *kClient) proxyInit(ctx context.Context) (context.Context, error) {
@@ -153,9 +153,6 @@ func (kc *kClient) proxyInit(ctx context.Context) (context.Context, error) {
 func (kc *kClient) checkOptions() (err error) {
 	if kc.opt.Svr.ServiceName == "" {
 		return errors.New("service name is required")
-	}
-	if kc.opt.Logger == nil {
-		return errors.New("logger need to be initialized")
 	}
 	return nil
 }
@@ -290,7 +287,6 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 
 func (kc *kClient) richRemoteOption(ctx context.Context) {
 	kc.opt.RemoteOpt.SvcInfo = kc.svcInfo
-	kc.opt.RemoteOpt.Logger = kc.opt.Logger
 
 	kc.addBoundHandlers(kc.opt.RemoteOpt)
 }
@@ -442,7 +438,6 @@ func fillContext(opt *client.Options) context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
 	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, opt.Events)
-	ctx = context.WithValue(ctx, endpoint.CtxLoggerKey, opt.Logger)
 	ctx = context.WithValue(ctx, rpctimeout.TimeoutAdjustKey, &opt.ExtraTimeout)
 	return ctx
 }

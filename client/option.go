@@ -211,12 +211,9 @@ func WithMuxConnection(connNum int) Option {
 }
 
 // WithLogger sets the Logger for kitex client.
+// Deprecated: client uses the global klog.DefaultLogger.
 func WithLogger(logger klog.FormatLogger) Option {
-	return Option{F: func(o *client.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithLogger(%T)", logger))
-
-		o.Logger = logger
-	}}
+	panic("client.WithLogger is deprecated")
 }
 
 // WithLoadBalancer sets the loadbalancer for client.
