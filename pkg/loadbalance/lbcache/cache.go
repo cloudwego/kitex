@@ -187,7 +187,7 @@ type Balancer struct {
 func (bl *Balancer) refresh() {
 	res, err := bl.b.resolver.Resolve(context.Background(), bl.target)
 	if err != nil {
-		klog.Warnf("[resolver] refresh key: %s error: %s", bl.target, err)
+		klog.Warnf("KITEX: resolver refresh failed, key=%s error=%s", bl.target, err.Error())
 		return
 	}
 	renameResultCacheKey(&res, bl.b.resolver.Name())

@@ -166,7 +166,7 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 
 	seqID := Bytes2Uint32NoCheck(headerMeta[Size32*2 : Size32*3])
 	if err = SetOrCheckSeqID(int32(seqID), message); err != nil {
-		klog.Warnf("the seqID in TTHeader check failed, err=%s", err.Error())
+		klog.Warnf("the seqID in TTHeader check failed, error=%s", err.Error())
 		// some framework doesn't write correct seqID in TTheader, to ignore err only check it in payload
 		// print log to push the downstream framework to refine it.
 	}

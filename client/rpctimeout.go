@@ -43,7 +43,7 @@ func init() {
 }
 
 func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo) error {
-	e := fmt.Errorf("KITEX: panic, remote[to_service=%s|method=%s], err=%v\n%s",
+	e := fmt.Errorf("KITEX: panic, to_service=%s to_method=%s error=%v\nstack=%s",
 		ri.To().ServiceName(), ri.To().Method(), panicInfo, debug.Stack())
 	klog.CtxErrorf(ctx, "%s", e.Error())
 	rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
@@ -122,10 +122,10 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 					// Specially, ErrRPCFinish can be ignored, it happens in retry scene, previous call returns first.
 					var errMsg string
 					if ri.To().Address() != nil {
-						errMsg = fmt.Sprintf("KITEX: remote[to_service=%s|method=%s|addr=%s]，err=%s",
+						errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s addr=%s error=%s",
 							ri.To().ServiceName(), ri.To().Method(), ri.To().Address(), err.Error())
 					} else {
-						errMsg = fmt.Sprintf("KITEX: remote[to_service=%s|method=%s], err=%s",
+						errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s error=%s",
 							ri.To().ServiceName(), ri.To().Method(), err.Error())
 					}
 					klog.CtxErrorf(ctx, "%s", errMsg)
