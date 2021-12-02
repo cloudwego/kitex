@@ -67,7 +67,7 @@ func (p *Pool) Go(task Task) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				klog.Errorf("panic in wpool: %v: %s", r, debug.Stack())
+				klog.Errorf("panic in wpool: error=%v: stack=%s", r, debug.Stack())
 			}
 			atomic.AddInt32(&p.size, -1)
 		}()
