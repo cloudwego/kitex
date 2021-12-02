@@ -96,9 +96,9 @@ func (t *MockSvrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 // OnError 传输层扩展中panic 回调
 func (t *MockSvrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.Errorf("KITEX: send request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+		klog.CtxErrorf(ctx, "KITEX: send request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
 	} else {
-		klog.Errorf("KITEX: send request error, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
+		klog.CtxErrorf(ctx, "KITEX: send request error, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 

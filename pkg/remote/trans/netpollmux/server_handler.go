@@ -137,14 +137,14 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 	length, _, err := parseHeader(connection.Reader())
 	if err != nil {
 		err = fmt.Errorf("%w: addr(%s)", err, connection.RemoteAddr())
-		klog.Errorf("KITEX: %s", err.Error())
+		klog.CtxErrorf(muxSvrConnCtx, "KITEX: %s", err.Error())
 		connection.Close()
 		return err
 	}
 	reader, err := connection.Reader().Slice(length)
 	if err != nil {
 		err = fmt.Errorf("%w: addr(%s)", err, connection.RemoteAddr())
-		klog.Errorf("KITEX: %s", err.Error())
+		klog.CtxErrorf(muxSvrConnCtx, "KITEX: %s", err.Error())
 		connection.Close()
 		return nil
 	}
@@ -168,10 +168,10 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 				if conn != nil {
 					ri := rpcinfo.GetRPCInfo(ctx)
 					rService, rAddr := getRemoteInfo(ri, conn)
-					klog.Errorf("KITEX: panic happened, close conn[%s], remoteService=%s, %v\n%s", rAddr, rService, panicErr, string(debug.Stack()))
+					klog.CtxErrorf(muxSvrConnCtx, "KITEX: panic happened, close conn[%s], remoteService=%s, %v\n%s", rAddr, rService, panicErr, string(debug.Stack()))
 					conn.Close()
 				} else {
-					klog.Errorf("KITEX: panic happened, %v\n%s", panicErr, string(debug.Stack()))
+					klog.CtxErrorf(muxSvrConnCtx, "KITEX: panic happened, %v\n%s", panicErr, string(debug.Stack()))
 				}
 			}
 			t.finishTracer(ctx, rpcInfo, err, panicErr)
@@ -267,9 +267,9 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 		remote := rpcinfo.AsMutableEndpointInfo(ri.From())
 		remote.SetTag(rpcinfo.RemoteClosedTag, "1")
 	} else if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.Errorf("KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s\n%s", rService, rAddr, err.Error(), pe.Stack())
+		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s\n%s", rService, rAddr, err.Error(), pe.Stack())
 	} else {
-		klog.Errorf("KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s", rService, rAddr, err.Error())
+		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s", rService, rAddr, err.Error())
 	}
 }
 
@@ -306,7 +306,7 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg r
 	}
 	err = t.transPipe.Write(ctx, conn, errMsg)
 	if err != nil {
-		klog.Errorf("KITEX: write error reply failed, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
+		klog.CtxErrorf(ctx, "KITEX: write error reply failed, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 
@@ -319,9 +319,9 @@ func (t *svrTransHandler) tryRecover(ctx context.Context, conn net.Conn) {
 
 		if conn != nil {
 			conn.Close()
-			klog.Errorf("KITEX: panic happened, close conn[%s], %s\n%s", conn.RemoteAddr(), err, string(debug.Stack()))
+			klog.CtxErrorf(ctx, "KITEX: panic happened, close conn[%s], %s\n%s", conn.RemoteAddr(), err, string(debug.Stack()))
 		} else {
-			klog.Errorf("KITEX: panic happened, %s\n%s", err, string(debug.Stack()))
+			klog.CtxErrorf(ctx, "KITEX: panic happened, %s\n%s", err, string(debug.Stack()))
 		}
 	}
 }

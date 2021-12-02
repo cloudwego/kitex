@@ -188,7 +188,7 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 	go func() {
 		err := t.loopy.run()
 		if err != nil {
-			klog.Errorf("transport: loopyWriter.run returning. Err: %v", err)
+			klog.CtxErrorf(ctx, "transport: loopyWriter.run returning. Err: %v", err)
 		}
 		// If it's a connection error, let reader goroutine handle it
 		// since there might be data in the buffers.

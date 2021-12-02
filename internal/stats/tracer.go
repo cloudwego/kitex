@@ -37,7 +37,7 @@ func (c *Controller) Append(col stats.Tracer) {
 
 // DoStart starts the tracers.
 func (c *Controller) DoStart(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {
-	defer c.tryRecover()
+	defer c.tryRecover(ctx)
 	Record(ctx, ri, stats.RPCStart, nil)
 
 	for _, col := range c.tracers {
@@ -48,7 +48,7 @@ func (c *Controller) DoStart(ctx context.Context, ri rpcinfo.RPCInfo) context.Co
 
 // DoFinish calls the tracers in reversed order.
 func (c *Controller) DoFinish(ctx context.Context, ri rpcinfo.RPCInfo, err error) {
-	defer c.tryRecover()
+	defer c.tryRecover(ctx)
 	Record(ctx, ri, stats.RPCFinish, err)
 	if err != nil {
 		rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
@@ -65,8 +65,8 @@ func (c *Controller) HasTracer() bool {
 	return c != nil && len(c.tracers) > 0
 }
 
-func (c *Controller) tryRecover() {
+func (c *Controller) tryRecover(ctx context.Context) {
 	if err := recover(); err != nil {
-		klog.Warnf("Panic happened during tracer call. This doesn't affect the rpc call, but may lead to lack of monitor data such as metrics and logs: %s, %s", err, string(debug.Stack()))
+		klog.CtxWarnf(ctx, "Panic happened during tracer call. This doesn't affect the rpc call, but may lead to lack of monitor data such as metrics and logs: %s, %s", err, string(debug.Stack()))
 	}
 }
