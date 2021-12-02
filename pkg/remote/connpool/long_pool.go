@@ -21,6 +21,7 @@ import (
 	"context"
 	"net"
 	"reflect"
+	"runtime"
 	"sync"
 	"time"
 
@@ -81,6 +82,8 @@ type peer struct {
 	ring           *utils.Ring
 	globalIdle     *utils.MaxCounter
 	maxIdleTimeout time.Duration
+	delayDestroy   bool
+	dirty          sync.Pool
 }
 
 func newPeer(
@@ -89,6 +92,7 @@ func newPeer(
 	maxIdle int,
 	maxIdleTimeout time.Duration,
 	globalIdle *utils.MaxCounter,
+	delayDestroy bool,
 ) *peer {
 	return &peer{
 		serviceName:    serviceName,
@@ -96,6 +100,7 @@ func newPeer(
 		ring:           utils.NewRing(maxIdle),
 		globalIdle:     globalIdle,
 		maxIdleTimeout: maxIdleTimeout,
+		delayDestroy:   delayDestroy,
 	}
 }
 
@@ -119,6 +124,20 @@ func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter, ad
 		}
 		_ = conn.Conn.Close()
 	}
+
+	// reuse conn from pool
+	if p.delayDestroy {
+		if reused := p.dirty.Get(); reused != nil {
+			conn := reused.(*longConn)
+			runtime.SetFinalizer(conn, nil) // clear finalizer
+			if conn.IsActive() {
+				reporter.ReuseSucceed(Long, p.serviceName, p.addr)
+				return conn, nil
+			}
+			_ = conn.Conn.Close()
+		}
+	}
+
 	conn, err := d.DialTimeout(p.addr.Network(), p.addr.String(), timeout)
 	if err != nil {
 		reporter.ConnFailed(Long, p.serviceName, p.addr)
@@ -132,17 +151,22 @@ func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter, ad
 	}, nil
 }
 
-func (p *peer) put(c *longConn) error {
-	if !p.globalIdle.Inc() {
-		return c.Conn.Close()
-	}
-	c.deadline = time.Now().Add(p.maxIdleTimeout)
-	err := p.ring.Push(c)
-	if err != nil {
+func (p *peer) put(c *longConn) (err error) {
+	if p.globalIdle.Inc() {
+		c.deadline = time.Now().Add(p.maxIdleTimeout)
+		err = p.ring.Push(c)
+		if err == nil {
+			return nil
+		}
 		p.globalIdle.Dec()
-		return c.Conn.Close()
 	}
-	return nil
+
+	if p.delayDestroy {
+		// caching connection to ease network jitter
+		runtime.SetFinalizer(c, func(c *longConn) { c.Conn.Close() })
+		p.dirty.Put(c)
+	}
+	return err
 }
 
 // Close closes the peer and all the connections in the ring.
@@ -258,7 +282,9 @@ func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
 				addr,
 				idlConfig.MaxIdlePerAddress,
 				idlConfig.MaxIdleTimeout,
-				limit)
+				limit,
+				true,
+			)
 		},
 	}
 }

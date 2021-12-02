@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -50,7 +51,7 @@ func newLongPoolForTest(peerAddr, global int, timeout time.Duration) *LongPool {
 	limit := utils.NewMaxCounter(global)
 
 	lp.newPeer = func(addr net.Addr) *peer {
-		return newPeer("test", addr, peerAddr, timeout, limit)
+		return newPeer("test", addr, peerAddr, timeout, limit, true)
 	}
 	return lp
 }
@@ -169,12 +170,15 @@ func TestLongConnPoolMaxIdle(t *testing.T) {
 		test.Assert(t, err == nil)
 	}
 
+	// remote dirty cache
+	runtime.GC()
+	runtime.GC()
 	for i := 0; i < 10; i++ {
 		c, err := p.Get(context.TODO(), "tcp", addr, opt)
 		test.Assert(t, err == nil)
 		count[c]++
 	}
-	test.Assert(t, len(count) == 18)
+	test.DeepEqual(t, len(count), 18)
 }
 
 func TestLongConnPoolGlobalMaxIdle(t *testing.T) {
@@ -211,6 +215,9 @@ func TestLongConnPoolGlobalMaxIdle(t *testing.T) {
 		test.Assert(t, err == nil)
 	}
 
+	// remote dirty cache
+	runtime.GC()
+	runtime.GC()
 	for i := 0; i < 10; i++ {
 		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
@@ -220,7 +227,7 @@ func TestLongConnPoolGlobalMaxIdle(t *testing.T) {
 		test.Assert(t, err == nil)
 		count[c]++
 	}
-	test.Assert(t, len(count) == 37)
+	test.DeepEqual(t, len(count), 37)
 }
 
 func TestLongConnPoolCloseOnDiscard(t *testing.T) {
