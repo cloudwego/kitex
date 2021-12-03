@@ -94,8 +94,12 @@ func newTransport(dialer remote.Dialer, network, address string, connectTimeout 
 	return grpc.NewClientTransport(
 		context.Background(),
 		conn.(netpoll.Connection),
-		nil,
-		nil,
+		func(grpc.GoAwayReason) {
+			// do nothing
+		},
+		func() {
+			// do nothing
+		},
 	)
 }
 
@@ -111,6 +115,7 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 	if ok {
 		trans = v.(*transports)
 		if tr := trans.get(); tr != nil {
+			// Actually new a stream, reuse the connection (grpc.ClientTransport)
 			conn, err = newClientConn(ctx, tr, address)
 			if err != nil {
 				tr.GracefulClose()
