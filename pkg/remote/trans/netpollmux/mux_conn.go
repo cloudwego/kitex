@@ -31,8 +31,10 @@ import (
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 )
 
+// ErrConnClosed .
 var ErrConnClosed = errors.New("conn closed")
 
+// SharedSize .
 var SharedSize int32 = 32
 
 func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
@@ -90,7 +92,7 @@ func (c *muxCliConn) close() error {
 }
 
 func (c *muxCliConn) onError(ctx context.Context, err error, connection netpoll.Connection) error {
-	klog.CtxErrorf(ctx, "KITEX: %s", err.Error())
+	klog.CtxErrorf(ctx, "KITEX: error=%s", err.Error())
 	connection.Close()
 	return err
 }
