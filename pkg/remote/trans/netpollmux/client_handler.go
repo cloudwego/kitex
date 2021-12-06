@@ -99,7 +99,7 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		return err
 	}
 	if methodInfo.OneWay() {
-		mc.Put(func() (_buf netpoll.Writer, isNil bool) {
+		mc.Put(func() (_ netpoll.Writer, isNil bool) {
 			return buf, false
 		})
 		return nil
