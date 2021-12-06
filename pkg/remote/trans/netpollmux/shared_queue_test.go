@@ -17,97 +17,66 @@
 package netpollmux
 
 import (
+	"net"
 	"runtime"
-	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-func TestShareQueue(t *testing.T) {
-	// check success
-	var (
-		sum     int32
-		flushed int32
-	)
-	var deal DealBufferGetters = func(gts []BufferGetter) {
-		for _, gt := range gts {
-			buf, isNil := gt()
-			test.Assert(t, isNil == false)
-			test.Assert(t, buf.MallocLen() == 11, buf.MallocLen())
+func TestShardQueue(t *testing.T) {
+	var svrConn net.Conn
+
+	network, address := "tcp", ":1234"
+	ln, err := net.Listen("tcp", ":1234")
+	test.Assert(t, err == nil)
+
+	stop := make(chan int, 1)
+	defer close(stop)
+	go func() {
+		var err error
+		for {
+			select {
+			case <-stop:
+				err = ln.Close()
+				test.Assert(t, err == nil)
+				return
+			default:
+			}
+			svrConn, err = ln.Accept()
+			test.Assert(t, err == nil)
 		}
-		atomic.AddInt32(&sum, -int32(len(gts)))
-	}
-	var flush FlushBufferGetters = func() {
-		atomic.AddInt32(&flushed, 1)
+	}()
+
+	conn, err := netpoll.DialConnection(network, address, time.Second)
+	test.Assert(t, err == nil)
+	for svrConn == nil {
+		runtime.Gosched()
 	}
 
-	var count int32 = 9
-	queue := newSharedQueue(4, deal, flush)
-	atomic.AddInt32(&sum, count)
+	// test
+	queue := newSharedQueue(4, conn)
+	count, pkgsize := 16, 11
 	for i := 0; i < int(count); i++ {
-		var getter BufferGetter = func() (buf remote.ByteBuffer, isNil bool) {
-			buf = remote.NewWriterBuffer(11)
-			buf.Malloc(11)
+		var getter BufferGetter = func() (buf netpoll.Writer, isNil bool) {
+			buf = netpoll.NewLinkBuffer(pkgsize)
+			buf.Malloc(pkgsize)
 			return buf, false
 		}
 		queue.Add(getter)
 	}
-	// wait for deal and flush all
-	for !(atomic.LoadInt32(&sum) == 0 && atomic.LoadInt32(&flushed) >= 1) {
-		runtime.Gosched()
-	}
 
-	// check fail
-	var deal2 DealBufferGetters = func(gts []BufferGetter) {
-		for _, gt := range gts {
-			test.Assert(t, gt == nil)
-		}
-		atomic.AddInt32(&sum, -int32(len(gts)))
-	}
-	queue2 := newSharedQueue(4, deal2, nil)
-	atomic.AddInt32(&sum, 1)
-	queue2.Add(nil)
-	for atomic.LoadInt32(&sum) > 0 {
-		runtime.Gosched()
-	}
+	total := count * pkgsize
+	recv := make([]byte, total)
+	rn, err := svrConn.Read(recv)
+	test.Assert(t, err == nil)
+	test.Assert(t, rn == total)
 }
 
-func BenchmarkShareQueue(b *testing.B) {
-	var sum int32
-	conn := remote.NewReaderWriterBuffer(0)
-	var testGetter BufferGetter = func() (buf remote.ByteBuffer, isNil bool) {
-		return remote.NewWriterBuffer(1024), false
-	}
-	var deal DealBufferGetters = func(gts []BufferGetter) {
-		for _, gt := range gts {
-			buf, isNil := gt()
-			if !isNil {
-				err := conn.AppendBuffer(buf)
-				if err != nil {
-					b.Fatal(err)
-				}
-			}
-		}
-		atomic.AddInt32(&sum, -int32(len(gts)))
-	}
-	var flush FlushBufferGetters = func() {
-		conn.Flush()
-	}
-	queue := newSharedQueue(32, deal, flush)
-
-	// benchmark
-	b.ReportAllocs()
-	b.SetParallelism(1024)
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			atomic.AddInt32(&sum, 1)
-			queue.Add(testGetter)
-		}
-	})
-	for atomic.LoadInt32(&sum) > 0 {
-		runtime.Gosched()
-	}
+// TODO: need mock flush
+func BenchmarkShardQueue(b *testing.B) {
+	b.Skip()
 }
