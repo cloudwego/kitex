@@ -150,7 +150,7 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 			return err
 		}
 		if total < length && len(fs) > 0 {
-			go t.benches(fs)
+			go t.batchGoTasks(fs)
 			fs = t.funcPool.Get().([]func())
 		}
 		reader, err := r.Slice(length)
@@ -165,20 +165,22 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 		})
 	}
 	if len(fs) > 0 {
-		go t.benches(fs)
+		go t.batchGoTasks(fs)
 	} else {
 		t.funcPool.Put(fs[:0])
 	}
 	return nil
 }
 
-func (t *svrTransHandler) benches(fs []func()) {
+// batchGoTasks centrally creates goroutines to execute tasks.
+func (t *svrTransHandler) batchGoTasks(fs []func()) {
 	for n := range fs {
 		gofunc.GoFunc(nil, fs[n])
 	}
 	t.funcPool.Put(fs[:0])
 }
 
+// task contains a complete process about decoding request -> handling -> writing response
 func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, reader netpoll.Reader) {
 	// rpcInfoCtx is a pooled ctx with inited RPCInfo which can be reused.
 	// it's recycled in defer.
