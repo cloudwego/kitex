@@ -139,7 +139,7 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 	connection := conn.(netpoll.Connection)
 	r := connection.Reader()
 
-	var fs = t.funcPool.Get().([]func())
+	fs := t.funcPool.Get().([]func())
 	for total := r.Len(); total > 0; total = r.Len() {
 		// protocol header check
 		length, _, err := parseHeader(r)
