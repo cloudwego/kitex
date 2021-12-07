@@ -25,6 +25,7 @@ import (
 	"syscall"
 
 	"github.com/cloudwego/netpoll"
+	"golang.org/x/sys/unix"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -39,7 +40,18 @@ type netpollTransServerFactory struct{}
 
 // NewTransServer implements the remote.TransServerFactory interface.
 func (f *netpollTransServerFactory) NewTransServer(opt *remote.ServerOption, transHdlr remote.ServerTransHandler) remote.TransServer {
-	return &transServer{opt: opt, transHdlr: transHdlr}
+	return &transServer{
+		opt: opt, transHdlr: transHdlr,
+		lncfg: net.ListenConfig{Control: func(network, address string, c syscall.RawConn) error {
+			var err error
+			c.Control(func(fd uintptr) {
+				if opt.ReusePort {
+					err = syscall.SetsockoptInt(int(fd), syscall.SOL_SOCKET, unix.SO_REUSEPORT, 1)
+				}
+			})
+			return err
+		}},
+	}
 }
 
 type transServer struct {
@@ -47,7 +59,8 @@ type transServer struct {
 	transHdlr remote.ServerTransHandler
 
 	evl       netpoll.EventLoop
-	ln        netpoll.Listener
+	ln        net.Listener
+	lncfg     net.ListenConfig
 	connCount utils.AtomicInt
 	sync.Mutex
 }
@@ -55,12 +68,12 @@ type transServer struct {
 var _ remote.TransServer = &transServer{}
 
 // CreateListener implements the remote.TransServer interface.
-func (ts *transServer) CreateListener(addr net.Addr) (net.Listener, error) {
+func (ts *transServer) CreateListener(addr net.Addr) (_ net.Listener, err error) {
 	if addr.Network() == "unix" {
 		syscall.Unlink(addr.String())
 	}
-	ln, err := netpoll.CreateListener(addr.Network(), addr.String())
-	ts.ln = ln
+	// The network must be "tcp", "tcp4", "tcp6" or "unix".
+	ts.ln, err = ts.lncfg.Listen(context.Background(), addr.Network(), addr.String())
 	return ts.ln, err
 }
 
@@ -93,9 +106,6 @@ func (ts *transServer) Shutdown() (err error) {
 		ctx, cancel := context.WithTimeout(context.Background(), ts.opt.ExitWaitTime)
 		defer cancel()
 		err = ts.evl.Shutdown(ctx)
-	}
-	if ts.ln != nil {
-		err = ts.ln.Close()
 	}
 	return
 }

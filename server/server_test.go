@@ -21,6 +21,7 @@ import (
 	"errors"
 	"net"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -64,6 +65,32 @@ func TestServerRun(t *testing.T) {
 
 	test.Assert(t, atomic.LoadInt32(&runHook) == 1)
 	test.Assert(t, atomic.LoadInt32(&shutdownHook) == 1)
+}
+
+func TestReusePortServerRun(t *testing.T) {
+	addr, _ := net.ResolveTCPAddr("tcp", ":19999")
+	var opts []Option
+	opts = append(opts, WithReusePort(true))
+	opts = append(opts, WithServiceAddr(addr))
+
+	var wg sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			svr := NewServer(opts...)
+			time.AfterFunc(time.Millisecond*100, func() {
+				defer wg.Done()
+				err := svr.Stop()
+				test.Assert(t, err == nil, err)
+			})
+			err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+			test.Assert(t, err == nil)
+			err = svr.Run()
+			test.Assert(t, err == nil, err)
+		}()
+	}
+	wg.Wait()
 }
 
 func TestInitRPCInfo(t *testing.T) {
