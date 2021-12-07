@@ -116,8 +116,8 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 	}()
 
 	kp := ClientKeepalive{
-		Time:    30 * time.Second,
-		Timeout: 1 * time.Second,
+		Time:    defaultClientKeepaliveTime,
+		Timeout: defaultClientKeepaliveTimeout,
 	}
 	keepaliveEnabled := false
 	if kp.Time != Infinity {

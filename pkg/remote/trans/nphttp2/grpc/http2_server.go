@@ -132,11 +132,11 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 		MaxConnectionIdle:     defaultMaxConnectionIdle,
 		MaxConnectionAge:      defaultMaxConnectionAge,
 		MaxConnectionAgeGrace: defaultMaxConnectionAgeGrace,
-		Time:                  30 * time.Second,
-		Timeout:               time.Second,
+		Time:                  defaultServerKeepaliveTime,
+		Timeout:               defaultServerKeepaliveTimeout,
 	}
 	kep := EnforcementPolicy{
-		MinTime: 20 * time.Second,
+		MinTime: defaultKeepalivePolicyMinTime,
 	}
 
 	done := make(chan struct{})
