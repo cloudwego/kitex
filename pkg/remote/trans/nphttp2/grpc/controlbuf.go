@@ -507,7 +507,7 @@ func (l *loopyWriter) run() (err error) {
 			// 1. When the connection is closed by some other known issue.
 			// 2. User closed the connection.
 			// 3. A graceful close of connection.
-			klog.Infof("transport: loopyWriter.run returning. %v", err)
+			klog.Infof("KITEX: grpc transport loopyWriter.run returning. %v", err)
 			err = nil
 		}
 	}()
