@@ -329,6 +329,14 @@ func (p *kClient) {{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{
 	if err = p.c.Call(ctx, "{{.RawName}}", &_args, &_result); err != nil {
 		return
 	}
+	{{if .Exceptions -}}
+	switch {
+	{{range .Exceptions -}}
+	case _result.{{.Name}} != nil:
+		return _result.{{.Name}}
+	{{end -}}
+	}
+	{{end -}}
 	{{end -}}
 	return nil
 {{else -}}
