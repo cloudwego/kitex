@@ -41,9 +41,9 @@ type shared struct {
 }
 
 // Creates a new concurrent map.
-func newSharedMap(size int32) *sharedMap {
+func newSharedMap(size int) *sharedMap {
 	m := &sharedMap{
-		size:   size,
+		size:   int32(size),
 		shared: make([]*shared, size),
 	}
 	for i := range m.shared {
