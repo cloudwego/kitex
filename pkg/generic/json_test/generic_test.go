@@ -20,6 +20,8 @@ import (
 	"context"
 	"net"
 	"reflect"
+	"runtime"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -147,7 +149,7 @@ func initThriftMockClient(t *testing.T) genericclient.Client {
 	test.Assert(t, err == nil)
 	g, err := generic.JSONThriftGeneric(p)
 	test.Assert(t, err == nil)
-	cli := newGenericClient("destServiceName", g, "127.0.0.1:9119")
+	cli := newGenericClient("destServiceName", g, "127.0.0.1:9128")
 	test.Assert(t, err == nil)
 	return cli
 }
@@ -178,7 +180,75 @@ func initThriftServer(t *testing.T, address string, handler generic.Service) ser
 }
 
 func initMockServer(t *testing.T, handler kt.Mock) server.Server {
-	addr, _ := net.ResolveTCPAddr("tcp", ":9119")
+	addr, _ := net.ResolveTCPAddr("tcp", ":9128")
 	svr := newMockServer(handler, addr)
 	return svr
+}
+
+func TestJSONThriftGenericClientClose(t *testing.T) {
+	debug.SetGCPercent(-1)
+	defer debug.SetGCPercent(100)
+
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	clis := make([]genericclient.Client, 1000)
+	for i := 0; i < 1000; i++ {
+		p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
+		test.Assert(t, err == nil)
+		g, err := generic.JSONThriftGeneric(p)
+		test.Assert(t, err == nil)
+		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9129")
+	}
+
+	runtime.ReadMemStats(&ms)
+	preHeepAlloc, preHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", preHeepAlloc, preHeapObjects)
+
+	for _, cli := range clis {
+		_ = cli.Close()
+	}
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	aferGCHeepAlloc, afterGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", aferGCHeepAlloc, afterGCHeapObjects)
+	test.Assert(t, aferGCHeepAlloc < preHeepAlloc && afterGCHeapObjects < preHeapObjects)
+}
+
+func TestJSONThriftGenericClientFinalizer(t *testing.T) {
+	debug.SetGCPercent(-1)
+	defer debug.SetGCPercent(100)
+
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	clis := make([]genericclient.Client, 1000)
+	for i := 0; i < 1000; i++ {
+		p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
+		test.Assert(t, err == nil)
+		g, err := generic.JSONThriftGeneric(p)
+		test.Assert(t, err == nil)
+		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9130")
+	}
+
+	runtime.ReadMemStats(&ms)
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	firstGCHeepAlloc, firstGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", firstGCHeepAlloc, firstGCHeapObjects)
+
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	secondGCHeepAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", secondGCHeepAlloc, secondGCHeapObjects)
+	test.Assert(t, secondGCHeepAlloc < firstGCHeepAlloc && secondGCHeapObjects < firstGCHeapObjects)
+}
+
+func mb(byteSize uint64) float32 {
+	return float32(byteSize) / float32(1024*1024)
 }

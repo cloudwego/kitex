@@ -25,6 +25,7 @@ import (
 
 // Generic ...
 type Generic interface {
+	Closer
 	// PayloadCodec return codec implement
 	PayloadCodec() remote.PayloadCodec
 	// PayloadCodecType return the type of codec
@@ -98,6 +99,10 @@ func (g *binaryThriftGeneric) GetMethod(req interface{}, method string) (*Method
 	return &Method{method, false}, nil
 }
 
+func (g *binaryThriftGeneric) Close() error {
+	return nil
+}
+
 type mapThriftGeneric struct {
 	codec *mapThriftCodec
 }
@@ -116,6 +121,10 @@ func (g *mapThriftGeneric) PayloadCodec() remote.PayloadCodec {
 
 func (g *mapThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
 	return g.codec.getMethod(req, method)
+}
+
+func (g *mapThriftGeneric) Close() error {
+	return g.codec.Close()
 }
 
 type jsonThriftGeneric struct {
@@ -138,6 +147,10 @@ func (g *jsonThriftGeneric) GetMethod(req interface{}, method string) (*Method, 
 	return g.codec.getMethod(req, method)
 }
 
+func (g *jsonThriftGeneric) Close() error {
+	return g.codec.Close()
+}
+
 type httpThriftGeneric struct {
 	codec *httpThriftCodec
 }
@@ -156,4 +169,8 @@ func (g *httpThriftGeneric) PayloadCodec() remote.PayloadCodec {
 
 func (g *httpThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
 	return g.codec.getMethod(req)
+}
+
+func (g *httpThriftGeneric) Close() error {
+	return g.codec.Close()
 }
