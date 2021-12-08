@@ -57,13 +57,13 @@ func (c *muxCliConn) OnRequest(ctx context.Context, connection netpoll.Connectio
 	length, seqID, err := parseHeader(connection.Reader())
 	if err != nil {
 		err = fmt.Errorf("%w: addr(%s)", err, connection.RemoteAddr())
-		return c.onError(err, connection)
+		return c.onError(ctx, err, connection)
 	}
 	// reader is nil if return error
 	reader, err := connection.Reader().Slice(length)
 	if err != nil {
 		err = fmt.Errorf("mux read package slice failed: addr(%s), %w", connection.RemoteAddr(), err)
-		return c.onError(err, connection)
+		return c.onError(ctx, err, connection)
 	}
 	go func() {
 		asyncCallback, ok := c.seqIDMap.load(seqID)
@@ -90,8 +90,8 @@ func (c *muxCliConn) close() error {
 	return nil
 }
 
-func (c *muxCliConn) onError(err error, connection netpoll.Connection) error {
-	klog.Errorf("KITEX: error=%s", err.Error())
+func (c *muxCliConn) onError(ctx context.Context, err error, connection netpoll.Connection) error {
+	klog.CtxErrorf(ctx, "KITEX: error=%s", err.Error())
 	connection.Close()
 	return err
 }
