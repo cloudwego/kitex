@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/binary"
 	"net"
+	"runtime"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -179,4 +181,66 @@ func genBinaryReqBuf(method string) []byte {
 	idx += 4
 	copy(buf[idx:idx+len(reqMsg)], reqMsg)
 	return buf
+}
+
+func TestBinaryThriftGenericClientClose(t *testing.T) {
+	debug.SetGCPercent(-1)
+	defer debug.SetGCPercent(100)
+
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	clis := make([]genericclient.Client, 10000)
+	for i := 0; i < 10000; i++ {
+		g := generic.BinaryThriftGeneric()
+		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009")
+	}
+
+	runtime.ReadMemStats(&ms)
+	preHeepAlloc, preHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", preHeepAlloc, preHeapObjects)
+
+	for _, cli := range clis {
+		_ = cli.Close()
+	}
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	aferGCHeepAlloc, afterGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", aferGCHeepAlloc, afterGCHeapObjects)
+	test.Assert(t, aferGCHeepAlloc < preHeepAlloc && afterGCHeapObjects < preHeapObjects)
+}
+
+func TestBinaryThriftGenericClientFinalizer(t *testing.T) {
+	debug.SetGCPercent(-1)
+	defer debug.SetGCPercent(100)
+
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	clis := make([]genericclient.Client, 10000)
+	for i := 0; i < 10000; i++ {
+		g := generic.BinaryThriftGeneric()
+		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009")
+	}
+
+	runtime.ReadMemStats(&ms)
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	firstGCHeepAlloc, firstGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", firstGCHeepAlloc, firstGCHeapObjects)
+
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	secondGCHeepAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", secondGCHeepAlloc, secondGCHeapObjects)
+	test.Assert(t, secondGCHeepAlloc < firstGCHeepAlloc && secondGCHeapObjects < firstGCHeapObjects)
+}
+
+func mb(byteSize uint64) float32 {
+	return float32(byteSize) / float32(1024*1024)
 }

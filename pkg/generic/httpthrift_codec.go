@@ -34,6 +34,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
+var (
+	_ remote.PayloadCodec = &httpThriftCodec{}
+	_ Closer              = &httpThriftCodec{}
+)
+
 // HTTPRequest alias of descriptor HTTPRequest
 type HTTPRequest = descriptor.HTTPRequest
 
@@ -106,6 +111,10 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 
 func (c *httpThriftCodec) Name() string {
 	return "HttpThrift"
+}
+
+func (c *httpThriftCodec) Close() error {
+	return c.provider.Close()
 }
 
 var json = jsoniter.Config{

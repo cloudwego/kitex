@@ -211,6 +211,8 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 
 		err := t.loopy.run()
 		if err != nil {
+      
+      
 			klog.CtxErrorf(ctx, "KITEX: grpc client loopyWriter.run returning, error=%v", err)
 		}
 		// If it's a connection error, let reader goroutine handle it
