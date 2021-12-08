@@ -71,7 +71,8 @@ func (p *thriftFileProvider) Close() error {
 
 // ThriftContentProvider provide descriptor from contents
 type ThriftContentProvider struct {
-	svcs chan *descriptor.ServiceDescriptor
+	closeOnce sync.Once
+	svcs      chan *descriptor.ServiceDescriptor
 }
 
 var _ DescriptorProvider = (*ThriftContentProvider)(nil)
@@ -123,7 +124,9 @@ func (p *ThriftContentProvider) Provide() <-chan *descriptor.ServiceDescriptor {
 
 // Close the sending chan.
 func (p *ThriftContentProvider) Close() error {
-	close(p.svcs)
+	p.closeOnce.Do(func() {
+		close(p.svcs)
+	})
 	return nil
 }
 
@@ -176,7 +179,8 @@ func parseContent(path, content string, includes map[string]string, isAbsInclude
 
 // ThriftContentWithAbsIncludePathProvider ...
 type ThriftContentWithAbsIncludePathProvider struct {
-	svcs chan *descriptor.ServiceDescriptor
+	closeOnce sync.Once
+	svcs      chan *descriptor.ServiceDescriptor
 }
 
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
@@ -235,6 +239,8 @@ func (p *ThriftContentWithAbsIncludePathProvider) Provide() <-chan *descriptor.S
 
 // Close the sending chan.
 func (p *ThriftContentWithAbsIncludePathProvider) Close() error {
-	close(p.svcs)
+	p.closeOnce.Do(func() {
+		close(p.svcs)
+	})
 	return nil
 }
