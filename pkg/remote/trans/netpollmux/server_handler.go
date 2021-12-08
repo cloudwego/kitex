@@ -64,7 +64,8 @@ func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 		svrHdlr.opt.TracerCtl = &stats2.Controller{}
 	}
 	svrHdlr.funcPool.New = func() interface{} {
-		return make([]func(), 0, 64) // 64 is defined casually, no special meaning
+		fs := make([]func(), 0, 64) // 64 is defined casually, no special meaning
+		return &fs
 	}
 	return svrHdlr, nil
 }
@@ -139,7 +140,7 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 	connection := conn.(netpoll.Connection)
 	r := connection.Reader()
 
-	fs := t.funcPool.Get().([]func())
+	fs := *t.funcPool.Get().(*[]func())
 	for total := r.Len(); total > 0; total = r.Len() {
 		// protocol header check
 		length, _, err := parseHeader(r)
@@ -151,7 +152,7 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 		}
 		if total < length && len(fs) > 0 {
 			go t.batchGoTasks(fs)
-			fs = t.funcPool.Get().([]func())
+			fs = *t.funcPool.Get().(*[]func())
 		}
 		reader, err := r.Slice(length)
 		if err != nil {
@@ -164,11 +165,7 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 			t.task(muxSvrConnCtx, conn, reader)
 		})
 	}
-	if len(fs) > 0 {
-		go t.batchGoTasks(fs)
-	} else {
-		t.funcPool.Put(fs[:0])
-	}
+	go t.batchGoTasks(fs)
 	return nil
 }
 
@@ -177,7 +174,8 @@ func (t *svrTransHandler) batchGoTasks(fs []func()) {
 	for n := range fs {
 		gofunc.GoFunc(nil, fs[n])
 	}
-	t.funcPool.Put(fs[:0])
+	fs = fs[:0]
+	t.funcPool.Put(&fs)
 }
 
 // task contains a complete process about decoding request -> handling -> writing response
