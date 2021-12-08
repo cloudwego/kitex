@@ -199,14 +199,14 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				klog.CtxErrorf(ctx, "KITEX: grpc server loopy run panicked, recover=%v, stack=%s", r, debug.Stack())
+				klog.CtxErrorf(ctx, "KITEX: grpc server loopy run panicked, recover=%v\nstack=%s", r, debug.Stack())
 			}
 		}()
 
 		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst)
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
 		if err := t.loopy.run(); err != nil {
-			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning. Err: %v", err)
+			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", err)
 		}
 		t.conn.Close()
 		close(t.writerDone)
@@ -983,7 +983,7 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				klog.Errorf("KITEX: grpc server outgoingGoAwayHandler panicked, recover=%v, stack=%s", r, debug.Stack())
+				klog.Errorf("KITEX: grpc server outgoingGoAwayHandler panicked, recover=%v\nstack=%s", r, debug.Stack())
 			}
 		}()
 

@@ -161,7 +161,7 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					klog.CtxErrorf(ctx, "KITEX: grpc client connection keepalive panicked, recover=%v, stack=%s", r, debug.Stack())
+					klog.CtxErrorf(ctx, "KITEX: grpc client connection keepalive panicked, recover=%v\nstack=%s", r, debug.Stack())
 				}
 			}()
 
@@ -174,7 +174,7 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				klog.CtxErrorf(ctx, "KITEX: grpc client reader panicked, recover=%v, stack=%s", r, debug.Stack())
+				klog.CtxErrorf(ctx, "KITEX: grpc client reader panicked, recover=%v\nstack=%s", r, debug.Stack())
 			}
 		}()
 
@@ -205,13 +205,13 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				klog.CtxErrorf(ctx, "KITEX: grpc loopy run panicked, recover=%v, stack=%s", r, debug.Stack())
+				klog.CtxErrorf(ctx, "KITEX: grpc loopy run panicked, recover=%v\nstack=%s", r, debug.Stack())
 			}
 		}()
 
 		err := t.loopy.run()
 		if err != nil {
-			klog.CtxErrorf(ctx, "KITEX: grpc client loopyWriter.run returning. Err: %v", err)
+			klog.CtxErrorf(ctx, "KITEX: grpc client loopyWriter.run returning, error=%v", err)
 		}
 		// If it's a connection error, let reader goroutine handle it
 		// since there might be data in the buffers.
