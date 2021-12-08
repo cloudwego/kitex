@@ -183,9 +183,9 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 // 传输层 error 回调
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remote=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+		klog.Errorf("KITEX: processing request error, remoteAddr=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
 	} else {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
+		klog.Errorf("KITEX: processing request error, remoteAddr=%s, error=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 

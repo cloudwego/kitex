@@ -29,6 +29,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"runtime/debug"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -131,11 +132,11 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 		MaxConnectionIdle:     defaultMaxConnectionIdle,
 		MaxConnectionAge:      defaultMaxConnectionAge,
 		MaxConnectionAgeGrace: defaultMaxConnectionAgeGrace,
-		Time:                  30 * time.Second,
-		Timeout:               time.Second,
+		Time:                  defaultServerKeepaliveTime,
+		Timeout:               defaultServerKeepaliveTimeout,
 	}
 	kep := EnforcementPolicy{
-		MinTime: 20 * time.Second,
+		MinTime: defaultKeepalivePolicyMinTime,
 	}
 
 	done := make(chan struct{})
@@ -196,10 +197,16 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 	t.handleSettings(sf)
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				klog.CtxErrorf(ctx, "KITEX: grpc server loopy run panicked, recover=%v\nstack=%s", r, debug.Stack())
+			}
+		}()
+
 		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst)
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
 		if err := t.loopy.run(); err != nil {
-			klog.CtxErrorf(ctx, "transport: loopyWriter.run returning. Err: %v", err)
+			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", err)
 		}
 		t.conn.Close()
 		close(t.writerDone)
@@ -974,6 +981,12 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 		return false, err
 	}
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				klog.Errorf("KITEX: grpc server outgoingGoAwayHandler panicked, recover=%v\nstack=%s", r, debug.Stack())
+			}
+		}()
+
 		timer := time.NewTimer(time.Minute)
 		defer timer.Stop()
 		select {
