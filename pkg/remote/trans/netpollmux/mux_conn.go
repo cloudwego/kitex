@@ -37,7 +37,7 @@ var ErrConnClosed = errors.New("conn closed")
 func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 	c := &muxCliConn{
 		muxConn:  newMuxConn(connection),
-		seqIDMap: newSharedMap(mux.ShardSize),
+		seqIDMap: newShardMap(mux.ShardSize),
 	}
 	connection.SetOnRequest(c.OnRequest)
 	return c
@@ -45,7 +45,7 @@ func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 
 type muxCliConn struct {
 	muxConn
-	seqIDMap *sharedMap // (k,v) is (sequenceID, notify)
+	seqIDMap *shardMap // (k,v) is (sequenceID, notify)
 }
 
 // OnRequest is called when the connection creates.
