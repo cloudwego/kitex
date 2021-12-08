@@ -25,20 +25,18 @@ import (
 	"io"
 	"math"
 	"net"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-
 	"github.com/cloudwego/netpoll"
-
 	"github.com/cloudwego/netpoll-http2"
 	"github.com/cloudwego/netpoll-http2/hpack"
 )
@@ -158,28 +156,13 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 
 	if t.keepaliveEnabled {
 		t.kpDormancyCond = sync.NewCond(&t.mu)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					klog.CtxErrorf(ctx, "KITEX: grpc client connection keepalive panicked, recover=%v\nstack=%s", r, debug.Stack())
-				}
-			}()
-
-			t.keepalive()
-		}()
+		gofunc.GoFuncWithRecover(ctx, conn, "KITEX: grpc client connection keepalive panicked", t.keepalive)
 	}
+
 	// Start the reader goroutine for incoming message. Each transport has
 	// a dedicated goroutine which reads HTTP2 frame from network. Then it
 	// dispatches the frame to the corresponding stream entity.
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				klog.CtxErrorf(ctx, "KITEX: grpc client reader panicked, recover=%v\nstack=%s", r, debug.Stack())
-			}
-		}()
-
-		t.reader()
-	}()
+	gofunc.GoFuncWithRecover(ctx, conn, "KITEX: grpc client reader panicked", t.reader)
 
 	// Send connection preface to server.
 	n, err := t.conn.Write(ClientPreface)
@@ -202,14 +185,8 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 		return nil, err
 	}
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				klog.CtxErrorf(ctx, "KITEX: grpc loopy run panicked, recover=%v\nstack=%s", r, debug.Stack())
-			}
-		}()
-
-		err := t.loopy.run()
+	gofunc.GoFuncWithRecover(ctx, conn, "KITEX: grpc loopy run panicked", func() {
+		err := t.loopy.run(ctx)
 		if err != nil {
 			klog.CtxErrorf(ctx, "KITEX: grpc client loopyWriter.run returning, error=%v", err)
 		}
@@ -219,7 +196,8 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 			t.conn.Close()
 		}
 		close(t.writerDone)
-	}()
+	})
+
 	return t, nil
 }
 

@@ -86,13 +86,13 @@ func (c *transports) close() {
 
 var _ remote.LongConnPool = (*connPool)(nil)
 
-func newTransport(dialer remote.Dialer, network, address string, connectTimeout time.Duration) (grpc.ClientTransport, error) {
+func newTransport(ctx context.Context, dialer remote.Dialer, network, address string, connectTimeout time.Duration) (grpc.ClientTransport, error) {
 	conn, err := dialer.DialTimeout(network, address, connectTimeout)
 	if err != nil {
 		return nil, err
 	}
 	return grpc.NewClientTransport(
-		context.Background(),
+		ctx,
 		conn.(netpoll.Connection),
 		func(grpc.GoAwayReason) {
 			// do nothing
@@ -126,7 +126,7 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 		}
 	}
 	tr, err, _ := p.sfg.Do(address, func() (i interface{}, e error) {
-		tr, err := newTransport(opt.Dialer, network, address, opt.ConnectTimeout)
+		tr, err := newTransport(ctx, opt.Dialer, network, address, opt.ConnectTimeout)
 		if err != nil {
 			return nil, err
 		}

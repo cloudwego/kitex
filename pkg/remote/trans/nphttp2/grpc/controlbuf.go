@@ -22,6 +22,7 @@ package grpc
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"runtime"
 	"sync"
@@ -462,7 +463,7 @@ type loopyWriter struct {
 	draining      bool
 
 	// Side-specific handlers
-	ssGoAwayHandler func(*goAway) (bool, error)
+	ssGoAwayHandler func(context.Context, *goAway) (bool, error)
 }
 
 func newLoopyWriter(s side, fr *framer, cbuf *controlBuffer, bdpEst *bdpEstimator) *loopyWriter {
@@ -500,7 +501,7 @@ const minBatchSize = 1000
 // When there's no more control frames to read from controlBuf, loopy flushes the write buffer.
 // As an optimization, to increase the batch size for each flush, loopy yields the processor, once
 // if the batch size is too low to give stream goroutines a chance to fill it up.
-func (l *loopyWriter) run() (err error) {
+func (l *loopyWriter) run(ctx context.Context) (err error) {
 	defer func() {
 		if err == ErrConnClosing {
 			// Don't log ErrConnClosing as error since it happens
@@ -516,7 +517,7 @@ func (l *loopyWriter) run() (err error) {
 		if err != nil {
 			return err
 		}
-		if err = l.handle(it); err != nil {
+		if err = l.handle(ctx, it); err != nil {
 			return err
 		}
 		if _, err = l.processData(); err != nil {
@@ -530,7 +531,7 @@ func (l *loopyWriter) run() (err error) {
 				return err
 			}
 			if it != nil {
-				if err = l.handle(it); err != nil {
+				if err = l.handle(ctx, it); err != nil {
 					return err
 				}
 				if _, err = l.processData(); err != nil {
@@ -753,10 +754,10 @@ func (l *loopyWriter) incomingGoAwayHandler(*incomingGoAway) error {
 	return nil
 }
 
-func (l *loopyWriter) goAwayHandler(g *goAway) error {
+func (l *loopyWriter) goAwayHandler(ctx context.Context, g *goAway) error {
 	// Handling of outgoing GoAway is very specific to side.
 	if l.ssGoAwayHandler != nil {
-		draining, err := l.ssGoAwayHandler(g)
+		draining, err := l.ssGoAwayHandler(ctx, g)
 		if err != nil {
 			return err
 		}
@@ -765,7 +766,7 @@ func (l *loopyWriter) goAwayHandler(g *goAway) error {
 	return nil
 }
 
-func (l *loopyWriter) handle(i interface{}) error {
+func (l *loopyWriter) handle(ctx context.Context, i interface{}) error {
 	switch i := i.(type) {
 	case *incomingWindowUpdate:
 		return l.incomingWindowUpdateHandler(i)
@@ -788,7 +789,7 @@ func (l *loopyWriter) handle(i interface{}) error {
 	case *ping:
 		return l.pingHandler(i)
 	case *goAway:
-		return l.goAwayHandler(i)
+		return l.goAwayHandler(ctx, i)
 	case *outFlowControlSizeRequest:
 		return l.outFlowControlSizeRequestHandler(i)
 	default:

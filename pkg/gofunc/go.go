@@ -18,6 +18,11 @@ package gofunc
 
 import (
 	"context"
+	"net"
+	"runtime/debug"
+
+	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 
 	"github.com/bytedance/gopkg/util/gopool"
 )
@@ -32,4 +37,34 @@ func init() {
 	GoFunc = func(ctx context.Context, f func()) {
 		gopool.CtxGo(ctx, f)
 	}
+}
+
+// GoFuncWithRecover is the go func with recover panic.
+func GoFuncWithRecover(ctx context.Context, conn net.Conn, panicMsg string, handler func()) {
+	rService, rAddr := getRemoteInfo(rpcinfo.GetRPCInfo(ctx), conn)
+	GoFunc(ctx, func() {
+		defer func() {
+			if r := recover(); r != nil {
+				klog.CtxErrorf(ctx, "%s, "+
+					"remoteService=%s, remoteAddress=%s, recover=%v\nstack=%s", panicMsg, rService, rAddr.String(), r, string(debug.Stack()))
+			}
+		}()
+
+		handler()
+	})
+}
+
+func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (remoteService string, remoteAddr net.Addr) {
+	rAddr := conn.RemoteAddr()
+	if ri == nil || ri.From() == nil {
+		return "", rAddr
+	}
+
+	from := ri.From()
+	if rAddr != nil && rAddr.Network() == "unix" {
+		if from.Address() != nil {
+			rAddr = from.Address()
+		}
+	}
+	return from.ServiceName(), rAddr
 }

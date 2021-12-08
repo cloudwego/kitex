@@ -35,9 +35,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/netpoll"
 	http2 "github.com/cloudwego/netpoll-http2"
 	"github.com/cloudwego/netpoll-http2/hpack"
@@ -196,21 +198,16 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 	}
 	t.handleSettings(sf)
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				klog.CtxErrorf(ctx, "KITEX: grpc server loopy run panicked, recover=%v\nstack=%s", r, debug.Stack())
-			}
-		}()
-
+	gofunc.GoFuncWithRecover(ctx, conn, "KITEX: grpc server loopy run panicked", func() {
 		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst)
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
-		if err := t.loopy.run(); err != nil {
+		if err := t.loopy.run(ctx); err != nil {
 			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", err)
 		}
 		t.conn.Close()
 		close(t.writerDone)
-	}()
+	})
+
 	go t.keepalive()
 	return t, nil
 }
@@ -941,7 +938,7 @@ var goAwayPing = &ping{data: [8]byte{1, 6, 1, 8, 0, 3, 3, 9}}
 
 // Handles outgoing GoAway and returns true if loopy needs to put itself
 // in draining mode.
-func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
+func (t *http2Server) outgoingGoAwayHandler(ctx context.Context, g *goAway) (bool, error) {
 	t.mu.Lock()
 	if t.state == closing { // TODO(mmukhi): This seems unnecessary.
 		t.mu.Unlock()
@@ -980,10 +977,15 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 	if err := t.framer.WritePing(false, goAwayPing.data); err != nil {
 		return false, err
 	}
+
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				klog.Errorf("KITEX: grpc server outgoingGoAwayHandler panicked, recover=%v\nstack=%s", r, debug.Stack())
+				remoteService := "unknown"
+				if ri := rpcinfo.GetRPCInfo(ctx); ri != nil && ri.From() != nil {
+					remoteService = ri.From().ServiceName()
+				}
+				klog.Errorf("KITEX: grpc server outgoingGoAwayHandler panicked, remoteService=%s, recover=%v\nstack=%s", remoteService, r, string(debug.Stack()))
 			}
 		}()
 
