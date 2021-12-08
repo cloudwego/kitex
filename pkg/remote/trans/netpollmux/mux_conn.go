@@ -20,20 +20,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"runtime"
 	"sync"
 
 	"github.com/cloudwego/netpoll"
 
-	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/remote"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 )
 
+// ErrConnClosed .
 var ErrConnClosed = errors.New("conn closed")
 
-var SharedSize int32 = 32
+// SharedSize .
+var SharedSize = int32(runtime.GOMAXPROCS(0))
 
 func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 	c := &muxCliConn{
@@ -57,22 +59,21 @@ func (c *muxCliConn) OnRequest(ctx context.Context, connection netpoll.Connectio
 		err = fmt.Errorf("%w: addr(%s)", err, connection.RemoteAddr())
 		return c.onError(err, connection)
 	}
-	asyncCallback, ok := c.seqIDMap.load(seqID)
-	if !ok {
-		connection.Reader().Skip(length)
-		connection.Reader().Release()
-		return
-	}
 	// reader is nil if return error
 	reader, err := connection.Reader().Slice(length)
 	if err != nil {
 		err = fmt.Errorf("mux read package slice failed: addr(%s), %w", connection.RemoteAddr(), err)
 		return c.onError(err, connection)
 	}
-	gofunc.GoFunc(ctx, func() {
+	go func() {
+		asyncCallback, ok := c.seqIDMap.load(seqID)
+		if !ok {
+			reader.(io.Closer).Close()
+			return
+		}
 		bufReader := np.NewReaderByteBuffer(reader)
 		asyncCallback.Recv(bufReader, nil)
-	})
+	}()
 	return nil
 }
 
@@ -90,7 +91,7 @@ func (c *muxCliConn) close() error {
 }
 
 func (c *muxCliConn) onError(err error, connection netpoll.Connection) error {
-	klog.Errorf("KITEX: %s", err.Error())
+	klog.Errorf("KITEX: error=%s", err.Error())
 	connection.Close()
 	return err
 }
@@ -111,28 +112,7 @@ type muxSvrConn struct {
 func newMuxConn(connection netpoll.Connection) muxConn {
 	c := muxConn{}
 	c.Connection = connection
-	writer := np.NewWriterByteBuffer(connection.Writer())
-	c.sharedQueue = newSharedQueue(SharedSize, func(gts []BufferGetter) {
-		var err error
-		var buf remote.ByteBuffer
-		var isNil bool
-		for _, gt := range gts {
-			buf, isNil = gt()
-			if !isNil {
-				err = writer.AppendBuffer(buf)
-				if err != nil {
-					connection.Close()
-					return
-				}
-			}
-		}
-	}, func() {
-		err := writer.Flush()
-		if err != nil {
-			connection.Close()
-			return
-		}
-	})
+	c.sharedQueue = newSharedQueue(SharedSize, connection)
 	return c
 }
 

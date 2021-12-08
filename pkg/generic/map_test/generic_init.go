@@ -28,7 +28,6 @@ import (
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
@@ -73,7 +72,6 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 	go func() {
 		err := svr.Run()
 		if err != nil {
-			klog.Errorf("addr=%v bind failed. %s", addr, err)
 			panic(err)
 		}
 	}()
@@ -170,7 +168,6 @@ func newMockServer(handler kt.Mock, addr net.Addr, opts ...server.Option) server
 	go func() {
 		err := svr.Run()
 		if err != nil {
-			klog.Errorf("addr=%v bind failed. %s", addr, err)
 			panic(err)
 		}
 	}()

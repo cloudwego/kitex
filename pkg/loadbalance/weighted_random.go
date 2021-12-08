@@ -231,7 +231,7 @@ func (wb *weightedBalancer) calcWeightInfo(e discovery.Result) *weightInfo {
 			w.weightSum += weight
 			cnt++
 		} else {
-			klog.Warnf("invalid weight %d on instance '%s'", weight, e.Instances[idx].Address())
+			klog.Warnf("KITEX: invalid weight, weight=%d instance=%s", weight, e.Instances[idx].Address())
 		}
 	}
 	w.instances = w.instances[:cnt]
@@ -264,7 +264,7 @@ func (wb *weightedBalancer) calcWeightInfoExcludeInst(e discovery.Result, addr s
 			}
 			cnt++
 		} else {
-			klog.Warnf("invalid weight %d on instance '%s'", weight, e.Instances[idx].Address())
+			klog.Warnf("KITEX: invalid weight: weight=%d instance=%s", weight, e.Instances[idx].Address())
 		}
 	}
 	w.instances = w.instances[:cnt]

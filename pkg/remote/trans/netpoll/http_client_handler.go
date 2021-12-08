@@ -141,9 +141,9 @@ func (t *httpCliTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 // This is called when panic happens.
 func (t *httpCliTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.Errorf("KITEX: send http request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+		klog.Errorf("KITEX: send http request error, remote=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
 	} else {
-		klog.Errorf("KITEX: send http request error, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
+		klog.Errorf("KITEX: send http request error, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 

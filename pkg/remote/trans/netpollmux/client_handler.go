@@ -22,8 +22,6 @@ import (
 	"net"
 	"sync/atomic"
 
-	"github.com/cloudwego/netpoll"
-
 	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -33,6 +31,7 @@ import (
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/netpoll"
 )
 
 type cliTransHandlerFactory struct{}
@@ -100,8 +99,8 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		return err
 	}
 	if methodInfo.OneWay() {
-		mc.Put(func() (buf remote.ByteBuffer, isNil bool) {
-			return bufWriter, false
+		mc.Put(func() (_ netpoll.Writer, isNil bool) {
+			return buf, false
 		})
 		return nil
 	}
@@ -162,9 +161,9 @@ func (t *cliTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 // OnError implements the remote.ClientTransHandler interface.
 func (t *cliTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.Errorf("KITEX: send request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+		klog.Errorf("KITEX: send request error, remote=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
 	} else {
-		klog.Errorf("KITEX: send request error, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
+		klog.Errorf("KITEX: send request error, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 
@@ -218,9 +217,9 @@ func (c *asyncCallback) notify(err error) {
 	}
 }
 
-func (c *asyncCallback) getter() (w remote.ByteBuffer, isNil bool) {
+func (c *asyncCallback) getter() (w netpoll.Writer, isNil bool) {
 	if atomic.CompareAndSwapInt32(&c.closed, 0, 2) {
-		return c.bufWriter, false
+		return c.wbuf, false
 	}
 	return nil, true
 }

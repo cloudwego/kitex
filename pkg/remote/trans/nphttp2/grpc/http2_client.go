@@ -508,7 +508,9 @@ func (t *http2Client) Close() error {
 	}
 	// Call t.onClose before setting the state to closing to prevent the client
 	// from attempting to create new streams ASAP.
-	t.onClose()
+	if t.onClose != nil {
+		t.onClose()
+	}
 	t.state = closing
 	streams := t.activeStreams
 	t.activeStreams = nil
@@ -792,7 +794,9 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 		// Notify the clientconn about the GOAWAY before we set the state to
 		// draining, to allow the client to stop attempting to create streams
 		// before disallowing new streams on this connection.
-		t.onGoAway(t.goAwayReason)
+		if t.onGoAway != nil {
+			t.onGoAway(t.goAwayReason)
+		}
 		t.state = draining
 	}
 	// All streams with IDs greater than the GoAwayId

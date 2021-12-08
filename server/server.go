@@ -195,7 +195,7 @@ func (s *server) Run() (err error) {
 	s.Unlock()
 
 	if err = s.waitExit(errCh); err != nil {
-		klog.Errorf("KITEX: received error and exit: %s", err.Error())
+		klog.Errorf("KITEX: received error and exit: error=%s", err.Error())
 	}
 	for i := range onShutdown {
 		onShutdown[i]()
@@ -203,7 +203,7 @@ func (s *server) Run() (err error) {
 	// stop server after user hooks
 	if e := s.Stop(); e != nil && err == nil {
 		err = e
-		klog.Errorf("KITEX: stop server error: %s", e.Error())
+		klog.Errorf("KITEX: stop server error: error=%s", e.Error())
 	}
 	return
 }

@@ -118,7 +118,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				panicErr := recover()
 				if panicErr != nil {
 					if conn != nil {
-						klog.Errorf("KITEX: panic happened, close conn. remoteAddr=%s, error=%v\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
+						klog.Errorf("KITEX: panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
 					} else {
 						klog.Errorf("KITEX: panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
 					}

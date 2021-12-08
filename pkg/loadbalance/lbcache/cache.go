@@ -161,11 +161,9 @@ func (b *BalancerFactory) Get(ctx context.Context, target rpcinfo.EndpointInfo) 
 			b:      b,
 			target: desc,
 		}
-		// store the res when init
 		bl.res.Store(res)
-		b.cache.Store(desc, bl)
-		// add self into sharedTicker
 		bl.sharedTicker = getSharedTicker(bl, b.opts.RefreshInterval)
+		b.cache.Store(desc, bl)
 		return bl, nil
 	})
 	if err != nil {
@@ -187,7 +185,7 @@ type Balancer struct {
 func (bl *Balancer) refresh() {
 	res, err := bl.b.resolver.Resolve(context.Background(), bl.target)
 	if err != nil {
-		klog.Warnf("[resolver] refresh key: %s error: %s", bl.target, err)
+		klog.Warnf("KITEX: resolver refresh failed, key=%s error=%s", bl.target, err.Error())
 		return
 	}
 	renameResultCacheKey(&res, bl.b.resolver.Name())
