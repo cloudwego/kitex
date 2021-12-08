@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"runtime"
 	"sync"
 
 	"github.com/cloudwego/netpoll"
+	"github.com/cloudwego/netpoll/mux"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
@@ -34,13 +34,10 @@ import (
 // ErrConnClosed .
 var ErrConnClosed = errors.New("conn closed")
 
-// SharedSize .
-var SharedSize = int32(runtime.GOMAXPROCS(0))
-
 func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 	c := &muxCliConn{
 		muxConn:  newMuxConn(connection),
-		seqIDMap: newSharedMap(SharedSize),
+		seqIDMap: newShardMap(mux.ShardSize),
 	}
 	connection.SetOnRequest(c.OnRequest)
 	return c
@@ -48,7 +45,7 @@ func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 
 type muxCliConn struct {
 	muxConn
-	seqIDMap *sharedMap // (k,v) is (sequenceID, notify)
+	seqIDMap *shardMap // (k,v) is (sequenceID, notify)
 }
 
 // OnRequest is called when the connection creates.
@@ -112,7 +109,7 @@ type muxSvrConn struct {
 func newMuxConn(connection netpoll.Connection) muxConn {
 	c := muxConn{}
 	c.Connection = connection
-	c.sharedQueue = newSharedQueue(SharedSize, connection)
+	c.shardQueue = mux.NewShardQueue(mux.ShardSize, connection)
 	return c
 }
 
@@ -122,11 +119,11 @@ var (
 )
 
 type muxConn struct {
-	netpoll.Connection              // raw conn
-	sharedQueue        *sharedQueue // use for write
+	netpoll.Connection                 // raw conn
+	shardQueue         *mux.ShardQueue // use for write
 }
 
 // Put puts the buffer getter back to the queue.
-func (c *muxConn) Put(gt BufferGetter) {
-	c.sharedQueue.Add(gt)
+func (c *muxConn) Put(gt mux.WriterGetter) {
+	c.shardQueue.Add(gt)
 }
