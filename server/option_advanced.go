@@ -160,3 +160,12 @@ func WithExitSignal(f func() <-chan error) Option {
 		o.ExitSignal = f
 	}}
 }
+
+// WithReusePort sets SO_REUSEPORT on listener.
+func WithReusePort(reuse bool) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithReusePort(%+v)", reuse))
+
+		o.RemoteOpt.ReusePort = reuse
+	}}
+}
