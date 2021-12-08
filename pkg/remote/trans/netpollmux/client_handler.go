@@ -99,8 +99,8 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		return err
 	}
 	if methodInfo.OneWay() {
-		mc.Put(func() (buf remote.ByteBuffer, isNil bool) {
-			return bufWriter, false
+		mc.Put(func() (_ netpoll.Writer, isNil bool) {
+			return buf, false
 		})
 		return nil
 	}
@@ -217,9 +217,9 @@ func (c *asyncCallback) notify(err error) {
 	}
 }
 
-func (c *asyncCallback) getter() (w remote.ByteBuffer, isNil bool) {
+func (c *asyncCallback) getter() (w netpoll.Writer, isNil bool) {
 	if atomic.CompareAndSwapInt32(&c.closed, 0, 2) {
-		return c.bufWriter, false
+		return c.wbuf, false
 	}
 	return nil, true
 }
