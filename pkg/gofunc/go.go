@@ -21,10 +21,9 @@ import (
 	"net"
 	"runtime/debug"
 
+	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-
-	"github.com/bytedance/gopkg/util/gopool"
 )
 
 // GoTask is used to spawn a new task.
