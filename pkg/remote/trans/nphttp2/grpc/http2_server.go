@@ -29,12 +29,12 @@ import (
 	"math"
 	"math/rand"
 	"net"
-	"runtime/debug"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
@@ -196,13 +196,7 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 	}
 	t.handleSettings(sf)
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				klog.CtxErrorf(ctx, "KITEX: grpc server loopy run panicked, recover=%v\nstack=%s", r, debug.Stack())
-			}
-		}()
-
+	gofunc.RecoverGoFuncWithInfo(ctx, func() {
 		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst)
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
 		if err := t.loopy.run(); err != nil {
@@ -210,8 +204,9 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 		}
 		t.conn.Close()
 		close(t.writerDone)
-	}()
-	go t.keepalive()
+	}, gofunc.NewBasicInfo("", conn.RemoteAddr().String()))
+
+	gofunc.RecoverGoFuncWithInfo(ctx, t.keepalive, gofunc.NewBasicInfo("", conn.RemoteAddr().String()))
 	return t, nil
 }
 
@@ -980,13 +975,8 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 	if err := t.framer.WritePing(false, goAwayPing.data); err != nil {
 		return false, err
 	}
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				klog.Errorf("KITEX: grpc server outgoingGoAwayHandler panicked, recover=%v\nstack=%s", r, debug.Stack())
-			}
-		}()
 
+	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
 		timer := time.NewTimer(time.Minute)
 		defer timer.Stop()
 		select {
@@ -996,6 +986,6 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 			return
 		}
 		t.controlBuf.put(&goAway{code: g.code, debugData: g.debugData})
-	}()
+	}, gofunc.EmptyInfo)
 	return false, nil
 }
