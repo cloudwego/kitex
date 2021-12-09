@@ -40,10 +40,10 @@ func init() {
 
 // GoFuncWithRecover is the go func with recover panic.
 func GoFuncWithRecover(ctx context.Context, conn net.Conn, panicMsg string, handler func()) {
-	rService, rAddr := getRemoteInfo(rpcinfo.GetRPCInfo(ctx), conn)
 	GoFunc(ctx, func() {
 		defer func() {
 			if r := recover(); r != nil {
+				rService, rAddr := getRemoteInfo(rpcinfo.GetRPCInfo(ctx), conn)
 				klog.CtxErrorf(ctx, "%s, "+
 					"remoteService=%s, remoteAddress=%s, recover=%v\nstack=%s", panicMsg, rService, rAddr.String(), r, string(debug.Stack()))
 			}
