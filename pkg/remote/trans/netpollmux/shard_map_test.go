@@ -24,8 +24,8 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
-func TestSharedMap(t *testing.T) {
-	m := newSharedMap(32)
+func TestShardMap(t *testing.T) {
+	m := newShardMap(32)
 	var key int32
 	var mod int32 = 1023
 	// check success
@@ -94,8 +94,8 @@ func BenchmarkSyncMap(b *testing.B) {
 	})
 }
 
-func BenchmarkSharedMap(b *testing.B) {
-	m := newSharedMap(32)
+func BenchmarkShardMap(b *testing.B) {
+	m := newShardMap(32)
 	var key int32
 	var mod int32 = 1023
 	for i := int32(0); i <= mod; i++ {

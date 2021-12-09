@@ -49,6 +49,8 @@ type ServerOption struct {
 
 	Address net.Addr
 
+	ReusePort bool
+
 	// Duration that server waits for to allow any existing connection to be closed gracefully.
 	ExitWaitTime time.Duration
 

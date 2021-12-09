@@ -79,7 +79,7 @@ func WithMetaHandler(h remote.MetaHandler) Option {
 }
 
 // WithProxy stes the backward Proxy for server.
-func WithProxy(p proxy.BackwardProxy) Option {
+func WithProxy(p proxy.ReverseProxy) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithProxy(%T)", p))
@@ -158,5 +158,14 @@ func WithExitSignal(f func() <-chan error) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("AddExitSignal(%+v)", utils.GetFuncName(f)))
 		o.ExitSignal = f
+	}}
+}
+
+// WithReusePort sets SO_REUSEPORT on listener.
+func WithReusePort(reuse bool) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithReusePort(%+v)", reuse))
+
+		o.RemoteOpt.ReusePort = reuse
 	}}
 }

@@ -25,6 +25,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -115,8 +116,8 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 	}()
 
 	kp := ClientKeepalive{
-		Time:    30 * time.Second,
-		Timeout: 1 * time.Second,
+		Time:    defaultClientKeepaliveTime,
+		Timeout: defaultClientKeepaliveTimeout,
 	}
 	keepaliveEnabled := false
 	if kp.Time != Infinity {
@@ -157,12 +158,28 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 
 	if t.keepaliveEnabled {
 		t.kpDormancyCond = sync.NewCond(&t.mu)
-		go t.keepalive()
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					klog.CtxErrorf(ctx, "KITEX: grpc client connection keepalive panicked, recover=%v\nstack=%s", r, debug.Stack())
+				}
+			}()
+
+			t.keepalive()
+		}()
 	}
 	// Start the reader goroutine for incoming message. Each transport has
 	// a dedicated goroutine which reads HTTP2 frame from network. Then it
 	// dispatches the frame to the corresponding stream entity.
-	go t.reader()
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				klog.CtxErrorf(ctx, "KITEX: grpc client reader panicked, recover=%v\nstack=%s", r, debug.Stack())
+			}
+		}()
+
+		t.reader()
+	}()
 
 	// Send connection preface to server.
 	n, err := t.conn.Write(ClientPreface)
@@ -186,9 +203,15 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 	}
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				klog.CtxErrorf(ctx, "KITEX: grpc loopy run panicked, recover=%v\nstack=%s", r, debug.Stack())
+			}
+		}()
+
 		err := t.loopy.run()
 		if err != nil {
-			klog.Errorf("transport: loopyWriter.run returning. Err: %v", err)
+			klog.CtxErrorf(ctx, "KITEX: grpc client loopyWriter.run returning, error=%v", err)
 		}
 		// If it's a connection error, let reader goroutine handle it
 		// since there might be data in the buffers.
@@ -485,7 +508,9 @@ func (t *http2Client) Close() error {
 	}
 	// Call t.onClose before setting the state to closing to prevent the client
 	// from attempting to create new streams ASAP.
-	t.onClose()
+	if t.onClose != nil {
+		t.onClose()
+	}
 	t.state = closing
 	streams := t.activeStreams
 	t.activeStreams = nil
@@ -769,7 +794,9 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 		// Notify the clientconn about the GOAWAY before we set the state to
 		// draining, to allow the client to stop attempting to create streams
 		// before disallowing new streams on this connection.
-		t.onGoAway(t.goAwayReason)
+		if t.onGoAway != nil {
+			t.onGoAway(t.goAwayReason)
+		}
 		t.state = draining
 	}
 	// All streams with IDs greater than the GoAwayId

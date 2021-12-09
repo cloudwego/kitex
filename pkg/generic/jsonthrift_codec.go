@@ -28,6 +28,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
+var (
+	_ remote.PayloadCodec = &jsonThriftCodec{}
+	_ Closer              = &jsonThriftCodec{}
+)
+
 // JSONRequest alias of string
 type JSONRequest = string
 
@@ -98,4 +103,8 @@ func (c *jsonThriftCodec) getMethod(req interface{}, method string) (*Method, er
 
 func (c *jsonThriftCodec) Name() string {
 	return "JSONThrift"
+}
+
+func (c *jsonThriftCodec) Close() error {
+	return c.provider.Close()
 }

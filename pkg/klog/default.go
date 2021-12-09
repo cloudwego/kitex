@@ -180,7 +180,7 @@ func (ll *defaultLogger) logf(lv Level, format *string, v ...interface{}) {
 	} else {
 		msg += fmt.Sprint(v...)
 	}
-	ll.stdlog.Output(3, msg)
+	ll.stdlog.Output(4, msg)
 	if lv == LevelFatal {
 		os.Exit(1)
 	}

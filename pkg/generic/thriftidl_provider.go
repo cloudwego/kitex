@@ -19,14 +19,21 @@ package generic
 import (
 	"fmt"
 	"path/filepath"
+	"sync"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/thriftgo/parser"
 )
 
+var (
+	_ Closer = &ThriftContentProvider{}
+	_ Closer = &ThriftContentWithAbsIncludePathProvider{}
+)
+
 type thriftFileProvider struct {
-	svcs chan *descriptor.ServiceDescriptor
+	closeOnce sync.Once
+	svcs      chan *descriptor.ServiceDescriptor
 }
 
 // NewThriftFileProvider create a ThriftIDLProvider by given path and include dirs
@@ -54,9 +61,18 @@ func (p *thriftFileProvider) Provide() <-chan *descriptor.ServiceDescriptor {
 	return p.svcs
 }
 
+// Close the sending chan.
+func (p *thriftFileProvider) Close() error {
+	p.closeOnce.Do(func() {
+		close(p.svcs)
+	})
+	return nil
+}
+
 // ThriftContentProvider provide descriptor from contents
 type ThriftContentProvider struct {
-	svcs chan *descriptor.ServiceDescriptor
+	closeOnce sync.Once
+	svcs      chan *descriptor.ServiceDescriptor
 }
 
 var _ DescriptorProvider = (*ThriftContentProvider)(nil)
@@ -104,6 +120,14 @@ func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]strin
 // Provide ...
 func (p *ThriftContentProvider) Provide() <-chan *descriptor.ServiceDescriptor {
 	return p.svcs
+}
+
+// Close the sending chan.
+func (p *ThriftContentProvider) Close() error {
+	p.closeOnce.Do(func() {
+		close(p.svcs)
+	})
+	return nil
 }
 
 func parseIncludes(tree *parser.Thrift, includes map[string]*parser.Thrift, isAbsIncludePath bool) error {
@@ -155,7 +179,8 @@ func parseContent(path, content string, includes map[string]string, isAbsInclude
 
 // ThriftContentWithAbsIncludePathProvider ...
 type ThriftContentWithAbsIncludePathProvider struct {
-	svcs chan *descriptor.ServiceDescriptor
+	closeOnce sync.Once
+	svcs      chan *descriptor.ServiceDescriptor
 }
 
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
@@ -210,4 +235,12 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 // Provide ...
 func (p *ThriftContentWithAbsIncludePathProvider) Provide() <-chan *descriptor.ServiceDescriptor {
 	return p.svcs
+}
+
+// Close the sending chan.
+func (p *ThriftContentWithAbsIncludePathProvider) Close() error {
+	p.closeOnce.Do(func() {
+		close(p.svcs)
+	})
+	return nil
 }
