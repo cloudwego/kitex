@@ -19,7 +19,6 @@ package nphttp2
 import (
 	"errors"
 	"net"
-	"sync"
 
 	"github.com/cloudwego/netpoll"
 
@@ -32,26 +31,13 @@ type buffer struct {
 	readSize int
 }
 
-var (
-	_ remote.ByteBuffer = (*buffer)(nil)
+var _ remote.ByteBuffer = (*buffer)(nil)
 
-	bufPool sync.Pool
-)
-
-func init() {
-	bufPool.New = newBuffer
-}
-
-func newBuffer() interface{} {
+func newBuffer(conn net.Conn) *buffer {
 	return &buffer{
-		buf: netpoll.NewLinkBuffer(),
+		buf:  netpoll.NewLinkBuffer(),
+		conn: conn,
 	}
-}
-
-func newByteBuffer(conn net.Conn) remote.ByteBuffer {
-	bytebuf := bufPool.Get().(*buffer)
-	bytebuf.conn = conn
-	return bytebuf
 }
 
 func (b *buffer) readN(n int) error {
@@ -161,7 +147,7 @@ func (b *buffer) Flush() (err error) {
 }
 
 func (b *buffer) NewBuffer() remote.ByteBuffer {
-	return newByteBuffer(b.conn)
+	return newBuffer(b.conn)
 }
 
 // ErrUnimplemented return unimplemented error
