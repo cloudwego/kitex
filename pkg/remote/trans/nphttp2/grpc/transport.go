@@ -513,8 +513,8 @@ func NewServerTransport(ctx context.Context, conn netpoll.Connection) (ServerTra
 
 // NewClientTransport establishes the transport with the required ConnectOptions
 // and returns it to the caller.
-func NewClientTransport(ctx context.Context, conn netpoll.Connection, onGoAway func(GoAwayReason), onClose func()) (ClientTransport, error) {
-	return newHTTP2Client(ctx, conn, onGoAway, onClose)
+func NewClientTransport(ctx context.Context, conn netpoll.Connection, remoteService string, onGoAway func(GoAwayReason), onClose func()) (ClientTransport, error) {
+	return newHTTP2Client(ctx, conn, remoteService, onGoAway, onClose)
 }
 
 // Options provides additional hints and information for message
