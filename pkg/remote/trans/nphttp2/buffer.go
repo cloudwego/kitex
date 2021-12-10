@@ -105,7 +105,9 @@ func (b *buffer) Skip(n int) (err error) {
 }
 
 func (b *buffer) Release(e error) (err error) {
-	return b.buf.Release()
+	_ = b.buf.Close()
+	b.buf = netpoll.NewLinkBuffer()
+	return nil
 }
 
 func (b *buffer) ReadableLen() (n int) {
