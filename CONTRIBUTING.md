@@ -11,7 +11,7 @@ We use [git-flow](https://nvie.com/posts/a-successful-git-branching-model/) as o
 
 ## Bugs
 ### 1. How to Find Known Issues
-We are using [Github Issues](https://github.com/cloudwego/kitex/issues) for our public bugs. We keep a close eye on this and try to make it clear when we have an internal fix in progress. Before filing a new task, try to make sure your problem doesn’t already exist.
+We are using [Github Issues](https://github.com/cloudwego/kitex/issues) for our public bugs. We keep a close eye on this and try to make it clear when we have an internal fix in progress. Before filing a new task, try to make sure your problem doesn't already exist.
 
 ### 2. Reporting New Issues
 Providing a reduced test code is a recommended way for reporting issues. Then can placed in:
