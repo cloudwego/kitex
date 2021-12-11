@@ -245,7 +245,7 @@ func WithConnectTimeout(d time.Duration) Option {
 // WithTimeoutProvider adds a TimeoutProvider to the client.
 // Note that the timeout settings provided by the TimeoutProvider
 // will be applied before the other timeout options in this package
-// and those in the callopt pacakage. Thus it can not modify the
+// and those in the callopt package. Thus it can not modify the
 // timeouts set by WithRPCTimeout or WithConnectTimeout.
 func WithTimeoutProvider(p rpcinfo.TimeoutProvider) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
