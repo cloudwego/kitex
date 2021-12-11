@@ -310,10 +310,10 @@ func (s *server) buildLimiterWithOpt() (connLimit limiter.ConcurrencyLimiter, qp
 
 func (s *server) check() error {
 	if s.svcInfo == nil {
-		return errors.New("Run: no service. Use RegisterService to set one")
+		return errors.New("run: no service. Use RegisterService to set one")
 	}
 	if s.handler == nil || reflect.ValueOf(s.handler).IsNil() {
-		return errors.New("Run: handler is nil")
+		return errors.New("run: handler is nil")
 	}
 	return nil
 }
