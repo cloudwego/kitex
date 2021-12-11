@@ -35,7 +35,7 @@ type PackageInfo struct {
 	Dependencies map[string]string // package name => import path, used for searching imports
 	*ServiceInfo                   // the target service
 
-	// the bellowing fields will be filled and used by the generator
+	// the following fields will be filled and used by the generator
 	Codec            string
 	Version          string
 	RealServiceName  string
