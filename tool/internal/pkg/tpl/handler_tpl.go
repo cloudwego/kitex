@@ -48,6 +48,7 @@ func (s *{{$.ServiceName}}Impl) {{.Name}}(ctx context.Context {{- range .Args}},
 // {{.Name}} implements the {{.ServiceName}}Impl interface.
 func (s *{{$.ServiceName}}Impl) {{.Name}}(ctx context.Context {{range .Args}}, {{LowerFirst .Name}} {{.Type}}{{end}} ) (resp {{.Resp.Type}}, err error) {
 	// TODO: Your code here...
+    resp = new({{.Resp.Type}})
 	return
 }
 {{end}}
