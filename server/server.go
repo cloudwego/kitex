@@ -31,6 +31,7 @@ import (
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
+	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -382,6 +383,10 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 	}
 	if info.PayloadCodec == "" {
 		info.PayloadCodec = s.opt.RemoteOpt.SvcInfo.PayloadCodec.String()
+	}
+
+	if info.Weight == 0 {
+		info.Weight = discovery.DefaultWeight
 	}
 }
 
