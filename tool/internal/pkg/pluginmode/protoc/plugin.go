@@ -195,6 +195,7 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 		panic(fmt.Errorf("missing %q option in %q", "go_package", file.Desc.Name()))
 	}
 	pi := generator.PkgInfo{
+		PkgName:    file.Proto.GetPackage(),
 		PkgRefName: goSanitized(path.Base(pth)),
 		ImportPath: pth,
 	}
