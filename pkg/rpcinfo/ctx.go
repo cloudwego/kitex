@@ -49,3 +49,14 @@ func PutRPCInfo(ri RPCInfo) {
 		v.Recycle()
 	}
 }
+
+// FreezeRPCInfo returns a new context containing an RPCInfo that is safe
+// to be used asynchronically.
+// Note that the RPCStats of the freezed RPCInfo will be nil.
+func FreezeRPCInfo(ctx context.Context) context.Context {
+	ri := GetRPCInfo(ctx)
+	if ri == nil {
+		return ctx
+	}
+	return NewCtxWithRPCInfo(ctx, freeze(ri))
+}
