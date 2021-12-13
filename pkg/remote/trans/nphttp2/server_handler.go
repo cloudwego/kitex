@@ -130,7 +130,16 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				tr.WriteStatus(s, status.New(codes.ResourceExhausted, errDesc))
 				return
 			}
-			ink.SetMethodName(sm[pos+1:])
+			methodName := sm[pos+1:]
+			ink.SetMethodName(methodName)
+
+			if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
+				if err := mutableTo.SetMethod(methodName); err != nil {
+					errDesc := fmt.Sprintf("setMethod failed in streaming, method=%s, err=%s", methodName, err.Error())
+					_ = tr.WriteStatus(s, status.New(codes.ResourceExhausted, errDesc))
+					return
+				}
+			}
 
 			idx := strings.LastIndex(sm[:pos], ".")
 			if idx == -1 {
