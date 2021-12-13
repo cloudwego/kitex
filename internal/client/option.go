@@ -39,12 +39,14 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/connpool"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func init() {
@@ -130,7 +132,7 @@ func NewOptions(opts []Option) *Options {
 	o.Apply(opts)
 	o.MetaHandlers = append(o.MetaHandlers, transmeta.MetainfoClientHandler)
 
-	o.initConnectionPool()
+	o.initRemoteOpt()
 
 	if o.RetryContainer != nil && o.DebugService != nil {
 		o.DebugService.RegisterProbeFunc(diagnosis.RetryPolicyKey, o.RetryContainer.Dump)
@@ -146,7 +148,11 @@ func NewOptions(opts []Option) *Options {
 	return o
 }
 
-func (o *Options) initConnectionPool() {
+func (o *Options) initRemoteOpt() {
+	if o.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
+		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName)
+		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
+	}
 	if o.RemoteOpt.ConnPool == nil {
 		if o.PoolCfg != nil {
 			var zero connpool2.IdleConfig

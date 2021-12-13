@@ -14,10 +14,26 @@
  * limitations under the License.
  */
 
-package kitex
+package gofunc
 
-// Name and Version info of this framework, used for statistics and debug
-const (
-	Name    = "Kitex"
-	Version = "v0.1.0"
+import (
+	"context"
+	"sync"
+	"testing"
 )
+
+func TestRecoverGoFuncWithInfo(t *testing.T) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	task := func() {
+		panic("test")
+	}
+	SetPanicHandler(func(info *Info, panicErr interface{}, panicStack string) {
+		wg.Done()
+	})
+	ctx := context.Background()
+	remoteService := "aaa.aaa.aaa"
+	remoteAddr := "127.0.0.1:888"
+	RecoverGoFuncWithInfo(ctx, task, NewBasicInfo(remoteService, remoteAddr))
+	wg.Wait()
+}

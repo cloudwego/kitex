@@ -35,7 +35,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -61,10 +60,6 @@ func WithTransportProtocol(tp transport.Protocol) Option {
 		tpName := tp.String()
 		if tpName == transport.Unknown {
 			panic(fmt.Errorf("WithTransportProtocol: invalid '%v'", tp))
-		}
-		if tp == transport.GRPC {
-			o.RemoteOpt.ConnPool = nphttp2.NewConnPool()
-			o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 		}
 		di.Push(fmt.Sprintf("WithTransportProtocol(%s)", tpName))
 		rpcinfo.AsMutableRPCConfig(o.Configs).SetTransportProtocol(tp)
@@ -250,7 +245,7 @@ func WithConnectTimeout(d time.Duration) Option {
 // WithTimeoutProvider adds a TimeoutProvider to the client.
 // Note that the timeout settings provided by the TimeoutProvider
 // will be applied before the other timeout options in this package
-// and those in the callopt pacakage. Thus it can not modify the
+// and those in the callopt package. Thus it can not modify the
 // timeouts set by WithRPCTimeout or WithConnectTimeout.
 func WithTimeoutProvider(p rpcinfo.TimeoutProvider) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {

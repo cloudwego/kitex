@@ -89,7 +89,7 @@ func (c *completer) compare(pkg *ast.Package) []*MethodInfo {
 	return newMethods
 }
 
-func (c *completer) addImplementions(w io.Writer, newMethods []*MethodInfo) error {
+func (c *completer) addImplementations(w io.Writer, newMethods []*MethodInfo) error {
 	// 调用模板生成新的methods基本实现代码
 	mt := template.New(HandlerFileName).Funcs(funcs)
 	mt = template.Must(mt.Parse(tpl.HandlerMethodsTpl))
@@ -173,7 +173,7 @@ func (c *completer) process(w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("add imports failed error: %v", err)
 	}
-	err = c.addImplementions(w, newMethods)
+	err = c.addImplementations(w, newMethods)
 	if err != nil {
 		return fmt.Errorf("add implements failed error: %v", err)
 	}
