@@ -519,16 +519,22 @@ const fieldContainerLength = `
 
 const fieldFastWriteMap = `
 {{define "FieldFastWriteMap"}}
-	offset += bthrift.Binary.WriteMapBegin(buf[offset:], thrift.
-		{{- .KeyCtx.Type | GetTypeIDConstant -}}
-		, thrift.{{- .ValCtx.Type | GetTypeIDConstant -}}
-		, len({{.Target}}))
+	mapBeginOffset := offset
+	offset += bthrift.Binary.MapBeginLength(thrift.
+	{{- .KeyCtx.Type | GetTypeIDConstant -}}
+	, thrift.{{- .ValCtx.Type | GetTypeIDConstant -}}, 0)
+	var length int
 	for k, v := range {{.Target}}{
+		length++
 		{{$ctx := .KeyCtx.WithTarget "k"}}
 		{{- template "FieldFastWrite" $ctx}}
 		{{$ctx := .ValCtx.WithTarget "v"}}
 		{{- template "FieldFastWrite" $ctx}}
 	}
+	bthrift.Binary.WriteMapBegin(buf[mapBeginOffset:], thrift.
+		{{- .KeyCtx.Type | GetTypeIDConstant -}}
+		, thrift.{{- .ValCtx.Type | GetTypeIDConstant -}}
+		, length)
 	offset += bthrift.Binary.WriteMapEnd(buf[offset:])
 {{- end}}{{/* define "FieldFastWriteMap" */}}
 `
@@ -560,14 +566,19 @@ const fieldMapLength = `
 
 const fieldFastWriteSet = `
 {{define "FieldFastWriteSet"}}
-		offset += bthrift.Binary.WriteSetBegin(buf[offset:], thrift.
-		{{- .ValCtx.Type | GetTypeIDConstant -}}
-		, len({{.Target}}))
+		setBeginOffset := offset
+		offset += bthrift.Binary.SetBeginLength(thrift.
+		{{- .ValCtx.Type | GetTypeIDConstant -}}, 0)
 		{{template "ValidateSet" .}}
+		var length int
 		for _, v := range {{.Target}} {
+			length++
 			{{- $ctx := .ValCtx.WithTarget "v"}}
 			{{- template "FieldFastWrite" $ctx}}
 		}
+		bthrift.Binary.WriteSetBegin(buf[setBeginOffset:], thrift.
+		{{- .ValCtx.Type | GetTypeIDConstant -}}
+		, length)
 		offset += bthrift.Binary.WriteSetEnd(buf[offset:])
 {{- end}}{{/* define "FieldFastWriteSet" */}}
 `
@@ -594,13 +605,18 @@ const fieldSetLength = `
 
 const fieldFastWriteList = `
 {{define "FieldFastWriteList"}}
-		offset += bthrift.Binary.WriteListBegin(buf[offset:], thrift.
-		{{- .ValCtx.Type | GetTypeIDConstant -}}
-		, len({{.Target}}))
+		listBeginOffset := offset
+		offset += bthrift.Binary.ListBeginLength(thrift.
+		{{- .ValCtx.Type | GetTypeIDConstant -}}, 0)
+		var length int
 		for _, v := range {{.Target}} {
+			length++
 			{{- $ctx := .ValCtx.WithTarget "v"}}
 			{{- template "FieldFastWrite" $ctx}}
 		}
+		bthrift.Binary.WriteListBegin(buf[listBeginOffset:], thrift.
+		{{- .ValCtx.Type | GetTypeIDConstant -}}
+		, length)
 		offset += bthrift.Binary.WriteListEnd(buf[offset:])
 {{- end}}{{/* define "FieldFastWriteList" */}}
 `

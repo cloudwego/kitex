@@ -36,7 +36,6 @@ type ServerTransHandlerFactory interface {
 // TransReadWriter .
 type TransReadWriter interface {
 	Write(ctx context.Context, conn net.Conn, send Message) error
-
 	Read(ctx context.Context, conn net.Conn, msg Message) error
 }
 
@@ -44,13 +43,9 @@ type TransReadWriter interface {
 // Transport can be refactored to support pipeline, and then is able to support other extensions at conn level.
 type TransHandler interface {
 	TransReadWriter
-
 	OnInactive(ctx context.Context, conn net.Conn)
-
 	OnError(ctx context.Context, err error, conn net.Conn)
-
 	OnMessage(ctx context.Context, args, result Message) (context.Context, error)
-
 	SetPipeline(pipeline *TransPipeline)
 }
 
@@ -62,9 +57,7 @@ type ClientTransHandler interface {
 // ServerTransHandler have some new functions.
 type ServerTransHandler interface {
 	TransHandler
-
 	OnActive(ctx context.Context, conn net.Conn) (context.Context, error)
-
 	OnRead(ctx context.Context, conn net.Conn) error
 }
 

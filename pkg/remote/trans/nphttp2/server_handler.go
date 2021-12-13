@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
@@ -95,7 +96,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	tr.HandleStreams(func(s *grpcTransport.Stream) {
 		gofunc.GoFunc(ctx, func() {
 			ri, ctx := t.opt.InitRPCInfoFunc(s.Context(), tr.RemoteAddr())
-			// set grpc transport flag before excute metahandler
+			// set grpc transport flag before execute metahandler
 			rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(transport.GRPC)
 			var err error
 			for _, shdlr := range t.opt.StreamingMetaHandlers {
@@ -110,9 +111,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				panicErr := recover()
 				if panicErr != nil {
 					if conn != nil {
-						t.opt.Logger.Errorf("KITEX: panic happened, close conn[%s], %v\n%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
+						klog.CtxErrorf(ctx, "KITEX: panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
 					} else {
-						t.opt.Logger.Errorf("KITEX: panic happened, %v\n%s", panicErr, string(debug.Stack()))
+						klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
 					}
 				}
 				t.finishTracer(ctx, ri, err, panicErr)
@@ -175,9 +176,9 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 // 传输层 error 回调
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	if pe, ok := err.(*kerrors.DetailedError); ok {
-		t.opt.Logger.Errorf("KITEX: processing request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+		klog.Errorf("KITEX: processing request error, remoteAddr=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
 	} else {
-		t.opt.Logger.Errorf("KITEX: processing request error, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
+		klog.Errorf("KITEX: processing request error, remoteAddr=%s, error=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 
@@ -189,7 +190,7 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {
-	c := t.opt.TracerCtl.DoStart(ctx, ri, t.opt.Logger)
+	c := t.opt.TracerCtl.DoStart(ctx, ri)
 	return c
 }
 
@@ -201,6 +202,6 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	if panicErr != nil {
 		rpcStats.SetPanicked(panicErr)
 	}
-	t.opt.TracerCtl.DoFinish(ctx, ri, err, t.opt.Logger)
+	t.opt.TracerCtl.DoFinish(ctx, ri, err)
 	rpcStats.Reset()
 }

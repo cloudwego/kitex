@@ -48,7 +48,7 @@ type MuxPool struct {
 }
 
 // Get pick or generate a net.Conn and return
-func (mp *MuxPool) Get(ctx context.Context, network, address string, opt *remote.ConnOption) (net.Conn, error) {
+func (mp *MuxPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
 	v, ok := mp.connMap.Load(address)
 	if ok {
 		connection := v.(*conns).get()

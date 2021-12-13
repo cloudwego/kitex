@@ -1,11 +1,11 @@
 /*
- * Copyright 2021 CloudWeGo
+ * Copyright 2021 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -79,7 +79,7 @@ func WithMetaHandler(h remote.MetaHandler) Option {
 }
 
 // WithProxy stes the backward Proxy for server.
-func WithProxy(p proxy.BackwardProxy) Option {
+func WithProxy(p proxy.ReverseProxy) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithProxy(%T)", p))
@@ -150,5 +150,22 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 		di.Push(fmt.Sprintf("AddBoundHandler(%T)", h))
 
 		doAddBoundHandler(h, o.RemoteOpt)
+	}}
+}
+
+// WithExitSignal adds ExitSignal for server.
+func WithExitSignal(f func() <-chan error) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("AddExitSignal(%+v)", utils.GetFuncName(f)))
+		o.ExitSignal = f
+	}}
+}
+
+// WithReusePort sets SO_REUSEPORT on listener.
+func WithReusePort(reuse bool) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithReusePort(%+v)", reuse))
+
+		o.RemoteOpt.ReusePort = reuse
 	}}
 }

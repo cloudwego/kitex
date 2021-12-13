@@ -33,7 +33,7 @@ var (
 type DummyPool struct{}
 
 // Get .
-func (p *DummyPool) Get(ctx context.Context, network, address string, opt *remote.ConnOption) (net.Conn, error) {
+func (p *DummyPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
 	return nil, nil
 }
 

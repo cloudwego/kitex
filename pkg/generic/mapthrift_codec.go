@@ -29,6 +29,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
+var (
+	_ remote.PayloadCodec = &mapThriftCodec{}
+	_ Closer              = &mapThriftCodec{}
+)
+
 type mapThriftCodec struct {
 	svcDsc   atomic.Value // *idl
 	provider DescriptorProvider
@@ -37,7 +42,10 @@ type mapThriftCodec struct {
 
 func newMapThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*mapThriftCodec, error) {
 	svc := <-p.Provide()
-	c := &mapThriftCodec{codec: codec, provider: p}
+	c := &mapThriftCodec{
+		codec:    codec,
+		provider: p,
+	}
 	c.svcDsc.Store(svc)
 	go c.update()
 	return c, nil
@@ -96,4 +104,8 @@ func (c *mapThriftCodec) getMethod(req interface{}, method string) (*Method, err
 
 func (c *mapThriftCodec) Name() string {
 	return "MapThrift"
+}
+
+func (c *mapThriftCodec) Close() error {
+	return c.provider.Close()
 }

@@ -30,7 +30,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/http"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
@@ -40,12 +39,14 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/connpool"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func init() {
@@ -74,7 +75,6 @@ type Options struct {
 	Targets          string
 	CBSuite          *circuitbreak.CBSuite
 	Timeouts         rpcinfo.TimeoutProvider
-	CheckRPCTimeout  bool
 
 	ACLRules []acl.RejectFunc
 
@@ -90,7 +90,6 @@ type Options struct {
 	DebugService diagnosis.Service
 
 	// Observability
-	Logger     klog.FormatLogger
 	TracerCtl  *internal_stats.Controller
 	StatsLevel *stats.Level
 
@@ -122,7 +121,6 @@ func NewOptions(opts []Option) *Options {
 		Configs:      rpcinfo.NewRPCConfig(),
 		Locks:        NewConfigLocks(),
 		Once:         configutil.NewOptionOnce(),
-		Logger:       klog.DefaultLogger(),
 		HTTPResolver: http.NewDefaultResolver(),
 		DebugService: diagnosis.NoopService,
 
@@ -134,7 +132,7 @@ func NewOptions(opts []Option) *Options {
 	o.Apply(opts)
 	o.MetaHandlers = append(o.MetaHandlers, transmeta.MetainfoClientHandler)
 
-	o.initConnectionPool()
+	o.initRemoteOpt()
 
 	if o.RetryContainer != nil && o.DebugService != nil {
 		o.DebugService.RegisterProbeFunc(diagnosis.RetryPolicyKey, o.RetryContainer.Dump)
@@ -150,7 +148,11 @@ func NewOptions(opts []Option) *Options {
 	return o
 }
 
-func (o *Options) initConnectionPool() {
+func (o *Options) initRemoteOpt() {
+	if o.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
+		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName)
+		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
+	}
 	if o.RemoteOpt.ConnPool == nil {
 		if o.PoolCfg != nil {
 			var zero connpool2.IdleConfig

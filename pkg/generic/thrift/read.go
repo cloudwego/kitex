@@ -18,6 +18,7 @@ package thrift
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -152,7 +153,16 @@ func readInt64(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescr
 }
 
 func readString(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
-	return in.ReadString()
+	switch t.Name {
+	case "binary":
+		bytes, err := in.ReadBinary()
+		if err != nil {
+			return "", err
+		}
+		return base64.StdEncoding.EncodeToString(bytes), nil
+	default:
+		return in.ReadString()
+	}
 }
 
 func readList(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {

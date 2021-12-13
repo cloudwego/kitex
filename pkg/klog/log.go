@@ -19,6 +19,7 @@ package klog
 import (
 	"context"
 	"fmt"
+	"io"
 )
 
 // FormatLogger is a logger interface that output logs with a format.
@@ -55,6 +56,20 @@ type CtxLogger interface {
 	CtxFatalf(ctx context.Context, format string, v ...interface{})
 }
 
+// Control provides methods to config a logger.
+type Control interface {
+	SetLevel(Level)
+	SetOutput(io.Writer)
+}
+
+// FullLogger is the combination of Logger, FormatLogger, CtxLogger and Control.
+type FullLogger interface {
+	Logger
+	FormatLogger
+	CtxLogger
+	Control
+}
+
 // Level defines the priority of a log message.
 // When a logger is configured with a level, any log message with a lower
 // log level (smaller by integer comparison) will not be output.
@@ -70,14 +85,6 @@ const (
 	LevelError
 	LevelFatal
 )
-
-// SetLevel sets the level of logs below which logs will not be output.
-// The default log level is LevelTrace.
-func SetLevel(lv Level) {
-	level = lv
-}
-
-var level Level
 
 var strs = []string{
 	"[Trace] ",

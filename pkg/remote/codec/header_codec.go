@@ -166,7 +166,7 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 
 	seqID := Bytes2Uint32NoCheck(headerMeta[Size32*2 : Size32*3])
 	if err = SetOrCheckSeqID(int32(seqID), message); err != nil {
-		klog.Warnf("the seqID in TTHeader check failed, err=%s", err.Error())
+		klog.Warnf("the seqID in TTHeader check failed, error=%s", err.Error())
 		// some framework doesn't write correct seqID in TTheader, to ignore err only check it in payload
 		// print log to push the downstream framework to refine it.
 	}
@@ -179,7 +179,7 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 	if headerInfo, err = in.Next(int(headerInfoSize)); err != nil {
 		return perrors.NewProtocolError(err)
 	}
-	if err = checkProtocalID(headerInfo[0], message); err != nil {
+	if err = checkProtocolID(headerInfo[0], message); err != nil {
 		return err
 	}
 	hdIdx := 2
@@ -388,7 +388,7 @@ func getProtocolID(pi remote.ProtocolInfo) ProtocolID {
 }
 
 // protoID just for ttheader
-func checkProtocalID(protoID uint8, message remote.Message) error {
+func checkProtocolID(protoID uint8, message remote.Message) error {
 	switch protoID {
 	case uint8(ProtocolIDProtobufKitex):
 		// rpcCfg := internal.AsMutableRPCConfig(message.RPCInfo().Config())

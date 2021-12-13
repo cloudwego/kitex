@@ -23,15 +23,17 @@ import (
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 // Config contains basic components used in service discovery process.
 type Config struct {
-	ServiceName  string
+	ServerInfo   *rpcinfo.EndpointBasicInfo
 	Resolver     discovery.Resolver
 	Balancer     loadbalance.Loadbalancer
 	Pool         remote.ConnPool
 	FixedTargets string // A comma separated list of host ports that user specify to use.
+	RPCConfig    rpcinfo.RPCConfig
 }
 
 // ForwardProxy manages the service discovery, load balance and connection pooling processes.
@@ -43,7 +45,17 @@ type ForwardProxy interface {
 	ResolveProxyInstance(ctx context.Context) error
 }
 
-// BackwardProxy replaces the listen address with another one.
-type BackwardProxy interface {
+// ReverseProxy replaces the listen address with another one.
+type ReverseProxy interface {
 	Replace(net.Addr) (net.Addr, error)
+}
+
+// Deprecated: BackwardProxy is deprecated, use ReverseProxy instead.
+type BackwardProxy = ReverseProxy
+
+// ContextHandler is to handle context info, it just be used for passing params when client/server initialization.
+// Eg: Customized endpoint.MiddlewareBuilder need get init information to judge
+// if it is necessary to add the middleware into the call chain.
+type ContextHandler interface {
+	HandleContext(context.Context) context.Context
 }

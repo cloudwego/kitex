@@ -40,10 +40,10 @@ func TestShortPool(t *testing.T) {
 		return nil, nil
 	}
 
-	_, err := p.Get(context.TODO(), "tcp", "127.0.0.1:8080", &remote.ConnOption{Dialer: d, ConnectTimeout: time.Second})
+	_, err := p.Get(context.TODO(), "tcp", "127.0.0.1:8080", remote.ConnOption{Dialer: d, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil)
 
-	_, err = p.Get(context.TODO(), "tcp", "127.0.0.1:8888", &remote.ConnOption{Dialer: d, ConnectTimeout: time.Millisecond})
+	_, err = p.Get(context.TODO(), "tcp", "127.0.0.1:8888", remote.ConnOption{Dialer: d, ConnectTimeout: time.Millisecond})
 	test.Assert(t, err != nil)
 }
 
@@ -56,7 +56,7 @@ func TestShortPoolPut(t *testing.T) {
 		return c, nil
 	}
 
-	x, err := p.Get(context.TODO(), "tcp", "127.0.0.1:8080", &remote.ConnOption{Dialer: d, ConnectTimeout: time.Second})
+	x, err := p.Get(context.TODO(), "tcp", "127.0.0.1:8080", remote.ConnOption{Dialer: d, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil)
 	y, ok := x.(*shortConn)
 	test.Assert(t, ok)
@@ -87,7 +87,7 @@ func TestShortPoolPutClosed(t *testing.T) {
 		return c, nil
 	}
 
-	x, err := p.Get(context.TODO(), "tcp", "127.0.0.1:8080", &remote.ConnOption{Dialer: d, ConnectTimeout: time.Second})
+	x, err := p.Get(context.TODO(), "tcp", "127.0.0.1:8080", remote.ConnOption{Dialer: d, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil)
 	y, ok := x.(*shortConn)
 	test.Assert(t, ok)

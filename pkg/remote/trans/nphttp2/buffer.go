@@ -91,7 +91,7 @@ func (b *buffer) Skip(n int) (err error) {
 }
 
 func (b *buffer) Release(e error) (err error) {
-	return b.buf.Release()
+	return b.buf.Close()
 }
 
 func (b *buffer) ReadableLen() (n int) {
@@ -153,8 +153,8 @@ func (b *buffer) NewBuffer() remote.ByteBuffer {
 // ErrUnimplemented return unimplemented error
 var ErrUnimplemented = errors.New("unimplemented")
 
-func (b *buffer) AppendBuffer(buf remote.ByteBuffer) (n int, err error) {
-	return 0, ErrUnimplemented
+func (b *buffer) AppendBuffer(buf remote.ByteBuffer) (err error) {
+	return ErrUnimplemented
 }
 
 func (b *buffer) Bytes() (buf []byte, err error) {

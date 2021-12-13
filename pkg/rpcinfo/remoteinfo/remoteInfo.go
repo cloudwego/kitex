@@ -27,7 +27,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-// RemoteInfo implements a rpcinfo.EndpointInfo with mutable addresss and connection.
+// RemoteInfo implements a rpcinfo.EndpointInfo with mutable address and connection.
 // It is typically used to represent server info on client side or client info on server side.
 type RemoteInfo interface {
 	rpcinfo.EndpointInfo
@@ -36,14 +36,12 @@ type RemoteInfo interface {
 
 	// SetTagLock freezes a key of the tags and refuses further modification on its value.
 	SetTagLock(key string)
-
 	GetInstance() discovery.Instance
 	SetInstance(ins discovery.Instance)
 
-	// SetRemoteAddr tries to set the network addresss of the discovery.Instance hold by RemoteInfo.
+	// SetRemoteAddr tries to set the network address of the discovery.Instance hold by RemoteInfo.
 	// The result indicates whether the modification is successful.
 	SetRemoteAddr(addr net.Addr) (ok bool)
-
 	ImmutableView() rpcinfo.EndpointInfo
 }
 

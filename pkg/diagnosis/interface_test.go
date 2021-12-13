@@ -22,7 +22,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
-func newMockSerivce() *mockService {
+func newMockService() *mockService {
 	return &mockService{probes: make(map[ProbeName]ProbeFunc)}
 }
 
@@ -39,7 +39,7 @@ func (m *mockService) ProbePairs() map[ProbeName]ProbeFunc {
 }
 
 func TestAddProbeDumpData(t *testing.T) {
-	s := newMockSerivce()
+	s := newMockService()
 	name := ProbeName("some probe")
 	data := "some data"
 	s.RegisterProbeFunc(name, WrapAsProbeFunc(data))
@@ -48,7 +48,7 @@ func TestAddProbeDumpData(t *testing.T) {
 }
 
 func TestAddProbeProbeFunc(t *testing.T) {
-	s := newMockSerivce()
+	s := newMockService()
 	name := ProbeName("some probe")
 	data := "some data"
 	s.RegisterProbeFunc(name, func() interface{} { return data })

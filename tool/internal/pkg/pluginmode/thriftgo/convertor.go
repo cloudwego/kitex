@@ -455,10 +455,10 @@ func (c *converter) persist(res *plugin.Response) error {
 		full := c.GetName()
 		content := []byte(c.Content)
 		if filepath.Ext(full) == ".go" {
-			if formated, err := format.Source([]byte(c.Content)); err != nil {
+			if formatted, err := format.Source([]byte(c.Content)); err != nil {
 				internal_log.Warn(fmt.Sprintf("Failed to format %s: %s", full, err.Error()))
 			} else {
-				content = formated
+				content = formatted
 			}
 		}
 

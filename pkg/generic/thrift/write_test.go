@@ -18,6 +18,7 @@ package thrift
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -411,6 +412,10 @@ func Test_writeString(t *testing.T) {
 			test.Assert(t, val == stringInput)
 			return nil
 		},
+		WriteBinaryFunc: func(val []byte) error {
+			test.DeepEqual(t, val, binaryInput)
+			return nil
+		},
 	}
 	tests := []struct {
 		name    string
@@ -424,6 +429,19 @@ func Test_writeString(t *testing.T) {
 				val: stringInput,
 				out: mockTTransport,
 				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.STRING,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			false,
+		},
+		{
+			"writeBinary", // write to binary field with base64 string
+			args{
+				val: base64.StdEncoding.EncodeToString(binaryInput),
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Name:   "binary",
 					Type:   descriptor.STRING,
 					Struct: &descriptor.StructDescriptor{},
 				},

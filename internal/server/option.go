@@ -1,11 +1,11 @@
 /*
- * Copyright 2021 CloudWeGo
+ * Copyright 2021 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *  http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,13 +18,16 @@
 package server
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limit"
 	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/proxy"
@@ -61,9 +64,10 @@ type Options struct {
 
 	MetaHandlers []remote.MetaHandler
 
-	RemoteOpt *remote.ServerOption
-	ErrHandle func(error) error
-	Proxy     proxy.BackwardProxy
+	RemoteOpt  *remote.ServerOption
+	ErrHandle  func(error) error
+	ExitSignal func() <-chan error
+	Proxy      proxy.ReverseProxy
 
 	// Registry is used for service registry.
 	Registry registry.Registry
@@ -84,7 +88,6 @@ type Options struct {
 	DebugService diagnosis.Service
 
 	// Observability
-	Logger     klog.FormatLogger
 	TracerCtl  *internal_stats.Controller
 	StatsLevel *stats.Level
 }
@@ -96,8 +99,8 @@ func NewOptions(opts []Option) *Options {
 		Configs:      rpcinfo.NewRPCConfig(),
 		Once:         configutil.NewOptionOnce(),
 		RemoteOpt:    newServerOption(),
-		Logger:       klog.DefaultLogger(),
 		DebugService: diagnosis.NoopService,
+		ExitSignal:   DefaultSysExitSignal,
 
 		Bus:    event.NewEventBus(),
 		Events: event.NewQueue(event.MaxEventNum),
@@ -135,4 +138,21 @@ func ApplyOptions(opts []Option, o *Options) {
 	for _, op := range opts {
 		op.F(o, &o.DebugInfo)
 	}
+}
+
+func DefaultSysExitSignal() <-chan error {
+	errCh := make(chan error, 1)
+	go func() {
+		sig := SysExitSignal()
+		defer signal.Stop(sig)
+		<-sig
+		errCh <- nil
+	}()
+	return errCh
+}
+
+func SysExitSignal() chan os.Signal {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
+	return signals
 }

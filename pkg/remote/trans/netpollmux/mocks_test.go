@@ -297,7 +297,7 @@ func (m *MockNetpollWriter) MallocAck(n int) (err error) {
 }
 
 // Append implements the netpoll.Writer interface.
-func (m *MockNetpollWriter) Append(w netpoll.Writer) (n int, err error) {
+func (m *MockNetpollWriter) Append(w netpoll.Writer) (err error) {
 	return
 }
 

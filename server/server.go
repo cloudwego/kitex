@@ -22,12 +22,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
-	"os/signal"
 	"reflect"
 	"runtime/debug"
 	"sync"
-	"syscall"
 	"time"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
@@ -36,6 +33,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -80,7 +78,11 @@ func (s *server) init() {
 	ctx := fillContext(s.opt)
 	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)
 	s.mws = append(s.mws, acl.NewACLMiddleware(s.opt.ACLRules))
-
+	if s.opt.ErrHandle != nil {
+		// errorHandleMW must be the last middleware,
+		// to ensure it only catches the server handler's error.
+		s.mws = append(s.mws, newErrorHandleMW(s.opt.ErrHandle))
+	}
 	if ds := s.opt.DebugService; ds != nil {
 		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(s.opt.DebugInfo))
 		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
@@ -92,7 +94,6 @@ func fillContext(opt *internal_server.Options) context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
 	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, opt.Events)
-	ctx = context.WithValue(ctx, endpoint.CtxLoggerKey, opt.Logger)
 	return ctx
 }
 
@@ -101,6 +102,19 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder, 
 		ks.mws = append(ks.mws, mwBs[i](ctx))
 	}
 	return ks.mws
+}
+
+// newErrorHandleMW provides a hook point for server error handling.
+func newErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request, response interface{}) error {
+			err := next(ctx, request, response)
+			if err == nil {
+				return nil
+			}
+			return errHandle(err)
+		}
+	}
 }
 
 func (s *server) initRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context) {
@@ -139,9 +153,7 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	}
 	s.svcInfo = svcInfo
 	s.handler = handler
-	if ds := s.opt.DebugService; ds != nil {
-		ds.RegisterProbeFunc(diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcInfo))
-	}
+	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcInfo))
 	return nil
 }
 
@@ -182,10 +194,8 @@ func (s *server) Run() (err error) {
 	s.buildRegistryInfo(s.svr.Address())
 	s.Unlock()
 
-	if err = s.waitSignal(errCh); err != nil {
-		if s.opt.Logger != nil {
-			s.opt.Logger.Errorf("KITEX: received error and exit: %s", err.Error())
-		}
+	if err = s.waitExit(errCh); err != nil {
+		klog.Errorf("KITEX: received error and exit: error=%s", err.Error())
 	}
 	for i := range onShutdown {
 		onShutdown[i]()
@@ -193,9 +203,7 @@ func (s *server) Run() (err error) {
 	// stop server after user hooks
 	if e := s.Stop(); e != nil && err == nil {
 		err = e
-		if s.opt.Logger != nil {
-			s.opt.Logger.Errorf("KITEX: stop server error: %s", e.Error())
-		}
+		klog.Errorf("KITEX: stop server error: error=%s", e.Error())
 	}
 	return
 }
@@ -247,7 +255,6 @@ func (s *server) initBasicRemoteOption() {
 	remoteOpt.SvcInfo = s.svcInfo
 	remoteOpt.InitRPCInfoFunc = s.initRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
-	remoteOpt.Logger = s.opt.Logger
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
 }
 
@@ -378,19 +385,15 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 	}
 }
 
-func (s *server) waitSignal(errCh chan error) error {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
+func (s *server) waitExit(errCh chan error) error {
+	exitSignal := s.opt.ExitSignal()
 
 	// service may not be available as soon as startup.
 	delayRegister := time.After(1 * time.Second)
 	for {
 		select {
-		case sig := <-signals:
-			switch sig {
-			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM:
-				return nil
-			}
+		case err := <-exitSignal:
+			return err
 		case err := <-errCh:
 			return err
 		case <-delayRegister:

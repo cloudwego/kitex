@@ -35,7 +35,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -61,10 +60,6 @@ func WithTransportProtocol(tp transport.Protocol) Option {
 		tpName := tp.String()
 		if tpName == transport.Unknown {
 			panic(fmt.Errorf("WithTransportProtocol: invalid '%v'", tp))
-		}
-		if tp == transport.GRPC {
-			o.RemoteOpt.ConnPool = nphttp2.NewConnPool()
-			o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 		}
 		di.Push(fmt.Sprintf("WithTransportProtocol(%s)", tpName))
 		rpcinfo.AsMutableRPCConfig(o.Configs).SetTransportProtocol(tp)
@@ -211,12 +206,9 @@ func WithMuxConnection(connNum int) Option {
 }
 
 // WithLogger sets the Logger for kitex client.
+// Deprecated: client uses the global klog.DefaultLogger.
 func WithLogger(logger klog.FormatLogger) Option {
-	return Option{F: func(o *client.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithLogger(%T)", logger))
-
-		o.Logger = logger
-	}}
+	panic("client.WithLogger is deprecated")
 }
 
 // WithLoadBalancer sets the loadbalancer for client.
@@ -237,7 +229,6 @@ func WithRPCTimeout(d time.Duration) Option {
 
 		rpcinfo.AsMutableRPCConfig(o.Configs).SetRPCTimeout(d)
 		o.Locks.Bits |= rpcinfo.BitRPCTimeout
-		o.CheckRPCTimeout = true
 	}}
 }
 
@@ -260,7 +251,6 @@ func WithTimeoutProvider(p rpcinfo.TimeoutProvider) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithTimeoutProvider(%T(%+v))", p, p))
 		o.Timeouts = p
-		o.CheckRPCTimeout = true
 	}}
 }
 

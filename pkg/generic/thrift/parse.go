@@ -20,22 +20,47 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cloudwego/thriftgo/parser"
-
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/thriftgo/parser"
 )
 
 const (
 	initRecursionDepth = 0
 )
 
+// ParseMode .
+type ParseMode int
+
+const (
+	// LastServiceOnly forces the parser to parse only the last service definition.
+	LastServiceOnly ParseMode = iota
+
+	// FirstServiceOnly forces the parser to parse only the first service definition.
+	FirstServiceOnly
+
+	// CombineServices forces the parser to combine methods of all service definitions.
+	// Note that method names of the service definitions can not be duplicate.
+	CombineServices
+)
+
+var defaultParseMode = LastServiceOnly
+
+// DefaultParseMode returns the default parse mode.
+func DefaultParseMode() ParseMode {
+	return defaultParseMode
+}
+
+// SetDefaultParseMode sets the default parse mode.
+func SetDefaultParseMode(m ParseMode) {
+	defaultParseMode = m
+}
+
 // Parse descriptor from parser.Thrift
-func Parse(tree *parser.Thrift) (*descriptor.ServiceDescriptor, error) {
+func Parse(tree *parser.Thrift, mode ParseMode) (*descriptor.ServiceDescriptor, error) {
 	if len(tree.Services) == 0 {
 		return nil, errors.New("empty serverce from idls")
 	}
 	sDsc := &descriptor.ServiceDescriptor{
-		Name:      tree.Services[0].Name,
 		Functions: map[string]*descriptor.FunctionDescriptor{},
 		Router:    descriptor.NewRouter(),
 	}
@@ -43,93 +68,110 @@ func Parse(tree *parser.Thrift) (*descriptor.ServiceDescriptor, error) {
 	structsCache := map[string]*descriptor.TypeDescriptor{}
 
 	// support one service
-	for _, fn := range tree.Services[0].Functions {
-		if len(fn.Arguments) == 0 {
-			return nil, fmt.Errorf("empty arguments in function: %s", fn.Name)
-		}
-		// only support single argument
-		field := fn.Arguments[0]
-		req := &descriptor.TypeDescriptor{
-			Type: descriptor.STRUCT,
-			Struct: &descriptor.StructDescriptor{
-				FieldsByID:   map[int32]*descriptor.FieldDescriptor{},
-				FieldsByName: map[string]*descriptor.FieldDescriptor{},
-			},
-		}
-		reqType, err := parseType(field.Type, tree, structsCache, initRecursionDepth)
-		if err != nil {
-			return nil, err
-		}
-		hasRequestBase := false
-		if reqType.Type == descriptor.STRUCT {
-			for _, f := range reqType.Struct.FieldsByName {
-				if f.Type.IsRequestBase {
-					hasRequestBase = true
-					break
-				}
+	svcs := tree.Services
+	switch mode {
+	case LastServiceOnly:
+		svcs = svcs[len(svcs)-1:]
+		sDsc.Name = svcs[len(svcs)-1].Name
+	case FirstServiceOnly:
+		svcs = svcs[:1]
+		sDsc.Name = svcs[0].Name
+	case CombineServices:
+		sDsc.Name = "CombinedServices"
+	}
+
+	for _, svc := range svcs {
+		for _, fn := range svc.Functions {
+			if sDsc.Functions[fn.Name] != nil {
+				return nil, fmt.Errorf("duplicate method name: %s", fn.Name)
 			}
-		}
-		reqField := &descriptor.FieldDescriptor{
-			Name: field.Name,
-			ID:   field.ID,
-			Type: reqType,
-		}
-		req.Struct.FieldsByID[field.ID] = reqField
-		req.Struct.FieldsByName[field.Name] = reqField
-		// parse response filed
-		resp := &descriptor.TypeDescriptor{
-			Type: descriptor.STRUCT,
-			Struct: &descriptor.StructDescriptor{
-				FieldsByID:   map[int32]*descriptor.FieldDescriptor{},
-				FieldsByName: map[string]*descriptor.FieldDescriptor{},
-			},
-		}
-		respType, err := parseType(fn.FunctionType, tree, structsCache, initRecursionDepth)
-		if err != nil {
-			return nil, err
-		}
-		respField := &descriptor.FieldDescriptor{
-			Type: respType,
-		}
-		// response has no name and id
-		resp.Struct.FieldsByID[0] = respField
-		resp.Struct.FieldsByName[""] = respField
-		// parse exception
-		if len(fn.Throws) > 0 {
-			// only support single exception
-			field := fn.Throws[0]
-			exceptionType, err := parseType(field.Type, tree, structsCache, initRecursionDepth)
+			if len(fn.Arguments) == 0 {
+				return nil, fmt.Errorf("empty arguments in function: %s", fn.Name)
+			}
+			// only support single argument
+			field := fn.Arguments[0]
+			req := &descriptor.TypeDescriptor{
+				Type: descriptor.STRUCT,
+				Struct: &descriptor.StructDescriptor{
+					FieldsByID:   map[int32]*descriptor.FieldDescriptor{},
+					FieldsByName: map[string]*descriptor.FieldDescriptor{},
+				},
+			}
+			reqType, err := parseType(field.Type, tree, structsCache, initRecursionDepth)
 			if err != nil {
 				return nil, err
 			}
-			exceptionField := &descriptor.FieldDescriptor{
-				Name:        field.Name,
-				ID:          field.ID,
-				IsException: true,
-				Type:        exceptionType,
-			}
-			resp.Struct.FieldsByID[field.ID] = exceptionField
-			resp.Struct.FieldsByName[field.Name] = exceptionField
-		}
-
-		fnDsc := &descriptor.FunctionDescriptor{
-			Name:           fn.Name,
-			Oneway:         fn.Oneway,
-			Request:        req,
-			Response:       resp,
-			HasRequestBase: hasRequestBase,
-		}
-		for _, ann := range fn.Annotations {
-			for _, v := range ann.GetValues() {
-				if handle, ok := descriptor.FindAnnotation(ann.GetKey(), v); ok {
-					if nr, ok := handle.(descriptor.NewRoute); ok {
-						sDsc.Router.Handle(nr(v, fnDsc))
+			hasRequestBase := false
+			if reqType.Type == descriptor.STRUCT {
+				for _, f := range reqType.Struct.FieldsByName {
+					if f.Type.IsRequestBase {
+						hasRequestBase = true
 						break
 					}
 				}
 			}
+			reqField := &descriptor.FieldDescriptor{
+				Name: field.Name,
+				ID:   field.ID,
+				Type: reqType,
+			}
+			req.Struct.FieldsByID[field.ID] = reqField
+			req.Struct.FieldsByName[field.Name] = reqField
+			// parse response filed
+			resp := &descriptor.TypeDescriptor{
+				Type: descriptor.STRUCT,
+				Struct: &descriptor.StructDescriptor{
+					FieldsByID:   map[int32]*descriptor.FieldDescriptor{},
+					FieldsByName: map[string]*descriptor.FieldDescriptor{},
+				},
+			}
+			respType, err := parseType(fn.FunctionType, tree, structsCache, initRecursionDepth)
+			if err != nil {
+				return nil, err
+			}
+			respField := &descriptor.FieldDescriptor{
+				Type: respType,
+			}
+			// response has no name or id
+			resp.Struct.FieldsByID[0] = respField
+			resp.Struct.FieldsByName[""] = respField
+
+			if len(fn.Throws) > 0 {
+				// only support single exception
+				field := fn.Throws[0]
+				exceptionType, err := parseType(field.Type, tree, structsCache, initRecursionDepth)
+				if err != nil {
+					return nil, err
+				}
+				exceptionField := &descriptor.FieldDescriptor{
+					Name:        field.Name,
+					ID:          field.ID,
+					IsException: true,
+					Type:        exceptionType,
+				}
+				resp.Struct.FieldsByID[field.ID] = exceptionField
+				resp.Struct.FieldsByName[field.Name] = exceptionField
+			}
+
+			fnDsc := &descriptor.FunctionDescriptor{
+				Name:           fn.Name,
+				Oneway:         fn.Oneway,
+				Request:        req,
+				Response:       resp,
+				HasRequestBase: hasRequestBase,
+			}
+			for _, ann := range fn.Annotations {
+				for _, v := range ann.GetValues() {
+					if handle, ok := descriptor.FindAnnotation(ann.GetKey(), v); ok {
+						if nr, ok := handle.(descriptor.NewRoute); ok {
+							sDsc.Router.Handle(nr(v, fnDsc))
+							break
+						}
+					}
+				}
+			}
+			sDsc.Functions[fn.Name] = fnDsc
 		}
-		sDsc.Functions[fn.Name] = fnDsc
 	}
 	return sDsc, nil
 }
@@ -243,7 +285,7 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 						case descriptor.NewValueMapping:
 							_f.ValueMapping = h(v)
 						case descriptor.NewFieldMapping:
-							// excute at compile time
+							// execute at compile time
 							h(v).Handle(_f)
 						case nil:
 							// none annotation

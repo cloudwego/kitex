@@ -62,18 +62,17 @@ func TestOrder(t *testing.T) {
 		rpcinfo.NewRPCConfig(),
 		rpcinfo.NewRPCStats(),
 	)
-	logger := klog.DefaultLogger()
 	klog.SetOutput(io.MultiWriter())
 
 	c.Append(t1)
 	c.Append(t2)
 
 	ctx0 := context.Background()
-	ctx1 := c.DoStart(ctx0, ri, logger)
+	ctx1 := c.DoStart(ctx0, ri)
 	test.Assert(t, ctx1 != ctx0)
 	test.Assert(t, len(stack) == 2 && stack[0] == 1 && stack[1] == 2, stack)
 
-	c.DoFinish(ctx1, ri, nil, logger)
+	c.DoFinish(ctx1, ri, nil)
 	test.Assert(t, len(stack) == 4 && stack[2] == -2 && stack[3] == -1, stack)
 }
 
@@ -89,18 +88,17 @@ func TestPanic(t *testing.T) {
 		rpcinfo.NewRPCConfig(),
 		rpcinfo.NewRPCStats(),
 	)
-	logger := klog.DefaultLogger()
 	klog.SetOutput(io.MultiWriter())
 
 	c.Append(t1)
 	c.Append(t2)
 
 	ctx0 := context.Background()
-	ctx1 := c.DoStart(ctx0, ri, logger)
+	ctx1 := c.DoStart(ctx0, ri)
 	test.Assert(t, ctx1 != ctx0)
 	test.Assert(t, len(stack) == 0) // t1's panic skips all subsequent Starts
 
 	err := errors.New("some error")
-	c.DoFinish(ctx1, ri, err, logger)
+	c.DoFinish(ctx1, ri, err)
 	test.Assert(t, len(stack) == 1 && stack[0] == -2, stack)
 }

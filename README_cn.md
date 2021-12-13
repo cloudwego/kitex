@@ -50,7 +50,7 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
       
     - **高级特性**
     
-      支持泛化调用、Server SDK 化等高级特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/advanced-features/)
+      支持泛化调用、Server SDK 化等高级特性，详见[文档](https://www.cloudwego.io/zh/docs/tutorials/advanced-feature/)
     
     - **代码生成**
     

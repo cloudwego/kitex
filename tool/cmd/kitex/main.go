@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -146,7 +147,6 @@ func buildCmd(a *arguments, out io.Writer) *exec.Cmd {
 			cmd.Args = append(cmd.Args, "-p", p)
 		}
 		cmd.Args = append(cmd.Args, a.IDL)
-		log.Info(strings.Join(cmd.Args, " "))
 	} else {
 		a.ThriftOptions = a.ThriftOptions[:0]
 		// "protobuf"
@@ -155,14 +155,18 @@ func buildCmd(a *arguments, out io.Writer) *exec.Cmd {
 			cmd.Args = append(cmd.Args, "-I", inc)
 		}
 		outPath := filepath.Join(".", generator.KitexGenPath)
-		os.MkdirAll(outPath, 0o755)
+		if a.Use == "" {
+			os.MkdirAll(outPath, 0o755)
+		} else {
+			outPath = "."
+		}
 		cmd.Args = append(cmd.Args,
 			"--kitex_out="+outPath,
 			"--kitex_opt="+kas,
 			a.IDL,
 		)
-		log.Info(strings.Join(cmd.Args, " "))
 	}
+	log.Info(strings.ReplaceAll(strings.Join(cmd.Args, " "), kas, fmt.Sprintf("%q", kas)))
 	return cmd
 }
 

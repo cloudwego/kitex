@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/binary"
 	"net"
+	"runtime"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -35,7 +37,14 @@ import (
 	"github.com/cloudwego/kitex/server"
 )
 
-func TestRawThriftBinary(t *testing.T) {
+func TestRun(t *testing.T) {
+	t.Run("RawThriftBinary", rawThriftBinary)
+	t.Run("RawThriftBinaryError", rawThriftBinaryError)
+	t.Run("RawThriftBinaryMockReq", rawThriftBinaryMockReq)
+	t.Run("RawThriftBinary2NormalServer", rawThriftBinary2NormalServer)
+}
+
+func rawThriftBinary(t *testing.T) {
 	svr := initRawThriftBinaryServer(new(GenericServiceImpl))
 	defer svr.Stop()
 	time.Sleep(500 * time.Millisecond)
@@ -52,8 +61,7 @@ func TestRawThriftBinary(t *testing.T) {
 	test.Assert(t, string(respBuf[12+len(method):]) == respMsg)
 }
 
-func TestRawThriftBinaryError(t *testing.T) {
-	time.Sleep(2 * time.Second)
+func rawThriftBinaryError(t *testing.T) {
 	svr := initRawThriftBinaryServer(new(GenericServiceErrorImpl))
 	defer svr.Stop()
 	time.Sleep(500 * time.Millisecond)
@@ -68,8 +76,7 @@ func TestRawThriftBinaryError(t *testing.T) {
 	test.Assert(t, strings.Contains(err.Error(), errResp), err.Error())
 }
 
-func TestRawThriftBinaryMockReq(t *testing.T) {
-	time.Sleep(3 * time.Second)
+func rawThriftBinaryMockReq(t *testing.T) {
 	svr := initRawThriftBinaryServer(new(GenericServiceMockImpl))
 	defer svr.Stop()
 	time.Sleep(500 * time.Millisecond)
@@ -101,10 +108,13 @@ func TestRawThriftBinaryMockReq(t *testing.T) {
 	test.Assert(t, method == "Test", method)
 	test.Assert(t, seqID != 100, seqID)
 	test.Assert(t, *result.Success == respMsg)
+
+	seqID2, err2 := generic.GetSeqID(buf)
+	test.Assert(t, err2 == nil, err2)
+	test.Assert(t, seqID2 == seqID, seqID2)
 }
 
-func TestRawThriftBinary2NormalServer(t *testing.T) {
-	time.Sleep(4 * time.Second)
+func rawThriftBinary2NormalServer(t *testing.T) {
 	svr := initMockServer(new(MockImpl))
 	defer svr.Stop()
 	time.Sleep(500 * time.Millisecond)
@@ -171,4 +181,66 @@ func genBinaryReqBuf(method string) []byte {
 	idx += 4
 	copy(buf[idx:idx+len(reqMsg)], reqMsg)
 	return buf
+}
+
+func TestBinaryThriftGenericClientClose(t *testing.T) {
+	debug.SetGCPercent(-1)
+	defer debug.SetGCPercent(100)
+
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	clis := make([]genericclient.Client, 10000)
+	for i := 0; i < 10000; i++ {
+		g := generic.BinaryThriftGeneric()
+		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009")
+	}
+
+	runtime.ReadMemStats(&ms)
+	preHeepAlloc, preHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", preHeepAlloc, preHeapObjects)
+
+	for _, cli := range clis {
+		_ = cli.Close()
+	}
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	aferGCHeepAlloc, afterGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", aferGCHeepAlloc, afterGCHeapObjects)
+	test.Assert(t, aferGCHeepAlloc < preHeepAlloc && afterGCHeapObjects < preHeapObjects)
+}
+
+func TestBinaryThriftGenericClientFinalizer(t *testing.T) {
+	debug.SetGCPercent(-1)
+	defer debug.SetGCPercent(100)
+
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	clis := make([]genericclient.Client, 10000)
+	for i := 0; i < 10000; i++ {
+		g := generic.BinaryThriftGeneric()
+		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009")
+	}
+
+	runtime.ReadMemStats(&ms)
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	firstGCHeepAlloc, firstGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", firstGCHeepAlloc, firstGCHeapObjects)
+
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	secondGCHeepAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", secondGCHeepAlloc, secondGCHeapObjects)
+	test.Assert(t, secondGCHeepAlloc < firstGCHeepAlloc && secondGCHeapObjects < firstGCHeapObjects)
+}
+
+func mb(byteSize uint64) float32 {
+	return float32(byteSize) / float32(1024*1024)
 }

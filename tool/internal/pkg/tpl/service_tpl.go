@@ -37,9 +37,9 @@ func serviceInfo() *kitex.ServiceInfo {
 	return {{LowerFirst .ServiceName}}ServiceInfo
  }
 
-var {{LowerFirst .ServiceName}}ServiceInfo = newServiceInfo()
+var {{LowerFirst .ServiceName}}ServiceInfo = NewServiceInfo()
 
-func newServiceInfo() *kitex.ServiceInfo {
+func NewServiceInfo() *kitex.ServiceInfo {
 	serviceName := "{{.RawServiceName}}"
 	handlerType := (*{{call .ServiceTypeName}})(nil)
 	methods := map[string]kitex.MethodInfo{
@@ -329,6 +329,14 @@ func (p *kClient) {{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{
 	if err = p.c.Call(ctx, "{{.RawName}}", &_args, &_result); err != nil {
 		return
 	}
+	{{if .Exceptions -}}
+	switch {
+	{{range .Exceptions -}}
+	case _result.{{.Name}} != nil:
+		return _result.{{.Name}}
+	{{end -}}
+	}
+	{{end -}}
 	{{end -}}
 	return nil
 {{else -}}

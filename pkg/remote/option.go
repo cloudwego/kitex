@@ -22,7 +22,6 @@ import (
 	"time"
 
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -50,6 +49,8 @@ type ServerOption struct {
 
 	Address net.Addr
 
+	ReusePort bool
+
 	// Duration that server waits for to allow any existing connection to be closed gracefully.
 	ExitWaitTime time.Duration
 
@@ -64,8 +65,6 @@ type ServerOption struct {
 	InitRPCInfoFunc func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context)
 
 	TracerCtl *internal_stats.Controller
-
-	Logger klog.FormatLogger
 
 	Option
 }
@@ -83,8 +82,6 @@ type ClientOption struct {
 	ConnPool ConnPool
 
 	Dialer Dialer
-
-	Logger klog.FormatLogger
 
 	Option
 

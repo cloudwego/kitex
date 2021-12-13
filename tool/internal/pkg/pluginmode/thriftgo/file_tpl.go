@@ -93,7 +93,7 @@ func (p *{{$resType.GoName}}) GetResult() interface{} {
 {{- end}}{{/* if not .Oneway */}}
 {{- end}}{{/* range Functions */}}
 {{- end}}{{/* range .Scope.Service */}}
-{{- end}}{{/* define "FristResult" */}}
+{{- end}}{{/* define "FirstResult" */}}
 `
 
 const patchBase = `

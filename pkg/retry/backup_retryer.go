@@ -34,8 +34,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-func newBackupRetryer(policy Policy, cbC *cbContainer, logger klog.FormatLogger) (Retryer, error) {
-	br := &backupRetryer{cbContainer: cbC, logger: logger}
+func newBackupRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
+	br := &backupRetryer{cbContainer: cbC}
 	if err := br.UpdatePolicy(policy); err != nil {
 		return nil, fmt.Errorf("newBackupRetryer failed, err=%w", err)
 	}
@@ -47,7 +47,6 @@ type backupRetryer struct {
 	policy      *BackupPolicy
 	cbContainer *cbContainer
 	retryDelay  time.Duration
-	logger      klog.FormatLogger
 	sync.RWMutex
 	errMsg string
 }
@@ -86,7 +85,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	r.RUnlock()
 	var callTimes int32 = 0
 	var callCosts strings.Builder
-	callCosts.Grow(16)
+	callCosts.Grow(32)
 	var recordCostDoing int32 = 0
 	var abort int32 = 0
 	// notice: buff num of chan is very important here, it cannot less than call times, or the below chan receive will block
@@ -95,7 +94,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	timer := time.NewTimer(retryDelay)
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
-			err = panicToErr(ctx, panicInfo, firstRI, r.logger)
+			err = panicToErr(ctx, panicInfo, firstRI)
 		}
 		timer.Stop()
 	}()
@@ -112,14 +111,14 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				var e error
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
-						e = panicToErr(ctx, panicInfo, firstRI, r.logger)
+						e = panicToErr(ctx, panicInfo, firstRI)
 					}
 					done <- e
 				}()
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
 				_, e = rpcCall(ctx, r)
-				recordCost(ct, callStart, &recordCostDoing, &callCosts)
+				recordCost(ct, callStart, &recordCostDoing, &callCosts, e)
 				if r.cbContainer.cbStat {
 					circuitbreak.RecordStat(ctx, request, nil, e, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 				}
@@ -171,7 +170,7 @@ func (r *backupRetryer) UpdatePolicy(rp Policy) (err error) {
 		if e := checkCBErrorRate(&rp.BackupPolicy.StopPolicy.CBPolicy); e != nil {
 			rp.BackupPolicy.StopPolicy.CBPolicy.ErrorRate = defaultCBErrRate
 			errMsg = fmt.Sprintf("backupRetryer %s, use default %0.2f", e.Error(), defaultCBErrRate)
-			r.logger.Warnf(errMsg)
+			klog.Warnf(errMsg)
 		}
 	}
 
@@ -215,7 +214,7 @@ func (r *backupRetryer) Type() Type {
 }
 
 // record request cost, it may execute concurrent
-func recordCost(ct int32, start time.Time, costRecordDoing *int32, sb *strings.Builder) {
+func recordCost(ct int32, start time.Time, costRecordDoing *int32, sb *strings.Builder, err error) {
 	for !atomic.CompareAndSwapInt32(costRecordDoing, 0, 1) {
 		runtime.Gosched()
 	}
@@ -225,5 +224,10 @@ func recordCost(ct int32, start time.Time, costRecordDoing *int32, sb *strings.B
 	sb.WriteString(strconv.Itoa(int(ct)))
 	sb.WriteByte('-')
 	sb.WriteString(strconv.FormatInt(time.Since(start).Microseconds(), 10))
+	if err != nil && errors.Is(err, kerrors.ErrRPCFinish) {
+		// ErrRPCFinish means previous call returns first but is decoding.
+		// Add ignore to distinguish.
+		sb.WriteString("(ignore)")
+	}
 	atomic.StoreInt32(costRecordDoing, 0)
 }

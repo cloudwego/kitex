@@ -165,9 +165,7 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 		if pp.Config.Use != "" && f.Proto.GetName() != idl {
 			continue
 		}
-		if pp.Config.Use == "" {
-			pp.GenerateFile(gen, f)
-		}
+		pp.GenerateFile(gen, f)
 	}
 
 	if pp.Config.GenerateMain {
@@ -321,8 +319,11 @@ func (pp *protocPlugin) makeInterfaces(gf *protogen.GeneratedFile, file *protoge
 	}{pp.Config.Version, is}
 }
 
-func (pp *protocPlugin) adjustPath(path string) string {
-	cur, _ := filepath.Abs(filepath.Join(".", generator.KitexGenPath))
+func (pp *protocPlugin) adjustPath(path string) (ret string) {
+	cur, _ := filepath.Abs(".")
+	if pp.Config.Use == "" {
+		cur = filepath.Join(cur, generator.KitexGenPath)
+	}
 	if filepath.IsAbs(path) {
 		path, _ = filepath.Rel(cur, path)
 		return path

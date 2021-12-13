@@ -18,6 +18,7 @@ package thrift
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -121,7 +122,7 @@ func typeJSONOf(data *gjson.Result, tt descriptor.Type) (v interface{}, w writer
 		return
 	// case descriptor.BINARY:
 	//	return writeBinary, nil
-	case descriptor.LIST:
+	case descriptor.SET, descriptor.LIST:
 		v = data.Array()
 		w = writeJSONList
 		return
@@ -303,7 +304,16 @@ func writeFloat64(ctx context.Context, val interface{}, out thrift.TProtocol, t 
 }
 
 func writeString(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
-	return out.WriteString(val.(string))
+	switch t.Name {
+	case "binary":
+		bytes, err := base64.StdEncoding.DecodeString(val.(string))
+		if err != nil {
+			return err
+		}
+		return out.WriteBinary(bytes)
+	default:
+		return out.WriteString(val.(string))
+	}
 }
 
 func writeBinary(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {

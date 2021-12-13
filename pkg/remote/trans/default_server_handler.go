@@ -24,6 +24,7 @@ import (
 	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -32,12 +33,17 @@ import (
 
 // NewDefaultSvrTransHandler to provide default impl of svrTransHandler, it can be reused in netpoll, shm-ipc, framework-sdk extensions
 func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.ServerTransHandler, error) {
-	return &svrTransHandler{
+	svrHdlr := &svrTransHandler{
 		opt:     opt,
 		codec:   opt.Codec,
 		svcInfo: opt.SvcInfo,
 		ext:     ext,
-	}, nil
+	}
+	if svrHdlr.opt.TracerCtl == nil {
+		// init TraceCtl when it is nil, or it will lead some unit tests panic
+		svrHdlr.opt.TracerCtl = &stats2.Controller{}
+	}
+	return svrHdlr, nil
 }
 
 type svrTransHandler struct {
@@ -106,9 +112,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			if conn != nil {
 				ri := rpcinfo.GetRPCInfo(ctx)
 				rService, rAddr := getRemoteInfo(ri, conn)
-				t.opt.Logger.Errorf("KITEX: panic happened, close conn[%s], remoteService=%s, %v\n%s", rAddr, rService, panicErr, string(debug.Stack()))
+				klog.CtxErrorf(ctx, "KITEX: panic happened, close conn, remoteAddress=%s, remoteService=%s, error=%v\nstack=%s", rAddr, rService, panicErr, string(debug.Stack()))
 			} else {
-				t.opt.Logger.Errorf("KITEX: panic happened, %v\n%s", panicErr, string(debug.Stack()))
+				klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
 			}
 		}
 		if closeConn && conn != nil {
@@ -193,9 +199,9 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 		remote := rpcinfo.AsMutableEndpointInfo(ri.From())
 		remote.SetTag(rpcinfo.RemoteClosedTag, "1")
 	} else if pe, ok := err.(*kerrors.DetailedError); ok {
-		t.opt.Logger.Errorf("KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s\n%s", rService, rAddr, err.Error(), pe.Stack())
+		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s\nstack=%s", rService, rAddr, err.Error(), pe.Stack())
 	} else {
-		t.opt.Logger.Errorf("KITEX: processing request error, remoteService=%s, remoteAddr=%v, err=%s", rService, rAddr, err.Error())
+		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s", rService, rAddr, err.Error())
 	}
 }
 
@@ -231,12 +237,12 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg r
 	}
 	err = t.transPipe.Write(ctx, conn, errMsg)
 	if err != nil {
-		t.opt.Logger.Errorf("KITEX: write error reply failed, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
+		klog.CtxErrorf(ctx, "KITEX: write error reply failed, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {
-	c := t.opt.TracerCtl.DoStart(ctx, ri, t.opt.Logger)
+	c := t.opt.TracerCtl.DoStart(ctx, ri)
 	return c
 }
 
@@ -252,7 +258,7 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 		// it should not regard the error which caused by remote connection closed as server error
 		err = nil
 	}
-	t.opt.TracerCtl.DoFinish(ctx, ri, err, t.opt.Logger)
+	t.opt.TracerCtl.DoFinish(ctx, ri, err)
 	// for server side, rpcinfo is reused on connection, clear the rpc stats info but keep the level config
 	sl := ri.Stats().Level()
 	rpcStats.Reset()
@@ -264,7 +270,7 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 	if ri == nil {
 		return "", rAddr
 	}
-	if rAddr.Network() == "unix" {
+	if rAddr != nil && rAddr.Network() == "unix" {
 		if ri.From().Address() != nil {
 			rAddr = ri.From().Address()
 		}

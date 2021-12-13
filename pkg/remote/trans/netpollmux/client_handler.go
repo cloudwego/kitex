@@ -24,6 +24,7 @@ import (
 
 	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
@@ -91,9 +92,6 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	}
 
 	mc, _ := conn.(*muxCliConn)
-	if mc.logger == nil {
-		mc.logger = t.opt.Logger
-	}
 
 	// if oneway
 	var methodInfo serviceinfo.MethodInfo
@@ -101,8 +99,8 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		return err
 	}
 	if methodInfo.OneWay() {
-		mc.Put(func() (buf remote.ByteBuffer, isNil bool) {
-			return bufWriter, false
+		mc.Put(func() (_ netpoll.Writer, isNil bool) {
+			return buf, false
 		})
 		return nil
 	}
@@ -127,8 +125,12 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 	callback, _ := event.(*asyncCallback)
 	defer callback.Close()
 
-	ctx, cancel := context.WithTimeout(ctx, trans.GetReadTimeout(ri.Config()))
-	defer cancel()
+	readTimeout := trans.GetReadTimeout(ri.Config())
+	if readTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, readTimeout)
+		defer cancel()
+	}
 	select {
 	case <-ctx.Done():
 		// timeout
@@ -159,9 +161,9 @@ func (t *cliTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 // OnError implements the remote.ClientTransHandler interface.
 func (t *cliTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	if pe, ok := err.(*kerrors.DetailedError); ok {
-		t.opt.Logger.Errorf("KITEX: send request error, remote=%s, err=%s\n%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+		klog.CtxErrorf(ctx, "KITEX: send request error, remote=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
 	} else {
-		t.opt.Logger.Errorf("KITEX: send request error, remote=%s, err=%s", conn.RemoteAddr(), err.Error())
+		klog.CtxErrorf(ctx, "KITEX: send request error, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 
@@ -215,9 +217,9 @@ func (c *asyncCallback) notify(err error) {
 	}
 }
 
-func (c *asyncCallback) getter() (w remote.ByteBuffer, isNil bool) {
+func (c *asyncCallback) getter() (w netpoll.Writer, isNil bool) {
 	if atomic.CompareAndSwapInt32(&c.closed, 0, 2) {
-		return c.bufWriter, false
+		return c.wbuf, false
 	}
 	return nil, true
 }

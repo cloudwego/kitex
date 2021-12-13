@@ -1,0 +1,4 @@
+# Typo check: https://github.com/crate-ci/typos
+
+[files]
+extend-exclude = ["go.sum", "pkg/remote/trans/nphttp2/grpc/*"]

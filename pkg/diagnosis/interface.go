@@ -31,6 +31,13 @@ type Service interface {
 	RegisterProbeFunc(ProbeName, ProbeFunc)
 }
 
+// RegisterProbeFunc is a wrap function to execute Service.RegisterProbeFunc.
+func RegisterProbeFunc(svc Service, name ProbeName, pf ProbeFunc) {
+	if svc != nil {
+		svc.RegisterProbeFunc(name, pf)
+	}
+}
+
 // Keys below are probe info that has been registered by default.
 // If you want to register other info, please use RegisterProbeFunc(ProbeName, ProbeFunc) to do that.
 const (
@@ -43,6 +50,7 @@ const (
 	DestServiceKey ProbeName = "dest_service"
 	ConnPoolKey    ProbeName = "conn_pool"
 	RetryPolicyKey ProbeName = "retry_policy"
+	LbCacheKey     ProbeName = "lb_cache"
 )
 
 // WrapAsProbeFunc is to wrap probe data as ProbeFunc, the data is some infos that you want to diagnosis, like config info.

@@ -19,12 +19,15 @@ package genericclient
 
 import (
 	"context"
+	"runtime"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
+
+var _ Client = &genericServiceClient{}
 
 // NewClient create a generic client
 func NewClient(destService string, g generic.Generic, opts ...client.Option) (Client, error) {
@@ -43,14 +46,19 @@ func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *se
 	if err != nil {
 		return nil, err
 	}
-	return &genericServiceClient{
+	cli := &genericServiceClient{
 		kClient: kc,
 		g:       g,
-	}, nil
+	}
+	runtime.SetFinalizer(cli, (*genericServiceClient).Close)
+
+	return cli, nil
 }
 
 // Client generic client
 type Client interface {
+	generic.Closer
+
 	// GenericCall generic call
 	GenericCall(ctx context.Context, method string, request interface{}, callOptions ...callopt.Option) (response interface{}, err error)
 }
@@ -77,4 +85,10 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 		return
 	}
 	return _result.GetSuccess(), nil
+}
+
+func (gc *genericServiceClient) Close() error {
+	// no need a finalizer anymore
+	runtime.SetFinalizer(gc, nil)
+	return gc.g.Close()
 }

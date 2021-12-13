@@ -44,7 +44,7 @@ func NewBackupPolicy(delayMS uint32) *BackupPolicy {
 // WithMaxRetryTimes default is 1, not include first call
 func (p *BackupPolicy) WithMaxRetryTimes(retryTimes int) {
 	if retryTimes < 0 || retryTimes > maxBackupRetryTimes {
-		panic(fmt.Errorf("maxBackupRetryTimes is %d", maxBackupRetryTimes))
+		panic(fmt.Errorf("maxBackupRetryTimes=%d", maxBackupRetryTimes))
 	}
 	p.StopPolicy.MaxRetryTimes = retryTimes
 }

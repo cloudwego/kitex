@@ -15,7 +15,7 @@
  * limitations under the License.
  *
  * This file may have been modified by CloudWeGo authors. All CloudWeGo
- * Modifications are Copyright 2021 CloudWeGo Authors authors.
+ * Modifications are Copyright 2021 CloudWeGo Authors.
  */
 
 package grpc
@@ -31,6 +31,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/gofunc"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
@@ -105,7 +107,7 @@ type http2Client struct {
 // newHTTP2Client constructs a connected ClientTransport to addr based on HTTP2
 // and starts to receive messages on it. Non-nil error returns if construction
 // fails.
-func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(GoAwayReason), onClose func()) (_ *http2Client, err error) {
+func newHTTP2Client(ctx context.Context, conn netpoll.Connection, remoteService string, onGoAway func(GoAwayReason), onClose func()) (_ *http2Client, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
@@ -114,8 +116,8 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 	}()
 
 	kp := ClientKeepalive{
-		Time:    30 * time.Second,
-		Timeout: 1 * time.Second,
+		Time:    defaultClientKeepaliveTime,
+		Timeout: defaultClientKeepaliveTimeout,
 	}
 	keepaliveEnabled := false
 	if kp.Time != Infinity {
@@ -134,11 +136,11 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 		writerDone:            make(chan struct{}),
 		goAway:                make(chan struct{}),
 		framer:                newFramer(conn, defaultClientMaxHeaderListSize),
-		fc:                    &trInFlow{limit: uint32(initialWindowSize)},
+		fc:                    &trInFlow{limit: initialWindowSize},
 		activeStreams:         make(map[uint32]*Stream),
 		kp:                    kp,
 		keepaliveEnabled:      keepaliveEnabled,
-		initialWindowSize:     initialWindowSize,
+		initialWindowSize:     int32(initialWindowSize),
 		nextID:                1,
 		maxConcurrentStreams:  defaultMaxStreamsClient,
 		streamQuota:           defaultMaxStreamsClient,
@@ -156,12 +158,12 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 
 	if t.keepaliveEnabled {
 		t.kpDormancyCond = sync.NewCond(&t.mu)
-		go t.keepalive()
+		gofunc.RecoverGoFuncWithInfo(ctx, t.keepalive, gofunc.NewBasicInfo(remoteService, conn.RemoteAddr().String()))
 	}
 	// Start the reader goroutine for incoming message. Each transport has
 	// a dedicated goroutine which reads HTTP2 frame from network. Then it
 	// dispatches the frame to the corresponding stream entity.
-	go t.reader()
+	gofunc.RecoverGoFuncWithInfo(ctx, t.reader, gofunc.NewBasicInfo(remoteService, conn.RemoteAddr().String()))
 
 	// Send connection preface to server.
 	n, err := t.conn.Write(ClientPreface)
@@ -184,10 +186,10 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 		return nil, err
 	}
 
-	go func() {
+	gofunc.RecoverGoFuncWithInfo(ctx, func() {
 		err := t.loopy.run()
 		if err != nil {
-			errorf("transport: loopyWriter.run returning. Err: %v", err)
+			klog.CtxErrorf(ctx, "KITEX: grpc client loopyWriter.run returning, error=%v", err)
 		}
 		// If it's a connection error, let reader goroutine handle it
 		// since there might be data in the buffers.
@@ -195,7 +197,8 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, onGoAway func(
 			t.conn.Close()
 		}
 		close(t.writerDone)
-	}()
+	}, gofunc.NewBasicInfo(remoteService, conn.RemoteAddr().String()))
+
 	return t, nil
 }
 
@@ -484,7 +487,9 @@ func (t *http2Client) Close() error {
 	}
 	// Call t.onClose before setting the state to closing to prevent the client
 	// from attempting to create new streams ASAP.
-	t.onClose()
+	if t.onClose != nil {
+		t.onClose()
+	}
 	t.state = closing
 	streams := t.activeStreams
 	t.activeStreams = nil
@@ -653,7 +658,7 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 	}
 	statusCode, ok := http2ErrConvTab[f.ErrCode]
 	if !ok {
-		warningf("transport: http2Client.handleRSTStream found no mapped gRPC status for the received nhttp2 error %v", f.ErrCode)
+		klog.Warnf("transport: http2Client.handleRSTStream found no mapped gRPC status for the received nhttp2 error %v", f.ErrCode)
 		statusCode = codes.Unknown
 	}
 	if statusCode == codes.Canceled {
@@ -735,7 +740,7 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 		return
 	}
 	if f.ErrCode == http2.ErrCodeEnhanceYourCalm {
-		infof("Client received GoAway with http2.ErrCodeEnhanceYourCalm.")
+		klog.Infof("Client received GoAway with http2.ErrCodeEnhanceYourCalm.")
 	}
 	id := f.LastStreamID
 	if id > 0 && id%2 != 1 {
@@ -768,7 +773,9 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 		// Notify the clientconn about the GOAWAY before we set the state to
 		// draining, to allow the client to stop attempting to create streams
 		// before disallowing new streams on this connection.
-		t.onGoAway(t.goAwayReason)
+		if t.onGoAway != nil {
+			t.onGoAway(t.goAwayReason)
+		}
 		t.state = draining
 	}
 	// All streams with IDs greater than the GoAwayId
@@ -940,7 +947,7 @@ func (t *http2Client) reader() {
 		case *http2.WindowUpdateFrame:
 			t.handleWindowUpdate(frame)
 		default:
-			errorf("transport: http2Client.reader got unhandled frame type %v.", frame)
+			klog.Warnf("transport: http2Client.reader got unhandled frame type %v.", frame)
 		}
 	}
 }

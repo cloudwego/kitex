@@ -41,23 +41,23 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
 
   - **Basic Features**
   
-    Including Message Type, Supported Protocols, Directly Invoke, Connection Pool, Timeout Control, Request Retry, LoadBalancer, Circuit Breaker, Rate Limiting, Instrumentation Control, Logging and HttpResolver, [learn more](https://www.cloudwego.io/docs/tutorials/basic-feature/)
+    Including Message Type, Supported Protocols, Directly Invoke, Connection Pool, Timeout Control, Request Retry, LoadBalancer, Circuit Breaker, Rate Limiting, Instrumentation Control, Logging and HttpResolver.[[more]](https://www.cloudwego.io/docs/tutorials/basic-feature/)
     
   - **Governance Features**
   
-    Supporting Service Discovery, Monitoring, Tracing and Customized Access Control, [learn more](https://www.cloudwego.io/docs/tutorials/service-governance/)
+    Supporting Service Discovery, Monitoring, Tracing and Customized Access Control.[[more]](https://www.cloudwego.io/docs/tutorials/service-governance/)
     
   - **Advanced Features**
   
-    Supporting Generic Call and Server SDK Mode, [learn more](https://www.cloudwego.io/docs/tutorials/advanced-feature/)
+    Supporting Generic Call and Server SDK Mode.[[more]](https://www.cloudwego.io/docs/tutorials/advanced-feature/)
     
   - **Code Generation**
   
-    Including Code Generation Tool and Combined Service, [learn more](https://www.cloudwego.io/docs/tutorials/code-gen/)
+    Including Code Generation Tool and Combined Service.[[more]](https://www.cloudwego.io/docs/tutorials/code-gen/)
     
   - **Framework Extension**
   
-    Providing Middleware Extensions, Suite Extensions, Service Registry, Service Discovery, Customize LoadBalancer, Monitoring, Logging, Codec, Transport Module, Transport Pipeline, Metadata Transparent Transmission, Diagnosis Module, [learn more](https://www.cloudwego.io/docs/tutorials/framework-exten/)
+    Providing Middleware Extensions, Suite Extensions, Service Registry, Service Discovery, Customize LoadBalancer, Monitoring, Logging, Codec, Transport Module, Transport Pipeline, Metadata Transparent Transmission, Diagnosis Module.[[more]](https://www.cloudwego.io/docs/tutorials/framework-exten/)
     
 - **Reference**
 

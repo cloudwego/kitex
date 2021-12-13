@@ -135,7 +135,7 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 			return err
 		}
 		if flagBuf, err = in.Peek(2 * Size32); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("ttheader read payload fisrt 8 byte failed: %s", err.Error()))
+			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("ttheader read payload first 8 byte failed: %s", err.Error()))
 		}
 		if err = checkPayload(flagBuf, message, in, true); err != nil {
 			return err
@@ -147,7 +147,7 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 			return err
 		}
 		if flagBuf, err = in.Peek(2 * Size32); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("meshHeader read payload fisrt 8 byte failed: %s", err.Error()))
+			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("meshHeader read payload first 8 byte failed: %s", err.Error()))
 		}
 		if err = checkPayload(flagBuf, message, in, false); err != nil {
 			return err
