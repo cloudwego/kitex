@@ -126,8 +126,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			}
 			pos := strings.LastIndex(sm, "/")
 			if pos == -1 {
-				errDesc := fmt.Sprintf("malformed method name: %q", s.Method())
-				tr.WriteStatus(s, status.New(codes.ResourceExhausted, errDesc))
+				errDesc := fmt.Sprintf("malformed method name, method=%q", s.Method())
+				tr.WriteStatus(s, status.New(codes.Internal, errDesc))
 				return
 			}
 			methodName := sm[pos+1:]
@@ -135,16 +135,16 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 
 			if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
 				if err := mutableTo.SetMethod(methodName); err != nil {
-					errDesc := fmt.Sprintf("setMethod failed in streaming, method=%s, err=%s", methodName, err.Error())
-					_ = tr.WriteStatus(s, status.New(codes.ResourceExhausted, errDesc))
+					errDesc := fmt.Sprintf("setMethod failed in streaming, method=%s, error=%s", methodName, err.Error())
+					_ = tr.WriteStatus(s, status.New(codes.Internal, errDesc))
 					return
 				}
 			}
 
 			idx := strings.LastIndex(sm[:pos], ".")
 			if idx == -1 {
-				errDesc := fmt.Sprintf("malformed package and service name: %q", s.Method())
-				tr.WriteStatus(s, status.New(codes.ResourceExhausted, errDesc))
+				errDesc := fmt.Sprintf("malformed package and service name, method=%q", s.Method())
+				tr.WriteStatus(s, status.New(codes.Internal, errDesc))
 				return
 			}
 			ink.SetPackageName(sm[:idx])
