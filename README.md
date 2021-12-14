@@ -35,7 +35,7 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
 
 ## Documentation
 
-- [**Getting Started**](https://www.cloudwego.io/docs/getting-started/)
+- [**Getting Started**](https://www.cloudwego.io/docs/kitex/getting-started/)
 
 - **User Guide**
 
@@ -45,23 +45,23 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
     
   - **Governance Features**
   
-    Supporting Service Discovery, Monitoring, Tracing and Customized Access Control.[[more]](https://www.cloudwego.io/docs/tutorials/service-governance/)
+    Supporting Service Discovery, Monitoring, Tracing and Customized Access Control.[[more]](https://www.cloudwego.io/docs/kitex/tutorials/service-governance/)
     
   - **Advanced Features**
   
-    Supporting Generic Call and Server SDK Mode.[[more]](https://www.cloudwego.io/docs/tutorials/advanced-feature/)
+    Supporting Generic Call and Server SDK Mode.[[more]](https://www.cloudwego.io/docs/kitex/tutorials/advanced-feature/)
     
   - **Code Generation**
   
-    Including Code Generation Tool and Combined Service.[[more]](https://www.cloudwego.io/docs/tutorials/code-gen/)
+    Including Code Generation Tool and Combined Service.[[more]](https://www.cloudwego.io/docs/kitex/tutorials/code-gen/)
     
   - **Framework Extension**
   
-    Providing Middleware Extensions, Suite Extensions, Service Registry, Service Discovery, Customize LoadBalancer, Monitoring, Logging, Codec, Transport Module, Transport Pipeline, Metadata Transparent Transmission, Diagnosis Module.[[more]](https://www.cloudwego.io/docs/tutorials/framework-exten/)
+    Providing Middleware Extensions, Suite Extensions, Service Registry, Service Discovery, Customize LoadBalancer, Monitoring, Logging, Codec, Transport Module, Transport Pipeline, Metadata Transparent Transmission, Diagnosis Module.[[more]](https://www.cloudwego.io/docs/kitex/tutorials/framework-exten/)
     
 - **Reference**
 
-  - For Transport Protocol, Exception Instruction and Version Specification, please refer to [doc](https://www.cloudwego.io/docs/reference/)
+  - For Transport Protocol, Exception Instruction and Version Specification, please refer to [doc](https://www.cloudwego.io/docs/kitex/reference/)
     
 - **FAQ**
 
@@ -79,8 +79,8 @@ We provide the [kitex-benchmark](https://github.com/cloudwego/kitex-benchmark) p
 
 ## Blogs
 
-- [Performance Optimization Practice of Go RPC framework Kitex](https://www.cloudwego.io/zh/blog/2021/09/23/%E5%AD%97%E8%8A%82%E8%B7%B3%E5%8A%A8-go-rpc-%E6%A1%86%E6%9E%B6-kitex-%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/)
-- [Practice of ByteDance on Go Network Library](https://mp.weixin.qq.com/s?__biz=MzI1MzYzMjE0MQ==&mid=2247485756&idx=1&sn=4d2712e4bfb9be27a790fa15159a7be1&chksm=e9d0c2dedea74bc8179af39888a5b2b99266587cad32744ad11092b91ec2e2babc74e69090e6&scene=21#wechat_redirect)
+- [Performance Optimization on Kitex](https://www.cloudwego.io/blog/2021/09/23/performance-optimization-on-kitex/)
+- [ByteDance Practice on Go Network Library](https://www.cloudwego.io/blog/2021/10/09/bytedance-practices-on-go-network-library/)
 
 ## Contributing
 
@@ -92,6 +92,7 @@ Kitex is distributed under the [Apache License, version 2.0](https://github.com/
 
 ## Community
 - Email: [conduct@cloudwego.io](conduct@cloudwego.io)
+- How to become a member: [COMMUNITY MEMBERSHIP](https://github.com/cloudwego/community/blob/main/COMMUNITY_MEMBERSHIP.md)
 - Issues: [Issues](https://github.com/cloudwego/kitex/issues)
 - Lark: Scan the QR code below with [Lark](https://www.larksuite.com/zh_cn/download) to join our CloudWeGo/kitex user group.
 
