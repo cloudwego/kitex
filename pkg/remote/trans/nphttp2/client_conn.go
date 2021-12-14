@@ -37,10 +37,16 @@ var _ net.Conn = (*clientConn)(nil)
 
 func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*clientConn, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
+	var svcName string
+	if ri.Invocation().PackageName() == "" {
+		svcName = ri.Invocation().ServiceName()
+	} else {
+		svcName = fmt.Sprintf("%s.%s", ri.Invocation().PackageName(), ri.Invocation().ServiceName())
+	}
 	s, err := tr.NewStream(ctx, &grpc.CallHdr{
 		Host: ri.To().ServiceName(),
 		// grpc method format /package.Service/Method
-		Method: fmt.Sprintf("/%s.%s/%s", ri.Invocation().PackageName(), ri.Invocation().ServiceName(), ri.Invocation().MethodName()),
+		Method: fmt.Sprintf("/%s/%s", svcName, ri.Invocation().MethodName()),
 	})
 	if err != nil {
 		return nil, err
