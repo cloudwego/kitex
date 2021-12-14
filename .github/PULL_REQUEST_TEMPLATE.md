@@ -16,7 +16,12 @@ test: Adding missing tests or correcting existing tests
 chore: Changes to the build process or auxiliary tools and libraries such as documentation generation
 -->
 
-#### What this PR does / why we need it:
+#### What this PR does / why we need it (English/Chinese):
+
+<!--
+The description will be attached in Release Notes, 
+so please describe it from user-oriented.
+-->
 
 #### Which issue(s) this PR fixes:
 
