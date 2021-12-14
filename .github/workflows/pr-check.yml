@@ -19,3 +19,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+
+      - name: Scenario Tests
+        run: |
+          cd ..
+          git clone https://github.com/cloudwego/kitex-tests.git
+          cd kitex-tests
+          ./run.sh ${{github.workspace}}
