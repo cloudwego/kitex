@@ -143,12 +143,12 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 
 			idx := strings.LastIndex(sm[:pos], ".")
 			if idx == -1 {
-				errDesc := fmt.Sprintf("malformed package and service name, method=%q", s.Method())
-				tr.WriteStatus(s, status.New(codes.Internal, errDesc))
-				return
+				ink.SetPackageName("")
+				ink.SetServiceName(sm[0:pos])
+			} else {
+				ink.SetPackageName(sm[:idx])
+				ink.SetServiceName(sm[idx+1 : pos])
 			}
-			ink.SetPackageName(sm[:idx])
-			ink.SetServiceName(sm[idx+1 : pos])
 
 			st := NewStream(ctx, t.svcInfo, newServerConn(tr, s), t)
 			if err := t.inkHdlFunc(ctx, &streaming.Args{Stream: st}, nil); err != nil {
