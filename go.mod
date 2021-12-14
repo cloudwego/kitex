@@ -8,7 +8,7 @@ require (
 	github.com/cespare/xxhash v1.1.0
 	github.com/choleraehyq/pid v0.0.12
 	github.com/cloudwego/netpoll v0.1.2
-	github.com/cloudwego/netpoll-http2 v0.0.5
+	github.com/cloudwego/netpoll-http2 v0.0.6
 	github.com/cloudwego/thriftgo v0.1.2
 	github.com/json-iterator/go v1.1.11
 	github.com/tidwall/gjson v1.9.3
