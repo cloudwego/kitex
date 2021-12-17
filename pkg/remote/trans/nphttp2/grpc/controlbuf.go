@@ -500,14 +500,14 @@ const minBatchSize = 1000
 // When there's no more control frames to read from controlBuf, loopy flushes the write buffer.
 // As an optimization, to increase the batch size for each flush, loopy yields the processor, once
 // if the batch size is too low to give stream goroutines a chance to fill it up.
-func (l *loopyWriter) run() (err error) {
+func (l *loopyWriter) run(remoteAddr string) (err error) {
 	defer func() {
 		if err == ErrConnClosing {
 			// Don't log ErrConnClosing as error since it happens
 			// 1. When the connection is closed by some other known issue.
 			// 2. User closed the connection.
 			// 3. A graceful close of connection.
-			klog.Infof("KITEX: grpc transport loopyWriter.run returning, error=%v", err)
+			klog.Debugf("KITEX: grpc transport loopyWriter.run returning, error=%v, remoteAddr=%s", err, remoteAddr)
 			err = nil
 		}
 	}()

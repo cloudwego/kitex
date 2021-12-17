@@ -18,70 +18,147 @@ package nphttp2
 
 import (
 	"context"
-	"io"
 	"net"
+	"runtime"
 	"sync"
+	"sync/atomic"
+	"time"
 
-	"github.com/cloudwego/netpoll"
-
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
-
+	"github.com/cloudwego/netpoll"
 	"golang.org/x/sync/singleflight"
 )
 
+var _ remote.LongConnPool = &connPool{}
+
+func poolSize() uint32 {
+	// One connection per processor, and need redundancy。
+	// Benchmark indicates this setting is the best performance.
+	numP := runtime.GOMAXPROCS(0)
+	return uint32(numP * 3 / 2)
+}
+
 // NewConnPool ...
-func NewConnPool(remoteService string) remote.LongConnPool {
-	return &connPool{remoteService: remoteService}
+func NewConnPool(remoteService string) *connPool {
+	return &connPool{
+		size:          poolSize(),
+		remoteService: remoteService,
+	}
 }
 
 // MuxPool manages a pool of long connections.
 type connPool struct {
-	sfg           singleflight.Group
-	conns         sync.Map // key address, value *clientConn
-	remoteService string
+	size  uint32
+	sfg   singleflight.Group
+	conns sync.Map // key: address, value: *transports
+
+	remoteService string // remote service name
+}
+
+type transports struct {
+	index         uint32
+	size          uint32
+	cliTransports []grpc.ClientTransport
+}
+
+// get connection from the pool, load balance with round-robin.
+func (t *transports) get() grpc.ClientTransport {
+	idx := atomic.AddUint32(&t.index, 1)
+	return t.cliTransports[idx%t.size]
+}
+
+// put find the first empty position to put the connection to the pool.
+func (t *transports) put(trans grpc.ClientTransport) {
+	for i := 0; i < int(t.size); i++ {
+		cliTransport := t.cliTransports[i]
+		if cliTransport == nil {
+			t.cliTransports[i] = trans
+			return
+		}
+		if !cliTransport.(grpc.IsActive).IsActive() {
+			t.cliTransports[i].GracefulClose()
+			t.cliTransports[i] = trans
+			return
+		}
+	}
+}
+
+// close all connections of the pool.
+func (c *transports) close() {
+	for i := range c.cliTransports {
+		if t := c.cliTransports[i]; t != nil {
+			t.GracefulClose()
+		}
+	}
 }
 
 var _ remote.LongConnPool = (*connPool)(nil)
 
+func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, network, address string, connectTimeout time.Duration) (grpc.ClientTransport, error) {
+	conn, err := dialer.DialTimeout(network, address, connectTimeout)
+	if err != nil {
+		return nil, err
+	}
+	return grpc.NewClientTransport(
+		ctx,
+		conn.(netpoll.Connection),
+		p.remoteService,
+		func(grpc.GoAwayReason) {
+			// do nothing
+		},
+		func() {
+			// do nothing
+		},
+	)
+}
+
 // Get pick or generate a net.Conn and return
 func (p *connPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
+	var (
+		trans *transports
+		conn  *clientConn
+		err   error
+	)
+
 	v, ok := p.conns.Load(address)
 	if ok {
-		tr := v.(grpc.ClientTransport)
-		conn, err := newClientConn(ctx, tr, address)
-		if err != nil {
-			p.conns.Delete(address)
-			return nil, err
+		trans = v.(*transports)
+		if tr := trans.get(); tr != nil {
+			if tr.(grpc.IsActive).IsActive() {
+				// Actually new a stream, reuse the connection (grpc.ClientTransport)
+				conn, err = newClientConn(ctx, tr, address)
+				if err == nil {
+					return conn, nil
+				}
+				klog.CtxDebugf(ctx, "KITEX: New grpc stream failed, network=%s, address=%s, error=%s", network, address, err.Error())
+			}
 		}
-		return conn, nil
 	}
 	tr, err, _ := p.sfg.Do(address, func() (i interface{}, e error) {
-		conn, err := opt.Dialer.DialTimeout(network, address, opt.ConnectTimeout)
+		// Notice: newTransport means new a connection, the timeout of connection cannot be set,
+		// so using context.Background() but not the ctx passed in as the parameter.
+		tr, err := p.newTransport(context.Background(), opt.Dialer, network, address, opt.ConnectTimeout)
 		if err != nil {
 			return nil, err
 		}
-		tr, err := grpc.NewClientTransport(context.Background(), conn.(netpoll.Connection), p.remoteService, func(r grpc.GoAwayReason) {
-			p.conns.Delete(address)
-		}, func() {
-			// delete from conn pool
-			p.conns.Delete(address)
-		})
-		if err != nil {
-			return nil, err
+		if trans == nil {
+			trans = &transports{
+				size:          p.size,
+				cliTransports: make([]grpc.ClientTransport, p.size),
+			}
 		}
-		p.conns.Store(address, tr)
+		trans.put(tr) // the tr (connection) maybe not in the pool, but can be recycled by keepalive.
+		p.conns.Store(address, trans)
 		return tr, nil
 	})
 	if err != nil {
+		klog.CtxErrorf(ctx, "KITEX: New grpc client connection failed, network=%s, address=%s, error=%s", network, address, err.Error())
 		return nil, err
 	}
-	conn, err := newClientConn(ctx, tr.(grpc.ClientTransport), address)
-	if err != nil {
-		p.conns.Delete(address)
-		return nil, err
-	}
-	return conn, nil
+	klog.CtxDebugf(ctx, "KITEX: New grpc client connection succeed, network=%s, address=%s", network, address)
+	return newClientConn(ctx, tr.(grpc.ClientTransport), address)
 }
 
 // Put implements the ConnPool interface.
@@ -98,15 +175,15 @@ func (p *connPool) Discard(conn net.Conn) error {
 func (p *connPool) Clean(network, address string) {
 	if v, ok := p.conns.Load(address); ok {
 		p.conns.Delete(address)
-		v.(io.Closer).Close()
+		v.(*transports).close()
 	}
 }
 
 // Close is to release resource of ConnPool, it is executed when client is closed.
 func (p *connPool) Close() error {
-	p.conns.Range(func(addr, clientConn interface{}) bool {
+	p.conns.Range(func(addr, trans interface{}) bool {
 		p.conns.Delete(addr)
-		clientConn.(io.Closer).Close()
+		trans.(*transports).close()
 		return true
 	})
 	return nil
