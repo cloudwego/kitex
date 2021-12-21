@@ -157,11 +157,65 @@ func (p *peer) Close() {
 	}
 }
 
+// connMeta stores the address and deadline of the connection
+type connMeta struct {
+	addr     netAddr
+	deadline time.Time
+}
+
+func (p *connMeta) Less(i interface{}) bool {
+	return p.deadline.Before(i.(*connMeta).deadline)
+}
+
+// watcher is responsible for the stale connection cleaning
+type watcher struct {
+	connMetaQueue *utils.PriorityQueue
+	checkInterval time.Duration
+	closeCh       chan struct{}
+	startCh       chan struct{}
+}
+
+func (w *watcher) Close() {
+	close(w.closeCh)
+	close(w.startCh)
+	w.connMetaQueue.Close()
+}
+
+// Pop gets the top of the queue and remove it
+func (w *watcher) Pop() utils.PQItem {
+	return w.connMetaQueue.Pop()
+}
+
+// Top gets the top of the queue, which is the connection with the earliest deadline
+func (w *watcher) Top() utils.PQItem {
+	return w.connMetaQueue.Top()
+}
+
+// Push pushes one connMeta into the queue of the watcher
+func (w *watcher) Push(i utils.PQItem) {
+	// start the watcher when the queue is not empty
+	if w.connMetaQueue.Len() == 0 {
+		w.startCh <- struct{}{}
+	}
+	w.connMetaQueue.Push(i)
+}
+
+func newWatcher(checkInterval time.Duration) *watcher {
+	w := &watcher{
+		checkInterval: checkInterval,
+		connMetaQueue: utils.NewPriorityQueue(),
+		startCh:       make(chan struct{}),
+		closeCh:       make(chan struct{}),
+	}
+	return w
+}
+
 // LongPool manages a pool of long connections.
 type LongPool struct {
 	reporter Reporter
 	peerMap  sync.Map
 	newPeer  func(net.Addr) *peer
+	watcher  *watcher
 }
 
 func (lp *LongPool) getPeer(addr netAddr) *peer {
@@ -193,6 +247,12 @@ func (lp *LongPool) Put(conn net.Conn) error {
 	p, ok := lp.peerMap.Load(na)
 	if ok {
 		p.(*peer).put(c)
+		// put the connMeta when the connection is put back
+		lp.watcher.Push(
+			&connMeta{
+				addr:     na,
+				deadline: c.deadline,
+			})
 		return nil
 	}
 	return c.Conn.Close()
@@ -239,6 +299,7 @@ func (lp *LongPool) Close() error {
 		v.Close()
 		return true
 	})
+	lp.watcher.Close()
 	return nil
 }
 
@@ -250,7 +311,7 @@ func (lp *LongPool) EnableReporter() {
 // NewLongPool creates a long pool using the given IdleConfig.
 func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
 	limit := utils.NewMaxCounter(idlConfig.MaxIdleGlobal)
-	return &LongPool{
+	lp := &LongPool{
 		reporter: &DummyReporter{},
 		newPeer: func(addr net.Addr) *peer {
 			return newPeer(
@@ -260,5 +321,67 @@ func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
 				idlConfig.MaxIdleTimeout,
 				limit)
 		},
+		// TODO: how to set the check interval
+		watcher: newWatcher(idlConfig.MaxIdleTimeout / 2),
+	}
+	go lp.watch()
+	return lp
+}
+
+// watch starts the watcher
+func (lp *LongPool) watch() {
+	ticker := time.NewTicker(lp.watcher.checkInterval)
+	for {
+		select {
+		case <-lp.watcher.startCh:
+			lp.invokeWatcher(ticker)
+		case <-lp.watcher.closeCh:
+			return
+		case <-ticker.C:
+			lp.cleanStaleConn(ticker)
+		}
+	}
+}
+
+// invokeWatcher invokes the watcher to reset the timer for next clean
+func (lp *LongPool) invokeWatcher(t *time.Ticker) {
+	top, _ := lp.watcher.Top().(*connMeta)
+	if top == nil {
+		return
+	}
+	t.Reset(getTickInterval(top.deadline.Sub(time.Now()), lp.watcher.checkInterval))
+	return
+}
+
+// cleanStaleConn cleans the stale conn and reset the timer
+func (lp *LongPool) cleanStaleConn(t *time.Ticker) {
+	pm, _ := lp.watcher.Pop().(*connMeta)
+	if pm == nil {
+		t.Stop()
+		return
+	}
+	// get the peer of this addr and loop to clean the stale conn
+	p := lp.getPeer(pm.addr)
+	conn, _ := p.ring.Top().(*longConn)
+	if conn != nil && !conn.IsActive() {
+		_ = conn.Conn.Close()
+		_ = p.ring.Pop()
+	}
+	// set next timer
+	top, _ := lp.watcher.Top().(*connMeta)
+	if top != nil {
+		t.Reset(getTickInterval(top.deadline.Sub(time.Now()), lp.watcher.checkInterval))
+	} else {
+		t.Stop()
+	}
+}
+
+func getTickInterval(beforeStale, defaultInterval time.Duration) time.Duration {
+	if beforeStale > 0 {
+		return beforeStale
+	} else {
+		// TODO: determine the next check time
+		//return defaultInterval
+		return 0
 	}
 }

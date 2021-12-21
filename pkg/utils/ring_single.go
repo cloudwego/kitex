@@ -65,6 +65,16 @@ func (r *ring) Pop() interface{} {
 	return c
 }
 
+// Top returns the last item
+func (r *ring) Top() interface{} {
+	r.l.Lock()
+	defer r.l.Unlock()
+	if r.isEmpty() {
+		return nil
+	}
+	return r.arr[r.tail]
+}
+
 type ringDump struct {
 	Array []interface{} `json:"array"`
 	Len   int           `json:"len"`

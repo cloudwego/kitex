@@ -90,6 +90,23 @@ func (r *Ring) Pop() interface{} {
 	return nil
 }
 
+// Top returns the last item
+func (r *Ring) Top() interface{} {
+	if r.length == 1 {
+		return r.rings[0].Top()
+	}
+
+	idx := goid.GetPid() % r.length
+	for i := 0; i < r.length; i, idx = i+1, (idx+1)%r.length {
+		obj := r.rings[idx].Top()
+		if obj != nil {
+			return obj
+		}
+	}
+	return nil
+
+}
+
 // Dump dumps the data in the ring.
 func (r *Ring) Dump() interface{} {
 	m := &ringDump{}

@@ -618,3 +618,77 @@ func BenchmarkLongPoolGetRand2000Mesh(b *testing.B) {
 		}
 	})
 }
+
+func getActiveConnNum(lp *LongPool) int {
+	count := 0
+	lp.peerMap.Range(func(key, value interface{}) bool {
+		for {
+			conn, _ := value.(*peer).ring.Pop().(*longConn)
+			if conn == nil {
+				break
+			}
+			if conn.IsActive() {
+				count++
+			}
+		}
+		return true
+	})
+	return count
+}
+
+func TestWatcherCleanStaleConnOne(t *testing.T) {
+	maxIdleTimeout := 100 * time.Millisecond
+	lp := newLongPoolForTest(10, 50, maxIdleTimeout)
+
+	d := &dialer.SynthesizedDialer{
+		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
+			na := utils.NewNetAddr(network, address)
+			return &mocks.Conn{
+				RemoteAddrFunc: func() net.Addr { return na },
+			}, nil
+		},
+	}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	addr := "127.0.0.1:8000"
+	count := 100
+	for i := 0; i < count; i++ {
+		conn, err := lp.Get(context.TODO(), "tcp", addr, opt)
+		test.Assert(t, err == nil)
+		err = lp.Put(conn)
+		test.Assert(t, err == nil)
+	}
+
+	time.Sleep(2 * maxIdleTimeout)
+	test.Assert(t, getActiveConnNum(lp) == 0)
+}
+
+func BenchmarkWatcherCleanStaleConnMultiple(b *testing.B) {
+	maxIdleTimeout := 100 * time.Millisecond
+	lp := newLongPoolForTest(100, 500, maxIdleTimeout)
+
+	d := &dialer.SynthesizedDialer{
+		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
+			na := utils.NewNetAddr(network, address)
+			return &mocks.Conn{
+				RemoteAddrFunc: func() net.Addr { return na },
+			}, nil
+		},
+	}
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+
+	var addrs []string
+	addrNum, basePort := 2000, 8000
+	for i := 0; i < addrNum; i++ {
+		addrs = append(addrs, fmt.Sprintf("127.0.0.1:%d", basePort+rand.Intn(10000)))
+	}
+	b.ResetTimer()
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			conn, _ := lp.Get(context.TODO(), "tcp", addrs[rand.Intn(addrNum)], opt)
+			lp.Put(conn)
+		}
+	})
+	time.Sleep(2 * maxIdleTimeout)
+	test.Assert(b, getActiveConnNum(lp) == 0)
+}
