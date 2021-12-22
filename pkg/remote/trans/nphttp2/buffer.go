@@ -91,7 +91,7 @@ func (b *buffer) Skip(n int) (err error) {
 }
 
 func (b *buffer) Release(e error) (err error) {
-	return b.buf.Close()
+	return b.buf.Release()
 }
 
 func (b *buffer) ReadableLen() (n int) {
