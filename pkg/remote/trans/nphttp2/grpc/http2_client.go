@@ -36,9 +36,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-
 	"github.com/cloudwego/netpoll"
-
 	"github.com/cloudwego/netpoll-http2"
 	"github.com/cloudwego/netpoll-http2/hpack"
 )
@@ -187,7 +185,7 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, remoteService 
 	}
 
 	gofunc.RecoverGoFuncWithInfo(ctx, func() {
-		err := t.loopy.run()
+		err := t.loopy.run(conn.RemoteAddr().String())
 		if err != nil {
 			klog.CtxErrorf(ctx, "KITEX: grpc client loopyWriter.run returning, error=%v", err)
 		}
@@ -1045,3 +1043,10 @@ func (t *http2Client) GoAway() <-chan struct{} {
 
 func (t *http2Client) RemoteAddr() net.Addr { return t.remoteAddr }
 func (t *http2Client) LocalAddr() net.Addr  { return t.localAddr }
+
+// IsActive return the connection's state, check if it's reachable.
+func (t *http2Client) IsActive() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.state == reachable
+}
