@@ -435,8 +435,41 @@ func Test_writeString(t *testing.T) {
 			},
 			false,
 		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := writeString(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+				t.Errorf("writeString() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_writeBase64String(t *testing.T) {
+	type args struct {
+		val interface{}
+		out thrift.TProtocol
+		t   *descriptor.TypeDescriptor
+		opt *writerOption
+	}
+	mockTTransport := &mocks.MockThriftTTransport{
+		WriteStringFunc: func(val string) error {
+			test.Assert(t, val == stringInput)
+			return nil
+		},
+		WriteBinaryFunc: func(val []byte) error {
+			test.DeepEqual(t, val, binaryInput)
+			return nil
+		},
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
 		{
-			"writeBinary", // write to binary field with base64 string
+			"writeBase64Binary", // write to binary field with base64 string
 			args{
 				val: base64.StdEncoding.EncodeToString(binaryInput),
 				out: mockTTransport,
@@ -451,7 +484,7 @@ func Test_writeString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeString(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeBase64Binary(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeString() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

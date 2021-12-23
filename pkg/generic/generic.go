@@ -18,6 +18,8 @@
 package generic
 
 import (
+	"fmt"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -58,7 +60,8 @@ func MapThriftGeneric(p DescriptorProvider) (Generic, error) {
 	}, nil
 }
 
-// HTTPThriftGeneric http mapping Generic
+// HTTPThriftGeneric http mapping Generic.
+// binary encode to/decode from base64 disabled by default.
 func HTTPThriftGeneric(p DescriptorProvider) (Generic, error) {
 	codec, err := newHTTPThriftCodec(p, thriftCodec)
 	if err != nil {
@@ -69,13 +72,33 @@ func HTTPThriftGeneric(p DescriptorProvider) (Generic, error) {
 	}, nil
 }
 
-// JSONThriftGeneric json mapping generic
+// JSONThriftGeneric json mapping generic.
+// binary encode to/decode from base64 enabled by default.
 func JSONThriftGeneric(p DescriptorProvider) (Generic, error) {
 	codec, err := newJsonThriftCodec(p, thriftCodec)
 	if err != nil {
 		return nil, err
 	}
 	return &jsonThriftGeneric{codec: codec}, nil
+}
+
+// SetBase64Binary enable/disable binary encode to/decode from base64 enabled.
+func SetBase64Binary(g Generic, enable bool) error {
+	switch c := g.(type) {
+	case *httpThriftGeneric:
+		if c.codec == nil {
+			return fmt.Errorf("empty codec for %#v", c)
+		}
+		c.codec.base64Binary = enable
+	case *jsonThriftGeneric:
+		if c.codec == nil {
+			return fmt.Errorf("empty codec for %#v", c)
+		}
+		c.codec.base64Binary = enable
+	default:
+		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
+	}
+	return nil
 }
 
 var thriftCodec = thrift.NewThriftCodec()

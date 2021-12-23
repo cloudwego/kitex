@@ -18,6 +18,7 @@ package test
 
 import (
 	"context"
+	"encoding/base64"
 	"net"
 	"reflect"
 	"runtime"
@@ -111,7 +112,7 @@ func TestThriftReadRequiredField(t *testing.T) {
 	svr := initThriftServer(t, ":9126", new(GenericServiceReadRequiredFiledImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClientByIDL(t, "127.0.0.1:9126", "./idl/example_check_read_required.thrift")
+	cli := initThriftClientByIDL(t, "127.0.0.1:9126", "./idl/example_check_read_required.thrift", nil)
 
 	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil, err)
@@ -124,7 +125,7 @@ func TestThriftWriteRequiredField(t *testing.T) {
 	svr := initThriftServer(t, ":9127", new(GenericServiceReadRequiredFiledImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClientByIDL(t, "127.0.0.1:9127", "./idl/example_check_write_required.thrift")
+	cli := initThriftClientByIDL(t, "127.0.0.1:9127", "./idl/example_check_write_required.thrift", nil)
 
 	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil, err)
@@ -144,6 +145,41 @@ func TestThrift2NormalServer(t *testing.T) {
 	svr.Stop()
 }
 
+func TestThriftRawBinaryEcho(t *testing.T) {
+	time.Sleep(1 * time.Second)
+	svr := initThriftServerByIDL(t, ":9126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", &(&struct{ x bool }{false}).x)
+	time.Sleep(500 * time.Millisecond)
+
+	cli := initThriftClientByIDL(t, "127.0.0.1:9126", "./idl/binary_echo.thrift", &(&struct{ x bool }{false}).x)
+
+	req := "{\"msg\":\"" + mockMyMsg + "\", \"got_base64\":\"false\"}"
+	resp, err := cli.GenericCall(context.Background(), "BinaryEcho", req, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	sr, ok := resp.(string)
+	test.Assert(t, ok)
+	test.Assert(t, strings.Contains(sr, mockMyMsg))
+
+	svr.Stop()
+}
+
+func TestThriftBase64BinaryEcho(t *testing.T) {
+	time.Sleep(1 * time.Second)
+	svr := initThriftServerByIDL(t, ":9126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", nil)
+	time.Sleep(500 * time.Millisecond)
+
+	cli := initThriftClientByIDL(t, "127.0.0.1:9126", "./idl/binary_echo.thrift", nil)
+
+	base64MockMyMsg := base64.StdEncoding.EncodeToString([]byte(mockMyMsg))
+	req := "{\"msg\":\"" + base64MockMyMsg + "\", \"got_base64\":\"true\"}"
+	resp, err := cli.GenericCall(context.Background(), "BinaryEcho", req, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	sr, ok := resp.(string)
+	test.Assert(t, ok)
+	test.Assert(t, strings.Contains(sr, base64MockMyMsg))
+
+	svr.Stop()
+}
+
 func initThriftMockClient(t *testing.T) genericclient.Client {
 	p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
 	test.Assert(t, err == nil)
@@ -155,25 +191,35 @@ func initThriftMockClient(t *testing.T) genericclient.Client {
 }
 
 func initThriftClient(t *testing.T, addr string) genericclient.Client {
-	return initThriftClientByIDL(t, addr, "./idl/example.thrift")
+	return initThriftClientByIDL(t, addr, "./idl/example.thrift", nil)
 }
 
-func initThriftClientByIDL(t *testing.T, addr, idl string) genericclient.Client {
+func initThriftClientByIDL(t *testing.T, addr, idl string, base64binary *bool) genericclient.Client {
 	p, err := generic.NewThriftFileProvider(idl)
 	test.Assert(t, err == nil)
 	g, err := generic.JSONThriftGeneric(p)
 	test.Assert(t, err == nil)
+	if base64binary != nil {
+		generic.SetBase64Binary(g, *base64binary)
+	}
 	cli := newGenericClient("destServiceName", g, addr)
 	test.Assert(t, err == nil)
 	return cli
 }
 
 func initThriftServer(t *testing.T, address string, handler generic.Service) server.Server {
+	return initThriftServerByIDL(t, address, handler, "./idl/example.thrift", nil)
+}
+
+func initThriftServerByIDL(t *testing.T, address string, handler generic.Service, idlPath string, base64Binary *bool) server.Server {
 	addr, _ := net.ResolveTCPAddr("tcp", address)
-	p, err := generic.NewThriftFileProvider("./idl/example.thrift")
+	p, err := generic.NewThriftFileProvider(idlPath)
 	test.Assert(t, err == nil)
 	g, err := generic.JSONThriftGeneric(p)
 	test.Assert(t, err == nil)
+	if base64Binary != nil {
+		generic.SetBase64Binary(g, *base64Binary)
+	}
 	svr := newGenericServer(g, addr, handler)
 	test.Assert(t, err == nil)
 	return svr
