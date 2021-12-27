@@ -38,7 +38,22 @@ import (
 	"github.com/cloudwego/kitex/server"
 )
 
-func TestThrift(t *testing.T) {
+func TestRun(t *testing.T) {
+	t.Run("TestThrift", testThrift)
+	t.Run("TestThriftPingMethod", testThriftPingMethod)
+	t.Run("TestThriftError", testThriftError)
+	t.Run("TestThriftOnewayMethod", testThriftOnewayMethod)
+	t.Run("TestThriftVoidMethod", testThriftVoidMethod)
+	t.Run("TestThriftReadRequiredField", testThriftReadRequiredField)
+	t.Run("TestThriftWriteRequiredField", testThriftWriteRequiredField)
+	t.Run("TestThrift2NormalServer", testThrift2NormalServer)
+	t.Run("TestJSONThriftGenericClientClose", testJSONThriftGenericClientClose)
+	t.Run("TestThriftRawBinaryEcho", testThriftRawBinaryEcho)
+	t.Run("TestThriftBase64BinaryEcho", testThriftBase64BinaryEcho)
+	t.Run("TestJSONThriftGenericClientFinalizer", testJSONThriftGenericClientFinalizer)
+}
+
+func testThrift(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":9121", new(GenericServiceImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -53,7 +68,7 @@ func TestThrift(t *testing.T) {
 	svr.Stop()
 }
 
-func TestThriftPingMethod(t *testing.T) {
+func testThriftPingMethod(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":9122", new(GenericServicePingImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -68,7 +83,7 @@ func TestThriftPingMethod(t *testing.T) {
 	svr.Stop()
 }
 
-func TestThriftError(t *testing.T) {
+func testThriftError(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	svr := initThriftServer(t, ":9123", new(GenericServiceErrorImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -81,7 +96,7 @@ func TestThriftError(t *testing.T) {
 	svr.Stop()
 }
 
-func TestThriftOnewayMethod(t *testing.T) {
+func testThriftOnewayMethod(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":9124", new(GenericServiceOnewayImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -94,7 +109,7 @@ func TestThriftOnewayMethod(t *testing.T) {
 	svr.Stop()
 }
 
-func TestThriftVoidMethod(t *testing.T) {
+func testThriftVoidMethod(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":9125", new(GenericServiceVoidImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -107,7 +122,7 @@ func TestThriftVoidMethod(t *testing.T) {
 	svr.Stop()
 }
 
-func TestThriftReadRequiredField(t *testing.T) {
+func testThriftReadRequiredField(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":9126", new(GenericServiceReadRequiredFiledImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -120,7 +135,7 @@ func TestThriftReadRequiredField(t *testing.T) {
 	svr.Stop()
 }
 
-func TestThriftWriteRequiredField(t *testing.T) {
+func testThriftWriteRequiredField(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":9127", new(GenericServiceReadRequiredFiledImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -133,7 +148,7 @@ func TestThriftWriteRequiredField(t *testing.T) {
 	svr.Stop()
 }
 
-func TestThrift2NormalServer(t *testing.T) {
+func testThrift2NormalServer(t *testing.T) {
 	time.Sleep(4 * time.Second)
 	svr := initMockServer(t, new(mockImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -145,7 +160,7 @@ func TestThrift2NormalServer(t *testing.T) {
 	svr.Stop()
 }
 
-func TestThriftRawBinaryEcho(t *testing.T) {
+func testThriftRawBinaryEcho(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServerByIDL(t, ":9126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", &(&struct{ x bool }{false}).x)
 	time.Sleep(500 * time.Millisecond)
@@ -162,7 +177,7 @@ func TestThriftRawBinaryEcho(t *testing.T) {
 	svr.Stop()
 }
 
-func TestThriftBase64BinaryEcho(t *testing.T) {
+func testThriftBase64BinaryEcho(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServerByIDL(t, ":9126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", nil)
 	time.Sleep(500 * time.Millisecond)
@@ -200,7 +215,7 @@ func initThriftClientByIDL(t *testing.T, addr, idl string, base64binary *bool) g
 	g, err := generic.JSONThriftGeneric(p)
 	test.Assert(t, err == nil)
 	if base64binary != nil {
-		generic.SetBase64Binary(g, *base64binary)
+		generic.SetBinaryWithBase64(g, *base64binary)
 	}
 	cli := newGenericClient("destServiceName", g, addr)
 	test.Assert(t, err == nil)
@@ -218,7 +233,7 @@ func initThriftServerByIDL(t *testing.T, address string, handler generic.Service
 	g, err := generic.JSONThriftGeneric(p)
 	test.Assert(t, err == nil)
 	if base64Binary != nil {
-		generic.SetBase64Binary(g, *base64Binary)
+		generic.SetBinaryWithBase64(g, *base64Binary)
 	}
 	svr := newGenericServer(g, addr, handler)
 	test.Assert(t, err == nil)
@@ -231,7 +246,7 @@ func initMockServer(t *testing.T, handler kt.Mock) server.Server {
 	return svr
 }
 
-func TestJSONThriftGenericClientClose(t *testing.T) {
+func testJSONThriftGenericClientClose(t *testing.T) {
 	debug.SetGCPercent(-1)
 	defer debug.SetGCPercent(100)
 
@@ -263,7 +278,7 @@ func TestJSONThriftGenericClientClose(t *testing.T) {
 	test.Assert(t, aferGCHeepAlloc < preHeepAlloc && afterGCHeapObjects < preHeapObjects)
 }
 
-func TestJSONThriftGenericClientFinalizer(t *testing.T) {
+func testJSONThriftGenericClientFinalizer(t *testing.T) {
 	debug.SetGCPercent(-1)
 	defer debug.SetGCPercent(100)
 

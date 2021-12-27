@@ -61,7 +61,10 @@ func MapThriftGeneric(p DescriptorProvider) (Generic, error) {
 }
 
 // HTTPThriftGeneric http mapping Generic.
-// binary encode to/decode from base64 disabled by default.
+// Base64 codec for binary field is disabled by default. You can change this option with SetBinaryWithBase64.
+// eg:
+// 		g, err := generic.HTTPThriftGeneric(p)
+// 		SetBinaryWithBase64(g, true)
 func HTTPThriftGeneric(p DescriptorProvider) (Generic, error) {
 	codec, err := newHTTPThriftCodec(p, thriftCodec)
 	if err != nil {
@@ -73,7 +76,10 @@ func HTTPThriftGeneric(p DescriptorProvider) (Generic, error) {
 }
 
 // JSONThriftGeneric json mapping generic.
-// binary encode to/decode from base64 enabled by default.
+// Base64 codec for binary field is enabled by default. You can change this option with SetBinaryWithBase64.
+// eg:
+// 		g, err := generic.JSONThriftGeneric(p)
+// 		SetBinaryWithBase64(g, false)
 func JSONThriftGeneric(p DescriptorProvider) (Generic, error) {
 	codec, err := newJsonThriftCodec(p, thriftCodec)
 	if err != nil {
@@ -82,19 +88,19 @@ func JSONThriftGeneric(p DescriptorProvider) (Generic, error) {
 	return &jsonThriftGeneric{codec: codec}, nil
 }
 
-// SetBase64Binary enable/disable binary encode to/decode from base64 enabled.
-func SetBase64Binary(g Generic, enable bool) error {
+// SetBinaryWithBase64 enable/disable Base64 codec for binary field.
+func SetBinaryWithBase64(g Generic, enable bool) error {
 	switch c := g.(type) {
 	case *httpThriftGeneric:
 		if c.codec == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
-		c.codec.base64Binary = enable
+		c.codec.binaryWithBase64 = enable
 	case *jsonThriftGeneric:
 		if c.codec == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
-		c.codec.base64Binary = enable
+		c.codec.binaryWithBase64 = enable
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
 	}

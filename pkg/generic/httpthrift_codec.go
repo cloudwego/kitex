@@ -46,15 +46,15 @@ type HTTPRequest = descriptor.HTTPRequest
 type HTTPResponse = descriptor.HTTPResponse
 
 type httpThriftCodec struct {
-	svcDsc       atomic.Value // *idl
-	provider     DescriptorProvider
-	codec        remote.PayloadCodec
-	base64Binary bool
+	svcDsc           atomic.Value // *idl
+	provider         DescriptorProvider
+	codec            remote.PayloadCodec
+	binaryWithBase64 bool
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*httpThriftCodec, error) {
 	svc := <-p.Provide()
-	c := &httpThriftCodec{codec: codec, provider: p, base64Binary: false}
+	c := &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false}
 	c.svcDsc.Store(svc)
 	go c.update()
 	return c, nil
@@ -93,7 +93,7 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	}
 
 	inner := thrift.NewWriteHTTPRequest(svcDsc)
-	inner.SetBase64Binary(c.base64Binary)
+	inner.SetBinaryWithBase64(c.binaryWithBase64)
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Marshal(ctx, msg, out)
 }
@@ -107,7 +107,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		return fmt.Errorf("get parser ServiceDescriptor failed")
 	}
 	inner := thrift.NewReadHTTPResponse(svcDsc)
-	inner.SetBase64Binary(c.base64Binary)
+	inner.SetBase64Binary(c.binaryWithBase64)
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Unmarshal(ctx, msg, in)
 }

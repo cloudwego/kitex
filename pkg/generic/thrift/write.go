@@ -31,7 +31,7 @@ import (
 type writerOption struct {
 	requestBase *Base // request base from metahandler
 	// decoding Base64 to binary
-	base64Binary bool
+	binaryWithBase64 bool
 }
 
 type writer func(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error
@@ -62,7 +62,7 @@ func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption)
 		}
 	case string:
 		// maybe a base64 string encoded from binary
-		if t.Name == "binary" && opt.base64Binary {
+		if t.Name == "binary" && opt.binaryWithBase64 {
 			return descriptor.STRING, writeBase64Binary, nil
 		}
 		// maybe a json number string
@@ -126,7 +126,7 @@ func typeJSONOf(data *gjson.Result, t *descriptor.TypeDescriptor, opt *writerOpt
 		return
 	case descriptor.STRING:
 		v = data.String()
-		if t.Name == "binary" && opt.base64Binary {
+		if t.Name == "binary" && opt.binaryWithBase64 {
 			w = writeBase64Binary
 		} else {
 			w = writeString

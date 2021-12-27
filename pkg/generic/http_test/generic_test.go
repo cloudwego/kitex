@@ -34,12 +34,17 @@ import (
 	"github.com/cloudwego/kitex/server"
 )
 
+func TestRun(t *testing.T) {
+	t.Run("TestThriftNormalBinaryEcho", testThriftNormalBinaryEcho)
+	t.Run("TestThriftBase64BinaryEcho", testThriftBase64BinaryEcho)
+}
+
 func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary bool) genericclient.Client {
 	p, err := generic.NewThriftFileProvider(idl)
 	test.Assert(t, err == nil)
 	g, err := generic.HTTPThriftGeneric(p)
 	test.Assert(t, err == nil)
-	err = generic.SetBase64Binary(g, base64Binary)
+	err = generic.SetBinaryWithBase64(g, base64Binary)
 	test.Assert(t, err == nil)
 	cli := newGenericClient("destServiceName", g, addr)
 	test.Assert(t, err == nil)
@@ -57,8 +62,7 @@ func initThriftServer(t *testing.T, address string, handler generic.Service) ser
 	return svr
 }
 
-func TestThriftNormalBinaryEcho(t *testing.T) {
-	time.Sleep(1 * time.Second)
+func testThriftNormalBinaryEcho(t *testing.T) {
 	svr := initThriftServer(t, ":9126", new(GenericServiceBinaryEchoImpl))
 	time.Sleep(500 * time.Millisecond)
 
@@ -114,8 +118,7 @@ func TestThriftNormalBinaryEcho(t *testing.T) {
 	svr.Stop()
 }
 
-func TestThriftBase64BinaryEcho(t *testing.T) {
-	time.Sleep(1 * time.Second)
+func testThriftBase64BinaryEcho(t *testing.T) {
 	svr := initThriftServer(t, ":9126", new(GenericServiceBinaryEchoImpl))
 	time.Sleep(500 * time.Millisecond)
 

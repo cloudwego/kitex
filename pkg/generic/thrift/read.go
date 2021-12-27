@@ -32,8 +32,8 @@ type readerOption struct {
 	// return exception as error
 	throwException bool
 	// read http response
-	http         bool
-	base64Binary bool
+	http             bool
+	binaryWithBase64 bool
 }
 
 type reader func(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error)
@@ -54,7 +54,7 @@ func nextReader(tt descriptor.Type, t *descriptor.TypeDescriptor, opt *readerOpt
 	case descriptor.I64:
 		return readInt64, nil
 	case descriptor.STRING:
-		if t.Name == "binary" && opt.base64Binary {
+		if t.Name == "binary" && opt.binaryWithBase64 {
 			return readBase64Binary, nil
 		}
 		return readString, nil
