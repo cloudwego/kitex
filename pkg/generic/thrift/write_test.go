@@ -896,3 +896,68 @@ func Test_writeJSON(t *testing.T) {
 		})
 	}
 }
+
+func Test_writeJSONBase(t *testing.T) {
+	type args struct {
+		val interface{}
+		out thrift.TProtocol
+		t   *descriptor.TypeDescriptor
+		opt *writerOption
+	}
+	mockTTransport := &mocks.MockThriftTTransport{
+		WriteStructBeginFunc: func(name string) error {
+			return nil
+		},
+		WriteFieldBeginFunc: func(name string, typeID thrift.TType, id int16) error {
+			return nil
+		},
+	}
+	data := gjson.Parse(`{"hello":"world", "base": {"Extra": {"hello":"world"}}}`)
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+		{
+			"writeJSONBase",
+			args{
+				val: &data,
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"hello": {Name: "hello", ID: 1, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+							"base": {Name: "base", ID: 255, Type: &descriptor.TypeDescriptor{
+								Type:          descriptor.STRUCT,
+								IsRequestBase: true,
+							}},
+						},
+						RequiredFields: map[int32]*descriptor.FieldDescriptor{
+							1: {Name: "hello", ID: 1, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+						},
+					},
+				},
+				opt: &writerOption{
+					requestBase: &Base{
+						LogID:  "logID-12345",
+						Caller: "Caller.Name",
+					},
+				},
+			},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := writeJSON(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+				t.Errorf("writeJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			test.DeepEqual(t, tt.args.opt.requestBase.Extra, map[string]string{"hello": "world"})
+		})
+	}
+}
