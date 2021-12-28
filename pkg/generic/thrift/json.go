@@ -40,6 +40,7 @@ func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient boo
 	ws := &WriteJSON{
 		ty:             ty,
 		hasRequestBase: fnDsc.HasRequestBase && isClient,
+		base64Binary:   true,
 	}
 	return ws, nil
 }
@@ -48,9 +49,16 @@ func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient boo
 type WriteJSON struct {
 	ty             *descriptor.TypeDescriptor
 	hasRequestBase bool
+	base64Binary   bool
 }
 
 var _ MessageWriter = (*WriteJSON)(nil)
+
+// SetBase64Binary enable/disable Base64 decoding for binary.
+// Note that this method is not concurrent-safe.
+func (m *WriteJSON) SetBase64Binary(enable bool) {
+	m.base64Binary = enable
+}
 
 // Write write json string to out thrift.TProtocol
 func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
@@ -60,7 +68,7 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 
 	// msg is void
 	if _, ok := msg.(descriptor.Void); ok {
-		return wrapStructWriter(ctx, msg, out, m.ty, &writerOption{requestBase: requestBase})
+		return wrapStructWriter(ctx, msg, out, m.ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary})
 	}
 
 	// msg is string
@@ -79,24 +87,32 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 			Index: 0,
 		}
 	}
-	return wrapJSONWriter(ctx, &body, out, m.ty, &writerOption{requestBase: requestBase})
+	return wrapJSONWriter(ctx, &body, out, m.ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary})
 }
 
 // NewReadJSON build ReadJSON according to ServiceDescriptor
 func NewReadJSON(svc *descriptor.ServiceDescriptor, isClient bool) *ReadJSON {
 	return &ReadJSON{
-		svc:      svc,
-		isClient: isClient,
+		svc:              svc,
+		isClient:         isClient,
+		binaryWithBase64: true,
 	}
 }
 
 // ReadJSON implement of MessageReaderWithMethod
 type ReadJSON struct {
-	svc      *descriptor.ServiceDescriptor
-	isClient bool
+	svc              *descriptor.ServiceDescriptor
+	isClient         bool
+	binaryWithBase64 bool
 }
 
 var _ MessageReader = (*ReadJSON)(nil)
+
+// SetBinaryWithBase64 enable/disable Base64 encoding for binary.
+// Note that this method is not concurrent-safe.
+func (m *ReadJSON) SetBinaryWithBase64(enable bool) {
+	m.binaryWithBase64 = enable
+}
 
 // Read read data from in thrift.TProtocol and convert to json string
 func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
@@ -108,7 +124,7 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 	if !m.isClient {
 		fDsc = fnDsc.Request
 	}
-	resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, throwException: true})
+	resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
 	if err != nil {
 		return nil, err
 	}

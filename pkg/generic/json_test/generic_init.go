@@ -19,6 +19,8 @@ package test
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -121,6 +123,30 @@ func (g *GenericServiceReadRequiredFiledImpl) GenericCall(ctx context.Context, m
 	msg := request.(string)
 	fmt.Printf("Recv: %s\n", msg)
 	return `{"Msg":"world"}`, nil
+}
+
+// GenericServiceReadRequiredFiledImpl ...
+type GenericServiceBinaryEchoImpl struct{}
+
+const mockMyMsg = "my msg"
+
+type BinaryEcho struct {
+	Msg       string `json:"msg"`
+	GotBase64 bool   `json:"got_base64"`
+}
+
+// GenericCall ...
+func (g *GenericServiceBinaryEchoImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	req := &BinaryEcho{}
+	json.Unmarshal([]byte(request.(string)), req)
+	fmt.Printf("Recv: %s\n", req.Msg)
+	if !req.GotBase64 && req.Msg != mockMyMsg {
+		return nil, errors.New("call failed, msg type mismatch")
+	}
+	if req.GotBase64 && req.Msg != base64.StdEncoding.EncodeToString([]byte(mockMyMsg)) {
+		return nil, errors.New("call failed, incorrect base64 data")
+	}
+	return request, nil
 }
 
 var (
