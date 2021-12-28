@@ -172,8 +172,8 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
 
-	smallDc := NewDefaultSizedCodec(1)
-	largeDc := NewDefaultSizedCodec(1024)
+	smallDc := NewDefaultCodecWithSizeLimit(1)
+	largeDc := NewDefaultCodecWithSizeLimit(1024)
 	ctx := context.Background()
 	intKVInfo := prepareIntKVInfo()
 	strKVInfo := prepareStrKVInfo()

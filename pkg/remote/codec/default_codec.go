@@ -60,8 +60,9 @@ func NewDefaultCodec() remote.Codec {
 	}
 }
 
-// NewDefaultSizedCodec creates the default protocol sniffing codec supporting thrift and protobuf but with size limit.
-func NewDefaultSizedCodec(maxSize int) remote.Codec {
+// NewDefaultCodecWithSizeLimit creates the default protocol sniffing codec supporting thrift and protobuf but with size limit.
+// maxSize is in bytes
+func NewDefaultCodecWithSizeLimit(maxSize int) remote.Codec {
 	return &defaultCodec{
 		maxSize: maxSize,
 	}
