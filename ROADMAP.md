@@ -16,7 +16,6 @@ This document shows key roadmap of Kitex development from the year of 2021 to 20
   - Support no serialization which references [Cap'n](https://capnproto.org/index.html) but is compatible with Thrift.
   - Support runtime serialization&deserialization without generating code (JIT) for Thrift.
 - Tool
-  - Support Thrift IDL Validator. (DONE)
   - Support generating Protobuf code to optimize performance.
 
 ## Performance Optimization
