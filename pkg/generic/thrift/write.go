@@ -639,9 +639,10 @@ func writeJSON(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 	for name, field := range t.Struct.FieldsByName {
 		elem := data.Get(name)
 		if field.Type.IsRequestBase && opt.requestBase != nil {
-			//if err := writeRequestBase(ctx, elem, out, field, opt); err != nil {
-			//	return err
-			//}
+			elemI := elem.Value()
+			if err := writeRequestBase(ctx, elemI, out, field, opt); err != nil {
+				return err
+			}
 			continue
 		}
 
