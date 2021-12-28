@@ -49,7 +49,7 @@ func TestThriftProtocolCheck(t *testing.T) {
 		flagBuf = flagBuf[8:]
 	}
 	rbf = remote.NewReaderBuffer(flagBuf)
-	err := checkPayload(flagBuf, msg, rbf, ttheader)
+	err := checkPayload(flagBuf, msg, rbf, ttheader, 10)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, msg.ProtocolInfo().TransProto == transport.TTHeader)
 	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
@@ -65,7 +65,7 @@ func TestThriftProtocolCheck(t *testing.T) {
 		flagBuf = flagBuf[8:]
 	}
 	rbf = remote.NewReaderBuffer(flagBuf)
-	err = checkPayload(flagBuf, msg, rbf, ttheader)
+	err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, msg.ProtocolInfo().TransProto == transport.TTHeaderFramed)
 	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
@@ -77,20 +77,24 @@ func TestThriftProtocolCheck(t *testing.T) {
 	ttheader = IsTTHeader(flagBuf)
 	test.Assert(t, !ttheader)
 	rbf = remote.NewReaderBuffer(flagBuf)
-	err = checkPayload(flagBuf, msg, rbf, ttheader)
+	err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
 	test.Assert(t, err == nil, err)
+	err = checkPayload(flagBuf, msg, rbf, ttheader, 9)
+	test.Assert(t, err != nil, err)
 	test.Assert(t, msg.ProtocolInfo().TransProto == transport.Framed)
 	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
 
-	// 3. thrift pure payload
+	// 4. thrift pure payload
 	flagBuf = make([]byte, 8*2)
 	binary.BigEndian.PutUint32(flagBuf, uint32(10))
 	binary.BigEndian.PutUint32(flagBuf[0:4], ThriftV1Magic)
 	ttheader = IsTTHeader(flagBuf)
 	test.Assert(t, !ttheader)
 	rbf = remote.NewReaderBuffer(flagBuf)
-	err = checkPayload(flagBuf, msg, rbf, ttheader)
+	err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
 	test.Assert(t, err == nil, err)
+	err = checkPayload(flagBuf, msg, rbf, ttheader, 9)
+	test.Assert(t, err != nil, err)
 	test.Assert(t, msg.ProtocolInfo().TransProto == transport.PurePayload)
 	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
 }
@@ -114,7 +118,7 @@ func TestProtobufProtocolCheck(t *testing.T) {
 		flagBuf = flagBuf[8:]
 	}
 	rbf = remote.NewReaderBuffer(flagBuf)
-	err := checkPayload(flagBuf, msg, rbf, ttheader)
+	err := checkPayload(flagBuf, msg, rbf, ttheader, 10)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, msg.ProtocolInfo().TransProto == transport.TTHeaderFramed)
 	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Protobuf)
@@ -126,8 +130,10 @@ func TestProtobufProtocolCheck(t *testing.T) {
 	ttheader = IsTTHeader(flagBuf)
 	test.Assert(t, !ttheader)
 	rbf = remote.NewReaderBuffer(flagBuf)
-	err = checkPayload(flagBuf, msg, rbf, ttheader)
+	err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
 	test.Assert(t, err == nil, err)
+	err = checkPayload(flagBuf, msg, rbf, ttheader, 9)
+	test.Assert(t, err != nil, err)
 	test.Assert(t, msg.ProtocolInfo().TransProto == transport.Framed)
 	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Protobuf)
 }
@@ -161,6 +167,36 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
 	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
 	test.Assert(t, sendMsg.RPCInfo().Invocation().SeqID() == recvMsg.RPCInfo().Invocation().SeqID())
+}
+
+func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
+	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
+
+	smallDc := NewDefaultSizedCodec(1)
+	largeDc := NewDefaultSizedCodec(1024)
+	ctx := context.Background()
+	intKVInfo := prepareIntKVInfo()
+	strKVInfo := prepareStrKVInfo()
+	sendMsg := initSendMsg(transport.TTHeader)
+	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
+	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
+
+	// encode
+	smallOut := remote.NewWriterBuffer(256)
+	largeOut := remote.NewWriterBuffer(256)
+	err := smallDc.Encode(ctx, sendMsg, smallOut)
+	test.Assert(t, err != nil, err)
+	err = largeDc.Encode(ctx, sendMsg, largeOut)
+	test.Assert(t, err == nil, err)
+
+	// decode
+	recvMsg := initRecvMsg()
+	smallBuf, _ := smallOut.Bytes()
+	largeBuf, _ := largeOut.Bytes()
+	err = smallDc.Decode(ctx, recvMsg, remote.NewReaderBuffer(smallBuf))
+	test.Assert(t, err != nil, err)
+	err = largeDc.Decode(ctx, recvMsg, remote.NewReaderBuffer(largeBuf))
+	test.Assert(t, err == nil, err)
 }
 
 var mpc remote.PayloadCodec = mockPayloadCodec{}
