@@ -148,10 +148,10 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, remoteService 
 		bufferPool:            newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.ctx.Done())
-	// t.bdpEst = &bdpEstimator{
-	// 	bdp:               initialWindowSize,
-	// 	updateFlowControl: t.updateFlowControl,
-	// }
+	t.bdpEst = &bdpEstimator{
+		bdp:               initialWindowSize,
+		updateFlowControl: t.updateFlowControl,
+	}
 	t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst)
 
 	if t.keepaliveEnabled {
@@ -174,7 +174,13 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, remoteService 
 		return nil, connectionErrorf(true, err, "transport: preface mismatch, wrote %d bytes; want %d", n, ClientPrefaceLen)
 	}
 
-	err = t.framer.WriteSettings()
+	ss := []http2.Setting{
+		{
+			ID:  http2.SettingInitialWindowSize,
+			Val: uint32(t.initialWindowSize),
+		},
+	}
+	err = t.framer.WriteSettings(ss...)
 	if err != nil {
 		t.Close()
 		return nil, connectionErrorf(true, err, "transport: failed to write initial settings frame: %v", err)
@@ -568,6 +574,30 @@ func (t *http2Client) adjustWindow(s *Stream, n uint32) {
 	if w := s.fc.maybeAdjust(n); w > 0 {
 		t.controlBuf.put(&outgoingWindowUpdate{streamID: s.id, increment: w})
 	}
+}
+
+// updateFlowControl updates the incoming flow control windows
+// for the transport and the stream based on the current bdp
+// estimation.
+func (t *http2Client) updateFlowControl(n uint32) {
+	t.mu.Lock()
+	for _, s := range t.activeStreams {
+		s.fc.newLimit(n)
+	}
+	t.mu.Unlock()
+	updateIWS := func(interface{}) bool {
+		t.initialWindowSize = int32(n)
+		return true
+	}
+	t.controlBuf.executeAndPut(updateIWS, &outgoingWindowUpdate{streamID: 0, increment: t.fc.newLimit(n)})
+	t.controlBuf.put(&outgoingSettings{
+		ss: []http2.Setting{
+			{
+				ID:  http2.SettingInitialWindowSize,
+				Val: n,
+			},
+		},
+	})
 }
 
 // updateWindow adjusts the inbound quota for the stream.
