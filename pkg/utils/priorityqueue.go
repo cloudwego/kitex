@@ -65,7 +65,7 @@ func (pq *PriorityQueue) Top() PQItem {
 	if pq.queue == nil || len(*pq.queue) == 0 {
 		return nil
 	}
-	return (*pq.queue)[0].(PQItem)
+	return (*pq.queue)[0]
 }
 
 func (pq *PriorityQueue) Len() int {

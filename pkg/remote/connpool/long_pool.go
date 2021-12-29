@@ -349,8 +349,7 @@ func (lp *LongPool) invokeWatcher(t *time.Ticker) {
 	if top == nil {
 		return
 	}
-	t.Reset(getTickInterval(top.deadline.Sub(time.Now()), lp.watcher.checkInterval))
-	return
+	t.Reset(getTickInterval(time.Until(top.deadline), lp.watcher.checkInterval))
 }
 
 // cleanStaleConn cleans the stale conn and reset the timer
@@ -370,7 +369,7 @@ func (lp *LongPool) cleanStaleConn(t *time.Ticker) {
 	// set next timer
 	top, _ := lp.watcher.Top().(*connMeta)
 	if top != nil {
-		t.Reset(getTickInterval(top.deadline.Sub(time.Now()), lp.watcher.checkInterval))
+		t.Reset(getTickInterval(time.Until(top.deadline), lp.watcher.checkInterval))
 	} else {
 		t.Stop()
 	}
