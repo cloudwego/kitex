@@ -897,7 +897,6 @@ func Test_writeJSON(t *testing.T) {
 	}
 }
 
-
 func Test_writeJSONBase(t *testing.T) {
 	type args struct {
 		val interface{}
@@ -919,7 +918,6 @@ func Test_writeJSONBase(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		// TODO: Add test cases.
 		{
 			"writeJSONBase",
 			args{
