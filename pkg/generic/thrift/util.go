@@ -101,7 +101,7 @@ func buildinTypeFromString(s string, t *descriptor.TypeDescriptor) (interface{},
 		if err != nil {
 			return nil, err
 		}
-		return int64(i), nil
+		return i, nil
 	case descriptor.DOUBLE:
 		return strconv.ParseFloat(s, 64)
 	case descriptor.STRING:
@@ -133,7 +133,7 @@ func buildinTypeIntoString(val interface{}) string {
 	case int32:
 		return strconv.FormatInt(int64(v), 10)
 	case int64:
-		return strconv.FormatInt(int64(v), 10)
+		return strconv.FormatInt(v, 10)
 	case float64:
 		return strconv.FormatFloat(v, 'f', -1, 64)
 	case string:

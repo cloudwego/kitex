@@ -271,7 +271,7 @@ func writeJSONNumber(ctx context.Context, val interface{}, out thrift.TProtocol,
 		if err != nil {
 			return err
 		}
-		return writeInt64(ctx, int64(i), out, t, opt)
+		return writeInt64(ctx, i, out, t, opt)
 	case thrift.DOUBLE:
 		i, err := jn.Float64()
 		if err != nil {
