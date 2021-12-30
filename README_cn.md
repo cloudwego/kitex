@@ -1,5 +1,14 @@
 # CloudWeGo-Kitex
 
+[![Release](https://img.shields.io/github/v/release/cloudwego/kitex)](https://github.com/cloudwego/kitex/releases)
+[![WebSite](https://img.shields.io/website?up_message=cloudwego&url=https%3A%2F%2Fwww.cloudwego.io%2F)](https://www.cloudwego.io/)
+[![License](https://img.shields.io/github/license/cloudwego/kitex)](https://github.com/cloudwego/kitex/blob/main/LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cloudwego/kitex)](https://goreportcard.com/report/github.com/cloudwego/kitex)
+[![OpenIssue](https://img.shields.io/github/issues/cloudwego/kitex)](https://github.com/cloudwego/kitex/issues)
+[![ClosedIssue](https://img.shields.io/github/issues-closed/cloudwego/kitex)](https://github.com/cloudwego/kitex/issues?q=is%3Aissue+is%3Aclosed)
+![Stars](https://img.shields.io/github/stars/cloudwego/kitex)
+![Forks](https://img.shields.io/github/forks/cloudwego/kitex)
+
 [English](README.md) | 中文
 
 Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、**强可扩展**的特点，在字节内部已广泛使用。如今越来越多的微服务选择使用 Golang，如果对微服务性能有要求，又希望定制扩展融入自己的治理体系，Kitex 会是一个不错的选择。
