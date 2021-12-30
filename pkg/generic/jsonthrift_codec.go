@@ -37,14 +37,15 @@ var (
 type JSONRequest = string
 
 type jsonThriftCodec struct {
-	svcDsc   atomic.Value // *idl
-	provider DescriptorProvider
-	codec    remote.PayloadCodec
+	svcDsc           atomic.Value // *idl
+	provider         DescriptorProvider
+	codec            remote.PayloadCodec
+	binaryWithBase64 bool
 }
 
 func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*jsonThriftCodec, error) {
 	svc := <-p.Provide()
-	c := &jsonThriftCodec{codec: codec, provider: p}
+	c := &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true}
 	c.svcDsc.Store(svc)
 	go c.update()
 	return c, nil
@@ -76,6 +77,7 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	if err != nil {
 		return err
 	}
+	wm.SetBase64Binary(c.binaryWithBase64)
 	msg.Data().(WithCodec).SetCodec(wm)
 	return c.codec.Marshal(ctx, msg, out)
 }
@@ -89,6 +91,7 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
 	rm := thrift.NewReadJSON(svcDsc, msg.RPCRole() == remote.Client)
+	rm.SetBinaryWithBase64(c.binaryWithBase64)
 	msg.Data().(WithCodec).SetCodec(rm)
 	return c.codec.Unmarshal(ctx, msg, in)
 }

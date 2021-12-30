@@ -26,14 +26,22 @@ import (
 
 // WriteHTTPRequest implement of MessageWriter
 type WriteHTTPRequest struct {
-	svc *descriptor.ServiceDescriptor
+	svc              *descriptor.ServiceDescriptor
+	binaryWithBase64 bool
 }
 
 var _ MessageWriter = (*WriteHTTPRequest)(nil)
 
 // NewWriteHTTPRequest ...
+// Base64 decoding for binary is enabled by default.
 func NewWriteHTTPRequest(svc *descriptor.ServiceDescriptor) *WriteHTTPRequest {
-	return &WriteHTTPRequest{svc}
+	return &WriteHTTPRequest{svc, true}
+}
+
+// SetBase64Binary enable/disable Base64 decoding for binary.
+// Note that this method is not concurrent-safe.
+func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
+	w.binaryWithBase64 = enable
 }
 
 // Write ...
@@ -46,19 +54,27 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 	if !fn.HasRequestBase {
 		requestBase = nil
 	}
-	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase})
+	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
 }
 
 // ReadHTTPResponse implement of MessageReaderWithMethod
 type ReadHTTPResponse struct {
-	svc *descriptor.ServiceDescriptor
+	svc          *descriptor.ServiceDescriptor
+	base64Binary bool
 }
 
 var _ MessageReader = (*ReadHTTPResponse)(nil)
 
 // NewReadHTTPResponse ...
+// Base64 encoding for binary is enabled by default.
 func NewReadHTTPResponse(svc *descriptor.ServiceDescriptor) *ReadHTTPResponse {
-	return &ReadHTTPResponse{svc}
+	return &ReadHTTPResponse{svc, true}
+}
+
+// SetBase64Binary enable/disable Base64 encoding for binary.
+// Note that this method is not concurrent-safe.
+func (r *ReadHTTPResponse) SetBase64Binary(enable bool) {
+	r.base64Binary = enable
 }
 
 // Read ...
@@ -68,5 +84,5 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		return nil, err
 	}
 	fDsc := fnDsc.Response
-	return skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, http: true})
+	return skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
 }
