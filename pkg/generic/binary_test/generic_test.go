@@ -207,9 +207,9 @@ func TestBinaryThriftGenericClientClose(t *testing.T) {
 	}
 	runtime.GC()
 	runtime.ReadMemStats(&ms)
-	aferGCHeepAlloc, afterGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", aferGCHeepAlloc, afterGCHeapObjects)
-	test.Assert(t, aferGCHeepAlloc < preHeepAlloc && afterGCHeapObjects < preHeapObjects)
+	afterGCHeepAlloc, afterGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", afterGCHeepAlloc, afterGCHeapObjects)
+	test.Assert(t, afterGCHeepAlloc < preHeepAlloc && afterGCHeapObjects < preHeapObjects)
 }
 
 func TestBinaryThriftGenericClientFinalizer(t *testing.T) {
