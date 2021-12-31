@@ -627,9 +627,7 @@ func getActiveConnNum(lp *LongPool) int {
 			if conn == nil {
 				break
 			}
-			if conn.IsActive() {
-				count++
-			}
+			count++
 		}
 		return true
 	})

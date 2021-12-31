@@ -85,9 +85,6 @@ func (pq *PriorityQueue) Top() PQItem {
 }
 
 func (pq *PriorityQueue) Len() int {
-	pq.m.Lock()
-	defer pq.m.Unlock()
-
 	return pq.queue.Len()
 }
 
