@@ -217,7 +217,7 @@ func skipLine(buffer remote.ByteBuffer) (n int, err error) {
 	}
 }
 
-func parseHTTPResposneHead(line string) (protoMajor, protoMinor, statusCodeInt int, err error) {
+func parseHTTPResponseHead(line string) (protoMajor, protoMinor, statusCodeInt int, err error) {
 	var proto, status, statusCode string
 	i := strings.IndexByte(line, ' ')
 	if i == -1 {
@@ -248,7 +248,7 @@ func skipToBody(buffer remote.ByteBuffer) error {
 	if err != nil {
 		return err
 	}
-	_, _, statusCode, err := parseHTTPResposneHead(string(head))
+	_, _, statusCode, err := parseHTTPResponseHead(string(head))
 	if err != nil {
 		return err
 	}
