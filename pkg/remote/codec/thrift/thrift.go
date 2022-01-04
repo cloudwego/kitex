@@ -23,6 +23,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 
+	"github.com/cloudwego/frugal"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -62,6 +63,26 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 
 	msgType := message.MessageType()
 	seqID := message.RPCInfo().Invocation().SeqID()
+
+	// encode with frugal
+	if !c.disableFastWrite {
+		// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
+		msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
+		msgEndLen := bthrift.Binary.MessageEndLength()
+		objectLen := frugal.EncodedSize(data)
+		buf, err := out.Malloc(msgBeginLen + objectLen + msgEndLen)
+		if err != nil {
+			return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
+		}
+		offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
+		writeLen, err := frugal.EncodeObject(buf[offset:], nil, data)
+		if err != nil {
+			return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Encode failed: %s", err.Error()))
+		}
+		offset += writeLen
+		bthrift.Binary.WriteMessageEnd(buf[offset:])
+		return nil
+	}
 
 	// 2. encode thrift
 	// encode with FastWrite
@@ -141,6 +162,30 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	}
 	// decode thrift
 	data := message.Data()
+	// decode with frugal
+	if !c.disableFastRead {
+		if message.PayloadLen() != 0 {
+			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
+			ri := message.RPCInfo()
+			internal_stats.Record(ctx, ri, stats.WaitReadStart, nil)
+			buf, err := tProt.next(message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+			internal_stats.Record(ctx, ri, stats.WaitReadFinish, err)
+			if err != nil {
+				return remote.NewTransError(remote.ProtocolError, err)
+			}
+			_, err = frugal.DecodeObject(buf, data)
+			if err != nil {
+				return remote.NewTransError(remote.ProtocolError, err)
+			}
+			err = tProt.ReadMessageEnd()
+			if err != nil {
+				return remote.NewTransError(remote.ProtocolError, err)
+			}
+			tProt.Recycle()
+			return err
+		}
+	}
+
 	// decode with FastRead
 	if !c.disableFastRead {
 		if msg, ok := data.(thriftMsgFastCodec); ok && message.PayloadLen() != 0 {
