@@ -52,9 +52,9 @@ func TestSkipToBody(t *testing.T) {
 	}
 }
 
-func TestParseHTTPResonseHead(t *testing.T) {
+func TestParseHTTPResponseHead(t *testing.T) {
 	head := "HTTP/1.1 200 OK"
-	major, minor, statusCode, err := parseHTTPResposneHead(head)
+	major, minor, statusCode, err := parseHTTPResponseHead(head)
 	if err != nil {
 		t.Fatal(err)
 	}
