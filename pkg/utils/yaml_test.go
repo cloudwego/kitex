@@ -191,7 +191,7 @@ func TestYamlConfig_GetFloat(t *testing.T) {
 func TestYamlConfig_GetDuration(t *testing.T) {
 	// duration
 	val, ok := cfg.GetDuration("ExitWaitTimeout")
-	test.Assert(t, ok && val == time.Duration(time.Millisecond*123))
+	test.Assert(t, ok && val == time.Millisecond*123)
 
 	// not duration
 	_, ok = cfg.GetDuration("EnableMetrics")
