@@ -202,17 +202,17 @@ func TestMapThriftGenericClientClose(t *testing.T) {
 	}
 
 	runtime.ReadMemStats(&ms)
-	preHeepAlloc, preHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", preHeepAlloc, preHeapObjects)
+	preHeapAlloc, preHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", preHeapAlloc, preHeapObjects)
 
 	for _, cli := range clis {
 		_ = cli.Close()
 	}
 	runtime.GC()
 	runtime.ReadMemStats(&ms)
-	afterGCHeepAlloc, afterGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", afterGCHeepAlloc, afterGCHeapObjects)
-	test.Assert(t, afterGCHeepAlloc < preHeepAlloc && afterGCHeapObjects < preHeapObjects)
+	afterGCHeapAlloc, afterGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", afterGCHeapAlloc, afterGCHeapObjects)
+	test.Assert(t, afterGCHeapAlloc < preHeapAlloc && afterGCHeapObjects < preHeapObjects)
 }
 
 func TestMapThriftGenericClientFinalizer(t *testing.T) {
@@ -237,14 +237,14 @@ func TestMapThriftGenericClientFinalizer(t *testing.T) {
 
 	runtime.GC()
 	runtime.ReadMemStats(&ms)
-	firstGCHeepAlloc, firstGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", firstGCHeepAlloc, firstGCHeapObjects)
+	firstGCHeapAlloc, firstGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", firstGCHeapAlloc, firstGCHeapObjects)
 
 	runtime.GC()
 	runtime.ReadMemStats(&ms)
-	secondGCHeepAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", secondGCHeepAlloc, secondGCHeapObjects)
-	test.Assert(t, secondGCHeepAlloc < firstGCHeepAlloc && secondGCHeapObjects < firstGCHeapObjects)
+	secondGCHeapAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", secondGCHeapAlloc, secondGCHeapObjects)
+	test.Assert(t, secondGCHeapAlloc < firstGCHeapAlloc && secondGCHeapObjects < firstGCHeapObjects)
 }
 
 func mb(byteSize uint64) float32 {
