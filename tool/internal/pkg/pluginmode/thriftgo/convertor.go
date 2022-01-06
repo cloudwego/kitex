@@ -318,6 +318,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 		c.Utils.SetRootScope(scope)
 
 		pi := generator.PkgInfo{
+			PkgName:    pkg,
 			PkgRefName: pkg,
 			ImportPath: filepath.Join(c.Config.PackagePrefix, pth),
 		}
