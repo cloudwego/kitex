@@ -158,14 +158,15 @@ func (kc *kClient) checkOptions() (err error) {
 }
 
 func (kc *kClient) initMiddlewares(ctx context.Context) {
+	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
 	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW(), rpcTimeoutMW(ctx))
-	kc.mws = richMWsWithBuilder(ctx, kc.opt.MWBs, kc)
+	kc.mws = append(kc.mws, builderMWs...)
 	// add new middlewares
 	kc.mws = append(kc.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
 	if kc.opt.Proxy == nil {
 		kc.mws = append(kc.mws, newResolveMWBuilder(kc.opt)(ctx))
 		kc.mws = append(kc.mws, kc.opt.CBSuite.InstanceCBMW())
-		kc.mws = richMWsWithBuilder(ctx, kc.opt.IMWBs, kc)
+		kc.mws = append(kc.mws, richMWsWithBuilder(ctx, kc.opt.IMWBs)...)
 	} else {
 		if kc.opt.Resolver != nil { // customized service discovery
 			kc.mws = append(kc.mws, newResolveMWBuilder(kc.opt)(ctx))
@@ -175,11 +176,11 @@ func (kc *kClient) initMiddlewares(ctx context.Context) {
 	kc.mws = append(kc.mws, newIOErrorHandleMW(kc.opt.ErrHandle))
 }
 
-func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder, kc *kClient) []endpoint.Middleware {
+func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) (mws []endpoint.Middleware) {
 	for i := range mwBs {
-		kc.mws = append(kc.mws, mwBs[i](ctx))
+		mws = append(mws, mwBs[i](ctx))
 	}
-	return kc.mws
+	return
 }
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
