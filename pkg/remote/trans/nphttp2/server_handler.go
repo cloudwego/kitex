@@ -87,7 +87,7 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 
 // 只 return write err
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
-	tr, err := grpcTransport.NewServerTransport(ctx, conn.(netpoll.Connection))
+	tr, err := grpcTransport.NewServerTransport(ctx, conn.(netpoll.Connection), t.opt.GRPCCfg)
 	if err != nil {
 		return err
 	}
