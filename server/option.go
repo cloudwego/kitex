@@ -209,7 +209,10 @@ func WithRegistryInfo(info *registry.Info) Option {
 
 // WithGRPCInitialWindowSize returns a Option that sets window size for stream.
 // The lower bound for window size is 64K and any value smaller than that will be ignored.
+<<<<<<< HEAD
 // It corresponds to the InitialWindowSize ServerOption of gRPC.
+=======
+>>>>>>> feat: support options to set the internal params of grpc
 func WithGRPCInitialWindowSize(s uint32) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithRegistryInfo(%+v)", s))
@@ -220,7 +223,10 @@ func WithGRPCInitialWindowSize(s uint32) Option {
 
 // WithGRPCInitialConnWindowSize returns a Option that sets window size for a connection.
 // The lower bound for window size is 64K and any value smaller than that will be ignored.
+<<<<<<< HEAD
 // It corresponds to the InitialConnWindowSize ServerOption of gRPC.
+=======
+>>>>>>> feat: support options to set the internal params of grpc
 func WithGRPCInitialConnWindowSize(s uint32) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCInitialConnWindowSize(%+v)", s))
@@ -230,7 +236,10 @@ func WithGRPCInitialConnWindowSize(s uint32) Option {
 }
 
 // WithGRPCKeepaliveParams returns a Option that sets keepalive and max-age parameters for the server.
+<<<<<<< HEAD
 // It corresponds to the KeepaliveParams ServerOption of gRPC.
+=======
+>>>>>>> feat: support options to set the internal params of grpc
 func WithGRPCKeepaliveParams(kp grpc.ServerKeepalive) Option {
 	if kp.Time > 0 && kp.Time < time.Second {
 		kp.Time = time.Second
@@ -244,7 +253,10 @@ func WithGRPCKeepaliveParams(kp grpc.ServerKeepalive) Option {
 }
 
 // WithGRPCKeepaliveEnforcementPolicy returns a Option that sets keepalive enforcement policy for the server.
+<<<<<<< HEAD
 // It corresponds to the KeepaliveEnforcementPolicy ServerOption of gRPC.
+=======
+>>>>>>> feat: support options to set the internal params of grpc
 func WithGRPCKeepaliveEnforcementPolicy(kep grpc.EnforcementPolicy) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCKeepaliveEnforcementPolicy(%+v)", kep))
@@ -255,7 +267,10 @@ func WithGRPCKeepaliveEnforcementPolicy(kep grpc.EnforcementPolicy) Option {
 
 // WithGRPCMaxConcurrentStreams returns a Option that will apply a limit on the number
 // of concurrent streams to each ServerTransport.
+<<<<<<< HEAD
 // It corresponds to the MaxConcurrentStreams ServerOption of gRPC.
+=======
+>>>>>>> feat: support options to set the internal params of grpc
 func WithGRPCMaxConcurrentStreams(n uint32) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCMaxConcurrentStreams(%+v)", n))
@@ -266,7 +281,10 @@ func WithGRPCMaxConcurrentStreams(n uint32) Option {
 
 // WithGRPCMaxHeaderListSize returns a ServerOption that sets the max (uncompressed) size
 // of header list that the server is prepared to accept.
+<<<<<<< HEAD
 // It corresponds to the MaxHeaderListSize ServerOption of gRPC.
+=======
+>>>>>>> feat: support options to set the internal params of grpc
 func WithGRPCMaxHeaderListSize(s uint32) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCMaxHeaderListSize(%+v)", s))
