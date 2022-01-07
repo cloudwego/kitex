@@ -66,7 +66,7 @@ type http2Client struct {
 	kp               ClientKeepalive
 	keepaliveEnabled bool
 
-	initialWindowSize int32
+	initialWindowSize uint32
 
 	// configured by peer through SETTINGS_MAX_HEADER_LIST_SIZE
 	maxSendHeaderListSize *uint32
@@ -105,7 +105,8 @@ type http2Client struct {
 // newHTTP2Client constructs a connected ClientTransport to addr based on HTTP2
 // and starts to receive messages on it. Non-nil error returns if construction
 // fails.
-func newHTTP2Client(ctx context.Context, conn netpoll.Connection, remoteService string, onGoAway func(GoAwayReason), onClose func()) (_ *http2Client, err error) {
+func newHTTP2Client(ctx context.Context, conn netpoll.Connection, opts ConnectOptions,
+	remoteService string, onGoAway func(GoAwayReason), onClose func()) (_ *http2Client, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
@@ -113,9 +114,13 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, remoteService 
 		}
 	}()
 
-	kp := ClientKeepalive{
-		Time:    defaultClientKeepaliveTime,
-		Timeout: defaultClientKeepaliveTimeout,
+	kp := opts.KeepaliveParams
+	// Validate keepalive parameters.
+	if kp.Time == 0 {
+		kp.Time = defaultClientKeepaliveTime
+	}
+	if kp.Timeout == 0 {
+		kp.Timeout = defaultClientKeepaliveTimeout
 	}
 	keepaliveEnabled := false
 	if kp.Time != Infinity {
@@ -123,6 +128,18 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, remoteService 
 			return nil, connectionErrorf(false, err, "transport: failed to set TCP_USER_TIMEOUT: %v", err)
 		}
 		keepaliveEnabled = true
+	}
+
+	dynamicWindow := true
+	icwz := initialWindowSize
+	if opts.InitialConnWindowSize >= defaultWindowSize {
+		icwz = opts.InitialConnWindowSize
+		dynamicWindow = false
+	}
+
+	maxHeaderListSize := defaultClientMaxHeaderListSize
+	if opts.MaxHeaderListSize != nil {
+		maxHeaderListSize = *opts.MaxHeaderListSize
 	}
 	t := &http2Client{
 		ctx:                   ctx,
@@ -133,12 +150,12 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, remoteService 
 		readerDone:            make(chan struct{}),
 		writerDone:            make(chan struct{}),
 		goAway:                make(chan struct{}),
-		framer:                newFramer(conn, defaultClientMaxHeaderListSize),
-		fc:                    &trInFlow{limit: initialWindowSize},
+		framer:                newFramer(conn, maxHeaderListSize),
+		fc:                    &trInFlow{limit: icwz},
 		activeStreams:         make(map[uint32]*Stream),
 		kp:                    kp,
 		keepaliveEnabled:      keepaliveEnabled,
-		initialWindowSize:     int32(initialWindowSize),
+		initialWindowSize:     initialWindowSize,
 		nextID:                1,
 		maxConcurrentStreams:  defaultMaxStreamsClient,
 		streamQuota:           defaultMaxStreamsClient,
@@ -148,9 +165,15 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, remoteService 
 		bufferPool:            newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.ctx.Done())
-	t.bdpEst = &bdpEstimator{
-		bdp:               initialWindowSize,
-		updateFlowControl: t.updateFlowControl,
+	if opts.InitialWindowSize >= defaultWindowSize {
+		t.initialWindowSize = opts.InitialWindowSize
+		dynamicWindow = false
+	}
+	if dynamicWindow {
+		t.bdpEst = &bdpEstimator{
+			bdp:               initialWindowSize,
+			updateFlowControl: t.updateFlowControl,
+		}
 	}
 	t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst)
 
@@ -586,7 +609,7 @@ func (t *http2Client) updateFlowControl(n uint32) {
 	}
 	t.mu.Unlock()
 	updateIWS := func(interface{}) bool {
-		t.initialWindowSize = int32(n)
+		t.initialWindowSize = n
 		return true
 	}
 	t.controlBuf.executeAndPut(updateIWS, &outgoingWindowUpdate{streamID: 0, increment: t.fc.newLimit(n)})
