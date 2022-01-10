@@ -72,6 +72,7 @@ func (p *PackageInfo) AddImports(pkgs ...string) {
 
 // PkgInfo .
 type PkgInfo struct {
+	PkgName    string
 	PkgRefName string
 	ImportPath string
 }

@@ -55,7 +55,7 @@ func convertToInt32(val interface{}) int32 {
 	case int16:
 		return int32(v)
 	case int32:
-		return int32(v)
+		return v
 	case int64:
 		return int32(v)
 	case float64:

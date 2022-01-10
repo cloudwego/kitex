@@ -124,6 +124,10 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 		ID:  http2.SettingMaxConcurrentStreams,
 		Val: math.MaxUint32,
 	})
+	isettings = append(isettings, http2.Setting{
+		ID:  http2.SettingInitialWindowSize,
+		Val: defaultWindowSize,
+	})
 	if err := framer.WriteSettings(isettings...); err != nil {
 		return nil, connectionErrorf(false, err, "transport: %v", err)
 	}
@@ -160,10 +164,10 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 		bufferPool:        newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.done)
-	// t.bdpEst = &bdpEstimator{
-	// 	bdp:               initialWindowSize,
-	// 	updateFlowControl: t.updateFlowControl,
-	// }
+	t.bdpEst = &bdpEstimator{
+		bdp:               initialWindowSize,
+		updateFlowControl: t.updateFlowControl,
+	}
 
 	t.framer.writer.Flush()
 
@@ -389,6 +393,30 @@ func (t *http2Server) adjustWindow(s *Stream, n uint32) {
 	if w := s.fc.maybeAdjust(n); w > 0 {
 		t.controlBuf.put(&outgoingWindowUpdate{streamID: s.id, increment: w})
 	}
+}
+
+// updateFlowControl updates the incoming flow control windows
+// for the transport and the stream based on the current bdp
+// estimation.
+func (t *http2Server) updateFlowControl(n uint32) {
+	t.mu.Lock()
+	for _, s := range t.activeStreams {
+		s.fc.newLimit(n)
+	}
+	t.initialWindowSize = int32(n)
+	t.mu.Unlock()
+	t.controlBuf.put(&outgoingWindowUpdate{
+		streamID:  0,
+		increment: t.fc.newLimit(n),
+	})
+	t.controlBuf.put(&outgoingSettings{
+		ss: []http2.Setting{
+			{
+				ID:  http2.SettingInitialWindowSize,
+				Val: n,
+			},
+		},
+	})
 }
 
 // updateWindow adjusts the inbound quota for the stream and the transport.
