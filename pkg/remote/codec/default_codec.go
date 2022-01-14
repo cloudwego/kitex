@@ -321,7 +321,7 @@ func checkPayloadSize(payloadLen, maxSize int) error {
 	if maxSize > 0 && payloadLen > 0 && payloadLen > maxSize {
 		return perrors.NewProtocolErrorWithType(
 			perrors.InvalidData,
-			fmt.Sprintf("Invalid data: payload size(%d) larger than the limit(%d)", payloadLen, maxSize),
+			fmt.Sprintf("invalid data: payload size(%d) larger than the limit(%d)", payloadLen, maxSize),
 		)
 	}
 	return nil
