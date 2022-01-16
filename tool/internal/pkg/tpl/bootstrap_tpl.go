@@ -16,7 +16,7 @@ package tpl
 
 // BootstrapTpl is the template for generating bootstrap.sh.
 var BootstrapTpl = `#! /usr/bin/env bash
-export PSM=${PSM:-{{.RealServiceName}}}
+export SERVICE_NAME=${SERVICE_NAME:-{{.RealServiceName}}}
 CURDIR=$(cd $(dirname $0); pwd)
 
 if [ "X$1" != "X" ]; then
