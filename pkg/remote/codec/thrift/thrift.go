@@ -37,6 +37,11 @@ func NewThriftCodec() remote.PayloadCodec {
 	return &thriftCodec{}
 }
 
+// NewThriftFrugalCodec creates the thrift binary codec powered by frugal.
+func NewThriftFrugalCodec() remote.PayloadCodec {
+	return &thriftCodec{useFrugal: true}
+}
+
 // NewThriftCodecDisableFastMode creates the thrift binary codec which can control if do fast codec.
 // Eg: xxxservice.NewServer(handler, server.WithPayloadCodec(thrift.NewThriftCodecDisableFastMode(true, true)))
 func NewThriftCodecDisableFastMode(disableFastWrite, disableFastRead bool) remote.PayloadCodec {
@@ -47,6 +52,7 @@ func NewThriftCodecDisableFastMode(disableFastWrite, disableFastRead bool) remot
 type thriftCodec struct {
 	disableFastWrite bool
 	disableFastRead  bool
+	useFrugal        bool
 }
 
 // Marshal implements the remote.PayloadCodec interface.
@@ -65,7 +71,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	seqID := message.RPCInfo().Invocation().SeqID()
 
 	// encode with frugal
-	if !c.disableFastWrite {
+	if c.useFrugal {
 		// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
 		msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
 		msgEndLen := bthrift.Binary.MessageEndLength()
@@ -163,7 +169,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	// decode thrift
 	data := message.Data()
 	// decode with frugal
-	if !c.disableFastRead {
+	if c.useFrugal {
 		if message.PayloadLen() != 0 {
 			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
 			ri := message.RPCInfo()
