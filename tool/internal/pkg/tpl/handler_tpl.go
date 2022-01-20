@@ -33,7 +33,7 @@ type {{.ServiceName}}Impl struct{}
 var HandlerMethodsTpl = `
 {{range .AllMethods}}
 {{- if or .ClientStreaming .ServerStreaming}}
-func (s *{{$.ServiceName}}Impl) {{.Name}}({{if not .ClientStreaming}}{{range .Args}}{{LowerFirst .Name}} {{.Type}}, {{end}}{{end}}stream {{.PkgRefName}}.{{.ServiceName}}_{{.RawName}}Server) (err error) {	
+func (s *{{$.ServiceName}}Impl) {{.Name}}({{if not .ClientStreaming}}{{range .Args}}{{LowerFirst .Name}} {{.Type}}, {{end}}{{end}}stream {{.PkgRefName}}.{{.ServiceName}}_{{.Name}}Server) (err error) {	
 	println("{{.Name}} called")
 	return
 }
