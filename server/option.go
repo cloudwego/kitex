@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -203,5 +204,67 @@ func WithRegistryInfo(info *registry.Info) Option {
 		di.Push(fmt.Sprintf("WithRegistryInfo(%+v)", info))
 
 		o.RegistryInfo = info
+	}}
+}
+
+// WithGRPCInitialWindowSize returns a Option that sets window size for stream.
+// The lower bound for window size is 64K and any value smaller than that will be ignored.
+func WithGRPCInitialWindowSize(s uint32) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithRegistryInfo(%+v)", s))
+
+		o.RemoteOpt.GRPCCfg.InitialWindowSize = s
+	}}
+}
+
+// WithGRPCInitialConnWindowSize returns a Option that sets window size for a connection.
+// The lower bound for window size is 64K and any value smaller than that will be ignored.
+func WithGRPCInitialConnWindowSize(s uint32) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCInitialConnWindowSize(%+v)", s))
+
+		o.RemoteOpt.GRPCCfg.InitialConnWindowSize = s
+	}}
+}
+
+// WithGRPCKeepaliveParams returns a Option that sets keepalive and max-age parameters for the server.
+func WithGRPCKeepaliveParams(kp grpc.ServerKeepalive) Option {
+	if kp.Time > 0 && kp.Time < time.Second {
+		kp.Time = time.Second
+	}
+
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCKeepaliveParams(%+v)", kp))
+
+		o.RemoteOpt.GRPCCfg.KeepaliveParams = kp
+	}}
+}
+
+// WithGRPCKeepaliveEnforcementPolicy returns a Option that sets keepalive enforcement policy for the server.
+func WithGRPCKeepaliveEnforcementPolicy(kep grpc.EnforcementPolicy) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCKeepaliveEnforcementPolicy(%+v)", kep))
+
+		o.RemoteOpt.GRPCCfg.KeepaliveEnforcementPolicy = kep
+	}}
+}
+
+// WithGRPCMaxConcurrentStreams returns a Option that will apply a limit on the number
+// of concurrent streams to each ServerTransport.
+func WithGRPCMaxConcurrentStreams(n uint32) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCMaxConcurrentStreams(%+v)", n))
+
+		o.RemoteOpt.GRPCCfg.MaxStreams = n
+	}}
+}
+
+// WithGRPCMaxHeaderListSize returns a ServerOption that sets the max (uncompressed) size
+// of header list that the server is prepared to accept.
+func WithGRPCMaxHeaderListSize(s uint32) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCMaxHeaderListSize(%+v)", s))
+
+		o.RemoteOpt.GRPCCfg.MaxHeaderListSize = &s
 	}}
 }

@@ -29,7 +29,7 @@ import (
 
 const (
 	// The default value of flow control window size in HTTP2 spec.
-	defaultWindowSize = uint32(1 << 30) // 1GB
+	defaultWindowSize = uint32(65535) // 64KB
 	// The initial window size for flow control.
 	initialWindowSize = defaultWindowSize // for an RPC
 	// Infinity means unset duration
@@ -54,4 +54,10 @@ const (
 	defaultServerMaxHeaderListSize = uint32(16 << 20)
 
 	defaultUserAgent = "kitex/" + kitex.Version
+)
+
+const (
+	// KeepaliveMinPingTime is the minimum ping interval.
+	// This must be 10s by default, but tests may wish to set it lower for convenience.
+	KeepaliveMinPingTime = 10 * time.Second
 )
