@@ -152,8 +152,9 @@ func TestMuxConnPoolDiscardClean(t *testing.T) {
 		p.Discard(conns[i])
 		test.Assert(t, closed == 0, closed)
 	}
+	// graceful clean
 	p.Clean(network, address)
-	test.Assert(t, closed == size, closed, size)
+	test.Assert(t, closed == 0, closed)
 }
 
 func TestMuxConnPoolClose(t *testing.T) {

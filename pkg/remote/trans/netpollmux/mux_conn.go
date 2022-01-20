@@ -39,6 +39,7 @@ func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 		muxConn:  newMuxConn(connection),
 		seqIDMap: newShardMap(mux.ShardSize),
 	}
+	connection.AddCloseCallback(c.CloseCallback)
 	connection.SetOnRequest(c.OnRequest)
 	return c
 }
@@ -80,7 +81,11 @@ func (c *muxCliConn) Close() error {
 }
 
 func (c *muxCliConn) close() error {
-	c.Connection.Close()
+	return c.Connection.Close()
+}
+
+// graceful exit
+func (c *muxCliConn) CloseCallback(connection netpoll.Connection) error {
 	c.seqIDMap.rangeMap(func(seqID int32, msg EventHandler) {
 		msg.Recv(nil, ErrConnClosed)
 	})

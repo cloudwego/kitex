@@ -96,9 +96,13 @@ func (mp *MuxPool) Discard(conn net.Conn) error {
 
 // Clean implements the LongConnPool interface.
 func (mp *MuxPool) Clean(network, address string) {
-	if v, ok := mp.connMap.Load(address); ok {
+	if _, ok := mp.connMap.Load(address); ok {
 		mp.connMap.Delete(address)
-		v.(*conns).close()
+		// `Clean` is called by `lbcache.clean` which means the peer (server) is exiting,
+		// so we don't have to close these connections.
+		// Just wait for the peer to close, then gracefully close the connection via `CloseCallback`
+		//
+		// v.(*conns).close()
 	}
 }
 
