@@ -60,6 +60,10 @@ type ServiceInfo struct {
 	// Extra is for future feature info, to avoid compatibility issue
 	// as otherwise we need to add a new field in the struct
 	Extra map[string]interface{}
+
+	// GenericMethod returns a MethodInfo for the given name.
+	// It is used by generic calls only.
+	GenericMethod func(name string) MethodInfo
 }
 
 // GetPackageName returns the PackageName.
@@ -76,6 +80,9 @@ func (i *ServiceInfo) GetPackageName() (pkg string) {
 // MethodInfo gets MethodInfo.
 func (i *ServiceInfo) MethodInfo(name string) MethodInfo {
 	if i.ServiceName == GenericService {
+		if i.GenericMethod != nil {
+			return i.GenericMethod(name)
+		}
 		return i.Methods[GenericMethod]
 	}
 	return i.Methods[name]
