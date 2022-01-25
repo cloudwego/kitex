@@ -353,7 +353,7 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		if err = cli.Send(ctx, ri, sendMsg); err != nil {
 			return
 		}
-		if resp == nil || m.OneWay() {
+		if m.OneWay() {
 			cli.Recv(ctx, ri, nil)
 			return nil
 		}
