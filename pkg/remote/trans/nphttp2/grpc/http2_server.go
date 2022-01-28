@@ -119,7 +119,7 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection, config *Server
 		maxHeaderListSize = *config.MaxHeaderListSize
 	}
 
-	framer := newFramer(conn, maxHeaderListSize)
+	framer := newFramer(conn, defaultWriteSize, maxHeaderListSize)
 	// Send initial settings as connection preface to client.
 	isettings := []http2.Setting{{
 		ID:  http2.SettingMaxFrameSize,
