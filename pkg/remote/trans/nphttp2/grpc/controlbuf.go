@@ -27,18 +27,28 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/netpoll-http2"
 	"github.com/cloudwego/netpoll-http2/hpack"
+
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 var updateHeaderTblSize = func(e *hpack.Encoder, v uint32) {
 	e.SetMaxDynamicTableSizeLimit(v)
 }
 
+var itemNodePool = sync.Pool{
+	New: func() interface{} { return &itemNode{} },
+}
+
 type itemNode struct {
 	it   interface{}
 	next *itemNode
+}
+
+func (n *itemNode) reset() {
+	n.it = nil
+	n.next = nil
 }
 
 type itemList struct {
@@ -47,13 +57,14 @@ type itemList struct {
 }
 
 func (il *itemList) enqueue(i interface{}) {
-	n := &itemNode{it: i}
+	node := itemNodePool.Get().(*itemNode)
+	node.it = i
 	if il.tail == nil {
-		il.head, il.tail = n, n
+		il.head, il.tail = node, node
 		return
 	}
-	il.tail.next = n
-	il.tail = n
+	il.tail.next = node
+	il.tail = node
 }
 
 // peek returns the first item in the list without removing it from the
@@ -66,18 +77,15 @@ func (il *itemList) dequeue() interface{} {
 	if il.head == nil {
 		return nil
 	}
-	i := il.head.it
+	node := il.head
+	i := node.it
 	il.head = il.head.next
 	if il.head == nil {
 		il.tail = nil
 	}
+	node.reset()
+	itemNodePool.Put(node)
 	return i
-}
-
-func (il *itemList) dequeueAll() *itemNode {
-	h := il.head
-	il.head, il.tail = nil, nil
-	return h
 }
 
 func (il *itemList) isEmpty() bool {
@@ -413,8 +421,8 @@ func (c *controlBuffer) finish() {
 	// There may be headers for streams in the control buffer.
 	// These streams need to be cleaned out since the transport
 	// is still not aware of these yet.
-	for head := c.list.dequeueAll(); head != nil; head = head.next {
-		hdr, ok := head.it.(*headerFrame)
+	for it := c.list.dequeue(); it != nil; it = c.list.dequeue() {
+		hdr, ok := it.(*headerFrame)
 		if !ok {
 			continue
 		}
