@@ -150,7 +150,7 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, opts ConnectOp
 		readerDone:            make(chan struct{}),
 		writerDone:            make(chan struct{}),
 		goAway:                make(chan struct{}),
-		framer:                newFramer(conn, maxHeaderListSize),
+		framer:                newFramer(conn, defaultWriteSize, maxHeaderListSize),
 		fc:                    &trInFlow{limit: icwz},
 		activeStreams:         make(map[uint32]*Stream),
 		kp:                    kp,
