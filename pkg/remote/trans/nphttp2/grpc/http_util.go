@@ -603,13 +603,14 @@ func decodeGrpcMessageUnchecked(msg string) string {
 
 type framer struct {
 	*http2.Framer
-	writer netpoll.Writer
+	writer *bufWriter
 }
 
-func newFramer(conn netpoll.Connection, maxHeaderListSize uint32) *framer {
+func newFramer(conn netpoll.Connection, writeBufferSize, maxHeaderListSize uint32) *framer {
+	w := newBufWriter(conn, int(writeBufferSize))
 	fr := &framer{
-		writer: conn.Writer(),
-		Framer: http2.NewFramer(conn.Writer(), conn.Reader()),
+		writer: w,
+		Framer: http2.NewFramer(w, conn.Reader()),
 	}
 	fr.SetMaxReadFrameSize(http2MaxFrameLen)
 	// Opt-in to Frame reuse API on framer to reduce garbage.
@@ -618,4 +619,56 @@ func newFramer(conn netpoll.Connection, maxHeaderListSize uint32) *framer {
 	fr.MaxHeaderListSize = maxHeaderListSize
 	fr.ReadMetaHeaders = hpack.NewDecoder(http2InitHeaderTableSize, nil)
 	return fr
+}
+
+type bufWriter struct {
+	buf       []byte
+	offset    int
+	batchSize int
+	conn      netpoll.Connection
+	err       error
+
+	onFlush func()
+}
+
+func newBufWriter(conn netpoll.Connection, batchSize int) *bufWriter {
+	return &bufWriter{
+		buf:       make([]byte, batchSize*2),
+		batchSize: batchSize,
+		conn:      conn,
+	}
+}
+
+func (w *bufWriter) Write(b []byte) (n int, err error) {
+	if w.err != nil {
+		return 0, w.err
+	}
+	if w.batchSize == 0 { // Buffer has been disabled.
+		return w.conn.Write(b)
+	}
+	for len(b) > 0 {
+		nn := copy(w.buf[w.offset:], b)
+		b = b[nn:]
+		w.offset += nn
+		n += nn
+		if w.offset >= w.batchSize {
+			err = w.Flush()
+		}
+	}
+	return n, err
+}
+
+func (w *bufWriter) Flush() error {
+	if w.err != nil {
+		return w.err
+	}
+	if w.offset == 0 {
+		return nil
+	}
+	if w.onFlush != nil {
+		w.onFlush()
+	}
+	_, w.err = w.conn.Write(w.buf[:w.offset])
+	w.offset = 0
+	return w.err
 }
