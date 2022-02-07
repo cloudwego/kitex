@@ -206,6 +206,6 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("AddBoundHandler(%T)", h))
 
-		doAddBoundHandler(h, o.RemoteOpt)
+		o.RemoteOpt.AppendBoundHandler(h)
 	}}
 }
