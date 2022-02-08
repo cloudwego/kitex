@@ -39,8 +39,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/netpoll"
-	http2 "github.com/cloudwego/netpoll-http2"
-	"github.com/cloudwego/netpoll-http2/hpack"
+	http2 "golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -62,7 +62,7 @@ type http2Server struct {
 	lastRead    int64
 	ctx         context.Context
 	done        chan struct{}
-	conn        netpoll.Connection
+	conn        net.Conn
 	loopy       *loopyWriter
 	readerDone  chan struct{} // sync point to enable testing.
 	writerDone  chan struct{} // sync point to enable testing.
@@ -113,13 +113,13 @@ type http2Server struct {
 
 // newHTTP2Server constructs a ServerTransport based on HTTP2. ConnectionError is
 // returned if something goes wrong.
-func newHTTP2Server(ctx context.Context, conn netpoll.Connection, config *ServerConfig) (_ ServerTransport, err error) {
+func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_ ServerTransport, err error) {
 	maxHeaderListSize := defaultServerMaxHeaderListSize
 	if config.MaxHeaderListSize != nil {
 		maxHeaderListSize = *config.MaxHeaderListSize
 	}
 
-	framer := newFramer(conn, defaultWriteSize, maxHeaderListSize)
+	framer := newFramer(conn, defaultWriteSize, defaultReadSize, maxHeaderListSize)
 	// Send initial settings as connection preface to client.
 	isettings := []http2.Setting{{
 		ID:  http2.SettingMaxFrameSize,
@@ -230,8 +230,16 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection, config *Server
 	}()
 
 	// Check the validity of client preface.
-	preface, err := t.conn.Reader().Next(ClientPrefaceLen)
-	if err != nil {
+	preface := make([]byte, len(ClientPreface))
+	if _, err := io.ReadFull(t.conn, preface); err != nil {
+		// In deployments where a gRPC server runs behind a cloud load balancer
+		// which performs regular TCP level health checks, the connection is
+		// closed immediately by the latter.  Returning io.EOF here allows the
+		// grpc server implementation to recognize this scenario and suppress
+		// logging to reduce spam.
+		if err == io.EOF {
+			return nil, io.EOF
+		}
 		return nil, connectionErrorf(false, err, "transport: http2Server.HandleStreams failed to receive the preface from client: %v", err)
 	}
 	if !bytes.Equal(preface, ClientPreface) {

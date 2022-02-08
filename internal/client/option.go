@@ -138,7 +138,6 @@ func NewOptions(opts []Option) *Options {
 	}
 	o.Apply(opts)
 	o.MetaHandlers = append(o.MetaHandlers, transmeta.MetainfoClientHandler)
-
 	o.initRemoteOpt()
 
 	if o.RetryContainer != nil && o.DebugService != nil {
