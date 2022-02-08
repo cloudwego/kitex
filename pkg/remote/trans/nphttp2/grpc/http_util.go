@@ -21,10 +21,12 @@
 package grpc
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/base64"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -34,9 +36,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"github.com/cloudwego/netpoll"
-	"github.com/cloudwego/netpoll-http2"
-	"github.com/cloudwego/netpoll-http2/hpack"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
 )
@@ -606,11 +607,13 @@ type framer struct {
 	writer *bufWriter
 }
 
-func newFramer(conn netpoll.Connection, writeBufferSize, maxHeaderListSize uint32) *framer {
+func newFramer(conn net.Conn, writeBufferSize, readBufferSize, maxHeaderListSize uint32) *framer {
 	w := newBufWriter(conn, int(writeBufferSize))
+	r := bufio.NewReaderSize(conn, int(readBufferSize))
+
 	fr := &framer{
 		writer: w,
-		Framer: http2.NewFramer(w, conn.Reader()),
+		Framer: http2.NewFramer(w, r),
 	}
 	fr.SetMaxReadFrameSize(http2MaxFrameLen)
 	// Opt-in to Frame reuse API on framer to reduce garbage.
@@ -625,13 +628,13 @@ type bufWriter struct {
 	buf       []byte
 	offset    int
 	batchSize int
-	conn      netpoll.Connection
+	conn      net.Conn
 	err       error
 
 	onFlush func()
 }
 
-func newBufWriter(conn netpoll.Connection, batchSize int) *bufWriter {
+func newBufWriter(conn net.Conn, batchSize int) *bufWriter {
 	return &bufWriter{
 		buf:       make([]byte, batchSize*2),
 		batchSize: batchSize,

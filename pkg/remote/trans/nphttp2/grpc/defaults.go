@@ -54,6 +54,7 @@ const (
 	defaultClientMaxHeaderListSize = uint32(16 << 20)
 	defaultServerMaxHeaderListSize = uint32(16 << 20)
 	defaultWriteSize               = uint32(32 * 1024)
+	defaultReadSize                = uint32(32 * 1024)
 
 	defaultUserAgent = "kitex/" + kitex.Version
 )
