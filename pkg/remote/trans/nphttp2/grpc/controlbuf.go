@@ -827,10 +827,12 @@ func (l *loopyWriter) applySettings(ss []http2.Setting) error {
 // to be sent and stream has some stream-level flow control.
 func (l *loopyWriter) processData() (bool, error) {
 	if l.sendQuota == 0 {
+		atomic.AddInt64(&noQuotaCnt, 1)
 		return true, nil
 	}
 	str := l.activeStreams.dequeue() // Remove the first stream.
 	if str == nil {
+		atomic.AddInt64(&noActiveStreamCnt, 1)
 		return true, nil
 	}
 	dataItem := str.itl.peek().(*dataFrame) // Peek at the first data item this stream.
