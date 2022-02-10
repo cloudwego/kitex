@@ -28,7 +28,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
+	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/loadbalance"
+	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
@@ -58,6 +61,7 @@ type kClient struct {
 	eps     endpoint.Endpoint
 	sEps    endpoint.Endpoint
 	opt     *client.Options
+	lbf     *lbcache.BalancerFactory
 
 	inited bool
 	closed bool
@@ -96,17 +100,18 @@ func (kc *kClient) init() (err error) {
 	if err = kc.initProxy(); err != nil {
 		return err
 	}
+	if err = kc.initLBCache(); err != nil {
+		return err
+	}
 	ctx := kc.initContext()
 	kc.initMiddlewares(ctx)
-	kc.inited = true
-	if ds := kc.opt.DebugService; ds != nil {
-		ds.RegisterProbeFunc(diagnosis.DestServiceKey, diagnosis.WrapAsProbeFunc(kc.opt.Svr.ServiceName))
-		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(kc.opt.DebugInfo))
-		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, kc.opt.Events.Dump)
-		ds.RegisterProbeFunc(diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(kc.svcInfo))
-	}
+	kc.initDebugService()
 	kc.richRemoteOption()
-	return kc.buildInvokeChain()
+	if err = kc.buildInvokeChain(); err != nil {
+		return err
+	}
+	kc.inited = true
+	return nil
 }
 
 func (kc *kClient) checkOptions() (err error) {
@@ -166,17 +171,49 @@ func (kc *kClient) initProxy() error {
 	return nil
 }
 
+func (kc *kClient) initLBCache() error {
+	if kc.opt.Proxy != nil && kc.opt.Resolver == nil {
+		return nil
+	}
+	onChange := discoveryEventHandler(discovery.ChangeEventName, kc.opt.Bus, kc.opt.Events)
+	onDelete := discoveryEventHandler(discovery.DeleteEventName, kc.opt.Bus, kc.opt.Events)
+	resolver := kc.opt.Resolver
+	if resolver == nil {
+		return errors.New("no resolver available")
+	}
+	balancer := kc.opt.Balancer
+	if balancer == nil {
+		balancer = loadbalance.NewWeightedBalancer()
+	}
+	cacheOpts := lbcache.Options{DiagnosisService: kc.opt.DebugService}
+	if kc.opt.BalancerCacheOpt != nil {
+		cacheOpts = *kc.opt.BalancerCacheOpt
+	}
+	kc.lbf = lbcache.NewBalancerFactory(resolver, balancer, cacheOpts)
+	rbIdx := kc.lbf.RegisterRebalanceHook(onChange)
+	kc.opt.CloseCallbacks = append(kc.opt.CloseCallbacks, func() error {
+		kc.lbf.DeregisterRebalanceHook(rbIdx)
+		return nil
+	})
+	dIdx := kc.lbf.RegisterDeleteHook(onDelete)
+	kc.opt.CloseCallbacks = append(kc.opt.CloseCallbacks, func() error {
+		kc.lbf.DeregisterDeleteHook(dIdx)
+		return nil
+	})
+	return nil
+}
+
 func (kc *kClient) initMiddlewares(ctx context.Context) {
 	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW(), rpcTimeoutMW(ctx))
 	kc.mws = append(kc.mws, richMWsWithBuilder(ctx, kc.opt.MWBs)...)
 	kc.mws = append(kc.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
 	if kc.opt.Proxy == nil {
-		kc.mws = append(kc.mws, newResolveMWBuilder(kc.opt)(ctx))
+		kc.mws = append(kc.mws, newResolveMWBuilder(kc.lbf)(ctx))
 		kc.mws = append(kc.mws, kc.opt.CBSuite.InstanceCBMW())
 		kc.mws = append(kc.mws, richMWsWithBuilder(ctx, kc.opt.IMWBs)...)
 	} else {
 		if kc.opt.Resolver != nil { // customized service discovery
-			kc.mws = append(kc.mws, newResolveMWBuilder(kc.opt)(ctx))
+			kc.mws = append(kc.mws, newResolveMWBuilder(kc.lbf)(ctx))
 		}
 		kc.mws = append(kc.mws, newProxyMW(kc.opt.Proxy))
 	}
@@ -291,6 +328,15 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		rpcinfo.PutRPCInfo(ri)
 	}
 	return err
+}
+
+func (kc *kClient) initDebugService() {
+	if ds := kc.opt.DebugService; ds != nil {
+		ds.RegisterProbeFunc(diagnosis.DestServiceKey, diagnosis.WrapAsProbeFunc(kc.opt.Svr.ServiceName))
+		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(kc.opt.DebugInfo))
+		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, kc.opt.Events.Dump)
+		ds.RegisterProbeFunc(diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(kc.svcInfo))
+	}
 }
 
 func (kc *kClient) richRemoteOption() {
