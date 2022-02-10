@@ -43,18 +43,22 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var flushCnt int64
+var (
+	flushCnt      int64
+	runFlushCnt   int64
+	writeFlushCnt int64
+)
 
 func init() {
 	go printFlushCnt()
 }
 
-func printFlushCnt()  {
-	t := time.NewTicker(5*time.Second)
+func printFlushCnt() {
+	t := time.NewTicker(5 * time.Second)
 	for {
 		select {
 		case <-t.C:
-			println("FlushCnt", atomic.LoadInt64(&flushCnt))
+			println(fmt.Sprintf("FlushCnt=%d, RunFlushCnt=%d, WriteFlushCnt=%d", atomic.LoadInt64(&flushCnt), atomic.LoadInt64(&runFlushCnt), atomic.LoadInt64(&writeFlushCnt)))
 		}
 	}
 }
@@ -672,6 +676,7 @@ func (w *bufWriter) Write(b []byte) (n int, err error) {
 		w.offset += nn
 		n += nn
 		if w.offset >= w.batchSize {
+			atomic.AddInt64(&writeFlushCnt, 1)
 			err = w.Flush()
 		}
 	}
