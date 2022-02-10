@@ -249,6 +249,7 @@ func newOutStreamList() *outStreamList {
 }
 
 func (l *outStreamList) enqueue(s *outStream) {
+	atomic.AddInt64(&enqueueCnt, 1)
 	e := l.tail.prev
 	e.next = s
 	s.prev = e
@@ -577,6 +578,7 @@ func (l *loopyWriter) incomingWindowUpdateHandler(w *incomingWindowUpdate) error
 		str.bytesOutStanding -= int(w.increment)
 		if strQuota := int(l.oiws) - str.bytesOutStanding; strQuota > 0 && str.state == waitingOnStreamQuota {
 			str.state = active
+			atomic.AddInt64(&incomingWindowUpdateHandler, 1)
 			l.activeStreams.enqueue(str)
 			return nil
 		}
@@ -710,6 +712,7 @@ func (l *loopyWriter) preprocessData(df *dataFrame) error {
 	str.itl.enqueue(df)
 	if str.state == empty {
 		str.state = active
+		atomic.AddInt64(&preprocessData, 1)
 		l.activeStreams.enqueue(str)
 	}
 	return nil
@@ -811,6 +814,7 @@ func (l *loopyWriter) applySettings(ss []http2.Setting) error {
 				for _, stream := range l.estdStreams {
 					if stream.state == waitingOnStreamQuota {
 						stream.state = active
+						atomic.AddInt64(&applySettings, 1)
 						l.activeStreams.enqueue(stream)
 					}
 				}
@@ -827,7 +831,6 @@ func (l *loopyWriter) applySettings(ss []http2.Setting) error {
 // to be sent and stream has some stream-level flow control.
 func (l *loopyWriter) processData() (bool, error) {
 	if l.sendQuota == 0 {
-		atomic.AddInt64(&noQuotaCnt, 1)
 		return true, nil
 	}
 	str := l.activeStreams.dequeue() // Remove the first stream.
@@ -858,6 +861,7 @@ func (l *loopyWriter) processData() (bool, error) {
 				return false, nil
 			}
 		} else {
+			atomic.AddInt64(&processData1, 1)
 			l.activeStreams.enqueue(str)
 		}
 		return false, nil
@@ -927,6 +931,7 @@ func (l *loopyWriter) processData() (bool, error) {
 	} else if int(l.oiws)-str.bytesOutStanding <= 0 { // Ran out of stream quota.
 		str.state = waitingOnStreamQuota
 	} else { // Otherwise add it back to the list of active streams.
+		atomic.AddInt64(&processData2, 1)
 		l.activeStreams.enqueue(str)
 	}
 	return false, nil

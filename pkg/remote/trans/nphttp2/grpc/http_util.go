@@ -51,6 +51,12 @@ var (
 	emptyCnt          int64
 	noQuotaCnt        int64
 	noActiveStreamCnt int64
+	enqueueCnt                  int64
+	incomingWindowUpdateHandler int64
+	preprocessData              int64
+	applySettings               int64
+	processData1                int64
+	processData2                int64
 )
 
 func init() {
@@ -62,8 +68,10 @@ func printFlushCnt() {
 	for {
 		select {
 		case <-t.C:
-			println(fmt.Sprintf("FlushCnt=%d, emptyCnt=%d, noQuotaCnt=%d, noActiveStreamCnt=%d",
-				atomic.LoadInt64(&flushCnt), atomic.LoadInt64(&emptyCnt), atomic.LoadInt64(&noQuotaCnt), atomic.LoadInt64(&noActiveStreamCnt)))
+			println(fmt.Sprintf("enqueueCnt=%d, noActiveStreamCnt=%d, incomingWindowUpdateHandler=%d, preprocessData=%d, applySettings=%d, processData1=%d, processData2=%d",
+				atomic.LoadInt64(&enqueueCnt), atomic.LoadInt64(&noActiveStreamCnt)),
+				atomic.LoadInt64(&incomingWindowUpdateHandler), atomic.LoadInt64(&preprocessData), atomic.LoadInt64(&applySettings),
+				atomic.LoadInt64(&processData1), atomic.LoadInt64(&processData2))
 		}
 	}
 }
