@@ -34,14 +34,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/gofunc"
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/netpoll"
 	http2 "github.com/cloudwego/netpoll-http2"
 	"github.com/cloudwego/netpoll-http2/hpack"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/cloudwego/kitex/pkg/gofunc"
+	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
 var (
@@ -63,7 +64,6 @@ type http2Server struct {
 	ctx         context.Context
 	done        chan struct{}
 	conn        netpoll.Connection
-	loopy       *loopyWriter
 	readerDone  chan struct{} // sync point to enable testing.
 	writerDone  chan struct{} // sync point to enable testing.
 	remoteAddr  net.Addr
@@ -213,15 +213,17 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection, config *Server
 		initialWindowSize: int32(iwz),
 		bufferPool:        newBufferPool(),
 	}
-	t.controlBuf = newControlBuffer(t.done)
 	if dynamicWindow {
 		t.bdpEst = &bdpEstimator{
 			bdp:               initialWindowSize,
 			updateFlowControl: t.updateFlowControl,
 		}
 	}
+	loopy := newLoopyWriter(serverSide, t.framer, t.bdpEst)
+	loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
+	t.controlBuf = newControlBuffer(loopy, t.done)
 
-	t.framer.writer.Flush()
+	t.framer.Flush()
 
 	defer func() {
 		if err != nil {
@@ -251,16 +253,6 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection, config *Server
 		return nil, connectionErrorf(false, nil, "transport: http2Server.HandleStreams saw invalid preface type %T from client", frame)
 	}
 	t.handleSettings(sf)
-
-	gofunc.RecoverGoFuncWithInfo(ctx, func() {
-		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst)
-		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
-		if err := t.loopy.run(conn.RemoteAddr().String()); err != nil {
-			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", err)
-		}
-		t.conn.Close()
-		close(t.writerDone)
-	}, gofunc.NewBasicInfo("", conn.RemoteAddr().String()))
 
 	gofunc.RecoverGoFuncWithInfo(ctx, t.keepalive, gofunc.NewBasicInfo("", conn.RemoteAddr().String()))
 	return t, nil
@@ -1037,7 +1029,7 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 		if g.closeConn {
 			// Abruptly close the connection following the GoAway (via
 			// loopywriter).  But flush out what's inside the buffer first.
-			t.framer.writer.Flush()
+			t.framer.Flush()
 			return false, fmt.Errorf("transport: Connection closing")
 		}
 		return true, nil

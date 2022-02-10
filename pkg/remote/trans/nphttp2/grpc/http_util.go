@@ -31,14 +31,16 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	spb "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/cloudwego/netpoll"
 	"github.com/cloudwego/netpoll-http2"
 	"github.com/cloudwego/netpoll-http2/hpack"
-	spb "google.golang.org/genproto/googleapis/rpc/status"
-	"google.golang.org/protobuf/proto"
+
+	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
 const (
@@ -603,13 +605,13 @@ func decodeGrpcMessageUnchecked(msg string) string {
 
 type framer struct {
 	*http2.Framer
-	writer netpoll.Writer
+	shardQueue *ShardQueue // use for write
 }
 
 func newFramer(conn netpoll.Connection, maxHeaderListSize uint32) *framer {
 	fr := &framer{
-		writer: conn.Writer(),
-		Framer: http2.NewFramer(conn.Writer(), conn.Reader()),
+		Framer:     http2.NewFramer(conn.Writer(), conn.Reader()),
+		shardQueue: NewShardQueue(ShardSize, conn),
 	}
 	fr.SetMaxReadFrameSize(http2MaxFrameLen)
 	// Opt-in to Frame reuse API on framer to reduce garbage.
@@ -618,4 +620,13 @@ func newFramer(conn netpoll.Connection, maxHeaderListSize uint32) *framer {
 	fr.MaxHeaderListSize = maxHeaderListSize
 	fr.ReadMetaHeaders = hpack.NewDecoder(http2InitHeaderTableSize, nil)
 	return fr
+}
+
+func (f *framer) Flush() error {
+	return f.shardQueue.conn.Writer().Flush()
+}
+
+func (f *framer) Queue(wg WriterGetter) error {
+	f.shardQueue.Add(wg)
+	return nil
 }

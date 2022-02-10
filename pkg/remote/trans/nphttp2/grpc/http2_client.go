@@ -31,14 +31,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/netpoll"
+	"github.com/cloudwego/netpoll-http2"
+	"github.com/cloudwego/netpoll-http2/hpack"
+
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"github.com/cloudwego/netpoll"
-	"github.com/cloudwego/netpoll-http2"
-	"github.com/cloudwego/netpoll-http2/hpack"
 )
 
 // http2Client implements the ClientTransport interface with HTTP2.
@@ -47,7 +48,6 @@ type http2Client struct {
 	ctx        context.Context
 	cancel     context.CancelFunc
 	conn       netpoll.Connection // underlying communication channel
-	loopy      *loopyWriter
 	remoteAddr net.Addr
 	localAddr  net.Addr
 
@@ -164,7 +164,6 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, opts ConnectOp
 		onClose:               onClose,
 		bufferPool:            newBufferPool(),
 	}
-	t.controlBuf = newControlBuffer(t.ctx.Done())
 	if opts.InitialWindowSize >= defaultWindowSize {
 		t.initialWindowSize = opts.InitialWindowSize
 		dynamicWindow = false
@@ -175,7 +174,8 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, opts ConnectOp
 			updateFlowControl: t.updateFlowControl,
 		}
 	}
-	t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst)
+	loopy := newLoopyWriter(clientSide, t.framer, t.bdpEst)
+	t.controlBuf = newControlBuffer(loopy, t.ctx.Done())
 
 	if t.keepaliveEnabled {
 		t.kpDormancyCond = sync.NewCond(&t.mu)
@@ -209,22 +209,9 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, opts ConnectOp
 		return nil, connectionErrorf(true, err, "transport: failed to write initial settings frame: %v", err)
 	}
 
-	if err := t.framer.writer.Flush(); err != nil {
+	if err := t.framer.Flush(); err != nil {
 		return nil, err
 	}
-
-	gofunc.RecoverGoFuncWithInfo(ctx, func() {
-		err := t.loopy.run(conn.RemoteAddr().String())
-		if err != nil {
-			klog.CtxErrorf(ctx, "KITEX: grpc client loopyWriter.run returning, error=%v", err)
-		}
-		// If it's a connection error, let reader goroutine handle it
-		// since there might be data in the buffers.
-		if _, ok := err.(net.Error); !ok {
-			t.conn.Close()
-		}
-		close(t.writerDone)
-	}, gofunc.NewBasicInfo(remoteService, conn.RemoteAddr().String()))
 
 	return t, nil
 }

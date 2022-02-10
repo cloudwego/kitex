@@ -23,13 +23,14 @@ package grpc
 import (
 	"bytes"
 	"fmt"
-	"runtime"
 	"sync"
 	"sync/atomic"
 
-	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/netpoll"
 	"github.com/cloudwego/netpoll-http2"
 	"github.com/cloudwego/netpoll-http2/hpack"
+
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 var updateHeaderTblSize = func(e *hpack.Encoder, v uint32) {
@@ -72,12 +73,6 @@ func (il *itemList) dequeue() interface{} {
 		il.tail = nil
 	}
 	return i
-}
-
-func (il *itemList) dequeueAll() *itemNode {
-	h := il.head
-	il.head, il.tail = nil, nil
-	return h
 }
 
 func (il *itemList) isEmpty() bool {
@@ -273,12 +268,10 @@ func (l *outStreamList) dequeue() *outStream {
 // It shouldn't be confused with an HTTP2 frame, although some of the control frames
 // like dataFrame and headerFrame do go out on wire as HTTP2 frames.
 type controlBuffer struct {
-	ch              chan struct{}
-	done            <-chan struct{}
-	mu              sync.Mutex
-	consumerWaiting bool
-	list            *itemList
-	err             error
+	done     <-chan struct{}
+	mu       sync.Mutex
+	consumer *loopyWriter
+	err      error
 
 	// transportResponseFrames counts the number of queued items that represent
 	// the response of an action initiated by the peer.  trfChan is created
@@ -289,11 +282,10 @@ type controlBuffer struct {
 	trfChan                 atomic.Value // *chan struct{}
 }
 
-func newControlBuffer(done <-chan struct{}) *controlBuffer {
+func newControlBuffer(consumer *loopyWriter, done <-chan struct{}) *controlBuffer {
 	return &controlBuffer{
-		ch:   make(chan struct{}, 1),
-		list: &itemList{},
-		done: done,
+		consumer: consumer,
+		done:     done,
 	}
 }
 
@@ -315,7 +307,6 @@ func (c *controlBuffer) put(it cbItem) error {
 }
 
 func (c *controlBuffer) executeAndPut(f func(it interface{}) bool, it cbItem) (bool, error) {
-	var wakeUp bool
 	c.mu.Lock()
 	if c.err != nil {
 		c.mu.Unlock()
@@ -327,27 +318,22 @@ func (c *controlBuffer) executeAndPut(f func(it interface{}) bool, it cbItem) (b
 			return false, nil
 		}
 	}
-	if c.consumerWaiting {
-		wakeUp = true
-		c.consumerWaiting = false
-	}
-	c.list.enqueue(it)
-	if it.isTransportResponseFrame() {
-		c.transportResponseFrames++
-		if c.transportResponseFrames == maxQueuedTransportResponseFrames {
-			// We are adding the frame that puts us over the threshold; create
-			// a throttling channel.
-			ch := make(chan struct{})
-			c.trfChan.Store(&ch)
+	select {
+	case <-c.done:
+		c.err = ErrConnClosing
+		hdr, ok := it.(*headerFrame)
+		if !ok {
+			c.mu.Unlock()
+			return false, c.err
 		}
+		if hdr.onOrphaned != nil { // It will be nil on the server-side.
+			hdr.onOrphaned(ErrConnClosing)
+		}
+	default:
 	}
 	c.mu.Unlock()
-	if wakeUp {
-		select {
-		case c.ch <- struct{}{}:
-		default:
-		}
-	}
+
+	c.consumer.consume(it)
 	return true, nil
 }
 
@@ -366,43 +352,6 @@ func (c *controlBuffer) execute(f func(it interface{}) bool, it interface{}) (bo
 	return true, nil
 }
 
-func (c *controlBuffer) get(block bool) (interface{}, error) {
-	for {
-		c.mu.Lock()
-		if c.err != nil {
-			c.mu.Unlock()
-			return nil, c.err
-		}
-		if !c.list.isEmpty() {
-			h := c.list.dequeue().(cbItem)
-			if h.isTransportResponseFrame() {
-				if c.transportResponseFrames == maxQueuedTransportResponseFrames {
-					// We are removing the frame that put us over the
-					// threshold; close and clear the throttling channel.
-					ch := c.trfChan.Load().(*chan struct{})
-					close(*ch)
-					c.trfChan.Store((*chan struct{})(nil))
-				}
-				c.transportResponseFrames--
-			}
-			c.mu.Unlock()
-			return h, nil
-		}
-		if !block {
-			c.mu.Unlock()
-			return nil, nil
-		}
-		c.consumerWaiting = true
-		c.mu.Unlock()
-		select {
-		case <-c.ch:
-		case <-c.done:
-			c.finish()
-			return nil, ErrConnClosing
-		}
-	}
-}
-
 func (c *controlBuffer) finish() {
 	c.mu.Lock()
 	if c.err != nil {
@@ -410,18 +359,6 @@ func (c *controlBuffer) finish() {
 		return
 	}
 	c.err = ErrConnClosing
-	// There may be headers for streams in the control buffer.
-	// These streams need to be cleaned out since the transport
-	// is still not aware of these yet.
-	for head := c.list.dequeueAll(); head != nil; head = head.next {
-		hdr, ok := head.it.(*headerFrame)
-		if !ok {
-			continue
-		}
-		if hdr.onOrphaned != nil { // It will be nil on the server-side.
-			hdr.onOrphaned(ErrConnClosing)
-		}
-	}
 	c.mu.Unlock()
 }
 
@@ -443,7 +380,6 @@ const (
 // of http2MaxFrameLen, connection-level flow control and stream-level flow control.
 type loopyWriter struct {
 	side      side
-	cbuf      *controlBuffer
 	sendQuota uint32
 	oiws      uint32 // outbound initial window size.
 	// estdStreams is map of all established streams that are not cleaned-up yet.
@@ -465,11 +401,10 @@ type loopyWriter struct {
 	ssGoAwayHandler func(*goAway) (bool, error)
 }
 
-func newLoopyWriter(s side, fr *framer, cbuf *controlBuffer, bdpEst *bdpEstimator) *loopyWriter {
+func newLoopyWriter(s side, fr *framer, bdpEst *bdpEstimator) *loopyWriter {
 	var buf bytes.Buffer
 	l := &loopyWriter{
 		side:          s,
-		cbuf:          cbuf,
 		sendQuota:     defaultWindowSize,
 		oiws:          defaultWindowSize,
 		estdStreams:   make(map[uint32]*outStream),
@@ -482,80 +417,14 @@ func newLoopyWriter(s side, fr *framer, cbuf *controlBuffer, bdpEst *bdpEstimato
 	return l
 }
 
-const minBatchSize = 1000
-
-// run should be run in a separate goroutine.
-// It reads control frames from controlBuf and processes them by:
-// 1. Updating loopy's internal state, or/and
-// 2. Writing out HTTP2 frames on the wire.
-//
-// Loopy keeps all active streams with data to send in a linked-list.
-// All streams in the activeStreams linked-list must have both:
-// 1. Data to send, and
-// 2. Stream level flow control quota available.
-//
-// In each iteration of run loop, other than processing the incoming control
-// frame, loopy calls processData, which processes one node from the activeStreams linked-list.
-// This results in writing of HTTP2 frames into an underlying write buffer.
-// When there's no more control frames to read from controlBuf, loopy flushes the write buffer.
-// As an optimization, to increase the batch size for each flush, loopy yields the processor, once
-// if the batch size is too low to give stream goroutines a chance to fill it up.
-func (l *loopyWriter) run(remoteAddr string) (err error) {
-	defer func() {
-		if err == ErrConnClosing {
-			// Don't log ErrConnClosing as error since it happens
-			// 1. When the connection is closed by some other known issue.
-			// 2. User closed the connection.
-			// 3. A graceful close of connection.
-			klog.Debugf("KITEX: grpc transport loopyWriter.run returning, error=%v, remoteAddr=%s", err, remoteAddr)
-			err = nil
-		}
-	}()
-	for {
-		it, err := l.cbuf.get(true)
-		if err != nil {
-			return err
-		}
+func (l *loopyWriter) consume(it interface{}) (err error) {
+	return l.framer.Queue(func() (buf netpoll.Writer, isNil bool) {
 		if err = l.handle(it); err != nil {
-			return err
 		}
 		if _, err = l.processData(); err != nil {
-			return err
 		}
-		gosched := true
-	hasdata:
-		for {
-			it, err := l.cbuf.get(false)
-			if err != nil {
-				return err
-			}
-			if it != nil {
-				if err = l.handle(it); err != nil {
-					return err
-				}
-				if _, err = l.processData(); err != nil {
-					return err
-				}
-				continue hasdata
-			}
-			isEmpty, err := l.processData()
-			if err != nil {
-				return err
-			}
-			if !isEmpty {
-				continue hasdata
-			}
-			if gosched {
-				gosched = false
-				if l.framer.writer.MallocLen() < minBatchSize {
-					runtime.Gosched()
-					continue hasdata
-				}
-			}
-			l.framer.writer.Flush()
-			break hasdata
-		}
-	}
+		return nil, true
+	})
 }
 
 func (l *loopyWriter) outgoingWindowUpdateHandler(w *outgoingWindowUpdate) error {
