@@ -69,9 +69,9 @@ func printFlushCnt() {
 		select {
 		case <-t.C:
 			println(fmt.Sprintf("enqueueCnt=%d, noActiveStreamCnt=%d, incomingWindowUpdateHandler=%d, preprocessData=%d, applySettings=%d, processData1=%d, processData2=%d",
-				atomic.LoadInt64(&enqueueCnt), atomic.LoadInt64(&noActiveStreamCnt)),
+				atomic.LoadInt64(&enqueueCnt), atomic.LoadInt64(&noActiveStreamCnt),
 				atomic.LoadInt64(&incomingWindowUpdateHandler), atomic.LoadInt64(&preprocessData), atomic.LoadInt64(&applySettings),
-				atomic.LoadInt64(&processData1), atomic.LoadInt64(&processData2))
+				atomic.LoadInt64(&processData1), atomic.LoadInt64(&processData2)))
 		}
 	}
 }
