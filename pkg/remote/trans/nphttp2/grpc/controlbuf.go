@@ -530,6 +530,7 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 				return err
 			}
 			if it != nil {
+				atomic.AddInt64(&getBufferCnt, 1)
 				if err = l.handle(it); err != nil {
 					return err
 				}
@@ -544,6 +545,8 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 			}
 			if !isEmpty {
 				continue hasdata
+			} else {
+				atomic.AddInt64(&emptyCnt, 1)
 			}
 			if gosched {
 				gosched = false

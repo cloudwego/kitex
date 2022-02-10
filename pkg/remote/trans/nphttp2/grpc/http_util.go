@@ -47,6 +47,8 @@ var (
 	flushCnt      int64
 	runFlushCnt   int64
 	writeFlushCnt int64
+	getBufferCnt  int64
+	emptyCnt      int64
 )
 
 func init() {
@@ -58,7 +60,8 @@ func printFlushCnt() {
 	for {
 		select {
 		case <-t.C:
-			println(fmt.Sprintf("FlushCnt=%d, RunFlushCnt=%d, WriteFlushCnt=%d", atomic.LoadInt64(&flushCnt), atomic.LoadInt64(&runFlushCnt), atomic.LoadInt64(&writeFlushCnt)))
+			println(fmt.Sprintf("FlushCnt=%d, RunFlushCnt=%d, WriteFlushCnt=%d, getBufferCnt=%d, emptyCnt=%d",
+				atomic.LoadInt64(&flushCnt), atomic.LoadInt64(&runFlushCnt), atomic.LoadInt64(&writeFlushCnt), atomic.LoadInt64(&getBufferCnt), atomic.LoadInt64(&emptyCnt)))
 		}
 	}
 }
