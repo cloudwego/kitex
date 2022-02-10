@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -41,6 +42,22 @@ import (
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
 )
+
+var flushCnt int64
+
+func init() {
+	go printFlushCnt()
+}
+
+func printFlushCnt()  {
+	t := time.NewTicker(5*time.Second)
+	for {
+		select {
+		case <-t.C:
+			println("FlushCnt", atomic.LoadInt64(&flushCnt))
+		}
+	}
+}
 
 const (
 	// http2MaxFrameLen specifies the max length of a HTTP2 frame.
@@ -662,6 +679,7 @@ func (w *bufWriter) Write(b []byte) (n int, err error) {
 }
 
 func (w *bufWriter) Flush() error {
+	atomic.AddInt64(&flushCnt, 1)
 	if w.err != nil {
 		return w.err
 	}
