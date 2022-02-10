@@ -703,6 +703,7 @@ func (l *loopyWriter) writeHeader(streamID uint32, endStream bool, hf []hpack.He
 }
 
 func (l *loopyWriter) preprocessData(df *dataFrame) error {
+	atomic.AddInt64(&enterPreprocessData, 1)
 	str, ok := l.estdStreams[df.streamID]
 	if !ok {
 		return nil
