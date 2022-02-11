@@ -398,14 +398,14 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 		select {
 		case <-c.ch:
 		case <-c.done:
-			atomic.AddInt64(&finishCnt, 1)
-			c.finish()
+			//c.finish() // FIXME
 			return nil, ErrConnClosing
 		}
 	}
 }
 
 func (c *controlBuffer) finish() {
+	atomic.AddInt64(&finishCnt, 1)
 	c.mu.Lock()
 	if c.err != nil {
 		c.mu.Unlock()
