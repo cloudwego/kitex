@@ -387,6 +387,7 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 				c.transportResponseFrames--
 			}
 			c.mu.Unlock()
+			atomic.AddInt64(&getItemCnt, 1)
 			return h, nil
 		}
 		if !block {
@@ -394,6 +395,7 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 			return nil, nil
 		}
 		c.consumerWaiting = true
+		atomic.AddInt64(&consumerWaitingCnt, 1)
 		c.mu.Unlock()
 		select {
 		case <-c.ch:
@@ -405,7 +407,6 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 }
 
 func (c *controlBuffer) finish() {
-	atomic.AddInt64(&finishCnt, 1)
 	c.mu.Lock()
 	if c.err != nil {
 		c.mu.Unlock()
