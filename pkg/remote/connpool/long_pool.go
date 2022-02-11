@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/connpool"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/pkg/warmup"
 )
 
 var (
@@ -245,6 +246,12 @@ func (lp *LongPool) Close() error {
 // EnableReporter enable reporter for long connection pool.
 func (lp *LongPool) EnableReporter() {
 	lp.reporter = getCommonReporter()
+}
+
+// WarmUp implements the warmup.Pool interface.
+func (lp *LongPool) WarmUp(eh warmup.ErrorHandling, wuo *warmup.PoolOption, co remote.ConnOption) error {
+	h := &warmup.PoolHelper{ErrorHandling: eh}
+	return h.WarmUp(wuo, lp, co)
 }
 
 // NewLongPool creates a long pool using the given IdleConfig.

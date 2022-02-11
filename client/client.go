@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"strconv"
 
@@ -30,6 +31,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
@@ -42,6 +45,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -108,6 +112,9 @@ func (kc *kClient) init() (err error) {
 	kc.initDebugService()
 	kc.richRemoteOption()
 	if err = kc.buildInvokeChain(); err != nil {
+		return err
+	}
+	if err = kc.warmingUp(); err != nil {
 		return err
 	}
 	kc.inited = true
@@ -179,7 +186,7 @@ func (kc *kClient) initLBCache() error {
 	onDelete := discoveryEventHandler(discovery.DeleteEventName, kc.opt.Bus, kc.opt.Events)
 	resolver := kc.opt.Resolver
 	if resolver == nil {
-		return errors.New("no resolver available")
+		return kerrors.ErrNoResolver
 	}
 	balancer := kc.opt.Balancer
 	if balancer == nil {
@@ -457,4 +464,90 @@ func initTransportProtocol(svcInfo *serviceinfo.ServiceInfo, cfg rpcinfo.RPCConf
 		// pb use ttheader framed by default
 		rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
 	}
+}
+
+func (kc *kClient) warmingUp() error {
+	if kc.opt.WarmUpOption == nil {
+		return nil
+	}
+	wuo := kc.opt.WarmUpOption
+	doWarmupPool := wuo.PoolOption != nil && kc.opt.Proxy == nil
+
+	// service discovery
+	if kc.lbf == nil {
+		return nil
+	}
+	nas := make(map[string][]string)
+	ctx := context.Background()
+
+	var dests []rpcinfo.EndpointInfo
+	if ro := kc.opt.WarmUpOption.ResolverOption; ro != nil {
+		for _, d := range ro.Dests {
+			dests = append(dests, rpcinfo.FromBasicInfo(d))
+		}
+	}
+	if len(dests) == 0 && doWarmupPool && len(wuo.PoolOption.Targets) == 0 {
+		// build a default destination for the resolver
+		cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
+		rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, "*")
+		ctx = kc.applyCallOptions(ctx, cfg.ImmutableView(), rmt)
+		dests = append(dests, rmt.ImmutableView())
+	}
+
+	for _, dest := range dests {
+		lb, err := kc.lbf.Get(ctx, dest)
+		if err != nil {
+			switch kc.opt.WarmUpOption.ErrorHandling {
+			case warmup.IgnoreError:
+			case warmup.WarningLog:
+				klog.Warnf("failed to warm up service discovery: %s", err.Error())
+			case warmup.ErrorLog:
+				klog.Errorf("failed to warm up service discovery: %s", err.Error())
+			case warmup.FailFast:
+				return fmt.Errorf("service discovery warm-up: %w", err)
+			}
+			continue
+		}
+		if res, ok := lb.GetResult(); ok {
+			for _, i := range res.Instances {
+				if addr := i.Address(); addr != nil {
+					n, a := addr.Network(), addr.String()
+					nas[n] = append(nas[n], a)
+				}
+			}
+		}
+	}
+
+	// connection pool
+	if !doWarmupPool {
+		return nil
+	}
+
+	if len(wuo.PoolOption.Targets) == 0 {
+		wuo.PoolOption.Targets = nas
+	}
+
+	pool := kc.opt.RemoteOpt.ConnPool
+	if wp, ok := pool.(warmup.Pool); ok {
+		co := remote.ConnOption{
+			Dialer:         kc.opt.RemoteOpt.Dialer,
+			ConnectTimeout: kc.opt.Configs.ConnectTimeout(),
+		}
+		err := wp.WarmUp(kc.opt.WarmUpOption.ErrorHandling, wuo.PoolOption, co)
+		if err != nil {
+			switch kc.opt.WarmUpOption.ErrorHandling {
+			case warmup.IgnoreError:
+			case warmup.WarningLog:
+				klog.Warnf("failed to warm up connection pool: %s", err.Error())
+			case warmup.ErrorLog:
+				klog.Errorf("failed to warm up connection pool: %s", err.Error())
+			case warmup.FailFast:
+				return fmt.Errorf("connection pool warm-up: %w", err)
+			}
+		}
+	} else {
+		klog.Warnf("connection pool<%T> does not support warm-up operation", pool)
+	}
+
+	return nil
 }

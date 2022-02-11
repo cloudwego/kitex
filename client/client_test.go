@@ -393,5 +393,5 @@ func TestAdjustTimeout(t *testing.T) {
 		WithMiddleware(md),
 		WithRPCTimeout(time.Millisecond*500))
 	err = cli.Call(context.Background(), mtd, req, res)
-	test.Assert(t, err == nil)
+	test.Assert(t, err == nil, err)
 }
