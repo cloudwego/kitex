@@ -778,28 +778,40 @@ func (l *loopyWriter) goAwayHandler(g *goAway) error {
 func (l *loopyWriter) handle(i interface{}) error {
 	switch i := i.(type) {
 	case *incomingWindowUpdate:
+		atomic.AddInt64(&incomingWindowUpdateFrameCnt, 1)
 		return l.incomingWindowUpdateHandler(i)
 	case *outgoingWindowUpdate:
+		atomic.AddInt64(&outgoingWindowUpdateFrameCnt, 1)
 		return l.outgoingWindowUpdateHandler(i)
 	case *incomingSettings:
+		atomic.AddInt64(&incomingSettingsFrameCnt, 1)
 		return l.incomingSettingsHandler(i)
 	case *outgoingSettings:
+		atomic.AddInt64(&outgoingSettingsFrameCnt, 1)
 		return l.outgoingSettingsHandler(i)
 	case *headerFrame:
+		atomic.AddInt64(&headerFrameFrameCnt, 1)
 		return l.headerHandler(i)
 	case *registerStream:
+		atomic.AddInt64(&registerStreamFrameCnt, 1)
 		return l.registerStreamHandler(i)
 	case *cleanupStream:
+		atomic.AddInt64(&cleanupStreamFrameCnt, 1)
 		return l.cleanupStreamHandler(i)
 	case *incomingGoAway:
+		atomic.AddInt64(&incomingGoAwayFrameCnt, 1)
 		return l.incomingGoAwayHandler(i)
 	case *dataFrame:
+		atomic.AddInt64(&dataFrameFrameCnt, 1)
 		return l.preprocessData(i)
 	case *ping:
+		atomic.AddInt64(&pingFrameCnt, 1)
 		return l.pingHandler(i)
 	case *goAway:
+		atomic.AddInt64(&goAwayFrameCnt, 1)
 		return l.goAwayHandler(i)
 	case *outFlowControlSizeRequest:
+		atomic.AddInt64(&outFlowControlSizeRequestFrameCnt, 1)
 		return l.outFlowControlSizeRequestHandler(i)
 	default:
 		return fmt.Errorf("transport: unknown control message type %T", i)
