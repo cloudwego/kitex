@@ -533,7 +533,11 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 				return err
 			}
 			if it != nil {
-				atomic.AddInt64(&getBufferCnt, 1)
+				if l.side == clientSide {
+					atomic.AddInt64(&clientGetBufferCnt, 1)
+				} else {
+					atomic.AddInt64(&serverGetBufferCnt, 1)
+				}
 				if err = l.handle(it); err != nil {
 					return err
 				}
@@ -549,7 +553,11 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 			if !isEmpty {
 				continue hasdata
 			} else {
-				atomic.AddInt64(&emptyCnt, 1)
+				if l.side == clientSide {
+					atomic.AddInt64(&clientEmptyCnt, 1)
+				} else {
+					atomic.AddInt64(&serverEmptyCnt, 1)
+				}
 			}
 			if gosched {
 				gosched = false
@@ -558,7 +566,11 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 					continue hasdata
 				}
 			}
-			atomic.AddInt64(&runFlushCnt, 1)
+			if l.side == clientSide {
+				atomic.AddInt64(&clientRunFlushCnt, 1)
+			} else {
+				atomic.AddInt64(&serverRunFlushCnt, 1)
+			}
 			l.framer.writer.Flush()
 			break hasdata
 		}
@@ -777,9 +789,6 @@ func (l *loopyWriter) goAwayHandler(g *goAway) error {
 
 func (l *loopyWriter) handle(i interface{}) error {
 	switch i := i.(type) {
-	case *dataFrame:
-		atomic.AddInt64(&dataFrameFrameCnt, 1)
-		return l.preprocessData(i)
 	case *incomingWindowUpdate:
 		atomic.AddInt64(&incomingWindowUpdateFrameCnt, 1)
 		return l.incomingWindowUpdateHandler(i)
@@ -804,6 +813,9 @@ func (l *loopyWriter) handle(i interface{}) error {
 	case *incomingGoAway:
 		atomic.AddInt64(&incomingGoAwayFrameCnt, 1)
 		return l.incomingGoAwayHandler(i)
+	case *dataFrame:
+		atomic.AddInt64(&dataFrameFrameCnt, 1)
+		return l.preprocessData(i)
 	case *ping:
 		atomic.AddInt64(&pingFrameCnt, 1)
 		return l.pingHandler(i)
