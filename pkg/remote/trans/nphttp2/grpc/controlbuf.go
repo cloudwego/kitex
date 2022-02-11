@@ -777,6 +777,9 @@ func (l *loopyWriter) goAwayHandler(g *goAway) error {
 
 func (l *loopyWriter) handle(i interface{}) error {
 	switch i := i.(type) {
+	case *dataFrame:
+		atomic.AddInt64(&dataFrameFrameCnt, 1)
+		return l.preprocessData(i)
 	case *incomingWindowUpdate:
 		atomic.AddInt64(&incomingWindowUpdateFrameCnt, 1)
 		return l.incomingWindowUpdateHandler(i)
@@ -801,9 +804,6 @@ func (l *loopyWriter) handle(i interface{}) error {
 	case *incomingGoAway:
 		atomic.AddInt64(&incomingGoAwayFrameCnt, 1)
 		return l.incomingGoAwayHandler(i)
-	case *dataFrame:
-		atomic.AddInt64(&dataFrameFrameCnt, 1)
-		return l.preprocessData(i)
 	case *ping:
 		atomic.AddInt64(&pingFrameCnt, 1)
 		return l.pingHandler(i)
