@@ -33,10 +33,11 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"github.com/cloudwego/netpoll"
 )
 
 type bufferPool struct {
@@ -53,18 +54,10 @@ func newBufferPool() *bufferPool {
 	}
 }
 
-func (p *bufferPool) get() *bytes.Buffer {
-	return p.pool.Get().(*bytes.Buffer)
-}
-
-func (p *bufferPool) put(b *bytes.Buffer) {
-	p.pool.Put(b)
-}
-
 // recvMsg represents the received msg from the transport. All transport
 // protocol specific info has been removed.
 type recvMsg struct {
-	buffer *bytes.Buffer
+	data []byte
 	// nil: received some data
 	// io.EOF: stream is completed. data is nil.
 	// other non-nil error: transport failure. data is nil.
@@ -140,9 +133,9 @@ type recvBufferReader struct {
 	ctx         context.Context
 	ctxDone     <-chan struct{} // cache of ctx.Done() (for performance).
 	recv        *recvBuffer
-	last        *bytes.Buffer // Stores the remaining data in the previous calls.
+	last        []byte // Stores the remaining data in the previous calls.
 	err         error
-	freeBuffer  func(*bytes.Buffer)
+	freeBuffer  func(b []byte)
 }
 
 // Read reads the next len(p) bytes from last. If last is drained, it tries to
@@ -154,12 +147,17 @@ func (r *recvBufferReader) Read(p []byte) (n int, err error) {
 	}
 	if r.last != nil {
 		// Read remaining data left in last call.
-		copied, _ := r.last.Read(p)
-		if r.last.Len() == 0 {
+		n = len(p)
+		if n > len(r.last) {
+			n = len(r.last)
+		}
+		copy(p, r.last[:n])
+		r.last = r.last[n:]
+		if len(r.last) == 0 {
 			r.freeBuffer(r.last)
 			r.last = nil
 		}
-		return copied, nil
+		return n, nil
 	}
 	if r.closeStream != nil {
 		n, r.err = r.readClient(p)
@@ -210,14 +208,19 @@ func (r *recvBufferReader) readAdditional(m recvMsg, p []byte) (n int, err error
 	if m.err != nil {
 		return 0, m.err
 	}
-	copied, _ := m.buffer.Read(p)
-	if m.buffer.Len() == 0 {
-		r.freeBuffer(m.buffer)
+	n = len(p)
+	if n > len(m.data) {
+		n = len(m.data)
+	}
+	copy(p, m.data[:n])
+	m.data = m.data[n:]
+	if len(m.data) == 0 {
+		r.freeBuffer(m.data)
 		r.last = nil
 	} else {
-		r.last = m.buffer
+		r.last = m.data
 	}
-	return copied, nil
+	return n, nil
 }
 
 type streamState uint32
