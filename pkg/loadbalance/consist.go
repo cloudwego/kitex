@@ -344,59 +344,10 @@ func (cb *consistBalancer) buildNodes(ins []discovery.Instance) ([]realNode, []v
 	for i := range ins {
 		ret[i].Ins = ins[i]
 	}
-	if cb.opt.Weighted {
-		return ret, cb.buildWeightedVirtualNodes(ret)
-	}
 	return ret, cb.buildVirtualNodes(ret)
 }
 
 func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
-	// the total length is: len(realNodes) * VirtualFactor
-	vlen := len(rNodes) * int(cb.opt.VirtualFactor)
-	ret := make([]virtualNode, vlen)
-	if vlen == 0 {
-		return ret
-	}
-	maxLen := 0
-	for i := range rNodes {
-		if len(rNodes[i].Ins.Address().String()) > maxLen {
-			maxLen = len(rNodes[i].Ins.Address().String())
-		}
-	}
-	l := maxLen + 1 + cb.opt.virtualFactorLen // "$address + # + itoa(i)"
-	// pre-allocate []byte here, and reuse it to prevent memory allocation
-	b := make([]byte, l)
-	for i := range rNodes {
-		ins := rNodes[i].Ins
-		bAddr := utils.StringToSliceByte(ins.Address().String())
-		// assign the first few bits of b to string
-		copy(b, bAddr)
-
-		// initialize the last few bits, skipping '#'
-		for j := len(bAddr) + 1; j < len(b); j++ {
-			b[j] = 0
-		}
-		b[len(bAddr)] = '#'
-		for j := 0; j < int(cb.opt.VirtualFactor); j++ {
-			k := j
-			cnt := 0
-			// assign values to b one by one, starting with the last one
-			for k > 0 {
-				b[l-1-cnt] = byte(k % 10)
-				k /= 10
-				cnt++
-			}
-			// At this point the index inside ret should be i * virtualFactor + j
-			index := i*int(cb.opt.VirtualFactor) + j
-			ret[index].hash = xxhash.Sum64(b)
-			ret[index].RealNode = &rNodes[i]
-		}
-	}
-	sort.Sort(&vNodeType{s: ret})
-	return ret
-}
-
-func (cb *consistBalancer) buildWeightedVirtualNodes(rNodes []realNode) []virtualNode {
 	if len(rNodes) == 0 {
 		return []virtualNode{}
 	}
@@ -432,7 +383,17 @@ func (cb *consistBalancer) buildWeightedVirtualNodes(rNodes []realNode) []virtua
 			b[j] = 0
 		}
 		b[len(bAddr)] = '#'
-		for j := 0; j < int(cb.opt.VirtualFactor)*ins.Weight(); j++ {
+
+		// default weight is 1
+		weight := 1
+
+		// if cb.opt.Weighted is true, update current weight
+		if cb.opt.Weighted {
+			weight = ins.Weight()
+		}
+
+		curLen := weight * int(cb.opt.VirtualFactor)
+		for j := 0; j < curLen; j++ {
 			k := j
 			cnt := 0
 			// assign values to b one by one, starting with the last one
@@ -441,12 +402,12 @@ func (cb *consistBalancer) buildWeightedVirtualNodes(rNodes []realNode) []virtua
 				k /= 10
 				cnt++
 			}
-			// at this point, the index inside ret should be cur + j
+			// At this point, the index inside ret should be cur + j
 			index := cur + j
 			ret[index].hash = xxhash.Sum64(b)
 			ret[index].RealNode = &rNodes[i]
 		}
-		cur += ins.Weight() * int(cb.opt.VirtualFactor)
+		cur += curLen
 	}
 	sort.Sort(&vNodeType{s: ret})
 	return ret
