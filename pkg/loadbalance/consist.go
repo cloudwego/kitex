@@ -349,12 +349,8 @@ func (cb *consistBalancer) buildNodes(ins []discovery.Instance) ([]realNode, []v
 
 func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 	totalLen := 0
-	if cb.opt.Weighted {
-		for i := range rNodes {
-			totalLen += rNodes[i].Ins.Weight() * int(cb.opt.VirtualFactor)
-		}
-	} else {
-		totalLen = len(rNodes) * int(cb.opt.VirtualFactor)
+	for i := range rNodes {
+		totalLen += cb.getVirtualNodeLen(rNodes[i])
 	}
 
 	ret := make([]virtualNode, totalLen)
@@ -374,8 +370,7 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 	// record the start index
 	cur := 0
 	for i := range rNodes {
-		ins := rNodes[i].Ins
-		bAddr := utils.StringToSliceByte(ins.Address().String())
+		bAddr := utils.StringToSliceByte(rNodes[i].Ins.Address().String())
 		// assign the first few bits of b to string
 		copy(b, bAddr)
 
@@ -385,15 +380,7 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 		}
 		b[len(bAddr)] = '#'
 
-		// default weight is 1
-		weight := 1
-
-		// if cb.opt.Weighted is true, update current weight
-		if cb.opt.Weighted {
-			weight = ins.Weight()
-		}
-
-		vLen := weight * int(cb.opt.VirtualFactor)
+		vLen := cb.getVirtualNodeLen(rNodes[i])
 		for j := 0; j < vLen; j++ {
 			k := j
 			cnt := 0
@@ -412,6 +399,16 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 	}
 	sort.Sort(&vNodeType{s: ret})
 	return ret
+}
+
+func (cb *consistBalancer) getVirtualNodeLen(rNode realNode) int {
+	// default weight is 1
+	weight := 1
+	// if cb.opt.Weighted is true, update current weight
+	if cb.opt.Weighted {
+		weight = rNode.Ins.Weight()
+	}
+	return weight * int(cb.opt.VirtualFactor)
 }
 
 func (cb *consistBalancer) updateConsistInfo(e discovery.Result) {
