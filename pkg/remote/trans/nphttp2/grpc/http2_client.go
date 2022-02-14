@@ -565,6 +565,7 @@ var debugOnce sync.Once
 // Write formats the data into HTTP2 data frame(s) and sends it out. The caller
 // should proceed only if Write returns nil.
 func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
+	atomic.AddInt64(&EnterPut, 1)
 	if opts.Last {
 		// If it's the last message, update stream state.
 		if !s.compareAndSwapState(streamActive, streamWriteDone) {
