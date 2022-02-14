@@ -61,7 +61,7 @@ func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.M
 	//return buf.Flush() // FIXME debug
 
 	wb, _ := buf.ReadBinary(buf.buf.Len())
-	_, err = conn.Write(wb)
+	_, err = buf.conn.Write(wb)
 	return err
 }
 
