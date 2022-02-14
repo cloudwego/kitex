@@ -93,15 +93,15 @@ func printFlushCnt() {
 			//	atomic.LoadInt64(&enqueueCnt), atomic.LoadInt64(&noActiveStreamCnt),
 			//	atomic.LoadInt64(&preprocessData), atomic.LoadInt64(&getItemCnt), atomic.LoadInt64(&consumerWaitingCnt)))
 
-			//println(fmt.Sprintf("incomingWindowUpdateFrameCnt=%d, outgoingWindowUpdateFrameCnt=%d, incomingSettingsFrameCnt=%d, outgoingSettingsFrameCnt=%d, headerFrameFrameCnt=%d, registerStreamFrameCnt=%d, " +
-			//	"cleanupStreamFrameCnt=%d, incomingGoAwayFrameCnt=%d, dataFrameFrameCnt=%d, pingFrameCnt=%d, goAwayFrameCnt=%d, outFlowControlSizeRequestFrameCnt=%d",
-			//	atomic.LoadInt64(&incomingWindowUpdateFrameCnt), atomic.LoadInt64(&outgoingWindowUpdateFrameCnt), atomic.LoadInt64(&incomingSettingsFrameCnt), atomic.LoadInt64(&outgoingSettingsFrameCnt), atomic.LoadInt64(&headerFrameFrameCnt), atomic.LoadInt64(&registerStreamFrameCnt),
-			//	atomic.LoadInt64(&cleanupStreamFrameCnt), atomic.LoadInt64(&incomingGoAwayFrameCnt), atomic.LoadInt64(&dataFrameFrameCnt), atomic.LoadInt64(&pingFrameCnt), atomic.LoadInt64(&goAwayFrameCnt), atomic.LoadInt64(&outFlowControlSizeRequestFrameCnt)))
+			println(fmt.Sprintf("incomingWindowUpdateFrameCnt=%d, outgoingWindowUpdateFrameCnt=%d, incomingSettingsFrameCnt=%d, outgoingSettingsFrameCnt=%d, headerFrameFrameCnt=%d, registerStreamFrameCnt=%d, " +
+				"cleanupStreamFrameCnt=%d, incomingGoAwayFrameCnt=%d, dataFrameFrameCnt=%d, pingFrameCnt=%d, goAwayFrameCnt=%d, outFlowControlSizeRequestFrameCnt=%d",
+				atomic.LoadInt64(&incomingWindowUpdateFrameCnt), atomic.LoadInt64(&outgoingWindowUpdateFrameCnt), atomic.LoadInt64(&incomingSettingsFrameCnt), atomic.LoadInt64(&outgoingSettingsFrameCnt), atomic.LoadInt64(&headerFrameFrameCnt), atomic.LoadInt64(&registerStreamFrameCnt),
+				atomic.LoadInt64(&cleanupStreamFrameCnt), atomic.LoadInt64(&incomingGoAwayFrameCnt), atomic.LoadInt64(&dataFrameFrameCnt), atomic.LoadInt64(&pingFrameCnt), atomic.LoadInt64(&goAwayFrameCnt), atomic.LoadInt64(&outFlowControlSizeRequestFrameCnt)))
 
-			println(fmt.Sprintf("clientRunFlushCnt=%d, clientGetBufferCnt=%d, clientEmptyCnt=%d, "+
-				"serverRunFlushCnt=%d, serverGetBufferCnt=%d, serverEmptyCnt=%d",
-				atomic.LoadInt64(&clientRunFlushCnt), atomic.LoadInt64(&clientGetBufferCnt), atomic.LoadInt64(&clientEmptyCnt),
-				atomic.LoadInt64(&serverRunFlushCnt), atomic.LoadInt64(&serverGetBufferCnt), atomic.LoadInt64(&serverEmptyCnt)))
+			//println(fmt.Sprintf("clientRunFlushCnt=%d, clientGetBufferCnt=%d, clientEmptyCnt=%d, "+
+			//	"serverRunFlushCnt=%d, serverGetBufferCnt=%d, serverEmptyCnt=%d",
+			//	atomic.LoadInt64(&clientRunFlushCnt), atomic.LoadInt64(&clientGetBufferCnt), atomic.LoadInt64(&clientEmptyCnt),
+			//	atomic.LoadInt64(&serverRunFlushCnt), atomic.LoadInt64(&serverGetBufferCnt), atomic.LoadInt64(&serverEmptyCnt)))
 		}
 	}
 }
