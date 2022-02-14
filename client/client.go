@@ -211,8 +211,9 @@ func (kc *kClient) initLBCache() error {
 }
 
 func (kc *kClient) initMiddlewares(ctx context.Context) {
+	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
 	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW(), rpcTimeoutMW(ctx))
-	kc.mws = append(kc.mws, richMWsWithBuilder(ctx, kc.opt.MWBs)...)
+	kc.mws = append(kc.mws, builderMWs...)
 	kc.mws = append(kc.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
 	if kc.opt.Proxy == nil {
 		kc.mws = append(kc.mws, newResolveMWBuilder(kc.lbf)(ctx))

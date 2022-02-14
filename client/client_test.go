@@ -59,11 +59,14 @@ var (
 	hdlr = &mocks.MockCliTransHandler{}
 )
 
-func newMockClient(tb testing.TB, opts ...Option) Client {
-	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
-	opts = append(opts, WithResolver(resolver404))
-	opts = append(opts, WithDialer(dialer))
-	opts = append(opts, WithDestService("destService"))
+func newMockClient(tb testing.TB, extra ...Option) Client {
+	opts := []Option{
+		WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)),
+		WithResolver(resolver404),
+		WithDialer(dialer),
+		WithDestService("destService"),
+	}
+	opts = append(opts, extra...)
 
 	svcInfo := mocks.ServiceInfo()
 	cli, err := NewClient(svcInfo, opts...)

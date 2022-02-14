@@ -412,7 +412,7 @@ func WithGRPCKeepaliveParams(kp grpc.ClientKeepalive) Option {
 	}}
 }
 
-// WithWarmingUp .
+// WithWarmingUp forces the client to do some warm-ups at the end of the initialization.
 func WithWarmingUp(wuo *warmup.ClientOption) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithWarmingUp(%+v)", wuo))

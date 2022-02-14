@@ -94,6 +94,9 @@ func (m *manager) watch() {
 			case <-m.work.Done():
 				return
 			case tmp := <-m.errs:
+				if tmp == nil {
+					return // closed
+				}
 				m.bads = append(m.bads, tmp)
 				if m.ErrorHandling == FailFast {
 					m.cancel()  // stop workers
