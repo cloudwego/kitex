@@ -54,10 +54,11 @@ func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.M
 	buf := newBuffer(conn)
 	defer buf.Release(err)
 
-	if err = h.codec.Encode(ctx, msg, buf); err != nil {
-		return err
-	}
-	return buf.Flush()
+	//if err = h.codec.Encode(ctx, msg, buf); err != nil {
+	//	return err
+	//}
+	//return buf.Flush()
+	return h.codec.Encode(ctx, msg, buf)
 }
 
 func (h *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {

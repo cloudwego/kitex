@@ -137,10 +137,9 @@ func (b *buffer) WriteDirect(d []byte, remainCap int) error {
 }
 
 func (b *buffer) Flush() (err error) {
-	// FIXME no need write to peer
-	//if err = b.buf.Flush(); err != nil {
-	//	return
-	//}
+	if err = b.buf.Flush(); err != nil {
+		return
+	}
 
 	wb, _ := b.buf.ReadBinary(b.buf.Len())
 	_, err = b.conn.Write(wb)
