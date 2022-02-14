@@ -79,8 +79,9 @@ var (
 	serverGetBufferCnt int64
 	serverEmptyCnt     int64
 
-	EnterWrite int64
-	EnterPut   int64
+	EnterSendMsg int64
+	EnterWrite   int64
+	EnterPut     int64
 )
 
 func init() {
@@ -106,8 +107,8 @@ func printFlushCnt() {
 			//	atomic.LoadInt64(&clientRunFlushCnt), atomic.LoadInt64(&clientGetBufferCnt), atomic.LoadInt64(&clientEmptyCnt),
 			//	atomic.LoadInt64(&serverRunFlushCnt), atomic.LoadInt64(&serverGetBufferCnt), atomic.LoadInt64(&serverEmptyCnt)))
 
-			println(fmt.Sprintf("enterWrite=%d, enterPut=%d",
-				atomic.LoadInt64(&EnterWrite), atomic.LoadInt64(&EnterPut)))
+			println(fmt.Sprintf("EnterSendMsg=%d, EnterWrite=%d, EnterPut=%d",
+				atomic.LoadInt64(&EnterSendMsg), atomic.LoadInt64(&EnterWrite), atomic.LoadInt64(&EnterPut)))
 		}
 	}
 }
