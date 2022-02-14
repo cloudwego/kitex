@@ -814,7 +814,9 @@ func (l *loopyWriter) handle(i interface{}) error {
 		atomic.AddInt64(&incomingGoAwayFrameCnt, 1)
 		return l.incomingGoAwayHandler(i)
 	case *dataFrame:
-		atomic.AddInt64(&dataFrameFrameCnt, 1)
+		if l.side == clientSide {
+			atomic.AddInt64(&dataFrameFrameCnt, 1)
+		}
 		return l.preprocessData(i)
 	case *ping:
 		atomic.AddInt64(&pingFrameCnt, 1)
