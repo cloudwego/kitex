@@ -348,16 +348,17 @@ func (cb *consistBalancer) buildNodes(ins []discovery.Instance) ([]realNode, []v
 }
 
 func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
-	if len(rNodes) == 0 {
-		return []virtualNode{}
-	}
-	vlen := 0
-	for i := range rNodes {
-		vlen += rNodes[i].Ins.Weight() * int(cb.opt.VirtualFactor)
+	totalLen := 0
+	if cb.opt.Weighted {
+		for i := range rNodes {
+			totalLen += rNodes[i].Ins.Weight() * int(cb.opt.VirtualFactor)
+		}
+	} else {
+		totalLen = len(rNodes) * int(cb.opt.VirtualFactor)
 	}
 
-	ret := make([]virtualNode, vlen)
-	if vlen == 0 {
+	ret := make([]virtualNode, totalLen)
+	if totalLen == 0 {
 		return ret
 	}
 	maxLen := 0
@@ -392,8 +393,8 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 			weight = ins.Weight()
 		}
 
-		curLen := weight * int(cb.opt.VirtualFactor)
-		for j := 0; j < curLen; j++ {
+		vLen := weight * int(cb.opt.VirtualFactor)
+		for j := 0; j < vLen; j++ {
 			k := j
 			cnt := 0
 			// assign values to b one by one, starting with the last one
@@ -407,7 +408,7 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 			ret[index].hash = xxhash.Sum64(b)
 			ret[index].RealNode = &rNodes[i]
 		}
-		cur += curLen
+		cur += vLen
 	}
 	sort.Sort(&vNodeType{s: ret})
 	return ret
