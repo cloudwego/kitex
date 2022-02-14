@@ -82,6 +82,8 @@ var (
 	EnterSendMsg int64
 	EnterWrite   int64
 	EnterPut     int64
+
+	NewStreamCnt int64
 )
 
 func init() {
@@ -97,10 +99,10 @@ func printFlushCnt() {
 			//	atomic.LoadInt64(&enqueueCnt), atomic.LoadInt64(&noActiveStreamCnt),
 			//	atomic.LoadInt64(&preprocessData), atomic.LoadInt64(&getItemCnt), atomic.LoadInt64(&consumerWaitingCnt)))
 
-			println(fmt.Sprintf("incomingWindowUpdateFrameCnt=%d, outgoingWindowUpdateFrameCnt=%d, incomingSettingsFrameCnt=%d, outgoingSettingsFrameCnt=%d, headerFrameFrameCnt=%d, registerStreamFrameCnt=%d, " +
-				"cleanupStreamFrameCnt=%d, incomingGoAwayFrameCnt=%d, dataFrameFrameCnt=%d, pingFrameCnt=%d, goAwayFrameCnt=%d, outFlowControlSizeRequestFrameCnt=%d",
-				atomic.LoadInt64(&incomingWindowUpdateFrameCnt), atomic.LoadInt64(&outgoingWindowUpdateFrameCnt), atomic.LoadInt64(&incomingSettingsFrameCnt), atomic.LoadInt64(&outgoingSettingsFrameCnt), atomic.LoadInt64(&headerFrameFrameCnt), atomic.LoadInt64(&registerStreamFrameCnt),
-				atomic.LoadInt64(&cleanupStreamFrameCnt), atomic.LoadInt64(&incomingGoAwayFrameCnt), atomic.LoadInt64(&dataFrameFrameCnt), atomic.LoadInt64(&pingFrameCnt), atomic.LoadInt64(&goAwayFrameCnt), atomic.LoadInt64(&outFlowControlSizeRequestFrameCnt)))
+			//println(fmt.Sprintf("incomingWindowUpdateFrameCnt=%d, outgoingWindowUpdateFrameCnt=%d, incomingSettingsFrameCnt=%d, outgoingSettingsFrameCnt=%d, headerFrameFrameCnt=%d, registerStreamFrameCnt=%d, " +
+			//	"cleanupStreamFrameCnt=%d, incomingGoAwayFrameCnt=%d, dataFrameFrameCnt=%d, pingFrameCnt=%d, goAwayFrameCnt=%d, outFlowControlSizeRequestFrameCnt=%d",
+			//	atomic.LoadInt64(&incomingWindowUpdateFrameCnt), atomic.LoadInt64(&outgoingWindowUpdateFrameCnt), atomic.LoadInt64(&incomingSettingsFrameCnt), atomic.LoadInt64(&outgoingSettingsFrameCnt), atomic.LoadInt64(&headerFrameFrameCnt), atomic.LoadInt64(&registerStreamFrameCnt),
+			//	atomic.LoadInt64(&cleanupStreamFrameCnt), atomic.LoadInt64(&incomingGoAwayFrameCnt), atomic.LoadInt64(&dataFrameFrameCnt), atomic.LoadInt64(&pingFrameCnt), atomic.LoadInt64(&goAwayFrameCnt), atomic.LoadInt64(&outFlowControlSizeRequestFrameCnt)))
 
 			//println(fmt.Sprintf("clientRunFlushCnt=%d, clientGetBufferCnt=%d, clientEmptyCnt=%d, "+
 			//	"serverRunFlushCnt=%d, serverGetBufferCnt=%d, serverEmptyCnt=%d",
@@ -109,6 +111,8 @@ func printFlushCnt() {
 
 			//println(fmt.Sprintf("EnterSendMsg=%d, EnterWrite=%d, EnterPut=%d",
 			//	atomic.LoadInt64(&EnterSendMsg), atomic.LoadInt64(&EnterWrite), atomic.LoadInt64(&EnterPut)))
+
+			println(fmt.Sprintf("NewStreamCnt=%d", atomic.LoadInt64(&NewStreamCnt)))
 		}
 	}
 }
