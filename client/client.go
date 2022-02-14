@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
@@ -223,6 +224,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request interface{},
 	}
 	var ri rpcinfo.RPCInfo
 	ctx, ri = kc.initRPCInfo(ctx, method)
+	klog.Infof("call with seqId: %d", ri.Invocation().SeqID())
 
 	callTimes := 0
 	var prevRI rpcinfo.RPCInfo
