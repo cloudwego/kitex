@@ -44,8 +44,7 @@ func (p *PoolHelper) WarmUp(po *PoolOption, pool remote.ConnPool, co remote.Conn
 	go mgr.watch()
 	var wg sync.WaitGroup
 	for i := 0; i < num; i++ {
-		new(worker).setup(
-			&wg, mgr.jobs, mgr.errs, pool, co, po).goToWork(mgr.control)
+		newWorker(&wg, mgr.jobs, mgr.errs, pool, co, po).goToWork(mgr.control)
 	}
 	wg.Wait()
 	cancel()
@@ -179,7 +178,8 @@ type worker struct {
 	group *sync.WaitGroup
 }
 
-func (w *worker) setup(g *sync.WaitGroup, woods, ashes chan *job, pool remote.ConnPool, co remote.ConnOption, po *PoolOption) *worker {
+func newWorker(g *sync.WaitGroup, woods, ashes chan *job, pool remote.ConnPool, co remote.ConnOption, po *PoolOption) *worker {
+	w := new(worker)
 	w.group = g
 	w.oven = &oven{
 		woods: woods,
