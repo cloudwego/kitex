@@ -327,7 +327,7 @@ func timeCost() func() {
 // NewStream creates a stream and registers it into the transport as "active"
 // streams.
 func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Stream, err error) {
-	defer timeCost()()
+	//defer timeCost()()
 	atomic.AddInt64(&NewStreamCnt, 1)
 	s := t.newStream(ctx, callHdr)
 	cleanup := func(err error) {
