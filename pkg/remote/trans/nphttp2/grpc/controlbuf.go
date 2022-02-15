@@ -346,6 +346,7 @@ func (c *controlBuffer) executeAndPut(f func(it interface{}) bool, it cbItem) (b
 	if wakeUp {
 		select {
 		case c.ch <- struct{}{}:
+			atomic.AddInt64(&wakeUpCnt, 1)
 		default:
 		}
 	}

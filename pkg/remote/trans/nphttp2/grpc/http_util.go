@@ -58,6 +58,7 @@ var (
 	finishCnt                   int64
 	getItemCnt                  int64
 	consumerWaitingCnt          int64
+	wakeUpCnt int64
 
 	incomingWindowUpdateFrameCnt      int64
 	outgoingWindowUpdateFrameCnt      int64
@@ -95,9 +96,9 @@ func printFlushCnt() {
 	for {
 		select {
 		case <-t.C:
-			println(fmt.Sprintf("enqueueCnt=%d, noActiveStreamCnt=%d, preprocessData=%d, getItemCnt=%d, consumerWaitingCnt=%d",
+			println(fmt.Sprintf("enqueueCnt=%d, noActiveStreamCnt=%d, preprocessData=%d, getItemCnt=%d, consumerWaitingCnt=%d, wakeUpCnt=%d",
 				atomic.LoadInt64(&enqueueCnt), atomic.LoadInt64(&noActiveStreamCnt),
-				atomic.LoadInt64(&preprocessData), atomic.LoadInt64(&getItemCnt), atomic.LoadInt64(&consumerWaitingCnt)))
+				atomic.LoadInt64(&preprocessData), atomic.LoadInt64(&getItemCnt), atomic.LoadInt64(&consumerWaitingCnt), atomic.LoadInt64(&wakeUpCnt)))
 
 			//println(fmt.Sprintf("incomingWindowUpdateFrameCnt=%d, outgoingWindowUpdateFrameCnt=%d, incomingSettingsFrameCnt=%d, outgoingSettingsFrameCnt=%d, headerFrameFrameCnt=%d, registerStreamFrameCnt=%d, " +
 			//	"cleanupStreamFrameCnt=%d, incomingGoAwayFrameCnt=%d, dataFrameFrameCnt=%d, pingFrameCnt=%d, goAwayFrameCnt=%d, outFlowControlSizeRequestFrameCnt=%d",
