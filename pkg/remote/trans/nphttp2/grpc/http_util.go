@@ -95,9 +95,9 @@ func printFlushCnt() {
 	for {
 		select {
 		case <-t.C:
-			//println(fmt.Sprintf("enqueueCnt=%d, noActiveStreamCnt=%d, preprocessData=%d, getItemCnt=%d, consumerWaitingCnt=%d",
-			//	atomic.LoadInt64(&enqueueCnt), atomic.LoadInt64(&noActiveStreamCnt),
-			//	atomic.LoadInt64(&preprocessData), atomic.LoadInt64(&getItemCnt), atomic.LoadInt64(&consumerWaitingCnt)))
+			println(fmt.Sprintf("enqueueCnt=%d, noActiveStreamCnt=%d, preprocessData=%d, getItemCnt=%d, consumerWaitingCnt=%d",
+				atomic.LoadInt64(&enqueueCnt), atomic.LoadInt64(&noActiveStreamCnt),
+				atomic.LoadInt64(&preprocessData), atomic.LoadInt64(&getItemCnt), atomic.LoadInt64(&consumerWaitingCnt)))
 
 			//println(fmt.Sprintf("incomingWindowUpdateFrameCnt=%d, outgoingWindowUpdateFrameCnt=%d, incomingSettingsFrameCnt=%d, outgoingSettingsFrameCnt=%d, headerFrameFrameCnt=%d, registerStreamFrameCnt=%d, " +
 			//	"cleanupStreamFrameCnt=%d, incomingGoAwayFrameCnt=%d, dataFrameFrameCnt=%d, pingFrameCnt=%d, goAwayFrameCnt=%d, outFlowControlSizeRequestFrameCnt=%d",
@@ -112,7 +112,7 @@ func printFlushCnt() {
 			//println(fmt.Sprintf("EnterSendMsg=%d, EnterWrite=%d, EnterPut=%d",
 			//	atomic.LoadInt64(&EnterSendMsg), atomic.LoadInt64(&EnterWrite), atomic.LoadInt64(&EnterPut)))
 
-			println(fmt.Sprintf("NewStreamCnt=%d", atomic.LoadInt64(&NewStreamCnt)))
+			//println(fmt.Sprintf("NewStreamCnt=%d", atomic.LoadInt64(&NewStreamCnt)))
 		}
 	}
 }
