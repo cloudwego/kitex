@@ -364,17 +364,17 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 		}
 	}
 	l := maxLen + 1 + cb.opt.virtualFactorLen // "$address + # + itoa(i)"
-	// pre-allocate []byte here, and reuse it to prevent memory allocation
+	// pre-allocate []byte here, and reuse it to prevent memory allocation.
 	b := make([]byte, l)
 
-	// record the start index
+	// record the start index.
 	cur := 0
 	for i := range rNodes {
 		bAddr := utils.StringToSliceByte(rNodes[i].Ins.Address().String())
-		// assign the first few bits of b to string
+		// Assign the first few bits of b to string.
 		copy(b, bAddr)
 
-		// initialize the last few bits, skipping '#'
+		// Initialize the last few bits, skipping '#'.
 		for j := len(bAddr) + 1; j < len(b); j++ {
 			b[j] = 0
 		}
@@ -384,13 +384,13 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 		for j := 0; j < vLen; j++ {
 			k := j
 			cnt := 0
-			// assign values to b one by one, starting with the last one
+			// Assign values to b one by one, starting with the last one.
 			for k > 0 {
 				b[l-1-cnt] = byte(k % 10)
 				k /= 10
 				cnt++
 			}
-			// At this point, the index inside ret should be cur + j
+			// At this point, the index inside ret should be cur + j.
 			index := cur + j
 			ret[index].hash = xxhash.Sum64(b)
 			ret[index].RealNode = &rNodes[i]
@@ -401,14 +401,13 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 	return ret
 }
 
+// get virtual node number from one realNode.
+// if cb.opt.Weighted option is false, multiplier is 1, virtual node number is equal to VirtualFactor.
 func (cb *consistBalancer) getVirtualNodeLen(rNode realNode) int {
-	// default weight is 1
-	weight := 1
-	// if cb.opt.Weighted is true, update current weight
 	if cb.opt.Weighted {
-		weight = rNode.Ins.Weight()
+		return rNode.Ins.Weight() * int(cb.opt.VirtualFactor)
 	}
-	return weight * int(cb.opt.VirtualFactor)
+	return int(cb.opt.VirtualFactor)
 }
 
 func (cb *consistBalancer) updateConsistInfo(e discovery.Result) {
@@ -418,8 +417,8 @@ func (cb *consistBalancer) updateConsistInfo(e discovery.Result) {
 		return
 	}
 	info := infoI.(*consistInfo)
-	// warm up
-	// the reason for not modifying info directly is that there is no guarantee of concurrency security
+	// Warm up.
+	// The reason for not modifying info directly is that there is no guarantee of concurrency security.
 	info.cachedConsistResult.Range(func(key, value interface{}) bool {
 		cr := buildConsistResult(cb, newInfo, key.(uint64))
 		if cb.opt.ExpireDuration > 0 {
@@ -453,7 +452,7 @@ func (cb *consistBalancer) Delete(change discovery.Change) {
 		return
 	}
 	// FIXME: If Delete and Rebalance occur together (Discovery OnDelete and OnChange are triggered at the same time),
-	// it may cause the delete to fail and eventually lead to a resource leak
+	// it may cause the delete to fail and eventually lead to a resource leak.
 	cb.updateLock.Lock()
 	cb.cachedConsistInfo.Delete(change.Result.CacheKey)
 	cb.updateLock.Unlock()
