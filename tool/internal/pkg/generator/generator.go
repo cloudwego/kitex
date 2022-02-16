@@ -290,7 +290,7 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 	g.updatePackageInfo(pkg)
 	output := filepath.Join(g.OutputPath, KitexGenPath)
 	if pkg.Namespace != "" {
-		output = filepath.Join(output, strings.Replace(pkg.Namespace, ".", "/", -1))
+		output = filepath.Join(output, strings.ReplaceAll(pkg.Namespace, ".", "/"))
 	}
 	svcPkg := strings.ToLower(pkg.ServiceName)
 	output = filepath.Join(output, svcPkg)
