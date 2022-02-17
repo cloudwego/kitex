@@ -22,7 +22,6 @@ package discovery
 
 import (
 	"context"
-	"errors"
 	"net"
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -31,9 +30,6 @@ import (
 
 // DefaultWeight is the default weight for an instance.
 const DefaultWeight = 10
-
-// ErrInstanceNotFound means instance not found
-var ErrInstanceNotFound = errors.New("instance not found")
 
 // Result contains the result of service discovery process.
 // Cacheable tells whether the instance list can/should be cached.
