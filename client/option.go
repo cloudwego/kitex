@@ -369,6 +369,7 @@ func WithGRPCConnPoolSize(s uint32) Option {
 
 // WithGRPCInitialWindowSize sets the value for initial window size on a grpc stream.
 // The lower bound for window size is 64K and any value smaller than that will be ignored.
+// It corresponds to the WithInitialWindowSize DialOption of gRPC.
 func WithGRPCInitialWindowSize(s uint32) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCInitialWindowSize(%d)", s))
@@ -378,6 +379,7 @@ func WithGRPCInitialWindowSize(s uint32) Option {
 
 // WithGRPCInitialConnWindowSize sets the value for initial window size on a connection of grpc.
 // The lower bound for window size is 64K and any value smaller than that will be ignored.
+// It corresponds to the WithInitialConnWindowSize DialOption of gRPC.
 func WithGRPCInitialConnWindowSize(s uint32) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCInitialConnWindowSize(%d)", s))
@@ -387,6 +389,7 @@ func WithGRPCInitialConnWindowSize(s uint32) Option {
 
 // WithGRPCMaxHeaderListSize returns a DialOption that specifies the maximum
 // (uncompressed) size of header list that the client is prepared to accept.
+// It corresponds to the WithMaxHeaderListSize DialOption of gRPC.
 func WithGRPCMaxHeaderListSize(s uint32) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCMaxHeaderListSize(%d)", s))
@@ -395,6 +398,7 @@ func WithGRPCMaxHeaderListSize(s uint32) Option {
 }
 
 // WithGRPCKeepaliveParams returns a DialOption that specifies keepalive parameters for the client transport.
+// It corresponds to the WithKeepaliveParams DialOption of gRPC.
 func WithGRPCKeepaliveParams(kp grpc.ClientKeepalive) Option {
 	if kp.Time < grpc.KeepaliveMinPingTime {
 		kp.Time = grpc.KeepaliveMinPingTime

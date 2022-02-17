@@ -29,6 +29,7 @@ import (
 
 const (
 	// The default value of flow control window size in HTTP2 spec.
+	// Warning: please don't modify the value of defaultWindowSize, otherwise may cause compatibility problems.
 	defaultWindowSize = uint32(65535) // 64KB
 	// The initial window size for flow control.
 	initialWindowSize = defaultWindowSize // for an RPC
