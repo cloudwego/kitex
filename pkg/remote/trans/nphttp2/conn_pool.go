@@ -41,20 +41,24 @@ func poolSize() uint32 {
 }
 
 // NewConnPool ...
-func NewConnPool(remoteService string) *connPool {
+func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions) *connPool {
+	if size == 0 {
+		size = poolSize()
+	}
 	return &connPool{
-		size:          poolSize(),
 		remoteService: remoteService,
+		size:          size,
+		connOpts:      connOpts,
 	}
 }
 
 // MuxPool manages a pool of long connections.
 type connPool struct {
-	size  uint32
-	sfg   singleflight.Group
-	conns sync.Map // key: address, value: *transports
-
-	remoteService string // remote service name
+	size          uint32
+	sfg           singleflight.Group
+	conns         sync.Map // key: address, value: *transports
+	remoteService string   // remote service name
+	connOpts      grpc.ConnectOptions
 }
 
 type transports struct {
@@ -96,7 +100,8 @@ func (c *transports) close() {
 
 var _ remote.LongConnPool = (*connPool)(nil)
 
-func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, network, address string, connectTimeout time.Duration) (grpc.ClientTransport, error) {
+func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, network, address string,
+	connectTimeout time.Duration, opts grpc.ConnectOptions) (grpc.ClientTransport, error) {
 	conn, err := dialer.DialTimeout(network, address, connectTimeout)
 	if err != nil {
 		return nil, err
@@ -104,6 +109,7 @@ func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, netwo
 	return grpc.NewClientTransport(
 		ctx,
 		conn.(netpoll.Connection),
+		opts,
 		p.remoteService,
 		func(grpc.GoAwayReason) {
 			// do nothing
@@ -139,7 +145,7 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 	tr, err, _ := p.sfg.Do(address, func() (i interface{}, e error) {
 		// Notice: newTransport means new a connection, the timeout of connection cannot be set,
 		// so using context.Background() but not the ctx passed in as the parameter.
-		tr, err := p.newTransport(context.Background(), opt.Dialer, network, address, opt.ConnectTimeout)
+		tr, err := p.newTransport(context.Background(), opt.Dialer, network, address, opt.ConnectTimeout, p.connOpts)
 		if err != nil {
 			return nil, err
 		}

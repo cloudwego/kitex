@@ -25,6 +25,7 @@ import (
 )
 
 var logger FullLogger = &defaultLogger{
+	level:  LevelInfo,
 	stdlog: log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile|log.Lmicroseconds),
 }
 

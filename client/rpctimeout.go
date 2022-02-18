@@ -109,17 +109,20 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 						e := panicToErr(ctx, panicInfo, ri)
 						done <- e
 					}
-					if !errors.Is(err, kerrors.ErrRPCFinish) {
+					if err == nil || !errors.Is(err, kerrors.ErrRPCFinish) {
 						// Don't regards ErrRPCFinish as normal error, it happens in retry scene,
 						// ErrRPCFinish means previous call returns first but is decoding.
 						close(done)
 					}
 				}()
 				err = next(ctx, request, response)
-				if err != nil && ctx.Err() != nil && !errors.Is(err, kerrors.ErrRPCFinish) {
-					// error occurs after the wait goroutine returns,
-					// we should log this error or it will be discarded.
-					// Specially, ErrRPCFinish can be ignored, it happens in retry scene, previous call returns first.
+				if err != nil && ctx.Err() != nil &&
+					!errors.Is(err, kerrors.ErrRPCTimeout) && !errors.Is(err, kerrors.ErrRPCFinish) {
+					// error occurs after the wait goroutine returns(RPCTimeout happens),
+					// we should log this error for troubleshooting, or it will be discarded.
+					// but ErrRPCTimeout and ErrRPCFinish can be ignored:
+					//    ErrRPCTimeout: it is same with outer timeout, here only care about non timeout err.
+					//    ErrRPCFinish: it happens in retry scene, previous call returns first.
 					var errMsg string
 					if ri.To().Address() != nil {
 						errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s addr=%s error=%s",

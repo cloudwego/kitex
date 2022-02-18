@@ -86,6 +86,9 @@ func (c *client) init(handler remote.TransHandler, cm *ConnWrapper, conn net.Con
 // Send is blocked.
 func (c *client) Send(ctx context.Context, ri rpcinfo.RPCInfo, req remote.Message) (err error) {
 	err = c.transHdlr.Write(ctx, c.conn, req)
+	if err != nil {
+		c.connManager.ReleaseConn(err, ri)
+	}
 	return err
 }
 

@@ -123,7 +123,7 @@ func UpperFirst(s string) string {
 
 // NotPtr converts an pointer type into non-pointer type.
 func NotPtr(s string) string {
-	return strings.Replace(s, "*", "", -1)
+	return strings.ReplaceAll(s, "*", "")
 }
 
 // SearchGoMod searches go.mod from the given directory (which must be an absolute path) to

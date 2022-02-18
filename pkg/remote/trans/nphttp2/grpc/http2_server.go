@@ -113,34 +113,84 @@ type http2Server struct {
 
 // newHTTP2Server constructs a ServerTransport based on HTTP2. ConnectionError is
 // returned if something goes wrong.
-func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTransport, err error) {
-	framer := newFramer(conn, defaultServerMaxHeaderListSize)
+func newHTTP2Server(ctx context.Context, conn netpoll.Connection, config *ServerConfig) (_ ServerTransport, err error) {
+	maxHeaderListSize := defaultServerMaxHeaderListSize
+	if config.MaxHeaderListSize != nil {
+		maxHeaderListSize = *config.MaxHeaderListSize
+	}
+
+	framer := newFramer(conn, maxHeaderListSize)
 	// Send initial settings as connection preface to client.
 	isettings := []http2.Setting{{
 		ID:  http2.SettingMaxFrameSize,
 		Val: http2MaxFrameLen,
 	}}
-	isettings = append(isettings, http2.Setting{
-		ID:  http2.SettingMaxConcurrentStreams,
-		Val: math.MaxUint32,
-	})
-	isettings = append(isettings, http2.Setting{
-		ID:  http2.SettingInitialWindowSize,
-		Val: defaultWindowSize,
-	})
+
+	// 0 is permitted in the HTTP2 spec.
+	maxStreams := config.MaxStreams
+	if maxStreams == 0 {
+		maxStreams = math.MaxUint32
+	} else {
+		isettings = append(isettings, http2.Setting{
+			ID:  http2.SettingMaxConcurrentStreams,
+			Val: maxStreams,
+		})
+	}
+
+	dynamicWindow := true
+	iwz := initialWindowSize
+	if config.InitialWindowSize >= defaultWindowSize {
+		iwz = config.InitialWindowSize
+		dynamicWindow = false
+
+		isettings = append(isettings, http2.Setting{
+			ID:  http2.SettingInitialWindowSize,
+			Val: iwz,
+		})
+	}
+	icwz := initialWindowSize
+	if config.InitialConnWindowSize >= defaultWindowSize {
+		icwz = config.InitialConnWindowSize
+		dynamicWindow = false
+	}
+	if config.MaxHeaderListSize != nil {
+		isettings = append(isettings, http2.Setting{
+			ID:  http2.SettingMaxHeaderListSize,
+			Val: *config.MaxHeaderListSize,
+		})
+	}
+
 	if err := framer.WriteSettings(isettings...); err != nil {
 		return nil, connectionErrorf(false, err, "transport: %v", err)
 	}
 
-	kp := ServerKeepalive{
-		MaxConnectionIdle:     defaultMaxConnectionIdle,
-		MaxConnectionAge:      defaultMaxConnectionAge,
-		MaxConnectionAgeGrace: defaultMaxConnectionAgeGrace,
-		Time:                  defaultServerKeepaliveTime,
-		Timeout:               defaultServerKeepaliveTimeout,
+	// Adjust the connection flow control window if needed.
+	if icwz > defaultWindowSize {
+		if delta := icwz - defaultWindowSize; delta > 0 {
+			if err := framer.WriteWindowUpdate(0, delta); err != nil {
+				return nil, connectionErrorf(false, err, "transport: %v", err)
+			}
+		}
 	}
-	kep := EnforcementPolicy{
-		MinTime: defaultKeepalivePolicyMinTime,
+	kp := config.KeepaliveParams
+	if kp.MaxConnectionIdle == 0 {
+		kp.MaxConnectionIdle = defaultMaxConnectionIdle
+	}
+	if kp.MaxConnectionAge == 0 {
+		kp.MaxConnectionAge = defaultMaxConnectionAge
+	}
+	if kp.MaxConnectionAgeGrace == 0 {
+		kp.MaxConnectionAgeGrace = defaultMaxConnectionAgeGrace
+	}
+	if kp.Time == 0 {
+		kp.Time = defaultServerKeepaliveTime
+	}
+	if kp.Timeout == 0 {
+		kp.Timeout = defaultServerKeepaliveTimeout
+	}
+	kep := config.KeepaliveEnforcementPolicy
+	if kep.MinTime == 0 {
+		kep.MinTime = defaultKeepalivePolicyMinTime
 	}
 
 	done := make(chan struct{})
@@ -154,19 +204,21 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection) (_ ServerTrans
 		readerDone:        make(chan struct{}),
 		writerDone:        make(chan struct{}),
 		maxStreams:        math.MaxUint32,
-		fc:                &trInFlow{limit: defaultWindowSize},
+		fc:                &trInFlow{limit: icwz},
 		state:             reachable,
 		activeStreams:     make(map[uint32]*Stream),
 		kp:                kp,
 		kep:               kep,
 		idle:              time.Now(),
-		initialWindowSize: int32(defaultWindowSize),
+		initialWindowSize: int32(iwz),
 		bufferPool:        newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.done)
-	t.bdpEst = &bdpEstimator{
-		bdp:               initialWindowSize,
-		updateFlowControl: t.updateFlowControl,
+	if dynamicWindow {
+		t.bdpEst = &bdpEstimator{
+			bdp:               initialWindowSize,
+			updateFlowControl: t.updateFlowControl,
+		}
 	}
 
 	t.framer.writer.Flush()
