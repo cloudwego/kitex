@@ -40,6 +40,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/connpool"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -98,6 +99,10 @@ type Options struct {
 	RetryContainer *retry.Container
 
 	CloseCallbacks []func() error
+
+	// GRPC
+	GRPCConnPoolSize uint32
+	GRPCConnectOpts  *grpc.ConnectOptions
 }
 
 // Apply applies all options.
@@ -128,6 +133,8 @@ func NewOptions(opts []Option) *Options {
 		Events: event.NewQueue(event.MaxEventNum),
 
 		TracerCtl: &internal_stats.Controller{},
+
+		GRPCConnectOpts: new(grpc.ConnectOptions),
 	}
 	o.Apply(opts)
 	o.MetaHandlers = append(o.MetaHandlers, transmeta.MetainfoClientHandler)
@@ -150,7 +157,7 @@ func NewOptions(opts []Option) *Options {
 
 func (o *Options) initRemoteOpt() {
 	if o.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
-		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName)
+		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
 	if o.RemoteOpt.ConnPool == nil {
