@@ -16,13 +16,19 @@
 
 package server
 
+import "sync"
+
 // RegisterStartHook add hook which is executed after the server starts.
 func RegisterStartHook(h func()) {
+	muStartHooks.Lock()
+	defer muStartHooks.Unlock()
 	onServerStart.add(h)
 }
 
 // RegisterShutdownHook add hook which is executed after the server shutdown.
 func RegisterShutdownHook(h func()) {
+	muShutdownHooks.Lock()
+	defer muShutdownHooks.Unlock()
 	onShutdown.add(h)
 }
 
@@ -36,6 +42,8 @@ func (h *Hooks) add(g func()) {
 
 // Server hooks
 var (
-	onServerStart Hooks // Hooks executes after the server starts.
-	onShutdown    Hooks // Hooks executes when the server is shutdown gracefully.
+	onServerStart   Hooks      // Hooks executes after the server starts.
+	muStartHooks    sync.Mutex // onServerStart 's mutex
+	onShutdown      Hooks      // Hooks executes when the server is shutdown gracefully.
+	muShutdownHooks sync.Mutex // onShutdown 's mutex
 )
