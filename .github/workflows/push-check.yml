@@ -39,3 +39,8 @@ jobs:
 
       - name: Benchmark
         run: go test -bench=. -benchmem -run=none ./...
+        
+      - name: Codacy Coverage Reporter
+        uses: codacy/codacy-coverage-reporter-action@v1.3.0
+
+        
