@@ -38,6 +38,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -130,6 +131,7 @@ func newServerOption() *remote.ServerOption {
 		ExitWaitTime:          defaultExitWaitTime,
 		MaxConnectionIdleTime: defaultConnectionIdleTime,
 		AcceptFailedDelayTime: defaultAcceptFailedDelayTime,
+		GRPCCfg:               new(grpc.ServerConfig),
 	}
 }
 

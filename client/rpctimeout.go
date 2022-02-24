@@ -109,7 +109,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 						e := panicToErr(ctx, panicInfo, ri)
 						done <- e
 					}
-					if !errors.Is(err, kerrors.ErrRPCFinish) {
+					if err == nil || !errors.Is(err, kerrors.ErrRPCFinish) {
 						// Don't regards ErrRPCFinish as normal error, it happens in retry scene,
 						// ErrRPCFinish means previous call returns first but is decoding.
 						close(done)
