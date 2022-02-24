@@ -29,25 +29,25 @@ type EventHandler interface {
 
 // A concurrent safe <seqID,EventHandler> map
 // To avoid lock bottlenecks this map is dived to several (SHARD_COUNT) map shards.
-type shardMap struct {
+type sharedMap struct {
 	size   int32
-	shards []*shard
+	shared []*shared
 }
 
 // A "thread" safe string to anything map.
-type shard struct {
+type shared struct {
 	msgs map[int32]EventHandler
 	sync.RWMutex
 }
 
 // Creates a new concurrent map.
-func newShardMap(size int) *shardMap {
-	m := &shardMap{
-		size:   int32(size),
-		shards: make([]*shard, size),
+func newSharedMap(size int32) *sharedMap {
+	m := &sharedMap{
+		size:   size,
+		shared: make([]*shared, size),
 	}
-	for i := range m.shards {
-		m.shards[i] = &shard{
+	for i := range m.shared {
+		m.shared[i] = &shared{
 			msgs: make(map[int32]EventHandler),
 		}
 	}
@@ -55,12 +55,12 @@ func newShardMap(size int) *shardMap {
 }
 
 // getShard returns shard under given seq id
-func (m *shardMap) getShard(seqID int32) *shard {
-	return m.shards[abs(seqID)%m.size]
+func (m *sharedMap) getShard(seqID int32) *shared {
+	return m.shared[abs(seqID)%m.size]
 }
 
 // store stores msg under given seq id.
-func (m *shardMap) store(seqID int32, msg EventHandler) {
+func (m *sharedMap) store(seqID int32, msg EventHandler) {
 	if seqID == 0 {
 		return
 	}
@@ -72,7 +72,7 @@ func (m *shardMap) store(seqID int32, msg EventHandler) {
 }
 
 // load loads the msg under the seq id.
-func (m *shardMap) load(seqID int32) (msg EventHandler, ok bool) {
+func (m *sharedMap) load(seqID int32) (msg EventHandler, ok bool) {
 	if seqID == 0 {
 		return nil, false
 	}
@@ -84,7 +84,7 @@ func (m *shardMap) load(seqID int32) (msg EventHandler, ok bool) {
 }
 
 // delete deletes the msg under the given seq id.
-func (m *shardMap) delete(seqID int32) {
+func (m *sharedMap) delete(seqID int32) {
 	if seqID == 0 {
 		return
 	}
@@ -95,8 +95,8 @@ func (m *shardMap) delete(seqID int32) {
 }
 
 // rangeMap iterates over the map.
-func (m *shardMap) rangeMap(fn func(seqID int32, msg EventHandler)) {
-	for _, shard := range m.shards {
+func (m *sharedMap) rangeMap(fn func(seqID int32, msg EventHandler)) {
+	for _, shard := range m.shared {
 		shard.Lock()
 		for k, v := range shard.msgs {
 			fn(k, v)
