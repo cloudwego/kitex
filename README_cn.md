@@ -91,6 +91,7 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
 - [字节跳动 Go RPC 框架 Kitex 性能优化实践](https://www.cloudwego.io/zh/blog/2021/09/23/%E5%AD%97%E8%8A%82%E8%B7%B3%E5%8A%A8-go-rpc-%E6%A1%86%E6%9E%B6-kitex-%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/)
 - [字节跳动在 Go 网络库上的实践](https://www.cloudwego.io/zh/blog/2021/10/09/%E5%AD%97%E8%8A%82%E8%B7%B3%E5%8A%A8%E5%9C%A8-go-%E7%BD%91%E7%BB%9C%E5%BA%93%E4%B8%8A%E7%9A%84%E5%AE%9E%E8%B7%B5/)
+- [RPC 框架 Kitex 实践入门：性能测试指南](https://www.cloudwego.io/zh/blog/2021/11/24/rpc-%E6%A1%86%E6%9E%B6-kitex-%E5%AE%9E%E8%B7%B5%E5%85%A5%E9%97%A8%E6%80%A7%E8%83%BD%E6%B5%8B%E8%AF%95%E6%8C%87%E5%8D%97/)
 
 ## 贡献代码
 
@@ -106,7 +107,7 @@ Kitex 基于[Apache License 2.0](LICENSE) 许可证，其依赖的三方组件�
 - Issues: [Issues](https://github.com/cloudwego/kitex/issues)
 - 飞书用户群（[注册飞书](https://www.feishu.cn/)进群）
 
-  ![LarkGroup](docs/images/lark_group_cn.png)
+  ![LarkGroup](images/lark_group_cn.png)
 
 ## Landscapes
 
