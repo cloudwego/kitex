@@ -51,7 +51,7 @@ type longConn struct {
 	net.Conn
 	sync.RWMutex
 	deadline time.Time
-	address  string
+	//address  string
 }
 
 // Close implements the net.Conn interface.
@@ -128,7 +128,7 @@ func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter, ad
 	return &longConn{
 		Conn:     conn,
 		deadline: time.Now().Add(p.maxIdleTimeout),
-		address:  addr,
+		//address:  addr,
 	}, nil
 }
 
@@ -189,7 +189,7 @@ func (lp *LongPool) Put(conn net.Conn) error {
 	}
 
 	addr := conn.RemoteAddr()
-	na := netAddr{addr.Network(), c.address}
+	na := netAddr{addr.Network(), addr.String()}
 	p, ok := lp.peerMap.Load(na)
 	if ok {
 		p.(*peer).put(c)
