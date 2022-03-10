@@ -60,7 +60,6 @@ type Options struct {
 	Cli     *rpcinfo.EndpointBasicInfo
 	Svr     *rpcinfo.EndpointBasicInfo
 	Configs rpcinfo.RPCConfig
-	Locks   *ConfigLocks
 	Once    *configutil.OptionOnce
 
 	MetaHandlers []remote.MetaHandler
@@ -124,7 +123,6 @@ func NewOptions(opts []Option) *Options {
 		Svr:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
 		RemoteOpt:    newClientOption(),
 		Configs:      rpcinfo.NewRPCConfig(),
-		Locks:        NewConfigLocks(),
 		Once:         configutil.NewOptionOnce(),
 		HTTPResolver: http.NewDefaultResolver(),
 		DebugService: diagnosis.NoopService,

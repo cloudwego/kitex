@@ -59,7 +59,6 @@ func TestAsRemoteInfo(t *testing.T) {
 		Tags:        map[string]string{"a": "b", "1": "2"},
 	}
 	ri := remoteinfo.NewRemoteInfo(bi, "method1")
-	ri.SetTagLock("1")
 	test.Assert(t, ri.GetInstance() == nil)
 
 	ei = ri.ImmutableView()
@@ -68,11 +67,11 @@ func TestAsRemoteInfo(t *testing.T) {
 
 	ri2.SetServiceName("service2")
 	test.Assert(t, ri2.SetTag("a", "aa") == nil)
-	test.Assert(t, ri2.SetTag("1", "11") != nil)
+	test.Assert(t, ri2.SetTag("1", "11") == nil)
 
 	test.Assert(t, ri.ServiceName() == "service2")
 	test.Assert(t, ri.DefaultTag("a", "-") == "aa")
-	test.Assert(t, ri.DefaultTag("1", "-") == "2")
+	test.Assert(t, ri.DefaultTag("1", "-") == "11")
 	test.Assert(t, ri.GetInstance() == nil)
 	test.Assert(t, ri.Address() == nil)
 

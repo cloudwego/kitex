@@ -221,10 +221,8 @@ func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Cont
 func (kc *kClient) applyCallOptions(ctx context.Context, cfg rpcinfo.RPCConfig, svr remoteinfo.RemoteInfo) context.Context {
 	cos := CallOptionsFromCtx(ctx)
 	if len(cos) > 0 {
-		info := callopt.Apply(cos, cfg, svr, kc.opt.Locks, kc.opt.HTTPResolver)
+		info := callopt.Apply(cos, cfg, svr, kc.opt.HTTPResolver)
 		ctx = context.WithValue(ctx, ctxCallOptionInfoKey, info)
-	} else {
-		kc.opt.Locks.ApplyLocks(cfg, svr)
 	}
 	return ctx
 }

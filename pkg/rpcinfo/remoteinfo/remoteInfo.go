@@ -23,7 +23,6 @@ import (
 
 	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/pkg/discovery"
-	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
@@ -33,9 +32,6 @@ type RemoteInfo interface {
 	rpcinfo.EndpointInfo
 	SetServiceName(name string)
 	SetTag(key, value string) error
-
-	// SetTagLock freezes a key of the tags and refuses further modification on its value.
-	SetTagLock(key string)
 	GetInstance() discovery.Instance
 	SetInstance(ins discovery.Instance)
 
@@ -62,7 +58,6 @@ type remoteInfo struct {
 	tags        map[string]string
 
 	instance discovery.Instance
-	tagLocks map[string]struct{}
 }
 
 func init() {
@@ -71,8 +66,7 @@ func init() {
 
 func newRemoteInfo() interface{} {
 	return &remoteInfo{
-		tags:     make(map[string]string),
-		tagLocks: make(map[string]struct{}),
+		tags: make(map[string]string),
 	}
 }
 
@@ -146,20 +140,10 @@ func (ri *remoteInfo) Address() net.Addr {
 	return nil
 }
 
-// SetTagLocks locks tag.
-func (ri *remoteInfo) SetTagLock(key string) {
-	ri.Lock()
-	ri.tagLocks[key] = struct{}{}
-	ri.Unlock()
-}
-
 // SetTag implements rpcinfo.MutableEndpointInfo.
 func (ri *remoteInfo) SetTag(key, value string) error {
 	ri.Lock()
 	defer ri.Unlock()
-	if _, exist := ri.tagLocks[key]; exist {
-		return kerrors.ErrNotSupported
-	}
 	ri.tags[key] = value
 	return nil
 }
@@ -175,9 +159,6 @@ func (ri *remoteInfo) zero() {
 	ri.instance = nil
 	for k := range ri.tags {
 		delete(ri.tags, k)
-	}
-	for k := range ri.tagLocks {
-		delete(ri.tagLocks, k)
 	}
 }
 

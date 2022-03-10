@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/http"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -39,23 +38,17 @@ var callOptionsPool = sync.Pool{
 type callOptions struct {
 	configs      rpcinfo.RPCConfig
 	svr          remoteinfo.RemoteInfo
-	locks        *client.ConfigLocks
 	httpResolver http.Resolver
 }
 
 func newOptions() interface{} {
-	return &callOptions{
-		locks: &client.ConfigLocks{
-			Tags: make(map[string]struct{}),
-		},
-	}
+	return &callOptions{}
 }
 
 // Recycle zeros the call option and put it to the pool.
 func (co *callOptions) Recycle() {
 	co.configs = nil
 	co.svr = nil
-	co.locks.Zero()
 	callOptionsPool.Put(co)
 }
 
@@ -127,11 +120,9 @@ func WithRPCTimeout(d time.Duration) Option {
 
 		cfg := rpcinfo.AsMutableRPCConfig(o.configs)
 		cfg.SetRPCTimeout(d)
-		o.locks.Bits |= rpcinfo.BitRPCTimeout
 
 		// TODO SetReadWriteTimeout 是否考虑删除
 		cfg.SetReadWriteTimeout(d)
-		o.locks.Bits |= rpcinfo.BitReadWriteTimeout
 	}}
 }
 
@@ -144,7 +135,6 @@ func WithConnectTimeout(d time.Duration) Option {
 
 		cfg := rpcinfo.AsMutableRPCConfig(o.configs)
 		cfg.SetConnectTimeout(d)
-		o.locks.Bits |= rpcinfo.BitConnectTimeout
 	}}
 }
 
@@ -159,20 +149,18 @@ func WithTag(key, val string) Option {
 		di.WriteByte(')')
 
 		o.svr.SetTag(key, val)
-		o.locks.Tags[key] = struct{}{}
 	}}
 }
 
 // Apply applies call options to the rpcinfo.RPCConfig and internal.RemoteInfo of kitex client.
 // The return value records the name and arguments of each option.
 // This function is for internal purpose only.
-func Apply(cos []Option, cfg rpcinfo.RPCConfig, svr remoteinfo.RemoteInfo, locks *client.ConfigLocks, httpResolver http.Resolver) string {
+func Apply(cos []Option, cfg rpcinfo.RPCConfig, svr remoteinfo.RemoteInfo, httpResolver http.Resolver) string {
 	var buf strings.Builder
 
 	co := callOptionsPool.Get().(*callOptions)
 	co.configs = cfg
 	co.svr = svr
-	co.locks.Merge(locks)
 	co.httpResolver = httpResolver
 
 	buf.WriteByte('[')
@@ -184,7 +172,6 @@ func Apply(cos []Option, cfg rpcinfo.RPCConfig, svr remoteinfo.RemoteInfo, locks
 	}
 	buf.WriteByte(']')
 
-	co.locks.ApplyLocks(cfg, svr)
 	co.Recycle()
 	return buf.String()
 }

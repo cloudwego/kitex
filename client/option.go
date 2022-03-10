@@ -229,7 +229,6 @@ func WithRPCTimeout(d time.Duration) Option {
 		di.Push(fmt.Sprintf("WithRPCTimeout(%dms)", d.Milliseconds()))
 
 		rpcinfo.AsMutableRPCConfig(o.Configs).SetRPCTimeout(d)
-		o.Locks.Bits |= rpcinfo.BitRPCTimeout
 	}}
 }
 
@@ -239,7 +238,6 @@ func WithConnectTimeout(d time.Duration) Option {
 		di.Push(fmt.Sprintf("WithConnectTimeout(%dms)", d.Milliseconds()))
 
 		rpcinfo.AsMutableRPCConfig(o.Configs).SetConnectTimeout(d)
-		o.Locks.Bits |= rpcinfo.BitConnectTimeout
 	}}
 }
 
@@ -261,7 +259,6 @@ func WithTag(key, val string) Option {
 		di.Push(fmt.Sprintf("WithTag(%s=%s)", key, val))
 
 		o.Svr.Tags[key] = val
-		o.Locks.Tags[key] = struct{}{}
 	}}
 }
 
