@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/trans/invoke"
@@ -51,7 +50,8 @@ func TestInvokerCall(t *testing.T) {
 	// call success
 	b, _ := codec.Encode("mock", thrift.CALL, 0, args.(thrift.TStruct))
 	msg := invoke.NewMessage(nil, nil)
-	msg.SetRequestBytes(b)
+	err = msg.SetRequestBytes(b)
+	test.Assert(t, err == nil)
 	err = invoker.Call(msg)
 	if err != nil {
 		t.Fatal(err)
@@ -66,10 +66,19 @@ func TestInvokerCall(t *testing.T) {
 	// call fails
 	b, _ = codec.Encode("mockError", thrift.CALL, 0, args.(thrift.TStruct))
 	msg = invoke.NewMessage(nil, nil)
-	msg.SetRequestBytes(b)
+	err = msg.SetRequestBytes(b)
+	test.Assert(t, err == nil)
 	err = invoker.Call(msg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	test.Assert(t, strings.Contains(gotErr.Load().(error).Error(), "mockError"))
+}
+
+func TestInvokerInit(t *testing.T) {
+	// test init without register server info
+	invoker := NewInvoker()
+	err := invoker.Init()
+	test.Assert(t, err != nil)
+	test.Assert(t, strings.Contains(err.(error).Error(), "run: no service. Use RegisterService to set one"))
 }
