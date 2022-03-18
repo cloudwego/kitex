@@ -113,10 +113,12 @@ func (ri *remoteInfo) Tag(key string) (value string, exist bool) {
 	ri.RLock()
 	defer ri.RUnlock()
 
-	value, exist = ri.tags[key]
-	if !exist && ri.instance != nil {
-		value, exist = ri.instance.Tag(key)
+	if ri.instance != nil {
+		if value, exist = ri.instance.Tag(key); exist {
+			return
+		}
 	}
+	value, exist = ri.tags[key]
 	return
 }
 
