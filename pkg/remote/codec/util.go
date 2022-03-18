@@ -63,7 +63,7 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 // SetOrCheckSeqID is used to check the sequence ID.
 func SetOrCheckSeqID(seqID int32, message remote.Message) error {
 	switch message.MessageType() {
-	case remote.Call:
+	case remote.Call, remote.Oneway:
 		if ink, ok := message.RPCInfo().Invocation().(rpcinfo.InvocationSetter); ok {
 			ink.SetSeqID(seqID)
 		} else {

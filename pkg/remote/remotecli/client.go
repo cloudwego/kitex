@@ -21,6 +21,7 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -98,6 +99,10 @@ func (c *client) Recv(ctx context.Context, ri rpcinfo.RPCInfo, resp remote.Messa
 	if resp != nil {
 		err = c.transHdlr.Read(ctx, c.conn, resp)
 		c.transHdlr.OnMessage(ctx, nil, resp)
+	} else {
+		// Wait for the request to be flushed out before closing the connection.
+		// 500us is an acceptable duration to keep a minimal loss rate at best effort.
+		time.Sleep(time.Millisecond / 2)
 	}
 
 	c.connManager.ReleaseConn(err, ri)
