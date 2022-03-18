@@ -85,8 +85,9 @@ func Parse(tree *parser.Thrift, mode ParseMode) (*descriptor.ServiceDescriptor, 
 		sDsc.Name = "CombinedServices"
 	}
 
+	visitedSvcs := make(map[*parser.Service]bool, len(tree.Services))
 	for _, svc := range svcs {
-		for p := range getAllFunctions(svc, tree) {
+		for p := range getAllFunctions(svc, tree, visitedSvcs) {
 			fn := p.data.(*parser.Function)
 			if err := addFunction(fn, p.tree, sDsc, structsCache); err != nil {
 				return nil, err
@@ -101,11 +102,17 @@ type pair struct {
 	data interface{}
 }
 
-func getAllFunctions(svc *parser.Service, tree *parser.Thrift) chan *pair {
+func getAllFunctions(svc *parser.Service, tree *parser.Thrift, visitedSvcs map[*parser.Service]bool) chan *pair {
 	ch := make(chan *pair)
 	svcs := make(chan *pair)
+	addSvc := func(tree *parser.Thrift, svc *parser.Service) {
+		if exist := visitedSvcs[svc]; !exist {
+			svcs <- &pair{tree: tree, data: svc}
+			visitedSvcs[svc] = true
+		}
+	}
 	go func() {
-		svcs <- &pair{tree: tree, data: svc}
+		addSvc(tree, svc)
 		for base := svc.Extends; base != ""; base = svc.Extends {
 			ref := svc.GetReference()
 			if ref != nil {
@@ -114,10 +121,7 @@ func getAllFunctions(svc *parser.Service, tree *parser.Thrift) chan *pair {
 				tree = tree.Includes[idx].Reference
 			}
 			svc, _ = tree.GetService(base)
-			svcs <- &pair{
-				tree: tree,
-				data: svc,
-			}
+			addSvc(tree, svc)
 		}
 		close(svcs)
 	}()
