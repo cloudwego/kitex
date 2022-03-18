@@ -19,7 +19,6 @@ package event
 import (
 	"sync"
 	"sync/atomic"
-	"unsafe"
 )
 
 const (
@@ -66,8 +65,7 @@ func (q *queue) Push(e *Event) {
 		newV := oldV + 1
 		if atomic.CompareAndSwapUint32(&q.tail, old, new) && atomic.CompareAndSwapUint32(q.tailVersion[old], oldV, newV) {
 			q.mu.Lock()
-			p := (*unsafe.Pointer)(unsafe.Pointer(&q.ring[old]))
-			atomic.StorePointer(p, unsafe.Pointer(e))
+			q.ring[old] = e
 			q.mu.Unlock()
 			break
 		}
