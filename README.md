@@ -91,7 +91,7 @@ We provide the [kitex-benchmark](https://github.com/cloudwego/kitex-benchmark) p
 
 - [Performance Optimization on Kitex](https://www.cloudwego.io/blog/2021/09/23/performance-optimization-on-kitex/)
 - [ByteDance Practice on Go Network Library](https://www.cloudwego.io/blog/2021/10/09/bytedance-practices-on-go-network-library/)
-- [Getting Started With RPC Practices: Performance Testing Guide](https://www.cloudwego.io/blog/2021/11/24/getting-started-with-rpc-practices-performance-testing-guide/)
+- [Getting Started With Kitex's Practice: Performance Testing Guide](https://www.cloudwego.io/blog/2021/11/24/getting-started-with-kitexs-practice-performance-testing-guide/)
 
 ## Contributing
 
