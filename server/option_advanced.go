@@ -78,7 +78,7 @@ func WithMetaHandler(h remote.MetaHandler) Option {
 	}}
 }
 
-// WithProxy stes the backward Proxy for server.
+// WithProxy sets the backward Proxy for server.
 func WithProxy(p proxy.ReverseProxy) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		o.Once.OnceOrPanic()

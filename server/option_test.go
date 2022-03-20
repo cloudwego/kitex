@@ -114,3 +114,19 @@ func (m *mockDiagnosis) RegisterProbeFunc(name diagnosis.ProbeName, probeFunc di
 func (m *mockDiagnosis) ProbePairs() map[diagnosis.ProbeName]diagnosis.ProbeFunc {
 	return m.probes
 }
+
+func TestExitWaitTimeOption(t *testing.T) {
+	// random timeout value
+	testTimeOut := time.Duration(time.Now().Unix()) * time.Microsecond
+	svr := NewServer(WithExitWaitTime(testTimeOut))
+	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr.Run()
+	test.Assert(t, err == nil, err)
+	iSvr := svr.(*server)
+	test.Assert(t, iSvr.opt.RemoteOpt.ExitWaitTime == testTimeOut)
+}
