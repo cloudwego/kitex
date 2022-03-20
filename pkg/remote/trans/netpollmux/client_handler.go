@@ -131,7 +131,6 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 		ctx, cancel = context.WithTimeout(ctx, readTimeout)
 		defer cancel()
 	}
-
 	select {
 	case <-ctx.Done():
 		// timeout
