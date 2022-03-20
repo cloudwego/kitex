@@ -81,4 +81,7 @@ func TestInvokerInit(t *testing.T) {
 	err := invoker.Init()
 	test.Assert(t, err != nil)
 	test.Assert(t, strings.Contains(err.(error).Error(), "run: no service. Use RegisterService to set one"))
+
+	err = invoker.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil)
 }

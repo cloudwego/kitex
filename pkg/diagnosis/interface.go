@@ -60,7 +60,7 @@ func WrapAsProbeFunc(data interface{}) ProbeFunc {
 	}
 }
 
-// NoopService is a empty implementation of Service.
+// NoopService is an empty implementation of Service.
 // If you need diagnosis feature, specify Service through the option WithDiagnosisService of client and server.
 var NoopService Service = &noopService{}
 

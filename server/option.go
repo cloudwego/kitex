@@ -48,7 +48,7 @@ type Suite interface {
 	Options() []Option
 }
 
-// WithSuite adds a option suite for server.
+// WithSuite adds an option suite for server.
 func WithSuite(suite Suite) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		var nested struct {
