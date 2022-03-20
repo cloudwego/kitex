@@ -134,7 +134,7 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 	select {
 	case <-ctx.Done():
 		// timeout
-		return fmt.Errorf("recv wait timeout %s, seqID=%d", msg.RPCInfo().Config().ReadWriteTimeout().String(), seqID)
+		return fmt.Errorf("recv wait timeout %s, seqID=%d", readTimeout, seqID)
 	case err := <-callback.notifyChan:
 		// recv
 		if err != nil {
