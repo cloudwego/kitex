@@ -43,8 +43,14 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 	} else {
 		svcName = fmt.Sprintf("%s.%s", ri.Invocation().PackageName(), ri.Invocation().ServiceName())
 	}
+
+	host := ri.To().ServiceName()
+	if url, ok := ri.To().Tag(rpcinfo.HTTPURL); ok {
+		host = url
+	}
+
 	s, err := tr.NewStream(ctx, &grpc.CallHdr{
-		Host: ri.To().ServiceName(),
+		Host: host,
 		// grpc method format /package.Service/Method
 		Method: fmt.Sprintf("/%s/%s", svcName, ri.Invocation().MethodName()),
 	})
