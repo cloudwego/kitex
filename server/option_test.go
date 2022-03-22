@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -129,4 +130,86 @@ func TestExitWaitTimeOption(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	iSvr := svr.(*server)
 	test.Assert(t, iSvr.opt.RemoteOpt.ExitWaitTime == testTimeOut)
+}
+
+func TestMaxConnIdleTimeOption(t *testing.T) {
+	// random timeout value
+	testTimeOut := time.Duration(time.Now().Unix())
+	svr := NewServer(WithMaxConnIdleTime(testTimeOut))
+	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr.Run()
+	test.Assert(t, err == nil, err)
+	iSvr := svr.(*server)
+	test.Assert(t, iSvr.opt.RemoteOpt.MaxConnectionIdleTime == testTimeOut)
+}
+
+type myTracer struct {
+}
+
+func (t *myTracer) Start(ctx context.Context) context.Context {
+	return nil
+}
+
+func (t *myTracer) Finish(ctx context.Context) {
+}
+
+func TestTracerOption(t *testing.T) {
+	svr1 := NewServer()
+	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr1.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr1.Run()
+	test.Assert(t, err == nil, err)
+	iSvr1 := svr1.(*server)
+	test.Assert(t, iSvr1.opt.TracerCtl != nil)
+	test.Assert(t, iSvr1.opt.TracerCtl.HasTracer() != true)
+
+	tracer := &myTracer{}
+	svr2 := NewServer(WithTracer(tracer))
+	err = svr2.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr2.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr2.Run()
+	test.Assert(t, err == nil, err)
+	iSvr2 := svr2.(*server)
+	test.Assert(t, iSvr2.opt.TracerCtl != nil)
+	test.Assert(t, iSvr2.opt.TracerCtl.HasTracer())
+}
+
+func TestStatsLevelOption(t *testing.T) {
+	svr1 := NewServer()
+	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr1.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr1.Run()
+	test.Assert(t, err == nil, err)
+	iSvr1 := svr1.(*server)
+	test.Assert(t, iSvr1.opt.StatsLevel != nil)
+	test.Assert(t, *iSvr1.opt.StatsLevel == stats.LevelDisabled)
+
+	svr2 := NewServer(WithStatsLevel(stats.LevelDetailed))
+	err = svr2.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr2.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr2.Run()
+	test.Assert(t, err == nil, err)
+	iSvr2 := svr2.(*server)
+	test.Assert(t, *iSvr2.opt.StatsLevel == stats.LevelDetailed)
 }
