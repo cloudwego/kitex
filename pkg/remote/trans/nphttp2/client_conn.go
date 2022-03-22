@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
@@ -45,8 +46,12 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 	}
 
 	host := ri.To().ServiceName()
-	if url, ok := ri.To().Tag(rpcinfo.HTTPURL); ok {
-		host = url
+	if rawURL, ok := ri.To().Tag(rpcinfo.HTTPURL); ok {
+		u, err := url.Parse(rawURL)
+		if err != nil {
+			return nil, err
+		}
+		host = u.Host
 	}
 
 	s, err := tr.NewStream(ctx, &grpc.CallHdr{
