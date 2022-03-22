@@ -45,7 +45,12 @@ func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 
 type muxCliConn struct {
 	muxConn
+	closing  bool      // whether the server is going to close this connection
 	seqIDMap *shardMap // (k,v) is (sequenceID, notify)
+}
+
+func (c *muxCliConn) IsActive() bool {
+	return !c.closing && c.muxConn.IsActive()
 }
 
 // OnRequest is called when the connection creates.
@@ -61,6 +66,14 @@ func (c *muxCliConn) OnRequest(ctx context.Context, connection netpoll.Connectio
 	if err != nil {
 		err = fmt.Errorf("mux read package slice failed: addr(%s), %w", connection.RemoteAddr(), err)
 		return c.onError(ctx, err, connection)
+	}
+	if seqID == 0 {
+		// the server is closing this connection
+		c.closing = true
+
+		// the payload will be a thrift exception, we don't need it by now,
+		// so discard it.
+		return reader.Skip(length)
 	}
 	go func() {
 		asyncCallback, ok := c.seqIDMap.load(seqID)

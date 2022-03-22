@@ -19,6 +19,8 @@ package remote
 import (
 	"context"
 	"net"
+
+	"github.com/cloudwego/kitex/pkg/kerrors"
 )
 
 // BoundHandler is used to abstract the bound handler.
@@ -160,4 +162,12 @@ func (p *TransPipeline) OnMessage(ctx context.Context, args, result Message) (co
 // SetPipeline does nothing now.
 func (p *TransPipeline) SetPipeline(transPipe *TransPipeline) {
 	// do nothing
+}
+
+// Shutdown implements the remote GracefulShutdown interface.
+func (p *TransPipeline) Shutdown(ctx context.Context) error {
+	if g, ok := p.netHdlr.(GracefulShutdown); ok {
+		return g.Shutdown(ctx)
+	}
+	return kerrors.ErrNotSupported
 }

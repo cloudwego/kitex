@@ -76,9 +76,12 @@ type defaultCodec struct {
 // Encode implements the remote.Codec interface, it does complete message encode include header and payload.
 func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
 	defer func() {
-		ri := message.RPCInfo()
 		// notice: mallocLen() must exec before flush, or it will be reset
-		rpcinfo.AsMutableRPCStats(ri.Stats()).SetSendSize(uint64(out.MallocLen()))
+		if ri := message.RPCInfo(); ri != nil {
+			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {
+				ms.SetSendSize(uint64(out.MallocLen()))
+			}
+		}
 	}()
 	var err error
 	var totalLenField []byte
@@ -132,8 +135,11 @@ func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out r
 // Decode implements the remote.Codec interface, it does complete message decode include header and payload.
 func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
 	defer func() {
-		ri := message.RPCInfo()
-		rpcinfo.AsMutableRPCStats(ri.Stats()).SetRecvSize(uint64(in.ReadLen()))
+		if ri := message.RPCInfo(); ri != nil {
+			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {
+				ms.SetRecvSize(uint64(in.ReadLen()))
+			}
+		}
 	}()
 
 	var flagBuf []byte

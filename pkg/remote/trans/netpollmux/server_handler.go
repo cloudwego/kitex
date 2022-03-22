@@ -23,7 +23,9 @@ import (
 	"net"
 	"runtime/debug"
 	"sync"
+	"time"
 
+	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/netpoll"
 
 	stats2 "github.com/cloudwego/kitex/internal/stats"
@@ -37,6 +39,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/transport"
 )
 
 type svrTransHandlerFactory struct{}
@@ -80,6 +83,7 @@ type svrTransHandler struct {
 	transPipe  *remote.TransPipeline
 	ext        trans.Extension
 	funcPool   sync.Pool
+	conns      sync.Map
 }
 
 // Write implements the remote.ServerTransHandler interface.
@@ -275,12 +279,44 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 			return ctx
 		},
 	}
-	return context.WithValue(context.Background(), ctxKeyMuxSvrConn{}, newMuxSvrConn(connection, pool)), nil
+	muxConn := newMuxSvrConn(connection, pool)
+	t.conns.Store(conn, muxConn)
+	return context.WithValue(context.Background(), ctxKeyMuxSvrConn{}, muxConn), nil
 }
 
 // OnInactive implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
-	// do nothing now
+	t.conns.Delete(conn)
+}
+
+func (t *svrTransHandler) Shutdown(ctx context.Context) error {
+	// Send a thrift exception with sequence ID 0 to notify the remote
+	// end to close the connection or prevent further operation on it.
+	iv := rpcinfo.NewInvocation("none", "none")
+	iv.(interface{ SetSeqID(seqID int32) }).SetSeqID(0)
+	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
+	data := thrift.NewTProtocolException(errors.New("server is shutting down"))
+	msg := remote.NewMessage(data, t.svcInfo, ri, remote.Exception, remote.Server)
+	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	t.conns.Range(func(k, v interface{}) bool {
+		wbuf := netpoll.NewLinkBuffer()
+		bufWriter := np.NewWriterByteBuffer(wbuf)
+		err := t.codec.Encode(ctx, msg, bufWriter)
+		bufWriter.Release(err)
+		if err == nil {
+			v.(*muxSvrConn).Put(func() (buf netpoll.Writer, isNil bool) {
+				return wbuf, false
+			})
+		} else {
+			c := v.(*muxSvrConn)
+			klog.Warn("[mux] signal connection closing error:",
+				err.Error(), c.LocalAddr().String(), "=>", c.RemoteAddr().String())
+		}
+		return true
+	})
+	// wait for a while until all notifications are sent
+	time.Sleep(time.Second)
+	return nil
 }
 
 // OnError implements the remote.ServerTransHandler interface.
