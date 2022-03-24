@@ -91,6 +91,7 @@ We provide the [kitex-benchmark](https://github.com/cloudwego/kitex-benchmark) p
 
 - [Performance Optimization on Kitex](https://www.cloudwego.io/blog/2021/09/23/performance-optimization-on-kitex/)
 - [ByteDance Practice on Go Network Library](https://www.cloudwego.io/blog/2021/10/09/bytedance-practices-on-go-network-library/)
+- [Getting Started With Kitex's Practice: Performance Testing Guide](https://www.cloudwego.io/blog/2021/11/24/getting-started-with-kitexs-practice-performance-testing-guide/)
 
 ## Contributing
 
@@ -106,7 +107,7 @@ Kitex is distributed under the [Apache License, version 2.0](https://github.com/
 - Issues: [Issues](https://github.com/cloudwego/kitex/issues)
 - Lark: Scan the QR code below with [Lark](https://www.larksuite.com/zh_cn/download) to join our CloudWeGo/kitex user group.
 
-  ![LarkGroup](docs/images/lark_group.png)
+  ![LarkGroup](images/lark_group.png)
 
 ## Landscapes
 

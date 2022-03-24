@@ -27,7 +27,7 @@ type IdleConfig struct {
 
 const (
 	defaultMaxIdleTimeout = 30 * time.Second
-	minMaxIdleTimeout     = 3 * time.Second
+	minMaxIdleTimeout     = 2 * time.Second
 )
 
 // CheckPoolConfig to check invalid param.

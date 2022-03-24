@@ -50,7 +50,6 @@ const (
 	DestServiceKey ProbeName = "dest_service"
 	ConnPoolKey    ProbeName = "conn_pool"
 	RetryPolicyKey ProbeName = "retry_policy"
-	LbCacheKey     ProbeName = "lb_cache"
 )
 
 // WrapAsProbeFunc is to wrap probe data as ProbeFunc, the data is some infos that you want to diagnosis, like config info.

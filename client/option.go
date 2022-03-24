@@ -155,6 +155,9 @@ func WithHostPorts(hostports ...string) Option {
 				}, nil
 			},
 			NameFunc: func() string { return o.Targets },
+			TargetFunc: func(ctx context.Context, target rpcinfo.EndpointInfo) string {
+				return o.Targets
+			},
 		}
 	}}
 }

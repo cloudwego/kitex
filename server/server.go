@@ -188,9 +188,11 @@ func (s *server) Run() (err error) {
 	}
 
 	errCh := s.svr.Start()
+	muStartHooks.Lock()
 	for i := range onServerStart {
 		go onServerStart[i]()
 	}
+	muStartHooks.Unlock()
 	s.Lock()
 	s.buildRegistryInfo(s.svr.Address())
 	s.Unlock()
@@ -198,9 +200,11 @@ func (s *server) Run() (err error) {
 	if err = s.waitExit(errCh); err != nil {
 		klog.Errorf("KITEX: received error and exit: error=%s", err.Error())
 	}
+	muShutdownHooks.Lock()
 	for i := range onShutdown {
 		onShutdown[i]()
 	}
+	muShutdownHooks.Unlock()
 	// stop server after user hooks
 	if e := s.Stop(); e != nil && err == nil {
 		err = e
