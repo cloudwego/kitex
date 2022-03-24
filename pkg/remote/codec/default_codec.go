@@ -317,6 +317,7 @@ func checkPayload(
 		return err
 	}
 	message.SetProtocolInfo(remote.NewProtocolInfo(transProto, codecType))
+	rpcinfo.AsMutableRPCConfig(message.RPCInfo().Config()).SetTransportProtocol(message.ProtocolInfo().TransProto)
 	return nil
 }
 
