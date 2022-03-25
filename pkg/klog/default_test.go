@@ -19,9 +19,10 @@ package klog
 import (
 	"bytes"
 	"context"
-	"github.com/cloudwego/kitex/internal/test"
 	"os"
 	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func normalOutput(t *testing.T, testLevel Level, want string, args ...interface{}) {
@@ -54,7 +55,7 @@ func normalOutput(t *testing.T, testLevel Level, want string, args ...interface{
 	}
 }
 
-func ctxOutput(t *testing.T, testLevel Level, want string, format string, args ...interface{}) {
+func ctxOutput(t *testing.T, testLevel Level, want, format string, args ...interface{}) {
 	buf := new(bytes.Buffer)
 	SetOutput(buf)
 	defer SetOutput(os.Stderr)
@@ -88,7 +89,7 @@ func ctxOutput(t *testing.T, testLevel Level, want string, format string, args .
 	}
 }
 
-func formatOutput(t *testing.T, testLevel Level, want string, format string, args ...interface{}) {
+func formatOutput(t *testing.T, testLevel Level, want, format string, args ...interface{}) {
 	buf := new(bytes.Buffer)
 	SetOutput(buf)
 	defer SetOutput(os.Stderr)
@@ -125,7 +126,7 @@ func TestOutput(t *testing.T) {
 	defer l.stdlog.SetFlags(oldFlags)
 	defer SetLevel(LevelInfo)
 
-	var tests = []struct {
+	tests := []struct {
 		format      string
 		args        []interface{}
 		testLevel   Level
