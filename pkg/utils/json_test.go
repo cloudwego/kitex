@@ -103,6 +103,11 @@ func TestMap2JSONStr(t *testing.T) {
 	for k := range map1 {
 		test.Assert(t, map1[k] == map2[k])
 	}
+
+	mapInfo = nil
+	jsonRetNil, err := Map2JSONStr(mapInfo)
+	test.Assert(t, err == nil)
+	test.Assert(t, jsonRetNil == "{}")
 }
 
 func TestJSONStr2Map(t *testing.T) {
@@ -120,6 +125,19 @@ func TestJSONStr2Map(t *testing.T) {
 	ret, err := JSONStr2Map(str)
 	test.Assert(t, ret == nil)
 	test.Assert(t, err == nil)
+	str = "nUll"
+	ret, err = JSONStr2Map(str)
+	test.Assert(t, ret == nil)
+	test.Assert(t, err != nil)
+	str = "nuLL"
+	ret, err = JSONStr2Map(str)
+	test.Assert(t, ret == nil)
+	test.Assert(t, err != nil)
+	str = "nulL"
+	ret, err = JSONStr2Map(str)
+	test.Assert(t, ret == nil)
+	test.Assert(t, err != nil)
+
 	str = "{}"
 	ret, err = JSONStr2Map(str)
 	test.Assert(t, ret == nil)
@@ -135,12 +153,25 @@ func TestJSONStr2Map(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, mapRet["你好"] == "周杰伦")
 
-	unicodeMiexedStr := `{"aaa\u4f60\u597daaa": ":\\\u5468\u6770\u4f26"  ,  "加油 \u52a0\u6cb9" : "Come on \u52a0\u6cb9"}`
-	mapRet, err = JSONStr2Map(unicodeMiexedStr)
-	// err = json.Unmarshal([]byte(unicodeMiexedStr), &mapRet)
+	unicodeMixedStr := `{"aaa\u4f60\u597daaa": ":\\\u5468\u6770\u4f26"  ,  "加油 \u52a0\u6cb9" : "Come on \u52a0\u6cb9"}`
+	mapRet, err = JSONStr2Map(unicodeMixedStr)
 	test.Assert(t, err == nil)
 	test.Assert(t, mapRet["aaa你好aaa"] == ":\\周杰伦")
 	test.Assert(t, mapRet["加油 加油"] == "Come on 加油")
+
+	unicodeMixedStr = `{"aaa\u4F60\u597Daaa": "\u5468\u6770\u4f26"}`
+	mapRet, err = JSONStr2Map(unicodeMixedStr)
+	test.Assert(t, err == nil)
+	test.Assert(t, mapRet["aaa你好aaa"] == "周杰伦")
+
+	illegalUnicodeStr := `{"aaa\u4z60\u597daaa": "加油"}`
+	mapRet, err = JSONStr2Map(illegalUnicodeStr)
+	test.Assert(t, err != nil)
+
+	surrogateUnicodeStr := `{"\u4F60\u597D": "\uDFFF\uD800"}`
+	mapRet, err = JSONStr2Map(surrogateUnicodeStr)
+	test.Assert(t, err == nil)
+
 }
 
 func TestJSONUtil(t *testing.T) {

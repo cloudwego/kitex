@@ -36,6 +36,13 @@ func TestNewRing(t *testing.T) {
 
 	obj3 := r.Pop()
 	test.Assert(t, obj3.(string) == obj2)
+
+	r = NewRing(1)
+	test.Assert(t, r.length == 1)
+
+	test.Panic(t, func() {
+		r = NewRing(0)
+	})
 }
 
 func TestRing_Push(t *testing.T) {
@@ -51,6 +58,11 @@ func TestRing_Push(t *testing.T) {
 			test.Assert(t, err != nil)
 		}
 	}
+
+	// size == 1
+	r = NewRing(1)
+	err = r.Push(1)
+	test.Assert(t, err == nil)
 }
 
 func TestRing_Pop(t *testing.T) {
@@ -70,6 +82,24 @@ func TestRing_Pop(t *testing.T) {
 			test.Assert(t, elem == nil)
 		}
 	}
+
+	// size == 1
+	r = NewRing(1)
+	err := r.Push(1)
+	test.Assert(t, err == nil)
+	elem := r.Pop()
+	test.Assert(t, elem != nil)
+}
+
+func TestRing_Dump(t *testing.T) {
+	r := NewRing(10)
+	for i := 0; i < 10; i++ {
+		err := r.Push(i)
+		test.Assert(t, err == nil)
+	}
+
+	dumpData := r.Dump()
+	test.Assert(t, dumpData != nil)
 }
 
 func TestRing_Parallel(t *testing.T) {
