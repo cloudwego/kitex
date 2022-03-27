@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"math/rand"
 	"net"
 	"testing"
 	"time"
@@ -212,4 +213,70 @@ func TestStatsLevelOption(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	iSvr2 := svr2.(*server)
 	test.Assert(t, *iSvr2.opt.StatsLevel == stats.LevelDetailed)
+}
+
+const (
+	suiteSvcName = "suiteSvcName"
+)
+
+type mySuiteOption struct {
+	myOpts []Option
+}
+
+func (s *mySuiteOption) Options() []Option {
+	return s.myOpts
+}
+
+func TestSuiteOption(t *testing.T) {
+	svr1 := NewServer()
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr1.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	err = svr1.Run()
+	test.Assert(t, err == nil, err)
+	iSvr1 := svr1.(*server)
+	defaultExitWaitTime := iSvr1.opt.RemoteOpt.ExitWaitTime
+	defaultConnectionIdleTime := iSvr1.opt.RemoteOpt.MaxConnectionIdleTime
+	test.Assert(t, defaultExitWaitTime != 0)
+	test.Assert(t, defaultConnectionIdleTime != 0)
+
+	tmpWaitTime := defaultExitWaitTime*2 + time.Duration(rand.Intn(20))
+	tmpConnIdleTime := defaultConnectionIdleTime*2 + time.Duration(rand.Intn(20))
+	suiteOpt := &mySuiteOption{myOpts: []Option{
+		WithExitWaitTime(tmpWaitTime),
+		WithMaxConnIdleTime(tmpConnIdleTime),
+	}}
+	svr2 := NewServer(WithSuite(suiteOpt))
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr2.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr2.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	err = svr2.Run()
+	test.Assert(t, err == nil, err)
+	iSvr2 := svr2.(*server)
+	test.Assert(t, iSvr2.opt.RemoteOpt.ExitWaitTime != defaultExitWaitTime, iSvr2.opt.RemoteOpt.ExitWaitTime)
+	test.Assert(t, iSvr2.opt.RemoteOpt.MaxConnectionIdleTime != defaultConnectionIdleTime, iSvr2.opt.RemoteOpt.ExitWaitTime)
+
+	test.Assert(t, iSvr2.opt.RemoteOpt.ExitWaitTime == tmpWaitTime, iSvr2.opt.RemoteOpt.ExitWaitTime)
+	test.Assert(t, iSvr2.opt.RemoteOpt.MaxConnectionIdleTime == tmpConnIdleTime, iSvr2.opt.RemoteOpt.MaxConnectionIdleTime)
+}
+
+func TestMuxTransportOption(t *testing.T) {
+	svr1 := NewServer()
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr1.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	err = svr1.Run()
+	test.Assert(t, err == nil, err)
+	iSvr1 := svr1.(*server)
+	defaultHandlerFactory := iSvr1.opt.RemoteOpt.SvrHandlerFactory
+	t.Logf("defaultHandlerFactory:%v", defaultHandlerFactory)
 }
