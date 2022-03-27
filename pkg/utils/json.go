@@ -143,7 +143,9 @@ func JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
 	mapInfo = make(map[string]string)
 	for ; c == Comma || c == LeftBrace; c, idx, err = nextToken(data, idx, lastIdx) {
 		var key, val string
-		key, idx, err = readString(data, idx, lastIdx)
+		if key, idx, err = readString(data, idx, lastIdx); err != nil {
+			return
+		}
 		if c, idx, err = nextToken(data, idx, lastIdx); c != ':' || err != nil {
 			err = fmt.Errorf("json str is invalid, expect ':' after object field, but found %s", string(c))
 			return
@@ -267,7 +269,7 @@ func readU4(buf []byte, idx, lastIdx int) (rune, int, error) {
 		} else if c >= 'A' && c <= 'F' {
 			ret = ret*16 + rune(c-'A'+10)
 		} else {
-			return ret, idx, fmt.Errorf("readU4 expects 0~9 or a~f, but found %v", string([]byte{c}))
+			return ret, idx, fmt.Errorf("unicode invalid: expects 0~9 or a~f, but found %v", string([]byte{c}))
 		}
 	}
 	return ret, idx, nil
