@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
+// test package level functions without format
 func normalOutput(t *testing.T, testLevel Level, want string, args ...interface{}) {
 	buf := new(bytes.Buffer)
 	SetOutput(buf)
@@ -55,6 +56,7 @@ func normalOutput(t *testing.T, testLevel Level, want string, args ...interface{
 	}
 }
 
+// test package level Ctx-related functions with 'format'
 func ctxOutput(t *testing.T, testLevel Level, want, format string, args ...interface{}) {
 	buf := new(bytes.Buffer)
 	SetOutput(buf)
@@ -89,6 +91,7 @@ func ctxOutput(t *testing.T, testLevel Level, want, format string, args ...inter
 	}
 }
 
+// test package level functions with 'format'
 func formatOutput(t *testing.T, testLevel Level, want, format string, args ...interface{}) {
 	buf := new(bytes.Buffer)
 	SetOutput(buf)
@@ -119,6 +122,7 @@ func formatOutput(t *testing.T, testLevel Level, want, format string, args ...in
 	}
 }
 
+//
 func TestOutput(t *testing.T) {
 	l := DefaultLogger().(*defaultLogger)
 	oldFlags := l.stdlog.Flags()
