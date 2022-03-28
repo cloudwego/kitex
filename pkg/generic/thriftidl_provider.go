@@ -130,20 +130,29 @@ func (p *ThriftContentProvider) Close() error {
 	return nil
 }
 
-func parseIncludes(tree *parser.Thrift, includes map[string]*parser.Thrift, isAbsIncludePath bool) error {
+func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, sources map[string]string, isAbsIncludePath bool) (err error) {
 	for _, i := range tree.Includes {
 		p := i.Path
 		if isAbsIncludePath {
 			p = absPath(tree.Filename, i.Path)
 		}
-		ref, ok := includes[p]
-		if !ok {
+		ref, ok := parsed[p] // avoid infinite recursion
+		if ok {
+			i.Reference = ref
+			continue
+		}
+		if src, ok := sources[p]; !ok {
 			return fmt.Errorf("miss include path: %s for file: %s", p, tree.Filename)
+		} else {
+			if ref, err = parser.ParseString(p, src); err != nil {
+				return
+			}
 		}
-		if err := parseIncludes(ref, includes, isAbsIncludePath); err != nil {
-			return err
-		}
+		parsed[p] = ref
 		i.Reference = ref
+		if err = parseIncludes(ref, parsed, sources, isAbsIncludePath); err != nil {
+			return
+		}
 	}
 	return nil
 }
@@ -159,20 +168,20 @@ func absPath(path, includePath string) string {
 }
 
 func parseContent(path, content string, includes map[string]string, isAbsIncludePath bool) (*parser.Thrift, error) {
+	if src := includes[path]; src != "" && src != content {
+		return nil, fmt.Errorf("provided main IDL content conflicts with includes: %q", path)
+	}
 	tree, err := parser.ParseString(path, content)
 	if err != nil {
 		return nil, err
 	}
-	_includes := make(map[string]*parser.Thrift, len(includes))
-	for k, v := range includes {
-		t, err := parser.ParseString(k, v)
-		if err != nil {
-			return nil, err
-		}
-		_includes[k] = t
-	}
-	if err := parseIncludes(tree, _includes, isAbsIncludePath); err != nil {
+	parsed := make(map[string]*parser.Thrift)
+	parsed[path] = tree
+	if err := parseIncludes(tree, parsed, includes, isAbsIncludePath); err != nil {
 		return nil, err
+	}
+	if cir := parser.CircleDetect(tree); cir != "" {
+		return tree, fmt.Errorf("IDL circular dependency: %s", cir)
 	}
 	return tree, nil
 }
