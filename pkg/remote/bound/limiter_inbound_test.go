@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var mockErr = errors.New("mockError")
+var errFoo = errors.New("mockError")
 
 func TestNewServerLimiterHandler(t *testing.T) {
 	concurrencyLimiter := &mocks.ConcurrencyLimiter{}
