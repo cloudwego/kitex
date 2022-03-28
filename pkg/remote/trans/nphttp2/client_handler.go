@@ -18,9 +18,7 @@ package nphttp2
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"net"
-	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
@@ -53,7 +51,6 @@ type cliTransHandler struct {
 }
 
 func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
-	atomic.AddInt64(&grpc.EnterWrite, 1)
 	buf := newBuffer(conn)
 	defer buf.Release(err)
 
@@ -62,17 +59,6 @@ func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.M
 	}
 
 	return buf.Flush()
-
-	//buf := newBuffer(conn)
-	//defer buf.Release(err)
-	//
-	//if err = h.codec.Encode(ctx, msg, buf); err != nil {
-	//	return err
-	//}
-	//
-	//wb, _ := buf.buf.ReadBinary(buf.buf.Len())
-	//_, err = buf.conn.Write(wb)
-	//return err
 }
 
 func (h *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {

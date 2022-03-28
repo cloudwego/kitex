@@ -249,7 +249,6 @@ func newOutStreamList() *outStreamList {
 }
 
 func (l *outStreamList) enqueue(s *outStream) {
-	atomic.AddInt64(&enqueueCnt, 1)
 	e := l.tail.prev
 	e.next = s
 	s.prev = e
@@ -346,7 +345,6 @@ func (c *controlBuffer) executeAndPut(f func(it interface{}) bool, it cbItem) (b
 	if wakeUp {
 		select {
 		case c.ch <- struct{}{}:
-			atomic.AddInt64(&wakeUpCnt, 1)
 		default:
 		}
 	}
@@ -388,7 +386,6 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 				c.transportResponseFrames--
 			}
 			c.mu.Unlock()
-			atomic.AddInt64(&getItemCnt, 1)
 			return h, nil
 		}
 		if !block {
@@ -396,7 +393,6 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 			return nil, nil
 		}
 		c.consumerWaiting = true
-		atomic.AddInt64(&consumerWaitingCnt, 1)
 		c.mu.Unlock()
 		select {
 		case <-c.ch:
@@ -534,11 +530,6 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 				return err
 			}
 			if it != nil {
-				if l.side == clientSide {
-					atomic.AddInt64(&clientGetBufferCnt, 1)
-				} else {
-					atomic.AddInt64(&serverGetBufferCnt, 1)
-				}
 				if err = l.handle(it); err != nil {
 					return err
 				}
@@ -553,12 +544,6 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 			}
 			if !isEmpty {
 				continue hasdata
-			} else {
-				if l.side == clientSide {
-					atomic.AddInt64(&clientEmptyCnt, 1)
-				} else {
-					atomic.AddInt64(&serverEmptyCnt, 1)
-				}
 			}
 			if gosched {
 				gosched = false
@@ -566,11 +551,6 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 					runtime.Gosched()
 					continue hasdata
 				}
-			}
-			if l.side == clientSide {
-				atomic.AddInt64(&clientRunFlushCnt, 1)
-			} else {
-				atomic.AddInt64(&serverRunFlushCnt, 1)
 			}
 			l.framer.writer.Flush()
 			break hasdata
@@ -593,7 +573,6 @@ func (l *loopyWriter) incomingWindowUpdateHandler(w *incomingWindowUpdate) error
 		str.bytesOutStanding -= int(w.increment)
 		if strQuota := int(l.oiws) - str.bytesOutStanding; strQuota > 0 && str.state == waitingOnStreamQuota {
 			str.state = active
-			atomic.AddInt64(&incomingWindowUpdateHandler, 1)
 			l.activeStreams.enqueue(str)
 			return nil
 		}
@@ -718,7 +697,6 @@ func (l *loopyWriter) writeHeader(streamID uint32, endStream bool, hf []hpack.He
 }
 
 func (l *loopyWriter) preprocessData(df *dataFrame) error {
-	atomic.AddInt64(&enterPreprocessData, 1)
 	str, ok := l.estdStreams[df.streamID]
 	if !ok {
 		return nil
@@ -728,7 +706,6 @@ func (l *loopyWriter) preprocessData(df *dataFrame) error {
 	str.itl.enqueue(df)
 	if str.state == empty {
 		str.state = active
-		atomic.AddInt64(&preprocessData, 1)
 		l.activeStreams.enqueue(str)
 	}
 	return nil
@@ -791,42 +768,28 @@ func (l *loopyWriter) goAwayHandler(g *goAway) error {
 func (l *loopyWriter) handle(i interface{}) error {
 	switch i := i.(type) {
 	case *incomingWindowUpdate:
-		atomic.AddInt64(&incomingWindowUpdateFrameCnt, 1)
 		return l.incomingWindowUpdateHandler(i)
 	case *outgoingWindowUpdate:
-		atomic.AddInt64(&outgoingWindowUpdateFrameCnt, 1)
 		return l.outgoingWindowUpdateHandler(i)
 	case *incomingSettings:
-		atomic.AddInt64(&incomingSettingsFrameCnt, 1)
 		return l.incomingSettingsHandler(i)
 	case *outgoingSettings:
-		atomic.AddInt64(&outgoingSettingsFrameCnt, 1)
 		return l.outgoingSettingsHandler(i)
 	case *headerFrame:
-		atomic.AddInt64(&headerFrameFrameCnt, 1)
 		return l.headerHandler(i)
 	case *registerStream:
-		atomic.AddInt64(&registerStreamFrameCnt, 1)
 		return l.registerStreamHandler(i)
 	case *cleanupStream:
-		atomic.AddInt64(&cleanupStreamFrameCnt, 1)
 		return l.cleanupStreamHandler(i)
 	case *incomingGoAway:
-		atomic.AddInt64(&incomingGoAwayFrameCnt, 1)
 		return l.incomingGoAwayHandler(i)
 	case *dataFrame:
-		if l.side == clientSide {
-			atomic.AddInt64(&dataFrameFrameCnt, 1)
-		}
 		return l.preprocessData(i)
 	case *ping:
-		atomic.AddInt64(&pingFrameCnt, 1)
 		return l.pingHandler(i)
 	case *goAway:
-		atomic.AddInt64(&goAwayFrameCnt, 1)
 		return l.goAwayHandler(i)
 	case *outFlowControlSizeRequest:
-		atomic.AddInt64(&outFlowControlSizeRequestFrameCnt, 1)
 		return l.outFlowControlSizeRequestHandler(i)
 	default:
 		return fmt.Errorf("transport: unknown control message type %T", i)
@@ -844,7 +807,6 @@ func (l *loopyWriter) applySettings(ss []http2.Setting) error {
 				for _, stream := range l.estdStreams {
 					if stream.state == waitingOnStreamQuota {
 						stream.state = active
-						atomic.AddInt64(&applySettings, 1)
 						l.activeStreams.enqueue(stream)
 					}
 				}
@@ -865,7 +827,6 @@ func (l *loopyWriter) processData() (bool, error) {
 	}
 	str := l.activeStreams.dequeue() // Remove the first stream.
 	if str == nil {
-		atomic.AddInt64(&noActiveStreamCnt, 1)
 		return true, nil
 	}
 	dataItem := str.itl.peek().(*dataFrame) // Peek at the first data item this stream.
@@ -891,7 +852,6 @@ func (l *loopyWriter) processData() (bool, error) {
 				return false, nil
 			}
 		} else {
-			atomic.AddInt64(&processData1, 1)
 			l.activeStreams.enqueue(str)
 		}
 		return false, nil
@@ -961,7 +921,6 @@ func (l *loopyWriter) processData() (bool, error) {
 	} else if int(l.oiws)-str.bytesOutStanding <= 0 { // Ran out of stream quota.
 		str.state = waitingOnStreamQuota
 	} else { // Otherwise add it back to the list of active streams.
-		atomic.AddInt64(&processData2, 1)
 		l.activeStreams.enqueue(str)
 	}
 	return false, nil
