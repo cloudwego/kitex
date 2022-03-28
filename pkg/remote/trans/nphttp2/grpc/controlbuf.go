@@ -397,7 +397,7 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 		select {
 		case <-c.ch:
 		case <-c.done:
-			//c.finish() // FIXME
+			c.finish()
 			return nil, ErrConnClosing
 		}
 	}

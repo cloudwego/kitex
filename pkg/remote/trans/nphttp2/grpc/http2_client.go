@@ -318,14 +318,6 @@ func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) 
 	return headerFields
 }
 
-func timeCost() func() {
-	start := time.Now()
-	return func() {
-		tc := time.Since(start)
-		fmt.Printf("NewStream cost = %v\n", tc)
-	}
-}
-
 // NewStream creates a stream and registers it into the transport as "active"
 // streams.
 func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Stream, err error) {
@@ -570,8 +562,6 @@ func (t *http2Client) GracefulClose() {
 	t.controlBuf.put(&incomingGoAway{})
 }
 
-var debugOnce sync.Once
-
 // Write formats the data into HTTP2 data frame(s) and sends it out. The caller
 // should proceed only if Write returns nil.
 func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
@@ -594,17 +584,6 @@ func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 			return err
 		}
 	}
-	debugOnce.Do(func() {
-		_, file2, line2, _ := runtime.Caller(2)
-		_, file3, line3, _ := runtime.Caller(3)
-		_, file4, line4, _ := runtime.Caller(4)
-		_, file5, line5, _ := runtime.Caller(5)
-		_, file6, line6, _ := runtime.Caller(6)
-		_, file7, line7, _ := runtime.Caller(7)
-		_, file8, line8, _ := runtime.Caller(8)
-		fmt.Printf("Debug: caller-line [2][%s][%d], [3][%s][%d], 4[%s][%d], 5[%s][%d], [6][%s][%d], 7[%s][%d], 8[%s][%d]\n",
-			file2, line2, file3, line3, file4, line4, file5, line5, file6, line6, file7, line7, file8, line8)
-	})
 	return t.controlBuf.put(df)
 }
 
