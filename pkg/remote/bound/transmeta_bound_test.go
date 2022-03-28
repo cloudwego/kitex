@@ -65,7 +65,7 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 			nil, nil, nil, remote.Call, remote.Client)
 		ctx := context.Background()
 
-		metaHandler1.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), mockErr)
+		metaHandler1.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), errFoo)
 		metaHandler2.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), nil)
 		metaHandler3.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), nil)
 
@@ -74,7 +74,7 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 
 		ctx, err := handler.Write(context.Background(), invokeMessage, remoteMessage)
 		assert.NotNil(t, ctx)
-		assert.Equal(t, mockErr, err)
+		assert.Equal(t, errFoo, err)
 	})
 }
 
