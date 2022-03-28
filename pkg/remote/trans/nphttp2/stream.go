@@ -18,9 +18,7 @@ package nphttp2
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"net"
-	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -65,7 +63,6 @@ func (s *stream) RecvMsg(m interface{}) error {
 }
 
 func (s *stream) SendMsg(m interface{}) error {
-	atomic.AddInt64(&grpc.EnterSendMsg, 1)
 	ri := rpcinfo.GetRPCInfo(s.ctx)
 
 	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)

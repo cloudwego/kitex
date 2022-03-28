@@ -37,7 +37,6 @@ func poolSize() uint32 {
 	// One connection per processor, and need redundancy。
 	// Benchmark indicates this setting is the best performance.
 	numP := runtime.GOMAXPROCS(0)
-	println("core number:", numP)
 	return uint32(numP * 3 / 2)
 }
 

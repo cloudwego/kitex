@@ -31,7 +31,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -43,81 +42,6 @@ import (
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
 )
-
-var (
-	flushCnt                    int64
-	writeFlushCnt               int64
-	noQuotaCnt                  int64
-	noActiveStreamCnt           int64
-	enqueueCnt                  int64
-	incomingWindowUpdateHandler int64
-	preprocessData              int64
-	applySettings               int64
-	processData1                int64
-	processData2                int64
-	enterPreprocessData         int64
-	finishCnt                   int64
-	getItemCnt                  int64
-	consumerWaitingCnt          int64
-	wakeUpCnt                   int64
-
-	incomingWindowUpdateFrameCnt      int64
-	outgoingWindowUpdateFrameCnt      int64
-	incomingSettingsFrameCnt          int64
-	outgoingSettingsFrameCnt          int64
-	headerFrameFrameCnt               int64
-	registerStreamFrameCnt            int64
-	cleanupStreamFrameCnt             int64
-	incomingGoAwayFrameCnt            int64
-	dataFrameFrameCnt                 int64
-	pingFrameCnt                      int64
-	goAwayFrameCnt                    int64
-	outFlowControlSizeRequestFrameCnt int64
-
-	clientRunFlushCnt  int64
-	clientGetBufferCnt int64
-	clientEmptyCnt     int64
-	serverRunFlushCnt  int64
-	serverGetBufferCnt int64
-	serverEmptyCnt     int64
-
-	EnterSendMsg int64
-	EnterWrite   int64
-	EnterPut     int64
-
-	NewStreamCnt int64
-)
-
-func init() {
-	go printFlushCnt()
-}
-
-func printFlushCnt() {
-	t := time.NewTicker(5 * time.Second)
-	for {
-		select {
-		case <-t.C:
-			println(fmt.Sprintf("enqueueCnt=%d, noActiveStreamCnt=%d, preprocessData=%d, getItemCnt=%d, consumerWaitingCnt=%d, wakeUpCnt=%d",
-				atomic.LoadInt64(&enqueueCnt), atomic.LoadInt64(&noActiveStreamCnt),
-				atomic.LoadInt64(&preprocessData), atomic.LoadInt64(&getItemCnt), atomic.LoadInt64(&consumerWaitingCnt), atomic.LoadInt64(&wakeUpCnt)))
-
-			//println(fmt.Sprintf("incomingWindowUpdateFrameCnt=%d, outgoingWindowUpdateFrameCnt=%d, incomingSettingsFrameCnt=%d, outgoingSettingsFrameCnt=%d, headerFrameFrameCnt=%d, registerStreamFrameCnt=%d, " +
-			//	"cleanupStreamFrameCnt=%d, incomingGoAwayFrameCnt=%d, dataFrameFrameCnt=%d, pingFrameCnt=%d, goAwayFrameCnt=%d, outFlowControlSizeRequestFrameCnt=%d",
-			//	atomic.LoadInt64(&incomingWindowUpdateFrameCnt), atomic.LoadInt64(&outgoingWindowUpdateFrameCnt), atomic.LoadInt64(&incomingSettingsFrameCnt), atomic.LoadInt64(&outgoingSettingsFrameCnt), atomic.LoadInt64(&headerFrameFrameCnt), atomic.LoadInt64(&registerStreamFrameCnt),
-			//	atomic.LoadInt64(&cleanupStreamFrameCnt), atomic.LoadInt64(&incomingGoAwayFrameCnt), atomic.LoadInt64(&dataFrameFrameCnt), atomic.LoadInt64(&pingFrameCnt), atomic.LoadInt64(&goAwayFrameCnt), atomic.LoadInt64(&outFlowControlSizeRequestFrameCnt)))
-
-			//println(fmt.Sprintf("clientRunFlushCnt=%d, clientGetBufferCnt=%d, clientEmptyCnt=%d, "+
-			//	"serverRunFlushCnt=%d, serverGetBufferCnt=%d, serverEmptyCnt=%d",
-			//	atomic.LoadInt64(&clientRunFlushCnt), atomic.LoadInt64(&clientGetBufferCnt), atomic.LoadInt64(&clientEmptyCnt),
-			//	atomic.LoadInt64(&serverRunFlushCnt), atomic.LoadInt64(&serverGetBufferCnt), atomic.LoadInt64(&serverEmptyCnt)))
-
-			//println(fmt.Sprintf("EnterSendMsg=%d, EnterWrite=%d, EnterPut=%d",
-			//	atomic.LoadInt64(&EnterSendMsg), atomic.LoadInt64(&EnterWrite), atomic.LoadInt64(&EnterPut)))
-
-			//println(fmt.Sprintf("NewStreamCnt=%d", atomic.LoadInt64(&NewStreamCnt)))
-		}
-	}
-}
 
 const (
 	// http2MaxFrameLen specifies the max length of a HTTP2 frame.
@@ -736,7 +660,6 @@ func (w *bufWriter) Write(b []byte) (n int, err error) {
 		w.offset += nn
 		n += nn
 		if w.offset >= w.batchSize {
-			atomic.AddInt64(&writeFlushCnt, 1)
 			err = w.Flush()
 		}
 	}
@@ -744,7 +667,6 @@ func (w *bufWriter) Write(b []byte) (n int, err error) {
 }
 
 func (w *bufWriter) Flush() error {
-	atomic.AddInt64(&flushCnt, 1)
 	if w.err != nil {
 		return w.err
 	}

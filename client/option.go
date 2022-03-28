@@ -380,7 +380,7 @@ func WithGRPCConnPoolSize(s uint32) Option {
 // Zero will disable the write buffer such that each write will be on underlying
 // connection. Note: A Send call may not directly translate to a write.
 // It corresponds to the WithWriteBufferSize DialOption of gRPC.
-func WithGRPCWriteBufferSize(s int) Option {
+func WithGRPCWriteBufferSize(s uint32) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCWriteBufferSize(%d)", s))
 		o.GRPCConnectOpts.WriteBufferSize = s
@@ -393,7 +393,7 @@ func WithGRPCWriteBufferSize(s int) Option {
 // The default value for this buffer is 32KB. Zero will disable read buffer for
 // a connection so data framer can access the underlying conn directly.
 // It corresponds to the WithReadBufferSize DialOption of gRPC.
-func WithGRPCReadBufferSize(s int) Option {
+func WithGRPCReadBufferSize(s uint32) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCReadBufferSize(%d)", s))
 		o.GRPCConnectOpts.ReadBufferSize = s
