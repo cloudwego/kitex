@@ -59,7 +59,7 @@ var (
 	finishCnt                   int64
 	getItemCnt                  int64
 	consumerWaitingCnt          int64
-	wakeUpCnt int64
+	wakeUpCnt                   int64
 
 	incomingWindowUpdateFrameCnt      int64
 	outgoingWindowUpdateFrameCnt      int64
