@@ -521,6 +521,10 @@ type ConnectOptions struct {
 	InitialWindowSize uint32
 	// InitialConnWindowSize sets the initial window size for a connection.
 	InitialConnWindowSize uint32
+	// WriteBufferSize sets the size of write buffer which in turn determines how much data can be batched before it's written on the wire.
+	WriteBufferSize int
+	// ReadBufferSize sets the size of read buffer, which in turn determines how much data can be read at most for one read syscall.
+	ReadBufferSize int
 	// MaxHeaderListSize sets the max (uncompressed) size of header list that is prepared to be received.
 	MaxHeaderListSize *uint32
 }

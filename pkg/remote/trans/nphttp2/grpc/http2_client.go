@@ -139,6 +139,8 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		dynamicWindow = false
 	}
 
+	writeBufSize := opts.WriteBufferSize
+	readBufSize := opts.ReadBufferSize
 	maxHeaderListSize := defaultClientMaxHeaderListSize
 	if opts.MaxHeaderListSize != nil {
 		maxHeaderListSize = *opts.MaxHeaderListSize
@@ -152,7 +154,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		readerDone:            make(chan struct{}),
 		writerDone:            make(chan struct{}),
 		goAway:                make(chan struct{}),
-		framer:                newFramer(conn, defaultWriteSize, defaultReadSize, maxHeaderListSize),
+		framer:                newFramer(conn, writeBufSize, readBufSize, maxHeaderListSize),
 		fc:                    &trInFlow{limit: icwz},
 		activeStreams:         make(map[uint32]*Stream),
 		kp:                    kp,
