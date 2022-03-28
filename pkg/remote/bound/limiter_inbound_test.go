@@ -1,3 +1,19 @@
+/*
+ * Copyright 2021 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package bound
 
 import (
@@ -14,6 +30,7 @@ import (
 
 var errFoo = errors.New("mockError")
 
+// TestNewServerLimiterHandler test NewServerLimiterHandler function and assert result to be not nil.
 func TestNewServerLimiterHandler(t *testing.T) {
 	concurrencyLimiter := &mocks.ConcurrencyLimiter{}
 	rateLimiter := &mocks.RateLimiter{}
@@ -23,6 +40,8 @@ func TestNewServerLimiterHandler(t *testing.T) {
 	assert.NotNil(t, handler)
 }
 
+// TestLimiterOnActive test OnActive function of serverLimiterHandler, to assert the concurrencyLimiter 'Acquire' works.
+// If not acquired, the message would be rejected with ErrConnOverLimit error.
 func TestLimiterOnActive(t *testing.T) {
 	t.Run("Test OnActive with limit acquired", func(t *testing.T) {
 		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
@@ -71,6 +90,8 @@ func TestLimiterOnActive(t *testing.T) {
 	})
 }
 
+// TestLimiterOnRead test OnRead function of serverLimiterHandler, to assert the rateLimiter 'Acquire' works.
+// If not acquired, the message would be rejected with ErrQPSOverLimit error.
 func TestLimiterOnRead(t *testing.T) {
 	t.Run("Test OnRead with limit acquired", func(t *testing.T) {
 		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
@@ -119,6 +140,7 @@ func TestLimiterOnRead(t *testing.T) {
 	})
 }
 
+// TestLimiterOnInactive test OnInactive function of serverLimiterHandler, to assert the release is called.
 func TestLimiterOnInactive(t *testing.T) {
 	t.Run("Test OnInactive", func(t *testing.T) {
 		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
@@ -135,6 +157,7 @@ func TestLimiterOnInactive(t *testing.T) {
 	})
 }
 
+// TestLimiterOnMessage test OnMessage function of serverLimiterHandler
 func TestLimiterOnMessage(t *testing.T) {
 	t.Run("Test OnMessage", func(t *testing.T) {
 		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
