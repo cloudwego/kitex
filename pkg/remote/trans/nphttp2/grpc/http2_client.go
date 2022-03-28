@@ -321,7 +321,7 @@ func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) 
 func timeCost() func() {
 	start := time.Now()
 	return func() {
-		tc:=time.Since(start)
+		tc := time.Since(start)
 		fmt.Printf("NewStream cost = %v\n", tc)
 	}
 }
