@@ -18,22 +18,23 @@ package bound
 
 import (
 	"context"
+	"testing"
+
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
-	"testing"
 
-	"github.com/cloudwego/kitex/pkg/remote/mocks"
+	remoteMocks "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/invoke"
 	"github.com/stretchr/testify/assert"
 )
 
 // TestNewTransMetaHandler test NewTransMetaHandler function and assert the result not nil.
 func TestNewTransMetaHandler(t *testing.T) {
-	metaHandler1 := &mocks.MetaHandler{}
-	metaHandler2 := &mocks.MetaHandler{}
-	metaHandler3 := &mocks.MetaHandler{}
+	metaHandler1 := &remoteMocks.MetaHandler{}
+	metaHandler2 := &remoteMocks.MetaHandler{}
+	metaHandler3 := &remoteMocks.MetaHandler{}
 	mhs := []remote.MetaHandler{
 		metaHandler1, metaHandler2, metaHandler3,
 	}
@@ -46,9 +47,9 @@ func TestNewTransMetaHandler(t *testing.T) {
 // TestTransMetaHandlerWrite test Write function of transMetaHandler.
 func TestTransMetaHandlerWrite(t *testing.T) {
 	t.Run("Test transMetahandler Write success", func(t *testing.T) {
-		metaHandler1 := &mocks.MetaHandler{}
-		metaHandler2 := &mocks.MetaHandler{}
-		metaHandler3 := &mocks.MetaHandler{}
+		metaHandler1 := &remoteMocks.MetaHandler{}
+		metaHandler2 := &remoteMocks.MetaHandler{}
+		metaHandler3 := &remoteMocks.MetaHandler{}
 		mhs := []remote.MetaHandler{
 			metaHandler1, metaHandler2, metaHandler3,
 		}
@@ -71,9 +72,9 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 	})
 
 	t.Run("Test TransMetahandler Write with error", func(t *testing.T) {
-		metaHandler1 := &mocks.MetaHandler{}
-		metaHandler2 := &mocks.MetaHandler{}
-		metaHandler3 := &mocks.MetaHandler{}
+		metaHandler1 := &remoteMocks.MetaHandler{}
+		metaHandler2 := &remoteMocks.MetaHandler{}
+		metaHandler3 := &remoteMocks.MetaHandler{}
 		mhs := []remote.MetaHandler{
 			metaHandler1, metaHandler2, metaHandler3,
 		}
@@ -99,9 +100,9 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 // TestTransMetaHandlerOnMessage test OnMessage function of transMetaHandler, on client side and on server side.
 func TestTransMetaHandlerOnMessage(t *testing.T) {
 	t.Run("Test TransMetaHandler OnMessage success client side", func(t *testing.T) {
-		metaHandler1 := &mocks.MetaHandler{}
-		metaHandler2 := &mocks.MetaHandler{}
-		metaHandler3 := &mocks.MetaHandler{}
+		metaHandler1 := &remoteMocks.MetaHandler{}
+		metaHandler2 := &remoteMocks.MetaHandler{}
+		metaHandler3 := &remoteMocks.MetaHandler{}
 		mhs := []remote.MetaHandler{
 			metaHandler1, metaHandler2, metaHandler3,
 		}
@@ -125,9 +126,9 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 	})
 
 	t.Run("Test TransMetaHandler OnMessage success server side", func(t *testing.T) {
-		metaHandler1 := &mocks.MetaHandler{}
-		metaHandler2 := &mocks.MetaHandler{}
-		metaHandler3 := &mocks.MetaHandler{}
+		metaHandler1 := &remoteMocks.MetaHandler{}
+		metaHandler2 := &remoteMocks.MetaHandler{}
+		metaHandler3 := &remoteMocks.MetaHandler{}
 		mhs := []remote.MetaHandler{
 			metaHandler1, metaHandler2, metaHandler3,
 		}
@@ -177,7 +178,7 @@ func TestGetValidMsg(t *testing.T) {
 // TestTransMetaHandlerOnActive test OnActive function of transMetaHandler
 func TestTransMetaHandlerOnActive(t *testing.T) {
 	mhs := []remote.MetaHandler{
-		&mocks.MetaHandler{},
+		&remoteMocks.MetaHandler{},
 	}
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)
@@ -189,7 +190,7 @@ func TestTransMetaHandlerOnActive(t *testing.T) {
 // TestTransMetaHandlerOnRead test OnRead function of transMetaHandler
 func TestTransMetaHandlerOnRead(t *testing.T) {
 	mhs := []remote.MetaHandler{
-		&mocks.MetaHandler{},
+		&remoteMocks.MetaHandler{},
 	}
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)
@@ -201,7 +202,7 @@ func TestTransMetaHandlerOnRead(t *testing.T) {
 // TestTransMetaHandlerOnInactive test OnInactive function of transMetaHandler
 func TestTransMetaHandlerOnInactive(t *testing.T) {
 	mhs := []remote.MetaHandler{
-		&mocks.MetaHandler{},
+		&remoteMocks.MetaHandler{},
 	}
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)

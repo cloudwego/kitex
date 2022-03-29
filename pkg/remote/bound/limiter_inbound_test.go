@@ -19,11 +19,12 @@ package bound
 import (
 	"context"
 	"errors"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"testing"
 
+	"github.com/cloudwego/kitex/pkg/remote"
+
+	limiterMocks "github.com/cloudwego/kitex/internal/mocks/limiter"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/limiter/mocks"
 	"github.com/cloudwego/kitex/pkg/remote/trans/invoke"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,9 +33,9 @@ var errFoo = errors.New("mockError")
 
 // TestNewServerLimiterHandler test NewServerLimiterHandler function and assert result to be not nil.
 func TestNewServerLimiterHandler(t *testing.T) {
-	concurrencyLimiter := &mocks.ConcurrencyLimiter{}
-	rateLimiter := &mocks.RateLimiter{}
-	limitReporter := &mocks.LimitReporter{}
+	concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
+	rateLimiter := &limiterMocks.RateLimiter{}
+	limitReporter := &limiterMocks.LimitReporter{}
 
 	handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
 	assert.NotNil(t, handler)
@@ -44,9 +45,9 @@ func TestNewServerLimiterHandler(t *testing.T) {
 // If not acquired, the message would be rejected with ErrConnOverLimit error.
 func TestLimiterOnActive(t *testing.T) {
 	t.Run("Test OnActive with limit acquired", func(t *testing.T) {
-		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
-		rateLimiter := &mocks.RateLimiter{}
-		limitReporter := &mocks.LimitReporter{}
+		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
+		rateLimiter := &limiterMocks.RateLimiter{}
+		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
 
 		concurrencyLimiter.On("Acquire").Return(true)
@@ -59,8 +60,8 @@ func TestLimiterOnActive(t *testing.T) {
 	})
 
 	t.Run("Test OnActive with nil reporter", func(t *testing.T) {
-		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
-		rateLimiter := &mocks.RateLimiter{}
+		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
+		rateLimiter := &limiterMocks.RateLimiter{}
 		ctx := context.Background()
 
 		concurrencyLimiter.On("Acquire").Return(false)
@@ -73,9 +74,9 @@ func TestLimiterOnActive(t *testing.T) {
 	})
 
 	t.Run("Test OnActive with reporter", func(t *testing.T) {
-		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
-		rateLimiter := &mocks.RateLimiter{}
-		limitReporter := &mocks.LimitReporter{}
+		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
+		rateLimiter := &limiterMocks.RateLimiter{}
+		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
 
 		concurrencyLimiter.On("Acquire").Return(false)
@@ -94,9 +95,9 @@ func TestLimiterOnActive(t *testing.T) {
 // If not acquired, the message would be rejected with ErrQPSOverLimit error.
 func TestLimiterOnRead(t *testing.T) {
 	t.Run("Test OnRead with limit acquired", func(t *testing.T) {
-		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
-		rateLimiter := &mocks.RateLimiter{}
-		limitReporter := &mocks.LimitReporter{}
+		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
+		rateLimiter := &limiterMocks.RateLimiter{}
+		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
 
 		rateLimiter.On("Acquire").Return(true)
@@ -109,8 +110,8 @@ func TestLimiterOnRead(t *testing.T) {
 	})
 
 	t.Run("Test OnRead with nil reporter", func(t *testing.T) {
-		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
-		rateLimiter := &mocks.RateLimiter{}
+		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
+		rateLimiter := &limiterMocks.RateLimiter{}
 		ctx := context.Background()
 
 		rateLimiter.On("Acquire").Return(false)
@@ -123,9 +124,9 @@ func TestLimiterOnRead(t *testing.T) {
 	})
 
 	t.Run("Test OnRead with reporter", func(t *testing.T) {
-		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
-		rateLimiter := &mocks.RateLimiter{}
-		limitReporter := &mocks.LimitReporter{}
+		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
+		rateLimiter := &limiterMocks.RateLimiter{}
+		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
 
 		rateLimiter.On("Acquire").Return(false)
@@ -143,9 +144,9 @@ func TestLimiterOnRead(t *testing.T) {
 // TestLimiterOnInactive test OnInactive function of serverLimiterHandler, to assert the release is called.
 func TestLimiterOnInactive(t *testing.T) {
 	t.Run("Test OnInactive", func(t *testing.T) {
-		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
-		rateLimiter := &mocks.RateLimiter{}
-		limitReporter := &mocks.LimitReporter{}
+		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
+		rateLimiter := &limiterMocks.RateLimiter{}
+		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
 
 		concurrencyLimiter.On("Release")
@@ -160,9 +161,9 @@ func TestLimiterOnInactive(t *testing.T) {
 // TestLimiterOnMessage test OnMessage function of serverLimiterHandler
 func TestLimiterOnMessage(t *testing.T) {
 	t.Run("Test OnMessage", func(t *testing.T) {
-		concurrencyLimiter := &mocks.ConcurrencyLimiter{}
-		rateLimiter := &mocks.RateLimiter{}
-		limitReporter := &mocks.LimitReporter{}
+		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
+		rateLimiter := &limiterMocks.RateLimiter{}
+		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
 
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
