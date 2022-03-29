@@ -22,6 +22,9 @@ import (
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
+
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
@@ -34,6 +37,8 @@ type readerOption struct {
 	// read http response
 	http             bool
 	binaryWithBase64 bool
+	// describe struct of current level
+	pbDsc *desc.MessageDescriptor
 }
 
 type reader func(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error)
@@ -67,10 +72,16 @@ func nextReader(tt descriptor.Type, t *descriptor.TypeDescriptor, opt *readerOpt
 	case descriptor.MAP:
 		return readMap, nil
 	case descriptor.STRUCT:
+		if opt.pbDsc != nil {
+			return readPBStruct, nil
+		}
 		return readStruct, nil
 	case descriptor.VOID:
 		return readVoid, nil
 	case descriptor.JSON:
+		if opt.pbDsc != nil {
+			return readPBStruct, nil
+		}
 		return readStruct, nil
 	default:
 		return nil, fmt.Errorf("unsupported type: %d", tt)
@@ -114,6 +125,9 @@ func skipStructReader(ctx context.Context, in thrift.TProtocol, t *descriptor.Ty
 				// use http response reader when http generic call
 				// only support struct response method, return error when use base type response
 				reader = readHTTPResponse
+			}
+			if opt != nil && opt.pbDsc != nil {
+				reader = readHTTPPbResponse
 			}
 			if v, err = reader(ctx, in, field.Type, opt); err != nil {
 				return nil, err
@@ -318,7 +332,7 @@ func readStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDesc
 }
 
 func readHTTPResponse(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
-	resp := descriptor.NewHTTPResponse()
+	resp := descriptor.NewHTTPJsonResponse()
 	_, err := in.ReadStructBegin()
 	if err != nil {
 		return nil, err
@@ -364,6 +378,152 @@ func readHTTPResponse(ctx context.Context, in thrift.TProtocol, t *descriptor.Ty
 			if err = field.HTTPMapping.Response(ctx, resp, field, val); err != nil {
 				return nil, err
 			}
+		}
+		if err := in.ReadFieldEnd(); err != nil {
+			return nil, err
+		}
+		readFields[int32(fieldID)] = struct{}{}
+	}
+}
+
+func readPBStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+	if opt.pbDsc == nil {
+		return nil, fmt.Errorf("struct is missing in pb: %s", t.Name)
+	}
+
+	st := dynamic.NewMessage(opt.pbDsc)
+	_, err := in.ReadStructBegin()
+	if err != nil {
+		return nil, err
+	}
+	readFields := map[int32]struct{}{}
+	for {
+		_, fieldType, fieldID, err := in.ReadFieldBegin()
+		if err != nil {
+			return nil, err
+		}
+		if fieldType == thrift.STOP {
+			if err := in.ReadFieldEnd(); err != nil {
+				return nil, err
+			}
+			// check required
+			// void is nil struct
+			if t.Struct != nil {
+				if err := t.Struct.CheckRequired(readFields); err != nil {
+					return nil, err
+				}
+			}
+			return st, in.ReadStructEnd()
+		}
+		field, ok := t.Struct.FieldsByID[int32(fieldID)]
+		if !ok {
+			// just ignore the missing field, maybe server update its idls
+			if err := in.Skip(fieldType); err != nil {
+				return nil, err
+			}
+		} else {
+			fd := opt.pbDsc.FindFieldByNumber(field.ID)
+			pbDsc := opt.pbDsc
+			if fd != nil && fd.GetMessageType() != nil {
+				opt.pbDsc = fd.GetMessageType()
+			} else {
+				opt.pbDsc = nil
+			}
+
+			_fieldType := descriptor.FromThriftTType(fieldType)
+
+			reader, err := nextReader(_fieldType, field.Type, opt)
+			if err != nil {
+				return nil, fmt.Errorf("nextReader of %s/%s/%d error %w", t.Name, field.Name, fieldID, err)
+			}
+			val, err := reader(ctx, in, field.Type, opt)
+			if err != nil {
+				return nil, err
+			}
+			if field.ValueMapping != nil {
+				if val, err = field.ValueMapping.Response(ctx, val, field); err != nil {
+					return nil, err
+				}
+			}
+
+			switch _fieldType {
+			case thrift.I08:
+				val = int32(val.(int8))
+			case thrift.I16:
+				val = int32(val.(int16))
+			}
+			err = st.TrySetFieldByNumber(int(fieldID), val)
+			if err != nil {
+				return nil, fmt.Errorf("failed to write pb field[%d]: %v", fieldID, err)
+			}
+
+			opt.pbDsc = pbDsc
+		}
+		if err := in.ReadFieldEnd(); err != nil {
+			return nil, err
+		}
+		readFields[int32(fieldID)] = struct{}{}
+	}
+}
+
+func readHTTPPbResponse(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+	resp := descriptor.NewHTTPResponse(descriptor.MIMEApplicationProtobuf, dynamic.NewMessage(opt.pbDsc))
+
+	_, err := in.ReadStructBegin()
+	if err != nil {
+		return nil, err
+	}
+	readFields := map[int32]struct{}{}
+	for {
+		_, fieldType, fieldID, err := in.ReadFieldBegin()
+		if err != nil {
+			return nil, err
+		}
+		if fieldType == thrift.STOP {
+			if err := in.ReadFieldEnd(); err != nil {
+				return nil, err
+			}
+			// check required
+			if err := t.Struct.CheckRequired(readFields); err != nil {
+				return nil, err
+			}
+			return resp, in.ReadStructEnd()
+		}
+		field, ok := t.Struct.FieldsByID[int32(fieldID)]
+		if !ok {
+			// just ignore the missing field, maybe server update its idls
+			if err := in.Skip(fieldType); err != nil {
+				return nil, err
+			}
+		} else {
+			 fd := opt.pbDsc.FindFieldByNumber(field.ID)
+			curPbDsc := opt.pbDsc
+			if fd != nil && fd.GetMessageType() != nil {
+				opt.pbDsc = fd.GetMessageType()
+			} else {
+				opt.pbDsc = nil
+			}
+
+			// check required
+			_fieldType := descriptor.FromThriftTType(fieldType)
+			reader, err := nextReader(_fieldType, field.Type, opt)
+			if err != nil {
+				return nil, fmt.Errorf("nextReader of %s/%s/%d error %w", t.Name, field.Name, fieldID, err)
+			}
+			val, err := reader(ctx, in, field.Type, opt)
+			if err != nil {
+				return nil, err
+			}
+			if field.ValueMapping != nil {
+				if val, err = field.ValueMapping.Response(ctx, val, field); err != nil {
+					return nil, err
+				}
+			}
+			if err = field.HTTPMapping.Response(ctx, resp, field, val); err != nil {
+				return nil, err
+			}
+
+			opt.pbDsc = curPbDsc
 		}
 		if err := in.ReadFieldEnd(); err != nil {
 			return nil, err

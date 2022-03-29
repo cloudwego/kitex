@@ -541,7 +541,7 @@ func Test_readHTTPResponse(t *testing.T) {
 			return "world", nil
 		},
 	}
-	resp := descriptor.NewHTTPResponse()
+	resp := descriptor.NewHTTPJsonResponse()
 	resp.Body = map[string]interface{}{"hello": "world"}
 	tests := []struct {
 		name    string

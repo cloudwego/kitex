@@ -134,6 +134,7 @@ func FromHTTPRequest(req *http.Request) (*HTTPRequest, error) {
 		Method:  req.Method,
 		Host:    req.Host,
 		Path:    req.URL.Path,
+		ContentType: descriptor.MIMEApplicationJson,
 		Body:    map[string]interface{}{},
 	}
 	for _, cookie := range req.Cookies() {

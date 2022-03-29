@@ -20,36 +20,59 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+
+	"github.com/jhump/protoreflect/dynamic"
 )
 
 // Cookies ...
 type Cookies map[string]string
 
+// MIMEType ...
+type MIMEType string
+
+const (
+	MIMEApplicationJson     = "application/json"
+	MIMEApplicationForm     = "application/x-www-form-urlencoded"
+	MIMEApplicationProtobuf = "application/x-protobuf"
+)
+
 // HTTPRequest ...
 type HTTPRequest struct {
-	Header  http.Header
-	Query   url.Values
-	Cookies Cookies
-	Method  string
-	Host    string
-	Path    string
-	Params  *Params // path params
-	RawBody []byte
-	Body    map[string]interface{}
+	Header      http.Header
+	Query       url.Values
+	Cookies     Cookies
+	Method      string
+	Host        string
+	Path        string
+	Params      *Params // path params
+	RawBody     []byte
+	Body        interface{}
+	ContentType MIMEType
 }
 
 // HTTPResponse ...
 type HTTPResponse struct {
-	Header     http.Header
-	StatusCode int32
-	Body       map[string]interface{}
+	Header      http.Header
+	StatusCode  int32
+	Body        interface{}
+	ContentType MIMEType
 }
 
-// NewHTTPResponse ...
-func NewHTTPResponse() *HTTPResponse {
+// NewHTTPJsonResponse ...
+func NewHTTPJsonResponse() *HTTPResponse {
 	return &HTTPResponse{
-		Header: http.Header{},
-		Body:   map[string]interface{}{},
+		Header:      http.Header{},
+		ContentType: MIMEApplicationJson,
+		Body:        map[string]interface{}{},
+	}
+}
+
+// NewHTTPResponse init response with given MIMEType and body
+func NewHTTPResponse(contentType MIMEType, initBody interface{}) *HTTPResponse {
+	return &HTTPResponse{
+		Header:      http.Header{},
+		ContentType: contentType,
+		Body:        initBody,
 	}
 }
 
@@ -59,8 +82,22 @@ func (resp *HTTPResponse) Write(w http.ResponseWriter) error {
 	for k := range resp.Header {
 		w.Header().Set(k, resp.Header.Get(k))
 	}
-	w.Header().Set("Content-Type", "application/json")
-	return json.NewEncoder(w).Encode(resp.Body)
+
+	w.Header().Set("Content-Type", string(resp.ContentType))
+
+	switch resp.ContentType {
+	case MIMEApplicationJson:
+		return json.NewEncoder(w).Encode(resp.Body)
+	case MIMEApplicationProtobuf:
+		bytes, err := resp.Body.(*dynamic.Message).Marshal()
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(bytes)
+		return err
+	default:
+		return nil
+	}
 }
 
 // Param in request path

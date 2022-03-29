@@ -16,7 +16,11 @@
 
 package descriptor
 
-import "context"
+import (
+	"context"
+
+	"github.com/jhump/protoreflect/dynamic"
+)
 
 // HTTPMapping http mapping annotation
 type HTTPMapping interface {
@@ -140,13 +144,28 @@ var NewAPIBody NewHTTPMapping = func(value string) HTTPMapping {
 }
 
 func (m *apiBody) Request(ctx context.Context, req *HTTPRequest, field *FieldDescriptor) (interface{}, bool, error) {
-	val, ok := req.Body[m.value]
-	return val, ok, nil
+	switch req.ContentType {
+	case MIMEApplicationJson:
+		val, ok := req.Body.(map[string]interface{})[m.value]
+		return val, ok, nil
+	case MIMEApplicationProtobuf:
+		val, err := req.Body.(*dynamic.Message).TryGetFieldByNumber(int(field.ID))
+		return val, err == nil, nil
+	default:
+		return nil, false, nil
+	}
 }
 
 func (m *apiBody) Response(ctx context.Context, resp *HTTPResponse, field *FieldDescriptor, val interface{}) error {
-	resp.Body[m.value] = val
-	return nil
+	switch resp.ContentType {
+	case MIMEApplicationJson:
+		resp.Body.(map[string]interface{})[m.value] = val
+		return nil
+	case MIMEApplicationProtobuf:
+		return resp.Body.(*dynamic.Message).TrySetFieldByNumber(int(field.ID), val)
+	default:
+		return nil
+	}
 }
 
 type apiHTTPCode struct{}
