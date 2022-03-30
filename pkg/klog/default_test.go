@@ -62,7 +62,7 @@ func ctxOutput(t *testing.T, testLevel Level, want, format string, args ...inter
 	SetOutput(buf)
 	defer SetOutput(os.Stderr)
 
-	// TODO: fill ctx and complete Ctx-related methods
+	// the default logger implementation of CtxLogger is same as FormatLogger, no context handle now
 	ctx := context.Background()
 
 	switch testLevel {
@@ -122,7 +122,6 @@ func formatOutput(t *testing.T, testLevel Level, want, format string, args ...in
 	}
 }
 
-//
 func TestOutput(t *testing.T) {
 	l := DefaultLogger().(*defaultLogger)
 	oldFlags := l.stdlog.Flags()
