@@ -18,12 +18,13 @@ package utils
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	STATS "github.com/cloudwego/kitex/pkg/stats"
-	"testing"
-	"time"
 )
 
 func TestCalculateEventCost(t *testing.T) {

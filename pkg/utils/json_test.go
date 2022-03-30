@@ -167,11 +167,12 @@ func TestJSONStr2Map(t *testing.T) {
 	illegalUnicodeStr := `{"aaa\u4z60\u597daaa": "加油"}`
 	mapRet, err = JSONStr2Map(illegalUnicodeStr)
 	test.Assert(t, err != nil)
+	test.Assert(t, mapRet == nil)
 
 	surrogateUnicodeStr := `{"\u4F60\u597D": "\uDFFF\uD800"}`
 	mapRet, err = JSONStr2Map(surrogateUnicodeStr)
 	test.Assert(t, err == nil)
-
+	test.Assert(t, mapRet == nil)
 }
 
 func TestJSONUtil(t *testing.T) {
