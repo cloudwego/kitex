@@ -64,13 +64,13 @@ type transServer struct {
 var _ remote.TransServer = &transServer{}
 
 // CreateListener implements the remote.TransServer interface.
-func (ts *transServer) CreateListener(addr net.Addr) (net.Listener, error) {
+func (ts *transServer) CreateListener(addr net.Addr) (_ net.Listener, err error) {
 	if addr.Network() == "unix" {
 		syscall.Unlink(addr.String())
 	}
 	// The network must be "tcp", "tcp4", "tcp6" or "unix".
-	ln, err := ts.lncfg.Listen(context.Background(), addr.Network(), addr.String())
-	return ln, err
+	ts.ln, err = netpoll.CreateListener(addr.Network(), addr.String())
+	return ts.ln, err
 }
 
 // BootstrapServer implements the remote.TransServer interface.
