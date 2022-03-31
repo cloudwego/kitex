@@ -24,9 +24,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 
 	limiterMocks "github.com/cloudwego/kitex/internal/mocks/limiter"
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/invoke"
-	"github.com/stretchr/testify/assert"
 )
 
 var errFoo = errors.New("mockError")
@@ -38,7 +38,7 @@ func TestNewServerLimiterHandler(t *testing.T) {
 	limitReporter := &limiterMocks.LimitReporter{}
 
 	handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
-	assert.NotNil(t, handler)
+	test.Assert(t, handler != nil)
 }
 
 // TestLimiterOnActive test OnActive function of serverLimiterHandler, to assert the concurrencyLimiter 'Acquire' works.
@@ -55,8 +55,8 @@ func TestLimiterOnActive(t *testing.T) {
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
 		ctx, err := handler.OnActive(ctx, invoke.NewMessage(nil, nil))
 
-		assert.NotNil(t, ctx)
-		assert.Nil(t, err)
+		test.Assert(t, ctx != nil)
+		test.Assert(t, err == nil)
 	})
 
 	t.Run("Test OnActive with nil reporter", func(t *testing.T) {
@@ -69,8 +69,8 @@ func TestLimiterOnActive(t *testing.T) {
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, nil)
 		ctx, err := handler.OnActive(ctx, invoke.NewMessage(nil, nil))
 
-		assert.NotNil(t, ctx)
-		assert.Equal(t, kerrors.ErrConnOverLimit, err)
+		test.Assert(t, ctx != nil)
+		test.Assert(t, errors.Is(kerrors.ErrConnOverLimit, err))
 	})
 
 	t.Run("Test OnActive with reporter", func(t *testing.T) {
@@ -85,9 +85,9 @@ func TestLimiterOnActive(t *testing.T) {
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
 		ctx, err := handler.OnActive(ctx, invoke.NewMessage(nil, nil))
 
-		assert.NotNil(t, ctx)
-		assert.NotNil(t, err)
-		assert.Equal(t, kerrors.ErrConnOverLimit, err)
+		test.Assert(t, ctx != nil)
+		test.Assert(t, err != nil)
+		test.Assert(t, errors.Is(kerrors.ErrConnOverLimit, err))
 	})
 }
 
@@ -105,8 +105,8 @@ func TestLimiterOnRead(t *testing.T) {
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
 		ctx, err := handler.OnRead(ctx, invoke.NewMessage(nil, nil))
 
-		assert.NotNil(t, ctx)
-		assert.Nil(t, err)
+		test.Assert(t, ctx != nil)
+		test.Assert(t, err == nil)
 	})
 
 	t.Run("Test OnRead with nil reporter", func(t *testing.T) {
@@ -119,8 +119,8 @@ func TestLimiterOnRead(t *testing.T) {
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, nil)
 		ctx, err := handler.OnRead(ctx, invoke.NewMessage(nil, nil))
 
-		assert.NotNil(t, ctx)
-		assert.Equal(t, kerrors.ErrQPSOverLimit, err)
+		test.Assert(t, ctx != nil)
+		test.Assert(t, errors.Is(kerrors.ErrQPSOverLimit, err))
 	})
 
 	t.Run("Test OnRead with reporter", func(t *testing.T) {
@@ -135,9 +135,9 @@ func TestLimiterOnRead(t *testing.T) {
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
 		ctx, err := handler.OnRead(ctx, invoke.NewMessage(nil, nil))
 
-		assert.NotNil(t, ctx)
-		assert.NotNil(t, err)
-		assert.Equal(t, kerrors.ErrQPSOverLimit, err)
+		test.Assert(t, ctx != nil)
+		test.Assert(t, err != nil)
+		test.Assert(t, errors.Is(kerrors.ErrQPSOverLimit, err))
 	})
 }
 
@@ -154,7 +154,7 @@ func TestLimiterOnInactive(t *testing.T) {
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
 		ctx = handler.OnInactive(ctx, invoke.NewMessage(nil, nil))
 
-		assert.NotNil(t, ctx)
+		test.Assert(t, ctx != nil)
 	})
 }
 
@@ -170,7 +170,7 @@ func TestLimiterOnMessage(t *testing.T) {
 		ctx, err := handler.OnMessage(ctx, remote.NewMessage(nil, nil, nil, remote.Call, remote.Client),
 			remote.NewMessage(nil, nil, nil, remote.Reply, remote.Client))
 
-		assert.NotNil(t, ctx)
-		assert.Nil(t, err)
+		test.Assert(t, ctx != nil)
+		test.Assert(t, err == nil)
 	})
 }

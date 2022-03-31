@@ -18,8 +18,10 @@ package bound
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -27,7 +29,6 @@ import (
 
 	remoteMocks "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/invoke"
-	"github.com/stretchr/testify/assert"
 )
 
 // TestNewTransMetaHandler test NewTransMetaHandler function and assert the result not nil.
@@ -41,7 +42,7 @@ func TestNewTransMetaHandler(t *testing.T) {
 
 	handler := NewTransMetaHandler(mhs)
 
-	assert.NotNil(t, handler)
+	test.Assert(t, handler != nil)
 }
 
 // TestTransMetaHandlerWrite test Write function of transMetaHandler.
@@ -65,10 +66,10 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 		metaHandler2.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), nil)
 		metaHandler3.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), nil)
 
-		assert.NotNil(t, handler)
+		test.Assert(t, handler != nil)
 		ctx, err := handler.Write(ctx, invokeMessage, remoteMessage)
-		assert.NotNil(t, ctx)
-		assert.Nil(t, err)
+		test.Assert(t, ctx != nil)
+		test.Assert(t, err == nil)
 	})
 
 	t.Run("Test TransMetahandler Write with error", func(t *testing.T) {
@@ -89,11 +90,11 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 		metaHandler3.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), nil)
 
 		handler := NewTransMetaHandler(mhs)
-		assert.NotNil(t, handler)
+		test.Assert(t, handler != nil)
 
 		ctx, err := handler.Write(context.Background(), invokeMessage, remoteMessage)
-		assert.NotNil(t, ctx)
-		assert.Equal(t, errFoo, err)
+		test.Assert(t, ctx != nil)
+		test.Assert(t, errors.Is(errFoo, err))
 	})
 }
 
@@ -119,10 +120,10 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 
 		handler := NewTransMetaHandler(mhs)
 
-		assert.NotNil(t, handler)
+		test.Assert(t, handler != nil)
 		ctx, err := handler.OnMessage(ctx, args, result)
-		assert.NotNil(t, ctx)
-		assert.Nil(t, err)
+		test.Assert(t, ctx != nil)
+		test.Assert(t, err == nil)
 	})
 
 	t.Run("Test TransMetaHandler OnMessage success server side", func(t *testing.T) {
@@ -148,11 +149,10 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 
 		handler := NewTransMetaHandler(mhs)
 
-		assert.NotNil(t, handler)
+		test.Assert(t, handler != nil)
 		ctx, err := handler.OnMessage(ctx, args, result)
-		assert.NotNil(t, ctx)
-		assert.Nil(t, err)
-		assert.Equal(t, args.RPCInfo().To().Method(), ctx.Value(consts.CtxKeyMethod))
+		test.Assert(t, err == nil)
+		test.Assert(t, ctx != nil && args.RPCInfo().To().Method() == ctx.Value(consts.CtxKeyMethod))
 	})
 }
 
@@ -162,16 +162,16 @@ func TestGetValidMsg(t *testing.T) {
 		args := remote.NewMessage(nil, nil, nil, remote.Call, remote.Server)
 		result := remote.NewMessage(nil, nil, nil, remote.Reply, remote.Server)
 		msg, isServer := getValidMsg(args, result)
-		assert.Equal(t, true, isServer)
-		assert.Equal(t, args, msg)
+		test.Assert(t, isServer)
+		test.Assert(t, args == msg)
 	})
 
 	t.Run("Test getValidMsg client side read result", func(t *testing.T) {
 		args := remote.NewMessage(nil, nil, nil, remote.Call, remote.Client)
 		result := remote.NewMessage(nil, nil, nil, remote.Reply, remote.Client)
 		msg, isServer := getValidMsg(args, result)
-		assert.Equal(t, false, isServer)
-		assert.Equal(t, result, msg)
+		test.Assert(t, !isServer)
+		test.Assert(t, result == msg)
 	})
 }
 
@@ -183,8 +183,8 @@ func TestTransMetaHandlerOnActive(t *testing.T) {
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)
 	ctx, err := handler.OnActive(ctx, invoke.NewMessage(nil, nil))
-	assert.Nil(t, err)
-	assert.NotNil(t, ctx)
+	test.Assert(t, err == nil)
+	test.Assert(t, ctx != nil)
 }
 
 // TestTransMetaHandlerOnRead test OnRead function of transMetaHandler
@@ -195,8 +195,8 @@ func TestTransMetaHandlerOnRead(t *testing.T) {
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)
 	ctx, err := handler.OnRead(ctx, invoke.NewMessage(nil, nil))
-	assert.Nil(t, err)
-	assert.NotNil(t, ctx)
+	test.Assert(t, err == nil)
+	test.Assert(t, ctx != nil)
 }
 
 // TestTransMetaHandlerOnInactive test OnInactive function of transMetaHandler
@@ -207,5 +207,5 @@ func TestTransMetaHandlerOnInactive(t *testing.T) {
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)
 	ctx = handler.OnInactive(ctx, invoke.NewMessage(nil, nil))
-	assert.NotNil(t, ctx)
+	test.Assert(t, ctx != nil)
 }
