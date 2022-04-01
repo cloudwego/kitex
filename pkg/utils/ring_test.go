@@ -73,7 +73,7 @@ func TestRing_Pop(t *testing.T) {
 }
 
 func TestRing_Dump(t *testing.T) {
-	elemTotal := 10
+	elemTotal := 97
 	r := NewRing(elemTotal)
 	for i := 0; i < elemTotal; i++ {
 		err := r.Push(i)
