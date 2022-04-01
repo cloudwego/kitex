@@ -92,17 +92,6 @@ func TestRing_Pop(t *testing.T) {
 }
 
 func TestRing_Dump(t *testing.T) {
-	r := NewRing(10)
-	for i := 0; i < 10; i++ {
-		err := r.Push(i)
-		test.Assert(t, err == nil)
-	}
-
-	dumpData := r.Dump()
-	test.Assert(t, dumpData != nil)
-}
-
-func TestRing_Dump(t *testing.T) {
 	elemTotal := 97
 	r := NewRing(elemTotal)
 	for i := 0; i < elemTotal; i++ {
@@ -116,6 +105,24 @@ func TestRing_Dump(t *testing.T) {
 	test.Assert(t, dumpRet.Cap >= elemTotal)
 	for i := 0; i < elemTotal; i++ {
 		test.Assert(t, dumpRet.Array[i].(int) == i)
+	}
+}
+
+func TestRing_SingleDump(t *testing.T) {
+	elemTotal := 10
+	r := NewRing(elemTotal)
+	for i := 0; i < elemTotal; i++ {
+		err := r.Push(i)
+		test.Assert(t, err == nil)
+	}
+
+	singleDump := &ringDump{}
+	r.rings[0].Dump(singleDump)
+	test.Assert(t, singleDump != nil)
+	test.Assert(t, singleDump.Cap == r.rings[0].size+1)
+	test.Assert(t, singleDump.Len == r.rings[0].size)
+	for i := 0; i < singleDump.Len; i++ {
+		test.Assert(t, singleDump.Array[i].(int) == r.rings[0].arr[i])
 	}
 }
 
@@ -166,6 +173,21 @@ func BenchmarkRing(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		obj := r.Pop()
 		r.Push(obj)
+	}
+}
+
+func BenchmarkRing_Dump(b *testing.B) {
+	size := 1000000
+	r := NewRing(size)
+	for i := 0; i < size; i++ {
+		r.Push(struct{}{})
+	}
+
+	// benchmark
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = r.Dump()
 	}
 }
 
