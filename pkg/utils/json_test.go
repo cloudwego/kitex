@@ -173,6 +173,11 @@ func TestJSONStr2Map(t *testing.T) {
 	surrogateUnicodeMapRet, err := JSONStr2Map(surrogateUnicodeStr)
 	test.Assert(t, err == nil)
 	test.Assert(t, surrogateUnicodeMapRet != nil)
+
+	illegalEscapeCharStr := `{"\x4F60\x597D": "\uDFqwdFF\uD800"}`
+	illegalEscapeCharMapRet, err := JSONStr2Map(illegalEscapeCharStr)
+	test.Assert(t, err != nil)
+	test.Assert(t, len(illegalEscapeCharMapRet) == 0)
 }
 
 func TestJSONUtil(t *testing.T) {
