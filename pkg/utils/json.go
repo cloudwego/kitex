@@ -142,6 +142,10 @@ func JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
 
 	mapInfo = make(map[string]string)
 	for ; c == Comma || c == LeftBrace; c, idx, err = nextToken(data, idx, lastIdx) {
+		if err != nil {
+			err = fmt.Errorf("json str is invalid")
+			return
+		}
 		var key, val string
 		if key, idx, err = readString(data, idx, lastIdx); err != nil {
 			return
@@ -150,7 +154,9 @@ func JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
 			err = fmt.Errorf("json str is invalid, expect ':' after object field, but found %s", string(c))
 			return
 		}
-		val, idx, err = readString(data, idx, lastIdx)
+		if val, idx, err = readString(data, idx, lastIdx); err != nil {
+			return
+		}
 		mapInfo[key] = val
 	}
 	return mapInfo, err
