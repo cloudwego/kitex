@@ -1,4 +1,4 @@
-name: Push Check
+name: Push and Pull Request Check
 
 on: [push, pull_request]
 
