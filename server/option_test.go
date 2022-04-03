@@ -153,8 +153,7 @@ func TestMaxConnIdleTimeOption(t *testing.T) {
 	test.Assert(t, iSvr.opt.RemoteOpt.MaxConnectionIdleTime == testTimeOut)
 }
 
-type myTracer struct {
-}
+type myTracer struct{}
 
 func (t *myTracer) Start(ctx context.Context) context.Context {
 	return nil

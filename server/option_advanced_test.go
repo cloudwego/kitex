@@ -40,9 +40,7 @@ func TestWithServerBasicInfo(t *testing.T) {
 }
 
 func TestACLRulesOption(t *testing.T) {
-	var (
-		rules []acl.RejectFunc
-	)
+	var rules []acl.RejectFunc
 	rules = append(rules, func(ctx context.Context, request interface{}) error {
 		return nil
 	})
@@ -81,15 +79,12 @@ func TestProxyOptionPanic(t *testing.T) {
 	})
 }
 
-type myLimitReporter struct {
-}
+type myLimitReporter struct{}
 
 func (m *myLimitReporter) ConnOverloadReport() {
-
 }
 
 func (m *myLimitReporter) QPSOverloadReport() {
-
 }
 
 func TestLimitReporterOption(t *testing.T) {
