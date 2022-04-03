@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/acl"
+	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
@@ -90,20 +92,8 @@ func (m *myLimitReporter) QPSOverloadReport() {
 
 }
 
-type otherLimitReporter struct {
-}
-
-func (m *otherLimitReporter) ConnOverloadReport() {
-
-}
-
-func (m *otherLimitReporter) QPSOverloadReport() {
-
-}
-
 func TestLimitReporterOption(t *testing.T) {
 	my := &myLimitReporter{}
-	other := &otherLimitReporter{}
 	svr := NewServer(WithLimitReporter(my))
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
@@ -115,11 +105,47 @@ func TestLimitReporterOption(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	iSvr := svr.(*server)
 	test.Assert(t, iSvr.opt.LimitReporter != nil)
-	test.Assert(t, iSvr.opt.LimitReporter == my)
 	test.DeepEqual(t, iSvr.opt.LimitReporter, my)
-	test.Assert(t, iSvr.opt.LimitReporter != other)
+}
+
+func TestGenericOptionPanic(t *testing.T) {
+	test.Panic(t, func() {
+		NewServer(WithGeneric(nil))
+	})
 }
 
 func TestGenericOption(t *testing.T) {
+	g := generic.BinaryThriftGeneric()
+	svr := NewServer(WithGeneric(g))
+	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr.Run()
+	test.Assert(t, err == nil, err)
+	iSvr := svr.(*server)
+	test.DeepEqual(t, iSvr.opt.RemoteOpt.PayloadCodec, g.PayloadCodec())
+}
 
+func TestBoundHandlerOptionPanic(t *testing.T) {
+	test.Panic(t, func() {
+		NewServer(WithBoundHandler(nil))
+	})
+}
+
+func TestExitSignalOption(t *testing.T) {
+	stopSignal := make(chan error, 1)
+	stopErr := errors.New("stop signal")
+	svr := NewServer(WithExitSignal(func() <-chan error {
+		return stopSignal
+	}))
+	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	time.AfterFunc(100*time.Millisecond, func() {
+		stopSignal <- stopErr
+	})
+	err = svr.Run()
+	test.Assert(t, err == stopErr, err)
 }
