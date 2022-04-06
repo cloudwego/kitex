@@ -37,14 +37,29 @@ func (p *PoolHelper) WarmUp(po *PoolOption, pool remote.ConnPool, co remote.Conn
 		num = po.Parallel
 	}
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 
 	mgr := newManager(ctx, po, p.ErrorHandling)
 	go mgr.watch()
 	var wg sync.WaitGroup
 	for i := 0; i < num; i++ {
-		newWorker(&wg, mgr.jobs, mgr.errs, pool, co, po).goToWork(mgr.control)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if x := recover(); x != nil {
+					klog.Errorf("KITEX: warmup: unexpected error: %+v", x)
+				}
+			}()
+			o := &worker{
+				jobs: mgr.jobs,
+				errs: mgr.errs,
+				pool: pool,
+				co:   co,
+				po:   po,
+			}
+			o.fire(mgr.control)
+		}()
 	}
 	wg.Wait()
 	cancel()
@@ -69,7 +84,7 @@ func newManager(ctx context.Context, po *PoolOption, eh ErrorHandling) *manager 
 		control:       control,
 		cancel:        cancel,
 		errs:          make(chan *job),
-		jobs:          chop(po.Targets, po.ConnNum),
+		jobs:          split(po.Targets, po.ConnNum),
 	}
 }
 
@@ -77,7 +92,7 @@ func (m *manager) report() error {
 	<-m.work.Done()
 	close(m.errs)
 	switch {
-	case len(m.bads) == 0:
+	case len(m.bads) == 0 || m.ErrorHandling == IgnoreError:
 		return nil
 	case m.ErrorHandling == FailFast:
 		return m.bads[0].err
@@ -87,29 +102,27 @@ func (m *manager) report() error {
 }
 
 func (m *manager) watch() {
-	go func() {
-		for {
-			select {
-			case <-m.work.Done():
-				return
-			case tmp := <-m.errs:
-				if tmp == nil {
-					return // closed
-				}
-				m.bads = append(m.bads, tmp)
-				if m.ErrorHandling == FailFast {
-					m.cancel()  // stop workers
-					go func() { // clean up
-						discard(m.errs)
-						discard(m.jobs)
-					}()
-					return
-				}
-			default:
-				continue
+	for {
+		select {
+		case <-m.work.Done():
+			return
+		case tmp := <-m.errs:
+			if tmp == nil {
+				return // closed
 			}
+			m.bads = append(m.bads, tmp)
+			if m.ErrorHandling == FailFast {
+				m.cancel()  // stop workers
+				go func() { // clean up
+					discard(m.errs)
+					discard(m.jobs)
+				}()
+				return
+			}
+		default:
+			continue
 		}
-	}()
+	}
 }
 
 func discard(ch chan *job) {
@@ -117,7 +130,7 @@ func discard(ch chan *job) {
 	}
 }
 
-func chop(targets map[string][]string, dup int) (js chan *job) {
+func split(targets map[string][]string, dup int) (js chan *job) {
 	js = make(chan *job)
 	go func() {
 		for network, addresses := range targets {
@@ -138,68 +151,37 @@ type job struct {
 	err     error
 }
 
-type oven struct {
-	woods chan *job
-	ashes chan *job
-	pool  remote.ConnPool
-	co    remote.ConnOption
-	po    *PoolOption
+type worker struct {
+	jobs chan *job
+	errs chan *job
+	pool remote.ConnPool
+	co   remote.ConnOption
+	po   *PoolOption
 }
 
-func (o *oven) fire(ctx context.Context) {
+func (w *worker) fire(ctx context.Context) {
 	var conns []net.Conn
 	defer func() {
 		for _, conn := range conns {
-			o.pool.Put(conn)
+			w.pool.Put(conn)
 		}
 	}()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case wood := <-o.woods:
+		case wood := <-w.jobs:
 			if wood == nil {
 				return
 			}
 			var conn net.Conn
-			conn, wood.err = o.pool.Get(
-				ctx, wood.network, wood.address, o.co)
+			conn, wood.err = w.pool.Get(
+				ctx, wood.network, wood.address, w.co)
 			if wood.err == nil {
 				conns = append(conns, conn)
 			} else {
-				o.ashes <- wood
+				w.errs <- wood
 			}
 		}
 	}
-}
-
-type worker struct {
-	oven  *oven
-	group *sync.WaitGroup
-}
-
-func newWorker(g *sync.WaitGroup, woods, ashes chan *job, pool remote.ConnPool, co remote.ConnOption, po *PoolOption) *worker {
-	w := new(worker)
-	w.group = g
-	w.oven = &oven{
-		woods: woods,
-		ashes: ashes,
-		pool:  pool,
-		po:    po,
-		co:    co,
-	}
-	return w
-}
-
-func (w *worker) goToWork(ctx context.Context) {
-	w.group.Add(1)
-	go func() {
-		defer w.group.Done()
-		defer func() {
-			if x := recover(); x != nil {
-				klog.Errorf("warmup: unexpected error: %+v", x)
-			}
-		}()
-		w.oven.fire(ctx)
-	}()
 }
