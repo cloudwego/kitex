@@ -86,6 +86,7 @@ func BenchmarkJSONIterUnmarshal(b *testing.B) {
 	}
 }
 
+// TestMap2JSONStr test convert map to json string
 func TestMap2JSONStr(t *testing.T) {
 	mapInfo := prepareMap()
 
@@ -110,6 +111,7 @@ func TestMap2JSONStr(t *testing.T) {
 	test.Assert(t, jsonRetNil == "{}")
 }
 
+// TestJSONStr2Map test convert json string to map
 func TestJSONStr2Map(t *testing.T) {
 	mapInfo := prepareMap()
 	jsonRet, _ := json.Marshal(mapInfo)
@@ -180,6 +182,7 @@ func TestJSONStr2Map(t *testing.T) {
 	test.Assert(t, len(illegalEscapeCharMapRet) == 0)
 }
 
+// TestJSONUtil compare return between encoding/json, json-iterator and json.go
 func TestJSONUtil(t *testing.T) {
 	mapInfo := prepareMap()
 	jsonRet1, _ := json.Marshal(mapInfo)

@@ -24,6 +24,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
+// TestNewRing test new a ring object
 func TestNewRing(t *testing.T) {
 	r := NewRing(10)
 
@@ -45,6 +46,7 @@ func TestNewRing(t *testing.T) {
 	})
 }
 
+// TestRing_Push test ring push
 func TestRing_Push(t *testing.T) {
 	var err error
 	// size > 0
@@ -65,6 +67,7 @@ func TestRing_Push(t *testing.T) {
 	test.Assert(t, err == nil)
 }
 
+// TestRing_Pop test ring pop
 func TestRing_Pop(t *testing.T) {
 	// size > 0
 	r := NewRing(10)
@@ -91,6 +94,7 @@ func TestRing_Pop(t *testing.T) {
 	test.Assert(t, elem != nil)
 }
 
+// TestRing_Dump test dump data of a ring
 func TestRing_Dump(t *testing.T) {
 	elemTotal := 97
 	r := NewRing(elemTotal)
@@ -108,6 +112,7 @@ func TestRing_Dump(t *testing.T) {
 	}
 }
 
+// TestRing_SingleDump test dump data of a ring node
 func TestRing_SingleDump(t *testing.T) {
 	elemTotal := 10
 	r := NewRing(elemTotal)

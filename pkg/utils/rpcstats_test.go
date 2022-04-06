@@ -27,6 +27,7 @@ import (
 	STATS "github.com/cloudwego/kitex/pkg/stats"
 )
 
+// TestCalculateEventCost test calculate time cost of a rpc event
 func TestCalculateEventCost(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(
 		rpcinfo.NewEndpointInfo("client", "client_method", nil, nil),
