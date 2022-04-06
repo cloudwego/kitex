@@ -46,3 +46,54 @@ func TestRandomBackOff_Wait(T *testing.T) {
 	}
 	bk.Wait(1)
 }
+
+func TestRandomBackOff_String(T *testing.T) {
+	min := 10
+	max := 100
+	bk := &randomBackOff{
+		minMS: min,
+		maxMS: max,
+	}
+	msg := "RandomBackOff(10ms-100ms)"
+	test.Assert(T, bk.String() == msg)
+}
+
+func TestFixedBackOff_Wait(T *testing.T) {
+	fix := 50
+	bk := &fixedBackOff{
+		fixMS: fix,
+	}
+	bk.Wait(1)
+}
+
+func TestFixedBackOff_String(T *testing.T) {
+	fix := 50
+	bk := &fixedBackOff{
+		fixMS: fix,
+	}
+	msg := "FixedBackOff(50ms)"
+	test.Assert(T, bk.String() == msg)
+}
+
+func TestNoneBackOff_Wait(T *testing.T) {
+	bk := &noneBackOff{}
+	bk.Wait(1)
+}
+
+func TestNoneBackOff_String(T *testing.T) {
+	bk := &noneBackOff{}
+	msg := "NoneBackOff"
+	test.Assert(T, bk.String() == msg)
+}
+
+func TestCheckFixedBackOff(T *testing.T) {
+	err := checkFixedBackOff(0)
+	msg := "invalid FixedBackOff, fixMS=0"
+	test.Assert(T, err.Error() == msg, err)
+}
+
+func TestCheckRandomBackOff(T *testing.T) {
+	err := checkRandomBackOff(100, 10)
+	msg := "invalid RandomBackOff, minMS=100, maxMS=10"
+	test.Assert(T, err.Error() == msg, err)
+}

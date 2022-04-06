@@ -96,6 +96,20 @@ func TestFailureRetryPolicy(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, fp6.BackOffPolicy == nil)
 	test.Assert(t, fp.Equals(&fp6), fp6)
+
+	// case 7
+	fp.DisableChainRetryStop()
+	jsonRet, err = jsoni.MarshalToString(fp)
+	test.Assert(t, err == nil, err)
+	var fp7 FailurePolicy
+	err = jsoni.UnmarshalFromString(jsonRet, &fp7)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, fp7.BackOffPolicy == nil)
+	test.Assert(t, fp.Equals(&fp7), fp7)
+
+	// case 8
+	test.Assert(t, fp.String() == "{StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:true "+
+		"DDLStop:false CBPolicy:{ErrorRate:0.1}} BackOffPolicy:<nil> RetrySameNode:false}", fp)
 }
 
 func TestBackupRequest(t *testing.T) {
@@ -215,6 +229,154 @@ func TestRetryPolicyFailure(t *testing.T) {
 	fr, ok = r.(*failureRetryer)
 	test.Assert(t, ok)
 	test.Assert(t, fr.policy.Equals(p.FailurePolicy))
+}
+
+func TestPolicyNotEqual(T *testing.T) {
+	var p, policy Policy
+
+	// create failurePolicy
+	policy = Policy{
+		Enable: true,
+		Type:   FailureType,
+		FailurePolicy: &FailurePolicy{
+			StopPolicy: StopPolicy{
+				MaxRetryTimes:    1,
+				MaxDurationMS:    2,
+				DisableChainStop: false,
+				DDLStop:          false,
+				CBPolicy: CBPolicy{
+					ErrorRate: defaultCBErrRate,
+				},
+			},
+			BackOffPolicy: &BackOffPolicy{
+				BackOffType: FixedBackOffType,
+				CfgItems: map[BackOffCfgKey]float64{
+					FixMSBackOffCfgKey: 100.0,
+				},
+			},
+			RetrySameNode: false,
+		},
+	}
+	jsonRet, err := jsoni.MarshalToString(policy)
+	test.Assert(T, err == nil, err)
+
+	// case1 enable not equal
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.Enable = false
+	test.Assert(T, !p.Equals(policy))
+
+	// case2 type not equal
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.Type = BackupType
+	test.Assert(T, !p.Equals(policy))
+
+	// case3 failurePolicy not equal
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.FailurePolicy = nil
+	test.Assert(T, !p.Equals(policy))
+	test.Assert(T, !policy.Equals(p))
+
+	// case4 failurePolicy stopPolicy not equal
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.FailurePolicy.StopPolicy.MaxRetryTimes = 2
+	test.Assert(T, !p.Equals(policy))
+
+	// case5 failurePolicy backOffPolicy not equal
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.FailurePolicy.BackOffPolicy = nil
+	test.Assert(T, !p.Equals(policy))
+	test.Assert(T, !policy.Equals(p))
+
+	// case6 failurePolicy backOffPolicy backOffType not equal
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.FailurePolicy.BackOffPolicy.BackOffType = RandomBackOffType
+	test.Assert(T, !p.Equals(policy))
+
+	// case7 failurePolicy backOffPolicy len(cfgItems) not equal
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.FailurePolicy.BackOffPolicy.CfgItems[MinMSBackOffCfgKey] = 100
+	test.Assert(T, !p.Equals(policy))
+
+	// case8 failurePolicy backOffPolicy cfgItems not equal
+	p = Policy{}
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.FailurePolicy.BackOffPolicy.CfgItems[FixMSBackOffCfgKey] = 101
+	test.Assert(T, !p.Equals(policy))
+
+	// case9 failurePolicy retrySameNode not equal
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.FailurePolicy.RetrySameNode = true
+	test.Assert(T, !p.Equals(policy))
+
+	// create backupPolicy
+	policy = Policy{
+		Enable: true,
+		Type:   BackupType,
+		BackupPolicy: &BackupPolicy{
+			RetryDelayMS: 1,
+			StopPolicy: StopPolicy{
+				MaxRetryTimes:    2,
+				MaxDurationMS:    3,
+				DisableChainStop: false,
+				DDLStop:          false,
+				CBPolicy: CBPolicy{
+					ErrorRate: defaultCBErrRate,
+				},
+			},
+			RetrySameNode: false,
+		},
+	}
+	jsonRet, err = jsoni.MarshalToString(policy)
+	test.Assert(T, err == nil, err)
+
+	// case10 backupPolicy not equal
+	p = Policy{}
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.BackupPolicy = nil
+	test.Assert(T, !p.Equals(policy))
+	test.Assert(T, !policy.Equals(p))
+
+	// case11 backupPolicy retryDelayMS not equal
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.BackupPolicy.RetryDelayMS = 2
+	test.Assert(T, !p.Equals(policy))
+
+	// case12 backupPolicy stopPolicy not equal
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.BackupPolicy.StopPolicy.MaxRetryTimes = 3
+	test.Assert(T, !p.Equals(policy))
+
+	// case13 backupPolicy retrySameNode not equal
+	err = jsoni.UnmarshalFromString(jsonRet, &p)
+	test.Assert(T, err == nil, err)
+	p.BackupPolicy.RetrySameNode = true
+	test.Assert(T, !p.Equals(policy))
+}
+
+func TestCheckCBErrorRate(T *testing.T) {
+	p := &CBPolicy{
+		ErrorRate: 0,
+	}
+	err := checkCBErrorRate(p)
+	msg := "invalid retry circuit breaker rate, errRate=0.00"
+	test.Assert(T, err.Error() == msg, err)
+
+	p.ErrorRate = 0.4
+	err = checkCBErrorRate(p)
+	msg = "invalid retry circuit breaker rate, errRate=0.40"
+	test.Assert(T, err.Error() == msg, err)
 }
 
 func genRPCInfo() rpcinfo.RPCInfo {
