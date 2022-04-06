@@ -74,6 +74,7 @@ type manager struct {
 	errs    chan *job
 	jobs    chan *job
 	bads    []*job
+	errLock sync.RWMutex // for bads
 }
 
 func newManager(ctx context.Context, po *PoolOption, eh ErrorHandling) *manager {
@@ -91,6 +92,8 @@ func newManager(ctx context.Context, po *PoolOption, eh ErrorHandling) *manager 
 func (m *manager) report() error {
 	<-m.work.Done()
 	close(m.errs)
+	m.errLock.RLock()
+	defer m.errLock.RUnlock()
 	switch {
 	case len(m.bads) == 0 || m.ErrorHandling == IgnoreError:
 		return nil
@@ -110,7 +113,10 @@ func (m *manager) watch() {
 			if tmp == nil {
 				return // closed
 			}
+			m.errLock.Lock()
 			m.bads = append(m.bads, tmp)
+			m.errLock.Unlock()
+
 			if m.ErrorHandling == FailFast {
 				m.cancel()  // stop workers
 				go func() { // clean up

@@ -18,8 +18,10 @@ package warmup_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -28,6 +30,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/warmup"
 )
 
+var errReject = errors.New("rejected")
+
 type mockConn struct {
 	network string
 	address string
@@ -35,12 +39,14 @@ type mockConn struct {
 }
 
 type mockPool struct {
+	sync.Mutex
 	connpool.DummyPool
 	targets map[string][]string
 	get     mockCounter
 	put     mockCounter
 	conns   map[net.Conn]int // 0: unknown, 1: created, 2: created and put
 	dup     int
+	reject  map[string]map[string]bool
 }
 
 func (p *mockPool) init(targets map[string][]string, dup int) *mockPool {
@@ -55,8 +61,13 @@ func (p *mockPool) init(targets map[string][]string, dup int) *mockPool {
 // Get implements the remote.ConnPool interface.
 func (p *mockPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
 	p.get.set(network, address)
+	if p.reject[network][address] {
+		return nil, errReject
+	}
 	conn := &mockConn{network, address, nil}
+	p.Lock()
 	p.conns[conn] = 1
+	p.Unlock()
 	return conn, nil
 }
 
@@ -68,11 +79,13 @@ func (p *mockPool) Put(conn net.Conn) error {
 		addr := conn.RemoteAddr()
 		p.put.set(addr.Network(), addr.String())
 	}
+	p.Lock()
 	if _, ok := p.conns[conn]; ok {
 		p.conns[conn]++
 	} else {
 		p.conns[conn] = 0
 	}
+	p.Unlock()
 	return nil
 }
 
@@ -104,35 +117,42 @@ func (p *mockPool) report() error {
 	return nil
 }
 
-type mockCounter map[string]map[string]int
+type mockCounter struct {
+	sync.RWMutex
+	data map[string]map[string]int
+}
 
 func (mc *mockCounter) init(targets map[string][]string, cnt int) {
-	*mc = make(map[string]map[string]int, len(targets))
+	mc.data = make(map[string]map[string]int, len(targets))
 	for n, v := range targets {
-		(*mc)[n] = make(map[string]int, len(v))
+		mc.data[n] = make(map[string]int, len(v))
 		for _, a := range v {
-			(*mc)[n][a] -= cnt
+			mc.data[n][a] -= cnt
 		}
 	}
 }
 
 func (mc *mockCounter) set(network, address string) {
-	if (*mc)[network] == nil {
-		(*mc)[network] = make(map[string]int)
+	mc.Lock()
+	defer mc.Unlock()
+	if mc.data[network] == nil {
+		mc.data[network] = make(map[string]int)
 	}
-	(*mc)[network][address]++
+	mc.data[network][address]++
 }
 
 func (mc *mockCounter) report(op string, targets map[string][]string) error {
+	mc.RLock()
+	defer mc.RUnlock()
 	for n, v := range targets {
 		for _, a := range v {
-			if c := (*mc)[n][a]; c != 0 {
+			if c := mc.data[n][a]; c != 0 {
 				return fmt.Errorf("%s: miss <%s,%s>: %d", op, n, a, c)
 			}
-			delete((*mc)[n], a)
+			delete(mc.data[n], a)
 		}
 	}
-	for n, m := range *mc {
+	for n, m := range mc.data {
 		for a, c := range m {
 			return fmt.Errorf("%s: unexpected <%s,%s>: %d", op, n, a, c)
 		}
@@ -148,7 +168,7 @@ func TestPoolHelper(t *testing.T) {
 			"unix": {"4", "4"},
 		},
 		ConnNum:  3,
-		Parallel: 0,
+		Parallel: 5,
 	}
 	co := remote.ConnOption{}
 	h := &warmup.PoolHelper{warmup.FailFast}
@@ -158,4 +178,51 @@ func TestPoolHelper(t *testing.T) {
 
 	err = p.report()
 	test.Assert(t, err == nil, err)
+}
+
+func TestPoolHelperFailFast(t *testing.T) {
+	po := &warmup.PoolOption{
+		Targets: map[string][]string{
+			"tcp":  {"1"},
+			"udp":  {"2", "3"},
+			"unix": {"4", "4"},
+		},
+		ConnNum:  3,
+		Parallel: 5,
+	}
+	co := remote.ConnOption{}
+	h := &warmup.PoolHelper{warmup.FailFast}
+	p := new(mockPool).init(po.Targets, po.ConnNum)
+	p.reject = map[string]map[string]bool{
+		"udp": {
+			"2": true,
+		},
+	}
+	err := h.WarmUp(po, p, co)
+	test.Assert(t, errors.Is(err, errReject))
+
+	err = p.report()
+	test.Assert(t, err != nil)
+}
+
+func TestPoolHelperIgnoreError(t *testing.T) {
+	po := &warmup.PoolOption{
+		Targets: map[string][]string{
+			"tcp":  {"1"},
+			"udp":  {"2", "3"},
+			"unix": {"4", "4"},
+		},
+		ConnNum:  3,
+		Parallel: 5,
+	}
+	co := remote.ConnOption{}
+	h := &warmup.PoolHelper{warmup.IgnoreError}
+	p := new(mockPool).init(po.Targets, po.ConnNum)
+	p.reject = map[string]map[string]bool{
+		"udp": {
+			"2": true,
+		},
+	}
+	err := h.WarmUp(po, p, co)
+	test.Assert(t, err == nil)
 }
