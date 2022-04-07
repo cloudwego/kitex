@@ -217,7 +217,7 @@ func TestMuxSvrOnRead(t *testing.T) {
 
 	err = svrTransHdlr.OnRead(ctx, npconn)
 	test.Assert(t, err == nil, err)
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(5 * time.Second)
 
 	test.Assert(t, isReaderBufReleased)
 	test.Assert(t, isWriteBufFlushed)
@@ -291,7 +291,7 @@ func TestPanicAfterMuxSvrOnRead(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	err = svrTransHdlr.OnRead(ctx, conn)
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, isReaderBufReleased)
 	test.Assert(t, isWriteBufFlushed)
@@ -447,7 +447,7 @@ func TestInvokeError(t *testing.T) {
 	}
 
 	err = svrTransHdlr.OnRead(ctx, npconn)
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, isReaderBufReleased)
 	test.Assert(t, isWriteBufFlushed)
@@ -556,7 +556,7 @@ func TestInvokeNoMethod(t *testing.T) {
 	}
 
 	err = svrTransHdlr.OnRead(ctx, npconn)
-	time.Sleep(1 * time.Second)
+	time.Sleep(5 * time.Second)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, isReaderBufReleased)
 	test.Assert(t, isWriteBufFlushed)
