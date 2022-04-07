@@ -258,6 +258,7 @@ func TestReadTimeout(t *testing.T) {
 	}
 
 	handler, err := NewCliTransHandlerFactory().NewTransHandler(opt)
+	test.Assert(t, err == nil, err)
 
 	ctx := context.Background()
 	buf := netpoll.NewLinkBuffer(1024)
