@@ -23,6 +23,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 )
 
 var (
@@ -365,22 +366,8 @@ func TestPolicyNotEqual(T *testing.T) {
 	test.Assert(T, !p.Equals(policy))
 }
 
-func TestCheckCBErrorRate(T *testing.T) {
-	p := &CBPolicy{
-		ErrorRate: 0,
-	}
-	err := checkCBErrorRate(p)
-	msg := "invalid retry circuit breaker rate, errRate=0.00"
-	test.Assert(T, err.Error() == msg, err)
-
-	p.ErrorRate = 0.4
-	err = checkCBErrorRate(p)
-	msg = "invalid retry circuit breaker rate, errRate=0.40"
-	test.Assert(T, err.Error() == msg, err)
-}
-
 func genRPCInfo() rpcinfo.RPCInfo {
-	to := rpcinfo.NewEndpointInfo("", method, nil, nil)
-	ri := rpcinfo.NewRPCInfo(nil, to, nil, nil, nil)
+	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Method: method}, method).ImmutableView()
+	ri := rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	return ri
 }

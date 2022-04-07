@@ -85,15 +85,3 @@ func TestNoneBackOff_String(T *testing.T) {
 	msg := "NoneBackOff"
 	test.Assert(T, bk.String() == msg)
 }
-
-func TestCheckFixedBackOff(T *testing.T) {
-	err := checkFixedBackOff(0)
-	msg := "invalid FixedBackOff, fixMS=0"
-	test.Assert(T, err.Error() == msg, err)
-}
-
-func TestCheckRandomBackOff(T *testing.T) {
-	err := checkRandomBackOff(100, 10)
-	msg := "invalid RandomBackOff, minMS=100, maxMS=10"
-	test.Assert(T, err.Error() == msg, err)
-}
