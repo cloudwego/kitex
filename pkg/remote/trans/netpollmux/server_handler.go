@@ -25,7 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/netpoll"
 
 	stats2 "github.com/cloudwego/kitex/internal/stats"
@@ -36,6 +35,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -295,9 +295,11 @@ func (t *svrTransHandler) Shutdown(ctx context.Context) error {
 	iv := rpcinfo.NewInvocation("none", "none")
 	iv.(interface{ SetSeqID(seqID int32) }).SetSeqID(0)
 	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
-	data := thrift.NewTProtocolException(errors.New("server is shutting down"))
-	msg := remote.NewMessage(data, t.svcInfo, ri, remote.Exception, remote.Server)
+	data := NewControlFrame()
+	msg := remote.NewMessage(data, t.svcInfo, ri, remote.Reply, remote.Server)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	msg.TransInfo().TransStrInfo()[transmeta.HeaderConnectionReadyToReset] = "1"
+
 	t.conns.Range(func(k, v interface{}) bool {
 		wbuf := netpoll.NewLinkBuffer()
 		bufWriter := np.NewWriterByteBuffer(wbuf)

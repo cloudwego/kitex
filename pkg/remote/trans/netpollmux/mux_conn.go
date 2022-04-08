@@ -28,11 +28,17 @@ import (
 	"github.com/cloudwego/netpoll/mux"
 
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 // ErrConnClosed .
 var ErrConnClosed = errors.New("conn closed")
+
+var defaultCodec = codec.NewDefaultCodec()
 
 func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 	c := &muxCliConn{
@@ -68,12 +74,24 @@ func (c *muxCliConn) OnRequest(ctx context.Context, connection netpoll.Connectio
 		return c.onError(ctx, err, connection)
 	}
 	if seqID == 0 {
-		// the server is closing this connection
-		c.closing = true
+		iv := rpcinfo.NewInvocation("none", "none")
+		iv.(interface{ SetSeqID(seqID int32) }).SetSeqID(0)
+		ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
+		ctl := NewControlFrame()
+		msg := remote.NewMessage(ctl, nil, ri, remote.Reply, remote.Client)
 
-		// the payload will be a thrift exception, we don't need it by now,
-		// so discard it.
-		return reader.Skip(length)
+		bufReader := np.NewReaderByteBuffer(reader)
+		if err = defaultCodec.Decode(ctx, msg, bufReader); err != nil {
+			return
+		}
+
+		crrst := msg.TransInfo().TransStrInfo()[transmeta.HeaderConnectionReadyToReset]
+		if len(crrst) > 0 {
+			// the server is closing this connection
+			c.closing = true
+			reader.(io.Closer).Close()
+		}
+		return
 	}
 	go func() {
 		asyncCallback, ok := c.seqIDMap.load(seqID)
@@ -93,10 +111,12 @@ func (c *muxCliConn) Close() error {
 }
 
 func (c *muxCliConn) close() error {
-	c.Connection.Close()
-	c.seqIDMap.rangeMap(func(seqID int32, msg EventHandler) {
-		msg.Recv(nil, ErrConnClosed)
-	})
+	if !c.closing {
+		c.Connection.Close()
+		c.seqIDMap.rangeMap(func(seqID int32, msg EventHandler) {
+			msg.Recv(nil, ErrConnClosed)
+		})
+	}
 	return nil
 }
 
