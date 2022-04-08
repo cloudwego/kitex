@@ -290,15 +290,15 @@ func TestContainer_Dump(t *testing.T) {
 	rc = NewRetryContainerWithCB(nil, nil)
 	methodPolicies = map[string]Policy{
 		method: {
-			Enable:       true,
-			Type:         FailureType,
+			Enable:        true,
+			Type:          FailureType,
 			FailurePolicy: NewFailurePolicy(),
 		},
 	}
 	rc.InitWithPolicies(methodPolicies)
 	err = rc.Init(&Policy{
-		Enable:       true,
-		Type:         FailureType,
+		Enable:        true,
+		Type:          FailureType,
 		FailurePolicy: NewFailurePolicy(),
 	})
 	test.Assert(t, err == nil, err)
@@ -506,7 +506,7 @@ func TestPolicyInvalidCall(t *testing.T) {
 	// failurePolicy DDLStop rpcTimeOut
 	failurePolicy := NewFailurePolicy()
 	failurePolicy.WithDDLStop()
-	RegisterDDLStop(func(ctx context.Context, policy StopPolicy) (bool, string){
+	RegisterDDLStop(func(ctx context.Context, policy StopPolicy) (bool, string) {
 		return true, "TestDDLStop"
 	})
 	err = rc.Init(&Policy{
