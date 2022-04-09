@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+// TestInvokerCall tests Invoker, call Kitex server just like SDK.
 func TestInvokerCall(t *testing.T) {
 	var gotErr atomic.Value
 	invoker := NewInvoker(WithMetaHandler(noopMetahandler{}), WithErrorHandler(func(err error) error {
