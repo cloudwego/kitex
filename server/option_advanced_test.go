@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
+// TestWithServerBasicInfo tests the creation of a server with basic info
 func TestWithServerBasicInfo(t *testing.T) {
 	svcName := "svcName" + time.Now().String()
 	svr := NewServer(WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
@@ -39,6 +40,7 @@ func TestWithServerBasicInfo(t *testing.T) {
 	test.Assert(t, iSvr.opt.Svr.ServiceName == svcName, iSvr.opt.Svr.ServiceName)
 }
 
+// TestWithServerBasicInfo tests the creation of a server with ACLRules option
 func TestACLRulesOption(t *testing.T) {
 	var rules []acl.RejectFunc
 	rules = append(rules, func(ctx context.Context, request interface{}) error {
@@ -63,6 +65,7 @@ func TestACLRulesOption(t *testing.T) {
 	test.Assert(t, iSvr.opt.ACLRules[1] != nil)
 }
 
+// TestProxyOptionPanic tests the creation of a server with Proxy option,if the proxy is not nil, should panic
 func TestProxyOptionPanic(t *testing.T) {
 	o := internal_server.NewOptions(nil)
 	o.Proxy = &proxyMock{}
@@ -87,6 +90,7 @@ func (m *myLimitReporter) ConnOverloadReport() {
 func (m *myLimitReporter) QPSOverloadReport() {
 }
 
+// TestLimitReporterOption tests the creation of a server with LimitReporter option
 func TestLimitReporterOption(t *testing.T) {
 	my := &myLimitReporter{}
 	svr := NewServer(WithLimitReporter(my))
@@ -103,12 +107,14 @@ func TestLimitReporterOption(t *testing.T) {
 	test.DeepEqual(t, iSvr.opt.LimitReporter, my)
 }
 
+// TestGenericOptionPanic tests the creation of a server with RemoteOpt.PayloadCodec,if the generic is nil, should panic
 func TestGenericOptionPanic(t *testing.T) {
 	test.Panic(t, func() {
 		NewServer(WithGeneric(nil))
 	})
 }
 
+// TestGenericOption tests the creation of a server with RemoteOpt.PayloadCodec option
 func TestGenericOption(t *testing.T) {
 	g := generic.BinaryThriftGeneric()
 	svr := NewServer(WithGeneric(g))
@@ -124,12 +130,14 @@ func TestGenericOption(t *testing.T) {
 	test.DeepEqual(t, iSvr.opt.RemoteOpt.PayloadCodec, g.PayloadCodec())
 }
 
+// TestBoundHandlerOptionPanic tests the creation of a server with remote.BoundHandler option,if the bound handler is nil, should panic
 func TestBoundHandlerOptionPanic(t *testing.T) {
 	test.Panic(t, func() {
 		NewServer(WithBoundHandler(nil))
 	})
 }
 
+// TestExitSignalOption tests the creation of a server with ExitSignal option
 func TestExitSignalOption(t *testing.T) {
 	stopSignal := make(chan error, 1)
 	stopErr := errors.New("stop signal")

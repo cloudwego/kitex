@@ -35,6 +35,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+// TestOptionDebugInfo tests the creation of a server with DebugService option
 func TestOptionDebugInfo(t *testing.T) {
 	var opts []Option
 	md := newMockDiagnosis()
@@ -75,6 +76,7 @@ func TestOptionDebugInfo(t *testing.T) {
 	}
 }
 
+// TestProxyOption tests the creation of a server with Proxy option
 func TestProxyOption(t *testing.T) {
 	var opts []Option
 	addr, err := net.ResolveTCPAddr("tcp", ":8888")
@@ -121,6 +123,7 @@ func (m *mockDiagnosis) ProbePairs() map[diagnosis.ProbeName]diagnosis.ProbeFunc
 	return m.probes
 }
 
+// TestExitWaitTimeOption tests the creation of a server with RemoteOpt.ExitWaitTime option
 func TestExitWaitTimeOption(t *testing.T) {
 	// random timeout value
 	testTimeOut := time.Duration(time.Now().Unix()) * time.Microsecond
@@ -137,6 +140,7 @@ func TestExitWaitTimeOption(t *testing.T) {
 	test.Assert(t, iSvr.opt.RemoteOpt.ExitWaitTime == testTimeOut)
 }
 
+// TestMaxConnIdleTimeOption tests the creation of a server with RemoteOpt.MaxConnectionIdleTime option
 func TestMaxConnIdleTimeOption(t *testing.T) {
 	// random timeout value
 	testTimeOut := time.Duration(time.Now().Unix())
@@ -162,6 +166,7 @@ func (t *myTracer) Start(ctx context.Context) context.Context {
 func (t *myTracer) Finish(ctx context.Context) {
 }
 
+// TestTracerOption tests the creation of a server with TracerCtl option
 func TestTracerOption(t *testing.T) {
 	svr1 := NewServer()
 	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
@@ -191,6 +196,7 @@ func TestTracerOption(t *testing.T) {
 	test.Assert(t, iSvr2.opt.TracerCtl.HasTracer())
 }
 
+// TestStatsLevelOption tests the creation of a server with StatsLevel option
 func TestStatsLevelOption(t *testing.T) {
 	svr1 := NewServer()
 	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
@@ -226,6 +232,7 @@ func (s *mySuiteOption) Options() []Option {
 	return s.myOpts
 }
 
+// TestSuiteOption tests the creation of a server with SuiteOption option
 func TestSuiteOption(t *testing.T) {
 	svr1 := NewServer()
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -265,6 +272,7 @@ func TestSuiteOption(t *testing.T) {
 	test.Assert(t, iSvr2.opt.RemoteOpt.MaxConnectionIdleTime == tmpConnIdleTime, iSvr2.opt.RemoteOpt.MaxConnectionIdleTime)
 }
 
+// TestMuxTransportOption tests the creation of a server,with netpollmux remote.ServerTransHandlerFactory option,
 func TestMuxTransportOption(t *testing.T) {
 	svr1 := NewServer()
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -292,6 +300,7 @@ func TestMuxTransportOption(t *testing.T) {
 	test.DeepEqual(t, handlerFactory, netpollmux.NewSvrTransHandlerFactory())
 }
 
+// TestPayloadCodecOption tests the creation of a server with RemoteOpt.PayloadCodec option
 func TestPayloadCodecOption(t *testing.T) {
 	svr1 := NewServer()
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -319,6 +328,8 @@ func TestPayloadCodecOption(t *testing.T) {
 	test.DeepEqual(t, iSvr2.opt.RemoteOpt.PayloadCodec, protobuf.NewProtobufCodec())
 }
 
+// TestRemoteOptGRPCCfgUintValueOption tests the creation of a server with RemoteOpt.GRPCCfg option
+// and the value of the option is uint32
 func TestRemoteOptGRPCCfgUintValueOption(t *testing.T) {
 	// random value between 1 and 100
 	randUint1 := uint32(rand.Int31n(100)) + 1
@@ -349,6 +360,7 @@ func TestRemoteOptGRPCCfgUintValueOption(t *testing.T) {
 	test.Assert(t, *iSvr1.opt.RemoteOpt.GRPCCfg.MaxHeaderListSize == randUint4)
 }
 
+// TestGRPCKeepaliveEnforcementPolicyOption tests the creation of a server with RemoteOpt.GRPCCfg.KeepaliveEnforcementPolicy option
 func TestGRPCKeepaliveEnforcementPolicyOption(t *testing.T) {
 	// random value between 1 and 100
 	randInt := rand.Int31n(100) + 1
@@ -372,6 +384,7 @@ func TestGRPCKeepaliveEnforcementPolicyOption(t *testing.T) {
 	test.DeepEqual(t, iSvr1.opt.RemoteOpt.GRPCCfg.KeepaliveEnforcementPolicy, kep)
 }
 
+// TestGRPCKeepaliveParamsOption tests the creation of a server with RemoteOpt.GRPCCfg.KeepaliveParams option
 func TestGRPCKeepaliveParamsOption(t *testing.T) {
 	randTimeDuration1 := time.Duration(rand.Int31n(100)+1) * time.Second
 	randTimeDuration2 := time.Duration(rand.Int31n(100)+1) * time.Second

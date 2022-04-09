@@ -75,6 +75,7 @@ func TestInvokerCall(t *testing.T) {
 	test.Assert(t, strings.Contains(gotErr.Load().(error).Error(), "mockError"))
 }
 
+// TestInvokerInit test invoker init without service info, should fail
 func TestInvokerInit(t *testing.T) {
 	// test init without register server info
 	invoker := NewInvoker()
