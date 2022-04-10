@@ -21,6 +21,7 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -36,16 +37,14 @@ import (
 )
 
 var (
-	svrTransHdlr remote.ServerTransHandler
-	opt          *remote.ServerOption
-	rwTimeout    = time.Second
-	addrStr      = "test addr"
-	addr         = utils.NewNetAddr("tcp", addrStr)
-	method       = "mock"
-	rpcInfo      rpcinfo.RPCInfo
+	opt       *remote.ServerOption
+	rwTimeout = time.Second
+	addrStr   = "test addr"
+	addr      = utils.NewNetAddr("tcp", addrStr)
+	method    = "mock"
 )
 
-func init() {
+func newTestRpcInfo() rpcinfo.RPCInfo {
 	fromInfo := rpcinfo.EmptyEndpointInfo()
 	rpcCfg := rpcinfo.NewRPCConfig()
 	mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
@@ -53,10 +52,15 @@ func init() {
 	ink := rpcinfo.NewInvocation("", method)
 	rpcStat := rpcinfo.NewRPCStats()
 
-	body := "hello world"
-
-	rpcInfo = rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
+	rpcInfo := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
 	rpcinfo.AsMutableEndpointInfo(rpcInfo.From()).SetAddress(addr)
+
+	return rpcInfo
+}
+
+func init() {
+	body := "hello world"
+	rpcInfo := newTestRpcInfo()
 
 	opt = &remote.ServerOption{
 		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
@@ -79,8 +83,6 @@ func init() {
 		TracerCtl:        &internal_stats.Controller{},
 		ReadWriteTimeout: rwTimeout,
 	}
-
-	svrTransHdlr, _ = NewSvrTransHandlerFactory().NewTransHandler(opt)
 }
 
 // TestNewTransHandler test new a ServerTransHandler
@@ -108,6 +110,9 @@ func TestOnActive(t *testing.T) {
 
 	// 2. test
 	ctx := context.Background()
+
+	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
+
 	ctx, err := svrTransHdlr.OnActive(ctx, conn)
 	test.Assert(t, err == nil, err)
 	muxSvrCon, _ := ctx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
@@ -130,7 +135,10 @@ func TestMuxSvrWrite(t *testing.T) {
 	test.Assert(t, muxSvrCon != nil)
 
 	ctx := context.Background()
+	rpcInfo := newTestRpcInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
+
+	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
 	msg := &MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
@@ -148,18 +156,18 @@ func TestMuxSvrWrite(t *testing.T) {
 
 // TestMuxSvrOnRead test ServerTransHandler OnRead
 func TestMuxSvrOnRead(t *testing.T) {
-	var isWriteBufFlushed bool
-	var isReaderBufReleased bool
-	var isInvoked bool
+	var isWriteBufFlushed atomic.Value
+	var isReaderBufReleased atomic.Value
+	var isInvoked atomic.Value
 
 	buf := netpoll.NewLinkBuffer(1024)
 	npconn := &MockNetpollConn{
 		ReaderFunc: func() (r netpoll.Reader) {
-			isReaderBufReleased = true
+			isReaderBufReleased.Store(1)
 			return buf
 		},
 		WriterFunc: func() (r netpoll.Writer) {
-			isWriteBufFlushed = true
+			isWriteBufFlushed.Store(1)
 			return buf
 		},
 		Conn: mocks.Conn{
@@ -170,7 +178,10 @@ func TestMuxSvrOnRead(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	rpcInfo := newTestRpcInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
+
+	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
 	msg := &MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
@@ -196,7 +207,7 @@ func TestMuxSvrOnRead(t *testing.T) {
 	err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
 	test.Assert(t, err == nil, err)
 
-	time.Sleep(5 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 	buf.Flush()
 	test.Assert(t, npconn.Reader().Len() > 0, npconn.Reader().Len())
 
@@ -210,18 +221,18 @@ func TestMuxSvrOnRead(t *testing.T) {
 
 	if setter, ok := svrTransHdlr.(remote.InvokeHandleFuncSetter); ok {
 		setter.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
-			isInvoked = true
+			isInvoked.Store(1)
 			return nil
 		})
 	}
 
 	err = svrTransHdlr.OnRead(ctx, npconn)
 	test.Assert(t, err == nil, err)
-	time.Sleep(5 * time.Second)
+	time.Sleep(50 * time.Millisecond)
 
-	test.Assert(t, isReaderBufReleased)
-	test.Assert(t, isWriteBufFlushed)
-	test.Assert(t, isInvoked)
+	test.Assert(t, isReaderBufReleased.Load() == 1)
+	test.Assert(t, isWriteBufFlushed.Load() == 1)
+	test.Assert(t, isInvoked.Load() == 1)
 }
 
 // TestPanicAfterMuxSvrOnRead test have panic after read
@@ -252,6 +263,9 @@ func TestPanicAfterMuxSvrOnRead(t *testing.T) {
 			return true
 		},
 	}
+
+	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
+	rpcInfo := newTestRpcInfo()
 
 	// pipeline nil panic
 	svrTransHdlr.SetPipeline(nil)
@@ -291,7 +305,7 @@ func TestPanicAfterMuxSvrOnRead(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	err = svrTransHdlr.OnRead(ctx, conn)
-	time.Sleep(5 * time.Second)
+	time.Sleep(50 * time.Millisecond)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, isReaderBufReleased)
 	test.Assert(t, isWriteBufFlushed)
@@ -327,6 +341,8 @@ func TestRecoverAfterOnReadPanic(t *testing.T) {
 		},
 	}
 
+	rpcInfo := newTestRpcInfo()
+
 	msg := &MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return rpcInfo
@@ -342,6 +358,8 @@ func TestRecoverAfterOnReadPanic(t *testing.T) {
 
 	pool := &sync.Pool{}
 	muxSvrCon := newMuxSvrConn(conn, pool)
+
+	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
 	var err error
 	ctx := context.Background()
@@ -377,9 +395,9 @@ func TestRecoverAfterOnReadPanic(t *testing.T) {
 
 // TestOnError test Invoke has err
 func TestInvokeError(t *testing.T) {
-	var isWriteBufFlushed bool
 	var isReaderBufReleased bool
-	var isInvoked bool
+	var isWriteBufFlushed atomic.Value
+	var invokedErr atomic.Value
 
 	buf := netpoll.NewLinkBuffer(1024)
 	npconn := &MockNetpollConn{
@@ -388,7 +406,7 @@ func TestInvokeError(t *testing.T) {
 			return buf
 		},
 		WriterFunc: func() (r netpoll.Writer) {
-			isWriteBufFlushed = true
+			isWriteBufFlushed.Store(1)
 			return buf
 		},
 		Conn: mocks.Conn{
@@ -400,6 +418,8 @@ func TestInvokeError(t *testing.T) {
 			},
 		},
 	}
+
+	rpcInfo := newTestRpcInfo()
 
 	msg := &MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
@@ -413,6 +433,31 @@ func TestInvokeError(t *testing.T) {
 			}
 		},
 	}
+
+	body := "hello world"
+	opt := &remote.ServerOption{
+		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
+			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
+			return rpcInfo, ctx
+		},
+		Codec: &MockCodec{
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), body)
+				_, err := out.WriteBinary(r.Bytes())
+				return err
+			},
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				in.Skip(3 * codec.Size32)
+				_, err := in.ReadString(len(body))
+				return err
+			},
+		},
+		SvcInfo:          mocks.ServiceInfo(),
+		TracerCtl:        &internal_stats.Controller{},
+		ReadWriteTimeout: rwTimeout,
+	}
+
+	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
 	pool := &sync.Pool{}
 	muxSvrCon := newMuxSvrConn(npconn, pool)
@@ -441,17 +486,18 @@ func TestInvokeError(t *testing.T) {
 
 	if setter, ok := svrTransHdlr.(remote.InvokeHandleFuncSetter); ok {
 		setter.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
-			isInvoked = true
-			return errors.New("mock invoke err test")
+			err = errors.New("mock invoke err test")
+			invokedErr.Store(err)
+			return err
 		})
 	}
 
 	err = svrTransHdlr.OnRead(ctx, npconn)
-	time.Sleep(5 * time.Second)
+	time.Sleep(50 * time.Millisecond)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, isReaderBufReleased)
-	test.Assert(t, isWriteBufFlushed)
-	test.Assert(t, isInvoked)
+	test.Assert(t, invokedErr.Load() != nil)
+	test.Assert(t, isWriteBufFlushed.Load() == 1)
 }
 
 // TestOnError test OnError method
@@ -475,16 +521,20 @@ func TestOnError(t *testing.T) {
 		},
 	}
 
+	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
+
 	// 2. test
 	ctx := context.Background()
+	rpcInfo := newTestRpcInfo()
+
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
-	svrTransHdlr.OnError(ctx, errors.New("a"), conn)
+	svrTransHdlr.OnError(ctx, errors.New("test mock err"), conn)
 	svrTransHdlr.OnError(ctx, netpoll.ErrConnClosed, conn)
 }
 
 // TestInvokeNoMethod test invoke no method
 func TestInvokeNoMethod(t *testing.T) {
-	var isWriteBufFlushed bool
+	var isWriteBufFlushed atomic.Value
 	var isReaderBufReleased bool
 	var isInvoked bool
 
@@ -495,7 +545,7 @@ func TestInvokeNoMethod(t *testing.T) {
 			return buf
 		},
 		WriterFunc: func() (r netpoll.Writer) {
-			isWriteBufFlushed = true
+			isWriteBufFlushed.Store(1)
 			return buf
 		},
 		Conn: mocks.Conn{
@@ -507,6 +557,8 @@ func TestInvokeNoMethod(t *testing.T) {
 			},
 		},
 	}
+
+	rpcInfo := newTestRpcInfo()
 
 	msg := &MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
@@ -520,6 +572,31 @@ func TestInvokeNoMethod(t *testing.T) {
 			}
 		},
 	}
+
+	body := "hello world"
+	opt := &remote.ServerOption{
+		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
+			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
+			return rpcInfo, ctx
+		},
+		Codec: &MockCodec{
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), body)
+				_, err := out.WriteBinary(r.Bytes())
+				return err
+			},
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				in.Skip(3 * codec.Size32)
+				_, err := in.ReadString(len(body))
+				return err
+			},
+		},
+		SvcInfo:          mocks.ServiceInfo(),
+		TracerCtl:        &internal_stats.Controller{},
+		ReadWriteTimeout: rwTimeout,
+	}
+
+	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
 	pool := &sync.Pool{}
 	muxSvrCon := newMuxSvrConn(npconn, pool)
@@ -556,9 +633,9 @@ func TestInvokeNoMethod(t *testing.T) {
 	}
 
 	err = svrTransHdlr.OnRead(ctx, npconn)
-	time.Sleep(5 * time.Second)
+	time.Sleep(50 * time.Millisecond)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, isReaderBufReleased)
-	test.Assert(t, isWriteBufFlushed)
+	test.Assert(t, isWriteBufFlushed.Load() == 1)
 	test.Assert(t, !isInvoked)
 }
