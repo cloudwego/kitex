@@ -23,7 +23,6 @@ import (
 	"net"
 	"runtime/debug"
 	"sync"
-	"time"
 
 	"github.com/cloudwego/netpoll"
 
@@ -311,13 +310,13 @@ func (t *svrTransHandler) Shutdown(ctx context.Context) error {
 			})
 		} else {
 			c := v.(*muxSvrConn)
-			klog.Warn("[mux] signal connection closing error:",
+			klog.Warn("KITEX: signal connection closing error:",
 				err.Error(), c.LocalAddr().String(), "=>", c.RemoteAddr().String())
 		}
 		return true
 	})
 	// wait for a while until all notifications are sent
-	time.Sleep(time.Second)
+	<-ctx.Done()
 	return nil
 }
 

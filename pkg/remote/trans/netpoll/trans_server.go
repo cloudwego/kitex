@@ -125,7 +125,7 @@ func (ts *transServer) BootstrapServer() (err error) {
 	ts.Unlock()
 
 	if err == nil {
-		// Convert the listener so that closing the it also stops the
+		// Convert the listener so that closing it also stops the
 		// event loop in netpoll.
 		ts.Lock()
 		ts.ln, err = netpoll.ConvertListener(ts.ln)

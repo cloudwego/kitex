@@ -46,6 +46,9 @@ func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 		seqIDMap: newShardMap(mux.ShardSize),
 	}
 	connection.SetOnRequest(c.OnRequest)
+	connection.AddCloseCallback(func(connection netpoll.Connection) error {
+		return c.forceClose()
+	})
 	return c
 }
 
@@ -110,12 +113,17 @@ func (c *muxCliConn) Close() error {
 	return nil
 }
 
+func (c *muxCliConn) forceClose() error {
+	c.Connection.Close()
+	c.seqIDMap.rangeMap(func(seqID int32, msg EventHandler) {
+		msg.Recv(nil, ErrConnClosed)
+	})
+	return nil
+}
+
 func (c *muxCliConn) close() error {
 	if !c.closing {
-		c.Connection.Close()
-		c.seqIDMap.rangeMap(func(seqID int32, msg EventHandler) {
-			msg.Recv(nil, ErrConnClosed)
-		})
+		return c.forceClose()
 	}
 	return nil
 }
