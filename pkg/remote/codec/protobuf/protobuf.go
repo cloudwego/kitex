@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/cloudwego/kitex/pkg/protocol/bprotoc"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -62,17 +63,6 @@ func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out 
 	if err != nil {
 		return err
 	}
-	msg, ok := data.(protobufMsgCodec)
-	if !ok {
-		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "encode failed, codec msg type not match with protobufCodec")
-	}
-
-	// 2. encode pb struct
-	// TODO 传入预分配的buf可以减少buf扩容
-	var actualMsgBuf []byte
-	if actualMsgBuf, err = msg.Marshal(actualMsgBuf); err != nil {
-		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("protobuf marshal message failed: %s", err.Error()))
-	}
 
 	// 3. encode metainfo
 	// 3.1 magic && msgType
@@ -89,6 +79,27 @@ func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out 
 	}
 
 	// 4. write actual message buf
+	msg, ok := data.(protobufMsgCodec)
+	if !ok {
+		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "encode failed, codec msg type not match with protobufCodec")
+	}
+
+	// 2. encode pb struct
+	// fast write
+	if msg, ok := data.(bprotoc.FastWrite); ok {
+		msgsize := msg.Size()
+		actualMsgBuf, err := out.Malloc(msgsize)
+		if err != nil {
+			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("protobuf malloc size %d failed: %s", msgsize, err.Error()))
+		}
+		msg.FastWrite(actualMsgBuf)
+		return nil
+	}
+
+	var actualMsgBuf []byte
+	if actualMsgBuf, err = msg.Marshal(actualMsgBuf); err != nil {
+		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("protobuf marshal message failed: %s", err.Error()))
+	}
 	if _, err = out.WriteBinary(actualMsgBuf); err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("protobuf marshal, write message buffer failed: %s", err.Error()))
 	}
@@ -141,6 +152,14 @@ func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in
 		return err
 	}
 	data := message.Data()
+	// fast read
+	if msg, ok := data.(bprotoc.FastRead); ok {
+		_, err := bprotoc.Binary.ReadMessage(actualMsgBuf, bprotoc.SkipTypeCheck, msg)
+		if err != nil {
+			return remote.NewTransErrorWithMsg(remote.ProtocolError, err.Error())
+		}
+		return nil
+	}
 	msg, ok := data.(protobufMsgCodec)
 	if !ok {
 		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "decode failed, codec msg type not match with protobufCodec")
