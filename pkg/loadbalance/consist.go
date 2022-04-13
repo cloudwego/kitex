@@ -24,10 +24,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/bytedance/gopkg/util/xxhash3"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/utils"
-
-	"github.com/cespare/xxhash"
 
 	"golang.org/x/sync/singleflight"
 )
@@ -180,7 +179,7 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 		if key == "" {
 			return nil
 		}
-		cp.result = cp.getConsistResult(xxhash.Sum64(utils.StringToSliceByte(key)))
+		cp.result = cp.getConsistResult(xxhash3.HashString(key))
 		cp.index = 0
 		return cp.result.Primary
 	}
@@ -392,7 +391,7 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 			}
 			// At this point, the index inside ret should be cur + j.
 			index := cur + j
-			ret[index].hash = xxhash.Sum64(b)
+			ret[index].hash = xxhash3.Hash(b)
 			ret[index].RealNode = &rNodes[i]
 		}
 		cur += vLen

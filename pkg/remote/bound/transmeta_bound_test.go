@@ -19,6 +19,7 @@ package bound
 import (
 	"context"
 	"errors"
+	"github.com/stretchr/testify/mock"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -62,14 +63,41 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 
 		handler := NewTransMetaHandler(mhs)
 
-		metaHandler1.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), nil)
-		metaHandler2.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), nil)
-		metaHandler3.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), nil)
+		metaHandler1.On("WriteMeta",
+			mock.MatchedBy(func(context.Context) bool { return true }),
+			mock.MatchedBy(func(remote.Message) bool { return true })).
+			Return(func(ctx context.Context, msg remote.Message) context.Context {
+				ctx = context.WithValue(ctx, "key1", "val1")
+				return ctx
+			}, nil)
+
+		metaHandler2.On("WriteMeta",
+			mock.MatchedBy(func(context.Context) bool { return true }),
+			mock.MatchedBy(func(remote.Message) bool { return true })).
+			Return(func(ctx context.Context, msg remote.Message) context.Context {
+				ctx = context.WithValue(ctx, "key2", "val2")
+				return ctx
+			}, nil)
+
+		metaHandler3.On("WriteMeta",
+			mock.MatchedBy(func(context.Context) bool { return true }),
+			mock.MatchedBy(func(remote.Message) bool { return true })).
+			Return(func(ctx context.Context, msg remote.Message) context.Context {
+				ctx = context.WithValue(ctx, "key3", "val3")
+				return ctx
+			}, nil)
 
 		test.Assert(t, handler != nil)
-		ctx, err := handler.Write(ctx, invokeMessage, remoteMessage)
-		test.Assert(t, ctx != nil)
-		test.Assert(t, err == nil)
+
+		newctx, err := handler.Write(ctx, invokeMessage, remoteMessage)
+
+		test.Assert(t, err == nil, err)
+		val1 := newctx.Value("key1")
+		test.Assert(t, val1 == "val1")
+		val2 := newctx.Value("key2")
+		test.Assert(t, val2 == "val2")
+		val3 := newctx.Value("key3")
+		test.Assert(t, val3 == "val3")
 	})
 
 	t.Run("Test TransMetahandler Write with error", func(t *testing.T) {
@@ -114,16 +142,42 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 			nil, nil, nil, remote.Reply, remote.Client)
 		ctx := context.Background()
 
-		metaHandler1.On("ReadMeta", ctx, result).Return(context.Background(), nil)
-		metaHandler2.On("ReadMeta", ctx, result).Return(context.Background(), nil)
-		metaHandler3.On("ReadMeta", ctx, result).Return(context.Background(), nil)
+		metaHandler1.On("ReadMeta",
+			mock.MatchedBy(func(context.Context) bool { return true }),
+			mock.MatchedBy(func(remote.Message) bool { return true })).
+			Return(func(ctx context.Context, msg remote.Message) context.Context {
+				ctx = context.WithValue(ctx, "key1", "val1")
+				return ctx
+			}, nil)
+
+		metaHandler2.On("ReadMeta",
+			mock.MatchedBy(func(context.Context) bool { return true }),
+			mock.MatchedBy(func(remote.Message) bool { return true })).
+			Return(func(ctx context.Context, msg remote.Message) context.Context {
+				ctx = context.WithValue(ctx, "key2", "val2")
+				return ctx
+			}, nil)
+
+		metaHandler3.On("ReadMeta",
+			mock.MatchedBy(func(context.Context) bool { return true }),
+			mock.MatchedBy(func(remote.Message) bool { return true })).
+			Return(func(ctx context.Context, msg remote.Message) context.Context {
+				ctx = context.WithValue(ctx, "key3", "val3")
+				return ctx
+			}, nil)
 
 		handler := NewTransMetaHandler(mhs)
-
 		test.Assert(t, handler != nil)
-		ctx, err := handler.OnMessage(ctx, args, result)
-		test.Assert(t, ctx != nil)
-		test.Assert(t, err == nil)
+
+		newctx, err := handler.OnMessage(ctx, args, result)
+
+		test.Assert(t, err == nil, err)
+		val1 := newctx.Value("key1")
+		test.Assert(t, val1 == "val1")
+		val2 := newctx.Value("key2")
+		test.Assert(t, val2 == "val2")
+		val3 := newctx.Value("key3")
+		test.Assert(t, val3 == "val3")
 	})
 
 	t.Run("Test TransMetaHandler OnMessage success server side", func(t *testing.T) {

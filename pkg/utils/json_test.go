@@ -86,6 +86,7 @@ func BenchmarkJSONIterUnmarshal(b *testing.B) {
 	}
 }
 
+// TestMap2JSONStr test convert map to json string
 func TestMap2JSONStr(t *testing.T) {
 	mapInfo := prepareMap()
 
@@ -103,8 +104,14 @@ func TestMap2JSONStr(t *testing.T) {
 	for k := range map1 {
 		test.Assert(t, map1[k] == map2[k])
 	}
+
+	mapInfo = nil
+	jsonRetNil, err := Map2JSONStr(mapInfo)
+	test.Assert(t, err == nil)
+	test.Assert(t, jsonRetNil == "{}")
 }
 
+// TestJSONStr2Map test convert json string to map
 func TestJSONStr2Map(t *testing.T) {
 	mapInfo := prepareMap()
 	jsonRet, _ := json.Marshal(mapInfo)
@@ -120,6 +127,19 @@ func TestJSONStr2Map(t *testing.T) {
 	ret, err := JSONStr2Map(str)
 	test.Assert(t, ret == nil)
 	test.Assert(t, err == nil)
+	str = "nUll"
+	ret, err = JSONStr2Map(str)
+	test.Assert(t, ret == nil)
+	test.Assert(t, err != nil)
+	str = "nuLL"
+	ret, err = JSONStr2Map(str)
+	test.Assert(t, ret == nil)
+	test.Assert(t, err != nil)
+	str = "nulL"
+	ret, err = JSONStr2Map(str)
+	test.Assert(t, ret == nil)
+	test.Assert(t, err != nil)
+
 	str = "{}"
 	ret, err = JSONStr2Map(str)
 	test.Assert(t, ret == nil)
@@ -135,14 +155,34 @@ func TestJSONStr2Map(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, mapRet["你好"] == "周杰伦")
 
-	unicodeMiexedStr := `{"aaa\u4f60\u597daaa": ":\\\u5468\u6770\u4f26"  ,  "加油 \u52a0\u6cb9" : "Come on \u52a0\u6cb9"}`
-	mapRet, err = JSONStr2Map(unicodeMiexedStr)
-	// err = json.Unmarshal([]byte(unicodeMiexedStr), &mapRet)
+	unicodeMixedStr := `{"aaa\u4f60\u597daaa": ":\\\u5468\u6770\u4f26"  ,  "加油 \u52a0\u6cb9" : "Come on \u52a0\u6cb9"}`
+	mapRet, err = JSONStr2Map(unicodeMixedStr)
 	test.Assert(t, err == nil)
 	test.Assert(t, mapRet["aaa你好aaa"] == ":\\周杰伦")
 	test.Assert(t, mapRet["加油 加油"] == "Come on 加油")
+
+	unicodeMixedStr = `{"aaa\u4F60\u597Daaa": "\u5468\u6770\u4f26"}`
+	mapRet, err = JSONStr2Map(unicodeMixedStr)
+	test.Assert(t, err == nil)
+	test.Assert(t, mapRet["aaa你好aaa"] == "周杰伦")
+
+	illegalUnicodeStr := `{"aaa\u4z60\u597daaa": "加油"}`
+	illegalUnicodeMapRet, err := JSONStr2Map(illegalUnicodeStr)
+	test.Assert(t, err != nil)
+	test.Assert(t, len(illegalUnicodeMapRet) == 0)
+
+	surrogateUnicodeStr := `{"\u4F60\u597D": "\uDFFF\uD800"}`
+	surrogateUnicodeMapRet, err := JSONStr2Map(surrogateUnicodeStr)
+	test.Assert(t, err == nil)
+	test.Assert(t, surrogateUnicodeMapRet != nil)
+
+	illegalEscapeCharStr := `{"\x4F60\x597D": "\uDFqwdFF\uD800"}`
+	illegalEscapeCharMapRet, err := JSONStr2Map(illegalEscapeCharStr)
+	test.Assert(t, err != nil)
+	test.Assert(t, len(illegalEscapeCharMapRet) == 0)
 }
 
+// TestJSONUtil compare return between encoding/json, json-iterator and json.go
 func TestJSONUtil(t *testing.T) {
 	mapInfo := prepareMap()
 	jsonRet1, _ := json.Marshal(mapInfo)

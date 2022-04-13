@@ -59,7 +59,7 @@ func TestLimiterOnActive(t *testing.T) {
 		test.Assert(t, err == nil)
 	})
 
-	t.Run("Test OnActive with nil reporter", func(t *testing.T) {
+	t.Run("Test OnActive with limit acquire false and nil reporter", func(t *testing.T) {
 		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
 		rateLimiter := &limiterMocks.RateLimiter{}
 		ctx := context.Background()
@@ -73,7 +73,7 @@ func TestLimiterOnActive(t *testing.T) {
 		test.Assert(t, errors.Is(kerrors.ErrConnOverLimit, err))
 	})
 
-	t.Run("Test OnActive with reporter", func(t *testing.T) {
+	t.Run("Test OnActive with limit acquire false and non-nil reporter", func(t *testing.T) {
 		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
 		rateLimiter := &limiterMocks.RateLimiter{}
 		limitReporter := &limiterMocks.LimitReporter{}
@@ -109,7 +109,7 @@ func TestLimiterOnRead(t *testing.T) {
 		test.Assert(t, err == nil)
 	})
 
-	t.Run("Test OnRead with nil reporter", func(t *testing.T) {
+	t.Run("Test OnActive with limit acquire false and nil reporter", func(t *testing.T) {
 		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
 		rateLimiter := &limiterMocks.RateLimiter{}
 		ctx := context.Background()
@@ -123,7 +123,7 @@ func TestLimiterOnRead(t *testing.T) {
 		test.Assert(t, errors.Is(kerrors.ErrQPSOverLimit, err))
 	})
 
-	t.Run("Test OnRead with reporter", func(t *testing.T) {
+	t.Run("Test OnActive with limit acquire false and non-nil reporter", func(t *testing.T) {
 		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
 		rateLimiter := &limiterMocks.RateLimiter{}
 		limitReporter := &limiterMocks.LimitReporter{}
