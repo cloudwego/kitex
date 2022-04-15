@@ -34,7 +34,7 @@ import (
 
 var (
 	svrTransHdlr remote.ServerTransHandler
-	opt          *remote.ServerOption
+	srvopt       *remote.ServerOption
 	rwTimeout    = time.Second
 	addrStr      = "test addr"
 	addr         = utils.NewNetAddr("tcp", addrStr)
@@ -49,7 +49,7 @@ func init() {
 	ink := rpcinfo.NewInvocation("", method)
 	rpcStat := rpcinfo.NewRPCStats()
 
-	opt = &remote.ServerOption{
+	srvopt = &remote.ServerOption{
 		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
 			ri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
@@ -63,7 +63,7 @@ func init() {
 		SvcInfo:   mocks.ServiceInfo(),
 		TracerCtl: &internal_stats.Controller{},
 	}
-	svrTransHdlr, _ = newSvrTransHandler(opt)
+	svrTransHdlr, _ = newSvrTransHandler(srvopt)
 }
 
 func TestOnActive(t *testing.T) {
@@ -299,7 +299,7 @@ func TestNoMethodInfo(t *testing.T) {
 		},
 	}
 	remote.NewTransPipeline(svrTransHdlr)
-	delete(opt.SvcInfo.Methods, method)
+	delete(srvopt.SvcInfo.Methods, method)
 
 	// 2. test
 	ctx := context.Background()
