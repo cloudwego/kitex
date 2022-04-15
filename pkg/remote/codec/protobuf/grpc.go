@@ -19,9 +19,11 @@ package protobuf
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 
 	"google.golang.org/protobuf/proto"
 
+	"github.com/cloudwego/kitex/pkg/protocol/bprotoc"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
@@ -36,68 +38,52 @@ type protobufV2MsgCodec interface {
 	XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
 }
 
+type grpcCodec struct{}
+
 // NewGRPCCodec create grpc and protobuf codec
 func NewGRPCCodec() remote.Codec {
 	return new(grpcCodec)
 }
 
-type grpcCodec struct{}
-
 func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
-	// 5byte + body
-	data := message.Data()
-	var (
-		size int
-		buf  []byte
-	)
-	switch t := data.(type) {
+	writer, ok := out.(remote.FrameWrite)
+	if !ok {
+		return fmt.Errorf("output buffer must implement FrameWrite")
+	}
+	var header [5]byte
+	var data []byte
+	switch t := message.Data().(type) {
+	case bprotoc.FastWrite:
+		// TODO: reuse data buffer when we can free it safely
+		data = make([]byte, t.Size())
+		t.FastWrite(data)
 	case marshaler:
-		size = t.Size()
-		buf, err = out.Malloc(5 + size)
-		if err != nil {
-			return err
-		}
-		if _, err = t.MarshalTo(buf[5:]); err != nil {
+		// TODO: reuse data buffer when we can free it safely
+		data = make([]byte, t.Size())
+		if _, err = t.MarshalTo(data); err != nil {
 			return err
 		}
 	case protobufV2MsgCodec:
-		d, err := t.XXX_Marshal(nil, true)
+		data, err = t.XXX_Marshal(nil, true)
 		if err != nil {
 			return err
 		}
-		size = len(d)
-		buf, err = out.Malloc(5 + size)
-		if err != nil {
-			return err
-		}
-		copy(buf[5:], d)
 	case proto.Message:
-		d, err := proto.Marshal(t)
+		data, err = proto.Marshal(t)
 		if err != nil {
 			return err
 		}
-		size = len(d)
-		buf, err = out.Malloc(5 + size)
-		if err != nil {
-			return err
-		}
-		copy(buf[5:], d)
 	case protobufMsgCodec:
-		d, err := t.Marshal(nil)
+		data, err = t.Marshal(nil)
 		if err != nil {
 			return err
 		}
-		size = len(d)
-		buf, err = out.Malloc(5 + size)
-		if err != nil {
-			return err
-		}
-		copy(buf[5:], d)
 	}
-	// reuse buffer need clean data
-	buf[0] = 0
-	binary.BigEndian.PutUint32(buf[1:5], uint32(size))
-	return nil
+	if err = writer.WriteData(data); err != nil {
+		return err
+	}
+	binary.BigEndian.PutUint32(header[1:5], uint32(len(data)))
+	return writer.WriteHeader(header[:])
 }
 
 func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
@@ -112,6 +98,9 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	}
 	data := message.Data()
 	switch t := data.(type) {
+	case bprotoc.FastRead:
+		_, err = bprotoc.Binary.ReadMessage(d, bprotoc.SkipTypeCheck, t)
+		return err
 	case protobufV2MsgCodec:
 		return t.XXX_Unmarshal(d)
 	case proto.Message:

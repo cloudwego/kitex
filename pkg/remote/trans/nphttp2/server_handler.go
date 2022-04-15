@@ -69,7 +69,7 @@ type svrTransHandler struct {
 }
 
 func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
-	buf := newBuffer(conn)
+	buf := newBuffer(conn.(*serverConn))
 	defer buf.Release(err)
 
 	if err = t.codec.Encode(ctx, msg, buf); err != nil {
@@ -79,8 +79,9 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.M
 }
 
 func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
-	buf := newBuffer(conn)
+	buf := newBuffer(conn.(*serverConn))
 	defer buf.Release(err)
+
 	err = t.codec.Decode(ctx, msg, buf)
 	return
 }
