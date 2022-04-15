@@ -211,6 +211,29 @@ type {{.ArgStructName}} struct {
 	Req {{$arg.Type}}
 }
 
+{{- if eq $.Codec "protobuf"}} {{/* protobuf logic */}}
+func (p *{{.ArgStructName}}) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
+	if !p.IsSetReq() {
+		p.Req = new({{NotPtr $arg.Type}})
+	}
+	return p.Req.FastRead(buf, _type, number)
+}
+
+func (p *{{.ArgStructName}}) FastWrite(buf []byte) (n int) {
+	if !p.IsSetReq() {
+		return 0
+	}
+	return p.Req.FastWrite(buf)
+}
+
+func (p *{{.ArgStructName}}) Size() (n int) {
+	if !p.IsSetReq() {
+		return 0
+	}
+	return p.Req.Size()
+}
+{{- end}} {{/* protobuf end */}}
+
 func (p *{{.ArgStructName}}) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetReq() {
 	   return out, fmt.Errorf("No req in {{.ArgStructName}}")
@@ -245,6 +268,29 @@ type {{.ResStructName}} struct {
 }
 
 var {{.ResStructName}}_Success_DEFAULT {{.Resp.Type}}
+
+{{- if eq $.Codec "protobuf"}} {{/* protobuf logic */}}
+func (p *{{.ResStructName}}) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
+	if !p.IsSetSuccess() {
+		p.Success = new({{NotPtr .Resp.Type}})
+	}
+	return p.Success.FastRead(buf, _type, number)
+}
+
+func (p *{{.ResStructName}}) FastWrite(buf []byte) (n int) {
+	if !p.IsSetSuccess() {
+		return 0
+	}
+	return p.Success.FastWrite(buf)
+}
+
+func (p *{{.ResStructName}}) Size() (n int) {
+	if !p.IsSetSuccess() {
+		return 0
+	}
+	return p.Success.Size()
+}
+{{- end}} {{/* protobuf end */}}
 
 func (p *{{.ResStructName}}) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
