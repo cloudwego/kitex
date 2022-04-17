@@ -22,45 +22,48 @@ import (
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/transport"
 )
 
-func TestJsonThriftCodec(t *testing.T) {
-	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
+func TestMapThriftCodec(t *testing.T) {
+	p, err := NewThriftFileProvider("./map_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	jtc, err := newJsonThriftCodec(p, thriftCodec)
+	mtc, err := newMapThriftCodec(p, thriftCodec)
 	test.Assert(t, err == nil)
-	defer jtc.Close()
-	t.Log(jtc.Name())
+	defer mtc.Close()
+	t.Log(mtc.Name())
 
-	method, err := jtc.getMethod(nil, "Test")
+	method, err := mtc.getMethod(nil, "Test")
 	test.Assert(t, err == nil, err)
 	test.Assert(t, method != nil)
 
 	ctx := context.Background()
-	sendMsg := initJsonSendMsg(transport.TTHeader)
+	sendMsg := initMapSendMsg(transport.TTHeader)
 
 	// Marshal side
 	out := remote.NewWriterBuffer(256)
-	err = jtc.Marshal(ctx, sendMsg, out)
+	err = mtc.Marshal(ctx, sendMsg, out)
 	test.Assert(t, err == nil, err)
 
 	// UnMarshal side
-	recvMsg := initJsonRecvMsg()
+	recvMsg := initMapRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil, err)
 	recvMsg.SetPayloadLen(len(buf))
 	in := remote.NewReaderBuffer(buf)
-	err = jtc.Unmarshal(ctx, recvMsg, in)
+	err = mtc.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)
 }
 
-func initJsonSendMsg(tp transport.Protocol) remote.Message {
+func initMapSendMsg(tp transport.Protocol) remote.Message {
 	var req = &Args{
-		Request: "Test",
-		Method:  "Test",
+		Request: &descriptor.HTTPRequest{
+			Method: "Test",
+		},
+		Method: "Test",
 	}
 	svcInfo := mocks.ServiceInfo()
 	ink := rpcinfo.NewInvocation("", "Test")
@@ -70,7 +73,7 @@ func initJsonSendMsg(tp transport.Protocol) remote.Message {
 	return msg
 }
 
-func initJsonRecvMsg() remote.Message {
+func initMapRecvMsg() remote.Message {
 	var req = &Args{
 		Request: "Test",
 		Method:  "Test",
