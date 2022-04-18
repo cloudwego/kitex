@@ -94,7 +94,6 @@ func cacheKey(resolver, balancer string, opts Options) string {
 // NewBalancerFactory get or create a balancer factory for balancer instance
 // cache key with resolver name, balancer name and options
 func NewBalancerFactory(resolver discovery.Resolver, balancer loadbalance.Loadbalancer, opts Options) *BalancerFactory {
-	diagnosis.RegisterProbeFunc(opts.DiagnosisService, diagnosis.LbCacheKey, Dump)
 	opts.check()
 	uniqueKey := cacheKey(resolver.Name(), balancer.Name(), opts)
 	val, ok := balancerFactories.Load(uniqueKey)

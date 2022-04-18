@@ -244,7 +244,7 @@ func (lp *LongPool) Close() error {
 
 // EnableReporter enable reporter for long connection pool.
 func (lp *LongPool) EnableReporter() {
-	lp.reporter = getCommonReporter()
+	lp.reporter = GetCommonReporter()
 }
 
 // NewLongPool creates a long pool using the given IdleConfig.

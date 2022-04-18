@@ -24,10 +24,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/bytedance/gopkg/util/xxhash3"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/utils"
-
-	"github.com/cespare/xxhash"
 
 	"golang.org/x/sync/singleflight"
 )
@@ -180,7 +179,7 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 		if key == "" {
 			return nil
 		}
-		cp.result = cp.getConsistResult(xxhash.Sum64(utils.StringToSliceByte(key)))
+		cp.result = cp.getConsistResult(xxhash3.HashString(key))
 		cp.index = 0
 		return cp.result.Primary
 	}
@@ -344,17 +343,17 @@ func (cb *consistBalancer) buildNodes(ins []discovery.Instance) ([]realNode, []v
 	for i := range ins {
 		ret[i].Ins = ins[i]
 	}
-	if cb.opt.Weighted {
-		return ret, cb.buildWeightedVirtualNodes(ret)
-	}
 	return ret, cb.buildVirtualNodes(ret)
 }
 
 func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
-	// the total length is: len(realNodes) * VirtualFactor
-	vlen := len(rNodes) * int(cb.opt.VirtualFactor)
-	ret := make([]virtualNode, vlen)
-	if vlen == 0 {
+	totalLen := 0
+	for i := range rNodes {
+		totalLen += cb.getVirtualNodeLen(rNodes[i])
+	}
+
+	ret := make([]virtualNode, totalLen)
+	if totalLen == 0 {
 		return ret
 	}
 	maxLen := 0
@@ -364,92 +363,50 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 		}
 	}
 	l := maxLen + 1 + cb.opt.virtualFactorLen // "$address + # + itoa(i)"
-	// pre-allocate []byte here, and reuse it to prevent memory allocation
+	// pre-allocate []byte here, and reuse it to prevent memory allocation.
 	b := make([]byte, l)
+
+	// record the start index.
+	cur := 0
 	for i := range rNodes {
-		ins := rNodes[i].Ins
-		bAddr := utils.StringToSliceByte(ins.Address().String())
-		// assign the first few bits of b to string
+		bAddr := utils.StringToSliceByte(rNodes[i].Ins.Address().String())
+		// Assign the first few bits of b to string.
 		copy(b, bAddr)
 
-		// initialize the last few bits, skipping '#'
+		// Initialize the last few bits, skipping '#'.
 		for j := len(bAddr) + 1; j < len(b); j++ {
 			b[j] = 0
 		}
 		b[len(bAddr)] = '#'
-		for j := 0; j < int(cb.opt.VirtualFactor); j++ {
+
+		vLen := cb.getVirtualNodeLen(rNodes[i])
+		for j := 0; j < vLen; j++ {
 			k := j
 			cnt := 0
-			// assign values to b one by one, starting with the last one
+			// Assign values to b one by one, starting with the last one.
 			for k > 0 {
 				b[l-1-cnt] = byte(k % 10)
 				k /= 10
 				cnt++
 			}
-			// At this point the index inside ret should be i * virtualFactor + j
-			index := i*int(cb.opt.VirtualFactor) + j
-			ret[index].hash = xxhash.Sum64(b)
+			// At this point, the index inside ret should be cur + j.
+			index := cur + j
+			ret[index].hash = xxhash3.Hash(b)
 			ret[index].RealNode = &rNodes[i]
 		}
+		cur += vLen
 	}
 	sort.Sort(&vNodeType{s: ret})
 	return ret
 }
 
-func (cb *consistBalancer) buildWeightedVirtualNodes(rNodes []realNode) []virtualNode {
-	if len(rNodes) == 0 {
-		return []virtualNode{}
+// get virtual node number from one realNode.
+// if cb.opt.Weighted option is false, multiplier is 1, virtual node number is equal to VirtualFactor.
+func (cb *consistBalancer) getVirtualNodeLen(rNode realNode) int {
+	if cb.opt.Weighted {
+		return rNode.Ins.Weight() * int(cb.opt.VirtualFactor)
 	}
-	vlen := 0
-	for i := range rNodes {
-		vlen += rNodes[i].Ins.Weight() * int(cb.opt.VirtualFactor)
-	}
-
-	ret := make([]virtualNode, vlen)
-	if vlen == 0 {
-		return ret
-	}
-	maxLen := 0
-	for i := range rNodes {
-		if len(rNodes[i].Ins.Address().String()) > maxLen {
-			maxLen = len(rNodes[i].Ins.Address().String())
-		}
-	}
-	l := maxLen + 1 + cb.opt.virtualFactorLen // "$address + # + itoa(i)"
-	// pre-allocate []byte here, and reuse it to prevent memory allocation
-	b := make([]byte, l)
-
-	// record the start index
-	cur := 0
-	for i := range rNodes {
-		ins := rNodes[i].Ins
-		bAddr := utils.StringToSliceByte(ins.Address().String())
-		// assign the first few bits of b to string
-		copy(b, bAddr)
-
-		// initialize the last few bits, skipping '#'
-		for j := len(bAddr) + 1; j < len(b); j++ {
-			b[j] = 0
-		}
-		b[len(bAddr)] = '#'
-		for j := 0; j < int(cb.opt.VirtualFactor)*ins.Weight(); j++ {
-			k := j
-			cnt := 0
-			// assign values to b one by one, starting with the last one
-			for k > 0 {
-				b[l-1-cnt] = byte(k % 10)
-				k /= 10
-				cnt++
-			}
-			// at this point, the index inside ret should be cur + j
-			index := cur + j
-			ret[index].hash = xxhash.Sum64(b)
-			ret[index].RealNode = &rNodes[i]
-		}
-		cur += ins.Weight() * int(cb.opt.VirtualFactor)
-	}
-	sort.Sort(&vNodeType{s: ret})
-	return ret
+	return int(cb.opt.VirtualFactor)
 }
 
 func (cb *consistBalancer) updateConsistInfo(e discovery.Result) {
@@ -459,8 +416,8 @@ func (cb *consistBalancer) updateConsistInfo(e discovery.Result) {
 		return
 	}
 	info := infoI.(*consistInfo)
-	// warm up
-	// the reason for not modifying info directly is that there is no guarantee of concurrency security
+	// Warm up.
+	// The reason for not modifying info directly is that there is no guarantee of concurrency security.
 	info.cachedConsistResult.Range(func(key, value interface{}) bool {
 		cr := buildConsistResult(cb, newInfo, key.(uint64))
 		if cb.opt.ExpireDuration > 0 {
@@ -494,7 +451,7 @@ func (cb *consistBalancer) Delete(change discovery.Change) {
 		return
 	}
 	// FIXME: If Delete and Rebalance occur together (Discovery OnDelete and OnChange are triggered at the same time),
-	// it may cause the delete to fail and eventually lead to a resource leak
+	// it may cause the delete to fail and eventually lead to a resource leak.
 	cb.updateLock.Lock()
 	cb.cachedConsistInfo.Delete(change.Result.CacheKey)
 	cb.updateLock.Unlock()

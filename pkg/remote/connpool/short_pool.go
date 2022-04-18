@@ -97,5 +97,5 @@ func (p *ShortPool) Close() error {
 
 // EnableReporter enable reporter for short connection pool.
 func (p *ShortPool) EnableReporter() {
-	p.reporter = getCommonReporter()
+	p.reporter = GetCommonReporter()
 }

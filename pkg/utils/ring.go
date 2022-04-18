@@ -93,9 +93,20 @@ func (r *Ring) Pop() interface{} {
 // Dump dumps the data in the ring.
 func (r *Ring) Dump() interface{} {
 	m := &ringDump{}
+	dumpList := make([]*ringDump, 0, r.length)
 	idx := goid.GetPid() % r.length
 	for i := 0; i < r.length; i, idx = i+1, (idx+1)%r.length {
-		r.rings[idx].Dump(m)
+		curDump := &ringDump{}
+		r.rings[idx].Dump(curDump)
+		dumpList = append(dumpList, curDump)
+		m.Cap += curDump.Cap
+		m.Len += curDump.Len
+	}
+	m.Array = make([]interface{}, 0, m.Len)
+	for _, shardData := range dumpList {
+		for i := 0; i < shardData.Len; i++ {
+			m.Array = append(m.Array, shardData.Array[i])
+		}
 	}
 	return m
 }
