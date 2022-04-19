@@ -26,6 +26,7 @@ import (
 	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 type testImpl struct{}
@@ -117,4 +118,9 @@ func TestGenericService(t *testing.T) {
 	a.Method = tt
 	err = callHandler(ctx, handler, arg, result)
 	test.Assert(t, err == nil)
+}
+
+func TestServiceInfo(t *testing.T) {
+	s := ServiceInfo(serviceinfo.Thrift)
+	t.Log(s.ServiceName)
 }

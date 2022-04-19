@@ -55,9 +55,12 @@ func TestHttpThriftCodec(t *testing.T) {
 		Method: http.MethodGet,
 		Path:   "/BinaryEcho",
 	}
-	method, err := htc.getMethod(req)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, method != nil)
+	// wrong
+	method, err := htc.getMethod("test")
+	test.Assert(t, err != nil && method == nil, err)
+	// right
+	method, err = htc.getMethod(req)
+	test.Assert(t, err == nil && method != nil, err)
 
 	ctx := context.Background()
 	sendMsg := initHttpSendMsg(transport.TTHeader)

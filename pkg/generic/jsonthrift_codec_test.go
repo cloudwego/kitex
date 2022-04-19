@@ -57,6 +57,31 @@ func TestJsonThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
+func TestJsonExceptionError(t *testing.T) {
+	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
+	test.Assert(t, err == nil)
+	jtc, err := newJsonThriftCodec(p, thriftCodec)
+	test.Assert(t, err == nil)
+
+	ctx := context.Background()
+	out := remote.NewWriterBuffer(256)
+	// empty method test
+	emptyMethodInk := rpcinfo.NewInvocation("", "")
+	emptyMethodRi := rpcinfo.NewRPCInfo(nil, nil, emptyMethodInk, nil, nil)
+	emptyMethodMsg := remote.NewMessage(nil, nil, emptyMethodRi, remote.Exception, remote.Client)
+	// Marshal side
+	err = jtc.Marshal(ctx, emptyMethodMsg, out)
+	test.Assert(t, err != nil)
+
+	// Exception MsgType test
+	exceptionMsgTypeInk := rpcinfo.NewInvocation("", "Test")
+	exceptionMsgTypeRi := rpcinfo.NewRPCInfo(nil, nil, exceptionMsgTypeInk, nil, nil)
+	exceptionMsgTypeMsg := remote.NewMessage(&remote.TransError{}, nil, exceptionMsgTypeRi, remote.Exception, remote.Client)
+	// Marshal side
+	err = jtc.Marshal(ctx, exceptionMsgTypeMsg, out)
+	test.Assert(t, err == nil)
+}
+
 func initJsonSendMsg(tp transport.Protocol) remote.Message {
 	var req = &Args{
 		Request: "Test",

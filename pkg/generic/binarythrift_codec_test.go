@@ -98,12 +98,12 @@ func TestBinaryThriftCodec(t *testing.T) {
 	test.Assert(t, method == "mock", method)
 }
 
-func TestBinaryThriftCodecDefaultError(t *testing.T) {
+func TestBinaryThriftCodecExceptionError(t *testing.T) {
 	ctx := context.Background()
 	btc := &binaryThriftCodec{thriftCodec}
 	cliMsg := &mockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
-			return newMockRPCInfo()
+			return newEmptyMethodRPCInfo()
 		},
 		RPCRoleFunc: func() remote.RPCRole {
 			return remote.Server
@@ -122,10 +122,17 @@ func TestBinaryThriftCodecDefaultError(t *testing.T) {
 	}
 
 	// test Exception
+	// empty method
 	err = btc.Marshal(ctx, cliMsg, rwbuf)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err != nil)
+
+	cliMsg.RPCInfoFunc = func() rpcinfo.RPCInfo {
+		return newMockRPCInfo()
+	}
+	err = btc.Marshal(ctx, cliMsg, rwbuf)
+	test.Assert(t, err == nil)
 	err = btc.Unmarshal(ctx, cliMsg, rwbuf)
-	test.Assert(t, err != nil, err)
+	test.Assert(t, err != nil)
 
 	// test server role
 	cliMsg.MessageTypeFunc = func() remote.MessageType {
@@ -137,7 +144,7 @@ func TestBinaryThriftCodecDefaultError(t *testing.T) {
 		}
 	}
 	err = btc.Marshal(ctx, cliMsg, rwbuf)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 }
 
 func newMockRPCInfo() rpcinfo.RPCInfo {
@@ -145,6 +152,14 @@ func newMockRPCInfo() rpcinfo.RPCInfo {
 	s := rpcinfo.NewEndpointInfo("", "", nil, nil)
 	ink := rpcinfo.NewInvocation("", "mock")
 	ri := rpcinfo.NewRPCInfo(c, s, ink, nil, rpcinfo.NewRPCStats())
+	return ri
+}
+
+func newEmptyMethodRPCInfo() rpcinfo.RPCInfo {
+	c := rpcinfo.NewEndpointInfo("", "", nil, nil)
+	s := rpcinfo.NewEndpointInfo("", "", nil, nil)
+	ink := rpcinfo.NewInvocation("", "")
+	ri := rpcinfo.NewRPCInfo(c, s, ink, nil, nil)
 	return ri
 }
 

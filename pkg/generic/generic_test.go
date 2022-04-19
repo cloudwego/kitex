@@ -49,6 +49,7 @@ func TestMapThriftGeneric(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	defer g.Close()
 
+	err = SetBinaryWithBase64(g, true)
 	test.Assert(t, g.Framed() == false)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
@@ -103,6 +104,8 @@ func TestJSONThriftGeneric(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	defer g.Close()
 
+	err = SetBinaryWithBase64(g, true)
+	test.Assert(t, err == nil, err)
 	test.Assert(t, g.Framed() == false)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)

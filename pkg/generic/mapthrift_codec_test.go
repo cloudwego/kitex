@@ -58,6 +58,31 @@ func TestMapThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
+func TestMapExceptionError(t *testing.T) {
+	p, err := NewThriftFileProvider("./map_test/idl/mock.thrift")
+	test.Assert(t, err == nil)
+	mtc, err := newMapThriftCodec(p, thriftCodec)
+	test.Assert(t, err == nil)
+
+	ctx := context.Background()
+	out := remote.NewWriterBuffer(256)
+	// empty method test
+	emptyMethodInk := rpcinfo.NewInvocation("", "")
+	emptyMethodRi := rpcinfo.NewRPCInfo(nil, nil, emptyMethodInk, nil, nil)
+	emptyMethodMsg := remote.NewMessage(nil, nil, emptyMethodRi, remote.Exception, remote.Client)
+	// Marshal side
+	err = mtc.Marshal(ctx, emptyMethodMsg, out)
+	test.Assert(t, err != nil)
+
+	// Exception MsgType test
+	exceptionMsgTypeInk := rpcinfo.NewInvocation("", "Test")
+	exceptionMsgTypeRi := rpcinfo.NewRPCInfo(nil, nil, exceptionMsgTypeInk, nil, nil)
+	exceptionMsgTypeMsg := remote.NewMessage(&remote.TransError{}, nil, exceptionMsgTypeRi, remote.Exception, remote.Client)
+	// Marshal side
+	err = mtc.Marshal(ctx, exceptionMsgTypeMsg, out)
+	test.Assert(t, err == nil)
+}
+
 func initMapSendMsg(tp transport.Protocol) remote.Message {
 	var req = &Args{
 		Request: &descriptor.HTTPRequest{
