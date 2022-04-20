@@ -86,6 +86,7 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	tags[codec.HeaderFlagsKey] = codec.HeaderFlagSupportOutOfOrder
 
 	// encode
+	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
 		return err
@@ -141,6 +142,7 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 			return err
 		}
 		stats2.Record(ctx, ri, stats.ReadStart, nil)
+		msg.SetPayloadCodec(t.opt.PayloadCodec)
 		err = t.codec.Decode(ctx, msg, callback.bufReader)
 		stats2.Record(ctx, ri, stats.ReadFinish, err)
 		return err

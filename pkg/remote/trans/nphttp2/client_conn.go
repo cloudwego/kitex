@@ -34,7 +34,7 @@ type clientConn struct {
 	s  *grpc.Stream
 }
 
-var _ net.Conn = (*clientConn)(nil)
+var _ grpcConn = (*clientConn)(nil)
 
 func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*clientConn, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
@@ -83,8 +83,12 @@ func (c *clientConn) Write(b []byte) (n int, err error) {
 	if len(b) < 5 {
 		return 0, io.ErrShortWrite
 	}
-	err = c.tr.Write(c.s, b[:5], b[5:], &grpc.Options{})
-	return len(b), convertErrorFromGrpcToKitex(err)
+	return c.WriteFrame(b[:5], b[5:])
+}
+
+func (c *clientConn) WriteFrame(hdr, data []byte) (n int, err error) {
+	err = c.tr.Write(c.s, hdr, data, &grpc.Options{})
+	return len(hdr) + len(data), convertErrorFromGrpcToKitex(err)
 }
 
 func (c *clientConn) LocalAddr() net.Addr                { return c.tr.LocalAddr() }

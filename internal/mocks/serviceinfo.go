@@ -53,7 +53,9 @@ func newServiceInfo() *serviceinfo.ServiceInfo {
 	svcInfo := &serviceinfo.ServiceInfo{
 		ServiceName: MockServiceName,
 		Methods:     methods,
-		Extra:       make(map[string]interface{}),
+		Extra: map[string]interface{}{
+			"PackageName": "mock",
+		},
 	}
 	return svcInfo
 }
