@@ -131,7 +131,7 @@ func newServerOption() *remote.ServerOption {
 		ExitWaitTime:          defaultExitWaitTime,
 		MaxConnectionIdleTime: defaultConnectionIdleTime,
 		AcceptFailedDelayTime: defaultAcceptFailedDelayTime,
-		GRPCCfg:               new(grpc.ServerConfig),
+		GRPCCfg:               grpc.DefaultServerConfig(),
 	}
 }
 

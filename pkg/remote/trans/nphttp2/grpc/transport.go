@@ -36,7 +36,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"github.com/cloudwego/netpoll"
 )
 
 type bufferPool struct {
@@ -511,7 +510,16 @@ type ServerConfig struct {
 	KeepaliveEnforcementPolicy EnforcementPolicy
 	InitialWindowSize          uint32
 	InitialConnWindowSize      uint32
+	WriteBufferSize            uint32
+	ReadBufferSize             uint32
 	MaxHeaderListSize          *uint32
+}
+
+func DefaultServerConfig() *ServerConfig {
+	return &ServerConfig{
+		WriteBufferSize: defaultWriteBufferSize,
+		ReadBufferSize:  defaultReadBufferSize,
+	}
 }
 
 // ConnectOptions covers all relevant options for communicating with the server.
@@ -522,19 +530,23 @@ type ConnectOptions struct {
 	InitialWindowSize uint32
 	// InitialConnWindowSize sets the initial window size for a connection.
 	InitialConnWindowSize uint32
+	// WriteBufferSize sets the size of write buffer which in turn determines how much data can be batched before it's written on the wire.
+	WriteBufferSize uint32
+	// ReadBufferSize sets the size of read buffer, which in turn determines how much data can be read at most for one read syscall.
+	ReadBufferSize uint32
 	// MaxHeaderListSize sets the max (uncompressed) size of header list that is prepared to be received.
 	MaxHeaderListSize *uint32
 }
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error
 // if it fails.
-func NewServerTransport(ctx context.Context, conn netpoll.Connection, cfg *ServerConfig) (ServerTransport, error) {
+func NewServerTransport(ctx context.Context, conn net.Conn, cfg *ServerConfig) (ServerTransport, error) {
 	return newHTTP2Server(ctx, conn, cfg)
 }
 
 // NewClientTransport establishes the transport with the required ConnectOptions
 // and returns it to the caller.
-func NewClientTransport(ctx context.Context, conn netpoll.Connection, opts ConnectOptions,
+func NewClientTransport(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	remoteService string, onGoAway func(GoAwayReason), onClose func()) (ClientTransport, error) {
 	return newHTTP2Client(ctx, conn, opts, remoteService, onGoAway, onClose)
 }
