@@ -81,7 +81,7 @@ func TestHttpThriftCodec(t *testing.T) {
 }
 
 func initHttpSendMsg(tp transport.Protocol) remote.Message {
-	var req = &Args{
+	req := &Args{
 		Request: &descriptor.HTTPRequest{
 			Method: http.MethodGet,
 			Path:   "/BinaryEcho",
@@ -97,7 +97,7 @@ func initHttpSendMsg(tp transport.Protocol) remote.Message {
 }
 
 func initHttpRecvMsg() remote.Message {
-	var req = &Args{
+	req := &Args{
 		Request: "Test",
 		Method:  "BinaryEcho",
 	}

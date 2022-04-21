@@ -84,7 +84,7 @@ func TestMapExceptionError(t *testing.T) {
 }
 
 func initMapSendMsg(tp transport.Protocol) remote.Message {
-	var req = &Args{
+	req := &Args{
 		Request: &descriptor.HTTPRequest{
 			Method: "Test",
 		},
@@ -99,7 +99,7 @@ func initMapSendMsg(tp transport.Protocol) remote.Message {
 }
 
 func initMapRecvMsg() remote.Message {
-	var req = &Args{
+	req := &Args{
 		Request: "Test",
 		Method:  "Test",
 	}

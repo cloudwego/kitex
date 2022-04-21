@@ -83,7 +83,7 @@ func TestJsonExceptionError(t *testing.T) {
 }
 
 func initJsonSendMsg(tp transport.Protocol) remote.Message {
-	var req = &Args{
+	req := &Args{
 		Request: "Test",
 		Method:  "Test",
 	}
@@ -96,7 +96,7 @@ func initJsonSendMsg(tp transport.Protocol) remote.Message {
 }
 
 func initJsonRecvMsg() remote.Message {
-	var req = &Args{
+	req := &Args{
 		Request: "Test",
 		Method:  "Test",
 	}
