@@ -43,7 +43,7 @@ func NewWriterBuffer(size int) ByteBuffer {
 
 // NewReaderBuffer is used to create a defaultByteBuffer using the given buf.
 func NewReaderBuffer(buf []byte) ByteBuffer {
-	return newReaderByteBuffer(buf)
+	return NewReaderByteBuffer(buf)
 }
 
 // NewReaderWriterBuffer is used to create a defaultByteBuffer using the given size.
@@ -64,7 +64,7 @@ func newDefaultByteBuffer() interface{} {
 	return &defaultByteBuffer{}
 }
 
-func newReaderByteBuffer(buf []byte) ByteBuffer {
+func NewReaderByteBuffer(buf []byte) ByteBuffer {
 	bytebuf := bytebufPool.Get().(*defaultByteBuffer)
 	bytebuf.buff = buf
 	bytebuf.readIdx = 0
