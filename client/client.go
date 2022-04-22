@@ -501,9 +501,9 @@ func (kc *kClient) warmingUp() error {
 			switch kc.opt.WarmUpOption.ErrorHandling {
 			case warmup.IgnoreError:
 			case warmup.WarningLog:
-				klog.Warnf("failed to warm up service discovery: %s", err.Error())
+				klog.Warnf("KITEX: failed to warm up service discovery: %s", err.Error())
 			case warmup.ErrorLog:
-				klog.Errorf("failed to warm up service discovery: %s", err.Error())
+				klog.Errorf("KITEX: failed to warm up service discovery: %s", err.Error())
 			case warmup.FailFast:
 				return fmt.Errorf("service discovery warm-up: %w", err)
 			}
@@ -539,15 +539,15 @@ func (kc *kClient) warmingUp() error {
 			switch kc.opt.WarmUpOption.ErrorHandling {
 			case warmup.IgnoreError:
 			case warmup.WarningLog:
-				klog.Warnf("failed to warm up connection pool: %s", err.Error())
+				klog.Warnf("KITEX: failed to warm up connection pool: %s", err.Error())
 			case warmup.ErrorLog:
-				klog.Errorf("failed to warm up connection pool: %s", err.Error())
+				klog.Errorf("KITEX: failed to warm up connection pool: %s", err.Error())
 			case warmup.FailFast:
 				return fmt.Errorf("connection pool warm-up: %w", err)
 			}
 		}
 	} else {
-		klog.Warnf("connection pool<%T> does not support warm-up operation", pool)
+		klog.Warnf("KITEX: connection pool<%T> does not support warm-up operation", pool)
 	}
 
 	return nil
