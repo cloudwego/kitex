@@ -26,8 +26,8 @@ import (
 
 // singletons .
 var (
-	MetainfoClientHandler = new(metainfoClientHandler)
-	MetainfoServerHandler = new(metainfoServerHandler)
+	MetainfoClientHandler remote.MetaHandler = new(metainfoClientHandler)
+	MetainfoServerHandler remote.MetaHandler = new(metainfoServerHandler)
 )
 
 type metainfoClientHandler struct{}
