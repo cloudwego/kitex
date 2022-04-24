@@ -32,7 +32,7 @@ import (
 
 // TestWithServerBasicInfo tests the creation of a server with basic info
 func TestWithServerBasicInfo(t *testing.T) {
-	svcName := "svcName" + time.Now().String()
+	svcName := "svcNameWithServerBasicInfo"
 	svr := NewServer(WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
 		ServiceName: svcName,
 	}))
