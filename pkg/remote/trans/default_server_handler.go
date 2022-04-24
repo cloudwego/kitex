@@ -129,8 +129,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	err = t.Read(ctx, conn, recvMsg)
 	if err != nil {
-		closeConn = true
-		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
+		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
 		t.OnError(ctx, err, conn)
 		return nil
 	}
@@ -138,8 +137,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	var methodInfo serviceinfo.MethodInfo
 	if methodInfo, err = GetMethodInfo(ri, t.svcInfo); err != nil {
 		// it won't be err, because the method has been checked in decode, err check here just do defensive inspection
-		closeConn = true
-		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
+		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
 		// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded
 		t.OnError(ctx, err, conn)
 		return nil
@@ -155,12 +153,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		// error cannot be wrapped to print here, so it must exec before NewTransError
 		t.OnError(ctx, err, conn)
 		err = remote.NewTransError(remote.InternalError, err)
-		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false)
+		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false)
 		return nil
 	}
 
 	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
 	if err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
+		closeConn = true
 		t.OnError(ctx, err, conn)
 		return nil
 	}
@@ -215,7 +214,9 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 	t.transPipe = p
 }
 
-func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg remote.Message, conn net.Conn, err error, ri rpcinfo.RPCInfo, doOnMessage bool) {
+func (t *svrTransHandler) writeErrorReplyIfNeeded(
+	ctx context.Context, recvMsg remote.Message, conn net.Conn, err error, ri rpcinfo.RPCInfo, doOnMessage bool,
+) (shouldCloseConn bool) {
 	if cn, ok := conn.(remote.IsActive); ok && !cn.IsActive() {
 		// conn is closed, no need reply
 		return
@@ -238,7 +239,9 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg r
 	err = t.transPipe.Write(ctx, conn, errMsg)
 	if err != nil {
 		klog.CtxErrorf(ctx, "KITEX: write error reply failed, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
+		return true
 	}
+	return
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {
