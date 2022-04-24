@@ -19,6 +19,7 @@ package retry
 import (
 	"context"
 	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -427,17 +428,18 @@ func TestBackupPolicyCall(t *testing.T) {
 	})
 	test.Assert(t, err == nil, err)
 
-	callTimes := 0
+	callTimes := int32(0)
 	var prevRI rpcinfo.RPCInfo
 	ri := genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
-		callTimes++
+		atomic.AddInt32(&callTimes, 1)
 		retryCtx := ctx
 		cRI := ri
-		if callTimes > 1 {
+		callTimesAtomic := atomic.LoadInt32(&callTimes)
+		if callTimesAtomic > 1 {
 			retryCtx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, TransitKey, strconv.Itoa(callTimes-1))
+			retryCtx = metainfo.WithPersistentValue(retryCtx, TransitKey, strconv.Itoa(int(callTimesAtomic-1)))
 			if prevRI == nil {
 				prevRI = ri
 			}
