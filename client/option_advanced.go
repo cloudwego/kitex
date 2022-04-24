@@ -57,7 +57,7 @@ func WithClientBasicInfo(ebi *rpcinfo.EndpointBasicInfo) Option {
 	}}
 }
 
-// WithDiagnosisService sets the diagnosis service for gathering debug informations.
+// WithDiagnosisService sets the diagnosis service for gathering debug information.
 func WithDiagnosisService(ds diagnosis.Service) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		o.Once.OnceOrPanic()

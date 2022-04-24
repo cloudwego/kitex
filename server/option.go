@@ -48,7 +48,7 @@ type Suite interface {
 	Options() []Option
 }
 
-// WithSuite adds a option suite for server.
+// WithSuite adds an option suite for server.
 func WithSuite(suite Suite) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		var nested struct {
@@ -246,7 +246,7 @@ func WithGRPCInitialWindowSize(s uint32) Option {
 	}}
 }
 
-// WithGRPCInitialConnWindowSize returns a Option that sets window size for a connection.
+// WithGRPCInitialConnWindowSize returns an Option that sets window size for a connection.
 // The lower bound for window size is 64K and any value smaller than that will be ignored.
 // It corresponds to the InitialConnWindowSize ServerOption of gRPC.
 func WithGRPCInitialConnWindowSize(s uint32) Option {
@@ -257,7 +257,7 @@ func WithGRPCInitialConnWindowSize(s uint32) Option {
 	}}
 }
 
-// WithGRPCKeepaliveParams returns a Option that sets keepalive and max-age parameters for the server.
+// WithGRPCKeepaliveParams returns an Option that sets keepalive and max-age parameters for the server.
 // It corresponds to the KeepaliveParams ServerOption of gRPC.
 func WithGRPCKeepaliveParams(kp grpc.ServerKeepalive) Option {
 	if kp.Time > 0 && kp.Time < time.Second {
@@ -271,7 +271,7 @@ func WithGRPCKeepaliveParams(kp grpc.ServerKeepalive) Option {
 	}}
 }
 
-// WithGRPCKeepaliveEnforcementPolicy returns a Option that sets keepalive enforcement policy for the server.
+// WithGRPCKeepaliveEnforcementPolicy returns an Option that sets keepalive enforcement policy for the server.
 // It corresponds to the KeepaliveEnforcementPolicy ServerOption of gRPC.
 func WithGRPCKeepaliveEnforcementPolicy(kep grpc.EnforcementPolicy) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
@@ -281,7 +281,7 @@ func WithGRPCKeepaliveEnforcementPolicy(kep grpc.EnforcementPolicy) Option {
 	}}
 }
 
-// WithGRPCMaxConcurrentStreams returns a Option that will apply a limit on the number
+// WithGRPCMaxConcurrentStreams returns an Option that will apply a limit on the number
 // of concurrent streams to each ServerTransport.
 // It corresponds to the MaxConcurrentStreams ServerOption of gRPC.
 func WithGRPCMaxConcurrentStreams(n uint32) Option {
