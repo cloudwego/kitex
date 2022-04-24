@@ -54,6 +54,7 @@ var (
 	ErrNoIvkRequest         = ErrInternalException.WithCause(errors.New("invoker request not set"))
 	ErrServiceCircuitBreak  = ErrCircuitBreak.WithCause(errors.New("service circuitbreak"))
 	ErrInstanceCircuitBreak = ErrCircuitBreak.WithCause(errors.New("instance circuitbreak"))
+	ErrNoInstance           = ErrServiceDiscovery.WithCause(errors.New("no instance available"))
 )
 
 type basicError struct {

@@ -53,7 +53,8 @@ func SetReporter(r Reporter) {
 	}
 }
 
-func getCommonReporter() Reporter {
+// GetCommonReporter returns the current Reporter used by connection pools.
+func GetCommonReporter() Reporter {
 	rwLock.RLock()
 	defer rwLock.RUnlock()
 	return commonReporter

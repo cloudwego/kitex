@@ -248,6 +248,12 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 			}
 			mm[m.Name] = m
 		}
+		var hasStreaming bool
+		for _, m := range methods {
+			if m.ClientStreaming || m.ServerStreaming {
+				hasStreaming = true
+			}
+		}
 		svcName := pp.getCombineServiceName("CombineService", ss)
 		si := &generator.ServiceInfo{
 			PkgInfo:         pi,
@@ -255,6 +261,7 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 			RawServiceName:  svcName,
 			CombineServices: svcs,
 			Methods:         methods,
+			HasStreaming:    hasStreaming,
 		}
 		si.ServiceTypeName = func() string { return si.ServiceName }
 		ss = append(ss, si)

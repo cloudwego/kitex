@@ -175,7 +175,7 @@ func BenchmarkTTHeaderCodecParallel(b *testing.B) {
 func initRecvMsg() remote.Message {
 	var req interface{}
 	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
 	return msg
 }
