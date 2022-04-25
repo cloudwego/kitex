@@ -186,7 +186,14 @@ func (kc *kClient) initLBCache() error {
 	onDelete := discoveryEventHandler(discovery.DeleteEventName, kc.opt.Bus, kc.opt.Events)
 	resolver := kc.opt.Resolver
 	if resolver == nil {
-		return kerrors.ErrNoResolver
+		// fake a resolver instead of returning an error directly because users may use
+		// callopt.WithHostPort to specify target addresses after NewClient.
+		resolver = &discovery.SynthesizedResolver{
+			ResolveFunc: func(ctx context.Context, target string) (discovery.Result, error) {
+				return discovery.Result{}, kerrors.ErrNoResolver
+			},
+			NameFunc: func() string { return "no_resolver" },
+		}
 	}
 	balancer := kc.opt.Balancer
 	if balancer == nil {
@@ -475,7 +482,7 @@ func (kc *kClient) warmingUp() error {
 	doWarmupPool := wuo.PoolOption != nil && kc.opt.Proxy == nil
 
 	// service discovery
-	if kc.lbf == nil {
+	if kc.opt.Resolver == nil {
 		return nil
 	}
 	nas := make(map[string][]string)

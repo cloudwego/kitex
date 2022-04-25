@@ -60,8 +60,11 @@ var (
 
 func TestNoResolver(t *testing.T) {
 	svcInfo := mocks.ServiceInfo()
-	_, err := NewClient(svcInfo, WithDestService("destService"))
-	test.Assert(t, errors.Is(err, kerrors.ErrNoResolver), err)
+	cli, err := NewClient(svcInfo, WithDestService("destService"))
+	test.Assert(t, err == nil)
+
+	err = cli.Call(context.Background(), "mock", mocks.NewMockArgs(), mocks.NewMockResult())
+	test.Assert(t, errors.Is(err, kerrors.ErrNoResolver))
 }
 
 func TestResolverMW(t *testing.T) {
