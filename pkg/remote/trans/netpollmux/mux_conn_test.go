@@ -18,7 +18,6 @@ package netpollmux
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -29,14 +28,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/netpoll"
 )
-
-// TestNewMuxSvrConn test new a muxSvrConn
-func TestNewMuxSvrConn(t *testing.T) {
-	pool := &sync.Pool{}
-	npconn := &MockNetpollConn{}
-	muxSvrCon := newMuxSvrConn(npconn, pool)
-	test.Assert(t, muxSvrCon != nil)
-}
 
 // TestOnRequest test muxSvrConn OnRequest return Err
 func TestOnRequestErr(t *testing.T) {

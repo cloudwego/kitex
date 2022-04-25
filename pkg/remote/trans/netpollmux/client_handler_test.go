@@ -18,19 +18,39 @@ package netpollmux
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
-	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
+	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
+
+func newTestRemoteClientOptionWithInStr(s string) *remote.ClientOption {
+	opt := &remote.ClientOption{
+		Codec: &MockCodec{
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), s)
+				_, err := out.WriteBinary(r.Bytes())
+				return err
+			},
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				in.Skip(3 * codec.Size32)
+				_, err := in.ReadString(len(s))
+				return err
+			},
+		},
+		ConnPool: NewMuxConnPool(1),
+	}
+	return opt
+}
 
 func TestNewCliTransHandler(t *testing.T) {
 	// check success
@@ -115,27 +135,7 @@ func TestCliTransHandler(t *testing.T) {
 func TestWriteNoMethod(t *testing.T) {
 	// 1. prepare mock data
 	s := "hello world"
-	opt := &remote.ClientOption{
-		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), s)
-				n, err := out.WriteBinary(r.Bytes())
-				test.Assert(t, err == nil, err)
-				test.Assert(t, n == r.Len(), n, r.Len())
-				return err
-			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				l := in.ReadableLen()
-				test.Assert(t, l == 3*codec.Size32+len(s))
-				in.Skip(3 * codec.Size32)
-				got, err := in.ReadString(len(s))
-				test.Assert(t, err == nil, err)
-				test.Assert(t, got == s, got, s)
-				return err
-			},
-		},
-		ConnPool: NewMuxConnPool(1),
-	}
+	opt := newTestRemoteClientOptionWithInStr(s)
 
 	handler, err := NewCliTransHandlerFactory().NewTransHandler(opt)
 	test.Assert(t, err == nil)
@@ -170,6 +170,9 @@ func TestWriteNoMethod(t *testing.T) {
 	err = handler.Write(ctx, conn, msg)
 	// check err not nil
 	test.Assert(t, err != nil, err)
+	tErr, ok := err.(*remote.TransError)
+	test.Assert(t, ok)
+	test.Assert(t, tErr.TypeID() == remote.UnknownMethod)
 	test.Assert(t, !isWriteBufFlushed)
 }
 
@@ -177,27 +180,7 @@ func TestWriteNoMethod(t *testing.T) {
 func TestWriteOneWayMethod(t *testing.T) {
 	// 1. prepare mock data
 	s := "hello world"
-	opt := &remote.ClientOption{
-		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), s)
-				n, err := out.WriteBinary(r.Bytes())
-				test.Assert(t, err == nil, err)
-				test.Assert(t, n == r.Len(), n, r.Len())
-				return err
-			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				l := in.ReadableLen()
-				test.Assert(t, l == 3*codec.Size32+len(s))
-				in.Skip(3 * codec.Size32)
-				got, err := in.ReadString(len(s))
-				test.Assert(t, err == nil, err)
-				test.Assert(t, got == s, got, s)
-				return err
-			},
-		},
-		ConnPool: NewMuxConnPool(1),
-	}
+	opt := newTestRemoteClientOptionWithInStr(s)
 
 	handler, err := NewCliTransHandlerFactory().NewTransHandler(opt)
 	test.Assert(t, err == nil)
@@ -205,12 +188,16 @@ func TestWriteOneWayMethod(t *testing.T) {
 	ctx := context.Background()
 	ri := newMockRPCInfo()
 
-	buf := netpoll.NewLinkBuffer(1024)
+	buf := netpoll.NewLinkBuffer(2048)
+	var isWrite bool
+	var isRead bool
 	npconn := &MockNetpollConn{
 		ReaderFunc: func() (r netpoll.Reader) {
+			isRead = true
 			return buf
 		},
 		WriterFunc: func() (r netpoll.Writer) {
+			isWrite = true
 			return buf
 		},
 	}
@@ -230,32 +217,22 @@ func TestWriteOneWayMethod(t *testing.T) {
 	}
 	err = handler.Write(ctx, conn, oneWayMsg)
 	test.Assert(t, err == nil, err)
+
+	time.Sleep(5 * time.Millisecond)
+	buf.Flush()
+	test.Assert(t, isWrite)
+	test.Assert(t, buf.Len() > len(s), buf.Len())
+
+	err = conn.OnRequest(ctx, npconn)
+	test.Assert(t, err == nil, err)
+
+	test.Assert(t, isRead)
 }
 
 // TestReadTimeout test client_handler read timeout because of no execute OnRequest
 func TestReadTimeout(t *testing.T) {
 	s := "hello world"
-	opt := &remote.ClientOption{
-		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), s)
-				n, err := out.WriteBinary(r.Bytes())
-				test.Assert(t, err == nil, err)
-				test.Assert(t, n == r.Len(), n, r.Len())
-				return err
-			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				l := in.ReadableLen()
-				test.Assert(t, l == 3*codec.Size32+len(s))
-				in.Skip(3 * codec.Size32)
-				got, err := in.ReadString(len(s))
-				test.Assert(t, err == nil, err)
-				test.Assert(t, got == s, got, s)
-				return err
-			},
-		},
-		ConnPool: NewMuxConnPool(1),
-	}
+	opt := newTestRemoteClientOptionWithInStr(s)
 
 	handler, err := NewCliTransHandlerFactory().NewTransHandler(opt)
 	test.Assert(t, err == nil, err)
@@ -303,12 +280,13 @@ func TestReadTimeout(t *testing.T) {
 
 	time.Sleep(5 * time.Millisecond)
 	buf.Flush()
-	test.Assert(t, buf.Len() > len(s), buf.Len())
 	test.Assert(t, isWrite)
+	test.Assert(t, buf.Len() > len(s), buf.Len())
 
 	err = handler.Read(ctx, conn, msg)
 	test.Assert(t, rwTimeout <= trans.GetReadTimeout(ri.Config()))
 	test.Assert(t, err != nil, err)
+	test.Assert(t, strings.Contains(err.Error(), "recv wait timeout"))
 	test.Assert(t, !isRead)
 
 	handler.OnError(ctx, err, conn)
