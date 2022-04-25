@@ -219,8 +219,8 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	bufReader := np.NewReaderByteBuffer(reader)
 	err = t.readWithByteBuffer(ctx, bufReader, recvMsg)
 	if err != nil {
-		closeConn = true
-		t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, true)
+		// no need to close connection in mux case, because it had finished reads.
+		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, true)
 		// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded
 		t.OnError(ctx, err, muxSvrConn)
 		return
