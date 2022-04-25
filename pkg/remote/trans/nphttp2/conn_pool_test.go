@@ -26,6 +26,7 @@ import (
 func TestConnPool(t *testing.T) {
 	// mock init
 	connPool := newMockConnPool()
+	defer connPool.Close()
 	opt := newMockConnOption()
 	ctx := newMockCtxWithRPCInfo()
 
@@ -49,15 +50,11 @@ func TestConnPool(t *testing.T) {
 	// test Clean()
 	connPool.Clean("tcp", mockAddr0)
 
-	// test put
+	// test put()
 	err = connPool.Put(conn)
 	test.Assert(t, err == nil, err)
 
 	// test Discard()
 	err = connPool.Discard(conn)
-	test.Assert(t, err == nil, err)
-
-	// test Close()
-	err = connPool.Close()
 	test.Assert(t, err == nil, err)
 }

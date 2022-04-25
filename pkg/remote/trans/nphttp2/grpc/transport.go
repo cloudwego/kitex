@@ -461,6 +461,31 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 	return io.ReadFull(s.trReader, p)
 }
 
+// CreateStream create an independent stream out of http2client / http2server
+func CreateStream(id uint32, requestRead func(i int)) *Stream {
+	recvBuffer := newRecvBuffer()
+	trReader := &transportReader{
+		reader: &recvBufferReader{
+			recv: recvBuffer,
+			freeBuffer: func(buffer *bytes.Buffer) {
+				buffer.Reset()
+			},
+		},
+		windowHandler: func(i int) {},
+	}
+
+	stream := &Stream{
+		id:          id,
+		buf:         recvBuffer,
+		trReader:    trReader,
+		wq:          newWriteQuota(defaultWriteQuota, nil),
+		requestRead: requestRead,
+		hdrMu:       sync.Mutex{},
+	}
+
+	return stream
+}
+
 // transportReader reads all the data available for this Stream from the transport and
 // passes them into the decoder, which converts them into a gRPC message stream.
 // The error is io.EOF when the stream is done or another non-nil error if

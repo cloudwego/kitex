@@ -49,8 +49,6 @@ func TestConvertErrorFromGrpcToKitex(t *testing.T) {
 	err = convertErrorFromGrpcToKitex(context.Canceled)
 	test.Assert(t, err == context.Canceled, err)
 
-	// fixme: assert detail
-
 	// test convertErrorFromGrpcToKitex() grpc err
 	permissionDeniedErr := status.Errorf(codes.PermissionDenied, "grpc permission denied")
 	err = convertErrorFromGrpcToKitex(permissionDeniedErr)

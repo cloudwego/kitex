@@ -29,6 +29,7 @@ func TestClientConn(t *testing.T) {
 	ctx := newMockCtxWithRPCInfo()
 	conn, err := connPool.Get(ctx, "tcp", mockAddr0, newMockConnOption())
 	test.Assert(t, err == nil, err)
+	defer conn.Close()
 	clientConn := conn.(*clientConn)
 
 	// test LocalAddr()
@@ -67,8 +68,6 @@ func TestClientConn(t *testing.T) {
 	// test Trailer()
 	_ = clientConn.Trailer()
 
-	// todo check return value
-
 	// test SetDeadline()
 	err = clientConn.SetDeadline(time.Now())
 	test.Assert(t, err == nil, err)
@@ -79,9 +78,5 @@ func TestClientConn(t *testing.T) {
 
 	// test SetReadDeadline()
 	err = clientConn.SetReadDeadline(time.Now())
-	test.Assert(t, err == nil, err)
-
-	// test Close()
-	err = clientConn.Close()
 	test.Assert(t, err == nil, err)
 }

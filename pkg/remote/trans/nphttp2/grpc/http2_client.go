@@ -976,7 +976,7 @@ func (t *http2Client) reader() {
 					// use error detail to provide better err message
 					code := http2ErrConvTab[se.Code]
 					err := t.framer.ErrorDetail()
-					msg := "stream error"
+					var msg string
 					if err != nil {
 						msg = err.Error()
 					}

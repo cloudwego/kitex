@@ -45,6 +45,8 @@ func TestStatus(t *testing.T) {
 	statusEmpty := Status{}
 	test.Assert(t, statusEmpty.Code() == codes.OK)
 	test.Assert(t, statusEmpty.Message() == "")
+	emptyDetail := statusEmpty.Details()
+	test.Assert(t, emptyDetail == nil)
 
 	// test error status
 	notFoundErr := Errorf(codes.NotFound, statusMsg)
@@ -75,6 +77,9 @@ func TestError(t *testing.T) {
 
 	is := er.Is(context.Canceled)
 	test.Assert(t, !is)
+
+	is = er.Is(er)
+	test.Assert(t, is)
 }
 
 func TestFromContextError(t *testing.T) {

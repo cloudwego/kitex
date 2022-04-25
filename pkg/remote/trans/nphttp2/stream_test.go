@@ -31,8 +31,10 @@ func TestStream(t *testing.T) {
 	conn.mockSettingFrame()
 	tr, err := newMockServerTransport(conn)
 	test.Assert(t, err == nil, err)
-	s := grpc.MockNewServerSideStream()
+	s := grpc.CreateStream(1, func(i int) {})
 	serverConn := newServerConn(tr, s)
+	defer serverConn.Close()
+
 	handler, err := NewSvrTransHandlerFactory().NewTransHandler(opt)
 	test.Assert(t, err == nil, err)
 	ctx := newMockCtxWithRPCInfo()

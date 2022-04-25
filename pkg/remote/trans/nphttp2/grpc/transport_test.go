@@ -1,10 +1,6 @@
 /*
-<<<<<<< HEAD
  *
  * Copyright 2014 gRPC authors.
-=======
- * Copyright 2022 CloudWeGo Authors
->>>>>>> 5da50e1 (test: --20220424 add ut for pkg/remote/trans/nphttp2 (unfinished))
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,13 +13,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
-<<<<<<< HEAD
  *
  * This file may have been modified by CloudWeGo authors. All CloudWeGo
  * Modifications are Copyright 2021 CloudWeGo Authors.
-=======
->>>>>>> 5da50e1 (test: --20220424 add ut for pkg/remote/trans/nphttp2 (unfinished))
-*/
+ */
 
 package grpc
 

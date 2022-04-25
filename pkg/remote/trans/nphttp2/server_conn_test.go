@@ -30,8 +30,9 @@ func TestServerConn(t *testing.T) {
 	npConn.mockSettingFrame()
 	tr, err := newMockServerTransport(npConn)
 	test.Assert(t, err == nil, err)
-	s := grpc.MockNewServerSideStream()
+	s := grpc.CreateStream(1, func(i int) {})
 	serverConn := newServerConn(tr, s)
+	defer serverConn.Close()
 
 	// test LocalAddr()
 	la := serverConn.LocalAddr()
@@ -71,9 +72,5 @@ func TestServerConn(t *testing.T) {
 
 	// test SetWriteDeadline()
 	err = serverConn.SetWriteDeadline(time.Now())
-	test.Assert(t, err == nil, err)
-
-	// test Close()
-	err = serverConn.Close()
 	test.Assert(t, err == nil, err)
 }

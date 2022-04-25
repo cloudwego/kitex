@@ -58,6 +58,8 @@ func newMockNpConn(address string) *mockNetpollConn {
 }
 
 func (mc *mockNetpollConn) mockReader(b []byte) (n int, err error) {
+	mc.counterLock.Lock()
+	defer mc.counterLock.Unlock()
 	bLen := len(b)
 	if bLen == frameHeaderLen {
 		b = b[0:0]
@@ -94,60 +96,21 @@ type mockFrame struct {
 }
 
 var (
-	headerPayload          = []byte{131, 134, 69, 147, 99, 21, 149, 146, 249, 105, 58, 248, 172, 41, 82, 91, 24, 220, 63, 88, 203, 69, 7, 65, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 95, 139, 29, 117, 208, 98, 13, 38, 61, 76, 77, 101, 100, 122, 137, 234, 100, 151, 203, 29, 192, 184, 151, 7, 64, 2, 116, 101, 134, 77, 131, 53, 5, 177, 31, 64, 137, 154, 202, 200, 178, 77, 73, 79, 106, 127, 134, 125, 247, 217, 124, 86, 255, 64, 138, 65, 237, 176, 133, 89, 5, 179, 185, 136, 95, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 64, 137, 65, 237, 176, 133, 90, 146, 166, 115, 201, 0, 64, 136, 242, 178, 82, 181, 7, 152, 210, 127, 164, 0, 130, 227, 96, 109, 150, 93, 105, 151, 157, 124, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 150, 89, 64, 48, 54, 228, 146, 190, 16, 134, 50, 203, 64, 135, 65, 237, 176, 133, 88, 181, 119, 131, 174, 195, 201, 64, 143, 143, 210, 75, 73, 81, 58, 210, 154, 132, 150, 197, 147, 234, 178, 255, 131, 154, 202, 201, 64, 141, 144, 168, 73, 170, 26, 76, 122, 150, 65, 108, 238, 98, 23, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 64, 141, 144, 168, 73, 170, 26, 76, 122, 150, 164, 169, 156, 242, 127, 134, 220, 63, 88, 203, 69, 7, 64, 138, 144, 168, 73, 170, 26, 76, 122, 150, 52, 132, 1, 45, 64, 138, 65, 237, 176, 133, 88, 148, 90, 132, 150, 207, 133, 144, 178, 142, 218, 19, 64, 135, 65, 237, 176, 133, 88, 210, 19, 1, 45}
-	windowUpdatePayload    = []byte{0, 0, 0, 1}
-	windowUpdateErrPayload = []byte{0, 0, 0, 0}
-	mockHeaderFrame        = []byte{0, 1, 42, 1, 4, 0, 0, 0, 1}
-	mockSettingFrame       = []byte{0, 0, 6, 4, 0, 0, 0, 0, 0}
-	mockDataFrame          = []byte{0, 20, 0, 0, 1, 0, 0, 0, 1}
-	mockPingFrame          = []byte{0, 0, 8, 6, 0, 0, 0, 0, 0}
-	mockWindowUpdateFrame  = []byte{0, 0, 4, 8, 0, 0, 0, 0, 1}
-	mockWindowUpdateFrame2 = []byte{0, 0, 4, 8, 0, 0, 0, 0, 2}
-	mockRSTFrame           = []byte{0, 0, 4, 3, 0, 0, 0, 0, 1}
-	mockGoAwayFrame        = []byte{0, 0, 8, 7, 0, 0, 0, 0, 1}
-	mockErrFrame           = []byte{0, 0, 4, 9, 0, 0, 0, 0, 5}
+	headerPayload    = []byte{131, 134, 69, 147, 99, 21, 149, 146, 249, 105, 58, 248, 172, 41, 82, 91, 24, 220, 63, 88, 203, 69, 7, 65, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 95, 139, 29, 117, 208, 98, 13, 38, 61, 76, 77, 101, 100, 122, 137, 234, 100, 151, 203, 29, 192, 184, 151, 7, 64, 2, 116, 101, 134, 77, 131, 53, 5, 177, 31, 64, 137, 154, 202, 200, 178, 77, 73, 79, 106, 127, 134, 125, 247, 217, 124, 86, 255, 64, 138, 65, 237, 176, 133, 89, 5, 179, 185, 136, 95, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 64, 137, 65, 237, 176, 133, 90, 146, 166, 115, 201, 0, 64, 136, 242, 178, 82, 181, 7, 152, 210, 127, 164, 0, 130, 227, 96, 109, 150, 93, 105, 151, 157, 124, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 150, 89, 64, 48, 54, 228, 146, 190, 16, 134, 50, 203, 64, 135, 65, 237, 176, 133, 88, 181, 119, 131, 174, 195, 201, 64, 143, 143, 210, 75, 73, 81, 58, 210, 154, 132, 150, 197, 147, 234, 178, 255, 131, 154, 202, 201, 64, 141, 144, 168, 73, 170, 26, 76, 122, 150, 65, 108, 238, 98, 23, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 64, 141, 144, 168, 73, 170, 26, 76, 122, 150, 164, 169, 156, 242, 127, 134, 220, 63, 88, 203, 69, 7, 64, 138, 144, 168, 73, 170, 26, 76, 122, 150, 52, 132, 1, 45, 64, 138, 65, 237, 176, 133, 88, 148, 90, 132, 150, 207, 133, 144, 178, 142, 218, 19, 64, 135, 65, 237, 176, 133, 88, 210, 19, 1, 45}
+	mockHeaderFrame  = []byte{0, 1, 42, 1, 4, 0, 0, 0, 1}
+	mockSettingFrame = []byte{0, 0, 6, 4, 0, 0, 0, 0, 0}
 )
 
-func (mc *mockNetpollConn) mockErrFrame() {
-	mc.mockQueue = append(mc.mockQueue, mockFrame{mockErrFrame, nil})
-}
-
 func (mc *mockNetpollConn) mockSettingFrame() {
+	mc.counterLock.Lock()
+	defer mc.counterLock.Unlock()
 	mc.mockQueue = append(mc.mockQueue, mockFrame{mockSettingFrame, nil})
 }
 
-func (mc *mockNetpollConn) mockPingFrame() {
-	mc.mockQueue = append(mc.mockQueue, mockFrame{mockPingFrame, nil})
-}
-
 func (mc *mockNetpollConn) mockMetaHeaderFrame() {
+	mc.counterLock.Lock()
+	defer mc.counterLock.Unlock()
 	mc.mockQueue = append(mc.mockQueue, mockFrame{mockHeaderFrame, headerPayload})
-}
-
-func (mc *mockNetpollConn) mockWindowUpdateFrame() {
-	mc.mockQueue = append(mc.mockQueue, mockFrame{mockWindowUpdateFrame, windowUpdatePayload})
-}
-
-// mock incr size stream err (server)
-func (mc *mockNetpollConn) mockStreamErrFrame1() {
-	mc.mockQueue = append(mc.mockQueue, mockFrame{mockWindowUpdateFrame, windowUpdateErrPayload})
-}
-
-// mock stream not active err (server)
-func (mc *mockNetpollConn) mockStreamErrFrame2() {
-	mc.mockQueue = append(mc.mockQueue, mockFrame{mockWindowUpdateFrame2, nil})
-}
-
-func (mc *mockNetpollConn) mockRSTFrame() {
-	mc.mockQueue = append(mc.mockQueue, mockFrame{mockRSTFrame, nil})
-}
-
-func (mc *mockNetpollConn) mockGoAwayFrame() {
-	mc.mockQueue = append(mc.mockQueue, mockFrame{mockGoAwayFrame, nil})
-}
-
-func (mc *mockNetpollConn) mockDataFrame() {
-	mc.mockQueue = append(mc.mockQueue, mockFrame{mockDataFrame, nil})
 }
 
 var _ netpoll.Connection = &mockNetpollConn{}
@@ -159,6 +122,7 @@ type mockNetpollConn struct {
 	WriterFunc   func() (r netpoll.Writer)
 	mockQueue    []mockFrame
 	queueCounter int
+	counterLock  sync.Mutex
 }
 
 func (m *mockNetpollConn) Reader() netpoll.Reader {
@@ -274,8 +238,8 @@ func (m mockConn) SetWriteDeadline(t time.Time) (e error) {
 }
 
 var (
-	mockAddr0 = "127.0.0.1:8000"
-	mockAddr1 = "127.0.0.1:8001"
+	mockAddr0 = "127.0.0.1:28000"
+	mockAddr1 = "127.0.0.1:28001"
 )
 
 func newMockConnPool() *connPool {

@@ -25,6 +25,7 @@ import (
 )
 
 func TestClientHandler(t *testing.T) {
+	// init
 	opt := newMockClientOption()
 	ctx := newMockCtxWithRPCInfo()
 	msg := newMockNewMessage()
@@ -45,16 +46,15 @@ func TestClientHandler(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
-// todo too many meaningless
 func TestClientHandlerOnAction(t *testing.T) {
 	// init
 	opt := newMockClientOption()
 	ctx := newMockCtxWithRPCInfo()
 	conn, err := opt.ConnPool.Get(ctx, "tcp", mockAddr0, remote.ConnOption{Dialer: opt.Dialer, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil, err)
+	defer conn.Close()
 	cliTransHandler, err := newCliTransHandler(opt)
 	test.Assert(t, err == nil, err)
-
 	// test OnConnection()
 	cliCtx, err := cliTransHandler.OnConnect(ctx)
 	test.Assert(t, err == nil, err)
@@ -72,17 +72,4 @@ func TestClientHandlerOnAction(t *testing.T) {
 
 	// test SetPipeline()
 	cliTransHandler.SetPipeline(nil)
-
-	defer func() {
-		_ = recover()
-	}()
-
-	defer func() {
-		err1 := recover()
-		test.Assert(t, err1 != nil)
-		// test OnInactive()
-		cliTransHandler.OnInactive(ctx, conn)
-	}()
-	// test OnError()
-	cliTransHandler.OnError(ctx, nil, conn)
 }
