@@ -323,7 +323,11 @@ func checkPayload(
 		return err
 	}
 	message.SetProtocolInfo(remote.NewProtocolInfo(transProto, codecType))
-	rpcinfo.AsMutableRPCConfig(message.RPCInfo().Config()).SetTransportProtocol(message.ProtocolInfo().TransProto)
+	cfg := rpcinfo.AsMutableRPCConfig(message.RPCInfo().Config())
+	if cfg != nil {
+		tp := message.ProtocolInfo().TransProto
+		cfg.SetTransportProtocol(tp)
+	}
 	return nil
 }
 

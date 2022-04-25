@@ -147,11 +147,9 @@ func (ts *transServer) Shutdown() (err error) {
 	if g, ok := ts.transHdlr.(remote.GracefulShutdown); ok {
 		// 1. stop listener
 		ts.ln.Close()
+
 		// 2. signal all active connections to close gracefully
-		if err = g.GracefulShutdown(ctx); err == nil {
-			return
-		}
-		// 3. fallthrough to close the event loop
+		g.GracefulShutdown(ctx)
 	}
 	if ts.evl != nil {
 		err = ts.evl.Shutdown(ctx)

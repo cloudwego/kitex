@@ -83,6 +83,7 @@ type svrTransHandler struct {
 	ext        trans.Extension
 	funcPool   sync.Pool
 	conns      sync.Map
+	tasks      sync.WaitGroup
 }
 
 // Write implements the remote.ServerTransHandler interface.
@@ -183,6 +184,9 @@ func (t *svrTransHandler) batchGoTasks(fs []func()) {
 
 // task contains a complete process about decoding request -> handling -> writing response
 func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, reader netpoll.Reader) {
+	t.tasks.Add(1)
+	defer t.tasks.Done()
+
 	// rpcInfoCtx is a pooled ctx with inited RPCInfo which can be reused.
 	// it's recycled in defer.
 	muxSvrConn, _ := muxSvrConnCtx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
@@ -315,9 +319,20 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 		}
 		return true
 	})
-	// wait for a while until all notifications are sent
-	<-ctx.Done()
-	return nil
+	// wait until all notifications are sent and clients stop using those connections
+	done := make(chan struct{})
+	go func() {
+		t.tasks.Wait()
+		close(done)
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-done:
+			return nil
+		}
+	}
 }
 
 // OnError implements the remote.ServerTransHandler interface.
