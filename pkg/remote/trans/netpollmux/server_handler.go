@@ -288,8 +288,8 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	t.conns.Delete(conn)
 }
 
-func (t *svrTransHandler) Shutdown(ctx context.Context) error {
-	// Send a thrift exception with sequence ID 0 to notify the remote
+func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
+	// Send a control frame with sequence ID 0 to notify the remote
 	// end to close the connection or prevent further operation on it.
 	iv := rpcinfo.NewInvocation("none", "none")
 	iv.(interface{ SetSeqID(seqID int32) }).SetSeqID(0)

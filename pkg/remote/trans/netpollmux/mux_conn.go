@@ -76,6 +76,7 @@ func (c *muxCliConn) OnRequest(ctx context.Context, connection netpoll.Connectio
 		err = fmt.Errorf("mux read package slice failed: addr(%s), %w", connection.RemoteAddr(), err)
 		return c.onError(ctx, err, connection)
 	}
+	// seqId == 0 means a control frame.
 	if seqID == 0 {
 		iv := rpcinfo.NewInvocation("none", "none")
 		iv.(interface{ SetSeqID(seqID int32) }).SetSeqID(0)

@@ -164,10 +164,10 @@ func (p *TransPipeline) SetPipeline(transPipe *TransPipeline) {
 	// do nothing
 }
 
-// Shutdown implements the remote GracefulShutdown interface.
-func (p *TransPipeline) Shutdown(ctx context.Context) error {
+// GracefulShutdown implements the GracefulShutdown interface.
+func (p *TransPipeline) GracefulShutdown(ctx context.Context) error {
 	if g, ok := p.netHdlr.(GracefulShutdown); ok {
-		return g.Shutdown(ctx)
+		return g.GracefulShutdown(ctx)
 	}
 	return kerrors.ErrNotSupported
 }

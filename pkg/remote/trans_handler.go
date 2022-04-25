@@ -68,5 +68,5 @@ type InvokeHandleFuncSetter interface {
 
 // GracefulShutdown supports closing connections in a graceful manner.
 type GracefulShutdown interface {
-	Shutdown(ctx context.Context) error
+	GracefulShutdown(ctx context.Context) error
 }
