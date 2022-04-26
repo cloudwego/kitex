@@ -62,6 +62,7 @@ type server struct {
 	eps     endpoint.Endpoint
 	mws     []endpoint.Middleware
 	svr     remotesvr.Server
+	stopped sync.Once
 
 	sync.Mutex
 }
@@ -200,12 +201,6 @@ func (s *server) Run() (err error) {
 	if err = s.waitExit(errCh); err != nil {
 		klog.Errorf("KITEX: received error and exit: error=%s", err.Error())
 	}
-	muShutdownHooks.Lock()
-	for i := range onShutdown {
-		onShutdown[i]()
-	}
-	muShutdownHooks.Unlock()
-	// stop server after user hooks
 	if e := s.Stop(); e != nil && err == nil {
 		err = e
 		klog.Errorf("KITEX: stop server error: error=%s", e.Error())
@@ -215,18 +210,27 @@ func (s *server) Run() (err error) {
 
 // Stop stops the server gracefully.
 func (s *server) Stop() (err error) {
-	s.Lock()
-	defer s.Unlock()
-	if s.opt.RegistryInfo != nil {
-		err = s.opt.Registry.Deregister(s.opt.RegistryInfo)
-		s.opt.RegistryInfo = nil
-	}
-	if s.svr != nil {
-		if e := s.svr.Stop(); e != nil {
-			err = e
+	s.stopped.Do(func() {
+		s.Lock()
+		defer s.Unlock()
+
+		muShutdownHooks.Lock()
+		for i := range onShutdown {
+			onShutdown[i]()
 		}
-		s.svr = nil
-	}
+		muShutdownHooks.Unlock()
+
+		if s.opt.RegistryInfo != nil {
+			err = s.opt.Registry.Deregister(s.opt.RegistryInfo)
+			s.opt.RegistryInfo = nil
+		}
+		if s.svr != nil {
+			if e := s.svr.Stop(); e != nil {
+				err = e
+			}
+			s.svr = nil
+		}
+	})
 	return
 }
 

@@ -34,9 +34,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/transport"
 )
 
 type svrTransHandlerFactory struct{}
@@ -80,6 +82,8 @@ type svrTransHandler struct {
 	transPipe  *remote.TransPipeline
 	ext        trans.Extension
 	funcPool   sync.Pool
+	conns      sync.Map
+	tasks      sync.WaitGroup
 }
 
 // Write implements the remote.ServerTransHandler interface.
@@ -180,6 +184,9 @@ func (t *svrTransHandler) batchGoTasks(fs []func()) {
 
 // task contains a complete process about decoding request -> handling -> writing response
 func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, reader netpoll.Reader) {
+	t.tasks.Add(1)
+	defer t.tasks.Done()
+
 	// rpcInfoCtx is a pooled ctx with inited RPCInfo which can be reused.
 	// it's recycled in defer.
 	muxSvrConn, _ := muxSvrConnCtx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
@@ -282,12 +289,57 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 			return ctx
 		},
 	}
-	return context.WithValue(context.Background(), ctxKeyMuxSvrConn{}, newMuxSvrConn(connection, pool)), nil
+	muxConn := newMuxSvrConn(connection, pool)
+	t.conns.Store(conn, muxConn)
+	return context.WithValue(context.Background(), ctxKeyMuxSvrConn{}, muxConn), nil
 }
 
 // OnInactive implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
-	// do nothing now
+	t.conns.Delete(conn)
+}
+
+func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
+	// Send a control frame with sequence ID 0 to notify the remote
+	// end to close the connection or prevent further operation on it.
+	iv := rpcinfo.NewInvocation("none", "none")
+	iv.(interface{ SetSeqID(seqID int32) }).SetSeqID(0)
+	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
+	data := NewControlFrame()
+	msg := remote.NewMessage(data, t.svcInfo, ri, remote.Reply, remote.Server)
+	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	msg.TransInfo().TransStrInfo()[transmeta.HeaderConnectionReadyToReset] = "1"
+
+	t.conns.Range(func(k, v interface{}) bool {
+		wbuf := netpoll.NewLinkBuffer()
+		bufWriter := np.NewWriterByteBuffer(wbuf)
+		err := t.codec.Encode(ctx, msg, bufWriter)
+		bufWriter.Release(err)
+		if err == nil {
+			v.(*muxSvrConn).Put(func() (buf netpoll.Writer, isNil bool) {
+				return wbuf, false
+			})
+		} else {
+			c := v.(*muxSvrConn)
+			klog.Warn("KITEX: signal connection closing error:",
+				err.Error(), c.LocalAddr().String(), "=>", c.RemoteAddr().String())
+		}
+		return true
+	})
+	// wait until all notifications are sent and clients stop using those connections
+	done := make(chan struct{})
+	go func() {
+		t.tasks.Wait()
+		close(done)
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-done:
+			return nil
+		}
+	}
 }
 
 // OnError implements the remote.ServerTransHandler interface.
