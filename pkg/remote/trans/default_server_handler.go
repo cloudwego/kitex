@@ -138,7 +138,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	var methodInfo serviceinfo.MethodInfo
 	if methodInfo, err = GetMethodInfo(ri, t.svcInfo); err != nil {
 		// it won't be err, because the method has been checked in decode, err check here just do defensive inspection
-		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
+		closeConn = true
+		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
 		// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded
 		t.OnError(ctx, err, conn)
 		return nil
