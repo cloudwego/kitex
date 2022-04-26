@@ -57,6 +57,11 @@ func Newf(c codes.Code, format string, a ...interface{}) *Status {
 	return New(c, fmt.Sprintf(format, a...))
 }
 
+// ErrorProto returns an error representing s.  If s.Code is OK, returns nil.
+func ErrorProto(s *spb.Status) error {
+	return FromProto(s).Err()
+}
+
 // FromProto returns a Status representing s.
 func FromProto(s *spb.Status) *Status {
 	return &Status{s: proto.Clone(s).(*spb.Status)}
