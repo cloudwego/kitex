@@ -162,7 +162,7 @@ func (r *rpcConfig) TransportProtocol() transport.Protocol {
 
 // SetTransportProtocol implements MutableRPCConfig interface.
 func (r *rpcConfig) SetTransportProtocol(tp transport.Protocol) error {
-	r.transportProtocol |= tp
+	r.transportProtocol = tp
 	return nil
 }
 
