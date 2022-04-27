@@ -592,7 +592,11 @@ func TestClientSendAndReceive(t *testing.T) {
 
 func TestClientErrorNotify(t *testing.T) {
 	server, ct := setUp(t, 0, math.MaxUint32, normal)
-	go server.stop()
+	go func() {
+		if server != nil {
+			server.stop()
+		}
+	}()
 	// ct.reader should detect the error and activate ct.Error().
 	<-ct.Error()
 	ct.Close()
