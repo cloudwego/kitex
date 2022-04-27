@@ -20,22 +20,28 @@ import (
 	"context"
 	"errors"
 	"net"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"bou.ke/monkey"
 	"github.com/cloudwego/kitex/internal/mocks"
+	limiterMocks "github.com/cloudwego/kitex/internal/mocks/limiter"
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/limit"
+	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/bound"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -251,26 +257,164 @@ func TestServiceRegistryNoInitInfo(t *testing.T) {
 }
 
 func TestServerBoundHandler(t *testing.T) {
-	var opts []Option
-	opts = append(opts, WithLimit(&limit.Option{
-		MaxConnections: 1000,
-		MaxQPS:         10000,
-	}))
-	opts = append(opts, WithMetaHandler(noopMetahandler{}))
-	svr := NewServer(opts...)
-
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
+	interval := time.Millisecond * 100
+	monkey.Patch(limiter.NewQPSLimiter, func(interval time.Duration, limit int) limiter.RateLimiter {
+		return &mockRateLimiter{}
 	})
-	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	test.Assert(t, err == nil)
-	err = svr.Run()
-	test.Assert(t, err == nil, err)
+	cases := []struct {
+		opts          []Option
+		wantInbounds  []remote.InboundHandler
+		wantOutbounds []remote.OutboundHandler
+	}{
+		{
+			opts: []Option{
+				WithLimit(&limit.Option{
+					MaxConnections: 1000,
+					MaxQPS:         10000,
+				}),
+				WithMetaHandler(noopMetahandler{}),
+			},
+			wantInbounds: []remote.InboundHandler{
+				bound.NewServerLimiterOnReadHandler(limiter.NewConcurrencyLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil),
+				bound.NewTransMetaHandler([]remote.MetaHandler{noopMetahandler{}, transmeta.MetainfoServerHandler}),
+			},
+			wantOutbounds: []remote.OutboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{noopMetahandler{}, transmeta.MetainfoServerHandler}),
+			},
+		},
+		{
+			opts: []Option{
+				WithConcurrencyLimiter(&limiterMocks.ConcurrencyLimiter{}),
+			},
+			wantInbounds: []remote.InboundHandler{
+				bound.NewServerLimiterOnReadHandler(&limiterMocks.ConcurrencyLimiter{}, &limiter.DummyRateLimiter{}, nil),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+			wantOutbounds: []remote.OutboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+		},
+		{
+			opts: []Option{
+				WithQPSLimiter(&limiterMocks.RateLimiter{}),
+			},
+			wantInbounds: []remote.InboundHandler{
+				bound.NewServerLimiterHandler(&limiter.DummyConcurrencyLimiter{}, &limiterMocks.RateLimiter{}, nil),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+			wantOutbounds: []remote.OutboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+		},
+		{
+			opts: []Option{
+				WithConcurrencyLimiter(&limiterMocks.ConcurrencyLimiter{}),
+				WithQPSLimiter(&limiterMocks.RateLimiter{}),
+			},
+			wantInbounds: []remote.InboundHandler{
+				bound.NewServerLimiterHandler(&limiterMocks.ConcurrencyLimiter{}, &limiterMocks.RateLimiter{}, nil),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+			wantOutbounds: []remote.OutboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+		},
+		{
+			opts: []Option{
+				WithLimit(&limit.Option{
+					MaxConnections: 1000,
+					MaxQPS:         10000,
+				}),
+				WithConcurrencyLimiter(&limiterMocks.ConcurrencyLimiter{}),
+			},
+			wantInbounds: []remote.InboundHandler{
+				bound.NewServerLimiterOnReadHandler(&limiterMocks.ConcurrencyLimiter{}, limiter.NewQPSLimiter(interval, 10000), nil),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+			wantOutbounds: []remote.OutboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+		},
+		{
+			opts: []Option{
+				WithLimit(&limit.Option{
+					MaxConnections: 1000,
+					MaxQPS:         10000,
+				}),
+				WithConcurrencyLimiter(&limiterMocks.ConcurrencyLimiter{}),
+				WithQPSLimiter(&limiterMocks.RateLimiter{}),
+			},
+			wantInbounds: []remote.InboundHandler{
+				bound.NewServerLimiterHandler(&limiterMocks.ConcurrencyLimiter{}, &limiterMocks.RateLimiter{}, nil),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+			wantOutbounds: []remote.OutboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+		},
+		{
+			opts: []Option{
+				WithLimit(&limit.Option{
+					MaxConnections: 1000,
+					MaxQPS:         10000,
+				}),
+				WithConcurrencyLimiter(&limiterMocks.ConcurrencyLimiter{}),
+				WithQPSLimiter(&limiterMocks.RateLimiter{}),
+				WithMuxTransport(),
+			},
+			wantInbounds: []remote.InboundHandler{
+				bound.NewServerLimiterHandler(&limiterMocks.ConcurrencyLimiter{}, &limiterMocks.RateLimiter{}, nil),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+			wantOutbounds: []remote.OutboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+		},
+		{
+			opts: []Option{
+				WithLimit(&limit.Option{
+					MaxConnections: 1000,
+					MaxQPS:         10000,
+				}),
+				WithMuxTransport(),
+			},
+			wantInbounds: []remote.InboundHandler{
+				bound.NewServerLimiterHandler(limiter.NewConcurrencyLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+			wantOutbounds: []remote.OutboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+		},
+		{
+			opts: []Option{
+				WithMetaHandler(noopMetahandler{}),
+			},
+			wantInbounds: []remote.InboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{noopMetahandler{}, transmeta.MetainfoServerHandler}),
+			},
+			wantOutbounds: []remote.OutboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{noopMetahandler{}, transmeta.MetainfoServerHandler}),
+			},
+		},
+	}
+	for _, tcase := range cases {
+		svr := NewServer(tcase.opts...)
 
-	iSvr := svr.(*server)
-	test.Assert(t, len(iSvr.opt.RemoteOpt.Inbounds) == 2)
-	test.Assert(t, len(iSvr.opt.RemoteOpt.Outbounds) == 1)
+		time.AfterFunc(100*time.Millisecond, func() {
+			err := svr.Stop()
+			test.Assert(t, err == nil, err)
+		})
+		err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+		test.Assert(t, err == nil)
+		err = svr.Run()
+		test.Assert(t, err == nil, err)
+
+		iSvr := svr.(*server)
+		test.Assert(t, reflect.DeepEqual(iSvr.opt.RemoteOpt.Inbounds, tcase.wantInbounds))
+		test.Assert(t, reflect.DeepEqual(iSvr.opt.RemoteOpt.Outbounds, tcase.wantOutbounds))
+		svr.Stop()
+	}
 }
 
 func TestInvokeHandlerExec(t *testing.T) {
@@ -409,6 +553,13 @@ func (noopMetahandler) ReadMeta(ctx context.Context, msg remote.Message) (contex
 }
 func (noopMetahandler) OnConnectStream(ctx context.Context) (context.Context, error) { return ctx, nil }
 func (noopMetahandler) OnReadStream(ctx context.Context) (context.Context, error)    { return ctx, nil }
+
+type mockRateLimiter struct{}
+
+func (*mockRateLimiter) Acquire(ctx context.Context, req remote.Message) bool { return true }
+func (*mockRateLimiter) Status(ctx context.Context, req remote.Message) (max, current int, interval time.Duration) {
+	return
+}
 
 type mockSvrTransHandlerFactory struct {
 	hdlr remote.ServerTransHandler

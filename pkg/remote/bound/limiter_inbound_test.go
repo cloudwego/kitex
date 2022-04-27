@@ -39,6 +39,8 @@ func TestNewServerLimiterHandler(t *testing.T) {
 
 	handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
 	test.Assert(t, handler != nil)
+	handler = NewServerLimiterOnReadHandler(concurrencyLimiter, rateLimiter, limitReporter)
+	test.Assert(t, handler != nil)
 }
 
 // TestLimiterOnActive test OnActive function of serverLimiterHandler, to assert the concurrencyLimiter 'Acquire' works.
@@ -50,11 +52,15 @@ func TestLimiterOnActive(t *testing.T) {
 		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
 
-		concurrencyLimiter.On("Acquire").Return(true)
+		concurrencyLimiter.On("Acquire", ctx).Return(true)
 
-		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
+		handler := NewServerLimiterOnReadHandler(concurrencyLimiter, rateLimiter, limitReporter)
 		ctx, err := handler.OnActive(ctx, invoke.NewMessage(nil, nil))
+		test.Assert(t, ctx != nil)
+		test.Assert(t, err == nil)
 
+		muxHandler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
+		ctx, err = muxHandler.OnActive(ctx, invoke.NewMessage(nil, nil))
 		test.Assert(t, ctx != nil)
 		test.Assert(t, err == nil)
 	})
@@ -64,11 +70,15 @@ func TestLimiterOnActive(t *testing.T) {
 		rateLimiter := &limiterMocks.RateLimiter{}
 		ctx := context.Background()
 
-		concurrencyLimiter.On("Acquire").Return(false)
+		concurrencyLimiter.On("Acquire", ctx).Return(false)
 
-		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, nil)
+		handler := NewServerLimiterOnReadHandler(concurrencyLimiter, rateLimiter, nil)
 		ctx, err := handler.OnActive(ctx, invoke.NewMessage(nil, nil))
+		test.Assert(t, ctx != nil)
+		test.Assert(t, errors.Is(kerrors.ErrConnOverLimit, err))
 
+		muxHandler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, nil)
+		ctx, err = muxHandler.OnActive(ctx, invoke.NewMessage(nil, nil))
 		test.Assert(t, ctx != nil)
 		test.Assert(t, errors.Is(kerrors.ErrConnOverLimit, err))
 	})
@@ -79,12 +89,17 @@ func TestLimiterOnActive(t *testing.T) {
 		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
 
-		concurrencyLimiter.On("Acquire").Return(false)
+		concurrencyLimiter.On("Acquire", ctx).Return(false)
 		limitReporter.On("ConnOverloadReport")
 
-		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
+		handler := NewServerLimiterOnReadHandler(concurrencyLimiter, rateLimiter, limitReporter)
 		ctx, err := handler.OnActive(ctx, invoke.NewMessage(nil, nil))
+		test.Assert(t, ctx != nil)
+		test.Assert(t, err != nil)
+		test.Assert(t, errors.Is(kerrors.ErrConnOverLimit, err))
 
+		muxHandler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
+		ctx, err = muxHandler.OnActive(ctx, invoke.NewMessage(nil, nil))
 		test.Assert(t, ctx != nil)
 		test.Assert(t, err != nil)
 		test.Assert(t, errors.Is(kerrors.ErrConnOverLimit, err))
@@ -100,39 +115,39 @@ func TestLimiterOnRead(t *testing.T) {
 		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
 
-		rateLimiter.On("Acquire").Return(true)
+		rateLimiter.On("Acquire", ctx, nil).Return(true)
 
-		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
+		handler := NewServerLimiterOnReadHandler(concurrencyLimiter, rateLimiter, limitReporter)
 		ctx, err := handler.OnRead(ctx, invoke.NewMessage(nil, nil))
 
 		test.Assert(t, ctx != nil)
 		test.Assert(t, err == nil)
 	})
 
-	t.Run("Test OnActive with limit acquire false and nil reporter", func(t *testing.T) {
+	t.Run("Test OnRead with limit acquire false and nil reporter", func(t *testing.T) {
 		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
 		rateLimiter := &limiterMocks.RateLimiter{}
 		ctx := context.Background()
 
-		rateLimiter.On("Acquire").Return(false)
+		rateLimiter.On("Acquire", ctx, nil).Return(false)
 
-		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, nil)
+		handler := NewServerLimiterOnReadHandler(concurrencyLimiter, rateLimiter, nil)
 		ctx, err := handler.OnRead(ctx, invoke.NewMessage(nil, nil))
 
 		test.Assert(t, ctx != nil)
 		test.Assert(t, errors.Is(kerrors.ErrQPSOverLimit, err))
 	})
 
-	t.Run("Test OnActive with limit acquire false and non-nil reporter", func(t *testing.T) {
+	t.Run("Test OnRead with limit acquire false and non-nil reporter", func(t *testing.T) {
 		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
 		rateLimiter := &limiterMocks.RateLimiter{}
 		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
 
-		rateLimiter.On("Acquire").Return(false)
+		rateLimiter.On("Acquire", ctx, nil).Return(false)
 		limitReporter.On("QPSOverloadReport")
 
-		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
+		handler := NewServerLimiterOnReadHandler(concurrencyLimiter, rateLimiter, limitReporter)
 		ctx, err := handler.OnRead(ctx, invoke.NewMessage(nil, nil))
 
 		test.Assert(t, ctx != nil)
@@ -149,28 +164,66 @@ func TestLimiterOnInactive(t *testing.T) {
 		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
 
-		concurrencyLimiter.On("Release")
+		concurrencyLimiter.On("Release", ctx)
 
-		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
+		handler := NewServerLimiterOnReadHandler(concurrencyLimiter, rateLimiter, limitReporter)
 		ctx = handler.OnInactive(ctx, invoke.NewMessage(nil, nil))
+		test.Assert(t, ctx != nil)
 
+		muxHandler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
+		ctx = muxHandler.OnInactive(ctx, invoke.NewMessage(nil, nil))
 		test.Assert(t, ctx != nil)
 	})
 }
 
 // TestLimiterOnMessage test OnMessage function of serverLimiterHandler
 func TestLimiterOnMessage(t *testing.T) {
-	t.Run("Test OnMessage", func(t *testing.T) {
+	t.Run("Test OnMessage with limit acquired", func(t *testing.T) {
 		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
 		rateLimiter := &limiterMocks.RateLimiter{}
 		limitReporter := &limiterMocks.LimitReporter{}
 		ctx := context.Background()
+		req := remote.NewMessage(nil, nil, nil, remote.Call, remote.Client)
+
+		rateLimiter.On("Acquire", ctx, req).Return(true)
 
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
-		ctx, err := handler.OnMessage(ctx, remote.NewMessage(nil, nil, nil, remote.Call, remote.Client),
-			remote.NewMessage(nil, nil, nil, remote.Reply, remote.Client))
+		ctx, err := handler.OnMessage(ctx, req, remote.NewMessage(nil, nil, nil, remote.Reply, remote.Client))
 
 		test.Assert(t, ctx != nil)
 		test.Assert(t, err == nil)
+	})
+
+	t.Run("Test OnMessage with limit acquire false and nil reporter", func(t *testing.T) {
+		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
+		rateLimiter := &limiterMocks.RateLimiter{}
+		ctx := context.Background()
+		req := remote.NewMessage(nil, nil, nil, remote.Call, remote.Client)
+
+		rateLimiter.On("Acquire", ctx, req).Return(false)
+
+		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, nil)
+		ctx, err := handler.OnMessage(ctx, req, remote.NewMessage(nil, nil, nil, remote.Reply, remote.Client))
+
+		test.Assert(t, ctx != nil)
+		test.Assert(t, errors.Is(kerrors.ErrQPSOverLimit, err))
+	})
+
+	t.Run("Test OnMessage with limit acquire false and non-nil reporter", func(t *testing.T) {
+		concurrencyLimiter := &limiterMocks.ConcurrencyLimiter{}
+		rateLimiter := &limiterMocks.RateLimiter{}
+		limitReporter := &limiterMocks.LimitReporter{}
+		ctx := context.Background()
+		req := remote.NewMessage(nil, nil, nil, remote.Call, remote.Client)
+
+		rateLimiter.On("Acquire", ctx, req).Return(false)
+		limitReporter.On("QPSOverloadReport")
+
+		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter)
+		ctx, err := handler.OnMessage(ctx, req, remote.NewMessage(nil, nil, nil, remote.Reply, remote.Client))
+
+		test.Assert(t, ctx != nil)
+		test.Assert(t, err != nil)
+		test.Assert(t, errors.Is(kerrors.ErrQPSOverLimit, err))
 	})
 }

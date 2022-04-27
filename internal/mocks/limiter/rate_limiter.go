@@ -19,8 +19,10 @@
 package limiter
 
 import (
+	context "context"
 	time "time"
 
+	remote "github.com/cloudwego/kitex/pkg/remote"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -29,13 +31,13 @@ type RateLimiter struct {
 	mock.Mock
 }
 
-// Acquire provides a mock function with given fields:
-func (_m *RateLimiter) Acquire() bool {
-	ret := _m.Called()
+// Acquire provides a mock function with given fields: ctx, req
+func (_m *RateLimiter) Acquire(ctx context.Context, req remote.Message) bool {
+	ret := _m.Called(ctx, req)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func() bool); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context, remote.Message) bool); ok {
+		r0 = rf(ctx, req)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
@@ -43,27 +45,27 @@ func (_m *RateLimiter) Acquire() bool {
 	return r0
 }
 
-// Status provides a mock function with given fields:
-func (_m *RateLimiter) Status() (int, int, time.Duration) {
-	ret := _m.Called()
+// Status provides a mock function with given fields: ctx, req
+func (_m *RateLimiter) Status(ctx context.Context, req remote.Message) (int, int, time.Duration) {
+	ret := _m.Called(ctx, req)
 
 	var r0 int
-	if rf, ok := ret.Get(0).(func() int); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(context.Context, remote.Message) int); ok {
+		r0 = rf(ctx, req)
 	} else {
 		r0 = ret.Get(0).(int)
 	}
 
 	var r1 int
-	if rf, ok := ret.Get(1).(func() int); ok {
-		r1 = rf()
+	if rf, ok := ret.Get(1).(func(context.Context, remote.Message) int); ok {
+		r1 = rf(ctx, req)
 	} else {
 		r1 = ret.Get(1).(int)
 	}
 
 	var r2 time.Duration
-	if rf, ok := ret.Get(2).(func() time.Duration); ok {
-		r2 = rf()
+	if rf, ok := ret.Get(2).(func(context.Context, remote.Message) time.Duration); ok {
+		r2 = rf(ctx, req)
 	} else {
 		r2 = ret.Get(2).(time.Duration)
 	}

@@ -17,31 +17,33 @@
 package limiter
 
 import (
+	"context"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/limit"
+	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 // ConcurrencyLimiter limits the number of concurrent access towards the protected resource.
 // The implementation of ConcurrencyLimiter should be concurrent safe.
 type ConcurrencyLimiter interface {
 	// Acquire reports if next access to the protected resource is allowed.
-	Acquire() bool
+	Acquire(ctx context.Context) bool
 
 	// Release claims a previous taken access has released the resource.
-	Release()
+	Release(ctx context.Context)
 
 	// Status returns the total quota and occupied.
-	Status() (limit, occupied int)
+	Status(ctx context.Context) (limit, occupied int)
 }
 
 // RateLimiter limits the access rate towards the protected resource.
 type RateLimiter interface {
 	// Acquire reports if next access to the protected resource is allowed.
-	Acquire() bool
+	Acquire(ctx context.Context, req remote.Message) bool
 
 	// Status returns the rate limit.
-	Status() (max, current int, interval time.Duration)
+	Status(ctx context.Context, req remote.Message) (max, current int, interval time.Duration)
 }
 
 // Updatable is a kind of limiters that support changing the limit dynamically.

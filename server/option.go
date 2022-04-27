@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limit"
+	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
@@ -69,6 +70,8 @@ func WithMuxTransport() Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push("WithMuxTransport()")
 		o.RemoteOpt.SvrHandlerFactory = netpollmux.NewSvrTransHandlerFactory()
+		// set limit options
+		o.Limit.LimitOnMessage = true
 	}}
 }
 
@@ -136,7 +139,27 @@ func WithLimit(lim *limit.Option) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithLimit(%+v)", lim))
 
-		o.Limits = lim
+		o.Limit.Limits = lim
+	}}
+}
+
+// WithConcurrencyLimiter sets the limiter of concurrent connections.
+// If both WithLimit and WithConcurrencyLimiter are called, only the latter will take effect.
+func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithConcurrencyLimiter(%T{%+v})", conLimit, conLimit))
+
+		o.Limit.ConLimit = conLimit
+	}}
+}
+
+// WithQPSLimiter sets the limiter of max QPS.
+// If both WithLimit and WithQPSLimiter are called, only the latter will take effect.
+func WithQPSLimiter(qpsLimit limiter.RateLimiter) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithQPSLimiter(%T{%+v})", qpsLimit, qpsLimit))
+
+		o.Limit.QPSLimit = qpsLimit
 	}}
 }
 
