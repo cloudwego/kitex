@@ -42,7 +42,7 @@ const defaultTestTimeout = 10 * time.Second
 func TestMaxConnectionIdle(t *testing.T) {
 	serverConfig := &ServerConfig{
 		KeepaliveParams: ServerKeepalive{
-			MaxConnectionIdle: 2 * time.Second,
+			MaxConnectionIdle: 500 * time.Millisecond,
 		},
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, ConnectOptions{})
@@ -61,7 +61,7 @@ func TestMaxConnectionIdle(t *testing.T) {
 
 	// Wait for the server's MaxConnectionIdle timeout to kick in, and for it
 	// to send a GoAway.
-	timeout := time.NewTimer(time.Second * 4)
+	timeout := time.NewTimer(time.Second * 1)
 	select {
 	case <-client.Error():
 		if !timeout.Stop() {
@@ -80,7 +80,7 @@ func TestMaxConnectionIdle(t *testing.T) {
 func TestMaxConnectionIdleBusyClient(t *testing.T) {
 	serverConfig := &ServerConfig{
 		KeepaliveParams: ServerKeepalive{
-			MaxConnectionIdle: 2 * time.Second,
+			MaxConnectionIdle: 500 * time.Millisecond,
 		},
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, ConnectOptions{})
@@ -98,7 +98,7 @@ func TestMaxConnectionIdleBusyClient(t *testing.T) {
 
 	// Wait for double the MaxConnectionIdle time to make sure the server does
 	// not send a GoAway, as the client has an open stream.
-	timeout := time.NewTimer(time.Second * 4)
+	timeout := time.NewTimer(time.Second * 1)
 	select {
 	case <-client.GoAway():
 		if !timeout.Stop() {
@@ -156,8 +156,8 @@ func TestMaxConnectionIdleBusyClient(t *testing.T) {
 func TestKeepaliveServerClosesUnresponsiveClient(t *testing.T) {
 	serverConfig := &ServerConfig{
 		KeepaliveParams: ServerKeepalive{
-			Time:    1 * time.Second,
-			Timeout: 1 * time.Second,
+			Time:    250 * time.Millisecond,
+			Timeout: 250 * time.Millisecond,
 		},
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, ConnectOptions{})
@@ -197,7 +197,7 @@ func TestKeepaliveServerClosesUnresponsiveClient(t *testing.T) {
 
 	// Server waits for KeepaliveParams.Time seconds before sending out a ping,
 	// and then waits for KeepaliveParams.Timeout for a ping ack.
-	timeout := time.NewTimer(4 * time.Second)
+	timeout := time.NewTimer(1 * time.Second)
 	select {
 	case err := <-errCh:
 		if err != io.EOF {
@@ -213,15 +213,15 @@ func TestKeepaliveServerClosesUnresponsiveClient(t *testing.T) {
 func TestKeepaliveServerWithResponsiveClient(t *testing.T) {
 	serverConfig := &ServerConfig{
 		KeepaliveParams: ServerKeepalive{
-			Time:    1 * time.Second,
-			Timeout: 1 * time.Second,
+			Time:    500 * time.Millisecond,
+			Timeout: 500 * time.Millisecond,
 		},
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, ConnectOptions{
-		// FIXME
+		// FIXME the original ut don't contain KeepaliveParams
 		KeepaliveParams: ClientKeepalive{
-			Time:                1 * time.Second,
-			Timeout:             1 * time.Second,
+			Time:                500 * time.Millisecond,
+			Timeout:             500 * time.Millisecond,
 			PermitWithoutStream: true,
 		},
 	})
@@ -231,7 +231,7 @@ func TestKeepaliveServerWithResponsiveClient(t *testing.T) {
 	}()
 
 	// Give keepalive logic some time by sleeping.
-	time.Sleep(4 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer cancel()
@@ -249,8 +249,8 @@ func TestKeepaliveServerWithResponsiveClient(t *testing.T) {
 func TestKeepaliveClientClosesUnresponsiveServer(t *testing.T) {
 	connCh := make(chan net.Conn, 1)
 	client := setUpWithNoPingServer(t, ConnectOptions{KeepaliveParams: ClientKeepalive{
-		Time:                1 * time.Second,
-		Timeout:             1 * time.Second,
+		Time:                250 * time.Millisecond,
+		Timeout:             250 * time.Millisecond,
 		PermitWithoutStream: true,
 	}}, connCh)
 	if client == nil {
@@ -265,7 +265,7 @@ func TestKeepaliveClientClosesUnresponsiveServer(t *testing.T) {
 	defer conn.Close()
 
 	// Sleep for keepalive to close the connection.
-	time.Sleep(4 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer cancel()
@@ -283,8 +283,8 @@ func TestKeepaliveClientClosesUnresponsiveServer(t *testing.T) {
 func TestKeepaliveClientOpenWithUnresponsiveServer(t *testing.T) {
 	connCh := make(chan net.Conn, 1)
 	client := setUpWithNoPingServer(t, ConnectOptions{KeepaliveParams: ClientKeepalive{
-		Time:    1 * time.Second,
-		Timeout: 1 * time.Second,
+		Time:    250 * time.Millisecond,
+		Timeout: 250 * time.Millisecond,
 	}}, connCh)
 	if client == nil {
 		t.Fatalf("setUpWithNoPingServer failed, return nil client")
@@ -298,7 +298,7 @@ func TestKeepaliveClientOpenWithUnresponsiveServer(t *testing.T) {
 	defer conn.Close()
 
 	// Give keepalive some time.
-	time.Sleep(4 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer cancel()
@@ -314,8 +314,8 @@ func TestKeepaliveClientOpenWithUnresponsiveServer(t *testing.T) {
 func TestKeepaliveClientClosesWithActiveStreams(t *testing.T) {
 	connCh := make(chan net.Conn, 1)
 	client := setUpWithNoPingServer(t, ConnectOptions{KeepaliveParams: ClientKeepalive{
-		Time:    1 * time.Second,
-		Timeout: 1 * time.Second,
+		Time:    250 * time.Millisecond,
+		Timeout: 250 * time.Millisecond,
 	}}, connCh)
 	if client == nil {
 		t.Fatalf("setUpWithNoPingServer failed, return nil client")
@@ -336,7 +336,7 @@ func TestKeepaliveClientClosesWithActiveStreams(t *testing.T) {
 	}
 
 	// Give keepalive some time.
-	time.Sleep(4 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	// Make sure the client transport is not healthy.
 	if _, err := client.NewStream(ctx, &CallHdr{}); err == nil {
@@ -350,8 +350,8 @@ func TestKeepaliveClientClosesWithActiveStreams(t *testing.T) {
 func TestKeepaliveClientStaysHealthyWithResponsiveServer(t *testing.T) {
 	server, client := setUpWithOptions(t, 0, &ServerConfig{}, normal, ConnectOptions{
 		KeepaliveParams: ClientKeepalive{
-			Time:                1 * time.Second,
-			Timeout:             1 * time.Second,
+			Time:                500 * time.Millisecond,
+			Timeout:             500 * time.Millisecond,
 			PermitWithoutStream: true,
 		},
 	})
@@ -361,7 +361,7 @@ func TestKeepaliveClientStaysHealthyWithResponsiveServer(t *testing.T) {
 	}()
 
 	// Give keepalive some time.
-	time.Sleep(4 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer cancel()
@@ -381,14 +381,14 @@ func TestKeepaliveClientStaysHealthyWithResponsiveServer(t *testing.T) {
 func TestKeepaliveClientFrequency(t *testing.T) {
 	serverConfig := &ServerConfig{
 		KeepaliveEnforcementPolicy: EnforcementPolicy{
-			MinTime:             1200 * time.Millisecond, // 1.2 seconds
+			MinTime:             200 * time.Millisecond, // 1.2 seconds
 			PermitWithoutStream: true,
 		},
 	}
 	clientOptions := ConnectOptions{
 		KeepaliveParams: ClientKeepalive{
-			Time:                1 * time.Second,
-			Timeout:             2 * time.Second,
+			Time:                150 * time.Millisecond,
+			Timeout:             300 * time.Millisecond,
 			PermitWithoutStream: true,
 		},
 	}
@@ -398,7 +398,7 @@ func TestKeepaliveClientFrequency(t *testing.T) {
 		server.stop()
 	}()
 
-	timeout := time.NewTimer(6 * time.Second)
+	timeout := time.NewTimer(1 * time.Second)
 	select {
 	case <-client.Error():
 		if !timeout.Stop() {
@@ -517,14 +517,14 @@ func TestKeepaliveServerEnforcementWithAbusiveClientWithRPC(t *testing.T) {
 func TestKeepaliveServerEnforcementWithObeyingClientNoRPC(t *testing.T) {
 	serverConfig := &ServerConfig{
 		KeepaliveEnforcementPolicy: EnforcementPolicy{
-			MinTime:             100 * time.Millisecond,
+			MinTime:             50 * time.Millisecond,
 			PermitWithoutStream: true,
 		},
 	}
 	clientOptions := ConnectOptions{
 		KeepaliveParams: ClientKeepalive{
-			Time:                101 * time.Millisecond,
-			Timeout:             1 * time.Second,
+			Time:                51 * time.Millisecond,
+			Timeout:             500 * time.Millisecond,
 			PermitWithoutStream: true,
 		},
 	}
@@ -535,7 +535,7 @@ func TestKeepaliveServerEnforcementWithObeyingClientNoRPC(t *testing.T) {
 	}()
 
 	// Give keepalive enough time.
-	time.Sleep(3 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer cancel()
@@ -552,13 +552,13 @@ func TestKeepaliveServerEnforcementWithObeyingClientNoRPC(t *testing.T) {
 func TestKeepaliveServerEnforcementWithObeyingClientWithRPC(t *testing.T) {
 	serverConfig := &ServerConfig{
 		KeepaliveEnforcementPolicy: EnforcementPolicy{
-			MinTime: 100 * time.Millisecond,
+			MinTime: 50 * time.Millisecond,
 		},
 	}
 	clientOptions := ConnectOptions{
 		KeepaliveParams: ClientKeepalive{
-			Time:    101 * time.Millisecond,
-			Timeout: 1 * time.Second,
+			Time:    51 * time.Millisecond,
+			Timeout: 500 * time.Millisecond,
 		},
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, clientOptions)
@@ -574,7 +574,7 @@ func TestKeepaliveServerEnforcementWithObeyingClientWithRPC(t *testing.T) {
 	}
 
 	// Give keepalive enough time.
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	// Make sure the client transport is healthy.
 	if _, err := client.NewStream(ctx, &CallHdr{}); err != nil {
@@ -591,13 +591,13 @@ func TestKeepaliveServerEnforcementWithObeyingClientWithRPC(t *testing.T) {
 func TestKeepaliveServerEnforcementWithDormantKeepaliveOnClient(t *testing.T) {
 	serverConfig := &ServerConfig{
 		KeepaliveEnforcementPolicy: EnforcementPolicy{
-			MinTime: 2 * time.Second,
+			MinTime: 400 * time.Millisecond,
 		},
 	}
 	clientOptions := ConnectOptions{
 		KeepaliveParams: ClientKeepalive{
-			Time:    50 * time.Millisecond,
-			Timeout: 1 * time.Second,
+			Time:    25 * time.Millisecond,
+			Timeout: 250 * time.Millisecond,
 		},
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, normal, clientOptions)
@@ -607,7 +607,7 @@ func TestKeepaliveServerEnforcementWithDormantKeepaliveOnClient(t *testing.T) {
 	}()
 
 	// No active streams on the client. Give keepalive enough time.
-	time.Sleep(5 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer cancel()

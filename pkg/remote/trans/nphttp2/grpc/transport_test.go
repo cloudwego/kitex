@@ -437,7 +437,7 @@ func (s *server) addr() string {
 func setUpServerOnly(t *testing.T, port int, serverConfig *ServerConfig, ht hType) *server {
 	server := &server{startedErr: make(chan error, 1), ready: make(chan struct{})}
 	go server.start(t, port, serverConfig, ht)
-	server.wait(t, 2*time.Second)
+	server.wait(t, time.Second)
 	return server
 }
 
@@ -540,7 +540,7 @@ func TestInflightStreamClosing(t *testing.T) {
 	client.CloseStream(stream, serr)
 
 	// wait for stream.Read error
-	timeout := time.NewTimer(5 * time.Second)
+	timeout := time.NewTimer(3 * time.Second)
 	select {
 	case <-donec:
 		if !timeout.Stop() {
@@ -611,7 +611,7 @@ func performOneRPC(ct ClientTransport) {
 	}
 	opts := Options{Last: true}
 	if err := ct.Write(s, []byte{}, expectedRequest, &opts); err == nil || err == io.EOF {
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(2 * time.Millisecond)
 		// The following s.Recv()'s could error out because the
 		// underlying transport is gone.
 		//
@@ -626,7 +626,7 @@ func performOneRPC(ct ClientTransport) {
 func TestClientMix(t *testing.T) {
 	s, ct := setUp(t, 0, math.MaxUint32, normal)
 	go func(s *server) {
-		time.Sleep(5 * time.Second)
+		time.Sleep(300 * time.Millisecond)
 		s.stop()
 	}(s)
 	go func(ct ClientTransport) {
@@ -634,7 +634,7 @@ func TestClientMix(t *testing.T) {
 		ct.Close()
 	}(ct)
 	for i := 0; i < 1000; i++ {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(1 * time.Millisecond)
 		go performOneRPC(ct)
 	}
 }
@@ -995,7 +995,7 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 		if ss.Context().Err() != context.Canceled {
 			t.Fatalf("ss.Context().Err() got %v, want %v", ss.Context().Err(), context.Canceled)
 		}
-	case <-time.After(5 * time.Second):
+	case <-time.After(3 * time.Second):
 		t.Fatalf("Failed to cancel the context of the sever side stream.")
 	}
 	server.stop()
@@ -1884,7 +1884,7 @@ func runPingPongTest(t *testing.T, msgSize int) {
 	incomingHeader := make([]byte, 5)
 	done := make(chan struct{})
 	go func() {
-		timer := time.NewTimer(time.Second * 5)
+		timer := time.NewTimer(time.Second * 1)
 		<-timer.C
 		close(done)
 	}()
