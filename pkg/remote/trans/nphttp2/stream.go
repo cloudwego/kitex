@@ -39,7 +39,8 @@ type stream struct {
 
 // NewStream ...
 func NewStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn net.Conn,
-	handler remote.TransReadWriter) streaming.Stream {
+	handler remote.TransReadWriter,
+) streaming.Stream {
 	return &stream{
 		ctx:     ctx,
 		svcInfo: svcInfo,

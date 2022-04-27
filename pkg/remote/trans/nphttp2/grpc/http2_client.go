@@ -106,7 +106,8 @@ type http2Client struct {
 // and starts to receive messages on it. Non-nil error returns if construction
 // fails.
 func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
-	remoteService string, onGoAway func(GoAwayReason), onClose func()) (_ *http2Client, err error) {
+	remoteService string, onGoAway func(GoAwayReason), onClose func(),
+) (_ *http2Client, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
@@ -239,7 +240,7 @@ func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 		method:         callHdr.Method,
 		sendCompress:   callHdr.SendCompress,
 		buf:            newRecvBuffer(),
-		headerChan:     make(chan struct{}),
+		HeaderChan:     make(chan struct{}),
 		contentSubtype: callHdr.ContentSubtype,
 	}
 	s.wq = newWriteQuota(defaultWriteQuota, s.done)
@@ -327,11 +328,11 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 		}
 		// The stream was unprocessed by the server.
 		atomic.StoreUint32(&s.unprocessed, 1)
-		s.write(recvMsg{err: err})
+		s.Write(RecvMsg{err: err})
 		close(s.done)
 		// If headerChan isn't closed, then close it.
 		if atomic.CompareAndSwapUint32(&s.headerChanClosed, 0, 1) {
-			close(s.headerChan)
+			close(s.HeaderChan)
 		}
 	}
 	hdr := &headerFrame{
@@ -466,12 +467,12 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 	}
 	if err != nil {
 		// This will unblock reads eventually.
-		s.write(recvMsg{err: err})
+		s.Write(RecvMsg{err: err})
 	}
 	// If headerChan isn't closed, then close it.
 	if atomic.CompareAndSwapUint32(&s.headerChanClosed, 0, 1) {
 		s.noHeaders = true
-		close(s.headerChan)
+		close(s.HeaderChan)
 	}
 	cleanup := &cleanupStream{
 		streamID: s.id,
@@ -690,7 +691,7 @@ func (t *http2Client) handleData(f *http2.DataFrame) {
 			buffer := t.bufferPool.get()
 			buffer.Reset()
 			buffer.Write(f.Data())
-			s.write(recvMsg{buffer: buffer})
+			s.Write(RecvMsg{Buffer: buffer})
 		}
 	}
 	// The server has closed the stream without sending trailers.  Record that
@@ -919,7 +920,7 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 			// HEADERS frame block carries a Trailers-Only.
 			s.noHeaders = true
 		}
-		close(s.headerChan)
+		close(s.HeaderChan)
 	}
 
 	if !endStream {
@@ -974,7 +975,11 @@ func (t *http2Client) reader() {
 				if s != nil {
 					// use error detail to provide better err message
 					code := http2ErrConvTab[se.Code]
-					msg := t.framer.ErrorDetail().Error()
+					err := t.framer.ErrorDetail()
+					msg := "stream error"
+					if err != nil {
+						msg = err.Error()
+					}
 					t.closeStream(s, status.New(code, msg).Err(), true, http2.ErrCodeProtocol, status.New(code, msg), nil, false)
 				}
 				continue

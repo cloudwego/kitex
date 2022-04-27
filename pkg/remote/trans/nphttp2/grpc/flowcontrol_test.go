@@ -1,14 +1,30 @@
+/*
+ * Copyright 2022 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package grpc
 
 import (
-	"github.com/cloudwego/kitex/internal/test"
 	"math"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestWriteQuota(t *testing.T) {
-
 	// init
 	quotaLimit := int32(100)
 	done := make(chan struct{})
@@ -44,11 +60,9 @@ func TestWriteQuota(t *testing.T) {
 	}()
 	err = wq.get(20)
 	test.Assert(t, err == errStreamDone)
-
 }
 
 func TestTrInFlow(t *testing.T) {
-
 	// init
 	oldLimit := uint32(100)
 	trInFlow := &trInFlow{limit: oldLimit}
@@ -71,11 +85,9 @@ func TestTrInFlow(t *testing.T) {
 	test.Assert(t, increase == 0)
 	increase = trInFlow.reset()
 	test.Assert(t, increase == limit/5)
-
 }
 
 func TestInFlow(t *testing.T) {
-
 	// init
 	oldLimit := uint32(100)
 	inFlow := &inFlow{limit: oldLimit}
@@ -111,5 +123,4 @@ func TestInFlow(t *testing.T) {
 
 	// test maybeAdjust() maxSize adjust
 	inFlow.maybeAdjust(math.MaxInt32 + 1)
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,254 +17,391 @@
 package nphttp2
 
 import (
+	"bytes"
 	"context"
-	"fmt"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/runtime/protoimpl"
+	"errors"
+	"net"
 	"reflect"
 	"sync"
 	"time"
 
+	"github.com/cloudwego/kitex/internal/stats"
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/netpoll"
-
-	"github.com/cloudwego/kitex/internal/mocks"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/runtime/protoimpl"
 )
 
-var _ netpoll.Connection = &MockNetpollConn{}
-var _ grpcConn = &MockNetpollConn{}
+var (
+	frameHeaderLen = 9
+	prefaceLen     = 24
+	prefaceByte    = []byte("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")
+)
 
-// MockNetpollConn implements netpoll.Connection.
-type MockNetpollConn struct {
-	mocks.Conn
-	AddCloseCallbackFunc func(c netpoll.CloseCallback) (e error)
-	IsActiveFunc         func() (r bool)
-	ReaderFunc           func() (r netpoll.Reader)
-	WriterFunc           func() (r netpoll.Writer)
-	SetIdleTimeoutFunc   func(timeout time.Duration) (e error)
-	SetOnRequestFunc     func(on netpoll.OnRequest) (e error)
-	SetReadTimeoutFunc   func(timeout time.Duration) (e error)
-}
-
-func (m *MockNetpollConn) WriteFrame(hdr, data []byte) (n int, err error) {
-	return
-}
-
-// AddCloseCallback implements the netpoll.Connection interface.
-func (m *MockNetpollConn) AddCloseCallback(c netpoll.CloseCallback) (e error) {
-	if m.AddCloseCallbackFunc != nil {
-		return m.AddCloseCallbackFunc(c)
+func newMockNpConn(address string) *mockNetpollConn {
+	mc := &mockNetpollConn{
+		mockConn: mockConn{
+			RemoteAddrFunc: func() net.Addr { return utils.NewNetAddr("tcp", address) },
+			WriteFunc: func(b []byte) (n int, err error) {
+				// mock write preface
+				return len(b), nil
+			},
+		},
+		mockQueue: []mockFrame{},
 	}
-	return
+	mc.mockConn.ReadFunc = mc.mockReader
+	return mc
 }
 
-// IsActive implements the netpoll.Connection interface.
-func (m *MockNetpollConn) IsActive() (r bool) {
-	if m.IsActiveFunc != nil {
-		return m.IsActiveFunc()
+func (mc *mockNetpollConn) mockReader(b []byte) (n int, err error) {
+	bLen := len(b)
+	if bLen == frameHeaderLen {
+		b = b[0:0]
+		if mc.queueCounter >= len(mc.mockQueue) {
+			return
+		}
+		fr := mc.mockQueue[mc.queueCounter]
+		frame := fr.header
+		b = append(b, frame...)
+		return len(b), nil
 	}
-	return
-}
-
-// Reader implements the netpoll.Connection interface.
-func (m *MockNetpollConn) Reader() (r netpoll.Reader) {
-	if m.ReaderFunc != nil {
-		return m.ReaderFunc()
+	if bLen == prefaceLen {
+		b = b[0:0]
+		b = append(b, prefaceByte...)
+		return len(b), nil
 	}
-	return
-}
 
-// Writer implements the netpoll.Connection interface.
-func (m *MockNetpollConn) Writer() (r netpoll.Writer) {
-	if m.WriterFunc != nil {
-		return m.WriterFunc()
+	if mc.queueCounter < len(mc.mockQueue) {
+		fr := mc.mockQueue[mc.queueCounter]
+		mc.queueCounter++
+		body := fr.body
+		if body != nil && len(body) > 0 {
+			b = b[0:0]
+			b = append(b, body...)
+		}
 	}
-	return
-}
 
-// SetIdleTimeout implements the netpoll.Connection interface.
-func (m *MockNetpollConn) SetIdleTimeout(timeout time.Duration) (e error) {
-	if m.SetIdleTimeoutFunc != nil {
-		return m.SetIdleTimeoutFunc(timeout)
-	}
-	return
-}
-
-// SetOnRequest implements the netpoll.Connection interface.
-func (m *MockNetpollConn) SetOnRequest(on netpoll.OnRequest) (e error) {
-	if m.SetOnRequestFunc != nil {
-		return m.SetOnRequestFunc(on)
-	}
-	return
-}
-
-// SetReadTimeout implements the netpoll.Connection interface.
-func (m *MockNetpollConn) SetReadTimeout(timeout time.Duration) (e error) {
-	if m.SetReadTimeoutFunc != nil {
-		return m.SetReadTimeoutFunc(timeout)
-	}
-	return
-}
-
-// MockNetpollWriter implements netpoll.Writer
-type MockNetpollWriter struct {
-	FlushFunc       func() (err error)
-	WriteDirectFunc func(p []byte, remainCap int) error
-}
-
-var _ netpoll.Writer = &MockNetpollWriter{}
-
-// Flush implements the netpoll.Writer interface.
-func (m *MockNetpollWriter) Flush() (err error) {
-	if m.FlushFunc != nil {
-		return m.FlushFunc()
-	}
-	return
-}
-
-// Malloc implements the netpoll.Writer interface.
-func (m *MockNetpollWriter) Malloc(n int) (buf []byte, err error) {
-	return
-}
-
-// MallocLen implements the netpoll.Writer interface.
-func (m *MockNetpollWriter) MallocLen() (length int) {
-	return
-}
-
-// MallocAck implements the netpoll.Writer interface.
-func (m *MockNetpollWriter) MallocAck(n int) (err error) {
-	return
-}
-
-// Append implements the netpoll.Writer interface.
-func (m *MockNetpollWriter) Append(w netpoll.Writer) (err error) {
-	return
-}
-
-// Write implements the netpoll.Writer interface.
-func (m *MockNetpollWriter) Write(b []byte) (n int, err error) {
 	return len(b), nil
 }
 
-// WriteString implements the netpoll.Writer interface.
-func (m *MockNetpollWriter) WriteString(s string) (n int, err error) {
+type mockFrame struct {
+	header []byte
+	body   []byte
+}
+
+var (
+	headerPayload          = []byte{131, 134, 69, 147, 99, 21, 149, 146, 249, 105, 58, 248, 172, 41, 82, 91, 24, 220, 63, 88, 203, 69, 7, 65, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 95, 139, 29, 117, 208, 98, 13, 38, 61, 76, 77, 101, 100, 122, 137, 234, 100, 151, 203, 29, 192, 184, 151, 7, 64, 2, 116, 101, 134, 77, 131, 53, 5, 177, 31, 64, 137, 154, 202, 200, 178, 77, 73, 79, 106, 127, 134, 125, 247, 217, 124, 86, 255, 64, 138, 65, 237, 176, 133, 89, 5, 179, 185, 136, 95, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 64, 137, 65, 237, 176, 133, 90, 146, 166, 115, 201, 0, 64, 136, 242, 178, 82, 181, 7, 152, 210, 127, 164, 0, 130, 227, 96, 109, 150, 93, 105, 151, 157, 124, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 37, 150, 89, 64, 48, 54, 228, 146, 190, 16, 134, 50, 203, 64, 135, 65, 237, 176, 133, 88, 181, 119, 131, 174, 195, 201, 64, 143, 143, 210, 75, 73, 81, 58, 210, 154, 132, 150, 197, 147, 234, 178, 255, 131, 154, 202, 201, 64, 141, 144, 168, 73, 170, 26, 76, 122, 150, 65, 108, 238, 98, 23, 139, 234, 100, 151, 202, 243, 89, 89, 23, 144, 180, 159, 64, 141, 144, 168, 73, 170, 26, 76, 122, 150, 164, 169, 156, 242, 127, 134, 220, 63, 88, 203, 69, 7, 64, 138, 144, 168, 73, 170, 26, 76, 122, 150, 52, 132, 1, 45, 64, 138, 65, 237, 176, 133, 88, 148, 90, 132, 150, 207, 133, 144, 178, 142, 218, 19, 64, 135, 65, 237, 176, 133, 88, 210, 19, 1, 45}
+	windowUpdatePayload    = []byte{0, 0, 0, 1}
+	windowUpdateErrPayload = []byte{0, 0, 0, 0}
+	mockHeaderFrame        = []byte{0, 1, 42, 1, 4, 0, 0, 0, 1}
+	mockSettingFrame       = []byte{0, 0, 6, 4, 0, 0, 0, 0, 0}
+	mockDataFrame          = []byte{0, 20, 0, 0, 1, 0, 0, 0, 1}
+	mockPingFrame          = []byte{0, 0, 8, 6, 0, 0, 0, 0, 0}
+	mockWindowUpdateFrame  = []byte{0, 0, 4, 8, 0, 0, 0, 0, 1}
+	mockWindowUpdateFrame2 = []byte{0, 0, 4, 8, 0, 0, 0, 0, 2}
+	mockRSTFrame           = []byte{0, 0, 4, 3, 0, 0, 0, 0, 1}
+	mockGoAwayFrame        = []byte{0, 0, 8, 7, 0, 0, 0, 0, 1}
+	mockErrFrame           = []byte{0, 0, 4, 9, 0, 0, 0, 0, 5}
+)
+
+func (mc *mockNetpollConn) mockErrFrame() {
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockErrFrame, nil})
+}
+
+func (mc *mockNetpollConn) mockSettingFrame() {
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockSettingFrame, nil})
+}
+
+func (mc *mockNetpollConn) mockPingFrame() {
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockPingFrame, nil})
+}
+
+func (mc *mockNetpollConn) mockMetaHeaderFrame() {
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockHeaderFrame, headerPayload})
+}
+
+func (mc *mockNetpollConn) mockWindowUpdateFrame() {
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockWindowUpdateFrame, windowUpdatePayload})
+}
+
+// mock incr size stream err (server)
+func (mc *mockNetpollConn) mockStreamErrFrame1() {
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockWindowUpdateFrame, windowUpdateErrPayload})
+}
+
+// mock stream not active err (server)
+func (mc *mockNetpollConn) mockStreamErrFrame2() {
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockWindowUpdateFrame2, nil})
+}
+
+func (mc *mockNetpollConn) mockRSTFrame() {
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockRSTFrame, nil})
+}
+
+func (mc *mockNetpollConn) mockGoAwayFrame() {
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockGoAwayFrame, nil})
+}
+
+func (mc *mockNetpollConn) mockDataFrame() {
+	mc.mockQueue = append(mc.mockQueue, mockFrame{mockDataFrame, nil})
+}
+
+var _ netpoll.Connection = &mockNetpollConn{}
+
+// mockNetpollConn implements netpoll.Connection.
+type mockNetpollConn struct {
+	mockConn
+	ReaderFunc   func() (r netpoll.Reader)
+	WriterFunc   func() (r netpoll.Writer)
+	mockQueue    []mockFrame
+	queueCounter int
+}
+
+func (m *mockNetpollConn) Reader() netpoll.Reader {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m *mockNetpollConn) Writer() netpoll.Writer {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (m *mockNetpollConn) IsActive() bool {
+	panic("implement me")
+}
+
+func (m *mockNetpollConn) SetReadTimeout(timeout time.Duration) error {
+	return nil
+}
+
+func (m *mockNetpollConn) SetIdleTimeout(timeout time.Duration) error {
+	return nil
+}
+
+func (m *mockNetpollConn) SetOnRequest(on netpoll.OnRequest) error {
+	return nil
+}
+
+func (m *mockNetpollConn) AddCloseCallback(callback netpoll.CloseCallback) error {
+	return nil
+}
+
+func (m *mockNetpollConn) WriteFrame(hdr, data []byte) (n int, err error) {
 	return
 }
 
-// WriteBinary implements the netpoll.Writer interface.
-func (m *MockNetpollWriter) WriteBinary(b []byte) (n int, err error) {
-	return
+var _ net.Conn = &mockConn{}
+
+// mockConn implements the net.Conn interface.
+type mockConn struct {
+	ReadFunc             func(b []byte) (n int, err error)
+	WriteFunc            func(b []byte) (n int, err error)
+	CloseFunc            func() (e error)
+	LocalAddrFunc        func() (r net.Addr)
+	RemoteAddrFunc       func() (r net.Addr)
+	SetDeadlineFunc      func(t time.Time) (e error)
+	SetReadDeadlineFunc  func(t time.Time) (e error)
+	SetWriteDeadlineFunc func(t time.Time) (e error)
 }
 
-// WriteDirect implements the netpoll.Writer interface.
-func (m *MockNetpollWriter) WriteDirect(p []byte, remainCap int) (err error) {
-	if m.WriteDirectFunc != nil {
-		return m.WriteDirectFunc(p, remainCap)
+// Read implements the net.Conn interface.
+func (m mockConn) Read(b []byte) (n int, err error) {
+	if m.ReadFunc != nil {
+		return m.ReadFunc(b)
 	}
 	return
 }
 
-// WriteByte implements the netpoll.Writer interface.
-func (m *MockNetpollWriter) WriteByte(b byte) (err error) {
+// Write implements the net.Conn interface.
+func (m mockConn) Write(b []byte) (n int, err error) {
+	if m.WriteFunc != nil {
+		return m.WriteFunc(b)
+	}
 	return
 }
 
-// MockNetpollReader implements netpoll.Reader
-type MockNetpollReader struct {
-	ReleaseFunc func() (err error)
+// Close implements the net.Conn interface.
+func (m mockConn) Close() (e error) {
+	if m.CloseFunc != nil {
+		return m.CloseFunc()
+	}
+	return
 }
 
-var cliCallCounter = 0
+// LocalAddr implements the net.Conn interface.
+func (m mockConn) LocalAddr() (r net.Addr) {
+	if m.LocalAddrFunc != nil {
+		return m.LocalAddrFunc()
+	}
+	return
+}
 
-// Next implements the netpoll.Reader interface.
-func (m *MockNetpollReader) Next(n int) (p []byte, err error) {
-	// client preface mock
+// RemoteAddr implements the net.Conn interface.
+func (m mockConn) RemoteAddr() (r net.Addr) {
+	if m.RemoteAddrFunc != nil {
+		return m.RemoteAddrFunc()
+	}
+	return
+}
 
-	if n == 9 {
-		cliCallCounter++
-		if cliCallCounter != 10 {
-			// pretend to be a setting frame
-			header := "\u0000\u0000\u0006\u0004\u0000\u0000\u0000\u0000\u0000"
-			return []byte(header), nil
-		} else {
-			// pretend to be a metaHeader frame
-			return []byte{0, 1, 42, 1, 4, 0, 0, 0, 1}, nil
+// SetDeadline implements the net.Conn interface.
+func (m mockConn) SetDeadline(t time.Time) (e error) {
+	if m.SetDeadlineFunc != nil {
+		return m.SetDeadlineFunc(t)
+	}
+	return
+}
+
+// SetReadDeadline implements the net.Conn interface.
+func (m mockConn) SetReadDeadline(t time.Time) (e error) {
+	if m.SetReadDeadlineFunc != nil {
+		return m.SetReadDeadlineFunc(t)
+	}
+	return
+}
+
+// SetWriteDeadline implements the net.Conn interface.
+func (m mockConn) SetWriteDeadline(t time.Time) (e error) {
+	if m.SetWriteDeadlineFunc != nil {
+		return m.SetWriteDeadlineFunc(t)
+	}
+	return
+}
+
+var (
+	mockAddr0 = "127.0.0.1:8000"
+	mockAddr1 = "127.0.0.1:8001"
+)
+
+func newMockConnPool() *connPool {
+	connPool := NewConnPool("test", uint32(0), grpc.ConnectOptions{})
+	return connPool
+}
+
+func newMockConnOption() remote.ConnOption {
+	return remote.ConnOption{Dialer: newMockDialer(), ConnectTimeout: time.Second}
+}
+
+func newMockServerOption() *remote.ServerOption {
+	return &remote.ServerOption{
+		SvcInfo:               nil,
+		TransServerFactory:    nil,
+		SvrHandlerFactory:     nil,
+		Codec:                 nil,
+		PayloadCodec:          nil,
+		Address:               nil,
+		ReusePort:             false,
+		ExitWaitTime:          0,
+		AcceptFailedDelayTime: 0,
+		MaxConnectionIdleTime: 0,
+		ReadWriteTimeout:      0,
+		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
+			return newMockRPCInfo(), context.Background()
+		},
+		TracerCtl: &stats.Controller{},
+		GRPCCfg: &grpc.ServerConfig{
+			MaxStreams:                 0,
+			KeepaliveParams:            grpc.ServerKeepalive{},
+			KeepaliveEnforcementPolicy: grpc.EnforcementPolicy{},
+			InitialWindowSize:          0,
+			InitialConnWindowSize:      0,
+			MaxHeaderListSize:          nil,
+		},
+		Option: remote.Option{},
+	}
+}
+
+func newMockClientOption() *remote.ClientOption {
+	return &remote.ClientOption{
+		SvcInfo:           nil,
+		CliHandlerFactory: nil,
+		Codec:             nil,
+		PayloadCodec:      nil,
+		ConnPool:          newMockConnPool(),
+		Dialer:            newMockDialer(),
+		Option: remote.Option{
+			Outbounds:             nil,
+			Inbounds:              nil,
+			StreamingMetaHandlers: nil,
+		},
+		EnableConnPoolReporter: false,
+	}
+}
+
+func newMockDialer() *remote.SynthesizedDialer {
+	d := &remote.SynthesizedDialer{}
+	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+		connectCost := time.Millisecond * 10
+		if timeout < connectCost {
+			return nil, errors.New("connect timeout")
 		}
+		return newMockNpConn(address), nil
 	}
-	// server preface mock
-	if n == 24 {
-		mocker := "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
-		return []byte(mocker), nil
+	return d
+}
+
+func newMockCtxWithRPCInfo() context.Context {
+	return rpcinfo.NewCtxWithRPCInfo(context.Background(), newMockRPCInfo())
+}
+
+func newMockRPCInfo() rpcinfo.RPCInfo {
+	method := "method"
+	c := rpcinfo.NewEndpointInfo("", method, nil, nil)
+	endpointTags := map[string]string{}
+	endpointTags[rpcinfo.HTTPURL] = "https://github.com/cloudwego/kitex"
+	s := rpcinfo.NewEndpointInfo("", method, nil, endpointTags)
+	ink := rpcinfo.NewInvocation("", method)
+	cfg := rpcinfo.NewRPCConfig()
+	ri := rpcinfo.NewRPCInfo(c, s, ink, cfg, rpcinfo.NewRPCStats())
+	return ri
+}
+
+func newMockNewMessage() *mockMessage {
+	return &mockMessage{
+		DataFunc: func() interface{} {
+			return &HelloRequest{
+				state:         protoimpl.MessageState{},
+				sizeCache:     0,
+				unknownFields: nil,
+				Name:          "test",
+			}
+		},
 	}
-
-	return
 }
 
-// Peek implements the netpoll.Reader interface.
-func (m *MockNetpollReader) Peek(n int) (buf []byte, err error) {
-	return
+func newMockServerTransport(npConn *mockNetpollConn) (grpc.ServerTransport, error) {
+	opt := newMockServerOption()
+	tr, err := grpc.NewServerTransport(context.Background(), npConn, opt.GRPCCfg)
+	return tr, err
 }
 
-// Until implements the netpoll.Reader interface.
-func (m *MockNetpollReader) Until(b byte) (buf []byte, err error) {
-	return
+func newMockStreamRecvHelloRequest(s *grpc.Stream) {
+	hdr := []byte{0, 0, 0, 0, 6, 10, 4, 116, 101, 115, 116, 0}
+	buffer := new(bytes.Buffer)
+	buffer.Reset()
+	buffer.Write(hdr)
+	s.Write(grpc.RecvMsg{Buffer: buffer})
 }
 
-// Skip implements the netpoll.Reader interface.
-func (m *MockNetpollReader) Skip(n int) (err error) {
-	return
+func setDontWaitHeader(s *grpc.Stream) {
+	s.HeaderChan = nil
 }
 
-// Release implements the netpoll.Reader interface.
-func (m *MockNetpollReader) Release() (err error) {
-	if m.ReleaseFunc != nil {
-		return m.ReleaseFunc()
-	}
-	return
+func mockStreamRecv(s *grpc.Stream, data string) {
+	buffer := new(bytes.Buffer)
+	buffer.Reset()
+	buffer.Write([]byte(data))
+	s.Write(grpc.RecvMsg{Buffer: buffer})
 }
 
-// Slice implements the netpoll.Reader interface.
-func (m *MockNetpollReader) Slice(n int) (r netpoll.Reader, err error) {
-	return
-}
+var _ remote.Message = &mockMessage{}
 
-// Len implements the netpoll.Reader interface.
-func (m *MockNetpollReader) Len() (length int) {
-	return
-}
-
-// Read implements the netpoll.Reader interface.
-func (m *MockNetpollReader) Read(b []byte) (n int, err error) {
-	fmt.Println("request read")
-	return
-}
-
-// ReadString implements the netpoll.Reader interface.
-func (m *MockNetpollReader) ReadString(n int) (s string, err error) {
-	return
-}
-
-// ReadBinary implements the netpoll.Reader interface.
-func (m *MockNetpollReader) ReadBinary(n int) (p []byte, err error) {
-	// mock meta header when n =298
-	if n == 298 {
-		metaPayload := ""
-		return []byte(metaPayload), nil
-	}
-	return
-}
-
-// ReadByte implements the netpoll.Reader interface.
-func (m *MockNetpollReader) ReadByte() (b byte, err error) {
-	return
-}
-
-var _ remote.Message = &MockMessage{}
-
-type MockMessage struct {
+type mockMessage struct {
 	RPCInfoFunc         func() rpcinfo.RPCInfo
 	ServiceInfoFunc     func() *serviceinfo.ServiceInfo
 	DataFunc            func() interface{}
@@ -283,108 +420,108 @@ type MockMessage struct {
 	RecycleFunc         func()
 }
 
-func (m *MockMessage) RPCInfo() rpcinfo.RPCInfo {
+func (m *mockMessage) RPCInfo() rpcinfo.RPCInfo {
 	if m.RPCInfoFunc != nil {
 		return m.RPCInfoFunc()
 	}
 	return nil
 }
 
-func (m *MockMessage) ServiceInfo() (si *serviceinfo.ServiceInfo) {
+func (m *mockMessage) ServiceInfo() (si *serviceinfo.ServiceInfo) {
 	if m.ServiceInfoFunc != nil {
 		return m.ServiceInfoFunc()
 	}
 	return
 }
 
-func (m *MockMessage) Data() interface{} {
+func (m *mockMessage) Data() interface{} {
 	if m.DataFunc != nil {
 		return m.DataFunc()
 	}
 	return nil
 }
 
-func (m *MockMessage) NewData(method string) (ok bool) {
+func (m *mockMessage) NewData(method string) (ok bool) {
 	if m.NewDataFunc != nil {
 		return m.NewDataFunc(method)
 	}
 	return false
 }
 
-func (m *MockMessage) MessageType() (mt remote.MessageType) {
+func (m *mockMessage) MessageType() (mt remote.MessageType) {
 	if m.MessageTypeFunc != nil {
 		return m.MessageTypeFunc()
 	}
 	return
 }
 
-func (m *MockMessage) SetMessageType(mt remote.MessageType) {
+func (m *mockMessage) SetMessageType(mt remote.MessageType) {
 	if m.SetMessageTypeFunc != nil {
 		m.SetMessageTypeFunc(mt)
 	}
 }
 
-func (m *MockMessage) RPCRole() (r remote.RPCRole) {
+func (m *mockMessage) RPCRole() (r remote.RPCRole) {
 	if m.RPCRoleFunc != nil {
 		return m.RPCRoleFunc()
 	}
 	return
 }
 
-func (m *MockMessage) PayloadLen() int {
+func (m *mockMessage) PayloadLen() int {
 	if m.PayloadLenFunc != nil {
 		return m.PayloadLenFunc()
 	}
 	return 0
 }
 
-func (m *MockMessage) SetPayloadLen(size int) {
+func (m *mockMessage) SetPayloadLen(size int) {
 	if m.SetPayloadLenFunc != nil {
 		m.SetPayloadLenFunc(size)
 	}
 }
 
-func (m *MockMessage) TransInfo() remote.TransInfo {
+func (m *mockMessage) TransInfo() remote.TransInfo {
 	if m.TransInfoFunc != nil {
 		return m.TransInfoFunc()
 	}
 	return nil
 }
 
-func (m *MockMessage) Tags() map[string]interface{} {
+func (m *mockMessage) Tags() map[string]interface{} {
 	if m.TagsFunc != nil {
 		return m.TagsFunc()
 	}
 	return nil
 }
 
-func (m *MockMessage) ProtocolInfo() (pi remote.ProtocolInfo) {
+func (m *mockMessage) ProtocolInfo() (pi remote.ProtocolInfo) {
 	if m.ProtocolInfoFunc != nil {
 		return m.ProtocolInfoFunc()
 	}
 	return
 }
 
-func (m *MockMessage) SetProtocolInfo(pi remote.ProtocolInfo) {
+func (m *mockMessage) SetProtocolInfo(pi remote.ProtocolInfo) {
 	if m.SetProtocolInfoFunc != nil {
 		m.SetProtocolInfoFunc(pi)
 	}
 }
 
-func (m *MockMessage) PayloadCodec() remote.PayloadCodec {
+func (m *mockMessage) PayloadCodec() remote.PayloadCodec {
 	if m.PayloadCodecFunc != nil {
 		return m.PayloadCodecFunc()
 	}
 	return nil
 }
 
-func (m *MockMessage) SetPayloadCodec(pc remote.PayloadCodec) {
+func (m *mockMessage) SetPayloadCodec(pc remote.PayloadCodec) {
 	if m.SetPayloadCodecFunc != nil {
 		m.SetPayloadCodecFunc(pc)
 	}
 }
 
-func (m *MockMessage) Recycle() {
+func (m *mockMessage) Recycle() {
 	if m.RecycleFunc != nil {
 		m.RecycleFunc()
 	}
@@ -529,11 +666,14 @@ func file_message_proto_rawDescGZIP() []byte {
 	return file_message_proto_rawDescData
 }
 
-var file_message_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-var file_message_proto_goTypes = []interface{}{
-	(*HelloRequest)(nil), // 0: GrpcDemo.HelloRequest
-	(*HelloReply)(nil),   // 1: GrpcDemo.HelloReply
-}
+var (
+	file_message_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+	file_message_proto_goTypes  = []interface{}{
+		(*HelloRequest)(nil), // 0: GrpcDemo.HelloRequest
+		(*HelloReply)(nil),   // 1: GrpcDemo.HelloReply
+	}
+)
+
 var file_message_proto_depIdxs = []int32{
 	0, // 0: GrpcDemo.Greeter.SayHello:input_type -> GrpcDemo.HelloRequest
 	1, // 1: GrpcDemo.Greeter.SayHello:output_type -> GrpcDemo.HelloReply
@@ -598,7 +738,3 @@ func file_message_proto_init() {
 var _ context.Context
 
 // Code generated by Kitex v1.8.0. DO NOT EDIT.
-
-type Greeter interface {
-	SayHello(ctx context.Context, req *HelloRequest) (res *HelloReply, err error)
-}

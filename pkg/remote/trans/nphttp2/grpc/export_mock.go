@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package grpc
 
 import (
@@ -5,33 +21,10 @@ import (
 	"sync"
 )
 
-//fixme
-// todo 后续先通过改大小写的方式实现
-func MockStreamRecv(s *Stream) {
-	hdr := []byte{0, 0, 0, 0, 10}
-	body := []byte("1234567890")
-	hdr = append(hdr, body...)
-	buffer := new(bytes.Buffer)
-	buffer.Reset()
-	buffer.Write(hdr)
-	s.write(recvMsg{buffer: buffer})
-}
+// fixme 关联太大，无法通过修改大小写完成
 
-func MockStreamRecvHelloRequest(s *Stream) {
-	hdr := []byte{0, 0, 0, 0, 6, 10, 4, 116, 101, 115, 116, 0}
-	buffer := new(bytes.Buffer)
-	buffer.Reset()
-	buffer.Write(hdr)
-	s.write(recvMsg{buffer: buffer})
-}
-
-func DontWaitHeader(s *Stream) {
-	s.headerChan = nil
-}
-
-// mock a stream with recvBuffer
+// MockNewServerSideStream mock a stream with recvBuffer
 func MockNewServerSideStream() *Stream {
-
 	recvBuffer := newRecvBuffer()
 	trReader := &transportReader{
 		reader: &recvBufferReader{
@@ -43,12 +36,11 @@ func MockNewServerSideStream() *Stream {
 			},
 		},
 		windowHandler: func(i int) {
-
 		},
 	}
 
 	stream := &Stream{
-		id:           2,
+		id:           1,
 		st:           nil,
 		ct:           nil,
 		ctx:          nil,
@@ -63,9 +55,8 @@ func MockNewServerSideStream() *Stream {
 		fc:           nil,
 		wq:           newWriteQuota(defaultWriteQuota, nil),
 		requestRead: func(i int) {
-
 		},
-		headerChan:       nil,
+		HeaderChan:       nil,
 		headerChanClosed: 0,
 		headerValid:      false,
 		hdrMu:            sync.Mutex{},

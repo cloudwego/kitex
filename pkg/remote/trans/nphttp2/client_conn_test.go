@@ -1,18 +1,33 @@
+/*
+ * Copyright 2022 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package nphttp2
 
 import (
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestClientConn(t *testing.T) {
-
 	// init
-	connPool := MockConnPool()
-	ctx := MockCtxWithRPCInfo()
-	conn, err := connPool.Get(ctx, "tcp", mockAddr0, MockConnOption())
+	connPool := newMockConnPool()
+	ctx := newMockCtxWithRPCInfo()
+	conn, err := connPool.Get(ctx, "tcp", mockAddr0, newMockConnOption())
 	test.Assert(t, err == nil, err)
 	clientConn := conn.(*clientConn)
 
@@ -25,13 +40,13 @@ func TestClientConn(t *testing.T) {
 	test.Assert(t, ra.String() == mockAddr0)
 
 	// test Read()
-	grpc.MockStreamRecv(clientConn.s)
 	testStr := "1234567890"
-	testByte := []byte(testStr)
+	mockStreamRecv(clientConn.s, testStr)
+	testByte := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	n, err := clientConn.Read(testByte)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, n == len(testStr))
-	//todo check testStr data
+	test.Assert(t, string(testByte) == testStr)
 
 	// test Write()
 	testByte = []byte(testStr)
@@ -42,15 +57,17 @@ func TestClientConn(t *testing.T) {
 	// test Write() short write error
 	n, err = clientConn.Write([]byte(""))
 	test.Assert(t, err != nil, err)
+	test.Assert(t, n == 0)
 
 	// test Header()
-	grpc.DontWaitHeader(clientConn.s)
+	setDontWaitHeader(clientConn.s)
 	_, err = clientConn.Header()
+	test.Assert(t, err == nil, err)
 
 	// test Trailer()
 	_ = clientConn.Trailer()
 
-	//todo check return value
+	// todo check return value
 
 	// test SetDeadline()
 	err = clientConn.SetDeadline(time.Now())

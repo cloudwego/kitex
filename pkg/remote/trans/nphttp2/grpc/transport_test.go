@@ -1,6 +1,10 @@
 /*
+<<<<<<< HEAD
  *
  * Copyright 2014 gRPC authors.
+=======
+ * Copyright 2022 CloudWeGo Authors
+>>>>>>> 5da50e1 (test: --20220424 add ut for pkg/remote/trans/nphttp2 (unfinished))
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +17,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+<<<<<<< HEAD
  *
  * This file may have been modified by CloudWeGo authors. All CloudWeGo
  * Modifications are Copyright 2021 CloudWeGo Authors.
- */
+=======
+>>>>>>> 5da50e1 (test: --20220424 add ut for pkg/remote/trans/nphttp2 (unfinished))
+*/
 
 package grpc
 
@@ -1495,7 +1502,7 @@ func TestHeaderChanClosedAfterReceivingAnInvalidHeader(t *testing.T) {
 	timer := time.NewTimer(time.Second)
 	defer timer.Stop()
 	select {
-	case <-s.headerChan:
+	case <-s.HeaderChan:
 	case <-timer.C:
 		t.Errorf("s.headerChan: got open, want closed")
 	}
@@ -1747,7 +1754,7 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 	testData[0] = 5
 	testBuffer := bytes.NewBuffer(testData)
 	testErr := errors.New("test error")
-	s.write(recvMsg{buffer: testBuffer, err: testErr})
+	s.Write(RecvMsg{Buffer: testBuffer, err: testErr})
 
 	inBuf := make([]byte, 1)
 	actualCount, actualErr := s.Read(inBuf)
@@ -1758,8 +1765,8 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 		t.Errorf("_ , actualErr := s.Read(_) differs; want actualErr.Error() to be %v; got %v", testErr.Error(), actualErr.Error())
 	}
 
-	s.write(recvMsg{buffer: testBuffer, err: nil})
-	s.write(recvMsg{buffer: testBuffer, err: errors.New("different error from first")})
+	s.Write(RecvMsg{Buffer: testBuffer, err: nil})
+	s.Write(RecvMsg{Buffer: testBuffer, err: errors.New("different error from first")})
 
 	for i := 0; i < 2; i++ {
 		inBuf := make([]byte, 1)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,36 +17,36 @@
 package codes
 
 import (
-	"github.com/cloudwego/kitex/internal/test"
 	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestUnmarshalJSON(t *testing.T) {
 	code := new(Code)
 
-	//input is "null"
+	// input is "null"
 	err := code.UnmarshalJSON([]byte("null"))
 	test.Assert(t, err == nil, err)
 
-	//input is a valid number
+	// input is a valid number
 	err = code.UnmarshalJSON([]byte("1"))
 	test.Assert(t, err == nil, err)
 
-	//input is an invalid number
+	// input is an invalid number
 	err = code.UnmarshalJSON([]byte("200"))
 	test.Assert(t, err != nil, err)
 
-	//input is a valid string
+	// input is a valid string
 	err = code.UnmarshalJSON([]byte("\"DATA_LOSS\""))
 	test.Assert(t, err == nil, err)
 
-	//input is an invalid string
+	// input is an invalid string
 	err = code.UnmarshalJSON([]byte("WRONG_INPUT"))
 	test.Assert(t, err != nil, err)
 
-	//code is null
+	// code is null
 	code = nil
 	err = code.UnmarshalJSON([]byte("\"DATA_LOSS\""))
 	test.Assert(t, err != nil, err)
-
 }

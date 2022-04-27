@@ -1,30 +1,48 @@
+/*
+ * Copyright 2022 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package nphttp2
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 )
 
 func TestServerHandler(t *testing.T) {
-
 	// init
-	opt := MockServerOption()
-	msg := MockNewMessage()
-	npConn := MockNpConn(mockAddr0)
-	tr, err := MockServerTransport(mockAddr0)
+	opt := newMockServerOption()
+	msg := newMockNewMessage()
+	npConn := newMockNpConn(mockAddr0)
+	npConn.mockSettingFrame()
+	tr, err := newMockServerTransport(npConn)
 	test.Assert(t, err == nil, err)
 	s := grpc.MockNewServerSideStream()
 	serverConn := newServerConn(tr, s)
+
 	// test NewTransHandler()
 	handler, err := NewSvrTransHandlerFactory().NewTransHandler(opt)
 	test.Assert(t, err == nil, err)
 
 	// test Read()
 	// mock grpc encoded msg data into stream recv buffer
-	grpc.MockStreamRecvHelloRequest(s)
+	newMockStreamRecvHelloRequest(s)
 	err = handler.Read(context.Background(), serverConn, msg)
 	test.Assert(t, err == nil, err)
 
@@ -32,16 +50,34 @@ func TestServerHandler(t *testing.T) {
 	err = handler.Write(context.Background(), serverConn, msg)
 	test.Assert(t, err == nil, err)
 
-	//模拟handler整个的运转过程,触发一次metaHeader，才能覆盖大部分的代码
-	// 这里上层对tr没有把控。。。导致很难写单测。。。。。
-	//初始化（需要被迫停止，不然一直read循环）
-	go handler.OnRead(context.Background(), npConn)
+	// test SetInvokeHandleFunc()
+	svrHdl := handler.(*svrTransHandler)
+	svrHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+		return nil
+	})
 
-	defer func() {
-		recover()
+	// 放入setting frame用于mock server连接preface的检验
+	npConn.mockSettingFrame()
+	// onRead()场景需要从mock conn里陆续获取headerFrame
+	npConn.mockMetaHeaderFrame()
+	go func() {
+		handler.OnRead(newMockCtxWithRPCInfo(), npConn)
+		test.Assert(t, err == nil, err)
 	}()
 
-	time.Sleep(time.Second)
-	panic("test stop!")
+	// sleep 100 mills so server can handle metaHeader frame
+	time.Sleep(time.Millisecond * 100)
 
+	// test OnActive()
+	_, err = handler.OnActive(context.Background(), npConn)
+	test.Assert(t, err == nil, err)
+
+	// test OnInactive()
+	handler.OnInactive(newMockCtxWithRPCInfo(), npConn)
+
+	// test OnError()
+	handler.OnError(context.Background(), context.Canceled, npConn)
+
+	// test SetPipeline()
+	handler.SetPipeline(nil)
 }
