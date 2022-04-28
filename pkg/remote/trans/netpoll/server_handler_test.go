@@ -23,13 +23,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/netpoll"
 )
 
 var (
@@ -264,7 +265,6 @@ func TestNoMethodInfo(t *testing.T) {
 	// 1. prepare mock data
 	var isWriteBufFlushed bool
 	var isReaderBufReleased bool
-	var isInvoked bool
 	var isClosed bool
 	conn := &MockNetpollConn{
 		Conn: mocks.Conn{
@@ -312,6 +312,5 @@ func TestNoMethodInfo(t *testing.T) {
 	test.Assert(t, ri != nil)
 	test.Assert(t, isReaderBufReleased)
 	test.Assert(t, isWriteBufFlushed)
-	test.Assert(t, !isInvoked)
 	test.Assert(t, isClosed)
 }

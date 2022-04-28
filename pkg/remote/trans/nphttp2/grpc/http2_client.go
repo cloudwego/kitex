@@ -34,11 +34,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/syscall"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"github.com/cloudwego/netpoll"
-	"github.com/cloudwego/netpoll-http2"
-	"github.com/cloudwego/netpoll-http2/hpack"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
 )
 
 // http2Client implements the ClientTransport interface with HTTP2.
@@ -46,7 +46,7 @@ type http2Client struct {
 	lastRead   int64 // Keep this field 64-bit aligned. Accessed atomically.
 	ctx        context.Context
 	cancel     context.CancelFunc
-	conn       netpoll.Connection // underlying communication channel
+	conn       net.Conn // underlying communication channel
 	loopy      *loopyWriter
 	remoteAddr net.Addr
 	localAddr  net.Addr
@@ -105,7 +105,7 @@ type http2Client struct {
 // newHTTP2Client constructs a connected ClientTransport to addr based on HTTP2
 // and starts to receive messages on it. Non-nil error returns if construction
 // fails.
-func newHTTP2Client(ctx context.Context, conn netpoll.Connection, opts ConnectOptions,
+func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	remoteService string, onGoAway func(GoAwayReason), onClose func()) (_ *http2Client, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
@@ -124,7 +124,7 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, opts ConnectOp
 	}
 	keepaliveEnabled := false
 	if kp.Time != Infinity {
-		if err = conn.SetIdleTimeout(kp.Timeout); err != nil {
+		if err = syscall.SetTCPUserTimeout(conn, kp.Timeout); err != nil {
 			return nil, connectionErrorf(false, err, "transport: failed to set TCP_USER_TIMEOUT: %v", err)
 		}
 		keepaliveEnabled = true
@@ -137,6 +137,8 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, opts ConnectOp
 		dynamicWindow = false
 	}
 
+	writeBufSize := opts.WriteBufferSize
+	readBufSize := opts.ReadBufferSize
 	maxHeaderListSize := defaultClientMaxHeaderListSize
 	if opts.MaxHeaderListSize != nil {
 		maxHeaderListSize = *opts.MaxHeaderListSize
@@ -150,7 +152,7 @@ func newHTTP2Client(ctx context.Context, conn netpoll.Connection, opts ConnectOp
 		readerDone:            make(chan struct{}),
 		writerDone:            make(chan struct{}),
 		goAway:                make(chan struct{}),
-		framer:                newFramer(conn, maxHeaderListSize),
+		framer:                newFramer(conn, writeBufSize, readBufSize, maxHeaderListSize),
 		fc:                    &trInFlow{limit: icwz},
 		activeStreams:         make(map[uint32]*Stream),
 		kp:                    kp,

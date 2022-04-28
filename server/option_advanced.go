@@ -46,7 +46,7 @@ func WithServerBasicInfo(ebi *rpcinfo.EndpointBasicInfo) Option {
 	}}
 }
 
-// WithDiagnosisService sets the diagnosis service for gathering debug informations.
+// WithDiagnosisService sets the diagnosis service for gathering debug information.
 func WithDiagnosisService(ds diagnosis.Service) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		o.Once.OnceOrPanic()
@@ -78,7 +78,7 @@ func WithMetaHandler(h remote.MetaHandler) Option {
 	}}
 }
 
-// WithProxy stes the backward Proxy for server.
+// WithProxy sets the backward Proxy for server.
 func WithProxy(p proxy.ReverseProxy) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		o.Once.OnceOrPanic()

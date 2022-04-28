@@ -466,3 +466,25 @@ func (m *mockCodec) Decode(ctx context.Context, msg remote.Message, in remote.By
 	}
 	return
 }
+
+func TestDuplicatedRegisterInfoPanic(t *testing.T) {
+	s := &server{
+		svcInfo: mocks.ServiceInfo(),
+		opt:     internal_server.NewOptions(nil),
+	}
+	s.init()
+
+	test.Panic(t, func() {
+		_ = s.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	})
+}
+
+func TestRunServiceWithoutSvcInfo(t *testing.T) {
+	svr := NewServer()
+	time.AfterFunc(100*time.Millisecond, func() {
+		_ = svr.Stop()
+	})
+	err := svr.Run()
+	test.Assert(t, err != nil)
+	test.Assert(t, strings.Contains(err.Error(), "no service"))
+}

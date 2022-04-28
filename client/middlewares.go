@@ -25,12 +25,10 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 
 	"github.com/cloudwego/kitex/internal"
-	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
@@ -74,42 +72,8 @@ func discoveryEventHandler(name string, bus event.Bus, queue event.Queue) func(d
 // newResolveMWBuilder creates a middleware for service discovery.
 // This middleware selects an appropriate instance based on the resolver and loadbalancer given.
 // If retryable error is encountered, it will retry until timeout or an unretryable error is returned.
-func newResolveMWBuilder(opt *client.Options) endpoint.MiddlewareBuilder {
+func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilder {
 	return func(ctx context.Context) endpoint.Middleware {
-		bus := ctx.Value(endpoint.CtxEventBusKey).(event.Bus)
-		events := ctx.Value(endpoint.CtxEventQueueKey).(event.Queue)
-
-		onChange := discoveryEventHandler(discovery.ChangeEventName, bus, events)
-		onDelete := discoveryEventHandler(discovery.DeleteEventName, bus, events)
-		resolver := opt.Resolver
-		if resolver == nil {
-			resolver = &discovery.SynthesizedResolver{
-				ResolveFunc: func(ctx context.Context, target string) (discovery.Result, error) {
-					return discovery.Result{}, kerrors.ErrNoResolver
-				},
-				NameFunc: func() string { return "no_resolver" },
-			}
-		}
-		balancer := opt.Balancer
-		if balancer == nil {
-			balancer = loadbalance.NewWeightedBalancer()
-		}
-
-		cacheOpts := lbcache.Options{DiagnosisService: opt.DebugService}
-		if opt.BalancerCacheOpt != nil {
-			cacheOpts = *opt.BalancerCacheOpt
-		}
-		balancerFactory := lbcache.NewBalancerFactory(resolver, balancer, cacheOpts)
-		rbIdx := balancerFactory.RegisterRebalanceHook(onChange)
-		opt.CloseCallbacks = append(opt.CloseCallbacks, func() error {
-			balancerFactory.DeregisterRebalanceHook(rbIdx)
-			return nil
-		})
-		dIdx := balancerFactory.RegisterDeleteHook(onDelete)
-		opt.CloseCallbacks = append(opt.CloseCallbacks, func() error {
-			balancerFactory.DeregisterDeleteHook(dIdx)
-			return nil
-		})
 		retryable := func(err error) bool {
 			return errors.Is(err, kerrors.ErrGetConnection) || errors.Is(err, kerrors.ErrCircuitBreak)
 		}
@@ -131,7 +95,7 @@ func newResolveMWBuilder(opt *client.Options) endpoint.MiddlewareBuilder {
 				if remote.GetInstance() != nil {
 					return next(ctx, request, response)
 				}
-				lb, err := balancerFactory.Get(ctx, dest)
+				lb, err := lbf.Get(ctx, dest)
 				if err != nil {
 					return kerrors.ErrServiceDiscovery.WithCause(err)
 				}

@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"strconv"
 
@@ -28,7 +29,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
+	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/loadbalance"
+	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
@@ -39,6 +45,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -58,6 +65,7 @@ type kClient struct {
 	eps     endpoint.Endpoint
 	sEps    endpoint.Endpoint
 	opt     *client.Options
+	lbf     *lbcache.BalancerFactory
 
 	inited bool
 	closed bool
@@ -82,33 +90,42 @@ func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error)
 	return kc, nil
 }
 
-func (kc *kClient) init() error {
+func (kc *kClient) init() (err error) {
 	initTransportProtocol(kc.svcInfo, kc.opt.Configs)
-	ctx := fillContext(kc.opt)
-	if nCtx, err := kc.proxyInit(ctx); err != nil {
-		return err
-	} else {
-		ctx = nCtx
-	}
-	if err := kc.checkOptions(); err != nil {
+	if err = kc.checkOptions(); err != nil {
 		return err
 	}
-	if err := kc.initCircuitBreaker(); err != nil {
+	if err = kc.initCircuitBreaker(); err != nil {
 		return err
 	}
-	if err := kc.initRetryer(); err != nil {
+	if err = kc.initRetryer(); err != nil {
 		return err
 	}
+	if err = kc.initProxy(); err != nil {
+		return err
+	}
+	if err = kc.initLBCache(); err != nil {
+		return err
+	}
+	ctx := kc.initContext()
 	kc.initMiddlewares(ctx)
-	kc.inited = true
-	if kc.opt.DebugService != nil {
-		kc.opt.DebugService.RegisterProbeFunc(diagnosis.DestServiceKey, diagnosis.WrapAsProbeFunc(kc.opt.Svr.ServiceName))
-		kc.opt.DebugService.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(kc.opt.DebugInfo))
-		kc.opt.DebugService.RegisterProbeFunc(diagnosis.ChangeEventsKey, kc.opt.Events.Dump)
-		kc.opt.DebugService.RegisterProbeFunc(diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(kc.svcInfo))
+	kc.initDebugService()
+	kc.richRemoteOption()
+	if err = kc.buildInvokeChain(); err != nil {
+		return err
 	}
-	kc.richRemoteOption(ctx)
-	return kc.buildInvokeChain()
+	if err = kc.warmingUp(); err != nil {
+		return err
+	}
+	kc.inited = true
+	return nil
+}
+
+func (kc *kClient) checkOptions() (err error) {
+	if kc.opt.Svr.ServiceName == "" {
+		return errors.New("service name is required")
+	}
+	return nil
 }
 
 func (kc *kClient) initCircuitBreaker() error {
@@ -122,14 +139,24 @@ func (kc *kClient) initRetryer() error {
 	if kc.opt.RetryContainer == nil {
 		if kc.opt.RetryPolicy == nil {
 			return nil
-		} else {
-			kc.opt.RetryContainer = retry.NewRetryContainer()
 		}
+		kc.opt.RetryContainer = retry.NewRetryContainer()
 	}
 	return kc.opt.RetryContainer.Init(kc.opt.RetryPolicy)
 }
 
-func (kc *kClient) proxyInit(ctx context.Context) (context.Context, error) {
+func (kc *kClient) initContext() context.Context {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, kc.opt.Bus)
+	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, kc.opt.Events)
+	ctx = context.WithValue(ctx, rpctimeout.TimeoutAdjustKey, &kc.opt.ExtraTimeout)
+	if chr, ok := kc.opt.Proxy.(proxy.ContextHandler); ok {
+		ctx = chr.HandleContext(ctx)
+	}
+	return ctx
+}
+
+func (kc *kClient) initProxy() error {
 	if kc.opt.Proxy != nil {
 		cfg := proxy.Config{
 			ServerInfo:   kc.opt.Svr,
@@ -140,20 +167,53 @@ func (kc *kClient) proxyInit(ctx context.Context) (context.Context, error) {
 			RPCConfig:    kc.opt.Configs,
 		}
 		if err := kc.opt.Proxy.Configure(&cfg); err != nil {
-			return ctx, err
+			return err
 		}
-		if chr, ok := kc.opt.Proxy.(proxy.ContextHandler); ok {
-			ctx = chr.HandleContext(ctx)
-		}
-		updateOptWithProxyCfg(cfg, kc.opt)
+		// update fields in the client option for further use.
+		kc.opt.Resolver = cfg.Resolver
+		kc.opt.Balancer = cfg.Balancer
+		kc.opt.RemoteOpt.ConnPool = cfg.Pool
+		kc.opt.Targets = cfg.FixedTargets
 	}
-	return ctx, nil
+	return nil
 }
 
-func (kc *kClient) checkOptions() (err error) {
-	if kc.opt.Svr.ServiceName == "" {
-		return errors.New("service name is required")
+func (kc *kClient) initLBCache() error {
+	if kc.opt.Proxy != nil && kc.opt.Resolver == nil {
+		return nil
 	}
+	onChange := discoveryEventHandler(discovery.ChangeEventName, kc.opt.Bus, kc.opt.Events)
+	onDelete := discoveryEventHandler(discovery.DeleteEventName, kc.opt.Bus, kc.opt.Events)
+	resolver := kc.opt.Resolver
+	if resolver == nil {
+		// fake a resolver instead of returning an error directly because users may use
+		// callopt.WithHostPort to specify target addresses after NewClient.
+		resolver = &discovery.SynthesizedResolver{
+			ResolveFunc: func(ctx context.Context, target string) (discovery.Result, error) {
+				return discovery.Result{}, kerrors.ErrNoResolver
+			},
+			NameFunc: func() string { return "no_resolver" },
+		}
+	}
+	balancer := kc.opt.Balancer
+	if balancer == nil {
+		balancer = loadbalance.NewWeightedBalancer()
+	}
+	cacheOpts := lbcache.Options{DiagnosisService: kc.opt.DebugService}
+	if kc.opt.BalancerCacheOpt != nil {
+		cacheOpts = *kc.opt.BalancerCacheOpt
+	}
+	kc.lbf = lbcache.NewBalancerFactory(resolver, balancer, cacheOpts)
+	rbIdx := kc.lbf.RegisterRebalanceHook(onChange)
+	kc.opt.CloseCallbacks = append(kc.opt.CloseCallbacks, func() error {
+		kc.lbf.DeregisterRebalanceHook(rbIdx)
+		return nil
+	})
+	dIdx := kc.lbf.RegisterDeleteHook(onDelete)
+	kc.opt.CloseCallbacks = append(kc.opt.CloseCallbacks, func() error {
+		kc.lbf.DeregisterDeleteHook(dIdx)
+		return nil
+	})
 	return nil
 }
 
@@ -161,15 +221,14 @@ func (kc *kClient) initMiddlewares(ctx context.Context) {
 	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
 	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW(), rpcTimeoutMW(ctx))
 	kc.mws = append(kc.mws, builderMWs...)
-	// add new middlewares
 	kc.mws = append(kc.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
 	if kc.opt.Proxy == nil {
-		kc.mws = append(kc.mws, newResolveMWBuilder(kc.opt)(ctx))
+		kc.mws = append(kc.mws, newResolveMWBuilder(kc.lbf)(ctx))
 		kc.mws = append(kc.mws, kc.opt.CBSuite.InstanceCBMW())
 		kc.mws = append(kc.mws, richMWsWithBuilder(ctx, kc.opt.IMWBs)...)
 	} else {
 		if kc.opt.Resolver != nil { // customized service discovery
-			kc.mws = append(kc.mws, newResolveMWBuilder(kc.opt)(ctx))
+			kc.mws = append(kc.mws, newResolveMWBuilder(kc.lbf)(ctx))
 		}
 		kc.mws = append(kc.mws, newProxyMW(kc.opt.Proxy))
 	}
@@ -252,54 +311,59 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 			rpcinfo.PutRPCInfo(ri)
 		}
 		return err
-	} else {
-		callTimes := 0
-		var prevRI rpcinfo.RPCInfo
-		recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, error) {
-			callTimes++
-			retryCtx := ctx
-			cRI := ri
-			if callTimes > 1 {
-				retryCtx, cRI = kc.initRPCInfo(ctx, method)
-				retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(callTimes-1))
-				if prevRI == nil {
-					prevRI = ri
-				}
-				r.Prepare(retryCtx, prevRI, cRI)
-				prevRI = cRI
-			}
-			err := kc.eps(retryCtx, request, response)
-			return cRI, err
-		}, ri, request)
+	}
 
-		kc.opt.TracerCtl.DoFinish(ctx, ri, err)
-		if recycleRI {
-			// why need check recycleRI to decide if recycle RPCInfo?
-			// 1. no retry, rpc timeout happen will cause panic when response return
-			// 2. retry success, will cause panic when first call return
-			// 3. backup request may cause panic, cannot recycle first RPCInfo
-			// RPCInfo will be recycled after rpc is finished,
-			// holding RPCInfo in a new goroutine is forbidden.
-			rpcinfo.PutRPCInfo(ri)
+	callTimes := 0
+	var prevRI rpcinfo.RPCInfo
+	recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, error) {
+		callTimes++
+		retryCtx := ctx
+		cRI := ri
+		if callTimes > 1 {
+			retryCtx, cRI = kc.initRPCInfo(ctx, method)
+			retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(callTimes-1))
+			if prevRI == nil {
+				prevRI = ri
+			}
+			r.Prepare(retryCtx, prevRI, cRI)
+			prevRI = cRI
 		}
-		return err
+		err := kc.eps(retryCtx, request, response)
+		return cRI, err
+	}, ri, request)
+
+	kc.opt.TracerCtl.DoFinish(ctx, ri, err)
+	if recycleRI {
+		// why need check recycleRI to decide if recycle RPCInfo?
+		// 1. no retry, rpc timeout happen will cause panic when response return
+		// 2. retry success, will cause panic when first call return
+		// 3. backup request may cause panic, cannot recycle first RPCInfo
+		// RPCInfo will be recycled after rpc is finished,
+		// holding RPCInfo in a new goroutine is forbidden.
+		rpcinfo.PutRPCInfo(ri)
+	}
+	return err
+}
+
+func (kc *kClient) initDebugService() {
+	if ds := kc.opt.DebugService; ds != nil {
+		ds.RegisterProbeFunc(diagnosis.DestServiceKey, diagnosis.WrapAsProbeFunc(kc.opt.Svr.ServiceName))
+		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(kc.opt.DebugInfo))
+		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, kc.opt.Events.Dump)
+		ds.RegisterProbeFunc(diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(kc.svcInfo))
 	}
 }
 
-func (kc *kClient) richRemoteOption(ctx context.Context) {
+func (kc *kClient) richRemoteOption() {
 	kc.opt.RemoteOpt.SvcInfo = kc.svcInfo
 
-	kc.addBoundHandlers(kc.opt.RemoteOpt)
-}
-
-func (kc *kClient) addBoundHandlers(opt *remote.ClientOption) {
 	// for client trans info handler
 	if len(kc.opt.MetaHandlers) > 0 {
 		// TODO in stream situations, meta is only assembled when the stream creates
 		// metaHandler needs to be called separately.
 		// (newClientStreamer: call WriteMeta before remotecli.NewClient)
 		transInfoHdlr := bound.NewTransMetaHandler(kc.opt.MetaHandlers)
-		doAddBoundHandlerToHead(transInfoHdlr, opt)
+		kc.opt.RemoteOpt.PrependBoundHandler(transInfoHdlr)
 	}
 }
 
@@ -388,38 +452,6 @@ func (kc *kClient) Close() error {
 	return nil
 }
 
-func doAddBoundHandlerToHead(h remote.BoundHandler, opt *remote.ClientOption) {
-	add := false
-	if ih, ok := h.(remote.InboundHandler); ok {
-		handlers := []remote.InboundHandler{ih}
-		opt.Inbounds = append(handlers, opt.Inbounds...)
-		add = true
-	}
-	if oh, ok := h.(remote.OutboundHandler); ok {
-		handlers := []remote.OutboundHandler{oh}
-		opt.Outbounds = append(handlers, opt.Outbounds...)
-		add = true
-	}
-	if !add {
-		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
-	}
-}
-
-func doAddBoundHandler(h remote.BoundHandler, opt *remote.ClientOption) {
-	add := false
-	if ih, ok := h.(remote.InboundHandler); ok {
-		opt.Inbounds = append(opt.Inbounds, ih)
-		add = true
-	}
-	if oh, ok := h.(remote.OutboundHandler); ok {
-		opt.Outbounds = append(opt.Outbounds, oh)
-		add = true
-	}
-	if !add {
-		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
-	}
-}
-
 func newCliTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, error) {
 	handler, err := opt.CliHandlerFactory.NewTransHandler(opt)
 	if err != nil {
@@ -435,24 +467,95 @@ func newCliTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, er
 	return transPl, nil
 }
 
-func fillContext(opt *client.Options) context.Context {
-	ctx := context.Background()
-	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
-	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, opt.Events)
-	ctx = context.WithValue(ctx, rpctimeout.TimeoutAdjustKey, &opt.ExtraTimeout)
-	return ctx
-}
-
-func updateOptWithProxyCfg(cfg proxy.Config, opt *client.Options) {
-	opt.Resolver = cfg.Resolver
-	opt.Balancer = cfg.Balancer
-	opt.RemoteOpt.ConnPool = cfg.Pool
-	opt.Targets = cfg.FixedTargets
-}
-
 func initTransportProtocol(svcInfo *serviceinfo.ServiceInfo, cfg rpcinfo.RPCConfig) {
 	if svcInfo.PayloadCodec == serviceinfo.Protobuf && cfg.TransportProtocol() != transport.GRPC {
 		// pb use ttheader framed by default
 		rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
 	}
+}
+
+func (kc *kClient) warmingUp() error {
+	if kc.opt.WarmUpOption == nil {
+		return nil
+	}
+	wuo := kc.opt.WarmUpOption
+	doWarmupPool := wuo.PoolOption != nil && kc.opt.Proxy == nil
+
+	// service discovery
+	if kc.opt.Resolver == nil {
+		return nil
+	}
+	nas := make(map[string][]string)
+	ctx := context.Background()
+
+	var dests []rpcinfo.EndpointInfo
+	if ro := kc.opt.WarmUpOption.ResolverOption; ro != nil {
+		for _, d := range ro.Dests {
+			dests = append(dests, rpcinfo.FromBasicInfo(d))
+		}
+	}
+	if len(dests) == 0 && doWarmupPool && len(wuo.PoolOption.Targets) == 0 {
+		// build a default destination for the resolver
+		cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
+		rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, "*")
+		ctx = kc.applyCallOptions(ctx, cfg.ImmutableView(), rmt)
+		dests = append(dests, rmt.ImmutableView())
+	}
+
+	for _, dest := range dests {
+		lb, err := kc.lbf.Get(ctx, dest)
+		if err != nil {
+			switch kc.opt.WarmUpOption.ErrorHandling {
+			case warmup.IgnoreError:
+			case warmup.WarningLog:
+				klog.Warnf("KITEX: failed to warm up service discovery: %s", err.Error())
+			case warmup.ErrorLog:
+				klog.Errorf("KITEX: failed to warm up service discovery: %s", err.Error())
+			case warmup.FailFast:
+				return fmt.Errorf("service discovery warm-up: %w", err)
+			}
+			continue
+		}
+		if res, ok := lb.GetResult(); ok {
+			for _, i := range res.Instances {
+				if addr := i.Address(); addr != nil {
+					n, a := addr.Network(), addr.String()
+					nas[n] = append(nas[n], a)
+				}
+			}
+		}
+	}
+
+	// connection pool
+	if !doWarmupPool {
+		return nil
+	}
+
+	if len(wuo.PoolOption.Targets) == 0 {
+		wuo.PoolOption.Targets = nas
+	}
+
+	pool := kc.opt.RemoteOpt.ConnPool
+	if wp, ok := pool.(warmup.Pool); ok {
+		co := remote.ConnOption{
+			Dialer:         kc.opt.RemoteOpt.Dialer,
+			ConnectTimeout: kc.opt.Configs.ConnectTimeout(),
+		}
+		err := wp.WarmUp(kc.opt.WarmUpOption.ErrorHandling, wuo.PoolOption, co)
+		if err != nil {
+			switch kc.opt.WarmUpOption.ErrorHandling {
+			case warmup.IgnoreError:
+			case warmup.WarningLog:
+				klog.Warnf("KITEX: failed to warm up connection pool: %s", err.Error())
+			case warmup.ErrorLog:
+				klog.Errorf("KITEX: failed to warm up connection pool: %s", err.Error())
+			case warmup.FailFast:
+				return fmt.Errorf("connection pool warm-up: %w", err)
+			}
+		}
+	} else {
+		klog.Warnf("KITEX: connection pool<%T> does not support warm-up operation", pool)
+	}
+
+	return nil
 }

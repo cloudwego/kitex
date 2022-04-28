@@ -28,11 +28,17 @@ import (
 	"github.com/cloudwego/netpoll/mux"
 
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 // ErrConnClosed .
 var ErrConnClosed = errors.New("conn closed")
+
+var defaultCodec = codec.NewDefaultCodec()
 
 func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 	c := &muxCliConn{
@@ -40,12 +46,20 @@ func newMuxCliConn(connection netpoll.Connection) *muxCliConn {
 		seqIDMap: newShardMap(mux.ShardSize),
 	}
 	connection.SetOnRequest(c.OnRequest)
+	connection.AddCloseCallback(func(connection netpoll.Connection) error {
+		return c.forceClose()
+	})
 	return c
 }
 
 type muxCliConn struct {
 	muxConn
+	closing  bool      // whether the server is going to close this connection
 	seqIDMap *shardMap // (k,v) is (sequenceID, notify)
+}
+
+func (c *muxCliConn) IsActive() bool {
+	return !c.closing && c.muxConn.IsActive()
 }
 
 // OnRequest is called when the connection creates.
@@ -61,6 +75,27 @@ func (c *muxCliConn) OnRequest(ctx context.Context, connection netpoll.Connectio
 	if err != nil {
 		err = fmt.Errorf("mux read package slice failed: addr(%s), %w", connection.RemoteAddr(), err)
 		return c.onError(ctx, err, connection)
+	}
+	// seqId == 0 means a control frame.
+	if seqID == 0 {
+		iv := rpcinfo.NewInvocation("none", "none")
+		iv.(interface{ SetSeqID(seqID int32) }).SetSeqID(0)
+		ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
+		ctl := NewControlFrame()
+		msg := remote.NewMessage(ctl, nil, ri, remote.Reply, remote.Client)
+
+		bufReader := np.NewReaderByteBuffer(reader)
+		if err = defaultCodec.Decode(ctx, msg, bufReader); err != nil {
+			return
+		}
+
+		crrst := msg.TransInfo().TransStrInfo()[transmeta.HeaderConnectionReadyToReset]
+		if len(crrst) > 0 {
+			// the server is closing this connection
+			c.closing = true
+			reader.(io.Closer).Close()
+		}
+		return
 	}
 	go func() {
 		asyncCallback, ok := c.seqIDMap.load(seqID)
@@ -79,11 +114,18 @@ func (c *muxCliConn) Close() error {
 	return nil
 }
 
-func (c *muxCliConn) close() error {
+func (c *muxCliConn) forceClose() error {
 	c.Connection.Close()
 	c.seqIDMap.rangeMap(func(seqID int32, msg EventHandler) {
 		msg.Recv(nil, ErrConnClosed)
 	})
+	return nil
+}
+
+func (c *muxCliConn) close() error {
+	if !c.closing {
+		return c.forceClose()
+	}
 	return nil
 }
 
