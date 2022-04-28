@@ -42,14 +42,14 @@ func TestClientReadMetainfo(t *testing.T) {
 	ctx, err = MetainfoClientHandler.ReadMeta(ctx, msg)
 	test.Assert(t, err == nil)
 
-	kvs := metainfo.GetAllBackwardValues(ctx)
+	kvs := metainfo.RecvAllBackwardValues(ctx)
 	test.Assert(t, len(kvs) == 0)
 
 	ctx = metainfo.WithBackwardValues(context.Background())
 	ctx, err = MetainfoClientHandler.ReadMeta(ctx, msg)
 	test.Assert(t, err == nil)
 
-	kvs = metainfo.GetAllBackwardValues(ctx)
+	kvs = metainfo.RecvAllBackwardValues(ctx)
 	test.Assert(t, len(kvs) == 1)
 	test.Assert(t, kvs["hello"] == "world")
 }
