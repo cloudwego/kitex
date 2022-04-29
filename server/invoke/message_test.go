@@ -23,6 +23,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+// TestNewMessage tests the NewMessage function.
 func TestNewMessage(t *testing.T) {
 	lAddr := utils.NewNetAddr("tcp", "lAddr")
 	rAddr := utils.NewNetAddr("tcp", "rAddr")

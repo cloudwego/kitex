@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
@@ -33,7 +34,7 @@ type clientConn struct {
 	s  *grpc.Stream
 }
 
-var _ net.Conn = (*clientConn)(nil)
+var _ grpcConn = (*clientConn)(nil)
 
 func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*clientConn, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
@@ -43,8 +44,18 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 	} else {
 		svcName = fmt.Sprintf("%s.%s", ri.Invocation().PackageName(), ri.Invocation().ServiceName())
 	}
+
+	host := ri.To().ServiceName()
+	if rawURL, ok := ri.To().Tag(rpcinfo.HTTPURL); ok {
+		u, err := url.Parse(rawURL)
+		if err != nil {
+			return nil, err
+		}
+		host = u.Host
+	}
+
 	s, err := tr.NewStream(ctx, &grpc.CallHdr{
-		Host: ri.To().ServiceName(),
+		Host: host,
 		// grpc method format /package.Service/Method
 		Method: fmt.Sprintf("/%s/%s", svcName, ri.Invocation().MethodName()),
 	})
@@ -72,8 +83,12 @@ func (c *clientConn) Write(b []byte) (n int, err error) {
 	if len(b) < 5 {
 		return 0, io.ErrShortWrite
 	}
-	err = c.tr.Write(c.s, b[:5], b[5:], &grpc.Options{})
-	return len(b), convertErrorFromGrpcToKitex(err)
+	return c.WriteFrame(b[:5], b[5:])
+}
+
+func (c *clientConn) WriteFrame(hdr, data []byte) (n int, err error) {
+	err = c.tr.Write(c.s, hdr, data, &grpc.Options{})
+	return len(hdr) + len(data), convertErrorFromGrpcToKitex(err)
 }
 
 func (c *clientConn) LocalAddr() net.Addr                { return c.tr.LocalAddr() }

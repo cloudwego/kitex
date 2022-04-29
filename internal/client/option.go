@@ -47,6 +47,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -99,6 +100,7 @@ type Options struct {
 	RetryContainer *retry.Container
 
 	CloseCallbacks []func() error
+	WarmUpOption   *warmup.ClientOption
 
 	// GRPC
 	GRPCConnPoolSize uint32

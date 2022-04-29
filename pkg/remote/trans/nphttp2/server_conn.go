@@ -31,7 +31,7 @@ type serverConn struct {
 	s  *grpc.Stream
 }
 
-var _ net.Conn = (*serverConn)(nil)
+var _ grpcConn = (*serverConn)(nil)
 
 func newServerConn(tr grpc.ServerTransport, s *grpc.Stream) *serverConn {
 	return &serverConn{
@@ -50,8 +50,12 @@ func (c *serverConn) Write(b []byte) (n int, err error) {
 	if len(b) < 5 {
 		return 0, io.ErrShortWrite
 	}
-	err = c.tr.Write(c.s, b[:5], b[5:], nil)
-	return len(b), convertErrorFromGrpcToKitex(err)
+	return c.WriteFrame(b[:5], b[5:])
+}
+
+func (c *serverConn) WriteFrame(hdr, data []byte) (n int, err error) {
+	err = c.tr.Write(c.s, hdr, data, nil)
+	return len(hdr) + len(data), convertErrorFromGrpcToKitex(err)
 }
 
 func (c *serverConn) LocalAddr() net.Addr                { return c.tr.LocalAddr() }

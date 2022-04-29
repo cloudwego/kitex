@@ -124,6 +124,13 @@ func (ts *transServer) BootstrapServer() (err error) {
 	ts.evl, err = netpoll.NewEventLoop(ts.onConnRead, opts...)
 	ts.Unlock()
 
+	if err == nil {
+		// Convert the listener so that closing it also stops the
+		// event loop in netpoll.
+		ts.Lock()
+		ts.ln, err = netpoll.ConvertListener(ts.ln)
+		ts.Unlock()
+	}
 	if err != nil {
 		return err
 	}
@@ -134,9 +141,17 @@ func (ts *transServer) BootstrapServer() (err error) {
 func (ts *transServer) Shutdown() (err error) {
 	ts.Lock()
 	defer ts.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), ts.opt.ExitWaitTime)
+	defer cancel()
+	if g, ok := ts.transHdlr.(remote.GracefulShutdown); ok {
+		// 1. stop listener
+		ts.ln.Close()
+
+		// 2. signal all active connections to close gracefully
+		g.GracefulShutdown(ctx)
+	}
 	if ts.evl != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), ts.opt.ExitWaitTime)
-		defer cancel()
 		err = ts.evl.Shutdown(ctx)
 	}
 	return
