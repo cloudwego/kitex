@@ -22,6 +22,7 @@ import (
 	"github.com/cloudwego/thriftgo/pkg/test"
 )
 
+// test backupPolicy string
 func TestBackupPolicy_String(T *testing.T) {
 	r := NewBackupPolicy(100)
 	r.WithRetryBreaker(0.3)

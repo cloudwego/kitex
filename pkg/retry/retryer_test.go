@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
+// test new retry container
 func TestNewRetryContainer(t *testing.T) {
 	rc := NewRetryContainerWithCB(nil, nil)
 	rc.NotifyPolicyChange(method, Policy{
@@ -260,6 +261,7 @@ func TestNewRetryContainer(t *testing.T) {
 	test.Assert(t, err != nil, err)
 }
 
+// test container dump
 func TestContainer_Dump(t *testing.T) {
 	// test backupPolicy dump
 	rc := NewRetryContainerWithCB(nil, nil)
@@ -314,7 +316,9 @@ func TestContainer_Dump(t *testing.T) {
 	test.Assert(t, testStr == msg)
 }
 
+// test failurePolicy call
 func TestFailurePolicyCall(t *testing.T) {
+	// call while rpc timeout
 	ctx := context.Background()
 	rc := NewRetryContainer()
 	failurePolicy := NewFailurePolicy()
@@ -351,6 +355,7 @@ func TestFailurePolicyCall(t *testing.T) {
 	test.Assert(t, err != nil, err)
 	test.Assert(t, !ok)
 
+	// call normal
 	failurePolicy.StopPolicy.MaxDurationMS = 0
 	err = rc.Init(&Policy{
 		Enable:        true,
@@ -359,47 +364,9 @@ func TestFailurePolicyCall(t *testing.T) {
 	})
 	test.Assert(t, err == nil, err)
 	callTimes = 0
-	prevRI = nil
 	ri = genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
-		callTimes++
-		retryCtx := ctx
-		cRI := ri
-		if callTimes > 1 {
-			retryCtx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, TransitKey, strconv.Itoa(callTimes-1))
-			if prevRI == nil {
-				prevRI = ri
-			}
-			r.Prepare(retryCtx, prevRI, cRI)
-			prevRI = cRI
-		}
-		return cRI, kerrors.ErrRPCTimeout
-	}, ri, nil)
-	test.Assert(t, err != nil, err)
-	test.Assert(t, !ok)
-}
-
-func TestFailurePolicyBackOffCall(t *testing.T) {
-	ctx := context.Background()
-	rc := NewRetryContainer()
-	failurePolicy := NewFailurePolicy()
-	failurePolicy.BackOffPolicy.BackOffType = FixedBackOffType
-	failurePolicy.BackOffPolicy.CfgItems = map[BackOffCfgKey]float64{
-		FixMSBackOffCfgKey: 100.0,
-	}
-	err := rc.Init(&Policy{
-		Enable:        true,
-		Type:          0,
-		FailurePolicy: failurePolicy,
-	})
-	test.Assert(t, err == nil, err)
-	callTimes := 0
-	var prevRI rpcinfo.RPCInfo
-	ri := genRPCInfo()
-	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
 		callTimes++
 		retryCtx := ctx
 		cRI := ri
@@ -418,6 +385,7 @@ func TestFailurePolicyBackOffCall(t *testing.T) {
 	test.Assert(t, ok)
 }
 
+// test backupPolicy call while rpcTime = 100ms
 func TestBackupPolicyCall(t *testing.T) {
 	ctx := context.Background()
 	rc := NewRetryContainer()
@@ -453,6 +421,7 @@ func TestBackupPolicyCall(t *testing.T) {
 	test.Assert(t, !ok)
 }
 
+// test policy invalid call
 func TestPolicyInvalidCall(t *testing.T) {
 	ctx := context.Background()
 	rc := NewRetryContainer()

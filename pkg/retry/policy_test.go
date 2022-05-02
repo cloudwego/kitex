@@ -31,6 +31,7 @@ var (
 	method = "test"
 )
 
+// test new failurePolicy
 func TestFailureRetryPolicy(t *testing.T) {
 	fp := NewFailurePolicy()
 
@@ -113,6 +114,7 @@ func TestFailureRetryPolicy(t *testing.T) {
 		"DDLStop:false CBPolicy:{ErrorRate:0.1}} BackOffPolicy:<nil> RetrySameNode:false}", fp)
 }
 
+// test new backupPolicy
 func TestBackupRequest(t *testing.T) {
 	bp := NewBackupPolicy(20)
 
@@ -137,6 +139,7 @@ func TestBackupRequest(t *testing.T) {
 	test.Assert(t, bp.Equals(&bp3))
 }
 
+// test new policy both not nil
 func TestRetryPolicyBothNotNil(t *testing.T) {
 	p := Policy{
 		Enable:        true,
@@ -167,6 +170,7 @@ func TestRetryPolicyBothNotNil(t *testing.T) {
 	test.Assert(t, !fr.enable)
 }
 
+// test new policy both nil
 func TestRetryPolicyBothNil(t *testing.T) {
 	p := Policy{}
 	jsonRet, err := jsoni.MarshalToString(p)
@@ -185,6 +189,7 @@ func TestRetryPolicyBothNil(t *testing.T) {
 	test.Assert(t, r == nil, r)
 }
 
+// test failurePolicy update
 func TestRetryPolicyFailure(t *testing.T) {
 	p := Policy{
 		Enable:        true,
@@ -232,6 +237,7 @@ func TestRetryPolicyFailure(t *testing.T) {
 	test.Assert(t, fr.policy.Equals(p.FailurePolicy))
 }
 
+// test policy equal
 func TestPolicyNotEqual(T *testing.T) {
 	var p, policy Policy
 
