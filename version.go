@@ -19,5 +19,5 @@ package kitex
 // Name and Version info of this framework, used for statistics and debug
 const (
 	Name    = "Kitex"
-	Version = "v0.3.0"
+	Version = "v0.3.1"
 )
