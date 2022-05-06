@@ -137,8 +137,14 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		dynamicWindow = false
 	}
 
-	writeBufSize := opts.WriteBufferSize
-	readBufSize := opts.ReadBufferSize
+	writeBufSize := defaultWriteBufferSize
+	readBufSize := defaultReadBufferSize
+	if opts.WriteBufferSize > 0 {
+		writeBufSize = opts.WriteBufferSize
+	}
+	if opts.ReadBufferSize > 0 {
+		readBufSize = opts.ReadBufferSize
+	}
 	maxHeaderListSize := defaultClientMaxHeaderListSize
 	if opts.MaxHeaderListSize != nil {
 		maxHeaderListSize = *opts.MaxHeaderListSize
