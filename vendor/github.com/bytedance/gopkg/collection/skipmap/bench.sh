@@ -1,0 +1,1 @@
+go test -run=NOTEST -bench=. -count=10 -timeout=60m -benchtime=100000x -benchmem > x.txt && benchstat x.txt
