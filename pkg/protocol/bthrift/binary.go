@@ -152,7 +152,9 @@ func (binaryProtocol) WriteBinary(buf, value []byte) int {
 }
 
 func (binaryProtocol) WriteStringNocopy(buf []byte, binaryWriter BinaryWriter, value string) int {
-	return Binary.WriteBinaryNocopy(buf, binaryWriter, utils.StringToSliceByte(value))
+	l := Binary.WriteI32(buf, int32(len(value)))
+	copy(buf[l:], value)
+	return l + len(value)
 }
 
 func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, value []byte) int {
