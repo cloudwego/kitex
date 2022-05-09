@@ -69,7 +69,7 @@ func TestConsistPicker_Next_Nil(t *testing.T) {
 	}
 
 	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
+	picker := cb.GetPicker(context.TODO(), e)
 	test.Assert(t, picker.Next(context.TODO(), nil) == nil)
 
 	e = discovery.Result{
@@ -79,7 +79,7 @@ func TestConsistPicker_Next_Nil(t *testing.T) {
 	}
 
 	cb = NewConsistBalancer(newTestConsistentHashOption())
-	picker = cb.GetPicker(e)
+	picker = cb.GetPicker(context.TODO(), e)
 	test.Assert(t, picker.Next(context.TODO(), nil) == nil)
 	test.Assert(t, cb.Name() == "consist")
 }
@@ -99,7 +99,7 @@ func TestConsistPicker_Replica(t *testing.T) {
 	}
 
 	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
+	picker := cb.GetPicker(context.TODO(), e)
 	first := picker.Next(context.TODO(), nil)
 	second := picker.Next(context.TODO(), nil)
 	test.Assert(t, first != second)
@@ -118,7 +118,7 @@ func TestConsistPicker_Next_NoCache(t *testing.T) {
 	}
 
 	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
+	picker := cb.GetPicker(context.TODO(), e)
 	test.Assert(t, picker.Next(context.TODO(), nil) == ins)
 	test.Assert(t, picker.Next(context.TODO(), nil) == nil)
 }
@@ -139,16 +139,16 @@ func TestConsistPicker_Next_NoCache_Consist(t *testing.T) {
 	}
 
 	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
+	picker := cb.GetPicker(context.TODO(), e)
 	ins := picker.Next(context.TODO(), nil)
 	for i := 0; i < 100; i++ {
-		picker := cb.GetPicker(e)
+		picker := cb.GetPicker(context.TODO(), e)
 		test.Assert(t, picker.Next(context.TODO(), nil) == ins)
 	}
 
 	cb = NewConsistBalancer(opt)
 	for i := 0; i < 100; i++ {
-		picker := cb.GetPicker(e)
+		picker := cb.GetPicker(context.TODO(), e)
 		test.Assert(t, picker.Next(context.TODO(), nil) == ins)
 	}
 }
@@ -166,7 +166,7 @@ func TestConsistPicker_Next_Cache(t *testing.T) {
 	}
 
 	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
+	picker := cb.GetPicker(context.TODO(), e)
 	test.Assert(t, picker.Next(context.TODO(), nil) == ins)
 }
 
@@ -190,16 +190,16 @@ func TestConsistPicker_Next_Cache_Consist(t *testing.T) {
 	}
 
 	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
+	picker := cb.GetPicker(context.TODO(), e)
 	ins := picker.Next(context.TODO(), nil)
 	for i := 0; i < 100; i++ {
-		picker := cb.GetPicker(e)
+		picker := cb.GetPicker(context.TODO(), e)
 		test.Assert(t, picker.Next(context.TODO(), nil) == ins)
 	}
 
 	cb = NewConsistBalancer(opt)
 	for i := 0; i < 100; i++ {
-		picker := cb.GetPicker(e)
+		picker := cb.GetPicker(context.TODO(), e)
 		test.Assert(t, picker.Next(context.TODO(), nil) == ins)
 	}
 }
@@ -226,7 +226,7 @@ func TestConsistBalance(t *testing.T) {
 
 	cb := NewConsistBalancer(opt)
 	for i := 0; i < 100000; i++ {
-		picker := cb.GetPicker(e)
+		picker := cb.GetPicker(context.TODO(), e)
 		ins := picker.Next(context.TODO(), nil)
 		m[ins]++
 		if p, ok := picker.(internal.Reusable); ok {
@@ -257,7 +257,7 @@ func TestWeightedConsistBalance(t *testing.T) {
 
 	cb := NewConsistBalancer(opt)
 	for i := 0; i < 100000; i++ {
-		picker := cb.GetPicker(e)
+		picker := cb.GetPicker(context.TODO(), e)
 		ins := picker.Next(context.TODO(), nil)
 		m[ins]++
 	}
@@ -276,7 +276,7 @@ func TestConsistPicker_Reblance(t *testing.T) {
 	cb := NewConsistBalancer(opt)
 	record := make(map[string]discovery.Instance)
 	for i := 0; i < 10; i++ {
-		picker := cb.GetPicker(e)
+		picker := cb.GetPicker(context.TODO(), e)
 		key := strconv.Itoa(i)
 		ctx = context.WithValue(ctx, keyCtxKey, key)
 		record[key] = picker.Next(ctx, nil)
@@ -287,7 +287,7 @@ func TestConsistPicker_Reblance(t *testing.T) {
 	}
 	cb.(Rebalancer).Rebalance(c)
 	for i := 0; i < 10; i++ {
-		picker := cb.GetPicker(e)
+		picker := cb.GetPicker(context.TODO(), e)
 		key := strconv.Itoa(i)
 		ctx = context.WithValue(ctx, keyCtxKey, key)
 		test.DeepEqual(t, record[key], picker.Next(ctx, nil))
@@ -307,13 +307,13 @@ func BenchmarkNewConsistPicker_NoCache(bb *testing.B) {
 				CacheKey:  "",
 				Instances: inss,
 			}
-			picker := balancer.GetPicker(e)
+			picker := balancer.GetPicker(ctx, e)
 			picker.Next(ctx, nil)
 			picker.(internal.Reusable).Recycle()
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				picker := balancer.GetPicker(e)
+				picker := balancer.GetPicker(ctx, e)
 				// picker.Next(ctx, nil)
 				if r, ok := picker.(internal.Reusable); ok {
 					r.Recycle()
@@ -337,13 +337,13 @@ func BenchmarkNewConsistPicker(bb *testing.B) {
 				CacheKey:  "test",
 				Instances: inss,
 			}
-			picker := balancer.GetPicker(e)
+			picker := balancer.GetPicker(ctx, e)
 			picker.Next(ctx, nil)
 			picker.(internal.Reusable).Recycle()
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				picker := balancer.GetPicker(e)
+				picker := balancer.GetPicker(ctx, e)
 				picker.Next(ctx, nil)
 				if r, ok := picker.(internal.Reusable); ok {
 					r.Recycle()

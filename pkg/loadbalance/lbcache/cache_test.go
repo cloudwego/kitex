@@ -61,7 +61,7 @@ func TestBuilder(t *testing.T) {
 	test.Assert(t, b != nil)
 	bl, err := b.(*BalancerFactory).Get(context.Background(), nil)
 	test.Assert(t, err == nil)
-	test.Assert(t, bl.GetPicker() != nil)
+	test.Assert(t, bl.GetPicker(context.TODO()) != nil)
 	dump := Dump()
 	dumpJson, err := json.Marshal(dump)
 	test.Assert(t, err == nil)
@@ -94,7 +94,7 @@ func TestBalancerCache(t *testing.T) {
 		info := rpcinfo.NewEndpointInfo("svc", "", nil, nil)
 		b, err := blf.Get(context.Background(), info)
 		test.Assert(t, err == nil)
-		p := b.GetPicker()
+		p := b.GetPicker(context.TODO())
 		for a := 0; a < count; a++ {
 			addr := p.Next(context.Background(), nil).Address().String()
 			fmt.Printf("count: %d addr: %s\n", i, addr)

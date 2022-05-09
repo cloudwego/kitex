@@ -207,10 +207,10 @@ func (bl *Balancer) GetResult() (res discovery.Result, ok bool) {
 }
 
 // GetPicker equal to loadbalance.Balancer without pass discovery.Result, because we cache the result
-func (bl *Balancer) GetPicker() loadbalance.Picker {
+func (bl *Balancer) GetPicker(ctx context.Context) loadbalance.Picker {
 	atomic.StoreInt32(&bl.expire, 0)
 	res := bl.res.Load().(discovery.Result)
-	return bl.b.balancer.GetPicker(res)
+	return bl.b.balancer.GetPicker(ctx, res)
 }
 
 func (bl *Balancer) close() {

@@ -312,7 +312,7 @@ func (cb *consistBalancer) AddToDaemon() {
 }
 
 // GetPicker implements the Loadbalancer interface.
-func (cb *consistBalancer) GetPicker(e discovery.Result) Picker {
+func (cb *consistBalancer) GetPicker(ctx context.Context, e discovery.Result) Picker {
 	var ci *consistInfo
 	if e.Cacheable {
 		cii, ok := cb.cachedConsistInfo.Load(e.CacheKey)

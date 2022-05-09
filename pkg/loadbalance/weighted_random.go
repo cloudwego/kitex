@@ -178,7 +178,7 @@ func NewWeightedBalancer() Loadbalancer {
 }
 
 // GetPicker implements the Loadbalancer interface.
-func (wb *weightedBalancer) GetPicker(e discovery.Result) Picker {
+func (wb *weightedBalancer) GetPicker(ctx context.Context, e discovery.Result) Picker {
 	var w *weightInfo
 	if e.Cacheable {
 		wi, ok := wb.cachedWeightInfo.Load(e.CacheKey)

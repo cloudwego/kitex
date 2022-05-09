@@ -31,13 +31,13 @@ import (
 func TestWeightedBalancer_GetPicker(t *testing.T) {
 	balancer := NewWeightedBalancer()
 	// nil
-	picker := balancer.GetPicker(discovery.Result{})
+	picker := balancer.GetPicker(context.TODO(), discovery.Result{})
 	test.Assert(t, picker != nil)
 	dp, ok := picker.(*DummyPicker)
 	test.Assert(t, ok && dp != nil)
 
 	// invalid
-	picker = balancer.GetPicker(discovery.Result{
+	picker = balancer.GetPicker(context.TODO(), discovery.Result{
 		Instances: []discovery.Instance{
 			discovery.NewInstance("tcp", "addr1", -10, nil),
 			discovery.NewInstance("tcp", "addr2", -20, nil),
@@ -51,7 +51,7 @@ func TestWeightedBalancer_GetPicker(t *testing.T) {
 	insList := []discovery.Instance{
 		discovery.NewInstance("tcp", "addr1", 10, nil),
 	}
-	picker = balancer.GetPicker(discovery.Result{
+	picker = balancer.GetPicker(context.TODO(), discovery.Result{
 		Instances: insList,
 	})
 	test.Assert(t, picker != nil)
@@ -64,7 +64,7 @@ func TestWeightedBalancer_GetPicker(t *testing.T) {
 		discovery.NewInstance("tcp", "addr2", 20, nil),
 		discovery.NewInstance("tcp", "addr3", 30, nil),
 	}
-	picker = balancer.GetPicker(discovery.Result{
+	picker = balancer.GetPicker(context.TODO(), discovery.Result{
 		Instances: insList,
 	})
 	test.Assert(t, picker != nil)
@@ -75,7 +75,7 @@ func TestWeightedBalancer_GetPicker(t *testing.T) {
 		discovery.NewInstance("tcp", "addr2", 10, nil),
 		discovery.NewInstance("tcp", "addr3", 10, nil),
 	}
-	picker = balancer.GetPicker(discovery.Result{
+	picker = balancer.GetPicker(context.TODO(), discovery.Result{
 		Instances: insList,
 	})
 	test.Assert(t, picker != nil)
@@ -88,12 +88,12 @@ func TestWeightedPicker_Next(t *testing.T) {
 	balancer := NewWeightedBalancer()
 	ctx := context.Background()
 	// nil
-	picker := balancer.GetPicker(discovery.Result{})
+	picker := balancer.GetPicker(ctx, discovery.Result{})
 	ins := picker.Next(ctx, nil)
 	test.Assert(t, ins == nil)
 
 	// empty instance
-	picker = balancer.GetPicker(discovery.Result{
+	picker = balancer.GetPicker(ctx, discovery.Result{
 		Instances: make([]discovery.Instance, 0),
 	})
 	ins = picker.Next(ctx, nil)
@@ -104,7 +104,7 @@ func TestWeightedPicker_Next(t *testing.T) {
 		discovery.NewInstance("tcp", "addr1", 10, nil),
 	}
 	for i := 0; i < 100; i++ {
-		picker := balancer.GetPicker(discovery.Result{
+		picker := balancer.GetPicker(ctx, discovery.Result{
 			Instances: insList,
 		})
 		ins := picker.Next(ctx, nil)
@@ -130,7 +130,7 @@ func TestWeightedPicker_Next(t *testing.T) {
 	n := 10000000
 	pickedStat := map[int]int{}
 	for i := 0; i < n; i++ {
-		picker := balancer.GetPicker(discovery.Result{
+		picker := balancer.GetPicker(ctx, discovery.Result{
 			Instances: insList,
 		})
 		ins := picker.Next(ctx, nil)
@@ -155,7 +155,7 @@ func TestWeightedPicker_Next(t *testing.T) {
 		discovery.NewInstance("tcp", "addr1", 10, nil),
 		discovery.NewInstance("tcp", "addr2", -10, nil),
 	}
-	picker = balancer.GetPicker(discovery.Result{
+	picker = balancer.GetPicker(ctx, discovery.Result{
 		Instances: insList,
 	})
 	test.Assert(t, picker.Next(ctx, nil) != nil)
@@ -166,7 +166,7 @@ func TestWeightedPicker_Next(t *testing.T) {
 		discovery.NewInstance("tcp", "addr1", 10, nil),
 		discovery.NewInstance("tcp", "addr2", -20, nil),
 	}
-	picker = balancer.GetPicker(discovery.Result{
+	picker = balancer.GetPicker(ctx, discovery.Result{
 		Instances: insList,
 	})
 	test.Assert(t, picker.Next(ctx, nil) != nil)
@@ -187,7 +187,7 @@ func TestWeightedPicker_NoMoreInstance(t *testing.T) {
 		discovery.NewInstance("tcp", "addr6", 500, nil),
 	}
 
-	picker := balancer.GetPicker(discovery.Result{
+	picker := balancer.GetPicker(ctx, discovery.Result{
 		Instances: insList,
 	})
 
@@ -227,13 +227,13 @@ func BenchmarkNewWeightedPicker(bb *testing.B) {
 				CacheKey:  "test",
 				Instances: inss,
 			}
-			picker := balancer.GetPicker(e)
+			picker := balancer.GetPicker(ctx, e)
 			picker.Next(ctx, nil)
 			picker.(internal.Reusable).Recycle()
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				picker := balancer.GetPicker(e)
+				picker := balancer.GetPicker(ctx, e)
 				picker.Next(ctx, nil)
 				if r, ok := picker.(internal.Reusable); ok {
 					r.Recycle()

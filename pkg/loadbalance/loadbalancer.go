@@ -29,7 +29,7 @@ type Picker interface {
 
 // Loadbalancer generates pickers for the given service discovery result.
 type Loadbalancer interface {
-	GetPicker(discovery.Result) Picker
+	GetPicker(context.Context, discovery.Result) Picker
 	Name() string // unique key
 }
 
@@ -56,7 +56,7 @@ type SynthesizedLoadbalancer struct {
 }
 
 // GetPicker implements the Loadbalancer interface.
-func (slb *SynthesizedLoadbalancer) GetPicker(entry discovery.Result) Picker {
+func (slb *SynthesizedLoadbalancer) GetPicker(ctx context.Context, entry discovery.Result) Picker {
 	if slb.GetPickerFunc == nil {
 		return nil
 	}

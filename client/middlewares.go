@@ -100,7 +100,7 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 					return kerrors.ErrServiceDiscovery.WithCause(err)
 				}
 
-				picker := lb.GetPicker()
+				picker := lb.GetPicker(ctx)
 				if r, ok := picker.(internal.Reusable); ok {
 					defer r.Recycle()
 				}
