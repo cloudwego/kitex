@@ -198,6 +198,14 @@ func (bl *Balancer) refresh() {
 	bl.res.Store(res)
 }
 
+// GetResult returns the discovery result that the Balancer holds.
+func (bl *Balancer) GetResult() (res discovery.Result, ok bool) {
+	if v := bl.res.Load(); v != nil {
+		return v.(discovery.Result), true
+	}
+	return
+}
+
 // GetPicker equal to loadbalance.Balancer without pass discovery.Result, because we cache the result
 func (bl *Balancer) GetPicker() loadbalance.Picker {
 	atomic.StoreInt32(&bl.expire, 0)
