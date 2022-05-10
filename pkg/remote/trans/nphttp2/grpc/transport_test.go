@@ -1164,7 +1164,12 @@ func TestServerConnDecoupledFromApplicationRead(t *testing.T) {
 }
 
 func TestServerWithMisbehavedClient(t *testing.T) {
+	var wg sync.WaitGroup
 	server := setUpServerOnly(t, 0, &ServerConfig{}, suspended)
+	defer func() {
+		wg.Wait()
+		server.stop()
+	}()
 	defer server.stop()
 	// Create a client that can override server stream quota.
 	mconn, err := netpoll.NewDialer().DialTimeout("tcp", server.lis.Addr().String(), time.Second)
@@ -1185,7 +1190,9 @@ func TestServerWithMisbehavedClient(t *testing.T) {
 	if err := framer.WriteSettings(); err != nil {
 		t.Fatalf("Error while writing settings: %v", err)
 	}
+	wg.Add(1)
 	go func() { // Launch a reader for this misbehaving client.
+		defer wg.Done()
 		for {
 			frame, err := framer.ReadFrame()
 			if err != nil {
