@@ -340,6 +340,22 @@ func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 	if length == 0 {
 		return out.WriteListEnd()
 	}
+	// check the type of each elem in the list is the same
+	if length > 1 {
+		tt0, _, err := typeOf(l[0], t, opt)
+		if err != nil {
+			return err
+		}
+		for i := 1; i < length; i = i + 1 {
+			ttn, _, err := typeOf(l[i], t, opt)
+			if err != nil {
+				return err
+			}
+			if tt0 != ttn {
+				return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("echo elem of type is not same (%v)", l))
+			}
+		}
+	}
 	writer, err := nextWriter(l[0], t.Elem, opt)
 	if err != nil {
 		return err
