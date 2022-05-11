@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
+	"sync/atomic"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/kitex/client/callopt"
@@ -313,15 +314,15 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		return err
 	}
 
-	callTimes := 0
+	var callTimes int32
 	var prevRI rpcinfo.RPCInfo
 	recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, error) {
-		callTimes++
+		curCallTimes := int(atomic.AddInt32(&callTimes, 1))
 		retryCtx := ctx
 		cRI := ri
-		if callTimes > 1 {
+		if curCallTimes > 1 {
 			retryCtx, cRI = kc.initRPCInfo(ctx, method)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(callTimes-1))
+			retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(curCallTimes-1))
 			if prevRI == nil {
 				prevRI = ri
 			}
