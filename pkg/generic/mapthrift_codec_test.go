@@ -34,11 +34,11 @@ func TestMapThriftCodec(t *testing.T) {
 	mtc, err := newMapThriftCodec(p, thriftCodec)
 	test.Assert(t, err == nil)
 	defer mtc.Close()
-	t.Log(mtc.Name())
+	test.Assert(t, mtc.Name() == "MapThrift")
 
 	method, err := mtc.getMethod(nil, "Test")
-	test.Assert(t, err == nil, err)
-	test.Assert(t, method != nil)
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
 
 	ctx := context.Background()
 	sendMsg := initMapSendMsg(transport.TTHeader)
@@ -46,16 +46,16 @@ func TestMapThriftCodec(t *testing.T) {
 	// Marshal side
 	out := remote.NewWriterBuffer(256)
 	err = mtc.Marshal(ctx, sendMsg, out)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 
 	// UnMarshal side
 	recvMsg := initMapRecvMsg()
 	buf, err := out.Bytes()
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 	recvMsg.SetPayloadLen(len(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = mtc.Unmarshal(ctx, recvMsg, in)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 }
 
 func TestMapExceptionError(t *testing.T) {
@@ -72,7 +72,7 @@ func TestMapExceptionError(t *testing.T) {
 	emptyMethodMsg := remote.NewMessage(nil, nil, emptyMethodRi, remote.Exception, remote.Client)
 	// Marshal side
 	err = mtc.Marshal(ctx, emptyMethodMsg, out)
-	test.Assert(t, err != nil)
+	test.Assert(t, err.Error() == "empty methodName in thrift Marshal")
 
 	// Exception MsgType test
 	exceptionMsgTypeInk := rpcinfo.NewInvocation("", "Test")

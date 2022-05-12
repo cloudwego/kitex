@@ -33,11 +33,11 @@ func TestJsonThriftCodec(t *testing.T) {
 	jtc, err := newJsonThriftCodec(p, thriftCodec)
 	test.Assert(t, err == nil)
 	defer jtc.Close()
-	t.Log(jtc.Name())
+	test.Assert(t, jtc.Name() == "JSONThrift")
 
 	method, err := jtc.getMethod(nil, "Test")
-	test.Assert(t, err == nil, err)
-	test.Assert(t, method != nil)
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
 
 	ctx := context.Background()
 	sendMsg := initJsonSendMsg(transport.TTHeader)
@@ -45,16 +45,16 @@ func TestJsonThriftCodec(t *testing.T) {
 	// Marshal side
 	out := remote.NewWriterBuffer(256)
 	err = jtc.Marshal(ctx, sendMsg, out)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 
 	// UnMarshal side
 	recvMsg := initJsonRecvMsg()
 	buf, err := out.Bytes()
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 	recvMsg.SetPayloadLen(len(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = jtc.Unmarshal(ctx, recvMsg, in)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 }
 
 func TestJsonExceptionError(t *testing.T) {
@@ -71,7 +71,7 @@ func TestJsonExceptionError(t *testing.T) {
 	emptyMethodMsg := remote.NewMessage(nil, nil, emptyMethodRi, remote.Exception, remote.Client)
 	// Marshal side
 	err = jtc.Marshal(ctx, emptyMethodMsg, out)
-	test.Assert(t, err != nil)
+	test.Assert(t, err.Error() == "empty methodName in thrift Marshal")
 
 	// Exception MsgType test
 	exceptionMsgTypeInk := rpcinfo.NewInvocation("", "Test")

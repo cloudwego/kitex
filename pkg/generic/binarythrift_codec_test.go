@@ -116,15 +116,14 @@ func TestBinaryThriftCodecExceptionError(t *testing.T) {
 	rwbuf := remote.NewReaderWriterBuffer(1024)
 	// test data is empty
 	err := btc.Marshal(ctx, cliMsg, rwbuf)
-	test.Assert(t, err != nil, err)
+	test.Assert(t, err.Error() == "invalid marshal data in rawThriftBinaryCodec: nil")
 	cliMsg.DataFunc = func() interface{} {
 		return &remote.TransError{}
 	}
 
-	// test Exception
 	// empty method
 	err = btc.Marshal(ctx, cliMsg, rwbuf)
-	test.Assert(t, err != nil)
+	test.Assert(t, err.Error() == "rawThriftBinaryCodec Marshal exception failed, err: empty methodName in thrift Marshal")
 
 	cliMsg.RPCInfoFunc = func() rpcinfo.RPCInfo {
 		return newMockRPCInfo()
@@ -132,7 +131,7 @@ func TestBinaryThriftCodecExceptionError(t *testing.T) {
 	err = btc.Marshal(ctx, cliMsg, rwbuf)
 	test.Assert(t, err == nil)
 	err = btc.Unmarshal(ctx, cliMsg, rwbuf)
-	test.Assert(t, err != nil)
+	test.Assert(t, err.Error() == "unknown application exception")
 
 	// test server role
 	cliMsg.MessageTypeFunc = func() remote.MessageType {

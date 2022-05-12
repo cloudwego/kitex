@@ -49,7 +49,7 @@ func TestHttpThriftCodec(t *testing.T) {
 	htc, err := newHTTPThriftCodec(p, thriftCodec)
 	test.Assert(t, err == nil)
 	defer htc.Close()
-	t.Log(htc.Name())
+	test.Assert(t, htc.Name() == "HttpThrift")
 
 	req := &HTTPRequest{
 		Method: http.MethodGet,
@@ -57,10 +57,10 @@ func TestHttpThriftCodec(t *testing.T) {
 	}
 	// wrong
 	method, err := htc.getMethod("test")
-	test.Assert(t, err != nil && method == nil, err)
+	test.Assert(t, err.Error() == "req is invalid, need descriptor.HTTPRequest" && method == nil)
 	// right
 	method, err = htc.getMethod(req)
-	test.Assert(t, err == nil && method != nil, err)
+	test.Assert(t, err == nil && method.Name == "BinaryEcho")
 
 	ctx := context.Background()
 	sendMsg := initHttpSendMsg(transport.TTHeader)
@@ -68,16 +68,16 @@ func TestHttpThriftCodec(t *testing.T) {
 	// Marshal side
 	out := remote.NewWriterBuffer(256)
 	err = htc.Marshal(ctx, sendMsg, out)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 
 	// UnMarshal side
 	recvMsg := initHttpRecvMsg()
 	buf, err := out.Bytes()
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 	recvMsg.SetPayloadLen(len(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = htc.Unmarshal(ctx, recvMsg, in)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 }
 
 func initHttpSendMsg(tp transport.Protocol) remote.Message {

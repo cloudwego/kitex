@@ -93,5 +93,6 @@ func TestCircularDependency(t *testing.T) {
 
 func TestThriftContentProvider(t *testing.T) {
 	p, err := NewThriftContentProvider("test", nil)
-	test.Assert(t, err != nil && p == nil)
+	test.Assert(t, strings.Contains(err.Error(), "parse error"))
+	test.Assert(t, p == nil)
 }

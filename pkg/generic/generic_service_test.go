@@ -19,6 +19,7 @@ package generic
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -56,7 +57,7 @@ func (m *testRead) Read(ctx context.Context, method string, in thrift.TProtocol)
 
 func TestGenericService(t *testing.T) {
 	ctx := context.Background()
-	tt := "test"
+	method := "test"
 	out := remote.NewWriterBuffer(256)
 	tProto := codecThrift.NewBinaryProtocol(out)
 	wInner, rInner := &testWrite{}, &testRead{}
@@ -67,20 +68,20 @@ func TestGenericService(t *testing.T) {
 	test.Assert(t, ok == true)
 	base := a.GetOrSetBase()
 	test.Assert(t, base != nil)
-	a.SetCodec(tt)
+	a.SetCodec(struct{}{})
 	// write not ok
 	err := a.Write(ctx, nil)
-	test.Assert(t, err != nil)
+	test.Assert(t, err.Error() == "unexpected Args writer type: struct {}")
 	// write ok
 	a.SetCodec(wInner)
 	err = a.Write(ctx, tProto)
 	test.Assert(t, err == nil)
 	// read not ok
-	err = a.Read(ctx, tt, nil)
-	test.Assert(t, err != nil)
+	err = a.Read(ctx, method, nil)
+	test.Assert(t, strings.Contains(err.Error(), "unexpected Args reader type"))
 	// read ok
 	a.SetCodec(rInner)
-	err = a.Read(ctx, tt, tProto)
+	err = a.Read(ctx, method, tProto)
 	test.Assert(t, err == nil)
 
 	// Result...
@@ -90,37 +91,37 @@ func TestGenericService(t *testing.T) {
 
 	// write not ok
 	err = r.Write(ctx, nil)
-	test.Assert(t, err != nil)
+	test.Assert(t, err.Error() == "unexpected Result writer type: <nil>")
 	// write ok
 	r.SetCodec(wInner)
 	err = r.Write(ctx, tProto)
 	test.Assert(t, err == nil)
 	// read not ok
-	err = r.Read(ctx, tt, nil)
-	test.Assert(t, err != nil)
+	err = r.Read(ctx, method, nil)
+	test.Assert(t, err.Error() == "unexpected Result reader type: *generic.testWrite")
 	// read ok
 	r.SetCodec(rInner)
-	err = r.Read(ctx, tt, tProto)
+	err = r.Read(ctx, method, tProto)
 	test.Assert(t, err == nil)
 
 	r.SetSuccess(nil)
 	success := r.GetSuccess()
 	test.Assert(t, success == nil)
-	r.SetSuccess(tt)
+	r.SetSuccess(method)
 	success = r.GetSuccess()
-	test.Assert(t, success.(string) == tt)
+	test.Assert(t, success.(string) == method)
 
 	// test callHandler...
 	handler := &testImpl{}
 	a.Method = ""
 	err = callHandler(ctx, handler, arg, result)
-	test.Assert(t, err != nil)
-	a.Method = tt
+	test.Assert(t, err.Error() == "method is invalid, method: ")
+	a.Method = method
 	err = callHandler(ctx, handler, arg, result)
 	test.Assert(t, err == nil)
 }
 
 func TestServiceInfo(t *testing.T) {
 	s := ServiceInfo(serviceinfo.Thrift)
-	t.Log(s.ServiceName)
+	test.Assert(t, s.ServiceName == "$GenericService")
 }

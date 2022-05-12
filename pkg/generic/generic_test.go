@@ -19,6 +19,7 @@ package generic
 import (
 	"bytes"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -30,49 +31,50 @@ func TestBinaryThriftGeneric(t *testing.T) {
 	defer g.Close()
 
 	test.Assert(t, g.Framed() == true)
-
+	test.Assert(t, g.PayloadCodec().Name() == "RawThriftBinary")
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
 	method, err := g.GetMethod(nil, "Test")
-	test.Assert(t, err == nil, err)
-	test.Assert(t, method != nil)
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
 
-	t.Log(g.PayloadCodec().Name())
 }
 
 func TestMapThriftGeneric(t *testing.T) {
 	p, err := NewThriftFileProvider("./map_test/idl/mock.thrift")
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 
 	// new
 	g, err := MapThriftGeneric(p)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 	defer g.Close()
 
+	test.Assert(t, g.PayloadCodec().Name() == "MapThrift")
+
 	err = SetBinaryWithBase64(g, true)
-	test.Assert(t, err != nil)
+	test.Assert(t, strings.Contains(err.Error(), "Base64Binary is unavailable"))
 	test.Assert(t, g.Framed() == false)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
 	method, err := g.GetMethod(nil, "Test")
-	test.Assert(t, err == nil, err)
-	test.Assert(t, method != nil)
-
-	t.Log(g.PayloadCodec().Name())
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
 }
 
 func TestHTTPThriftGeneric(t *testing.T) {
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 
 	// new
 	g, err := HTTPThriftGeneric(p)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 	defer g.Close()
 
+	test.Assert(t, g.PayloadCodec().Name() == "HttpThrift")
+
 	err = SetBinaryWithBase64(g, true)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 
 	test.Assert(t, g.Framed() == false)
 
@@ -88,32 +90,30 @@ func TestHTTPThriftGeneric(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
 	test.Assert(t, err == nil)
 	customReq, err := FromHTTPRequest(req)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 
 	method, err := g.GetMethod(customReq, "Test")
-	test.Assert(t, err == nil, err)
-	test.Assert(t, method != nil)
-
-	t.Log(g.PayloadCodec().Name())
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "BinaryEcho")
 }
 
 func TestJSONThriftGeneric(t *testing.T) {
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 
 	g, err := JSONThriftGeneric(p)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 	defer g.Close()
 
+	test.Assert(t, g.PayloadCodec().Name() == "JSONThrift")
+
 	err = SetBinaryWithBase64(g, true)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err == nil)
 	test.Assert(t, g.Framed() == false)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
 	method, err := g.GetMethod(nil, "Test")
-	test.Assert(t, err == nil, err)
-	test.Assert(t, method != nil)
-
-	t.Log(g.PayloadCodec().Name())
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
 }
