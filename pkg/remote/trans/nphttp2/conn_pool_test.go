@@ -31,7 +31,7 @@ func TestConnPool(t *testing.T) {
 	ctx := newMockCtxWithRPCInfo()
 
 	// test Get()
-	conn, err := connPool.Get(ctx, "tcp", mockAddr0, opt)
+	_, err := connPool.Get(ctx, "tcp", mockAddr0, opt)
 	test.Assert(t, err == nil, err)
 
 	// test connection reuse
@@ -49,12 +49,6 @@ func TestConnPool(t *testing.T) {
 
 	// test Clean()
 	connPool.Clean("tcp", mockAddr0)
-
-	// test put()
-	err = connPool.Put(conn)
-	test.Assert(t, err == nil, err)
-
-	// test Discard()
-	err = connPool.Discard(conn)
-	test.Assert(t, err == nil, err)
+	_, ok := connPool.conns.Load(mockAddr0)
+	test.Assert(t, !ok)
 }

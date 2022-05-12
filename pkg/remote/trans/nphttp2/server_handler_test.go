@@ -66,8 +66,8 @@ func TestServerHandler(t *testing.T) {
 		test.Assert(t, err == nil, err)
 	}()
 
-	// sleep 100 mills so server can handle metaHeader frame
-	time.Sleep(time.Millisecond * 100)
+	// sleep 50 mills so server can handle metaHeader frame
+	time.Sleep(time.Millisecond * 50)
 
 	// test OnActive()
 	_, err = handler.OnActive(context.Background(), npConn)

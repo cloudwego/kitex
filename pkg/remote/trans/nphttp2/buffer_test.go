@@ -22,7 +22,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
-func TestNewBuffer(t *testing.T) {
+func TestBuffer(t *testing.T) {
 	// test NewBuffer()
 	grpcConn := newMockNpConn(mockAddr0)
 	buffer := newBuffer(grpcConn)

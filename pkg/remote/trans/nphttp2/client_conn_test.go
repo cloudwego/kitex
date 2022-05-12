@@ -18,7 +18,6 @@ package nphttp2
 
 import (
 	"testing"
-	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -59,24 +58,4 @@ func TestClientConn(t *testing.T) {
 	n, err = clientConn.Write([]byte(""))
 	test.Assert(t, err != nil, err)
 	test.Assert(t, n == 0)
-
-	// test Header()
-	setDontWaitHeader(clientConn.s)
-	_, err = clientConn.Header()
-	test.Assert(t, err == nil, err)
-
-	// test Trailer()
-	_ = clientConn.Trailer()
-
-	// test SetDeadline()
-	err = clientConn.SetDeadline(time.Now())
-	test.Assert(t, err == nil, err)
-
-	// test SetWriteDeadline()
-	err = clientConn.SetWriteDeadline(time.Now())
-	test.Assert(t, err == nil, err)
-
-	// test SetReadDeadline()
-	err = clientConn.SetReadDeadline(time.Now())
-	test.Assert(t, err == nil, err)
 }
