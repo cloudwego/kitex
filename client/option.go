@@ -40,6 +40,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -439,5 +440,13 @@ func WithGRPCKeepaliveParams(kp grpc.ClientKeepalive) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCKeepaliveParams(%+v)", kp))
 		o.GRPCConnectOpts.KeepaliveParams = kp
+	}}
+}
+
+// WithWarmingUp forces the client to do some warm-ups at the end of the initialization.
+func WithWarmingUp(wuo *warmup.ClientOption) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithWarmingUp(%+v)", wuo))
+		o.WarmUpOption = wuo
 	}}
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/server"
 )
 
+// TestNewServer tests the creation of a new server
 func TestNewServer(t *testing.T) {
 	addr, _ := net.ResolveTCPAddr("tcp", ":9999")
 	g := generic.BinaryThriftGeneric()
@@ -40,6 +41,7 @@ func TestNewServer(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
+// TestNewServerWithServiceInfo tests the creation of a new server with service info
 func TestNewServerWithServiceInfo(t *testing.T) {
 	g := generic.BinaryThriftGeneric()
 	svr := NewServerWithServiceInfo(new(mockImpl), g, nil)

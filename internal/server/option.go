@@ -84,7 +84,7 @@ type Options struct {
 	Bus    event.Bus
 	Events event.Queue
 
-	// DebugInfo should only contains objects that are suitable for json serialization.
+	// DebugInfo should only contain objects that are suitable for json serialization.
 	DebugInfo    utils.Slice
 	DebugService diagnosis.Service
 
