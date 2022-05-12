@@ -307,4 +307,6 @@ func TestRecycle(t *testing.T) {
 	test.Assert(t, cli != nil, cli)
 
 	cli.Recycle()
+	poolCli := clientPool.Get()
+	test.Assert(t, cli == poolCli)
 }
