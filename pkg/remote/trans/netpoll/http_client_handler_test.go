@@ -33,12 +33,12 @@ import (
 )
 
 var (
+	cliTransHdlr     remote.ClientTransHandler
 	httpCilTransHdlr remote.ClientTransHandler
 	cilopt           *remote.ClientOption
 )
 
 func init() {
-	ext := NewNetpollConnExtension()
 	cilopt = &remote.ClientOption{
 		SvcInfo: mocks.ServiceInfo(),
 		Codec: &MockCodec{
@@ -47,7 +47,31 @@ func init() {
 		},
 		Dialer: NewDialer(),
 	}
-	httpCilTransHdlr, _ = newHTTPCliTransHandler(cilopt, ext)
+
+	cliTransHdlr, _ = NewCliTransHandlerFactory().NewTransHandler(cilopt)
+	httpCilTransHdlr, _ = NewHTTPCliTransHandlerFactory().NewTransHandler(cilopt)
+}
+
+func TestHTTPWrite(t *testing.T) {
+	// 1. prepare
+	conn := &MockNetpollConn{}
+	rwTimeout := time.Second
+	cfg := rpcinfo.NewRPCConfig()
+	rpcinfo.AsMutableRPCConfig(cfg).SetReadWriteTimeout(rwTimeout)
+	to := rpcinfo.NewEndpointInfo("", "", nil, map[string]string{
+		"http_url": "https://example.com",
+	})
+	ri := rpcinfo.NewRPCInfo(nil, to, nil, cfg, rpcinfo.NewRPCStats())
+	ctx := context.Background()
+
+	// 2. test
+	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
+	err := httpCilTransHdlr.Write(ctx, conn, msg)
+	test.Assert(t, err != nil)
+
+	msg = remote.NewMessage("is no nil", mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
+	err = httpCilTransHdlr.Write(ctx, conn, msg)
+	test.Assert(t, err != nil)
 }
 
 func TestHTTPRead(t *testing.T) {

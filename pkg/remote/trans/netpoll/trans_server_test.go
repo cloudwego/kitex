@@ -57,7 +57,8 @@ func init() {
 		TracerCtl: &internal_stats.Controller{},
 	}
 	svrTransHdlr, _ = newSvrTransHandler(opt)
-	transSvr = &transServer{opt: opt, transHdlr: svrTransHdlr}
+
+	transSvr = NewTransServerFactory().NewTransServer(opt, svrTransHdlr).(*transServer)
 }
 
 func TestCreateListener(t *testing.T) {
@@ -100,6 +101,7 @@ func TestBootStrap(t *testing.T) {
 }
 
 func TestOnConnActive(t *testing.T) {
+	// 1. prepare
 	conn := &MockNetpollConn{
 		SetReadTimeoutFunc: func(timeout time.Duration) (e error) {
 			return nil
@@ -110,6 +112,8 @@ func TestOnConnActive(t *testing.T) {
 			},
 		},
 	}
+
+	// 2. test
 	connCount := 100
 	for i := 0; i < connCount; i++ {
 		transSvr.onConnActive(conn)
@@ -126,6 +130,7 @@ func TestOnConnActive(t *testing.T) {
 }
 
 func TestOnConnRead(t *testing.T) {
+	// 1. prepare
 	conn := &MockNetpollConn{
 		Conn: mocks.Conn{
 			RemoteAddrFunc: func() (r net.Addr) {
@@ -140,6 +145,8 @@ func TestOnConnRead(t *testing.T) {
 		},
 		Opt: transSvr.opt,
 	}
+
+	// 2. test
 	err := transSvr.onConnRead(context.Background(), conn)
 	test.Assert(t, err == nil, err)
 }

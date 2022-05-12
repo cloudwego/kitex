@@ -64,7 +64,8 @@ func init() {
 		SvcInfo:   mocks.ServiceInfo(),
 		TracerCtl: &internal_stats.Controller{},
 	}
-	svrTransHdlr, _ = newSvrTransHandler(srvopt)
+
+	svrTransHdlr, _ = NewSvrTransHandlerFactory().NewTransHandler(srvopt)
 }
 
 func TestOnActive(t *testing.T) {
