@@ -61,7 +61,7 @@ func TestNewClientNoAddr(t *testing.T) {
 // TestNewClient test new a client
 func TestNewClient(t *testing.T) {
 	addr := utils.NewNetAddr("tcp", "to")
-	ri := newMockRpcInfo(addr)
+	ri := newMockRPCInfo(addr)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
 	hdlr := &mocks.MockCliTransHandler{}
@@ -99,7 +99,7 @@ func TestNewClient(t *testing.T) {
 	test.Assert(t, dialCount == 1)
 }
 
-func newMockRpcInfo(addr net.Addr) rpcinfo.RPCInfo {
+func newMockRPCInfo(addr net.Addr) rpcinfo.RPCInfo {
 	from := rpcinfo.NewEndpointInfo("from", "method", nil, nil)
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
 	to.SetInstance(discovery.NewInstance(addr.Network(), addr.String(), discovery.DefaultWeight, nil))
@@ -136,7 +136,7 @@ func TestSend(t *testing.T) {
 	// 1. prepare mock data
 	ctx := context.Background()
 	addr := utils.NewNetAddr("tcp", "to")
-	ri := newMockRpcInfo(addr)
+	ri := newMockRPCInfo(addr)
 
 	isWrite := false
 	var writeMsg remote.Message
@@ -168,7 +168,7 @@ func TestSend(t *testing.T) {
 func TestSendErr(t *testing.T) {
 	// 1. prepare mock data
 	addr := utils.NewNetAddr("tcp", "to")
-	ri := newMockRpcInfo(addr)
+	ri := newMockRPCInfo(addr)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
 	isWrite := false
@@ -220,7 +220,7 @@ func TestRecv(t *testing.T) {
 	ctx := context.Background()
 
 	addr := utils.NewNetAddr("tcp", "to")
-	ri := newMockRpcInfo(addr)
+	ri := newMockRPCInfo(addr)
 
 	svcInfo := mocks.ServiceInfo()
 	var resp interface{}
@@ -254,7 +254,7 @@ func TestRecvOneWay(t *testing.T) {
 	ctx := context.Background()
 
 	addr := utils.NewNetAddr("tcp", "to")
-	ri := newMockRpcInfo(addr)
+	ri := newMockRPCInfo(addr)
 
 	hdlr := &mocks.MockCliTransHandler{
 		WriteFunc: nil,
@@ -293,7 +293,7 @@ func TestRecycle(t *testing.T) {
 	ctx := context.Background()
 
 	addr := utils.NewNetAddr("tcp", "to")
-	ri := newMockRpcInfo(addr)
+	ri := newMockRPCInfo(addr)
 
 	hdlr := &mocks.MockCliTransHandler{
 		WriteFunc: nil,
