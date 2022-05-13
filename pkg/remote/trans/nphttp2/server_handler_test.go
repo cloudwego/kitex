@@ -57,9 +57,9 @@ func TestServerHandler(t *testing.T) {
 		return nil
 	})
 
-	// 放入setting frame用于mock server连接preface的检验
+	// mock a setting frame to pass the server side preface check
 	npConn.mockSettingFrame()
-	// onRead()场景需要从mock conn里陆续获取headerFrame
+	// mock a headerFrame so onRead() can start working
 	npConn.mockMetaHeaderFrame()
 	go func() {
 		handler.OnRead(newMockCtxWithRPCInfo(), npConn)
