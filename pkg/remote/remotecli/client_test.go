@@ -262,14 +262,15 @@ func TestRecvOneWay(t *testing.T) {
 	}
 
 	opt := newMockOption(addr)
+	opt.ConnPool = nil
 
 	isClose := false
 	conn := &mocks.Conn{
 		RemoteAddrFunc: func() (r net.Addr) {
-			isClose = true
 			return addr
 		},
 		CloseFunc: func() (err error) {
+			isClose = true
 			return err
 		},
 	}

@@ -30,7 +30,7 @@ import (
 
 func TestNewStream(t *testing.T) {
 	addr := utils.NewNetAddr("tcp", "to")
-	ri := newMockRpcInfo(addr)
+	ri := newMockRPCInfo(addr)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
 	hdlr := &mocks.MockCliTransHandler{}
