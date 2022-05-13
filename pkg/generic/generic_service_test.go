@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	mocks "github.com/cloudwego/kitex/internal/mocks/generic"
 	"github.com/cloudwego/kitex/internal/test"
 	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -30,54 +30,37 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-type testImpl struct{}
-
-// GenericCall test call
-func (g *testImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-	response = "test"
-	if method != "test" {
-		err = fmt.Errorf("method is invalid, method: %v", method)
-	}
-	return
-}
-
-type testWrite struct{}
-
-// Write test write
-func (m *testWrite) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *gthrift.Base) error {
-	return nil
-}
-
-type testRead struct{}
-
-// Read test read
-func (m *testRead) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
-	return "test", nil
-}
-
 func TestGenericService(t *testing.T) {
 	ctx := context.Background()
 	method := "test"
 	out := remote.NewWriterBuffer(256)
 	tProto := codecThrift.NewBinaryProtocol(out)
-	wInner, rInner := &testWrite{}, &testRead{}
+
+	argWriteInner, resultWriteInner := mocks.NewMessageWriter(t), mocks.NewMessageWriter(t)
+	rInner := mocks.NewMessageReader(t)
+	// Read expect
+	rInner.On("Read", ctx, method, tProto).Return("test", nil)
 
 	// Args...
 	arg := newGenericServiceCallArgs()
 	a, ok := arg.(*Args)
 	test.Assert(t, ok == true)
+
 	base := a.GetOrSetBase()
 	test.Assert(t, base != nil)
 	a.SetCodec(struct{}{})
 	// write not ok
 	err := a.Write(ctx, tProto)
 	test.Assert(t, err.Error() == "unexpected Args writer type: struct {}")
+
+	// Write expect
+	argWriteInner.On("Write", ctx, tProto, a.Request, a.GetOrSetBase()).Return(nil)
+	a.SetCodec(argWriteInner)
 	// write ok
-	a.SetCodec(wInner)
 	err = a.Write(ctx, tProto)
 	test.Assert(t, err == nil)
 	// read not ok
-	err = a.Read(ctx, method, nil)
+	err = a.Read(ctx, method, tProto)
 	test.Assert(t, strings.Contains(err.Error(), "unexpected Args reader type"))
 	// read ok
 	a.SetCodec(rInner)
@@ -90,15 +73,17 @@ func TestGenericService(t *testing.T) {
 	test.Assert(t, ok == true)
 
 	// write not ok
-	err = r.Write(ctx, nil)
+	err = r.Write(ctx, tProto)
 	test.Assert(t, err.Error() == "unexpected Result writer type: <nil>")
+	// Write expect
+	resultWriteInner.On("Write", ctx, tProto, r.Success, (*gthrift.Base)(nil)).Return(nil)
+	r.SetCodec(resultWriteInner)
 	// write ok
-	r.SetCodec(wInner)
 	err = r.Write(ctx, tProto)
 	test.Assert(t, err == nil)
 	// read not ok
-	err = r.Read(ctx, method, nil)
-	test.Assert(t, err.Error() == "unexpected Result reader type: *generic.testWrite")
+	err = r.Read(ctx, method, tProto)
+	test.Assert(t, strings.Contains(err.Error(), "unexpected Result reader type"))
 	// read ok
 	r.SetCodec(rInner)
 	err = r.Read(ctx, method, tProto)
@@ -111,12 +96,21 @@ func TestGenericService(t *testing.T) {
 	success = r.GetSuccess()
 	test.Assert(t, success.(string) == method)
 
+	// handler mock result func
+	mockHandlerResultFn := func(srcMethod, expMethod string) (string, error) {
+		if srcMethod != expMethod {
+			return "", fmt.Errorf("srcMethod is not equal to expMethod: %v", srcMethod)
+		}
+		return expMethod, nil
+	}
 	// test callHandler...
-	handler := &testImpl{}
+	handler := mocks.NewService(t)
 	a.Method = ""
+	handler.On("GenericCall", ctx, a.Method, a.Request).Return(mockHandlerResultFn(a.Method, method))
 	err = callHandler(ctx, handler, arg, result)
-	test.Assert(t, err.Error() == "method is invalid, method: ")
+	test.Assert(t, strings.Contains(err.Error(), "srcMethod is not equal to expMethod"))
 	a.Method = method
+	handler.On("GenericCall", ctx, a.Method, a.Request).Return(mockHandlerResultFn(a.Method, method))
 	err = callHandler(ctx, handler, arg, result)
 	test.Assert(t, err == nil)
 }
