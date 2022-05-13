@@ -70,7 +70,7 @@ func TestGenericService(t *testing.T) {
 	test.Assert(t, base != nil)
 	a.SetCodec(struct{}{})
 	// write not ok
-	err := a.Write(ctx, nil)
+	err := a.Write(ctx, tProto)
 	test.Assert(t, err.Error() == "unexpected Args writer type: struct {}")
 	// write ok
 	a.SetCodec(wInner)
