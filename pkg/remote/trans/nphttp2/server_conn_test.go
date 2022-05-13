@@ -51,13 +51,13 @@ func TestServerConn(t *testing.T) {
 	test.Assert(t, n == len(testStr))
 	test.Assert(t, string(testByte) == testStr)
 
-	// test Write()
+	// test write()
 	testByte = []byte(testStr)
 	n, err = serverConn.Write(testByte)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, n == len(testStr))
 
-	// test Write() short write error
+	// test write() short write error
 	n, err = serverConn.Write([]byte(""))
 	test.Assert(t, err != nil, err)
 	test.Assert(t, n == 0)

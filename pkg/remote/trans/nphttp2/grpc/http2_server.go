@@ -544,13 +544,13 @@ func (t *http2Server) handleData(f *http2.DataFrame) {
 			buffer := t.bufferPool.get()
 			buffer.Reset()
 			buffer.Write(f.Data())
-			s.Write(RecvMsg{Buffer: buffer})
+			s.write(recvMsg{buffer: buffer})
 		}
 	}
 	if f.Header().Flags.Has(http2.FlagDataEndStream) {
 		// Received the end of stream from the client.
 		s.compareAndSwapState(streamActive, streamReadDone)
-		s.Write(RecvMsg{err: io.EOF})
+		s.write(recvMsg{err: io.EOF})
 	}
 }
 

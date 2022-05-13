@@ -41,7 +41,7 @@ func TestClientHandler(t *testing.T) {
 	err = cliTransHandler.Read(ctx, conn, msg)
 	test.Assert(t, err == nil, err)
 
-	// test Write()
+	// test write()
 	err = cliTransHandler.Write(ctx, conn, msg)
 	test.Assert(t, err == nil, err)
 }

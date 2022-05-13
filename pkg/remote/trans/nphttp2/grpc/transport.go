@@ -60,37 +60,37 @@ func (p *bufferPool) put(b *bytes.Buffer) {
 	p.pool.Put(b)
 }
 
-// RecvMsg represents the received msg from the transport. All transport
+// recvMsg represents the received msg from the transport. All transport
 // protocol specific info has been removed.
-type RecvMsg struct {
-	Buffer *bytes.Buffer
+type recvMsg struct {
+	buffer *bytes.Buffer
 	// nil: received some data
 	// io.EOF: stream is completed. data is nil.
 	// other non-nil error: transport failure. data is nil.
 	err error
 }
 
-// recvBuffer is an unbounded channel of RecvMsg structs.
+// recvBuffer is an unbounded channel of recvMsg structs.
 //
 // Note: recvBuffer differs from buffer.Unbounded only in the fact that it
-// holds a channel of RecvMsg structs instead of objects implementing "item"
-// interface. recvBuffer is written to much more often and using strict RecvMsg
+// holds a channel of recvMsg structs instead of objects implementing "item"
+// interface. recvBuffer is written to much more often and using strict recvMsg
 // structs helps avoid allocation in "recvBuffer.put"
 type recvBuffer struct {
-	c       chan RecvMsg
+	c       chan recvMsg
 	mu      sync.Mutex
-	backlog []RecvMsg
+	backlog []recvMsg
 	err     error
 }
 
 func newRecvBuffer() *recvBuffer {
 	b := &recvBuffer{
-		c: make(chan RecvMsg, 1),
+		c: make(chan recvMsg, 1),
 	}
 	return b
 }
 
-func (b *recvBuffer) put(r RecvMsg) {
+func (b *recvBuffer) put(r recvMsg) {
 	b.mu.Lock()
 	if b.err != nil {
 		b.mu.Unlock()
@@ -116,7 +116,7 @@ func (b *recvBuffer) load() {
 	if len(b.backlog) > 0 {
 		select {
 		case b.c <- b.backlog[0]:
-			b.backlog[0] = RecvMsg{}
+			b.backlog[0] = recvMsg{}
 			b.backlog = b.backlog[1:]
 		default:
 		}
@@ -124,11 +124,11 @@ func (b *recvBuffer) load() {
 	b.mu.Unlock()
 }
 
-// get returns the channel that receives a RecvMsg in the buffer.
+// get returns the channel that receives a recvMsg in the buffer.
 //
-// Upon receipt of a RecvMsg, the caller should call load to send another
-// RecvMsg onto the channel if there is any.
-func (b *recvBuffer) get() <-chan RecvMsg {
+// Upon receipt of a recvMsg, the caller should call load to send another
+// recvMsg onto the channel if there is any.
+func (b *recvBuffer) get() <-chan recvMsg {
 	return b.c
 }
 
@@ -204,17 +204,17 @@ func (r *recvBufferReader) readClient(p []byte) (n int, err error) {
 	}
 }
 
-func (r *recvBufferReader) readAdditional(m RecvMsg, p []byte) (n int, err error) {
+func (r *recvBufferReader) readAdditional(m recvMsg, p []byte) (n int, err error) {
 	r.recv.load()
 	if m.err != nil {
 		return 0, m.err
 	}
-	copied, _ := m.Buffer.Read(p)
-	if m.Buffer.Len() == 0 {
-		r.freeBuffer(m.Buffer)
+	copied, _ := m.buffer.Read(p)
+	if m.buffer.Len() == 0 {
+		r.freeBuffer(m.buffer)
 		r.last = nil
 	} else {
-		r.last = m.Buffer
+		r.last = m.buffer
 	}
 	return copied, nil
 }
@@ -249,10 +249,10 @@ type Stream struct {
 	// is used to adjust flow control, if needed.
 	requestRead func(int)
 
-	HeaderChan       chan struct{} // closed to indicate the end of header metadata.
-	headerChanClosed uint32        // set when HeaderChan is closed. Used to avoid closing HeaderChan multiple times.
+	headerChan       chan struct{} // closed to indicate the end of header metadata.
+	headerChanClosed uint32        // set when headerChan is closed. Used to avoid closing headerChan multiple times.
 	// headerValid indicates whether a valid header was received.  Only
-	// meaningful after HeaderChan is closed (always call waitOnHeader() before
+	// meaningful after headerChan is closed (always call waitOnHeader() before
 	// reading its value).  Not valid on server side.
 	headerValid bool
 
@@ -308,7 +308,7 @@ func (s *Stream) getState() streamState {
 }
 
 func (s *Stream) waitOnHeader() {
-	if s.HeaderChan == nil {
+	if s.headerChan == nil {
 		// On the server headerChan is always nil since a stream originates
 		// only after having received headers.
 		return
@@ -320,8 +320,8 @@ func (s *Stream) waitOnHeader() {
 		s.ct.CloseStream(s, ContextErr(s.ctx.Err()))
 		// headerChan could possibly not be closed yet if closeStream raced
 		// with operateHeaders; wait until it is closed explicitly here.
-		<-s.HeaderChan
-	case <-s.HeaderChan:
+		<-s.headerChan
+	case <-s.headerChan:
 	}
 }
 
@@ -352,7 +352,7 @@ func (s *Stream) Done() <-chan struct{} {
 // On server side, it returns the out header after t.WriteHeader is called.  It
 // does not block and must not be called until after WriteHeader.
 func (s *Stream) Header() (metadata.MD, error) {
-	if s.HeaderChan == nil {
+	if s.headerChan == nil {
 		// On server side, return the header in stream. It will be the out
 		// header after t.WriteHeader is called.
 		return s.header.Copy(), nil
@@ -447,7 +447,7 @@ func (s *Stream) SetTrailer(md metadata.MD) error {
 	return nil
 }
 
-func (s *Stream) Write(m RecvMsg) {
+func (s *Stream) write(m recvMsg) {
 	s.buf.put(m)
 }
 
@@ -461,7 +461,17 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 	return io.ReadFull(s.trReader, p)
 }
 
-// CreateStream create an independent stream out of http2client / http2server
+// SetHeaderChan only used for unit test
+func SetHeaderChan(s *Stream, ch chan struct{}) {
+	s.headerChan = ch
+}
+
+// StreamWrite only used for unit test
+func StreamWrite(s *Stream, buffer *bytes.Buffer) {
+	s.write(recvMsg{buffer: buffer})
+}
+
+// CreateStream only used for unit test. Create an independent stream out of http2client / http2server
 func CreateStream(id uint32, requestRead func(i int)) *Stream {
 	recvBuffer := newRecvBuffer()
 	trReader := &transportReader{

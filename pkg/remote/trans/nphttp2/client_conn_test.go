@@ -48,13 +48,13 @@ func TestClientConn(t *testing.T) {
 	test.Assert(t, n == len(testStr))
 	test.Assert(t, string(testByte) == testStr)
 
-	// test Write()
+	// test write()
 	testByte = []byte(testStr)
 	n, err = clientConn.Write(testByte)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, n == len(testByte))
 
-	// test Write() short write error
+	// test write() short write error
 	n, err = clientConn.Write([]byte(""))
 	test.Assert(t, err != nil, err)
 	test.Assert(t, n == 0)

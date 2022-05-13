@@ -240,7 +240,7 @@ func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 		method:         callHdr.Method,
 		sendCompress:   callHdr.SendCompress,
 		buf:            newRecvBuffer(),
-		HeaderChan:     make(chan struct{}),
+		headerChan:     make(chan struct{}),
 		contentSubtype: callHdr.ContentSubtype,
 	}
 	s.wq = newWriteQuota(defaultWriteQuota, s.done)
@@ -328,11 +328,11 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 		}
 		// The stream was unprocessed by the server.
 		atomic.StoreUint32(&s.unprocessed, 1)
-		s.Write(RecvMsg{err: err})
+		s.write(recvMsg{err: err})
 		close(s.done)
 		// If headerChan isn't closed, then close it.
 		if atomic.CompareAndSwapUint32(&s.headerChanClosed, 0, 1) {
-			close(s.HeaderChan)
+			close(s.headerChan)
 		}
 	}
 	hdr := &headerFrame{
@@ -467,12 +467,12 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 	}
 	if err != nil {
 		// This will unblock reads eventually.
-		s.Write(RecvMsg{err: err})
+		s.write(recvMsg{err: err})
 	}
 	// If headerChan isn't closed, then close it.
 	if atomic.CompareAndSwapUint32(&s.headerChanClosed, 0, 1) {
 		s.noHeaders = true
-		close(s.HeaderChan)
+		close(s.headerChan)
 	}
 	cleanup := &cleanupStream{
 		streamID: s.id,
@@ -691,7 +691,7 @@ func (t *http2Client) handleData(f *http2.DataFrame) {
 			buffer := t.bufferPool.get()
 			buffer.Reset()
 			buffer.Write(f.Data())
-			s.Write(RecvMsg{Buffer: buffer})
+			s.write(recvMsg{buffer: buffer})
 		}
 	}
 	// The server has closed the stream without sending trailers.  Record that
@@ -920,7 +920,7 @@ func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
 			// HEADERS frame block carries a Trailers-Only.
 			s.noHeaders = true
 		}
-		close(s.HeaderChan)
+		close(s.headerChan)
 	}
 
 	if !endStream {

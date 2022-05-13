@@ -47,7 +47,7 @@ func TestServerHandler(t *testing.T) {
 	err = handler.Read(context.Background(), serverConn, msg)
 	test.Assert(t, err == nil, err)
 
-	// test Write()
+	// test write()
 	err = handler.Write(context.Background(), serverConn, msg)
 	test.Assert(t, err == nil, err)
 

@@ -55,7 +55,7 @@ func TestStream(t *testing.T) {
 	strCtx := stream.Context()
 	test.Assert(t, strCtx == ctx)
 
-	// test RecvMsg()
+	// test recvMsg()
 	msg := newMockNewMessage().Data()
 	newMockStreamRecvHelloRequest(s)
 	err = stream.RecvMsg(msg)
