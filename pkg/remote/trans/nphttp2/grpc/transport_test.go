@@ -270,7 +270,7 @@ func (h *testStreamHandler) handleStreamDelayRead(t *testing.T, s *Stream) {
 	// flow control and the other side won't send a window update
 	// until that happens.
 	if err := h.t.Write(s, nil, resp, &Options{}); err != nil {
-		t.Errorf("server Write got %v, want <nil>", err)
+		t.Errorf("server write got %v, want <nil>", err)
 		return
 	}
 	// Read one more time to ensure that everything remains fine and
@@ -661,7 +661,7 @@ func TestLargeMessage(t *testing.T) {
 				t.Errorf("%v.NewStream(_, _) = _, %v, want _, <nil>", ct, err)
 			}
 			if err := ct.Write(s, []byte{}, expectedRequestLarge, &Options{Last: true}); err != nil && err != io.EOF {
-				t.Errorf("%v.Write(_, _, _) = %v, want  <nil>", ct, err)
+				t.Errorf("%v.write(_, _, _) = %v, want  <nil>", ct, err)
 			}
 			p := make([]byte, len(expectedResponseLarge))
 			if _, err := s.Read(p); err != nil || !bytes.Equal(p, expectedResponseLarge) {
@@ -766,7 +766,7 @@ func TestLargeMessageWithDelayRead(t *testing.T) {
 		t.Fatalf("s.Read(_) = _, %v, want _, <nil>", err)
 	}
 	if err := ct.Write(s, []byte{}, expectedRequestLarge, &Options{Last: true}); err != nil {
-		t.Fatalf("Write(_, _, _) = %v, want <nil>", err)
+		t.Fatalf("write(_, _, _) = %v, want <nil>", err)
 	}
 	if _, err = s.Read(p); err != io.EOF {
 		t.Fatalf("Failed to complete the stream %v; want <EOF>", err)
@@ -797,7 +797,7 @@ func TestLargeMessageWithDelayRead(t *testing.T) {
 //	outgoingHeader[0] = byte(0)
 //	binary.BigEndian.PutUint32(outgoingHeader[1:], uint32(len(msg)))
 //	incomingHeader := make([]byte, 5)
-//	if err := ct.Write(s, outgoingHeader, msg, &Options{}); err != nil {
+//	if err := ct.write(s, outgoingHeader, msg, &Options{}); err != nil {
 //		t.Fatalf("Error while writing: %v", err)
 //	}
 //	if _, err := s.Read(incomingHeader); err != nil {
@@ -822,13 +822,13 @@ func TestLargeMessageWithDelayRead(t *testing.T) {
 //				t.Errorf("_.NewStream(_, _) = _, %v, want _, %v", err, ErrConnClosing)
 //				return
 //			}
-//			ct.Write(str, nil, nil, &Options{Last: true})
+//			ct.write(str, nil, nil, &Options{Last: true})
 //			if _, err := str.Read(make([]byte, 8)); err != errStreamDrain && err != ErrConnClosing {
 //				t.Errorf("_.Read(_) = _, %v, want _, %v or %v", err, errStreamDrain, ErrConnClosing)
 //			}
 //		}()
 //	}
-//	ct.Write(s, nil, nil, &Options{Last: true})
+//	ct.write(s, nil, nil, &Options{Last: true})
 //	if _, err := s.Read(incomingHeader); err != io.EOF {
 //		t.Fatalf("Client expected EOF from the server. Got: %v", err)
 //	}
@@ -855,12 +855,12 @@ func TestLargeMessageSuspension(t *testing.T) {
 		<-ctx.Done()
 		ct.CloseStream(s, ContextErr(ctx.Err()))
 	}()
-	// Write should not be done successfully due to flow control.
+	// write should not be done successfully due to flow control.
 	msg := make([]byte, initialWindowSize*8)
 	ct.Write(s, nil, msg, &Options{})
 	err = ct.Write(s, nil, msg, &Options{Last: true})
 	if err != errStreamDone {
-		t.Fatalf("Write got %v, want io.EOF", err)
+		t.Fatalf("write got %v, want io.EOF", err)
 	}
 	expectedErr := status.Err(codes.DeadlineExceeded, context.DeadlineExceeded.Error())
 	if _, err := s.Read(make([]byte, 8)); err.Error() != expectedErr.Error() {
@@ -1181,7 +1181,7 @@ func TestServerWithMisbehavedClient(t *testing.T) {
 		t.Fatalf("Failed to set write deadline: %v", err)
 	}
 	if n, err := mconn.Write(ClientPreface); err != nil || n != len(ClientPreface) {
-		t.Fatalf("mconn.Write(ClientPreface ) = %d, %v, want %d, <nil>", n, err, len(ClientPreface))
+		t.Fatalf("mconn.write(ClientPreface ) = %d, %v, want %d, <nil>", n, err, len(ClientPreface))
 	}
 	// success chan indicates that reader received a RSTStream from server.
 	success := make(chan struct{})
@@ -1200,7 +1200,7 @@ func TestServerWithMisbehavedClient(t *testing.T) {
 			}
 			switch frame := frame.(type) {
 			case *http2.PingFrame:
-				// Write ping ack back so that server's BDP estimation works right.
+				// write ping ack back so that server's BDP estimation works right.
 				mu.Lock()
 				framer.WritePing(true, frame.Data)
 				mu.Unlock()
@@ -1786,8 +1786,8 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 //	}
 //	defer mconn.Close()
 //
-//	if n, err := mconn.Write(ClientPreface); err != nil || n != len(ClientPreface) {
-//		t.Fatalf("mconn.Write(ClientPreface ) = %d, %v, want %d, <nil>", n, err, len(ClientPreface))
+//	if n, err := mconn.write(ClientPreface); err != nil || n != len(ClientPreface) {
+//		t.Fatalf("mconn.write(ClientPreface ) = %d, %v, want %d, <nil>", n, err, len(ClientPreface))
 //	}
 //
 //	framer := http2.NewFramer(mconn, mconn)
@@ -1825,7 +1825,7 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 //	}()
 //
 //	// Done with HTTP/2 setup - now create a stream with a bad method header.
-//	var buf bytes.Buffer
+//	var buf bytes.buffer
 //	henc := hpack.NewEncoder(&buf)
 //	// Method is required to be POST in a gRPC call.
 //	if err := henc.WriteField(hpack.HeaderField{Name: ":method", Value: "PUT"}); err != nil {

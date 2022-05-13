@@ -23,8 +23,6 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/cloudwego/netpoll"
-
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -38,6 +36,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/transport"
+	"github.com/cloudwego/netpoll"
 )
 
 type svrTransHandlerFactory struct{}

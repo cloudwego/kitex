@@ -101,7 +101,8 @@ func (c *transports) close() {
 var _ remote.LongConnPool = (*connPool)(nil)
 
 func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, network, address string,
-	connectTimeout time.Duration, opts grpc.ConnectOptions) (grpc.ClientTransport, error) {
+	connectTimeout time.Duration, opts grpc.ConnectOptions,
+) (grpc.ClientTransport, error) {
 	conn, err := dialer.DialTimeout(network, address, connectTimeout)
 	if err != nil {
 		return nil, err
