@@ -130,7 +130,7 @@ func TestOnConnActive(t *testing.T) {
 }
 
 func TestOnConnRead(t *testing.T) {
-	// 1. prepare
+	// init
 	conn := &MockNetpollConn{
 		Conn: mocks.Conn{
 			RemoteAddrFunc: func() (r net.Addr) {
@@ -146,7 +146,7 @@ func TestOnConnRead(t *testing.T) {
 		Opt: transSvr.opt,
 	}
 
-	// 2. test
+	// test onConnRead()
 	err := transSvr.onConnRead(context.Background(), conn)
 	test.Assert(t, err == nil, err)
 }

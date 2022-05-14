@@ -39,6 +39,7 @@ var (
 )
 
 func init() {
+	// init
 	cilopt = &remote.ClientOption{
 		SvcInfo: mocks.ServiceInfo(),
 		Codec: &MockCodec{
@@ -48,12 +49,19 @@ func init() {
 		Dialer: NewDialer(),
 	}
 
-	cliTransHdlr, _ = NewCliTransHandlerFactory().NewTransHandler(cilopt)
-	httpCilTransHdlr, _ = NewHTTPCliTransHandlerFactory().NewTransHandler(cilopt)
+	// test NewCliTransHandlerFactory()
+	cliTransHdlrFct := NewCliTransHandlerFactory()
+	// test NewTransHandler()
+	cliTransHdlr, _ = cliTransHdlrFct.NewTransHandler(cilopt)
+
+	// test NewHTTPCliTransHandlerFactory()
+	httpCilTransHdlrFct := NewHTTPCliTransHandlerFactory()
+	// test NewTransHandler()
+	httpCilTransHdlr, _ = httpCilTransHdlrFct.NewTransHandler(cilopt)
 }
 
 func TestHTTPWrite(t *testing.T) {
-	// 1. prepare
+	// init
 	conn := &MockNetpollConn{}
 	rwTimeout := time.Second
 	cfg := rpcinfo.NewRPCConfig()
@@ -64,7 +72,7 @@ func TestHTTPWrite(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, to, nil, cfg, rpcinfo.NewRPCStats())
 	ctx := context.Background()
 
-	// 2. test
+	// test Write()
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
 	err := httpCilTransHdlr.Write(ctx, conn, msg)
 	test.Assert(t, err != nil)
@@ -75,6 +83,7 @@ func TestHTTPWrite(t *testing.T) {
 }
 
 func TestHTTPRead(t *testing.T) {
+	// init
 	rwTimeout := time.Second
 
 	var readTimeout time.Duration
@@ -100,10 +109,11 @@ func TestHTTPRead(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	ctx := context.Background()
 
-	var req interface{}
-	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
-
+	// test Read()
+	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
 	err := httpCilTransHdlr.Read(ctx, conn, msg)
+
+	// test OnError()
 	httpCilTransHdlr.OnError(ctx, err, conn)
 	test.Assert(t, err != nil)
 	test.Assert(t, readTimeout == trans.GetReadTimeout(ri.Config()))
@@ -111,7 +121,7 @@ func TestHTTPRead(t *testing.T) {
 }
 
 func TestHTTPPanicAfterRead(t *testing.T) {
-	// 1. prepare mock data
+	// init
 	var isOnActive bool
 	svcInfo := mocks.ServiceInfo()
 	conn := &MockNetpollConn{
@@ -131,73 +141,76 @@ func TestHTTPPanicAfterRead(t *testing.T) {
 	recvMsg.NewData(method)
 	sendMsg := remote.NewMessage(svcInfo.MethodInfo(method).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
-	// pipeline nil panic
+	// test SetPipeline()
 	httpCilTransHdlr.SetPipeline(nil)
 
-	// 2. test
+	// test OnMessage()
 	_, err := httpCilTransHdlr.OnMessage(ctx, recvMsg, sendMsg)
 	test.Assert(t, err == nil, err)
 
+	// test OnInactive()
 	httpCilTransHdlr.OnInactive(ctx, conn)
 	test.Assert(t, !isOnActive)
 }
 
 func TestAddMetaInfo(t *testing.T) {
+	// init
 	cfg := rpcinfo.NewRPCConfig()
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	var req interface{}
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
 	h := http.Header{}
 
+	// test addMetaInfo()
 	err := addMetaInfo(msg, h)
 	test.Assert(t, err == nil)
 }
 
 func TestReadLine(t *testing.T) {
+	// init
 	wantHead := "HTTP/1.1 200 OK"
 	body := "{\"code\":0,\"data\":[\"mobile\",\"xxxxxxx\"],\"msg\":\"ok\"}"
 	resp := []byte(wantHead + "\r\nDate: Thu, 16 Aug 2018 03:10:03 GMT\r\nKeep-Alive: timeout=5, max=100\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n" + body)
 	reader := remote.NewReaderBuffer(resp)
+
+	// test readLine()
 	getHead, _ := readLine(reader)
-	if strings.Compare(string(getHead), wantHead) != 0 {
-		t.Fatal("readLine wrong")
-	}
+	test.Assert(t, strings.Compare(string(getHead), wantHead) == 0)
 }
 
 func TestSkipToBody(t *testing.T) {
+	// init
 	head := "HTTP/1.1 200 OK"
 	wantBody := "{\"code\":0,\"data\":[\"mobile\",\"xxxxxxx\"],\"msg\":\"ok\"}"
 	resp := []byte(head + "\r\nDate: Thu, 16 Aug 2018 03:10:03 GMT\r\nKeep-Alive: timeout=5, max=100\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n" + wantBody)
 	reader := remote.NewReaderBuffer(resp)
+
+	// test skipToBody()
 	err := skipToBody(reader)
-	if err != nil {
-		t.Fatal(err)
-	}
+	test.Assert(t, err == nil)
 	getBody, err := reader.ReadBinary(reader.ReadableLen())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Compare(string(getBody), wantBody) != 0 {
-		t.Fatal("skipToBody wrong")
-	}
+	test.Assert(t, err == nil)
+	test.Assert(t, strings.Compare(string(getBody), wantBody) == 0)
 }
 
 func TestParseHTTPResponseHead(t *testing.T) {
+	// init
 	head := "HTTP/1.1 200 OK"
+
+	// test parseHTTPResponseHead()
 	major, minor, statusCode, err := parseHTTPResponseHead(head)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if major != 1 || minor != 1 || statusCode != 200 {
-		t.Fatal("ParseHTTPResponseHead wrong")
-	}
+	test.Assert(t, err == nil)
+	test.Assert(t, !(major != 1 || minor != 1 || statusCode != 200))
 }
 
 func TestGetBodyBufReader(t *testing.T) {
+	// init
 	head := "HTTP/1.1 200 OK"
 	body := "{\"code\":0,\"data\":[\"mobile\",\"xxxxxxx\"],\"msg\":\"ok\"}"
 	resp := []byte(head + "\r\nDate: Thu, 16 Aug 2018 03:10:03 GMT\r\nKeep-Alive: timeout=5, max=100\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n" + body)
 	reader := remote.NewReaderBuffer(resp)
+
+	// test getBodyBufReader
 	_, err := getBodyBufReader(reader)
 	test.Assert(t, err != nil)
 }
