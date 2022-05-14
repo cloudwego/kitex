@@ -65,7 +65,10 @@ func init() {
 		TracerCtl: &internal_stats.Controller{},
 	}
 
-	svrTransHdlr, _ = NewSvrTransHandlerFactory().NewTransHandler(srvopt)
+	// test NewCliTransHandlerFactory()
+	svrTransHdlrFct := NewSvrTransHandlerFactory()
+	// test NewTransHandler()
+	svrTransHdlr, _ = svrTransHdlrFct.NewTransHandler(srvopt)
 }
 
 func TestOnActive(t *testing.T) {

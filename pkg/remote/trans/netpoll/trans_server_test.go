@@ -58,22 +58,29 @@ func init() {
 	}
 	svrTransHdlr, _ = newSvrTransHandler(opt)
 
-	transSvr = NewTransServerFactory().NewTransServer(opt, svrTransHdlr).(*transServer)
+	// test NewCliTransHandlerFactory()
+	transSvrFct := NewTransServerFactory()
+	// test NewTransHandler()
+	transSvr = transSvrFct.NewTransServer(opt, svrTransHdlr).(*transServer)
 }
 
 func TestCreateListener(t *testing.T) {
-	// tcp
+	// tcp init
 	addrStr := "127.0.0.1:9090"
 	addr = utils.NewNetAddr("tcp", addrStr)
+
+	// test CreateListener()
 	ln, err := transSvr.CreateListener(addr)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ln.Addr().String() == addrStr)
 	ln.Close()
 
-	// uds
+	// uds init
 	addrStr = "server.addr"
 	addr, err = net.ResolveUnixAddr("unix", addrStr)
 	test.Assert(t, err == nil, err)
+
+	// test CreateListener()
 	ln, err = transSvr.CreateListener(addr)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ln.Addr().String() == addrStr)
@@ -81,9 +88,11 @@ func TestCreateListener(t *testing.T) {
 }
 
 func TestBootStrap(t *testing.T) {
-	// tcp
+	// tcp init
 	addrStr := "127.0.0.1:9090"
 	addr = utils.NewNetAddr("tcp", addrStr)
+
+	// test CreateListener()
 	ln, err := transSvr.CreateListener(addr)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ln.Addr().String() == addrStr)
@@ -91,11 +100,14 @@ func TestBootStrap(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
+		// test BootstrapServer()
 		err = transSvr.BootstrapServer()
 		test.Assert(t, err == nil, err)
 		wg.Done()
 	}()
 	time.Sleep(10 * time.Millisecond)
+
+	// test Shutdown()
 	transSvr.Shutdown()
 	wg.Wait()
 }
@@ -116,15 +128,21 @@ func TestOnConnActive(t *testing.T) {
 	// 2. test
 	connCount := 100
 	for i := 0; i < connCount; i++ {
+		// test onConnActive()
 		transSvr.onConnActive(conn)
 	}
 	ctx := context.Background()
+
+	// test ConnCount
 	currConnCount := transSvr.ConnCount()
 	test.Assert(t, currConnCount.Value() == connCount)
 
 	for i := 0; i < connCount; i++ {
+		// test onConnInactive()
 		transSvr.onConnInactive(ctx, conn)
 	}
+
+	// test ConnCount()
 	currConnCount = transSvr.ConnCount()
 	test.Assert(t, currConnCount.Value() == 0)
 }
