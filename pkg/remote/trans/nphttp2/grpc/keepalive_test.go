@@ -174,7 +174,7 @@ func TestKeepaliveServerClosesUnresponsiveClient(t *testing.T) {
 	defer conn.Close()
 
 	if n, err := conn.Write(ClientPreface); err != nil || n != len(ClientPreface) {
-		t.Fatalf("conn.Write(clientPreface) failed: n=%v, err=%v", n, err)
+		t.Fatalf("conn.write(clientPreface) failed: n=%v, err=%v", n, err)
 	}
 	framer := newFramer(conn, 0, 0, 0)
 	if err := framer.WriteSettings(http2.Setting{}); err != nil {
