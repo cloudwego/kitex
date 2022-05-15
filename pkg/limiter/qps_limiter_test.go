@@ -37,7 +37,7 @@ func TestQPSLimiter(t *testing.T) {
 	limiter := NewQPSLimiter(interval, qps)
 
 	// case1: init
-	max, cur, itv := limiter.Status(ctx, nil)
+	max, cur, itv := limiter.Status(ctx)
 	test.Assert(t, max == qps)
 	test.Assert(t, cur == int(float64(qps)/(time.Second.Seconds()/interval.Seconds())), cur)
 	test.Assert(t, itv == interval)
@@ -51,7 +51,7 @@ func TestQPSLimiter(t *testing.T) {
 	for i := 0; i < concurrent; i++ {
 		go func() {
 			for atomic.LoadInt32(&stopFlag) == 0 {
-				if limiter.Acquire(ctx, nil) {
+				if limiter.Acquire(ctx) {
 					atomic.AddInt32(&count, 1)
 				}
 			}
@@ -72,7 +72,7 @@ func TestQPSLimiter(t *testing.T) {
 	count = 0
 	interval = time.Second / 50
 	limiter.(*qpsLimiter).UpdateQPSLimit(interval, qps)
-	max, _, itv = limiter.Status(ctx, nil)
+	max, _, itv = limiter.Status(ctx)
 	test.Assert(t, max == qps)
 	test.Assert(t, limiter.(*qpsLimiter).once == int32(float64(qps)/(time.Second.Seconds()/interval.Seconds())), limiter.(*qpsLimiter).once)
 	test.Assert(t, itv == interval)
@@ -82,7 +82,7 @@ func TestQPSLimiter(t *testing.T) {
 	for i := 0; i < concurrent; i++ {
 		go func() {
 			for atomic.LoadInt32(&stopFlag) == 0 {
-				if limiter.Acquire(ctx, nil) {
+				if limiter.Acquire(ctx) {
 					atomic.AddInt32(&count, 1)
 				}
 			}
@@ -103,7 +103,7 @@ func TestQPSLimiter(t *testing.T) {
 	count = 0
 	limiter.(*qpsLimiter).UpdateLimit(qps)
 	time.Sleep(interval)
-	max, _, itv = limiter.Status(ctx, nil)
+	max, _, itv = limiter.Status(ctx)
 	test.Assert(t, max == qps)
 	test.Assert(t, limiter.(*qpsLimiter).once == int32(float64(qps)/(time.Second.Seconds()/interval.Seconds())), limiter.(*qpsLimiter).once)
 	test.Assert(t, itv == interval)
@@ -113,7 +113,7 @@ func TestQPSLimiter(t *testing.T) {
 	for i := 0; i < concurrent; i++ {
 		go func() {
 			for atomic.LoadInt32(&stopFlag) == 0 {
-				if limiter.Acquire(ctx, nil) {
+				if limiter.Acquire(ctx) {
 					atomic.AddInt32(&count, 1)
 				}
 			}

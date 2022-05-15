@@ -27,9 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"bou.ke/monkey"
 	"github.com/cloudwego/kitex/internal/mocks"
-	limiterMocks "github.com/cloudwego/kitex/internal/mocks/limiter"
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -43,6 +41,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/golang/mock/gomock"
 )
 
 func TestServerRun(t *testing.T) {
@@ -257,10 +256,10 @@ func TestServiceRegistryNoInitInfo(t *testing.T) {
 }
 
 func TestServerBoundHandler(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	interval := time.Millisecond * 100
-	monkey.Patch(limiter.NewQPSLimiter, func(interval time.Duration, limit int) limiter.RateLimiter {
-		return &mockRateLimiter{}
-	})
 	cases := []struct {
 		opts          []Option
 		wantInbounds  []remote.InboundHandler
@@ -275,7 +274,7 @@ func TestServerBoundHandler(t *testing.T) {
 				WithMetaHandler(noopMetahandler{}),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterOnReadHandler(limiter.NewConcurrencyLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil),
+				bound.NewServerLimiterHandler(limiter.NewConcurrencyLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil, false),
 				bound.NewTransMetaHandler([]remote.MetaHandler{noopMetahandler{}, transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -284,10 +283,10 @@ func TestServerBoundHandler(t *testing.T) {
 		},
 		{
 			opts: []Option{
-				WithConcurrencyLimiter(&limiterMocks.ConcurrencyLimiter{}),
+				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterOnReadHandler(&limiterMocks.ConcurrencyLimiter{}, &limiter.DummyRateLimiter{}, nil),
+				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), &limiter.DummyRateLimiter{}, nil, false),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -296,10 +295,10 @@ func TestServerBoundHandler(t *testing.T) {
 		},
 		{
 			opts: []Option{
-				WithQPSLimiter(&limiterMocks.RateLimiter{}),
+				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(&limiter.DummyConcurrencyLimiter{}, &limiterMocks.RateLimiter{}, nil),
+				bound.NewServerLimiterHandler(&limiter.DummyConcurrencyLimiter{}, mocks.NewMockRateLimiter(ctrl), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -308,27 +307,11 @@ func TestServerBoundHandler(t *testing.T) {
 		},
 		{
 			opts: []Option{
-				WithConcurrencyLimiter(&limiterMocks.ConcurrencyLimiter{}),
-				WithQPSLimiter(&limiterMocks.RateLimiter{}),
+				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(&limiterMocks.ConcurrencyLimiter{}, &limiterMocks.RateLimiter{}, nil),
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
-			},
-			wantOutbounds: []remote.OutboundHandler{
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
-			},
-		},
-		{
-			opts: []Option{
-				WithLimit(&limit.Option{
-					MaxConnections: 1000,
-					MaxQPS:         10000,
-				}),
-				WithConcurrencyLimiter(&limiterMocks.ConcurrencyLimiter{}),
-			},
-			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterOnReadHandler(&limiterMocks.ConcurrencyLimiter{}, limiter.NewQPSLimiter(interval, 10000), nil),
+				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), mocks.NewMockRateLimiter(ctrl), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -341,11 +324,10 @@ func TestServerBoundHandler(t *testing.T) {
 					MaxConnections: 1000,
 					MaxQPS:         10000,
 				}),
-				WithConcurrencyLimiter(&limiterMocks.ConcurrencyLimiter{}),
-				WithQPSLimiter(&limiterMocks.RateLimiter{}),
+				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(&limiterMocks.ConcurrencyLimiter{}, &limiterMocks.RateLimiter{}, nil),
+				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), limiter.NewQPSLimiter(interval, 10000), nil, false),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -358,12 +340,29 @@ func TestServerBoundHandler(t *testing.T) {
 					MaxConnections: 1000,
 					MaxQPS:         10000,
 				}),
-				WithConcurrencyLimiter(&limiterMocks.ConcurrencyLimiter{}),
-				WithQPSLimiter(&limiterMocks.RateLimiter{}),
+				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
+			},
+			wantInbounds: []remote.InboundHandler{
+				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), mocks.NewMockRateLimiter(ctrl), nil, true),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+			wantOutbounds: []remote.OutboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+		},
+		{
+			opts: []Option{
+				WithLimit(&limit.Option{
+					MaxConnections: 1000,
+					MaxQPS:         10000,
+				}),
+				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
 				WithMuxTransport(),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(&limiterMocks.ConcurrencyLimiter{}, &limiterMocks.RateLimiter{}, nil),
+				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), mocks.NewMockRateLimiter(ctrl), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -379,7 +378,7 @@ func TestServerBoundHandler(t *testing.T) {
 				WithMuxTransport(),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(limiter.NewConcurrencyLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil),
+				bound.NewServerLimiterHandler(limiter.NewConcurrencyLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -411,7 +410,7 @@ func TestServerBoundHandler(t *testing.T) {
 		test.Assert(t, err == nil, err)
 
 		iSvr := svr.(*server)
-		test.Assert(t, reflect.DeepEqual(iSvr.opt.RemoteOpt.Inbounds, tcase.wantInbounds))
+		test.Assert(t, inboundDeepEqual(iSvr.opt.RemoteOpt.Inbounds, tcase.wantInbounds))
 		test.Assert(t, reflect.DeepEqual(iSvr.opt.RemoteOpt.Outbounds, tcase.wantOutbounds))
 		svr.Stop()
 	}
@@ -554,13 +553,6 @@ func (noopMetahandler) ReadMeta(ctx context.Context, msg remote.Message) (contex
 func (noopMetahandler) OnConnectStream(ctx context.Context) (context.Context, error) { return ctx, nil }
 func (noopMetahandler) OnReadStream(ctx context.Context) (context.Context, error)    { return ctx, nil }
 
-type mockRateLimiter struct{}
-
-func (*mockRateLimiter) Acquire(ctx context.Context, req remote.Message) bool { return true }
-func (*mockRateLimiter) Status(ctx context.Context, req remote.Message) (max, current int, interval time.Duration) {
-	return
-}
-
 type mockSvrTransHandlerFactory struct {
 	hdlr remote.ServerTransHandler
 }
@@ -638,4 +630,16 @@ func TestRunServiceWithoutSvcInfo(t *testing.T) {
 	err := svr.Run()
 	test.Assert(t, err != nil)
 	test.Assert(t, strings.Contains(err.Error(), "no service"))
+}
+
+func inboundDeepEqual(inbound1, inbound2 []remote.InboundHandler) bool {
+	if len(inbound1) != len(inbound2) {
+		return false
+	}
+	for i := 0; i < len(inbound1); i++ {
+		if !bound.DeepEqual(inbound1[i], inbound2[i]) {
+			return false
+		}
+	}
+	return true
 }

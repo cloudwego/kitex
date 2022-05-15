@@ -317,25 +317,21 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 			connLimit = &limiter.DummyConcurrencyLimiter{}
 		}
 	}
-	var useDefaultRateLimiter bool
 	if qpsLimit == nil {
-		useDefaultRateLimiter = true
 		if limits != nil && limits.MaxQPS > 0 {
 			interval := time.Millisecond * 100 // FIXME: should not care this implementation-specific parameter
 			qpsLimit = limiter.NewQPSLimiter(interval, limits.MaxQPS)
 		} else {
 			qpsLimit = &limiter.DummyRateLimiter{}
 		}
+	} else {
+		s.opt.Limit.QPSLimitPostDecode = true
 	}
 	if limits != nil && limits.UpdateControl != nil {
 		updater := limiter.NewLimiterWrapper(connLimit, qpsLimit)
 		limits.UpdateControl(updater)
 	}
-	if !s.opt.Limit.LimitOnMessage && useDefaultRateLimiter {
-		handler = bound.NewServerLimiterOnReadHandler(connLimit, qpsLimit, s.opt.Limit.LimitReporter)
-	} else {
-		handler = bound.NewServerLimiterHandler(connLimit, qpsLimit, s.opt.Limit.LimitReporter)
-	}
+	handler = bound.NewServerLimiterHandler(connLimit, qpsLimit, s.opt.Limit.LimitReporter, s.opt.Limit.QPSLimitPostDecode)
 	// TODO: gRPC limiter
 	return
 }

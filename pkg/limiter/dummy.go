@@ -19,8 +19,6 @@ package limiter
 import (
 	"context"
 	"time"
-
-	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 // DummyConcurrencyLimiter implements ConcurrencyLimiter but without actual limitation.
@@ -43,9 +41,9 @@ func (dcl *DummyConcurrencyLimiter) Status(ctx context.Context) (limit, occupied
 type DummyRateLimiter struct{}
 
 // Acquire .
-func (drl *DummyRateLimiter) Acquire(ctx context.Context, req remote.Message) bool { return true }
+func (drl *DummyRateLimiter) Acquire(ctx context.Context) bool { return true }
 
 // Status .
-func (drl *DummyRateLimiter) Status(ctx context.Context, req remote.Message) (max, current int, interval time.Duration) {
+func (drl *DummyRateLimiter) Status(ctx context.Context) (max, current int, interval time.Duration) {
 	return
 }

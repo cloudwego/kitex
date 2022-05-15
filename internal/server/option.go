@@ -98,10 +98,10 @@ type Limit struct {
 	ConLimit      limiter.ConcurrencyLimiter
 	QPSLimit      limiter.RateLimiter
 
-	// LimitOnMessage is true to indicate that the QPS limiter takes effect in
+	// QPSLimitPostDecode is true to indicate that the QPS limiter takes effect in
 	// the OnMessage callback, and false for the OnRead callback.
 	// Usually when the server is multiplexed, Kitex set it to True by default.
-	LimitOnMessage bool
+	QPSLimitPostDecode bool
 }
 
 // NewOptions creates a default options.

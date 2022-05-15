@@ -71,7 +71,7 @@ func WithMuxTransport() Option {
 		di.Push("WithMuxTransport()")
 		o.RemoteOpt.SvrHandlerFactory = netpollmux.NewSvrTransHandlerFactory()
 		// set limit options
-		o.Limit.LimitOnMessage = true
+		o.Limit.QPSLimitPostDecode = true
 	}}
 }
 

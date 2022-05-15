@@ -21,23 +21,25 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/mock"
-
+	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/golang/mock/gomock"
 
-	remoteMocks "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/invoke"
 )
 
 // TestNewTransMetaHandler test NewTransMetaHandler function and assert the result not nil.
 func TestNewTransMetaHandler(t *testing.T) {
-	metaHandler1 := &remoteMocks.MetaHandler{}
-	metaHandler2 := &remoteMocks.MetaHandler{}
-	metaHandler3 := &remoteMocks.MetaHandler{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	metaHandler1 := mocks.NewMockMetaHandler(ctrl)
+	metaHandler2 := mocks.NewMockMetaHandler(ctrl)
+	metaHandler3 := mocks.NewMockMetaHandler(ctrl)
 	mhs := []remote.MetaHandler{
 		metaHandler1, metaHandler2, metaHandler3,
 	}
@@ -50,44 +52,36 @@ func TestNewTransMetaHandler(t *testing.T) {
 // TestTransMetaHandlerWrite test Write function of transMetaHandler.
 func TestTransMetaHandlerWrite(t *testing.T) {
 	t.Run("Test transMetahandler Write success", func(t *testing.T) {
-		metaHandler1 := &remoteMocks.MetaHandler{}
-		metaHandler2 := &remoteMocks.MetaHandler{}
-		metaHandler3 := &remoteMocks.MetaHandler{}
-		mhs := []remote.MetaHandler{
-			metaHandler1, metaHandler2, metaHandler3,
-		}
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		metaHandler1 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler2 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler3 := mocks.NewMockMetaHandler(ctrl)
 
 		invokeMessage := invoke.NewMessage(nil, nil)
 		remoteMessage := remote.NewMessage(
 			nil, nil, nil, remote.Call, remote.Client)
 		ctx := context.Background()
 
+		metaHandler1.EXPECT().WriteMeta(gomock.Any(), remoteMessage).DoAndReturn(func(ctx context.Context, msg remote.Message) (context.Context, error) {
+			ctx = context.WithValue(ctx, "key1", "val1")
+			return ctx, nil
+		}).Times(1)
+		metaHandler2.EXPECT().WriteMeta(gomock.Any(), remoteMessage).DoAndReturn(func(ctx context.Context, msg remote.Message) (context.Context, error) {
+			ctx = context.WithValue(ctx, "key2", "val2")
+			return ctx, nil
+		}).Times(1)
+		metaHandler3.EXPECT().WriteMeta(gomock.Any(), remoteMessage).DoAndReturn(func(ctx context.Context, msg remote.Message) (context.Context, error) {
+			ctx = context.WithValue(ctx, "key3", "val3")
+			return ctx, nil
+		}).Times(1)
+
+		mhs := []remote.MetaHandler{
+			metaHandler1, metaHandler2, metaHandler3,
+		}
+
 		handler := NewTransMetaHandler(mhs)
-
-		metaHandler1.On("WriteMeta",
-			mock.MatchedBy(func(context.Context) bool { return true }),
-			mock.MatchedBy(func(remote.Message) bool { return true })).
-			Return(func(ctx context.Context, msg remote.Message) context.Context {
-				ctx = context.WithValue(ctx, "key1", "val1")
-				return ctx
-			}, nil)
-
-		metaHandler2.On("WriteMeta",
-			mock.MatchedBy(func(context.Context) bool { return true }),
-			mock.MatchedBy(func(remote.Message) bool { return true })).
-			Return(func(ctx context.Context, msg remote.Message) context.Context {
-				ctx = context.WithValue(ctx, "key2", "val2")
-				return ctx
-			}, nil)
-
-		metaHandler3.On("WriteMeta",
-			mock.MatchedBy(func(context.Context) bool { return true }),
-			mock.MatchedBy(func(remote.Message) bool { return true })).
-			Return(func(ctx context.Context, msg remote.Message) context.Context {
-				ctx = context.WithValue(ctx, "key3", "val3")
-				return ctx
-			}, nil)
-
 		test.Assert(t, handler != nil)
 
 		newctx, err := handler.Write(ctx, invokeMessage, remoteMessage)
@@ -102,21 +96,25 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 	})
 
 	t.Run("Test TransMetahandler Write with error", func(t *testing.T) {
-		metaHandler1 := &remoteMocks.MetaHandler{}
-		metaHandler2 := &remoteMocks.MetaHandler{}
-		metaHandler3 := &remoteMocks.MetaHandler{}
-		mhs := []remote.MetaHandler{
-			metaHandler1, metaHandler2, metaHandler3,
-		}
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		metaHandler1 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler2 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler3 := mocks.NewMockMetaHandler(ctrl)
 
 		invokeMessage := invoke.NewMessage(nil, nil)
 		remoteMessage := remote.NewMessage(
 			nil, nil, nil, remote.Call, remote.Client)
 		ctx := context.Background()
 
-		metaHandler1.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), errFoo)
-		metaHandler2.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), nil)
-		metaHandler3.On("WriteMeta", ctx, remoteMessage).Return(context.Background(), nil)
+		metaHandler1.EXPECT().WriteMeta(ctx, remoteMessage).Return(context.Background(), errFoo).Times(1)
+		metaHandler2.EXPECT().WriteMeta(ctx, remoteMessage).Return(context.Background(), nil).Times(0)
+		metaHandler3.EXPECT().WriteMeta(ctx, remoteMessage).Return(context.Background(), nil).Times(0)
+
+		mhs := []remote.MetaHandler{
+			metaHandler1, metaHandler2, metaHandler3,
+		}
 
 		handler := NewTransMetaHandler(mhs)
 		test.Assert(t, handler != nil)
@@ -130,12 +128,12 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 // TestTransMetaHandlerOnMessage test OnMessage function of transMetaHandler, on client side and on server side.
 func TestTransMetaHandlerOnMessage(t *testing.T) {
 	t.Run("Test TransMetaHandler OnMessage success client side", func(t *testing.T) {
-		metaHandler1 := &remoteMocks.MetaHandler{}
-		metaHandler2 := &remoteMocks.MetaHandler{}
-		metaHandler3 := &remoteMocks.MetaHandler{}
-		mhs := []remote.MetaHandler{
-			metaHandler1, metaHandler2, metaHandler3,
-		}
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		metaHandler1 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler2 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler3 := mocks.NewMockMetaHandler(ctrl)
 
 		args := remote.NewMessage(
 			nil, nil, nil, remote.Call, remote.Client)
@@ -143,29 +141,22 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 			nil, nil, nil, remote.Reply, remote.Client)
 		ctx := context.Background()
 
-		metaHandler1.On("ReadMeta",
-			mock.MatchedBy(func(context.Context) bool { return true }),
-			mock.MatchedBy(func(remote.Message) bool { return true })).
-			Return(func(ctx context.Context, msg remote.Message) context.Context {
-				ctx = context.WithValue(ctx, "key1", "val1")
-				return ctx
-			}, nil)
+		metaHandler1.EXPECT().ReadMeta(gomock.Any(), result).DoAndReturn(func(ctx context.Context, msg remote.Message) (context.Context, error) {
+			ctx = context.WithValue(ctx, "key1", "val1")
+			return ctx, nil
+		}).Times(1)
+		metaHandler2.EXPECT().ReadMeta(gomock.Any(), result).DoAndReturn(func(ctx context.Context, msg remote.Message) (context.Context, error) {
+			ctx = context.WithValue(ctx, "key2", "val2")
+			return ctx, nil
+		}).Times(1)
+		metaHandler3.EXPECT().ReadMeta(gomock.Any(), result).DoAndReturn(func(ctx context.Context, msg remote.Message) (context.Context, error) {
+			ctx = context.WithValue(ctx, "key3", "val3")
+			return ctx, nil
+		}).Times(1)
 
-		metaHandler2.On("ReadMeta",
-			mock.MatchedBy(func(context.Context) bool { return true }),
-			mock.MatchedBy(func(remote.Message) bool { return true })).
-			Return(func(ctx context.Context, msg remote.Message) context.Context {
-				ctx = context.WithValue(ctx, "key2", "val2")
-				return ctx
-			}, nil)
-
-		metaHandler3.On("ReadMeta",
-			mock.MatchedBy(func(context.Context) bool { return true }),
-			mock.MatchedBy(func(remote.Message) bool { return true })).
-			Return(func(ctx context.Context, msg remote.Message) context.Context {
-				ctx = context.WithValue(ctx, "key3", "val3")
-				return ctx
-			}, nil)
+		mhs := []remote.MetaHandler{
+			metaHandler1, metaHandler2, metaHandler3,
+		}
 
 		handler := NewTransMetaHandler(mhs)
 		test.Assert(t, handler != nil)
@@ -182,12 +173,13 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 	})
 
 	t.Run("Test TransMetaHandler OnMessage success server side", func(t *testing.T) {
-		metaHandler1 := &remoteMocks.MetaHandler{}
-		metaHandler2 := &remoteMocks.MetaHandler{}
-		metaHandler3 := &remoteMocks.MetaHandler{}
-		mhs := []remote.MetaHandler{
-			metaHandler1, metaHandler2, metaHandler3,
-		}
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		metaHandler1 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler2 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler3 := mocks.NewMockMetaHandler(ctrl)
+
 		ink := rpcinfo.NewInvocation("", "mock")
 		to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
 		ri := rpcinfo.NewRPCInfo(nil, to, ink, nil, nil)
@@ -198,9 +190,12 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 			nil, nil, nil, remote.Reply, remote.Server)
 		ctx := context.Background()
 
-		metaHandler1.On("ReadMeta", ctx, args).Return(context.Background(), nil)
-		metaHandler2.On("ReadMeta", ctx, args).Return(context.Background(), nil)
-		metaHandler3.On("ReadMeta", ctx, args).Return(context.Background(), nil)
+		metaHandler1.EXPECT().ReadMeta(ctx, args).Return(context.Background(), nil).Times(1)
+		metaHandler2.EXPECT().ReadMeta(ctx, args).Return(context.Background(), nil).Times(1)
+		metaHandler3.EXPECT().ReadMeta(ctx, args).Return(context.Background(), nil).Times(1)
+		mhs := []remote.MetaHandler{
+			metaHandler1, metaHandler2, metaHandler3,
+		}
 
 		handler := NewTransMetaHandler(mhs)
 
@@ -232,8 +227,11 @@ func TestGetValidMsg(t *testing.T) {
 
 // TestTransMetaHandlerOnActive test OnActive function of transMetaHandler
 func TestTransMetaHandlerOnActive(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	mhs := []remote.MetaHandler{
-		&remoteMocks.MetaHandler{},
+		mocks.NewMockMetaHandler(ctrl),
 	}
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)
@@ -244,8 +242,11 @@ func TestTransMetaHandlerOnActive(t *testing.T) {
 
 // TestTransMetaHandlerOnRead test OnRead function of transMetaHandler
 func TestTransMetaHandlerOnRead(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	mhs := []remote.MetaHandler{
-		&remoteMocks.MetaHandler{},
+		mocks.NewMockMetaHandler(ctrl),
 	}
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)
@@ -256,8 +257,11 @@ func TestTransMetaHandlerOnRead(t *testing.T) {
 
 // TestTransMetaHandlerOnInactive test OnInactive function of transMetaHandler
 func TestTransMetaHandlerOnInactive(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	mhs := []remote.MetaHandler{
-		&remoteMocks.MetaHandler{},
+		mocks.NewMockMetaHandler(ctrl),
 	}
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)
