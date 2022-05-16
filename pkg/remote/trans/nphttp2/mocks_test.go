@@ -61,7 +61,8 @@ func (mc *mockNetpollConn) mockReader(b []byte) (n int, err error) {
 	mc.counterLock.Lock()
 	defer mc.counterLock.Unlock()
 	bLen := len(b)
-	if bLen == frameHeaderLen {
+	// mock: handle bufio Read()
+	if bLen == frameHeaderLen || bLen == defaultMockReadWriteBufferSize {
 		b = b[0:0]
 		if mc.queueCounter >= len(mc.mockQueue) {
 			return
@@ -242,8 +243,17 @@ var (
 	mockAddr1 = "127.0.0.1:28001"
 )
 
+const defaultMockReadWriteBufferSize = 16
+
 func newMockConnPool() *connPool {
-	connPool := NewConnPool("test", uint32(0), grpc.ConnectOptions{})
+	connPool := NewConnPool("test", uint32(0), grpc.ConnectOptions{
+		KeepaliveParams:       grpc.ClientKeepalive{},
+		InitialWindowSize:     0,
+		InitialConnWindowSize: 0,
+		WriteBufferSize:       defaultMockReadWriteBufferSize,
+		ReadBufferSize:        defaultMockReadWriteBufferSize,
+		MaxHeaderListSize:     nil,
+	})
 	return connPool
 }
 
@@ -304,7 +314,9 @@ func newMockDialer() *remote.SynthesizedDialer {
 		if timeout < connectCost {
 			return nil, errors.New("connect timeout")
 		}
-		return newMockNpConn(address), nil
+		npConn := newMockNpConn(address)
+		npConn.mockSettingFrame()
+		return npConn, nil
 	}
 	return d
 }
