@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/golang/mock/gomock"
 )
 
 func TestGenericService(t *testing.T) {
@@ -36,10 +37,13 @@ func TestGenericService(t *testing.T) {
 	out := remote.NewWriterBuffer(256)
 	tProto := codecThrift.NewBinaryProtocol(out)
 
-	argWriteInner, resultWriteInner := mocks.NewMessageWriter(t), mocks.NewMessageWriter(t)
-	rInner := mocks.NewMessageReader(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	argWriteInner, resultWriteInner := mocks.NewMockMessageWriter(ctrl), mocks.NewMockMessageWriter(ctrl)
+	rInner := mocks.NewMockMessageReader(ctrl)
 	// Read expect
-	rInner.On("Read", ctx, method, tProto).Return("test", nil)
+	rInner.EXPECT().Read(ctx, method, tProto).Return("test", nil).AnyTimes()
 
 	// Args...
 	arg := newGenericServiceCallArgs()
@@ -54,7 +58,7 @@ func TestGenericService(t *testing.T) {
 	test.Assert(t, err.Error() == "unexpected Args writer type: struct {}")
 
 	// Write expect
-	argWriteInner.On("Write", ctx, tProto, a.Request, a.GetOrSetBase()).Return(nil)
+	argWriteInner.EXPECT().Write(ctx, tProto, a.Request, a.GetOrSetBase()).Return(nil)
 	a.SetCodec(argWriteInner)
 	// write ok
 	err = a.Write(ctx, tProto)
@@ -76,7 +80,7 @@ func TestGenericService(t *testing.T) {
 	err = r.Write(ctx, tProto)
 	test.Assert(t, err.Error() == "unexpected Result writer type: <nil>")
 	// Write expect
-	resultWriteInner.On("Write", ctx, tProto, r.Success, (*gthrift.Base)(nil)).Return(nil)
+	resultWriteInner.EXPECT().Write(ctx, tProto, r.Success, (*gthrift.Base)(nil)).Return(nil).AnyTimes()
 	r.SetCodec(resultWriteInner)
 	// write ok
 	err = r.Write(ctx, tProto)
@@ -97,20 +101,20 @@ func TestGenericService(t *testing.T) {
 	test.Assert(t, success.(string) == method)
 
 	// handler mock result func
-	mockHandlerResultFn := func(srcMethod, expMethod string) (string, error) {
-		if srcMethod != expMethod {
-			return "", fmt.Errorf("srcMethod is not equal to expMethod: %v", srcMethod)
+	mockHandlerResultFn := func(_ context.Context, srcMethod string, request interface{}) (string, error) {
+		if srcMethod != method {
+			return "", fmt.Errorf("srcMethod: %v is not equal to method: %v", srcMethod, method)
 		}
-		return expMethod, nil
+		return method, nil
 	}
 	// test callHandler...
-	handler := mocks.NewService(t)
+	handler := mocks.NewMockService(ctrl)
 	a.Method = ""
-	handler.On("GenericCall", ctx, a.Method, a.Request).Return(mockHandlerResultFn(a.Method, method))
+	handler.EXPECT().GenericCall(ctx, a.Method, a.Request).DoAndReturn(mockHandlerResultFn)
 	err = callHandler(ctx, handler, arg, result)
-	test.Assert(t, strings.Contains(err.Error(), "srcMethod is not equal to expMethod"))
+	test.Assert(t, strings.Contains(err.Error(), "not equal to method"))
 	a.Method = method
-	handler.On("GenericCall", ctx, a.Method, a.Request).Return(mockHandlerResultFn(a.Method, method))
+	handler.EXPECT().GenericCall(ctx, a.Method, a.Request).DoAndReturn(mockHandlerResultFn)
 	err = callHandler(ctx, handler, arg, result)
 	test.Assert(t, err == nil)
 }
