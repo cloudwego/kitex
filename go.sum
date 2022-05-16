@@ -12,6 +12,8 @@ github.com/choleraehyq/pid v0.0.13/go.mod h1:uhzeFgxJZWQsZulelVQZwdASxQ9TIPZYL4T
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/cloudwego/frugal v0.0.0-20220427092356-a8f6898e3101 h1:nXincy9fUH5TOs5Cu66sFyiBzAXA1nZoOUMIiIiIofs=
 github.com/cloudwego/frugal v0.0.0-20220427092356-a8f6898e3101/go.mod h1:AiUb1EsCxvFHP23gIb18MFPRwtYdn+bNQWRUGaEQtHw=
+github.com/cloudwego/frugal v0.1.0 h1:zhGT2scqhmeqKs5yBFIrN7F28FydFIoWni2EtB6lQdI=
+github.com/cloudwego/frugal v0.1.0/go.mod h1:JEn/47GqOo9iwk4zeiHz2G5hU4wg4ol+lvs1RL56qkc=
 github.com/cloudwego/netpoll v0.2.2 h1:mhrwGBNlnplC607H6zOmFOUXEoUUVUdu9OeEQJiqZj4=
 github.com/cloudwego/netpoll v0.2.2/go.mod h1:1T2WVuQ+MQw6h6DpE45MohSvDTKdy2DlzCx2KsnPI4E=
 github.com/cloudwego/thriftgo v0.1.2 h1:AXpGJiWE3VggfiRHwA6raRJUIcjxliEIfJfGlvRiYUA=
@@ -76,6 +78,8 @@ github.com/tidwall/pretty v1.2.0/go.mod h1:ITEVvHYasfjBbM0u2Pg8T2nJnzm8xPwvNhhso
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 golang.org/x/arch v0.0.0-20220401014709-5424468ecbac h1:05z6X/pDgf2qll8x7kbRRVdr33GjdV/GOCGiQfnaJS8=
 golang.org/x/arch v0.0.0-20220401014709-5424468ecbac/go.mod h1:5om86z9Hs0C8fWVUuoMHwpExlXzs5Tkyp9hOrfG7pp8=
+golang.org/x/arch v0.0.0-20220412001346-fc48f9fe4c15 h1:GVfVkciLYxn5mY5EncwAe0SXUn9Rm81rRkZ0TTmn/cU=
+golang.org/x/arch v0.0.0-20220412001346-fc48f9fe4c15/go.mod h1:5om86z9Hs0C8fWVUuoMHwpExlXzs5Tkyp9hOrfG7pp8=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
