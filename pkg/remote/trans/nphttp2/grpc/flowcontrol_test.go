@@ -110,17 +110,22 @@ func TestInFlow(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// test onRead()
-	inFlow.onRead(limit)
+	size := inFlow.onRead(limit)
+	test.Assert(t, size == limit)
 
 	// test onData() illegal situation
-	inFlow.onData(limit * 2)
+	err = inFlow.onData(limit * 2)
+	test.Assert(t, err != nil)
 
 	// test maybeAdjust() no adjust
-	inFlow.maybeAdjust(0)
+	adjustNum := inFlow.maybeAdjust(0)
+	test.Assert(t, adjustNum == 0)
 
 	// test maybeAdjust() do adjust
-	inFlow.maybeAdjust(limit * 2)
+	adjustNum = inFlow.maybeAdjust(limit * 2)
+	test.Assert(t, adjustNum == limit*2)
 
-	// test maybeAdjust() maxSize adjust
-	inFlow.maybeAdjust(math.MaxInt32 + 1)
+	// test maybeAdjust() maxSize adjust (f.delta - limit)
+	adjustNum = inFlow.maybeAdjust(math.MaxInt32 + 1)
+	test.Assert(t, adjustNum == math.MaxInt32-limit)
 }
