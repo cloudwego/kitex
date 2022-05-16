@@ -20,6 +20,7 @@
 package limiter
 
 import (
+	"math"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -28,56 +29,106 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
-func TestQpsLimiter(t *testing.T) {
-	limiter := NewQPSLimiter(time.Second/10, 1000)
-	for i := 0; i < 1000; i++ {
-		test.Assert(t, limiter.Acquire())
-	}
-	for i := 0; i < 1000; i++ {
-		test.Assert(t, !limiter.Acquire())
-	}
+func TestQPSLimiter(t *testing.T) {
+	qps := 1000
+	interval := time.Second / 100
+	limiter := NewQPSLimiter(interval, qps)
 
-	time.Sleep(time.Second/2 + 10*time.Millisecond)
+	// case1: init
+	max, cur, itv := limiter.Status()
+	test.Assert(t, max == qps)
+	test.Assert(t, cur == int(float64(qps)/(time.Second.Seconds()/interval.Seconds())), cur)
+	test.Assert(t, itv == interval)
 
-	for i := 0; i < 500; i++ {
-		test.Assert(t, limiter.Acquire())
-	}
-	for i := 0; i < 500; i++ {
-		test.Assert(t, !limiter.Acquire())
-	}
-
+	// case2: get tokens with parallel 3 and QPS is 1000
+	concurrent := 3
 	var wg sync.WaitGroup
-	var success int32
-	limiter.(*qpsLimiter).UpdateQPSLimit(time.Second/5, 10000)
-	max, _, interval := limiter.Status()
-	test.Assert(t, max == 10000)
-	test.Assert(t, interval == time.Second/5)
-	time.Sleep(time.Second)
-	for i := 0; i < 100000; i++ {
-		wg.Add(1)
+	wg.Add(concurrent)
+	var count, stopFlag int32
+	now := time.Now()
+	for i := 0; i < concurrent; i++ {
 		go func() {
-			defer wg.Done()
-			ok := limiter.Acquire()
-			if ok {
-				atomic.AddInt32(&success, 1)
+			for atomic.LoadInt32(&stopFlag) == 0 {
+				if limiter.Acquire() {
+					atomic.AddInt32(&count, 1)
+				}
 			}
+			wg.Done()
 		}()
 	}
+	time.AfterFunc(time.Second*2, func() {
+		atomic.StoreInt32(&stopFlag, 1)
+	})
 	wg.Wait()
-	if success > 11000 {
-		t.Log(success)
-		t.Fail()
+	actualQPS := count / int32(time.Since(now).Seconds())
+	delta := math.Abs(float64(actualQPS - int32(qps)))
+	// the diff range need be < 2%
+	test.Assert(t, delta < float64(qps)*0.02, delta)
+
+	// case3: UpdateQPSLimit and get Status
+	qps = 10000
+	count = 0
+	interval = time.Second / 50
+	limiter.(*qpsLimiter).UpdateQPSLimit(interval, qps)
+	max, _, itv = limiter.Status()
+	test.Assert(t, max == qps)
+	test.Assert(t, limiter.(*qpsLimiter).once == int32(float64(qps)/(time.Second.Seconds()/interval.Seconds())), limiter.(*qpsLimiter).once)
+	test.Assert(t, itv == interval)
+	wg.Add(concurrent)
+	stopFlag = 0
+	now = time.Now()
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			for atomic.LoadInt32(&stopFlag) == 0 {
+				if limiter.Acquire() {
+					atomic.AddInt32(&count, 1)
+				}
+			}
+			wg.Done()
+		}()
 	}
-	t.Log(success)
-	// test negative limit
-	limiter = NewQPSLimiter(time.Second, -100)
-	time.Sleep(time.Second * 2)
-	tokens := atomic.LoadInt32(&limiter.(*qpsLimiter).tokens)
-	once := atomic.LoadInt32(&limiter.(*qpsLimiter).once)
-	test.Assert(t, tokens == once)
+	time.AfterFunc(time.Second*2, func() {
+		atomic.StoreInt32(&stopFlag, 1)
+	})
+	wg.Wait()
+	actualQPS = count / int32(time.Since(now).Seconds())
+	delta = math.Abs(float64(actualQPS - int32(qps)))
+	// the diff range need be < 5%, the range is larger because the interval config is larger
+	test.Assert(t, delta < float64(qps)*0.05, delta, actualQPS)
+
+	// case4: UpdateLimit and get Status
+	qps = 300
+	count = 0
+	limiter.(*qpsLimiter).UpdateLimit(qps)
+	time.Sleep(interval)
+	max, _, itv = limiter.Status()
+	test.Assert(t, max == qps)
+	test.Assert(t, limiter.(*qpsLimiter).once == int32(float64(qps)/(time.Second.Seconds()/interval.Seconds())), limiter.(*qpsLimiter).once)
+	test.Assert(t, itv == interval)
+	wg.Add(concurrent)
+	stopFlag = 0
+	now = time.Now()
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			for atomic.LoadInt32(&stopFlag) == 0 {
+				if limiter.Acquire() {
+					atomic.AddInt32(&count, 1)
+				}
+			}
+			wg.Done()
+		}()
+	}
+	time.AfterFunc(time.Second*2, func() {
+		atomic.StoreInt32(&stopFlag, 1)
+	})
+	wg.Wait()
+	actualQPS = count / int32(time.Since(now).Seconds())
+	delta = math.Abs(float64(actualQPS - int32(qps)))
+	// the diff range need be < 5%, the range is larger because the interval config is larger
+	test.Assert(t, delta < float64(qps)*0.05, delta, actualQPS)
 }
 
-func Test_calOnce(t *testing.T) {
+func TestCalcOnce(t *testing.T) {
 	ret := calcOnce(10*time.Millisecond, 100)
 	test.Assert(t, ret > 0)
 
