@@ -22,12 +22,12 @@ import (
 	"github.com/cloudwego/thriftgo/pkg/test"
 )
 
-// test backupPolicy string
-func TestBackupPolicy_String(T *testing.T) {
+// test BackupPolicy string
+func TestBackupPolicy_String(t *testing.T) {
 	r := NewBackupPolicy(100)
 	r.WithRetryBreaker(0.3)
 	r.WithRetrySameNode()
 	msg := "{RetryDelayMS:100 StopPolicy:{MaxRetryTimes:1 MaxDurationMS:0 " +
 		"DisableChainStop:false DDLStop:false CBPolicy:{ErrorRate:0.3}} RetrySameNode:true}"
-	test.Assert(T, r.String() == msg)
+	test.Assert(t, r.String() == msg)
 }

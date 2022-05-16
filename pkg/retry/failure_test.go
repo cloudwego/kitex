@@ -58,14 +58,6 @@ func TestRandomBackOff_String(T *testing.T) {
 	test.Assert(T, bk.String() == msg)
 }
 
-func TestFixedBackOff_Wait(T *testing.T) {
-	fix := 50
-	bk := &fixedBackOff{
-		fixMS: fix,
-	}
-	bk.Wait(1)
-}
-
 func TestFixedBackOff_String(T *testing.T) {
 	fix := 50
 	bk := &fixedBackOff{

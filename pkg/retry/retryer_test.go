@@ -18,16 +18,12 @@ package retry
 
 import (
 	"context"
-	"strconv"
-	"sync/atomic"
-	"testing"
-	"time"
-
-	"github.com/bytedance/gopkg/cloud/metainfo"
-
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"sync/atomic"
+	"testing"
+	"time"
 )
 
 // test new retry container
@@ -85,7 +81,7 @@ func TestNewRetryContainer(t *testing.T) {
 	_, allow = r.AllowRetry(context.Background())
 	test.Assert(t, !allow)
 
-	// backPolicy is nil
+	// BackPolicy is nil
 	rc = NewRetryContainer()
 	rc.NotifyPolicyChange(method, Policy{
 		Enable: true,
@@ -94,7 +90,7 @@ func TestNewRetryContainer(t *testing.T) {
 	msg := "new retryer[test-Backup] failed, err=newBackupRetryer failed, err=BackupPolicy is nil or retry type not match, cannot do update in backupRetryer, at "
 	test.Assert(t, rc.msg[:len(msg)] == msg)
 
-	// backPolicy config invalid
+	// BackPolicy config invalid
 	rc.NotifyPolicyChange(method, Policy{
 		Enable: true,
 		Type:   1,
@@ -105,7 +101,7 @@ func TestNewRetryContainer(t *testing.T) {
 	msg = "new retryer[test-Backup] failed, err=newBackupRetryer failed, err=invalid backup request delay duration or retryTimes, at "
 	test.Assert(t, rc.msg[:len(msg)] == msg)
 
-	// backPolicy cBPolicy config invalid
+	// BackPolicy cBPolicy config invalid
 	rc.NotifyPolicyChange(method, Policy{
 		Enable: true,
 		Type:   1,
@@ -282,7 +278,7 @@ func TestContainer_Dump(t *testing.T) {
 	rcDump, ok := rc.Dump().(map[string]interface{})
 	test.Assert(t, ok)
 	cliRetryerStr, err := jsoni.MarshalToString(rcDump["clientRetryer"])
-	msg := "{\"backupRequest\":{\"retry_delay_ms\":20,\"stop_policy\":{\"max_retry_times\":1,\"max_duration_ms\":0,\"disable_chain_stop\":false,\"ddl_stop\":false,\"cb_policy\":{\"error_rate\":0.1}},\"retry_same_node\":false},\"enable\":true}"
+	msg := `{"backupRequest":{"retry_delay_ms":20,"stop_policy":{"max_retry_times":1,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1}},"retry_same_node":false},"enable":true}`
 	test.Assert(t, err == nil, err)
 	test.Assert(t, cliRetryerStr == msg)
 	testStr, err := jsoni.MarshalToString(rcDump["test"])
@@ -308,7 +304,7 @@ func TestContainer_Dump(t *testing.T) {
 	rcDump, ok = rc.Dump().(map[string]interface{})
 	test.Assert(t, ok)
 	cliRetryerStr, err = jsoni.MarshalToString(rcDump["clientRetryer"])
-	msg = "{\"enable\":true,\"failureRetry\":{\"stop_policy\":{\"max_retry_times\":2,\"max_duration_ms\":0,\"disable_chain_stop\":false,\"ddl_stop\":false,\"cb_policy\":{\"error_rate\":0.1}},\"backoff_policy\":{\"backoff_type\":\"none\"},\"retry_same_node\":false}}"
+	msg = `{"enable":true,"failureRetry":{"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false}}`
 	test.Assert(t, err == nil, err)
 	test.Assert(t, cliRetryerStr == msg)
 	testStr, err = jsoni.MarshalToString(rcDump["test"])
@@ -316,7 +312,7 @@ func TestContainer_Dump(t *testing.T) {
 	test.Assert(t, testStr == msg)
 }
 
-// test failurePolicy call
+// test FailurePolicy call
 func TestFailurePolicyCall(t *testing.T) {
 	// call while rpc timeout
 	ctx := context.Background()
@@ -333,24 +329,10 @@ func TestFailurePolicyCall(t *testing.T) {
 		FailurePolicy: failurePolicy,
 	})
 	test.Assert(t, err == nil, err)
-	callTimes := 0
-	var prevRI rpcinfo.RPCInfo
 	ri := genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
-		callTimes++
-		retryCtx := ctx
-		cRI := ri
-		if callTimes > 1 {
-			retryCtx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, TransitKey, strconv.Itoa(callTimes-1))
-			if prevRI == nil {
-				prevRI = ri
-			}
-			r.Prepare(retryCtx, prevRI, cRI)
-			prevRI = cRI
-		}
-		return cRI, kerrors.ErrRPCTimeout
+		return ri, kerrors.ErrRPCTimeout
 	}, ri, nil)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, !ok)
@@ -363,30 +345,48 @@ func TestFailurePolicyCall(t *testing.T) {
 		FailurePolicy: failurePolicy,
 	})
 	test.Assert(t, err == nil, err)
-	callTimes = 0
-	ri = genRPCInfo()
-	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
-		callTimes++
-		retryCtx := ctx
-		cRI := ri
-		if callTimes > 1 {
-			retryCtx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, TransitKey, strconv.Itoa(callTimes-1))
-			if prevRI == nil {
-				prevRI = ri
-			}
-			r.Prepare(retryCtx, prevRI, cRI)
-			prevRI = cRI
-		}
-		return cRI, nil
+		return ri, nil
 	}, ri, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ok)
 }
 
-// test backupPolicy call while rpcTime = 100ms
+// test BackupPolicy call while rpcTime > delayTime
 func TestBackupPolicyCall(t *testing.T) {
+	ctx := context.Background()
+	rc := NewRetryContainer()
+	err := rc.Init(&Policy{
+		Enable: true,
+		Type:   1,
+		BackupPolicy: &BackupPolicy{
+			RetryDelayMS: 100,
+			StopPolicy: StopPolicy{
+				MaxRetryTimes:    2,
+				DisableChainStop: false,
+				CBPolicy: CBPolicy{
+					ErrorRate: defaultCBErrRate,
+				},
+			},
+		},
+	})
+	test.Assert(t, err == nil, err)
+
+	callTimes := int32(0)
+	ri := genRPCInfo()
+	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
+		atomic.AddInt32(&callTimes, 1)
+		time.Sleep(time.Millisecond * 160)
+		return ri, nil
+	}, ri, nil)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, callTimes == 2)
+	test.Assert(t, !ok)
+}
+
+// test BackupPolicy call while failed the first time, succeeded the second time
+func TestBackupPolicyCall1(t *testing.T) {
 	ctx := context.Background()
 	rc := NewRetryContainer()
 	err := rc.Init(&Policy{
@@ -397,27 +397,17 @@ func TestBackupPolicyCall(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	callTimes := int32(0)
-	var prevRI rpcinfo.RPCInfo
 	ri := genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
 		atomic.AddInt32(&callTimes, 1)
-		retryCtx := ctx
-		cRI := ri
-		callTimesAtomic := atomic.LoadInt32(&callTimes)
-		if callTimesAtomic > 1 {
-			retryCtx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, TransitKey, strconv.Itoa(int(callTimesAtomic-1)))
-			if prevRI == nil {
-				prevRI = ri
-			}
-			r.Prepare(retryCtx, prevRI, cRI)
-			prevRI = cRI
+		if atomic.LoadInt32(&callTimes) == 1 {
+			return ri, kerrors.ErrRPCTimeout
 		}
-		time.Sleep(time.Millisecond * 100)
-		return cRI, nil
+		return ri, nil
 	}, ri, nil)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err != nil, err)
+	test.Assert(t, callTimes == 1)
 	test.Assert(t, !ok)
 }
 
@@ -429,48 +419,26 @@ func TestPolicyInvalidCall(t *testing.T) {
 	// case 1(default): no retry policy
 	// no retry policy, call success
 	callTimes := 0
-	var prevRI rpcinfo.RPCInfo
 	ri := genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
 		callTimes++
-		retryCtx := ctx
-		cRI := ri
-		if callTimes > 1 {
-			retryCtx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, TransitKey, strconv.Itoa(callTimes-1))
-			if prevRI == nil {
-				prevRI = ri
-			}
-			r.Prepare(retryCtx, prevRI, cRI)
-			prevRI = cRI
-		}
-		return cRI, nil
+		return ri, nil
 	}, ri, nil)
 	test.Assert(t, err == nil, err)
+	test.Assert(t, callTimes == 1)
 	test.Assert(t, ok)
 
 	// no retry policy, call rpcTimeout
 	callTimes = 0
-	prevRI = nil
 	ri = genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
 		callTimes++
-		retryCtx := ctx
-		cRI := ri
-		if callTimes > 1 {
-			retryCtx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, TransitKey, strconv.Itoa(callTimes-1))
-			if prevRI == nil {
-				prevRI = ri
-			}
-			r.Prepare(retryCtx, prevRI, cRI)
-			prevRI = cRI
-		}
-		return cRI, kerrors.ErrRPCTimeout
+		return ri, kerrors.ErrRPCTimeout
 	}, ri, nil)
 	test.Assert(t, kerrors.IsTimeoutError(err), err)
+	test.Assert(t, callTimes == 1)
 	test.Assert(t, !ok)
 
 	// case 2: setup retry policy, but not satisfy retry condition eg: circuit, retry times == 0, chain stop, ddl
@@ -487,25 +455,14 @@ func TestPolicyInvalidCall(t *testing.T) {
 	})
 	test.Assert(t, err == nil, err)
 	callTimes = 0
-	prevRI = nil
 	ri = genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
 		callTimes++
-		retryCtx := ctx
-		cRI := ri
-		if callTimes > 1 {
-			retryCtx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, TransitKey, strconv.Itoa(callTimes-1))
-			if prevRI == nil {
-				prevRI = ri
-			}
-			r.Prepare(retryCtx, prevRI, cRI)
-			prevRI = cRI
-		}
-		return cRI, kerrors.ErrRPCTimeout
+		return ri, kerrors.ErrRPCTimeout
 	}, ri, nil)
 	test.Assert(t, kerrors.IsTimeoutError(err), err)
+	test.Assert(t, callTimes == 1)
 	test.Assert(t, !ok)
 
 	// backupPolicy MaxRetryTimes = 0
@@ -518,24 +475,13 @@ func TestPolicyInvalidCall(t *testing.T) {
 	})
 	test.Assert(t, err == nil, err)
 	callTimes = 0
-	prevRI = nil
 	ri = genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
 		callTimes++
-		retryCtx := ctx
-		cRI := ri
-		if callTimes > 1 {
-			retryCtx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, TransitKey, strconv.Itoa(callTimes-1))
-			if prevRI == nil {
-				prevRI = ri
-			}
-			r.Prepare(retryCtx, prevRI, cRI)
-			prevRI = cRI
-		}
-		return cRI, nil
+		return ri, nil
 	}, ri, nil)
 	test.Assert(t, err == nil, err)
+	test.Assert(t, callTimes == 1)
 	test.Assert(t, ok)
 }
