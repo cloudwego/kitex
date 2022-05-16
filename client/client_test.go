@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/retry"
+
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -78,6 +80,17 @@ func newMockClient(tb testing.TB, extra ...Option) Client {
 func TestCall(t *testing.T) {
 	mtd := mocks.MockMethod
 	cli := newMockClient(t)
+	ctx := context.Background()
+	req := new(MockTStruct)
+	res := new(MockTStruct)
+
+	err := cli.Call(ctx, mtd, req, res)
+	test.Assert(t, err == nil, err)
+}
+
+func TestCallWithRetryContainer(t *testing.T) {
+	mtd := mocks.MockMethod
+	cli := newMockClient(t, WithRetryContainer(retry.NewRetryContainer()))
 	ctx := context.Background()
 	req := new(MockTStruct)
 	res := new(MockTStruct)
