@@ -18,7 +18,6 @@ package netpoll
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/cloudwego/netpoll"
@@ -39,10 +38,6 @@ func (m *MockCodec) Name() string {
 }
 
 func (m *MockCodec) Encode(ctx context.Context, msg remote.Message, out remote.ByteBuffer) (err error) {
-	if msg.Data() == nil {
-		return errors.New("msg data is nil")
-	}
-
 	if m.EncodeFunc != nil {
 		return m.EncodeFunc(ctx, msg, out)
 	}
