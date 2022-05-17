@@ -238,7 +238,7 @@ func TestRetryPolicyFailure(t *testing.T) {
 }
 
 // test policy equal
-func TestPolicyNotEqual(T *testing.T) {
+func TestPolicyNotEqual(t *testing.T) {
 	var p, policy Policy
 
 	// create failurePolicy
@@ -265,64 +265,64 @@ func TestPolicyNotEqual(T *testing.T) {
 		},
 	}
 	jsonRet, err := jsoni.MarshalToString(policy)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 
 	// case1 enable not equal
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.Enable = false
-	test.Assert(T, !p.Equals(policy))
+	test.Assert(t, !p.Equals(policy))
 
 	// case2 type not equal
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.Type = BackupType
-	test.Assert(T, !p.Equals(policy))
+	test.Assert(t, !p.Equals(policy))
 
 	// case3 failurePolicy not equal
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.FailurePolicy = nil
-	test.Assert(T, !p.Equals(policy))
-	test.Assert(T, !policy.Equals(p))
+	test.Assert(t, !p.Equals(policy))
+	test.Assert(t, !policy.Equals(p))
 
 	// case4 failurePolicy stopPolicy not equal
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.FailurePolicy.StopPolicy.MaxRetryTimes = 2
-	test.Assert(T, !p.Equals(policy))
+	test.Assert(t, !p.Equals(policy))
 
 	// case5 failurePolicy backOffPolicy not equal
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.FailurePolicy.BackOffPolicy = nil
-	test.Assert(T, !p.Equals(policy))
-	test.Assert(T, !policy.Equals(p))
+	test.Assert(t, !p.Equals(policy))
+	test.Assert(t, !policy.Equals(p))
 
 	// case6 failurePolicy backOffPolicy backOffType not equal
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.FailurePolicy.BackOffPolicy.BackOffType = RandomBackOffType
-	test.Assert(T, !p.Equals(policy))
+	test.Assert(t, !p.Equals(policy))
 
 	// case7 failurePolicy backOffPolicy len(cfgItems) not equal
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.FailurePolicy.BackOffPolicy.CfgItems[MinMSBackOffCfgKey] = 100
-	test.Assert(T, !p.Equals(policy))
+	test.Assert(t, !p.Equals(policy))
 
 	// case8 failurePolicy backOffPolicy cfgItems not equal
 	p = Policy{}
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.FailurePolicy.BackOffPolicy.CfgItems[FixMSBackOffCfgKey] = 101
-	test.Assert(T, !p.Equals(policy))
+	test.Assert(t, !p.Equals(policy))
 
 	// case9 failurePolicy retrySameNode not equal
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.FailurePolicy.RetrySameNode = true
-	test.Assert(T, !p.Equals(policy))
+	test.Assert(t, !p.Equals(policy))
 
 	// create backupPolicy
 	policy = Policy{
@@ -343,33 +343,33 @@ func TestPolicyNotEqual(T *testing.T) {
 		},
 	}
 	jsonRet, err = jsoni.MarshalToString(policy)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 
 	// case10 backupPolicy not equal
 	p = Policy{}
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.BackupPolicy = nil
-	test.Assert(T, !p.Equals(policy))
-	test.Assert(T, !policy.Equals(p))
+	test.Assert(t, !p.Equals(policy))
+	test.Assert(t, !policy.Equals(p))
 
 	// case11 backupPolicy retryDelayMS not equal
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.BackupPolicy.RetryDelayMS = 2
-	test.Assert(T, !p.Equals(policy))
+	test.Assert(t, !p.Equals(policy))
 
 	// case12 backupPolicy stopPolicy not equal
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.BackupPolicy.StopPolicy.MaxRetryTimes = 3
-	test.Assert(T, !p.Equals(policy))
+	test.Assert(t, !p.Equals(policy))
 
 	// case13 backupPolicy retrySameNode not equal
 	err = jsoni.UnmarshalFromString(jsonRet, &p)
-	test.Assert(T, err == nil, err)
+	test.Assert(t, err == nil, err)
 	p.BackupPolicy.RetrySameNode = true
-	test.Assert(T, !p.Equals(policy))
+	test.Assert(t, !p.Equals(policy))
 }
 
 func genRPCInfo() rpcinfo.RPCInfo {

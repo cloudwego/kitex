@@ -18,12 +18,13 @@ package retry
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 // test new retry container
@@ -81,7 +82,7 @@ func TestNewRetryContainer(t *testing.T) {
 	_, allow = r.AllowRetry(context.Background())
 	test.Assert(t, !allow)
 
-	// BackPolicy is nil
+	// backupPolicy is nil
 	rc = NewRetryContainer()
 	rc.NotifyPolicyChange(method, Policy{
 		Enable: true,
@@ -90,7 +91,7 @@ func TestNewRetryContainer(t *testing.T) {
 	msg := "new retryer[test-Backup] failed, err=newBackupRetryer failed, err=BackupPolicy is nil or retry type not match, cannot do update in backupRetryer, at "
 	test.Assert(t, rc.msg[:len(msg)] == msg)
 
-	// BackPolicy config invalid
+	// backupPolicy config invalid
 	rc.NotifyPolicyChange(method, Policy{
 		Enable: true,
 		Type:   1,
@@ -101,7 +102,7 @@ func TestNewRetryContainer(t *testing.T) {
 	msg = "new retryer[test-Backup] failed, err=newBackupRetryer failed, err=invalid backup request delay duration or retryTimes, at "
 	test.Assert(t, rc.msg[:len(msg)] == msg)
 
-	// BackPolicy cBPolicy config invalid
+	// backupPolicy cBPolicy config invalid
 	rc.NotifyPolicyChange(method, Policy{
 		Enable: true,
 		Type:   1,
@@ -385,32 +386,6 @@ func TestBackupPolicyCall(t *testing.T) {
 	test.Assert(t, !ok)
 }
 
-// test BackupPolicy call while failed the first time, succeeded the second time
-func TestBackupPolicyCall1(t *testing.T) {
-	ctx := context.Background()
-	rc := NewRetryContainer()
-	err := rc.Init(&Policy{
-		Enable:       true,
-		Type:         1,
-		BackupPolicy: NewBackupPolicy(20),
-	})
-	test.Assert(t, err == nil, err)
-
-	callTimes := int32(0)
-	ri := genRPCInfo()
-	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
-		atomic.AddInt32(&callTimes, 1)
-		if atomic.LoadInt32(&callTimes) == 1 {
-			return ri, kerrors.ErrRPCTimeout
-		}
-		return ri, nil
-	}, ri, nil)
-	test.Assert(t, err != nil, err)
-	test.Assert(t, callTimes == 1)
-	test.Assert(t, !ok)
-}
-
 // test policy invalid call
 func TestPolicyInvalidCall(t *testing.T) {
 	ctx := context.Background()
@@ -418,7 +393,7 @@ func TestPolicyInvalidCall(t *testing.T) {
 
 	// case 1(default): no retry policy
 	// no retry policy, call success
-	callTimes := 0
+	callTimes := int32(0)
 	ri := genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
@@ -458,8 +433,11 @@ func TestPolicyInvalidCall(t *testing.T) {
 	ri = genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
-		callTimes++
-		return ri, kerrors.ErrRPCTimeout
+		atomic.AddInt32(&callTimes, 1)
+		if atomic.LoadInt32(&callTimes) == 1 {
+			return ri, kerrors.ErrRPCTimeout
+		}
+		return ri, nil
 	}, ri, nil)
 	test.Assert(t, kerrors.IsTimeoutError(err), err)
 	test.Assert(t, callTimes == 1)
@@ -479,6 +457,7 @@ func TestPolicyInvalidCall(t *testing.T) {
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
 		callTimes++
+		time.Sleep(time.Millisecond * 100)
 		return ri, nil
 	}, ri, nil)
 	test.Assert(t, err == nil, err)

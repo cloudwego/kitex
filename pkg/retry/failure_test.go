@@ -37,17 +37,7 @@ func BenchmarkRandomBackOff_Wait(b *testing.B) {
 	})
 }
 
-func TestRandomBackOff_Wait(T *testing.T) {
-	min := 10
-	max := 100
-	bk := &randomBackOff{
-		minMS: min,
-		maxMS: max,
-	}
-	bk.Wait(1)
-}
-
-func TestRandomBackOff_String(T *testing.T) {
+func TestRandomBackOff_String(t *testing.T) {
 	min := 10
 	max := 100
 	bk := &randomBackOff{
@@ -55,25 +45,20 @@ func TestRandomBackOff_String(T *testing.T) {
 		maxMS: max,
 	}
 	msg := "RandomBackOff(10ms-100ms)"
-	test.Assert(T, bk.String() == msg)
+	test.Assert(t, bk.String() == msg)
 }
 
-func TestFixedBackOff_String(T *testing.T) {
+func TestFixedBackOff_String(t *testing.T) {
 	fix := 50
 	bk := &fixedBackOff{
 		fixMS: fix,
 	}
 	msg := "FixedBackOff(50ms)"
-	test.Assert(T, bk.String() == msg)
+	test.Assert(t, bk.String() == msg)
 }
 
-func TestNoneBackOff_Wait(T *testing.T) {
-	bk := &noneBackOff{}
-	bk.Wait(1)
-}
-
-func TestNoneBackOff_String(T *testing.T) {
+func TestNoneBackOff_String(t *testing.T) {
 	bk := &noneBackOff{}
 	msg := "NoneBackOff"
-	test.Assert(T, bk.String() == msg)
+	test.Assert(t, bk.String() == msg)
 }
