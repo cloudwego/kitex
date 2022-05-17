@@ -3,9 +3,9 @@ on: [pull_request]
 jobs:
   staticcheck:
     name: runner / staticcheck
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: reviewdog/action-staticcheck@v1
         with:
           github_token: ${{ secrets.github_token }}
