@@ -18,6 +18,7 @@ package retry
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -37,6 +38,20 @@ func BenchmarkRandomBackOff_Wait(b *testing.B) {
 	})
 }
 
+func TestRandomBackOff_Wait(t *testing.T) {
+	min := 99
+	max := 100
+	bk := &randomBackOff{
+		minMS: min,
+		maxMS: max,
+	}
+	startTime := time.Now()
+	bk.Wait(1)
+	waitTime := time.Now().Sub(startTime)
+	test.Assert(t, time.Millisecond*time.Duration(min) <= waitTime)
+	test.Assert(t, waitTime < time.Millisecond*time.Duration(max+5))
+}
+
 func TestRandomBackOff_String(t *testing.T) {
 	min := 10
 	max := 100
@@ -46,6 +61,18 @@ func TestRandomBackOff_String(t *testing.T) {
 	}
 	msg := "RandomBackOff(10ms-100ms)"
 	test.Assert(t, bk.String() == msg)
+}
+
+func TestFixedBackOff_Wait(t *testing.T) {
+	fix := 50
+	bk := &fixedBackOff{
+		fixMS: fix,
+	}
+	startTime := time.Now()
+	bk.Wait(1)
+	waitTime := time.Now().Sub(startTime)
+	test.Assert(t, time.Millisecond*time.Duration(fix) <= waitTime)
+	test.Assert(t, waitTime < time.Millisecond*time.Duration(fix+5))
 }
 
 func TestFixedBackOff_String(t *testing.T) {
