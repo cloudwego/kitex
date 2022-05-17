@@ -65,12 +65,10 @@ func init() {
 		TracerCtl: &internal_stats.Controller{},
 	}
 
-	// test NewCliTransHandlerFactory()
-	svrTransHdlrFct := NewSvrTransHandlerFactory()
-	// test NewTransHandler()
-	svrTransHdlr, _ = svrTransHdlrFct.NewTransHandler(srvopt)
+	svrTransHdlr, _ = NewSvrTransHandlerFactory().NewTransHandler(srvopt)
 }
 
+// TestOnActive test server_handler OnActive success
 func TestOnActive(t *testing.T) {
 	// 1. prepare mock data
 	var readTimeout time.Duration
@@ -98,6 +96,7 @@ func TestOnActive(t *testing.T) {
 	test.Assert(t, readTimeout == rwTimeout, readTimeout, rwTimeout)
 }
 
+// TestOnRead test server_handler OnRead success
 func TestOnRead(t *testing.T) {
 	// 1. prepare mock data
 	var isWriteBufFlushed bool
@@ -151,6 +150,7 @@ func TestOnRead(t *testing.T) {
 	test.Assert(t, isInvoked)
 }
 
+// TestInvokeErr test server_handler invoke err
 func TestInvokeErr(t *testing.T) {
 	// 1. prepare mock data
 	var isWriteBufFlushed bool
@@ -209,6 +209,7 @@ func TestInvokeErr(t *testing.T) {
 	test.Assert(t, isInvoked)
 }
 
+// TestPanicAfterRead test server_handler not panic afer read
 func TestPanicAfterRead(t *testing.T) {
 	// 1. prepare mock data
 	var isWriteBufFlushed bool
@@ -265,6 +266,7 @@ func TestPanicAfterRead(t *testing.T) {
 	test.Assert(t, isClosed)
 }
 
+// TestNoMethodInfo test server_handler without method info success
 func TestNoMethodInfo(t *testing.T) {
 	// 1. prepare mock data
 	var isWriteBufFlushed bool

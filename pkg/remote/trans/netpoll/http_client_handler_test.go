@@ -18,7 +18,6 @@ package netpoll
 
 import (
 	"context"
-	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -39,7 +38,6 @@ var (
 )
 
 func init() {
-	// init
 	cilopt = &remote.ClientOption{
 		SvcInfo: mocks.ServiceInfo(),
 		Codec: &MockCodec{
@@ -49,19 +47,13 @@ func init() {
 		Dialer: NewDialer(),
 	}
 
-	// test NewCliTransHandlerFactory()
-	cliTransHdlrFct := NewCliTransHandlerFactory()
-	// test NewTransHandler()
-	cliTransHdlr, _ = cliTransHdlrFct.NewTransHandler(cilopt)
-
-	// test NewHTTPCliTransHandlerFactory()
-	httpCilTransHdlrFct := NewHTTPCliTransHandlerFactory()
-	// test NewTransHandler()
-	httpCilTransHdlr, _ = httpCilTransHdlrFct.NewTransHandler(cilopt)
+	cliTransHdlr, _ = NewCliTransHandlerFactory().NewTransHandler(cilopt)
+	httpCilTransHdlr, _ = NewHTTPCliTransHandlerFactory().NewTransHandler(cilopt)
 }
 
+// TestHTTPWrite test http_client_handler Write return err
 func TestHTTPWrite(t *testing.T) {
-	// init
+	// 1. prepare mock data
 	conn := &MockNetpollConn{}
 	rwTimeout := time.Second
 	cfg := rpcinfo.NewRPCConfig()
@@ -71,19 +63,17 @@ func TestHTTPWrite(t *testing.T) {
 	})
 	ri := rpcinfo.NewRPCInfo(nil, to, nil, cfg, rpcinfo.NewRPCStats())
 	ctx := context.Background()
-
-	// test Write()
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
-	err := httpCilTransHdlr.Write(ctx, conn, msg)
-	test.Assert(t, err != nil)
 
-	msg = remote.NewMessage("is no nil", mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
-	err = httpCilTransHdlr.Write(ctx, conn, msg)
+	// 2. test
+	err := httpCilTransHdlr.Write(ctx, conn, msg)
+	// check err not nil
 	test.Assert(t, err != nil)
 }
 
+// TestHTTPRead test http_client_handler Read return err
 func TestHTTPRead(t *testing.T) {
-	// init
+	// 1. prepare mock data
 	rwTimeout := time.Second
 
 	var readTimeout time.Duration
@@ -108,109 +98,98 @@ func TestHTTPRead(t *testing.T) {
 	rpcinfo.AsMutableRPCConfig(cfg).SetReadWriteTimeout(rwTimeout)
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	ctx := context.Background()
-
-	// test Read()
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
-	err := httpCilTransHdlr.Read(ctx, conn, msg)
 
-	// test OnError()
-	httpCilTransHdlr.OnError(ctx, err, conn)
+	// 2. test
+	err := httpCilTransHdlr.Read(ctx, conn, msg)
+	// check err not nil
 	test.Assert(t, err != nil)
+
+	httpCilTransHdlr.OnError(ctx, err, conn)
 	test.Assert(t, readTimeout == trans.GetReadTimeout(ri.Config()))
 	test.Assert(t, isReaderBufReleased)
 }
 
-func TestHTTPPanicAfterRead(t *testing.T) {
-	// init
-	var isOnActive bool
+// TestHTTPPanicAfterRead test http_client_handler OnMessage success
+func TestHTTPOnMessage(t *testing.T) {
+	// 1. prepare mock data
 	svcInfo := mocks.ServiceInfo()
-	conn := &MockNetpollConn{
-		Conn: mocks.Conn{
-			RemoteAddrFunc: func() (r net.Addr) {
-				return addr
-			},
-		},
-		IsActiveFunc: func() (r bool) {
-			return true
-		},
-	}
 
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, method), nil, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	recvMsg := remote.NewMessageWithNewer(svcInfo, ri, remote.Call, remote.Server)
-	recvMsg.NewData(method)
 	sendMsg := remote.NewMessage(svcInfo.MethodInfo(method).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
-	// test SetPipeline()
-	httpCilTransHdlr.SetPipeline(nil)
-
-	// test OnMessage()
+	// 2. test
 	_, err := httpCilTransHdlr.OnMessage(ctx, recvMsg, sendMsg)
 	test.Assert(t, err == nil, err)
-
-	// test OnInactive()
-	httpCilTransHdlr.OnInactive(ctx, conn)
-	test.Assert(t, !isOnActive)
 }
 
+// TestAddMetaInfo test http_client_handler addMetaInfo success
 func TestAddMetaInfo(t *testing.T) {
-	// init
+	// 1. prepare mock data
 	cfg := rpcinfo.NewRPCConfig()
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	var req interface{}
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
 	h := http.Header{}
 
-	// test addMetaInfo()
+	// 2. test
 	err := addMetaInfo(msg, h)
 	test.Assert(t, err == nil)
 }
 
+// TestReadLine test http_client_handler readLine success
 func TestReadLine(t *testing.T) {
-	// init
+	// 1. prepare mock data
 	wantHead := "HTTP/1.1 200 OK"
 	body := "{\"code\":0,\"data\":[\"mobile\",\"xxxxxxx\"],\"msg\":\"ok\"}"
 	resp := []byte(wantHead + "\r\nDate: Thu, 16 Aug 2018 03:10:03 GMT\r\nKeep-Alive: timeout=5, max=100\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n" + body)
 	reader := remote.NewReaderBuffer(resp)
 
-	// test readLine()
+	// 2. test
 	getHead, _ := readLine(reader)
 	test.Assert(t, strings.Compare(string(getHead), wantHead) == 0)
 }
 
+// TestSkipToBody test http_client_handler skipToBody success
 func TestSkipToBody(t *testing.T) {
-	// init
+	// 1. prepare mock data
 	head := "HTTP/1.1 200 OK"
 	wantBody := "{\"code\":0,\"data\":[\"mobile\",\"xxxxxxx\"],\"msg\":\"ok\"}"
 	resp := []byte(head + "\r\nDate: Thu, 16 Aug 2018 03:10:03 GMT\r\nKeep-Alive: timeout=5, max=100\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n" + wantBody)
 	reader := remote.NewReaderBuffer(resp)
 
-	// test skipToBody()
+	// 2. test
 	err := skipToBody(reader)
 	test.Assert(t, err == nil)
+
 	getBody, err := reader.ReadBinary(reader.ReadableLen())
 	test.Assert(t, err == nil)
 	test.Assert(t, strings.Compare(string(getBody), wantBody) == 0)
 }
 
+// TestParseHTTPResponseHead test http_client_handler parseHTTPResponseHead success
 func TestParseHTTPResponseHead(t *testing.T) {
-	// init
+	// 1. prepare mock data
 	head := "HTTP/1.1 200 OK"
 
-	// test parseHTTPResponseHead()
+	// 2. test
 	major, minor, statusCode, err := parseHTTPResponseHead(head)
 	test.Assert(t, err == nil)
 	test.Assert(t, !(major != 1 || minor != 1 || statusCode != 200))
 }
 
+// TestGetBodyBufReader test http_client_handler getBodyBufReader return  err
 func TestGetBodyBufReader(t *testing.T) {
-	// init
+	// 1. prepare mock data
 	head := "HTTP/1.1 200 OK"
 	body := "{\"code\":0,\"data\":[\"mobile\",\"xxxxxxx\"],\"msg\":\"ok\"}"
 	resp := []byte(head + "\r\nDate: Thu, 16 Aug 2018 03:10:03 GMT\r\nKeep-Alive: timeout=5, max=100\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n" + body)
 	reader := remote.NewReaderBuffer(resp)
 
-	// test getBodyBufReader
+	// 2. test
 	_, err := getBodyBufReader(reader)
+	// check err not nil
 	test.Assert(t, err != nil)
 }
