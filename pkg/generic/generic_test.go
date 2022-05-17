@@ -37,7 +37,6 @@ func TestBinaryThriftGeneric(t *testing.T) {
 	method, err := g.GetMethod(nil, "Test")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Test")
-
 }
 
 func TestMapThriftGeneric(t *testing.T) {
