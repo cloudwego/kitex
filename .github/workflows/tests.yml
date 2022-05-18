@@ -1,6 +1,6 @@
 name: Tests
 
-on: [push]
+on: [push, pull_request]
 
 jobs:
   lint-and-ut:
@@ -64,8 +64,10 @@ jobs:
       - uses: actions/cache@v3
         with:
           path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: scenario-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
+            scenario-${{ runner.os }}-go-
+            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
             ${{ runner.os }}-go-
 
       - name: Scenario Tests
