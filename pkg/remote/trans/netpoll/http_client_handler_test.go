@@ -133,9 +133,12 @@ func TestAddMetaInfo(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	var req interface{}
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
+	key, wantVal := "Data", "valid"
 	h := http.Header{
-		"Data": {"valid"},
+		key: {wantVal},
 	}
+	getVal := h.Get(key)
+	test.Assert(t, getVal == wantVal)
 
 	// 2. test
 	err := addMetaInfo(msg, h)
