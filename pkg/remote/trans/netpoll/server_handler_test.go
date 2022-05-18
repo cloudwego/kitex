@@ -209,7 +209,7 @@ func TestInvokeErr(t *testing.T) {
 	test.Assert(t, isInvoked)
 }
 
-// TestPanicAfterRead test server_handler not panic afer read
+// TestPanicAfterRead test server_handler not panic after read
 func TestPanicAfterRead(t *testing.T) {
 	// 1. prepare mock data
 	var isWriteBufFlushed bool
