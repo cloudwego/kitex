@@ -1,24 +1,12 @@
-name: Push and Pull Request Check
+name: Pull Request Check
 
-on: [push, pull_request]
+on: [pull_request]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  compliant:
+    runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.18
-
-      - uses: actions/cache@v2
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+      - uses: actions/checkout@v3
 
       - name: Check License Header
         uses: apache/skywalking-eyes@main
@@ -26,23 +14,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: typos-action
-        uses: crate-ci/typos@v1.3.3
-
-      - name: Lint
-        run: |
-          go vet -stdmethods=false $(go list ./...)
-          go install mvdan.cc/gofumpt@v0.2.0
-          test -z "$(gofumpt -l -extra .)" 
-
-      - name: Unit Test
-        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
-
-      - name: Benchmark
-        run: go test -bench=. -benchmem -run=none ./...
-
-      - name: Scenario Tests
-        run: |
-          cd ..
-          git clone https://github.com/cloudwego/kitex-tests.git
-          cd kitex-tests
-          ./run.sh ${{github.workspace}}
+        uses: crate-ci/typos@master
