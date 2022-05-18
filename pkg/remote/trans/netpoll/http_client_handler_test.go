@@ -59,7 +59,7 @@ func TestHTTPWrite(t *testing.T) {
 	cfg := rpcinfo.NewRPCConfig()
 	rpcinfo.AsMutableRPCConfig(cfg).SetReadWriteTimeout(rwTimeout)
 	to := rpcinfo.NewEndpointInfo("", "", nil, map[string]string{
-		"http_url": "https://example.com",
+		rpcinfo.HTTPURL: "https://example.com",
 	})
 	ri := rpcinfo.NewRPCInfo(nil, to, nil, cfg, rpcinfo.NewRPCStats())
 	ctx := context.Background()
@@ -105,8 +105,9 @@ func TestHTTPRead(t *testing.T) {
 	// check err not nil
 	test.Assert(t, err != nil)
 
+	rpcinfo.AsMutableRPCConfig(cfg).SetRPCTimeout(rwTimeout)
 	httpCilTransHdlr.OnError(ctx, err, conn)
-	test.Assert(t, readTimeout == trans.GetReadTimeout(ri.Config()))
+	test.Assert(t, readTimeout != trans.GetReadTimeout(ri.Config()))
 	test.Assert(t, isReaderBufReleased)
 }
 
@@ -132,7 +133,9 @@ func TestAddMetaInfo(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	var req interface{}
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
-	h := http.Header{}
+	h := http.Header{
+		"Data": {"valid"},
+	}
 
 	// 2. test
 	err := addMetaInfo(msg, h)
