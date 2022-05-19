@@ -133,16 +133,17 @@ func TestAddMetaInfo(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	var req interface{}
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
-	key, wantVal := "Data", "valid"
-	h := http.Header{
-		key: {wantVal},
-	}
-	getVal := h.Get(key)
-	test.Assert(t, getVal == wantVal)
+	h := http.Header{}
 
 	// 2. test
+	head, wantHead := "Head", "HTTP/1.1 200 OK"
+	msg.Tags()[rpcinfo.HTTPHeader] = http.Header{
+		head: []string{wantHead},
+	}
 	err := addMetaInfo(msg, h)
+	getHead := h.Get(head)
 	test.Assert(t, err == nil)
+	test.Assert(t, getHead == wantHead)
 }
 
 // TestReadLine test http_client_handler readLine success
