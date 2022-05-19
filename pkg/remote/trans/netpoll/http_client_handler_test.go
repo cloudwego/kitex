@@ -95,7 +95,7 @@ func TestHTTPRead(t *testing.T) {
 	}
 
 	cfg := rpcinfo.NewRPCConfig()
-	rpcinfo.AsMutableRPCConfig(cfg).SetReadWriteTimeout(rwTimeout)
+	rpcinfo.AsMutableRPCConfig(cfg).SetRPCTimeout(rwTimeout)
 	ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, rpcinfo.NewRPCStats())
 	ctx := context.Background()
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
@@ -107,7 +107,7 @@ func TestHTTPRead(t *testing.T) {
 
 	rpcinfo.AsMutableRPCConfig(cfg).SetRPCTimeout(rwTimeout)
 	httpCilTransHdlr.OnError(ctx, err, conn)
-	test.Assert(t, readTimeout != trans.GetReadTimeout(ri.Config()))
+	test.Assert(t, readTimeout == trans.GetReadTimeout(ri.Config()))
 	test.Assert(t, isReaderBufReleased)
 }
 
