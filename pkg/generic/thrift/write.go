@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -345,7 +344,7 @@ func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 	//Catch diff types are in the list panic error
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.New(fmt.Sprintf("%v", r))
+			err = fmt.Errorf("%v", r)
 			return
 		}
 	}()
@@ -376,7 +375,7 @@ func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t
 	//Catch diff types are in the JSONList panic error
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.New(fmt.Sprintf("%v", r))
+			err = fmt.Errorf("%v", r)
 			return
 		}
 	}()
@@ -422,7 +421,7 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 	//Catch diff types are in the InterfaceMap panic error
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.New(fmt.Sprintf("%v", r))
+			err = fmt.Errorf("%v", r)
 			return
 		}
 	}()
@@ -456,7 +455,7 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 	//Catch diff types are in the StringMap panic error
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.New(fmt.Sprintf("%v", r))
+			err = fmt.Errorf("%v", r)
 			return
 		}
 	}()
@@ -506,7 +505,7 @@ func writeStringJSONMap(ctx context.Context, val interface{}, out thrift.TProtoc
 	//Catch diff types are in the StringMap panic error
 	defer func() {
 		if r := recover(); r != nil {
-			err = errors.New(fmt.Sprintf("%v", r))
+			err = fmt.Errorf("%v", r)
 			return
 		}
 	}()
