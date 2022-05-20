@@ -19,6 +19,7 @@ package rpcinfo
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -81,6 +82,14 @@ func (e *event) Recycle() {
 	eventPool.Put(e)
 }
 
+type atomicErr struct {
+	err error
+}
+
+type atomicPanicErr struct {
+	panicErr interface{}
+}
+
 type rpcStats struct {
 	sync.RWMutex
 	level stats.Level
@@ -90,8 +99,8 @@ type rpcStats struct {
 	sendSize uint64
 	recvSize uint64
 
-	err      error
-	panicErr interface{}
+	err      atomic.Value
+	panicErr atomic.Value
 }
 
 func init() {
@@ -124,22 +133,24 @@ func (r *rpcStats) Record(ctx context.Context, e stats.Event, status stats.Statu
 
 // SendSize implements the RPCStats interface.
 func (r *rpcStats) SendSize() uint64 {
-	return r.sendSize
+	return atomic.LoadUint64(&r.sendSize)
 }
 
 // RecvSize implements the RPCStats interface.
 func (r *rpcStats) RecvSize() uint64 {
-	return r.recvSize
+	return atomic.LoadUint64(&r.recvSize)
 }
 
 // Error implements the RPCStats interface.
 func (r *rpcStats) Error() error {
-	return r.err
+	ae, _ := r.err.Load().(atomicErr)
+	return ae.err
 }
 
 // Panicked implements the RPCStats interface.
 func (r *rpcStats) Panicked() (bool, interface{}) {
-	return r.panicErr != nil, r.panicErr
+	ape, _ := r.panicErr.Load().(atomicPanicErr)
+	return ape.panicErr != nil, ape.panicErr
 }
 
 // GetEvent implements the RPCStats interface.
@@ -161,22 +172,22 @@ func (r *rpcStats) Level() stats.Level {
 
 // SetSendSize sets send size.
 func (r *rpcStats) SetSendSize(size uint64) {
-	r.sendSize = size
+	atomic.StoreUint64(&r.sendSize, size)
 }
 
 // SetRecvSize sets recv size.
 func (r *rpcStats) SetRecvSize(size uint64) {
-	r.recvSize = size
+	atomic.StoreUint64(&r.recvSize, size)
 }
 
 // SetError sets error.
 func (r *rpcStats) SetError(err error) {
-	r.err = err
+	r.err.Store(atomicErr{err: err})
 }
 
 // SetPanicked sets if panicked.
 func (r *rpcStats) SetPanicked(x interface{}) {
-	r.panicErr = x
+	r.panicErr.Store(atomicPanicErr{panicErr: x})
 }
 
 // SetLevel sets the level.
@@ -187,10 +198,14 @@ func (r *rpcStats) SetLevel(level stats.Level) {
 // Reset resets the stats.
 func (r *rpcStats) Reset() {
 	r.level = 0
-	r.err = nil
-	r.panicErr = nil
-	r.recvSize = 0
-	r.sendSize = 0
+	if ae, _ := r.err.Load().(atomicErr); ae.err != nil {
+		r.err.Store(atomicErr{})
+	}
+	if ape, _ := r.panicErr.Load().(atomicPanicErr); ape.panicErr != nil {
+		r.panicErr.Store(atomicPanicErr{})
+	}
+	atomic.StoreUint64(&r.recvSize, 0)
+	atomic.StoreUint64(&r.sendSize, 0)
 	for i := range r.eventMap {
 		if r.eventMap[i] != nil {
 			r.eventMap[i].(*event).Recycle()

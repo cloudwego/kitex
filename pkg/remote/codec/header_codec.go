@@ -395,7 +395,7 @@ func checkProtocolID(protoID uint8, message remote.Message) error {
 		// rpcCfg.SetCodecType(kitex.TTHeaderProtobufKitex)
 	case uint8(ProtocolIDThriftBinary):
 	default:
-		return fmt.Errorf("unsupport ProtocolID[%d]", protoID)
+		return fmt.Errorf("unsupported ProtocolID[%d]", protoID)
 	}
 	return nil
 }

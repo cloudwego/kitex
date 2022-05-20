@@ -4,9 +4,9 @@ go 1.13
 
 require (
 	github.com/apache/thrift v0.13.0
-	github.com/bytedance/gopkg v0.0.0-20220413063733-65bf48ffb3a7
+	github.com/bytedance/gopkg v0.0.0-20220509134931-d1878f638986
 	github.com/choleraehyq/pid v0.0.13
-	github.com/cloudwego/netpoll v0.2.2
+	github.com/cloudwego/netpoll v0.2.3
 	github.com/cloudwego/thriftgo v0.1.2
 	github.com/json-iterator/go v1.1.12
 	github.com/stretchr/testify v1.7.0
