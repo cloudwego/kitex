@@ -356,10 +356,6 @@ func newMockServerTransport(npConn *mockNetpollConn) (grpc.ServerTransport, erro
 	return tr, err
 }
 
-func setDontWaitHeader(s *grpc.Stream) {
-	grpc.SetHeaderChan(s, nil)
-}
-
 func mockStreamRecv(s *grpc.Stream, data string) {
 	buffer := new(bytes.Buffer)
 	buffer.Reset()
