@@ -17,10 +17,7 @@
 package generic
 
 import (
-	"bytes"
 	"context"
-	stdjson "encoding/json"
-	"net/http"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -31,77 +28,82 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-func TestFromHTTPRequest(t *testing.T) {
-	jsonBody := `{"a": 1111111111111, "b": "hello"}`
-	req, err := http.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString(jsonBody))
+func TestMapThriftCodec(t *testing.T) {
+	p, err := NewThriftFileProvider("./map_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	customReq, err := FromHTTPRequest(req)
+	mtc, err := newMapThriftCodec(p, thriftCodec)
 	test.Assert(t, err == nil)
-	test.DeepEqual(t, customReq.Body, map[string]interface{}{
-		"a": stdjson.Number("1111111111111"),
-		"b": "hello",
-	})
-}
+	defer mtc.Close()
+	test.Assert(t, mtc.Name() == "MapThrift")
 
-func TestHttpThriftCodec(t *testing.T) {
-	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
+	method, err := mtc.getMethod(nil, "Test")
 	test.Assert(t, err == nil)
-	htc, err := newHTTPThriftCodec(p, thriftCodec)
-	test.Assert(t, err == nil)
-	defer htc.Close()
-	test.Assert(t, htc.Name() == "HttpThrift")
-
-	req := &HTTPRequest{
-		Method: http.MethodGet,
-		Path:   "/BinaryEcho",
-	}
-	// wrong
-	method, err := htc.getMethod("test")
-	test.Assert(t, err.Error() == "req is invalid, need descriptor.HTTPRequest" && method == nil)
-	// right
-	method, err = htc.getMethod(req)
-	test.Assert(t, err == nil && method.Name == "BinaryEcho")
+	test.Assert(t, method.Name == "Test")
 
 	ctx := context.Background()
-	sendMsg := initHttpSendMsg(transport.TTHeader)
+	sendMsg := initMapSendMsg(transport.TTHeader)
 
 	// Marshal side
 	out := remote.NewWriterBuffer(256)
-	err = htc.Marshal(ctx, sendMsg, out)
+	err = mtc.Marshal(ctx, sendMsg, out)
 	test.Assert(t, err == nil)
 
 	// UnMarshal side
-	recvMsg := initHttpRecvMsg()
+	recvMsg := initMapRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil)
 	recvMsg.SetPayloadLen(len(buf))
 	in := remote.NewReaderBuffer(buf)
-	err = htc.Unmarshal(ctx, recvMsg, in)
+	err = mtc.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil)
 }
 
-func initHttpSendMsg(tp transport.Protocol) remote.Message {
+func TestMapExceptionError(t *testing.T) {
+	p, err := NewThriftFileProvider("./map_test/idl/mock.thrift")
+	test.Assert(t, err == nil)
+	mtc, err := newMapThriftCodec(p, thriftCodec)
+	test.Assert(t, err == nil)
+
+	ctx := context.Background()
+	out := remote.NewWriterBuffer(256)
+	// empty method test
+	emptyMethodInk := rpcinfo.NewInvocation("", "")
+	emptyMethodRi := rpcinfo.NewRPCInfo(nil, nil, emptyMethodInk, nil, nil)
+	emptyMethodMsg := remote.NewMessage(nil, nil, emptyMethodRi, remote.Exception, remote.Client)
+	// Marshal side
+	err = mtc.Marshal(ctx, emptyMethodMsg, out)
+	test.Assert(t, err.Error() == "empty methodName in thrift Marshal")
+
+	// Exception MsgType test
+	exceptionMsgTypeInk := rpcinfo.NewInvocation("", "Test")
+	exceptionMsgTypeRi := rpcinfo.NewRPCInfo(nil, nil, exceptionMsgTypeInk, nil, nil)
+	exceptionMsgTypeMsg := remote.NewMessage(&remote.TransError{}, nil, exceptionMsgTypeRi, remote.Exception, remote.Client)
+	// Marshal side
+	err = mtc.Marshal(ctx, exceptionMsgTypeMsg, out)
+	test.Assert(t, err == nil)
+}
+
+func initMapSendMsg(tp transport.Protocol) remote.Message {
 	req := &Args{
 		Request: &descriptor.HTTPRequest{
-			Method: http.MethodGet,
-			Path:   "/BinaryEcho",
+			Method: "Test",
 		},
-		Method: "BinaryEcho",
+		Method: "Test",
 	}
 	svcInfo := mocks.ServiceInfo()
-	ink := rpcinfo.NewInvocation("", "BinaryEcho")
+	ink := rpcinfo.NewInvocation("", "Test")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
 }
 
-func initHttpRecvMsg() remote.Message {
+func initMapRecvMsg() remote.Message {
 	req := &Args{
 		Request: "Test",
-		Method:  "BinaryEcho",
+		Method:  "Test",
 	}
-	ink := rpcinfo.NewInvocation("", "BinaryEcho")
+	ink := rpcinfo.NewInvocation("", "Test")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
 	return msg
