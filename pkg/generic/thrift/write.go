@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -331,44 +332,38 @@ func writeBinary(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 	return out.WriteBinary(val.([]byte))
 }
 
-func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) (err error) {
 	l := val.([]interface{})
 	length := len(l)
-	if err := out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
-		return err
+	if err = out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
+		return
 	}
 	if length == 0 {
 		return out.WriteListEnd()
 	}
-	// check the type of each elem in the list is the same
-	if length > 1 {
-		tt0, _, err := typeOf(l[0], t, opt)
-		if err != nil {
-			return err
+
+	//Catch diff types are in the list panic error
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprintf("%v", r))
+			return
 		}
-		for i := 1; i < length; i = i + 1 {
-			ttn, _, err := typeOf(l[i], t, opt)
-			if err != nil {
-				return err
-			}
-			if tt0 != ttn {
-				return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("echo elem of type is not same (%v)", l))
-			}
-		}
-	}
+	}()
+
 	writer, err := nextWriter(l[0], t.Elem, opt)
 	if err != nil {
 		return err
 	}
 	for _, elem := range l {
-		if err := writer(ctx, elem, out, t.Elem, opt); err != nil {
+		if err = writer(ctx, elem, out, t.Elem, opt); err != nil {
 			return err
 		}
 	}
-	return out.WriteListEnd()
+	err = out.WriteListEnd()
+	return err
 }
 
-func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) (err error) {
 	l := val.([]gjson.Result)
 	length := len(l)
 	if err := out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
@@ -377,6 +372,15 @@ func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t
 	if length == 0 {
 		return out.WriteListEnd()
 	}
+
+	//Catch diff types are in the JSONList panic error
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprintf("%v", r))
+			return
+		}
+	}()
+
 	for _, elem := range l {
 		v, writer, err := nextJSONWriter(&elem, t.Elem, opt)
 		if err != nil {
@@ -414,6 +418,15 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 	if err != nil {
 		return err
 	}
+
+	//Catch diff types are in the InterfaceMap panic error
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprintf("%v", r))
+			return
+		}
+	}()
+
 	for key, elem := range m {
 		if err := keyWriter(ctx, key, out, t.Key, opt); err != nil {
 			return err
@@ -425,7 +438,7 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 	return out.WriteMapEnd()
 }
 
-func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) (err error) {
 	m := val.(map[string]interface{})
 	length := len(m)
 	if err := out.WriteMapBegin(t.Key.Type.ToThriftTType(), t.Elem.Type.ToThriftTType(), length); err != nil {
@@ -439,6 +452,15 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 		keyWriter  writer
 		elemWriter writer
 	)
+
+	//Catch diff types are in the StringMap panic error
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprintf("%v", r))
+			return
+		}
+	}()
+
 	for key, elem := range m {
 		_key, err := buildinTypeFromString(key, t.Key)
 		if err != nil {
@@ -465,7 +487,7 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 	return out.WriteMapEnd()
 }
 
-func writeStringJSONMap(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeStringJSONMap(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) (err error) {
 	m := val.(map[string]gjson.Result)
 	length := len(m)
 	if err := out.WriteMapBegin(t.Key.Type.ToThriftTType(), t.Elem.Type.ToThriftTType(), length); err != nil {
@@ -480,6 +502,15 @@ func writeStringJSONMap(ctx context.Context, val interface{}, out thrift.TProtoc
 		elemWriter writer
 		v          interface{}
 	)
+
+	//Catch diff types are in the StringMap panic error
+	defer func() {
+		if r := recover(); r != nil {
+			err = errors.New(fmt.Sprintf("%v", r))
+			return
+		}
+	}()
+
 	for key, elem := range m {
 		_key, err := buildinTypeFromString(key, t.Key)
 		if err != nil {
