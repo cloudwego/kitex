@@ -651,7 +651,7 @@ func (w *bufWriter) Write(b []byte) (n int, err error) {
 	if w.err != nil {
 		return 0, w.err
 	}
-	if w.batchSize == 0 { // Buffer has been disabled.
+	if w.batchSize == 0 { // buffer has been disabled.
 		return w.conn.Write(b)
 	}
 	for len(b) > 0 {
