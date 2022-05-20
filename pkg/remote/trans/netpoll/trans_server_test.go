@@ -57,32 +57,41 @@ func init() {
 		TracerCtl: &internal_stats.Controller{},
 	}
 	svrTransHdlr, _ = newSvrTransHandler(opt)
-	transSvr = &transServer{opt: opt, transHdlr: svrTransHdlr}
+
+	transSvr = NewTransServerFactory().NewTransServer(opt, svrTransHdlr).(*transServer)
 }
 
+// TestCreateListener test trans_server CreateListener success
 func TestCreateListener(t *testing.T) {
-	// tcp
+	// tcp init
 	addrStr := "127.0.0.1:9090"
 	addr = utils.NewNetAddr("tcp", addrStr)
+
+	// test
 	ln, err := transSvr.CreateListener(addr)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ln.Addr().String() == addrStr)
 	ln.Close()
 
-	// uds
+	// uds init
 	addrStr = "server.addr"
 	addr, err = net.ResolveUnixAddr("unix", addrStr)
 	test.Assert(t, err == nil, err)
+
+	// test
 	ln, err = transSvr.CreateListener(addr)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ln.Addr().String() == addrStr)
 	ln.Close()
 }
 
+// TestBootStrap test trans_server BootstrapServer success
 func TestBootStrap(t *testing.T) {
-	// tcp
+	// tcp init
 	addrStr := "127.0.0.1:9090"
 	addr = utils.NewNetAddr("tcp", addrStr)
+
+	// test
 	ln, err := transSvr.CreateListener(addr)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ln.Addr().String() == addrStr)
@@ -95,11 +104,14 @@ func TestBootStrap(t *testing.T) {
 		wg.Done()
 	}()
 	time.Sleep(10 * time.Millisecond)
+
 	transSvr.Shutdown()
 	wg.Wait()
 }
 
+// TestOnConnActive test trans_server onConnActive success
 func TestOnConnActive(t *testing.T) {
+	// 1. prepare mock data
 	conn := &MockNetpollConn{
 		SetReadTimeoutFunc: func(timeout time.Duration) (e error) {
 			return nil
@@ -110,22 +122,28 @@ func TestOnConnActive(t *testing.T) {
 			},
 		},
 	}
+
+	// 2. test
 	connCount := 100
 	for i := 0; i < connCount; i++ {
 		transSvr.onConnActive(conn)
 	}
 	ctx := context.Background()
+
 	currConnCount := transSvr.ConnCount()
 	test.Assert(t, currConnCount.Value() == connCount)
 
 	for i := 0; i < connCount; i++ {
 		transSvr.onConnInactive(ctx, conn)
 	}
+
 	currConnCount = transSvr.ConnCount()
 	test.Assert(t, currConnCount.Value() == 0)
 }
 
+// TestOnConnRead test trans_server onConnRead success
 func TestOnConnRead(t *testing.T) {
+	// 1. prepare mock data
 	conn := &MockNetpollConn{
 		Conn: mocks.Conn{
 			RemoteAddrFunc: func() (r net.Addr) {
@@ -140,6 +158,8 @@ func TestOnConnRead(t *testing.T) {
 		},
 		Opt: transSvr.opt,
 	}
+
+	// 2. test
 	err := transSvr.onConnRead(context.Background(), conn)
 	test.Assert(t, err == nil, err)
 }
