@@ -196,9 +196,8 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 	if err := readKVInfo(hdIdx, headerInfo, message); err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader read kv info failed, %s", err.Error()))
 	}
-	if message.RPCRole() == remote.Server {
-		fillBasicFromInfoOfTTHeader(message)
-	}
+	fillBasicInfoOfTTHeader(message)
+
 	message.SetPayloadLen(int(totalLen - uint32(headerInfoSize) + Size32 - TTHeaderMetaSize))
 	return err
 }
@@ -444,15 +443,25 @@ func (m meshHeader) decode(ctx context.Context, message remote.Message, in remot
 // Fill basic from_info(from service, from address) which carried by ttheader to rpcinfo.
 // It is better to fill rpcinfo in matahandlers in terms of design,
 // but metahandlers are executed after payloadDecode, we don't know from_info when error happen in payloadDecode.
-// So 'fillBasicFromInfoOfTTHeader' is just for getting more info to output log when decode error happen.
-func fillBasicFromInfoOfTTHeader(svrMsg remote.Message) {
-	fi := rpcinfo.AsMutableEndpointInfo(svrMsg.RPCInfo().From())
-	if fi != nil {
-		if v := svrMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr]; v != "" {
-			fi.SetAddress(utils.NewNetAddr("tcp", v))
+// So 'fillBasicInfoOfTTHeader' is just for getting more info to output log when decode error happen.
+func fillBasicInfoOfTTHeader(msg remote.Message) {
+	var ei rpcinfo.MutableEndpointInfo
+	if msg.RPCRole() == remote.Server {
+		ei = rpcinfo.AsMutableEndpointInfo(msg.RPCInfo().From())
+		if ei != nil {
+			if v := msg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr]; v != "" {
+				ei.SetAddress(utils.NewNetAddr("tcp", v))
+			}
+			if v := msg.TransInfo().TransIntInfo()[transmeta.FromService]; v != "" {
+				ei.SetServiceName(v)
+			}
 		}
-		if v := svrMsg.TransInfo().TransIntInfo()[transmeta.FromService]; v != "" {
-			fi.SetServiceName(v)
+	} else {
+		ei = rpcinfo.AsMutableEndpointInfo(msg.RPCInfo().To())
+		if ei != nil {
+			if v := msg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr]; v != "" {
+				ei.SetAddress(utils.NewNetAddr("tcp", v))
+			}
 		}
 	}
 }
