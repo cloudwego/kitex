@@ -18,6 +18,7 @@ package netpollmux
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync/atomic"
@@ -115,7 +116,7 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 }
 
 // Read implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
+func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) error {
 	ri := msg.RPCInfo()
 	mc, _ := conn.(*muxCliConn)
 	seqID := ri.Invocation().SeqID()
@@ -144,6 +145,9 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 		stats2.Record(ctx, ri, stats.ReadStart, nil)
 		msg.SetPayloadCodec(t.opt.PayloadCodec)
 		err = t.codec.Decode(ctx, msg, callback.bufReader)
+		if err != nil && errors.Is(err, netpoll.ErrReadTimeout) {
+			err = kerrors.ErrRPCTimeout.WithCause(err)
+		}
 		stats2.Record(ctx, ri, stats.ReadFinish, err)
 		return err
 	}
