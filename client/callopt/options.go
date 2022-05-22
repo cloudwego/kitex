@@ -188,3 +188,7 @@ func Apply(cos []Option, cfg rpcinfo.RPCConfig, svr remoteinfo.RemoteInfo, locks
 	co.Recycle()
 	return buf.String()
 }
+
+func EmptyOption() Option {
+	return Option{f: func(o *callOptions, di *strings.Builder) {}}
+}

@@ -259,7 +259,7 @@ func WithTimeoutProvider(p rpcinfo.TimeoutProvider) Option {
 	}}
 }
 
-// WithTag sets the customize tag for service discovery, eg: idc, cluster.
+// WithTag sets the customized tag for service discovery, eg: idc, cluster.
 func WithTag(key, val string) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithTag(%s=%s)", key, val))

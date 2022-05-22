@@ -337,7 +337,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	if recycleRI {
 		// why need check recycleRI to decide if recycle RPCInfo?
 		// 1. no retry, rpc timeout happen will cause panic when response return
-		// 2. retry success, will cause panic when first call return
+		// 2. timeout retry success, will cause panic when first call return
 		// 3. backup request may cause panic, cannot recycle first RPCInfo
 		// RPCInfo will be recycled after rpc is finished,
 		// holding RPCInfo in a new goroutine is forbidden.
