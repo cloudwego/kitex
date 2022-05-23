@@ -288,3 +288,29 @@ func TestRecvOneWay(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, isClose)
 }
+
+// TestRecycle test recycle
+func TestRecycle(t *testing.T) {
+	ctx := context.Background()
+
+	addr := utils.NewNetAddr("tcp", "to")
+	ri := newMockRPCInfo(addr)
+
+	hdlr := &mocks.MockCliTransHandler{
+		WriteFunc: nil,
+		ReadFunc:  nil,
+	}
+
+	opt := newMockOption(addr)
+
+	cli, err := NewClient(ctx, ri, hdlr, opt)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, cli != nil, cli)
+
+	cli.Recycle()
+	afterCli, ok := cli.(*client)
+	test.Assert(t, ok)
+	test.Assert(t, afterCli.transHdlr == nil)
+	test.Assert(t, afterCli.conn == nil)
+	test.Assert(t, afterCli.connManager == nil)
+}
