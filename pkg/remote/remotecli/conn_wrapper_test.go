@@ -169,3 +169,78 @@ func BenchmarkGetConn(b *testing.B) {
 	test.Assert(b, shortConnDialCount == b.N)
 	test.Assert(b, longConnDialCount == 1)
 }
+
+// TestReleaseConnUseNilConn test release conn without before GetConn
+func TestReleaseConnUseNilConn(t *testing.T) {
+	addr := utils.NewNetAddr("tcp", "to")
+	ri := newMockRPCInfo(addr)
+	connPool := connpool.NewLongPool("destService", poolCfg)
+	connW := NewConnWrapper(connPool)
+
+	connW.ReleaseConn(nil, ri)
+}
+
+// TestReleaseConnUseNilConnPool test release conn use nil connPool
+func TestReleaseConnUseNilConnPool(t *testing.T) {
+	addr := utils.NewNetAddr("tcp", "to")
+	ri := newMockRPCInfo(addr)
+	isClose := false
+	conn := &mocks.Conn{
+		RemoteAddrFunc: func() (r net.Addr) {
+			return addr
+		},
+		CloseFunc: func() (err error) {
+			isClose = true
+			return err
+		},
+	}
+
+	dialer := &remote.SynthesizedDialer{
+		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
+			test.Assert(t, network == addr.Network())
+			test.Assert(t, address == addr.String())
+			return conn, nil
+		},
+	}
+
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+	connW := NewConnWrapper(nil)
+	conn2, err := connW.GetConn(ctx, dialer, ri)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, conn == conn2)
+	connW.ReleaseConn(nil, ri)
+	test.Assert(t, isClose)
+}
+
+// TestReleaseConn test release conn
+func TestReleaseConn(t *testing.T) {
+	addr := utils.NewNetAddr("tcp", "to")
+	ri := newMockRPCInfo(addr)
+	isClose := false
+	conn := &mocks.Conn{
+		RemoteAddrFunc: func() (r net.Addr) {
+			return addr
+		},
+		CloseFunc: func() (err error) {
+			isClose = true
+			return err
+		},
+	}
+
+	dialer := &remote.SynthesizedDialer{
+		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
+			test.Assert(t, network == addr.Network())
+			test.Assert(t, address == addr.String())
+			return conn, nil
+		},
+	}
+
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+
+	connW := NewConnWrapper(nil)
+	conn2, err := connW.GetConn(ctx, dialer, ri)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, conn == conn2)
+	connW.ReleaseConn(nil, ri)
+	test.Assert(t, isClose)
+}
