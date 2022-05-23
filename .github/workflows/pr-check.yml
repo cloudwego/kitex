@@ -1,24 +1,12 @@
-name: Push and Pull Request Check
+name: Pull Request Check
 
-on: [push, pull_request]
+on: [pull_request]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  compliant:
+    runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v2
-
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.18
-
-      - uses: actions/cache@v2
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+      - uses: actions/checkout@v3
 
       - name: Check License Header
         uses: apache/skywalking-eyes@main
@@ -26,23 +14,33 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: typos-action
-        uses: crate-ci/typos@v1.3.3
+        uses: crate-ci/typos@master
 
-      - name: Lint
-        run: |
-          go vet -stdmethods=false $(go list ./...)
-          go install mvdan.cc/gofumpt@v0.2.0
-          test -z "$(gofumpt -l -extra .)" 
+  staticcheck:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
 
-      - name: Unit Test
-        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
 
-      - name: Benchmark
-        run: go test -bench=. -benchmem -run=none ./...
+      - uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: reviewdog-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            reviewdog-${{ runner.os }}-go-
 
-      - name: Scenario Tests
-        run: |
-          cd ..
-          git clone https://github.com/cloudwego/kitex-tests.git
-          cd kitex-tests
-          ./run.sh ${{github.workspace}}
+      - uses: reviewdog/action-staticcheck@v1
+        with:
+          github_token: ${{ secrets.github_token }}
+          # Change reviewdog reporter if you need [github-pr-check,github-check,github-pr-review].
+          reporter: github-pr-review
+          # Report all results.
+          filter_mode: nofilter
+          # Exit with 1 when it find at least one finding.
+          fail_on_error: true
+          # Set staticcheck flags
+          staticcheck_flags: -checks=inherit,-SA1029

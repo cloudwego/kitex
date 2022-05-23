@@ -106,7 +106,8 @@ type http2Client struct {
 // and starts to receive messages on it. Non-nil error returns if construction
 // fails.
 func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
-	remoteService string, onGoAway func(GoAwayReason), onClose func()) (_ *http2Client, err error) {
+	remoteService string, onGoAway func(GoAwayReason), onClose func(),
+) (_ *http2Client, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
@@ -980,7 +981,11 @@ func (t *http2Client) reader() {
 				if s != nil {
 					// use error detail to provide better err message
 					code := http2ErrConvTab[se.Code]
-					msg := t.framer.ErrorDetail().Error()
+					err := t.framer.ErrorDetail()
+					var msg string
+					if err != nil {
+						msg = err.Error()
+					}
 					t.closeStream(s, status.New(code, msg).Err(), true, http2.ErrCodeProtocol, status.New(code, msg), nil, false)
 				}
 				continue
