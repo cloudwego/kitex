@@ -118,7 +118,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
 				_, e = rpcCall(ctx, r)
-				recordCost(ct, callStart, &recordCostDoing, &callCosts, e)
+				recordCost(ct, callStart, &recordCostDoing, &callCosts, &abort, e)
 				if r.cbContainer.cbStat {
 					circuitbreak.RecordStat(ctx, request, nil, e, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 				}
@@ -214,8 +214,11 @@ func (r *backupRetryer) Type() Type {
 }
 
 // record request cost, it may execute concurrent
-func recordCost(ct int32, start time.Time, costRecordDoing *int32, sb *strings.Builder, err error) {
-	for !atomic.CompareAndSwapInt32(costRecordDoing, 0, 1) {
+func recordCost(ct int32, start time.Time, recordCostDoing *int32, sb *strings.Builder, abort *int32, err error) {
+	if atomic.LoadInt32(abort) == 1 {
+		return
+	}
+	for !atomic.CompareAndSwapInt32(recordCostDoing, 0, 1) {
 		runtime.Gosched()
 	}
 	if sb.Len() > 0 {
@@ -229,5 +232,5 @@ func recordCost(ct int32, start time.Time, costRecordDoing *int32, sb *strings.B
 		// Add ignore to distinguish.
 		sb.WriteString("(ignore)")
 	}
-	atomic.StoreInt32(costRecordDoing, 0)
+	atomic.StoreInt32(recordCostDoing, 0)
 }
