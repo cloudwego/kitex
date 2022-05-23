@@ -33,38 +33,43 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
-// CodecConfig is config of the thrift codec. Priority: Frugal > FastMode > Normal
-type CodecConfig struct {
-	EnableFrugalWrite bool
-	EnableFrugalRead  bool
-	EnableFastWrite   bool
-	EnableFastRead    bool
-}
+// CodecType is config of the thrift codec. Priority: Frugal > FastMode > Normal
+type CodecType int
+
+const (
+	FastWrite CodecType = 1 << iota
+	FastRead
+	FrugalWrite
+	FrugalRead
+)
 
 // NewThriftCodec creates the thrift binary codec.
 func NewThriftCodec() remote.PayloadCodec {
-	return &thriftCodec{CodecConfig{true, true, true, true}}
+	return &thriftCodec{FastWrite | FastRead}
 }
 
 // NewThriftFrugalCodec creates the thrift binary codec powered by frugal.
-func NewThriftCodecWithConfig(c CodecConfig) remote.PayloadCodec {
+// Eg: xxxservice.NewServer(handler, server.WithPayloadCodec(thrift.NewThriftCodecWithConfig(thrift.CodecConfig{true, true, true, true})))
+func NewThriftCodecWithConfig(c CodecType) remote.PayloadCodec {
 	return &thriftCodec{c}
 }
 
 // NewThriftCodecDisableFastMode creates the thrift binary codec which can control if do fast codec.
 // Eg: xxxservice.NewServer(handler, server.WithPayloadCodec(thrift.NewThriftCodecDisableFastMode(true, true)))
 func NewThriftCodecDisableFastMode(disableFastWrite, disableFastRead bool) remote.PayloadCodec {
-	return &thriftCodec{CodecConfig{
-		EnableFrugalWrite: true,
-		EnableFrugalRead:  true,
-		EnableFastWrite:   !disableFastWrite,
-		EnableFastRead:    !disableFastRead,
-	}}
+	var c CodecType
+	if !disableFastRead {
+		c |= FastRead
+	}
+	if !disableFastWrite {
+		c |= FastWrite
+	}
+	return &thriftCodec{c}
 }
 
 // thriftCodec implements PayloadCodec
 type thriftCodec struct {
-	CodecConfig
+	CodecType
 }
 
 // Marshal implements the remote.PayloadCodec interface.
@@ -83,7 +88,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	seqID := message.RPCInfo().Invocation().SeqID()
 
 	// encode with frugal
-	if c.EnableFrugalWrite {
+	if c.CodecType&FrugalWrite != 0 {
 		dt := reflect.TypeOf(data).Elem()
 		if dt.NumField() == 0 || dt.Field(0).Tag.Get("frugal") != "" {
 			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
@@ -106,7 +111,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 
 	// 2. encode thrift
 	// encode with FastWrite
-	if c.EnableFastWrite {
+	if c.CodecType&FastWrite != 0 {
 		nw, nwOk := out.(remote.NocopyWrite)
 		if msg, ok := data.(thriftMsgFastCodec); ok && nwOk {
 			// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
@@ -183,7 +188,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	// decode thrift
 	data := message.Data()
 	// decode with frugal
-	if c.EnableFrugalRead {
+	if c.CodecType&FrugalRead != 0 {
 		if message.PayloadLen() != 0 {
 			dt := reflect.TypeOf(data).Elem()
 			if dt.NumField() == 0 || dt.Field(0).Tag.Get("frugal") != "" {
@@ -210,7 +215,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	}
 
 	// decode with FastRead
-	if c.EnableFastRead {
+	if c.CodecType&FastRead != 0 {
 		if msg, ok := data.(thriftMsgFastCodec); ok && message.PayloadLen() != 0 {
 			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
 			ri := message.RPCInfo()

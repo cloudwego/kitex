@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	payloadCodec = &thriftCodec{CodecConfig: CodecConfig{true, true, true, true}}
+	payloadCodec = &thriftCodec{FastWrite | FastRead}
 	svcInfo      = mocks.ServiceInfo()
 )
 
@@ -204,18 +204,19 @@ func initFrugalTagRecvMsg() remote.Message {
 
 func TestFrugal(t *testing.T) {
 	ctx := context.Background()
+	frugalCodec := &thriftCodec{FrugalRead | FrugalWrite}
 
 	// encode client side
 	// MockNoTagArgs cannot be marshaled
 	sendMsg := initNoTagSendMsg(transport.TTHeader)
 	out := remote.NewWriterBuffer(256)
-	err := payloadCodec.Marshal(ctx, sendMsg, out)
+	err := frugalCodec.Marshal(ctx, sendMsg, out)
 	test.Assert(t, err != nil)
 
 	// MockFrugalTagArgs can be marshaled by frugal
 	sendMsg = initFrugalTagSendMsg(transport.TTHeader)
 	out = remote.NewWriterBuffer(256)
-	err = payloadCodec.Marshal(ctx, sendMsg, out)
+	err = frugalCodec.Marshal(ctx, sendMsg, out)
 	test.Assert(t, err == nil, err)
 
 	// decode server side
@@ -224,7 +225,7 @@ func TestFrugal(t *testing.T) {
 	recvMsg.SetPayloadLen(len(buf))
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
-	err = payloadCodec.Unmarshal(ctx, recvMsg, in)
+	err = frugalCodec.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)
 
 	// compare Args
