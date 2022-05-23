@@ -361,7 +361,7 @@ func TestBackupPolicyCall(t *testing.T) {
 		Enable: true,
 		Type:   1,
 		BackupPolicy: &BackupPolicy{
-			RetryDelayMS: 100,
+			RetryDelayMS: 30,
 			StopPolicy: StopPolicy{
 				MaxRetryTimes:    2,
 				DisableChainStop: false,
@@ -378,7 +378,7 @@ func TestBackupPolicyCall(t *testing.T) {
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
 		atomic.AddInt32(&callTimes, 1)
-		time.Sleep(time.Millisecond * 160)
+		time.Sleep(time.Millisecond * 50)
 		return ri, nil
 	}, ri, nil)
 	test.Assert(t, err == nil, err)
@@ -386,8 +386,8 @@ func TestBackupPolicyCall(t *testing.T) {
 	test.Assert(t, !ok)
 }
 
-// test policy invalid call
-func TestPolicyInvalidCall(t *testing.T) {
+// test policy noRetry call
+func TestPolicyNoRetryCall(t *testing.T) {
 	ctx := context.Background()
 	rc := NewRetryContainer()
 
@@ -410,7 +410,10 @@ func TestPolicyInvalidCall(t *testing.T) {
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
 		callTimes++
-		return ri, kerrors.ErrRPCTimeout
+		if callTimes == 1 {
+			return ri, kerrors.ErrRPCTimeout
+		}
+		return ri, nil
 	}, ri, nil)
 	test.Assert(t, kerrors.IsTimeoutError(err), err)
 	test.Assert(t, callTimes == 1)

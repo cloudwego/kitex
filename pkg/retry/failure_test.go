@@ -39,17 +39,19 @@ func BenchmarkRandomBackOff_Wait(b *testing.B) {
 }
 
 func TestRandomBackOff_Wait(t *testing.T) {
-	min := 99
-	max := 100
+	const (
+		min = 99
+		max = 100
+	)
 	bk := &randomBackOff{
 		minMS: min,
 		maxMS: max,
 	}
 	startTime := time.Now()
 	bk.Wait(1)
-	waitTime := time.Now().Sub(startTime)
-	test.Assert(t, time.Millisecond*time.Duration(min) <= waitTime)
-	test.Assert(t, waitTime < time.Millisecond*time.Duration(max+5))
+	waitTime := time.Since(startTime)
+	test.Assert(t, time.Millisecond*min <= waitTime)
+	test.Assert(t, waitTime < time.Millisecond*(max+5))
 }
 
 func TestRandomBackOff_String(t *testing.T) {
@@ -64,15 +66,15 @@ func TestRandomBackOff_String(t *testing.T) {
 }
 
 func TestFixedBackOff_Wait(t *testing.T) {
-	fix := 50
+	const fix = 50
 	bk := &fixedBackOff{
 		fixMS: fix,
 	}
 	startTime := time.Now()
 	bk.Wait(1)
-	waitTime := time.Now().Sub(startTime)
-	test.Assert(t, time.Millisecond*time.Duration(fix) <= waitTime)
-	test.Assert(t, waitTime < time.Millisecond*time.Duration(fix+5))
+	waitTime := time.Since(startTime)
+	test.Assert(t, time.Millisecond*fix <= waitTime)
+	test.Assert(t, waitTime < time.Millisecond*(fix+5))
 }
 
 func TestFixedBackOff_String(t *testing.T) {
