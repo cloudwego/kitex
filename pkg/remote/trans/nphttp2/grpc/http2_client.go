@@ -567,6 +567,29 @@ func (t *http2Client) GracefulClose() {
 	t.controlBuf.put(&incomingGoAway{})
 }
 
+// TryClose is only called for grpc unary short connection situation.
+// When grpc conn pool is set to use short connection, after unary call is done
+// this method will be called to try to close http2client connection only when there is no more active stream.
+func (t *http2Client) TryClose() bool {
+	t.mu.Lock()
+	// Make sure we move to draining only from active.
+	if t.state == draining || t.state == closing {
+		t.mu.Unlock()
+		return true
+	}
+	active := len(t.activeStreams)
+	if active == 0 {
+		t.state = draining
+	}
+	t.mu.Unlock()
+	if active == 0 {
+		t.Close()
+		return true
+	} else {
+		return false
+	}
+}
+
 // Write formats the data into HTTP2 data frame(s) and sends it out. The caller
 // should proceed only if Write returns nil.
 func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {

@@ -41,7 +41,7 @@ func poolSize() uint32 {
 }
 
 // NewConnPool ...
-func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions) *connPool {
+func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions, isShortConn bool) *connPool {
 	if size == 0 {
 		size = poolSize()
 	}
@@ -49,6 +49,7 @@ func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions
 		remoteService: remoteService,
 		size:          size,
 		connOpts:      connOpts,
+		isShortConn:   isShortConn,
 	}
 }
 
@@ -59,6 +60,7 @@ type connPool struct {
 	conns         sync.Map // key: address, value: *transports
 	remoteService string   // remote service name
 	connOpts      grpc.ConnectOptions
+	isShortConn   bool
 }
 
 type transports struct {
@@ -170,6 +172,11 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 
 // Put implements the ConnPool interface.
 func (p *connPool) Put(conn net.Conn) error {
+	if p.isShortConn {
+		clientConn := conn.(*clientConn)
+		http2Client := clientConn.tr
+		http2Client.TryClose()
+	}
 	return nil
 }
 

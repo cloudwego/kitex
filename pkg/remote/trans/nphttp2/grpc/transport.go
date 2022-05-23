@@ -633,6 +633,9 @@ type ClientTransport interface {
 	// It does not block.
 	GracefulClose()
 
+	// TryClose tries to tear down the transport when there is no active streams.
+	TryClose() bool
+
 	// Write sends the data for the given stream. A nil stream indicates
 	// the write is to be performed on the transport as a whole.
 	Write(s *Stream, hdr, data []byte, opts *Options) error
