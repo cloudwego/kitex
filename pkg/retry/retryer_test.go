@@ -382,7 +382,7 @@ func TestBackupPolicyCall(t *testing.T) {
 		return ri, nil
 	}, ri, nil)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, callTimes == 2)
+	test.Assert(t, atomic.LoadInt32(&callTimes) == 2)
 	test.Assert(t, !ok)
 }
 
