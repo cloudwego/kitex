@@ -41,7 +41,7 @@ func poolSize() uint32 {
 }
 
 // NewConnPool ...
-func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions, isShortConn bool) *connPool {
+func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions) *connPool {
 	if size == 0 {
 		size = poolSize()
 	}
@@ -49,7 +49,6 @@ func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions
 		remoteService: remoteService,
 		size:          size,
 		connOpts:      connOpts,
-		isShortConn:   isShortConn,
 	}
 }
 
@@ -60,7 +59,6 @@ type connPool struct {
 	conns         sync.Map // key: address, value: *transports
 	remoteService string   // remote service name
 	connOpts      grpc.ConnectOptions
-	isShortConn   bool
 }
 
 type transports struct {
@@ -125,8 +123,8 @@ func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, netwo
 
 // Get pick or generate a net.Conn and return
 func (p *connPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
-	if p.isShortConn {
-		return p.createConn(ctx, network, address, opt)
+	if p.connOpts.ShortConn {
+		return p.createShortConn(ctx, network, address, opt)
 	}
 
 	var (
@@ -176,7 +174,7 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 
 // Put implements the ConnPool interface.
 func (p *connPool) Put(conn net.Conn) error {
-	if p.isShortConn {
+	if p.connOpts.ShortConn {
 		return p.release(conn)
 	}
 	return nil
@@ -184,12 +182,13 @@ func (p *connPool) Put(conn net.Conn) error {
 
 func (p *connPool) release(conn net.Conn) error {
 	clientConn := conn.(*clientConn)
-	http2Client := clientConn.tr
-	http2Client.GracefulClose()
+	clientConn.tr.GracefulClose()
 	return nil
 }
 
-func (p *connPool) createConn(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
+func (p *connPool) createShortConn(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
+	// Notice: newTransport means new a connection, the timeout of connection cannot be set,
+	// so using context.Background() but not the ctx passed in as the parameter.
 	tr, err := p.newTransport(context.Background(), opt.Dialer, network, address, opt.ConnectTimeout, p.connOpts)
 	if err != nil {
 		return nil, err

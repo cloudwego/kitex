@@ -253,7 +253,7 @@ func newMockConnPool() *connPool {
 		WriteBufferSize:       defaultMockReadWriteBufferSize,
 		ReadBufferSize:        defaultMockReadWriteBufferSize,
 		MaxHeaderListSize:     nil,
-	}, false)
+	})
 	return connPool
 }
 
