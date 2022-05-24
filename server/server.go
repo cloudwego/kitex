@@ -287,33 +287,52 @@ func (s *server) addBoundHandlers(opt *remote.ServerOption) {
 	}
 
 	// for server limiter, the handler should be added as first one
-	connLimit, qpsLimit, ok := s.buildLimiterWithOpt()
-	if ok {
-		limitHdlr := bound.NewServerLimiterHandler(connLimit, qpsLimit, s.opt.LimitReporter)
+	limitHdlr := s.buildLimiterWithOpt()
+	if limitHdlr != nil {
 		doAddBoundHandlerToHead(limitHdlr, opt)
 	}
 }
 
-func (s *server) buildLimiterWithOpt() (connLimit limiter.ConcurrencyLimiter, qpsLimit limiter.RateLimiter, ok bool) {
-	if s.opt.Limits != nil {
-		if s.opt.Limits.MaxConnections > 0 {
-			connLimit = limiter.NewConcurrencyLimiter(s.opt.Limits.MaxConnections)
+/*
+ * There are two times when the rate limiter can take effect for a non-multiplexed server,
+ * which are the OnRead and OnMessage callback. OnRead is called before request decoded
+ * and OnMessage is called after.
+ * Therefore, the optimization point is that we can make rate limiter take effect in OnRead as
+ * possible to save computational cost of decoding.
+ * The implementation is that when using the default rate limiter to launching a non-multiplexed
+ * service, use the `serverLimiterOnReadHandler` whose rate limiting takes effect in the OnRead
+ * callback.
+ */
+func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
+	limits := s.opt.Limit.Limits
+	connLimit := s.opt.Limit.ConLimit
+	qpsLimit := s.opt.Limit.QPSLimit
+	if limits == nil && connLimit == nil && qpsLimit == nil {
+		return
+	}
+	if connLimit == nil {
+		if limits != nil && limits.MaxConnections > 0 {
+			connLimit = limiter.NewConcurrencyLimiter(limits.MaxConnections)
 		} else {
 			connLimit = &limiter.DummyConcurrencyLimiter{}
 		}
-		if s.opt.Limits.MaxQPS > 0 {
+	}
+	if qpsLimit == nil {
+		if limits != nil && limits.MaxQPS > 0 {
 			interval := time.Millisecond * 100 // FIXME: should not care this implementation-specific parameter
-			qpsLimit = limiter.NewQPSLimiter(interval, s.opt.Limits.MaxQPS)
+			qpsLimit = limiter.NewQPSLimiter(interval, limits.MaxQPS)
 		} else {
 			qpsLimit = &limiter.DummyRateLimiter{}
 		}
-
-		if s.opt.Limits.UpdateControl != nil {
-			updater := limiter.NewLimiterWrapper(connLimit, qpsLimit)
-			s.opt.Limits.UpdateControl(updater)
-		}
-		ok = true
+	} else {
+		s.opt.Limit.QPSLimitPostDecode = true
 	}
+	if limits != nil && limits.UpdateControl != nil {
+		updater := limiter.NewLimiterWrapper(connLimit, qpsLimit)
+		limits.UpdateControl(updater)
+	}
+	handler = bound.NewServerLimiterHandler(connLimit, qpsLimit, s.opt.Limit.LimitReporter, s.opt.Limit.QPSLimitPostDecode)
+	// TODO: gRPC limiter
 	return
 }
 

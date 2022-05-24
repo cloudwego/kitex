@@ -10,7 +10,6 @@ require (
 	github.com/cloudwego/thriftgo v0.1.2
 	github.com/golang/mock v1.6.0
 	github.com/json-iterator/go v1.1.12
-	github.com/stretchr/testify v1.7.0
 	github.com/tidwall/gjson v1.9.3
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c

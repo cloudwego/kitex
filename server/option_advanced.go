@@ -117,7 +117,7 @@ func WithLimitReporter(r limiter.LimitReporter) Option {
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithLimitReporter(%T)", r))
 
-		o.LimitReporter = r
+		o.Limit.LimitReporter = r
 	}}
 }
 
