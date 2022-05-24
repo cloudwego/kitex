@@ -17,12 +17,12 @@
 package generic
 
 import (
-	"github.com/jhump/protoreflect/desc"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 // PbDescriptorProvider provide service descriptor
 type PbDescriptorProvider interface {
 	Closer
 	// Provide return a channel for provide service descriptors
-	Provide() <-chan *desc.ServiceDescriptor
+	Provide() <-chan proto.ServiceDescriptor
 }

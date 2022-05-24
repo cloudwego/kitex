@@ -11,7 +11,7 @@ require (
 	github.com/cloudwego/netpoll v0.2.0
 	github.com/cloudwego/netpoll-http2 v0.0.6
 	github.com/cloudwego/thriftgo v0.1.3
-	github.com/jhump/protoreflect v1.12.0
+	github.com/jhump/protoreflect v1.8.2
 	github.com/json-iterator/go v1.1.11
 	github.com/tidwall/gjson v1.9.3
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c

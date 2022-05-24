@@ -128,14 +128,14 @@ var json = jsoniter.Config{
 // FromHTTPRequest parse  HTTPRequest from http.Request
 func FromHTTPRequest(req *http.Request) (*HTTPRequest, error) {
 	customReq := &HTTPRequest{
-		Header:  req.Header,
-		Query:   req.URL.Query(),
-		Cookies: descriptor.Cookies{},
-		Method:  req.Method,
-		Host:    req.Host,
-		Path:    req.URL.Path,
+		Header:      req.Header,
+		Query:       req.URL.Query(),
+		Cookies:     descriptor.Cookies{},
+		Method:      req.Method,
+		Host:        req.Host,
+		Path:        req.URL.Path,
 		ContentType: descriptor.MIMEApplicationJson,
-		Body:    map[string]interface{}{},
+		Body:        map[string]interface{}{},
 	}
 	for _, cookie := range req.Cookies() {
 		customReq.Cookies[cookie.Name] = cookie.Value

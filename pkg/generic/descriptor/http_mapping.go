@@ -19,7 +19,7 @@ package descriptor
 import (
 	"context"
 
-	"github.com/jhump/protoreflect/dynamic"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 // HTTPMapping http mapping annotation
@@ -149,7 +149,8 @@ func (m *apiBody) Request(ctx context.Context, req *HTTPRequest, field *FieldDes
 		val, ok := req.Body.(map[string]interface{})[m.value]
 		return val, ok, nil
 	case MIMEApplicationProtobuf:
-		val, err := req.Body.(*dynamic.Message).TryGetFieldByNumber(int(field.ID))
+		msg := req.Body.(proto.Message)
+		val, err := msg.TryGetFieldByNumber(int(field.ID))
 		return val, err == nil, nil
 	default:
 		return nil, false, nil
@@ -162,7 +163,8 @@ func (m *apiBody) Response(ctx context.Context, resp *HTTPResponse, field *Field
 		resp.Body.(map[string]interface{})[m.value] = val
 		return nil
 	case MIMEApplicationProtobuf:
-		return resp.Body.(*dynamic.Message).TrySetFieldByNumber(int(field.ID), val)
+		msg := resp.Body.(proto.Message)
+		return msg.TrySetFieldByNumber(int(field.ID), val)
 	default:
 		return nil
 	}

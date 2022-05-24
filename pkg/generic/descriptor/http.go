@@ -17,11 +17,8 @@
 package descriptor
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
-
-	"github.com/jhump/protoreflect/dynamic"
 )
 
 // Cookies ...
@@ -56,6 +53,7 @@ type HTTPResponse struct {
 	StatusCode  int32
 	Body        interface{}
 	ContentType MIMEType
+	Renderer    Renderer
 }
 
 // NewHTTPJsonResponse ...
@@ -64,15 +62,26 @@ func NewHTTPJsonResponse() *HTTPResponse {
 		Header:      http.Header{},
 		ContentType: MIMEApplicationJson,
 		Body:        map[string]interface{}{},
+		Renderer:    JsonRenderer{},
+	}
+}
+
+func NewHTTPPbResponse(initBody interface{}) *HTTPResponse {
+	return &HTTPResponse{
+		Header:      http.Header{},
+		ContentType: MIMEApplicationProtobuf,
+		Body:        initBody,
+		Renderer:    PbRenderer{},
 	}
 }
 
 // NewHTTPResponse init response with given MIMEType and body
-func NewHTTPResponse(contentType MIMEType, initBody interface{}) *HTTPResponse {
+func NewHTTPResponse(contentType MIMEType, initBody interface{}, renderer Renderer) *HTTPResponse {
 	return &HTTPResponse{
 		Header:      http.Header{},
 		ContentType: contentType,
 		Body:        initBody,
+		Renderer:    renderer,
 	}
 }
 
@@ -83,21 +92,8 @@ func (resp *HTTPResponse) Write(w http.ResponseWriter) error {
 		w.Header().Set(k, resp.Header.Get(k))
 	}
 
-	w.Header().Set("Content-Type", string(resp.ContentType))
-
-	switch resp.ContentType {
-	case MIMEApplicationJson:
-		return json.NewEncoder(w).Encode(resp.Body)
-	case MIMEApplicationProtobuf:
-		bytes, err := resp.Body.(*dynamic.Message).Marshal()
-		if err != nil {
-			return err
-		}
-		_, err = w.Write(bytes)
-		return err
-	default:
-		return nil
-	}
+	resp.Renderer.WriteContentType(w)
+	return resp.Renderer.Render(w, resp.Body)
 }
 
 // Param in request path

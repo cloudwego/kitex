@@ -26,6 +26,7 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 // WriteHTTPPbRequest implement of MessageWriter
@@ -65,20 +66,20 @@ func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, ms
 	}
 	req.Body = pbMsg
 
-	return wrapPbStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase})
+	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase})
 }
 
 // ReadHTTPResponse implement of MessageReaderWithMethod
 type ReadHTTPPbResponse struct {
 	svc   *descriptor.ServiceDescriptor
-	pbSvc *desc.ServiceDescriptor
+	pbSvc proto.ServiceDescriptor
 }
 
 var _ MessageReader = (*ReadHTTPResponse)(nil)
 
 // NewReadHTTPResponse ...
 // Base64 encoding for binary is enabled by default.
-func NewReadHTTPPbResponse(svc *descriptor.ServiceDescriptor, pbSvc *desc.ServiceDescriptor) *ReadHTTPPbResponse {
+func NewReadHTTPPbResponse(svc *descriptor.ServiceDescriptor, pbSvc proto.ServiceDescriptor) *ReadHTTPPbResponse {
 	return &ReadHTTPPbResponse{svc, pbSvc}
 }
 
@@ -94,5 +95,5 @@ func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, in thrift.
 		return nil, errors.New("pb method not found")
 	}
 
-	return skipStructReader(ctx, in, fDsc, &readerOption{pbDsc: mt.GetOutputType()})
+	return skipStructReader(ctx, in, fDsc, &readerOption{pbDsc: mt.GetOutputType(), http: true})
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/jhump/protoreflect/desc"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
@@ -93,7 +94,7 @@ func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, i
 	if !ok {
 		return fmt.Errorf("get parser ServiceDescriptor failed")
 	}
-	pbSvcDsc, ok := c.pbSvcDsc.Load().(*desc.ServiceDescriptor)
+	pbSvcDsc, ok := c.pbSvcDsc.Load().(proto.ServiceDescriptor)
 	if !ok {
 		return fmt.Errorf("get parser PbServiceDescriptor failed")
 	}
