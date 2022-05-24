@@ -87,8 +87,8 @@ var prefaceReadAtMost = func() int {
 
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	// only need detect once when connection is reused
-	r := ctx.Value(detectionKey{}).(*detectionHandler)
-	if r.handler != nil {
+	r, ok := ctx.Value(detectionKey{}).(*detectionHandler)
+	if ok && r != nil && r.handler != nil {
 		return r.handler.OnRead(ctx, conn)
 	}
 	// Check the validity of client preface.
@@ -116,7 +116,7 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 }
 
 func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
-	if r := ctx.Value(detectionKey{}).(*detectionHandler); r.handler != nil {
+	if r, ok := ctx.Value(detectionKey{}).(*detectionHandler); ok && r != nil && r.handler != nil {
 		return r.handler
 	}
 	// use noop transHandler
