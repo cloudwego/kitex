@@ -97,7 +97,7 @@ func TestBalancerCache(t *testing.T) {
 		p := b.GetPicker()
 		for a := 0; a < count; a++ {
 			addr := p.Next(context.Background(), nil).Address().String()
-			fmt.Printf("count: %d addr: %s\n", i, addr)
+			t.Logf("count: %d addr: %s\n", i, addr)
 		}
 	}
 }
