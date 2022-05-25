@@ -158,7 +158,7 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 	ctx := context.Background()
 	intKVInfo := prepareIntKVInfo()
 	strKVInfo := prepareStrKVInfo()
-	sendMsg := initSendMsg(transport.TTHeader)
+	sendMsg := initClientSendMsg(transport.TTHeader)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
 
@@ -168,7 +168,7 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode
-	recvMsg := initRecvMsg()
+	recvMsg := initServerRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
@@ -190,7 +190,7 @@ func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 	ctx := context.Background()
 	intKVInfo := prepareIntKVInfo()
 	strKVInfo := prepareStrKVInfo()
-	sendMsg := initSendMsg(transport.TTHeader)
+	sendMsg := initClientSendMsg(transport.TTHeader)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
 
@@ -203,7 +203,7 @@ func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode
-	recvMsg := initRecvMsg()
+	recvMsg := initServerRecvMsg()
 	smallBuf, _ := smallOut.Bytes()
 	largeBuf, _ := largeOut.Bytes()
 	err = smallDc.Decode(ctx, recvMsg, remote.NewReaderBuffer(smallBuf))
