@@ -401,7 +401,7 @@ func checkProtocolID(protoID uint8, message remote.Message) error {
 	case uint8(ProtocolIDThriftCompactV2):
 		// just for compatibility
 	default:
-		klog.Warnf("KITEX: ProtocolID[%d] is not supported, do double check for payload", protoID)
+		return fmt.Errorf("unsupported ProtocolID[%d]", protoID)
 	}
 	return nil
 }
