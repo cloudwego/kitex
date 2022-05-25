@@ -98,10 +98,11 @@ type ProtocolID uint8
 
 // Supported ProtocolID values.
 const (
-	ProtocolIDThriftBinary  ProtocolID = 0x00
-	ProtocolIDThriftCompact ProtocolID = 0x02
-	ProtocolIDProtobufKitex ProtocolID = 0x03
-	ProtocolIDDefault                  = ProtocolIDThriftBinary
+	ProtocolIDThriftBinary    ProtocolID = 0x00
+	ProtocolIDThriftCompact   ProtocolID = 0x02 // Kitex not support
+	ProtocolIDThriftCompactV2 ProtocolID = 0x03 // Kitex not support
+	ProtocolIDKitexProtobuf   ProtocolID = 0x04
+	ProtocolIDDefault                    = ProtocolIDThriftBinary
 )
 
 type InfoIDType uint8 // uint8
@@ -382,7 +383,12 @@ func setFlags(flags uint16, message remote.Message) {
 func getProtocolID(pi remote.ProtocolInfo) ProtocolID {
 	switch pi.CodecType {
 	case serviceinfo.Protobuf:
-		return ProtocolIDProtobufKitex
+		// ProtocolIDKitexProtobuf is 0x03 at old version(<=v1.9.1) , but it conflicts with ThriftCompactV2.
+		// Change the ProtocolIDKitexProtobuf to 0x04 from v1.9.2. But notice! that it is an incompatible change of protocol.
+		// For keeping compatible, Kitex use ProtocolIDDefault send ttheader+KitexProtobuf request to ignore the old version
+		// check failed if use 0x04. It doesn't make sense, but it won't affect the correctness of RPC call because the actual
+		// protocol check at checkPayload func which check payload with HEADER MAGIC bytes of payload.
+		return ProtocolIDDefault
 	}
 	return ProtocolIDDefault
 }
@@ -390,10 +396,10 @@ func getProtocolID(pi remote.ProtocolInfo) ProtocolID {
 // protoID just for ttheader
 func checkProtocolID(protoID uint8, message remote.Message) error {
 	switch protoID {
-	case uint8(ProtocolIDProtobufKitex):
-		// rpcCfg := internal.AsMutableRPCConfig(message.RPCInfo().Config())
-		// rpcCfg.SetCodecType(kitex.TTHeaderProtobufKitex)
 	case uint8(ProtocolIDThriftBinary):
+	case uint8(ProtocolIDKitexProtobuf):
+	case uint8(ProtocolIDThriftCompactV2):
+		// just for compatibility
 	default:
 		return fmt.Errorf("unsupported ProtocolID[%d]", protoID)
 	}
