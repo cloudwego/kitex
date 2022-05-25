@@ -158,13 +158,18 @@ func NewOptions(opts []Option) *Options {
 }
 
 func (o *Options) initRemoteOpt() {
+	var zero connpool2.IdleConfig
+
 	if o.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
+		if o.PoolCfg != nil && *o.PoolCfg == zero {
+			// grpc unary short connection
+			o.GRPCConnectOpts.ShortConn = true
+		}
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
 	if o.RemoteOpt.ConnPool == nil {
 		if o.PoolCfg != nil {
-			var zero connpool2.IdleConfig
 			if *o.PoolCfg == zero {
 				o.RemoteOpt.ConnPool = connpool.NewShortPool(o.Svr.ServiceName)
 			} else {
