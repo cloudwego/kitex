@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -445,22 +446,21 @@ func (m meshHeader) decode(ctx context.Context, message remote.Message, in remot
 // but metahandlers are executed after payloadDecode, we don't know from_info when error happen in payloadDecode.
 // So 'fillBasicInfoOfTTHeader' is just for getting more info to output log when decode error happen.
 func fillBasicInfoOfTTHeader(msg remote.Message) {
-	var ei rpcinfo.MutableEndpointInfo
 	if msg.RPCRole() == remote.Server {
-		ei = rpcinfo.AsMutableEndpointInfo(msg.RPCInfo().From())
-		if ei != nil {
+		fi := rpcinfo.AsMutableEndpointInfo(msg.RPCInfo().From())
+		if fi != nil {
 			if v := msg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr]; v != "" {
-				ei.SetAddress(utils.NewNetAddr("tcp", v))
+				fi.SetAddress(utils.NewNetAddr("tcp", v))
 			}
 			if v := msg.TransInfo().TransIntInfo()[transmeta.FromService]; v != "" {
-				ei.SetServiceName(v)
+				fi.SetServiceName(v)
 			}
 		}
 	} else {
-		ei = rpcinfo.AsMutableEndpointInfo(msg.RPCInfo().To())
-		if ei != nil {
+		ti := remoteinfo.AsRemoteInfo(msg.RPCInfo().To())
+		if ti != nil {
 			if v := msg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr]; v != "" {
-				ei.SetAddress(utils.NewNetAddr("tcp", v))
+				ti.SetRemoteAddr(utils.NewNetAddr("tcp", v))
 			}
 		}
 	}
