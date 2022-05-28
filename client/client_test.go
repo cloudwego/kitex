@@ -19,11 +19,12 @@ package client
 import (
 	"context"
 	"errors"
-	"github.com/cloudwego/kitex/pkg/warmup"
 	"net"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/warmup"
 
 	"github.com/cloudwego/kitex/pkg/retry"
 

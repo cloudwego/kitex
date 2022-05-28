@@ -19,12 +19,13 @@ package client
 import (
 	"context"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/connpool"
-	"github.com/cloudwego/kitex/pkg/warmup"
 	"net"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/connpool"
+	"github.com/cloudwego/kitex/pkg/warmup"
 
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -596,7 +597,7 @@ func TestWithLongConnectionOption(t *testing.T) {
 	opts := client.NewOptions(options)
 	test.Assert(t, opts.PoolCfg.MaxIdleTimeout == 30*time.Second) // defaultMaxIdleTimeout
 	test.Assert(t, opts.PoolCfg.MaxIdlePerAddress == 1)           // default
-	test.Assert(t, opts.PoolCfg.MaxIdleGlobal == 1)               //default
+	test.Assert(t, opts.PoolCfg.MaxIdleGlobal == 1)               // default
 }
 
 func TestWithWarmingUpOption(t *testing.T) {
