@@ -116,8 +116,10 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 }
 
 func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
-	if r, ok := ctx.Value(detectionKey{}).(*detectionHandler); ok && r.handler != nil {
-		return r.handler
+	if ctx.Value(detectionKey{}) != nil {
+		if r, ok := ctx.Value(detectionKey{}).(*detectionHandler); ok && r.handler != nil {
+			return r.handler
+		}
 	}
 	// use noop transHandler
 	return noopSvrTransHandler{}
