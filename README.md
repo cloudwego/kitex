@@ -68,14 +68,14 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
   - **Framework Extension**
   
     Providing Middleware Extensions, Suite Extensions, Service Registry, Service Discovery, Customize LoadBalancer, Monitoring, Logging, Codec, Transport Module, Transport Pipeline, Metadata Transparent Transmission, Diagnosis Module.[[more]](https://www.cloudwego.io/docs/kitex/tutorials/framework-exten/)
-    
+  
 - **Reference**
 
-  - For Transport Protocol, Exception Instruction and Version Specification, please refer to [doc](https://www.cloudwego.io/docs/kitex/reference/)
-    
+  - For Transport Protocol, Exception Instruction and Version Specification, please refer to [doc](https://www.cloudwego.io/docs/kitex/reference/).
+  
 - **FAQ**
 
-  - Please refer to [FAQ](https://www.cloudwego.io/docs/kitex/faq/)
+  - Please refer to [FAQ](https://www.cloudwego.io/docs/kitex/faq/).
 
 ## Performance
 
