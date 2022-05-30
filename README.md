@@ -75,6 +75,8 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
     
 - **FAQ**
 
+  - Please refer to [FAQ](https://www.cloudwego.io/docs/kitex/faq/)
+
 ## Performance
 
 Performance benchmark can only provide limited reference. In production, there are many factors can affect actual performance.
