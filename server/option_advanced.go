@@ -169,3 +169,13 @@ func WithReusePort(reuse bool) Option {
 		o.RemoteOpt.ReusePort = reuse
 	}}
 }
+
+// WithSupportedTransportsFunc sets a function which converts supported transports from server option.
+func WithSupportedTransportsFunc(f func(option remote.ServerOption) []string) Option {
+	return Option{
+		F: func(o *internal_server.Options, di *utils.Slice) {
+			di.Push("WithSupportedTransportsFunc()")
+			o.SupportedTransportsFunc = f
+		},
+	}
+}

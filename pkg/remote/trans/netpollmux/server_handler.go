@@ -48,6 +48,11 @@ func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
 	return &svrTransHandlerFactory{}
 }
 
+// MuxEnabled returns true to mark svrTransHandlerFactory as a mux server factory.
+func (f *svrTransHandlerFactory) MuxEnabled() bool {
+	return true
+}
+
 // NewTransHandler implements the remote.ServerTransHandlerFactory interface.
 // TODO: use object pool?
 func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
@@ -371,7 +376,8 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 }
 
 func (t *svrTransHandler) writeErrorReplyIfNeeded(
-	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool) (shouldCloseConn bool) {
+	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool,
+) (shouldCloseConn bool) {
 	if methodInfo, _ := trans.GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return
