@@ -37,7 +37,7 @@ var (
 		WithDestService("destService"),
 	}
 	svcInfo   = mocks.ServiceInfo()
-	req, resp = &streaming.Result{}, &streaming.Result{}
+	req, resp = &streaming.Args{}, &streaming.Result{}
 )
 
 type mockRPCInfo struct{}
