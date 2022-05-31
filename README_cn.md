@@ -110,7 +110,7 @@ Kitex 基于[Apache License 2.0](LICENSE) 许可证，其依赖的三方组件�
   ![LarkGroup](images/lark_group_cn.png)
 - 微信: CloudWeGo community
 
-    ![WechatGroup](images/wechat_group_cn.png)
+  ![WechatGroup](images/wechat_group_cn.png)
 
 ## Landscapes
 
