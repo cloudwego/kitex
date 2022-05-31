@@ -40,16 +40,6 @@ var (
 	req, resp = &streaming.Args{}, &streaming.Result{}
 )
 
-type mockRPCInfo struct{}
-
-func (m mockRPCInfo) From() rpcinfo.EndpointInfo     { return nil }
-func (m mockRPCInfo) To() rpcinfo.EndpointInfo       { return nil }
-func (m mockRPCInfo) Invocation() rpcinfo.Invocation { return nil }
-func (m mockRPCInfo) Config() rpcinfo.RPCConfig {
-	return rpcinfo.NewRPCConfig()
-}
-func (m mockRPCInfo) Stats() rpcinfo.RPCStats { return nil }
-
 func TestStream(t *testing.T) {
 	ctx := context.Background()
 
@@ -71,7 +61,14 @@ func TestStreaming(t *testing.T) {
 		opt:     client.NewOptions(opts),
 		svcInfo: svcInfo,
 	}
-	ctx = rpcinfo.NewCtxWithRPCInfo(context.Background(), mockRPCInfo{})
+	mockRPCInfo := rpcinfo.NewRPCInfo(
+		rpcinfo.NewEndpointInfo("mock_client", "mock_client_method", nil, nil),
+		rpcinfo.NewEndpointInfo("mock_server", "mockserver_method", nil, nil),
+		rpcinfo.NewInvocation("mock_service", "mock_method"),
+		rpcinfo.NewRPCConfig(),
+		rpcinfo.NewRPCStats(),
+	)
+	ctx = rpcinfo.NewCtxWithRPCInfo(context.Background(), mockRPCInfo)
 	stream := &stream{
 		stream: nphttp2.NewStream(ctx, svcInfo, mocks.Conn{}, &mocks.MockCliTransHandler{}),
 		kc:     kc,
