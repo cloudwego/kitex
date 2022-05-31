@@ -106,8 +106,10 @@ Kitex 基于[Apache License 2.0](LICENSE) 许可证，其依赖的三方组件�
 - 如何成为 member: [COMMUNITY MEMBERSHIP](https://github.com/cloudwego/community/blob/main/COMMUNITY_MEMBERSHIP.md)
 - Issues: [Issues](https://github.com/cloudwego/kitex/issues)
 - 飞书用户群（[注册飞书](https://www.feishu.cn/)进群）
+
   ![LarkGroup](images/lark_group_cn.png)
 - 微信: CloudWeGo community
+
     ![WechatGroup](images/wechat_group_cn.png)
 
 ## Landscapes
