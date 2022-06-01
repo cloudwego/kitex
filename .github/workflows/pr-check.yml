@@ -1,10 +1,10 @@
 name: Pull Request Check
 
-on: [pull_request]
+on: [ pull_request ]
 
 jobs:
   compliant:
-    runs-on: [self-hosted, X64]
+    runs-on: [ self-hosted, X64 ]
     steps:
       - uses: actions/checkout@v3
 
@@ -13,18 +13,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: typos-action
+      - name: Check Spell
         uses: crate-ci/typos@master
 
   staticcheck:
-    runs-on: self-hosted
+    runs-on: [ self-hosted, X64 ]
     steps:
       - uses: actions/checkout@v3
-
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: 1.19
 
       - uses: actions/cache@v3
         with:
@@ -44,3 +43,26 @@ jobs:
           fail_on_error: true
           # Set staticcheck flags
           staticcheck_flags: -checks=inherit,-SA1029
+
+  lint:
+    runs-on: [ self-hosted, X64 ]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+
+      - name: Golangci Lint
+        # https://golangci-lint.run/
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          # Optional: golangci-lint command line arguments.
+          # args: --enable=gofumpt
+
+      - name: Lint
+        run: |
+          go vet -stdmethods=false $(go list ./...)
+          go install mvdan.cc/gofumpt@v0.2.0
+          test -z "$(gofumpt -l -extra .)" 
