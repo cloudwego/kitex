@@ -1,5 +1,11 @@
 # Options for analysis running.
 run:
+  # include `vendor` `third_party` `testdata` `examples` `Godeps` `builtin`
+  skip-dirs-use-default: true
+  skip-dirs:
+    - kitex_gen
+  skip-files:
+    - ".*\\.mock\\.go$"
   # The default concurrency value is the number of available CPU.
   concurrency: 4
 # output configuration options
@@ -30,8 +36,4 @@ linters:
     - errcheck
     - typecheck
 issues:
-  # See the dedicated "issues" documentation section.
-  option: value
-severity:
-  # See the dedicated "severity" documentation section.
-  option: value
+  exclude-use-default: true

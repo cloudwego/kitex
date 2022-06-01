@@ -50,7 +50,7 @@ jobs:
     strategy:
       matrix:
         go: [1.18]
-        os: [X64, ARM64]
+        os: [self-hosted]
     name: golangci-lint
     runs-on: ${{ matrix.os }}
     steps:
