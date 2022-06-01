@@ -46,11 +46,12 @@ jobs:
           staticcheck_flags: -checks=inherit,-SA1029
 
   golangci:
+    # https://golangci-lint.run/
     strategy:
       matrix:
         go: [1.18]
         os: [X64, ARM64]
-    name: lint
+    name: golangci-lint
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
@@ -63,6 +64,6 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: latest
+          version: v1.45.2
           # Optional: golangci-lint command line arguments.
           # args: --enable=gofumpt
