@@ -20,10 +20,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/remotecli"
+	"github.com/cloudwego/kitex/pkg/utils"
+
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -63,14 +66,24 @@ func TestStreaming(t *testing.T) {
 	}
 	mockRPCInfo := rpcinfo.NewRPCInfo(
 		rpcinfo.NewEndpointInfo("mock_client", "mock_client_method", nil, nil),
-		rpcinfo.NewEndpointInfo("mock_server", "mockserver_method", nil, nil),
+		rpcinfo.NewEndpointInfo(
+			"mock_server", "mockserver_method",
+			utils.NewNetAddr(
+				"mock_network", "mock_addr",
+			), nil,
+		),
 		rpcinfo.NewInvocation("mock_service", "mock_method"),
 		rpcinfo.NewRPCConfig(),
 		rpcinfo.NewRPCStats(),
 	)
 	ctx = rpcinfo.NewCtxWithRPCInfo(context.Background(), mockRPCInfo)
+
+	cliInfo := new(remote.ClientOption)
+	cliInfo.SvcInfo = svcInfo
+	cliInfo.ConnPool = &mockConnPool{}
+	s, err := remotecli.NewStream(ctx, mockRPCInfo, new(mocks.MockCliTransHandler), cliInfo)
 	stream := &stream{
-		stream: nphttp2.NewStream(ctx, svcInfo, mocks.Conn{}, &mocks.MockCliTransHandler{}),
+		stream: s,
 		kc:     kc,
 	}
 

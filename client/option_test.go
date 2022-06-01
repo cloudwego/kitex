@@ -509,7 +509,9 @@ func TestWithMetaHandler(t *testing.T) {
 type mockConnPool struct{}
 
 func (m *mockConnPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
-	return nil, nil
+	return &mocks.Conn{
+		CloseFunc: func() (e error) { return nil },
+	}, nil
 }
 func (m *mockConnPool) Put(conn net.Conn) error     { return nil }
 func (m *mockConnPool) Discard(conn net.Conn) error { return nil }
