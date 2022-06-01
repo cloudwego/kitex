@@ -52,7 +52,7 @@ jobs:
         go: [1.18]
         os: [self-hosted]
     name: golangci-lint
-    runs-on: ${{ matrix.os }}
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v3
 
