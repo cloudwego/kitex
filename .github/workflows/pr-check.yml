@@ -49,7 +49,7 @@ jobs:
     # https://golangci-lint.run/
     strategy:
       matrix:
-        go: [1.18]
+        go: [1.17]
         os: [self-hosted]
     name: golangci-lint
     runs-on: self-hosted
