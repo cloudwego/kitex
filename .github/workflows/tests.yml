@@ -6,7 +6,7 @@ jobs:
   lint-and-ut:
     strategy:
       matrix:
-        go: [1.16, 1.17, 1.18]
+        go: [1.17, 1.18]
         os: [X64, ARM64]
     runs-on: ${{ matrix.os }}
     steps:
@@ -36,8 +36,8 @@ jobs:
   benchmark:
     strategy:
       matrix:
-        go: [1.16, 1.17, 1.18]
-        os: [X64, ARM64]
+        go: [1.18]
+        os: [self-hosted]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
@@ -60,8 +60,8 @@ jobs:
   scenario:
     strategy:
       matrix:
-        go: [ 1.16, 1.17, 1.18 ]
-        os: [ X64, ARM64 ]
+        go: [1.17, 1.18]
+        os: [X64, ARM64]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
