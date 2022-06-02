@@ -145,11 +145,13 @@ func (ts *transServer) Shutdown() (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ts.opt.ExitWaitTime)
 	defer cancel()
 	if g, ok := ts.transHdlr.(remote.GracefulShutdown); ok {
-		// 1. stop listener
-		ts.ln.Close()
+		if ts.ln != nil {
+			// 1. stop listener
+			ts.ln.Close()
 
-		// 2. signal all active connections to close gracefully
-		g.GracefulShutdown(ctx)
+			// 2. signal all active connections to close gracefully
+			g.GracefulShutdown(ctx)
+		}
 	}
 	if ts.evl != nil {
 		err = ts.evl.Shutdown(ctx)
