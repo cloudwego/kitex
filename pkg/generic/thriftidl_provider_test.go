@@ -60,8 +60,11 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 	}
 	p, err := NewThriftContentWithAbsIncludePathProvider(path, includes)
 	test.Assert(t, err == nil)
+	defer p.Close()
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
+	err = p.UpdateIDL(path, includes)
+	test.Assert(t, err == nil)
 }
 
 func TestCircularDependency(t *testing.T) {
@@ -86,4 +89,10 @@ func TestCircularDependency(t *testing.T) {
 	p, err := NewThriftContentWithAbsIncludePathProvider(main, includes)
 	test.Assert(t, err != nil && p == nil)
 	test.Assert(t, strings.HasPrefix(err.Error(), "IDL circular dependency:"))
+}
+
+func TestThriftContentProvider(t *testing.T) {
+	p, err := NewThriftContentProvider("test", nil)
+	test.Assert(t, strings.Contains(err.Error(), "parse error"))
+	test.Assert(t, p == nil)
 }

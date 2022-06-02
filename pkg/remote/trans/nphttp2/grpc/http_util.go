@@ -231,9 +231,17 @@ func contentType(contentSubtype string) string {
 func (d *decodeState) status() *status.Status {
 	if d.data.statusGen == nil {
 		// No status-details were provided; generate status using code/msg.
-		d.data.statusGen = status.New(codes.Code(int32(*(d.data.rawStatusCode))), d.data.rawStatusMsg)
+		d.data.statusGen = status.New(codes.Code(safeCastInt32(*(d.data.rawStatusCode))), d.data.rawStatusMsg)
 	}
 	return d.data.statusGen
+}
+
+// safeCastInt32 casts the number from int to int32 in safety.
+func safeCastInt32(n int) int32 {
+	if n > math.MaxInt32 || n < math.MinInt32 {
+		panic(fmt.Sprintf("Cast int to int32 failed, due to overflow, n=%d", n))
+	}
+	return int32(n)
 }
 
 const binHdrSuffix = "-bin"
@@ -651,7 +659,7 @@ func (w *bufWriter) Write(b []byte) (n int, err error) {
 	if w.err != nil {
 		return 0, w.err
 	}
-	if w.batchSize == 0 { // Buffer has been disabled.
+	if w.batchSize == 0 { // buffer has been disabled.
 		return w.conn.Write(b)
 	}
 	for len(b) > 0 {

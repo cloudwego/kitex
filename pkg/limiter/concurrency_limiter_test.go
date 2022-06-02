@@ -17,6 +17,7 @@
 package limiter
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ import (
 )
 
 func TestConLimiter(t *testing.T) {
+	ctx := context.Background()
 	lim := NewConcurrencyLimiter(50)
 
 	var wg sync.WaitGroup
@@ -32,7 +34,7 @@ func TestConLimiter(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 10000; i++ {
-			_, now := lim.Status()
+			_, now := lim.Status(ctx)
 			test.Assert(t, now <= 50)
 			time.Sleep(time.Millisecond / 10)
 		}
@@ -43,9 +45,9 @@ func TestConLimiter(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 10; i++ {
-				if lim.Acquire() {
+				if lim.Acquire(ctx) {
 					time.Sleep(time.Millisecond)
-					lim.Release()
+					lim.Release(ctx)
 				} else {
 					time.Sleep(time.Millisecond)
 				}

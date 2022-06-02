@@ -101,7 +101,8 @@ func (c *transports) close() {
 var _ remote.LongConnPool = (*connPool)(nil)
 
 func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, network, address string,
-	connectTimeout time.Duration, opts grpc.ConnectOptions) (grpc.ClientTransport, error) {
+	connectTimeout time.Duration, opts grpc.ConnectOptions,
+) (grpc.ClientTransport, error) {
 	conn, err := dialer.DialTimeout(network, address, connectTimeout)
 	if err != nil {
 		return nil, err
@@ -122,6 +123,10 @@ func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, netwo
 
 // Get pick or generate a net.Conn and return
 func (p *connPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
+	if p.connOpts.ShortConn {
+		return p.createShortConn(ctx, network, address, opt)
+	}
+
 	var (
 		trans *transports
 		conn  *clientConn
@@ -169,7 +174,26 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 
 // Put implements the ConnPool interface.
 func (p *connPool) Put(conn net.Conn) error {
+	if p.connOpts.ShortConn {
+		return p.release(conn)
+	}
 	return nil
+}
+
+func (p *connPool) release(conn net.Conn) error {
+	clientConn := conn.(*clientConn)
+	clientConn.tr.GracefulClose()
+	return nil
+}
+
+func (p *connPool) createShortConn(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
+	// Notice: newTransport means new a connection, the timeout of connection cannot be set,
+	// so using context.Background() but not the ctx passed in as the parameter.
+	tr, err := p.newTransport(context.Background(), opt.Dialer, network, address, opt.ConnectTimeout, p.connOpts)
+	if err != nil {
+		return nil, err
+	}
+	return newClientConn(ctx, tr, address)
 }
 
 // Discard implements the ConnPool interface.

@@ -277,8 +277,7 @@ func checkRPCState(ctx context.Context, message remote.Message) error {
 }
 
 func checkPayload(
-	flagBuf []byte, message remote.Message, in remote.ByteBuffer, isTTHeader bool, maxPayloadSize int,
-) error {
+	flagBuf []byte, message remote.Message, in remote.ByteBuffer, isTTHeader bool, maxPayloadSize int) error {
 	var transProto transport.Protocol
 	var codecType serviceinfo.PayloadCodec
 	if isThriftBinary(flagBuf) {

@@ -103,8 +103,8 @@ func TestLimitReporterOption(t *testing.T) {
 	err = svr.Run()
 	test.Assert(t, err == nil, err)
 	iSvr := svr.(*server)
-	test.Assert(t, iSvr.opt.LimitReporter != nil)
-	test.DeepEqual(t, iSvr.opt.LimitReporter, my)
+	test.Assert(t, iSvr.opt.Limit.LimitReporter != nil)
+	test.DeepEqual(t, iSvr.opt.Limit.LimitReporter, my)
 }
 
 // TestGenericOptionPanic tests the creation of a server with RemoteOpt.PayloadCodec,if the generic is nil, should panic
