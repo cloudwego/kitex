@@ -123,7 +123,7 @@ func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
 		return r.handler
 	}
 	// use noop transHandler
-	return noopSvrTransHandler{}
+	return noopHandler
 }
 
 func (t *svrTransHandler) SetPipeline(pipeline *remote.TransPipeline) {
