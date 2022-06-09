@@ -36,6 +36,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
@@ -83,6 +84,8 @@ type Options struct {
 	Bus    event.Bus
 	Events event.Queue
 
+	SupportedTransportsFunc func(option remote.ServerOption) []string
+
 	// DebugInfo should only contain objects that are suitable for json serialization.
 	DebugInfo    utils.Slice
 	DebugService diagnosis.Service
@@ -116,6 +119,8 @@ func NewOptions(opts []Option) *Options {
 
 		Bus:    event.NewEventBus(),
 		Events: event.NewQueue(event.MaxEventNum),
+
+		SupportedTransportsFunc: DefaultSupportedTransportsFunc,
 
 		TracerCtl: &internal_stats.Controller{},
 		Registry:  registry.NoopRegistry,
@@ -168,4 +173,15 @@ func SysExitSignal() chan os.Signal {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	return signals
+}
+
+func DefaultSupportedTransportsFunc(option remote.ServerOption) []string {
+	if factory, ok := option.SvrHandlerFactory.(trans.MuxEnabledFlag); ok {
+		if factory.MuxEnabled() {
+			return []string{"ttheader_mux"}
+		} else {
+			return []string{"ttheader", "framed", "ttheader_framed", "grpc"}
+		}
+	}
+	return nil
 }
