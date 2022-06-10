@@ -11,6 +11,8 @@ github.com/choleraehyq/pid v0.0.13/go.mod h1:uhzeFgxJZWQsZulelVQZwdASxQ9TIPZYL4T
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/cloudwego/netpoll v0.2.4 h1:Kbo2HA1cXEgoy/bu1jSNrjcqZj2diENcJqLy6vKiROU=
 github.com/cloudwego/netpoll v0.2.4/go.mod h1:1T2WVuQ+MQw6h6DpE45MohSvDTKdy2DlzCx2KsnPI4E=
+github.com/cloudwego/netpoll v0.2.5-0.20220610094432-be0104887aa9 h1:5+a2dFtqX1H1syMOzlJ6zJ9t0ass/FZyVkPppKfZG8g=
+github.com/cloudwego/netpoll v0.2.5-0.20220610094432-be0104887aa9/go.mod h1:1T2WVuQ+MQw6h6DpE45MohSvDTKdy2DlzCx2KsnPI4E=
 github.com/cloudwego/thriftgo v0.1.2 h1:AXpGJiWE3VggfiRHwA6raRJUIcjxliEIfJfGlvRiYUA=
 github.com/cloudwego/thriftgo v0.1.2/go.mod h1:LzeafuLSiHA9JTiWC8TIMIq64iadeObgRUhmVG1OC/w=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
