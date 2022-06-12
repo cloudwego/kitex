@@ -81,7 +81,7 @@ func TestStreaming(t *testing.T) {
 	cliInfo := new(remote.ClientOption)
 	cliInfo.SvcInfo = svcInfo
 	cliInfo.ConnPool = &mockConnPool{}
-	s, err := remotecli.NewStream(ctx, mockRPCInfo, new(mocks.MockCliTransHandler), cliInfo)
+	s, _ := remotecli.NewStream(ctx, mockRPCInfo, new(mocks.MockCliTransHandler), cliInfo)
 	stream := &stream{
 		stream: s,
 		kc:     kc,
