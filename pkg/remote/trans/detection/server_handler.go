@@ -88,7 +88,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	// only need detect once when connection is reused
 	r := ctx.Value(handlerKey{}).(*handlerWrapper)
 	if r.handler != nil {
-		return r.handler.OnRead(ctx, conn)
+		return r.handler.OnRead(r.ctx, conn)
 	}
 	// Check the validity of client preface.
 	zr := conn.(netpoll.Connection).Reader()
@@ -106,7 +106,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			return err
 		}
 	}
-	r.handler = which
+	r.ctx, r.handler = ctx, which
 	return which.OnRead(ctx, conn)
 }
 
@@ -159,5 +159,6 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 type handlerKey struct{}
 
 type handlerWrapper struct {
+	ctx     context.Context
 	handler remote.ServerTransHandler
 }
