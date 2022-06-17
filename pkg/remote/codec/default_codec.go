@@ -176,7 +176,7 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 	}
 
 	// 2. decode body
-	if err := c.decodePayload(ctx, message, in); err != nil {
+	if err = c.decodePayload(ctx, message, in); err != nil {
 		return err
 	}
 	return nil

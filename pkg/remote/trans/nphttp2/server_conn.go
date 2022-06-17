@@ -46,13 +46,13 @@ func (c *serverConn) ReadFrame() (hdr, data []byte, err error) {
 	hdr = make([]byte, 5)
 	_, err = c.Read(hdr)
 	if err != nil {
-		return nil, nil, convertErrorFromGrpcToKitex(err)
+		return nil, nil, err
 	}
 	dLen := int(binary.BigEndian.Uint32(hdr[1:]))
 	data = make([]byte, dLen)
 	_, err = c.Read(data)
 	if err != nil {
-		return nil, nil, convertErrorFromGrpcToKitex(err)
+		return nil, nil, err
 	}
 	return hdr, data, nil
 }
@@ -74,7 +74,7 @@ func GetServerConn(st streaming.Stream) (GRPCConn, error) {
 // impl net.Conn
 func (c *serverConn) Read(b []byte) (n int, err error) {
 	n, err = c.s.Read(b)
-	return n, convertErrorFromGrpcToKitex(err)
+	return n, err
 }
 
 func (c *serverConn) Write(b []byte) (n int, err error) {
@@ -91,7 +91,7 @@ func (c *serverConn) WriteFrame(hdr, data []byte) (n int, err error) {
 		grpcConnOpt.Last = true
 	}
 	err = c.tr.Write(c.s, hdr, data, grpcConnOpt)
-	return len(hdr) + len(data), convertErrorFromGrpcToKitex(err)
+	return len(hdr) + len(data), err
 }
 
 func (c *serverConn) LocalAddr() net.Addr                { return c.tr.LocalAddr() }

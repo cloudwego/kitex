@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -31,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
@@ -133,7 +133,7 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 // newIOErrorHandleMW provides a hook point for io error handling.
 func newIOErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
 	if errHandle == nil {
-		errHandle = defaultErrorHandler
+		errHandle = DefaultClientErrorHandler
 	}
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response interface{}) (err error) {
@@ -146,16 +146,16 @@ func newIOErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
 	}
 }
 
-func defaultErrorHandler(err error) error {
-	switch e := err.(type) {
-	case thrift.TApplicationException:
+// DefaultClientErrorHandler is Default ErrorHandler for client
+// when no ErrorHandler is specified with Option `client.WithErrorHandler`, this ErrorHandler will be injected.
+// for thrift、KitexProtobuf, >= v0.4.0 wrap protocol error to TransError, which will be more friendly.
+func DefaultClientErrorHandler(err error) error {
+	switch err.(type) {
+	// for thrift、KitexProtobuf, actually check *remote.TransError is enough
+	case *remote.TransError, thrift.TApplicationException, protobuf.PBError:
 		// Add 'remote' prefix to distinguish with local err.
 		// Because it cannot make sure which side err when decode err happen
-		err = fmt.Errorf("[remote] %w", e)
-	case protobuf.PBError:
-		// Add 'remote' prefix to distinguish with local err.
-		// Because it cannot make sure which side err when decode err happen
-		err = fmt.Errorf("[remote] %w", e)
+		return kerrors.ErrRemoteOrNetwork.WithCauseAndExtraMsg(err, "remote")
 	}
 	return kerrors.ErrRemoteOrNetwork.WithCause(err)
 }
