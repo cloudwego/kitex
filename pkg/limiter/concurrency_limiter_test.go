@@ -19,6 +19,7 @@ package limiter
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,34 +27,51 @@ import (
 )
 
 func TestConLimiter(t *testing.T) {
+	connLimit := 50
 	ctx := context.Background()
-	lim := NewConcurrencyLimiter(50)
+	lim := NewConcurrencyLimiter(connLimit)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < 10000; i++ {
-			_, now := lim.Status(ctx)
-			test.Assert(t, now <= 50)
-			time.Sleep(time.Millisecond / 10)
-		}
-	}()
-
+	var connCount int32
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 10; i++ {
+			for j := 0; j < 10; j++ {
 				if lim.Acquire(ctx) {
+					atomic.AddInt32(&connCount, 1)
 					time.Sleep(time.Millisecond)
-					lim.Release(ctx)
 				} else {
+					lim.Release(ctx)
 					time.Sleep(time.Millisecond)
 				}
+				_, curr := lim.Status(ctx)
+				test.Assert(t, curr <= 60, curr)
 			}
 		}()
 	}
-
 	wg.Wait()
+	test.Assert(t, int(connCount) == connLimit)
+
+	// still limited
+	var newConnCount int32
+	for j := 0; j < 10; j++ {
+		if lim.Acquire(ctx) {
+			atomic.AddInt32(&newConnCount, 1)
+		} else {
+			lim.Release(ctx)
+		}
+	}
+	test.Assert(t, newConnCount == 0)
+
+	// release then new connection can be used
+	for j := 0; j < 10; j++ {
+		lim.Release(ctx)
+		if lim.Acquire(ctx) {
+			atomic.AddInt32(&newConnCount, 1)
+		} else {
+			lim.Release(ctx)
+		}
+	}
+	test.Assert(t, newConnCount == 10)
 }
