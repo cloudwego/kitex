@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -149,10 +152,10 @@ func (ts *transServer) Shutdown() (err error) {
 	if g, ok := ts.transHdlr.(remote.GracefulShutdown); ok {
 		if ts.ln != nil {
 			// 1. stop listener
-			ts.ln.Close()
+			_ = ts.ln.Close()
 
 			// 2. signal all active connections to close gracefully
-			g.GracefulShutdown(ctx)
+			_ = g.GracefulShutdown(ctx)
 		}
 	}
 	if ts.evl != nil {

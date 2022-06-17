@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -28,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
+	transGonet "github.com/cloudwego/kitex/pkg/remote/trans/gonet"
 	transNetpoll "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
@@ -38,12 +42,14 @@ func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
 	return &svrTransHandlerFactory{
 		http2:   nphttp2.NewSvrTransHandlerFactory(),
 		netpoll: transNetpoll.NewSvrTransHandlerFactory(),
+		gonet:   transGonet.NewSvrTransHandlerFactory(),
 	}
 }
 
 type svrTransHandlerFactory struct {
 	http2   remote.ServerTransHandlerFactory
 	netpoll remote.ServerTransHandlerFactory
+	gonet   remote.ServerTransHandlerFactory
 }
 
 func (f *svrTransHandlerFactory) MuxEnabled() bool {
@@ -59,12 +65,16 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 	if t.netpoll, err = f.netpoll.NewTransHandler(opt); err != nil {
 		return nil, err
 	}
+	if t.gonet, err = f.gonet.NewTransHandler(opt); err != nil {
+		return nil, err
+	}
 	return t, nil
 }
 
 type svrTransHandler struct {
 	http2   remote.ServerTransHandler
 	netpoll remote.ServerTransHandler
+	gonet   remote.ServerTransHandler
 }
 
 func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) error {
@@ -90,13 +100,20 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	if r.handler != nil {
 		return r.handler.OnRead(r.ctx, conn)
 	}
+
+	var (
+		preface []byte
+		err     error
+	)
+
 	// Check the validity of client preface.
 	zr := conn.(netpoll.Connection).Reader()
 	// read at most avoid block
-	preface, err := zr.Peek(prefaceReadAtMost)
+	preface, err = zr.Peek(prefaceReadAtMost)
 	if err != nil {
 		return err
 	}
+
 	// compare preface one by one
 	which := t.netpoll
 	if bytes.Equal(preface[:prefaceReadAtMost], grpc.ClientPreface[:prefaceReadAtMost]) {
@@ -133,6 +150,7 @@ func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
 func (t *svrTransHandler) SetPipeline(pipeline *remote.TransPipeline) {
 	t.http2.SetPipeline(pipeline)
 	t.netpoll.SetPipeline(pipeline)
+	t.gonet.SetPipeline(pipeline)
 }
 
 func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {

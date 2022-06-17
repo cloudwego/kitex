@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -13,7 +16,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package client
 
 // Notice!! This file defines the advanced Options of client, normal user should not use it.

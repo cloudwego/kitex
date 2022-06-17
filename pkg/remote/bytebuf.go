@@ -93,6 +93,7 @@ type ByteBuffer interface {
 
 	// NewBuffer returns a new writable remote.ByteBuffer.
 	NewBuffer() ByteBuffer
+
 	// AppendBuffer appends buf to the original buffer.
 	AppendBuffer(buf ByteBuffer) (err error)
 

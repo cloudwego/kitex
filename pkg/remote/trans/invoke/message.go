@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -33,8 +36,8 @@ var _ Message = &message{}
 type PayloadHandler interface {
 	SetRequestBytes(buf []byte) error
 	GetResponseBytes() ([]byte, error)
-	GetRequestReaderByteBuffer() remote.ByteBuffer
-	GetResponseWriterByteBuffer() remote.ByteBuffer
+	GetRequestReaderByteBuffer(conn net.Conn) remote.ByteBuffer
+	GetResponseWriterByteBuffer(conn net.Conn) remote.ByteBuffer
 	Release() error
 }
 
@@ -114,12 +117,12 @@ func (f *message) GetResponseBytes() ([]byte, error) {
 }
 
 // GetRequestReaderByteBuffer implements the Message interface.
-func (f *message) GetRequestReaderByteBuffer() remote.ByteBuffer {
+func (f *message) GetRequestReaderByteBuffer(conn net.Conn) remote.ByteBuffer {
 	return f.request
 }
 
 // GetResponseWriterByteBuffer implements the Message interface.
-func (f *message) GetResponseWriterByteBuffer() remote.ByteBuffer {
+func (f *message) GetResponseWriterByteBuffer(conn net.Conn) remote.ByteBuffer {
 	if f.response == nil {
 		f.response = internal_netpoll.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(0))
 	}

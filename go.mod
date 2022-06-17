@@ -19,3 +19,7 @@ require (
 	google.golang.org/protobuf v1.26.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
+
+replace github.com/cloudwego/netpoll => /Users/sinnera/Dev/goProjects/src/github.com/sinnera/netpoll
+
+replace github.com/cloudwego/kitex => /Users/sinnera/Dev/goProjects/src/github.com/sinnera/kitex

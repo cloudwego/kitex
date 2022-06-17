@@ -1,3 +1,6 @@
+//go:build linux || darwin
+// +build linux darwin
+
 /*
  * Copyright 2022 CloudWeGo Authors
  *

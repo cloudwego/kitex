@@ -38,12 +38,12 @@ func (e *ivkConnExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cf
 
 // NewWriteByteBuffer implements the trans.Extension interface.
 func (e *ivkConnExtension) NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-	return conn.(Message).GetResponseWriterByteBuffer()
+	return conn.(Message).GetResponseWriterByteBuffer(conn)
 }
 
 // NewReadByteBuffer implements the trans.Extension interface.
 func (e *ivkConnExtension) NewReadByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-	return conn.(Message).GetRequestReaderByteBuffer()
+	return conn.(Message).GetRequestReaderByteBuffer(conn)
 }
 
 // ReleaseBuffer implements the trans.Extension interface.
