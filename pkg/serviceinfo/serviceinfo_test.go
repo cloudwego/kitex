@@ -18,6 +18,8 @@ package serviceinfo_test
 
 import (
 	"context"
+	"net"
+	"reflect"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -32,13 +34,23 @@ func TestServiceInfo(t *testing.T) {
 		},
 	}
 	test.Assert(t, si.GetPackageName() == "123")
+	test.Assert(t, si.IsStreaming() == false)
+	test.Assert(t, si.GetAddress() == nil)
+	test.Assert(t, len(si.GetTransports()) == 0)
 
+	var addr net.Addr = &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 8888}
 	si = &serviceinfo.ServiceInfo{
 		Extra: map[string]interface{}{
 			"PackageName": "456",
+			"streaming":   true,
+			"transports":  []string{"ttheader_mux"},
+			"address":     addr,
 		},
 	}
 	test.Assert(t, si.GetPackageName() == "456")
+	test.Assert(t, si.IsStreaming() == true)
+	test.Assert(t, si.GetAddress() == addr)
+	test.Assert(t, reflect.DeepEqual(si.GetTransports(), []string{"ttheader_mux"}))
 }
 
 func TestMethodInfo(t *testing.T) {

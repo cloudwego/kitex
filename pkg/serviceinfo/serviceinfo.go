@@ -18,6 +18,7 @@ package serviceinfo
 
 import (
 	"context"
+	"net"
 )
 
 // PayloadCodec alias type
@@ -75,6 +76,24 @@ func (i *ServiceInfo) GetPackageName() (pkg string) {
 	}
 	pkg, _ = i.Extra["PackageName"].(string)
 	return
+}
+
+// GetAddress returns server listen address.
+func (i *ServiceInfo) GetAddress() net.Addr {
+	addr, _ := i.Extra["address"].(net.Addr)
+	return addr
+}
+
+// IsStreaming if server use grpc streaming return true,otherwise return false.
+func (i *ServiceInfo) IsStreaming() bool {
+	isStreaming, _ := i.Extra["streaming"].(bool)
+	return isStreaming
+}
+
+// GetTransports return server protocol info list.
+func (i *ServiceInfo) GetTransports() []string {
+	transports, _ := i.Extra["transports"].([]string)
+	return transports
 }
 
 // MethodInfo gets MethodInfo.
