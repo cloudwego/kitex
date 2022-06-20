@@ -62,19 +62,19 @@ func TestServerHandler(t *testing.T) {
 	// mock a headerFrame so onRead() can start working
 	npConn.mockMetaHeaderFrame()
 	go func() {
-		handler.OnRead(newMockCtxWithRPCInfo(), npConn)
+		// test OnActive()
+		ctx, err := handler.OnActive(newMockCtxWithRPCInfo(), npConn)
+		test.Assert(t, err == nil, err)
+
+		handler.OnRead(ctx, npConn)
+
+		// test OnInactive()
+		handler.OnInactive(ctx, npConn)
 		test.Assert(t, err == nil, err)
 	}()
 
 	// sleep 50 mills so server can handle metaHeader frame
 	time.Sleep(time.Millisecond * 50)
-
-	// test OnActive()
-	_, err = handler.OnActive(context.Background(), npConn)
-	test.Assert(t, err == nil, err)
-
-	// test OnInactive()
-	handler.OnInactive(newMockCtxWithRPCInfo(), npConn)
 
 	// test OnError()
 	handler.OnError(context.Background(), context.Canceled, npConn)
