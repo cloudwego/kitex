@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/transmeta"
+
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -285,6 +287,9 @@ func (s *server) richRemoteOption() {
 }
 
 func (s *server) addBoundHandlers(opt *remote.ServerOption) {
+	// add default meta handler
+	s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerHTTP2Handler)
+	s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerTTHeaderHandler)
 	// for server trans info handler
 	if len(s.opt.MetaHandlers) > 0 {
 		transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
