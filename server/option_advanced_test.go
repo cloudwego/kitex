@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
@@ -103,8 +105,8 @@ func TestLimitReporterOption(t *testing.T) {
 	err = svr.Run()
 	test.Assert(t, err == nil, err)
 	iSvr := svr.(*server)
-	test.Assert(t, iSvr.opt.LimitReporter != nil)
-	test.DeepEqual(t, iSvr.opt.LimitReporter, my)
+	test.Assert(t, iSvr.opt.Limit.LimitReporter != nil)
+	test.DeepEqual(t, iSvr.opt.Limit.LimitReporter, my)
 }
 
 // TestGenericOptionPanic tests the creation of a server with RemoteOpt.PayloadCodec,if the generic is nil, should panic
@@ -151,4 +153,50 @@ func TestExitSignalOption(t *testing.T) {
 	})
 	err = svr.Run()
 	test.Assert(t, err == stopErr, err)
+}
+
+func TestWithSupportedTransportsFunc(t *testing.T) {
+	cases := []struct {
+		options        []Option
+		wantTransports []string
+	}{
+		{
+			options: []Option{
+				WithSupportedTransportsFunc(func(option remote.ServerOption) []string {
+					return []string{"mock1", "mock2"}
+				}),
+			},
+			wantTransports: []string{"mock1", "mock2"},
+		},
+		{
+			options: []Option{
+				WithSupportedTransportsFunc(func(option remote.ServerOption) []string {
+					return []string{}
+				}),
+			},
+			wantTransports: []string{},
+		},
+		{
+			wantTransports: []string{"ttheader", "framed", "ttheader_framed", "grpc"},
+		},
+		{
+			options: []Option{
+				WithMuxTransport(),
+			},
+			wantTransports: []string{"ttheader_mux"},
+		},
+		{
+			options: []Option{
+				WithTransHandlerFactory(nil),
+			},
+			wantTransports: nil,
+		},
+	}
+	var svr Server
+	for _, tcase := range cases {
+		svr = NewServer(tcase.options...)
+		svr.RegisterService(mocks.ServiceInfo(), nil)
+		svr.(*server).fillMoreServiceInfo(nil)
+		test.Assert(t, reflect.DeepEqual(svr.GetServiceInfo().Extra["transports"], tcase.wantTransports))
+	}
 }

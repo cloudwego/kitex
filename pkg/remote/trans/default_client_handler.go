@@ -76,7 +76,7 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 	err = t.codec.Decode(ctx, recvMsg, bufReader)
 	if err != nil {
 		if t.ext.IsTimeoutErr(err) {
-			return kerrors.ErrRPCTimeout.WithCause(err)
+			err = kerrors.ErrRPCTimeout.WithCause(err)
 		}
 		return err
 	}

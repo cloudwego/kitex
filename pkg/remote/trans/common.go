@@ -61,3 +61,8 @@ func GetMethodInfo(ri rpcinfo.RPCInfo, svcInfo *serviceinfo.ServiceInfo) (servic
 	}
 	return nil, remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 }
+
+// MuxEnabledFlag is used to determine whether a serverHandlerFactory is multiplexing.
+type MuxEnabledFlag interface {
+	MuxEnabled() bool
+}

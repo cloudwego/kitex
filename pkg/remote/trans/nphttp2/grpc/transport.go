@@ -566,6 +566,8 @@ type ConnectOptions struct {
 	ReadBufferSize uint32
 	// MaxHeaderListSize sets the max (uncompressed) size of header list that is prepared to be received.
 	MaxHeaderListSize *uint32
+	// ShortConn indicates whether the connection will be reused from grpc conn pool
+	ShortConn bool
 }
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error

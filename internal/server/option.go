@@ -36,6 +36,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
@@ -75,14 +76,15 @@ type Options struct {
 	// RegistryInfo is used to in registry.
 	RegistryInfo *registry.Info
 
-	ACLRules      []acl.RejectFunc
-	Limits        *limit.Option
-	LimitReporter limiter.LimitReporter
+	ACLRules []acl.RejectFunc
+	Limit    Limit
 
 	MWBs []endpoint.MiddlewareBuilder
 
 	Bus    event.Bus
 	Events event.Queue
+
+	SupportedTransportsFunc func(option remote.ServerOption) []string
 
 	// DebugInfo should only contain objects that are suitable for json serialization.
 	DebugInfo    utils.Slice
@@ -91,6 +93,18 @@ type Options struct {
 	// Observability
 	TracerCtl  *internal_stats.Controller
 	StatsLevel *stats.Level
+}
+
+type Limit struct {
+	Limits        *limit.Option
+	LimitReporter limiter.LimitReporter
+	ConLimit      limiter.ConcurrencyLimiter
+	QPSLimit      limiter.RateLimiter
+
+	// QPSLimitPostDecode is true to indicate that the QPS limiter takes effect in
+	// the OnMessage callback, and false for the OnRead callback.
+	// Usually when the server is multiplexed, Kitex set it to True by default.
+	QPSLimitPostDecode bool
 }
 
 // NewOptions creates a default options.
@@ -105,6 +119,8 @@ func NewOptions(opts []Option) *Options {
 
 		Bus:    event.NewEventBus(),
 		Events: event.NewQueue(event.MaxEventNum),
+
+		SupportedTransportsFunc: DefaultSupportedTransportsFunc,
 
 		TracerCtl: &internal_stats.Controller{},
 		Registry:  registry.NoopRegistry,
@@ -157,4 +173,15 @@ func SysExitSignal() chan os.Signal {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	return signals
+}
+
+func DefaultSupportedTransportsFunc(option remote.ServerOption) []string {
+	if factory, ok := option.SvrHandlerFactory.(trans.MuxEnabledFlag); ok {
+		if factory.MuxEnabled() {
+			return []string{"ttheader_mux"}
+		} else {
+			return []string{"ttheader", "framed", "ttheader_framed", "grpc"}
+		}
+	}
+	return nil
 }

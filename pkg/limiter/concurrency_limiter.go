@@ -16,36 +16,34 @@
 
 package limiter
 
-import "sync/atomic"
+import (
+	"context"
+	"sync/atomic"
+)
 
 // concurrencyLimiter implements ConcurrencyLimiter.
 type concurrencyLimiter struct {
-	lim int32
-	now int32
-	tmp int32
+	lim  int32
+	curr int32
 }
 
 // NewConcurrencyLimiter returns a new ConcurrencyLimiter with the given limit.
 func NewConcurrencyLimiter(lim int) ConcurrencyLimiter {
-	return &concurrencyLimiter{int32(lim), 0, 0}
+	return &concurrencyLimiter{int32(lim), 0}
 }
 
 // Acquire tries to increase the concurrency by 1.
 // The return value indicates whether the operation is allowed under the concurrency limitation.
-func (ml *concurrencyLimiter) Acquire() bool {
-	x := atomic.AddInt32(&ml.tmp, 1)
-	if x <= atomic.LoadInt32(&ml.lim) {
-		atomic.AddInt32(&ml.now, 1)
-		return true
-	}
-	atomic.AddInt32(&ml.tmp, -1)
-	return false
+// Acquired is executed in `OnActive` which is called when a new connection is accepted, so even if the limit is reached
+// the count is still need increase, but return false will lead the connection is closed then Release also be executed.
+func (ml *concurrencyLimiter) Acquire(ctx context.Context) bool {
+	x := atomic.AddInt32(&ml.curr, 1)
+	return x <= atomic.LoadInt32(&ml.lim)
 }
 
 // Release decrease the concurrency by 1.
-func (ml *concurrencyLimiter) Release() {
-	atomic.AddInt32(&ml.now, -1)
-	atomic.AddInt32(&ml.tmp, -1)
+func (ml *concurrencyLimiter) Release(ctx context.Context) {
+	atomic.AddInt32(&ml.curr, -1)
 }
 
 // UpdateLimit updates the limit.
@@ -54,8 +52,8 @@ func (ml *concurrencyLimiter) UpdateLimit(lim int) {
 }
 
 // Status returns the current status.
-func (ml *concurrencyLimiter) Status() (limit, occupied int) {
+func (ml *concurrencyLimiter) Status(ctx context.Context) (limit, occupied int) {
 	limit = int(atomic.LoadInt32(&ml.lim))
-	occupied = int(atomic.LoadInt32(&ml.now))
+	occupied = int(atomic.LoadInt32(&ml.curr))
 	return
 }
