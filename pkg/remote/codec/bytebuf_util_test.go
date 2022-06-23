@@ -144,3 +144,21 @@ func TestWriteString2BLen(t *testing.T) {
 	writeString, err := WriteString2BLen(val, buffer)
 	test.Assert(t, writeString == 8, err)
 }
+
+// test  ReadString2Blen with  string
+func TestReadString2BLen(t *testing.T) {
+	msg := "hello world"
+	bytes := []byte(msg + msg + msg + msg + msg)
+	bLen, i, err := ReadString2BLen(bytes, 3)
+	test.Assert(t, bLen == "", err)
+	test.Assert(t, i == 0, err)
+}
+
+// test  ReadString with  string
+func TestReadString(t *testing.T) {
+	msg := "aAbBcC"
+	bytes := []byte(msg)
+	buffer := remote.NewReaderBuffer(bytes)
+	s, err := buffer.ReadString(6)
+	test.Assert(t, s == msg, err)
+}

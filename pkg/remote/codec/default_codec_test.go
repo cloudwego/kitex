@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -255,4 +256,72 @@ func (m mockPayloadCodec) Unmarshal(ctx context.Context, message remote.Message,
 
 func (m mockPayloadCodec) Name() string {
 	return "mock"
+}
+
+func TestNewDefaultCodec(t *testing.T) {
+	newDefaluteCode := &defaultCodec{
+		maxSize: 0,
+	}
+	codec := NewDefaultCodec()
+	test.Assert(t, reflect.DeepEqual(newDefaluteCode, codec))
+}
+
+func TestNewDefaultCodecWithSizeLimit(t *testing.T) {
+	size := 10
+	newDefaluteCode := &defaultCodec{
+		maxSize: 10,
+	}
+	default1 := NewDefaultCodecWithSizeLimit(size)
+	test.Assert(t, reflect.DeepEqual(default1, newDefaluteCode))
+}
+
+func Test_defaultCodec_Name(t *testing.T) {
+	codec := NewDefaultCodec()
+	test.Assert(t, codec.Name() == "default")
+}
+
+func Test_defaultCodec_encodePayload(t *testing.T) {
+	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
+	codec := defaultCodec{
+		maxSize: Size16,
+	}
+	ctx := context.Background()
+	sendMsg := initSendMsg(transport.TTHeader)
+	out := remote.NewWriterBuffer(256)
+	err := codec.encodePayload(ctx, sendMsg, out)
+	test.Assert(t, err == nil, err)
+}
+
+func Test_isMeshHeader(t *testing.T) {
+	var flagBuf []byte
+	flagBuf = make([]byte, 8*2)
+	binary.BigEndian.PutUint32(flagBuf, MeshHeaderMagic)
+	header := isMeshHeader(flagBuf)
+	test.Assert(t, header)
+}
+
+func Test_isProtobufKitex(t *testing.T) {
+	var flagBuf2 []byte
+	flagBuf2 = make([]byte, 4*2)
+	binary.BigEndian.PutUint32(flagBuf2, uint32(10))
+	binary.BigEndian.PutUint32(flagBuf2[4:8], ProtobufV1Magic)
+	header := isProtobufKitex(flagBuf2)
+	test.Assert(t, header)
+}
+
+func Test_isThriftBinary(t *testing.T) {
+	var flagBuf []byte
+	flagBuf = make([]byte, 4)
+	binary.BigEndian.PutUint32(flagBuf, ThriftV1Magic)
+	header := isThriftBinary(flagBuf)
+	test.Assert(t, header)
+}
+
+func Test_isThriftFramedBinary(t *testing.T) {
+	var flagBuf []byte
+	flagBuf = make([]byte, 8)
+	binary.BigEndian.PutUint32(flagBuf, uint32(10))
+	binary.BigEndian.PutUint32(flagBuf[4:8], ThriftV1Magic)
+	header := isThriftFramedBinary(flagBuf)
+	test.Assert(t, header)
 }
