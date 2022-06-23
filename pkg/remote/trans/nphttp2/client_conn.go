@@ -18,6 +18,7 @@ package nphttp2
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -34,7 +35,22 @@ type clientConn struct {
 	s  *grpc.Stream
 }
 
-var _ grpcConn = (*clientConn)(nil)
+var _ GRPCConn = (*clientConn)(nil)
+
+func (c *clientConn) ReadFrame() (hdr, data []byte, err error) {
+	hdr = make([]byte, 5)
+	_, err = c.Read(hdr)
+	if err != nil {
+		return nil, nil, err
+	}
+	dLen := int(binary.BigEndian.Uint32(hdr[1:]))
+	data = make([]byte, dLen)
+	_, err = c.Read(data)
+	if err != nil {
+		return nil, nil, err
+	}
+	return hdr, data, nil
+}
 
 func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*clientConn, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
@@ -87,7 +103,12 @@ func (c *clientConn) Write(b []byte) (n int, err error) {
 }
 
 func (c *clientConn) WriteFrame(hdr, data []byte) (n int, err error) {
-	err = c.tr.Write(c.s, hdr, data, &grpc.Options{})
+	grpcConnOpt := &grpc.Options{}
+	// When there's no more data frame, add END_STREAM flag to this empty frame.
+	if hdr == nil && data == nil {
+		grpcConnOpt.Last = true
+	}
+	err = c.tr.Write(c.s, hdr, data, grpcConnOpt)
 	return len(hdr) + len(data), convertErrorFromGrpcToKitex(err)
 }
 
