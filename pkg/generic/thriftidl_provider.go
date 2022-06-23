@@ -84,7 +84,7 @@ func NewThriftContentProvider(main string, includes map[string]string) (*ThriftC
 	p := &ThriftContentProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
 	}
-	tree, err := parseContent(defaultMainIDLPath, main, includes, false)
+	tree, err := ParseContent(defaultMainIDLPath, main, includes, false)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func NewThriftContentProvider(main string, includes map[string]string) (*ThriftC
 
 // UpdateIDL ...
 func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]string) error {
-	tree, err := parseContent(defaultMainIDLPath, main, includes, false)
+	tree, err := ParseContent(defaultMainIDLPath, main, includes, false)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,8 @@ func absPath(path, includePath string) string {
 	return filepath.Join(filepath.Dir(path), includePath)
 }
 
-func parseContent(path, content string, includes map[string]string, isAbsIncludePath bool) (*parser.Thrift, error) {
+// ParseContent parses the IDL from path and content using provided includes
+func ParseContent(path, content string, includes map[string]string, isAbsIncludePath bool) (*parser.Thrift, error) {
 	if src := includes[path]; src != "" && src != content {
 		return nil, fmt.Errorf("provided main IDL content conflicts with includes: %q", path)
 	}
@@ -195,7 +196,8 @@ type ThriftContentWithAbsIncludePathProvider struct {
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
 
 // NewThriftContentWithAbsIncludePathProvider create abs include path DescriptorProvider
-func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string) (*ThriftContentWithAbsIncludePathProvider, error) {
+func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string) (*ThriftContentWithAbsIncludePathProvider,
+	error) {
 	p := &ThriftContentWithAbsIncludePathProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
 	}
@@ -203,7 +205,7 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	if !ok {
 		return nil, fmt.Errorf("miss main IDL content for main IDL path: %s", mainIDLPath)
 	}
-	tree, err := parseContent(mainIDLPath, mainIDLContent, includes, true)
+	tree, err := ParseContent(mainIDLPath, mainIDLContent, includes, true)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +223,7 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 	if !ok {
 		return fmt.Errorf("miss main IDL content for main IDL path: %s", mainIDLPath)
 	}
-	tree, err := parseContent(mainIDLPath, mainIDLContent, includes, true)
+	tree, err := ParseContent(mainIDLPath, mainIDLContent, includes, true)
 	if err != nil {
 		return err
 	}
