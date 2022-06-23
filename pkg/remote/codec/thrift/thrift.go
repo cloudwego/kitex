@@ -20,9 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
 
+	"github.com/cloudwego/frugal"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -31,21 +33,38 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
+// CodecConfig is config of the thrift codec. Priority: Frugal > FastMode > Normal
+type CodecConfig struct {
+	EnableFrugalWrite bool
+	EnableFrugalRead  bool
+	EnableFastWrite   bool
+	EnableFastRead    bool
+}
+
 // NewThriftCodec creates the thrift binary codec.
 func NewThriftCodec() remote.PayloadCodec {
-	return &thriftCodec{}
+	return &thriftCodec{CodecConfig{true, true, true, true}}
+}
+
+// NewThriftFrugalCodec creates the thrift binary codec powered by frugal.
+func NewThriftCodecWithConfig(c CodecConfig) remote.PayloadCodec {
+	return &thriftCodec{c}
 }
 
 // NewThriftCodecDisableFastMode creates the thrift binary codec which can control if do fast codec.
 // Eg: xxxservice.NewServer(handler, server.WithPayloadCodec(thrift.NewThriftCodecDisableFastMode(true, true)))
 func NewThriftCodecDisableFastMode(disableFastWrite, disableFastRead bool) remote.PayloadCodec {
-	return &thriftCodec{disableFastWrite: disableFastWrite, disableFastRead: disableFastRead}
+	return &thriftCodec{CodecConfig{
+		EnableFrugalWrite: true,
+		EnableFrugalRead:  true,
+		EnableFastWrite:   !disableFastWrite,
+		EnableFastRead:    !disableFastRead,
+	}}
 }
 
 // thriftCodec implements PayloadCodec
 type thriftCodec struct {
-	disableFastWrite bool
-	disableFastRead  bool
+	CodecConfig
 }
 
 // Marshal implements the remote.PayloadCodec interface.
@@ -63,9 +82,31 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	msgType := message.MessageType()
 	seqID := message.RPCInfo().Invocation().SeqID()
 
+	// encode with frugal
+	if c.EnableFrugalWrite {
+		dt := reflect.TypeOf(data).Elem()
+		if dt.NumField() == 0 || dt.Field(0).Tag.Get("frugal") != "" {
+			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
+			msgEndLen := bthrift.Binary.MessageEndLength()
+			objectLen := frugal.EncodedSize(data)
+			buf, err := out.Malloc(msgBeginLen + objectLen + msgEndLen)
+			if err != nil {
+				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
+			}
+			offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
+			writeLen, err := frugal.EncodeObject(buf[offset:], nil, data)
+			if err != nil {
+				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Encode failed: %s", err.Error()))
+			}
+			offset += writeLen
+			bthrift.Binary.WriteMessageEnd(buf[offset:])
+			return nil
+		}
+	}
+
 	// 2. encode thrift
 	// encode with FastWrite
-	if !c.disableFastWrite {
+	if c.EnableFastWrite {
 		nw, nwOk := out.(remote.NocopyWrite)
 		if msg, ok := data.(thriftMsgFastCodec); ok && nwOk {
 			// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
@@ -141,8 +182,35 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	}
 	// decode thrift
 	data := message.Data()
+	// decode with frugal
+	if c.EnableFrugalRead {
+		if message.PayloadLen() != 0 {
+			dt := reflect.TypeOf(data).Elem()
+			if dt.NumField() == 0 || dt.Field(0).Tag.Get("frugal") != "" {
+				msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
+				ri := message.RPCInfo()
+				internal_stats.Record(ctx, ri, stats.WaitReadStart, nil)
+				buf, err := tProt.next(message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+				internal_stats.Record(ctx, ri, stats.WaitReadFinish, err)
+				if err != nil {
+					return remote.NewTransError(remote.ProtocolError, err)
+				}
+				_, err = frugal.DecodeObject(buf, data)
+				if err != nil {
+					return remote.NewTransError(remote.ProtocolError, err)
+				}
+				err = tProt.ReadMessageEnd()
+				if err != nil {
+					return remote.NewTransError(remote.ProtocolError, err)
+				}
+				tProt.Recycle()
+				return err
+			}
+		}
+	}
+
 	// decode with FastRead
-	if !c.disableFastRead {
+	if c.EnableFastRead {
 		if msg, ok := data.(thriftMsgFastCodec); ok && message.PayloadLen() != 0 {
 			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
 			ri := message.RPCInfo()
