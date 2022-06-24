@@ -19,12 +19,11 @@ package thrift
 import (
 	"context"
 	"encoding/binary"
-	"testing"
-
+	"fmt"
 	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"testing"
 )
 
 func TestMessage(t *testing.T) {
@@ -37,6 +36,8 @@ func TestMessage(t *testing.T) {
 	typeID := thrift.CALL
 	err := prot.WriteMessageBegin(name, typeID, seqID)
 	test.Assert(t, err == nil, err)
+	err1 := prot.WriteMessageBegin(name, 12711111111111111, seqID)
+	test.Assert(t, err1 == nil, err1)
 
 	tmp, _ := trans.Bytes()
 	test.Assert(t, binary.BigEndian.Uint32(tmp[:4]) == 0x80010001)
@@ -46,10 +47,8 @@ func TestMessage(t *testing.T) {
 
 	err = prot.WriteMessageEnd()
 	test.Assert(t, err == nil, err)
-
 	err = prot.Flush(context.Background())
 	test.Assert(t, err == nil, err)
-
 	// check read
 	_name, _typeID, _seqID, _err := prot.ReadMessageBegin()
 	test.Assert(t, _err == nil, _err)
@@ -110,6 +109,10 @@ func TestField(t *testing.T) {
 	test.Assert(t, _name == "", _name)
 	test.Assert(t, _typeID == thrift.STOP, _typeID)
 	test.Assert(t, _fieldID == 0, _fieldID)
+	err1 := prot.Skip(thrift.STRUCT)
+	test.Assert(t, err1 == nil, err1)
+	t_err := prot.Transport()
+	test.Assert(t, t_err == nil, t_err)
 }
 
 func TestMap(t *testing.T) {
@@ -129,7 +132,6 @@ func TestMap(t *testing.T) {
 
 	err = prot.Flush(context.Background())
 	test.Assert(t, err == nil, err)
-
 	_kType, _vType, _size, _err := prot.ReadMapBegin()
 	test.Assert(t, _err == nil, _err)
 	test.Assert(t, _size == size, _size, size)
@@ -138,7 +140,22 @@ func TestMap(t *testing.T) {
 	err = prot.ReadMapEnd()
 	test.Assert(t, err == nil, err)
 }
+func TestNext(t *testing.T) {
+	trans := remote.NewReaderWriterBuffer(-1)
+	prot := NewBinaryProtocol(trans)
 
+	size := 10
+	err := prot.WriteMapBegin(thrift.I32, thrift.BOOL, size)
+	test.Assert(t, err == nil, err)
+	err = prot.WriteMapEnd()
+	err = prot.Flush(context.Background())
+	test.Assert(t, err == nil, err)
+	next, err_1 := prot.next(1)
+	fmt.Println(next, err_1)
+	test.Assert(t, err_1 == nil, err_1)
+	test.Assert(t, next[0] == 8)
+
+}
 func TestList(t *testing.T) {
 	trans := remote.NewReaderWriterBuffer(-1)
 	prot := NewBinaryProtocol(trans)

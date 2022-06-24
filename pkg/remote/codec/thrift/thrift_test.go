@@ -19,6 +19,7 @@ package thrift
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -65,6 +66,8 @@ func TestWithContext(t *testing.T) {
 	req := &mockWithContext{WriteFunc: func(ctx context.Context, oprot thrift.TProtocol) error {
 		return nil
 	}}
+	name := payloadCodec.Name()
+	test.Assert(t, name == "thrift")
 	ink := rpcinfo.NewInvocation("", "mock")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
 	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
@@ -242,4 +245,23 @@ func prepareReq() *mt.MockReq {
 
 func newMockTestArgs() interface{} {
 	return mt.NewMockTestArgs()
+}
+
+func TestNewThriftCodecDisableFastMode(t *testing.T) {
+	mode := NewThriftCodecDisableFastMode(payloadCodec.disableFastWrite, payloadCodec.disableFastRead)
+	test.Assert(t, reflect.DeepEqual(mode, payloadCodec))
+}
+
+func TestNewThriftCodec(t *testing.T) {
+	codec := NewThriftCodec()
+	test.Assert(t, reflect.DeepEqual(codec, payloadCodec))
+}
+
+func Test_getValidData(t *testing.T) {
+
+	// encode client side
+	sendMsg := initSendMsg(transport.TTHeader)
+	_, err := getValidData(sendMsg.RPCInfo().Invocation().MethodName(), sendMsg)
+	test.Assert(t, err == nil)
+
 }
