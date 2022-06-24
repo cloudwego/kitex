@@ -160,6 +160,10 @@ func (m *mockNetpollConn) WriteFrame(hdr, data []byte) (n int, err error) {
 	return
 }
 
+func (c *mockNetpollConn) ReadFrame() (hdr, data []byte, err error) {
+	return
+}
+
 var _ net.Conn = &mockConn{}
 
 // mockConn implements the net.Conn interface.

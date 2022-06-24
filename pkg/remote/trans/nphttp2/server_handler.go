@@ -23,6 +23,9 @@ import (
 	"runtime/debug"
 	"strings"
 
+	internal_stats "github.com/cloudwego/kitex/internal/stats"
+	"github.com/cloudwego/kitex/pkg/stats"
+
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -151,7 +154,26 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			}
 
 			st := NewStream(ctx, t.svcInfo, newServerConn(tr, s), t)
-			if err := t.inkHdlFunc(ctx, &streaming.Args{Stream: st}, nil); err != nil {
+			streamArg := &streaming.Args{Stream: st}
+
+			// check grpc method
+			targetMethod := t.svcInfo.MethodInfo(methodName)
+			if targetMethod == nil {
+				unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
+				if unknownServiceHandlerFunc != nil {
+					internal_stats.Record(ctx, ri, stats.ServerHandleStart, nil)
+					err = unknownServiceHandlerFunc(ctx, methodName, st)
+					if err != nil {
+						err = kerrors.ErrBiz.WithCause(err)
+					}
+				} else {
+					err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
+				}
+			} else {
+				err = t.inkHdlFunc(ctx, streamArg, nil)
+			}
+
+			if err != nil {
 				tr.WriteStatus(s, convertFromKitexToGrpc(err))
 				return
 			}

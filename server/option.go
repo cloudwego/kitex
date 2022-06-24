@@ -22,6 +22,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -323,5 +325,12 @@ func WithGRPCMaxHeaderListSize(s uint32) Option {
 		di.Push(fmt.Sprintf("WithGRPCMaxHeaderListSize(%+v)", s))
 
 		o.RemoteOpt.GRPCCfg.MaxHeaderListSize = &s
+	}}
+}
+
+func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string, stream streaming.Stream) error) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCUnknownServiceHandler(%+v)", utils.GetFuncName(f)))
+		o.RemoteOpt.GRPCUnknownServiceHandler = f
 	}}
 }

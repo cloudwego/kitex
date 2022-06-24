@@ -17,6 +17,7 @@
 package nphttp2
 
 import (
+	"encoding/binary"
 	"io"
 	"net"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 type serverConn struct {
@@ -31,13 +33,42 @@ type serverConn struct {
 	s  *grpc.Stream
 }
 
-var _ grpcConn = (*serverConn)(nil)
+var _ GRPCConn = (*serverConn)(nil)
 
 func newServerConn(tr grpc.ServerTransport, s *grpc.Stream) *serverConn {
 	return &serverConn{
 		tr: tr,
 		s:  s,
 	}
+}
+
+func (c *serverConn) ReadFrame() (hdr, data []byte, err error) {
+	hdr = make([]byte, 5)
+	_, err = c.Read(hdr)
+	if err != nil {
+		return nil, nil, convertErrorFromGrpcToKitex(err)
+	}
+	dLen := int(binary.BigEndian.Uint32(hdr[1:]))
+	data = make([]byte, dLen)
+	_, err = c.Read(data)
+	if err != nil {
+		return nil, nil, convertErrorFromGrpcToKitex(err)
+	}
+	return hdr, data, nil
+}
+
+func GetServerConn(st streaming.Stream) (GRPCConn, error) {
+	serverStream, ok := st.(*stream)
+	if !ok {
+		// err!
+		return nil, status.Errorf(codes.Internal, "failed to get server conn from stream.")
+	}
+	grpcServerConn, ok := serverStream.conn.(GRPCConn)
+	if !ok {
+		// err!
+		return nil, status.Errorf(codes.Internal, "failed to trans conn to grpc conn.")
+	}
+	return grpcServerConn, nil
 }
 
 // impl net.Conn
@@ -54,7 +85,12 @@ func (c *serverConn) Write(b []byte) (n int, err error) {
 }
 
 func (c *serverConn) WriteFrame(hdr, data []byte) (n int, err error) {
-	err = c.tr.Write(c.s, hdr, data, nil)
+	grpcConnOpt := &grpc.Options{}
+	// When there's no more data frame, add END_STREAM flag to this empty frame.
+	if hdr == nil && data == nil {
+		grpcConnOpt.Last = true
+	}
+	err = c.tr.Write(c.s, hdr, data, grpcConnOpt)
 	return len(hdr) + len(data), convertErrorFromGrpcToKitex(err)
 }
 
