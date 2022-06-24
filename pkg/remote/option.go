@@ -21,12 +21,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/streaming"
-
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // Option is used to pack the inbound and outbound handlers.
@@ -101,9 +100,9 @@ type ServerOption struct {
 
 	GRPCCfg *grpc.ServerConfig
 
-	Option
-
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
+
+	Option
 }
 
 // ClientOption is used to init the remote client.
