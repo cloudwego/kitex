@@ -20,11 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
 
-	"github.com/cloudwego/frugal"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -39,8 +37,6 @@ type CodecType int
 const (
 	FastWrite CodecType = 1 << iota
 	FastRead
-	FrugalWrite
-	FrugalRead
 )
 
 // NewThriftCodec creates the thrift binary codec.
@@ -49,7 +45,7 @@ func NewThriftCodec() remote.PayloadCodec {
 }
 
 // NewThriftFrugalCodec creates the thrift binary codec powered by frugal.
-// Eg: xxxservice.NewServer(handler, server.WithPayloadCodec(thrift.NewThriftCodecWithConfig(thrift.CodecConfig{true, true, true, true})))
+// Eg: xxxservice.NewServer(handler, server.WithPayloadCodec(thrift.NewThriftCodecWithConfig(thrift.FastWrite | thrift.FastRead)))
 func NewThriftCodecWithConfig(c CodecType) remote.PayloadCodec {
 	return &thriftCodec{c}
 }
@@ -84,32 +80,17 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 		return err
 	}
 
-	msgType := message.MessageType()
-	seqID := message.RPCInfo().Invocation().SeqID()
-
-	// encode with frugal
-	if c.CodecType&FrugalWrite != 0 {
-		dt := reflect.TypeOf(data).Elem()
-		if dt.NumField() == 0 || dt.Field(0).Tag.Get("frugal") != "" {
-			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
-			msgEndLen := bthrift.Binary.MessageEndLength()
-			objectLen := frugal.EncodedSize(data)
-			buf, err := out.Malloc(msgBeginLen + objectLen + msgEndLen)
-			if err != nil {
-				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
-			}
-			offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
-			writeLen, err := frugal.EncodeObject(buf[offset:], nil, data)
-			if err != nil {
-				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Encode failed: %s", err.Error()))
-			}
-			offset += writeLen
-			bthrift.Binary.WriteMessageEnd(buf[offset:])
-			return nil
+	// 2. encode thrift
+	// encode with hyper codec
+	if c.hasHyperMarshal(data) {
+		if err := c.hyperMarshal(data, message, out); err != nil {
+			return err
 		}
+		return nil
 	}
 
-	// 2. encode thrift
+	msgType := message.MessageType()
+	seqID := message.RPCInfo().Invocation().SeqID()
 	// encode with FastWrite
 	if c.CodecType&FastWrite != 0 {
 		nw, nwOk := out.(remote.NocopyWrite)
@@ -127,6 +108,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 			return nil
 		}
 	}
+
 	// encode with normal way
 	tProt := NewBinaryProtocol(out)
 	if err := tProt.WriteMessageBegin(methodName, thrift.TMessageType(msgType), seqID); err != nil {
@@ -187,31 +169,27 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	}
 	// decode thrift
 	data := message.Data()
-	// decode with frugal
-	if c.CodecType&FrugalRead != 0 {
-		if message.PayloadLen() != 0 {
-			dt := reflect.TypeOf(data).Elem()
-			if dt.NumField() == 0 || dt.Field(0).Tag.Get("frugal") != "" {
-				msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
-				ri := message.RPCInfo()
-				internal_stats.Record(ctx, ri, stats.WaitReadStart, nil)
-				buf, err := tProt.next(message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
-				internal_stats.Record(ctx, ri, stats.WaitReadFinish, err)
-				if err != nil {
-					return remote.NewTransError(remote.ProtocolError, err)
-				}
-				_, err = frugal.DecodeObject(buf, data)
-				if err != nil {
-					return remote.NewTransError(remote.ProtocolError, err)
-				}
-				err = tProt.ReadMessageEnd()
-				if err != nil {
-					return remote.NewTransError(remote.ProtocolError, err)
-				}
-				tProt.Recycle()
-				return err
-			}
+
+	// decode with hyper unmarshal
+	if c.hasHyperMessageUnmarshal(data, message) {
+		msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
+		ri := message.RPCInfo()
+		internal_stats.Record(ctx, ri, stats.WaitReadStart, nil)
+		buf, err := tProt.next(message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+		internal_stats.Record(ctx, ri, stats.WaitReadFinish, err)
+		if err != nil {
+			return remote.NewTransError(remote.ProtocolError, err)
 		}
+		err = c.hyperMessageUnmarshal(buf, data)
+		if err != nil {
+			return err
+		}
+		err = tProt.ReadMessageEnd()
+		if err != nil {
+			return remote.NewTransError(remote.ProtocolError, err)
+		}
+		tProt.Recycle()
+		return nil
 	}
 
 	// decode with FastRead
@@ -237,6 +215,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 			return err
 		}
 	}
+
 	// decode with normal way
 	switch t := data.(type) {
 	case MessageReader:
