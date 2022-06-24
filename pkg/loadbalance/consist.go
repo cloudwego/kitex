@@ -49,7 +49,7 @@ import (
 	consistPicker -> consistResult
 */
 
-// KeyFunc should returns a non-empty string that stands for the request within the given context.
+// KeyFunc should return a non-empty string that stands for the request within the given context.
 type KeyFunc func(ctx context.Context, request interface{}) string
 
 // ConsistentHashOption .
