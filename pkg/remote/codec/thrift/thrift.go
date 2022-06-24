@@ -124,7 +124,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 		if err := tProt.ReadMessageEnd(); err != nil {
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageEnd failed: %s", err.Error()))
 		}
-		return exception
+		return remote.NewTransError(exception.TypeId(), exception)
 	}
 	// Must check after Exception handle.
 	// For server side, the following error can be sent back and 'SetSeqID' should be executed first to ensure the seqID

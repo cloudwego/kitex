@@ -30,8 +30,6 @@ func TestTransError(t *testing.T) {
 	test.Assert(t, errors.Is(transErr, io.ErrShortWrite))
 
 	transErr = NewTransError(InternalError, NewTransErrorWithMsg(100, errMsg))
-	uwErr, ok := errors.Unwrap(transErr).(*TransError)
-	test.Assert(t, ok)
-	test.Assert(t, uwErr.TypeID() == 100)
+	test.Assert(t, transErr.TypeID() == 100)
 	test.Assert(t, transErr.Error() == errMsg, transErr.Error())
 }
