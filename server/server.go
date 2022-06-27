@@ -197,7 +197,8 @@ func (s *server) Run() (err error) {
 	errCh := s.svr.Start()
 	select {
 	case err = <-errCh:
-		klog.Fatalf("KITEX: server start error: error=%s", err.Error())
+		klog.Errorf("KITEX: server start error: error=%s", err.Error())
+		return err
 	default:
 	}
 	muStartHooks.Lock()
