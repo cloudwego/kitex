@@ -29,6 +29,7 @@ import (
 )
 
 const (
+	// 0x1 0x10 used for FastWrite and FastRead, so Frugal starts from 0x100
 	FrugalWrite CodecType = 1 << (iota + 2)
 	FrugalRead
 )
