@@ -112,6 +112,32 @@ func TestThriftProtocolCheck(t *testing.T) {
 	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
 }
 
+func Test_isProtobufKitex(t *testing.T) {
+	var flagBuf2 []byte
+	flagBuf2 = make([]byte, 4*2)
+	binary.BigEndian.PutUint32(flagBuf2, uint32(10))
+	binary.BigEndian.PutUint32(flagBuf2[4:8], ProtobufV1Magic)
+	header := isProtobufKitex(flagBuf2)
+	test.Assert(t, header)
+}
+
+func Test_isThriftBinary(t *testing.T) {
+	var flagBuf []byte
+	flagBuf = make([]byte, 4)
+	binary.BigEndian.PutUint32(flagBuf, ThriftV1Magic)
+	header := isThriftBinary(flagBuf)
+	test.Assert(t, header)
+}
+
+func Test_isThriftFramedBinary(t *testing.T) {
+	var flagBuf []byte
+	flagBuf = make([]byte, 8)
+	binary.BigEndian.PutUint32(flagBuf, uint32(10))
+	binary.BigEndian.PutUint32(flagBuf[4:8], ThriftV1Magic)
+	header := isThriftFramedBinary(flagBuf)
+	test.Assert(t, header)
+}
+
 func TestProtobufProtocolCheck(t *testing.T) {
 	var req interface{}
 	var rbf remote.ByteBuffer
@@ -255,4 +281,11 @@ func (m mockPayloadCodec) Unmarshal(ctx context.Context, message remote.Message,
 
 func (m mockPayloadCodec) Name() string {
 	return "mock"
+}
+func Test_isMeshHeader(t *testing.T) {
+	var flagBuf []byte
+	flagBuf = make([]byte, 8*2)
+	binary.BigEndian.PutUint32(flagBuf, MeshHeaderMagic)
+	header := isMeshHeader(flagBuf)
+	test.Assert(t, header)
 }

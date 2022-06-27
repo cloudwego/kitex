@@ -38,3 +38,39 @@ func TestSetOrCheckMethodName(t *testing.T) {
 	test.Assert(t, ri.Invocation().MethodName() == "mock")
 	test.Assert(t, ri.To().Method() == "mock")
 }
+
+// test  SetOrCheckSeqID with  uint32
+func TestSetOrCheckSeqID(t *testing.T) {
+	var requset interface{}
+	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil),
+		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	msg := remote.NewMessage(requset, mocks.ServiceInfo(), ri, remote.Oneway, remote.Server)
+	err := SetOrCheckSeqID(2, msg)
+	test.Assert(t, err == nil)
+	ri = msg.RPCInfo()
+	test.Assert(t, ri.Invocation().SeqID() == 2)
+	msg2 := remote.NewMessage(requset, mocks.ServiceInfo(), ri, remote.Reply, remote.Server)
+	err2 := SetOrCheckSeqID(2, msg2)
+	test.Assert(t, err2 == nil)
+}
+
+// test  UpdateMsgType with  uint32
+func TestUpdateMsgType(t *testing.T) {
+	var req interface{}
+	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil),
+		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+	err := UpdateMsgType(uint32(remote.Oneway), msg)
+	test.Assert(t, err == nil)
+	test.Assert(t, msg.MessageType() == remote.Oneway)
+}
+
+// test is used to create the data if not exist.
+func TestNewDataIfNeeded(t *testing.T) {
+	var req interface{}
+	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "", nil, nil),
+		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Oneway, remote.Server)
+	err := NewDataIfNeeded("mock", msg)
+	test.Assert(t, err == nil)
+}
