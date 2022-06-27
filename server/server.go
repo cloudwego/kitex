@@ -323,7 +323,7 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 	}
 	if connLimit == nil {
 		if limits != nil && limits.MaxConnections > 0 {
-			connLimit = limiter.NewConcurrencyLimiter(limits.MaxConnections)
+			connLimit = limiter.NewConnectionLimiter(limits.MaxConnections)
 		} else {
 			connLimit = &limiter.DummyConcurrencyLimiter{}
 		}

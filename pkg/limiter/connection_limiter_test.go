@@ -26,10 +26,10 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
-func TestConLimiter(t *testing.T) {
+func TestConnectionLimiter(t *testing.T) {
 	connLimit := 50
 	ctx := context.Background()
-	lim := NewConcurrencyLimiter(connLimit)
+	lim := NewConnectionLimiter(connLimit)
 
 	var wg sync.WaitGroup
 	var connCount int32
