@@ -25,73 +25,73 @@ import (
 
 func TestAppendTag(t *testing.T) {
 	buf := make([]byte, 64)
-	expect_n := 2
-	expect_s := "fa0f"
+	expectN := 2
+	expectS := "fa0f"
 
 	n := AppendTag(buf, protowire.Number(255), protowire.BytesType)
-	got_s := fmt.Sprintf("%x", buf[:n])
-	if n != expect_n || got_s != expect_s {
-		panic(fmt.Errorf("AppendTag[%d][%x] != [%d][%s]\n", n, buf[:n], expect_n, expect_s))
+	gotS := fmt.Sprintf("%x", buf[:n])
+	if n != expectN || gotS != expectS {
+		panic(fmt.Errorf("AppendTag[%d][%x] != [%d][%s]\n", n, buf[:n], expectN, expectS))
 	}
 }
 
 func TestAppendVarint(t *testing.T) {
 	buf := make([]byte, 64)
-	expect_n := 5
-	expect_s := "ffffffff0f"
+	expectN := 5
+	expectS := "ffffffff0f"
 
 	n := AppendVarint(buf, 0xFFFFFFFF)
-	got_s := fmt.Sprintf("%x", buf[:n])
-	if n != expect_n || got_s != expect_s {
-		panic(fmt.Errorf("AppendVarint[%d][%x] != [%d][%s]\n", n, buf[:n], expect_n, expect_s))
+	gotS := fmt.Sprintf("%x", buf[:n])
+	if n != expectN || gotS != expectS {
+		panic(fmt.Errorf("AppendVarint[%d][%x] != [%d][%s]\n", n, buf[:n], expectN, expectS))
 	}
 }
 
 func TestAppendFixed32(t *testing.T) {
 	buf := make([]byte, 64)
-	expect_n := 4
-	expect_s := "ffffffff"
+	expectN := 4
+	expectS := "ffffffff"
 
 	n := AppendFixed32(buf, 0xFFFFFFFF)
-	got_s := fmt.Sprintf("%x", buf[:n])
-	if n != expect_n || got_s != expect_s {
-		panic(fmt.Errorf("AppendFixed32[%d][%x] != [%d][%s]\n", n, buf[:n], expect_n, expect_s))
+	gotS := fmt.Sprintf("%x", buf[:n])
+	if n != expectN || gotS != expectS {
+		panic(fmt.Errorf("AppendFixed32[%d][%x] != [%d][%s]\n", n, buf[:n], expectN, expectS))
 	}
 }
 
 func TestAppendFixed64(t *testing.T) {
 	buf := make([]byte, 64)
-	expect_n := 8
-	expect_s := "ffffffff00000000"
+	expectN := 8
+	expectS := "ffffffff00000000"
 
 	n := AppendFixed64(buf, 0xFFFFFFFF)
-	got_s := fmt.Sprintf("%x", buf[:n])
-	if n != expect_n || got_s != expect_s {
-		panic(fmt.Errorf("AppendFixed64[%d][%x] != [%d][%s]\n", n, buf[:n], expect_n, expect_s))
+	gotS := fmt.Sprintf("%x", buf[:n])
+	if n != expectN || gotS != expectS {
+		panic(fmt.Errorf("AppendFixed64[%d][%x] != [%d][%s]\n", n, buf[:n], expectN, expectS))
 	}
 }
 
 func TestAppendBytes(t *testing.T) {
 	buf := make([]byte, 64)
-	expect_n := 12
-	expect_s := "0b68656c6c6f20776f726c64"
+	expectN := 12
+	expectS := "0b68656c6c6f20776f726c64"
 
 	n := AppendBytes(buf, []byte("hello world"))
-	got_s := fmt.Sprintf("%x", buf[:n])
-	if n != expect_n || got_s != expect_s {
-		panic(fmt.Errorf("AppendBytes[%d][%x] != [%d][%s]\n", n, buf[:n], expect_n, expect_s))
+	gotS := fmt.Sprintf("%x", buf[:n])
+	if n != expectN || gotS != expectS {
+		panic(fmt.Errorf("AppendBytes[%d][%x] != [%d][%s]\n", n, buf[:n], expectN, expectS))
 	}
 }
 
 func TestAppendString(t *testing.T) {
 	buf := make([]byte, 64)
-	expect_n := 12
-	expect_s := "0b68656c6c6f20776f726c64"
+	expectN := 12
+	expectS := "0b68656c6c6f20776f726c64"
 
 	n := AppendString(buf, "hello world")
-	got_s := fmt.Sprintf("%x", buf[:n])
-	if n != expect_n || got_s != expect_s {
-		panic(fmt.Errorf("AppendString[%d][%x] != [%d][%s]\n", n, buf[:n], expect_n, expect_s))
+	gotS := fmt.Sprintf("%x", buf[:n])
+	if n != expectN || gotS != expectS {
+		panic(fmt.Errorf("AppendString[%d][%x] != [%d][%s]\n", n, buf[:n], expectN, expectS))
 	}
 }
 
