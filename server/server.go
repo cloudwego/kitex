@@ -27,8 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/transmeta"
-
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -45,6 +43,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
 // Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
