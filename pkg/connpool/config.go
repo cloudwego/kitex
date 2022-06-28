@@ -31,7 +31,7 @@ const (
 )
 
 // CheckPoolConfig to check invalid param.
-// default MaxIdleTimeout = 30s, min value is 3s
+// default MaxIdleTimeout = 30s, min value is 2s
 func CheckPoolConfig(config IdleConfig) *IdleConfig {
 	if config.MaxIdleTimeout == 0 {
 		config.MaxIdleTimeout = defaultMaxIdleTimeout
