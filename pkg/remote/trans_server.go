@@ -27,6 +27,8 @@ type TransServerFactory interface {
 	NewTransServer(opt *ServerOption, transHdlr ServerTransHandler) TransServer
 }
 
+type TransServerListenerBuilder func(network, address string) (net.Listener, error)
+
 // TransServer is the abstraction for remote server.
 type TransServer interface {
 	CreateListener(net.Addr) (net.Listener, error)

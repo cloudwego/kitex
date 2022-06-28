@@ -111,6 +111,15 @@ func WithTransServerFactory(f remote.TransServerFactory) Option {
 	}}
 }
 
+func WithTransServerCustomListernerBuilder(f remote.TransServerListenerBuilder) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.Once.OnceOrPanic()
+		di.Push(fmt.Sprintf("WithTransServerCustomListernerBuilder(%T)", f))
+
+		o.RemoteOpt.TransServerCustomListenerBuilder = f
+	}}
+}
+
 // WithLimitReporter do report when server limit happen
 func WithLimitReporter(r limiter.LimitReporter) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {

@@ -73,6 +73,8 @@ type ServerOption struct {
 
 	TransServerFactory TransServerFactory
 
+	TransServerCustomListenerBuilder TransServerListenerBuilder
+
 	SvrHandlerFactory ServerTransHandlerFactory
 
 	Codec Codec
