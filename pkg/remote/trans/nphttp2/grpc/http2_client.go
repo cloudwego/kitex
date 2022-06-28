@@ -31,14 +31,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/netpoll"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
+
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/syscall"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/hpack"
 )
 
 // http2Client implements the ClientTransport interface with HTTP2.
@@ -186,14 +188,22 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	}
 	t.loopy = newLoopyWriter(clientSide, t.framer, t.controlBuf, t.bdpEst)
 
+	// Start the reader goroutine for incoming message. Each transport has
+	// a dedicated goroutine which reads HTTP2 frame from network. Then it
+	// dispatches the frame to the corresponding stream entity.
+	if npconn, ok := t.conn.(netpoll.Connection); ok {
+		npconn.SetOnRequest(func(ctx context.Context, connection netpoll.Connection) error {
+			t.reader()
+			return nil
+		})
+	} else {
+		gofunc.RecoverGoFuncWithInfo(ctx, t.reader, gofunc.NewBasicInfo(remoteService, conn.RemoteAddr().String()))
+	}
+
 	if t.keepaliveEnabled {
 		t.kpDormancyCond = sync.NewCond(&t.mu)
 		gofunc.RecoverGoFuncWithInfo(ctx, t.keepalive, gofunc.NewBasicInfo(remoteService, conn.RemoteAddr().String()))
 	}
-	// Start the reader goroutine for incoming message. Each transport has
-	// a dedicated goroutine which reads HTTP2 frame from network. Then it
-	// dispatches the frame to the corresponding stream entity.
-	gofunc.RecoverGoFuncWithInfo(ctx, t.reader, gofunc.NewBasicInfo(remoteService, conn.RemoteAddr().String()))
 
 	// Send connection preface to server.
 	n, err := t.conn.Write(ClientPreface)

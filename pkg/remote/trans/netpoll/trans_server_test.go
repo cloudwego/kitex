@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -30,11 +31,15 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/golang/mock/gomock"
 )
 
-var transSvr *transServer
+var (
+	transSvr *transServer
+	svrOpt   *remote.ServerOption
+)
 
-func init() {
+func TestMain(m *testing.M) {
 	fromInfo := rpcinfo.EmptyEndpointInfo()
 	rpcCfg := rpcinfo.NewRPCConfig()
 	mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
@@ -42,7 +47,7 @@ func init() {
 	ink := rpcinfo.NewInvocation("", method)
 	rpcStat := rpcinfo.NewRPCStats()
 
-	opt := &remote.ServerOption{
+	svrOpt = &remote.ServerOption{
 		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
 			ri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
@@ -56,9 +61,10 @@ func init() {
 		SvcInfo:   mocks.ServiceInfo(),
 		TracerCtl: &internal_stats.Controller{},
 	}
-	svrTransHdlr, _ = newSvrTransHandler(opt)
+	svrTransHdlr, _ = newSvrTransHandler(svrOpt)
+	transSvr = NewTransServerFactory().NewTransServer(svrOpt, svrTransHdlr).(*transServer)
 
-	transSvr = NewTransServerFactory().NewTransServer(opt, svrTransHdlr).(*transServer)
+	os.Exit(m.Run())
 }
 
 // TestCreateListener test trans_server CreateListener success
@@ -110,7 +116,7 @@ func TestBootStrap(t *testing.T) {
 }
 
 // TestOnConnActive test trans_server onConnActive success
-func TestOnConnActive(t *testing.T) {
+func TestConnOnActive(t *testing.T) {
 	// 1. prepare mock data
 	conn := &MockNetpollConn{
 		SetReadTimeoutFunc: func(timeout time.Duration) (e error) {
@@ -141,8 +147,40 @@ func TestOnConnActive(t *testing.T) {
 	test.Assert(t, currConnCount.Value() == 0)
 }
 
+// TestOnConnActivePanic test panic recover when panic happen in OnActive
+func TestConnOnActiveAndOnInactivePanic(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer func() {
+		ctrl.Finish()
+	}()
+
+	inboundHandler := mocks.NewMockInboundHandler(ctrl)
+	transPl := remote.NewTransPipeline(svrTransHdlr)
+	transPl.AddInboundHandler(inboundHandler)
+	transSvrWithPl := NewTransServerFactory().NewTransServer(svrOpt, transPl).(*transServer)
+	conn := &MockNetpollConn{
+		Conn: mocks.Conn{
+			RemoteAddrFunc: func() (r net.Addr) {
+				return addr
+			},
+		},
+	}
+
+	// test1: recover OnActive panic
+	inboundHandler.EXPECT().OnActive(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, conn net.Conn) (context.Context, error) {
+		panic("mock panic")
+	})
+	transSvrWithPl.onConnActive(conn)
+
+	// test2: recover OnInactive panic
+	inboundHandler.EXPECT().OnInactive(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, conn net.Conn) (context.Context, error) {
+		panic("mock panic")
+	})
+	transSvrWithPl.onConnInactive(context.Background(), conn)
+}
+
 // TestOnConnRead test trans_server onConnRead success
-func TestOnConnRead(t *testing.T) {
+func TestConnOnRead(t *testing.T) {
 	// 1. prepare mock data
 	conn := &MockNetpollConn{
 		Conn: mocks.Conn{

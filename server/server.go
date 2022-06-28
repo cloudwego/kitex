@@ -43,12 +43,14 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
 // Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
 // registered to it.
 type Server interface {
 	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error
+	GetServiceInfo() *serviceinfo.ServiceInfo
 	Run() error
 	Stop() error
 }
@@ -159,6 +161,10 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	return nil
 }
 
+func (s *server) GetServiceInfo() *serviceinfo.ServiceInfo {
+	return s.svcInfo
+}
+
 // Run runs the server.
 func (s *server) Run() (err error) {
 	if s.svcInfo == nil {
@@ -177,6 +183,7 @@ func (s *server) Run() (err error) {
 	}
 
 	s.richRemoteOption()
+	s.fillMoreServiceInfo(s.opt.RemoteOpt.Address)
 	transHdlr, err := s.newSvrTransHandler()
 	if err != nil {
 		return err
@@ -189,6 +196,12 @@ func (s *server) Run() (err error) {
 	}
 
 	errCh := s.svr.Start()
+	select {
+	case err = <-errCh:
+		klog.Errorf("KITEX: server start error: error=%s", err.Error())
+		return err
+	default:
+	}
 	muStartHooks.Lock()
 	for i := range onServerStart {
 		go onServerStart[i]()
@@ -274,15 +287,18 @@ func (s *server) richRemoteOption() {
 }
 
 func (s *server) addBoundHandlers(opt *remote.ServerOption) {
+	// add default meta handler
+	if len(s.opt.MetaHandlers) == 0 {
+		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerHTTP2Handler)
+		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerTTHeaderHandler)
+	}
 	// for server trans info handler
-	if len(s.opt.MetaHandlers) > 0 {
-		transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
-		// meta handler exec before boundHandlers which add with option
-		doAddBoundHandlerToHead(transInfoHdlr, opt)
-		for _, h := range s.opt.MetaHandlers {
-			if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
-				opt.StreamingMetaHandlers = append(opt.StreamingMetaHandlers, shdlr)
-			}
+	transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
+	// meta handler exec before boundHandlers which add with option
+	doAddBoundHandlerToHead(transInfoHdlr, opt)
+	for _, h := range s.opt.MetaHandlers {
+		if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
+			opt.StreamingMetaHandlers = append(opt.StreamingMetaHandlers, shdlr)
 		}
 	}
 
@@ -312,7 +328,7 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 	}
 	if connLimit == nil {
 		if limits != nil && limits.MaxConnections > 0 {
-			connLimit = limiter.NewConcurrencyLimiter(limits.MaxConnections)
+			connLimit = limiter.NewConnectionLimiter(limits.MaxConnections)
 		} else {
 			connLimit = &limiter.DummyConcurrencyLimiter{}
 		}
@@ -414,6 +430,19 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 	if info.Weight == 0 {
 		info.Weight = discovery.DefaultWeight
 	}
+}
+
+func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
+	ni := *s.svcInfo
+	si := &ni
+	extra := make(map[string]interface{}, len(si.Extra)+2)
+	for k, v := range si.Extra {
+		extra[k] = v
+	}
+	extra["address"] = lAddr
+	extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
+	si.Extra = extra
+	s.svcInfo = si
 }
 
 func (s *server) waitExit(errCh chan error) error {

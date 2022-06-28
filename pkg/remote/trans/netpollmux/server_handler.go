@@ -48,6 +48,11 @@ func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
 	return &svrTransHandlerFactory{}
 }
 
+// MuxEnabled returns true to mark svrTransHandlerFactory as a mux server factory.
+func (f *svrTransHandlerFactory) MuxEnabled() bool {
+	return true
+}
+
 // NewTransHandler implements the remote.ServerTransHandlerFactory interface.
 // TODO: use object pool?
 func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
@@ -353,10 +358,13 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 		}
 		remote := rpcinfo.AsMutableEndpointInfo(ri.From())
 		remote.SetTag(rpcinfo.RemoteClosedTag, "1")
-	} else if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s\nstack=%s", rService, rAddr, err.Error(), pe.Stack())
 	} else {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s", rService, rAddr, err.Error())
+		var de *kerrors.DetailedError
+		if ok := errors.As(err, &de); ok && de.Stack() != "" {
+			klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s\nstack=%s", rService, rAddr, err.Error(), de.Stack())
+		} else {
+			klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s", rService, rAddr, err.Error())
+		}
 	}
 }
 
@@ -371,7 +379,8 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 }
 
 func (t *svrTransHandler) writeErrorReplyIfNeeded(
-	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool) (shouldCloseConn bool) {
+	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool,
+) (shouldCloseConn bool) {
 	if methodInfo, _ := trans.GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return

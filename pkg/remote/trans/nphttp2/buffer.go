@@ -23,15 +23,17 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-// grpcConn implement WriteFrame
-type grpcConn interface {
+// GRPCConn implement WriteFrame and ReadFrame
+type GRPCConn interface {
 	net.Conn
 	// WriteFrame set header and data buffer into frame with nocopy
 	WriteFrame(hdr, data []byte) (n int, err error)
+	// ReadFrame read a frame and return header and payload data
+	ReadFrame() (hdr, data []byte, err error)
 }
 
 type buffer struct {
-	conn       grpcConn
+	conn       GRPCConn
 	rbuf       []byte // for read
 	whdr, wbuf []byte // for write
 }
@@ -51,7 +53,7 @@ var bufferPool = sync.Pool{
 	},
 }
 
-func newBuffer(conn grpcConn) *buffer {
+func newBuffer(conn GRPCConn) *buffer {
 	buf := bufferPool.Get().(*buffer)
 	buf.conn = conn
 	return buf

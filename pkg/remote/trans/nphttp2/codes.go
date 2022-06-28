@@ -17,46 +17,51 @@
 package nphttp2
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
-var (
-	kitexErrConvTab = map[error]codes.Code{
-		kerrors.ErrInternalException: codes.Internal,
-		kerrors.ErrOverlimit:         codes.ResourceExhausted,
-		kerrors.ErrRemoteOrNetwork:   codes.Unavailable,
-		kerrors.ErrACL:               codes.PermissionDenied,
-	}
-	statusCodeConvTab = map[codes.Code]error{
-		codes.Internal:          kerrors.ErrInternalException,
-		codes.ResourceExhausted: kerrors.ErrOverlimit,
-		codes.Unavailable:       kerrors.ErrRemoteOrNetwork,
-		codes.PermissionDenied:  kerrors.ErrACL,
-	}
-)
+var kitexErrConvTab = map[error]codes.Code{
+	kerrors.ErrInternalException: codes.Internal,
+	kerrors.ErrOverlimit:         codes.ResourceExhausted,
+	kerrors.ErrRemoteOrNetwork:   codes.Unavailable,
+	kerrors.ErrACL:               codes.PermissionDenied,
+}
 
-func convertFromKitexToGrpc(err error) *status.Status {
+// convert error to *status.Status
+func convertStatus(err error) *status.Status {
 	if err == nil {
 		return status.New(codes.OK, "")
 	}
+	// biz error should add biz info which is convenient to be recognized by client side
+	if errors.Is(err, kerrors.ErrBiz) {
+		ie := errors.Unwrap(err)
+		if se, ok := ie.(status.Iface); ok {
+			gs := se.GRPCStatus()
+			gs.AppendMessage(fmt.Sprintf("[%s]", kerrors.ErrBiz.Error())).Err()
+			return gs
+		}
+		if te, ok := ie.(*remote.TransError); ok {
+			return status.New(codes.Code(te.TypeID()), fmt.Sprintf("%s [%s]", ie.Error(), kerrors.ErrBiz.Error()))
+		}
+		return status.New(codes.Internal, fmt.Sprintf("%s [%s]", ie.Error(), kerrors.ErrBiz.Error()))
+	}
+	// return GRPCStatus() if err is built with status.Error
+	if se, ok := err.(interface{ GRPCStatus() *status.Status }); ok {
+		return se.GRPCStatus()
+	}
+	// build status.Status with code if error is remote.TransError
+	if te, ok := err.(*remote.TransError); ok {
+		return status.New(codes.Code(te.TypeID()), err.Error())
+	}
+	// covert from kitex error
 	if c, ok := kitexErrConvTab[err]; ok {
 		return status.New(c, err.Error())
 	}
 	return status.New(codes.Internal, err.Error())
-}
-
-func convertErrorFromGrpcToKitex(err error) error {
-	s, ok := status.FromError(err)
-	if !ok {
-		return err
-	}
-	if s == nil || s.Code() == codes.OK {
-		return nil
-	}
-	if e, ok := statusCodeConvTab[s.Code()]; ok {
-		return e.(interface{ WithCause(cause error) error }).WithCause(s.Err())
-	}
-	return kerrors.ErrInternalException.WithCause(s.Err())
 }

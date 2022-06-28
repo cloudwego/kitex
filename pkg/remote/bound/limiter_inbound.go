@@ -33,7 +33,7 @@ func NewServerLimiterHandler(conLimit limiter.ConcurrencyLimiter, qpsLimit limit
 }
 
 type serverLimiterHandler struct {
-	conLimit           limiter.ConcurrencyLimiter
+	connLimit          limiter.ConcurrencyLimiter
 	qpsLimit           limiter.RateLimiter
 	reporter           limiter.LimitReporter
 	qpsLimitPostDecode bool
@@ -41,7 +41,7 @@ type serverLimiterHandler struct {
 
 // OnActive implements the remote.InboundHandler interface.
 func (l *serverLimiterHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
-	if l.conLimit.Acquire(ctx) {
+	if l.connLimit.Acquire(ctx) {
 		return ctx, nil
 	}
 	if l.reporter != nil {
@@ -66,7 +66,7 @@ func (l *serverLimiterHandler) OnRead(ctx context.Context, conn net.Conn) (conte
 
 // OnInactive implements the remote.InboundHandler interface.
 func (l *serverLimiterHandler) OnInactive(ctx context.Context, conn net.Conn) context.Context {
-	l.conLimit.Release(ctx)
+	l.connLimit.Release(ctx)
 	return ctx
 }
 
@@ -91,7 +91,7 @@ func DeepEqual(bound1, bound2 remote.InboundHandler) bool {
 		if !ok {
 			return false
 		}
-		return reflect.DeepEqual(b1.conLimit, b2.conLimit) && reflect.DeepEqual(b1.reporter, b2.reporter) &&
+		return reflect.DeepEqual(b1.connLimit, b2.connLimit) && reflect.DeepEqual(b1.reporter, b2.reporter) &&
 			fmt.Sprintf("%T", b1.qpsLimit) == fmt.Sprintf("%T", b2.qpsLimit) &&
 			b1.qpsLimitPostDecode == b2.qpsLimitPostDecode
 	default:
