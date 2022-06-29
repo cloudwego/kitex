@@ -286,17 +286,11 @@ func TestTagOptionLocks2(t *testing.T) {
 }
 
 func TestWarmingUpOption(t *testing.T) {
-	ctx := context.Background()
-	req := new(MockTStruct)
-	res := new(MockTStruct)
-	mtd := mocks.MockMethod
-
 	var options []client.Option
 	options = append(options, WithWarmingUp(mockWarmupOption))
 
 	cli := newMockClient(t, options...)
-	err := cli.Call(ctx, mtd, req, res)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, cli.(*kClient).opt.WarmUpOption == mockWarmupOption)
 }
 
 func TestTimeoutOptions(t *testing.T) {

@@ -19,18 +19,11 @@ package client
 import (
 	"context"
 	"fmt"
-	"net"
-	"reflect"
-	"testing"
-	"time"
-
-	"github.com/cloudwego/kitex/pkg/connpool"
-	"github.com/cloudwego/kitex/pkg/warmup"
-
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/circuitbreak"
+	"github.com/cloudwego/kitex/pkg/connpool"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -45,6 +38,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/transport"
+	"net"
+	"reflect"
+	"testing"
+	"time"
 )
 
 func TestRetryOptionDebugInfo(t *testing.T) {
@@ -490,8 +487,12 @@ func TestWithDiagnosisService(t *testing.T) {
 	test.Assert(t, opts.DebugService == mockDS, opts.DebugService)
 }
 
+func mockACLRule(ctx context.Context, request interface{}) (reason error) {
+	return nil
+}
 func TestWithACLRules(t *testing.T) {
-	_ = client.NewOptions([]client.Option{WithACLRules()})
+	opts := client.NewOptions([]client.Option{WithACLRules(mockACLRule)})
+	test.Assert(t, reflect.ValueOf(mockACLRule).Pointer() == reflect.ValueOf(opts.ACLRules[0]).Pointer())
 }
 
 func TestWithFirstMetaHandler(t *testing.T) {
@@ -604,7 +605,24 @@ func TestWithLongConnectionOption(t *testing.T) {
 
 func TestWithWarmingUpOption(t *testing.T) {
 	options := []client.Option{
-		WithWarmingUp(&warmup.ClientOption{}),
+		WithWarmingUp(mockWarmupOption),
 	}
-	_ = client.NewOptions(options)
+	opt := client.NewOptions(options)
+	test.Assert(t, opt.WarmUpOption == mockWarmupOption)
+}
+
+func TestWithFramedTransport(t *testing.T) {
+	options := []client.Option{
+		WithFramedTransport(),
+	}
+	opt := client.NewOptions(options)
+	test.Assert(t, opt.Configs.TransportProtocol() == transport.Framed)
+}
+
+func TestWithConnMetric(t *testing.T) {
+	options := []client.Option{
+		WithConnMetric(),
+	}
+	opt := client.NewOptions(options)
+	test.Assert(t, opt.RemoteOpt.EnableConnPoolReporter == true)
 }
