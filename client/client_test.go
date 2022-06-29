@@ -106,15 +106,10 @@ func TestCall(t *testing.T) {
 }
 
 func TestWithRetryOption(t *testing.T) {
-	mtd := mocks.MockMethod
-	cli := newMockClient(t, WithRetryContainer(retry.NewRetryContainer()))
+	mockRetryContainer := retry.NewRetryContainer()
+	cli := newMockClient(t, WithRetryContainer(mockRetryContainer))
 
-	ctx := context.Background()
-	req := new(MockTStruct)
-	res := new(MockTStruct)
-
-	err := cli.Call(ctx, mtd, req, res)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, cli.(*kClient).opt.RetryContainer == mockRetryContainer)
 }
 
 func BenchmarkCall(b *testing.B) {
