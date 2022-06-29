@@ -556,12 +556,15 @@ func TestWithBoundHandler(t *testing.T) {
 // collection of options
 type mockSuite struct{}
 
+var mockEndpointBasicInfo = &rpcinfo.EndpointBasicInfo{}
+var mockDiagnosisService = &mockDiagnosis{make(map[diagnosis.ProbeName]diagnosis.ProbeFunc)}
+var mockRetryContainer = &retry.Container{}
+
 func (m *mockSuite) Options() []Option {
 	return []Option{
-		WithClientBasicInfo(&rpcinfo.EndpointBasicInfo{}),
-		WithDiagnosisService(&mockDiagnosis{make(map[diagnosis.ProbeName]diagnosis.ProbeFunc)}),
-		WithACLRules(),
-		WithRetryContainer(&retry.Container{}),
+		WithClientBasicInfo(mockEndpointBasicInfo),
+		WithDiagnosisService(mockDiagnosisService),
+		WithRetryContainer(mockRetryContainer),
 	}
 }
 
@@ -570,7 +573,10 @@ func TestWithSuite(t *testing.T) {
 	options := []client.Option{
 		WithSuite(suite),
 	}
-	_ = client.NewOptions(options)
+	opts := client.NewOptions(options)
+	test.Assert(t, opts.Cli == mockEndpointBasicInfo)
+	test.Assert(t, reflect.DeepEqual(opts.DebugService, mockDiagnosisService))
+	test.Assert(t, opts.RetryContainer == mockRetryContainer)
 }
 
 type mockForwardProxy struct {
