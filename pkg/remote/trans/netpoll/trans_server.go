@@ -104,7 +104,8 @@ var _ remote.TransServer = &transServer{}
 // CreateListener implements the remote.TransServer interface.
 func (ts *transServer) CreateListener(addr net.Addr) (_ net.Listener, err error) {
 	if ts.opt.TransServerCustomListenerBuilder != nil {
-		return ts.opt.TransServerCustomListenerBuilder(addr.Network(), addr.String())
+		ts.ln, err = ts.opt.TransServerCustomListenerBuilder(addr.Network(), addr.String())
+		return ts.ln, err
 	}
 	if addr.Network() == "unix" {
 		syscall.Unlink(addr.String())
