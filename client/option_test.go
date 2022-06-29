@@ -19,8 +19,15 @@ package client
 import (
 	"context"
 	"fmt"
+	"net"
+	"reflect"
+	"testing"
+	"time"
+
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
+	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
+	"github.com/cloudwego/kitex/internal/mocks/rpc_info"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/circuitbreak"
 	"github.com/cloudwego/kitex/pkg/connpool"
@@ -38,10 +45,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/transport"
-	"net"
-	"reflect"
-	"testing"
-	"time"
+	"github.com/golang/mock/gomock"
 )
 
 func TestRetryOptionDebugInfo(t *testing.T) {
@@ -284,57 +288,6 @@ var (
 	httpResolver = http.NewDefaultResolver()
 )
 
-type mockCodec struct {
-	EncodeFunc func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error
-	DecodeFunc func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error
-	NameFunc   func() string
-}
-
-func (m *mockCodec) Encode(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	if m.EncodeFunc != nil {
-		return m.EncodeFunc(ctx, msg, out)
-	}
-	return nil
-}
-
-func (m *mockCodec) Decode(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if m.DecodeFunc != nil {
-		return m.DecodeFunc(ctx, msg, in)
-	}
-	return nil
-}
-
-func (m *mockCodec) Name() string {
-	if m.NameFunc != nil {
-		return m.NameFunc()
-	}
-	return ""
-}
-
-// mock pay load codec
-type mockPayloadCodec struct{}
-
-// do nothing
-func (m *mockPayloadCodec) Marshal(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
-	return nil
-}
-
-// do nothing
-func (m *mockPayloadCodec) Unmarshal(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
-	return nil
-}
-
-// return default name
-func (m *mockPayloadCodec) Name() string {
-	return "mock"
-}
-
-type mockTimeoutProvider struct{}
-
-func (m *mockTimeoutProvider) Timeouts(ri rpcinfo.RPCInfo) rpcinfo.Timeouts {
-	return rpcinfo.NewRPCConfig()
-}
-
 type mockDiagnosis struct {
 	probes map[diagnosis.ProbeName]diagnosis.ProbeFunc
 }
@@ -345,25 +298,6 @@ func (m *mockDiagnosis) RegisterProbeFunc(name diagnosis.ProbeName, probeFunc di
 
 func (m *mockDiagnosis) ProbePairs() map[diagnosis.ProbeName]diagnosis.ProbeFunc {
 	return m.probes
-}
-
-type mockOutboundHandler struct {
-	remote.BoundHandler
-}
-
-func (m *mockOutboundHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (context.Context, error) {
-	// do nothing
-	return ctx, nil
-}
-
-type mockMetaHandler struct{}
-
-func (m *mockMetaHandler) WriteMeta(ctx context.Context, msg remote.Message) (context.Context, error) {
-	return ctx, nil
-}
-
-func (m *mockMetaHandler) ReadMeta(ctx context.Context, msg remote.Message) (context.Context, error) {
-	return ctx, nil
 }
 
 func TestWithInstanceMW(t *testing.T) {
@@ -390,7 +324,10 @@ func TestWithMuxConnection(t *testing.T) {
 }
 
 func TestWithTimeoutProvider(t *testing.T) {
-	mockTimeoutProvider := &mockTimeoutProvider{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockTimeoutProvider := rpc_info.NewMockTimeoutProvider(ctrl)
 	opts := client.NewOptions([]client.Option{WithTimeoutProvider(mockTimeoutProvider)})
 	test.DeepEqual(t, opts.Timeouts, mockTimeoutProvider)
 }
@@ -401,13 +338,19 @@ func TestWithStatsLevel(t *testing.T) {
 }
 
 func TestWithCodec(t *testing.T) {
-	mockCodec := &mockCodec{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockCodec := mock_remote.NewMockCodec(ctrl)
 	opts := client.NewOptions([]client.Option{WithCodec(mockCodec)})
 	test.DeepEqual(t, opts.RemoteOpt.Codec, mockCodec)
 }
 
 func TestWithPayloadCodec(t *testing.T) {
-	mockPayloadCodec := &mockPayloadCodec{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockPayloadCodec := mock_remote.NewMockPayloadCodec(ctrl)
 	opts := client.NewOptions([]client.Option{WithPayloadCodec(mockPayloadCodec)})
 	test.DeepEqual(t, opts.RemoteOpt.PayloadCodec, mockPayloadCodec)
 }
@@ -490,19 +433,20 @@ func TestWithDiagnosisService(t *testing.T) {
 func mockACLRule(ctx context.Context, request interface{}) (reason error) {
 	return nil
 }
+
 func TestWithACLRules(t *testing.T) {
 	opts := client.NewOptions([]client.Option{WithACLRules(mockACLRule)})
 	test.Assert(t, reflect.ValueOf(mockACLRule).Pointer() == reflect.ValueOf(opts.ACLRules[0]).Pointer())
 }
 
 func TestWithFirstMetaHandler(t *testing.T) {
-	mockMetaHandler := &mockMetaHandler{}
+	mockMetaHandler := &mock_remote.MetaHandler{}
 	opts := client.NewOptions([]client.Option{WithFirstMetaHandler(mockMetaHandler)})
 	test.DeepEqual(t, opts.MetaHandlers[0], mockMetaHandler)
 }
 
 func TestWithMetaHandler(t *testing.T) {
-	mockMetaHandler := &mockMetaHandler{}
+	mockMetaHandler := &mock_remote.MetaHandler{}
 	opts := client.NewOptions([]client.Option{WithMetaHandler(mockMetaHandler)})
 	test.DeepEqual(t, opts.MetaHandlers[0], mockMetaHandler)
 }
@@ -547,7 +491,10 @@ func TestWithErrorHandler(t *testing.T) {
 }
 
 func TestWithBoundHandler(t *testing.T) {
-	mockOutboundHandler := &mockOutboundHandler{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockOutboundHandler := mock_remote.NewMockOutboundHandler(ctrl)
 	opts := client.NewOptions([]client.Option{WithBoundHandler(mockOutboundHandler)})
 	test.Assert(t, len(opts.RemoteOpt.Outbounds) > 0)
 	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 0)
@@ -556,9 +503,11 @@ func TestWithBoundHandler(t *testing.T) {
 // collection of options
 type mockSuite struct{}
 
-var mockEndpointBasicInfo = &rpcinfo.EndpointBasicInfo{}
-var mockDiagnosisService = &mockDiagnosis{make(map[diagnosis.ProbeName]diagnosis.ProbeFunc)}
-var mockRetryContainer = &retry.Container{}
+var (
+	mockEndpointBasicInfo = &rpcinfo.EndpointBasicInfo{}
+	mockDiagnosisService  = &mockDiagnosis{make(map[diagnosis.ProbeName]diagnosis.ProbeFunc)}
+	mockRetryContainer    = &retry.Container{}
+)
 
 func (m *mockSuite) Options() []Option {
 	return []Option{
