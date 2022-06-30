@@ -18,10 +18,10 @@
  * Modifications are Copyright 2021 CloudWeGo Authors.
  */
 
-// Package status implements errors returned by gRPC. These errors are
+// Package status implements errors returned by gRPC.  These errors are
 // serialized and transmitted on the wire between server and client, and allow
 // for additional data to be transmitted via the Details field in the status
-// proto. gRPC service handlers should return an error created by this
+// proto.  gRPC service handlers should return an error created by this
 // package, and gRPC clients should expect a corresponding error to be
 // returned from the RPC call.
 //
@@ -34,17 +34,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cloudwego/kitex/pkg/kerrors"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 )
-
-type Iface interface {
-	GRPCStatus() *Status
-}
 
 // Status represents an RPC status code, message, and details.  It is immutable
 // and should be created with New, Newf, or FromProto.
@@ -96,15 +91,6 @@ func (s *Status) Message() string {
 		return ""
 	}
 	return s.s.Message
-}
-
-// AppendMessage append extra msg for Status
-func (s *Status) AppendMessage(extraMsg string) *Status {
-	if s == nil || s.s == nil || extraMsg == "" {
-		return s
-	}
-	s.s.Message = fmt.Sprintf("%s %s", s.s.Message, extraMsg)
-	return s
 }
 
 // Proto returns s's status as an spb.Status proto message.
@@ -190,9 +176,6 @@ func (e *Error) Is(target error) bool {
 func FromError(err error) (s *Status, ok bool) {
 	if err == nil {
 		return nil, true
-	}
-	if kerrors.IsKitexError(err) {
-		err = errors.Unwrap(err)
 	}
 	if se, ok := err.(interface {
 		GRPCStatus() *Status

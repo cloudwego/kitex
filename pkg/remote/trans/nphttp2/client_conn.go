@@ -92,7 +92,7 @@ func (c *clientConn) Read(b []byte) (n int, err error) {
 			err = statusErr
 		}
 	}
-	return n, err
+	return n, convertErrorFromGrpcToKitex(err)
 }
 
 func (c *clientConn) Write(b []byte) (n int, err error) {
@@ -109,7 +109,7 @@ func (c *clientConn) WriteFrame(hdr, data []byte) (n int, err error) {
 		grpcConnOpt.Last = true
 	}
 	err = c.tr.Write(c.s, hdr, data, grpcConnOpt)
-	return len(hdr) + len(data), err
+	return len(hdr) + len(data), convertErrorFromGrpcToKitex(err)
 }
 
 func (c *clientConn) LocalAddr() net.Addr                { return c.tr.LocalAddr() }

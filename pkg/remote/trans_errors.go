@@ -16,12 +16,7 @@
 
 package remote
 
-import (
-	"errors"
-	"fmt"
-
-	"github.com/cloudwego/kitex/pkg/kerrors"
-)
+import "errors"
 
 // corresponding with thrift TApplicationException, cannot change it
 const (
@@ -82,16 +77,6 @@ func (e TransError) Is(target error) bool {
 	return e == target || errors.Is(e.rawErr, target)
 }
 
-// AppendMessage append extra msg for TransError
-func (e TransError) AppendMessage(extraMsg string) *TransError {
-	if extraMsg == "" {
-		return &e
-	}
-	msg := fmt.Sprintf("%s %s", e.message, extraMsg)
-	// should not modify origin error
-	return &TransError{message: msg, typeID: e.typeID, rawErr: e.rawErr}
-}
-
 // NewTransErrorWithMsg to build TransError with typeID and errMsg
 func NewTransErrorWithMsg(typeID int32, message string) *TransError {
 	return &TransError{message: message, typeID: typeID}
@@ -100,16 +85,6 @@ func NewTransErrorWithMsg(typeID int32, message string) *TransError {
 // NewTransError to build TransError with typeID and rawErr.
 // rawErr can be used by errors.Is(target) to check err type, like read timeout.
 func NewTransError(typeID int32, err error) *TransError {
-	if e, ok := err.(*TransError); ok {
-		return e
-	}
-	// biz error should add biz info which is convenient to be recognized by client side
-	if errors.Is(err, kerrors.ErrBiz) {
-		if e, ok := errors.Unwrap(err).(*TransError); ok {
-			e = e.AppendMessage(fmt.Sprintf("[%s]", kerrors.ErrBiz.Error()))
-			return e
-		}
-	}
 	if typeID == InternalError {
 		// try to get more specific err type if typeID is InternalError
 		if tID, ok := err.(TypeId); ok {

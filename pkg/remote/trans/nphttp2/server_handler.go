@@ -18,7 +18,6 @@ package nphttp2
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"runtime/debug"
@@ -91,36 +90,36 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 
 // 只 return write err
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
-	tr, e := grpcTransport.NewServerTransport(ctx, conn.(netpoll.Connection), t.opt.GRPCCfg)
-	if e != nil {
-		return e
+	tr, err := grpcTransport.NewServerTransport(ctx, conn.(netpoll.Connection), t.opt.GRPCCfg)
+	if err != nil {
+		return err
 	}
 	defer tr.Close()
 
 	tr.HandleStreams(func(s *grpcTransport.Stream) {
 		gofunc.GoFunc(ctx, func() {
-			ri, rCtx := t.opt.InitRPCInfoFunc(s.Context(), tr.RemoteAddr())
+			ri, ctx := t.opt.InitRPCInfoFunc(s.Context(), tr.RemoteAddr())
 			// set grpc transport flag before execute metahandler
 			rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(transport.GRPC)
 			var err error
 			for _, shdlr := range t.opt.StreamingMetaHandlers {
-				rCtx, err = shdlr.OnReadStream(rCtx)
+				ctx, err = shdlr.OnReadStream(ctx)
 				if err != nil {
-					tr.WriteStatus(s, convertStatus(err))
+					tr.WriteStatus(s, convertFromKitexToGrpc(err))
 					return
 				}
 			}
-			rCtx = t.startTracer(rCtx, ri)
+			ctx = t.startTracer(ctx, ri)
 			defer func() {
 				panicErr := recover()
 				if panicErr != nil {
 					if conn != nil {
-						klog.CtxErrorf(rCtx, "KITEX: gRPC panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
+						klog.CtxErrorf(ctx, "KITEX: panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
 					} else {
-						klog.CtxErrorf(rCtx, "KITEX: gRPC panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
+						klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
 					}
 				}
-				t.finishTracer(rCtx, ri, err, panicErr)
+				t.finishTracer(ctx, ri, err, panicErr)
 			}()
 
 			ink := ri.Invocation().(rpcinfo.InvocationSetter)
@@ -138,7 +137,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			ink.SetMethodName(methodName)
 
 			if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
-				if err = mutableTo.SetMethod(methodName); err != nil {
+				if err := mutableTo.SetMethod(methodName); err != nil {
 					errDesc := fmt.Sprintf("setMethod failed in streaming, method=%s, error=%s", methodName, err.Error())
 					_ = tr.WriteStatus(s, status.New(codes.Internal, errDesc))
 					return
@@ -154,7 +153,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				ink.SetServiceName(sm[idx+1 : pos])
 			}
 
-			st := NewStream(rCtx, t.svcInfo, newServerConn(tr, s), t)
+			st := NewStream(ctx, t.svcInfo, newServerConn(tr, s), t)
 			streamArg := &streaming.Args{Stream: st}
 
 			// check grpc method
@@ -162,8 +161,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			if targetMethod == nil {
 				unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
 				if unknownServiceHandlerFunc != nil {
-					internal_stats.Record(rCtx, ri, stats.ServerHandleStart, nil)
-					err = unknownServiceHandlerFunc(rCtx, methodName, st)
+					internal_stats.Record(ctx, ri, stats.ServerHandleStart, nil)
+					err = unknownServiceHandlerFunc(ctx, methodName, st)
 					if err != nil {
 						err = kerrors.ErrBiz.WithCause(err)
 					}
@@ -171,12 +170,11 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 					err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 				}
 			} else {
-				err = t.inkHdlFunc(rCtx, streamArg, nil)
+				err = t.inkHdlFunc(ctx, streamArg, nil)
 			}
 
 			if err != nil {
-				tr.WriteStatus(s, convertStatus(err))
-				t.OnError(rCtx, err, conn)
+				tr.WriteStatus(s, convertFromKitexToGrpc(err))
 				return
 			}
 			tr.WriteStatus(s, status.New(codes.OK, ""))
@@ -208,11 +206,10 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 
 // 传输层 error 回调
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
-	var de *kerrors.DetailedError
-	if ok := errors.As(err, &de); ok && de.Stack() != "" {
-		klog.Errorf("KITEX: processing gRPC request error, remoteAddr=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), de.Stack())
+	if pe, ok := err.(*kerrors.DetailedError); ok {
+		klog.Errorf("KITEX: processing request error, remoteAddr=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
 	} else {
-		klog.Errorf("KITEX: processing gRPC request error, remoteAddr=%s, error=%s", conn.RemoteAddr(), err.Error())
+		klog.Errorf("KITEX: processing request error, remoteAddr=%s, error=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 

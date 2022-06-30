@@ -145,7 +145,7 @@ func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in
 		if err := exception.Unmarshal(actualMsgBuf); err != nil {
 			return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("protobuf unmarshal Exception failed: %s", err.Error()))
 		}
-		return remote.NewTransError(exception.TypeID(), &exception)
+		return &exception
 	}
 
 	if err = codec.NewDataIfNeeded(methodName, message); err != nil {

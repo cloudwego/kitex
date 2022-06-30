@@ -30,7 +30,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 )
@@ -120,27 +119,23 @@ func TestResolverMWOutOfInstance(t *testing.T) {
 
 func TestDefaultErrorHandler(t *testing.T) {
 	// Test TApplicationException
-	err := DefaultClientErrorHandler(thrift.NewTApplicationException(100, "mock"))
-	test.Assert(t, err.Error() == "remote or network error[remote]: mock", err.Error())
+	err := defaultErrorHandler(thrift.NewTApplicationException(100, "mock"))
+	test.Assert(t, err.Error() == "remote or network error: [remote] mock")
 	var te thrift.TApplicationException
 	ok := errors.As(err, &te)
 	test.Assert(t, ok)
 	test.Assert(t, te.TypeId() == 100)
 
 	// Test PbError
-	err = DefaultClientErrorHandler(protobuf.NewPbError(100, "mock"))
-	test.Assert(t, err.Error() == "remote or network error[remote]: mock")
+	err = defaultErrorHandler(protobuf.NewPbError(100, "mock"))
+	test.Assert(t, err.Error() == "remote or network error: [remote] mock")
 	var pe protobuf.PBError
 	ok = errors.As(err, &pe)
 	test.Assert(t, ok)
 	test.Assert(t, te.TypeId() == 100)
 
-	// Test status.Error
-	err = DefaultClientErrorHandler(status.Err(100, "mock"))
-	test.Assert(t, err.Error() == "remote or network error: rpc error: code = 100 desc = mock", err.Error())
-
 	// Test other error
-	err = DefaultClientErrorHandler(errors.New("mock"))
+	err = defaultErrorHandler(errors.New("mock"))
 	test.Assert(t, err.Error() == "remote or network error: mock")
 }
 
