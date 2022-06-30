@@ -27,9 +27,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cloudwego/kitex/pkg/klog"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
+
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 var updateHeaderTblSize = func(e *hpack.Encoder, v uint32) {
@@ -507,7 +508,7 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 			// 1. When the connection is closed by some other known issue.
 			// 2. User closed the connection.
 			// 3. A graceful close of connection.
-			klog.Debugf("KITEX: grpc transport loopyWriter.run returning, error=%v, remoteAddr=%s", err, remoteAddr)
+			klog.Debugf("KITEX: grpc transport loopyWriter.run returning since connection closing by itself, remoteAddr=%s", remoteAddr)
 			err = nil
 		}
 	}()
