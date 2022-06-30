@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	payloadCodec = &thriftCodec{FastWrite | FastRead}
+	payloadCodec = &thriftCodec{}
 	svcInfo      = mocks.ServiceInfo()
 )
 
