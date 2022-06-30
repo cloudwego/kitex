@@ -45,7 +45,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
@@ -358,17 +357,15 @@ func (kc *kClient) initDebugService() {
 
 func (kc *kClient) richRemoteOption() {
 	kc.opt.RemoteOpt.SvcInfo = kc.svcInfo
-	// add default meta handler
-	if len(kc.opt.MetaHandlers) == 0 {
-		kc.opt.MetaHandlers = append(kc.opt.MetaHandlers, transmeta.ClientHTTP2Handler)
-		kc.opt.MetaHandlers = append(kc.opt.MetaHandlers, transmeta.ClientTTHeaderHandler)
-	}
+
 	// for client trans info handler
-	// TODO in stream situations, meta is only assembled when the stream creates
-	// metaHandler needs to be called separately.
-	// (newClientStreamer: call WriteMeta before remotecli.NewClient)
-	transInfoHdlr := bound.NewTransMetaHandler(kc.opt.MetaHandlers)
-	kc.opt.RemoteOpt.PrependBoundHandler(transInfoHdlr)
+	if len(kc.opt.MetaHandlers) > 0 {
+		// TODO in stream situations, meta is only assembled when the stream creates
+		// metaHandler needs to be called separately.
+		// (newClientStreamer: call WriteMeta before remotecli.NewClient)
+		transInfoHdlr := bound.NewTransMetaHandler(kc.opt.MetaHandlers)
+		kc.opt.RemoteOpt.PrependBoundHandler(transInfoHdlr)
+	}
 }
 
 func (kc *kClient) buildInvokeChain() error {
