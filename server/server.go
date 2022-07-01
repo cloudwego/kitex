@@ -208,6 +208,17 @@ func (s *server) Run() (err error) {
 		return err
 	}
 
+	// start profiler
+	if s.opt.RemoteOpt.Profiler != nil {
+		go func() {
+			klog.Info("KITEX: server starting profiler")
+			err := s.opt.RemoteOpt.Profiler.Run(context.Background())
+			if err != nil {
+				klog.Errorf("KITEX: server started profiler error: error=%s", err.Error())
+			}
+		}()
+	}
+
 	errCh := s.svr.Start()
 	select {
 	case err = <-errCh:
@@ -305,6 +316,13 @@ func (s *server) addBoundHandlers(opt *remote.ServerOption) {
 		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerHTTP2Handler)
 		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerTTHeaderHandler)
 	}
+	// add profiler meta handler, which should be exec after other MetaHandlers
+	if opt.Profiler != nil && opt.ProfilerMessageTagging != nil {
+		s.opt.MetaHandlers = append(s.opt.MetaHandlers,
+			remote.NewProfilerMetaHandler(opt.Profiler, opt.ProfilerMessageTagging),
+		)
+	}
+
 	// for server trans info handler
 	transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
 	// meta handler exec before boundHandlers which add with option

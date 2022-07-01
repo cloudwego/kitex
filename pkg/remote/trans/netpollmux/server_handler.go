@@ -181,7 +181,7 @@ func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) e
 // batchGoTasks centrally creates goroutines to execute tasks.
 func (t *svrTransHandler) batchGoTasks(fs []func()) {
 	for n := range fs {
-		gofunc.GoFunc(nil, fs[n])
+		gofunc.GoFunc(context.Background(), fs[n])
 	}
 	fs = fs[:0]
 	t.funcPool.Put(&fs)
