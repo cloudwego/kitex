@@ -84,6 +84,7 @@ type CBSuite struct {
 // because event.Queue and event.Bus are not shared with all clients now.
 func NewCBSuite(genKey GenServiceCBKeyFunc) *CBSuite {
 	s := &CBSuite{genServiceCBKey: genKey}
+	s.instanceCBConfig = instanceCBConfig{CBConfig: defaultCBConfig}
 	return s
 }
 
@@ -199,7 +200,6 @@ func (s *CBSuite) initInstanceCB() {
 	if s.instancePanel != nil && s.instanceControl != nil {
 		return
 	}
-	s.instanceCBConfig = instanceCBConfig{CBConfig: defaultCBConfig}
 	opts := circuitbreaker.Options{
 		ShouldTripWithKey: s.insTripFunc,
 	}
