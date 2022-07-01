@@ -20,14 +20,18 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/jhump/protoreflect/desc/protoparse"
+	"github.com/tidwall/gjson"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/tidwall/gjson"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 func Test_writeVoid(t *testing.T) {
@@ -782,6 +786,128 @@ func Test_writeHTTPRequest(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_writeHTTPRequestWithPbBody(t *testing.T) {
+	type args struct {
+		val interface{}
+		out thrift.TProtocol
+		t   *descriptor.TypeDescriptor
+		opt *writerOption
+	}
+	body, err := getReqPbBody()
+	if err != nil {
+		t.Error(err)
+	}
+	req := &descriptor.HTTPRequest{
+		Body: body,
+		ContentType: descriptor.MIMEApplicationProtobuf,
+	}
+	typeDescriptor := &descriptor.TypeDescriptor{
+		Type: descriptor.STRUCT,
+		Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+		Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+		Struct: &descriptor.StructDescriptor{
+			Name: "BizReq",
+			FieldsByName: map[string]*descriptor.FieldDescriptor{
+				"user_id": {
+					Name:        "user_id",
+					ID:          1,
+					Type:        &descriptor.TypeDescriptor{Type: descriptor.I32},
+					HTTPMapping: descriptor.DefaultNewMapping("user_id"),
+				},
+				"user_name": {
+					Name:        "user_name",
+					ID:          2,
+					Type:        &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					HTTPMapping: descriptor.DefaultNewMapping("user_name"),
+				},
+			},
+		},
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+		{
+			"writeStructSuccess",
+			args{
+				val: req,
+				out: &mocks.MockThriftTTransport{
+					WriteI32Func: func(value int32) error {
+						test.Assert(t, value == 1234)
+						return nil
+					},
+					WriteStringFunc: func(value string) error {
+						test.Assert(t, value == "John")
+						return nil
+					},
+				},
+				t:   typeDescriptor,
+			},
+			false,
+		},
+		{
+			"writeStructFail",
+			args{
+				val: req,
+				out: &mocks.MockThriftTTransport{
+					WriteI32Func: func(value int32) error {
+						test.Assert(t, value == 1234)
+						return nil
+					},
+					WriteStringFunc: func(value string) error {
+						if value == "John" {
+							return fmt.Errorf("MakeSureThisExecuted")
+						}
+						return nil
+					},
+				},
+				t:   typeDescriptor,
+			},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := writeHTTPRequest(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+				t.Errorf("writeHTTPRequest() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func getReqPbBody() (proto.Message, error) {
+	path := "main.proto"
+	content := `
+	package kitex.test.server;
+	
+	message BizReq {
+		optional int32 user_id = 1;
+		optional string user_name = 2;
+	}
+	`
+
+	var pbParser protoparse.Parser
+	pbParser.Accessor = protoparse.FileContentsFromMap(map[string]string{path: content})
+	fds, err := pbParser.ParseFiles(path)
+	if err != nil {
+		return nil, err
+	}
+
+	md := fds[0].GetMessageTypes()[0]
+	msg := proto.NewMessage(md)
+	items := map[int]interface{}{1: int32(1234), 2: "John"}
+	for id, value := range items {
+		err = msg.TrySetFieldByNumber(id, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return msg, nil
 }
 
 func Test_writeRequestBase(t *testing.T) {
