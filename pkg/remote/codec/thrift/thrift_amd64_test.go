@@ -72,28 +72,28 @@ func initFrugalTagRecvMsg() remote.Message {
 	return msg
 }
 
-func TestHasHyperCodec(t *testing.T) {
+func TestHyperCodecCheck(t *testing.T) {
 	msg := initFrugalTagRecvMsg()
 	msg.SetPayloadLen(0)
 	codec := &thriftCodec{}
 
 	// test CodecType check
-	test.Assert(t, codec.hasHyperMarshal(&MockFrugalTagArgs{}) == false)
+	test.Assert(t, codec.hyperMarshalEnabled() == false)
 	msg.SetPayloadLen(1)
-	test.Assert(t, codec.hasHyperMessageUnmarshal(&MockFrugalTagArgs{}, msg) == false)
+	test.Assert(t, codec.hyperMessageUnmarshalEnabled() == false)
 	msg.SetPayloadLen(0)
 
 	// test hyperMarshal check
 	codec = &thriftCodec{FrugalWrite}
-	test.Assert(t, codec.hasHyperMarshal(&MockNoTagArgs{}) == false)
-	test.Assert(t, codec.hasHyperMarshal(&MockFrugalTagArgs{}) == true)
+	test.Assert(t, hyperMarshalAvailable(&MockNoTagArgs{}) == false)
+	test.Assert(t, hyperMarshalAvailable(&MockFrugalTagArgs{}) == true)
 
 	// test hyperMessageUnmarshal check
 	codec = &thriftCodec{FrugalRead}
-	test.Assert(t, codec.hasHyperMessageUnmarshal(&MockNoTagArgs{}, msg) == false)
-	test.Assert(t, codec.hasHyperMessageUnmarshal(&MockFrugalTagArgs{}, msg) == false)
+	test.Assert(t, hyperMessageUnmarshalAvailable(&MockNoTagArgs{}, msg) == false)
+	test.Assert(t, hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg) == false)
 	msg.SetPayloadLen(1)
-	test.Assert(t, codec.hasHyperMessageUnmarshal(&MockFrugalTagArgs{}, msg) == true)
+	test.Assert(t, hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg) == true)
 }
 
 func TestFrugalCodec(t *testing.T) {
