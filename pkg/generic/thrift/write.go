@@ -20,13 +20,17 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/tidwall/gjson"
+	"runtime"
+	"runtime/debug"
 )
+
+var typeAssertErr = errors.New("type assertion error")
 
 type writerOption struct {
 	requestBase *Base // request base from metahandler
@@ -341,10 +345,10 @@ func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 		return out.WriteListEnd()
 	}
 
-	//Catch diff types are in the list panic error
+	// Catch diff types are in the list panic error.
 	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+		if r := recover(); r != nil && errors.Is(r.(error), &runtime.TypeAssertionError{}) {
+			err = fmt.Errorf("KITEX: panic=%v, error=%v, stack=%s", r, typeAssertErr, string(debug.Stack()))
 			return
 		}
 	}()
@@ -371,15 +375,6 @@ func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t
 	if length == 0 {
 		return out.WriteListEnd()
 	}
-
-	//Catch diff types are in the JSONList panic error
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
-			return
-		}
-	}()
-
 	for _, elem := range l {
 		v, writer, err := nextJSONWriter(&elem, t.Elem, opt)
 		if err != nil {
@@ -418,10 +413,10 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 		return err
 	}
 
-	//Catch diff types are in the InterfaceMap panic error
+	// Catch diff types are in the InterfaceMap panic error.
 	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
+		if r := recover(); r != nil && errors.Is(r.(error), &runtime.TypeAssertionError{}) {
+			err = fmt.Errorf("KITEX: panic=%v, error=%v, stack=%s", r, typeAssertErr, string(debug.Stack()))
 			return
 		}
 	}()
@@ -451,15 +446,6 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 		keyWriter  writer
 		elemWriter writer
 	)
-
-	//Catch diff types are in the StringMap panic error
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
-			return
-		}
-	}()
-
 	for key, elem := range m {
 		_key, err := buildinTypeFromString(key, t.Key)
 		if err != nil {
@@ -501,15 +487,6 @@ func writeStringJSONMap(ctx context.Context, val interface{}, out thrift.TProtoc
 		elemWriter writer
 		v          interface{}
 	)
-
-	//Catch diff types are in the StringMap panic error
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("%v", r)
-			return
-		}
-	}()
-
 	for key, elem := range m {
 		_key, err := buildinTypeFromString(key, t.Key)
 		if err != nil {
