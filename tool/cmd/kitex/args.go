@@ -61,7 +61,7 @@ func (a *arguments) buildFlags() *flag.FlagSet {
 	f.BoolVar(&a.NoFastAPI, "no-fast-api", false,
 		"Generate codes without injecting fast method.")
 	f.StringVar(&a.ModuleName, "module", "",
-		"Specify the Go module name to generate go.mod.")
+		"Specify the Go module name to generate go.mod. If not specified, the module name will be derived from the go.mod")
 	f.StringVar(&a.ServiceName, "service", "",
 		"Specify the service name to generate server side codes.")
 	f.StringVar(&a.Use, "use", "",
@@ -183,8 +183,18 @@ func (a *arguments) checkPath() {
 		a.PackagePrefix = filepath.Join(a.PackagePrefix, generator.KitexGenPath)
 	} else {
 		if a.ModuleName == "" {
-			log.Warn("Outside of $GOPATH. Please specify a module name with the '-module' flag.")
-			os.Exit(1)
+			moduleName, path, ok := util.SearchGoMod(curpath)
+			if ok {
+				if a.PackagePrefix, err = filepath.Rel(path, curpath); err != nil {
+					log.Warn("Get package prefix failed:", err.Error())
+					os.Exit(1)
+				}
+				a.PackagePrefix = filepath.Join(moduleName, a.PackagePrefix, generator.KitexGenPath)
+
+			} else {
+				log.Warn("Get module information failed: no go.mod found. Please generate go.mod file or use -module.")
+				os.Exit(1)
+			}
 		}
 	}
 
