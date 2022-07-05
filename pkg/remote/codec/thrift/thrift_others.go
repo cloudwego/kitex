@@ -23,13 +23,23 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-// hasHyperMarshal indicates that if there are high priority message codec for current platform.
-func (c thriftCodec) hasHyperMarshal(data interface{}) bool {
+// hyperMarshalEnabled indicates that if there are high priority message codec for current platform.
+func (c thriftCodec) hyperMarshalEnabled() bool {
 	return false
 }
 
-// hasHyperUnmarshal indicates that if there are high priority message codec for current platform.
-func (c thriftCodec) hasHyperMessageUnmarshal(data interface{}, message remote.Message) bool {
+// hyperMarshalAvailable indicates that if high priority message codec is available.
+func hyperMarshalAvailable(data interface{}) bool {
+	return false
+}
+
+// hyperMessageUnmarshalEnabled indicates that if there are high priority message codec for current platform.
+func (c thriftCodec) hyperMessageUnmarshalEnabled() bool {
+	return false
+}
+
+// hyperMessageUnmarshalAvailable indicates that if high priority message codec is available.
+func hyperMessageUnmarshalAvailable(data interface{}, message remote.Message) bool {
 	return false
 }
 
