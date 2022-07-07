@@ -53,7 +53,7 @@ func TestProfiler(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		p.Tag(ctx, []string{"type", "trace"})
+		p.Tag(ctx, []string{"type", "trace"}...)
 		defer p.Untag(ctx)
 		var sum int
 		for i := 0; i < 1024*1024*1024; i++ {

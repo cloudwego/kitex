@@ -92,14 +92,13 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 	bufReader = t.ext.NewReadByteBuffer(ctx, conn, recvMsg)
 	if codec, ok := t.codec.(remote.MetaDecoder); ok {
 		if err = codec.DecodeMeta(ctx, recvMsg, bufReader); err == nil {
-			// start profiler before decode payload
-			t.startProfiler(ctx, recvMsg)
+			if t.opt.ProfilerCtl != nil && recvMsg.TransInfo() != nil {
+				t.opt.ProfilerCtl.TagTransInfo(ctx, recvMsg.TransInfo())
+			}
 			err = codec.DecodePayload(ctx, recvMsg, bufReader)
 		}
 	} else {
 		err = t.codec.Decode(ctx, recvMsg, bufReader)
-		// start profiler after decode payload if the codec cannot support MetaDecoder interface
-		t.startProfiler(ctx, recvMsg)
 	}
 	if err != nil {
 		recvMsg.Tags()[remote.ReadFailed] = true
@@ -132,7 +131,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			conn.Close()
 		}
 		t.finishTracer(ctx, ri, err, panicErr)
-		t.finishProfiler(ctx, recvMsg)
+		t.finishProfiler(ctx)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
 	}()
@@ -285,18 +284,11 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	rpcStats.SetLevel(sl)
 }
 
-func (t *svrTransHandler) startProfiler(ctx context.Context, msg remote.Message) {
+func (t *svrTransHandler) finishProfiler(ctx context.Context) {
 	if t.opt.ProfilerCtl == nil {
 		return
 	}
-	t.opt.ProfilerCtl.Tag(ctx, msg)
-}
-
-func (t *svrTransHandler) finishProfiler(ctx context.Context, msg remote.Message) {
-	if t.opt.ProfilerCtl == nil {
-		return
-	}
-	t.opt.ProfilerCtl.Untag(ctx, msg)
+	t.opt.ProfilerCtl.Untag(ctx)
 }
 
 func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {

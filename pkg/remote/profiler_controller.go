@@ -25,15 +25,23 @@ import (
 )
 
 const (
+	keyType      = "type"
 	typeTrace    = "trace"
 	typeProfiler = "profiler"
+
+	keyStage     = "stage"
+	stageTrans   = "trans"
+	stageMessage = "message"
+
+	keyFrom = "from"
 )
 
 type ProfilerController interface {
 	Run(ctx context.Context) (err error)
 	Stop()
-	Tag(ctx context.Context, msg Message)
-	Untag(ctx context.Context, msg Message)
+	TagTransInfo(ctx context.Context, ti TransInfo)
+	TagMessage(ctx context.Context, msg Message)
+	Untag(ctx context.Context)
 }
 
 var _ ProfilerController = (*profilerController)(nil)
@@ -49,7 +57,7 @@ type profilerController struct {
 func (c *profilerController) Run(ctx context.Context) (err error) {
 	// tagging current goroutine
 	// we could filter tag from pprof data to figure out that how much cost our profiler cause
-	ctx = pprof.WithLabels(ctx, pprof.Labels("type", typeProfiler))
+	ctx = pprof.WithLabels(ctx, pprof.Labels(keyType, typeProfiler))
 	return c.p.Run(ctx)
 }
 
@@ -57,17 +65,54 @@ func (c *profilerController) Stop() {
 	c.p.Stop()
 }
 
-func (c *profilerController) Tag(ctx context.Context, msg Message) {
-	ti := msg.TransInfo()
-	if ti == nil {
+func (c *profilerController) TagTransInfo(ctx context.Context, ti TransInfo) {
+	if ti == nil || ti.TransIntInfo()[transmeta.FromService] == "" {
 		return
 	}
-	c.p.Tag(ctx, []string{
-		"type", typeTrace,
-		"from", ti.TransIntInfo()[transmeta.FromService],
-	})
+	c.p.Tag(ctx,
+		keyType, typeTrace,
+		keyStage, stageTrans,
+		keyFrom, ti.TransIntInfo()[transmeta.FromService],
+	)
 }
 
-func (c *profilerController) Untag(ctx context.Context, msg Message) {
+func (c *profilerController) TagMessage(ctx context.Context, msg Message) {
+	ti := msg.TransInfo()
+	// already tagged in trans stage
+	if ti != nil && ti.TransIntInfo()[transmeta.FromService] != "" {
+		return
+	}
+
+	ri := msg.RPCInfo()
+	if ri == nil || ri.From() == nil {
+		return
+	}
+	c.p.Tag(ctx,
+		keyType, typeTrace,
+		keyStage, stageMessage,
+		keyFrom, ri.From().ServiceName(),
+	)
+}
+
+func (c *profilerController) Untag(ctx context.Context) {
 	c.p.Untag(ctx)
+}
+
+var _ MetaHandler = (*profilerMetaHandler)(nil)
+
+func NewProfilerMetaHandler(ctl ProfilerController) MetaHandler {
+	return &profilerMetaHandler{ctl: ctl}
+}
+
+type profilerMetaHandler struct {
+	ctl ProfilerController
+}
+
+func (p *profilerMetaHandler) WriteMeta(ctx context.Context, msg Message) (context.Context, error) {
+	return ctx, nil
+}
+
+func (p *profilerMetaHandler) ReadMeta(ctx context.Context, msg Message) (context.Context, error) {
+	p.ctl.TagMessage(ctx, msg)
+	return ctx, nil
 }

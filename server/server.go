@@ -303,6 +303,11 @@ func (s *server) addBoundHandlers(opt *remote.ServerOption) {
 		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerHTTP2Handler)
 		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerTTHeaderHandler)
 	}
+	// add profiler meta handler, which should be exex after other MetaHandlers
+	if opt.ProfilerCtl != nil {
+		s.opt.MetaHandlers = append(s.opt.MetaHandlers, remote.NewProfilerMetaHandler(opt.ProfilerCtl))
+	}
+
 	// for server trans info handler
 	transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
 	// meta handler exec before boundHandlers which add with option

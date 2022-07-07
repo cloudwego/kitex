@@ -37,7 +37,7 @@ type recoverContextKey struct{}
 type Profiler interface {
 	Run(ctx context.Context) (err error)
 	Stop()
-	Tag(ctx context.Context, tags []string)
+	Tag(ctx context.Context, tags ...string) context.Context
 	Untag(ctx context.Context)
 }
 
@@ -125,11 +125,15 @@ func (p *profiler) Run(ctx context.Context) (err error) {
 	}
 }
 
-func (p *profiler) Tag(ctx context.Context, tags []string) {
-	// we need to recover the current context when DoFinish
-	ctx = context.WithValue(ctx, recoverContextKey{}, ctx)
+func (p *profiler) Tag(ctx context.Context, tags ...string) context.Context {
+	// if we called Tag many times, don't reset the recover ctx twice
+	if _, ok := ctx.Value(recoverContextKey{}).(context.Context); !ok {
+		// we need to recover the current context when Untag
+		ctx = context.WithValue(ctx, recoverContextKey{}, ctx)
+	}
 	ctx = pprof.WithLabels(ctx, pprof.Labels(tags...))
 	pprof.SetGoroutineLabels(ctx)
+	return ctx
 }
 
 func (p *profiler) Untag(ctx context.Context) {
@@ -155,22 +159,28 @@ func (p *profiler) analyse() ([]*TagsProfile, error) {
 	}
 
 	// filter cpu value index
-	cpuSampleIdx := -1
+	sampleIdx := -1
 	for idx, st := range pf.SampleType {
+		switch st.Type {
+		case "cycles":
+			sampleIdx = idx
+		case "cpu":
+			sampleIdx = idx
+		}
 		if st.Type == "cpu" {
-			cpuSampleIdx = idx
+			sampleIdx = idx
 			break
 		}
 	}
-	if cpuSampleIdx < 0 {
-		return nil, errors.New("cpu sample type not found")
+	if sampleIdx < 0 {
+		return nil, errors.New("sample type not found")
 	}
 
 	// calculate every sample expense
 	counter := map[string]*TagsProfile{} // map[tagsKey]funcProfile
 	var total int64
 	for _, sm := range pf.Sample {
-		value := sm.Value[cpuSampleIdx]
+		value := sm.Value[sampleIdx]
 		tags := labelToTags(sm.Label)
 		tagsKey := tagsToKey(tags)
 		tp, ok := counter[tagsKey]
