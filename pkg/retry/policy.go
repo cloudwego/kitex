@@ -42,6 +42,22 @@ func (t Type) String() string {
 	return ""
 }
 
+// BuildFailurePolicy is used to build Policy with *FailurePolicy
+func BuildFailurePolicy(p *FailurePolicy) Policy {
+	if p == nil {
+		return Policy{}
+	}
+	return Policy{Enable: true, Type: FailureType, FailurePolicy: p}
+}
+
+// BuildBackupRequest is used to build Policy with *BackupPolicy
+func BuildBackupRequest(p *BackupPolicy) Policy {
+	if p == nil {
+		return Policy{}
+	}
+	return Policy{Enable: true, Type: BackupType, BackupPolicy: p}
+}
+
 // Policy contains all retry policies
 type Policy struct {
 	Enable bool `json:"enable"`

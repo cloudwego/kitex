@@ -139,12 +139,12 @@ func (kc *kClient) initCircuitBreaker() error {
 
 func (kc *kClient) initRetryer() error {
 	if kc.opt.RetryContainer == nil {
-		if kc.opt.RetryPolicy == nil {
+		if kc.opt.RetryMethodPolicies == nil {
 			return nil
 		}
 		kc.opt.RetryContainer = retry.NewRetryContainer()
 	}
-	return kc.opt.RetryContainer.Init(kc.opt.RetryPolicy, kc.opt.RetryWithResult)
+	return kc.opt.RetryContainer.Init(kc.opt.RetryMethodPolicies, kc.opt.RetryWithResult)
 }
 
 func (kc *kClient) initContext() context.Context {

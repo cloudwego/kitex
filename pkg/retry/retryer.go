@@ -90,7 +90,7 @@ func NewRetryContainer() *Container {
 
 // Container is a wrapper for Retryer.
 type Container struct {
-	cliRetryer  Retryer
+	hasCodeCfg  bool
 	retryerMap  sync.Map // <method: retryer>
 	cbContainer *cbContainer
 	msg         string
@@ -107,22 +107,22 @@ type cbContainer struct {
 }
 
 // InitWithPolicies to init Retryer with methodPolicies
-func (rc *Container) InitWithPolicies(methodPolicies map[string]Policy) {
+func (rc *Container) InitWithPolicies(methodPolicies map[string]Policy) (inited bool, err error) {
 	rc.Lock()
 	defer rc.Unlock()
-	if rc.cliRetryer != nil {
-		// cliRetryer is not nil means that user setup code policy, the priority is higher than remote config
-		return
-	}
 	for m := range methodPolicies {
 		if methodPolicies[m].Enable {
+			inited = true
 			if _, ok := rc.retryerMap.Load(m); ok {
 				// NotifyPolicyChange may happen before
 				continue
 			}
-			rc.initRetryer(m, methodPolicies[m])
+			if err = rc.initRetryer(m, methodPolicies[m]); err != nil {
+				return false, err
+			}
 		}
 	}
+	return
 }
 
 // NotifyPolicyChange to receive policy when it changes
@@ -130,8 +130,8 @@ func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 	rc.Lock()
 	defer rc.Unlock()
 	rc.msg = ""
-	if rc.cliRetryer != nil {
-		// cliRetryer is not nil means that user setup code policy, the priority is higher than remote config
+	if rc.hasCodeCfg == true {
+		// the priority of user setup code policy is higher than remote config
 		return
 	}
 	r, ok := rc.retryerMap.Load(method)
@@ -150,15 +150,15 @@ func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 	rc.initRetryer(method, p)
 }
 
-// Init to build Retryer
-func (rc *Container) Init(p *Policy, r *IsResultRetry) error {
+// Init to build Retryer with code config.
+func (rc *Container) Init(mp map[string]Policy, r *IsResultRetry) (err error) {
 	rc.Lock()
 	defer rc.Unlock()
-	if p == nil {
+	rc.isResultRetry = r
+	if mp == nil {
 		return nil
 	}
-	var err error
-	rc.cliRetryer, err = NewRetryer(*p, r, rc.cbContainer)
+	rc.hasCodeCfg, err = rc.InitWithPolicies(mp)
 	if err != nil {
 		rc.msg = err.Error()
 		return fmt.Errorf("NewRetryer in Init failed, err=%w", err)
@@ -220,9 +220,6 @@ func NewRetryer(p Policy, r *IsResultRetry, cbC *cbContainer) (retryer Retryer, 
 }
 
 func (rc *Container) getRetryer(ri rpcinfo.RPCInfo) Retryer {
-	if rc.cliRetryer != nil {
-		return rc.cliRetryer
-	}
 	// the priority of specific method is high
 	r, ok := rc.retryerMap.Load(ri.To().Method())
 	if ok {
@@ -238,9 +235,7 @@ func (rc *Container) getRetryer(ri rpcinfo.RPCInfo) Retryer {
 // Dump is used to show current retry policy
 func (rc *Container) Dump() interface{} {
 	dm := make(map[string]interface{})
-	if rc.cliRetryer != nil {
-		dm["clientRetryer"] = rc.cliRetryer.Dump()
-	}
+	dm["hasCodeCfg"] = rc.hasCodeCfg
 	rc.retryerMap.Range(func(key, value interface{}) bool {
 		if r, ok := value.(Retryer); ok {
 			dm[key.(string)] = r.Dump()
@@ -253,13 +248,13 @@ func (rc *Container) Dump() interface{} {
 	return dm
 }
 
-func (rc *Container) initRetryer(method string, p Policy) {
+func (rc *Container) initRetryer(method string, p Policy) error {
 	retryer, err := NewRetryer(p, rc.isResultRetry, rc.cbContainer)
 	if err != nil {
 		errMsg := fmt.Sprintf("new retryer[%s-%s] failed, err=%s, at %s", method, p.Type, err.Error(), time.Now())
 		rc.msg = errMsg
 		klog.Warnf(errMsg)
-		return
+		return err
 	}
 	// NewRetryer can return nil if policy is nil
 	if retryer != nil {
@@ -268,4 +263,5 @@ func (rc *Container) initRetryer(method string, p Policy) {
 	} else {
 		rc.msg = fmt.Sprintf("disable retryer[%s-%s](enable=%t) %s", method, p.Type, p.Enable, time.Now())
 	}
+	return nil
 }

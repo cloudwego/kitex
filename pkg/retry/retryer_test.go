@@ -248,13 +248,13 @@ func TestNewRetryContainer(t *testing.T) {
 	// test init invalid case
 	err := rc.Init(nil, nil)
 	test.Assert(t, err == nil, err)
-	err = rc.Init(&Policy{
+	err = rc.Init(map[string]Policy{Wildcard: {
 		Enable: true,
 		Type:   1,
 		BackupPolicy: &BackupPolicy{
 			RetryDelayMS: 0,
 		},
-	}, nil)
+	}}, nil)
 	test.Assert(t, err != nil, err)
 }
 
@@ -270,11 +270,11 @@ func TestContainer_Dump(t *testing.T) {
 		},
 	}
 	rc.InitWithPolicies(methodPolicies)
-	err := rc.Init(&Policy{
+	err := rc.Init(map[string]Policy{Wildcard: {
 		Enable:       true,
 		Type:         1,
 		BackupPolicy: NewBackupPolicy(20),
-	}, nil)
+	}}, nil)
 	test.Assert(t, err == nil, err)
 	rcDump, ok := rc.Dump().(map[string]interface{})
 	test.Assert(t, ok)
@@ -296,11 +296,11 @@ func TestContainer_Dump(t *testing.T) {
 		},
 	}
 	rc.InitWithPolicies(methodPolicies)
-	err = rc.Init(&Policy{
+	err = rc.Init(map[string]Policy{Wildcard: {
 		Enable:        true,
 		Type:          FailureType,
 		FailurePolicy: NewFailurePolicy(),
-	}, nil)
+	}}, nil)
 	test.Assert(t, err == nil, err)
 	rcDump, ok = rc.Dump().(map[string]interface{})
 	test.Assert(t, ok)
@@ -324,11 +324,11 @@ func TestFailurePolicyCall(t *testing.T) {
 		FixMSBackOffCfgKey: 100.0,
 	}
 	failurePolicy.StopPolicy.MaxDurationMS = 100
-	err := rc.Init(&Policy{
+	err := rc.Init(map[string]Policy{Wildcard: {
 		Enable:        true,
 		Type:          0,
 		FailurePolicy: failurePolicy,
-	}, nil)
+	}}, nil)
 	test.Assert(t, err == nil, err)
 	ri := genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
@@ -340,11 +340,11 @@ func TestFailurePolicyCall(t *testing.T) {
 
 	// call normal
 	failurePolicy.StopPolicy.MaxDurationMS = 0
-	err = rc.Init(&Policy{
+	err = rc.Init(map[string]Policy{Wildcard: {
 		Enable:        true,
 		Type:          0,
 		FailurePolicy: failurePolicy,
-	}, nil)
+	}}, nil)
 	test.Assert(t, err == nil, err)
 	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		return ri, nil, nil
@@ -357,7 +357,7 @@ func TestFailurePolicyCall(t *testing.T) {
 func TestBackupPolicyCall(t *testing.T) {
 	ctx := context.Background()
 	rc := NewRetryContainer()
-	err := rc.Init(&Policy{
+	err := rc.Init(map[string]Policy{Wildcard: {
 		Enable: true,
 		Type:   1,
 		BackupPolicy: &BackupPolicy{
@@ -370,7 +370,7 @@ func TestBackupPolicyCall(t *testing.T) {
 				},
 			},
 		},
-	}, nil)
+	}}, nil)
 	test.Assert(t, err == nil, err)
 
 	callTimes := int32(0)
@@ -426,11 +426,11 @@ func TestPolicyNoRetryCall(t *testing.T) {
 	RegisterDDLStop(func(ctx context.Context, policy StopPolicy) (bool, string) {
 		return true, "TestDDLStop"
 	})
-	err = rc.Init(&Policy{
+	err = rc.Init(map[string]Policy{Wildcard: {
 		Enable:        true,
 		Type:          0,
 		FailurePolicy: failurePolicy,
-	}, nil)
+	}}, nil)
 	test.Assert(t, err == nil, err)
 	callTimes = 0
 	ri = genRPCInfo()
@@ -449,11 +449,11 @@ func TestPolicyNoRetryCall(t *testing.T) {
 	// backupPolicy MaxRetryTimes = 0
 	backupPolicy := NewBackupPolicy(20)
 	backupPolicy.StopPolicy.MaxRetryTimes = 0
-	err = rc.Init(&Policy{
+	err = rc.Init(map[string]Policy{Wildcard: {
 		Enable:       true,
 		Type:         1,
 		BackupPolicy: backupPolicy,
-	}, nil)
+	}}, nil)
 	test.Assert(t, err == nil, err)
 	callTimes = 0
 	ri = genRPCInfo()
