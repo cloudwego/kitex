@@ -246,7 +246,7 @@ func TestNewRetryContainer(t *testing.T) {
 	test.Assert(t, rc.msg[:len(msg)] == msg)
 
 	// test init invalid case
-	err := rc.Init(nil)
+	err := rc.Init(nil, nil)
 	test.Assert(t, err == nil, err)
 	err = rc.Init(&Policy{
 		Enable: true,
@@ -254,7 +254,7 @@ func TestNewRetryContainer(t *testing.T) {
 		BackupPolicy: &BackupPolicy{
 			RetryDelayMS: 0,
 		},
-	})
+	}, nil)
 	test.Assert(t, err != nil, err)
 }
 
@@ -274,7 +274,7 @@ func TestContainer_Dump(t *testing.T) {
 		Enable:       true,
 		Type:         1,
 		BackupPolicy: NewBackupPolicy(20),
-	})
+	}, nil)
 	test.Assert(t, err == nil, err)
 	rcDump, ok := rc.Dump().(map[string]interface{})
 	test.Assert(t, ok)
@@ -300,7 +300,7 @@ func TestContainer_Dump(t *testing.T) {
 		Enable:        true,
 		Type:          FailureType,
 		FailurePolicy: NewFailurePolicy(),
-	})
+	}, nil)
 	test.Assert(t, err == nil, err)
 	rcDump, ok = rc.Dump().(map[string]interface{})
 	test.Assert(t, ok)
@@ -328,12 +328,12 @@ func TestFailurePolicyCall(t *testing.T) {
 		Enable:        true,
 		Type:          0,
 		FailurePolicy: failurePolicy,
-	})
+	}, nil)
 	test.Assert(t, err == nil, err)
 	ri := genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
-		return ri, kerrors.ErrRPCTimeout
+	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+		return ri, nil, kerrors.ErrRPCTimeout
 	}, ri, nil)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, !ok)
@@ -344,10 +344,10 @@ func TestFailurePolicyCall(t *testing.T) {
 		Enable:        true,
 		Type:          0,
 		FailurePolicy: failurePolicy,
-	})
+	}, nil)
 	test.Assert(t, err == nil, err)
-	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
-		return ri, nil
+	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+		return ri, nil, nil
 	}, ri, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ok)
@@ -370,16 +370,16 @@ func TestBackupPolicyCall(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, nil)
 	test.Assert(t, err == nil, err)
 
 	callTimes := int32(0)
 	ri := genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
+	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		atomic.AddInt32(&callTimes, 1)
 		time.Sleep(time.Millisecond * 50)
-		return ri, nil
+		return ri, nil, nil
 	}, ri, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, atomic.LoadInt32(&callTimes) == 2)
@@ -396,9 +396,9 @@ func TestPolicyNoRetryCall(t *testing.T) {
 	callTimes := int32(0)
 	ri := genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
+	ok, err := rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		callTimes++
-		return ri, nil
+		return ri, nil, nil
 	}, ri, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, callTimes == 1)
@@ -408,12 +408,12 @@ func TestPolicyNoRetryCall(t *testing.T) {
 	callTimes = 0
 	ri = genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
+	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		callTimes++
 		if callTimes == 1 {
-			return ri, kerrors.ErrRPCTimeout
+			return ri, nil, kerrors.ErrRPCTimeout
 		}
-		return ri, nil
+		return ri, nil, nil
 	}, ri, nil)
 	test.Assert(t, kerrors.IsTimeoutError(err), err)
 	test.Assert(t, callTimes == 1)
@@ -430,17 +430,17 @@ func TestPolicyNoRetryCall(t *testing.T) {
 		Enable:        true,
 		Type:          0,
 		FailurePolicy: failurePolicy,
-	})
+	}, nil)
 	test.Assert(t, err == nil, err)
 	callTimes = 0
 	ri = genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
+	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		atomic.AddInt32(&callTimes, 1)
 		if atomic.LoadInt32(&callTimes) == 1 {
-			return ri, kerrors.ErrRPCTimeout
+			return ri, nil, kerrors.ErrRPCTimeout
 		}
-		return ri, nil
+		return ri, nil, nil
 	}, ri, nil)
 	test.Assert(t, kerrors.IsTimeoutError(err), err)
 	test.Assert(t, callTimes == 1)
@@ -453,15 +453,15 @@ func TestPolicyNoRetryCall(t *testing.T) {
 		Enable:       true,
 		Type:         1,
 		BackupPolicy: backupPolicy,
-	})
+	}, nil)
 	test.Assert(t, err == nil, err)
 	callTimes = 0
 	ri = genRPCInfo()
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, error) {
+	ok, err = rc.WithRetryIfNeeded(ctx, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		callTimes++
 		time.Sleep(time.Millisecond * 100)
-		return ri, nil
+		return ri, nil, nil
 	}, ri, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, callTimes == 1)

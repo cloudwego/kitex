@@ -355,6 +355,18 @@ func WithBackupRequest(p *retry.BackupPolicy) Option {
 	}}
 }
 
+// WithSpecifiedResultRetry is used with FailureRetry.
+// When you enable FailureRetry and want to retry with the specified error or response, you can configure this Option.
+func WithSpecifiedResultRetry(rr *retry.IsResultRetry) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		if rr == nil {
+			return
+		}
+		di.Push(fmt.Sprintf("WithSpecifiedResultRetry(%+v)", rr))
+		o.RetryWithResult = rr
+	}}
+}
+
 // WithCircuitBreaker adds a circuitbreaker suite for the client.
 func WithCircuitBreaker(s *circuitbreak.CBSuite) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {

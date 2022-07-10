@@ -144,7 +144,7 @@ func (kc *kClient) initRetryer() error {
 		}
 		kc.opt.RetryContainer = retry.NewRetryContainer()
 	}
-	return kc.opt.RetryContainer.Init(kc.opt.RetryPolicy)
+	return kc.opt.RetryContainer.Init(kc.opt.RetryPolicy, kc.opt.RetryWithResult)
 }
 
 func (kc *kClient) initContext() context.Context {
@@ -317,7 +317,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 
 	var callTimes int32
 	var prevRI rpcinfo.RPCInfo
-	recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, error) {
+	recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		curCallTimes := int(atomic.AddInt32(&callTimes, 1))
 		retryCtx := ctx
 		cRI := ri
@@ -331,7 +331,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 			prevRI = cRI
 		}
 		err := kc.eps(retryCtx, request, response)
-		return cRI, err
+		return cRI, response, err
 	}, ri, request)
 
 	kc.opt.TracerCtl.DoFinish(ctx, ri, err)

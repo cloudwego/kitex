@@ -18,6 +18,8 @@ package retry
 
 import (
 	"fmt"
+
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 // Type is retry type include FailureType, BackupType
@@ -110,6 +112,11 @@ const (
 	InitialMSBackOffCfgKey  BackOffCfgKey = "initial_ms"
 	MultiplierBackOffCfgKey BackOffCfgKey = "multiplier"
 )
+
+type IsResultRetry struct {
+	IsErrorRetry func(err error, ri rpcinfo.RPCInfo) bool
+	IsRespRetry  func(resp interface{}, ri rpcinfo.RPCInfo) bool
+}
 
 // Equals to check if policy is equal
 func (p Policy) Equals(np Policy) bool {
