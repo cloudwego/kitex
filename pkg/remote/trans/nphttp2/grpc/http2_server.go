@@ -109,8 +109,6 @@ type http2Server struct {
 	// RPCs go down to 0.
 	// When the connection is busy, this value is set to 0.
 	idle time.Time
-
-	bufferPool *bufferPool
 }
 
 // newHTTP2Server constructs a ServerTransport based on HTTP2. ConnectionError is
@@ -213,7 +211,6 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		kep:               kep,
 		idle:              time.Now(),
 		initialWindowSize: int32(iwz),
-		bufferPool:        newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.done)
 	if dynamicWindow {
@@ -356,10 +353,9 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 	s.wq = newWriteQuota(defaultWriteQuota, s.ctxDone)
 	s.trReader = &transportReader{
 		reader: &recvBufferReader{
-			ctx:        s.ctx,
-			ctxDone:    s.ctxDone,
-			recv:       s.buf,
-			freeBuffer: t.bufferPool.put,
+			ctx:     s.ctx,
+			ctxDone: s.ctxDone,
+			recv:    s.buf,
 		},
 		windowHandler: func(n int) {
 			t.updateWindow(s, uint32(n))
@@ -536,18 +532,15 @@ func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 			return
 		}
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
-			if w := s.fc.onRead(size - uint32(len(f.Data()))); w > 0 {
+			if w := s.fc.onRead(size - uint32(f.Data().Len())); w > 0 {
 				t.controlBuf.put(&outgoingWindowUpdate{s.id, w})
 			}
 		}
 		// TODO(bradfitz, zhaoq): A copy is required here because there is no
 		// guarantee f.Data() is consumed before the arrival of next frame.
 		// Can this copy be eliminated?
-		if len(f.Data()) > 0 {
-			buffer := t.bufferPool.get()
-			buffer.Reset()
-			buffer.Write(f.Data())
-			s.write(recvMsg{buffer: buffer})
+		if f.Data().Len() > 0 {
+			s.write(recvMsg{buffer: f.Data()})
 		}
 	}
 	if f.Header().Flags.Has(http2.FlagDataEndStream) {

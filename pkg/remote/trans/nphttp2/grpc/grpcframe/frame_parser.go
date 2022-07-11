@@ -59,7 +59,7 @@ func typeFrameParser(t http2.FrameType) frameParser {
 // See http://http2.github.io/http2-spec/#rfc.section.6.1
 type DataFrame struct {
 	http2.FrameHeader
-	data []byte // TODO: data = netpoll.Reader here
+	data netpoll.Reader
 }
 
 func (f *DataFrame) StreamEnded() bool {
@@ -70,7 +70,7 @@ func (f *DataFrame) StreamEnded() bool {
 // size byte or padding suffix bytes.
 // The caller must not retain the returned memory past the next
 // call to ReadFrame.
-func (f *DataFrame) Data() []byte {
+func (f *DataFrame) Data() netpoll.Reader {
 	return f.data
 }
 
@@ -103,8 +103,11 @@ func parseDataFrame(fc *frameCache, fh http2.FrameHeader, payload netpoll.Reader
 		// Filed: https://github.com/http2/http2-spec/issues/610
 		return nil, connError{http2.ErrCodeProtocol, "pad size larger than data payload"}
 	}
-	data, err := payload.Next(payloadLen)
-	f.data = data[:payloadLen-int(padSize)]
+	var err error
+	f.data, err = payload.Slice(payloadLen - int(padSize))
+	if int(padSize) > 0 {
+		payload.Skip(int(padSize))
+	}
 	if err != nil {
 		return nil, err
 	}

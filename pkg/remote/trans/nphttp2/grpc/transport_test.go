@@ -1738,16 +1738,17 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 	}
 	s.trReader = &transportReader{
 		reader: &recvBufferReader{
-			ctx:        s.ctx,
-			ctxDone:    s.ctx.Done(),
-			recv:       s.buf,
-			freeBuffer: func(*bytes.Buffer) {},
+			ctx:     s.ctx,
+			ctxDone: s.ctx.Done(),
+			recv:    s.buf,
 		},
 		windowHandler: func(int) {},
 	}
 	testData := make([]byte, 1)
 	testData[0] = 5
-	testBuffer := bytes.NewBuffer(testData)
+	testBuffer := netpoll.NewLinkBuffer()
+	testBuffer.WriteBinary(testData)
+	testBuffer.Flush()
 	testErr := errors.New("test error")
 	s.write(recvMsg{buffer: testBuffer, err: testErr})
 

@@ -24,7 +24,6 @@
 package grpc
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -33,37 +32,17 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
-type bufferPool struct {
-	pool sync.Pool
-}
-
-func newBufferPool() *bufferPool {
-	return &bufferPool{
-		pool: sync.Pool{
-			New: func() interface{} {
-				return new(bytes.Buffer)
-			},
-		},
-	}
-}
-
-func (p *bufferPool) get() *bytes.Buffer {
-	return p.pool.Get().(*bytes.Buffer)
-}
-
-func (p *bufferPool) put(b *bytes.Buffer) {
-	p.pool.Put(b)
-}
-
 // recvMsg represents the received msg from the transport. All transport
 // protocol specific info has been removed.
 type recvMsg struct {
-	buffer *bytes.Buffer
+	buffer netpoll.Reader
 	// nil: received some data
 	// io.EOF: stream is completed. data is nil.
 	// other non-nil error: transport failure. data is nil.
@@ -139,9 +118,8 @@ type recvBufferReader struct {
 	ctx         context.Context
 	ctxDone     <-chan struct{} // cache of ctx.Done() (for performance).
 	recv        *recvBuffer
-	last        *bytes.Buffer // Stores the remaining data in the previous calls.
+	last        netpoll.Reader // Stores the remaining data in the previous calls.
 	err         error
-	freeBuffer  func(*bytes.Buffer)
 }
 
 // Read reads the next len(p) bytes from last. If last is drained, it tries to
@@ -153,9 +131,14 @@ func (r *recvBufferReader) Read(p []byte) (n int, err error) {
 	}
 	if r.last != nil {
 		// Read remaining data left in last call.
-		copied, _ := r.last.Read(p)
+		l := r.last.Len()
+		if l > len(p) {
+			l = len(p)
+		}
+		src, _ := r.last.Next(l)
+		copied := copy(p, src)
 		if r.last.Len() == 0 {
-			r.freeBuffer(r.last)
+			r.last.Release()
 			r.last = nil
 		}
 		return copied, nil
@@ -209,9 +192,15 @@ func (r *recvBufferReader) readAdditional(m recvMsg, p []byte) (n int, err error
 	if m.err != nil {
 		return 0, m.err
 	}
-	copied, _ := m.buffer.Read(p)
+
+	l := m.buffer.Len()
+	if l > len(p) {
+		l = len(p)
+	}
+	src, _ := m.buffer.Next(l)
+	copied := copy(p, src)
 	if m.buffer.Len() == 0 {
-		r.freeBuffer(m.buffer)
+		m.buffer.Release()
 		r.last = nil
 	} else {
 		r.last = m.buffer
@@ -462,7 +451,7 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 }
 
 // StreamWrite only used for unit test
-func StreamWrite(s *Stream, buffer *bytes.Buffer) {
+func StreamWrite(s *Stream, buffer netpoll.Reader) {
 	s.write(recvMsg{buffer: buffer})
 }
 
@@ -472,9 +461,6 @@ func CreateStream(id uint32, requestRead func(i int)) *Stream {
 	trReader := &transportReader{
 		reader: &recvBufferReader{
 			recv: recvBuffer,
-			freeBuffer: func(buffer *bytes.Buffer) {
-				buffer.Reset()
-			},
 		},
 		windowHandler: func(i int) {},
 	}

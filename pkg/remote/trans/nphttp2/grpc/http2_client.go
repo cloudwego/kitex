@@ -101,8 +101,6 @@ type http2Client struct {
 	kpDormant bool
 	onGoAway  func(GoAwayReason)
 	onClose   func()
-
-	bufferPool *bufferPool
 }
 
 // newHTTP2Client constructs a connected ClientTransport to addr based on HTTP2
@@ -174,7 +172,6 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		streamsQuotaAvailable: make(chan struct{}, 1),
 		onGoAway:              onGoAway,
 		onClose:               onClose,
-		bufferPool:            newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.ctx.Done())
 	if opts.InitialWindowSize >= defaultWindowSize {
@@ -272,7 +269,6 @@ func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 			closeStream: func(err error) {
 				t.CloseStream(s, err)
 			},
-			freeBuffer: t.bufferPool.put,
 		},
 		windowHandler: func(n int) {
 			t.updateWindow(s, uint32(n))
@@ -697,18 +693,15 @@ func (t *http2Client) handleData(f *grpcframe.DataFrame) {
 			return
 		}
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
-			if w := s.fc.onRead(size - uint32(len(f.Data()))); w > 0 {
+			if w := s.fc.onRead(size - uint32(f.Data().Len())); w > 0 {
 				t.controlBuf.put(&outgoingWindowUpdate{s.id, w})
 			}
 		}
 		// TODO(bradfitz, zhaoq): A copy is required here because there is no
 		// guarantee f.Data() is consumed before the arrival of next frame.
 		// Can this copy be eliminated?
-		if len(f.Data()) > 0 {
-			buffer := t.bufferPool.get()
-			buffer.Reset()
-			buffer.Write(f.Data())
-			s.write(recvMsg{buffer: buffer})
+		if f.Data().Len() > 0 {
+			s.write(recvMsg{buffer: f.Data()})
 		}
 	}
 	// The server has closed the stream without sending trailers.  Record that
