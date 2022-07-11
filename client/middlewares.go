@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/xds/xdssuite"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -66,6 +68,35 @@ func discoveryEventHandler(name string, bus event.Bus, queue event.Queue) func(d
 				"Removed": wrapInstances(d.Removed),
 			},
 		})
+	}
+}
+
+// newXDSRouterMWBuilder creates a middleware for request routing via XDS.
+// This middleware picks one upstream cluster and sets RPCTimeout based on route config retrieved from XDS.
+func newXDSRouterMWBuilder() endpoint.MiddlewareBuilder {
+	router := xdssuite.NewXDSRouter()
+	return func(ctx context.Context) endpoint.Middleware {
+		return func(next endpoint.Endpoint) endpoint.Endpoint {
+			return func(ctx context.Context, request, response interface{}) error {
+				ri := rpcinfo.GetRPCInfo(ctx)
+				dest := ri.To()
+				if dest == nil {
+					return kerrors.ErrNoDestService
+				}
+				res, err := router.Route(ctx, ri)
+				if err != nil {
+					klog.Errorf("[XDS] Router, route failed, error=%s", err)
+					return err
+				}
+				// set destination
+				_ = remoteinfo.AsRemoteInfo(dest).SetTag(xdssuite.RouterClusterKey, res.ClusterPicked)
+				remoteinfo.AsRemoteInfo(dest).SetTagLock(xdssuite.RouterClusterKey)
+				// set timeout
+				_ = rpcinfo.AsMutableRPCConfig(ri.Config()).SetRPCTimeout(res.RPCTimeout)
+				ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+				return next(ctx, request, response)
+			}
+		}
 	}
 }
 

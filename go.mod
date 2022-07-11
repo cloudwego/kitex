@@ -9,7 +9,9 @@ require (
 	github.com/cloudwego/frugal v0.1.1
 	github.com/cloudwego/netpoll v0.2.6-0.20220728080803-64b2cef0508c
 	github.com/cloudwego/thriftgo v0.1.2
+	github.com/envoyproxy/go-control-plane v0.10.3-0.20220719090109-b024c36d9935
 	github.com/golang/mock v1.6.0
+	github.com/golang/protobuf v1.5.2
 	github.com/json-iterator/go v1.1.12
 	github.com/tidwall/gjson v1.9.3
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
