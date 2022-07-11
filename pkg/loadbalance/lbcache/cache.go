@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package lbcache combine balancer with reslover and cache the resolve result
+// Package lbcache combine balancer with resolver and cache the resolve result
 package lbcache
 
 import (

@@ -18,6 +18,7 @@ package trans
 
 import (
 	"context"
+	"errors"
 	"net"
 	"runtime/debug"
 
@@ -199,10 +200,13 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 		}
 		remote := rpcinfo.AsMutableEndpointInfo(ri.From())
 		remote.SetTag(rpcinfo.RemoteClosedTag, "1")
-	} else if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s\nstack=%s", rService, rAddr, err.Error(), pe.Stack())
 	} else {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s", rService, rAddr, err.Error())
+		var de *kerrors.DetailedError
+		if ok := errors.As(err, &de); ok && de.Stack() != "" {
+			klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s\nstack=%s", rService, rAddr, err.Error(), de.Stack())
+		} else {
+			klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s", rService, rAddr, err.Error())
+		}
 	}
 }
 
