@@ -34,14 +34,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/gofunc"
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/netpoll"
-	http2 "golang.org/x/net/http2"
+	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/cloudwego/kitex/pkg/gofunc"
+	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
 var (
@@ -107,8 +109,6 @@ type http2Server struct {
 	// RPCs go down to 0.
 	// When the connection is busy, this value is set to 0.
 	idle time.Time
-
-	bufferPool *bufferPool
 }
 
 // newHTTP2Server constructs a ServerTransport based on HTTP2. ConnectionError is
@@ -211,7 +211,6 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		kep:               kep,
 		idle:              time.Now(),
 		initialWindowSize: int32(iwz),
-		bufferPool:        newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.done)
 	if dynamicWindow {
@@ -254,7 +253,7 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		return nil, connectionErrorf(false, err, "transport: http2Server.HandleStreams failed to read initial settings frame: %v", err)
 	}
 	atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
-	sf, ok := frame.(*http2.SettingsFrame)
+	sf, ok := frame.(*grpcframe.SettingsFrame)
 	if !ok {
 		return nil, connectionErrorf(false, nil, "transport: http2Server.HandleStreams saw invalid preface type %T from client", frame)
 	}
@@ -275,7 +274,7 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 }
 
 // operateHeader takes action on the decoded headers.
-func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(*Stream), traceCtx func(context.Context, string) context.Context) (fatal bool) {
+func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle func(*Stream), traceCtx func(context.Context, string) context.Context) (fatal bool) {
 	streamID := frame.Header().StreamID
 	state := &decodeState{
 		serverSide: true,
@@ -354,10 +353,9 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 	s.wq = newWriteQuota(defaultWriteQuota, s.ctxDone)
 	s.trReader = &transportReader{
 		reader: &recvBufferReader{
-			ctx:        s.ctx,
-			ctxDone:    s.ctxDone,
-			recv:       s.buf,
-			freeBuffer: t.bufferPool.put,
+			ctx:     s.ctx,
+			ctxDone: s.ctxDone,
+			recv:    s.buf,
 		},
 		windowHandler: func(n int) {
 			t.updateWindow(s, uint32(n))
@@ -408,26 +406,27 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 			return
 		}
 		switch frame := frame.(type) {
-		case *http2.MetaHeadersFrame:
+		case *grpcframe.MetaHeadersFrame:
 			if t.operateHeaders(frame, handle, traceCtx) {
 				t.Close()
 				break
 			}
-		case *http2.DataFrame:
+		case *grpcframe.DataFrame:
 			t.handleData(frame)
 		case *http2.RSTStreamFrame:
 			t.handleRSTStream(frame)
-		case *http2.SettingsFrame:
+		case *grpcframe.SettingsFrame:
 			t.handleSettings(frame)
 		case *http2.PingFrame:
 			t.handlePing(frame)
 		case *http2.WindowUpdateFrame:
 			t.handleWindowUpdate(frame)
-		case *http2.GoAwayFrame:
+		case *grpcframe.GoAwayFrame:
 			// TODO: Handle GoAway from the client appropriately.
 		default:
 			klog.CtxErrorf(t.ctx, "transport: http2Server.HandleStreams found unhandled frame type %v.", frame)
 		}
+		t.framer.reader.Release()
 	}
 }
 
@@ -491,7 +490,7 @@ func (t *http2Server) updateWindow(s *Stream, n uint32) {
 	}
 }
 
-func (t *http2Server) handleData(f *http2.DataFrame) {
+func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 	size := f.Header().Length
 	var sendBDPPing bool
 	if t.bdpEst != nil {
@@ -533,18 +532,15 @@ func (t *http2Server) handleData(f *http2.DataFrame) {
 			return
 		}
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
-			if w := s.fc.onRead(size - uint32(len(f.Data()))); w > 0 {
+			if w := s.fc.onRead(size - uint32(f.Data().Len())); w > 0 {
 				t.controlBuf.put(&outgoingWindowUpdate{s.id, w})
 			}
 		}
 		// TODO(bradfitz, zhaoq): A copy is required here because there is no
 		// guarantee f.Data() is consumed before the arrival of next frame.
 		// Can this copy be eliminated?
-		if len(f.Data()) > 0 {
-			buffer := t.bufferPool.get()
-			buffer.Reset()
-			buffer.Write(f.Data())
-			s.write(recvMsg{buffer: buffer})
+		if f.Data().Len() > 0 {
+			s.write(recvMsg{buffer: f.Data()})
 		}
 	}
 	if f.Header().Flags.Has(http2.FlagDataEndStream) {
@@ -569,7 +565,7 @@ func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
 	})
 }
 
-func (t *http2Server) handleSettings(f *http2.SettingsFrame) {
+func (t *http2Server) handleSettings(f *grpcframe.SettingsFrame) {
 	if f.IsAck() {
 		return
 	}

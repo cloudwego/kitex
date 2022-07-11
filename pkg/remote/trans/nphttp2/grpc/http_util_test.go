@@ -17,10 +17,11 @@
 package grpc
 
 import (
-	"bytes"
 	"context"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -155,17 +156,11 @@ func TestBufferWriter(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
-func TestBufferPool(t *testing.T) {
-	pool := newBufferPool()
-	buffer := pool.get()
-	pool.put(buffer)
-}
-
 func TestRecvBufferReader(t *testing.T) {
 	testBytes := []byte("hello")
-	buffer := new(bytes.Buffer)
-	buffer.Reset()
-	buffer.Write(testBytes)
+	buffer := netpoll.NewLinkBuffer()
+	buffer.WriteBinary(testBytes)
+	buffer.Flush()
 	recvBuffer := newRecvBuffer()
 	recvBuffer.put(recvMsg{buffer: buffer})
 	ctx := context.Background()
@@ -175,16 +170,14 @@ func TestRecvBufferReader(t *testing.T) {
 		recv:    recvBuffer,
 		closeStream: func(err error) {
 		},
-		freeBuffer: func(buffer *bytes.Buffer) {
-			buffer.Reset()
-		},
 	}
 
 	n, err := rbReader.Read(testBytes)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, n == len(testBytes))
 
-	buffer.Write(testBytes)
+	buffer.WriteBinary(testBytes)
+	buffer.Flush()
 	recvBuffer.put(recvMsg{buffer: buffer})
 	rbReader.closeStream = nil
 	n, err = rbReader.Read(testBytes)

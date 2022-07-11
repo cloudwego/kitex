@@ -38,6 +38,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/syscall"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
@@ -100,8 +101,6 @@ type http2Client struct {
 	kpDormant bool
 	onGoAway  func(GoAwayReason)
 	onClose   func()
-
-	bufferPool *bufferPool
 }
 
 // newHTTP2Client constructs a connected ClientTransport to addr based on HTTP2
@@ -173,7 +172,6 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		streamsQuotaAvailable: make(chan struct{}, 1),
 		onGoAway:              onGoAway,
 		onClose:               onClose,
-		bufferPool:            newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.ctx.Done())
 	if opts.InitialWindowSize >= defaultWindowSize {
@@ -271,7 +269,6 @@ func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 			closeStream: func(err error) {
 				t.CloseStream(s, err)
 			},
-			freeBuffer: t.bufferPool.put,
 		},
 		windowHandler: func(n int) {
 			t.updateWindow(s, uint32(n))
@@ -651,7 +648,7 @@ func (t *http2Client) updateWindow(s *Stream, n uint32) {
 	}
 }
 
-func (t *http2Client) handleData(f *http2.DataFrame) {
+func (t *http2Client) handleData(f *grpcframe.DataFrame) {
 	size := f.Header().Length
 	var sendBDPPing bool
 	if t.bdpEst != nil {
@@ -696,18 +693,15 @@ func (t *http2Client) handleData(f *http2.DataFrame) {
 			return
 		}
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
-			if w := s.fc.onRead(size - uint32(len(f.Data()))); w > 0 {
+			if w := s.fc.onRead(size - uint32(f.Data().Len())); w > 0 {
 				t.controlBuf.put(&outgoingWindowUpdate{s.id, w})
 			}
 		}
 		// TODO(bradfitz, zhaoq): A copy is required here because there is no
 		// guarantee f.Data() is consumed before the arrival of next frame.
 		// Can this copy be eliminated?
-		if len(f.Data()) > 0 {
-			buffer := t.bufferPool.get()
-			buffer.Reset()
-			buffer.Write(f.Data())
-			s.write(recvMsg{buffer: buffer})
+		if f.Data().Len() > 0 {
+			s.write(recvMsg{buffer: f.Data()})
 		}
 	}
 	// The server has closed the stream without sending trailers.  Record that
@@ -741,7 +735,7 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.Newf(statusCode, "stream terminated by RST_STREAM with error code: %v", f.ErrCode), nil, false)
 }
 
-func (t *http2Client) handleSettings(f *http2.SettingsFrame, isFirst bool) {
+func (t *http2Client) handleSettings(f *grpcframe.SettingsFrame, isFirst bool) {
 	if f.IsAck() {
 		return
 	}
@@ -803,7 +797,7 @@ func (t *http2Client) handlePing(f *http2.PingFrame) {
 	t.controlBuf.put(pingAck)
 }
 
-func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
+func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	t.mu.Lock()
 	if t.state == closing {
 		t.mu.Unlock()
@@ -873,7 +867,7 @@ func (t *http2Client) handleGoAway(f *http2.GoAwayFrame) {
 // on the GoAway frame received.
 // It expects a lock on transport's mutext to be held by
 // the caller.
-func (t *http2Client) setGoAwayReason(f *http2.GoAwayFrame) {
+func (t *http2Client) setGoAwayReason(f *grpcframe.GoAwayFrame) {
 	t.goAwayReason = GoAwayNoReason
 	switch f.ErrCode {
 	case http2.ErrCodeEnhanceYourCalm:
@@ -897,7 +891,7 @@ func (t *http2Client) handleWindowUpdate(f *http2.WindowUpdateFrame) {
 }
 
 // operateHeaders takes action on the decoded headers.
-func (t *http2Client) operateHeaders(frame *http2.MetaHeadersFrame) {
+func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 	s := t.getStream(frame)
 	if s == nil {
 		return
@@ -966,7 +960,7 @@ func (t *http2Client) reader() {
 	if t.keepaliveEnabled {
 		atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
 	}
-	sf, ok := frame.(*http2.SettingsFrame)
+	sf, ok := frame.(*grpcframe.SettingsFrame)
 	if !ok {
 		t.Close() // this kicks off resetTransport, so must be last before return
 		return
@@ -1006,23 +1000,24 @@ func (t *http2Client) reader() {
 			}
 		}
 		switch frame := frame.(type) {
-		case *http2.MetaHeadersFrame:
+		case *grpcframe.MetaHeadersFrame:
 			t.operateHeaders(frame)
-		case *http2.DataFrame:
+		case *grpcframe.DataFrame:
 			t.handleData(frame)
 		case *http2.RSTStreamFrame:
 			t.handleRSTStream(frame)
-		case *http2.SettingsFrame:
+		case *grpcframe.SettingsFrame:
 			t.handleSettings(frame, false)
 		case *http2.PingFrame:
 			t.handlePing(frame)
-		case *http2.GoAwayFrame:
+		case *grpcframe.GoAwayFrame:
 			t.handleGoAway(frame)
 		case *http2.WindowUpdateFrame:
 			t.handleWindowUpdate(frame)
 		default:
 			klog.Warnf("transport: http2Client.reader got unhandled frame type %v.", frame)
 		}
+		t.framer.reader.Release()
 	}
 }
 
