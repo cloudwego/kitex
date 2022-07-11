@@ -36,12 +36,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/testutils"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
+
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/testutils"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
 type server struct {
@@ -1186,7 +1188,7 @@ func TestServerWithMisbehavedClient(t *testing.T) {
 	// success chan indicates that reader received a RSTStream from server.
 	success := make(chan struct{})
 	var mu sync.Mutex
-	framer := http2.NewFramer(mconn, mconn)
+	framer := grpcframe.NewFramer(mconn, mconn.(netpoll.Connection).Reader())
 	if err := framer.WriteSettings(); err != nil {
 		t.Fatalf("Error while writing settings: %v", err)
 	}
@@ -1807,7 +1809,7 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 //				return
 //			}
 //			switch frame := frame.(type) {
-//			case *http2.SettingsFrame:
+//			case *grpcframe.SettingsFrame:
 //				// Do nothing. A settings frame is expected from server preface.
 //			case *http2.RSTStreamFrame:
 //				if frame.Header().StreamID != 1 || http2.ErrCode(frame.ErrCode) != http2.ErrCodeProtocol {

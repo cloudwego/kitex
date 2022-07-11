@@ -10,9 +10,11 @@ header:
   paths-ignore:
     - internal/mocks/thrift/test.go
     - pkg/remote/trans/nphttp2/codes/codes.go
+    - pkg/remote/trans/nphttp2/grpc/grpcframe/
     - pkg/remote/trans/nphttp2/grpc/bdp_estimator.go
     - pkg/remote/trans/nphttp2/grpc/controlbuf.go
     - pkg/remote/trans/nphttp2/grpc/defaults.go
+    - pkg/remote/trans/nphttp2/grpc/framer.go
     - pkg/remote/trans/nphttp2/grpc/flowcontrol.go
     - pkg/remote/trans/nphttp2/grpc/http2_client.go
     - pkg/remote/trans/nphttp2/grpc/http2_server.go
