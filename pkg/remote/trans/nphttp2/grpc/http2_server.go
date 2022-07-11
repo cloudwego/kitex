@@ -822,6 +822,9 @@ func (t *http2Server) Write(s *Stream, hdr, data []byte, opts *Options) error {
 		d:           data,
 		onEachWrite: t.setResetPingStrikes,
 	}
+	if len(hdr) == 0 && len(data) != 0 {
+		df.dcache = data
+	}
 	if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
 		select {
 		case <-t.done:
