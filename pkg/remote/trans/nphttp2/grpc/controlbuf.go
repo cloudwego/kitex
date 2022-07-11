@@ -370,24 +370,27 @@ func (c *controlBuffer) execute(f func(it interface{}) bool, it interface{}) (bo
 	return true, nil
 }
 
-func (c *controlBuffer) get(block bool) (interface{}, error) {
+// getAll return link head *itemNode
+func (c *controlBuffer) getAll(block bool) (*itemNode, error) {
 	for {
 		c.mu.Lock()
 		if c.err != nil {
 			c.mu.Unlock()
 			return nil, c.err
 		}
-		if !c.list.isEmpty() {
-			h := c.list.dequeue().(cbItem)
-			if h.isTransportResponseFrame() {
-				if c.transportResponseFrames == maxQueuedTransportResponseFrames {
-					// We are removing the frame that put us over the
-					// threshold; close and clear the throttling channel.
-					ch := c.trfChan.Load().(*chan struct{})
-					close(*ch)
-					c.trfChan.Store((*chan struct{})(nil))
+		h := c.list.dequeueAll()
+		if h != nil {
+			for node := h; node != nil; node = node.next {
+				if node.it.(cbItem).isTransportResponseFrame() {
+					if c.transportResponseFrames == maxQueuedTransportResponseFrames {
+						// We are removing the frame that put us over the
+						// threshold; close and clear the throttling channel.
+						ch := c.trfChan.Load().(*chan struct{})
+						close(*ch)
+						c.trfChan.Store((*chan struct{})(nil))
+					}
+					c.transportResponseFrames--
 				}
-				c.transportResponseFrames--
 			}
 			c.mu.Unlock()
 			return h, nil
@@ -516,29 +519,33 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 		}
 	}()
 	for {
-		it, err := l.cbuf.get(true)
+		head, err := l.cbuf.getAll(true)
 		if err != nil {
 			return err
 		}
-		if err = l.handle(it); err != nil {
-			return err
-		}
-		if _, err = l.processData(); err != nil {
-			return err
+		for ; head != nil; head = head.next {
+			if err = l.handle(head.it); err != nil {
+				return err
+			}
+			if _, err = l.processData(); err != nil {
+				return err
+			}
 		}
 		gosched := true
 	hasdata:
 		for {
-			it, err := l.cbuf.get(false)
+			head, err := l.cbuf.getAll(false)
 			if err != nil {
 				return err
 			}
-			if it != nil {
-				if err = l.handle(it); err != nil {
-					return err
-				}
-				if _, err = l.processData(); err != nil {
-					return err
+			if head != nil {
+				for ; head != nil; head = head.next {
+					if err = l.handle(head.it); err != nil {
+						return err
+					}
+					if _, err = l.processData(); err != nil {
+						return err
+					}
 				}
 				continue hasdata
 			}

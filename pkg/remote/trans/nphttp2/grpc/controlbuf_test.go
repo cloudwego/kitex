@@ -34,12 +34,12 @@ func TestControlBuf(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// test get() with block
-	item, err := cb.get(true)
+	item, err := cb.getAll(true)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, item == testItem, err)
+	test.Assert(t, item.it == testItem, err)
 
 	// test get() with no block
-	item, err = cb.get(false)
+	item, err = cb.getAll(false)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, item == nil, err)
 
@@ -61,7 +61,7 @@ func TestControlBuf(t *testing.T) {
 	go func() {
 		time.Sleep(time.Millisecond * 100)
 		for {
-			it, err := cb.get(false)
+			it, err := cb.getAll(false)
 			if err != nil || it == nil {
 				break
 			}
