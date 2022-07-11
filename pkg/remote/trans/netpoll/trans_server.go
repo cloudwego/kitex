@@ -1,3 +1,6 @@
+//go:build !windows
+// +build !windows
+
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -15,6 +18,7 @@
  */
 
 // Package netpoll contains server and client implementation for netpoll.
+
 package netpoll
 
 import (

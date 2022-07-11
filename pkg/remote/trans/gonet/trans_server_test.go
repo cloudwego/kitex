@@ -1,8 +1,5 @@
-//go:build !windows
-// +build !windows
-
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +14,7 @@
  * limitations under the License.
  */
 
-package netpoll
+package gonet
 
 import (
 	"context"
@@ -34,7 +31,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/golang/mock/gomock"
 )
 
 var (
@@ -114,78 +110,14 @@ func TestBootStrap(t *testing.T) {
 	}()
 	time.Sleep(10 * time.Millisecond)
 
-	transSvr.Shutdown()
+	_ = transSvr.Shutdown()
 	wg.Wait()
-}
-
-// TestOnConnActive test trans_server onConnActive success
-func TestConnOnActive(t *testing.T) {
-	// 1. prepare mock data
-	conn := &MockNetpollConn{
-		SetReadTimeoutFunc: func(timeout time.Duration) (e error) {
-			return nil
-		},
-		Conn: mocks.Conn{
-			RemoteAddrFunc: func() (r net.Addr) {
-				return addr
-			},
-		},
-	}
-
-	// 2. test
-	connCount := 100
-	for i := 0; i < connCount; i++ {
-		transSvr.onConnActive(conn)
-	}
-	ctx := context.Background()
-
-	currConnCount := transSvr.ConnCount()
-	test.Assert(t, currConnCount.Value() == connCount)
-
-	for i := 0; i < connCount; i++ {
-		transSvr.onConnInactive(ctx, conn)
-	}
-
-	currConnCount = transSvr.ConnCount()
-	test.Assert(t, currConnCount.Value() == 0)
-}
-
-// TestOnConnActivePanic test panic recover when panic happen in OnActive
-func TestConnOnActiveAndOnInactivePanic(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer func() {
-		ctrl.Finish()
-	}()
-
-	inboundHandler := mocks.NewMockInboundHandler(ctrl)
-	transPl := remote.NewTransPipeline(svrTransHdlr)
-	transPl.AddInboundHandler(inboundHandler)
-	transSvrWithPl := NewTransServerFactory().NewTransServer(svrOpt, transPl).(*transServer)
-	conn := &MockNetpollConn{
-		Conn: mocks.Conn{
-			RemoteAddrFunc: func() (r net.Addr) {
-				return addr
-			},
-		},
-	}
-
-	// test1: recover OnActive panic
-	inboundHandler.EXPECT().OnActive(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, conn net.Conn) (context.Context, error) {
-		panic("mock panic")
-	})
-	transSvrWithPl.onConnActive(conn)
-
-	// test2: recover OnInactive panic
-	inboundHandler.EXPECT().OnInactive(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, conn net.Conn) (context.Context, error) {
-		panic("mock panic")
-	})
-	transSvrWithPl.onConnInactive(context.Background(), conn)
 }
 
 // TestOnConnRead test trans_server onConnRead success
 func TestConnOnRead(t *testing.T) {
 	// 1. prepare mock data
-	conn := &MockNetpollConn{
+	conn := &MockNetConn{
 		Conn: mocks.Conn{
 			RemoteAddrFunc: func() (r net.Addr) {
 				return addr
