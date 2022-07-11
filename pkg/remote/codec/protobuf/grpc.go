@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/bytedance/gopkg/lang/mcache"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/cloudwego/kitex/pkg/protocol/bprotoc"
@@ -56,14 +57,14 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	case bprotoc.FastWrite:
 		// TODO: reuse data buffer when we can free it safely
 		size := t.Size()
-		data = make([]byte, size+5)
+		data = mcache.Malloc(size + 5)
 		t.FastWrite(data[5:])
 		binary.BigEndian.PutUint32(data[1:5], uint32(size))
 		return writer.WriteData(data)
 	case marshaler:
 		// TODO: reuse data buffer when we can free it safely
 		size := t.Size()
-		data = make([]byte, size+5)
+		data = mcache.Malloc(size + 5)
 		if _, err = t.MarshalTo(data[5:]); err != nil {
 			return err
 		}
