@@ -30,7 +30,7 @@ import (
 	"runtime/debug"
 )
 
-var typeAssertErr = errors.New("type assertion error")
+var errTypeAssert = errors.New("type assertion error")
 
 type writerOption struct {
 	requestBase *Base // request base from metahandler
@@ -348,7 +348,7 @@ func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 	// Catch diff types are in the list panic error.
 	defer func() {
 		if r := recover(); r != nil && errors.Is(r.(error), &runtime.TypeAssertionError{}) {
-			err = fmt.Errorf("KITEX: panic=%v, error=%v, stack=%s", r, typeAssertErr, string(debug.Stack()))
+			err = fmt.Errorf("KITEX: panic=%v, error=%v, stack=%s", r, errTypeAssert, string(debug.Stack()))
 			return
 		}
 	}()
@@ -416,7 +416,7 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 	// Catch diff types are in the InterfaceMap panic error.
 	defer func() {
 		if r := recover(); r != nil && errors.Is(r.(error), &runtime.TypeAssertionError{}) {
-			err = fmt.Errorf("KITEX: panic=%v, error=%v, stack=%s", r, typeAssertErr, string(debug.Stack()))
+			err = fmt.Errorf("KITEX: panic=%v, error=%v, stack=%s", r, errTypeAssert, string(debug.Stack()))
 			return
 		}
 	}()
