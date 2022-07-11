@@ -130,7 +130,7 @@ func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 	rc.Lock()
 	defer rc.Unlock()
 	rc.msg = ""
-	if rc.hasCodeCfg == true {
+	if rc.hasCodeCfg {
 		// the priority of user setup code policy is higher than remote config
 		return
 	}
@@ -152,8 +152,6 @@ func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 
 // Init to build Retryer with code config.
 func (rc *Container) Init(mp map[string]Policy, r *IsResultRetry) (err error) {
-	rc.Lock()
-	defer rc.Unlock()
 	rc.isResultRetry = r
 	if mp == nil {
 		return nil

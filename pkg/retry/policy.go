@@ -129,6 +129,7 @@ const (
 	MultiplierBackOffCfgKey BackOffCfgKey = "multiplier"
 )
 
+// IsResultRetry is the param of `WithSpecifiedResultRetry`, it is used for specifying which error or resp need to be retried
 type IsResultRetry struct {
 	IsErrorRetry func(err error, ri rpcinfo.RPCInfo) bool
 	IsRespRetry  func(resp interface{}, ri rpcinfo.RPCInfo) bool

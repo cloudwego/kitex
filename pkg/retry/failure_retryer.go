@@ -32,9 +32,13 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-// TODO 每个方法配置单独的自定义异常
 func newFailureRetryer(policy Policy, r *IsResultRetry, cbC *cbContainer) (Retryer, error) {
-	fr := &failureRetryer{cbContainer: cbC, isResultRetry: r}
+	fr := &failureRetryer{cbContainer: cbC}
+	if r == nil {
+		fr.isResultRetry = IsResultRetry{}
+	} else {
+		fr.isResultRetry = *r
+	}
 	if err := fr.UpdatePolicy(policy); err != nil {
 		return nil, fmt.Errorf("newfailureRetryer failed, err=%w", err)
 	}
@@ -49,7 +53,7 @@ type failureRetryer struct {
 	sync.RWMutex
 	errMsg string
 
-	isResultRetry *IsResultRetry
+	isResultRetry IsResultRetry
 }
 
 // ShouldRetry implements the Retryer interface.
@@ -136,7 +140,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			circuitbreak.RecordStat(ctx, req, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 		}
 		if err == nil {
-			if r.isResultRetry != nil && r.isResultRetry.IsRespRetry(resp, cRI) {
+			if r.isResultRetry.IsRespRetry != nil && r.isResultRetry.IsRespRetry(resp, cRI) {
 				// user specified resp to do retry
 				continue
 			}
@@ -150,9 +154,9 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 				// retry error
 				err = kerrors.ErrRetry.WithCause(err)
 			} else {
-				if r.isRetryErr(err, cRI) {
+				if !r.isRetryErr(err, cRI) {
 					// timeout or user specified error to do retry
-					continue
+					break
 				}
 			}
 		}
@@ -237,10 +241,15 @@ func (r *failureRetryer) isRetryErr(err error, ri rpcinfo.RPCInfo) bool {
 	if err == nil {
 		return false
 	}
+	// Logic Notice:
+	// some kinds of error cannot be retried, eg: ServiceCircuitBreak.
+	// But CircuitBreak has been checked in ShouldRetry, it doesn't need to filter ServiceCircuitBreak.
+	// If there are some other specified errors that cannot be retried, it should be filtered here.
+
 	if kerrors.IsTimeoutError(err) {
 		return true
 	}
-	if r.isResultRetry != nil && r.isResultRetry.IsErrorRetry(err, ri) {
+	if r.isResultRetry.IsErrorRetry != nil && r.isResultRetry.IsErrorRetry(err, ri) {
 		return true
 	}
 	return false
