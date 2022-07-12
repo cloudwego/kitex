@@ -103,7 +103,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 			if err != nil {
 				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
 			}
-			offset := bthrift.Binary.WriteMessageBeginNocopy(buf, nw, methodName, thrift.TMessageType(msgType), seqID)
+			offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
 			offset += msg.FastWriteNocopy(buf[offset:], nw)
 			bthrift.Binary.WriteMessageEnd(buf[offset:])
 			return nil
