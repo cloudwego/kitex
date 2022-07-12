@@ -21,9 +21,11 @@ import (
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
+
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	internalnetpoll "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 )
@@ -531,4 +533,25 @@ func TestSkip(t *testing.T) {
 	offset += size
 	_, valSet, _, _ := Binary.ReadSetBegin(buf[offset:])
 	test.Assert(t, valSet == 11)
+}
+
+func BenchmarkStringLength(b *testing.B) {
+	var l int
+	msg := string(make([]byte, 1024))
+	for i := 0; i < b.N; i++ {
+		l = Binary.StringLength(msg)
+		if l != 4+1024 {
+			b.FailNow()
+		}
+	}
+}
+
+func BenchmarkBoolLength(b *testing.B) {
+	var l int
+	for i := 0; i < b.N; i++ {
+		l = Binary.BoolLength(true)
+		if l != 1 {
+			b.FailNow()
+		}
+	}
 }
