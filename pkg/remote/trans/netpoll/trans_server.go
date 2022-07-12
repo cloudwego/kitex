@@ -188,7 +188,6 @@ func (ts *transServer) onConnActive(conn netpoll.Connection) context.Context {
 }
 
 func (ts *transServer) onConnRead(ctx context.Context, conn netpoll.Connection) error {
-	defer transRecover(ctx, conn, "OnRead")
 	err := ts.transHdlr.OnRead(ctx, conn)
 	if err != nil {
 		ts.onError(ctx, err, conn)
