@@ -38,6 +38,16 @@ const binaryInplaceThreshold = 4096 // 4k
 
 type binaryProtocol struct{}
 
+const (
+	BoolLength = 1
+	ByteLength = 1
+	I16Length  = 2
+	I32Length  = 4
+	I64Length  = 8
+)
+
+// --- Write ---
+
 func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int {
 	offset := 0
 	version := uint32(thrift.VERSION_1) | uint32(typeID)
@@ -156,9 +166,10 @@ func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, v
 	return l + len(value)
 }
 
+// --- Length ---
+
 func (binaryProtocol) MessageBeginLength(name string, typeID thrift.TMessageType, seqid int32) int {
-	version := uint32(thrift.VERSION_1) | uint32(typeID)
-	return Binary.I32Length(int32(version)) + Binary.StringLength(name) + Binary.I32Length(seqid)
+	return I32Length + Binary.StringLength(name) + I32Length
 }
 
 func (binaryProtocol) MessageEndLength() int {
@@ -174,7 +185,7 @@ func (binaryProtocol) StructEndLength() int {
 }
 
 func (binaryProtocol) FieldBeginLength(name string, typeID thrift.TType, id int16) int {
-	return Binary.ByteLength(int8(typeID)) + Binary.I16Length(id)
+	return ByteLength + I16Length
 }
 
 func (binaryProtocol) FieldEndLength() int {
@@ -186,9 +197,7 @@ func (binaryProtocol) FieldStopLength() int {
 }
 
 func (binaryProtocol) MapBeginLength(keyType, valueType thrift.TType, size int) int {
-	return Binary.ByteLength(int8(keyType)) +
-		Binary.ByteLength(int8(valueType)) +
-		Binary.I32Length(int32(size))
+	return ByteLength + ByteLength + I32Length
 }
 
 func (binaryProtocol) MapEndLength() int {
@@ -196,8 +205,7 @@ func (binaryProtocol) MapEndLength() int {
 }
 
 func (binaryProtocol) ListBeginLength(elemType thrift.TType, size int) int {
-	return Binary.ByteLength(int8(elemType)) +
-		Binary.I32Length(int32(size))
+	return ByteLength + I32Length
 }
 
 func (binaryProtocol) ListEndLength() int {
@@ -205,8 +213,7 @@ func (binaryProtocol) ListEndLength() int {
 }
 
 func (binaryProtocol) SetBeginLength(elemType thrift.TType, size int) int {
-	return Binary.ByteLength(int8(elemType)) +
-		Binary.I32Length(int32(size))
+	return ByteLength + I32Length
 }
 
 func (binaryProtocol) SetEndLength() int {
@@ -214,38 +221,35 @@ func (binaryProtocol) SetEndLength() int {
 }
 
 func (binaryProtocol) BoolLength(value bool) int {
-	if value {
-		return Binary.ByteLength(1)
-	}
-	return Binary.ByteLength(0)
+	return BoolLength
 }
 
 func (binaryProtocol) ByteLength(value int8) int {
-	return 1
+	return ByteLength
 }
 
 func (binaryProtocol) I16Length(value int16) int {
-	return 2
+	return I16Length
 }
 
 func (binaryProtocol) I32Length(value int32) int {
-	return 4
+	return I32Length
 }
 
 func (binaryProtocol) I64Length(value int64) int {
-	return 8
+	return I64Length
 }
 
 func (binaryProtocol) DoubleLength(value float64) int {
-	return Binary.I64Length(int64(math.Float64bits(value)))
+	return I64Length
 }
 
 func (binaryProtocol) StringLength(value string) int {
-	return Binary.I32Length(int32(len(value))) + len(value)
+	return I32Length + len(value)
 }
 
 func (binaryProtocol) BinaryLength(value []byte) int {
-	return Binary.I32Length(int32(len(value))) + len(value)
+	return I32Length + len(value)
 }
 
 func (binaryProtocol) StringLengthNocopy(value string) int {
@@ -253,12 +257,13 @@ func (binaryProtocol) StringLengthNocopy(value string) int {
 }
 
 func (binaryProtocol) BinaryLengthNocopy(value []byte) int {
-	l := Binary.I32Length(int32(len(value)))
 	if len(value) > binaryInplaceThreshold {
-		return l
+		return I32Length
 	}
-	return l + len(value)
+	return I32Length + len(value)
 }
+
+// --- Read ---
 
 func (binaryProtocol) ReadMessageBegin(buf []byte) (name string, typeID thrift.TMessageType, seqid int32, length int, err error) {
 	size, l, e := Binary.ReadI32(buf)
