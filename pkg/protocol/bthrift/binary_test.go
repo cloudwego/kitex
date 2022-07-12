@@ -19,10 +19,11 @@ package bthrift
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/gopkg/lang/fastrand"
 	mt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -31,7 +32,7 @@ import (
 	"github.com/cloudwego/netpoll"
 )
 
-// TestWriteMessageEnd test binary WriteMessageEnd func
+// TestWriteMessageEnd test binary WriteMessageEnd function
 func TestWriteMessageEnd(t *testing.T) {
 	buf := make([]byte, 0)
 	test.Assert(t, Binary.WriteMessageEnd(buf) == 0)
@@ -329,7 +330,7 @@ func TestWriteStringNocopy(t *testing.T) {
 	test.Assert(t, ws == exceptWs, ws, exceptWs)
 }
 
-// TestWriteBinaryNocopy test binary NewReaderWriterByteBuffer with small content
+// TestWriteBinaryNocopy test binary NewReaderWriterByteBuffer
 func TestWriteBinaryNocopy(t *testing.T) {
 	buf := make([]byte, 128)
 	exceptWs := "0000000c6d657373616765426567696e"
@@ -340,9 +341,32 @@ func TestWriteBinaryNocopy(t *testing.T) {
 	ws := fmt.Sprintf("%x", buf[:wn])
 	test.Assert(t, wn == exceptSize, wn, exceptSize)
 	test.Assert(t, ws == exceptWs, ws, exceptWs)
+
+	// big message with generate, length is 7727
+	buf = make([]byte, 8194)
+	msg := getBigMessage()
+	exceptSize = 12
+	bufferLink := netpoll.NewLinkBuffer(1)
+	bufferLink.Malloc(8194)
+	out = internalnetpoll.NewReaderWriterByteBuffer(bufferLink)
+	nw, _ = out.(remote.NocopyWrite)
+	wn = Binary.WriteMessageBeginNocopy(buf, nw, msg, thrift.CALL, 1)
+	bufferLink.Flush()
+	valBuf := bufferLink.Bytes()
+	writer := bytes.Buffer{}
+	writer.Write(buf[:8])
+	writer.Write(valBuf[8 : len(msg)+8])
+	writer.Write(buf[8:])
+	msgCodec := utils.NewThriftMessageCodec()
+	var argsDecode1 mt.MockTestArgs
+	method, seqID, err := msgCodec.Decode(writer.Bytes(), &argsDecode1)
+	test.Assert(t, method == msg, method, msg)
+	test.Assert(t, seqID == 1, seqID)
+	test.Assert(t, nil == err, err)
+	test.Assert(t, wn == exceptSize, wn, exceptSize)
 }
 
-// TestLength test binary length funcs
+// TestLength test binary length functions
 func TestLength(t *testing.T) {
 	// Message Length
 	test.Assert(t, Binary.MessageBeginLength("kitex", thrift.CALL, 1) == 17)
@@ -495,32 +519,9 @@ func TestWriteMessageBeginNocopy(t *testing.T) {
 	ws = fmt.Sprintf("%x", buf[:wn])
 	test.Assert(t, wn == exceptSize, wn, exceptSize)
 	test.Assert(t, ws == exceptWs, ws, exceptWs)
-
-	// big message with generate, length is 7727
-	buf = make([]byte, 8194)
-	msg := getBigMessage()
-	exceptSize = 12
-	bufferLink := netpoll.NewLinkBuffer(1)
-	bufferLink.Malloc(8194)
-	out = internalnetpoll.NewReaderWriterByteBuffer(bufferLink)
-	nw, _ = out.(remote.NocopyWrite)
-	wn = Binary.WriteMessageBeginNocopy(buf, nw, msg, thrift.CALL, 1)
-	bufferLink.Flush()
-	valBuf := bufferLink.Bytes()
-	writer := bytes.Buffer{}
-	writer.Write(buf[:8])
-	writer.Write(valBuf[8 : len(msg)+8])
-	writer.Write(buf[8:])
-	msgCodec := utils.NewThriftMessageCodec()
-	var argsDecode1 mt.MockTestArgs
-	method, seqID, err := msgCodec.Decode(writer.Bytes(), &argsDecode1)
-	test.Assert(t, method == msg, method, msg)
-	test.Assert(t, seqID == 1, seqID)
-	test.Assert(t, nil == err, err)
-	test.Assert(t, wn == exceptSize, wn, exceptSize)
 }
 
-// TestSkip test binary Skip with multi write funcs
+// TestSkip test binary Skip with write functions
 func TestSkip(t *testing.T) {
 	buf := make([]byte, 1024)
 	offset, length := 0, 0
@@ -590,12 +591,14 @@ func TestSkip(t *testing.T) {
 	test.Assert(t, valSet == 11)
 }
 
-// getBigMessage rand big message
+// getBigMessage generate a rand message with length > 4096
 func getBigMessage() string {
 	byteSource := "abcdefghijklmnopqrstuvsxyz"
-	buf := bytes.Buffer{}
-	for i := 0; i < 7727; i++ {
-		buf.WriteByte(byteSource[rand.Intn(26)])
+	msgLength := 7727
+	builder := strings.Builder{}
+	builder.Grow(msgLength)
+	for i := 0; i < msgLength; i++ {
+		builder.WriteByte(byteSource[fastrand.Intn(26)])
 	}
-	return buf.String()
+	return builder.String()
 }
