@@ -1,0 +1,23 @@
+package xdsresource
+
+import (
+	"fmt"
+	"strings"
+)
+
+func processUnmarshalErrors(errSlice []error, errMap map[string]error) error {
+	var b strings.Builder
+	for _, err := range errSlice {
+		b.WriteString(err.Error())
+		b.WriteString("\n")
+	}
+
+	if len(errMap) > 0 {
+		b.WriteString("Error per resource:\n")
+		for name, err := range errMap {
+			b.WriteString(fmt.Sprintf("resource %s: %s;\n", name, err.Error()))
+		}
+	}
+
+	return fmt.Errorf(b.String())
+}
