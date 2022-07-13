@@ -4,7 +4,7 @@ on: [pull_request]
 
 jobs:
   compliant:
-    runs-on: self-hosted
+    runs-on: [self-hosted, X64]
     steps:
       - uses: actions/checkout@v3
 
