@@ -193,7 +193,7 @@ func newAsyncCallback(wbuf *netpoll.LinkBuffer, bufWriter remote.ByteBuffer) *as
 	return &asyncCallback{
 		wbuf:       wbuf,
 		bufWriter:  bufWriter,
-		notifyChan: make(chan remote.ByteBuffer),
+		notifyChan: make(chan remote.ByteBuffer, 1),
 	}
 }
 
