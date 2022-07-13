@@ -187,7 +187,8 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 	sendMsg := initClientSendMsg(transport.TTHeader)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
-
+	name := dc.Name()
+	test.Assert(t, name == "default")
 	// encode
 	out := remote.NewWriterBuffer(256)
 	err := dc.Encode(ctx, sendMsg, out)
@@ -210,7 +211,6 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 
 func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
-
 	smallDc := NewDefaultCodecWithSizeLimit(1)
 	largeDc := NewDefaultCodecWithSizeLimit(1024)
 	ctx := context.Background()
@@ -219,15 +219,14 @@ func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 	sendMsg := initClientSendMsg(transport.TTHeader)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
-
 	// encode
 	smallOut := remote.NewWriterBuffer(256)
 	largeOut := remote.NewWriterBuffer(256)
 	err := smallDc.Encode(ctx, sendMsg, smallOut)
 	test.Assert(t, err != nil, err)
 	err = largeDc.Encode(ctx, sendMsg, largeOut)
+	sendMsg.RPCRole()
 	test.Assert(t, err == nil, err)
-
 	// decode
 	recvMsg := initServerRecvMsg()
 	smallBuf, _ := smallOut.Bytes()

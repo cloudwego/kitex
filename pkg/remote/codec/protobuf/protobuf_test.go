@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -229,4 +230,9 @@ func (p *MockReqArgs) GetReq() *MockReq {
 
 func (p *MockReqArgs) IsSetReq() bool {
 	return p.Req != nil
+}
+
+func TestNewProtobufCodec(t *testing.T) {
+	codec := NewProtobufCodec()
+	test.Assert(t, reflect.DeepEqual(codec, payloadCodec))
 }

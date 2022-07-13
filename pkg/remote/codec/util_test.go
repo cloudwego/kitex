@@ -17,6 +17,7 @@
 package codec
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -63,6 +64,9 @@ func TestUpdateMsgType(t *testing.T) {
 	err := UpdateMsgType(uint32(remote.Oneway), msg)
 	test.Assert(t, err == nil)
 	test.Assert(t, msg.MessageType() == remote.Oneway)
+	msg1 := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.InternalError, remote.Server)
+	err2 := UpdateMsgType(uint32(remote.Reply), msg1)
+	test.Assert(t, err2 != nil)
 }
 
 // test is used to create the data if not exist.
@@ -71,6 +75,8 @@ func TestNewDataIfNeeded(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "", nil, nil),
 		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Oneway, remote.Server)
+	data := msg.Data()
+	fmt.Println(data)
 	err := NewDataIfNeeded("mock", msg)
 	test.Assert(t, err == nil)
 }

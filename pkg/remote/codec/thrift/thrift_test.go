@@ -19,6 +19,7 @@ package thrift
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -72,6 +73,7 @@ func TestWithContext(t *testing.T) {
 	out := remote.NewWriterBuffer(256)
 	err := payloadCodec.Marshal(ctx, msg, out)
 	test.Assert(t, err == nil, err)
+	payloadCodec.Marshal(ctx, msg, out)
 
 	{
 		resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, oprot thrift.TProtocol) error { return nil }}
@@ -242,4 +244,14 @@ func prepareReq() *mt.MockReq {
 
 func newMockTestArgs() interface{} {
 	return mt.NewMockTestArgs()
+}
+
+func TestNewThriftCodec(t *testing.T) {
+	codec := NewThriftCodec()
+	test.Assert(t, reflect.DeepEqual(codec, payloadCodec))
+}
+
+func Test_thriftCodec_Name(t *testing.T) {
+	name := payloadCodec.Name()
+	test.Assert(t, name == "thrift")
 }

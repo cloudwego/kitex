@@ -58,6 +58,11 @@ func TestMessage(t *testing.T) {
 	test.Assert(t, _seqID == seqID, _seqID, seqID)
 	err = prot.ReadMessageEnd()
 	test.Assert(t, err == nil, err)
+
+	transport := prot.Transport()
+	test.Assert(t, transport == nil)
+	err = prot.Skip(thrift.I32)
+	test.Assert(t, err != nil)
 }
 
 func TestStruct(t *testing.T) {
