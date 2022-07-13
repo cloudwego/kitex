@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -101,8 +102,12 @@ func (ts *transServer) BootstrapServer() (err error) {
 			os.Exit(1)
 		}
 		go func() {
+			_, ctx := ts.opt.InitRPCInfoFunc(context.Background(), conn.RemoteAddr())
+			defer func() {
+				// recycle rpcinfo
+				rpcinfo.PutRPCInfo(rpcinfo.GetRPCInfo(ctx))
+			}()
 			for {
-				_, ctx := ts.opt.InitRPCInfoFunc(context.Background(), conn.RemoteAddr())
 				err = ts.onConnRead(ctx, conn)
 				if err != nil {
 					klog.Errorf("server onConnRead error, err=%s", err.Error())
