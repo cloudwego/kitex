@@ -26,6 +26,7 @@ var (
 	cop = &grpcCodec{}
 )
 
+//test for name
 func Test_grpcCodec_Name(t *testing.T) {
 	newGrpcCodec := &grpcCodec{}
 	test.Assert(t, newGrpcCodec.Name() == "grpc")
