@@ -14,10 +14,10 @@ github.com/chenzhuoyu/iasm v0.0.0-20220407070608-915f5d279eca/go.mod h1:wOQ0nsbe
 github.com/choleraehyq/pid v0.0.13 h1:Tc/jYjHC50SDCxSX+DWHfMmFqtwGR8EiQ08qJ/EK8zs=
 github.com/choleraehyq/pid v0.0.13/go.mod h1:uhzeFgxJZWQsZulelVQZwdASxQ9TIPZYL4TPkQMtL/U=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
-github.com/cloudwego/frugal v0.1.1-0.20220623110256-ae138b45437e h1:GWwPHqW+TgpNgBfPpO+Qh0fJYYdDjLgqO/533TRdrq4=
-github.com/cloudwego/frugal v0.1.1-0.20220623110256-ae138b45437e/go.mod h1:qBJcpMNEGCb1BGMxY9JH8PV3XVWIH3qSrwSKHvODddE=
-github.com/cloudwego/netpoll v0.2.5-0.20220610094432-be0104887aa9 h1:5+a2dFtqX1H1syMOzlJ6zJ9t0ass/FZyVkPppKfZG8g=
-github.com/cloudwego/netpoll v0.2.5-0.20220610094432-be0104887aa9/go.mod h1:1T2WVuQ+MQw6h6DpE45MohSvDTKdy2DlzCx2KsnPI4E=
+github.com/cloudwego/frugal v0.1.1 h1:AQATdGAKsyO8BcEeSUzagdP1RO7EXh1Q9qKkAMU1cnw=
+github.com/cloudwego/frugal v0.1.1/go.mod h1:qBJcpMNEGCb1BGMxY9JH8PV3XVWIH3qSrwSKHvODddE=
+github.com/cloudwego/netpoll v0.2.5 h1:ojuAPsQqiQVM9XHd1s8trix2dLJbyDZ0fPPu6dWTT78=
+github.com/cloudwego/netpoll v0.2.5/go.mod h1:1T2WVuQ+MQw6h6DpE45MohSvDTKdy2DlzCx2KsnPI4E=
 github.com/cloudwego/thriftgo v0.1.2 h1:AXpGJiWE3VggfiRHwA6raRJUIcjxliEIfJfGlvRiYUA=
 github.com/cloudwego/thriftgo v0.1.2/go.mod h1:LzeafuLSiHA9JTiWC8TIMIq64iadeObgRUhmVG1OC/w=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
@@ -177,8 +177,8 @@ gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405 h1:yhCVgyC4o1eVCa2tZl7eS0r+
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b h1:h8qDotaEPuJATrMmW04NCwg7v22aHH28wwpauUhK9Oo=
-gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
+gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 honnef.co/go/tools v0.0.0-20190102054323-c2f93a96b099/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc/go.mod h1:rf3lG4BRIbNafJWhAfAdb/ePZxsR/4RtNHQocxwk9r4=
 honnef.co/go/tools v0.1.3/go.mod h1:NgwopIslSNH47DimFoV78dnkksY2EFtX0ajyb3K/las=
