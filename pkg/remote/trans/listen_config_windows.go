@@ -21,6 +21,7 @@ package trans
 
 import (
 	"net"
+	"syscall"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 )
