@@ -29,7 +29,6 @@ type BinaryWriter interface {
 // BTProtocol .
 type BTProtocol interface {
 	WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int
-	WriteMessageBeginNocopy(buf []byte, binaryWriter BinaryWriter, name string, typeID thrift.TMessageType, seqid int32) int
 	WriteMessageEnd(buf []byte) int
 	WriteStructBegin(buf []byte, name string) int
 	WriteStructEnd(buf []byte) int

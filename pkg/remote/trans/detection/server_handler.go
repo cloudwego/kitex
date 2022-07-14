@@ -46,6 +46,10 @@ type svrTransHandlerFactory struct {
 	netpoll remote.ServerTransHandlerFactory
 }
 
+func (f *svrTransHandlerFactory) MuxEnabled() bool {
+	return false
+}
+
 func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
 	t := &svrTransHandler{}
 	var err error
@@ -84,7 +88,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	// only need detect once when connection is reused
 	r := ctx.Value(handlerKey{}).(*handlerWrapper)
 	if r.handler != nil {
-		return r.handler.OnRead(ctx, conn)
+		return r.handler.OnRead(r.ctx, conn)
 	}
 	// Check the validity of client preface.
 	zr := conn.(netpoll.Connection).Reader()
@@ -102,11 +106,16 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			return err
 		}
 	}
-	r.handler = which
+	r.ctx, r.handler = ctx, which
 	return which.OnRead(ctx, conn)
 }
 
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
+	// t.http2 should use the ctx returned by OnActive in r.ctx
+	r := ctx.Value(handlerKey{}).(*handlerWrapper)
+	if r.ctx != nil {
+		ctx = r.ctx
+	}
 	t.which(ctx).OnInactive(ctx, conn)
 }
 
@@ -123,7 +132,7 @@ func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
 		return r.handler
 	}
 	// use noop transHandler
-	return noopSvrTransHandler{}
+	return noopHandler
 }
 
 func (t *svrTransHandler) SetPipeline(pipeline *remote.TransPipeline) {
@@ -155,5 +164,6 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 type handlerKey struct{}
 
 type handlerWrapper struct {
+	ctx     context.Context
 	handler remote.ServerTransHandler
 }

@@ -274,7 +274,7 @@ func TestServerBoundHandler(t *testing.T) {
 				WithMetaHandler(noopMetahandler{}),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(limiter.NewConcurrencyLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil, false),
+				bound.NewServerLimiterHandler(limiter.NewConnectionLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil, false),
 				bound.NewTransMetaHandler([]remote.MetaHandler{noopMetahandler{}, transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -378,7 +378,7 @@ func TestServerBoundHandler(t *testing.T) {
 				WithMuxTransport(),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(limiter.NewConcurrencyLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil, true),
+				bound.NewServerLimiterHandler(limiter.NewConnectionLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{

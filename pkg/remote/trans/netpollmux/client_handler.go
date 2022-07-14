@@ -137,17 +137,21 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 	case <-ctx.Done():
 		// timeout
 		return fmt.Errorf("recv wait timeout %s, seqID=%d", readTimeout, seqID)
-	case err := <-callback.notifyChan:
+	case bufReader := <-callback.notifyChan:
 		// recv
-		if err != nil {
-			return err
+		if bufReader == nil {
+			return ErrConnClosed
 		}
 		stats2.Record(ctx, ri, stats.ReadStart, nil)
 		msg.SetPayloadCodec(t.opt.PayloadCodec)
-		err = t.codec.Decode(ctx, msg, callback.bufReader)
+		err := t.codec.Decode(ctx, msg, bufReader)
 		if err != nil && errors.Is(err, netpoll.ErrReadTimeout) {
 			err = kerrors.ErrRPCTimeout.WithCause(err)
 		}
+		if l := bufReader.ReadableLen(); l > 0 {
+			bufReader.Skip(l)
+		}
+		bufReader.Release(nil)
 		stats2.Record(ctx, ri, stats.ReadFinish, err)
 		return err
 	}
@@ -181,23 +185,21 @@ func (t *cliTransHandler) SetPipeline(p *remote.TransPipeline) {
 type asyncCallback struct {
 	wbuf       *netpoll.LinkBuffer
 	bufWriter  remote.ByteBuffer
-	bufReader  remote.ByteBuffer
-	notifyChan chan error
-	closed     int32 // 1 is closed, 2 means wbuf has been flush
+	notifyChan chan remote.ByteBuffer // notify recv reader
+	closed     int32                  // 1 is closed, 2 means wbuf has been flush
 }
 
 func newAsyncCallback(wbuf *netpoll.LinkBuffer, bufWriter remote.ByteBuffer) *asyncCallback {
 	return &asyncCallback{
 		wbuf:       wbuf,
 		bufWriter:  bufWriter,
-		notifyChan: make(chan error, 1),
+		notifyChan: make(chan remote.ByteBuffer, 1),
 	}
 }
 
 // Recv is called when receive a message.
 func (c *asyncCallback) Recv(bufReader remote.ByteBuffer, err error) error {
-	c.bufReader = bufReader
-	c.notify(err)
+	c.notify(bufReader)
 	return nil
 }
 
@@ -207,19 +209,16 @@ func (c *asyncCallback) Close() error {
 		c.wbuf.Close()
 		c.bufWriter.Release(nil)
 	}
-	if c.bufReader != nil {
-		if l := c.bufReader.ReadableLen(); l > 0 {
-			c.bufReader.Skip(l)
-		}
-		c.bufReader.Release(nil)
-	}
 	return nil
 }
 
-func (c *asyncCallback) notify(err error) {
+func (c *asyncCallback) notify(bufReader remote.ByteBuffer) {
 	select {
-	case c.notifyChan <- err:
+	case c.notifyChan <- bufReader:
 	default:
+		if bufReader != nil {
+			bufReader.Release(nil)
+		}
 	}
 }
 

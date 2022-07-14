@@ -93,11 +93,11 @@ func TestException(t *testing.T) {
 	in := remote.NewReaderBuffer(buf)
 	err = payloadCodec.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err != nil)
-	pbErr, ok := err.(*pbError)
+	transErr, ok := err.(*remote.TransError)
 	test.Assert(t, ok)
 	test.Assert(t, err.Error() == errInfo)
-	test.Assert(t, pbErr.errProto.Message == errInfo)
-	test.Assert(t, pbErr.errProto.TypeID == remote.UnknownMethod)
+	test.Assert(t, transErr.Error() == errInfo)
+	test.Assert(t, transErr.TypeID() == remote.UnknownMethod)
 }
 
 func TestTransErrorUnwrap(t *testing.T) {

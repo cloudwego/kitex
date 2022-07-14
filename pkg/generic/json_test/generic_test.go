@@ -55,10 +55,10 @@ func TestRun(t *testing.T) {
 
 func testThrift(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9121", new(GenericServiceImpl))
+	svr := initThriftServer(t, ":8121", new(GenericServiceImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClient(t, "127.0.0.1:9121")
+	cli := initThriftClient(t, "127.0.0.1:8121")
 
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -70,10 +70,10 @@ func testThrift(t *testing.T) {
 
 func testThriftPingMethod(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9122", new(GenericServicePingImpl))
+	svr := initThriftServer(t, ":8122", new(GenericServicePingImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClient(t, "127.0.0.1:9122")
+	cli := initThriftClient(t, "127.0.0.1:8122")
 
 	resp, err := cli.GenericCall(context.Background(), "Ping", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -85,10 +85,10 @@ func testThriftPingMethod(t *testing.T) {
 
 func testThriftError(t *testing.T) {
 	time.Sleep(2 * time.Second)
-	svr := initThriftServer(t, ":9123", new(GenericServiceErrorImpl))
+	svr := initThriftServer(t, ":8123", new(GenericServiceErrorImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClient(t, "127.0.0.1:9123")
+	cli := initThriftClient(t, "127.0.0.1:8123")
 
 	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil)
@@ -98,10 +98,10 @@ func testThriftError(t *testing.T) {
 
 func testThriftOnewayMethod(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9124", new(GenericServiceOnewayImpl))
+	svr := initThriftServer(t, ":8124", new(GenericServiceOnewayImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClient(t, "127.0.0.1:9124")
+	cli := initThriftClient(t, "127.0.0.1:8124")
 
 	resp, err := cli.GenericCall(context.Background(), "Oneway", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -111,10 +111,10 @@ func testThriftOnewayMethod(t *testing.T) {
 
 func testThriftVoidMethod(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9125", new(GenericServiceVoidImpl))
+	svr := initThriftServer(t, ":8125", new(GenericServiceVoidImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClient(t, "127.0.0.1:9125")
+	cli := initThriftClient(t, "127.0.0.1:8125")
 
 	resp, err := cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -124,10 +124,10 @@ func testThriftVoidMethod(t *testing.T) {
 
 func testThriftReadRequiredField(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9126", new(GenericServiceReadRequiredFiledImpl))
+	svr := initThriftServer(t, ":8126", new(GenericServiceReadRequiredFiledImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClientByIDL(t, "127.0.0.1:9126", "./idl/example_check_read_required.thrift", nil)
+	cli := initThriftClientByIDL(t, "127.0.0.1:8126", "./idl/example_check_read_required.thrift", nil)
 
 	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil, err)
@@ -137,10 +137,10 @@ func testThriftReadRequiredField(t *testing.T) {
 
 func testThriftWriteRequiredField(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9127", new(GenericServiceReadRequiredFiledImpl))
+	svr := initThriftServer(t, ":8127", new(GenericServiceReadRequiredFiledImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClientByIDL(t, "127.0.0.1:9127", "./idl/example_check_write_required.thrift", nil)
+	cli := initThriftClientByIDL(t, "127.0.0.1:8127", "./idl/example_check_write_required.thrift", nil)
 
 	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil, err)
@@ -162,10 +162,10 @@ func testThrift2NormalServer(t *testing.T) {
 
 func testThriftRawBinaryEcho(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServerByIDL(t, ":9126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", &(&struct{ x bool }{false}).x)
+	svr := initThriftServerByIDL(t, ":8126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", &(&struct{ x bool }{false}).x)
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClientByIDL(t, "127.0.0.1:9126", "./idl/binary_echo.thrift", &(&struct{ x bool }{false}).x)
+	cli := initThriftClientByIDL(t, "127.0.0.1:8126", "./idl/binary_echo.thrift", &(&struct{ x bool }{false}).x)
 
 	req := "{\"msg\":\"" + mockMyMsg + "\", \"got_base64\":\"false\"}"
 	resp, err := cli.GenericCall(context.Background(), "BinaryEcho", req, callopt.WithRPCTimeout(100*time.Second))
@@ -179,10 +179,10 @@ func testThriftRawBinaryEcho(t *testing.T) {
 
 func testThriftBase64BinaryEcho(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServerByIDL(t, ":9126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", nil)
+	svr := initThriftServerByIDL(t, ":8126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", nil)
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClientByIDL(t, "127.0.0.1:9126", "./idl/binary_echo.thrift", nil)
+	cli := initThriftClientByIDL(t, "127.0.0.1:8126", "./idl/binary_echo.thrift", nil)
 
 	base64MockMyMsg := base64.StdEncoding.EncodeToString([]byte(mockMyMsg))
 	req := "{\"msg\":\"" + base64MockMyMsg + "\", \"got_base64\":\"true\"}"
@@ -200,7 +200,7 @@ func initThriftMockClient(t *testing.T) genericclient.Client {
 	test.Assert(t, err == nil)
 	g, err := generic.JSONThriftGeneric(p)
 	test.Assert(t, err == nil)
-	cli := newGenericClient("destServiceName", g, "127.0.0.1:9128")
+	cli := newGenericClient("destServiceName", g, "127.0.0.1:8128")
 	test.Assert(t, err == nil)
 	return cli
 }
@@ -241,7 +241,7 @@ func initThriftServerByIDL(t *testing.T, address string, handler generic.Service
 }
 
 func initMockServer(t *testing.T, handler kt.Mock) server.Server {
-	addr, _ := net.ResolveTCPAddr("tcp", ":9128")
+	addr, _ := net.ResolveTCPAddr("tcp", ":8128")
 	svr := newMockServer(handler, addr)
 	return svr
 }
@@ -261,7 +261,7 @@ func testJSONThriftGenericClientClose(t *testing.T) {
 		test.Assert(t, err == nil)
 		g, err := generic.JSONThriftGeneric(p)
 		test.Assert(t, err == nil)
-		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9129")
+		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:8129")
 	}
 
 	runtime.ReadMemStats(&ms)
@@ -292,7 +292,7 @@ func testJSONThriftGenericClientFinalizer(t *testing.T) {
 		test.Assert(t, err == nil)
 		g, err := generic.JSONThriftGeneric(p)
 		test.Assert(t, err == nil)
-		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9130")
+		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:8130")
 	}
 
 	runtime.ReadMemStats(&ms)
