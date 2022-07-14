@@ -18,6 +18,8 @@ github.com/cloudwego/frugal v0.1.1-0.20220623110256-ae138b45437e h1:GWwPHqW+TgpN
 github.com/cloudwego/frugal v0.1.1-0.20220623110256-ae138b45437e/go.mod h1:qBJcpMNEGCb1BGMxY9JH8PV3XVWIH3qSrwSKHvODddE=
 github.com/cloudwego/netpoll v0.2.5-0.20220610094432-be0104887aa9 h1:5+a2dFtqX1H1syMOzlJ6zJ9t0ass/FZyVkPppKfZG8g=
 github.com/cloudwego/netpoll v0.2.5-0.20220610094432-be0104887aa9/go.mod h1:1T2WVuQ+MQw6h6DpE45MohSvDTKdy2DlzCx2KsnPI4E=
+github.com/cloudwego/netpoll v0.2.5 h1:ojuAPsQqiQVM9XHd1s8trix2dLJbyDZ0fPPu6dWTT78=
+github.com/cloudwego/netpoll v0.2.5/go.mod h1:1T2WVuQ+MQw6h6DpE45MohSvDTKdy2DlzCx2KsnPI4E=
 github.com/cloudwego/thriftgo v0.1.2 h1:AXpGJiWE3VggfiRHwA6raRJUIcjxliEIfJfGlvRiYUA=
 github.com/cloudwego/thriftgo v0.1.2/go.mod h1:LzeafuLSiHA9JTiWC8TIMIq64iadeObgRUhmVG1OC/w=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
