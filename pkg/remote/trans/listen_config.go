@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 
-package netpoll
+package trans
 
 import (
 	"net"
@@ -27,8 +27,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// newListenConfig return an new net.ListenConfig.
-func newListenConfig(opt *remote.ServerOption) net.ListenConfig {
+// NewListenConfig return an new net.ListenConfig.
+func NewListenConfig(opt *remote.ServerOption) net.ListenConfig {
 	return net.ListenConfig{
 		Control: func(network, address string, c syscall.RawConn) error {
 			var err error

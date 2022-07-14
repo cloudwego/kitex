@@ -26,6 +26,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/cloudwego/kitex/pkg/remote/trans"
+
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -42,8 +44,9 @@ type netpollTransServerFactory struct{}
 // NewTransServer implements the remote.TransServerFactory interface.
 func (f *netpollTransServerFactory) NewTransServer(opt *remote.ServerOption, transHdlr remote.ServerTransHandler) remote.TransServer {
 	return &transServer{
-		opt: opt, transHdlr: transHdlr,
-		lncfg: newListenConfig(opt),
+		opt:       opt,
+		transHdlr: transHdlr,
+		lncfg:     trans.NewListenConfig(opt),
 	}
 }
 
