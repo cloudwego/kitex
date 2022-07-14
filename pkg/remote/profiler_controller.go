@@ -18,22 +18,6 @@ package remote
 
 import (
 	"context"
-	"runtime/pprof"
-
-	"github.com/cloudwego/kitex/pkg/profiler"
-	"github.com/cloudwego/kitex/pkg/remote/transmeta"
-)
-
-const (
-	keyType      = "type"
-	typeTrace    = "trace"
-	typeProfiler = "profiler"
-
-	keyStage     = "stage"
-	stageTrans   = "trans"
-	stageMessage = "message"
-
-	keyFrom = "from"
 )
 
 type ProfilerController interface {
@@ -42,60 +26,6 @@ type ProfilerController interface {
 	TagTransInfo(ctx context.Context, ti TransInfo)
 	TagMessage(ctx context.Context, msg Message)
 	Untag(ctx context.Context)
-}
-
-var _ ProfilerController = (*profilerController)(nil)
-
-func NewProfilerController(p profiler.Profiler) ProfilerController {
-	return &profilerController{p: p}
-}
-
-type profilerController struct {
-	p profiler.Profiler
-}
-
-func (c *profilerController) Run(ctx context.Context) (err error) {
-	// tagging current goroutine
-	// we could filter tag from pprof data to figure out that how much cost our profiler cause
-	ctx = pprof.WithLabels(ctx, pprof.Labels(keyType, typeProfiler))
-	return c.p.Run(ctx)
-}
-
-func (c *profilerController) Stop() {
-	c.p.Stop()
-}
-
-func (c *profilerController) TagTransInfo(ctx context.Context, ti TransInfo) {
-	if ti == nil || ti.TransIntInfo()[transmeta.FromService] == "" {
-		return
-	}
-	c.p.Tag(ctx,
-		keyType, typeTrace,
-		keyStage, stageTrans,
-		keyFrom, ti.TransIntInfo()[transmeta.FromService],
-	)
-}
-
-func (c *profilerController) TagMessage(ctx context.Context, msg Message) {
-	ti := msg.TransInfo()
-	// already tagged in trans stage
-	if ti != nil && ti.TransIntInfo()[transmeta.FromService] != "" {
-		return
-	}
-
-	ri := msg.RPCInfo()
-	if ri == nil || ri.From() == nil {
-		return
-	}
-	c.p.Tag(ctx,
-		keyType, typeTrace,
-		keyStage, stageMessage,
-		keyFrom, ri.From().ServiceName(),
-	)
-}
-
-func (c *profilerController) Untag(ctx context.Context) {
-	c.p.Untag(ctx)
 }
 
 var _ MetaHandler = (*profilerMetaHandler)(nil)
