@@ -21,17 +21,19 @@
 package server
 
 import (
+	"fmt"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
-	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/trans/gonet"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 )
 
 func newServerRemoteOption() *remote.ServerOption {
+	fmt.Println("server gonet")
 	return &remote.ServerOption{
-		TransServerFactory:    netpoll.NewTransServerFactory(),
-		SvrHandlerFactory:     detection.NewSvrTransHandlerFactory(),
+		TransServerFactory:    gonet.NewTransServerFactory(),     // FIXME
+		SvrHandlerFactory:     gonet.NewSvrTransHandlerFactory(), // FIXME
 		Codec:                 codec.NewDefaultCodec(),
 		Address:               defaultAddress,
 		ExitWaitTime:          defaultExitWaitTime,
