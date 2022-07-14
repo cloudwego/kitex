@@ -2,7 +2,7 @@
 // +build !windows
 
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,9 @@ package server
 import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
+	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 )
 
 func newServerRemoteOption() *remote.ServerOption {
