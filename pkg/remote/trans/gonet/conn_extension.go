@@ -22,12 +22,12 @@ import (
 	"io"
 	"net"
 	"syscall"
-
-	"github.com/cloudwego/netpoll"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/netpoll"
 )
 
 // NewGonetExtension to build new gonetConnExtension which implements trans.Extension
@@ -39,7 +39,13 @@ type gonetConnExtension struct{}
 
 // SetReadTimeout implements the trans.Extension interface.
 func (e *gonetConnExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cfg rpcinfo.RPCConfig, role remote.RPCRole) {
-	// do nothing
+	var readTimeout time.Duration
+	if role == remote.Client {
+		readTimeout = trans.GetReadTimeout(cfg)
+	} else {
+		readTimeout = cfg.ReadWriteTimeout()
+	}
+	_ = conn.SetReadDeadline(time.Now().Add(readTimeout))
 }
 
 // NewWriteByteBuffer implements the trans.Extension interface.

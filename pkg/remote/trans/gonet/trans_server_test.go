@@ -21,9 +21,7 @@ import (
 	"errors"
 	"net"
 	"os"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
@@ -88,30 +86,6 @@ func TestCreateListener(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ln.Addr().String() == addrStr)
 	ln.Close()
-}
-
-// TestBootStrap test trans_server BootstrapServer success
-func TestBootStrap(t *testing.T) {
-	// tcp init
-	addrStr := "127.0.0.1:9090"
-	addr = utils.NewNetAddr("tcp", addrStr)
-
-	// test
-	ln, err := transSvr.CreateListener(addr)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, ln.Addr().String() == addrStr)
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		err = transSvr.BootstrapServer()
-		test.Assert(t, err == nil, err)
-		wg.Done()
-	}()
-	time.Sleep(10 * time.Millisecond)
-
-	_ = transSvr.Shutdown()
-	wg.Wait()
 }
 
 // TestOnConnRead test trans_server onConnRead success
