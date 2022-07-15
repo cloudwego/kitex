@@ -19,8 +19,11 @@ package gonet
 import (
 	"context"
 	"errors"
+	"io"
 	"net"
 	"syscall"
+
+	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
@@ -72,5 +75,8 @@ func (e *gonetConnExtension) IsRemoteClosedErr(err error) bool {
 	if err == nil {
 		return false
 	}
-	return errors.Is(err, net.ErrClosed) || errors.Is(err, syscall.EPIPE)
+	return errors.Is(err, net.ErrClosed) ||
+		errors.Is(err, netpoll.ErrConnClosed) ||
+		errors.Is(err, io.EOF) ||
+		errors.Is(err, syscall.EPIPE)
 }

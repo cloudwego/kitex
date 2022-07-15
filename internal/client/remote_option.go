@@ -21,27 +21,15 @@
 package client
 
 import (
-	"fmt"
-
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/trans/gonet"
 )
 
-// FIXME
 func newClientRemoteOption() *remote.ClientOption {
-	fmt.Println("client gonet")
 	return &remote.ClientOption{
 		CliHandlerFactory: gonet.NewCliTransHandlerFactory(),
 		Dialer:            gonet.NewDialer(),
 		Codec:             codec.NewDefaultCodec(),
 	}
 }
-
-//func newClientRemoteOption() *remote.ClientOption {
-//	return &remote.ClientOption{
-//		CliHandlerFactory: netpoll.NewCliTransHandlerFactory(),
-//		Dialer:            netpoll.NewDialer(),
-//		Codec:             codec.NewDefaultCodec(),
-//	}
-//}
