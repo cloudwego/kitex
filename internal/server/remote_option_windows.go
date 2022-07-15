@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package client defines the Options about remote transport of client.
+// Package server defines the Options about remote transport of client.
 package server
 
 import (

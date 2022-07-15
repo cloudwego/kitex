@@ -17,12 +17,10 @@
  * limitations under the License.
  */
 
-// Package client defines the Options about remote transport of client.
+// Package server defines the Options about remote transport of client.
 package server
 
 import (
-	"fmt"
-
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/trans/gonet"
@@ -30,7 +28,6 @@ import (
 )
 
 func newServerRemoteOption() *remote.ServerOption {
-	fmt.Println("server gonet")
 	return &remote.ServerOption{
 		TransServerFactory:    gonet.NewTransServerFactory(),     // FIXME
 		SvrHandlerFactory:     gonet.NewSvrTransHandlerFactory(), // FIXME

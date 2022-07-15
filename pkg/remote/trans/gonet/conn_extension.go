@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import (
 	"errors"
 	"net"
 	"syscall"
-	"time"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
@@ -37,13 +36,7 @@ type gonetConnExtension struct{}
 
 // SetReadTimeout implements the trans.Extension interface.
 func (e *gonetConnExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cfg rpcinfo.RPCConfig, role remote.RPCRole) {
-	var readTimeout time.Duration
-	if role == remote.Client {
-		readTimeout = trans.GetReadTimeout(cfg)
-	} else {
-		readTimeout = cfg.ReadWriteTimeout()
-	}
-	_ = conn.SetReadDeadline(time.Now().Add(readTimeout))
+	// do nothing
 }
 
 // NewWriteByteBuffer implements the trans.Extension interface.

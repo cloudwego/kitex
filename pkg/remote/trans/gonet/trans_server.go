@@ -24,6 +24,7 @@ import (
 	"os"
 	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 
@@ -52,7 +53,6 @@ func (f *gonetTransServerFactory) NewTransServer(opt *remote.ServerOption, trans
 type transServer struct {
 	opt       *remote.ServerOption
 	transHdlr remote.ServerTransHandler
-
 	ln        net.Listener
 	lncfg     net.ListenConfig
 	connCount utils.AtomicInt
@@ -121,6 +121,7 @@ func (ts *transServer) ConnCount() utils.AtomicInt {
 
 func (ts *transServer) onConnRead(ctx context.Context, conn net.Conn) error {
 	defer transRecover(ctx, conn, "OnRead")
+	ts.refreshDeadline(rpcinfo.GetRPCInfo(ctx), conn)
 	err := ts.transHdlr.OnRead(ctx, conn)
 	if err != nil {
 		ts.onError(ctx, err, conn)
@@ -142,4 +143,9 @@ func transRecover(ctx context.Context, conn net.Conn, funcName string) {
 			klog.CtxErrorf(ctx, "KITEX: panic happened in %s, error=%v\nstack=%s", funcName, panicErr, string(debug.Stack()))
 		}
 	}
+}
+
+func (ts *transServer) refreshDeadline(ri rpcinfo.RPCInfo, conn net.Conn) {
+	readTimeout := ri.Config().ReadWriteTimeout()
+	_ = conn.SetReadDeadline(time.Now().Add(readTimeout))
 }
