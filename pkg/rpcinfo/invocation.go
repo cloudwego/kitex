@@ -21,7 +21,16 @@ import (
 	"sync/atomic"
 )
 
+type CallType int
+
+const (
+	ThriftCall CallType = iota
+	ThriftOneway
+)
+
 var (
+	_              Invocation       = (*invocation)(nil)
+	_              InvocationSetter = (*invocation)(nil)
 	invocationPool sync.Pool
 	globalSeqID    int32 = 0
 )
@@ -35,6 +44,7 @@ type InvocationSetter interface {
 	SetPackageName(name string)
 	SetServiceName(name string)
 	SetMethodName(name string)
+	SetCallType(typ CallType)
 	SetSeqID(seqID int32)
 }
 
@@ -42,11 +52,12 @@ type invocation struct {
 	packageName string
 	serviceName string
 	methodName  string
+	callType    CallType
 	seqID       int32
 }
 
 // NewInvocation creates a new Invocation with the given service, method and optional package.
-func NewInvocation(service, method string, pkgOpt ...string) Invocation {
+func NewInvocation(service, method string, pkgOpt ...string) *invocation {
 	ivk := invocationPool.Get().(*invocation)
 	ivk.seqID = genSeqID()
 	ivk.serviceName = service
@@ -111,6 +122,16 @@ func (i *invocation) MethodName() string {
 // SetMethodName implements the InvocationSetter interface.
 func (i *invocation) SetMethodName(name string) {
 	i.methodName = name
+}
+
+// CallType implements the Invocation interface.
+func (i *invocation) CallType() CallType {
+	return i.callType
+}
+
+// SetCallType implements the InvocationSetter interface.
+func (i *invocation) SetCallType(callType CallType) {
+	i.callType = callType
 }
 
 // Recycle reuses the invocation.

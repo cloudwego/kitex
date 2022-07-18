@@ -79,6 +79,8 @@ func (cm *ConnWrapper) ReleaseConn(err error, ri rpcinfo.RPCInfo) {
 		if err == nil {
 			if _, ok := ri.To().Tag(rpcinfo.ConnResetTag); ok {
 				cm.connPool.Discard(cm.conn)
+			} else if ri.Invocation().CallType() == rpcinfo.ThriftOneway {
+				cm.connPool.Discard(cm.conn)
 			} else {
 				cm.connPool.Put(cm.conn)
 			}
@@ -103,7 +105,8 @@ func (cm *ConnWrapper) zero() {
 }
 
 func (cm *ConnWrapper) getConnWithPool(ctx context.Context, cp remote.ConnPool, d remote.Dialer,
-	timeout time.Duration, ri rpcinfo.RPCInfo) (net.Conn, error) {
+	timeout time.Duration, ri rpcinfo.RPCInfo,
+) (net.Conn, error) {
 	addr := ri.To().Address()
 	if addr == nil {
 		return nil, kerrors.ErrNoDestAddress
@@ -120,7 +123,8 @@ func (cm *ConnWrapper) getConnWithPool(ctx context.Context, cp remote.ConnPool, 
 }
 
 func (cm *ConnWrapper) getConnWithDialer(ctx context.Context, d remote.Dialer,
-	timeout time.Duration, ri rpcinfo.RPCInfo) (net.Conn, error) {
+	timeout time.Duration, ri rpcinfo.RPCInfo,
+) (net.Conn, error) {
 	addr := ri.To().Address()
 	if addr == nil {
 		return nil, kerrors.ErrNoDestAddress

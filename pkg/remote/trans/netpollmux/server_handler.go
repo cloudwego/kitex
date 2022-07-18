@@ -308,7 +308,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	// Send a control frame with sequence ID 0 to notify the remote
 	// end to close the connection or prevent further operation on it.
 	iv := rpcinfo.NewInvocation("none", "none")
-	iv.(interface{ SetSeqID(seqID int32) }).SetSeqID(0)
+	iv.SetSeqID(0)
 	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
 	data := NewControlFrame()
 	msg := remote.NewMessage(data, t.svcInfo, ri, remote.Reply, remote.Server)
