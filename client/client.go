@@ -255,7 +255,7 @@ func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Cont
 	}
 
 	iv := rpcinfo.NewInvocation(kc.svcInfo.ServiceName, method, kc.svcInfo.GetPackageName())
-	if kc.svcInfo.MethodInfo(method).OneWay() {
+	if kc.svcInfo.Methods[method].OneWay() {
 		iv.SetCallType(rpcinfo.ThriftOneway)
 	}
 
