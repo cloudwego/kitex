@@ -23,8 +23,8 @@ import (
 type ProfilerController interface {
 	Run(ctx context.Context) (err error)
 	Stop()
-	TagTransInfo(ctx context.Context, ti TransInfo)
-	TagMessage(ctx context.Context, msg Message)
+	TagTransInfo(ctx context.Context, ti TransInfo) context.Context
+	TagMessage(ctx context.Context, msg Message) context.Context
 	Untag(ctx context.Context)
 }
 
@@ -43,6 +43,5 @@ func (p *profilerMetaHandler) WriteMeta(ctx context.Context, msg Message) (conte
 }
 
 func (p *profilerMetaHandler) ReadMeta(ctx context.Context, msg Message) (context.Context, error) {
-	p.ctl.TagMessage(ctx, msg)
-	return ctx, nil
+	return p.ctl.TagMessage(ctx, msg), nil
 }
