@@ -23,13 +23,13 @@ package client
 import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/remote/trans/gonet"
+	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 )
 
 func newClientRemoteOption() *remote.ClientOption {
 	return &remote.ClientOption{
-		CliHandlerFactory: gonet.NewCliTransHandlerFactory(),
-		Dialer:            gonet.NewDialer(),
+		CliHandlerFactory: netpoll.NewCliTransHandlerFactory(),
+		Dialer:            netpoll.NewDialer(),
 		Codec:             codec.NewDefaultCodec(),
 	}
 }
