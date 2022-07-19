@@ -83,6 +83,9 @@ func run(opts protogen.Options) error {
 	}
 	// fix proto file go_package to correct dependency import
 	for _, f := range req.ProtoFile {
+		if *f.Name != pp.IDL {
+			continue
+		}
 		if !strings.Contains(*f.Options.GoPackage, generator.KitexGenPath) {
 			if pp.completeImportPath {
 				return errors.New("mix use of new/old proto file standard")

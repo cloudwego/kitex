@@ -162,7 +162,7 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 	// iterate over all proto files
 	idl := gen.Request.FileToGenerate[0]
 	for _, f := range gen.Files {
-		if pp.Config.Use != "" && f.Proto.GetName() != idl {
+		if pp.Config.Use != "" || f.Proto.GetName() != idl {
 			continue
 		}
 		pp.GenerateFile(gen, f)
