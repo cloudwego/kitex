@@ -21,4 +21,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
-replace github.com/cloudwego/netpoll => github.com/sinnera/netpoll v0.2.5-0.20220711095802-da6e4cec8eca
+replace github.com/cloudwego/netpoll => github.com/sinnera/netpoll v0.2.5-0.20220706123608-624de37f9d93
