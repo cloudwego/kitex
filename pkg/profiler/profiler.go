@@ -39,6 +39,7 @@ type Profiler interface {
 	Stop()
 	Tag(ctx context.Context, tags ...string) context.Context
 	Untag(ctx context.Context)
+	Lookup(ctx context.Context, key string) (string, bool)
 }
 
 type Processor func(profiles []*TagsProfile) error
@@ -69,6 +70,8 @@ func NewProfiler(processor Processor, interval, window time.Duration) *profiler 
 		window:    window,
 	}
 }
+
+var _ Profiler = (*profiler)(nil)
 
 type profiler struct {
 	data    bytes.Buffer // protobuf
@@ -140,6 +143,10 @@ func (p *profiler) Untag(ctx context.Context) {
 	if recoverCtx, ok := ctx.Value(recoverContextKey{}).(context.Context); ok {
 		pprof.SetGoroutineLabels(recoverCtx)
 	}
+}
+
+func (p *profiler) Lookup(ctx context.Context, key string) (string, bool) {
+	return pprof.Label(ctx, key)
 }
 
 func (p *profiler) startProfile() error {
