@@ -17,6 +17,7 @@
 package nphttp2
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -25,6 +26,8 @@ import (
 	"strings"
 
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
+	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
 	"github.com/cloudwego/kitex/pkg/stats"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -34,6 +37,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	grpcTransport "github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -42,6 +46,10 @@ import (
 	"github.com/cloudwego/kitex/transport"
 	"github.com/cloudwego/netpoll"
 )
+
+func init() {
+	detection.RegisterServerTransHandlerFactory(NewSvrTransHandlerFactory())
+}
 
 type svrTransHandlerFactory struct{}
 
@@ -69,6 +77,29 @@ type svrTransHandler struct {
 	svcInfo    *serviceinfo.ServiceInfo
 	inkHdlFunc endpoint.Endpoint
 	codec      remote.Codec
+}
+
+var prefaceReadAtMost = func() int {
+	// min(len(ClientPreface), len(flagBuf))
+	// len(flagBuf) = 2 * codec.Size32
+	if 2*codec.Size32 < grpc.ClientPrefaceLen {
+		return 2 * codec.Size32
+	}
+	return grpc.ClientPrefaceLen
+}()
+
+func (t *svrTransHandler) ProtocolMatch(ctx context.Context, conn net.Conn) (err error) {
+	// Check the validity of client preface.
+	zr := conn.(netpoll.Connection).Reader()
+	// read at most avoid block
+	preface, err := zr.Peek(prefaceReadAtMost)
+	if err != nil {
+		return err
+	}
+	if bytes.Equal(preface[:prefaceReadAtMost], grpc.ClientPreface[:prefaceReadAtMost]) {
+		return nil
+	}
+	return errors.New("error protocol not match")
 }
 
 func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
