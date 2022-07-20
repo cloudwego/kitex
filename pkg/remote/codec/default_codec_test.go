@@ -20,14 +20,13 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"testing"
-
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
+	"testing"
 )
 
 func TestThriftProtocolCheck(t *testing.T) {
@@ -112,6 +111,32 @@ func TestThriftProtocolCheck(t *testing.T) {
 	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
 }
 
+func Test_isProtobufKitex(t *testing.T) {
+	var flagBuf2 []byte
+	flagBuf2 = make([]byte, 4*2)
+	binary.BigEndian.PutUint32(flagBuf2, uint32(10))
+	binary.BigEndian.PutUint32(flagBuf2[4:8], ProtobufV1Magic)
+	header := isProtobufKitex(flagBuf2)
+	test.Assert(t, header)
+}
+
+func Test_isThriftBinary(t *testing.T) {
+	var flagBuf []byte
+	flagBuf = make([]byte, 4)
+	binary.BigEndian.PutUint32(flagBuf, ThriftV1Magic)
+	header := isThriftBinary(flagBuf)
+	test.Assert(t, header)
+}
+
+func Test_isThriftFramedBinary(t *testing.T) {
+	var flagBuf []byte
+	flagBuf = make([]byte, 8)
+	binary.BigEndian.PutUint32(flagBuf, uint32(10))
+	binary.BigEndian.PutUint32(flagBuf[4:8], ThriftV1Magic)
+	header := isThriftFramedBinary(flagBuf)
+	test.Assert(t, header)
+}
+
 func TestProtobufProtocolCheck(t *testing.T) {
 	var req interface{}
 	var rbf remote.ByteBuffer
@@ -161,7 +186,8 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 	sendMsg := initClientSendMsg(transport.TTHeader)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
-
+	name := dc.Name()
+	test.Assert(t, name == "default")
 	// encode
 	out := remote.NewWriterBuffer(256)
 	err := dc.Encode(ctx, sendMsg, out)
@@ -184,7 +210,6 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 
 func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
-
 	smallDc := NewDefaultCodecWithSizeLimit(1)
 	largeDc := NewDefaultCodecWithSizeLimit(1024)
 	ctx := context.Background()
@@ -193,15 +218,14 @@ func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 	sendMsg := initClientSendMsg(transport.TTHeader)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
-
 	// encode
 	smallOut := remote.NewWriterBuffer(256)
 	largeOut := remote.NewWriterBuffer(256)
 	err := smallDc.Encode(ctx, sendMsg, smallOut)
 	test.Assert(t, err != nil, err)
 	err = largeDc.Encode(ctx, sendMsg, largeOut)
+	sendMsg.RPCRole()
 	test.Assert(t, err == nil, err)
-
 	// decode
 	recvMsg := initServerRecvMsg()
 	smallBuf, _ := smallOut.Bytes()
@@ -255,4 +279,11 @@ func (m mockPayloadCodec) Unmarshal(ctx context.Context, message remote.Message,
 
 func (m mockPayloadCodec) Name() string {
 	return "mock"
+}
+func Test_isMeshHeader(t *testing.T) {
+	var flagBuf []byte
+	flagBuf = make([]byte, 8*2)
+	binary.BigEndian.PutUint32(flagBuf, MeshHeaderMagic)
+	header := isMeshHeader(flagBuf)
+	test.Assert(t, header)
 }
