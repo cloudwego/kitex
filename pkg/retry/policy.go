@@ -18,6 +18,8 @@ package retry
 
 import (
 	"fmt"
+
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 // Type is retry type include FailureType, BackupType
@@ -38,6 +40,22 @@ func (t Type) String() string {
 		return "Backup"
 	}
 	return ""
+}
+
+// BuildFailurePolicy is used to build Policy with *FailurePolicy
+func BuildFailurePolicy(p *FailurePolicy) Policy {
+	if p == nil {
+		return Policy{}
+	}
+	return Policy{Enable: true, Type: FailureType, FailurePolicy: p}
+}
+
+// BuildBackupRequest is used to build Policy with *BackupPolicy
+func BuildBackupRequest(p *BackupPolicy) Policy {
+	if p == nil {
+		return Policy{}
+	}
+	return Policy{Enable: true, Type: BackupType, BackupPolicy: p}
 }
 
 // Policy contains all retry policies
@@ -110,6 +128,12 @@ const (
 	InitialMSBackOffCfgKey  BackOffCfgKey = "initial_ms"
 	MultiplierBackOffCfgKey BackOffCfgKey = "multiplier"
 )
+
+// IsResultRetry is the param of `WithSpecifiedResultRetry`, it is used for specifying which error or resp need to be retried
+type IsResultRetry struct {
+	IsErrorRetry func(err error, ri rpcinfo.RPCInfo) bool
+	IsRespRetry  func(resp interface{}, ri rpcinfo.RPCInfo) bool
+}
 
 // Equals to check if policy is equal
 func (p Policy) Equals(np Policy) bool {

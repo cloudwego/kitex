@@ -139,12 +139,12 @@ func (kc *kClient) initCircuitBreaker() error {
 
 func (kc *kClient) initRetryer() error {
 	if kc.opt.RetryContainer == nil {
-		if kc.opt.RetryPolicy == nil {
+		if kc.opt.RetryMethodPolicies == nil {
 			return nil
 		}
 		kc.opt.RetryContainer = retry.NewRetryContainer()
 	}
-	return kc.opt.RetryContainer.Init(kc.opt.RetryPolicy)
+	return kc.opt.RetryContainer.Init(kc.opt.RetryMethodPolicies, kc.opt.RetryWithResult)
 }
 
 func (kc *kClient) initContext() context.Context {
@@ -317,13 +317,13 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 
 	var callTimes int32
 	var prevRI rpcinfo.RPCInfo
-	recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, error) {
-		curCallTimes := int(atomic.AddInt32(&callTimes, 1))
+	recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
 		retryCtx := ctx
 		cRI := ri
-		if curCallTimes > 1 {
+		if currCallTimes > 1 {
 			retryCtx, cRI = kc.initRPCInfo(ctx, method)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(curCallTimes-1))
+			retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
 			if prevRI == nil {
 				prevRI = ri
 			}
@@ -331,7 +331,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 			prevRI = cRI
 		}
 		err := kc.eps(retryCtx, request, response)
-		return cRI, err
+		return cRI, response, err
 	}, ri, request)
 
 	kc.opt.TracerCtl.DoFinish(ctx, ri, err)

@@ -96,8 +96,9 @@ type Options struct {
 	StatsLevel *stats.Level
 
 	// retry policy
-	RetryPolicy    *retry.Policy
-	RetryContainer *retry.Container
+	RetryMethodPolicies map[string]retry.Policy
+	RetryContainer      *retry.Container
+	RetryWithResult     *retry.IsResultRetry
 
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption

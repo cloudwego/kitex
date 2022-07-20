@@ -32,8 +32,13 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-func newFailureRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
+func newFailureRetryer(policy Policy, r *IsResultRetry, cbC *cbContainer) (Retryer, error) {
 	fr := &failureRetryer{cbContainer: cbC}
+	if r == nil {
+		fr.isResultRetry = IsResultRetry{}
+	} else {
+		fr.isResultRetry = *r
+	}
 	if err := fr.UpdatePolicy(policy); err != nil {
 		return nil, fmt.Errorf("newfailureRetryer failed, err=%w", err)
 	}
@@ -47,16 +52,18 @@ type failureRetryer struct {
 	cbContainer *cbContainer
 	sync.RWMutex
 	errMsg string
+
+	isResultRetry IsResultRetry
 }
 
 // ShouldRetry implements the Retryer interface.
-func (r *failureRetryer) ShouldRetry(ctx context.Context, err error, callTimes int, request interface{}, cbKey string) (string, bool) {
+func (r *failureRetryer) ShouldRetry(ctx context.Context, err error, callTimes int, req interface{}, cbKey string) (string, bool) {
 	r.RLock()
 	defer r.RUnlock()
-	if !r.enable || !r.isRetryErr(err) {
+	if !r.enable {
 		return "", false
 	}
-	if stop, msg := circuitBreakerStop(ctx, r.policy.StopPolicy, r.cbContainer, request, cbKey); stop {
+	if stop, msg := circuitBreakerStop(ctx, r.policy.StopPolicy, r.cbContainer, req, cbKey); stop {
 		return msg, false
 	}
 	if stop, msg := ddlStop(ctx, r.policy.StopPolicy); stop {
@@ -83,7 +90,7 @@ func (r *failureRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implements the Retryer interface.
-func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request interface{}) (recycleRI bool, err error) {
+func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (recycleRI bool, err error) {
 	r.RLock()
 	var maxDuration time.Duration
 	if r.policy.StopPolicy.MaxDurationMS > 0 {
@@ -95,7 +102,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 	var callTimes int32
 	var callCosts strings.Builder
 	var cRI rpcinfo.RPCInfo
-	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, request)
+	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
 			err = panicToErr(ctx, panicInfo, firstRI)
@@ -103,6 +110,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 	}()
 	startTime := time.Now()
 	for i := 0; i <= retryTimes; i++ {
+		var resp interface{}
 		var callStart time.Time
 		if i == 0 {
 			callStart = startTime
@@ -111,7 +119,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 				err = makeRetryErr(ctx, "exceed max duration", callTimes)
 				break
 			}
-			if msg, ok := r.ShouldRetry(ctx, err, i, request, cbKey); !ok {
+			if msg, ok := r.ShouldRetry(ctx, err, i, req, cbKey); !ok {
 				if msg != "" {
 					appendMsg := fmt.Sprintf("retried %d, %s", i-1, msg)
 					appendErrMsg(err, appendMsg)
@@ -125,13 +133,17 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			}
 		}
 		callTimes++
-		cRI, err = rpcCall(ctx, r)
+		cRI, resp, err = rpcCall(ctx, r)
 		callCosts.WriteString(strconv.FormatInt(time.Since(callStart).Microseconds(), 10))
 
 		if r.cbContainer.cbStat {
-			circuitbreak.RecordStat(ctx, request, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
+			circuitbreak.RecordStat(ctx, req, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 		}
 		if err == nil {
+			if r.isResultRetry.IsRespRetry != nil && r.isResultRetry.IsRespRetry(resp, cRI) {
+				// user specified resp to do retry
+				continue
+			}
 			if i > 0 {
 				// monitor report just use firstRI
 				rpcinfo.PutRPCInfo(cRI)
@@ -141,6 +153,11 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			if i == retryTimes {
 				// retry error
 				err = kerrors.ErrRetry.WithCause(err)
+			} else {
+				if !r.isRetryErr(err, cRI) {
+					// timeout or user specified error to do retry
+					break
+				}
 			}
 		}
 	}
@@ -194,8 +211,8 @@ func (r *failureRetryer) UpdatePolicy(rp Policy) (err error) {
 }
 
 // AppendErrMsgIfNeeded implements the Retryer interface.
-func (r *failureRetryer) AppendErrMsgIfNeeded(err error, msg string) {
-	if r.isRetryErr(err) {
+func (r *failureRetryer) AppendErrMsgIfNeeded(err error, ri rpcinfo.RPCInfo, msg string) {
+	if r.isRetryErr(err, ri) {
 		// Add additional reason when retry is not applied.
 		appendErrMsg(err, msg)
 	}
@@ -220,9 +237,22 @@ func (r *failureRetryer) Dump() map[string]interface{} {
 	return map[string]interface{}{"enable": r.enable, "failureRetry": r.policy}
 }
 
-func (r *failureRetryer) isRetryErr(err error) bool {
-	// Consider timeout error only.
-	return kerrors.IsTimeoutError(err)
+func (r *failureRetryer) isRetryErr(err error, ri rpcinfo.RPCInfo) bool {
+	if err == nil {
+		return false
+	}
+	// Logic Notice:
+	// some kinds of error cannot be retried, eg: ServiceCircuitBreak.
+	// But CircuitBreak has been checked in ShouldRetry, it doesn't need to filter ServiceCircuitBreak.
+	// If there are some other specified errors that cannot be retried, it should be filtered here.
+
+	if kerrors.IsTimeoutError(err) {
+		return true
+	}
+	if r.isResultRetry.IsErrorRetry != nil && r.isResultRetry.IsErrorRetry(err, ri) {
+		return true
+	}
+	return false
 }
 
 func initBackOff(policy *BackOffPolicy) (bo BackOff, err error) {
