@@ -59,6 +59,26 @@ func (m *apiJSConv) Request(ctx context.Context, val interface{}, field *FieldDe
 			}
 		}
 		return res, nil
+	case map[interface{}]interface{}:
+		nv := make(map[interface{}]interface{}, len(v))
+		for key, value := range v {
+			nvalue, err := m.Request(ctx, value, field)
+			if err != nil {
+				return nil, err
+			}
+			nv[key] = nvalue
+		}
+		return nv, nil
+	case map[string]interface{}:
+		nv := make(map[string]interface{}, len(v))
+		for key, value := range v {
+			nvalue, err := m.Request(ctx, value, field)
+			if err != nil {
+				return nil, err
+			}
+			nv[key] = nvalue
+		}
+		return nv, nil
 	}
 	return val, nil
 }
@@ -77,6 +97,26 @@ func (m *apiJSConv) Response(ctx context.Context, val interface{}, field *FieldD
 			}
 		}
 		return res, nil
+	case map[interface{}]interface{}:
+		nv := make(map[interface{}]interface{}, len(v))
+		for key, value := range v {
+			nvalue, err := m.Response(ctx, value, field)
+			if err != nil {
+				return nil, err
+			}
+			nv[key] = nvalue
+		}
+		return nv, nil
+	case map[string]interface{}:
+		nv := make(map[string]interface{}, len(v))
+		for key, value := range v {
+			nvalue, err := m.Response(ctx, value, field)
+			if err != nil {
+				return nil, err
+			}
+			nv[key] = nvalue
+		}
+		return nv, nil
 	}
 	return val, nil
 }
