@@ -31,10 +31,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/pkg/warmup"
 )
 
 var (
@@ -56,7 +58,22 @@ var (
 			return conn, nil
 		},
 	}
-	hdlr = &mocks.MockCliTransHandler{}
+	hdlr             = &mocks.MockCliTransHandler{}
+	mockWarmupOption = &warmup.ClientOption{
+		ErrorHandling: warmup.ErrorLog,
+		ResolverOption: &warmup.ResolverOption{
+			Dests: []*rpcinfo.EndpointBasicInfo{
+				{
+					ServiceName: "mock_service",
+					Method:      "mock_method",
+				},
+			},
+		},
+		PoolOption: &warmup.PoolOption{
+			ConnNum:  128,
+			Parallel: 128,
+		},
+	}
 )
 
 func newMockClient(tb testing.TB, extra ...Option) Client {
@@ -84,6 +101,13 @@ func TestCall(t *testing.T) {
 
 	err := cli.Call(ctx, mtd, req, res)
 	test.Assert(t, err == nil, err)
+}
+
+func TestWithRetryOption(t *testing.T) {
+	mockRetryContainer := retry.NewRetryContainer()
+	cli := newMockClient(t, WithRetryContainer(mockRetryContainer))
+
+	test.Assert(t, cli.(*kClient).opt.RetryContainer == mockRetryContainer)
 }
 
 func BenchmarkCall(b *testing.B) {
@@ -257,6 +281,14 @@ func TestTagOptionLocks2(t *testing.T) {
 	})
 	err := cli.Call(ctx, mtd, req, res)
 	test.Assert(t, err == nil)
+}
+
+func TestWarmingUpOption(t *testing.T) {
+	var options []client.Option
+	options = append(options, WithWarmingUp(mockWarmupOption))
+
+	cli := newMockClient(t, options...)
+	test.Assert(t, cli.(*kClient).opt.WarmUpOption == mockWarmupOption)
 }
 
 func TestTimeoutOptions(t *testing.T) {
