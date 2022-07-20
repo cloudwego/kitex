@@ -50,38 +50,39 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	if !ok {
 		return fmt.Errorf("output buffer must implement FrameWrite")
 	}
-	var header [5]byte
+
 	var data []byte
 	switch t := message.Data().(type) {
 	case bprotoc.FastWrite:
 		// TODO: reuse data buffer when we can free it safely
-		data = make([]byte, t.Size())
-		t.FastWrite(data)
+		size := t.Size()
+		data = make([]byte, size+5)
+		t.FastWrite(data[5:])
+		binary.BigEndian.PutUint32(data[1:5], uint32(size))
+		return writer.WriteData(data)
 	case marshaler:
 		// TODO: reuse data buffer when we can free it safely
-		data = make([]byte, t.Size())
-		if _, err = t.MarshalTo(data); err != nil {
+		size := t.Size()
+		data = make([]byte, size+5)
+		if _, err = t.MarshalTo(data[5:]); err != nil {
 			return err
 		}
+		binary.BigEndian.PutUint32(data[1:5], uint32(size))
+		return writer.WriteData(data)
 	case protobufV2MsgCodec:
 		data, err = t.XXX_Marshal(nil, true)
-		if err != nil {
-			return err
-		}
 	case proto.Message:
 		data, err = proto.Marshal(t)
-		if err != nil {
-			return err
-		}
 	case protobufMsgCodec:
 		data, err = t.Marshal(nil)
-		if err != nil {
-			return err
-		}
+	}
+	if err != nil {
+		return err
 	}
 	if err = writer.WriteData(data); err != nil {
 		return err
 	}
+	var header [5]byte
 	binary.BigEndian.PutUint32(header[1:5], uint32(len(data)))
 	return writer.WriteHeader(header[:])
 }

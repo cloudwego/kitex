@@ -134,8 +134,12 @@ func (c *cleanupStream) isTransportResponseFrame() bool { return c.rst } // Resu
 type dataFrame struct {
 	streamID  uint32
 	endStream bool
-	h         []byte
-	d         []byte
+	// h is optional, d is required.
+	// you can assign the header to h and the payload to the d;
+	// or just assign the header + payload together to the d.
+	// In other words, h = nil means d = header + payload.
+	h []byte
+	d []byte
 	// onEachWrite is called every time
 	// a part of d is written out.
 	onEachWrite func()
