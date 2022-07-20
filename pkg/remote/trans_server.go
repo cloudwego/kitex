@@ -30,7 +30,7 @@ type TransServerFactory interface {
 // TransServer is the abstraction for remote server.
 type TransServer interface {
 	CreateListener(net.Addr) (net.Listener, error)
-	BootstrapServer() (err error)
+	BootstrapServer(net.Listener) (err error)
 	Shutdown() error
 	ConnCount() utils.AtomicInt
 }

@@ -102,20 +102,21 @@ type transServer struct {
 var _ remote.TransServer = &transServer{}
 
 // CreateListener implements the remote.TransServer interface.
-func (ts *transServer) CreateListener(addr net.Addr) (_ net.Listener, err error) {
+func (ts *transServer) CreateListener(addr net.Addr) (net.Listener, error) {
 	if addr.Network() == "unix" {
 		syscall.Unlink(addr.String())
 	}
 	// The network must be "tcp", "tcp4", "tcp6" or "unix".
-	ts.ln, err = ts.lncfg.Listen(context.Background(), addr.Network(), addr.String())
-	return ts.ln, err
+	ln, err := ts.lncfg.Listen(context.Background(), addr.Network(), addr.String())
+	return ln, err
 }
 
 // BootstrapServer implements the remote.TransServer interface.
-func (ts *transServer) BootstrapServer() (err error) {
-	if ts.ln == nil {
+func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
+	if ln == nil {
 		return errors.New("listener is nil in netpoll transport server")
 	}
+	ts.ln = ln
 	opts := []netpoll.Option{
 		netpoll.WithIdleTimeout(ts.opt.MaxConnectionIdleTime),
 		netpoll.WithReadTimeout(ts.opt.ReadWriteTimeout),

@@ -65,11 +65,15 @@ func (s *server) Start() chan error {
 	s.listener = ln
 	s.Unlock()
 
-	go func() { errCh <- s.transSvr.BootstrapServer() }()
+	go func() { errCh <- s.transSvr.BootstrapServer(ln) }()
 	return errCh
 }
 
 func (s *server) buildListener() (ln net.Listener, err error) {
+	if s.opt.Listener != nil {
+		klog.Infof("KITEX: server listen at addr=%s", s.opt.Listener.Addr().String())
+		return s.opt.Listener, nil
+	}
 	addr := s.opt.Address
 	if ln, err = s.transSvr.CreateListener(addr); err != nil {
 		klog.Errorf("KITEX: server listen failed, addr=%s error=%s", addr.String(), err)
