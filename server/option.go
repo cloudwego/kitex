@@ -22,6 +22,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/profiler"
 	"github.com/cloudwego/kitex/pkg/streaming"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
@@ -177,12 +178,45 @@ func WithTracer(c stats.Tracer) Option {
 	}}
 }
 
-// WithProfilerController set a profiler to server.
-func WithProfilerController(pc remote.ProfilerController) Option {
+// WithProfiler set a profiler to server.
+func WithProfiler(pc profiler.Profiler) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithProfilerController(%T{%+v})", pc, pc))
+		di.Push(fmt.Sprintf("WithProfiler(%T{%+v})", pc, pc))
+		o.RemoteOpt.Profiler = pc
+	}}
+}
 
-		o.RemoteOpt.ProfilerCtl = pc
+// WithProfilerTransInfoTagging set transinfo tagging function to profiler
+func WithProfilerTransInfoTagging(tagging remote.TransInfoTagging) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithProfilerTransInfoTagging(%+v)", utils.GetFuncName(tagging)))
+		preTagging := o.RemoteOpt.ProfilerTransInfoTagging
+		if preTagging == nil {
+			o.RemoteOpt.ProfilerTransInfoTagging = tagging
+			return
+		}
+		o.RemoteOpt.ProfilerTransInfoTagging = func(ctx context.Context, ti remote.TransInfo) (context.Context, []string) {
+			c, t := preTagging(ctx, ti)
+			c2, t2 := tagging(c, ti)
+			return c2, append(t, t2...)
+		}
+	}}
+}
+
+// WithProfilerMessageTagging set message tagging function to profiler
+func WithProfilerMessageTagging(tagging remote.MessageTagging) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithProfilerMessageTagging(%+v)", utils.GetFuncName(tagging)))
+		preTagging := o.RemoteOpt.ProfilerMessageTagging
+		if preTagging == nil {
+			o.RemoteOpt.ProfilerMessageTagging = tagging
+			return
+		}
+		o.RemoteOpt.ProfilerMessageTagging = func(ctx context.Context, msg remote.Message) (context.Context, []string) {
+			c, t := preTagging(ctx, msg)
+			c2, t2 := tagging(c, msg)
+			return c2, append(t, t2...)
+		}
 	}}
 }
 

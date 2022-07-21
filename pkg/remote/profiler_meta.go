@@ -18,24 +18,27 @@ package remote
 
 import (
 	"context"
+
+	"github.com/cloudwego/kitex/pkg/profiler"
 )
 
-type ProfilerController interface {
-	Run(ctx context.Context) (err error)
-	Stop()
-	TagTransInfo(ctx context.Context, ti TransInfo) context.Context
-	TagMessage(ctx context.Context, msg Message) context.Context
-	Untag(ctx context.Context)
-}
+type (
+	TransInfoTagging func(ctx context.Context, ti TransInfo) (context.Context, []string)
+	MessageTagging   func(ctx context.Context, msg Message) (context.Context, []string)
+)
 
 var _ MetaHandler = (*profilerMetaHandler)(nil)
 
-func NewProfilerMetaHandler(ctl ProfilerController) MetaHandler {
-	return &profilerMetaHandler{ctl: ctl}
+func NewProfilerMetaHandler(pr profiler.Profiler, tagging MessageTagging) MetaHandler {
+	return &profilerMetaHandler{
+		profiler: pr,
+		tagging:  tagging,
+	}
 }
 
 type profilerMetaHandler struct {
-	ctl ProfilerController
+	profiler profiler.Profiler
+	tagging  MessageTagging
 }
 
 func (p *profilerMetaHandler) WriteMeta(ctx context.Context, msg Message) (context.Context, error) {
@@ -43,5 +46,6 @@ func (p *profilerMetaHandler) WriteMeta(ctx context.Context, msg Message) (conte
 }
 
 func (p *profilerMetaHandler) ReadMeta(ctx context.Context, msg Message) (context.Context, error) {
-	return p.ctl.TagMessage(ctx, msg), nil
+	ctx, tags := p.tagging(ctx, msg)
+	return p.profiler.Tag(ctx, tags...), nil
 }

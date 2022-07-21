@@ -92,8 +92,10 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 	bufReader = t.ext.NewReadByteBuffer(ctx, conn, recvMsg)
 	if codec, ok := t.codec.(remote.MetaDecoder); ok {
 		if err = codec.DecodeMeta(ctx, recvMsg, bufReader); err == nil {
-			if t.opt.ProfilerCtl != nil && recvMsg.TransInfo() != nil {
-				ctx = t.opt.ProfilerCtl.TagTransInfo(ctx, recvMsg.TransInfo())
+			if t.opt.Profiler != nil && t.opt.ProfilerTransInfoTagging != nil && recvMsg.TransInfo() != nil {
+				var tags []string
+				ctx, tags = t.opt.ProfilerTransInfoTagging(ctx, recvMsg.TransInfo())
+				ctx = t.opt.Profiler.Tag(ctx, tags...)
 			}
 			err = codec.DecodePayload(ctx, recvMsg, bufReader)
 		}
@@ -285,10 +287,10 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 }
 
 func (t *svrTransHandler) finishProfiler(ctx context.Context) {
-	if t.opt.ProfilerCtl == nil {
+	if t.opt.Profiler == nil {
 		return
 	}
-	t.opt.ProfilerCtl.Untag(ctx)
+	t.opt.Profiler.Untag(ctx)
 }
 
 func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
