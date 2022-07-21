@@ -20,13 +20,17 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
-
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/tidwall/gjson"
+	"runtime"
+	"runtime/debug"
 )
+
+var errTypeAssert = errors.New("type assertion error")
 
 type writerOption struct {
 	requestBase *Base // request base from metahandler
@@ -331,28 +335,38 @@ func writeBinary(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 	return out.WriteBinary(val.([]byte))
 }
 
-func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) (err error) {
 	l := val.([]interface{})
 	length := len(l)
-	if err := out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
-		return err
+	if err = out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
+		return
 	}
 	if length == 0 {
 		return out.WriteListEnd()
 	}
+
+	// Catch diff types are in the list panic error.
+	defer func() {
+		if r := recover(); r != nil && errors.Is(r.(error), &runtime.TypeAssertionError{}) {
+			err = fmt.Errorf("KITEX: panic=%v, error=%v, stack=%s", r, errTypeAssert, string(debug.Stack()))
+			return
+		}
+	}()
+
 	writer, err := nextWriter(l[0], t.Elem, opt)
 	if err != nil {
 		return err
 	}
 	for _, elem := range l {
-		if err := writer(ctx, elem, out, t.Elem, opt); err != nil {
+		if err = writer(ctx, elem, out, t.Elem, opt); err != nil {
 			return err
 		}
 	}
-	return out.WriteListEnd()
+	err = out.WriteListEnd()
+	return err
 }
 
-func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) (err error) {
 	l := val.([]gjson.Result)
 	length := len(l)
 	if err := out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
@@ -398,6 +412,15 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 	if err != nil {
 		return err
 	}
+
+	// Catch diff types are in the InterfaceMap panic error.
+	defer func() {
+		if r := recover(); r != nil && errors.Is(r.(error), &runtime.TypeAssertionError{}) {
+			err = fmt.Errorf("KITEX: panic=%v, error=%v, stack=%s", r, errTypeAssert, string(debug.Stack()))
+			return
+		}
+	}()
+
 	for key, elem := range m {
 		if err := keyWriter(ctx, key, out, t.Key, opt); err != nil {
 			return err
@@ -409,7 +432,7 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 	return out.WriteMapEnd()
 }
 
-func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) (err error) {
 	m := val.(map[string]interface{})
 	length := len(m)
 	if err := out.WriteMapBegin(t.Key.Type.ToThriftTType(), t.Elem.Type.ToThriftTType(), length); err != nil {
@@ -449,7 +472,7 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 	return out.WriteMapEnd()
 }
 
-func writeStringJSONMap(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeStringJSONMap(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) (err error) {
 	m := val.(map[string]gjson.Result)
 	length := len(m)
 	if err := out.WriteMapBegin(t.Key.Type.ToThriftTType(), t.Elem.Type.ToThriftTType(), length); err != nil {

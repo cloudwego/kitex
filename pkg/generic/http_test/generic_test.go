@@ -37,6 +37,7 @@ import (
 func TestRun(t *testing.T) {
 	t.Run("TestThriftNormalBinaryEcho", testThriftNormalBinaryEcho)
 	t.Run("TestThriftBase64BinaryEcho", testThriftBase64BinaryEcho)
+	t.Run("TestThriftNormalListEcho", testThriftNormalListEcho)
 }
 
 func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary bool) genericclient.Client {
@@ -166,6 +167,39 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 	}
 	_, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, strings.Contains(err.Error(), "illegal base64 data"))
+
+	svr.Stop()
+}
+
+// for HTTP request.body list type check
+func testThriftNormalListEcho(t *testing.T) {
+	svr := initThriftServer(t, ":9126", new(GenericServiceListEchoImpl))
+	time.Sleep(500 * time.Millisecond)
+
+	cli := initThriftClientByIDL(t, "127.0.0.1:9126", "./idl/binary_echo.thrift", false)
+	url := "http://example.com/ListEcho"
+
+	userIds := []interface{}{"123"}
+	userIds = append(userIds, 456)
+	body := map[string]interface{}{
+		"user_ids": userIds,
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
+	customReq, err := generic.FromHTTPRequest(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := cli.GenericCall(context.Background(), "", customReq)
+	test.Assert(t, err != nil, err)
+	_, ok := resp.(*generic.HTTPResponse)
+	test.Assert(t, !ok)
 
 	svr.Stop()
 }

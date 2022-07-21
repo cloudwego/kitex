@@ -69,3 +69,12 @@ func (g *GenericServiceBinaryEchoImpl) GenericCall(ctx context.Context, method s
 	}
 	return req, nil
 }
+
+// GenericServiceListEchoImpl ...
+type GenericServiceListEchoImpl struct{}
+
+func (g *GenericServiceListEchoImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	req := request.(map[string]interface{})
+	fmt.Printf("Recv: (%T)%s\n", req["user_ids"], req["user_ids"])
+	return req, nil
+}
