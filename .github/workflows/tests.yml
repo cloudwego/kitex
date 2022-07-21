@@ -4,14 +4,18 @@ on: [push, pull_request]
 
 jobs:
   lint-and-ut:
-    runs-on: self-hosted
+    strategy:
+      matrix:
+        go: [1.17, 1.18]
+        os: [X64, ARM64]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
 
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: ${{ matrix.go }}
 
       - uses: actions/cache@v3
         with:
@@ -30,14 +34,18 @@ jobs:
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
 
   benchmark:
-    runs-on: self-hosted
+    strategy:
+      matrix:
+        go: [1.18]
+        os: [self-hosted]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
 
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: ${{ matrix.go }}
 
       - uses: actions/cache@v3
         with:
@@ -50,7 +58,11 @@ jobs:
         run: go test -bench=. -benchmem -run=none ./...
 
   scenario:
-    runs-on: self-hosted
+    strategy:
+      matrix:
+        go: [1.17, 1.18]
+        os: [X64, ARM64]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
 
@@ -62,7 +74,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
+          go-version: ${{ matrix.go }}
 
       - uses: actions/cache@v3
         with:
