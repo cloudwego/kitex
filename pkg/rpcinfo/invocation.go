@@ -21,14 +21,6 @@ import (
 	"sync/atomic"
 )
 
-type CallType int
-
-const (
-	PingPongCall CallType = iota
-	OnewayCall
-	StreamingCall
-)
-
 var (
 	_              Invocation       = (*invocation)(nil)
 	_              InvocationSetter = (*invocation)(nil)

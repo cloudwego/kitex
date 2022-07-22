@@ -77,9 +77,8 @@ func (cm *ConnWrapper) ReleaseConn(err error, ri rpcinfo.RPCInfo) {
 	}
 	if cm.connPool != nil {
 		if err == nil {
-			if _, ok := ri.To().Tag(rpcinfo.ConnResetTag); ok {
-				cm.connPool.Discard(cm.conn)
-			} else if ri.Config().InteractionMode() == rpcinfo.Oneway {
+			_, ok := ri.To().Tag(rpcinfo.ConnResetTag)
+			if ok || ri.Config().InteractionMode() == rpcinfo.Oneway {
 				cm.connPool.Discard(cm.conn)
 			} else {
 				cm.connPool.Put(cm.conn)
