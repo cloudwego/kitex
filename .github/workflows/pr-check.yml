@@ -4,12 +4,12 @@ on: [pull_request]
 
 jobs:
   compliant:
-    runs-on: self-hosted
+    runs-on: [self-hosted, X64]
     steps:
       - uses: actions/checkout@v3
 
       - name: Check License Header
-        uses: apache/skywalking-eyes@main
+        uses: apache/skywalking-eyes@f461a46e74e5fa22e9f9599a355ab4f0ac265469
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

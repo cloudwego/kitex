@@ -47,15 +47,6 @@ func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.T
 	return offset
 }
 
-func (binaryProtocol) WriteMessageBeginNocopy(buf []byte, binaryWriter BinaryWriter, name string, typeID thrift.TMessageType, seqid int32) int {
-	offset := 0
-	version := uint32(thrift.VERSION_1) | uint32(typeID)
-	offset += Binary.WriteI32(buf, int32(version))
-	offset += Binary.WriteStringNocopy(buf[offset:], binaryWriter, name)
-	offset += Binary.WriteI32(buf[offset:], seqid)
-	return offset
-}
-
 func (binaryProtocol) WriteMessageEnd(buf []byte) int {
 	return 0
 }

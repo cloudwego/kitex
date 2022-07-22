@@ -360,8 +360,12 @@ func (kc *kClient) richRemoteOption() {
 	kc.opt.RemoteOpt.SvcInfo = kc.svcInfo
 	// add default meta handler
 	if len(kc.opt.MetaHandlers) == 0 {
-		kc.opt.MetaHandlers = append(kc.opt.MetaHandlers, transmeta.ClientHTTP2Handler)
-		kc.opt.MetaHandlers = append(kc.opt.MetaHandlers, transmeta.ClientTTHeaderHandler)
+		if kc.opt.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
+			kc.opt.MetaHandlers = append(kc.opt.MetaHandlers, transmeta.ClientHTTP2Handler)
+		}
+		if kc.opt.Configs.TransportProtocol()&transport.TTHeader == transport.TTHeader {
+			kc.opt.MetaHandlers = append(kc.opt.MetaHandlers, transmeta.ClientTTHeaderHandler)
+		}
 	}
 	// for client trans info handler
 	// TODO in stream situations, meta is only assembled when the stream creates
@@ -472,7 +476,7 @@ func newCliTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, er
 }
 
 func initTransportProtocol(svcInfo *serviceinfo.ServiceInfo, cfg rpcinfo.RPCConfig) {
-	if svcInfo.PayloadCodec == serviceinfo.Protobuf && cfg.TransportProtocol() != transport.GRPC {
+	if svcInfo.PayloadCodec == serviceinfo.Protobuf && cfg.TransportProtocol()&transport.GRPC != transport.GRPC {
 		// pb use ttheader framed by default
 		rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
 	}
