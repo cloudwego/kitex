@@ -24,8 +24,9 @@ import (
 type CallType int
 
 const (
-	ThriftCall CallType = iota
-	ThriftOneway
+	PingPongCall CallType = iota
+	OnewayCall
+	StreamingCall
 )
 
 var (

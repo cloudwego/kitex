@@ -256,7 +256,7 @@ func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Cont
 
 	iv := rpcinfo.NewInvocation(kc.svcInfo.ServiceName, method, kc.svcInfo.GetPackageName())
 	if kc.svcInfo.Methods[method].OneWay() {
-		iv.SetCallType(rpcinfo.ThriftOneway)
+		iv.SetCallType(rpcinfo.OnewayCall)
 	}
 
 	// Export read-only views to external users.
