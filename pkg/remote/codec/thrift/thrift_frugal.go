@@ -1,3 +1,5 @@
+//go:build amd64 && !windows
+
 /*
  * Copyright 2021 CloudWeGo Authors
  *

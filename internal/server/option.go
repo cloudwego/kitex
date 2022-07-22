@@ -33,13 +33,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
-	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
-	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -113,7 +109,7 @@ func NewOptions(opts []Option) *Options {
 		Svr:          &rpcinfo.EndpointBasicInfo{},
 		Configs:      rpcinfo.NewRPCConfig(),
 		Once:         configutil.NewOptionOnce(),
-		RemoteOpt:    newServerOption(),
+		RemoteOpt:    newServerRemoteOption(),
 		DebugService: diagnosis.NoopService,
 		ExitSignal:   DefaultSysExitSignal,
 
@@ -136,19 +132,6 @@ func NewOptions(opts []Option) *Options {
 		o.StatsLevel = &level
 	}
 	return o
-}
-
-func newServerOption() *remote.ServerOption {
-	return &remote.ServerOption{
-		TransServerFactory:    netpoll.NewTransServerFactory(),
-		SvrHandlerFactory:     detection.NewSvrTransHandlerFactory(),
-		Codec:                 codec.NewDefaultCodec(),
-		Address:               defaultAddress,
-		ExitWaitTime:          defaultExitWaitTime,
-		MaxConnectionIdleTime: defaultConnectionIdleTime,
-		AcceptFailedDelayTime: defaultAcceptFailedDelayTime,
-		GRPCCfg:               grpc.DefaultServerConfig(),
-	}
 }
 
 // ApplyOptions applies the given options.
