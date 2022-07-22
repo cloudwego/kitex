@@ -21,7 +21,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bprotoc"
+	"github.com/cloudwego/fastpb"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -86,7 +87,7 @@ func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out 
 
 	// 2. encode pb struct
 	// fast write
-	if msg, ok := data.(bprotoc.FastWrite); ok {
+	if msg, ok := data.(fastpb.Writer); ok {
 		msgsize := msg.Size()
 		actualMsgBuf, err := out.Malloc(msgsize)
 		if err != nil {
@@ -153,8 +154,8 @@ func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in
 	}
 	data := message.Data()
 	// fast read
-	if msg, ok := data.(bprotoc.FastRead); ok {
-		_, err := bprotoc.Binary.ReadMessage(actualMsgBuf, bprotoc.SkipTypeCheck, msg)
+	if msg, ok := data.(fastpb.Reader); ok {
+		_, err := fastpb.ReadMessage(actualMsgBuf, fastpb.SkipTypeCheck, msg)
 		if err != nil {
 			return remote.NewTransErrorWithMsg(remote.ProtocolError, err.Error())
 		}
