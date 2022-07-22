@@ -22,9 +22,9 @@ import (
 	"fmt"
 
 	"github.com/bytedance/gopkg/lang/mcache"
+	"github.com/cloudwego/fastpb"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bprotoc"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
@@ -54,7 +54,7 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 
 	var data []byte
 	switch t := message.Data().(type) {
-	case bprotoc.FastWrite:
+	case fastpb.Writer:
 		// TODO: reuse data buffer when we can free it safely
 		size := t.Size()
 		data = mcache.Malloc(size + 5)
@@ -100,8 +100,8 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	}
 	data := message.Data()
 	switch t := data.(type) {
-	case bprotoc.FastRead:
-		_, err = bprotoc.Binary.ReadMessage(d, bprotoc.SkipTypeCheck, t)
+	case fastpb.Reader:
+		_, err = fastpb.ReadMessage(d, fastpb.SkipTypeCheck, t)
 		return err
 	case protobufV2MsgCodec:
 		return t.XXX_Unmarshal(d)
