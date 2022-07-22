@@ -45,7 +45,6 @@ type InvocationSetter interface {
 	SetPackageName(name string)
 	SetServiceName(name string)
 	SetMethodName(name string)
-	SetCallType(typ CallType)
 	SetSeqID(seqID int32)
 }
 
@@ -53,7 +52,6 @@ type invocation struct {
 	packageName string
 	serviceName string
 	methodName  string
-	callType    CallType
 	seqID       int32
 }
 
@@ -123,16 +121,6 @@ func (i *invocation) MethodName() string {
 // SetMethodName implements the InvocationSetter interface.
 func (i *invocation) SetMethodName(name string) {
 	i.methodName = name
-}
-
-// CallType implements the Invocation interface.
-func (i *invocation) CallType() CallType {
-	return i.callType
-}
-
-// SetCallType implements the InvocationSetter interface.
-func (i *invocation) SetCallType(callType CallType) {
-	i.callType = callType
 }
 
 // Recycle reuses the invocation.

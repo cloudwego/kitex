@@ -79,7 +79,6 @@ type Invocation interface {
 	PackageName() string
 	ServiceName() string
 	MethodName() string
-	CallType() CallType
 	SeqID() int32
 }
 

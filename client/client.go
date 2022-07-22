@@ -254,16 +254,15 @@ func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Cont
 		rpcStats.SetLevel(*kc.opt.StatsLevel)
 	}
 
-	iv := rpcinfo.NewInvocation(kc.svcInfo.ServiceName, method, kc.svcInfo.GetPackageName())
-	if kc.svcInfo.Methods[method].OneWay() {
-		iv.SetCallType(rpcinfo.OnewayCall)
+	if kc.svcInfo.MethodInfo(method).OneWay() {
+		cfg.SetInteractionMode(rpcinfo.Oneway)
 	}
 
 	// Export read-only views to external users.
 	ri := rpcinfo.NewRPCInfo(
 		rpcinfo.FromBasicInfo(kc.opt.Cli),
 		rmt.ImmutableView(),
-		iv,
+		rpcinfo.NewInvocation(kc.svcInfo.ServiceName, method, kc.svcInfo.GetPackageName()),
 		cfg.ImmutableView(),
 		rpcStats.ImmutableView(),
 	)
