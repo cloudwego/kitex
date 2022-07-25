@@ -10,11 +10,12 @@ require (
 	github.com/cloudwego/netpoll v0.2.5
 	github.com/cloudwego/thriftgo v0.1.2
 	github.com/golang/mock v1.6.0
+	github.com/google/pprof v0.0.0-20220608213341-c488b8fa1db3
 	github.com/json-iterator/go v1.1.12
 	github.com/tidwall/gjson v1.9.3
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220110181412-a018aaa089fe
+	golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5
 	golang.org/x/tools v0.1.1
 	google.golang.org/genproto v0.0.0-20210513213006-bf773b8c8384
 	google.golang.org/protobuf v1.26.0

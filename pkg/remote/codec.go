@@ -26,3 +26,8 @@ type Codec interface {
 	Decode(ctx context.Context, msg Message, in ByteBuffer) error
 	Name() string
 }
+
+type MetaDecoder interface {
+	DecodeMeta(ctx context.Context, msg Message, in ByteBuffer) error
+	DecodePayload(ctx context.Context, msg Message, in ByteBuffer) error
+}
