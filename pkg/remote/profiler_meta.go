@@ -23,7 +23,7 @@ import (
 )
 
 type (
-	TransInfoTagging func(ctx context.Context, ti TransInfo) (context.Context, []string)
+	TransInfoTagging func(ctx context.Context, msg Message) (context.Context, []string)
 	MessageTagging   func(ctx context.Context, msg Message) (context.Context, []string)
 )
 

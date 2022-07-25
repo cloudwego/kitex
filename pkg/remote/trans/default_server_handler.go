@@ -94,7 +94,7 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 		if err = codec.DecodeMeta(ctx, recvMsg, bufReader); err == nil {
 			if t.opt.Profiler != nil && t.opt.ProfilerTransInfoTagging != nil && recvMsg.TransInfo() != nil {
 				var tags []string
-				ctx, tags = t.opt.ProfilerTransInfoTagging(ctx, recvMsg.TransInfo())
+				ctx, tags = t.opt.ProfilerTransInfoTagging(ctx, recvMsg)
 				ctx = t.opt.Profiler.Tag(ctx, tags...)
 			}
 			err = codec.DecodePayload(ctx, recvMsg, bufReader)

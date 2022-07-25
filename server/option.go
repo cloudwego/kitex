@@ -195,9 +195,9 @@ func WithProfilerTransInfoTagging(tagging remote.TransInfoTagging) Option {
 			o.RemoteOpt.ProfilerTransInfoTagging = tagging
 			return
 		}
-		o.RemoteOpt.ProfilerTransInfoTagging = func(ctx context.Context, ti remote.TransInfo) (context.Context, []string) {
-			c, t := preTagging(ctx, ti)
-			c2, t2 := tagging(c, ti)
+		o.RemoteOpt.ProfilerTransInfoTagging = func(ctx context.Context, msg remote.Message) (context.Context, []string) {
+			c, t := preTagging(ctx, msg)
+			c2, t2 := tagging(c, msg)
 			return c2, append(t, t2...)
 		}
 	}}

@@ -142,6 +142,8 @@ func (p *profiler) Tag(ctx context.Context, tags ...string) context.Context {
 func (p *profiler) Untag(ctx context.Context) {
 	if recoverCtx, ok := ctx.Value(recoverContextKey{}).(context.Context); ok {
 		pprof.SetGoroutineLabels(recoverCtx)
+	} else {
+		pprof.SetGoroutineLabels(context.Background())
 	}
 }
 
