@@ -22,6 +22,8 @@ import (
 )
 
 var (
+	_              Invocation       = (*invocation)(nil)
+	_              InvocationSetter = (*invocation)(nil)
 	invocationPool sync.Pool
 	globalSeqID    int32 = 0
 )
@@ -46,7 +48,7 @@ type invocation struct {
 }
 
 // NewInvocation creates a new Invocation with the given service, method and optional package.
-func NewInvocation(service, method string, pkgOpt ...string) Invocation {
+func NewInvocation(service, method string, pkgOpt ...string) *invocation {
 	ivk := invocationPool.Get().(*invocation)
 	ivk.seqID = genSeqID()
 	ivk.serviceName = service

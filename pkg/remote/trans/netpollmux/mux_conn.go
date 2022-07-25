@@ -79,7 +79,7 @@ func (c *muxCliConn) OnRequest(ctx context.Context, connection netpoll.Connectio
 	// seqId == 0 means a control frame.
 	if seqID == 0 {
 		iv := rpcinfo.NewInvocation("none", "none")
-		iv.(interface{ SetSeqID(seqID int32) }).SetSeqID(0)
+		iv.SetSeqID(0)
 		ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
 		ctl := NewControlFrame()
 		msg := remote.NewMessage(ctl, nil, ri, remote.Reply, remote.Client)

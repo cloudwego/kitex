@@ -36,7 +36,7 @@ var (
 	defaultConnectTimeout   = time.Millisecond * 50
 	defaultReadWriteTimeout = time.Second * 5
 	defaultBufferSize       = 4096
-	defaultInteractionMode  = Unary
+	defaultInteractionMode  = PingPong
 )
 
 // Mask bits.
@@ -50,7 +50,7 @@ const (
 type InteractionMode int32
 
 const (
-	Unary     InteractionMode = 0
+	PingPong  InteractionMode = 0
 	Oneway    InteractionMode = 1
 	Streaming InteractionMode = 2
 )
