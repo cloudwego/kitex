@@ -138,6 +138,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		remote.RecycleMessage(sendMsg)
 	}()
 	ctx = t.startTracer(ctx, ri)
+	ctx = t.startProfiler(ctx)
 	recvMsg = remote.NewMessageWithNewer(t.svcInfo, ri, remote.Call, remote.Server)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	err = t.Read(ctx, conn, recvMsg)
@@ -284,6 +285,13 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	sl := ri.Stats().Level()
 	rpcStats.Reset()
 	rpcStats.SetLevel(sl)
+}
+
+func (t *svrTransHandler) startProfiler(ctx context.Context) context.Context {
+	if t.opt.Profiler == nil {
+		return ctx
+	}
+	return t.opt.Profiler.Prepare(ctx)
 }
 
 func (t *svrTransHandler) finishProfiler(ctx context.Context) {

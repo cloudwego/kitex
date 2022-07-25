@@ -32,11 +32,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 
-type recoverContextKey struct{}
+type profilerContextKey struct{}
 
 type Profiler interface {
 	Run(ctx context.Context) (err error)
 	Stop()
+	Prepare(ctx context.Context) context.Context
 	Tag(ctx context.Context, tags ...string) context.Context
 	Untag(ctx context.Context)
 	Lookup(ctx context.Context, key string) (string, bool)
@@ -80,6 +81,24 @@ type profiler struct {
 	processor Processor
 	interval  time.Duration
 	window    time.Duration
+}
+
+type profilerContext struct {
+	untagCtx context.Context
+	tags     []string
+}
+
+func newProfilerContext() *profilerContext {
+	return &profilerContext{
+		tags: make([]string, 0, 12),
+	}
+}
+
+func (p *profiler) Prepare(ctx context.Context) context.Context {
+	if c := ctx.Value(profilerContextKey{}); c != nil {
+		return ctx
+	}
+	return context.WithValue(ctx, profilerContextKey{}, newProfilerContext())
 }
 
 func (p *profiler) Stop() {
@@ -129,19 +148,24 @@ func (p *profiler) Run(ctx context.Context) (err error) {
 }
 
 func (p *profiler) Tag(ctx context.Context, tags ...string) context.Context {
-	// if we called Tag many times, don't reset the recover ctx twice
-	if _, ok := ctx.Value(recoverContextKey{}).(context.Context); !ok {
-		// we need to recover the current context when Untag
-		ctx = context.WithValue(ctx, recoverContextKey{}, ctx)
+	pctx, ok := ctx.Value(profilerContextKey{}).(*profilerContext)
+	if !ok {
+		pctx = newProfilerContext()
+		ctx = context.WithValue(ctx, profilerContextKey{}, pctx)
 	}
-	ctx = pprof.WithLabels(ctx, pprof.Labels(tags...))
-	pprof.SetGoroutineLabels(ctx)
+	if pctx.untagCtx == nil {
+		pctx.untagCtx = ctx
+	}
+	pctx.tags = append(pctx.tags, tags...)
+	// do not return pprof ctx
+	pprof.SetGoroutineLabels(pprof.WithLabels(context.Background(), pprof.Labels(pctx.tags...)))
 	return ctx
 }
 
 func (p *profiler) Untag(ctx context.Context) {
-	if recoverCtx, ok := ctx.Value(recoverContextKey{}).(context.Context); ok {
-		pprof.SetGoroutineLabels(recoverCtx)
+	pctx, ok := ctx.Value(profilerContextKey{}).(*profilerContext)
+	if ok && pctx.untagCtx != nil {
+		pprof.SetGoroutineLabels(pctx.untagCtx)
 	} else {
 		pprof.SetGoroutineLabels(context.Background())
 	}
