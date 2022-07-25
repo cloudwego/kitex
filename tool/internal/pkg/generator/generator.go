@@ -93,7 +93,6 @@ type Config struct {
 	CombineService  bool // combine services to one service
 	CopyIDL         bool
 	ThriftPlugins   util.StringSlice
-	Features        []feature
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -176,15 +175,6 @@ func (c *Config) Unpack(args []string) error {
 		}
 	}
 	return nil
-}
-
-// AddFeature add registered feature to config
-func (c *Config) AddFeature(key string) bool {
-	if f, ok := getFeature(key); ok {
-		c.Features = append(c.Features, f)
-		return true
-	}
-	return false
 }
 
 // NewGenerator .
@@ -299,17 +289,17 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 		{
 			Name: ClientFileName,
 			Path: filepath.Join(output, ClientFileName),
-			Text: tpl.GetClientTpl(),
+			Text: tpl.ClientTpl,
 		},
 		{
 			Name: ServerFileName,
 			Path: filepath.Join(output, ServerFileName),
-			Text: tpl.GetServerTpl(),
+			Text: tpl.ServerTpl,
 		},
 		{
 			Name: InvokerFileName,
 			Path: filepath.Join(output, InvokerFileName),
-			Text: tpl.GetInvokerTpl(),
+			Text: tpl.InvokerTpl,
 		},
 		{
 			Name: ServiceFileName,
@@ -342,7 +332,6 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	pkg.Codec = g.IDLType
 	pkg.Version = g.Version
 	pkg.RealServiceName = g.ServiceName
-	pkg.Features = g.Features
 	pkg.ExternalKitexGen = g.Use
 	if pkg.Dependencies == nil {
 		pkg.Dependencies = make(map[string]string)

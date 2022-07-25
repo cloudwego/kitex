@@ -29,6 +29,16 @@ type File struct {
 	Content string
 }
 
+// TemplateExtension .
+type TemplateExtension struct {
+	ClientOptionTpl  string
+	ClientExtendTpl  string
+	ServerOptionTpl  string
+	ServerExtendTpl  string
+	InvokerOptionTpl string
+	InvokerExtendTpl string
+}
+
 // PackageInfo contains information to generate a package for a service.
 type PackageInfo struct {
 	Namespace    string            // a dot-separated string for generating service package under kitex_gen
@@ -41,7 +51,7 @@ type PackageInfo struct {
 	RealServiceName  string
 	Imports          map[string]string // import path => alias
 	ExternalKitexGen string
-	Features         []feature
+	TemplateExtension
 }
 
 // AddImport .

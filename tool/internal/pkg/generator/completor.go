@@ -92,6 +92,7 @@ func (c *completer) compare(pkg *ast.Package) []*MethodInfo {
 func (c *completer) addImplementations(w io.Writer, newMethods []*MethodInfo) error {
 	// 调用模板生成新的methods基本实现代码
 	mt := template.New(HandlerFileName).Funcs(funcs)
+	mt = template.Must(mt.Parse(`{{template "HandlerMethods" .}}`))
 	mt = template.Must(mt.Parse(tpl.HandlerMethodsTpl))
 	data := struct {
 		AllMethods  []*MethodInfo
