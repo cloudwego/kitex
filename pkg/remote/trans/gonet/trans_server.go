@@ -80,15 +80,19 @@ func (ts *transServer) BootstrapServer() (err error) {
 			os.Exit(1)
 		}
 		go func() {
-			_, ctx := ts.opt.InitRPCInfoFunc(context.Background(), conn.RemoteAddr())
+			ri, ctx := ts.opt.InitRPCInfoFunc(context.Background(), conn.RemoteAddr())
 			defer func() {
+				transRecover(ctx, conn, "OnRead")
 				// recycle rpcinfo
-				rpcinfo.PutRPCInfo(rpcinfo.GetRPCInfo(ctx))
+				rpcinfo.PutRPCInfo(ri)
 			}()
 			for {
-				err = ts.onConnRead(ctx, conn)
+				ts.refreshDeadline(rpcinfo.GetRPCInfo(ctx), conn)
+				err := ts.transHdlr.OnRead(ctx, conn)
 				if err != nil {
-					klog.Errorf("server onConnRead error, err=%s", err.Error())
+					ts.onError(ctx, err, conn)
+					_ = conn.Close()
+					return
 				}
 			}
 		}()
