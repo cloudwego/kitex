@@ -222,7 +222,7 @@ func (lp *LongPool) Dump() interface{} {
 	m := make(map[string]interface{})
 	lp.peerMap.Range(func(key, value interface{}) bool {
 		t := value.(*peer).ring.Dump()
-		arr := reflect.ValueOf(t).FieldByName("Array").Interface().([]interface{})
+		arr := reflect.ValueOf(t).Elem().FieldByName("Array").Interface().([]interface{})
 		for i := range arr {
 			arr[i] = arr[i].(*longConn).deadline
 		}
