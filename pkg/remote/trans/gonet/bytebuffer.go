@@ -198,7 +198,6 @@ func (rw *bufferReadWriter) Write(p []byte) (n int, err error) {
 
 func (rw *bufferReadWriter) Release(e error) (err error) {
 	if rw.reader != nil {
-		// 重复执行Release nil panic
 		err = rw.reader.Release()
 	}
 	rw.zero()
