@@ -21,52 +21,11 @@ import (
 	"errors"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/cloudwego/kitex/internal/mocks"
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
-
-var (
-	svrTransHdlr remote.ServerTransHandler
-	srvopt       *remote.ServerOption
-	rwTimeout    = time.Second
-	addrStr      = "test addr"
-	addr         = utils.NewNetAddr("tcp", addrStr)
-	method       = "mock"
-)
-
-func init() {
-	var (
-		fromInfo = rpcinfo.EmptyEndpointInfo()
-		rpcCfg   = rpcinfo.NewRPCConfig()
-		mCfg     = rpcinfo.AsMutableRPCConfig(rpcCfg)
-		_        = mCfg.SetReadWriteTimeout(rwTimeout)
-		ink      = rpcinfo.NewInvocation("", method)
-		rpcStat  = rpcinfo.NewRPCStats()
-	)
-
-	srvopt = &remote.ServerOption{
-		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
-			ri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
-			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
-			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			return ri, ctx
-		},
-		Codec: &MockCodec{
-			EncodeFunc: nil,
-			DecodeFunc: nil,
-		},
-		SvcInfo:   mocks.ServiceInfo(),
-		TracerCtl: &internal_stats.Controller{},
-	}
-
-	svrTransHdlr, _ = NewSvrTransHandlerFactory().NewTransHandler(srvopt)
-}
 
 // TestOnActive test server_handler OnActive success
 func TestOnActive(t *testing.T) {
@@ -83,9 +42,6 @@ func TestOnActive(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	err = svrTransHdlr.OnRead(ctx, conn)
 	test.Assert(t, err == nil, err)
-	ri := rpcinfo.GetRPCInfo(ctx)
-	test.Assert(t, ri != nil)
-	test.Assert(t, ri.From().Address().String() == addrStr)
 }
 
 // TestOnRead test server_handler OnRead success
@@ -117,8 +73,6 @@ func TestOnRead(t *testing.T) {
 
 	err = svrTransHdlr.OnRead(ctx, conn)
 	test.Assert(t, err == nil, err)
-	ri := rpcinfo.GetRPCInfo(ctx)
-	test.Assert(t, ri != nil)
 	test.Assert(t, isInvoked)
 }
 
@@ -188,8 +142,6 @@ func TestPanicAfterRead(t *testing.T) {
 
 	err = svrTransHdlr.OnRead(ctx, conn)
 	test.Assert(t, err == nil, err)
-	ri := rpcinfo.GetRPCInfo(ctx)
-	test.Assert(t, ri != nil)
 	test.Assert(t, !isInvoked)
 	test.Assert(t, isClosed)
 }
@@ -213,7 +165,7 @@ func TestNoMethodInfo(t *testing.T) {
 		},
 	}
 	remote.NewTransPipeline(svrTransHdlr)
-	delete(srvopt.SvcInfo.Methods, method)
+	delete(svrOpt.SvcInfo.Methods, method)
 
 	// 2. test
 	ctx := context.Background()
@@ -222,7 +174,5 @@ func TestNoMethodInfo(t *testing.T) {
 
 	err = svrTransHdlr.OnRead(ctx, conn)
 	test.Assert(t, err == nil, err)
-	ri := rpcinfo.GetRPCInfo(ctx)
-	test.Assert(t, ri != nil)
 	test.Assert(t, isClosed)
 }
