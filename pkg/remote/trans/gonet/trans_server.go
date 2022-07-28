@@ -62,8 +62,8 @@ type transServer struct {
 var _ remote.TransServer = &transServer{}
 
 // CreateListener implements the remote.TransServer interface.
+// The network must be "tcp", "tcp4", "tcp6" or "unix".
 func (ts *transServer) CreateListener(addr net.Addr) (_ net.Listener, err error) {
-	// The network must be "tcp", "tcp4", "tcp6" or "unix".
 	ts.ln, err = ts.lncfg.Listen(context.Background(), addr.Network(), addr.String())
 	return ts.ln, err
 }
@@ -71,7 +71,7 @@ func (ts *transServer) CreateListener(addr net.Addr) (_ net.Listener, err error)
 // BootstrapServer implements the remote.TransServer interface.
 func (ts *transServer) BootstrapServer() (err error) {
 	if ts.ln == nil {
-		return errors.New("listener is nil in netpoll transport server")
+		return errors.New("listener is nil in gonet transport server")
 	}
 	for {
 		conn, err := ts.ln.Accept()
