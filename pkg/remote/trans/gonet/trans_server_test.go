@@ -18,7 +18,6 @@ package gonet
 
 import (
 	"context"
-	"errors"
 	"net"
 	"os"
 	"testing"
@@ -86,27 +85,4 @@ func TestCreateListener(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ln.Addr().String() == addrStr)
 	ln.Close()
-}
-
-// TestOnConnRead test trans_server onConnRead success
-func TestConnOnRead(t *testing.T) {
-	// 1. prepare mock data
-	conn := &MockNetConn{
-		Conn: mocks.Conn{
-			RemoteAddrFunc: func() (r net.Addr) {
-				return addr
-			},
-		},
-	}
-	mockErr := errors.New("mock error")
-	transSvr.transHdlr = &mocks.MockSvrTransHandler{
-		OnReadFunc: func(ctx context.Context, conn net.Conn) error {
-			return mockErr
-		},
-		Opt: transSvr.opt,
-	}
-
-	// 2. test
-	err := transSvr.onConnRead(context.Background(), conn)
-	test.Assert(t, err == nil, err)
 }

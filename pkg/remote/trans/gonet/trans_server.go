@@ -123,17 +123,6 @@ func (ts *transServer) ConnCount() utils.AtomicInt {
 	return ts.connCount
 }
 
-func (ts *transServer) onConnRead(ctx context.Context, conn net.Conn) error {
-	defer transRecover(ctx, conn, "OnRead")
-	ts.refreshDeadline(rpcinfo.GetRPCInfo(ctx), conn)
-	err := ts.transHdlr.OnRead(ctx, conn)
-	if err != nil {
-		ts.onError(ctx, err, conn)
-		_ = conn.Close()
-	}
-	return nil
-}
-
 func (ts *transServer) onError(ctx context.Context, err error, conn net.Conn) {
 	ts.transHdlr.OnError(ctx, err, conn)
 }
