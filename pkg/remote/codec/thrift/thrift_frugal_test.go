@@ -1,3 +1,6 @@
+//go:build amd64 || ignore || !windows
+// +build amd64 ignore !windows
+
 // Copyright 2022 ByteDance Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,9 +14,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-//go:build amd64
-// +build amd64
 
 package thrift
 

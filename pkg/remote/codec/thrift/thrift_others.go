@@ -1,5 +1,5 @@
-//go:build !amd64
-// +build !amd64
+//go:build !amd64 || ignore || windows
+// +build !amd64 ignore windows
 
 /*
  * Copyright 2021 CloudWeGo Authors
