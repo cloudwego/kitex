@@ -23,7 +23,7 @@ import (
 
 type svrTransHandlerFactory struct{}
 
-// NewSvrTransHandlerFactory creates a default netpoll server transport handler factory.
+// NewSvrTransHandlerFactory creates a default go net server transport handler factory.
 func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
 	return &svrTransHandlerFactory{}
 }

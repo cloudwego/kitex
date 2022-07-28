@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package gonet contains server and client implementation for netpoll.
+// Package gonet contains server and client implementation for go net.
 package gonet
 
 import (
@@ -34,7 +34,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-// NewTransServerFactory creates a default netpoll transport server factory.
+// NewTransServerFactory creates a default go net transport server factory.
 func NewTransServerFactory() remote.TransServerFactory {
 	return &gonetTransServerFactory{}
 }
