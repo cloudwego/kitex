@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,27 @@
  * limitations under the License.
  */
 
-package kitex
+package gonet
 
-// Name and Version info of this framework, used for statistics and debug
-const (
-	Name    = "Kitex"
-	Version = "v0.3.4"
+import (
+	"context"
+	"net"
+	"time"
+
+	"github.com/cloudwego/kitex/pkg/remote"
 )
+
+// NewDialer returns the default netpoll dialer.
+func NewDialer() remote.Dialer {
+	return &dialer{}
+}
+
+type dialer struct {
+	net.Dialer
+}
+
+func (d *dialer) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return d.DialContext(ctx, network, address)
+}

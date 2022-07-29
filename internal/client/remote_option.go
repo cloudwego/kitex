@@ -1,5 +1,8 @@
+//go:build !windows
+// +build !windows
+
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +17,19 @@
  * limitations under the License.
  */
 
-package kitex
+// Package client defines the Options about remote transport of client.
+package client
 
-// Name and Version info of this framework, used for statistics and debug
-const (
-	Name    = "Kitex"
-	Version = "v0.3.4"
+import (
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
+	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 )
+
+func newClientRemoteOption() *remote.ClientOption {
+	return &remote.ClientOption{
+		CliHandlerFactory: netpoll.NewCliTransHandlerFactory(),
+		Dialer:            netpoll.NewDialer(),
+		Codec:             codec.NewDefaultCodec(),
+	}
+}
