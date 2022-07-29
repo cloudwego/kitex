@@ -35,20 +35,24 @@ import (
 )
 
 var (
-	transSvr *transServer
-	svrOpt   *remote.ServerOption
+	svrTransHdlr remote.ServerTransHandler
+	rwTimeout    = time.Second
+	addrStr      = "test addr"
+	addr         = utils.NewNetAddr("tcp", addrStr)
+	method       = "mock"
+	transSvr     *transServer
+	svrOpt       *remote.ServerOption
 )
 
 func TestMain(m *testing.M) {
-	fromInfo := rpcinfo.EmptyEndpointInfo()
-	rpcCfg := rpcinfo.NewRPCConfig()
-	mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
-	mCfg.SetReadWriteTimeout(rwTimeout)
-	ink := rpcinfo.NewInvocation("", method)
-	rpcStat := rpcinfo.NewRPCStats()
-
 	svrOpt = &remote.ServerOption{
 		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
+			fromInfo := rpcinfo.EmptyEndpointInfo()
+			rpcCfg := rpcinfo.NewRPCConfig()
+			mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
+			mCfg.SetReadWriteTimeout(rwTimeout)
+			ink := rpcinfo.NewInvocation("", method)
+			rpcStat := rpcinfo.NewRPCStats()
 			ri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
 			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
