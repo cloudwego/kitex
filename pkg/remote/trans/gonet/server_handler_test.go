@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,13 @@
  * limitations under the License.
  */
 
-package netpoll
+package gonet
 
 import (
 	"context"
 	"errors"
 	"net"
 	"testing"
-	"time"
-
-	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
@@ -32,13 +29,7 @@ import (
 
 // TestOnActive test server_handler OnActive success
 func TestOnActive(t *testing.T) {
-	// 1. prepare mock data
-	var readTimeout time.Duration
-	conn := &MockNetpollConn{
-		SetReadTimeoutFunc: func(timeout time.Duration) (e error) {
-			readTimeout = timeout
-			return nil
-		},
+	conn := &MockNetConn{
 		Conn: mocks.Conn{
 			RemoteAddrFunc: func() (r net.Addr) {
 				return addr
@@ -46,44 +37,24 @@ func TestOnActive(t *testing.T) {
 		},
 	}
 
-	// 2. test
 	ctx := context.Background()
 	ctx, err := svrTransHdlr.OnActive(ctx, conn)
 	test.Assert(t, err == nil, err)
 	err = svrTransHdlr.OnRead(ctx, conn)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, readTimeout == rwTimeout, readTimeout, rwTimeout)
 }
 
 // TestOnRead test server_handler OnRead success
 func TestOnRead(t *testing.T) {
 	// 1. prepare mock data
-	var isWriteBufFlushed bool
-	var isReaderBufReleased bool
+	// var isWriteBufFlushed bool
+	// var isReaderBufReleased bool
 	var isInvoked bool
-	conn := &MockNetpollConn{
+	conn := &MockNetConn{
 		Conn: mocks.Conn{
 			RemoteAddrFunc: func() (r net.Addr) {
 				return addr
 			},
-		},
-		ReaderFunc: func() (r netpoll.Reader) {
-			reader := &MockNetpollReader{
-				ReleaseFunc: func() (err error) {
-					isReaderBufReleased = true
-					return nil
-				},
-			}
-			return reader
-		},
-		WriterFunc: func() (r netpoll.Writer) {
-			writer := &MockNetpollWriter{
-				FlushFunc: func() (err error) {
-					isWriteBufFlushed = true
-					return nil
-				},
-			}
-			return writer
 		},
 	}
 
@@ -102,18 +73,14 @@ func TestOnRead(t *testing.T) {
 
 	err = svrTransHdlr.OnRead(ctx, conn)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, isReaderBufReleased)
-	test.Assert(t, isWriteBufFlushed)
 	test.Assert(t, isInvoked)
 }
 
 // TestInvokeErr test server_handler invoke err
 func TestInvokeErr(t *testing.T) {
 	// 1. prepare mock data
-	var isWriteBufFlushed bool
-	var isReaderBufReleased bool
 	var isInvoked bool
-	conn := &MockNetpollConn{
+	conn := &MockNetConn{
 		Conn: mocks.Conn{
 			RemoteAddrFunc: func() (r net.Addr) {
 				return addr
@@ -121,24 +88,6 @@ func TestInvokeErr(t *testing.T) {
 			CloseFunc: func() (e error) {
 				return nil
 			},
-		},
-		ReaderFunc: func() (r netpoll.Reader) {
-			reader := &MockNetpollReader{
-				ReleaseFunc: func() (err error) {
-					isReaderBufReleased = true
-					return nil
-				},
-			}
-			return reader
-		},
-		WriterFunc: func() (r netpoll.Writer) {
-			writer := &MockNetpollWriter{
-				FlushFunc: func() (err error) {
-					isWriteBufFlushed = true
-					return nil
-				},
-			}
-			return writer
 		},
 		IsActiveFunc: func() (r bool) {
 			return true
@@ -161,19 +110,15 @@ func TestInvokeErr(t *testing.T) {
 
 	err = svrTransHdlr.OnRead(ctx, conn)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, isReaderBufReleased)
-	test.Assert(t, isWriteBufFlushed)
 	test.Assert(t, isInvoked)
 }
 
 // TestPanicAfterRead test server_handler not panic after read
 func TestPanicAfterRead(t *testing.T) {
 	// 1. prepare mock data
-	var isWriteBufFlushed bool
-	var isReaderBufReleased bool
 	var isInvoked bool
 	var isClosed bool
-	conn := &MockNetpollConn{
+	conn := &MockNetConn{
 		Conn: mocks.Conn{
 			RemoteAddrFunc: func() (r net.Addr) {
 				return addr
@@ -182,24 +127,6 @@ func TestPanicAfterRead(t *testing.T) {
 				isClosed = true
 				return nil
 			},
-		},
-		ReaderFunc: func() (r netpoll.Reader) {
-			reader := &MockNetpollReader{
-				ReleaseFunc: func() (err error) {
-					isReaderBufReleased = true
-					return nil
-				},
-			}
-			return reader
-		},
-		WriterFunc: func() (r netpoll.Writer) {
-			writer := &MockNetpollWriter{
-				FlushFunc: func() (err error) {
-					isWriteBufFlushed = true
-					return nil
-				},
-			}
-			return writer
 		},
 		IsActiveFunc: func() (r bool) {
 			return true
@@ -215,8 +142,6 @@ func TestPanicAfterRead(t *testing.T) {
 
 	err = svrTransHdlr.OnRead(ctx, conn)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, isReaderBufReleased)
-	test.Assert(t, !isWriteBufFlushed)
 	test.Assert(t, !isInvoked)
 	test.Assert(t, isClosed)
 }
@@ -224,10 +149,8 @@ func TestPanicAfterRead(t *testing.T) {
 // TestNoMethodInfo test server_handler without method info success
 func TestNoMethodInfo(t *testing.T) {
 	// 1. prepare mock data
-	var isWriteBufFlushed bool
-	var isReaderBufReleased bool
 	var isClosed bool
-	conn := &MockNetpollConn{
+	conn := &MockNetConn{
 		Conn: mocks.Conn{
 			RemoteAddrFunc: func() (r net.Addr) {
 				return addr
@@ -236,24 +159,6 @@ func TestNoMethodInfo(t *testing.T) {
 				isClosed = true
 				return nil
 			},
-		},
-		ReaderFunc: func() (r netpoll.Reader) {
-			reader := &MockNetpollReader{
-				ReleaseFunc: func() (err error) {
-					isReaderBufReleased = true
-					return nil
-				},
-			}
-			return reader
-		},
-		WriterFunc: func() (r netpoll.Writer) {
-			writer := &MockNetpollWriter{
-				FlushFunc: func() (err error) {
-					isWriteBufFlushed = true
-					return nil
-				},
-			}
-			return writer
 		},
 		IsActiveFunc: func() (r bool) {
 			return true
@@ -269,7 +174,5 @@ func TestNoMethodInfo(t *testing.T) {
 
 	err = svrTransHdlr.OnRead(ctx, conn)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, isReaderBufReleased)
-	test.Assert(t, isWriteBufFlushed)
 	test.Assert(t, isClosed)
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,35 +14,35 @@
  * limitations under the License.
  */
 
-// Package netpoll contains server and client implementation for netpoll.
-
-package netpoll
+// Package gonet contains server and client implementation for netpoll.
+package gonet
 
 import (
 	"context"
 	"errors"
 	"net"
+	"os"
 	"runtime/debug"
 	"sync"
-	"syscall"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/netpoll"
 )
 
 // NewTransServerFactory creates a default netpoll transport server factory.
 func NewTransServerFactory() remote.TransServerFactory {
-	return &netpollTransServerFactory{}
+	return &gonetTransServerFactory{}
 }
 
-type netpollTransServerFactory struct{}
+type gonetTransServerFactory struct{}
 
 // NewTransServer implements the remote.TransServerFactory interface.
-func (f *netpollTransServerFactory) NewTransServer(opt *remote.ServerOption, transHdlr remote.ServerTransHandler) remote.TransServer {
+func (f *gonetTransServerFactory) NewTransServer(opt *remote.ServerOption, transHdlr remote.ServerTransHandler) remote.TransServer {
 	return &transServer{
 		opt:       opt,
 		transHdlr: transHdlr,
@@ -53,8 +53,6 @@ func (f *netpollTransServerFactory) NewTransServer(opt *remote.ServerOption, tra
 type transServer struct {
 	opt       *remote.ServerOption
 	transHdlr remote.ServerTransHandler
-
-	evl       netpoll.EventLoop
 	ln        net.Listener
 	lncfg     net.ListenConfig
 	connCount utils.AtomicInt
@@ -64,11 +62,8 @@ type transServer struct {
 var _ remote.TransServer = &transServer{}
 
 // CreateListener implements the remote.TransServer interface.
+// The network must be "tcp", "tcp4", "tcp6" or "unix".
 func (ts *transServer) CreateListener(addr net.Addr) (_ net.Listener, err error) {
-	if addr.Network() == "unix" {
-		syscall.Unlink(addr.String())
-	}
-	// The network must be "tcp", "tcp4", "tcp6" or "unix".
 	ts.ln, err = ts.lncfg.Listen(context.Background(), addr.Network(), addr.String())
 	return ts.ln, err
 }
@@ -76,29 +71,32 @@ func (ts *transServer) CreateListener(addr net.Addr) (_ net.Listener, err error)
 // BootstrapServer implements the remote.TransServer interface.
 func (ts *transServer) BootstrapServer() (err error) {
 	if ts.ln == nil {
-		return errors.New("listener is nil in netpoll transport server")
+		return errors.New("listener is nil in gonet transport server")
 	}
-	opts := []netpoll.Option{
-		netpoll.WithIdleTimeout(ts.opt.MaxConnectionIdleTime),
-		netpoll.WithReadTimeout(ts.opt.ReadWriteTimeout),
+	for {
+		conn, err := ts.ln.Accept()
+		if err != nil {
+			klog.Errorf("bootstrap server accept failed, err=%s", err.Error())
+			os.Exit(1)
+		}
+		go func() {
+			ri, ctx := ts.opt.InitRPCInfoFunc(context.Background(), conn.RemoteAddr())
+			defer func() {
+				transRecover(ctx, conn, "OnRead")
+				// recycle rpcinfo
+				rpcinfo.PutRPCInfo(ri)
+			}()
+			for {
+				ts.refreshDeadline(rpcinfo.GetRPCInfo(ctx), conn)
+				err := ts.transHdlr.OnRead(ctx, conn)
+				if err != nil {
+					ts.onError(ctx, err, conn)
+					_ = conn.Close()
+					return
+				}
+			}
+		}()
 	}
-
-	ts.Lock()
-	opts = append(opts, netpoll.WithOnPrepare(ts.onConnActive))
-	ts.evl, err = netpoll.NewEventLoop(ts.onConnRead, opts...)
-	ts.Unlock()
-
-	if err == nil {
-		// Convert the listener so that closing it also stops the
-		// event loop in netpoll.
-		ts.Lock()
-		ts.ln, err = netpoll.ConvertListener(ts.ln)
-		ts.Unlock()
-	}
-	if err != nil {
-		return err
-	}
-	return ts.evl.Serve(ts.ln)
 }
 
 // Shutdown implements the remote.TransServer interface.
@@ -111,14 +109,11 @@ func (ts *transServer) Shutdown() (err error) {
 	if g, ok := ts.transHdlr.(remote.GracefulShutdown); ok {
 		if ts.ln != nil {
 			// 1. stop listener
-			ts.ln.Close()
+			_ = ts.ln.Close()
 
 			// 2. signal all active connections to close gracefully
-			g.GracefulShutdown(ctx)
+			_ = g.GracefulShutdown(ctx)
 		}
-	}
-	if ts.evl != nil {
-		err = ts.evl.Shutdown(ctx)
 	}
 	return
 }
@@ -128,47 +123,11 @@ func (ts *transServer) ConnCount() utils.AtomicInt {
 	return ts.connCount
 }
 
-// TODO: Is it necessary to init RPCInfo when connection is first created?
-// Now the strategy is the same as the original one.
-// 1. There's no request when the connection is first created.
-// 2. Doesn't need to init RPCInfo if it's not RPC request, such as heartbeat.
-func (ts *transServer) onConnActive(conn netpoll.Connection) context.Context {
-	ctx := context.Background()
-	defer transRecover(ctx, conn, "OnActive")
-	conn.AddCloseCallback(func(connection netpoll.Connection) error {
-		ts.onConnInactive(ctx, conn)
-		return nil
-	})
-	ts.connCount.Inc()
-	ctx, err := ts.transHdlr.OnActive(ctx, conn)
-	if err != nil {
-		ts.onError(ctx, err, conn)
-		conn.Close()
-		return ctx
-	}
-	return ctx
-}
-
-func (ts *transServer) onConnRead(ctx context.Context, conn netpoll.Connection) error {
-	err := ts.transHdlr.OnRead(ctx, conn)
-	if err != nil {
-		ts.onError(ctx, err, conn)
-		conn.Close()
-	}
-	return nil
-}
-
-func (ts *transServer) onConnInactive(ctx context.Context, conn netpoll.Connection) {
-	defer transRecover(ctx, conn, "OnInactive")
-	ts.connCount.Dec()
-	ts.transHdlr.OnInactive(ctx, conn)
-}
-
-func (ts *transServer) onError(ctx context.Context, err error, conn netpoll.Connection) {
+func (ts *transServer) onError(ctx context.Context, err error, conn net.Conn) {
 	ts.transHdlr.OnError(ctx, err, conn)
 }
 
-func transRecover(ctx context.Context, conn netpoll.Connection, funcName string) {
+func transRecover(ctx context.Context, conn net.Conn, funcName string) {
 	panicErr := recover()
 	if panicErr != nil {
 		if conn != nil {
@@ -177,4 +136,9 @@ func transRecover(ctx context.Context, conn netpoll.Connection, funcName string)
 			klog.CtxErrorf(ctx, "KITEX: panic happened in %s, error=%v\nstack=%s", funcName, panicErr, string(debug.Stack()))
 		}
 	}
+}
+
+func (ts *transServer) refreshDeadline(ri rpcinfo.RPCInfo, conn net.Conn) {
+	readTimeout := ri.Config().ReadWriteTimeout()
+	_ = conn.SetReadDeadline(time.Now().Add(readTimeout))
 }
