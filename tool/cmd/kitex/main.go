@@ -25,11 +25,11 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/generator"
-	"github.com/cloudwego/kitex/tool/internal/pkg/log"
-	"github.com/cloudwego/kitex/tool/internal/pkg/pluginmode/protoc"
-	"github.com/cloudwego/kitex/tool/internal/pkg/pluginmode/thriftgo"
-	"github.com/cloudwego/kitex/tool/internal/pkg/util"
+	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
+	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 var args arguments

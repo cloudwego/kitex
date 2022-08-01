@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/log"
-	"github.com/cloudwego/kitex/tool/internal/pkg/tpl"
-	"github.com/cloudwego/kitex/tool/internal/pkg/util"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 // Constants .
