@@ -18,6 +18,7 @@ package descriptor
 
 import (
 	"context"
+	"errors"
 
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
@@ -153,7 +154,7 @@ func (m *apiBody) Request(ctx context.Context, req *HTTPRequest, field *FieldDes
 		val, err := msg.TryGetFieldByNumber(int(field.ID))
 		return val, err == nil, nil
 	default:
-		return nil, false, nil
+		return nil, false, errors.New("unsupported request content type")
 	}
 }
 
@@ -166,7 +167,7 @@ func (m *apiBody) Response(ctx context.Context, resp *HTTPResponse, field *Field
 		msg := resp.Body.(proto.Message)
 		return msg.TrySetFieldByNumber(int(field.ID), val)
 	default:
-		return nil
+		return errors.New("unsupported response content type")
 	}
 }
 

@@ -3,7 +3,6 @@ module github.com/cloudwego/kitex
 go 1.13
 
 require (
-	code.byted.org/kite/kitex v1.8.1
 	github.com/apache/thrift v0.13.0
 	github.com/bytedance/gopkg v0.0.0-20211103090529-d4719f74be3d
 	github.com/cespare/xxhash v1.1.0
