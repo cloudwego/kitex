@@ -10,7 +10,7 @@ import (
 // NewServer creates a server.Server with the given handler and options.
 func NewServer(handler {{call .ServiceTypeName}}, opts ...server.Option) server.Server {
     var options []server.Option
-    {{.ServerOptionTpl}}
+    {{template "@server.go-NewServer-option" .}}
     options = append(options, opts...)
 
     svr := server.NewServer(options...)
@@ -19,4 +19,4 @@ func NewServer(handler {{call .ServiceTypeName}}, opts ...server.Option) server.
     }
     return svr
 }
-{{.ServerExtendTpl}}
+{{template "@server.go-EOF" .}}

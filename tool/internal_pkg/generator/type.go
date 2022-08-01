@@ -16,6 +16,7 @@ package generator
 
 import (
 	"bytes"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -27,16 +28,6 @@ import (
 type File struct {
 	Name    string
 	Content string
-}
-
-// TemplateExtension .
-type TemplateExtension struct {
-	ClientOptionTpl  string
-	ClientExtendTpl  string
-	ServerOptionTpl  string
-	ServerExtendTpl  string
-	InvokerOptionTpl string
-	InvokerExtendTpl string
 }
 
 // PackageInfo contains information to generate a package for a service.
@@ -51,7 +42,6 @@ type PackageInfo struct {
 	RealServiceName  string
 	Imports          map[string]string // import path => alias
 	ExternalKitexGen string
-	TemplateExtension
 }
 
 // AddImport .
@@ -143,6 +133,31 @@ var funcs = map[string]interface{}{
 	"HasFeature": HasFeature,
 }
 
+var templateNames = []string{
+	"@client.go-NewClient-option",
+	"@client.go-EOF",
+	"@invoker.go-NewInvoker-option",
+	"@invoker.go-EOF",
+	"@server.go-NewServer-option",
+	"@server.go-EOF",
+}
+
+var templateExtentions = (func() map[string]string {
+	m := make(map[string]string)
+	for _, name := range templateNames {
+		// create dummy templates
+		m[name] = fmt.Sprintf(`{{define "%s"}}{{end}}`, name)
+	}
+	return m
+})()
+
+// SetTemplateExtension .
+func SetTemplateExtension(name, text string) {
+	if _, ok := templateExtentions[name]; ok {
+		templateExtentions[name] = text
+	}
+}
+
 // Task .
 type Task struct {
 	Name string
@@ -156,6 +171,15 @@ func (t *Task) Build() error {
 	x, err := template.New(t.Name).Funcs(funcs).Parse(t.Text)
 	if err != nil {
 		return err
+	}
+	for _, n := range templateNames {
+		if strings.Contains(t.Text, n) {
+			x, err = x.Parse(templateExtentions[n])
+			if err != nil {
+				return fmt.Errorf("failed to parse extension %q for %s: %w (%#q)",
+					n, t.Name, err, templateExtentions[n])
+			}
+		}
 	}
 	t.Template = x
 	return nil

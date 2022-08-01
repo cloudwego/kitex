@@ -261,7 +261,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		task := Task{
 			Name: HandlerFileName,
 			Path: handlerFilePath,
-			Text: tpl.HandlerTpl,
+			Text: tpl.HandlerTpl + "\n" + tpl.HandlerMethodsTpl,
 		}
 		g.setImports(task.Name, pkg)
 		handle := func(task *Task, pkg *PackageInfo) (*File, error) {
