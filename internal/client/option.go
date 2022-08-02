@@ -104,6 +104,9 @@ type Options struct {
 	// GRPC
 	GRPCConnPoolSize uint32
 	GRPCConnectOpts  *grpc.ConnectOptions
+
+	// XDS
+	XDSEnabled bool
 }
 
 // Apply applies all options.

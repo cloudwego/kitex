@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/xds/xdssuite"
 	"net"
 	"strings"
 	"time"
@@ -128,7 +129,6 @@ func WithDestService(svr string) Option {
 func WithHostPorts(hostports ...string) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithHostPorts(%v)", hostports))
-
 		var ins []discovery.Instance
 		for _, hp := range hostports {
 			if _, err := net.ResolveTCPAddr("tcp", hp); err == nil {
@@ -160,6 +160,15 @@ func WithHostPorts(hostports ...string) Option {
 				return o.Targets
 			},
 		}
+	}}
+}
+
+func WithXDSSuite() Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithXDSSuite"))
+
+		o.XDSEnabled = true
+		o.Resolver = xdssuite.NewXDSResolver()
 	}}
 }
 

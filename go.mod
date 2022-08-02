@@ -21,4 +21,5 @@ require (
 	google.golang.org/genproto v0.0.0-20210513213006-bf773b8c8384
 	google.golang.org/protobuf v1.28.0
 	gopkg.in/yaml.v3 v3.0.1
+	istio.io/istio v0.0.0-20220802022311-24c4815f232c
 )
