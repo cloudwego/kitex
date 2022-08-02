@@ -31,8 +31,10 @@ import (
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	{{if GenerateFastAPIs}}
+	"{{ImportPathTo "pkg/protocol/bthrift"}}"
+	{{- end}}
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	{{- range $path, $alias := .Imports}}
 	{{$alias }}"{{$path}}"
 	{{- end}}
@@ -47,7 +49,9 @@ var (
 	_ = (*strings.Builder)(nil)
 	_ = reflect.Type(nil)
 	_ = thrift.TProtocol(nil)
+	{{if GenerateFastAPIs}}
 	_ = bthrift.BinaryWriter(nil)
+	{{- end}}
 	{{- range .Imports | ToPackageNames}}
 	_ = {{.}}.KitexUnusedProtection
 	{{- end}}
@@ -100,20 +104,18 @@ const patchBase = `
 {{define "GetOrSetBase"}}
 {{$RR := . | FilterBase}}
 {{range $RR.Requests }}
-{{- $TypeName := .GoName}}
-func (p *{{$TypeName}}) GetOrSetBase() interface{} {
+func (p *{{.StructTypeName}}) GetOrSetBase() interface{} {
 	if p.Base == nil {
-		p.Base = base.NewBase()
+		p.Base = {{.BaseFuncName}}()
 	}
 	return p.Base
 }
 {{- end}}{{/* range $RR.Requests */}}
 
 {{range $RR.Responses }}
-{{- $TypeName := .GoName}}
-func (p *{{$TypeName}}) GetOrSetBaseResp() interface{} {
+func (p *{{.StructTypeName}}) GetOrSetBaseResp() interface{} {
 	if p.BaseResp == nil {
-		p.BaseResp = base.NewBaseResp()
+		p.BaseResp = {{.BaseFuncName}}()
 	}
 	return p.BaseResp
 }

@@ -18,17 +18,16 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
 	"text/template"
 
+	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/thriftgo/generator/golang"
-	"github.com/cloudwego/thriftgo/generator/golang/common"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/plugin"
-
-	"github.com/cloudwego/kitex"
 )
 
 const kitexUnusedProtection = `
@@ -44,6 +43,7 @@ type patcher struct {
 	utils     *golang.CodeUtils
 	module    string
 	copyIDL   bool
+	version   string
 
 	fileTpl *template.Template
 }
@@ -54,8 +54,9 @@ func (p *patcher) buildTemplates() error {
 	m["TypeIDToGoType"] = func(t string) string { return typeIDToGoType[t] }
 	m["FilterBase"] = p.filterBase
 	m["IsBinaryOrStringType"] = p.isBinaryOrStringType
-	m["Version"] = func() string { return kitex.Version }
+	m["Version"] = func() string { return p.version }
 	m["GenerateFastAPIs"] = func() bool { return !p.noFastAPI }
+	m["ImportPathTo"] = generator.ImportPathTo
 	m["ToPackageNames"] = func(imports map[string]string) (res []string) {
 		for pth, alias := range imports {
 			if alias != "" {
@@ -72,6 +73,9 @@ func (p *patcher) buildTemplates() error {
 			return "_" + strconv.Itoa(-int(id))
 		}
 		return strconv.Itoa(int(id))
+	}
+	m["IsNil"] = func(i interface{}) bool {
+		return i == nil || reflect.ValueOf(i).IsNil()
 	}
 
 	tpl := template.New("kitex").Funcs(m)
@@ -126,6 +130,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
 		}
 		p.filterStdLib(data.Imports)
+
 		if err = p.fileTpl.ExecuteTemplate(&buf, "file", data); err != nil {
 			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
 		}
@@ -150,22 +155,32 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 }
 
 func (p *patcher) filterBase(ast *golang.Scope) interface{} {
-	var req, res []*golang.StructLike
+	type NamePair struct {
+		StructTypeName string
+		BaseFuncName   string
+	}
+	var req, res []*NamePair
 	for _, s := range ast.StructLikes() {
 		for _, f := range s.Fields() {
-			fn, _ := common.Unexport(f.Name)
+			fn := f.GoName().String()
 			tn := f.Type.Name
-			if fn == "base" && tn == "base.Base" {
-				req = append(req, s)
+			if fn == "Base" && tn == "base.Base" {
+				req = append(req, &NamePair{
+					StructTypeName: s.GoName().String(),
+					BaseFuncName:   f.GoTypeName().Deref().NewFunc().String(),
+				})
 			}
-			if fn == "baseResp" && tn == "base.BaseResp" {
-				res = append(res, s)
+			if fn == "BaseResp" && tn == "base.BaseResp" {
+				res = append(res, &NamePair{
+					StructTypeName: s.GoName().String(),
+					BaseFuncName:   f.GoTypeName().Deref().NewFunc().String(),
+				})
 			}
 		}
 	}
 	return &struct {
-		Requests  []*golang.StructLike
-		Responses []*golang.StructLike
+		Requests  []*NamePair
+		Responses []*NamePair
 	}{Requests: req, Responses: res}
 }
 

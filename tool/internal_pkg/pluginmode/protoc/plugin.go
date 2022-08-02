@@ -131,7 +131,9 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		f := gengo.GenerateFile(gen, &fixed)
 		f.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "context"})
 		if hasStreaming {
-			f.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "github.com/cloudwego/kitex/pkg/streaming"})
+			f.QualifiedGoIdent(protogen.GoIdent{
+				GoImportPath: protogen.GoImportPath(generator.ImportPathTo("pkg/streaming")),
+			})
 		}
 		f.P("var _ context.Context")
 
@@ -141,6 +143,10 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		pp.err = tpl.ExecuteTemplate(&buf, tpl.Name(), pp.makeInterfaces(f, file))
 
 		f.P(buf.String())
+	}
+	// generate fast api
+	if pp.Config.EXP && !pp.Config.NoFastAPI && pp.err == nil {
+		pp.GenerateFastFile(gen, file)
 	}
 }
 
