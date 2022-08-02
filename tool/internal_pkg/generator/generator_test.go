@@ -44,7 +44,6 @@ func TestConfig_Pack(t *testing.T) {
 		PackagePrefix   string
 		CombineService  bool
 		CopyIDL         bool
-		EXP             bool
 		ThriftPlugins   util.StringSlice
 		Features        []feature
 	}
@@ -57,7 +56,7 @@ func TestConfig_Pack(t *testing.T) {
 		{
 			name:    "some",
 			fields:  fields{Features: []feature{feature(999)}},
-			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "EXP=false", "Features=999"},
+			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "Features=999"},
 		},
 	}
 	for _, tt := range tests {
@@ -80,7 +79,6 @@ func TestConfig_Pack(t *testing.T) {
 				PackagePrefix:   tt.fields.PackagePrefix,
 				CombineService:  tt.fields.CombineService,
 				CopyIDL:         tt.fields.CopyIDL,
-				EXP:             tt.fields.EXP,
 				ThriftPlugins:   tt.fields.ThriftPlugins,
 				Features:        tt.fields.Features,
 			}

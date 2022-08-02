@@ -144,10 +144,6 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 
 		f.P(buf.String())
 	}
-	// generate fast api
-	if pp.Config.EXP && !pp.Config.NoFastAPI && pp.err == nil {
-		pp.GenerateFastFile(gen, file)
-	}
 }
 
 func (pp *protocPlugin) process(gen *protogen.Plugin) {

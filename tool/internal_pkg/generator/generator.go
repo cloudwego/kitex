@@ -107,7 +107,6 @@ type Config struct {
 	PackagePrefix   string
 	CombineService  bool // combine services to one service
 	CopyIDL         bool
-	EXP             bool // FIXME: the switch of generate fastpb code, which should be removed after full verification.
 	ThriftPlugins   util.StringSlice
 	Features        []feature
 }
@@ -355,7 +354,6 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 }
 
 func (g *generator) updatePackageInfo(pkg *PackageInfo) {
-	pkg.EXP = g.EXP
 	pkg.NoFastAPI = g.NoFastAPI
 	pkg.Codec = g.IDLType
 	pkg.Version = g.Version

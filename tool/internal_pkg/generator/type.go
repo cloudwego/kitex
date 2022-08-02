@@ -39,7 +39,6 @@ type PackageInfo struct {
 	// the following fields will be filled and used by the generator
 	Codec            string
 	NoFastAPI        bool
-	EXP              bool // FIXME: the switch of generate fastpb code, which should be removed after full verification.
 	Version          string
 	RealServiceName  string
 	Imports          map[string]string // import path => alias
