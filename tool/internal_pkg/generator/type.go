@@ -145,7 +145,7 @@ var templateNames = []string{
 	"@server.go-EOF",
 }
 
-var templateExtentions = (func() map[string]string {
+var templateExtensions = (func() map[string]string {
 	m := make(map[string]string)
 	for _, name := range templateNames {
 		// create dummy templates
@@ -156,8 +156,8 @@ var templateExtentions = (func() map[string]string {
 
 // SetTemplateExtension .
 func SetTemplateExtension(name, text string) {
-	if _, ok := templateExtentions[name]; ok {
-		templateExtentions[name] = text
+	if _, ok := templateExtensions[name]; ok {
+		templateExtensions[name] = text
 	}
 }
 
@@ -177,10 +177,10 @@ func (t *Task) Build() error {
 	}
 	for _, n := range templateNames {
 		if strings.Contains(t.Text, n) {
-			x, err = x.Parse(templateExtentions[n])
+			x, err = x.Parse(templateExtensions[n])
 			if err != nil {
 				return fmt.Errorf("failed to parse extension %q for %s: %w (%#q)",
-					n, t.Name, err, templateExtentions[n])
+					n, t.Name, err, templateExtensions[n])
 			}
 		}
 	}

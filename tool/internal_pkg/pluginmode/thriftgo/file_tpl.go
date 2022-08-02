@@ -49,7 +49,7 @@ var (
 	_ = (*strings.Builder)(nil)
 	_ = reflect.Type(nil)
 	_ = thrift.TProtocol(nil)
-	{{if GenerateFastAPIs}}
+	{{- if GenerateFastAPIs}}
 	_ = bthrift.BinaryWriter(nil)
 	{{- end}}
 	{{- range .Imports | ToPackageNames}}
