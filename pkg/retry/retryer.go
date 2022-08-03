@@ -233,7 +233,7 @@ func (rc *Container) getRetryer(ri rpcinfo.RPCInfo) Retryer {
 // Dump is used to show current retry policy
 func (rc *Container) Dump() interface{} {
 	dm := make(map[string]interface{})
-	dm["hasCodeCfg"] = rc.hasCodeCfg
+	dm["has_code_cfg"] = rc.hasCodeCfg
 	rc.retryerMap.Range(func(key, value interface{}) bool {
 		if r, ok := value.(Retryer); ok {
 			dm[key.(string)] = r.Dump()

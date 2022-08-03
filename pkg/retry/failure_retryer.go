@@ -227,14 +227,17 @@ func (r *failureRetryer) Prepare(ctx context.Context, prevRI, retryRI rpcinfo.RP
 func (r *failureRetryer) Dump() map[string]interface{} {
 	r.RLock()
 	defer r.RUnlock()
-	if r.errMsg != "" {
-		return map[string]interface{}{
-			"enable":       r.enable,
-			"failureRetry": r.policy,
-			"errMsg":       r.errMsg,
-		}
+	dm := make(map[string]interface{})
+	dm["enable"] = r.enable
+	dm["failure_retry"] = r.policy
+	dm["specified_result_retry"] = map[string]bool{
+		"error_retry": r.isResultRetry.IsErrorRetry != nil,
+		"resp_retry":  r.isResultRetry.IsRespRetry != nil,
 	}
-	return map[string]interface{}{"enable": r.enable, "failureRetry": r.policy}
+	if r.errMsg != "" {
+		dm["errMsg"] = r.errMsg
+	}
+	return dm
 }
 
 func (r *failureRetryer) isRetryErr(err error, ri rpcinfo.RPCInfo) bool {
