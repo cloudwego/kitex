@@ -175,12 +175,10 @@ func (t *Task) Build() error {
 		return err
 	}
 	for _, n := range templateNames {
-		if strings.Contains(t.Text, n) {
-			x, err = x.Parse(templateExtensions[n])
-			if err != nil {
-				return fmt.Errorf("failed to parse extension %q for %s: %w (%#q)",
-					n, t.Name, err, templateExtensions[n])
-			}
+		x, err = x.Parse(templateExtensions[n])
+		if err != nil {
+			return fmt.Errorf("failed to parse extension %q for %s: %w (%#q)",
+				n, t.Name, err, templateExtensions[n])
 		}
 	}
 	t.Template = x

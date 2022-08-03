@@ -30,6 +30,13 @@ import (
 	"github.com/cloudwego/thriftgo/plugin"
 )
 
+var extraTemplates []string
+
+// AppendToTemplate string
+func AppendToTemplate(text string) {
+	extraTemplates = append(extraTemplates, text)
+}
+
 const kitexUnusedProtection = `
 // KitexUnusedProtection is used to prevent 'imported and not used' error.
 var KitexUnusedProtection = struct{}{}
@@ -48,11 +55,10 @@ type patcher struct {
 	fileTpl *template.Template
 }
 
-func (p *patcher) buildTemplates() error {
+func (p *patcher) buildTemplates() (err error) {
 	m := p.utils.BuildFuncMap()
 	m["ReorderStructFields"] = p.reorderStructFields
 	m["TypeIDToGoType"] = func(t string) string { return typeIDToGoType[t] }
-	m["FilterBase"] = p.filterBase
 	m["IsBinaryOrStringType"] = p.isBinaryOrStringType
 	m["Version"] = func() string { return p.version }
 	m["GenerateFastAPIs"] = func() bool { return !p.noFastAPI }
@@ -81,6 +87,16 @@ func (p *patcher) buildTemplates() error {
 	tpl := template.New("kitex").Funcs(m)
 	for _, txt := range allTemplates {
 		tpl = template.Must(tpl.Parse(txt))
+	}
+
+	ext := `{{define "ExtraTemplates"}}{{end}}`
+	if len(extraTemplates) > 0 {
+		ext = fmt.Sprintf("{{define \"ExtraTemplates\"}}\n%s\n{{end}}",
+			strings.Join(extraTemplates, "\n"))
+	}
+	tpl, err = tpl.Parse(ext)
+	if err != nil {
+		return fmt.Errorf("failed to parse extra templates: %w: %q", err, ext)
 	}
 	p.fileTpl = tpl
 	return nil
@@ -152,36 +168,6 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		}
 	}
 	return
-}
-
-func (p *patcher) filterBase(ast *golang.Scope) interface{} {
-	type NamePair struct {
-		StructTypeName string
-		BaseFuncName   string
-	}
-	var req, res []*NamePair
-	for _, s := range ast.StructLikes() {
-		for _, f := range s.Fields() {
-			fn := f.GoName().String()
-			tn := f.Type.Name
-			if fn == "Base" && tn == "base.Base" {
-				req = append(req, &NamePair{
-					StructTypeName: s.GoName().String(),
-					BaseFuncName:   f.GoTypeName().Deref().NewFunc().String(),
-				})
-			}
-			if fn == "BaseResp" && tn == "base.BaseResp" {
-				res = append(res, &NamePair{
-					StructTypeName: s.GoName().String(),
-					BaseFuncName:   f.GoTypeName().Deref().NewFunc().String(),
-				})
-			}
-		}
-	}
-	return &struct {
-		Requests  []*NamePair
-		Responses []*NamePair
-	}{Requests: req, Responses: res}
 }
 
 func (p *patcher) reorderStructFields(fields []*golang.Field) ([]*golang.Field, error) {

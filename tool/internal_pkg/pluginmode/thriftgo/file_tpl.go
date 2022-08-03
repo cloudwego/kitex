@@ -76,8 +76,8 @@ const body = `
 {{- end}}{{/* if GenerateFastAPIs */}}
 
 {{template "FirstAndResult" .}}
-{{template "GetOrSetBase" .Scope}}
 
+{{template "ExtraTemplates" .}}
 {{- end}}{{/* define "body" */}}
 `
 
@@ -100,32 +100,8 @@ func (p *{{$resType.GoName}}) GetResult() interface{} {
 {{- end}}{{/* define "FirstResult" */}}
 `
 
-const patchBase = `
-{{define "GetOrSetBase"}}
-{{$RR := . | FilterBase}}
-{{range $RR.Requests }}
-func (p *{{.StructTypeName}}) GetOrSetBase() interface{} {
-	if p.Base == nil {
-		p.Base = {{.BaseFuncName}}()
-	}
-	return p.Base
-}
-{{- end}}{{/* range $RR.Requests */}}
-
-{{range $RR.Responses }}
-func (p *{{.StructTypeName}}) GetOrSetBaseResp() interface{} {
-	if p.BaseResp == nil {
-		p.BaseResp = {{.BaseFuncName}}()
-	}
-	return p.BaseResp
-}
-{{- end}}{{/* range $RR.Responses */}}
-{{- end}}{{/* define "GetOrSetBase" */}}
-`
-
 var allTemplates = []string{
 	patchFirstAndResult,
-	patchBase,
 	file,
 	body,
 	structLike,
