@@ -195,7 +195,8 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	// rpcInfoCtx is a pooled ctx with inited RPCInfo which can be reused.
 	// it's recycled in defer.
 	muxSvrConn, _ := muxSvrConnCtx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
-	rpcInfoCtx := muxSvrConn.pool.Get().(context.Context)
+	ri := muxSvrConn.pool.Get().(rpcinfo.RPCInfo)
+	rpcInfoCtx := rpcinfo.NewCtxWithRPCInfo(muxSvrConnCtx, ri)
 
 	rpcInfo := rpcinfo.GetRPCInfo(rpcInfoCtx)
 	// This is the request-level, one-shot ctx.
@@ -223,7 +224,9 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		t.finishTracer(ctx, rpcInfo, err, panicErr)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
-		muxSvrConn.pool.Put(rpcInfoCtx)
+		// reset rpcinfo
+		ri, _ = t.opt.InitOrResetRPCInfoFunc(rpcInfoCtx, conn.RemoteAddr())
+		muxSvrConn.pool.Put(ri)
 	}()
 
 	// read
@@ -290,8 +293,8 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	pool := &sync.Pool{
 		New: func() interface{} {
 			// init rpcinfo
-			_, ctx := t.opt.InitRPCInfoFunc(ctx, connection.RemoteAddr())
-			return ctx
+			ri, _ := t.opt.InitOrResetRPCInfoFunc(ctx, conn.RemoteAddr())
+			return ri
 		},
 	}
 	muxConn := newMuxSvrConn(connection, pool)

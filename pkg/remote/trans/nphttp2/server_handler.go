@@ -97,8 +97,12 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	tr.HandleStreams(func(s *grpcTransport.Stream) {
 		gofunc.GoFunc(ctx, func() {
 			ri := svrTrans.pool.Get().(rpcinfo.RPCInfo)
-			defer svrTrans.pool.Put(ri)
 			rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
+			defer func() {
+				// reset rpcinfo
+				ri, _ = t.opt.InitOrResetRPCInfoFunc(rCtx, conn.RemoteAddr())
+				svrTrans.pool.Put(ri)
+			}()
 
 			// set grpc transport flag before execute metahandler
 			rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(transport.GRPC)
@@ -214,7 +218,7 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	pool := &sync.Pool{
 		New: func() interface{} {
 			// init rpcinfo
-			ri, _ := t.opt.InitRPCInfoFunc(ctx, conn.RemoteAddr())
+			ri, _ := t.opt.InitOrResetRPCInfoFunc(ctx, conn.RemoteAddr())
 			return ri
 		},
 	}

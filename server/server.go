@@ -121,10 +121,28 @@ func newErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
 	}
 }
 
-func (s *server) initRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context) {
+func (s *server) initOrResetRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context) {
 	return func(ctx context.Context, rAddr net.Addr) (rpcinfo.RPCInfo, context.Context) {
 		if ctx == nil {
 			ctx = context.Background()
+		}
+		var ri rpcinfo.RPCInfo
+		// Reset rpcinfo if it exists in ctx.
+		if ri = rpcinfo.GetRPCInfo(ctx); ri != nil {
+			fi := rpcinfo.AsMutableEndpointInfo(ri.From())
+			fi.Reset()
+			fi.SetAddress(rAddr)
+			rpcinfo.AsMutableEndpointInfo(ri.To()).ResetFromBasicInfo(s.opt.Svr)
+			if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+				setter.Reset()
+			}
+			rpcinfo.AsMutableRPCConfig(ri.Config()).CopyFrom(rpcinfo.AsMutableRPCConfig(s.opt.Configs))
+			rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
+			rpcStats.Reset()
+			if s.opt.StatsLevel != nil {
+				rpcStats.SetLevel(*s.opt.StatsLevel)
+			}
+			return ri, ctx
 		}
 		rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 		if s.opt.StatsLevel != nil {
@@ -132,7 +150,7 @@ func (s *server) initRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCI
 		}
 
 		// Export read-only views to external users and keep a mapping for internal users.
-		ri := rpcinfo.NewRPCInfo(
+		ri = rpcinfo.NewRPCInfo(
 			rpcinfo.EmptyEndpointInfo(),
 			rpcinfo.FromBasicInfo(s.opt.Svr),
 			rpcinfo.NewServerInvocation(),
@@ -275,7 +293,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
 	remoteOpt.SvcInfo = s.svcInfo
-	remoteOpt.InitRPCInfoFunc = s.initRPCInfoFunc()
+	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
 }

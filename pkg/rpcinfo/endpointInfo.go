@@ -100,6 +100,19 @@ func (ei *endpointInfo) ImmutableView() EndpointInfo {
 	return ei
 }
 
+// Reset implements the MutableEndpointInfo interface.
+func (ei *endpointInfo) Reset() {
+	ei.zero()
+}
+
+// ResetFromBasicInfo implements the MutableEndpointInfo interface.
+func (ei *endpointInfo) ResetFromBasicInfo(bi *EndpointBasicInfo) {
+	ei.serviceName = bi.ServiceName
+	ei.method = bi.Method
+	ei.address = nil
+	ei.tags = bi.Tags
+}
+
 func (ei *endpointInfo) zero() {
 	ei.serviceName = ""
 	ei.method = ""

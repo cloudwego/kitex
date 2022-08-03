@@ -71,7 +71,9 @@ func init() {
 }
 
 func newRPCConfig() interface{} {
-	return &rpcConfig{}
+	c := &rpcConfig{}
+	c.initialize()
+	return c
 }
 
 // LockConfig sets the bits of readonly mask to prevent sequential modification on certain configs.
@@ -182,28 +184,29 @@ func (r *rpcConfig) Clone() MutableRPCConfig {
 	return r2
 }
 
-func (r *rpcConfig) zero() {
-	r.rpcTimeout = 0
-	r.transportProtocol = 0
-	r.connectTimeout = 0
-	r.ioBufferSize = 0
+func (r *rpcConfig) CopyFrom(from MutableRPCConfig) {
+	f := from.(*rpcConfig)
+	*r = *f
+}
+
+func (r *rpcConfig) initialize() {
 	r.readOnlyMask = 0
-	r.readWriteTimeout = 0
+	r.rpcTimeout = defaultRPCTimeout
+	r.connectTimeout = defaultConnectTimeout
+	r.readWriteTimeout = defaultReadWriteTimeout
+	r.ioBufferSize = defaultBufferSize
+	r.transportProtocol = 0
+	r.interactionMode = defaultInteractionMode
 }
 
 // Recycle reuses the rpcConfig.
 func (r *rpcConfig) Recycle() {
-	r.zero()
+	r.initialize()
 	rpcConfigPool.Put(r)
 }
 
 // NewRPCConfig creates a default RPCConfig.
 func NewRPCConfig() RPCConfig {
 	r := rpcConfigPool.Get().(*rpcConfig)
-	r.rpcTimeout = defaultRPCTimeout
-	r.connectTimeout = defaultConnectTimeout
-	r.readWriteTimeout = defaultReadWriteTimeout
-	r.ioBufferSize = defaultBufferSize
-	r.interactionMode = defaultInteractionMode
 	return r
 }
