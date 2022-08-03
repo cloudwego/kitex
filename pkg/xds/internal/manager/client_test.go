@@ -150,15 +150,22 @@ func Test_xdsClient_handleResponse(t *testing.T) {
 	}
 	defer c.close()
 
-	// handle the response that includes resources that are not in the subscribed list
+	// handle before watch
 	err := c.handleResponse(mock.LdsResp1)
+	test.Assert(t, err == nil)
+	test.Assert(t, c.versionMap[xdsresource.ListenerType] == "")
+	test.Assert(t, c.nonceMap[xdsresource.ListenerType] == "")
+
+	// handle after watch
+	c.watchedResource[xdsresource.ListenerType] = make(map[string]bool)
+	err = c.handleResponse(mock.LdsResp1)
 	test.Assert(t, err == nil)
 	test.Assert(t, c.versionMap[xdsresource.ListenerType] == mock.LDSVersion1)
 	test.Assert(t, c.nonceMap[xdsresource.ListenerType] == mock.LDSNonce1)
 
+	c.watchedResource[xdsresource.RouteConfigType] = make(map[string]bool)
 	err = c.handleResponse(mock.RdsResp1)
 	test.Assert(t, err == nil)
 	test.Assert(t, c.versionMap[xdsresource.RouteConfigType] == mock.RDSVersion1)
 	test.Assert(t, c.nonceMap[xdsresource.RouteConfigType] == mock.RDSNonce1)
-	test.Assert(t, err == nil)
 }

@@ -210,11 +210,12 @@ func Test_xdsResourceManager_Get_Resource_Update(t *testing.T) {
 	test.Assert(t, m.meta[xdsresource.EndpointsType][xdsresource.EndpointName1] != nil)
 	test.Assert(t, m.cache[xdsresource.EndpointsType][xdsresource.EndpointName1] != nil)
 	// push the new resource and check if the resourceManager can update the resource
-	svr.PushResourceUpdate(mock.EdsResp2)
-	time.Sleep(time.Millisecond * 100)
-	res, err = m.Get(context.Background(), xdsresource.EndpointsType, xdsresource.EndpointName1)
-	test.Assert(t, err != nil)
-	test.Assert(t, m.cache[xdsresource.EndpointsType][xdsresource.EndpointName1] == nil)
+	// TODO: endpoint will not be updated because of the incremental push feature of Istio
+	//svr.PushResourceUpdate(mock.EdsResp2)
+	//time.Sleep(time.Millisecond * 100)
+	//res, err = m.Get(context.Background(), xdsresource.EndpointsType, xdsresource.EndpointName1)
+	//test.Assert(t, err != nil)
+	//test.Assert(t, m.cache[xdsresource.EndpointsType][xdsresource.EndpointName1] == nil)
 }
 
 func Test_xdsResourceManager_getFromCache(t *testing.T) {

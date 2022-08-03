@@ -1,6 +1,7 @@
 package xdssuite
 
 import (
+	"fmt"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
@@ -8,6 +9,7 @@ import (
 )
 
 var (
+	pkgName      = "pkg"
 	svcName      = "svc"
 	method       = "method"
 	clusterName1 = "cluster1"
@@ -31,7 +33,7 @@ var (
 	}
 	route2 = &xdsresource.Route{
 		Match: &xdsresource.HTTPRouteMatch{
-			Path: svcName + "/" + method,
+			Path: fmt.Sprintf("/%s.%s/%s", pkgName, svcName, method),
 		},
 		WeightedClusters: []*xdsresource.WeightedCluster{
 			{
@@ -95,7 +97,7 @@ var (
 
 func Test_matchHTTPRoute(t *testing.T) {
 	to := rpcinfo.NewEndpointInfo(svcName, method, nil, nil)
-	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation(svcName, method), nil, nil)
+	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation(svcName, method, pkgName), nil, nil)
 
 	var r *xdsresource.Route
 	// not matched

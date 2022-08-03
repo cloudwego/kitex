@@ -393,7 +393,6 @@ func (c *xdsClient) handleRDS(resp *discoveryv3.DiscoveryResponse) error {
 		// only accept the routeConfig that is subscribed
 		if _, ok := c.watchedResource[xdsresource.RouteConfigType][name]; !ok {
 			delete(res, name)
-			continue
 		}
 	}
 	// update to cache
@@ -415,7 +414,6 @@ func (c *xdsClient) handleCDS(resp *discoveryv3.DiscoveryResponse) error {
 	for name := range res {
 		if _, ok := c.watchedResource[xdsresource.ClusterType][name]; !ok {
 			delete(res, name)
-			continue
 		}
 	}
 	// update to cache
@@ -437,7 +435,6 @@ func (c *xdsClient) handleEDS(resp *discoveryv3.DiscoveryResponse) error {
 	for name := range res {
 		if _, ok := c.watchedResource[xdsresource.EndpointsType][name]; !ok {
 			delete(res, name)
-			continue
 		}
 	}
 	// update to cache
@@ -465,6 +462,7 @@ func (c *xdsClient) handleResponse(msg interface{}) error {
 	if !ok {
 		return fmt.Errorf("invalid discovery response")
 	}
+
 	url := resp.GetTypeUrl()
 	rType, ok := xdsresource.ResourceUrlToType[url]
 	if !ok {
@@ -472,16 +470,13 @@ func (c *xdsClient) handleResponse(msg interface{}) error {
 		return nil
 	}
 
-	c.mu.Lock()
+	// check if this resource type is watched
+	c.mu.RLock()
 	if _, ok := c.watchedResource[rType]; !ok {
-		c.watchedResource[rType] = make(map[string]bool)
-	}
-	// ignore the duplicated response
-	if c.versionMap[rType] == resp.VersionInfo {
-		c.mu.Unlock()
+		c.mu.RUnlock()
 		return nil
 	}
-	c.mu.Unlock()
+	c.mu.RUnlock()
 
 	/*
 		handle different resources:

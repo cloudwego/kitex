@@ -13,6 +13,7 @@ const (
 	INSTANCE_IP   = "INSTANCE_IP"
 	ISTIOD_ADDR   = "istiod.istio-system.svc:15010"
 	ISTIO_VERSION = "ISTIO_VERSION"
+	nodeIdSuffix = "svc.cluster.local"
 )
 
 type BootstrapConfig struct {
@@ -43,10 +44,10 @@ func newBootstrapConfig() (*BootstrapConfig, error) {
 	// specify the version of istio in case of the canary deployment of istiod
 	// warning log if not specified
 	istioVersion := os.Getenv(ISTIO_VERSION)
-
 	return &BootstrapConfig{
 		node: &v3core.Node{
-			Id: "sidecar~" + podIp + "~" + podName + "." + namespace + "~" + namespace + ".svc.cluster.local",
+			//"sidecar~" + podIp + "~" + podName + "." + namespace + "~" + namespace + ".svc.cluster.local",
+			Id: fmt.Sprintf("sidecar~%s~%s.%s~%s.%s", podIp, podName, namespace, namespace, nodeIdSuffix),
 			Metadata: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
 					"ISTIO_VERSION": {

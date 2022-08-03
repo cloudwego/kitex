@@ -127,6 +127,14 @@ func (m *xdsResourceManager) Get(ctx context.Context, rType xdsresource.Resource
 		m.notifierMap[rType][rName] = nf
 	}
 	m.mu.Unlock()
+	// remove the notifier
+	defer func() {
+		m.mu.Lock()
+		if _, ok := m.notifierMap[rType][rName]; ok {
+			delete(m.notifierMap[rType], rName)
+		}
+		m.mu.Unlock()
+	}()
 
 	// Set fetch timeout
 	// TODO: timeout should be specified in the config of xdsResourceManager
@@ -236,7 +244,6 @@ func (m *xdsResourceManager) updateMeta(rType xdsresource.ResourceType, version 
 // UpdateListenerResource is invoked by client to update the cache
 func (m *xdsResourceManager) UpdateListenerResource(up map[string]*xdsresource.ListenerResource, version string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	for name, res := range up {
 		if _, ok := m.cache[xdsresource.ListenerType]; !ok {
@@ -264,12 +271,13 @@ func (m *xdsResourceManager) UpdateListenerResource(up map[string]*xdsresource.L
 	//}
 	// update meta
 	m.updateMeta(xdsresource.ListenerType, version)
+	m.mu.Unlock()
+	m.Dump()
 }
 
 // UpdateRouteConfigResource is invoked by client to update the cache
 func (m *xdsResourceManager) UpdateRouteConfigResource(up map[string]*xdsresource.RouteConfigResource, version string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	for name, res := range up {
 		if _, ok := m.cache[xdsresource.RouteConfigType]; !ok {
@@ -297,12 +305,13 @@ func (m *xdsResourceManager) UpdateRouteConfigResource(up map[string]*xdsresourc
 	//}
 	// update meta
 	m.updateMeta(xdsresource.RouteConfigType, version)
+	m.mu.Unlock()
+	m.Dump()
 }
 
 // UpdateClusterResource is invoked by client to update the cache
 func (m *xdsResourceManager) UpdateClusterResource(up map[string]*xdsresource.ClusterResource, version string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	for name, res := range up {
 		if _, ok := m.cache[xdsresource.ClusterType]; !ok {
@@ -330,12 +339,13 @@ func (m *xdsResourceManager) UpdateClusterResource(up map[string]*xdsresource.Cl
 	//}
 	// update meta
 	m.updateMeta(xdsresource.ClusterType, version)
+	m.mu.Unlock()
+	m.Dump()
 }
 
 // UpdateEndpointsResource is invoked by client to update the cache
 func (m *xdsResourceManager) UpdateEndpointsResource(up map[string]*xdsresource.EndpointsResource, version string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	for name, res := range up {
 		if _, ok := m.cache[xdsresource.EndpointsType]; !ok {
@@ -351,11 +361,13 @@ func (m *xdsResourceManager) UpdateEndpointsResource(up map[string]*xdsresource.
 		}
 	}
 	// remove all resources that are not in the update list
-	for name := range m.cache[xdsresource.EndpointsType] {
-		if _, ok := up[name]; !ok {
-			delete(m.cache[xdsresource.EndpointsType], name)
-		}
-	}
+	// TODO: endpoints cannot be removed in this case because Istio will perform incremental update of EDS.
+	//for name := range m.cache[xdsresource.EndpointsType] {
+	//	if _, ok := up[name]; !ok {
+	//		delete(m.cache[xdsresource.EndpointsType], name)
+	//	}
+	//}
+
 	//// notify all watchers that the resource is not in the new update
 	//for name, nf := range m.notifierMap[xdsresource.EndpointsType] {
 	//	nf.notify(ErrResourceNotFound)
@@ -363,4 +375,6 @@ func (m *xdsResourceManager) UpdateEndpointsResource(up map[string]*xdsresource.
 	//}
 	// update meta
 	m.updateMeta(xdsresource.EndpointsType, version)
+	m.mu.Unlock()
+	m.Dump()
 }
