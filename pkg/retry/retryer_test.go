@@ -280,7 +280,7 @@ func TestContainer_Dump(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	rcDump, ok := rc.Dump().(map[string]interface{})
 	test.Assert(t, ok)
-	hasCodeCfg, err := jsoni.MarshalToString(rcDump["hasCodeCfg"])
+	hasCodeCfg, err := jsoni.MarshalToString(rcDump["has_code_cfg"])
 	test.Assert(t, err == nil, err)
 	test.Assert(t, hasCodeCfg == "true", hasCodeCfg)
 	testStr, err := jsoni.MarshalToString(rcDump["test"])
@@ -306,13 +306,13 @@ func TestContainer_Dump(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	rcDump, ok = rc.Dump().(map[string]interface{})
 	test.Assert(t, ok)
-	hasCodeCfg, err = jsoni.MarshalToString(rcDump["hasCodeCfg"])
+	hasCodeCfg, err = jsoni.MarshalToString(rcDump["has_code_cfg"])
 	test.Assert(t, err == nil, err)
 	test.Assert(t, hasCodeCfg == "true")
 	testStr, err = jsoni.MarshalToString(rcDump["test"])
-	msg = `{"enable":true,"failureRetry":{"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false}}`
+	msg = `{"enable":true,"failure_retry":{"stop_policy":{"max_retry_times":2,"max_duration_ms":0,"disable_chain_stop":false,"ddl_stop":false,"cb_policy":{"error_rate":0.1}},"backoff_policy":{"backoff_type":"none"},"retry_same_node":false},"specified_result_retry":{"error_retry":false,"resp_retry":false}}`
 	test.Assert(t, err == nil, err)
-	test.Assert(t, testStr == msg)
+	test.Assert(t, testStr == msg, testStr)
 }
 
 // test FailurePolicy call
