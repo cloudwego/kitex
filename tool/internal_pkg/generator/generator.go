@@ -22,16 +22,15 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/log"
-	"github.com/cloudwego/kitex/tool/internal/pkg/tpl"
-	"github.com/cloudwego/kitex/tool/internal/pkg/util"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 // Constants .
 const (
-	KitexGenPath    = "kitex_gen"
-	KitexImportPath = "github.com/cloudwego/kitex"
-	DefaultCodec    = "thrift"
+	KitexGenPath = "kitex_gen"
+	DefaultCodec = "thrift"
 
 	BuildFileName     = "build.sh"
 	BootstrapFileName = "bootstrap.sh"
@@ -44,14 +43,30 @@ const (
 )
 
 var (
+	kitexImportPath = "github.com/cloudwego/kitex"
+
 	globalMiddlewares  []Middleware
 	globalDependencies = map[string]string{
-		"kitex":   KitexImportPath,
-		"client":  filepath.Join(KitexImportPath, "client"),
-		"server":  filepath.Join(KitexImportPath, "server"),
-		"callopt": filepath.Join(KitexImportPath, "client/callopt"),
+		"kitex":   kitexImportPath,
+		"client":  ImportPathTo("client"),
+		"server":  ImportPathTo("server"),
+		"callopt": ImportPathTo("client/callopt"),
 	}
 )
+
+// SetKitexImportPath sets the import path of kitex.
+// Must be called before generating code.
+func SetKitexImportPath(path string) {
+	for k, v := range globalDependencies {
+		globalDependencies[k] = strings.ReplaceAll(v, kitexImportPath, path)
+	}
+	kitexImportPath = path
+}
+
+// ImportPathTo returns a import path to the specified package under kitex.
+func ImportPathTo(pkg string) string {
+	return filepath.Join(kitexImportPath, pkg)
+}
 
 // AddGlobalMiddleware adds middleware for all generators
 func AddGlobalMiddleware(mw Middleware) {
@@ -271,7 +286,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		task := Task{
 			Name: HandlerFileName,
 			Path: handlerFilePath,
-			Text: tpl.HandlerTpl,
+			Text: tpl.HandlerTpl + "\n" + tpl.HandlerMethodsTpl,
 		}
 		g.setImports(task.Name, pkg)
 		handle := func(task *Task, pkg *PackageInfo) (*File, error) {
@@ -299,17 +314,17 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 		{
 			Name: ClientFileName,
 			Path: filepath.Join(output, ClientFileName),
-			Text: tpl.GetClientTpl(),
+			Text: tpl.ClientTpl,
 		},
 		{
 			Name: ServerFileName,
 			Path: filepath.Join(output, ServerFileName),
-			Text: tpl.GetServerTpl(),
+			Text: tpl.ServerTpl,
 		},
 		{
 			Name: InvokerFileName,
 			Path: filepath.Join(output, InvokerFileName),
-			Text: tpl.GetInvokerTpl(),
+			Text: tpl.InvokerTpl,
 		},
 		{
 			Name: ServiceFileName,
@@ -339,6 +354,7 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 }
 
 func (g *generator) updatePackageInfo(pkg *PackageInfo) {
+	pkg.NoFastAPI = g.NoFastAPI
 	pkg.Codec = g.IDLType
 	pkg.Version = g.Version
 	pkg.RealServiceName = g.ServiceName
@@ -361,8 +377,8 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 	case ClientFileName:
 		pkg.AddImports("client")
 		if pkg.HasStreaming {
-			pkg.AddImport("streaming", filepath.Join(KitexImportPath, "pkg/streaming"))
-			pkg.AddImport("transport", filepath.Join(KitexImportPath, "transport"))
+			pkg.AddImport("streaming", ImportPathTo("pkg/streaming"))
+			pkg.AddImport("transport", ImportPathTo("transport"))
 		}
 		if len(pkg.AllMethods()) > 0 {
 			pkg.AddImports("callopt")
@@ -391,7 +407,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		pkg.AddImports("server")
 	case ServiceFileName:
 		pkg.AddImports("client")
-		pkg.AddImport("kitex", filepath.Join(KitexImportPath, "pkg/serviceinfo"))
+		pkg.AddImport("kitex", ImportPathTo("pkg/serviceinfo"))
 		pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)
 		if len(pkg.AllMethods()) > 0 {
 			pkg.AddImports("context")
@@ -409,7 +425,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 				}
 			}
 			if pkg.Codec == "protobuf" {
-				pkg.AddImport("streaming", filepath.Join(KitexImportPath, "pkg/streaming"))
+				pkg.AddImport("streaming", ImportPathTo("pkg/streaming"))
 			}
 			if !m.Void && m.Resp != nil {
 				for _, dep := range m.Resp.Deps {

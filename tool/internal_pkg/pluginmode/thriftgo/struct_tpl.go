@@ -288,12 +288,17 @@ const fieldFastRead = `
 
 const fieldFastReadStructLike = `
 {{define "FieldFastReadStructLike"}}
-	{{- .Target}} {{if .NeedDecl}}:{{end}}= {{.TypeName.Deref.NewFunc}}()
-	if l, err := {{.Target}}.FastRead(buf[offset:]); err != nil {
+	{{- if .NeedDecl}}
+	{{- .Target}} := {{.TypeName.Deref.NewFunc}}()
+	{{- else}}
+	tmp := {{.TypeName.Deref.NewFunc}}()
+	{{- end}}
+	if l, err := {{- if .NeedDecl}}{{.Target}}{{else}}tmp{{end}}.FastRead(buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
 	}
+	{{if not .NeedDecl}}{{- .Target}} = tmp{{end}}
 {{- end}}{{/* define "FieldFastReadStructLike" */}} 
 `
 

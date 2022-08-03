@@ -1,4 +1,4 @@
-// Copyright 2021 CloudWeGo Authors
+// Copyright 2022 CloudWeGo Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,18 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tpl
-
-// BuildTpl is the template for generating build.sh.
-var BuildTpl = `#!/usr/bin/env bash
-RUN_NAME="{{.RealServiceName}}"
-
-mkdir -p output/bin
-cp script/* output/
-chmod +x output/bootstrap.sh
-
-if [ "$IS_SYSTEM_TEST_ENV" != "1" ]; then
-    go build -o output/bin/${RUN_NAME}
-else
-    go test -c -covermode=set -o output/bin/${RUN_NAME} -coverpkg=./...
-fi`
+// internal_pkg contains packages for building the kitex command line tool.
+// APIs exported by packages under this directory do not promise any backward
+// compatibility, so please do not rely on them.
+package internal_pkg

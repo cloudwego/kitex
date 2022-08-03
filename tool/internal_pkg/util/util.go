@@ -26,7 +26,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 )
 
 // StringSlice implements the flag.Value interface on string slices
@@ -50,26 +50,6 @@ func FormatCode(code []byte) ([]byte, error) {
 		return code, fmt.Errorf("format code error: %s", err)
 	}
 	return formatCode, nil
-}
-
-// WriteToFile writes data into target file.
-func WriteToFile(filename string, data []byte) {
-	var err error
-
-	if strings.HasSuffix(filename, ".go") {
-		data, err = FormatCode(data)
-		if err != nil {
-			log.Warnf("format %v code error: %v\n", filename, err)
-		}
-		err = ioutil.WriteFile(filename, data, 0o644)
-	} else if strings.HasSuffix(filename, ".sh") {
-		err = ioutil.WriteFile(filename, data, 0o755)
-	} else {
-		err = ioutil.WriteFile(filename, data, 0o644)
-	}
-	if err != nil {
-		log.Warn("write to file err:", err.Error())
-	}
 }
 
 // GetGOPATH retrieves the GOPATH from environment variables or the `go env` command.

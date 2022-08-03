@@ -26,8 +26,8 @@ import (
 	gengo "google.golang.org/protobuf/cmd/protoc-gen-go/internal_gengo"
 	"google.golang.org/protobuf/compiler/protogen"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/generator"
-	"github.com/cloudwego/kitex/tool/internal/pkg/util"
+	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 type protocPlugin struct {
@@ -131,7 +131,9 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		f := gengo.GenerateFile(gen, &fixed)
 		f.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "context"})
 		if hasStreaming {
-			f.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "github.com/cloudwego/kitex/pkg/streaming"})
+			f.QualifiedGoIdent(protogen.GoIdent{
+				GoImportPath: protogen.GoImportPath(generator.ImportPathTo("pkg/streaming")),
+			})
 		}
 		f.P("var _ context.Context")
 

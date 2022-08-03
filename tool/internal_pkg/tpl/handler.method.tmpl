@@ -1,0 +1,24 @@
+{{define "HandlerMethod"}}
+{{range .AllMethods}}
+{{- if or .ClientStreaming .ServerStreaming}}
+func (s *{{$.ServiceName}}Impl) {{.Name}}({{if not .ClientStreaming}}{{range .Args}}{{LowerFirst .Name}} {{.Type}}, {{end}}{{end}}stream {{.PkgRefName}}.{{.ServiceName}}_{{.RawName}}Server) (err error) {	
+	println("{{.Name}} called")
+	return
+}
+{{- else}}
+{{- if .Void}}
+// {{.Name}} implements the {{.ServiceName}}Impl interface.
+func (s *{{$.ServiceName}}Impl) {{.Name}}(ctx context.Context {{- range .Args}}, {{LowerFirst .Name}} {{.Type}}{{end}}) (err error) {
+	// TODO: Your code here...
+	return
+}
+{{else -}}
+// {{.Name}} implements the {{.ServiceName}}Impl interface.
+func (s *{{$.ServiceName}}Impl) {{.Name}}(ctx context.Context {{range .Args}}, {{LowerFirst .Name}} {{.Type}}{{end}} ) (resp {{.Resp.Type}}, err error) {
+	// TODO: Your code here...
+	return
+}
+{{end}}
+{{end}}
+{{end}}
+{{end}}{{/* define "HandlerMethod" */}}

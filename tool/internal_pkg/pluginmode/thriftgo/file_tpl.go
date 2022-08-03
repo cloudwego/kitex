@@ -31,8 +31,10 @@ import (
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	{{if GenerateFastAPIs}}
+	"{{ImportPathTo "pkg/protocol/bthrift"}}"
+	{{- end}}
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	{{- range $path, $alias := .Imports}}
 	{{$alias }}"{{$path}}"
 	{{- end}}
@@ -47,7 +49,9 @@ var (
 	_ = (*strings.Builder)(nil)
 	_ = reflect.Type(nil)
 	_ = thrift.TProtocol(nil)
+	{{- if GenerateFastAPIs}}
 	_ = bthrift.BinaryWriter(nil)
+	{{- end}}
 	{{- range .Imports | ToPackageNames}}
 	_ = {{.}}.KitexUnusedProtection
 	{{- end}}
@@ -72,8 +76,8 @@ const body = `
 {{- end}}{{/* if GenerateFastAPIs */}}
 
 {{template "FirstAndResult" .}}
-{{template "GetOrSetBase" .Scope}}
 
+{{template "ExtraTemplates" .}}
 {{- end}}{{/* define "body" */}}
 `
 
@@ -96,34 +100,8 @@ func (p *{{$resType.GoName}}) GetResult() interface{} {
 {{- end}}{{/* define "FirstResult" */}}
 `
 
-const patchBase = `
-{{define "GetOrSetBase"}}
-{{$RR := . | FilterBase}}
-{{range $RR.Requests }}
-{{- $TypeName := .GoName}}
-func (p *{{$TypeName}}) GetOrSetBase() interface{} {
-	if p.Base == nil {
-		p.Base = base.NewBase()
-	}
-	return p.Base
-}
-{{- end}}{{/* range $RR.Requests */}}
-
-{{range $RR.Responses }}
-{{- $TypeName := .GoName}}
-func (p *{{$TypeName}}) GetOrSetBaseResp() interface{} {
-	if p.BaseResp == nil {
-		p.BaseResp = base.NewBaseResp()
-	}
-	return p.BaseResp
-}
-{{- end}}{{/* range $RR.Responses */}}
-{{- end}}{{/* define "GetOrSetBase" */}}
-`
-
 var allTemplates = []string{
 	patchFirstAndResult,
-	patchBase,
 	file,
 	body,
 	structLike,

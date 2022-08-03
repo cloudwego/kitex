@@ -1,4 +1,4 @@
-// Copyright 2021 CloudWeGo Authors
+// Copyright 2022 CloudWeGo Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,25 +14,20 @@
 
 package tpl
 
-// BootstrapTpl is the template for generating bootstrap.sh.
-var BootstrapTpl = `#! /usr/bin/env bash
-CURDIR=$(cd $(dirname $0); pwd)
+import (
+	"testing"
 
-if [ "X$1" != "X" ]; then
-    RUNTIME_ROOT=$1
-else
-    RUNTIME_ROOT=${CURDIR}
-fi
+	"github.com/cloudwego/kitex/internal/test"
+)
 
-export KITEX_RUNTIME_ROOT=$RUNTIME_ROOT
-export KITEX_LOG_DIR="$RUNTIME_ROOT/log"
-
-if [ ! -d "$KITEX_LOG_DIR/app" ]; then
-    mkdir -p "$KITEX_LOG_DIR/app"
-fi
-
-if [ ! -d "$KITEX_LOG_DIR/rpc" ]; then
-    mkdir -p "$KITEX_LOG_DIR/rpc"
-fi
-
-exec "$CURDIR/bin/{{.RealServiceName}}"`
+func TestEmbedOK(t *testing.T) {
+	test.Assert(t, len(BootstrapTpl) > 0)
+	test.Assert(t, len(BuildTpl) > 0)
+	test.Assert(t, len(ClientTpl) > 0)
+	test.Assert(t, len(HandlerTpl) > 0)
+	test.Assert(t, len(HandlerMethodsTpl) > 0)
+	test.Assert(t, len(InvokerTpl) > 0)
+	test.Assert(t, len(MainTpl) > 0)
+	test.Assert(t, len(ServerTpl) > 0)
+	test.Assert(t, len(ServiceTpl) > 0)
+}

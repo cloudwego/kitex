@@ -18,7 +18,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/util"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 func TestConfig_Pack(t *testing.T) {
@@ -79,10 +79,11 @@ func TestConfig_Pack(t *testing.T) {
 				PackagePrefix:   tt.fields.PackagePrefix,
 				CombineService:  tt.fields.CombineService,
 				CopyIDL:         tt.fields.CopyIDL,
+				ThriftPlugins:   tt.fields.ThriftPlugins,
 				Features:        tt.fields.Features,
 			}
 			if gotRes := c.Pack(); !reflect.DeepEqual(gotRes, tt.wantRes) {
-				t.Errorf("Config.Pack() = %v, want %v", gotRes, tt.wantRes)
+				t.Errorf("Config.Pack() = \n%v\nwant\n%v", gotRes, tt.wantRes)
 			}
 		})
 	}

@@ -16,11 +16,12 @@ package generator
 
 import (
 	"bytes"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"text/template"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/util"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 // File .
@@ -37,6 +38,7 @@ type PackageInfo struct {
 
 	// the following fields will be filled and used by the generator
 	Codec            string
+	NoFastAPI        bool
 	Version          string
 	RealServiceName  string
 	Imports          map[string]string // import path => alias
@@ -133,6 +135,31 @@ var funcs = map[string]interface{}{
 	"HasFeature": HasFeature,
 }
 
+var templateNames = []string{
+	"@client.go-NewClient-option",
+	"@client.go-EOF",
+	"@invoker.go-NewInvoker-option",
+	"@invoker.go-EOF",
+	"@server.go-NewServer-option",
+	"@server.go-EOF",
+}
+
+var templateExtensions = (func() map[string]string {
+	m := make(map[string]string)
+	for _, name := range templateNames {
+		// create dummy templates
+		m[name] = fmt.Sprintf(`{{define "%s"}}{{end}}`, name)
+	}
+	return m
+})()
+
+// SetTemplateExtension .
+func SetTemplateExtension(name, text string) {
+	if _, ok := templateExtensions[name]; ok {
+		templateExtensions[name] = text
+	}
+}
+
 // Task .
 type Task struct {
 	Name string
@@ -146,6 +173,13 @@ func (t *Task) Build() error {
 	x, err := template.New(t.Name).Funcs(funcs).Parse(t.Text)
 	if err != nil {
 		return err
+	}
+	for _, n := range templateNames {
+		x, err = x.Parse(templateExtensions[n])
+		if err != nil {
+			return fmt.Errorf("failed to parse extension %q for %s: %w (%#q)",
+				n, t.Name, err, templateExtensions[n])
+		}
 	}
 	t.Template = x
 	return nil

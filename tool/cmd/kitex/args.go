@@ -23,9 +23,9 @@ import (
 	"strings"
 
 	"github.com/cloudwego/kitex"
-	"github.com/cloudwego/kitex/tool/internal/pkg/generator"
-	"github.com/cloudwego/kitex/tool/internal/pkg/log"
-	"github.com/cloudwego/kitex/tool/internal/pkg/util"
+	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 // extraFlag is designed for adding flags that is irrelevant to

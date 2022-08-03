@@ -22,7 +22,7 @@ import (
 
 	"github.com/cloudwego/thriftgo/plugin"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/generator"
+	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 )
 
 // PluginName is the link name when the kitex binary is used as a plugin for thriftgo.
@@ -108,6 +108,7 @@ func Run() int {
 		utils:     conv.Utils,
 		module:    conv.Config.ModuleName,
 		copyIDL:   conv.Config.CopyIDL,
+		version:   conv.Config.Version,
 	}
 	patches, err := p.patch(req)
 	if err != nil {

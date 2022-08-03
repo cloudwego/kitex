@@ -28,8 +28,8 @@ import (
 
 	"golang.org/x/tools/go/ast/astutil"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/log"
-	"github.com/cloudwego/kitex/tool/internal/pkg/tpl"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
 )
 
 var errNoNewMethod = fmt.Errorf("no new method")
@@ -92,6 +92,7 @@ func (c *completer) compare(pkg *ast.Package) []*MethodInfo {
 func (c *completer) addImplementations(w io.Writer, newMethods []*MethodInfo) error {
 	// 调用模板生成新的methods基本实现代码
 	mt := template.New(HandlerFileName).Funcs(funcs)
+	mt = template.Must(mt.Parse(`{{template "HandlerMethods" .}}`))
 	mt = template.Must(mt.Parse(tpl.HandlerMethodsTpl))
 	data := struct {
 		AllMethods  []*MethodInfo
