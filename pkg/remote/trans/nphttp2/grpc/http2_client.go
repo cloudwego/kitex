@@ -594,6 +594,9 @@ func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 		h:         hdr,
 		d:         data,
 	}
+	if len(hdr) == 0 && len(data) != 0 {
+		df.dcache = data
+	}
 	if hdr != nil || data != nil { // If it's not an empty data frame, check quota.
 		if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
 			return err
