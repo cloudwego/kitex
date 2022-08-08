@@ -2,9 +2,10 @@ package manager
 
 import (
 	"fmt"
+	"os"
+
 	v3core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	structpb "github.com/golang/protobuf/ptypes/struct"
-	"os"
 )
 
 const (
@@ -13,7 +14,7 @@ const (
 	INSTANCE_IP   = "INSTANCE_IP"
 	ISTIOD_ADDR   = "istiod.istio-system.svc:15010"
 	ISTIO_VERSION = "ISTIO_VERSION"
-	nodeIdSuffix = "svc.cluster.local"
+	nodeIdSuffix  = "svc.cluster.local"
 )
 
 type BootstrapConfig struct {

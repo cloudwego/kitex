@@ -2,6 +2,7 @@ package xdsresource
 
 import (
 	"fmt"
+
 	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/protobuf/proto"
 	dnsProto "istio.io/istio/pkg/dns/proto"

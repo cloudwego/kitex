@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	"io/ioutil"
 	"sync"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 )
 
 // xdsResourceManager manages all the xds resources in the cache and export Get function for resource retrieve.
@@ -127,15 +128,6 @@ func (m *xdsResourceManager) Get(ctx context.Context, rType xdsresource.Resource
 		m.notifierMap[rType][rName] = nf
 	}
 	m.mu.Unlock()
-	// remove the notifier
-	defer func() {
-		m.mu.Lock()
-		if _, ok := m.notifierMap[rType][rName]; ok {
-			delete(m.notifierMap[rType], rName)
-		}
-		m.mu.Unlock()
-	}()
-
 	// Set fetch timeout
 	// TODO: timeout should be specified in the config of xdsResourceManager
 	timeout := defaultXDSFetchTimeout
@@ -143,29 +135,32 @@ func (m *xdsResourceManager) Get(ctx context.Context, rType xdsresource.Resource
 
 	select {
 	case <-nf.ch:
+		// error in the notifier
+		if nf.err != nil {
+			return nil, fmt.Errorf("[XDS] manager, fetch %s resource[%s] failed, error=%s",
+				xdsresource.ResourceTypeToName[rType], rName, nf.err.Error())
+		}
+		res, _ = m.getFromCache(rType, rName)
+		return res, nil
 	case <-t.C:
+		// remove the notifier if timeout.
+		m.mu.Lock()
+		delete(m.notifierMap[rType], rName)
+		m.mu.Unlock()
 		return nil, fmt.Errorf("[XDS] manager, fetch %s resource[%s] failed, timeout %s",
 			xdsresource.ResourceTypeToName[rType], rName, timeout)
 	}
-	// error in the notifier
-	if nf.err != nil {
-		return nil, fmt.Errorf("[XDS] manager, fetch %s resource[%s] failed, error=%s",
-			xdsresource.ResourceTypeToName[rType], rName, nf.err.Error())
-	}
-	res, _ = m.getFromCache(rType, rName)
-	return res, nil
 }
 
 // cleaner cleans the expired cache periodically
 func (m *xdsResourceManager) cleaner() {
 	t := time.NewTicker(defaultCacheExpireTime)
-
-	select {
-	case <-t.C:
+	for {
+		<-t.C
 		m.mu.Lock()
 		for rt := range m.meta {
 			for rName, meta := range m.meta[rt] {
-				if time.Now().Sub(meta.LastAccessTime) > defaultCacheExpireTime {
+				if time.Since(meta.LastAccessTime) > defaultCacheExpireTime {
 					delete(m.meta[rt], rName)
 					delete(m.cache[rt], rName)
 					m.client.RemoveWatch(rt, rName)

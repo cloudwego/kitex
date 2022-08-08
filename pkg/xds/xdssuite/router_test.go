@@ -2,10 +2,11 @@ package xdssuite
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
-	"testing"
 )
 
 var (

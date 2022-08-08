@@ -2,15 +2,16 @@ package manager
 
 import (
 	"context"
+	"reflect"
+	"sync"
+	"testing"
+
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/xds/internal/api/discoveryv3"
 	"github.com/cloudwego/kitex/pkg/xds/internal/manager/mock"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	v3core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
-	"reflect"
-	"sync"
-	"testing"
 )
 
 type mockADSClient struct {

@@ -2,6 +2,7 @@ package xdsresource
 
 import (
 	"fmt"
+
 	v3listenerpb "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	v3routepb "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	v3httppb "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
@@ -29,8 +30,8 @@ const (
 // If InlineRouteConfig is not nil, use it to perform routing.
 // Or, use RouteConfigName as the resourceName to get the RouteConfigResource.
 type NetworkFilter struct {
-	FilterType      NetworkFilterType
-	RouteConfigName string
+	FilterType        NetworkFilterType
+	RouteConfigName   string
 	InlineRouteConfig *RouteConfigResource
 }
 
@@ -44,14 +45,14 @@ func UnmarshalLDS(rawResources []*any.Any) (map[string]*ListenerResource, error)
 
 	for _, r := range rawResources {
 		if r.GetTypeUrl() != ListenerTypeUrl {
-			err := fmt.Errorf("invalid listener resource type: %s\n", r.GetTypeUrl())
+			err := fmt.Errorf("invalid listener resource type: %s", r.GetTypeUrl())
 			errSlice = append(errSlice, err)
 			continue
 		}
 		lis := &v3listenerpb.Listener{}
 		if err := proto.Unmarshal(r.GetValue(), lis); err != nil {
-			err = fmt.Errorf("unmarshal Listener failed, error=%s\n", err)
-			errSlice = append(errSlice, fmt.Errorf("unmarshal Listener failed, error=%s\n", err))
+			err = fmt.Errorf("unmarshal Listener failed, error=%s", err)
+			errSlice = append(errSlice, fmt.Errorf("unmarshal Listener failed, error=%s", err))
 			continue
 		}
 		// Process Network Filters
@@ -136,7 +137,7 @@ func unmarshalThriftProxy(rawResources *any.Any) (*RouteConfigResource, error) {
 		routeMatch := &ThriftRouteMatch{}
 		match := r.GetMatch()
 		if match == nil {
-			return nil, fmt.Errorf("no match in routeConfig:%s\n", tp.RouteConfig.Name)
+			return nil, fmt.Errorf("no match in routeConfig:%s", tp.RouteConfig.Name)
 		}
 		// method or service match
 		switch t := match.GetMatchSpecifier().(type) {
@@ -169,7 +170,7 @@ func unmarshalThriftProxy(rawResources *any.Any) (*RouteConfigResource, error) {
 		// action
 		action := r.Route
 		if action == nil {
-			return nil, fmt.Errorf("no action in routeConfig:%s\n", tp.RouteConfig.Name)
+			return nil, fmt.Errorf("no action in routeConfig:%s", tp.RouteConfig.Name)
 		}
 		switch cs := action.GetClusterSpecifier().(type) {
 		case *v3thrift_proxy.RouteAction_Cluster:

@@ -3,6 +3,7 @@ package xdssuite
 import (
 	"context"
 	"fmt"
+
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"

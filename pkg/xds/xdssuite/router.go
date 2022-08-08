@@ -3,12 +3,13 @@ package xdssuite
 import (
 	"context"
 	"fmt"
+	"math/rand"
+	"time"
+
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	"github.com/cloudwego/kitex/transport"
-	"math/rand"
-	"time"
 )
 
 const (
@@ -144,7 +145,7 @@ func matchThriftRoute(ri rpcinfo.RPCInfo, routeConfig *xdsresource.RouteConfigRe
 // routeMatched checks if the route matches the info provided in the RPCInfo
 func routeMatched(path string, to rpcinfo.EndpointInfo, r *xdsresource.Route) bool {
 	if r.Match != nil && r.Match.MatchPath(path) {
-		//return r
+		// return r
 		tagMatched := true
 		for mk, mv := range r.Match.GetTags() {
 			if v, ok := to.Tag(mk); !ok || v != mv {

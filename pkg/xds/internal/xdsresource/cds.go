@@ -3,6 +3,7 @@ package xdsresource
 import (
 	"encoding/json"
 	"fmt"
+
 	v3clusterpb "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
 	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/protobuf/proto"

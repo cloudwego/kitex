@@ -1,11 +1,12 @@
 package xdsresource
 
 import (
+	"reflect"
+	"testing"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/golang/protobuf/ptypes/any"
 	dnsProto "istio.io/istio/pkg/dns/proto"
-	"reflect"
-	"testing"
 )
 
 func TestUnmarshalNDSError(t *testing.T) {
@@ -53,7 +54,7 @@ func TestUnmarshalNDSError(t *testing.T) {
 
 func TestUnmarshalNDSSuccess(t *testing.T) {
 	ln, cip := "listener1", "0.0.0.0"
-	nt:= &dnsProto.NameTable{
+	nt := &dnsProto.NameTable{
 		Table: map[string]*dnsProto.NameTable_NameInfo{
 			"listener1": {
 				Ips: []string{cip},
@@ -67,6 +68,6 @@ func TestUnmarshalNDSSuccess(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, res.NameTable != nil)
 	ips := res.NameTable[ln]
-	test.Assert(t, ips != nil && len(ips) == 1)
+	test.Assert(t, len(ips) == 1)
 	test.Assert(t, ips[0] == cip)
 }

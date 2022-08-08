@@ -1,12 +1,13 @@
 package xdsresource
 
 import (
+	"reflect"
+	"testing"
+
 	"github.com/cloudwego/kitex/internal/test"
 	v3routepb "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/protobuf/types/known/wrapperspb"
-	"reflect"
-	"testing"
 )
 
 func TestUnmarshalRDSError(t *testing.T) {

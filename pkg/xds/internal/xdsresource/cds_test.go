@@ -1,10 +1,11 @@
 package xdsresource
 
 import (
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/golang/protobuf/ptypes/any"
 	"reflect"
 	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/golang/protobuf/ptypes/any"
 )
 
 func TestUnmarshalCDSError(t *testing.T) {

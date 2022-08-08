@@ -19,10 +19,11 @@ package client
 import (
 	"context"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/xds/xdssuite"
 	"net"
 	"strings"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/xds/xdssuite"
 
 	"github.com/cloudwego/kitex/internal/client"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
@@ -165,7 +166,7 @@ func WithHostPorts(hostports ...string) Option {
 
 func WithXDSSuite() Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithXDSSuite"))
+		di.Push("WithXDSSuite")
 
 		o.XDSEnabled = true
 		o.Resolver = xdssuite.NewXDSResolver()

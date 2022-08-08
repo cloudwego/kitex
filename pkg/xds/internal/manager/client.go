@@ -3,6 +3,10 @@ package manager
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
@@ -10,13 +14,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/xds/internal/api/discoveryv3/aggregateddiscoveryservice"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	"google.golang.org/genproto/googleapis/rpc/status"
-	"strings"
-	"sync"
-	"time"
 )
 
-type ADSClient = aggregateddiscoveryservice.Client
-type ADSStream = aggregateddiscoveryservice.AggregatedDiscoveryService_StreamAggregatedResourcesClient
+type (
+	ADSClient = aggregateddiscoveryservice.Client
+	ADSStream = aggregateddiscoveryservice.AggregatedDiscoveryService_StreamAggregatedResourcesClient
+)
 
 // xdsClient communicates with the control plane to perform xds resource discovery.
 // It maintains the connection and all the resources being watched.
@@ -173,11 +176,10 @@ func (c *xdsClient) sender() {
 			klog.Infof("[XDS] client: stop ads client sender")
 			return
 		case <-timer.C:
-			//c.refresh()
+			// c.refresh()
 			timer.Reset(c.refreshInterval)
 		}
 	}
-
 }
 
 // receiver receives and handle response from the xds server.
@@ -366,7 +368,7 @@ func (c *xdsClient) handleLDS(resp *discoveryv3.DiscoveryResponse) error {
 	for n := range c.watchedResource[xdsresource.ListenerType] {
 		ln, err := c.getListenerName(n)
 		if err != nil || ln == "" {
-			//klog.Warnf("[XDS] client, handleLDS failed, error=%s", err)
+			// klog.Warnf("[XDS] client, handleLDS failed, error=%s", err)
 			continue
 		}
 		if lis, ok := res[ln]; ok {

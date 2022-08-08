@@ -3,12 +3,13 @@ package xdsresource
 import (
 	"encoding/json"
 	"fmt"
+	"net"
+	"strconv"
+
 	"github.com/cloudwego/kitex/pkg/utils"
 	v3endpointpb "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
 	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/protobuf/proto"
-	"net"
-	"strconv"
 )
 
 type Endpoint struct {
@@ -94,7 +95,7 @@ func UnmarshalEDS(rawResources []*any.Any) (map[string]*EndpointsResource, error
 		}
 		cla := &v3endpointpb.ClusterLoadAssignment{}
 		if err := proto.Unmarshal(r.GetValue(), cla); err != nil {
-			err = fmt.Errorf("unmarshal ClusterLoadAssignment failed, error=%s\n", err)
+			err = fmt.Errorf("unmarshal ClusterLoadAssignment failed, error=%s", err)
 			errSlice = append(errSlice, err)
 			continue
 		}

@@ -3,11 +3,12 @@ package xdsresource
 import (
 	"encoding/json"
 	"fmt"
+	"time"
+
 	v3routepb "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
 	matcherv3 "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/protobuf/proto"
-	"time"
 )
 
 // RouteConfigResource is used for routing
@@ -102,7 +103,7 @@ func unmarshalRoutes(rs []*v3routepb.Route) ([]*Route, error) {
 		routeMatch := &HTTPRouteMatch{}
 		match := r.GetMatch()
 		if match == nil {
-			return nil, fmt.Errorf("no match in route %s\n", r.GetName())
+			return nil, fmt.Errorf("no match in route %s", r.GetName())
 		}
 		// path match
 		pathSpecifier := match.GetPathSpecifier()
@@ -113,7 +114,7 @@ func unmarshalRoutes(rs []*v3routepb.Route) ([]*Route, error) {
 			routeMatch.Prefix = p.Prefix
 		case *v3routepb.RouteMatch_Path:
 			routeMatch.Path = p.Path
-			//default:
+			// default:
 			//	return nil, fmt.Errorf("only support path match")
 		}
 		// header match
@@ -140,7 +141,7 @@ func unmarshalRoutes(rs []*v3routepb.Route) ([]*Route, error) {
 		// action
 		action := r.GetAction()
 		if action == nil {
-			return nil, fmt.Errorf("no action in route %s\n", r.GetName())
+			return nil, fmt.Errorf("no action in route %s", r.GetName())
 		}
 		switch a := action.(type) {
 		case *v3routepb.Route_Route:
@@ -175,7 +176,7 @@ func unmarshalRouteConfig(routeConfig *v3routepb.RouteConfiguration) (*RouteConf
 		rs := vhs[i].GetRoutes()
 		routes, err := unmarshalRoutes(rs)
 		if err != nil {
-			return nil, fmt.Errorf("processing route in virtual host %s failed: %s\n", vhs[i].GetName(), err)
+			return nil, fmt.Errorf("processing route in virtual host %s failed: %s", vhs[i].GetName(), err)
 		}
 		virtualHost := &VirtualHost{
 			Name:   vhs[i].GetName(),
@@ -194,13 +195,13 @@ func UnmarshalRDS(rawResources []*any.Any) (map[string]*RouteConfigResource, err
 	var errSlice []error
 	for _, r := range rawResources {
 		if r.GetTypeUrl() != RouteTypeUrl {
-			err := fmt.Errorf("invalid route config resource type: %s\n", r.GetTypeUrl())
+			err := fmt.Errorf("invalid route config resource type: %s", r.GetTypeUrl())
 			errSlice = append(errSlice, err)
 			continue
 		}
 		rcfg := &v3routepb.RouteConfiguration{}
 		if err := proto.Unmarshal(r.GetValue(), rcfg); err != nil {
-			err = fmt.Errorf("unmarshal failed: %s\n", err)
+			err = fmt.Errorf("unmarshal failed: %s", err)
 			errSlice = append(errSlice, err)
 			continue
 		}

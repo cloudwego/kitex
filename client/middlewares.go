@@ -20,9 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/xds/xdssuite"
-	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/kitex/internal"

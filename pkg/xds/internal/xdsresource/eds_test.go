@@ -1,11 +1,12 @@
 package xdsresource
 
 import (
-	"github.com/cloudwego/thriftgo/pkg/test"
-	"github.com/golang/protobuf/ptypes/any"
 	"reflect"
 	"strconv"
 	"testing"
+
+	"github.com/cloudwego/thriftgo/pkg/test"
+	"github.com/golang/protobuf/ptypes/any"
 )
 
 func TestUnmarshalEDSError(t *testing.T) {
@@ -45,9 +46,9 @@ func TestUnmarshalEDSError(t *testing.T) {
 }
 
 func TestUnmarshalEDSSuccess(t *testing.T) {
-	//edsAddr := "127.0.0.1"
-	//edsPort1, edsPort2 := 8080, 8081
-	//edsWeight1, edsWeight2 := 50, 50
+	// edsAddr := "127.0.0.1"
+	// edsPort1, edsPort2 := 8080, 8081
+	// edsWeight1, edsWeight2 := 50, 50
 	rawResources := []*any.Any{
 		MarshalAny(Endpoints1),
 	}

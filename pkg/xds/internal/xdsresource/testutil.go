@@ -9,15 +9,15 @@ import (
 	v3httppb "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	v3thrift_proxy "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/thrift_proxy/v3"
 	v3matcher "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/any"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 	dnsProto "istio.io/istio/pkg/dns/proto"
 )
 
 func MarshalAny(message proto.Message) *any.Any {
-	a, _ := ptypes.MarshalAny(message)
+	a, _ := anypb.New(message)
 	return a
 }
 
@@ -76,16 +76,16 @@ var (
 )
 
 var (
-	HostName1     = "host1"
-	Port1         = "80"
-	ClusterIP1    = "0.0.0.0"
-	ListenerName1 = HostName1 + ":" + Port1
+	HostName1        = "host1"
+	Port1            = "80"
+	ClusterIP1       = "0.0.0.0"
+	ListenerName1    = HostName1 + ":" + Port1
 	ReturnedLisName1 = ClusterIP1 + "_" + Port1
 
-	HostName2     = "host2"
-	Port2         = "8080"
-	ClusterIP2    = "10.0.0.1"
-	ListenerName2 = HostName2 + ":" + Port2
+	HostName2        = "host2"
+	Port2            = "8080"
+	ClusterIP2       = "10.0.0.1"
+	ListenerName2    = HostName2 + ":" + Port2
 	ReturnedLisName2 = ClusterIP2 + "_" + Port2
 	ReturnedLisName3 = "lis3"
 
@@ -161,7 +161,6 @@ var (
 			},
 		},
 	}
-
 )
 
 var (
@@ -265,7 +264,7 @@ var (
 	EndpointName1 = "endpoint1"
 	EndpointName2 = "endpoint2"
 
-	edsAddr            = "127.0.0.1"
+	edsAddr                = "127.0.0.1"
 	edsPort1, edsPort2     = 8080, 8081
 	edsWeight1, edsWeight2 = 50, 50
 	Endpoints1             = &v3endpointpb.ClusterLoadAssignment{
@@ -322,15 +321,13 @@ var (
 	}
 )
 
-var (
-	NameTable1         = &dnsProto.NameTable{
-		Table: map[string]*dnsProto.NameTable_NameInfo{
-			HostName1: {
-				Ips: []string{ClusterIP1},
-			},
-			HostName2: {
-				Ips: []string{ClusterIP2},
-			},
+var NameTable1 = &dnsProto.NameTable{
+	Table: map[string]*dnsProto.NameTable_NameInfo{
+		HostName1: {
+			Ips: []string{ClusterIP1},
 		},
-	}
-)
+		HostName2: {
+			Ips: []string{ClusterIP2},
+		},
+	},
+}

@@ -2,11 +2,12 @@ package xdssuite
 
 import (
 	"context"
+
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 )
 
 var (
-	xdsResourceManager               XDSResourceManager
+	xdsResourceManager    XDSResourceManager
 	newXDSResourceManager func() (XDSResourceManager, error)
 )
 

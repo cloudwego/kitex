@@ -1,9 +1,10 @@
 package xds
 
 import (
+	"sync"
+
 	"github.com/cloudwego/kitex/pkg/xds/internal/manager"
 	"github.com/cloudwego/kitex/pkg/xds/xdssuite"
-	"sync"
 )
 
 func newManager() (xdssuite.XDSResourceManager, error) {

@@ -2,13 +2,14 @@ package mock
 
 import (
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	"github.com/cloudwego/kitex/pkg/xds/internal/api/discoveryv3"
 	"github.com/cloudwego/kitex/pkg/xds/internal/api/discoveryv3/aggregateddiscoveryservice"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	"github.com/cloudwego/kitex/server"
-	"net"
-	"sync"
-	"time"
 )
 
 type testXDSServer struct {
@@ -104,21 +105,17 @@ func (svr *testAdsService) StreamAggregatedResources(stream discoveryv3.Aggregat
 			default:
 			}
 
-			select {
-			case resp := <-svr.respCh:
-				err := stream.Send(resp)
-				if err != nil {
-					errCh <- err
-					return
-				}
+			resp := <-svr.respCh
+			err := stream.Send(resp)
+			if err != nil {
+				errCh <- err
+				return
 			}
 		}
 	}()
 
-	select {
-	case err := <-errCh:
-		return err
-	}
+	err = <-errCh
+	return err
 }
 
 func (svr *testAdsService) handleRequest(msg interface{}) {

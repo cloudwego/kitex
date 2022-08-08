@@ -2,12 +2,13 @@ package manager
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/xds/internal/manager/mock"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	v3core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
-	"testing"
-	"time"
 )
 
 // for test use
@@ -140,7 +141,6 @@ func Test_xdsResourceManager_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
 			_, err := m.Get(tt.args.ctx, tt.args.resourceType, tt.args.resourceName)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
@@ -211,11 +211,11 @@ func Test_xdsResourceManager_Get_Resource_Update(t *testing.T) {
 	test.Assert(t, m.cache[xdsresource.EndpointsType][xdsresource.EndpointName1] != nil)
 	// push the new resource and check if the resourceManager can update the resource
 	// TODO: endpoint will not be updated because of the incremental push feature of Istio
-	//svr.PushResourceUpdate(mock.EdsResp2)
-	//time.Sleep(time.Millisecond * 100)
-	//res, err = m.Get(context.Background(), xdsresource.EndpointsType, xdsresource.EndpointName1)
-	//test.Assert(t, err != nil)
-	//test.Assert(t, m.cache[xdsresource.EndpointsType][xdsresource.EndpointName1] == nil)
+	// svr.PushResourceUpdate(mock.EdsResp2)
+	// time.Sleep(time.Millisecond * 100)
+	// res, err = m.Get(context.Background(), xdsresource.EndpointsType, xdsresource.EndpointName1)
+	// test.Assert(t, err != nil)
+	// test.Assert(t, m.cache[xdsresource.EndpointsType][xdsresource.EndpointName1] == nil)
 }
 
 func Test_xdsResourceManager_getFromCache(t *testing.T) {
@@ -237,9 +237,9 @@ func Test_xdsResourceManager_getFromCache(t *testing.T) {
 	test.Assert(t, m.meta[xdsresource.ListenerType][xdsresource.ListenerName1] != nil)
 
 	// failed
-	res, ok = m.getFromCache(xdsresource.ListenerType, "randomListener")
+	_, ok = m.getFromCache(xdsresource.ListenerType, "randomListener")
 	test.Assert(t, ok == false)
-	res, ok = m.getFromCache(xdsresource.ClusterType, "randomCluster")
+	_, ok = m.getFromCache(xdsresource.ClusterType, "randomCluster")
 	test.Assert(t, ok == false)
 }
 
