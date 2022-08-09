@@ -23,6 +23,7 @@ import (
 	"strings"
 	"text/template"
 
+	genfastpb "github.com/cloudwego/fastpb/protoc-gen-fastpb/generator"
 	gengo "google.golang.org/protobuf/cmd/protoc-gen-go/internal_gengo"
 	"google.golang.org/protobuf/compiler/protogen"
 
@@ -143,6 +144,13 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		pp.err = tpl.ExecuteTemplate(&buf, tpl.Name(), pp.makeInterfaces(f, file))
 
 		f.P(buf.String())
+	}
+
+	// generate fast api
+	if !pp.Config.NoFastAPI && pp.err == nil {
+		fixed := *file
+		fixed.GeneratedFilenamePrefix = strings.TrimPrefix(fixed.GeneratedFilenamePrefix, pp.PackagePrefix)
+		genfastpb.GenerateFile(gen, &fixed)
 	}
 }
 
