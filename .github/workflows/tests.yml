@@ -26,7 +26,10 @@ jobs:
 #            ${{ runner.os }}-go-
 
       - name: Unit Test
-        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
+        run: go test -race -covermode=atomic -coverprofile=coverage.txt ./...
+        
+      - name: Codecov
+        run: bash <(curl -s https://codecov.io/bash)
 
       - name: Benchmark
         run: go test -bench=. -benchmem -run=none ./...
