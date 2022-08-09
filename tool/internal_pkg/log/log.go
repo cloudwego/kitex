@@ -52,13 +52,13 @@ func Warnf(format string, v ...interface{}) {
 // Info .
 func Info(v ...interface{}) {
 	if Verbose {
-		defaultLogger.Println(os.Stdout, v...)
+		defaultLogger.Println(os.Stderr, v...)
 	}
 }
 
 // Infof .
 func Infof(format string, v ...interface{}) {
 	if Verbose {
-		defaultLogger.Printf(os.Stdout, format, v...)
+		defaultLogger.Printf(os.Stderr, format, v...)
 	}
 }

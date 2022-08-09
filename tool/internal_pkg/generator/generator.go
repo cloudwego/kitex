@@ -190,6 +190,7 @@ func (c *Config) Unpack(args []string) error {
 			}
 		}
 	}
+	log.Verbose = c.Verbose
 	return nil
 }
 

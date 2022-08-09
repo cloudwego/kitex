@@ -22,12 +22,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	gengo "google.golang.org/protobuf/cmd/protoc-gen-go/internal_gengo"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/pluginpb"
-
-	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 )
 
 // PluginName .
@@ -62,32 +61,31 @@ func run(opts protogen.Options) error {
 		return fmt.Errorf("%s: unpack args: %w", PluginName, err)
 	}
 
-	// check GoPackage
+	pp.parseM()
+
+	// unify go_package
+	pe := &pathElements{
+		module: pp.ModuleName,
+		prefix: pp.PackagePrefix,
+	}
 	for _, f := range req.ProtoFile {
 		if f == nil {
 			return errors.New("ERROR: got nil ProtoFile")
 		}
-		if f.Options == nil || f.Options.GoPackage == nil {
-			return fmt.Errorf("ERROR: go_package is missing in proto file %s", *f.Name)
-		}
-	}
 
-	for _, f := range req.ProtoFile {
-		if strings.Contains(*f.Options.GoPackage, generator.KitexGenPath) {
-			pp.completeImportPath = true
-		}
-	}
-	if pp.completeImportPath {
-		println("WARNING: you should not use go_package with complete package path any more," +
-			"use package name like thrift namespace instead of complete package path.")
-	}
-	// fix proto file go_package to correct dependency import
-	for _, f := range req.ProtoFile {
-		if !strings.Contains(*f.Options.GoPackage, generator.KitexGenPath) {
-			if pp.completeImportPath {
-				return errors.New("mix use of new/old proto file standard")
+		gopkg, ok := pp.importPaths[f.GetName()]
+		if ok {
+			f.Options.GoPackage = &gopkg
+			log.Infof("[INFO] option specified import path for %q: %q\n", f.GetName(), gopkg)
+		} else {
+			if f.Options == nil || f.Options.GoPackage == nil {
+				return fmt.Errorf("ERROR: go_package is missing in proto file %q", f.GetName())
 			}
-			f.Options.GoPackage = &(&struct{ x string }{filepath.Join(pp.PackagePrefix, *f.Options.GoPackage)}).x
+			gopkg = f.GetOptions().GetGoPackage()
+		}
+		if path, ok := pe.getImportPath(gopkg); ok {
+			f.Options.GoPackage = &path
+			log.Infof("[INFO] update import path for %q: %q -> %q\n", f.GetName(), gopkg, path)
 		}
 	}
 
