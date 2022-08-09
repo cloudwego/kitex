@@ -28,6 +28,7 @@ import (
 	"google.golang.org/protobuf/compiler/protogen"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 type protocPlugin struct {
@@ -121,7 +122,7 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 			hasStreaming = true
 		}
 		for _, f := range fs {
-			gen.NewGeneratedFile(pp.adjustServicePath(file, f.Name), "").P(f.Content)
+			gen.NewGeneratedFile(pp.adjustPath(f.Name), "").P(f.Content)
 		}
 	}
 	// generate service interface
@@ -188,7 +189,7 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 			pp.err = err
 		}
 		for _, f := range fs {
-			gen.NewGeneratedFile(pp.adjustMainPath(f.Name), "").P(f.Content)
+			gen.NewGeneratedFile(pp.adjustPath(f.Name), "").P(f.Content)
 		}
 	}
 
@@ -234,14 +235,14 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 				ServerStreaming:    m.Desc.IsStreamingServer(),
 			}
 			si.Methods = append(si.Methods, mi)
-			if mi.ClientStreaming || mi.ServerStreaming {
+			if !si.HasStreaming && (mi.ClientStreaming || mi.ServerStreaming) {
 				si.HasStreaming = true
 			}
 		}
 		ss = append(ss, si)
 	}
 	// combine service
-	if pp.CombineService && len(file.Services) > 0 {
+	if pp.Config.CombineService && len(file.Services) > 0 {
 		var svcs []*generator.ServiceInfo
 		var methods []*generator.MethodInfo
 		for _, s := range ss {
@@ -336,22 +337,23 @@ func (pp *protocPlugin) makeInterfaces(gf *protogen.GeneratedFile, file *protoge
 	}{pp.Config.Version, is}
 }
 
-func (pp *protocPlugin) adjustMainPath(path string) (ret string) {
+func (pp *protocPlugin) adjustPath(path string) (ret string) {
 	cur, _ := filepath.Abs(".")
-	if pp.Use == "" {
+	if pp.Config.Use == "" {
 		cur = filepath.Join(cur, generator.KitexGenPath)
 	}
-	path, _ = filepath.Rel(cur, path)
-	return path
-}
-
-func (pp *protocPlugin) adjustServicePath(file *protogen.File, path string) (ret string) {
-	dir := filepath.Dir(strings.TrimPrefix(file.GeneratedFilenamePrefix, pp.PackagePrefix))
-	pl := strings.Split(path, string(filepath.Separator))
-	if len(pl) <= 2 {
-		panic("invalid service file path: " + path)
+	if filepath.IsAbs(path) {
+		path, _ = filepath.Rel(cur, path)
+		return path
 	}
-	return filepath.Join(dir, pl[len(pl)-2], pl[len(pl)-1])
+	if pp.ModuleName == "" {
+		gopath := util.GetGOPATH()
+		path = filepath.Join(gopath, "src", path)
+		path, _ = filepath.Rel(cur, path)
+	} else {
+		path, _ = filepath.Rel(pp.ModuleName, path)
+	}
+	return path
 }
 
 func (pp *protocPlugin) fixImport(path string) string {
