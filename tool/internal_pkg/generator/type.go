@@ -53,7 +53,7 @@ func (p *PackageInfo) AddImport(pkg, path string) {
 			parts := strings.Split(path, KitexGenPath)
 			path = filepath.Join(p.ExternalKitexGen, parts[len(parts)-1])
 		}
-		if strings.HasSuffix(path, "/"+pkg) || path == pkg {
+		if path == pkg {
 			p.Imports[path] = ""
 		} else {
 			p.Imports[path] = pkg

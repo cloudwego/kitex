@@ -28,16 +28,17 @@ import (
 	"google.golang.org/protobuf/compiler/protogen"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 type protocPlugin struct {
 	generator.Config
 	generator.PackageInfo
-	Services           []*generator.ServiceInfo
-	kg                 generator.Generator
-	completeImportPath bool // indicates whether proto file go_package contains complete package path
-	err                error
+	Services    []*generator.ServiceInfo
+	kg          generator.Generator
+	err         error
+	importPaths map[string]string // file -> import path
 }
 
 // Name implements the protobuf_generator.Plugin interface.
@@ -49,6 +50,31 @@ func (pp *protocPlugin) Name() string {
 func (pp *protocPlugin) init() {
 	pp.Dependencies = map[string]string{
 		"proto": "google.golang.org/protobuf/proto",
+	}
+}
+
+// parse the 'M*' option
+// See https://developers.google.com/protocol-buffers/docs/reference/go-generated for more information.
+func (pp *protocPlugin) parseM() {
+	pp.importPaths = make(map[string]string)
+	for _, po := range pp.Config.ProtobufOptions {
+		if po == "" || po[0] != 'M' {
+			continue
+		}
+		idx := strings.Index(po, "=")
+		if idx < 0 {
+			continue
+		}
+		key := po[1:idx]
+		val := po[idx+1:]
+		if val == "" {
+			continue
+		}
+		idx = strings.Index(val, ";")
+		if idx >= 0 {
+			val = val[:idx]
+		}
+		pp.importPaths[key] = val
 	}
 }
 
@@ -94,13 +120,17 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		return
 	}
 	gopkg := file.Proto.GetOptions().GetGoPackage()
-	if pp.completeImportPath {
-		if parts := strings.SplitN(gopkg, generator.KitexGenPath, 2); len(parts) == 2 {
-			pp.Namespace = parts[1]
-		}
-	} else {
-		pp.Namespace = strings.TrimPrefix(gopkg, pp.PackagePrefix)
+	if !strings.HasPrefix(gopkg, pp.PackagePrefix) {
+		log.Warnf("[WARN] %q is skipped because its import path %q is not located in ./kitex_gen. Change the go_package option or use '--protobuf M%s=A-Import-Path-In-kitex_gen' to override it if you want this file to be generated under kitex_gen.\n",
+			file.Proto.GetName(), gopkg, file.Proto.GetName())
+		return
 	}
+	log.Infof("[INFO] Generate %q at %q\n", file.Proto.GetName(), gopkg)
+
+	if parts := strings.Split(gopkg, ";"); len(parts) > 1 {
+		gopkg = parts[0] // remove package alias from file path
+	}
+	pp.Namespace = strings.TrimPrefix(gopkg, pp.PackagePrefix)
 
 	ss := pp.convertTypes(file)
 	pp.Services = append(pp.Services, ss...)
@@ -253,7 +283,8 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 		mm := make(map[string]*generator.MethodInfo)
 		for _, m := range methods {
 			if _, ok := mm[m.Name]; ok {
-				println(fmt.Sprintf("combine service method %s in %s conflicts with %s in %s", m.Name, m.ServiceName, m.Name, mm[m.Name].ServiceName))
+				log.Warnf("[WARN] combine service method %s in %s conflicts with %s in %s\n",
+					m.Name, m.ServiceName, m.Name, mm[m.Name].ServiceName)
 				return
 			}
 			mm[m.Name] = m

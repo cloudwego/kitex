@@ -163,8 +163,11 @@ func buildCmd(a *arguments, out io.Writer) *exec.Cmd {
 		cmd.Args = append(cmd.Args,
 			"--kitex_out="+outPath,
 			"--kitex_opt="+kas,
-			a.IDL,
 		)
+		for _, po := range a.ProtobufOptions {
+			cmd.Args = append(cmd.Args, "--kitex_opt="+po)
+		}
+		cmd.Args = append(cmd.Args, a.IDL)
 	}
 	log.Info(strings.ReplaceAll(strings.Join(cmd.Args, " "), kas, fmt.Sprintf("%q", kas)))
 	return cmd
