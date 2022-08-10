@@ -56,6 +56,16 @@ func (a *arguments) checkExtension(ext string) {
 	}
 }
 
+func (a *arguments) guessIDLType() (string, bool) {
+	switch {
+	case strings.HasSuffix(a.IDL, ".thrift"):
+		return "thrift", true
+	case strings.HasSuffix(a.IDL, ".proto"):
+		return "protobuf", true
+	}
+	return "unknown", false
+}
+
 func (a *arguments) buildFlags() *flag.FlagSet {
 	f := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	f.BoolVar(&a.NoFastAPI, "no-fast-api", false,
@@ -71,7 +81,7 @@ func (a *arguments) buildFlags() *flag.FlagSet {
 		"Turn on verbose mode.")
 	f.BoolVar(&a.GenerateInvoker, "invoker", false,
 		"Generate invoker side codes when service name is specified.")
-	f.StringVar(&a.IDLType, "type", "thrift", "Specify the type of IDL: 'thrift' or 'protobuf'.")
+	f.StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")
 	f.Var(&a.Includes, "I", "Add an IDL search path for includes.")
 	f.Var(&a.ThriftOptions, "thrift", "Specify arguments for the thrift compiler.")
 	f.Var(&a.ThriftPlugins, "thrift-plugin", "Specify thrift plugin arguments for the thrift compiler.")
@@ -139,6 +149,13 @@ func (a *arguments) checkIDL(files []string) {
 		a.checkExtension(".thrift")
 	case "protobuf":
 		a.checkExtension(".proto")
+	case "unknown":
+		if typ, ok := a.guessIDLType(); ok {
+			a.IDLType = typ
+		} else {
+			log.Warn("Can not guess an IDL type from %q, please specify with the '-type' flag.", a.IDL)
+			os.Exit(2)
+		}
 	default:
 		log.Warn("Unsupported IDL type:", a.IDLType)
 		os.Exit(2)
