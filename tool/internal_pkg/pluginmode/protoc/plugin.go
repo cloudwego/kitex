@@ -125,6 +125,10 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		return
 	}
 	log.Infof("[INFO] Generate %q at %q\n", file.Proto.GetName(), gopkg)
+
+	if parts := strings.Split(gopkg, ";"); len(parts) > 1 {
+		gopkg = parts[0] // remove package alias from file path
+	}
 	pp.Namespace = strings.TrimPrefix(gopkg, pp.PackagePrefix)
 
 	ss := pp.convertTypes(file)
