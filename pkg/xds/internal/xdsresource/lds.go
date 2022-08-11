@@ -157,8 +157,6 @@ func unmarshalThriftProxy(rawResources *any.Any) (*RouteConfigResource, error) {
 					case *v3matcher.StringMatcher_Exact:
 						v = p.Exact
 					}
-				case *v3routepb.HeaderMatcher_ExactMatch:
-					v = hm.ExactMatch
 				}
 				if v != "" {
 					tags[h.Name] = v

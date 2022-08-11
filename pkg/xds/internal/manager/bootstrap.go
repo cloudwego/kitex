@@ -43,7 +43,6 @@ func newBootstrapConfig() (*BootstrapConfig, error) {
 		return nil, fmt.Errorf("[XDS] Bootstrap, INSTANCE_IP is not set in env")
 	}
 	// specify the version of istio in case of the canary deployment of istiod
-	// warning log if not specified
 	istioVersion := os.Getenv(ISTIO_VERSION)
 	return &BootstrapConfig{
 		node: &v3core.Node{

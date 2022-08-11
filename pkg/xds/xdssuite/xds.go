@@ -2,7 +2,6 @@ package xdssuite
 
 import (
 	"context"
-
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 )
 
@@ -20,6 +19,9 @@ type XDSResourceManager interface {
 
 // BuildXDSResourceManager builds the XDSResourceManager using the input function.
 func BuildXDSResourceManager(f func() (XDSResourceManager, error)) error {
+	if xdsResourceManager != nil {
+		return nil
+	}
 	newXDSResourceManager = f
 	m, err := newXDSResourceManager()
 	if err != nil {

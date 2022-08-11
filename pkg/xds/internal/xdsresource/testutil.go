@@ -33,8 +33,12 @@ var (
 						Headers: []*v3routepb.HeaderMatcher{
 							{
 								Name: "k1",
-								HeaderMatchSpecifier: &v3routepb.HeaderMatcher_ExactMatch{
-									ExactMatch: "v1",
+								HeaderMatchSpecifier: &v3routepb.HeaderMatcher_StringMatch{
+									StringMatch: &v3matcher.StringMatcher{
+										MatchPattern: &v3matcher.StringMatcher_Exact{
+											Exact: "v1",
+										},
+									},
 								},
 							},
 							{

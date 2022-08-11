@@ -128,8 +128,6 @@ func unmarshalRoutes(rs []*v3routepb.Route) ([]*Route, error) {
 					case *matcherv3.StringMatcher_Exact:
 						v = p.Exact
 					}
-				case *v3routepb.HeaderMatcher_ExactMatch:
-					v = hm.ExactMatch
 				}
 				if v != "" {
 					tags[h.Name] = v

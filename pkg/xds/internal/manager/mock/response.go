@@ -1,7 +1,7 @@
 package mock
 
 import (
-	"github.com/cloudwego/kitex/pkg/xds/internal/api/discoveryv3"
+	discoveryv3 "github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	"github.com/golang/protobuf/ptypes/any"
 )

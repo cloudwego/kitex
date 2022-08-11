@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/xds/internal/api/discoveryv3"
-	"github.com/cloudwego/kitex/pkg/xds/internal/api/discoveryv3/aggregateddiscoveryservice"
+	discoveryv3 "github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3"
+	"github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3/aggregateddiscoveryservice"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	"github.com/cloudwego/kitex/server"
 )

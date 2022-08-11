@@ -10,8 +10,8 @@ import (
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
-	"github.com/cloudwego/kitex/pkg/xds/internal/api/discoveryv3"
-	"github.com/cloudwego/kitex/pkg/xds/internal/api/discoveryv3/aggregateddiscoveryservice"
+	discoveryv3 "github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3"
+	"github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3/aggregateddiscoveryservice"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	"google.golang.org/genproto/googleapis/rpc/status"
 )
@@ -103,7 +103,7 @@ func newADSClient(addr string) (ADSClient, error) {
 	return cli, nil
 }
 
-// newXDSClient constructs a new xdsClient, which is used to get xds resources from the xds server.
+// newXdsClient constructs a new xdsClient, which is used to get xds resources from the xds server.
 func newXdsClient(bCfg *BootstrapConfig, updater *xdsResourceManager) (*xdsClient, error) {
 	// build stream client that communicates with the xds server
 	ac, err := newADSClient(bCfg.xdsSvrCfg.serverAddress)
