@@ -49,13 +49,6 @@ func (a *arguments) addExtraFlag(e *extraFlag) {
 	a.extends = append(a.extends, e)
 }
 
-func (a *arguments) checkExtension(ext string) {
-	if !strings.HasSuffix(a.IDL, ext) {
-		fmt.Fprintf(os.Stderr, "Expect the IDL file to have an extension of '%s'. Got '%s'.", ext, a.IDL)
-		os.Exit(2)
-	}
-}
-
 func (a *arguments) guessIDLType() (string, bool) {
 	switch {
 	case strings.HasSuffix(a.IDL, ".thrift"):
@@ -145,10 +138,7 @@ func (a *arguments) checkIDL(files []string) {
 	a.IDL = files[0]
 
 	switch a.IDLType {
-	case "thrift":
-		a.checkExtension(".thrift")
-	case "protobuf":
-		a.checkExtension(".proto")
+	case "thrift", "protobuf":
 	case "unknown":
 		if typ, ok := a.guessIDLType(); ok {
 			a.IDLType = typ
