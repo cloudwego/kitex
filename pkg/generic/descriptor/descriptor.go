@@ -30,6 +30,8 @@ type FieldDescriptor struct {
 	Alias        string // alias name
 	ID           int32
 	Required     bool
+	Optional     bool
+	DefaultValue interface{}
 	IsException  bool
 	Type         *TypeDescriptor
 	HTTPMapping  HTTPMapping
