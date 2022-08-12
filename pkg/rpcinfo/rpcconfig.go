@@ -184,7 +184,7 @@ func (r *rpcConfig) Clone() MutableRPCConfig {
 	return r2
 }
 
-func (r *rpcConfig) CopyFrom(from MutableRPCConfig) {
+func (r *rpcConfig) CopyFrom(from RPCConfig) {
 	f := from.(*rpcConfig)
 	*r = *f
 }

@@ -136,7 +136,7 @@ func (s *server) initOrResetRPCInfoFunc() func(context.Context, net.Addr) (rpcin
 			if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
 				setter.Reset()
 			}
-			rpcinfo.AsMutableRPCConfig(ri.Config()).CopyFrom(rpcinfo.AsMutableRPCConfig(s.opt.Configs))
+			rpcinfo.AsMutableRPCConfig(ri.Config()).CopyFrom(s.opt.Configs)
 			rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
 			rpcStats.Reset()
 			if s.opt.StatsLevel != nil {

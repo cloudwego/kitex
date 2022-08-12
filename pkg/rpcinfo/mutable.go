@@ -48,7 +48,7 @@ type MutableRPCConfig interface {
 	SetInteractionMode(mode InteractionMode) error
 	LockConfig(bits int)
 	Clone() MutableRPCConfig
-	CopyFrom(from MutableRPCConfig)
+	CopyFrom(from RPCConfig)
 	ImmutableView() RPCConfig
 }
 
