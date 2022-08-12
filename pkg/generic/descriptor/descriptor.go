@@ -62,6 +62,7 @@ type StructDescriptor struct {
 	FieldsByID     map[int32]*FieldDescriptor
 	FieldsByName   map[string]*FieldDescriptor
 	RequiredFields map[int32]*FieldDescriptor
+	DefaultFields  map[string]*FieldDescriptor
 }
 
 // CheckRequired check all required fields at the end of read or write

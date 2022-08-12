@@ -286,6 +286,10 @@ struct BaseElem {
 	1: optional i32 a,
 }
 
+const BaseElem defaultBaseElem = {
+	"a": 56
+}
+
 struct BaseStruct {
     1: optional bool a,
     2: optional byte b,
@@ -321,7 +325,7 @@ const BaseStruct defaultBase = {
 	"h": "456",
 	"i": TestEnum.THIRD,
 	"j": defaultJ,
-	"k": [{"a": 34}, {"a": 56}],
+	"k": [{"a": 34}, defaultBaseElem],
 	"l": defaultL,
 	"m": {
 		12: {
@@ -350,7 +354,7 @@ struct Request {
 	8: optional binary h = "456",
 	9: optional base.TestEnum i = base.TestEnum.THIRD,
 	10: optional set<string> j = base.defaultJ,
-	11: optional list<base.BaseElem> k = [{"a": 34}, {"a": 56}],
+	11: optional list<base.BaseElem> k = [{"a": 34}, base.defaultBaseElem],
 	12: optional map<string, i32> l = base.defaultL,
 	13: optional map<i32, base.BaseElem> m = {
 		12: {

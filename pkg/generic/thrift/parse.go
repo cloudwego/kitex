@@ -317,6 +317,7 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 				FieldsByID:     map[int32]*descriptor.FieldDescriptor{},
 				FieldsByName:   map[string]*descriptor.FieldDescriptor{},
 				RequiredFields: map[int32]*descriptor.FieldDescriptor{},
+				DefaultFields:  map[string]*descriptor.FieldDescriptor{},
 			},
 			// the first depth of base.Base is Request Base
 			IsRequestBase: t.Name == "base.Base" && recursionDepth == 1,
@@ -365,6 +366,7 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 				if err != nil {
 					return nil, err
 				}
+				ty.Struct.DefaultFields[_f.FieldName()] = _f
 			}
 			ty.Struct.FieldsByID[field.ID] = _f
 			ty.Struct.FieldsByName[_f.FieldName()] = _f
@@ -693,7 +695,6 @@ func getIDValue(tree *parser.Thrift, name string, t *parser.Type, extra *parser.
 			if con, ok := tree.GetConstant(extra.Name); ok {
 				return parse(tree, name, con.Type, con.Value)
 			}
-			// TODO: struct like？
 		}
 	} else {
 		tree = tree.Includes[extra.Index].Reference
