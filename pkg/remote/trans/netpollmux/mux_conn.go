@@ -145,7 +145,7 @@ func newMuxSvrConn(connection netpoll.Connection, pool *sync.Pool) *muxSvrConn {
 
 type muxSvrConn struct {
 	muxConn
-	pool *sync.Pool // value is rpcInfo
+	pool *sync.Pool // ctx with rpcInfo
 }
 
 func newMuxConn(connection netpoll.Connection) muxConn {
