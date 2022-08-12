@@ -228,8 +228,6 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 
 // 连接关闭时回调
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
-	// recycle rpcinfo
-	rpcinfo.PutRPCInfo(rpcinfo.GetRPCInfo(ctx))
 	tr := ctx.Value(ctxKeySvrTransport).(*SvrTrans).tr
 	tr.Close()
 }
