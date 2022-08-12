@@ -110,7 +110,12 @@ func (ei *endpointInfo) ResetFromBasicInfo(bi *EndpointBasicInfo) {
 	ei.serviceName = bi.ServiceName
 	ei.method = bi.Method
 	ei.address = nil
-	ei.tags = bi.Tags
+	for k := range ei.tags {
+		delete(ei.tags, k)
+	}
+	for k, v := range bi.Tags {
+		ei.tags[k] = v
+	}
 }
 
 func (ei *endpointInfo) zero() {
