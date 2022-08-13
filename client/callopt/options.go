@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/http"
+	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -37,10 +38,11 @@ var callOptionsPool = sync.Pool{
 }
 
 type callOptions struct {
-	configs      rpcinfo.RPCConfig
+	configs      rpcinfo.MutableRPCConfig
 	svr          remoteinfo.RemoteInfo
 	locks        *client.ConfigLocks
 	httpResolver http.Resolver
+	retryPolicy  retry.Policy
 }
 
 func newOptions() interface{} {
@@ -55,6 +57,7 @@ func newOptions() interface{} {
 func (co *callOptions) Recycle() {
 	co.configs = nil
 	co.svr = nil
+	co.retryPolicy = retry.Policy{}
 	co.locks.Zero()
 	callOptionsPool.Put(co)
 }
@@ -125,12 +128,11 @@ func WithRPCTimeout(d time.Duration) Option {
 		utils.WriteInt64ToStringBuilder(di, d.Milliseconds())
 		di.WriteString("ms)")
 
-		cfg := rpcinfo.AsMutableRPCConfig(o.configs)
-		cfg.SetRPCTimeout(d)
+		o.configs.SetRPCTimeout(d)
 		o.locks.Bits |= rpcinfo.BitRPCTimeout
 
 		// TODO SetReadWriteTimeout 是否考虑删除
-		cfg.SetReadWriteTimeout(d)
+		o.configs.SetReadWriteTimeout(d)
 		o.locks.Bits |= rpcinfo.BitReadWriteTimeout
 	}}
 }
@@ -142,8 +144,7 @@ func WithConnectTimeout(d time.Duration) Option {
 		utils.WriteInt64ToStringBuilder(di, d.Milliseconds())
 		di.WriteString("ms)")
 
-		cfg := rpcinfo.AsMutableRPCConfig(o.configs)
-		cfg.SetConnectTimeout(d)
+		o.configs.SetConnectTimeout(d)
 		o.locks.Bits |= rpcinfo.BitConnectTimeout
 	}}
 }
@@ -166,7 +167,7 @@ func WithTag(key, val string) Option {
 // Apply applies call options to the rpcinfo.RPCConfig and internal.RemoteInfo of kitex client.
 // The return value records the name and arguments of each option.
 // This function is for internal purpose only.
-func Apply(cos []Option, cfg rpcinfo.RPCConfig, svr remoteinfo.RemoteInfo, locks *client.ConfigLocks, httpResolver http.Resolver) string {
+func Apply(cos []Option, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo, locks *client.ConfigLocks, httpResolver http.Resolver) string {
 	var buf strings.Builder
 
 	co := callOptionsPool.Get().(*callOptions)

@@ -248,7 +248,7 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) 
 func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo) {
 	cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
 	rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, method)
-	ctx = kc.applyCallOptions(ctx, cfg.ImmutableView(), rmt)
+	ctx = kc.applyCallOptions(ctx, cfg, rmt)
 	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 	if kc.opt.StatsLevel != nil {
 		rpcStats.SetLevel(*kc.opt.StatsLevel)
@@ -279,7 +279,7 @@ func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Cont
 	return ctx, ri
 }
 
-func (kc *kClient) applyCallOptions(ctx context.Context, cfg rpcinfo.RPCConfig, svr remoteinfo.RemoteInfo) context.Context {
+func (kc *kClient) applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo) context.Context {
 	cos := CallOptionsFromCtx(ctx)
 	if len(cos) > 0 {
 		info := callopt.Apply(cos, cfg, svr, kc.opt.Locks, kc.opt.HTTPResolver)
@@ -506,7 +506,7 @@ func (kc *kClient) warmingUp() error {
 		// build a default destination for the resolver
 		cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
 		rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, "*")
-		ctx = kc.applyCallOptions(ctx, cfg.ImmutableView(), rmt)
+		ctx = kc.applyCallOptions(ctx, cfg, rmt)
 		dests = append(dests, rmt.ImmutableView())
 	}
 

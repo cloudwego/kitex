@@ -374,6 +374,8 @@ func WithRetryMethodPolicies(mp map[string]retry.Policy) Option {
 
 // WithSpecifiedResultRetry is used with FailureRetry.
 // When you enable FailureRetry and want to retry with the specified error or response, you can configure this Option.
+// IsResultRetry is defined inside retry.FailurePolicy, so WithFailureRetry also can set IsResultRetry.
+// But if your retry policy is enabled by remote config, WithSpecifiedResultRetry is useful.
 func WithSpecifiedResultRetry(rr *retry.IsResultRetry) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if rr == nil {

@@ -51,23 +51,23 @@ import (
 func TestRetryOptionDebugInfo(t *testing.T) {
 	fp := retry.NewFailurePolicy()
 	fp.WithDDLStop()
-	expectPolicyStr := "WithFailureRetry({StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:false DDLStop:true CBPolicy:{ErrorRate:0.1}} BackOffPolicy:&{BackOffType:none CfgItems:map[]} RetrySameNode:false})"
+	expectPolicyStr := "WithFailureRetry({StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:false DDLStop:true CBPolicy:{ErrorRate:0.1}} BackOffPolicy:&{BackOffType:none CfgItems:map[]} RetrySameNode:false IsResultRetry:<nil>})"
 	policyStr := fmt.Sprintf("WithFailureRetry(%+v)", *fp)
 	test.Assert(t, policyStr == expectPolicyStr, policyStr)
 
 	fp.WithFixedBackOff(10)
-	expectPolicyStr = "WithFailureRetry({StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:false DDLStop:true CBPolicy:{ErrorRate:0.1}} BackOffPolicy:&{BackOffType:fixed CfgItems:map[fix_ms:10]} RetrySameNode:false})"
+	expectPolicyStr = "WithFailureRetry({StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:false DDLStop:true CBPolicy:{ErrorRate:0.1}} BackOffPolicy:&{BackOffType:fixed CfgItems:map[fix_ms:10]} RetrySameNode:false IsResultRetry:<nil>})"
 	policyStr = fmt.Sprintf("WithFailureRetry(%+v)", *fp)
 	test.Assert(t, policyStr == expectPolicyStr, policyStr)
 
 	fp.WithRandomBackOff(10, 20)
 	fp.DisableChainRetryStop()
-	expectPolicyStr = "WithFailureRetry({StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:true DDLStop:true CBPolicy:{ErrorRate:0.1}} BackOffPolicy:&{BackOffType:random CfgItems:map[max_ms:20 min_ms:10]} RetrySameNode:false})"
+	expectPolicyStr = "WithFailureRetry({StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:true DDLStop:true CBPolicy:{ErrorRate:0.1}} BackOffPolicy:&{BackOffType:random CfgItems:map[max_ms:20 min_ms:10]} RetrySameNode:false IsResultRetry:<nil>})"
 	policyStr = fmt.Sprintf("WithFailureRetry(%+v)", *fp)
 	test.Assert(t, policyStr == expectPolicyStr, policyStr)
 
 	fp.WithRetrySameNode()
-	expectPolicyStr = "WithFailureRetry({StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:true DDLStop:true CBPolicy:{ErrorRate:0.1}} BackOffPolicy:&{BackOffType:random CfgItems:map[max_ms:20 min_ms:10]} RetrySameNode:true})"
+	expectPolicyStr = "WithFailureRetry({StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:true DDLStop:true CBPolicy:{ErrorRate:0.1}} BackOffPolicy:&{BackOffType:random CfgItems:map[max_ms:20 min_ms:10]} RetrySameNode:true IsResultRetry:<nil>})"
 	policyStr = fmt.Sprintf("WithFailureRetry(%+v)", *fp)
 	test.Assert(t, policyStr == expectPolicyStr, policyStr)
 
