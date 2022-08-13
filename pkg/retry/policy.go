@@ -73,6 +73,7 @@ type FailurePolicy struct {
 	StopPolicy    StopPolicy     `json:"stop_policy"`
 	BackOffPolicy *BackOffPolicy `json:"backoff_policy,omitempty"`
 	RetrySameNode bool           `json:"retry_same_node"`
+	IsResultRetry *IsResultRetry `json:"-"`
 }
 
 // BackupPolicy for backup request
@@ -169,7 +170,8 @@ func (p *FailurePolicy) Equals(np *FailurePolicy) bool {
 	if p.RetrySameNode != np.RetrySameNode {
 		return false
 	}
-
+	// don't need to check `IsResultRetry`, IsResultRetry is only setup by option
+	// in remote config case will always return false if check it
 	return true
 }
 

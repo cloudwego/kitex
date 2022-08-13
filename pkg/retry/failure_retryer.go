@@ -32,13 +32,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-func newFailureRetryer(policy Policy, r *IsResultRetry, cbC *cbContainer) (Retryer, error) {
+func newFailureRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
 	fr := &failureRetryer{cbContainer: cbC}
-	if r == nil {
-		fr.isResultRetry = IsResultRetry{}
-	} else {
-		fr.isResultRetry = *r
-	}
 	if err := fr.UpdatePolicy(policy); err != nil {
 		return nil, fmt.Errorf("newfailureRetryer failed, err=%w", err)
 	}
@@ -52,8 +47,6 @@ type failureRetryer struct {
 	cbContainer *cbContainer
 	sync.RWMutex
 	errMsg string
-
-	isResultRetry IsResultRetry
 }
 
 // ShouldRetry implements the Retryer interface.
@@ -140,7 +133,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			circuitbreak.RecordStat(ctx, req, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 		}
 		if err == nil {
-			if r.isResultRetry.IsRespRetry != nil && r.isResultRetry.IsRespRetry(resp, cRI) {
+			if r.policy.IsResultRetry.IsRespRetry != nil && r.policy.IsResultRetry.IsRespRetry(resp, cRI) {
 				// user specified resp to do retry
 				continue
 			}
@@ -186,6 +179,10 @@ func (r *failureRetryer) UpdatePolicy(rp Policy) (err error) {
 		errMsg = fmt.Sprintf("invalid failure MaxRetryTimes[%d]", rt)
 		err = errors.New(errMsg)
 	}
+	if rp.FailurePolicy.IsResultRetry == nil {
+		// FailurePolicy.IsResultRetry cannot be nil
+		rp.FailurePolicy.IsResultRetry = &IsResultRetry{}
+	}
 	if errMsg == "" {
 		if e := checkCBErrorRate(&rp.FailurePolicy.StopPolicy.CBPolicy); e != nil {
 			rp.FailurePolicy.StopPolicy.CBPolicy.ErrorRate = defaultCBErrRate
@@ -223,23 +220,6 @@ func (r *failureRetryer) Prepare(ctx context.Context, prevRI, retryRI rpcinfo.RP
 	handleRetryInstance(r.policy.RetrySameNode, prevRI, retryRI)
 }
 
-// Dump implements the Retryer interface.
-func (r *failureRetryer) Dump() map[string]interface{} {
-	r.RLock()
-	defer r.RUnlock()
-	dm := make(map[string]interface{})
-	dm["enable"] = r.enable
-	dm["failure_retry"] = r.policy
-	dm["specified_result_retry"] = map[string]bool{
-		"error_retry": r.isResultRetry.IsErrorRetry != nil,
-		"resp_retry":  r.isResultRetry.IsRespRetry != nil,
-	}
-	if r.errMsg != "" {
-		dm["errMsg"] = r.errMsg
-	}
-	return dm
-}
-
 func (r *failureRetryer) isRetryErr(err error, ri rpcinfo.RPCInfo) bool {
 	if err == nil {
 		return false
@@ -252,7 +232,7 @@ func (r *failureRetryer) isRetryErr(err error, ri rpcinfo.RPCInfo) bool {
 	if kerrors.IsTimeoutError(err) {
 		return true
 	}
-	if r.isResultRetry.IsErrorRetry != nil && r.isResultRetry.IsErrorRetry(err, ri) {
+	if r.policy.IsResultRetry.IsErrorRetry != nil && r.policy.IsResultRetry.IsErrorRetry(err, ri) {
 		return true
 	}
 	return false
@@ -296,4 +276,21 @@ func initBackOff(policy *BackOffPolicy) (bo BackOff, err error) {
 // Type implements the Retryer interface.
 func (r *failureRetryer) Type() Type {
 	return FailureType
+}
+
+// Dump implements the Retryer interface.
+func (r *failureRetryer) Dump() map[string]interface{} {
+	r.RLock()
+	defer r.RUnlock()
+	dm := make(map[string]interface{})
+	dm["enable"] = r.enable
+	dm["failure_retry"] = r.policy
+	dm["specified_result_retry"] = map[string]bool{
+		"error_retry": r.policy.IsResultRetry.IsErrorRetry != nil,
+		"resp_retry":  r.policy.IsResultRetry.IsRespRetry != nil,
+	}
+	if r.errMsg != "" {
+		dm["errMsg"] = r.errMsg
+	}
+	return dm
 }

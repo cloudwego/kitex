@@ -111,7 +111,19 @@ func TestFailureRetryPolicy(t *testing.T) {
 
 	// case 8
 	test.Assert(t, fp.String() == "{StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:true "+
-		"DDLStop:false CBPolicy:{ErrorRate:0.1}} BackOffPolicy:<nil> RetrySameNode:false}", fp)
+		"DDLStop:false CBPolicy:{ErrorRate:0.1}} BackOffPolicy:<nil> RetrySameNode:false IsResultRetry:<nil>}", fp)
+
+	// case 9
+	fp.WithSpecifiedResultRetry(&IsResultRetry{IsErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+		return false
+	}})
+	jsonRet, err = jsoni.MarshalToString(fp)
+	test.Assert(t, err == nil, err)
+	var fp9 FailurePolicy
+	err = jsoni.UnmarshalFromString(jsonRet, &fp9)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, fp.Equals(&fp9), fp9)
+	test.Assert(t, fp9.IsResultRetry == nil)
 }
 
 // test new backupPolicy

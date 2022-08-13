@@ -352,7 +352,7 @@ func WithBackupRequest(p *retry.BackupPolicy) Option {
 }
 
 // WithRetryMethodPolicies sets the retry policy for method.
-// The priority is higher than WithFailureRetry and WithBackupRequest. Only the methods which are not be included by
+// The priority is higher than WithFailureRetry and WithBackupRequest. Only the methods which are not included by
 // this config will use the policy that is configured by WithFailureRetry or WithBackupRequest .
 // FailureRetry and BackupRequest can be set for different method at same time.
 // Notice: method name is case-sensitive, it should be same with the definition in IDL.

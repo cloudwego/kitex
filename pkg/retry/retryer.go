@@ -218,7 +218,12 @@ func NewRetryer(p Policy, r *IsResultRetry, cbC *cbContainer) (retryer Retryer, 
 	if p.Type == BackupType {
 		retryer, err = newBackupRetryer(p, cbC)
 	} else {
-		retryer, err = newFailureRetryer(p, r, cbC)
+		if p.FailurePolicy != nil && p.FailurePolicy.IsResultRetry == nil {
+			// the IsResultRetry priority of that config inside FailurePolicy is
+			// higher than config by`WithSpecifiedResultRetry` option
+			p.FailurePolicy.IsResultRetry = r
+		}
+		retryer, err = newFailureRetryer(p, cbC)
 	}
 	return
 }
@@ -275,8 +280,8 @@ func (rc *Container) updateRetryer() {
 	defer rc.Unlock()
 	if rc.isResultRetry != nil {
 		rc.retryerMap.Range(func(key, value interface{}) bool {
-			if fr, ok := value.(*failureRetryer); ok {
-				fr.isResultRetry = *rc.isResultRetry
+			if fr, ok := value.(*failureRetryer); ok && fr.policy.IsResultRetry == nil {
+				fr.policy.IsResultRetry = rc.isResultRetry
 			}
 			return true
 		})

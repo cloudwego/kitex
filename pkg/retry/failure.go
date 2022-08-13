@@ -95,9 +95,16 @@ func (p *FailurePolicy) WithRetrySameNode() {
 	p.RetrySameNode = true
 }
 
+// WithDDLStop sets ddl stop to true.
+func (p *FailurePolicy) WithSpecifiedResultRetry(rr *IsResultRetry) {
+	if rr != nil {
+		p.IsResultRetry = rr
+	}
+}
+
 // String prints human readable information.
 func (p FailurePolicy) String() string {
-	return fmt.Sprintf("{StopPolicy:%+v BackOffPolicy:%+v RetrySameNode:%+v}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode)
+	return fmt.Sprintf("{StopPolicy:%+v BackOffPolicy:%+v RetrySameNode:%+v IsResultRetry:%+v}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode, p.IsResultRetry)
 }
 
 // BackOff is the interface of back off implements
