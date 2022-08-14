@@ -469,7 +469,15 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 	err = rc.Init(map[string]Policy{method: BuildFailurePolicy(NewFailurePolicy())}, isResultRetry)
 	test.Assert(t, err == nil, err)
 	ok, err = rc.WithRetryIfNeeded(ctx, Policy{}, retryWithTransError, ri, nil)
-	test.Assert(t, err != nil, err)
+	test.Assert(t, err != nil)
+	test.Assert(t, !ok)
+
+	// case4: all error retry
+	callTimes = 0
+	rc = NewRetryContainer()
+	p := BuildFailurePolicy(NewFailurePolicyWithResultRetry(AllErrorRetry()))
+	ok, err = rc.WithRetryIfNeeded(ctx, p, retryWithTransError, ri, nil)
+	test.Assert(t, err == nil, err)
 	test.Assert(t, !ok)
 }
 

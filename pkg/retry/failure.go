@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/bytedance/gopkg/lang/fastrand"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 const maxFailureRetryTimes = 5
@@ -113,6 +114,13 @@ func (p *FailurePolicy) WithSpecifiedResultRetry(rr *IsResultRetry) {
 func (p FailurePolicy) String() string {
 	return fmt.Sprintf("{StopPolicy:%+v BackOffPolicy:%+v RetrySameNode:%+v "+
 		"IsResultRetry:{IsErrorRetry:%t, IsResultRetry:%t}}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode, p.IsErrorRetryNonNil(), p.IsRespRetryNonNil())
+}
+
+// AllErrorRetry is common choice for IsResultRetry.
+func AllErrorRetry() *IsResultRetry {
+	return &IsResultRetry{IsErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+		return err != nil
+	}}
 }
 
 // BackOff is the interface of back off implements
