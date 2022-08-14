@@ -76,6 +76,22 @@ type FailurePolicy struct {
 	IsResultRetry *IsResultRetry `json:"-"`
 }
 
+// IsRespRetryNonNil is used to judge if IsRespRetry is nil
+func (p FailurePolicy) IsRespRetryNonNil() bool {
+	if p.IsResultRetry != nil && p.IsResultRetry.IsRespRetry != nil {
+		return true
+	}
+	return false
+}
+
+// IsErrorRetryNonNil is used to judge if IsErrorRetry is nil
+func (p FailurePolicy) IsErrorRetryNonNil() bool {
+	if p.IsResultRetry != nil && p.IsResultRetry.IsErrorRetry != nil {
+		return true
+	}
+	return false
+}
+
 // BackupPolicy for backup request
 type BackupPolicy struct {
 	RetryDelayMS  uint32     `json:"retry_delay_ms"`

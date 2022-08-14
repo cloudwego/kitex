@@ -133,7 +133,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			circuitbreak.RecordStat(ctx, req, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 		}
 		if err == nil {
-			if r.policy.IsResultRetry.IsRespRetry != nil && r.policy.IsResultRetry.IsRespRetry(resp, cRI) {
+			if r.policy.IsRespRetryNonNil() && r.policy.IsResultRetry.IsRespRetry(resp, cRI) {
 				// user specified resp to do retry
 				continue
 			}
@@ -178,10 +178,6 @@ func (r *failureRetryer) UpdatePolicy(rp Policy) (err error) {
 	if errMsg == "" && (rt < 0 || rt > maxFailureRetryTimes) {
 		errMsg = fmt.Sprintf("invalid failure MaxRetryTimes[%d]", rt)
 		err = errors.New(errMsg)
-	}
-	if rp.FailurePolicy.IsResultRetry == nil {
-		// FailurePolicy.IsResultRetry cannot be nil
-		rp.FailurePolicy.IsResultRetry = &IsResultRetry{}
 	}
 	if errMsg == "" {
 		if e := checkCBErrorRate(&rp.FailurePolicy.StopPolicy.CBPolicy); e != nil {
@@ -232,7 +228,7 @@ func (r *failureRetryer) isRetryErr(err error, ri rpcinfo.RPCInfo) bool {
 	if kerrors.IsTimeoutError(err) {
 		return true
 	}
-	if r.policy.IsResultRetry.IsErrorRetry != nil && r.policy.IsResultRetry.IsErrorRetry(err, ri) {
+	if r.policy.IsErrorRetryNonNil() && r.policy.IsResultRetry.IsErrorRetry(err, ri) {
 		return true
 	}
 	return false
@@ -286,8 +282,8 @@ func (r *failureRetryer) Dump() map[string]interface{} {
 	dm["enable"] = r.enable
 	dm["failure_retry"] = r.policy
 	dm["specified_result_retry"] = map[string]bool{
-		"error_retry": r.policy.IsResultRetry.IsErrorRetry != nil,
-		"resp_retry":  r.policy.IsResultRetry.IsRespRetry != nil,
+		"error_retry": r.policy.IsErrorRetryNonNil(),
+		"resp_retry":  r.policy.IsRespRetryNonNil(),
 	}
 	if r.errMsg != "" {
 		dm["errMsg"] = r.errMsg

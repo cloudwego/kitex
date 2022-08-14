@@ -245,10 +245,11 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) 
 }
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
-func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo) {
+func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
 	cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
 	rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, method)
-	ctx = kc.applyCallOptions(ctx, cfg, rmt)
+	var callOpts *callopt.CallOptions
+	ctx, callOpts = kc.applyCallOptions(ctx, cfg, rmt)
 	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 	if kc.opt.StatsLevel != nil {
 		rpcStats.SetLevel(*kc.opt.StatsLevel)
@@ -276,18 +277,18 @@ func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Cont
 	}
 
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	return ctx, ri
+	return ctx, ri, callOpts
 }
 
-func (kc *kClient) applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo) context.Context {
+func (kc *kClient) applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo) (context.Context, *callopt.CallOptions) {
 	cos := CallOptionsFromCtx(ctx)
 	if len(cos) > 0 {
-		info := callopt.Apply(cos, cfg, svr, kc.opt.Locks, kc.opt.HTTPResolver)
+		info, callOpts := callopt.Apply(cos, cfg, svr, kc.opt.Locks, kc.opt.HTTPResolver)
 		ctx = context.WithValue(ctx, ctxCallOptionInfoKey, info)
-	} else {
-		kc.opt.Locks.ApplyLocks(cfg, svr)
+		return ctx, callOpts
 	}
-	return ctx
+	kc.opt.Locks.ApplyLocks(cfg, svr)
+	return ctx, nil
 }
 
 // Call implements the Client interface .
@@ -302,27 +303,37 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		panic("ctx is nil")
 	}
 	var ri rpcinfo.RPCInfo
-	ctx, ri = kc.initRPCInfo(ctx, method)
+	var callOpts *callopt.CallOptions
+	ctx, ri, callOpts = kc.initRPCInfo(ctx, method)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 
+	var callOptRetry retry.Policy
+	if callOpts != nil && callOpts.RetryPolicy.Enable {
+		callOptRetry = callOpts.RetryPolicy
+	}
 	if kc.opt.RetryContainer == nil {
-		err := kc.eps(ctx, request, response)
-		kc.opt.TracerCtl.DoFinish(ctx, ri, err)
-		if err == nil {
-			rpcinfo.PutRPCInfo(ri)
+		if callOptRetry.Enable {
+			// setup retry in callopt
+			kc.opt.RetryContainer = retry.NewRetryContainer()
+		} else {
+			err := kc.eps(ctx, request, response)
+			kc.opt.TracerCtl.DoFinish(ctx, ri, err)
+			if err == nil {
+				rpcinfo.PutRPCInfo(ri)
+			}
+			return err
 		}
-		return err
 	}
 
 	var callTimes int32
 	var prevRI rpcinfo.RPCInfo
-	recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+	recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
 		retryCtx := ctx
 		cRI := ri
 		if currCallTimes > 1 {
-			retryCtx, cRI = kc.initRPCInfo(ctx, method)
+			retryCtx, cRI, _ = kc.initRPCInfo(ctx, method)
 			retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
 			if prevRI == nil {
 				prevRI = ri
@@ -335,6 +346,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}, ri, request)
 
 	kc.opt.TracerCtl.DoFinish(ctx, ri, err)
+	callOpts.Recycle()
 	if recycleRI {
 		// why need check recycleRI to decide if recycle RPCInfo?
 		// 1. no retry, rpc timeout happen will cause panic when response return
@@ -506,7 +518,7 @@ func (kc *kClient) warmingUp() error {
 		// build a default destination for the resolver
 		cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
 		rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, "*")
-		ctx = kc.applyCallOptions(ctx, cfg, rmt)
+		ctx, _ = kc.applyCallOptions(ctx, cfg, rmt)
 		dests = append(dests, rmt.ImmutableView())
 	}
 

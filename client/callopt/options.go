@@ -37,16 +37,18 @@ var callOptionsPool = sync.Pool{
 	New: newOptions,
 }
 
-type callOptions struct {
+type CallOptions struct {
 	configs      rpcinfo.MutableRPCConfig
 	svr          remoteinfo.RemoteInfo
 	locks        *client.ConfigLocks
 	httpResolver http.Resolver
-	retryPolicy  retry.Policy
+
+	// export field for using in client
+	RetryPolicy retry.Policy
 }
 
 func newOptions() interface{} {
-	return &callOptions{
+	return &CallOptions{
 		locks: &client.ConfigLocks{
 			Tags: make(map[string]struct{}),
 		},
@@ -54,23 +56,26 @@ func newOptions() interface{} {
 }
 
 // Recycle zeros the call option and put it to the pool.
-func (co *callOptions) Recycle() {
+func (co *CallOptions) Recycle() {
+	if co == nil {
+		return
+	}
 	co.configs = nil
 	co.svr = nil
-	co.retryPolicy = retry.Policy{}
+	co.RetryPolicy = retry.Policy{}
 	co.locks.Zero()
 	callOptionsPool.Put(co)
 }
 
 // Option is a series of options used at the beginning of a RPC call.
 type Option struct {
-	f func(o *callOptions, di *strings.Builder)
+	f func(o *CallOptions, di *strings.Builder)
 }
 
 // WithHostPort specifies the target address for a RPC call.
 // The given address will overwrite the result from Resolver.
 func WithHostPort(hostport string) Option {
-	return Option{func(o *callOptions, di *strings.Builder) {
+	return Option{func(o *CallOptions, di *strings.Builder) {
 		di.WriteString("WithHostPort(")
 		di.WriteString(hostport)
 		di.WriteString("),")
@@ -95,7 +100,7 @@ func setInstance(svr remoteinfo.RemoteInfo, hostport string) error {
 // WithURL specifies the target for a RPC call with url.
 // The given url will be resolved to hostport and overwrites the result from Resolver.
 func WithURL(url string) Option {
-	return Option{func(o *callOptions, di *strings.Builder) {
+	return Option{func(o *CallOptions, di *strings.Builder) {
 		di.WriteString("WithURL(")
 		di.WriteString(url)
 		di.WriteString("),")
@@ -114,7 +119,7 @@ func WithURL(url string) Option {
 
 // WithHTTPHost specifies host in http header(work when RPC over http).
 func WithHTTPHost(host string) Option {
-	return Option{func(o *callOptions, di *strings.Builder) {
+	return Option{func(o *CallOptions, di *strings.Builder) {
 		o.svr.SetTag(rpcinfo.HTTPHost, host)
 	}}
 }
@@ -123,7 +128,7 @@ func WithHTTPHost(host string) Option {
 // FIXME: callopt.WithRPCTimeout works only when client.WithRPCTimeout or
 // client.WithTimeoutProvider is specified.
 func WithRPCTimeout(d time.Duration) Option {
-	return Option{func(o *callOptions, di *strings.Builder) {
+	return Option{func(o *CallOptions, di *strings.Builder) {
 		di.WriteString("WithRPCTimeout(")
 		utils.WriteInt64ToStringBuilder(di, d.Milliseconds())
 		di.WriteString("ms)")
@@ -139,7 +144,7 @@ func WithRPCTimeout(d time.Duration) Option {
 
 // WithConnectTimeout specifies the connection timeout for a RPC call.
 func WithConnectTimeout(d time.Duration) Option {
-	return Option{func(o *callOptions, di *strings.Builder) {
+	return Option{func(o *CallOptions, di *strings.Builder) {
 		di.WriteString("WithConnectTimeout(")
 		utils.WriteInt64ToStringBuilder(di, d.Milliseconds())
 		di.WriteString("ms)")
@@ -151,7 +156,7 @@ func WithConnectTimeout(d time.Duration) Option {
 
 // WithTag sets the tags for service discovery for a RPC call.
 func WithTag(key, val string) Option {
-	return Option{f: func(o *callOptions, di *strings.Builder) {
+	return Option{f: func(o *CallOptions, di *strings.Builder) {
 		di.WriteString("WithTag")
 		di.WriteByte('(')
 		di.WriteString(key)
@@ -164,13 +169,36 @@ func WithTag(key, val string) Option {
 	}}
 }
 
+// WithRetryPolicy sets the retry policy for a RPC call.
+// Build retry.Policy with retry.BuildFailurePolicy or retry.BuildBackupRequest instead of building retry.Policy directly.
+// Below is use demo, eg:
+//   demo1. call with failure retry policy, default retry error is Timeout
+//   	resp, err := cli.Mock(ctx, req, callopt.WithRetryPolicy(retry.BuildFailurePolicy(retry.NewFailurePolicy())))
+//   demo2. call with backup request policy
+//   	bp := retry.NewBackupPolicy(10)
+//	 	bp.WithMaxRetryTimes(1)
+//   	resp, err := cli.Mock(ctx, req, callopt.WithRetryPolicy(retry.BuildBackupRequest(bp)))
+func WithRetryPolicy(p retry.Policy) Option {
+	return Option{f: func(o *CallOptions, di *strings.Builder) {
+		if !p.Enable {
+			return
+		}
+		if p.Type == retry.BackupType {
+			di.WriteString("WithBackupRequest")
+		} else {
+			di.WriteString("WithFailureRetry")
+		}
+		o.RetryPolicy = p
+	}}
+}
+
 // Apply applies call options to the rpcinfo.RPCConfig and internal.RemoteInfo of kitex client.
 // The return value records the name and arguments of each option.
 // This function is for internal purpose only.
-func Apply(cos []Option, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo, locks *client.ConfigLocks, httpResolver http.Resolver) string {
+func Apply(cos []Option, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo, locks *client.ConfigLocks, httpResolver http.Resolver) (string, *CallOptions) {
 	var buf strings.Builder
 
-	co := callOptionsPool.Get().(*callOptions)
+	co := callOptionsPool.Get().(*CallOptions)
 	co.configs = cfg
 	co.svr = svr
 	co.locks.Merge(locks)
@@ -186,6 +214,5 @@ func Apply(cos []Option, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo
 	buf.WriteByte(']')
 
 	co.locks.ApplyLocks(cfg, svr)
-	co.Recycle()
-	return buf.String()
+	return buf.String(), co
 }

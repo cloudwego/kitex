@@ -25,7 +25,7 @@ import (
 
 const maxFailureRetryTimes = 5
 
-// NewFailurePolicy init failure retry policy
+// NewFailurePolicy init default failure retry policy
 func NewFailurePolicy() *FailurePolicy {
 	p := &FailurePolicy{
 		StopPolicy: StopPolicy{
@@ -38,6 +38,13 @@ func NewFailurePolicy() *FailurePolicy {
 		BackOffPolicy: &BackOffPolicy{BackOffType: NoneBackOffType},
 	}
 	return p
+}
+
+// NewFailurePolicyWithResultRetry init failure retry policy with IsResultRetry
+func NewFailurePolicyWithResultRetry(rr *IsResultRetry) *FailurePolicy {
+	fp := NewFailurePolicy()
+	fp.IsResultRetry = rr
+	return fp
 }
 
 // WithMaxRetryTimes default is 2, not include first call
@@ -95,7 +102,7 @@ func (p *FailurePolicy) WithRetrySameNode() {
 	p.RetrySameNode = true
 }
 
-// WithDDLStop sets ddl stop to true.
+// WithSpecifiedResultRetry sets customized IsResultRetry.
 func (p *FailurePolicy) WithSpecifiedResultRetry(rr *IsResultRetry) {
 	if rr != nil {
 		p.IsResultRetry = rr
@@ -104,7 +111,8 @@ func (p *FailurePolicy) WithSpecifiedResultRetry(rr *IsResultRetry) {
 
 // String prints human readable information.
 func (p FailurePolicy) String() string {
-	return fmt.Sprintf("{StopPolicy:%+v BackOffPolicy:%+v RetrySameNode:%+v IsResultRetry:%+v}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode, p.IsResultRetry)
+	return fmt.Sprintf("{StopPolicy:%+v BackOffPolicy:%+v RetrySameNode:%+v "+
+		"IsResultRetry:{IsErrorRetry:%t, IsResultRetry:%t}}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode, p.IsErrorRetryNonNil(), p.IsRespRetryNonNil())
 }
 
 // BackOff is the interface of back off implements

@@ -172,8 +172,17 @@ func (rc *Container) Init(mp map[string]Policy, rr *IsResultRetry) (err error) {
 
 // WithRetryIfNeeded to check if there is a retryer can be used and if current call can retry.
 // When the retry condition is satisfied, use retryer to call
-func (rc *Container) WithRetryIfNeeded(ctx context.Context, rpcCall RPCCallFunc, ri rpcinfo.RPCInfo, request interface{}) (recycleRI bool, err error) {
-	retryer := rc.getRetryer(ri)
+func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry Policy, rpcCall RPCCallFunc, ri rpcinfo.RPCInfo, request interface{}) (recycleRI bool, err error) {
+	var retryer Retryer
+	if callOptRetry.Enable {
+		// build retryer for call level if retry policy is set up with callopt
+		if retryer, err = NewRetryer(callOptRetry, nil, rc.cbContainer); err != nil {
+			klog.Warnf("KITEX: new callopt retryer[%s] failed, err=%w", callOptRetry.Type, err)
+		}
+	} else {
+		retryer = rc.getRetryer(ri)
+	}
+
 	// case 1(default): no retry policy
 	if retryer == nil {
 		if _, _, err = rpcCall(ctx, nil); err == nil {
