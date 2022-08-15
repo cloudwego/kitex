@@ -162,8 +162,7 @@ func WithExitSignal(f func() <-chan error) Option {
 	}}
 }
 
-// WithListener sets the listener for server, which is used for customized need to listen addr,
-// the priority is higher than WithServiceAddr
+// WithListener sets the listener for server, the priority is higher than WithServiceAddr
 func WithListener(ln net.Listener) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithListener(%+v)", ln))
@@ -173,7 +172,7 @@ func WithListener(ln net.Listener) Option {
 }
 
 // WithReusePort sets SO_REUSEPORT on listener, it is only used with Option `WithServiceAddr`.
-// It cannot be effective for specifying Listener by `WithListener`.
+// It won't take effect when listener is specified by WithListener.
 func WithReusePort(reuse bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithReusePort(%+v)", reuse))
