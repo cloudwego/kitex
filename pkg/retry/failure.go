@@ -41,10 +41,10 @@ func NewFailurePolicy() *FailurePolicy {
 	return p
 }
 
-// NewFailurePolicyWithResultRetry init failure retry policy with IsResultRetry
-func NewFailurePolicyWithResultRetry(rr *IsResultRetry) *FailurePolicy {
+// NewFailurePolicyWithResultRetry init failure retry policy with ShouldResultRetry
+func NewFailurePolicyWithResultRetry(rr *ShouldResultRetry) *FailurePolicy {
 	fp := NewFailurePolicy()
-	fp.IsResultRetry = rr
+	fp.ShouldResultRetry = rr
 	return fp
 }
 
@@ -103,22 +103,22 @@ func (p *FailurePolicy) WithRetrySameNode() {
 	p.RetrySameNode = true
 }
 
-// WithSpecifiedResultRetry sets customized IsResultRetry.
-func (p *FailurePolicy) WithSpecifiedResultRetry(rr *IsResultRetry) {
+// WithSpecifiedResultRetry sets customized ShouldResultRetry.
+func (p *FailurePolicy) WithSpecifiedResultRetry(rr *ShouldResultRetry) {
 	if rr != nil {
-		p.IsResultRetry = rr
+		p.ShouldResultRetry = rr
 	}
 }
 
 // String prints human readable information.
 func (p FailurePolicy) String() string {
 	return fmt.Sprintf("{StopPolicy:%+v BackOffPolicy:%+v RetrySameNode:%+v "+
-		"IsResultRetry:{IsErrorRetry:%t, IsResultRetry:%t}}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode, p.IsErrorRetryNonNil(), p.IsRespRetryNonNil())
+		"ShouldResultRetry:{ErrorRetry:%t, ResultRetry:%t}}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode, p.IsErrorRetryNonNil(), p.IsRespRetryNonNil())
 }
 
-// AllErrorRetry is common choice for IsResultRetry.
-func AllErrorRetry() *IsResultRetry {
-	return &IsResultRetry{IsErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+// AllErrorRetry is common choice for ShouldResultRetry.
+func AllErrorRetry() *ShouldResultRetry {
+	return &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
 		return err != nil
 	}}
 }

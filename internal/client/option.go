@@ -96,7 +96,7 @@ type Options struct {
 	// retry policy
 	RetryMethodPolicies map[string]retry.Policy
 	RetryContainer      *retry.Container
-	RetryWithResult     *retry.IsResultRetry
+	RetryWithResult     *retry.ShouldResultRetry
 
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption

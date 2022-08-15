@@ -111,40 +111,40 @@ func TestFailureRetryPolicy(t *testing.T) {
 
 	// case 8
 	test.Assert(t, fp.String() == "{StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:true "+
-		"DDLStop:false CBPolicy:{ErrorRate:0.1}} BackOffPolicy:<nil> RetrySameNode:false IsResultRetry:{IsErrorRetry:false, IsResultRetry:false}}", fp)
+		"DDLStop:false CBPolicy:{ErrorRate:0.1}} BackOffPolicy:<nil> RetrySameNode:false ShouldResultRetry:{ErrorRetry:false, ResultRetry:false}}", fp)
 
 	// case 9
-	fp.WithSpecifiedResultRetry(&IsResultRetry{IsErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+	fp.WithSpecifiedResultRetry(&ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
 		return false
 	}})
 	test.Assert(t, fp.String() == "{StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:true "+
-		"DDLStop:false CBPolicy:{ErrorRate:0.1}} BackOffPolicy:<nil> RetrySameNode:false IsResultRetry:{IsErrorRetry:true, IsResultRetry:false}}", fp)
+		"DDLStop:false CBPolicy:{ErrorRate:0.1}} BackOffPolicy:<nil> RetrySameNode:false ShouldResultRetry:{ErrorRetry:true, ResultRetry:false}}", fp)
 	jsonRet, err = jsoni.MarshalToString(fp)
 	test.Assert(t, err == nil, err)
 	var fp9 FailurePolicy
 	err = jsoni.UnmarshalFromString(jsonRet, &fp9)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, fp.Equals(&fp9), fp9)
-	test.Assert(t, fp9.IsResultRetry == nil)
+	test.Assert(t, fp9.ShouldResultRetry == nil)
 }
 
 // test new failurePolicy with result retry
 func TestFailureRetryPolicyWithResultRetry(t *testing.T) {
-	fp := NewFailurePolicyWithResultRetry(&IsResultRetry{IsRespRetry: func(resp interface{}, ri rpcinfo.RPCInfo) bool {
+	fp := NewFailurePolicyWithResultRetry(&ShouldResultRetry{RespRetry: func(resp interface{}, ri rpcinfo.RPCInfo) bool {
 		return false
-	}, IsErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+	}, ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
 		return false
 	}})
 
 	test.Assert(t, fp.String() == "{StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:false DDLStop:false "+
-		"CBPolicy:{ErrorRate:0.1}} BackOffPolicy:&{BackOffType:none CfgItems:map[]} RetrySameNode:false IsResultRetry:{IsErrorRetry:true, IsResultRetry:true}}", fp)
+		"CBPolicy:{ErrorRate:0.1}} BackOffPolicy:&{BackOffType:none CfgItems:map[]} RetrySameNode:false ShouldResultRetry:{ErrorRetry:true, ResultRetry:true}}", fp)
 	jsonRet, err := jsoni.MarshalToString(fp)
 	test.Assert(t, err == nil, err)
 	var fp10 FailurePolicy
 	err = jsoni.UnmarshalFromString(jsonRet, &fp10)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, fp.Equals(&fp10), fp10)
-	test.Assert(t, fp10.IsResultRetry == nil)
+	test.Assert(t, fp10.ShouldResultRetry == nil)
 }
 
 // test new backupPolicy

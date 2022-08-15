@@ -133,7 +133,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			circuitbreak.RecordStat(ctx, req, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 		}
 		if err == nil {
-			if r.policy.IsRespRetryNonNil() && r.policy.IsResultRetry.IsRespRetry(resp, cRI) {
+			if r.policy.IsRespRetryNonNil() && r.policy.ShouldResultRetry.RespRetry(resp, cRI) {
 				// user specified resp to do retry
 				continue
 			}
@@ -228,7 +228,7 @@ func (r *failureRetryer) isRetryErr(err error, ri rpcinfo.RPCInfo) bool {
 	if kerrors.IsTimeoutError(err) {
 		return true
 	}
-	if r.policy.IsErrorRetryNonNil() && r.policy.IsResultRetry.IsErrorRetry(err, ri) {
+	if r.policy.IsErrorRetryNonNil() && r.policy.ShouldResultRetry.ErrorRetry(err, ri) {
 		return true
 	}
 	return false

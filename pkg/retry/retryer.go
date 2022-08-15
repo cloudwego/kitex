@@ -96,8 +96,8 @@ type Container struct {
 	msg         string
 	sync.Mutex
 
-	// isResultRetry is only used with FailureRetry
-	isResultRetry *IsResultRetry
+	// shouldResultRetry is only used with FailureRetry
+	shouldResultRetry *ShouldResultRetry
 }
 
 type cbContainer struct {
@@ -155,11 +155,11 @@ func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 }
 
 // Init to build Retryer with code config.
-func (rc *Container) Init(mp map[string]Policy, rr *IsResultRetry) (err error) {
-	rc.isResultRetry = rr
+func (rc *Container) Init(mp map[string]Policy, rr *ShouldResultRetry) (err error) {
+	rc.shouldResultRetry = rr
 	// NotifyPolicyChange func may execute before Init func.
 	// Because retry Container is built before Client init, NotifyPolicyChange can be triggered first
-	// Notice, updateRetryer must be called after isResultRetry is set
+	// Notice, updateRetryer must be called after shouldResultRetry is set
 	rc.updateRetryer()
 
 	rc.hasCodeCfg, err = rc.InitWithPolicies(mp)
@@ -219,7 +219,7 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry Policy,
 }
 
 // NewRetryer build a retryer with policy
-func NewRetryer(p Policy, r *IsResultRetry, cbC *cbContainer) (retryer Retryer, err error) {
+func NewRetryer(p Policy, r *ShouldResultRetry, cbC *cbContainer) (retryer Retryer, err error) {
 	if !p.Enable {
 		return nil, nil
 	}
@@ -227,10 +227,10 @@ func NewRetryer(p Policy, r *IsResultRetry, cbC *cbContainer) (retryer Retryer, 
 	if p.Type == BackupType {
 		retryer, err = newBackupRetryer(p, cbC)
 	} else {
-		if p.FailurePolicy != nil && p.FailurePolicy.IsResultRetry == nil {
-			// the IsResultRetry priority of that config inside FailurePolicy is
+		if p.FailurePolicy != nil && p.FailurePolicy.ShouldResultRetry == nil {
+			// the ShouldResultRetry priority of that config inside FailurePolicy is
 			// higher than config by`WithSpecifiedResultRetry` option
-			p.FailurePolicy.IsResultRetry = r
+			p.FailurePolicy.ShouldResultRetry = r
 		}
 		retryer, err = newFailureRetryer(p, cbC)
 	}
@@ -267,7 +267,7 @@ func (rc *Container) Dump() interface{} {
 }
 
 func (rc *Container) initRetryer(method string, p Policy) error {
-	retryer, err := NewRetryer(p, rc.isResultRetry, rc.cbContainer)
+	retryer, err := NewRetryer(p, rc.shouldResultRetry, rc.cbContainer)
 	if err != nil {
 		errMsg := fmt.Sprintf("new retryer[%s-%s] failed, err=%s, at %s", method, p.Type, err.Error(), time.Now())
 		rc.msg = errMsg
@@ -287,10 +287,10 @@ func (rc *Container) initRetryer(method string, p Policy) error {
 func (rc *Container) updateRetryer() {
 	rc.Lock()
 	defer rc.Unlock()
-	if rc.isResultRetry != nil {
+	if rc.shouldResultRetry != nil {
 		rc.retryerMap.Range(func(key, value interface{}) bool {
-			if fr, ok := value.(*failureRetryer); ok && fr.policy.IsResultRetry == nil {
-				fr.policy.IsResultRetry = rc.isResultRetry
+			if fr, ok := value.(*failureRetryer); ok && fr.policy.ShouldResultRetry == nil {
+				fr.policy.ShouldResultRetry = rc.shouldResultRetry
 			}
 			return true
 		})

@@ -70,23 +70,23 @@ type Policy struct {
 
 // FailurePolicy for failure retry
 type FailurePolicy struct {
-	StopPolicy    StopPolicy     `json:"stop_policy"`
-	BackOffPolicy *BackOffPolicy `json:"backoff_policy,omitempty"`
-	RetrySameNode bool           `json:"retry_same_node"`
-	IsResultRetry *IsResultRetry `json:"-"`
+	StopPolicy        StopPolicy         `json:"stop_policy"`
+	BackOffPolicy     *BackOffPolicy     `json:"backoff_policy,omitempty"`
+	RetrySameNode     bool               `json:"retry_same_node"`
+	ShouldResultRetry *ShouldResultRetry `json:"-"`
 }
 
-// IsRespRetryNonNil is used to judge if IsRespRetry is nil
+// IsRespRetryNonNil is used to judge if RespRetry is nil
 func (p FailurePolicy) IsRespRetryNonNil() bool {
-	if p.IsResultRetry != nil && p.IsResultRetry.IsRespRetry != nil {
+	if p.ShouldResultRetry != nil && p.ShouldResultRetry.RespRetry != nil {
 		return true
 	}
 	return false
 }
 
-// IsErrorRetryNonNil is used to judge if IsErrorRetry is nil
+// IsErrorRetryNonNil is used to judge if ErrorRetry is nil
 func (p FailurePolicy) IsErrorRetryNonNil() bool {
-	if p.IsResultRetry != nil && p.IsResultRetry.IsErrorRetry != nil {
+	if p.ShouldResultRetry != nil && p.ShouldResultRetry.ErrorRetry != nil {
 		return true
 	}
 	return false
@@ -146,10 +146,10 @@ const (
 	MultiplierBackOffCfgKey BackOffCfgKey = "multiplier"
 )
 
-// IsResultRetry is the param of `WithSpecifiedResultRetry`, it is used for specifying which error or resp need to be retried
-type IsResultRetry struct {
-	IsErrorRetry func(err error, ri rpcinfo.RPCInfo) bool
-	IsRespRetry  func(resp interface{}, ri rpcinfo.RPCInfo) bool
+// ShouldResultRetry is the param of `WithSpecifiedResultRetry`, it is used for specifying which error or resp need to be retried
+type ShouldResultRetry struct {
+	ErrorRetry func(err error, ri rpcinfo.RPCInfo) bool
+	RespRetry  func(resp interface{}, ri rpcinfo.RPCInfo) bool
 }
 
 // Equals to check if policy is equal
@@ -186,7 +186,7 @@ func (p *FailurePolicy) Equals(np *FailurePolicy) bool {
 	if p.RetrySameNode != np.RetrySameNode {
 		return false
 	}
-	// don't need to check `IsResultRetry`, IsResultRetry is only setup by option
+	// don't need to check `ShouldResultRetry`, ShouldResultRetry is only setup by option
 	// in remote config case will always return false if check it
 	return true
 }

@@ -424,7 +424,7 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	// case1: specified method retry with error
 	rc := NewRetryContainer()
-	isResultRetry := &IsResultRetry{IsErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+	shouldResultRetry := &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
 		if ri.To().Method() == method {
 			if te, ok := err.(*remote.TransError); ok && te.TypeID() == 1000 {
 				return true
@@ -432,7 +432,7 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 		}
 		return false
 	}}
-	err := rc.Init(map[string]Policy{Wildcard: BuildFailurePolicy(NewFailurePolicy())}, isResultRetry)
+	err := rc.Init(map[string]Policy{Wildcard: BuildFailurePolicy(NewFailurePolicy())}, shouldResultRetry)
 	test.Assert(t, err == nil, err)
 	ok, err := rc.WithRetryIfNeeded(ctx, Policy{}, retryWithTransError, ri, nil)
 	test.Assert(t, err == nil, err)
@@ -440,7 +440,7 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 
 	// case2: specified method retry with error, but use backup request config cannot be effective
 	callTimes = 0
-	isResultRetry = &IsResultRetry{IsErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+	shouldResultRetry = &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
 		if ri.To().Method() == method {
 			if te, ok := err.(*remote.TransError); ok && te.TypeID() == 1000 {
 				return true
@@ -449,7 +449,7 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 		return false
 	}}
 	rc = NewRetryContainer()
-	err = rc.Init(map[string]Policy{Wildcard: BuildBackupRequest(NewBackupPolicy(10))}, isResultRetry)
+	err = rc.Init(map[string]Policy{Wildcard: BuildBackupRequest(NewBackupPolicy(10))}, shouldResultRetry)
 	test.Assert(t, err == nil, err)
 	ok, err = rc.WithRetryIfNeeded(ctx, Policy{}, retryWithTransError, ri, nil)
 	test.Assert(t, err != nil, err)
@@ -457,7 +457,7 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 
 	// case3: specified method retry with error, but method not match
 	callTimes = 0
-	isResultRetry = &IsResultRetry{IsErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+	shouldResultRetry = &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
 		if ri.To().Method() != method {
 			if te, ok := err.(*remote.TransError); ok && te.TypeID() == 1000 {
 				return true
@@ -466,7 +466,7 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 		return false
 	}}
 	rc = NewRetryContainer()
-	err = rc.Init(map[string]Policy{method: BuildFailurePolicy(NewFailurePolicy())}, isResultRetry)
+	err = rc.Init(map[string]Policy{method: BuildFailurePolicy(NewFailurePolicy())}, shouldResultRetry)
 	test.Assert(t, err == nil, err)
 	ok, err = rc.WithRetryIfNeeded(ctx, Policy{}, retryWithTransError, ri, nil)
 	test.Assert(t, err != nil)
@@ -508,7 +508,7 @@ func TestSpecifiedRespRetry(t *testing.T) {
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 	rc := NewRetryContainer()
 	// case1: specified method retry with resp
-	isResultRetry := &IsResultRetry{IsRespRetry: func(resp interface{}, ri rpcinfo.RPCInfo) bool {
+	shouldResultRetry := &ShouldResultRetry{RespRetry: func(resp interface{}, ri rpcinfo.RPCInfo) bool {
 		if ri.To().Method() == method {
 			if r, ok := resp.(*mockResult); ok && r.GetResult() == retryResp {
 				return true
@@ -516,7 +516,7 @@ func TestSpecifiedRespRetry(t *testing.T) {
 		}
 		return false
 	}}
-	err := rc.Init(map[string]Policy{Wildcard: BuildFailurePolicy(NewFailurePolicy())}, isResultRetry)
+	err := rc.Init(map[string]Policy{Wildcard: BuildFailurePolicy(NewFailurePolicy())}, shouldResultRetry)
 	test.Assert(t, err == nil, err)
 	ok, err := rc.WithRetryIfNeeded(ctx, Policy{}, retryWithResp, ri, nil)
 	test.Assert(t, err == nil, err)
@@ -526,7 +526,7 @@ func TestSpecifiedRespRetry(t *testing.T) {
 	// case2 specified method retry with resp, but use backup request config cannot be effective
 	callTimes = 0
 	rc = NewRetryContainer()
-	err = rc.Init(map[string]Policy{Wildcard: BuildBackupRequest(NewBackupPolicy(10))}, isResultRetry)
+	err = rc.Init(map[string]Policy{Wildcard: BuildBackupRequest(NewBackupPolicy(10))}, shouldResultRetry)
 	test.Assert(t, err == nil, err)
 	ok, err = rc.WithRetryIfNeeded(ctx, Policy{}, retryWithResp, ri, nil)
 	test.Assert(t, err == nil, err)
@@ -535,7 +535,7 @@ func TestSpecifiedRespRetry(t *testing.T) {
 
 	// case3: specified method retry with resp, but method not match
 	callTimes = 0
-	isResultRetry = &IsResultRetry{IsRespRetry: func(resp interface{}, ri rpcinfo.RPCInfo) bool {
+	shouldResultRetry = &ShouldResultRetry{RespRetry: func(resp interface{}, ri rpcinfo.RPCInfo) bool {
 		if ri.To().Method() != method {
 			if r, ok := resp.(*mockResult); ok && r.GetResult() == retryResp {
 				return true
@@ -544,7 +544,7 @@ func TestSpecifiedRespRetry(t *testing.T) {
 		return false
 	}}
 	rc = NewRetryContainer()
-	err = rc.Init(map[string]Policy{method: BuildFailurePolicy(NewFailurePolicy())}, isResultRetry)
+	err = rc.Init(map[string]Policy{method: BuildFailurePolicy(NewFailurePolicy())}, shouldResultRetry)
 	test.Assert(t, err == nil, err)
 	ok, err = rc.WithRetryIfNeeded(ctx, Policy{}, retryWithResp, ri, nil)
 	test.Assert(t, err == nil, err)
@@ -581,7 +581,7 @@ func TestDifferentMethodConfig(t *testing.T) {
 		return genRPCInfo(), nil, nil
 	}
 	rc := NewRetryContainer()
-	isResultRetry := &IsResultRetry{IsErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+	shouldResultRetry := &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
 		if ri.To().Method() == method {
 			if te, ok := err.(*remote.TransError); ok && te.TypeID() == 1000 {
 				return true
@@ -592,7 +592,7 @@ func TestDifferentMethodConfig(t *testing.T) {
 	err := rc.Init(map[string]Policy{
 		method:   BuildFailurePolicy(NewFailurePolicy()),
 		Wildcard: BuildBackupRequest(NewBackupPolicy(10)),
-	}, isResultRetry)
+	}, shouldResultRetry)
 	test.Assert(t, err == nil, err)
 
 	// case1: test method do error retry
