@@ -317,7 +317,7 @@ func WithConnReporterEnabled() Option {
 	}}
 }
 
-// WithFailureRetry sets the failure retry policy for client, it will be effective for all methods.
+// WithFailureRetry sets the failure retry policy for client, it will take effect for all methods.
 func WithFailureRetry(p *retry.FailurePolicy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if p == nil {
@@ -334,7 +334,7 @@ func WithFailureRetry(p *retry.FailurePolicy) Option {
 	}}
 }
 
-// WithBackupRequest sets the backup request policy for client, it will be effective for all methods.
+// WithBackupRequest sets the backup request policy for client, it will take effect for all methods.
 func WithBackupRequest(p *retry.BackupPolicy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if p == nil {
