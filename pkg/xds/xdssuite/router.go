@@ -1,3 +1,19 @@
+/*
+ * Copyright 2021 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package xdssuite
 
 import (
@@ -37,7 +53,7 @@ func NewXDSRouter() *XDSRouter {
 
 // Route routes the rpc call to a cluster based on the RPCInfo
 func (r *XDSRouter) Route(ctx context.Context, ri rpcinfo.RPCInfo) (*RouteResult, error) {
-	route, err := r.getRoute(ctx, ri)
+	route, err := r.matchRoute(ctx, ri)
 	// no matched route
 	if err != nil {
 		return nil, kerrors.ErrXDSRoute.WithCause(fmt.Errorf("no matched route for service %s", ri.To().ServiceName()))
@@ -53,8 +69,8 @@ func (r *XDSRouter) Route(ctx context.Context, ri rpcinfo.RPCInfo) (*RouteResult
 	}, nil
 }
 
-// getRouteConfig gets the route config from xdsResourceManager
-func (r *XDSRouter) getRoute(ctx context.Context, ri rpcinfo.RPCInfo) (*xdsresource.Route, error) {
+// matchRoute gets the route config from xdsResourceManager
+func (r *XDSRouter) matchRoute(ctx context.Context, ri rpcinfo.RPCInfo) (*xdsresource.Route, error) {
 	// use serviceName as the listener name
 	ln := ri.To().ServiceName()
 	lds, err := r.manager.Get(ctx, xdsresource.ListenerType, ln)

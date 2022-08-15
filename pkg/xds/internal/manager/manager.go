@@ -1,3 +1,19 @@
+/*
+ * Copyright 2021 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package manager
 
 import (
@@ -130,8 +146,8 @@ func (m *xdsResourceManager) Get(ctx context.Context, rType xdsresource.Resource
 	m.mu.Unlock()
 	// Set fetch timeout
 	// TODO: timeout should be specified in the config of xdsResourceManager
-	timeout := defaultXDSFetchTimeout
-	t := time.NewTimer(timeout)
+	ctx, cancel := context.WithTimeout(ctx, defaultXDSFetchTimeout)
+	defer cancel()
 
 	select {
 	case <-nf.ch:
@@ -142,13 +158,13 @@ func (m *xdsResourceManager) Get(ctx context.Context, rType xdsresource.Resource
 		}
 		res, _ = m.getFromCache(rType, rName)
 		return res, nil
-	case <-t.C:
+	case <-ctx.Done():
 		// remove the notifier if timeout.
 		m.mu.Lock()
 		delete(m.notifierMap[rType], rName)
 		m.mu.Unlock()
-		return nil, fmt.Errorf("[XDS] manager, fetch %s resource[%s] failed, timeout %s",
-			xdsresource.ResourceTypeToName[rType], rName, timeout)
+		return nil, fmt.Errorf("[XDS] manager, fetch %s resource[%s] timeout",
+			xdsresource.ResourceTypeToName[rType], rName)
 	}
 }
 
@@ -172,8 +188,7 @@ func (m *xdsResourceManager) cleaner() {
 	}
 }
 
-// Dump dumps the cache to local file
-// Dump when the cache is updated
+// Dump dumps the cache to local file when the cache is updated
 func (m *xdsResourceManager) Dump() {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -22,8 +22,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/xds/xdssuite"
-
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -36,6 +34,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/pkg/xds/xdssuite"
 )
 
 func newProxyMW(prx proxy.ForwardProxy) endpoint.Middleware {
