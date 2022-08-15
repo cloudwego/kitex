@@ -144,13 +144,11 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			break
 		} else {
 			if i == retryTimes {
-				// retry error
+				// stop retry then wrap error
 				err = kerrors.ErrRetry.WithCause(err)
-			} else {
-				if !r.isRetryErr(err, cRI) {
-					// timeout or user specified error to do retry
-					break
-				}
+			} else if !r.isRetryErr(err, cRI) {
+				// not timeout or user specified error won't do retry
+				break
 			}
 		}
 	}
