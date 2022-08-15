@@ -8,7 +8,7 @@ require (
 	github.com/choleraehyq/pid v0.0.13
 	github.com/cloudwego/fastpb v0.0.1
 	github.com/cloudwego/frugal v0.1.1
-	github.com/cloudwego/netpoll v0.2.6-0.20220728080803-64b2cef0508c
+	github.com/cloudwego/netpoll v0.2.6
 	github.com/cloudwego/thriftgo v0.1.2
 	github.com/golang/mock v1.6.0
 	github.com/json-iterator/go v1.1.12
