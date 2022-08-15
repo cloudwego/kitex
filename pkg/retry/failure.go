@@ -113,7 +113,7 @@ func (p *FailurePolicy) WithSpecifiedResultRetry(rr *ShouldResultRetry) {
 // String prints human readable information.
 func (p FailurePolicy) String() string {
 	return fmt.Sprintf("{StopPolicy:%+v BackOffPolicy:%+v RetrySameNode:%+v "+
-		"ShouldResultRetry:{ErrorRetry:%t, ResultRetry:%t}}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode, p.IsErrorRetryNonNil(), p.IsRespRetryNonNil())
+		"ShouldResultRetry:{ErrorRetry:%t, RespRetry:%t}}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode, p.IsErrorRetryNonNil(), p.IsRespRetryNonNil())
 }
 
 // AllErrorRetry is common choice for ShouldResultRetry.
