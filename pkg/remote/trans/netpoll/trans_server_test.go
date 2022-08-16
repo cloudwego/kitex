@@ -109,7 +109,7 @@ func TestBootStrap(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		err = transSvr.BootstrapServer()
+		err = transSvr.BootstrapServer(ln)
 		test.Assert(t, err == nil, err)
 		wg.Done()
 	}()

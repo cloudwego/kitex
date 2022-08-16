@@ -79,6 +79,10 @@ type ServerOption struct {
 
 	PayloadCodec PayloadCodec
 
+	// Listener is used to specify the server listener, which comes with higher priority than Address below.
+	Listener net.Listener
+
+	// Address is the listener addr
 	Address net.Addr
 
 	ReusePort bool
