@@ -32,7 +32,7 @@ import (
 var (
 	option     Option
 	applyRes   string
-	rpcConfig  = rpcinfo.NewRPCConfig()
+	rpcConfig  = rpcinfo.AsMutableRPCConfig(rpcinfo.NewRPCConfig())
 	remoteInfo = remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{
 		ServiceName: "service",
 		Method:      "method0",
@@ -55,37 +55,37 @@ const (
 func TestApply(t *testing.T) {
 	// WithHostPort
 	option = WithHostPort(mockHostPort)
-	applyRes = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
+	applyRes, _ = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
 	test.Assert(t, applyRes == fmt.Sprintf("[WithHostPort(%s),]", mockHostPort))
 
 	// WithURL
 	option = WithURL(mockURL)
-	applyRes = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
+	applyRes, _ = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
 	test.Assert(t, applyRes == fmt.Sprintf("[WithURL(%s),]", mockURL))
 
 	// WithHTTPHost
 	option = WithHTTPHost(mockHTTPHost)
-	applyRes = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
+	applyRes, _ = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
 	httpHost, exist := remoteInfo.Tag(rpcinfo.HTTPHost)
 	test.Assert(t, httpHost == mockHTTPHost, applyRes)
 	test.Assert(t, exist)
 
 	// WithRPCTimeout
 	option = WithRPCTimeout(mockRPCTimeout)
-	applyRes = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
+	applyRes, _ = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
 	test.Assert(t, applyRes == fmt.Sprintf("[WithRPCTimeout(%s)]", mockRPCTimeoutStr), mockRPCTimeout)
-	test.Assert(t, rpcConfig.RPCTimeout() == mockRPCTimeout, rpcConfig.RPCTimeout())
-	test.Assert(t, rpcConfig.ReadWriteTimeout() == mockRPCTimeout, rpcConfig.ReadWriteTimeout())
+	test.Assert(t, rpcConfig.ImmutableView().RPCTimeout() == mockRPCTimeout, rpcConfig.ImmutableView().RPCTimeout())
+	test.Assert(t, rpcConfig.ImmutableView().ReadWriteTimeout() == mockRPCTimeout, rpcConfig.ImmutableView().ReadWriteTimeout())
 
 	// WithConnectTimeout
 	option = WithConnectTimeout(mockConnectTimeout)
-	applyRes = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
+	applyRes, _ = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
 	test.Assert(t, applyRes == fmt.Sprintf("[WithConnectTimeout(%s)]", mockConnectTimeoutStr), mockConnectTimeout)
-	test.Assert(t, rpcConfig.ConnectTimeout() == mockConnectTimeout, rpcConfig.ConnectTimeout())
+	test.Assert(t, rpcConfig.ImmutableView().ConnectTimeout() == mockConnectTimeout, rpcConfig.ImmutableView().ConnectTimeout())
 
 	// WithTag
 	option = WithTag(mockKey, mockVal)
-	applyRes = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
+	applyRes, _ = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
 	v, exist := remoteInfo.Tag(mockKey)
 	test.Assert(t, exist)
 	test.Assert(t, v == mockVal, v)
