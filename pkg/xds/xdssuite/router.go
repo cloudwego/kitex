@@ -46,8 +46,12 @@ type XDSRouter struct {
 }
 
 func NewXDSRouter() *XDSRouter {
+	m := xdsResourceManager.getManager()
+	if m == nil {
+		panic("xds resource manager has not been initialized")
+	}
 	return &XDSRouter{
-		manager: xdsResourceManager,
+		manager: m,
 	}
 }
 

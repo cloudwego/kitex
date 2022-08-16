@@ -122,7 +122,7 @@ func newADSClient(addr string) (ADSClient, error) {
 // newXdsClient constructs a new xdsClient, which is used to get xds resources from the xds server.
 func newXdsClient(bCfg *BootstrapConfig, updater *xdsResourceManager) (*xdsClient, error) {
 	// build stream client that communicates with the xds server
-	ac, err := newADSClient(bCfg.xdsSvrCfg.serverAddress)
+	ac, err := newADSClient(bCfg.xdsSvrCfg.SvrAddr)
 	if err != nil {
 		return nil, fmt.Errorf("[XDS] client: construct stream client failed, %s", err.Error())
 	}

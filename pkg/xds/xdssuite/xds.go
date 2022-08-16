@@ -19,12 +19,23 @@ package xdssuite
 import (
 	"context"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
+	"sync"
 )
 
 var (
-	xdsResourceManager    XDSResourceManager
-	newXDSResourceManager func() (XDSResourceManager, error)
+	xdsResourceManager = &singletonManager{}
 )
+
+type singletonManager struct {
+	manager XDSResourceManager
+	sync.Mutex
+}
+
+func (m *singletonManager) getManager() XDSResourceManager {
+	m.Lock()
+	defer m.Unlock()
+	return m.manager
+}
 
 // XDSResourceManager is the interface for the xds resource manager.
 // Get() returns the resources according to the input resourceType and resourceName.
@@ -33,16 +44,19 @@ type XDSResourceManager interface {
 	Get(ctx context.Context, resourceType xdsresource.ResourceType, resourceName string) (interface{}, error)
 }
 
-// BuildXDSResourceManager builds the XDSResourceManager using the input function.
-func BuildXDSResourceManager(f func() (XDSResourceManager, error)) error {
-	if xdsResourceManager != nil {
-		return nil
+func XDSInited() bool {
+	xdsResourceManager.Lock()
+	defer xdsResourceManager.Unlock()
+	return xdsResourceManager.manager != nil
+}
+
+// SetXDSResourceManager builds the XDSResourceManager using the input function.
+func SetXDSResourceManager(m XDSResourceManager) error {
+	xdsResourceManager.Lock()
+	defer xdsResourceManager.Unlock()
+
+	if xdsResourceManager.manager == nil {
+		xdsResourceManager.manager = m
 	}
-	newXDSResourceManager = f
-	m, err := newXDSResourceManager()
-	if err != nil {
-		return err
-	}
-	xdsResourceManager = m
 	return nil
 }

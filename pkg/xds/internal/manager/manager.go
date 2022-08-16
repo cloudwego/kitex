@@ -41,9 +41,10 @@ type xdsResourceManager struct {
 	// notifierMap maintains the channel for notifying resource update
 	notifierMap map[xdsresource.ResourceType]map[string]*notifier
 	mu          sync.Mutex
+	closeCh     chan struct{}
 
-	// dumpPath is the path to dump the cached resource.
-	dumpPath string
+	// options
+	opts *Options
 }
 
 // notifier is used to notify the resource update along with error
@@ -58,24 +59,24 @@ func (n *notifier) notify(err error) {
 }
 
 // NewXDSResourceManager creates a new xds resource manager
-func NewXDSResourceManager(bootstrapConfig *BootstrapConfig) (*xdsResourceManager, error) {
+func NewXDSResourceManager(bootstrapConfig *BootstrapConfig, opts ...Option) (*xdsResourceManager, error) {
 	// load bootstrap config
 	var err error
-	if bootstrapConfig == nil {
-		bootstrapConfig, err = newBootstrapConfig()
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	m := &xdsResourceManager{
 		cache:       map[xdsresource.ResourceType]map[string]xdsresource.Resource{},
 		meta:        make(map[xdsresource.ResourceType]map[string]*xdsresource.ResourceMeta),
 		notifierMap: make(map[xdsresource.ResourceType]map[string]*notifier),
 		mu:          sync.Mutex{},
-		dumpPath:    defaultDumpPath,
+		opts:        NewOptions(opts),
+		closeCh:     make(chan struct{}),
 	}
 	// Initial xds client
+	if bootstrapConfig == nil {
+		bootstrapConfig, err = newBootstrapConfig(m.opts.XDSSvrConfig.SvrAddr)
+		if err != nil {
+			return nil, err
+		}
+	}
 	cli, err := newXdsClient(bootstrapConfig, m)
 	if err != nil {
 		return nil, err
@@ -172,19 +173,23 @@ func (m *xdsResourceManager) Get(ctx context.Context, rType xdsresource.Resource
 func (m *xdsResourceManager) cleaner() {
 	t := time.NewTicker(defaultCacheExpireTime)
 	for {
-		<-t.C
-		m.mu.Lock()
-		for rt := range m.meta {
-			for rName, meta := range m.meta[rt] {
-				if time.Since(meta.LastAccessTime) > defaultCacheExpireTime {
-					delete(m.meta[rt], rName)
-					delete(m.cache[rt], rName)
-					m.client.RemoveWatch(rt, rName)
+		select {
+		case <-t.C:
+			m.mu.Lock()
+			for rt := range m.meta {
+				for rName, meta := range m.meta[rt] {
+					if time.Since(meta.LastAccessTime) > defaultCacheExpireTime {
+						delete(m.meta[rt], rName)
+						delete(m.cache[rt], rName)
+						m.client.RemoveWatch(rt, rName)
+					}
 				}
 			}
+			m.mu.Unlock()
+			t.Reset(defaultRefreshInterval)
+		case <-m.closeCh:
+			return
 		}
-		m.mu.Unlock()
-		t.Reset(defaultRefreshInterval)
 	}
 }
 
@@ -193,14 +198,13 @@ func (m *xdsResourceManager) Dump() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	path := m.opts.DumpPath
 	dumpResource := make(map[string]interface{})
 	for rType, n := range xdsresource.ResourceTypeToName {
 		if res, ok := m.cache[rType]; ok {
 			dumpResource[n] = res
 		}
 	}
-
-	path := m.dumpPath
 	data, err := json.MarshalIndent(dumpResource, "", "    ")
 	if err != nil {
 		klog.Warnf("[XDS] manager, marshal xds resource failed when dumping, error=%s", err)
@@ -214,6 +218,7 @@ func (m *xdsResourceManager) Dump() {
 func (m *xdsResourceManager) Close() {
 	// close xds client
 	m.client.close()
+	close(m.closeCh)
 }
 
 // updateMeta updates the meta (version, updateTime) of the resource

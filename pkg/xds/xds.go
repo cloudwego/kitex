@@ -21,11 +21,14 @@ import (
 	"github.com/cloudwego/kitex/pkg/xds/xdssuite"
 )
 
-func newManager() (xdssuite.XDSResourceManager, error) {
-	return manager.NewXDSResourceManager(nil)
-}
-
 // Init initializes the xds resource manager.
-func Init() error {
-	return xdssuite.BuildXDSResourceManager(newManager)
+func Init(opts ...manager.Option) error {
+	if xdssuite.XDSInited() {
+		return nil
+	}
+	m, err := manager.NewXDSResourceManager(nil, opts...)
+	if err != nil {
+		return err
+	}
+	return xdssuite.SetXDSResourceManager(m)
 }

@@ -32,8 +32,12 @@ type XDSResolver struct {
 }
 
 func NewXDSResolver() *XDSResolver {
+	m := xdsResourceManager.getManager()
+	if m == nil {
+		panic("xds resource manager has not been initialized")
+	}
 	return &XDSResolver{
-		manager: xdsResourceManager,
+		manager: m,
 	}
 }
 

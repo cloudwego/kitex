@@ -65,7 +65,7 @@ func Test_newXdsClient(t *testing.T) {
 	c, err := newXdsClient(
 		&BootstrapConfig{
 			node:      &v3core.Node{},
-			xdsSvrCfg: &XDSServerConfig{serverAddress: address},
+			xdsSvrCfg: &XDSServerConfig{SvrAddr: address},
 		},
 		nil,
 	)
@@ -160,7 +160,7 @@ func Test_xdsClient_handleResponse(t *testing.T) {
 			meta:        make(map[xdsresource.ResourceType]map[string]*xdsresource.ResourceMeta),
 			notifierMap: make(map[xdsresource.ResourceType]map[string]*notifier),
 			mu:          sync.Mutex{},
-			dumpPath:    defaultDumpPath,
+			opts:        NewOptions(nil),
 		},
 		refreshInterval: defaultRefreshInterval,
 		closeCh:         make(chan struct{}),
