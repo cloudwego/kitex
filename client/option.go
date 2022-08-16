@@ -367,8 +367,10 @@ func WithRetryMethodPolicies(mp map[string]retry.Policy) Option {
 		}
 		wildcardCfg := o.RetryMethodPolicies[retry.Wildcard]
 		o.RetryMethodPolicies = mp
-		// if there is wildcard config, keep it
-		o.RetryMethodPolicies[retry.Wildcard] = wildcardCfg
+		if wildcardCfg.Enable && !mp[retry.Wildcard].Enable {
+			// if there is enabled wildcard config before, keep it
+			o.RetryMethodPolicies[retry.Wildcard] = wildcardCfg
+		}
 	}}
 }
 
