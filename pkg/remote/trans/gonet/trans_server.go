@@ -81,7 +81,7 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 			os.Exit(1)
 		}
 		go func() {
-			ri, ctx := ts.opt.InitRPCInfoFunc(context.Background(), conn.RemoteAddr())
+			ri, ctx := ts.opt.InitOrResetRPCInfoFunc(context.Background(), conn.RemoteAddr())
 			defer func() {
 				transRecover(ctx, conn, "OnRead")
 				// recycle rpcinfo

@@ -36,6 +36,7 @@ type InvocationSetter interface {
 	SetServiceName(name string)
 	SetMethodName(name string)
 	SetSeqID(seqID int32)
+	Reset()
 }
 
 type invocation struct {
@@ -113,6 +114,11 @@ func (i *invocation) SetMethodName(name string) {
 	i.methodName = name
 }
 
+// Reset implements the InvocationSetter interface.
+func (i *invocation) Reset() {
+	i.zero()
+}
+
 // Recycle reuses the invocation.
 func (i *invocation) Recycle() {
 	i.zero()
@@ -121,6 +127,7 @@ func (i *invocation) Recycle() {
 
 func (i *invocation) zero() {
 	i.seqID = 0
+	i.packageName = ""
 	i.serviceName = ""
 	i.methodName = ""
 }
