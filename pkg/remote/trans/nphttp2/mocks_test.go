@@ -414,12 +414,16 @@ type mockMessage struct {
 	PayloadLenFunc      func() int
 	SetPayloadLenFunc   func(size int)
 	TransInfoFunc       func() remote.TransInfo
-	TagsFunc            func() map[string]interface{}
 	ProtocolInfoFunc    func() remote.ProtocolInfo
 	SetProtocolInfoFunc func(remote.ProtocolInfo)
 	PayloadCodecFunc    func() remote.PayloadCodec
 	SetPayloadCodecFunc func(pc remote.PayloadCodec)
 	RecycleFunc         func()
+	header              remote.MessageHeader
+}
+
+func (m *mockMessage) Header() *remote.MessageHeader {
+	return &m.header
 }
 
 func (m *mockMessage) RPCInfo() rpcinfo.RPCInfo {
@@ -486,13 +490,6 @@ func (m *mockMessage) SetPayloadLen(size int) {
 func (m *mockMessage) TransInfo() remote.TransInfo {
 	if m.TransInfoFunc != nil {
 		return m.TransInfoFunc()
-	}
-	return nil
-}
-
-func (m *mockMessage) Tags() map[string]interface{} {
-	if m.TagsFunc != nil {
-		return m.TagsFunc()
 	}
 	return nil
 }

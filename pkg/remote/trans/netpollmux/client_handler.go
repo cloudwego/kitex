@@ -81,11 +81,7 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	}()
 
 	// Set header flag = 1
-	tags := sendMsg.Tags()
-	if tags == nil {
-		tags = make(map[string]interface{})
-	}
-	tags[codec.HeaderFlagsKey] = codec.HeaderFlagSupportOutOfOrder
+	sendMsg.Header().SetFlags(remote.HeaderFlags(codec.HeaderFlagSupportOutOfOrder))
 
 	// encode
 	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)

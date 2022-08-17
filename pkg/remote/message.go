@@ -17,6 +17,7 @@
 package remote
 
 import (
+	"net/http"
 	"sync"
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -53,14 +54,6 @@ const (
 	Stream MessageType = 5
 )
 
-const (
-	// ReadFailed .
-	ReadFailed string = "RFailed"
-
-	// MeshHeader use in message.Tag to check MeshHeader
-	MeshHeader string = "mHeader"
-)
-
 var emptyProtocolInfo ProtocolInfo
 
 // ProtocolInfo is used to indicate the transport protocol and payload codec information.
@@ -89,12 +82,61 @@ type Message interface {
 	PayloadLen() int
 	SetPayloadLen(size int)
 	TransInfo() TransInfo
-	Tags() map[string]interface{}
 	ProtocolInfo() ProtocolInfo
 	SetProtocolInfo(ProtocolInfo)
 	PayloadCodec() PayloadCodec
 	SetPayloadCodec(pc PayloadCodec)
 	Recycle()
+
+	// Header returns the header of the message.
+	// Do not keep any reference of the return value.
+	Header() *MessageHeader
+}
+
+type (
+	HeaderMagic = uint32
+	HeaderFlags = uint16
+)
+
+// MessageHeader contains some header information of a message.
+type MessageHeader struct {
+	magic HeaderMagic
+	flags HeaderFlags
+	hh    http.Header
+}
+
+func (p *MessageHeader) SetMagic(m HeaderMagic) {
+	p.magic = m
+}
+
+func (p *MessageHeader) Magic() HeaderMagic {
+	return p.magic
+}
+
+func (p *MessageHeader) SetFlags(f HeaderFlags) {
+	p.flags = f
+}
+
+func (p *MessageHeader) Flags() HeaderFlags {
+	return p.flags
+}
+
+func (p *MessageHeader) HTTPHeader() http.Header {
+	return p.hh
+}
+
+func (p *MessageHeader) OverrideHTTPHeader(k string, v []string) {
+	if p.hh == nil {
+		p.hh = make(http.Header)
+	}
+	p.hh[k] = v
+}
+
+func (p *MessageHeader) AddHTTPHeader(k, v string) {
+	if p.hh == nil {
+		p.hh = make(http.Header)
+	}
+	p.hh[k] = append(p.hh[k], v)
 }
 
 // NewMessage creates a new Message using the given info.
@@ -128,7 +170,7 @@ func RecycleMessage(msg Message) {
 }
 
 func newMessage() interface{} {
-	return &message{tags: make(map[string]interface{})}
+	return &message{}
 }
 
 type message struct {
@@ -140,9 +182,9 @@ type message struct {
 	compressType CompressType
 	payloadSize  int
 	transInfo    TransInfo
-	tags         map[string]interface{}
 	protocol     ProtocolInfo
 	payloadCodec PayloadCodec
+	header       MessageHeader
 }
 
 func (m *message) zero() {
@@ -157,10 +199,8 @@ func (m *message) zero() {
 		m.transInfo.Recycle()
 		m.transInfo = nil
 	}
-	for k := range m.tags {
-		delete(m.tags, k)
-	}
 	m.protocol = emptyProtocolInfo
+	m.header = MessageHeader{}
 }
 
 // RPCInfo implements the Message interface.
@@ -212,11 +252,6 @@ func (m *message) TransInfo() TransInfo {
 	return m.transInfo
 }
 
-// Tags implements the Message interface.
-func (m *message) Tags() map[string]interface{} {
-	return m.tags
-}
-
 // PayloadLen implements the Message interface.
 func (m *message) PayloadLen() int {
 	return m.payloadSize
@@ -251,6 +286,10 @@ func (m *message) SetPayloadCodec(pc PayloadCodec) {
 func (m *message) Recycle() {
 	m.zero()
 	messagePool.Put(m)
+}
+
+func (m *message) Header() *MessageHeader {
+	return &m.header
 }
 
 // TransInfo contains transport information.

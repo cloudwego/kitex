@@ -138,9 +138,7 @@ func TestAddMetaInfo(t *testing.T) {
 
 	// 2. test
 	head, wantHead := "Head", "HTTP/1.1 200 OK"
-	msg.Tags()[rpcinfo.HTTPHeader] = http.Header{
-		head: []string{wantHead},
-	}
+	msg.Header().AddHTTPHeader(head, wantHead)
 	err := addMetaInfo(msg, h)
 	getHead := h.Get(head)
 	test.Assert(t, err == nil)

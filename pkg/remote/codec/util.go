@@ -66,7 +66,8 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 func SetOrCheckSeqID(seqID int32, message remote.Message) error {
 	switch message.MessageType() {
 	case remote.Call, remote.Oneway:
-		if ink, ok := message.RPCInfo().Invocation().(rpcinfo.InvocationSetter); ok {
+		iv := message.RPCInfo().Invocation()
+		if ink, ok := iv.(rpcinfo.InvocationSetter); ok {
 			ink.SetSeqID(seqID)
 		} else {
 			return errors.New("the interface Invocation doesn't implement InvocationSetter")

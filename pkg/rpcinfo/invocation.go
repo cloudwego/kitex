@@ -26,6 +26,8 @@ var (
 	_              InvocationSetter = (*invocation)(nil)
 	invocationPool sync.Pool
 	globalSeqID    int32 = 0
+
+	_ InvocationSetter = (*invocation)(nil)
 )
 
 func init() {

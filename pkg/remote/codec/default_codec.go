@@ -162,7 +162,7 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("ttheader read payload first 8 byte failed: %s", err.Error()))
 		}
 	} else if isMeshHeader(flagBuf) {
-		message.Tags()[remote.MeshHeader] = true
+		message.Header().SetMagic(MeshHeaderMagic)
 		// MeshHeader
 		if err = meshHeaderCodec.decode(ctx, message, in); err != nil {
 			return err
