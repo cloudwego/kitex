@@ -19,6 +19,8 @@ package client
 import (
 	"context"
 
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
@@ -78,6 +80,27 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 type stream struct {
 	stream streaming.Stream
 	kc     *kClient
+}
+
+// fixme: cannot use this function in client side
+func (s *stream) SetTrailer(metadata.MD) {
+	panic("this method should only be used in server side stream!")
+}
+
+func (s *stream) SetHeader(metadata.MD) error {
+	panic("this method should only be used in server side stream!")
+}
+
+func (s *stream) SendHeader(metadata.MD) error {
+	panic("this method should only be used in server side stream!")
+}
+
+func (s *stream) Header() (metadata.MD, error) {
+	return s.stream.Header()
+}
+
+func (s *stream) Trailer() metadata.MD {
+	return s.stream.Trailer()
 }
 
 func (s *stream) Context() context.Context {

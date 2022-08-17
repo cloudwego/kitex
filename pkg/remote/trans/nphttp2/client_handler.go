@@ -65,6 +65,7 @@ func (h *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 	defer buf.Release(err)
 
 	err = h.codec.Decode(ctx, msg, buf)
+	receiveHeaderAndTrailer(ctx, conn)
 	return
 }
 

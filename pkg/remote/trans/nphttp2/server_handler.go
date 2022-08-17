@@ -156,7 +156,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 
 			st := NewStream(rCtx, t.svcInfo, newServerConn(tr, s), t)
 			streamArg := &streaming.Args{Stream: st}
-
+			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
+			rCtx = context.WithValue(rCtx, streamKey{}, st)
 			// check grpc method
 			targetMethod := t.svcInfo.MethodInfo(methodName)
 			if targetMethod == nil {
