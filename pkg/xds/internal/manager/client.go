@@ -546,7 +546,6 @@ func (c *xdsClient) prepareRequest(rType xdsresource.ResourceType, ack bool, err
 		ResourceNames: rNames,
 		ResponseNonce: nonce,
 	}
-
 	// NACK with error message
 	if ack && errMsg != "" {
 		req.ErrorDetail = &status.Status{

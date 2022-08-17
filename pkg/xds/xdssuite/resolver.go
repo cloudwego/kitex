@@ -62,8 +62,8 @@ func (r *XDSResolver) Resolve(ctx context.Context, desc string) (discovery.Resul
 		instances[i] = discovery.NewInstance(e.Addr().Network(), e.Addr().String(), int(e.Weight()), e.Meta())
 	}
 	res := discovery.Result{
-		Cacheable: false,
-		CacheKey:  "",
+		Cacheable: true,
+		CacheKey:  desc,
 		Instances: instances,
 	}
 	return res, nil
@@ -95,8 +95,9 @@ func (r *XDSResolver) getEndpoints(ctx context.Context, desc string) ([]*xdsreso
 	return endpoints.Localities[0].Endpoints, nil
 }
 
+// Diff implements the Resolver interface. Use DefaultDiff.
 func (r *XDSResolver) Diff(cacheKey string, prev, next discovery.Result) (discovery.Change, bool) {
-	return discovery.Change{}, false
+	return discovery.DefaultDiff(cacheKey, prev, next)
 }
 
 // Name returns the name of the resolver.

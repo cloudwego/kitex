@@ -18,8 +18,9 @@ package xdssuite
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	"sync"
+
+	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 )
 
 var (

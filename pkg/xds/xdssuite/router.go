@@ -19,9 +19,9 @@ package xdssuite
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"time"
 
+	"github.com/bytedance/gopkg/lang/fastrand"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
@@ -81,38 +81,38 @@ func (r *XDSRouter) matchRoute(ctx context.Context, ri rpcinfo.RPCInfo) (*xdsres
 	if err != nil {
 		return nil, fmt.Errorf("get listener failed: %v", err)
 	}
-	lis := lds.(*xdsresource.ListenerResource)
+	listener := lds.(*xdsresource.ListenerResource)
 
-	var thrift, http *xdsresource.NetworkFilter
-	for _, f := range lis.NetworkFilters {
+	var thriftFilter, httpFilter *xdsresource.NetworkFilter
+	for _, f := range listener.NetworkFilters {
 		if f.FilterType == xdsresource.NetworkFilterTypeHTTP {
-			http = f
+			httpFilter = f
 		}
 		if f.FilterType == xdsresource.NetworkFilterTypeThrift {
-			thrift = f
+			thriftFilter = f
 		}
 	}
-	// match thrift route first, only inline route is supported
+	// match thriftFilter route first, only inline route is supported
 	if ri.Config().TransportProtocol() != transport.GRPC {
-		if thrift != nil && thrift.InlineRouteConfig != nil {
-			r := matchThriftRoute(ri, thrift.InlineRouteConfig)
+		if thriftFilter != nil && thriftFilter.InlineRouteConfig != nil {
+			r := matchThriftRoute(ri, thriftFilter.InlineRouteConfig)
 			if r != nil {
 				return r, nil
 			}
 		}
 	}
-	if http == nil {
+	if httpFilter == nil {
 		return nil, fmt.Errorf("no http filter found in listener %s", ln)
 	}
 	// inline route config
-	if http.InlineRouteConfig != nil {
-		r := matchHTTPRoute(ri, http.InlineRouteConfig)
+	if httpFilter.InlineRouteConfig != nil {
+		r := matchHTTPRoute(ri, httpFilter.InlineRouteConfig)
 		if r != nil {
 			return r, nil
 		}
 	}
 	// Get the route config
-	rds, err := r.manager.Get(ctx, xdsresource.RouteConfigType, http.RouteConfigName)
+	rds, err := r.manager.Get(ctx, xdsresource.RouteConfigType, httpFilter.RouteConfigName)
 	if err != nil {
 		return nil, fmt.Errorf("get route failed: %v", err)
 	}
@@ -191,7 +191,7 @@ func pickCluster(route *xdsresource.Route) string {
 		return wcs[0].Name
 	}
 	currWeight := uint32(0)
-	targetWeight := uint32(rand.Int31n(defaultTotalWeight))
+	targetWeight := uint32(fastrand.Int31n(defaultTotalWeight))
 	for _, wc := range wcs {
 		currWeight += wc.Weight
 		if currWeight >= targetWeight {

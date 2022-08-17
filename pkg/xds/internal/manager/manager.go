@@ -172,6 +172,7 @@ func (m *xdsResourceManager) Get(ctx context.Context, rType xdsresource.Resource
 // cleaner cleans the expired cache periodically
 func (m *xdsResourceManager) cleaner() {
 	t := time.NewTicker(defaultCacheExpireTime)
+	defer t.Stop()
 	for {
 		select {
 		case <-t.C:
@@ -186,7 +187,6 @@ func (m *xdsResourceManager) cleaner() {
 				}
 			}
 			m.mu.Unlock()
-			t.Reset(defaultRefreshInterval)
 		case <-m.closeCh:
 			return
 		}
