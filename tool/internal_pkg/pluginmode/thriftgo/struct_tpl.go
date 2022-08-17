@@ -176,8 +176,10 @@ func (p *{{$TypeName}}) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryW
 	offset := 0
 	{{- if eq .Category "union"}}
 	var c int
-	if c = p.CountSetFields{{$TypeName}}(); c != 1 {
-		goto CountSetFieldsError
+	if p != nil {
+		if c = p.CountSetFields{{$TypeName}}(); c != 1 {
+			goto CountSetFieldsError
+		}
 	}
 	{{- end}}
 	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "{{.Name}}")
@@ -205,8 +207,10 @@ func (p *{{$TypeName}}) BLength() int {
 	l := 0
 	{{- if eq .Category "union"}}
 	var c int
-	if c = p.CountSetFields{{$TypeName}}(); c != 1 {
-		goto CountSetFieldsError
+	if p != nil {
+		if c = p.CountSetFields{{$TypeName}}(); c != 1 {
+			goto CountSetFieldsError
+		}
 	}
 	{{- end}}
 	l += bthrift.Binary.StructBeginLength("{{.Name}}")
