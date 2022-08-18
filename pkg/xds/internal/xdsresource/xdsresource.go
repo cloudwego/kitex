@@ -16,14 +16,18 @@
 
 package xdsresource
 
-import "time"
+import (
+	"sync/atomic"
+	"time"
+)
 
 type Resource interface{}
 
+// ResourceMeta records the meta information of a resource.
 type ResourceMeta struct {
 	Version        string
-	LastAccessTime time.Time
 	UpdateTime     time.Time
+	LastAccessTime atomic.Value
 }
 
 type ResourceType int

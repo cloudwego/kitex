@@ -242,7 +242,9 @@ func Test_xdsResourceManager_getFromCache(t *testing.T) {
 			},
 		},
 		meta: map[xdsresource.ResourceType]map[string]*xdsresource.ResourceMeta{
-			xdsresource.ListenerType: {},
+			xdsresource.ListenerType: {
+				xdsresource.ListenerName1: &xdsresource.ResourceMeta{},
+			},
 		},
 	}
 

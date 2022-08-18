@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
-	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 )
@@ -55,7 +54,7 @@ func (r *XDSResolver) Target(ctx context.Context, target rpcinfo.EndpointInfo) (
 func (r *XDSResolver) Resolve(ctx context.Context, desc string) (discovery.Result, error) {
 	eps, err := r.getEndpoints(ctx, desc)
 	if err != nil {
-		return discovery.Result{}, kerrors.ErrServiceDiscovery.WithCause(err)
+		return discovery.Result{}, err
 	}
 	instances := make([]discovery.Instance, len(eps))
 	for i, e := range eps {

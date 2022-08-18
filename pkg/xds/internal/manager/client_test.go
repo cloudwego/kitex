@@ -18,7 +18,6 @@ package manager
 
 import (
 	"context"
-	"reflect"
 	"sync"
 	"testing"
 
@@ -73,76 +72,6 @@ func Test_newXdsClient(t *testing.T) {
 	test.Assert(t, err == nil)
 }
 
-func Test_xdsClient_prepareRequest(t *testing.T) {
-	c := &xdsClient{
-		config: XdsBootstrapConfig,
-		watchedResource: map[xdsresource.ResourceType]map[string]bool{
-			xdsresource.RouteConfigType: {},
-			xdsresource.ClusterType:     {"cluster1": true},
-		},
-	}
-	type args struct {
-		resourceType xdsresource.ResourceType
-		ack          bool
-		errMsg       string
-	}
-	tests := []struct {
-		name string
-		args args
-		want *discoveryv3.DiscoveryRequest
-	}{
-		{
-			name: "unknown resource type",
-			args: args{
-				resourceType: -1,
-				ack:          false,
-				errMsg:       "",
-			},
-			want: nil,
-		},
-		{
-			name: "resource type not in the subscribed list",
-			args: args{
-				resourceType: xdsresource.ListenerType,
-				ack:          false,
-				errMsg:       "",
-			},
-			want: nil,
-		},
-		{
-			name: "resource list is empty",
-			args: args{
-				resourceType: xdsresource.RouteConfigType,
-				ack:          false,
-				errMsg:       "",
-			},
-			want: nil,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := c.prepareRequest(tt.args.resourceType, tt.args.ack, tt.args.errMsg); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("prepareRequest() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-
-	var req *discoveryv3.DiscoveryRequest
-	// ack = false
-	req = c.prepareRequest(xdsresource.ClusterType, false, "")
-	test.Assert(t, req != nil)
-	test.Assert(t, req.ResourceNames[0] == "cluster1")
-	test.Assert(t, req.ErrorDetail == nil)
-	// ack = true, errMsg = ""
-	req = c.prepareRequest(xdsresource.ClusterType, true, "")
-	test.Assert(t, req != nil)
-	test.Assert(t, req.ErrorDetail == nil)
-	// ack = true, errMsg = "error"
-	req = c.prepareRequest(xdsresource.ClusterType, true, "error")
-	test.Assert(t, req != nil)
-	test.Assert(t, req.ErrorDetail.Message == "error")
-}
-
 func Test_xdsClient_handleResponse(t *testing.T) {
 	// inject mock
 	c := &xdsClient{
@@ -159,10 +88,9 @@ func Test_xdsClient_handleResponse(t *testing.T) {
 			cache:       map[xdsresource.ResourceType]map[string]xdsresource.Resource{},
 			meta:        make(map[xdsresource.ResourceType]map[string]*xdsresource.ResourceMeta),
 			notifierMap: make(map[xdsresource.ResourceType]map[string]*notifier),
-			mu:          sync.Mutex{},
+			mu:          sync.RWMutex{},
 			opts:        NewOptions(nil),
 		},
-		refreshInterval: defaultRefreshInterval,
 		closeCh:         make(chan struct{}),
 	}
 	defer c.close()

@@ -60,7 +60,7 @@ func (r *XDSRouter) Route(ctx context.Context, ri rpcinfo.RPCInfo) (*RouteResult
 	route, err := r.matchRoute(ctx, ri)
 	// no matched route
 	if err != nil {
-		return nil, kerrors.ErrXDSRoute.WithCause(fmt.Errorf("no matched route for service %s", ri.To().ServiceName()))
+		return nil, kerrors.ErrXDSRoute.WithCause(fmt.Errorf("no matched route for service %s, err=%s", ri.To().ServiceName(), err))
 	}
 	// pick cluster from the matched route
 	cluster := pickCluster(route)
