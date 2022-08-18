@@ -385,7 +385,7 @@ func TestServerBoundHandler(t *testing.T) {
 		},
 		{
 			opts: []Option{
-				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
 				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), &limiter.DummyRateLimiter{}, nil, false),
@@ -409,7 +409,7 @@ func TestServerBoundHandler(t *testing.T) {
 		},
 		{
 			opts: []Option{
-				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
@@ -426,7 +426,7 @@ func TestServerBoundHandler(t *testing.T) {
 					MaxConnections: 1000,
 					MaxQPS:         10000,
 				}),
-				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
 				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), limiter.NewQPSLimiter(interval, 10000), nil, false),
@@ -442,7 +442,7 @@ func TestServerBoundHandler(t *testing.T) {
 					MaxConnections: 1000,
 					MaxQPS:         10000,
 				}),
-				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
@@ -459,7 +459,7 @@ func TestServerBoundHandler(t *testing.T) {
 					MaxConnections: 1000,
 					MaxQPS:         10000,
 				}),
-				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
 				WithMuxTransport(),
 			},

@@ -21,10 +21,11 @@ import (
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 func TestException(t *testing.T) {
 	errMsg := "my error"
-	b := MarshalError("some method", errors.New(errMsg))
-	test.Assert(t, UnmarshalError(b).Error() == errMsg)
+	b := utils.MarshalError("some method", errors.New(errMsg))
+	test.Assert(t, utils.UnmarshalError(b).Error() == errMsg)
 }
