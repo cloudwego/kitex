@@ -77,7 +77,7 @@ func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
 	return "", true
 }
 
-// Do implements the Retryer interface.
+// Do implement the Retryer interface.
 func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (recycleRI bool, err error) {
 	r.RLock()
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes

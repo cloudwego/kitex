@@ -52,7 +52,7 @@ func ErrorTypeOnServiceLevel(ctx context.Context, request, response interface{},
 	return TypeSuccess
 }
 
-// ErrorTypeOnInstanceLevel determines the error type with a instance level criteria.
+// ErrorTypeOnInstanceLevel determines the error type with an instance level criteria.
 // Basically, it treats only the connection error as failure.
 func ErrorTypeOnInstanceLevel(ctx context.Context, request, response interface{}, err error) ErrorType {
 	if errors.Is(err, kerrors.ErrGetConnection) {

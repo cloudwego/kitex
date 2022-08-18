@@ -63,7 +63,7 @@ func SetKitexImportPath(path string) {
 	kitexImportPath = path
 }
 
-// ImportPathTo returns a import path to the specified package under kitex.
+// ImportPathTo returns an import path to the specified package under kitex.
 func ImportPathTo(pkg string) string {
 	return filepath.Join(kitexImportPath, pkg)
 }

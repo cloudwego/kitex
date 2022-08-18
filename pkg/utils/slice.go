@@ -19,7 +19,7 @@ package utils
 // Slice is an abstraction of []interface{}.
 type Slice []interface{}
 
-// Push pushes a interface to the slice.
+// Push pushes an interface to the slice.
 func (s *Slice) Push(any interface{}) {
 	*s = append(*s, any)
 }
