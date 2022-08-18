@@ -9,7 +9,7 @@ require (
 	github.com/cloudwego/fastpb v0.0.1
 	github.com/cloudwego/frugal v0.1.1
 	github.com/cloudwego/netpoll v0.2.6
-	github.com/cloudwego/thriftgo v0.1.2
+	github.com/cloudwego/thriftgo v0.2.0
 	github.com/golang/mock v1.6.0
 	github.com/json-iterator/go v1.1.12
 	github.com/tidwall/gjson v1.9.3

@@ -14,8 +14,8 @@
 
 package thriftgo
 
-const structLike = `
-{{define "StructLike"}}
+const structLikeCodec = `
+{{define "StructLikeCodec"}}
 {{template "StructLikeFastRead" .}}
 
 {{template "StructLikeFastReadField" .}}
@@ -29,7 +29,7 @@ const structLike = `
 {{template "StructLikeFastWriteField" .}}
 
 {{template "StructLikeFieldLength" .}}
-{{- end}}{{/* define "StructLike" */}}
+{{- end}}{{/* define "StructLikeCodec" */}}
 `
 
 const structLikeFastRead = `
@@ -653,10 +653,10 @@ const processor = `
 {{define "Processor"}}
 {{- range .Functions}}
 {{$ArgsType := .ArgType}}
-{{template "StructLike" $ArgsType}}
+{{template "StructLikeCodec" $ArgsType}}
 {{- if not .Oneway}}
 	{{$ResType := .ResType}}
-	{{template "StructLike" $ResType}}
+	{{template "StructLikeCodec" $ResType}}
 {{- end}}
 {{- end}}{{/* range .Functions */}}
 {{- end}}{{/* define "Processor" */}}
