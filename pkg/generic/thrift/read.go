@@ -264,7 +264,21 @@ func readStringMap(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeD
 
 func readStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	st := map[string]interface{}{}
-	_, err := in.ReadStructBegin()
+	var err error
+	// set default value
+	// void is nil struct
+	if t.Struct != nil {
+		for fieldName, field := range t.Struct.DefaultFields {
+			val := field.DefaultValue
+			if field.ValueMapping != nil {
+				if val, err = field.ValueMapping.Response(ctx, val, field); err != nil {
+					return nil, err
+				}
+			}
+			st[fieldName] = val
+		}
+	}
+	_, err = in.ReadStructBegin()
 	if err != nil {
 		return nil, err
 	}
@@ -319,7 +333,20 @@ func readStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDesc
 
 func readHTTPResponse(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	resp := descriptor.NewHTTPResponse()
-	_, err := in.ReadStructBegin()
+	var err error
+	// set default value
+	for _, field := range t.Struct.DefaultFields {
+		val := field.DefaultValue
+		if field.ValueMapping != nil {
+			if val, err = field.ValueMapping.Response(ctx, val, field); err != nil {
+				return nil, err
+			}
+		}
+		if err = field.HTTPMapping.Response(ctx, resp, field, val); err != nil {
+			return nil, err
+		}
+	}
+	_, err = in.ReadStructBegin()
 	if err != nil {
 		return nil, err
 	}

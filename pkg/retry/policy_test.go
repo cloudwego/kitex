@@ -111,7 +111,40 @@ func TestFailureRetryPolicy(t *testing.T) {
 
 	// case 8
 	test.Assert(t, fp.String() == "{StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:true "+
-		"DDLStop:false CBPolicy:{ErrorRate:0.1}} BackOffPolicy:<nil> RetrySameNode:false}", fp)
+		"DDLStop:false CBPolicy:{ErrorRate:0.1}} BackOffPolicy:<nil> RetrySameNode:false ShouldResultRetry:{ErrorRetry:false, RespRetry:false}}", fp)
+
+	// case 9
+	fp.WithSpecifiedResultRetry(&ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+		return false
+	}})
+	test.Assert(t, fp.String() == "{StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:true "+
+		"DDLStop:false CBPolicy:{ErrorRate:0.1}} BackOffPolicy:<nil> RetrySameNode:false ShouldResultRetry:{ErrorRetry:true, RespRetry:false}}", fp)
+	jsonRet, err = jsoni.MarshalToString(fp)
+	test.Assert(t, err == nil, err)
+	var fp9 FailurePolicy
+	err = jsoni.UnmarshalFromString(jsonRet, &fp9)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, fp.Equals(&fp9), fp9)
+	test.Assert(t, fp9.ShouldResultRetry == nil)
+}
+
+// test new failurePolicy with result retry
+func TestFailureRetryPolicyWithResultRetry(t *testing.T) {
+	fp := NewFailurePolicyWithResultRetry(&ShouldResultRetry{RespRetry: func(resp interface{}, ri rpcinfo.RPCInfo) bool {
+		return false
+	}, ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+		return false
+	}})
+
+	test.Assert(t, fp.String() == "{StopPolicy:{MaxRetryTimes:2 MaxDurationMS:0 DisableChainStop:false DDLStop:false "+
+		"CBPolicy:{ErrorRate:0.1}} BackOffPolicy:&{BackOffType:none CfgItems:map[]} RetrySameNode:false ShouldResultRetry:{ErrorRetry:true, RespRetry:true}}", fp)
+	jsonRet, err := jsoni.MarshalToString(fp)
+	test.Assert(t, err == nil, err)
+	var fp10 FailurePolicy
+	err = jsoni.UnmarshalFromString(jsonRet, &fp10)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, fp.Equals(&fp10), fp10)
+	test.Assert(t, fp10.ShouldResultRetry == nil)
 }
 
 // test new backupPolicy

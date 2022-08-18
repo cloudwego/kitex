@@ -63,7 +63,7 @@ func init() {
 	rpcInfo := newTestRpcInfo()
 
 	opt = &remote.ServerOption{
-		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
+		InitOrResetRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
 			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
 			return rpcInfo, ctx
 		},
@@ -436,7 +436,7 @@ func TestInvokeError(t *testing.T) {
 
 	body := "hello world"
 	opt := &remote.ServerOption{
-		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
+		InitOrResetRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
 			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
 			return rpcInfo, ctx
 		},
@@ -575,7 +575,7 @@ func TestInvokeNoMethod(t *testing.T) {
 
 	body := "hello world"
 	opt := &remote.ServerOption{
-		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
+		InitOrResetRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
 			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
 			return rpcInfo, ctx
 		},

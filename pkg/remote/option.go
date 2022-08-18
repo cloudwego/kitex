@@ -79,6 +79,10 @@ type ServerOption struct {
 
 	PayloadCodec PayloadCodec
 
+	// Listener is used to specify the server listener, which comes with higher priority than Address below.
+	Listener net.Listener
+
+	// Address is the listener addr
 	Address net.Addr
 
 	ReusePort bool
@@ -94,7 +98,7 @@ type ServerOption struct {
 
 	ReadWriteTimeout time.Duration
 
-	InitRPCInfoFunc func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context)
+	InitOrResetRPCInfoFunc func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context)
 
 	TracerCtl *internal_stats.Controller
 

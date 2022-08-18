@@ -223,6 +223,8 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		t.finishTracer(ctx, rpcInfo, err, panicErr)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
+		// reset rpcinfo
+		_, rpcInfoCtx = t.opt.InitOrResetRPCInfoFunc(rpcInfoCtx, conn.RemoteAddr())
 		muxSvrConn.pool.Put(rpcInfoCtx)
 	}()
 
@@ -290,7 +292,7 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	pool := &sync.Pool{
 		New: func() interface{} {
 			// init rpcinfo
-			_, ctx := t.opt.InitRPCInfoFunc(ctx, connection.RemoteAddr())
+			_, ctx := t.opt.InitOrResetRPCInfoFunc(ctx, connection.RemoteAddr())
 			return ctx
 		},
 	}

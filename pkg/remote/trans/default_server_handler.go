@@ -100,7 +100,9 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 
 // OnRead implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
-	ri := rpcinfo.GetRPCInfo(ctx)
+	// reset rpcinfo
+	var ri rpcinfo.RPCInfo
+	ri, ctx = t.opt.InitOrResetRPCInfoFunc(ctx, conn.RemoteAddr())
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var err error
 	var closeConn bool
@@ -179,7 +181,7 @@ func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Mes
 // OnActive implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	// init rpcinfo
-	_, ctx = t.opt.InitRPCInfoFunc(ctx, conn.RemoteAddr())
+	_, ctx = t.opt.InitOrResetRPCInfoFunc(ctx, conn.RemoteAddr())
 	return ctx, nil
 }
 
