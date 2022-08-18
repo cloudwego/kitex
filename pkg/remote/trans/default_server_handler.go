@@ -18,6 +18,7 @@ package trans
 
 import (
 	"context"
+	"errors"
 	"net"
 	"runtime/debug"
 
@@ -99,7 +100,9 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 
 // OnRead implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
-	ri := rpcinfo.GetRPCInfo(ctx)
+	// reset rpcinfo
+	var ri rpcinfo.RPCInfo
+	ri, ctx = t.opt.InitOrResetRPCInfoFunc(ctx, conn.RemoteAddr())
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var err error
 	var closeConn bool
@@ -155,12 +158,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		// error cannot be wrapped to print here, so it must exec before NewTransError
 		t.OnError(ctx, err, conn)
 		err = remote.NewTransError(remote.InternalError, err)
-		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false)
+		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false)
 		return nil
 	}
 
 	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
 	if err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
+		closeConn = true
 		t.OnError(ctx, err, conn)
 		return nil
 	}
@@ -177,7 +181,7 @@ func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Mes
 // OnActive implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	// init rpcinfo
-	_, ctx = t.opt.InitRPCInfoFunc(ctx, conn.RemoteAddr())
+	_, ctx = t.opt.InitOrResetRPCInfoFunc(ctx, conn.RemoteAddr())
 	return ctx, nil
 }
 
@@ -198,10 +202,13 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 		}
 		remote := rpcinfo.AsMutableEndpointInfo(ri.From())
 		remote.SetTag(rpcinfo.RemoteClosedTag, "1")
-	} else if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s\nstack=%s", rService, rAddr, err.Error(), pe.Stack())
 	} else {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s", rService, rAddr, err.Error())
+		var de *kerrors.DetailedError
+		if ok := errors.As(err, &de); ok && de.Stack() != "" {
+			klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s\nstack=%s", rService, rAddr, err.Error(), de.Stack())
+		} else {
+			klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s", rService, rAddr, err.Error())
+		}
 	}
 }
 
@@ -215,7 +222,9 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 	t.transPipe = p
 }
 
-func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg remote.Message, conn net.Conn, err error, ri rpcinfo.RPCInfo, doOnMessage bool) {
+func (t *svrTransHandler) writeErrorReplyIfNeeded(
+	ctx context.Context, recvMsg remote.Message, conn net.Conn, err error, ri rpcinfo.RPCInfo, doOnMessage bool,
+) (shouldCloseConn bool) {
 	if cn, ok := conn.(remote.IsActive); ok && !cn.IsActive() {
 		// conn is closed, no need reply
 		return
@@ -238,7 +247,9 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg r
 	err = t.transPipe.Write(ctx, conn, errMsg)
 	if err != nil {
 		klog.CtxErrorf(ctx, "KITEX: write error reply failed, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
+		return true
 	}
+	return
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package lbcache combine balancer with reslover and cache the resolve result
+// Package lbcache combine balancer with resolver and cache the resolve result
 package lbcache
 
 import (
@@ -196,6 +196,14 @@ func (bl *Balancer) refresh() {
 	}
 	// replace previous result
 	bl.res.Store(res)
+}
+
+// GetResult returns the discovery result that the Balancer holds.
+func (bl *Balancer) GetResult() (res discovery.Result, ok bool) {
+	if v := bl.res.Load(); v != nil {
+		return v.(discovery.Result), true
+	}
+	return
 }
 
 // GetPicker equal to loadbalance.Balancer without pass discovery.Result, because we cache the result

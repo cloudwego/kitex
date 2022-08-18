@@ -18,6 +18,7 @@ package retry
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -37,12 +38,56 @@ func BenchmarkRandomBackOff_Wait(b *testing.B) {
 	})
 }
 
-func TestRandomBackOff_Wait(T *testing.T) {
+func TestRandomBackOff_Wait(t *testing.T) {
+	const (
+		min = 99
+		max = 100
+	)
+	bk := &randomBackOff{
+		minMS: min,
+		maxMS: max,
+	}
+	startTime := time.Now()
+	bk.Wait(1)
+	waitTime := time.Since(startTime)
+	test.Assert(t, time.Millisecond*min <= waitTime)
+	test.Assert(t, waitTime < time.Millisecond*(max+5))
+}
+
+func TestRandomBackOff_String(t *testing.T) {
 	min := 10
 	max := 100
 	bk := &randomBackOff{
 		minMS: min,
 		maxMS: max,
 	}
+	msg := "RandomBackOff(10ms-100ms)"
+	test.Assert(t, bk.String() == msg)
+}
+
+func TestFixedBackOff_Wait(t *testing.T) {
+	const fix = 50
+	bk := &fixedBackOff{
+		fixMS: fix,
+	}
+	startTime := time.Now()
 	bk.Wait(1)
+	waitTime := time.Since(startTime)
+	test.Assert(t, time.Millisecond*fix <= waitTime)
+	test.Assert(t, waitTime < time.Millisecond*(fix+5))
+}
+
+func TestFixedBackOff_String(t *testing.T) {
+	fix := 50
+	bk := &fixedBackOff{
+		fixMS: fix,
+	}
+	msg := "FixedBackOff(50ms)"
+	test.Assert(t, bk.String() == msg)
+}
+
+func TestNoneBackOff_String(t *testing.T) {
+	bk := &noneBackOff{}
+	msg := "NoneBackOff"
+	test.Assert(t, bk.String() == msg)
 }

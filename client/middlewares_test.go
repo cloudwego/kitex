@@ -23,13 +23,14 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 
-	"github.com/cloudwego/kitex/internal/client"
+	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 )
@@ -58,33 +59,19 @@ var (
 	}()
 )
 
-func TestResolverMWNoResolver(t *testing.T) {
-	var invoked bool
-	opts := &client.Options{}
-	mw := newResolveMWBuilder(opts)(ctx)
-	ep := func(ctx context.Context, request, response interface{}) error {
-		invoked = true
-		return nil
-	}
+func TestNoResolver(t *testing.T) {
+	svcInfo := mocks.ServiceInfo()
+	cli, err := NewClient(svcInfo, WithDestService("destService"))
+	test.Assert(t, err == nil)
 
-	ri := rpcinfo.NewRPCInfo(nil,
-		remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, ""),
-		rpcinfo.NewInvocation("", ""),
-		nil, rpcinfo.NewRPCStats())
-
-	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	req := new(MockTStruct)
-	res := new(MockTStruct)
-	err := mw(ep)(ctx, req, res)
-	test.Assert(t, err != nil)
+	err = cli.Call(context.Background(), "mock", mocks.NewMockArgs(), mocks.NewMockResult())
 	test.Assert(t, errors.Is(err, kerrors.ErrNoResolver))
-	test.Assert(t, !invoked)
 }
 
 func TestResolverMW(t *testing.T) {
 	var invoked bool
-	opts := &client.Options{Resolver: resolver404}
-	mw := newResolveMWBuilder(opts)(ctx)
+	cli := newMockClient(t).(*kClient)
+	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error {
 		invoked = true
 		return nil
@@ -110,8 +97,8 @@ func TestResolverMWOutOfInstance(t *testing.T) {
 		NameFunc: func() string { return t.Name() },
 	}
 	var invoked bool
-	opts := &client.Options{Resolver: resolver}
-	mw := newResolveMWBuilder(opts)(ctx)
+	cli := newMockClient(t, WithResolver(resolver)).(*kClient)
+	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error {
 		invoked = true
 		return nil
@@ -133,29 +120,33 @@ func TestResolverMWOutOfInstance(t *testing.T) {
 
 func TestDefaultErrorHandler(t *testing.T) {
 	// Test TApplicationException
-	err := defaultErrorHandler(thrift.NewTApplicationException(100, "mock"))
-	test.Assert(t, err.Error() == "remote or network error: [remote] mock")
+	err := DefaultClientErrorHandler(thrift.NewTApplicationException(100, "mock"))
+	test.Assert(t, err.Error() == "remote or network error[remote]: mock", err.Error())
 	var te thrift.TApplicationException
 	ok := errors.As(err, &te)
 	test.Assert(t, ok)
 	test.Assert(t, te.TypeId() == 100)
 
 	// Test PbError
-	err = defaultErrorHandler(protobuf.NewPbError(100, "mock"))
-	test.Assert(t, err.Error() == "remote or network error: [remote] mock")
+	err = DefaultClientErrorHandler(protobuf.NewPbError(100, "mock"))
+	test.Assert(t, err.Error() == "remote or network error[remote]: mock")
 	var pe protobuf.PBError
 	ok = errors.As(err, &pe)
 	test.Assert(t, ok)
 	test.Assert(t, te.TypeId() == 100)
 
+	// Test status.Error
+	err = DefaultClientErrorHandler(status.Err(100, "mock"))
+	test.Assert(t, err.Error() == "remote or network error: rpc error: code = 100 desc = mock", err.Error())
+
 	// Test other error
-	err = defaultErrorHandler(errors.New("mock"))
+	err = DefaultClientErrorHandler(errors.New("mock"))
 	test.Assert(t, err.Error() == "remote or network error: mock")
 }
 
 func BenchmarkResolverMW(b *testing.B) {
-	opts := &client.Options{Resolver: resolver404}
-	mw := newResolveMWBuilder(opts)(ctx)
+	cli := newMockClient(b).(*kClient)
+	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error { return nil }
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
 
@@ -170,9 +161,8 @@ func BenchmarkResolverMW(b *testing.B) {
 }
 
 func BenchmarkResolverMWParallel(b *testing.B) {
-	opts := &client.Options{Resolver: resolver404}
-
-	mw := newResolveMWBuilder(opts)(ctx)
+	cli := newMockClient(b).(*kClient)
+	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error { return nil }
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
 

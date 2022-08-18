@@ -34,11 +34,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/connpool"
-	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/retry"
@@ -47,6 +45,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -95,10 +94,12 @@ type Options struct {
 	StatsLevel *stats.Level
 
 	// retry policy
-	RetryPolicy    *retry.Policy
-	RetryContainer *retry.Container
+	RetryMethodPolicies map[string]retry.Policy
+	RetryContainer      *retry.Container
+	RetryWithResult     *retry.ShouldResultRetry
 
 	CloseCallbacks []func() error
+	WarmUpOption   *warmup.ClientOption
 
 	// GRPC
 	GRPCConnPoolSize uint32
@@ -122,7 +123,7 @@ func NewOptions(opts []Option) *Options {
 	o := &Options{
 		Cli:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
 		Svr:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
-		RemoteOpt:    newClientOption(),
+		RemoteOpt:    newClientRemoteOption(),
 		Configs:      rpcinfo.NewRPCConfig(),
 		Locks:        NewConfigLocks(),
 		Once:         configutil.NewOptionOnce(),
@@ -156,13 +157,18 @@ func NewOptions(opts []Option) *Options {
 }
 
 func (o *Options) initRemoteOpt() {
+	var zero connpool2.IdleConfig
+
 	if o.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
+		if o.PoolCfg != nil && *o.PoolCfg == zero {
+			// grpc unary short connection
+			o.GRPCConnectOpts.ShortConn = true
+		}
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
 	if o.RemoteOpt.ConnPool == nil {
 		if o.PoolCfg != nil {
-			var zero connpool2.IdleConfig
 			if *o.PoolCfg == zero {
 				o.RemoteOpt.ConnPool = connpool.NewShortPool(o.Svr.ServiceName)
 			} else {
@@ -201,13 +207,5 @@ func (o *Options) initRemoteOpt() {
 				}
 			}
 		})
-	}
-}
-
-func newClientOption() *remote.ClientOption {
-	return &remote.ClientOption{
-		CliHandlerFactory: netpoll.NewCliTransHandlerFactory(),
-		Dialer:            netpoll.NewDialer(),
-		Codec:             codec.NewDefaultCodec(),
 	}
 }

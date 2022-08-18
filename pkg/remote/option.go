@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // Option is used to pack the inbound and outbound handlers.
@@ -34,6 +35,36 @@ type Option struct {
 	Inbounds []InboundHandler
 
 	StreamingMetaHandlers []StreamingMetaHandler
+}
+
+// PrependBoundHandler adds a BoundHandler to the head.
+func (o *Option) PrependBoundHandler(h BoundHandler) {
+	switch v := h.(type) {
+	case DuplexBoundHandler:
+		o.Inbounds = append([]InboundHandler{v}, o.Inbounds...)
+		o.Outbounds = append([]OutboundHandler{v}, o.Outbounds...)
+	case InboundHandler:
+		o.Inbounds = append([]InboundHandler{v}, o.Inbounds...)
+	case OutboundHandler:
+		o.Outbounds = append([]OutboundHandler{v}, o.Outbounds...)
+	default:
+		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
+	}
+}
+
+// AppendBoundHandler adds a BoundHandler to the end.
+func (o *Option) AppendBoundHandler(h BoundHandler) {
+	switch v := h.(type) {
+	case DuplexBoundHandler:
+		o.Inbounds = append(o.Inbounds, v)
+		o.Outbounds = append(o.Outbounds, v)
+	case InboundHandler:
+		o.Inbounds = append(o.Inbounds, v)
+	case OutboundHandler:
+		o.Outbounds = append(o.Outbounds, v)
+	default:
+		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
+	}
 }
 
 // ServerOption contains option that is used to init the remote server.
@@ -48,6 +79,10 @@ type ServerOption struct {
 
 	PayloadCodec PayloadCodec
 
+	// Listener is used to specify the server listener, which comes with higher priority than Address below.
+	Listener net.Listener
+
+	// Address is the listener addr
 	Address net.Addr
 
 	ReusePort bool
@@ -63,11 +98,13 @@ type ServerOption struct {
 
 	ReadWriteTimeout time.Duration
 
-	InitRPCInfoFunc func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context)
+	InitOrResetRPCInfoFunc func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context)
 
 	TracerCtl *internal_stats.Controller
 
 	GRPCCfg *grpc.ServerConfig
+
+	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
 
 	Option
 }

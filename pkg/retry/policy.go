@@ -18,6 +18,8 @@ package retry
 
 import (
 	"fmt"
+
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 // Type is retry type include FailureType, BackupType
@@ -40,6 +42,22 @@ func (t Type) String() string {
 	return ""
 }
 
+// BuildFailurePolicy is used to build Policy with *FailurePolicy
+func BuildFailurePolicy(p *FailurePolicy) Policy {
+	if p == nil {
+		return Policy{}
+	}
+	return Policy{Enable: true, Type: FailureType, FailurePolicy: p}
+}
+
+// BuildBackupRequest is used to build Policy with *BackupPolicy
+func BuildBackupRequest(p *BackupPolicy) Policy {
+	if p == nil {
+		return Policy{}
+	}
+	return Policy{Enable: true, Type: BackupType, BackupPolicy: p}
+}
+
 // Policy contains all retry policies
 type Policy struct {
 	Enable bool `json:"enable"`
@@ -52,9 +70,26 @@ type Policy struct {
 
 // FailurePolicy for failure retry
 type FailurePolicy struct {
-	StopPolicy    StopPolicy     `json:"stop_policy"`
-	BackOffPolicy *BackOffPolicy `json:"backoff_policy,omitempty"`
-	RetrySameNode bool           `json:"retry_same_node"`
+	StopPolicy        StopPolicy         `json:"stop_policy"`
+	BackOffPolicy     *BackOffPolicy     `json:"backoff_policy,omitempty"`
+	RetrySameNode     bool               `json:"retry_same_node"`
+	ShouldResultRetry *ShouldResultRetry `json:"-"`
+}
+
+// IsRespRetryNonNil is used to judge if RespRetry is nil
+func (p FailurePolicy) IsRespRetryNonNil() bool {
+	if p.ShouldResultRetry != nil && p.ShouldResultRetry.RespRetry != nil {
+		return true
+	}
+	return false
+}
+
+// IsErrorRetryNonNil is used to judge if ErrorRetry is nil
+func (p FailurePolicy) IsErrorRetryNonNil() bool {
+	if p.ShouldResultRetry != nil && p.ShouldResultRetry.ErrorRetry != nil {
+		return true
+	}
+	return false
 }
 
 // BackupPolicy for backup request
@@ -111,6 +146,12 @@ const (
 	MultiplierBackOffCfgKey BackOffCfgKey = "multiplier"
 )
 
+// ShouldResultRetry is used for specifying which error or resp need to be retried
+type ShouldResultRetry struct {
+	ErrorRetry func(err error, ri rpcinfo.RPCInfo) bool
+	RespRetry  func(resp interface{}, ri rpcinfo.RPCInfo) bool
+}
+
 // Equals to check if policy is equal
 func (p Policy) Equals(np Policy) bool {
 	if p.Enable != np.Enable {
@@ -145,7 +186,8 @@ func (p *FailurePolicy) Equals(np *FailurePolicy) bool {
 	if p.RetrySameNode != np.RetrySameNode {
 		return false
 	}
-
+	// don't need to check `ShouldResultRetry`, ShouldResultRetry is only setup by option
+	// in remote config case will always return false if check it
 	return true
 }
 

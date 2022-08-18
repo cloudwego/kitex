@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-// Package detection protocol detection
+// Package detection protocol detection, it is used for a scenario that switching KitexProtobuf to gRPC.
+// No matter KitexProtobuf or gRPC the server side can handle with this detection handler.
 package detection
 
 import (
@@ -32,12 +33,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 )
 
-type detectionKey struct{}
-
-type detectionHandler struct {
-	handler remote.ServerTransHandler
-}
-
 // NewSvrTransHandlerFactory detection factory construction
 func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
 	return &svrTransHandlerFactory{
@@ -49,6 +44,10 @@ func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
 type svrTransHandlerFactory struct {
 	http2   remote.ServerTransHandlerFactory
 	netpoll remote.ServerTransHandlerFactory
+}
+
+func (f *svrTransHandlerFactory) MuxEnabled() bool {
+	return false
 }
 
 func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
@@ -87,9 +86,9 @@ var prefaceReadAtMost = func() int {
 
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	// only need detect once when connection is reused
-	r := ctx.Value(detectionKey{}).(*detectionHandler)
+	r := ctx.Value(handlerKey{}).(*handlerWrapper)
 	if r.handler != nil {
-		return r.handler.OnRead(ctx, conn)
+		return r.handler.OnRead(r.ctx, conn)
 	}
 	// Check the validity of client preface.
 	zr := conn.(netpoll.Connection).Reader()
@@ -107,20 +106,17 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			return err
 		}
 	}
-	r.handler = which
+	r.ctx, r.handler = ctx, which
 	return which.OnRead(ctx, conn)
 }
 
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
-	t.which(ctx).OnInactive(ctx, conn)
-}
-
-func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
-	if r := ctx.Value(detectionKey{}).(*detectionHandler); r.handler != nil {
-		return r.handler
+	// t.http2 should use the ctx returned by OnActive in r.ctx
+	r := ctx.Value(handlerKey{}).(*handlerWrapper)
+	if r.ctx != nil {
+		ctx = r.ctx
 	}
-	// use noop transHandler
-	return noopSvrTransHandler{}
+	t.which(ctx).OnInactive(ctx, conn)
 }
 
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
@@ -131,7 +127,14 @@ func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Mes
 	return t.which(ctx).OnMessage(ctx, args, result)
 }
 
-//
+func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
+	if r, ok := ctx.Value(handlerKey{}).(*handlerWrapper); ok && r.handler != nil {
+		return r.handler
+	}
+	// use noop transHandler
+	return noopHandler
+}
+
 func (t *svrTransHandler) SetPipeline(pipeline *remote.TransPipeline) {
 	t.http2.SetPipeline(pipeline)
 	t.netpoll.SetPipeline(pipeline)
@@ -151,5 +154,16 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	if err != nil {
 		return nil, err
 	}
-	return context.WithValue(ctx, detectionKey{}, &detectionHandler{}), nil
+	// svrTransHandler wraps two kinds of ServerTransHandler: http2, none-http2.
+	// We think that one connection only use one type, it doesn't need to do protocol detection for every request.
+	// And ctx is initialized with a new connection, so we put a handlerWrapper into ctx, which for recording
+	// the actual handler, then the later request don't need to do http2 detection.
+	return context.WithValue(ctx, handlerKey{}, &handlerWrapper{}), nil
+}
+
+type handlerKey struct{}
+
+type handlerWrapper struct {
+	ctx     context.Context
+	handler remote.ServerTransHandler
 }

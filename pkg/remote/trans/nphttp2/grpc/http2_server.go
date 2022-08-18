@@ -34,14 +34,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/netpoll"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/hpack"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"github.com/cloudwego/netpoll"
-	http2 "github.com/cloudwego/netpoll-http2"
-	"github.com/cloudwego/netpoll-http2/hpack"
-	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -62,7 +64,7 @@ type http2Server struct {
 	lastRead    int64
 	ctx         context.Context
 	done        chan struct{}
-	conn        netpoll.Connection
+	conn        net.Conn
 	loopy       *loopyWriter
 	readerDone  chan struct{} // sync point to enable testing.
 	writerDone  chan struct{} // sync point to enable testing.
@@ -113,13 +115,13 @@ type http2Server struct {
 
 // newHTTP2Server constructs a ServerTransport based on HTTP2. ConnectionError is
 // returned if something goes wrong.
-func newHTTP2Server(ctx context.Context, conn netpoll.Connection, config *ServerConfig) (_ ServerTransport, err error) {
+func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_ ServerTransport, err error) {
 	maxHeaderListSize := defaultServerMaxHeaderListSize
 	if config.MaxHeaderListSize != nil {
 		maxHeaderListSize = *config.MaxHeaderListSize
 	}
 
-	framer := newFramer(conn, maxHeaderListSize)
+	framer := newFramer(conn, config.WriteBufferSize, config.ReadBufferSize, maxHeaderListSize)
 	// Send initial settings as connection preface to client.
 	isettings := []http2.Setting{{
 		ID:  http2.SettingMaxFrameSize,
@@ -230,8 +232,16 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection, config *Server
 	}()
 
 	// Check the validity of client preface.
-	preface, err := t.conn.Reader().Next(ClientPrefaceLen)
-	if err != nil {
+	preface := make([]byte, len(ClientPreface))
+	if _, err := io.ReadFull(t.conn, preface); err != nil {
+		// In deployments where a gRPC server runs behind a cloud load balancer
+		// which performs regular TCP level health checks, the connection is
+		// closed immediately by the latter.  Returning io.EOF here allows the
+		// grpc server implementation to recognize this scenario and suppress
+		// logging to reduce spam.
+		if err == io.EOF {
+			return nil, io.EOF
+		}
 		return nil, connectionErrorf(false, err, "transport: http2Server.HandleStreams failed to receive the preface from client: %v", err)
 	}
 	if !bytes.Equal(preface, ClientPreface) {
@@ -246,7 +256,7 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection, config *Server
 		return nil, connectionErrorf(false, err, "transport: http2Server.HandleStreams failed to read initial settings frame: %v", err)
 	}
 	atomic.StoreInt64(&t.lastRead, time.Now().UnixNano())
-	sf, ok := frame.(*http2.SettingsFrame)
+	sf, ok := frame.(*grpcframe.SettingsFrame)
 	if !ok {
 		return nil, connectionErrorf(false, nil, "transport: http2Server.HandleStreams saw invalid preface type %T from client", frame)
 	}
@@ -267,7 +277,7 @@ func newHTTP2Server(ctx context.Context, conn netpoll.Connection, config *Server
 }
 
 // operateHeader takes action on the decoded headers.
-func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(*Stream), traceCtx func(context.Context, string) context.Context) (fatal bool) {
+func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle func(*Stream), traceCtx func(context.Context, string) context.Context) (fatal bool) {
 	streamID := frame.Header().StreamID
 	state := &decodeState{
 		serverSide: true,
@@ -400,26 +410,27 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 			return
 		}
 		switch frame := frame.(type) {
-		case *http2.MetaHeadersFrame:
+		case *grpcframe.MetaHeadersFrame:
 			if t.operateHeaders(frame, handle, traceCtx) {
 				t.Close()
 				break
 			}
-		case *http2.DataFrame:
+		case *grpcframe.DataFrame:
 			t.handleData(frame)
 		case *http2.RSTStreamFrame:
 			t.handleRSTStream(frame)
-		case *http2.SettingsFrame:
+		case *grpcframe.SettingsFrame:
 			t.handleSettings(frame)
 		case *http2.PingFrame:
 			t.handlePing(frame)
 		case *http2.WindowUpdateFrame:
 			t.handleWindowUpdate(frame)
-		case *http2.GoAwayFrame:
+		case *grpcframe.GoAwayFrame:
 			// TODO: Handle GoAway from the client appropriately.
 		default:
 			klog.CtxErrorf(t.ctx, "transport: http2Server.HandleStreams found unhandled frame type %v.", frame)
 		}
+		t.framer.reader.Release()
 	}
 }
 
@@ -483,7 +494,7 @@ func (t *http2Server) updateWindow(s *Stream, n uint32) {
 	}
 }
 
-func (t *http2Server) handleData(f *http2.DataFrame) {
+func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 	size := f.Header().Length
 	var sendBDPPing bool
 	if t.bdpEst != nil {
@@ -561,7 +572,7 @@ func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
 	})
 }
 
-func (t *http2Server) handleSettings(f *http2.SettingsFrame) {
+func (t *http2Server) handleSettings(f *grpcframe.SettingsFrame) {
 	if f.IsAck() {
 		return
 	}
@@ -813,6 +824,9 @@ func (t *http2Server) Write(s *Stream, hdr, data []byte, opts *Options) error {
 		h:           hdr,
 		d:           data,
 		onEachWrite: t.setResetPingStrikes,
+	}
+	if len(hdr) == 0 && len(data) != 0 {
+		df.dcache = data
 	}
 	if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
 		select {

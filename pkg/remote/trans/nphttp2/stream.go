@@ -33,13 +33,14 @@ type Streamer func(ctx context.Context, svcInfo serviceinfo.ServiceInfo, conn ne
 type stream struct {
 	ctx     context.Context
 	svcInfo *serviceinfo.ServiceInfo
-	conn    net.Conn
+	conn    net.Conn // clientConn or serverConn
 	handler remote.TransReadWriter
 }
 
 // NewStream ...
 func NewStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn net.Conn,
-	handler remote.TransReadWriter) streaming.Stream {
+	handler remote.TransReadWriter,
+) streaming.Stream {
 	return &stream{
 		ctx:     ctx,
 		svcInfo: svcInfo,

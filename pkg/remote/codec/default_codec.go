@@ -76,9 +76,12 @@ type defaultCodec struct {
 // Encode implements the remote.Codec interface, it does complete message encode include header and payload.
 func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
 	defer func() {
-		ri := message.RPCInfo()
 		// notice: mallocLen() must exec before flush, or it will be reset
-		rpcinfo.AsMutableRPCStats(ri.Stats()).SetSendSize(uint64(out.MallocLen()))
+		if ri := message.RPCInfo(); ri != nil {
+			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {
+				ms.SetSendSize(uint64(out.MallocLen()))
+			}
+		}
 	}()
 	var err error
 	var totalLenField []byte
@@ -132,8 +135,11 @@ func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out r
 // Decode implements the remote.Codec interface, it does complete message decode include header and payload.
 func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
 	defer func() {
-		ri := message.RPCInfo()
-		rpcinfo.AsMutableRPCStats(ri.Stats()).SetRecvSize(uint64(in.ReadLen()))
+		if ri := message.RPCInfo(); ri != nil {
+			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {
+				ms.SetRecvSize(uint64(in.ReadLen()))
+			}
+		}
 	}()
 
 	var flagBuf []byte
@@ -170,7 +176,7 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 	}
 
 	// 2. decode body
-	if err := c.decodePayload(ctx, message, in); err != nil {
+	if err = c.decodePayload(ctx, message, in); err != nil {
 		return err
 	}
 	return nil
@@ -271,8 +277,7 @@ func checkRPCState(ctx context.Context, message remote.Message) error {
 }
 
 func checkPayload(
-	flagBuf []byte, message remote.Message, in remote.ByteBuffer, isTTHeader bool, maxPayloadSize int,
-) error {
+	flagBuf []byte, message remote.Message, in remote.ByteBuffer, isTTHeader bool, maxPayloadSize int) error {
 	var transProto transport.Protocol
 	var codecType serviceinfo.PayloadCodec
 	if isThriftBinary(flagBuf) {
@@ -317,6 +322,11 @@ func checkPayload(
 		return err
 	}
 	message.SetProtocolInfo(remote.NewProtocolInfo(transProto, codecType))
+	cfg := rpcinfo.AsMutableRPCConfig(message.RPCInfo().Config())
+	if cfg != nil {
+		tp := message.ProtocolInfo().TransProto
+		cfg.SetTransportProtocol(tp)
+	}
 	return nil
 }
 

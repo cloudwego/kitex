@@ -33,12 +33,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
-	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
-	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
+	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -75,16 +72,17 @@ type Options struct {
 	// RegistryInfo is used to in registry.
 	RegistryInfo *registry.Info
 
-	ACLRules      []acl.RejectFunc
-	Limits        *limit.Option
-	LimitReporter limiter.LimitReporter
+	ACLRules []acl.RejectFunc
+	Limit    Limit
 
 	MWBs []endpoint.MiddlewareBuilder
 
 	Bus    event.Bus
 	Events event.Queue
 
-	// DebugInfo should only contains objects that are suitable for json serialization.
+	SupportedTransportsFunc func(option remote.ServerOption) []string
+
+	// DebugInfo should only contain objects that are suitable for json serialization.
 	DebugInfo    utils.Slice
 	DebugService diagnosis.Service
 
@@ -93,18 +91,32 @@ type Options struct {
 	StatsLevel *stats.Level
 }
 
+type Limit struct {
+	Limits        *limit.Option
+	LimitReporter limiter.LimitReporter
+	ConLimit      limiter.ConcurrencyLimiter
+	QPSLimit      limiter.RateLimiter
+
+	// QPSLimitPostDecode is true to indicate that the QPS limiter takes effect in
+	// the OnMessage callback, and false for the OnRead callback.
+	// Usually when the server is multiplexed, Kitex set it to True by default.
+	QPSLimitPostDecode bool
+}
+
 // NewOptions creates a default options.
 func NewOptions(opts []Option) *Options {
 	o := &Options{
 		Svr:          &rpcinfo.EndpointBasicInfo{},
 		Configs:      rpcinfo.NewRPCConfig(),
 		Once:         configutil.NewOptionOnce(),
-		RemoteOpt:    newServerOption(),
+		RemoteOpt:    newServerRemoteOption(),
 		DebugService: diagnosis.NoopService,
 		ExitSignal:   DefaultSysExitSignal,
 
 		Bus:    event.NewEventBus(),
 		Events: event.NewQueue(event.MaxEventNum),
+
+		SupportedTransportsFunc: DefaultSupportedTransportsFunc,
 
 		TracerCtl: &internal_stats.Controller{},
 		Registry:  registry.NoopRegistry,
@@ -120,19 +132,6 @@ func NewOptions(opts []Option) *Options {
 		o.StatsLevel = &level
 	}
 	return o
-}
-
-func newServerOption() *remote.ServerOption {
-	return &remote.ServerOption{
-		TransServerFactory:    netpoll.NewTransServerFactory(),
-		SvrHandlerFactory:     detection.NewSvrTransHandlerFactory(),
-		Codec:                 codec.NewDefaultCodec(),
-		Address:               defaultAddress,
-		ExitWaitTime:          defaultExitWaitTime,
-		MaxConnectionIdleTime: defaultConnectionIdleTime,
-		AcceptFailedDelayTime: defaultAcceptFailedDelayTime,
-		GRPCCfg:               new(grpc.ServerConfig),
-	}
 }
 
 // ApplyOptions applies the given options.
@@ -157,4 +156,15 @@ func SysExitSignal() chan os.Signal {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
 	return signals
+}
+
+func DefaultSupportedTransportsFunc(option remote.ServerOption) []string {
+	if factory, ok := option.SvrHandlerFactory.(trans.MuxEnabledFlag); ok {
+		if factory.MuxEnabled() {
+			return []string{"ttheader_mux"}
+		} else {
+			return []string{"ttheader", "framed", "ttheader_framed", "grpc"}
+		}
+	}
+	return nil
 }

@@ -17,146 +17,149 @@
 package nphttp2
 
 import (
-	"errors"
 	"net"
-
-	"github.com/cloudwego/netpoll"
+	"sync"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
+// GRPCConn implement WriteFrame and ReadFrame
+type GRPCConn interface {
+	net.Conn
+	// WriteFrame set header and data buffer into frame with nocopy
+	WriteFrame(hdr, data []byte) (n int, err error)
+	// ReadFrame read a frame and return header and payload data
+	ReadFrame() (hdr, data []byte, err error)
+}
+
 type buffer struct {
-	buf      *netpoll.LinkBuffer
-	conn     net.Conn
-	readSize int
+	conn       GRPCConn
+	rbuf       []byte // for read
+	whdr, wbuf []byte // for write
 }
 
-var _ remote.ByteBuffer = (*buffer)(nil)
+var (
+	_ remote.ByteBuffer = (*buffer)(nil)
+	_ remote.FrameWrite = (*buffer)(nil)
+)
 
-func newBuffer(conn net.Conn) *buffer {
-	return &buffer{
-		buf:  netpoll.NewLinkBuffer(),
-		conn: conn,
-	}
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return &buffer{
+			rbuf: make([]byte, 0, 4096),
+			wbuf: nil,
+			whdr: nil,
+		}
+	},
 }
 
-func (b *buffer) readN(n int) error {
-	readLen := b.buf.Len()
-	if readLen >= n {
-		return nil
-	}
+func newBuffer(conn GRPCConn) *buffer {
+	buf := bufferPool.Get().(*buffer)
+	buf.conn = conn
+	return buf
+}
 
-	d, err := b.buf.Malloc(n - readLen)
+func (b *buffer) growRbuf(n int) {
+	capacity := cap(b.rbuf)
+	if capacity >= n {
+		return
+	}
+	buf := make([]byte, 0, 2*capacity+n)
+	b.rbuf = buf
+}
+
+func (b *buffer) Next(n int) (p []byte, err error) {
+	b.growRbuf(n)
+	_, err = b.conn.Read(b.rbuf[:n])
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if _, err = b.conn.Read(d); err != nil {
-		return err
-	}
-	if err = b.buf.Flush(); err != nil {
-		return err
-	}
-	b.readSize += n
+	return b.rbuf[:n], nil
+}
+
+func (b *buffer) WriteHeader(buf []byte) (err error) {
+	b.whdr = buf
 	return nil
 }
 
-func (b *buffer) Read(d []byte) (n int, err error) {
-	return
-}
-
-func (b *buffer) Write(p []byte) (n int, err error) {
-	return
-}
-
-// impl ByteBuffer
-func (b *buffer) Next(n int) (p []byte, err error) {
-	if err = b.readN(n); err != nil {
-		return nil, err
-	}
-	return b.buf.Next(n)
-}
-
-func (b *buffer) Peek(n int) (buf []byte, err error) {
-	if err = b.readN(n); err != nil {
-		return nil, err
-	}
-	return b.buf.Peek(n)
-}
-
-func (b *buffer) Skip(n int) (err error) {
-	if err = b.readN(n); err != nil {
-		return err
-	}
-	return b.buf.Skip(n)
-}
-
-func (b *buffer) Release(e error) (err error) {
-	return b.buf.Close()
-}
-
-func (b *buffer) ReadableLen() (n int) {
-	return b.buf.Len()
-}
-
-func (b *buffer) ReadLen() (n int) {
-	return b.readSize
-}
-
-func (b *buffer) ReadString(n int) (s string, err error) {
-	if err = b.readN(n); err != nil {
-		return
-	}
-	return b.buf.ReadString(n)
-}
-
-func (b *buffer) ReadBinary(n int) (p []byte, err error) {
-	if err = b.readN(n); err != nil {
-		return
-	}
-	return b.buf.ReadBinary(n)
-}
-
-func (b *buffer) Malloc(n int) (buf []byte, err error) {
-	return b.buf.Malloc(n)
-}
-
-func (b *buffer) MallocLen() (length int) {
-	return b.buf.MallocLen()
-}
-
-func (b *buffer) WriteString(s string) (n int, err error) {
-	return b.buf.WriteString(s)
-}
-
-func (b *buffer) WriteBinary(d []byte) (n int, err error) {
-	return b.buf.WriteBinary(d)
-}
-
-func (b *buffer) WriteDirect(d []byte, remainCap int) error {
-	return b.buf.WriteDirect(d, remainCap)
+func (b *buffer) WriteData(buf []byte) (err error) {
+	b.wbuf = buf
+	return nil
 }
 
 func (b *buffer) Flush() (err error) {
-	if err = b.buf.Flush(); err != nil {
-		return
-	}
+	_, err = b.conn.WriteFrame(b.whdr, b.wbuf)
+	b.whdr = nil
+	b.wbuf = nil
+	return err
+}
 
-	wb, _ := b.buf.ReadBinary(b.buf.Len())
-	_, err = b.conn.Write(wb)
-	return
+func (b *buffer) Release(e error) (err error) {
+	b.rbuf = b.rbuf[:0]
+	b.whdr = nil
+	b.wbuf = nil
+	bufferPool.Put(b)
+	return e
+}
+
+// === unimplemented ===
+
+func (b *buffer) Read(p []byte) (n int, err error) {
+	panic("implement me")
+}
+
+func (b *buffer) Write(p []byte) (n int, err error) {
+	panic("implement me")
+}
+
+func (b *buffer) Peek(n int) (buf []byte, err error) {
+	panic("implement me")
+}
+
+func (b *buffer) Skip(n int) (err error) {
+	panic("implement me")
+}
+
+func (b *buffer) ReadableLen() (n int) {
+	panic("implement me")
+}
+
+func (b *buffer) ReadLen() (n int) {
+	panic("implement me")
+}
+
+func (b *buffer) ReadString(n int) (s string, err error) {
+	panic("implement me")
+}
+
+func (b *buffer) ReadBinary(n int) (p []byte, err error) {
+	panic("implement me")
+}
+
+func (b *buffer) Malloc(n int) (buf []byte, err error) {
+	panic("implement me")
+}
+
+func (b *buffer) MallocLen() (length int) {
+	panic("implement me")
+}
+
+func (b *buffer) WriteString(s string) (n int, err error) {
+	panic("implement me")
+}
+
+func (b *buffer) WriteBinary(data []byte) (n int, err error) {
+	panic("implement me")
 }
 
 func (b *buffer) NewBuffer() remote.ByteBuffer {
-	return newBuffer(b.conn)
+	panic("implement me")
 }
 
-// ErrUnimplemented return unimplemented error
-var ErrUnimplemented = errors.New("unimplemented")
-
 func (b *buffer) AppendBuffer(buf remote.ByteBuffer) (err error) {
-	return ErrUnimplemented
+	panic("implement me")
 }
 
 func (b *buffer) Bytes() (buf []byte, err error) {
-	return nil, ErrUnimplemented
+	panic("implement me")
 }

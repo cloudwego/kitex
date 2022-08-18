@@ -43,12 +43,14 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
 // Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
 // registered to it.
 type Server interface {
 	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error
+	GetServiceInfo() *serviceinfo.ServiceInfo
 	Run() error
 	Stop() error
 }
@@ -62,6 +64,7 @@ type server struct {
 	eps     endpoint.Endpoint
 	mws     []endpoint.Middleware
 	svr     remotesvr.Server
+	stopped sync.Once
 
 	sync.Mutex
 }
@@ -118,10 +121,28 @@ func newErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
 	}
 }
 
-func (s *server) initRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context) {
+func (s *server) initOrResetRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context) {
 	return func(ctx context.Context, rAddr net.Addr) (rpcinfo.RPCInfo, context.Context) {
 		if ctx == nil {
 			ctx = context.Background()
+		}
+		var ri rpcinfo.RPCInfo
+		// Reset rpcinfo if it exists in ctx.
+		if ri = rpcinfo.GetRPCInfo(ctx); ri != nil {
+			fi := rpcinfo.AsMutableEndpointInfo(ri.From())
+			fi.Reset()
+			fi.SetAddress(rAddr)
+			rpcinfo.AsMutableEndpointInfo(ri.To()).ResetFromBasicInfo(s.opt.Svr)
+			if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+				setter.Reset()
+			}
+			rpcinfo.AsMutableRPCConfig(ri.Config()).CopyFrom(s.opt.Configs)
+			rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
+			rpcStats.Reset()
+			if s.opt.StatsLevel != nil {
+				rpcStats.SetLevel(*s.opt.StatsLevel)
+			}
+			return ri, ctx
 		}
 		rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 		if s.opt.StatsLevel != nil {
@@ -129,7 +150,7 @@ func (s *server) initRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCI
 		}
 
 		// Export read-only views to external users and keep a mapping for internal users.
-		ri := rpcinfo.NewRPCInfo(
+		ri = rpcinfo.NewRPCInfo(
 			rpcinfo.EmptyEndpointInfo(),
 			rpcinfo.FromBasicInfo(s.opt.Svr),
 			rpcinfo.NewServerInvocation(),
@@ -158,6 +179,10 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	return nil
 }
 
+func (s *server) GetServiceInfo() *serviceinfo.ServiceInfo {
+	return s.svcInfo
+}
+
 // Run runs the server.
 func (s *server) Run() (err error) {
 	if s.svcInfo == nil {
@@ -176,6 +201,7 @@ func (s *server) Run() (err error) {
 	}
 
 	s.richRemoteOption()
+	s.fillMoreServiceInfo(s.opt.RemoteOpt.Address)
 	transHdlr, err := s.newSvrTransHandler()
 	if err != nil {
 		return err
@@ -188,6 +214,12 @@ func (s *server) Run() (err error) {
 	}
 
 	errCh := s.svr.Start()
+	select {
+	case err = <-errCh:
+		klog.Errorf("KITEX: server start error: error=%s", err.Error())
+		return err
+	default:
+	}
 	muStartHooks.Lock()
 	for i := range onServerStart {
 		go onServerStart[i]()
@@ -200,12 +232,6 @@ func (s *server) Run() (err error) {
 	if err = s.waitExit(errCh); err != nil {
 		klog.Errorf("KITEX: received error and exit: error=%s", err.Error())
 	}
-	muShutdownHooks.Lock()
-	for i := range onShutdown {
-		onShutdown[i]()
-	}
-	muShutdownHooks.Unlock()
-	// stop server after user hooks
 	if e := s.Stop(); e != nil && err == nil {
 		err = e
 		klog.Errorf("KITEX: stop server error: error=%s", e.Error())
@@ -215,18 +241,27 @@ func (s *server) Run() (err error) {
 
 // Stop stops the server gracefully.
 func (s *server) Stop() (err error) {
-	s.Lock()
-	defer s.Unlock()
-	if s.opt.RegistryInfo != nil {
-		err = s.opt.Registry.Deregister(s.opt.RegistryInfo)
-		s.opt.RegistryInfo = nil
-	}
-	if s.svr != nil {
-		if e := s.svr.Stop(); e != nil {
-			err = e
+	s.stopped.Do(func() {
+		s.Lock()
+		defer s.Unlock()
+
+		muShutdownHooks.Lock()
+		for i := range onShutdown {
+			onShutdown[i]()
 		}
-		s.svr = nil
-	}
+		muShutdownHooks.Unlock()
+
+		if s.opt.RegistryInfo != nil {
+			err = s.opt.Registry.Deregister(s.opt.RegistryInfo)
+			s.opt.RegistryInfo = nil
+		}
+		if s.svr != nil {
+			if e := s.svr.Stop(); e != nil {
+				err = e
+			}
+			s.svr = nil
+		}
+	})
 	return
 }
 
@@ -258,7 +293,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
 	remoteOpt.SvcInfo = s.svcInfo
-	remoteOpt.InitRPCInfoFunc = s.initRPCInfoFunc()
+	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
 }
@@ -270,46 +305,68 @@ func (s *server) richRemoteOption() {
 }
 
 func (s *server) addBoundHandlers(opt *remote.ServerOption) {
+	// add default meta handler
+	if len(s.opt.MetaHandlers) == 0 {
+		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerHTTP2Handler)
+		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerTTHeaderHandler)
+	}
 	// for server trans info handler
-	if len(s.opt.MetaHandlers) > 0 {
-		transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
-		// meta handler exec before boundHandlers which add with option
-		doAddBoundHandlerToHead(transInfoHdlr, opt)
-		for _, h := range s.opt.MetaHandlers {
-			if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
-				opt.StreamingMetaHandlers = append(opt.StreamingMetaHandlers, shdlr)
-			}
+	transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
+	// meta handler exec before boundHandlers which add with option
+	doAddBoundHandlerToHead(transInfoHdlr, opt)
+	for _, h := range s.opt.MetaHandlers {
+		if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
+			opt.StreamingMetaHandlers = append(opt.StreamingMetaHandlers, shdlr)
 		}
 	}
 
 	// for server limiter, the handler should be added as first one
-	connLimit, qpsLimit, ok := s.buildLimiterWithOpt()
-	if ok {
-		limitHdlr := bound.NewServerLimiterHandler(connLimit, qpsLimit, s.opt.LimitReporter)
+	limitHdlr := s.buildLimiterWithOpt()
+	if limitHdlr != nil {
 		doAddBoundHandlerToHead(limitHdlr, opt)
 	}
 }
 
-func (s *server) buildLimiterWithOpt() (connLimit limiter.ConcurrencyLimiter, qpsLimit limiter.RateLimiter, ok bool) {
-	if s.opt.Limits != nil {
-		if s.opt.Limits.MaxConnections > 0 {
-			connLimit = limiter.NewConcurrencyLimiter(s.opt.Limits.MaxConnections)
+/*
+ * There are two times when the rate limiter can take effect for a non-multiplexed server,
+ * which are the OnRead and OnMessage callback. OnRead is called before request decoded
+ * and OnMessage is called after.
+ * Therefore, the optimization point is that we can make rate limiter take effect in OnRead as
+ * possible to save computational cost of decoding.
+ * The implementation is that when using the default rate limiter to launching a non-multiplexed
+ * service, use the `serverLimiterOnReadHandler` whose rate limiting takes effect in the OnRead
+ * callback.
+ */
+func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
+	limits := s.opt.Limit.Limits
+	connLimit := s.opt.Limit.ConLimit
+	qpsLimit := s.opt.Limit.QPSLimit
+	if limits == nil && connLimit == nil && qpsLimit == nil {
+		return
+	}
+	if connLimit == nil {
+		if limits != nil && limits.MaxConnections > 0 {
+			connLimit = limiter.NewConnectionLimiter(limits.MaxConnections)
 		} else {
 			connLimit = &limiter.DummyConcurrencyLimiter{}
 		}
-		if s.opt.Limits.MaxQPS > 0 {
+	}
+	if qpsLimit == nil {
+		if limits != nil && limits.MaxQPS > 0 {
 			interval := time.Millisecond * 100 // FIXME: should not care this implementation-specific parameter
-			qpsLimit = limiter.NewQPSLimiter(interval, s.opt.Limits.MaxQPS)
+			qpsLimit = limiter.NewQPSLimiter(interval, limits.MaxQPS)
 		} else {
 			qpsLimit = &limiter.DummyRateLimiter{}
 		}
-
-		if s.opt.Limits.UpdateControl != nil {
-			updater := limiter.NewLimiterWrapper(connLimit, qpsLimit)
-			s.opt.Limits.UpdateControl(updater)
-		}
-		ok = true
+	} else {
+		s.opt.Limit.QPSLimitPostDecode = true
 	}
+	if limits != nil && limits.UpdateControl != nil {
+		updater := limiter.NewLimiterWrapper(connLimit, qpsLimit)
+		limits.UpdateControl(updater)
+	}
+	handler = bound.NewServerLimiterHandler(connLimit, qpsLimit, s.opt.Limit.LimitReporter, s.opt.Limit.QPSLimitPostDecode)
+	// TODO: gRPC limiter
 	return
 }
 
@@ -391,6 +448,19 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 	if info.Weight == 0 {
 		info.Weight = discovery.DefaultWeight
 	}
+}
+
+func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
+	ni := *s.svcInfo
+	si := &ni
+	extra := make(map[string]interface{}, len(si.Extra)+2)
+	for k, v := range si.Extra {
+		extra[k] = v
+	}
+	extra["address"] = lAddr
+	extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
+	si.Extra = extra
+	s.svcInfo = si
 }
 
 func (s *server) waitExit(errCh chan error) error {

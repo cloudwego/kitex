@@ -40,6 +40,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -316,41 +317,74 @@ func WithConnReporterEnabled() Option {
 	}}
 }
 
-// WithFailureRetry sets the failure retry policy for client.
+// WithFailureRetry sets the failure retry policy for client, it will take effect for all methods.
 func WithFailureRetry(p *retry.FailurePolicy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if p == nil {
 			return
 		}
 		di.Push(fmt.Sprintf("WithFailureRetry(%+v)", *p))
-		if o.RetryPolicy == nil {
-			o.RetryPolicy = &retry.Policy{}
+		if o.RetryMethodPolicies == nil {
+			o.RetryMethodPolicies = make(map[string]retry.Policy)
 		}
-		if o.RetryPolicy.BackupPolicy != nil {
+		if o.RetryMethodPolicies[retry.Wildcard].BackupPolicy != nil {
 			panic("BackupPolicy has been setup, cannot support Failure Retry at same time")
 		}
-		o.RetryPolicy.FailurePolicy = p
-		o.RetryPolicy.Enable = true
-		o.RetryPolicy.Type = retry.FailureType
+		o.RetryMethodPolicies[retry.Wildcard] = retry.BuildFailurePolicy(p)
 	}}
 }
 
-// WithBackupRequest sets the backup request policy for client.
+// WithBackupRequest sets the backup request policy for client, it will take effect for all methods.
 func WithBackupRequest(p *retry.BackupPolicy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if p == nil {
 			return
 		}
 		di.Push(fmt.Sprintf("WithBackupRequest(%+v)", *p))
-		if o.RetryPolicy == nil {
-			o.RetryPolicy = &retry.Policy{}
+		if o.RetryMethodPolicies == nil {
+			o.RetryMethodPolicies = make(map[string]retry.Policy)
 		}
-		if o.RetryPolicy.FailurePolicy != nil {
-			panic("Failure Retry has been setup, cannot support Backup Request at same time")
+		if o.RetryMethodPolicies[retry.Wildcard].FailurePolicy != nil {
+			panic("BackupPolicy has been setup, cannot support Failure Retry at same time")
 		}
-		o.RetryPolicy.BackupPolicy = p
-		o.RetryPolicy.Enable = true
-		o.RetryPolicy.Type = retry.BackupType
+		o.RetryMethodPolicies[retry.Wildcard] = retry.BuildBackupRequest(p)
+	}}
+}
+
+// WithRetryMethodPolicies sets the retry policy for method.
+// The priority is higher than WithFailureRetry and WithBackupRequest. Only the methods which are not included by
+// this config will use the policy that is configured by WithFailureRetry or WithBackupRequest .
+// FailureRetry and BackupRequest can be set for different method at same time.
+// Notice: method name is case-sensitive, it should be same with the definition in IDL.
+func WithRetryMethodPolicies(mp map[string]retry.Policy) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		if mp == nil {
+			return
+		}
+		di.Push(fmt.Sprintf("WithRetryMethodPolicies(%+v)", mp))
+		if o.RetryMethodPolicies == nil {
+			o.RetryMethodPolicies = make(map[string]retry.Policy)
+		}
+		wildcardCfg := o.RetryMethodPolicies[retry.Wildcard]
+		o.RetryMethodPolicies = mp
+		if wildcardCfg.Enable && !mp[retry.Wildcard].Enable {
+			// if there is enabled wildcard config before, keep it
+			o.RetryMethodPolicies[retry.Wildcard] = wildcardCfg
+		}
+	}}
+}
+
+// WithSpecifiedResultRetry is used with FailureRetry.
+// When you enable FailureRetry and want to retry with the specified error or response, you can configure this Option.
+// ShouldResultRetry is defined inside retry.FailurePolicy, so WithFailureRetry also can set ShouldResultRetry.
+// But if your retry policy is enabled by remote config, WithSpecifiedResultRetry is useful.
+func WithSpecifiedResultRetry(rr *retry.ShouldResultRetry) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		if rr == nil {
+			return
+		}
+		di.Push(fmt.Sprintf("WithSpecifiedResultRetry(%+v)", rr))
+		o.RetryWithResult = rr
 	}}
 }
 
@@ -369,6 +403,34 @@ func WithGRPCConnPoolSize(s uint32) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCConnPoolSize(%d)", s))
 		o.GRPCConnPoolSize = s
+	}}
+}
+
+// WithGRPCWriteBufferSize determines how much data can be batched before doing a
+// write on the wire. The corresponding memory allocation for this buffer will
+// be twice the size to keep syscalls low. The default value for this buffer is
+// 32KB.
+//
+// Zero will disable the write buffer such that each write will be on underlying
+// connection. Note: A Send call may not directly translate to a write.
+// It corresponds to the WithWriteBufferSize DialOption of gRPC.
+func WithGRPCWriteBufferSize(s uint32) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCWriteBufferSize(%d)", s))
+		o.GRPCConnectOpts.WriteBufferSize = s
+	}}
+}
+
+// WithGRPCReadBufferSize lets you set the size of read buffer, this determines how
+// much data can be read at most for each read syscall.
+//
+// The default value for this buffer is 32KB. Zero will disable read buffer for
+// a connection so data framer can access the underlying conn directly.
+// It corresponds to the WithReadBufferSize DialOption of gRPC.
+func WithGRPCReadBufferSize(s uint32) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCReadBufferSize(%d)", s))
+		o.GRPCConnectOpts.ReadBufferSize = s
 	}}
 }
 
@@ -411,5 +473,13 @@ func WithGRPCKeepaliveParams(kp grpc.ClientKeepalive) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCKeepaliveParams(%+v)", kp))
 		o.GRPCConnectOpts.KeepaliveParams = kp
+	}}
+}
+
+// WithWarmingUp forces the client to do some warm-ups at the end of the initialization.
+func WithWarmingUp(wuo *warmup.ClientOption) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithWarmingUp(%+v)", wuo))
+		o.WarmUpOption = wuo
 	}}
 }

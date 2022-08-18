@@ -34,9 +34,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/transport"
 )
 
 type svrTransHandlerFactory struct{}
@@ -44,6 +46,11 @@ type svrTransHandlerFactory struct{}
 // NewSvrTransHandlerFactory creates a default netpollmux remote.ServerTransHandlerFactory.
 func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
 	return &svrTransHandlerFactory{}
+}
+
+// MuxEnabled returns true to mark svrTransHandlerFactory as a mux server factory.
+func (f *svrTransHandlerFactory) MuxEnabled() bool {
+	return true
 }
 
 // NewTransHandler implements the remote.ServerTransHandlerFactory interface.
@@ -80,6 +87,8 @@ type svrTransHandler struct {
 	transPipe  *remote.TransPipeline
 	ext        trans.Extension
 	funcPool   sync.Pool
+	conns      sync.Map
+	tasks      sync.WaitGroup
 }
 
 // Write implements the remote.ServerTransHandler interface.
@@ -180,6 +189,9 @@ func (t *svrTransHandler) batchGoTasks(fs []func()) {
 
 // task contains a complete process about decoding request -> handling -> writing response
 func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, reader netpoll.Reader) {
+	t.tasks.Add(1)
+	defer t.tasks.Done()
+
 	// rpcInfoCtx is a pooled ctx with inited RPCInfo which can be reused.
 	// it's recycled in defer.
 	muxSvrConn, _ := muxSvrConnCtx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
@@ -192,6 +204,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	var err error
 	var recvMsg remote.Message
 	var sendMsg remote.Message
+	var closeConn bool
 	defer func() {
 		panicErr := recover()
 		if panicErr != nil {
@@ -199,14 +212,19 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 				ri := rpcinfo.GetRPCInfo(ctx)
 				rService, rAddr := getRemoteInfo(ri, conn)
 				klog.Errorf("KITEX: panic happened, close conn, remoteAddress=%s remoteService=%s error=%s\nstack=%s", rAddr, rService, panicErr, string(debug.Stack()))
-				conn.Close()
+				closeConn = true
 			} else {
 				klog.Errorf("KITEX: panic happened, error=%s\nstack=%s", panicErr, string(debug.Stack()))
 			}
 		}
+		if closeConn && conn != nil {
+			conn.Close()
+		}
 		t.finishTracer(ctx, rpcInfo, err, panicErr)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
+		// reset rpcinfo
+		_, rpcInfoCtx = t.opt.InitOrResetRPCInfoFunc(rpcInfoCtx, conn.RemoteAddr())
 		muxSvrConn.pool.Put(rpcInfoCtx)
 	}()
 
@@ -215,7 +233,9 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	bufReader := np.NewReaderByteBuffer(reader)
 	err = t.readWithByteBuffer(ctx, bufReader, recvMsg)
 	if err != nil {
-		t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, false, true)
+		// No need to close the connection when read failed in mux case, because it had finished reads.
+		// But still need to close conn if write failed
+		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, true)
 		// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded
 		t.OnError(ctx, err, muxSvrConn)
 		return
@@ -223,7 +243,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 
 	var methodInfo serviceinfo.MethodInfo
 	if methodInfo, err = trans.GetMethodInfo(rpcInfo, t.svcInfo); err != nil {
-		t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, false, true)
+		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, true)
 		t.OnError(ctx, err, muxSvrConn)
 		return
 	}
@@ -238,13 +258,14 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		// error cannot be wrapped to print here, so it must exec before NewTransError
 		t.OnError(ctx, err, muxSvrConn)
 		err = remote.NewTransError(remote.InternalError, err)
-		t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, false, false)
+		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, false)
 		return
 	}
 
 	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
 	if err = t.transPipe.Write(ctx, muxSvrConn, sendMsg); err != nil {
 		t.OnError(ctx, err, muxSvrConn)
+		closeConn = true
 		return
 	}
 }
@@ -271,16 +292,61 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	pool := &sync.Pool{
 		New: func() interface{} {
 			// init rpcinfo
-			_, ctx := t.opt.InitRPCInfoFunc(ctx, connection.RemoteAddr())
+			_, ctx := t.opt.InitOrResetRPCInfoFunc(ctx, connection.RemoteAddr())
 			return ctx
 		},
 	}
-	return context.WithValue(context.Background(), ctxKeyMuxSvrConn{}, newMuxSvrConn(connection, pool)), nil
+	muxConn := newMuxSvrConn(connection, pool)
+	t.conns.Store(conn, muxConn)
+	return context.WithValue(context.Background(), ctxKeyMuxSvrConn{}, muxConn), nil
 }
 
 // OnInactive implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
-	// do nothing now
+	t.conns.Delete(conn)
+}
+
+func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
+	// Send a control frame with sequence ID 0 to notify the remote
+	// end to close the connection or prevent further operation on it.
+	iv := rpcinfo.NewInvocation("none", "none")
+	iv.SetSeqID(0)
+	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
+	data := NewControlFrame()
+	msg := remote.NewMessage(data, t.svcInfo, ri, remote.Reply, remote.Server)
+	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	msg.TransInfo().TransStrInfo()[transmeta.HeaderConnectionReadyToReset] = "1"
+
+	t.conns.Range(func(k, v interface{}) bool {
+		wbuf := netpoll.NewLinkBuffer()
+		bufWriter := np.NewWriterByteBuffer(wbuf)
+		err := t.codec.Encode(ctx, msg, bufWriter)
+		bufWriter.Release(err)
+		if err == nil {
+			v.(*muxSvrConn).Put(func() (buf netpoll.Writer, isNil bool) {
+				return wbuf, false
+			})
+		} else {
+			c := v.(*muxSvrConn)
+			klog.Warn("KITEX: signal connection closing error:",
+				err.Error(), c.LocalAddr().String(), "=>", c.RemoteAddr().String())
+		}
+		return true
+	})
+	// wait until all notifications are sent and clients stop using those connections
+	done := make(chan struct{})
+	go func() {
+		t.tasks.Wait()
+		close(done)
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-done:
+			return nil
+		}
+	}
 }
 
 // OnError implements the remote.ServerTransHandler interface.
@@ -294,10 +360,13 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 		}
 		remote := rpcinfo.AsMutableEndpointInfo(ri.From())
 		remote.SetTag(rpcinfo.RemoteClosedTag, "1")
-	} else if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s\nstack=%s", rService, rAddr, err.Error(), pe.Stack())
 	} else {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s", rService, rAddr, err.Error())
+		var de *kerrors.DetailedError
+		if ok := errors.As(err, &de); ok && de.Stack() != "" {
+			klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s\nstack=%s", rService, rAddr, err.Error(), de.Stack())
+		} else {
+			klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s", rService, rAddr, err.Error())
+		}
 	}
 }
 
@@ -311,12 +380,9 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 	t.transPipe = p
 }
 
-func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, closeConn, doOnMessage bool) {
-	defer func() {
-		if closeConn {
-			conn.Close()
-		}
-	}()
+func (t *svrTransHandler) writeErrorReplyIfNeeded(
+	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool,
+) (shouldCloseConn bool) {
 	if methodInfo, _ := trans.GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return
@@ -335,7 +401,9 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(ctx context.Context, recvMsg r
 	err = t.transPipe.Write(ctx, conn, errMsg)
 	if err != nil {
 		klog.CtxErrorf(ctx, "KITEX: write error reply failed, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
+		return true
 	}
+	return
 }
 
 func (t *svrTransHandler) tryRecover(ctx context.Context, conn net.Conn) {

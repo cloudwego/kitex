@@ -35,9 +35,9 @@ func NewConfigLocks() *ConfigLocks {
 }
 
 // ApplyLocks applies the locking operations on rpcinfo.RPCConfig and internal.RemoteInfo.
-func (cl *ConfigLocks) ApplyLocks(cfg rpcinfo.RPCConfig, svr remoteinfo.RemoteInfo) {
+func (cl *ConfigLocks) ApplyLocks(cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo) {
 	if cfg != nil {
-		rpcinfo.AsMutableRPCConfig(cfg).LockConfig(cl.Bits)
+		cfg.LockConfig(cl.Bits)
 	}
 	if svr != nil {
 		for t := range cl.Tags {

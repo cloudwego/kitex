@@ -65,3 +65,8 @@ type ServerTransHandler interface {
 type InvokeHandleFuncSetter interface {
 	SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint)
 }
+
+// GracefulShutdown supports closing connections in a graceful manner.
+type GracefulShutdown interface {
+	GracefulShutdown(ctx context.Context) error
+}

@@ -17,6 +17,7 @@
 package limiter
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 )
@@ -35,11 +36,12 @@ type qpsLimiter struct {
 
 // NewQPSLimiter creates qpsLimiter.
 func NewQPSLimiter(interval time.Duration, limit int) RateLimiter {
+	once := calcOnce(interval, limit)
 	l := &qpsLimiter{
 		limit:    int32(limit),
-		tokens:   int32(limit),
 		interval: interval,
-		once:     calcOnce(interval, limit),
+		tokens:   once,
+		once:     once,
 	}
 	go l.startTicker(interval)
 	return l
@@ -50,15 +52,15 @@ func (l *qpsLimiter) UpdateLimit(limit int) {
 	once := calcOnce(l.interval, limit)
 	atomic.StoreInt32(&l.limit, int32(limit))
 	atomic.StoreInt32(&l.once, once)
-	l.resetTokens()
+	l.resetTokens(once)
 }
 
 // UpdateQPSLimit update the interval and limit. It is **not** concurrent-safe.
 func (l *qpsLimiter) UpdateQPSLimit(interval time.Duration, limit int) {
-	atomic.StoreInt32(&l.limit, int32(limit))
 	once := calcOnce(interval, limit)
+	atomic.StoreInt32(&l.limit, int32(limit))
 	atomic.StoreInt32(&l.once, once)
-	l.resetTokens()
+	l.resetTokens(once)
 	if interval != l.interval {
 		l.interval = interval
 		l.stopTicker()
@@ -66,8 +68,8 @@ func (l *qpsLimiter) UpdateQPSLimit(interval time.Duration, limit int) {
 	}
 }
 
-// Acquire adds 1.
-func (l *qpsLimiter) Acquire() bool {
+// Acquire one token.
+func (l *qpsLimiter) Acquire(ctx context.Context) bool {
 	if atomic.LoadInt32(&l.tokens) <= 0 {
 		return false
 	}
@@ -75,7 +77,7 @@ func (l *qpsLimiter) Acquire() bool {
 }
 
 // Status returns the current status.
-func (l *qpsLimiter) Status() (max, cur int, interval time.Duration) {
+func (l *qpsLimiter) Status(ctx context.Context) (max, cur int, interval time.Duration) {
 	max = int(atomic.LoadInt32(&l.limit))
 	cur = int(atomic.LoadInt32(&l.tokens))
 	interval = l.interval
@@ -140,9 +142,8 @@ func calcOnce(interval time.Duration, limit int) int32 {
 	return once
 }
 
-func (l *qpsLimiter) resetTokens() {
-	limit := atomic.LoadInt32(&l.limit)
-	if atomic.LoadInt32(&l.tokens) > limit {
-		atomic.StoreInt32(&l.tokens, l.limit)
+func (l *qpsLimiter) resetTokens(once int32) {
+	if atomic.LoadInt32(&l.tokens) > once {
+		atomic.StoreInt32(&l.tokens, once)
 	}
 }

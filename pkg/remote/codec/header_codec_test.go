@@ -19,14 +19,17 @@ package codec
 import (
 	"context"
 	"encoding/binary"
+	"net"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -34,7 +37,7 @@ var mockPayloadLen = 100
 
 func TestTTHeaderCodec(t *testing.T) {
 	ctx := context.Background()
-	sendMsg := initSendMsg(transport.TTHeader)
+	sendMsg := initClientSendMsg(transport.TTHeader)
 
 	// encode
 	out := remote.NewWriterBuffer(256)
@@ -43,7 +46,7 @@ func TestTTHeaderCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode
-	recvMsg := initRecvMsg()
+	recvMsg := initServerRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
@@ -56,7 +59,7 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 	ctx := context.Background()
 	intKVInfo := prepareIntKVInfo()
 	strKVInfo := prepareStrKVInfo()
-	sendMsg := initSendMsg(transport.TTHeader)
+	sendMsg := initClientSendMsg(transport.TTHeader)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
 	sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
@@ -68,7 +71,7 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// decode
-	recvMsg := initRecvMsg()
+	recvMsg := initServerRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
@@ -85,12 +88,56 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
 }
 
+func TestFillBasicInfoOfTTHeader(t *testing.T) {
+	ctx := context.Background()
+	mockAddr := "mock address"
+	// 1. server side fill from address
+	// encode
+	sendMsg := initClientSendMsg(transport.TTHeader)
+	sendMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr] = mockAddr
+	sendMsg.TransInfo().TransIntInfo()[transmeta.FromService] = mockServiceName
+	out := remote.NewWriterBuffer(256)
+	totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, out)
+	binary.BigEndian.PutUint32(totalLenField, uint32(out.MallocLen()-Size32+mockPayloadLen))
+	test.Assert(t, err == nil, err)
+	// decode
+	recvMsg := initServerRecvMsg()
+	buf, err := out.Bytes()
+	test.Assert(t, err == nil, err)
+	in := remote.NewReaderBuffer(buf)
+	err = ttHeaderCodec.decode(ctx, recvMsg, in)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, recvMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr] == mockAddr)
+	test.Assert(t, recvMsg.RPCInfo().From().Address().String() == mockAddr)
+	test.Assert(t, recvMsg.RPCInfo().From().ServiceName() == mockServiceName)
+
+	// 2. client side fill to address
+	// encode
+	sendMsg = initServerSendMsg(transport.TTHeader)
+	sendMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr] = mockAddr
+	out = remote.NewWriterBuffer(256)
+	totalLenField, err = ttHeaderCodec.encode(ctx, sendMsg, out)
+	binary.BigEndian.PutUint32(totalLenField, uint32(out.MallocLen()-Size32+mockPayloadLen))
+	test.Assert(t, err == nil, err)
+	// decode
+	recvMsg = initClientRecvMsg()
+	toInfo := remoteinfo.AsRemoteInfo(recvMsg.RPCInfo().To())
+	toInfo.SetInstance(&mockInst{})
+	buf, err = out.Bytes()
+	test.Assert(t, err == nil, err)
+	in = remote.NewReaderBuffer(buf)
+	err = ttHeaderCodec.decode(ctx, recvMsg, in)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, recvMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr] == mockAddr)
+	test.Assert(t, toInfo.Address().String() == mockAddr, toInfo.Address())
+}
+
 func BenchmarkTTHeaderCodec(b *testing.B) {
 	ctx := context.Background()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sendMsg := initSendMsg(transport.TTHeader)
+		sendMsg := initClientSendMsg(transport.TTHeader)
 		// encode
 		out := remote.NewWriterBuffer(256)
 		totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, out)
@@ -98,7 +145,7 @@ func BenchmarkTTHeaderCodec(b *testing.B) {
 		test.Assert(b, err == nil, err)
 
 		// decode
-		recvMsg := initRecvMsg()
+		recvMsg := initServerRecvMsg()
 		buf, err := out.Bytes()
 		test.Assert(b, err == nil, err)
 		in := remote.NewReaderBuffer(buf)
@@ -116,7 +163,7 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			sendMsg := initSendMsg(transport.TTHeader)
+			sendMsg := initClientSendMsg(transport.TTHeader)
 			sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 			sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
 			sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
@@ -128,7 +175,7 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 			test.Assert(b, err == nil, err)
 
 			// decode
-			recvMsg := initRecvMsg()
+			recvMsg := initServerRecvMsg()
 			buf, err := out.Bytes()
 			test.Assert(b, err == nil, err)
 			in := remote.NewReaderBuffer(buf)
@@ -153,7 +200,7 @@ func BenchmarkTTHeaderCodecParallel(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			sendMsg := initSendMsg(transport.TTHeader)
+			sendMsg := initClientSendMsg(transport.TTHeader)
 			// encode
 			out := remote.NewWriterBuffer(256)
 			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, out)
@@ -161,7 +208,7 @@ func BenchmarkTTHeaderCodecParallel(b *testing.B) {
 			test.Assert(b, err == nil, err)
 
 			// decode
-			recvMsg := initRecvMsg()
+			recvMsg := initServerRecvMsg()
 			buf, err := out.Bytes()
 			test.Assert(b, err == nil, err)
 			in := remote.NewReaderBuffer(buf)
@@ -172,22 +219,71 @@ func BenchmarkTTHeaderCodecParallel(b *testing.B) {
 	})
 }
 
-func initRecvMsg() remote.Message {
+var (
+	mockServiceName = "mock service"
+	mockMethod      = "mock"
+
+	mockCliRPCInfo = rpcinfo.NewRPCInfo(
+		rpcinfo.EmptyEndpointInfo(),
+		remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: mockServiceName}, mockMethod).ImmutableView(),
+		rpcinfo.NewInvocation("", mockMethod),
+		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+
+	mockSvrRPCInfo = rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(),
+		rpcinfo.FromBasicInfo(&rpcinfo.EndpointBasicInfo{ServiceName: mockServiceName}),
+		rpcinfo.NewServerInvocation(),
+		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+)
+
+func initServerRecvMsg() remote.Message {
 	var req interface{}
-	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+	msg := remote.NewMessage(req, mocks.ServiceInfo(), mockSvrRPCInfo, remote.Call, remote.Server)
 	return msg
 }
 
-func initSendMsg(tp transport.Protocol) remote.Message {
+func initClientSendMsg(tp transport.Protocol) remote.Message {
 	var req interface{}
 	svcInfo := mocks.ServiceInfo()
-	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
+	msg := remote.NewMessage(req, svcInfo, mockCliRPCInfo, remote.Call, remote.Client)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
+}
+
+func initServerSendMsg(tp transport.Protocol) remote.Message {
+	var resp interface{}
+	msg := remote.NewMessage(resp, mocks.ServiceInfo(), mockSvrRPCInfo, remote.Reply, remote.Server)
+	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, mocks.ServiceInfo().PayloadCodec))
+	return msg
+}
+
+func initClientRecvMsg() remote.Message {
+	var resp interface{}
+	svcInfo := mocks.ServiceInfo()
+	msg := remote.NewMessage(resp, svcInfo, mockCliRPCInfo, remote.Reply, remote.Client)
+	return msg
+}
+
+var _ discovery.Instance = &mockInst{}
+
+type mockInst struct {
+	addr net.Addr
+}
+
+func (m *mockInst) Address() net.Addr {
+	return m.addr
+}
+
+func (m *mockInst) SetRemoteAddr(addr net.Addr) (ok bool) {
+	m.addr = addr
+	return true
+}
+
+func (m *mockInst) Weight() int {
+	return 10
+}
+
+func (m *mockInst) Tag(key string) (value string, exist bool) {
+	return
 }
 
 func prepareIntKVInfo() map[uint16]string {
