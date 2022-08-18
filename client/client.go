@@ -255,6 +255,11 @@ func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Cont
 		rpcStats.SetLevel(*kc.opt.StatsLevel)
 	}
 
+	mi := kc.svcInfo.MethodInfo(method)
+	if mi != nil && mi.OneWay() {
+		cfg.SetInteractionMode(rpcinfo.Oneway)
+	}
+
 	// Export read-only views to external users.
 	ri := rpcinfo.NewRPCInfo(
 		rpcinfo.FromBasicInfo(kc.opt.Cli),

@@ -212,7 +212,7 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	test.Assert(t, ri.Config().TransportProtocol() == 0)
 	test.Assert(t, ri.Config().ConnectTimeout() == 50*time.Millisecond)
 	test.Assert(t, ri.Config().RPCTimeout() == 0)
-	test.Assert(t, ri.Config().InteractionMode() == rpcinfo.Unary)
+	test.Assert(t, ri.Config().InteractionMode() == rpcinfo.PingPong)
 	test.Assert(t, ri.Config().IOBufferSize() == 4096)
 	test.Assert(t, ri.Config().ReadWriteTimeout() == rwTimeout)
 
