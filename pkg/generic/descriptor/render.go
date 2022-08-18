@@ -28,7 +28,7 @@ type Renderer interface {
 	WriteContentType(w http.ResponseWriter)
 }
 
-type JsonRenderer struct {}
+type JsonRenderer struct{}
 
 func (j JsonRenderer) Render(w http.ResponseWriter, body interface{}) error {
 	return json.NewEncoder(w).Encode(body)
@@ -38,7 +38,7 @@ func (j JsonRenderer) WriteContentType(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", MIMEApplicationJson)
 }
 
-type PbRenderer struct {}
+type PbRenderer struct{}
 
 func (p PbRenderer) Render(w http.ResponseWriter, body interface{}) error {
 	bytes, err := body.(proto.Message).Marshal()
@@ -52,4 +52,3 @@ func (p PbRenderer) Render(w http.ResponseWriter, body interface{}) error {
 func (p PbRenderer) WriteContentType(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", MIMEApplicationProtobuf)
 }
-

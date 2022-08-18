@@ -800,7 +800,7 @@ func Test_writeHTTPRequestWithPbBody(t *testing.T) {
 		t.Error(err)
 	}
 	req := &descriptor.HTTPRequest{
-		Body: body,
+		Body:        body,
 		ContentType: descriptor.MIMEApplicationProtobuf,
 	}
 	typeDescriptor := &descriptor.TypeDescriptor{
@@ -845,7 +845,7 @@ func Test_writeHTTPRequestWithPbBody(t *testing.T) {
 						return nil
 					},
 				},
-				t:   typeDescriptor,
+				t: typeDescriptor,
 			},
 			false,
 		},
@@ -865,7 +865,7 @@ func Test_writeHTTPRequestWithPbBody(t *testing.T) {
 						return nil
 					},
 				},
-				t:   typeDescriptor,
+				t: typeDescriptor,
 			},
 			true,
 		},

@@ -21,10 +21,12 @@ import (
 	"github.com/jhump/protoreflect/dynamic"
 )
 
-type ServiceDescriptor = *desc.ServiceDescriptor
-type MessageDescriptor = *desc.MessageDescriptor
+type (
+	ServiceDescriptor = *desc.ServiceDescriptor
+	MessageDescriptor = *desc.MessageDescriptor
+)
 
-type Message interface{
+type Message interface {
 	Marshal() ([]byte, error)
 	TryGetFieldByNumber(fieldNumber int) (interface{}, error)
 	TrySetFieldByNumber(fieldNumber int, val interface{}) error

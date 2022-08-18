@@ -32,7 +32,7 @@ func TestPbContentProvider(t *testing.T) {
 	service InboxService {}
 	`
 	includes := map[string]string{
-		path:           content,
+		path:          content,
 		"a/b/x.proto": "package kitex.test.server;",
 		"a/y.proto": `
 		package kitex.test.server;

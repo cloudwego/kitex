@@ -66,12 +66,12 @@ func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption)
 		// data from pb decode
 		switch tt {
 		case descriptor.I08:
-			if v & 0xff != v {
+			if v&0xff != v {
 				err = fmt.Errorf("value is beyond range of i8: %v", v)
 			}
 			return tt, writeInt32AsInt8, err
 		case descriptor.I16:
-			if v & 0xffff != v {
+			if v&0xffff != v {
 				err = fmt.Errorf("value is beyond range of i16: %v", v)
 			}
 			return tt, writeInt32AsInt16, err
