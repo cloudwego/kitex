@@ -255,7 +255,8 @@ func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Cont
 		rpcStats.SetLevel(*kc.opt.StatsLevel)
 	}
 
-	if kc.svcInfo.MethodInfo(method).OneWay() {
+	mi := kc.svcInfo.MethodInfo(method)
+	if mi != nil && mi.OneWay() {
 		cfg.SetInteractionMode(rpcinfo.Oneway)
 	}
 
