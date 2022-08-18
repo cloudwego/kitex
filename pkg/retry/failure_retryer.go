@@ -82,7 +82,7 @@ func (r *failureRetryer) AllowRetry(ctx context.Context) (string, bool) {
 	return "", true
 }
 
-// Do implements the Retryer interface.
+// Do implement the Retryer interface.
 func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (recycleRI bool, err error) {
 	r.RLock()
 	var maxDuration time.Duration

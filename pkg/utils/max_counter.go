@@ -18,7 +18,7 @@ package utils
 
 import "sync/atomic"
 
-// MaxCounter is a integer counter with upper limit.
+// MaxCounter is an integer counter with upper limit.
 type MaxCounter struct {
 	now int64
 	max int

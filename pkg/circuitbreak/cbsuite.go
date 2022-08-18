@@ -61,7 +61,7 @@ type instanceCBConfig struct {
 	sync.RWMutex
 }
 
-// CBSuite is default wrapper of CircuitBreaker. If you don't have customize policy, you can specify CircuitBreaker
+// CBSuite is default wrapper of CircuitBreaker. If you don't have customized policy, you can specify CircuitBreaker
 // middlewares like this:
 //     cbs := NewCBSuite(GenServiceCBKeyFunc)
 //     opts = append(opts, client.WithCircuitBreaker(cbs))

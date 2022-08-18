@@ -68,7 +68,7 @@ func WithTransportProtocol(tp transport.Protocol) Option {
 	}}
 }
 
-// WithSuite adds a option suite for client.
+// WithSuite adds an option suite for client.
 func WithSuite(suite Suite) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		var nested struct {
