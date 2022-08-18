@@ -100,7 +100,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
 			defer func() {
 				// reset rpcinfo
-				ri, _ = t.opt.InitOrResetRPCInfoFunc(rCtx, conn.RemoteAddr())
+				ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
 				svrTrans.pool.Put(ri)
 			}()
 
@@ -218,7 +218,7 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	pool := &sync.Pool{
 		New: func() interface{} {
 			// init rpcinfo
-			ri, _ := t.opt.InitOrResetRPCInfoFunc(ctx, conn.RemoteAddr())
+			ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
 			return ri
 		},
 	}

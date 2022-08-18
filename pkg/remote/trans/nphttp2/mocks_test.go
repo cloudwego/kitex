@@ -304,8 +304,8 @@ func newMockServerOption() *remote.ServerOption {
 		AcceptFailedDelayTime: 0,
 		MaxConnectionIdleTime: 0,
 		ReadWriteTimeout:      0,
-		InitOrResetRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
-			return newMockRPCInfo(), context.Background()
+		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+			return newMockRPCInfo()
 		},
 		TracerCtl: &stats.Controller{},
 		GRPCCfg: &grpc.ServerConfig{

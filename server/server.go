@@ -121,14 +121,10 @@ func newErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
 	}
 }
 
-func (s *server) initOrResetRPCInfoFunc() func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context) {
-	return func(ctx context.Context, rAddr net.Addr) (rpcinfo.RPCInfo, context.Context) {
-		if ctx == nil {
-			ctx = context.Background()
-		}
-		var ri rpcinfo.RPCInfo
+func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinfo.RPCInfo {
+	return func(ri rpcinfo.RPCInfo, rAddr net.Addr) rpcinfo.RPCInfo {
 		// Reset rpcinfo if it exists in ctx.
-		if ri = rpcinfo.GetRPCInfo(ctx); ri != nil {
+		if ri != nil {
 			fi := rpcinfo.AsMutableEndpointInfo(ri.From())
 			fi.Reset()
 			fi.SetAddress(rAddr)
@@ -142,7 +138,7 @@ func (s *server) initOrResetRPCInfoFunc() func(context.Context, net.Addr) (rpcin
 			if s.opt.StatsLevel != nil {
 				rpcStats.SetLevel(*s.opt.StatsLevel)
 			}
-			return ri, ctx
+			return ri
 		}
 		rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 		if s.opt.StatsLevel != nil {
@@ -158,8 +154,7 @@ func (s *server) initOrResetRPCInfoFunc() func(context.Context, net.Addr) (rpcin
 			rpcStats.ImmutableView(),
 		)
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(rAddr)
-		ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-		return ri, ctx
+		return ri
 	}
 }
 
