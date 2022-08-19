@@ -16,7 +16,12 @@
 
 package descriptor
 
-import "context"
+import (
+	"context"
+	"errors"
+
+	"github.com/cloudwego/kitex/pkg/generic/proto"
+)
 
 // HTTPMapping http mapping annotation
 type HTTPMapping interface {
@@ -140,13 +145,30 @@ var NewAPIBody NewHTTPMapping = func(value string) HTTPMapping {
 }
 
 func (m *apiBody) Request(ctx context.Context, req *HTTPRequest, field *FieldDescriptor) (interface{}, bool, error) {
-	val, ok := req.Body[m.value]
-	return val, ok, nil
+	switch req.ContentType {
+	case "", MIMEApplicationJson:
+		val, ok := req.Body[m.value]
+		return val, ok, nil
+	case MIMEApplicationProtobuf:
+		msg := req.GeneralBody.(proto.Message)
+		val, err := msg.TryGetFieldByNumber(int(field.ID))
+		return val, err == nil, nil
+	default:
+		return nil, false, errors.New("unsupported request content type")
+	}
 }
 
 func (m *apiBody) Response(ctx context.Context, resp *HTTPResponse, field *FieldDescriptor, val interface{}) error {
-	resp.Body[m.value] = val
-	return nil
+	switch resp.ContentType {
+	case "", MIMEApplicationJson:
+		resp.Body[m.value] = val
+		return nil
+	case MIMEApplicationProtobuf:
+		msg := resp.GeneralBody.(proto.Message)
+		return msg.TrySetFieldByNumber(int(field.ID), val)
+	default:
+		return errors.New("unsupported response content type")
+	}
 }
 
 type apiHTTPCode struct{}
