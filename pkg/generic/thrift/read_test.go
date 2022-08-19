@@ -543,7 +543,7 @@ func Test_readHTTPResponse(t *testing.T) {
 			return "world", nil
 		},
 	}
-	resp := descriptor.NewHTTPJsonResponse()
+	resp := descriptor.NewHTTPResponse()
 	resp.Body = map[string]interface{}{"hello": "world"}
 	tests := []struct {
 		name    string
@@ -650,7 +650,7 @@ func Test_readHTTPResponseWithPbBody(t *testing.T) {
 			if respGot.ContentType != descriptor.MIMEApplicationProtobuf {
 				t.Errorf("expected content type: %v, got: %v", descriptor.MIMEApplicationProtobuf, respGot.ContentType)
 			}
-			body := respGot.Body.(proto.Message)
+			body := respGot.GeneralBody.(proto.Message)
 			for fieldID, expectedVal := range tt.want {
 				val, err := body.TryGetFieldByNumber(fieldID)
 				if err != nil {

@@ -64,7 +64,7 @@ func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, ms
 	if err != nil {
 		return fmt.Errorf("unmarshal pb body error: %v", err)
 	}
-	req.Body = pbMsg
+	req.GeneralBody = pbMsg
 
 	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase})
 }

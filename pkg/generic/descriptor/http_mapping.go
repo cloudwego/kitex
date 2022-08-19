@@ -146,11 +146,11 @@ var NewAPIBody NewHTTPMapping = func(value string) HTTPMapping {
 
 func (m *apiBody) Request(ctx context.Context, req *HTTPRequest, field *FieldDescriptor) (interface{}, bool, error) {
 	switch req.ContentType {
-	case MIMEApplicationJson:
-		val, ok := req.Body.(map[string]interface{})[m.value]
+	case "", MIMEApplicationJson:
+		val, ok := req.Body[m.value]
 		return val, ok, nil
 	case MIMEApplicationProtobuf:
-		msg := req.Body.(proto.Message)
+		msg := req.GeneralBody.(proto.Message)
 		val, err := msg.TryGetFieldByNumber(int(field.ID))
 		return val, err == nil, nil
 	default:
@@ -160,11 +160,11 @@ func (m *apiBody) Request(ctx context.Context, req *HTTPRequest, field *FieldDes
 
 func (m *apiBody) Response(ctx context.Context, resp *HTTPResponse, field *FieldDescriptor, val interface{}) error {
 	switch resp.ContentType {
-	case MIMEApplicationJson:
-		resp.Body.(map[string]interface{})[m.value] = val
+	case "", MIMEApplicationJson:
+		resp.Body[m.value] = val
 		return nil
 	case MIMEApplicationProtobuf:
-		msg := resp.Body.(proto.Message)
+		msg := resp.GeneralBody.(proto.Message)
 		return msg.TrySetFieldByNumber(int(field.ID), val)
 	default:
 		return errors.New("unsupported response content type")

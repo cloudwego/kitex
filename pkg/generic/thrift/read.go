@@ -284,7 +284,10 @@ func readStringMap(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeD
 func readStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	var fs fieldSetter
 	var st interface{}
-	if opt.pbDsc == nil {
+	if opt == nil || opt.pbDsc == nil {
+		if opt == nil {
+			opt = &readerOption{}
+		}
 		holder := map[string]interface{}{}
 		fs = getMapFieldSetter(holder)
 		st = holder
@@ -391,8 +394,11 @@ func readStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDesc
 
 func readHTTPResponse(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	var resp *descriptor.HTTPResponse
-	if opt.pbDsc == nil {
-		resp = descriptor.NewHTTPJsonResponse()
+	if opt == nil || opt.pbDsc == nil {
+		if opt == nil {
+			opt = &readerOption{}
+		}
+		resp = descriptor.NewHTTPResponse()
 	} else {
 		resp = descriptor.NewHTTPPbResponse(proto.NewMessage(opt.pbDsc))
 	}

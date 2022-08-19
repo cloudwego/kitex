@@ -29,7 +29,6 @@ type MIMEType string
 
 const (
 	MIMEApplicationJson     = "application/json"
-	MIMEApplicationForm     = "application/x-www-form-urlencoded"
 	MIMEApplicationProtobuf = "application/x-protobuf"
 )
 
@@ -43,7 +42,8 @@ type HTTPRequest struct {
 	Path        string
 	Params      *Params // path params
 	RawBody     []byte
-	Body        interface{}
+	Body        map[string]interface{}
+	GeneralBody interface{} // body of other representation, used with ContentType
 	ContentType MIMEType
 }
 
@@ -51,13 +51,14 @@ type HTTPRequest struct {
 type HTTPResponse struct {
 	Header      http.Header
 	StatusCode  int32
-	Body        interface{}
+	Body        map[string]interface{}
+	GeneralBody interface{} // body of other representation, used with ContentType
 	ContentType MIMEType
 	Renderer    Renderer
 }
 
-// NewHTTPJsonResponse ...
-func NewHTTPJsonResponse() *HTTPResponse {
+// NewHTTPResponse HTTP response for JSON body
+func NewHTTPResponse() *HTTPResponse {
 	return &HTTPResponse{
 		Header:      http.Header{},
 		ContentType: MIMEApplicationJson,
@@ -70,17 +71,17 @@ func NewHTTPPbResponse(initBody interface{}) *HTTPResponse {
 	return &HTTPResponse{
 		Header:      http.Header{},
 		ContentType: MIMEApplicationProtobuf,
-		Body:        initBody,
+		GeneralBody: initBody,
 		Renderer:    PbRenderer{},
 	}
 }
 
-// NewHTTPResponse init response with given MIMEType and body
-func NewHTTPResponse(contentType MIMEType, initBody interface{}, renderer Renderer) *HTTPResponse {
+// NewGeneralHTTPResponse init response with given MIMEType and body
+func NewGeneralHTTPResponse(contentType MIMEType, initBody interface{}, renderer Renderer) *HTTPResponse {
 	return &HTTPResponse{
 		Header:      http.Header{},
 		ContentType: contentType,
-		Body:        initBody,
+		GeneralBody: initBody,
 		Renderer:    renderer,
 	}
 }
@@ -93,7 +94,12 @@ func (resp *HTTPResponse) Write(w http.ResponseWriter) error {
 	}
 
 	resp.Renderer.WriteContentType(w)
-	return resp.Renderer.Render(w, resp.Body)
+
+	if resp.Body != nil {
+		return resp.Renderer.Render(w, resp.Body)
+	}
+
+	return resp.Renderer.Render(w, resp.GeneralBody)
 }
 
 // Param in request path

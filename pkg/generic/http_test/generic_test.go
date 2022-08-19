@@ -90,8 +90,7 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	gr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
-	bodyMap := gr.Body.(map[string]interface{})
-	test.Assert(t, bodyMap["msg"] == base64.StdEncoding.EncodeToString([]byte(mockMyMsg)))
+	test.Assert(t, gr.Body["msg"] == base64.StdEncoding.EncodeToString([]byte(mockMyMsg)))
 
 	// string value for binary field which should fail
 	body = map[string]interface{}{
@@ -114,8 +113,7 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	gr, ok = resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
-	bodyMap = gr.Body.(map[string]interface{})
-	test.Assert(t, bodyMap["msg"] == mockMyMsg)
+	test.Assert(t, gr.Body["msg"] == mockMyMsg)
 
 	svr.Stop()
 }
@@ -148,8 +146,7 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	gr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
-	bodyMap := gr.Body.(map[string]interface{})
-	test.Assert(t, bodyMap["msg"] == base64.StdEncoding.EncodeToString(body["msg"].([]byte)))
+	test.Assert(t, gr.Body["msg"] == base64.StdEncoding.EncodeToString(body["msg"].([]byte)))
 
 	// string value for binary field which should fail
 	body = map[string]interface{}{
