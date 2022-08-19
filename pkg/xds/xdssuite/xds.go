@@ -23,9 +23,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 )
 
-var (
-	xdsResourceManager = &singletonManager{}
-)
+var xdsResourceManager = &singletonManager{}
 
 type singletonManager struct {
 	manager XDSResourceManager

@@ -19,6 +19,9 @@ package manager
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
@@ -26,8 +29,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3/aggregateddiscoveryservice"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	"google.golang.org/genproto/googleapis/rpc/status"
-	"strings"
-	"sync"
 )
 
 type (
@@ -233,8 +234,8 @@ func (c *xdsClient) warmup() {
 	<-c.cipResolver.initRequestCh
 	klog.Infof("[XDS] client, warmup done")
 	c.mu.Lock()
-	c.mu.Unlock()
 	c.cipResolver.initRequestCh = nil
+	c.mu.Unlock()
 	// TODO: maybe need to watch the listener
 }
 

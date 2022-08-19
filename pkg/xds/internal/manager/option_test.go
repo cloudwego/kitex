@@ -17,8 +17,9 @@
 package manager
 
 import (
-	"github.com/cloudwego/kitex/internal/test"
 	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func Test_xdsResourceManager_Option(t *testing.T) {

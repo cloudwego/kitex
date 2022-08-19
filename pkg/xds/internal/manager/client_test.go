@@ -91,7 +91,7 @@ func Test_xdsClient_handleResponse(t *testing.T) {
 			mu:          sync.RWMutex{},
 			opts:        NewOptions(nil),
 		},
-		closeCh:         make(chan struct{}),
+		closeCh: make(chan struct{}),
 	}
 	defer c.close()
 
