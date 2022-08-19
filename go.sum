@@ -271,10 +271,14 @@ github.com/chenzhuoyu/iasm v0.0.0-20220407070608-915f5d279eca/go.mod h1:wOQ0nsbe
 github.com/choleraehyq/pid v0.0.12/go.mod h1:uhzeFgxJZWQsZulelVQZwdASxQ9TIPZYL4TPkQMtL/U=
 github.com/choleraehyq/pid v0.0.13 h1:Tc/jYjHC50SDCxSX+DWHfMmFqtwGR8EiQ08qJ/EK8zs=
 github.com/choleraehyq/pid v0.0.13/go.mod h1:uhzeFgxJZWQsZulelVQZwdASxQ9TIPZYL4TPkQMtL/U=
+github.com/choleraehyq/pid v0.0.15 h1:PejhUZowqxxssjwyaw4OZURRFjnvftZfeEWK9UoWPXU=
+github.com/choleraehyq/pid v0.0.15/go.mod h1:uhzeFgxJZWQsZulelVQZwdASxQ9TIPZYL4TPkQMtL/U=
 github.com/clbanning/x2j v0.0.0-20191024224557-825249438eec/go.mod h1:jMjuTZXRI4dUb/I5gc9Hdhagfvm9+RyrPryS/auMzxE=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/cloudwego/fastpb v0.0.1 h1:E68PDVsY+dC1Z1kAhD8gA/PaZkLFveZwUPof45QLmiQ=
 github.com/cloudwego/fastpb v0.0.1/go.mod h1:scLJDGxKXd+CRSHXarLqzkDjpR3iN28UULA83PtUm9Q=
+github.com/cloudwego/fastpb v0.0.2 h1:qgz6Qxz1DRQ95Der6nr6vsdgXV58rvuK1J2VNzwlzg4=
+github.com/cloudwego/fastpb v0.0.2/go.mod h1:/V13XFTq2TUkxj2qWReV8MwfPC4NnPcy6FsrojnsSG0=
 github.com/cloudwego/frugal v0.1.1 h1:AQATdGAKsyO8BcEeSUzagdP1RO7EXh1Q9qKkAMU1cnw=
 github.com/cloudwego/frugal v0.1.1/go.mod h1:qBJcpMNEGCb1BGMxY9JH8PV3XVWIH3qSrwSKHvODddE=
 github.com/cloudwego/kitex v0.0.6/go.mod h1:sDiWpxbadYE5wFYj7MrSzm2Tle7TFZdcSezIErMsvp8=

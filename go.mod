@@ -5,8 +5,8 @@ go 1.16
 require (
 	github.com/apache/thrift v0.13.0
 	github.com/bytedance/gopkg v0.0.0-20220531084716-665b4f21126f
-	github.com/choleraehyq/pid v0.0.13
-	github.com/cloudwego/fastpb v0.0.1
+	github.com/choleraehyq/pid v0.0.15
+	github.com/cloudwego/fastpb v0.0.2
 	github.com/cloudwego/frugal v0.1.1
 	github.com/cloudwego/netpoll v0.2.6
 	github.com/cloudwego/thriftgo v0.2.0
