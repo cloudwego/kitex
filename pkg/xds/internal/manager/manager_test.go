@@ -29,7 +29,7 @@ import (
 
 // for test use
 var (
-	XdsSercerAddress = ":8888"
+	XdsSercerAddress = ":8889"
 	NodeProto        = &v3core.Node{
 		Id: "sidecar~kitex-test-node",
 	}
@@ -183,48 +183,46 @@ func Test_xdsResourceManager_Get_Resource_Update(t *testing.T) {
 	res, err = m.Get(context.Background(), xdsresource.ListenerType, xdsresource.ListenerName1)
 	test.Assert(t, err == nil)
 	test.Assert(t, res != nil)
-	test.Assert(t, m.meta[xdsresource.ListenerType][xdsresource.ListenerName1] != nil)
-	test.Assert(t, m.cache[xdsresource.ListenerType][xdsresource.ListenerName1] != nil)
+	listener, ok := res.(*xdsresource.ListenerResource)
+	test.Assert(t, ok)
+	test.Assert(t, len(listener.NetworkFilters) == 2)
 	// push the new resource that does not include listener1 and check if the resourceManager can update the resource
 	svr.PushResourceUpdate(mock.LdsResp2)
 	time.Sleep(time.Millisecond * 100)
 	// should return nil resource
 	res, err = m.Get(context.Background(), xdsresource.ListenerType, xdsresource.ListenerName1)
 	test.Assert(t, err != nil)
-	test.Assert(t, m.cache[xdsresource.ListenerType][xdsresource.ListenerName1] == nil)
 
 	// RouteConfig
 	res, err = m.Get(context.Background(), xdsresource.RouteConfigType, xdsresource.RouteConfigName1)
 	test.Assert(t, err == nil)
 	test.Assert(t, res != nil)
-	test.Assert(t, m.meta[xdsresource.RouteConfigType][xdsresource.RouteConfigName1] != nil)
-	test.Assert(t, m.cache[xdsresource.RouteConfigType][xdsresource.RouteConfigName1] != nil)
+	_, ok = res.(*xdsresource.RouteConfigResource)
+	test.Assert(t, ok)
 	// push the new resource and check if the resourceManager can update the resource
 	svr.PushResourceUpdate(mock.RdsResp2)
 	time.Sleep(time.Millisecond * 100)
 	res, err = m.Get(context.Background(), xdsresource.RouteConfigType, xdsresource.RouteConfigName1)
 	test.Assert(t, err != nil)
-	test.Assert(t, m.cache[xdsresource.RouteConfigType][xdsresource.RouteConfigName1] == nil)
 
 	// Cluster
 	res, err = m.Get(context.Background(), xdsresource.ClusterType, xdsresource.ClusterName1)
 	test.Assert(t, err == nil)
 	test.Assert(t, res != nil)
-	test.Assert(t, m.meta[xdsresource.ClusterType][xdsresource.ClusterName1] != nil)
-	test.Assert(t, m.cache[xdsresource.ClusterType][xdsresource.ClusterName1] != nil)
+	_, ok = res.(*xdsresource.ClusterResource)
+	test.Assert(t, ok)
 	// push the new resource and check if the resourceManager can update the resource
 	svr.PushResourceUpdate(mock.CdsResp2)
 	time.Sleep(time.Millisecond * 100)
 	res, err = m.Get(context.Background(), xdsresource.ClusterType, xdsresource.ClusterName1)
 	test.Assert(t, err != nil)
-	test.Assert(t, m.cache[xdsresource.ClusterType][xdsresource.ClusterName1] == nil)
 
 	// Endpoint
 	res, err = m.Get(context.Background(), xdsresource.EndpointsType, xdsresource.EndpointName1)
 	test.Assert(t, err == nil)
 	test.Assert(t, res != nil)
-	test.Assert(t, m.meta[xdsresource.EndpointsType][xdsresource.EndpointName1] != nil)
-	test.Assert(t, m.cache[xdsresource.EndpointsType][xdsresource.EndpointName1] != nil)
+	_, ok = res.(*xdsresource.EndpointsResource)
+	test.Assert(t, ok)
 	// push the new resource and check if the resourceManager can update the resource
 	// TODO: endpoint will not be updated because of the incremental push feature of Istio
 	// svr.PushResourceUpdate(mock.EdsResp2)

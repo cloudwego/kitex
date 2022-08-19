@@ -48,8 +48,8 @@ func (e *Endpoint) Meta() map[string]string {
 
 func (e *Endpoint) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		Addr   string            `json:"edsAddr"`
-		Weight uint32            `json:"Weight"`
+		Addr   string            `json:"eds_addr"`
+		Weight uint32            `json:"weight"`
 		Meta   map[string]string `json:"meta,omitempty"`
 	}{
 		Addr:   e.addr.String(),

@@ -13,6 +13,7 @@ require (
 	github.com/envoyproxy/go-control-plane v0.10.3-0.20220719090109-b024c36d9935
 	github.com/envoyproxy/protoc-gen-validate v0.6.7
 	github.com/golang/mock v1.6.0
+	github.com/golang/protobuf v1.5.2
 	github.com/jhump/protoreflect v1.8.2
 	github.com/json-iterator/go v1.1.12
 	github.com/tidwall/gjson v1.9.3

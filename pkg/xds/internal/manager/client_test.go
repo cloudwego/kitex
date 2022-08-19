@@ -54,7 +54,7 @@ func (sc *mockADSStream) Close() error {
 }
 
 func Test_newXdsClient(t *testing.T) {
-	address := ":8888"
+	address := ":8889"
 	svr := mock.StartXDSServer(address)
 	defer func() {
 		if svr != nil {

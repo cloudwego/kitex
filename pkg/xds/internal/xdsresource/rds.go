@@ -103,7 +103,7 @@ func (rm *HTTPRouteMatch) GetTags() map[string]string {
 func (r *Route) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		Match            RouteMatch         `json:"Match"`
-		WeightedClusters []*WeightedCluster `json:"WeightedClusters"`
+		WeightedClusters []*WeightedCluster `json:"Weighted_Clusters"`
 		Timeout          string             `json:"Timeout"`
 	}{
 		Match:            r.Match,

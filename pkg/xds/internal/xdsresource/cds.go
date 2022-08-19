@@ -33,12 +33,32 @@ const (
 	ClusterDiscoveryTypeStatic
 )
 
+func (d ClusterDiscoveryType) String() string {
+	switch d {
+	case ClusterDiscoveryTypeEDS:
+		return "EDS"
+	case ClusterDiscoveryTypeLogicalDNS:
+		return "LOGICAL_DNS"
+	}
+	return "Static"
+}
+
 type ClusterLbPolicy int
 
 const (
 	ClusterLbRoundRobin = iota
 	ClusterLbRingHash
 )
+
+func (p ClusterLbPolicy) String() string {
+	switch p {
+	case ClusterLbRoundRobin:
+		return "roundrobin"
+	case ClusterLbRingHash:
+		return "ringhash"
+	}
+	return ""
+}
 
 type ClusterResource struct {
 	DiscoveryType   ClusterDiscoveryType
@@ -49,36 +69,16 @@ type ClusterResource struct {
 
 func (c *ClusterResource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		DiscoveryType   string             `json:"discoveryType"`
-		LbPolicy        string             `json:"lbPolicy"`
-		EndpointName    string             `json:"endpointName"`
+		DiscoveryType   string             `json:"discovery_type"`
+		LbPolicy        string             `json:"lb_policy"`
+		EndpointName    string             `json:"endpoint_name"`
 		InlineEndpoints *EndpointsResource `json:"meta,omitempty"`
 	}{
-		DiscoveryType:   c.ClusterType(),
-		LbPolicy:        c.GetLbPolicy(),
+		DiscoveryType:   c.DiscoveryType.String(),
+		LbPolicy:        c.LbPolicy.String(),
 		EndpointName:    c.EndpointName,
 		InlineEndpoints: c.InlineEDS(),
 	})
-}
-
-func (r *ClusterResource) ClusterType() string {
-	switch r.DiscoveryType {
-	case ClusterDiscoveryTypeEDS:
-		return "EDS"
-	case ClusterDiscoveryTypeLogicalDNS:
-		return "LOGICAL_DNS"
-	}
-	return "Static"
-}
-
-func (r *ClusterResource) GetLbPolicy() string {
-	switch r.LbPolicy {
-	case ClusterLbRoundRobin:
-		return "roundrobin"
-	case ClusterLbRingHash:
-		return "ringhash"
-	}
-	return ""
 }
 
 func (r *ClusterResource) InlineEDS() *EndpointsResource {
