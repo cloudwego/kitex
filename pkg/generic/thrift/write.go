@@ -28,7 +28,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-var typeAssertErr = errors.New("type assertion error")
+var errTypeAssert = errors.New("type assertion error")
 
 type writerOption struct {
 	requestBase *Base // request base from metahandler
@@ -320,7 +320,7 @@ func writeFloat64(ctx context.Context, val interface{}, out thrift.TProtocol, t 
 func writeString(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	s, ok := val.(string)
 	if !ok {
-		return typeAssertErr
+		return errTypeAssert
 	}
 	return out.WriteString(s)
 }
