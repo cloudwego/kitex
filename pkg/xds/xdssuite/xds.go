@@ -31,8 +31,8 @@ type singletonManager struct {
 }
 
 func (m *singletonManager) getManager() XDSResourceManager {
-	m.Lock()
-	defer m.Unlock()
+	m.RLock()
+	defer m.RUnlock()
 	return m.manager
 }
 
