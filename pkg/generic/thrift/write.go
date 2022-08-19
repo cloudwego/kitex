@@ -337,30 +337,28 @@ func writeBinary(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 	return out.WriteBinary(val.([]byte))
 }
 
-func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) (err error) {
+func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	l := val.([]interface{})
 	length := len(l)
-	if err = out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
-		return
+	if err := out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
+		return err
 	}
 	if length == 0 {
 		return out.WriteListEnd()
 	}
-
 	writer, err := nextWriter(l[0], t.Elem, opt)
 	if err != nil {
 		return err
 	}
 	for _, elem := range l {
-		if err = writer(ctx, elem, out, t.Elem, opt); err != nil {
+		if err := writer(ctx, elem, out, t.Elem, opt); err != nil {
 			return err
 		}
 	}
-	err = out.WriteListEnd()
-	return err
+	return out.WriteListEnd()
 }
 
-func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) (err error) {
+func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	l := val.([]gjson.Result)
 	length := len(l)
 	if err := out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
@@ -406,7 +404,6 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 	if err != nil {
 		return err
 	}
-
 	for key, elem := range m {
 		if err := keyWriter(ctx, key, out, t.Key, opt); err != nil {
 			return err
