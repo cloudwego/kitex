@@ -19,6 +19,7 @@ package manager
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"strings"
 	"sync"
 
@@ -52,6 +53,7 @@ type ndsResolver struct {
 	lookupTable   map[string][]string
 	mu            sync.Mutex
 	initRequestCh chan struct{}
+	closed        bool
 }
 
 func newNdsResolver() *ndsResolver {
@@ -74,8 +76,9 @@ func (r *ndsResolver) lookupHost(host string) ([]string, bool) {
 func (r *ndsResolver) updateLookupTable(up map[string][]string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.initRequestCh != nil {
+	if !r.closed {
 		close(r.initRequestCh)
+		r.closed = true
 	}
 	r.lookupTable = up
 }
@@ -203,26 +206,26 @@ func (c *xdsClient) receiver() {
 	// receiver
 	defer func() {
 		if err := recover(); err != nil {
-			klog.Errorf("[XDS] client: run receiver panic, error=%s", err)
+			klog.Errorf("KITEX: [XDS] client, run receiver panic, error=%s, stack=%s", err, string(debug.Stack()))
 		}
 	}()
 
 	for {
 		select {
 		case <-c.closeCh:
-			klog.Infof("[XDS] client: stop ads client receiver")
+			klog.Infof("KITEX: [XDS] client, stop ads client receiver")
 			return
 		default:
 		}
 		resp, err := c.recv()
 		if err != nil {
-			klog.Errorf("[XDS] client, receive failed, error=%s", err)
+			klog.Errorf("KITEX: [XDS] client, receive failed, error=%s", err)
 			c.reconnect()
 			continue
 		}
 		err = c.handleResponse(resp)
 		if err != nil {
-			klog.Errorf("[XDS] client, handle response failed, error=%s", err)
+			klog.Errorf("KITEX: [XDS] client, handle response failed, error=%s", err)
 		}
 	}
 }
@@ -232,10 +235,7 @@ func (c *xdsClient) warmup() {
 	// watch the NameTable when init the xds client
 	c.Watch(xdsresource.NameTableType, "", false)
 	<-c.cipResolver.initRequestCh
-	klog.Infof("[XDS] client, warmup done")
-	c.mu.Lock()
-	c.cipResolver.initRequestCh = nil
-	c.mu.Unlock()
+	klog.Infof("KITEX: [XDS] client, warmup done")
 	// TODO: maybe need to watch the listener
 }
 
@@ -310,12 +310,12 @@ func (c *xdsClient) sendRequest(req *discoveryv3.DiscoveryRequest) {
 	// get stream client
 	sc, err := c.getStreamClient()
 	if err != nil {
-		klog.Errorf("[XDS] client, get stream client failed, error=%s", err)
+		klog.Errorf("KITEX: [XDS] client, get stream client failed, error=%s", err)
 		return
 	}
 	err = sc.Send(req)
 	if err != nil {
-		klog.Errorf("[XDS] client, send failed, error=%s", err)
+		klog.Errorf("KITEX: [XDS] client, send failed, error=%s", err)
 	}
 }
 
@@ -333,7 +333,7 @@ func (c *xdsClient) recv() (resp *discoveryv3.DiscoveryResponse, err error) {
 // lookup the clusterIP using the cipResolver and return the listenerName
 func (c *xdsClient) getListenerName(rName string) (string, error) {
 	tmp := strings.Split(rName, ":")
-	if len(tmp) < 2 {
+	if len(tmp) != 2 {
 		return "", fmt.Errorf("invalid listener name: %s", rName)
 	}
 	addr, port := tmp[0], tmp[1]
@@ -361,7 +361,6 @@ func (c *xdsClient) handleLDS(resp *discoveryv3.DiscoveryResponse) error {
 	for n := range c.watchedResource[xdsresource.ListenerType] {
 		ln, err := c.getListenerName(n)
 		if err != nil || ln == "" {
-			// klog.Warnf("[XDS] client, handleLDS failed, error=%s", err)
 			continue
 		}
 		if lis, ok := res[ln]; ok {
@@ -462,7 +461,7 @@ func (c *xdsClient) handleResponse(msg interface{}) error {
 	url := resp.GetTypeUrl()
 	rType, ok := xdsresource.ResourceUrlToType[url]
 	if !ok {
-		klog.Warnf("unknown type of resource, url: %s", url)
+		klog.Warnf("KITEX: [XDS] client handleResponse, unknown type of resource, url: %s", url)
 		return nil
 	}
 

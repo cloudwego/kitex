@@ -21,5 +21,5 @@ import "time"
 const (
 	defaultXDSFetchTimeout = time.Second
 	defaultCacheExpireTime = time.Second * 30
-	defaultDumpPath        = "/tmp/xds_resource_manager.json"
+	defaultDumpPath        = "/tmp/dumped_xds_resource_manager.json"
 )

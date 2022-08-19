@@ -27,7 +27,7 @@ var xdsResourceManager = &singletonManager{}
 
 type singletonManager struct {
 	manager XDSResourceManager
-	sync.Mutex
+	sync.RWMutex
 }
 
 func (m *singletonManager) getManager() XDSResourceManager {
@@ -44,9 +44,10 @@ type XDSResourceManager interface {
 }
 
 func XDSInited() bool {
-	xdsResourceManager.Lock()
-	defer xdsResourceManager.Unlock()
-	return xdsResourceManager.manager != nil
+	xdsResourceManager.RLock()
+	inited := xdsResourceManager.manager != nil
+	xdsResourceManager.RUnlock()
+	return inited
 }
 
 // SetXDSResourceManager builds the XDSResourceManager using the input function.

@@ -112,7 +112,7 @@ func (m *xdsResourceManager) getFromCache(rType xdsresource.ResourceType, rName 
 // This will be a synchronous call. It uses the notifier to notify the resource update and return the resource.
 func (m *xdsResourceManager) Get(ctx context.Context, rType xdsresource.ResourceType, rName string) (interface{}, error) {
 	if _, ok := xdsresource.ResourceTypeToUrl[rType]; !ok {
-		return nil, fmt.Errorf("[XDS ResourceManager] invalid resource type: %d", rType)
+		return nil, fmt.Errorf("[XDS] manager, invalid resource type: %d", rType)
 	}
 	// Get from cache first
 	res, ok := m.getFromCache(rType, rName)
@@ -206,7 +206,7 @@ func (m *xdsResourceManager) Dump() {
 	if err != nil {
 		klog.Warnf("[XDS] manager, marshal xds resource failed when dumping, error=%s", err)
 	}
-	if err := ioutil.WriteFile(path, data, 0o644); err != nil {
+	if err := ioutil.WriteFile(path, data, 0644); err != nil {
 		klog.Warnf("[XDS] manager, dump xds resource failed\n")
 	}
 }
@@ -238,10 +238,6 @@ func (m *xdsResourceManager) updateMeta(rType xdsresource.ResourceType, version 
 		}
 	}
 }
-
-//var (
-//	ErrResourceNotFound = errors.New("resource not found in the latest xds response")
-//)
 
 /**
  	The following functions are invoked by xds client to update the cache.
@@ -350,13 +346,7 @@ func (m *xdsResourceManager) UpdateEndpointsResource(up map[string]*xdsresource.
 			delete(m.notifierMap[xdsresource.EndpointsType], name)
 		}
 	}
-	// remove all resources that are not in the update list
-	// TODO: endpoints cannot be removed in this case because Istio will perform incremental update of EDS.
-	//for name := range m.cache[xdsresource.EndpointsType] {
-	//	if _, ok := up[name]; !ok {
-	//		delete(m.cache[xdsresource.EndpointsType], name)
-	//	}
-	//}
+	// endpoints cannot be removed in this case because Istio will perform incremental update of EDS.
 
 	// update meta
 	m.updateMeta(xdsresource.EndpointsType, version)
