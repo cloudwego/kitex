@@ -46,17 +46,16 @@ var (
 
 func TestMain(m *testing.M) {
 	svrOpt = &remote.ServerOption{
-		InitOrResetRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
+		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
 			rpcCfg := rpcinfo.NewRPCConfig()
 			mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
 			mCfg.SetReadWriteTimeout(rwTimeout)
 			ink := rpcinfo.NewInvocation("", method)
 			rpcStat := rpcinfo.NewRPCStats()
-			ri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
-			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
-			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			return ri, ctx
+			nri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
+			rpcinfo.AsMutableEndpointInfo(nri.From()).SetAddress(addr)
+			return nri
 		},
 		Codec: &MockCodec{
 			EncodeFunc: nil,

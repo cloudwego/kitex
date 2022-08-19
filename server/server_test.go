@@ -116,10 +116,9 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	conn.RemoteAddrFunc = func() (r net.Addr) {
 		return remoteAddr
 	}
-	ctx := context.Background()
 	rpcInfoInitFunc := svr.initOrResetRPCInfoFunc()
-	ri, ctx := rpcInfoInitFunc(ctx, conn.RemoteAddr())
-	test.Assert(t, rpcinfo.GetRPCInfo(ctx) != nil)
+	ri := rpcInfoInitFunc(nil, conn.RemoteAddr())
+	test.Assert(t, ri != nil)
 	test.Assert(t, ri.From().Address().String() == remoteAddr.String())
 	test.Assert(t, ri.Config().ReadWriteTimeout() == rwTimeout)
 
@@ -157,8 +156,6 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	rpcStats.SetLevel(stats.LevelDetailed)
 
 	// check setting
-	test.Assert(t, rpcinfo.GetRPCInfo(ctx) == ri)
-
 	test.Assert(t, ri.From().ServiceName() == "mock service")
 	test.Assert(t, ri.From().Method() == "mock method")
 	value, exist := ri.From().Tag("key")
@@ -189,8 +186,7 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	test.Assert(t, ri.Stats().Level() == stats.LevelDetailed)
 
 	// test reset
-	ri, ctx = rpcInfoInitFunc(ctx, conn.RemoteAddr())
-	test.Assert(t, rpcinfo.GetRPCInfo(ctx) == ri)
+	ri = rpcInfoInitFunc(ri, conn.RemoteAddr())
 	test.Assert(t, ri.From().Address().String() == remoteAddr.String())
 	test.Assert(t, ri.Config().ReadWriteTimeout() == rwTimeout)
 

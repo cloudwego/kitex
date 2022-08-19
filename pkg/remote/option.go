@@ -98,7 +98,7 @@ type ServerOption struct {
 
 	ReadWriteTimeout time.Duration
 
-	InitOrResetRPCInfoFunc func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context)
+	InitOrResetRPCInfoFunc func(rpcinfo.RPCInfo, net.Addr) rpcinfo.RPCInfo
 
 	TracerCtl *internal_stats.Controller
 
