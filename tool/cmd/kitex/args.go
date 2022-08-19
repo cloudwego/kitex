@@ -45,6 +45,16 @@ type arguments struct {
 	extends []*extraFlag
 }
 
+const cmdExample = `  # Generate client codes or update kitex_gen codes when a project is in $GOPATH:
+  kitex {{path/to/IDL_file.thrift}}
+
+  # Generate client codes or update kitex_gen codes  when a project is not in $GOPATH:
+  kitex -module {{github.com/xxx_org/xxx_name}} {{path/to/IDL_file.thrift}}
+
+  # Generate server codes:
+  kitex -service {{svc_name}} {{path/to/IDL_file.thrift}}
+`
+
 func (a *arguments) addExtraFlag(e *extraFlag) {
 	a.extends = append(a.extends, e)
 }
@@ -100,8 +110,10 @@ func (a *arguments) buildFlags() *flag.FlagSet {
 		fmt.Fprintf(os.Stderr, `Version %s
 Usage: %s [flags] IDL
 
-flags:
-`, kitex.Version, os.Args[0])
+Examples:
+%s
+Flags:
+`, kitex.Version, os.Args[0], cmdExample)
 		f.PrintDefaults()
 		os.Exit(1)
 	}
