@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// Package gonet contains server and client implementation for netpoll.
+// Package gonet contains server and client implementation for go net.
 package gonet
 
 import (
@@ -34,7 +34,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-// NewTransServerFactory creates a default netpoll transport server factory.
+// NewTransServerFactory creates a default go net transport server factory.
 func NewTransServerFactory() remote.TransServerFactory {
 	return &gonetTransServerFactory{}
 }
@@ -63,16 +63,17 @@ var _ remote.TransServer = &transServer{}
 
 // CreateListener implements the remote.TransServer interface.
 // The network must be "tcp", "tcp4", "tcp6" or "unix".
-func (ts *transServer) CreateListener(addr net.Addr) (_ net.Listener, err error) {
-	ts.ln, err = ts.lncfg.Listen(context.Background(), addr.Network(), addr.String())
-	return ts.ln, err
+func (ts *transServer) CreateListener(addr net.Addr) (ln net.Listener, err error) {
+	ln, err = ts.lncfg.Listen(context.Background(), addr.Network(), addr.String())
+	return ln, err
 }
 
 // BootstrapServer implements the remote.TransServer interface.
-func (ts *transServer) BootstrapServer() (err error) {
-	if ts.ln == nil {
+func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
+	if ln == nil {
 		return errors.New("listener is nil in gonet transport server")
 	}
+	ts.ln = ln
 	for {
 		conn, err := ts.ln.Accept()
 		if err != nil {
@@ -80,7 +81,8 @@ func (ts *transServer) BootstrapServer() (err error) {
 			os.Exit(1)
 		}
 		go func() {
-			ri, ctx := ts.opt.InitRPCInfoFunc(context.Background(), conn.RemoteAddr())
+			ri := ts.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
+			ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 			defer func() {
 				transRecover(ctx, conn, "OnRead")
 				// recycle rpcinfo

@@ -72,6 +72,8 @@ func copyEndpointInfo(ei EndpointInfo) EndpointInfo {
 	}
 	if v, ok := ei.(*endpointInfo); ok {
 		p.tags = copyMap(v.tags)
+	} else {
+		p.tags = make(map[string]string)
 	}
 	return p
 }

@@ -237,7 +237,7 @@ func (b *netpollByteBuffer) AppendBuffer(buf remote.ByteBuffer) (err error) {
 	return
 }
 
-// Bytes is not supported in netpoll bytebuf.
+// Bytes are not supported in netpoll bytebuf.
 func (b *netpollByteBuffer) Bytes() (buf []byte, err error) {
 	return nil, errors.New("method Bytes() not support in netpoll bytebuf")
 }

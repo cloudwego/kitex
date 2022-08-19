@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -546,6 +547,36 @@ func TestLongConnPoolPutUnknownConnection(t *testing.T) {
 	err = p.Put(lc.Conn)
 	test.Assert(t, err == nil)
 	test.Assert(t, closed)
+}
+
+func TestLongConnPoolDump(t *testing.T) {
+	idleTime := time.Second
+	d := &dialer.SynthesizedDialer{}
+	p := newLongPoolForTest(2, 3, idleTime)
+
+	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+		na := utils.NewNetAddr(network, address)
+		return &mocks.Conn{
+			RemoteAddrFunc: func() net.Addr { return na },
+		}, nil
+	}
+
+	// get a new conn
+	conn, err := p.Get(context.TODO(), "tcp", mockAddr0, dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second})
+	test.Assert(t, err == nil, err)
+
+	// put conn back to the pool
+	err = p.Put(conn)
+	test.Assert(t, err == nil, err)
+
+	// test Dump() to get conn pool info
+	data := p.Dump().(map[string]interface{})
+	val := data[mockAddr0]
+	test.Assert(t, val != nil)
+
+	// check dump data
+	length := reflect.ValueOf(val).Elem().FieldByName("Len").Int()
+	test.Assert(t, length == 1)
 }
 
 func BenchmarkLongPoolGetOne(b *testing.B) {

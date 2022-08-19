@@ -25,7 +25,7 @@ import (
 )
 
 func TestLimiterWrapper(t *testing.T) {
-	cl := NewConcurrencyLimiter(1000)
+	cl := NewConnectionLimiter(1000)
 	rl := NewQPSLimiter(time.Second, 10000)
 	lw := NewLimiterWrapper(cl, rl)
 	test.Assert(t, lw.UpdateLimit(nil) == false)
