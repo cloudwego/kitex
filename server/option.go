@@ -22,11 +22,14 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limit"
+	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
@@ -69,6 +72,8 @@ func WithMuxTransport() Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push("WithMuxTransport()")
 		o.RemoteOpt.SvrHandlerFactory = netpollmux.NewSvrTransHandlerFactory()
+		// set limit options
+		o.Limit.QPSLimitPostDecode = true
 	}}
 }
 
@@ -136,7 +141,27 @@ func WithLimit(lim *limit.Option) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithLimit(%+v)", lim))
 
-		o.Limits = lim
+		o.Limit.Limits = lim
+	}}
+}
+
+// WithConnectionLimiter sets the limiter of connections.
+// If both WithLimit and WithConnectionLimiter are called, only the latter will take effect.
+func WithConnectionLimiter(conLimit limiter.ConcurrencyLimiter) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithConnectionLimiter(%T{%+v})", conLimit, conLimit))
+
+		o.Limit.ConLimit = conLimit
+	}}
+}
+
+// WithQPSLimiter sets the limiter of max QPS.
+// If both WithLimit and WithQPSLimiter are called, only the latter will take effect.
+func WithQPSLimiter(qpsLimit limiter.RateLimiter) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithQPSLimiter(%T{%+v})", qpsLimit, qpsLimit))
+
+		o.Limit.QPSLimit = qpsLimit
 	}}
 }
 
@@ -300,5 +325,21 @@ func WithGRPCMaxHeaderListSize(s uint32) Option {
 		di.Push(fmt.Sprintf("WithGRPCMaxHeaderListSize(%+v)", s))
 
 		o.RemoteOpt.GRPCCfg.MaxHeaderListSize = &s
+	}}
+}
+
+func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string, stream streaming.Stream) error) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCUnknownServiceHandler(%+v)", utils.GetFuncName(f)))
+		o.RemoteOpt.GRPCUnknownServiceHandler = f
+	}}
+}
+
+// Deprecated: Use WithConnectionLimiter instead.
+func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithConcurrencyLimiter(%T{%+v})", conLimit, conLimit))
+
+		o.Limit.ConLimit = conLimit
 	}}
 }

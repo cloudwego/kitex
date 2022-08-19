@@ -461,11 +461,6 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 	return io.ReadFull(s.trReader, p)
 }
 
-// SetHeaderChan only used for unit test
-func SetHeaderChan(s *Stream, ch chan struct{}) {
-	s.headerChan = ch
-}
-
 // StreamWrite only used for unit test
 func StreamWrite(s *Stream, buffer *bytes.Buffer) {
 	s.write(recvMsg{buffer: buffer})
@@ -571,6 +566,8 @@ type ConnectOptions struct {
 	ReadBufferSize uint32
 	// MaxHeaderListSize sets the max (uncompressed) size of header list that is prepared to be received.
 	MaxHeaderListSize *uint32
+	// ShortConn indicates whether the connection will be reused from grpc conn pool
+	ShortConn bool
 }
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error

@@ -23,9 +23,9 @@ import (
 	"strings"
 
 	"github.com/cloudwego/kitex"
-	"github.com/cloudwego/kitex/tool/internal/pkg/generator"
-	"github.com/cloudwego/kitex/tool/internal/pkg/log"
-	"github.com/cloudwego/kitex/tool/internal/pkg/util"
+	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 // extraFlag is designed for adding flags that is irrelevant to
@@ -49,11 +49,14 @@ func (a *arguments) addExtraFlag(e *extraFlag) {
 	a.extends = append(a.extends, e)
 }
 
-func (a *arguments) checkExtension(ext string) {
-	if !strings.HasSuffix(a.IDL, ext) {
-		fmt.Fprintf(os.Stderr, "Expect the IDL file to have an extension of '%s'. Got '%s'.", ext, a.IDL)
-		os.Exit(2)
+func (a *arguments) guessIDLType() (string, bool) {
+	switch {
+	case strings.HasSuffix(a.IDL, ".thrift"):
+		return "thrift", true
+	case strings.HasSuffix(a.IDL, ".proto"):
+		return "protobuf", true
 	}
+	return "unknown", false
 }
 
 func (a *arguments) buildFlags() *flag.FlagSet {
@@ -71,7 +74,7 @@ func (a *arguments) buildFlags() *flag.FlagSet {
 		"Turn on verbose mode.")
 	f.BoolVar(&a.GenerateInvoker, "invoker", false,
 		"Generate invoker side codes when service name is specified.")
-	f.StringVar(&a.IDLType, "type", "thrift", "Specify the type of IDL: 'thrift' or 'protobuf'.")
+	f.StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")
 	f.Var(&a.Includes, "I", "Add an IDL search path for includes.")
 	f.Var(&a.ThriftOptions, "thrift", "Specify arguments for the thrift compiler.")
 	f.Var(&a.ThriftPlugins, "thrift-plugin", "Specify thrift plugin arguments for the thrift compiler.")
@@ -135,10 +138,14 @@ func (a *arguments) checkIDL(files []string) {
 	a.IDL = files[0]
 
 	switch a.IDLType {
-	case "thrift":
-		a.checkExtension(".thrift")
-	case "protobuf":
-		a.checkExtension(".proto")
+	case "thrift", "protobuf":
+	case "unknown":
+		if typ, ok := a.guessIDLType(); ok {
+			a.IDLType = typ
+		} else {
+			log.Warn("Can not guess an IDL type from %q, please specify with the '-type' flag.", a.IDL)
+			os.Exit(2)
+		}
 	default:
 		log.Warn("Unsupported IDL type:", a.IDLType)
 		os.Exit(2)

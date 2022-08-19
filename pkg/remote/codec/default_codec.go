@@ -176,7 +176,7 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 	}
 
 	// 2. decode body
-	if err := c.decodePayload(ctx, message, in); err != nil {
+	if err = c.decodePayload(ctx, message, in); err != nil {
 		return err
 	}
 	return nil
@@ -277,8 +277,7 @@ func checkRPCState(ctx context.Context, message remote.Message) error {
 }
 
 func checkPayload(
-	flagBuf []byte, message remote.Message, in remote.ByteBuffer, isTTHeader bool, maxPayloadSize int,
-) error {
+	flagBuf []byte, message remote.Message, in remote.ByteBuffer, isTTHeader bool, maxPayloadSize int) error {
 	var transProto transport.Protocol
 	var codecType serviceinfo.PayloadCodec
 	if isThriftBinary(flagBuf) {

@@ -15,20 +15,23 @@
  */
 
 // Package netpoll contains server and client implementation for netpoll.
+
 package netpoll
 
 import (
 	"context"
 	"errors"
 	"net"
+	"runtime/debug"
 	"sync"
 	"syscall"
 
-	"github.com/cloudwego/netpoll"
-	"golang.org/x/sys/unix"
+	"github.com/cloudwego/kitex/pkg/remote/trans"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/netpoll"
 )
 
 // NewTransServerFactory creates a default netpoll transport server factory.
@@ -41,48 +44,9 @@ type netpollTransServerFactory struct{}
 // NewTransServer implements the remote.TransServerFactory interface.
 func (f *netpollTransServerFactory) NewTransServer(opt *remote.ServerOption, transHdlr remote.ServerTransHandler) remote.TransServer {
 	return &transServer{
-		opt: opt, transHdlr: transHdlr,
-		lncfg: net.ListenConfig{Control: func(network, address string, c syscall.RawConn) error {
-			var err error
-			c.Control(func(fd uintptr) {
-				if !opt.ReusePort {
-					return
-				}
-				/* The real behavior of 'SO_REUSEADDR/SO_REUSEPORT' depends on the underlying OS.
-				For BSD(/Darwin):
-					With 'SO_REUSEADDR' option, the socket can be successfully bound unless there is
-					a conflict with another socket bound to exactly the same combination of source address and port.
-
-					Here is an example to give a better overview:
-					SO_REUSEADDR       socketA        socketB       Result
-					---------------------------------------------------------------------
-					  ON/OFF       192.168.0.1:21   192.168.0.1:21    Error (EADDRINUSE)
-					  ON/OFF       192.168.0.1:21      10.0.0.1:21    OK
-					  ON/OFF          10.0.0.1:21   192.168.0.1:21    OK
-					   OFF             0.0.0.0:21   192.168.1.0:21    Error (EADDRINUSE)
-					   OFF         192.168.1.0:21       0.0.0.0:21    Error (EADDRINUSE)
-					   ON              0.0.0.0:21   192.168.1.0:21    OK
-					   ON          192.168.1.0:21       0.0.0.0:21    OK
-					  ON/OFF           0.0.0.0:21       0.0.0.0:21    Error (EADDRINUSE)
-
-					With 'SO_REUSEPORT', you could bind an arbitrary number of sockets to exactly the same source address
-					and port as long as all prior bound sockets also had 'SO_REUSEPORT' set before they were bound.
-				For Linux < 3.9:
-					Only the option 'SO_REUSEADDR' existed.
-				For Linux >= 3.9:
-					The 'SO_REUSEPORT' behaves exactly like the option in BSD.
-
-				More details can be found at https://stackoverflow.com/questions/14388706/how-do-so-reuseaddr-and-so-reuseport-differ.
-				*/
-				if err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEADDR, 1); err != nil {
-					return
-				}
-				if err = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1); err != nil {
-					return
-				}
-			})
-			return err
-		}},
+		opt:       opt,
+		transHdlr: transHdlr,
+		lncfg:     trans.NewListenConfig(opt),
 	}
 }
 
@@ -100,20 +64,21 @@ type transServer struct {
 var _ remote.TransServer = &transServer{}
 
 // CreateListener implements the remote.TransServer interface.
-func (ts *transServer) CreateListener(addr net.Addr) (_ net.Listener, err error) {
+func (ts *transServer) CreateListener(addr net.Addr) (net.Listener, error) {
 	if addr.Network() == "unix" {
 		syscall.Unlink(addr.String())
 	}
 	// The network must be "tcp", "tcp4", "tcp6" or "unix".
-	ts.ln, err = ts.lncfg.Listen(context.Background(), addr.Network(), addr.String())
-	return ts.ln, err
+	ln, err := ts.lncfg.Listen(context.Background(), addr.Network(), addr.String())
+	return ln, err
 }
 
 // BootstrapServer implements the remote.TransServer interface.
-func (ts *transServer) BootstrapServer() (err error) {
-	if ts.ln == nil {
+func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
+	if ln == nil {
 		return errors.New("listener is nil in netpoll transport server")
 	}
+	ts.ln = ln
 	opts := []netpoll.Option{
 		netpoll.WithIdleTimeout(ts.opt.MaxConnectionIdleTime),
 		netpoll.WithReadTimeout(ts.opt.ReadWriteTimeout),
@@ -145,11 +110,13 @@ func (ts *transServer) Shutdown() (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ts.opt.ExitWaitTime)
 	defer cancel()
 	if g, ok := ts.transHdlr.(remote.GracefulShutdown); ok {
-		// 1. stop listener
-		ts.ln.Close()
+		if ts.ln != nil {
+			// 1. stop listener
+			ts.ln.Close()
 
-		// 2. signal all active connections to close gracefully
-		g.GracefulShutdown(ctx)
+			// 2. signal all active connections to close gracefully
+			g.GracefulShutdown(ctx)
+		}
 	}
 	if ts.evl != nil {
 		err = ts.evl.Shutdown(ctx)
@@ -168,6 +135,7 @@ func (ts *transServer) ConnCount() utils.AtomicInt {
 // 2. Doesn't need to init RPCInfo if it's not RPC request, such as heartbeat.
 func (ts *transServer) onConnActive(conn netpoll.Connection) context.Context {
 	ctx := context.Background()
+	defer transRecover(ctx, conn, "OnActive")
 	conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		ts.onConnInactive(ctx, conn)
 		return nil
@@ -192,10 +160,22 @@ func (ts *transServer) onConnRead(ctx context.Context, conn netpoll.Connection) 
 }
 
 func (ts *transServer) onConnInactive(ctx context.Context, conn netpoll.Connection) {
+	defer transRecover(ctx, conn, "OnInactive")
 	ts.connCount.Dec()
 	ts.transHdlr.OnInactive(ctx, conn)
 }
 
 func (ts *transServer) onError(ctx context.Context, err error, conn netpoll.Connection) {
 	ts.transHdlr.OnError(ctx, err, conn)
+}
+
+func transRecover(ctx context.Context, conn netpoll.Connection, funcName string) {
+	panicErr := recover()
+	if panicErr != nil {
+		if conn != nil {
+			klog.CtxErrorf(ctx, "KITEX: panic happened in %s, remoteAddress=%s, error=%v\nstack=%s", funcName, conn.RemoteAddr(), panicErr, string(debug.Stack()))
+		} else {
+			klog.CtxErrorf(ctx, "KITEX: panic happened in %s, error=%v\nstack=%s", funcName, panicErr, string(debug.Stack()))
+		}
+	}
 }

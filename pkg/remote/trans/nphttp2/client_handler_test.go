@@ -45,31 +45,3 @@ func TestClientHandler(t *testing.T) {
 	err = cliTransHandler.Write(ctx, conn, msg)
 	test.Assert(t, err == nil, err)
 }
-
-func TestClientHandlerOnAction(t *testing.T) {
-	// init
-	opt := newMockClientOption()
-	ctx := newMockCtxWithRPCInfo()
-	conn, err := opt.ConnPool.Get(ctx, "tcp", mockAddr0, remote.ConnOption{Dialer: opt.Dialer, ConnectTimeout: time.Second})
-	test.Assert(t, err == nil, err)
-	defer conn.Close()
-	cliTransHandler, err := newCliTransHandler(opt)
-	test.Assert(t, err == nil, err)
-	// test OnConnection()
-	cliCtx, err := cliTransHandler.OnConnect(ctx)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, cliCtx == ctx)
-
-	// test OnMessage()
-	cliCtx, err = cliTransHandler.OnMessage(ctx, new(mockMessage), new(mockMessage))
-	test.Assert(t, err == nil, err)
-	test.Assert(t, cliCtx == ctx)
-
-	// test OnRead()
-	setDontWaitHeader(conn.(*clientConn).s)
-	_, err = cliTransHandler.OnRead(ctx, conn)
-	test.Assert(t, err == nil, err)
-
-	// test SetPipeline()
-	cliTransHandler.SetPipeline(nil)
-}

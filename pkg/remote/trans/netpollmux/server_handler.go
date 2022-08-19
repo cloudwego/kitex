@@ -48,6 +48,11 @@ func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
 	return &svrTransHandlerFactory{}
 }
 
+// MuxEnabled returns true to mark svrTransHandlerFactory as a mux server factory.
+func (f *svrTransHandlerFactory) MuxEnabled() bool {
+	return true
+}
+
 // NewTransHandler implements the remote.ServerTransHandlerFactory interface.
 // TODO: use object pool?
 func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
@@ -190,9 +195,9 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	// rpcInfoCtx is a pooled ctx with inited RPCInfo which can be reused.
 	// it's recycled in defer.
 	muxSvrConn, _ := muxSvrConnCtx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
-	rpcInfoCtx := muxSvrConn.pool.Get().(context.Context)
+	rpcInfo := muxSvrConn.pool.Get().(rpcinfo.RPCInfo)
+	rpcInfoCtx := rpcinfo.NewCtxWithRPCInfo(muxSvrConnCtx, rpcInfo)
 
-	rpcInfo := rpcinfo.GetRPCInfo(rpcInfoCtx)
 	// This is the request-level, one-shot ctx.
 	// It adds the tracer principally, thus do not recycle.
 	ctx := t.startTracer(rpcInfoCtx, rpcInfo)
@@ -218,7 +223,9 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		t.finishTracer(ctx, rpcInfo, err, panicErr)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
-		muxSvrConn.pool.Put(rpcInfoCtx)
+		// reset rpcinfo
+		rpcInfo = t.opt.InitOrResetRPCInfoFunc(rpcInfo, conn.RemoteAddr())
+		muxSvrConn.pool.Put(rpcInfo)
 	}()
 
 	// read
@@ -285,8 +292,8 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	pool := &sync.Pool{
 		New: func() interface{} {
 			// init rpcinfo
-			_, ctx := t.opt.InitRPCInfoFunc(ctx, connection.RemoteAddr())
-			return ctx
+			ri := t.opt.InitOrResetRPCInfoFunc(nil, connection.RemoteAddr())
+			return ri
 		},
 	}
 	muxConn := newMuxSvrConn(connection, pool)
@@ -303,7 +310,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	// Send a control frame with sequence ID 0 to notify the remote
 	// end to close the connection or prevent further operation on it.
 	iv := rpcinfo.NewInvocation("none", "none")
-	iv.(interface{ SetSeqID(seqID int32) }).SetSeqID(0)
+	iv.SetSeqID(0)
 	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
 	data := NewControlFrame()
 	msg := remote.NewMessage(data, t.svcInfo, ri, remote.Reply, remote.Server)
@@ -353,10 +360,13 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 		}
 		remote := rpcinfo.AsMutableEndpointInfo(ri.From())
 		remote.SetTag(rpcinfo.RemoteClosedTag, "1")
-	} else if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s\nstack=%s", rService, rAddr, err.Error(), pe.Stack())
 	} else {
-		klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s", rService, rAddr, err.Error())
+		var de *kerrors.DetailedError
+		if ok := errors.As(err, &de); ok && de.Stack() != "" {
+			klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s\nstack=%s", rService, rAddr, err.Error(), de.Stack())
+		} else {
+			klog.CtxErrorf(ctx, "KITEX: processing request error, remoteService=%s, remoteAddr=%v, error=%s", rService, rAddr, err.Error())
+		}
 	}
 }
 
@@ -371,7 +381,8 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 }
 
 func (t *svrTransHandler) writeErrorReplyIfNeeded(
-	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool) (shouldCloseConn bool) {
+	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool,
+) (shouldCloseConn bool) {
 	if methodInfo, _ := trans.GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return

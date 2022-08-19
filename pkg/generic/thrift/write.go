@@ -23,9 +23,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/tidwall/gjson"
+
+	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
+	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
 var errTypeAssert = errors.New("type assertion error")
@@ -38,9 +40,23 @@ type writerOption struct {
 
 type writer func(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error
 
+type fieldGetter func(val interface{}, field *descriptor.FieldDescriptor) (interface{}, bool)
+
+var mapGetter fieldGetter = func(val interface{}, field *descriptor.FieldDescriptor) (interface{}, bool) {
+	st := val.(map[string]interface{})
+	ret, ok := st[field.FieldName()]
+	return ret, ok
+}
+
+var pbGetter fieldGetter = func(val interface{}, field *descriptor.FieldDescriptor) (interface{}, bool) {
+	st := val.(proto.Message)
+	ret, err := st.TryGetFieldByNumber(int(field.ID))
+	return ret, err == nil
+}
+
 func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption) (descriptor.Type, writer, error) {
 	tt := t.Type
-	switch sample.(type) {
+	switch v := sample.(type) {
 	case bool:
 		return descriptor.BOOL, writeBool, nil
 	case int8, byte:
@@ -48,6 +64,20 @@ func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption)
 	case int16:
 		return descriptor.I16, writeInt16, nil
 	case int32:
+		var err error
+		// data from pb decode
+		switch tt {
+		case descriptor.I08:
+			if v&0xff != v {
+				err = fmt.Errorf("value is beyond range of i8: %v", v)
+			}
+			return tt, writeInt32AsInt8, err
+		case descriptor.I16:
+			if v&0xffff != v {
+				err = fmt.Errorf("value is beyond range of i16: %v", v)
+			}
+			return tt, writeInt32AsInt16, err
+		}
 		return descriptor.I32, writeInt32, nil
 	case int64:
 		return descriptor.I64, writeInt64, nil
@@ -84,6 +114,8 @@ func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption)
 		case descriptor.MAP:
 			return descriptor.MAP, writeStringMap, nil
 		}
+	case proto.Message:
+		return descriptor.STRUCT, writeStruct, nil
 	case *descriptor.HTTPRequest:
 		return descriptor.STRUCT, writeHTTPRequest, nil
 	case *gjson.Result:
@@ -307,6 +339,14 @@ func writeInt16(ctx context.Context, val interface{}, out thrift.TProtocol, t *d
 
 func writeInt32(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	return out.WriteI32(val.(int32))
+}
+
+func writeInt32AsInt8(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	return out.WriteByte(int8(val.(int32)))
+}
+
+func writeInt32AsInt16(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	return out.WriteI16(int16(val.(int32)))
 }
 
 func writeInt64(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
@@ -539,13 +579,20 @@ func writeRequestBase(ctx context.Context, val interface{}, out thrift.TProtocol
 
 // writeStruct iter with Descriptor, can check the field's required and others
 func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
-	st := val.(map[string]interface{})
+	var fg fieldGetter
+	switch val.(type) {
+	case map[string]interface{}:
+		fg = mapGetter
+	case proto.Message:
+		fg = pbGetter
+	}
+
 	err := out.WriteStructBegin(t.Struct.Name)
 	if err != nil {
 		return err
 	}
 	for name, field := range t.Struct.FieldsByName {
-		elem, ok := st[name]
+		elem, ok := fg(val, field)
 		if field.Type.IsRequestBase && opt.requestBase != nil {
 			if err := writeRequestBase(ctx, elem, out, field, opt); err != nil {
 				return err

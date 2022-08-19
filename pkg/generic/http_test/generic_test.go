@@ -64,10 +64,10 @@ func initThriftServer(t *testing.T, address string, handler generic.Service) ser
 }
 
 func testThriftNormalBinaryEcho(t *testing.T) {
-	svr := initThriftServer(t, ":9126", new(GenericServiceBinaryEchoImpl))
+	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClientByIDL(t, "127.0.0.1:9126", "./idl/binary_echo.thrift", false)
+	cli := initThriftClientByIDL(t, "127.0.0.1:8126", "./idl/binary_echo.thrift", false)
 	url := "http://example.com/BinaryEcho"
 
 	// []byte value for binary field
@@ -120,10 +120,10 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 }
 
 func testThriftBase64BinaryEcho(t *testing.T) {
-	svr := initThriftServer(t, ":9126", new(GenericServiceBinaryEchoImpl))
+	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClientByIDL(t, "127.0.0.1:9126", "./idl/binary_echo.thrift", true)
+	cli := initThriftClientByIDL(t, "127.0.0.1:8126", "./idl/binary_echo.thrift", true)
 	url := "http://example.com/BinaryEcho"
 
 	// []byte value for binary field

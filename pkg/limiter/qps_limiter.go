@@ -17,6 +17,7 @@
 package limiter
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 )
@@ -68,7 +69,7 @@ func (l *qpsLimiter) UpdateQPSLimit(interval time.Duration, limit int) {
 }
 
 // Acquire one token.
-func (l *qpsLimiter) Acquire() bool {
+func (l *qpsLimiter) Acquire(ctx context.Context) bool {
 	if atomic.LoadInt32(&l.tokens) <= 0 {
 		return false
 	}
@@ -76,7 +77,7 @@ func (l *qpsLimiter) Acquire() bool {
 }
 
 // Status returns the current status.
-func (l *qpsLimiter) Status() (max, cur int, interval time.Duration) {
+func (l *qpsLimiter) Status(ctx context.Context) (max, cur int, interval time.Duration) {
 	max = int(atomic.LoadInt32(&l.limit))
 	cur = int(atomic.LoadInt32(&l.tokens))
 	interval = l.interval

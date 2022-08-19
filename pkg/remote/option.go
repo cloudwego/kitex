@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // Option is used to pack the inbound and outbound handlers.
@@ -78,6 +79,10 @@ type ServerOption struct {
 
 	PayloadCodec PayloadCodec
 
+	// Listener is used to specify the server listener, which comes with higher priority than Address below.
+	Listener net.Listener
+
+	// Address is the listener addr
 	Address net.Addr
 
 	ReusePort bool
@@ -93,11 +98,13 @@ type ServerOption struct {
 
 	ReadWriteTimeout time.Duration
 
-	InitRPCInfoFunc func(context.Context, net.Addr) (rpcinfo.RPCInfo, context.Context)
+	InitOrResetRPCInfoFunc func(rpcinfo.RPCInfo, net.Addr) rpcinfo.RPCInfo
 
 	TracerCtl *internal_stats.Controller
 
 	GRPCCfg *grpc.ServerConfig
+
+	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
 
 	Option
 }

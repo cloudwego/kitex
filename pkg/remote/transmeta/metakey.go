@@ -17,12 +17,6 @@
 // Package transmeta .
 package transmeta
 
-// Protocol constants.
-const (
-	MeshTHeaderProtocolVersion = "1.0.0"
-	MeshOrTTHeaderProtocol     = "3"
-)
-
 // Keys in mesh header.
 const (
 	MeshVersion uint16 = iota
