@@ -1,3 +1,5 @@
+// This file is a copy of github.com/envoyproxy/data-plane-api/envoy/service/discovery/v3/discovery.proto
+
 syntax = "proto3";
 
 package envoy.service.discovery.v3;

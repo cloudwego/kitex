@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ package aggregateddiscoveryservice
 import (
 	"context"
 	"fmt"
+
+	v3discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 
 	client "github.com/cloudwego/kitex/client"
 	kitex "github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -67,12 +69,12 @@ type aggregatedDiscoveryServiceStreamAggregatedResourcesClient struct {
 	streaming.Stream
 }
 
-func (x *aggregatedDiscoveryServiceStreamAggregatedResourcesClient) Send(m *v3.DiscoveryRequest) error {
+func (x *aggregatedDiscoveryServiceStreamAggregatedResourcesClient) Send(m *v3discovery.DiscoveryRequest) error {
 	return x.Stream.SendMsg(m)
 }
 
-func (x *aggregatedDiscoveryServiceStreamAggregatedResourcesClient) Recv() (*v3.DiscoveryResponse, error) {
-	m := new(v3.DiscoveryResponse)
+func (x *aggregatedDiscoveryServiceStreamAggregatedResourcesClient) Recv() (*v3discovery.DiscoveryResponse, error) {
+	m := new(v3discovery.DiscoveryResponse)
 	return m, x.Stream.RecvMsg(m)
 }
 
@@ -80,12 +82,12 @@ type aggregatedDiscoveryServiceStreamAggregatedResourcesServer struct {
 	streaming.Stream
 }
 
-func (x *aggregatedDiscoveryServiceStreamAggregatedResourcesServer) Send(m *v3.DiscoveryResponse) error {
+func (x *aggregatedDiscoveryServiceStreamAggregatedResourcesServer) Send(m *v3discovery.DiscoveryResponse) error {
 	return x.Stream.SendMsg(m)
 }
 
-func (x *aggregatedDiscoveryServiceStreamAggregatedResourcesServer) Recv() (*v3.DiscoveryRequest, error) {
-	m := new(v3.DiscoveryRequest)
+func (x *aggregatedDiscoveryServiceStreamAggregatedResourcesServer) Recv() (*v3discovery.DiscoveryRequest, error) {
+	m := new(v3discovery.DiscoveryRequest)
 	return m, x.Stream.RecvMsg(m)
 }
 
@@ -98,7 +100,7 @@ func newStreamAggregatedResourcesResult() interface{} {
 }
 
 type StreamAggregatedResourcesArgs struct {
-	Req *v3.DiscoveryRequest
+	Req *v3discovery.DiscoveryRequest
 }
 
 func (p *StreamAggregatedResourcesArgs) Marshal(out []byte) ([]byte, error) {
@@ -109,7 +111,7 @@ func (p *StreamAggregatedResourcesArgs) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *StreamAggregatedResourcesArgs) Unmarshal(in []byte) error {
-	msg := new(v3.DiscoveryRequest)
+	msg := new(v3discovery.DiscoveryRequest)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -117,9 +119,9 @@ func (p *StreamAggregatedResourcesArgs) Unmarshal(in []byte) error {
 	return nil
 }
 
-var StreamAggregatedResourcesArgs_Req_DEFAULT *v3.DiscoveryRequest
+var StreamAggregatedResourcesArgs_Req_DEFAULT *v3discovery.DiscoveryRequest
 
-func (p *StreamAggregatedResourcesArgs) GetReq() *v3.DiscoveryRequest {
+func (p *StreamAggregatedResourcesArgs) GetReq() *v3discovery.DiscoveryRequest {
 	if !p.IsSetReq() {
 		return StreamAggregatedResourcesArgs_Req_DEFAULT
 	}
@@ -131,10 +133,10 @@ func (p *StreamAggregatedResourcesArgs) IsSetReq() bool {
 }
 
 type StreamAggregatedResourcesResult struct {
-	Success *v3.DiscoveryResponse
+	Success *v3discovery.DiscoveryResponse
 }
 
-var StreamAggregatedResourcesResult_Success_DEFAULT *v3.DiscoveryResponse
+var StreamAggregatedResourcesResult_Success_DEFAULT *v3discovery.DiscoveryResponse
 
 func (p *StreamAggregatedResourcesResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -144,7 +146,7 @@ func (p *StreamAggregatedResourcesResult) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *StreamAggregatedResourcesResult) Unmarshal(in []byte) error {
-	msg := new(v3.DiscoveryResponse)
+	msg := new(v3discovery.DiscoveryResponse)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -152,7 +154,7 @@ func (p *StreamAggregatedResourcesResult) Unmarshal(in []byte) error {
 	return nil
 }
 
-func (p *StreamAggregatedResourcesResult) GetSuccess() *v3.DiscoveryResponse {
+func (p *StreamAggregatedResourcesResult) GetSuccess() *v3discovery.DiscoveryResponse {
 	if !p.IsSetSuccess() {
 		return StreamAggregatedResourcesResult_Success_DEFAULT
 	}
@@ -160,7 +162,7 @@ func (p *StreamAggregatedResourcesResult) GetSuccess() *v3.DiscoveryResponse {
 }
 
 func (p *StreamAggregatedResourcesResult) SetSuccess(x interface{}) {
-	p.Success = x.(*v3.DiscoveryResponse)
+	p.Success = x.(*v3discovery.DiscoveryResponse)
 }
 
 func (p *StreamAggregatedResourcesResult) IsSetSuccess() bool {
@@ -177,12 +179,12 @@ type aggregatedDiscoveryServiceDeltaAggregatedResourcesClient struct {
 	streaming.Stream
 }
 
-func (x *aggregatedDiscoveryServiceDeltaAggregatedResourcesClient) Send(m *v3.DeltaDiscoveryRequest) error {
+func (x *aggregatedDiscoveryServiceDeltaAggregatedResourcesClient) Send(m *v3discovery.DeltaDiscoveryRequest) error {
 	return x.Stream.SendMsg(m)
 }
 
-func (x *aggregatedDiscoveryServiceDeltaAggregatedResourcesClient) Recv() (*v3.DeltaDiscoveryResponse, error) {
-	m := new(v3.DeltaDiscoveryResponse)
+func (x *aggregatedDiscoveryServiceDeltaAggregatedResourcesClient) Recv() (*v3discovery.DeltaDiscoveryResponse, error) {
+	m := new(v3discovery.DeltaDiscoveryResponse)
 	return m, x.Stream.RecvMsg(m)
 }
 
@@ -190,12 +192,12 @@ type aggregatedDiscoveryServiceDeltaAggregatedResourcesServer struct {
 	streaming.Stream
 }
 
-func (x *aggregatedDiscoveryServiceDeltaAggregatedResourcesServer) Send(m *v3.DeltaDiscoveryResponse) error {
+func (x *aggregatedDiscoveryServiceDeltaAggregatedResourcesServer) Send(m *v3discovery.DeltaDiscoveryResponse) error {
 	return x.Stream.SendMsg(m)
 }
 
-func (x *aggregatedDiscoveryServiceDeltaAggregatedResourcesServer) Recv() (*v3.DeltaDiscoveryRequest, error) {
-	m := new(v3.DeltaDiscoveryRequest)
+func (x *aggregatedDiscoveryServiceDeltaAggregatedResourcesServer) Recv() (*v3discovery.DeltaDiscoveryRequest, error) {
+	m := new(v3discovery.DeltaDiscoveryRequest)
 	return m, x.Stream.RecvMsg(m)
 }
 
@@ -208,7 +210,7 @@ func newDeltaAggregatedResourcesResult() interface{} {
 }
 
 type DeltaAggregatedResourcesArgs struct {
-	Req *v3.DeltaDiscoveryRequest
+	Req *v3discovery.DeltaDiscoveryRequest
 }
 
 func (p *DeltaAggregatedResourcesArgs) Marshal(out []byte) ([]byte, error) {
@@ -219,7 +221,7 @@ func (p *DeltaAggregatedResourcesArgs) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *DeltaAggregatedResourcesArgs) Unmarshal(in []byte) error {
-	msg := new(v3.DeltaDiscoveryRequest)
+	msg := new(v3discovery.DeltaDiscoveryRequest)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -227,9 +229,9 @@ func (p *DeltaAggregatedResourcesArgs) Unmarshal(in []byte) error {
 	return nil
 }
 
-var DeltaAggregatedResourcesArgs_Req_DEFAULT *v3.DeltaDiscoveryRequest
+var DeltaAggregatedResourcesArgs_Req_DEFAULT *v3discovery.DeltaDiscoveryRequest
 
-func (p *DeltaAggregatedResourcesArgs) GetReq() *v3.DeltaDiscoveryRequest {
+func (p *DeltaAggregatedResourcesArgs) GetReq() *v3discovery.DeltaDiscoveryRequest {
 	if !p.IsSetReq() {
 		return DeltaAggregatedResourcesArgs_Req_DEFAULT
 	}
@@ -241,10 +243,10 @@ func (p *DeltaAggregatedResourcesArgs) IsSetReq() bool {
 }
 
 type DeltaAggregatedResourcesResult struct {
-	Success *v3.DeltaDiscoveryResponse
+	Success *v3discovery.DeltaDiscoveryResponse
 }
 
-var DeltaAggregatedResourcesResult_Success_DEFAULT *v3.DeltaDiscoveryResponse
+var DeltaAggregatedResourcesResult_Success_DEFAULT *v3discovery.DeltaDiscoveryResponse
 
 func (p *DeltaAggregatedResourcesResult) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
@@ -254,7 +256,7 @@ func (p *DeltaAggregatedResourcesResult) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *DeltaAggregatedResourcesResult) Unmarshal(in []byte) error {
-	msg := new(v3.DeltaDiscoveryResponse)
+	msg := new(v3discovery.DeltaDiscoveryResponse)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
 	}
@@ -262,7 +264,7 @@ func (p *DeltaAggregatedResourcesResult) Unmarshal(in []byte) error {
 	return nil
 }
 
-func (p *DeltaAggregatedResourcesResult) GetSuccess() *v3.DeltaDiscoveryResponse {
+func (p *DeltaAggregatedResourcesResult) GetSuccess() *v3discovery.DeltaDiscoveryResponse {
 	if !p.IsSetSuccess() {
 		return DeltaAggregatedResourcesResult_Success_DEFAULT
 	}
@@ -270,7 +272,7 @@ func (p *DeltaAggregatedResourcesResult) GetSuccess() *v3.DeltaDiscoveryResponse
 }
 
 func (p *DeltaAggregatedResourcesResult) SetSuccess(x interface{}) {
-	p.Success = x.(*v3.DeltaDiscoveryResponse)
+	p.Success = x.(*v3discovery.DeltaDiscoveryResponse)
 }
 
 func (p *DeltaAggregatedResourcesResult) IsSetSuccess() bool {

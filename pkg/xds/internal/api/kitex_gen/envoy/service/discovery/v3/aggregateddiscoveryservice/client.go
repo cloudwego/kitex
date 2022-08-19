@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import (
 	client "github.com/cloudwego/kitex/client"
 	callopt "github.com/cloudwego/kitex/client/callopt"
 	streaming "github.com/cloudwego/kitex/pkg/streaming"
-	v3 "github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3"
 	transport "github.com/cloudwego/kitex/transport"
+	v3discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 )
 
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
@@ -36,14 +36,14 @@ type Client interface {
 
 type AggregatedDiscoveryService_StreamAggregatedResourcesClient interface {
 	streaming.Stream
-	Send(*v3.DiscoveryRequest) error
-	Recv() (*v3.DiscoveryResponse, error)
+	Send(*v3discovery.DiscoveryRequest) error
+	Recv() (*v3discovery.DiscoveryResponse, error)
 }
 
 type AggregatedDiscoveryService_DeltaAggregatedResourcesClient interface {
 	streaming.Stream
-	Send(*v3.DeltaDiscoveryRequest) error
-	Recv() (*v3.DeltaDiscoveryResponse, error)
+	Send(*v3discovery.DeltaDiscoveryRequest) error
+	Recv() (*v3discovery.DeltaDiscoveryResponse, error)
 }
 
 // NewClient creates a client for the service defined in IDL.

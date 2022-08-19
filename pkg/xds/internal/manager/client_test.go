@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@ import (
 
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/test"
-	discoveryv3 "github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3"
 	"github.com/cloudwego/kitex/pkg/xds/internal/manager/mock"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	v3core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
+	discoveryv3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 )
 
 type mockADSClient struct {

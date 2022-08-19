@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,10 +22,12 @@ import (
 	"sync"
 	"time"
 
-	discoveryv3 "github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3"
+	v3 "github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3"
+
 	"github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3/aggregateddiscoveryservice"
 	"github.com/cloudwego/kitex/pkg/xds/internal/xdsresource"
 	"github.com/cloudwego/kitex/server"
+	discoveryv3 "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 )
 
 type testXDSServer struct {
@@ -90,7 +92,7 @@ type testAdsService struct {
 	resourceCache map[xdsresource.ResourceType]map[string]*discoveryv3.DiscoveryResponse
 }
 
-func (svr *testAdsService) StreamAggregatedResources(stream discoveryv3.AggregatedDiscoveryService_StreamAggregatedResourcesServer) (err error) {
+func (svr *testAdsService) StreamAggregatedResources(stream v3.AggregatedDiscoveryService_StreamAggregatedResourcesServer) (err error) {
 	errCh := make(chan error, 2)
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -155,6 +157,6 @@ func (svr *testAdsService) handleRequest(msg interface{}) {
 	svr.respCh <- cache
 }
 
-func (svr *testAdsService) DeltaAggregatedResources(stream discoveryv3.AggregatedDiscoveryService_DeltaAggregatedResourcesServer) (err error) {
+func (svr *testAdsService) DeltaAggregatedResources(stream v3.AggregatedDiscoveryService_DeltaAggregatedResourcesServer) (err error) {
 	return fmt.Errorf("DeltaAggregatedResources has not been implemented")
 }
