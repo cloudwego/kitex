@@ -35,8 +35,7 @@ func TestInvocation(t *testing.T) {
 	inv := NewInvocation("a.a.a", "aaa")
 	test.Assert(t, inv.SeqID() == globalSeqID)
 
-	set, ok := inv.(InvocationSetter)
-	test.Assert(t, ok && set != nil)
+	var set InvocationSetter = inv
 
 	set.SetSeqID(111)
 	set.SetPackageName("pkg")

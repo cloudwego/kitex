@@ -23,7 +23,7 @@ import (
 
 type cliTransHandlerFactory struct{}
 
-// NewCliTransHandlerFactory returns a new remote.ClientTransHandlerFactory for netpoll.
+// NewCliTransHandlerFactory returns a new remote.ClientTransHandlerFactory for go net.
 func NewCliTransHandlerFactory() remote.ClientTransHandlerFactory {
 	return &cliTransHandlerFactory{}
 }

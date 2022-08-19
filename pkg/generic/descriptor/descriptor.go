@@ -30,6 +30,8 @@ type FieldDescriptor struct {
 	Alias        string // alias name
 	ID           int32
 	Required     bool
+	Optional     bool
+	DefaultValue interface{}
 	IsException  bool
 	Type         *TypeDescriptor
 	HTTPMapping  HTTPMapping
@@ -60,6 +62,7 @@ type StructDescriptor struct {
 	FieldsByID     map[int32]*FieldDescriptor
 	FieldsByName   map[string]*FieldDescriptor
 	RequiredFields map[int32]*FieldDescriptor
+	DefaultFields  map[string]*FieldDescriptor
 }
 
 // CheckRequired check all required fields at the end of read or write

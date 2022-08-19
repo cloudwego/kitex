@@ -22,6 +22,7 @@ package server
 
 import (
 	"fmt"
+	"net"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -161,7 +162,17 @@ func WithExitSignal(f func() <-chan error) Option {
 	}}
 }
 
-// WithReusePort sets SO_REUSEPORT on listener.
+// WithListener sets the listener for server, the priority is higher than WithServiceAddr
+func WithListener(ln net.Listener) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithListener(%+v)", ln))
+
+		o.RemoteOpt.Listener = ln
+	}}
+}
+
+// WithReusePort sets SO_REUSEPORT on listener, it is only used with Option `WithServiceAddr`.
+// It won't take effect when listener is specified by WithListener.
 func WithReusePort(reuse bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithReusePort(%+v)", reuse))

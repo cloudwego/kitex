@@ -45,7 +45,7 @@ func NewCliTransHandlerFactory() remote.ClientTransHandlerFactory {
 // NewTransHandler implements the remote.ClientTransHandlerFactory interface.
 func (f *cliTransHandlerFactory) NewTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, error) {
 	if _, ok := opt.ConnPool.(*MuxPool); !ok {
-		return nil, fmt.Errorf("ConnPool[%T] invalid, netpoll mux just suppot MuxPool", opt.ConnPool)
+		return nil, fmt.Errorf("ConnPool[%T] invalid, netpoll mux just support MuxPool", opt.ConnPool)
 	}
 	return newCliTransHandler(opt)
 }

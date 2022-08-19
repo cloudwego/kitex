@@ -14,21 +14,24 @@
  * limitations under the License.
  */
 
-package utils
+package proto
 
-// Slice is an abstraction of []interface{}.
-type Slice []interface{}
+import (
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
+)
 
-// Push pushes an interface to the slice.
-func (s *Slice) Push(any interface{}) {
-	*s = append(*s, any)
+type (
+	ServiceDescriptor = *desc.ServiceDescriptor
+	MessageDescriptor = *desc.MessageDescriptor
+)
+
+type Message interface {
+	Marshal() ([]byte, error)
+	TryGetFieldByNumber(fieldNumber int) (interface{}, error)
+	TrySetFieldByNumber(fieldNumber int, val interface{}) error
 }
 
-// Pop pops the last element from the slice.
-func (s *Slice) Pop() (res interface{}) {
-	if size := len(*s); size > 0 {
-		res = (*s)[size-1]
-		*s = (*s)[:size-1]
-	}
-	return
+func NewMessage(descriptor MessageDescriptor) Message {
+	return dynamic.NewMessage(descriptor)
 }

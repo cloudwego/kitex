@@ -75,6 +75,16 @@ func HTTPThriftGeneric(p DescriptorProvider) (Generic, error) {
 	}, nil
 }
 
+func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generic, error) {
+	codec, err := newHTTPPbThriftCodec(p, pbp, thriftCodec)
+	if err != nil {
+		return nil, err
+	}
+	return &httpPbThriftGeneric{
+		codec: codec,
+	}, nil
+}
+
 // JSONThriftGeneric json mapping generic.
 // Base64 codec for binary field is enabled by default. You can change this option with SetBinaryWithBase64.
 // eg:
@@ -201,5 +211,29 @@ func (g *httpThriftGeneric) GetMethod(req interface{}, method string) (*Method, 
 }
 
 func (g *httpThriftGeneric) Close() error {
+	return g.codec.Close()
+}
+
+type httpPbThriftGeneric struct {
+	codec *httpPbThriftCodec
+}
+
+func (g *httpPbThriftGeneric) Framed() bool {
+	return false
+}
+
+func (g *httpPbThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
+	return serviceinfo.Thrift
+}
+
+func (g *httpPbThriftGeneric) PayloadCodec() remote.PayloadCodec {
+	return g.codec
+}
+
+func (g *httpPbThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
+	return g.codec.getMethod(req)
+}
+
+func (g *httpPbThriftGeneric) Close() error {
 	return g.codec.Close()
 }

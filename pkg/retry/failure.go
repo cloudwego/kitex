@@ -21,11 +21,12 @@ import (
 	"time"
 
 	"github.com/bytedance/gopkg/lang/fastrand"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 const maxFailureRetryTimes = 5
 
-// NewFailurePolicy init failure retry policy
+// NewFailurePolicy init default failure retry policy
 func NewFailurePolicy() *FailurePolicy {
 	p := &FailurePolicy{
 		StopPolicy: StopPolicy{
@@ -38,6 +39,13 @@ func NewFailurePolicy() *FailurePolicy {
 		BackOffPolicy: &BackOffPolicy{BackOffType: NoneBackOffType},
 	}
 	return p
+}
+
+// NewFailurePolicyWithResultRetry init failure retry policy with ShouldResultRetry
+func NewFailurePolicyWithResultRetry(rr *ShouldResultRetry) *FailurePolicy {
+	fp := NewFailurePolicy()
+	fp.ShouldResultRetry = rr
+	return fp
 }
 
 // WithMaxRetryTimes default is 2, not include first call
@@ -95,9 +103,24 @@ func (p *FailurePolicy) WithRetrySameNode() {
 	p.RetrySameNode = true
 }
 
+// WithSpecifiedResultRetry sets customized ShouldResultRetry.
+func (p *FailurePolicy) WithSpecifiedResultRetry(rr *ShouldResultRetry) {
+	if rr != nil {
+		p.ShouldResultRetry = rr
+	}
+}
+
 // String prints human readable information.
 func (p FailurePolicy) String() string {
-	return fmt.Sprintf("{StopPolicy:%+v BackOffPolicy:%+v RetrySameNode:%+v}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode)
+	return fmt.Sprintf("{StopPolicy:%+v BackOffPolicy:%+v RetrySameNode:%+v "+
+		"ShouldResultRetry:{ErrorRetry:%t, RespRetry:%t}}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode, p.IsErrorRetryNonNil(), p.IsRespRetryNonNil())
+}
+
+// AllErrorRetry is common choice for ShouldResultRetry.
+func AllErrorRetry() *ShouldResultRetry {
+	return &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+		return err != nil
+	}}
 }
 
 // BackOff is the interface of back off implements

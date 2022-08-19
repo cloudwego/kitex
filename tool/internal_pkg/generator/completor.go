@@ -90,9 +90,9 @@ func (c *completer) compare(pkg *ast.Package) []*MethodInfo {
 }
 
 func (c *completer) addImplementations(w io.Writer, newMethods []*MethodInfo) error {
-	// 调用模板生成新的methods基本实现代码
+	// generate implements of new methods
 	mt := template.New(HandlerFileName).Funcs(funcs)
-	mt = template.Must(mt.Parse(`{{template "HandlerMethods" .}}`))
+	mt = template.Must(mt.Parse(`{{template "HandlerMethod" .}}`))
 	mt = template.Must(mt.Parse(tpl.HandlerMethodsTpl))
 	data := struct {
 		AllMethods  []*MethodInfo
@@ -109,7 +109,7 @@ func (c *completer) addImplementations(w io.Writer, newMethods []*MethodInfo) er
 	return err
 }
 
-// 为新的methods添加新的import（如果有）到handler
+// add imports for new methods
 func (c *completer) addImport(w io.Writer, newMethods []*MethodInfo, fset *token.FileSet, handlerAST *ast.File) error {
 	newImports := make(map[string]bool)
 	for _, m := range newMethods {
@@ -128,7 +128,7 @@ func (c *completer) addImport(w io.Writer, newMethods []*MethodInfo, fset *token
 	for _, i := range imports {
 		path := strings.Trim(i.Path.Value, "\"")
 		var aliasPath string
-		// 去除 handler.go 中已有的import
+		// remove imports that already in handler.go
 		if i.Name != nil {
 			aliasPath = i.Name.String() + " " + path
 		} else {
@@ -153,7 +153,7 @@ func (c *completer) addImport(w io.Writer, newMethods []*MethodInfo, fset *token
 }
 
 func (c *completer) process(w io.Writer) error {
-	// 获取main package的AST
+	// get AST of main package
 	fset := token.NewFileSet()
 	pkgs, err := parser.ParseDir(fset, filepath.Dir(c.handlerPath), nil, parser.ParseComments)
 	if err != nil {

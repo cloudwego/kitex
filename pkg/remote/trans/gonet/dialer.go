@@ -24,7 +24,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-// NewDialer returns the default netpoll dialer.
+// NewDialer returns the default go net dialer.
 func NewDialer() remote.Dialer {
 	return &dialer{}
 }

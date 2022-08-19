@@ -26,6 +26,8 @@ import (
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/thriftgo/generator/golang"
+	"github.com/cloudwego/thriftgo/generator/golang/templates"
+	"github.com/cloudwego/thriftgo/generator/golang/templates/slim"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/plugin"
 )
@@ -61,7 +63,8 @@ func (p *patcher) buildTemplates() (err error) {
 	m["TypeIDToGoType"] = func(t string) string { return typeIDToGoType[t] }
 	m["IsBinaryOrStringType"] = p.isBinaryOrStringType
 	m["Version"] = func() string { return p.version }
-	m["GenerateFastAPIs"] = func() bool { return !p.noFastAPI }
+	m["GenerateFastAPIs"] = func() bool { return !p.noFastAPI && p.utils.Template() != "slim" }
+	m["GenerateArgsResultTypes"] = func() bool { return p.utils.Template() == "slim" }
 	m["ImportPathTo"] = generator.ImportPathTo
 	m["ToPackageNames"] = func(imports map[string]string) (res []string) {
 		for pth, alias := range imports {
@@ -85,6 +88,51 @@ func (p *patcher) buildTemplates() (err error) {
 	}
 
 	tpl := template.New("kitex").Funcs(m)
+	allTemplates := basicTemplates
+	if p.utils.Template() == "slim" {
+		allTemplates = append(allTemplates, slim.StructLike,
+			templates.StructLikeDefault,
+			templates.FieldGetOrSet,
+			templates.FieldIsSet)
+	} else {
+		allTemplates = append(allTemplates, structLikeCodec,
+			structLikeFastRead,
+			structLikeFastReadField,
+			structLikeFastWrite,
+			structLikeFastWriteNocopy,
+			structLikeLength,
+			structLikeFastWriteField,
+			structLikeFieldLength,
+			fieldFastRead,
+			fieldFastReadStructLike,
+			fieldFastReadBaseType,
+			fieldFastReadContainer,
+			fieldFastReadMap,
+			fieldFastReadSet,
+			fieldFastReadList,
+			fieldFastWrite,
+			fieldLength,
+			fieldFastWriteStructLike,
+			fieldStructLikeLength,
+			fieldFastWriteBaseType,
+			fieldBaseTypeLength,
+			fieldFixedLengthTypeLength,
+			fieldFastWriteContainer,
+			fieldContainerLength,
+			fieldFastWriteMap,
+			fieldMapLength,
+			fieldFastWriteSet,
+			fieldSetLength,
+			fieldFastWriteList,
+			fieldListLength,
+			templates.FieldDeepEqual,
+			templates.FieldDeepEqualBase,
+			templates.FieldDeepEqualStructLike,
+			templates.FieldDeepEqualContainer,
+			validateSet,
+			processor,
+		)
+	}
 	for _, txt := range allTemplates {
 		tpl = template.Must(tpl.Parse(txt))
 	}

@@ -76,7 +76,7 @@ type Hookable interface {
 }
 
 // BalancerFactory get or create a balancer with given target
-// if has the same key(reslover.Target(target)), we will cache and reuse the Balance
+// if it has the same key(reslover.Target(target)), we will cache and reuse the Balance
 type BalancerFactory struct {
 	Hookable
 	opts       Options

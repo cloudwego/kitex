@@ -14,8 +14,8 @@
 
 package thriftgo
 
-const structLike = `
-{{define "StructLike"}}
+const structLikeCodec = `
+{{define "StructLikeCodec"}}
 {{template "StructLikeFastRead" .}}
 
 {{template "StructLikeFastReadField" .}}
@@ -29,7 +29,7 @@ const structLike = `
 {{template "StructLikeFastWriteField" .}}
 
 {{template "StructLikeFieldLength" .}}
-{{- end}}{{/* define "StructLike" */}}
+{{- end}}{{/* define "StructLikeCodec" */}}
 `
 
 const structLikeFastRead = `
@@ -176,8 +176,10 @@ func (p *{{$TypeName}}) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryW
 	offset := 0
 	{{- if eq .Category "union"}}
 	var c int
-	if c = p.CountSetFields{{$TypeName}}(); c != 1 {
-		goto CountSetFieldsError
+	if p != nil {
+		if c = p.CountSetFields{{$TypeName}}(); c != 1 {
+			goto CountSetFieldsError
+		}
 	}
 	{{- end}}
 	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "{{.Name}}")
@@ -205,8 +207,10 @@ func (p *{{$TypeName}}) BLength() int {
 	l := 0
 	{{- if eq .Category "union"}}
 	var c int
-	if c = p.CountSetFields{{$TypeName}}(); c != 1 {
-		goto CountSetFieldsError
+	if p != nil {
+		if c = p.CountSetFields{{$TypeName}}(); c != 1 {
+			goto CountSetFieldsError
+		}
 	}
 	{{- end}}
 	l += bthrift.Binary.StructBeginLength("{{.Name}}")
@@ -649,10 +653,10 @@ const processor = `
 {{define "Processor"}}
 {{- range .Functions}}
 {{$ArgsType := .ArgType}}
-{{template "StructLike" $ArgsType}}
+{{template "StructLikeCodec" $ArgsType}}
 {{- if not .Oneway}}
 	{{$ResType := .ResType}}
-	{{template "StructLike" $ResType}}
+	{{template "StructLikeCodec" $ResType}}
 {{- end}}
 {{- end}}{{/* range .Functions */}}
 {{- end}}{{/* define "Processor" */}}
