@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"go/format"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -468,7 +467,7 @@ func (c *converter) persist(res *plugin.Response) error {
 		if err := os.MkdirAll(path, 0o755); err != nil && !os.IsExist(err) {
 			return fmt.Errorf("failed to create path '%s': %w", path, err)
 		}
-		if err := ioutil.WriteFile(full, content, 0o644); err != nil {
+		if err := os.WriteFile(full, content, 0o644); err != nil {
 			return fmt.Errorf("failed to write file '%s': %w", full, err)
 		}
 	}
