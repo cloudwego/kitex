@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
+
 	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"

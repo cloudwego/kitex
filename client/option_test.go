@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
 	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
@@ -45,7 +47,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/transport"
-	"github.com/golang/mock/gomock"
 )
 
 func TestRetryOptionDebugInfo(t *testing.T) {

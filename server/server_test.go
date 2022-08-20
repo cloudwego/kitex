@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/test"
@@ -43,7 +45,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
-	"github.com/golang/mock/gomock"
 )
 
 func TestServerRun(t *testing.T) {
