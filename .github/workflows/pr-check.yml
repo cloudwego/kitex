@@ -58,11 +58,3 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          # Optional: golangci-lint command line arguments.
-          # args: --enable=gofumpt
-
-      - name: Lint
-        run: |
-          go vet -stdmethods=false $(go list ./...)
-          go install mvdan.cc/gofumpt@v0.2.0
-          test -z "$(gofumpt -l -extra .)" 

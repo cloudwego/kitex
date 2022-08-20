@@ -15,10 +15,10 @@ output:
 # All available settings of specific linters.
 # Refer to https://golangci-lint.run/usage/linters
 linters-settings:
-#  gofumpt:
-#    # Choose whether to use the extra rules.
-#    # Default: false
-#    extra-rules: true
+  gofumpt:
+    # Choose whether to use the extra rules.
+    # Default: false
+    extra-rules: true
   goimports:
     # Put imports beginning with prefix after 3rd-party packages.
     # It's a comma-separated list of prefixes.

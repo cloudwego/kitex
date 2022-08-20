@@ -31,7 +31,7 @@ jobs:
       - name: Benchmark
         run: go test -bench=. -benchmem -run=none ./...
 
-  scenario:
+  scenario-test:
     strategy:
       matrix:
         go: [ 1.17, 1.18 ]
