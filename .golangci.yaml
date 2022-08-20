@@ -6,7 +6,6 @@ run:
     - kitex_gen
   skip-files:
     - ".*\\.mock\\.go$"
-  go: "1.18"
 # output configuration options
 output:
   # Format: colored-line-number|line-number|json|tab|checkstyle|code-climate|junit-xml|github-actions
