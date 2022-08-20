@@ -32,6 +32,7 @@ linters:
   enable:
     - gofumpt
     - goimports
+    - gofmt
   disable:
     - errcheck
     - typecheck

@@ -24,8 +24,9 @@ import (
 	context "context"
 	reflect "reflect"
 
-	remote "github.com/cloudwego/kitex/pkg/remote"
 	gomock "github.com/golang/mock/gomock"
+
+	remote "github.com/cloudwego/kitex/pkg/remote"
 )
 
 // MockPayloadCodec is a mock of PayloadCodec interface.
