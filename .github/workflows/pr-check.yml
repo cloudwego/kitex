@@ -57,4 +57,4 @@ jobs:
         # https://golangci-lint.run/
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.42.1
+          version: latest
