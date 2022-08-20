@@ -30,7 +30,7 @@ linters-settings:
       - stdmethods
 linters:
   enable:
-#    - gofumpt
+    - gofumpt
     - goimports
   disable:
     - errcheck
