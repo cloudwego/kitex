@@ -197,8 +197,7 @@ type ThriftContentWithAbsIncludePathProvider struct {
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
 
 // NewThriftContentWithAbsIncludePathProvider create abs include path DescriptorProvider
-func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string) (*ThriftContentWithAbsIncludePathProvider,
-	error) {
+func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string) (*ThriftContentWithAbsIncludePathProvider, error) {
 	p := &ThriftContentWithAbsIncludePathProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
 	}
