@@ -6,8 +6,6 @@ run:
     - kitex_gen
   skip-files:
     - ".*\\.mock\\.go$"
-  # The default concurrency value is the number of available CPU.
-  concurrency: 4
 # output configuration options
 output:
   # Format: colored-line-number|line-number|json|tab|checkstyle|code-climate|junit-xml|github-actions
