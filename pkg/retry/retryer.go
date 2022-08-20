@@ -59,12 +59,13 @@ type Retryer interface {
 // NewRetryContainerWithCB build Container that doesn't do circuit breaker statistic but get statistic result.
 // Which is used in case that circuit breaker is enable.
 // eg:
-//    cbs := circuitbreak.NewCBSuite(circuitbreak.RPCInfo2Key)
-//    retryC := retry.NewRetryContainerWithCB(cbs.ServiceControl(), cbs.ServicePanel())
-// 	  var opts []client.Option
-//	  opts = append(opts, client.WithRetryContainer(retryC))
-//    // enable service circuit breaker
-//	  opts = append(opts, client.WithMiddleware(cbs.ServiceCBMW()))
+//
+//	   cbs := circuitbreak.NewCBSuite(circuitbreak.RPCInfo2Key)
+//	   retryC := retry.NewRetryContainerWithCB(cbs.ServiceControl(), cbs.ServicePanel())
+//		  var opts []client.Option
+//		  opts = append(opts, client.WithRetryContainer(retryC))
+//	   // enable service circuit breaker
+//		  opts = append(opts, client.WithMiddleware(cbs.ServiceCBMW()))
 func NewRetryContainerWithCB(cc *circuitbreak.Control, cp circuitbreaker.Panel) *Container {
 	return &Container{
 		cbContainer: &cbContainer{cbCtl: cc, cbPanel: cp}, retryerMap: sync.Map{},
@@ -74,8 +75,9 @@ func NewRetryContainerWithCB(cc *circuitbreak.Control, cp circuitbreaker.Panel) 
 // NewRetryContainerWithCBStat build Container that need to do circuit breaker statistic.
 // Which is used in case that the service CB key is customized.
 // eg:
-//    cbs := circuitbreak.NewCBSuite(YourGenServiceCBKeyFunc)
-//    retry.NewRetryContainerWithCBStat(cbs.ServiceControl(), cbs.ServicePanel())
+//
+//	cbs := circuitbreak.NewCBSuite(YourGenServiceCBKeyFunc)
+//	retry.NewRetryContainerWithCBStat(cbs.ServiceControl(), cbs.ServicePanel())
 func NewRetryContainerWithCBStat(cc *circuitbreak.Control, cp circuitbreaker.Panel) *Container {
 	return &Container{
 		cbContainer: &cbContainer{cbCtl: cc, cbPanel: cp, cbStat: true}, retryerMap: sync.Map{},

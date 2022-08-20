@@ -63,8 +63,9 @@ type instanceCBConfig struct {
 
 // CBSuite is default wrapper of CircuitBreaker. If you don't have customized policy, you can specify CircuitBreaker
 // middlewares like this:
-//     cbs := NewCBSuite(GenServiceCBKeyFunc)
-//     opts = append(opts, client.WithCircuitBreaker(cbs))
+//
+//	cbs := NewCBSuite(GenServiceCBKeyFunc)
+//	opts = append(opts, client.WithCircuitBreaker(cbs))
 type CBSuite struct {
 	servicePanel    circuitbreaker.Panel
 	serviceControl  *Control
