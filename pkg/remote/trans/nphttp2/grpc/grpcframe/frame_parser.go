@@ -106,10 +106,10 @@ func parseDataFrame(fc *frameCache, fh http2.FrameHeader, payload netpoll.Reader
 		return nil, connError{http2.ErrCodeProtocol, "pad size larger than data payload"}
 	}
 	data, err := payload.Next(payloadLen)
-	f.data = data[:payloadLen-int(padSize)]
 	if err != nil {
 		return nil, err
 	}
+	f.data = data[:payloadLen-int(padSize)]
 	return f, nil
 }
 
