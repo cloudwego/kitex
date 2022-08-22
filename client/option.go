@@ -23,8 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/xds/xdssuite"
-
 	"github.com/cloudwego/kitex/internal/client"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/circuitbreak"
@@ -43,6 +41,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
+	"github.com/cloudwego/kitex/pkg/xds/xdssuite"
 	"github.com/cloudwego/kitex/transport"
 )
 
