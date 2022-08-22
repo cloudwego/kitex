@@ -176,8 +176,13 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 	}
 
 	// 2. decode body
+	hasRead := in.ReadLen()
 	if err = c.decodePayload(ctx, message, in); err != nil {
 		return err
+	}
+	if message.PayloadLen() == 0 {
+		// if protocol is PurePayload, should set payload length after decoded
+		message.SetPayloadLen(in.ReadLen() - hasRead)
 	}
 	return nil
 }
