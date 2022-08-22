@@ -330,10 +330,13 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 		s.mu.Unlock()
 		switch ht {
 		case notifyCall:
-			go transport.HandleStreams(h.handleStreamAndNotify,
-				func(ctx context.Context, _ string) context.Context {
-					return ctx
-				})
+			go transport.HandleStreams(func(stream *Stream) {
+				s.mu.Lock()
+				h.handleStreamAndNotify(stream)
+				s.mu.Unlock()
+			}, func(ctx context.Context, _ string) context.Context {
+				return ctx
+			})
 		case suspended:
 			go transport.HandleStreams(func(*Stream) {}, // Do nothing to handle the stream.
 				func(ctx context.Context, method string) context.Context {
