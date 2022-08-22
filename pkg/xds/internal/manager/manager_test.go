@@ -18,6 +18,7 @@ package manager
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -291,7 +292,13 @@ func Test_xdsResourceManager_ConcurrentGet(t *testing.T) {
 		test.Assert(t2, err != nil)
 	}
 
+	wg := sync.WaitGroup{}
 	for i := 0; i < 10; i++ {
-		go g(t)
+		wg.Add(1)
+		go func() {
+			g(t)
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 }

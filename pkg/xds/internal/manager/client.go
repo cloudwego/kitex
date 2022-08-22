@@ -18,12 +18,15 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cloudwego/kitex/client"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/xds/internal/api/kitex_gen/envoy/service/discovery/v3/aggregateddiscoveryservice"
@@ -43,7 +46,7 @@ func newADSClient(addr string) (ADSClient, error) {
 		client.WithHostPorts(addr),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("[XDS] client: construct ads client failed, %s", err.Error())
+		return nil, err
 	}
 	return cli, nil
 }
@@ -274,6 +277,10 @@ func (c *xdsClient) getStreamClient() (ADSStream, error) {
 func (c *xdsClient) connect() (ADSStream, error) {
 	as, err := c.adsClient.StreamAggregatedResources(context.Background())
 	if err != nil {
+		// TODO: optimize the retry of create stream
+		if errors.Is(err, kerrors.ErrGetConnection) {
+			time.Sleep(time.Second)
+		}
 		return nil, err
 	}
 	return as, nil
