@@ -483,3 +483,14 @@ func WithWarmingUp(wuo *warmup.ClientOption) Option {
 		o.WarmUpOption = wuo
 	}}
 }
+
+// WithXDSSuite is used to set the xds suite for the client with the input xdsRouteMiddleware and xdsResolver
+func WithXDSSuite(rm endpoint.Middleware, r discovery.Resolver) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push("WithXDSSuite")
+
+		o.XDSEnabled = true
+		o.XDSRouterMiddleware = rm
+		o.Resolver = r
+	}}
+}
