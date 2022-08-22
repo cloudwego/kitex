@@ -41,7 +41,7 @@ var (
 	// ErrRPCFinish happens when retry enabled and there is one call has finished
 	ErrRPCFinish = &basicError{"rpc call finished"}
 	// ErrRoute happens when router fail to route this call
-	ErrRoute = &basicError{"rpc call route failed"}
+	ErrRoute = &basicError{"rpc route failed"}
 )
 
 // More detailed error types
