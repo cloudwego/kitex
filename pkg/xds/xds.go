@@ -29,6 +29,6 @@ type ClientSuite struct {
 
 // CheckClientSuite checks if the client suite is valid.
 // RouteMiddleware and Resolver should not be nil.
-func CheckClientSuite(cs *ClientSuite) bool {
+func CheckClientSuite(cs ClientSuite) bool {
 	return cs.RouterMiddleware != nil && cs.Resolver != nil
 }

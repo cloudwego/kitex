@@ -599,7 +599,7 @@ func TestWithConnMetric(t *testing.T) {
 
 func TestWithXDSSuite(t *testing.T) {
 	// failed
-	s := &xds.ClientSuite{}
+	s := xds.ClientSuite{}
 	options := []client.Option{
 		WithXDSSuite(s),
 	}
@@ -609,7 +609,7 @@ func TestWithXDSSuite(t *testing.T) {
 	test.Assert(t, opt.Resolver == nil)
 
 	// succeed
-	s = &xds.ClientSuite{
+	s = xds.ClientSuite{
 		RouterMiddleware: endpoint.DummyMiddleware,
 		Resolver:         discovery.SynthesizedResolver{},
 	}

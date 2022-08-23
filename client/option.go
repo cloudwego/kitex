@@ -486,7 +486,7 @@ func WithWarmingUp(wuo *warmup.ClientOption) Option {
 }
 
 // WithXDSSuite is used to set the xds suite for the client.
-func WithXDSSuite(suite *xds.ClientSuite) Option {
+func WithXDSSuite(suite xds.ClientSuite) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if xds.CheckClientSuite(suite) {
 			di.Push("WithXDSSuite")
