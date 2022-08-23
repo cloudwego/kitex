@@ -73,21 +73,27 @@ type kClient struct {
 	closed bool
 }
 
+// Set finalizer on kClient does not take effect, because kClient has a circular reference problem
+// when construct the endpoint.Endpoint in the invokeHandleEndpoint,
+// so wrapping kClient as kcFinalizerClient, and set finalizer on kcFinalizerClient, it can solve this problem.
+type kcFinalizerClient struct {
+	*kClient
+}
+
 // NewClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
 func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error) {
 	if svcInfo == nil {
 		return nil, errors.New("NewClient: no service info")
 	}
-	kc := &kClient{
-		svcInfo: svcInfo,
-		opt:     client.NewOptions(opts),
-	}
+	kc := &kcFinalizerClient{kClient: &kClient{}}
+	kc.svcInfo = svcInfo
+	kc.opt = client.NewOptions(opts)
 	if err := kc.init(); err != nil {
 		return nil, err
 	}
 	// like os.File, if kc is garbage-collected, but Close is not called, call Close.
-	runtime.SetFinalizer(kc, func(c *kClient) {
-		c.Close()
+	runtime.SetFinalizer(kc, func(c *kcFinalizerClient) {
+		_ = c.Close()
 	})
 	return kc, nil
 }
@@ -474,7 +480,6 @@ func (kc *kClient) Close() error {
 			errs.Append(err)
 		}
 	}
-	runtime.SetFinalizer(kc, nil)
 	if errs.HasError() {
 		return errs
 	}

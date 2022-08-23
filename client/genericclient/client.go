@@ -112,5 +112,7 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 func (gc *genericServiceClient) Close() error {
 	// no need a finalizer anymore
 	runtime.SetFinalizer(gc, nil)
+
+	// Notice: don't need to close kClient because finalizer will close it.
 	return gc.g.Close()
 }

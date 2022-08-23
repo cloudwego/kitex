@@ -70,7 +70,7 @@ func TestNoResolver(t *testing.T) {
 
 func TestResolverMW(t *testing.T) {
 	var invoked bool
-	cli := newMockClient(t).(*kClient)
+	cli := newMockClient(t).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error {
 		invoked = true
@@ -97,7 +97,7 @@ func TestResolverMWOutOfInstance(t *testing.T) {
 		NameFunc: func() string { return t.Name() },
 	}
 	var invoked bool
-	cli := newMockClient(t, WithResolver(resolver)).(*kClient)
+	cli := newMockClient(t, WithResolver(resolver)).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error {
 		invoked = true
@@ -145,7 +145,7 @@ func TestDefaultErrorHandler(t *testing.T) {
 }
 
 func BenchmarkResolverMW(b *testing.B) {
-	cli := newMockClient(b).(*kClient)
+	cli := newMockClient(b).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error { return nil }
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
@@ -161,7 +161,7 @@ func BenchmarkResolverMW(b *testing.B) {
 }
 
 func BenchmarkResolverMWParallel(b *testing.B) {
-	cli := newMockClient(b).(*kClient)
+	cli := newMockClient(b).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error { return nil }
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
