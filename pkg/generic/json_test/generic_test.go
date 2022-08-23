@@ -255,12 +255,13 @@ func testJSONThriftGenericClientClose(t *testing.T) {
 
 	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 
-	clis := make([]genericclient.Client, 1000)
-	for i := 0; i < 1000; i++ {
+	clientCnt := 1000
+	clis := make([]genericclient.Client, clientCnt)
+	for i := 0; i < clientCnt; i++ {
 		p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
-		test.Assert(t, err == nil)
+		test.Assertf(t, err == nil, "generic NewThriftFileProvider failed, err=%v", err)
 		g, err := generic.JSONThriftGeneric(p)
-		test.Assert(t, err == nil)
+		test.Assertf(t, err == nil, "generic JSONThriftGeneric failed, err=%v", err)
 		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:8129")
 	}
 
@@ -286,12 +287,13 @@ func testJSONThriftGenericClientFinalizer(t *testing.T) {
 	runtime.ReadMemStats(&ms)
 	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 
-	clis := make([]genericclient.Client, 1000)
-	for i := 0; i < 1000; i++ {
+	clientCnt := 1000
+	clis := make([]genericclient.Client, clientCnt)
+	for i := 0; i < clientCnt; i++ {
 		p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
-		test.Assert(t, err == nil)
+		test.Assert(t, err == nil, "generic NewThriftFileProvider failed, err=%v", err)
 		g, err := generic.JSONThriftGeneric(p)
-		test.Assert(t, err == nil)
+		test.Assert(t, err == nil, "generic JSONThriftGeneric failed, err=%v", err)
 		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:8130")
 	}
 
