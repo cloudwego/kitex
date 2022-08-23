@@ -40,6 +40,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
+	"github.com/cloudwego/kitex/pkg/remote/connpool"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -162,12 +163,13 @@ func (kc *kClient) initContext() context.Context {
 func (kc *kClient) initProxy() error {
 	if kc.opt.Proxy != nil {
 		cfg := proxy.Config{
-			ServerInfo:   kc.opt.Svr,
-			Resolver:     kc.opt.Resolver,
-			Balancer:     kc.opt.Balancer,
-			Pool:         kc.opt.RemoteOpt.ConnPool,
-			FixedTargets: kc.opt.Targets,
-			RPCConfig:    kc.opt.Configs,
+			ServerInfo:      kc.opt.Svr,
+			Resolver:        kc.opt.Resolver,
+			Balancer:        kc.opt.Balancer,
+			Pool:            kc.opt.RemoteOpt.ConnPool,
+			FixedTargets:    kc.opt.Targets,
+			RPCConfig:       kc.opt.Configs,
+			AsyncPoolConfig: kc.opt.RemoteOpt.AsyncPoolConfig,
 		}
 		if err := kc.opt.Proxy.Configure(&cfg); err != nil {
 			return err
@@ -175,7 +177,11 @@ func (kc *kClient) initProxy() error {
 		// update fields in the client option for further use.
 		kc.opt.Resolver = cfg.Resolver
 		kc.opt.Balancer = cfg.Balancer
-		kc.opt.RemoteOpt.ConnPool = cfg.Pool
+		if asyncPool, ok := cfg.Pool.(remote.AsyncConnPool); ok {
+			kc.opt.RemoteOpt.ConnPool = asyncPool
+		} else {
+			kc.opt.RemoteOpt.ConnPool = connpool.WrapConnPoolIntoAsync(cfg.Pool, cfg.AsyncPoolConfig)
+		}
 		kc.opt.Targets = cfg.FixedTargets
 	}
 	return nil

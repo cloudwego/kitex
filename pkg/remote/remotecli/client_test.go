@@ -47,8 +47,12 @@ func TestNewClientNoAddr(t *testing.T) {
 
 	hdlr := &mocks.MockCliTransHandler{}
 	connPool := connpool.NewLongPool("destService", poolCfg)
+	asyncPool := connpool.WrapConnPoolIntoAsync(connPool, &remote.AsyncConnPoolConfig{
+		DelayDiscardInterrupt: time.Millisecond * 500,
+		DelayDiscardTime:      time.Millisecond * 500,
+	})
 	opt := &remote.ClientOption{
-		ConnPool: connPool,
+		ConnPool: asyncPool,
 		Dialer:   dialer,
 	}
 
@@ -82,9 +86,13 @@ func TestNewClient(t *testing.T) {
 	}
 
 	connPool := connpool.NewLongPool("destService", poolCfg)
+	asyncConnPool := connpool.WrapConnPoolIntoAsync(connPool, &remote.AsyncConnPoolConfig{
+		DelayDiscardInterrupt: time.Millisecond * 500,
+		DelayDiscardTime:      time.Millisecond * 500,
+	})
 
 	opt := &remote.ClientOption{
-		ConnPool: connPool,
+		ConnPool: asyncConnPool,
 		Dialer:   dialer,
 		Option: remote.Option{
 			StreamingMetaHandlers: []remote.StreamingMetaHandler{
@@ -122,9 +130,13 @@ func newMockOption(addr net.Addr) *remote.ClientOption {
 	}
 
 	connPool := connpool.NewLongPool("destService", poolCfg)
+	asyncPool := connpool.WrapConnPoolIntoAsync(connPool, &remote.AsyncConnPoolConfig{
+		DelayDiscardInterrupt: time.Millisecond * 500,
+		DelayDiscardTime:      time.Millisecond * 500,
+	})
 
 	opt := &remote.ClientOption{
-		ConnPool: connPool,
+		ConnPool: asyncPool,
 		Dialer:   dialer,
 	}
 

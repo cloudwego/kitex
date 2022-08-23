@@ -36,12 +36,12 @@ func init() {
 
 // ConnWrapper wraps a connection.
 type ConnWrapper struct {
-	connPool remote.ConnPool
+	connPool remote.AsyncConnPool
 	conn     net.Conn
 }
 
 // NewConnWrapper returns a new ConnWrapper using the given connPool and logger.
-func NewConnWrapper(connPool remote.ConnPool) *ConnWrapper {
+func NewConnWrapper(connPool remote.AsyncConnPool) *ConnWrapper {
 	cm := connWrapperPool.Get().(*ConnWrapper)
 	cm.connPool = connPool
 	return cm
@@ -78,8 +78,10 @@ func (cm *ConnWrapper) ReleaseConn(err error, ri rpcinfo.RPCInfo) {
 	if cm.connPool != nil {
 		if err == nil {
 			_, ok := ri.To().Tag(rpcinfo.ConnResetTag)
-			if ok || ri.Config().InteractionMode() == rpcinfo.Oneway {
+			if ok {
 				cm.connPool.Discard(cm.conn)
+			} else if ri.Config().InteractionMode() == rpcinfo.Oneway {
+				cm.connPool.DelayDiscard(cm.conn)
 			} else {
 				cm.connPool.Put(cm.conn)
 			}

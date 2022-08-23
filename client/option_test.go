@@ -41,6 +41,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
+	remote_connpool "github.com/cloudwego/kitex/pkg/remote/connpool"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -475,12 +476,17 @@ func (m *mockConnPool) Get(ctx context.Context, network, address string, opt rem
 }
 func (m *mockConnPool) Put(conn net.Conn) error     { return nil }
 func (m *mockConnPool) Discard(conn net.Conn) error { return nil }
+func (m *mockConnPool) DelayDiscard(conn net.Conn)  {}
 func (m *mockConnPool) Close() error                { return nil }
 
 func TestWithConnPool(t *testing.T) {
 	mockPool := &mockConnPool{}
 	opts := client.NewOptions([]client.Option{WithConnPool(mockPool)})
-	test.Assert(t, opts.RemoteOpt.ConnPool == mockPool)
+	if sp, ok := opts.RemoteOpt.ConnPool.(*remote_connpool.SynthesizedConnPool); ok {
+		test.Assert(t, sp.ConnPool == mockPool, sp.ConnPool)
+	} else {
+		t.Error("not synthesized conn pool")
+	}
 }
 
 func TestWithRetryContainer(t *testing.T) {

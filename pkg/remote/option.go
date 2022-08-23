@@ -119,7 +119,8 @@ type ClientOption struct {
 
 	PayloadCodec PayloadCodec
 
-	ConnPool ConnPool
+	ConnPool        AsyncConnPool
+	AsyncPoolConfig *AsyncConnPoolConfig
 
 	Dialer Dialer
 

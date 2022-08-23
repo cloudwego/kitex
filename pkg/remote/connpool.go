@@ -44,6 +44,18 @@ type ConnPool interface {
 	Close() error
 }
 
+type AsyncConnPoolConfig struct {
+	DelayDiscardInterrupt time.Duration
+	DelayDiscardTime      time.Duration
+}
+
+// AsyncConnPool is used to get connections just like ConnPool, but with some async operations like DelayDiscard.
+type AsyncConnPool interface {
+	ConnPool
+	// DelayDiscard discards the connection after the given delay.
+	DelayDiscard(conn net.Conn)
+}
+
 // LongConnPool supports Clean connections to a desired address.
 type LongConnPool interface {
 	ConnPool

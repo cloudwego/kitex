@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
+	"github.com/cloudwego/kitex/pkg/remote/connpool"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -47,7 +48,7 @@ func newTestRemoteClientOptionWithInStr(s string) *remote.ClientOption {
 				return err
 			},
 		},
-		ConnPool: NewMuxConnPool(1),
+		ConnPool: connpool.WrapConnPoolIntoAsync(NewMuxConnPool(1), &remote.AsyncConnPoolConfig{}),
 	}
 	return opt
 }
@@ -55,7 +56,7 @@ func newTestRemoteClientOptionWithInStr(s string) *remote.ClientOption {
 func TestNewCliTransHandler(t *testing.T) {
 	// check success
 	handler, err := NewCliTransHandlerFactory().NewTransHandler(&remote.ClientOption{
-		ConnPool: &MuxPool{},
+		ConnPool: connpool.WrapConnPoolIntoAsync(&MuxPool{}, &remote.AsyncConnPoolConfig{}),
 	})
 	test.Assert(t, err == nil, err)
 	test.Assert(t, handler != nil)
@@ -86,7 +87,7 @@ func TestCliTransHandler(t *testing.T) {
 				return err
 			},
 		},
-		ConnPool: NewMuxConnPool(1),
+		ConnPool: connpool.WrapConnPoolIntoAsync(NewMuxConnPool(1), &remote.AsyncConnPoolConfig{}),
 	}
 
 	handler, err := NewCliTransHandlerFactory().NewTransHandler(opt)

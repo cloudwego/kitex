@@ -53,7 +53,7 @@ func TestDefaultCliTransHandler(t *testing.T) {
 				return nil
 			},
 		},
-		ConnPool: connpool.NewShortPool("opt"),
+		ConnPool: connpool.WrapConnPoolIntoAsync(connpool.NewShortPool("opt"), &remote.AsyncConnPoolConfig{}),
 	}
 
 	handler, err := NewDefaultCliTransHandler(opt, ext)

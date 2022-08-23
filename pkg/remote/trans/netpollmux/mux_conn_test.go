@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
+	"github.com/cloudwego/kitex/pkg/remote/connpool"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -73,7 +74,7 @@ func TestOnRequest(t *testing.T) {
 				return err
 			},
 		},
-		ConnPool: NewMuxConnPool(1),
+		ConnPool: connpool.WrapConnPoolIntoAsync(NewMuxConnPool(1), &remote.AsyncConnPoolConfig{}),
 	}
 
 	buf := netpoll.NewLinkBuffer(1024)

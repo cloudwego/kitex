@@ -43,6 +43,9 @@ func (p *DummyPool) Put(conn net.Conn) error { return nil }
 // Discard implements the remote.ConnPool interface.
 func (p *DummyPool) Discard(conn net.Conn) error { return nil }
 
+// Discard implements the remote.ConnPool interface.
+func (p *DummyPool) DelayDiscard(conn net.Conn) {}
+
 // Clean implements the remote.LongConnPool interface.
 func (p *DummyPool) Clean(network, address string) {}
 

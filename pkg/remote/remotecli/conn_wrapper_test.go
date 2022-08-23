@@ -36,7 +36,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-var poolCfg = connpool2.IdleConfig{MaxIdlePerAddress: 100, MaxIdleGlobal: 100, MaxIdleTimeout: time.Second}
+var (
+	poolCfg      = connpool2.IdleConfig{MaxIdlePerAddress: 100, MaxIdleGlobal: 100, MaxIdleTimeout: time.Second}
+	asyncPoolCfg = remote.AsyncConnPoolConfig{DelayDiscardInterrupt: time.Millisecond * 500, DelayDiscardTime: time.Millisecond * 500}
+)
 
 func TestDialerMWNoAddr(t *testing.T) {
 	dialer := &remote.SynthesizedDialer{}
@@ -45,7 +48,8 @@ func TestDialerMWNoAddr(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
-	connW := NewConnWrapper(connpool.NewLongPool("destService", poolCfg))
+	asyncPool := connpool.WrapConnPoolIntoAsync(connpool.NewLongPool("destService", poolCfg), &asyncPoolCfg)
+	connW := NewConnWrapper(asyncPool)
 	_, err := connW.GetConn(ctx, dialer, ri)
 	test.Assert(t, err != nil)
 	test.Assert(t, errors.Is(err, kerrors.ErrNoDestAddress))
@@ -97,10 +101,11 @@ func TestGetConnByPool(t *testing.T) {
 	conf := rpcinfo.NewRPCConfig()
 	ri := rpcinfo.NewRPCInfo(from, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 	connPool := connpool.NewLongPool("destService", poolCfg)
+	asyncConnPool := connpool.WrapConnPoolIntoAsync(connPool, &asyncPoolCfg)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	// 释放连接, 连接复用
+	// 释放连接，连接复用
 	for i := 0; i < 10; i++ {
-		connW := NewConnWrapper(connPool)
+		connW := NewConnWrapper(asyncConnPool)
 		conn2, err := connW.GetConn(ctx, dialer, ri)
 		test.Assert(t, err == nil, err)
 		test.Assert(t, conn == conn2)
@@ -111,9 +116,9 @@ func TestGetConnByPool(t *testing.T) {
 
 	dialCount = 0
 	connPool.Clean(addr.Network(), addr.String())
-	// 未释放连接, 连接重建
+	// 未释放连接，连接重建
 	for i := 0; i < 10; i++ {
-		connW := NewConnWrapper(connPool)
+		connW := NewConnWrapper(asyncConnPool)
 		conn2, err := connW.GetConn(ctx, dialer, ri)
 		test.Assert(t, err == nil, err)
 		test.Assert(t, conn == conn2)
@@ -151,10 +156,11 @@ func BenchmarkGetConn(b *testing.B) {
 	ri := rpcinfo.NewRPCInfo(from, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	connPool := connpool.NewLongPool("destService", poolCfg)
+	asyncConnPool := connpool.WrapConnPoolIntoAsync(connPool, &asyncPoolCfg)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		connW := NewConnWrapper(connPool)
+		connW := NewConnWrapper(asyncConnPool)
 		conn2, err := connW.GetConn(ctx, longConnDialer, ri)
 		test.Assert(b, err == nil, err)
 		test.Assert(b, conn == conn2)
@@ -175,7 +181,8 @@ func TestReleaseConnUseNilConn(t *testing.T) {
 	addr := utils.NewNetAddr("tcp", "to")
 	ri := newMockRPCInfo(addr)
 	connPool := connpool.NewLongPool("destService", poolCfg)
-	connW := NewConnWrapper(connPool)
+	asyncConnPool := connpool.WrapConnPoolIntoAsync(connPool, &asyncPoolCfg)
+	connW := NewConnWrapper(asyncConnPool)
 
 	connW.ReleaseConn(nil, ri)
 }

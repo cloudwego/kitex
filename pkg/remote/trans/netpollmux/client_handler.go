@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
+	"github.com/cloudwego/kitex/pkg/remote/connpool"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -45,7 +46,11 @@ func NewCliTransHandlerFactory() remote.ClientTransHandlerFactory {
 
 // NewTransHandler implements the remote.ClientTransHandlerFactory interface.
 func (f *cliTransHandlerFactory) NewTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, error) {
-	if _, ok := opt.ConnPool.(*MuxPool); !ok {
+	var connPool remote.ConnPool
+	if sp, ok := opt.ConnPool.(*connpool.SynthesizedConnPool); ok {
+		connPool = sp.ConnPool
+	}
+	if _, ok := connPool.(*MuxPool); !ok {
 		return nil, fmt.Errorf("ConnPool[%T] invalid, netpoll mux just support MuxPool", opt.ConnPool)
 	}
 	return newCliTransHandler(opt)

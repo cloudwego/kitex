@@ -21,6 +21,7 @@ package client
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -29,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/connpool"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -135,17 +137,37 @@ func WithDialer(d remote.Dialer) Option {
 }
 
 // WithConnPool sets the connection pool.
-// Note that this option can only be specified once. If more
+// Note that this option and `WithConnPoolWithAsync` can only be specified once totally.  If more
 // than one pool is specified by this option, only the first
 // one will be used.
 func WithConnPool(pool remote.ConnPool) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithConnPool((%T)", pool))
+		di.Push(fmt.Sprintf("WithConnPool(%T)", pool))
 
 		if o.RemoteOpt.ConnPool == nil {
-			o.RemoteOpt.ConnPool = pool
+			o.RemoteOpt.ConnPool = connpool.WrapConnPoolIntoAsync(pool, &remote.AsyncConnPoolConfig{
+				DelayDiscardInterrupt: time.Millisecond * 500,
+				DelayDiscardTime:      time.Millisecond * 500,
+			})
 		} else {
 			klog.Warnf("The connection pool has been initialized. The call to WithConnPool will not take effect.")
+		}
+	}}
+}
+
+// WithConnPoolWithAsync sets the connection pool with async config.
+// Note that this option and `WithConnPool` can only be specified once totally. If more
+// than one pool is specified by this option, only the first
+// one will be used.
+func WithConnPoolWithAsync(pool remote.ConnPool, cfg *remote.AsyncConnPoolConfig) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithConnPoolWithAsync(%T, %+v)", pool, cfg))
+
+		if o.RemoteOpt.ConnPool == nil {
+			o.RemoteOpt.ConnPool = connpool.WrapConnPoolIntoAsync(pool, cfg)
+			o.RemoteOpt.AsyncPoolConfig = cfg
+		} else {
+			klog.Warnf("The connection pool has been initialized. The call to WithConnPoolWithAsync will not take effect.")
 		}
 	}}
 }

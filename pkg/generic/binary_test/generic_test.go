@@ -144,7 +144,7 @@ func rawThriftBinary2NormalServer(t *testing.T) {
 	method, seqID, err := rc.Decode(buf, &result)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, method == "Test", method)
-	// seqID会在kitex中覆盖，避免TTHeader和Payload codec 不一致问题
+	// seqID 会在 kitex 中覆盖，避免 TTHeader 和 Payload codec 不一致问题
 	test.Assert(t, seqID != 100, seqID)
 	test.Assert(t, *result.Success == respMsg)
 }
@@ -193,7 +193,7 @@ func TestBinaryThriftGenericClientClose(t *testing.T) {
 	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 
 	clis := make([]genericclient.Client, 10000)
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < len(clis); i++ {
 		g := generic.BinaryThriftGeneric()
 		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009")
 	}
@@ -202,6 +202,7 @@ func TestBinaryThriftGenericClientClose(t *testing.T) {
 	preHeapAlloc, preHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
 	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", preHeapAlloc, preHeapObjects)
 
+	t.Log(runtime.NumGoroutine())
 	for _, cli := range clis {
 		_ = cli.Close()
 	}
@@ -221,7 +222,7 @@ func TestBinaryThriftGenericClientFinalizer(t *testing.T) {
 	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 
 	clis := make([]genericclient.Client, 10000)
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < len(clis); i++ {
 		g := generic.BinaryThriftGeneric()
 		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009")
 	}

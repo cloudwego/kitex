@@ -21,6 +21,8 @@
 package client
 
 import (
+	"time"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
@@ -31,5 +33,9 @@ func newClientRemoteOption() *remote.ClientOption {
 		CliHandlerFactory: netpoll.NewCliTransHandlerFactory(),
 		Dialer:            netpoll.NewDialer(),
 		Codec:             codec.NewDefaultCodec(),
+		AsyncPoolConfig: &remote.AsyncConnPoolConfig{
+			DelayDiscardInterrupt: 500 * time.Millisecond,
+			DelayDiscardTime:      500 * time.Millisecond,
+		},
 	}
 }

@@ -19,6 +19,7 @@ package remotecli
 
 import (
 	"context"
+	"net"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
@@ -26,9 +27,17 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
+type fakeAsyncConnPool struct {
+	remote.ConnPool
+}
+
+func (sp *fakeAsyncConnPool) DelayDiscard(conn net.Conn) {
+	sp.ConnPool.Discard(conn)
+}
+
 // NewStream create a client side stream
 func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTransHandler, opt *remote.ClientOption) (streaming.Stream, error) {
-	cm := NewConnWrapper(opt.ConnPool)
+	cm := NewConnWrapper(&fakeAsyncConnPool{opt.ConnPool})
 	var err error
 	for _, shdlr := range opt.StreamingMetaHandlers {
 		ctx, err = shdlr.OnConnectStream(ctx)

@@ -34,6 +34,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/remote"
+	remote_connpool "github.com/cloudwego/kitex/pkg/remote/connpool"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/retry"
@@ -205,7 +206,7 @@ func WithMuxConnection(connNum int) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push("WithMuxConnection")
 
-		o.RemoteOpt.ConnPool = netpollmux.NewMuxConnPool(connNum)
+		o.RemoteOpt.ConnPool = remote_connpool.WrapConnPoolIntoAsync(netpollmux.NewMuxConnPool(connNum), o.RemoteOpt.AsyncPoolConfig)
 		WithTransHandlerFactory(netpollmux.NewCliTransHandlerFactory()).F(o, di)
 		rpcinfo.AsMutableRPCConfig(o.Configs).SetTransportProtocol(transport.TTHeader)
 	}}

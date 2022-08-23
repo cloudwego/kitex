@@ -202,6 +202,10 @@ func (p *connPool) Discard(conn net.Conn) error {
 	return nil
 }
 
+// DelayDiscard implements the ConnPool interface.
+func (p *connPool) DelayDiscard(conn net.Conn) {
+}
+
 // Clean implements the LongConnPool interface.
 func (p *connPool) Clean(network, address string) {
 	if v, ok := p.conns.Load(address); ok {

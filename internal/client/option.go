@@ -172,24 +172,30 @@ func (o *Options) initRemoteOpt() {
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
 	if o.RemoteOpt.ConnPool == nil {
+		asyncConfig := &remote.AsyncConnPoolConfig{
+			DelayDiscardInterrupt: time.Millisecond * 500,
+			DelayDiscardTime:      time.Millisecond * 500,
+		}
 		if o.PoolCfg != nil {
 			if *o.PoolCfg == zero {
-				o.RemoteOpt.ConnPool = connpool.NewShortPool(o.Svr.ServiceName)
+				o.RemoteOpt.ConnPool = connpool.WrapConnPoolIntoAsync(connpool.NewShortPool(o.Svr.ServiceName), asyncConfig)
 			} else {
-				o.RemoteOpt.ConnPool = connpool.NewLongPool(o.Svr.ServiceName, *o.PoolCfg)
+				o.RemoteOpt.ConnPool = connpool.WrapConnPoolIntoAsync(connpool.NewLongPool(o.Svr.ServiceName, *o.PoolCfg), asyncConfig)
 			}
 		} else {
-			o.RemoteOpt.ConnPool = connpool.NewLongPool(
+			o.RemoteOpt.ConnPool = connpool.WrapConnPoolIntoAsync(connpool.NewLongPool(
 				o.Svr.ServiceName,
 				connpool2.IdleConfig{
 					MaxIdlePerAddress: 10,
 					MaxIdleGlobal:     100,
 					MaxIdleTimeout:    time.Minute,
 				},
-			)
+			), asyncConfig)
 		}
 	}
+
 	pool := o.RemoteOpt.ConnPool
+
 	o.CloseCallbacks = append(o.CloseCallbacks, pool.Close)
 
 	if df, ok := pool.(interface{ Dump() interface{} }); ok {

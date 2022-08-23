@@ -28,12 +28,13 @@ import (
 
 // Config contains basic components used in service discovery process.
 type Config struct {
-	ServerInfo   *rpcinfo.EndpointBasicInfo
-	Resolver     discovery.Resolver
-	Balancer     loadbalance.Loadbalancer
-	Pool         remote.ConnPool
-	FixedTargets string // A comma separated list of host ports that user specify to use.
-	RPCConfig    rpcinfo.RPCConfig
+	ServerInfo      *rpcinfo.EndpointBasicInfo
+	Resolver        discovery.Resolver
+	Balancer        loadbalance.Loadbalancer
+	Pool            remote.ConnPool
+	FixedTargets    string // A comma separated list of host ports that user specify to use.
+	RPCConfig       rpcinfo.RPCConfig
+	AsyncPoolConfig *remote.AsyncConnPoolConfig
 }
 
 // ForwardProxy manages the service discovery, load balance and connection pooling processes.
