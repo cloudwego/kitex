@@ -41,6 +41,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
+	"github.com/cloudwego/kitex/pkg/xds"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -484,13 +485,14 @@ func WithWarmingUp(wuo *warmup.ClientOption) Option {
 	}}
 }
 
-// WithXDSSuite is used to set the xds suite for the client with the input xdsRouteMiddleware and xdsResolver
-func WithXDSSuite(rm endpoint.Middleware, r discovery.Resolver) Option {
+// WithXDSSuite is used to set the xds suite for the client.
+func WithXDSSuite(suite *xds.ClientSuite) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
-		di.Push("WithXDSSuite")
-
-		o.XDSEnabled = true
-		o.XDSRouterMiddleware = rm
-		o.Resolver = r
+		if xds.CheckClientSuite(suite) {
+			di.Push("WithXDSSuite")
+			o.XDSEnabled = true
+			o.XDSRouterMiddleware = suite.RouterMiddleware
+			o.Resolver = suite.Resolver
+		}
 	}}
 }

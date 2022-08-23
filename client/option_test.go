@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
 	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
@@ -44,8 +46,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/xds"
 	"github.com/cloudwego/kitex/transport"
-	"github.com/golang/mock/gomock"
 )
 
 func TestRetryOptionDebugInfo(t *testing.T) {
@@ -593,4 +595,29 @@ func TestWithConnMetric(t *testing.T) {
 	}
 	opt := client.NewOptions(options)
 	test.Assert(t, opt.RemoteOpt.EnableConnPoolReporter == true)
+}
+
+func TestWithXDSSuite(t *testing.T) {
+	// failed
+	s := &xds.ClientSuite{}
+	options := []client.Option{
+		WithXDSSuite(s),
+	}
+	opt := client.NewOptions(options)
+	test.Assert(t, opt.XDSEnabled == false)
+	test.Assert(t, opt.XDSRouterMiddleware == nil)
+	test.Assert(t, opt.Resolver == nil)
+
+	// succeed
+	s = &xds.ClientSuite{
+		RouterMiddleware: endpoint.DummyMiddleware,
+		Resolver:         discovery.SynthesizedResolver{},
+	}
+	options = []client.Option{
+		WithXDSSuite(s),
+	}
+	opt = client.NewOptions(options)
+	test.Assert(t, opt.XDSEnabled == true)
+	test.Assert(t, opt.XDSRouterMiddleware != nil)
+	test.Assert(t, opt.Resolver != nil)
 }
