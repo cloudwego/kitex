@@ -26,12 +26,12 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/cloudwego/kitex/pkg/remote/trans"
+	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/netpoll"
 )
 
 // NewTransServerFactory creates a default netpoll transport server factory.

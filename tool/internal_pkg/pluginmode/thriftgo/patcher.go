@@ -16,7 +16,7 @@ package thriftgo
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -24,12 +24,13 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/thriftgo/generator/golang"
 	"github.com/cloudwego/thriftgo/generator/golang/templates"
 	"github.com/cloudwego/thriftgo/generator/golang/templates/slim"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/plugin"
+
+	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 )
 
 var extraTemplates []string
@@ -204,7 +205,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		})
 
 		if p.copyIDL {
-			content, err := ioutil.ReadFile(ast.Filename)
+			content, err := os.ReadFile(ast.Filename)
 			if err != nil {
 				return nil, fmt.Errorf("read %q: %w", ast.Filename, err)
 			}

@@ -25,10 +25,10 @@ import (
 	"time"
 
 	"github.com/bytedance/gopkg/util/xxhash3"
+	"golang.org/x/sync/singleflight"
+
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/utils"
-
-	"golang.org/x/sync/singleflight"
 )
 
 /*

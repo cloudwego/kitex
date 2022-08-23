@@ -23,8 +23,9 @@ package diagnosis
 import (
 	reflect "reflect"
 
-	diagnosis "github.com/cloudwego/kitex/pkg/diagnosis"
 	gomock "github.com/golang/mock/gomock"
+
+	diagnosis "github.com/cloudwego/kitex/pkg/diagnosis"
 )
 
 // MockService is a mock of Service interface.

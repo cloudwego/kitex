@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"testing"
 
+	spb "google.golang.org/genproto/googleapis/rpc/status"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
-	spb "google.golang.org/genproto/googleapis/rpc/status"
 )
 
 func TestStatus(t *testing.T) {

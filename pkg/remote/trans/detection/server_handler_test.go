@@ -23,12 +23,13 @@ import (
 	"net"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/golang/mock/gomock"
 )
 
 func TestOnError(t *testing.T) {

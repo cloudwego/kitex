@@ -20,9 +20,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/semantic"
+
+	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
 const (

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/bytedance/gopkg/lang/fastrand"
+
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 

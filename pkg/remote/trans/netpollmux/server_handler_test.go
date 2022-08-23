@@ -25,15 +25,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/internal/mocks"
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
+	"github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/netpoll"
 )
 
 var (
@@ -79,7 +80,7 @@ func init() {
 			},
 		},
 		SvcInfo:          mocks.ServiceInfo(),
-		TracerCtl:        &internal_stats.Controller{},
+		TracerCtl:        &stats.Controller{},
 		ReadWriteTimeout: rwTimeout,
 	}
 }
@@ -459,7 +460,7 @@ func TestInvokeError(t *testing.T) {
 			},
 		},
 		SvcInfo:          mocks.ServiceInfo(),
-		TracerCtl:        &internal_stats.Controller{},
+		TracerCtl:        &stats.Controller{},
 		ReadWriteTimeout: rwTimeout,
 	}
 
@@ -603,7 +604,7 @@ func TestInvokeNoMethod(t *testing.T) {
 			},
 		},
 		SvcInfo:          mocks.ServiceInfo(),
-		TracerCtl:        &internal_stats.Controller{},
+		TracerCtl:        &stats.Controller{},
 		ReadWriteTimeout: rwTimeout,
 	}
 

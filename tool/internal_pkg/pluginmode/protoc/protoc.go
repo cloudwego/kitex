@@ -17,16 +17,17 @@ package protoc
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	gengo "google.golang.org/protobuf/cmd/protoc-gen-go/internal_gengo"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/pluginpb"
+
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 )
 
 // PluginName .
@@ -43,7 +44,7 @@ func Run() int {
 
 func run(opts protogen.Options) error {
 	// unmarshal request from stdin
-	in, err := ioutil.ReadAll(os.Stdin)
+	in, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		return err
 	}

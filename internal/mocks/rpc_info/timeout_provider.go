@@ -23,8 +23,9 @@ package rpc_info
 import (
 	reflect "reflect"
 
-	rpcinfo "github.com/cloudwego/kitex/pkg/rpcinfo"
 	gomock "github.com/golang/mock/gomock"
+
+	rpcinfo "github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 // MockTimeoutProvider is a mock of TimeoutProvider interface.

@@ -23,10 +23,11 @@ import (
 	"net"
 	"syscall"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/netpoll"
 )
 
 // NewGonetExtension to build new gonetConnExtension which implements trans.Extension

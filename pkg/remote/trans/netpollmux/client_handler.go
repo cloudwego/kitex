@@ -23,6 +23,8 @@ import (
 	"net"
 	"sync/atomic"
 
+	"github.com/cloudwego/netpoll"
+
 	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -32,7 +34,6 @@ import (
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
-	"github.com/cloudwego/netpoll"
 )
 
 type cliTransHandlerFactory struct{}

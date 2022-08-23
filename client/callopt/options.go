@@ -172,12 +172,13 @@ func WithTag(key, val string) Option {
 // WithRetryPolicy sets the retry policy for a RPC call.
 // Build retry.Policy with retry.BuildFailurePolicy or retry.BuildBackupRequest instead of building retry.Policy directly.
 // Below is use demo, eg:
-//   demo1. call with failure retry policy, default retry error is Timeout
-//   	resp, err := cli.Mock(ctx, req, callopt.WithRetryPolicy(retry.BuildFailurePolicy(retry.NewFailurePolicy())))
-//   demo2. call with backup request policy
-//   	bp := retry.NewBackupPolicy(10)
-//	 	bp.WithMaxRetryTimes(1)
-//   	resp, err := cli.Mock(ctx, req, callopt.WithRetryPolicy(retry.BuildBackupRequest(bp)))
+//
+//	  demo1. call with failure retry policy, default retry error is Timeout
+//	  	resp, err := cli.Mock(ctx, req, callopt.WithRetryPolicy(retry.BuildFailurePolicy(retry.NewFailurePolicy())))
+//	  demo2. call with backup request policy
+//	  	bp := retry.NewBackupPolicy(10)
+//		 	bp.WithMaxRetryTimes(1)
+//	  	resp, err := cli.Mock(ctx, req, callopt.WithRetryPolicy(retry.BuildBackupRequest(bp)))
 func WithRetryPolicy(p retry.Policy) Option {
 	return Option{f: func(o *CallOptions, di *strings.Builder) {
 		if !p.Enable {

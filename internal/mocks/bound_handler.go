@@ -25,8 +25,9 @@ import (
 	net "net"
 	reflect "reflect"
 
-	remote "github.com/cloudwego/kitex/pkg/remote"
 	gomock "github.com/golang/mock/gomock"
+
+	remote "github.com/cloudwego/kitex/pkg/remote"
 )
 
 // MockBoundHandler is a mock of BoundHandler interface.

@@ -21,9 +21,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/netpoll"
 )
 
 type MockCodec struct {
