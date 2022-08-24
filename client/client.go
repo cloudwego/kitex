@@ -466,7 +466,7 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 // Close is not concurrency safe.
 func (kc *kClient) Close() error {
 	if kc.closed {
-		panic("client is already closed")
+		return nil
 	}
 	kc.closed = true
 	var errs utils.ErrChain
