@@ -27,9 +27,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/bytedance/gopkg/lang/mcache"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
+
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 var updateHeaderTblSize = func(e *hpack.Encoder, v uint32) {
@@ -134,8 +136,13 @@ func (c *cleanupStream) isTransportResponseFrame() bool { return c.rst } // Resu
 type dataFrame struct {
 	streamID  uint32
 	endStream bool
-	h         []byte
-	d         []byte
+	// h is optional, d is required.
+	// you can assign the header to h and the payload to the d;
+	// or just assign the header + payload together to the d.
+	// In other words, h = nil means d = header + payload.
+	h      []byte
+	d      []byte
+	dcache []byte // dcache is the origin d created by mcache, this ptr is only used for kitex
 	// onEachWrite is called every time
 	// a part of d is written out.
 	onEachWrite func()
@@ -907,6 +914,9 @@ func (l *loopyWriter) processData() (bool, error) {
 	dataItem.d = dataItem.d[dSize:]
 
 	if len(dataItem.h) == 0 && len(dataItem.d) == 0 { // All the data from that message was written out.
+		if len(dataItem.dcache) > 0 {
+			mcache.Free(dataItem.dcache)
+		}
 		str.itl.dequeue()
 	}
 	if str.itl.isEmpty() {

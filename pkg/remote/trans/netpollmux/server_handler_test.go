@@ -25,15 +25,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/internal/mocks"
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
+	"github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/netpoll"
 )
 
 var (
@@ -63,9 +64,8 @@ func init() {
 	rpcInfo := newTestRpcInfo()
 
 	opt = &remote.ServerOption{
-		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
-			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
-			return rpcInfo, ctx
+		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+			return rpcInfo
 		},
 		Codec: &MockCodec{
 			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
@@ -80,7 +80,7 @@ func init() {
 			},
 		},
 		SvcInfo:          mocks.ServiceInfo(),
-		TracerCtl:        &internal_stats.Controller{},
+		TracerCtl:        &stats.Controller{},
 		ReadWriteTimeout: rwTimeout,
 	}
 }
@@ -436,9 +436,16 @@ func TestInvokeError(t *testing.T) {
 
 	body := "hello world"
 	opt := &remote.ServerOption{
-		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
-			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
-			return rpcInfo, ctx
+		InitOrResetRPCInfoFunc: func(rpcInfo rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+			fromInfo := rpcinfo.EmptyEndpointInfo()
+			rpcCfg := rpcinfo.NewRPCConfig()
+			mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
+			mCfg.SetReadWriteTimeout(rwTimeout)
+			ink := rpcinfo.NewInvocation("", method)
+			rpcStat := rpcinfo.NewRPCStats()
+			nri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
+			rpcinfo.AsMutableEndpointInfo(nri.From()).SetAddress(addr)
+			return nri
 		},
 		Codec: &MockCodec{
 			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
@@ -453,13 +460,19 @@ func TestInvokeError(t *testing.T) {
 			},
 		},
 		SvcInfo:          mocks.ServiceInfo(),
-		TracerCtl:        &internal_stats.Controller{},
+		TracerCtl:        &stats.Controller{},
 		ReadWriteTimeout: rwTimeout,
 	}
 
 	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
-	pool := &sync.Pool{}
+	pool := &sync.Pool{
+		New: func() interface{} {
+			// init rpcinfo
+			ri := opt.InitOrResetRPCInfoFunc(nil, npconn.RemoteAddr())
+			return ri
+		},
+	}
 	muxSvrCon := newMuxSvrConn(npconn, pool)
 
 	var err error
@@ -575,9 +588,8 @@ func TestInvokeNoMethod(t *testing.T) {
 
 	body := "hello world"
 	opt := &remote.ServerOption{
-		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
-			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
-			return rpcInfo, ctx
+		InitOrResetRPCInfoFunc: func(rpcInfo rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+			return rpcInfo
 		},
 		Codec: &MockCodec{
 			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
@@ -592,7 +604,7 @@ func TestInvokeNoMethod(t *testing.T) {
 			},
 		},
 		SvcInfo:          mocks.ServiceInfo(),
-		TracerCtl:        &internal_stats.Controller{},
+		TracerCtl:        &stats.Controller{},
 		ReadWriteTimeout: rwTimeout,
 	}
 

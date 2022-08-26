@@ -482,6 +482,8 @@ func TestSkip(t *testing.T) {
 	length += Binary.WriteSetBegin(buf[length:], thrift.STRING, 11)
 	length += Binary.WriteSetEnd(buf[length:])
 
+	test.Assert(t, length == 46)
+
 	size, _ := Binary.Skip(buf, thrift.BYTE)
 	offset += size
 	valStr, _, _ := Binary.ReadString(buf[offset:])

@@ -21,10 +21,11 @@ import (
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/tidwall/gjson"
+
+	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
 // NewWriteJSON build WriteJSON according to ServiceDescriptor

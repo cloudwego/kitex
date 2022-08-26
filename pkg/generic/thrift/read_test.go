@@ -24,9 +24,11 @@ import (
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/jhump/protoreflect/desc/protoparse"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 var (
@@ -580,4 +582,104 @@ func Test_readHTTPResponse(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_readHTTPResponseWithPbBody(t *testing.T) {
+	type args struct {
+		in  thrift.TProtocol
+		t   *descriptor.TypeDescriptor
+		opt *readerOption
+	}
+	read := false
+	mockTTransport := &mocks.MockThriftTTransport{
+		ReadStructBeginFunc: func() (name string, err error) {
+			return "BizResp", nil
+		},
+		ReadFieldBeginFunc: func() (name string, typeID thrift.TType, id int16, err error) {
+			if !read {
+				read = true
+				return "", thrift.STRING, 1, nil
+			}
+			return "", thrift.STOP, 0, nil
+		},
+		ReadStringFunc: func() (string, error) {
+			return "hello world", nil
+		},
+	}
+	desc, err := getRespPbDesc()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    map[int]interface{}
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+		{
+			"readHTTPResponse",
+			args{in: mockTTransport, t: &descriptor.TypeDescriptor{
+				Type: descriptor.STRUCT,
+				Struct: &descriptor.StructDescriptor{
+					FieldsByID: map[int32]*descriptor.FieldDescriptor{
+						1: {
+							ID:          1,
+							Name:        "msg",
+							Type:        &descriptor.TypeDescriptor{Type: descriptor.STRING},
+							HTTPMapping: descriptor.DefaultNewMapping("msg"),
+						},
+					},
+				},
+			}, opt: &readerOption{pbDsc: desc}},
+			map[int]interface{}{
+				1: "hello world",
+			},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readHTTPResponse(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readHTTPResponse() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			respGot := got.(*descriptor.HTTPResponse)
+			if respGot.ContentType != descriptor.MIMEApplicationProtobuf {
+				t.Errorf("expected content type: %v, got: %v", descriptor.MIMEApplicationProtobuf, respGot.ContentType)
+			}
+			body := respGot.GeneralBody.(proto.Message)
+			for fieldID, expectedVal := range tt.want {
+				val, err := body.TryGetFieldByNumber(fieldID)
+				if err != nil {
+					t.Errorf("get by fieldID [%v] err: %v", fieldID, err)
+				}
+				if val != expectedVal {
+					t.Errorf("expected field value: %v, got: %v", expectedVal, val)
+				}
+			}
+		})
+	}
+}
+
+func getRespPbDesc() (proto.MessageDescriptor, error) {
+	path := "main.proto"
+	content := `
+	package kitex.test.server;
+
+	message BizResp {
+		optional string msg = 1;
+	}
+	`
+
+	var pbParser protoparse.Parser
+	pbParser.Accessor = protoparse.FileContentsFromMap(map[string]string{path: content})
+	fds, err := pbParser.ParseFiles(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return fds[0].GetMessageTypes()[0], nil
 }

@@ -23,13 +23,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"syscall"
 
-	"github.com/cloudwego/kitex/tool/internal/pkg/generator"
-	"github.com/cloudwego/kitex/tool/internal/pkg/log"
-	"github.com/cloudwego/kitex/tool/internal/pkg/pluginmode/protoc"
-	"github.com/cloudwego/kitex/tool/internal/pkg/pluginmode/thriftgo"
-	"github.com/cloudwego/kitex/tool/internal/pkg/util"
+	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
+	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 var args arguments
@@ -50,13 +49,18 @@ func init() {
 	})
 }
 
+const pluginMode = "KITEX_PLUGIN_MODE"
+
 func main() {
-	// run as a plugin
-	switch filepath.Base(os.Args[0]) {
-	case thriftgo.PluginName:
-		os.Exit(thriftgo.Run())
-	case protoc.PluginName:
-		os.Exit(protoc.Run())
+	mode := os.Getenv(pluginMode)
+	if len(os.Args) <= 1 && mode != "" {
+		// run as a plugin
+		switch mode {
+		case thriftgo.PluginName:
+			os.Exit(thriftgo.Run())
+		case protoc.PluginName:
+			os.Exit(protoc.Run())
+		}
 	}
 
 	// run as kitex
@@ -77,19 +81,6 @@ func main() {
 }
 
 func lookupTool(idlType string) string {
-	exe, err := os.Executable()
-	if err != nil {
-		log.Warn("Failed to detect current executable:", err.Error())
-		os.Exit(1)
-	}
-
-	dir := filepath.Dir(exe)
-	pgk := filepath.Join(dir, protoc.PluginName)
-	tgk := filepath.Join(dir, thriftgo.PluginName)
-
-	link(exe, pgk)
-	link(exe, tgk)
-
 	tool := "thriftgo"
 	if idlType == "protobuf" {
 		tool = "protoc"
@@ -103,21 +94,13 @@ func lookupTool(idlType string) string {
 	return path
 }
 
-// link removes the previous symbol link and rebuilds a new one.
-func link(src, dst string) {
-	err := syscall.Unlink(dst)
-	if err != nil && !os.IsNotExist(err) {
-		log.Warnf("failed to unlink '%s': %s\n", dst, err)
-		os.Exit(1)
-	}
-	err = os.Symlink(src, dst)
-	if err != nil {
-		log.Warnf("failed to link '%s' -> '%s': %s\n", src, dst, err)
-		os.Exit(1)
-	}
-}
-
 func buildCmd(a *arguments, out io.Writer) *exec.Cmd {
+	exe, err := os.Executable()
+	if err != nil {
+		log.Warn("Failed to detect current executable:", err.Error())
+		os.Exit(1)
+	}
+
 	kas := strings.Join(a.Config.Pack(), ",")
 	cmd := &exec.Cmd{
 		Path:   lookupTool(a.IDLType),
@@ -126,6 +109,7 @@ func buildCmd(a *arguments, out io.Writer) *exec.Cmd {
 		Stderr: &teeWriter{out, os.Stderr},
 	}
 	if a.IDLType == "thrift" {
+		os.Setenv(pluginMode, thriftgo.PluginName)
 		cmd.Args = append(cmd.Args, "thriftgo")
 		for _, inc := range a.Includes {
 			cmd.Args = append(cmd.Args, "-i", inc)
@@ -141,13 +125,14 @@ func buildCmd(a *arguments, out io.Writer) *exec.Cmd {
 		cmd.Args = append(cmd.Args,
 			"-o", generator.KitexGenPath,
 			"-g", gas,
-			"-p", "kitex:"+kas,
+			"-p", "kitex="+exe+":"+kas,
 		)
 		for _, p := range a.ThriftPlugins {
 			cmd.Args = append(cmd.Args, "-p", p)
 		}
 		cmd.Args = append(cmd.Args, a.IDL)
 	} else {
+		os.Setenv(pluginMode, protoc.PluginName)
 		a.ThriftOptions = a.ThriftOptions[:0]
 		// "protobuf"
 		cmd.Args = append(cmd.Args, "protoc")
@@ -161,10 +146,14 @@ func buildCmd(a *arguments, out io.Writer) *exec.Cmd {
 			outPath = "."
 		}
 		cmd.Args = append(cmd.Args,
+			"--plugin=protoc-gen-kitex="+exe,
 			"--kitex_out="+outPath,
 			"--kitex_opt="+kas,
-			a.IDL,
 		)
+		for _, po := range a.ProtobufOptions {
+			cmd.Args = append(cmd.Args, "--kitex_opt="+po)
+		}
+		cmd.Args = append(cmd.Args, a.IDL)
 	}
 	log.Info(strings.ReplaceAll(strings.Join(cmd.Args, " "), kas, fmt.Sprintf("%q", kas)))
 	return cmd

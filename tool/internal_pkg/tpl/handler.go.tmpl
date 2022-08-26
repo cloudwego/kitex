@@ -1,0 +1,11 @@
+package main
+
+import (
+	{{- range $path, $alias := .Imports}}
+	{{$alias }}"{{$path}}"
+	{{- end}}
+)
+
+// {{.ServiceName}}Impl implements the last service interface defined in the IDL.
+type {{.ServiceName}}Impl struct{}
+{{template "HandlerMethod" .}}

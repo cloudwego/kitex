@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/bytedance/gopkg/cloud/circuitbreaker"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 )

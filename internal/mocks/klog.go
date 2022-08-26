@@ -25,8 +25,9 @@ import (
 	io "io"
 	reflect "reflect"
 
-	klog "github.com/cloudwego/kitex/pkg/klog"
 	gomock "github.com/golang/mock/gomock"
+
+	klog "github.com/cloudwego/kitex/pkg/klog"
 )
 
 // MockFormatLogger is a mock of FormatLogger interface.

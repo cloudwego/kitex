@@ -34,11 +34,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/connpool"
-	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/retry"
@@ -96,8 +94,9 @@ type Options struct {
 	StatsLevel *stats.Level
 
 	// retry policy
-	RetryPolicy    *retry.Policy
-	RetryContainer *retry.Container
+	RetryMethodPolicies map[string]retry.Policy
+	RetryContainer      *retry.Container
+	RetryWithResult     *retry.ShouldResultRetry
 
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption
@@ -105,6 +104,10 @@ type Options struct {
 	// GRPC
 	GRPCConnPoolSize uint32
 	GRPCConnectOpts  *grpc.ConnectOptions
+
+	// XDS
+	XDSEnabled          bool
+	XDSRouterMiddleware endpoint.Middleware
 }
 
 // Apply applies all options.
@@ -124,7 +127,7 @@ func NewOptions(opts []Option) *Options {
 	o := &Options{
 		Cli:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
 		Svr:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
-		RemoteOpt:    newClientOption(),
+		RemoteOpt:    newClientRemoteOption(),
 		Configs:      rpcinfo.NewRPCConfig(),
 		Locks:        NewConfigLocks(),
 		Once:         configutil.NewOptionOnce(),
@@ -208,13 +211,5 @@ func (o *Options) initRemoteOpt() {
 				}
 			}
 		})
-	}
-}
-
-func newClientOption() *remote.ClientOption {
-	return &remote.ClientOption{
-		CliHandlerFactory: netpoll.NewCliTransHandlerFactory(),
-		Dialer:            netpoll.NewDialer(),
-		Codec:             codec.NewDefaultCodec(),
 	}
 }

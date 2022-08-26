@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/bytedance/gopkg/util/gopool"
+
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 

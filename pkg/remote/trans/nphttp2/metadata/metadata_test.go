@@ -19,8 +19,9 @@ package metadata
 import (
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
 	"golang.org/x/net/context"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestDecodeKeyValue(t *testing.T) {

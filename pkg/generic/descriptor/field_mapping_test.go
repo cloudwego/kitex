@@ -30,4 +30,6 @@ func Test_goTag_Handle(t *testing.T) {
 	test.Assert(t, f.Alias == "a", f.Alias)
 	NewGoTag(`db:"b" json:"a,string"`).Handle(f)
 	test.Assert(t, f.Alias == "a", f.Alias)
+	NewGoTag(`json:\"a\"`).Handle(f)
+	test.Assert(t, f.Alias == "a", f.Alias)
 }

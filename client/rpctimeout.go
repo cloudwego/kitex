@@ -117,11 +117,11 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 				}()
 				err = next(ctx, request, response)
 				if err != nil && ctx.Err() != nil &&
-					!errors.Is(err, kerrors.ErrRPCTimeout) && !errors.Is(err, kerrors.ErrRPCFinish) {
+					!kerrors.IsTimeoutError(err) && !errors.Is(err, kerrors.ErrRPCFinish) {
 					// error occurs after the wait goroutine returns(RPCTimeout happens),
 					// we should log this error for troubleshooting, or it will be discarded.
 					// but ErrRPCTimeout and ErrRPCFinish can be ignored:
-					//    ErrRPCTimeout: it is same with outer timeout, here only care about non timeout err.
+					//    ErrRPCTimeout: it is same with outer timeout, here only care about non-timeout err.
 					//    ErrRPCFinish: it happens in retry scene, previous call returns first.
 					var errMsg string
 					if ri.To().Address() != nil {

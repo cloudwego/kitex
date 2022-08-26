@@ -18,8 +18,11 @@ package descriptor
 
 import (
 	"reflect"
+	"regexp"
 	"strings"
 )
+
+var escape = regexp.MustCompile(`\\.`)
 
 // FiledMapping mapping handle for filed descriptor
 type FiledMapping interface {
@@ -39,6 +42,12 @@ type goTag struct {
 
 // NewGoTag go.tag annotation creator
 var NewGoTag NewFieldMapping = func(value string) FiledMapping {
+	value = escape.ReplaceAllStringFunc(value, func(m string) string {
+		if m[1] == '"' {
+			return m[1:]
+		}
+		return m
+	})
 	return &goTag{reflect.StructTag(value)}
 }
 
