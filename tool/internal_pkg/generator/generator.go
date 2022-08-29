@@ -194,7 +194,7 @@ func (c *Config) Unpack(args []string) error {
 	return nil
 }
 
-// AddFeature add registered feature to config
+// AddFeature add registered feature to remoteconfig
 func (c *Config) AddFeature(key string) bool {
 	if f, ok := getFeature(key); ok {
 		c.Features = append(c.Features, f)

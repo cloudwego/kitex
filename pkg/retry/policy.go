@@ -187,7 +187,7 @@ func (p *FailurePolicy) Equals(np *FailurePolicy) bool {
 		return false
 	}
 	// don't need to check `ShouldResultRetry`, ShouldResultRetry is only setup by option
-	// in remote config case will always return false if check it
+	// in remote remoteconfig case will always return false if check it
 	return true
 }
 

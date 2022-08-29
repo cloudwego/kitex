@@ -48,7 +48,7 @@ func init() {
 	remote.PutPayloadCode(serviceinfo.Protobuf, protobuf.NewProtobufCodec())
 }
 
-// Option is the only way to config a server.
+// Option is the only way to remoteconfig a server.
 type Option struct {
 	F func(o *Options, di *utils.Slice)
 }

@@ -23,7 +23,7 @@ type Config interface {
 	Get(key string) (val interface{}, ok bool)
 }
 
-// Container manages multiple config sources with priorities.
+// Container manages multiple remoteconfig sources with priorities.
 type Container interface {
 	Config
 	AddPriorSource(src Config) error
@@ -54,12 +54,12 @@ type RichTypeDefaultConfig interface {
 	GetDuration(key string, def time.Duration) time.Duration
 }
 
-// dummyConfig is a dummy config source.
+// dummyConfig is a dummy remoteconfig source.
 type dummyConfig struct{}
 
 func (dc *dummyConfig) Get(key string) (val interface{}, ok bool) { return }
 
-// NewDummyConfig creates a dummy config.
+// NewDummyConfig creates a dummy remoteconfig.
 func NewDummyConfig() Config {
 	return &dummyConfig{}
 }

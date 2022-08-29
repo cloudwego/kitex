@@ -21,7 +21,7 @@ type Updater interface {
 	UpdateLimit(opt *Option) (updated bool)
 }
 
-// Option is used to config the limiter.
+// Option is used to remoteconfig the limiter.
 type Option struct {
 	MaxConnections int
 	MaxQPS         int

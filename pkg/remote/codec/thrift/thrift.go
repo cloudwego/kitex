@@ -31,7 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
-// CodecType is config of the thrift codec. Priority: Frugal > FastMode > Normal
+// CodecType is remoteconfig of the thrift codec. Priority: Frugal > FastMode > Normal
 type CodecType int
 
 const (

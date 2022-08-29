@@ -45,7 +45,7 @@ type Config struct {
 	MaxConnectionIdleTime time.Duration
 }
 
-// NewConfig creates a new default config.
+// NewConfig creates a new default remoteconfig.
 func NewConfig() *Config {
 	return &Config{
 		Address:               defaultAddress,

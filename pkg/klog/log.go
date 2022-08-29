@@ -56,7 +56,7 @@ type CtxLogger interface {
 	CtxFatalf(ctx context.Context, format string, v ...interface{})
 }
 
-// Control provides methods to config a logger.
+// Control provides methods to remoteconfig a logger.
 type Control interface {
 	SetLevel(Level)
 	SetOutput(io.Writer)

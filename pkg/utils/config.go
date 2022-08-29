@@ -33,7 +33,7 @@ const (
 	DefaultLogDir   = "log"
 )
 
-// GetConfDir gets dir of config file.
+// GetConfDir gets dir of remoteconfig file.
 func GetConfDir() string {
 	if confDir := os.Getenv(EnvConfDir); confDir != "" {
 		return confDir
@@ -41,7 +41,7 @@ func GetConfDir() string {
 	return DefaultConfDir
 }
 
-// GetConfFile gets config file path.
+// GetConfFile gets remoteconfig file path.
 func GetConfFile() string {
 	file := DefaultConfFile
 	if confFile := os.Getenv(EnvConfFile); confFile != "" {

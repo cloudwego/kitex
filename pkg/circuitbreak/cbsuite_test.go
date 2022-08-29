@@ -376,7 +376,7 @@ func TestCBSuite_Dump(t *testing.T) {
 	test.Assert(t, cfg.MinSample == GetDefaultCBConfig().MinSample)
 	test.Assert(t, cfg.ErrRate == GetDefaultCBConfig().ErrRate)
 
-	// update config, then dump
+	// update remoteconfig, then dump
 	newCfg := CBConfig{
 		Enable:    true,
 		ErrRate:   0.1,

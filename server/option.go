@@ -39,7 +39,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-// Option is the only way to config server.
+// Option is the only way to remoteconfig server.
 type Option = internal_server.Option
 
 // Options is used to initialize the server.

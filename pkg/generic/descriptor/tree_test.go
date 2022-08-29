@@ -416,8 +416,8 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {
 		"/1/go",
 		"/a",
 		"/admin/",
-		"/admin/config/",
-		"/admin/config/permissions/",
+		"/admin/remoteconfig/",
+		"/admin/remoteconfig/permissions/",
 		"/doc/",
 		"/vendor/x",
 	}

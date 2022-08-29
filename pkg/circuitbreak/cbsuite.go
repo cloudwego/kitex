@@ -45,7 +45,7 @@ func GetDefaultCBConfig() CBConfig {
 	return defaultCBConfig
 }
 
-// CBConfig is policy config of CircuitBreaker.
+// CBConfig is policy remoteconfig of CircuitBreaker.
 type CBConfig struct {
 	Enable    bool    `json:"enable"`
 	ErrRate   float64 `json:"err_rate"`
@@ -53,7 +53,7 @@ type CBConfig struct {
 }
 
 // GenServiceCBKeyFunc to generate circuit breaker key through rpcinfo.
-// You can customize the config key according to your config center.
+// You can customize the remoteconfig key according to your remoteconfig center.
 type GenServiceCBKeyFunc func(ri rpcinfo.RPCInfo) string
 
 type instanceCBConfig struct {
@@ -123,14 +123,14 @@ func (s *CBSuite) ServiceControl() *Control {
 	return s.serviceControl
 }
 
-// UpdateServiceCBConfig is to update service CircuitBreaker config.
-// This func is suggested to be called in remote config module.
+// UpdateServiceCBConfig is to update service CircuitBreaker remoteconfig.
+// This func is suggested to be called in remote remoteconfig module.
 func (s *CBSuite) UpdateServiceCBConfig(key string, cfg CBConfig) {
 	s.serviceCBConfig.Store(key, cfg)
 }
 
 // UpdateInstanceCBConfig is to update instance CircuitBreaker param.
-// This func is suggested to be called in remote config module.
+// This func is suggested to be called in remote remoteconfig module.
 func (s *CBSuite) UpdateInstanceCBConfig(cfg CBConfig) {
 	s.instanceCBConfig.Lock()
 	s.instanceCBConfig.CBConfig = cfg

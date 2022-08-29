@@ -137,7 +137,7 @@ func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 	defer rc.Unlock()
 	rc.msg = ""
 	if rc.hasCodeCfg {
-		// the priority of user setup code policy is higher than remote config
+		// the priority of user setup code policy is higher than remote remoteconfig
 		return
 	}
 	r, ok := rc.retryerMap.Load(method)
@@ -156,7 +156,7 @@ func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 	rc.initRetryer(method, p)
 }
 
-// Init to build Retryer with code config.
+// Init to build Retryer with code remoteconfig.
 func (rc *Container) Init(mp map[string]Policy, rr *ShouldResultRetry) (err error) {
 	rc.shouldResultRetry = rr
 	// NotifyPolicyChange func may execute before Init func.
@@ -230,8 +230,8 @@ func NewRetryer(p Policy, r *ShouldResultRetry, cbC *cbContainer) (retryer Retry
 		retryer, err = newBackupRetryer(p, cbC)
 	} else {
 		if p.FailurePolicy != nil && p.FailurePolicy.ShouldResultRetry == nil {
-			// the ShouldResultRetry priority of that config inside FailurePolicy is
-			// higher than config by`WithSpecifiedResultRetry` option
+			// the ShouldResultRetry priority of that remoteconfig inside FailurePolicy is
+			// higher than remoteconfig by`WithSpecifiedResultRetry` option
 			p.FailurePolicy.ShouldResultRetry = r
 		}
 		retryer, err = newFailureRetryer(p, cbC)

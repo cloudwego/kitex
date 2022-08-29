@@ -95,7 +95,7 @@ func TestQPSLimiter(t *testing.T) {
 	wg.Wait()
 	actualQPS = count / int32(time.Since(now).Seconds())
 	delta = math.Abs(float64(actualQPS - int32(qps)))
-	// the diff range need be < 5%, the range is larger because the interval config is larger
+	// the diff range need be < 5%, the range is larger because the interval remoteconfig is larger
 	test.Assert(t, delta < float64(qps)*0.05, delta, actualQPS)
 
 	// case4: UpdateLimit and get Status
@@ -126,7 +126,7 @@ func TestQPSLimiter(t *testing.T) {
 	wg.Wait()
 	actualQPS = count / int32(time.Since(now).Seconds())
 	delta = math.Abs(float64(actualQPS - int32(qps)))
-	// the diff range need be < 5%, the range is larger because the interval config is larger
+	// the diff range need be < 5%, the range is larger because the interval remoteconfig is larger
 	test.Assert(t, delta < float64(qps)*0.05, delta, actualQPS)
 }
 

@@ -45,7 +45,7 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-// Option is the only way to config client.
+// Option is the only way to remoteconfig client.
 type Option = client.Option
 
 // Options is used to initialize a client.
@@ -354,7 +354,7 @@ func WithBackupRequest(p *retry.BackupPolicy) Option {
 
 // WithRetryMethodPolicies sets the retry policy for method.
 // The priority is higher than WithFailureRetry and WithBackupRequest. Only the methods which are not included by
-// this config will use the policy that is configured by WithFailureRetry or WithBackupRequest .
+// this remoteconfig will use the policy that is configured by WithFailureRetry or WithBackupRequest .
 // FailureRetry and BackupRequest can be set for different method at same time.
 // Notice: method name is case-sensitive, it should be same with the definition in IDL.
 func WithRetryMethodPolicies(mp map[string]retry.Policy) Option {
@@ -369,7 +369,7 @@ func WithRetryMethodPolicies(mp map[string]retry.Policy) Option {
 		wildcardCfg := o.RetryMethodPolicies[retry.Wildcard]
 		o.RetryMethodPolicies = mp
 		if wildcardCfg.Enable && !mp[retry.Wildcard].Enable {
-			// if there is enabled wildcard config before, keep it
+			// if there is enabled wildcard remoteconfig before, keep it
 			o.RetryMethodPolicies[retry.Wildcard] = wildcardCfg
 		}
 	}}
@@ -378,7 +378,7 @@ func WithRetryMethodPolicies(mp map[string]retry.Policy) Option {
 // WithSpecifiedResultRetry is used with FailureRetry.
 // When you enable FailureRetry and want to retry with the specified error or response, you can configure this Option.
 // ShouldResultRetry is defined inside retry.FailurePolicy, so WithFailureRetry also can set ShouldResultRetry.
-// But if your retry policy is enabled by remote config, WithSpecifiedResultRetry is useful.
+// But if your retry policy is enabled by remote remoteconfig, WithSpecifiedResultRetry is useful.
 func WithSpecifiedResultRetry(rr *retry.ShouldResultRetry) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if rr == nil {

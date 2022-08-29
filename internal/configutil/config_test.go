@@ -33,7 +33,7 @@ func (c *mockConfig) Get(key string) (interface{}, bool) {
 }
 
 func TestConfigs_Get(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyConfigs := configs{}
 	val, ok := emptyConfigs.Get("key")
 	test.Assert(t, val == nil)
@@ -42,7 +42,7 @@ func TestConfigs_Get(t *testing.T) {
 	test.Assert(t, val == nil)
 	test.Assert(t, ok == false)
 
-	// contain single config
+	// contain single remoteconfig
 	singleCfg := configs{
 		sources: []Config{
 			&mockConfig{
@@ -123,13 +123,13 @@ func TestConfigs_AddPriorSource(t *testing.T) {
 }
 
 func TestDefaultConfig_Get(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	emptyDefCfg := NewDefaultConfig(emptyCfg)
 	val := emptyDefCfg.Get("key", "def_val")
 	test.Assert(t, val.(string) == "def_val")
 
-	// config contain element
+	// remoteconfig contain element
 	cfg := &mockConfig{
 		data: map[interface{}]interface{}{
 			"key": "val",
@@ -153,7 +153,7 @@ func TestDummyConfig_Get(t *testing.T) {
 }
 
 func TestRichTypeConfig_GetBool(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	val, ok := richCfg.GetBool("key")
@@ -191,7 +191,7 @@ func TestRichTypeConfig_GetBool(t *testing.T) {
 }
 
 func TestRichTypeConfig_GetDuration(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	val, ok := richCfg.GetDuration("key")
@@ -229,7 +229,7 @@ func TestRichTypeConfig_GetDuration(t *testing.T) {
 }
 
 func TestRichTypeConfig_GetFloat(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	val, ok := richCfg.GetFloat("key")
@@ -267,7 +267,7 @@ func TestRichTypeConfig_GetFloat(t *testing.T) {
 }
 
 func TestRichTypeConfig_GetInt(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	val, ok := richCfg.GetInt("key")
@@ -305,7 +305,7 @@ func TestRichTypeConfig_GetInt(t *testing.T) {
 }
 
 func TestRichTypeConfig_GetInt64(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	val, ok := richCfg.GetInt64("key")
@@ -343,7 +343,7 @@ func TestRichTypeConfig_GetInt64(t *testing.T) {
 }
 
 func TestRichTypeConfig_GetString(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	val, ok := richCfg.GetString("key")
@@ -381,7 +381,7 @@ func TestRichTypeConfig_GetString(t *testing.T) {
 }
 
 func TestRichTypeDefaultConfig_GetBool(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	emptyDefRichCfg := NewRichTypeDefaultConfig(richCfg)
@@ -422,7 +422,7 @@ func TestRichTypeDefaultConfig_GetBool(t *testing.T) {
 }
 
 func TestRichTypeDefaultConfig_GetDuration(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	emptyDefRichCfg := NewRichTypeDefaultConfig(richCfg)
@@ -463,7 +463,7 @@ func TestRichTypeDefaultConfig_GetDuration(t *testing.T) {
 }
 
 func TestRichTypeDefaultConfig_GetFloat(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	emptyDefRichCfg := NewRichTypeDefaultConfig(richCfg)
@@ -504,7 +504,7 @@ func TestRichTypeDefaultConfig_GetFloat(t *testing.T) {
 }
 
 func TestRichTypeDefaultConfig_GetInt(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	emptyDefRichCfg := NewRichTypeDefaultConfig(richCfg)
@@ -545,7 +545,7 @@ func TestRichTypeDefaultConfig_GetInt(t *testing.T) {
 }
 
 func TestRichTypeDefaultConfig_GetInt64(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	emptyDefRichCfg := NewRichTypeDefaultConfig(richCfg)
@@ -586,7 +586,7 @@ func TestRichTypeDefaultConfig_GetInt64(t *testing.T) {
 }
 
 func TestRichTypeDefaultConfig_GetString(t *testing.T) {
-	// empty config
+	// empty remoteconfig
 	emptyCfg := &mockConfig{}
 	richCfg := NewRichTypeConfig(emptyCfg)
 	emptyDefRichCfg := NewRichTypeDefaultConfig(richCfg)

@@ -94,7 +94,7 @@ func TestNewRetryContainer(t *testing.T) {
 	msg := "new retryer[test-Backup] failed, err=newBackupRetryer failed, err=BackupPolicy is nil or retry type not match, cannot do update in backupRetryer, at "
 	test.Assert(t, rc.msg[:len(msg)] == msg)
 
-	// backupPolicy config invalid
+	// backupPolicy remoteconfig invalid
 	rc.NotifyPolicyChange(method, Policy{
 		Enable: true,
 		Type:   1,
@@ -105,7 +105,7 @@ func TestNewRetryContainer(t *testing.T) {
 	msg = "new retryer[test-Backup] failed, err=newBackupRetryer failed, err=invalid backup request delay duration or retryTimes, at "
 	test.Assert(t, rc.msg[:len(msg)] == msg)
 
-	// backupPolicy cBPolicy config invalid
+	// backupPolicy cBPolicy remoteconfig invalid
 	rc.NotifyPolicyChange(method, Policy{
 		Enable: true,
 		Type:   1,
@@ -121,7 +121,7 @@ func TestNewRetryContainer(t *testing.T) {
 	msg = "new retryer[test-Backup] at "
 	test.Assert(t, rc.msg[:len(msg)] == msg)
 
-	// failurePolicy config invalid
+	// failurePolicy remoteconfig invalid
 	rc = NewRetryContainer()
 	rc.NotifyPolicyChange(method, Policy{
 		Enable: true,
@@ -135,7 +135,7 @@ func TestNewRetryContainer(t *testing.T) {
 	msg = "new retryer[test-Failure] failed, err=newfailureRetryer failed, err=invalid failure MaxRetryTimes[6], at "
 	test.Assert(t, rc.msg[:len(msg)] == msg)
 
-	// failurePolicy cBPolicy config invalid
+	// failurePolicy cBPolicy remoteconfig invalid
 	rc = NewRetryContainer()
 	rc.NotifyPolicyChange(method, Policy{
 		Enable: true,
@@ -358,7 +358,7 @@ func TestFailurePolicyCall(t *testing.T) {
 
 // test retry with one time policy
 func TestRetryWithOneTimePolicy(t *testing.T) {
-	// call while rpc timeout and exceed MaxDurationMS cause BackOffPolicy is wait fix 100ms, it is invalid config
+	// call while rpc timeout and exceed MaxDurationMS cause BackOffPolicy is wait fix 100ms, it is invalid remoteconfig
 	failurePolicy := NewFailurePolicy()
 	failurePolicy.BackOffPolicy.BackOffType = FixedBackOffType
 	failurePolicy.BackOffPolicy.CfgItems = map[BackOffCfgKey]float64{
@@ -438,7 +438,7 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, !ok)
 
-	// case2: specified method retry with error, but use backup request config cannot be effective
+	// case2: specified method retry with error, but use backup request remoteconfig cannot be effective
 	callTimes = 0
 	shouldResultRetry = &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
 		if ri.To().Method() == method {
@@ -523,7 +523,7 @@ func TestSpecifiedRespRetry(t *testing.T) {
 	test.Assert(t, retryResult.GetResult() == noRetryResp, retryResult)
 	test.Assert(t, !ok)
 
-	// case2 specified method retry with resp, but use backup request config cannot be effective
+	// case2 specified method retry with resp, but use backup request remoteconfig cannot be effective
 	callTimes = 0
 	rc = NewRetryContainer()
 	err = rc.Init(map[string]Policy{Wildcard: BuildBackupRequest(NewBackupPolicy(10))}, shouldResultRetry)

@@ -117,7 +117,7 @@ func (o *Options) Apply(opts []Option) {
 	}
 }
 
-// Option is the only way to config client.
+// Option is the only way to remoteconfig client.
 type Option struct {
 	F func(o *Options, di *utils.Slice)
 }

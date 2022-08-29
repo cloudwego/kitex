@@ -52,7 +52,7 @@ const (
 	RetryPolicyKey ProbeName = "retry_policy"
 )
 
-// WrapAsProbeFunc is to wrap probe data as ProbeFunc, the data is some infos that you want to diagnosis, like config info.
+// WrapAsProbeFunc is to wrap probe data as ProbeFunc, the data is some infos that you want to diagnosis, like remoteconfig info.
 func WrapAsProbeFunc(data interface{}) ProbeFunc {
 	return func() interface{} {
 		return data
