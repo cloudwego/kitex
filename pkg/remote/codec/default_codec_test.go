@@ -20,13 +20,14 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"testing"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
-	"testing"
 )
 
 func TestThriftProtocolCheck(t *testing.T) {
@@ -280,6 +281,7 @@ func (m mockPayloadCodec) Unmarshal(ctx context.Context, message remote.Message,
 func (m mockPayloadCodec) Name() string {
 	return "mock"
 }
+
 func Test_isMeshHeader(t *testing.T) {
 	var flagBuf []byte
 	flagBuf = make([]byte, 8*2)

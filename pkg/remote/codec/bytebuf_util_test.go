@@ -18,9 +18,10 @@ package codec
 
 import (
 	"encoding/binary"
+	"testing"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"testing"
 )
 
 func TestPeekUint32(t *testing.T) {
@@ -35,7 +36,6 @@ func TestPeekUint32(t *testing.T) {
 	read2, err2 := PeekUint32(buffer2)
 	b22 := binary.BigEndian.Uint32(bytes2)
 	test.Assert(t, read2 == b22, err2)
-
 }
 
 // test readUint16 with  byte array
@@ -98,7 +98,6 @@ func TestReadString2BLen(t *testing.T) {
 	bLen3, i3, err3 := ReadString2BLen(bytes, 3)
 	test.Assert(t, bLen3 == "", err3)
 	test.Assert(t, i3 == 0, err3)
-
 }
 
 func TestWriteString(t *testing.T) {
@@ -107,7 +106,6 @@ func TestWriteString(t *testing.T) {
 	str := "test123"
 	writeString, err := WriteString(str, buffer)
 	test.Assert(t, writeString == 0, err)
-
 }
 
 func TestWriteString2BLen(t *testing.T) {

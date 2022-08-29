@@ -17,16 +17,15 @@
 package protobuf
 
 import (
-	"github.com/cloudwego/kitex/internal/test"
 	"reflect"
 	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
-var (
-	cop = &grpcCodec{}
-)
+var cop = &grpcCodec{}
 
-//test for name
+// test for name
 func Test_grpcCodec_Name(t *testing.T) {
 	newGrpcCodec := &grpcCodec{}
 	test.Assert(t, newGrpcCodec.Name() == "grpc")
