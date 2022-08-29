@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"go/build"
 	"go/format"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -110,7 +111,7 @@ func NotPtr(s string) string {
 func SearchGoMod(cwd string) (moduleName, path string, found bool) {
 	for {
 		path = filepath.Join(cwd, "go.mod")
-		data, err := os.ReadFile(path)
+		data, err := ioutil.ReadFile(path)
 		if err == nil {
 			re := regexp.MustCompile(`^\s*module\s+(\S+)\s*`)
 			for _, line := range strings.Split(string(data), "\n") {
