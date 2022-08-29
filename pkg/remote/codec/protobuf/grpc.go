@@ -98,6 +98,7 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	if err != nil {
 		return err
 	}
+	message.SetPayloadLen(dLen)
 	data := message.Data()
 	switch t := data.(type) {
 	case fastpb.Reader:

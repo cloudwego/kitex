@@ -112,8 +112,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	// t.http2 should use the ctx returned by OnActive in r.ctx
-	r := ctx.Value(handlerKey{}).(*handlerWrapper)
-	if r.ctx != nil {
+	if r, ok := ctx.Value(handlerKey{}).(*handlerWrapper); ok && r.ctx != nil {
 		ctx = r.ctx
 	}
 	t.which(ctx).OnInactive(ctx, conn)
