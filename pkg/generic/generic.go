@@ -63,8 +63,9 @@ func MapThriftGeneric(p DescriptorProvider) (Generic, error) {
 // HTTPThriftGeneric http mapping Generic.
 // Base64 codec for binary field is disabled by default. You can change this option with SetBinaryWithBase64.
 // eg:
-// 		g, err := generic.HTTPThriftGeneric(p)
-// 		SetBinaryWithBase64(g, true)
+//
+//	g, err := generic.HTTPThriftGeneric(p)
+//	SetBinaryWithBase64(g, true)
 func HTTPThriftGeneric(p DescriptorProvider) (Generic, error) {
 	codec, err := newHTTPThriftCodec(p, thriftCodec)
 	if err != nil {
@@ -75,11 +76,22 @@ func HTTPThriftGeneric(p DescriptorProvider) (Generic, error) {
 	}, nil
 }
 
+func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generic, error) {
+	codec, err := newHTTPPbThriftCodec(p, pbp, thriftCodec)
+	if err != nil {
+		return nil, err
+	}
+	return &httpPbThriftGeneric{
+		codec: codec,
+	}, nil
+}
+
 // JSONThriftGeneric json mapping generic.
 // Base64 codec for binary field is enabled by default. You can change this option with SetBinaryWithBase64.
 // eg:
-// 		g, err := generic.JSONThriftGeneric(p)
-// 		SetBinaryWithBase64(g, false)
+//
+//	g, err := generic.JSONThriftGeneric(p)
+//	SetBinaryWithBase64(g, false)
 func JSONThriftGeneric(p DescriptorProvider) (Generic, error) {
 	codec, err := newJsonThriftCodec(p, thriftCodec)
 	if err != nil {
@@ -201,5 +213,29 @@ func (g *httpThriftGeneric) GetMethod(req interface{}, method string) (*Method, 
 }
 
 func (g *httpThriftGeneric) Close() error {
+	return g.codec.Close()
+}
+
+type httpPbThriftGeneric struct {
+	codec *httpPbThriftCodec
+}
+
+func (g *httpPbThriftGeneric) Framed() bool {
+	return false
+}
+
+func (g *httpPbThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
+	return serviceinfo.Thrift
+}
+
+func (g *httpPbThriftGeneric) PayloadCodec() remote.PayloadCodec {
+	return g.codec
+}
+
+func (g *httpPbThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
+	return g.codec.getMethod(req)
+}
+
+func (g *httpPbThriftGeneric) Close() error {
 	return g.codec.Close()
 }

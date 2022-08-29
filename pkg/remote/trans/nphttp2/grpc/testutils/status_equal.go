@@ -21,8 +21,9 @@
 package testutils
 
 import (
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
 // StatusErrEqual returns true iff both err1 and err2 wrap status.Status errors

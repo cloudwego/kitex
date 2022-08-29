@@ -25,13 +25,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/golang/mock/gomock"
 )
 
 var (
@@ -46,17 +47,16 @@ var (
 
 func TestMain(m *testing.M) {
 	svrOpt = &remote.ServerOption{
-		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
+		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
 			rpcCfg := rpcinfo.NewRPCConfig()
 			mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
 			mCfg.SetReadWriteTimeout(rwTimeout)
 			ink := rpcinfo.NewInvocation("", method)
 			rpcStat := rpcinfo.NewRPCStats()
-			ri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
-			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
-			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			return ri, ctx
+			nri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
+			rpcinfo.AsMutableEndpointInfo(nri.From()).SetAddress(addr)
+			return nri
 		},
 		Codec: &MockCodec{
 			EncodeFunc: nil,
@@ -109,7 +109,7 @@ func TestBootStrap(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		err = transSvr.BootstrapServer()
+		err = transSvr.BootstrapServer(ln)
 		test.Assert(t, err == nil, err)
 		wg.Done()
 	}()

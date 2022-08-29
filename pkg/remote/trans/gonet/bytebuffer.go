@@ -21,8 +21,9 @@ import (
 	"io"
 	"sync"
 
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/netpoll"
+
+	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 var rwPool sync.Pool

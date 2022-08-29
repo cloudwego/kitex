@@ -34,11 +34,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cloudwego/kitex/pkg/kerrors"
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 )
 

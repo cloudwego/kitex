@@ -20,7 +20,7 @@ import (
 	"errors"
 	"runtime"
 
-	"github.com/choleraehyq/pid"
+	goid "github.com/choleraehyq/pid"
 )
 
 // ErrRingFull means the ring is full.

@@ -94,8 +94,9 @@ type Options struct {
 	StatsLevel *stats.Level
 
 	// retry policy
-	RetryPolicy    *retry.Policy
-	RetryContainer *retry.Container
+	RetryMethodPolicies map[string]retry.Policy
+	RetryContainer      *retry.Container
+	RetryWithResult     *retry.ShouldResultRetry
 
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption
@@ -103,6 +104,10 @@ type Options struct {
 	// GRPC
 	GRPCConnPoolSize uint32
 	GRPCConnectOpts  *grpc.ConnectOptions
+
+	// XDS
+	XDSEnabled          bool
+	XDSRouterMiddleware endpoint.Middleware
 }
 
 // Apply applies all options.

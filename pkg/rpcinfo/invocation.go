@@ -22,6 +22,8 @@ import (
 )
 
 var (
+	_              Invocation       = (*invocation)(nil)
+	_              InvocationSetter = (*invocation)(nil)
 	invocationPool sync.Pool
 	globalSeqID    int32 = 0
 )
@@ -36,6 +38,7 @@ type InvocationSetter interface {
 	SetServiceName(name string)
 	SetMethodName(name string)
 	SetSeqID(seqID int32)
+	Reset()
 }
 
 type invocation struct {
@@ -46,7 +49,7 @@ type invocation struct {
 }
 
 // NewInvocation creates a new Invocation with the given service, method and optional package.
-func NewInvocation(service, method string, pkgOpt ...string) Invocation {
+func NewInvocation(service, method string, pkgOpt ...string) *invocation {
 	ivk := invocationPool.Get().(*invocation)
 	ivk.seqID = genSeqID()
 	ivk.serviceName = service
@@ -113,6 +116,11 @@ func (i *invocation) SetMethodName(name string) {
 	i.methodName = name
 }
 
+// Reset implements the InvocationSetter interface.
+func (i *invocation) Reset() {
+	i.zero()
+}
+
 // Recycle reuses the invocation.
 func (i *invocation) Recycle() {
 	i.zero()
@@ -121,6 +129,7 @@ func (i *invocation) Recycle() {
 
 func (i *invocation) zero() {
 	i.seqID = 0
+	i.packageName = ""
 	i.serviceName = ""
 	i.methodName = ""
 }

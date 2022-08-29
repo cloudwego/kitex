@@ -21,12 +21,13 @@
 package mocks
 
 import (
-	context "context"
-	reflect "reflect"
+	"context"
+	"reflect"
 
-	thrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/golang/mock/gomock"
+
 	thrift0 "github.com/cloudwego/kitex/pkg/generic/thrift"
-	gomock "github.com/golang/mock/gomock"
 )
 
 // MockMessageReader is a mock of MessageReader interface.

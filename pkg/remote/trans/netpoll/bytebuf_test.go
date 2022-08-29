@@ -22,9 +22,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/netpoll"
 )
 
 // TestByteBuffer test bytebuf write and read success

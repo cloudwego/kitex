@@ -48,7 +48,7 @@ type Info struct {
 	Tags map[string]string
 }
 
-// NoopRegistry is a empty implement of Registry
+// NoopRegistry is an empty implement of Registry
 var NoopRegistry Registry = &noopRegistry{}
 
 // NoopRegistry

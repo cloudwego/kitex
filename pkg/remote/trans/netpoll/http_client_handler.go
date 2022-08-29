@@ -21,7 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"path"
@@ -279,7 +279,7 @@ func getBodyBufReader(buf remote.ByteBuffer) (remote.ByteBuffer, error) {
 	if hr.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("http response not OK, StatusCode: %d", hr.StatusCode)
 	}
-	b, err := ioutil.ReadAll(hr.Body)
+	b, err := io.ReadAll(hr.Body)
 	hr.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf("read http response body error:%w", err)

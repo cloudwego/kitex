@@ -1,5 +1,5 @@
-//go:build amd64 || ignore || !windows
-// +build amd64 ignore !windows
+//go:build amd64 && !windows
+// +build amd64,!windows
 
 /*
  * Copyright 2021 CloudWeGo Authors
@@ -24,8 +24,8 @@ import (
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/frugal"
+
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"

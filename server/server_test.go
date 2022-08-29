@@ -27,6 +27,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/test"
@@ -39,9 +41,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/golang/mock/gomock"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func TestServerRun(t *testing.T) {
@@ -98,7 +101,7 @@ func TestReusePortServerRun(t *testing.T) {
 	wg.Wait()
 }
 
-func TestInitRPCInfo(t *testing.T) {
+func TestInitOrResetRPCInfo(t *testing.T) {
 	var opts []Option
 	rwTimeout := time.Millisecond
 	opts = append(opts, WithReadWriteTimeout(rwTimeout))
@@ -114,12 +117,108 @@ func TestInitRPCInfo(t *testing.T) {
 	conn.RemoteAddrFunc = func() (r net.Addr) {
 		return remoteAddr
 	}
-	ctx := context.Background()
-	rpcInfoInitFunc := svr.initRPCInfoFunc()
-	ri, ctx := rpcInfoInitFunc(ctx, conn.RemoteAddr())
-	test.Assert(t, rpcinfo.GetRPCInfo(ctx) != nil)
+	rpcInfoInitFunc := svr.initOrResetRPCInfoFunc()
+	ri := rpcInfoInitFunc(nil, conn.RemoteAddr())
+	test.Assert(t, ri != nil)
 	test.Assert(t, ri.From().Address().String() == remoteAddr.String())
 	test.Assert(t, ri.Config().ReadWriteTimeout() == rwTimeout)
+
+	// modify rpcinfo
+	fi := rpcinfo.AsMutableEndpointInfo(ri.From())
+	fi.SetServiceName("mock service")
+	fi.SetMethod("mock method")
+	fi.SetTag("key", "value")
+
+	ti := rpcinfo.AsMutableEndpointInfo(ri.To())
+	ti.SetServiceName("mock service")
+	ti.SetMethod("mock method")
+	ti.SetTag("key", "value")
+
+	if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+		setter.SetSeqID(123)
+		setter.SetPackageName("mock package")
+		setter.SetServiceName("mock service")
+		setter.SetMethodName("mock method")
+	}
+
+	mc := rpcinfo.AsMutableRPCConfig(ri.Config())
+	mc.SetTransportProtocol(transport.TTHeader)
+	mc.SetConnectTimeout(10 * time.Second)
+	mc.SetRPCTimeout(20 * time.Second)
+	mc.SetInteractionMode(rpcinfo.Streaming)
+	mc.SetIOBufferSize(1024)
+	mc.SetReadWriteTimeout(30 * time.Second)
+
+	rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
+	rpcStats.SetRecvSize(1024)
+	rpcStats.SetSendSize(1024)
+	rpcStats.SetPanicked(errors.New("panic"))
+	rpcStats.SetError(errors.New("err"))
+	rpcStats.SetLevel(stats.LevelDetailed)
+
+	// check setting
+	test.Assert(t, ri.From().ServiceName() == "mock service")
+	test.Assert(t, ri.From().Method() == "mock method")
+	value, exist := ri.From().Tag("key")
+	test.Assert(t, exist && value == "value")
+
+	test.Assert(t, ri.To().ServiceName() == "mock service")
+	test.Assert(t, ri.To().Method() == "mock method")
+	value, exist = ri.To().Tag("key")
+	test.Assert(t, exist && value == "value")
+
+	test.Assert(t, ri.Invocation().SeqID() == 123)
+	test.Assert(t, ri.Invocation().PackageName() == "mock package")
+	test.Assert(t, ri.Invocation().ServiceName() == "mock service")
+	test.Assert(t, ri.Invocation().MethodName() == "mock method")
+
+	test.Assert(t, ri.Config().TransportProtocol() == transport.TTHeader)
+	test.Assert(t, ri.Config().ConnectTimeout() == 10*time.Second)
+	test.Assert(t, ri.Config().RPCTimeout() == 20*time.Second)
+	test.Assert(t, ri.Config().InteractionMode() == rpcinfo.Streaming)
+	test.Assert(t, ri.Config().IOBufferSize() == 1024)
+	test.Assert(t, ri.Config().ReadWriteTimeout() == rwTimeout)
+
+	test.Assert(t, ri.Stats().RecvSize() == 1024)
+	test.Assert(t, ri.Stats().SendSize() == 1024)
+	hasPanicked, _ := ri.Stats().Panicked()
+	test.Assert(t, hasPanicked)
+	test.Assert(t, ri.Stats().Error() != nil)
+	test.Assert(t, ri.Stats().Level() == stats.LevelDetailed)
+
+	// test reset
+	ri = rpcInfoInitFunc(ri, conn.RemoteAddr())
+	test.Assert(t, ri.From().Address().String() == remoteAddr.String())
+	test.Assert(t, ri.Config().ReadWriteTimeout() == rwTimeout)
+
+	test.Assert(t, ri.From().ServiceName() == "")
+	test.Assert(t, ri.From().Method() == "")
+	_, exist = ri.From().Tag("key")
+	test.Assert(t, !exist)
+
+	test.Assert(t, ri.To().ServiceName() == "")
+	test.Assert(t, ri.To().Method() == "")
+	_, exist = ri.To().Tag("key")
+	test.Assert(t, !exist)
+
+	test.Assert(t, ri.Invocation().SeqID() == 0)
+	test.Assert(t, ri.Invocation().PackageName() == "")
+	test.Assert(t, ri.Invocation().ServiceName() == "")
+	test.Assert(t, ri.Invocation().MethodName() == "")
+
+	test.Assert(t, ri.Config().TransportProtocol() == 0)
+	test.Assert(t, ri.Config().ConnectTimeout() == 50*time.Millisecond)
+	test.Assert(t, ri.Config().RPCTimeout() == 0)
+	test.Assert(t, ri.Config().InteractionMode() == rpcinfo.PingPong)
+	test.Assert(t, ri.Config().IOBufferSize() == 4096)
+	test.Assert(t, ri.Config().ReadWriteTimeout() == rwTimeout)
+
+	test.Assert(t, ri.Stats().RecvSize() == 0)
+	test.Assert(t, ri.Stats().SendSize() == 0)
+	_, panicked := ri.Stats().Panicked()
+	test.Assert(t, panicked == nil)
+	test.Assert(t, ri.Stats().Error() == nil)
+	test.Assert(t, ri.Stats().Level() == 0)
 }
 
 func TestServiceRegisterFailed(t *testing.T) {
@@ -283,7 +382,7 @@ func TestServerBoundHandler(t *testing.T) {
 		},
 		{
 			opts: []Option{
-				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
 				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), &limiter.DummyRateLimiter{}, nil, false),
@@ -307,7 +406,7 @@ func TestServerBoundHandler(t *testing.T) {
 		},
 		{
 			opts: []Option{
-				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
@@ -324,7 +423,7 @@ func TestServerBoundHandler(t *testing.T) {
 					MaxConnections: 1000,
 					MaxQPS:         10000,
 				}),
-				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
 				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), limiter.NewQPSLimiter(interval, 10000), nil, false),
@@ -340,7 +439,7 @@ func TestServerBoundHandler(t *testing.T) {
 					MaxConnections: 1000,
 					MaxQPS:         10000,
 				}),
-				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
@@ -357,7 +456,7 @@ func TestServerBoundHandler(t *testing.T) {
 					MaxConnections: 1000,
 					MaxQPS:         10000,
 				}),
-				WithConcurrencyLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
 				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
 				WithMuxTransport(),
 			},
@@ -432,7 +531,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 	exitCh := make(chan bool)
 	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
-		BootstrapServerFunc: func() error {
+		BootstrapServerFunc: func(net.Listener) error {
 			{ // mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
@@ -495,7 +594,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 	exitCh := make(chan bool)
 	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
-		BootstrapServerFunc: func() error {
+		BootstrapServerFunc: func(net.Listener) error {
 			{
 				// mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())

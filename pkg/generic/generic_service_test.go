@@ -22,13 +22,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
 	mocks "github.com/cloudwego/kitex/internal/mocks/generic"
 	"github.com/cloudwego/kitex/internal/test"
 	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/golang/mock/gomock"
 )
 
 func TestGenericService(t *testing.T) {

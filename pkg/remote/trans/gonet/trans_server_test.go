@@ -17,7 +17,6 @@
 package gonet
 
 import (
-	"context"
 	"net"
 	"os"
 	"testing"
@@ -43,17 +42,16 @@ var (
 
 func TestMain(m *testing.M) {
 	svrOpt = &remote.ServerOption{
-		InitRPCInfoFunc: func(ctx context.Context, addr net.Addr) (rpcinfo.RPCInfo, context.Context) {
+		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
 			rpcCfg := rpcinfo.NewRPCConfig()
 			mCfg := rpcinfo.AsMutableRPCConfig(rpcCfg)
 			mCfg.SetReadWriteTimeout(rwTimeout)
 			ink := rpcinfo.NewInvocation("", method)
 			rpcStat := rpcinfo.NewRPCStats()
-			ri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
-			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
-			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-			return ri, ctx
+			nri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
+			rpcinfo.AsMutableEndpointInfo(nri.From()).SetAddress(addr)
+			return nri
 		},
 		Codec: &MockCodec{
 			EncodeFunc: nil,
@@ -71,7 +69,7 @@ func TestMain(m *testing.M) {
 // TestCreateListener test trans_server CreateListener success
 func TestCreateListener(t *testing.T) {
 	// tcp init
-	addrStr := "127.0.0.1:9090"
+	addrStr := "127.0.0.1:9091"
 	addr = utils.NewNetAddr("tcp", addrStr)
 
 	// test

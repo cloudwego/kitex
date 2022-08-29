@@ -28,8 +28,7 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 )
 
-type ControlFrame struct {
-}
+type ControlFrame struct{}
 
 func NewControlFrame() *ControlFrame {
 	return &ControlFrame{}
@@ -38,7 +37,6 @@ func NewControlFrame() *ControlFrame {
 var fieldIDToName_ControlFrame = map[int16]string{}
 
 func (p *ControlFrame) Read(iprot thrift.TProtocol) (err error) {
-
 	var fieldTypeId thrift.TType
 	var fieldId int16
 
@@ -85,7 +83,6 @@ func (p *ControlFrame) Write(oprot thrift.TProtocol) (err error) {
 		goto WriteStructBeginError
 	}
 	if p != nil {
-
 	}
 	if err = oprot.WriteFieldStop(); err != nil {
 		goto WriteFieldStopError

@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	mt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"

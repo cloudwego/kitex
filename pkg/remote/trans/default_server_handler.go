@@ -100,10 +100,7 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 
 // OnRead implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
-	// init rpcinfo
-	var ri rpcinfo.RPCInfo
-	ri, ctx = t.opt.InitRPCInfoFunc(ctx, conn.RemoteAddr())
-
+	ri := rpcinfo.GetRPCInfo(ctx)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var err error
 	var closeConn bool
@@ -127,8 +124,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		t.finishTracer(ctx, ri, err, panicErr)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
-		// recycle rpcinfo
-		rpcinfo.PutRPCInfo(ri)
+		// reset rpcinfo
+		t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
 	}()
 	ctx = t.startTracer(ctx, ri)
 	recvMsg = remote.NewMessageWithNewer(t.svcInfo, ri, remote.Call, remote.Server)
@@ -183,11 +180,15 @@ func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Mes
 
 // OnActive implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
-	return ctx, nil
+	// init rpcinfo
+	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
+	return rpcinfo.NewCtxWithRPCInfo(ctx, ri), nil
 }
 
 // OnInactive implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
+	// recycle rpcinfo
+	rpcinfo.PutRPCInfo(rpcinfo.GetRPCInfo(ctx))
 }
 
 // OnError implements the remote.ServerTransHandler interface.

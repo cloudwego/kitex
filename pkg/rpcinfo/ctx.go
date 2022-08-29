@@ -57,22 +57,21 @@ func PutRPCInfo(ri RPCInfo) {
 //
 // Example:
 //
-//     func (p *MyServiceImpl) MyMethod(ctx context.Context, req *MyRequest) (resp *MyResponse, err error) {
-//         ri := rpcinfo.GetRPCInfo(ctx)
-//         go func(ctx context.Context) {
-//             ...
-//             ri := rpcinfo.GetRPCInfo(ctx) // not concurrent-safe
-//             ...
-//         }(ctx2)
+//	func (p *MyServiceImpl) MyMethod(ctx context.Context, req *MyRequest) (resp *MyResponse, err error) {
+//	    ri := rpcinfo.GetRPCInfo(ctx)
+//	    go func(ctx context.Context) {
+//	        ...
+//	        ri := rpcinfo.GetRPCInfo(ctx) // not concurrent-safe
+//	        ...
+//	    }(ctx2)
 //
-//         ctx2 := rpcinfo.FreezeRPCInfo(ctx) // this creates a read-only copy of `ri` and attaches it to the new context
-//         go func(ctx context.Context) {
-//             ...
-//             ri := rpcinfo.GetRPCInfo(ctx) // OK
-//             ...
-//         }(ctx2)
-//     }
-//
+//	    ctx2 := rpcinfo.FreezeRPCInfo(ctx) // this creates a read-only copy of `ri` and attaches it to the new context
+//	    go func(ctx context.Context) {
+//	        ...
+//	        ri := rpcinfo.GetRPCInfo(ctx) // OK
+//	        ...
+//	    }(ctx2)
+//	}
 func FreezeRPCInfo(ctx context.Context) context.Context {
 	ri := GetRPCInfo(ctx)
 	if ri == nil {
