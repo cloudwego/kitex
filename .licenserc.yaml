@@ -4,11 +4,14 @@ header:
     copyright-owner: CloudWeGo Authors
 
   paths:
-    - '**/*.go'
-    - '**/*.s'
+    - "**/*.go"
+    - "**/*.s"
 
   paths-ignore:
     - internal/mocks/thrift/test.go
+    - pkg/remote/codec/thrift/thrift_frugal.go
+    - pkg/remote/codec/thrift/thrift_frugal_test.go
+    - pkg/remote/codec/thrift/thrift_others.go
     - pkg/remote/trans/nphttp2/codes/codes.go
     - pkg/remote/trans/nphttp2/grpc/grpcframe/
     - pkg/remote/trans/nphttp2/grpc/bdp_estimator.go
