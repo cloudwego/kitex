@@ -21,6 +21,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"strings"
 	"syscall"
 
 	"github.com/cloudwego/netpoll"
@@ -75,8 +76,10 @@ func (e *gonetConnExtension) IsRemoteClosedErr(err error) bool {
 	if err == nil {
 		return false
 	}
-	return errors.Is(err, net.ErrClosed) ||
-		errors.Is(err, netpoll.ErrConnClosed) ||
+	// strings.Contains(err.Error(), "closed network connection") change to errors.Is(err, net.ErrClosed)
+	// when support go version >= 1.16
+	return errors.Is(err, netpoll.ErrConnClosed) ||
 		errors.Is(err, io.EOF) ||
-		errors.Is(err, syscall.EPIPE)
+		errors.Is(err, syscall.EPIPE) ||
+		strings.Contains(err.Error(), "closed network connection")
 }
