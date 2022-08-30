@@ -2,9 +2,15 @@
 package {{ToLower .ServiceName}}
 
 import (
-    {{- range $path, $alias := .Imports}}
-    {{$alias }}"{{$path}}"
-    {{- end}}
+	{{- range $path, $aliases := .Imports}}
+		{{- if not $aliases}}
+			"{{$path}}"
+		{{- else}}
+			{{- range $alias, $is := $aliases}}
+				{{$alias}} "{{$path}}"
+			{{- end}}
+		{{- end}}
+	{{- end}}
 )
 
 // NewServer creates a server.Server with the given handler and options.
