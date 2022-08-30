@@ -172,7 +172,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	data := message.Data()
 
 	// decode with hyper unmarshal
-	if c.hyperMarshalEnabled() && hyperMessageUnmarshalAvailable(data, message) {
+	if c.hyperMessageUnmarshalEnabled() && hyperMessageUnmarshalAvailable(data, message) {
 		msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
 		ri := message.RPCInfo()
 		internal_stats.Record(ctx, ri, stats.WaitReadStart, nil)
