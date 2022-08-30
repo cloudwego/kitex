@@ -496,10 +496,10 @@ func TestSpecifiedRespRetry(t *testing.T) {
 	retryWithResp := func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		callTimes++
 		if callTimes == 1 {
-			retryResult.result = retryResp
+			retryResult.SetResult(retryResp)
 			return genRPCInfo(), retryResult, nil
 		} else {
-			retryResult.result = noRetryResp
+			retryResult.SetResult(noRetryResp)
 			return genRPCInfo(), retryResult, nil
 		}
 	}
@@ -733,6 +733,7 @@ func TestPolicyNoRetryCall(t *testing.T) {
 
 type mockResult struct {
 	result mockResp
+	sync.RWMutex
 }
 
 type mockResp struct {
@@ -740,6 +741,14 @@ type mockResp struct {
 	msg  string
 }
 
-func (r mockResult) GetResult() interface{} {
+func (r *mockResult) GetResult() interface{} {
+	r.RLock()
+	defer r.RUnlock()
 	return r.result
+}
+
+func (r *mockResult) SetResult(ret mockResp) {
+	r.Lock()
+	defer r.Unlock()
+	r.result = ret
 }
