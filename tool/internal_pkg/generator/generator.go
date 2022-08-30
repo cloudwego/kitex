@@ -373,7 +373,7 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 }
 
 func (g *generator) setImports(name string, pkg *PackageInfo) {
-	pkg.Imports = make(map[string]string)
+	pkg.Imports = make(map[string]map[string]bool)
 	switch name {
 	case ClientFileName:
 		pkg.AddImports("client")

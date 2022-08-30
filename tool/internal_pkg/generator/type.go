@@ -41,7 +41,7 @@ type PackageInfo struct {
 	NoFastAPI        bool
 	Version          string
 	RealServiceName  string
-	Imports          map[string]string // import path => alias
+	Imports          map[string]map[string]bool // import path => alias
 	ExternalKitexGen string
 	Features         []feature
 }
@@ -54,9 +54,12 @@ func (p *PackageInfo) AddImport(pkg, path string) {
 			path = filepath.Join(p.ExternalKitexGen, parts[len(parts)-1])
 		}
 		if path == pkg {
-			p.Imports[path] = ""
+			p.Imports[path] = nil
 		} else {
-			p.Imports[path] = pkg
+			if p.Imports[path] == nil {
+				p.Imports[path] = make(map[string]bool)
+			}
+			p.Imports[path][pkg] = true
 		}
 	}
 }
