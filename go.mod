@@ -1,6 +1,6 @@
 module github.com/cloudwego/kitex
 
-go 1.16
+go 1.13
 
 require (
 	github.com/apache/thrift v0.13.0
@@ -9,7 +9,7 @@ require (
 	github.com/cloudwego/fastpb v0.0.2
 	github.com/cloudwego/frugal v0.1.3
 	github.com/cloudwego/netpoll v0.2.6
-	github.com/cloudwego/thriftgo v0.2.0
+	github.com/cloudwego/thriftgo v0.2.1
 	github.com/golang/mock v1.6.0
 	github.com/jhump/protoreflect v1.8.2
 	github.com/json-iterator/go v1.1.12

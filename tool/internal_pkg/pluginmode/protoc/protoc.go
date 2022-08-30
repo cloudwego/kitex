@@ -17,7 +17,7 @@ package protoc
 import (
 	"errors"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -44,7 +44,7 @@ func Run() int {
 
 func run(opts protogen.Options) error {
 	// unmarshal request from stdin
-	in, err := io.ReadAll(os.Stdin)
+	in, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
 		return err
 	}
