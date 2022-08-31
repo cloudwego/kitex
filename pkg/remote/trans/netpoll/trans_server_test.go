@@ -28,6 +28,7 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -158,7 +159,7 @@ func TestConnOnActiveAndOnInactivePanic(t *testing.T) {
 		ctrl.Finish()
 	}()
 
-	inboundHandler := mocks.NewMockInboundHandler(ctrl)
+	inboundHandler := mocksremote.NewMockInboundHandler(ctrl)
 	transPl := remote.NewTransPipeline(svrTransHdlr)
 	transPl.AddInboundHandler(inboundHandler)
 	transSvrWithPl := NewTransServerFactory().NewTransServer(svrOpt, transPl).(*transServer)

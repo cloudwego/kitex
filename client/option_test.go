@@ -126,6 +126,9 @@ func TestWithHostPorts(t *testing.T) {
 }
 
 func TestForwardProxy(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	fp := &mockForwardProxy{
 		ConfigureFunc: func(cfg *proxy.Config) error {
 			test.Assert(t, cfg.Resolver == nil, cfg.Resolver)
@@ -143,8 +146,8 @@ func TestForwardProxy(t *testing.T) {
 	}
 
 	var opts []Option
-	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
-	opts = append(opts, WithDialer(dialer))
+	opts = append(opts, WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)))
+	opts = append(opts, WithDialer(newDialer(ctrl)))
 	opts = append(opts, WithDestService("destService"))
 	opts = append(opts, WithProxy(fp))
 
@@ -162,6 +165,9 @@ func TestForwardProxy(t *testing.T) {
 }
 
 func TestProxyWithResolver(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	fp := &mockForwardProxy{
 		ConfigureFunc: func(cfg *proxy.Config) error {
 			test.Assert(t, cfg.Resolver == resolver404)
@@ -179,8 +185,8 @@ func TestProxyWithResolver(t *testing.T) {
 	}
 
 	var opts []Option
-	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
-	opts = append(opts, WithDialer(dialer))
+	opts = append(opts, WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)))
+	opts = append(opts, WithDialer(newDialer(ctrl)))
 	opts = append(opts, WithDestService("destService"))
 	opts = append(opts, WithProxy(fp))
 	opts = append(opts, WithResolver(resolver404))
@@ -199,6 +205,9 @@ func TestProxyWithResolver(t *testing.T) {
 }
 
 func TestProxyWithBalancer(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	lb := &loadbalance.SynthesizedLoadbalancer{
 		GetPickerFunc: func(entry discovery.Result) loadbalance.Picker {
 			return &loadbalance.SynthesizedPicker{
@@ -228,8 +237,8 @@ func TestProxyWithBalancer(t *testing.T) {
 	}
 
 	var opts []Option
-	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
-	opts = append(opts, WithDialer(dialer))
+	opts = append(opts, WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)))
+	opts = append(opts, WithDialer(newDialer(ctrl)))
 	opts = append(opts, WithDestService("destService"))
 	opts = append(opts, WithProxy(fp))
 	opts = append(opts, WithLoadBalancer(lb))
@@ -248,6 +257,9 @@ func TestProxyWithBalancer(t *testing.T) {
 }
 
 func TestProxyWithResolverAndBalancer(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	lb := &loadbalance.SynthesizedLoadbalancer{
 		GetPickerFunc: func(entry discovery.Result) loadbalance.Picker {
 			return &loadbalance.SynthesizedPicker{
@@ -273,8 +285,8 @@ func TestProxyWithResolverAndBalancer(t *testing.T) {
 	}
 
 	var opts []Option
-	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
-	opts = append(opts, WithDialer(dialer))
+	opts = append(opts, WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)))
+	opts = append(opts, WithDialer(newDialer(ctrl)))
 	opts = append(opts, WithDestService("destService"))
 	opts = append(opts, WithProxy(fp))
 	opts = append(opts, WithResolver(resolver404))

@@ -20,6 +20,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -29,13 +31,16 @@ import (
 )
 
 func TestNewStream(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	addr := utils.NewNetAddr("tcp", "to")
 	ri := newMockRPCInfo(addr)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
 	hdlr := &mocks.MockCliTransHandler{}
 
-	opt := newMockOption(addr)
+	opt := newMockOption(ctrl, addr)
 	opt.Option = remote.Option{
 		StreamingMetaHandlers: []remote.StreamingMetaHandler{
 			transmeta.ClientHTTP2Handler,

@@ -23,7 +23,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/cloudwego/kitex/internal/mocks"
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -37,9 +37,9 @@ func TestNewTransMetaHandler(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	metaHandler1 := mocks.NewMockMetaHandler(ctrl)
-	metaHandler2 := mocks.NewMockMetaHandler(ctrl)
-	metaHandler3 := mocks.NewMockMetaHandler(ctrl)
+	metaHandler1 := mocksremote.NewMockMetaHandler(ctrl)
+	metaHandler2 := mocksremote.NewMockMetaHandler(ctrl)
+	metaHandler3 := mocksremote.NewMockMetaHandler(ctrl)
 	mhs := []remote.MetaHandler{
 		metaHandler1, metaHandler2, metaHandler3,
 	}
@@ -55,9 +55,9 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		metaHandler1 := mocks.NewMockMetaHandler(ctrl)
-		metaHandler2 := mocks.NewMockMetaHandler(ctrl)
-		metaHandler3 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler1 := mocksremote.NewMockMetaHandler(ctrl)
+		metaHandler2 := mocksremote.NewMockMetaHandler(ctrl)
+		metaHandler3 := mocksremote.NewMockMetaHandler(ctrl)
 
 		invokeMessage := invoke.NewMessage(nil, nil)
 		remoteMessage := remote.NewMessage(
@@ -99,9 +99,9 @@ func TestTransMetaHandlerWrite(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		metaHandler1 := mocks.NewMockMetaHandler(ctrl)
-		metaHandler2 := mocks.NewMockMetaHandler(ctrl)
-		metaHandler3 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler1 := mocksremote.NewMockMetaHandler(ctrl)
+		metaHandler2 := mocksremote.NewMockMetaHandler(ctrl)
+		metaHandler3 := mocksremote.NewMockMetaHandler(ctrl)
 
 		invokeMessage := invoke.NewMessage(nil, nil)
 		remoteMessage := remote.NewMessage(
@@ -131,9 +131,9 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		metaHandler1 := mocks.NewMockMetaHandler(ctrl)
-		metaHandler2 := mocks.NewMockMetaHandler(ctrl)
-		metaHandler3 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler1 := mocksremote.NewMockMetaHandler(ctrl)
+		metaHandler2 := mocksremote.NewMockMetaHandler(ctrl)
+		metaHandler3 := mocksremote.NewMockMetaHandler(ctrl)
 
 		args := remote.NewMessage(
 			nil, nil, nil, remote.Call, remote.Client)
@@ -176,9 +176,9 @@ func TestTransMetaHandlerOnMessage(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		metaHandler1 := mocks.NewMockMetaHandler(ctrl)
-		metaHandler2 := mocks.NewMockMetaHandler(ctrl)
-		metaHandler3 := mocks.NewMockMetaHandler(ctrl)
+		metaHandler1 := mocksremote.NewMockMetaHandler(ctrl)
+		metaHandler2 := mocksremote.NewMockMetaHandler(ctrl)
+		metaHandler3 := mocksremote.NewMockMetaHandler(ctrl)
 
 		ink := rpcinfo.NewInvocation("", "mock")
 		to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
@@ -231,7 +231,7 @@ func TestTransMetaHandlerOnActive(t *testing.T) {
 	defer ctrl.Finish()
 
 	mhs := []remote.MetaHandler{
-		mocks.NewMockMetaHandler(ctrl),
+		mocksremote.NewMockMetaHandler(ctrl),
 	}
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)
@@ -246,7 +246,7 @@ func TestTransMetaHandlerOnRead(t *testing.T) {
 	defer ctrl.Finish()
 
 	mhs := []remote.MetaHandler{
-		mocks.NewMockMetaHandler(ctrl),
+		mocksremote.NewMockMetaHandler(ctrl),
 	}
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)
@@ -261,7 +261,7 @@ func TestTransMetaHandlerOnInactive(t *testing.T) {
 	defer ctrl.Finish()
 
 	mhs := []remote.MetaHandler{
-		mocks.NewMockMetaHandler(ctrl),
+		mocksremote.NewMockMetaHandler(ctrl),
 	}
 	ctx := context.Background()
 	handler := NewTransMetaHandler(mhs)

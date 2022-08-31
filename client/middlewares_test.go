@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
@@ -69,8 +70,11 @@ func TestNoResolver(t *testing.T) {
 }
 
 func TestResolverMW(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	var invoked bool
-	cli := newMockClient(t).(*kcFinalizerClient)
+	cli := newMockClient(t, ctrl).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error {
 		invoked = true
@@ -90,6 +94,9 @@ func TestResolverMW(t *testing.T) {
 }
 
 func TestResolverMWOutOfInstance(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	resolver := &discovery.SynthesizedResolver{
 		ResolveFunc: func(ctx context.Context, key string) (discovery.Result, error) {
 			return discovery.Result{}, nil
@@ -97,7 +104,7 @@ func TestResolverMWOutOfInstance(t *testing.T) {
 		NameFunc: func() string { return t.Name() },
 	}
 	var invoked bool
-	cli := newMockClient(t, WithResolver(resolver)).(*kcFinalizerClient)
+	cli := newMockClient(t, ctrl, WithResolver(resolver)).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error {
 		invoked = true
@@ -145,7 +152,10 @@ func TestDefaultErrorHandler(t *testing.T) {
 }
 
 func BenchmarkResolverMW(b *testing.B) {
-	cli := newMockClient(b).(*kcFinalizerClient)
+	ctrl := gomock.NewController(b)
+	defer ctrl.Finish()
+
+	cli := newMockClient(b, ctrl).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error { return nil }
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
@@ -161,7 +171,10 @@ func BenchmarkResolverMW(b *testing.B) {
 }
 
 func BenchmarkResolverMWParallel(b *testing.B) {
-	cli := newMockClient(b).(*kcFinalizerClient)
+	ctrl := gomock.NewController(b)
+	defer ctrl.Finish()
+
+	cli := newMockClient(b, ctrl).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error { return nil }
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
