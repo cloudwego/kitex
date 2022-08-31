@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"net"
+	"runtime"
+	"runtime/debug"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -107,7 +109,7 @@ func TestWithRetryOption(t *testing.T) {
 	mockRetryContainer := retry.NewRetryContainer()
 	cli := newMockClient(t, WithRetryContainer(mockRetryContainer))
 
-	test.Assert(t, cli.(*kClient).opt.RetryContainer == mockRetryContainer)
+	test.Assert(t, cli.(*kcFinalizerClient).opt.RetryContainer == mockRetryContainer)
 }
 
 func BenchmarkCall(b *testing.B) {
@@ -288,7 +290,7 @@ func TestWarmingUpOption(t *testing.T) {
 	options = append(options, WithWarmingUp(mockWarmupOption))
 
 	cli := newMockClient(t, options...)
-	test.Assert(t, cli.(*kClient).opt.WarmUpOption == mockWarmupOption)
+	test.Assert(t, cli.(*kcFinalizerClient).opt.WarmUpOption == mockWarmupOption)
 }
 
 func TestTimeoutOptions(t *testing.T) {
@@ -429,4 +431,44 @@ func TestAdjustTimeout(t *testing.T) {
 		WithRPCTimeout(time.Millisecond*500))
 	err = cli.Call(context.Background(), mtd, req, res)
 	test.Assert(t, err == nil, err)
+}
+
+func TestClientFinalizer(t *testing.T) {
+	debug.SetGCPercent(-1)
+	defer debug.SetGCPercent(100)
+
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	t.Logf("Before new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	var closeCalledCnt int32
+	cliCnt := 1000
+	clis := make([]Client, cliCnt)
+	for i := 0; i < cliCnt; i++ {
+		mockClient := newMockClient(t, WithCloseCallbacks(func() error {
+			atomic.AddInt32(&closeCalledCnt, 1)
+			return nil
+		}))
+		clis[i] = mockClient
+	}
+
+	runtime.ReadMemStats(&ms)
+	t.Logf("After new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	firstGCHeapAlloc, firstGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("After first GC, allocation: %f Mb, Number of allocation: %d\n", firstGCHeapAlloc, firstGCHeapObjects)
+	time.Sleep(200 * time.Millisecond)                                 // ensure the finalizer be executed
+	test.Assert(t, atomic.LoadInt32(&closeCalledCnt) == int32(cliCnt)) // ensure CloseCallback of client has been called
+
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	secondGCHeapAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("After second GC, allocation: %f Mb, Number of allocation: %d\n", secondGCHeapAlloc, secondGCHeapObjects)
+	test.Assert(t, secondGCHeapAlloc < firstGCHeapAlloc/2 && secondGCHeapObjects < firstGCHeapObjects/2)
+}
+
+func mb(byteSize uint64) float32 {
+	return float32(byteSize) / float32(1024*1024)
 }
