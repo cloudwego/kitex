@@ -168,12 +168,14 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		}
 		f.P("var _ context.Context")
 
-		tpl := template.New("interface")
-		tpl = template.Must(tpl.Parse(interfaceTemplate))
-		var buf bytes.Buffer
-		pp.err = tpl.ExecuteTemplate(&buf, tpl.Name(), pp.makeInterfaces(f, file))
+		if len(file.Services) != 0 {
+			tpl := template.New("interface")
+			tpl = template.Must(tpl.Parse(interfaceTemplate))
+			var buf bytes.Buffer
+			pp.err = tpl.ExecuteTemplate(&buf, tpl.Name(), pp.makeInterfaces(f, file))
 
-		f.P(buf.String())
+			f.P(buf.String())
+		}
 	}
 
 	// generate fast api
