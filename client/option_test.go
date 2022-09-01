@@ -19,7 +19,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -40,7 +39,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/http"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/proxy"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -478,19 +476,11 @@ func TestWithMetaHandler(t *testing.T) {
 	test.DeepEqual(t, opts.MetaHandlers[0], mockMetaHandler)
 }
 
-type mockConnPool struct{}
-
-func (m *mockConnPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
-	return &mocks.Conn{
-		CloseFunc: func() (e error) { return nil },
-	}, nil
-}
-func (m *mockConnPool) Put(conn net.Conn) error     { return nil }
-func (m *mockConnPool) Discard(conn net.Conn) error { return nil }
-func (m *mockConnPool) Close() error                { return nil }
-
 func TestWithConnPool(t *testing.T) {
-	mockPool := &mockConnPool{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockPool := mock_remote.NewMockConnPool(ctrl)
 	opts := client.NewOptions([]client.Option{WithConnPool(mockPool)})
 	test.Assert(t, opts.RemoteOpt.ConnPool == mockPool)
 }

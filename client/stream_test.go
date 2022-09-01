@@ -24,6 +24,8 @@ import (
 
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksnet "github.com/cloudwego/kitex/internal/mocks/net"
+	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
@@ -89,7 +91,11 @@ func TestStreaming(t *testing.T) {
 
 	cliInfo := new(remote.ClientOption)
 	cliInfo.SvcInfo = svcInfo
-	cliInfo.ConnPool = &mockConnPool{}
+	conn := mocksnet.NewMockConn(ctrl)
+	conn.EXPECT().Close().Return(nil).AnyTimes()
+	connpool := mock_remote.NewMockConnPool(ctrl)
+	connpool.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil)
+	cliInfo.ConnPool = connpool
 	s, _ := remotecli.NewStream(ctx, mockRPCInfo, new(mocks.MockCliTransHandler), cliInfo)
 	stream := &stream{
 		stream: s,

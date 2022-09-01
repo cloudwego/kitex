@@ -16,6 +16,7 @@ files=(
 ../../pkg/klog/log.go klog/log.go klog
 ../../pkg/generic/thrift/thrift.go generic/thrift.go generic
 ../../../netpoll/connection.go netpoll/connection.go netpoll
+$GOROOT/src/net/net.go net/net.go net
 )
 
 i=0

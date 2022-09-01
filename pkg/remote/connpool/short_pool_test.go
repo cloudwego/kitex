@@ -23,22 +23,28 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/mocks"
+	"github.com/golang/mock/gomock"
+
+	mocksnet "github.com/cloudwego/kitex/internal/mocks/net"
+
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 func TestShortPool(t *testing.T) {
-	d := &remote.SynthesizedDialer{}
-	p := NewShortPool("test")
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
 		cost := time.Millisecond * 10
 		if timeout < cost {
 			return nil, errors.New("connection timeout")
 		}
 		return nil, nil
-	}
+	}).AnyTimes()
+	p := NewShortPool("test")
 
 	_, err := p.Get(context.TODO(), "tcp", "127.0.0.1:8080", remote.ConnOption{Dialer: d, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil)
@@ -48,19 +54,22 @@ func TestShortPool(t *testing.T) {
 }
 
 func TestShortPoolPut(t *testing.T) {
-	d := &remote.SynthesizedDialer{}
-	p := NewShortPool("test")
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	c := &mocks.Conn{}
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
-		return c, nil
-	}
+	conn := mocksnet.NewMockConn(ctrl)
+	conn.EXPECT().Close().AnyTimes()
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
+		return conn, nil
+	}).AnyTimes()
+	p := NewShortPool("test")
 
 	x, err := p.Get(context.TODO(), "tcp", "127.0.0.1:8080", remote.ConnOption{Dialer: d, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil)
 	y, ok := x.(*shortConn)
 	test.Assert(t, ok)
-	test.Assert(t, y.Conn == c)
+	test.Assert(t, y.Conn == conn)
 	test.Assert(t, !y.closed)
 
 	err = p.Put(x)
@@ -69,29 +78,32 @@ func TestShortPoolPut(t *testing.T) {
 }
 
 func TestShortPoolPutClosed(t *testing.T) {
-	d := &remote.SynthesizedDialer{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	p := NewShortPool("test")
 
 	var closed bool
 	cmto := errors.New("closed more than once")
-	c := &mocks.Conn{
-		CloseFunc: func() (err error) {
-			if closed {
-				err = cmto
-			}
-			closed = true
-			return
-		},
-	}
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
-		return c, nil
-	}
+
+	conn := mocksnet.NewMockConn(ctrl)
+	conn.EXPECT().Close().DoAndReturn(func() (err error) {
+		if closed {
+			err = cmto
+		}
+		closed = true
+		return
+	})
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
+		return conn, nil
+	}).AnyTimes()
 
 	x, err := p.Get(context.TODO(), "tcp", "127.0.0.1:8080", remote.ConnOption{Dialer: d, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil)
 	y, ok := x.(*shortConn)
 	test.Assert(t, ok)
-	test.Assert(t, y.Conn == c)
+	test.Assert(t, y.Conn == conn)
 	test.Assert(t, !y.closed)
 	test.Assert(t, !closed)
 

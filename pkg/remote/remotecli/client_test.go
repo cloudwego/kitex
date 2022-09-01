@@ -46,7 +46,6 @@ func TestNewClientNoAddr(t *testing.T) {
 	// 1. prepare mock data
 	ctx := context.Background()
 
-	dialer := &remote.SynthesizedDialer{}
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
 	conf := rpcinfo.NewRPCConfig()
 	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
@@ -55,7 +54,7 @@ func TestNewClientNoAddr(t *testing.T) {
 	connPool := connpool.NewLongPool("destService", poolCfg)
 	opt := &remote.ClientOption{
 		ConnPool: connPool,
-		Dialer:   dialer,
+		Dialer:   mocksremote.NewMockDialer(ctrl),
 	}
 
 	// 2. test
