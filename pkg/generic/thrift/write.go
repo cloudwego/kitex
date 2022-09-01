@@ -98,6 +98,9 @@ func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption)
 		// maybe a json number string
 		return descriptor.STRING, writeString, nil
 	case []byte:
+		if tt == descriptor.LIST {
+			return descriptor.LIST, writeBinaryList, nil
+		}
 		return descriptor.STRING, writeBinary, nil
 	case []interface{}:
 		return descriptor.LIST, writeList, nil
@@ -371,6 +374,20 @@ func writeBinary(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 	return out.WriteBinary(val.([]byte))
 }
 
+func writeBinaryList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	l := val.([]byte)
+	length := len(l)
+	if err := out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
+		return err
+	}
+	for _, b := range l {
+		if err := out.WriteByte(int8(b)); err != nil {
+			return err
+		}
+	}
+	return out.WriteListEnd()
+}
+
 func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	l := val.([]interface{})
 	length := len(l)
@@ -528,7 +545,8 @@ func writeStringJSONMap(ctx context.Context, val interface{}, out thrift.TProtoc
 	return out.WriteMapEnd()
 }
 
-func writeRequestBase(ctx context.Context, val interface{}, out thrift.TProtocol, field *descriptor.FieldDescriptor, opt *writerOption) error {
+func writeRequestBase(ctx context.Context, val interface{}, out thrift.TProtocol, field *descriptor.FieldDescriptor,
+	opt *writerOption) error {
 	if st, ok := val.(map[string]interface{}); ok {
 		// copy from user's Extra
 		if ext, ok := st["Extra"]; ok {
