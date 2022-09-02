@@ -20,6 +20,7 @@ import (
 	"context"
 	"math/rand"
 	"net"
+	"reflect"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
@@ -299,7 +301,8 @@ func TestMuxTransportOption(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	iSvr2 := svr2.(*server)
 	handlerFactory := iSvr2.opt.RemoteOpt.SvrHandlerFactory
-	test.DeepEqual(t, handlerFactory, netpollmux.NewSvrTransHandlerFactory())
+	test.Assert(t, reflect.TypeOf(handlerFactory).Name() ==
+		reflect.TypeOf(netpollmux.NewSvrTransHandlerFactoryWithDetector(codec.PacketDetector)).Name())
 }
 
 // TestPayloadCodecOption tests the creation of a server with RemoteOpt.PayloadCodec option

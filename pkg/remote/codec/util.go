@@ -17,6 +17,7 @@
 package codec
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -114,4 +115,21 @@ func NewDataIfNeeded(method string, message remote.Message) error {
 		return nil
 	}
 	return remote.NewTransErrorWithMsg(remote.InternalError, "message data for codec is nil")
+}
+
+// PacketDetector return the size of the whole packet.
+// If it cannot detect size, return (0, nil)
+func PacketDetector(first8Bytes []byte) (packetSize int) {
+	if len(first8Bytes) < Size32*2 {
+		return 0
+	}
+	switch binary.BigEndian.Uint32(first8Bytes[Size32:]) & MagicMask {
+	// ttheader, framed
+	case TTHeaderMagic, ThriftV1Magic:
+		packetSize = int(binary.BigEndian.Uint32(first8Bytes[:Size32])) + Size32
+		return packetSize
+	default:
+		// cannot detect packetSize
+		return 0
+	}
 }

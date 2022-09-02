@@ -30,7 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-// TestOnRequest test muxSvrConn OnRequest return Err
+// TestOnRequest test muxServerConn OnRequest return Err
 func TestOnRequestErr(t *testing.T) {
 	ctx := context.Background()
 
@@ -49,7 +49,7 @@ func TestOnRequestErr(t *testing.T) {
 	test.Assert(t, isRead)
 }
 
-// TestOnRequestErr test muxSvrConn OnRequest success
+// TestOnRequestErr test muxServerConn OnRequest success
 func TestOnRequest(t *testing.T) {
 	s := "hello world"
 	ctx := context.Background()

@@ -135,15 +135,15 @@ func (c *muxCliConn) onError(ctx context.Context, err error, connection netpoll.
 	return err
 }
 
-func newMuxSvrConn(connection netpoll.Connection, pool *sync.Pool) *muxSvrConn {
-	c := &muxSvrConn{
+func newMuxServerConn(connection netpoll.Connection, pool *sync.Pool) *muxServerConn {
+	c := &muxServerConn{
 		muxConn: newMuxConn(connection),
 		pool:    pool,
 	}
 	return c
 }
 
-type muxSvrConn struct {
+type muxServerConn struct {
 	muxConn
 	pool *sync.Pool // pool of rpcInfo
 }

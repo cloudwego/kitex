@@ -116,7 +116,7 @@ func TestOnActive(t *testing.T) {
 	ctx, err := svrTransHdlr.OnActive(ctx, conn)
 	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
-	muxSvrCon, _ := ctx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
+	muxSvrCon, _ := ctx.Value(ctxKeyMuxSvrConn{}).(*muxServerConn)
 	test.Assert(t, muxSvrCon != nil)
 	test.Assert(t, readTimeout == rwTimeout, readTimeout, rwTimeout)
 }
@@ -132,7 +132,7 @@ func TestMuxSvrWrite(t *testing.T) {
 		},
 	}
 	pool := &sync.Pool{}
-	muxSvrCon := newMuxSvrConn(npconn, pool)
+	muxSvrCon := newMuxServerConn(npconn, pool)
 	test.Assert(t, muxSvrCon != nil)
 
 	ctx := context.Background()
@@ -199,7 +199,7 @@ func TestMuxSvrOnRead(t *testing.T) {
 	}
 
 	pool := &sync.Pool{}
-	muxSvrCon := newMuxSvrConn(npconn, pool)
+	muxSvrCon := newMuxServerConn(npconn, pool)
 
 	var err error
 
@@ -217,7 +217,7 @@ func TestMuxSvrOnRead(t *testing.T) {
 	ctx, err = svrTransHdlr.OnActive(ctx, muxSvrCon)
 	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
-	muxSvrConFromCtx, _ := ctx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
+	muxSvrConFromCtx, _ := ctx.Value(ctxKeyMuxSvrConn{}).(*muxServerConn)
 	test.Assert(t, muxSvrConFromCtx != nil)
 
 	pl := remote.NewTransPipeline(svrTransHdlr)
@@ -288,7 +288,7 @@ func TestPanicAfterMuxSvrOnRead(t *testing.T) {
 	}
 
 	pool := &sync.Pool{}
-	muxSvrCon := newMuxSvrConn(conn, pool)
+	muxSvrCon := newMuxServerConn(conn, pool)
 
 	// 2. test
 	var err error
@@ -363,7 +363,7 @@ func TestRecoverAfterOnReadPanic(t *testing.T) {
 	}
 
 	pool := &sync.Pool{}
-	muxSvrCon := newMuxSvrConn(conn, pool)
+	muxSvrCon := newMuxServerConn(conn, pool)
 
 	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
@@ -481,7 +481,7 @@ func TestInvokeError(t *testing.T) {
 			return ri
 		},
 	}
-	muxSvrCon := newMuxSvrConn(npconn, pool)
+	muxSvrCon := newMuxServerConn(npconn, pool)
 
 	var err error
 	ctx := context.Background()
@@ -501,7 +501,7 @@ func TestInvokeError(t *testing.T) {
 	ctx, err = svrTransHdlr.OnActive(ctx, muxSvrCon)
 	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
-	muxSvrCon, _ = ctx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
+	muxSvrCon, _ = ctx.Value(ctxKeyMuxSvrConn{}).(*muxServerConn)
 	test.Assert(t, muxSvrCon != nil)
 
 	pl := remote.NewTransPipeline(svrTransHdlr)
@@ -599,7 +599,7 @@ func TestInvokeNoMethod(t *testing.T) {
 	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
 	pool := &sync.Pool{}
-	muxSvrCon := newMuxSvrConn(npconn, pool)
+	muxSvrCon := newMuxServerConn(npconn, pool)
 
 	var err error
 	ctx := context.Background()
@@ -619,7 +619,7 @@ func TestInvokeNoMethod(t *testing.T) {
 	ctx, err = svrTransHdlr.OnActive(ctx, muxSvrCon)
 	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
-	muxSvrCon, _ = ctx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
+	muxSvrCon, _ = ctx.Value(ctxKeyMuxSvrConn{}).(*muxServerConn)
 	test.Assert(t, muxSvrCon != nil)
 
 	pl := remote.NewTransPipeline(svrTransHdlr)
@@ -640,4 +640,126 @@ func TestInvokeNoMethod(t *testing.T) {
 	test.Assert(t, isReaderBufReleased)
 	test.Assert(t, isWriteBufFlushed.Load() == 1)
 	test.Assert(t, !isInvoked)
+}
+
+// TestMultiProtocol test multi protocol
+func TestMultiProtocol(t *testing.T) {
+	body := "hello world"
+	codecs := []*MockCodec{
+		{
+			NameFunc: func() string { return "header" },
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), body)
+				_, err := out.WriteBinary(r.Bytes())
+				return err
+			},
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				in.Skip(3 * codec.Size32)
+				got, err := in.ReadString(len(body))
+				test.DeepEqual(t, got, body)
+				return err
+			},
+		},
+		{
+			NameFunc: func() string { return "framed" },
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				r := mockFramed(msg.RPCInfo().Invocation().SeqID(), body)
+				_, err := out.WriteBinary(r.Bytes())
+				return err
+			},
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				in.Skip(6 * codec.Size32)
+				got, err := in.ReadString(len(body))
+				test.DeepEqual(t, got, body)
+				return err
+			},
+		},
+		{
+			NameFunc: func() string { return "binary" },
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				r := mockBinary(msg.RPCInfo().Invocation().SeqID(), body)
+				_, err := out.WriteBinary(r.Bytes())
+				return err
+			},
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				in.Skip(5 * codec.Size32)
+				got, err := in.ReadString(len(body))
+				test.DeepEqual(t, got, body)
+				return err
+			},
+		},
+	}
+
+	for _, codec := range codecs {
+		opt := &remote.ServerOption{
+			InitOrResetRPCInfoFunc: func(rpcInfo rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
+				fromInfo := rpcinfo.EmptyEndpointInfo()
+				rpcCfg := rpcinfo.NewRPCConfig()
+				ink := rpcinfo.NewInvocation("", method)
+				rpcStat := rpcinfo.NewRPCStats()
+				nri := rpcinfo.NewRPCInfo(fromInfo, nil, ink, rpcCfg, rpcStat)
+				rpcinfo.AsMutableEndpointInfo(nri.From()).SetAddress(addr)
+				return nri
+			},
+			Codec:            codec,
+			SvcInfo:          mocks.ServiceInfo(),
+			TracerCtl:        &stats.Controller{},
+			ReadWriteTimeout: rwTimeout,
+		}
+		svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
+
+		buf := netpoll.NewLinkBuffer(1024)
+		npconn := &MockNetpollConn{
+			ReaderFunc: func() (r netpoll.Reader) {
+				return buf
+			},
+			WriterFunc: func() (r netpoll.Writer) {
+				return buf
+			},
+			Conn: mocks.Conn{
+				RemoteAddrFunc: func() (r net.Addr) {
+					return addr
+				},
+				CloseFunc: func() (e error) {
+					return nil
+				},
+			},
+		}
+		rpcInfo := newTestRpcInfo()
+		muxSvrCon := newMuxServerConn(npconn, &sync.Pool{})
+
+		ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), rpcInfo)
+
+		msg := &MockMessage{
+			RPCInfoFunc: func() rpcinfo.RPCInfo {
+				return rpcInfo
+			},
+			ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
+				return &serviceinfo.ServiceInfo{
+					Methods: map[string]serviceinfo.MethodInfo{
+						"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
+					},
+				}
+			},
+		}
+		err := svrTransHdlr.Write(ctx, muxSvrCon, msg)
+		test.Assert(t, err == nil, err)
+
+		time.Sleep(5 * time.Millisecond)
+		buf.Flush()
+		test.Assert(t, npconn.Reader().Len() > 0, npconn.Reader().Len())
+
+		ctx, err = svrTransHdlr.OnActive(ctx, muxSvrCon)
+		test.Assert(t, err == nil, err)
+		muxSvrConFromCtx, _ := ctx.Value(ctxKeyMuxSvrConn{}).(*muxServerConn)
+		test.Assert(t, muxSvrConFromCtx != nil)
+		test.Assert(t, muxSvrConFromCtx.pool.Get() != nil)
+
+		pl := remote.NewTransPipeline(svrTransHdlr)
+		svrTransHdlr.SetPipeline(pl)
+
+		err = svrTransHdlr.OnRead(ctx, npconn)
+		time.Sleep(50 * time.Millisecond)
+		test.Assert(t, err == nil, err)
+	}
 }

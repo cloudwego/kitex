@@ -73,11 +73,36 @@ func mockHeader(seqID int32, body string) *netpoll.LinkBuffer {
 	buf, _ := reader.Malloc(3 * codec.Size32)
 	// length
 	binary.BigEndian.PutUint32(buf[:codec.Size32], uint32(len(body))+(2*codec.Size32))
-	// TTHeader
+	// TTHeader Magic
 	binary.BigEndian.PutUint32(buf[codec.Size32:2*codec.Size32], codec.TTHeaderMagic)
 	// seqID
 	binary.BigEndian.PutUint32(buf[2*codec.Size32:3*codec.Size32], uint32(seqID))
 	reader.WriteString(body)
 	reader.Flush()
 	return reader
+}
+
+// 0-4Byte length, 4-8Byte version check, 8-12Byte ignored,  12-16Byte name length, {name}, ..4 Bytes SeqID
+func mockFramed(seqID int32, body string) *netpoll.LinkBuffer {
+	reader := netpoll.NewLinkBuffer()
+	buf, _ := reader.Malloc(6 * codec.Size32)
+	// length
+	binary.BigEndian.PutUint32(buf[:codec.Size32], uint32(len(body))+(2*codec.Size32))
+	// Binary Magic
+	binary.BigEndian.PutUint32(buf[codec.Size32:2*codec.Size32], codec.ThriftV1Magic)
+	// name
+	binary.BigEndian.PutUint32(buf[3*codec.Size32:4*codec.Size32], uint32(4))
+	copy(buf[4*codec.Size32:5*codec.Size32], []byte("test"))
+	// seqID
+	binary.BigEndian.PutUint32(buf[5*codec.Size32:6*codec.Size32], uint32(seqID))
+	reader.WriteString(body)
+	reader.Flush()
+	return reader
+}
+
+// 4-8Byte version check, 8-12Byte ignored,  12-16Byte name length, {name}, ..4 Bytes SeqID
+func mockBinary(seqID int32, body string) *netpoll.LinkBuffer {
+	r := mockFramed(seqID, body)
+	r.Skip(4) // skip length
+	return r
 }

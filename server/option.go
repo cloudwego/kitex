@@ -22,6 +22,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/streaming"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
@@ -71,7 +72,7 @@ func WithSuite(suite Suite) Option {
 func WithMuxTransport() Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push("WithMuxTransport()")
-		o.RemoteOpt.SvrHandlerFactory = netpollmux.NewSvrTransHandlerFactory()
+		o.RemoteOpt.SvrHandlerFactory = netpollmux.NewSvrTransHandlerFactoryWithDetector(codec.PacketDetector)
 		// set limit options
 		o.Limit.QPSLimitPostDecode = true
 	}}
