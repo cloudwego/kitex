@@ -26,6 +26,7 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksklog "github.com/cloudwego/kitex/internal/mocks/klog"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -43,7 +44,7 @@ func TestOnError(t *testing.T) {
 	})
 	test.Assert(t, err == nil)
 
-	mocklogger := mocks.NewMockFullLogger(ctrl)
+	mocklogger := mocksklog.NewMockFullLogger(ctrl)
 	klog.SetLogger(mocklogger)
 
 	var errMsg string

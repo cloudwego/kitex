@@ -19,16 +19,20 @@ package client
 import (
 	"context"
 	"errors"
-	"net"
 	"runtime"
 	"runtime/debug"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/cloudwego/netpoll"
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -43,24 +47,7 @@ import (
 
 var (
 	// method="mock" typeID=thrift.REPLY seqID=1
-	bs   = []byte{128, 1, 0, 2, 0, 0, 0, 4, 109, 111, 99, 107, 0, 0, 0, 1}
-	conn = &mocks.Conn{
-		ReadFunc: func(b []byte) (n int, err error) {
-			return copy(b, bs), nil
-		},
-		WriteFunc: func(b []byte) (n int, err error) {
-			return len(b), nil
-		},
-		RemoteAddrFunc: func() (r net.Addr) {
-			return utils.NewNetAddr("tcp", "mock")
-		},
-	}
-	dialer = &remote.SynthesizedDialer{
-		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
-			return conn, nil
-		},
-	}
-	hdlr             = &mocks.MockCliTransHandler{}
+	bs               = []byte{128, 1, 0, 2, 0, 0, 0, 4, 109, 111, 99, 107, 0, 0, 0, 1}
 	mockWarmupOption = &warmup.ClientOption{
 		ErrorHandling: warmup.ErrorLog,
 		ResolverOption: &warmup.ResolverOption{
@@ -78,11 +65,49 @@ var (
 	}
 )
 
-func newMockClient(tb testing.TB, extra ...Option) Client {
+func newMockConn(ctrl *gomock.Controller) netpoll.Connection {
+	conn := mocksnetpoll.NewMockConnection(ctrl)
+	conn.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+		return copy(b, bs), nil
+	}).AnyTimes()
+	conn.EXPECT().Write(gomock.Any()).DoAndReturn(func(b []byte) (n int, err error) {
+		return len(b), nil
+	}).AnyTimes()
+	conn.EXPECT().RemoteAddr().Return(utils.NewNetAddr("tcp", "mock")).AnyTimes()
+	conn.EXPECT().IsActive().Return(true).AnyTimes()
+	conn.EXPECT().Close().Return(nil).AnyTimes()
+	return conn
+}
+
+func newDialer(ctrl *gomock.Controller) remote.Dialer {
+	conn := newMockConn(ctrl)
+	dialer := mocksremote.NewMockDialer(ctrl)
+	dialer.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil).AnyTimes()
+	return dialer
+}
+
+func newMockCliTransHandlerFactory(ctrl *gomock.Controller) remote.ClientTransHandlerFactory {
+	handler := mocksremote.NewMockClientTransHandler(ctrl)
+	handler.EXPECT().OnMessage(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, args, result remote.Message) (context.Context, error) {
+		return ctx, nil
+	}).AnyTimes()
+	handler.EXPECT().Read(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	handler.EXPECT().Write(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	handler.EXPECT().SetPipeline(gomock.Any()).AnyTimes()
+	handler.EXPECT().OnError(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	handler.EXPECT().OnInactive(gomock.Any(), gomock.Any()).AnyTimes()
+	factory := mocksremote.NewMockClientTransHandlerFactory(ctrl)
+	factory.EXPECT().NewTransHandler(gomock.Any()).DoAndReturn(func(opt *remote.ClientOption) (remote.ClientTransHandler, error) {
+		return handler, nil
+	}).AnyTimes()
+	return factory
+}
+
+func newMockClient(tb testing.TB, ctrl *gomock.Controller, extra ...Option) Client {
 	opts := []Option{
-		WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)),
-		WithResolver(resolver404),
-		WithDialer(dialer),
+		WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)),
+		WithResolver(resolver404(ctrl)),
+		WithDialer(newDialer(ctrl)),
 		WithDestService("destService"),
 	}
 	opts = append(opts, extra...)
@@ -95,8 +120,11 @@ func newMockClient(tb testing.TB, extra ...Option) Client {
 }
 
 func TestCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	mtd := mocks.MockMethod
-	cli := newMockClient(t)
+	cli := newMockClient(t, ctrl)
 	ctx := context.Background()
 	req := new(MockTStruct)
 	res := new(MockTStruct)
@@ -106,15 +134,21 @@ func TestCall(t *testing.T) {
 }
 
 func TestWithRetryOption(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	mockRetryContainer := retry.NewRetryContainer()
-	cli := newMockClient(t, WithRetryContainer(mockRetryContainer))
+	cli := newMockClient(t, ctrl, WithRetryContainer(mockRetryContainer))
 
 	test.Assert(t, cli.(*kcFinalizerClient).opt.RetryContainer == mockRetryContainer)
 }
 
 func BenchmarkCall(b *testing.B) {
+	ctrl := gomock.NewController(b)
+	defer ctrl.Finish()
+
 	mtd := mocks.MockExceptionMethod
-	cli := newMockClient(b)
+	cli := newMockClient(b, ctrl)
 	ctx := context.Background()
 	req := new(MockTStruct)
 	res := new(MockTStruct)
@@ -126,8 +160,11 @@ func BenchmarkCall(b *testing.B) {
 }
 
 func BenchmarkCallParallel(b *testing.B) {
+	ctrl := gomock.NewController(b)
+	defer ctrl.Finish()
+
 	mtd := mocks.MockOnewayMethod
-	cli := newMockClient(b)
+	cli := newMockClient(b, ctrl)
 	ctx := context.Background()
 	req := new(MockTStruct)
 	res := new(MockTStruct)
@@ -141,6 +178,9 @@ func BenchmarkCallParallel(b *testing.B) {
 }
 
 func TestTagOptions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	mtd := mocks.MockMethod
 	tgs := map[string]string{}
 	cls := func(m map[string]string) {
@@ -174,14 +214,14 @@ func TestTagOptions(t *testing.T) {
 	req := new(MockTStruct)
 	res := new(MockTStruct)
 
-	cli := newMockClient(t, options...)
+	cli := newMockClient(t, ctrl, options...)
 	err := cli.Call(ctx, mtd, req, res)
 	test.Assert(t, err == nil)
 
 	cls(tgs)
 	tgs["cluster"] = "client cluster"
 	tgs["idc"] = "client idc"
-	cli = newMockClient(t, WithTag("cluster", "client cluster"), WithTag("idc", "client idc"))
+	cli = newMockClient(t, ctrl, WithTag("cluster", "client cluster"), WithTag("idc", "client idc"))
 	err = cli.Call(ctx, mtd, req, res)
 	test.Assert(t, err == nil)
 
@@ -197,6 +237,9 @@ func TestTagOptions(t *testing.T) {
 }
 
 func TestTagOptionLocks0(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	mtd := mocks.MockMethod
 	md := func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, res interface{}) error {
@@ -220,12 +263,15 @@ func TestTagOptionLocks0(t *testing.T) {
 	req := new(MockTStruct)
 	res := new(MockTStruct)
 
-	cli := newMockClient(t, options...)
+	cli := newMockClient(t, ctrl, options...)
 	err := cli.Call(ctx, mtd, req, res)
 	test.Assert(t, err == nil)
 }
 
 func TestTagOptionLocks1(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	mtd := mocks.MockMethod
 	md := func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, res interface{}) error {
@@ -249,12 +295,15 @@ func TestTagOptionLocks1(t *testing.T) {
 	req := new(MockTStruct)
 	res := new(MockTStruct)
 
-	cli := newMockClient(t, options...)
+	cli := newMockClient(t, ctrl, options...)
 	err := cli.Call(ctx, mtd, req, res)
 	test.Assert(t, err == nil)
 }
 
 func TestTagOptionLocks2(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	mtd := mocks.MockOnewayMethod
 	md := func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, res interface{}) error {
@@ -276,7 +325,7 @@ func TestTagOptionLocks2(t *testing.T) {
 	req := new(MockTStruct)
 	res := new(MockTStruct)
 
-	cli := newMockClient(t, options...)
+	cli := newMockClient(t, ctrl, options...)
 	ctx = NewCtxWithCallOptions(ctx, []callopt.Option{
 		callopt.WithTag("cluster", "cluster"),
 		callopt.WithTag("idc", "idc"),
@@ -286,14 +335,20 @@ func TestTagOptionLocks2(t *testing.T) {
 }
 
 func TestWarmingUpOption(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	var options []client.Option
 	options = append(options, WithWarmingUp(mockWarmupOption))
 
-	cli := newMockClient(t, options...)
+	cli := newMockClient(t, ctrl, options...)
 	test.Assert(t, cli.(*kcFinalizerClient).opt.WarmUpOption == mockWarmupOption)
 }
 
 func TestTimeoutOptions(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	mtd := mocks.MockMethod
 	md := func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, res interface{}) error {
@@ -324,12 +379,15 @@ func TestTimeoutOptions(t *testing.T) {
 	req := new(MockTStruct)
 	res := new(MockTStruct)
 
-	cli := newMockClient(t, options...)
+	cli := newMockClient(t, ctrl, options...)
 	err := cli.Call(ctx, mtd, req, res)
 	test.Assert(t, err == nil)
 }
 
 func TestTimeoutCtxCall(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	mtd := mocks.MockMethod
 	var accessed int32
 	md := func(next endpoint.Endpoint) endpoint.Endpoint {
@@ -341,7 +399,7 @@ func TestTimeoutCtxCall(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*10)
 	req, res := new(MockTStruct), new(MockTStruct)
-	cli := newMockClient(t, WithMiddleware(md))
+	cli := newMockClient(t, ctrl, WithMiddleware(md))
 	err := cli.Call(ctx, mtd, req, res)
 	test.Assert(t, errors.Is(err, kerrors.ErrRPCTimeout))
 	test.Assert(t, atomic.LoadInt32(&accessed) == 0)
@@ -353,6 +411,9 @@ func TestTimeoutCtxCall(t *testing.T) {
 }
 
 func TestTimeoutOptionsLock0(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	tos := []time.Duration{time.Hour / 2, time.Hour / 3}
 	mtd := mocks.MockMethod
 	md := func(next endpoint.Endpoint) endpoint.Endpoint {
@@ -386,7 +447,7 @@ func TestTimeoutOptionsLock0(t *testing.T) {
 	req := new(MockTStruct)
 	res := new(MockTStruct)
 
-	cli := newMockClient(t, options...)
+	cli := newMockClient(t, ctrl, options...)
 	err := cli.Call(ctx, mtd, req, res)
 	test.Assert(t, err == nil)
 
@@ -400,6 +461,9 @@ func TestTimeoutOptionsLock0(t *testing.T) {
 }
 
 func TestAdjustTimeout(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	adjustTimeoutMWB := func(moreTimeout time.Duration) endpoint.MiddlewareBuilder {
 		return func(mwCtx context.Context) endpoint.Middleware {
 			if p, ok := mwCtx.Value(rpctimeout.TimeoutAdjustKey).(*time.Duration); ok {
@@ -418,14 +482,14 @@ func TestAdjustTimeout(t *testing.T) {
 	req, res := new(MockTStruct), new(MockTStruct)
 
 	// should timeout
-	cli := newMockClient(t,
+	cli := newMockClient(t, ctrl,
 		WithMiddlewareBuilder(adjustTimeoutMWB(0)),
 		WithMiddleware(md),
 		WithRPCTimeout(time.Millisecond*500))
 	err := cli.Call(context.Background(), mtd, req, res)
 	test.Assert(t, errors.Is(err, kerrors.ErrRPCTimeout))
 	// shouldn't timeout
-	cli = newMockClient(t,
+	cli = newMockClient(t, ctrl,
 		WithMiddlewareBuilder(adjustTimeoutMWB(time.Second)),
 		WithMiddleware(md),
 		WithRPCTimeout(time.Millisecond*500))
@@ -434,6 +498,9 @@ func TestAdjustTimeout(t *testing.T) {
 }
 
 func TestClientFinalizer(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	debug.SetGCPercent(-1)
 	defer debug.SetGCPercent(100)
 
@@ -445,10 +512,12 @@ func TestClientFinalizer(t *testing.T) {
 	cliCnt := 1000
 	clis := make([]Client, cliCnt)
 	for i := 0; i < cliCnt; i++ {
-		mockClient := newMockClient(t, WithCloseCallbacks(func() error {
+		svcInfo := mocks.ServiceInfo()
+		mockClient, err := NewClient(svcInfo, WithDestService("destService"), WithCloseCallbacks(func() error {
 			atomic.AddInt32(&closeCalledCnt, 1)
 			return nil
 		}))
+		test.Assert(t, err == nil, err)
 		clis[i] = mockClient
 	}
 

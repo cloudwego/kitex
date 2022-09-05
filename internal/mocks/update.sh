@@ -2,14 +2,24 @@
 
 cd $(dirname "${BASH_SOURCE[0]}")
 
-# source file => output file
+# source file => output file => package name
 files=(
-../../pkg/limiter/limiter.go limiter.go
-../../pkg/remote/trans_meta.go trans_meta.go
-../../pkg/remote/trans_pipeline.go bound_handler.go
-../../pkg/generic/generic_service.go generic/generic_service.go
-../../pkg/generic/thrift/thrift.go generic/thrift.go
-../../pkg/klog/log.go klog.go
+../../pkg/limiter/limiter.go limiter/limiter.go limiter
+../../pkg/remote/trans_handler.go remote/trans_handler.go remote
+../../pkg/remote/codec.go remote/codec.go remote
+../../pkg/remote/connpool.go remote/connpool.go remote
+../../pkg/remote/dialer.go remote/dialer.go remote
+../../pkg/remote/trans_meta.go remote/trans_meta.go remote
+../../pkg/remote/trans_pipeline.go remote/trans_pipeline.go remote
+../../pkg/remote/payload_codec.go remote/payload_codec.go remote
+../../pkg/generic/generic_service.go generic/generic_service.go generic
+../../pkg/klog/log.go klog/log.go klog
+../../pkg/generic/thrift/thrift.go generic/thrift.go generic
+../../pkg/discovery/discovery.go discovery/discovery.go discovery
+../../pkg/loadbalance/loadbalancer.go loadbalance/loadbalancer.go loadbalance
+../../pkg/proxy/proxy.go proxy/proxy.go proxy
+../../../netpoll/connection.go netpoll/connection.go netpoll
+$GOROOT/src/net/net.go net/net.go net
 )
 
 i=0
@@ -19,6 +29,8 @@ do
     let i++
     outfile=${files[$i]}
     let i++
+    package=${files[$i]}
+    let i++
 
     if [ ! -f $infile ]; then
         echo "ERROR: $infile not existing"
@@ -27,7 +39,7 @@ do
 
     # echo $infile
     # echo $outfile
-    mockgen -source=$infile -package=mocks > $outfile || exit 1
+    mockgen -source=$infile -package=$package > $outfile || exit 1
     if [[ "$OSTYPE" =~ ^darwin ]];
     then
       sed -i '' -e '1i \

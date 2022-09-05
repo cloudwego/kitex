@@ -47,6 +47,8 @@ type MockCliTransHandler struct {
 	WriteFunc func(ctx context.Context, conn net.Conn, send remote.Message) error
 
 	ReadFunc func(ctx context.Context, conn net.Conn, msg remote.Message) error
+
+	OnMessageFunc func(ctx context.Context, args, result remote.Message) (context.Context, error)
 }
 
 // Write implements the remote.TransHandler interface.
@@ -67,7 +69,9 @@ func (t *MockCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remot
 
 // OnMessage implements the remote.TransHandler interface.
 func (t *MockCliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
-	// do nothing
+	if t.OnMessageFunc != nil {
+		return t.OnMessageFunc(ctx, args, result)
+	}
 	return ctx, nil
 }
 
