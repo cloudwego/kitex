@@ -60,6 +60,16 @@ func MapThriftGeneric(p DescriptorProvider) (Generic, error) {
 	}, nil
 }
 
+func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
+	codec, err := newMapThriftCodecForJSON(p, thriftCodec)
+	if err != nil {
+		return nil, err
+	}
+	return &mapThriftGeneric{
+		codec: codec,
+	}, nil
+}
+
 // HTTPThriftGeneric http mapping Generic.
 // Base64 codec for binary field is disabled by default. You can change this option with SetBinaryWithBase64.
 // eg:
