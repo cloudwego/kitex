@@ -23,6 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
+	mocksloadbalance "github.com/cloudwego/kitex/internal/mocks/loadbalance"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
@@ -35,6 +38,9 @@ var defaultOptions = Options{
 }
 
 func TestBuilder(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	ins := discovery.NewInstance("tcp", "127.0.0.1:8888", 10, nil)
 	r := &discovery.SynthesizedResolver{
 		ResolveFunc: func(ctx context.Context, key string) (discovery.Result, error) {
@@ -45,16 +51,16 @@ func TestBuilder(t *testing.T) {
 		},
 		NameFunc: func() string { return t.Name() },
 	}
-	lb := &loadbalance.SynthesizedLoadbalancer{
-		GetPickerFunc: func(res discovery.Result) loadbalance.Picker {
-			test.Assert(t, res.Cacheable)
-			test.Assert(t, res.CacheKey == t.Name()+":mockRoute", res.CacheKey)
-			test.Assert(t, len(res.Instances) == 1)
-			test.Assert(t, res.Instances[0].Address().String() == "127.0.0.1:8888")
-			return &loadbalance.SynthesizedPicker{}
-		},
-		NameFunc: func() string { return "Synthesized" },
-	}
+	lb := mocksloadbalance.NewMockLoadbalancer(ctrl)
+	lb.EXPECT().GetPicker(gomock.Any()).DoAndReturn(func(res discovery.Result) loadbalance.Picker {
+		test.Assert(t, res.Cacheable)
+		test.Assert(t, res.CacheKey == t.Name()+":mockRoute", res.CacheKey)
+		test.Assert(t, len(res.Instances) == 1)
+		test.Assert(t, res.Instances[0].Address().String() == "127.0.0.1:8888")
+		picker := mocksloadbalance.NewMockPicker(ctrl)
+		return picker
+	}).AnyTimes()
+	lb.EXPECT().Name().Return("Synthesized").AnyTimes()
 	NewBalancerFactory(r, lb, Options{})
 	b, ok := balancerFactories.Load(cacheKey(t.Name(), "Synthesized", defaultOptions))
 	test.Assert(t, ok)

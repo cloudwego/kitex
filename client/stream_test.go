@@ -42,7 +42,7 @@ var (
 func newOpts(ctrl *gomock.Controller) []Option {
 	return []Option{
 		WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)),
-		WithResolver(resolver404),
+		WithResolver(resolver404(ctrl)),
 		WithDialer(newDialer(ctrl)),
 		WithDestService("destService"),
 	}

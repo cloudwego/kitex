@@ -106,7 +106,7 @@ func newMockCliTransHandlerFactory(ctrl *gomock.Controller) remote.ClientTransHa
 func newMockClient(tb testing.TB, ctrl *gomock.Controller, extra ...Option) Client {
 	opts := []Option{
 		WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)),
-		WithResolver(resolver404),
+		WithResolver(resolver404(ctrl)),
 		WithDialer(newDialer(ctrl)),
 		WithDestService("destService"),
 	}
@@ -512,10 +512,12 @@ func TestClientFinalizer(t *testing.T) {
 	cliCnt := 1000
 	clis := make([]Client, cliCnt)
 	for i := 0; i < cliCnt; i++ {
-		mockClient := newMockClient(t, ctrl, WithCloseCallbacks(func() error {
+		svcInfo := mocks.ServiceInfo()
+		mockClient, err := NewClient(svcInfo, WithDestService("destService"), WithCloseCallbacks(func() error {
 			atomic.AddInt32(&closeCalledCnt, 1)
 			return nil
 		}))
+		test.Assert(t, err == nil, err)
 		clis[i] = mockClient
 	}
 

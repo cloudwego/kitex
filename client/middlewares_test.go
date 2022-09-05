@@ -25,6 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksdiscovery "github.com/cloudwego/kitex/internal/mocks/discovery"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -41,16 +42,6 @@ var (
 		discovery.NewInstance("tcp", "localhost:404", 1, make(map[string]string)),
 	}
 	instance505 = discovery.NewInstance("tcp", "localhost:505", 1, make(map[string]string))
-	resolver404 = &discovery.SynthesizedResolver{
-		ResolveFunc: func(ctx context.Context, key string) (discovery.Result, error) {
-			return discovery.Result{
-				Cacheable: true,
-				CacheKey:  "test",
-				Instances: instance404,
-			}, nil
-		},
-		NameFunc: func() string { return "middlewares_test" },
-	}
 
 	ctx = func() context.Context {
 		ctx := context.Background()
@@ -59,6 +50,19 @@ var (
 		return ctx
 	}()
 )
+
+func resolver404(ctrl *gomock.Controller) discovery.Resolver {
+	resolver := mocksdiscovery.NewMockResolver(ctrl)
+	resolver.EXPECT().Resolve(gomock.Any(), gomock.Any()).Return(discovery.Result{
+		Cacheable: true,
+		CacheKey:  "test",
+		Instances: instance404,
+	}, nil).AnyTimes()
+	resolver.EXPECT().Diff(gomock.Any(), gomock.Any(), gomock.Any()).Return(discovery.Change{}, false).AnyTimes()
+	resolver.EXPECT().Name().Return("middlewares_test").AnyTimes()
+	resolver.EXPECT().Target(gomock.Any(), gomock.Any()).AnyTimes()
+	return resolver
+}
 
 func TestNoResolver(t *testing.T) {
 	svcInfo := mocks.ServiceInfo()
