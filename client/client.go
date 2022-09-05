@@ -33,6 +33,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
@@ -113,6 +114,9 @@ func (kc *kClient) init() (err error) {
 	if err = kc.initProxy(); err != nil {
 		return err
 	}
+	if err = kc.initConnPool(); err != nil {
+		return err
+	}
 	if err = kc.initLBCache(); err != nil {
 		return err
 	}
@@ -183,6 +187,33 @@ func (kc *kClient) initProxy() error {
 		kc.opt.Balancer = cfg.Balancer
 		kc.opt.RemoteOpt.ConnPool = cfg.Pool
 		kc.opt.Targets = cfg.FixedTargets
+	}
+	return nil
+}
+
+func (kc *kClient) initConnPool() error {
+	pool := kc.opt.RemoteOpt.ConnPool
+	kc.opt.CloseCallbacks = append(kc.opt.CloseCallbacks, pool.Close)
+
+	if df, ok := pool.(interface{ Dump() interface{} }); ok {
+		kc.opt.DebugService.RegisterProbeFunc(diagnosis.ConnPoolKey, df.Dump)
+	}
+	if r, ok := pool.(remote.ConnPoolReporter); ok && kc.opt.RemoteOpt.EnableConnPoolReporter {
+		r.EnableReporter()
+	}
+
+	if long, ok := pool.(remote.LongConnPool); ok {
+		kc.opt.Bus.Watch(discovery.ChangeEventName, func(ev *event.Event) {
+			ch, ok := ev.Extra.(*discovery.Change)
+			if !ok {
+				return
+			}
+			for _, inst := range ch.Removed {
+				if addr := inst.Address(); addr != nil {
+					long.Clean(addr.Network(), addr.String())
+				}
+			}
+		})
 	}
 	return nil
 }
