@@ -18,8 +18,14 @@ package tpl
 var HandlerTpl string = `package main
 
 import (
-	{{- range $path, $alias := .Imports}}
-	{{$alias }}"{{$path}}"
+	{{- range $path, $aliases := .Imports}}
+		{{- if not $aliases}}
+			"{{$path}}"
+		{{- else}}
+			{{- range $alias, $is := $aliases}}
+				{{$alias}} "{{$path}}"
+			{{- end}}
+		{{- end}}
 	{{- end}}
 )
 
