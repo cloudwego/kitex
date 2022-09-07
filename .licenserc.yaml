@@ -30,6 +30,7 @@ header:
     - pkg/remote/codec/protobuf/test.pb.go
     - pkg/generic/descriptor/tree.go
     - pkg/generic/descriptor/tree_test.go
+    - pkg/generic/httppb_test/idl/echo.pb.go
     - pkg/utils/json.go
 
   comment: on-failure

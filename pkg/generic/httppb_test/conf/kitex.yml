@@ -1,0 +1,18 @@
+Address: ":8109"
+EnableDebugServer: true
+DebugServerPort: "19109"
+Log:
+  Dir: log
+  Loggers:
+    - Name: default
+      Level: info # Notice: change it to debug if needed in local development
+      Outputs:
+        - Console # Notice: change it to debug if needed in local development, don't use this in production!
+    - Name: rpcAccess
+      Level: trace # Notice: Not recommended for modification, otherwise may affect construction of call chain (tracing)
+      Outputs:
+        - Agent
+    - Name: rpcCall
+      Level: trace # Notice: Not recommended for modification, otherwise may affect construction of call chain (tracing)
+      Outputs:
+        - Console
