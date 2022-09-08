@@ -23,6 +23,9 @@ import (
 	"net"
 	"testing"
 
+	npmocks "github.com/cloudwego/kitex/internal/mocks/netpoll"
+	remote_mocks "github.com/cloudwego/kitex/internal/mocks/remote"
+
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -32,6 +35,70 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
+
+func TestServerHandlerCall(t *testing.T) {
+	transHdler, _ := NewSvrTransHandlerFactory().NewTransHandler(&remote.ServerOption{
+		SvcInfo: mocks.ServiceInfo(),
+	})
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	npConn := npmocks.NewMockConnection(ctrl)
+	npReader := npmocks.NewMockReader(ctrl)
+	hdl := remote_mocks.NewMockServerTransHandler(ctrl)
+
+	errOnActive := errors.New("mock on active error")
+	errOnRead := errors.New("mock on read error")
+
+	triggerReadErr := false
+	triggerActiveErr := false
+
+	hdl.EXPECT().OnActive(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, conn net.Conn) (context.Context, error) {
+		if triggerActiveErr {
+			return ctx, errOnActive
+		}
+		return ctx, nil
+	}).AnyTimes()
+	hdl.EXPECT().OnRead(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, conn net.Conn) error {
+		if triggerReadErr {
+			return errOnRead
+		}
+		return nil
+	}).AnyTimes()
+	hdl.EXPECT().OnInactive(gomock.Any(), gomock.Any()).AnyTimes()
+	hdl.EXPECT().OnError(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, err error, conn net.Conn) {
+		if conn != nil {
+			klog.CtxErrorf(ctx, "KITEX: processing error, remoteAddr=%v, error=%s", conn.RemoteAddr(), err.Error())
+		} else {
+			klog.CtxErrorf(ctx, "KITEX: processing error, error=%s", err.Error())
+		}
+	}).AnyTimes()
+
+	npReader.EXPECT().Peek(prefaceReadAtMost).Return([]byte("connection prefix bytes"), nil).AnyTimes()
+	npConn.EXPECT().Reader().Return(npReader).AnyTimes()
+	npConn.EXPECT().RemoteAddr().Return(nil).AnyTimes()
+
+	transHdler.(*svrTransHandler).netpoll = hdl
+
+	// case1 successful call: onActive() and onRead() all success
+	triggerActiveErr = false
+	triggerReadErr = false
+	err := mockCall(transHdler, npConn)
+	test.Assert(t, err == nil, err)
+
+	// case2 onActive failed: onActive() err and close conn
+	triggerActiveErr = true
+	triggerReadErr = false
+	err = mockCall(transHdler, npConn)
+	test.Assert(t, err == errOnActive, err)
+
+	// case3 onRead failed: onRead() err and close conn
+	triggerActiveErr = false
+	triggerReadErr = true
+	err = mockCall(transHdler, npConn)
+	test.Assert(t, err == errOnRead, err)
+}
 
 func TestOnError(t *testing.T) {
 	ctrl := gomock.NewController(t)
@@ -64,4 +131,62 @@ func TestOnError(t *testing.T) {
 	})
 	transHdler.OnError(context.Background(), errors.New("mock error"), conn)
 	test.Assert(t, errMsg == "KITEX: processing error, remoteAddr=mock, error=mock error", errMsg)
+}
+
+func TestOnInactive(t *testing.T) {
+	transHdler, err := NewSvrTransHandlerFactory().NewTransHandler(&remote.ServerOption{
+		SvcInfo: mocks.ServiceInfo(),
+	})
+	test.Assert(t, err == nil)
+
+	conn := &mocks.Conn{
+		RemoteAddrFunc: func() (r net.Addr) {
+			return utils.NewNetAddr("mock", "mock")
+		},
+	}
+
+	// test noopHandler onInactive()
+	transHdler.OnInactive(context.Background(), conn)
+
+	subHandler := &mocks.MockSvrTransHandler{}
+	subHandlerCtx := context.WithValue(
+		context.Background(),
+		handlerKey{},
+		&handlerWrapper{
+			handler: subHandler,
+		},
+	)
+
+	ctx := context.WithValue(
+		context.Background(),
+		handlerKey{},
+		&handlerWrapper{
+			ctx: subHandlerCtx,
+		},
+	)
+	// test mockHandler onInactive()
+	transHdler.OnInactive(ctx, conn)
+}
+
+// MockCall mocks how detection transHdlr processing with incoming requests
+func mockCall(transHdlr remote.ServerTransHandler, conn net.Conn) (err error) {
+	ctx := context.Background()
+	// do onConnActive
+	ctxWithHandler, err := transHdlr.OnActive(ctx, conn)
+	// onActive failed, such as connections limitation
+	if err != nil {
+		transHdlr.OnError(ctx, err, conn)
+		transHdlr.OnInactive(ctx, conn)
+		return
+	}
+	// do onConnRead
+	err = transHdlr.OnRead(ctxWithHandler, conn)
+	if err != nil {
+		transHdlr.OnError(ctxWithHandler, err, conn)
+		transHdlr.OnInactive(ctxWithHandler, conn)
+		return
+	}
+	// do onConnInactive
+	transHdlr.OnInactive(ctxWithHandler, conn)
+	return
 }
