@@ -1,6 +1,5 @@
-//go:build amd64 && !windows && !go1.13 && !go.14
-// +build amd64,!windows,!go1.13,!go.14
-
+//go:build amd64 && !windows && go1.15
+// +build amd64,!windows,go1.15
 /*
  * Copyright 2021 CloudWeGo Authors
  *
