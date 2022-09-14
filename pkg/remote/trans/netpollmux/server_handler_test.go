@@ -586,28 +586,6 @@ func TestInvokeNoMethod(t *testing.T) {
 		},
 	}
 
-	body := "hello world"
-	opt := &remote.ServerOption{
-		InitOrResetRPCInfoFunc: func(rpcInfo rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
-			return rpcInfo
-		},
-		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), body)
-				_, err := out.WriteBinary(r.Bytes())
-				return err
-			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				in.Skip(3 * codec.Size32)
-				_, err := in.ReadString(len(body))
-				return err
-			},
-		},
-		SvcInfo:          mocks.ServiceInfo(),
-		TracerCtl:        &stats.Controller{},
-		ReadWriteTimeout: rwTimeout,
-	}
-
 	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
 	pool := &sync.Pool{}
