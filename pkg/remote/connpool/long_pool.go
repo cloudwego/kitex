@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/connpool"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
@@ -287,7 +286,6 @@ func (lp *LongPool) Evict(frequency time.Duration) {
 			return
 		}
 	}
-	klog.Info("!!!!!")
 }
 
 // NewLongPool creates a long pool using the given IdleConfig.

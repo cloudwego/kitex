@@ -568,8 +568,6 @@ func TestLongConnPoolPutUnknownConnection(t *testing.T) {
 	test.Assert(t, closed)
 }
 
-
-
 func TestLongConnPoolEvict(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
