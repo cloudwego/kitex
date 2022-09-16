@@ -20,6 +20,8 @@ package client
 import (
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/remoteconfig"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -108,6 +110,9 @@ type Options struct {
 	// XDS
 	XDSEnabled          bool
 	XDSRouterMiddleware endpoint.Middleware
+
+	// Remote Config
+	RemoteConfigurator remoteconfig.Configurator
 }
 
 // Apply applies all options.
