@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/connpool"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
@@ -72,7 +73,7 @@ func (c *longConn) IsActive() bool {
 			return true
 		}
 	}
-	return false
+	return time.Now().Before(c.deadline)
 }
 
 func (c *longConn) Expired() bool {
@@ -219,7 +220,7 @@ func (lp *LongPool) Put(conn net.Conn) error {
 func (lp *LongPool) Discard(conn net.Conn) error {
 	c, ok := conn.(*longConn)
 	if ok {
-		return c.Conn.Close()
+		return c.Close()
 	}
 	return conn.Close()
 }
@@ -271,16 +272,22 @@ func (lp *LongPool) WarmUp(eh warmup.ErrorHandling, wuo *warmup.PoolOption, co r
 
 func (lp *LongPool) Evict(frequency time.Duration) {
 	t := time.NewTicker(frequency)
-	select {
-	case <-t.C:
-		lp.peerMap.Range(func(key interface{}, value interface{}) bool {
-			p := value.(*peer)
-			p.Evict()
-			return true
-		})
-	case <-lp.closeCh:
-		return
+	for {
+		select {
+		case <-t.C:
+			if atomic.LoadInt32(&lp.closed) == 1 {
+				return
+			}
+			lp.peerMap.Range(func(key, value interface{}) bool {
+				p := value.(*peer)
+				p.Evict()
+				return true
+			})
+		case <-lp.closeCh:
+			return
+		}
 	}
+	klog.Info("!!!!!")
 }
 
 // NewLongPool creates a long pool using the given IdleConfig.

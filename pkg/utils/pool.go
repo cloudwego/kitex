@@ -34,12 +34,6 @@ type PoolDump struct {
 	IdleList []interface{} `json:"idle_list"`
 }
 
-type PoolConfig struct {
-	MinIdle        int
-	MaxIdle        int
-	MaxIdleTimeout time.Duration
-}
-
 type Pool struct {
 	idleList []PoolObject
 	mu       sync.RWMutex
