@@ -4,6 +4,20 @@ on: [ push, pull_request ]
 
 jobs:
   unit-benchmark-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Unit Test
+        run: go test -race -covermode=atomic -coverprofile=coverage.txt ./...
+      - name: Codecov
+        run: bash <(curl -s https://codecov.io/bash)
+      - name: Benchmark
+        run: go test -bench=. -benchmem -run=none ./...
+  compatibility-test:
     strategy:
       matrix:
         go: [ 1.15, 1.17, 1.18, 1.19 ]
@@ -11,29 +25,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
-
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
-
-       # block scenario, comment temporarily
-#      - uses: actions/cache@v3
-#        with:
-#          path: ~/go/pkg/mod
-#          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-#          restore-keys: |
-#            ${{ runner.os }}-go-
-
       - name: Unit Test
         run: go test -race -covermode=atomic -coverprofile=coverage.txt ./...
-        
-      - name: Codecov
-        run: bash <(curl -s https://codecov.io/bash)
-
-      - name: Benchmark
-        run: go test -bench=. -benchmem -run=none ./...
-
   scenario-test:
     strategy:
       matrix:
@@ -41,27 +38,14 @@ jobs:
     runs-on: [ self-hosted, X64 ]
     steps:
       - uses: actions/checkout@v3
-
       - uses: actions/setup-python@v4
         with:
           python-version: '3.x'
           architecture: x64
-
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go }}
-
-       # block scenario, comment temporarily
-#      - uses: actions/cache@v3
-#        with:
-#          path: ~/go/pkg/mod
-#          key: scenario-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-#          restore-keys: |
-#            scenario-${{ runner.os }}-go-
-#            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-#            ${{ runner.os }}-go-
-
       - name: Scenario Tests
         run: |
           cd ..
