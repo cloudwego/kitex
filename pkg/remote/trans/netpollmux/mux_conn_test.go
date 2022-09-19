@@ -102,7 +102,8 @@ func TestOnRequest(t *testing.T) {
 			}
 		},
 	}
-	err = handler.Write(ctx, conn, msg)
+	ctx, err = handler.Write(ctx, conn, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	time.Sleep(5 * time.Millisecond)

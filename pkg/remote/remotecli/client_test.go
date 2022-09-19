@@ -138,7 +138,7 @@ func TestSend(t *testing.T) {
 
 	var sendMsg remote.Message
 	hdlr := mocksremote.NewMockClientTransHandler(ctrl)
-	hdlr.EXPECT().Write(gomock.Any(), gomock.Any(), sendMsg).Return(nil).MinTimes(1)
+	hdlr.EXPECT().Write(gomock.Any(), gomock.Any(), sendMsg).Return(ctx, nil).MinTimes(1)
 
 	opt := newMockOption(ctrl, addr)
 
@@ -165,7 +165,7 @@ func TestSendErr(t *testing.T) {
 	errMsg := "mock test send err"
 
 	hdlr := mocksremote.NewMockClientTransHandler(ctrl)
-	hdlr.EXPECT().Write(gomock.Any(), gomock.Any(), sendMsg).Return(errors.New(errMsg)).MinTimes(1)
+	hdlr.EXPECT().Write(gomock.Any(), gomock.Any(), sendMsg).Return(ctx, errors.New(errMsg)).MinTimes(1)
 
 	opt := newMockOption(ctrl, addr)
 
@@ -202,7 +202,7 @@ func TestRecv(t *testing.T) {
 	msg := remote.NewMessage(resp, svcInfo, ri, remote.Call, remote.Client)
 
 	hdlr := mocksremote.NewMockClientTransHandler(ctrl)
-	hdlr.EXPECT().Read(gomock.Any(), gomock.Any(), msg).Return(nil).MinTimes(1)
+	hdlr.EXPECT().Read(gomock.Any(), gomock.Any(), msg).Return(ctx, nil).MinTimes(1)
 	hdlr.EXPECT().OnMessage(gomock.Any(), gomock.Any(), gomock.Any()).Return(ctx, nil).AnyTimes()
 
 	opt := newMockOption(ctrl, addr)
@@ -218,7 +218,7 @@ func TestRecv(t *testing.T) {
 	onMessageErr := errors.New("on message failed")
 
 	hdlr = mocksremote.NewMockClientTransHandler(ctrl)
-	hdlr.EXPECT().Read(gomock.Any(), gomock.Any(), gomock.Any()).Return(readErr).AnyTimes()
+	hdlr.EXPECT().Read(gomock.Any(), gomock.Any(), gomock.Any()).Return(ctx, readErr).AnyTimes()
 	hdlr.EXPECT().OnMessage(gomock.Any(), gomock.Any(), gomock.Any()).Return(ctx, onMessageErr).AnyTimes()
 
 	cli, err = NewClient(ctx, ri, hdlr, opt)

@@ -60,7 +60,9 @@ func (s *stream) RecvMsg(m interface{}) error {
 	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
 	defer msg.Recycle()
 
-	return s.handler.Read(s.ctx, s.conn, msg)
+	ctx, err := s.handler.Read(s.ctx, s.conn, msg)
+	s.ctx = ctx
+	return err
 }
 
 func (s *stream) SendMsg(m interface{}) error {
@@ -70,7 +72,9 @@ func (s *stream) SendMsg(m interface{}) error {
 	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
 	defer msg.Recycle()
 
-	return s.handler.Write(s.ctx, s.conn, msg)
+	ctx, err := s.handler.Write(s.ctx, s.conn, msg)
+	s.ctx = ctx
+	return err
 }
 
 func (s *stream) Close() error {

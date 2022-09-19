@@ -57,7 +57,7 @@ type svrTransHandler struct {
 }
 
 // Write implements the remote.ServerTransHandler interface.
-func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (err error) {
+func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	var bufWriter remote.ByteBuffer
 	ri := sendMsg.RPCInfo()
 	stats2.Record(ctx, ri, stats.WriteStart, nil)
@@ -68,20 +68,20 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 
 	if methodInfo, _ := GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
-			return nil
+			return ctx, nil
 		}
 	}
 
 	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
-		return err
+		return ctx, err
 	}
-	return bufWriter.Flush()
+	return ctx, bufWriter.Flush()
 }
 
 // Read implements the remote.ServerTransHandler interface.
-func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remote.Message) (err error) {
+func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remote.Message) (nctx context.Context, err error) {
 	var bufReader remote.ByteBuffer
 	defer func() {
 		t.ext.ReleaseBuffer(bufReader, err)
@@ -93,9 +93,9 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 	err = t.codec.Decode(ctx, recvMsg, bufReader)
 	if err != nil {
 		recvMsg.Tags()[remote.ReadFailed] = true
-		return err
+		return ctx, err
 	}
-	return nil
+	return ctx, nil
 }
 
 // OnRead implements the remote.ServerTransHandler interface.
@@ -130,7 +130,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	ctx = t.startTracer(ctx, ri)
 	recvMsg = remote.NewMessageWithNewer(t.svcInfo, ri, remote.Call, remote.Server)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
-	err = t.Read(ctx, conn, recvMsg)
+	ctx, err = t.Read(ctx, conn, recvMsg)
 	if err != nil {
 		closeConn = true
 		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
@@ -163,7 +163,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	}
 
 	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
-	if err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
+	if ctx, err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
 		closeConn = true
 		t.OnError(ctx, err, conn)
 		return nil
@@ -244,7 +244,7 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		// if error happen before normal OnMessage, exec it to transfer header trans info into rpcinfo
 		t.transPipe.OnMessage(ctx, recvMsg, errMsg)
 	}
-	err = t.transPipe.Write(ctx, conn, errMsg)
+	ctx, err = t.transPipe.Write(ctx, conn, errMsg)
 	if err != nil {
 		klog.CtxErrorf(ctx, "KITEX: write error reply failed, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
 		return true

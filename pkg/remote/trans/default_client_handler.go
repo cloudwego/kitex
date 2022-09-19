@@ -44,7 +44,7 @@ type cliTransHandler struct {
 }
 
 // Write implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (err error) {
+func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	var bufWriter remote.ByteBuffer
 	stats2.Record(ctx, sendMsg.RPCInfo(), stats.WriteStart, nil)
 	defer func() {
@@ -56,13 +56,13 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
-		return err
+		return ctx, err
 	}
-	return bufWriter.Flush()
+	return ctx, bufWriter.Flush()
 }
 
 // Read implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remote.Message) (err error) {
+func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remote.Message) (nctx context.Context, err error) {
 	var bufReader remote.ByteBuffer
 	stats2.Record(ctx, recvMsg.RPCInfo(), stats.ReadStart, nil)
 	defer func() {
@@ -78,10 +78,10 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 		if t.ext.IsTimeoutErr(err) {
 			err = kerrors.ErrRPCTimeout.WithCause(err)
 		}
-		return err
+		return ctx, err
 	}
 
-	return nil
+	return ctx, nil
 }
 
 // OnMessage implements the remote.ClientTransHandler interface.

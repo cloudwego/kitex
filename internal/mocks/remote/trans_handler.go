@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -131,11 +131,12 @@ func (m *MockTransReadWriter) EXPECT() *MockTransReadWriterMockRecorder {
 }
 
 // Read mocks base method.
-func (m *MockTransReadWriter) Read(ctx context.Context, conn net.Conn, msg remote.Message) error {
+func (m *MockTransReadWriter) Read(ctx context.Context, conn net.Conn, msg remote.Message) (context.Context, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Read", ctx, conn, msg)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(context.Context)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Read indicates an expected call of Read.
@@ -145,11 +146,12 @@ func (mr *MockTransReadWriterMockRecorder) Read(ctx, conn, msg interface{}) *gom
 }
 
 // Write mocks base method.
-func (m *MockTransReadWriter) Write(ctx context.Context, conn net.Conn, send remote.Message) error {
+func (m *MockTransReadWriter) Write(ctx context.Context, conn net.Conn, send remote.Message) (context.Context, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", ctx, conn, send)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(context.Context)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Write indicates an expected call of Write.
@@ -221,11 +223,12 @@ func (mr *MockTransHandlerMockRecorder) OnMessage(ctx, args, result interface{})
 }
 
 // Read mocks base method.
-func (m *MockTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) error {
+func (m *MockTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (context.Context, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Read", ctx, conn, msg)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(context.Context)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Read indicates an expected call of Read.
@@ -247,11 +250,12 @@ func (mr *MockTransHandlerMockRecorder) SetPipeline(pipeline interface{}) *gomoc
 }
 
 // Write mocks base method.
-func (m *MockTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) error {
+func (m *MockTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (context.Context, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", ctx, conn, send)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(context.Context)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Write indicates an expected call of Write.
@@ -323,11 +327,12 @@ func (mr *MockClientTransHandlerMockRecorder) OnMessage(ctx, args, result interf
 }
 
 // Read mocks base method.
-func (m *MockClientTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) error {
+func (m *MockClientTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (context.Context, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Read", ctx, conn, msg)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(context.Context)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Read indicates an expected call of Read.
@@ -349,11 +354,12 @@ func (mr *MockClientTransHandlerMockRecorder) SetPipeline(pipeline interface{}) 
 }
 
 // Write mocks base method.
-func (m *MockClientTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) error {
+func (m *MockClientTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (context.Context, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", ctx, conn, send)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(context.Context)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Write indicates an expected call of Write.
@@ -454,11 +460,12 @@ func (mr *MockServerTransHandlerMockRecorder) OnRead(ctx, conn interface{}) *gom
 }
 
 // Read mocks base method.
-func (m *MockServerTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) error {
+func (m *MockServerTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (context.Context, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Read", ctx, conn, msg)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(context.Context)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Read indicates an expected call of Read.
@@ -480,11 +487,12 @@ func (mr *MockServerTransHandlerMockRecorder) SetPipeline(pipeline interface{}) 
 }
 
 // Write mocks base method.
-func (m *MockServerTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) error {
+func (m *MockServerTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (context.Context, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", ctx, conn, send)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(context.Context)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Write indicates an expected call of Write.

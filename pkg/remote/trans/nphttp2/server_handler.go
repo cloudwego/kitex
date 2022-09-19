@@ -72,22 +72,22 @@ type svrTransHandler struct {
 	codec      remote.Codec
 }
 
-func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
+func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	buf := newBuffer(conn.(*serverConn))
 	defer buf.Release(err)
 
 	if err = t.codec.Encode(ctx, msg, buf); err != nil {
-		return err
+		return ctx, err
 	}
-	return buf.Flush()
+	return ctx, buf.Flush()
 }
 
-func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
+func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	buf := newBuffer(conn.(*serverConn))
 	defer buf.Release(err)
 
 	err = t.codec.Decode(ctx, msg, buf)
-	return
+	return ctx, err
 }
 
 // 只 return write err

@@ -114,6 +114,7 @@ func TestOnActive(t *testing.T) {
 	svrTransHdlr, _ := NewSvrTransHandlerFactory().NewTransHandler(opt)
 
 	ctx, err := svrTransHdlr.OnActive(ctx, conn)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 	muxSvrCon, _ := ctx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
 	test.Assert(t, muxSvrCon != nil)
@@ -150,7 +151,8 @@ func TestMuxSvrWrite(t *testing.T) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	test.Assert(t, ri != nil, ri)
 
-	err := svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	ctx, err := svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 }
 
@@ -204,7 +206,8 @@ func TestMuxSvrOnRead(t *testing.T) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	test.Assert(t, ri != nil, ri)
 
-	err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	ctx, err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	time.Sleep(10 * time.Millisecond)
@@ -212,6 +215,7 @@ func TestMuxSvrOnRead(t *testing.T) {
 	test.Assert(t, npconn.Reader().Len() > 0, npconn.Reader().Len())
 
 	ctx, err = svrTransHdlr.OnActive(ctx, muxSvrCon)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 	muxSvrConFromCtx, _ := ctx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
 	test.Assert(t, muxSvrConFromCtx != nil)
@@ -294,7 +298,8 @@ func TestPanicAfterMuxSvrOnRead(t *testing.T) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	test.Assert(t, ri != nil, ri)
 
-	err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	ctx, err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	time.Sleep(5 * time.Millisecond)
@@ -302,6 +307,7 @@ func TestPanicAfterMuxSvrOnRead(t *testing.T) {
 	test.Assert(t, conn.Reader().Len() > 0, conn.Reader().Len())
 
 	ctx, err = svrTransHdlr.OnActive(ctx, conn)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	err = svrTransHdlr.OnRead(ctx, conn)
@@ -368,7 +374,8 @@ func TestRecoverAfterOnReadPanic(t *testing.T) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	test.Assert(t, ri != nil, ri)
 
-	err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	ctx, err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	time.Sleep(5 * time.Millisecond)
@@ -376,6 +383,7 @@ func TestRecoverAfterOnReadPanic(t *testing.T) {
 	test.Assert(t, conn.Reader().Len() > 0, conn.Reader().Len())
 
 	ctx, err = svrTransHdlr.OnActive(ctx, conn)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	// test recover after panic
@@ -482,7 +490,8 @@ func TestInvokeError(t *testing.T) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	test.Assert(t, ri != nil, ri)
 
-	err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	ctx, err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	time.Sleep(5 * time.Millisecond)
@@ -490,6 +499,7 @@ func TestInvokeError(t *testing.T) {
 	test.Assert(t, npconn.Reader().Len() > 0, npconn.Reader().Len())
 
 	ctx, err = svrTransHdlr.OnActive(ctx, muxSvrCon)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 	muxSvrCon, _ = ctx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
 	test.Assert(t, muxSvrCon != nil)
@@ -598,7 +608,8 @@ func TestInvokeNoMethod(t *testing.T) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	test.Assert(t, ri != nil, ri)
 
-	err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	ctx, err = svrTransHdlr.Write(ctx, muxSvrCon, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	time.Sleep(5 * time.Millisecond)
@@ -606,6 +617,7 @@ func TestInvokeNoMethod(t *testing.T) {
 	test.Assert(t, npconn.Reader().Len() > 0, npconn.Reader().Len())
 
 	ctx, err = svrTransHdlr.OnActive(ctx, muxSvrCon)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 	muxSvrCon, _ = ctx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
 	test.Assert(t, muxSvrCon != nil)
