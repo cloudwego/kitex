@@ -134,12 +134,7 @@ func (t *svrTransHandler) readWithByteBuffer(ctx context.Context, bufReader remo
 	}()
 	stats2.Record(ctx, msg.RPCInfo(), stats.ReadStart, nil)
 
-	err = t.codec.Decode(ctx, msg, bufReader)
-	if err != nil {
-		msg.Tags()[remote.ReadFailed] = true
-		return err
-	}
-	return nil
+	return t.codec.Decode(ctx, msg, bufReader)
 }
 
 // OnRead implements the remote.ServerTransHandler interface.

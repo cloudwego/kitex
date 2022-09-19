@@ -83,7 +83,6 @@ const (
 type HeaderFlags uint16
 
 const (
-	HeaderFlagsKey              string      = "HeaderFlags"
 	HeaderFlagSupportOutOfOrder HeaderFlags = 0x01
 	HeaderFlagDuplexReverse     HeaderFlags = 0x08
 	HeaderFlagSASL              HeaderFlags = 0x10
@@ -116,41 +115,101 @@ const (
 
 type ttHeader struct{}
 
-func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (totalLenField []byte, err error) {
-	// 1. header meta
-	var headerMeta []byte
-	headerMeta, err = out.Malloc(TTHeaderMetaSize)
+func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) ([]byte, error) {
+	tm := message.TransInfo()
+	strKV := tm.TransStrInfo()
+	intKV := tm.TransIntInfo()
+	total, headerInfoSize := t.calcEncodeLength(strKV, intKV)
+
+	buf, err := out.Malloc(total)
 	if err != nil {
-		return nil, perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader malloc header meta failed, %s", err.Error()))
+		return nil, perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader malloc failed: %s", err.Error()))
 	}
 
-	totalLenField = headerMeta[0:4]
-	headerInfoSizeField := headerMeta[12:14]
-	binary.BigEndian.PutUint32(headerMeta[4:8], TTHeaderMagic+uint32(getFlags(message)))
-	binary.BigEndian.PutUint32(headerMeta[8:12], uint32(message.RPCInfo().Invocation().SeqID()))
+	_ = buf[15] // bounds check
+	// 1. header meta
+	flags := HeaderFlags(message.Header().Flags())
+	binary.BigEndian.PutUint32(buf[4:8], TTHeaderMagic+uint32(flags))
+	binary.BigEndian.PutUint32(buf[8:12], uint32(message.RPCInfo().Invocation().SeqID()))
+	binary.BigEndian.PutUint16(buf[12:14], uint16(headerInfoSize/4))
 
-	var transformIDs []uint8 // transformIDs not support TODO compress
-	// 2.  header info, malloc and write
-	if err = WriteByte(byte(getProtocolID(message.ProtocolInfo())), out); err != nil {
-		return nil, perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader write protocol id failed, %s", err.Error()))
-	}
-	if err = WriteByte(byte(len(transformIDs)), out); err != nil {
-		return nil, perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader write transformIDs length failed, %s", err.Error()))
-	}
-	for tid := range transformIDs {
-		if err = WriteByte(byte(tid), out); err != nil {
-			return nil, perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader write transformIDs failed, %s", err.Error()))
+	// 2.  header info
+	// PROTOCOL ID(u8) + NUM TRANSFORMS(always 0)(u8) + TRANSFORM IDs([]u8)
+	buf[14] = byte(getProtocolID(message.ProtocolInfo()))
+	buf[15] = 0 // no transform IDs
+
+	idx := 16
+	// str kv info
+	if size := len(strKV); size > 0 {
+		// INFO ID TYPE(u8) + NUM HEADERS(u16)
+		buf[idx] = byte(InfoIDKeyValue)
+		binary.BigEndian.PutUint16(buf[idx+1:], uint16(size))
+		idx += 3
+		for k, v := range strKV {
+			lenK, lenV := len(k), len(v)
+
+			binary.BigEndian.PutUint16(buf[idx:], uint16(lenK))
+			copy(buf[idx+2:], utils.StringToSliceByte(k))
+			idx += 2 + lenK
+
+			binary.BigEndian.PutUint16(buf[idx:], uint16(lenV))
+			copy(buf[idx+2:], utils.StringToSliceByte(v))
+			idx += 2 + lenV
 		}
 	}
-	// PROTOCOL ID(u8) + NUM TRANSFORMS(always 0)(u8) + TRANSFORM IDs([]u8)
-	headerInfoSize := 1 + 1 + len(transformIDs)
-	headerInfoSize, err = writeKVInfo(headerInfoSize, message, out)
-	if err != nil {
-		return nil, perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader write kv info failed, %s", err.Error()))
+	// int kv info
+	if size := len(intKV); size > 0 {
+		// INFO ID TYPE(u8) + NUM HEADERS(u16)
+		buf[idx] = byte(InfoIDIntKeyValue)
+		binary.BigEndian.PutUint16(buf[idx+1:], uint16(size))
+		idx += 3
+		for k, v := range intKV {
+			binary.BigEndian.PutUint16(buf[idx:], k)
+			idx += 2
+
+			lenV := len(v)
+			binary.BigEndian.PutUint16(buf[idx:], uint16(lenV))
+			copy(buf[idx+2:], utils.StringToSliceByte(v))
+			idx += 2 + lenV
+		}
+	}
+	for idx < total {
+		buf[idx] = 0
+		idx++
 	}
 
-	binary.BigEndian.PutUint16(headerInfoSizeField, uint16(headerInfoSize/4))
-	return totalLenField, err
+	return buf[:4], err
+}
+
+func (t ttHeader) calcEncodeLength(strKV map[string]string, intKV map[uint16]string) (total, infoSize int) {
+	// 1. header meta
+	total += TTHeaderMetaSize
+
+	// 2. header info
+	infoSize += 1 /* Protocol ID (u8) */ + 1 /* number of transform IDs (u8) */ + 0 /* transform IDs u8s */
+
+	// 3. KV infos
+	if len(strKV) > 0 {
+		infoSize += 1 /* INFO ID TYPE(u8) */ + 2 /* NUM HEADERS(u16) */
+		for k, v := range strKV {
+			infoSize += 2 /* length (u16) */ + len(k)
+			infoSize += 2 /* length (u16) */ + len(v)
+		}
+	}
+
+	if len(intKV) > 0 {
+		infoSize += 1 /* INFO ID TYPE(u8) */ + 2 /* NUM HEADERS(u16) */
+		for _, v := range intKV {
+			infoSize += 2 /* key (u16) */
+			infoSize += 2 /* length (u16) */ + len(v)
+		}
+	}
+
+	// 4. padding by 4
+	infoSize = ((infoSize + 3) >> 2) << 2
+
+	total += infoSize
+	return
 }
 
 func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
@@ -161,10 +220,11 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 	if !IsTTHeader(headerMeta) {
 		return perrors.NewProtocolErrorWithMsg("not TTHeader protocol")
 	}
-	totalLen := Bytes2Uint32NoCheck(headerMeta[:Size32])
 
 	flags := Bytes2Uint16NoCheck(headerMeta[Size16*3:])
-	setFlags(flags, message)
+	if message.MessageType() == remote.Call {
+		message.Header().SetFlags(flags)
+	}
 
 	seqID := Bytes2Uint32NoCheck(headerMeta[Size32*2 : Size32*3])
 	if err = SetOrCheckSeqID(int32(seqID), message); err != nil {
@@ -186,148 +246,122 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 	}
 	hdIdx := 2
 	transformIDNum := int(headerInfo[1])
-	if int(headerInfoSize)-hdIdx < transformIDNum {
-		return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("need read %d transformIDs, but not enough", transformIDNum))
-	}
-	transformIDs := make([]uint8, transformIDNum)
-	for i := 0; i < transformIDNum; i++ {
-		transformIDs[i] = headerInfo[hdIdx]
-		hdIdx++
+	if transformIDNum > 0 {
+		if int(headerInfoSize)-hdIdx < transformIDNum {
+			return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("need read %d transformIDs, but not enough", transformIDNum))
+		}
+		transformIDs := make([]uint8, transformIDNum)
+		for i := 0; i < transformIDNum; i++ {
+			transformIDs[i] = headerInfo[hdIdx]
+			hdIdx++
+		}
 	}
 
-	if err := readKVInfo(hdIdx, headerInfo, message); err != nil {
+	intKV := message.TransInfo().TransIntInfo()
+	strKV := message.TransInfo().TransStrInfo()
+	if err := readKVInfo(headerInfo[hdIdx:], intKV, strKV); err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader read kv info failed, %s", err.Error()))
 	}
-	fillBasicInfoOfTTHeader(message)
+	fillBasicInfoOfTTHeader(message, intKV, strKV)
 
+	totalLen := Bytes2Uint32NoCheck(headerMeta[:Size32])
 	message.SetPayloadLen(int(totalLen - uint32(headerInfoSize) + Size32 - TTHeaderMetaSize))
 	return err
 }
 
-func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer) (writeSize int, err error) {
-	writeSize = writtenSize
-	tm := message.TransInfo()
-	// str kv info
-	strKVSize := len(tm.TransStrInfo())
-	if strKVSize > 0 {
-		// INFO ID TYPE(u8) + NUM HEADERS(u16)
-		if err = WriteByte(byte(InfoIDKeyValue), out); err != nil {
-			return writeSize, err
-		}
-		if err = WriteUint16(uint16(strKVSize), out); err != nil {
-			return writeSize, err
-		}
-		writeSize += 3
-		for key, val := range tm.TransStrInfo() {
-			keyWLen, err := WriteString2BLen(key, out)
-			if err != nil {
-				return writeSize, err
-			}
-			valWLen, err := WriteString2BLen(val, out)
-			if err != nil {
-				return writeSize, err
-			}
-			writeSize = writeSize + keyWLen + valWLen
-		}
-	}
-
-	// int kv info
-	intKVSize := len(tm.TransIntInfo())
-	if intKVSize > 0 {
-		// INFO ID TYPE(u8) + NUM HEADERS(u16)
-		if err = WriteByte(byte(InfoIDIntKeyValue), out); err != nil {
-			return writeSize, err
-		}
-		if err = WriteUint16(uint16(intKVSize), out); err != nil {
-			return writeSize, err
-		}
-		writeSize += 3
-		for key, val := range tm.TransIntInfo() {
-			if err = WriteUint16(key, out); err != nil {
-				return writeSize, err
-			}
-			valWLen, err := WriteString2BLen(val, out)
-			if err != nil {
-				return writeSize, err
-			}
-			writeSize = writeSize + 2 + valWLen
-		}
-	}
-	// padding = (4 - headerInfoSize%4) % 4
-	padding := (4 - writeSize%4) % 4
-	paddingBuf, err := out.Malloc(padding)
-	if err != nil {
-		return writeSize, err
-	}
-	for i := 0; i < len(paddingBuf); i++ {
-		paddingBuf[i] = byte(0)
-	}
-	writeSize += padding
-	return
-}
-
-func readKVInfo(idx int, buf []byte, message remote.Message) error {
-	intInfo := message.TransInfo().TransIntInfo()
-	strInfo := message.TransInfo().TransStrInfo()
-	for {
-		infoID, err := Bytes2Uint8(buf, idx)
-		idx++
-		if err != nil {
-			// this is the last field, read until there is no more padding
-			if err == io.EOF {
-				break
-			} else {
-				return err
-			}
-		}
-		switch InfoIDType(infoID) {
+func readKVInfo(bytes []byte, intKV map[uint16]string, strKV map[string]string) (err error) {
+	off, end := 0, len(bytes)
+loop:
+	for off < end {
+		infoID := InfoIDType(bytes[off])
+		off++
+		switch infoID {
 		case InfoIDPadding:
 			continue
 		case InfoIDKeyValue:
-			_, err := readStrKVInfo(&idx, buf, strInfo)
-			if err != nil {
-				return err
+			if off+2 > end {
+				err = io.EOF
+				break loop
+			} else {
+				cnt := int(bytes[off+1]) | int(bytes[off])<<8
+				off += 2
+				spans := make([]int, cnt*4)
+				for i := 0; i < cnt*2; i++ { // string key-value pairs
+					if off+2 > end {
+						err = io.EOF
+						break loop
+					}
+					length := int(bytes[off+1]) | int(bytes[off])<<8
+					off += 2
+
+					if length < 0 || off+length > end {
+						err = io.EOF
+						break loop
+					}
+					spans[i*2] = off
+					spans[i*2+1] = off + length
+					off += length
+				}
+				for i := 0; i < cnt*4; i += 4 {
+					b, e := spans[i], spans[i+1]
+					k := string(bytes[b:e])
+					b, e = spans[i+2], spans[i+3]
+					v := string(bytes[b:e])
+					strKV[k] = v
+				}
 			}
 		case InfoIDIntKeyValue:
-			_, err := readIntKVInfo(&idx, buf, intInfo)
-			if err != nil {
-				return err
+			if off+2 > end {
+				err = io.EOF
+				break loop
+			} else {
+				cnt := int(bytes[off+1]) | int(bytes[off])<<8
+				off += 2
+				spans := make([]int, cnt*3)
+				for i := 0; i < cnt; i++ { // int key & string value
+					if off+4 > end {
+						err = io.EOF
+						break loop
+					}
+					key := int(bytes[off+1]) | int(bytes[off])<<8
+					length := int(bytes[off+3]) | int(bytes[off+2])<<8
+					off += 4
+
+					if length < 0 || off+length > end {
+						err = io.EOF
+						break loop
+					}
+					spans[i*3] = key
+					spans[i*3+1] = off
+					spans[i*3+2] = off + length
+					off += length
+				}
+				for i := 0; i < cnt*3; i += 3 {
+					k, b, e := spans[i], spans[i+1], spans[i+2]
+					v := string(bytes[b:e])
+					intKV[uint16(k)] = v
+				}
 			}
 		case InfoIDACLToken:
-			err = skipACLToken(&idx, buf)
-			if err != nil {
-				return err
+			if off+2 > end {
+				err = io.EOF
+				break loop
+			} else {
+				// skip ACLToken
+				length := int(bytes[off+1]) | int(bytes[off])<<8
+				off += 2
+				if length < 0 || off+length > end {
+					err = io.EOF
+					break loop
+				}
+				off += length
 			}
 		default:
-			return fmt.Errorf("invalid infoIDType[%#x]", infoID)
+			err = fmt.Errorf("invalid infoIDType[%#x]", infoID)
+			break loop
 		}
 	}
-	return nil
-}
-
-func readIntKVInfo(idx *int, buf []byte, info map[uint16]string) (has bool, err error) {
-	kvSize, err := Bytes2Uint16(buf, *idx)
-	*idx += 2
-	if err != nil {
-		return false, fmt.Errorf("error reading int kv info size: %s", err.Error())
-	}
-	if kvSize <= 0 {
-		return false, nil
-	}
-	for i := uint16(0); i < kvSize; i++ {
-		key, err := Bytes2Uint16(buf, *idx)
-		*idx += 2
-		if err != nil {
-			return false, fmt.Errorf("error reading int kv info: %s", err.Error())
-		}
-		val, n, err := ReadString2BLen(buf, *idx)
-		*idx += n
-		if err != nil {
-			return false, fmt.Errorf("error reading int kv info: %s", err.Error())
-		}
-		info[key] = val
-	}
-	return true, nil
+	return
 }
 
 func readStrKVInfo(idx *int, buf []byte, info map[string]string) (has bool, err error) {
@@ -353,30 +387,6 @@ func readStrKVInfo(idx *int, buf []byte, info map[string]string) (has bool, err 
 		info[key] = val
 	}
 	return true, nil
-}
-
-// skipACLToken SDK don't need acl token, just skip it
-func skipACLToken(idx *int, buf []byte) error {
-	_, n, err := ReadString2BLen(buf, *idx)
-	*idx += n
-	if err != nil {
-		return fmt.Errorf("error reading acl token: %s", err.Error())
-	}
-	return nil
-}
-
-func getFlags(message remote.Message) HeaderFlags {
-	var headerFlags HeaderFlags
-	if message.Tags() != nil && message.Tags()[HeaderFlagsKey] != nil {
-		headerFlags = message.Tags()[HeaderFlagsKey].(HeaderFlags)
-	}
-	return headerFlags
-}
-
-func setFlags(flags uint16, message remote.Message) {
-	if message.MessageType() == remote.Call {
-		message.Tags()[HeaderFlagsKey] = flags
-	}
 }
 
 // protoID just for ttheader
@@ -451,21 +461,21 @@ func (m meshHeader) decode(ctx context.Context, message remote.Message, in remot
 // It is better to fill rpcinfo in matahandlers in terms of design,
 // but metahandlers are executed after payloadDecode, we don't know from_info when error happen in payloadDecode.
 // So 'fillBasicInfoOfTTHeader' is just for getting more info to output log when decode error happen.
-func fillBasicInfoOfTTHeader(msg remote.Message) {
+func fillBasicInfoOfTTHeader(msg remote.Message, intKV map[uint16]string, strKV map[string]string) {
 	if msg.RPCRole() == remote.Server {
 		fi := rpcinfo.AsMutableEndpointInfo(msg.RPCInfo().From())
 		if fi != nil {
-			if v := msg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr]; v != "" {
+			if v := strKV[transmeta.HeaderTransRemoteAddr]; v != "" {
 				fi.SetAddress(utils.NewNetAddr("tcp", v))
 			}
-			if v := msg.TransInfo().TransIntInfo()[transmeta.FromService]; v != "" {
+			if v := intKV[transmeta.FromService]; v != "" {
 				fi.SetServiceName(v)
 			}
 		}
 	} else {
 		ti := remoteinfo.AsRemoteInfo(msg.RPCInfo().To())
 		if ti != nil {
-			if v := msg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr]; v != "" {
+			if v := strKV[transmeta.HeaderTransRemoteAddr]; v != "" {
 				ti.SetRemoteAddr(utils.NewNetAddr("tcp", v))
 			}
 		}

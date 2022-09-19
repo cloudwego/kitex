@@ -153,16 +153,8 @@ func (t *httpCliTransHandler) SetPipeline(p *remote.TransPipeline) {
 }
 
 func addMetaInfo(msg remote.Message, h http.Header) error {
-	meta, ok := msg.Tags()[rpcinfo.HTTPHeader]
-	if !ok {
-		return nil
-	}
-	if header, ok := meta.(http.Header); ok {
-		for k, v := range header {
-			h[k] = v
-		}
-	} else {
-		return errors.New("http header in rpcinfo type assertion failed")
+	for k, v := range msg.Header().HTTPHeader() {
+		h[k] = v
 	}
 	return nil
 }

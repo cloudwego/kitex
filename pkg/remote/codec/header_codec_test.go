@@ -62,7 +62,7 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 	sendMsg := initClientSendMsg(transport.TTHeader)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
-	sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
+	sendMsg.Header().SetFlags(uint16(HeaderFlagSupportOutOfOrder))
 
 	// encode
 	out := remote.NewWriterBuffer(256)
@@ -83,8 +83,7 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
 	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
 	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
-	flag := recvMsg.Tags()[HeaderFlagsKey]
-	test.Assert(t, flag != nil)
+	flag := recvMsg.Header().Flags()
 	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
 }
 
@@ -166,7 +165,7 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 			sendMsg := initClientSendMsg(transport.TTHeader)
 			sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 			sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
-			sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
+			sendMsg.Header().SetFlags(uint16(HeaderFlagSupportOutOfOrder))
 
 			// encode
 			out := remote.NewWriterBuffer(256)
@@ -187,8 +186,7 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 			strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
 			test.DeepEqual(b, intKVInfoRecv, intKVInfo)
 			test.DeepEqual(b, strKVInfoRecv, strKVInfo)
-			flag := recvMsg.Tags()[HeaderFlagsKey]
-			test.Assert(b, flag != nil)
+			flag := recvMsg.Header().Flags()
 			test.Assert(b, flag == uint16(HeaderFlagSupportOutOfOrder))
 		}
 	})
@@ -317,7 +315,8 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	totalLenField := headerMeta[0:4]
 	headerSizeField := headerMeta[12:14]
 
-	binary.BigEndian.PutUint32(headerMeta[4:8], TTHeaderMagic+uint32(getFlags(message)))
+	flags := HeaderFlags(message.Header().Flags())
+	binary.BigEndian.PutUint32(headerMeta[4:8], TTHeaderMagic+uint32(flags))
 	binary.BigEndian.PutUint32(headerMeta[8:12], uint32(message.RPCInfo().Invocation().SeqID()))
 
 	var transformIDs []uint8

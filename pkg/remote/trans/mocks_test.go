@@ -134,6 +134,11 @@ type MockMessage struct {
 	PayloadCodecFunc    func() remote.PayloadCodec
 	SetPayloadCodecFunc func(pc remote.PayloadCodec)
 	RecycleFunc         func()
+	header              remote.MessageHeader
+}
+
+func (m *MockMessage) Header() *remote.MessageHeader {
+	return &m.header
 }
 
 func (m *MockMessage) RPCInfo() rpcinfo.RPCInfo {
