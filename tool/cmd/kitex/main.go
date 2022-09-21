@@ -17,30 +17,25 @@ package main
 import (
 	"bytes"
 	"flag"
-	"fmt"
-	"io"
 	"os"
-	"os/exec"
-	"path/filepath"
 	"strings"
 
-	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
-	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex"
+	kargs "github.com/cloudwego/kitex/tool/cmd/kitex/args"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
-	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
-var args arguments
+var args kargs.Arguments
 
 func init() {
 	var queryVersion bool
-	args.addExtraFlag(&extraFlag{
-		apply: func(f *flag.FlagSet) {
+	args.AddExtraFlag(&kargs.ExtraFlag{
+		Apply: func(f *flag.FlagSet) {
 			f.BoolVar(&queryVersion, "version", false,
 				"Show the version of kitex")
 		},
-		check: func(a *arguments) {
+		Check: func(a *kargs.Arguments) {
 			if queryVersion {
 				println(a.Version)
 				os.Exit(0)
@@ -49,10 +44,8 @@ func init() {
 	})
 }
 
-const pluginMode = "KITEX_PLUGIN_MODE"
-
 func main() {
-	mode := os.Getenv(pluginMode)
+	mode := os.Getenv(kargs.EnvPluginMode)
 	if len(os.Args) <= 1 && mode != "" {
 		// run as a plugin
 		switch mode {
@@ -64,10 +57,10 @@ func main() {
 	}
 
 	// run as kitex
-	args.parseArgs()
+	args.ParseArgs(kitex.Version)
 
 	out := new(bytes.Buffer)
-	cmd := buildCmd(&args, out)
+	cmd := args.BuildCmd(out)
 	err := cmd.Run()
 	if err != nil {
 		if args.Use != "" {
@@ -78,96 +71,4 @@ func main() {
 		}
 		os.Exit(1)
 	}
-}
-
-func lookupTool(idlType string) string {
-	tool := "thriftgo"
-	if idlType == "protobuf" {
-		tool = "protoc"
-	}
-
-	path, err := exec.LookPath(tool)
-	if err != nil {
-		log.Warnf("Failed to find %q from $PATH: %s. Try $GOPATH/bin/%s instead\n", path, err.Error(), tool)
-		path = filepath.Join(util.GetGOPATH(), "bin", tool)
-	}
-	return path
-}
-
-func buildCmd(a *arguments, out io.Writer) *exec.Cmd {
-	exe, err := os.Executable()
-	if err != nil {
-		log.Warn("Failed to detect current executable:", err.Error())
-		os.Exit(1)
-	}
-
-	kas := strings.Join(a.Config.Pack(), ",")
-	cmd := &exec.Cmd{
-		Path:   lookupTool(a.IDLType),
-		Stdin:  os.Stdin,
-		Stdout: &teeWriter{out, os.Stdout},
-		Stderr: &teeWriter{out, os.Stderr},
-	}
-	if a.IDLType == "thrift" {
-		os.Setenv(pluginMode, thriftgo.PluginName)
-		cmd.Args = append(cmd.Args, "thriftgo")
-		for _, inc := range a.Includes {
-			cmd.Args = append(cmd.Args, "-i", inc)
-		}
-		a.ThriftOptions = append(a.ThriftOptions, "package_prefix="+a.PackagePrefix)
-		gas := "go:" + strings.Join(a.ThriftOptions, ",")
-		if a.Verbose {
-			cmd.Args = append(cmd.Args, "-v")
-		}
-		if a.Use == "" {
-			cmd.Args = append(cmd.Args, "-r")
-		}
-		cmd.Args = append(cmd.Args,
-			"-o", generator.KitexGenPath,
-			"-g", gas,
-			"-p", "kitex="+exe+":"+kas,
-		)
-		for _, p := range a.ThriftPlugins {
-			cmd.Args = append(cmd.Args, "-p", p)
-		}
-		cmd.Args = append(cmd.Args, a.IDL)
-	} else {
-		os.Setenv(pluginMode, protoc.PluginName)
-		a.ThriftOptions = a.ThriftOptions[:0]
-		// "protobuf"
-		cmd.Args = append(cmd.Args, "protoc")
-		for _, inc := range a.Includes {
-			cmd.Args = append(cmd.Args, "-I", inc)
-		}
-		outPath := filepath.Join(".", generator.KitexGenPath)
-		if a.Use == "" {
-			os.MkdirAll(outPath, 0o755)
-		} else {
-			outPath = "."
-		}
-		cmd.Args = append(cmd.Args,
-			"--plugin=protoc-gen-kitex="+exe,
-			"--kitex_out="+outPath,
-			"--kitex_opt="+kas,
-		)
-		for _, po := range a.ProtobufOptions {
-			cmd.Args = append(cmd.Args, "--kitex_opt="+po)
-		}
-		cmd.Args = append(cmd.Args, a.IDL)
-	}
-	log.Info(strings.ReplaceAll(strings.Join(cmd.Args, " "), kas, fmt.Sprintf("%q", kas)))
-	return cmd
-}
-
-type teeWriter struct {
-	a io.Writer
-	b io.Writer
-}
-
-func (tw *teeWriter) Write(p []byte) (n int, err error) {
-	n, err = tw.a.Write(p)
-	if err != nil {
-		return
-	}
-	return tw.b.Write(p)
 }
