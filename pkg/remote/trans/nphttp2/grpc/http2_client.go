@@ -231,10 +231,17 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		return nil, connectionErrorf(true, err, "transport: failed to write initial settings frame: %v", err)
 	}
 
+	// Adjust the connection flow control window if needed.
+	if delta := uint32(icwz - defaultWindowSize); delta > 0 {
+		if err := t.framer.WriteWindowUpdate(0, delta); err != nil {
+			t.Close()
+			return nil, connectionErrorf(true, err, "transport: failed to write window update: %v", err)
+		}
+	}
+
 	if err := t.framer.writer.Flush(); err != nil {
 		return nil, err
 	}
-
 	gofunc.RecoverGoFuncWithInfo(ctx, func() {
 		err := t.loopy.run(conn.RemoteAddr().String())
 		if err != nil {
