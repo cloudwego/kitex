@@ -55,7 +55,7 @@ type httpCliTransHandler struct {
 }
 
 // Write implements the remote.ClientTransHandler interface.
-func (t *httpCliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (err error) {
+func (t *httpCliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	var bufWriter remote.ByteBuffer
 	ri := sendMsg.RPCInfo()
 	stats2.Record(ctx, ri, stats.WriteStart, nil)
@@ -69,15 +69,15 @@ func (t *httpCliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg 
 	bodyReaderWriter := NewReaderWriterByteBuffer(buffer)
 	defer bodyReaderWriter.Release(err)
 	if err != nil {
-		return err
+		return ctx, err
 	}
 	err = t.codec.Encode(ctx, sendMsg, bodyReaderWriter)
 	if err != nil {
-		return err
+		return ctx, err
 	}
 	err = bodyReaderWriter.Flush()
 	if err != nil {
-		return err
+		return ctx, err
 	}
 	var url string
 	if hu, ok := ri.To().Tag(rpcinfo.HTTPURL); ok {
@@ -87,21 +87,21 @@ func (t *httpCliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg 
 	}
 	req, err := http.NewRequest("POST", url, netpoll.NewIOReader(buffer))
 	if err != nil {
-		return err
+		return ctx, err
 	}
 	err = addMetaInfo(sendMsg, req.Header)
 	if err != nil {
-		return err
+		return ctx, err
 	}
 	err = req.Write(bufWriter)
 	if err != nil {
-		return err
+		return ctx, err
 	}
-	return bufWriter.Flush()
+	return ctx, bufWriter.Flush()
 }
 
 // Read implements the remote.ClientTransHandler interface. Read is blocked.
-func (t *httpCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
+func (t *httpCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	var bufReader remote.ByteBuffer
 	stats2.Record(ctx, msg.RPCInfo(), stats.ReadStart, nil)
 	defer func() {
@@ -113,16 +113,16 @@ func (t *httpCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remot
 	bufReader = t.ext.NewReadByteBuffer(ctx, conn, msg)
 	bodyReader, err := getBodyBufReader(bufReader)
 	if err != nil {
-		return fmt.Errorf("get body bufreader error:%w", err)
+		return ctx, fmt.Errorf("get body bufreader error:%w", err)
 	}
 	err = t.codec.Decode(ctx, msg, bodyReader)
 	if err != nil {
-		return err
+		return ctx, err
 	}
 	if left := bufReader.ReadableLen(); left > 0 {
 		bufReader.Skip(left)
 	}
-	return
+	return ctx, nil
 }
 
 // OnMessage implements the remote.ClientTransHandler interface.

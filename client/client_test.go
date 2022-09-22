@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"errors"
+	"net"
 	"runtime"
 	"runtime/debug"
 	"sync/atomic"
@@ -91,8 +92,12 @@ func newMockCliTransHandlerFactory(ctrl *gomock.Controller) remote.ClientTransHa
 	handler.EXPECT().OnMessage(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, args, result remote.Message) (context.Context, error) {
 		return ctx, nil
 	}).AnyTimes()
-	handler.EXPECT().Read(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-	handler.EXPECT().Write(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	handler.EXPECT().Read(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, conn net.Conn, msg remote.Message) (context.Context, error) {
+		return ctx, nil
+	}).AnyTimes()
+	handler.EXPECT().Write(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, conn net.Conn, msg remote.Message) (context.Context, error) {
+		return ctx, nil
+	}).AnyTimes()
 	handler.EXPECT().SetPipeline(gomock.Any()).AnyTimes()
 	handler.EXPECT().OnError(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	handler.EXPECT().OnInactive(gomock.Any(), gomock.Any()).AnyTimes()

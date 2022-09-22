@@ -67,8 +67,9 @@ func TestHTTPWrite(t *testing.T) {
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
 
 	// 2. test
-	err := httpCilTransHdlr.Write(ctx, conn, msg)
-	// check err not nil
+	ctx, err := httpCilTransHdlr.Write(ctx, conn, msg)
+	// check ctx/err not nil
+	test.Assert(t, ctx != nil)
 	test.Assert(t, err != nil)
 }
 
@@ -102,8 +103,9 @@ func TestHTTPRead(t *testing.T) {
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Reply, remote.Client)
 
 	// 2. test
-	err := httpCilTransHdlr.Read(ctx, conn, msg)
-	// check err not nil
+	ctx, err := httpCilTransHdlr.Read(ctx, conn, msg)
+	// check ctx/err not nil
+	test.Assert(t, ctx != nil)
 	test.Assert(t, err != nil)
 
 	rpcinfo.AsMutableRPCConfig(cfg).SetRPCTimeout(rwTimeout)

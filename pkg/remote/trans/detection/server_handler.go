@@ -67,11 +67,11 @@ type svrTransHandler struct {
 	netpoll remote.ServerTransHandler
 }
 
-func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) error {
+func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error) {
 	return t.which(ctx).Write(ctx, conn, send)
 }
 
-func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) error {
+func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	return t.which(ctx).Read(ctx, conn, msg)
 }
 

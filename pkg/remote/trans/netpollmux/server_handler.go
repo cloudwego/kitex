@@ -92,7 +92,7 @@ type svrTransHandler struct {
 }
 
 // Write implements the remote.ServerTransHandler interface.
-func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (err error) {
+func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	stats2.Record(ctx, ri, stats.WriteStart, nil)
 	defer func() {
@@ -101,7 +101,7 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 
 	if methodInfo, _ := trans.GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
-			return nil
+			return ctx, nil
 		}
 	}
 	wbuf := netpoll.NewLinkBuffer()
@@ -109,17 +109,17 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	bufWriter.Release(err)
 	if err != nil {
-		return err
+		return ctx, err
 	}
 	conn.(*muxSvrConn).Put(func() (buf netpoll.Writer, isNil bool) {
 		return wbuf, false
 	})
-	return nil
+	return ctx, nil
 }
 
 // Read implements the remote.ServerTransHandler interface.
-func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
-	return nil
+func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
+	return ctx, nil
 }
 
 func (t *svrTransHandler) readWithByteBuffer(ctx context.Context, bufReader remote.ByteBuffer, msg remote.Message) (err error) {
@@ -263,7 +263,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	}
 
 	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
-	if err = t.transPipe.Write(ctx, muxSvrConn, sendMsg); err != nil {
+	if ctx, err = t.transPipe.Write(ctx, muxSvrConn, sendMsg); err != nil {
 		t.OnError(ctx, err, muxSvrConn)
 		closeConn = true
 		return
@@ -398,7 +398,7 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		// if error happen before normal OnMessage, exec it to transfer header trans info into rpcinfo
 		t.transPipe.OnMessage(ctx, recvMsg, errMsg)
 	}
-	err = t.transPipe.Write(ctx, conn, errMsg)
+	ctx, err = t.transPipe.Write(ctx, conn, errMsg)
 	if err != nil {
 		klog.CtxErrorf(ctx, "KITEX: write error reply failed, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
 		return true

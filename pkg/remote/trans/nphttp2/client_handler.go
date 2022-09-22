@@ -50,22 +50,22 @@ type cliTransHandler struct {
 	codec remote.Codec
 }
 
-func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
+func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	buf := newBuffer(conn.(*clientConn))
 	defer buf.Release(err)
 
 	if err = h.codec.Encode(ctx, msg, buf); err != nil {
-		return err
+		return ctx, err
 	}
-	return buf.Flush()
+	return ctx, buf.Flush()
 }
 
-func (h *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
+func (h *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	buf := newBuffer(conn.(*clientConn))
 	defer buf.Release(err)
 
 	err = h.codec.Decode(ctx, msg, buf)
-	return
+	return ctx, err
 }
 
 func (h *cliTransHandler) OnRead(ctx context.Context, conn net.Conn) (context.Context, error) {
