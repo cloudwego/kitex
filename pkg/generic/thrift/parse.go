@@ -472,6 +472,12 @@ func onInt(tree *parser.Thrift, name string, t *parser.Type, v *parser.ConstValu
 			return 0, err
 		}
 		switch rv := val.(type) {
+		case byte:
+			return int64(rv), nil
+		case int16:
+			return int64(rv), nil
+		case int32:
+			return int64(rv), nil
 		case int64:
 			return rv, nil
 		}
