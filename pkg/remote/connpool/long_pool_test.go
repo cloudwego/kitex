@@ -573,7 +573,7 @@ func TestLongConnPoolEvict(t *testing.T) {
 	defer ctrl.Finish()
 
 	var (
-		idleTime = time.Millisecond * 10
+		idleTime = time.Millisecond * 100
 		minIdle  = 1
 		maxIdle  = 5
 	)

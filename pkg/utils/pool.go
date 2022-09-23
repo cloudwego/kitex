@@ -21,6 +21,7 @@ import (
 	"time"
 )
 
+// PoolObject is the interface of the object in the pool.
 type PoolObject interface {
 	SetDeadline(time.Time) error
 	IsActive() bool // IsActive checks if the object is active.
@@ -34,10 +35,10 @@ type PoolDump struct {
 	IdleList []interface{} `json:"idle_list"`
 }
 
+// Pool implements a pool of general objects.
 type Pool struct {
 	idleList []PoolObject
 	mu       sync.RWMutex
-
 	// config
 	minIdle        int
 	maxIdle        int           // currIdle <= maxIdle.
@@ -84,6 +85,7 @@ func (p *Pool) Get(newer func() (PoolObject, error)) (PoolObject, bool, error) {
 	return o, false, nil
 }
 
+// Put puts the object back to the pool and returns true if the objects has been put into the pool.
 func (p *Pool) Put(o PoolObject) bool {
 	var recycled bool
 	p.mu.Lock()
@@ -96,7 +98,7 @@ func (p *Pool) Put(o PoolObject) bool {
 	return recycled
 }
 
-// Evict clean those expired objects.
+// Evict cleans those expired objects.
 func (p *Pool) Evict() {
 	p.mu.Lock()
 	i := 0
@@ -111,6 +113,7 @@ func (p *Pool) Evict() {
 	p.mu.Unlock()
 }
 
+// Len returns the length of the pool.
 func (p *Pool) Len() int {
 	p.mu.RLock()
 	l := len(p.idleList)
@@ -118,6 +121,7 @@ func (p *Pool) Len() int {
 	return l
 }
 
+// Close closes the pool and all the objects in the pool.
 func (p *Pool) Close() {
 	p.mu.Lock()
 	for i := 0; i < len(p.idleList); i++ {
@@ -127,6 +131,7 @@ func (p *Pool) Close() {
 	p.mu.Unlock()
 }
 
+// Dump dumps the info of all the objects in the pool.
 func (p *Pool) Dump() PoolDump {
 	p.mu.RLock()
 	idleNum := len(p.idleList)

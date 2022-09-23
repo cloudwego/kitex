@@ -21,7 +21,6 @@ import (
 	"context"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/connpool"
@@ -178,7 +177,6 @@ type LongPool struct {
 	newPeer  func(net.Addr) *peer
 
 	closeCh chan struct{}
-	closed  int32
 }
 
 func (lp *LongPool) getPeer(addr netAddr) *peer {
@@ -246,7 +244,9 @@ func (lp *LongPool) Dump() interface{} {
 
 // Close releases all peers in the pool, it is executed when client is closed.
 func (lp *LongPool) Close() error {
-	if atomic.CompareAndSwapInt32(&lp.closed, 0, 1) {
+	select {
+	case <-lp.closeCh:
+	default:
 		close(lp.closeCh)
 	}
 	lp.peerMap.Range(func(addr, value interface{}) bool {
@@ -269,14 +269,13 @@ func (lp *LongPool) WarmUp(eh warmup.ErrorHandling, wuo *warmup.PoolOption, co r
 	return h.WarmUp(wuo, lp, co)
 }
 
+// Evict cleanups the idle connections in peers.
 func (lp *LongPool) Evict(frequency time.Duration) {
 	t := time.NewTicker(frequency)
+	defer t.Stop()
 	for {
 		select {
 		case <-t.C:
-			if atomic.LoadInt32(&lp.closed) == 1 {
-				return
-			}
 			lp.peerMap.Range(func(key, value interface{}) bool {
 				p := value.(*peer)
 				p.Evict()
@@ -303,7 +302,6 @@ func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
 				limit)
 		},
 		closeCh: make(chan struct{}),
-		closed:  0,
 	}
 
 	go lp.Evict(idlConfig.MaxIdleTimeout)
