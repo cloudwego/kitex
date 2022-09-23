@@ -14,7 +14,7 @@
 
 package tpl
 
-// HandlerMethodTpl is the template for generating methods in handler.go.
+// HandlerMethodsTpl is the template for generating methods in handler.go.
 var HandlerMethodsTpl string = `{{define "HandlerMethod"}}
 {{range .AllMethods}}
 {{- if or .ClientStreaming .ServerStreaming}}

@@ -23,7 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cloudwego/kitex"
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
@@ -46,6 +45,7 @@ type ExtraFlag struct {
 	Check func(*Arguments)
 }
 
+// Arguments .
 type Arguments struct {
 	generator.Config
 	extends []*ExtraFlag
@@ -61,6 +61,7 @@ const cmdExample = `  # Generate client codes or update kitex_gen codes when a p
   kitex -service {{svc_name}} {{path/to/IDL_file.thrift}}
 `
 
+// AddExtraFlag .
 func (a *Arguments) AddExtraFlag(e *ExtraFlag) {
 	a.extends = append(a.extends, e)
 }
@@ -99,6 +100,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Combine services in root thrift file.")
 	f.BoolVar(&a.CopyIDL, "copy-idl", false,
 		"Copy each IDL file to the output path.")
+	f.StringVar(&a.ExtensionFile, "template-extension", a.ExtensionFile,
+		"Specify a file for template extension.")
 
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
@@ -119,7 +122,7 @@ Usage: %s [flags] IDL
 Examples:
 %s
 Flags:
-`, kitex.Version, os.Args[0], cmdExample)
+`, a.Version, os.Args[0], cmdExample)
 		f.PrintDefaults()
 		os.Exit(1)
 	}
