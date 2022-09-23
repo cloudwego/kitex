@@ -10,13 +10,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ matrix.go }}
+          go-version: '1.16'
       - name: Unit Test
         run: go test -race -covermode=atomic -coverprofile=coverage.txt ./...
       - name: Codecov
         run: bash <(curl -s https://codecov.io/bash)
       - name: Benchmark
         run: go test -bench=. -benchmem -run=none ./...
+
   compatibility-test:
     strategy:
       matrix:
@@ -31,10 +32,11 @@ jobs:
           go-version: ${{ matrix.go }}
       - name: Unit Test
         run: go test -race -covermode=atomic -coverprofile=coverage.txt ./...
+
   scenario-test:
     strategy:
       matrix:
-        go: [ 1.15, 1.18 ]
+        go: [ 1.16, 1.18 ]
     runs-on: [ self-hosted, X64 ]
     steps:
       - uses: actions/checkout@v3
