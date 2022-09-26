@@ -103,7 +103,7 @@ func (p *Pool) Evict() {
 	p.mu.Lock()
 	i := 0
 	for ; i < len(p.idleList)-p.minIdle; i++ {
-		if !p.idleList[i].Expired() {
+		if !p.idleList[i].Expired() && p.idleList[i].IsActive() {
 			break
 		}
 		// close the inactive object

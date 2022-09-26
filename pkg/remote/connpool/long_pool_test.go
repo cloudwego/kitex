@@ -607,7 +607,8 @@ func TestLongConnPoolEvict(t *testing.T) {
 	}
 
 	// only `minIdle` of connections should be kept in the pool
-	time.Sleep(2 * idleTime)
+	// 3 times of idleTime to make sure the eviction goroutine can be done
+	time.Sleep(3 * idleTime)
 	p.peerMap.Range(func(key, value interface{}) bool {
 		v := value.(*peer)
 		test.Assert(t, v.Len() == minIdle)
