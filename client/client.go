@@ -227,6 +227,7 @@ func (kc *kClient) initLBCache() error {
 }
 
 func (kc *kClient) initMiddlewares(ctx context.Context) {
+	kc.mws = append(kc.mws, richMWsWithBuilder(ctx, kc.opt.EntranceMWBs)...)
 	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
 	// integrate xds if enabled
 	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {

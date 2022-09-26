@@ -78,8 +78,9 @@ type Options struct {
 
 	ACLRules []acl.RejectFunc
 
-	MWBs  []endpoint.MiddlewareBuilder
-	IMWBs []endpoint.MiddlewareBuilder
+	EntranceMWBs []endpoint.MiddlewareBuilder
+	MWBs         []endpoint.MiddlewareBuilder
+	IMWBs        []endpoint.MiddlewareBuilder
 
 	Bus          event.Bus
 	Events       event.Queue

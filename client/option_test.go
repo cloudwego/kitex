@@ -327,6 +327,11 @@ func TestWithInstanceMW(t *testing.T) {
 	test.Assert(t, len(opts.IMWBs) == 1, len(opts.IMWBs))
 }
 
+func TestWithEntranceMW(t *testing.T) {
+	opts := client.NewOptions([]client.Option{WithEntranceMW(md)})
+	test.Assert(t, len(opts.EntranceMWBs) == 1, len(opts.EntranceMWBs))
+}
+
 func TestWithHTTPResolver(t *testing.T) {
 	opts := client.NewOptions([]client.Option{WithHTTPResolver(httpResolver)})
 	test.DeepEqual(t, opts.HTTPResolver, httpResolver)

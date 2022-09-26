@@ -104,6 +104,17 @@ func WithMiddlewareBuilder(mwb endpoint.MiddlewareBuilder) Option {
 	}}
 }
 
+// WithEntranceMW adds middleware for client to handle request before all another middlewares.
+func WithEntranceMW(mw endpoint.Middleware) Option {
+	emwb := func(ctx context.Context) endpoint.Middleware {
+		return mw
+	}
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithEntranceMW(%+v)", utils.GetFuncName(mw)))
+		o.EntranceMWBs = append(o.EntranceMWBs, emwb)
+	}}
+}
+
 // WithInstanceMW adds middleware for client to handle request after service discovery and loadbalance process.
 func WithInstanceMW(mw endpoint.Middleware) Option {
 	imwb := func(ctx context.Context) endpoint.Middleware {
