@@ -65,10 +65,19 @@ func NewReadStruct(svc *descriptor.ServiceDescriptor, isClient bool) *ReadStruct
 	}
 }
 
+func NewReadStructForJSON(svc *descriptor.ServiceDescriptor, isClient bool) *ReadStruct {
+	return &ReadStruct{
+		svc:      svc,
+		isClient: isClient,
+		forJSON:  true,
+	}
+}
+
 // ReadStruct implement of MessageReaderWithMethod
 type ReadStruct struct {
 	svc      *descriptor.ServiceDescriptor
 	isClient bool
+	forJSON  bool
 }
 
 var _ MessageReader = (*ReadStruct)(nil)
@@ -83,5 +92,5 @@ func (m *ReadStruct) Read(ctx context.Context, method string, in thrift.TProtoco
 	if !m.isClient {
 		fDsc = fnDsc.Request
 	}
-	return skipStructReader(ctx, in, fDsc, &readerOption{throwException: true})
+	return skipStructReader(ctx, in, fDsc, &readerOption{throwException: true, forJSON: m.forJSON})
 }

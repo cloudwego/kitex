@@ -17,9 +17,11 @@
 package thrift
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -488,7 +490,8 @@ func Test_writeBase64String(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeBase64Binary(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeBase64Binary(context.Background(), tt.args.val, tt.args.out, tt.args.t,
+				tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeString() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -531,6 +534,105 @@ func Test_writeBinary(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := writeBinary(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeBinary() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_writeBinaryList(t *testing.T) {
+	type args struct {
+		val []byte
+		t   *descriptor.TypeDescriptor
+		opt *writerOption
+	}
+	type params struct {
+		listBeginErr error
+		writeByteErr error
+		listEndErr   error
+	}
+	commonArgs := args{
+		val: []byte(stringInput),
+		t: &descriptor.TypeDescriptor{
+			Type:   descriptor.LIST,
+			Elem:   &descriptor.TypeDescriptor{Type: descriptor.BYTE},
+			Struct: &descriptor.StructDescriptor{},
+		},
+	}
+	tests := []struct {
+		name    string
+		args    args
+		params  params
+		wantErr bool
+	}{
+		{
+			name:    "writeBinaryList",
+			args:    commonArgs,
+			wantErr: false,
+		},
+		{
+			name: "list begin error",
+			args: commonArgs,
+			params: params{
+				listBeginErr: errors.New("test error"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "write byte error",
+			args: commonArgs,
+			params: params{
+				writeByteErr: errors.New("test error"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "list end error",
+			args: commonArgs,
+			params: params{
+				listEndErr: errors.New("test error"),
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty slice",
+			args: args{
+				val: []byte(""),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.LIST,
+					Elem:   &descriptor.TypeDescriptor{Type: descriptor.BYTE},
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var writtenData []byte
+			var endHit bool
+			mockTTransport := &mocks.MockThriftTTransport{
+				WriteListBeginFunc: func(elemType thrift.TType, size int) error {
+					test.Assert(t, elemType == thrift.BYTE)
+					test.Assert(t, size == len(tt.args.val))
+					return tt.params.listBeginErr
+				},
+				WriteByteFunc: func(val int8) error {
+					writtenData = append(writtenData, byte(val))
+					return tt.params.writeByteErr
+				},
+				WriteListEndFunc: func() error {
+					endHit = true
+					return tt.params.listEndErr
+				},
+			}
+
+			if err := writeBinaryList(context.Background(), tt.args.val, mockTTransport, tt.args.t,
+				tt.args.opt); (err != nil) != tt.wantErr {
+				t.Errorf("writeBinary() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr {
+				test.Assert(t, bytes.Equal(tt.args.val, writtenData))
+				test.Assert(t, endHit == true)
 			}
 		})
 	}
@@ -617,7 +719,8 @@ func Test_writeInterfaceMap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeInterfaceMap(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeInterfaceMap(context.Background(), tt.args.val, tt.args.out, tt.args.t,
+				tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeInterfaceMap() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

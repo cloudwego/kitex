@@ -98,6 +98,9 @@ func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption)
 		// maybe a json number string
 		return descriptor.STRING, writeString, nil
 	case []byte:
+		if tt == descriptor.LIST {
+			return descriptor.LIST, writeBinaryList, nil
+		}
 		return descriptor.STRING, writeBinary, nil
 	case []interface{}:
 		return descriptor.LIST, writeList, nil
@@ -369,6 +372,20 @@ func writeBase64Binary(ctx context.Context, val interface{}, out thrift.TProtoco
 
 func writeBinary(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	return out.WriteBinary(val.([]byte))
+}
+
+func writeBinaryList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	l := val.([]byte)
+	length := len(l)
+	if err := out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
+		return err
+	}
+	for _, b := range l {
+		if err := out.WriteByte(int8(b)); err != nil {
+			return err
+		}
+	}
+	return out.WriteListEnd()
 }
 
 func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
