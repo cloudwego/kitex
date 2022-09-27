@@ -213,16 +213,24 @@ func (t *Task) Build() error {
 	return nil
 }
 
-var indexes = map[string]int{
-	ClientFileName: 0, ServerFileName: 2, InvokerFileName: 4,
+func fileTemplateExtension(name string) (option, eof string) {
+	for _, tn := range templateNames {
+		if strings.HasPrefix(tn, "@"+name+"-") {
+			if strings.HasSuffix(tn, "-option") {
+				option = tn
+			} else if strings.HasSuffix(tn, "-EOF") {
+				eof = tn
+			}
+		}
+	}
+	return
 }
 
 func (t *Task) makeExtension() (res []string) {
-	idx, ok := indexes[t.Name]
-	if !ok || t.Ext == nil {
+	if t.Ext == nil {
 		return
 	}
-	p1, p2 := templateNames[idx], templateNames[idx+1]
+	p1, p2 := fileTemplateExtension(t.Name)
 	if t.Ext.ExtendOption != "" {
 		res = append(res, wrapTemplate(p1, t.Ext.ExtendOption))
 	}
