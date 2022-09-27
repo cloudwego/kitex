@@ -33,6 +33,7 @@ import (
 // PluginName .
 const PluginName = "protoc-gen-kitex"
 
+// Run .
 func Run() int {
 	opts := protogen.Options{}
 	if err := run(opts); err != nil {

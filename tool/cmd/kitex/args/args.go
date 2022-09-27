@@ -12,37 +12,43 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package args
 
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/cloudwego/kitex"
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
+	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
-// extraFlag is designed for adding flags that is irrelevant to
+// EnvPluginMode is an environment that kitex uses to distinguish run modes.
+const EnvPluginMode = "KITEX_PLUGIN_MODE"
+
+// ExtraFlag is designed for adding flags that is irrelevant to
 // code generation.
-type extraFlag struct {
+type ExtraFlag struct {
 	// apply may add flags to the FlagSet.
-	apply func(*flag.FlagSet)
+	Apply func(*flag.FlagSet)
 
 	// check may perform any value checking for flags added by apply above.
 	// When an error occur, check should directly terminate the program by
 	// os.Exit with exit code 1 for internal error and 2 for invalid arguments.
-	check func(*arguments)
+	Check func(*Arguments)
 }
 
-type arguments struct {
+// Arguments .
+type Arguments struct {
 	generator.Config
-	extends []*extraFlag
+	extends []*ExtraFlag
 }
 
 const cmdExample = `  # Generate client codes or update kitex_gen codes when a project is in $GOPATH:
@@ -55,11 +61,12 @@ const cmdExample = `  # Generate client codes or update kitex_gen codes when a p
   kitex -service {{svc_name}} {{path/to/IDL_file.thrift}}
 `
 
-func (a *arguments) addExtraFlag(e *extraFlag) {
+// AddExtraFlag .
+func (a *Arguments) AddExtraFlag(e *ExtraFlag) {
 	a.extends = append(a.extends, e)
 }
 
-func (a *arguments) guessIDLType() (string, bool) {
+func (a *Arguments) guessIDLType() (string, bool) {
 	switch {
 	case strings.HasSuffix(a.IDL, ".thrift"):
 		return "thrift", true
@@ -69,7 +76,7 @@ func (a *arguments) guessIDLType() (string, bool) {
 	return "unknown", false
 }
 
-func (a *arguments) buildFlags() *flag.FlagSet {
+func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
 	f.BoolVar(&a.NoFastAPI, "no-fast-api", false,
 		"Generate codes without injecting fast method.")
@@ -93,8 +100,10 @@ func (a *arguments) buildFlags() *flag.FlagSet {
 		"Combine services in root thrift file.")
 	f.BoolVar(&a.CopyIDL, "copy-idl", false,
 		"Copy each IDL file to the output path.")
+	f.StringVar(&a.ExtensionFile, "template-extension", a.ExtensionFile,
+		"Specify a file for template extension.")
 
-	a.Version = kitex.Version
+	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
 		"naming_style=golint",
 		"ignore_initialisms",
@@ -104,7 +113,7 @@ func (a *arguments) buildFlags() *flag.FlagSet {
 	)
 
 	for _, e := range a.extends {
-		e.apply(f)
+		e.Apply(f)
 	}
 	f.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Version %s
@@ -113,15 +122,16 @@ Usage: %s [flags] IDL
 Examples:
 %s
 Flags:
-`, kitex.Version, os.Args[0], cmdExample)
+`, a.Version, os.Args[0], cmdExample)
 		f.PrintDefaults()
 		os.Exit(1)
 	}
 	return f
 }
 
-func (a *arguments) parseArgs() {
-	f := a.buildFlags()
+// ParseArgs parses command line arguments.
+func (a *Arguments) ParseArgs(version string) {
+	f := a.buildFlags(version)
 	if err := f.Parse(os.Args[1:]); err != nil {
 		log.Warn(os.Stderr, err)
 		os.Exit(2)
@@ -130,7 +140,7 @@ func (a *arguments) parseArgs() {
 	log.Verbose = a.Verbose
 
 	for _, e := range a.extends {
-		e.check(a)
+		e.Check(a)
 	}
 
 	a.checkIDL(f.Args())
@@ -138,7 +148,7 @@ func (a *arguments) parseArgs() {
 	a.checkPath()
 }
 
-func (a *arguments) checkIDL(files []string) {
+func (a *Arguments) checkIDL(files []string) {
 	if len(files) == 0 {
 		log.Warn("No IDL file found.")
 		os.Exit(2)
@@ -164,7 +174,7 @@ func (a *arguments) checkIDL(files []string) {
 	}
 }
 
-func (a *arguments) checkServiceName() {
+func (a *Arguments) checkServiceName() {
 	if a.ServiceName == "" {
 		if a.Use != "" {
 			log.Warn("-use must be used with -service")
@@ -175,7 +185,7 @@ func (a *arguments) checkServiceName() {
 	}
 }
 
-func (a *arguments) checkPath() {
+func (a *Arguments) checkPath() {
 	pathToGo, err := exec.LookPath("go")
 	if err != nil {
 		log.Warn(err)
@@ -234,6 +244,86 @@ func (a *arguments) checkPath() {
 		a.PackagePrefix = a.Use
 	}
 	a.OutputPath = curpath
+}
+
+// BuildCmd builds an exec.Cmd.
+func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
+	exe, err := os.Executable()
+	if err != nil {
+		log.Warn("Failed to detect current executable:", err.Error())
+		os.Exit(1)
+	}
+
+	kas := strings.Join(a.Config.Pack(), ",")
+	cmd := &exec.Cmd{
+		Path:   lookupTool(a.IDLType),
+		Stdin:  os.Stdin,
+		Stdout: io.MultiWriter(out, os.Stdout),
+		Stderr: io.MultiWriter(out, os.Stderr),
+	}
+	if a.IDLType == "thrift" {
+		os.Setenv(EnvPluginMode, thriftgo.PluginName)
+		cmd.Args = append(cmd.Args, "thriftgo")
+		for _, inc := range a.Includes {
+			cmd.Args = append(cmd.Args, "-i", inc)
+		}
+		a.ThriftOptions = append(a.ThriftOptions, "package_prefix="+a.PackagePrefix)
+		gas := "go:" + strings.Join(a.ThriftOptions, ",")
+		if a.Verbose {
+			cmd.Args = append(cmd.Args, "-v")
+		}
+		if a.Use == "" {
+			cmd.Args = append(cmd.Args, "-r")
+		}
+		cmd.Args = append(cmd.Args,
+			"-o", generator.KitexGenPath,
+			"-g", gas,
+			"-p", "kitex="+exe+":"+kas,
+		)
+		for _, p := range a.ThriftPlugins {
+			cmd.Args = append(cmd.Args, "-p", p)
+		}
+		cmd.Args = append(cmd.Args, a.IDL)
+	} else {
+		os.Setenv(EnvPluginMode, protoc.PluginName)
+		a.ThriftOptions = a.ThriftOptions[:0]
+		// "protobuf"
+		cmd.Args = append(cmd.Args, "protoc")
+		for _, inc := range a.Includes {
+			cmd.Args = append(cmd.Args, "-I", inc)
+		}
+		outPath := filepath.Join(".", generator.KitexGenPath)
+		if a.Use == "" {
+			os.MkdirAll(outPath, 0o755)
+		} else {
+			outPath = "."
+		}
+		cmd.Args = append(cmd.Args,
+			"--plugin=protoc-gen-kitex="+exe,
+			"--kitex_out="+outPath,
+			"--kitex_opt="+kas,
+		)
+		for _, po := range a.ProtobufOptions {
+			cmd.Args = append(cmd.Args, "--kitex_opt="+po)
+		}
+		cmd.Args = append(cmd.Args, a.IDL)
+	}
+	log.Info(strings.ReplaceAll(strings.Join(cmd.Args, " "), kas, fmt.Sprintf("%q", kas)))
+	return cmd
+}
+
+func lookupTool(idlType string) string {
+	tool := "thriftgo"
+	if idlType == "protobuf" {
+		tool = "protoc"
+	}
+
+	path, err := exec.LookPath(tool)
+	if err != nil {
+		log.Warnf("Failed to find %q from $PATH: %s. Try $GOPATH/bin/%s instead\n", path, err.Error(), tool)
+		path = filepath.Join(util.GetGOPATH(), "bin", tool)
+	}
+	return path
 }
 
 func initGoMod(pathToGo, module string) error {
