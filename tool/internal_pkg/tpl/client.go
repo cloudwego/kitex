@@ -70,6 +70,9 @@ func NewClient(destService string, opts ...client.Option) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	{{- if .FrugalPretouch}}
+	pretouch()
+	{{- end}}{{/* if .FrugalPretouch */}}
 	return &k{{.ServiceName}}Client{
 		kClient: newServiceClient(kc),
 	}, nil

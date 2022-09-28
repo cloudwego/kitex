@@ -40,6 +40,9 @@ func NewServer(handler {{call .ServiceTypeName}}, opts ...server.Option) server.
     if err := svr.RegisterService(serviceInfo(), handler); err != nil {
             panic(err)
     }
+	{{- if .FrugalPretouch}}
+	pretouch()
+	{{- end}}{{/* if .FrugalPretouch */}}
     return svr
 }
 {{template "@server.go-EOF" .}}

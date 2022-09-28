@@ -44,6 +44,7 @@ type PackageInfo struct {
 	Imports          map[string]map[string]bool // import path => alias
 	ExternalKitexGen string
 	Features         []feature
+	FrugalPretouch   bool
 }
 
 // AddImport .

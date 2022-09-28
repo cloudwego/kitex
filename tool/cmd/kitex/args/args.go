@@ -102,6 +102,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Copy each IDL file to the output path.")
 	f.StringVar(&a.ExtensionFile, "template-extension", a.ExtensionFile,
 		"Specify a file for template extension.")
+	f.BoolVar(&a.FrugalPretouch, "frugal-pretouch", false,
+		"Use frugal to compile arguments and results when new clients and servers.")
 
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
