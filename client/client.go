@@ -336,6 +336,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 			err := kc.eps(ctx, request, response)
 			kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 			if err == nil {
+				err = ri.Invocation().BizStatusErr()
 				rpcinfo.PutRPCInfo(ri)
 			}
 			return err
@@ -363,6 +364,9 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 
 	kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 	callOpts.Recycle()
+	if err == nil {
+		err = ri.Invocation().BizStatusErr()
+	}
 	if recycleRI {
 		// why need check recycleRI to decide if recycle RPCInfo?
 		// 1. no retry, rpc timeout happen will cause panic when response return

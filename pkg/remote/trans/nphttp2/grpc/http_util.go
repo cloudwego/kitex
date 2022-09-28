@@ -36,6 +36,9 @@ import (
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/utils"
+
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
@@ -112,9 +115,11 @@ type parsedHeaderData struct {
 	statusGen *status.Status
 	// rawStatusCode and rawStatusMsg are set from the raw trailer fields and are not
 	// intended for direct access outside of parsing.
-	rawStatusCode *int
-	rawStatusMsg  string
-	httpStatus    *int
+	rawStatusCode  *int
+	rawStatusMsg   string
+	bizStatusCode  *int
+	bizStatusExtra map[string]string
+	httpStatus     *int
 	// Server side only fields.
 	timeoutSet bool
 	timeout    time.Duration
@@ -231,6 +236,10 @@ func (d *decodeState) status() *status.Status {
 	if d.data.statusGen == nil {
 		// No status-details were provided; generate status using code/msg.
 		d.data.statusGen = status.New(codes.Code(safeCastInt32(*(d.data.rawStatusCode))), d.data.rawStatusMsg)
+	}
+	if d.data.statusGen.BizStatusError == nil && d.data.bizStatusCode != nil {
+		d.data.statusGen.BizStatusError = kerrors.NewBizStatusErrorWithExtra(
+			safeCastInt32(*(d.data.bizStatusCode)), d.data.rawStatusMsg, d.data.bizStatusExtra)
 	}
 	return d.data.statusGen
 }
@@ -376,6 +385,20 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 		d.data.rawStatusCode = &code
 	case "grpc-message":
 		d.data.rawStatusMsg = decodeGrpcMessage(f.Value)
+	case "biz-status":
+		code, err := strconv.Atoi(f.Value)
+		if err != nil {
+			d.data.grpcErr = status.Errorf(codes.Internal, "transport: malformed biz-status: %v", err)
+			return
+		}
+		d.data.bizStatusCode = &code
+	case "biz-extra":
+		extra, err := utils.JSONStr2Map(f.Value)
+		if err != nil {
+			d.data.grpcErr = status.Errorf(codes.Internal, "transport: malformed biz-extra: %v", err)
+			return
+		}
+		d.data.bizStatusExtra = extra
 	case "grpc-status-details-bin":
 		v, err := decodeBinHeader(f.Value)
 		if err != nil {

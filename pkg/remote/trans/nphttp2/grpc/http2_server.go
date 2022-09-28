@@ -39,6 +39,8 @@ import (
 	"golang.org/x/net/http2/hpack"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/cloudwego/kitex/pkg/utils"
+
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
@@ -765,6 +767,13 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 	}
 	headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-status", Value: strconv.Itoa(int(st.Code()))})
 	headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-message", Value: encodeGrpcMessage(st.Message())})
+	if st.BizStatusError != nil {
+		headerFields = append(headerFields, hpack.HeaderField{Name: "biz-status", Value: strconv.Itoa(int(st.BizStatusError.BizStatusCode()))})
+		if len(st.BizStatusError.BizExtra()) != 0 {
+			value, _ := utils.Map2JSONStr(st.BizStatusError.BizExtra())
+			headerFields = append(headerFields, hpack.HeaderField{Name: "biz-extra", Value: value})
+		}
+	}
 
 	if p := st.Proto(); p != nil && len(p.Details) > 0 {
 		stBytes, err := proto.Marshal(p)

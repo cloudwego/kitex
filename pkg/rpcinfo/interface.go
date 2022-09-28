@@ -21,6 +21,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -80,6 +81,7 @@ type Invocation interface {
 	ServiceName() string
 	MethodName() string
 	SeqID() int32
+	BizStatusErr() kerrors.BizStatusErrorIface
 }
 
 // RPCInfo is the core abstraction of information about an RPC in Kitex.

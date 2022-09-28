@@ -49,7 +49,8 @@ type Iface interface {
 // Status represents an RPC status code, message, and details.  It is immutable
 // and should be created with New, Newf, or FromProto.
 type Status struct {
-	s *spb.Status
+	s              *spb.Status
+	BizStatusError kerrors.BizStatusErrorIface
 }
 
 // New returns a Status representing c and msg.
@@ -191,12 +192,8 @@ func FromError(err error) (s *Status, ok bool) {
 	if err == nil {
 		return nil, true
 	}
-	if kerrors.IsKitexError(err) {
-		err = errors.Unwrap(err)
-	}
-	if se, ok := err.(interface {
-		GRPCStatus() *Status
-	}); ok {
+	var se Iface
+	if errors.As(err, &se) {
 		return se.GRPCStatus(), true
 	}
 	return New(codes.Unknown, err.Error()), false
@@ -216,9 +213,8 @@ func Code(err error) codes.Code {
 	if err == nil {
 		return codes.OK
 	}
-	if se, ok := err.(interface {
-		GRPCStatus() *Status
-	}); ok {
+	var se Iface
+	if errors.As(err, &se) {
 		return se.GRPCStatus().Code()
 	}
 	return codes.Unknown

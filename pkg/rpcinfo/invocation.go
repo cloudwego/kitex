@@ -19,6 +19,8 @@ package rpcinfo
 import (
 	"sync"
 	"sync/atomic"
+
+	"github.com/cloudwego/kitex/pkg/kerrors"
 )
 
 var (
@@ -38,6 +40,7 @@ type InvocationSetter interface {
 	SetServiceName(name string)
 	SetMethodName(name string)
 	SetSeqID(seqID int32)
+	SetBizStatusErr(err kerrors.BizStatusErrorIface)
 	Reset()
 }
 
@@ -46,6 +49,7 @@ type invocation struct {
 	serviceName string
 	methodName  string
 	seqID       int32
+	bizErr      kerrors.BizStatusErrorIface
 }
 
 // NewInvocation creates a new Invocation with the given service, method and optional package.
@@ -116,6 +120,16 @@ func (i *invocation) SetMethodName(name string) {
 	i.methodName = name
 }
 
+// BizStatusErr implements the Invocation interface.
+func (i *invocation) BizStatusErr() kerrors.BizStatusErrorIface {
+	return i.bizErr
+}
+
+// SetBizStatusErr implements the InvocationSetter interface.
+func (i *invocation) SetBizStatusErr(err kerrors.BizStatusErrorIface) {
+	i.bizErr = err
+}
+
 // Reset implements the InvocationSetter interface.
 func (i *invocation) Reset() {
 	i.zero()
@@ -132,4 +146,5 @@ func (i *invocation) zero() {
 	i.packageName = ""
 	i.serviceName = ""
 	i.methodName = ""
+	i.bizErr = nil
 }
