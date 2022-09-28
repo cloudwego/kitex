@@ -24,8 +24,28 @@ import (
 )
 
 func TestCheckPoolConfig(t *testing.T) {
-	cfg := IdleConfig{MaxIdleTimeout: 0}
-	test.Assert(t, CheckPoolConfig(cfg).MaxIdleTimeout == defaultMaxIdleTimeout)
-	cfg = IdleConfig{MaxIdleTimeout: time.Millisecond}
-	test.Assert(t, CheckPoolConfig(cfg).MaxIdleTimeout == minMaxIdleTimeout)
+	cfg := CheckPoolConfig(IdleConfig{MaxIdleTimeout: 0})
+	test.Assert(t, cfg.MaxIdleTimeout == defaultMaxIdleTimeout)
+	cfg = CheckPoolConfig(IdleConfig{MaxIdleTimeout: time.Millisecond})
+	test.Assert(t, cfg.MaxIdleTimeout == minMaxIdleTimeout)
+
+	// minIdle
+	cfg = CheckPoolConfig(IdleConfig{MinIdlePerAddress: -1})
+	test.Assert(t, cfg.MinIdlePerAddress == 0)
+	test.Assert(t, cfg.MaxIdlePerAddress == 1)
+	test.Assert(t, cfg.MaxIdleGlobal == 1)
+	cfg = CheckPoolConfig(IdleConfig{MinIdlePerAddress: 1})
+	test.Assert(t, cfg.MinIdlePerAddress == 1)
+	cfg = CheckPoolConfig(IdleConfig{MinIdlePerAddress: defaultMinIdlePerAddress+1})
+	test.Assert(t, cfg.MinIdlePerAddress == defaultMinIdlePerAddress)
+
+	// maxIdle
+	cfg = CheckPoolConfig(IdleConfig{MaxIdlePerAddress: 1, MinIdlePerAddress: 2})
+	test.Assert(t, cfg.MaxIdlePerAddress == 2)
+	cfg = CheckPoolConfig(IdleConfig{MaxIdlePerAddress: -1})
+	test.Assert(t, cfg.MaxIdlePerAddress == 1)
+
+	// maxIdleGlobal
+	cfg = CheckPoolConfig(IdleConfig{MaxIdleGlobal: 9, MaxIdlePerAddress: 10, MinIdlePerAddress: 1})
+	test.Assert(t, cfg.MaxIdleGlobal == 10)
 }
