@@ -526,7 +526,7 @@ func TestSpecifiedRespRetry(t *testing.T) {
 	// case2 specified method retry with resp, but use backup request config cannot be effective
 	callTimes = 0
 	rc = NewRetryContainer()
-	err = rc.Init(map[string]Policy{Wildcard: BuildBackupRequest(NewBackupPolicy(10))}, shouldResultRetry)
+	err = rc.Init(map[string]Policy{Wildcard: BuildBackupRequest(NewBackupPolicy(100))}, shouldResultRetry)
 	test.Assert(t, err == nil, err)
 	ok, err = rc.WithRetryIfNeeded(ctx, Policy{}, retryWithResp, ri, nil)
 	test.Assert(t, err == nil, err)
