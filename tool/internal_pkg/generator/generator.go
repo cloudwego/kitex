@@ -52,6 +52,7 @@ var (
 		"client":  ImportPathTo("client"),
 		"server":  ImportPathTo("server"),
 		"callopt": ImportPathTo("client/callopt"),
+		"frugal":  "github.com/cloudwego/frugal",
 	}
 )
 
@@ -110,6 +111,7 @@ type Config struct {
 	CopyIDL         bool
 	ThriftPlugins   util.StringSlice
 	Features        []feature
+	FrugalPretouch  bool
 
 	ExtensionFile string
 	tmplExt       *TemplateExtension
@@ -404,6 +406,7 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	pkg.RealServiceName = g.ServiceName
 	pkg.Features = g.Features
 	pkg.ExternalKitexGen = g.Use
+	pkg.FrugalPretouch = g.FrugalPretouch
 	if pkg.Dependencies == nil {
 		pkg.Dependencies = make(map[string]string)
 	}
@@ -480,6 +483,13 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 				for _, dep := range e.Deps {
 					pkg.AddImport(dep.PkgRefName, dep.ImportPath)
 				}
+			}
+		}
+		if pkg.FrugalPretouch {
+			pkg.AddImports("sync")
+			if len(pkg.AllMethods()) > 0 {
+				pkg.AddImports("frugal")
+				pkg.AddImports("reflect")
 			}
 		}
 	case MainFileName:

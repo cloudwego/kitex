@@ -44,6 +44,9 @@ func NewInvoker(handler {{call .ServiceTypeName}}, opts ...server.Option) server
 	if err := s.Init(); err != nil {
 		panic(err)
 	}
+	{{- if .FrugalPretouch}}
+	pretouch()
+	{{- end}}{{/* if .FrugalPretouch */}}
     return s
 }
 {{template "@invoker.go-EOF" .}}
