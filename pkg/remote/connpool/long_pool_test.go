@@ -503,14 +503,14 @@ func TestConnPoolClose(t *testing.T) {
 	}).AnyTimes()
 
 	network, address := "tcp", mockAddr0
-	conn, err := p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
+	conn0, err := p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
 	test.Assert(t, err == nil)
-	p.Put(conn)
+	p.Put(conn0)
 
 	network, address = "tcp", mockAddr1
-	_, err = p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
+	conn1, err := p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
 	test.Assert(t, err == nil)
-	p.Put(conn)
+	p.Put(conn1)
 
 	connCount := 0
 	p.peerMap.Range(func(key, value interface{}) bool {
@@ -521,6 +521,7 @@ func TestConnPoolClose(t *testing.T) {
 
 	p.Close()
 	test.Assert(t, closed == 2, closed)
+	test.Assert(t, p.globalIdle.Now() == 0)
 
 	connCount = 0
 	p.peerMap.Range(func(key, value interface{}) bool {

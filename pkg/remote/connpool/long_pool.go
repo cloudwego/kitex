@@ -87,11 +87,10 @@ func (c *longConn) Dump() interface{} {
 	return c.deadline
 }
 
-// Pool implements a pool of general objects.
+// pool implements a pool of long connections.
 type pool struct {
 	idleList []*longConn
 	mu       sync.RWMutex
-	closed   bool
 	// config
 	minIdle        int
 	maxIdle        int           // currIdle <= maxIdle.
@@ -108,13 +107,9 @@ func newPool(minIdle, maxIdle int, maxIdleTimeout time.Duration) *pool {
 	return p
 }
 
-// Get gets the first active objects from the idleList or construct a new object.
+// Get gets the first active connection from the idleList.
 func (p *pool) Get() (*longConn, bool) {
 	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		return nil, false
-	}
 	// Get the first active one
 	i := len(p.idleList) - 1
 	for ; i >= 0; i-- {
@@ -136,12 +131,9 @@ func (p *pool) Get() (*longConn, bool) {
 	return nil, false
 }
 
+// Put puts back a connection to the pool.
 func (p *pool) Put(o *longConn) bool {
 	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		return false
-	}
 	var recycled bool
 	if len(p.idleList) < p.maxIdle {
 		o.deadline = time.Now().Add(p.maxIdleTimeout)
@@ -152,12 +144,9 @@ func (p *pool) Put(o *longConn) bool {
 	return recycled
 }
 
+// Evict cleanups the expired connections.
 func (p *pool) Evict() int {
 	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		return 0
-	}
 	i := 0
 	for ; i < len(p.idleList)-p.minIdle; i++ {
 		if !p.idleList[i].Expired() && p.idleList[i].IsActive() {
@@ -182,16 +171,11 @@ func (p *pool) Len() int {
 // Close closes the pool and all the objects in the pool.
 func (p *pool) Close() int {
 	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		return 0
-	}
 	num := len(p.idleList)
 	for i := 0; i < num; i++ {
 		p.idleList[i].Close()
 	}
 	p.idleList = nil
-	p.closed = true
 
 	p.mu.Unlock()
 	return num
