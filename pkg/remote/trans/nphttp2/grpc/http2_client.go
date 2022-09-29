@@ -31,6 +31,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/peer"
+
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
@@ -343,9 +345,17 @@ func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) 
 	return headerFields
 }
 
+func (t *http2Client) setPeer(ctx context.Context) {
+	peer, ok := peer.GetPeerFromContext(ctx)
+	if ok {
+		peer.Addr = t.remoteAddr
+	}
+}
+
 // NewStream creates a stream and registers it into the transport as "active"
 // streams.
 func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Stream, err error) {
+	t.setPeer(ctx)
 	s := t.newStream(ctx, callHdr)
 	cleanup := func(err error) {
 		if s.swapState(streamDone) == streamDone {
