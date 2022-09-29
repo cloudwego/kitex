@@ -41,6 +41,148 @@ var (
 	mockAddr1 = "127.0.0.1:8001"
 )
 
+func newLongConnForTest(ctrl *gomock.Controller, addr string) *longConn {
+	mockConn := mocksnet.NewMockConn(ctrl)
+	mockConn.EXPECT().Close().DoAndReturn(func() error {
+		return nil
+	}).AnyTimes()
+	return &longConn{
+		Conn:    mockConn,
+		address: addr,
+	}
+}
+
+func TestPoolGetPut(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 1
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+
+	c, reused := p.Get()
+	test.Assert(t, c == nil)
+	test.Assert(t, reused == false)
+
+	conn := newLongConnForTest(ctrl, mockAddr0)
+	recycled := p.Put(conn)
+	test.Assert(t, recycled == true)
+	test.Assert(t, p.Len() == 1)
+}
+
+func TestPoolReuse(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 1
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	count := make(map[*longConn]bool)
+
+	conn := newLongConnForTest(ctrl, mockAddr0)
+	recycled := p.Put(conn)
+	test.Assert(t, recycled == true)
+	test.Assert(t, p.Len() == 1)
+
+	c, reused := p.Get()
+	test.Assert(t, c != nil)
+	test.Assert(t, reused == true)
+	count[c] = true
+	test.Assert(t, len(count) == 1)
+}
+
+func TestPoolMaxIdle(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 2
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	for i := 0; i < maxIdle+1; i++ {
+		recycled := p.Put(newLongConnForTest(ctrl, mockAddr0))
+		if i < maxIdle {
+			test.Assert(t, recycled == true)
+		} else {
+			test.Assert(t, recycled == false)
+		}
+	}
+	test.Assert(t, p.Len() == maxIdle)
+}
+
+func TestPoolMinIdle(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 1
+		maxIdle        = 10
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	for i := 0; i < maxIdle+1; i++ {
+		p.Put(newLongConnForTest(ctrl, mockAddr0))
+	}
+	test.Assert(t, p.Len() == maxIdle)
+
+	time.Sleep(maxIdleTimeout)
+	p.Evict()
+	test.Assert(t, p.Len() == minIdle)
+}
+
+func TestPoolClose(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 2
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	for i := 0; i < maxIdle+1; i++ {
+		p.Put(newLongConnForTest(ctrl, mockAddr0))
+	}
+
+	n := p.Close()
+	test.Assert(t, n == maxIdle)
+	test.Assert(t, p.idleList == nil)
+	test.Assert(t, p.Len() == 0)
+}
+
+func TestPoolDump(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 2
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	for i := 0; i < maxIdle+1; i++ {
+		p.Put(newLongConnForTest(ctrl, mockAddr0))
+	}
+
+	dump := p.Dump()
+	test.Assert(t, dump.IdleNum == 2)
+	test.Assert(t, len(dump.IdleList) == 2)
+}
+
 // fakeNewLongPool creates a LongPool object and modifies it to fit tests.
 func newLongPoolForTest(minPeerAddr, maxPeerAddr, global int, timeout time.Duration) *LongPool {
 	cfg := connpool.IdleConfig{
