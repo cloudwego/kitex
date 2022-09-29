@@ -71,7 +71,7 @@ func (c *longConn) IsActive() bool {
 			return true
 		}
 	}
-	return time.Now().Before(c.deadline)
+	return false
 }
 
 func (c *longConn) Expired() bool {
@@ -80,6 +80,11 @@ func (c *longConn) Expired() bool {
 
 func (c *longConn) Dump() interface{} {
 	return c.deadline
+}
+
+type PoolDump struct {
+	IdleNum  int           `json:"idle_num"`
+	IdleList []interface{} `json:"idle_list"`
 }
 
 // pool implements a pool of long connections.
@@ -144,7 +149,7 @@ func (p *pool) Evict() int {
 	p.mu.Lock()
 	i := 0
 	for ; i < len(p.idleList)-p.minIdle; i++ {
-		if !p.idleList[i].Expired() && p.idleList[i].IsActive() {
+		if !p.idleList[i].Expired() {
 			break
 		}
 		// close the inactive object
@@ -174,6 +179,22 @@ func (p *pool) Close() int {
 
 	p.mu.Unlock()
 	return num
+}
+
+// Dump dumps the info of all the objects in the pool.
+func (p *pool) Dump() PoolDump {
+	p.mu.RLock()
+	idleNum := len(p.idleList)
+	idleList := make([]interface{}, idleNum)
+	for i := 0; i < idleNum; i++ {
+		idleList[i] = p.idleList[i].Dump()
+	}
+	s := PoolDump{
+		IdleNum:  idleNum,
+		IdleList: idleList,
+	}
+	p.mu.RUnlock()
+	return s
 }
 
 // peer has one address, it manages all connections base on this address
@@ -208,6 +229,7 @@ func (p *peer) Reset(addr net.Addr) {
 	p.Close()
 }
 
+// Get gets a connection with dialer and timeout. Dial a new connection if no idle connection in pool is available.
 func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter, addr string) (net.Conn, error) {
 	var c net.Conn
 	c, reused := p.pool.Get()
@@ -228,27 +250,7 @@ func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter, ad
 	}, nil
 }
 
-type PoolDump struct {
-	IdleNum  int           `json:"idle_num"`
-	IdleList []interface{} `json:"idle_list"`
-}
-
-// Dump dumps the info of all the objects in the pool.
-func (p *pool) Dump() PoolDump {
-	p.mu.RLock()
-	idleNum := len(p.idleList)
-	idleList := make([]interface{}, idleNum)
-	for i := 0; i < idleNum; i++ {
-		idleList[i] = p.idleList[i].Dump()
-	}
-	s := PoolDump{
-		IdleNum:  idleNum,
-		IdleList: idleList,
-	}
-	p.mu.RUnlock()
-	return s
-}
-
+// Put puts a connection back to the peer.
 func (p *peer) Put(c *longConn) error {
 	if !p.globalIdle.Inc() {
 		return c.Close()
@@ -266,17 +268,13 @@ func (p *peer) Len() int {
 
 func (p *peer) Evict() {
 	n := p.pool.Evict()
-	for i := 0; i < n; i++ {
-		p.globalIdle.Dec()
-	}
+	p.globalIdle.DecN(int64(n))
 }
 
 // Close closes the peer and all the connections in the ring.
 func (p *peer) Close() {
 	n := p.pool.Close()
-	for i := 0; i < n; i++ {
-		p.globalIdle.Dec()
-	}
+	p.globalIdle.DecN(int64(n))
 }
 
 // LongPool manages a pool of long connections.

@@ -40,9 +40,14 @@ func (cl *MaxCounter) Inc() bool {
 	return true
 }
 
-// Dec decrease the counter by one.
+// Dec decreases the counter by one.
 func (cl *MaxCounter) Dec() {
 	atomic.AddInt64(&cl.now, -1)
+}
+
+// DecN decreases the counter by n.
+func (cl *MaxCounter) DecN(n int64) {
+	atomic.AddInt64(&cl.now, -n)
 }
 
 func (cl *MaxCounter) Now() int64 {
