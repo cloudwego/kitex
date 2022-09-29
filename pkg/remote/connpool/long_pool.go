@@ -87,6 +87,116 @@ func (c *longConn) Dump() interface{} {
 	return c.deadline
 }
 
+// Pool implements a pool of general objects.
+type pool struct {
+	idleList []*longConn
+	mu       sync.RWMutex
+	closed   bool
+	// config
+	minIdle        int
+	maxIdle        int           // currIdle <= maxIdle.
+	maxIdleTimeout time.Duration // the idle connection will be cleaned if the idle time exceeds maxIdleTimeout.
+}
+
+func newPool(minIdle, maxIdle int, maxIdleTimeout time.Duration) *pool {
+	p := &pool{
+		idleList:       make([]*longConn, 0, maxIdle),
+		minIdle:        minIdle,
+		maxIdle:        maxIdle,
+		maxIdleTimeout: maxIdleTimeout,
+	}
+	return p
+}
+
+// Get gets the first active objects from the idleList or construct a new object.
+func (p *pool) Get() (*longConn, bool) {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return nil, false
+	}
+	// Get the first active one
+	i := len(p.idleList) - 1
+	for ; i >= 0; i-- {
+		o := p.idleList[i]
+		if o.IsActive() {
+			p.idleList = p.idleList[:i]
+			p.mu.Unlock()
+			return o, true
+		}
+		// inactive object
+		o.Close()
+	}
+	// in case all objects are inactive
+	if i < 0 {
+		i = 0
+	}
+	p.idleList = p.idleList[:i]
+	p.mu.Unlock()
+	return nil, false
+}
+
+func (p *pool) Put(o *longConn) bool {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return false
+	}
+	var recycled bool
+	if len(p.idleList) < p.maxIdle {
+		o.deadline = time.Now().Add(p.maxIdleTimeout)
+		p.idleList = append(p.idleList, o)
+		recycled = true
+	}
+	p.mu.Unlock()
+	return recycled
+}
+
+func (p *pool) Evict() int {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return 0
+	}
+	i := 0
+	for ; i < len(p.idleList)-p.minIdle; i++ {
+		if !p.idleList[i].Expired() && p.idleList[i].IsActive() {
+			break
+		}
+		// close the inactive object
+		p.idleList[i].Close()
+	}
+	p.idleList = p.idleList[i:]
+	p.mu.Unlock()
+	return i
+}
+
+// Len returns the length of the pool.
+func (p *pool) Len() int {
+	p.mu.RLock()
+	l := len(p.idleList)
+	p.mu.RUnlock()
+	return l
+}
+
+// Close closes the pool and all the objects in the pool.
+func (p *pool) Close() int {
+	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		return 0
+	}
+	num := len(p.idleList)
+	for i := 0; i < num; i++ {
+		p.idleList[i].Close()
+	}
+	p.idleList = nil
+	p.closed = true
+
+	p.mu.Unlock()
+	return num
+}
+
 // peer has one address, it manages all connections base on this address
 type peer struct {
 	// info
@@ -94,7 +204,7 @@ type peer struct {
 	addr        net.Addr
 	globalIdle  *utils.MaxCounter
 	// pool
-	pool *utils.Pool
+	pool *pool
 }
 
 func newPeer(
@@ -109,7 +219,7 @@ func newPeer(
 		serviceName: serviceName,
 		addr:        addr,
 		globalIdle:  globalIdle,
-		pool:        utils.NewPool(minIdle, maxIdle, maxIdleTimeout),
+		pool:        newPool(minIdle, maxIdle, maxIdleTimeout),
 	}
 }
 
@@ -120,26 +230,44 @@ func (p *peer) Reset(addr net.Addr) {
 }
 
 func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter, addr string) (net.Conn, error) {
-	newer := func() (utils.PoolObject, error) {
-		conn, err := d.DialTimeout(p.addr.Network(), p.addr.String(), timeout)
-		if err != nil {
-			reporter.ConnFailed(Long, p.serviceName, p.addr)
-			return nil, err
-		}
-		reporter.ConnSucceed(Long, p.serviceName, p.addr)
-		return &longConn{
-			Conn:    conn,
-			address: addr,
-		}, nil
-	}
-	c, reused, err := p.pool.Get(newer)
-	if err != nil {
-		return nil, err
-	}
+	var c net.Conn
+	c, reused := p.pool.Get()
 	if reused {
 		p.globalIdle.Dec()
+		return c, nil
 	}
-	return c.(net.Conn), err
+	// dial a new connection
+	c, err := d.DialTimeout(p.addr.Network(), p.addr.String(), timeout)
+	if err != nil {
+		reporter.ConnFailed(Long, p.serviceName, p.addr)
+		return nil, err
+	}
+	reporter.ConnSucceed(Long, p.serviceName, p.addr)
+	return &longConn{
+		Conn:    c,
+		address: addr,
+	}, nil
+}
+
+type PoolDump struct {
+	IdleNum  int           `json:"idle_num"`
+	IdleList []interface{} `json:"idle_list"`
+}
+
+// Dump dumps the info of all the objects in the pool.
+func (p *pool) Dump() PoolDump {
+	p.mu.RLock()
+	idleNum := len(p.idleList)
+	idleList := make([]interface{}, idleNum)
+	for i := 0; i < idleNum; i++ {
+		idleList[i] = p.idleList[i].Dump()
+	}
+	s := PoolDump{
+		IdleNum:  idleNum,
+		IdleList: idleList,
+	}
+	p.mu.RUnlock()
+	return s
 }
 
 func (p *peer) Put(c *longConn) error {
@@ -166,21 +294,19 @@ func (p *peer) Evict() {
 
 // Close closes the peer and all the connections in the ring.
 func (p *peer) Close() {
-	// TODO: correct this count
-	n := p.pool.Len()
+	n := p.pool.Close()
 	for i := 0; i < n; i++ {
 		p.globalIdle.Dec()
 	}
-	p.pool.Close()
 }
 
 // LongPool manages a pool of long connections.
 type LongPool struct {
-	reporter Reporter
-	peerMap  sync.Map
-	newPeer  func(net.Addr) *peer
-	globalIdle  *utils.MaxCounter
-	closeCh chan struct{}
+	reporter   Reporter
+	peerMap    sync.Map
+	newPeer    func(net.Addr) *peer
+	globalIdle *utils.MaxCounter
+	closeCh    chan struct{}
 }
 
 func (lp *LongPool) getPeer(addr netAddr) *peer {
@@ -295,7 +421,7 @@ func (lp *LongPool) Evict(frequency time.Duration) {
 func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
 	limit := utils.NewMaxCounter(idlConfig.MaxIdleGlobal)
 	lp := &LongPool{
-		reporter: &DummyReporter{},
+		reporter:   &DummyReporter{},
 		globalIdle: limit,
 		newPeer: func(addr net.Addr) *peer {
 			return newPeer(

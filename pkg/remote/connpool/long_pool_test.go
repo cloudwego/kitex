@@ -660,7 +660,7 @@ func TestLongConnPoolDump(t *testing.T) {
 	val := data[mockAddr0]
 	test.Assert(t, val != nil)
 
-	length := len(val.(utils.PoolDump).IdleList)
+	length := len(val.(PoolDump).IdleList)
 	test.Assert(t, length == 1)
 }
 
