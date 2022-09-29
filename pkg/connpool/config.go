@@ -27,9 +27,9 @@ type IdleConfig struct {
 }
 
 const (
-	defaultMaxIdleTimeout    = 30 * time.Second
-	minMaxIdleTimeout        = 2 * time.Second
-	defaultMinIdlePerAddress = 2
+	defaultMaxIdleTimeout = 30 * time.Second
+	minMaxIdleTimeout     = 2 * time.Second
+	maxMinIdlePerAddress  = 5
 )
 
 // CheckPoolConfig to check invalid param.
@@ -46,8 +46,8 @@ func CheckPoolConfig(config IdleConfig) *IdleConfig {
 	if config.MinIdlePerAddress < 0 {
 		config.MinIdlePerAddress = 0
 	}
-	if config.MinIdlePerAddress > defaultMinIdlePerAddress {
-		config.MinIdlePerAddress = defaultMinIdlePerAddress
+	if config.MinIdlePerAddress > maxMinIdlePerAddress {
+		config.MinIdlePerAddress = maxMinIdlePerAddress
 	}
 	if config.MaxIdlePerAddress <= 0 {
 		config.MaxIdlePerAddress = 1

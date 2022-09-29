@@ -36,8 +36,8 @@ func TestCheckPoolConfig(t *testing.T) {
 	test.Assert(t, cfg.MaxIdleGlobal == 1)
 	cfg = CheckPoolConfig(IdleConfig{MinIdlePerAddress: 1})
 	test.Assert(t, cfg.MinIdlePerAddress == 1)
-	cfg = CheckPoolConfig(IdleConfig{MinIdlePerAddress: defaultMinIdlePerAddress + 1})
-	test.Assert(t, cfg.MinIdlePerAddress == defaultMinIdlePerAddress)
+	cfg = CheckPoolConfig(IdleConfig{MinIdlePerAddress: maxMinIdlePerAddress + 1})
+	test.Assert(t, cfg.MinIdlePerAddress == maxMinIdlePerAddress)
 
 	// maxIdle
 	cfg = CheckPoolConfig(IdleConfig{MaxIdlePerAddress: 1, MinIdlePerAddress: 2})

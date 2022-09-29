@@ -78,11 +78,6 @@ func (c *longConn) Expired() bool {
 	return time.Now().After(c.deadline)
 }
 
-func (c *longConn) SetDeadline(t time.Time) error {
-	c.deadline = t
-	return nil
-}
-
 func (c *longConn) Dump() interface{} {
 	return c.deadline
 }
