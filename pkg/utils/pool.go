@@ -99,7 +99,7 @@ func (p *Pool) Put(o PoolObject) bool {
 }
 
 // Evict cleans those expired objects.
-func (p *Pool) Evict() {
+func (p *Pool) Evict() int {
 	p.mu.Lock()
 	i := 0
 	for ; i < len(p.idleList)-p.minIdle; i++ {
@@ -111,6 +111,7 @@ func (p *Pool) Evict() {
 	}
 	p.idleList = p.idleList[i:]
 	p.mu.Unlock()
+	return i
 }
 
 // Len returns the length of the pool.

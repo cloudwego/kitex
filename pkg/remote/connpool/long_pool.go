@@ -158,11 +158,15 @@ func (p *peer) Len() int {
 }
 
 func (p *peer) Evict() {
-	p.pool.Evict()
+	n := p.pool.Evict()
+	for i := 0; i < n; i++ {
+		p.globalIdle.Dec()
+	}
 }
 
 // Close closes the peer and all the connections in the ring.
 func (p *peer) Close() {
+	// TODO: correct this count
 	n := p.pool.Len()
 	for i := 0; i < n; i++ {
 		p.globalIdle.Dec()
@@ -175,7 +179,7 @@ type LongPool struct {
 	reporter Reporter
 	peerMap  sync.Map
 	newPeer  func(net.Addr) *peer
-
+	globalIdle  *utils.MaxCounter
 	closeCh chan struct{}
 }
 
@@ -292,6 +296,7 @@ func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
 	limit := utils.NewMaxCounter(idlConfig.MaxIdleGlobal)
 	lp := &LongPool{
 		reporter: &DummyReporter{},
+		globalIdle: limit,
 		newPeer: func(addr net.Addr) *peer {
 			return newPeer(
 				serviceName,

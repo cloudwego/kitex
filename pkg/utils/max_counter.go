@@ -44,3 +44,7 @@ func (cl *MaxCounter) Inc() bool {
 func (cl *MaxCounter) Dec() {
 	atomic.AddInt64(&cl.now, -1)
 }
+
+func (cl *MaxCounter) Now() int64 {
+	return atomic.LoadInt64(&cl.now)
+}
