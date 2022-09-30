@@ -98,4 +98,3 @@ func (m Conn) SetWriteDeadline(t time.Time) (e error) {
 	}
 	return
 }
-

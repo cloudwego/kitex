@@ -77,6 +77,40 @@ func TestPoolReuse(t *testing.T) {
 	test.Assert(t, len(count) == 1)
 }
 
+func TestPoolGetInactiveConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 1
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+
+	// inactive conn
+	var closed bool
+	c := mocksnetpoll.NewMockConnection(ctrl)
+	c.EXPECT().IsActive().Return(false).AnyTimes()
+	c.EXPECT().Close().DoAndReturn(func() error {
+		closed = true
+		return nil
+	}).AnyTimes()
+	conn := &longConn{
+		Conn:    c,
+		address: mockAddr0,
+	}
+
+	recycled := p.Put(conn)
+	test.Assert(t, recycled == true)
+	// inactive
+	conn, reused := p.Get()
+	test.Assert(t, conn == nil)
+	test.Assert(t, reused == false)
+	test.Assert(t, closed == true)
+}
+
 func TestPoolMaxIdle(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -158,7 +192,7 @@ func TestPoolDump(t *testing.T) {
 
 	dump := p.Dump()
 	test.Assert(t, dump.IdleNum == 2)
-	test.Assert(t, len(dump.IdleList) == 2)
+	test.Assert(t, len(dump.ConnsDeadline) == 2)
 }
 
 // fakeNewLongPool creates a LongPool object and modifies it to fit tests.
@@ -264,7 +298,7 @@ func TestLongConnPoolReuse(t *testing.T) {
 		err = p.Put(c)
 		test.Assert(t, err == nil)
 		count[c]++
-		time.Sleep(idleTime * 2)
+		time.Sleep(idleTime * 3)
 	}
 	test.Assert(t, len(count) == 3)
 }
@@ -511,7 +545,7 @@ func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
-	time.Sleep(idleTime * 2)
+	time.Sleep(idleTime * 3)
 
 	c2, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
@@ -793,7 +827,7 @@ func TestLongConnPoolDump(t *testing.T) {
 	val := data[mockAddr0]
 	test.Assert(t, val != nil)
 
-	length := len(val.(PoolDump).IdleList)
+	length := len(val.(PoolDump).ConnsDeadline)
 	test.Assert(t, length == 1)
 }
 

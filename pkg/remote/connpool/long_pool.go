@@ -74,27 +74,14 @@ func (c *longConn) IsActive() bool {
 	return false
 }
 
+// Expired checks the deadline of the connection.
 func (c *longConn) Expired() bool {
 	return time.Now().After(c.deadline)
 }
 
-func (c *longConn) Dump() interface{} {
-	return c.deadline
-}
-
 type PoolDump struct {
-	IdleNum  int           `json:"idle_num"`
-	IdleList []interface{} `json:"idle_list"`
-}
-
-// pool implements a pool of long connections.
-type pool struct {
-	idleList []*longConn
-	mu       sync.RWMutex
-	// config
-	minIdle        int
-	maxIdle        int           // currIdle <= maxIdle.
-	maxIdleTimeout time.Duration // the idle connection will be cleaned if the idle time exceeds maxIdleTimeout.
+	IdleNum       int         `json:"idle_num"`
+	ConnsDeadline []time.Time `json:"conns_deadline"`
 }
 
 func newPool(minIdle, maxIdle int, maxIdleTimeout time.Duration) *pool {
@@ -105,6 +92,16 @@ func newPool(minIdle, maxIdle int, maxIdleTimeout time.Duration) *pool {
 		maxIdleTimeout: maxIdleTimeout,
 	}
 	return p
+}
+
+// pool implements a pool of long connections.
+type pool struct {
+	idleList []*longConn
+	mu       sync.RWMutex
+	// config
+	minIdle        int
+	maxIdle        int           // currIdle <= maxIdle.
+	maxIdleTimeout time.Duration // the idle connection will be cleaned if the idle time exceeds maxIdleTimeout.
 }
 
 // Get gets the first active connection from the idleList.
@@ -185,26 +182,16 @@ func (p *pool) Close() int {
 func (p *pool) Dump() PoolDump {
 	p.mu.RLock()
 	idleNum := len(p.idleList)
-	idleList := make([]interface{}, idleNum)
+	connsDeadline := make([]time.Time, idleNum)
 	for i := 0; i < idleNum; i++ {
-		idleList[i] = p.idleList[i].Dump()
+		connsDeadline[i] = p.idleList[i].deadline
 	}
 	s := PoolDump{
-		IdleNum:  idleNum,
-		IdleList: idleList,
+		IdleNum:       idleNum,
+		ConnsDeadline: connsDeadline,
 	}
 	p.mu.RUnlock()
 	return s
-}
-
-// peer has one address, it manages all connections base on this address
-type peer struct {
-	// info
-	serviceName string
-	addr        net.Addr
-	globalIdle  *utils.MaxCounter
-	// pool
-	pool *pool
 }
 
 func newPeer(
@@ -223,10 +210,14 @@ func newPeer(
 	}
 }
 
-// Reset resets the peer to addr.
-func (p *peer) Reset(addr net.Addr) {
-	p.addr = addr
-	p.Close()
+// peer has one address, it manages all connections base on this address
+type peer struct {
+	// info
+	serviceName string
+	addr        net.Addr
+	globalIdle  *utils.MaxCounter
+	// pool
+	pool *pool
 }
 
 // Get gets a connection with dialer and timeout. Dial a new connection if no idle connection in pool is available.
@@ -277,6 +268,28 @@ func (p *peer) Close() {
 	p.globalIdle.DecN(int64(n))
 }
 
+// NewLongPool creates a long pool using the given IdleConfig.
+func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
+	limit := utils.NewMaxCounter(idlConfig.MaxIdleGlobal)
+	lp := &LongPool{
+		reporter:   &DummyReporter{},
+		globalIdle: limit,
+		newPeer: func(addr net.Addr) *peer {
+			return newPeer(
+				serviceName,
+				addr,
+				idlConfig.MinIdlePerAddress,
+				idlConfig.MaxIdlePerAddress,
+				idlConfig.MaxIdleTimeout,
+				limit)
+		},
+		closeCh: make(chan struct{}),
+	}
+
+	go lp.Evict(idlConfig.MaxIdleTimeout)
+	return lp
+}
+
 // LongPool manages a pool of long connections.
 type LongPool struct {
 	reporter   Reporter
@@ -284,15 +297,6 @@ type LongPool struct {
 	newPeer    func(net.Addr) *peer
 	globalIdle *utils.MaxCounter
 	closeCh    chan struct{}
-}
-
-func (lp *LongPool) getPeer(addr netAddr) *peer {
-	p, ok := lp.peerMap.Load(addr)
-	if ok {
-		return p.(*peer)
-	}
-	p, _ = lp.peerMap.LoadOrStore(addr, lp.newPeer(addr))
-	return p.(*peer)
 }
 
 // Get pick or generate a net.Conn and return
@@ -394,24 +398,12 @@ func (lp *LongPool) Evict(frequency time.Duration) {
 	}
 }
 
-// NewLongPool creates a long pool using the given IdleConfig.
-func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
-	limit := utils.NewMaxCounter(idlConfig.MaxIdleGlobal)
-	lp := &LongPool{
-		reporter:   &DummyReporter{},
-		globalIdle: limit,
-		newPeer: func(addr net.Addr) *peer {
-			return newPeer(
-				serviceName,
-				addr,
-				idlConfig.MinIdlePerAddress,
-				idlConfig.MaxIdlePerAddress,
-				idlConfig.MaxIdleTimeout,
-				limit)
-		},
-		closeCh: make(chan struct{}),
+// getPeer gets a peer from the pool based on the addr, or create a new one if not exist.
+func (lp *LongPool) getPeer(addr netAddr) *peer {
+	p, ok := lp.peerMap.Load(addr)
+	if ok {
+		return p.(*peer)
 	}
-
-	go lp.Evict(idlConfig.MaxIdleTimeout)
-	return lp
+	p, _ = lp.peerMap.LoadOrStore(addr, lp.newPeer(addr))
+	return p.(*peer)
 }
