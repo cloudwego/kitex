@@ -27,7 +27,7 @@ type Codec interface {
 	Name() string
 }
 
-// MetaDecoder is the abstraction the codec layer that has meta and payload stage
+// MetaDecoder is an abstraction of the codec layer that has meta and payload stage
 type MetaDecoder interface {
 	DecodeMeta(ctx context.Context, msg Message, in ByteBuffer) error
 	DecodePayload(ctx context.Context, msg Message, in ByteBuffer) error
