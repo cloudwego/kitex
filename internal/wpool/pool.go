@@ -16,6 +16,11 @@
 
 package wpool
 
+/* Difference between wpool and gopool(github.com/bytedance/gopkg/util/gopool):
+- wpool is a goroutine pool with high reuse rate. The old goroutine will block to wait for new tasks coming.
+- gopool sometimes will have a very low reuse rate. The old goroutine will not block if no new task coming.
+*/
+
 import (
 	"runtime/debug"
 	"sync/atomic"
