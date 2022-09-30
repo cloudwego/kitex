@@ -18,7 +18,6 @@ package event
 
 import (
 	"sync"
-	"sync/atomic"
 )
 
 const (
@@ -55,28 +54,22 @@ func NewQueue(cap int) Queue {
 
 // Push pushes an event to the queue.
 func (q *queue) Push(e *Event) {
-	for {
-		old := atomic.LoadUint32(&q.tail)
-		new := old + 1
-		if new >= uint32(len(q.ring)) {
-			new = 0
-		}
-		oldV := atomic.LoadUint32(q.tailVersion[old])
-		newV := oldV + 1
-		if atomic.CompareAndSwapUint32(&q.tail, old, new) && atomic.CompareAndSwapUint32(q.tailVersion[old], oldV, newV) {
-			q.mu.Lock()
-			q.ring[old] = e
-			q.mu.Unlock()
-			break
-		}
-	}
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	q.ring[q.tail] = e
+
+	newVersion := (*(q.tailVersion[q.tail])) + 1
+	q.tailVersion[q.tail] = &newVersion
+
+	q.tail = (q.tail + 1) % uint32(len(q.ring))
 }
 
 // Dump dumps the previously pushed events out in a reversed order.
 func (q *queue) Dump() interface{} {
-	results := make([]*Event, 0, len(q.ring))
 	q.mu.RLock()
 	defer q.mu.RUnlock()
+	results := make([]*Event, 0, len(q.ring))
 	pos := int32(q.tail)
 	for i := 0; i < len(q.ring); i++ {
 		pos--
