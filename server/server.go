@@ -165,10 +165,13 @@ func (s *server) buildInvokeChain() {
 
 // RegisterService should not be called by users directly.
 func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error {
+	s.Lock()
 	if s.svcInfo != nil {
+		s.Unlock()
 		panic(fmt.Sprintf("Service[%s] is already defined", s.svcInfo.ServiceName))
 	}
 	s.svcInfo = svcInfo
+	s.Unlock()
 	s.handler = handler
 	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcInfo))
 	return nil
