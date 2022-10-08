@@ -100,5 +100,5 @@ func (c *serverConn) SetDeadline(t time.Time) error      { return nil }
 func (c *serverConn) SetReadDeadline(t time.Time) error  { return nil }
 func (c *serverConn) SetWriteDeadline(t time.Time) error { return nil }
 func (c *serverConn) Close() error {
-	return c.tr.WriteStatus(c.s, status.New(codes.OK, ""))
+	return c.tr.WriteStatus(c.s, status.New(codes.OK, ""), nil)
 }

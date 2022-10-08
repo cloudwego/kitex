@@ -19,6 +19,9 @@ package kerrors
 import (
 	"errors"
 	"fmt"
+
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
 /**
@@ -67,10 +70,46 @@ type BizStatusErrorIface interface {
 	Error() string
 }
 
+/**
+ * GRPCStatusIface must be implemented by the BizStatusErrorIface implementation also
+ * if you need to transmit GRPCStatus.Details in your rpc response.
+ * Here is the code sample:
+ *
+ * Server:
+ *	func (h *Handler) Serve(ctx, Request) (Response, error) {
+ *		bizErr := kerrors.NewBizStatusError(404, "not found")
+ *		st, _ := bizErr.GRPCStatus().WithDetails(&echo.Echo{Str: "hello world"})
+ *		bizErr.SetGRPCStatus(st)
+ *		return nil, bizErr
+ *	}
+ *	// ...
+ *	svr := myservice.NewServer(&Handler{})
+ *
+ * Client:
+ *	cli := myservice.MustNewClient("client", client.WithTransportProtocol(transport.GRPC))
+ *	resp, err := cli.Serve(ctx, req)
+ *	if err != nil {
+ *		if bizErr, ok := kerrors.FromBizStatusError(err); ok {
+ *  		println(bizErr.BizStatusCode())
+ *			println(bizErr.BizMessage())
+ *			println(bizErr.(status.Iface).GRPCStatus().Details()[0].(*echo.Echo).Str)
+ *			// ...
+ *		}
+ *	}
+ */
+
+type GRPCStatusIface interface {
+	GRPCStatus() *status.Status
+	SetGRPCStatus(status *status.Status)
+}
+
 type BizStatusError struct {
 	code  int32
 	msg   string
 	extra map[string]string
+
+	// for grpc
+	status *status.Status
 }
 
 // FromBizStatusError converts err to BizStatusErrorIface.
@@ -82,13 +121,28 @@ func FromBizStatusError(err error) (bizErr BizStatusErrorIface, ok bool) {
 	return
 }
 
-// NewBizStatusError returns *BizStatusError which implements BizStatusErrorIface.
-func NewBizStatusError(code int32, msg string) *BizStatusError {
+// NewBizStatusError returns BizStatusErrorIface by passing in code and msg.
+// DefaultNewBizStatusError is used by default.
+// Assign it to the function that returns your own BizStatusErrorIface implementation
+// if you want to implement BizStatusErrorIface by yourself.
+var NewBizStatusError func(code int32, msg string) BizStatusErrorIface
+
+// NewBizStatusErrorWithExtra returns BizStatusErrorIface which contains extra info.
+// DefaultNewBizStatusErrorWithExtra is used by default.
+// Assign it to the function that returns your own BizStatusErrorIface implementation
+// if you want to implement BizStatusErrorIface by yourself.
+var NewBizStatusErrorWithExtra func(code int32, msg string, extra map[string]string) BizStatusErrorIface
+
+func init() {
+	NewBizStatusError = DefaultNewBizStatusError
+	NewBizStatusErrorWithExtra = DefaultNewBizStatusErrorWithExtra
+}
+
+func DefaultNewBizStatusError(code int32, msg string) BizStatusErrorIface {
 	return &BizStatusError{code: code, msg: msg}
 }
 
-// NewBizStatusErrorWithExtra returns *BizStatusError which contains extra info.
-func NewBizStatusErrorWithExtra(code int32, msg string, extra map[string]string) *BizStatusError {
+func DefaultNewBizStatusErrorWithExtra(code int32, msg string, extra map[string]string) BizStatusErrorIface {
 	return &BizStatusError{code: code, msg: msg, extra: extra}
 }
 
@@ -115,6 +169,17 @@ func (e *BizStatusError) SetBizExtra(key, value string) {
 		e.extra = make(map[string]string)
 	}
 	e.extra[key] = value
+}
+
+func (e *BizStatusError) GRPCStatus() *status.Status {
+	if e.status == nil {
+		e.status = status.New(codes.Internal, e.msg)
+	}
+	return e.status
+}
+
+func (e *BizStatusError) SetGRPCStatus(status *status.Status) {
+	e.status = status
 }
 
 func (e *BizStatusError) Error() string {

@@ -39,13 +39,13 @@ import (
 	"golang.org/x/net/http2/hpack"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/cloudwego/kitex/pkg/utils"
-
 	"github.com/cloudwego/kitex/pkg/gofunc"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 var (
@@ -746,7 +746,7 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 // There is no further I/O operations being able to perform on this stream.
 // TODO(zhaoq): Now it indicates the end of entire stream. Revisit if early
 // OK is adopted.
-func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
+func (t *http2Server) WriteStatus(s *Stream, st *status.Status, bizStatusErr kerrors.BizStatusErrorIface) error {
 	if s.getState() == streamDone {
 		return nil
 	}
@@ -767,10 +767,10 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 	}
 	headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-status", Value: strconv.Itoa(int(st.Code()))})
 	headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-message", Value: encodeGrpcMessage(st.Message())})
-	if st.BizStatusError != nil {
-		headerFields = append(headerFields, hpack.HeaderField{Name: "biz-status", Value: strconv.Itoa(int(st.BizStatusError.BizStatusCode()))})
-		if len(st.BizStatusError.BizExtra()) != 0 {
-			value, _ := utils.Map2JSONStr(st.BizStatusError.BizExtra())
+	if bizStatusErr != nil {
+		headerFields = append(headerFields, hpack.HeaderField{Name: "biz-status", Value: strconv.Itoa(int(bizStatusErr.BizStatusCode()))})
+		if len(bizStatusErr.BizExtra()) != 0 {
+			value, _ := utils.Map2JSONStr(bizStatusErr.BizExtra())
 			headerFields = append(headerFields, hpack.HeaderField{Name: "biz-extra", Value: value})
 		}
 	}

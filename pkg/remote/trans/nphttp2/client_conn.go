@@ -92,9 +92,9 @@ func (c *clientConn) Read(b []byte) (n int, err error) {
 	n, err = c.s.Read(b)
 	if err == io.EOF {
 		if status := c.s.Status(); status.Code() != codes.OK {
-			if status.BizStatusError != nil {
+			if bizStatusErr := c.s.BizStatusErr(); bizStatusErr != nil {
 				if setter, ok := c.ri.Invocation().(rpcinfo.InvocationSetter); ok {
-					setter.SetBizStatusErr(status.BizStatusError)
+					setter.SetBizStatusErr(bizStatusErr)
 					return n, nil
 				}
 			}

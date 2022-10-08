@@ -33,6 +33,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
@@ -274,7 +275,8 @@ type Stream struct {
 
 	// On client-side it is the status error received from the server.
 	// On server-side it is unused.
-	status *status.Status
+	status       *status.Status
+	bizStatusErr kerrors.BizStatusErrorIface
 
 	bytesReceived uint32 // indicates whether any bytes have been received on this stream
 	unprocessed   uint32 // set if the server sends a refused stream or GOAWAY including this stream
@@ -406,6 +408,10 @@ func (s *Stream) Method() string {
 // that is, after Done() is closed.
 func (s *Stream) Status() *status.Status {
 	return s.status
+}
+
+func (s *Stream) BizStatusErr() kerrors.BizStatusErrorIface {
+	return s.bizStatusErr
 }
 
 // SetHeader sets the header metadata. This can be called multiple times.
@@ -687,7 +693,7 @@ type ServerTransport interface {
 
 	// WriteStatus sends the status of a stream to the client.  WriteStatus is
 	// the final call made on a stream and always occurs.
-	WriteStatus(s *Stream, st *status.Status) error
+	WriteStatus(s *Stream, st *status.Status, bizStatusErr kerrors.BizStatusErrorIface) error
 
 	// Close tears down the transport. Once it is called, the transport
 	// should not be accessed any more. All the pending streams and their

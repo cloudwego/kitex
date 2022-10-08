@@ -37,12 +37,11 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/utils"
-
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 const (
@@ -112,7 +111,8 @@ type parsedHeaderData struct {
 	// statusGen caches the stream status received from the trailer the server
 	// sent.  Client side only.  Do not access directly.  After all trailers are
 	// parsed, use the status method to retrieve the status.
-	statusGen *status.Status
+	statusGen    *status.Status
+	bizStatusErr kerrors.BizStatusErrorIface
 	// rawStatusCode and rawStatusMsg are set from the raw trailer fields and are not
 	// intended for direct access outside of parsing.
 	rawStatusCode  *int
@@ -237,11 +237,18 @@ func (d *decodeState) status() *status.Status {
 		// No status-details were provided; generate status using code/msg.
 		d.data.statusGen = status.New(codes.Code(safeCastInt32(*(d.data.rawStatusCode))), d.data.rawStatusMsg)
 	}
-	if d.data.statusGen.BizStatusError == nil && d.data.bizStatusCode != nil {
-		d.data.statusGen.BizStatusError = kerrors.NewBizStatusErrorWithExtra(
-			safeCastInt32(*(d.data.bizStatusCode)), d.data.rawStatusMsg, d.data.bizStatusExtra)
-	}
 	return d.data.statusGen
+}
+
+func (d *decodeState) bizStatusErr() kerrors.BizStatusErrorIface {
+	if d.data.bizStatusErr == nil && d.data.bizStatusCode != nil {
+		d.data.bizStatusErr = kerrors.NewBizStatusErrorWithExtra(
+			safeCastInt32(*(d.data.bizStatusCode)), d.data.rawStatusMsg, d.data.bizStatusExtra)
+		if st, ok := d.data.bizStatusErr.(kerrors.GRPCStatusIface); ok {
+			st.SetGRPCStatus(d.status())
+		}
+	}
+	return d.data.bizStatusErr
 }
 
 // safeCastInt32 casts the number from int to int32 in safety.

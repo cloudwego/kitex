@@ -36,6 +36,7 @@ import (
 	"golang.org/x/net/http2/hpack"
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
@@ -473,10 +474,10 @@ func (t *http2Client) CloseStream(s *Stream, err error) {
 		rst = true
 		rstCode = http2.ErrCodeCancel
 	}
-	t.closeStream(s, err, rst, rstCode, status.Convert(err), nil, false)
+	t.closeStream(s, err, rst, rstCode, status.Convert(err), nil, nil, false)
 }
 
-func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.ErrCode, st *status.Status, mdata map[string][]string, eosReceived bool) {
+func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.ErrCode, st *status.Status, bizStatusErr kerrors.BizStatusErrorIface, mdata map[string][]string, eosReceived bool) {
 	// Set stream status to done.
 	if s.swapState(streamDone) == streamDone {
 		// If it was already done, return.  If multiple closeStream calls
@@ -488,6 +489,7 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 	// only read it after it sees an io.EOF error from read or write and we'll write those errors
 	// only after updating this.
 	s.status = st
+	s.bizStatusErr = bizStatusErr
 	if len(mdata) > 0 {
 		s.trailer = mdata
 	}
@@ -560,7 +562,7 @@ func (t *http2Client) Close() error {
 	err := t.conn.Close()
 	// Notify all active streams.
 	for _, s := range streams {
-		t.closeStream(s, ErrConnClosing, false, http2.ErrCodeNo, status.New(codes.Unavailable, ErrConnClosing.Desc), nil, false)
+		t.closeStream(s, ErrConnClosing, false, http2.ErrCodeNo, status.New(codes.Unavailable, ErrConnClosing.Desc), nil, nil, false)
 	}
 	return err
 }
@@ -705,7 +707,7 @@ func (t *http2Client) handleData(f *grpcframe.DataFrame) {
 	}
 	if size > 0 {
 		if err := s.fc.onData(size); err != nil {
-			t.closeStream(s, io.EOF, true, http2.ErrCodeFlowControl, status.New(codes.Internal, err.Error()), nil, false)
+			t.closeStream(s, io.EOF, true, http2.ErrCodeFlowControl, status.New(codes.Internal, err.Error()), nil, nil, false)
 			return
 		}
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
@@ -726,7 +728,7 @@ func (t *http2Client) handleData(f *grpcframe.DataFrame) {
 	// The server has closed the stream without sending trailers.  Record that
 	// the read direction is closed, and set the status appropriately.
 	if f.FrameHeader.Flags.Has(http2.FlagDataEndStream) {
-		t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.New(codes.Internal, "server closed the stream without sending trailers"), nil, true)
+		t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.New(codes.Internal, "server closed the stream without sending trailers"), nil, nil, true)
 	}
 }
 
@@ -751,7 +753,7 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 			statusCode = codes.DeadlineExceeded
 		}
 	}
-	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.Newf(statusCode, "stream terminated by RST_STREAM with error code: %v", f.ErrCode), nil, false)
+	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.Newf(statusCode, "stream terminated by RST_STREAM with error code: %v", f.ErrCode), nil, nil, false)
 }
 
 func (t *http2Client) handleSettings(f *grpcframe.SettingsFrame, isFirst bool) {
@@ -871,7 +873,7 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 		if streamID > id && streamID <= upperLimit {
 			// The stream was unprocessed by the server.
 			atomic.StoreUint32(&stream.unprocessed, 1)
-			t.closeStream(stream, errStreamDrain, false, http2.ErrCodeNo, statusGoAway, nil, false)
+			t.closeStream(stream, errStreamDrain, false, http2.ErrCodeNo, statusGoAway, nil, nil, false)
 		}
 	}
 	t.prevGoAwayID = id
@@ -922,7 +924,7 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 	if !initialHeader && !endStream {
 		// As specified by gRPC over HTTP2, a HEADERS frame (and associated CONTINUATION frames) can only appear at the start or end of a stream. Therefore, second HEADERS frame must have EOS bit set.
 		st := status.New(codes.Internal, "a HEADERS frame cannot appear in the middle of a stream")
-		t.closeStream(s, st.Err(), true, http2.ErrCodeProtocol, st, nil, false)
+		t.closeStream(s, st.Err(), true, http2.ErrCodeProtocol, st, nil, nil, false)
 		return
 	}
 
@@ -930,7 +932,7 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 	// Initialize isGRPC value to be !initialHeader, since if a gRPC Response-Headers has already been received, then it means that the peer is speaking gRPC and we are in gRPC mode.
 	state.data.isGRPC = !initialHeader
 	if err := state.decodeHeader(frame); err != nil {
-		t.closeStream(s, err, true, http2.ErrCodeProtocol, status.Convert(err), nil, endStream)
+		t.closeStream(s, err, true, http2.ErrCodeProtocol, status.Convert(err), nil, nil, endStream)
 		return
 	}
 
@@ -958,7 +960,7 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 
 	// if client received END_STREAM from server while stream was still active, send RST_STREAM
 	rst := s.getState() == streamActive
-	t.closeStream(s, io.EOF, rst, http2.ErrCodeNo, state.status(), state.data.mdata, true)
+	t.closeStream(s, io.EOF, rst, http2.ErrCodeNo, state.status(), state.bizStatusErr(), state.data.mdata, true)
 }
 
 // reader runs as a separate goroutine in charge of reading data from network
@@ -1009,7 +1011,7 @@ func (t *http2Client) reader() {
 					if err != nil {
 						msg = err.Error()
 					}
-					t.closeStream(s, status.New(code, msg).Err(), true, http2.ErrCodeProtocol, status.New(code, msg), nil, false)
+					t.closeStream(s, status.New(code, msg).Err(), true, http2.ErrCodeProtocol, status.New(code, msg), nil, nil, false)
 				}
 				continue
 			} else {

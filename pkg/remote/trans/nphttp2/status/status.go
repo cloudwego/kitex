@@ -38,7 +38,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 )
 
@@ -49,8 +48,7 @@ type Iface interface {
 // Status represents an RPC status code, message, and details.  It is immutable
 // and should be created with New, Newf, or FromProto.
 type Status struct {
-	s              *spb.Status
-	BizStatusError kerrors.BizStatusErrorIface
+	s *spb.Status
 }
 
 // New returns a Status representing c and msg.

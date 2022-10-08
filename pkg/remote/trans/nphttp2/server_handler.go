@@ -111,7 +111,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			for _, shdlr := range t.opt.StreamingMetaHandlers {
 				rCtx, err = shdlr.OnReadStream(rCtx)
 				if err != nil {
-					tr.WriteStatus(s, convertStatus(err))
+					tr.WriteStatus(s, convertStatus(err), nil)
 					return
 				}
 			}
@@ -136,7 +136,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			pos := strings.LastIndex(sm, "/")
 			if pos == -1 {
 				errDesc := fmt.Sprintf("malformed method name, method=%q", s.Method())
-				tr.WriteStatus(s, status.New(codes.Internal, errDesc))
+				tr.WriteStatus(s, status.New(codes.Internal, errDesc), nil)
 				return
 			}
 			methodName := sm[pos+1:]
@@ -145,7 +145,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
 				if err = mutableTo.SetMethod(methodName); err != nil {
 					errDesc := fmt.Sprintf("setMethod failed in streaming, method=%s, error=%s", methodName, err.Error())
-					_ = tr.WriteStatus(s, status.New(codes.Internal, errDesc))
+					_ = tr.WriteStatus(s, status.New(codes.Internal, errDesc), nil)
 					return
 				}
 			}
@@ -180,17 +180,21 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			}
 
 			if err != nil {
-				tr.WriteStatus(s, convertStatus(err))
+				tr.WriteStatus(s, convertStatus(err), nil)
 				t.OnError(rCtx, err, conn)
 				return
 			}
 			if bizStatusErr := ri.Invocation().BizStatusErr(); bizStatusErr != nil {
-				st := status.New(codes.Internal, bizStatusErr.BizMessage())
-				st.BizStatusError = bizStatusErr
-				tr.WriteStatus(s, st)
+				var st *status.Status
+				if sterr, ok := bizStatusErr.(status.Iface); ok {
+					st = sterr.GRPCStatus()
+				} else {
+					st = status.New(codes.Internal, bizStatusErr.BizMessage())
+				}
+				tr.WriteStatus(s, st, bizStatusErr)
 				return
 			}
-			tr.WriteStatus(s, status.New(codes.OK, ""))
+			tr.WriteStatus(s, status.New(codes.OK, ""), nil)
 		})
 	}, func(ctx context.Context, method string) context.Context {
 		return ctx
