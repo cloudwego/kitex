@@ -18,6 +18,8 @@ package kerrors
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -177,6 +179,40 @@ func TestWithCause1(t *testing.T) {
 		e2.WithExtraMsg("retry circuite break")
 	}
 	test.Assert(t, be.Error() == "rpc timeout[retry circuite break]: basic", be)
+}
+
+type _err struct {
+	error
+}
+
+// Format the error.
+func (de *_err) Format(s fmt.State, verb rune) {
+	fmt.Println("should run here")
+	switch verb {
+	case 'v':
+		if s.Flag('+') {
+			_, _ = io.WriteString(s, "some message only when v+")
+			return
+		}
+		fallthrough
+	case 's', 'q':
+		_, _ = io.WriteString(s, de.Error())
+	}
+}
+func TestFormat(t *testing.T) {
+	businessError := &_err{
+		error: errors.New("some_business_error"),
+	}
+	basicErr := &basicError{
+		message: "fake_msg",
+	}
+	err := basicErr.WithCause(businessError)
+	got := fmt.Sprintf("%+v", err)
+	test.Assert(t, got == "fake_msg: some message only when v+")
+
+	got = fmt.Sprintf("%v", err)
+	test.Assert(t, got == "fake_msg: some_business_error")
+
 }
 
 func BenchmarkWithCause3(b *testing.B) {
