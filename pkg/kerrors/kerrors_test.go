@@ -198,6 +198,7 @@ func (de *_err) Format(s fmt.State, verb rune) {
 		_, _ = io.WriteString(s, de.Error())
 	}
 }
+
 func TestFormat(t *testing.T) {
 	businessError := &_err{
 		error: errors.New("some_business_error"),
@@ -211,7 +212,6 @@ func TestFormat(t *testing.T) {
 
 	got = fmt.Sprintf("%v", err)
 	test.Assert(t, got == "fake_msg: some_business_error")
-
 }
 
 func BenchmarkWithCause3(b *testing.B) {
