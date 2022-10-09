@@ -32,7 +32,7 @@ import (
  * BizStatusErrorIface through FromBizStatusError on the client side to obtain information
  * such as error status codes.
  *
- * Here is the code sample:
+ * Here is the code example:
  *
  * Server:
  *	func (h *Handler) Serve(ctx, Request) (Response, error) {
@@ -73,19 +73,25 @@ type BizStatusErrorIface interface {
 /**
  * GRPCStatusIface must be implemented by the BizStatusErrorIface implementation also
  * if you need to transmit GRPCStatus.Details in your rpc response.
- * Here is the code sample:
+ * Here is the code example:
  *
  * Server:
  *	func (h *Handler) Serve(ctx, Request) (Response, error) {
  *		bizErr := kerrors.NewBizStatusError(404, "not found")
- *		st, _ := bizErr.GRPCStatus().WithDetails(&echo.Echo{Str: "hello world"})
- *		bizErr.SetGRPCStatus(st)
+ *		grpcStatusErr := bizErr.(kerrors.GRPCStatusIface)
+ *		st, _ := grpcStatusErr.GRPCStatus().WithDetails(&echo.Echo{Str: "hello world"})
+ *		grpcStatusErr.SetGRPCStatus(st)
  *		return nil, bizErr
  *	}
  *	// ...
+ *	kerrors.NewBizStatusError = kerrors.NewGrpcBizStatusError
+ *	kerrors.NewBizStatusErrorWithExtra = kerrors.NewGrpcBizStatusErrorWithExtra
  *	svr := myservice.NewServer(&Handler{})
  *
  * Client:
+ *	// Replace these two functions to let Kitex pass Details successfully.
+ *	kerrors.NewBizStatusError = kerrors.NewGrpcBizStatusError
+ *	kerrors.NewBizStatusErrorWithExtra = kerrors.NewGrpcBizStatusErrorWithExtra
  *	cli := myservice.MustNewClient("client", client.WithTransportProtocol(transport.GRPC))
  *	resp, err := cli.Serve(ctx, req)
  *	if err != nil {
@@ -107,9 +113,6 @@ type BizStatusError struct {
 	code  int32
 	msg   string
 	extra map[string]string
-
-	// for grpc
-	status *status.Status
 }
 
 // FromBizStatusError converts err to BizStatusErrorIface.
@@ -122,13 +125,15 @@ func FromBizStatusError(err error) (bizErr BizStatusErrorIface, ok bool) {
 }
 
 // NewBizStatusError returns BizStatusErrorIface by passing in code and msg.
-// DefaultNewBizStatusError is used by default.
+// DefaultNewBizStatusError is used by default. Replace it by NewGrpcBizStatusError
+// if you want to pass status.Details in gRPC scenario.
 // Assign it to the function that returns your own BizStatusErrorIface implementation
 // if you want to implement BizStatusErrorIface by yourself.
 var NewBizStatusError func(code int32, msg string) BizStatusErrorIface
 
 // NewBizStatusErrorWithExtra returns BizStatusErrorIface which contains extra info.
-// DefaultNewBizStatusErrorWithExtra is used by default.
+// DefaultNewBizStatusErrorWithExtra is used by default. Repalce it by NewGrpcBizStatusErrorWithExtra
+// if you want to pass status.Details in gRPC scenario.
 // Assign it to the function that returns your own BizStatusErrorIface implementation
 // if you want to implement BizStatusErrorIface by yourself.
 var NewBizStatusErrorWithExtra func(code int32, msg string, extra map[string]string) BizStatusErrorIface
@@ -171,17 +176,32 @@ func (e *BizStatusError) SetBizExtra(key, value string) {
 	e.extra[key] = value
 }
 
-func (e *BizStatusError) GRPCStatus() *status.Status {
+func (e *BizStatusError) Error() string {
+	return fmt.Sprintf("biz error: code=%d, msg=%s", e.code, e.msg)
+}
+
+func NewGrpcBizStatusError(code int32, msg string) BizStatusErrorIface {
+	return &GrpcBizStatusError{BizStatusError: BizStatusError{code: code, msg: msg}}
+}
+
+func NewGrpcBizStatusErrorWithExtra(code int32, msg string, extra map[string]string) BizStatusErrorIface {
+	return &GrpcBizStatusError{BizStatusError: BizStatusError{code: code, msg: msg, extra: extra}}
+}
+
+type GrpcBizStatusError struct {
+	BizStatusError
+
+	// for grpc
+	status *status.Status
+}
+
+func (e *GrpcBizStatusError) GRPCStatus() *status.Status {
 	if e.status == nil {
 		e.status = status.New(codes.Internal, e.msg)
 	}
 	return e.status
 }
 
-func (e *BizStatusError) SetGRPCStatus(status *status.Status) {
+func (e *GrpcBizStatusError) SetGRPCStatus(status *status.Status) {
 	e.status = status
-}
-
-func (e *BizStatusError) Error() string {
-	return fmt.Sprintf("biz error: code=%d, msg=%s", e.code, e.msg)
 }

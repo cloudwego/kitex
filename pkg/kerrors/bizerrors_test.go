@@ -32,16 +32,37 @@ func TestBizStatusErrors(t *testing.T) {
 	berr := bserr.(*BizStatusError)
 	berr.SetBizExtra("key1", "value1")
 	berr.AppendBizMessage("[tag1]")
-	st, err := berr.GRPCStatus().WithDetails(&emptypb.Empty{})
+	test.Assert(t, bserr.BizStatusCode() == 502)
+	test.Assert(t, bserr.BizMessage() == "bad gateway [tag1]")
+	test.Assert(t, bserr.BizExtra()["key1"] == "value1")
+	test.Assert(t, bserr.Error() == "biz error: code=502, msg=bad gateway [tag1]")
+
+	var err error = bserr
+	_, ok := FromBizStatusError(err)
+	test.Assert(t, ok)
+	_, ok = FromBizStatusError(nil)
+	test.Assert(t, !ok)
+
+	// test grpc status error
+	NewBizStatusError = NewGrpcBizStatusError
+	NewBizStatusErrorWithExtra = NewGrpcBizStatusErrorWithExtra
+	bserr = NewBizStatusError(404, "not found")
+	test.Assert(t, bserr.BizStatusCode() == 404)
+	test.Assert(t, bserr.BizMessage() == "not found")
+	bserr = NewBizStatusErrorWithExtra(502, "bad gateway", nil)
+	gberr := bserr.(*GrpcBizStatusError)
+	gberr.SetBizExtra("key1", "value1")
+	gberr.AppendBizMessage("[tag1]")
+	st, err := gberr.GRPCStatus().WithDetails(&emptypb.Empty{})
 	test.Assert(t, err == nil)
-	berr.SetGRPCStatus(st)
+	gberr.SetGRPCStatus(st)
 	test.Assert(t, bserr.BizStatusCode() == 502)
 	test.Assert(t, bserr.BizMessage() == "bad gateway [tag1]")
 	test.Assert(t, bserr.BizExtra()["key1"] == "value1")
 	test.Assert(t, bserr.Error() == "biz error: code=502, msg=bad gateway [tag1]")
 
 	err = bserr
-	_, ok := FromBizStatusError(err)
+	_, ok = FromBizStatusError(err)
 	test.Assert(t, ok)
 	_, ok = FromBizStatusError(nil)
 	test.Assert(t, !ok)
