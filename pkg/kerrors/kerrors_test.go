@@ -187,7 +187,6 @@ type _err struct {
 
 // Format the error.
 func (de *_err) Format(s fmt.State, verb rune) {
-	fmt.Println("should run here")
 	switch verb {
 	case 'v':
 		if s.Flag('+') {
