@@ -277,6 +277,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 		if a.Use == "" {
 			cmd.Args = append(cmd.Args, "-r")
 		}
+		exe = strings.ReplaceAll(exe, ":", "\\:")
 		cmd.Args = append(cmd.Args,
 			"-o", generator.KitexGenPath,
 			"-g", gas,
