@@ -28,6 +28,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 
+	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/client/genericclient"
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
@@ -196,7 +197,7 @@ func TestBinaryThriftGenericClientClose(t *testing.T) {
 	clis := make([]genericclient.Client, cliCnt)
 	for i := 0; i < cliCnt; i++ {
 		g := generic.BinaryThriftGeneric()
-		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009")
+		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009", client.WithShortConnection())
 	}
 
 	runtime.ReadMemStats(&ms)
@@ -233,7 +234,7 @@ func TestBinaryThriftGenericClientFinalizer(t *testing.T) {
 	clis := make([]genericclient.Client, cliCnt)
 	for i := 0; i < cliCnt; i++ {
 		g := generic.BinaryThriftGeneric()
-		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009")
+		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009", client.WithShortConnection())
 	}
 
 	runtime.ReadMemStats(&ms)
