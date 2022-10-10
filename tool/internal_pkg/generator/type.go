@@ -52,6 +52,7 @@ func (p *PackageInfo) AddImport(pkg, path string) {
 	if p.Imports == nil {
 		p.Imports = make(map[string]map[string]bool)
 	}
+	path = strings.ReplaceAll(path, "\\", "/")
 	if pkg != "" {
 		if p.ExternalKitexGen != "" && strings.Contains(path, KitexGenPath) {
 			parts := strings.Split(path, KitexGenPath)

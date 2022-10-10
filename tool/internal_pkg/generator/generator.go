@@ -67,7 +67,8 @@ func SetKitexImportPath(path string) {
 
 // ImportPathTo returns an import path to the specified package under kitex.
 func ImportPathTo(pkg string) string {
-	return filepath.Join(kitexImportPath, pkg)
+	res := filepath.Join(kitexImportPath, pkg)
+	return strings.ReplaceAll(res, "\\", "/")
 }
 
 // AddGlobalMiddleware adds middleware for all generators

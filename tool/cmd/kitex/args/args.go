@@ -245,6 +245,7 @@ func (a *Arguments) checkPath() {
 	if a.Use != "" {
 		a.PackagePrefix = a.Use
 	}
+	a.PackagePrefix = strings.ReplaceAll(a.PackagePrefix, "\\", "/")
 	a.OutputPath = curpath
 }
 
