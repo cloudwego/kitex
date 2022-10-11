@@ -270,6 +270,7 @@ func (p *peer) Close() {
 
 // NewLongPool creates a long pool using the given IdleConfig.
 func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
+	idlConfig = *connpool.CheckPoolConfig(idlConfig)
 	limit := utils.NewMaxCounter(idlConfig.MaxIdleGlobal)
 	lp := &LongPool{
 		reporter:   &DummyReporter{},
