@@ -115,12 +115,14 @@ func (c *completer) addImport(w io.Writer, newMethods []*MethodInfo, fset *token
 	for _, m := range newMethods {
 		for _, arg := range m.Args {
 			for _, dep := range arg.Deps {
-				newImports[dep.PkgRefName+" "+dep.ImportPath] = true
+				s := strings.ReplaceAll(dep.PkgRefName+" "+dep.ImportPath, "\\", "/")
+				newImports[s] = true
 			}
 		}
 		if m.Resp != nil {
 			for _, dep := range m.Resp.Deps {
-				newImports[dep.PkgRefName+" "+dep.ImportPath] = true
+				s := strings.ReplaceAll(dep.PkgRefName+" "+dep.ImportPath, "\\", "/")
+				newImports[s] = true
 			}
 		}
 	}
@@ -138,6 +140,7 @@ func (c *completer) addImport(w io.Writer, newMethods []*MethodInfo, fset *token
 		delete(newImports, aliasPath)
 	}
 	for path := range newImports {
+		path = strings.ReplaceAll(path, "\\", "/")
 		s := strings.Split(path, " ")
 		switch len(s) {
 		case 1:
