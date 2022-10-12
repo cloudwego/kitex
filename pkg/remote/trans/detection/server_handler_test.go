@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	mocksklog "github.com/cloudwego/kitex/internal/mocks/klog"
+	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 
 	"github.com/golang/mock/gomock"
 
@@ -38,7 +40,10 @@ import (
 )
 
 func TestServerHandlerCall(t *testing.T) {
-	transHdler, _ := NewSvrTransHandlerFactory().NewTransHandler(&remote.ServerOption{
+	transHandler, _ := NewSvrTransHandlerFactory(
+		nphttp2.NewSvrTransHandlerFactory(),
+		netpoll.NewSvrTransHandlerFactory(),
+	).NewTransHandler(&remote.ServerOption{
 		SvcInfo: mocks.ServiceInfo(),
 	})
 
@@ -80,24 +85,24 @@ func TestServerHandlerCall(t *testing.T) {
 	npConn.EXPECT().Reader().Return(npReader).AnyTimes()
 	npConn.EXPECT().RemoteAddr().Return(nil).AnyTimes()
 
-	transHdler.(*svrTransHandler).netpoll = hdl
+	transHandler.(*svrTransHandler).nonHttp2 = hdl
 
 	// case1 successful call: onActive() and onRead() all success
 	triggerActiveErr = false
 	triggerReadErr = false
-	err := mockCall(transHdler, npConn)
+	err := mockCall(transHandler, npConn)
 	test.Assert(t, err == nil, err)
 
 	// case2 onActive failed: onActive() err and close conn
 	triggerActiveErr = true
 	triggerReadErr = false
-	err = mockCall(transHdler, npConn)
+	err = mockCall(transHandler, npConn)
 	test.Assert(t, err == errOnActive, err)
 
 	// case3 onRead failed: onRead() err and close conn
 	triggerActiveErr = false
 	triggerReadErr = true
-	err = mockCall(transHdler, npConn)
+	err = mockCall(transHandler, npConn)
 	test.Assert(t, err == errOnRead, err)
 }
 
@@ -107,19 +112,22 @@ func TestOnError(t *testing.T) {
 		klog.SetLogger(klog.DefaultLogger())
 		ctrl.Finish()
 	}()
-	transHdler, err := NewSvrTransHandlerFactory().NewTransHandler(&remote.ServerOption{
+	transHandler, err := NewSvrTransHandlerFactory(
+		nphttp2.NewSvrTransHandlerFactory(),
+		netpoll.NewSvrTransHandlerFactory(),
+	).NewTransHandler(&remote.ServerOption{
 		SvcInfo: mocks.ServiceInfo(),
 	})
 	test.Assert(t, err == nil)
 
-	mocklogger := mocksklog.NewMockFullLogger(ctrl)
-	klog.SetLogger(mocklogger)
+	mockLogger := mocksklog.NewMockFullLogger(ctrl)
+	klog.SetLogger(mockLogger)
 
 	var errMsg string
-	mocklogger.EXPECT().CtxErrorf(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(ctx context.Context, format string, v ...interface{}) {
+	mockLogger.EXPECT().CtxErrorf(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(ctx context.Context, format string, v ...interface{}) {
 		errMsg = fmt.Sprintf(format, v...)
 	})
-	transHdler.OnError(context.Background(), errors.New("mock error"), nil)
+	transHandler.OnError(context.Background(), errors.New("mock error"), nil)
 	test.Assert(t, errMsg == "KITEX: processing error, error=mock error", errMsg)
 
 	conn := &mocks.Conn{
@@ -127,16 +135,19 @@ func TestOnError(t *testing.T) {
 			return utils.NewNetAddr("mock", "mock")
 		},
 	}
-	mocklogger.EXPECT().CtxErrorf(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(ctx context.Context, format string, v ...interface{}) {
+	mockLogger.EXPECT().CtxErrorf(gomock.Any(), gomock.Any(), gomock.Any()).Do(func(ctx context.Context, format string, v ...interface{}) {
 		errMsg = fmt.Sprintf(format, v...)
 	})
-	transHdler.OnError(context.Background(), errors.New("mock error"), conn)
+	transHandler.OnError(context.Background(), errors.New("mock error"), conn)
 	test.Assert(t, errMsg == "KITEX: processing error, remoteAddr=mock, error=mock error", errMsg)
 }
 
 // TestOnInactive covers onInactive() codes to check panic
 func TestOnInactive(t *testing.T) {
-	transHdler, err := NewSvrTransHandlerFactory().NewTransHandler(&remote.ServerOption{
+	transHandler, err := NewSvrTransHandlerFactory(
+		nphttp2.NewSvrTransHandlerFactory(),
+		netpoll.NewSvrTransHandlerFactory(),
+	).NewTransHandler(&remote.ServerOption{
 		SvcInfo: mocks.ServiceInfo(),
 	})
 	test.Assert(t, err == nil)
@@ -148,7 +159,7 @@ func TestOnInactive(t *testing.T) {
 	}
 
 	// case1 test noopHandler onInactive()
-	transHdler.OnInactive(context.Background(), conn)
+	transHandler.OnInactive(context.Background(), conn)
 
 	// mock a ctx and set handlerKey
 	subHandler := &mocks.MockSvrTransHandler{}
@@ -168,7 +179,7 @@ func TestOnInactive(t *testing.T) {
 		},
 	)
 	// case2 test subHandler onInactive()
-	transHdler.OnInactive(ctx, conn)
+	transHandler.OnInactive(ctx, conn)
 }
 
 // mockCall mocks how detection transHdlr processing with incoming requests
