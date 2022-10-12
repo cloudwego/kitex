@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -104,7 +105,10 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Specify a file for template extension.")
 	f.BoolVar(&a.FrugalPretouch, "frugal-pretouch", false,
 		"Use frugal to compile arguments and results when new clients and servers.")
-
+	f.BoolVar(&a.Record, "record", false,
+		"Record Kitex cmd into kitex-all.sh.")
+	f.StringVar(&a.GitUrl, "git", "", "Pull IDL file from git repo")
+	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
 		"naming_style=golint",
@@ -248,12 +252,102 @@ func (a *Arguments) checkPath() {
 	a.OutputPath = curpath
 }
 
+func runGitCommand(a *Arguments) (string, error) {
+	u, err := user.Current()
+	if err != nil {
+		return "Failed to get home dir", err
+	}
+	cachePath := filepath.Join(u.HomeDir, ".kitex", "cache")
+
+	gitLink := a.GitUrl
+	branch := ""
+	if strings.Contains(gitLink, ".git@") {
+		strs := strings.Split(gitLink, ".git@")
+		branch = strs[1]
+		gitLink = strs[0] + ".git"
+	}
+	pullLink := gitLink
+
+	gitLink = strings.TrimPrefix(gitLink, "git@")
+
+	gitLink = strings.TrimSuffix(gitLink, ".git")
+
+	repoLink := ""
+	if strings.Contains(gitLink, "://") {
+		repoLink = strings.Split(gitLink, "://")[1]
+	} else {
+		repoLink = strings.ReplaceAll(gitLink, ":", "/")
+	}
+
+	branchSuffix := ""
+	if branch != "" {
+		branchSuffix = "@" + branch
+	}
+	gitPath := filepath.Join(cachePath, repoLink+branchSuffix)
+	a.IDL = filepath.Join(gitPath, a.IDL)
+
+	_, err = os.Stat(gitPath)
+	if err != nil && !os.IsExist(err) {
+		err = os.MkdirAll(gitPath, os.ModePerm)
+		if err != nil {
+			return "Failed to create cache directory,please check your permission for ~/.kitex/cache", err
+		}
+		cmdClone := exec.Command("git", "clone", pullLink, ".")
+		cmdClone.Dir = gitPath
+		out, gitErr := cmdClone.CombinedOutput()
+		if gitErr != nil {
+			return string(out), gitErr
+		}
+		if branch != "" {
+			cmdCheckout := exec.Command("git", "checkout", branch)
+			cmdCheckout.Dir = gitPath
+			out, gitErr = cmdCheckout.CombinedOutput()
+			return string(out), gitErr
+		} else {
+			return "", nil
+		}
+	}
+
+	cmdFetch := exec.Command("git", "fetch", "--all")
+	cmdFetch.Dir = gitPath
+	out, gitErr := cmdFetch.CombinedOutput()
+	if gitErr != nil {
+		return string(out), gitErr
+	}
+
+	cmdReset := exec.Command("git", "reset", "--hard", "master")
+	cmdReset.Dir = gitPath
+	out, gitErr = cmdReset.CombinedOutput()
+	if gitErr != nil {
+		return string(out), gitErr
+	}
+
+	cmdPull := exec.Command("git", "pull")
+	cmdPull.Dir = gitPath
+	out, gitErr = cmdPull.CombinedOutput()
+	if gitErr != nil {
+		return string(out), gitErr
+	}
+
+	return "", nil
+}
+
 // BuildCmd builds an exec.Cmd.
 func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 	exe, err := os.Executable()
 	if err != nil {
 		log.Warn("Failed to detect current executable:", err.Error())
 		os.Exit(1)
+	}
+	if a.GitUrl != "" {
+		errMsg, gitErr := runGitCommand(a)
+		if gitErr != nil {
+			if errMsg == "" {
+				errMsg = gitErr.Error()
+			}
+			log.Warn("Failed to pull IDL from git:", errMsg)
+			os.Exit(1)
+		}
 	}
 
 	kas := strings.Join(a.Config.Pack(), ",")

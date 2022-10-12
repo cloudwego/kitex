@@ -109,6 +109,8 @@ func Run() int {
 		module:    conv.Config.ModuleName,
 		copyIDL:   conv.Config.CopyIDL,
 		version:   conv.Config.Version,
+		record:    conv.Config.Record,
+		recordCmd: conv.Config.RecordCmd,
 	}
 	patches, err := p.patch(req)
 	if err != nil {

@@ -54,6 +54,8 @@ type patcher struct {
 	module    string
 	copyIDL   bool
 	version   string
+	record    bool
+	recordCmd []string
 
 	fileTpl *template.Template
 }
@@ -215,8 +217,59 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 				Name:    &path,
 			})
 		}
+
+		if p.record {
+			content := doRecord(p.recordCmd)
+			bashPath := filepath.Join(BASH_PATH)
+			patches = append(patches, &plugin.Generated{
+				Content: content,
+				Name:    &bashPath,
+			})
+		}
 	}
 	return
+}
+
+const BASH_PATH = "kitex-all.sh"
+
+// DoRecord records current cmd into kitex-all.sh
+func doRecord(recordCmd []string) string {
+	bytes, err := ioutil.ReadFile(BASH_PATH)
+	content := string(bytes)
+	if err != nil {
+		content = "#! /usr/bin/env bash\n"
+	}
+	var input, currentIdl string
+	for _, s := range recordCmd {
+		if s != "-record" {
+			input += s + " "
+		}
+		if strings.HasSuffix(s, ".thrift") || strings.HasSuffix(s, ".proto") {
+			currentIdl = s
+		}
+	}
+	if input != "" && currentIdl != "" {
+		find := false
+		lines := strings.Split(content, "\n")
+		for i, line := range lines {
+			if strings.Contains(input, "-service") && strings.Contains(line, "-service") {
+				lines[i] = input
+				find = true
+				break
+			}
+			if strings.Contains(line, currentIdl) && !strings.Contains(line, "-service") {
+				lines[i] = input
+				find = true
+				break
+			}
+		}
+		if !find {
+			content += "\n" + input
+		} else {
+			content = strings.Join(lines, "\n")
+		}
+	}
+	return content
 }
 
 func (p *patcher) reorderStructFields(fields []*golang.Field) ([]*golang.Field, error) {
