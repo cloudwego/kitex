@@ -80,7 +80,7 @@ func (be *basicError) WithCauseAndStack(cause error, stack string) error {
 	return &DetailedError{basic: be, cause: cause, stack: stack}
 }
 
-// WithCauseAndStack creates a detailed error which attach the given cause to current error and wrap extra msg to supply error msg.
+// WithCauseAndExtraMsg creates a detailed error which attach the given cause to current error and wrap extra msg to supply error msg.
 func (be *basicError) WithCauseAndExtraMsg(cause error, extraMsg string) error {
 	return &DetailedError{basic: be, cause: cause, extraMsg: extraMsg}
 }
