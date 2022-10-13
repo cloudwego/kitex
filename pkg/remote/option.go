@@ -22,6 +22,7 @@ import (
 	"time"
 
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
+	"github.com/cloudwego/kitex/pkg/profiler"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -101,6 +102,10 @@ type ServerOption struct {
 	InitOrResetRPCInfoFunc func(rpcinfo.RPCInfo, net.Addr) rpcinfo.RPCInfo
 
 	TracerCtl *internal_stats.Controller
+
+	Profiler                 profiler.Profiler
+	ProfilerTransInfoTagging TransInfoTagging
+	ProfilerMessageTagging   MessageTagging
 
 	GRPCCfg *grpc.ServerConfig
 

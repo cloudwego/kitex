@@ -50,6 +50,9 @@ const (
 var (
 	ttHeaderCodec   = ttHeader{}
 	meshHeaderCodec = meshHeader{}
+
+	_ remote.Codec       = (*defaultCodec)(nil)
+	_ remote.MetaDecoder = (*defaultCodec)(nil)
 )
 
 // NewDefaultCodec creates the default protocol sniffing codec supporting thrift and protobuf.
@@ -132,16 +135,8 @@ func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out r
 	return checkPayloadSize(payloadLen, c.maxSize)
 }
 
-// Decode implements the remote.Codec interface, it does complete message decode include header and payload.
-func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
-	defer func() {
-		if ri := message.RPCInfo(); ri != nil {
-			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {
-				ms.SetRecvSize(uint64(in.ReadLen()))
-			}
-		}
-	}()
-
+// DecodeMeta decode header
+func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
 	var flagBuf []byte
 	if flagBuf, err = in.Peek(2 * Size32); err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("default codec read failed: %s", err.Error()))
@@ -171,13 +166,25 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("meshHeader read payload first 8 byte failed: %s", err.Error()))
 		}
 	}
-	if err = checkPayload(flagBuf, message, in, isTTHeader, c.maxSize); err != nil {
+	return checkPayload(flagBuf, message, in, isTTHeader, c.maxSize)
+}
+
+// DecodePayload decode payload
+func (c *defaultCodec) DecodePayload(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
+	defer func() {
+		if ri := message.RPCInfo(); ri != nil {
+			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {
+				ms.SetRecvSize(uint64(in.ReadLen()))
+			}
+		}
+	}()
+
+	hasRead := in.ReadLen()
+	pCodec, err := remote.GetPayloadCodec(message)
+	if err != nil {
 		return err
 	}
-
-	// 2. decode body
-	hasRead := in.ReadLen()
-	if err = c.decodePayload(ctx, message, in); err != nil {
+	if err = pCodec.Unmarshal(ctx, message, in); err != nil {
 		return err
 	}
 	if message.PayloadLen() == 0 {
@@ -185,6 +192,17 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 		message.SetPayloadLen(in.ReadLen() - hasRead)
 	}
 	return nil
+}
+
+// Decode implements the remote.Codec interface, it does complete message decode include header and payload.
+func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
+	// 1. decode meta
+	if err = c.DecodeMeta(ctx, message, in); err != nil {
+		return err
+	}
+
+	// 2. decode payload
+	return c.DecodePayload(ctx, message, in)
 }
 
 func (c *defaultCodec) Name() string {
@@ -198,14 +216,6 @@ func (c *defaultCodec) encodePayload(ctx context.Context, message remote.Message
 		return err
 	}
 	return pCodec.Marshal(ctx, message, out)
-}
-
-func (c *defaultCodec) decodePayload(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
-	pCodec, err := remote.GetPayloadCodec(message)
-	if err != nil {
-		return err
-	}
-	return pCodec.Unmarshal(ctx, message, in)
 }
 
 /**
