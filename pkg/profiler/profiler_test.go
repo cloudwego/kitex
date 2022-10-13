@@ -31,6 +31,8 @@ import (
 
 func TestProfiler(t *testing.T) {
 	var processed int32
+	interval := time.Millisecond * 100
+	window := time.Millisecond * 100
 	testProcessor := func(pfs []*TagsProfile) error {
 		if len(pfs) <= 1 {
 			return nil
@@ -46,7 +48,7 @@ func TestProfiler(t *testing.T) {
 		return nil
 	}
 
-	p := NewProfiler(testProcessor, time.Millisecond*100, time.Second)
+	p := NewProfiler(testProcessor, interval, window)
 	ctx := pprof.WithLabels(context.Background(), pprof.Labels("type", "profiler"))
 	stopCh := make(chan struct{})
 	go func() {
@@ -55,7 +57,7 @@ func TestProfiler(t *testing.T) {
 		stopCh <- struct{}{}
 	}()
 
-	time.Sleep(time.Millisecond * 100) // wait for interval finished
+	time.Sleep(interval) // wait for interval finished
 	go func() {
 		p.Tag(ctx, []string{"type", "trace"}...)
 		defer p.Untag(ctx)
@@ -81,11 +83,12 @@ func TestProfilerPaused(t *testing.T) {
 		return nil
 	}, interval, window)
 	ctx := pprof.WithLabels(context.Background(), pprof.Labels("type", "profiler"))
+	stopCh := make(chan struct{})
 	go func() {
 		err := p.Run(ctx)
 		test.Assert(t, err == nil, err)
+		close(stopCh)
 	}()
-	defer p.Stop()
 	time.Sleep(interval / 2)
 
 	var data bytes.Buffer
@@ -104,6 +107,9 @@ func TestProfilerPaused(t *testing.T) {
 	for atomic.LoadInt32(&count) > 5 { // wait for processor finished
 		runtime.Gosched()
 	}
+
+	p.Stop()
+	<-stopCh
 }
 
 func TestLabelToTags(t *testing.T) {

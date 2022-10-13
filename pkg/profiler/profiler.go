@@ -168,27 +168,36 @@ func (p *profiler) Resume() {
 	}
 }
 
+func timeoutOrTrigger(timer *time.Timer, trigger chan struct{}) {
+	select {
+	case <-timer.C:
+		// clear trigger if it's also active
+		select {
+		case <-trigger:
+		default:
+		}
+	case <-trigger:
+		// stop timer when trigger active
+		if !timer.Stop() {
+			<-timer.C
+		}
+	}
+}
+
 // Run start analyse the pprof data with interval and window settings
 func (p *profiler) Run(ctx context.Context) (err error) {
 	var profiles []*TagsProfile
 	timer := time.NewTimer(0)
 	for {
-		if p.State() == stateStopped {
-			return nil
-		}
-
 		// wait for an internal time to reduce the cost of profiling
 		if p.interval > 0 {
 			timer.Reset(p.interval)
-			select {
-			case <-timer.C:
-			case <-p.stateTrigger:
-				if !timer.Stop() {
-					<-timer.C
-				}
-			}
+			timeoutOrTrigger(timer, p.stateTrigger)
 		}
-		if p.State() == statePaused {
+		switch p.State() {
+		case stateStopped:
+			return nil
+		case statePaused:
 			klog.Info("KITEX: profiler paused")
 			p.waitResumed()
 			klog.Info("KITEX: profiler resumed")
@@ -202,23 +211,22 @@ func (p *profiler) Run(ctx context.Context) (err error) {
 			time.Sleep(time.Second * 30)
 			continue
 		}
+
 		// wait for a window time to collect pprof data
 		if p.window > 0 {
 			timer.Reset(p.window)
-			select {
-			case <-timer.C:
-			case <-p.stateTrigger:
-				if !timer.Stop() {
-					<-timer.C
-				}
-			}
+			timeoutOrTrigger(timer, p.stateTrigger)
 		}
-		if p.State() == statePaused {
+		switch p.State() {
+		case stateStopped:
+			return nil
+		case statePaused:
 			klog.Info("KITEX: profiler paused")
 			p.waitResumed()
 			klog.Info("KITEX: profiler resumed")
 			continue
 		}
+
 		// stop profiler
 		p.stopProfile()
 
