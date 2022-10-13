@@ -118,7 +118,6 @@ type Config struct {
 
 	Record    bool
 	RecordCmd []string
-	GitUrl    string
 }
 
 // Pack packs the Config into a slice of "key=val" strings.

@@ -49,7 +49,6 @@ func TestConfig_Pack(t *testing.T) {
 		FrugalPretouch  bool
 		Record          bool
 		RecordCmd       string
-		GitUrl          string
 	}
 	tests := []struct {
 		name    string
@@ -60,7 +59,7 @@ func TestConfig_Pack(t *testing.T) {
 		{
 			name:    "some",
 			fields:  fields{Features: []feature{feature(999)}},
-			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "Features=999", "FrugalPretouch=false", "ExtensionFile=", "Record=false", "RecordCmd=", "GitUrl="},
+			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "Features=999", "FrugalPretouch=false", "ExtensionFile=", "Record=false", "RecordCmd="},
 		},
 	}
 	for _, tt := range tests {

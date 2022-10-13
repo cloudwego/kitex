@@ -107,7 +107,6 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Use frugal to compile arguments and results when new clients and servers.")
 	f.BoolVar(&a.Record, "record", false,
 		"Record Kitex cmd into kitex-all.sh.")
-	f.StringVar(&a.GitUrl, "git", "", "Pull IDL file from git repo")
 	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
@@ -252,14 +251,13 @@ func (a *Arguments) checkPath() {
 	a.OutputPath = curpath
 }
 
-func runGitCommand(a *Arguments) (string, error) {
+func runGitCommand(a *Arguments, gitLink string) (string, string, error) {
 	u, err := user.Current()
 	if err != nil {
-		return "Failed to get home dir", err
+		return "", "Failed to get home dir", err
 	}
 	cachePath := filepath.Join(u.HomeDir, ".kitex", "cache")
 
-	gitLink := a.GitUrl
 	branch := ""
 	if strings.Contains(gitLink, ".git@") {
 		strs := strings.Split(gitLink, ".git@")
@@ -284,27 +282,26 @@ func runGitCommand(a *Arguments) (string, error) {
 		branchSuffix = "@" + branch
 	}
 	gitPath := filepath.Join(cachePath, repoLink+branchSuffix)
-	a.IDL = filepath.Join(gitPath, a.IDL)
 
 	_, err = os.Stat(gitPath)
 	if err != nil && !os.IsExist(err) {
 		err = os.MkdirAll(gitPath, os.ModePerm)
 		if err != nil {
-			return "Failed to create cache directory,please check your permission for ~/.kitex/cache", err
+			return "", "Failed to create cache directory,please check your permission for ~/.kitex/cache", err
 		}
 		cmdClone := exec.Command("git", "clone", pullLink, ".")
 		cmdClone.Dir = gitPath
 		out, gitErr := cmdClone.CombinedOutput()
 		if gitErr != nil {
-			return string(out), gitErr
+			return "", string(out), gitErr
 		}
 		if branch != "" {
 			cmdCheckout := exec.Command("git", "checkout", branch)
 			cmdCheckout.Dir = gitPath
 			out, gitErr = cmdCheckout.CombinedOutput()
-			return string(out), gitErr
+			return gitPath, string(out), gitErr
 		} else {
-			return "", nil
+			return gitPath, "", nil
 		}
 	}
 
@@ -312,24 +309,24 @@ func runGitCommand(a *Arguments) (string, error) {
 	cmdFetch.Dir = gitPath
 	out, gitErr := cmdFetch.CombinedOutput()
 	if gitErr != nil {
-		return string(out), gitErr
+		return "", string(out), gitErr
 	}
 
 	cmdReset := exec.Command("git", "reset", "--hard", "master")
 	cmdReset.Dir = gitPath
 	out, gitErr = cmdReset.CombinedOutput()
 	if gitErr != nil {
-		return string(out), gitErr
+		return "", string(out), gitErr
 	}
 
 	cmdPull := exec.Command("git", "pull")
 	cmdPull.Dir = gitPath
 	out, gitErr = cmdPull.CombinedOutput()
 	if gitErr != nil {
-		return string(out), gitErr
+		return "", string(out), gitErr
 	}
 
-	return "", nil
+	return gitPath, "", nil
 }
 
 // BuildCmd builds an exec.Cmd.
@@ -339,14 +336,18 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 		log.Warn("Failed to detect current executable:", err.Error())
 		os.Exit(1)
 	}
-	if a.GitUrl != "" {
-		errMsg, gitErr := runGitCommand(a)
-		if gitErr != nil {
-			if errMsg == "" {
-				errMsg = gitErr.Error()
+
+	for i, inc := range a.Includes {
+		if strings.HasPrefix(inc, "git@") || strings.HasPrefix(inc, "http://") || strings.HasPrefix(inc, "https://") {
+			localGitPath, errMsg, gitErr := runGitCommand(a, inc)
+			if gitErr != nil {
+				if errMsg == "" {
+					errMsg = gitErr.Error()
+				}
+				log.Warn("Failed to pull IDL from git:", errMsg)
+				os.Exit(1)
 			}
-			log.Warn("Failed to pull IDL from git:", errMsg)
-			os.Exit(1)
+			a.Includes[i] = localGitPath
 		}
 	}
 
