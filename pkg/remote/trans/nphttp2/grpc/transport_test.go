@@ -118,13 +118,13 @@ func (h *testStreamHandler) handleStream(t *testing.T, s *Stream) {
 	}
 	if !bytes.Equal(p, req) {
 		t.Errorf("handleStream got %v, want %v", p, req)
-		h.t.WriteStatus(s, status.New(codes.Internal, "panic"), nil)
+		h.t.WriteStatus(s, status.New(codes.Internal, "panic"))
 		return
 	}
 	// send a response back to the client.
 	h.t.Write(s, nil, resp, &Options{})
 	// send the trailer to end the stream.
-	h.t.WriteStatus(s, status.New(codes.OK, ""), nil)
+	h.t.WriteStatus(s, status.New(codes.OK, ""))
 }
 
 func (h *testStreamHandler) handleStreamPingPong(t *testing.T, s *Stream) {
@@ -132,18 +132,18 @@ func (h *testStreamHandler) handleStreamPingPong(t *testing.T, s *Stream) {
 	for {
 		if _, err := s.Read(header); err != nil {
 			if err == io.EOF {
-				h.t.WriteStatus(s, status.New(codes.OK, ""), nil)
+				h.t.WriteStatus(s, status.New(codes.OK, ""))
 				return
 			}
 			t.Errorf("Error on server while reading data header: %v", err)
-			h.t.WriteStatus(s, status.New(codes.Internal, "panic"), nil)
+			h.t.WriteStatus(s, status.New(codes.Internal, "panic"))
 			return
 		}
 		sz := binary.BigEndian.Uint32(header[1:])
 		msg := make([]byte, int(sz))
 		if _, err := s.Read(msg); err != nil {
 			t.Errorf("Error on server while reading message: %v", err)
-			h.t.WriteStatus(s, status.New(codes.Internal, "panic"), nil)
+			h.t.WriteStatus(s, status.New(codes.Internal, "panic"))
 			return
 		}
 		buf := make([]byte, sz+5)
@@ -158,7 +158,7 @@ func (h *testStreamHandler) handleStreamMisbehave(t *testing.T, s *Stream) {
 	conn, ok := s.st.(*http2Server)
 	if !ok {
 		t.Errorf("Failed to convert %v to *http2Server", s.st)
-		h.t.WriteStatus(s, status.New(codes.Internal, ""), nil)
+		h.t.WriteStatus(s, status.New(codes.Internal, ""))
 		return
 	}
 	var sent int
@@ -188,7 +188,7 @@ func (h *testStreamHandler) handleStreamMisbehave(t *testing.T, s *Stream) {
 
 func (h *testStreamHandler) handleStreamEncodingRequiredStatus(t *testing.T, s *Stream) {
 	// raw newline is not accepted by http2 framer so it must be encoded.
-	h.t.WriteStatus(s, encodingTestStatus, nil)
+	h.t.WriteStatus(s, encodingTestStatus)
 }
 
 func (h *testStreamHandler) handleStreamInvalidHeaderField(t *testing.T, s *Stream) {
@@ -284,7 +284,7 @@ func (h *testStreamHandler) handleStreamDelayRead(t *testing.T, s *Stream) {
 		return
 	}
 	// send the trailer to end the stream.
-	if err := h.t.WriteStatus(s, status.New(codes.OK, ""), nil); err != nil {
+	if err := h.t.WriteStatus(s, status.New(codes.OK, "")); err != nil {
 		t.Errorf("server WriteStatus got %v, want <nil>", err)
 		return
 	}

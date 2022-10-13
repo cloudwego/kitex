@@ -242,7 +242,7 @@ func (d *decodeState) status() *status.Status {
 
 func (d *decodeState) bizStatusErr() kerrors.BizStatusErrorIface {
 	if d.data.bizStatusErr == nil && d.data.bizStatusCode != nil {
-		d.data.bizStatusErr = kerrors.NewBizStatusErrorWithExtra(
+		d.data.bizStatusErr = kerrors.NewGRPCBizStatusErrorWithExtra(
 			safeCastInt32(*(d.data.bizStatusCode)), d.data.rawStatusMsg, d.data.bizStatusExtra)
 		if st, ok := d.data.bizStatusErr.(kerrors.GRPCStatusIface); ok {
 			st.SetGRPCStatus(d.status())

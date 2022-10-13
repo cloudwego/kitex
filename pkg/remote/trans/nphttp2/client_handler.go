@@ -20,9 +20,11 @@ import (
 	"context"
 	"net"
 
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 type cliTransHandlerFactory struct{}
@@ -65,6 +67,12 @@ func (h *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 	defer buf.Release(err)
 
 	err = h.codec.Decode(ctx, msg, buf)
+	if bizStatusErr, isBizErr := kerrors.FromBizStatusError(err); isBizErr {
+		if setter, ok := msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter); ok {
+			setter.SetBizStatusErr(bizStatusErr)
+			return ctx, nil
+		}
+	}
 	return ctx, err
 }
 

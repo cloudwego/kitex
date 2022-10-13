@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,13 +44,11 @@ func TestBizStatusErrors(t *testing.T) {
 	test.Assert(t, !ok)
 
 	// test grpc status error
-	NewBizStatusError = NewGrpcBizStatusError
-	NewBizStatusErrorWithExtra = NewGrpcBizStatusErrorWithExtra
-	bserr = NewBizStatusError(404, "not found")
+	bserr = NewGRPCBizStatusError(404, "not found")
 	test.Assert(t, bserr.BizStatusCode() == 404)
 	test.Assert(t, bserr.BizMessage() == "not found")
-	bserr = NewBizStatusErrorWithExtra(502, "bad gateway", nil)
-	gberr := bserr.(*GrpcBizStatusError)
+	bserr = NewGRPCBizStatusErrorWithExtra(502, "bad gateway", nil)
+	gberr := bserr.(*GRPCBizStatusError)
 	gberr.SetBizExtra("key1", "value1")
 	gberr.AppendBizMessage("[tag1]")
 	st, err := gberr.GRPCStatus().WithDetails(&emptypb.Empty{})

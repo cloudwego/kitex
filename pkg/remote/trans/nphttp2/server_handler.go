@@ -111,7 +111,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			for _, shdlr := range t.opt.StreamingMetaHandlers {
 				rCtx, err = shdlr.OnReadStream(rCtx)
 				if err != nil {
-					tr.WriteStatus(s, convertStatus(err), nil)
+					tr.WriteStatus(s, convertStatus(err))
 					return
 				}
 			}
@@ -136,7 +136,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			pos := strings.LastIndex(sm, "/")
 			if pos == -1 {
 				errDesc := fmt.Sprintf("malformed method name, method=%q", s.Method())
-				tr.WriteStatus(s, status.New(codes.Internal, errDesc), nil)
+				tr.WriteStatus(s, status.New(codes.Internal, errDesc))
 				return
 			}
 			methodName := sm[pos+1:]
@@ -145,7 +145,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
 				if err = mutableTo.SetMethod(methodName); err != nil {
 					errDesc := fmt.Sprintf("setMethod failed in streaming, method=%s, error=%s", methodName, err.Error())
-					_ = tr.WriteStatus(s, status.New(codes.Internal, errDesc), nil)
+					_ = tr.WriteStatus(s, status.New(codes.Internal, errDesc))
 					return
 				}
 			}
@@ -180,7 +180,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			}
 
 			if err != nil {
-				tr.WriteStatus(s, convertStatus(err), nil)
+				tr.WriteStatus(s, convertStatus(err))
 				t.OnError(rCtx, err, conn)
 				return
 			}
@@ -191,10 +191,11 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				} else {
 					st = status.New(codes.Internal, bizStatusErr.BizMessage())
 				}
-				tr.WriteStatus(s, st, bizStatusErr)
+				s.SetBizStatusErr(bizStatusErr)
+				tr.WriteStatus(s, st)
 				return
 			}
-			tr.WriteStatus(s, status.New(codes.OK, ""), nil)
+			tr.WriteStatus(s, status.New(codes.OK, ""))
 		})
 	}, func(ctx context.Context, method string) context.Context {
 		return ctx

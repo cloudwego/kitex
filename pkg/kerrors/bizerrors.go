@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,21 +77,17 @@ type BizStatusErrorIface interface {
  *
  * Server:
  *	func (h *Handler) Serve(ctx, Request) (Response, error) {
- *		bizErr := kerrors.NewBizStatusError(404, "not found")
+ *		bizErr := kerrors.NewGRPCBizStatusError(404, "not found")
  *		grpcStatusErr := bizErr.(kerrors.GRPCStatusIface)
  *		st, _ := grpcStatusErr.GRPCStatus().WithDetails(&echo.Echo{Str: "hello world"})
  *		grpcStatusErr.SetGRPCStatus(st)
  *		return nil, bizErr
  *	}
  *	// ...
- *	kerrors.NewBizStatusError = kerrors.NewGrpcBizStatusError
- *	kerrors.NewBizStatusErrorWithExtra = kerrors.NewGrpcBizStatusErrorWithExtra
  *	svr := myservice.NewServer(&Handler{})
  *
  * Client:
  *	// Replace these two functions to let Kitex pass Details successfully.
- *	kerrors.NewBizStatusError = kerrors.NewGrpcBizStatusError
- *	kerrors.NewBizStatusErrorWithExtra = kerrors.NewGrpcBizStatusErrorWithExtra
  *	cli := myservice.MustNewClient("client", client.WithTransportProtocol(transport.GRPC))
  *	resp, err := cli.Serve(ctx, req)
  *	if err != nil {
@@ -125,29 +121,12 @@ func FromBizStatusError(err error) (bizErr BizStatusErrorIface, ok bool) {
 }
 
 // NewBizStatusError returns BizStatusErrorIface by passing in code and msg.
-// DefaultNewBizStatusError is used by default. Replace it by NewGrpcBizStatusError
-// if you want to pass status.Details in gRPC scenario.
-// Assign it to the function that returns your own BizStatusErrorIface implementation
-// if you want to implement BizStatusErrorIface by yourself.
-var NewBizStatusError func(code int32, msg string) BizStatusErrorIface
-
-// NewBizStatusErrorWithExtra returns BizStatusErrorIface which contains extra info.
-// DefaultNewBizStatusErrorWithExtra is used by default. Repalce it by NewGrpcBizStatusErrorWithExtra
-// if you want to pass status.Details in gRPC scenario.
-// Assign it to the function that returns your own BizStatusErrorIface implementation
-// if you want to implement BizStatusErrorIface by yourself.
-var NewBizStatusErrorWithExtra func(code int32, msg string, extra map[string]string) BizStatusErrorIface
-
-func init() {
-	NewBizStatusError = DefaultNewBizStatusError
-	NewBizStatusErrorWithExtra = DefaultNewBizStatusErrorWithExtra
-}
-
-func DefaultNewBizStatusError(code int32, msg string) BizStatusErrorIface {
+func NewBizStatusError(code int32, msg string) BizStatusErrorIface {
 	return &BizStatusError{code: code, msg: msg}
 }
 
-func DefaultNewBizStatusErrorWithExtra(code int32, msg string, extra map[string]string) BizStatusErrorIface {
+// NewBizStatusErrorWithExtra returns BizStatusErrorIface which contains extra info.
+func NewBizStatusErrorWithExtra(code int32, msg string, extra map[string]string) BizStatusErrorIface {
 	return &BizStatusError{code: code, msg: msg, extra: extra}
 }
 
@@ -180,28 +159,34 @@ func (e *BizStatusError) Error() string {
 	return fmt.Sprintf("biz error: code=%d, msg=%s", e.code, e.msg)
 }
 
-func NewGrpcBizStatusError(code int32, msg string) BizStatusErrorIface {
-	return &GrpcBizStatusError{BizStatusError: BizStatusError{code: code, msg: msg}}
+// NewGRPCBizStatusError returns *GRPCBizStatusError which implements both
+// BizStatusErrorIface and GRPCStatusIface, use this function instead of NewBizStatusError
+// to pass status.Details in gRPC scenario.
+func NewGRPCBizStatusError(code int32, msg string) BizStatusErrorIface {
+	return &GRPCBizStatusError{BizStatusError: BizStatusError{code: code, msg: msg}}
 }
 
-func NewGrpcBizStatusErrorWithExtra(code int32, msg string, extra map[string]string) BizStatusErrorIface {
-	return &GrpcBizStatusError{BizStatusError: BizStatusError{code: code, msg: msg, extra: extra}}
+// NewGRPCBizStatusErrorWithExtra returns *GRPCBizStatusError which implements both
+// BizStatusErrorIface and GRPCStatusIface, use this function instead of NewBizStatusErrorWithExtra
+// to pass status.Details in gRPC scenario.
+func NewGRPCBizStatusErrorWithExtra(code int32, msg string, extra map[string]string) BizStatusErrorIface {
+	return &GRPCBizStatusError{BizStatusError: BizStatusError{code: code, msg: msg, extra: extra}}
 }
 
-type GrpcBizStatusError struct {
+type GRPCBizStatusError struct {
 	BizStatusError
 
 	// for grpc
 	status *status.Status
 }
 
-func (e *GrpcBizStatusError) GRPCStatus() *status.Status {
+func (e *GRPCBizStatusError) GRPCStatus() *status.Status {
 	if e.status == nil {
 		e.status = status.New(codes.Internal, e.msg)
 	}
 	return e.status
 }
 
-func (e *GrpcBizStatusError) SetGRPCStatus(status *status.Status) {
+func (e *GRPCBizStatusError) SetGRPCStatus(status *status.Status) {
 	e.status = status
 }

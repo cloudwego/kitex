@@ -27,7 +27,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 func TestClientConn(t *testing.T) {
@@ -72,25 +71,25 @@ func TestClientConnRead(t *testing.T) {
 	mockey.PatchConvey("TestClientConnRead", t, func() {
 		mockey.Mock((*grpc.Stream).Read).Return(1, io.EOF).Build()
 		mockey.Mock((*grpc.Stream).Status).Return(status.New(codes.Internal, "not found")).Build()
-		mockey.Mock((*grpc.Stream).BizStatusErr).Return(kerrors.NewBizStatusError(404, "not found")).Build()
+		mockey.Mock((*grpc.Stream).BizStatusErr).Return(kerrors.NewGRPCBizStatusError(404, "not found")).Build()
 		s := &grpc.Stream{}
-		ri := rpcinfo.GetRPCInfo(newMockCtxWithRPCInfo())
-		cli := &clientConn{s: s, ri: ri}
+		cli := &clientConn{s: s}
 		n, err := cli.Read(nil)
-		test.Assert(t, err == nil)
 		test.Assert(t, n == 1)
-		test.Assert(t, ri.Invocation().BizStatusErr().BizStatusCode() == 404)
-		test.Assert(t, ri.Invocation().BizStatusErr().BizMessage() == "not found")
+		bizErr, _ := kerrors.FromBizStatusError(err)
+		test.Assert(t, bizErr.BizStatusCode() == 404)
+		test.Assert(t, bizErr.BizMessage() == "not found")
 	})
 	mockey.PatchConvey("TestClientConnRead", t, func() {
 		mockey.Mock((*grpc.Stream).Read).Return(1, io.EOF).Build()
 		mockey.Mock((*grpc.Stream).Status).Return(status.New(codes.Internal, "not found")).Build()
 		mockey.Mock((*grpc.Stream).BizStatusErr).Return(nil).Build()
 		s := &grpc.Stream{}
-		ri := rpcinfo.GetRPCInfo(newMockCtxWithRPCInfo())
-		cli := &clientConn{s: s, ri: ri}
+		cli := &clientConn{s: s}
 		n, err := cli.Read(nil)
 		test.Assert(t, err != nil)
+		_, isBizErr := kerrors.FromBizStatusError(err)
+		test.Assert(t, !isBizErr)
 		test.Assert(t, n == 1)
 	})
 }

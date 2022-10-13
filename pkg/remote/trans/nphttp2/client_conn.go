@@ -34,7 +34,6 @@ import (
 type clientConn struct {
 	tr grpc.ClientTransport
 	s  *grpc.Stream
-	ri rpcinfo.RPCInfo
 }
 
 var _ GRPCConn = (*clientConn)(nil)
@@ -83,7 +82,6 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 	return &clientConn{
 		tr: tr,
 		s:  s,
-		ri: ri,
 	}, nil
 }
 
@@ -93,12 +91,10 @@ func (c *clientConn) Read(b []byte) (n int, err error) {
 	if err == io.EOF {
 		if status := c.s.Status(); status.Code() != codes.OK {
 			if bizStatusErr := c.s.BizStatusErr(); bizStatusErr != nil {
-				if setter, ok := c.ri.Invocation().(rpcinfo.InvocationSetter); ok {
-					setter.SetBizStatusErr(bizStatusErr)
-					return n, nil
-				}
+				err = bizStatusErr
+			} else {
+				err = status.Err()
 			}
-			err = status.Err()
 		}
 	}
 	return n, err

@@ -410,6 +410,10 @@ func (s *Stream) Status() *status.Status {
 	return s.status
 }
 
+func (s *Stream) SetBizStatusErr(bizStatusErr kerrors.BizStatusErrorIface) {
+	s.bizStatusErr = bizStatusErr
+}
+
 func (s *Stream) BizStatusErr() kerrors.BizStatusErrorIface {
 	return s.bizStatusErr
 }
@@ -693,7 +697,7 @@ type ServerTransport interface {
 
 	// WriteStatus sends the status of a stream to the client.  WriteStatus is
 	// the final call made on a stream and always occurs.
-	WriteStatus(s *Stream, st *status.Status, bizStatusErr kerrors.BizStatusErrorIface) error
+	WriteStatus(s *Stream, st *status.Status) error
 
 	// Close tears down the transport. Once it is called, the transport
 	// should not be accessed any more. All the pending streams and their
