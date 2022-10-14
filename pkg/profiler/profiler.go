@@ -219,6 +219,7 @@ func (p *profiler) Run(ctx context.Context) (err error) {
 		}
 		switch p.State() {
 		case stateStopped:
+			p.stopProfile()
 			return nil
 		case statePaused:
 			klog.Info("KITEX: profiler paused")
