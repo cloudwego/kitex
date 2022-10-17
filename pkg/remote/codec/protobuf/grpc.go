@@ -21,8 +21,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/fastpb"
+	"github.com/cloudwego/netpoll"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -57,14 +57,14 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	case fastpb.Writer:
 		// TODO: reuse data buffer when we can free it safely
 		size := t.Size()
-		data = mcache.Malloc(size + 5)
+		data = netpoll.Malloc(size + 5)
 		t.FastWrite(data[5:])
 		binary.BigEndian.PutUint32(data[1:5], uint32(size))
 		return writer.WriteData(data)
 	case marshaler:
 		// TODO: reuse data buffer when we can free it safely
 		size := t.Size()
-		data = mcache.Malloc(size + 5)
+		data = netpoll.Malloc(size + 5)
 		if _, err = t.MarshalTo(data[5:]); err != nil {
 			return err
 		}
