@@ -18,17 +18,25 @@ package transmeta
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
 )
 
 const (
 	framedTransportType   = "framed"
 	unframedTransportType = "unframed"
+
+	// for biz error
+	bizStatus  = "biz-status"
+	bizMessage = "biz-message"
+	bizExtra   = "biz-extra"
 )
 
 // TTHeader handlers.
@@ -67,7 +75,26 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 
 // ReadMeta of clientTTHeaderHandler reads headers of TTHeader protocol from transport
 func (ch *clientTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Message) (context.Context, error) {
-	// do nothing
+	if !isTTHeader(msg) {
+		return ctx, nil
+	}
+	ri := msg.RPCInfo()
+	transInfo := msg.TransInfo()
+	strInfo := transInfo.TransStrInfo()
+
+	if code, err := strconv.Atoi(strInfo[bizStatus]); err == nil && code != 0 {
+		if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+			if bizExtra := strInfo[bizExtra]; bizExtra != "" {
+				extra, err := utils.JSONStr2Map(bizExtra)
+				if err != nil {
+					return ctx, fmt.Errorf("malformed header info, extra: %s", bizExtra)
+				}
+				setter.SetBizStatusErr(kerrors.NewBizStatusErrorWithExtra(int32(code), strInfo[bizMessage], extra))
+			} else {
+				setter.SetBizStatusErr(kerrors.NewBizStatusError(int32(code), strInfo[bizMessage]))
+			}
+		}
+	}
 	return ctx, nil
 }
 
@@ -100,10 +127,21 @@ func (sh *serverTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 	if !isTTHeader(msg) {
 		return ctx, nil
 	}
-	hd := map[uint16]string{
-		transmeta.MsgType: strconv.Itoa(int(msg.MessageType())),
+	ri := msg.RPCInfo()
+	transInfo := msg.TransInfo()
+	intInfo := transInfo.TransIntInfo()
+	strInfo := transInfo.TransStrInfo()
+
+	intInfo[transmeta.MsgType] = strconv.Itoa(int(msg.MessageType()))
+
+	if bizErr := ri.Invocation().BizStatusErr(); bizErr != nil {
+		strInfo[bizStatus] = strconv.Itoa(int(bizErr.BizStatusCode()))
+		strInfo[bizMessage] = bizErr.BizMessage()
+		if len(bizErr.BizExtra()) != 0 {
+			strInfo[bizExtra], _ = utils.Map2JSONStr(bizErr.BizExtra())
+		}
 	}
-	msg.TransInfo().PutTransIntInfo(hd)
+
 	return ctx, nil
 }
 

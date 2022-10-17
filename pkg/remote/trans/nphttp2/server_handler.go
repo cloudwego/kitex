@@ -184,6 +184,17 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				t.OnError(rCtx, err, conn)
 				return
 			}
+			if bizStatusErr := ri.Invocation().BizStatusErr(); bizStatusErr != nil {
+				var st *status.Status
+				if sterr, ok := bizStatusErr.(status.Iface); ok {
+					st = sterr.GRPCStatus()
+				} else {
+					st = status.New(codes.Internal, bizStatusErr.BizMessage())
+				}
+				s.SetBizStatusErr(bizStatusErr)
+				tr.WriteStatus(s, st)
+				return
+			}
 			tr.WriteStatus(s, status.New(codes.OK, ""))
 		})
 	}, func(ctx context.Context, method string) context.Context {

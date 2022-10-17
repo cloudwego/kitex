@@ -38,7 +38,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 )
 
@@ -191,12 +190,8 @@ func FromError(err error) (s *Status, ok bool) {
 	if err == nil {
 		return nil, true
 	}
-	if kerrors.IsKitexError(err) {
-		err = errors.Unwrap(err)
-	}
-	if se, ok := err.(interface {
-		GRPCStatus() *Status
-	}); ok {
+	var se Iface
+	if errors.As(err, &se) {
 		return se.GRPCStatus(), true
 	}
 	return New(codes.Unknown, err.Error()), false
@@ -216,9 +211,8 @@ func Code(err error) codes.Code {
 	if err == nil {
 		return codes.OK
 	}
-	if se, ok := err.(interface {
-		GRPCStatus() *Status
-	}); ok {
+	var se Iface
+	if errors.As(err, &se) {
 		return se.GRPCStatus().Code()
 	}
 	return codes.Unknown
