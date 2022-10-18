@@ -73,6 +73,7 @@ func (h *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 			return ctx, nil
 		}
 	}
+	receiveHeaderAndTrailer(ctx, conn)
 	return ctx, err
 }
 

@@ -20,10 +20,30 @@ package streaming
 import (
 	"context"
 	"io"
+
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 )
 
 // Stream both client and server stream
 type Stream interface {
+	// SetHeader sets the header metadata. It may be called multiple times.
+	// When call multiple times, all the provided metadata will be merged.
+	// All the metadata will be sent out when one of the following happens:
+	//  - ServerStream.SendHeader() is called;
+	//  - The first response is sent out;
+	//  - An RPC status is sent out (error or success).
+	SetHeader(metadata.MD) error
+	// SendHeader sends the header metadata.
+	// The provided md and headers set by SetHeader() will be sent.
+	// It fails if called multiple times.
+	SendHeader(metadata.MD) error
+	// SetTrailer sets the trailer metadata which will be sent with the RPC status.
+	// When called more than once, all the provided metadata will be merged.
+	SetTrailer(metadata.MD)
+	// Header is used for client side stream to receive header from server.
+	Header() (metadata.MD, error)
+	// Trailer is used for client side stream to receive trailer from server.
+	Trailer() metadata.MD
 	// Context the stream context.Context
 	Context() context.Context
 	// RecvMsg recvive message from peer
