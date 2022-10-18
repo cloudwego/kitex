@@ -31,8 +31,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/peer"
-
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
@@ -43,6 +41,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/syscall"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/peer"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
