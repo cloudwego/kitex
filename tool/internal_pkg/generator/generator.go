@@ -116,6 +116,7 @@ type Config struct {
 	CombineService        bool // combine services to one service
 	CopyIDL               bool
 	ThriftPlugins         util.StringSlice
+	ProtobufPlugins       util.StringSlice
 	Features              []feature
 	FrugalPretouch        bool
 	ThriftPluginTimeLimit time.Duration

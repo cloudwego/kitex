@@ -97,6 +97,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.DurationVar(&a.ThriftPluginTimeLimit, "thrift-plugin-time-limit", generator.DefaultThriftPluginTimeLimit, "Specify thrift plugin execution time limit.")
 	f.Var(&a.ThriftPlugins, "thrift-plugin", "Specify thrift plugin arguments for the thrift compiler.")
 	f.Var(&a.ProtobufOptions, "protobuf", "Specify arguments for the protobuf compiler.")
+	f.Var(&a.ProtobufPlugins, "protobuf-plugin", "Specify protobuf plugin arguments for the protobuf compiler.(plugin_name:options:out_dir)")
 	f.BoolVar(&a.CombineService, "combine-service", false,
 		"Combine services in root thrift file.")
 	f.BoolVar(&a.CopyIDL, "copy-idl", false,
@@ -343,6 +344,19 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 		for _, po := range a.ProtobufOptions {
 			cmd.Args = append(cmd.Args, "--kitex_opt="+po)
 		}
+		for _, p := range a.ProtobufPlugins {
+			pluginParams := strings.Split(p, ":")
+			if len(pluginParams) != 3 {
+				log.Warnf("Failed to get the correct protoc plugin parameters for %. Please specify the protoc plugin in the form of \"plugin_name:options:out_dir\"", p)
+				os.Exit(1)
+			}
+			// pluginParams[0] -> plugin name, pluginParams[1] -> plugin options, pluginParams[2] -> out_dir
+			cmd.Args = append(cmd.Args,
+				fmt.Sprintf("--%s_out=%s", pluginParams[0], pluginParams[2]),
+				fmt.Sprintf("--%s_opt=%s", pluginParams[0], pluginParams[1]),
+			)
+		}
+
 		cmd.Args = append(cmd.Args, a.IDL)
 	}
 	log.Info(strings.ReplaceAll(strings.Join(cmd.Args, " "), kas, fmt.Sprintf("%q", kas)))
