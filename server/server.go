@@ -43,7 +43,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
-	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
 // Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
@@ -317,25 +316,21 @@ func (s *server) richRemoteOption() {
 }
 
 func (s *server) addBoundHandlers(opt *remote.ServerOption) {
-	// add default meta handler
-	if len(s.opt.MetaHandlers) == 0 {
-		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerHTTP2Handler)
-		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerTTHeaderHandler)
-	}
 	// add profiler meta handler, which should be exec after other MetaHandlers
 	if opt.Profiler != nil && opt.ProfilerMessageTagging != nil {
 		s.opt.MetaHandlers = append(s.opt.MetaHandlers,
 			remote.NewProfilerMetaHandler(opt.Profiler, opt.ProfilerMessageTagging),
 		)
 	}
-
 	// for server trans info handler
-	transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
-	// meta handler exec before boundHandlers which add with option
-	doAddBoundHandlerToHead(transInfoHdlr, opt)
-	for _, h := range s.opt.MetaHandlers {
-		if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
-			opt.StreamingMetaHandlers = append(opt.StreamingMetaHandlers, shdlr)
+	if len(s.opt.MetaHandlers) > 0 {
+		transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
+		// meta handler exec before boundHandlers which add with option
+		doAddBoundHandlerToHead(transInfoHdlr, opt)
+		for _, h := range s.opt.MetaHandlers {
+			if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
+				opt.StreamingMetaHandlers = append(opt.StreamingMetaHandlers, shdlr)
+			}
 		}
 	}
 
