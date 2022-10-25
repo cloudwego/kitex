@@ -189,27 +189,4 @@ func (o *Options) initRemoteOpt() {
 			)
 		}
 	}
-	pool := o.RemoteOpt.ConnPool
-	o.CloseCallbacks = append(o.CloseCallbacks, pool.Close)
-
-	if df, ok := pool.(interface{ Dump() interface{} }); ok {
-		o.DebugService.RegisterProbeFunc(diagnosis.ConnPoolKey, df.Dump)
-	}
-	if r, ok := pool.(remote.ConnPoolReporter); ok && o.RemoteOpt.EnableConnPoolReporter {
-		r.EnableReporter()
-	}
-
-	if long, ok := pool.(remote.LongConnPool); ok {
-		o.Bus.Watch(discovery.ChangeEventName, func(ev *event.Event) {
-			ch, ok := ev.Extra.(*discovery.Change)
-			if !ok {
-				return
-			}
-			for _, inst := range ch.Removed {
-				if addr := inst.Address(); addr != nil {
-					long.Clean(addr.Network(), addr.String())
-				}
-			}
-		})
-	}
 }
