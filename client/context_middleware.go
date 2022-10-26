@@ -31,24 +31,25 @@ func WithContextMiddlewares(ctx context.Context, mws ...endpoint.Middleware) con
 	if len(mws) == 0 {
 		return ctx
 	}
-	oldMWs := getContextMiddlewares(ctx)
-	if len(oldMWs) > 0 {
-		mws = append(oldMWs, mws...)
+	mw := getContextMiddleware(ctx)
+	if mw != nil {
+		mws = append([]endpoint.Middleware{mw}, mws...)
 	}
-	return context.WithValue(ctx, ctxMWChainKey{}, mws)
+	mw = endpoint.Chain(mws...)
+	return context.WithValue(ctx, ctxMWChainKey{}, mw)
 }
 
-func getContextMiddlewares(ctx context.Context) []endpoint.Middleware {
-	mws, _ := ctx.Value(ctxMWChainKey{}).([]endpoint.Middleware)
+func getContextMiddleware(ctx context.Context) endpoint.Middleware {
+	mws, _ := ctx.Value(ctxMWChainKey{}).(endpoint.Middleware)
 	return mws
 }
 
 // contextMW execute the ContextMiddlewares in ctx
 func contextMW(next endpoint.Endpoint) endpoint.Endpoint {
 	return func(ctx context.Context, req, resp interface{}) (err error) {
-		mws := getContextMiddlewares(ctx)
-		if len(mws) > 0 {
-			return endpoint.Chain(mws...)(next)(ctx, req, resp)
+		mw := getContextMiddleware(ctx)
+		if mw != nil {
+			return mw(next)(ctx, req, resp)
 		}
 		return next(ctx, req, resp)
 	}

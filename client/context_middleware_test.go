@@ -35,11 +35,11 @@ func TestContextMiddlewares(t *testing.T) {
 		}
 	}
 
-	mws := getContextMiddlewares(ctx)
-	test.Assert(t, mws == nil)
+	cmw := getContextMiddleware(ctx)
+	test.Assert(t, cmw == nil)
 	ctx = WithContextMiddlewares(ctx, mw)
-	mws = getContextMiddlewares(ctx)
-	test.Assert(t, len(mws) == 1)
+	cmw = getContextMiddleware(ctx)
+	test.Assert(t, cmw != nil)
 }
 
 func TestCallWithContextMiddlewares(t *testing.T) {
@@ -48,7 +48,15 @@ func TestCallWithContextMiddlewares(t *testing.T) {
 
 	mtd := mocks.MockMethod
 	var beforeCall, afterCall int
-	var mw endpoint.Middleware = func(next endpoint.Endpoint) endpoint.Endpoint {
+	var mw1 endpoint.Middleware = func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			beforeCall++
+			err = next(ctx, req, resp)
+			afterCall++
+			return err
+		}
+	}
+	var mw2 endpoint.Middleware = func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, resp interface{}) (err error) {
 			beforeCall++
 			err = next(ctx, req, resp)
@@ -65,9 +73,17 @@ func TestCallWithContextMiddlewares(t *testing.T) {
 	test.Assert(t, beforeCall == 0)
 	test.Assert(t, afterCall == 0)
 
-	ctx = WithContextMiddlewares(ctx, mw)
+	ctx = WithContextMiddlewares(ctx, mw1)
 	err = cli.Call(ctx, mtd, req, res)
 	test.Assert(t, err == nil)
 	test.Assert(t, beforeCall == 1)
 	test.Assert(t, afterCall == 1)
+
+	beforeCall = 0
+	afterCall = 0
+	ctx = WithContextMiddlewares(ctx, mw2)
+	err = cli.Call(ctx, mtd, req, res)
+	test.Assert(t, err == nil)
+	test.Assert(t, beforeCall == 2)
+	test.Assert(t, afterCall == 2)
 }
