@@ -13,6 +13,14 @@ jobs:
           go-version: '1.16'
       - name: Unit Test
         run: go test -gcflags all=-N -l -race -covermode=atomic -coverprofile=coverage.txt ./...
+      - name: Scenario Test
+        run: |
+          cd ..
+          rm -rf kitex-tests
+          git clone https://github.com/jayantxie/kitex-tests.git
+          cd kitex-tests
+          ./run.sh ${{github.workspace}}
+          cd ${{github.workspace}}
       - name: Codecov
         run: bash <(curl -s https://codecov.io/bash)
       - name: Benchmark
@@ -36,7 +44,7 @@ jobs:
   scenario-test:
     strategy:
       matrix:
-        go: [ 1.16, 1.18 ]
+        go: [ 1.18 ]
     runs-on: [ self-hosted, X64 ]
     steps:
       - uses: actions/checkout@v3
