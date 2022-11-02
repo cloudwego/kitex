@@ -104,17 +104,18 @@ type pool struct {
 	maxIdleTimeout time.Duration // the idle connection will be cleaned if the idle time exceeds maxIdleTimeout.
 }
 
-// Get gets the first active connection from the idleList.
-func (p *pool) Get() (*longConn, bool) {
+// Get gets the first active connection from the idleList. Return the number of connections decreased during the Get.
+func (p *pool) Get() (*longConn, bool, int) {
 	p.mu.Lock()
 	// Get the first active one
-	i := len(p.idleList) - 1
+	n := len(p.idleList)
+	i := n - 1
 	for ; i >= 0; i-- {
 		o := p.idleList[i]
 		if o.IsActive() {
 			p.idleList = p.idleList[:i]
 			p.mu.Unlock()
-			return o, true
+			return o, true, n - i
 		}
 		// inactive object
 		o.Close()
@@ -125,7 +126,7 @@ func (p *pool) Get() (*longConn, bool) {
 	}
 	p.idleList = p.idleList[:i]
 	p.mu.Unlock()
-	return nil, false
+	return nil, false, n - i
 }
 
 // Put puts back a connection to the pool.
@@ -223,9 +224,9 @@ type peer struct {
 // Get gets a connection with dialer and timeout. Dial a new connection if no idle connection in pool is available.
 func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter, addr string) (net.Conn, error) {
 	var c net.Conn
-	c, reused := p.pool.Get()
+	c, reused, decNum := p.pool.Get()
+	p.globalIdle.DecN(int64(decNum))
 	if reused {
-		p.globalIdle.Dec()
 		return c, nil
 	}
 	// dial a new connection
