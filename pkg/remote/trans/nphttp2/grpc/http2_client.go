@@ -41,6 +41,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/syscall"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/peer"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
@@ -63,6 +64,7 @@ type http2Client struct {
 	framer *framer
 	// controlBuf delivers all the control related tasks (e.g., window
 	// updates, reset streams, and various settings) to the controller.
+	// Do not access controlBuf with mu held.
 	controlBuf *controlBuffer
 	fc         *trInFlow
 
@@ -82,6 +84,7 @@ type http2Client struct {
 	waitingStreams        uint32
 	nextID                uint32
 
+	// Do not access controlBuf with mu held.
 	mu            sync.Mutex // guard the following variables
 	state         transportState
 	activeStreams map[uint32]*Stream
@@ -229,10 +232,17 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		return nil, connectionErrorf(true, err, "transport: failed to write initial settings frame: %v", err)
 	}
 
+	// Adjust the connection flow control window if needed.
+	if delta := uint32(icwz - defaultWindowSize); delta > 0 {
+		if err := t.framer.WriteWindowUpdate(0, delta); err != nil {
+			t.Close()
+			return nil, connectionErrorf(true, err, "transport: failed to write window update: %v", err)
+		}
+	}
+
 	if err := t.framer.writer.Flush(); err != nil {
 		return nil, err
 	}
-
 	gofunc.RecoverGoFuncWithInfo(ctx, func() {
 		err := t.loopy.run(conn.RemoteAddr().String())
 		if err != nil {
@@ -334,9 +344,17 @@ func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) 
 	return headerFields
 }
 
+func (t *http2Client) setPeer(ctx context.Context) {
+	peer, ok := peer.GetPeerFromContext(ctx)
+	if ok {
+		peer.Addr = t.remoteAddr
+	}
+}
+
 // NewStream creates a stream and registers it into the transport as "active"
 // streams.
 func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Stream, err error) {
+	t.setPeer(ctx)
 	s := t.newStream(ctx, callHdr)
 	cleanup := func(err error) {
 		if s.swapState(streamDone) == streamDone {
@@ -367,7 +385,6 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 				cleanup(err)
 				return err
 			}
-			t.activeStreams[id] = s
 			// If the keepalive goroutine has gone dormant, wake it up.
 			if t.kpDormant {
 				t.kpDormancyCond.Signal()
@@ -397,6 +414,13 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 		t.nextID += 2
 		s.id = h.streamID
 		s.fc = &inFlow{limit: uint32(t.initialWindowSize)}
+		t.mu.Lock()
+		if t.activeStreams == nil { // Can be niled from Close().
+			t.mu.Unlock()
+			return false // Don't create a stream if the transport is already closed.
+		}
+		t.activeStreams[s.id] = s
+		t.mu.Unlock()
 		if t.streamQuota > 0 && t.waitingStreams > 0 {
 			select {
 			case t.streamsQuotaAvailable <- struct{}{}:
@@ -422,13 +446,7 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 	}
 	for {
 		success, err := t.controlBuf.executeAndPut(func(it interface{}) bool {
-			if !checkForStreamQuota(it) {
-				return false
-			}
-			if !checkForHeaderListSize(it) {
-				return false
-			}
-			return true
+			return checkForHeaderListSize(it) && checkForStreamQuota(it)
 		}, hdr)
 		if err != nil {
 			return nil, err
@@ -626,13 +644,13 @@ func (t *http2Client) adjustWindow(s *Stream, n uint32) {
 // for the transport and the stream based on the current bdp
 // estimation.
 func (t *http2Client) updateFlowControl(n uint32) {
-	t.mu.Lock()
-	for _, s := range t.activeStreams {
-		s.fc.newLimit(n)
-	}
-	t.mu.Unlock()
 	updateIWS := func(interface{}) bool {
 		t.initialWindowSize = n
+		t.mu.Lock()
+		for _, s := range t.activeStreams {
+			s.fc.newLimit(n)
+		}
+		t.mu.Unlock()
 		return true
 	}
 	t.controlBuf.executeAndPut(updateIWS, &outgoingWindowUpdate{streamID: 0, increment: t.fc.newLimit(n)})
@@ -843,7 +861,7 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	default:
 		t.setGoAwayReason(f)
 		close(t.goAway)
-		t.controlBuf.put(&incomingGoAway{})
+		defer t.controlBuf.put(&incomingGoAway{}) // Defer as t.mu is currently held.
 		// Notify the clientconn about the GOAWAY before we set the state to
 		// draining, to allow the client to stop attempting to create streams
 		// before disallowing new streams on this connection.
@@ -949,6 +967,7 @@ func (t *http2Client) operateHeaders(frame *grpcframe.MetaHeadersFrame) {
 
 	// if client received END_STREAM from server while stream was still active, send RST_STREAM
 	rst := s.getState() == streamActive
+	s.SetBizStatusErr(state.bizStatusErr())
 	t.closeStream(s, io.EOF, rst, http2.ErrCodeNo, state.status(), state.data.mdata, true)
 }
 

@@ -19,9 +19,9 @@ package transmeta
 import (
 	"context"
 
-	"github.com/cloudwego/kitex/pkg/remote"
-
 	"github.com/bytedance/gopkg/cloud/metainfo"
+
+	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 // singletons .

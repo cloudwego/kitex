@@ -58,6 +58,42 @@ func TestMapThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil)
 }
 
+func TestMapThriftCodecForJSON(t *testing.T) {
+	p, err := NewThriftFileProvider("./map_test/idl/mock.thrift")
+	test.Assert(t, err == nil)
+	mtc, err := newMapThriftCodecForJSON(p, thriftCodec)
+	test.Assert(t, err == nil)
+	defer mtc.Close()
+	test.Assert(t, mtc.Name() == "MapThrift")
+
+	method, err := mtc.getMethod(nil, "Test")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
+
+	ctx := context.Background()
+	sendMsg := initMapSendMsg(transport.TTHeader)
+
+	// Marshal side
+	out := remote.NewWriterBuffer(256)
+	err = mtc.Marshal(ctx, sendMsg, out)
+	test.Assert(t, err == nil)
+
+	// UnMarshal side
+	recvMsg := initMapRecvMsg()
+	buf, err := out.Bytes()
+	test.Assert(t, err == nil)
+	recvMsg.SetPayloadLen(len(buf))
+	in := remote.NewReaderBuffer(buf)
+	err = mtc.Unmarshal(ctx, recvMsg, in)
+	test.Assert(t, err == nil)
+	args, ok := recvMsg.Data().(*Args)
+	test.Assert(t, ok)
+	fieldMap, ok := args.Request.(map[string]interface{})
+	test.Assert(t, ok)
+	_, ok = fieldMap["strMap"].(map[string]interface{})
+	test.Assert(t, ok)
+}
+
 func TestMapExceptionError(t *testing.T) {
 	p, err := NewThriftFileProvider("./map_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
@@ -86,6 +122,11 @@ func TestMapExceptionError(t *testing.T) {
 func initMapSendMsg(tp transport.Protocol) remote.Message {
 	req := &Args{
 		Request: &descriptor.HTTPRequest{
+			Body: map[string]interface{}{
+				"strMap": map[string]interface{}{
+					"Test1": "Test2",
+				},
+			},
 			Method: "Test",
 		},
 		Method: "Test",

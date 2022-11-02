@@ -65,12 +65,14 @@ func TestDefaultSvrTransHandler(t *testing.T) {
 			return newMockRPCInfo()
 		},
 	}
-	err = handler.Write(ctx, conn, msg)
+	ctx, err = handler.Write(ctx, conn, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, tagEncode == 1, tagEncode)
 	test.Assert(t, tagDecode == 0, tagDecode)
 
-	err = handler.Read(ctx, conn, msg)
+	ctx, err = handler.Read(ctx, conn, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, tagEncode == 1, tagEncode)
 	test.Assert(t, tagDecode == 1, tagDecode)

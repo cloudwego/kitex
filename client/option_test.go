@@ -19,7 +19,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -28,6 +27,9 @@ import (
 
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksloadbalance "github.com/cloudwego/kitex/internal/mocks/loadbalance"
+	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
+	mocksproxy "github.com/cloudwego/kitex/internal/mocks/proxy"
 	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/mocks/rpc_info"
 	"github.com/cloudwego/kitex/internal/test"
@@ -40,7 +42,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/http"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/proxy"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -126,25 +127,27 @@ func TestWithHostPorts(t *testing.T) {
 }
 
 func TestForwardProxy(t *testing.T) {
-	fp := &mockForwardProxy{
-		ConfigureFunc: func(cfg *proxy.Config) error {
-			test.Assert(t, cfg.Resolver == nil, cfg.Resolver)
-			test.Assert(t, cfg.Balancer == nil, cfg.Balancer)
-			return nil
-		},
-		ResolveProxyInstanceFunc: func(ctx context.Context) error {
-			ri := rpcinfo.GetRPCInfo(ctx)
-			re := remoteinfo.AsRemoteInfo(ri.To())
-			in := re.GetInstance()
-			test.Assert(t, in == nil, in)
-			re.SetInstance(instance505)
-			return nil
-		},
-	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	fp := mocksproxy.NewMockForwardProxy(ctrl)
+	fp.EXPECT().Configure(gomock.Any()).DoAndReturn(func(cfg *proxy.Config) error {
+		test.Assert(t, cfg.Resolver == nil, cfg.Resolver)
+		test.Assert(t, cfg.Balancer == nil, cfg.Balancer)
+		return nil
+	}).AnyTimes()
+	fp.EXPECT().ResolveProxyInstance(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+		ri := rpcinfo.GetRPCInfo(ctx)
+		re := remoteinfo.AsRemoteInfo(ri.To())
+		in := re.GetInstance()
+		test.Assert(t, in == nil, in)
+		re.SetInstance(instance505)
+		return nil
+	}).AnyTimes()
 
 	var opts []Option
-	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
-	opts = append(opts, WithDialer(dialer))
+	opts = append(opts, WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)))
+	opts = append(opts, WithDialer(newDialer(ctrl)))
 	opts = append(opts, WithDestService("destService"))
 	opts = append(opts, WithProxy(fp))
 
@@ -162,28 +165,31 @@ func TestForwardProxy(t *testing.T) {
 }
 
 func TestProxyWithResolver(t *testing.T) {
-	fp := &mockForwardProxy{
-		ConfigureFunc: func(cfg *proxy.Config) error {
-			test.Assert(t, cfg.Resolver == resolver404)
-			test.Assert(t, cfg.Balancer == nil, cfg.Balancer)
-			return nil
-		},
-		ResolveProxyInstanceFunc: func(ctx context.Context) error {
-			ri := rpcinfo.GetRPCInfo(ctx)
-			re := remoteinfo.AsRemoteInfo(ri.To())
-			in := re.GetInstance()
-			test.Assert(t, in == instance404[0])
-			re.SetInstance(instance505)
-			return nil
-		},
-	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	resolver := resolver404(ctrl)
+	fp := mocksproxy.NewMockForwardProxy(ctrl)
+	fp.EXPECT().Configure(gomock.Any()).DoAndReturn(func(cfg *proxy.Config) error {
+		test.Assert(t, cfg.Resolver == resolver)
+		test.Assert(t, cfg.Balancer == nil, cfg.Balancer)
+		return nil
+	}).AnyTimes()
+	fp.EXPECT().ResolveProxyInstance(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+		ri := rpcinfo.GetRPCInfo(ctx)
+		re := remoteinfo.AsRemoteInfo(ri.To())
+		in := re.GetInstance()
+		test.Assert(t, in == instance404[0])
+		re.SetInstance(instance505)
+		return nil
+	}).AnyTimes()
 
 	var opts []Option
-	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
-	opts = append(opts, WithDialer(dialer))
+	opts = append(opts, WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)))
+	opts = append(opts, WithDialer(newDialer(ctrl)))
 	opts = append(opts, WithDestService("destService"))
 	opts = append(opts, WithProxy(fp))
-	opts = append(opts, WithResolver(resolver404))
+	opts = append(opts, WithResolver(resolver))
 
 	svcInfo := mocks.ServiceInfo()
 	cli, err := NewClient(svcInfo, opts...)
@@ -199,37 +205,38 @@ func TestProxyWithResolver(t *testing.T) {
 }
 
 func TestProxyWithBalancer(t *testing.T) {
-	lb := &loadbalance.SynthesizedLoadbalancer{
-		GetPickerFunc: func(entry discovery.Result) loadbalance.Picker {
-			return &loadbalance.SynthesizedPicker{
-				NextFunc: func(ctx context.Context, request interface{}) discovery.Instance {
-					if len(entry.Instances) > 0 {
-						return entry.Instances[0]
-					}
-					return nil
-				},
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	lb := mocksloadbalance.NewMockLoadbalancer(ctrl)
+	lb.EXPECT().GetPicker(gomock.Any()).DoAndReturn(func(entry discovery.Result) loadbalance.Picker {
+		picker := mocksloadbalance.NewMockPicker(ctrl)
+		picker.EXPECT().Next(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, request interface{}) discovery.Instance {
+			if len(entry.Instances) > 0 {
+				return entry.Instances[0]
 			}
-		},
-	}
-	fp := &mockForwardProxy{
-		ConfigureFunc: func(cfg *proxy.Config) error {
-			test.Assert(t, cfg.Resolver == nil, cfg.Resolver)
-			test.Assert(t, cfg.Balancer == lb)
 			return nil
-		},
-		ResolveProxyInstanceFunc: func(ctx context.Context) error {
-			ri := rpcinfo.GetRPCInfo(ctx)
-			re := remoteinfo.AsRemoteInfo(ri.To())
-			in := re.GetInstance()
-			test.Assert(t, in == nil)
-			re.SetInstance(instance505)
-			return nil
-		},
-	}
+		}).AnyTimes()
+		return picker
+	}).AnyTimes()
+	fp := mocksproxy.NewMockForwardProxy(ctrl)
+	fp.EXPECT().Configure(gomock.Any()).DoAndReturn(func(cfg *proxy.Config) error {
+		test.Assert(t, cfg.Resolver == nil, cfg.Resolver)
+		test.Assert(t, cfg.Balancer == lb)
+		return nil
+	}).AnyTimes()
+	fp.EXPECT().ResolveProxyInstance(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+		ri := rpcinfo.GetRPCInfo(ctx)
+		re := remoteinfo.AsRemoteInfo(ri.To())
+		in := re.GetInstance()
+		test.Assert(t, in == nil)
+		re.SetInstance(instance505)
+		return nil
+	}).AnyTimes()
 
 	var opts []Option
-	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
-	opts = append(opts, WithDialer(dialer))
+	opts = append(opts, WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)))
+	opts = append(opts, WithDialer(newDialer(ctrl)))
 	opts = append(opts, WithDestService("destService"))
 	opts = append(opts, WithProxy(fp))
 	opts = append(opts, WithLoadBalancer(lb))
@@ -248,36 +255,37 @@ func TestProxyWithBalancer(t *testing.T) {
 }
 
 func TestProxyWithResolverAndBalancer(t *testing.T) {
-	lb := &loadbalance.SynthesizedLoadbalancer{
-		GetPickerFunc: func(entry discovery.Result) loadbalance.Picker {
-			return &loadbalance.SynthesizedPicker{
-				NextFunc: func(ctx context.Context, request interface{}) discovery.Instance {
-					return instance505
-				},
-			}
-		},
-	}
-	fp := &mockForwardProxy{
-		ConfigureFunc: func(cfg *proxy.Config) error {
-			test.Assert(t, cfg.Resolver == resolver404)
-			test.Assert(t, cfg.Balancer == lb)
-			return nil
-		},
-		ResolveProxyInstanceFunc: func(ctx context.Context) error {
-			ri := rpcinfo.GetRPCInfo(ctx)
-			re := remoteinfo.AsRemoteInfo(ri.To())
-			in := re.GetInstance()
-			test.Assert(t, in == instance505)
-			return nil
-		},
-	}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	lb := mocksloadbalance.NewMockLoadbalancer(ctrl)
+	lb.EXPECT().GetPicker(gomock.Any()).DoAndReturn(func(entry discovery.Result) loadbalance.Picker {
+		picker := mocksloadbalance.NewMockPicker(ctrl)
+		picker.EXPECT().Next(gomock.Any(), gomock.Any()).Return(instance505).AnyTimes()
+		return picker
+	}).AnyTimes()
+	lb.EXPECT().Name().Return("mock_load_balancer").AnyTimes()
+	resolver := resolver404(ctrl)
+	fp := mocksproxy.NewMockForwardProxy(ctrl)
+	fp.EXPECT().Configure(gomock.Any()).DoAndReturn(func(cfg *proxy.Config) error {
+		test.Assert(t, cfg.Resolver == resolver)
+		test.Assert(t, cfg.Balancer == lb)
+		return nil
+	}).AnyTimes()
+	fp.EXPECT().ResolveProxyInstance(gomock.Any()).DoAndReturn(func(ctx context.Context) error {
+		ri := rpcinfo.GetRPCInfo(ctx)
+		re := remoteinfo.AsRemoteInfo(ri.To())
+		in := re.GetInstance()
+		test.Assert(t, in == instance505)
+		return nil
+	}).AnyTimes()
 
 	var opts []Option
-	opts = append(opts, WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(hdlr)))
-	opts = append(opts, WithDialer(dialer))
+	opts = append(opts, WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)))
+	opts = append(opts, WithDialer(newDialer(ctrl)))
 	opts = append(opts, WithDestService("destService"))
 	opts = append(opts, WithProxy(fp))
-	opts = append(opts, WithResolver(resolver404))
+	opts = append(opts, WithResolver(resolver))
 	opts = append(opts, WithLoadBalancer(lb))
 
 	svcInfo := mocks.ServiceInfo()
@@ -290,6 +298,53 @@ func TestProxyWithResolverAndBalancer(t *testing.T) {
 	res := new(MockTStruct)
 
 	err = cli.Call(ctx, mtd, req, res)
+	test.Assert(t, err == nil)
+}
+
+func TestProxyWithConnPool(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	type mockLongConnPool struct {
+		*mock_remote.MockLongConnPool
+		*mock_remote.MockConnPoolReporter
+	}
+
+	fp := mocksproxy.NewMockForwardProxy(ctrl)
+	fp.EXPECT().Configure(gomock.Any()).DoAndReturn(func(cfg *proxy.Config) error {
+		cp := mock_remote.NewMockLongConnPool(ctrl)
+		cp.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mocksnetpoll.NewMockConnection(ctrl), nil).Times(1)
+		cp.EXPECT().Put(gomock.Any()).Return(nil).AnyTimes()
+		cp.EXPECT().Discard(gomock.Any()).Return(nil).AnyTimes()
+		cp.EXPECT().Close().Return(nil).Times(1)
+		rp := mock_remote.NewMockConnPoolReporter(ctrl)
+		rp.EXPECT().EnableReporter().Times(1)
+		cfg.Pool = &mockLongConnPool{cp, rp}
+		return nil
+	}).AnyTimes()
+	fp.EXPECT().ResolveProxyInstance(gomock.Any()).Return(nil).AnyTimes()
+
+	var opts []Option
+	opts = append(opts, WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)))
+	opts = append(opts, WithDestService("destService"))
+	opts = append(opts, WithProxy(fp))
+	opts = append(opts, WithConnPool(&mockLongConnPool{mock_remote.NewMockLongConnPool(ctrl), mock_remote.NewMockConnPoolReporter(ctrl)}))
+	opts = append(opts, WithConnReporterEnabled())
+	opts = append(opts, WithResolver(resolver404(ctrl)))
+
+	svcInfo := mocks.ServiceInfo()
+	cli, err := NewClient(svcInfo, opts...)
+	test.Assert(t, err == nil)
+
+	mtd := mocks.MockMethod
+	ctx := context.Background()
+	req := new(MockTStruct)
+	res := new(MockTStruct)
+
+	err = cli.Call(ctx, mtd, req, res)
+	test.Assert(t, err == nil)
+
+	err = cli.(interface{ Close() error }).Close()
 	test.Assert(t, err == nil)
 }
 
@@ -466,19 +521,11 @@ func TestWithMetaHandler(t *testing.T) {
 	test.DeepEqual(t, opts.MetaHandlers[0], mockMetaHandler)
 }
 
-type mockConnPool struct{}
-
-func (m *mockConnPool) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
-	return &mocks.Conn{
-		CloseFunc: func() (e error) { return nil },
-	}, nil
-}
-func (m *mockConnPool) Put(conn net.Conn) error     { return nil }
-func (m *mockConnPool) Discard(conn net.Conn) error { return nil }
-func (m *mockConnPool) Close() error                { return nil }
-
 func TestWithConnPool(t *testing.T) {
-	mockPool := &mockConnPool{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockPool := mock_remote.NewMockConnPool(ctrl)
 	opts := client.NewOptions([]client.Option{WithConnPool(mockPool)})
 	test.Assert(t, opts.RemoteOpt.ConnPool == mockPool)
 }
@@ -541,25 +588,6 @@ func TestWithSuite(t *testing.T) {
 	test.Assert(t, opts.Cli == mockEndpointBasicInfo)
 	test.Assert(t, reflect.DeepEqual(opts.DebugService, mockDiagnosisService))
 	test.Assert(t, opts.RetryContainer == mockRetryContainer)
-}
-
-type mockForwardProxy struct {
-	ConfigureFunc            func(*proxy.Config) error
-	ResolveProxyInstanceFunc func(ctx context.Context) error
-}
-
-func (m *mockForwardProxy) Configure(cfg *proxy.Config) error {
-	if m.ConfigureFunc != nil {
-		return m.ConfigureFunc(cfg)
-	}
-	return nil
-}
-
-func (m *mockForwardProxy) ResolveProxyInstance(ctx context.Context) error {
-	if m.ResolveProxyInstanceFunc != nil {
-		return m.ResolveProxyInstanceFunc(ctx)
-	}
-	return nil
 }
 
 func TestWithLongConnectionOption(t *testing.T) {

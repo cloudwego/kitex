@@ -22,8 +22,10 @@ import (
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksdiscovery "github.com/cloudwego/kitex/internal/mocks/discovery"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -40,16 +42,6 @@ var (
 		discovery.NewInstance("tcp", "localhost:404", 1, make(map[string]string)),
 	}
 	instance505 = discovery.NewInstance("tcp", "localhost:505", 1, make(map[string]string))
-	resolver404 = &discovery.SynthesizedResolver{
-		ResolveFunc: func(ctx context.Context, key string) (discovery.Result, error) {
-			return discovery.Result{
-				Cacheable: true,
-				CacheKey:  "test",
-				Instances: instance404,
-			}, nil
-		},
-		NameFunc: func() string { return "middlewares_test" },
-	}
 
 	ctx = func() context.Context {
 		ctx := context.Background()
@@ -58,6 +50,19 @@ var (
 		return ctx
 	}()
 )
+
+func resolver404(ctrl *gomock.Controller) discovery.Resolver {
+	resolver := mocksdiscovery.NewMockResolver(ctrl)
+	resolver.EXPECT().Resolve(gomock.Any(), gomock.Any()).Return(discovery.Result{
+		Cacheable: true,
+		CacheKey:  "test",
+		Instances: instance404,
+	}, nil).AnyTimes()
+	resolver.EXPECT().Diff(gomock.Any(), gomock.Any(), gomock.Any()).Return(discovery.Change{}, false).AnyTimes()
+	resolver.EXPECT().Name().Return("middlewares_test").AnyTimes()
+	resolver.EXPECT().Target(gomock.Any(), gomock.Any()).AnyTimes()
+	return resolver
+}
 
 func TestNoResolver(t *testing.T) {
 	svcInfo := mocks.ServiceInfo()
@@ -69,8 +74,11 @@ func TestNoResolver(t *testing.T) {
 }
 
 func TestResolverMW(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	var invoked bool
-	cli := newMockClient(t).(*kClient)
+	cli := newMockClient(t, ctrl).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error {
 		invoked = true
@@ -90,6 +98,9 @@ func TestResolverMW(t *testing.T) {
 }
 
 func TestResolverMWOutOfInstance(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	resolver := &discovery.SynthesizedResolver{
 		ResolveFunc: func(ctx context.Context, key string) (discovery.Result, error) {
 			return discovery.Result{}, nil
@@ -97,7 +108,7 @@ func TestResolverMWOutOfInstance(t *testing.T) {
 		NameFunc: func() string { return t.Name() },
 	}
 	var invoked bool
-	cli := newMockClient(t, WithResolver(resolver)).(*kClient)
+	cli := newMockClient(t, ctrl, WithResolver(resolver)).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error {
 		invoked = true
@@ -145,7 +156,10 @@ func TestDefaultErrorHandler(t *testing.T) {
 }
 
 func BenchmarkResolverMW(b *testing.B) {
-	cli := newMockClient(b).(*kClient)
+	ctrl := gomock.NewController(b)
+	defer ctrl.Finish()
+
+	cli := newMockClient(b, ctrl).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error { return nil }
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
@@ -161,7 +175,10 @@ func BenchmarkResolverMW(b *testing.B) {
 }
 
 func BenchmarkResolverMWParallel(b *testing.B) {
-	cli := newMockClient(b).(*kClient)
+	ctrl := gomock.NewController(b)
+	defer ctrl.Finish()
+
+	cli := newMockClient(b, ctrl).(*kcFinalizerClient)
 	mw := newResolveMWBuilder(cli.lbf)(ctx)
 	ep := func(ctx context.Context, request, response interface{}) error { return nil }
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())

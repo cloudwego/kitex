@@ -343,12 +343,17 @@ namespace * demo
 
 include "base.thrift"
 
+const byte DefaultB = 1
+const i16 DefaultC = 2
+const i32 DefaultD = 3
+const i64 DefaultE = 4
+
 struct Request {
 	1: optional bool a = true,
-    2: optional byte b = 1,
-    3: optional i16 c = 2,
-	4: optional i32 d = 3,
-	5: optional i64 e = 4,
+	2: optional byte b = DefaultB,
+	3: optional i16 c = DefaultC,
+	4: optional i32 d = DefaultD,
+	5: optional i64 e = DefaultE,
 	6: optional double f = 5.1,
 	7: optional string g = "123",
 	8: optional binary h = "456",
@@ -386,7 +391,7 @@ func TestDefaultValue(t *testing.T) {
 	demo.Includes[0].Reference = base
 
 	dp, err := Parse(demo, DefaultParseMode())
-	test.Assert(t, err == nil)
+	test.Assert(t, err == nil, err)
 
 	fun, err := dp.LookupFunctionByMethod("req2res")
 	test.Assert(t, err == nil)

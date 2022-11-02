@@ -20,8 +20,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksnet "github.com/cloudwego/kitex/internal/mocks/net"
+	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
@@ -31,23 +35,28 @@ import (
 )
 
 var (
-	mockCLiTransHandler = &mocks.MockCliTransHandler{}
-	opts                = []Option{
-		WithTransHandlerFactory(mocks.NewMockCliTransHandlerFactory(mockCLiTransHandler)),
-		WithResolver(resolver404),
-		WithDialer(dialer),
-		WithDestService("destService"),
-	}
 	svcInfo   = mocks.ServiceInfo()
 	req, resp = &streaming.Args{}, &streaming.Result{}
 )
 
+func newOpts(ctrl *gomock.Controller) []Option {
+	return []Option{
+		WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)),
+		WithResolver(resolver404(ctrl)),
+		WithDialer(newDialer(ctrl)),
+		WithDestService("destService"),
+	}
+}
+
 func TestStream(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	ctx := context.Background()
 
 	var err error
 	kc := &kClient{
-		opt:     client.NewOptions(opts),
+		opt:     client.NewOptions(newOpts(ctrl)),
 		svcInfo: svcInfo,
 	}
 
@@ -58,9 +67,12 @@ func TestStream(t *testing.T) {
 }
 
 func TestStreaming(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	var err error
 	kc := &kClient{
-		opt:     client.NewOptions(opts),
+		opt:     client.NewOptions(newOpts(ctrl)),
 		svcInfo: svcInfo,
 	}
 	mockRPCInfo := rpcinfo.NewRPCInfo(
@@ -79,7 +91,11 @@ func TestStreaming(t *testing.T) {
 
 	cliInfo := new(remote.ClientOption)
 	cliInfo.SvcInfo = svcInfo
-	cliInfo.ConnPool = &mockConnPool{}
+	conn := mocksnet.NewMockConn(ctrl)
+	conn.EXPECT().Close().Return(nil).AnyTimes()
+	connpool := mock_remote.NewMockConnPool(ctrl)
+	connpool.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil)
+	cliInfo.ConnPool = connpool
 	s, _ := remotecli.NewStream(ctx, mockRPCInfo, new(mocks.MockCliTransHandler), cliInfo)
 	stream := &stream{
 		stream: s,
@@ -100,10 +116,13 @@ func TestStreaming(t *testing.T) {
 }
 
 func TestUninitClient(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	ctx := context.Background()
 
 	kc := &kClient{
-		opt:     client.NewOptions(opts),
+		opt:     client.NewOptions(newOpts(ctrl)),
 		svcInfo: svcInfo,
 	}
 
@@ -115,10 +134,13 @@ func TestUninitClient(t *testing.T) {
 }
 
 func TestClosedClient(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	ctx := context.Background()
 
 	kc := &kClient{
-		opt:     client.NewOptions(opts),
+		opt:     client.NewOptions(newOpts(ctrl)),
 		svcInfo: svcInfo,
 	}
 	_ = kc.init()

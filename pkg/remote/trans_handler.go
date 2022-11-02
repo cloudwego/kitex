@@ -35,8 +35,8 @@ type ServerTransHandlerFactory interface {
 
 // TransReadWriter .
 type TransReadWriter interface {
-	Write(ctx context.Context, conn net.Conn, send Message) error
-	Read(ctx context.Context, conn net.Conn, msg Message) error
+	Write(ctx context.Context, conn net.Conn, send Message) (nctx context.Context, err error)
+	Read(ctx context.Context, conn net.Conn, msg Message) (nctx context.Context, err error)
 }
 
 // TransHandler is similar to the handler role in netty

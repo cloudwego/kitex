@@ -17,6 +17,7 @@
 package wpool
 
 import (
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -26,14 +27,16 @@ import (
 )
 
 func TestWPool(t *testing.T) {
-	p := New(1, time.Millisecond*100)
+	maxIdle := 1
+	maxIdleTime := time.Millisecond * 500
+	p := New(maxIdle, maxIdleTime)
 	var (
 		sum  int32
 		wg   sync.WaitGroup
-		size = 100
+		size int32 = 100
 	)
 	test.Assert(t, p.Size() == 0)
-	for i := 0; i < size; i++ {
+	for i := int32(0); i < size; i++ {
 		wg.Add(1)
 		p.Go(func() {
 			defer wg.Done()
@@ -43,9 +46,12 @@ func TestWPool(t *testing.T) {
 	test.Assert(t, p.Size() != 0)
 
 	wg.Wait()
-	test.Assert(t, atomic.LoadInt32(&sum) == int32(size))
-	time.Sleep(time.Millisecond * 10) // waiting for workers finished
-	test.Assert(t, p.Size() == 1)
-	time.Sleep(time.Millisecond * 100) // waiting for idle timeout
+	test.Assert(t, atomic.LoadInt32(&sum) == size)
+	for p.Size() != int32(maxIdle) { // waiting for workers finished and idle workers left
+		runtime.Gosched()
+	}
+	for p.Size() > 0 { // waiting for idle workers timeout
+		time.Sleep(maxIdleTime)
+	}
 	test.Assert(t, p.Size() == 0)
 }

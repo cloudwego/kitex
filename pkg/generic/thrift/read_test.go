@@ -180,7 +180,7 @@ func Test_readByte(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readByte", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.BYTE}}, int8(1), false},
+		{"readByte", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.BYTE}, opt: &readerOption{}}, int8(1), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -214,7 +214,7 @@ func Test_readInt16(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readInt16", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.I16}}, int16(1), false},
+		{"readInt16", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.I16}, opt: &readerOption{}}, int16(1), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -439,7 +439,7 @@ func Test_readMap(t *testing.T) {
 		// TODO: Add test cases.
 		{
 			"readMap",
-			args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}},
+			args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}, opt: &readerOption{}},
 			map[interface{}]interface{}{"hello": "world"},
 			false,
 		},

@@ -20,6 +20,8 @@ import (
 	"context"
 	"net"
 
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -53,6 +55,42 @@ func (s *stream) Context() context.Context {
 	return s.ctx
 }
 
+// Trailer is used for client side stream
+func (s *stream) Trailer() metadata.MD {
+	sc, ok := s.conn.(*clientConn)
+	if !ok {
+		panic("this method should only be used in client side stream!")
+	}
+	return sc.s.Trailer()
+}
+
+// Header is used for client side stream
+func (s *stream) Header() (metadata.MD, error) {
+	sc, ok := s.conn.(*clientConn)
+	if !ok {
+		panic("this method should only be used in client side stream!")
+	}
+	return sc.s.Header()
+}
+
+// SendHeader is used for server side stream
+func (s *stream) SendHeader(md metadata.MD) error {
+	sc := s.conn.(*serverConn)
+	return sc.s.SendHeader(md)
+}
+
+// SetHeader is used for server side stream
+func (s *stream) SetHeader(md metadata.MD) error {
+	sc := s.conn.(*serverConn)
+	return sc.s.SetHeader(md)
+}
+
+// SetTrailer is used for server side stream
+func (s *stream) SetTrailer(md metadata.MD) {
+	sc := s.conn.(*serverConn)
+	sc.s.SetTrailer(md)
+}
+
 func (s *stream) RecvMsg(m interface{}) error {
 	ri := rpcinfo.GetRPCInfo(s.ctx)
 
@@ -60,7 +98,9 @@ func (s *stream) RecvMsg(m interface{}) error {
 	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
 	defer msg.Recycle()
 
-	return s.handler.Read(s.ctx, s.conn, msg)
+	ctx, err := s.handler.Read(s.ctx, s.conn, msg)
+	s.ctx = ctx
+	return err
 }
 
 func (s *stream) SendMsg(m interface{}) error {
@@ -70,7 +110,9 @@ func (s *stream) SendMsg(m interface{}) error {
 	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
 	defer msg.Recycle()
 
-	return s.handler.Write(s.ctx, s.conn, msg)
+	ctx, err := s.handler.Write(s.ctx, s.conn, msg)
+	s.ctx = ctx
+	return err
 }
 
 func (s *stream) Close() error {

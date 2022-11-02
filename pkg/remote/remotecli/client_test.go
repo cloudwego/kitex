@@ -21,9 +21,12 @@ import (
 	"errors"
 	"net"
 	"testing"
-	"time"
+
+	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -37,19 +40,21 @@ import (
 
 // TestNewClientNoAddr test new client return err because no addr
 func TestNewClientNoAddr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	// 1. prepare mock data
 	ctx := context.Background()
 
-	dialer := &remote.SynthesizedDialer{}
 	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "")
 	conf := rpcinfo.NewRPCConfig()
 	ri := rpcinfo.NewRPCInfo(nil, to, rpcinfo.NewInvocation("", ""), conf, rpcinfo.NewRPCStats())
 
-	hdlr := &mocks.MockCliTransHandler{}
+	hdlr := mocksremote.NewMockClientTransHandler(ctrl)
 	connPool := connpool.NewLongPool("destService", poolCfg)
 	opt := &remote.ClientOption{
 		ConnPool: connPool,
-		Dialer:   dialer,
+		Dialer:   mocksremote.NewMockDialer(ctrl),
 	}
 
 	// 2. test
@@ -60,26 +65,20 @@ func TestNewClientNoAddr(t *testing.T) {
 
 // TestNewClient test new a client
 func TestNewClient(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	addr := utils.NewNetAddr("tcp", "to")
 	ri := newMockRPCInfo(addr)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
-	hdlr := &mocks.MockCliTransHandler{}
+	hdlr := mocksremote.NewMockClientTransHandler(ctrl)
 
-	conn := &mocks.Conn{
-		RemoteAddrFunc: func() (r net.Addr) {
-			return addr
-		},
-	}
-	dialCount := 0
-	dialer := &remote.SynthesizedDialer{
-		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
-			test.Assert(t, network == addr.Network())
-			test.Assert(t, address == addr.String())
-			dialCount++
-			return conn, nil
-		},
-	}
+	conn := mocksnetpoll.NewMockConnection(ctrl)
+	conn.EXPECT().RemoteAddr().Return(addr).AnyTimes()
+
+	dialer := mocksremote.NewMockDialer(ctrl)
+	dialer.EXPECT().DialTimeout(addr.Network(), addr.String(), gomock.Any()).Return(conn, nil).Times(1)
 
 	connPool := connpool.NewLongPool("destService", poolCfg)
 
@@ -96,7 +95,6 @@ func TestNewClient(t *testing.T) {
 	cli, err := NewClient(ctx, ri, hdlr, opt)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, cli != nil, cli)
-	test.Assert(t, dialCount == 1)
 }
 
 func newMockRPCInfo(addr net.Addr) rpcinfo.RPCInfo {
@@ -109,17 +107,14 @@ func newMockRPCInfo(addr net.Addr) rpcinfo.RPCInfo {
 	return ri
 }
 
-func newMockOption(addr net.Addr) *remote.ClientOption {
-	conn := &mocks.Conn{
-		RemoteAddrFunc: func() (r net.Addr) {
-			return addr
-		},
-	}
-	dialer := &remote.SynthesizedDialer{
-		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
-			return conn, nil
-		},
-	}
+func newMockOption(ctrl *gomock.Controller, addr net.Addr) *remote.ClientOption {
+	conn := mocksnetpoll.NewMockConnection(ctrl)
+	conn.EXPECT().RemoteAddr().Return(addr).AnyTimes()
+	conn.EXPECT().IsActive().Return(true).AnyTimes()
+	conn.EXPECT().Close().Return(nil).AnyTimes()
+
+	dialer := mocksremote.NewMockDialer(ctrl)
+	dialer.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil).AnyTimes()
 
 	connPool := connpool.NewLongPool("destService", poolCfg)
 
@@ -133,90 +128,70 @@ func newMockOption(addr net.Addr) *remote.ClientOption {
 
 // TestSend test send msg
 func TestSend(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	// 1. prepare mock data
 	ctx := context.Background()
 	addr := utils.NewNetAddr("tcp", "to")
 	ri := newMockRPCInfo(addr)
 
-	isWrite := false
-	var writeMsg remote.Message
-	hdlr := &mocks.MockCliTransHandler{
-		WriteFunc: func(ctx context.Context, conn net.Conn, send remote.Message) error {
-			isWrite = true
-			writeMsg = send
-			return nil
-		},
-		ReadFunc: nil,
-	}
+	var sendMsg remote.Message
+	hdlr := mocksremote.NewMockClientTransHandler(ctrl)
+	hdlr.EXPECT().Write(gomock.Any(), gomock.Any(), sendMsg).Return(ctx, nil).MinTimes(1)
 
-	opt := newMockOption(addr)
+	opt := newMockOption(ctrl, addr)
 
 	cli, err := NewClient(ctx, ri, hdlr, opt)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, cli != nil, cli)
 
-	var sendMsg remote.Message
-
 	// 2. test
 	err = cli.Send(ctx, ri, sendMsg)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, isWrite)
-	test.Assert(t, writeMsg == sendMsg)
 }
 
 // TestSendErr test send return err because write fail
 func TestSendErr(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	// 1. prepare mock data
 	addr := utils.NewNetAddr("tcp", "to")
 	ri := newMockRPCInfo(addr)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
-	isWrite := false
-	var writeMsg remote.Message
+	var sendMsg remote.Message
 	errMsg := "mock test send err"
-	hdlr := &mocks.MockCliTransHandler{
-		WriteFunc: func(ctx context.Context, conn net.Conn, send remote.Message) error {
-			isWrite = true
-			writeMsg = send
-			return errors.New(errMsg)
-		},
-		ReadFunc: nil,
-	}
 
-	opt := newMockOption(addr)
+	hdlr := mocksremote.NewMockClientTransHandler(ctrl)
+	hdlr.EXPECT().Write(gomock.Any(), gomock.Any(), sendMsg).Return(ctx, errors.New(errMsg)).MinTimes(1)
 
-	isClose := false
-	conn := &mocks.Conn{
-		RemoteAddrFunc: func() (r net.Addr) {
-			return addr
-		},
-		CloseFunc: func() (err error) {
-			isClose = true
-			return err
-		},
-	}
-	opt.Dialer = &remote.SynthesizedDialer{
-		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
-			return conn, nil
-		},
-	}
+	opt := newMockOption(ctrl, addr)
+
+	conn := mocksnetpoll.NewMockConnection(ctrl)
+	conn.EXPECT().RemoteAddr().Return(addr).AnyTimes()
+	conn.EXPECT().Close().Return(nil).Times(1)
+
+	dialer := mocksremote.NewMockDialer(ctrl)
+	dialer.EXPECT().DialTimeout(addr.Network(), addr.String(), gomock.Any()).Return(conn, nil).Times(1)
+	opt.Dialer = dialer
 
 	// 2. test
 	cli, err := NewClient(ctx, ri, hdlr, opt)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, cli != nil, cli)
 
-	var sendMsg remote.Message
 	err = cli.Send(ctx, ri, sendMsg)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, err.Error() == errMsg)
-	test.Assert(t, isWrite)
-	test.Assert(t, writeMsg == sendMsg)
-	test.Assert(t, isClose)
 }
 
 // TestRecv test recv msg
 func TestRecv(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	ctx := context.Background()
 
 	addr := utils.NewNetAddr("tcp", "to")
@@ -226,18 +201,11 @@ func TestRecv(t *testing.T) {
 	var resp interface{}
 	msg := remote.NewMessage(resp, svcInfo, ri, remote.Call, remote.Client)
 
-	var readMsg remote.Message
-	isRead := false
-	hdlr := &mocks.MockCliTransHandler{
-		WriteFunc: nil,
-		ReadFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) error {
-			isRead = true
-			readMsg = msg
-			return nil
-		},
-	}
+	hdlr := mocksremote.NewMockClientTransHandler(ctrl)
+	hdlr.EXPECT().Read(gomock.Any(), gomock.Any(), msg).Return(ctx, nil).MinTimes(1)
+	hdlr.EXPECT().OnMessage(gomock.Any(), gomock.Any(), gomock.Any()).Return(ctx, nil).AnyTimes()
 
-	opt := newMockOption(addr)
+	opt := newMockOption(ctrl, addr)
 
 	cli, err := NewClient(ctx, ri, hdlr, opt)
 	test.Assert(t, err == nil, err)
@@ -245,40 +213,43 @@ func TestRecv(t *testing.T) {
 
 	err = cli.Recv(ctx, ri, msg)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, isRead)
-	test.Assert(t, readMsg == msg)
+
+	readErr := errors.New("read failed")
+	onMessageErr := errors.New("on message failed")
+
+	hdlr = mocksremote.NewMockClientTransHandler(ctrl)
+	hdlr.EXPECT().Read(gomock.Any(), gomock.Any(), gomock.Any()).Return(ctx, readErr).AnyTimes()
+	hdlr.EXPECT().OnMessage(gomock.Any(), gomock.Any(), gomock.Any()).Return(ctx, onMessageErr).AnyTimes()
+
+	cli, err = NewClient(ctx, ri, hdlr, opt)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, cli != nil, cli)
+
+	err = cli.Recv(ctx, ri, msg)
+	test.Assert(t, err == readErr, err)
 }
 
 // TestRecvOneWay test recv onw way msg
 func TestRecvOneWay(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	ctx := context.Background()
 
 	addr := utils.NewNetAddr("tcp", "to")
 	ri := newMockRPCInfo(addr)
 
-	hdlr := &mocks.MockCliTransHandler{
-		WriteFunc: nil,
-		ReadFunc:  nil,
-	}
+	hdlr := mocksremote.NewMockClientTransHandler(ctrl)
 
-	opt := newMockOption(addr)
+	opt := newMockOption(ctrl, addr)
 	opt.ConnPool = nil
 
-	isClose := false
-	conn := &mocks.Conn{
-		RemoteAddrFunc: func() (r net.Addr) {
-			return addr
-		},
-		CloseFunc: func() (err error) {
-			isClose = true
-			return err
-		},
-	}
-	opt.Dialer = &remote.SynthesizedDialer{
-		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
-			return conn, nil
-		},
-	}
+	conn := mocksnetpoll.NewMockConnection(ctrl)
+	conn.EXPECT().RemoteAddr().Return(addr).AnyTimes()
+	conn.EXPECT().Close().Return(nil).MinTimes(1)
+	dialer := mocksremote.NewMockDialer(ctrl)
+	dialer.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil).AnyTimes()
+	opt.Dialer = dialer
 
 	cli, err := NewClient(ctx, ri, hdlr, opt)
 	test.Assert(t, err == nil, err)
@@ -286,22 +257,21 @@ func TestRecvOneWay(t *testing.T) {
 
 	err = cli.Recv(ctx, ri, nil)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, isClose)
 }
 
 // TestRecycle test recycle
 func TestRecycle(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	ctx := context.Background()
 
 	addr := utils.NewNetAddr("tcp", "to")
 	ri := newMockRPCInfo(addr)
 
-	hdlr := &mocks.MockCliTransHandler{
-		WriteFunc: nil,
-		ReadFunc:  nil,
-	}
+	hdlr := mocksremote.NewMockClientTransHandler(ctrl)
 
-	opt := newMockOption(addr)
+	opt := newMockOption(ctrl, addr)
 
 	cli, err := NewClient(ctx, ri, hdlr, opt)
 	test.Assert(t, err == nil, err)

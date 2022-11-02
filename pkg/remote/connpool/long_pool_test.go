@@ -22,12 +22,14 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/mocks"
+	"github.com/golang/mock/gomock"
+
+	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/connpool"
 	dialer "github.com/cloudwego/kitex/pkg/remote"
@@ -39,37 +41,242 @@ var (
 	mockAddr1 = "127.0.0.1:8001"
 )
 
+func newLongConnForTest(ctrl *gomock.Controller, addr string) *longConn {
+	conn := mocksnetpoll.NewMockConnection(ctrl)
+	conn.EXPECT().IsActive().Return(true).AnyTimes()
+	conn.EXPECT().Close().AnyTimes()
+
+	return &longConn{
+		Conn:    conn,
+		address: addr,
+	}
+}
+
+func TestPoolReuse(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 1
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	count := make(map[*longConn]bool)
+
+	conn := newLongConnForTest(ctrl, mockAddr0)
+	recycled := p.Put(conn)
+	test.Assert(t, recycled == true)
+	test.Assert(t, p.Len() == 1)
+
+	c, reused, decN := p.Get()
+	test.Assert(t, c != nil)
+	test.Assert(t, reused == true)
+	test.Assert(t, decN == 1)
+	count[c] = true
+	test.Assert(t, len(count) == 1)
+}
+
+// TestPoolGetInactiveConn tests the pool with only inactive connection. Get() should return nil.
+func TestPoolGetInactiveConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 1
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+
+	// inactive conn
+	var closed bool
+	c := mocksnetpoll.NewMockConnection(ctrl)
+	c.EXPECT().IsActive().Return(false).AnyTimes()
+	c.EXPECT().Close().DoAndReturn(func() error {
+		closed = true
+		return nil
+	}).AnyTimes()
+	conn := &longConn{
+		Conn:    c,
+		address: mockAddr0,
+	}
+
+	recycled := p.Put(conn)
+	test.Assert(t, recycled == true)
+	// inactive
+	conn, reused, decNum := p.Get()
+	test.Assert(t, decNum == 1)
+	test.Assert(t, conn == nil)
+	test.Assert(t, reused == false)
+	test.Assert(t, closed == true)
+}
+
+// TestPoolGetWithInactiveConn tests the pool with inactive connection. Get() should return the first active one.
+func TestPoolGetWithInactiveConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 10
+		maxIdleTimeout = time.Millisecond
+		inactiveNum    = 5
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	// put active conn
+	activeConn := newLongConnForTest(ctrl, mockAddr0)
+	recycled := p.Put(activeConn)
+	test.Assert(t, recycled == true)
+
+	// put inactive conn
+	closed := make([]bool, inactiveNum)
+	for i := 0; i < inactiveNum; i++ {
+		idx := i
+		c := mocksnetpoll.NewMockConnection(ctrl)
+		c.EXPECT().IsActive().Return(false).AnyTimes()
+		c.EXPECT().Close().DoAndReturn(func() error {
+			closed[idx] = true
+			return nil
+		}).AnyTimes()
+		conn := &longConn{
+			Conn:    c,
+			address: mockAddr0,
+		}
+		recycled := p.Put(conn)
+		test.Assert(t, recycled == true)
+	}
+	test.Assert(t, p.Len() == inactiveNum+1)
+
+	// decNum should be inactiveNum + 1
+	conn, reused, decNum := p.Get()
+	test.Assert(t, conn != nil)
+	test.Assert(t, reused == true)
+	test.Assert(t, decNum == inactiveNum+1)
+	// check if all inactive conns have been closed
+	for i := 0; i < inactiveNum; i++ {
+		test.Assert(t, closed[i] == true)
+	}
+}
+
+func TestPoolMaxIdle(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 2
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	for i := 0; i < maxIdle+1; i++ {
+		recycled := p.Put(newLongConnForTest(ctrl, mockAddr0))
+		if i < maxIdle {
+			test.Assert(t, recycled == true)
+		} else {
+			test.Assert(t, recycled == false)
+		}
+	}
+	test.Assert(t, p.Len() == maxIdle)
+}
+
+func TestPoolMinIdle(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 1
+		maxIdle        = 10
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	for i := 0; i < maxIdle+1; i++ {
+		p.Put(newLongConnForTest(ctrl, mockAddr0))
+	}
+	test.Assert(t, p.Len() == maxIdle)
+
+	time.Sleep(maxIdleTimeout)
+	p.Evict()
+	test.Assert(t, p.Len() == minIdle)
+}
+
+func TestPoolClose(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 2
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	for i := 0; i < maxIdle+1; i++ {
+		p.Put(newLongConnForTest(ctrl, mockAddr0))
+	}
+
+	n := p.Close()
+	test.Assert(t, n == maxIdle)
+	test.Assert(t, p.idleList == nil)
+	test.Assert(t, p.Len() == 0)
+}
+
+func TestPoolDump(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		minIdle        = 0
+		maxIdle        = 2
+		maxIdleTimeout = time.Millisecond
+	)
+
+	p := newPool(minIdle, maxIdle, maxIdleTimeout)
+	for i := 0; i < maxIdle+1; i++ {
+		p.Put(newLongConnForTest(ctrl, mockAddr0))
+	}
+
+	dump := p.Dump()
+	test.Assert(t, dump.IdleNum == 2)
+	test.Assert(t, len(dump.ConnsDeadline) == 2)
+}
+
 // fakeNewLongPool creates a LongPool object and modifies it to fit tests.
-func newLongPoolForTest(peerAddr, global int, timeout time.Duration) *LongPool {
+func newLongPoolForTest(minPeerAddr, maxPeerAddr, global int, timeout time.Duration) *LongPool {
 	cfg := connpool.IdleConfig{
-		MaxIdlePerAddress: peerAddr,
+		MinIdlePerAddress: minPeerAddr,
+		MaxIdlePerAddress: maxPeerAddr,
 		MaxIdleGlobal:     global,
 		MaxIdleTimeout:    timeout,
 	}
-	lp := NewLongPool("test", cfg)
-
-	limit := utils.NewMaxCounter(global)
-
-	lp.newPeer = func(addr net.Addr) *peer {
-		return newPeer("test", addr, peerAddr, timeout, limit)
-	}
-	return lp
+	return NewLongPool("test", cfg)
 }
 
 func TestLongConnPoolGetTimeout(t *testing.T) {
-	d := &dialer.SynthesizedDialer{}
-	p := newLongPoolForTest(2, 3, time.Second)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+	p := newLongPoolForTest(0, 2, 3, time.Second)
+	defer p.Close()
+
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
 		connectCost := time.Millisecond * 10
 		if timeout < connectCost {
 			return nil, errors.New("connect timeout")
 		}
 		na := utils.NewNetAddr(network, address)
-		return &mocks.Conn{
-			RemoteAddrFunc: func() net.Addr { return na },
-		}, nil
-	}
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().AnyTimes()
+		return conn, nil
+	}).AnyTimes()
 	var err error
 
 	_, err = p.Get(context.TODO(), "tcp", mockAddr0, dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second})
@@ -80,16 +287,22 @@ func TestLongConnPoolGetTimeout(t *testing.T) {
 }
 
 func TestLongConnPoolReuse(t *testing.T) {
-	idleTime := time.Second
-	d := &dialer.SynthesizedDialer{}
-	p := newLongPoolForTest(2, 3, idleTime)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+	idleTime := time.Millisecond * 10
+	p := newLongPoolForTest(0, 2, 3, idleTime)
+	defer p.Close()
+
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
 		na := utils.NewNetAddr(network, address)
-		return &mocks.Conn{
-			RemoteAddrFunc: func() net.Addr { return na },
-		}, nil
-	}
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().AnyTimes()
+		return conn, nil
+	}).AnyTimes()
 
 	addr1, addr2 := mockAddr1, "127.0.0.1:8002"
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
@@ -136,21 +349,27 @@ func TestLongConnPoolReuse(t *testing.T) {
 		err = p.Put(c)
 		test.Assert(t, err == nil)
 		count[c]++
-		time.Sleep(idleTime + 2)
+		time.Sleep(idleTime * 3)
 	}
 	test.Assert(t, len(count) == 3)
 }
 
 func TestLongConnPoolMaxIdle(t *testing.T) {
-	d := &dialer.SynthesizedDialer{}
-	p := newLongPoolForTest(2, 5, time.Second)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+	p := newLongPoolForTest(0, 2, 5, time.Second)
+	defer p.Close()
+
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
 		na := utils.NewNetAddr(network, address)
-		return &mocks.Conn{
-			RemoteAddrFunc: func() net.Addr { return na },
-		}, nil
-	}
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().AnyTimes()
+		return conn, nil
+	}).AnyTimes()
 
 	addr := mockAddr1
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
@@ -179,15 +398,21 @@ func TestLongConnPoolMaxIdle(t *testing.T) {
 }
 
 func TestLongConnPoolGlobalMaxIdle(t *testing.T) {
-	d := &dialer.SynthesizedDialer{}
-	p := newLongPoolForTest(2, 3, time.Second)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+	p := newLongPoolForTest(0, 2, 3, time.Second)
+	defer p.Close()
+
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
 		na := utils.NewNetAddr(network, address)
-		return &mocks.Conn{
-			RemoteAddrFunc: func() net.Addr { return na },
-		}, nil
-	}
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().AnyTimes()
+		return conn, nil
+	}).AnyTimes()
 
 	addr1, addr2 := mockAddr1, "127.0.0.1:8002"
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
@@ -225,34 +450,33 @@ func TestLongConnPoolGlobalMaxIdle(t *testing.T) {
 }
 
 func TestLongConnPoolCloseOnDiscard(t *testing.T) {
-	d := &dialer.SynthesizedDialer{}
-	p := newLongPoolForTest(2, 5, time.Second)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	p := newLongPoolForTest(0, 2, 5, time.Second)
+	defer p.Close()
 
 	var closed bool
-	closer := func() error {
-		if closed {
-			return errors.New("connection already closed")
-		}
-		closed = true
-		return nil
-	}
-
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
 		na := utils.NewNetAddr(network, address)
-		return &mocks.Conn{
-			RemoteAddrFunc: func() net.Addr { return na },
-			CloseFunc:      closer,
-		}, nil
-	}
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().DoAndReturn(func() error {
+			if closed {
+				return errors.New("connection already closed")
+			}
+			closed = true
+			return nil
+		}).AnyTimes()
+		return conn, nil
+	}).AnyTimes()
 
 	addr := mockAddr1
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	c, err := p.Get(context.TODO(), "tcp", addr, opt)
-	test.Assert(t, err == nil)
-	test.Assert(t, !closed)
-
-	err = c.Close()
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
@@ -272,38 +496,39 @@ func TestLongConnPoolCloseOnDiscard(t *testing.T) {
 	c3, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, c3 != c2)
-	test.Assert(t, closed)
 }
 
 func TestLongConnPoolCloseOnError(t *testing.T) {
-	d := &dialer.SynthesizedDialer{}
-	p := newLongPoolForTest(2, 5, time.Second)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	p := newLongPoolForTest(0, 2, 5, time.Second)
+	defer p.Close()
 
 	var closed, read bool
-	closer := func() error {
-		if closed {
-			return errors.New("connection already closed")
-		}
-		closed = true
-		return nil
-	}
-	reader := func(b []byte) (n int, err error) {
-		// Error on second time reading
-		if read {
-			return 0, errors.New("read timeout")
-		}
-		read = true
-		return 0, nil
-	}
 
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
 		na := utils.NewNetAddr(network, address)
-		return &mocks.Conn{
-			RemoteAddrFunc: func() net.Addr { return na },
-			CloseFunc:      closer,
-			ReadFunc:       reader,
-		}, nil
-	}
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().DoAndReturn(func() error {
+			if closed {
+				return errors.New("connection already closed")
+			}
+			closed = true
+			return nil
+		}).AnyTimes()
+		conn.EXPECT().Read(gomock.Any()).DoAndReturn(func(b []byte) (int, error) {
+			// Error on second time reading
+			if read {
+				return 0, errors.New("read timeout")
+			}
+			read = true
+			return 0, nil
+		}).AnyTimes()
+		return conn, nil
+	}).AnyTimes()
 
 	addr := mockAddr1
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
@@ -336,24 +561,29 @@ func TestLongConnPoolCloseOnError(t *testing.T) {
 }
 
 func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
-	d := &dialer.SynthesizedDialer{}
-	p := newLongPoolForTest(2, 5, time.Millisecond)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	idleTime := time.Millisecond
+	p := newLongPoolForTest(0, 2, 5, idleTime)
+	defer p.Close()
 
 	var closed bool
-	closer := func() error {
-		if closed {
-			return errors.New("connection already closed")
-		}
-		closed = true
-		return nil
-	}
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
 		na := utils.NewNetAddr(network, address)
-		return &mocks.Conn{
-			RemoteAddrFunc: func() net.Addr { return na },
-			CloseFunc:      closer,
-		}, nil
-	}
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().DoAndReturn(func() error {
+			if closed {
+				return errors.New("connection already closed")
+			}
+			closed = true
+			return nil
+		}).AnyTimes()
+		return conn, nil
+	}).AnyTimes()
 
 	addr := mockAddr1
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
@@ -366,39 +596,43 @@ func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
-	time.Sleep(time.Millisecond * 2)
+	time.Sleep(idleTime * 3)
 
 	c2, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, c != c2)
-	test.Assert(t, closed)
+	test.Assert(t, closed) // the first connection should be closed
 }
 
 func TestLongConnPoolCloseOnClean(t *testing.T) {
-	d := &dialer.SynthesizedDialer{}
-	p := newLongPoolForTest(2, 5, time.Second)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	p := newLongPoolForTest(0, 2, 5, time.Second)
+	defer p.Close()
 
 	var closed bool
 	var mu sync.RWMutex // fix data race in test
-	closer := func() error {
-		mu.RLock()
-		if closed {
-			mu.RUnlock()
-			return errors.New("connection already closed")
-		}
-		mu.RUnlock()
-		mu.Lock()
-		closed = true
-		mu.Unlock()
-		return nil
-	}
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
 		na := utils.NewNetAddr(network, address)
-		return &mocks.Conn{
-			RemoteAddrFunc: func() net.Addr { return na },
-			CloseFunc:      closer,
-		}, nil
-	}
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().DoAndReturn(func() error {
+			mu.RLock()
+			if closed {
+				mu.RUnlock()
+				return errors.New("connection already closed")
+			}
+			mu.RUnlock()
+			mu.Lock()
+			closed = true
+			mu.Unlock()
+			return nil
+		}).AnyTimes()
+		return conn, nil
+	}).AnyTimes()
 
 	addr := mockAddr1
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
@@ -423,40 +657,39 @@ func TestLongConnPoolCloseOnClean(t *testing.T) {
 }
 
 func TestLongConnPoolDiscardUnknownConnection(t *testing.T) {
-	d := &dialer.SynthesizedDialer{}
-	p := newLongPoolForTest(2, 5, time.Second)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	p := newLongPoolForTest(0, 2, 5, time.Second)
+	defer p.Close()
 
 	var closed bool
-	closer := func() error {
-		if closed {
-			return errors.New("connection already closed")
-		}
-		closed = true
-		return nil
-	}
-	network, address := "tcp", mockAddr1
-	na := utils.NewNetAddr(network, address)
-	mc := &mocks.Conn{
-		RemoteAddrFunc: func() net.Addr { return na },
-		CloseFunc:      closer,
-	}
+	conn := mocksnetpoll.NewMockConnection(ctrl)
+	conn.EXPECT().IsActive().Return(true).AnyTimes()
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
+		na := utils.NewNetAddr(network, address)
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().DoAndReturn(func() error {
+			if closed {
+				return errors.New("connection already closed")
+			}
+			closed = true
+			return nil
+		}).MaxTimes(1)
+		return conn, nil
+	}).AnyTimes()
 
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
-		return mc, nil
-	}
+	network, address := "tcp", mockAddr1
 
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 	c, err := p.Get(context.TODO(), network, address, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
-	err = c.Close()
-	test.Assert(t, err == nil)
-	test.Assert(t, !closed)
-
 	lc, ok := c.(*longConn)
 	test.Assert(t, ok)
-	test.Assert(t, lc.Conn == mc)
+	test.Assert(t, lc.Conn == conn)
 
 	err = p.Discard(lc.Conn)
 	test.Assert(t, err == nil)
@@ -464,31 +697,34 @@ func TestLongConnPoolDiscardUnknownConnection(t *testing.T) {
 }
 
 func TestConnPoolClose(t *testing.T) {
-	p := newLongPoolForTest(2, 3, time.Second)
-	d := &dialer.SynthesizedDialer{}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	p := newLongPoolForTest(0, 2, 3, time.Second)
 
 	var closed int
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
-		return &mocks.Conn{
-			CloseFunc: func() (e error) {
-				closed++
-				return nil
-			},
-			RemoteAddrFunc: func() (r net.Addr) {
-				return utils.NewNetAddr(network, address)
-			},
-		}, nil
-	}
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
+		na := utils.NewNetAddr(network, address)
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().DoAndReturn(func() error {
+			closed++
+			return nil
+		}).AnyTimes()
+		return conn, nil
+	}).AnyTimes()
 
 	network, address := "tcp", mockAddr0
-	conn, err := p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
+	conn0, err := p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
 	test.Assert(t, err == nil)
-	p.Put(conn)
+	p.Put(conn0)
 
 	network, address = "tcp", mockAddr1
-	_, err = p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
+	conn1, err := p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
 	test.Assert(t, err == nil)
-	p.Put(conn)
+	p.Put(conn1)
 
 	connCount := 0
 	p.peerMap.Range(func(key, value interface{}) bool {
@@ -499,6 +735,7 @@ func TestConnPoolClose(t *testing.T) {
 
 	p.Close()
 	test.Assert(t, closed == 2, closed)
+	test.Assert(t, p.globalIdle.Now() == 0)
 
 	connCount = 0
 	p.peerMap.Range(func(key, value interface{}) bool {
@@ -509,57 +746,124 @@ func TestConnPoolClose(t *testing.T) {
 }
 
 func TestLongConnPoolPutUnknownConnection(t *testing.T) {
-	d := &dialer.SynthesizedDialer{}
-	p := newLongPoolForTest(2, 5, time.Second)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	p := newLongPoolForTest(0, 2, 5, time.Second)
+	defer p.Close()
 
 	var closed bool
-	closer := func() error {
-		if closed {
-			return errors.New("connection already closed")
-		}
-		closed = true
-		return nil
-	}
+	conn := mocksnetpoll.NewMockConnection(ctrl)
+	conn.EXPECT().IsActive().Return(true).AnyTimes()
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
+		na := utils.NewNetAddr(network, address)
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().DoAndReturn(func() error {
+			if closed {
+				return errors.New("connection already closed")
+			}
+			closed = true
+			return nil
+		}).AnyTimes()
+		return conn, nil
+	}).AnyTimes()
+
 	network, address := "tcp", mockAddr1
-	na := utils.NewNetAddr(network, address)
-	mc := &mocks.Conn{
-		RemoteAddrFunc: func() net.Addr { return na },
-		CloseFunc:      closer,
-	}
-
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
-		return mc, nil
-	}
-
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 	c, err := p.Get(context.TODO(), network, address, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
-	err = c.Close()
-	test.Assert(t, err == nil)
-	test.Assert(t, !closed)
-
 	lc, ok := c.(*longConn)
 	test.Assert(t, ok)
-	test.Assert(t, lc.Conn == mc)
+	test.Assert(t, lc.Conn == conn)
 
 	err = p.Put(lc.Conn)
 	test.Assert(t, err == nil)
 	test.Assert(t, closed)
 }
 
-func TestLongConnPoolDump(t *testing.T) {
-	idleTime := time.Second
-	d := &dialer.SynthesizedDialer{}
-	p := newLongPoolForTest(2, 3, idleTime)
+func TestLongConnPoolEvict(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-	d.DialFunc = func(network, address string, timeout time.Duration) (net.Conn, error) {
+	var (
+		idleTime = time.Millisecond * 100
+		minIdle  = 1
+		maxIdle  = 5
+	)
+	p := newLongPoolForTest(minIdle, maxIdle, maxIdle, idleTime)
+	defer p.Close()
+
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
 		na := utils.NewNetAddr(network, address)
-		return &mocks.Conn{
-			RemoteAddrFunc: func() net.Addr { return na },
-		}, nil
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().DoAndReturn(func() error {
+			return nil
+		}).MaxTimes(1)
+		return conn, nil
+	}).AnyTimes()
+
+	network, address := "tcp", mockAddr1
+	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
+	// get a new conn
+	var conns []net.Conn
+	for i := 0; i < maxIdle; i++ {
+		c, err := p.Get(context.TODO(), network, address, opt)
+		test.Assert(t, err == nil)
+		conns = append(conns, c)
 	}
+	for i := 0; i < maxIdle; i++ {
+		// put conn back to the pool
+		err := p.Put(conns[i])
+		test.Assert(t, err == nil)
+	}
+
+	// only `minIdle` of connections should be kept in the pool
+	// 3 times of idleTime to make sure the eviction goroutine can be done
+	time.Sleep(3 * idleTime)
+	p.peerMap.Range(func(key, value interface{}) bool {
+		v := value.(*peer)
+		test.Assert(t, v.Len() == minIdle)
+		return true
+	})
+	// globalIdle should also be decreased when evicting
+	test.Assert(t, int(p.globalIdle.Now()) == minIdle, p.globalIdle.Now())
+	// get after eviction
+	conns = []net.Conn{}
+	for i := 0; i < maxIdle; i++ {
+		c, err := p.Get(context.TODO(), network, address, opt)
+		test.Assert(t, err == nil)
+		conns = append(conns, c)
+	}
+	for i := 0; i < maxIdle; i++ {
+		// put conn back to the pool
+		err := p.Put(conns[i])
+		test.Assert(t, err == nil)
+	}
+}
+
+func TestLongConnPoolDump(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	idleTime := time.Second
+	p := newLongPoolForTest(0, 2, 3, idleTime)
+	defer p.Close()
+
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
+		na := utils.NewNetAddr(network, address)
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().AnyTimes()
+		return conn, nil
+	}).AnyTimes()
 
 	// get a new conn
 	conn, err := p.Get(context.TODO(), "tcp", mockAddr0, dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second})
@@ -574,21 +878,26 @@ func TestLongConnPoolDump(t *testing.T) {
 	val := data[mockAddr0]
 	test.Assert(t, val != nil)
 
-	// check dump data
-	length := reflect.ValueOf(val).Elem().FieldByName("Len").Int()
+	length := len(val.(PoolDump).ConnsDeadline)
 	test.Assert(t, length == 1)
 }
 
 func BenchmarkLongPoolGetOne(b *testing.B) {
-	d := &dialer.SynthesizedDialer{
-		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
-			na := utils.NewNetAddr(network, address)
-			return &mocks.Conn{
-				RemoteAddrFunc: func() net.Addr { return na },
-			}, nil
-		},
-	}
-	p := newLongPoolForTest(100000, 1<<20, time.Second)
+	ctrl := gomock.NewController(b)
+	defer ctrl.Finish()
+
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
+		na := utils.NewNetAddr(network, address)
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().AnyTimes()
+		return conn, nil
+	}).AnyTimes()
+
+	p := newLongPoolForTest(0, 100000, 1<<20, time.Second)
+	defer p.Close()
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	b.ResetTimer()
@@ -601,15 +910,20 @@ func BenchmarkLongPoolGetOne(b *testing.B) {
 }
 
 func BenchmarkLongPoolGetRand2000(b *testing.B) {
-	d := &dialer.SynthesizedDialer{
-		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
-			na := utils.NewNetAddr(network, address)
-			return &mocks.Conn{
-				RemoteAddrFunc: func() net.Addr { return na },
-			}, nil
-		},
-	}
-	p := newLongPoolForTest(50, 50, time.Second)
+	ctrl := gomock.NewController(b)
+	defer ctrl.Finish()
+
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
+		na := utils.NewNetAddr(network, address)
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().AnyTimes()
+		return conn, nil
+	}).AnyTimes()
+	p := newLongPoolForTest(0, 50, 50, time.Second)
+	defer p.Close()
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	var addrs []string
@@ -626,15 +940,20 @@ func BenchmarkLongPoolGetRand2000(b *testing.B) {
 }
 
 func BenchmarkLongPoolGetRand2000Mesh(b *testing.B) {
-	d := &dialer.SynthesizedDialer{
-		DialFunc: func(network, address string, timeout time.Duration) (net.Conn, error) {
-			na := utils.NewNetAddr(network, address)
-			return &mocks.Conn{
-				RemoteAddrFunc: func() net.Addr { return na },
-			}, nil
-		},
-	}
-	p := newLongPoolForTest(100000, 1<<20, time.Second)
+	ctrl := gomock.NewController(b)
+	defer ctrl.Finish()
+
+	d := mocksremote.NewMockDialer(ctrl)
+	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
+		na := utils.NewNetAddr(network, address)
+		conn := mocksnetpoll.NewMockConnection(ctrl)
+		conn.EXPECT().IsActive().Return(true).AnyTimes()
+		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
+		conn.EXPECT().Close().AnyTimes()
+		return conn, nil
+	}).AnyTimes()
+	p := newLongPoolForTest(0, 100000, 1<<20, time.Second)
+	defer p.Close()
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 
 	var addrs []string

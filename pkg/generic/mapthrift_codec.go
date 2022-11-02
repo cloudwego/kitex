@@ -38,6 +38,7 @@ type mapThriftCodec struct {
 	svcDsc   atomic.Value // *idl
 	provider DescriptorProvider
 	codec    remote.PayloadCodec
+	forJSON  bool
 }
 
 func newMapThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*mapThriftCodec, error) {
@@ -48,6 +49,15 @@ func newMapThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*mapThr
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
+	return c, nil
+}
+
+func newMapThriftCodecForJSON(p DescriptorProvider, codec remote.PayloadCodec) (*mapThriftCodec, error) {
+	c, err := newMapThriftCodec(p, codec)
+	if err != nil {
+		return nil, err
+	}
+	c.forJSON = true
 	return c, nil
 }
 
@@ -89,7 +99,12 @@ func (c *mapThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in r
 	if !ok {
 		return fmt.Errorf("get parser ServiceDescriptor failed")
 	}
-	rm := thrift.NewReadStruct(svcDsc, msg.RPCRole() == remote.Client)
+	var rm *thrift.ReadStruct
+	if c.forJSON {
+		rm = thrift.NewReadStructForJSON(svcDsc, msg.RPCRole() == remote.Client)
+	} else {
+		rm = thrift.NewReadStruct(svcDsc, msg.RPCRole() == remote.Client)
+	}
 	msg.Data().(WithCodec).SetCodec(rm)
 	return c.codec.Unmarshal(ctx, msg, in)
 }

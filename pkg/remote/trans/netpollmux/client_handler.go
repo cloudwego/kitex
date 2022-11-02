@@ -67,7 +67,7 @@ type cliTransHandler struct {
 }
 
 // Write implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (err error) {
+func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	ri := sendMsg.RPCInfo()
 	stats2.Record(ctx, ri, stats.WriteStart, nil)
 	buf := netpoll.NewLinkBuffer()
@@ -91,7 +91,7 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
-		return err
+		return ctx, err
 	}
 
 	mc, _ := conn.(*muxCliConn)
@@ -99,13 +99,13 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	// if oneway
 	var methodInfo serviceinfo.MethodInfo
 	if methodInfo, err = trans.GetMethodInfo(ri, sendMsg.ServiceInfo()); err != nil {
-		return err
+		return ctx, err
 	}
 	if methodInfo.OneWay() {
 		mc.Put(func() (_ netpoll.Writer, isNil bool) {
 			return buf, false
 		})
-		return nil
+		return ctx, nil
 	}
 
 	// add notify
@@ -113,11 +113,11 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	callback := newAsyncCallback(buf, bufWriter)
 	mc.seqIDMap.store(seqID, callback)
 	mc.Put(callback.getter)
-	return err
+	return ctx, err
 }
 
 // Read implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) error {
+func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	ri := msg.RPCInfo()
 	mc, _ := conn.(*muxCliConn)
 	seqID := ri.Invocation().SeqID()
@@ -137,11 +137,11 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 	select {
 	case <-ctx.Done():
 		// timeout
-		return fmt.Errorf("recv wait timeout %s, seqID=%d", readTimeout, seqID)
+		return ctx, fmt.Errorf("recv wait timeout %s, seqID=%d", readTimeout, seqID)
 	case bufReader := <-callback.notifyChan:
 		// recv
 		if bufReader == nil {
-			return ErrConnClosed
+			return ctx, ErrConnClosed
 		}
 		stats2.Record(ctx, ri, stats.ReadStart, nil)
 		msg.SetPayloadCodec(t.opt.PayloadCodec)
@@ -154,7 +154,7 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 		}
 		bufReader.Release(nil)
 		stats2.Record(ctx, ri, stats.ReadFinish, err)
-		return err
+		return ctx, err
 	}
 }
 

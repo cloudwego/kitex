@@ -117,7 +117,8 @@ func TestCliTransHandler(t *testing.T) {
 			}
 		},
 	}
-	err = handler.Write(ctx, conn, msg)
+	ctx, err = handler.Write(ctx, conn, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	time.Sleep(5 * time.Millisecond)
@@ -127,7 +128,8 @@ func TestCliTransHandler(t *testing.T) {
 	err = conn.OnRequest(ctx, npconn)
 	test.Assert(t, err == nil, err)
 
-	err = handler.Read(ctx, conn, msg)
+	ctx, err = handler.Read(ctx, conn, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 }
 
@@ -167,8 +169,9 @@ func TestWriteNoMethod(t *testing.T) {
 	}
 
 	// 2. test
-	err = handler.Write(ctx, conn, msg)
-	// check err not nil
+	ctx, err = handler.Write(ctx, conn, msg)
+	// check ctx/err not nil
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err != nil, err)
 	tErr, ok := err.(*remote.TransError)
 	test.Assert(t, ok)
@@ -215,7 +218,8 @@ func TestWriteOneWayMethod(t *testing.T) {
 			}
 		},
 	}
-	err = handler.Write(ctx, conn, oneWayMsg)
+	ctx, err = handler.Write(ctx, conn, oneWayMsg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	time.Sleep(5 * time.Millisecond)
@@ -275,7 +279,8 @@ func TestReadTimeout(t *testing.T) {
 		},
 	}
 
-	err = handler.Write(ctx, conn, msg)
+	ctx, err = handler.Write(ctx, conn, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	time.Sleep(5 * time.Millisecond)
@@ -283,8 +288,9 @@ func TestReadTimeout(t *testing.T) {
 	test.Assert(t, isWrite)
 	test.Assert(t, buf.Len() > len(s), buf.Len())
 
-	err = handler.Read(ctx, conn, msg)
+	ctx, err = handler.Read(ctx, conn, msg)
 	test.Assert(t, rwTimeout <= trans.GetReadTimeout(ri.Config()))
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, strings.Contains(err.Error(), "recv wait timeout"))
 	test.Assert(t, !isRead)

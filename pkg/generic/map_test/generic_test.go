@@ -190,7 +190,7 @@ func TestMapThriftGenericClientClose(t *testing.T) {
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+	t.Logf("Before new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 
 	clientCnt := 1000
 	clis := make([]genericclient.Client, clientCnt)
@@ -204,7 +204,7 @@ func TestMapThriftGenericClientClose(t *testing.T) {
 
 	runtime.ReadMemStats(&ms)
 	preHeapAlloc, preHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", preHeapAlloc, preHeapObjects)
+	t.Logf("After new clients, allocation: %f Mb, Number of allocation: %d\n", preHeapAlloc, preHeapObjects)
 
 	for _, cli := range clis {
 		_ = cli.Close()
@@ -212,8 +212,16 @@ func TestMapThriftGenericClientClose(t *testing.T) {
 	runtime.GC()
 	runtime.ReadMemStats(&ms)
 	afterGCHeapAlloc, afterGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", afterGCHeapAlloc, afterGCHeapObjects)
+	t.Logf("After close clients and GC be executed, allocation: %f Mb, Number of allocation: %d\n", afterGCHeapAlloc, afterGCHeapObjects)
 	test.Assert(t, afterGCHeapAlloc < preHeapAlloc && afterGCHeapObjects < preHeapObjects)
+
+	// Trigger the finalizer of kclient be executed
+	time.Sleep(200 * time.Millisecond) // ensure the finalizer be executed
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	secondGCHeapAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("After second GC, allocation: %f Mb, Number of allocation: %d\n", secondGCHeapAlloc, secondGCHeapObjects)
+	test.Assert(t, secondGCHeapAlloc/2 < afterGCHeapAlloc && secondGCHeapObjects/2 < afterGCHeapObjects)
 }
 
 func TestMapThriftGenericClientFinalizer(t *testing.T) {
@@ -222,7 +230,7 @@ func TestMapThriftGenericClientFinalizer(t *testing.T) {
 
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+	t.Logf("Before new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 
 	clientCnt := 1000
 	clis := make([]genericclient.Client, clientCnt)
@@ -235,18 +243,28 @@ func TestMapThriftGenericClientFinalizer(t *testing.T) {
 	}
 
 	runtime.ReadMemStats(&ms)
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+	t.Logf("After new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 
 	runtime.GC()
 	runtime.ReadMemStats(&ms)
 	firstGCHeapAlloc, firstGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", firstGCHeapAlloc, firstGCHeapObjects)
+	t.Logf("After first GC, allocation: %f Mb, Number of allocation: %d\n", firstGCHeapAlloc, firstGCHeapObjects)
 
+	// Trigger the finalizer of generic client be executed
+	time.Sleep(200 * time.Millisecond) // ensure the finalizer be executed
 	runtime.GC()
 	runtime.ReadMemStats(&ms)
 	secondGCHeapAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("Allocation: %f Mb, Number of allocation: %d\n", secondGCHeapAlloc, secondGCHeapObjects)
-	test.Assert(t, secondGCHeapAlloc < firstGCHeapAlloc && secondGCHeapObjects < firstGCHeapObjects)
+	t.Logf("After second GC, allocation: %f Mb, Number of allocation: %d\n", secondGCHeapAlloc, secondGCHeapObjects)
+	// test.Assert(t, secondGCHeapAlloc < firstGCHeapAlloc && secondGCHeapObjects < firstGCHeapObjects)
+
+	// Trigger the finalizer of kClient be executed
+	time.Sleep(200 * time.Millisecond) // ensure the finalizer be executed
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	thirdGCHeapAlloc, thirdGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
+	t.Logf("After third GC, allocation: %f Mb, Number of allocation: %d\n", thirdGCHeapAlloc, thirdGCHeapObjects)
+	test.Assert(t, thirdGCHeapAlloc < secondGCHeapAlloc/2 && thirdGCHeapObjects < secondGCHeapObjects/2)
 }
 
 func mb(byteSize uint64) float32 {

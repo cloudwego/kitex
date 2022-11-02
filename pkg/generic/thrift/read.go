@@ -22,10 +22,13 @@ import (
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/jhump/protoreflect/desc"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
+
+var emptyPbDsc = &desc.MessageDescriptor{}
 
 type readerOption struct {
 	// result will be encode to json, so map[interface{}]interface{} will not be valid
@@ -160,11 +163,25 @@ func readBool(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescri
 }
 
 func readByte(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
-	return in.ReadByte()
+	res, err := in.ReadByte()
+	if err != nil {
+		return nil, err
+	}
+	if opt.pbDsc != nil {
+		return int32(res), nil
+	}
+	return res, nil
 }
 
 func readInt16(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
-	return in.ReadI16()
+	res, err := in.ReadI16()
+	if err != nil {
+		return nil, err
+	}
+	if opt.pbDsc != nil {
+		return int32(res), nil
+	}
+	return res, nil
 }
 
 func readInt32(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
@@ -235,14 +252,18 @@ func readInterfaceMap(ctx context.Context, in thrift.TProtocol, t *descriptor.Ty
 		return nil, err
 	}
 	for i := 0; i < length; i++ {
+		nest := unnestPb(opt, 1)
 		key, err := keyReader(ctx, in, t.Key, opt)
 		if err != nil {
 			return nil, err
 		}
+		nest()
+		nest = unnestPb(opt, 2)
 		elem, err := elemReader(ctx, in, t.Elem, opt)
 		if err != nil {
 			return nil, err
 		}
+		nest()
 		m[key] = elem
 	}
 	return m, in.ReadMapEnd()
@@ -300,6 +321,7 @@ func readStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDesc
 	var err error
 	// set default value
 	// void is nil struct
+	// default value with struct NOT SUPPORT pb.
 	if t.Struct != nil {
 		for _, field := range t.Struct.DefaultFields {
 			val := field.DefaultValue
@@ -343,16 +365,7 @@ func readStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDesc
 				return nil, err
 			}
 		} else {
-			pbDsc := opt.pbDsc
-			if pbDsc != nil {
-				fd := opt.pbDsc.FindFieldByNumber(field.ID)
-				if fd != nil && fd.GetMessageType() != nil {
-					opt.pbDsc = fd.GetMessageType()
-				} else {
-					opt.pbDsc = nil
-				}
-			}
-
+			nest := unnestPb(opt, field.ID)
 			_fieldType := descriptor.FromThriftTType(fieldType)
 			reader, err := nextReader(_fieldType, field.Type, opt)
 			if err != nil {
@@ -367,22 +380,10 @@ func readStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDesc
 					return nil, err
 				}
 			}
-
-			if pbDsc != nil {
-				switch _fieldType {
-				case thrift.I08:
-					val = int32(val.(int8))
-				case thrift.I16:
-					val = int32(val.(int16))
-				}
-			}
+			nest()
 
 			if err := fs(field, val); err != nil {
 				return nil, err
-			}
-
-			if pbDsc != nil {
-				opt.pbDsc = pbDsc
 			}
 		}
 		if err := in.ReadFieldEnd(); err != nil {
@@ -405,6 +406,7 @@ func readHTTPResponse(ctx context.Context, in thrift.TProtocol, t *descriptor.Ty
 
 	var err error
 	// set default value
+	// default value with struct NOT SUPPORT pb.
 	for _, field := range t.Struct.DefaultFields {
 		val := field.DefaultValue
 		if field.ValueMapping != nil {
@@ -444,15 +446,7 @@ func readHTTPResponse(ctx context.Context, in thrift.TProtocol, t *descriptor.Ty
 			}
 		} else {
 			// Replace pb descriptor with field type
-			pbDsc := opt.pbDsc
-			if pbDsc != nil {
-				fd := opt.pbDsc.FindFieldByNumber(field.ID)
-				if fd != nil && fd.GetMessageType() != nil {
-					opt.pbDsc = fd.GetMessageType()
-				} else {
-					opt.pbDsc = nil
-				}
-			}
+			nest := unnestPb(opt, field.ID)
 
 			// check required
 			_fieldType := descriptor.FromThriftTType(fieldType)
@@ -469,17 +463,29 @@ func readHTTPResponse(ctx context.Context, in thrift.TProtocol, t *descriptor.Ty
 					return nil, err
 				}
 			}
+			nest()
 			if err = field.HTTPMapping.Response(ctx, resp, field, val); err != nil {
 				return nil, err
-			}
-
-			if pbDsc != nil {
-				opt.pbDsc = pbDsc
 			}
 		}
 		if err := in.ReadFieldEnd(); err != nil {
 			return nil, err
 		}
 		readFields[int32(fieldID)] = struct{}{}
+	}
+}
+
+func unnestPb(opt *readerOption, fieldId int32) func() {
+	pbDsc := opt.pbDsc
+	if pbDsc != nil {
+		fd := opt.pbDsc.FindFieldByNumber(fieldId)
+		if fd != nil && fd.GetMessageType() != nil {
+			opt.pbDsc = fd.GetMessageType()
+		} else {
+			opt.pbDsc = emptyPbDsc
+		}
+	}
+	return func() {
+		opt.pbDsc = pbDsc
 	}
 }

@@ -18,6 +18,8 @@ package kerrors
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -78,7 +80,7 @@ func (be *basicError) WithCauseAndStack(cause error, stack string) error {
 	return &DetailedError{basic: be, cause: cause, stack: stack}
 }
 
-// WithCauseAndStack creates a detailed error which attach the given cause to current error and wrap extra msg to supply error msg.
+// WithCauseAndExtraMsg creates a detailed error which attach the given cause to current error and wrap extra msg to supply error msg.
 func (be *basicError) WithCauseAndExtraMsg(cause error, extraMsg string) error {
 	return &DetailedError{basic: be, cause: cause, extraMsg: extraMsg}
 }
@@ -103,6 +105,24 @@ func (de *DetailedError) Error() string {
 		return msg + ": " + de.cause.Error()
 	}
 	return msg
+}
+
+// Format the error.
+func (de *DetailedError) Format(s fmt.State, verb rune) {
+	switch verb {
+	case 'v':
+		if s.Flag('+') {
+			msg := appendErrMsg(de.basic.Error(), de.extraMsg)
+			_, _ = io.WriteString(s, msg)
+			if de.cause != nil {
+				_, _ = fmt.Fprintf(s, ": %+v", de.cause)
+			}
+			return
+		}
+		fallthrough
+	case 's', 'q':
+		_, _ = io.WriteString(s, de.Error())
+	}
 }
 
 // ErrorType returns the basic error type.

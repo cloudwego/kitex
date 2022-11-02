@@ -46,6 +46,9 @@ func TestConfig_Pack(t *testing.T) {
 		CopyIDL         bool
 		ThriftPlugins   util.StringSlice
 		Features        []feature
+		FrugalPretouch  bool
+		Record          bool
+		RecordCmd       string
 	}
 	tests := []struct {
 		name    string
@@ -56,7 +59,7 @@ func TestConfig_Pack(t *testing.T) {
 		{
 			name:    "some",
 			fields:  fields{Features: []feature{feature(999)}},
-			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "Features=999"},
+			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "Features=999", "FrugalPretouch=false", "ExtensionFile=", "Record=false", "RecordCmd="},
 		},
 	}
 	for _, tt := range tests {
@@ -81,6 +84,7 @@ func TestConfig_Pack(t *testing.T) {
 				CopyIDL:         tt.fields.CopyIDL,
 				ThriftPlugins:   tt.fields.ThriftPlugins,
 				Features:        tt.fields.Features,
+				FrugalPretouch:  tt.fields.FrugalPretouch,
 			}
 			if gotRes := c.Pack(); !reflect.DeepEqual(gotRes, tt.wantRes) {
 				t.Errorf("Config.Pack() = \n%v\nwant\n%v", gotRes, tt.wantRes)
@@ -109,6 +113,7 @@ func TestConfig_Unpack(t *testing.T) {
 		CombineService  bool
 		CopyIDL         bool
 		Features        []feature
+		FrugalPretouch  bool
 	}
 	type args struct {
 		args []string
@@ -148,6 +153,7 @@ func TestConfig_Unpack(t *testing.T) {
 				CombineService:  tt.fields.CombineService,
 				CopyIDL:         tt.fields.CopyIDL,
 				Features:        tt.fields.Features,
+				FrugalPretouch:  tt.fields.FrugalPretouch,
 			}
 			if err := c.Unpack(tt.args.args); (err != nil) != tt.wantErr {
 				t.Errorf("Config.Unpack() error = %v, wantErr %v", err, tt.wantErr)

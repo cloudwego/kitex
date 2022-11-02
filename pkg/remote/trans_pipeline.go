@@ -85,12 +85,11 @@ func (p *TransPipeline) AddOutboundHandler(hdlr OutboundHandler) *TransPipeline 
 }
 
 // Write implements the OutboundHandler interface.
-func (p *TransPipeline) Write(ctx context.Context, conn net.Conn, sendMsg Message) error {
-	var err error
+func (p *TransPipeline) Write(ctx context.Context, conn net.Conn, sendMsg Message) (nctx context.Context, err error) {
 	for _, h := range p.outboundHdrls {
 		ctx, err = h.Write(ctx, conn, sendMsg)
 		if err != nil {
-			return err
+			return ctx, err
 		}
 	}
 	return p.netHdlr.Write(ctx, conn, sendMsg)
@@ -135,7 +134,7 @@ func (p *TransPipeline) OnRead(ctx context.Context, conn net.Conn) error {
 }
 
 // Read reads from conn.
-func (p *TransPipeline) Read(ctx context.Context, conn net.Conn, msg Message) error {
+func (p *TransPipeline) Read(ctx context.Context, conn net.Conn, msg Message) (nctx context.Context, err error) {
 	return p.netHdlr.Read(ctx, conn, msg)
 }
 

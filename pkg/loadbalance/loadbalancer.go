@@ -38,35 +38,3 @@ type Rebalancer interface {
 	Rebalance(discovery.Change)
 	Delete(discovery.Change)
 }
-
-// SynthesizedPicker synthesizes a picker using a next function.
-type SynthesizedPicker struct {
-	NextFunc func(ctx context.Context, request interface{}) discovery.Instance
-}
-
-// Next implements the Picker interface.
-func (sp *SynthesizedPicker) Next(ctx context.Context, request interface{}) discovery.Instance {
-	return sp.NextFunc(ctx, request)
-}
-
-// SynthesizedLoadbalancer synthesizes a loadbalancer using a GetPickerFunc function.
-type SynthesizedLoadbalancer struct {
-	GetPickerFunc func(discovery.Result) Picker
-	NameFunc      func() string
-}
-
-// GetPicker implements the Loadbalancer interface.
-func (slb *SynthesizedLoadbalancer) GetPicker(entry discovery.Result) Picker {
-	if slb.GetPickerFunc == nil {
-		return nil
-	}
-	return slb.GetPickerFunc(entry)
-}
-
-// Name implements the Loadbalancer interface.
-func (slb *SynthesizedLoadbalancer) Name() string {
-	if slb.NameFunc == nil {
-		return ""
-	}
-	return slb.NameFunc()
-}

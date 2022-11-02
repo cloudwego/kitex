@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -88,8 +89,12 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 func (c *clientConn) Read(b []byte) (n int, err error) {
 	n, err = c.s.Read(b)
 	if err == io.EOF {
-		if statusErr := c.s.Status().Err(); statusErr != nil {
-			err = statusErr
+		if status := c.s.Status(); status.Code() != codes.OK {
+			if bizStatusErr := c.s.BizStatusErr(); bizStatusErr != nil {
+				err = bizStatusErr
+			} else {
+				err = status.Err()
+			}
 		}
 	}
 	return n, err

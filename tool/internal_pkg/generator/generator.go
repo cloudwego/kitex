@@ -17,6 +17,7 @@ package generator
 
 import (
 	"fmt"
+	"go/token"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -51,6 +52,7 @@ var (
 		"client":  ImportPathTo("client"),
 		"server":  ImportPathTo("server"),
 		"callopt": ImportPathTo("client/callopt"),
+		"frugal":  "github.com/cloudwego/frugal",
 	}
 )
 
@@ -109,6 +111,13 @@ type Config struct {
 	CopyIDL         bool
 	ThriftPlugins   util.StringSlice
 	Features        []feature
+	FrugalPretouch  bool
+
+	ExtensionFile string
+	tmplExt       *TemplateExtension
+
+	Record    bool
+	RecordCmd []string
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -121,7 +130,7 @@ func (c *Config) Pack() (res []string) {
 		n := f.Name
 
 		// skip the plugin arguments to avoid the 'strings in strings' trouble
-		if f.Name == "ThriftPlugins" {
+		if f.Name == "ThriftPlugins" || !token.IsExported(f.Name) {
 			continue
 		}
 
@@ -191,7 +200,7 @@ func (c *Config) Unpack(args []string) error {
 		}
 	}
 	log.Verbose = c.Verbose
-	return nil
+	return c.ApplyExtension()
 }
 
 // AddFeature add registered feature to config
@@ -201,6 +210,31 @@ func (c *Config) AddFeature(key string) bool {
 		return true
 	}
 	return false
+}
+
+// ApplyExtension applies template extension.
+func (c *Config) ApplyExtension() error {
+	if c.ExtensionFile == "" {
+		return nil
+	}
+
+	ext := new(TemplateExtension)
+	if err := ext.FromJSONFile(c.ExtensionFile); err != nil {
+		return fmt.Errorf("read template extension %q failed: %s", c.ExtensionFile, err.Error())
+	}
+
+	for _, fn := range ext.FeatureNames {
+		RegisterFeature(fn)
+	}
+	for _, fn := range ext.EnableFeatures {
+		c.AddFeature(fn)
+	}
+	for path, alias := range ext.Dependencies {
+		AddGlobalDependency(alias, path)
+	}
+
+	c.tmplExt = ext
+	return nil
 }
 
 // NewGenerator .
@@ -310,22 +344,29 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 	}
 	svcPkg := strings.ToLower(pkg.ServiceName)
 	output = filepath.Join(output, svcPkg)
+	ext := g.tmplExt
+	if ext == nil {
+		ext = new(TemplateExtension)
+	}
 
 	tasks := []*Task{
 		{
 			Name: ClientFileName,
 			Path: filepath.Join(output, ClientFileName),
 			Text: tpl.ClientTpl,
+			Ext:  ext.ExtendClient,
 		},
 		{
 			Name: ServerFileName,
 			Path: filepath.Join(output, ServerFileName),
 			Text: tpl.ServerTpl,
+			Ext:  ext.ExtendServer,
 		},
 		{
 			Name: InvokerFileName,
 			Path: filepath.Join(output, InvokerFileName),
 			Text: tpl.InvokerTpl,
+			Ext:  ext.ExtendInvoker,
 		},
 		{
 			Name: ServiceFileName,
@@ -341,6 +382,13 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 			return nil, err
 		}
 		g.setImports(t.Name, pkg)
+		if t.Ext != nil {
+			for _, path := range t.Ext.ImportPaths {
+				if alias, exist := ext.Dependencies[path]; exist {
+					pkg.AddImports(alias)
+				}
+			}
+		}
 		handle := func(task *Task, pkg *PackageInfo) (*File, error) {
 			return task.Render(pkg)
 		}
@@ -361,6 +409,7 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	pkg.RealServiceName = g.ServiceName
 	pkg.Features = g.Features
 	pkg.ExternalKitexGen = g.Use
+	pkg.FrugalPretouch = g.FrugalPretouch
 	if pkg.Dependencies == nil {
 		pkg.Dependencies = make(map[string]string)
 	}
@@ -373,7 +422,7 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 }
 
 func (g *generator) setImports(name string, pkg *PackageInfo) {
-	pkg.Imports = make(map[string]string)
+	pkg.Imports = make(map[string]map[string]bool)
 	switch name {
 	case ClientFileName:
 		pkg.AddImports("client")
@@ -437,6 +486,13 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 				for _, dep := range e.Deps {
 					pkg.AddImport(dep.PkgRefName, dep.ImportPath)
 				}
+			}
+		}
+		if pkg.FrugalPretouch {
+			pkg.AddImports("sync")
+			if len(pkg.AllMethods()) > 0 {
+				pkg.AddImports("frugal")
+				pkg.AddImports("reflect")
 			}
 		}
 	case MainFileName:

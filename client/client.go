@@ -33,6 +33,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
@@ -46,7 +47,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
@@ -74,21 +74,27 @@ type kClient struct {
 	closed bool
 }
 
+// Set finalizer on kClient does not take effect, because kClient has a circular reference problem
+// when construct the endpoint.Endpoint in the invokeHandleEndpoint,
+// so wrapping kClient as kcFinalizerClient, and set finalizer on kcFinalizerClient, it can solve this problem.
+type kcFinalizerClient struct {
+	*kClient
+}
+
 // NewClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
 func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error) {
 	if svcInfo == nil {
 		return nil, errors.New("NewClient: no service info")
 	}
-	kc := &kClient{
-		svcInfo: svcInfo,
-		opt:     client.NewOptions(opts),
-	}
+	kc := &kcFinalizerClient{kClient: &kClient{}}
+	kc.svcInfo = svcInfo
+	kc.opt = client.NewOptions(opts)
 	if err := kc.init(); err != nil {
 		return nil, err
 	}
 	// like os.File, if kc is garbage-collected, but Close is not called, call Close.
-	runtime.SetFinalizer(kc, func(c *kClient) {
-		c.Close()
+	runtime.SetFinalizer(kc, func(c *kcFinalizerClient) {
+		_ = c.Close()
 	})
 	return kc, nil
 }
@@ -105,6 +111,9 @@ func (kc *kClient) init() (err error) {
 		return err
 	}
 	if err = kc.initProxy(); err != nil {
+		return err
+	}
+	if err = kc.initConnPool(); err != nil {
 		return err
 	}
 	if err = kc.initLBCache(); err != nil {
@@ -181,6 +190,33 @@ func (kc *kClient) initProxy() error {
 	return nil
 }
 
+func (kc *kClient) initConnPool() error {
+	pool := kc.opt.RemoteOpt.ConnPool
+	kc.opt.CloseCallbacks = append(kc.opt.CloseCallbacks, pool.Close)
+
+	if df, ok := pool.(interface{ Dump() interface{} }); ok {
+		kc.opt.DebugService.RegisterProbeFunc(diagnosis.ConnPoolKey, df.Dump)
+	}
+	if r, ok := pool.(remote.ConnPoolReporter); ok && kc.opt.RemoteOpt.EnableConnPoolReporter {
+		r.EnableReporter()
+	}
+
+	if long, ok := pool.(remote.LongConnPool); ok {
+		kc.opt.Bus.Watch(discovery.ChangeEventName, func(ev *event.Event) {
+			ch, ok := ev.Extra.(*discovery.Change)
+			if !ok {
+				return
+			}
+			for _, inst := range ch.Removed {
+				if addr := inst.Address(); addr != nil {
+					long.Clean(addr.Network(), addr.String())
+				}
+			}
+		})
+	}
+	return nil
+}
+
 func (kc *kClient) initLBCache() error {
 	if kc.opt.Proxy != nil && kc.opt.Resolver == nil {
 		return nil
@@ -226,7 +262,7 @@ func (kc *kClient) initMiddlewares(ctx context.Context) {
 	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
 		kc.mws = append(kc.mws, kc.opt.XDSRouterMiddleware)
 	}
-	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW(), rpcTimeoutMW(ctx))
+	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW(), rpcTimeoutMW(ctx), contextMW)
 	kc.mws = append(kc.mws, builderMWs...)
 	kc.mws = append(kc.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
 	if kc.opt.Proxy == nil {
@@ -330,6 +366,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 			err := kc.eps(ctx, request, response)
 			kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 			if err == nil {
+				err = ri.Invocation().BizStatusErr()
 				rpcinfo.PutRPCInfo(ri)
 			}
 			return err
@@ -357,6 +394,9 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 
 	kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 	callOpts.Recycle()
+	if err == nil {
+		err = ri.Invocation().BizStatusErr()
+	}
 	if recycleRI {
 		// why need check recycleRI to decide if recycle RPCInfo?
 		// 1. no retry, rpc timeout happen will cause panic when response return
@@ -380,21 +420,14 @@ func (kc *kClient) initDebugService() {
 
 func (kc *kClient) richRemoteOption() {
 	kc.opt.RemoteOpt.SvcInfo = kc.svcInfo
-	// add default meta handler
-	if len(kc.opt.MetaHandlers) == 0 {
-		if kc.opt.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
-			kc.opt.MetaHandlers = append(kc.opt.MetaHandlers, transmeta.ClientHTTP2Handler)
-		}
-		if kc.opt.Configs.TransportProtocol()&transport.TTHeader == transport.TTHeader {
-			kc.opt.MetaHandlers = append(kc.opt.MetaHandlers, transmeta.ClientTTHeaderHandler)
-		}
-	}
 	// for client trans info handler
-	// TODO in stream situations, meta is only assembled when the stream creates
-	// metaHandler needs to be called separately.
-	// (newClientStreamer: call WriteMeta before remotecli.NewClient)
-	transInfoHdlr := bound.NewTransMetaHandler(kc.opt.MetaHandlers)
-	kc.opt.RemoteOpt.PrependBoundHandler(transInfoHdlr)
+	if len(kc.opt.MetaHandlers) > 0 {
+		// TODO in stream situations, meta is only assembled when the stream creates
+		// metaHandler needs to be called separately.
+		// (newClientStreamer: call WriteMeta before remotecli.NewClient)
+		transInfoHdlr := bound.NewTransMetaHandler(kc.opt.MetaHandlers)
+		kc.opt.RemoteOpt.PrependBoundHandler(transInfoHdlr)
+	}
 }
 
 func (kc *kClient) buildInvokeChain() error {
@@ -461,7 +494,7 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 // Close is not concurrency safe.
 func (kc *kClient) Close() error {
 	if kc.closed {
-		panic("client is already closed")
+		return nil
 	}
 	kc.closed = true
 	var errs utils.ErrChain
@@ -475,7 +508,6 @@ func (kc *kClient) Close() error {
 			errs.Append(err)
 		}
 	}
-	runtime.SetFinalizer(kc, nil)
 	if errs.HasError() {
 		return errs
 	}

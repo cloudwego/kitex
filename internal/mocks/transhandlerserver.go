@@ -47,9 +47,9 @@ type MockSvrTransHandler struct {
 
 	OnReadFunc func(ctx context.Context, conn net.Conn) error
 
-	WriteFunc func(ctx context.Context, conn net.Conn, send remote.Message) error
+	WriteFunc func(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error)
 
-	ReadFunc func(ctx context.Context, conn net.Conn, msg remote.Message) error
+	ReadFunc func(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error)
 }
 
 // OnRead implements the remote.TransHandler interface.
@@ -61,7 +61,7 @@ func (t *MockSvrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err er
 }
 
 // Write implements the remote.TransHandler interface.
-func (t *MockSvrTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (err error) {
+func (t *MockSvrTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error) {
 	if t.WriteFunc != nil {
 		return t.WriteFunc(ctx, conn, send)
 	}
@@ -69,7 +69,7 @@ func (t *MockSvrTransHandler) Write(ctx context.Context, conn net.Conn, send rem
 }
 
 // Read implements the remote.TransHandler interface.
-func (t *MockSvrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
+func (t *MockSvrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	if t.ReadFunc != nil {
 		return t.ReadFunc(ctx, conn, msg)
 	}

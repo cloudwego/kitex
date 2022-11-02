@@ -72,22 +72,22 @@ type svrTransHandler struct {
 	codec      remote.Codec
 }
 
-func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
+func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	buf := newBuffer(conn.(*serverConn))
 	defer buf.Release(err)
 
 	if err = t.codec.Encode(ctx, msg, buf); err != nil {
-		return err
+		return ctx, err
 	}
-	return buf.Flush()
+	return ctx, buf.Flush()
 }
 
-func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
+func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	buf := newBuffer(conn.(*serverConn))
 	defer buf.Release(err)
 
 	err = t.codec.Decode(ctx, msg, buf)
-	return
+	return ctx, err
 }
 
 // 只 return write err
@@ -162,6 +162,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			st := NewStream(rCtx, t.svcInfo, newServerConn(tr, s), t)
 			streamArg := &streaming.Args{Stream: st}
 
+			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
+			rCtx = context.WithValue(rCtx, streamKey{}, st)
+
 			// check grpc method
 			targetMethod := t.svcInfo.MethodInfo(methodName)
 			if targetMethod == nil {
@@ -182,6 +185,17 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			if err != nil {
 				tr.WriteStatus(s, convertStatus(err))
 				t.OnError(rCtx, err, conn)
+				return
+			}
+			if bizStatusErr := ri.Invocation().BizStatusErr(); bizStatusErr != nil {
+				var st *status.Status
+				if sterr, ok := bizStatusErr.(status.Iface); ok {
+					st = sterr.GRPCStatus()
+				} else {
+					st = status.New(codes.Internal, bizStatusErr.BizMessage())
+				}
+				s.SetBizStatusErr(bizStatusErr)
+				tr.WriteStatus(s, st)
 				return
 			}
 			tr.WriteStatus(s, status.New(codes.OK, ""))

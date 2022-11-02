@@ -61,6 +61,28 @@ func TestMapThriftGeneric(t *testing.T) {
 	test.Assert(t, method.Name == "Test")
 }
 
+func TestMapThriftGenericForJSON(t *testing.T) {
+	p, err := NewThriftFileProvider("./map_test/idl/mock.thrift")
+	test.Assert(t, err == nil)
+
+	// new
+	g, err := MapThriftGenericForJSON(p)
+	test.Assert(t, err == nil)
+	defer g.Close()
+
+	test.Assert(t, g.PayloadCodec().Name() == "MapThrift")
+
+	err = SetBinaryWithBase64(g, true)
+	test.Assert(t, strings.Contains(err.Error(), "Base64Binary is unavailable"))
+	test.Assert(t, g.Framed() == false)
+
+	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
+
+	method, err := g.GetMethod(nil, "Test")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
+}
+
 func TestHTTPThriftGeneric(t *testing.T) {
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)

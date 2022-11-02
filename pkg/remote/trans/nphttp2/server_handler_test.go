@@ -44,11 +44,13 @@ func TestServerHandler(t *testing.T) {
 	// test Read()
 	// mock grpc encoded msg data into stream recv buffer
 	newMockStreamRecvHelloRequest(s)
-	err = handler.Read(context.Background(), serverConn, msg)
+	ctx, err := handler.Read(context.Background(), serverConn, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	// test write()
-	err = handler.Write(context.Background(), serverConn, msg)
+	ctx, err = handler.Write(context.Background(), serverConn, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 
 	// test SetInvokeHandleFunc()

@@ -30,6 +30,7 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mockslimiter "github.com/cloudwego/kitex/internal/mocks/limiter"
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -382,10 +383,10 @@ func TestServerBoundHandler(t *testing.T) {
 		},
 		{
 			opts: []Option{
-				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
+				WithConnectionLimiter(mockslimiter.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), &limiter.DummyRateLimiter{}, nil, false),
+				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), &limiter.DummyRateLimiter{}, nil, false),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -394,10 +395,10 @@ func TestServerBoundHandler(t *testing.T) {
 		},
 		{
 			opts: []Option{
-				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
+				WithQPSLimiter(mockslimiter.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(&limiter.DummyConcurrencyLimiter{}, mocks.NewMockRateLimiter(ctrl), nil, true),
+				bound.NewServerLimiterHandler(&limiter.DummyConcurrencyLimiter{}, mockslimiter.NewMockRateLimiter(ctrl), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -406,27 +407,11 @@ func TestServerBoundHandler(t *testing.T) {
 		},
 		{
 			opts: []Option{
-				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
-				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
+				WithConnectionLimiter(mockslimiter.NewMockConcurrencyLimiter(ctrl)),
+				WithQPSLimiter(mockslimiter.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), mocks.NewMockRateLimiter(ctrl), nil, true),
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
-			},
-			wantOutbounds: []remote.OutboundHandler{
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
-			},
-		},
-		{
-			opts: []Option{
-				WithLimit(&limit.Option{
-					MaxConnections: 1000,
-					MaxQPS:         10000,
-				}),
-				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
-			},
-			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), limiter.NewQPSLimiter(interval, 10000), nil, false),
+				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -439,11 +424,10 @@ func TestServerBoundHandler(t *testing.T) {
 					MaxConnections: 1000,
 					MaxQPS:         10000,
 				}),
-				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
-				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
+				WithConnectionLimiter(mockslimiter.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), mocks.NewMockRateLimiter(ctrl), nil, true),
+				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), limiter.NewQPSLimiter(interval, 10000), nil, false),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
@@ -456,12 +440,29 @@ func TestServerBoundHandler(t *testing.T) {
 					MaxConnections: 1000,
 					MaxQPS:         10000,
 				}),
-				WithConnectionLimiter(mocks.NewMockConcurrencyLimiter(ctrl)),
-				WithQPSLimiter(mocks.NewMockRateLimiter(ctrl)),
+				WithConnectionLimiter(mockslimiter.NewMockConcurrencyLimiter(ctrl)),
+				WithQPSLimiter(mockslimiter.NewMockRateLimiter(ctrl)),
+			},
+			wantInbounds: []remote.InboundHandler{
+				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+			wantOutbounds: []remote.OutboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+			},
+		},
+		{
+			opts: []Option{
+				WithLimit(&limit.Option{
+					MaxConnections: 1000,
+					MaxQPS:         10000,
+				}),
+				WithConnectionLimiter(mockslimiter.NewMockConcurrencyLimiter(ctrl)),
+				WithQPSLimiter(mockslimiter.NewMockRateLimiter(ctrl)),
 				WithMuxTransport(),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(mocks.NewMockConcurrencyLimiter(ctrl), mocks.NewMockRateLimiter(ctrl), nil, true),
+				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{

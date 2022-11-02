@@ -24,6 +24,7 @@ import (
 	"github.com/bytedance/gopkg/util/gopool"
 
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/profiler"
 )
 
 // GoTask is used to spawn a new task.
@@ -34,7 +35,11 @@ var GoFunc GoTask
 
 func init() {
 	GoFunc = func(ctx context.Context, f func()) {
-		gopool.CtxGo(ctx, f)
+		gopool.CtxGo(ctx, func() {
+			profiler.Tag(ctx)
+			f()
+			profiler.Untag(ctx)
+		})
 	}
 }
 

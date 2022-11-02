@@ -86,7 +86,7 @@ func (c *client) init(handler remote.TransHandler, cm *ConnWrapper, conn net.Con
 
 // Send is blocked.
 func (c *client) Send(ctx context.Context, ri rpcinfo.RPCInfo, req remote.Message) (err error) {
-	err = c.transHdlr.Write(ctx, c.conn, req)
+	_, err = c.transHdlr.Write(ctx, c.conn, req)
 	if err != nil {
 		c.connManager.ReleaseConn(err, ri)
 	}
@@ -97,7 +97,7 @@ func (c *client) Send(ctx context.Context, ri rpcinfo.RPCInfo, req remote.Messag
 func (c *client) Recv(ctx context.Context, ri rpcinfo.RPCInfo, resp remote.Message) (err error) {
 	// resp is nil means oneway
 	if resp != nil {
-		err = c.transHdlr.Read(ctx, c.conn, resp)
+		ctx, err = c.transHdlr.Read(ctx, c.conn, resp)
 		c.transHdlr.OnMessage(ctx, nil, resp)
 	} else {
 		// Wait for the request to be flushed out before closing the connection.

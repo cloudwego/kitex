@@ -16,12 +16,19 @@
 
 package wpool
 
+/* Difference between wpool and gopool(github.com/bytedance/gopkg/util/gopool):
+- wpool is a goroutine pool with high reuse rate. The old goroutine will block to wait for new tasks coming.
+- gopool sometimes will have a very low reuse rate. The old goroutine will not block if no new task coming.
+*/
+
 import (
+	"context"
 	"runtime/debug"
 	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/profiler"
 )
 
 // Task is the function that the worker will execute.
@@ -55,6 +62,11 @@ func (p *Pool) Size() int32 {
 
 // Go creates/reuses a worker to run task.
 func (p *Pool) Go(task Task) {
+	p.GoCtx(context.Background(), task)
+}
+
+// GoCtx creates/reuses a worker to run task.
+func (p *Pool) GoCtx(ctx context.Context, task Task) {
 	select {
 	case p.tasks <- task:
 		// reuse exist worker
@@ -71,7 +83,11 @@ func (p *Pool) Go(task Task) {
 			}
 			atomic.AddInt32(&p.size, -1)
 		}()
+
+		profiler.Tag(ctx)
 		task()
+		profiler.Untag(ctx)
+
 		if atomic.LoadInt32(&p.size) > p.maxIdle {
 			return
 		}
@@ -81,7 +97,9 @@ func (p *Pool) Go(task Task) {
 		for {
 			select {
 			case task = <-p.tasks:
+				profiler.Tag(ctx)
 				task()
+				profiler.Untag(ctx)
 			case <-idleTimer.C:
 				// worker exits
 				return

@@ -44,30 +44,34 @@ type MockCliTransHandler struct {
 	opt       *remote.ClientOption
 	transPipe *remote.TransPipeline
 
-	WriteFunc func(ctx context.Context, conn net.Conn, send remote.Message) error
+	WriteFunc func(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error)
 
-	ReadFunc func(ctx context.Context, conn net.Conn, msg remote.Message) error
+	ReadFunc func(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error)
+
+	OnMessageFunc func(ctx context.Context, args, result remote.Message) (context.Context, error)
 }
 
 // Write implements the remote.TransHandler interface.
-func (t *MockCliTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (err error) {
+func (t *MockCliTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error) {
 	if t.WriteFunc != nil {
 		return t.WriteFunc(ctx, conn, send)
 	}
-	return
+	return ctx, nil
 }
 
 // Read implements the remote.TransHandler interface.
-func (t *MockCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (err error) {
+func (t *MockCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	if t.ReadFunc != nil {
 		return t.ReadFunc(ctx, conn, msg)
 	}
-	return
+	return ctx, nil
 }
 
 // OnMessage implements the remote.TransHandler interface.
 func (t *MockCliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
-	// do nothing
+	if t.OnMessageFunc != nil {
+		return t.OnMessageFunc(ctx, args, result)
+	}
 	return ctx, nil
 }
 

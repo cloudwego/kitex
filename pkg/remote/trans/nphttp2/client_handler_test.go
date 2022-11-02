@@ -38,10 +38,11 @@ func TestClientHandler(t *testing.T) {
 
 	// test Read()
 	newMockStreamRecvHelloRequest(conn.(*clientConn).s)
-	err = cliTransHandler.Read(ctx, conn, msg)
+	ctx, err = cliTransHandler.Read(ctx, conn, msg)
 	test.Assert(t, err == nil, err)
 
 	// test write()
-	err = cliTransHandler.Write(ctx, conn, msg)
+	ctx, err = cliTransHandler.Write(ctx, conn, msg)
+	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
 }

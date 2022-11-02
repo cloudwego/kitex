@@ -43,7 +43,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
-	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
 // Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
@@ -208,6 +207,17 @@ func (s *server) Run() (err error) {
 		return err
 	}
 
+	// start profiler
+	if s.opt.RemoteOpt.Profiler != nil {
+		go func() {
+			klog.Info("KITEX: server starting profiler")
+			err := s.opt.RemoteOpt.Profiler.Run(context.Background())
+			if err != nil {
+				klog.Errorf("KITEX: server started profiler error: error=%s", err.Error())
+			}
+		}()
+	}
+
 	errCh := s.svr.Start()
 	select {
 	case err = <-errCh:
@@ -279,6 +289,12 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		internal_stats.Record(ctx, ri, stats.ServerHandleStart, nil)
 		err = implHandlerFunc(ctx, s.handler, args, resp)
 		if err != nil {
+			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
+				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+					setter.SetBizStatusErr(bizErr)
+					return nil
+				}
+			}
 			err = kerrors.ErrBiz.WithCause(err)
 		}
 		return err
@@ -300,18 +316,21 @@ func (s *server) richRemoteOption() {
 }
 
 func (s *server) addBoundHandlers(opt *remote.ServerOption) {
-	// add default meta handler
-	if len(s.opt.MetaHandlers) == 0 {
-		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerHTTP2Handler)
-		s.opt.MetaHandlers = append(s.opt.MetaHandlers, transmeta.ServerTTHeaderHandler)
+	// add profiler meta handler, which should be exec after other MetaHandlers
+	if opt.Profiler != nil && opt.ProfilerMessageTagging != nil {
+		s.opt.MetaHandlers = append(s.opt.MetaHandlers,
+			remote.NewProfilerMetaHandler(opt.Profiler, opt.ProfilerMessageTagging),
+		)
 	}
 	// for server trans info handler
-	transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
-	// meta handler exec before boundHandlers which add with option
-	doAddBoundHandlerToHead(transInfoHdlr, opt)
-	for _, h := range s.opt.MetaHandlers {
-		if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
-			opt.StreamingMetaHandlers = append(opt.StreamingMetaHandlers, shdlr)
+	if len(s.opt.MetaHandlers) > 0 {
+		transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
+		// meta handler exec before boundHandlers which add with option
+		doAddBoundHandlerToHead(transInfoHdlr, opt)
+		for _, h := range s.opt.MetaHandlers {
+			if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
+				opt.StreamingMetaHandlers = append(opt.StreamingMetaHandlers, shdlr)
+			}
 		}
 	}
 

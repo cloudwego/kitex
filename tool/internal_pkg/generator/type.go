@@ -41,22 +41,29 @@ type PackageInfo struct {
 	NoFastAPI        bool
 	Version          string
 	RealServiceName  string
-	Imports          map[string]string // import path => alias
+	Imports          map[string]map[string]bool // import path => alias
 	ExternalKitexGen string
 	Features         []feature
+	FrugalPretouch   bool
 }
 
 // AddImport .
 func (p *PackageInfo) AddImport(pkg, path string) {
+	if p.Imports == nil {
+		p.Imports = make(map[string]map[string]bool)
+	}
 	if pkg != "" {
 		if p.ExternalKitexGen != "" && strings.Contains(path, KitexGenPath) {
 			parts := strings.Split(path, KitexGenPath)
 			path = filepath.Join(p.ExternalKitexGen, parts[len(parts)-1])
 		}
 		if path == pkg {
-			p.Imports[path] = ""
+			p.Imports[path] = nil
 		} else {
-			p.Imports[path] = pkg
+			if p.Imports[path] == nil {
+				p.Imports[path] = make(map[string]bool)
+			}
+			p.Imports[path][pkg] = true
 		}
 	}
 }
@@ -138,17 +145,21 @@ var funcs = map[string]interface{}{
 var templateNames = []string{
 	"@client.go-NewClient-option",
 	"@client.go-EOF",
-	"@invoker.go-NewInvoker-option",
-	"@invoker.go-EOF",
 	"@server.go-NewServer-option",
 	"@server.go-EOF",
+	"@invoker.go-NewInvoker-option",
+	"@invoker.go-EOF",
+}
+
+func wrapTemplate(point, content string) string {
+	return fmt.Sprintf(`{{define "%s"}}%s{{end}}`, point, content)
 }
 
 var templateExtensions = (func() map[string]string {
 	m := make(map[string]string)
 	for _, name := range templateNames {
 		// create dummy templates
-		m[name] = fmt.Sprintf(`{{define "%s"}}{{end}}`, name)
+		m[name] = wrapTemplate(name, "")
 	}
 	return m
 })()
@@ -160,12 +171,25 @@ func SetTemplateExtension(name, text string) {
 	}
 }
 
+func applyExtension(name string, x *template.Template) (*template.Template, error) {
+	var err error
+	for _, n := range templateNames {
+		x, err = x.Parse(templateExtensions[n])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse extension %q for %s: %w (%#q)",
+				n, name, err, templateExtensions[n])
+		}
+	}
+	return x, nil
+}
+
 // Task .
 type Task struct {
 	Name string
 	Path string
 	Text string
 	*template.Template
+	Ext *APIExtension
 }
 
 // Build .
@@ -174,15 +198,47 @@ func (t *Task) Build() error {
 	if err != nil {
 		return err
 	}
-	for _, n := range templateNames {
-		x, err = x.Parse(templateExtensions[n])
-		if err != nil {
-			return fmt.Errorf("failed to parse extension %q for %s: %w (%#q)",
-				n, t.Name, err, templateExtensions[n])
+	// old fashion
+	x, err = applyExtension(t.Name, x)
+	if err != nil {
+		return err
+	}
+	// new fashion
+	for _, str := range t.makeExtension() {
+		if x, err = x.Parse(str); err != nil {
+			return err
 		}
 	}
+
 	t.Template = x
 	return nil
+}
+
+func fileTemplateExtension(name string) (option, eof string) {
+	for _, tn := range templateNames {
+		if strings.HasPrefix(tn, "@"+name+"-") {
+			if strings.HasSuffix(tn, "-option") {
+				option = tn
+			} else if strings.HasSuffix(tn, "-EOF") {
+				eof = tn
+			}
+		}
+	}
+	return
+}
+
+func (t *Task) makeExtension() (res []string) {
+	if t.Ext == nil {
+		return
+	}
+	p1, p2 := fileTemplateExtension(t.Name)
+	if t.Ext.ExtendOption != "" {
+		res = append(res, wrapTemplate(p1, t.Ext.ExtendOption))
+	}
+	if t.Ext.ExtendFile != "" {
+		res = append(res, wrapTemplate(p2, t.Ext.ExtendFile))
+	}
+	return
 }
 
 // Render .
