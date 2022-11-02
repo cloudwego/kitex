@@ -104,7 +104,7 @@ type pool struct {
 	maxIdleTimeout time.Duration // the idle connection will be cleaned if the idle time exceeds maxIdleTimeout.
 }
 
-// Get gets the first active connection from the idleList.
+// Get gets the first active connection from the idleList. Return the number of connections decreased during the Get.
 func (p *pool) Get() (*longConn, bool, int) {
 	p.mu.Lock()
 	// Get the first active one
