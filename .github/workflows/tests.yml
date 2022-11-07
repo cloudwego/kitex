@@ -12,11 +12,11 @@ jobs:
         with:
           go-version: '1.16'
       - name: Unit Test
-        run: go test -gcflags all=-N -l -race -covermode=atomic -coverprofile=coverage.txt ./...
+        run: go test -gcflags=-l -race -covermode=atomic -coverprofile=coverage.txt ./...
       - name: Codecov
         run: bash <(curl -s https://codecov.io/bash)
       - name: Benchmark
-        run: go test -gcflags all=-N -l -bench=. -benchmem -run=none ./...
+        run: go test -gcflags='all=-N -l' -bench=. -benchmem -run=none ./...
 
   compatibility-test:
     strategy:
@@ -31,7 +31,7 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
       - name: Unit Test
-        run: go test -gcflags all=-N -l -race -covermode=atomic -coverprofile=coverage.txt ./...
+        run: go test -gcflags=-l -race -covermode=atomic -coverprofile=coverage.txt ./...
 
   scenario-test:
     strategy:
