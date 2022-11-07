@@ -10,6 +10,8 @@ English | [中文](README_cn.md)
 [![ClosedIssue](https://img.shields.io/github/issues-closed/cloudwego/kitex)](https://github.com/cloudwego/kitex/issues?q=is%3Aissue+is%3Aclosed)
 ![Stars](https://img.shields.io/github/stars/cloudwego/kitex)
 ![Forks](https://img.shields.io/github/forks/cloudwego/kitex)
+[![Slack](https://img.shields.io/badge/slack-join_chat-success.svg?logo=slack)](https://cloudwego.slack.com/join/shared_invite/zt-tmcbzewn-UjXMF3ZQsPhl7W3tEDZboA)
+
 
 Kitex [kaɪt'eks] is a **high-performance** and **strong-extensibility** Golang RPC framework that helps developers build microservices. If the performance and extensibility are the main concerns when you develop microservices, Kitex can be a good choice.
 
@@ -107,6 +109,7 @@ Kitex is distributed under the [Apache License, version 2.0](https://github.com/
 - Email: [conduct@cloudwego.io](conduct@cloudwego.io)
 - How to become a member: [COMMUNITY MEMBERSHIP](https://github.com/cloudwego/community/blob/main/COMMUNITY_MEMBERSHIP.md)
 - Issues: [Issues](https://github.com/cloudwego/kitex/issues)
+- Slack: Join our CloudWeGo community [Slack Channel](https://join.slack.com/t/cloudwego/shared_invite/zt-tmcbzewn-UjXMF3ZQsPhl7W3tEDZboA).
 - Lark: Scan the QR code below with [Lark](https://www.larksuite.com/zh_cn/download) to join our CloudWeGo/kitex user group.
 
   ![LarkGroup](images/lark_group.png)
