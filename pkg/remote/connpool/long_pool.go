@@ -67,11 +67,10 @@ func (c *longConn) RawConn() net.Conn {
 // IsActive indicates whether the connection is active.
 func (c *longConn) IsActive() bool {
 	if conn, ok := c.Conn.(remote.IsActive); ok {
-		if conn.IsActive() {
-			return true
-		}
+		return conn.IsActive()
+	} else {
+		return time.Now().Before(c.deadline)
 	}
-	return false
 }
 
 // Expired checks the deadline of the connection.
