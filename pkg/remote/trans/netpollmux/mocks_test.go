@@ -207,6 +207,7 @@ type MockNetpollConn struct {
 	SetIdleTimeoutFunc   func(timeout time.Duration) (e error)
 	SetOnRequestFunc     func(on netpoll.OnRequest) (e error)
 	SetReadTimeoutFunc   func(timeout time.Duration) (e error)
+	SetWriteTimeoutFunc  func(timeout time.Duration) (e error)
 }
 
 // AddCloseCallback implements the netpoll.Connection interface.
@@ -261,6 +262,14 @@ func (m *MockNetpollConn) SetOnRequest(on netpoll.OnRequest) (e error) {
 func (m *MockNetpollConn) SetReadTimeout(timeout time.Duration) (e error) {
 	if m.SetReadTimeoutFunc != nil {
 		return m.SetReadTimeoutFunc(timeout)
+	}
+	return
+}
+
+// SetWriteTimeout implements the netpoll.Connection interface.
+func (m *MockNetpollConn) SetWriteTimeout(timeout time.Duration) (e error) {
+	if m.SetWriteTimeoutFunc != nil {
+		return m.SetWriteTimeoutFunc(timeout)
 	}
 	return
 }
