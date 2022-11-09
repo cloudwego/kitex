@@ -20,10 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime/debug"
 
 	"github.com/apache/thrift/lib/go/thrift"
 
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
@@ -69,13 +71,37 @@ type thriftCodec struct {
 }
 
 // Marshal implements the remote.PayloadCodec interface.
-func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
+func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
+	var fastWrite = c.CodecType&FastWrite != 0
+	var data interface{}
+	var msgBLength int
+	defer func() {
+		panicInfo := recover()
+		if panicInfo == nil || data == nil || err != nil {
+			return
+		}
+		stack := debug.Stack()
+		if fastWrite {
+			fastMsg, ok := data.(thriftMsgFastCodec)
+			if !ok {
+				return
+			}
+			newMsgBLength := fastMsg.BLength()
+			err = kerrors.ErrCodec.WithCauseAndStack(
+				fmt.Errorf("[%s] blength (%d)=>(%d)", panicInfo, msgBLength, newMsgBLength), string(stack),
+			)
+		} else {
+			err = kerrors.ErrCodec.WithCauseAndStack(
+				fmt.Errorf("[%s]", panicInfo), string(stack),
+			)
+		}
+	}()
 	// 1. prepare info
 	methodName := message.RPCInfo().Invocation().MethodName()
 	if methodName == "" {
 		return errors.New("empty methodName in thrift Marshal")
 	}
-	data, err := getValidData(methodName, message)
+	data, err = getValidData(methodName, message)
 	if err != nil {
 		return err
 	}
@@ -93,13 +119,14 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	msgType := message.MessageType()
 	seqID := message.RPCInfo().Invocation().SeqID()
 	// encode with FastWrite
-	if c.CodecType&FastWrite != 0 {
+	if fastWrite {
 		nw, nwOk := out.(remote.NocopyWrite)
 		if msg, ok := data.(thriftMsgFastCodec); ok && nwOk {
 			// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
 			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
 			msgEndLen := bthrift.Binary.MessageEndLength()
-			buf, err := out.Malloc(msgBeginLen + msg.BLength() + msgEndLen)
+			msgBLength = msg.BLength()
+			buf, err := out.Malloc(msgBeginLen + msgBLength + msgEndLen)
 			if err != nil {
 				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
 			}

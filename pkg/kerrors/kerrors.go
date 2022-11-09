@@ -38,6 +38,7 @@ var (
 	ErrOverlimit         = &basicError{"request over limit"}
 	ErrPanic             = &basicError{"panic"}
 	ErrBiz               = &basicError{"biz error"}
+	ErrCodec             = &basicError{"codec error"}
 
 	ErrRetry = &basicError{"retry error"}
 	// ErrRPCFinish happens when retry enabled and there is one call has finished
