@@ -94,7 +94,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Generate invoker side codes when service name is specified.")
 	f.StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")
 	f.Var(&a.Includes, "I", "Add an IDL search path for includes.")
-	f.Var(&a.ThriftOptions, "thrift", "Specify arguments for the thrift compiler.")
+	f.Var(&a.ThriftOptions, "thrift", "Specify arguments for the thrift go compiler.")
+	f.DurationVar(&a.ThriftPluginTimeLimit, "thrift-plugin-time-limit", generator.DefaultThriftPluginTimeLimit, "Specify thrift plugin execution time limit.")
 	f.Var(&a.ThriftPlugins, "thrift-plugin", "Specify thrift plugin arguments for the thrift compiler.")
 	f.Var(&a.ProtobufOptions, "protobuf", "Specify arguments for the protobuf compiler.")
 	f.BoolVar(&a.CombineService, "combine-service", false,
@@ -377,6 +378,11 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 			"-g", gas,
 			"-p", "kitex="+exe+":"+kas,
 		)
+		if a.ThriftPluginTimeLimit != generator.DefaultThriftPluginTimeLimit {
+			cmd.Args = append(cmd.Args,
+				"--plugin-time-limit", a.ThriftPluginTimeLimit.String(),
+			)
+		}
 		for _, p := range a.ThriftPlugins {
 			cmd.Args = append(cmd.Args, "-p", p)
 		}
