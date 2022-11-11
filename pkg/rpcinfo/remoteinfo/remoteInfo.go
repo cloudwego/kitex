@@ -33,6 +33,7 @@ type RemoteInfo interface {
 	rpcinfo.EndpointInfo
 	SetServiceName(name string)
 	SetTag(key, value string) error
+	ForceSetTag(key, value string)
 
 	// SetTagLock freezes a key of the tags and refuses further modification on its value.
 	SetTagLock(key string)
@@ -162,6 +163,13 @@ func (ri *remoteInfo) SetTag(key, value string) error {
 	}
 	ri.tags[key] = value
 	return nil
+}
+
+// ForceSetTag is used to set Tag without tag lock.
+func (ri *remoteInfo) ForceSetTag(key, value string) {
+	ri.Lock()
+	defer ri.Unlock()
+	ri.tags[key] = value
 }
 
 // ImmutableView implements rpcinfo.MutableEndpointInfo.
