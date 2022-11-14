@@ -63,6 +63,10 @@ func (m *mockNetpollConn) SetReadTimeout(timeout time.Duration) error {
 	return nil
 }
 
+func (m *mockNetpollConn) SetWriteTimeout(timeout time.Duration) error {
+	return nil
+}
+
 func (m *mockNetpollConn) SetIdleTimeout(timeout time.Duration) error {
 	return nil
 }
