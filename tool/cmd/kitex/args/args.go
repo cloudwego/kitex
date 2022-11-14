@@ -251,7 +251,7 @@ func (a *Arguments) checkPath() {
 	a.OutputPath = curpath
 }
 
-func runGitCommand(a *Arguments, gitLink string) (string, string, error) {
+func RunGitCommand(a *Arguments, gitLink string) (string, string, error) {
 	u, err := user.Current()
 	if err != nil {
 		return "", "Failed to get home dir", err
@@ -283,7 +283,7 @@ func runGitCommand(a *Arguments, gitLink string) (string, string, error) {
 	}
 	gitPath := filepath.Join(cachePath, repoLink+branchSuffix)
 
-	_, err = os.Stat(gitPath)
+	_, err = os.Stat(filepath.Join(gitPath, ".git"))
 	if err != nil && !os.IsExist(err) {
 		err = os.MkdirAll(gitPath, os.ModePerm)
 		if err != nil {
@@ -339,7 +339,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 
 	for i, inc := range a.Includes {
 		if strings.HasPrefix(inc, "git@") || strings.HasPrefix(inc, "http://") || strings.HasPrefix(inc, "https://") {
-			localGitPath, errMsg, gitErr := runGitCommand(a, inc)
+			localGitPath, errMsg, gitErr := RunGitCommand(a, inc)
 			if gitErr != nil {
 				if errMsg == "" {
 					errMsg = gitErr.Error()
