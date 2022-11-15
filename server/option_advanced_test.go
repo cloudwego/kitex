@@ -162,7 +162,7 @@ func TestWithBoundHandler(t *testing.T) {
 	opts = internal_server.NewOptions([]internal_server.Option{
 		WithBoundHandler(mockOutboundHandler), WithBoundHandler(mockOutboundHandler2), WithBoundHandler(mockOutboundHandler),
 	})
-	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 2)
+	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 1)
 	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 0)
 
 	mockDuplexBoundHandler := mock_remote.NewMockDuplexBoundHandler(ctrl)

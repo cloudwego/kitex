@@ -21,6 +21,7 @@ package client
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -210,14 +211,14 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 		switch handler := h.(type) {
 		case remote.InboundHandler:
 			for _, inboundHandler := range o.RemoteOpt.Inbounds {
-				if inboundHandler == handler {
+				if reflect.DeepEqual(inboundHandler, handler) {
 					exist = true
 					break
 				}
 			}
 		case remote.OutboundHandler:
 			for _, outboundHandler := range o.RemoteOpt.Outbounds {
-				if outboundHandler == handler {
+				if reflect.DeepEqual(outboundHandler, handler) {
 					exist = true
 					break
 				}
