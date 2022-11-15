@@ -153,24 +153,17 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 		di.Push(fmt.Sprintf("AddBoundHandler(%T)", h))
 
 		exist := false
-		switch h.(type) {
+		switch handler := h.(type) {
 		case remote.InboundHandler:
 			for _, inboundHandler := range o.RemoteOpt.Inbounds {
-				if inboundHandler == h.(remote.InboundHandler) {
+				if inboundHandler == handler {
 					exist = true
 					break
 				}
 			}
 		case remote.OutboundHandler:
 			for _, outboundHandler := range o.RemoteOpt.Outbounds {
-				if outboundHandler == h.(remote.OutboundHandler) {
-					exist = true
-					break
-				}
-			}
-		case remote.DuplexBoundHandler:
-			for _, duplexboundHandler := range o.RemoteOpt.Inbounds {
-				if duplexboundHandler == h.(remote.DuplexBoundHandler) {
+				if outboundHandler == handler {
 					exist = true
 					break
 				}
