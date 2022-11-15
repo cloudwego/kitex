@@ -147,9 +147,22 @@ func TestWithBoundHandler(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockOutboundHandler := mock_remote.NewMockOutboundHandler(ctrl)
-	opts := internal_server.NewOptions([]internal_server.Option{WithBoundHandler(mockOutboundHandler)})
+	mockInboundHandler := mock_remote.NewMockInboundHandler(ctrl)
+	opts := internal_server.NewOptions([]internal_server.Option{WithBoundHandler(mockInboundHandler)})
+	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 0)
+	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 1)
 
+	opts = internal_server.NewOptions([]internal_server.Option{WithBoundHandler(mockInboundHandler), WithBoundHandler(mockInboundHandler)})
+	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 0)
+	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 1)
+
+	mockInboundHandler2 := mock_remote.NewMockInboundHandler(ctrl)
+	opts = internal_server.NewOptions([]internal_server.Option{WithBoundHandler(mockInboundHandler), WithBoundHandler(mockInboundHandler2)})
+	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 0)
+	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 1)
+
+	mockOutboundHandler := mock_remote.NewMockOutboundHandler(ctrl)
+	opts = internal_server.NewOptions([]internal_server.Option{WithBoundHandler(mockOutboundHandler)})
 	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 1)
 	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 0)
 
