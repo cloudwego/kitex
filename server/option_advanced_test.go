@@ -23,7 +23,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/internal/mocks"
+	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -137,6 +140,30 @@ func TestBoundHandlerOptionPanic(t *testing.T) {
 	test.Panic(t, func() {
 		NewServer(WithBoundHandler(nil))
 	})
+}
+
+// TestWithBoundHandler tests the creation of a server with remote.BoundHandler option, if there are duplicate bound handlers, avoid creating an option
+func TestWithBoundHandler(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockOutboundHandler := mock_remote.NewMockOutboundHandler(ctrl)
+	opts := internal_server.NewOptions([]internal_server.Option{WithBoundHandler(mockOutboundHandler)})
+
+	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 1)
+	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 0)
+
+	opts = internal_server.NewOptions(
+		[]internal_server.Option{WithBoundHandler(mockOutboundHandler), WithBoundHandler(mockOutboundHandler)})
+	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 1)
+	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 0)
+
+	mockOutboundHandler2 := mock_remote.NewMockOutboundHandler(ctrl)
+	opts = internal_server.NewOptions([]internal_server.Option{
+		WithBoundHandler(mockOutboundHandler), WithBoundHandler(mockOutboundHandler2), WithBoundHandler(mockOutboundHandler),
+	})
+	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 2)
+	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 0)
 }
 
 // TestExitSignalOption tests the creation of a server with ExitSignal option

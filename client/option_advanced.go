@@ -206,6 +206,23 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("AddBoundHandler(%T)", h))
 
-		o.RemoteOpt.AppendBoundHandler(h)
+		existInbound := false
+		existOutbound := false
+		for _, inboundHandler := range o.RemoteOpt.Inbounds {
+			if inboundHandler == h.(remote.InboundHandler) {
+				existInbound = true
+				break
+			}
+		}
+		for _, outboundHandler := range o.RemoteOpt.Outbounds {
+			if outboundHandler == h.(remote.OutboundHandler) {
+				existOutbound = true
+				break
+			}
+		}
+		// prevent duplication
+		if !existInbound && !existOutbound {
+			o.RemoteOpt.AppendBoundHandler(h)
+		}
 	}}
 }

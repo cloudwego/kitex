@@ -558,7 +558,18 @@ func TestWithBoundHandler(t *testing.T) {
 
 	mockOutboundHandler := mock_remote.NewMockOutboundHandler(ctrl)
 	opts := client.NewOptions([]client.Option{WithBoundHandler(mockOutboundHandler)})
-	test.Assert(t, len(opts.RemoteOpt.Outbounds) > 0)
+	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 1)
+	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 0)
+
+	opts = client.NewOptions(
+		[]client.Option{WithBoundHandler(mockOutboundHandler), WithBoundHandler(mockOutboundHandler)})
+	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 1)
+	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 0)
+
+	mockOutboundHandler2 := mock_remote.NewMockOutboundHandler(ctrl)
+	opts = client.NewOptions([]client.Option{
+		WithBoundHandler(mockOutboundHandler), WithBoundHandler(mockOutboundHandler2), WithBoundHandler(mockOutboundHandler)})
+	test.Assert(t, len(opts.RemoteOpt.Outbounds) == 2)
 	test.Assert(t, len(opts.RemoteOpt.Inbounds) == 0)
 }
 
