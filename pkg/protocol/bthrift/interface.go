@@ -22,6 +22,7 @@ import (
 )
 
 // BinaryWriter .
+// Deprecated: removed from FastCodec in order to be compatible with Bytebuffer other than netpoll.
 type BinaryWriter interface {
 	WriteDirect(b []byte, remainCap int) error
 }
