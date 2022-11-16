@@ -34,8 +34,6 @@ var Binary binaryProtocol
 
 var _ BTProtocol = binaryProtocol{}
 
-const binaryInplaceThreshold = 4096 // 4k
-
 type binaryProtocol struct{}
 
 func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int {
