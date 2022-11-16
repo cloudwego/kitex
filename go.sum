@@ -17,8 +17,6 @@ github.com/chzyer/logex v1.2.0/go.mod h1:9+9sk7u7pGNWYMkh0hdiL++6OeibzJccyQU4p4M
 github.com/chzyer/readline v1.5.0/go.mod h1:x22KAscuvRqlLoK9CsoYsmxoXZMMFVyOl86cAH8qUic=
 github.com/chzyer/test v0.0.0-20210722231415-061457976a23/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
-github.com/cloudwego/fastpb v0.0.2 h1:qgz6Qxz1DRQ95Der6nr6vsdgXV58rvuK1J2VNzwlzg4=
-github.com/cloudwego/fastpb v0.0.2/go.mod h1:/V13XFTq2TUkxj2qWReV8MwfPC4NnPcy6FsrojnsSG0=
 github.com/cloudwego/fastpb v0.0.3 h1:GZE0WzlnjQFE3+vkYFZd964PGT9AXOuvir+JGzuBSPM=
 github.com/cloudwego/fastpb v0.0.3/go.mod h1:/V13XFTq2TUkxj2qWReV8MwfPC4NnPcy6FsrojnsSG0=
 github.com/cloudwego/frugal v0.1.3 h1:tw3+hh4YMmtHFHRue3OGYjAnkxnZRHqeAyG18+7z5aI=

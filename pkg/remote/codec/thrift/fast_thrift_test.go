@@ -19,7 +19,7 @@ package thrift
 import (
 	"testing"
 
-	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
+	mocks "github.com/cloudwego/kitex/internal/mocks/thrift/fast"
 	"github.com/cloudwego/kitex/internal/test"
 )
 
