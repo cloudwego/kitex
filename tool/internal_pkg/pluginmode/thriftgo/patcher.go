@@ -44,8 +44,17 @@ func AppendToTemplate(text string) {
 }
 
 const kitexUnusedProtection = `
+import "unsafe"
+
 // KitexUnusedProtection is used to prevent 'imported and not used' error.
 var KitexUnusedProtection = struct{}{}
+
+func StringDeepCopy(s string) string {
+	buf := []byte(s)
+	ns := (*string)(unsafe.Pointer(&buf))
+	return *ns
+}
+
 `
 
 //lint:ignore U1000 until protectionInsertionPoint is used
@@ -93,6 +102,18 @@ func (p *patcher) buildTemplates() (err error) {
 	m["IsNil"] = func(i interface{}) bool {
 		return i == nil || reflect.ValueOf(i).IsNil()
 	}
+	m["SourceTarget"] = func(s string) string {
+		// p.XXX
+		if strings.HasPrefix(s, "p.") {
+			return "src." + s[2:]
+		}
+		// _key, _val
+		return s[1:]
+	}
+	m["FieldName"] = func(s string) string {
+		// p.XXX
+		return strings.ToLower(s[2:3]) + s[3:]
+	}
 
 	tpl := template.New("kitex").Funcs(m)
 	allTemplates := basicTemplates
@@ -105,6 +126,7 @@ func (p *patcher) buildTemplates() (err error) {
 		allTemplates = append(allTemplates, structLikeCodec,
 			structLikeFastRead,
 			structLikeFastReadField,
+			structLikeDeepCopy,
 			structLikeFastWrite,
 			structLikeFastWriteNocopy,
 			structLikeLength,
@@ -117,6 +139,13 @@ func (p *patcher) buildTemplates() (err error) {
 			fieldFastReadMap,
 			fieldFastReadSet,
 			fieldFastReadList,
+			fieldDeepCopy,
+			fieldDeepCopyStructLike,
+			fieldDeepCopyContainer,
+			fieldDeepCopyMap,
+			fieldDeepCopyList,
+			fieldDeepCopySet,
+			fieldDeepCopyBaseType,
 			fieldFastWrite,
 			fieldLength,
 			fieldFastWriteStructLike,
@@ -141,7 +170,11 @@ func (p *patcher) buildTemplates() (err error) {
 		)
 	}
 	for _, txt := range allTemplates {
-		tpl = template.Must(tpl.Parse(txt))
+		tpl, err = tpl.Parse(txt)
+		if err != nil {
+			println(txt)
+			panic(err)
+		}
 	}
 
 	ext := `{{define "ExtraTemplates"}}{{end}}`
