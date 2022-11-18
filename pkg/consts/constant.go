@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2022 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,31 @@
 
 package consts
 
-// Method key used in context.
+// Tag names in RPCInfo.
 const (
-	CtxKeyMethod = "K_METHOD"
+	IDC         = "idc"
+	Cluster     = "cluster"
+	Env         = "env"
+	Client      = "client"
+	Weight      = "weight"
+	LogID       = "log_id"
+	StressTag   = "stress_tag"
+	Mesh        = "mesh"
+	MeshIngress = "mesh_ingress"
+	Transport   = "transport"
+	Capability  = "capability"
+
+	CombineTag = "combine"
+)
+
+const (
+	DefaultEnv     = "prod"
+	DefaultCluster = "default"
+)
+
+const (
+	CtxKeyLogID     = "K_LOGID"
+	CtxKeyStressTag = "K_STRESS"
+	CtxKeyEnv       = "K_ENV"
+	CtxKeyMethod    = "K_METHOD"
 )

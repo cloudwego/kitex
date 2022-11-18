@@ -17,12 +17,16 @@
 package rpcinfo
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/cloudwego/kitex/internal"
+	"github.com/cloudwego/kitex/pkg/consts"
 )
 
 var rpcInfoPool sync.Pool
+
+var _ RPCInfo = (*rpcInfo)(nil)
 
 type rpcInfo struct {
 	from       EndpointInfo
@@ -30,6 +34,7 @@ type rpcInfo struct {
 	invocation Invocation
 	config     RPCConfig
 	stats      RPCStats
+	key        string
 }
 
 // From implements the RPCInfo interface.
@@ -47,12 +52,43 @@ func (r *rpcInfo) Invocation() Invocation { return r.invocation }
 // Stats implements the RPCInfo interface.
 func (r *rpcInfo) Stats() RPCStats { return r.stats }
 
+// Key implements the RPCInfo interface.
+func (r *rpcInfo) Key() string {
+	if r.key != "" {
+		return r.key
+	}
+	if r == nil || r.From() == nil || r.To() == nil {
+		return ""
+	}
+	fromService := r.From().ServiceName()
+	fromCluster := r.From().DefaultTag(consts.Cluster, consts.DefaultCluster)
+	toService := r.To().ServiceName()
+	toCluster := r.To().DefaultTag(consts.Cluster, consts.DefaultCluster)
+	method := r.To().Method()
+
+	sum := len(fromService) + len(fromCluster) + len(toService) + len(toCluster) + len(method) + 4
+	var buf strings.Builder
+	buf.Grow(sum)
+	buf.WriteString(fromService)
+	buf.WriteByte('/')
+	buf.WriteString(fromCluster)
+	buf.WriteByte('/')
+	buf.WriteString(toService)
+	buf.WriteByte('/')
+	buf.WriteString(toCluster)
+	buf.WriteByte('/')
+	buf.WriteString(method)
+	r.key = buf.String()
+	return r.key
+}
+
 func (r *rpcInfo) zero() {
 	r.from = nil
 	r.to = nil
 	r.invocation = nil
 	r.config = nil
 	r.stats = nil
+	r.key = ""
 }
 
 // Recycle reuses the rpcInfo.
@@ -88,6 +124,7 @@ func NewRPCInfo(from, to EndpointInfo, ink Invocation, config RPCConfig, stats R
 	r.invocation = ink
 	r.config = config
 	r.stats = stats
+	r.key = ""
 	return r
 }
 

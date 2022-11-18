@@ -16,12 +16,15 @@
 
 package rpcinfo
 
+var _ RPCInfo = (*plainRPCInfo)(nil)
+
 type plainRPCInfo struct {
 	// use anonymous structs to force objects to be read-only
 	from struct{ EndpointInfo }
 	to   struct{ EndpointInfo }
 	inv  struct{ Invocation }
 	cfg  struct{ RPCConfig }
+	key  struct{ key string }
 }
 
 func (p *plainRPCInfo) From() EndpointInfo {
@@ -44,12 +47,17 @@ func (p *plainRPCInfo) Stats() RPCStats {
 	return nil
 }
 
+func (p *plainRPCInfo) Key() string {
+	return p.key.key
+}
+
 func freeze(ri RPCInfo) RPCInfo {
 	p := new(plainRPCInfo)
 	p.from.EndpointInfo = copyEndpointInfo(ri.From())
 	p.to.EndpointInfo = copyEndpointInfo(ri.To())
 	p.inv.Invocation = copyInvocation(ri.Invocation())
 	p.cfg.RPCConfig = copyRPCConfig(ri.Config())
+	p.key.key = ri.Key()
 	return p
 }
 

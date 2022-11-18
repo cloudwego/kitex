@@ -91,4 +91,5 @@ type RPCInfo interface {
 	Invocation() Invocation
 	Config() RPCConfig
 	Stats() RPCStats
+	Key() string
 }
