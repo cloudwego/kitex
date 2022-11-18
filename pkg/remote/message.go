@@ -259,8 +259,12 @@ type TransInfo interface {
 	TransIntInfo() map[uint16]string
 	PutTransIntInfo(map[uint16]string)
 	PutTransStrInfo(kvInfo map[string]string)
+	SetTransIntInfo(k uint16, v string)
+	SetTransStrInfo(k string, v string)
 	Recycle()
 }
+
+var _ TransInfo = (*transInfo)(nil)
 
 func newTransInfo() interface{} {
 	return &transInfo{
@@ -319,6 +323,14 @@ func (ti *transInfo) PutTransStrInfo(kvInfo map[string]string) {
 			ti.strInfo[k] = v
 		}
 	}
+}
+
+func (ti *transInfo) SetTransIntInfo(k uint16, v string) {
+	ti.intInfo[k] = v
+}
+
+func (ti *transInfo) SetTransStrInfo(k, v string) {
+	ti.strInfo[k] = v
 }
 
 // Recycle is used to recycle the transInfo.
