@@ -390,18 +390,28 @@ func writeBinaryList(ctx context.Context, val interface{}, out thrift.TProtocol,
 
 func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	l := val.([]interface{})
-	length := len(l)
+	length := 0
+	var sample interface{}
+	for _, elem := range l {
+		if elem != nil {
+			length++
+			sample = elem
+		}
+	}
 	if err := out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
 		return err
 	}
 	if length == 0 {
 		return out.WriteListEnd()
 	}
-	writer, err := nextWriter(l[0], t.Elem, opt)
+	writer, err := nextWriter(sample, t.Elem, opt)
 	if err != nil {
 		return err
 	}
 	for _, elem := range l {
+		if elem == nil {
+			continue
+		}
 		if err := writer(ctx, elem, out, t.Elem, opt); err != nil {
 			return err
 		}

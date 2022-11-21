@@ -142,6 +142,18 @@ func TestThrift2NormalServer(t *testing.T) {
 	svr.Stop()
 }
 
+func TestThriftWithNilField(t *testing.T) {
+	time.Sleep(4 * time.Second)
+	svr := initMockServer(t, new(mockImpl))
+	time.Sleep(500 * time.Millisecond)
+
+	cli := initThriftMockClient(t)
+
+	_, err := cli.GenericCall(context.Background(), "Test", mockReqWithNil, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	svr.Stop()
+}
+
 func initThriftMockClient(t *testing.T) genericclient.Client {
 	p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
 	test.Assert(t, err == nil)
