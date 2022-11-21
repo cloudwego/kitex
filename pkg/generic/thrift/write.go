@@ -449,7 +449,7 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 		if elem != nil {
 			length++
 			keySample = key
-			elemSample = key
+			elemSample = elem
 		}
 	}
 	if err := out.WriteMapBegin(t.Key.Type.ToThriftTType(), t.Elem.Type.ToThriftTType(), length); err != nil {
