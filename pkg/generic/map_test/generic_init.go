@@ -151,12 +151,6 @@ var (
 		"strList": []interface{}{
 			"lv1", "lv2",
 		},
-		"strMapWithNil": map[interface{}]interface{}{
-			"mk1": nil,
-		},
-		"strListWithNil": []interface{}{
-			"lv1", "lv2", nil, "lv4",
-		},
 	}
 	mockResp = "this is response"
 )
