@@ -151,14 +151,10 @@ var (
 		"strList": []interface{}{
 			"lv1", "lv2",
 		},
-	}
-	mockReqWithNil = map[string]interface{}{
-		"Msg": "hello",
-		"strMap": map[interface{}]interface{}{
-			"mk1": "mv1",
-			"mk2": "mv2",
+		"strMapWithNil": map[interface{}]interface{}{
+			"mk1": nil,
 		},
-		"strList": []interface{}{
+		"strListWithNil": []interface{}{
 			"lv1", "lv2", nil, "lv4",
 		},
 	}
@@ -230,6 +226,9 @@ func (m *mockImpl) Test(ctx context.Context, req *kt.MockReq) (r string, err err
 		return "", fmt.Errorf("strmsg is not map[interface{}]interface{}")
 	}
 	for k, v := range sm {
+		if v == nil {
+			continue
+		}
 		if req.StrMap[k.(string)] != v.(string) {
 			return "", fmt.Errorf("strMsg is not %s", req.StrMap)
 		}

@@ -440,23 +440,27 @@ func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t
 	return out.WriteListEnd()
 }
 
-func takeSampleFromMap(sample map[interface{}]interface{}) (interface{}, interface{}) {
-	for key, elem := range sample {
-		return key, elem
-	}
-	panic("unreachable")
-}
-
 func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	m := val.(map[interface{}]interface{})
-	length := len(m)
+	length := 0
+	var keySample interface{}
+	var elemSample interface{}
+	for key, elem := range m {
+		if elem != nil {
+			length++
+			keySample = key
+			elemSample = key
+		}
+	}
 	if err := out.WriteMapBegin(t.Key.Type.ToThriftTType(), t.Elem.Type.ToThriftTType(), length); err != nil {
 		return err
 	}
 	if length == 0 {
 		return out.WriteMapEnd()
 	}
-	keySample, elemSample := takeSampleFromMap(m)
+	if keySample == nil {
+		return out.WriteMapEnd()
+	}
 	keyWriter, err := nextWriter(keySample, t.Key, opt)
 	if err != nil {
 		return err
@@ -466,6 +470,9 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 		return err
 	}
 	for key, elem := range m {
+		if elem == nil {
+			continue
+		}
 		if err := keyWriter(ctx, key, out, t.Key, opt); err != nil {
 			return err
 		}
