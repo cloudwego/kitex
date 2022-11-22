@@ -46,16 +46,6 @@ var reqMsg = map[string]interface{}{
 	},
 }
 
-var respMsg = map[string]interface{}{
-	"Msg":            "world",
-	"required_field": "required_field",
-}
-
-var respMsgWithExtra = map[string]interface{}{
-	"Msg":            "world",
-	"required_field": "required_field",
-	"extra_field":    "extra_field",
-}
 var errResp = "Test Error"
 
 func newGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
