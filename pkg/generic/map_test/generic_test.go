@@ -166,6 +166,39 @@ func TestThrift(t *testing.T) {
 				},
 			},
 		},
+		{
+			reqMsg: map[string]interface{}{
+				"Msg": "hello",
+				"TestList": []interface{}{
+					nil,
+				},
+				"TestMap": map[string]interface{}{
+					"l2": nil,
+				},
+				"StrList": []interface{}{
+					nil,
+				},
+				"I64List": []interface{}{
+					nil,
+				},
+				"B": nil,
+			},
+			wantResp: map[string]interface{}{
+				"Msg": "hello",
+				"TestList": []interface{}{
+					map[string]interface{}{},
+				},
+				"TestMap": map[interface{}]interface{}{
+					"l2": map[string]interface{}{},
+				},
+				"StrList": []interface{}{
+					"",
+				},
+				"I64List": []interface{}{
+					int64(0),
+				},
+			},
+		},
 	}
 	for _, tcase := range cases {
 		resp, err := cli.GenericCall(context.Background(), "ExampleMethod", tcase.reqMsg, callopt.WithRPCTimeout(100*time.Second))

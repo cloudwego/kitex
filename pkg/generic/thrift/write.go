@@ -529,14 +529,11 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 		err        error
 	)
 	existNil := false
-	for key, elem := range m {
-		if keyWriter != nil && existNil {
+	for _, elem := range m {
+		if elemWriter != nil && existNil {
 			break
 		}
 		if elem != nil {
-			if keyWriter, err = nextWriter(key, t.Key, opt); err != nil {
-				return err
-			}
 			if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
 				return err
 			}
@@ -544,10 +541,7 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 			existNil = true
 		}
 	}
-	if keyWriter == nil {
-		if keyWriter, err = getWriter(t.Key, opt); err != nil {
-			return err
-		}
+	if elemWriter == nil {
 		if elemWriter, err = getWriter(t.Elem, opt); err != nil {
 			return err
 		}
@@ -560,6 +554,11 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 	for key, elem := range m {
 		if elem == nil {
 			elem = elemInit
+		}
+		if keyWriter == nil {
+			if keyWriter, err = nextWriter(key, t.Key, opt); err != nil {
+				return err
+			}
 		}
 		if err := keyWriter(ctx, key, out, t.Key, opt); err != nil {
 			return err
@@ -584,19 +583,42 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 	var (
 		keyWriter  writer
 		elemWriter writer
+		elemInit   interface{}
+		err        error
 	)
+	existNil := false
+	for _, elem := range m {
+		if elemWriter != nil && existNil {
+			break
+		}
+		if elem != nil {
+			if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
+				return err
+			}
+		} else {
+			existNil = true
+		}
+	}
+	if elemWriter == nil {
+		if elemWriter, err = getWriter(t.Elem, opt); err != nil {
+			return err
+		}
+	}
+	if existNil {
+		if elemInit, err = zeroValue(t.Elem.Type); err != nil {
+			return err
+		}
+	}
 	for key, elem := range m {
 		_key, err := buildinTypeFromString(key, t.Key)
 		if err != nil {
 			return err
 		}
+		if elem == nil {
+			elem = elemInit
+		}
 		if keyWriter == nil {
 			if keyWriter, err = nextWriter(_key, t.Key, opt); err != nil {
-				return err
-			}
-		}
-		if elemWriter == nil {
-			if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
 				return err
 			}
 		}
