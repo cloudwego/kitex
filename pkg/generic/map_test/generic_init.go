@@ -88,7 +88,7 @@ func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, req
 	fmt.Printf("Method from Ctx: %s\n", rpcinfo.Invocation().MethodName())
 	fmt.Printf("Recv: %v\n", buf)
 	fmt.Printf("Method: %s\n", method)
-	return respMsgWithExtra, nil
+	return buf, nil
 }
 
 // GenericServiceErrorImpl ...
@@ -220,9 +220,6 @@ func (m *mockImpl) Test(ctx context.Context, req *kt.MockReq) (r string, err err
 		return "", fmt.Errorf("strmsg is not map[interface{}]interface{}")
 	}
 	for k, v := range sm {
-		if v == nil {
-			continue
-		}
 		if req.StrMap[k.(string)] != v.(string) {
 			return "", fmt.Errorf("strMsg is not %s", req.StrMap)
 		}
@@ -231,16 +228,10 @@ func (m *mockImpl) Test(ctx context.Context, req *kt.MockReq) (r string, err err
 	if !ok {
 		return "", fmt.Errorf("strlist is not %s", mockReq["strList"])
 	}
-	reqIdx := 0
 	for idx := range sl {
-		value := sl[idx]
-		if value == nil {
-			continue
-		}
-		if value.(string) != req.StrList[reqIdx] {
+		if sl[idx].(string) != req.StrList[idx] {
 			return "", fmt.Errorf("strlist is not %s", mockReq)
 		}
-		reqIdx++
 	}
 	return mockResp, nil
 }

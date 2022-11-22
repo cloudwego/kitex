@@ -208,6 +208,32 @@ func nextJSONWriter(data *gjson.Result, t *descriptor.TypeDescriptor, opt *write
 	return v, fn, nil
 }
 
+func zeroValue(t descriptor.Type) (interface{}, error) {
+	switch t {
+	case descriptor.BOOL:
+		return false, nil
+	case descriptor.I08:
+		return int8(0), nil
+	case descriptor.I16:
+		return int16(0), nil
+	case descriptor.I32:
+		return int32(0), nil
+	case descriptor.I64:
+		return int64(0), nil
+	case descriptor.DOUBLE:
+		return float64(0), nil
+	case descriptor.STRING:
+		return "", nil
+	case descriptor.LIST, descriptor.SET:
+		return []interface{}{}, nil
+	case descriptor.MAP:
+		return map[interface{}]interface{}{}, nil
+	case descriptor.STRUCT:
+		return map[string]interface{}{}, nil
+	}
+	return nil, fmt.Errorf("unsupported type:%T", t)
+}
+
 func wrapStructWriter(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	if err := out.WriteStructBegin(t.Struct.Name); err != nil {
 		return err
@@ -390,27 +416,24 @@ func writeBinaryList(ctx context.Context, val interface{}, out thrift.TProtocol,
 
 func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	l := val.([]interface{})
-	length := 0
-	var sample interface{}
-	for _, elem := range l {
-		if elem != nil {
-			length++
-			sample = elem
-		}
-	}
+	length := len(l)
 	if err := out.WriteListBegin(t.Elem.Type.ToThriftTType(), length); err != nil {
 		return err
 	}
 	if length == 0 {
 		return out.WriteListEnd()
 	}
-	writer, err := nextWriter(sample, t.Elem, opt)
+	init, err := zeroValue(t.Elem.Type)
+	if err != nil {
+		return err
+	}
+	writer, err := nextWriter(init, t.Elem, opt)
 	if err != nil {
 		return err
 	}
 	for _, elem := range l {
 		if elem == nil {
-			continue
+			elem = init
 		}
 		if err := writer(ctx, elem, out, t.Elem, opt); err != nil {
 			return err
@@ -442,24 +465,20 @@ func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t
 
 func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	m := val.(map[interface{}]interface{})
-	length := 0
-	var keySample interface{}
-	var elemSample interface{}
-	for key, elem := range m {
-		if elem != nil {
-			length++
-			keySample = key
-			elemSample = elem
-		}
-	}
+	length := len(m)
 	if err := out.WriteMapBegin(t.Key.Type.ToThriftTType(), t.Elem.Type.ToThriftTType(), length); err != nil {
 		return err
 	}
 	if length == 0 {
 		return out.WriteMapEnd()
 	}
-	if keySample == nil {
-		return out.WriteMapEnd()
+	keySample, err := zeroValue(t.Key.Type)
+	if err != nil {
+		return err
+	}
+	elemSample, err := zeroValue(t.Elem.Type)
+	if err != nil {
+		return err
 	}
 	keyWriter, err := nextWriter(keySample, t.Key, opt)
 	if err != nil {
@@ -471,7 +490,7 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 	}
 	for key, elem := range m {
 		if elem == nil {
-			continue
+			elem = elemSample
 		}
 		if err := keyWriter(ctx, key, out, t.Key, opt); err != nil {
 			return err
