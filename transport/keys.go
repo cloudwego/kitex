@@ -54,9 +54,3 @@ func (tp Protocol) String() string {
 	}
 	return Unknown
 }
-
-// WithMeta reports whether the protocol is capable of carrying meta
-// data besides the payload.
-func (tp Protocol) WithMeta() bool {
-	return tp != PurePayload && tp != Framed
-}
