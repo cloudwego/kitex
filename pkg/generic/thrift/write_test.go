@@ -1083,9 +1083,12 @@ func Test_writeStringMap(t *testing.T) {
 					},
 				},
 				t: &descriptor.TypeDescriptor{
-					Type:   descriptor.MAP,
-					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
-					Elem:   &descriptor.TypeDescriptor{Type: descriptor.VOID},
+					Type: descriptor.MAP,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{
+						Type:   descriptor.VOID,
+						Struct: &descriptor.StructDescriptor{},
+					},
 					Struct: &descriptor.StructDescriptor{},
 				},
 			},
