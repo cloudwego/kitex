@@ -1639,7 +1639,8 @@ func Test_zeroValueAndgetWriter(t *testing.T) {
 					Type: descriptor.LIST,
 					Elem: &descriptor.TypeDescriptor{
 						Name: "binary",
-						Type: descriptor.STRING},
+						Type: descriptor.STRING,
+					},
 					Struct: &descriptor.StructDescriptor{},
 				},
 			},
