@@ -112,21 +112,21 @@ func TestSetTag(t *testing.T) {
 
 	// lock key cannot be reset
 	ri.SetTag(lockKey, "aa")
-	val, exist = ri.Tag(lockKey)
+	val, _ = ri.Tag(lockKey)
 	test.Assert(t, val == "a")
 
 	// lock key still can be reset with ForceSetTag
 	ri.ForceSetTag(lockKey, "aa")
-	val, exist = ri.Tag(lockKey)
+	val, _ = ri.Tag(lockKey)
 	test.Assert(t, val == "aa")
 
 	// unlock key can be reset
 	ri.SetTag(unlockKey, "bb")
-	val, exist = ri.Tag(unlockKey)
+	val, _ = ri.Tag(unlockKey)
 	test.Assert(t, val == "bb")
 
 	// unlock key can be reset
 	ri.ForceSetTag(unlockKey, "bb")
-	val, exist = ri.Tag(unlockKey)
+	val, _ = ri.Tag(unlockKey)
 	test.Assert(t, val == "bb")
 }
