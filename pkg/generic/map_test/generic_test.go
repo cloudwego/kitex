@@ -170,32 +170,44 @@ func TestThrift(t *testing.T) {
 			reqMsg: map[string]interface{}{
 				"Msg": "hello",
 				"TestList": []interface{}{
+					map[string]interface{}{
+						"Bar": "foo",
+					},
 					nil,
 				},
-				"TestMap": map[string]interface{}{
+				"TestMap": map[interface{}]interface{}{
+					"l1": map[string]interface{}{
+						"Bar": "foo",
+					},
 					"l2": nil,
 				},
 				"StrList": []interface{}{
-					nil,
+					"123", nil,
 				},
 				"I64List": []interface{}{
-					nil,
+					float64(123), nil,
 				},
 				"B": nil,
 			},
 			wantResp: map[string]interface{}{
 				"Msg": "hello",
 				"TestList": []interface{}{
+					map[string]interface{}{
+						"Bar": "foo",
+					},
 					map[string]interface{}{},
 				},
 				"TestMap": map[interface{}]interface{}{
+					"l1": map[string]interface{}{
+						"Bar": "foo",
+					},
 					"l2": map[string]interface{}{},
 				},
 				"StrList": []interface{}{
-					"",
+					"123", "",
 				},
 				"I64List": []interface{}{
-					int64(0),
+					int64(123), int64(0),
 				},
 			},
 		},
