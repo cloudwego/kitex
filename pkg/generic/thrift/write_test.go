@@ -727,47 +727,6 @@ func Test_writeList(t *testing.T) {
 			},
 			true,
 		},
-		{
-			"writeListWithGetDefaultValueAndWriterError",
-			args{
-				val: []interface{}{nil},
-				out: &mocks.MockThriftTTransport{
-					WriteListBeginFunc: func(elemType thrift.TType, size int) error {
-						test.Assert(t, elemType == thrift.VOID)
-						test.Assert(t, size == 1)
-						return nil
-					},
-				},
-				t: &descriptor.TypeDescriptor{
-					Type:   descriptor.LIST,
-					Elem:   &descriptor.TypeDescriptor{Type: descriptor.VOID},
-					Struct: &descriptor.StructDescriptor{},
-				},
-			},
-			true,
-		},
-		{
-			"writeListWithGetDefaultValueError",
-			args{
-				val: []interface{}{descriptor.Void{}, nil},
-				out: &mocks.MockThriftTTransport{
-					WriteListBeginFunc: func(elemType thrift.TType, size int) error {
-						test.Assert(t, elemType == thrift.VOID)
-						test.Assert(t, size == 2)
-						return nil
-					},
-				},
-				t: &descriptor.TypeDescriptor{
-					Type: descriptor.LIST,
-					Elem: &descriptor.TypeDescriptor{
-						Type:   descriptor.VOID,
-						Struct: &descriptor.StructDescriptor{},
-					},
-					Struct: &descriptor.StructDescriptor{},
-				},
-			},
-			true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -870,51 +829,6 @@ func Test_writeInterfaceMap(t *testing.T) {
 					Type:   descriptor.MAP,
 					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.BOOL},
-					Struct: &descriptor.StructDescriptor{},
-				},
-			},
-			true,
-		},
-		{
-			"writeInterfaceMapWithElemDefaultWriterError",
-			args{
-				val: map[interface{}]interface{}{"hello": nil},
-				out: &mocks.MockThriftTTransport{
-					WriteMapBeginFunc: func(keyType, valueType thrift.TType, size int) error {
-						test.Assert(t, keyType == thrift.STRING)
-						test.Assert(t, valueType == thrift.VOID)
-						test.Assert(t, size == 1)
-						return nil
-					},
-				},
-				t: &descriptor.TypeDescriptor{
-					Type:   descriptor.MAP,
-					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
-					Elem:   &descriptor.TypeDescriptor{Type: descriptor.VOID},
-					Struct: &descriptor.StructDescriptor{},
-				},
-			},
-			true,
-		},
-		{
-			"writeInterfaceMapWithElemDefaultValueError",
-			args{
-				val: map[interface{}]interface{}{"hello": descriptor.Void{}, "hi": nil},
-				out: &mocks.MockThriftTTransport{
-					WriteMapBeginFunc: func(keyType, valueType thrift.TType, size int) error {
-						test.Assert(t, keyType == thrift.STRING)
-						test.Assert(t, valueType == thrift.VOID)
-						test.Assert(t, size == 2)
-						return nil
-					},
-				},
-				t: &descriptor.TypeDescriptor{
-					Type: descriptor.MAP,
-					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
-					Elem: &descriptor.TypeDescriptor{
-						Type:   descriptor.VOID,
-						Struct: &descriptor.StructDescriptor{},
-					},
 					Struct: &descriptor.StructDescriptor{},
 				},
 			},
@@ -1044,51 +958,6 @@ func Test_writeStringMap(t *testing.T) {
 					Type:   descriptor.MAP,
 					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.BOOL},
-					Struct: &descriptor.StructDescriptor{},
-				},
-			},
-			true,
-		},
-		{
-			"writeStringMapWithElemDefaultWriterError",
-			args{
-				val: map[string]interface{}{"hello": nil},
-				out: &mocks.MockThriftTTransport{
-					WriteMapBeginFunc: func(keyType, valueType thrift.TType, size int) error {
-						test.Assert(t, keyType == thrift.STRING)
-						test.Assert(t, valueType == thrift.VOID)
-						test.Assert(t, size == 1)
-						return nil
-					},
-				},
-				t: &descriptor.TypeDescriptor{
-					Type:   descriptor.MAP,
-					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
-					Elem:   &descriptor.TypeDescriptor{Type: descriptor.VOID},
-					Struct: &descriptor.StructDescriptor{},
-				},
-			},
-			true,
-		},
-		{
-			"writeStringMapWithElemDefaultValueError",
-			args{
-				val: map[string]interface{}{"hello": descriptor.Void{}, "hi": nil},
-				out: &mocks.MockThriftTTransport{
-					WriteMapBeginFunc: func(keyType, valueType thrift.TType, size int) error {
-						test.Assert(t, keyType == thrift.STRING)
-						test.Assert(t, valueType == thrift.VOID)
-						test.Assert(t, size == 2)
-						return nil
-					},
-				},
-				t: &descriptor.TypeDescriptor{
-					Type: descriptor.MAP,
-					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
-					Elem: &descriptor.TypeDescriptor{
-						Type:   descriptor.VOID,
-						Struct: &descriptor.StructDescriptor{},
-					},
 					Struct: &descriptor.StructDescriptor{},
 				},
 			},
@@ -1787,25 +1656,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 				},
 			},
 			false,
-		},
-		{
-			"unsupportedTypeError",
-			args{
-				val: []interface{}{nil},
-				out: &mocks.MockThriftTTransport{
-					WriteListBeginFunc: func(elemType thrift.TType, size int) error {
-						test.Assert(t, elemType == thrift.VOID)
-						test.Assert(t, size == 1)
-						return nil
-					},
-				},
-				t: &descriptor.TypeDescriptor{
-					Type:   descriptor.LIST,
-					Elem:   &descriptor.TypeDescriptor{Type: descriptor.VOID},
-					Struct: &descriptor.StructDescriptor{},
-				},
-			},
-			true,
 		},
 	}
 	for _, tt := range tests {
