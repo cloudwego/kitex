@@ -430,9 +430,9 @@ func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 		return out.WriteListEnd()
 	}
 	var (
-		writer    writer
-		zeroValue interface{}
-		err       error
+		writer, defaultWriter writer
+		zeroValue             interface{}
+		err                   error
 	)
 	for _, elem := range l {
 		if elem != nil {
@@ -444,13 +444,18 @@ func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 	}
 	for _, elem := range l {
 		if elem == nil {
-			if zeroValue, writer, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
+			if defaultWriter == nil {
+				if zeroValue, defaultWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
+					return err
+				}
+			}
+			if err := defaultWriter(ctx, zeroValue, out, t.Elem, opt); err != nil {
 				return err
 			}
-			elem = zeroValue
-		}
-		if err := writer(ctx, elem, out, t.Elem, opt); err != nil {
-			return err
+		} else {
+			if err := writer(ctx, elem, out, t.Elem, opt); err != nil {
+				return err
+			}
 		}
 	}
 	return out.WriteListEnd()
@@ -487,10 +492,11 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 		return out.WriteMapEnd()
 	}
 	var (
-		keyWriter     writer
-		elemWriter    writer
-		elemZeroValue interface{}
-		err           error
+		keyWriter         writer
+		elemWriter        writer
+		elemDefaultWriter writer
+		elemZeroValue     interface{}
+		err               error
 	)
 	for _, elem := range m {
 		if elem != nil {
@@ -501,12 +507,6 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 		}
 	}
 	for key, elem := range m {
-		if elem == nil {
-			if elemZeroValue, elemWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
-				return err
-			}
-			elem = elemZeroValue
-		}
 		if keyWriter == nil {
 			if keyWriter, err = nextWriter(key, t.Key, opt); err != nil {
 				return err
@@ -515,8 +515,19 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 		if err := keyWriter(ctx, key, out, t.Key, opt); err != nil {
 			return err
 		}
-		if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
-			return err
+		if elem == nil {
+			if elemDefaultWriter == nil {
+				if elemZeroValue, elemDefaultWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
+					return err
+				}
+			}
+			if err := elemDefaultWriter(ctx, elemZeroValue, out, t.Elem, opt); err != nil {
+				return err
+			}
+		} else {
+			if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
+				return err
+			}
 		}
 	}
 	return out.WriteMapEnd()
@@ -533,10 +544,11 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 	}
 
 	var (
-		keyWriter     writer
-		elemWriter    writer
-		elemZeroValue interface{}
-		err           error
+		keyWriter         writer
+		elemWriter        writer
+		elemDefaultWriter writer
+		elemZeroValue     interface{}
+		err               error
 	)
 	for _, elem := range m {
 		if elem != nil {
@@ -551,20 +563,6 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 		if err != nil {
 			return err
 		}
-		if elem == nil {
-			if elemZeroValue == nil {
-				if elemWriter == nil {
-					if elemZeroValue, elemWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
-						return err
-					}
-				} else {
-					if elemZeroValue, _, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
-						return err
-					}
-				}
-			}
-			elem = elemZeroValue
-		}
 		if keyWriter == nil {
 			if keyWriter, err = nextWriter(_key, t.Key, opt); err != nil {
 				return err
@@ -573,9 +571,19 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 		if err := keyWriter(ctx, _key, out, t.Key, opt); err != nil {
 			return err
 		}
-
-		if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
-			return err
+		if elem == nil {
+			if elemDefaultWriter == nil {
+				if elemZeroValue, elemDefaultWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
+					return err
+				}
+			}
+			if err := elemDefaultWriter(ctx, elemZeroValue, out, t.Elem, opt); err != nil {
+				return err
+			}
+		} else {
+			if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
+				return err
+			}
 		}
 	}
 	return out.WriteMapEnd()

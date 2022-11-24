@@ -185,7 +185,7 @@ func TestThrift(t *testing.T) {
 					"123", nil,
 				},
 				"I64List": []interface{}{
-					float64(123), nil,
+					float64(123), nil, float64(456),
 				},
 				"B": nil,
 			},
@@ -207,7 +207,7 @@ func TestThrift(t *testing.T) {
 					"123", "",
 				},
 				"I64List": []interface{}{
-					int64(123), int64(0),
+					int64(123), int64(0), int64(456),
 				},
 			},
 		},
