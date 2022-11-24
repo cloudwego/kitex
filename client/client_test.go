@@ -558,6 +558,13 @@ func TestClientFinalizer(t *testing.T) {
 		test.Assert(t, err == nil, err)
 		clis[i] = mockClient
 	}
+	// client that init failed, closeCallback should be called
+	cliCnt += 1
+	_, err := NewClient(svcInfo, WithDestService(""), WithCloseCallbacks(func() error {
+		atomic.AddInt32(&closeCalledCnt, 1)
+		return nil
+	}))
+	test.Assert(t, err != nil, err)
 
 	runtime.ReadMemStats(&ms)
 	t.Logf("After new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)

@@ -90,6 +90,7 @@ func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error)
 	kc.svcInfo = svcInfo
 	kc.opt = client.NewOptions(opts)
 	if err := kc.init(); err != nil {
+		_ = kc.Close()
 		return nil, err
 	}
 	// like os.File, if kc is garbage-collected, but Close is not called, call Close.
