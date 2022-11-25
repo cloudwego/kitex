@@ -208,6 +208,38 @@ func nextJSONWriter(data *gjson.Result, t *descriptor.TypeDescriptor, opt *write
 	return v, fn, nil
 }
 
+func getDefaultValueAndWriter(t *descriptor.TypeDescriptor, opt *writerOption) (interface{}, writer, error) {
+	switch t.Type {
+	case descriptor.BOOL:
+		return false, writeBool, nil
+	case descriptor.I08:
+		return int8(0), writeInt8, nil
+	case descriptor.I16:
+		return int16(0), writeInt16, nil
+	case descriptor.I32:
+		return int32(0), writeInt32, nil
+	case descriptor.I64:
+		return int64(0), writeInt64, nil
+	case descriptor.DOUBLE:
+		return float64(0), writeJSONFloat64, nil
+	case descriptor.STRING:
+		if t.Name == "binary" && opt.binaryWithBase64 {
+			return "", writeBase64Binary, nil
+		} else {
+			return "", writeString, nil
+		}
+	case descriptor.LIST, descriptor.SET:
+		return []interface{}{}, writeList, nil
+	case descriptor.MAP:
+		return map[interface{}]interface{}{}, writeInterfaceMap, nil
+	case descriptor.STRUCT:
+		return map[string]interface{}{}, writeStruct, nil
+	case descriptor.VOID:
+		return descriptor.Void{}, writeVoid, nil
+	}
+	return nil, nil, fmt.Errorf("unsupported type:%T", t)
+}
+
 func wrapStructWriter(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	if err := out.WriteStructBegin(t.Struct.Name); err != nil {
 		return err
@@ -397,13 +429,30 @@ func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 	if length == 0 {
 		return out.WriteListEnd()
 	}
-	writer, err := nextWriter(l[0], t.Elem, opt)
-	if err != nil {
-		return err
-	}
+	var (
+		writer, defaultWriter writer
+		zeroValue             interface{}
+		err                   error
+	)
 	for _, elem := range l {
-		if err := writer(ctx, elem, out, t.Elem, opt); err != nil {
-			return err
+		if elem == nil {
+			if defaultWriter == nil {
+				if zeroValue, defaultWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
+					return err
+				}
+			}
+			if err := defaultWriter(ctx, zeroValue, out, t.Elem, opt); err != nil {
+				return err
+			}
+		} else {
+			if writer == nil {
+				if writer, err = nextWriter(elem, t.Elem, opt); err != nil {
+					return err
+				}
+			}
+			if err := writer(ctx, elem, out, t.Elem, opt); err != nil {
+				return err
+			}
 		}
 	}
 	return out.WriteListEnd()
@@ -430,13 +479,6 @@ func writeJSONList(ctx context.Context, val interface{}, out thrift.TProtocol, t
 	return out.WriteListEnd()
 }
 
-func takeSampleFromMap(sample map[interface{}]interface{}) (interface{}, interface{}) {
-	for key, elem := range sample {
-		return key, elem
-	}
-	panic("unreachable")
-}
-
 func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	m := val.(map[interface{}]interface{})
 	length := len(m)
@@ -446,21 +488,40 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 	if length == 0 {
 		return out.WriteMapEnd()
 	}
-	keySample, elemSample := takeSampleFromMap(m)
-	keyWriter, err := nextWriter(keySample, t.Key, opt)
-	if err != nil {
-		return err
-	}
-	elemWriter, err := nextWriter(elemSample, t.Elem, opt)
-	if err != nil {
-		return err
-	}
+	var (
+		keyWriter         writer
+		elemWriter        writer
+		elemDefaultWriter writer
+		elemZeroValue     interface{}
+		err               error
+	)
 	for key, elem := range m {
+		if keyWriter == nil {
+			if keyWriter, err = nextWriter(key, t.Key, opt); err != nil {
+				return err
+			}
+		}
 		if err := keyWriter(ctx, key, out, t.Key, opt); err != nil {
 			return err
 		}
-		if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
-			return err
+		if elem == nil {
+			if elemDefaultWriter == nil {
+				if elemZeroValue, elemDefaultWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
+					return err
+				}
+			}
+			if err := elemDefaultWriter(ctx, elemZeroValue, out, t.Elem, opt); err != nil {
+				return err
+			}
+		} else {
+			if elemWriter == nil {
+				if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
+					return err
+				}
+			}
+			if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
+				return err
+			}
 		}
 	}
 	return out.WriteMapEnd()
@@ -477,8 +538,10 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 	}
 
 	var (
-		keyWriter  writer
-		elemWriter writer
+		keyWriter         writer
+		elemWriter        writer
+		elemDefaultWriter writer
+		elemZeroValue     interface{}
 	)
 	for key, elem := range m {
 		_key, err := buildinTypeFromString(key, t.Key)
@@ -490,17 +553,27 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 				return err
 			}
 		}
-		if elemWriter == nil {
-			if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
-				return err
-			}
-		}
 		if err := keyWriter(ctx, _key, out, t.Key, opt); err != nil {
 			return err
 		}
-
-		if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
-			return err
+		if elem == nil {
+			if elemDefaultWriter == nil {
+				if elemZeroValue, elemDefaultWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
+					return err
+				}
+			}
+			if err := elemDefaultWriter(ctx, elemZeroValue, out, t.Elem, opt); err != nil {
+				return err
+			}
+		} else {
+			if elemWriter == nil {
+				if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
+					return err
+				}
+			}
+			if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
+				return err
+			}
 		}
 	}
 	return out.WriteMapEnd()
