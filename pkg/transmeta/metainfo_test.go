@@ -67,7 +67,9 @@ func TestClientWriteMetainfo(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	kvs := msg.TransInfo().TransStrInfo()
-	test.Assert(t, len(kvs) == 0)
+	test.Assert(t, len(kvs) == 2, kvs)
+	test.Assert(t, kvs[metainfo.PrefixTransient+"tk"] == "tv")
+	test.Assert(t, kvs[metainfo.PrefixPersistent+"pk"] == "pv")
 
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
 	_, err = MetainfoClientHandler.WriteMeta(ctx, msg)
@@ -96,8 +98,8 @@ func TestServerReadMetainfo(t *testing.T) {
 	tvs := metainfo.GetAllValues(ctx)
 	pvs := metainfo.GetAllPersistentValues(ctx)
 	test.Assert(t, err == nil)
-	test.Assert(t, len(tvs) == 0)
-	test.Assert(t, len(pvs) == 0)
+	test.Assert(t, len(tvs) == 1 && tvs["tk"] == "tv", tvs)
+	test.Assert(t, len(pvs) == 1 && pvs["pk"] == "pv")
 
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
 	ctx, err = MetainfoServerHandler.ReadMeta(ctx0, msg)
@@ -129,7 +131,7 @@ func TestServerWriteMetainfo(t *testing.T) {
 	ctx, err := MetainfoServerHandler.WriteMeta(ctx, msg)
 	test.Assert(t, err == nil)
 	kvs := msg.TransInfo().TransStrInfo()
-	test.Assert(t, len(kvs) == 0)
+	test.Assert(t, len(kvs) == 1 && kvs["bk"] == "bv", kvs)
 
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
 	_, err = MetainfoServerHandler.WriteMeta(ctx, msg)
