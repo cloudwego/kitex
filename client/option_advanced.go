@@ -227,6 +227,8 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 		// prevent duplication
 		if !exist {
 			o.RemoteOpt.AppendBoundHandler(h)
+		} else {
+			klog.Warnf("KITEX: BoundHandler already exists, BoundHandler=%v", h)
 		}
 	}}
 }

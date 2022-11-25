@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/profiler"
 	"github.com/cloudwego/kitex/pkg/proxy"
@@ -173,6 +174,8 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 		// prevent duplication
 		if !exist {
 			doAddBoundHandler(h, o.RemoteOpt)
+		} else {
+			klog.Warnf("KITEX: BoundHandler already exists, BoundHandler=%v", h)
 		}
 	}}
 }
