@@ -1657,6 +1657,28 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"void",
+			args{
+				val: []interface{}{nil},
+				out: &mocks.MockThriftTTransport{
+					WriteListBeginFunc: func(elemType thrift.TType, size int) error {
+						test.Assert(t, elemType == thrift.VOID)
+						test.Assert(t, size == 1)
+						return nil
+					},
+				},
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.LIST,
+					Elem: &descriptor.TypeDescriptor{
+						Type:   descriptor.VOID,
+						Struct: &descriptor.StructDescriptor{},
+					},
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
