@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package thrift
+package fast_thrift
 
 import (
 	"testing"
