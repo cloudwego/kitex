@@ -435,14 +435,6 @@ func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 		err                   error
 	)
 	for _, elem := range l {
-		if elem != nil {
-			if writer, err = nextWriter(elem, t.Elem, opt); err != nil {
-				return err
-			}
-			break
-		}
-	}
-	for _, elem := range l {
 		if elem == nil {
 			if defaultWriter == nil {
 				if zeroValue, defaultWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
@@ -453,6 +445,11 @@ func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 				return err
 			}
 		} else {
+			if writer == nil {
+				if writer, err = nextWriter(elem, t.Elem, opt); err != nil {
+					return err
+				}
+			}
 			if err := writer(ctx, elem, out, t.Elem, opt); err != nil {
 				return err
 			}
@@ -498,14 +495,6 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 		elemZeroValue     interface{}
 		err               error
 	)
-	for _, elem := range m {
-		if elem != nil {
-			if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
-				return err
-			}
-			break
-		}
-	}
 	for key, elem := range m {
 		if keyWriter == nil {
 			if keyWriter, err = nextWriter(key, t.Key, opt); err != nil {
@@ -525,6 +514,11 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 				return err
 			}
 		} else {
+			if elemWriter == nil {
+				if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
+					return err
+				}
+			}
 			if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
 				return err
 			}
@@ -548,16 +542,7 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 		elemWriter        writer
 		elemDefaultWriter writer
 		elemZeroValue     interface{}
-		err               error
 	)
-	for _, elem := range m {
-		if elem != nil {
-			if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
-				return err
-			}
-			break
-		}
-	}
 	for key, elem := range m {
 		_key, err := buildinTypeFromString(key, t.Key)
 		if err != nil {
@@ -581,6 +566,11 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 				return err
 			}
 		} else {
+			if elemWriter == nil {
+				if elemWriter, err = nextWriter(elem, t.Elem, opt); err != nil {
+					return err
+				}
+			}
 			if err := elemWriter(ctx, elem, out, t.Elem, opt); err != nil {
 				return err
 			}
