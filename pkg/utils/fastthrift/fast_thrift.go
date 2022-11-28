@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package fast_thrift
+package fastthrift
 
 import "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 
