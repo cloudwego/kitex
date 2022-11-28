@@ -73,6 +73,7 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 	body := map[string]interface{}{
 		"msg":        []byte(mockMyMsg),
 		"got_base64": true,
+		"num":        "",
 	}
 	data, err := json.Marshal(body)
 	if err != nil {
@@ -96,6 +97,7 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 	body = map[string]interface{}{
 		"msg":        string(mockMyMsg),
 		"got_base64": false,
+		"num":        0,
 	}
 	data, err = json.Marshal(body)
 	if err != nil {
@@ -129,6 +131,7 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 	body := map[string]interface{}{
 		"msg":        []byte(mockMyMsg),
 		"got_base64": false,
+		"num":        "0",
 	}
 	data, err := json.Marshal(body)
 	if err != nil {
