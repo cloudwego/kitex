@@ -650,7 +650,7 @@ func TestLongConnPoolCloseOnClean(t *testing.T) {
 	mu.RUnlock()
 
 	p.Clean("tcp", addr)
-	time.Sleep(time.Millisecond) // Wait for the clean goroutine to finish
+	time.Sleep(100 * time.Millisecond) // Wait for the clean goroutine to finish
 	mu.RLock()
 	test.Assert(t, closed)
 	mu.RUnlock()

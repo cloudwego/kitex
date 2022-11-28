@@ -34,8 +34,6 @@ var Binary binaryProtocol
 
 var _ BTProtocol = binaryProtocol{}
 
-const binaryInplaceThreshold = 4096 // 4k
-
 type binaryProtocol struct{}
 
 func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int {
@@ -148,10 +146,6 @@ func (binaryProtocol) WriteStringNocopy(buf []byte, binaryWriter BinaryWriter, v
 
 func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, value []byte) int {
 	l := Binary.WriteI32(buf, int32(len(value)))
-	if len(value) > binaryInplaceThreshold {
-		binaryWriter.WriteDirect(value, len(buf[l:]))
-		return l
-	}
 	copy(buf[l:], value)
 	return l + len(value)
 }
@@ -254,9 +248,6 @@ func (binaryProtocol) StringLengthNocopy(value string) int {
 
 func (binaryProtocol) BinaryLengthNocopy(value []byte) int {
 	l := Binary.I32Length(int32(len(value)))
-	if len(value) > binaryInplaceThreshold {
-		return l
-	}
 	return l + len(value)
 }
 
