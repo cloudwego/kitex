@@ -71,14 +71,5 @@ func (g *GenericServiceBinaryEchoImpl) GenericCall(ctx context.Context, method s
 	if num != 0 {
 		return nil, errors.New("call failed, incorrect num")
 	}
-	some := req["some"].(map[string]interface{})
-	id := some["id"].(int64)
-	if id != 0 {
-		return nil, errors.New("call failed, incorrect id")
-	}
-	text := some["text"].(string)
-	if text != "text" {
-		return nil, errors.New("call failed, incorrect id")
-	}
 	return req, nil
 }
