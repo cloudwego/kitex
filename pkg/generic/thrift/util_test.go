@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
 func TestSplitType(t *testing.T) {
@@ -38,4 +39,10 @@ func TestSplitType(t *testing.T) {
 	pkg, name = splitType("")
 	test.Assert(t, pkg == "")
 	test.Assert(t, name == "")
+}
+
+func TestBuildinTypeFromString(t *testing.T) {
+	val, err := buildinTypeFromString("", &descriptor.TypeDescriptor{Type: descriptor.I64})
+	test.Assert(t, err == nil)
+	test.Assert(t, val == int64(0))
 }
