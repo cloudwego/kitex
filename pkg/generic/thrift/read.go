@@ -375,11 +375,6 @@ func readStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDesc
 			if err != nil {
 				return nil, err
 			}
-			if field.ValueMapping != nil {
-				if val, err = field.ValueMapping.Response(ctx, val, field); err != nil {
-					return nil, err
-				}
-			}
 			nest()
 
 			if err := fs(field, val); err != nil {

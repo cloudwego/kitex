@@ -67,8 +67,8 @@ func (g *GenericServiceBinaryEchoImpl) GenericCall(ctx context.Context, method s
 	if gotBase64 && req["msg"].(string) != base64.StdEncoding.EncodeToString([]byte(mockMyMsg)) {
 		return nil, errors.New("call failed, incorrect base64 data")
 	}
-	num := req["num"].(int64)
-	if num != 0 {
+	num := req["num"].(string)
+	if num != "0" {
 		return nil, errors.New("call failed, incorrect num")
 	}
 	return req, nil
