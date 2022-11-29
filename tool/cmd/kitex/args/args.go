@@ -115,6 +115,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"gen_setter",
 		"gen_deep_equal",
 		"compatible_names",
+		"frugal_tag",
 	)
 
 	for _, e := range a.extends {
