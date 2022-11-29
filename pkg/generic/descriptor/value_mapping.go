@@ -44,9 +44,6 @@ var NewAPIJSConv NewValueMapping = func(value string) ValueMapping {
 // FIXME: compatible with old usages
 // we just return the origin val instead of return error
 func (m *apiJSConv) Request(ctx context.Context, val interface{}, field *FieldDescriptor) (interface{}, error) {
-	if field != nil && field.HTTPMapping != nil {
-		return val, nil
-	}
 	switch v := val.(type) {
 	case string:
 		i, _ := strconv.ParseInt(v, 10, 64)

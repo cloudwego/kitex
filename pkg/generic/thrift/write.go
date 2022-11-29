@@ -742,7 +742,7 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 			}
 			continue
 		}
-		if field.ValueMapping != nil {
+		if field.ValueMapping != nil && field.HTTPMapping == nil {
 			if v, err = field.ValueMapping.Request(ctx, v, field); err != nil {
 				return err
 			}
