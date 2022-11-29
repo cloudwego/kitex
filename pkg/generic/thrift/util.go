@@ -34,7 +34,7 @@ var typeZeroValueMap = map[descriptor.Type]string{
 	descriptor.I64:    "0",
 	descriptor.DOUBLE: "0",
 	descriptor.STRING: "",
-	descriptor.LIST:   "[]",
+	descriptor.LIST:   "",
 }
 
 func assertType(expected, but descriptor.Type) error {

@@ -17,6 +17,7 @@
 package thrift
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -42,7 +43,28 @@ func TestSplitType(t *testing.T) {
 }
 
 func TestBuildinTypeFromString(t *testing.T) {
-	val, err := buildinTypeFromString("", &descriptor.TypeDescriptor{Type: descriptor.I64})
+	val, err := buildinTypeFromString("", &descriptor.TypeDescriptor{Type: descriptor.BOOL})
+	test.Assert(t, err == nil)
+	test.Assert(t, val == false)
+	val, err = buildinTypeFromString("", &descriptor.TypeDescriptor{Type: descriptor.I08})
+	test.Assert(t, err == nil)
+	test.Assert(t, val == int8(0))
+	val, err = buildinTypeFromString("", &descriptor.TypeDescriptor{Type: descriptor.I16})
+	test.Assert(t, err == nil)
+	test.Assert(t, val == int16(0))
+	val, err = buildinTypeFromString("", &descriptor.TypeDescriptor{Type: descriptor.I32})
+	test.Assert(t, err == nil)
+	test.Assert(t, val == int32(0))
+	val, err = buildinTypeFromString("", &descriptor.TypeDescriptor{Type: descriptor.I64})
 	test.Assert(t, err == nil)
 	test.Assert(t, val == int64(0))
+	val, err = buildinTypeFromString("", &descriptor.TypeDescriptor{Type: descriptor.DOUBLE})
+	test.Assert(t, err == nil)
+	test.Assert(t, val == float64(0))
+	val, err = buildinTypeFromString("", &descriptor.TypeDescriptor{Type: descriptor.STRING})
+	test.Assert(t, err == nil)
+	test.Assert(t, val == "")
+	val, err = buildinTypeFromString("", &descriptor.TypeDescriptor{Type: descriptor.LIST, Elem: &descriptor.TypeDescriptor{Type: descriptor.I64}})
+	test.Assert(t, err == nil)
+	test.Assert(t, reflect.DeepEqual(val, []interface{}{int64(0)}))
 }
