@@ -136,7 +136,7 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 		t.Fatal(err)
 	}
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err.Error() == "remote or network error[remote]: biz error: call failed, incorrect num", err)
+	test.Assert(t, err.Error() == "remote or network error[remote]: biz error: call failed, incorrect num")
 
 	svr.Stop()
 }
