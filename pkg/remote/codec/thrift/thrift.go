@@ -39,11 +39,6 @@ const (
 	FastRead
 )
 
-// NewThriftCodec creates the thrift binary codec.
-func NewThriftCodec() remote.PayloadCodec {
-	return &thriftCodec{FastWrite | FastRead}
-}
-
 // NewThriftFrugalCodec creates the thrift binary codec powered by frugal.
 // Eg: xxxservice.NewServer(handler, server.WithPayloadCodec(thrift.NewThriftCodecWithConfig(thrift.FastWrite | thrift.FastRead)))
 func NewThriftCodecWithConfig(c CodecType) remote.PayloadCodec {
