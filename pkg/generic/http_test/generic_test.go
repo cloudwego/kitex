@@ -117,6 +117,27 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, gr.Body["msg"] == mockMyMsg)
 
+	// []byte value for binary field
+	body = map[string]interface{}{
+		"msg":        []byte(mockMyMsg),
+		"got_base64": true,
+		"num":        "123",
+	}
+	data, err = json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+	req, err = http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
+	customReq, err = generic.FromHTTPRequest(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err.Error() == "remote or network error[remote]: biz error: call failed, incorrect num", err)
+
 	svr.Stop()
 }
 
