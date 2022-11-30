@@ -34,14 +34,15 @@ const (
 	KitexGenPath = "kitex_gen"
 	DefaultCodec = "thrift"
 
-	BuildFileName     = "build.sh"
-	BootstrapFileName = "bootstrap.sh"
-	HandlerFileName   = "handler.go"
-	MainFileName      = "main.go"
-	ClientFileName    = "client.go"
-	ServerFileName    = "server.go"
-	InvokerFileName   = "invoker.go"
-	ServiceFileName   = "*service.go"
+	BuildFileName       = "build.sh"
+	BootstrapFileName   = "bootstrap.sh"
+	ToolVersionFileName = "kitex.yaml"
+	HandlerFileName     = "handler.go"
+	MainFileName        = "main.go"
+	ClientFileName      = "client.go"
+	ServerFileName      = "server.go"
+	InvokerFileName     = "invoker.go"
+	ServiceFileName     = "*service.go"
 
 	DefaultThriftPluginTimeLimit = time.Minute
 )
@@ -295,6 +296,11 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 			Name: BootstrapFileName,
 			Path: filepath.Join(g.OutputPath, "script", BootstrapFileName),
 			Text: tpl.BootstrapTpl,
+		},
+		{
+			Name: ToolVersionFileName,
+			Path: filepath.Join(g.OutputPath, ToolVersionFileName),
+			Text: tpl.ToolVersionTpl,
 		},
 	}
 	if !g.Config.GenerateInvoker {
