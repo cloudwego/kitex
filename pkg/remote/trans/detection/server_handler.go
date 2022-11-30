@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"context"
 	"net"
+	"time"
 
 	"github.com/cloudwego/netpoll"
 
@@ -89,9 +90,17 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		return r.handler.OnRead(r.ctx, conn)
 	}
 	// Check the validity of client preface.
-	zr := conn.(netpoll.Connection).Reader()
-	// read at most avoid block
-	preface, err := zr.Peek(prefaceReadAtMost)
+	var preface []byte
+	var err error
+	if npConn, ok := conn.(netpoll.Connection); ok {
+		zr := npConn.Reader()
+		// read at most avoid block
+		preface, err = zr.Peek(prefaceReadAtMost)
+	} else {
+		preface = make([]byte, prefaceReadAtMost)
+		conn.SetReadDeadline(time.Now().Add(time.Second))
+		_, err = conn.Read(preface)
+	}
 	if err != nil {
 		return err
 	}
