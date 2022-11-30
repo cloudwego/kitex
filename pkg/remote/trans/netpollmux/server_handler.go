@@ -317,26 +317,39 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
 	msg.TransInfo().TransStrInfo()[transmeta.HeaderConnectionReadyToReset] = "1"
 
-	t.conns.Range(func(k, v interface{}) bool {
-		wbuf := netpoll.NewLinkBuffer()
-		bufWriter := np.NewWriterByteBuffer(wbuf)
-		err := t.codec.Encode(ctx, msg, bufWriter)
-		bufWriter.Release(err)
-		if err == nil {
-			v.(*muxSvrConn).Put(func() (buf netpoll.Writer, isNil bool) {
-				return wbuf, false
-			})
-		} else {
-			c := v.(*muxSvrConn)
-			klog.Warn("KITEX: signal connection closing error:",
-				err.Error(), c.LocalAddr().String(), "=>", c.RemoteAddr().String())
-		}
-		return true
-	})
 	// wait until all notifications are sent and clients stop using those connections
 	done := make(chan struct{})
 	go func() {
+		// 1. write control frames to all connections
+		t.conns.Range(func(k, v interface{}) bool {
+			sconn := v.(*muxSvrConn)
+			if !sconn.IsActive() {
+				return true
+			}
+			wbuf := netpoll.NewLinkBuffer()
+			bufWriter := np.NewWriterByteBuffer(wbuf)
+			err := t.codec.Encode(ctx, msg, bufWriter)
+			bufWriter.Release(err)
+			if err == nil {
+				sconn.Put(func() (buf netpoll.Writer, isNil bool) {
+					return wbuf, false
+				})
+			} else {
+				klog.Warn("KITEX: signal connection closing error:",
+					err.Error(), sconn.LocalAddr().String(), "=>", sconn.RemoteAddr().String())
+			}
+			return true
+		})
+		// 2. waiting for all tasks finished
 		t.tasks.Wait()
+		// 3. waiting for all connections have been shutdown gracefully
+		t.conns.Range(func(k, v interface{}) bool {
+			sconn := v.(*muxSvrConn)
+			if sconn.IsActive() {
+				sconn.GracefulShutdown()
+			}
+			return true
+		})
 		close(done)
 	}()
 	for {
