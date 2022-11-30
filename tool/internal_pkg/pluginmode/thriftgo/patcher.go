@@ -58,6 +58,7 @@ type patcher struct {
 	recordCmd []string
 
 	fileTpl *template.Template
+	refTpl  *template.Template
 }
 
 func (p *patcher) buildTemplates() (err error) {
@@ -150,6 +151,14 @@ func (p *patcher) buildTemplates() (err error) {
 		return fmt.Errorf("failed to parse extra templates: %w: %q", err, ext)
 	}
 	p.fileTpl = tpl
+
+	refAll := template.New("kitex").Funcs(m)
+	refTpls := []string{emptyFile}
+	for _, refTpl := range refTpls {
+		refAll = template.Must(refAll.Parse(refTpl))
+	}
+	p.refTpl = refAll
+
 	return nil
 }
 
@@ -160,6 +169,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 	protection := make(map[string]*plugin.Generated)
 
 	for ast := range req.AST.DepthFirstSearch() {
+
 		scope, err := golang.BuildScope(p.utils, ast)
 		if err != nil {
 			return nil, fmt.Errorf("build scope for ast %q: %w", ast.Filename, err)
@@ -187,6 +197,12 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		}
 
 		buf.Reset()
+
+		fileTpl := p.fileTpl
+		if ok, _ := golang.DoRef(ast.Filename); ok {
+			fileTpl = p.refTpl
+		}
+
 		data := &struct {
 			Scope   *golang.Scope
 			PkgName string
@@ -197,8 +213,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
 		}
 		p.filterStdLib(data.Imports)
-
-		if err = p.fileTpl.ExecuteTemplate(&buf, "file", data); err != nil {
+		if err = fileTpl.ExecuteTemplate(&buf, "file", data); err != nil {
 			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
 		}
 		patches = append(patches, &plugin.Generated{
