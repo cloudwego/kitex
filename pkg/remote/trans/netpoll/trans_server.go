@@ -115,7 +115,10 @@ func (ts *transServer) Shutdown() (err error) {
 			ts.ln.Close()
 
 			// 2. signal all active connections to close gracefully
-			g.GracefulShutdown(ctx)
+			err = g.GracefulShutdown(ctx)
+			if err != nil {
+				klog.Warnf("KITEX: server graceful shutdown error: %v", err)
+			}
 		}
 	}
 	if ts.evl != nil {
