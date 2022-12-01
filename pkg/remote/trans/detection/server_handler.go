@@ -21,6 +21,7 @@ package detection
 import (
 	"bytes"
 	"context"
+	"io"
 	"net"
 	"time"
 
@@ -96,10 +97,12 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		zr := npConn.Reader()
 		// read at most avoid block
 		preface, err = zr.Peek(prefaceReadAtMost)
+		//preface, err = zr.ReadBinary(prefaceReadAtMost)
 	} else {
 		preface = make([]byte, prefaceReadAtMost)
 		conn.SetReadDeadline(time.Now().Add(time.Second))
-		_, err = conn.Read(preface)
+		_, err = io.ReadFull(conn, preface)
+		//_, err = conn.Read(preface)
 	}
 	if err != nil {
 		return err

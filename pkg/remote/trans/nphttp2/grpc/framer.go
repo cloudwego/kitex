@@ -20,7 +20,6 @@ import (
 	"io"
 	"net"
 
-	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2/hpack"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
@@ -28,17 +27,20 @@ import (
 
 type framer struct {
 	*grpcframe.Framer
-	reader netpoll.Reader
+	reader io.Reader //netpoll.Reader
 	writer *bufWriter
 }
 
 func newFramer(conn net.Conn, writeBufferSize, readBufferSize, maxHeaderListSize uint32) *framer {
-	var r netpoll.Reader
-	if npconn, ok := conn.(netpoll.Connection); ok {
-		r = npconn.Reader()
-	} else {
-		r = netpoll.NewReader(conn)
-	}
+	//var r netpoll.Reader
+	//if npconn, ok := conn.(netpoll.Connection); ok {
+	//	r = npconn.Reader()
+	//} else {
+	//	r = netpoll.NewReader(conn)
+	//}
+	var r io.Reader
+	r = conn.(io.Reader)
+
 	w := newBufWriter(conn, int(writeBufferSize))
 	fr := &framer{
 		reader: r,

@@ -15,8 +15,8 @@ package grpcframe
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 
-	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 )
@@ -76,7 +76,7 @@ func (f *DataFrame) Data() []byte {
 	return f.data
 }
 
-func parseDataFrame(fc *frameCache, fh http2.FrameHeader, payload netpoll.Reader) (http2.Frame, error) {
+func parseDataFrame(fc *frameCache, fh http2.FrameHeader, payload io.Reader) (http2.Frame, error) {
 	if fh.StreamID == 0 {
 		// DATA frames MUST be associated with a stream. If a
 		// DATA frame is received whose stream identifier
@@ -92,7 +92,9 @@ func parseDataFrame(fc *frameCache, fh http2.FrameHeader, payload netpoll.Reader
 	payloadLen := int(fh.Length)
 	if fh.Flags.Has(http2.FlagDataPadded) {
 		var err error
-		padSize, err = payload.ReadByte()
+		s := make([]byte, 1)
+		_, err = payload.Read(s)
+		padSize = s[0]
 		payloadLen--
 		if err != nil {
 			return nil, err
@@ -105,7 +107,11 @@ func parseDataFrame(fc *frameCache, fh http2.FrameHeader, payload netpoll.Reader
 		// Filed: https://github.com/http2/http2-spec/issues/610
 		return nil, connError{http2.ErrCodeProtocol, "pad size larger than data payload"}
 	}
-	data, err := payload.Next(payloadLen)
+	data := make([]byte, payloadLen)
+	n, err := payload.Read(data)
+	if n < payloadLen {
+		return nil, fmt.Errorf("DEBUG: DATA frame payload size was %d; want %d", n, payloadLen)
+	}
 	if err != nil {
 		return nil, err
 	}

@@ -21,6 +21,7 @@
 package grpc
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -231,21 +232,21 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 	}()
 
 	// Check the validity of client preface.
-	//preface := make([]byte, len(ClientPreface))
-	//if _, err := io.ReadFull(t.conn, preface); err != nil {
-	//	// In deployments where a gRPC server runs behind a cloud load balancer
-	//	// which performs regular TCP level health checks, the connection is
-	//	// closed immediately by the latter.  Returning io.EOF here allows the
-	//	// grpc server implementation to recognize this scenario and suppress
-	//	// logging to reduce spam.
-	//	if err == io.EOF {
-	//		return nil, io.EOF
-	//	}
-	//	return nil, connectionErrorf(false, err, "transport: http2Server.HandleStreams failed to receive the preface from client: %v", err)
-	//}
-	//if !bytes.Equal(preface, ClientPreface) {
-	//	return nil, connectionErrorf(false, nil, "transport: http2Server.HandleStreams received bogus greeting from client: %q", preface)
-	//}
+	preface := make([]byte, len(ClientPreface))
+	if _, err := io.ReadFull(t.conn, preface); err != nil {
+		// In deployments where a gRPC server runs behind a cloud load balancer
+		// which performs regular TCP level health checks, the connection is
+		// closed immediately by the latter.  Returning io.EOF here allows the
+		// grpc server implementation to recognize this scenario and suppress
+		// logging to reduce spam.
+		if err == io.EOF {
+			return nil, io.EOF
+		}
+		return nil, connectionErrorf(false, err, "transport: http2Server.HandleStreams failed to receive the preface from client: %v", err)
+	}
+	if !bytes.Equal(preface, ClientPreface) {
+		return nil, connectionErrorf(false, nil, "transport: http2Server.HandleStreams received bogus greeting from client: %q", preface)
+	}
 
 	frame, err := t.framer.ReadFrame()
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
@@ -429,7 +430,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 		default:
 			klog.CtxErrorf(t.ctx, "transport: http2Server.HandleStreams found unhandled frame type %v.", frame)
 		}
-		t.framer.reader.Release()
+		t.framer.reader = nil
 	}
 }
 
