@@ -158,12 +158,9 @@ func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 
 // Init to build Retryer with code config.
 func (rc *Container) Init(mp map[string]Policy, rr *ShouldResultRetry) (err error) {
-	rc.shouldResultRetry = rr
 	// NotifyPolicyChange func may execute before Init func.
 	// Because retry Container is built before Client init, NotifyPolicyChange can be triggered first
-	// Notice, updateRetryer must be called after shouldResultRetry is set
-	rc.updateRetryer()
-
+	rc.updateRetryer(rr)
 	rc.hasCodeCfg, err = rc.InitWithPolicies(mp)
 	if err != nil {
 		rc.msg = err.Error()
@@ -286,9 +283,11 @@ func (rc *Container) initRetryer(method string, p Policy) error {
 	return nil
 }
 
-func (rc *Container) updateRetryer() {
+func (rc *Container) updateRetryer(rr *ShouldResultRetry) {
 	rc.Lock()
 	defer rc.Unlock()
+
+	rc.shouldResultRetry = rr
 	if rc.shouldResultRetry != nil {
 		rc.retryerMap.Range(func(key, value interface{}) bool {
 			if fr, ok := value.(*failureRetryer); ok && fr.policy.ShouldResultRetry == nil {
