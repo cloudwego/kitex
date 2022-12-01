@@ -37,11 +37,6 @@ const (
 	FrugalRead
 )
 
-// NewThriftCodec creates the thrift binary codec.
-func NewThriftCodec() remote.PayloadCodec {
-	return &thriftCodec{FrugalWrite | FrugalRead | FastWrite | FastRead}
-}
-
 // hyperMarshalEnabled indicates that if there are high priority message codec for current platform.
 func (c thriftCodec) hyperMarshalEnabled() bool {
 	return c.CodecType&FrugalWrite != 0
