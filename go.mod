@@ -9,17 +9,17 @@ require (
 	github.com/cloudwego/fastpb v0.0.3
 	github.com/cloudwego/frugal v0.1.3
 	github.com/cloudwego/netpoll v0.3.1
-	github.com/cloudwego/thriftgo v0.2.1
+	github.com/cloudwego/thriftgo v0.2.4
 	github.com/golang/mock v1.6.0
 	github.com/google/pprof v0.0.0-20220608213341-c488b8fa1db3
 	github.com/jhump/protoreflect v1.8.2
 	github.com/json-iterator/go v1.1.12
 	github.com/tidwall/gjson v1.9.3
-	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20220817070843-5a390386f1f2
-	golang.org/x/tools v0.1.1
-	google.golang.org/genproto v0.0.0-20210513213006-bf773b8c8384
-	google.golang.org/protobuf v1.28.0
+	golang.org/x/net v0.0.0-20221014081412-f15817d10f9b
+	golang.org/x/sync v0.1.0
+	golang.org/x/sys v0.0.0-20220908164124-27713097b956
+	golang.org/x/tools v0.1.12
+	google.golang.org/genproto v0.0.0-20221024183307-1bc688fe9f3e
+	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v3 v3.0.1
 )
