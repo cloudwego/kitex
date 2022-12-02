@@ -96,7 +96,7 @@ type Container struct {
 	retryerMap  sync.Map // <method: retryer>
 	cbContainer *cbContainer
 	msg         string
-	sync.Mutex
+	sync.RWMutex
 
 	// shouldResultRetry is only used with FailureRetry
 	shouldResultRetry *ShouldResultRetry
@@ -110,12 +110,13 @@ type cbContainer struct {
 
 // InitWithPolicies to init Retryer with methodPolicies
 // Notice, InitWithPolicies is export func, the lock should be added inside
-func (rc *Container) InitWithPolicies(methodPolicies map[string]Policy) (inited bool, err error) {
+func (rc *Container) InitWithPolicies(methodPolicies map[string]Policy) error {
 	if methodPolicies == nil {
-		return
+		return nil
 	}
 	rc.Lock()
 	defer rc.Unlock()
+	var inited bool
 	for m := range methodPolicies {
 		if methodPolicies[m].Enable {
 			inited = true
@@ -123,12 +124,14 @@ func (rc *Container) InitWithPolicies(methodPolicies map[string]Policy) (inited 
 				// NotifyPolicyChange may happen before
 				continue
 			}
-			if err = rc.initRetryer(m, methodPolicies[m]); err != nil {
-				return false, err
+			if err := rc.initRetryer(m, methodPolicies[m]); err != nil {
+				rc.msg = err.Error()
+				return err
 			}
 		}
 	}
-	return
+	rc.hasCodeCfg = inited
+	return nil
 }
 
 // NotifyPolicyChange to receive policy when it changes
@@ -161,9 +164,7 @@ func (rc *Container) Init(mp map[string]Policy, rr *ShouldResultRetry) (err erro
 	// NotifyPolicyChange func may execute before Init func.
 	// Because retry Container is built before Client init, NotifyPolicyChange can be triggered first
 	rc.updateRetryer(rr)
-	rc.hasCodeCfg, err = rc.InitWithPolicies(mp)
-	if err != nil {
-		rc.msg = err.Error()
+	if err = rc.InitWithPolicies(mp); err != nil {
 		return fmt.Errorf("NewRetryer in Init failed, err=%w", err)
 	}
 	return nil
@@ -251,6 +252,7 @@ func (rc *Container) getRetryer(ri rpcinfo.RPCInfo) Retryer {
 
 // Dump is used to show current retry policy
 func (rc *Container) Dump() interface{} {
+	rc.RLock()
 	dm := make(map[string]interface{})
 	dm["has_code_cfg"] = rc.hasCodeCfg
 	rc.retryerMap.Range(func(key, value interface{}) bool {
@@ -262,6 +264,7 @@ func (rc *Container) Dump() interface{} {
 	if rc.msg != "" {
 		dm["msg"] = rc.msg
 	}
+	rc.RUnlock()
 	return dm
 }
 
