@@ -26,17 +26,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
-var typeZeroValueMap = map[descriptor.Type]string{
-	descriptor.BOOL:   "false",
-	descriptor.I08:    "0",
-	descriptor.I16:    "0",
-	descriptor.I32:    "0",
-	descriptor.I64:    "0",
-	descriptor.DOUBLE: "0",
-	descriptor.STRING: "",
-	descriptor.LIST:   "",
-}
-
 func assertType(expected, but descriptor.Type) error {
 	if expected == but {
 		return nil
@@ -81,9 +70,6 @@ func requestMappingValue(ctx context.Context, req *descriptor.HTTPRequest, field
 
 func buildinTypeFromString(s string, t *descriptor.TypeDescriptor) (interface{}, error) {
 	tt := t.Type
-	if s == "" {
-		s = typeZeroValueMap[tt]
-	}
 	switch tt {
 	case descriptor.BOOL:
 		switch s {
@@ -111,6 +97,9 @@ func buildinTypeFromString(s string, t *descriptor.TypeDescriptor) (interface{},
 		}
 		return int32(i), nil
 	case descriptor.I64:
+		if s == "" {
+			s = "0"
+		}
 		i, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
 			return nil, err
