@@ -33,7 +33,7 @@ var (
 type metainfoClientHandler struct{}
 
 func (mi *metainfoClientHandler) WriteMeta(ctx context.Context, sendMsg remote.Message) (context.Context, error) {
-	if metainfo.HasMetaInfo(ctx) {
+	if sendMsg.ProtocolInfo().TransProto.WithMeta() && metainfo.HasMetaInfo(ctx) {
 		kvs := make(map[string]string)
 		metainfo.SaveMetaInfoToMap(ctx, kvs)
 		sendMsg.TransInfo().PutTransStrInfo(kvs)
@@ -53,17 +53,22 @@ func (mi *metainfoClientHandler) ReadMeta(ctx context.Context, recvMsg remote.Me
 type metainfoServerHandler struct{}
 
 func (mi *metainfoServerHandler) ReadMeta(ctx context.Context, recvMsg remote.Message) (context.Context, error) {
-	if kvs := recvMsg.TransInfo().TransStrInfo(); len(kvs) > 0 {
-		ctx = metainfo.SetMetaInfoFromMap(ctx, kvs)
+	if recvMsg.ProtocolInfo().TransProto.WithMeta() {
+		if kvs := recvMsg.TransInfo().TransStrInfo(); len(kvs) > 0 {
+			ctx = metainfo.SetMetaInfoFromMap(ctx, kvs)
+		}
+		ctx = metainfo.WithBackwardValuesToSend(ctx)
 	}
-	ctx = metainfo.WithBackwardValuesToSend(ctx)
+
 	ctx = metainfo.TransferForward(ctx)
 	return ctx, nil
 }
 
 func (mi *metainfoServerHandler) WriteMeta(ctx context.Context, sendMsg remote.Message) (context.Context, error) {
-	if kvs := metainfo.AllBackwardValuesToSend(ctx); len(kvs) > 0 {
-		sendMsg.TransInfo().PutTransStrInfo(kvs)
+	if sendMsg.ProtocolInfo().TransProto.WithMeta() {
+		if kvs := metainfo.AllBackwardValuesToSend(ctx); len(kvs) > 0 {
+			sendMsg.TransInfo().PutTransStrInfo(kvs)
+		}
 	}
 
 	return ctx, nil
