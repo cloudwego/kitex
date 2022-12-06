@@ -91,7 +91,12 @@ func (c thriftCodec) hyperMarshal(data interface{}, message remote.Message, out 
 	// encode message
 	offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
 	var writeLen int
-	writeLen, err = frugal.EncodeObject(buf[offset:], nil, data)
+	nw, nwOk := out.(remote.NocopyWrite)
+	if nwOk {
+		writeLen, err = frugal.EncodeObject(buf[offset:], nil, data)
+	} else {
+		writeLen, err = frugal.EncodeObject(buf[offset:], nw, data)
+	}
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Encode failed: %s", err.Error()))
 	}
