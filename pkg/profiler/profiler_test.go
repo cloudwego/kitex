@@ -75,8 +75,8 @@ func TestProfiler(t *testing.T) {
 }
 
 func TestProfilerPaused(t *testing.T) {
-	interval := time.Millisecond * 100
-	window := time.Millisecond * 100
+	interval := time.Millisecond * 50
+	window := time.Millisecond * 50
 	var count int32
 	p := NewProfiler(func(profiles []*TagsProfile) error {
 		atomic.AddInt32(&count, 1)
@@ -89,7 +89,7 @@ func TestProfilerPaused(t *testing.T) {
 		test.Assert(t, err == nil, err)
 		close(stopCh)
 	}()
-	time.Sleep(interval / 2)
+	time.Sleep(interval)
 
 	var data bytes.Buffer
 	for i := 0; i < 5; i++ {
@@ -101,7 +101,6 @@ func TestProfilerPaused(t *testing.T) {
 		pprof.StopCPUProfile()
 		p.Resume()
 		p.Resume() // resume twice by mistake
-		time.Sleep(interval)
 	}
 
 	for atomic.LoadInt32(&count) > 5 { // wait for processor finished
@@ -109,6 +108,7 @@ func TestProfilerPaused(t *testing.T) {
 	}
 
 	p.Stop()
+	p.Stop() // stop twice by mistake
 	<-stopCh
 }
 

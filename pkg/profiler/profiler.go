@@ -24,7 +24,7 @@ import (
 	"runtime/pprof"
 	"sort"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/google/pprof/profile"
@@ -68,25 +68,30 @@ func NewProfiler(processor Processor, interval, window time.Duration) *profiler 
 		processor = LogProcessor
 	}
 	return &profiler{
-		stateTrigger: make(chan struct{}),
-		processor:    processor,
-		interval:     interval,
-		window:       window,
+		stateCond: sync.NewCond(&sync.Mutex{}),
+		processor: processor,
+		interval:  interval,
+		window:    window,
 	}
 }
 
 var _ Profiler = (*profiler)(nil)
 
 const (
-	stateRunning = 0
-	statePaused  = 1
-	stateStopped = 2
+	// state changes:
+	//   running => pausing => paused => resuming => running
+	//           => stopped
+	stateRunning  = 0
+	statePausing  = 1
+	statePaused   = 2
+	stateResuming = 3
+	stateStopped  = 4
 )
 
 type profiler struct {
-	data         bytes.Buffer // protobuf
-	stateTrigger chan struct{}
-	state        int32
+	data      bytes.Buffer // protobuf
+	state     int
+	stateCond *sync.Cond
 	// settings
 	processor Processor
 	interval  time.Duration // sleep time between every profiling window
@@ -130,58 +135,45 @@ func (p *profiler) Prepare(ctx context.Context) context.Context {
 	return context.WithValue(ctx, profilerContextKey{}, newProfilerContext(p))
 }
 
-// Stop the profiler analyse loop
+// State return current profiler state
+func (p *profiler) State() (state int) {
+	p.stateCond.L.Lock()
+	state = p.state
+	p.stateCond.L.Unlock()
+	return state
+}
+
+// Stop the profiler
 func (p *profiler) Stop() {
-	for !atomic.CompareAndSwapInt32(&p.state, stateRunning, stateStopped) {
-		// wait for profiler to running state
-		time.Sleep(time.Second)
+	if p.State() == stateStopped {
+		return
 	}
-	p.stateTrigger <- struct{}{}
+	// stateRunning => stateStopped
+	p.stateChange(stateRunning, stateStopped)
 }
 
-func (p *profiler) State() int32 {
-	return atomic.LoadInt32(&p.state)
-}
-
-// Pause the profiler
+// Pause the profiler.
+// The profiler has been paused when Pause() return
 func (p *profiler) Pause() {
-	if atomic.CompareAndSwapInt32(&p.state, stateRunning, statePaused) {
-		// stop first then trigger
-		p.stopProfile()
-		p.stateTrigger <- struct{}{}
-	}
-}
-
-func (p *profiler) waitResumed() {
 	if p.State() == statePaused {
-		for p.State() != stateRunning {
-			// prevent if resumed twice
-			<-p.stateTrigger
-		}
+		return
 	}
+	// stateRunning => statePausing
+	p.stateChange(stateRunning, statePausing)
+	// => statePaused
+	p.stateWait(statePaused)
 }
 
-// Resume the profiler
+// Resume the profiler.
+// The profiler has been resumed when Resume() return
 func (p *profiler) Resume() {
-	if atomic.CompareAndSwapInt32(&p.state, statePaused, stateRunning) {
-		p.stateTrigger <- struct{}{}
+	if p.State() == stateRunning {
+		return
 	}
-}
-
-func timeoutOrTrigger(timer *time.Timer, trigger chan struct{}) {
-	select {
-	case <-timer.C:
-		// clear trigger if it's also active
-		select {
-		case <-trigger:
-		default:
-		}
-	case <-trigger:
-		// stop timer when trigger active
-		if !timer.Stop() {
-			<-timer.C
-		}
-	}
+	// statePaused => stateResuming
+	p.stateChange(statePaused, stateResuming)
+	// => stateRunning
+	p.stateWait(stateRunning)
 }
 
 // Run start analyse the pprof data with interval and window settings
@@ -189,18 +181,27 @@ func (p *profiler) Run(ctx context.Context) (err error) {
 	var profiles []*TagsProfile
 	timer := time.NewTimer(0)
 	for {
-		// wait for an internal time to reduce the cost of profiling
+		// check state
+		state := p.State()
+		switch state {
+		case stateRunning: // do nothing
+		case statePausing: // pause the loop
+			p.stateChange(statePausing, statePaused) // wake up Pause()
+			klog.Info("KITEX: profiler paused")
+			p.stateChange(stateResuming, stateRunning) // wake up Resume()
+			klog.Info("KITEX: profiler resumed")
+			continue
+		case statePaused, stateResuming: // actually, no such case
+			continue
+		case stateStopped: // end the loop
+			klog.Info("KITEX: profiler stopped")
+			return nil
+		}
+
+		// wait for an interval time to reduce the cost of profiling
 		if p.interval > 0 {
 			timer.Reset(p.interval)
-			timeoutOrTrigger(timer, p.stateTrigger)
-		}
-		switch p.State() {
-		case stateStopped:
-			return nil
-		case statePaused:
-			klog.Info("KITEX: profiler paused")
-			p.waitResumed()
-			klog.Info("KITEX: profiler resumed")
+			<-timer.C
 		}
 
 		// start profiler
@@ -215,17 +216,7 @@ func (p *profiler) Run(ctx context.Context) (err error) {
 		// wait for a window time to collect pprof data
 		if p.window > 0 {
 			timer.Reset(p.window)
-			timeoutOrTrigger(timer, p.stateTrigger)
-		}
-		switch p.State() {
-		case stateStopped:
-			p.stopProfile()
-			return nil
-		case statePaused:
-			klog.Info("KITEX: profiler paused")
-			p.waitResumed()
-			klog.Info("KITEX: profiler resumed")
-			continue
+			<-timer.C
 		}
 
 		// stop profiler
@@ -275,6 +266,24 @@ func (p *profiler) Untag(ctx context.Context) {
 
 func (p *profiler) Lookup(ctx context.Context, key string) (string, bool) {
 	return pprof.Label(ctx, key)
+}
+
+func (p *profiler) stateChange(from, to int) {
+	p.stateCond.L.Lock()
+	for p.state != from { // wait state to from first
+		p.stateCond.Wait()
+	}
+	p.state = to
+	p.stateCond.L.Unlock()
+	p.stateCond.Broadcast()
+}
+
+func (p *profiler) stateWait(to int) {
+	p.stateCond.L.Lock()
+	for p.state != to {
+		p.stateCond.Wait()
+	}
+	p.stateCond.L.Unlock()
 }
 
 func (p *profiler) startProfile() error {
