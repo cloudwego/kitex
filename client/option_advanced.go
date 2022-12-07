@@ -50,7 +50,6 @@ func WithHTTPConnection() Option {
 // WithClientBasicInfo provides initial information for client endpoint in RPCInfo.
 func WithClientBasicInfo(ebi *rpcinfo.EndpointBasicInfo) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
-		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithClientBasicInfo(%+v)", ebi))
 		if ebi != nil {
 			o.Cli = ebi
