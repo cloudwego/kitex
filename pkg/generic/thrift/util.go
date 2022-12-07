@@ -59,6 +59,9 @@ func requestMappingValue(ctx context.Context, req *descriptor.HTTPRequest, field
 	case json.Number:
 		return buildinTypeFromString(string(v), t)
 	case string:
+		if v == "" && t.Type == descriptor.I64 {
+			v = "0"
+		}
 		return buildinTypeFromString(v, t)
 	case map[string]interface{}:
 		return v, nil
@@ -97,9 +100,6 @@ func buildinTypeFromString(s string, t *descriptor.TypeDescriptor) (interface{},
 		}
 		return int32(i), nil
 	case descriptor.I64:
-		if s == "" {
-			s = "0"
-		}
 		i, err := strconv.ParseInt(s, 10, 64)
 		if err != nil {
 			return nil, err
