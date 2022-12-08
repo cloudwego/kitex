@@ -55,5 +55,5 @@ func TestRequestMappingValue(t *testing.T) {
 		},
 	)
 	test.Assert(t, err == nil)
-	test.Assert(t, val == int64(0))
+	test.Assert(t, val == "")
 }
