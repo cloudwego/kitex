@@ -17,9 +17,11 @@
 package thrift
 
 import (
+	"context"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
 func TestSplitType(t *testing.T) {
@@ -38,4 +40,20 @@ func TestSplitType(t *testing.T) {
 	pkg, name = splitType("")
 	test.Assert(t, pkg == "")
 	test.Assert(t, name == "")
+}
+
+func TestRequestMappingValue(t *testing.T) {
+	httpMapping := descriptor.NewAPIBody
+	val, err := requestMappingValue(context.Background(),
+		&descriptor.HTTPRequest{
+			Body:        map[string]interface{}{"num": ""},
+			ContentType: descriptor.MIMEApplicationJson,
+		},
+		&descriptor.FieldDescriptor{
+			Type:        &descriptor.TypeDescriptor{Type: descriptor.I64},
+			HTTPMapping: httpMapping("num"),
+		},
+	)
+	test.Assert(t, err == nil)
+	test.Assert(t, val == int64(0))
 }
