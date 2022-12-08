@@ -51,19 +51,18 @@ func requestMappingValue(ctx context.Context, req *descriptor.HTTPRequest, field
 	}
 	t := field.Type
 	switch v := val.(type) {
-	case nil:
-		// json null
-		return nil, nil
-	case bool:
-		return v, nil
 	case json.Number:
-		return buildinTypeFromString(string(v), t)
+		bt, err := buildinTypeFromString(string(v), t)
+		if err != nil {
+			return v, nil
+		}
+		return bt, nil
 	case string:
-		return buildinTypeFromString(v, t)
-	case map[string]interface{}:
-		return v, nil
-	case []interface{}:
-		return v, nil
+		bt, err := buildinTypeFromString(v, t)
+		if err != nil {
+			return v, nil
+		}
+		return bt, err
 	}
 	return val, nil
 }
