@@ -73,6 +73,18 @@ func TestCountParams(t *testing.T) {
 	}
 }
 
+func TestNoFunction(t *testing.T) {
+	tree := &node{}
+
+	route := "/hi"
+	recv := catchPanic(func() {
+		tree.addRoute(route, nil)
+	})
+	if recv == nil {
+		t.Fatalf("no panic while inserting route with empty function '%s", route)
+	}
+}
+
 func TestEmptyPath(t *testing.T) {
 	tree := &node{}
 
