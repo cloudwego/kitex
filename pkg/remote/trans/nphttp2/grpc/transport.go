@@ -26,6 +26,7 @@ package grpc
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -568,6 +569,8 @@ type ConnectOptions struct {
 	MaxHeaderListSize *uint32
 	// ShortConn indicates whether the connection will be reused from grpc conn pool
 	ShortConn bool
+	// TLSConfig
+	TLSConfig *tls.Config
 }
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error

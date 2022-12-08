@@ -31,7 +31,7 @@ import (
 
 func newServerRemoteOption() *remote.ServerOption {
 	return &remote.ServerOption{
-		TransServerFactory:    netpoll.NewTransServerFactory(), //gonet.NewTransServerFactory(),
+		TransServerFactory:    netpoll.NewTransServerFactory(),
 		SvrHandlerFactory:     detection.NewSvrTransHandlerFactory(nphttp2.NewSvrTransHandlerFactory(), netpoll.NewSvrTransHandlerFactory()),
 		Codec:                 codec.NewDefaultCodec(),
 		Address:               defaultAddress,
