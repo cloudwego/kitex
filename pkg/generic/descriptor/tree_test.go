@@ -32,9 +32,13 @@ func getParams() *Params {
 	}
 }
 
-func checkRequests(t *testing.T, tree *node, requests testRequests) {
+func checkRequests(t *testing.T, tree *node, requests testRequests, unescapes ...bool) {
+	unescape := false
+	if len(unescapes) >= 1 {
+		unescape = unescapes[0]
+	}
 	for _, request := range requests {
-		handler, psp, _ := tree.getValue(request.path, getParams)
+		handler, psp, _ := tree.getValue(request.path, getParams, unescape)
 
 		switch {
 		case handler == nil:
@@ -162,6 +166,41 @@ func TestTreeWildcard(t *testing.T) {
 		{"/info/gordon/public", false, "/info/:user/public", &Params{params: []Param{{"user", "gordon"}}}},
 		{"/info/gordon/project/go", false, "/info/:user/project/:project", &Params{params: []Param{{"user", "gordon"}, {"project", "go"}}}},
 	})
+}
+
+func TestUnescapeParameters(t *testing.T) {
+	tree := &node{}
+
+	routes := [...]string{
+		"/",
+		"/cmd/:tool/:sub",
+		"/cmd/:tool/",
+		"/src/*filepath",
+		"/search/:query",
+		"/files/:dir/*filepath",
+		"/info/:user/project/:project",
+		"/info/:user",
+	}
+	for _, route := range routes {
+		tree.addRoute(route, fakeHandler(route))
+	}
+
+	unescape := true
+	checkRequests(t, tree, testRequests{
+		{"/", false, "/", nil},
+		{"/cmd/test/", false, "/cmd/:tool/", &Params{params: []Param{{"tool", "test"}}}},
+		{"/cmd/test", true, "", &Params{params: []Param{}}},
+		{"/src/some/file.png", false, "/src/*filepath", &Params{params: []Param{{"filepath", "some/file.png"}}}},
+		{"/src/some/file+test.png", false, "/src/*filepath", &Params{params: []Param{{"filepath", "some/file test.png"}}}},
+		{"/src/some/file++++%%%%test.png", false, "/src/*filepath", &Params{params: []Param{{"filepath", "some/file++++%%%%test.png"}}}},
+		{"/src/some/file%2Ftest.png", false, "/src/*filepath", &Params{params: []Param{{"filepath", "some/file/test.png"}}}},
+		{"/search/someth!ng+in+ünìcodé", false, "/search/:query", &Params{params: []Param{{"query", "someth!ng in ünìcodé"}}}},
+		{"/info/gordon/project/go", false, "/info/:user/project/:project", &Params{params: []Param{{"user", "gordon"}, {"project", "go"}}}},
+		{"/info/slash%2Fgordon", false, "/info/:user", &Params{params: []Param{{"user", "slash/gordon"}}}},
+		{"/info/slash%2Fgordon/project/Project%20%231", false, "/info/:user/project/:project", &Params{params: []Param{{"user", "slash/gordon"}, {"project", "Project #1"}}}},
+		{"/info/slash%%%%", false, "/info/:user", &Params{params: []Param{{"user", "slash%%%%"}}}},
+		{"/info/slash%%%%2Fgordon/project/Project%%%%20%231", false, "/info/:user/project/:project", &Params{params: []Param{{"user", "slash%%%%2Fgordon"}, {"project", "Project%%%%20%231"}}}},
+	}, unescape)
 }
 
 func catchPanic(testFunc func()) (recv interface{}) {
@@ -388,7 +427,7 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {
 		"/vendor/x",
 	}
 	for _, route := range tsrRoutes {
-		handler, _, tsr := tree.getValue(route, getParams)
+		handler, _, tsr := tree.getValue(route, getParams, false)
 		if handler != nil {
 			t.Fatalf("non-nil handler for TSR route '%s", route)
 		} else if !tsr {
@@ -405,7 +444,7 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {
 		"/api/world/abc",
 	}
 	for _, route := range noTsrRoutes {
-		handler, _, tsr := tree.getValue(route, getParams)
+		handler, _, tsr := tree.getValue(route, getParams, false)
 		if handler != nil {
 			t.Fatalf("non-nil handler for No-TSR route '%s", route)
 		} else if tsr {
@@ -437,7 +476,7 @@ func TestTreeTrailingSlashRedirect2(t *testing.T) {
 	}
 
 	for _, route := range tsrRoutes {
-		handler, _, tsr := tree.getValue(route, getParams)
+		handler, _, tsr := tree.getValue(route, getParams, false)
 		if handler != nil {
 			t.Fatalf("non-nil handler for TSR route '%s", route)
 		} else if !tsr {
@@ -449,7 +488,7 @@ func TestTreeTrailingSlashRedirect2(t *testing.T) {
 		"/api/v:version/seller/permissions/get/a",
 	}
 	for _, route := range noTsrRoutes {
-		handler, _, tsr := tree.getValue(route, getParams)
+		handler, _, tsr := tree.getValue(route, getParams, false)
 		if handler != nil {
 			t.Fatalf("non-nil handler for No-TSR route '%s", route)
 		} else if tsr {
@@ -468,7 +507,7 @@ func TestTreeRootTrailingSlashRedirect(t *testing.T) {
 		t.Fatalf("panic inserting test route: %v", recv)
 	}
 
-	handler, _, tsr := tree.getValue("/", nil)
+	handler, _, tsr := tree.getValue("/", nil, false)
 	if handler != nil {
 		t.Fatalf("non-nil handler")
 	} else if tsr {

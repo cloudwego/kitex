@@ -11,6 +11,7 @@ package descriptor
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -260,7 +261,7 @@ func (n *node) insert(path string, function *FunctionDescriptor, t nodeType, ppa
 // If no function can be found, a TSR (trailing slash redirect) recommendation is
 // made if a function exists with an extra (without the) trailing slash for the
 // given path.
-func (n *node) getValue(path string, params func() *Params) (function *FunctionDescriptor, ps *Params, tsr bool) {
+func (n *node) getValue(path string, params func() *Params, unescape bool) (function *FunctionDescriptor, ps *Params, tsr bool) {
 	var (
 		cn          = n    // current node
 		search      = path // current path
@@ -359,6 +360,11 @@ func (n *node) getValue(path string, params func() *Params) (function *FunctionD
 				ps = params()
 			}
 			val := search[:i]
+			if unescape {
+				if v, err := url.QueryUnescape(val); err == nil {
+					val = v
+				}
+			}
 			ps.params = ps.params[:paramIndex+1]
 			ps.params[paramIndex].Value = val
 			paramIndex++
@@ -381,7 +387,11 @@ func (n *node) getValue(path string, params func() *Params) (function *FunctionD
 			}
 			index := len(cn.pnames) - 1
 			val := search
-
+			if unescape {
+				if v, err := url.QueryUnescape(val); err == nil {
+					val = v
+				}
+			}
 			ps.params = ps.params[:paramIndex+1]
 			ps.params[index].Value = val
 			// update indexes/search in case we need to backtrack when no handler match is found
