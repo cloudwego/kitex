@@ -86,7 +86,7 @@ func TestRequestMappingValue(t *testing.T) {
 
 	val, err = requestMappingValue(context.Background(),
 		&descriptor.HTTPRequest{
-			Body:        map[string]interface{}{"num": 123},
+			Body:        map[string]interface{}{"num": json.Number("123")},
 			ContentType: descriptor.MIMEApplicationJson,
 		},
 		&descriptor.FieldDescriptor{
@@ -95,5 +95,5 @@ func TestRequestMappingValue(t *testing.T) {
 		},
 	)
 	test.Assert(t, err == nil)
-	test.Assert(t, val == 123)
+	test.Assert(t, val == int64(123))
 }
