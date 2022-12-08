@@ -18,6 +18,7 @@ package thrift
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -56,4 +57,43 @@ func TestRequestMappingValue(t *testing.T) {
 	)
 	test.Assert(t, err == nil)
 	test.Assert(t, val == "")
+
+	val, err = requestMappingValue(context.Background(),
+		&descriptor.HTTPRequest{
+			Body:        map[string]interface{}{"num": "123"},
+			ContentType: descriptor.MIMEApplicationJson,
+		},
+		&descriptor.FieldDescriptor{
+			Type:        &descriptor.TypeDescriptor{Type: descriptor.I64},
+			HTTPMapping: httpMapping("num"),
+		},
+	)
+	test.Assert(t, err == nil)
+	test.Assert(t, val == int64(123))
+
+	val, err = requestMappingValue(context.Background(),
+		&descriptor.HTTPRequest{
+			Body:        map[string]interface{}{"num": json.Number("")},
+			ContentType: descriptor.MIMEApplicationJson,
+		},
+		&descriptor.FieldDescriptor{
+			Type:        &descriptor.TypeDescriptor{Type: descriptor.I64},
+			HTTPMapping: httpMapping("num"),
+		},
+	)
+	test.Assert(t, err == nil)
+	test.Assert(t, val == json.Number(""))
+
+	val, err = requestMappingValue(context.Background(),
+		&descriptor.HTTPRequest{
+			Body:        map[string]interface{}{"num": 123},
+			ContentType: descriptor.MIMEApplicationJson,
+		},
+		&descriptor.FieldDescriptor{
+			Type:        &descriptor.TypeDescriptor{Type: descriptor.I64},
+			HTTPMapping: httpMapping("num"),
+		},
+	)
+	test.Assert(t, err == nil)
+	test.Assert(t, val == 123)
 }
