@@ -23,11 +23,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-// NewThriftCodec creates the thrift binary codec.
-func NewThriftCodec() remote.PayloadCodec {
-	return &thriftCodec{FastWrite | FastRead}
-}
-
 // hyperMarshalEnabled indicates that if there are high priority message codec for current platform.
 func (c thriftCodec) hyperMarshalEnabled() bool {
 	return false
