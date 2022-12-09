@@ -745,6 +745,36 @@ func TestConnPoolClose(t *testing.T) {
 	test.Assert(t, connCount == 0)
 }
 
+func TestClosePoolAndSharedTicker(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var (
+		poolNum         = 10
+		idleTimeoutUnit = time.Second
+		pools           = make([]*LongPool, poolNum)
+	)
+	for i := 0; i < poolNum; i++ {
+		pools[i] = newLongPoolForTest(0, 2, 3, time.Duration(i+1)*idleTimeoutUnit)
+	}
+	n := 0
+	sharedTickers.Range(func(key, value interface{}) bool {
+		n++
+		return true
+	})
+	test.Assert(t, n == poolNum)
+	time.Sleep(idleTimeoutUnit)
+	for i := 0; i < poolNum; i++ {
+		pools[i].Close()
+	}
+	// closed
+	sharedTickers.Range(func(key, value interface{}) bool {
+		ticker := value.(*utils.SharedTicker)
+		test.Assert(t, ticker.Closed() == true)
+		return true
+	})
+}
+
 func TestLongConnPoolPutUnknownConnection(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
