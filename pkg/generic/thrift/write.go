@@ -258,7 +258,7 @@ func wrapStructWriter(ctx context.Context, val interface{}, out thrift.TProtocol
 			return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
 		}
 		if err := writer(ctx, val, out, field.Type, opt); err != nil {
-			return err
+			return fmt.Errorf("writer of field[%s] error %w", name, err)
 		}
 		if err := out.WriteFieldEnd(); err != nil {
 			return err
@@ -285,10 +285,10 @@ func wrapJSONWriter(ctx context.Context, val *gjson.Result, out thrift.TProtocol
 		}
 		v, writer, err := nextJSONWriter(val, field.Type, opt)
 		if err != nil {
-			return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
+			return fmt.Errorf("nextJSONWriter of field[%s] error %w", name, err)
 		}
 		if err := writer(ctx, v, out, field.Type, opt); err != nil {
-			return err
+			return fmt.Errorf("writer of field[%s] error %w", name, err)
 		}
 		if err := out.WriteFieldEnd(); err != nil {
 			return err
@@ -703,7 +703,7 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 			return err
 		}
 		if err := writer(ctx, elem, out, field.Type, opt); err != nil {
-			return err
+			return fmt.Errorf("writer of field[%s] error %w", name, err)
 		}
 		if err := out.WriteFieldEnd(); err != nil {
 			return err
@@ -755,7 +755,7 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 			return err
 		}
 		if err := writer(ctx, v, out, field.Type, opt); err != nil {
-			return err
+			return fmt.Errorf("writer of field[%s] error %w", name, err)
 		}
 		if err := out.WriteFieldEnd(); err != nil {
 			return err
@@ -798,7 +798,7 @@ func writeJSON(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 			return err
 		}
 		if err := writer(ctx, v, out, field.Type, opt); err != nil {
-			return err
+			return fmt.Errorf("writer of field[%s] error %w", name, err)
 		}
 		if err := out.WriteFieldEnd(); err != nil {
 			return err
