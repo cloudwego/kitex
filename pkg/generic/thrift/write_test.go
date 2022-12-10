@@ -992,6 +992,25 @@ func Test_writeStruct(t *testing.T) {
 			return nil
 		},
 	}
+	mockTTransportError := &mocks.MockThriftTTransport{
+		WriteStructBeginFunc: func(name string) error {
+			test.Assert(t, name == "Demo")
+			return nil
+		},
+		WriteFieldBeginFunc: func(name string, typeID thrift.TType, id int16) error {
+			test.Assert(t, name == "strList")
+			test.Assert(t, typeID == thrift.LIST)
+			test.Assert(t, id == 1)
+			return nil
+		},
+		WriteListBeginFunc: func(elemType thrift.TType, size int) error {
+			test.Assert(t, elemType == thrift.STRING)
+			return nil
+		},
+		WriteStringFunc: func(value string) error {
+			return errors.New("need STRING type, but got: I64")
+		},
+	}
 	tests := []struct {
 		name    string
 		args    args
@@ -1014,6 +1033,25 @@ func Test_writeStruct(t *testing.T) {
 						},
 						RequiredFields: map[int32]*descriptor.FieldDescriptor{
 							1: {Name: "hello", ID: 1, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+						},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"writeStruct",
+			args{
+				val: map[string]interface{}{"strList": []interface{}{int64(123)}},
+				out: mockTTransportError,
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.LIST, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"strList": {Name: "strList", ID: 1, Type: &descriptor.TypeDescriptor{Type: descriptor.LIST, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}},
 						},
 					},
 				},
