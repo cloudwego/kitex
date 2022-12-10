@@ -487,13 +487,14 @@ func Test_readStruct(t *testing.T) {
 			return "world", nil
 		},
 	}
+	readError := false
 	mockTTransportError := &mocks.MockThriftTTransport{
 		ReadStructBeginFunc: func() (name string, err error) {
 			return "Demo", nil
 		},
 		ReadFieldBeginFunc: func() (name string, typeID thrift.TType, id int16, err error) {
-			if !read {
-				read = true
+			if !readError {
+				readError = true
 				return "", thrift.LIST, 1, nil
 			}
 			return "", thrift.STOP, 0, nil
