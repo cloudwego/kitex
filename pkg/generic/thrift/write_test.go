@@ -1040,7 +1040,7 @@ func Test_writeStruct(t *testing.T) {
 			false,
 		},
 		{
-			"writeStruct",
+			"writeStructError",
 			args{
 				val: map[string]interface{}{"strList": []interface{}{int64(123)}},
 				out: mockTTransportError,
@@ -1056,7 +1056,7 @@ func Test_writeStruct(t *testing.T) {
 					},
 				},
 			},
-			false,
+			true,
 		},
 	}
 	for _, tt := range tests {

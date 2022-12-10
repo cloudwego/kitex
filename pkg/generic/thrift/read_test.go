@@ -526,7 +526,7 @@ func Test_readStruct(t *testing.T) {
 			false,
 		},
 		{
-			"readStruct",
+			"readStructError",
 			args{in: mockTTransportError, t: &descriptor.TypeDescriptor{
 				Type: descriptor.STRUCT,
 				Struct: &descriptor.StructDescriptor{
