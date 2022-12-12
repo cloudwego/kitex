@@ -140,9 +140,6 @@ func (n *node) addRoute(path string, function *FunctionDescriptor) {
 
 func (n *node) insert(path string, function *FunctionDescriptor, t nodeType, ppath string, pnames []string) {
 	currentNode := n
-	if currentNode == nil {
-		panic("invalid node")
-	}
 	search := path
 
 	for {
