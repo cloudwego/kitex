@@ -418,7 +418,14 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {
 		"/no/a",
 		"/no/b",
 		"/api/hello/:name",
-		"/vendor/:x/*y",
+		"/user/:name/*id",
+		"/resource",
+		"/r/*id",
+		"/book/biz/:name",
+		"/book/biz/abc",
+		"/book/biz/abc/bar",
+		"/book/:page/:name",
+		"/book/hello/:name/biz/",
 	}
 	for i := range routes {
 		route := routes[i]
@@ -445,7 +452,11 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {
 		"/admin/config/",
 		"/admin/config/permissions/",
 		"/doc/",
-		"/vendor/x",
+		"/user/name",
+		"/r",
+		"/book/hello/a/biz",
+		"/book/biz/foo/",
+		"/book/biz/abc/bar/",
 	}
 	for _, route := range tsrRoutes {
 		handler, _, tsr := tree.getValue(route, getParams, false)
@@ -463,6 +474,10 @@ func TestTreeTrailingSlashRedirect(t *testing.T) {
 		"/_",
 		"/_/",
 		"/api/world/abc",
+		"/book",
+		"/book/",
+		"/book/hello/a/abc",
+		"/book/biz/abc/biz",
 	}
 	for _, route := range noTsrRoutes {
 		handler, _, tsr := tree.getValue(route, getParams, false)
