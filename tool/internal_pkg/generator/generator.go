@@ -92,6 +92,7 @@ func AddGlobalDependency(ref, path string) bool {
 type Generator interface {
 	GenerateService(pkg *PackageInfo) ([]*File, error)
 	GenerateMainPackage(pkg *PackageInfo) ([]*File, error)
+	GenerateCustomPackage(pkg *PackageInfo) ([]*File, error)
 }
 
 // Config .
@@ -123,6 +124,8 @@ type Config struct {
 
 	Record    bool
 	RecordCmd []string
+
+	CustomTemplate string
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -433,6 +436,7 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	pkg.Features = g.Features
 	pkg.ExternalKitexGen = g.Use
 	pkg.FrugalPretouch = g.FrugalPretouch
+	pkg.Module = g.ModuleName
 	if pkg.Dependencies == nil {
 		pkg.Dependencies = make(map[string]string)
 	}

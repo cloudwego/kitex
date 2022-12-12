@@ -225,6 +225,21 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 		}
 	}
 
+	if pp.Config.CustomTemplate != "" {
+		if len(pp.Services) == 0 {
+			gen.Error(errors.New("no service defined"))
+			return
+		}
+		pp.ServiceInfo = pp.Services[len(pp.Services)-1]
+		fs, err := pp.kg.GenerateCustomPackage(&pp.PackageInfo)
+		if err != nil {
+			pp.err = err
+		}
+		for _, f := range fs {
+			gen.NewGeneratedFile(pp.adjustPath(f.Name), "").P(f.Content)
+		}
+	}
+
 	if pp.err != nil {
 		gen.Error(pp.err)
 	}

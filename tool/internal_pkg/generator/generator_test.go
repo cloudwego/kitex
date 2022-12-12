@@ -51,6 +51,7 @@ func TestConfig_Pack(t *testing.T) {
 		Record                bool
 		RecordCmd             string
 		ThriftPluginTimeLimit time.Duration
+		CustomTemplate        string
 	}
 	tests := []struct {
 		name    string
@@ -61,7 +62,7 @@ func TestConfig_Pack(t *testing.T) {
 		{
 			name:    "some",
 			fields:  fields{Features: []feature{feature(999)}, ThriftPluginTimeLimit: 30 * time.Second},
-			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "ExtensionFile=", "Record=false", "RecordCmd="},
+			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "ExtensionFile=", "Record=false", "RecordCmd=", "CustomTemplate="},
 		},
 	}
 	for _, tt := range tests {
@@ -88,6 +89,7 @@ func TestConfig_Pack(t *testing.T) {
 				Features:              tt.fields.Features,
 				FrugalPretouch:        tt.fields.FrugalPretouch,
 				ThriftPluginTimeLimit: tt.fields.ThriftPluginTimeLimit,
+				CustomTemplate:        tt.fields.CustomTemplate,
 			}
 			if gotRes := c.Pack(); !reflect.DeepEqual(gotRes, tt.wantRes) {
 				t.Errorf("Config.Pack() = \n%v\nwant\n%v", gotRes, tt.wantRes)
@@ -117,6 +119,7 @@ func TestConfig_Unpack(t *testing.T) {
 		CopyIDL         bool
 		Features        []feature
 		FrugalPretouch  bool
+		CustomTemplate  string
 	}
 	type args struct {
 		args []string
@@ -157,6 +160,7 @@ func TestConfig_Unpack(t *testing.T) {
 				CopyIDL:         tt.fields.CopyIDL,
 				Features:        tt.fields.Features,
 				FrugalPretouch:  tt.fields.FrugalPretouch,
+				CustomTemplate:  tt.fields.CustomTemplate,
 			}
 			if err := c.Unpack(tt.args.args); (err != nil) != tt.wantErr {
 				t.Errorf("Config.Unpack() error = %v, wantErr %v", err, tt.wantErr)
