@@ -125,6 +125,7 @@ func TestTreeAddAndGet(t *testing.T) {
 	}
 
 	checkRequests(t, tree, testRequests{
+		{"", true, "", nil},
 		{"/a", false, "/a", nil},
 		{"/", true, "", nil},
 		{"/hi", false, "/hi", nil},
