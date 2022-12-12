@@ -126,6 +126,7 @@ func TestTreeAddAndGet(t *testing.T) {
 
 	checkRequests(t, tree, testRequests{
 		{"", true, "", nil},
+		{"a", true, "", nil},
 		{"/a", false, "/a", nil},
 		{"/", true, "", nil},
 		{"/hi", false, "/hi", nil},
@@ -147,6 +148,7 @@ func TestTreeWildcard(t *testing.T) {
 		"/",
 		"/cmd/:tool/:sub",
 		"/cmd/:tool/",
+		"/cmd/xxx/",
 		"/src/*filepath",
 		"/search/",
 		"/search/:query",
@@ -158,6 +160,9 @@ func TestTreeWildcard(t *testing.T) {
 		"/doc/go1.html",
 		"/info/:user/public",
 		"/info/:user/project/:project",
+		"/a/b/:c",
+		"/a/:b/c/d",
+		"/a/*b",
 	}
 	for _, route := range routes {
 		tree.addRoute(route, fakeHandler(route))
@@ -178,6 +183,9 @@ func TestTreeWildcard(t *testing.T) {
 		{"/files/js/inc/framework.js", false, "/files/:dir/*filepath", &Params{params: []Param{{"dir", "js"}, {"filepath", "inc/framework.js"}}}},
 		{"/info/gordon/public", false, "/info/:user/public", &Params{params: []Param{{"user", "gordon"}}}},
 		{"/info/gordon/project/go", false, "/info/:user/project/:project", &Params{params: []Param{{"user", "gordon"}, {"project", "go"}}}},
+		{"/a/b/c", false, "/a/b/:c", &Params{params: []Param{{Key: "c", Value: "c"}}}},
+		{"/a/b/c/d", false, "/a/:b/c/d", &Params{params: []Param{{Key: "b", Value: "b"}}}},
+		{"/a/b", false, "/a/*b", &Params{params: []Param{{Key: "b", Value: "b"}}}},
 	})
 }
 
