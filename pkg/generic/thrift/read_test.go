@@ -19,6 +19,7 @@ package thrift
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -486,6 +487,25 @@ func Test_readStruct(t *testing.T) {
 			return "world", nil
 		},
 	}
+	readError := false
+	mockTTransportError := &mocks.MockThriftTTransport{
+		ReadStructBeginFunc: func() (name string, err error) {
+			return "Demo", nil
+		},
+		ReadFieldBeginFunc: func() (name string, typeID thrift.TType, id int16, err error) {
+			if !readError {
+				readError = true
+				return "", thrift.LIST, 1, nil
+			}
+			return "", thrift.STOP, 0, nil
+		},
+		ReadListBeginFunc: func() (elemType thrift.TType, size int, err error) {
+			return thrift.STRING, 1, nil
+		},
+		ReadStringFunc: func() (string, error) {
+			return "123", errors.New("need STRING type, but got: I64")
+		},
+	}
 	tests := []struct {
 		name    string
 		args    args
@@ -505,6 +525,19 @@ func Test_readStruct(t *testing.T) {
 			}},
 			map[string]interface{}{"hello": "world"},
 			false,
+		},
+		{
+			"readStructError",
+			args{in: mockTTransportError, t: &descriptor.TypeDescriptor{
+				Type: descriptor.STRUCT,
+				Struct: &descriptor.StructDescriptor{
+					FieldsByID: map[int32]*descriptor.FieldDescriptor{
+						1: {Name: "strList", Type: &descriptor.TypeDescriptor{Type: descriptor.LIST, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}},
+					},
+				},
+			}},
+			nil,
+			true,
 		},
 	}
 	for _, tt := range tests {

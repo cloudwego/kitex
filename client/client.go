@@ -81,6 +81,11 @@ type kcFinalizerClient struct {
 	*kClient
 }
 
+func (kf *kcFinalizerClient) Call(ctx context.Context, method string, request, response interface{}) error {
+	defer runtime.KeepAlive(kf)
+	return kf.kClient.Call(ctx, method, request, response)
+}
+
 // NewClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
 func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error) {
 	if svcInfo == nil {
@@ -90,6 +95,7 @@ func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error)
 	kc.svcInfo = svcInfo
 	kc.opt = client.NewOptions(opts)
 	if err := kc.init(); err != nil {
+		_ = kc.Close()
 		return nil, err
 	}
 	// like os.File, if kc is garbage-collected, but Close is not called, call Close.
@@ -184,6 +190,10 @@ func (kc *kClient) initProxy() error {
 		// update fields in the client option for further use.
 		kc.opt.Resolver = cfg.Resolver
 		kc.opt.Balancer = cfg.Balancer
+		// close predefined pool when proxy init new pool.
+		if cfg.Pool != kc.opt.RemoteOpt.ConnPool && kc.opt.RemoteOpt.ConnPool != nil {
+			kc.opt.RemoteOpt.ConnPool.Close()
+		}
 		kc.opt.RemoteOpt.ConnPool = cfg.Pool
 		kc.opt.Targets = cfg.FixedTargets
 	}

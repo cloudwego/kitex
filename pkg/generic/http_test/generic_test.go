@@ -73,6 +73,7 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 	body := map[string]interface{}{
 		"msg":        []byte(mockMyMsg),
 		"got_base64": true,
+		"num":        "",
 	}
 	data, err := json.Marshal(body)
 	if err != nil {
@@ -96,6 +97,7 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 	body = map[string]interface{}{
 		"msg":        string(mockMyMsg),
 		"got_base64": false,
+		"num":        0,
 	}
 	data, err = json.Marshal(body)
 	if err != nil {
@@ -115,6 +117,26 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, gr.Body["msg"] == mockMyMsg)
 
+	body = map[string]interface{}{
+		"msg":        []byte(mockMyMsg),
+		"got_base64": true,
+		"num":        "123",
+	}
+	data, err = json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+	req, err = http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
+	customReq, err = generic.FromHTTPRequest(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err.Error() == "remote or network error[remote]: biz error: call failed, incorrect num")
+
 	svr.Stop()
 }
 
@@ -129,6 +151,7 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 	body := map[string]interface{}{
 		"msg":        []byte(mockMyMsg),
 		"got_base64": false,
+		"num":        "0",
 	}
 	data, err := json.Marshal(body)
 	if err != nil {

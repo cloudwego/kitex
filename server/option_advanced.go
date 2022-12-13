@@ -24,11 +24,13 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"reflect"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/profiler"
 	"github.com/cloudwego/kitex/pkg/proxy"
@@ -40,7 +42,6 @@ import (
 // WithServerBasicInfo provides initial information for client endpoint in RPCInfo.
 func WithServerBasicInfo(ebi *rpcinfo.EndpointBasicInfo) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithServerBasicInfo(%+v)", ebi))
 
 		if ebi != nil {
@@ -152,7 +153,29 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("AddBoundHandler(%T)", h))
 
-		doAddBoundHandler(h, o.RemoteOpt)
+		exist := false
+		switch handler := h.(type) {
+		case remote.InboundHandler:
+			for _, inboundHandler := range o.RemoteOpt.Inbounds {
+				if reflect.DeepEqual(inboundHandler, handler) {
+					exist = true
+					break
+				}
+			}
+		case remote.OutboundHandler:
+			for _, outboundHandler := range o.RemoteOpt.Outbounds {
+				if reflect.DeepEqual(outboundHandler, handler) {
+					exist = true
+					break
+				}
+			}
+		}
+		// prevent duplication
+		if !exist {
+			doAddBoundHandler(h, o.RemoteOpt)
+		} else {
+			klog.Warnf("KITEX: BoundHandler already exists, BoundHandler=%v", h)
+		}
 	}}
 }
 

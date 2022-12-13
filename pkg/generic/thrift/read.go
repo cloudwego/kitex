@@ -138,7 +138,7 @@ func skipStructReader(ctx context.Context, in thrift.TProtocol, t *descriptor.Ty
 				reader = readHTTPResponse
 			}
 			if v, err = reader(ctx, in, field.Type, opt); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("reader of %s/%s/%d error %w", structName, fieldName, fieldID, err)
 			}
 		}
 		if err := in.ReadFieldEnd(); err != nil {
@@ -373,7 +373,7 @@ func readStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDesc
 			}
 			val, err := reader(ctx, in, field.Type, opt)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("reader of %s/%s/%d error %w", t.Name, field.Name, fieldID, err)
 			}
 			if field.ValueMapping != nil {
 				if val, err = field.ValueMapping.Response(ctx, val, field); err != nil {
@@ -456,7 +456,7 @@ func readHTTPResponse(ctx context.Context, in thrift.TProtocol, t *descriptor.Ty
 			}
 			val, err := reader(ctx, in, field.Type, opt)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("reader of %s/%s/%d error %w", t.Name, field.Name, fieldID, err)
 			}
 			if field.ValueMapping != nil {
 				if val, err = field.ValueMapping.Response(ctx, val, field); err != nil {

@@ -10,10 +10,18 @@ struct InnerBase {
     255: base.Base Base,
 }
 
+struct MockElem {
+    1: string Bar
+}
+
 struct ExampleReq {
     1: required string Msg,
     2: FOO Foo,
-    3: InnerBase InnerBase,
+    3: list<MockElem> TestList,
+    4: map<string, MockElem> TestMap,
+    5: list<string> StrList,
+    6: list<i64> I64List,
+    7: bool B,
     255: base.Base Base,
 }
 struct ExampleResp {
@@ -32,7 +40,7 @@ struct A {
 }
 
 service ExampleService {
-    ExampleResp ExampleMethod(1: ExampleReq req)throws(1: Exception err),
+    ExampleReq ExampleMethod(1: ExampleReq req)throws(1: Exception err),
     A Foo(1: A req)
     string Ping(1: string msg)
     oneway void Oneway(1: string msg)

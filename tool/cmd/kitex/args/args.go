@@ -20,7 +20,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -94,7 +93,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Generate invoker side codes when service name is specified.")
 	f.StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")
 	f.Var(&a.Includes, "I", "Add an IDL search path for includes.")
-	f.Var(&a.ThriftOptions, "thrift", "Specify arguments for the thrift compiler.")
+	f.Var(&a.ThriftOptions, "thrift", "Specify arguments for the thrift go compiler.")
+	f.DurationVar(&a.ThriftPluginTimeLimit, "thrift-plugin-time-limit", generator.DefaultThriftPluginTimeLimit, "Specify thrift plugin execution time limit.")
 	f.Var(&a.ThriftPlugins, "thrift-plugin", "Specify thrift plugin arguments for the thrift compiler.")
 	f.Var(&a.ProtobufOptions, "protobuf", "Specify arguments for the protobuf compiler.")
 	f.BoolVar(&a.CombineService, "combine-service", false,
@@ -115,6 +115,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"gen_setter",
 		"gen_deep_equal",
 		"compatible_names",
+		"frugal_tag",
 	)
 
 	for _, e := range a.extends {
@@ -251,84 +252,6 @@ func (a *Arguments) checkPath() {
 	a.OutputPath = curpath
 }
 
-func runGitCommand(a *Arguments, gitLink string) (string, string, error) {
-	u, err := user.Current()
-	if err != nil {
-		return "", "Failed to get home dir", err
-	}
-	cachePath := filepath.Join(u.HomeDir, ".kitex", "cache")
-
-	branch := ""
-	if strings.Contains(gitLink, ".git@") {
-		strs := strings.Split(gitLink, ".git@")
-		branch = strs[1]
-		gitLink = strs[0] + ".git"
-	}
-	pullLink := gitLink
-
-	gitLink = strings.TrimPrefix(gitLink, "git@")
-
-	gitLink = strings.TrimSuffix(gitLink, ".git")
-
-	repoLink := ""
-	if strings.Contains(gitLink, "://") {
-		repoLink = strings.Split(gitLink, "://")[1]
-	} else {
-		repoLink = strings.ReplaceAll(gitLink, ":", "/")
-	}
-
-	branchSuffix := ""
-	if branch != "" {
-		branchSuffix = "@" + branch
-	}
-	gitPath := filepath.Join(cachePath, repoLink+branchSuffix)
-
-	_, err = os.Stat(gitPath)
-	if err != nil && !os.IsExist(err) {
-		err = os.MkdirAll(gitPath, os.ModePerm)
-		if err != nil {
-			return "", "Failed to create cache directory,please check your permission for ~/.kitex/cache", err
-		}
-		cmdClone := exec.Command("git", "clone", pullLink, ".")
-		cmdClone.Dir = gitPath
-		out, gitErr := cmdClone.CombinedOutput()
-		if gitErr != nil {
-			return "", string(out), gitErr
-		}
-		if branch != "" {
-			cmdCheckout := exec.Command("git", "checkout", branch)
-			cmdCheckout.Dir = gitPath
-			out, gitErr = cmdCheckout.CombinedOutput()
-			return gitPath, string(out), gitErr
-		} else {
-			return gitPath, "", nil
-		}
-	}
-
-	cmdFetch := exec.Command("git", "fetch", "--all")
-	cmdFetch.Dir = gitPath
-	out, gitErr := cmdFetch.CombinedOutput()
-	if gitErr != nil {
-		return "", string(out), gitErr
-	}
-
-	cmdReset := exec.Command("git", "reset", "--hard", "master")
-	cmdReset.Dir = gitPath
-	out, gitErr = cmdReset.CombinedOutput()
-	if gitErr != nil {
-		return "", string(out), gitErr
-	}
-
-	cmdPull := exec.Command("git", "pull")
-	cmdPull.Dir = gitPath
-	out, gitErr = cmdPull.CombinedOutput()
-	if gitErr != nil {
-		return "", string(out), gitErr
-	}
-
-	return gitPath, "", nil
-}
-
 // BuildCmd builds an exec.Cmd.
 func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 	exe, err := os.Executable()
@@ -339,7 +262,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 
 	for i, inc := range a.Includes {
 		if strings.HasPrefix(inc, "git@") || strings.HasPrefix(inc, "http://") || strings.HasPrefix(inc, "https://") {
-			localGitPath, errMsg, gitErr := runGitCommand(a, inc)
+			localGitPath, errMsg, gitErr := util.RunGitCommand(inc)
 			if gitErr != nil {
 				if errMsg == "" {
 					errMsg = gitErr.Error()
@@ -377,6 +300,11 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 			"-g", gas,
 			"-p", "kitex="+exe+":"+kas,
 		)
+		if a.ThriftPluginTimeLimit != generator.DefaultThriftPluginTimeLimit {
+			cmd.Args = append(cmd.Args,
+				"--plugin-time-limit", a.ThriftPluginTimeLimit.String(),
+			)
+		}
 		for _, p := range a.ThriftPlugins {
 			cmd.Args = append(cmd.Args, "-p", p)
 		}

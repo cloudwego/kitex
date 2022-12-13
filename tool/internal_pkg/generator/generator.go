@@ -22,6 +22,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
@@ -33,14 +34,17 @@ const (
 	KitexGenPath = "kitex_gen"
 	DefaultCodec = "thrift"
 
-	BuildFileName     = "build.sh"
-	BootstrapFileName = "bootstrap.sh"
-	HandlerFileName   = "handler.go"
-	MainFileName      = "main.go"
-	ClientFileName    = "client.go"
-	ServerFileName    = "server.go"
-	InvokerFileName   = "invoker.go"
-	ServiceFileName   = "*service.go"
+	BuildFileName       = "build.sh"
+	BootstrapFileName   = "bootstrap.sh"
+	ToolVersionFileName = "kitex.yaml"
+	HandlerFileName     = "handler.go"
+	MainFileName        = "main.go"
+	ClientFileName      = "client.go"
+	ServerFileName      = "server.go"
+	InvokerFileName     = "invoker.go"
+	ServiceFileName     = "*service.go"
+
+	DefaultThriftPluginTimeLimit = time.Minute
 )
 
 var (
@@ -92,26 +96,27 @@ type Generator interface {
 
 // Config .
 type Config struct {
-	Verbose         bool
-	GenerateMain    bool // whether stuff in the main package should be generated
-	GenerateInvoker bool // generate main.go with invoker when main package generate
-	Version         string
-	NoFastAPI       bool
-	ModuleName      string
-	ServiceName     string
-	Use             string
-	IDLType         string
-	Includes        util.StringSlice
-	ThriftOptions   util.StringSlice
-	ProtobufOptions util.StringSlice
-	IDL             string // the IDL file passed on the command line
-	OutputPath      string // the output path for main pkg and kitex_gen
-	PackagePrefix   string
-	CombineService  bool // combine services to one service
-	CopyIDL         bool
-	ThriftPlugins   util.StringSlice
-	Features        []feature
-	FrugalPretouch  bool
+	Verbose               bool
+	GenerateMain          bool // whether stuff in the main package should be generated
+	GenerateInvoker       bool // generate main.go with invoker when main package generate
+	Version               string
+	NoFastAPI             bool
+	ModuleName            string
+	ServiceName           string
+	Use                   string
+	IDLType               string
+	Includes              util.StringSlice
+	ThriftOptions         util.StringSlice
+	ProtobufOptions       util.StringSlice
+	IDL                   string // the IDL file passed on the command line
+	OutputPath            string // the output path for main pkg and kitex_gen
+	PackagePrefix         string
+	CombineService        bool // combine services to one service
+	CopyIDL               bool
+	ThriftPlugins         util.StringSlice
+	Features              []feature
+	FrugalPretouch        bool
+	ThriftPluginTimeLimit time.Duration
 
 	ExtensionFile string
 	tmplExt       *TemplateExtension
@@ -131,6 +136,11 @@ func (c *Config) Pack() (res []string) {
 
 		// skip the plugin arguments to avoid the 'strings in strings' trouble
 		if f.Name == "ThriftPlugins" || !token.IsExported(f.Name) {
+			continue
+		}
+
+		if str, ok := x.Interface().(interface{ String() string }); ok {
+			res = append(res, n+"="+str.String())
 			continue
 		}
 
@@ -171,6 +181,14 @@ func (c *Config) Unpack(args []string) error {
 		f, ok := t.FieldByName(name)
 		if ok && value != "" {
 			x := v.FieldByName(name)
+			if _, ok := x.Interface().(time.Duration); ok {
+				if d, err := time.ParseDuration(value); err != nil {
+					return fmt.Errorf("invalid time duration '%s' for %s", value, name)
+				} else {
+					x.SetInt(int64(d))
+				}
+				continue
+			}
 			switch x.Kind() {
 			case reflect.Bool:
 				x.SetBool(value == "true")
@@ -278,6 +296,11 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 			Name: BootstrapFileName,
 			Path: filepath.Join(g.OutputPath, "script", BootstrapFileName),
 			Text: tpl.BootstrapTpl,
+		},
+		{
+			Name: ToolVersionFileName,
+			Path: filepath.Join(g.OutputPath, ToolVersionFileName),
+			Text: tpl.ToolVersionTpl,
 		},
 	}
 	if !g.Config.GenerateInvoker {

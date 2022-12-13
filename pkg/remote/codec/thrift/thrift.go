@@ -94,8 +94,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	seqID := message.RPCInfo().Invocation().SeqID()
 	// encode with FastWrite
 	if c.CodecType&FastWrite != 0 {
-		nw, nwOk := out.(remote.NocopyWrite)
-		if msg, ok := data.(thriftMsgFastCodec); ok && nwOk {
+		if msg, ok := data.(ThriftMsgFastCodec); ok {
 			// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
 			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
 			msgEndLen := bthrift.Binary.MessageEndLength()
@@ -104,7 +103,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
 			}
 			offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
-			offset += msg.FastWriteNocopy(buf[offset:], nw)
+			offset += msg.FastWriteNocopy(buf[offset:], nil)
 			bthrift.Binary.WriteMessageEnd(buf[offset:])
 			return nil
 		}
@@ -195,7 +194,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 
 	// decode with FastRead
 	if c.CodecType&FastRead != 0 {
-		if msg, ok := data.(thriftMsgFastCodec); ok && message.PayloadLen() != 0 {
+		if msg, ok := data.(ThriftMsgFastCodec); ok && message.PayloadLen() != 0 {
 			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
 			ri := message.RPCInfo()
 			internal_stats.Record(ctx, ri, stats.WaitReadStart, nil)
@@ -260,7 +259,7 @@ type MessageReaderWithMethodWithContext interface {
 	Read(ctx context.Context, method string, oprot thrift.TProtocol) error
 }
 
-type thriftMsgFastCodec interface {
+type ThriftMsgFastCodec interface {
 	BLength() int
 	FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int
 	FastRead(buf []byte) (int, error)

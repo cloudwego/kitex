@@ -546,16 +546,32 @@ func TestClientFinalizer(t *testing.T) {
 	runtime.ReadMemStats(&ms)
 	t.Logf("Before new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 
-	var closeCalledCnt int32
-	cliCnt := 1000
+	var (
+		closeCalledCnt int32
+		succeedCnt     = 10000
+		failedCnt      = 10000
+		cliCnt         = succeedCnt + failedCnt
+	)
 	clis := make([]Client, cliCnt)
-	for i := 0; i < cliCnt; i++ {
+	// clients that init successfully.
+	for i := 0; i < succeedCnt; i++ {
 		svcInfo := mocks.ServiceInfo()
-		mockClient, err := NewClient(svcInfo, WithDestService("destService"), WithCloseCallbacks(func() error {
-			atomic.AddInt32(&closeCalledCnt, 1)
-			return nil
-		}))
+		mockClient, err := NewClient(svcInfo, WithDestService("destService"), WithShortConnection(),
+			WithCloseCallbacks(func() error {
+				atomic.AddInt32(&closeCalledCnt, 1)
+				return nil
+			}))
 		test.Assert(t, err == nil, err)
+		clis[i] = mockClient
+	}
+	// clients that init failed, closeCallback should be called
+	for i := succeedCnt; i < cliCnt; i++ {
+		mockClient, err := NewClient(svcInfo, WithDestService(""), WithShortConnection(),
+			WithCloseCallbacks(func() error {
+				atomic.AddInt32(&closeCalledCnt, 1)
+				return nil
+			}))
+		test.Assert(t, err != nil, err)
 		clis[i] = mockClient
 	}
 
