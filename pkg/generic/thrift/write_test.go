@@ -1451,6 +1451,7 @@ func Test_writeJSON(t *testing.T) {
 		},
 	}
 	data := gjson.Parse(`{"hello": "world"}`)
+	dataEmpty := gjson.Parse(`{"hello": nil}`)
 	tests := []struct {
 		name    string
 		args    args
@@ -1473,6 +1474,47 @@ func Test_writeJSON(t *testing.T) {
 						},
 						RequiredFields: map[int32]*descriptor.FieldDescriptor{
 							1: {Name: "hello", ID: 1, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+						},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"writeJSONRequired",
+			args{
+				val: &dataEmpty,
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"hello": {Name: "hello", ID: 1, Required: true, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+						},
+						RequiredFields: map[int32]*descriptor.FieldDescriptor{
+							1: {Name: "hello", ID: 1, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+						},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"writeJSONOptional",
+			args{
+				val: &dataEmpty,
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"hello": {Name: "hello", ID: 1, Optional: true, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
 						},
 					},
 				},

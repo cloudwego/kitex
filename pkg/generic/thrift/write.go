@@ -792,10 +792,9 @@ func writeJSON(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 		}
 
 		if elem.Type == gjson.Null {
-			if field.Required {
-				return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("required field (%d/%s) missing", field.ID, name))
+			if field.Optional {
+				continue
 			}
-			continue
 		}
 
 		v, writer, err := nextJSONWriter(&elem, field.Type, opt)

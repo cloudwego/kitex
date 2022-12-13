@@ -44,8 +44,6 @@ func TestRun(t *testing.T) {
 	t.Run("TestThriftError", testThriftError)
 	t.Run("TestThriftOnewayMethod", testThriftOnewayMethod)
 	t.Run("TestThriftVoidMethod", testThriftVoidMethod)
-	t.Run("TestThriftReadRequiredField", testThriftReadRequiredField)
-	t.Run("TestThriftWriteRequiredField", testThriftWriteRequiredField)
 	t.Run("TestThrift2NormalServer", testThrift2NormalServer)
 	t.Run("TestJSONThriftGenericClientClose", TestJSONThriftGenericClientClose)
 	t.Run("TestThriftRawBinaryEcho", testThriftRawBinaryEcho)
@@ -119,32 +117,6 @@ func testThriftVoidMethod(t *testing.T) {
 	resp, err := cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	test.Assert(t, resp == descriptor.Void{})
-	svr.Stop()
-}
-
-func testThriftReadRequiredField(t *testing.T) {
-	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":8126", new(GenericServiceReadRequiredFiledImpl))
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClientByIDL(t, "127.0.0.1:8126", "./idl/example_check_read_required.thrift", nil)
-
-	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err != nil, err)
-	test.Assert(t, strings.Contains(err.Error(), "required field (2/required_field) missing"), err.Error())
-	svr.Stop()
-}
-
-func testThriftWriteRequiredField(t *testing.T) {
-	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":8127", new(GenericServiceReadRequiredFiledImpl))
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClientByIDL(t, "127.0.0.1:8127", "./idl/example_check_write_required.thrift", nil)
-
-	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err != nil, err)
-	test.Assert(t, strings.Contains(err.Error(), "required field (2/Foo) missing"), err.Error())
 	svr.Stop()
 }
 
