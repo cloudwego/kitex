@@ -684,10 +684,14 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 			continue
 		}
 		if !ok || elem == nil {
-			if field.Required {
-				return fmt.Errorf("required field (%d/%s) missing", field.ID, name)
+			if !field.Optional {
+				elem, _, err = getDefaultValueAndWriter(field.Type, opt)
+				if err != nil {
+					return fmt.Errorf("field (%d/%s) error: %w", field.ID, name, err)
+				}
+			} else {
+				continue
 			}
-			continue
 		}
 		if field.ValueMapping != nil {
 			elem, err = field.ValueMapping.Request(ctx, elem, field)
