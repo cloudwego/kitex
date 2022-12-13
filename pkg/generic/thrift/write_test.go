@@ -1040,6 +1040,47 @@ func Test_writeStruct(t *testing.T) {
 			false,
 		},
 		{
+			"writeStructRequired",
+			args{
+				val: map[string]interface{}{"hello": nil},
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"hello": {Name: "hello", ID: 1, Required: true, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+						},
+						RequiredFields: map[int32]*descriptor.FieldDescriptor{
+							1: {Name: "hello", ID: 1, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+						},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"writeStructOptional",
+			args{
+				val: map[string]interface{}{},
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"hello": {Name: "hello", ID: 1, Optional: true, DefaultValue: "Hello", Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+						},
+					},
+				},
+			},
+			false,
+		},
+		{
 			"writeStructError",
 			args{
 				val: map[string]interface{}{"strList": []interface{}{int64(123)}},
