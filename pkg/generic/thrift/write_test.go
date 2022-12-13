@@ -1128,9 +1128,9 @@ func Test_writeHTTPRequest(t *testing.T) {
 			return nil
 		},
 	}
-	req := &descriptor.HTTPRequest{
-		Body: map[string]interface{}{"hello": "world"},
-	}
+	//req := &descriptor.HTTPRequest{
+	//	Body: map[string]interface{}{"hello": "world"},
+	//}
 	tests := []struct {
 		name    string
 		args    args
@@ -1140,7 +1140,9 @@ func Test_writeHTTPRequest(t *testing.T) {
 		{
 			"writeStruct",
 			args{
-				val: req,
+				val: &descriptor.HTTPRequest{
+					Body: map[string]interface{}{"hello": "world"},
+				},
 				out: mockTTransport,
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
@@ -1152,6 +1154,87 @@ func Test_writeHTTPRequest(t *testing.T) {
 							"hello": {
 								Name:        "hello",
 								ID:          1,
+								Type:        &descriptor.TypeDescriptor{Type: descriptor.STRING},
+								HTTPMapping: descriptor.DefaultNewMapping("hello"),
+							},
+						},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"writeStructRequired",
+			args{
+				val: &descriptor.HTTPRequest{
+					Body: map[string]interface{}{"hello": nil},
+				},
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"hello": {
+								Name:        "hello",
+								ID:          1,
+								Required:    true,
+								Type:        &descriptor.TypeDescriptor{Type: descriptor.STRING},
+								HTTPMapping: descriptor.DefaultNewMapping("hello"),
+							},
+						},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"writeStructDefault",
+			args{
+				val: &descriptor.HTTPRequest{
+					Body: map[string]interface{}{"hello": nil},
+				},
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"hello": {
+								Name:         "hello",
+								ID:           1,
+								DefaultValue: "world",
+								Type:         &descriptor.TypeDescriptor{Type: descriptor.STRING},
+								HTTPMapping:  descriptor.DefaultNewMapping("hello"),
+							},
+						},
+					},
+				},
+			},
+			false,
+		},
+		{
+			"writeStructOptional",
+			args{
+				val: &descriptor.HTTPRequest{
+					Body: map[string]interface{}{},
+				},
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"hello": {
+								Name:        "hello",
+								ID:          1,
+								Optional:    true,
 								Type:        &descriptor.TypeDescriptor{Type: descriptor.STRING},
 								HTTPMapping: descriptor.DefaultNewMapping("hello"),
 							},
