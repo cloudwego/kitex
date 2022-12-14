@@ -18,13 +18,13 @@ package nphttp2
 
 import (
 	"context"
+	"crypto/tls"
 	"net"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/cloudwego/netpoll"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -104,13 +104,18 @@ var _ remote.LongConnPool = (*connPool)(nil)
 func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, network, address string,
 	connectTimeout time.Duration, opts grpc.ConnectOptions,
 ) (grpc.ClientTransport, error) {
-	conn, err := dialer.DialTimeout(network, address, connectTimeout)
+	var conn net.Conn
+	rawConn, err := dialer.DialTimeout(network, address, connectTimeout)
 	if err != nil {
 		return nil, err
 	}
+	conn = rawConn
+	if opts.TLSConfig != nil {
+		conn = tls.Client(rawConn, opts.TLSConfig)
+	}
 	return grpc.NewClientTransport(
 		ctx,
-		conn.(netpoll.Connection),
+		conn,
 		opts,
 		p.remoteService,
 		func(grpc.GoAwayReason) {

@@ -20,6 +20,7 @@ package client
 // It is used for customized extension.
 
 import (
+	"crypto/tls"
 	"fmt"
 	"reflect"
 
@@ -229,5 +230,13 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 		} else {
 			klog.Warnf("KITEX: BoundHandler already exists, BoundHandler=%v", h)
 		}
+	}}
+}
+
+// WithGRPCTLSConfig sets the TLS config for gRPC client.
+func WithGRPCTLSConfig(tlsConfig *tls.Config) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithGRPCTLSConfig"))
+		o.GRPCConnectOpts.TLSConfig = tlsConfig
 	}}
 }
