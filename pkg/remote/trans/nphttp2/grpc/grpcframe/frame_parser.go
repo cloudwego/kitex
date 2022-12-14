@@ -108,12 +108,13 @@ func parseDataFrame(fc *frameCache, fh http2.FrameHeader, payload io.Reader) (ht
 		return nil, connError{http2.ErrCodeProtocol, "pad size larger than data payload"}
 	}
 	data := make([]byte, payloadLen)
-	n, err := payload.Read(data)
-	if n < payloadLen {
-		return nil, fmt.Errorf("DEBUG: DATA frame payload size was %d; want %d", n, payloadLen)
-	}
-	if err != nil {
-		return nil, err
+	i := 0
+	for i < payloadLen {
+		n, err := payload.Read(data[i:])
+		if err != nil {
+			return nil, err
+		}
+		i += n
 	}
 	f.data = data[:payloadLen-int(padSize)]
 	return f, nil
