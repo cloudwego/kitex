@@ -506,7 +506,7 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 func (kc *kClient) Close() error {
 	defer func() {
 		if err := recover(); err != nil {
-			klog.Warnf("KITEX: panic when close client, error=%s, stack=%s\"", err, string(debug.Stack()))
+			klog.Warnf("KITEX: panic when close client, error=%s, stack=%s", err, string(debug.Stack()))
 		}
 	}()
 	if kc.closed {
