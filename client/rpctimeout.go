@@ -63,13 +63,16 @@ func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration)
 
 	// cancel error
 	if ctx.Err() == context.Canceled {
-		return kerrors.ErrRPCTimeout.WithCause(fmt.Errorf("%s: %w", errMsg, ctx.Err()))
+		return kerrors.ErrRPCTimeout.WithCause(fmt.Errorf("%s: %w by business", errMsg, ctx.Err()))
 	}
 
 	if ddl, ok := ctx.Deadline(); !ok {
 		errMsg = fmt.Sprintf("%s, %s", errMsg, "unknown error: context deadline not set?")
 	} else {
-		if ddl.Before(start.Add(timeout)) {
+		// Go's timer implementation is not so accurate,
+		// so if we need to check ctx deadline earlier than our timeout, we should consider the accuracy
+		roundTimeout := timeout - time.Millisecond
+		if roundTimeout >= 0 && ddl.Before(start.Add(roundTimeout)) {
 			errMsg = fmt.Sprintf("%s, context deadline earlier than timeout, actual=%v", errMsg, ddl.Sub(start))
 		}
 	}
@@ -91,8 +94,9 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 
 			tm := ri.Config().RPCTimeout()
 			if tm > 0 {
+				tm += moreTimeout
 				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, tm+moreTimeout)
+				ctx, cancel = context.WithTimeout(ctx, tm)
 				defer cancel()
 			}
 			// Fast path for ctx without timeout
