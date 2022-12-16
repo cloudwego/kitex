@@ -25,8 +25,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/transport"
-
-	"github.com/bytedance/gopkg/cloud/metainfo"
 )
 
 // ClientHTTP2Handler default global client metadata handler
@@ -44,13 +42,15 @@ func (*clientHTTP2Handler) OnConnectStream(ctx context.Context) (context.Context
 	if !isGRPC(ri) {
 		return ctx, nil
 	}
-	md := metadata.MD{}
+	// append more meta into current metadata
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		md = metadata.MD{}
+	}
 	md.Append(transmeta.HTTPDestService, ri.To().ServiceName())
 	md.Append(transmeta.HTTPDestMethod, ri.To().Method())
 	md.Append(transmeta.HTTPSourceService, ri.From().ServiceName())
 	md.Append(transmeta.HTTPSourceMethod, ri.From().Method())
-	// get custom kv from metainfo and set to grpc metadata
-	metainfo.ToHTTPHeader(ctx, metainfo.HTTPHeader(md))
 	return metadata.NewOutgoingContext(ctx, md), nil
 }
 
@@ -84,9 +84,6 @@ func (*serverHTTP2Handler) OnReadStream(ctx context.Context) (context.Context, e
 	if !ok {
 		return ctx, nil
 	}
-	// get custom kv from metadata and set to context
-	ctx = metainfo.FromHTTPHeader(ctx, metainfo.HTTPHeader(md))
-	ctx = metainfo.TransferForward(ctx)
 	ci := rpcinfo.AsMutableEndpointInfo(ri.From())
 	if ci != nil {
 		if v := md.Get(transmeta.HTTPSourceService); len(v) != 0 {
