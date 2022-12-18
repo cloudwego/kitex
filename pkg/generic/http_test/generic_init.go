@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/tidwall/gjson"
+
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/genericclient"
 	"github.com/cloudwego/kitex/pkg/generic"
@@ -58,16 +60,17 @@ const mockMyMsg = "my msg"
 
 // GenericCall ...
 func (g *GenericServiceBinaryEchoImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-	req := request.(map[string]interface{})
-	gotBase64 := req["got_base64"].(bool)
-	fmt.Printf("Recv: (%T)%s\n", req["msg"], req["msg"])
-	if !gotBase64 && req["msg"].(string) != mockMyMsg {
+	req := request.(string)
+	gotBase64 := gjson.Get(req, "got_base64").Bool()
+	msg := gjson.Get(req, "msg").String()
+	fmt.Printf("Recv: (%T)%s\n", msg, msg)
+	if !gotBase64 && msg != mockMyMsg {
 		return nil, errors.New("call failed, msg type mismatch")
 	}
-	if gotBase64 && req["msg"].(string) != base64.StdEncoding.EncodeToString([]byte(mockMyMsg)) {
+	if gotBase64 && msg != base64.StdEncoding.EncodeToString([]byte(mockMyMsg)) {
 		return nil, errors.New("call failed, incorrect base64 data")
 	}
-	num := req["num"].(string)
+	num := gjson.Get(req, "num").String()
 	if num != "0" {
 		return nil, errors.New("call failed, incorrect num")
 	}

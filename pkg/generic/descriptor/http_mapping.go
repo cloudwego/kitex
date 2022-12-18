@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 
+	"github.com/tidwall/gjson"
+
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
@@ -147,8 +149,8 @@ var NewAPIBody NewHTTPMapping = func(value string) HTTPMapping {
 func (m *apiBody) Request(ctx context.Context, req *HTTPRequest, field *FieldDescriptor) (interface{}, bool, error) {
 	switch req.ContentType {
 	case "", MIMEApplicationJson:
-		val, ok := req.Body[m.value]
-		return val, ok, nil
+		val := req.GeneralBody.(*gjson.Result).Get(field.Name)
+		return &val, true, nil
 	case MIMEApplicationProtobuf:
 		msg := req.GeneralBody.(proto.Message)
 		val, err := msg.TryGetFieldByNumber(int(field.ID))

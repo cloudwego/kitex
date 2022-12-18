@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	jsoniter "github.com/json-iterator/go"
+	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
@@ -161,5 +162,17 @@ func FromHTTPRequest(req *http.Request) (*HTTPRequest, error) {
 	if len(customReq.RawBody) == 0 {
 		return customReq, nil
 	}
-	return customReq, json.Unmarshal(customReq.RawBody, &customReq.Body)
+	s := string(customReq.RawBody)
+	body := gjson.Parse(s)
+	if body.Type == gjson.Null {
+		body = gjson.Result{
+			Type:  gjson.String,
+			Raw:   s,
+			Str:   s,
+			Num:   0,
+			Index: 0,
+		}
+	}
+	customReq.GeneralBody = &body
+	return customReq, nil
 }
