@@ -22,13 +22,14 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/tidwall/gjson"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/transport"
-	"github.com/tidwall/gjson"
 )
 
 func TestFromHTTPRequest(t *testing.T) {
