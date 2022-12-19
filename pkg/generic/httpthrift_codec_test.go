@@ -19,7 +19,6 @@ package generic
 import (
 	"bytes"
 	"context"
-	stdjson "encoding/json"
 	"net/http"
 	"testing"
 
@@ -29,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/transport"
+	"github.com/tidwall/gjson"
 )
 
 func TestFromHTTPRequest(t *testing.T) {
@@ -37,10 +37,7 @@ func TestFromHTTPRequest(t *testing.T) {
 	test.Assert(t, err == nil)
 	customReq, err := FromHTTPRequest(req)
 	test.Assert(t, err == nil)
-	test.DeepEqual(t, customReq.Body, map[string]interface{}{
-		"a": stdjson.Number("1111111111111"),
-		"b": "hello",
-	})
+	test.DeepEqual(t, customReq.GeneralBody.(*gjson.Result).String(), `{"a": 1111111111111, "b": "hello"}`)
 }
 
 func TestHttpThriftCodec(t *testing.T) {
