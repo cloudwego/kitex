@@ -18,7 +18,6 @@ package thrift
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/tidwall/gjson"
@@ -61,7 +60,7 @@ func TestRequestMappingValue(t *testing.T) {
 		},
 	)
 	test.Assert(t, err == nil)
-	test.Assert(t, val.(*gjson.Result).Value() == "")
+	test.Assert(t, val == "")
 
 	jsonMsg = `{"num": "123"}`
 	body = gjson.Parse(jsonMsg)
@@ -77,8 +76,7 @@ func TestRequestMappingValue(t *testing.T) {
 		},
 	)
 	test.Assert(t, err == nil)
-	fmt.Println(val.(*gjson.Result).Value())
-	test.Assert(t, val.(*gjson.Result).Int() == int64(123))
+	test.Assert(t, val == int64(123))
 
 	// TODO: json.Number
 	//jsonMsg = `{"num": 123}`
