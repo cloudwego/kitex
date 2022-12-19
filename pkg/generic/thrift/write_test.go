@@ -1087,8 +1087,9 @@ func Test_writeHTTPRequest(t *testing.T) {
 			return nil
 		},
 	}
+	body := gjson.Parse(`{"hello": "world"}`)
 	req := &descriptor.HTTPRequest{
-		Body: map[string]interface{}{"hello": "world"},
+		GeneralBody: &body,
 	}
 	tests := []struct {
 		name    string

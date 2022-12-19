@@ -149,8 +149,8 @@ var NewAPIBody NewHTTPMapping = func(value string) HTTPMapping {
 func (m *apiBody) Request(ctx context.Context, req *HTTPRequest, field *FieldDescriptor) (interface{}, bool, error) {
 	switch req.ContentType {
 	case "", MIMEApplicationJson:
-		val := req.GeneralBody.(*gjson.Result).Get(field.Name)
-		return &val, true, nil
+		val := req.GeneralBody.(*gjson.Result).Get(field.Name).Value()
+		return val, true, nil
 	case MIMEApplicationProtobuf:
 		msg := req.GeneralBody.(proto.Message)
 		val, err := msg.TryGetFieldByNumber(int(field.ID))
