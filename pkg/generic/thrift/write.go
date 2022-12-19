@@ -747,13 +747,7 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 				return err
 			}
 		}
-		var writer writer
-		if req.ContentType == descriptor.MIMEApplicationJson {
-			fmt.Println(v)
-			v, writer, err = nextJSONWriter(v.(*gjson.Result), field.Type, opt)
-		} else {
-			writer, err = nextWriter(v, field.Type, opt)
-		}
+		writer, err := nextWriter(v, field.Type, opt)
 		if err != nil {
 			return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
 		}
