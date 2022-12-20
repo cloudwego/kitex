@@ -107,7 +107,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Use frugal to compile arguments and results when new clients and servers.")
 	f.BoolVar(&a.Record, "record", false,
 		"Record Kitex cmd into kitex-all.sh.")
-	f.StringVar(&a.CustomTemplate, "custom-template", "",
+	f.StringVar(&a.TemplateDir, "template-dir", "",
 		"Use custom template to generate codes.")
 	a.RecordCmd = os.Args
 	a.Version = version
@@ -189,8 +189,8 @@ func (a *Arguments) checkServiceName() {
 			os.Exit(2)
 		}
 	} else {
-		if a.CustomTemplate != "" {
-			log.Warn("-custom-template and -service cannot be specified at the same time")
+		if a.TemplateDir != "" {
+			log.Warn("-template-dir and -service cannot be specified at the same time")
 			os.Exit(2)
 		}
 		a.GenerateMain = true

@@ -43,6 +43,7 @@ const (
 	ServerFileName      = "server.go"
 	InvokerFileName     = "invoker.go"
 	ServiceFileName     = "*service.go"
+	ExtensionFilename   = "extensions.yaml"
 
 	DefaultThriftPluginTimeLimit = time.Minute
 )
@@ -125,7 +126,7 @@ type Config struct {
 	Record    bool
 	RecordCmd []string
 
-	CustomTemplate string
+	TemplateDir string
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -235,13 +236,20 @@ func (c *Config) AddFeature(key string) bool {
 
 // ApplyExtension applies template extension.
 func (c *Config) ApplyExtension() error {
-	if c.ExtensionFile == "" {
+	path := filepath.Join(c.TemplateDir, ExtensionFilename)
+	if c.ExtensionFile == "" && !util.Exists(path) {
 		return nil
 	}
 
 	ext := new(TemplateExtension)
-	if err := ext.FromJSONFile(c.ExtensionFile); err != nil {
-		return fmt.Errorf("read template extension %q failed: %s", c.ExtensionFile, err.Error())
+	if c.ExtensionFile != "" {
+		if err := ext.FromJSONFile(c.ExtensionFile); err != nil {
+			return fmt.Errorf("read template extension %q failed: %s", c.ExtensionFile, err.Error())
+		}
+	} else {
+		if err := ext.FromYAMLFile(path); err != nil {
+			return fmt.Errorf("read template extension %q failed: %s", path, err.Error())
+		}
 	}
 
 	for _, fn := range ext.FeatureNames {

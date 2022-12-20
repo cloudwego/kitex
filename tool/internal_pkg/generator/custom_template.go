@@ -15,7 +15,6 @@
 package generator
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -31,10 +30,6 @@ import (
 )
 
 var DefaultDelimiters = [2]string{"{{", "}}"}
-
-type Templates struct {
-	Layouts []Template `yaml:"layouts"`
-}
 
 type Template struct {
 	// The generated path and its filename. For example: biz/test.go
@@ -53,12 +48,12 @@ type Template struct {
 func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err error) {
 	g.updatePackageInfo(pkg)
 
-	t, err := readTemplates(g.CustomTemplate)
+	t, err := readTemplates(g.TemplateDir)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, tpl := range t.Layouts {
+	for _, tpl := range t {
 		update := util.Exists(tpl.Path)
 		if update && tpl.UpdateIsSkip {
 			log.Infof("skip generate file %s", tpl.Path)
@@ -113,19 +108,25 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 	return
 }
 
-func readTemplates(path string) (*Templates, error) {
-	cdata, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read layout config from  %s failed, err: %v", path, err.Error())
+func readTemplates(dir string) ([]*Template, error) {
+	files, _ := ioutil.ReadDir(dir)
+	var ts []*Template
+	for _, f := range files {
+		if f.Name() != ExtensionFilename {
+			path := filepath.Join(dir, f.Name())
+			tplData, err := ioutil.ReadFile(path)
+			if err != nil {
+				return nil, fmt.Errorf("read layout config from  %s failed, err: %v", path, err.Error())
+			}
+			t := &Template{}
+			if err = yaml.Unmarshal(tplData, t); err != nil {
+				return nil, fmt.Errorf("unmarshal layout config failed, err: %v", err.Error())
+			}
+			ts = append(ts, t)
+		}
 	}
-	t := &Templates{}
-	if err = yaml.Unmarshal(cdata, t); err != nil {
-		return nil, fmt.Errorf("unmarshal layout config failed, err: %v", err.Error())
-	}
-	if reflect.DeepEqual(*t, Templates{}) {
-		return nil, errors.New("empty config")
-	}
-	return t, nil
+
+	return ts, nil
 }
 
 func convert(path string, method *MethodInfo) string {

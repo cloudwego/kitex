@@ -85,7 +85,7 @@ func Run() int {
 		files = append(files, fs...)
 	}
 
-	if conv.Config.CustomTemplate != "" {
+	if conv.Config.TemplateDir != "" {
 		if len(conv.Services) == 0 {
 			return conv.fail(errors.New("no service defined in the IDL"))
 		}

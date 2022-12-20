@@ -225,7 +225,7 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 		}
 	}
 
-	if pp.Config.CustomTemplate != "" {
+	if pp.Config.TemplateDir != "" {
 		if len(pp.Services) == 0 {
 			gen.Error(errors.New("no service defined"))
 			return
