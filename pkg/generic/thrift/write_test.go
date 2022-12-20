@@ -1128,9 +1128,6 @@ func Test_writeHTTPRequest(t *testing.T) {
 			return nil
 		},
 	}
-	//req := &descriptor.HTTPRequest{
-	//	Body: map[string]interface{}{"hello": "world"},
-	//}
 	tests := []struct {
 		name    string
 		args    args
