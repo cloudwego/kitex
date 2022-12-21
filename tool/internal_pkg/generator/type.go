@@ -45,6 +45,7 @@ type PackageInfo struct {
 	ExternalKitexGen string
 	Features         []feature
 	FrugalPretouch   bool
+	Module           string
 }
 
 // AddImport .
@@ -100,7 +101,7 @@ type ServiceInfo struct {
 
 // AllMethods returns all methods that the service have.
 func (s *ServiceInfo) AllMethods() (ms []*MethodInfo) {
-	ms = s.Methods
+	ms = append(ms, s.Methods...)
 	for base := s.Base; base != nil; base = base.Base {
 		ms = append(base.Methods, ms...)
 	}
