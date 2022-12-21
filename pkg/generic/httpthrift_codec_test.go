@@ -39,6 +39,12 @@ func TestFromHTTPRequest(t *testing.T) {
 	customReq, err := FromHTTPRequest(req)
 	test.Assert(t, err == nil)
 	test.DeepEqual(t, customReq.GeneralBody.(*gjson.Result).String(), `{"a": 1111111111111, "b": "hello"}`)
+
+	req, err = http.NewRequest(http.MethodPost, "http://example.com", bytes.NewBuffer([]byte("null")))
+	test.Assert(t, err == nil)
+	customReq, err = FromHTTPRequest(req)
+	test.Assert(t, err == nil)
+	test.DeepEqual(t, customReq.GeneralBody.(*gjson.Result).String(), "null")
 }
 
 func TestHttpThriftCodec(t *testing.T) {
