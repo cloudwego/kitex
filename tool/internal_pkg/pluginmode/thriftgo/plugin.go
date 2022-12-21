@@ -85,6 +85,18 @@ func Run() int {
 		files = append(files, fs...)
 	}
 
+	if conv.Config.TemplateDir != "" {
+		if len(conv.Services) == 0 {
+			return conv.fail(errors.New("no service defined in the IDL"))
+		}
+		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
+		fs, err := gen.GenerateCustomPackage(&conv.Package)
+		if err != nil {
+			return conv.fail(err)
+		}
+		files = append(files, fs...)
+	}
+
 	res := &plugin.Response{
 		Warnings: conv.Warnings,
 	}
