@@ -70,7 +70,7 @@ func (g *GenericServiceBinaryEchoImpl) GenericCall(ctx context.Context, method s
 	if gotBase64 && msg != base64.StdEncoding.EncodeToString([]byte(mockMyMsg)) {
 		return nil, errors.New("call failed, incorrect base64 data")
 	}
-	num := gjson.Get(req, "num").String()
+	num := gjson.Get(req, "num").Value()
 	if num != "0" {
 		return nil, errors.New("call failed, incorrect num")
 	}

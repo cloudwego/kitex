@@ -78,19 +78,19 @@ func TestRequestMappingValue(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, val == int64(123))
 
-	// TODO: json.Number
-	//jsonMsg = `{"num": 123}`
-	//body = gjson.Parse(jsonMsg)
-	//val, err = requestMappingValue(context.Background(),
-	//	&descriptor.HTTPRequest{
-	//		GeneralBody: &body,
-	//		ContentType: descriptor.MIMEApplicationJson,
-	//	},
-	//	&descriptor.FieldDescriptor{
-	//		Type:        &descriptor.TypeDescriptor{Type: descriptor.I64},
-	//		HTTPMapping: httpMapping("num"),
-	//	},
-	//)
-	//test.Assert(t, err == nil)
-	//test.Assert(t, val == int64(0))
+	jsonMsg = `{"num": 123}`
+	body = gjson.Parse(jsonMsg)
+	val, err = requestMappingValue(context.Background(),
+		&descriptor.HTTPRequest{
+			GeneralBody: &body,
+			ContentType: descriptor.MIMEApplicationJson,
+		},
+		&descriptor.FieldDescriptor{
+			Name:        "num",
+			Type:        &descriptor.TypeDescriptor{Type: descriptor.I64},
+			HTTPMapping: httpMapping("num"),
+		},
+	)
+	test.Assert(t, err == nil)
+	test.Assert(t, val == float64(123))
 }
