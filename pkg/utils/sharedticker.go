@@ -42,19 +42,21 @@ type SharedTicker struct {
 }
 
 func (t *SharedTicker) Add(b RefreshTask) {
+	if b == nil {
+		return
+	}
 	t.Lock()
-	defer t.Unlock()
 	// Add task
 	t.tasks[b] = struct{}{}
 	if !t.started {
 		t.started = true
 		go t.Tick(t.Interval)
 	}
+	t.Unlock()
 }
 
 func (t *SharedTicker) Delete(b RefreshTask) {
 	t.Lock()
-	defer t.Unlock()
 	// Delete from tasks
 	delete(t.tasks, b)
 	// no tasks remaining then stop the Tick
@@ -66,6 +68,7 @@ func (t *SharedTicker) Delete(b RefreshTask) {
 		default:
 		}
 	}
+	t.Unlock()
 }
 
 func (t *SharedTicker) Closed() bool {

@@ -25,8 +25,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"golang.org/x/sync/singleflight"
-
 	"github.com/cloudwego/kitex/pkg/connpool"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -38,8 +36,7 @@ var (
 	_ remote.LongConnPool = &LongPool{}
 
 	// global shared tickers for different LongPool
-	sharedTickers    sync.Map
-	sharedTickersSfg singleflight.Group
+	sharedTickers sync.Map
 )
 
 const (
@@ -53,14 +50,8 @@ func getSharedTicker(p *LongPool, refreshInterval time.Duration) *utils.SharedTi
 		st.Add(p)
 		return st
 	}
-	v, _, _ := sharedTickersSfg.Do(refreshInterval.String(), func() (interface{}, error) {
-		st := utils.NewSharedTicker(refreshInterval)
-		sharedTickers.Store(refreshInterval, st)
-		return st, nil
-	})
-	st := v.(*utils.SharedTicker)
-	// Add without singleflight,
-	// because we need all refreshers those call this function to add themselves to SharedTicker
+	sti, _ = sharedTickers.LoadOrStore(refreshInterval, utils.NewSharedTicker(refreshInterval))
+	st := sti.(*utils.SharedTicker)
 	st.Add(p)
 	return st
 }
