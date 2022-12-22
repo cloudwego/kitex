@@ -18,10 +18,12 @@ import (
 	"bytes"
 	"flag"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/cloudwego/kitex"
 	kargs "github.com/cloudwego/kitex/tool/cmd/kitex/args"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
 )
@@ -66,9 +68,21 @@ func main() {
 		if args.Use != "" {
 			out := strings.TrimSpace(out.String())
 			if strings.HasSuffix(out, thriftgo.TheUseOptionMessage) {
-				os.Exit(0)
+				goto NormalExit
 			}
 		}
 		os.Exit(1)
+	}
+NormalExit:
+	if args.IDLType == "thrift" {
+		cmd := "go mod edit -replace github.com/apache/thrift=github.com/apache/thrift@v0.13.0"
+		argv := strings.Split(cmd, " ")
+		err := exec.Command(argv[0], argv[1:]...).Run()
+
+		res := "Done"
+		if err != nil {
+			res = err.Error()
+		}
+		log.Warn("Adding apache/thrift@v0.13.0 to go.mod for generated code ..........", res)
 	}
 }
