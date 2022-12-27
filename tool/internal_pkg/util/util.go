@@ -212,3 +212,22 @@ func RunGitCommand(gitLink string) (string, string, error) {
 
 	return gitPath, "", nil
 }
+
+// CombineOutputPath read the output and path variables and render them into the final path
+func CombineOutputPath(outputPath string, ns string) string {
+	if ns != "" {
+		ns = strings.ReplaceAll(ns, ".", "/")
+	}
+	hasVarNs := strings.Contains(outputPath, "{namespace}")
+	hasVarNsSlash := strings.Contains(outputPath, "{namespaceSlash}")
+	if hasVarNs || hasVarNsSlash {
+		if hasVarNs {
+			outputPath = strings.ReplaceAll(outputPath, "{namespace}", ns)
+		} else if hasVarNsSlash {
+			outputPath = strings.ReplaceAll(outputPath, "{namespaceSlash}", strings.ReplaceAll(ns, "/", "_"))
+		}
+	} else {
+		outputPath = filepath.Join(outputPath, ns)
+	}
+	return outputPath
+}

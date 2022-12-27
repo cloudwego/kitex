@@ -107,6 +107,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Use frugal to compile arguments and results when new clients and servers.")
 	f.BoolVar(&a.Record, "record", false,
 		"Record Kitex cmd into kitex-all.sh.")
+	f.StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
+		"Specify a code gen path.")
 	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
@@ -151,6 +153,10 @@ func (a *Arguments) ParseArgs(version string) {
 
 	a.checkIDL(f.Args())
 	a.checkServiceName()
+	// todo finish protobuf
+	if a.IDLType != "thrift" {
+		a.GenPath = generator.KitexGenPath
+	}
 	a.checkPath()
 }
 
@@ -215,7 +221,7 @@ func (a *Arguments) checkPath() {
 			log.Warn("Get GOPATH/src relpath failed:", err.Error())
 			os.Exit(1)
 		}
-		a.PackagePrefix = filepath.Join(a.PackagePrefix, generator.KitexGenPath)
+		a.PackagePrefix = filepath.Join(a.PackagePrefix, a.GenPath)
 	} else {
 		if a.ModuleName == "" {
 			log.Warn("Outside of $GOPATH. Please specify a module name with the '-module' flag.")
@@ -236,13 +242,13 @@ func (a *Arguments) checkPath() {
 				log.Warn("Get package prefix failed:", err.Error())
 				os.Exit(1)
 			}
-			a.PackagePrefix = filepath.Join(a.ModuleName, a.PackagePrefix, generator.KitexGenPath)
+			a.PackagePrefix = filepath.Join(a.ModuleName, a.PackagePrefix, a.GenPath)
 		} else {
 			if err = initGoMod(pathToGo, a.ModuleName); err != nil {
 				log.Warn("Init go mod failed:", err.Error())
 				os.Exit(1)
 			}
-			a.PackagePrefix = filepath.Join(a.ModuleName, generator.KitexGenPath)
+			a.PackagePrefix = filepath.Join(a.ModuleName, a.GenPath)
 		}
 	}
 
@@ -296,7 +302,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 			cmd.Args = append(cmd.Args, "-r")
 		}
 		cmd.Args = append(cmd.Args,
-			"-o", generator.KitexGenPath,
+			"-o", a.GenPath,
 			"-g", gas,
 			"-p", "kitex="+exe+":"+kas,
 		)
@@ -317,7 +323,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 		for _, inc := range a.Includes {
 			cmd.Args = append(cmd.Args, "-I", inc)
 		}
-		outPath := filepath.Join(".", generator.KitexGenPath)
+		outPath := filepath.Join(".", a.GenPath)
 		if a.Use == "" {
 			os.MkdirAll(outPath, 0o755)
 		} else {

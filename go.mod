@@ -9,7 +9,7 @@ require (
 	github.com/cloudwego/fastpb v0.0.3
 	github.com/cloudwego/frugal v0.1.3
 	github.com/cloudwego/netpoll v0.3.1
-	github.com/cloudwego/thriftgo v0.2.4
+	github.com/cloudwego/thriftgo v0.2.5
 	github.com/golang/mock v1.6.0
 	github.com/google/pprof v0.0.0-20220608213341-c488b8fa1db3
 	github.com/jhump/protoreflect v1.8.2

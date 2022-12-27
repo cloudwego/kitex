@@ -16,6 +16,7 @@ package thriftgo
 
 import (
 	"fmt"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"go/format"
 	"io"
 	"io/ioutil"
@@ -298,7 +299,6 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 	c.svc2ast = make(map[*generator.ServiceInfo]*parser.Thrift)
 	for ast := range req.AST.DepthFirstSearch() {
 		ref, pkg, pth := c.Utils.ParseNamespace(ast)
-
 		// make the current ast as an include to produce correct type references.
 		fake := c.copyTreeWithRef(ast, ref)
 		fake.Name2Category = nil
@@ -316,13 +316,11 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 			return fmt.Errorf("build scope for fake ast '%s': %w", ast.Filename, err)
 		}
 		c.Utils.SetRootScope(scope)
-
 		pi := generator.PkgInfo{
 			PkgName:    pkg,
 			PkgRefName: pkg,
-			ImportPath: filepath.Join(c.Config.PackagePrefix, pth),
+			ImportPath: util.CombineOutputPath(c.Config.PackagePrefix, pth),
 		}
-
 		for _, svc := range scope.Services() {
 			si, err := c.makeService(pi, svc)
 			if err != nil {

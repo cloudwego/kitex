@@ -123,6 +123,8 @@ type Config struct {
 
 	Record    bool
 	RecordCmd []string
+
+	GenPath string
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -361,10 +363,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 
 func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 	g.updatePackageInfo(pkg)
-	output := filepath.Join(g.OutputPath, KitexGenPath)
-	if pkg.Namespace != "" {
-		output = filepath.Join(output, strings.ReplaceAll(pkg.Namespace, ".", "/"))
-	}
+	output := util.CombineOutputPath(g.GenPath, pkg.Namespace)
 	svcPkg := strings.ToLower(pkg.ServiceName)
 	output = filepath.Join(output, svcPkg)
 	ext := g.tmplExt
