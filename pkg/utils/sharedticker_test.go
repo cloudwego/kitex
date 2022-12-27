@@ -75,7 +75,7 @@ func TestSharedTicker_Tick(t *testing.T) {
 	)
 	for i := 0; i < num; i++ {
 		rt := mockutils.NewMockRefreshTask(ctrl)
-		rt.EXPECT().Refresh().Times(1) // all tasks should be refreshed once during the test
+		rt.EXPECT().Refresh().MinTimes(1) // all tasks should be refreshed once during the test
 		tasks[i] = rt
 		st.Add(rt)
 	}

@@ -751,28 +751,20 @@ func TestClosePoolAndSharedTicker(t *testing.T) {
 
 	var (
 		poolNum         = 10
-		idleTimeoutUnit = time.Second
+		idleTimeoutUnit = 111 * time.Millisecond
 		pools           = make([]*LongPool, poolNum)
 	)
+	// add new pool with different idleTimeout, increasing the number of shared ticker
 	for i := 0; i < poolNum; i++ {
 		pools[i] = newLongPoolForTest(0, 2, 3, time.Duration(i+1)*idleTimeoutUnit)
 	}
-	n := 0
-	sharedTickers.Range(func(key, value interface{}) bool {
-		n++
-		return true
-	})
-	test.Assert(t, n == poolNum)
-	time.Sleep(idleTimeoutUnit)
+	// close
 	for i := 0; i < poolNum; i++ {
 		pools[i].Close()
+		// should be removed from shardTickers
+		_, ok := sharedTickers.Load(pools[i])
+		test.Assert(t, !ok)
 	}
-	// closed
-	sharedTickers.Range(func(key, value interface{}) bool {
-		ticker := value.(*utils.SharedTicker)
-		test.Assert(t, ticker.Closed() == true)
-		return true
-	})
 }
 
 func TestLongConnPoolPutUnknownConnection(t *testing.T) {
