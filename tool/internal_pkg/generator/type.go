@@ -136,11 +136,13 @@ type Parameter struct {
 }
 
 var funcs = map[string]interface{}{
-	"ToLower":    strings.ToLower,
-	"LowerFirst": util.LowerFirst,
-	"UpperFirst": util.UpperFirst,
-	"NotPtr":     util.NotPtr,
-	"HasFeature": HasFeature,
+	"ToLower":       strings.ToLower,
+	"LowerFirst":    util.LowerFirst,
+	"UpperFirst":    util.UpperFirst,
+	"NotPtr":        util.NotPtr,
+	"ReplaceString": util.ReplaceString,
+	"SnakeString":   util.SnakeString,
+	"HasFeature":    HasFeature,
 }
 
 var templateNames = []string{
