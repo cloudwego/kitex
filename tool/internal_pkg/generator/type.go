@@ -258,3 +258,19 @@ func (t *Task) Render(data interface{}) (*File, error) {
 	}
 	return &File{t.Path, buf.String()}, nil
 }
+
+func (t *Task) RenderString(data interface{}) (string, error) {
+	if t.Template == nil {
+		err := t.Build()
+		if err != nil {
+			return "", err
+		}
+	}
+
+	var buf bytes.Buffer
+	err := t.ExecuteTemplate(&buf, t.Name, data)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
