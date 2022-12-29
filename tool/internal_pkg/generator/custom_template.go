@@ -20,8 +20,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
-	"regexp"
 
 	"gopkg.in/yaml.v3"
 
@@ -71,12 +69,18 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 			tmp := pkg.Methods
 			m := pkg.AllMethods()
 			for _, method := range m {
-				realPath := convert(tpl.Path, method)
+				pkg.Methods = []*MethodInfo{method}
+				pathTask := &Task{
+					Text: tpl.Path,
+				}
+				realPath, err := pathTask.RenderString(pkg)
+				if err != nil {
+					return fs, err
+				}
 				filePath := filepath.Join(g.OutputPath, realPath)
 				if util.Exists(filePath) && tpl.UpdateIsSkip {
 					continue
 				}
-				pkg.Methods = []*MethodInfo{method}
 				task := &Task{
 					Name: path.Base(realPath),
 					Path: filePath,
@@ -127,20 +131,4 @@ func readTemplates(dir string) ([]*Template, error) {
 	}
 
 	return ts, nil
-}
-
-func convert(path string, method *MethodInfo) string {
-	reg := regexp.MustCompile(`{{.*}}`)
-	s := reg.FindAllString(path, -1)
-	// not found `{{}}`, no need to replace
-	if len(s) == 0 {
-		return path
-	}
-	// Replace `{{}}` with specific field in MethodInfo
-	// If the field is not found, it will be replaced with
-	// "<invalid Value>".
-	field := s[0][2 : len(s[0])-2]
-	v := reflect.ValueOf(method)
-	f := reflect.Indirect(v).FieldByName(field).String()
-	return reg.ReplaceAllString(path, f)
 }
