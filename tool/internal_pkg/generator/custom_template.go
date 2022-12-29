@@ -52,18 +52,6 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 	}
 
 	for _, tpl := range t {
-		update := util.Exists(tpl.Path)
-		if update && tpl.UpdateIsSkip {
-			log.Infof("skip generate file %s", tpl.Path)
-			continue
-		}
-
-		// just create dir
-		if tpl.Path[len(tpl.Path)-1] == '/' && tpl.LoopField == "" {
-			os.MkdirAll(tpl.Path, 0o755)
-			continue
-		}
-
 		// special handling Methods field
 		if tpl.LoopField == "Methods" {
 			tmp := pkg.Methods
@@ -73,16 +61,17 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 				pathTask := &Task{
 					Text: tpl.Path,
 				}
-				realPath, err := pathTask.RenderString(pkg)
+				renderPath, err := pathTask.RenderString(pkg)
 				if err != nil {
 					return fs, err
 				}
-				filePath := filepath.Join(g.OutputPath, realPath)
+				filePath := filepath.Join(g.OutputPath, renderPath)
+				// update
 				if util.Exists(filePath) && tpl.UpdateIsSkip {
 					continue
 				}
 				task := &Task{
-					Name: path.Base(realPath),
+					Name: path.Base(renderPath),
 					Path: filePath,
 					Text: tpl.Body,
 				}
@@ -97,9 +86,28 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 		}
 
 		// custom render
+		pathTask := &Task{
+			Text: tpl.Path,
+		}
+		renderPath, err := pathTask.RenderString(pkg)
+		if err != nil {
+			return fs, err
+		}
+		filePath := filepath.Join(g.OutputPath, renderPath)
+		update := util.Exists(filePath)
+		if update && tpl.UpdateIsSkip {
+			log.Infof("skip generate file %s", tpl.Path)
+			continue
+		}
+
+		// just create dir
+		if tpl.Path[len(tpl.Path)-1] == '/' && tpl.LoopField == "" {
+			os.MkdirAll(filePath, 0o755)
+			continue
+		}
 		task := &Task{
 			Name: path.Base(tpl.Path),
-			Path: filepath.Join(g.OutputPath, tpl.Path),
+			Path: filePath,
 			Text: tpl.Body,
 		}
 
