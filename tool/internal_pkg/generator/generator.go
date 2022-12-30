@@ -36,7 +36,7 @@ const (
 
 	BuildFileName       = "build.sh"
 	BootstrapFileName   = "bootstrap.sh"
-	ToolVersionFileName = "kitex.yaml"
+	ToolVersionFileName = "kitex_info.yaml"
 	HandlerFileName     = "handler.go"
 	MainFileName        = "main.go"
 	ClientFileName      = "client.go"
