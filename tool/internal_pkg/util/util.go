@@ -219,12 +219,12 @@ func CombineOutputPath(outputPath, ns string) string {
 		ns = strings.ReplaceAll(ns, ".", "/")
 	}
 	hasVarNs := strings.Contains(outputPath, "{namespace}")
-	hasVarNsSlash := strings.Contains(outputPath, "{namespaceSlash}")
-	if hasVarNs || hasVarNsSlash {
+	hasVarNsUnderscore := strings.Contains(outputPath, "{namespaceUnderscore}")
+	if hasVarNs || hasVarNsUnderscore {
 		if hasVarNs {
 			outputPath = strings.ReplaceAll(outputPath, "{namespace}", ns)
-		} else if hasVarNsSlash {
-			outputPath = strings.ReplaceAll(outputPath, "{namespaceSlash}", strings.ReplaceAll(ns, "/", "_"))
+		} else if hasVarNsUnderscore {
+			outputPath = strings.ReplaceAll(outputPath, "{namespaceUnderscore}", strings.ReplaceAll(ns, "/", "_"))
 		}
 	} else {
 		outputPath = filepath.Join(outputPath, ns)
