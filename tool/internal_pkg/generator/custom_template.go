@@ -39,8 +39,8 @@ type Template struct {
 	// If true, kitex will skip the file otherwise it will cover the file.
 	UpdateIsSkip bool `yaml:"update_is_skip"`
 	// If set this field, kitex will generate file by cycle. For example:
-	// test_a/test_b/MethodInfo
-	LoopField string `yaml:"loopfield"`
+	// test_a/test_b/{{ .Name}}_test.go
+	LoopMethod bool `yaml:"loop_method"`
 }
 
 func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err error) {
@@ -53,7 +53,7 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 
 	for _, tpl := range t {
 		// special handling Methods field
-		if tpl.LoopField == "Methods" {
+		if tpl.LoopMethod {
 			tmp := pkg.Methods
 			m := pkg.AllMethods()
 			for _, method := range m {
@@ -101,7 +101,7 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 		}
 
 		// just create dir
-		if tpl.Path[len(tpl.Path)-1] == '/' && tpl.LoopField == "" {
+		if tpl.Path[len(tpl.Path)-1] == '/' && !tpl.LoopMethod {
 			os.MkdirAll(filePath, 0o755)
 			continue
 		}
