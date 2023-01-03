@@ -363,7 +363,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 
 func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 	g.updatePackageInfo(pkg)
-	output := util.CombineOutputPath(g.GenPath, pkg.Namespace)
+	output := filepath.Join(g.OutputPath, util.CombineOutputPath(g.GenPath, pkg.Namespace))
 	svcPkg := strings.ToLower(pkg.ServiceName)
 	output = filepath.Join(output, svcPkg)
 	ext := g.tmplExt
