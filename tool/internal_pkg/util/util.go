@@ -214,7 +214,7 @@ func RunGitCommand(gitLink string) (string, string, error) {
 }
 
 // CombineOutputPath read the output and path variables and render them into the final path
-func CombineOutputPath(outputPath string, ns string) string {
+func CombineOutputPath(outputPath, ns string) string {
 	if ns != "" {
 		ns = strings.ReplaceAll(ns, ".", "/")
 	}

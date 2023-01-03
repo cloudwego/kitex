@@ -16,7 +16,6 @@ package thriftgo
 
 import (
 	"fmt"
-	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"go/format"
 	"io"
 	"io/ioutil"
@@ -24,6 +23,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 
 	"github.com/cloudwego/thriftgo/generator/backend"
 	"github.com/cloudwego/thriftgo/generator/golang"
