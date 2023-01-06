@@ -61,8 +61,8 @@ func TestBuilder(t *testing.T) {
 		return picker
 	}).AnyTimes()
 	lb.EXPECT().Name().Return("Synthesized").AnyTimes()
-	NewBalancerFactory(r, lb, Options{})
-	b, ok := balancerFactories.Load(cacheKey(t.Name(), "Synthesized", defaultOptions))
+	NewBalancerFactory(r, nil, lb, Options{})
+	b, ok := balancerFactories.Load(cacheKey(t.Name(), "", "Synthesized", defaultOptions))
 	test.Assert(t, ok)
 	test.Assert(t, b != nil)
 	bl, err := b.(*BalancerFactory).Get(context.Background(), nil)
@@ -75,7 +75,7 @@ func TestBuilder(t *testing.T) {
 }
 
 func TestCacheKey(t *testing.T) {
-	uniqueKey := cacheKey("hello", "world", Options{RefreshInterval: 15 * time.Second, ExpireInterval: 5 * time.Minute})
+	uniqueKey := cacheKey("hello", "noop", "world", Options{RefreshInterval: 15 * time.Second, ExpireInterval: 5 * time.Minute})
 	test.Assert(t, uniqueKey == "hello|world|{15s 5m0s}")
 }
 
@@ -96,7 +96,7 @@ func TestBalancerCache(t *testing.T) {
 	}
 	lb := loadbalance.NewWeightedBalancer()
 	for i := 0; i < count; i++ {
-		blf := NewBalancerFactory(r, lb, Options{})
+		blf := NewBalancerFactory(r, nil, lb, Options{})
 		info := rpcinfo.NewEndpointInfo("svc", "", nil, nil)
 		b, err := blf.Get(context.Background(), info)
 		test.Assert(t, err == nil)

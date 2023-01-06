@@ -67,6 +67,7 @@ type Options struct {
 	RemoteOpt        *remote.ClientOption
 	Proxy            proxy.ForwardProxy
 	Resolver         discovery.Resolver
+	InstanceFilter   discovery.InstanceFilter
 	HTTPResolver     http.Resolver
 	Balancer         loadbalance.Loadbalancer
 	BalancerCacheOpt *lbcache.Options

@@ -32,9 +32,11 @@ import (
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksdiscovery "github.com/cloudwego/kitex/internal/mocks/discovery"
 	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -146,6 +148,24 @@ func TestWithRetryOption(t *testing.T) {
 	cli := newMockClient(t, ctrl, WithRetryContainer(mockRetryContainer))
 
 	test.Assert(t, cli.(*kcFinalizerClient).opt.RetryContainer == mockRetryContainer)
+}
+
+func TestWithInstanceFilter(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockFilter := mocksdiscovery.NewMockInstanceFilter(ctrl)
+	mockFilter.EXPECT().Rule(gomock.Any()).DoAndReturn(func(ctx context.Context) *discovery.FilterRule {
+		return &discovery.FilterRule{}
+	}).Times(1)
+	mockFilter.EXPECT().Name().Return("mockFilter").Times(1)
+	cli := newMockClient(t, ctrl, WithInstanceFilter(mockFilter))
+	mtd := mocks.MockMethod
+	ctx := context.Background()
+	req := new(MockTStruct)
+	res := new(MockTStruct)
+	err := cli.Call(ctx, mtd, req, res)
+	test.Assert(t, err == nil, err)
 }
 
 func BenchmarkCall(b *testing.B) {

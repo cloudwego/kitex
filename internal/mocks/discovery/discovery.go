@@ -112,6 +112,57 @@ func (mr *MockResolverMockRecorder) Target(ctx, target interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Target", reflect.TypeOf((*MockResolver)(nil).Target), ctx, target)
 }
 
+// MockInstanceFilter is a mock of InstanceFilter interface.
+type MockInstanceFilter struct {
+	ctrl     *gomock.Controller
+	recorder *MockInstanceFilterMockRecorder
+}
+
+// MockInstanceFilterMockRecorder is the mock recorder for MockInstanceFilter.
+type MockInstanceFilterMockRecorder struct {
+	mock *MockInstanceFilter
+}
+
+// NewMockInstanceFilter creates a new mock instance.
+func NewMockInstanceFilter(ctrl *gomock.Controller) *MockInstanceFilter {
+	mock := &MockInstanceFilter{ctrl: ctrl}
+	mock.recorder = &MockInstanceFilterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockInstanceFilter) EXPECT() *MockInstanceFilterMockRecorder {
+	return m.recorder
+}
+
+// Name mocks base method.
+func (m *MockInstanceFilter) Name() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Name")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Name indicates an expected call of Name.
+func (mr *MockInstanceFilterMockRecorder) Name() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Name", reflect.TypeOf((*MockInstanceFilter)(nil).Name))
+}
+
+// Rule mocks base method.
+func (m *MockInstanceFilter) Rule(ctx context.Context) *discovery.FilterRule {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Rule", ctx)
+	ret0, _ := ret[0].(*discovery.FilterRule)
+	return ret0
+}
+
+// Rule indicates an expected call of Rule.
+func (mr *MockInstanceFilterMockRecorder) Rule(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Rule", reflect.TypeOf((*MockInstanceFilter)(nil).Rule), ctx)
+}
+
 // MockInstance is a mock of Instance interface.
 type MockInstance struct {
 	ctrl     *gomock.Controller

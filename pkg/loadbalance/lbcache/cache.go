@@ -82,20 +82,25 @@ type BalancerFactory struct {
 	opts       Options
 	cache      sync.Map // key -> LoadBalancer
 	resolver   discovery.Resolver
+	filter     discovery.InstanceFilter
 	balancer   loadbalance.Loadbalancer
 	rebalancer loadbalance.Rebalancer
 	sfg        singleflight.Group
 }
 
-func cacheKey(resolver, balancer string, opts Options) string {
-	return fmt.Sprintf("%s|%s|{%s %s}", resolver, balancer, opts.RefreshInterval, opts.ExpireInterval)
+func cacheKey(resolver, filter, balancer string, opts Options) string {
+	return fmt.Sprintf("%s|%s|%s|{%s %s}", resolver, filter, balancer, opts.RefreshInterval, opts.ExpireInterval)
 }
 
 // NewBalancerFactory get or create a balancer factory for balancer instance
 // cache key with resolver name, balancer name and options
-func NewBalancerFactory(resolver discovery.Resolver, balancer loadbalance.Loadbalancer, opts Options) *BalancerFactory {
+func NewBalancerFactory(resolver discovery.Resolver, instanceFilter discovery.InstanceFilter, balancer loadbalance.Loadbalancer, opts Options) *BalancerFactory {
 	opts.check()
-	uniqueKey := cacheKey(resolver.Name(), balancer.Name(), opts)
+	var filterName string
+	if instanceFilter != nil {
+		filterName = instanceFilter.Name()
+	}
+	uniqueKey := cacheKey(resolver.Name(), filterName, balancer.Name(), opts)
 	val, ok := balancerFactories.Load(uniqueKey)
 	if ok {
 		return val.(*BalancerFactory)
@@ -105,6 +110,7 @@ func NewBalancerFactory(resolver discovery.Resolver, balancer loadbalance.Loadba
 			opts:     opts,
 			resolver: resolver,
 			balancer: balancer,
+			filter:   instanceFilter,
 		}
 		if rb, ok := balancer.(loadbalance.Rebalancer); ok {
 			hrb := newHookRebalancer(rb)
@@ -155,6 +161,10 @@ func (b *BalancerFactory) Get(ctx context.Context, target rpcinfo.EndpointInfo) 
 		if err != nil {
 			return nil, err
 		}
+		if b.filter != nil {
+			ins := discovery.Filter(ctx, b.filter, res.Instances)
+			res.Instances = ins
+		}
 		renameResultCacheKey(&res, b.resolver.Name())
 		bl := &Balancer{
 			b:      b,
@@ -186,6 +196,10 @@ func (bl *Balancer) refresh() {
 	if err != nil {
 		klog.Warnf("KITEX: resolver refresh failed, key=%s error=%s", bl.target, err.Error())
 		return
+	}
+	if bl.b.filter != nil {
+		ins := discovery.Filter(context.Background(), bl.b.filter, res.Instances)
+		res.Instances = ins
 	}
 	renameResultCacheKey(&res, bl.b.resolver.Name())
 	prev := bl.res.Load().(discovery.Result)

@@ -101,6 +101,36 @@ func DefaultDiff(cacheKey string, prev, next Result) (Change, bool) {
 	return ch, len(ch.Added)+len(ch.Removed) != 0
 }
 
+// FilterRule defines the rules that will be used to filter service instances.
+type FilterRule struct {
+	Funcs []FilterFunc
+}
+
+type FilterFunc func(ctx context.Context, instances []Instance) []Instance
+
+// InstanceFilter is used to filter instances after resolve.
+type InstanceFilter interface {
+	// Rule returns the filter rule.
+	Rule(ctx context.Context) *FilterRule
+
+	// Name returns the name of the filter, which will be used for cacheKey.
+	Name() string
+}
+
+func Filter(ctx context.Context, filter InstanceFilter, instances []Instance) []Instance {
+	if filter == nil {
+		return instances
+	}
+	var rule *FilterRule
+	if rule = filter.Rule(ctx); rule == nil || len(rule.Funcs) == 0 {
+		return instances
+	}
+	for _, f := range rule.Funcs {
+		instances = f(ctx, instances)
+	}
+	return instances
+}
+
 type instance struct {
 	addr   net.Addr
 	weight int
@@ -127,6 +157,13 @@ func NewInstance(network, address string, weight int, tags map[string]string) In
 		weight: weight,
 		tags:   tags,
 	}
+}
+
+// Instance contains information of an instance from the target service.
+type Instance interface {
+	Address() net.Addr
+	Weight() int
+	Tag(key string) (value string, exist bool)
 }
 
 // SynthesizedResolver synthesizes a Resolver using a resolve function.
@@ -164,11 +201,4 @@ func (sr SynthesizedResolver) Name() string {
 		return ""
 	}
 	return sr.NameFunc()
-}
-
-// Instance contains information of an instance from the target service.
-type Instance interface {
-	Address() net.Addr
-	Weight() int
-	Tag(key string) (value string, exist bool)
 }

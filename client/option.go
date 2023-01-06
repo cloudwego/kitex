@@ -182,6 +182,15 @@ func WithHTTPResolver(r http.Resolver) Option {
 	}}
 }
 
+// WithInstanceFilter specifies the filter for instances in Service Discovery.
+func WithInstanceFilter(f discovery.InstanceFilter) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithInstanceFilter(%T)", f))
+
+		o.InstanceFilter = f
+	}}
+}
+
 // WithShortConnection forces kitex to close connection after each call is finished.
 func WithShortConnection() Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {

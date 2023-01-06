@@ -18,8 +18,11 @@
 package discovery
 
 import (
+	"context"
 	"reflect"
 	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestDefaultDiff(t *testing.T) {
@@ -72,4 +75,62 @@ func TestDefaultDiff(t *testing.T) {
 			}
 		})
 	}
+}
+
+type mockInstanceFilter struct {
+	rule *FilterRule
+}
+
+func (f *mockInstanceFilter) Rule(ctx context.Context) *FilterRule {
+	return f.rule
+}
+
+func (f *mockInstanceFilter) Name() string {
+	return "mock_filter"
+}
+
+var (
+	filterFunc1 = func(ctx context.Context, instance []Instance) []Instance {
+		var res []Instance
+		for _, ins := range instance {
+			if ins.Address().Network() == "tcp" {
+				res = append(res, ins)
+			}
+		}
+		return res
+	}
+	filterFunc2 = func(ctx context.Context, instance []Instance) []Instance {
+		var res []Instance
+		for _, ins := range instance {
+			if v, ok := ins.Tag("tag"); ok && v == "1" {
+				res = append(res, ins)
+			}
+		}
+		return res
+	}
+)
+
+func TestFilter(t *testing.T) {
+	instances := []Instance{
+		NewInstance("tcp", "1", 10, map[string]string{"tag": "1"}),
+		NewInstance("tcp", "1", 10, nil),
+		NewInstance("unix", "1", 10, map[string]string{"tag": "1"}),
+	}
+	var res []Instance
+	res = Filter(context.Background(), nil, instances)
+	test.Assert(t, reflect.DeepEqual(res, instances))
+
+	filter := &mockInstanceFilter{
+		rule: &FilterRule{[]FilterFunc{filterFunc1}},
+	}
+	res = Filter(context.Background(), filter, instances)
+	test.Assert(t, len(res) == 2)
+
+	filter.rule = &FilterRule{[]FilterFunc{filterFunc2}}
+	res = Filter(context.Background(), filter, instances)
+	test.Assert(t, len(res) == 2)
+
+	filter.rule = &FilterRule{[]FilterFunc{filterFunc1, filterFunc2}}
+	res = Filter(context.Background(), filter, instances)
+	test.Assert(t, len(res) == 1)
 }
