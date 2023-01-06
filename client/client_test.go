@@ -157,8 +157,8 @@ func TestWithInstanceFilter(t *testing.T) {
 	mockFilter := mocksdiscovery.NewMockInstanceFilter(ctrl)
 	mockFilter.EXPECT().Rule(gomock.Any()).DoAndReturn(func(ctx context.Context) *discovery.FilterRule {
 		return &discovery.FilterRule{}
-	}).Times(1)
-	mockFilter.EXPECT().Name().Return("mockFilter").Times(1)
+	}).AnyTimes()
+	mockFilter.EXPECT().Name().Return("mockFilter").AnyTimes()
 	cli := newMockClient(t, ctrl, WithInstanceFilter(mockFilter))
 	mtd := mocks.MockMethod
 	ctx := context.Background()

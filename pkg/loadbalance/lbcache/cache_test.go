@@ -71,12 +71,12 @@ func TestBuilder(t *testing.T) {
 	dump := Dump()
 	dumpJson, err := json.Marshal(dump)
 	test.Assert(t, err == nil)
-	test.Assert(t, string(dumpJson) == `{"TestBuilder|Synthesized|{5s 15s}":{"mockRoute":[{"Address":"tcp://127.0.0.1:8888","Weight":10}]}}`)
+	test.Assert(t, string(dumpJson) == `{"TestBuilder||Synthesized|{5s 15s}":{"mockRoute":[{"Address":"tcp://127.0.0.1:8888","Weight":10}]}}`)
 }
 
 func TestCacheKey(t *testing.T) {
 	uniqueKey := cacheKey("hello", "noop", "world", Options{RefreshInterval: 15 * time.Second, ExpireInterval: 5 * time.Minute})
-	test.Assert(t, uniqueKey == "hello|world|{15s 5m0s}")
+	test.Assert(t, uniqueKey == "hello|noop|world|{15s 5m0s}")
 }
 
 func TestBalancerCache(t *testing.T) {
