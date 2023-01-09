@@ -29,18 +29,131 @@ import (
 
 var DefaultDelimiters = [2]string{"{{", "}}"}
 
+type updateType string
+
+const (
+	skip              updateType = "skip"
+	cover             updateType = "cover"
+	incrementalUpdate updateType = "append"
+)
+
+type Update struct {
+	// update type: skip / cover / append. Default is skip.
+	// If `LoopMethod` is true, only Type field is effect and no append behavior.
+	Type string `yaml:"type,omitempty"`
+	// Match key in append type. If the rendered key exists in the file, the method will be skipped.
+	Key string `yaml:"key,omitempty"`
+	// Append template. Use it to render append content.
+	AppendTpl string `yaml:"append_tpl,omitempty"`
+	// Append import template. Use it to render import content to append.
+	ImportTpl []string `yaml:"import_tpl,omitempty"`
+}
+
 type Template struct {
 	// The generated path and its filename. For example: biz/test.go
 	// will generate test.go in biz directory.
-	Path string `yaml:"path"`
+	Path string `yaml:"path,omitempty"`
 	// Render template content, currently only supports go template syntax
-	Body string `yaml:"body"`
-	// Chooses whether to cover or skip the file if file exists.
-	// If true, kitex will skip the file otherwise it will cover the file.
-	UpdateIsSkip bool `yaml:"update_is_skip"`
+	Body string `yaml:"body,omitempty"`
+	// define update behavior
+	UpdateBehavior *Update `yaml:"update_behavior,omitempty"`
 	// If set this field, kitex will generate file by cycle. For example:
 	// test_a/test_b/{{ .Name}}_test.go
-	LoopMethod bool `yaml:"loop_method"`
+	LoopMethod bool `yaml:"loop_method,omitempty"`
+}
+
+type customGenerator struct {
+	fs       []*File
+	pkg      *PackageInfo
+	basePath string
+}
+
+func NewCustomGenerator(pkg *PackageInfo, basePath string) *customGenerator {
+	return &customGenerator{
+		pkg:      pkg,
+		basePath: basePath,
+	}
+}
+
+func (c *customGenerator) loopGenerate(tpl *Template) error {
+	tmp := c.pkg.Methods
+	m := c.pkg.AllMethods()
+	for _, method := range m {
+		c.pkg.Methods = []*MethodInfo{method}
+		pathTask := &Task{
+			Text: tpl.Path,
+		}
+		renderPath, err := pathTask.RenderString(c.pkg)
+		if err != nil {
+			return err
+		}
+		filePath := filepath.Join(c.basePath, renderPath)
+		// update
+		if util.Exists(filePath) && updateType(tpl.UpdateBehavior.Type) == skip {
+			continue
+		}
+		task := &Task{
+			Name: path.Base(renderPath),
+			Path: filePath,
+			Text: tpl.Body,
+		}
+		f, err := task.Render(c.pkg)
+		if err != nil {
+			return err
+		}
+		c.fs = append(c.fs, f)
+	}
+	c.pkg.Methods = tmp
+	return nil
+}
+
+func (c *customGenerator) commonGenerate(tpl *Template) error {
+	pathTask := &Task{
+		Text: tpl.Path,
+	}
+	renderPath, err := pathTask.RenderString(c.pkg)
+	if err != nil {
+		return err
+	}
+	filePath := filepath.Join(c.basePath, renderPath)
+	update := util.Exists(filePath)
+	if update && updateType(tpl.UpdateBehavior.Type) == skip {
+		log.Infof("skip generate file %s", tpl.Path)
+		return nil
+	}
+
+	var f *File
+	if update && updateType(tpl.UpdateBehavior.Type) == incrementalUpdate {
+		cc := &commonCompleter{
+			path:   filePath,
+			pkg:    c.pkg,
+			update: tpl.UpdateBehavior,
+		}
+		f, err = cc.Complete()
+		if err != nil {
+			return err
+		}
+	} else {
+		// just create dir
+		if tpl.Path[len(tpl.Path)-1] == '/' {
+			os.MkdirAll(filePath, 0o755)
+			return nil
+		}
+
+		task := &Task{
+			Name: path.Base(tpl.Path),
+			Path: filePath,
+			Text: tpl.Body,
+		}
+
+		f, err = task.Render(c.pkg)
+		if err != nil {
+			return err
+		}
+	}
+
+	c.fs = append(c.fs, f)
+	return nil
 }
 
 func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err error) {
@@ -51,73 +164,17 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 		return nil, err
 	}
 
+	cg := NewCustomGenerator(pkg, g.OutputPath)
 	for _, tpl := range t {
 		// special handling Methods field
 		if tpl.LoopMethod {
-			tmp := pkg.Methods
-			m := pkg.AllMethods()
-			for _, method := range m {
-				pkg.Methods = []*MethodInfo{method}
-				pathTask := &Task{
-					Text: tpl.Path,
-				}
-				renderPath, err := pathTask.RenderString(pkg)
-				if err != nil {
-					return fs, err
-				}
-				filePath := filepath.Join(g.OutputPath, renderPath)
-				// update
-				if util.Exists(filePath) && tpl.UpdateIsSkip {
-					continue
-				}
-				task := &Task{
-					Name: path.Base(renderPath),
-					Path: filePath,
-					Text: tpl.Body,
-				}
-				f, err := task.Render(pkg)
-				if err != nil {
-					return fs, err
-				}
-				fs = append(fs, f)
-			}
-			pkg.Methods = tmp
-			continue
+			cg.loopGenerate(tpl)
+		} else {
+			cg.commonGenerate(tpl)
 		}
-
-		// custom render
-		pathTask := &Task{
-			Text: tpl.Path,
-		}
-		renderPath, err := pathTask.RenderString(pkg)
-		if err != nil {
-			return fs, err
-		}
-		filePath := filepath.Join(g.OutputPath, renderPath)
-		update := util.Exists(filePath)
-		if update && tpl.UpdateIsSkip {
-			log.Infof("skip generate file %s", tpl.Path)
-			continue
-		}
-
-		// just create dir
-		if tpl.Path[len(tpl.Path)-1] == '/' && !tpl.LoopMethod {
-			os.MkdirAll(filePath, 0o755)
-			continue
-		}
-		task := &Task{
-			Name: path.Base(tpl.Path),
-			Path: filePath,
-			Text: tpl.Body,
-		}
-
-		f, err := task.Render(pkg)
-		if err != nil {
-			return fs, err
-		}
-		fs = append(fs, f)
 	}
-	return
+
+	return cg.fs, nil
 }
 
 func readTemplates(dir string) ([]*Template, error) {
@@ -130,7 +187,9 @@ func readTemplates(dir string) ([]*Template, error) {
 			if err != nil {
 				return nil, fmt.Errorf("read layout config from  %s failed, err: %v", path, err.Error())
 			}
-			t := &Template{}
+			t := &Template{
+				UpdateBehavior: &Update{Type: string(skip)},
+			}
 			if err = yaml.Unmarshal(tplData, t); err != nil {
 				return nil, fmt.Errorf("unmarshal layout config failed, err: %v", err.Error())
 			}
