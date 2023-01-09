@@ -236,7 +236,7 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 // WithGRPCTLSConfig sets the TLS config for gRPC client.
 func WithGRPCTLSConfig(tlsConfig *tls.Config) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithGRPCTLSConfig"))
+		di.Push("WithGRPCTLSConfig")
 		o.GRPCConnectOpts.TLSConfig = tlsConfig
 	}}
 }
