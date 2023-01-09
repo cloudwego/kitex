@@ -104,31 +104,33 @@ func DefaultDiff(cacheKey string, prev, next Result) (Change, bool) {
 // FilterRule defines the rules that will be used to filter service instances.
 type FilterRule struct {
 	Funcs []FilterFunc
+	Name  string // the name of the filter rule, which will be used for cache key.
 }
 
 type FilterFunc func(ctx context.Context, instances []Instance) []Instance
 
-// InstanceFilter is used to filter instances after resolve.
-type InstanceFilter interface {
-	// Rule returns the filter rule.
-	Rule(ctx context.Context) *FilterRule
-
-	// Name returns the name of the filter, which will be used for cacheKey.
-	Name() string
+type InstanceFilter struct {
+	Rule *FilterRule
 }
 
-func Filter(ctx context.Context, filter InstanceFilter, instances []Instance) []Instance {
-	if filter == nil {
+func (filter *InstanceFilter) Filter(ctx context.Context, instances []Instance) []Instance {
+	if len(instances) == 0 {
 		return instances
 	}
-	var rule *FilterRule
-	if rule = filter.Rule(ctx); rule == nil || len(rule.Funcs) == 0 {
+	if filter.Rule == nil || len(filter.Rule.Funcs) == 0 {
 		return instances
 	}
-	for _, f := range rule.Funcs {
+	for _, f := range filter.Rule.Funcs {
 		instances = f(ctx, instances)
 	}
 	return instances
+}
+
+func (filter *InstanceFilter) Name() string {
+	if filter.Rule == nil {
+		return ""
+	}
+	return filter.Rule.Name
 }
 
 type instance struct {

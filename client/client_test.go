@@ -32,7 +32,6 @@ import (
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/mocks"
-	mocksdiscovery "github.com/cloudwego/kitex/internal/mocks/discovery"
 	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
@@ -153,13 +152,25 @@ func TestWithRetryOption(t *testing.T) {
 func TestWithInstanceFilter(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-
-	mockFilter := mocksdiscovery.NewMockInstanceFilter(ctrl)
-	mockFilter.EXPECT().Rule(gomock.Any()).DoAndReturn(func(ctx context.Context) *discovery.FilterRule {
-		return &discovery.FilterRule{}
-	}).AnyTimes()
-	mockFilter.EXPECT().Name().Return("mockFilter").AnyTimes()
-	cli := newMockClient(t, ctrl, WithInstanceFilter(mockFilter))
+	rule := &discovery.FilterRule{
+		Name: "test_filter",
+		Funcs: []discovery.FilterFunc{
+			func(ctx context.Context, instances []discovery.Instance) []discovery.Instance {
+				// do nothing
+				return instances
+			},
+			func(ctx context.Context, instances []discovery.Instance) []discovery.Instance {
+				res := make([]discovery.Instance, 0, len(instances))
+				for _, ins := range instances {
+					if network := ins.Address().Network(); network == "tcp" {
+						res = append(res, ins)
+					}
+				}
+				return res
+			},
+		},
+	}
+	cli := newMockClient(t, ctrl, WithInstanceFilterRule(rule))
 	mtd := mocks.MockMethod
 	ctx := context.Background()
 	req := new(MockTStruct)

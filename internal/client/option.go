@@ -67,7 +67,6 @@ type Options struct {
 	RemoteOpt        *remote.ClientOption
 	Proxy            proxy.ForwardProxy
 	Resolver         discovery.Resolver
-	InstanceFilter   discovery.InstanceFilter
 	HTTPResolver     http.Resolver
 	Balancer         loadbalance.Loadbalancer
 	BalancerCacheOpt *lbcache.Options
@@ -98,6 +97,9 @@ type Options struct {
 	RetryMethodPolicies map[string]retry.Policy
 	RetryContainer      *retry.Container
 	RetryWithResult     *retry.ShouldResultRetry
+
+	// instance filter rule
+	InstanceFilterRule *discovery.FilterRule
 
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption

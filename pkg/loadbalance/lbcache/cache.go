@@ -82,7 +82,7 @@ type BalancerFactory struct {
 	opts       Options
 	cache      sync.Map // key -> LoadBalancer
 	resolver   discovery.Resolver
-	filter     discovery.InstanceFilter
+	filter     *discovery.InstanceFilter
 	balancer   loadbalance.Loadbalancer
 	rebalancer loadbalance.Rebalancer
 	sfg        singleflight.Group
@@ -94,7 +94,7 @@ func cacheKey(resolver, filter, balancer string, opts Options) string {
 
 // NewBalancerFactory get or create a balancer factory for balancer instance
 // cache key with resolver name, balancer name and options
-func NewBalancerFactory(resolver discovery.Resolver, instanceFilter discovery.InstanceFilter, balancer loadbalance.Loadbalancer, opts Options) *BalancerFactory {
+func NewBalancerFactory(resolver discovery.Resolver, instanceFilter *discovery.InstanceFilter, balancer loadbalance.Loadbalancer, opts Options) *BalancerFactory {
 	opts.check()
 	var filterName string
 	if instanceFilter != nil {
@@ -162,7 +162,7 @@ func (b *BalancerFactory) Get(ctx context.Context, target rpcinfo.EndpointInfo) 
 			return nil, err
 		}
 		if b.filter != nil {
-			ins := discovery.Filter(ctx, b.filter, res.Instances)
+			ins := b.filter.Filter(context.Background(), res.Instances)
 			res.Instances = ins
 		}
 		renameResultCacheKey(&res, b.resolver.Name())
@@ -198,7 +198,7 @@ func (bl *Balancer) refresh() {
 		return
 	}
 	if bl.b.filter != nil {
-		ins := discovery.Filter(context.Background(), bl.b.filter, res.Instances)
+		ins := bl.b.filter.Filter(context.Background(), res.Instances)
 		res.Instances = ins
 	}
 	renameResultCacheKey(&res, bl.b.resolver.Name())

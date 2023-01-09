@@ -253,7 +253,11 @@ func (kc *kClient) initLBCache() error {
 	if kc.opt.BalancerCacheOpt != nil {
 		cacheOpts = *kc.opt.BalancerCacheOpt
 	}
-	instanceFilter := kc.opt.InstanceFilter
+	instanceFilter := &discovery.InstanceFilter{}
+	if kc.opt.InstanceFilterRule != nil {
+		instanceFilter.Rule = kc.opt.InstanceFilterRule
+	}
+
 	kc.lbf = lbcache.NewBalancerFactory(resolver, instanceFilter, balancer, cacheOpts)
 	rbIdx := kc.lbf.RegisterRebalanceHook(onChange)
 	kc.opt.CloseCallbacks = append(kc.opt.CloseCallbacks, func() error {
