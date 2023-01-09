@@ -373,7 +373,7 @@ func (pp *protocPlugin) makeInterfaces(gf *protogen.GeneratedFile, file *protoge
 func (pp *protocPlugin) adjustPath(path string) (ret string) {
 	cur, _ := filepath.Abs(".")
 	if pp.Config.Use == "" {
-		cur = filepath.Join(cur, generator.KitexGenPath)
+		cur = util.FilePathJoin(cur, generator.KitexGenPath)
 	}
 	if filepath.IsAbs(path) {
 		path, _ = filepath.Rel(cur, path)
@@ -381,7 +381,7 @@ func (pp *protocPlugin) adjustPath(path string) (ret string) {
 	}
 	if pp.ModuleName == "" {
 		gopath := util.GetGOPATH()
-		path = filepath.Join(gopath, "src", path)
+		path = util.FilePathJoin(gopath, "src", path)
 		path, _ = filepath.Rel(cur, path)
 	} else {
 		path, _ = filepath.Rel(pp.ModuleName, path)

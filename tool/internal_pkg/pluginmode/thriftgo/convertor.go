@@ -108,7 +108,7 @@ func (c *converter) avoidIncludeConflict(ast *parser.Thrift, ref string) (*parse
 		if filepath.Base(inc.Path) == fn { // will cause include conflict
 			ref = "kitex_faked_idl"
 			faked := *ast
-			faked.Filename = filepath.Join(filepath.Dir(faked.Filename), ref+".thrift")
+			faked.Filename = util.FilePathJoin(filepath.Dir(faked.Filename), ref+".thrift")
 			_, hasNamespace := ast.GetNamespace("go")
 			if !hasNamespace {
 				faked.Namespaces = append(faked.Namespaces, &parser.Namespace{

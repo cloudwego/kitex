@@ -24,6 +24,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"unicode"
 
@@ -111,7 +112,7 @@ func NotPtr(s string) string {
 // the root directory. When the go.mod is found, its module name and path will be returned.
 func SearchGoMod(cwd string) (moduleName, path string, found bool) {
 	for {
-		path = filepath.Join(cwd, "go.mod")
+		path = FilePathJoin(cwd, "go.mod")
 		data, err := ioutil.ReadFile(path)
 		if err == nil {
 			re := regexp.MustCompile(`^\s*module\s+(\S+)\s*`)
@@ -140,7 +141,7 @@ func RunGitCommand(gitLink string) (string, string, error) {
 	if err != nil {
 		return "", "Failed to get home dir", err
 	}
-	cachePath := filepath.Join(u.HomeDir, ".kitex", "cache")
+	cachePath := FilePathJoin(u.HomeDir, ".kitex", "cache")
 
 	branch := ""
 	if strings.Contains(gitLink, ".git@") {
@@ -165,9 +166,9 @@ func RunGitCommand(gitLink string) (string, string, error) {
 	if branch != "" {
 		branchSuffix = "@" + branch
 	}
-	gitPath := filepath.Join(cachePath, repoLink+branchSuffix)
+	gitPath := FilePathJoin(cachePath, repoLink+branchSuffix)
 
-	_, err = os.Stat(filepath.Join(gitPath, ".git"))
+	_, err = os.Stat(FilePathJoin(gitPath, ".git"))
 	if err != nil && !os.IsExist(err) {
 		err = os.MkdirAll(gitPath, os.ModePerm)
 		if err != nil {
@@ -227,7 +228,14 @@ func CombineOutputPath(outputPath, ns string) string {
 			outputPath = strings.ReplaceAll(outputPath, "{namespaceUnderscore}", strings.ReplaceAll(ns, "/", "_"))
 		}
 	} else {
-		outputPath = filepath.Join(outputPath, ns)
+		outputPath = FilePathJoin(outputPath, ns)
 	}
 	return outputPath
+}
+
+func FilePathJoin(elem ...string) string {
+	if runtime.GOOS == "windows" {
+		return strings.ReplaceAll(filepath.Join(elem...), "\\", "/")
+	}
+	return filepath.Join(elem...)
 }

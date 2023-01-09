@@ -17,7 +17,6 @@ package generator
 import (
 	"bytes"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -55,7 +54,7 @@ func (p *PackageInfo) AddImport(pkg, path string) {
 	if pkg != "" {
 		if p.ExternalKitexGen != "" && strings.Contains(path, KitexGenPath) {
 			parts := strings.Split(path, KitexGenPath)
-			path = filepath.Join(p.ExternalKitexGen, parts[len(parts)-1])
+			path = util.FilePathJoin(p.ExternalKitexGen, parts[len(parts)-1])
 		}
 		if path == pkg {
 			p.Imports[path] = nil

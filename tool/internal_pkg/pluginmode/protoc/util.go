@@ -16,9 +16,10 @@ package protoc
 
 import (
 	"go/token"
-	"path/filepath"
 	"strings"
 	"unicode"
+
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 func goSanitized(s string) string {
@@ -57,5 +58,5 @@ func (p *pathElements) getImportPath(pkg string) (path string, ok bool) {
 		return "", false
 	}
 	// incomplete import path
-	return filepath.Join(p.prefix, pkg), true
+	return util.FilePathJoin(p.prefix, pkg), true
 }
