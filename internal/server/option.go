@@ -94,7 +94,7 @@ type Options struct {
 type Limit struct {
 	Limits        *limit.Option
 	LimitReporter limiter.LimitReporter
-	ConLimit      limiter.ConcurrencyLimiter
+	ConnLimit     limiter.ConnectionLimiter
 	QPSLimit      limiter.RateLimiter
 
 	// QPSLimitPostDecode is true to indicate that the QPS limiter takes effect in

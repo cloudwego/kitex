@@ -28,12 +28,12 @@ import (
 )
 
 // NewServerLimiterHandler creates a new server limiter handler.
-func NewServerLimiterHandler(conLimit limiter.ConcurrencyLimiter, qpsLimit limiter.RateLimiter, reporter limiter.LimitReporter, qpsLimitPostDecode bool) remote.InboundHandler {
-	return &serverLimiterHandler{conLimit, qpsLimit, reporter, qpsLimitPostDecode}
+func NewServerLimiterHandler(connLimit limiter.ConnectionLimiter, qpsLimit limiter.RateLimiter, reporter limiter.LimitReporter, qpsLimitPostDecode bool) remote.InboundHandler {
+	return &serverLimiterHandler{connLimit, qpsLimit, reporter, qpsLimitPostDecode}
 }
 
 type serverLimiterHandler struct {
-	connLimit          limiter.ConcurrencyLimiter
+	connLimit          limiter.ConnectionLimiter
 	qpsLimit           limiter.RateLimiter
 	reporter           limiter.LimitReporter
 	qpsLimitPostDecode bool

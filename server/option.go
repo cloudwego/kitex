@@ -147,11 +147,11 @@ func WithLimit(lim *limit.Option) Option {
 
 // WithConnectionLimiter sets the limiter of connections.
 // If both WithLimit and WithConnectionLimiter are called, only the latter will take effect.
-func WithConnectionLimiter(conLimit limiter.ConcurrencyLimiter) Option {
+func WithConnectionLimiter(connLimit limiter.ConnectionLimiter) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithConnectionLimiter(%T{%+v})", conLimit, conLimit))
+		di.Push(fmt.Sprintf("WithConnectionLimiter(%T{%+v})", connLimit, connLimit))
 
-		o.Limit.ConLimit = conLimit
+		o.Limit.ConnLimit = connLimit
 	}}
 }
 
@@ -336,10 +336,10 @@ func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string
 }
 
 // Deprecated: Use WithConnectionLimiter instead.
-func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
+func WithConcurrencyLimiter(conLimit limiter.ConnectionLimiter) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithConcurrencyLimiter(%T{%+v})", conLimit, conLimit))
 
-		o.Limit.ConLimit = conLimit
+		o.Limit.ConnLimit = conLimit
 	}}
 }

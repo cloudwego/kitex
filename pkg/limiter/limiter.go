@@ -23,9 +23,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/limit"
 )
 
-// ConcurrencyLimiter limits the number of concurrent access towards the protected resource.
-// The implementation of ConcurrencyLimiter should be concurrent safe.
-type ConcurrencyLimiter interface {
+// ConnectionLimiter limits the number of concurrent access towards the protected resource.
+// The implementation of ConnectionLimiter should be concurrent safe.
+type ConnectionLimiter interface {
 	// Acquire reports if next access to the protected resource is allowed.
 	Acquire(ctx context.Context) bool
 
@@ -57,22 +57,22 @@ type LimitReporter interface {
 	QPSOverloadReport()
 }
 
-// NewLimiterWrapper wraps the given ConcurrencyLimiter and RateLimiter into a limit.Updater.
-func NewLimiterWrapper(conLimit ConcurrencyLimiter, qpsLimit RateLimiter) limit.Updater {
+// NewLimiterWrapper wraps the given ConnectionLimiter and RateLimiter into a limit.Updater.
+func NewLimiterWrapper(connLimit ConnectionLimiter, qpsLimit RateLimiter) limit.Updater {
 	return &limitWrapper{
-		conLimit: conLimit,
-		qpsLimit: qpsLimit,
+		connLimit: connLimit,
+		qpsLimit:  qpsLimit,
 	}
 }
 
 type limitWrapper struct {
-	conLimit ConcurrencyLimiter
-	qpsLimit RateLimiter
+	connLimit ConnectionLimiter
+	qpsLimit  RateLimiter
 }
 
 func (l *limitWrapper) UpdateLimit(opt *limit.Option) (updated bool) {
 	if opt != nil {
-		if ul, ok := l.conLimit.(Updatable); ok {
+		if ul, ok := l.connLimit.(Updatable); ok {
 			ul.UpdateLimit(opt.MaxConnections)
 			updated = true
 		}

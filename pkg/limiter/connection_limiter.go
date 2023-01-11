@@ -21,19 +21,19 @@ import (
 	"sync/atomic"
 )
 
-// connectionLimiter implements ConcurrencyLimiter.
+// connectionLimiter implements ConnectionLimiter.
 type connectionLimiter struct {
 	lim  int32
 	curr int32
 }
 
 // NewConnectionLimiter returns a new ConnectionLimiter with the given limit.
-func NewConnectionLimiter(lim int) ConcurrencyLimiter {
+func NewConnectionLimiter(lim int) ConnectionLimiter {
 	return &connectionLimiter{int32(lim), 0}
 }
 
 // Deprecated: Use NewConnectionLimiter instead.
-func NewConcurrencyLimiter(lim int) ConcurrencyLimiter {
+func NewConcurrencyLimiter(lim int) ConnectionLimiter {
 	return &connectionLimiter{int32(lim), 0}
 }
 

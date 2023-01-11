@@ -21,7 +21,7 @@ import (
 	"time"
 )
 
-// DummyConcurrencyLimiter implements ConcurrencyLimiter but without actual limitation.
+// DummyConcurrencyLimiter implements ConnectionLimiter but without actual limitation.
 type DummyConcurrencyLimiter struct{}
 
 // Acquire .

@@ -353,7 +353,7 @@ func (s *server) addBoundHandlers(opt *remote.ServerOption) {
  */
 func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 	limits := s.opt.Limit.Limits
-	connLimit := s.opt.Limit.ConLimit
+	connLimit := s.opt.Limit.ConnLimit
 	qpsLimit := s.opt.Limit.QPSLimit
 	if limits == nil && connLimit == nil && qpsLimit == nil {
 		return
