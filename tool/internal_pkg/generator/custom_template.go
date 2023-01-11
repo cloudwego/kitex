@@ -168,9 +168,15 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 	for _, tpl := range t {
 		// special handling Methods field
 		if tpl.LoopMethod {
-			cg.loopGenerate(tpl)
+			err = cg.loopGenerate(tpl)
+			if err != nil {
+				return cg.fs, err
+			}
 		} else {
-			cg.commonGenerate(tpl)
+			err = cg.commonGenerate(tpl)
+			if err != nil {
+				return cg.fs, err
+			}
 		}
 	}
 
