@@ -61,3 +61,8 @@ const (
 	HeaderConnectionReadyToReset = "crrst"
 	HeaderProcessAtTime          = "K_ProcessAtTime"
 )
+
+// key of acl token
+const (
+	GDPRToken = "gdpr"
+)

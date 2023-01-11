@@ -253,6 +253,31 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 			writeSize = writeSize + 2 + valWLen
 		}
 	}
+
+	// custom kv info
+	customKVSize := len(tm.TransCustomInfo())
+	if customKVSize > 0 {
+		// INFO ID TYPE(u8) + NUM HEADERS(u16)
+		if err = WriteByte(byte(InfoIDACLToken), out); err != nil {
+			return writeSize, err
+		}
+		if err = WriteUint16(uint16(customKVSize), out); err != nil {
+			return writeSize, err
+		}
+		writeSize += 3
+		for key, val := range tm.TransCustomInfo() {
+			keyWLen, err := WriteString2BLen(key, out)
+			if err != nil {
+				return writeSize, err
+			}
+			valWLen, err := WriteString2BLen(val, out)
+			if err != nil {
+				return writeSize, err
+			}
+			writeSize = writeSize + keyWLen + valWLen
+		}
+	}
+
 	// padding = (4 - headerInfoSize%4) % 4
 	padding := (4 - writeSize%4) % 4
 	paddingBuf, err := out.Malloc(padding)
