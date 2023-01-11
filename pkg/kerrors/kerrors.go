@@ -53,6 +53,7 @@ var (
 	ErrNoDestService        = ErrInternalException.WithCause(errors.New("no dest service"))
 	ErrNoDestAddress        = ErrInternalException.WithCause(errors.New("no dest address"))
 	ErrNoConnection         = ErrInternalException.WithCause(errors.New("no connection available"))
+	ErrConcurrencyOverLimit = ErrOverlimit.WithCause(errors.New("to many concurrency"))
 	ErrConnOverLimit        = ErrOverlimit.WithCause(errors.New("to many connections"))
 	ErrQPSOverLimit         = ErrOverlimit.WithCause(errors.New("request too frequent"))
 	ErrNoIvkRequest         = ErrInternalException.WithCause(errors.New("invoker request not set"))

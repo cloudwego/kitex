@@ -335,11 +335,10 @@ func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string
 	}}
 }
 
-// Deprecated: Use WithConnectionLimiter instead.
-func WithConcurrencyLimiter(conLimit limiter.ConnectionLimiter) Option {
+func WithConcurrencyLimiter(concurrencyLimit limiter.ConcurrencyLimiter) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithConcurrencyLimiter(%T{%+v})", conLimit, conLimit))
+		di.Push(fmt.Sprintf("WithConcurrencyLimiter(%T{%+v})", concurrencyLimit, concurrencyLimit))
 
-		o.Limit.ConnLimit = conLimit
+		o.Limit.ConcurrencyLimit = concurrencyLimit
 	}}
 }

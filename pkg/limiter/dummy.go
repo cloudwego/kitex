@@ -21,21 +21,17 @@ import (
 	"time"
 )
 
-// DummyConcurrencyLimiter implements ConnectionLimiter but without actual limitation.
-type DummyConcurrencyLimiter struct{}
+// DummyConnectionLimiter implements ConnectionLimiter but without actual limitation.
+type DummyConnectionLimiter struct{}
 
 // Acquire .
-func (dcl *DummyConcurrencyLimiter) Acquire(ctx context.Context) bool {
-	return true
-}
+func (dcl *DummyConnectionLimiter) Acquire(ctx context.Context) bool { return true }
 
 // Release .
-func (dcl *DummyConcurrencyLimiter) Release(ctx context.Context) {}
+func (dcl *DummyConnectionLimiter) Release(ctx context.Context) {}
 
 // Status .
-func (dcl *DummyConcurrencyLimiter) Status(ctx context.Context) (limit, occupied int) {
-	return
-}
+func (dcl *DummyConnectionLimiter) Status(ctx context.Context) (limit, occupied int) { return }
 
 // DummyRateLimiter implements RateLimiter but without actual limitation.
 type DummyRateLimiter struct{}
@@ -47,3 +43,15 @@ func (drl *DummyRateLimiter) Acquire(ctx context.Context) bool { return true }
 func (drl *DummyRateLimiter) Status(ctx context.Context) (max, current int, interval time.Duration) {
 	return
 }
+
+// DummyConcurrencyLimiter implements ConcurrencyLimiter but without actual limitation.
+type DummyConcurrencyLimiter struct{}
+
+// Acquire .
+func (dcl *DummyConcurrencyLimiter) Acquire(ctx context.Context) bool { return true }
+
+// Release .
+func (dcl *DummyConcurrencyLimiter) Release(ctx context.Context) {}
+
+// Status .
+func (dcl *DummyConcurrencyLimiter) Status(ctx context.Context) (limit, occupied int) { return }

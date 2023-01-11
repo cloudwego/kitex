@@ -27,13 +27,19 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
+var _ remote.InboundHandler = (*serverLimiterHandler)(nil)
+var _ remote.OutboundHandler = (*serverLimiterHandler)(nil)
+
 // NewServerLimiterHandler creates a new server limiter handler.
-func NewServerLimiterHandler(connLimit limiter.ConnectionLimiter, qpsLimit limiter.RateLimiter, reporter limiter.LimitReporter, qpsLimitPostDecode bool) remote.InboundHandler {
-	return &serverLimiterHandler{connLimit, qpsLimit, reporter, qpsLimitPostDecode}
+func NewServerLimiterHandler(connLimit limiter.ConnectionLimiter, concurrencyLimit limiter.ConcurrencyLimiter, qpsLimit limiter.RateLimiter, reporter limiter.LimitReporter, qpsLimitPostDecode bool) remote.InboundHandler {
+	return &serverLimiterHandler{
+		connLimit: connLimit, concurrencyLimit: concurrencyLimit, qpsLimit: qpsLimit, reporter: reporter, qpsLimitPostDecode: qpsLimitPostDecode,
+	}
 }
 
 type serverLimiterHandler struct {
 	connLimit          limiter.ConnectionLimiter
+	concurrencyLimit   limiter.ConcurrencyLimiter
 	qpsLimit           limiter.RateLimiter
 	reporter           limiter.LimitReporter
 	qpsLimitPostDecode bool
@@ -52,14 +58,14 @@ func (l *serverLimiterHandler) OnActive(ctx context.Context, conn net.Conn) (con
 
 // OnRead implements the remote.InboundHandler interface.
 func (l *serverLimiterHandler) OnRead(ctx context.Context, conn net.Conn) (context.Context, error) {
-	if !l.qpsLimitPostDecode {
-		if l.qpsLimit.Acquire(ctx) {
-			return ctx, nil
-		}
+	if !l.qpsLimitPostDecode && !l.qpsLimit.Acquire(ctx) {
 		if l.reporter != nil {
 			l.reporter.QPSOverloadReport()
 		}
 		return ctx, kerrors.ErrQPSOverLimit
+	}
+	if !l.concurrencyLimit.Acquire(ctx) {
+		return ctx, kerrors.ErrConcurrencyOverLimit
 	}
 	return ctx, nil
 }
@@ -81,6 +87,11 @@ func (l *serverLimiterHandler) OnMessage(ctx context.Context, args, result remot
 		}
 		return ctx, kerrors.ErrQPSOverLimit
 	}
+	return ctx, nil
+}
+
+func (l *serverLimiterHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (context.Context, error) {
+	l.concurrencyLimit.Release(ctx)
 	return ctx, nil
 }
 

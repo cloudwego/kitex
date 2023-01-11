@@ -354,13 +354,21 @@ func (s *server) addBoundHandlers(opt *remote.ServerOption) {
 func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 	limits := s.opt.Limit.Limits
 	connLimit := s.opt.Limit.ConnLimit
+	concurrencyLimit := s.opt.Limit.ConcurrencyLimit
 	qpsLimit := s.opt.Limit.QPSLimit
-	if limits == nil && connLimit == nil && qpsLimit == nil {
+	if limits == nil && connLimit == nil && qpsLimit == nil && concurrencyLimit == nil {
 		return
 	}
 	if connLimit == nil {
 		if limits != nil && limits.MaxConnections > 0 {
 			connLimit = limiter.NewConnectionLimiter(limits.MaxConnections)
+		} else {
+			connLimit = &limiter.DummyConnectionLimiter{}
+		}
+	}
+	if concurrencyLimit == nil {
+		if limits != nil && limits.MaxConcurrency > 0 {
+			connLimit = limiter.NewConcurrencyLimiter(limits.MaxConcurrency, true) // default is blocking limiter
 		} else {
 			connLimit = &limiter.DummyConcurrencyLimiter{}
 		}
@@ -379,7 +387,7 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 		updater := limiter.NewLimiterWrapper(connLimit, qpsLimit)
 		limits.UpdateControl(updater)
 	}
-	handler = bound.NewServerLimiterHandler(connLimit, qpsLimit, s.opt.Limit.LimitReporter, s.opt.Limit.QPSLimitPostDecode)
+	handler = bound.NewServerLimiterHandler(connLimit, concurrencyLimit, qpsLimit, s.opt.Limit.LimitReporter, s.opt.Limit.QPSLimitPostDecode)
 	// TODO: gRPC limiter
 	return
 }

@@ -398,7 +398,7 @@ func TestServerBoundHandler(t *testing.T) {
 				WithQPSLimiter(mockslimiter.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(&limiter.DummyConcurrencyLimiter{}, mockslimiter.NewMockRateLimiter(ctrl), nil, true),
+				bound.NewServerLimiterHandler(&limiter.DummyConnectionLimiter{}, mockslimiter.NewMockRateLimiter(ctrl), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{

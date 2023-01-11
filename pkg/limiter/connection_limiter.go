@@ -32,11 +32,6 @@ func NewConnectionLimiter(lim int) ConnectionLimiter {
 	return &connectionLimiter{int32(lim), 0}
 }
 
-// Deprecated: Use NewConnectionLimiter instead.
-func NewConcurrencyLimiter(lim int) ConnectionLimiter {
-	return &connectionLimiter{int32(lim), 0}
-}
-
 // Acquire tries to increase the connection counter.
 // The return value indicates whether the operation is allowed under the connection limitation.
 // Acquired is executed in `OnActive` which is called when a new connection is accepted, so even if the limit is reached

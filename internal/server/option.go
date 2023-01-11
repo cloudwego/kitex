@@ -92,10 +92,11 @@ type Options struct {
 }
 
 type Limit struct {
-	Limits        *limit.Option
-	LimitReporter limiter.LimitReporter
-	ConnLimit     limiter.ConnectionLimiter
-	QPSLimit      limiter.RateLimiter
+	Limits           *limit.Option
+	LimitReporter    limiter.LimitReporter
+	ConnLimit        limiter.ConnectionLimiter
+	ConcurrencyLimit limiter.ConcurrencyLimiter
+	QPSLimit         limiter.RateLimiter
 
 	// QPSLimitPostDecode is true to indicate that the QPS limiter takes effect in
 	// the OnMessage callback, and false for the OnRead callback.

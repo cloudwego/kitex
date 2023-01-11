@@ -24,6 +24,7 @@ type Updater interface {
 // Option is used to config the limiter.
 type Option struct {
 	MaxConnections int
+	MaxConcurrency int
 	MaxQPS         int
 
 	// UpdateControl receives a Updater which gives the limitation provider
@@ -33,5 +34,5 @@ type Option struct {
 
 // Valid checks if the option is valid.
 func (lo *Option) Valid() bool {
-	return lo.MaxConnections > 0 || lo.MaxQPS > 0
+	return lo.MaxConnections > 0 || lo.MaxQPS > 0 || lo.MaxConcurrency > 0
 }

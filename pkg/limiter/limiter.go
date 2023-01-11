@@ -23,6 +23,17 @@ import (
 	"github.com/cloudwego/kitex/pkg/limit"
 )
 
+type ConcurrencyLimiter interface {
+	// Acquire reports if next access to the protected resource is allowed.
+	Acquire(ctx context.Context) bool
+
+	// Release claims a previous taken access has released the resource.
+	Release(ctx context.Context)
+
+	// Status returns the total quota and inflight.
+	Status(ctx context.Context) (limit, inflight int)
+}
+
 // ConnectionLimiter limits the number of concurrent access towards the protected resource.
 // The implementation of ConnectionLimiter should be concurrent safe.
 type ConnectionLimiter interface {
