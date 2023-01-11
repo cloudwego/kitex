@@ -143,6 +143,7 @@ var funcs = map[string]interface{}{
 	"ReplaceString": util.ReplaceString,
 	"SnakeString":   util.SnakeString,
 	"HasFeature":    HasFeature,
+	"FilterImports": FilterImports,
 }
 
 var templateNames = []string{
@@ -275,4 +276,26 @@ func (t *Task) RenderString(data interface{}) (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+
+func FilterImports(Imports map[string]map[string]bool, ms []*MethodInfo) map[string]map[string]bool {
+	res := map[string]map[string]bool{}
+	for _, m := range ms {
+		if m.Resp != nil {
+			for _, dep := range m.Resp.Deps {
+				if _, ok := Imports[dep.ImportPath]; ok {
+					res[dep.ImportPath] = Imports[dep.ImportPath]
+				}
+			}
+		}
+		for _, arg := range m.Args {
+			for _, dep := range arg.Deps {
+				if _, ok := Imports[dep.ImportPath]; ok {
+					res[dep.ImportPath] = Imports[dep.ImportPath]
+				}
+			}
+		}
+	}
+	return res
 }
