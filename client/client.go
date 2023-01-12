@@ -406,7 +406,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	kc.opt.TracerCtl.DoFinish(ctx, lastRI, err)
 	callOpts.Recycle()
 	if err == nil {
-		err = ri.Invocation().BizStatusErr()
+		err = lastRI.Invocation().BizStatusErr()
 		// RPCInfo will be recycled after rpc is finished,
 		// holding RPCInfo in a new goroutine is forbidden.
 

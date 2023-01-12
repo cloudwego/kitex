@@ -137,10 +137,6 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 				// user specified resp to do retry
 				continue
 			}
-			if i > 0 {
-				// monitor report just use firstRI
-				rpcinfo.PutRPCInfo(cRI)
-			}
 			break
 		} else {
 			if i == retryTimes {
