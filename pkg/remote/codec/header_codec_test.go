@@ -349,7 +349,7 @@ func prepareStrKVInfo() map[string]string {
 
 func prepareCustomKVInfo() map[string]string {
 	kvInfo := map[string]string{
-		//transmeta.GDPRToken: "mockToken",
+		transmeta.GDPRToken: "mockToken",
 	}
 	return kvInfo
 }
