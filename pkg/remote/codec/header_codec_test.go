@@ -331,11 +331,6 @@ func prepareIntKVInfo() map[uint16]string {
 	return kvInfo
 }
 
-func prepareEmptyIntKVInfo() map[uint16]string {
-	kvInfo := map[uint16]string{}
-	return kvInfo
-}
-
 func prepareStrKVInfo() map[string]string {
 	kvInfo := map[string]string{}
 	return kvInfo
