@@ -64,6 +64,11 @@ func (r *backupRetryer) ShouldRetry(ctx context.Context, err error, callTimes in
 	return "", true
 }
 
+type resultWrapper struct {
+	rpcinfo.RPCInfo
+	error
+}
+
 // AllowRetry implements the Retryer interface.
 func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
 	r.RLock()
@@ -78,7 +83,7 @@ func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (recycleRI bool, err error) {
+func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (lastRI rpcinfo.RPCInfo, err error) {
 	r.RLock()
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes
 	retryDelay := r.retryDelay
@@ -89,7 +94,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	var recordCostDoing int32 = 0
 	var abort int32 = 0
 	// notice: buff num of chan is very important here, it cannot less than call times, or the below chan receive will block
-	done := make(chan error, retryTimes+1)
+	done := make(chan *resultWrapper, retryTimes+1)
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
 	timer := time.NewTimer(retryDelay)
 	defer func() {
@@ -108,16 +113,19 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				if atomic.LoadInt32(&abort) == 1 {
 					return
 				}
-				var e error
+				var (
+					e   error
+					cRI rpcinfo.RPCInfo
+				)
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
 						e = panicToErr(ctx, panicInfo, firstRI)
 					}
-					done <- e
+					done <- &resultWrapper{cRI, e}
 				}()
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
-				_, _, e = rpcCall(ctx, r)
+				cRI, _, e = rpcCall(ctx, r)
 				recordCost(ct, callStart, &recordCostDoing, &callCosts, &abort, e)
 				if r.cbContainer.cbStat {
 					circuitbreak.RecordStat(ctx, req, nil, e, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
@@ -131,14 +139,15 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				timer.Reset(retryDelay)
 			}
 		case e := <-done:
-			if e != nil && errors.Is(e, kerrors.ErrRPCFinish) {
+			if e.error != nil && errors.Is(e.error, kerrors.ErrRPCFinish) {
 				// To ignore resp concurrent write, the later response won't do decode and return ErrRPCFinish.
 				// But if the cost of decode is long, ErrRPCFinish will return before previous normal call.
 				continue
 			}
 			atomic.StoreInt32(&abort, 1)
-			recordRetryInfo(firstRI, atomic.LoadInt32(&callTimes), callCosts.String())
-			return false, e
+			lastRI = e.RPCInfo
+			recordRetryInfo(lastRI, atomic.LoadInt32(&callTimes), callCosts.String())
+			return lastRI, e.error
 		}
 	}
 }

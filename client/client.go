@@ -386,7 +386,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 
 	var callTimes int32
 	var prevRI rpcinfo.RPCInfo
-	recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+	lastRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
 		retryCtx := ctx
 		cRI := ri
@@ -403,19 +403,17 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		return cRI, response, err
 	}, ri, request)
 
-	kc.opt.TracerCtl.DoFinish(ctx, ri, err)
+	kc.opt.TracerCtl.DoFinish(ctx, lastRI, err)
 	callOpts.Recycle()
 	if err == nil {
 		err = ri.Invocation().BizStatusErr()
-	}
-	if recycleRI {
-		// why need check recycleRI to decide if recycle RPCInfo?
-		// 1. no retry, rpc timeout happen will cause panic when response return
-		// 2. retry success, will cause panic when first call return
-		// 3. backup request may cause panic, cannot recycle first RPCInfo
 		// RPCInfo will be recycled after rpc is finished,
 		// holding RPCInfo in a new goroutine is forbidden.
-		rpcinfo.PutRPCInfo(ri)
+
+		// recycle when err == nil
+		// 1. if no retry, lastRI == firstRI, then recycle
+		// 2. retry success, recycle lastRI, firstRI can not be recycled.
+		rpcinfo.PutRPCInfo(lastRI)
 	}
 	return err
 }
