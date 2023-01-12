@@ -351,7 +351,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 			}
 		}
 		// combine service
-		if c.Config.CombineService && len(ast.Services) > 0 {
+		if ast == req.AST && c.Config.CombineService && len(ast.Services) > 0 {
 			var svcs []*generator.ServiceInfo
 			var methods []*generator.MethodInfo
 			for _, s := range all[ast.Filename] {
