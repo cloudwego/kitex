@@ -278,7 +278,6 @@ func (t *Task) RenderString(data interface{}) (string, error) {
 	return buf.String(), nil
 }
 
-
 func FilterImports(Imports map[string]map[string]bool, ms []*MethodInfo) map[string]map[string]bool {
 	res := map[string]map[string]bool{}
 	for _, m := range ms {
