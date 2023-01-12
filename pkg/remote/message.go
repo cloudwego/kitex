@@ -257,25 +257,21 @@ func (m *message) Recycle() {
 type TransInfo interface {
 	TransStrInfo() map[string]string
 	TransIntInfo() map[uint16]string
-	TransCustomInfo() map[string]string
 	PutTransIntInfo(map[uint16]string)
 	PutTransStrInfo(kvInfo map[string]string)
-	PutTransCustomInfo(map[string]string)
 	Recycle()
 }
 
 func newTransInfo() interface{} {
 	return &transInfo{
-		intInfo:    make(map[uint16]string),
-		strInfo:    make(map[string]string),
-		customInfo: make(map[string]string),
+		intInfo: make(map[uint16]string),
+		strInfo: make(map[string]string),
 	}
 }
 
 type transInfo struct {
-	strInfo    map[string]string
-	intInfo    map[uint16]string
-	customInfo map[string]string
+	strInfo map[string]string
+	intInfo map[uint16]string
 }
 
 func (ti *transInfo) zero() {
@@ -284,9 +280,6 @@ func (ti *transInfo) zero() {
 	}
 	for k := range ti.strInfo {
 		delete(ti.strInfo, k)
-	}
-	for k := range ti.customInfo {
-		delete(ti.customInfo, k)
 	}
 }
 
@@ -324,25 +317,6 @@ func (ti *transInfo) PutTransStrInfo(kvInfo map[string]string) {
 	} else {
 		for k, v := range kvInfo {
 			ti.strInfo[k] = v
-		}
-	}
-}
-
-// TransCustomInfo implements the TransInfo interface.
-func (ti *transInfo) TransCustomInfo() map[string]string {
-	return ti.customInfo
-}
-
-// PutTransCustomInfo implements the TransInfo interface.
-func (ti *transInfo) PutTransCustomInfo(kvInfo map[string]string) {
-	if kvInfo == nil {
-		return
-	}
-	if len(ti.customInfo) == 0 {
-		ti.customInfo = kvInfo
-	} else {
-		for k, v := range kvInfo {
-			ti.customInfo[k] = v
 		}
 	}
 }

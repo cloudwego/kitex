@@ -89,15 +89,13 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
 }
 
-func TestTTHeaderCodecWithTransCustomInfo(t *testing.T) {
+func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
 	ctx := context.Background()
-	intKVInfo := prepareEmptyIntKVInfo()
-	strKVInfo := prepareStrKVInfo()
-	customKVInfo := prepareCustomKVInfo()
+	intKVInfo := prepareIntKVInfo()
+	strKVInfo := prepareStrKVInfoWithGDPRToken()
 	sendMsg := initClientSendMsg(transport.TTHeader)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
-	sendMsg.TransInfo().PutTransCustomInfo(customKVInfo)
 	sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
 
 	// encode
@@ -110,7 +108,7 @@ func TestTTHeaderCodecWithTransCustomInfo(t *testing.T) {
 	recvMsg := initServerRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil, err)
-	test.Assert(t, strings.Contains(string(buf), customKVInfo[transmeta.GDPRToken]), string(buf))
+	test.Assert(t, strings.Contains(string(buf), strKVInfo[transmeta.GDPRToken]), string(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = ttHeaderCodec.decode(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)
@@ -118,10 +116,8 @@ func TestTTHeaderCodecWithTransCustomInfo(t *testing.T) {
 
 	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
 	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
-	customKVInfoRecv := recvMsg.TransInfo().TransCustomInfo()
 	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
-	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
-	test.DeepEqual(t, customKVInfoRecv, map[string]string{})
+	test.DeepEqual(t, strKVInfoRecv, map[string]string{})
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
 	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
@@ -345,7 +341,7 @@ func prepareStrKVInfo() map[string]string {
 	return kvInfo
 }
 
-func prepareCustomKVInfo() map[string]string {
+func prepareStrKVInfoWithGDPRToken() map[string]string {
 	kvInfo := map[string]string{
 		transmeta.GDPRToken: "mockToken",
 	}

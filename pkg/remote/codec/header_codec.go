@@ -208,7 +208,23 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 	writeSize = writtenSize
 	tm := message.TransInfo()
 	// str kv info
-	strKVSize := len(tm.TransStrInfo())
+	strKVMap := tm.TransStrInfo()
+	strKVSize := len(strKVMap)
+	if gdprToken, ok := strKVMap[transmeta.GDPRToken]; ok {
+		strKVSize--
+		// INFO ID TYPE(u8)
+		if err = WriteByte(byte(InfoIDACLToken), out); err != nil {
+			return writeSize, err
+		}
+		writeSize += 1
+
+		wLen, err := WriteString2BLen(gdprToken, out)
+		if err != nil {
+			return writeSize, err
+		}
+		writeSize = writeSize + wLen
+	}
+
 	if strKVSize > 0 {
 		// INFO ID TYPE(u8) + NUM HEADERS(u16)
 		if err = WriteByte(byte(InfoIDKeyValue), out); err != nil {
@@ -218,7 +234,10 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 			return writeSize, err
 		}
 		writeSize += 3
-		for key, val := range tm.TransStrInfo() {
+		for key, val := range strKVMap {
+			if key == transmeta.GDPRToken {
+				continue
+			}
 			keyWLen, err := WriteString2BLen(key, out)
 			if err != nil {
 				return writeSize, err
@@ -252,21 +271,6 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 			}
 			writeSize = writeSize + 2 + valWLen
 		}
-	}
-
-	// custom kv info
-	if gdprToken, ok := tm.TransCustomInfo()[transmeta.GDPRToken]; ok {
-		// INFO ID TYPE(u8) + NUM HEADERS(u16)
-		if err = WriteByte(byte(InfoIDACLToken), out); err != nil {
-			return writeSize, err
-		}
-		writeSize += 1
-
-		wLen, err := WriteString2BLen(gdprToken, out)
-		if err != nil {
-			return writeSize, err
-		}
-		writeSize = writeSize + wLen
 	}
 
 	// padding = (4 - headerInfoSize%4) % 4
