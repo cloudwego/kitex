@@ -590,8 +590,6 @@ func TestDifferentMethodConfig(t *testing.T) {
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	_, err = rc.WithRetryIfNeeded(ctx, Policy{}, rpcCall, ri, nil)
 	test.Assert(t, err == nil, err)
-	lock.Lock()
-	lock.Unlock()
 
 	// case2: other method do backup request
 	method2 := "method2"
@@ -600,8 +598,6 @@ func TestDifferentMethodConfig(t *testing.T) {
 	ctx = rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	_, err = rc.WithRetryIfNeeded(ctx, Policy{}, rpcCall, ri, nil)
 	test.Assert(t, err == nil, err)
-	lock.Lock()
-	lock.Unlock()
 }
 
 // test BackupPolicy call while rpcTime > delayTime
