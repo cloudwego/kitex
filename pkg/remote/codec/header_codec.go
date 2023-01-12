@@ -210,6 +210,7 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 	// str kv info
 	strKVMap := tm.TransStrInfo()
 	strKVSize := len(strKVMap)
+	// write gdpr token into InfoIDACLToken
 	if gdprToken, ok := strKVMap[transmeta.GDPRToken]; ok {
 		strKVSize--
 		// INFO ID TYPE(u8)
