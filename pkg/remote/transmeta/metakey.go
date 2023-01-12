@@ -64,5 +64,5 @@ const (
 
 // key of acl token
 const (
-	GDPRToken = "gdpr"
+	GDPRToken = "gdpr-token"
 )

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/binary"
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -30,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -83,6 +85,45 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
 	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
 	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
+	flag := recvMsg.Tags()[HeaderFlagsKey]
+	test.Assert(t, flag != nil)
+	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
+}
+
+func TestTTHeaderCodecWithTransCustomInfo(t *testing.T) {
+	ctx := context.Background()
+	intKVInfo := prepareEmptyIntKVInfo()
+	strKVInfo := prepareStrKVInfo()
+	customKVInfo := prepareCustomKVInfo()
+	customStr, _ := utils.Map2JSONStr(customKVInfo)
+	sendMsg := initClientSendMsg(transport.TTHeader)
+	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
+	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
+	sendMsg.TransInfo().PutTransCustomInfo(customKVInfo)
+	sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
+
+	// encode
+	out := remote.NewWriterBuffer(256)
+	totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, out)
+	binary.BigEndian.PutUint32(totalLenField, uint32(out.MallocLen()-Size32+mockPayloadLen))
+	test.Assert(t, err == nil, err)
+
+	// decode
+	recvMsg := initServerRecvMsg()
+	buf, err := out.Bytes()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, strings.Contains(string(buf), customStr), string(buf))
+	in := remote.NewReaderBuffer(buf)
+	err = ttHeaderCodec.decode(ctx, recvMsg, in)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
+
+	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
+	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
+	customKVInfoRecv := recvMsg.TransInfo().TransCustomInfo()
+	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
+	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
+	test.DeepEqual(t, customKVInfoRecv, map[string]string{})
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
 	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
@@ -296,8 +337,20 @@ func prepareIntKVInfo() map[uint16]string {
 	return kvInfo
 }
 
+func prepareEmptyIntKVInfo() map[uint16]string {
+	kvInfo := map[uint16]string{}
+	return kvInfo
+}
+
 func prepareStrKVInfo() map[string]string {
 	kvInfo := map[string]string{}
+	return kvInfo
+}
+
+func prepareCustomKVInfo() map[string]string {
+	kvInfo := map[string]string{
+		//transmeta.GDPRToken: "mockToken",
+	}
 	return kvInfo
 }
 

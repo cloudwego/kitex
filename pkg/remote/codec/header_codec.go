@@ -255,27 +255,22 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 	}
 
 	// custom kv info
-	customKVSize := len(tm.TransCustomInfo())
-	if customKVSize > 0 {
+	customMap := tm.TransCustomInfo()
+	customStr, err := utils.Map2JSONStr(customMap)
+	if err != nil {
+		klog.Errorf("failed to transfer customMap to json string, error=%s", err.Error())
+	} else {
 		// INFO ID TYPE(u8) + NUM HEADERS(u16)
 		if err = WriteByte(byte(InfoIDACLToken), out); err != nil {
 			return writeSize, err
 		}
-		if err = WriteUint16(uint16(customKVSize), out); err != nil {
+		writeSize += 1
+
+		wLen, err := WriteString2BLen(customStr, out)
+		if err != nil {
 			return writeSize, err
 		}
-		writeSize += 3
-		for key, val := range tm.TransCustomInfo() {
-			keyWLen, err := WriteString2BLen(key, out)
-			if err != nil {
-				return writeSize, err
-			}
-			valWLen, err := WriteString2BLen(val, out)
-			if err != nil {
-				return writeSize, err
-			}
-			writeSize = writeSize + keyWLen + valWLen
-		}
+		writeSize = writeSize + wLen
 	}
 
 	// padding = (4 - headerInfoSize%4) % 4
