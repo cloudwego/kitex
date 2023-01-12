@@ -31,7 +31,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
-	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -95,7 +94,6 @@ func TestTTHeaderCodecWithTransCustomInfo(t *testing.T) {
 	intKVInfo := prepareEmptyIntKVInfo()
 	strKVInfo := prepareStrKVInfo()
 	customKVInfo := prepareCustomKVInfo()
-	customStr, _ := utils.Map2JSONStr(customKVInfo)
 	sendMsg := initClientSendMsg(transport.TTHeader)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
@@ -112,7 +110,7 @@ func TestTTHeaderCodecWithTransCustomInfo(t *testing.T) {
 	recvMsg := initServerRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil, err)
-	test.Assert(t, strings.Contains(string(buf), customStr), string(buf))
+	test.Assert(t, strings.Contains(string(buf), customKVInfo[transmeta.GDPRToken]), string(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = ttHeaderCodec.decode(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)

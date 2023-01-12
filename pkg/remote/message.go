@@ -285,6 +285,9 @@ func (ti *transInfo) zero() {
 	for k := range ti.strInfo {
 		delete(ti.strInfo, k)
 	}
+	for k := range ti.customInfo {
+		delete(ti.customInfo, k)
+	}
 }
 
 // TransIntInfo implements the TransInfo interface.

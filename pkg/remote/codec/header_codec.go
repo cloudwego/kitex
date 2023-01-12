@@ -255,18 +255,14 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 	}
 
 	// custom kv info
-	customMap := tm.TransCustomInfo()
-	customStr, err := utils.Map2JSONStr(customMap)
-	if err != nil {
-		klog.Errorf("failed to transfer customMap to json string, error=%s", err.Error())
-	} else {
+	if gdprToken, ok := tm.TransCustomInfo()[transmeta.GDPRToken]; ok {
 		// INFO ID TYPE(u8) + NUM HEADERS(u16)
 		if err = WriteByte(byte(InfoIDACLToken), out); err != nil {
 			return writeSize, err
 		}
 		writeSize += 1
 
-		wLen, err := WriteString2BLen(customStr, out)
+		wLen, err := WriteString2BLen(gdprToken, out)
 		if err != nil {
 			return writeSize, err
 		}
