@@ -17,6 +17,8 @@
 // Package transmeta .
 package transmeta
 
+import "github.com/bytedance/gopkg/cloud/metainfo"
+
 // Keys in mesh header.
 const (
 	MeshVersion uint16 = iota
@@ -63,7 +65,12 @@ const (
 )
 
 // key of acl token
+// You can set up acl token through metainfo.
+// eg:
+//
+//  ctx = metainfo.WithValue(ctx, "gdpr-token", "your token")
+//  ctx, err := tm.MetainfoClientHandler.WriteMeta(ctx, sendMsg)
 const (
 	// GDPRToken is used to set up gdpr token into InfoIDACLToken
-	GDPRToken = "RPC_TRANSIT_gdpr-token"
+	GDPRToken = metainfo.PrefixTransient + "gdpr-token"
 )

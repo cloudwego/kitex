@@ -315,8 +315,7 @@ func readKVInfo(idx int, buf []byte, message remote.Message) error {
 				return err
 			}
 		case InfoIDACLToken:
-			_, err := readACLToken(&idx, buf, strInfo)
-			if err != nil {
+			if err := readACLToken(&idx, buf, strInfo); err != nil {
 				return err
 			}
 		default:
@@ -377,14 +376,14 @@ func readStrKVInfo(idx *int, buf []byte, info map[string]string) (has bool, err 
 }
 
 // readACLToken reads acl token
-func readACLToken(idx *int, buf []byte, info map[string]string) (has bool, err error) {
+func readACLToken(idx *int, buf []byte, info map[string]string) error {
 	val, n, err := ReadString2BLen(buf, *idx)
 	*idx += n
 	if err != nil {
-		return false, fmt.Errorf("error reading acl token: %s", err.Error())
+		return fmt.Errorf("error reading acl token: %s", err.Error())
 	}
 	info[transmeta.GDPRToken] = val
-	return true, nil
+	return nil
 }
 
 func getFlags(message remote.Message) HeaderFlags {
