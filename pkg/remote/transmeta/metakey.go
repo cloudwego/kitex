@@ -68,8 +68,8 @@ const (
 // You can set up acl token through metainfo.
 // eg:
 //
-//  ctx = metainfo.WithValue(ctx, "gdpr-token", "your token")
-//  ctx, err := tm.MetainfoClientHandler.WriteMeta(ctx, sendMsg)
+//	ctx = metainfo.WithValue(ctx, "gdpr-token", "your token")
+//	ctx, err := tm.MetainfoClientHandler.WriteMeta(ctx, sendMsg)
 const (
 	// GDPRToken is used to set up gdpr token into InfoIDACLToken
 	GDPRToken = metainfo.PrefixTransient + "gdpr-token"
