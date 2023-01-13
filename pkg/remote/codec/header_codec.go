@@ -208,7 +208,25 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 	writeSize = writtenSize
 	tm := message.TransInfo()
 	// str kv info
-	strKVSize := len(tm.TransStrInfo())
+	strKVMap := tm.TransStrInfo()
+	strKVSize := len(strKVMap)
+	// write gdpr token into InfoIDACLToken
+	// supplementary doc: https://www.cloudwego.io/docs/kitex/reference/transport_protocol_ttheader/
+	if gdprToken, ok := strKVMap[transmeta.GDPRToken]; ok {
+		strKVSize--
+		// INFO ID TYPE(u8)
+		if err = WriteByte(byte(InfoIDACLToken), out); err != nil {
+			return writeSize, err
+		}
+		writeSize += 1
+
+		wLen, err := WriteString2BLen(gdprToken, out)
+		if err != nil {
+			return writeSize, err
+		}
+		writeSize += wLen
+	}
+
 	if strKVSize > 0 {
 		// INFO ID TYPE(u8) + NUM HEADERS(u16)
 		if err = WriteByte(byte(InfoIDKeyValue), out); err != nil {
@@ -218,7 +236,10 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 			return writeSize, err
 		}
 		writeSize += 3
-		for key, val := range tm.TransStrInfo() {
+		for key, val := range strKVMap {
+			if key == transmeta.GDPRToken {
+				continue
+			}
 			keyWLen, err := WriteString2BLen(key, out)
 			if err != nil {
 				return writeSize, err
@@ -253,6 +274,7 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 			writeSize = writeSize + 2 + valWLen
 		}
 	}
+
 	// padding = (4 - headerInfoSize%4) % 4
 	padding := (4 - writeSize%4) % 4
 	paddingBuf, err := out.Malloc(padding)
@@ -294,8 +316,7 @@ func readKVInfo(idx int, buf []byte, message remote.Message) error {
 				return err
 			}
 		case InfoIDACLToken:
-			err = skipACLToken(&idx, buf)
-			if err != nil {
+			if err := readACLToken(&idx, buf, strInfo); err != nil {
 				return err
 			}
 		default:
@@ -355,13 +376,14 @@ func readStrKVInfo(idx *int, buf []byte, info map[string]string) (has bool, err 
 	return true, nil
 }
 
-// skipACLToken SDK don't need acl token, just skip it
-func skipACLToken(idx *int, buf []byte) error {
-	_, n, err := ReadString2BLen(buf, *idx)
+// readACLToken reads acl token
+func readACLToken(idx *int, buf []byte, info map[string]string) error {
+	val, n, err := ReadString2BLen(buf, *idx)
 	*idx += n
 	if err != nil {
 		return fmt.Errorf("error reading acl token: %s", err.Error())
 	}
+	info[transmeta.GDPRToken] = val
 	return nil
 }
 
