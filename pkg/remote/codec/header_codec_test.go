@@ -20,11 +20,9 @@ import (
 	"context"
 	"encoding/binary"
 	"net"
-	"strings"
 	"testing"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
-
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -33,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	tm "github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -110,7 +109,6 @@ func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
 	recvMsg := initServerRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil, err)
-	test.Assert(t, strings.Contains(string(buf), strKVInfo[transmeta.GDPRToken]), string(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = ttHeaderCodec.decode(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)
@@ -119,7 +117,7 @@ func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
 	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
 	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
 	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
-	test.DeepEqual(t, strKVInfoRecv, map[string]string{transmeta.HeaderTransRemoteAddr: "mockRemoteAddr"})
+	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
 	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
@@ -129,11 +127,10 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 	ctx := context.Background()
 	intKVInfo := prepareIntKVInfo()
 	ctx = metainfo.WithValue(ctx, "gdpr-token", "test token")
-	token, ok := metainfo.GetValue(ctx, "gdpr-token")
-	test.Assert(t, ok == true)
 	sendMsg := initClientSendMsg(transport.TTHeader)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
-	sendMsg.TransInfo().PutTransStrInfo(map[string]string{transmeta.GDPRToken: token})
+	ctx, err := tm.MetainfoClientHandler.WriteMeta(ctx, sendMsg)
+	test.Assert(t, err == nil)
 	sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
 
 	// encode
@@ -146,7 +143,6 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 	recvMsg := initServerRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil, err)
-	test.Assert(t, strings.Contains(string(buf), token), string(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = ttHeaderCodec.decode(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)
@@ -155,7 +151,7 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
 	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
 	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
-	test.DeepEqual(t, strKVInfoRecv, map[string]string{})
+	test.DeepEqual(t, strKVInfoRecv, map[string]string{transmeta.GDPRToken: "test token"})
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
 	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))

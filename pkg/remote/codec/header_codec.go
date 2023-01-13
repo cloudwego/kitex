@@ -315,7 +315,7 @@ func readKVInfo(idx int, buf []byte, message remote.Message) error {
 				return err
 			}
 		case InfoIDACLToken:
-			err = skipACLToken(&idx, buf)
+			_, err := readACLToken(&idx, buf, strInfo)
 			if err != nil {
 				return err
 			}
@@ -376,14 +376,15 @@ func readStrKVInfo(idx *int, buf []byte, info map[string]string) (has bool, err 
 	return true, nil
 }
 
-// skipACLToken SDK don't need acl token, just skip it
-func skipACLToken(idx *int, buf []byte) error {
-	_, n, err := ReadString2BLen(buf, *idx)
+// readACLToken reads acl token
+func readACLToken(idx *int, buf []byte, info map[string]string) (has bool, err error) {
+	val, n, err := ReadString2BLen(buf, *idx)
 	*idx += n
 	if err != nil {
-		return fmt.Errorf("error reading acl token: %s", err.Error())
+		return false, fmt.Errorf("error reading acl token: %s", err.Error())
 	}
-	return nil
+	info[transmeta.GDPRToken] = val
+	return true, nil
 }
 
 func getFlags(message remote.Message) HeaderFlags {
