@@ -211,6 +211,7 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 	strKVMap := tm.TransStrInfo()
 	strKVSize := len(strKVMap)
 	// write gdpr token into InfoIDACLToken
+	// supplementary doc: https://www.cloudwego.io/docs/kitex/reference/transport_protocol_ttheader/
 	if gdprToken, ok := strKVMap[transmeta.GDPRToken]; ok {
 		strKVSize--
 		// INFO ID TYPE(u8)
