@@ -32,7 +32,7 @@ import (
 )
 
 // RPCCallFunc is the definition with wrap rpc call
-type RPCCallFunc func(context.Context, Retryer) (rpcinfo rpcinfo.RPCInfo, resp interface{}, err error)
+type RPCCallFunc func(context.Context, Retryer) (ri rpcinfo.RPCInfo, resp interface{}, err error)
 
 // Retryer is the interface for Retry implements
 type Retryer interface {
