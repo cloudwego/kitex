@@ -65,5 +65,5 @@ const (
 // key of acl token
 const (
 	// GDPRToken is used to set up gdpr token into InfoIDACLToken
-	GDPRToken = "gdpr-token"
+	GDPRToken = "RPC_TRANSIT_gdpr-token"
 )

@@ -223,7 +223,7 @@ func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer)
 		if err != nil {
 			return writeSize, err
 		}
-		writeSize = writeSize + wLen
+		writeSize += wLen
 	}
 
 	if strKVSize > 0 {

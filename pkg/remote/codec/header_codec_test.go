@@ -23,6 +23,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bytedance/gopkg/cloud/metainfo"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -118,6 +120,42 @@ func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
 	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
 	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
 	test.DeepEqual(t, strKVInfoRecv, map[string]string{transmeta.HeaderTransRemoteAddr: "mockRemoteAddr"})
+	flag := recvMsg.Tags()[HeaderFlagsKey]
+	test.Assert(t, flag != nil)
+	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
+}
+
+func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
+	ctx := context.Background()
+	intKVInfo := prepareIntKVInfo()
+	ctx = metainfo.WithValue(ctx, "gdpr-token", "test token")
+	token, ok := metainfo.GetValue(ctx, "gdpr-token")
+	test.Assert(t, ok == true)
+	sendMsg := initClientSendMsg(transport.TTHeader)
+	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
+	sendMsg.TransInfo().PutTransStrInfo(map[string]string{transmeta.GDPRToken: token})
+	sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
+
+	// encode
+	out := remote.NewWriterBuffer(256)
+	totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, out)
+	binary.BigEndian.PutUint32(totalLenField, uint32(out.MallocLen()-Size32+mockPayloadLen))
+	test.Assert(t, err == nil, err)
+
+	// decode
+	recvMsg := initServerRecvMsg()
+	buf, err := out.Bytes()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, strings.Contains(string(buf), token), string(buf))
+	in := remote.NewReaderBuffer(buf)
+	err = ttHeaderCodec.decode(ctx, recvMsg, in)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
+
+	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
+	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
+	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
+	test.DeepEqual(t, strKVInfoRecv, map[string]string{})
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
 	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
