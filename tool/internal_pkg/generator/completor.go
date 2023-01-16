@@ -189,3 +189,109 @@ func (c *completer) CompleteMethods() (*File, error) {
 	}
 	return &File{Name: c.handlerPath, Content: buf.String()}, nil
 }
+
+type commonCompleter struct {
+	path   string
+	pkg    *PackageInfo
+	update *Update
+}
+
+func (c *commonCompleter) Complete() (*File, error) {
+	var w bytes.Buffer
+	// get AST of main package
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, c.path, nil, parser.ParseComments)
+	if err != nil {
+		err = fmt.Errorf("go/parser failed to parse the file: %s, err: %v", c.path, err)
+		log.Warnf("NOTICE: This is not a bug. We cannot update the file %s because your codes failed to compile. Fix the compile errors and try again.\n%s", c.path, err.Error())
+		return nil, err
+	}
+
+	newMethods, err := c.compare(f)
+	if err != nil {
+		return nil, err
+	}
+	if len(newMethods) == 0 {
+		return nil, errNoNewMethod
+	}
+	err = c.addImport(&w, newMethods, fset, f)
+	if err != nil {
+		return nil, fmt.Errorf("add imports failed error: %v", err)
+	}
+	err = c.addImplementations(&w, newMethods)
+	if err != nil {
+		return nil, fmt.Errorf("add implements failed error: %v", err)
+	}
+	return &File{Name: c.path, Content: w.String()}, nil
+}
+
+func (c *commonCompleter) compare(f *ast.File) ([]*MethodInfo, error) {
+	var newMethods []*MethodInfo
+	tmp := c.pkg.Methods
+	methods := c.pkg.AllMethods()
+	for _, m := range methods {
+		c.pkg.Methods = []*MethodInfo{m}
+		keyTask := &Task{
+			Text: c.update.Key,
+		}
+		key, err := keyTask.RenderString(c.pkg)
+		if err != nil {
+			return newMethods, err
+		}
+		have := false
+		for _, d := range f.Decls {
+			if fd, ok := d.(*ast.FuncDecl); ok {
+				_, fn := parseFuncDecl(fd)
+				if fn == key {
+					have = true
+					break
+				}
+			}
+		}
+		if !have {
+			newMethods = append(newMethods, m)
+		}
+	}
+
+	c.pkg.Methods = tmp
+	return newMethods, nil
+}
+
+// add imports for new methods
+func (c *commonCompleter) addImport(w io.Writer, newMethods []*MethodInfo, fset *token.FileSet, handlerAST *ast.File) error {
+	existImports := make(map[string]bool)
+	for _, i := range handlerAST.Imports {
+		existImports[i.Path.Value] = true
+	}
+
+	for _, i := range c.update.ImportTpl {
+		importTask := &Task{
+			Text: i,
+		}
+		content, err := importTask.RenderString(c.pkg)
+		if err != nil {
+			return err
+		}
+		if _, ok := existImports[content]; !ok {
+			astutil.AddImport(fset, handlerAST, strings.Trim(content, "\""))
+		}
+	}
+	printer.Fprint(w, fset, handlerAST)
+	return nil
+}
+
+func (c *commonCompleter) addImplementations(w io.Writer, newMethods []*MethodInfo) error {
+	tmp := c.pkg.Methods
+	c.pkg.Methods = newMethods
+	// generate implements of new methods
+	appendTask := &Task{
+		Text: c.update.AppendTpl,
+	}
+	content, err := appendTask.RenderString(c.pkg)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write([]byte(content))
+	c.pkg.Methods = tmp
+	return err
+}
