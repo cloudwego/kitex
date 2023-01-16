@@ -368,9 +368,9 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 	}
 	if concurrencyLimit == nil {
 		if limits != nil && limits.MaxConcurrency > 0 {
-			connLimit = limiter.NewConcurrencyLimiter(limits.MaxConcurrency, true) // default is blocking limiter
+			concurrencyLimit = limiter.NewConcurrencyLimiter(limits.MaxConcurrency, true) // default is blocking limiter
 		} else {
-			connLimit = &limiter.DummyConcurrencyLimiter{}
+			concurrencyLimit = &limiter.DummyConcurrencyLimiter{}
 		}
 	}
 	if qpsLimit == nil {

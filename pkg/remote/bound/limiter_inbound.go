@@ -64,7 +64,7 @@ func (l *serverLimiterHandler) OnRead(ctx context.Context, conn net.Conn) (conte
 		}
 		return ctx, kerrors.ErrQPSOverLimit
 	}
-	if !l.concurrencyLimit.Acquire(ctx) {
+	if l.concurrencyLimit != nil && !l.concurrencyLimit.Acquire(ctx) {
 		return ctx, kerrors.ErrConcurrencyOverLimit
 	}
 	return ctx, nil
