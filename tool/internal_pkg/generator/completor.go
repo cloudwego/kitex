@@ -261,9 +261,10 @@ func (c *commonCompleter) compare(f *ast.File) ([]*MethodInfo, error) {
 func (c *commonCompleter) addImport(w io.Writer, newMethods []*MethodInfo, fset *token.FileSet, handlerAST *ast.File) error {
 	existImports := make(map[string]bool)
 	for _, i := range handlerAST.Imports {
-		existImports[i.Path.Value] = true
+		existImports[strings.Trim(i.Path.Value, "\"")] = true
 	}
-
+	tmp := c.pkg.Methods
+	c.pkg.Methods = newMethods
 	for _, i := range c.update.ImportTpl {
 		importTask := &Task{
 			Text: i,
@@ -272,10 +273,11 @@ func (c *commonCompleter) addImport(w io.Writer, newMethods []*MethodInfo, fset 
 		if err != nil {
 			return err
 		}
-		if _, ok := existImports[content]; !ok {
+		if _, ok := existImports[strings.Trim(content, "\"")]; !ok {
 			astutil.AddImport(fset, handlerAST, strings.Trim(content, "\""))
 		}
 	}
+	c.pkg.Methods = tmp
 	printer.Fprint(w, fset, handlerAST)
 	return nil
 }
