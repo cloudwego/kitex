@@ -238,20 +238,29 @@ func (c *Config) AddFeature(key string) bool {
 
 // ApplyExtension applies template extension.
 func (c *Config) ApplyExtension() error {
+	templateExtExist := false
 	path := filepath.Join(c.TemplateDir, ExtensionFilename)
-	if c.ExtensionFile == "" && !util.Exists(path) {
+	if c.TemplateDir != "" && util.Exists(path) {
+		templateExtExist = true
+	}
+
+	if c.ExtensionFile == "" && !templateExtExist {
 		return nil
 	}
 
 	ext := new(TemplateExtension)
 	if c.ExtensionFile != "" {
-		if err := ext.FromJSONFile(c.ExtensionFile); err != nil {
+		if err := ext.FromYAMLFile(c.ExtensionFile); err != nil {
 			return fmt.Errorf("read template extension %q failed: %s", c.ExtensionFile, err.Error())
 		}
-	} else {
-		if err := ext.FromYAMLFile(path); err != nil {
+	}
+
+	if templateExtExist {
+		yamlExt := new(TemplateExtension)
+		if err := yamlExt.FromYAMLFile(path); err != nil {
 			return fmt.Errorf("read template extension %q failed: %s", path, err.Error())
 		}
+		ext.Merge(yamlExt)
 	}
 
 	for _, fn := range ext.FeatureNames {
