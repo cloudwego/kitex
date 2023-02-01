@@ -54,6 +54,10 @@ func newWeightedPicker() interface{} {
 
 // Next implements the Picker interface.
 func (wp *weightedPicker) Next(ctx context.Context, request interface{}) (ins discovery.Instance) {
+	defer func() {
+		klog.Infof("KITEX: weighted picker pick: %s", ins.Address())
+	}()
+
 	if wp.firstIndex < 0 {
 		weight := fastrand.Intn(wp.weightSum)
 		for i := 0; i < len(wp.immutableEntries); i++ {
@@ -63,7 +67,8 @@ func (wp *weightedPicker) Next(ctx context.Context, request interface{}) (ins di
 				break
 			}
 		}
-		return wp.immutableInstances[wp.firstIndex]
+		ins = wp.immutableInstances[wp.firstIndex]
+		return ins
 	}
 
 	if wp.copiedInstances == nil {
@@ -85,7 +90,7 @@ func (wp *weightedPicker) Next(ctx context.Context, request interface{}) (ins di
 			weight -= wp.copiedEntries[i]
 			if weight < 0 {
 				wp.weightSum -= wp.copiedEntries[i]
-				ins := wp.copiedInstances[i]
+				ins = wp.copiedInstances[i]
 				wp.copiedInstances[i] = wp.copiedInstances[n-1]
 				wp.copiedInstances = wp.copiedInstances[:n-1]
 				wp.copiedEntries[i] = wp.copiedEntries[n-1]
@@ -125,9 +130,14 @@ func newRandomPicker() interface{} {
 
 // Next implements the Picker interface.
 func (rp *randomPicker) Next(ctx context.Context, request interface{}) (ins discovery.Instance) {
+	defer func() {
+		klog.Infof("KITEX: random picker pick: %s", ins.Address())
+	}()
+
 	if rp.firstIndex < 0 {
 		rp.firstIndex = fastrand.Intn(len(rp.immutableInstances))
-		return rp.immutableInstances[rp.firstIndex]
+		ins = rp.immutableInstances[rp.firstIndex]
+		return ins
 	}
 
 	if rp.copiedInstances == nil {
@@ -139,7 +149,7 @@ func (rp *randomPicker) Next(ctx context.Context, request interface{}) (ins disc
 	n := len(rp.copiedInstances)
 	if n > 0 {
 		index := fastrand.Intn(n)
-		ins := rp.copiedInstances[index]
+		ins = rp.copiedInstances[index]
 		rp.copiedInstances[index] = rp.copiedInstances[n-1]
 		rp.copiedInstances = rp.copiedInstances[:n-1]
 		return ins
