@@ -91,10 +91,18 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		return r.handler.OnRead(r.ctx, conn)
 	}
 	// Check the validity of client preface.
-	zr := conn.(netpoll.Connection).Reader()
+	var (
+		preface []byte
+		err     error
+		zr      netpoll.Reader
+	)
+	if npConn, ok := conn.(netpoll.Connection); ok {
+		zr = npConn.Reader()
+	} else {
+		zr = netpoll.NewReader(conn)
+	}
 	// read at most avoid block
-	preface, err := zr.Peek(prefaceReadAtMost)
-	if err != nil {
+	if preface, err = zr.Peek(prefaceReadAtMost); err != nil {
 		return err
 	}
 	// compare preface one by one

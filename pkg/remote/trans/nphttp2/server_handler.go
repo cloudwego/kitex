@@ -24,6 +24,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cloudwego/netpoll"
 
@@ -224,9 +225,13 @@ type SvrTrans struct {
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	// set readTimeout to infinity to avoid streaming break
 	// use keepalive to check the health of connection
-	conn.(netpoll.Connection).SetReadTimeout(grpcTransport.Infinity)
+	if npConn, ok := conn.(netpoll.Connection); ok {
+		npConn.SetReadTimeout(grpcTransport.Infinity)
+	} else {
+		conn.SetReadDeadline(time.Now().Add(grpcTransport.Infinity))
+	}
 
-	tr, err := grpcTransport.NewServerTransport(ctx, conn.(netpoll.Connection), t.opt.GRPCCfg)
+	tr, err := grpcTransport.NewServerTransport(ctx, conn, t.opt.GRPCCfg)
 	if err != nil {
 		return nil, err
 	}

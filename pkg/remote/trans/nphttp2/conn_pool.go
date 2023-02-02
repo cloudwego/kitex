@@ -24,7 +24,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/cloudwego/netpoll"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -110,7 +109,7 @@ func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, netwo
 	}
 	return grpc.NewClientTransport(
 		ctx,
-		conn.(netpoll.Connection),
+		conn,
 		opts,
 		p.remoteService,
 		func(grpc.GoAwayReason) {
