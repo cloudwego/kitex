@@ -168,6 +168,7 @@ type weightInfo struct {
 	instances []discovery.Instance
 	entries   []entry
 	weightSum int
+	picker    *RoundPicker
 }
 
 type weightedBalancer struct {
@@ -201,17 +202,18 @@ func (wb *weightedBalancer) GetPicker(e discovery.Result) Picker {
 		return new(DummyPicker)
 	}
 
-	if w.balance {
-		picker := randomPickerPool.Get().(*randomPicker)
-		picker.immutableInstances = w.instances
-		picker.firstIndex = -1
-		return picker
-	}
-	picker := weightedPickerPool.Get().(*weightedPicker)
-	picker.immutableInstances = w.instances
-	picker.immutableEntries = w.entries
-	picker.weightSum = w.weightSum
-	return picker
+	return w.picker
+	//if w.balance {
+	//	picker := randomPickerPool.Get().(*randomPicker)
+	//	picker.immutableInstances = w.instances
+	//	picker.firstIndex = -1
+	//	return picker
+	//}
+	//picker := weightedPickerPool.Get().(*weightedPicker)
+	//picker.immutableInstances = w.instances
+	//picker.immutableEntries = w.entries
+	//picker.weightSum = w.weightSum
+	//return picker
 }
 
 func (wb *weightedBalancer) calcWeightInfo(e discovery.Result) *weightInfo {
@@ -220,6 +222,7 @@ func (wb *weightedBalancer) calcWeightInfo(e discovery.Result) *weightInfo {
 		instances: make([]discovery.Instance, len(e.Instances)),
 		entries:   make([]entry, len(e.Instances)),
 		weightSum: 0,
+		picker:    &RoundPicker{},
 	}
 
 	var cnt int
@@ -239,6 +242,7 @@ func (wb *weightedBalancer) calcWeightInfo(e discovery.Result) *weightInfo {
 	}
 	w.instances = w.instances[:cnt]
 	w.entries = w.entries[:cnt]
+	w.picker.immutableInstances = w.instances
 	return w
 }
 

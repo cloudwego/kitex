@@ -192,6 +192,8 @@ func TestWeightedPicker_Randomly(t *testing.T) {
 	for i := 0; i < n; i++ {
 		picker := balancer.GetPicker(discovery.Result{
 			Instances: insList,
+			Cacheable: true,
+			CacheKey:  "xxx",
 		})
 		ins := picker.Next(ctx, nil)
 		picker.(internal.Reusable).Recycle()
