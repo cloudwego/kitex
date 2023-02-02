@@ -18,6 +18,7 @@ package loadbalance
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 
 	"github.com/bytedance/gopkg/lang/fastrand"
@@ -55,51 +56,43 @@ func newWeightedPicker() interface{} {
 // Next implements the Picker interface.
 func (wp *weightedPicker) Next(ctx context.Context, request interface{}) (ins discovery.Instance) {
 	defer func() {
-		klog.Infof("KITEX: weighted picker pick: %s", ins.Address())
+		if ins != nil {
+			klog.Infof("KITEX: weighted picker pick: %s", ins.Address())
+		}
 	}()
 
+	if wp.firstIndex >= len(wp.immutableInstances) {
+		wp.firstIndex = -1
+	}
+
+	weightSum := wp.weightSum
+	if wp.firstIndex >= 0 {
+		weightSum -= wp.immutableInstances[wp.firstIndex].Weight()
+	}
+	//rand.Seed(time.Now().UnixNano() + int64(wp.firstIndex))
+	weight := int(rand.Int31n(int32(weightSum)))
+	//weight := fastrand.Intn(weightSum)
+	//n, _ := rand.Int(rand.Reader, big.NewInt(int64(weightSum)))
+	//weight := int(n.Int64())
+	//fmt.Printf("random weight: %d, weightSum: %d, lastIndex: %d\n", weight, weightSum, wp.firstIndex)
+	for i := 0; i < len(wp.immutableEntries); i++ {
+		if i == wp.firstIndex {
+			continue
+		}
+		weight -= wp.immutableEntries[i]
+		if weight < 0 {
+			wp.firstIndex = i
+			break
+		}
+	}
 	if wp.firstIndex < 0 {
-		weight := fastrand.Intn(wp.weightSum)
-		for i := 0; i < len(wp.immutableEntries); i++ {
-			weight -= wp.immutableEntries[i]
-			if weight < 0 {
-				wp.firstIndex = i
-				break
-			}
-		}
-		ins = wp.immutableInstances[wp.firstIndex]
-		return ins
+		return nil
 	}
 
-	if wp.copiedInstances == nil {
-		wp.copiedInstances = make([]discovery.Instance, len(wp.immutableInstances)-1)
-		copy(wp.copiedInstances, wp.immutableInstances[:wp.firstIndex])
-		copy(wp.copiedInstances[wp.firstIndex:], wp.immutableInstances[wp.firstIndex+1:])
-
-		wp.copiedEntries = make([]entry, len(wp.immutableEntries)-1)
-		copy(wp.copiedEntries, wp.immutableEntries[:wp.firstIndex])
-		copy(wp.copiedEntries[wp.firstIndex:], wp.immutableEntries[wp.firstIndex+1:])
-
-		wp.weightSum -= wp.immutableEntries[wp.firstIndex]
-	}
-
-	n := len(wp.copiedInstances)
-	if n > 0 {
-		weight := fastrand.Intn(wp.weightSum)
-		for i := 0; i < len(wp.copiedEntries); i++ {
-			weight -= wp.copiedEntries[i]
-			if weight < 0 {
-				wp.weightSum -= wp.copiedEntries[i]
-				ins = wp.copiedInstances[i]
-				wp.copiedInstances[i] = wp.copiedInstances[n-1]
-				wp.copiedInstances = wp.copiedInstances[:n-1]
-				wp.copiedEntries[i] = wp.copiedEntries[n-1]
-				wp.copiedEntries = wp.copiedEntries[:n-1]
-				return ins
-			}
-		}
-	}
-	return nil
+	ins = wp.immutableInstances[wp.firstIndex]
+	//fmt.Printf("immutableInstances: %d, immutableEntries: %d, firstIndex: %d\n",
+	//	len(wp.immutableInstances), len(wp.immutableEntries), wp.firstIndex)
+	return ins
 }
 
 func (wp *weightedPicker) zero() {
@@ -108,7 +101,6 @@ func (wp *weightedPicker) zero() {
 	wp.weightSum = 0
 	wp.copiedInstances = nil
 	wp.copiedEntries = nil
-	wp.firstIndex = -1
 }
 
 func (wp *weightedPicker) Recycle() {
@@ -131,7 +123,9 @@ func newRandomPicker() interface{} {
 // Next implements the Picker interface.
 func (rp *randomPicker) Next(ctx context.Context, request interface{}) (ins discovery.Instance) {
 	defer func() {
-		klog.Infof("KITEX: random picker pick: %s", ins.Address())
+		if ins != nil {
+			klog.Infof("KITEX: random picker pick: %s", ins.Address())
+		}
 	}()
 
 	if rp.firstIndex < 0 {
@@ -214,10 +208,9 @@ func (wb *weightedBalancer) GetPicker(e discovery.Result) Picker {
 		return picker
 	}
 	picker := weightedPickerPool.Get().(*weightedPicker)
+	picker.immutableInstances = w.instances
 	picker.immutableEntries = w.entries
 	picker.weightSum = w.weightSum
-	picker.immutableInstances = w.instances
-	picker.firstIndex = -1
 	return picker
 }
 

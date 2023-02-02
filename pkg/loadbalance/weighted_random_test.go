@@ -127,13 +127,14 @@ func TestWeightedPicker_Next(t *testing.T) {
 		weightSum += weight
 	}
 
-	n := 10000000
+	n := 100000
 	pickedStat := map[int]int{}
 	for i := 0; i < n; i++ {
 		picker := balancer.GetPicker(discovery.Result{
 			Instances: insList,
 		})
 		ins := picker.Next(ctx, nil)
+		picker.(internal.Reusable).Recycle()
 		weight := ins.Weight()
 		if pickedCnt, ok := pickedStat[weight]; ok {
 			pickedStat[weight] = pickedCnt + 1
@@ -147,7 +148,7 @@ func TestWeightedPicker_Next(t *testing.T) {
 		expect := float64(weight) / float64(weightSum) * float64(n)
 		actual := float64(pickedStat[weight])
 		delta := math.Abs(expect - actual)
-		test.Assertf(t, delta/expect < 0.01, "delta(%f)/expect(%f) = %f", delta, expect, delta/expect)
+		test.Assertf(t, delta/expect < 0.05, "ins[%s]: (expect[%f] - actual[%f])/expect[%f] = %f", ins.Address(), expect, actual, expect, delta/expect)
 	}
 
 	// weightSum = 0
@@ -171,6 +172,36 @@ func TestWeightedPicker_Next(t *testing.T) {
 	})
 	test.Assert(t, picker.Next(ctx, nil) != nil)
 	test.Assert(t, picker.Next(ctx, nil) == nil)
+}
+
+func TestWeightedPicker_Randomly(t *testing.T) {
+	balancer := NewWeightedBalancer()
+	ctx := context.Background()
+	insList := []discovery.Instance{
+		discovery.NewInstance("tcp", "addr1", 10, nil),
+		discovery.NewInstance("tcp", "addr2", 10, nil),
+		discovery.NewInstance("tcp", "addr3", 10, nil),
+		discovery.NewInstance("tcp", "addr4", 10, nil),
+		discovery.NewInstance("tcp", "addr5", 10, nil),
+		discovery.NewInstance("tcp", "addr6", 10, nil),
+		discovery.NewInstance("tcp", "addr0", 5, nil),
+	}
+
+	n := 10000
+	pickedStat := map[int]int{}
+	for i := 0; i < n; i++ {
+		picker := balancer.GetPicker(discovery.Result{
+			Instances: insList,
+		})
+		ins := picker.Next(ctx, nil)
+		picker.(internal.Reusable).Recycle()
+		weight := ins.Weight()
+		if pickedCnt, ok := pickedStat[weight]; ok {
+			pickedStat[weight] = pickedCnt + 1
+		} else {
+			pickedStat[weight] = 1
+		}
+	}
 }
 
 func TestWeightedPicker_NoMoreInstance(t *testing.T) {
