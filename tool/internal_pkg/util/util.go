@@ -57,7 +57,7 @@ func FormatCode(code []byte) ([]byte, error) {
 func GetGOPATH() string {
 	goPath := os.Getenv("GOPATH")
 	// If there are many path in GOPATH, pick up the first one.
-	if GoPaths := strings.Split(goPath, ":"); len(GoPaths) > 1 {
+	if GoPaths := strings.Split(goPath, ":"); len(GoPaths) >= 1 {
 		return GoPaths[0]
 	}
 	// GOPATH not set through environment variables, try to get one by executing "go env GOPATH"
