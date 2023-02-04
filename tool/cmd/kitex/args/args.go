@@ -109,6 +109,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Record Kitex cmd into kitex-all.sh.")
 	f.StringVar(&a.TemplateDir, "template-dir", "",
 		"Use custom template to generate codes.")
+	f.StringVar(&a.OutputPath, "out-dir", "",
+		"Specify output path")
 	f.StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
 		"Specify a code gen path.")
 	a.RecordCmd = os.Args
@@ -216,14 +218,18 @@ func (a *Arguments) checkPath() {
 		log.Warn("Get GOPATH/src path failed:", err.Error())
 		os.Exit(1)
 	}
-	curpath, err := filepath.Abs(".")
+
+	if a.OutputPath == "" {
+		a.OutputPath = "."
+	}
+	outputPath, err := filepath.Abs(a.OutputPath)
 	if err != nil {
 		log.Warn("Get current path failed:", err.Error())
 		os.Exit(1)
 	}
 
-	if strings.HasPrefix(curpath, gosrc) {
-		if a.PackagePrefix, err = filepath.Rel(gosrc, curpath); err != nil {
+	if strings.HasPrefix(outputPath, gosrc) {
+		if a.PackagePrefix, err = filepath.Rel(gosrc, outputPath); err != nil {
 			log.Warn("Get GOPATH/src relpath failed:", err.Error())
 			os.Exit(1)
 		}
@@ -236,7 +242,7 @@ func (a *Arguments) checkPath() {
 	}
 
 	if a.ModuleName != "" {
-		module, path, ok := util.SearchGoMod(curpath)
+		module, path, ok := util.SearchGoMod(outputPath)
 		if ok {
 			// go.mod exists
 			if module != a.ModuleName {
@@ -244,7 +250,7 @@ func (a *Arguments) checkPath() {
 					a.ModuleName, module, path)
 				os.Exit(1)
 			}
-			if a.PackagePrefix, err = filepath.Rel(path, curpath); err != nil {
+			if a.PackagePrefix, err = filepath.Rel(path, outputPath); err != nil {
 				log.Warn("Get package prefix failed:", err.Error())
 				os.Exit(1)
 			}
@@ -261,7 +267,8 @@ func (a *Arguments) checkPath() {
 	if a.Use != "" {
 		a.PackagePrefix = a.Use
 	}
-	a.OutputPath = curpath
+
+	a.OutputPath = outputPath
 }
 
 // BuildCmd builds an exec.Cmd.
