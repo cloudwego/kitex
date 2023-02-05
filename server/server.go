@@ -45,7 +45,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
-// Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
+// Server is an abstraction of a RPC server. It accepts connections and dispatches them to the service
 // registered to it.
 type Server interface {
 	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error
