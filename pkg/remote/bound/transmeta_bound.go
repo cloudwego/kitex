@@ -66,7 +66,7 @@ func (h *transMetaHandler) OnMessage(ctx context.Context, args, result remote.Me
 	return ctx, nil
 }
 
-// Onactive implements the remote.InboundHandler interface.
+// OnActive implements the remote.InboundHandler interface.
 func (h *transMetaHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	return ctx, nil
 }

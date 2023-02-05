@@ -107,7 +107,7 @@ func (s *CBSuite) InstanceCBMW() endpoint.Middleware {
 	return NewCircuitBreakerMW(*s.instanceControl, s.instancePanel)
 }
 
-// ServicePanel return return cb Panel of service
+// ServicePanel return cb Panel of service
 func (s *CBSuite) ServicePanel() circuitbreaker.Panel {
 	if s.servicePanel == nil {
 		s.initServiceCB()

@@ -30,7 +30,7 @@ var (
 // ConnectionPoolType is the type of connection pool.
 type ConnectionPoolType int8
 
-// Short and Long flags define which indicates type of connection pool..
+// Short and Long flags define which indicates type of connection pool.
 const (
 	Short ConnectionPoolType = iota
 	Long

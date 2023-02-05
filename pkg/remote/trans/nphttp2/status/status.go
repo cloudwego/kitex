@@ -174,7 +174,7 @@ func (e *Error) GRPCStatus() *Status {
 }
 
 // Is implements future error.Is functionality.
-// A Error is equivalent if the code and message are identical.
+// An Error is equivalent if the code and message are identical.
 func (e *Error) Is(target error) bool {
 	tse, ok := target.(*Error)
 	if !ok {
