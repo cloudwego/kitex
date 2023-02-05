@@ -26,7 +26,7 @@ type Option struct {
 	MaxConnections int
 	MaxQPS         int
 
-	// UpdateControl receives a Updater which gives the limitation provider
+	// UpdateControl receives an Updater which gives the limitation provider
 	// the ability to update limit dynamically.
 	UpdateControl func(u Updater)
 }
