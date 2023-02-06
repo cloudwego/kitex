@@ -13,7 +13,7 @@ struct Nesting {
     1: string String (api.header = "String")
     2: list<Simple> ListSimple
     3: double Double (api.path = "double")
-    4: i32 I32 (api.http_code = "", api.body = "I32")
+    4: i32 I32 (api.body = "I32")
     5: list<i32> ListI32 (api.query = "ListI32")
     6: i64 I64
     7: map<string, string> MapStringString
@@ -28,6 +28,6 @@ struct Nesting {
 }
 
 service BaselineService {
-    Simple SimpleMethod(1: Simple req) (api.post = "/simple")
-    Nesting NestingMethod(1: Nesting req) (api.post = "/nesting")
+    Simple SimpleMethod(1: Simple req) (api.post = "/simple", api.baseurl = 'example.com')
+    Nesting NestingMethod(1: Nesting req) (api.post = "/nesting/:double", api.baseurl = 'example.com')
 }

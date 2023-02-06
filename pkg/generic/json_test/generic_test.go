@@ -89,7 +89,7 @@ func testDynamicgoThrift(t *testing.T) {
 
 func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 	// small data
-	sobj := getSimpleValue()
+	sobj := GetSimpleValue()
 	sout, err := json.Marshal(sobj)
 	if err != nil {
 		panic(err)
@@ -141,7 +141,7 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 
 func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 	// medium data
-	nobj := getNestingValue()
+	nobj := GetNestingValue()
 	nout, err := json.Marshal(nobj)
 	if err != nil {
 		panic(err)
@@ -337,7 +337,7 @@ func initDynamicgoThriftClient(t *testing.T, addr, idl string, convOpts conv.Opt
 	test.Assert(t, err == nil)
 	g, err := generic.JSONThriftDynamicgoGeneric(p, convOpts)
 	test.Assert(t, err == nil)
-	cli := newDynamicgoGenericClient("destServiceName", g, addr)
+	cli := newGenericTTHeaderClient("destServiceName", g, addr)
 	test.Assert(t, err == nil)
 	return cli
 }

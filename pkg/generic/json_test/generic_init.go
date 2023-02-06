@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/cloudwego/kitex/transport"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/client"
@@ -40,7 +41,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
-	"github.com/cloudwego/kitex/transport"
 )
 
 var reqMsg = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"}}`
@@ -57,7 +57,7 @@ func getBytes() []byte {
 	return bytes.Repeat([]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}, 2)
 }
 
-func getSimpleValue() *Simple {
+func GetSimpleValue() *Simple {
 	return &Simple{
 		ByteField:   math.MaxInt8,
 		I64Field:    math.MaxInt64,
@@ -68,7 +68,7 @@ func getSimpleValue() *Simple {
 	}
 }
 
-func getNestingValue() *Nesting {
+func GetNestingValue() *Nesting {
 	var ret = &Nesting{
 		String_:         getString(),
 		ListSimple:      []*Simple{},
@@ -77,7 +77,7 @@ func getNestingValue() *Nesting {
 		ListI32:         []int32{},
 		I64:             math.MaxInt64,
 		MapStringString: map[string]string{},
-		SimpleStruct:    getSimpleValue(),
+		SimpleStruct:    GetSimpleValue(),
 		MapI32I64:       map[int32]int64{},
 		ListString:      []string{},
 		Binary:          getBytes(),
@@ -88,7 +88,7 @@ func getNestingValue() *Nesting {
 	}
 
 	for i := 0; i < 16; i++ {
-		ret.ListSimple = append(ret.ListSimple, getSimpleValue())
+		ret.ListSimple = append(ret.ListSimple, GetSimpleValue())
 		ret.ListI32 = append(ret.ListI32, math.MinInt32)
 		ret.ListI64 = append(ret.ListI64, math.MinInt64)
 		ret.ListString = append(ret.ListString, getString())
@@ -98,7 +98,7 @@ func getNestingValue() *Nesting {
 		ret.MapStringString[strconv.Itoa(i)] = getString()
 		ret.MapI32I64[int32(i)] = math.MinInt64
 		ret.MapI64String[int64(i)] = getString()
-		ret.MapStringSimple[strconv.Itoa(i)] = getSimpleValue()
+		ret.MapStringSimple[strconv.Itoa(i)] = GetSimpleValue()
 	}
 
 	return ret
@@ -107,6 +107,13 @@ func getNestingValue() *Nesting {
 func newGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
 	var opts []client.Option
 	opts = append(opts, client.WithHostPorts(targetIPPort))
+	genericCli, _ := genericclient.NewClient(destService, g, opts...)
+	return genericCli
+}
+
+func newGenericTTHeaderClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
+	var opts []client.Option
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(transport.TTHeader))
 	genericCli, _ := genericclient.NewClient(destService, g, opts...)
 	return genericCli
 }
@@ -122,13 +129,6 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 		}
 	}()
 	return svr
-}
-
-func newDynamicgoGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
-	var opts []client.Option
-	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(transport.TTHeader))
-	genericCli, _ := genericclient.NewClient(destService, g, opts...)
-	return genericCli
 }
 
 // GenericServiceImpl ...

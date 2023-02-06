@@ -25,12 +25,21 @@ import (
 	"net/http"
 	"sync/atomic"
 
+	athrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/dynamicgo/conv"
+	"github.com/cloudwego/dynamicgo/conv/j2t"
+	"github.com/cloudwego/dynamicgo/conv/t2j"
+	dhttp "github.com/cloudwego/dynamicgo/http"
+	dthrift "github.com/cloudwego/dynamicgo/thrift"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
+	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -87,6 +96,7 @@ func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
 }
 
 func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	//fmt.Println("🐶 remote.MessageType", msg.MessageType())
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return fmt.Errorf("get parser ServiceDescriptor failed")
@@ -99,6 +109,7 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 }
 
 func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	//fmt.Println("🦖 remote.MessageType", msg.MessageType())
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
 	}
@@ -162,4 +173,247 @@ func FromHTTPRequest(req *http.Request) (*HTTPRequest, error) {
 		return customReq, nil
 	}
 	return customReq, json.Unmarshal(customReq.RawBody, &customReq.Body)
+}
+
+type httpThriftDynamicgoCodec struct {
+	svcDsc   atomic.Value // *idl
+	provider DynamicgoDescriptorProvider
+	codec    remote.PayloadCodec
+	convOpts conv.Options
+}
+
+func newHttpThriftDynamicgoCodec(p DynamicgoDescriptorProvider, codec remote.PayloadCodec, convOpts conv.Options) (*httpThriftDynamicgoCodec, error) {
+	svc := <-p.Provide()
+	c := &httpThriftDynamicgoCodec{codec: codec, provider: p, convOpts: convOpts}
+	c.svcDsc.Store(svc)
+	go c.update()
+	return c, nil
+}
+
+func (c *httpThriftDynamicgoCodec) update() {
+	for {
+		svc, ok := <-c.provider.Provide()
+		if !ok {
+			return
+		}
+		c.svcDsc.Store(svc)
+	}
+}
+
+// This method makes users to specify the method name even though the method name should be included in http request...
+func (c *httpThriftDynamicgoCodec) getMethod(req interface{}, method string) (*Method, error) {
+	// Discusstion is below
+	//svcDsc, ok := c.svcDsc.Load().(*dthrift.ServiceDescriptor)
+	//if !ok {
+	//	return nil, errors.New("get method name failed, no ServiceDescriptor")
+	//}
+	//r, ok := req.(*HTTPRequest)
+	//if !ok {
+	//	return nil, errors.New("req is invalid, need descriptor.HTTPRequest")
+	//}
+	//function, err := svcDsc.Router.Lookup(r)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//return &Method{function.Name(), function.Oneway()}, nil
+	fnDsc, err := c.svcDsc.Load().(*dthrift.ServiceDescriptor).LookupFunctionByMethod(method)
+	if err != nil {
+		return nil, err
+	}
+	return &Method{fnDsc.Name(), fnDsc.Oneway()}, nil
+}
+
+func (c *httpThriftDynamicgoCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	method := msg.RPCInfo().Invocation().MethodName()
+	if method == "" {
+		return perrors.NewProtocolErrorWithMsg("empty methodName in thrift Marshal")
+	}
+
+	msgType := msg.MessageType()
+	//fmt.Println("🐶 remote.MessageType, rpcRole: ", msgType, msg.RPCRole())
+	data := msg.Data()
+	if msgType == remote.Exception {
+		transErr, isTransErr := data.(*remote.TransError)
+		if !isTransErr {
+			if err, isError := data.(error); isError {
+				data = athrift.NewTApplicationException(remote.InternalError, err.Error())
+			}
+		} else {
+			return errors.New("exception relay need error type data")
+		}
+		data = athrift.NewTApplicationException(transErr.TypeID(), transErr.Error())
+	}
+
+	// TODO: discuss encode with hyper codec
+	// TODO: discuss encode with FastWrite
+
+	// TODO: clientのみ
+	gArg := data.(*Args)
+	transData := gArg.Request
+	transBuff, ok := transData.(*dhttp.HTTPRequest)
+	if !ok {
+		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not *dhttp.HTTPRequest")
+	}
+
+	svcDsc, ok := c.svcDsc.Load().(*dthrift.ServiceDescriptor)
+	if !ok {
+		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
+	}
+	tyDsc := svcDsc.Functions()[method].Request().Struct().Fields()[0].Type()
+
+	// encode in normal way using dynamicgo
+	cv := j2t.NewBinaryConv(c.convOpts)
+	body := transBuff.Body()
+	buf := make([]byte, 0, len(body))
+	seqID := msg.RPCInfo().Invocation().SeqID()
+	tProt := cthrift.NewBinaryProtocol(out)
+	if err := tProt.WriteMessageBegin(method, athrift.TMessageType(msgType), seqID); err != nil {
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageBegin failed: %s", err.Error()))
+	}
+	if err := tProt.WriteStructBegin(""); err != nil {
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteStructBegin failed: %s", err.Error()))
+	}
+	if err := tProt.WriteFieldBegin("", athrift.STRUCT, 1); err != nil {
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteFieldBegin failed: %s", err.Error()))
+	}
+
+	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, transBuff)
+	// json to thrift
+	if err := cv.DoInto(ctx, tyDsc, body, &buf); err != nil {
+		return err
+	}
+
+	if _, err := out.WriteBinary(buf); err != nil {
+		return err
+	}
+	tProt.WriteFieldStop()
+	if err := tProt.WriteFieldEnd(); err != nil {
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteFieldEnd failed: %s", err.Error()))
+	}
+	if err := tProt.WriteStructEnd(); err != nil {
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteStructEnd failed: %s", err.Error()))
+	}
+	if err := tProt.WriteMessageEnd(); err != nil {
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageEnd failed: %s", err.Error()))
+	}
+	tProt.Recycle()
+	return nil
+}
+
+func (c *httpThriftDynamicgoCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
+		return err
+	}
+
+	tProt := cthrift.NewBinaryProtocol(in)
+
+	method, msgType, seqID, err := tProt.ReadMessageBegin()
+	if err != nil {
+		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageBegin failed: %s", err.Error()))
+	}
+	sname, err := tProt.ReadStructBegin()
+	if err != nil {
+		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadStructBegin failed: %s", err.Error()))
+	}
+	fname, ftype, fid, err := tProt.ReadFieldBegin()
+	if err != nil {
+		return perrors.NewProtocolErrorWithErrMsg(err,
+			fmt.Sprintf("thrift unmarshal, ReadFieldBegin failed: %s", err.Error()))
+	}
+	if err = codec.UpdateMsgType(uint32(msgType), msg); err != nil {
+		return err
+	}
+	// exception message
+	if msg.MessageType() == remote.Exception {
+		exception := athrift.NewTApplicationException(athrift.UNKNOWN_APPLICATION_EXCEPTION, "")
+		if err := exception.Read(tProt); err != nil {
+			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal Exception failed: %s", err.Error()))
+		}
+		if err := tProt.ReadMessageEnd(); err != nil {
+			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageEnd failed: %s", err.Error()))
+		}
+		return remote.NewTransError(exception.TypeId(), exception)
+	}
+	// Must check after Exception handle.
+	// For server side, the following error can be sent back and 'SetSeqID' should be executed first to ensure the seqID
+	// is right when return Exception back.
+	if err = codec.SetOrCheckSeqID(seqID, msg); err != nil {
+		return err
+	}
+	if err = codec.SetOrCheckMethodName(method, msg); err != nil {
+		return err
+	}
+
+	if err = codec.NewDataIfNeeded(method, msg); err != nil {
+		return err
+	}
+
+	// TODO: discuss decode with hyper unmarshal
+	// TODO: discuss decode with FastRead
+
+	// decode in normal way
+	if msg.PayloadLen() == 0 {
+		return errors.New("msg.PayloadLen must not be 0. Please use TTHeader protocol")
+	}
+	msgBeginLen := bthrift.Binary.MessageBeginLength(method, msgType, seqID)
+	structBeginLen := bthrift.Binary.StructBeginLength(sname)
+	fieldBeginLen := bthrift.Binary.FieldBeginLength(fname, ftype, fid)
+	transBuff, err := in.ReadBinary(
+		msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength() -
+			structBeginLen - bthrift.Binary.StructEndLength() -
+			fieldBeginLen - bthrift.Binary.FieldEndLength() - bthrift.Binary.FieldStopLength())
+	if err != nil {
+		return err
+	}
+	svcDsc, ok := c.svcDsc.Load().(*dthrift.ServiceDescriptor)
+	if !ok {
+		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
+	}
+	tyDsc := svcDsc.Functions()[method].Response().Struct().Fields()[0].Type()
+
+	buf := bytesPool.Get().(*[]byte)
+	if err != nil {
+		panic(err)
+	}
+	//fmt.Println("-Dynamicgo-")
+	cv := t2j.NewBinaryConv(c.convOpts)
+	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, dhttp.NewHTTPResponse())
+	if err = cv.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
+		return err
+	}
+
+	tProt.ReadFieldEnd()
+	in.ReadBinary(bthrift.Binary.FieldStopLength())
+	tProt.ReadStructEnd()
+	tProt.ReadMessageEnd()
+	tProt.Recycle()
+
+	// TODO: only Client
+	gResult := msg.Data().(*Result)
+	// TODO: consider what to respond
+	resp := descriptor.NewHTTPResponse()
+	// TODO: そのうちresp.Bodyをjson stringにしたいかなー
+	resp.GeneralBody = string(*buf)
+	gResult.Success = resp
+
+	*buf = (*buf)[:0]
+	bytesPool.Put(buf)
+	return nil
+}
+
+func (c *httpThriftDynamicgoCodec) Name() string {
+	return "HttpThrift"
+}
+
+func (c *httpThriftDynamicgoCodec) Close() error {
+	return c.provider.Close()
+}
+
+func DynamicgoRequestFromHTTPRequest(req *http.Request) (*dhttp.HTTPRequest, error) {
+	req.Header.Set(dhttp.HeaderContentType, descriptor.MIMEApplicationJson)
+	return dhttp.NewHTTPRequestFromStdReq(req)
+}
+
+func DynamicgoRequestFromUrl(method, url string, body io.Reader, params ...dhttp.Param) (*dhttp.HTTPRequest, error) {
+	return dhttp.NewHTTPRequestFromUrl(method, url, body, params...)
 }

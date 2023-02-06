@@ -99,6 +99,15 @@ func HTTPThriftGeneric(p DescriptorProvider) (Generic, error) {
 	}, nil
 }
 
+// HTTPThriftDynamicgoGeneric http mapping Generic using dynamicgo.
+func HTTPThriftDynamicgoGeneric(p DynamicgoDescriptorProvider, convOpts conv.Options) (Generic, error) {
+	codec, err := newHttpThriftDynamicgoCodec(p, thrift.NewThriftCodec(), convOpts)
+	if err != nil {
+		return nil, err
+	}
+	return &httpThriftDynamicgoGeneric{codec: codec}, nil
+}
+
 func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generic, error) {
 	codec, err := newHTTPPbThriftCodec(p, pbp, thriftCodec)
 	if err != nil {
@@ -269,6 +278,30 @@ func (g *httpThriftGeneric) GetMethod(req interface{}, method string) (*Method, 
 }
 
 func (g *httpThriftGeneric) Close() error {
+	return g.codec.Close()
+}
+
+type httpThriftDynamicgoGeneric struct {
+	codec *httpThriftDynamicgoCodec
+}
+
+func (g *httpThriftDynamicgoGeneric) Framed() bool {
+	return false
+}
+
+func (g *httpThriftDynamicgoGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
+	return serviceinfo.Thrift
+}
+
+func (g *httpThriftDynamicgoGeneric) PayloadCodec() remote.PayloadCodec {
+	return g.codec
+}
+
+func (g *httpThriftDynamicgoGeneric) GetMethod(req interface{}, method string) (*Method, error) {
+	return g.codec.getMethod(req, method)
+}
+
+func (g *httpThriftDynamicgoGeneric) Close() error {
 	return g.codec.Close()
 }
 

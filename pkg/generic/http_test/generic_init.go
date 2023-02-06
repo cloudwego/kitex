@@ -23,17 +23,28 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/genericclient"
+	connpool2 "github.com/cloudwego/kitex/pkg/connpool"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func newGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
 	var opts []client.Option
 	opts = append(opts, client.WithHostPorts(targetIPPort))
+	genericCli, _ := genericclient.NewClient(destService, g, opts...)
+	return genericCli
+}
+
+func newGenericTTHeaderClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
+	var opts []client.Option
+	var poolCfg = connpool2.IdleConfig{MaxIdlePerAddress: 10000, MaxIdleGlobal: 10000, MaxIdleTimeout: time.Second}
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(transport.TTHeader), client.WithLongConnection(poolCfg))
 	genericCli, _ := genericclient.NewClient(destService, g, opts...)
 	return genericCli
 }
@@ -72,4 +83,12 @@ func (g *GenericServiceBinaryEchoImpl) GenericCall(ctx context.Context, method s
 		return nil, errors.New("call failed, incorrect num")
 	}
 	return req, nil
+}
+
+// GenericServiceImpl ...
+type GenericServiceBenchmarkImpl struct{}
+
+// GenericCall ...
+func (g *GenericServiceBenchmarkImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	return request, nil
 }
