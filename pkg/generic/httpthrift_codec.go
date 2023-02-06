@@ -390,7 +390,7 @@ func (c *httpThriftDynamicgoCodec) Unmarshal(ctx context.Context, msg remote.Mes
 	gResult := msg.Data().(*Result)
 	// TODO: consider what to respond
 	resp := descriptor.NewHTTPResponse()
-	// TODO: そのうちresp.Bodyをjson stringにしたいかなー
+	// TODO: make resp.Body json string in the future?
 	resp.GeneralBody = string(*buf)
 	gResult.Success = resp
 
