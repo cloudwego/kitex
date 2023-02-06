@@ -74,10 +74,10 @@ func testThrift(t *testing.T) {
 func testDynamicgoThrift(t *testing.T) {
 	fmt.Println(len(reqMsg))
 	time.Sleep(1 * time.Second)
-	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceImpl), "./idl/example.thrift", conv.Options{NoBase64Binary: true})
+	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceImpl), "./idl/example.thrift", conv.Options{})
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initDynamicgoThriftClient(t, "127.0.0.1:8128", "./idl/example.thrift", conv.Options{NoBase64Binary: true})
+	cli := initDynamicgoThriftClient(t, "127.0.0.1:8128", "./idl/example.thrift", conv.Options{})
 
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -95,7 +95,7 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 		panic(err)
 	}
 	simpleJSON := string(sout)
-	println("small data size: ", len(simpleJSON))
+	fmt.Println("small data size: ", len(simpleJSON))
 
 	t := testing.T{}
 	b.Run("thrift_small", func(b *testing.B) {
@@ -147,7 +147,7 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		panic(err)
 	}
 	nestingJSON := string(nout)
-	println("medium data size: ", len(nestingJSON))
+	fmt.Println("medium data size: ", len(nestingJSON))
 
 	t := testing.T{}
 
@@ -337,7 +337,7 @@ func initDynamicgoThriftClient(t *testing.T, addr, idl string, convOpts conv.Opt
 	test.Assert(t, err == nil)
 	g, err := generic.JSONThriftDynamicgoGeneric(p, convOpts)
 	test.Assert(t, err == nil)
-	cli := newGenericClient("destServiceName", g, addr)
+	cli := newDynamicgoGenericClient("destServiceName", g, addr)
 	test.Assert(t, err == nil)
 	return cli
 }

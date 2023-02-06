@@ -40,6 +40,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
+	"github.com/cloudwego/kitex/transport"
 )
 
 var reqMsg = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"}}`
@@ -121,6 +122,13 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 		}
 	}()
 	return svr
+}
+
+func newDynamicgoGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
+	var opts []client.Option
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(transport.TTHeader))
+	genericCli, _ := genericclient.NewClient(destService, g, opts...)
+	return genericCli
 }
 
 // GenericServiceImpl ...
