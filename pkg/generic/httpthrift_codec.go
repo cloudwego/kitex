@@ -96,7 +96,6 @@ func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
 }
 
 func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	//fmt.Println("🐶 remote.MessageType", msg.MessageType())
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return fmt.Errorf("get parser ServiceDescriptor failed")
@@ -109,7 +108,6 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 }
 
 func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	//fmt.Println("🦖 remote.MessageType", msg.MessageType())
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
 	}
