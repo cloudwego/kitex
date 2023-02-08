@@ -37,6 +37,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 )
 
+const maxRetry = 6
+
 func newProxyMW(prx proxy.ForwardProxy) endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response interface{}) error {
@@ -75,10 +77,6 @@ func discoveryEventHandler(name string, bus event.Bus, queue event.Queue) func(d
 // If retryable error is encountered, it will retry until timeout or an unretryable error is returned.
 func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilder {
 	return func(ctx context.Context) endpoint.Middleware {
-		retryable := func(err error) bool {
-			return errors.Is(err, kerrors.ErrGetConnection) || errors.Is(err, kerrors.ErrCircuitBreak)
-		}
-
 		return func(next endpoint.Endpoint) endpoint.Endpoint {
 			return func(ctx context.Context, request, response interface{}) error {
 				rpcInfo := rpcinfo.GetRPCInfo(ctx)
@@ -101,31 +99,38 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 					return kerrors.ErrServiceDiscovery.WithCause(err)
 				}
 
-				picker := lb.GetPicker()
-				if r, ok := picker.(internal.Reusable); ok {
-					defer r.Recycle()
-				}
 				var lastErr error
-				for {
+				for i := 0; i < maxRetry; i++ {
 					select {
 					case <-ctx.Done():
 						return kerrors.ErrRPCTimeout
 					default:
 					}
 
+					// we always need to get a new picker every time, because when downstream update deployment,
+					// we may get an old picker that include all outdated instances which will cause connect always failed.
+					picker := lb.GetPicker()
 					ins := picker.Next(ctx, request)
 					if ins == nil {
-						return kerrors.ErrNoMoreInstance.WithCause(fmt.Errorf("last error: %w", lastErr))
+						err = kerrors.ErrNoMoreInstance.WithCause(fmt.Errorf("last error: %w", lastErr))
+					} else {
+						remote.SetInstance(ins)
+						// TODO: generalize retry strategy
+						err = next(ctx, request, response)
 					}
-					remote.SetInstance(ins)
-
-					// TODO: generalize retry strategy
-					if err = next(ctx, request, response); err != nil && retryable(err) {
+					if r, ok := picker.(internal.Reusable); ok {
+						r.Recycle()
+					}
+					if err == nil {
+						return nil
+					}
+					if retryable(err) {
 						lastErr = err
 						continue
 					}
 					return err
 				}
+				return lastErr
 			}
 		}
 	}
@@ -177,4 +182,8 @@ func wrapInstances(insts []discovery.Instance) []*instInfo {
 		instInfos = append(instInfos, &instInfo{Address: addr, Weight: inst.Weight()})
 	}
 	return instInfos
+}
+
+func retryable(err error) bool {
+	return errors.Is(err, kerrors.ErrGetConnection) || errors.Is(err, kerrors.ErrCircuitBreak)
 }
