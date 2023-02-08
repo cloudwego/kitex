@@ -368,7 +368,7 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 	if qpsLimit == nil {
 		if limits != nil && limits.MaxQPS > 0 && limits.Interval > 0 {
 			qpsLimit = limiter.NewQPSLimiter(limits.Interval, limits.MaxQPS)
-		} else if limits != nil && limits.MaxQPS == 0 {
+		} else if limits != nil && limits.MaxQPS > 0 {
 			interval := time.Millisecond * 100 // FIXME: should not care this implementation-specific parameter
 			qpsLimit = limiter.NewQPSLimiter(interval, limits.MaxQPS)
 		} else {
