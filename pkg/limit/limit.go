@@ -16,6 +16,8 @@
 
 package limit
 
+import "time"
+
 // Updater is used to update the limit dynamically.
 type Updater interface {
 	UpdateLimit(opt *Option) (updated bool)
@@ -25,7 +27,7 @@ type Updater interface {
 type Option struct {
 	MaxConnections int
 	MaxQPS         int
-
+	Interval       time.Duration
 	// UpdateControl receives a Updater which gives the limitation provider
 	// the ability to update limit dynamically.
 	UpdateControl func(u Updater)
