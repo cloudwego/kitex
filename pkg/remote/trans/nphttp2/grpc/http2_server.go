@@ -413,7 +413,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 		switch frame := frame.(type) {
 		case *grpcframe.MetaHeadersFrame:
 			if t.operateHeaders(frame, handle, traceCtx) {
-				err = t.Close()
+				t.Close()
 				break
 			}
 		case *grpcframe.DataFrame:

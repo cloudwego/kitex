@@ -95,8 +95,8 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 			bc := NewBufioConn(conn)
 			ctx, err = ts.transHdlr.OnActive(ctx, bc)
 			if err != nil {
-				//return err
 				klog.CtxErrorf(ctx, "KITEX: OnActive error=%s", err)
+				return
 			}
 			for {
 				ts.refreshDeadline(rpcinfo.GetRPCInfo(ctx), bc)
@@ -154,7 +154,7 @@ type BufioConn struct {
 func NewBufioConn(c net.Conn) *BufioConn {
 	return &BufioConn{
 		conn: c,
-		//rw:   &bufioReader{rw: bufio.NewReadWriter(r, w)},
+		// rw:   &bufioReader{rw: bufio.NewReadWriter(r, w)},
 		r: NewBufioReader(c),
 	}
 }
@@ -164,7 +164,7 @@ func (bc *BufioConn) RawConn() net.Conn {
 }
 
 func (bc *BufioConn) Read(b []byte) (int, error) {
-	//return bc.rw.rw.Read(b)
+	// return bc.rw.rw.Read(b)
 	return bc.r.r.Read(b)
 }
 

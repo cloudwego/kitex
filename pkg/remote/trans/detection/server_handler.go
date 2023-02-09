@@ -32,7 +32,7 @@ import (
 )
 
 // NewSvrTransHandlerFactory detection factory construction
-func NewSvrTransHandlerFactory(nonHttp2 remote.ServerTransHandlerFactory, http2 remote.ServerTransHandlerFactory) remote.ServerTransHandlerFactory {
+func NewSvrTransHandlerFactory(nonHttp2, http2 remote.ServerTransHandlerFactory) remote.ServerTransHandlerFactory {
 	return &svrTransHandlerFactory{nonHttp2, http2}
 }
 
