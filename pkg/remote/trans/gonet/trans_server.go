@@ -18,13 +18,17 @@
 package gonet
 
 import (
+	"bufio"
 	"context"
 	"errors"
+	"io"
 	"net"
 	"os"
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 
@@ -77,23 +81,30 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 	for {
 		conn, err := ts.ln.Accept()
 		if err != nil {
-			klog.Errorf("bootstrap server accept failed, err=%s", err.Error())
+			klog.Errorf("KITEX: BootstrapServer accept failed, err=%s", err.Error())
 			os.Exit(1)
 		}
-		ctx, err := ts.transHdlr.OnActive(context.Background(), conn)
-		if err != nil {
-			return err
-		}
 		go func() {
+			var (
+				ctx = context.Background()
+				err error
+			)
 			defer func() {
 				transRecover(ctx, conn, "OnRead")
 			}()
+			bc := NewBufioConn(conn)
+			ctx, err = ts.transHdlr.OnActive(ctx, bc)
+			if err != nil {
+				//return err
+				klog.CtxErrorf(ctx, "KITEX: OnActive error=%s", err)
+			}
 			for {
-				ts.refreshDeadline(rpcinfo.GetRPCInfo(ctx), conn)
-				err := ts.transHdlr.OnRead(ctx, conn)
+				ts.refreshDeadline(rpcinfo.GetRPCInfo(ctx), bc)
+				err := ts.transHdlr.OnRead(ctx, bc)
 				if err != nil {
-					ts.onError(ctx, err, conn)
-					_ = conn.Close()
+					klog.CtxErrorf(ctx, "KITEX: OnRead Error: %s\n", err.Error())
+					ts.onError(ctx, err, bc)
+					_ = bc.Close()
 					return
 				}
 			}
@@ -129,6 +140,124 @@ func (ts *transServer) onError(ctx context.Context, err error, conn net.Conn) {
 	ts.transHdlr.OnError(ctx, err, conn)
 }
 
+func (ts *transServer) refreshDeadline(ri rpcinfo.RPCInfo, conn net.Conn) {
+	readTimeout := ri.Config().ReadWriteTimeout()
+	_ = conn.SetReadDeadline(time.Now().Add(readTimeout))
+}
+
+// BufioConn implements the net.Conn interface.
+type BufioConn struct {
+	conn net.Conn
+	r    *bufioReader
+}
+
+func NewBufioConn(c net.Conn) *BufioConn {
+	return &BufioConn{
+		conn: c,
+		//rw:   &bufioReader{rw: bufio.NewReadWriter(r, w)},
+		r: NewBufioReader(c),
+	}
+}
+
+func (bc *BufioConn) RawConn() net.Conn {
+	return bc.conn
+}
+
+func (bc *BufioConn) Read(b []byte) (int, error) {
+	//return bc.rw.rw.Read(b)
+	return bc.r.r.Read(b)
+}
+
+func (bc *BufioConn) Write(b []byte) (int, error) {
+	return bc.conn.Write(b)
+}
+
+func (bc *BufioConn) Close() error {
+	bc.r.Release()
+	return bc.conn.Close()
+}
+
+func (bc *BufioConn) LocalAddr() net.Addr {
+	return bc.conn.LocalAddr()
+}
+
+func (bc *BufioConn) RemoteAddr() net.Addr {
+	return bc.conn.RemoteAddr()
+}
+
+func (bc *BufioConn) SetDeadline(t time.Time) error {
+	return bc.conn.SetDeadline(t)
+}
+
+func (bc *BufioConn) SetReadDeadline(t time.Time) error {
+	return bc.conn.SetReadDeadline(t)
+}
+
+func (bc *BufioConn) SetWriteDeadline(t time.Time) error {
+	return bc.conn.SetWriteDeadline(t)
+}
+
+func (bc *BufioConn) Reader() netpoll.Reader {
+	return bc.r
+}
+
+var _ netpoll.Reader = &bufioReader{}
+
+func NewBufioReader(c net.Conn) *bufioReader {
+	return &bufioReader{r: bufio.NewReader(c)}
+}
+
+// bufioReader implements the netpoll.Reader interface.
+type bufioReader struct {
+	r *bufio.Reader
+}
+
+func (br bufioReader) Next(n int) (p []byte, err error) {
+	p = make([]byte, n)
+	if _, err = io.ReadFull(br.r, p); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (br *bufioReader) Peek(n int) (buf []byte, err error) {
+	return br.r.Peek(n)
+}
+
+func (br *bufioReader) Skip(n int) (err error) {
+	_, err = br.r.Discard(n)
+	return
+}
+
+func (br *bufioReader) Until(delim byte) (line []byte, err error) {
+	panic("unimplemented")
+}
+
+func (br *bufioReader) ReadString(n int) (s string, err error) {
+	return br.r.ReadString(byte(n))
+}
+
+func (br *bufioReader) ReadBinary(n int) (p []byte, err error) {
+	return br.r.ReadBytes(byte(n))
+}
+
+func (br *bufioReader) ReadByte() (b byte, err error) {
+	return br.r.ReadByte()
+}
+
+func (br *bufioReader) Slice(n int) (r netpoll.Reader, err error) {
+	panic("implement me")
+}
+
+func (br *bufioReader) Release() (err error) {
+	br.r.Buffered()
+	return nil
+}
+
+func (br *bufioReader) Len() (length int) {
+	return br.r.Buffered()
+}
+
 func transRecover(ctx context.Context, conn net.Conn, funcName string) {
 	panicErr := recover()
 	if panicErr != nil {
@@ -138,9 +267,4 @@ func transRecover(ctx context.Context, conn net.Conn, funcName string) {
 			klog.CtxErrorf(ctx, "KITEX: panic happened in %s, error=%v\nstack=%s", funcName, panicErr, string(debug.Stack()))
 		}
 	}
-}
-
-func (ts *transServer) refreshDeadline(ri rpcinfo.RPCInfo, conn net.Conn) {
-	readTimeout := ri.Config().ReadWriteTimeout()
-	_ = conn.SetReadDeadline(time.Now().Add(readTimeout))
 }

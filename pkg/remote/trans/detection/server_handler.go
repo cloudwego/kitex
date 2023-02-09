@@ -28,22 +28,17 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
-	transNetpoll "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 )
 
 // NewSvrTransHandlerFactory detection factory construction
-func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
-	return &svrTransHandlerFactory{
-		http2:   nphttp2.NewSvrTransHandlerFactory(),
-		netpoll: transNetpoll.NewSvrTransHandlerFactory(),
-	}
+func NewSvrTransHandlerFactory(nonHttp2 remote.ServerTransHandlerFactory, http2 remote.ServerTransHandlerFactory) remote.ServerTransHandlerFactory {
+	return &svrTransHandlerFactory{nonHttp2, http2}
 }
 
 type svrTransHandlerFactory struct {
-	http2   remote.ServerTransHandlerFactory
-	netpoll remote.ServerTransHandlerFactory
+	nonHttp2 remote.ServerTransHandlerFactory
+	http2    remote.ServerTransHandlerFactory
 }
 
 func (f *svrTransHandlerFactory) MuxEnabled() bool {
@@ -56,15 +51,15 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 	if t.http2, err = f.http2.NewTransHandler(opt); err != nil {
 		return nil, err
 	}
-	if t.netpoll, err = f.netpoll.NewTransHandler(opt); err != nil {
+	if t.nonHttp2, err = f.nonHttp2.NewTransHandler(opt); err != nil {
 		return nil, err
 	}
 	return t, nil
 }
 
 type svrTransHandler struct {
-	http2   remote.ServerTransHandler
-	netpoll remote.ServerTransHandler
+	http2    remote.ServerTransHandler
+	nonHttp2 remote.ServerTransHandler
 }
 
 func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error) {
@@ -94,19 +89,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	var (
 		preface []byte
 		err     error
-		zr      netpoll.Reader
 	)
-	if npConn, ok := conn.(netpoll.Connection); ok {
-		zr = npConn.Reader()
-	} else {
-		zr = netpoll.NewReader(conn)
-	}
-	// read at most avoid block
-	if preface, err = zr.Peek(prefaceReadAtMost); err != nil {
+	npReader := conn.(interface{ Reader() netpoll.Reader }).Reader()
+	if preface, err = npReader.Peek(prefaceReadAtMost); err != nil {
 		return err
 	}
 	// compare preface one by one
-	which := t.netpoll
+	which := t.nonHttp2
 	if bytes.Equal(preface[:prefaceReadAtMost], grpc.ClientPreface[:prefaceReadAtMost]) {
 		which = t.http2
 		ctx, err = which.OnActive(ctx, conn)
@@ -144,20 +133,20 @@ func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
 
 func (t *svrTransHandler) SetPipeline(pipeline *remote.TransPipeline) {
 	t.http2.SetPipeline(pipeline)
-	t.netpoll.SetPipeline(pipeline)
+	t.nonHttp2.SetPipeline(pipeline)
 }
 
 func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
 	if t, ok := t.http2.(remote.InvokeHandleFuncSetter); ok {
 		t.SetInvokeHandleFunc(inkHdlFunc)
 	}
-	if t, ok := t.netpoll.(remote.InvokeHandleFuncSetter); ok {
+	if t, ok := t.nonHttp2.(remote.InvokeHandleFuncSetter); ok {
 		t.SetInvokeHandleFunc(inkHdlFunc)
 	}
 }
 
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
-	ctx, err := t.netpoll.OnActive(ctx, conn)
+	ctx, err := t.nonHttp2.OnActive(ctx, conn)
 	if err != nil {
 		return nil, err
 	}

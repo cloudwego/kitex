@@ -34,8 +34,8 @@ type framer struct {
 
 func newFramer(conn net.Conn, writeBufferSize, readBufferSize, maxHeaderListSize uint32) *framer {
 	var r netpoll.Reader
-	if npconn, ok := conn.(netpoll.Connection); ok {
-		r = npconn.Reader()
+	if npConn, ok := conn.(interface{ Reader() netpoll.Reader }); ok {
+		r = npConn.Reader()
 	} else {
 		r = netpoll.NewReader(conn)
 	}
