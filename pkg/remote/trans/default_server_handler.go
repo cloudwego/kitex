@@ -110,27 +110,22 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 }
 
 // OnRead implements the remote.ServerTransHandler interface.
-func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
+func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
-	var err error
-	var closeConn bool
 	var recvMsg remote.Message
 	var sendMsg remote.Message
 	defer func() {
 		panicErr := recover()
 		if panicErr != nil {
-			closeConn = true
 			if conn != nil {
 				ri := rpcinfo.GetRPCInfo(ctx)
 				rService, rAddr := getRemoteInfo(ri, conn)
+				conn.Close()
 				klog.CtxErrorf(ctx, "KITEX: panic happened, close conn, remoteAddress=%s, remoteService=%s, error=%v\nstack=%s", rAddr, rService, panicErr, string(debug.Stack()))
 			} else {
 				klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
 			}
-		}
-		if closeConn && conn != nil {
-			conn.Close()
 		}
 		t.finishTracer(ctx, ri, err, panicErr)
 		t.finishProfiler(ctx)
@@ -145,20 +140,18 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	ctx, err = t.Read(ctx, conn, recvMsg)
 	if err != nil {
-		closeConn = true
 		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
 		t.OnError(ctx, err, conn)
-		return nil
+		return err
 	}
 
 	var methodInfo serviceinfo.MethodInfo
 	if methodInfo, err = GetMethodInfo(ri, t.svcInfo); err != nil {
 		// it won't be err, because the method has been checked in decode, err check here just do defensive inspection
-		closeConn = true
 		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
 		// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded
 		t.OnError(ctx, err, conn)
-		return nil
+		return err
 	}
 	if methodInfo.OneWay() {
 		sendMsg = remote.NewMessage(nil, t.svcInfo, ri, remote.Reply, remote.Server)
@@ -171,15 +164,18 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		// error cannot be wrapped to print here, so it must exec before NewTransError
 		t.OnError(ctx, err, conn)
 		err = remote.NewTransError(remote.InternalError, err)
-		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false)
+		// connection should not be closed only when the error is return by the server handler
+		// otherwise, return the error and the connection will be closed outside.
+		if closeConn := t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false); closeConn {
+			return err
+		}
 		return nil
 	}
 
 	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
 	if ctx, err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
-		closeConn = true
 		t.OnError(ctx, err, conn)
-		return nil
+		return err
 	}
 	return nil
 }

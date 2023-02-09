@@ -268,8 +268,8 @@ func TestNoMethodInfo(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	err = svrTransHdlr.OnRead(ctx, conn)
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err != nil, err)
 	test.Assert(t, isReaderBufReleased)
 	test.Assert(t, isWriteBufFlushed)
-	test.Assert(t, isClosed)
+	test.Assert(t, !isClosed)
 }
