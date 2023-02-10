@@ -233,7 +233,7 @@ func handleRouter(fn *parser.Function, sDsc *descriptor.ServiceDescriptor, fnDsc
 	defer func() {
 		if ret := recover(); ret != nil {
 			klog.Errorf("KITEX: router handle failed, err=%v\nstack=%s", ret, string(debug.Stack()))
-			err = fmt.Errorf("%v. please check the paths defined in the IDL", ret)
+			err = fmt.Errorf("router handle failed, err=%v", ret)
 		}
 	}()
 	for _, ann := range fn.Annotations {
