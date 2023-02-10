@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/semantic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 const (
