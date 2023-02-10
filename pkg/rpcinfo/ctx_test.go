@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 func TestNewCtxWithRPCInfo(t *testing.T) {
@@ -49,12 +50,28 @@ func TestGetCtxRPCInfo(t *testing.T) {
 }
 
 func TestPutRPCInfo(t *testing.T) {
-	ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, nil)
+	// pre-declared variables and initialization to ensure readability
+	method := "TestMethod"
+	svcName := "TestServiceName"
+	netAddr := utils.NewNetAddr("TestNetWork", "TestAddress")
+	tags := map[string]string{"MapTestKey": "MapTestValue"}
+
+	ri := rpcinfo.NewRPCInfo(
+		rpcinfo.NewEndpointInfo(svcName, method, netAddr, tags),
+		rpcinfo.NewEndpointInfo(svcName, method, netAddr, tags),
+		rpcinfo.NewInvocation(svcName, method),
+		rpcinfo.NewRPCConfig(),
+		rpcinfo.NewRPCStats(),
+	)
 
 	// nil safe
 	rpcinfo.PutRPCInfo(nil)
 	rpcinfo.PutRPCInfo(ri)
 
-	// TODO: mock each field to check if them are recycled respectively
-	// ...
+	test.Assert(t, ri.From() == nil)
+	test.Assert(t, ri.To() == nil)
+	test.Assert(t, ri.Stats() == nil)
+	test.Assert(t, ri.Invocation() == nil)
+	test.Assert(t, ri.Config() == nil)
+	test.Assert(t, ri.Stats() == nil)
 }
