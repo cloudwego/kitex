@@ -219,31 +219,30 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		Response:       resp,
 		HasRequestBase: hasRequestBase,
 	}
-	for _, ann := range fn.Annotations {
-		for _, v := range ann.GetValues() {
-			if handle, ok := descriptor.FindAnnotation(ann.GetKey(), v); ok {
-				if nr, ok := handle.(descriptor.NewRoute); ok {
-					recv := panicHandler(func() {
-						sDsc.Router.Handle(nr(v, fnDsc))
-					})
-					if recv != nil {
-						return fmt.Errorf("failed to construct a routing tree of paths: %v. please check the paths defined in the IDL", recv)
-					}
-					break
-				}
-			}
-		}
+	err = handleRouter(fn, sDsc, fnDsc)
+	if err != nil {
+		return err
 	}
 	sDsc.Functions[fn.Name] = fnDsc
 	return nil
 }
 
-func panicHandler(fn func()) (recv interface{}) {
+func handleRouter(fn *parser.Function, sDsc *descriptor.ServiceDescriptor, fnDsc *descriptor.FunctionDescriptor) (err error) {
 	defer func() {
-		recv = recover()
+		if ret := recover(); ret != nil {
+			err = fmt.Errorf("%v. please check the paths defined in the IDL", ret)
+		}
 	}()
-
-	fn()
+	for _, ann := range fn.Annotations {
+		for _, v := range ann.GetValues() {
+			if handle, ok := descriptor.FindAnnotation(ann.GetKey(), v); ok {
+				if nr, ok := handle.(descriptor.NewRoute); ok {
+					sDsc.Router.Handle(nr(v, fnDsc))
+					break
+				}
+			}
+		}
+	}
 	return
 }
 
