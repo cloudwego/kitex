@@ -59,6 +59,7 @@ func BuildBackupRequest(p *BackupPolicy) Policy {
 }
 
 // Policy contains all retry policies
+// DON'T FORGET to update Equals() and DeepCopy() if you add new fields
 type Policy struct {
 	Enable bool `json:"enable"`
 	// 0 is failure retry, 1 is backup
@@ -68,7 +69,20 @@ type Policy struct {
 	BackupPolicy  *BackupPolicy  `json:"backup_policy,omitempty"`
 }
 
+func (p *Policy) DeepCopy() *Policy {
+	if p == nil {
+		return nil
+	}
+	return &Policy{
+		Enable:        p.Enable,
+		Type:          p.Type,
+		FailurePolicy: p.FailurePolicy.DeepCopy(),
+		BackupPolicy:  p.BackupPolicy.DeepCopy(),
+	}
+}
+
 // FailurePolicy for failure retry
+// DON'T FORGET to update Equals() and DeepCopy() if you add new fields
 type FailurePolicy struct {
 	StopPolicy        StopPolicy         `json:"stop_policy"`
 	BackOffPolicy     *BackOffPolicy     `json:"backoff_policy,omitempty"`
@@ -93,6 +107,7 @@ func (p FailurePolicy) IsErrorRetryNonNil() bool {
 }
 
 // BackupPolicy for backup request
+// DON'T FORGET to update Equals() and DeepCopy() if you add new fields
 type BackupPolicy struct {
 	RetryDelayMS  uint32     `json:"retry_delay_ms"`
 	StopPolicy    StopPolicy `json:"stop_policy"`
@@ -119,6 +134,7 @@ type CBPolicy struct {
 }
 
 // BackOffPolicy is the BackOff policy.
+// DON'T FORGET to update Equals() and DeepCopy() if you add new fields
 type BackOffPolicy struct {
 	BackOffType BackOffType               `json:"backoff_type"`
 	CfgItems    map[BackOffCfgKey]float64 `json:"cfg_items,omitempty"`
@@ -191,6 +207,18 @@ func (p *FailurePolicy) Equals(np *FailurePolicy) bool {
 	return true
 }
 
+func (p *FailurePolicy) DeepCopy() *FailurePolicy {
+	if p == nil {
+		return nil
+	}
+	return &FailurePolicy{
+		StopPolicy:        p.StopPolicy,
+		BackOffPolicy:     p.BackOffPolicy.DeepCopy(),
+		RetrySameNode:     p.RetrySameNode,
+		ShouldResultRetry: p.ShouldResultRetry, // don't need DeepCopy
+	}
+}
+
 // Equals to check if BackupPolicy is equal
 func (p *BackupPolicy) Equals(np *BackupPolicy) bool {
 	if p == nil {
@@ -210,6 +238,17 @@ func (p *BackupPolicy) Equals(np *BackupPolicy) bool {
 	}
 
 	return true
+}
+
+func (p *BackupPolicy) DeepCopy() *BackupPolicy {
+	if p == nil {
+		return nil
+	}
+	return &BackupPolicy{
+		RetryDelayMS:  p.RetryDelayMS,
+		StopPolicy:    p.StopPolicy, // not a pointer, will copy the value here
+		RetrySameNode: p.RetrySameNode,
+	}
 }
 
 // Equals to check if BackOffPolicy is equal.
@@ -233,6 +272,27 @@ func (p *BackOffPolicy) Equals(np *BackOffPolicy) bool {
 	}
 
 	return true
+}
+
+func (p *BackOffPolicy) DeepCopy() *BackOffPolicy {
+	if p == nil {
+		return nil
+	}
+	return &BackOffPolicy{
+		BackOffType: p.BackOffType,
+		CfgItems:    p.copyCfgItems(),
+	}
+}
+
+func (p *BackOffPolicy) copyCfgItems() map[BackOffCfgKey]float64 {
+	if p.CfgItems == nil {
+		return nil
+	}
+	cfgItems := make(map[BackOffCfgKey]float64, len(p.CfgItems))
+	for k, v := range p.CfgItems {
+		cfgItems[k] = v
+	}
+	return cfgItems
 }
 
 func checkCBErrorRate(p *CBPolicy) error {
