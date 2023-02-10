@@ -223,7 +223,12 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		for _, v := range ann.GetValues() {
 			if handle, ok := descriptor.FindAnnotation(ann.GetKey(), v); ok {
 				if nr, ok := handle.(descriptor.NewRoute); ok {
-					sDsc.Router.Handle(nr(v, fnDsc))
+					recv := panicHandler(func() {
+						sDsc.Router.Handle(nr(v, fnDsc))
+					})
+					if recv != nil {
+						return errors.New("failed to construct a routing tree of paths. please check the paths defined in the IDL")
+					}
 					break
 				}
 			}
@@ -231,6 +236,15 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 	}
 	sDsc.Functions[fn.Name] = fnDsc
 	return nil
+}
+
+func panicHandler(fn func()) (recv interface{}) {
+	defer func() {
+		recv = recover()
+	}()
+
+	fn()
+	return
 }
 
 // reuse builtin types
