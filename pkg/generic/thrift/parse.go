@@ -19,7 +19,9 @@ package thrift
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/semantic"
 
@@ -230,6 +232,7 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 func handleRouter(fn *parser.Function, sDsc *descriptor.ServiceDescriptor, fnDsc *descriptor.FunctionDescriptor) (err error) {
 	defer func() {
 		if ret := recover(); ret != nil {
+			klog.Errorf("KITEX: %v. please check the paths defined in the IDL. stack info: %s", ret, string(debug.Stack()))
 			err = fmt.Errorf("%v. please check the paths defined in the IDL", ret)
 		}
 	}()
