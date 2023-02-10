@@ -227,7 +227,7 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 						sDsc.Router.Handle(nr(v, fnDsc))
 					})
 					if recv != nil {
-						return errors.New("failed to construct a routing tree of paths. please check the paths defined in the IDL")
+						return fmt.Errorf("failed to construct a routing tree of paths: %v. please check the paths defined in the IDL", recv)
 					}
 					break
 				}
