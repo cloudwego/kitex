@@ -19,6 +19,7 @@ package trans
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"runtime/debug"
 
@@ -110,6 +111,7 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 }
 
 // OnRead implements the remote.ServerTransHandler interface.
+// The connection should be closed after returning error.
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
@@ -117,14 +119,20 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	var sendMsg remote.Message
 	defer func() {
 		panicErr := recover()
+		var wrapErr error
 		if panicErr != nil {
+			stack := string(debug.Stack())
 			if conn != nil {
 				ri := rpcinfo.GetRPCInfo(ctx)
 				rService, rAddr := getRemoteInfo(ri, conn)
-				conn.Close()
-				klog.CtxErrorf(ctx, "KITEX: panic happened, close conn, remoteAddress=%s, remoteService=%s, error=%v\nstack=%s", rAddr, rService, panicErr, string(debug.Stack()))
+				klog.CtxErrorf(ctx, "KITEX: panic happened, close conn, remoteAddress=%s, remoteService=%s, error=%v\nstack=%s", rAddr, rService, panicErr, stack)
 			} else {
-				klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
+				klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", panicErr, stack)
+			}
+			if err != nil {
+				wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %s, last error=%s", panicErr, err.Error()), stack)
+			} else {
+				wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %s", panicErr), stack)
 			}
 		}
 		t.finishTracer(ctx, ri, err, panicErr)
@@ -133,6 +141,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		remote.RecycleMessage(sendMsg)
 		// reset rpcinfo
 		t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
+		if wrapErr != nil {
+			err = wrapErr
+		}
 	}()
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
