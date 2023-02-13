@@ -82,7 +82,7 @@ func TestServerHandlerCall(t *testing.T) {
 	npConn.EXPECT().Reader().Return(npReader).AnyTimes()
 	npConn.EXPECT().RemoteAddr().Return(nil).AnyTimes()
 
-	transHdler.(*svrTransHandler).nonHttp2 = hdl
+	transHdler.(*svrTransHandler).defaultHandler = hdl
 
 	// case1 successful call: onActive() and onRead() all success
 	triggerActiveErr = false
