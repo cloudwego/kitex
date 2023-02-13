@@ -221,15 +221,6 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		Response:       resp,
 		HasRequestBase: hasRequestBase,
 	}
-	err = handleRouter(fn, sDsc, fnDsc)
-	if err != nil {
-		return err
-	}
-	sDsc.Functions[fn.Name] = fnDsc
-	return nil
-}
-
-func handleRouter(fn *parser.Function, sDsc *descriptor.ServiceDescriptor, fnDsc *descriptor.FunctionDescriptor) (err error) {
 	defer func() {
 		if ret := recover(); ret != nil {
 			klog.Errorf("KITEX: router handle failed, err=%v\nstack=%s", ret, string(debug.Stack()))
@@ -246,7 +237,8 @@ func handleRouter(fn *parser.Function, sDsc *descriptor.ServiceDescriptor, fnDsc
 			}
 		}
 	}
-	return
+	sDsc.Functions[fn.Name] = fnDsc
+	return nil
 }
 
 // reuse builtin types
