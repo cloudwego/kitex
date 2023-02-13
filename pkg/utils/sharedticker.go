@@ -92,8 +92,8 @@ func (t *SharedTicker) Tick(interval time.Duration) {
 					b.Refresh()
 				}(b)
 			}
-			wg.Wait()
 			t.Unlock()
+			wg.Wait()
 		case <-t.stopChan:
 			return
 		}
