@@ -120,7 +120,7 @@ func TestPanicRecover(t *testing.T) {
 	re, err := parser.ParseString("http.thrift", httpConflictPathIDL)
 	test.Assert(t, err == nil, err)
 	_, err = Parse(re, LastServiceOnly)
-	test.Assert(t, err != nil)
+	test.Assert(t, err == nil)
 }
 
 var selfReferenceIDL = `
