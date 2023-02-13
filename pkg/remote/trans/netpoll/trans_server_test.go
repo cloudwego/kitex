@@ -187,10 +187,15 @@ func TestConnOnActiveAndOnInactivePanic(t *testing.T) {
 // TestOnConnRead test trans_server onConnRead success
 func TestConnOnRead(t *testing.T) {
 	// 1. prepare mock data
+	var isClosed bool
 	conn := &MockNetpollConn{
 		Conn: mocks.Conn{
 			RemoteAddrFunc: func() (r net.Addr) {
 				return addr
+			},
+			CloseFunc: func() (e error) {
+				isClosed = true
+				return nil
 			},
 		},
 	}
@@ -205,4 +210,5 @@ func TestConnOnRead(t *testing.T) {
 	// 2. test
 	err := transSvr.onConnRead(context.Background(), conn)
 	test.Assert(t, err == nil, err)
+	test.Assert(t, isClosed)
 }
