@@ -10,49 +10,10 @@
 package descriptor
 
 import (
+	"fmt"
+	"net/url"
 	"strings"
 )
-
-func min(a, b int) int {
-	if a <= b {
-		return a
-	}
-	return b
-}
-
-func longestCommonPrefix(a, b string) int {
-	i := 0
-	max := min(len(a), len(b))
-	for i < max && a[i] == b[i] {
-		i++
-	}
-	return i
-}
-
-// Search for a wildcard segment and check the name for invalid characters.
-// Returns -1 as index, if no wildcard was found.
-func findWildcard(path string) (wildcard string, i int, valid bool) {
-	// Find start
-	for start, c := range []byte(path) {
-		// A wildcard starts with ':' (param) or '*' (catch-all)
-		if c != ':' && c != '*' {
-			continue
-		}
-
-		// Find end and check for invalid characters
-		valid = true
-		for end, c := range []byte(path[start+1:]) {
-			switch c {
-			case '/':
-				return path[start : start+1+end], start, valid
-			case ':', '*':
-				valid = false
-			}
-		}
-		return path[start:], start, valid
-	}
-	return "", -1, false
-}
 
 func countParams(path string) uint16 {
 	var n uint
@@ -69,249 +30,227 @@ type nodeType uint8
 
 const (
 	static nodeType = iota // default
-	root
 	param
 	catchAll
+	paramLabel = byte(':')
+	anyLabel   = byte('*')
+	slash      = "/"
+	nilString  = ""
 )
 
-type node struct {
-	path      string
-	indices   string
-	wildChild bool
-	nType     nodeType
-	priority  uint32
-	children  []*node
-	function  *FunctionDescriptor
-}
-
-// Increments priority of the given child and reorders if necessary
-func (n *node) incrementChildPrio(pos int) int {
-	cs := n.children
-	cs[pos].priority++
-	prio := cs[pos].priority
-
-	// Adjust position (move to front)
-	newPos := pos
-	for ; newPos > 0 && cs[newPos-1].priority < prio; newPos-- {
-		// Swap node positions
-		cs[newPos-1], cs[newPos] = cs[newPos], cs[newPos-1]
+type (
+	node struct {
+		nType    nodeType
+		label    byte
+		prefix   string
+		parent   *node
+		children children
+		// original path
+		ppath string
+		// param names
+		pnames     []string
+		function   *FunctionDescriptor
+		paramChild *node
+		anyChild   *node
+		// isLeaf indicates that node does not have child routes
+		isLeaf bool
 	}
+	children []*node
+)
 
-	// Build new index char string
-	if newPos != pos {
-		n.indices = n.indices[:newPos] + // Unchanged prefix, might be empty
-			n.indices[pos:pos+1] + // The index char we move
-			n.indices[newPos:pos] + n.indices[pos+1:] // Rest without char at 'pos'
+func checkPathValid(path string) {
+	if path == nilString {
+		panic("empty path")
 	}
-
-	return newPos
+	if path[0] != '/' {
+		panic("path must begin with '/'")
+	}
+	for i, c := range []byte(path) {
+		switch c {
+		case ':':
+			if (i < len(path)-1 && path[i+1] == '/') || i == (len(path)-1) {
+				panic("wildcards must be named with a non-empty name in path '" + path + "'")
+			}
+			i++
+			for ; i < len(path) && path[i] != '/'; i++ {
+				if path[i] == ':' || path[i] == '*' {
+					panic("only one wildcard per path segment is allowed, find multi in path '" + path + "'")
+				}
+			}
+		case '*':
+			if i == len(path)-1 {
+				panic("wildcards must be named with a non-empty name in path '" + path + "'")
+			}
+			if i > 0 && path[i-1] != '/' {
+				panic(" no / before wildcards in path " + path)
+			}
+			for ; i < len(path); i++ {
+				if path[i] == '/' {
+					panic("catch-all routes are only allowed at the end of the path in path '" + path + "'")
+				}
+			}
+		}
+	}
 }
 
 // addRoute adds a node with the given function to the path.
 // Not concurrency-safe!
 func (n *node) addRoute(path string, function *FunctionDescriptor) {
-	fullPath := path
-	n.priority++
+	checkPathValid(path)
 
-	// Empty tree
-	if n.path == "" && n.indices == "" {
-		n.insertChild(path, fullPath, function)
-		n.nType = root
-		return
+	var (
+		pnames []string // Param names
+		ppath  = path   // Pristine path
+	)
+
+	if function == nil {
+		panic(fmt.Sprintf("adding route without handler function: %v", path))
 	}
 
-walk:
-	for {
-		// Find the longest common prefix.
-		// This also implies that the common prefix contains no ':' or '*'
-		// since the existing key can't contain those chars.
-		i := longestCommonPrefix(path, n.path)
+	// Add the front static route part of a non-static route
+	for i, lcpIndex := 0, len(path); i < lcpIndex; i++ {
+		// param route
+		if path[i] == paramLabel {
+			j := i + 1
 
-		// Split edge
-		if i < len(n.path) {
-			child := node{
-				path:      n.path[i:],
-				wildChild: n.wildChild,
-				nType:     static,
-				indices:   n.indices,
-				children:  n.children,
-				function:  n.function,
-				priority:  n.priority - 1,
+			n.insert(path[:i], nil, static, nilString, nil)
+			for ; i < lcpIndex && path[i] != '/'; i++ {
 			}
 
-			n.children = []*node{&child}
-			// []byte for proper unicode char conversion, see #65
-			n.indices = string([]byte{n.path[i]})
-			n.path = path[:i]
-			n.function = nil
-			n.wildChild = false
-		}
+			pnames = append(pnames, path[j:i])
+			path = path[:j] + path[i:]
+			i, lcpIndex = j, len(path)
 
-		// Make new node a child of this node
-		if i < len(path) {
-			path = path[i:]
-
-			if n.wildChild {
-				n = n.children[0]
-				n.priority++
-
-				// Check if the wildcard matches
-				if len(path) >= len(n.path) && n.path == path[:len(n.path)] &&
-					// Adding a child to a catchAll is not possible
-					n.nType != catchAll &&
-					// Check for longer wildcard, e.g. :name and :names
-					(len(n.path) >= len(path) || path[len(n.path)] == '/') {
-					continue walk
-				} else {
-					// Wildcard conflict
-					pathSeg := path
-					if n.nType != catchAll {
-						pathSeg = strings.SplitN(pathSeg, "/", 2)[0]
-					}
-					prefix := fullPath[:strings.Index(fullPath, pathSeg)] + n.path
-					panic("'" + pathSeg +
-						"' in new path '" + fullPath +
-						"' conflicts with existing wildcard '" + n.path +
-						"' in existing prefix '" + prefix +
-						"'")
-				}
+			if i == lcpIndex {
+				// path node is last fragment of route path. ie. `/users/:id`
+				n.insert(path[:i], function, param, ppath, pnames)
+				return
+			} else {
+				n.insert(path[:i], nil, param, nilString, pnames)
 			}
-
-			idxc := path[0]
-
-			// '/' after param
-			if n.nType == param && idxc == '/' && len(n.children) == 1 {
-				n = n.children[0]
-				n.priority++
-				continue walk
-			}
-
-			// Check if a child with the next path byte exists
-			for i, c := range []byte(n.indices) {
-				if c == idxc {
-					i = n.incrementChildPrio(i)
-					n = n.children[i]
-					continue walk
-				}
-			}
-
-			// Otherwise insert it
-			if idxc != ':' && idxc != '*' {
-				// []byte for proper unicode char conversion, see #65
-				n.indices += string([]byte{idxc})
-				child := &node{}
-				n.children = append(n.children, child)
-				n.incrementChildPrio(len(n.indices) - 1)
-				n = child
-			}
-			n.insertChild(path, fullPath, function)
+		} else if path[i] == anyLabel {
+			n.insert(path[:i], nil, static, nilString, nil)
+			pnames = append(pnames, path[i+1:])
+			n.insert(path[:i+1], function, catchAll, ppath, pnames)
 			return
 		}
-
-		// Otherwise add function to current node
-		if n.function != nil {
-			panic("a function is already registered for path '" + fullPath + "'")
-		}
-		n.function = function
-		return
 	}
+	n.insert(path, function, static, ppath, pnames)
 }
 
-func (n *node) insertChild(path, fullPath string, function *FunctionDescriptor) {
+func (n *node) insert(path string, function *FunctionDescriptor, t nodeType, ppath string, pnames []string) {
+	currentNode := n
+	search := path
+
 	for {
-		// Find prefix until first wildcard
-		wildcard, i, valid := findWildcard(path)
-		if i < 0 { // No wildcard found
-			break
+		searchLen := len(search)
+		prefixLen := len(currentNode.prefix)
+		lcpLen := 0
+
+		max := prefixLen
+		if searchLen < max {
+			max = searchLen
+		}
+		for ; lcpLen < max && search[lcpLen] == currentNode.prefix[lcpLen]; lcpLen++ {
 		}
 
-		// The wildcard name must not contain ':' and '*'
-		if !valid {
-			panic("only one wildcard per path segment is allowed, has: '" +
-				wildcard + "' in path '" + fullPath + "'")
-		}
-
-		// Check if the wildcard has a name
-		if len(wildcard) < 2 {
-			panic("wildcards must be named with a non-empty name in path '" + fullPath + "'")
-		}
-
-		// param
-		if wildcard[0] == ':' {
-			if i > 0 {
-				// Insert prefix before the current wildcard
-				n.path = path[:i]
-				path = path[i:]
+		if lcpLen == 0 {
+			currentNode.label = search[0]
+			currentNode.prefix = search
+			if function != nil {
+				currentNode.nType = t
+				currentNode.function = function
+				currentNode.ppath = ppath
+				currentNode.pnames = pnames
+			}
+			currentNode.isLeaf = currentNode.children == nil && currentNode.paramChild == nil && currentNode.anyChild == nil
+		} else if lcpLen < prefixLen {
+			// Split node
+			n := newNode(
+				currentNode.nType,
+				currentNode.prefix[lcpLen:],
+				currentNode,
+				currentNode.children,
+				currentNode.function,
+				currentNode.ppath,
+				currentNode.pnames,
+				currentNode.paramChild,
+				currentNode.anyChild,
+			)
+			// Update parent path for all children to new node
+			for _, child := range currentNode.children {
+				child.parent = n
+			}
+			if currentNode.paramChild != nil {
+				currentNode.paramChild.parent = n
+			}
+			if currentNode.anyChild != nil {
+				currentNode.anyChild.parent = n
 			}
 
-			n.wildChild = true
-			child := &node{
-				nType: param,
-				path:  wildcard,
-			}
-			n.children = []*node{child}
-			n = child
-			n.priority++
+			// Reset parent node
+			currentNode.nType = static
+			currentNode.label = currentNode.prefix[0]
+			currentNode.prefix = currentNode.prefix[:lcpLen]
+			currentNode.children = nil
+			currentNode.function = nil
+			currentNode.ppath = nilString
+			currentNode.pnames = nil
+			currentNode.paramChild = nil
+			currentNode.anyChild = nil
+			currentNode.isLeaf = false
 
-			// If the path doesn't end with the wildcard, then there
-			// will be another non-wildcard subpath starting with '/'
-			if len(wildcard) < len(path) {
-				path = path[len(wildcard):]
-				child := &node{
-					priority: 1,
-				}
-				n.children = []*node{child}
-				n = child
+			// Only Static children could reach here
+			currentNode.children = append(currentNode.children, n)
+
+			if lcpLen == searchLen {
+				// At parent node
+				currentNode.nType = t
+				currentNode.function = function
+				currentNode.ppath = ppath
+				currentNode.pnames = pnames
+			} else {
+				// Create child node
+				n = newNode(t, search[lcpLen:], currentNode, nil, function, ppath, pnames, nil, nil)
+				// Only Static children could reach here
+				currentNode.children = append(currentNode.children, n)
+			}
+			currentNode.isLeaf = currentNode.children == nil && currentNode.paramChild == nil && currentNode.anyChild == nil
+		} else if lcpLen < searchLen {
+			search = search[lcpLen:]
+			c := currentNode.findChildWithLabel(search[0])
+			if c != nil {
+				// Go deeper
+				currentNode = c
 				continue
 			}
+			// Create child node
+			n := newNode(t, search, currentNode, nil, function, ppath, pnames, nil, nil)
+			switch t {
+			case static:
+				currentNode.children = append(currentNode.children, n)
+			case param:
+				currentNode.paramChild = n
+			case catchAll:
+				currentNode.anyChild = n
+			}
+			currentNode.isLeaf = currentNode.children == nil && currentNode.paramChild == nil && currentNode.anyChild == nil
+		} else {
+			// Node already exists
+			if currentNode.function != nil && function != nil {
+				panic("handlers are already registered for path '" + ppath + "'")
+			}
 
-			// Otherwise we're done. Insert the function in the new leaf
-			n.function = function
-			return
+			if function != nil {
+				currentNode.function = function
+				currentNode.ppath = ppath
+				if len(currentNode.pnames) == 0 {
+					currentNode.pnames = pnames
+				}
+			}
 		}
-
-		// catchAll
-		if i+len(wildcard) != len(path) {
-			panic("catch-all routes are only allowed at the end of the path in path '" + fullPath + "'")
-		}
-
-		if len(n.path) > 0 && n.path[len(n.path)-1] == '/' {
-			panic("catch-all conflicts with existing function for the path segment root in path '" + fullPath + "'")
-		}
-
-		// Currently fixed width 1 for '/'
-		i--
-		if path[i] != '/' {
-			panic("no / before catch-all in path '" + fullPath + "'")
-		}
-
-		n.path = path[:i]
-
-		// First node: catchAll node with empty path
-		child := &node{
-			wildChild: true,
-			nType:     catchAll,
-		}
-		n.children = []*node{child}
-		n.indices = string('/')
-		n = child
-		n.priority++
-
-		// Second node: node holding the variable
-		child = &node{
-			path:     path[i:],
-			nType:    catchAll,
-			function: function,
-			priority: 1,
-		}
-		n.children = []*node{child}
-
 		return
 	}
-
-	// If no wildcard was found, simply insert the path and function
-	n.path = path
-	n.function = function
 }
 
 // Returns the function registered with the given path (key). The values of
@@ -319,136 +258,206 @@ func (n *node) insertChild(path, fullPath string, function *FunctionDescriptor) 
 // If no function can be found, a TSR (trailing slash redirect) recommendation is
 // made if a function exists with an extra (without the) trailing slash for the
 // given path.
-func (n *node) getValue(path string, params func() *Params) (function *FunctionDescriptor, ps *Params, tsr bool) {
-walk: // Outer loop for walking the tree
-	for {
-		prefix := n.path
-		if len(path) > len(prefix) {
-			if path[:len(prefix)] == prefix {
-				path = path[len(prefix):]
+func (n *node) getValue(path string, params func() *Params, unescape bool) (function *FunctionDescriptor, ps *Params, tsr bool) {
+	var (
+		cn          = n    // current node
+		search      = path // current path
+		searchIndex = 0
+		paramIndex  int
+	)
 
-				// If this node does not have a wildcard (param or catchAll)
-				// child, we can just look up the next child node and continue
-				// to walk down the tree
-				if !n.wildChild {
-					idxc := path[0]
-					for i, c := range []byte(n.indices) {
-						if c == idxc {
-							n = n.children[i]
-							continue walk
-						}
-					}
+	backtrackToNextNodeType := func(fromNodeType nodeType) (nextNodeType nodeType, valid bool) {
+		previous := cn
+		cn = previous.parent
+		valid = cn != nil
 
-					// Nothing found.
-					// We can recommend to redirect to the same URL without a
-					// trailing slash if a leaf exists for that path.
-					tsr = (path == "/" && n.function != nil)
-					return
-				}
+		// Next node type by priority
+		if previous.nType == catchAll {
+			nextNodeType = static
+		} else {
+			nextNodeType = previous.nType + 1
+		}
 
-				// Handle wildcard child
-				n = n.children[0]
-				switch n.nType {
-				case param:
-					// Find param end (either '/' or path end)
-					end := 0
-					for end < len(path) && path[end] != '/' {
-						end++
-					}
-
-					// Save param value
-					if params != nil {
-						if ps == nil {
-							ps = params()
-						}
-						// Expand slice within preallocated capacity
-						i := len(ps.params)
-						ps.params = ps.params[:i+1]
-						ps.params[i] = Param{
-							Key:   n.path[1:],
-							Value: path[:end],
-						}
-					}
-
-					// We need to go deeper!
-					if end < len(path) {
-						if len(n.children) > 0 {
-							path = path[end:]
-							n = n.children[0]
-							continue walk
-						}
-
-						// ... but we can't
-						tsr = (len(path) == end+1)
-						return
-					}
-
-					if function = n.function; function != nil {
-						return
-					} else if len(n.children) == 1 {
-						// No function found. Check if a function for this path + a
-						// trailing slash exists for TSR recommendation
-						n = n.children[0]
-						tsr = (n.path == "/" && n.function != nil) || (n.path == "" && n.indices == "/")
-					}
-
-					return
-
-				case catchAll:
-					// Save param value
-					if params != nil {
-						if ps == nil {
-							ps = params()
-						}
-						// Expand slice within preallocated capacity
-						i := len(ps.params)
-						ps.params = ps.params[:i+1]
-						ps.params[i] = Param{
-							Key:   n.path[2:],
-							Value: path,
-						}
-					}
-
-					function = n.function
-					return
-
-				default:
-					panic("invalid node type")
-				}
-			}
-		} else if path == prefix {
-			// We should have reached the node containing the function.
-			// Check if this node has a function registered.
-			if function = n.function; function != nil {
-				return
-			}
-
-			// If there is no function for this route, but this route has a
-			// wildcard child, there must be a function for this path with an
-			// additional trailing slash
-			if path == "/" && n.wildChild && n.nType != root {
-				tsr = true
-				return
-			}
-
-			// No function found. Check if a function for this path + a
-			// trailing slash exists for trailing slash recommendation
-			for i, c := range []byte(n.indices) {
-				if c == '/' {
-					n = n.children[i]
-					tsr = (len(n.path) == 1 && n.function != nil) ||
-						(n.nType == catchAll && n.children[0].function != nil)
-					return
-				}
-			}
+		if fromNodeType == static {
+			// when backtracking is done from static type block we did not change search so nothing to restore
 			return
 		}
 
-		// Nothing found. We can recommend to redirect to the same URL with an
-		// extra trailing slash if a leaf exists for that path
-		tsr = (path == "/") ||
-			(len(prefix) == len(path)+1 && prefix[len(path)] == '/' &&
-				path == prefix[:len(prefix)-1] && n.function != nil)
+		// restore search to value it was before we move to current node we are backtracking from.
+		if previous.nType == static {
+			searchIndex -= len(previous.prefix)
+		} else {
+			paramIndex--
+			// for param/any node.prefix value is always `:`/`*` so we cannot deduce searchIndex from that and must use pValue
+			// for that index as it would also contain part of path we cut off before moving into node we are backtracking from
+			searchIndex -= len(ps.params[paramIndex].Value)
+			ps.params = ps.params[:paramIndex]
+		}
+		search = path[searchIndex:]
 		return
+	}
+
+	// search order: static > param > any
+	for {
+		if cn.nType == static {
+			if len(search) >= len(cn.prefix) && cn.prefix == search[:len(cn.prefix)] {
+				// Continue search
+				search = search[len(cn.prefix):]
+				searchIndex = searchIndex + len(cn.prefix)
+			} else {
+				// not equal
+				if (len(cn.prefix) == len(search)+1) &&
+					(cn.prefix[len(search)]) == '/' && cn.prefix[:len(search)] == search && (cn.function != nil || cn.anyChild != nil) {
+					tsr = true
+				}
+				// No matching prefix, let's backtrack to the first possible alternative node of the decision path
+				nk, ok := backtrackToNextNodeType(static)
+				if !ok {
+					return // No other possibilities on the decision path
+				} else if nk == param {
+					goto Param
+				} else {
+					// Not found (this should never be possible for static node we are looking currently)
+					break
+				}
+			}
+		}
+		if search == nilString && cn.function != nil {
+			function = cn.function
+			break
+		}
+
+		// Static node
+		if search != nilString {
+			// If it can execute that logic, there is handler registered on the current node and search is `/`.
+			if search == "/" && cn.function != nil {
+				tsr = true
+			}
+			if child := cn.findChild(search[0]); child != nil {
+				cn = child
+				continue
+			}
+		}
+
+		if search == nilString {
+			if cd := cn.findChild('/'); cd != nil && (cd.function != nil || cd.anyChild != nil) {
+				tsr = true
+			}
+		}
+
+	Param:
+		// Param node
+		if child := cn.paramChild; search != nilString && child != nil {
+			cn = child
+			i := strings.Index(search, slash)
+			if i == -1 {
+				i = len(search)
+			}
+			if ps == nil {
+				ps = params()
+			}
+			val := search[:i]
+			if unescape {
+				if v, err := url.QueryUnescape(val); err == nil {
+					val = v
+				}
+			}
+			ps.params = ps.params[:paramIndex+1]
+			ps.params[paramIndex].Value = val
+			paramIndex++
+			search = search[i:]
+			searchIndex = searchIndex + i
+			if search == nilString {
+				if cd := cn.findChild('/'); cd != nil && (cd.function != nil || cd.anyChild != nil) {
+					tsr = true
+				}
+			}
+			continue
+		}
+	Any:
+		// Any node
+		if child := cn.anyChild; child != nil {
+			// If any node is found, use remaining path for paramValues
+			cn = child
+			if ps == nil {
+				ps = params()
+			}
+			index := len(cn.pnames) - 1
+			val := search
+			if unescape {
+				if v, err := url.QueryUnescape(val); err == nil {
+					val = v
+				}
+			}
+			ps.params = ps.params[:paramIndex+1]
+			ps.params[index].Value = val
+			// update indexes/search in case we need to backtrack when no handler match is found
+			paramIndex++
+			searchIndex += len(search)
+			search = nilString
+			function = cn.function
+			break
+		}
+
+		// Let's backtrack to the first possible alternative node of the decision path
+		nk, ok := backtrackToNextNodeType(catchAll)
+		if !ok {
+			break // No other possibilities on the decision path
+		} else if nk == param {
+			goto Param
+		} else if nk == catchAll {
+			goto Any
+		} else {
+			// Not found
+			break
+		}
+	}
+
+	if cn != nil {
+		for i, name := range cn.pnames {
+			ps.params[i].Key = name
+		}
+	}
+
+	return
+}
+
+func (n *node) findChild(l byte) *node {
+	for _, c := range n.children {
+		if c.label == l {
+			return c
+		}
+	}
+	return nil
+}
+
+func (n *node) findChildWithLabel(l byte) *node {
+	for _, c := range n.children {
+		if c.label == l {
+			return c
+		}
+	}
+	if l == paramLabel {
+		return n.paramChild
+	}
+	if l == anyLabel {
+		return n.anyChild
+	}
+	return nil
+}
+
+func newNode(t nodeType, pre string, p *node, child children, f *FunctionDescriptor, ppath string, pnames []string, paramChildren, anyChildren *node) *node {
+	return &node{
+		nType:      t,
+		label:      pre[0],
+		prefix:     pre,
+		parent:     p,
+		children:   child,
+		ppath:      ppath,
+		pnames:     pnames,
+		function:   f,
+		paramChild: paramChildren,
+		anyChild:   anyChildren,
+		isLeaf:     child == nil && paramChildren == nil && anyChildren == nil,
 	}
 }
