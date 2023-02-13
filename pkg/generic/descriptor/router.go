@@ -99,7 +99,7 @@ func (r *router) Lookup(req *HTTPRequest) (*FunctionDescriptor, error) {
 	if !ok {
 		return nil, fmt.Errorf("function lookup failed, no root with method=%s", req.Method)
 	}
-	fn, ps, _ := root.getValue(req.Path, r.getParams)
+	fn, ps, _ := root.getValue(req.Path, r.getParams, false)
 	if fn == nil {
 		r.putParams(ps)
 		return nil, fmt.Errorf("function lookup failed, path=%s", req.Path)

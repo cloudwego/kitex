@@ -19,11 +19,13 @@ package thrift
 import (
 	"errors"
 	"fmt"
+	"runtime/debug"
 
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/semantic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 const (
@@ -141,7 +143,7 @@ func getAllFunctions(svc *parser.Service, tree *parser.Thrift, visitedSvcs map[*
 	return ch
 }
 
-func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.ServiceDescriptor, structsCache map[string]*descriptor.TypeDescriptor) error {
+func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.ServiceDescriptor, structsCache map[string]*descriptor.TypeDescriptor) (err error) {
 	if sDsc.Functions[fn.Name] != nil {
 		return fmt.Errorf("duplicate method name: %s", fn.Name)
 	}
@@ -157,7 +159,8 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 			FieldsByName: map[string]*descriptor.FieldDescriptor{},
 		},
 	}
-	reqType, err := parseType(field.Type, tree, structsCache, initRecursionDepth)
+	var reqType *descriptor.TypeDescriptor
+	reqType, err = parseType(field.Type, tree, structsCache, initRecursionDepth)
 	if err != nil {
 		return err
 	}
@@ -185,7 +188,8 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 			FieldsByName: map[string]*descriptor.FieldDescriptor{},
 		},
 	}
-	respType, err := parseType(fn.FunctionType, tree, structsCache, initRecursionDepth)
+	var respType *descriptor.TypeDescriptor
+	respType, err = parseType(fn.FunctionType, tree, structsCache, initRecursionDepth)
 	if err != nil {
 		return err
 	}
@@ -199,7 +203,8 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 	if len(fn.Throws) > 0 {
 		// only support single exception
 		field := fn.Throws[0]
-		exceptionType, err := parseType(field.Type, tree, structsCache, initRecursionDepth)
+		var exceptionType *descriptor.TypeDescriptor
+		exceptionType, err = parseType(field.Type, tree, structsCache, initRecursionDepth)
 		if err != nil {
 			return err
 		}
@@ -219,6 +224,12 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		Response:       resp,
 		HasRequestBase: hasRequestBase,
 	}
+	defer func() {
+		if ret := recover(); ret != nil {
+			klog.Errorf("KITEX: router handle failed, err=%v\nstack=%s", ret, string(debug.Stack()))
+			err = fmt.Errorf("router handle failed, err=%v", ret)
+		}
+	}()
 	for _, ann := range fn.Annotations {
 		for _, v := range ann.GetValues() {
 			if handle, ok := descriptor.FindAnnotation(ann.GetKey(), v); ok {
