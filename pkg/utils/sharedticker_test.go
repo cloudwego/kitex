@@ -26,7 +26,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
-func TestSharedTicker_Add(t *testing.T) {
+func TestSharedTickerAdd(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -40,7 +40,7 @@ func TestSharedTicker_Add(t *testing.T) {
 	test.Assert(t, !st.Closed())
 }
 
-func TestSharedTicker_DeleteAndClose(t *testing.T) {
+func TestSharedTickerDeleteAndClose(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -63,7 +63,7 @@ func TestSharedTicker_DeleteAndClose(t *testing.T) {
 	test.Assert(t, st.Closed())
 }
 
-func TestSharedTicker_Tick(t *testing.T) {
+func TestSharedTickerTick(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
