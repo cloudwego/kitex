@@ -28,6 +28,7 @@ import (
 )
 
 func TestJsonThriftCodec(t *testing.T) {
+	EnableDynamicgo(false)
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 	jtc, err := newJsonThriftCodec(p, thriftCodec)
