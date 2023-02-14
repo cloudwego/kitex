@@ -197,11 +197,14 @@ func (kc *kClient) initLBCache() error {
 			NameFunc: func() string { return "no_resolver" },
 		}
 	}
+	// because we cannot ensure that user's custom loadbalancer is cacheable, we need to disable it here
+	cacheOpts := lbcache.Options{DiagnosisService: kc.opt.DebugService, Cacheable: false}
 	balancer := kc.opt.Balancer
 	if balancer == nil {
+		// default internal lb balancer is cacheable
+		cacheOpts.Cacheable = true
 		balancer = loadbalance.NewWeightedBalancer()
 	}
-	cacheOpts := lbcache.Options{DiagnosisService: kc.opt.DebugService}
 	if kc.opt.BalancerCacheOpt != nil {
 		cacheOpts = *kc.opt.BalancerCacheOpt
 	}
