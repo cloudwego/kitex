@@ -138,8 +138,8 @@ var json = jsoniter.Config{
 }.Froze()
 
 // FromHTTPRequest parse  HTTPRequest from http.Request
-func FromHTTPRequest(req *http.Request, enableDynamicgo ...bool) (customReq *HTTPRequest, err error) {
-	if enableDynamicgo != nil && enableDynamicgo[0] {
+func FromHTTPRequest(req *http.Request) (customReq *HTTPRequest, err error) {
+	if enableDynamicgo {
 		req.Header.Set(dhttp.HeaderContentType, descriptor.MIMEApplicationJson)
 		dreq, err := dhttp.NewHTTPRequestFromStdReq(req)
 		if err != nil {

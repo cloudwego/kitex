@@ -221,7 +221,7 @@ func testThriftDyanmicgo(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	customReq, err := generic.FromHTTPRequest(req, true)
+	customReq, err := generic.FromHTTPRequest(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,7 +286,7 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 		if err != nil {
 			panic(err)
 		}
-		customReq, err := generic.FromHTTPRequest(req, true)
+		customReq, err := generic.FromHTTPRequest(req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -356,7 +356,7 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		if err != nil {
 			panic(err)
 		}
-		customReq, err := generic.FromHTTPRequest(req, true)
+		customReq, err := generic.FromHTTPRequest(req)
 		if err != nil {
 			t.Fatal(err)
 		}
