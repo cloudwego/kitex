@@ -17,8 +17,6 @@
 package generic
 
 import (
-	dthrift "github.com/cloudwego/dynamicgo/thrift"
-
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 

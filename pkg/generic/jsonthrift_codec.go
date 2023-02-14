@@ -127,12 +127,12 @@ func (c *jsonThriftCodec) Close() error {
 
 type jsonThriftDynamicgoCodec struct {
 	svcDsc   atomic.Value // *idl
-	provider DynamicgoDescriptorProvider
+	provider DescriptorProvider
 	codec    remote.PayloadCodec
 	convOpts conv.Options
 }
 
-func newJsonThriftDynamicgoCodec(p DynamicgoDescriptorProvider, codec remote.PayloadCodec, convOpts conv.Options) (*jsonThriftDynamicgoCodec, error) {
+func newJsonThriftDynamicgoCodec(p DescriptorProvider, codec remote.PayloadCodec, convOpts conv.Options) (*jsonThriftDynamicgoCodec, error) {
 	svc := <-p.Provide()
 	c := &jsonThriftDynamicgoCodec{codec: codec, provider: p, convOpts: convOpts}
 	c.svcDsc.Store(svc)
@@ -151,7 +151,7 @@ func (c *jsonThriftDynamicgoCodec) update() {
 }
 
 func (c *jsonThriftDynamicgoCodec) getMethod(req interface{}, method string) (*Method, error) {
-	fnSvc, err := c.svcDsc.Load().(*dthrift.ServiceDescriptor).LookupFunctionByMethod(method)
+	fnSvc, err := c.svcDsc.Load().(*descriptor.ServiceDescriptor).DynamicgoDesc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (c *jsonThriftDynamicgoCodec) Marshal(ctx context.Context, msg remote.Messa
 
 	msgType := msg.MessageType()
 	data := msg.Data()
-	svcDsc, ok := c.svcDsc.Load().(*dthrift.ServiceDescriptor)
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
@@ -181,10 +181,15 @@ func (c *jsonThriftDynamicgoCodec) Marshal(ctx context.Context, msg remote.Messa
 			return errors.New("exception relay need error type data")
 		}
 		data = athrift.NewTApplicationException(transErr.TypeID(), transErr.Error())
-	} else if msgType == remote.Reply {
-		tyDsc = svcDsc.Functions()[method].Response().Struct().Fields()[0].Type()
-	} else { // TODO: think about remote.OneWay, remote.Stream, remote.InvalidProtocol
-		tyDsc = svcDsc.Functions()[method].Request().Struct().Fields()[0].Type()
+	} else {
+		if svcDsc.DynamicgoDesc == nil {
+			return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDesc is nil")
+		}
+		if msgType == remote.Reply {
+			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Response().Struct().Fields()[0].Type()
+		} else { // TODO: think about remote.OneWay, remote.Stream, remote.InvalidProtocol
+			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Request().Struct().Fields()[0].Type()
+		}
 	}
 
 	// TODO: discuss encode with hyper codec
@@ -247,7 +252,7 @@ func (c *jsonThriftDynamicgoCodec) Unmarshal(ctx context.Context, msg remote.Mes
 	if err = codec.UpdateMsgType(uint32(msgType), msg); err != nil {
 		return err
 	}
-	svcDsc, ok := c.svcDsc.Load().(*dthrift.ServiceDescriptor)
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
@@ -263,10 +268,15 @@ func (c *jsonThriftDynamicgoCodec) Unmarshal(ctx context.Context, msg remote.Mes
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageEnd failed: %s", err.Error()))
 		}
 		return remote.NewTransError(exception.TypeId(), exception)
-	} else if messageType == remote.Reply {
-		tyDsc = svcDsc.Functions()[method].Response().Struct().Fields()[0].Type()
-	} else { // TODO: think about remote.Stream, remote.InvalidProtocol
-		tyDsc = svcDsc.Functions()[method].Request().Struct().Fields()[0].Type()
+	} else {
+		if svcDsc.DynamicgoDesc == nil {
+			return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDesc is nil")
+		}
+		if messageType == remote.Reply {
+			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Response().Struct().Fields()[0].Type()
+		} else { // TODO: think about remote.Stream, remote.InvalidProtocol
+			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Request().Struct().Fields()[0].Type()
+		}
 	}
 
 	// Must check after Exception handle.

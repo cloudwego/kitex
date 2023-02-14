@@ -89,23 +89,28 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 //
 //	g, err := generic.HTTPThriftGeneric(p)
 //	SetBinaryWithBase64(g, true)
-func HTTPThriftGeneric(p DescriptorProvider) (Generic, error) {
-	codec, err := newHTTPThriftCodec(p, thriftCodec)
-	if err != nil {
-		return nil, err
+func HTTPThriftGeneric(p DescriptorProvider, convOpts ...conv.Options) (Generic, error) {
+	if convOpts != nil {
+		// generic with dynamicgo
+		opts := convOpts[0]
+		if !opts.EnableHttpMapping {
+			opts.EnableHttpMapping = true
+		}
+		codec, err := newHttpThriftDynamicgoCodec(p, thrift.NewThriftCodec(), opts)
+		if err != nil {
+			return nil, err
+		}
+		return &httpThriftDynamicgoGeneric{codec: codec}, nil
+	} else {
+		// kitex original generic
+		codec, err := newHTTPThriftCodec(p, thriftCodec)
+		if err != nil {
+			return nil, err
+		}
+		return &httpThriftGeneric{
+			codec: codec,
+		}, nil
 	}
-	return &httpThriftGeneric{
-		codec: codec,
-	}, nil
-}
-
-// HTTPThriftDynamicgoGeneric http mapping Generic using dynamicgo.
-func HTTPThriftDynamicgoGeneric(p DynamicgoDescriptorProvider, convOpts conv.Options) (Generic, error) {
-	codec, err := newHttpThriftDynamicgoCodec(p, thrift.NewThriftCodec(), convOpts)
-	if err != nil {
-		return nil, err
-	}
-	return &httpThriftDynamicgoGeneric{codec: codec}, nil
 }
 
 func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generic, error) {
@@ -124,21 +129,20 @@ func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generi
 //
 //	g, err := generic.JSONThriftGeneric(p)
 //	SetBinaryWithBase64(g, false)
-func JSONThriftGeneric(p DescriptorProvider) (Generic, error) {
-	codec, err := newJsonThriftCodec(p, thriftCodec)
-	if err != nil {
-		return nil, err
+func JSONThriftGeneric(p DescriptorProvider, convOpts ...conv.Options) (Generic, error) {
+	if convOpts != nil {
+		codec, err := newJsonThriftDynamicgoCodec(p, thrift.NewThriftCodec(), convOpts[0])
+		if err != nil {
+			return nil, err
+		}
+		return &jsonThriftDynamicgoGeneric{codec: codec}, nil
+	} else {
+		codec, err := newJsonThriftCodec(p, thriftCodec)
+		if err != nil {
+			return nil, err
+		}
+		return &jsonThriftGeneric{codec: codec}, nil
 	}
-	return &jsonThriftGeneric{codec: codec}, nil
-}
-
-// JSONThriftDynamicgoGeneric json mapping Generic using dynamicgo.
-func JSONThriftDynamicgoGeneric(p DynamicgoDescriptorProvider, convOpts conv.Options) (Generic, error) {
-	codec, err := newJsonThriftDynamicgoCodec(p, thrift.NewThriftCodec(), convOpts)
-	if err != nil {
-		return nil, err
-	}
-	return &jsonThriftDynamicgoGeneric{codec: codec}, nil
 }
 
 // SetBinaryWithBase64 enable/disable Base64 codec for binary field.
@@ -154,6 +158,8 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
 		c.codec.binaryWithBase64 = enable
+	case *jsonThriftDynamicgoGeneric, *httpThriftDynamicgoGeneric:
+		return nil
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
 	}
@@ -298,7 +304,7 @@ func (g *httpThriftDynamicgoGeneric) PayloadCodec() remote.PayloadCodec {
 }
 
 func (g *httpThriftDynamicgoGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return g.codec.getMethod(req, method)
+	return g.codec.getMethod(req)
 }
 
 func (g *httpThriftDynamicgoGeneric) Close() error {

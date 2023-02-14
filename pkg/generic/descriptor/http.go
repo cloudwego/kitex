@@ -19,6 +19,8 @@ package descriptor
 import (
 	"net/http"
 	"net/url"
+
+	dhttp "github.com/cloudwego/dynamicgo/http"
 )
 
 // Cookies ...
@@ -34,17 +36,18 @@ const (
 
 // HTTPRequest ...
 type HTTPRequest struct {
-	Header      http.Header
-	Query       url.Values
-	Cookies     Cookies
-	Method      string
-	Host        string
-	Path        string
-	Params      *Params // path params
-	RawBody     []byte
-	Body        map[string]interface{}
-	GeneralBody interface{} // body of other representation, used with ContentType
-	ContentType MIMEType
+	Header       http.Header
+	Query        url.Values
+	Cookies      Cookies
+	Method       string
+	Host         string
+	Path         string
+	Params       *Params // path params
+	RawBody      []byte
+	Body         map[string]interface{}
+	GeneralBody  interface{} // body of other representation, used with ContentType
+	ContentType  MIMEType
+	DHTTPRequest *dhttp.HTTPRequest
 }
 
 // HTTPResponse ...

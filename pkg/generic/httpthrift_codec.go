@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"sync/atomic"
 
 	athrift "github.com/apache/thrift/lib/go/thrift"
@@ -137,55 +138,80 @@ var json = jsoniter.Config{
 }.Froze()
 
 // FromHTTPRequest parse  HTTPRequest from http.Request
-func FromHTTPRequest(req *http.Request) (*HTTPRequest, error) {
-	customReq := &HTTPRequest{
-		Header:      req.Header,
-		Query:       req.URL.Query(),
-		Cookies:     descriptor.Cookies{},
-		Method:      req.Method,
-		Host:        req.Host,
-		Path:        req.URL.Path,
-		ContentType: descriptor.MIMEApplicationJson,
-		Body:        map[string]interface{}{},
-	}
-	for _, cookie := range req.Cookies() {
-		customReq.Cookies[cookie.Name] = cookie.Value
-	}
-	// copy the request body, maybe user used it after parse
-	var b io.ReadCloser
-	var err error
-	if req.GetBody != nil {
-		// req from ServerHTTP or create by http.NewRequest
-		if b, err = req.GetBody(); err != nil {
+func FromHTTPRequest(req *http.Request, enableDynamicgo ...bool) (customReq *HTTPRequest, err error) {
+	if enableDynamicgo != nil && enableDynamicgo[0] {
+		req.Header.Set(dhttp.HeaderContentType, descriptor.MIMEApplicationJson)
+		dreq, err := dhttp.NewHTTPRequestFromStdReq(req)
+		if err != nil {
 			return nil, err
 		}
+		customReq = &HTTPRequest{
+			Method:       req.Method,
+			Path:         req.URL.Path,
+			DHTTPRequest: dreq,
+		}
 	} else {
-		b = req.Body
+		customReq = &HTTPRequest{
+			Header:      req.Header,
+			Query:       req.URL.Query(),
+			Cookies:     descriptor.Cookies{},
+			Method:      req.Method,
+			Host:        req.Host,
+			Path:        req.URL.Path,
+			ContentType: descriptor.MIMEApplicationJson,
+			Body:        map[string]interface{}{},
+		}
+		for _, cookie := range req.Cookies() {
+			customReq.Cookies[cookie.Name] = cookie.Value
+		}
+		// copy the request body, maybe user used it after parse
+		var b io.ReadCloser
+		if req.GetBody != nil {
+			// req from ServerHTTP or create by http.NewRequest
+			if b, err = req.GetBody(); err != nil {
+				return nil, err
+			}
+		} else {
+			b = req.Body
+		}
+		if b == nil {
+			// body == nil if from Get request
+			return customReq, nil
+		}
+		if customReq.RawBody, err = ioutil.ReadAll(b); err != nil {
+			return nil, err
+		}
+		if len(customReq.RawBody) == 0 {
+			return customReq, nil
+		}
+		err = json.Unmarshal(customReq.RawBody, &customReq.Body)
 	}
-	if b == nil {
-		// body == nil if from Get request
-		return customReq, nil
-	}
-	if customReq.RawBody, err = ioutil.ReadAll(b); err != nil {
-		return nil, err
-	}
-	if len(customReq.RawBody) == 0 {
-		return customReq, nil
-	}
-	return customReq, json.Unmarshal(customReq.RawBody, &customReq.Body)
+	return customReq, err
 }
 
 type httpThriftDynamicgoCodec struct {
 	svcDsc   atomic.Value // *idl
-	provider DynamicgoDescriptorProvider
+	provider DescriptorProvider
 	codec    remote.PayloadCodec
 	convOpts conv.Options
+	j2t      j2t.BinaryConv
+	t2j      t2j.BinaryConv
+	router   descriptor.Router
 }
 
-func newHttpThriftDynamicgoCodec(p DynamicgoDescriptorProvider, codec remote.PayloadCodec, convOpts conv.Options) (*httpThriftDynamicgoCodec, error) {
+func newHttpThriftDynamicgoCodec(p DescriptorProvider, codec remote.PayloadCodec, convOpts conv.Options) (*httpThriftDynamicgoCodec, error) {
 	svc := <-p.Provide()
 	c := &httpThriftDynamicgoCodec{codec: codec, provider: p, convOpts: convOpts}
 	c.svcDsc.Store(svc)
+	c.j2t = j2t.NewBinaryConv(convOpts)
+	c.t2j = t2j.NewBinaryConv(convOpts)
+	c.router = descriptor.NewRouter()
+	// initialize router
+	for _, fnDsc := range svc.DynamicgoDesc.Functions() {
+		for _, ep := range fnDsc.Endpoints() {
+			c.router.Handle(descriptor.NewDynamicgoRoute(ep.Method, ep.Path, fnDsc))
+		}
+	}
 	go c.update()
 	return c, nil
 }
@@ -201,25 +227,16 @@ func (c *httpThriftDynamicgoCodec) update() {
 }
 
 // This method makes users to specify the method name even though the method name should be included in http request...
-func (c *httpThriftDynamicgoCodec) getMethod(req interface{}, method string) (*Method, error) {
-	// Discusstion is below
-	//svcDsc, ok := c.svcDsc.Load().(*dthrift.ServiceDescriptor)
-	//if !ok {
-	//	return nil, errors.New("get method name failed, no ServiceDescriptor")
-	//}
-	//r, ok := req.(*HTTPRequest)
-	//if !ok {
-	//	return nil, errors.New("req is invalid, need descriptor.HTTPRequest")
-	//}
-	//function, err := svcDsc.Router.Lookup(r)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//return &Method{function.Name(), function.Oneway()}, nil
-	fnDsc, err := c.svcDsc.Load().(*dthrift.ServiceDescriptor).LookupFunctionByMethod(method)
+func (c *httpThriftDynamicgoCodec) getMethod(req interface{}) (*Method, error) {
+	r, ok := req.(*HTTPRequest)
+	if !ok {
+		return nil, errors.New("req is invalid, need descriptor.HTTPRequest")
+	}
+	function, err := c.router.Lookup(r)
 	if err != nil {
 		return nil, err
 	}
+	fnDsc := function.(*dthrift.FunctionDescriptor)
 	return &Method{fnDsc.Name(), fnDsc.Oneway()}, nil
 }
 
@@ -230,7 +247,6 @@ func (c *httpThriftDynamicgoCodec) Marshal(ctx context.Context, msg remote.Messa
 	}
 
 	msgType := msg.MessageType()
-	//fmt.Println("🐶 remote.MessageType, rpcRole: ", msgType, msg.RPCRole())
 	data := msg.Data()
 	if msgType == remote.Exception {
 		transErr, isTransErr := data.(*remote.TransError)
@@ -247,24 +263,25 @@ func (c *httpThriftDynamicgoCodec) Marshal(ctx context.Context, msg remote.Messa
 	// TODO: discuss encode with hyper codec
 	// TODO: discuss encode with FastWrite
 
-	// TODO: clientのみ
 	gArg := data.(*Args)
 	transData := gArg.Request
-	transBuff, ok := transData.(*dhttp.HTTPRequest)
+	transBuff, ok := transData.(*HTTPRequest)
+	//transBuff, ok := transData.(*dhttp.HTTPRequest)
 	if !ok {
-		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not *dhttp.HTTPRequest")
+		return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("decode msg failed, type(%v) is not *HTTPRequest", reflect.TypeOf(transData)))
+		//return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("decode msg failed, type(%v) is not *dhttp.HTTPRequest", reflect.TypeOf(transData)))
 	}
 
-	svcDsc, ok := c.svcDsc.Load().(*dthrift.ServiceDescriptor)
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
-	tyDsc := svcDsc.Functions()[method].Request().Struct().Fields()[0].Type()
+	if svcDsc.DynamicgoDesc == nil {
+		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDesc is nil")
+	}
+	tyDsc := svcDsc.DynamicgoDesc.Functions()[method].Request().Struct().Fields()[0].Type()
 
 	// encode in normal way using dynamicgo
-	cv := j2t.NewBinaryConv(c.convOpts)
-	body := transBuff.Body()
-	buf := make([]byte, 0, len(body))
 	seqID := msg.RPCInfo().Invocation().SeqID()
 	tProt := cthrift.NewBinaryProtocol(out)
 	if err := tProt.WriteMessageBegin(method, athrift.TMessageType(msgType), seqID); err != nil {
@@ -277,9 +294,13 @@ func (c *httpThriftDynamicgoCodec) Marshal(ctx context.Context, msg remote.Messa
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteFieldBegin failed: %s", err.Error()))
 	}
 
-	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, transBuff)
+	//body := transBuff.RawBody
+	body := transBuff.DHTTPRequest.Body()
+	//body := transBuff.Body()
+	buf := make([]byte, 0, len(body))
+	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, transBuff.DHTTPRequest)
 	// json to thrift
-	if err := cv.DoInto(ctx, tyDsc, body, &buf); err != nil {
+	if err := c.j2t.DoInto(ctx, tyDsc, body, &buf); err != nil {
 		return err
 	}
 
@@ -365,20 +386,21 @@ func (c *httpThriftDynamicgoCodec) Unmarshal(ctx context.Context, msg remote.Mes
 	if err != nil {
 		return err
 	}
-	svcDsc, ok := c.svcDsc.Load().(*dthrift.ServiceDescriptor)
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
-	tyDsc := svcDsc.Functions()[method].Response().Struct().Fields()[0].Type()
+	if svcDsc.DynamicgoDesc == nil {
+		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDesc is nil")
+	}
+	tyDsc := svcDsc.DynamicgoDesc.Functions()[method].Response().Struct().Fields()[0].Type()
 
 	buf := bytesPool.Get().(*[]byte)
 	if err != nil {
 		panic(err)
 	}
-	//fmt.Println("-Dynamicgo-")
-	cv := t2j.NewBinaryConv(c.convOpts)
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, dhttp.NewHTTPResponse())
-	if err = cv.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
+	if err = c.t2j.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
 		return err
 	}
 
@@ -388,7 +410,6 @@ func (c *httpThriftDynamicgoCodec) Unmarshal(ctx context.Context, msg remote.Mes
 	tProt.ReadMessageEnd()
 	tProt.Recycle()
 
-	// TODO: only Client
 	gResult := msg.Data().(*Result)
 	// TODO: consider what to respond
 	resp := descriptor.NewHTTPResponse()
@@ -402,18 +423,9 @@ func (c *httpThriftDynamicgoCodec) Unmarshal(ctx context.Context, msg remote.Mes
 }
 
 func (c *httpThriftDynamicgoCodec) Name() string {
-	return "HttpThrift"
+	return "HttpThriftDynamicgo"
 }
 
 func (c *httpThriftDynamicgoCodec) Close() error {
 	return c.provider.Close()
-}
-
-func DynamicgoRequestFromHTTPRequest(req *http.Request) (*dhttp.HTTPRequest, error) {
-	req.Header.Set(dhttp.HeaderContentType, descriptor.MIMEApplicationJson)
-	return dhttp.NewHTTPRequestFromStdReq(req)
-}
-
-func DynamicgoRequestFromUrl(method, url string, body io.Reader, params ...dhttp.Param) (*dhttp.HTTPRequest, error) {
-	return dhttp.NewHTTPRequestFromUrl(method, url, body, params...)
 }
