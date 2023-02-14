@@ -333,9 +333,9 @@ func initOriginalThriftClient(t *testing.T, addr, idl string, base64binary *bool
 }
 
 func initDynamicgoThriftClient(t *testing.T, addr, idl string, convOpts conv.Options) genericclient.Client {
-	p, err := generic.NewDynamicgoThriftFileProviderFromPath(idl)
+	p, err := generic.NewThriftFileProvider(idl)
 	test.Assert(t, err == nil)
-	g, err := generic.JSONThriftDynamicgoGeneric(p, convOpts)
+	g, err := generic.JSONThriftGeneric(p, convOpts)
 	test.Assert(t, err == nil)
 	cli := newGenericTTHeaderClient("destServiceName", g, addr)
 	test.Assert(t, err == nil)
@@ -347,6 +347,7 @@ func initThriftServer(t *testing.T, address string, handler generic.Service) ser
 }
 
 func initThriftServerByIDL(t *testing.T, address string, handler generic.Service, idlPath string, base64Binary *bool) server.Server {
+	generic.EnableDynamicgo(false)
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	p, err := generic.NewThriftFileProvider(idlPath)
 	test.Assert(t, err == nil)
@@ -361,6 +362,7 @@ func initThriftServerByIDL(t *testing.T, address string, handler generic.Service
 }
 
 func initOriginalThriftServer(t *testing.T, address string, handler generic.Service, idlPath string, base64Binary *bool) server.Server {
+	generic.EnableDynamicgo(false)
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	p, err := generic.NewThriftFileProvider(idlPath)
 	test.Assert(t, err == nil)
@@ -375,10 +377,11 @@ func initOriginalThriftServer(t *testing.T, address string, handler generic.Serv
 }
 
 func initDynamicgoThriftServer(t *testing.T, address string, handler generic.Service, idlPath string, convOpts conv.Options) server.Server {
+	generic.EnableDynamicgo(true)
 	addr, _ := net.ResolveTCPAddr("tcp", address)
-	p, err := generic.NewDynamicgoThriftFileProviderFromPath(idlPath)
+	p, err := generic.NewThriftFileProvider(idlPath)
 	test.Assert(t, err == nil)
-	g, err := generic.JSONThriftDynamicgoGeneric(p, convOpts)
+	g, err := generic.JSONThriftGeneric(p, convOpts)
 	test.Assert(t, err == nil)
 	svr := newGenericServer(g, addr, handler)
 	test.Assert(t, err == nil)
