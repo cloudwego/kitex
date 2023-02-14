@@ -26,10 +26,3 @@ type DescriptorProvider interface {
 	// Provide return a channel for provide service descriptors
 	Provide() <-chan *descriptor.ServiceDescriptor
 }
-
-// DynamicgoDescriptorProvider provide service descriptor for Json generic call
-type DynamicgoDescriptorProvider interface {
-	Closer
-	// Provide return a channel for provide service descriptors
-	Provide() <-chan *dthrift.ServiceDescriptor
-}

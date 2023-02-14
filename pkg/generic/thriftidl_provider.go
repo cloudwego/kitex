@@ -95,30 +95,6 @@ type dynamicgoThriftFileProvider struct {
 	svcs      chan *dthrift.ServiceDescriptor
 }
 
-func NewDynamicgoThriftFileProviderFromPath(path string, includeDirs ...string) (DynamicgoDescriptorProvider, error) {
-	p := &dynamicgoThriftFileProvider{
-		svcs: make(chan *dthrift.ServiceDescriptor, 1), // unblock with buffered channel
-	}
-	svc, err := dthrift.NewDescritorFromPath(context.Background(), path, includeDirs...) // parse idl to service descriptor
-	if err != nil {
-		panic(err)
-	}
-	p.svcs <- svc
-	return p, nil
-}
-
-func NewDynamicgoThriftFileProviderFromContent(path, content string, includes map[string]string, isAbsIncludePath bool) (DynamicgoDescriptorProvider, error) {
-	p := &dynamicgoThriftFileProvider{
-		svcs: make(chan *dthrift.ServiceDescriptor, 1), // unblock with buffered channel
-	}
-	svc, err := dthrift.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
-	if err != nil {
-		panic(err)
-	}
-	p.svcs <- svc
-	return p, nil
-}
-
 func (p *dynamicgoThriftFileProvider) Provide() <-chan *dthrift.ServiceDescriptor {
 	return p.svcs
 }
