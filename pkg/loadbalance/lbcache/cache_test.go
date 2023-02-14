@@ -61,7 +61,7 @@ func TestBuilder(t *testing.T) {
 		return picker
 	}).AnyTimes()
 	lb.EXPECT().Name().Return("Synthesized").AnyTimes()
-	NewBalancerFactory(r, lb, Options{})
+	NewBalancerFactory(r, lb, Options{Cacheable: true})
 	b, ok := balancerFactories.Load(cacheKey(t.Name(), "Synthesized", defaultOptions))
 	test.Assert(t, ok)
 	test.Assert(t, b != nil)
