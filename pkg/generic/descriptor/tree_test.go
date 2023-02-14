@@ -48,8 +48,8 @@ func checkRequests(t *testing.T, tree *node, requests testRequests, unescapes ..
 		case request.nilHandler:
 			t.Errorf("handle mismatch for route '%s': Expected nil handle", request.path)
 		default:
-			if handler.Name != request.route {
-				t.Errorf("handle mismatch for route '%s': Wrong handle (%s != %s)", request.path, handler.Name, request.route)
+			if handler.(*FunctionDescriptor).Name != request.route {
+				t.Errorf("handle mismatch for route '%s': Wrong handle (%s != %s)", request.path, handler.(*FunctionDescriptor).Name, request.route)
 			}
 		}
 

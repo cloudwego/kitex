@@ -51,10 +51,11 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 	if err != nil {
 		return err
 	}
-	if !fn.HasRequestBase {
+	fnDsc := fn.(*descriptor.FunctionDescriptor)
+	if !fnDsc.HasRequestBase {
 		requestBase = nil
 	}
-	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
+	return wrapStructWriter(ctx, req, out, fnDsc.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
 }
 
 // ReadHTTPResponse implement of MessageReaderWithMethod

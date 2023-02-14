@@ -84,7 +84,8 @@ func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Method{function.Name, function.Oneway}, nil
+	fnDsc := function.(*descriptor.FunctionDescriptor)
+	return &Method{fnDsc.Name, fnDsc.Oneway}, nil
 }
 
 func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {

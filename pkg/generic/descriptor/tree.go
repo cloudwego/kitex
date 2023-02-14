@@ -49,7 +49,7 @@ type (
 		ppath string
 		// param names
 		pnames     []string
-		function   *FunctionDescriptor
+		function   interface{}
 		paramChild *node
 		anyChild   *node
 		// isLeaf indicates that node does not have child routes
@@ -95,7 +95,7 @@ func checkPathValid(path string) {
 
 // addRoute adds a node with the given function to the path.
 // Not concurrency-safe!
-func (n *node) addRoute(path string, function *FunctionDescriptor) {
+func (n *node) addRoute(path string, function interface{}) {
 	checkPathValid(path)
 
 	var (
@@ -138,7 +138,7 @@ func (n *node) addRoute(path string, function *FunctionDescriptor) {
 	n.insert(path, function, static, ppath, pnames)
 }
 
-func (n *node) insert(path string, function *FunctionDescriptor, t nodeType, ppath string, pnames []string) {
+func (n *node) insert(path string, function interface{}, t nodeType, ppath string, pnames []string) {
 	currentNode := n
 	search := path
 
@@ -258,7 +258,7 @@ func (n *node) insert(path string, function *FunctionDescriptor, t nodeType, ppa
 // If no function can be found, a TSR (trailing slash redirect) recommendation is
 // made if a function exists with an extra (without the) trailing slash for the
 // given path.
-func (n *node) getValue(path string, params func() *Params, unescape bool) (function *FunctionDescriptor, ps *Params, tsr bool) {
+func (n *node) getValue(path string, params func() *Params, unescape bool) (function interface{}, ps *Params, tsr bool) {
 	var (
 		cn          = n    // current node
 		search      = path // current path
@@ -446,7 +446,7 @@ func (n *node) findChildWithLabel(l byte) *node {
 	return nil
 }
 
-func newNode(t nodeType, pre string, p *node, child children, f *FunctionDescriptor, ppath string, pnames []string, paramChildren, anyChildren *node) *node {
+func newNode(t nodeType, pre string, p *node, child children, f interface{}, ppath string, pnames []string, paramChildren, anyChildren *node) *node {
 	return &node{
 		nType:      t,
 		label:      pre[0],
