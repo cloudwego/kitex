@@ -18,10 +18,8 @@
 package gonet
 
 import (
-	"bufio"
 	"context"
 	"errors"
-	"io"
 	"net"
 	"os"
 	"runtime/debug"
@@ -92,7 +90,7 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 			defer func() {
 				transRecover(ctx, conn, "OnRead")
 			}()
-			bc := NewBufioConn(conn)
+			bc := newBufioConn(conn)
 			ctx, err = ts.transHdlr.OnActive(ctx, bc)
 			if err != nil {
 				klog.CtxErrorf(ctx, "KITEX: OnActive error=%s", err)
@@ -148,14 +146,13 @@ func (ts *transServer) refreshDeadline(ri rpcinfo.RPCInfo, conn net.Conn) {
 // BufioConn implements the net.Conn interface.
 type BufioConn struct {
 	conn net.Conn
-	r    *bufioReader
+	r    netpoll.Reader
 }
 
-func NewBufioConn(c net.Conn) *BufioConn {
+func newBufioConn(c net.Conn) *BufioConn {
 	return &BufioConn{
 		conn: c,
-		// rw:   &bufioReader{rw: bufio.NewReadWriter(r, w)},
-		r: NewBufioReader(c),
+		r:    netpoll.NewReader(c),
 	}
 }
 
@@ -164,8 +161,12 @@ func (bc *BufioConn) RawConn() net.Conn {
 }
 
 func (bc *BufioConn) Read(b []byte) (int, error) {
-	// return bc.rw.rw.Read(b)
-	return bc.r.r.Read(b)
+	buf, err := bc.r.Next(len(b))
+	if err != nil {
+		return 0, err
+	}
+	copy(b, buf)
+	return len(b), nil
 }
 
 func (bc *BufioConn) Write(b []byte) (int, error) {
@@ -199,63 +200,6 @@ func (bc *BufioConn) SetWriteDeadline(t time.Time) error {
 
 func (bc *BufioConn) Reader() netpoll.Reader {
 	return bc.r
-}
-
-var _ netpoll.Reader = &bufioReader{}
-
-func NewBufioReader(c net.Conn) *bufioReader {
-	return &bufioReader{r: bufio.NewReader(c)}
-}
-
-// bufioReader implements the netpoll.Reader interface.
-type bufioReader struct {
-	r *bufio.Reader
-}
-
-func (br bufioReader) Next(n int) (p []byte, err error) {
-	p = make([]byte, n)
-	if _, err = io.ReadFull(br.r, p); err != nil {
-		return nil, err
-	}
-	return p, nil
-}
-
-func (br *bufioReader) Peek(n int) (buf []byte, err error) {
-	return br.r.Peek(n)
-}
-
-func (br *bufioReader) Skip(n int) (err error) {
-	_, err = br.r.Discard(n)
-	return
-}
-
-func (br *bufioReader) Until(delim byte) (line []byte, err error) {
-	panic("unimplemented")
-}
-
-func (br *bufioReader) ReadString(n int) (s string, err error) {
-	return br.r.ReadString(byte(n))
-}
-
-func (br *bufioReader) ReadBinary(n int) (p []byte, err error) {
-	return br.r.ReadBytes(byte(n))
-}
-
-func (br *bufioReader) ReadByte() (b byte, err error) {
-	return br.r.ReadByte()
-}
-
-func (br *bufioReader) Slice(n int) (r netpoll.Reader, err error) {
-	panic("implement me")
-}
-
-func (br *bufioReader) Release() (err error) {
-	br.r.Buffered()
-	return nil
-}
-
-func (br *bufioReader) Len() (length int) {
-	return br.r.Buffered()
 }
 
 func transRecover(ctx context.Context, conn net.Conn, funcName string) {
