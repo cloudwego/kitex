@@ -18,6 +18,7 @@
 package generic
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -90,7 +91,10 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 //	g, err := generic.HTTPThriftGeneric(p)
 //	SetBinaryWithBase64(g, true)
 func HTTPThriftGeneric(p DescriptorProvider, convOpts ...conv.Options) (Generic, error) {
-	if convOpts != nil {
+	if enableDynamicgo {
+		if convOpts == nil {
+			return nil, errors.New("please add conv.Options as an argument")
+		}
 		// generic with dynamicgo
 		opts := convOpts[0]
 		if !opts.EnableHttpMapping {
@@ -130,7 +134,10 @@ func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generi
 //	g, err := generic.JSONThriftGeneric(p)
 //	SetBinaryWithBase64(g, false)
 func JSONThriftGeneric(p DescriptorProvider, convOpts ...conv.Options) (Generic, error) {
-	if convOpts != nil {
+	if enableDynamicgo {
+		if convOpts == nil {
+			return nil, errors.New("please add conv.Options as an argument")
+		}
 		codec, err := newJsonThriftDynamicgoCodec(p, thrift.NewThriftCodec(), convOpts[0])
 		if err != nil {
 			return nil, err

@@ -108,7 +108,7 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	customReq, err := FromHTTPRequest(req, true)
+	customReq, err := FromHTTPRequest(req)
 	if err != nil {
 		t.Fatal(err)
 	}
