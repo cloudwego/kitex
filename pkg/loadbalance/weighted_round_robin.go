@@ -19,7 +19,6 @@ package loadbalance
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 
 	"github.com/bytedance/gopkg/lang/fastrand"
 
@@ -38,6 +37,7 @@ type wrrNode struct {
 
 func newWeightedRoundRobinPicker(instances []discovery.Instance) Picker {
 	wrrp := new(WeightedRoundRobinPicker)
+	wrrp.iterator = newRound()
 
 	// shuffle nodes
 	wrrp.size = uint64(len(instances))
@@ -67,7 +67,7 @@ type WeightedRoundRobinPicker struct {
 	nodes []*wrrNode
 	size  uint64
 
-	vindex    uint64
+	iterator  *round
 	vsize     uint64
 	vcapacity uint64
 	vnodes    []discovery.Instance
@@ -76,8 +76,7 @@ type WeightedRoundRobinPicker struct {
 
 // Next implements the Picker interface.
 func (wp *WeightedRoundRobinPicker) Next(ctx context.Context, request interface{}) (ins discovery.Instance) {
-	vindex := atomic.AddUint64(&wp.vindex, 1)
-	idx := vindex % wp.vcapacity
+	idx := wp.iterator.Next() % wp.vcapacity
 	// fast path
 	if wp.vnodes[idx] != nil {
 		return wp.vnodes[idx]
@@ -127,17 +126,17 @@ func nextWrrNode(nodes []*wrrNode) (selected *wrrNode) {
 
 // RoundRobinPicker .
 type RoundRobinPicker struct {
-	cursor    uint64
 	size      uint64
 	instances []discovery.Instance
+	iterator  *round
 }
 
 func newRoundRobinPicker(instances []discovery.Instance) Picker {
 	size := uint64(len(instances))
 	return &RoundRobinPicker{
-		cursor:    fastrand.Uint64n(size),
 		size:      size,
 		instances: instances,
+		iterator:  newRound(),
 	}
 }
 
@@ -146,7 +145,7 @@ func (rp *RoundRobinPicker) Next(ctx context.Context, request interface{}) (ins 
 	if rp.size == 0 {
 		return nil
 	}
-	idx := (atomic.AddUint64(&rp.cursor, 1)) % rp.size
+	idx := rp.iterator.Next() % rp.size
 	ins = rp.instances[idx]
 	return ins
 }
