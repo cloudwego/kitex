@@ -59,30 +59,3 @@ func TestClientConn(t *testing.T) {
 	test.Assert(t, err != nil, err)
 	test.Assert(t, n == 0)
 }
-
-//func TestClientConnRead(t *testing.T) {
-//	mockey.PatchConvey("TestClientConnRead", t, func() {
-//		mockey.Mock((*grpc.Stream).Read).Return(1, io.EOF).Build()
-//		mockey.Mock((*grpc.Stream).Status).Return(status.New(codes.Internal, "not found")).Build()
-//		mockey.Mock((*grpc.Stream).BizStatusErr).Return(kerrors.NewGRPCBizStatusError(404, "not found")).Build()
-//		s := &grpc.Stream{}
-//		cli := &clientConn{s: s}
-//		n, err := cli.Read(nil)
-//		test.Assert(t, n == 1)
-//		bizErr, _ := kerrors.FromBizStatusError(err)
-//		test.Assert(t, bizErr.BizStatusCode() == 404)
-//		test.Assert(t, bizErr.BizMessage() == "not found")
-//	})
-//	mockey.PatchConvey("TestClientConnRead", t, func() {
-//		mockey.Mock((*grpc.Stream).Read).Return(1, io.EOF).Build()
-//		mockey.Mock((*grpc.Stream).Status).Return(status.New(codes.Internal, "not found")).Build()
-//		mockey.Mock((*grpc.Stream).BizStatusErr).Return(nil).Build()
-//		s := &grpc.Stream{}
-//		cli := &clientConn{s: s}
-//		n, err := cli.Read(nil)
-//		test.Assert(t, err != nil)
-//		_, isBizErr := kerrors.FromBizStatusError(err)
-//		test.Assert(t, !isBizErr)
-//		test.Assert(t, n == 1)
-//	})
-//}
