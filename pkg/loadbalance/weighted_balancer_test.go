@@ -229,14 +229,14 @@ func makeNWeightedInstances(n int) (res []discovery.Instance) {
 	return
 }
 
-func BenchmarkNewWeightedPicker(b *testing.B) {
-	n := 10
+func BenchmarkWeightedPicker(b *testing.B) {
 	ctx := context.Background()
 
 	for _, tc := range balancerTestcases {
 		b.Run(tc.Name, func(b *testing.B) {
 			balancer := tc.factory()
 
+			n := 10
 			for i := 0; i < 4; i++ {
 				b.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
 					inss := makeNinstances(n)
