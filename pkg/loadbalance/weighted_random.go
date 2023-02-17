@@ -36,18 +36,6 @@ func newWeightedRandomPickerWithSum(instances []discovery.Instance, weightSum in
 	}
 }
 
-func newWeightedRandomPicker(instances []discovery.Instance) Picker {
-	weightSum := 0
-	var weight int
-	for _, ins := range instances {
-		weight = ins.Weight()
-		if weight > 0 {
-			weightSum += weight
-		}
-	}
-	return newWeightedRandomPickerWithSum(instances, weightSum)
-}
-
 // Next implements the Picker interface.
 func (wp *weightedRandomPicker) Next(ctx context.Context, request interface{}) (ins discovery.Instance) {
 	weight := fastrand.Intn(wp.weightSum)
