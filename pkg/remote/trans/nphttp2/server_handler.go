@@ -24,6 +24,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/cloudwego/netpoll"
 
@@ -95,7 +96,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	svrTrans := ctx.Value(ctxKeySvrTransport).(*SvrTrans)
 	tr := svrTrans.tr
 
-	tr.HandleStreams(func(s *grpcTransport.Stream) {
+	return tr.HandleStreams(func(s *grpcTransport.Stream) {
 		gofunc.GoFunc(ctx, func() {
 			ri := svrTrans.pool.Get().(rpcinfo.RPCInfo)
 			rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
@@ -203,7 +204,6 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	}, func(ctx context.Context, method string) context.Context {
 		return ctx
 	})
-	return nil
 }
 
 // msg 是解码后的实例，如 Arg 或 Result, 触发上层处理，用于异步 和 服务端处理
@@ -224,9 +224,13 @@ type SvrTrans struct {
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	// set readTimeout to infinity to avoid streaming break
 	// use keepalive to check the health of connection
-	conn.(netpoll.Connection).SetReadTimeout(grpcTransport.Infinity)
+	if npConn, ok := conn.(netpoll.Connection); ok {
+		npConn.SetReadTimeout(grpcTransport.Infinity)
+	} else {
+		conn.SetReadDeadline(time.Now().Add(grpcTransport.Infinity))
+	}
 
-	tr, err := grpcTransport.NewServerTransport(ctx, conn.(netpoll.Connection), t.opt.GRPCCfg)
+	tr, err := grpcTransport.NewServerTransport(ctx, conn, t.opt.GRPCCfg)
 	if err != nil {
 		return nil, err
 	}

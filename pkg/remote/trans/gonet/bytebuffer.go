@@ -52,7 +52,11 @@ func newBufferReadWriter() interface{} {
 // NewBufferReader creates a new remote.ByteBuffer using the given netpoll.ZeroCopyReader.
 func NewBufferReader(ir io.Reader) remote.ByteBuffer {
 	rw := rwPool.Get().(*bufferReadWriter)
-	rw.reader = netpoll.NewReader(ir)
+	if npReader, ok := ir.(interface{ Reader() netpoll.Reader }); ok {
+		rw.reader = npReader.Reader()
+	} else {
+		rw.reader = netpoll.NewReader(ir)
+	}
 	rw.ioReader = ir
 	rw.status = remote.BitReadable
 	rw.readSize = 0
