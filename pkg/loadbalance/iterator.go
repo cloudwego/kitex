@@ -32,7 +32,9 @@ type iterator interface {
 
 // round implement a strict Round Robin algorithm
 type round struct {
-	state uint64
+	state uint64    // 8 bytes
+	_     [7]uint64 // + 7 * 8 bytes
+	// = 64 bytes
 }
 
 func (r *round) Next() uint64 {
