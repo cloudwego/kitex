@@ -84,14 +84,13 @@ func TestHttpThriftCodec(t *testing.T) {
 }
 
 func TestHttpThriftDynamicgoCodec(t *testing.T) {
-	EnableDynamicgo(true)
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
-	convOpts := conv.Options{EnableHttpMapping: true, EnableValueMapping: true}
-	htc, err := newHttpThriftDynamicgoCodec(p, thriftCodec, convOpts)
+	convOpts := conv.Options{EnableValueMapping: true}
+	htc, err := newHTTPThriftCodec(p, thriftCodec, convOpts)
 	test.Assert(t, err == nil)
 	defer htc.Close()
-	test.Assert(t, htc.Name() == "HttpThriftDynamicgo")
+	test.Assert(t, htc.Name() == "HttpDynamicgoThrift")
 
 	url := "http://example.com/BinaryEcho"
 	// []byte value for binary field
@@ -129,13 +128,14 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	// UnMarshal side
-	recvMsg := initDynamicgoHttpRecvMsg()
+	recvMsg := initDynamicgoHttpRecvMsg(transport.TTHeader)
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil)
 	recvMsg.SetPayloadLen(len(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = htc.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil)
+
 }
 
 func initHttpSendMsg(tp transport.Protocol) remote.Message {
@@ -197,10 +197,12 @@ func initHttpRecvMsg() remote.Message {
 	return msg
 }
 
-func initDynamicgoHttpRecvMsg() remote.Message {
+func initDynamicgoHttpRecvMsg(tp transport.Protocol) remote.Message {
 	req := &Result{}
 	ink := rpcinfo.NewInvocation("", "BinaryEcho")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+	svcInfo := mocks.ServiceInfo()
+	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
 }

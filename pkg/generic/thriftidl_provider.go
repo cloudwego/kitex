@@ -39,38 +39,28 @@ type thriftFileProvider struct {
 	svcs      chan *descriptor.ServiceDescriptor
 }
 
-var enableDynamicgo bool
-var enableDynamicgoLock sync.Mutex
-
-func EnableDynamicgo(enable bool) {
-	enableDynamicgoLock.Lock()
-	enableDynamicgo = enable
-	enableDynamicgoLock.Unlock()
-}
-
 // NewThriftFileProvider create a ThriftIDLProvider by given path and include dirs
 func NewThriftFileProvider(path string, includeDirs ...string) (DescriptorProvider, error) {
 	p := &thriftFileProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
 	}
-	if !enableDynamicgo {
-		tree, err := parser.ParseFile(path, includeDirs, true)
-		if err != nil {
-			return nil, err
-		}
-		svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
-		if err != nil {
-			return nil, err
-		}
-		p.svcs <- svc
-	} else {
-		// svc for dynamicgo
-		dsvc, err := dthrift.NewDescritorFromPath(context.Background(), path, includeDirs...)
-		if err != nil {
-			return nil, err
-		}
-		p.svcs <- &descriptor.ServiceDescriptor{DynamicgoDesc: dsvc}
+	tree, err := parser.ParseFile(path, includeDirs, true)
+	if err != nil {
+		return nil, err
 	}
+	svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
+	if err != nil {
+		return nil, err
+	}
+
+	// ServiceDescriptor of dynamicgo
+	dsvc, err := dthrift.NewDescritorFromPath(context.Background(), path, includeDirs...)
+	if err != nil {
+		return nil, err
+	}
+	svc.DynamicgoDesc = dsvc
+
+	p.svcs <- svc
 	return p, nil
 }
 
@@ -84,23 +74,6 @@ func (p *thriftFileProvider) Provide() <-chan *descriptor.ServiceDescriptor {
 
 // Close the sending chan.
 func (p *thriftFileProvider) Close() error {
-	p.closeOnce.Do(func() {
-		close(p.svcs)
-	})
-	return nil
-}
-
-type dynamicgoThriftFileProvider struct {
-	closeOnce sync.Once
-	svcs      chan *dthrift.ServiceDescriptor
-}
-
-func (p *dynamicgoThriftFileProvider) Provide() <-chan *dthrift.ServiceDescriptor {
-	return p.svcs
-}
-
-// Close the sending chan.
-func (p *dynamicgoThriftFileProvider) Close() error {
 	p.closeOnce.Do(func() {
 		close(p.svcs)
 	})
@@ -122,45 +95,44 @@ func NewThriftContentProvider(main string, includes map[string]string) (*ThriftC
 	p := &ThriftContentProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
 	}
-	if !enableDynamicgo {
-		tree, err := ParseContent(defaultMainIDLPath, main, includes, false)
-		if err != nil {
-			return nil, err
-		}
-		svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
-		if err != nil {
-			return nil, err
-		}
-		p.svcs <- svc
-	} else {
-		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
-		if err != nil {
-			panic(err)
-		}
-		p.svcs <- &descriptor.ServiceDescriptor{DynamicgoDesc: dsvc}
+	tree, err := ParseContent(defaultMainIDLPath, main, includes, false)
+	if err != nil {
+		return nil, err
 	}
+	svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
+	if err != nil {
+		return nil, err
+	}
+
+	// ServiceDescriptor of dynamicgo
+	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
+	if err != nil {
+		return nil, err
+	}
+	svc.DynamicgoDesc = dsvc
+
+	p.svcs <- svc
 	return p, nil
 }
 
 // UpdateIDL ...
 func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]string) error {
 	var svc *descriptor.ServiceDescriptor
-	if !enableDynamicgo {
-		tree, err := ParseContent(defaultMainIDLPath, main, includes, false)
-		if err != nil {
-			return err
-		}
-		svc, err = thrift.Parse(tree, thrift.DefaultParseMode())
-		if err != nil {
-			return err
-		}
-	} else {
-		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
-		if err != nil {
-			panic(err)
-		}
-		svc = &descriptor.ServiceDescriptor{DynamicgoDesc: dsvc}
+	tree, err := ParseContent(defaultMainIDLPath, main, includes, false)
+	if err != nil {
+		return err
 	}
+	svc, err = thrift.Parse(tree, thrift.DefaultParseMode())
+	if err != nil {
+		return err
+	}
+
+	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
+	if err != nil {
+		return err
+	}
+	svc.DynamicgoDesc = dsvc
+
 	select {
 	case <-p.svcs:
 	default:
@@ -259,23 +231,24 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	if !ok {
 		return nil, fmt.Errorf("miss main IDL content for main IDL path: %s", mainIDLPath)
 	}
-	if !enableDynamicgo {
-		tree, err := ParseContent(mainIDLPath, mainIDLContent, includes, true)
-		if err != nil {
-			return nil, err
-		}
-		svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
-		if err != nil {
-			return nil, err
-		}
-		p.svcs <- svc
-	} else {
-		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
-		if err != nil {
-			panic(err)
-		}
-		p.svcs <- &descriptor.ServiceDescriptor{DynamicgoDesc: dsvc}
+	tree, err := ParseContent(mainIDLPath, mainIDLContent, includes, true)
+	if err != nil {
+		return nil, err
 	}
+	svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
+	if err != nil {
+		return nil, err
+	}
+
+	// ServiceDescriptor of dynamicgo
+	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
+	if err != nil {
+		return nil, err
+	}
+	svc.DynamicgoDesc = dsvc
+
+	p.svcs <- svc
+
 	return p, nil
 }
 
@@ -286,22 +259,21 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 		return fmt.Errorf("miss main IDL content for main IDL path: %s", mainIDLPath)
 	}
 	var svc *descriptor.ServiceDescriptor
-	if !enableDynamicgo {
-		tree, err := ParseContent(mainIDLPath, mainIDLContent, includes, true)
-		if err != nil {
-			return err
-		}
-		svc, err = thrift.Parse(tree, thrift.DefaultParseMode())
-		if err != nil {
-			return err
-		}
-	} else {
-		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
-		if err != nil {
-			panic(err)
-		}
-		svc = &descriptor.ServiceDescriptor{DynamicgoDesc: dsvc}
+	tree, err := ParseContent(mainIDLPath, mainIDLContent, includes, true)
+	if err != nil {
+		return err
 	}
+	svc, err = thrift.Parse(tree, thrift.DefaultParseMode())
+	if err != nil {
+		return err
+	}
+
+	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
+	if err != nil {
+		return err
+	}
+	svc.DynamicgoDesc = dsvc
+
 	// drain the channel
 	select {
 	case <-p.svcs:

@@ -16,17 +16,13 @@
 
 package descriptor
 
-import (
-	"net/http"
-
-	dthrift "github.com/cloudwego/dynamicgo/thrift"
-)
+import "net/http"
 
 // Route the route annotation
 type Route interface {
 	Method() string
 	Path() string
-	Function() interface{}
+	Function() *FunctionDescriptor
 }
 
 // NewRoute route creator
@@ -63,14 +59,10 @@ var NewAPIDelete NewRoute = func(value string, function *FunctionDescriptor) Rou
 	return &apiRoute{http.MethodDelete, value, function}
 }
 
-func NewDynamicgoRoute(method, path string, function *dthrift.FunctionDescriptor) Route {
-	return &apiRoute{method, path, function}
-}
-
 type apiRoute struct {
 	method   string
 	value    string
-	function interface{}
+	function *FunctionDescriptor
 }
 
 func (r *apiRoute) Method() string {
@@ -81,6 +73,6 @@ func (r *apiRoute) Path() string {
 	return r.value
 }
 
-func (r *apiRoute) Function() interface{} {
+func (r *apiRoute) Function() *FunctionDescriptor {
 	return r.function
 }

@@ -50,15 +50,14 @@ func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, ms
 	if err != nil {
 		return err
 	}
-	fnDsc := fn.(*descriptor.FunctionDescriptor)
-	if !fnDsc.HasRequestBase {
+	if !fn.HasRequestBase {
 		requestBase = nil
 	}
 
 	// unmarshal body bytes to pb message
-	mt := w.pbSvc.FindMethodByName(fnDsc.Name)
+	mt := w.pbSvc.FindMethodByName(fn.Name)
 	if mt == nil {
-		return fmt.Errorf("method not found in pb descriptor: %v", fnDsc.Name)
+		return fmt.Errorf("method not found in pb descriptor: %v", fn.Name)
 	}
 	pbMsg := dynamic.NewMessage(mt.GetInputType())
 	err = pbMsg.Unmarshal(req.RawBody)
@@ -67,7 +66,7 @@ func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, ms
 	}
 	req.GeneralBody = pbMsg
 
-	return wrapStructWriter(ctx, req, out, fnDsc.Request, &writerOption{requestBase: requestBase})
+	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase})
 }
 
 // ReadHTTPResponse implement of MessageReaderWithMethod

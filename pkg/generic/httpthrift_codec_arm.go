@@ -1,3 +1,6 @@
+//go:build !amd64 || go1.21
+// +build !amd64 go1.21
+
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -23,55 +26,54 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"sync/atomic"
 
-	"github.com/jhump/protoreflect/desc"
+	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-type httpPbThriftCodec struct {
-	svcDsc     atomic.Value // *idl
-	pbSvcDsc   atomic.Value // *pbIdl
-	provider   DescriptorProvider
-	pbProvider PbDescriptorProvider
-	codec      remote.PayloadCodec
+var (
+	_ remote.PayloadCodec = &httpThriftCodec{}
+	_ Closer              = &httpThriftCodec{}
+)
+
+// HTTPRequest alias of descriptor HTTPRequest
+type HTTPRequest = descriptor.HTTPRequest
+
+// HTTPResponse alias of descriptor HTTPResponse
+type HTTPResponse = descriptor.HTTPResponse
+
+type httpThriftCodec struct {
+	svcDsc           atomic.Value // *idl
+	provider         DescriptorProvider
+	codec            remote.PayloadCodec
+	binaryWithBase64 bool
 }
 
-func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider, codec remote.PayloadCodec) (*httpPbThriftCodec, error) {
+func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*httpThriftCodec, error) {
 	svc := <-p.Provide()
-	pbSvc := <-pbp.Provide()
-	c := &httpPbThriftCodec{codec: codec, provider: p, pbProvider: pbp}
+	c := &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false}
 	c.svcDsc.Store(svc)
-	c.pbSvcDsc.Store(pbSvc)
 	go c.update()
 	return c, nil
 }
 
-func (c *httpPbThriftCodec) update() {
+func (c *httpThriftCodec) update() {
 	for {
 		svc, ok := <-c.provider.Provide()
 		if !ok {
 			return
 		}
-
-		pbSvc, ok := <-c.pbProvider.Provide()
-		if !ok {
-			return
-		}
-
 		c.svcDsc.Store(svc)
-		c.pbSvcDsc.Store(pbSvc)
 	}
 }
 
-func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
+func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return nil, errors.New("get method name failed, no ServiceDescriptor")
@@ -87,22 +89,19 @@ func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
 	return &Method{function.Name, function.Oneway}, nil
 }
 
-func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return fmt.Errorf("get parser ServiceDescriptor failed")
 	}
-	pbSvcDsc, ok := c.pbSvcDsc.Load().(*desc.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser PbServiceDescriptor failed")
-	}
 
-	inner := thrift.NewWriteHTTPPbRequest(svcDsc, pbSvcDsc)
+	inner := thrift.NewWriteHTTPRequest(svcDsc)
+	inner.SetBinaryWithBase64(c.binaryWithBase64)
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Marshal(ctx, msg, out)
 }
 
-func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
 	}
@@ -110,53 +109,42 @@ func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, i
 	if !ok {
 		return fmt.Errorf("get parser ServiceDescriptor failed")
 	}
-	pbSvcDsc, ok := c.pbSvcDsc.Load().(proto.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser PbServiceDescriptor failed")
-	}
-
-	inner := thrift.NewReadHTTPPbResponse(svcDsc, pbSvcDsc)
+	inner := thrift.NewReadHTTPResponse(svcDsc)
+	inner.SetBase64Binary(c.binaryWithBase64)
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Unmarshal(ctx, msg, in)
 }
 
-func (c *httpPbThriftCodec) Name() string {
-	return "HttpPbThrift"
+func (c *httpThriftCodec) Name() string {
+	return "HttpThrift"
 }
 
-func (c *httpPbThriftCodec) Close() error {
-	var errs []string
-	if err := c.provider.Close(); err != nil {
-		errs = append(errs, err.Error())
-	}
-	if err := c.pbProvider.Close(); err != nil {
-		errs = append(errs, err.Error())
-	}
-
-	if len(errs) == 0 {
-		return nil
-	} else {
-		return errors.New(strings.Join(errs, ";"))
-	}
+func (c *httpThriftCodec) Close() error {
+	return c.provider.Close()
 }
 
-// FromHTTPPbRequest parse  HTTPRequest from http.Request
-func FromHTTPPbRequest(req *http.Request) (*HTTPRequest, error) {
-	customReq := &HTTPRequest{
+var json = jsoniter.Config{
+	EscapeHTML: true,
+	UseNumber:  true,
+}.Froze()
+
+// FromHTTPRequest parse  HTTPRequest from http.Request
+func FromHTTPRequest(req *http.Request) (customReq *HTTPRequest, err error) {
+	customReq = &HTTPRequest{
 		Header:      req.Header,
 		Query:       req.URL.Query(),
 		Cookies:     descriptor.Cookies{},
 		Method:      req.Method,
 		Host:        req.Host,
 		Path:        req.URL.Path,
-		ContentType: descriptor.MIMEApplicationProtobuf,
+		ContentType: descriptor.MIMEApplicationJson,
+		Body:        map[string]interface{}{},
 	}
 	for _, cookie := range req.Cookies() {
 		customReq.Cookies[cookie.Name] = cookie.Value
 	}
 	// copy the request body, maybe user used it after parse
 	var b io.ReadCloser
-	var err error
 	if req.GetBody != nil {
 		// req from ServerHTTP or create by http.NewRequest
 		if b, err = req.GetBody(); err != nil {
@@ -175,6 +163,5 @@ func FromHTTPPbRequest(req *http.Request) (*HTTPRequest, error) {
 	if len(customReq.RawBody) == 0 {
 		return customReq, nil
 	}
-
-	return customReq, nil
+	return customReq, json.Unmarshal(customReq.RawBody, &customReq.Body)
 }

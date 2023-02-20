@@ -72,7 +72,6 @@ func testThrift(t *testing.T) {
 }
 
 func testDynamicgoThrift(t *testing.T) {
-	fmt.Println(len(reqMsg))
 	time.Sleep(1 * time.Second)
 	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceImpl), "./idl/example.thrift", conv.Options{})
 	time.Sleep(500 * time.Millisecond)
@@ -347,7 +346,6 @@ func initThriftServer(t *testing.T, address string, handler generic.Service) ser
 }
 
 func initThriftServerByIDL(t *testing.T, address string, handler generic.Service, idlPath string, base64Binary *bool) server.Server {
-	generic.EnableDynamicgo(false)
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	p, err := generic.NewThriftFileProvider(idlPath)
 	test.Assert(t, err == nil)
@@ -362,7 +360,6 @@ func initThriftServerByIDL(t *testing.T, address string, handler generic.Service
 }
 
 func initOriginalThriftServer(t *testing.T, address string, handler generic.Service, idlPath string, base64Binary *bool) server.Server {
-	generic.EnableDynamicgo(false)
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	p, err := generic.NewThriftFileProvider(idlPath)
 	test.Assert(t, err == nil)
@@ -377,7 +374,6 @@ func initOriginalThriftServer(t *testing.T, address string, handler generic.Serv
 }
 
 func initDynamicgoThriftServer(t *testing.T, address string, handler generic.Service, idlPath string, convOpts conv.Options) server.Server {
-	generic.EnableDynamicgo(true)
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	p, err := generic.NewThriftFileProvider(idlPath)
 	test.Assert(t, err == nil)

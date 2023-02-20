@@ -1,5 +1,5 @@
-//go:build amd64 && go1.15 && !go1.21
-// +build amd64,go1.15,!go1.21
+//go:build !amd64 || go1.21
+// +build !amd64 go1.21
 
 /*
  * Copyright 2021 CloudWeGo Authors
@@ -18,28 +18,17 @@
  */
 
 // Package generic ...
+
 package generic
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/cloudwego/dynamicgo/conv"
-
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
-
-const defaultBufferSize = 4096
-
-var bytesPool = sync.Pool{
-	New: func() interface{} {
-		// TODO: need to consider the size
-		b := make([]byte, 0, defaultBufferSize)
-		return &b
-	},
-}
 
 // Generic ...
 type Generic interface {
@@ -93,25 +82,14 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 //	g, err := generic.HTTPThriftGeneric(p)
 //	SetBinaryWithBase64(g, true)
 func HTTPThriftGeneric(p DescriptorProvider, convOpts ...conv.Options) (Generic, error) {
-	var codec *httpThriftCodec
-	var err error
-	if convOpts != nil {
-		// generic with dynamicgo
-		opts := convOpts[0]
-		if !opts.EnableHttpMapping {
-			opts.EnableHttpMapping = true
-		}
-		codec, err = newHTTPThriftCodec(p, thriftCodec, opts)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		codec, err = newHTTPThriftCodec(p, thriftCodec)
-		if err != nil {
-			return nil, err
-		}
+	// kitex original generic
+	codec, err := newHTTPThriftCodec(p, thriftCodec)
+	if err != nil {
+		return nil, err
 	}
-	return &httpThriftGeneric{codec: codec}, nil
+	return &httpThriftGeneric{
+		codec: codec,
+	}, nil
 }
 
 func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generic, error) {
@@ -131,19 +109,9 @@ func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generi
 //	g, err := generic.JSONThriftGeneric(p)
 //	SetBinaryWithBase64(g, false)
 func JSONThriftGeneric(p DescriptorProvider, convOpts ...conv.Options) (Generic, error) {
-	var codec *jsonThriftCodec
-	var err error
-	if convOpts != nil {
-		// generic with dynamicgo
-		codec, err = newJsonThriftCodec(p, thriftCodec, convOpts[0])
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		codec, err = newJsonThriftCodec(p, thriftCodec)
-		if err != nil {
-			return nil, err
-		}
+	codec, err := newJsonThriftCodec(p, thriftCodec)
+	if err != nil {
+		return nil, err
 	}
 	return &jsonThriftGeneric{codec: codec}, nil
 }

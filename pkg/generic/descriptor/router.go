@@ -26,7 +26,7 @@ type Router interface {
 	// Handle register Route to Router
 	Handle(rt Route)
 	// Lookup FunctionDescriptor from HTTPRequest
-	Lookup(req *HTTPRequest) (interface{}, error)
+	Lookup(req *HTTPRequest) (*FunctionDescriptor, error)
 }
 
 type router struct {
@@ -94,8 +94,7 @@ func (r *router) Handle(rt Route) {
 	}
 }
 
-// Lookup returns kitex's *FunctionDescriptor or dynamicgo's *FunctionDescriptor
-func (r *router) Lookup(req *HTTPRequest) (interface{}, error) {
+func (r *router) Lookup(req *HTTPRequest) (*FunctionDescriptor, error) {
 	root, ok := r.trees[req.Method]
 	if !ok {
 		return nil, fmt.Errorf("function lookup failed, no root with method=%s", req.Method)

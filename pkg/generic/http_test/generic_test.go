@@ -49,7 +49,6 @@ func TestRun(t *testing.T) {
 }
 
 func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary bool) genericclient.Client {
-	generic.EnableDynamicgo(false)
 	p, err := generic.NewThriftFileProvider(idl)
 	test.Assert(t, err == nil)
 	g, err := generic.HTTPThriftGeneric(p)
@@ -62,7 +61,6 @@ func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary bool) ge
 }
 
 func initDynamicgoThriftClientByIDL(t *testing.T, addr, idl string, convOpts conv.Options) genericclient.Client {
-	generic.EnableDynamicgo(true)
 	p, err := generic.NewThriftFileProvider(idl)
 	test.Assert(t, err == nil)
 	g, err := generic.HTTPThriftGeneric(p, convOpts)
@@ -73,7 +71,6 @@ func initDynamicgoThriftClientByIDL(t *testing.T, addr, idl string, convOpts con
 }
 
 func initThriftServer(t *testing.T, address string, handler generic.Service) server.Server {
-	generic.EnableDynamicgo(false)
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	p, err := generic.NewThriftFileProvider("./idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
@@ -85,7 +82,6 @@ func initThriftServer(t *testing.T, address string, handler generic.Service) ser
 }
 
 func initOriginalThriftServer(t *testing.T, address string, handler generic.Service, idlPath string) server.Server {
-	generic.EnableDynamicgo(false)
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	p, err := generic.NewThriftFileProvider(idlPath)
 	test.Assert(t, err == nil)
@@ -376,7 +372,6 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 }
 
 func testThriftBase64BinaryEcho(t *testing.T) {
-	generic.EnableDynamicgo(false)
 	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
 	time.Sleep(500 * time.Millisecond)
 
