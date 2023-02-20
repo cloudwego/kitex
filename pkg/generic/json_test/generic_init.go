@@ -29,7 +29,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/kitex/transport"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/client"
@@ -41,6 +40,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
+	"github.com/cloudwego/kitex/transport"
 )
 
 var reqMsg = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"}}`
