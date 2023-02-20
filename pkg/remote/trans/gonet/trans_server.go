@@ -143,24 +143,24 @@ func (ts *transServer) refreshDeadline(ri rpcinfo.RPCInfo, conn net.Conn) {
 	_ = conn.SetReadDeadline(time.Now().Add(readTimeout))
 }
 
-// BufioConn implements the net.Conn interface.
-type BufioConn struct {
+// bufioConn implements the net.Conn interface.
+type bufioConn struct {
 	conn net.Conn
 	r    netpoll.Reader
 }
 
-func newBufioConn(c net.Conn) *BufioConn {
-	return &BufioConn{
+func newBufioConn(c net.Conn) *bufioConn {
+	return &bufioConn{
 		conn: c,
 		r:    netpoll.NewReader(c),
 	}
 }
 
-func (bc *BufioConn) RawConn() net.Conn {
+func (bc *bufioConn) RawConn() net.Conn {
 	return bc.conn
 }
 
-func (bc *BufioConn) Read(b []byte) (int, error) {
+func (bc *bufioConn) Read(b []byte) (int, error) {
 	buf, err := bc.r.Next(len(b))
 	if err != nil {
 		return 0, err
@@ -169,36 +169,36 @@ func (bc *BufioConn) Read(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (bc *BufioConn) Write(b []byte) (int, error) {
+func (bc *bufioConn) Write(b []byte) (int, error) {
 	return bc.conn.Write(b)
 }
 
-func (bc *BufioConn) Close() error {
+func (bc *bufioConn) Close() error {
 	bc.r.Release()
 	return bc.conn.Close()
 }
 
-func (bc *BufioConn) LocalAddr() net.Addr {
+func (bc *bufioConn) LocalAddr() net.Addr {
 	return bc.conn.LocalAddr()
 }
 
-func (bc *BufioConn) RemoteAddr() net.Addr {
+func (bc *bufioConn) RemoteAddr() net.Addr {
 	return bc.conn.RemoteAddr()
 }
 
-func (bc *BufioConn) SetDeadline(t time.Time) error {
+func (bc *bufioConn) SetDeadline(t time.Time) error {
 	return bc.conn.SetDeadline(t)
 }
 
-func (bc *BufioConn) SetReadDeadline(t time.Time) error {
+func (bc *bufioConn) SetReadDeadline(t time.Time) error {
 	return bc.conn.SetReadDeadline(t)
 }
 
-func (bc *BufioConn) SetWriteDeadline(t time.Time) error {
+func (bc *bufioConn) SetWriteDeadline(t time.Time) error {
 	return bc.conn.SetWriteDeadline(t)
 }
 
-func (bc *BufioConn) Reader() netpoll.Reader {
+func (bc *bufioConn) Reader() netpoll.Reader {
 	return bc.r
 }
 
