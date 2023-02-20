@@ -94,11 +94,6 @@ type ServiceDescriptor struct {
 	DynamicgoDesc *dthrift.ServiceDescriptor
 }
 
-//
-//func (self ServiceDescriptor) ToDynamicgoDesc() *dthrift.ServiceDescriptor {
-//	return self.dc
-//}
-
 // LookupFunctionByMethod lookup function by method
 func (s *ServiceDescriptor) LookupFunctionByMethod(method string) (*FunctionDescriptor, error) {
 	fnSvc, ok := s.Functions[method]
