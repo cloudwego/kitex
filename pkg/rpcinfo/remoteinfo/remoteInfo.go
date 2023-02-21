@@ -174,7 +174,11 @@ func (ri *remoteInfo) ForceSetTag(key, value string) {
 }
 
 // CopyFrom copies the input RemoteInfo.
+// Not deepcopy.
 func (ri *remoteInfo) CopyFrom(from RemoteInfo) {
+	if from == nil {
+		return
+	}
 	ri.Lock()
 	f := from.(*remoteInfo)
 	ri.serviceName = f.serviceName
