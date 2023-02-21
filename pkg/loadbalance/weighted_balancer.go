@@ -36,7 +36,7 @@ type weightedBalancer struct {
 
 // NewWeightedBalancer creates a loadbalancer using weighted-round-robin algorithm.
 func NewWeightedBalancer() Loadbalancer {
-	return NewWeightedRoundRobinBalancer()
+	return NewWeightedRandomBalancer()
 }
 
 // NewWeightedRoundRobinBalancer creates a loadbalancer using weighted-round-robin algorithm.
