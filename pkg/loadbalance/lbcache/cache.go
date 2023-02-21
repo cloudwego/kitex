@@ -31,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 const (
@@ -178,10 +179,10 @@ type Balancer struct {
 	target       string       // a description returned from the resolver's Target method
 	res          atomic.Value // newest and previous discovery result
 	expire       int32        // 0 = normal, 1 = expire and collect next ticker
-	sharedTicker *sharedTicker
+	sharedTicker *utils.SharedTicker
 }
 
-func (bl *Balancer) refresh() {
+func (bl *Balancer) Refresh() {
 	res, err := bl.b.resolver.Resolve(context.Background(), bl.target)
 	if err != nil {
 		klog.Warnf("KITEX: resolver refresh failed, key=%s error=%s", bl.target, err.Error())
@@ -196,6 +197,11 @@ func (bl *Balancer) refresh() {
 	}
 	// replace previous result
 	bl.res.Store(res)
+}
+
+// Tick implements the interface utils.TickerTask.
+func (bl *Balancer) Tick() {
+	bl.Refresh()
 }
 
 // GetResult returns the discovery result that the Balancer holds.
@@ -225,7 +231,7 @@ func (bl *Balancer) close() {
 		})
 	}
 	// delete from sharedTicker
-	bl.sharedTicker.delete(bl)
+	bl.sharedTicker.Delete(bl)
 }
 
 const unknown = "unknown"
