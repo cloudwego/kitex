@@ -94,10 +94,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 
 	var callTimes int32
 	var callCosts strings.Builder
-	var (
-		cRI    rpcinfo.RPCInfo
-		lastRI rpcinfo.RPCInfo
-	)
+	var cRI rpcinfo.RPCInfo
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
@@ -140,23 +137,18 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 				// user specified resp to do retry
 				continue
 			}
-			if i > 0 {
-				lastRI = cRI
-			}
 			break
 		} else {
 			if i == retryTimes {
 				// stop retry then wrap error
 				err = kerrors.ErrRetry.WithCause(err)
-				lastRI = cRI
 			} else if !r.isRetryErr(err, cRI) {
 				// not timeout or user specified error won't do retry
-				lastRI = cRI
 				break
 			}
 		}
 	}
-	recordRetryInfo(firstRI, lastRI, callTimes, callCosts.String())
+	recordRetryInfo(firstRI, cRI, callTimes, callCosts.String())
 	if err == nil && callTimes == 1 {
 		return true, nil
 	}

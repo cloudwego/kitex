@@ -145,7 +145,6 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				continue
 			}
 			atomic.StoreInt32(&abort, 1)
-			// use the remote info of the RPCCall that responds first.
 			recordRetryInfo(firstRI, res.ri, atomic.LoadInt32(&callTimes), callCosts.String())
 			return false, res.err
 		}

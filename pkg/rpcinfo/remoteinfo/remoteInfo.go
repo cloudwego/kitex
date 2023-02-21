@@ -175,12 +175,14 @@ func (ri *remoteInfo) ForceSetTag(key, value string) {
 
 // CopyFrom copies the input RemoteInfo.
 func (ri *remoteInfo) CopyFrom(from RemoteInfo) {
+	ri.Lock()
 	f := from.(*remoteInfo)
 	ri.serviceName = f.serviceName
 	ri.instance = f.instance
 	ri.tags = f.tags
 	ri.method = f.method
 	ri.tagLocks = f.tagLocks
+	ri.Unlock()
 }
 
 // ImmutableView implements rpcinfo.MutableEndpointInfo.
