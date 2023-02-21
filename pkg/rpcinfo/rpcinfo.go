@@ -47,6 +47,12 @@ func (r *rpcInfo) Invocation() Invocation { return r.invocation }
 // Stats implements the RPCInfo interface.
 func (r *rpcInfo) Stats() RPCStats { return r.stats }
 
+// SetTo implements MutableRPCInfo interface.
+func (r *rpcInfo) SetTo(e EndpointInfo) error {
+	r.to = e
+	return nil
+}
+
 func (r *rpcInfo) zero() {
 	r.from = nil
 	r.to = nil

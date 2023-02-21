@@ -30,6 +30,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 )
 
+var (
+	remoteTagKey   = "k"
+	remoteTagValue = "v"
+	remoteTags     = map[string]string{remoteTagKey: remoteTagValue}
+)
+
 // test new retry container
 func TestNewRetryContainer(t *testing.T) {
 	rc := NewRetryContainerWithCB(nil, nil)
@@ -416,7 +422,7 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 		if newVal == 1 {
 			return genRPCInfo(), nil, remote.NewTransErrorWithMsg(1000, "mock")
 		} else {
-			return genRPCInfo(), nil, nil
+			return genRPCInfoWithRemoteTag(remoteTags), nil, nil
 		}
 	}
 	ctx := context.Background()
@@ -437,6 +443,9 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 	ok, err := rc.WithRetryIfNeeded(ctx, Policy{}, retryWithTransError, ri, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, !ok)
+	v, ok := ri.To().Tag(remoteTagKey)
+	test.Assert(t, ok)
+	test.Assert(t, v == remoteTagValue)
 
 	// case2: specified method retry with error, but use backup request config cannot be effective
 	atomic.StoreInt32(&callTimes, 0)
@@ -471,6 +480,8 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 	ok, err = rc.WithRetryIfNeeded(ctx, Policy{}, retryWithTransError, ri, nil)
 	test.Assert(t, err != nil)
 	test.Assert(t, !ok)
+	v, ok = ri.To().Tag(remoteTagKey)
+	test.Assert(t, !ok)
 
 	// case4: all error retry
 	atomic.StoreInt32(&callTimes, 0)
@@ -479,6 +490,9 @@ func TestSpecifiedErrorRetry(t *testing.T) {
 	ok, err = rc.WithRetryIfNeeded(ctx, p, retryWithTransError, ri, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, !ok)
+	v, ok = ri.To().Tag(remoteTagKey)
+	test.Assert(t, ok)
+	test.Assert(t, v == remoteTagValue)
 }
 
 // test specified resp to retry
@@ -500,7 +514,7 @@ func TestSpecifiedRespRetry(t *testing.T) {
 			return genRPCInfo(), retryResult, nil
 		} else {
 			retryResult.SetResult(noRetryResp)
-			return genRPCInfo(), retryResult, nil
+			return genRPCInfoWithRemoteTag(remoteTags), retryResult, nil
 		}
 	}
 	ctx := context.Background()
@@ -522,6 +536,9 @@ func TestSpecifiedRespRetry(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, retryResult.GetResult() == noRetryResp, retryResult)
 	test.Assert(t, !ok)
+	v, ok := ri.To().Tag(remoteTagKey)
+	test.Assert(t, ok)
+	test.Assert(t, v == remoteTagValue)
 
 	// case2 specified method retry with resp, but use backup request config cannot be effective
 	atomic.StoreInt32(&callTimes, 0)
@@ -550,6 +567,8 @@ func TestSpecifiedRespRetry(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, retryResult.GetResult() == retryResp, retryResult)
 	test.Assert(t, ok)
+	_, ok = ri.To().Tag(remoteTagKey)
+	test.Assert(t, !ok)
 }
 
 // test different method use different retry policy
@@ -641,16 +660,24 @@ func TestBackupPolicyCall(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	callTimes := int32(0)
-	ri := genRPCInfo()
-	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+	firstRI := genRPCInfo()
+	secondRI := genRPCInfoWithRemoteTag(remoteTags)
+	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, firstRI)
 	ok, err := rc.WithRetryIfNeeded(ctx, Policy{}, func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		atomic.AddInt32(&callTimes, 1)
-		time.Sleep(time.Millisecond * 50)
-		return ri, nil, nil
-	}, ri, nil)
+		if atomic.LoadInt32(&callTimes) == 1 {
+			// mock timeout for the first request and get the response of the backup request.
+			time.Sleep(time.Millisecond * 50)
+			return firstRI, nil, nil
+		}
+		return secondRI, nil, nil
+	}, firstRI, nil)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, atomic.LoadInt32(&callTimes) == 2)
 	test.Assert(t, !ok)
+	v, ok := firstRI.To().Tag(remoteTagKey)
+	test.Assert(t, ok)
+	test.Assert(t, v == remoteTagValue)
 }
 
 // test policy noRetry call
