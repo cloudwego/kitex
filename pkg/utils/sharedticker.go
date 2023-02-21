@@ -21,14 +21,15 @@ import (
 	"time"
 )
 
-type RefreshTask interface {
-	Refresh()
+type TickerTask interface {
+	Tick()
 }
 
-func NewSharedTicker(refreshInterval time.Duration) *SharedTicker {
+// NewSharedTicker constructs a SharedTicker with specified interval.
+func NewSharedTicker(interval time.Duration) *SharedTicker {
 	return &SharedTicker{
-		Interval: refreshInterval,
-		tasks:    map[RefreshTask]struct{}{},
+		Interval: interval,
+		tasks:    map[TickerTask]struct{}{},
 		stopChan: make(chan struct{}, 1),
 	}
 }
@@ -37,11 +38,11 @@ type SharedTicker struct {
 	sync.Mutex
 	started  bool
 	Interval time.Duration
-	tasks    map[RefreshTask]struct{}
+	tasks    map[TickerTask]struct{}
 	stopChan chan struct{}
 }
 
-func (t *SharedTicker) Add(b RefreshTask) {
+func (t *SharedTicker) Add(b TickerTask) {
 	if b == nil {
 		return
 	}
@@ -55,7 +56,7 @@ func (t *SharedTicker) Add(b RefreshTask) {
 	t.Unlock()
 }
 
-func (t *SharedTicker) Delete(b RefreshTask) {
+func (t *SharedTicker) Delete(b TickerTask) {
 	t.Lock()
 	// Delete from tasks
 	delete(t.tasks, b)
@@ -87,9 +88,9 @@ func (t *SharedTicker) Tick(interval time.Duration) {
 			t.Lock()
 			for b := range t.tasks {
 				wg.Add(1)
-				go func(b RefreshTask) {
+				go func(b TickerTask) {
 					defer wg.Done()
-					b.Refresh()
+					b.Tick()
 				}(b)
 			}
 			t.Unlock()

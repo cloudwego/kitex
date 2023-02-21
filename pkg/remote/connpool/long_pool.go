@@ -406,8 +406,8 @@ func (lp *LongPool) WarmUp(eh warmup.ErrorHandling, wuo *warmup.PoolOption, co r
 	return h.WarmUp(wuo, lp, co)
 }
 
-// Refresh refreshes the LongPool, currently only cleanups the idle connections in peers.
-func (lp *LongPool) Refresh() {
+// Evict cleanups the idle connections in peers.
+func (lp *LongPool) Evict() {
 	if atomic.LoadInt32(&lp.closed) == 0 {
 		// Evict idle connections
 		lp.peerMap.Range(func(key, value interface{}) bool {
@@ -416,6 +416,11 @@ func (lp *LongPool) Refresh() {
 			return true
 		})
 	}
+}
+
+// Tick implements the interface utils.TickerTask.
+func (lp *LongPool) Tick() {
+	lp.Evict()
 }
 
 // getPeer gets a peer from the pool based on the addr, or create a new one if not exist.

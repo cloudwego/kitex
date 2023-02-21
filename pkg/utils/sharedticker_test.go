@@ -30,8 +30,8 @@ func TestSharedTickerAdd(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	rt := mockutils.NewMockRefreshTask(ctrl)
-	rt.EXPECT().Refresh().AnyTimes()
+	rt := mockutils.NewMockTickerTask(ctrl)
+	rt.EXPECT().Tick().AnyTimes()
 	st := NewSharedTicker(1)
 	st.Add(nil)
 	test.Assert(t, len(st.tasks) == 0)
@@ -47,11 +47,11 @@ func TestSharedTickerDeleteAndClose(t *testing.T) {
 	st := NewSharedTicker(1)
 	var (
 		num   = 10
-		tasks = make([]RefreshTask, num)
+		tasks = make([]TickerTask, num)
 	)
 	for i := 0; i < num; i++ {
-		rt := mockutils.NewMockRefreshTask(ctrl)
-		rt.EXPECT().Refresh().AnyTimes()
+		rt := mockutils.NewMockTickerTask(ctrl)
+		rt.EXPECT().Tick().AnyTimes()
 		tasks[i] = rt
 		st.Add(rt)
 	}
@@ -71,11 +71,11 @@ func TestSharedTickerTick(t *testing.T) {
 	st := NewSharedTicker(duration)
 	var (
 		num   = 10
-		tasks = make([]RefreshTask, num)
+		tasks = make([]TickerTask, num)
 	)
 	for i := 0; i < num; i++ {
-		rt := mockutils.NewMockRefreshTask(ctrl)
-		rt.EXPECT().Refresh().MinTimes(1) // all tasks should be refreshed once during the test
+		rt := mockutils.NewMockTickerTask(ctrl)
+		rt.EXPECT().Tick().MinTimes(1) // all tasks should be refreshed once during the test
 		tasks[i] = rt
 		st.Add(rt)
 	}

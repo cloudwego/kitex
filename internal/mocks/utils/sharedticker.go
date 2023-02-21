@@ -27,37 +27,37 @@ import (
 	gomock "github.com/golang/mock/gomock"
 )
 
-// MockRefreshTask is a mock of RefreshTask interface.
-type MockRefreshTask struct {
+// MockTickerTask is a mock of TickerTask interface.
+type MockTickerTask struct {
 	ctrl     *gomock.Controller
-	recorder *MockRefreshTaskMockRecorder
+	recorder *MockTickerTaskMockRecorder
 }
 
-// MockRefreshTaskMockRecorder is the mock recorder for MockRefreshTask.
-type MockRefreshTaskMockRecorder struct {
-	mock *MockRefreshTask
+// MockTickerTaskMockRecorder is the mock recorder for MockTickerTask.
+type MockTickerTaskMockRecorder struct {
+	mock *MockTickerTask
 }
 
-// NewMockRefreshTask creates a new mock instance.
-func NewMockRefreshTask(ctrl *gomock.Controller) *MockRefreshTask {
-	mock := &MockRefreshTask{ctrl: ctrl}
-	mock.recorder = &MockRefreshTaskMockRecorder{mock}
+// NewMockTickerTask creates a new mock instance.
+func NewMockTickerTask(ctrl *gomock.Controller) *MockTickerTask {
+	mock := &MockTickerTask{ctrl: ctrl}
+	mock.recorder = &MockTickerTaskMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockRefreshTask) EXPECT() *MockRefreshTaskMockRecorder {
+func (m *MockTickerTask) EXPECT() *MockTickerTaskMockRecorder {
 	return m.recorder
 }
 
-// Refresh mocks base method.
-func (m *MockRefreshTask) Refresh() {
+// Tick mocks base method.
+func (m *MockTickerTask) Tick() {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Refresh")
+	m.ctrl.Call(m, "Tick")
 }
 
-// Refresh indicates an expected call of Refresh.
-func (mr *MockRefreshTaskMockRecorder) Refresh() *gomock.Call {
+// Tick indicates an expected call of Tick.
+func (mr *MockTickerTaskMockRecorder) Tick() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Refresh", reflect.TypeOf((*MockRefreshTask)(nil).Refresh))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Tick", reflect.TypeOf((*MockTickerTask)(nil).Tick))
 }

@@ -199,6 +199,11 @@ func (bl *Balancer) Refresh() {
 	bl.res.Store(res)
 }
 
+// Tick implements the interface utils.TickerTask.
+func (bl *Balancer) Tick() {
+	bl.Refresh()
+}
+
 // GetResult returns the discovery result that the Balancer holds.
 func (bl *Balancer) GetResult() (res discovery.Result, ok bool) {
 	if v := bl.res.Load(); v != nil {
