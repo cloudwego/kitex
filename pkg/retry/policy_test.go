@@ -412,6 +412,12 @@ func genRPCInfo() rpcinfo.RPCInfo {
 	return ri
 }
 
+func genRPCInfoWithRemoteTag(tags map[string]string) rpcinfo.RPCInfo {
+	to := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{Method: method, Tags: tags}, method).ImmutableView()
+	ri := rpcinfo.NewRPCInfo(to, to, rpcinfo.NewInvocation("", method), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+	return ri
+}
+
 func TestBackOffPolicy_copyCfgItems(t *testing.T) {
 	type fields struct {
 		BackOffType BackOffType
