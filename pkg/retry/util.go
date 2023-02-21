@@ -154,12 +154,17 @@ func appendErrMsg(err error, msg string) {
 	}
 }
 
-func recordRetryInfo(ri rpcinfo.RPCInfo, callTimes int32, lastCosts string) {
+func recordRetryInfo(firstRI, lastRI rpcinfo.RPCInfo, callTimes int32, lastCosts string) {
 	if callTimes > 1 {
-		if me := remoteinfo.AsRemoteInfo(ri.To()); me != nil {
-			me.SetTag(rpcinfo.RetryTag, strconv.Itoa(int(callTimes)-1))
+		if firstRe := remoteinfo.AsRemoteInfo(firstRI.To()); firstRe != nil {
+			firstRe.SetTag(rpcinfo.RetryTag, strconv.Itoa(int(callTimes)-1))
 			// record last cost
-			me.SetTag(rpcinfo.RetryLastCostTag, lastCosts)
+			firstRe.SetTag(rpcinfo.RetryLastCostTag, lastCosts)
+
+			// set the remoteInfo of lastRI to the firstRI
+			if lastRe := remoteinfo.AsRemoteInfo(lastRI.To()); lastRe != nil {
+				firstRe.CopyFrom(lastRe)
+			}
 		}
 	}
 }

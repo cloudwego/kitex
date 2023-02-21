@@ -156,11 +156,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			}
 		}
 	}
-	if lastRI != nil && lastRI != firstRI {
-		// If retried, use the remote info of the last retry.
-		firstRI.(rpcinfo.MutableRPCInfo).SetTo(lastRI.To())
-	}
-	recordRetryInfo(firstRI, callTimes, callCosts.String())
+	recordRetryInfo(firstRI, lastRI, callTimes, callCosts.String())
 	if err == nil && callTimes == 1 {
 		return true, nil
 	}

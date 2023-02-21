@@ -24,11 +24,6 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-// MutableRPCInfo is used to change the information in the RPCInfo.
-type MutableRPCInfo interface {
-	SetTo(to EndpointInfo) error
-}
-
 // MutableEndpointInfo is used to change the information in the EndpointInfo.
 type MutableEndpointInfo interface {
 	SetServiceName(service string) error
