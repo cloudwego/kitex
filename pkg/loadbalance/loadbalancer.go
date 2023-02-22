@@ -22,6 +22,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/discovery"
 )
 
+type CtxPickerStateKey struct{}
+
 // Picker picks an instance for next RPC call.
 type Picker interface {
 	Next(ctx context.Context, request interface{}) discovery.Instance

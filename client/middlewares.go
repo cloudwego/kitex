@@ -20,15 +20,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/gopkg/lang/fastrand"
 
 	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -78,6 +81,7 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 		retryable := func(err error) bool {
 			return errors.Is(err, kerrors.ErrGetConnection) || errors.Is(err, kerrors.ErrCircuitBreak)
 		}
+		round := newRound()
 
 		return func(next endpoint.Endpoint) endpoint.Endpoint {
 			return func(ctx context.Context, request, response interface{}) error {
@@ -113,6 +117,7 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 					default:
 					}
 
+					ctx = context.WithValue(ctx, loadbalance.CtxPickerStateKey{}, round.Next())
 					ins := picker.Next(ctx, request)
 					if ins == nil {
 						return kerrors.ErrNoMoreInstance.WithCause(fmt.Errorf("last error: %w", lastErr))
@@ -177,4 +182,22 @@ func wrapInstances(insts []discovery.Instance) []*instInfo {
 		instInfos = append(instInfos, &instInfo{Address: addr, Weight: inst.Weight()})
 	}
 	return instInfos
+}
+
+// round implement a strict Round Robin algorithm
+type round struct {
+	state uint64    // 8 bytes
+	_     [7]uint64 // + 7 * 8 bytes
+	// = 64 bytes
+}
+
+func (r *round) Next() uint64 {
+	return atomic.AddUint64(&r.state, 1)
+}
+
+func newRound() *round {
+	r := &round{
+		state: fastrand.Uint64(), // every thread have a rand start order
+	}
+	return r
 }

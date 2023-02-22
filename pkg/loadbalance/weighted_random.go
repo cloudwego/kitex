@@ -54,6 +54,12 @@ func newWeightedPicker() interface{} {
 
 // Next implements the Picker interface.
 func (wp *weightedPicker) Next(ctx context.Context, request interface{}) (ins discovery.Instance) {
+	// DEBUG: 如果上层函数传递了种子，直接切到轮询模式
+	state, ok := ctx.Value(CtxPickerStateKey{}).(uint64)
+	if ok {
+		return wp.immutableInstances[state%uint64(len(wp.immutableInstances))]
+	}
+
 	if wp.firstIndex < 0 {
 		weight := fastrand.Intn(wp.weightSum)
 		for i := 0; i < len(wp.immutableEntries); i++ {
@@ -125,6 +131,12 @@ func newRandomPicker() interface{} {
 
 // Next implements the Picker interface.
 func (rp *randomPicker) Next(ctx context.Context, request interface{}) (ins discovery.Instance) {
+	// DEBUG: 如果上层函数传递了种子，直接切到轮询模式
+	state, ok := ctx.Value(CtxPickerStateKey{}).(uint64)
+	if ok {
+		return rp.immutableInstances[state%uint64(len(rp.immutableInstances))]
+	}
+
 	if rp.firstIndex < 0 {
 		rp.firstIndex = fastrand.Intn(len(rp.immutableInstances))
 		return rp.immutableInstances[rp.firstIndex]
