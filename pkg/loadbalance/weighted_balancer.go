@@ -25,8 +25,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 
-const lbKindRoundRobin = 1
-const lbKindRandom = 2
+const (
+	lbKindRoundRobin = 1
+	lbKindRandom     = 2
+)
 
 type weightedBalancer struct {
 	kind        int

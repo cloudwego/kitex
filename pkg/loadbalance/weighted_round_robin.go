@@ -25,8 +25,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/discovery"
 )
 
-var _ Picker = &WeightedRoundRobinPicker{}
-var _ Picker = &RoundRobinPicker{}
+var (
+	_ Picker = &WeightedRoundRobinPicker{}
+	_ Picker = &RoundRobinPicker{}
+)
 
 const wrrVNodesBatchSize = 500 // it will calculate wrrVNodesBatchSize vnodes when insufficient
 
