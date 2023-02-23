@@ -1,5 +1,5 @@
-//go:build amd64 && go1.15 && !go1.21
-// +build amd64,go1.15,!go1.21
+//go:build amd64
+// +build amd64
 
 /*
  * Copyright 2021 CloudWeGo Authors
@@ -44,7 +44,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/transport"
 )
 
 var (
@@ -120,7 +119,7 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
-	if !c.enableDynamicgo || msg.ProtocolInfo().TransProto&transport.TTHeader != transport.TTHeader {
+	if !c.enableDynamicgo {
 		inner := thrift.NewWriteHTTPRequest(svcDsc)
 		inner.SetBinaryWithBase64(c.binaryWithBase64)
 		msg.Data().(WithCodec).SetCodec(inner)
@@ -213,7 +212,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
 
-	if !c.enableDynamicgo || msg.PayloadLen() == 0 || msg.ProtocolInfo().TransProto&transport.TTHeader != transport.TTHeader {
+	if !c.enableDynamicgo || msg.PayloadLen() == 0 {
 		inner := thrift.NewReadHTTPResponse(svcDsc)
 		inner.SetBase64Binary(c.binaryWithBase64)
 		msg.Data().(WithCodec).SetCodec(inner)

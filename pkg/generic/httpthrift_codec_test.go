@@ -136,6 +136,20 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 	err = htc.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil)
 
+	sendMsg = initDynamicgoHttpSendMsg(transport.PurePayload)
+
+	// Marshal side
+	out = remote.NewWriterBuffer(256)
+	err = htc.Marshal(ctx, sendMsg, out)
+	test.Assert(t, err == nil)
+
+	// UnMarshal side
+	recvMsg = initDynamicgoHttpRecvMsg(transport.PurePayload)
+	buf, err = out.Bytes()
+	test.Assert(t, err == nil)
+	in = remote.NewReaderBuffer(buf)
+	err = htc.Unmarshal(ctx, recvMsg, in)
+	test.Assert(t, err == nil)
 }
 
 func initHttpSendMsg(tp transport.Protocol) remote.Message {

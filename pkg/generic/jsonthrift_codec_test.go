@@ -96,7 +96,7 @@ func TestJsonDynamicgoThriftCodec(t *testing.T) {
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONDynamicgoThrift")
 
-	sendMsg = initJsonSendMsgForDynamicgo(transport.Framed)
+	sendMsg = initJsonSendMsgForDynamicgo(transport.PurePayload)
 	// Marshal side
 	out = remote.NewWriterBuffer(256)
 	err = jtc.Marshal(ctx, sendMsg, out)

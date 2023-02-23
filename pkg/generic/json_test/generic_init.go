@@ -111,9 +111,9 @@ func newGenericClient(destService string, g generic.Generic, targetIPPort string
 	return genericCli
 }
 
-func newGenericTTHeaderClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
+func newGenericDynamicgoClient(tp transport.Protocol, destService string, g generic.Generic, targetIPPort string) genericclient.Client {
 	var opts []client.Option
-	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(transport.TTHeader))
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(tp))
 	genericCli, _ := genericclient.NewClient(destService, g, opts...)
 	return genericCli
 }
