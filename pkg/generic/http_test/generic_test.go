@@ -235,7 +235,7 @@ func testThriftDyanmicgo(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	gr, ok = resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
-	test.Assert(t, reflect.DeepEqual(gjson.Get(gr.GeneralBody.(string), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), base64.StdEncoding.EncodeToString([]byte(mockMyMsg)))
+	test.Assert(t, gr.Body["msg"] == base64.StdEncoding.EncodeToString([]byte(mockMyMsg)))
 
 	svr.Stop()
 }

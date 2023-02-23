@@ -306,7 +306,6 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		gArg.Request = string(*buf)
 	} else {
 		gResult := data.(*Result)
-		// TODO: consider what to respond
 		gResult.Success = string(*buf)
 	}
 	*buf = (*buf)[:0]

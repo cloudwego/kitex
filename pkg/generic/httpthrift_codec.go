@@ -152,10 +152,8 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	gArg := data.(*Args)
 	transData := gArg.Request
 	transBuff, ok := transData.(*HTTPRequest)
-	//transBuff, ok := transData.(*dhttp.HTTPRequest)
 	if !ok {
 		return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("decode msg failed, type(%v) is not *HTTPRequest", reflect.TypeOf(transData)))
-		//return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("decode msg failed, type(%v) is not *dhttp.HTTPRequest", reflect.TypeOf(transData)))
 	}
 
 	if svcDsc.DynamicgoDesc == nil {
@@ -176,9 +174,7 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteFieldBegin failed: %s", err.Error()))
 	}
 
-	//body := transBuff.RawBody
 	body := transBuff.DHTTPRequest.Body()
-	//body := transBuff.Body()
 	buf := make([]byte, 0, len(body))
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, transBuff.DHTTPRequest)
 	// json to thrift
