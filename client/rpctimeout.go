@@ -51,8 +51,11 @@ func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo) 
 	return e
 }
 
-func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration) error {
+func handleCtxDone(ctx context.Context, start time.Time, timeout time.Duration) error {
 	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri == nil {
+		return nil
+	}
 	to := ri.To()
 
 	errMsg := fmt.Sprintf("timeout=%v, to=%s, method=%s", timeout, to.ServiceName(), to.Method())
@@ -61,9 +64,11 @@ func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration)
 		errMsg = fmt.Sprintf("%s, remote=%s", errMsg, target.String())
 	}
 
-	// cancel error
 	if ctx.Err() == context.Canceled {
-		return kerrors.ErrRPCTimeout.WithCause(fmt.Errorf("%s: %w by business", errMsg, ctx.Err()))
+		// do not return error if canceled
+		errMsg = fmt.Sprintf("KITEX: %s, %s by business", errMsg, ctx.Err())
+		klog.CtxWarnf(ctx, "%s", errMsg)
+		return nil
 	}
 
 	if ddl, ok := ctx.Deadline(); !ok {
@@ -146,7 +151,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 				}
 				return err
 			case <-ctx.Done():
-				return makeTimeoutErr(ctx, start, tm)
+				return handleCtxDone(ctx, start, tm)
 			}
 		}
 	}

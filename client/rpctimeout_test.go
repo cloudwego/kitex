@@ -18,7 +18,6 @@ package client
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -88,14 +87,57 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	mw2 = rpcTimeoutMW(mwCtx)
 	err = mw1(mw2(ache))(ctx, nil, nil)
 	test.Assert(t, strings.Contains(err.Error(), panicMsg))
+}
 
-	// 5. cancel
-	cancelCtx, cancelFunc := context.WithCancel(ctx)
-	time.AfterFunc(100*time.Millisecond, func() {
-		cancelFunc()
-	})
-	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
-	mw2 = rpcTimeoutMW(mwCtx)
-	err = mw1(mw2(block))(cancelCtx, nil, nil)
-	test.Assert(t, errors.Is(err, context.Canceled), err)
+func TestHandleCtxDone(t *testing.T) {
+	to := rpcinfo.NewEndpointInfo("service", "method", nil, nil)
+	ri := rpcinfo.NewRPCInfo(nil, to, nil, nil, nil)
+	canceledCtx, cancel := context.WithCancel(rpcinfo.NewCtxWithRPCInfo(context.Background(), ri))
+	cancel()
+
+	type args struct {
+		ctx     context.Context
+		start   time.Time
+		timeout time.Duration
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "nil rpcinfo",
+			args: args{
+				ctx:     context.Background(),
+				start:   time.Time{},
+				timeout: time.Duration(0),
+			},
+			wantErr: false,
+		},
+		{
+			name: "normal",
+			args: args{
+				ctx:     rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
+				start:   time.Time{},
+				timeout: time.Duration(0),
+			},
+			wantErr: true,
+		},
+		{
+			name: "context canceled",
+			args: args{
+				ctx:     canceledCtx,
+				start:   time.Time{},
+				timeout: time.Duration(0),
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := handleCtxDone(tt.args.ctx, tt.args.start, tt.args.timeout); (err != nil) != tt.wantErr {
+				t.Errorf("handleCtxDone() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }
