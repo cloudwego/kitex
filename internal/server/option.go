@@ -109,6 +109,7 @@ func NewOptions(opts []Option) *Options {
 		Svr:          &rpcinfo.EndpointBasicInfo{},
 		Configs:      rpcinfo.NewRPCConfig(),
 		Once:         configutil.NewOptionOnce(),
+		MetaHandlers: []remote.MetaHandler{transmeta.MetainfoServerHandler},
 		RemoteOpt:    newServerRemoteOption(),
 		DebugService: diagnosis.NoopService,
 		ExitSignal:   DefaultSysExitSignal,
@@ -122,7 +123,6 @@ func NewOptions(opts []Option) *Options {
 		Registry:  registry.NoopRegistry,
 	}
 	ApplyOptions(opts, o)
-	o.MetaHandlers = append(o.MetaHandlers, transmeta.MetainfoServerHandler)
 	rpcinfo.AsMutableRPCConfig(o.Configs).LockConfig(o.LockBits)
 	if o.StatsLevel == nil {
 		level := stats.LevelDisabled
