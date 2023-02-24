@@ -246,7 +246,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
 
-	if !c.enableDynamicgoReq || !c.enableDynamicgoResp || msg.PayloadLen() == 0 {
+	if !c.enableDynamicgoResp || msg.PayloadLen() == 0 {
 		inner := thrift.NewReadHTTPResponse(svcDsc)
 		inner.SetBase64Binary(c.binaryWithBase64)
 		msg.Data().(WithCodec).SetCodec(inner)
