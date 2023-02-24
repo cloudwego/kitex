@@ -54,16 +54,6 @@ func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, convOpt
 	return c, nil
 }
 
-func (c *jsonThriftCodec) update() {
-	for {
-		svc, ok := <-c.provider.Provide()
-		if !ok {
-			return
-		}
-		c.svcDsc.Store(svc)
-	}
-}
-
 func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	if !c.enableDynamicgo {
 		return c.originalMarshal(ctx, msg, out)

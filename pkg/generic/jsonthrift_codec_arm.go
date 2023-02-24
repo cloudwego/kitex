@@ -33,22 +33,12 @@ func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*jsonT
 	return c, nil
 }
 
-func (c *jsonThriftCodec) update() {
-	for {
-		svc, ok := <-c.provider.Provide()
-		if !ok {
-			return
-		}
-		c.svcDsc.Store(svc)
-	}
-}
-
 func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	c.originalMarshal(ctx, msg, in)
+	return c.originalMarshal(ctx, msg, in)
 }
 
 func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	c.originalUnmarshal(ctx, msg, in)
+	return c.originalUnmarshal(ctx, msg, in)
 }
 
 func (c *jsonThriftCodec) Name() string {

@@ -21,39 +21,13 @@ package generic
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"sync/atomic"
-
-	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
-
-var (
-	_ remote.PayloadCodec = &httpThriftCodec{}
-	_ Closer              = &httpThriftCodec{}
-)
-
-// HTTPRequest alias of descriptor HTTPRequest
-type HTTPRequest = descriptor.HTTPRequest
-
-// HTTPResponse alias of descriptor HTTPResponse
-type HTTPResponse = descriptor.HTTPResponse
-
-type httpThriftCodec struct {
-	svcDsc           atomic.Value // *idl
-	provider         DescriptorProvider
-	codec            remote.PayloadCodec
-	binaryWithBase64 bool
-}
 
 func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*httpThriftCodec, error) {
 	svc := <-p.Provide()
@@ -63,70 +37,17 @@ func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*httpT
 	return c, nil
 }
 
-func (c *httpThriftCodec) update() {
-	for {
-		svc, ok := <-c.provider.Provide()
-		if !ok {
-			return
-		}
-		c.svcDsc.Store(svc)
-	}
-}
-
-func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return nil, errors.New("get method name failed, no ServiceDescriptor")
-	}
-	r, ok := req.(*HTTPRequest)
-	if !ok {
-		return nil, errors.New("req is invalid, need descriptor.HTTPRequest")
-	}
-	function, err := svcDsc.Router.Lookup(r)
-	if err != nil {
-		return nil, err
-	}
-	return &Method{function.Name, function.Oneway}, nil
-}
-
 func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
-	}
-
-	inner := thrift.NewWriteHTTPRequest(svcDsc)
-	inner.SetBinaryWithBase64(c.binaryWithBase64)
-	msg.Data().(WithCodec).SetCodec(inner)
-	return c.codec.Marshal(ctx, msg, out)
+	return c.originalMarshal(ctx, msg, out)
 }
 
 func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
-	}
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
-	}
-	inner := thrift.NewReadHTTPResponse(svcDsc)
-	inner.SetBase64Binary(c.binaryWithBase64)
-	msg.Data().(WithCodec).SetCodec(inner)
-	return c.codec.Unmarshal(ctx, msg, in)
+	return c.originalUnmarshal(ctx, msg, in)
 }
 
 func (c *httpThriftCodec) Name() string {
 	return "HttpThrift"
 }
-
-func (c *httpThriftCodec) Close() error {
-	return c.provider.Close()
-}
-
-var json = jsoniter.Config{
-	EscapeHTML: true,
-	UseNumber:  true,
-}.Froze()
 
 // FromHTTPRequest parse  HTTPRequest from http.Request
 func FromHTTPRequest(req *http.Request) (customReq *HTTPRequest, err error) {

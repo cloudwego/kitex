@@ -31,6 +31,16 @@ type jsonThriftCodec struct {
 	convOpts         conv.Options
 }
 
+func (c *jsonThriftCodec) update() {
+	for {
+		svc, ok := <-c.provider.Provide()
+		if !ok {
+			return
+		}
+		c.svcDsc.Store(svc)
+	}
+}
+
 func (c *jsonThriftCodec) originalMarshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	method := msg.RPCInfo().Invocation().MethodName()
 	if method == "" {
