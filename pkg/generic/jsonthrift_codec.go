@@ -26,7 +26,6 @@ import (
 	"unsafe"
 
 	athrift "github.com/apache/thrift/lib/go/thrift"
-	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
@@ -40,14 +39,19 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, convOpts ...conv.Options) (*jsonThriftCodec, error) {
+func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...DynamicgoOptions) (*jsonThriftCodec, error) {
 	svc := <-p.Provide()
 	var c *jsonThriftCodec
-	if convOpts == nil {
+	if opts == nil {
 		c = &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true}
 	} else {
 		// codec with dynamicgo
-		c = &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true, convOpts: convOpts[0], enableDynamicgo: true}
+		convOpts := opts[0].ConvOpts
+		binaryWithBase64 := true
+		if convOpts.NoBase64Binary {
+			binaryWithBase64 = false
+		}
+		c = &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: binaryWithBase64, convOpts: convOpts, enableDynamicgo: true}
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
@@ -91,9 +95,6 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Request().Struct().Fields()[0].Type()
 		}
 	}
-
-	// TODO: discuss encode with hyper codec
-	// TODO: discuss encode with FastWrite
 
 	var transBuff string
 	if msg.RPCRole() == remote.Server {
@@ -224,9 +225,6 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	if err = codec.NewDataIfNeeded(method, msg); err != nil {
 		return err
 	}
-
-	// TODO: discuss decode with hyper unmarshal
-	// TODO: discuss decode with FastRead
 
 	// decode in normal way
 	msgBeginLen := bthrift.Binary.MessageBeginLength(method, msgType, seqID)

@@ -73,11 +73,12 @@ func testThrift(t *testing.T) {
 }
 
 func testDynamicgoThrift(t *testing.T) {
+	dOpts := generic.DynamicgoOptions{}
 	time.Sleep(1 * time.Second)
-	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceImpl), "./idl/example.thrift", conv.Options{})
+	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceImpl), "./idl/example.thrift", dOpts)
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initDynamicgoThriftClient(transport.TTHeader, t, "127.0.0.1:8128", "./idl/example.thrift", conv.Options{})
+	cli := initDynamicgoThriftClient(transport.TTHeader, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -85,7 +86,7 @@ func testDynamicgoThrift(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), "world")
 
-	cli = initDynamicgoThriftClient(transport.PurePayload, t, "127.0.0.1:8128", "./idl/example.thrift", conv.Options{})
+	cli = initDynamicgoThriftClient(transport.PurePayload, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 	resp, err = cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	respStr, ok = resp.(string)
@@ -127,10 +128,12 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 	})
 
 	b.Run("dynamicgoThrift_small", func(b *testing.B) {
+		convOpts := conv.Options{NoBase64Binary: true}
+		dOpts := generic.DynamicgoOptions{ConvOpts: convOpts}
 		time.Sleep(1 * time.Second)
-		svr := initDynamicgoThriftServer(&t, ":8128", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift", conv.Options{NoBase64Binary: true})
+		svr := initDynamicgoThriftServer(&t, ":8128", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift", dOpts)
 		time.Sleep(500 * time.Millisecond)
-		cli := initDynamicgoThriftClient(transport.TTHeader, &t, "127.0.0.1:8128", "./idl/baseline.thrift", conv.Options{NoBase64Binary: true})
+		cli := initDynamicgoThriftClient(transport.TTHeader, &t, "127.0.0.1:8128", "./idl/baseline.thrift", dOpts)
 
 		resp, err := cli.GenericCall(context.Background(), "SimpleMethod", simpleJSON, callopt.WithRPCTimeout(100*time.Second))
 		test.Assert(&t, err == nil, err)
@@ -179,10 +182,12 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 	})
 
 	b.Run("dynamicgoThrift_medium", func(b *testing.B) {
+		convOpts := conv.Options{NoBase64Binary: true}
+		dOpts := generic.DynamicgoOptions{ConvOpts: convOpts}
 		time.Sleep(1 * time.Second)
-		svr := initDynamicgoThriftServer(&t, ":8128", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift", conv.Options{NoBase64Binary: true})
+		svr := initDynamicgoThriftServer(&t, ":8128", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift", dOpts)
 		time.Sleep(500 * time.Millisecond)
-		cli := initDynamicgoThriftClient(transport.TTHeader, &t, "127.0.0.1:8128", "./idl/baseline.thrift", conv.Options{NoBase64Binary: true})
+		cli := initDynamicgoThriftClient(transport.TTHeader, &t, "127.0.0.1:8128", "./idl/baseline.thrift", dOpts)
 
 		resp, err := cli.GenericCall(context.Background(), "NestingMethod", nestingJSON, callopt.WithRPCTimeout(100*time.Second))
 		test.Assert(&t, err == nil, err)
@@ -340,10 +345,10 @@ func initOriginalThriftClient(t *testing.T, addr, idl string, base64binary *bool
 	return cli
 }
 
-func initDynamicgoThriftClient(tp transport.Protocol, t *testing.T, addr, idl string, convOpts conv.Options) genericclient.Client {
+func initDynamicgoThriftClient(tp transport.Protocol, t *testing.T, addr, idl string, opts generic.DynamicgoOptions) genericclient.Client {
 	p, err := generic.NewThriftFileProvider(idl)
 	test.Assert(t, err == nil)
-	g, err := generic.JSONThriftGeneric(p, convOpts)
+	g, err := generic.JSONThriftGeneric(p, opts)
 	test.Assert(t, err == nil)
 	cli := newGenericDynamicgoClient(tp, "destServiceName", g, addr)
 	test.Assert(t, err == nil)
@@ -382,11 +387,11 @@ func initOriginalThriftServer(t *testing.T, address string, handler generic.Serv
 	return svr
 }
 
-func initDynamicgoThriftServer(t *testing.T, address string, handler generic.Service, idlPath string, convOpts conv.Options) server.Server {
+func initDynamicgoThriftServer(t *testing.T, address string, handler generic.Service, idlPath string, opts generic.DynamicgoOptions) server.Server {
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	p, err := generic.NewThriftFileProvider(idlPath)
 	test.Assert(t, err == nil)
-	g, err := generic.JSONThriftGeneric(p, convOpts)
+	g, err := generic.JSONThriftGeneric(p, opts)
 	test.Assert(t, err == nil)
 	svr := newGenericServer(g, addr, handler)
 	test.Assert(t, err == nil)

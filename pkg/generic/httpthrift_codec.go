@@ -42,11 +42,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-type DynamicgoOptions struct {
-	ConvOpts                conv.Options
-	EnableDynamicgoHTTPResp bool
-}
-
 type IntendedHttpResponse interface {
 	GetHttpResponse() *http.Response
 	GetRawBody() []byte
@@ -90,7 +85,11 @@ func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ..
 		if !convOpts.EnableHttpMapping {
 			convOpts.EnableHttpMapping = true
 		}
-		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false, enableDynamicgoReq: true, enableDynamicgoResp: opts[0].EnableDynamicgoHTTPResp, convOpts: convOpts}
+		binaryWithBase64 := false
+		if !convOpts.NoBase64Binary {
+			binaryWithBase64 = true
+		}
+		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: binaryWithBase64, enableDynamicgoReq: true, enableDynamicgoResp: opts[0].EnableDynamicgoHTTPResp, convOpts: convOpts}
 		c.j2t = j2t.NewBinaryConv(convOpts)
 		c.t2j = t2j.NewBinaryConv(convOpts)
 	}
@@ -102,11 +101,6 @@ func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ..
 func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	if !c.enableDynamicgoReq {
 		return c.originalMarshal(ctx, msg, out)
-	}
-
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
 
 	// encode with dynamicgo
@@ -129,9 +123,6 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 		data = athrift.NewTApplicationException(transErr.TypeID(), transErr.Error())
 	}
 
-	// TODO: discuss encode with hyper codec
-	// TODO: discuss encode with FastWrite
-
 	gArg := data.(*Args)
 	transData := gArg.Request
 	transBuff, ok := transData.(*HTTPRequest)
@@ -139,6 +130,10 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 		return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("decode msg failed, type(%v) is not *HTTPRequest", reflect.TypeOf(transData)))
 	}
 
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
+	}
 	if svcDsc.DynamicgoDesc == nil {
 		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDesc is nil")
 	}
@@ -238,9 +233,6 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	if err = codec.NewDataIfNeeded(method, msg); err != nil {
 		return err
 	}
-
-	// TODO: discuss decode with hyper unmarshal
-	// TODO: discuss decode with FastRead
 
 	// decode in normal way
 	msgBeginLen := bthrift.Binary.MessageBeginLength(method, msgType, seqID)

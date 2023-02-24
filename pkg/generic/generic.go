@@ -86,6 +86,11 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 	}, nil
 }
 
+type DynamicgoOptions struct {
+	ConvOpts                conv.Options
+	EnableDynamicgoHTTPResp bool
+}
+
 // HTTPThriftGeneric http mapping Generic.
 // Base64 codec for binary field is disabled by default. You can change this option with SetBinaryWithBase64.
 // eg:
@@ -126,12 +131,12 @@ func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generi
 //
 //	g, err := generic.JSONThriftGeneric(p)
 //	SetBinaryWithBase64(g, false)
-func JSONThriftGeneric(p DescriptorProvider, convOpts ...conv.Options) (Generic, error) {
+func JSONThriftGeneric(p DescriptorProvider, opts ...DynamicgoOptions) (Generic, error) {
 	var codec *jsonThriftCodec
 	var err error
-	if convOpts != nil {
+	if opts != nil {
 		// generic with dynamicgo
-		codec, err = newJsonThriftCodec(p, thriftCodec, convOpts[0])
+		codec, err = newJsonThriftCodec(p, thriftCodec, opts[0])
 		if err != nil {
 			return nil, err
 		}
