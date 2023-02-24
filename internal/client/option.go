@@ -127,6 +127,7 @@ func NewOptions(opts []Option) *Options {
 	o := &Options{
 		Cli:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
 		Svr:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
+		MetaHandlers: []remote.MetaHandler{transmeta.MetainfoClientHandler},
 		RemoteOpt:    newClientRemoteOption(),
 		Configs:      rpcinfo.NewRPCConfig(),
 		Locks:        NewConfigLocks(),
@@ -142,7 +143,6 @@ func NewOptions(opts []Option) *Options {
 		GRPCConnectOpts: new(grpc.ConnectOptions),
 	}
 	o.Apply(opts)
-	o.MetaHandlers = append(o.MetaHandlers, transmeta.MetainfoClientHandler)
 
 	o.initRemoteOpt()
 
