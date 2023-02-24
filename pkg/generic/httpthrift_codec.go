@@ -58,30 +58,68 @@ type HTTPRequest = descriptor.HTTPRequest
 type HTTPResponse = descriptor.HTTPResponse
 
 type httpThriftCodec struct {
-	svcDsc           atomic.Value // *idl
-	provider         DescriptorProvider
-	codec            remote.PayloadCodec
-	binaryWithBase64 bool
-	enableDynamicgo  bool
-	convOpts         conv.Options
-	j2t              j2t.BinaryConv
-	t2j              t2j.BinaryConv
+	svcDsc              atomic.Value // *idl
+	provider            DescriptorProvider
+	codec               remote.PayloadCodec
+	binaryWithBase64    bool
+	enableDynamicgoReq  bool
+	enableDynamicgoResp bool
+	convOpts            conv.Options
+	j2t                 j2t.BinaryConv
+	t2j                 t2j.BinaryConv
 }
 
-func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, convOpts ...conv.Options) (*httpThriftCodec, error) {
+type DynamicgoOptions struct {
+	ConvOpts                conv.Options
+	EnableDynamicgoHTTPResp bool
+}
+
+type IntendedHttpResponse interface {
+	GetHttpResponse() *http.Response
+	GetRawBody() []byte
+	SetHttpResponse(*http.Response)
+	SetRawBody([]byte)
+}
+
+type DynamicgoHttpResponse struct {
+	resp *http.Response
+	body []byte
+}
+
+func (d *DynamicgoHttpResponse) SetHttpResponse(resp *http.Response) {
+	d.resp = resp
+}
+
+func (d *DynamicgoHttpResponse) GetHttpResponse() *http.Response {
+	return d.resp
+}
+
+func (d *DynamicgoHttpResponse) SetRawBody(body []byte) {
+	d.body = body
+}
+
+func (d *DynamicgoHttpResponse) GetRawBody() []byte {
+	return d.body
+}
+
+func newDynamicgoHttpResponse() IntendedHttpResponse {
+	return &DynamicgoHttpResponse{}
+}
+
+func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...DynamicgoOptions) (*httpThriftCodec, error) {
 	svc := <-p.Provide()
 	var c *httpThriftCodec
-	if convOpts == nil {
+	if opts == nil {
 		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false}
 	} else {
 		// codec with dynamicgo
-		opts := convOpts[0]
-		if !opts.EnableHttpMapping {
-			opts.EnableHttpMapping = true
+		convOpts := opts[0].ConvOpts
+		if !convOpts.EnableHttpMapping {
+			convOpts.EnableHttpMapping = true
 		}
-		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false, enableDynamicgo: true, convOpts: opts}
-		c.j2t = j2t.NewBinaryConv(opts)
-		c.t2j = t2j.NewBinaryConv(opts)
+		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false, enableDynamicgoReq: true, enableDynamicgoResp: opts[0].EnableDynamicgoHTTPResp, convOpts: convOpts}
+		c.j2t = j2t.NewBinaryConv(convOpts)
+		c.t2j = t2j.NewBinaryConv(convOpts)
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
@@ -119,7 +157,7 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
-	if !c.enableDynamicgo {
+	if !c.enableDynamicgoReq {
 		inner := thrift.NewWriteHTTPRequest(svcDsc)
 		inner.SetBinaryWithBase64(c.binaryWithBase64)
 		msg.Data().(WithCodec).SetCodec(inner)
@@ -208,7 +246,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
 
-	if !c.enableDynamicgo || msg.PayloadLen() == 0 {
+	if !c.enableDynamicgoReq || !c.enableDynamicgoResp || msg.PayloadLen() == 0 {
 		inner := thrift.NewReadHTTPResponse(svcDsc)
 		inner.SetBase64Binary(c.binaryWithBase64)
 		msg.Data().(WithCodec).SetCodec(inner)
@@ -282,7 +320,8 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	if err != nil {
 		panic(err)
 	}
-	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, dhttp.NewHTTPResponse())
+	dresp := dhttp.NewHTTPResponse()
+	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, dresp)
 	if err = c.t2j.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
 		return err
 	}
@@ -294,10 +333,9 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	tProt.Recycle()
 
 	gResult := msg.Data().(*Result)
-	// TODO: consider what to respond
-	resp := descriptor.NewHTTPResponse()
-	// TODO: make resp.Body json string in the future?
-	resp.GeneralBody = string(*buf)
+	resp := newDynamicgoHttpResponse()
+	resp.SetHttpResponse(dresp.Response)
+	resp.SetRawBody(*buf)
 	gResult.Success = resp
 
 	*buf = (*buf)[:0]
@@ -306,7 +344,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 }
 
 func (c *httpThriftCodec) Name() string {
-	if c.enableDynamicgo {
+	if c.enableDynamicgoReq {
 		return "HttpDynamicgoThrift"
 	}
 	return "HttpThrift"

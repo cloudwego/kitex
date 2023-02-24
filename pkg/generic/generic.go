@@ -92,16 +92,12 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 //
 //	g, err := generic.HTTPThriftGeneric(p)
 //	SetBinaryWithBase64(g, true)
-func HTTPThriftGeneric(p DescriptorProvider, convOpts ...conv.Options) (Generic, error) {
+func HTTPThriftGeneric(p DescriptorProvider, opts ...DynamicgoOptions) (Generic, error) {
 	var codec *httpThriftCodec
 	var err error
-	if convOpts != nil {
+	if opts != nil {
 		// generic with dynamicgo
-		opts := convOpts[0]
-		if !opts.EnableHttpMapping {
-			opts.EnableHttpMapping = true
-		}
-		codec, err = newHTTPThriftCodec(p, thriftCodec, opts)
+		codec, err = newHTTPThriftCodec(p, thriftCodec, opts[0])
 		if err != nil {
 			return nil, err
 		}
