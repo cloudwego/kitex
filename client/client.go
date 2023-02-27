@@ -385,7 +385,8 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}
 
 	var callTimes int32
-	var prevRI rpcinfo.RPCInfo
+	// prevRI represents a value of rpcinfo.RPCInfo type.
+	var prevRI atomic.Value
 	recycleRI, err := kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
 		retryCtx := ctx
@@ -393,11 +394,11 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		if currCallTimes > 1 {
 			retryCtx, cRI, _ = kc.initRPCInfo(ctx, method)
 			retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
-			if prevRI == nil {
-				prevRI = ri
+			if prevRI.Load() == nil {
+				prevRI.Store(ri)
 			}
-			r.Prepare(retryCtx, prevRI, cRI)
-			prevRI = cRI
+			r.Prepare(retryCtx, prevRI.Load().(rpcinfo.RPCInfo), cRI)
+			prevRI.Store(cRI)
 		}
 		err := kc.eps(retryCtx, request, response)
 		return cRI, response, err
