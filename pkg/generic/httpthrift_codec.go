@@ -21,7 +21,6 @@ package generic
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -100,7 +99,8 @@ func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ..
 }
 
 func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	if !c.enableDynamicgoReq {
+	msgType := msg.MessageType()
+	if !c.enableDynamicgoReq || msgType == remote.Exception {
 		return c.originalMarshal(ctx, msg, out)
 	}
 
@@ -110,20 +110,7 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 		return perrors.NewProtocolErrorWithMsg("empty methodName in thrift Marshal")
 	}
 
-	msgType := msg.MessageType()
 	data := msg.Data()
-	if msgType == remote.Exception {
-		transErr, isTransErr := data.(*remote.TransError)
-		if !isTransErr {
-			if err, isError := data.(error); isError {
-				data = athrift.NewTApplicationException(remote.InternalError, err.Error())
-			}
-		} else {
-			return errors.New("exception relay need error type data")
-		}
-		data = athrift.NewTApplicationException(transErr.TypeID(), transErr.Error())
-	}
-
 	gArg := data.(*Args)
 	transData := gArg.Request
 	transBuff, ok := transData.(*HTTPRequest)
@@ -135,10 +122,10 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
-	if svcDsc.DynamicgoDesc == nil {
-		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDesc is nil")
+	if svcDsc.DynamicgoDsc == nil {
+		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
 	}
-	tyDsc := svcDsc.DynamicgoDesc.Functions()[method].Request().Struct().Fields()[0].Type()
+	tyDsc := svcDsc.DynamicgoDsc.Functions()[method].Request().Struct().Fields()[0].Type()
 
 	// encode in normal way using dynamicgo
 	seqID := msg.RPCInfo().Invocation().SeqID()
@@ -246,10 +233,10 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	if err != nil {
 		return err
 	}
-	if svcDsc.DynamicgoDesc == nil {
-		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDesc is nil")
+	if svcDsc.DynamicgoDsc == nil {
+		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
 	}
-	tyDsc := svcDsc.DynamicgoDesc.Functions()[method].Response().Struct().Fields()[0].Type()
+	tyDsc := svcDsc.DynamicgoDsc.Functions()[method].Response().Struct().Fields()[0].Type()
 
 	buf := bytesPool.Get().(*[]byte)
 	if err != nil {

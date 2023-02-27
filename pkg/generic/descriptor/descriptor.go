@@ -88,10 +88,10 @@ type FunctionDescriptor struct {
 
 // ServiceDescriptor idl service descriptor
 type ServiceDescriptor struct {
-	Name          string
-	Functions     map[string]*FunctionDescriptor
-	Router        Router
-	DynamicgoDesc *dthrift.ServiceDescriptor
+	Name         string
+	Functions    map[string]*FunctionDescriptor
+	Router       Router
+	DynamicgoDsc *dthrift.ServiceDescriptor
 }
 
 // LookupFunctionByMethod lookup function by method

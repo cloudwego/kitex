@@ -58,7 +58,7 @@ func NewThriftFileProvider(path string, includeDirs ...string) (DescriptorProvid
 	if err != nil {
 		return nil, err
 	}
-	svc.DynamicgoDesc = dsvc
+	svc.DynamicgoDsc = dsvc
 
 	p.svcs <- svc
 	return p, nil
@@ -109,7 +109,7 @@ func NewThriftContentProvider(main string, includes map[string]string) (*ThriftC
 	if err != nil {
 		return nil, err
 	}
-	svc.DynamicgoDesc = dsvc
+	svc.DynamicgoDsc = dsvc
 
 	p.svcs <- svc
 	return p, nil
@@ -131,7 +131,7 @@ func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]strin
 	if err != nil {
 		return err
 	}
-	svc.DynamicgoDesc = dsvc
+	svc.DynamicgoDsc = dsvc
 
 	select {
 	case <-p.svcs:
@@ -245,7 +245,7 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	if err != nil {
 		return nil, err
 	}
-	svc.DynamicgoDesc = dsvc
+	svc.DynamicgoDsc = dsvc
 
 	p.svcs <- svc
 
@@ -272,7 +272,7 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 	if err != nil {
 		return err
 	}
-	svc.DynamicgoDesc = dsvc
+	svc.DynamicgoDsc = dsvc
 
 	// drain the channel
 	select {

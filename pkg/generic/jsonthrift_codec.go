@@ -21,7 +21,6 @@ package generic
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"unsafe"
 
@@ -59,7 +58,8 @@ func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ..
 }
 
 func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	if !c.enableDynamicgo {
+	msgType := msg.MessageType()
+	if !c.enableDynamicgo || msgType == remote.Exception {
 		return c.originalMarshal(ctx, msg, out)
 	}
 
@@ -68,32 +68,19 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 		return perrors.NewProtocolErrorWithMsg("empty methodName in thrift Marshal")
 	}
 
-	msgType := msg.MessageType()
 	data := msg.Data()
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
 	var tyDsc *dthrift.TypeDescriptor
-	if msgType == remote.Exception {
-		transErr, isTransErr := data.(*remote.TransError)
-		if !isTransErr {
-			if err, isError := data.(error); isError {
-				data = athrift.NewTApplicationException(remote.InternalError, err.Error())
-			}
-		} else {
-			return errors.New("exception relay need error type data")
-		}
-		data = athrift.NewTApplicationException(transErr.TypeID(), transErr.Error())
+	if svcDsc.DynamicgoDsc == nil {
+		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
+	}
+	if msgType == remote.Reply {
+		tyDsc = svcDsc.DynamicgoDsc.Functions()[method].Response().Struct().Fields()[0].Type()
 	} else {
-		if svcDsc.DynamicgoDesc == nil {
-			return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDesc is nil")
-		}
-		if msgType == remote.Reply {
-			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Response().Struct().Fields()[0].Type()
-		} else {
-			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Request().Struct().Fields()[0].Type()
-		}
+		tyDsc = svcDsc.DynamicgoDsc.Functions()[method].Request().Struct().Fields()[0].Type()
 	}
 
 	var transBuff string
@@ -202,13 +189,13 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		}
 		return remote.NewTransError(exception.TypeId(), exception)
 	} else {
-		if svcDsc.DynamicgoDesc == nil {
-			return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDesc is nil")
+		if svcDsc.DynamicgoDsc == nil {
+			return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
 		}
 		if messageType == remote.Reply {
-			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Response().Struct().Fields()[0].Type()
+			tyDsc = svcDsc.DynamicgoDsc.Functions()[method].Response().Struct().Fields()[0].Type()
 		} else {
-			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Request().Struct().Fields()[0].Type()
+			tyDsc = svcDsc.DynamicgoDsc.Functions()[method].Request().Struct().Fields()[0].Type()
 		}
 	}
 
