@@ -45,6 +45,18 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
+func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary bool) genericclient.Client {
+	p, err := generic.NewThriftFileProvider(idl)
+	test.Assert(t, err == nil)
+	g, err := generic.HTTPThriftGeneric(p)
+	test.Assert(t, err == nil)
+	err = generic.SetBinaryWithBase64(g, base64Binary)
+	test.Assert(t, err == nil)
+	cli := newGenericClient("destServiceName", g, addr)
+	test.Assert(t, err == nil)
+	return cli
+}
+
 func initDynamicgoThriftClientByIDL(tp transport.Protocol, t *testing.T, addr, idl string, opts generic.DynamicgoOptions) genericclient.Client {
 	p, err := generic.NewThriftFileProvider(idl)
 	test.Assert(t, err == nil)
@@ -53,6 +65,17 @@ func initDynamicgoThriftClientByIDL(tp transport.Protocol, t *testing.T, addr, i
 	cli := newGenericDynamicgoClient(tp, "destServiceName", g, addr)
 	test.Assert(t, err == nil)
 	return cli
+}
+
+func initThriftServer(t *testing.T, address string, handler generic.Service) server.Server {
+	addr, _ := net.ResolveTCPAddr("tcp", address)
+	p, err := generic.NewThriftFileProvider("./idl/binary_echo.thrift")
+	test.Assert(t, err == nil)
+	g, err := generic.MapThriftGeneric(p)
+	test.Assert(t, err == nil)
+	svr := newGenericServer(g, addr, handler)
+	test.Assert(t, err == nil)
+	return svr
 }
 
 func initOriginalThriftServer(t *testing.T, address string, handler generic.Service, idlPath string) server.Server {
@@ -64,6 +87,13 @@ func initOriginalThriftServer(t *testing.T, address string, handler generic.Serv
 	svr := newGenericServer(g, addr, handler)
 	test.Assert(t, err == nil)
 	return svr
+}
+
+func newGenericDynamicgoClient(tp transport.Protocol, destService string, g generic.Generic, targetIPPort string) genericclient.Client {
+	var opts []client.Option
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(tp))
+	genericCli, _ := genericclient.NewClient(destService, g, opts...)
+	return genericCli
 }
 
 func TestThriftDynamicgo(t *testing.T) {
