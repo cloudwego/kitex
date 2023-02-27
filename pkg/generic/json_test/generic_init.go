@@ -115,17 +115,7 @@ func (g *GenericServiceVoidImpl) GenericCall(ctx context.Context, method string,
 	return descriptor.Void{}, nil
 }
 
-// GenericServiceReadRequiredFiledImpl ...
-type GenericServiceReadRequiredFiledImpl struct{}
-
-// GenericCall ...
-func (g *GenericServiceReadRequiredFiledImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-	msg := request.(string)
-	fmt.Printf("Recv: %s\n", msg)
-	return `{"Msg":"world"}`, nil
-}
-
-// GenericServiceReadRequiredFiledImpl ...
+// GenericServiceBinaryEchoImpl ...
 type GenericServiceBinaryEchoImpl struct{}
 
 const mockMyMsg = "my msg"

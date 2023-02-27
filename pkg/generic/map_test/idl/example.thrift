@@ -15,12 +15,12 @@ struct MockElem {
 }
 
 struct ExampleReq {
-    1: required string Msg,
+    1: required string Msg = "Hello",
     2: FOO Foo,
     3: list<MockElem> TestList,
-    4: map<string, MockElem> TestMap,
+    4: optional map<string, MockElem> TestMap,
     5: list<string> StrList,
-    6: list<i64> I64List,
+    6: list<i64> I64List = [1, 2, 3],
     7: bool B,
     255: base.Base Base,
 }
