@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
+
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"

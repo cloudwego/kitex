@@ -95,19 +95,6 @@ func initJsonSendMsgForDynamicgo(tp transport.Protocol) remote.Message {
 	return msg
 }
 
-func initJsonSendMsg(tp transport.Protocol) remote.Message {
-	req := &Args{
-		Request: "Test",
-		Method:  "Test",
-	}
-	svcInfo := mocks.ServiceInfo()
-	ink := rpcinfo.NewInvocation("", "Test")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
-	return msg
-}
-
 func initJsonRecvMsg() remote.Message {
 	req := &Args{
 		Request: "Test",
