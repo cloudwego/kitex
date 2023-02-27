@@ -287,3 +287,11 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		svr.Stop()
 	})
 }
+
+// GenericServiceImpl ...
+type GenericServiceBenchmarkImpl struct{}
+
+// GenericCall ...
+func (g *GenericServiceBenchmarkImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	return request, nil
+}

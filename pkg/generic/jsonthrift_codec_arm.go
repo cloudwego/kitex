@@ -25,6 +25,13 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
+type jsonThriftCodec struct {
+	svcDsc           atomic.Value // *idl
+	provider         DescriptorProvider
+	codec            remote.PayloadCodec
+	binaryWithBase64 bool
+}
+
 func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*jsonThriftCodec, error) {
 	svc := <-p.Provide()
 	c := &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true}

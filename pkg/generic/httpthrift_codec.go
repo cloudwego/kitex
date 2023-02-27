@@ -20,11 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync/atomic"
 
-	"github.com/cloudwego/dynamicgo/conv"
-	"github.com/cloudwego/dynamicgo/conv/j2t"
-	"github.com/cloudwego/dynamicgo/conv/t2j"
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -44,18 +40,6 @@ type HTTPRequest = descriptor.HTTPRequest
 
 // HTTPResponse alias of descriptor HTTPResponse
 type HTTPResponse = descriptor.HTTPResponse
-
-type httpThriftCodec struct {
-	svcDsc              atomic.Value // *idl
-	provider            DescriptorProvider
-	codec               remote.PayloadCodec
-	binaryWithBase64    bool
-	enableDynamicgoReq  bool
-	enableDynamicgoResp bool
-	convOpts            conv.Options
-	j2t                 j2t.BinaryConv
-	t2j                 t2j.BinaryConv
-}
 
 func (c *httpThriftCodec) update() {
 	for {

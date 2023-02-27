@@ -29,6 +29,13 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
+type httpThriftCodec struct {
+	svcDsc           atomic.Value // *idl
+	provider         DescriptorProvider
+	codec            remote.PayloadCodec
+	binaryWithBase64 bool
+}
+
 func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*httpThriftCodec, error) {
 	svc := <-p.Provide()
 	c := &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false}

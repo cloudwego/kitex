@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"reflect"
+	"sync/atomic"
 
 	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/dynamicgo/conv"
@@ -72,6 +73,18 @@ func (d *DynamicgoHttpResponse) GetRawBody() []byte {
 
 func newDynamicgoHttpResponse() IntendedHttpResponse {
 	return &DynamicgoHttpResponse{}
+}
+
+type httpThriftCodec struct {
+	svcDsc              atomic.Value // *idl
+	provider            DescriptorProvider
+	codec               remote.PayloadCodec
+	binaryWithBase64    bool
+	enableDynamicgoReq  bool
+	enableDynamicgoResp bool
+	convOpts            conv.Options
+	j2t                 j2t.BinaryConv
+	t2j                 t2j.BinaryConv
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...DynamicgoOptions) (*httpThriftCodec, error) {

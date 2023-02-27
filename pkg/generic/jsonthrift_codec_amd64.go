@@ -22,9 +22,11 @@ package generic
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"unsafe"
 
 	athrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
@@ -37,6 +39,15 @@ import (
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
+
+type jsonThriftCodec struct {
+	svcDsc           atomic.Value // *idl
+	provider         DescriptorProvider
+	codec            remote.PayloadCodec
+	binaryWithBase64 bool
+	enableDynamicgo  bool
+	convOpts         conv.Options
+}
 
 func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...DynamicgoOptions) (*jsonThriftCodec, error) {
 	svc := <-p.Provide()

@@ -18,9 +18,6 @@ package generic
 
 import (
 	"context"
-	"sync/atomic"
-
-	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
@@ -37,15 +34,6 @@ var (
 
 // JSONRequest alias of string
 type JSONRequest = string
-
-type jsonThriftCodec struct {
-	svcDsc           atomic.Value // *idl
-	provider         DescriptorProvider
-	codec            remote.PayloadCodec
-	binaryWithBase64 bool
-	enableDynamicgo  bool
-	convOpts         conv.Options
-}
 
 func (c *jsonThriftCodec) update() {
 	for {

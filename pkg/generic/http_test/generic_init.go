@@ -73,11 +73,3 @@ func (g *GenericServiceBinaryEchoImpl) GenericCall(ctx context.Context, method s
 	}
 	return req, nil
 }
-
-// GenericServiceImpl ...
-type GenericServiceBenchmarkImpl struct{}
-
-// GenericCall ...
-func (g *GenericServiceBenchmarkImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-	return request, nil
-}
