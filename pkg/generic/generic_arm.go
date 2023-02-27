@@ -18,13 +18,10 @@
  */
 
 // Package generic ...
-
 package generic
 
 import (
 	"fmt"
-
-	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
@@ -82,8 +79,7 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 //
 //	g, err := generic.HTTPThriftGeneric(p)
 //	SetBinaryWithBase64(g, true)
-func HTTPThriftGeneric(p DescriptorProvider, convOpts ...conv.Options) (Generic, error) {
-	// kitex original generic
+func HTTPThriftGeneric(p DescriptorProvider) (Generic, error) {
 	codec, err := newHTTPThriftCodec(p, thriftCodec)
 	if err != nil {
 		return nil, err
@@ -109,7 +105,7 @@ func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generi
 //
 //	g, err := generic.JSONThriftGeneric(p)
 //	SetBinaryWithBase64(g, false)
-func JSONThriftGeneric(p DescriptorProvider, convOpts ...conv.Options) (Generic, error) {
+func JSONThriftGeneric(p DescriptorProvider) (Generic, error) {
 	codec, err := newJsonThriftCodec(p, thriftCodec)
 	if err != nil {
 		return nil, err
