@@ -91,7 +91,7 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 		}
 		if msgType == remote.Reply {
 			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Response().Struct().Fields()[0].Type()
-		} else { // TODO: think about remote.OneWay, remote.Stream, remote.InvalidProtocol
+		} else {
 			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Request().Struct().Fields()[0].Type()
 		}
 	}
@@ -207,7 +207,7 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		}
 		if messageType == remote.Reply {
 			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Response().Struct().Fields()[0].Type()
-		} else { // TODO: think about remote.Stream, remote.InvalidProtocol
+		} else {
 			tyDsc = svcDsc.DynamicgoDesc.Functions()[method].Request().Struct().Fields()[0].Type()
 		}
 	}

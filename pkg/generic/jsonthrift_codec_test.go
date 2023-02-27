@@ -20,8 +20,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/cloudwego/dynamicgo/conv"
-
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -62,7 +60,7 @@ func TestJsonThriftCodec(t *testing.T) {
 func TestJsonDynamicgoThriftCodec(t *testing.T) {
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	jtc, err := newJsonThriftCodec(p, thriftCodec, conv.Options{})
+	jtc, err := newJsonThriftCodec(p, thriftCodec, DynamicgoOptions{})
 	test.Assert(t, err == nil)
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONDynamicgoThrift")
@@ -91,7 +89,7 @@ func TestJsonDynamicgoThriftCodec(t *testing.T) {
 	// can't use dynamicgo because the protocol is not TTHeader
 	p, err = NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	jtc, err = newJsonThriftCodec(p, thriftCodec, conv.Options{})
+	jtc, err = newJsonThriftCodec(p, thriftCodec, DynamicgoOptions{})
 	test.Assert(t, err == nil)
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONDynamicgoThrift")

@@ -128,7 +128,7 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 	})
 
 	b.Run("dynamicgoThrift_small", func(b *testing.B) {
-		convOpts := conv.Options{NoBase64Binary: true}
+		convOpts := conv.Options{NoBase64Binary: true, EnableValueMapping: true}
 		dOpts := generic.DynamicgoOptions{ConvOpts: convOpts}
 		time.Sleep(1 * time.Second)
 		svr := initDynamicgoThriftServer(&t, ":8128", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift", dOpts)
