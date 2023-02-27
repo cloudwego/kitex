@@ -119,7 +119,6 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 		test.Assert(&t, ok)
 		test.Assert(&t, gjson.Get(respStr, "I64Field").Int() == math.MaxInt64, math.MaxInt64)
 
-		b.N = 100000
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cli.GenericCall(context.Background(), "SimpleMethod", simpleJSON, callopt.WithRPCTimeout(100*time.Second))
@@ -141,7 +140,6 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 		test.Assert(&t, ok)
 		test.Assert(&t, gjson.Get(respStr, "I64Field").Int() == math.MaxInt64, math.MaxInt64)
 
-		b.N = 100000
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cli.GenericCall(context.Background(), "SimpleMethod", simpleJSON, callopt.WithRPCTimeout(100*time.Second))
@@ -173,7 +171,6 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		test.Assert(&t, ok)
 		test.Assert(&t, gjson.Get(respStr, "Double").Float() == math.MaxFloat64, math.MaxFloat64)
 
-		b.N = 100000
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cli.GenericCall(context.Background(), "NestingMethod", nestingJSON, callopt.WithRPCTimeout(100*time.Second))
@@ -195,7 +192,6 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		test.Assert(&t, ok)
 		test.Assert(&t, gjson.Get(respStr, "Double").Float() == math.MaxFloat64, math.MaxFloat64)
 
-		b.N = 100000
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cli.GenericCall(context.Background(), "NestingMethod", nestingJSON, callopt.WithRPCTimeout(100*time.Second))

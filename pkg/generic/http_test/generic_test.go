@@ -281,7 +281,6 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 		test.Assert(&t, ok)
 		test.Assert(&t, reflect.DeepEqual(gr.Body["I64Field"].(string), strconv.Itoa(math.MaxInt64)), gr.Body["I64Field"].(string))
 
-		b.N = 100000
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
@@ -311,7 +310,6 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 		test.Assert(&t, ok)
 		test.Assert(&t, reflect.DeepEqual(gjson.Get(string(gr.GetRawBody()), "I64Field").String(), strconv.Itoa(math.MaxInt64)), gjson.Get(string(gr.GetRawBody()), "I64Field").String())
 
-		b.N = 100000
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cli.GenericCall(context.Background(), "SimpleMethod", customReq, callopt.WithRPCTimeout(100*time.Second))
@@ -352,7 +350,6 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		test.Assert(&t, ok)
 		test.Assert(&t, gr.Body["I32"].(int32) == math.MaxInt32, gr.Body["I32"].(int32))
 
-		b.N = 100000
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
@@ -382,7 +379,6 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		test.Assert(&t, ok)
 		test.Assert(&t, reflect.DeepEqual(gjson.Get(string(gr.GetRawBody()), "I32").String(), strconv.Itoa(math.MaxInt32)), gjson.Get(string(gr.GetRawBody()), "I32").String())
 
-		b.N = 100000
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			cli.GenericCall(context.Background(), "NestingMethod", customReq, callopt.WithRPCTimeout(100*time.Second))
