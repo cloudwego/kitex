@@ -463,7 +463,7 @@ func (p *Simple) Field5DeepEqual(src string) bool {
 }
 
 func (p *Simple) Field6DeepEqual(src []byte) bool {
-	return bytes.Compare(p.BinaryField, src) == 0
+	return bytes.Equal(p.BinaryField, src)
 }
 
 type Nesting struct {
@@ -1665,7 +1665,7 @@ func (p *Nesting) Field10DeepEqual(src []string) bool {
 }
 
 func (p *Nesting) Field11DeepEqual(src []byte) bool {
-	return bytes.Compare(p.Binary, src) == 0
+	return bytes.Equal(p.Binary, src)
 }
 
 func (p *Nesting) Field12DeepEqual(src map[int64]string) bool {
@@ -2062,10 +2062,7 @@ func (p *BaselineServiceSimpleMethodArgs) DeepEqual(ano *BaselineServiceSimpleMe
 }
 
 func (p *BaselineServiceSimpleMethodArgs) Field1DeepEqual(src *Simple) bool {
-	if !p.Req.DeepEqual(src) {
-		return false
-	}
-	return true
+	return p.Req.DeepEqual(src)
 }
 
 type BaselineServiceSimpleMethodResult struct {
@@ -2230,10 +2227,7 @@ func (p *BaselineServiceSimpleMethodResult) DeepEqual(ano *BaselineServiceSimple
 }
 
 func (p *BaselineServiceSimpleMethodResult) Field0DeepEqual(src *Simple) bool {
-	if !p.Success.DeepEqual(src) {
-		return false
-	}
-	return true
+	return p.Success.DeepEqual(src)
 }
 
 type BaselineServiceNestingMethodArgs struct {
@@ -2396,10 +2390,7 @@ func (p *BaselineServiceNestingMethodArgs) DeepEqual(ano *BaselineServiceNesting
 }
 
 func (p *BaselineServiceNestingMethodArgs) Field1DeepEqual(src *Nesting) bool {
-	if !p.Req.DeepEqual(src) {
-		return false
-	}
-	return true
+	return p.Req.DeepEqual(src)
 }
 
 type BaselineServiceNestingMethodResult struct {
@@ -2564,8 +2555,5 @@ func (p *BaselineServiceNestingMethodResult) DeepEqual(ano *BaselineServiceNesti
 }
 
 func (p *BaselineServiceNestingMethodResult) Field0DeepEqual(src *Nesting) bool {
-	if !p.Success.DeepEqual(src) {
-		return false
-	}
-	return true
+	return p.Success.DeepEqual(src)
 }
