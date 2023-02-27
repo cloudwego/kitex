@@ -69,7 +69,7 @@ func GetSimpleValue() *Simple {
 }
 
 func GetNestingValue() *Nesting {
-	var ret = &Nesting{
+	ret := &Nesting{
 		String_:         getString(),
 		ListSimple:      []*Simple{},
 		Double:          math.MaxFloat64,

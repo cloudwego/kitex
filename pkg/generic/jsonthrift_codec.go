@@ -134,7 +134,7 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	// TODO: discuss *(*[]byte)(unsafe.Pointer(&transBuff))
 	// encode json binary to thrift binary
 	err := cv.DoInto(ctx, tyDsc, *(*[]byte)(unsafe.Pointer(&transBuff)), &buf)
-	//err := cv.DoInto(ctx, tyDsc, []byte(transBuff), &buf)
+	// err := cv.DoInto(ctx, tyDsc, []byte(transBuff), &buf)
 	if err != nil {
 		return err
 	}
