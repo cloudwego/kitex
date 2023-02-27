@@ -1,6 +1,3 @@
-//go:build amd64
-// +build amd64
-
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -20,16 +17,13 @@
 package generic
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
 
-	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	"github.com/cloudwego/thriftgo/parser"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
 var (
@@ -40,31 +34,6 @@ var (
 type thriftFileProvider struct {
 	closeOnce sync.Once
 	svcs      chan *descriptor.ServiceDescriptor
-}
-
-// NewThriftFileProvider create a ThriftIDLProvider by given path and include dirs
-func NewThriftFileProvider(path string, includeDirs ...string) (DescriptorProvider, error) {
-	p := &thriftFileProvider{
-		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-	}
-	tree, err := parser.ParseFile(path, includeDirs, true)
-	if err != nil {
-		return nil, err
-	}
-	svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
-	if err != nil {
-		return nil, err
-	}
-
-	// ServiceDescriptor of dynamicgo
-	dsvc, err := dthrift.NewDescritorFromPath(context.Background(), path, includeDirs...)
-	if err != nil {
-		return nil, err
-	}
-	svc.DynamicgoDsc = dsvc
-
-	p.svcs <- svc
-	return p, nil
 }
 
 // maybe watch the file change and reparse
@@ -92,60 +61,6 @@ type ThriftContentProvider struct {
 var _ DescriptorProvider = (*ThriftContentProvider)(nil)
 
 const defaultMainIDLPath = "main.thrift"
-
-// NewThriftContentProvider builder
-func NewThriftContentProvider(main string, includes map[string]string) (*ThriftContentProvider, error) {
-	p := &ThriftContentProvider{
-		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-	}
-	tree, err := ParseContent(defaultMainIDLPath, main, includes, false)
-	if err != nil {
-		return nil, err
-	}
-	svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
-	if err != nil {
-		return nil, err
-	}
-
-	// ServiceDescriptor of dynamicgo
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
-	if err != nil {
-		return nil, err
-	}
-	svc.DynamicgoDsc = dsvc
-
-	p.svcs <- svc
-	return p, nil
-}
-
-// UpdateIDL ...
-func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]string) error {
-	var svc *descriptor.ServiceDescriptor
-	tree, err := ParseContent(defaultMainIDLPath, main, includes, false)
-	if err != nil {
-		return err
-	}
-	svc, err = thrift.Parse(tree, thrift.DefaultParseMode())
-	if err != nil {
-		return err
-	}
-
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
-	if err != nil {
-		return err
-	}
-	svc.DynamicgoDsc = dsvc
-
-	select {
-	case <-p.svcs:
-	default:
-	}
-	select {
-	case p.svcs <- svc:
-	default:
-	}
-	return nil
-}
 
 // Provide ...
 func (p *ThriftContentProvider) Provide() <-chan *descriptor.ServiceDescriptor {
@@ -224,70 +139,6 @@ type ThriftContentWithAbsIncludePathProvider struct {
 }
 
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
-
-// NewThriftContentWithAbsIncludePathProvider create abs include path DescriptorProvider
-func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string) (*ThriftContentWithAbsIncludePathProvider, error) {
-	p := &ThriftContentWithAbsIncludePathProvider{
-		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-	}
-	mainIDLContent, ok := includes[mainIDLPath]
-	if !ok {
-		return nil, fmt.Errorf("miss main IDL content for main IDL path: %s", mainIDLPath)
-	}
-	tree, err := ParseContent(mainIDLPath, mainIDLContent, includes, true)
-	if err != nil {
-		return nil, err
-	}
-	svc, err := thrift.Parse(tree, thrift.DefaultParseMode())
-	if err != nil {
-		return nil, err
-	}
-
-	// ServiceDescriptor of dynamicgo
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
-	if err != nil {
-		return nil, err
-	}
-	svc.DynamicgoDsc = dsvc
-
-	p.svcs <- svc
-
-	return p, nil
-}
-
-// UpdateIDL update idl by given args
-func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, includes map[string]string) error {
-	mainIDLContent, ok := includes[mainIDLPath]
-	if !ok {
-		return fmt.Errorf("miss main IDL content for main IDL path: %s", mainIDLPath)
-	}
-	var svc *descriptor.ServiceDescriptor
-	tree, err := ParseContent(mainIDLPath, mainIDLContent, includes, true)
-	if err != nil {
-		return err
-	}
-	svc, err = thrift.Parse(tree, thrift.DefaultParseMode())
-	if err != nil {
-		return err
-	}
-
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
-	if err != nil {
-		return err
-	}
-	svc.DynamicgoDsc = dsvc
-
-	// drain the channel
-	select {
-	case <-p.svcs:
-	default:
-	}
-	select {
-	case p.svcs <- svc:
-	default:
-	}
-	return nil
-}
 
 // Provide ...
 func (p *ThriftContentWithAbsIncludePathProvider) Provide() <-chan *descriptor.ServiceDescriptor {

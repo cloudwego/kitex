@@ -1,5 +1,5 @@
-//go:build !amd64 || !go1.16
-// +build !amd64 !go1.16
+//go:build amd64 && go1.16
+// +build amd64,go1.16
 
 /*
  * Copyright 2021 CloudWeGo Authors
@@ -22,9 +22,11 @@ package generic
 import (
 	"bytes"
 	"context"
-	stdjson "encoding/json"
 	"net/http"
 	"testing"
+
+	"github.com/cloudwego/dynamicgo/conv"
+	dhttp "github.com/cloudwego/dynamicgo/http"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
@@ -34,39 +36,45 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-func TestFromHTTPRequest(t *testing.T) {
-	jsonBody := `{"a": 1111111111111, "b": "hello"}`
-	req, err := http.NewRequest(http.MethodPost, "http://example.com", bytes.NewBufferString(jsonBody))
-	test.Assert(t, err == nil)
-	customReq, err := FromHTTPRequest(req)
-	test.Assert(t, err == nil)
-	test.DeepEqual(t, customReq.Body, map[string]interface{}{
-		"a": stdjson.Number("1111111111111"),
-		"b": "hello",
-	})
-}
-
-func TestHttpThriftCodec(t *testing.T) {
+func TestHttpThriftDynamicgoCodec(t *testing.T) {
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
-	htc, err := newHTTPThriftCodec(p, thriftCodec)
+	convOpts := conv.Options{EnableValueMapping: true}
+	dOpts := DynamicgoOptions{ConvOpts: convOpts, EnableDynamicgoHTTPResp: true}
+	htc, err := newHTTPThriftCodec(p, thriftCodec, dOpts)
 	test.Assert(t, err == nil)
 	defer htc.Close()
-	test.Assert(t, htc.Name() == "HttpThrift")
+	test.Assert(t, htc.Name() == "HttpDynamicgoThrift")
 
-	req := &HTTPRequest{
-		Method: http.MethodGet,
-		Path:   "/BinaryEcho",
+	url := "http://example.com/BinaryEcho"
+	// []byte value for binary field
+	body := map[string]interface{}{
+		"msg":        []byte("hello"),
+		"got_base64": true,
+		"num":        0,
 	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
+	customReq, err := FromHTTPRequest(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// wrong
 	method, err := htc.getMethod("test")
 	test.Assert(t, err.Error() == "req is invalid, need descriptor.HTTPRequest" && method == nil)
 	// right
-	method, err = htc.getMethod(req)
+	method, err = htc.getMethod(customReq)
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
 
 	ctx := context.Background()
-	sendMsg := initHttpSendMsg(transport.TTHeader)
+	sendMsg := initDynamicgoHttpSendMsg(transport.TTHeader)
 
 	// Marshal side
 	out := remote.NewWriterBuffer(256)
@@ -74,20 +82,54 @@ func TestHttpThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	// UnMarshal side
-	recvMsg := initHttpRecvMsg()
+	recvMsg := initDynamicgoHttpRecvMsg(transport.TTHeader)
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil)
 	recvMsg.SetPayloadLen(len(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = htc.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil)
+
+	sendMsg = initDynamicgoHttpSendMsg(transport.PurePayload)
+
+	// Marshal side
+	out = remote.NewWriterBuffer(256)
+	err = htc.Marshal(ctx, sendMsg, out)
+	test.Assert(t, err == nil)
+
+	// UnMarshal side
+	recvMsg = initDynamicgoHttpRecvMsg(transport.PurePayload)
+	buf, err = out.Bytes()
+	test.Assert(t, err == nil)
+	in = remote.NewReaderBuffer(buf)
+	err = htc.Unmarshal(ctx, recvMsg, in)
+	test.Assert(t, err == nil)
 }
 
-func initHttpSendMsg(tp transport.Protocol) remote.Message {
+func initDynamicgoHttpSendMsg(tp transport.Protocol) remote.Message {
+	body := map[string]interface{}{
+		"msg":        []byte("hello"),
+		"got_base64": true,
+		"num":        "",
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+	stdReq, err := http.NewRequest(http.MethodGet, "/BinaryEcho", bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
+	stdReq.Header.Set(dhttp.HeaderContentType, descriptor.MIMEApplicationJson)
+	dReq, err := dhttp.NewHTTPRequestFromStdReq(stdReq)
+	if err != nil {
+		panic(err)
+	}
 	req := &Args{
 		Request: &descriptor.HTTPRequest{
-			Method: http.MethodGet,
-			Path:   "/BinaryEcho",
+			Method:       http.MethodGet,
+			Path:         "/BinaryEcho",
+			DHTTPRequest: dReq,
 		},
 		Method: "BinaryEcho",
 	}
@@ -99,13 +141,12 @@ func initHttpSendMsg(tp transport.Protocol) remote.Message {
 	return msg
 }
 
-func initHttpRecvMsg() remote.Message {
-	req := &Args{
-		Request: "Test",
-		Method:  "BinaryEcho",
-	}
+func initDynamicgoHttpRecvMsg(tp transport.Protocol) remote.Message {
+	req := &Result{}
 	ink := rpcinfo.NewInvocation("", "BinaryEcho")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+	svcInfo := mocks.ServiceInfo()
+	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
 }
