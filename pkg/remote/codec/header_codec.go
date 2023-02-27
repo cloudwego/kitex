@@ -196,7 +196,7 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 	}
 
 	if err := readKVInfo(hdIdx, headerInfo, message); err != nil {
-		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader read kv info failed, %s", err.Error()))
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader read kv info failed, %s, headerInfo=%#x", err.Error(), headerInfo))
 	}
 	fillBasicInfoOfTTHeader(message)
 
