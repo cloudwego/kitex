@@ -443,45 +443,27 @@ func (p *Simple) DeepEqual(ano *Simple) bool {
 }
 
 func (p *Simple) Field1DeepEqual(src int8) bool {
-	if p.ByteField == src {
-		return true
-	}
-	return false
+	return p.ByteField == src
 }
 
 func (p *Simple) Field2DeepEqual(src int64) bool {
-	if p.I64Field == src {
-		return true
-	}
-	return false
+	return p.I64Field == src
 }
 
 func (p *Simple) Field3DeepEqual(src float64) bool {
-	if p.DoubleField == src {
-		return true
-	}
-	return false
+	return p.DoubleField == src
 }
 
 func (p *Simple) Field4DeepEqual(src int32) bool {
-	if p.I32Field == src {
-		return true
-	}
-	return false
+	return p.I32Field == src
 }
 
 func (p *Simple) Field5DeepEqual(src string) bool {
-	if strings.Compare(p.StringField, src) == 0 {
-		return true
-	}
-	return false
+	return strings.Compare(p.StringField, src) == 0
 }
 
 func (p *Simple) Field6DeepEqual(src []byte) bool {
-	if bytes.Compare(p.BinaryField, src) == 0 {
-		return true
-	}
-	return false
+	return bytes.Compare(p.BinaryField, src) == 0
 }
 
 type Nesting struct {
@@ -1598,10 +1580,7 @@ func (p *Nesting) DeepEqual(ano *Nesting) bool {
 }
 
 func (p *Nesting) Field1DeepEqual(src string) bool {
-	if strings.Compare(p.String_, src) == 0 {
-		return true
-	}
-	return false
+	return strings.Compare(p.String_, src) == 0
 }
 
 func (p *Nesting) Field2DeepEqual(src []*Simple) bool {
@@ -1618,17 +1597,11 @@ func (p *Nesting) Field2DeepEqual(src []*Simple) bool {
 }
 
 func (p *Nesting) Field3DeepEqual(src float64) bool {
-	if p.Double == src {
-		return true
-	}
-	return false
+	return p.Double == src
 }
 
 func (p *Nesting) Field4DeepEqual(src int32) bool {
-	if p.I32 == src {
-		return true
-	}
-	return false
+	return p.I32 == src
 }
 
 func (p *Nesting) Field5DeepEqual(src []int32) bool {
@@ -1645,10 +1618,7 @@ func (p *Nesting) Field5DeepEqual(src []int32) bool {
 }
 
 func (p *Nesting) Field6DeepEqual(src int64) bool {
-	if p.I64 == src {
-		return true
-	}
-	return false
+	return p.I64 == src
 }
 
 func (p *Nesting) Field7DeepEqual(src map[string]string) bool {
@@ -1665,10 +1635,7 @@ func (p *Nesting) Field7DeepEqual(src map[string]string) bool {
 }
 
 func (p *Nesting) Field8DeepEqual(src *Simple) bool {
-	if p.SimpleStruct.DeepEqual(src) {
-		return true
-	}
-	return false
+	return p.SimpleStruct.DeepEqual(src)
 }
 
 func (p *Nesting) Field9DeepEqual(src map[int32]int64) bool {
@@ -1698,10 +1665,7 @@ func (p *Nesting) Field10DeepEqual(src []string) bool {
 }
 
 func (p *Nesting) Field11DeepEqual(src []byte) bool {
-	if bytes.Compare(p.Binary, src) == 0 {
-		return true
-	}
-	return false
+	return bytes.Compare(p.Binary, src) == 0
 }
 
 func (p *Nesting) Field12DeepEqual(src map[int64]string) bool {
@@ -1731,10 +1695,7 @@ func (p *Nesting) Field13DeepEqual(src []int64) bool {
 }
 
 func (p *Nesting) Field14DeepEqual(src int8) bool {
-	if p.Byte == src {
-		return true
-	}
-	return false
+	return p.Byte == src
 }
 
 func (p *Nesting) Field15DeepEqual(src map[string]*Simple) bool {
