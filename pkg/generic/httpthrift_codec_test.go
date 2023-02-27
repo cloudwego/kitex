@@ -180,6 +180,9 @@ func initDynamicgoHttpSendMsg(tp transport.Protocol) remote.Message {
 		panic(err)
 	}
 	stdReq, err := http.NewRequest(http.MethodGet, "/BinaryEcho", bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
 	stdReq.Header.Set(dhttp.HeaderContentType, descriptor.MIMEApplicationJson)
 	dReq, err := dhttp.NewHTTPRequestFromStdReq(stdReq)
 	if err != nil {
