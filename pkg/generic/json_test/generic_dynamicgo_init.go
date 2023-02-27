@@ -22,9 +22,15 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/cloudwego/kitex/client"
+	"github.com/cloudwego/kitex/client/genericclient"
+	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func getString() string {
@@ -80,4 +86,19 @@ func GetNestingValue() *Nesting {
 	}
 
 	return ret
+}
+
+func newGenericDynamicgoClient(tp transport.Protocol, destService string, g generic.Generic, targetIPPort string) genericclient.Client {
+	var opts []client.Option
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(tp))
+	genericCli, _ := genericclient.NewClient(destService, g, opts...)
+	return genericCli
+}
+
+// GenericServiceImpl ...
+type GenericServiceBenchmarkImpl struct{}
+
+// GenericCall ...
+func (g *GenericServiceBenchmarkImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	return request, nil
 }

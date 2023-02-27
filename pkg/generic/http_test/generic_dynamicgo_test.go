@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/dynamicgo/conv"
+	"github.com/cloudwego/kitex/client"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/client/callopt"
