@@ -49,6 +49,17 @@ type jsonThriftCodec struct {
 	convOpts         conv.Options
 }
 
+type GoSlice struct {
+	Ptr unsafe.Pointer
+	Len int
+	Cap int
+}
+
+type GoString struct {
+	Ptr unsafe.Pointer
+	Len int
+}
+
 func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...DynamicgoOptions) (*jsonThriftCodec, error) {
 	svc := <-p.Provide()
 	var c *jsonThriftCodec
@@ -131,7 +142,12 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	}
 	// TODO: discuss *(*[]byte)(unsafe.Pointer(&transBuff))
 	// encode json binary to thrift binary
-	err := cv.DoInto(ctx, tyDsc, *(*[]byte)(unsafe.Pointer(&transBuff)), &buf)
+	var v []byte
+	(*GoSlice)(unsafe.Pointer(&v)).Cap = (*GoString)(unsafe.Pointer(&transBuff)).Len
+	(*GoSlice)(unsafe.Pointer(&v)).Len = (*GoString)(unsafe.Pointer(&transBuff)).Len
+	(*GoSlice)(unsafe.Pointer(&v)).Ptr = (*GoString)(unsafe.Pointer(&transBuff)).Ptr
+	err := cv.DoInto(ctx, tyDsc, v, &buf)
+	// err := cv.DoInto(ctx, tyDsc, *(*[]byte)(unsafe.Pointer(&transBuff)), &buf)
 	// err := cv.DoInto(ctx, tyDsc, []byte(transBuff), &buf)
 	if err != nil {
 		return err
