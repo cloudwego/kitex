@@ -115,6 +115,7 @@ func (c *muxCliConn) Close() error {
 }
 
 func (c *muxCliConn) forceClose() error {
+	c.shardQueue.Close()
 	c.Connection.Close()
 	c.seqIDMap.rangeMap(func(seqID int32, msg EventHandler) {
 		msg.Recv(nil, ErrConnClosed)
@@ -168,4 +169,8 @@ type muxConn struct {
 // Put puts the buffer getter back to the queue.
 func (c *muxConn) Put(gt mux.WriterGetter) {
 	c.shardQueue.Add(gt)
+}
+
+func (c *muxConn) GracefulShutdown() {
+	c.shardQueue.Close()
 }
