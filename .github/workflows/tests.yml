@@ -48,6 +48,4 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
       - name: Unit Test
-        run: |
-          go clean -cache
-          go test -gcflags=-l -race -covermode=atomic ./...
+        run: go test -gcflags=-l -race -covermode=atomic ./...
