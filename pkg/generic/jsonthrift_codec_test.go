@@ -1,6 +1,3 @@
-//go:build !amd64
-// +build !amd64
-
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -60,6 +57,58 @@ func TestJsonThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil)
 }
 
+func TestJsonDynamicgoThriftCodec(t *testing.T) {
+	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
+	test.Assert(t, err == nil)
+	jtc, err := newJsonThriftCodec(p, thriftCodec, DynamicgoOptions{})
+	test.Assert(t, err == nil)
+	defer jtc.Close()
+	test.Assert(t, jtc.Name() == "JSONDynamicgoThrift")
+
+	method, err := jtc.getMethod(nil, "Test")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
+
+	ctx := context.Background()
+	sendMsg := initJsonSendMsgForDynamicgo(transport.TTHeader)
+
+	// Marshal side
+	out := remote.NewWriterBuffer(256)
+	err = jtc.Marshal(ctx, sendMsg, out)
+	test.Assert(t, err == nil)
+
+	// UnMarshal side
+	recvMsg := initJsonRecvMsg()
+	buf, err := out.Bytes()
+	test.Assert(t, err == nil)
+	recvMsg.SetPayloadLen(len(buf))
+	in := remote.NewReaderBuffer(buf)
+	err = jtc.Unmarshal(ctx, recvMsg, in)
+	test.Assert(t, err == nil)
+
+	// can't use dynamicgo because the protocol is not TTHeader
+	p, err = NewThriftFileProvider("./json_test/idl/mock.thrift")
+	test.Assert(t, err == nil)
+	jtc, err = newJsonThriftCodec(p, thriftCodec, DynamicgoOptions{})
+	test.Assert(t, err == nil)
+	defer jtc.Close()
+	test.Assert(t, jtc.Name() == "JSONDynamicgoThrift")
+
+	sendMsg = initJsonSendMsgForDynamicgo(transport.PurePayload)
+	// Marshal side
+	out = remote.NewWriterBuffer(256)
+	err = jtc.Marshal(ctx, sendMsg, out)
+	test.Assert(t, err == nil)
+
+	// UnMarshal side
+	recvMsg = initJsonRecvMsg()
+	buf, err = out.Bytes()
+	test.Assert(t, err == nil)
+	in = remote.NewReaderBuffer(buf)
+	err = jtc.Unmarshal(ctx, recvMsg, in)
+	test.Assert(t, err == nil)
+}
+
 func TestJsonExceptionError(t *testing.T) {
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
@@ -106,5 +155,18 @@ func initJsonRecvMsg() remote.Message {
 	ink := rpcinfo.NewInvocation("", "Test")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+	return msg
+}
+
+func initJsonSendMsgForDynamicgo(tp transport.Protocol) remote.Message {
+	req := &Args{
+		Request: `{"Msg": "Hello"}`,
+		Method:  "Test",
+	}
+	svcInfo := mocks.ServiceInfo()
+	ink := rpcinfo.NewInvocation("", "Test")
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
+	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
+	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
 }

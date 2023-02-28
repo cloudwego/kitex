@@ -21,34 +21,10 @@ package generic
 
 import (
 	"context"
-	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-type jsonThriftCodec struct {
-	svcDsc           atomic.Value // *idl
-	provider         DescriptorProvider
-	codec            remote.PayloadCodec
-	binaryWithBase64 bool
-}
-
-func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*jsonThriftCodec, error) {
-	svc := <-p.Provide()
-	c := &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true}
-	c.svcDsc.Store(svc)
-	go c.update()
-	return c, nil
-}
-
 func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	return c.originalMarshal(ctx, msg, out)
-}
-
-func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	return c.originalUnmarshal(ctx, msg, in)
-}
-
-func (c *jsonThriftCodec) Name() string {
-	return "JSONThrift"
 }

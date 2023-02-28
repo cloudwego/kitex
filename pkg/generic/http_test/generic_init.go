@@ -29,6 +29,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func newGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
@@ -49,6 +50,13 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 		}
 	}()
 	return svr
+}
+
+func newGenericDynamicgoClient(tp transport.Protocol, destService string, g generic.Generic, targetIPPort string) genericclient.Client {
+	var opts []client.Option
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(tp))
+	genericCli, _ := genericclient.NewClient(destService, g, opts...)
+	return genericCli
 }
 
 // GenericServiceReadRequiredFiledImpl ...
@@ -72,4 +80,12 @@ func (g *GenericServiceBinaryEchoImpl) GenericCall(ctx context.Context, method s
 		return nil, errors.New("call failed, incorrect num")
 	}
 	return req, nil
+}
+
+// GenericServiceImpl ...
+type GenericServiceBenchmarkImpl struct{}
+
+// GenericCall ...
+func (g *GenericServiceBenchmarkImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	return request, nil
 }

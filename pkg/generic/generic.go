@@ -19,11 +19,29 @@ package generic
 
 import (
 	"fmt"
+	"sync"
+
+	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
+
+const defaultBufferSize = 4096
+
+var bytesPool = sync.Pool{
+	New: func() interface{} {
+		// TODO: need to consider the size
+		b := make([]byte, 0, defaultBufferSize)
+		return &b
+	},
+}
+
+type DynamicgoOptions struct {
+	ConvOpts                conv.Options
+	EnableDynamicgoHTTPResp bool
+}
 
 // Generic ...
 type Generic interface {
@@ -70,6 +88,30 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 	}, nil
 }
 
+// HTTPThriftGeneric http mapping Generic.
+// Base64 codec for binary field is disabled by default. You can change this option with SetBinaryWithBase64.
+// eg:
+//
+//	g, err := generic.HTTPThriftGeneric(p)
+//	SetBinaryWithBase64(g, true)
+func HTTPThriftGeneric(p DescriptorProvider, opts ...DynamicgoOptions) (Generic, error) {
+	var codec *httpThriftCodec
+	var err error
+	if opts != nil {
+		// generic with dynamicgo
+		codec, err = newHTTPThriftCodec(p, thriftCodec, opts[0])
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		codec, err = newHTTPThriftCodec(p, thriftCodec)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &httpThriftGeneric{codec: codec}, nil
+}
+
 func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generic, error) {
 	codec, err := newHTTPPbThriftCodec(p, pbp, thriftCodec)
 	if err != nil {
@@ -78,6 +120,30 @@ func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generi
 	return &httpPbThriftGeneric{
 		codec: codec,
 	}, nil
+}
+
+// JSONThriftGeneric json mapping generic.
+// Base64 codec for binary field is enabled by default. You can change this option with SetBinaryWithBase64.
+// eg:
+//
+//	g, err := generic.JSONThriftGeneric(p)
+//	SetBinaryWithBase64(g, false)
+func JSONThriftGeneric(p DescriptorProvider, opts ...DynamicgoOptions) (Generic, error) {
+	var codec *jsonThriftCodec
+	var err error
+	if opts != nil {
+		// generic with dynamicgo
+		codec, err = newJsonThriftCodec(p, thriftCodec, opts[0])
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		codec, err = newJsonThriftCodec(p, thriftCodec)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &jsonThriftGeneric{codec: codec}, nil
 }
 
 // SetBinaryWithBase64 enable/disable Base64 codec for binary field.

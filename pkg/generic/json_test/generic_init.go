@@ -1,6 +1,3 @@
-//go:build !amd64
-// +build !amd64
-
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -21,22 +18,158 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net"
+	"strconv"
+	"strings"
 
 	"github.com/tidwall/gjson"
 
+	"github.com/cloudwego/kitex/client"
+	"github.com/cloudwego/kitex/client/genericclient"
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
+	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
+	"github.com/cloudwego/kitex/server/genericserver"
+	"github.com/cloudwego/kitex/transport"
 )
 
+var reqMsg = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"}}`
+
+var respMsgWithExtra = `{"Msg":"world","required_field":"required_field","extra_field":"extra_field"}`
+
 var errResp = "Test Error"
+
+type Simple struct {
+	ByteField   int8    `thrift:"ByteField,1" json:"ByteField"`
+	I64Field    int64   `thrift:"I64Field,2" json:"I64Field"`
+	DoubleField float64 `thrift:"DoubleField,3" json:"DoubleField"`
+	I32Field    int32   `thrift:"I32Field,4" json:"I32Field"`
+	StringField string  `thrift:"StringField,5" json:"StringField"`
+	BinaryField []byte  `thrift:"BinaryField,6" json:"BinaryField"`
+}
+
+type Nesting struct {
+	String_         string             `thrift:"String,1" json:"String"`
+	ListSimple      []*Simple          `thrift:"ListSimple,2" json:"ListSimple"`
+	Double          float64            `thrift:"Double,3" json:"Double"`
+	I32             int32              `thrift:"I32,4" json:"I32"`
+	ListI32         []int32            `thrift:"ListI32,5" json:"ListI32"`
+	I64             int64              `thrift:"I64,6" json:"I64"`
+	MapStringString map[string]string  `thrift:"MapStringString,7" json:"MapStringString"`
+	SimpleStruct    *Simple            `thrift:"SimpleStruct,8" json:"SimpleStruct"`
+	MapI32I64       map[int32]int64    `thrift:"MapI32I64,9" json:"MapI32I64"`
+	ListString      []string           `thrift:"ListString,10" json:"ListString"`
+	Binary          []byte             `thrift:"Binary,11" json:"Binary"`
+	MapI64String    map[int64]string   `thrift:"MapI64String,12" json:"MapI64String"`
+	ListI64         []int64            `thrift:"ListI64,13" json:"ListI64"`
+	Byte            int8               `thrift:"Byte,14" json:"Byte"`
+	MapStringSimple map[string]*Simple `thrift:"MapStringSimple,15" json:"MapStringSimple"`
+}
+
+func getString() string {
+	return strings.Repeat("你好,\b\n\r\t世界", 2)
+}
+
+func getBytes() []byte {
+	return bytes.Repeat([]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}, 2)
+}
+
+func GetSimpleValue() *Simple {
+	return &Simple{
+		ByteField:   math.MaxInt8,
+		I64Field:    math.MaxInt64,
+		DoubleField: math.MaxFloat64,
+		I32Field:    math.MaxInt32,
+		StringField: getString(),
+		BinaryField: getBytes(),
+	}
+}
+
+func GetNestingValue() *Nesting {
+	ret := &Nesting{
+		String_:         getString(),
+		ListSimple:      []*Simple{},
+		Double:          math.MaxFloat64,
+		I32:             math.MaxInt32,
+		ListI32:         []int32{},
+		I64:             math.MaxInt64,
+		MapStringString: map[string]string{},
+		SimpleStruct:    GetSimpleValue(),
+		MapI32I64:       map[int32]int64{},
+		ListString:      []string{},
+		Binary:          getBytes(),
+		MapI64String:    map[int64]string{},
+		ListI64:         []int64{},
+		Byte:            math.MaxInt8,
+		MapStringSimple: map[string]*Simple{},
+	}
+
+	for i := 0; i < 16; i++ {
+		ret.ListSimple = append(ret.ListSimple, GetSimpleValue())
+		ret.ListI32 = append(ret.ListI32, math.MinInt32)
+		ret.ListI64 = append(ret.ListI64, math.MinInt64)
+		ret.ListString = append(ret.ListString, getString())
+	}
+
+	for i := 0; i < 16; i++ {
+		ret.MapStringString[strconv.Itoa(i)] = getString()
+		ret.MapI32I64[int32(i)] = math.MinInt64
+		ret.MapI64String[int64(i)] = getString()
+		ret.MapStringSimple[strconv.Itoa(i)] = GetSimpleValue()
+	}
+
+	return ret
+}
+
+func newGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
+	var opts []client.Option
+	opts = append(opts, client.WithHostPorts(targetIPPort))
+	genericCli, _ := genericclient.NewClient(destService, g, opts...)
+	return genericCli
+}
+
+func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service) server.Server {
+	var opts []server.Option
+	opts = append(opts, server.WithServiceAddr(addr))
+	svr := genericserver.NewServer(handler, g, opts...)
+	go func() {
+		err := svr.Run()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	return svr
+}
+
+func newGenericDynamicgoClient(tp transport.Protocol, destService string, g generic.Generic, targetIPPort string) genericclient.Client {
+	var opts []client.Option
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(tp))
+	genericCli, _ := genericclient.NewClient(destService, g, opts...)
+	return genericCli
+}
+
+// GenericServiceImpl ...
+type GenericServiceImpl struct{}
+
+// GenericCall ...
+func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	buf := request.(string)
+	rpcinfo := rpcinfo.GetRPCInfo(ctx)
+	fmt.Printf("Method from Ctx: %s\n", rpcinfo.Invocation().MethodName())
+	fmt.Printf("Recv: %v\n", buf)
+	fmt.Printf("Method: %s\n", method)
+	return respMsgWithExtra, nil
+}
 
 // GenericServiceErrorImpl ...
 type GenericServiceErrorImpl struct{}
@@ -97,6 +230,14 @@ func (g *GenericServiceBinaryEchoImpl) GenericCall(ctx context.Context, method s
 	if req.GotBase64 && req.Msg != base64.StdEncoding.EncodeToString([]byte(mockMyMsg)) {
 		return nil, errors.New("call failed, incorrect base64 data")
 	}
+	return request, nil
+}
+
+// GenericServiceImpl ...
+type GenericServiceBenchmarkImpl struct{}
+
+// GenericCall ...
+func (g *GenericServiceBenchmarkImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
 	return request, nil
 }
 

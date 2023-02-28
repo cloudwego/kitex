@@ -21,76 +21,10 @@ package generic
 
 import (
 	"context"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"sync/atomic"
 
-	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-type httpThriftCodec struct {
-	svcDsc           atomic.Value // *idl
-	provider         DescriptorProvider
-	codec            remote.PayloadCodec
-	binaryWithBase64 bool
-}
-
-func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*httpThriftCodec, error) {
-	svc := <-p.Provide()
-	c := &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false}
-	c.svcDsc.Store(svc)
-	go c.update()
-	return c, nil
-}
-
 func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	return c.originalMarshal(ctx, msg, out)
-}
-
-func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	return c.originalUnmarshal(ctx, msg, in)
-}
-
-func (c *httpThriftCodec) Name() string {
-	return "HttpThrift"
-}
-
-// FromHTTPRequest parse  HTTPRequest from http.Request
-func FromHTTPRequest(req *http.Request) (customReq *HTTPRequest, err error) {
-	customReq = &HTTPRequest{
-		Header:      req.Header,
-		Query:       req.URL.Query(),
-		Cookies:     descriptor.Cookies{},
-		Method:      req.Method,
-		Host:        req.Host,
-		Path:        req.URL.Path,
-		ContentType: descriptor.MIMEApplicationJson,
-		Body:        map[string]interface{}{},
-	}
-	for _, cookie := range req.Cookies() {
-		customReq.Cookies[cookie.Name] = cookie.Value
-	}
-	// copy the request body, maybe user used it after parse
-	var b io.ReadCloser
-	if req.GetBody != nil {
-		// req from ServerHTTP or create by http.NewRequest
-		if b, err = req.GetBody(); err != nil {
-			return nil, err
-		}
-	} else {
-		b = req.Body
-	}
-	if b == nil {
-		// body == nil if from Get request
-		return customReq, nil
-	}
-	if customReq.RawBody, err = ioutil.ReadAll(b); err != nil {
-		return nil, err
-	}
-	if len(customReq.RawBody) == 0 {
-		return customReq, nil
-	}
-	return customReq, json.Unmarshal(customReq.RawBody, &customReq.Body)
 }
