@@ -67,13 +67,13 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	seqID := msg.RPCInfo().Invocation().SeqID()
 	tProt := cthrift.NewBinaryProtocol(out)
 	if err := tProt.WriteMessageBegin(method, athrift.TMessageType(msgType), seqID); err != nil {
-		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshalHTTP, WriteMessageBegin failed: %s", err.Error()))
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageBegin failed: %s", err.Error()))
 	}
 	if err := tProt.WriteStructBegin(""); err != nil {
-		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshalHTTP, WriteStructBegin failed: %s", err.Error()))
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteStructBegin failed: %s", err.Error()))
 	}
 	if err := tProt.WriteFieldBegin("", athrift.STRUCT, 1); err != nil {
-		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshalHTTP, WriteFieldBegin failed: %s", err.Error()))
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteFieldBegin failed: %s", err.Error()))
 	}
 
 	body := transBuff.DHTTPRequest.Body()
@@ -90,13 +90,13 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	}
 	tProt.WriteFieldStop()
 	if err := tProt.WriteFieldEnd(); err != nil {
-		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshalHTTP, WriteFieldEnd failed: %s", err.Error()))
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteFieldEnd failed: %s", err.Error()))
 	}
 	if err := tProt.WriteStructEnd(); err != nil {
-		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshalHTTP, WriteStructEnd failed: %s", err.Error()))
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteStructEnd failed: %s", err.Error()))
 	}
 	if err := tProt.WriteMessageEnd(); err != nil {
-		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshalHTTP, WriteMessageEnd failed: %s", err.Error()))
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageEnd failed: %s", err.Error()))
 	}
 	tProt.Recycle()
 	return nil

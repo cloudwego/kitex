@@ -39,7 +39,7 @@ type binaryThriftCodec struct {
 func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	data := msg.Data()
 	if data == nil {
-		return perrors.NewProtocolErrorWithMsg("invalid marshalHTTP data in rawThriftBinaryCodec: nil")
+		return perrors.NewProtocolErrorWithMsg("invalid marshal data in rawThriftBinaryCodec: nil")
 	}
 	if msg.MessageType() == remote.Exception {
 		if ink, ok := msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter); ok {
@@ -56,13 +56,13 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 		gResult := data.(*Result)
 		transBinary := gResult.Success
 		if transBuff, ok = transBinary.(binaryReqType); !ok {
-			return perrors.NewProtocolErrorWithMsg("invalid marshalHTTP result in rawThriftBinaryCodec: must be []byte")
+			return perrors.NewProtocolErrorWithMsg("invalid marshal result in rawThriftBinaryCodec: must be []byte")
 		}
 	} else {
 		gArg := data.(*Args)
 		transBinary := gArg.Request
 		if transBuff, ok = transBinary.(binaryReqType); !ok {
-			return perrors.NewProtocolErrorWithMsg("invalid marshalHTTP request in rawThriftBinaryCodec: must be []byte")
+			return perrors.NewProtocolErrorWithMsg("invalid marshal request in rawThriftBinaryCodec: must be []byte")
 		}
 		if err := SetSeqID(msg.RPCInfo().Invocation().SeqID(), transBuff); err != nil {
 			return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("rawThriftBinaryCodec set seqID failed, err: %s", err.Error()))

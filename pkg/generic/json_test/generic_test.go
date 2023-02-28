@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/dynamicgo/conv"
-	"github.com/cloudwego/kitex/transport"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/client/callopt"
@@ -41,6 +40,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/server"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func TestRun(t *testing.T) {
@@ -70,8 +70,6 @@ func testThrift(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), "world")
 
-	//resp, err = cli.GenericCall(context.Background(), "ExampleMethod", descriptor.Void{})
-	//test.Assert(t, err == nil, err)
 	svr.Stop()
 }
 
