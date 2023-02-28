@@ -1,5 +1,5 @@
-//go:build amd64 && go1.16
-// +build amd64,go1.16
+//go:build amd64
+// +build amd64
 
 /*
  * Copyright 2021 CloudWeGo Authors
@@ -147,8 +147,8 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	(*GoSlice)(unsafe.Pointer(&v)).Len = (*GoString)(unsafe.Pointer(&transBuff)).Len
 	(*GoSlice)(unsafe.Pointer(&v)).Ptr = (*GoString)(unsafe.Pointer(&transBuff)).Ptr
 	err := cv.DoInto(ctx, tyDsc, v, &buf)
-	//err := cv.DoInto(ctx, tyDsc, *(*[]byte)(unsafe.Pointer(&transBuff)), &buf)
-	//err := cv.DoInto(ctx, tyDsc, []byte(transBuff), &buf)
+	// err := cv.DoInto(ctx, tyDsc, *(*[]byte)(unsafe.Pointer(&transBuff)), &buf)
+	// err := cv.DoInto(ctx, tyDsc, []byte(transBuff), &buf)
 	if err != nil {
 		return err
 	}
