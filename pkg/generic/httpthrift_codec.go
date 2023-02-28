@@ -27,7 +27,6 @@ import (
 
 	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/dynamicgo/conv"
-	"github.com/cloudwego/dynamicgo/conv/j2t"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dhttp "github.com/cloudwego/dynamicgo/http"
 	jsoniter "github.com/json-iterator/go"
@@ -61,8 +60,6 @@ type httpThriftCodec struct {
 	enableDynamicgoReq  bool
 	enableDynamicgoResp bool
 	convOpts            conv.Options
-	j2t                 j2t.BinaryConv
-	t2j                 t2j.BinaryConv
 }
 
 type IntendedHttpResponse interface {
@@ -113,8 +110,6 @@ func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ..
 			binaryWithBase64 = true
 		}
 		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: binaryWithBase64, enableDynamicgoReq: true, enableDynamicgoResp: opts[0].EnableDynamicgoHTTPResp, convOpts: convOpts}
-		c.j2t = j2t.NewBinaryConv(convOpts)
-		c.t2j = t2j.NewBinaryConv(convOpts)
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
@@ -145,6 +140,10 @@ func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
 		return nil, err
 	}
 	return &Method{function.Name, function.Oneway}, nil
+}
+
+func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	return c.marshal(ctx, msg, out)
 }
 
 func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
@@ -226,7 +225,8 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	}
 	dresp := dhttp.NewHTTPResponse()
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, dresp)
-	if err = c.t2j.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
+	cv := t2j.NewBinaryConv(c.convOpts)
+	if err = cv.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
 		return err
 	}
 

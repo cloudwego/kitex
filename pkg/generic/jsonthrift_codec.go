@@ -82,6 +82,10 @@ func (c *jsonThriftCodec) update() {
 	}
 }
 
+func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	return c.marshal(ctx, msg, out)
+}
+
 func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 	if !c.enableDynamicgo || msg.PayloadLen() == 0 {
 		return c.originalUnmarshal(ctx, msg, in)

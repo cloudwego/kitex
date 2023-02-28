@@ -49,3 +49,7 @@ tool/cmd/kitex/kitex
 
 # remote dump file
 *.json
+
+*.DS_Store
+
+.gitconfig

@@ -117,7 +117,7 @@ func TestBinaryThriftCodecExceptionError(t *testing.T) {
 	rwbuf := remote.NewReaderWriterBuffer(1024)
 	// test data is empty
 	err := btc.Marshal(ctx, cliMsg, rwbuf)
-	test.Assert(t, err.Error() == "invalid marshal data in rawThriftBinaryCodec: nil")
+	test.Assert(t, err.Error() == "invalid marshalHTTP data in rawThriftBinaryCodec: nil")
 	cliMsg.DataFunc = func() interface{} {
 		return &remote.TransError{}
 	}
