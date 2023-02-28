@@ -21,6 +21,8 @@
 package descriptor
 
 import (
+	"fmt"
+
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 )
 
