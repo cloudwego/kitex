@@ -89,6 +89,9 @@ type Options struct {
 	// Observability
 	TracerCtl  *internal_stats.Controller
 	StatsLevel *stats.Level
+
+	// Reflection
+	ReflectionEnabled bool
 }
 
 type Limit struct {

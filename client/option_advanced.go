@@ -240,3 +240,11 @@ func WithGRPCTLSConfig(tlsConfig *tls.Config) Option {
 		o.GRPCConnectOpts.TLSConfig = tlsConfig
 	}}
 }
+
+// WithThriftReflectionEnable sets reflection method into client.
+func WithThriftReflectionEnable() Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push("WithThriftReflectionEnable")
+		o.ReflectionEnabled = true
+	}}
+}

@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	thriftreflection "github.com/cloudwego/kitex/pkg/reflection/thrift"
+
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -182,6 +184,11 @@ func (s *server) Run() (err error) {
 	if s.svcInfo == nil {
 		return errors.New("no service, use RegisterService to set one")
 	}
+
+	if s.opt.ReflectionEnabled {
+		thriftreflection.RegisterReflectionMethod(s.svcInfo)
+	}
+
 	if err = s.check(); err != nil {
 		return err
 	}
