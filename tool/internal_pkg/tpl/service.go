@@ -269,6 +269,10 @@ func (p *{{.ArgStructName}}) IsSetReq() bool {
 	return p.Req != nil
 }
 
+func (p *{{.ArgStructName}}) GetFirstArgument() interface{} {
+	return p.Req
+}
+
 type {{.ResStructName}} struct {
 	Success {{.Resp.Type}}
 }
@@ -327,6 +331,10 @@ func (p *{{.ResStructName}}) SetSuccess(x interface{}) {
 
 func (p *{{.ResStructName}}) IsSetSuccess() bool {
 	return p.Success != nil
+}
+
+func (p *{{.ResStructName}}) GetResult() interface{} {
+	return p.Success
 }
 {{- end}}
 {{end}}
