@@ -20,9 +20,20 @@
 // Package descriptor the idl descriptor for describe the idls with golang
 package descriptor
 
+import "fmt"
+
 // ServiceDescriptor idl service descriptor
 type ServiceDescriptor struct {
 	Name      string
 	Functions map[string]*FunctionDescriptor
 	Router    Router
+}
+
+// LookupFunctionByMethod lookup function by method
+func (s *ServiceDescriptor) LookupFunctionByMethod(method string) (*FunctionDescriptor, error) {
+	fnSvc, ok := s.Functions[method]
+	if !ok {
+		return nil, fmt.Errorf("missing method: %s in service: %s", method, s.Name)
+	}
+	return fnSvc, nil
 }

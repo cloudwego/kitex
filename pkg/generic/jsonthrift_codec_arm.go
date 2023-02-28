@@ -21,6 +21,7 @@ package generic
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 )
@@ -41,7 +42,7 @@ func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*jsonT
 }
 
 func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	return c.originalMarshal(ctx, msg, in)
+	return c.originalMarshal(ctx, msg, out)
 }
 
 func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {

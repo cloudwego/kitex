@@ -31,3 +31,12 @@ type ServiceDescriptor struct {
 	Router       Router
 	DynamicgoDsc *dthrift.ServiceDescriptor
 }
+
+// LookupFunctionByMethod lookup function by method
+func (s *ServiceDescriptor) LookupFunctionByMethod(method string) (*FunctionDescriptor, error) {
+	fnSvc, ok := s.Functions[method]
+	if !ok {
+		return nil, fmt.Errorf("missing method: %s in service: %s", method, s.Name)
+	}
+	return fnSvc, nil
+}
