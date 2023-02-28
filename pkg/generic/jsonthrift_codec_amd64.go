@@ -45,7 +45,7 @@ type GoString struct {
 	Len int
 }
 
-func (c *jsonThriftCodec) marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	msgType := msg.MessageType()
 	if !c.enableDynamicgo || msgType == remote.Exception {
 		return c.originalMarshal(ctx, msg, out)

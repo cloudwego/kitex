@@ -34,7 +34,7 @@ import (
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
 
-func (c *httpThriftCodec) marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	msgType := msg.MessageType()
 	if !c.enableDynamicgoReq || msgType == remote.Exception {
 		return c.originalMarshal(ctx, msg, out)

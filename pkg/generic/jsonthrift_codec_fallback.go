@@ -25,6 +25,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-func (c *jsonThriftCodec) marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	return c.originalMarshal(ctx, msg, out)
 }

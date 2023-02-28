@@ -142,10 +142,6 @@ func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
 	return &Method{function.Name, function.Oneway}, nil
 }
 
-func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	return c.marshal(ctx, msg, out)
-}
-
 func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 	if !c.enableDynamicgoResp || msg.PayloadLen() == 0 {
 		return c.originalUnmarshal(ctx, msg, in)
