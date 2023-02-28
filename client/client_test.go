@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	mockthrift "github.com/cloudwego/kitex/internal/mocks/thrift"
+	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/netpoll"
 	"github.com/golang/mock/gomock"
 
@@ -34,6 +36,7 @@ import (
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
+	mocksstats "github.com/cloudwego/kitex/internal/mocks/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -507,10 +510,10 @@ func TestRetry(t *testing.T) {
 	defer ctrl.Finish()
 
 	var count int32
-	md := func(next endpoint.Endpoint) endpoint.Endpoint {
+	sleepMW := func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, resp interface{}) (err error) {
 			if atomic.CompareAndSwapInt32(&count, 0, 1) {
-				time.Sleep(time.Second)
+				time.Sleep(300 * time.Millisecond)
 			}
 			return nil
 		}
@@ -518,8 +521,8 @@ func TestRetry(t *testing.T) {
 
 	// should timeout
 	cli := newMockClient(t, ctrl,
-		WithMiddleware(md),
-		WithRPCTimeout(500*time.Millisecond),
+		WithMiddleware(sleepMW),
+		WithRPCTimeout(100*time.Millisecond),
 		WithFailureRetry(&retry.FailurePolicy{
 			StopPolicy: retry.StopPolicy{
 				MaxRetryTimes: 3,
@@ -533,6 +536,249 @@ func TestRetry(t *testing.T) {
 	req, res := new(MockTStruct), new(MockTStruct)
 	err := cli.Call(context.Background(), mtd, req, res)
 	test.Assert(t, err == nil, err)
+}
+
+func TestRetryWithResultRetry(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var mockErr = errors.New("mock")
+	retryWithMockErr := false
+	var count int32
+	errMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			if atomic.CompareAndSwapInt32(&count, 0, 1) {
+				return mockErr
+			}
+			return nil
+		}
+	}
+	errRetryFunc := func(err error, ri rpcinfo.RPCInfo) bool {
+		if errors.Is(err, mockErr) {
+			retryWithMockErr = true
+			return true
+		}
+		return false
+	}
+
+	// should timeout
+	cli := newMockClient(t, ctrl,
+		WithMiddleware(errMW),
+		WithRPCTimeout(100*time.Millisecond),
+		WithFailureRetry(&retry.FailurePolicy{
+			StopPolicy: retry.StopPolicy{
+				MaxRetryTimes: 3,
+				CBPolicy: retry.CBPolicy{
+					ErrorRate: 0.1,
+				},
+			},
+			RetrySameNode:     true,
+			ShouldResultRetry: &retry.ShouldResultRetry{ErrorRetry: errRetryFunc},
+		}))
+	mtd := mocks.MockMethod
+	req, res := new(MockTStruct), new(MockTStruct)
+	err := cli.Call(context.Background(), mtd, req, res)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, retryWithMockErr)
+}
+
+func TestFallbackForError(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	isTimeout := false
+	isMockErr := false
+	isBizErr := false
+	errForReportIsNil := false
+	var rpcResult interface{}
+
+	// prepare mock data
+	retStr := "success"
+	sleepMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			time.Sleep(300 * time.Millisecond)
+			return nil
+		}
+	}
+	var mockErr = errors.New("mock")
+	mockErrMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			return mockErr
+		}
+	}
+	bizErrMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			if setter, ok := rpcinfo.GetRPCInfo(ctx).Invocation().(rpcinfo.InvocationSetter); ok {
+				setter.SetBizStatusErr(kerrors.NewBizStatusError(100, mockErr.Error()))
+			}
+			return nil
+		}
+	}
+
+	mockTracer := mocksstats.NewMockTracer(ctrl)
+	mockTracer.EXPECT().Start(gomock.Any()).DoAndReturn(func(ctx context.Context) context.Context {
+		return ctx
+	}).AnyTimes()
+	mockTracer.EXPECT().Finish(gomock.Any()).DoAndReturn(func(ctx context.Context) {
+		if rpcinfo.GetRPCInfo(ctx).Stats().Error() == nil {
+			errForReportIsNil = true
+		} else {
+			errForReportIsNil = false
+		}
+	}).AnyTimes()
+	newFallback := func(reportAsFallback bool) *fallback.Policy {
+		fbP := fallback.NewFallbackPolicy(func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+			if errors.Is(err, kerrors.ErrRPCTimeout) {
+				isTimeout = true
+			}
+			if errors.Is(err, mockErr) {
+				isMockErr = true
+			}
+			if _, ok := kerrors.FromBizStatusError(err); ok {
+				isBizErr = true
+			}
+			if setResp, ok := resp.(utils.KitexResult); ok {
+				setResp.SetSuccess(&retStr)
+			}
+			return resp, nil
+		})
+		if reportAsFallback {
+			fbP.EnableReportAsFallbackRet()
+		}
+		return fbP
+	}
+
+	// case 1: fallback for timeout, return nil err, but report original err
+	cli := newMockClient(t, ctrl,
+		WithMiddleware(sleepMW),
+		WithRPCTimeout(100*time.Millisecond),
+		WithFallback(newFallback(false)),
+		WithTracer(mockTracer),
+	)
+	mtd := mocks.MockMethod
+	rpcResult = mockthrift.NewMockTestResult()
+	err := cli.Call(context.Background(), mtd, mockthrift.NewMockTestArgs(), rpcResult)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, *rpcResult.(utils.KitexResult).GetResult().(*string) == retStr)
+	test.Assert(t, isTimeout, err)
+	test.Assert(t, !errForReportIsNil)
+
+	// case 2: fallback for mock error, but report original err
+	cli = newMockClient(t, ctrl,
+		WithMiddleware(mockErrMW),
+		WithFallback(newFallback(false)))
+	rpcResult = mockthrift.NewMockTestResult()
+	err = cli.Call(context.Background(), mtd, mockthrift.NewMockTestArgs(), rpcResult)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, *rpcResult.(utils.KitexResult).GetResult().(*string) == retStr)
+	test.Assert(t, isMockErr, err)
+	test.Assert(t, !errForReportIsNil)
+
+	// case 3: fallback for timeout, return nil err, and report nil err as enable reportAsFallback
+	cli = newMockClient(t, ctrl,
+		WithMiddleware(sleepMW),
+		WithRPCTimeout(100*time.Millisecond),
+		WithFallback(newFallback(true)),
+		WithTracer(mockTracer),
+	)
+	// reset
+	isTimeout = false
+	errForReportIsNil = false
+	rpcResult = mockthrift.NewMockTestResult()
+	err = cli.Call(context.Background(), mtd, mockthrift.NewMockTestArgs(), rpcResult)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, *rpcResult.(utils.KitexResult).GetResult().(*string) == retStr)
+	test.Assert(t, isTimeout, err)
+	test.Assert(t, errForReportIsNil)
+
+	// case 4: no fallback, return biz err, but report nil err
+	cli = newMockClient(t, ctrl,
+		WithMiddleware(bizErrMW),
+		WithRPCTimeout(100*time.Millisecond),
+		WithTracer(mockTracer),
+	)
+	// reset
+	errForReportIsNil = false
+	rpcResult = mockthrift.NewMockTestResult()
+	err = cli.Call(context.Background(), mtd, mockthrift.NewMockTestArgs(), rpcResult)
+	_, ok := kerrors.FromBizStatusError(err)
+	test.Assert(t, ok, err)
+	test.Assert(t, errForReportIsNil)
+
+	// case 5: fallback for biz error, return nil err,
+	// and report nil err even if don't enable reportAsFallback as biz error won't report failure by design
+	cli = newMockClient(t, ctrl,
+		WithMiddleware(bizErrMW),
+		WithRPCTimeout(100*time.Millisecond),
+		WithFallback(newFallback(false)),
+		WithTracer(mockTracer),
+	)
+	// reset
+	isBizErr = false
+	errForReportIsNil = false
+	rpcResult = mockthrift.NewMockTestResult()
+	err = cli.Call(context.Background(), mtd, mockthrift.NewMockTestArgs(), rpcResult)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, *rpcResult.(utils.KitexResult).GetResult().(*string) == retStr)
+	test.Assert(t, isBizErr, err)
+	test.Assert(t, errForReportIsNil)
+
+	// case 6: fallback for timeout error, return nil err
+	cli = newMockClient(t, ctrl,
+		WithMiddleware(sleepMW),
+		WithRPCTimeout(100*time.Millisecond),
+		WithFallback(fallback.TimeoutAndCBFallback(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+			if errors.Is(err, kerrors.ErrRPCTimeout) {
+				isTimeout = true
+			}
+			ret := mockthrift.NewMockTestResult()
+			ret.SetSuccess(&retStr)
+			return ret, nil
+		})),
+		WithTracer(mockTracer),
+	)
+	// reset
+	isTimeout = false
+	errForReportIsNil = true
+	rpcResult = mockthrift.NewMockTestResult()
+	err = cli.Call(context.Background(), mtd, mockthrift.NewMockTestArgs(), rpcResult)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, *rpcResult.(utils.KitexResult).GetResult().(*string) == retStr, rpcResult)
+	test.Assert(t, isTimeout, err)
+	test.Assert(t, !errForReportIsNil)
+
+	// case 6: use TimeoutAndCBFallback, non-timeout and non-CB error cannot do fallback
+	var fallbackExecuted bool
+	cli = newMockClient(t, ctrl,
+		WithMiddleware(mockErrMW),
+		WithRPCTimeout(100*time.Millisecond),
+		WithFallback(fallback.TimeoutAndCBFallback(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+			fallbackExecuted = true
+			return
+		})),
+		WithTracer(mockTracer),
+	)
+	// reset
+	errForReportIsNil = true
+	rpcResult = mockthrift.NewMockTestResult()
+	err = cli.Call(context.Background(), mtd, mockthrift.NewMockTestArgs(), rpcResult)
+	test.Assert(t, err != nil, err)
+	test.Assert(t, !fallbackExecuted)
+
+	// case 7: fallback return nil-resp and nil-err, framework will return the original resp and err
+	cli = newMockClient(t, ctrl,
+		WithMiddleware(mockErrMW),
+		WithRPCTimeout(100*time.Millisecond),
+		WithFallback(fallback.NewFallbackPolicy(func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+			return
+		})),
+		WithTracer(mockTracer),
+	)
+	mtd = mocks.MockMethod
+	rpcResult = mockthrift.NewMockTestResult()
+	err = cli.Call(context.Background(), mtd, mockthrift.NewMockTestArgs(), rpcResult)
+	test.Assert(t, err == mockErr)
+	test.Assert(t, !errForReportIsNil)
 }
 
 func TestClientFinalizer(t *testing.T) {

@@ -17,13 +17,16 @@
 package callopt
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/http"
+	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 )
@@ -89,4 +92,28 @@ func TestApply(t *testing.T) {
 	v, exist := remoteInfo.Tag(mockKey)
 	test.Assert(t, exist)
 	test.Assert(t, v == mockVal, v)
+
+	// WithRetryPolicy
+	option = WithRetryPolicy(retry.BuildFailurePolicy(retry.NewFailurePolicy()))
+	_, co := Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
+	test.Assert(t, co.RetryPolicy.Enable)
+	test.Assert(t, co.RetryPolicy.FailurePolicy != nil)
+
+	// WithRetryPolicy pass empty struct
+	option = WithRetryPolicy(retry.Policy{})
+	_, co = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
+	test.Assert(t, !co.RetryPolicy.Enable)
+
+	// WithFallback
+	option = WithFallback(fallback.ErrorFallback(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+		return
+	}).EnableReportAsFallbackRet())
+	_, co = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
+	test.Assert(t, co.Fallback != nil)
+	test.Assert(t, co.Fallback.ReportAsFallbackRet)
+
+	// WithFallback pass nil
+	option = WithFallback(nil)
+	_, co = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
+	test.Assert(t, co.Fallback == nil)
 }

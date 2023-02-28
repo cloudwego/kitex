@@ -687,6 +687,10 @@ func (p *MockTestResult) SetSuccess(x interface{}) {
 	p.Success = x.(*string)
 }
 
+func (p *MockTestResult) GetResult() interface{} {
+	return p.Success
+}
+
 var fieldIDToName_MockTestResult = map[int16]string{
 	0: "success",
 }

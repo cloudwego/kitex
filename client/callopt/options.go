@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/discovery"
+	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/http"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -45,6 +46,7 @@ type CallOptions struct {
 
 	// export field for using in client
 	RetryPolicy retry.Policy
+	Fallback    *fallback.Policy
 }
 
 func newOptions() interface{} {
@@ -63,6 +65,7 @@ func (co *CallOptions) Recycle() {
 	co.configs = nil
 	co.svr = nil
 	co.RetryPolicy = retry.Policy{}
+	co.Fallback = nil
 	co.locks.Zero()
 	callOptionsPool.Put(co)
 }
@@ -174,11 +177,11 @@ func WithTag(key, val string) Option {
 // Below is use demo, eg:
 //
 //	  demo1. call with failure retry policy, default retry error is Timeout
-//	  	resp, err := cli.Mock(ctx, req, callopt.WithRetryPolicy(retry.BuildFailurePolicy(retry.NewFailurePolicy())))
+//	  	`resp, err := cli.Mock(ctx, req, callopt.WithRetryPolicy(retry.BuildFailurePolicy(retry.NewFailurePolicy())))`
 //	  demo2. call with backup request policy
-//	  	bp := retry.NewBackupPolicy(10)
+//	  	`bp := retry.NewBackupPolicy(10)
 //		 	bp.WithMaxRetryTimes(1)
-//	  	resp, err := cli.Mock(ctx, req, callopt.WithRetryPolicy(retry.BuildBackupRequest(bp)))
+//	  	resp, err := cli.Mock(ctx, req, callopt.WithRetryPolicy(retry.BuildBackupRequest(bp)))`
 func WithRetryPolicy(p retry.Policy) Option {
 	return Option{f: func(o *CallOptions, di *strings.Builder) {
 		if !p.Enable {
@@ -190,6 +193,24 @@ func WithRetryPolicy(p retry.Policy) Option {
 			di.WriteString("WithFailureRetry")
 		}
 		o.RetryPolicy = p
+	}}
+}
+
+// WithFallback is used to set the fallback policy for a RPC call.
+// Below is use demo, eg:
+//
+//	demo1. call with fallback for error
+//		`resp, err := cli.Mock(ctx, req, callopt.WithFallback(fallback.ErrorFallback(yourFBFunc))`
+//
+//	demo2. call with fallback for error and enable reportAsFallbackRet, reportAsFallbackRet set true the RPC stat will set error as fallback not original error
+//		`resp, err := cli.Mock(ctx, req, callopt.WithFallback(fallback.ErrorFallback(yourFBFunc).EnableReportAsFallbackRet())`
+func WithFallback(fb *fallback.Policy) Option {
+	return Option{f: func(o *CallOptions, di *strings.Builder) {
+		if fb == nil || fb.FallbackFunc == nil {
+			return
+		}
+		di.WriteString("WithFallback")
+		o.Fallback = fb
 	}}
 }
 
