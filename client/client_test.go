@@ -26,8 +26,6 @@ import (
 	"testing"
 	"time"
 
-	mockthrift "github.com/cloudwego/kitex/internal/mocks/thrift"
-	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/netpoll"
 	"github.com/golang/mock/gomock"
 
@@ -37,8 +35,10 @@ import (
 	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	mocksstats "github.com/cloudwego/kitex/internal/mocks/stats"
+	mockthrift "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/retry"

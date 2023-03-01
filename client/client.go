@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -413,9 +414,9 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	// do fallback if with setup
 	fallback, hasFallback := getFallbackPolicy(callOptFallback, kc.opt.Fallback)
 	var fbErr error
-	if fallback != nil {
+	if hasFallback {
 		rpcStatAsFB := false
-		// Notice: if err is nil, rpcStatAsFB always be false even if user set true
+		// Notice: If err is nil, rpcStatAsFB will always be false, even if it's set to true by user.
 		_, fbErr, rpcStatAsFB = fallback.DoIfNeeded(ctx, ri, request, response, err)
 		if rpcStatAsFB {
 			err = fbErr

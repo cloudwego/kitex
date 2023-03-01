@@ -133,7 +133,7 @@ func TestTimeoutAndCBFallback(t *testing.T) {
 	test.Assert(t, fbErr == nil)
 	test.Assert(t, !reportAsFallback)
 
-	// case2: circuit breaker error will do fallbck
+	// case2: circuit breaker error will do fallback
 	fbP = TimeoutAndCBFallback(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 		fbResp = mockthrift.NewMockTestResult()
 		if setResp, ok := fbResp.(utils.KitexResult); ok {

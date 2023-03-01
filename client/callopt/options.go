@@ -174,7 +174,7 @@ func WithTag(key, val string) Option {
 
 // WithRetryPolicy sets the retry policy for a RPC call.
 // Build retry.Policy with retry.BuildFailurePolicy or retry.BuildBackupRequest instead of building retry.Policy directly.
-// Below is use demo, eg:
+// Demos are provided below:
 //
 //	  demo1. call with failure retry policy, default retry error is Timeout
 //	  	`resp, err := cli.Mock(ctx, req, callopt.WithRetryPolicy(retry.BuildFailurePolicy(retry.NewFailurePolicy())))`
@@ -197,12 +197,11 @@ func WithRetryPolicy(p retry.Policy) Option {
 }
 
 // WithFallback is used to set the fallback policy for a RPC call.
-// Below is use demo, eg:
+// Demos are provided below:
 //
 //	demo1. call with fallback for error
 //		`resp, err := cli.Mock(ctx, req, callopt.WithFallback(fallback.ErrorFallback(yourFBFunc))`
-//
-//	demo2. call with fallback for error and enable reportAsFallback, reportAsFallback set true the RPC stat will set error as fallback not original error
+//	demo2. call with fallback for error and enable reportAsFallback, which sets reportAsFallback to be true and will do report(metric) as Fallback result
 //		`resp, err := cli.Mock(ctx, req, callopt.WithFallback(fallback.ErrorFallback(yourFBFunc).EnableReportAsFallback())`
 func WithFallback(fb *fallback.Policy) Option {
 	return Option{f: func(o *CallOptions, di *strings.Builder) {

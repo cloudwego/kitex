@@ -391,17 +391,14 @@ func WithSpecifiedResultRetry(rr *retry.ShouldResultRetry) Option {
 }
 
 // WithFallback is used to set the fallback policy for the client.
-// Below is use demo, eg:
+// Demos are provided below:
 //
-//   demo1. fallback for error and resp
-//	    `client.WithFallback(fallback.NewFallbackPolicy(yourFBFunc))`
-//
-//	 demo2. fallback for error and enable reportAsFallback, reportAsFallback set true the RPC stat will set error as fallback not original error
-//	    `client.WithFallback(fallback.ErrorFallback(yourErrFBFunc).EnableReportAsFallback())`
-
-// demo2. fallback for rpctime and circuit breaker
-//
-//	`client.WithFallback(fallback.TimeoutAndCBFallback(yourErrFBFunc))`
+//	demo1. fallback for error and resp
+//		`client.WithFallback(fallback.NewFallbackPolicy(yourFBFunc))`
+//	demo2. fallback for error and enable reportAsFallback, which sets reportAsFallback to be true and will do report(metric) as Fallback result
+//		`client.WithFallback(fallback.ErrorFallback(yourErrFBFunc).EnableReportAsFallback())`
+//	demo2. fallback for rpctime and circuit breaker
+//		`client.WithFallback(fallback.TimeoutAndCBFallback(yourErrFBFunc))`
 func WithFallback(fb *fallback.Policy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		if fb == nil || fb.FallbackFunc == nil {
