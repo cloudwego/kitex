@@ -103,6 +103,7 @@ func TestServerReadMetainfo(t *testing.T) {
 
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
 	ctx, err = MetainfoServerHandler.ReadMeta(ctx0, msg)
+	ctx = metainfo.TransferForward(ctx)
 	tvs = metainfo.GetAllValues(ctx)
 	pvs = metainfo.GetAllPersistentValues(ctx)
 	test.Assert(t, err == nil)
@@ -112,7 +113,7 @@ func TestServerReadMetainfo(t *testing.T) {
 	ctx = metainfo.TransferForward(ctx)
 	tvs = metainfo.GetAllValues(ctx)
 	pvs = metainfo.GetAllPersistentValues(ctx)
-	test.Assert(t, len(tvs) == 0)
+	test.Assert(t, len(tvs) == 0, len(tvs))
 	test.Assert(t, len(pvs) == 1 && pvs["pk"] == "pv")
 }
 
