@@ -202,8 +202,8 @@ func WithRetryPolicy(p retry.Policy) Option {
 //	demo1. call with fallback for error
 //		`resp, err := cli.Mock(ctx, req, callopt.WithFallback(fallback.ErrorFallback(yourFBFunc))`
 //
-//	demo2. call with fallback for error and enable reportAsFallbackRet, reportAsFallbackRet set true the RPC stat will set error as fallback not original error
-//		`resp, err := cli.Mock(ctx, req, callopt.WithFallback(fallback.ErrorFallback(yourFBFunc).EnableReportAsFallbackRet())`
+//	demo2. call with fallback for error and enable reportAsFallback, reportAsFallback set true the RPC stat will set error as fallback not original error
+//		`resp, err := cli.Mock(ctx, req, callopt.WithFallback(fallback.ErrorFallback(yourFBFunc).EnableReportAsFallback())`
 func WithFallback(fb *fallback.Policy) Option {
 	return Option{f: func(o *CallOptions, di *strings.Builder) {
 		if fb == nil || fb.FallbackFunc == nil {

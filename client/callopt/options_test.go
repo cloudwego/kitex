@@ -107,10 +107,10 @@ func TestApply(t *testing.T) {
 	// WithFallback
 	option = WithFallback(fallback.ErrorFallback(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 		return
-	}).EnableReportAsFallbackRet())
+	}).EnableReportAsFallback())
 	_, co = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
 	test.Assert(t, co.Fallback != nil)
-	test.Assert(t, co.Fallback.ReportAsFallbackRet)
+	test.Assert(t, co.Fallback.ReportAsFallback)
 
 	// WithFallback pass nil
 	option = WithFallback(nil)

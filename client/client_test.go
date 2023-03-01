@@ -643,7 +643,7 @@ func TestFallbackForError(t *testing.T) {
 			return resp, nil
 		})
 		if reportAsFallback {
-			fbP.EnableReportAsFallbackRet()
+			fbP.EnableReportAsFallback()
 		}
 		return fbP
 	}

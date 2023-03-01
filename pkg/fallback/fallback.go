@@ -59,14 +59,14 @@ func NewFallbackPolicy(fb Func) *Policy {
 
 // Policy is the definition for fallback.
 //   - FallbackFunc is fallback func.
-//   - ReportAsFallbackRet is used to decide whether to report RPCStat according to the Fallback result.
+//   - ReportAsFallback is used to decide whether to report Metric according to the Fallback result.
 type Policy struct {
-	FallbackFunc        Func
-	ReportAsFallbackRet bool
+	FallbackFunc     Func
+	ReportAsFallback bool
 }
 
-func (p *Policy) EnableReportAsFallbackRet() *Policy {
-	p.ReportAsFallbackRet = true
+func (p *Policy) EnableReportAsFallback() *Policy {
+	p.ReportAsFallback = true
 	return p
 }
 
@@ -79,18 +79,18 @@ func (p *Policy) EnableReportAsFallbackRet() *Policy {
 type Func func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error)
 
 // DoFallback execute the fallback logic that user customized.
-// this func is not suggested to couple with Kitex.
+// this func is supposed not be related with Kitex.
 func (p *Policy) DoFallback(ctx context.Context, req, resp interface{}, err error,
-	allowReportAsFB bool) (fbResp interface{}, fbErr error, reportAsFallbackRet bool) {
+	allowReportAsFB bool) (fbResp interface{}, fbErr error, reportAsFallback bool) {
 	if p.FallbackFunc != nil {
 		fbResp, fbErr = p.FallbackFunc(ctx, req, resp, err)
-		return fbResp, fbErr, p.ReportAsFallbackRet && allowReportAsFB
+		return fbResp, fbErr, p.ReportAsFallback && allowReportAsFB
 	}
 	return resp, err, false
 }
 
 // DoIfNeeded will do prepare for fallback, which is coupled with Kitex.
-func (p *Policy) DoIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, req, resp interface{}, err error) (fbResp interface{}, fbErr error, reportAsFallbackRet bool) {
+func (p *Policy) DoIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, req, resp interface{}, err error) (fbResp interface{}, fbErr error, reportAsFallback bool) {
 	if p == nil {
 		return resp, err, false
 	}
@@ -103,7 +103,7 @@ func (p *Policy) DoIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, req, resp i
 		// if err is nil, rpcStatAsFB always be false even if user set true
 		allowReportAsFB = false
 	}
-	fbResp, fbErr, reportAsFallbackRet = p.DoFallback(ctx, req, resp, err, allowReportAsFB)
+	fbResp, fbErr, reportAsFallback = p.DoFallback(ctx, req, resp, err, allowReportAsFB)
 	if fbResp == nil && fbErr == nil {
 		return resp, err, false
 	}
@@ -121,7 +121,7 @@ func (p *Policy) DoIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, req, resp i
 			}
 		} else {
 			// assert failed, return fallback result directly
-			return fbResp, fbErr, reportAsFallbackRet
+			return fbResp, fbErr, reportAsFallback
 		}
 	}
 	return

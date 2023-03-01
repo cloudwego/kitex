@@ -396,8 +396,8 @@ func WithSpecifiedResultRetry(rr *retry.ShouldResultRetry) Option {
 //   demo1. fallback for error and resp
 //	    `client.WithFallback(fallback.NewFallbackPolicy(yourFBFunc))`
 //
-//	 demo2. fallback for error and enable reportAsFallbackRet, reportAsFallbackRet set true the RPC stat will set error as fallback not original error
-//	    `client.WithFallback(fallback.ErrorFallback(yourErrFBFunc).EnableReportAsFallbackRet())`
+//	 demo2. fallback for error and enable reportAsFallback, reportAsFallback set true the RPC stat will set error as fallback not original error
+//	    `client.WithFallback(fallback.ErrorFallback(yourErrFBFunc).EnableReportAsFallback())`
 
 // demo2. fallback for rpctime and circuit breaker
 //
