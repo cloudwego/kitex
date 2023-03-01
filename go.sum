@@ -13,8 +13,8 @@ github.com/apache/thrift v0.13.0/go.mod h1:cp2SuWMxlEZw2r+iP2GNCdIi4C1qmUzdZFSVb
 github.com/boombuler/barcode v1.0.0/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl3JlRe0mD8=
 github.com/boombuler/barcode v1.0.1/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl3JlRe0mD8=
 github.com/bytedance/gopkg v0.0.0-20220413063733-65bf48ffb3a7/go.mod h1:2ZlV9BaUH4+NXIBF0aMdKKAnHTzqH+iMU4KUjAbL23Q=
-github.com/bytedance/gopkg v0.0.0-20220531084716-665b4f21126f h1:2YCF3cgO6XCub0HIsLrA8ZGhmAPGZfOeSaGjT6Kx4Mc=
-github.com/bytedance/gopkg v0.0.0-20220531084716-665b4f21126f/go.mod h1:2ZlV9BaUH4+NXIBF0aMdKKAnHTzqH+iMU4KUjAbL23Q=
+github.com/bytedance/gopkg v0.0.0-20220817015305-b879a72dc90f h1:U3Bk6S9UyqFM5tU3bZ3pwqx5xyypHP7Bm2QCbOUwxSc=
+github.com/bytedance/gopkg v0.0.0-20220817015305-b879a72dc90f/go.mod h1:2ZlV9BaUH4+NXIBF0aMdKKAnHTzqH+iMU4KUjAbL23Q=
 github.com/bytedance/mockey v1.2.0 h1:847+X2fBSM4s/AIN4loO5d16PCgEj53j7Q8YVB+8P6c=
 github.com/bytedance/mockey v1.2.0/go.mod h1:+Jm/fzWZAuhEDrPXVjDf/jLM2BlLXJkwk94zf2JZ3X4=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
@@ -34,6 +34,8 @@ github.com/cloudwego/netpoll v0.3.2 h1:/998ICrNMVBo4mlul4j7qcIeY7QnEfuCCPPwck9S3
 github.com/cloudwego/netpoll v0.3.2/go.mod h1:xVefXptcyheopwNDZjDPcfU6kIjZXZ4nY550k1yH9eQ=
 github.com/cloudwego/thriftgo v0.2.6 h1:tU0E1UIrCogbiW0SD+1XW3Nv6JAGvx08aAmW2Kefztg=
 github.com/cloudwego/thriftgo v0.2.6/go.mod h1:8i9AF5uDdWHGqzUhXDlubCjx4MEfKvWXGQlMWyR0tM4=
+github.com/cloudwego/thriftgo v0.2.7 h1:LsBihiC57II94y7xiReBW/KRSnW78BrDVuVPvVH3e2Y=
+github.com/cloudwego/thriftgo v0.2.7/go.mod h1:8i9AF5uDdWHGqzUhXDlubCjx4MEfKvWXGQlMWyR0tM4=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
