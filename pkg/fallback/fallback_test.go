@@ -39,7 +39,7 @@ func TestNewFallbackPolicy(t *testing.T) {
 	test.Assert(t, !reportAsFallback)
 
 	// case1: original error is non-nil and set result in fallback
-	fbP = NewFallbackPolicy(func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+	fbP = NewFallbackPolicy(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 		if setResp, ok := resp.(utils.KitexResult); ok {
 			setResp.SetSuccess(&retStr)
 		}
@@ -54,7 +54,7 @@ func TestNewFallbackPolicy(t *testing.T) {
 	test.Assert(t, !reportAsFallback)
 
 	// case2: enable reportAsFallback
-	fbP = NewFallbackPolicy(func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+	fbP = NewFallbackPolicy(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 		if setResp, ok := resp.(utils.KitexResult); ok {
 			setResp.SetSuccess(&retStr)
 		}
@@ -65,7 +65,7 @@ func TestNewFallbackPolicy(t *testing.T) {
 	test.Assert(t, reportAsFallback)
 
 	// case3: original error is nil, still can update result
-	fbP = NewFallbackPolicy(func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+	fbP = NewFallbackPolicy(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 		if setResp, ok := resp.(utils.KitexResult); ok {
 			setResp.SetSuccess(&retStr)
 		}
@@ -79,7 +79,7 @@ func TestNewFallbackPolicy(t *testing.T) {
 	test.Assert(t, !reportAsFallback)
 
 	// case4: fallback return nil-resp and nil-err, framework will return the original resp and err
-	fbP = NewFallbackPolicy(func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+	fbP = NewFallbackPolicy(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 		return
 	}).EnableReportAsFallback()
 	test.Assert(t, fbP.ReportAsFallback)

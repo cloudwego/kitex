@@ -542,7 +542,7 @@ func TestRetryWithResultRetry(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	var mockErr = errors.New("mock")
+	mockErr := errors.New("mock")
 	retryWithMockErr := false
 	var count int32
 	errMW := func(next endpoint.Endpoint) endpoint.Endpoint {
@@ -600,7 +600,7 @@ func TestFallbackForError(t *testing.T) {
 			return nil
 		}
 	}
-	var mockErr = errors.New("mock")
+	mockErr := errors.New("mock")
 	mockErrMW := func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, resp interface{}) (err error) {
 			return mockErr
@@ -627,7 +627,7 @@ func TestFallbackForError(t *testing.T) {
 		}
 	}).AnyTimes()
 	newFallback := func(reportAsFallback bool) *fallback.Policy {
-		fbP := fallback.NewFallbackPolicy(func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+		fbP := fallback.NewFallbackPolicy(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 			if errors.Is(err, kerrors.ErrRPCTimeout) {
 				isTimeout = true
 			}
@@ -769,7 +769,7 @@ func TestFallbackForError(t *testing.T) {
 	cli = newMockClient(t, ctrl,
 		WithMiddleware(mockErrMW),
 		WithRPCTimeout(100*time.Millisecond),
-		WithFallback(fallback.NewFallbackPolicy(func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+		WithFallback(fallback.NewFallbackPolicy(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 			return
 		})),
 		WithTracer(mockTracer),

@@ -28,7 +28,7 @@ import (
 
 // ErrorFallback is to build fallback policy for error.
 func ErrorFallback(ef Func) *Policy {
-	return &Policy{FallbackFunc: func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+	return &Policy{FallbackFunc: func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 		if err == nil {
 			return resp, err
 		}
@@ -39,7 +39,7 @@ func ErrorFallback(ef Func) *Policy {
 // TimeoutAndCBFallback is to build fallback policy for rpc timeout and circuit breaker error.
 // Kitex will filter the errors, only timeout and circuit breaker can trigger the ErrorFunc to execute.
 func TimeoutAndCBFallback(ef Func) *Policy {
-	return &Policy{FallbackFunc: func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+	return &Policy{FallbackFunc: func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 		if err == nil {
 			return resp, err
 		}
@@ -76,12 +76,13 @@ func (p *Policy) EnableReportAsFallback() *Policy {
 //
 //	for resp, assert utils.KitexResult can get or set actual resp
 //	for req, assert utils.KitexArgs can get first actual req
-type Func func(ctx context.Context, req interface{}, resp interface{}, err error) (fbResp interface{}, fbErr error)
+type Func func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error)
 
 // DoFallback execute the fallback logic that user customized.
 // this func is supposed not be related with Kitex.
 func (p *Policy) DoFallback(ctx context.Context, req, resp interface{}, err error,
-	allowReportAsFB bool) (fbResp interface{}, fbErr error, reportAsFallback bool) {
+	allowReportAsFB bool,
+) (fbResp interface{}, fbErr error, reportAsFallback bool) {
 	if p.FallbackFunc != nil {
 		fbResp, fbErr = p.FallbackFunc(ctx, req, resp, err)
 		return fbResp, fbErr, p.ReportAsFallback && allowReportAsFB

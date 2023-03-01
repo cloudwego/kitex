@@ -663,7 +663,7 @@ func (kc *kClient) warmingUp() error {
 }
 
 // return fallback policy from call option and client option.
-func getFallbackPolicy(callOptFB *fallback.Policy, cliOptFB *fallback.Policy) (fb *fallback.Policy, hasFallback bool) {
+func getFallbackPolicy(callOptFB, cliOptFB *fallback.Policy) (fb *fallback.Policy, hasFallback bool) {
 	if callOptFB != nil {
 		return callOptFB, true
 	}
