@@ -33,9 +33,9 @@ func TestNewFallbackPolicy(t *testing.T) {
 	// case0: policy is nil
 	var fbP *Policy
 	result := mockthrift.NewMockTestResult()
-	fbResp, fbErr, reportAsFallback := fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), result, mockErr)
+	fbResp, fbErr, reportAsFallback := fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), result, errMock)
 	test.Assert(t, fbResp == result)
-	test.Assert(t, fbErr == mockErr)
+	test.Assert(t, fbErr == errMock)
 	test.Assert(t, !reportAsFallback)
 
 	// case1: original error is non-nil and set result in fallback
@@ -47,7 +47,7 @@ func TestNewFallbackPolicy(t *testing.T) {
 	})
 	test.Assert(t, !fbP.ReportAsFallback)
 	test.Assert(t, fbP.FallbackFunc != nil)
-	fbResp, fbErr, reportAsFallback = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), mockthrift.NewMockTestResult(), mockErr)
+	fbResp, fbErr, reportAsFallback = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), mockthrift.NewMockTestResult(), errMock)
 	test.Assert(t, fbResp != nil)
 	test.Assert(t, *fbResp.(utils.KitexResult).GetResult().(*string) == retStr)
 	test.Assert(t, fbErr == nil)
@@ -61,7 +61,7 @@ func TestNewFallbackPolicy(t *testing.T) {
 		return resp, nil
 	}).EnableReportAsFallback()
 	test.Assert(t, fbP.ReportAsFallback)
-	fbResp, fbErr, reportAsFallback = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), mockthrift.NewMockTestResult(), mockErr)
+	_, _, reportAsFallback = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), mockthrift.NewMockTestResult(), errMock)
 	test.Assert(t, reportAsFallback)
 
 	// case3: original error is nil, still can update result
@@ -83,8 +83,8 @@ func TestNewFallbackPolicy(t *testing.T) {
 		return
 	}).EnableReportAsFallback()
 	test.Assert(t, fbP.ReportAsFallback)
-	fbResp, fbErr, reportAsFallback = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), mockthrift.NewMockTestResult(), mockErr)
-	test.Assert(t, fbErr == mockErr)
+	_, fbErr, reportAsFallback = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), mockthrift.NewMockTestResult(), errMock)
+	test.Assert(t, fbErr == errMock)
 	test.Assert(t, !reportAsFallback)
 }
 
@@ -97,7 +97,7 @@ func TestErrorFallback(t *testing.T) {
 		}
 		return fbResp, nil
 	})
-	fbResp, fbErr, reportAsFallback := fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), mockthrift.NewMockTestResult(), mockErr)
+	fbResp, fbErr, reportAsFallback := fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), mockthrift.NewMockTestResult(), errMock)
 	test.Assert(t, fbResp != nil)
 	test.Assert(t, *fbResp.(utils.KitexResult).GetResult().(*string) == retStr)
 	test.Assert(t, fbErr == nil)
@@ -112,7 +112,7 @@ func TestErrorFallback(t *testing.T) {
 		return fbResp, nil
 	})
 	result := mockthrift.NewMockTestResult()
-	fbResp, fbErr, reportAsFallback = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), result, nil)
+	fbResp, fbErr, _ = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), result, nil)
 	test.Assert(t, fbResp == result)
 	test.Assert(t, fbErr == nil)
 }
@@ -127,7 +127,7 @@ func TestTimeoutAndCBFallback(t *testing.T) {
 		return fbResp, nil
 	})
 	result := mockthrift.NewMockTestResult()
-	fbResp, fbErr, reportAsFallback := fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), result, kerrors.ErrRPCTimeout.WithCause(mockErr))
+	fbResp, fbErr, reportAsFallback := fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), result, kerrors.ErrRPCTimeout.WithCause(errMock))
 	test.Assert(t, fbResp != nil)
 	test.Assert(t, *fbResp.(utils.KitexResult).GetResult().(*string) == retStr)
 	test.Assert(t, fbErr == nil)
@@ -142,7 +142,7 @@ func TestTimeoutAndCBFallback(t *testing.T) {
 		return fbResp, nil
 	}).EnableReportAsFallback()
 	result = mockthrift.NewMockTestResult()
-	fbResp, fbErr, reportAsFallback = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), result, kerrors.ErrCircuitBreak.WithCause(mockErr))
+	fbResp, fbErr, reportAsFallback = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), result, kerrors.ErrCircuitBreak.WithCause(errMock))
 	test.Assert(t, fbResp != nil)
 	test.Assert(t, *fbResp.(utils.KitexResult).GetResult().(*string) == retStr)
 	test.Assert(t, fbErr == nil)
@@ -157,15 +157,15 @@ func TestTimeoutAndCBFallback(t *testing.T) {
 		return fbResp, nil
 	})
 	result = mockthrift.NewMockTestResult()
-	fbResp, fbErr, reportAsFallback = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), result, mockErr)
+	fbResp, fbErr, reportAsFallback = fbP.DoIfNeeded(context.Background(), genRPCInfo(), mockthrift.NewMockTestArgs(), result, errMock)
 	test.Assert(t, fbResp == result)
-	test.Assert(t, fbErr == mockErr)
+	test.Assert(t, fbErr == errMock)
 	test.Assert(t, !reportAsFallback)
 }
 
 var (
 	method  = "test"
-	mockErr = errors.New("mock")
+	errMock = errors.New("mock")
 	retStr  = "success"
 )
 
