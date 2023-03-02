@@ -157,7 +157,10 @@ func (ts *transServer) onConnRead(ctx context.Context, conn netpoll.Connection) 
 	err := ts.transHdlr.OnRead(ctx, conn)
 	if err != nil {
 		ts.onError(ctx, err, conn)
-		conn.Close()
+		if conn != nil {
+			// close the connection if OnRead return error
+			conn.Close()
+		}
 	}
 	return nil
 }
