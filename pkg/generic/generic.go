@@ -19,7 +19,6 @@ package generic
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/cloudwego/dynamicgo/conv"
 
@@ -27,16 +26,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
-
-const defaultBufferSize = 4096
-
-var bytesPool = sync.Pool{
-	New: func() interface{} {
-		// TODO: need to consider the size
-		b := make([]byte, 0, defaultBufferSize)
-		return &b
-	},
-}
 
 type DynamicgoOptions struct {
 	ConvOpts                conv.Options

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"sync/atomic"
 
 	athrift "github.com/apache/thrift/lib/go/thrift"
@@ -167,8 +168,16 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		if err != nil {
 			return err
 		}
-		cv := t2j.NewBinaryConv(c.convOpts)
+
+		var bytesPool = sync.Pool{
+			New: func() interface{} {
+				bufLen := float64(len(transBuff)) * 1.5
+				b := make([]byte, 0, int(bufLen))
+				return &b
+			},
+		}
 		buf := bytesPool.Get().(*[]byte)
+		cv := t2j.NewBinaryConv(c.convOpts)
 		// decode thrift binary to json binary
 		if err := cv.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
 			return err
