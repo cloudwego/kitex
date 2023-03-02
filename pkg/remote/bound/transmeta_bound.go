@@ -20,6 +20,8 @@ import (
 	"context"
 	"net"
 
+	"github.com/bytedance/gopkg/cloud/metainfo"
+
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
@@ -62,6 +64,11 @@ func (h *transMetaHandler) OnMessage(ctx context.Context, args, result remote.Me
 	if isServer && result.MessageType() != remote.Exception {
 		// Pass through method name using ctx, the method name will be used as from method in the client.
 		ctx = context.WithValue(ctx, consts.CtxKeyMethod, msg.RPCInfo().To().Method())
+		// TransferForward converts transient values to transient-upstream values and filters out original transient-upstream values.
+		// It should be used before the context is passing from server to client.
+		// reference https://github.com/bytedance/gopkg/tree/main/cloud/metainfo
+		// Notice, it should be after ReadMeta().
+		ctx = metainfo.TransferForward(ctx)
 	}
 	return ctx, nil
 }

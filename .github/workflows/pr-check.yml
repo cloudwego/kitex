@@ -14,7 +14,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check Spell
-        uses: crate-ci/typos@master
+        uses: crate-ci/typos@v1.13.14
 
   staticcheck:
     runs-on: [ self-hosted, X64 ]
