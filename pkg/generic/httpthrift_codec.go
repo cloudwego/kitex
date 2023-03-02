@@ -162,15 +162,6 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	if err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageBegin failed: %s", err.Error()))
 	}
-	sname, err := tProt.ReadStructBegin()
-	if err != nil {
-		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadStructBegin failed: %s", err.Error()))
-	}
-	fname, ftype, fid, err := tProt.ReadFieldBegin()
-	if err != nil {
-		return perrors.NewProtocolErrorWithErrMsg(err,
-			fmt.Sprintf("thrift unmarshal, ReadFieldBegin failed: %s", err.Error()))
-	}
 	if err = codec.UpdateMsgType(uint32(msgType), msg); err != nil {
 		return err
 	}
@@ -199,7 +190,15 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		return err
 	}
 
-	// decode in normal way
+	sname, err := tProt.ReadStructBegin()
+	if err != nil {
+		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadStructBegin failed: %s", err.Error()))
+	}
+	fname, ftype, fid, err := tProt.ReadFieldBegin()
+	if err != nil {
+		return perrors.NewProtocolErrorWithErrMsg(err,
+			fmt.Sprintf("thrift unmarshal, ReadFieldBegin failed: %s", err.Error()))
+	}
 	msgBeginLen := bthrift.Binary.MessageBeginLength(method, msgType, seqID)
 	structBeginLen := bthrift.Binary.StructBeginLength(sname)
 	fieldBeginLen := bthrift.Binary.FieldBeginLength(fname, ftype, fid)

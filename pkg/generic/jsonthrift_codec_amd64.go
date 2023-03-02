@@ -71,25 +71,15 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 		tyDsc = svcDsc.DynamicgoDsc.Functions()[method].Request().Struct().Fields()[0].Type()
 	}
 
-	var transBuff string
+	var transData interface{}
 	if msg.RPCRole() == remote.Server {
 		gResult := data.(*Result)
-		transData := gResult.Success
-		// TODO: deal with void
-		if transBuff, ok = transData.(string); !ok {
-			return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
-		}
+		transData = gResult.Success
 	} else {
 		gArg := data.(*Args)
-		transData := gArg.Request
-		if transBuff, ok = transData.(string); !ok {
-			return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
-		}
+		transData = gArg.Request
 	}
 
-	// encode in normal way using dynamicgo
-	cv := j2t.NewBinaryConv(c.convOpts)
-	buf := make([]byte, 0, len(transBuff))
 	tProt := cthrift.NewBinaryProtocol(out)
 	if err := tProt.WriteMessageBegin(method, athrift.TMessageType(msgType), msg.RPCInfo().Invocation().SeqID()); err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageBegin failed: %s", err.Error()))
@@ -98,31 +88,45 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteStructBegin failed: %s", err.Error()))
 	}
 	if msgType == remote.Reply {
-		if err := tProt.WriteFieldBegin("", athrift.STRUCT, 0); err != nil {
+		if err := tProt.WriteFieldBegin("", tyDsc.Type().ToThriftTType(), 0); err != nil {
 			return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteFieldBegin failed: %s", err.Error()))
 		}
 	} else {
-		if err := tProt.WriteFieldBegin("", athrift.STRUCT, 1); err != nil {
+		if err := tProt.WriteFieldBegin("", tyDsc.Type().ToThriftTType(), 1); err != nil {
 			return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteFieldBegin failed: %s", err.Error()))
 		}
 	}
-	// TODO: discuss *(*[]byte)(unsafe.Pointer(&transBuff))
-	// encode json binary to thrift binary
-	var v []byte
-	(*GoSlice)(unsafe.Pointer(&v)).Cap = (*GoString)(unsafe.Pointer(&transBuff)).Len
-	(*GoSlice)(unsafe.Pointer(&v)).Len = (*GoString)(unsafe.Pointer(&transBuff)).Len
-	(*GoSlice)(unsafe.Pointer(&v)).Ptr = (*GoString)(unsafe.Pointer(&transBuff)).Ptr
-	err := cv.DoInto(ctx, tyDsc, v, &buf)
-	// err := cv.DoInto(ctx, tyDsc, *(*[]byte)(unsafe.Pointer(&transBuff)), &buf)
-	// err := cv.DoInto(ctx, tyDsc, []byte(transBuff), &buf)
-	if err != nil {
-		return err
+
+	_, isVoid := transData.(descriptor.Void)
+	transBuff, isString := transData.(string)
+	if !isVoid && !isString {
+		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
+	} else if isString {
+		// encode in normal way using dynamicgo
+		cv := j2t.NewBinaryConv(c.convOpts)
+		buf := make([]byte, 0, len(transBuff))
+		// TODO: discuss *(*[]byte)(unsafe.Pointer(&transBuff))
+		// encode json binary to thrift binary
+		var v []byte
+		(*GoSlice)(unsafe.Pointer(&v)).Cap = (*GoString)(unsafe.Pointer(&transBuff)).Len
+		(*GoSlice)(unsafe.Pointer(&v)).Len = (*GoString)(unsafe.Pointer(&transBuff)).Len
+		(*GoSlice)(unsafe.Pointer(&v)).Ptr = (*GoString)(unsafe.Pointer(&transBuff)).Ptr
+		err := cv.DoInto(ctx, tyDsc, v, &buf)
+		// err := cv.DoInto(ctx, tyDsc, *(*[]byte)(unsafe.Pointer(&transBuff)), &buf)
+		// err := cv.DoInto(ctx, tyDsc, []byte(transBuff), &buf)
+		if err != nil {
+			return err
+		}
+		// write thrift []byte
+		if _, err = out.WriteBinary(buf); err != nil {
+			return err
+		}
+	} else {
+		tProt.WriteStructBegin("")
+		tProt.WriteFieldStop()
+		tProt.WriteStructEnd()
 	}
 
-	// write thrift []byte
-	if _, err = out.WriteBinary(buf); err != nil {
-		return err
-	}
 	tProt.WriteFieldStop()
 	if err := tProt.WriteFieldEnd(); err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteFieldEnd failed: %s", err.Error()))

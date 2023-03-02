@@ -19,6 +19,7 @@ package generic
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"sync/atomic"
 
 	athrift "github.com/apache/thrift/lib/go/thrift"
@@ -95,20 +96,10 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
 
-	// decode with dynamicgo
 	tProt := cthrift.NewBinaryProtocol(in)
 	method, msgType, seqID, err := tProt.ReadMessageBegin()
 	if err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageBegin failed: %s", err.Error()))
-	}
-	sname, err := tProt.ReadStructBegin()
-	if err != nil {
-		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadStructBegin failed: %s", err.Error()))
-	}
-	fname, ftype, fid, err := tProt.ReadFieldBegin()
-	if err != nil {
-		return perrors.NewProtocolErrorWithErrMsg(err,
-			fmt.Sprintf("thrift unmarshal, ReadFieldBegin failed: %s", err.Error()))
 	}
 	if err = codec.UpdateMsgType(uint32(msgType), msg); err != nil {
 		return err
@@ -116,7 +107,6 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 
 	var tyDsc *dthrift.TypeDescriptor
 	messageType := msg.MessageType()
-	// exception message
 	if messageType == remote.Exception {
 		exception := athrift.NewTApplicationException(athrift.UNKNOWN_APPLICATION_EXCEPTION, "")
 		if err := exception.Read(tProt); err != nil {
@@ -151,23 +141,47 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		return err
 	}
 
-	// decode in normal way
-	msgBeginLen := bthrift.Binary.MessageBeginLength(method, msgType, seqID)
-	structBeginLen := bthrift.Binary.StructBeginLength(sname)
-	fieldBeginLen := bthrift.Binary.FieldBeginLength(fname, ftype, fid)
-	transBuff, err := in.ReadBinary(
-		msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength() -
-			structBeginLen - bthrift.Binary.StructEndLength() -
-			fieldBeginLen - bthrift.Binary.FieldEndLength() - bthrift.Binary.FieldStopLength())
-	if err != nil {
-		return err
-	}
-
-	cv := t2j.NewBinaryConv(c.convOpts)
-	buf := bytesPool.Get().(*[]byte)
-	// decode thrift binary to json binary
-	if err := cv.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
-		return err
+	var resp interface{}
+	if tyDsc.Type() == dthrift.VOID {
+		tProt.ReadStructBegin()
+		in.ReadBinary(bthrift.Binary.FieldStopLength())
+		tProt.ReadStructEnd()
+		resp = descriptor.Void{}
+	} else {
+		sname, err := tProt.ReadStructBegin()
+		if err != nil {
+			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadStructBegin failed: %s", err.Error()))
+		}
+		fname, ftype, fid, err := tProt.ReadFieldBegin()
+		if err != nil {
+			return perrors.NewProtocolErrorWithErrMsg(err,
+				fmt.Sprintf("thrift unmarshal, ReadFieldBegin failed: %s", err.Error()))
+		}
+		msgBeginLen := bthrift.Binary.MessageBeginLength(method, msgType, seqID)
+		structBeginLen := bthrift.Binary.StructBeginLength(sname)
+		fieldBeginLen := bthrift.Binary.FieldBeginLength(fname, ftype, fid)
+		transBuff, err := in.ReadBinary(
+			msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength() -
+				structBeginLen - bthrift.Binary.StructEndLength() -
+				fieldBeginLen - bthrift.Binary.FieldEndLength() - bthrift.Binary.FieldStopLength())
+		if err != nil {
+			return err
+		}
+		cv := t2j.NewBinaryConv(c.convOpts)
+		buf := bytesPool.Get().(*[]byte)
+		// decode thrift binary to json binary
+		if err := cv.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
+			return err
+		}
+		resp = string(*buf)
+		if tyDsc.Type() == dthrift.STRING {
+			resp, err = strconv.Unquote(resp.(string))
+			if err != nil {
+				return err
+			}
+		}
+		*buf = (*buf)[:0]
+		bytesPool.Put(buf)
 	}
 
 	tProt.ReadFieldEnd()
@@ -180,13 +194,11 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	if msg.RPCRole() == remote.Server {
 		gArg := data.(*Args)
 		gArg.Method = method
-		gArg.Request = string(*buf)
+		gArg.Request = resp
 	} else {
 		gResult := data.(*Result)
-		gResult.Success = string(*buf)
+		gResult.Success = resp
 	}
-	*buf = (*buf)[:0]
-	bytesPool.Put(buf)
 	return nil
 }
 
