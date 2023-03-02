@@ -117,6 +117,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var recvMsg remote.Message
 	var sendMsg remote.Message
+	closeConnOutsideIfErr := true
 	defer func() {
 		panicErr := recover()
 		var wrapErr error
@@ -143,6 +144,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
 		if wrapErr != nil {
 			err = wrapErr
+		}
+		if err != nil && !closeConnOutsideIfErr {
+			err = nil
 		}
 	}()
 	ctx = t.startTracer(ctx, ri)
@@ -175,12 +179,12 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		// error cannot be wrapped to print here, so it must exec before NewTransError
 		t.OnError(ctx, err, conn)
 		err = remote.NewTransError(remote.InternalError, err)
-		// connection should not be closed only when the error is return by the server handler
-		// otherwise, return the error and the connection will be closed outside.
 		if closeConn := t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false); closeConn {
 			return err
 		}
-		return nil
+		// connection don't need to be closed when the error is return by the server handler
+		closeConnOutsideIfErr = false
+		return
 	}
 
 	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
@@ -188,7 +192,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		t.OnError(ctx, err, conn)
 		return err
 	}
-	return nil
+	return
 }
 
 // OnMessage implements the remote.ServerTransHandler interface.
