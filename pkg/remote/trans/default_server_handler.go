@@ -145,7 +145,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		if wrapErr != nil {
 			err = wrapErr
 		}
-		if !closeConnOutsideIfErr && err != nil {
+		if err != nil && !closeConnOutsideIfErr {
 			err = nil
 		}
 	}()
