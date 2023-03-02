@@ -215,7 +215,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	}
 	tyDsc := svcDsc.DynamicgoDsc.Functions()[method].Response().Struct().Fields()[0].Type()
 
-	var bytesPool = sync.Pool{
+	bytesPool := sync.Pool{
 		New: func() interface{} {
 			bufLen := float64(len(transBuff)) * 1.5
 			b := make([]byte, 0, int(bufLen))
