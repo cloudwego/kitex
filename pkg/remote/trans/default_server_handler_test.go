@@ -22,6 +22,8 @@ import (
 	"net"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/mocks/stats"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
@@ -29,7 +31,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/golang/mock/gomock"
 )
 
 func TestDefaultSvrTransHandler(t *testing.T) {
