@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
-	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/golang/mock/gomock"
 
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
@@ -32,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/invoke"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
 // TestNewTransMetaHandler test NewTransMetaHandler function and assert the result not nil.
