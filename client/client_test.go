@@ -648,7 +648,6 @@ func TestFallbackForError(t *testing.T) {
 				return &retStr, nil
 			})
 		} else {
-
 			fallbackFunc = func(ctx context.Context, args utils.KitexArgs, result utils.KitexResult, err error) (fbErr error) {
 				checkErr(err)
 				_, ok := args.(*mockthrift.MockTestArgs)
