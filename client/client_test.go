@@ -627,7 +627,9 @@ func TestFallbackForError(t *testing.T) {
 		}
 	}).AnyTimes()
 	newFallback := func(realReqResp bool, testCase string) *fallback.Policy {
-		fbP := fallback.NewFallbackPolicy(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+		var fallbackFunc fallback.Func
+		checkErr := func(err error) {
+			isTimeout, isMockErr, isBizErr = false, false, false
 			if errors.Is(err, kerrors.ErrRPCTimeout) {
 				isTimeout = true
 			}
@@ -637,21 +639,25 @@ func TestFallbackForError(t *testing.T) {
 			if _, ok := kerrors.FromBizStatusError(err); ok {
 				isBizErr = true
 			}
-			if realReqResp {
+		}
+		if realReqResp {
+			fallbackFunc = fallback.UnwrapHelper(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+				checkErr(err)
 				_, ok := req.(*mockthrift.MockReq)
 				test.Assert(t, ok, testCase)
 				return &retStr, nil
+			})
+		} else {
+
+			fallbackFunc = func(ctx context.Context, args utils.KitexArgs, result utils.KitexResult, err error) (fbErr error) {
+				checkErr(err)
+				_, ok := args.(*mockthrift.MockTestArgs)
+				test.Assert(t, ok, testCase)
+				result.SetSuccess(&retStr)
+				return nil
 			}
-			_, ok := req.(*mockthrift.MockTestArgs)
-			test.Assert(t, ok, testCase)
-			fbResult := mockthrift.NewMockTestResult()
-			fbResult.SetSuccess(&retStr)
-			return fbResult, nil
-		})
-		if realReqResp {
-			fbP.WithRealReqResp()
 		}
-		return fbP
+		return fallback.NewFallbackPolicy(fallbackFunc)
 	}
 
 	// case 1: fallback for timeout, return nil err, but report original err
@@ -733,16 +739,12 @@ func TestFallbackForError(t *testing.T) {
 	cli = newMockClient(t, ctrl,
 		WithMiddleware(sleepMW),
 		WithRPCTimeout(100*time.Millisecond),
-		WithFallback(fallback.TimeoutAndCBFallback(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+		WithFallback(fallback.TimeoutAndCBFallback(fallback.UnwrapHelper(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 			if errors.Is(err, kerrors.ErrRPCTimeout) {
 				isTimeout = true
 			}
-			_, ok := req.(*mockthrift.MockTestArgs)
-			test.Assert(t, ok)
-			ret := mockthrift.NewMockTestResult()
-			ret.SetSuccess(&retStr)
-			return ret, nil
-		})),
+			return &retStr, nil
+		}))),
 		WithTracer(mockTracer),
 	)
 	// reset
@@ -760,7 +762,7 @@ func TestFallbackForError(t *testing.T) {
 	cli = newMockClient(t, ctrl,
 		WithMiddleware(mockErrMW),
 		WithRPCTimeout(100*time.Millisecond),
-		WithFallback(fallback.TimeoutAndCBFallback(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+		WithFallback(fallback.TimeoutAndCBFallback(func(ctx context.Context, args utils.KitexArgs, result utils.KitexResult, err error) (fbErr error) {
 			fallbackExecuted = true
 			return
 		})),
@@ -777,7 +779,7 @@ func TestFallbackForError(t *testing.T) {
 	cli = newMockClient(t, ctrl,
 		WithMiddleware(mockErrMW),
 		WithRPCTimeout(100*time.Millisecond),
-		WithFallback(fallback.NewFallbackPolicy(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+		WithFallback(fallback.NewFallbackPolicy(func(ctx context.Context, args utils.KitexArgs, result utils.KitexResult, err error) (fbErr error) {
 			return
 		})),
 		WithTracer(mockTracer),

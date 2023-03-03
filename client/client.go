@@ -417,7 +417,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	if hasFallback {
 		rpcStatAsFB := false
 		// Notice: If err is nil, rpcStatAsFB will always be false, even if it's set to true by user.
-		_, fbErr, rpcStatAsFB = fallback.DoIfNeeded(ctx, ri, request, response, err)
+		fbErr, rpcStatAsFB = fallback.DoIfNeeded(ctx, ri, request, response, err)
 		if rpcStatAsFB {
 			err = fbErr
 		}

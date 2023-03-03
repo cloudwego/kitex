@@ -105,9 +105,9 @@ func TestApply(t *testing.T) {
 	test.Assert(t, !co.RetryPolicy.Enable)
 
 	// WithFallback
-	option = WithFallback(fallback.ErrorFallback(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
+	option = WithFallback(fallback.ErrorFallback(fallback.UnwrapHelper(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 		return
-	}).EnableReportAsFallback())
+	})).EnableReportAsFallback())
 	_, co = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
 	test.Assert(t, co.Fallback != nil)
 
