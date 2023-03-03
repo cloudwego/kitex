@@ -401,7 +401,7 @@ func WithSpecifiedResultRetry(rr *retry.ShouldResultRetry) Option {
 //		`client.WithFallback(fallback.TimeoutAndCBFallback(yourErrFBFunc))`
 func WithFallback(fb *fallback.Policy) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
-		if fb == nil || fb.FallbackFunc == nil {
+		if !fallback.IsPolicyValid(fb) {
 			panic(fmt.Errorf("WithFallback: invalid '%+v'", fb))
 		}
 		di.Push(fmt.Sprintf("WithFallback(%+v)", fb))

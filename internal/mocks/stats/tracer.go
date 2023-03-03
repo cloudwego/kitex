@@ -18,7 +18,7 @@
 // Source: ../../pkg/stats/tracer.go
 
 // Package tracer is a generated GoMock package.
-package tracer
+package stats
 
 import (
 	context "context"

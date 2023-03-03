@@ -519,6 +519,10 @@ func (p *MockTestArgs) SetReq(val *MockReq) {
 	p.Req = val
 }
 
+func (p *MockTestArgs) GetFirstArgument() (interface{}) {
+	return p.Req
+}
+
 var fieldIDToName_MockTestArgs = map[int16]string{
 	1: "req",
 }

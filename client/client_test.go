@@ -626,7 +626,7 @@ func TestFallbackForError(t *testing.T) {
 			errForReportIsNil = false
 		}
 	}).AnyTimes()
-	newFallback := func(reportAsFallback bool) *fallback.Policy {
+	newFallback := func(realReqResp bool, testCase string) *fallback.Policy {
 		fbP := fallback.NewFallbackPolicy(func(ctx context.Context, req, resp interface{}, err error) (fbResp interface{}, fbErr error) {
 			if errors.Is(err, kerrors.ErrRPCTimeout) {
 				isTimeout = true
@@ -637,13 +637,19 @@ func TestFallbackForError(t *testing.T) {
 			if _, ok := kerrors.FromBizStatusError(err); ok {
 				isBizErr = true
 			}
-			if setResp, ok := resp.(utils.KitexResult); ok {
-				setResp.SetSuccess(&retStr)
+			if realReqResp {
+				_, ok := req.(*mockthrift.MockReq)
+				test.Assert(t, ok, testCase)
+				return &retStr, nil
 			}
-			return resp, nil
+			_, ok := req.(*mockthrift.MockTestArgs)
+			test.Assert(t, ok, testCase)
+			fbResult := mockthrift.NewMockTestResult()
+			fbResult.SetSuccess(&retStr)
+			return fbResult, nil
 		})
-		if reportAsFallback {
-			fbP.EnableReportAsFallback()
+		if realReqResp {
+			fbP.WithRealReqResp()
 		}
 		return fbP
 	}
@@ -652,7 +658,7 @@ func TestFallbackForError(t *testing.T) {
 	cli := newMockClient(t, ctrl,
 		WithMiddleware(sleepMW),
 		WithRPCTimeout(100*time.Millisecond),
-		WithFallback(newFallback(false)),
+		WithFallback(newFallback(false, "case 1")),
 		WithTracer(mockTracer),
 	)
 	mtd := mocks.MockMethod
@@ -666,7 +672,7 @@ func TestFallbackForError(t *testing.T) {
 	// case 2: fallback for mock error, but report original err
 	cli = newMockClient(t, ctrl,
 		WithMiddleware(mockErrMW),
-		WithFallback(newFallback(false)))
+		WithFallback(newFallback(false, "case 2")))
 	rpcResult = mockthrift.NewMockTestResult()
 	err = cli.Call(context.Background(), mtd, mockthrift.NewMockTestArgs(), rpcResult)
 	test.Assert(t, err == nil, err)
@@ -678,7 +684,7 @@ func TestFallbackForError(t *testing.T) {
 	cli = newMockClient(t, ctrl,
 		WithMiddleware(sleepMW),
 		WithRPCTimeout(100*time.Millisecond),
-		WithFallback(newFallback(true)),
+		WithFallback(newFallback(true, "case 3").EnableReportAsFallback()),
 		WithTracer(mockTracer),
 	)
 	// reset
@@ -710,7 +716,7 @@ func TestFallbackForError(t *testing.T) {
 	cli = newMockClient(t, ctrl,
 		WithMiddleware(bizErrMW),
 		WithRPCTimeout(100*time.Millisecond),
-		WithFallback(newFallback(false)),
+		WithFallback(newFallback(true, "case 5")),
 		WithTracer(mockTracer),
 	)
 	// reset
@@ -731,6 +737,8 @@ func TestFallbackForError(t *testing.T) {
 			if errors.Is(err, kerrors.ErrRPCTimeout) {
 				isTimeout = true
 			}
+			_, ok := req.(*mockthrift.MockTestArgs)
+			test.Assert(t, ok)
 			ret := mockthrift.NewMockTestResult()
 			ret.SetSuccess(&retStr)
 			return ret, nil

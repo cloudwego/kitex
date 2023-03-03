@@ -205,7 +205,7 @@ func WithRetryPolicy(p retry.Policy) Option {
 //		`resp, err := cli.Mock(ctx, req, callopt.WithFallback(fallback.ErrorFallback(yourFBFunc).EnableReportAsFallback())`
 func WithFallback(fb *fallback.Policy) Option {
 	return Option{f: func(o *CallOptions, di *strings.Builder) {
-		if fb == nil || fb.FallbackFunc == nil {
+		if !fallback.IsPolicyValid(fb) {
 			return
 		}
 		di.WriteString("WithFallback")

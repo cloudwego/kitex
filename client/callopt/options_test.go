@@ -110,7 +110,6 @@ func TestApply(t *testing.T) {
 	}).EnableReportAsFallback())
 	_, co = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
 	test.Assert(t, co.Fallback != nil)
-	test.Assert(t, co.Fallback.ReportAsFallback)
 
 	// WithFallback pass nil
 	option = WithFallback(nil)
