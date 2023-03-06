@@ -19,7 +19,6 @@ package generic
 import (
 	"bytes"
 	"context"
-	stdjson "encoding/json"
 	"io/ioutil"
 	"net/http"
 	"testing"
@@ -47,10 +46,7 @@ func TestFromHTTPRequest(t *testing.T) {
 	test.Assert(t, err == nil)
 	customReq, err := FromHTTPRequest(req)
 	test.Assert(t, err == nil)
-	test.DeepEqual(t, customReq.Body, map[string]interface{}{
-		"a": stdjson.Number("1111111111111"),
-		"b": "hello",
-	})
+	test.DeepEqual(t, string(customReq.RawBody), jsonBody)
 }
 
 func TestHttpThriftCodec(t *testing.T) {

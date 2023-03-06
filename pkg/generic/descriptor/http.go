@@ -98,8 +98,8 @@ func (hreq HTTPRequest) GetParam(key string) string {
 	return hreq.Params.ByName(key)
 }
 
-// GetMapBody implements RequestGetter.GetMapBody.
-func (hreq *HTTPRequest) GetMapBody(key string) string {
+// GetMapBody implements RequestGetter.GetMapBody of dynamicgo
+func (hreq HTTPRequest) GetMapBody(key string) string {
 	switch t := hreq.GeneralBody.(type) {
 	case *jsonCache:
 		// fast path
@@ -166,19 +166,19 @@ func NewHTTPResponse() *HTTPResponse {
 }
 
 // SetStatusCode implements ResponseSetter.SetStatusCode of dynamicgo
-func (hresp HTTPResponse) SetStatusCode(code int) error {
+func (hresp *HTTPResponse) SetStatusCode(code int) error {
 	hresp.StatusCode = int32(code)
 	return nil
 }
 
 // SetHeader implements ResponseSetter.SetHeader of dynamicgo
-func (hresp HTTPResponse) SetHeader(key string, val string) error {
+func (hresp *HTTPResponse) SetHeader(key string, val string) error {
 	hresp.Header.Set(key, val)
 	return nil
 }
 
 // SetCookie implements ResponseSetter.SetCookie of dynamicgo
-func (hresp HTTPResponse) SetCookie(key string, val string) error {
+func (hresp *HTTPResponse) SetCookie(key string, val string) error {
 	c := &http.Cookie{Name: key, Value: val}
 	hresp.Header.Add("Set-Cookie", c.String())
 	return nil
@@ -190,7 +190,7 @@ type wrapBody struct {
 
 func (wrapBody) Close() error { return nil }
 
-func (hresp HTTPResponse) SetRawBody(body []byte) error {
+func (hresp *HTTPResponse) SetRawBody(body []byte) error {
 	hresp.GeneralBody = wrapBody{bytes.NewReader(body)}
 	return nil
 }
