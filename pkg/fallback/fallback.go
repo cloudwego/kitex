@@ -77,6 +77,11 @@ func IsPolicyValid(p *Policy) bool {
 	return p != nil && p.fallbackFunc != nil
 }
 
+// UnwrapHelper helps to get the real request and response.
+// Therefor, the RealReqRespFunc only need to process the real rpc req and resp but not the XXXArgs and XXXResult.
+// eg:
+//
+//	`client.WithFallback(fallback.NewFallbackPolicy(fallback.UnwrapHelper(yourRealReqRespFunc)))`
 func UnwrapHelper(userFB RealReqRespFunc) Func {
 	return func(ctx context.Context, args utils.KitexArgs, result utils.KitexResult, err error) error {
 		req, resp := args.GetFirstArgument(), result.GetResult()
@@ -89,7 +94,7 @@ func UnwrapHelper(userFB RealReqRespFunc) Func {
 }
 
 // Func is the definition for fallback func, which can do fallback both for error and resp.
-// Notice !! The args and result are not the real rpc req and resp, are respectively XXArgs and XXXResult of generated code.
+// Notice !! The args and result are not the real rpc req and resp, are respectively XXXArgs and XXXResult of generated code.
 // setup eg: client.WithFallback(fallback.NewFallbackPolicy(yourFunc))
 type Func func(ctx context.Context, args utils.KitexArgs, result utils.KitexResult, err error) (fbErr error)
 
