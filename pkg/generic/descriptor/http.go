@@ -172,13 +172,13 @@ func (hresp *HTTPResponse) SetStatusCode(code int) error {
 }
 
 // SetHeader implements ResponseSetter.SetHeader of dynamicgo
-func (hresp *HTTPResponse) SetHeader(key string, val string) error {
+func (hresp *HTTPResponse) SetHeader(key, val string) error {
 	hresp.Header.Set(key, val)
 	return nil
 }
 
 // SetCookie implements ResponseSetter.SetCookie of dynamicgo
-func (hresp *HTTPResponse) SetCookie(key string, val string) error {
+func (hresp *HTTPResponse) SetCookie(key, val string) error {
 	c := &http.Cookie{Name: key, Value: val}
 	hresp.Header.Add("Set-Cookie", c.String())
 	return nil
