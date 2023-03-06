@@ -414,18 +414,20 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	// do fallback if with setup
 	fallback, hasFallback := getFallbackPolicy(callOptFallback, kc.opt.Fallback)
 	var fbErr error
+	reportErr := err
 	if hasFallback {
 		rpcStatAsFB := false
-		// Notice: If err is nil, rpcStatAsFB will always be false, even if it's set to true by user.
+		// Notice: If rpc err is nil, rpcStatAsFB will always be false, even if it's set to true by user.
 		fbErr, rpcStatAsFB = fallback.DoIfNeeded(ctx, ri, request, response, err)
 		if rpcStatAsFB {
-			err = fbErr
+			reportErr = fbErr
 		}
+		err = fbErr
 	}
 
-	kc.opt.TracerCtl.DoFinish(ctx, ri, err)
+	kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
 	callOpts.Recycle()
-	if err == nil {
+	if err == nil && !hasFallback {
 		err = ri.Invocation().BizStatusErr()
 	}
 
@@ -437,9 +439,6 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		// RPCInfo will be recycled after rpc is finished,
 		// holding RPCInfo in a new goroutine is forbidden.
 		rpcinfo.PutRPCInfo(ri)
-	}
-	if hasFallback {
-		return fbErr
 	}
 	return err
 }
