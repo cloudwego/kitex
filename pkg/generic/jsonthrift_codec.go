@@ -172,7 +172,7 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 
 		bytesPool := sync.Pool{
 			New: func() interface{} {
-				b := make([]byte, 0, int(float64(len(transBuff))*2))
+				b := make([]byte, 0, len(transBuff)*2)
 				return &b
 			},
 		}
