@@ -190,8 +190,8 @@ type wrapBody struct {
 
 func (wrapBody) Close() error { return nil }
 
-func (self HTTPResponse) SetRawBody(body []byte) error {
-	self.GeneralBody = wrapBody{bytes.NewReader(body)}
+func (hresp HTTPResponse) SetRawBody(body []byte) error {
+	hresp.GeneralBody = wrapBody{bytes.NewReader(body)}
 	return nil
 }
 

@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloudwego/dynamicgo/conv"
 	dhttp "github.com/cloudwego/dynamicgo/http"
+	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
@@ -34,6 +35,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/transport"
 )
+
+var json = jsoniter.Config{
+	EscapeHTML: true,
+	UseNumber:  true,
+}.Froze()
 
 func TestFromHTTPRequest(t *testing.T) {
 	jsonBody := `{"a": 1111111111111, "b": "hello"}`
