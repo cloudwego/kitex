@@ -54,6 +54,8 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 // Write ...
 func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
 	req := msg.(*descriptor.HTTPRequest)
+	req.ContentType = descriptor.MIMEApplicationJson
+	req.Body = map[string]interface{}{}
 	if len(req.RawBody) != 0 {
 		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {
 			return err

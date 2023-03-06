@@ -186,8 +186,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 
 	bytesPool := sync.Pool{
 		New: func() interface{} {
-			bufLen := float64(len(transBuff)) * 1.5
-			b := make([]byte, 0, int(bufLen))
+			b := make([]byte, 0, int(float64(len(transBuff))*2))
 			return &b
 		},
 	}
@@ -259,14 +258,12 @@ func (c *httpThriftCodec) Close() error {
 // FromHTTPRequest parse  HTTPRequest from http.Request
 func FromHTTPRequest(req *http.Request, opts ...DynamicgoOptions) (customReq *HTTPRequest, err error) {
 	customReq = &HTTPRequest{
-		Header:      req.Header,
-		Query:       req.URL.Query(),
-		Cookies:     descriptor.Cookies{},
-		Method:      req.Method,
-		Host:        req.Host,
-		Path:        req.URL.Path,
-		ContentType: descriptor.MIMEApplicationJson,
-		Body:        map[string]interface{}{},
+		Header:  req.Header,
+		Query:   req.URL.Query(),
+		Cookies: descriptor.Cookies{},
+		Method:  req.Method,
+		Host:    req.Host,
+		Path:    req.URL.Path,
 	}
 	for _, cookie := range req.Cookies() {
 		customReq.Cookies[cookie.Name] = cookie.Value
