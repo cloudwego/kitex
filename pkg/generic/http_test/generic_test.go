@@ -229,17 +229,16 @@ func testThriftDynamicgo(t *testing.T) {
 	// unmarshal: dynamicgo
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
-	gdr, ok := resp.(*generic.DynamicgoHttpResponse)
+	gr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
-	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gdr.GetRawBody()), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), base64.StdEncoding.EncodeToString([]byte(mockMyMsg)))
-
-	cli = initDynamicgoThriftClientByIDL(transport.PurePayload, t, "127.0.0.1:8126", "./idl/binary_echo.thrift", dOpts)
+	test.Assert(t, reflect.DeepEqual(gjson.Get(gr.GeneralBody.(string), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(gr.GeneralBody.(string), "msg").String())
 
 	// marshal: dynamicgo (amd64), kitex original (arm)
 	// unmarshal: kitex original
+	cli = initDynamicgoThriftClientByIDL(transport.PurePayload, t, "127.0.0.1:8126", "./idl/binary_echo.thrift", dOpts)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
-	gr, ok := resp.(*generic.HTTPResponse)
+	gr, ok = resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 	test.Assert(t, gr.Body["msg"] == base64.StdEncoding.EncodeToString([]byte(mockMyMsg)))
 
@@ -313,9 +312,9 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 		}
 		resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 		test.Assert(&t, err == nil, err)
-		gr, ok := resp.(*generic.DynamicgoHttpResponse)
+		gr, ok := resp.(*generic.HTTPResponse)
 		test.Assert(&t, ok)
-		test.Assert(&t, reflect.DeepEqual(gjson.Get(string(gr.GetRawBody()), "I64Field").String(), strconv.Itoa(math.MaxInt64)), gjson.Get(string(gr.GetRawBody()), "I64Field").String())
+		test.Assert(&t, reflect.DeepEqual(gjson.Get(gr.GeneralBody.(string), "I64Field").String(), strconv.Itoa(math.MaxInt64)), gjson.Get(gr.GeneralBody.(string), "I64Field").String())
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -382,9 +381,9 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		}
 		resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 		test.Assert(&t, err == nil, err)
-		gr, ok := resp.(*generic.DynamicgoHttpResponse)
+		gr, ok := resp.(*generic.HTTPResponse)
 		test.Assert(&t, ok)
-		test.Assert(&t, reflect.DeepEqual(gjson.Get(string(gr.GetRawBody()), "I32").String(), strconv.Itoa(math.MaxInt32)), gjson.Get(string(gr.GetRawBody()), "I32").String())
+		test.Assert(&t, reflect.DeepEqual(gjson.Get(gr.GeneralBody.(string), "I32").String(), strconv.Itoa(math.MaxInt32)), gjson.Get(gr.GeneralBody.(string), "I32").String())
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {

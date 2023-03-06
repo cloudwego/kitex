@@ -149,6 +149,7 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		tProt.ReadStructEnd()
 		resp = descriptor.Void{}
 	} else {
+		// decode using dynamicgo
 		sname, err := tProt.ReadStructBegin()
 		if err != nil {
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadStructBegin failed: %s", err.Error()))
@@ -178,7 +179,7 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		}
 		buf := bytesPool.Get().(*[]byte)
 		cv := t2j.NewBinaryConv(c.convOpts)
-		// decode thrift binary to json binary
+		// thrift []byte to json []byte
 		if err := cv.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
 			return err
 		}

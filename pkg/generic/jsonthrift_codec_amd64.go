@@ -102,18 +102,15 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	if !isVoid && !isString {
 		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
 	} else if isString {
-		// encode in normal way using dynamicgo
+		// encode using dynamicgo
 		cv := j2t.NewBinaryConv(c.convOpts)
 		buf := make([]byte, 0, len(transBuff))
-		// TODO: discuss *(*[]byte)(unsafe.Pointer(&transBuff))
-		// encode json binary to thrift binary
 		var v []byte
 		(*GoSlice)(unsafe.Pointer(&v)).Cap = (*GoString)(unsafe.Pointer(&transBuff)).Len
 		(*GoSlice)(unsafe.Pointer(&v)).Len = (*GoString)(unsafe.Pointer(&transBuff)).Len
 		(*GoSlice)(unsafe.Pointer(&v)).Ptr = (*GoString)(unsafe.Pointer(&transBuff)).Ptr
+		// json []byte to thrift []byte
 		err := cv.DoInto(ctx, tyDsc, v, &buf)
-		// err := cv.DoInto(ctx, tyDsc, *(*[]byte)(unsafe.Pointer(&transBuff)), &buf)
-		// err := cv.DoInto(ctx, tyDsc, []byte(transBuff), &buf)
 		if err != nil {
 			return err
 		}

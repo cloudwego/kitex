@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
@@ -30,7 +31,13 @@ type WriteHTTPRequest struct {
 	binaryWithBase64 bool
 }
 
-var _ MessageWriter = (*WriteHTTPRequest)(nil)
+var (
+	_          MessageWriter = (*WriteHTTPRequest)(nil)
+	customJson               = jsoniter.Config{
+		EscapeHTML: true,
+		UseNumber:  true,
+	}.Froze()
+)
 
 // NewWriteHTTPRequest ...
 // Base64 decoding for binary is enabled by default.
@@ -47,6 +54,11 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 // Write ...
 func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
 	req := msg.(*descriptor.HTTPRequest)
+	if len(req.RawBody) != 0 {
+		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {
+			return err
+		}
+	}
 	fn, err := w.svc.Router.Lookup(req)
 	if err != nil {
 		return err

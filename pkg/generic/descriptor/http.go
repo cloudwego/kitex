@@ -17,10 +17,12 @@
 package descriptor
 
 import (
+	"bytes"
+	"io"
 	"net/http"
 	"net/url"
 
-	dhttp "github.com/cloudwego/dynamicgo/http"
+	"github.com/bytedance/sonic/ast"
 )
 
 // Cookies ...
@@ -36,18 +38,111 @@ const (
 
 // HTTPRequest ...
 type HTTPRequest struct {
-	Header       http.Header
-	Query        url.Values
-	Cookies      Cookies
-	Method       string
-	Host         string
-	Path         string
-	Params       *Params // path params
-	RawBody      []byte
-	Body         map[string]interface{}
-	GeneralBody  interface{} // body of other representation, used with ContentType
-	ContentType  MIMEType
-	DHTTPRequest *dhttp.HTTPRequest
+	Header      http.Header
+	Query       url.Values
+	Cookies     Cookies
+	Method      string
+	Host        string
+	Path        string
+	Params      *Params // path params
+	PostForm    url.Values
+	Uri         string
+	RawBody     []byte
+	Body        map[string]interface{}
+	GeneralBody interface{} // body of other representation, used with ContentType
+	ContentType MIMEType
+}
+
+type jsonCache struct {
+	root ast.Node
+	m    map[string]string
+}
+
+// GetHeader implements RequestGetter.GetHeader of dynamicgo
+func (hreq HTTPRequest) GetHeader(key string) string {
+	return hreq.Header.Get(key)
+}
+
+// GetCookie implements RequestGetter.GetCookie of dynamicgo
+func (hreq HTTPRequest) GetCookie(key string) string {
+	return hreq.Cookies[key]
+}
+
+// GetQuery implements RequestGetter.GetQuery of dynamicgo
+func (hreq HTTPRequest) GetQuery(key string) string {
+	return hreq.Query.Get(key)
+}
+
+// GetBody implements RequestGetter.GetBody of dynamicgo
+func (hreq HTTPRequest) GetBody() []byte {
+	return hreq.RawBody
+}
+
+// GetMethod implements RequestGetter.GetMethod of dynamicgo
+func (hreq HTTPRequest) GetMethod() string {
+	return hreq.Method
+}
+
+// GetPath implements RequestGetter.GetPath of dynamicgo
+func (hreq HTTPRequest) GetPath() string {
+	return hreq.Path
+}
+
+// GetHost implements RequestGetter.GetHost of dynamicgo
+func (hreq HTTPRequest) GetHost() string {
+	return hreq.Host
+}
+
+// GetParam implements RequestGetter.GetParam of dynamicgo
+func (hreq HTTPRequest) GetParam(key string) string {
+	return hreq.Params.ByName(key)
+}
+
+// GetMapBody implements RequestGetter.GetMapBody.
+func (hreq *HTTPRequest) GetMapBody(key string) string {
+	switch t := hreq.GeneralBody.(type) {
+	case *jsonCache:
+		// fast path
+		if v, ok := t.m[key]; ok {
+			return v
+		}
+		// slow path
+		v := t.root.Get(key)
+		if v.Check() != nil {
+			return ""
+		}
+		j, e := v.Raw()
+		if e != nil {
+			return ""
+		}
+		if v.Type() == ast.V_STRING {
+			j, e = v.String()
+			if e != nil {
+				return ""
+			}
+		}
+		t.m[key] = j
+		return j
+	case map[string]string:
+		return t[key]
+	case url.Values:
+		return t.Get(key)
+	default:
+		return ""
+	}
+}
+
+// GetPostForm implements RequestGetter.GetPostForm of dynamicgo.
+func (hreq HTTPRequest) GetPostForm(key string) string {
+	if vs := hreq.PostForm[key]; len(vs) > 0 {
+		return vs[0]
+	}
+	return ""
+}
+
+// GetUri implements RequestGetter.GetUri.
+func (hreq HTTPRequest) GetUri() string {
+	return hreq.Uri
 }
 
 // HTTPResponse ...
@@ -68,6 +163,36 @@ func NewHTTPResponse() *HTTPResponse {
 		Body:        map[string]interface{}{},
 		Renderer:    JsonRenderer{},
 	}
+}
+
+// SetStatusCode implements ResponseSetter.SetStatusCode of dynamicgo
+func (hresp HTTPResponse) SetStatusCode(code int) error {
+	hresp.StatusCode = int32(code)
+	return nil
+}
+
+// SetHeader implements ResponseSetter.SetHeader of dynamicgo
+func (hresp HTTPResponse) SetHeader(key string, val string) error {
+	hresp.Header.Set(key, val)
+	return nil
+}
+
+// SetCookie implements ResponseSetter.SetCookie of dynamicgo
+func (hresp HTTPResponse) SetCookie(key string, val string) error {
+	c := &http.Cookie{Name: key, Value: val}
+	hresp.Header.Add("Set-Cookie", c.String())
+	return nil
+}
+
+type wrapBody struct {
+	io.Reader
+}
+
+func (wrapBody) Close() error { return nil }
+
+func (self HTTPResponse) SetRawBody(body []byte) error {
+	self.GeneralBody = wrapBody{bytes.NewReader(body)}
+	return nil
 }
 
 func NewHTTPPbResponse(initBody interface{}) *HTTPResponse {

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	stdjson "encoding/json"
+	"io/ioutil"
 	"net/http"
 	"testing"
 
@@ -101,17 +102,11 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 		"num":        0,
 	}
 	data, err := json.Marshal(body)
-	if err != nil {
-		panic(err)
-	}
+	test.Assert(t, err == nil)
 	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
-	if err != nil {
-		panic(err)
-	}
+	test.Assert(t, err == nil)
 	customReq, err := FromHTTPRequest(req, dOpts)
-	if err != nil {
-		t.Fatal(err)
-	}
+	test.Assert(t, err == nil)
 
 	// wrong
 	method, err := htc.getMethod("test")
@@ -199,11 +194,30 @@ func initDynamicgoHttpSendMsg(tp transport.Protocol) remote.Message {
 	if err != nil {
 		panic(err)
 	}
+	cookies := descriptor.Cookies{}
+	for _, cookie := range stdReq.Cookies() {
+		cookies[cookie.Name] = cookie.Value
+	}
+	b, err := stdReq.GetBody()
+	if err != nil {
+		panic(err)
+	}
+	rawBody, err := ioutil.ReadAll(b)
+	if err != nil {
+		panic(err)
+	}
 	req := &Args{
 		Request: &descriptor.HTTPRequest{
-			Method:       http.MethodGet,
-			Path:         "/BinaryEcho",
-			DHTTPRequest: dReq,
+			Header:      stdReq.Header,
+			Query:       stdReq.URL.Query(),
+			Cookies:     cookies,
+			Method:      stdReq.Method,
+			Host:        stdReq.Host,
+			Path:        stdReq.URL.Path,
+			PostForm:    stdReq.PostForm,
+			Uri:         stdReq.URL.String(),
+			RawBody:     rawBody,
+			GeneralBody: dReq.BodyMap,
 		},
 		Method: "BinaryEcho",
 	}

@@ -40,7 +40,6 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 		return c.originalMarshal(ctx, msg, out)
 	}
 
-	// encode with dynamicgo
 	method := msg.RPCInfo().Invocation().MethodName()
 	if method == "" {
 		return perrors.NewProtocolErrorWithMsg("empty methodName in thrift Marshal")
@@ -63,7 +62,6 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	}
 	tyDsc := svcDsc.DynamicgoDsc.Functions()[method].Request().Struct().Fields()[0].Type()
 
-	// encode in normal way using dynamicgo
 	seqID := msg.RPCInfo().Invocation().SeqID()
 	tProt := cthrift.NewBinaryProtocol(out)
 	if err := tProt.WriteMessageBegin(method, athrift.TMessageType(msgType), seqID); err != nil {
@@ -76,11 +74,12 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteFieldBegin failed: %s", err.Error()))
 	}
 
-	body := transBuff.DHTTPRequest.Body()
+	body := transBuff.GetBody()
 	buf := make([]byte, 0, len(body))
-	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, transBuff.DHTTPRequest)
+	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, transBuff)
 	cv := j2t.NewBinaryConv(c.convOpts)
-	// json to thrift
+	// encode with dynamicgo
+	// json []byte to thrift []byte
 	if err := cv.DoInto(ctx, tyDsc, body, &buf); err != nil {
 		return err
 	}

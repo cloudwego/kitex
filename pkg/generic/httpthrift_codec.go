@@ -30,8 +30,6 @@ import (
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dhttp "github.com/cloudwego/dynamicgo/http"
-	jsoniter "github.com/json-iterator/go"
-
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
@@ -40,6 +38,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+)
+
+const (
+	defaultMaxMemory = 32 << 20 // 32 MB
 )
 
 var (
@@ -61,38 +63,6 @@ type httpThriftCodec struct {
 	enableDynamicgoReq  bool
 	enableDynamicgoResp bool
 	convOpts            conv.Options
-}
-
-type IntendedHttpResponse interface {
-	GetHttpResponse() *http.Response
-	GetRawBody() []byte
-	SetHttpResponse(*http.Response)
-	SetRawBody([]byte)
-}
-
-type DynamicgoHttpResponse struct {
-	resp *http.Response
-	body []byte
-}
-
-func (d *DynamicgoHttpResponse) SetHttpResponse(resp *http.Response) {
-	d.resp = resp
-}
-
-func (d *DynamicgoHttpResponse) GetHttpResponse() *http.Response {
-	return d.resp
-}
-
-func (d *DynamicgoHttpResponse) SetRawBody(body []byte) {
-	d.body = body
-}
-
-func (d *DynamicgoHttpResponse) GetRawBody() []byte {
-	return d.body
-}
-
-func newDynamicgoHttpResponse() IntendedHttpResponse {
-	return &DynamicgoHttpResponse{}
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...DynamicgoOptions) (*httpThriftCodec, error) {
@@ -156,9 +126,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
 
-	// decode with dynamicgo
 	tProt := cthrift.NewBinaryProtocol(in)
-
 	method, msgType, seqID, err := tProt.ReadMessageBegin()
 	if err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageBegin failed: %s", err.Error()))
@@ -226,10 +194,11 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	if err != nil {
 		panic(err)
 	}
-	dresp := dhttp.NewHTTPResponse()
-	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, dresp)
+	resp := descriptor.NewHTTPResponse()
+	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, resp)
 	cv := t2j.NewBinaryConv(c.convOpts)
-	// decode thrift binary to json binary
+	// decode with dynamicgo
+	// thrift []byte to json []byte
 	if err = cv.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
 		return err
 	}
@@ -241,9 +210,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	tProt.Recycle()
 
 	gResult := msg.Data().(*Result)
-	resp := newDynamicgoHttpResponse()
-	resp.SetHttpResponse(dresp.Response)
-	resp.SetRawBody(*buf)
+	resp.GeneralBody = string(*buf)
 	gResult.Success = resp
 
 	*buf = (*buf)[:0]
@@ -288,11 +255,6 @@ func (c *httpThriftCodec) Close() error {
 	return c.provider.Close()
 }
 
-var json = jsoniter.Config{
-	EscapeHTML: true,
-	UseNumber:  true,
-}.Froze()
-
 // FromHTTPRequest parse  HTTPRequest from http.Request
 func FromHTTPRequest(req *http.Request, opts ...DynamicgoOptions) (customReq *HTTPRequest, err error) {
 	customReq = &HTTPRequest{
@@ -325,17 +287,19 @@ func FromHTTPRequest(req *http.Request, opts ...DynamicgoOptions) (customReq *HT
 	if customReq.RawBody, err = ioutil.ReadAll(b); err != nil {
 		return nil, err
 	}
-	if len(customReq.RawBody) == 0 {
-		return customReq, nil
-	}
-	// dynamicgo HTTPRequest
+
 	if opts != nil {
+		if req.PostForm == nil {
+			req.ParseMultipartForm(defaultMaxMemory)
+		}
+		customReq.PostForm = req.PostForm
+		customReq.Uri = req.URL.String()
 		req.Header.Set(dhttp.HeaderContentType, descriptor.MIMEApplicationJson)
 		dreq, err := dhttp.NewHTTPRequestFromStdReq(req)
-		if err != nil {
+		if err != nil || dreq.BodyMap == nil {
 			return nil, err
 		}
-		customReq.DHTTPRequest = dreq
+		customReq.GeneralBody = dreq.BodyMap
 	}
-	return customReq, json.Unmarshal(customReq.RawBody, &customReq.Body)
+	return customReq, nil
 }
