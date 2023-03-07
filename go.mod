@@ -8,7 +8,7 @@ require (
 	github.com/bytedance/mockey v1.2.0
 	github.com/choleraehyq/pid v0.0.16
 	github.com/cloudwego/fastpb v0.0.4-0.20230131074846-6fc453d58b96
-	github.com/cloudwego/frugal v0.1.5
+	github.com/cloudwego/frugal v0.1.6
 	github.com/cloudwego/netpoll v0.3.2
 	github.com/cloudwego/thriftgo v0.2.7
 	github.com/golang/mock v1.6.0
