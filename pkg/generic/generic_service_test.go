@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 func TestGenericService(t *testing.T) {
@@ -123,4 +124,14 @@ func TestGenericService(t *testing.T) {
 func TestServiceInfo(t *testing.T) {
 	s := ServiceInfo(serviceinfo.Thrift)
 	test.Assert(t, s.ServiceName == "$GenericService")
+}
+
+func TestArgsResult(t *testing.T) {
+	var args interface{} = &Args{}
+	_, kaOK := args.(utils.KitexArgs)
+	test.Assert(t, kaOK)
+
+	var result interface{} = &Result{}
+	_, krOK := result.(utils.KitexResult)
+	test.Assert(t, krOK)
 }

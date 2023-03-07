@@ -29,6 +29,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
+	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/http"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
@@ -97,6 +98,9 @@ type Options struct {
 	RetryMethodPolicies map[string]retry.Policy
 	RetryContainer      *retry.Container
 	RetryWithResult     *retry.ShouldResultRetry
+
+	// fallback policy
+	Fallback *fallback.Policy
 
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption

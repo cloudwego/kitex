@@ -29,6 +29,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/connpool"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/http"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
@@ -381,11 +382,30 @@ func WithRetryMethodPolicies(mp map[string]retry.Policy) Option {
 // But if your retry policy is enabled by remote config, WithSpecifiedResultRetry is useful.
 func WithSpecifiedResultRetry(rr *retry.ShouldResultRetry) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
-		if rr == nil {
-			return
+		if rr == nil || (rr.RespRetry == nil && rr.ErrorRetry == nil) {
+			panic(fmt.Errorf("WithSpecifiedResultRetry: invalid '%+v'", rr))
 		}
 		di.Push(fmt.Sprintf("WithSpecifiedResultRetry(%+v)", rr))
 		o.RetryWithResult = rr
+	}}
+}
+
+// WithFallback is used to set the fallback policy for the client.
+// Demos are provided below:
+//
+//	demo1. fallback for error and resp
+//		`client.WithFallback(fallback.NewFallbackPolicy(yourFBFunc))`
+//	demo2. fallback for error and enable reportAsFallback, which sets reportAsFallback to be true and will do report(metric) as Fallback result
+//		`client.WithFallback(fallback.ErrorFallback(yourErrFBFunc).EnableReportAsFallback())`
+//	demo2. fallback for rpctime and circuit breaker
+//		`client.WithFallback(fallback.TimeoutAndCBFallback(yourErrFBFunc))`
+func WithFallback(fb *fallback.Policy) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		if !fallback.IsPolicyValid(fb) {
+			panic(fmt.Errorf("WithFallback: invalid '%+v'", fb))
+		}
+		di.Push(fmt.Sprintf("WithFallback(%+v)", fb))
+		o.Fallback = fb
 	}}
 }
 

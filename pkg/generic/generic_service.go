@@ -124,6 +124,11 @@ func (g *Args) Read(ctx context.Context, method string, in thrift.TProtocol) err
 	return fmt.Errorf("unexpected Args reader type: %T", g.inner)
 }
 
+// GetFirstArgument implements util.KitexArgs.
+func (g *Args) GetFirstArgument() interface{} {
+	return g.Request
+}
+
 // Result generic response
 type Result struct {
 	Success interface{}
@@ -159,7 +164,7 @@ func (r *Result) Read(ctx context.Context, method string, in thrift.TProtocol) e
 	return fmt.Errorf("unexpected Result reader type: %T", r.inner)
 }
 
-// GetSuccess ...
+// GetSuccess implements util.KitexResult.
 func (r *Result) GetSuccess() interface{} {
 	if !r.IsSetSuccess() {
 		return nil
@@ -167,7 +172,7 @@ func (r *Result) GetSuccess() interface{} {
 	return r.Success
 }
 
-// SetSuccess ...
+// SetSuccess implements util.KitexResult.
 func (r *Result) SetSuccess(x interface{}) {
 	r.Success = x
 }
@@ -175,4 +180,9 @@ func (r *Result) SetSuccess(x interface{}) {
 // IsSetSuccess ...
 func (r *Result) IsSetSuccess() bool {
 	return r.Success != nil
+}
+
+// GetResult ...
+func (r *Result) GetResult() interface{} {
+	return r.Success
 }
