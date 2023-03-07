@@ -192,10 +192,6 @@ func initDynamicgoHttpSendMsg(tp transport.Protocol) remote.Message {
 		panic(err)
 	}
 	stdReq.Header.Set(dhttp.HeaderContentType, descriptor.MIMEApplicationJson)
-	dReq, err := dhttp.NewHTTPRequestFromStdReq(stdReq)
-	if err != nil {
-		panic(err)
-	}
 	cookies := descriptor.Cookies{}
 	for _, cookie := range stdReq.Cookies() {
 		cookies[cookie.Name] = cookie.Value
@@ -210,16 +206,13 @@ func initDynamicgoHttpSendMsg(tp transport.Protocol) remote.Message {
 	}
 	req := &Args{
 		Request: &descriptor.HTTPRequest{
-			Header:      stdReq.Header,
-			Query:       stdReq.URL.Query(),
-			Cookies:     cookies,
-			Method:      stdReq.Method,
-			Host:        stdReq.Host,
-			Path:        stdReq.URL.Path,
-			PostForm:    stdReq.PostForm,
-			Uri:         stdReq.URL.String(),
-			RawBody:     rawBody,
-			GeneralBody: dReq.BodyMap,
+			Header:  stdReq.Header,
+			Query:   stdReq.URL.Query(),
+			Cookies: cookies,
+			Method:  stdReq.Method,
+			Host:    stdReq.Host,
+			Path:    stdReq.URL.Path,
+			RawBody: rawBody,
 		},
 		Method: "BinaryEcho",
 	}

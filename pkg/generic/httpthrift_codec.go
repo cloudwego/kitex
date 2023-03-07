@@ -23,13 +23,11 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"sync"
 	"sync/atomic"
 
 	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
-	dhttp "github.com/cloudwego/dynamicgo/http"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
@@ -39,10 +37,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-)
-
-const (
-	defaultMaxMemory = 32 << 20 // 32 MB
 )
 
 var (
@@ -184,13 +178,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	}
 	tyDsc := svcDsc.DynamicgoDsc.Functions()[method].Response().Struct().Fields()[0].Type()
 
-	bytesPool := sync.Pool{
-		New: func() interface{} {
-			b := make([]byte, 0, len(transBuff)*2)
-			return &b
-		},
-	}
-	buf := bytesPool.Get().(*[]byte)
+	buf := make([]byte, 0, len(transBuff)*2)
 	if err != nil {
 		panic(err)
 	}
@@ -199,7 +187,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	cv := t2j.NewBinaryConv(c.convOpts)
 	// decode with dynamicgo
 	// thrift []byte to json []byte
-	if err = cv.DoInto(ctx, tyDsc, transBuff, buf); err != nil {
+	if err = cv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
 		return err
 	}
 
@@ -210,11 +198,9 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	tProt.Recycle()
 
 	gResult := msg.Data().(*Result)
-	resp.GeneralBody = string(*buf)
+	resp.GeneralBody = string(buf)
 	gResult.Success = resp
 
-	*buf = (*buf)[:0]
-	bytesPool.Put(buf)
 	return nil
 }
 
@@ -285,19 +271,8 @@ func FromHTTPRequest(req *http.Request, opts ...DynamicgoOptions) (customReq *HT
 	if customReq.RawBody, err = ioutil.ReadAll(b); err != nil {
 		return nil, err
 	}
-
 	if opts != nil {
-		if req.PostForm == nil {
-			req.ParseMultipartForm(defaultMaxMemory)
-		}
-		customReq.PostForm = req.PostForm
-		customReq.Uri = req.URL.String()
-		req.Header.Set(dhttp.HeaderContentType, descriptor.MIMEApplicationJson)
-		dreq, err := dhttp.NewHTTPRequestFromStdReq(req)
-		if err != nil || dreq.BodyMap == nil {
-			return nil, err
-		}
-		customReq.GeneralBody = dreq.BodyMap
+		customReq.Request = req
 	}
 	return customReq, nil
 }

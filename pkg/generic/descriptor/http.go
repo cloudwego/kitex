@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"unsafe"
 
 	"github.com/bytedance/sonic/ast"
 )
@@ -36,6 +37,17 @@ const (
 	MIMEApplicationProtobuf = "application/x-protobuf"
 )
 
+type GoSlice struct {
+	Ptr unsafe.Pointer
+	Len int
+	Cap int
+}
+
+type GoString struct {
+	Ptr unsafe.Pointer
+	Len int
+}
+
 // HTTPRequest ...
 type HTTPRequest struct {
 	Header      http.Header
@@ -45,8 +57,7 @@ type HTTPRequest struct {
 	Host        string
 	Path        string
 	Params      *Params // path params
-	PostForm    url.Values
-	Uri         string
+	Request     *http.Request
 	RawBody     []byte
 	Body        map[string]interface{}
 	GeneralBody interface{} // body of other representation, used with ContentType
@@ -100,49 +111,53 @@ func (hreq HTTPRequest) GetParam(key string) string {
 
 // GetMapBody implements RequestGetter.GetMapBody of dynamicgo
 func (hreq HTTPRequest) GetMapBody(key string) string {
-	switch t := hreq.GeneralBody.(type) {
-	case *jsonCache:
-		// fast path
-		if v, ok := t.m[key]; ok {
-			return v
+	if hreq.GeneralBody == nil && hreq.Request != nil {
+		body := hreq.RawBody
+		var s string
+		(*GoString)(unsafe.Pointer(&s)).Len = (*GoSlice)(unsafe.Pointer(&body)).Len
+		(*GoString)(unsafe.Pointer(&s)).Ptr = (*GoSlice)(unsafe.Pointer(&body)).Ptr
+		node := ast.NewRaw(s)
+		cache := &jsonCache{
+			root: node,
+			m:    make(map[string]string),
 		}
-		// slow path
-		v := t.root.Get(key)
-		if v.Check() != nil {
-			return ""
-		}
-		j, e := v.Raw()
+		hreq.GeneralBody = cache
+	}
+	t, ok := hreq.GeneralBody.(*jsonCache)
+	if !ok {
+		return ""
+	}
+	// fast path
+	if v, ok := t.m[key]; ok {
+		return v
+	}
+	// slow path
+	v := t.root.Get(key)
+	if v.Check() != nil {
+		return ""
+	}
+	j, e := v.Raw()
+	if e != nil {
+		return ""
+	}
+	if v.Type() == ast.V_STRING {
+		j, e = v.String()
 		if e != nil {
 			return ""
 		}
-		if v.Type() == ast.V_STRING {
-			j, e = v.String()
-			if e != nil {
-				return ""
-			}
-		}
-		t.m[key] = j
-		return j
-	case map[string]string:
-		return t[key]
-	case url.Values:
-		return t.Get(key)
-	default:
-		return ""
 	}
+	t.m[key] = j
+	return j
 }
 
 // GetPostForm implements RequestGetter.GetPostForm of dynamicgo.
 func (hreq HTTPRequest) GetPostForm(key string) string {
-	if vs := hreq.PostForm[key]; len(vs) > 0 {
-		return vs[0]
-	}
-	return ""
+	return hreq.Request.PostFormValue(key)
 }
 
 // GetUri implements RequestGetter.GetUri.
 func (hreq HTTPRequest) GetUri() string {
-	return hreq.Uri
+	return hreq.Request.URL.String()
 }
 
 // HTTPResponse ...

@@ -34,17 +34,6 @@ import (
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
 
-type GoSlice struct {
-	Ptr unsafe.Pointer
-	Len int
-	Cap int
-}
-
-type GoString struct {
-	Ptr unsafe.Pointer
-	Len int
-}
-
 func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	msgType := msg.MessageType()
 	if !c.enableDynamicgo || msgType == remote.Exception {
@@ -106,9 +95,9 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 		cv := j2t.NewBinaryConv(c.convOpts)
 		buf := make([]byte, 0, len(transBuff))
 		var v []byte
-		(*GoSlice)(unsafe.Pointer(&v)).Cap = (*GoString)(unsafe.Pointer(&transBuff)).Len
-		(*GoSlice)(unsafe.Pointer(&v)).Len = (*GoString)(unsafe.Pointer(&transBuff)).Len
-		(*GoSlice)(unsafe.Pointer(&v)).Ptr = (*GoString)(unsafe.Pointer(&transBuff)).Ptr
+		(*descriptor.GoSlice)(unsafe.Pointer(&v)).Cap = (*descriptor.GoString)(unsafe.Pointer(&transBuff)).Len
+		(*descriptor.GoSlice)(unsafe.Pointer(&v)).Len = (*descriptor.GoString)(unsafe.Pointer(&transBuff)).Len
+		(*descriptor.GoSlice)(unsafe.Pointer(&v)).Ptr = (*descriptor.GoString)(unsafe.Pointer(&transBuff)).Ptr
 		// json []byte to thrift []byte
 		err := cv.DoInto(ctx, tyDsc, v, &buf)
 		if err != nil {
