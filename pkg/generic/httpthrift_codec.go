@@ -242,19 +242,8 @@ func (c *httpThriftCodec) Close() error {
 }
 
 // FromHTTPRequest parse  HTTPRequest from http.Request
-func FromHTTPRequest(req *http.Request, opts ...DynamicgoOptions) (customReq *HTTPRequest, err error) {
-	customReq = &HTTPRequest{
-		Header:  req.Header,
-		Query:   req.URL.Query(),
-		Cookies: descriptor.Cookies{},
-		Method:  req.Method,
-		Host:    req.Host,
-		Path:    req.URL.Path,
-	}
-	for _, cookie := range req.Cookies() {
-		customReq.Cookies[cookie.Name] = cookie.Value
-	}
-	// copy the request body, maybe user used it after parse
+func FromHTTPRequest(req *http.Request) (customReq *HTTPRequest, err error) {
+	customReq = &HTTPRequest{Request: req}
 	var b io.ReadCloser
 	if req.GetBody != nil {
 		// req from ServerHTTP or create by http.NewRequest
@@ -270,9 +259,6 @@ func FromHTTPRequest(req *http.Request, opts ...DynamicgoOptions) (customReq *HT
 	}
 	if customReq.RawBody, err = ioutil.ReadAll(b); err != nil {
 		return nil, err
-	}
-	if opts != nil {
-		customReq.Request = req
 	}
 	return customReq, nil
 }

@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/cloudwego/dynamicgo/conv"
-	dhttp "github.com/cloudwego/dynamicgo/http"
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -57,10 +56,7 @@ func TestHttpThriftCodec(t *testing.T) {
 	defer htc.Close()
 	test.Assert(t, htc.Name() == "HttpThrift")
 
-	req := &HTTPRequest{
-		Method: http.MethodGet,
-		Path:   "/BinaryEcho",
-	}
+	req := &HTTPRequest{Request: getStdHttpRequest()}
 	// wrong
 	method, err := htc.getMethod("test")
 	test.Assert(t, err.Error() == "req is invalid, need descriptor.HTTPRequest" && method == nil)
@@ -107,7 +103,7 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 	test.Assert(t, err == nil)
 	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
 	test.Assert(t, err == nil)
-	customReq, err := FromHTTPRequest(req, dOpts)
+	customReq, err := FromHTTPRequest(req)
 	test.Assert(t, err == nil)
 
 	// wrong
@@ -152,11 +148,8 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 
 func initHttpSendMsg(tp transport.Protocol) remote.Message {
 	req := &Args{
-		Request: &descriptor.HTTPRequest{
-			Method: http.MethodGet,
-			Path:   "/BinaryEcho",
-		},
-		Method: "BinaryEcho",
+		Request: &descriptor.HTTPRequest{Request: getStdHttpRequest()},
+		Method:  "BinaryEcho",
 	}
 	svcInfo := mocks.ServiceInfo()
 	ink := rpcinfo.NewInvocation("", "BinaryEcho")
@@ -178,24 +171,7 @@ func initHttpRecvMsg() remote.Message {
 }
 
 func initDynamicgoHttpSendMsg(tp transport.Protocol) remote.Message {
-	body := map[string]interface{}{
-		"msg":        []byte("hello"),
-		"got_base64": true,
-		"num":        "",
-	}
-	data, err := json.Marshal(body)
-	if err != nil {
-		panic(err)
-	}
-	stdReq, err := http.NewRequest(http.MethodGet, "/BinaryEcho", bytes.NewBuffer(data))
-	if err != nil {
-		panic(err)
-	}
-	stdReq.Header.Set(dhttp.HeaderContentType, descriptor.MIMEApplicationJson)
-	cookies := descriptor.Cookies{}
-	for _, cookie := range stdReq.Cookies() {
-		cookies[cookie.Name] = cookie.Value
-	}
+	stdReq := getStdHttpRequest()
 	b, err := stdReq.GetBody()
 	if err != nil {
 		panic(err)
@@ -206,12 +182,7 @@ func initDynamicgoHttpSendMsg(tp transport.Protocol) remote.Message {
 	}
 	req := &Args{
 		Request: &descriptor.HTTPRequest{
-			Header:  stdReq.Header,
-			Query:   stdReq.URL.Query(),
-			Cookies: cookies,
-			Method:  stdReq.Method,
-			Host:    stdReq.Host,
-			Path:    stdReq.URL.Path,
+			Request: stdReq,
 			RawBody: rawBody,
 		},
 		Method: "BinaryEcho",
@@ -232,4 +203,21 @@ func initDynamicgoHttpRecvMsg(tp transport.Protocol) remote.Message {
 	svcInfo := mocks.ServiceInfo()
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
+}
+
+func getStdHttpRequest() *http.Request {
+	body := map[string]interface{}{
+		"msg":        []byte("hello"),
+		"got_base64": true,
+		"num":        "",
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+	stdReq, err := http.NewRequest(http.MethodGet, "/BinaryEcho", bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
+	return stdReq
 }

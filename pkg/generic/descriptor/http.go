@@ -20,14 +20,10 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"net/url"
 	"unsafe"
 
 	"github.com/bytedance/sonic/ast"
 )
-
-// Cookies ...
-type Cookies map[string]string
 
 // MIMEType ...
 type MIMEType string
@@ -50,12 +46,6 @@ type GoString struct {
 
 // HTTPRequest ...
 type HTTPRequest struct {
-	Header      http.Header
-	Query       url.Values
-	Cookies     Cookies
-	Method      string
-	Host        string
-	Path        string
 	Params      *Params // path params
 	Request     *http.Request
 	RawBody     []byte
@@ -70,49 +60,52 @@ type jsonCache struct {
 }
 
 // GetHeader implements RequestGetter.GetHeader of dynamicgo
-func (hreq HTTPRequest) GetHeader(key string) string {
-	return hreq.Header.Get(key)
+func (req HTTPRequest) GetHeader(key string) string {
+	return req.Request.Header.Get(key)
 }
 
 // GetCookie implements RequestGetter.GetCookie of dynamicgo
-func (hreq HTTPRequest) GetCookie(key string) string {
-	return hreq.Cookies[key]
+func (req HTTPRequest) GetCookie(key string) string {
+	if c, err := req.Request.Cookie(key); err == nil {
+		return c.Value
+	}
+	return ""
 }
 
 // GetQuery implements RequestGetter.GetQuery of dynamicgo
-func (hreq HTTPRequest) GetQuery(key string) string {
-	return hreq.Query.Get(key)
+func (req HTTPRequest) GetQuery(key string) string {
+	return req.Request.URL.Query().Get(key)
 }
 
 // GetBody implements RequestGetter.GetBody of dynamicgo
-func (hreq HTTPRequest) GetBody() []byte {
-	return hreq.RawBody
+func (req HTTPRequest) GetBody() []byte {
+	return req.RawBody
 }
 
 // GetMethod implements RequestGetter.GetMethod of dynamicgo
-func (hreq HTTPRequest) GetMethod() string {
-	return hreq.Method
+func (req HTTPRequest) GetMethod() string {
+	return req.Request.Method
 }
 
 // GetPath implements RequestGetter.GetPath of dynamicgo
-func (hreq HTTPRequest) GetPath() string {
-	return hreq.Path
+func (req HTTPRequest) GetPath() string {
+	return req.Request.URL.Path
 }
 
 // GetHost implements RequestGetter.GetHost of dynamicgo
-func (hreq HTTPRequest) GetHost() string {
-	return hreq.Host
+func (req HTTPRequest) GetHost() string {
+	return req.Request.Host
 }
 
 // GetParam implements RequestGetter.GetParam of dynamicgo
-func (hreq HTTPRequest) GetParam(key string) string {
-	return hreq.Params.ByName(key)
+func (req HTTPRequest) GetParam(key string) string {
+	return req.Params.ByName(key)
 }
 
 // GetMapBody implements RequestGetter.GetMapBody of dynamicgo
-func (hreq HTTPRequest) GetMapBody(key string) string {
-	if hreq.GeneralBody == nil && hreq.Request != nil {
-		body := hreq.RawBody
+func (req HTTPRequest) GetMapBody(key string) string {
+	if req.GeneralBody == nil && req.Request != nil {
+		body := req.RawBody
 		var s string
 		(*GoString)(unsafe.Pointer(&s)).Len = (*GoSlice)(unsafe.Pointer(&body)).Len
 		(*GoString)(unsafe.Pointer(&s)).Ptr = (*GoSlice)(unsafe.Pointer(&body)).Ptr
@@ -121,9 +114,9 @@ func (hreq HTTPRequest) GetMapBody(key string) string {
 			root: node,
 			m:    make(map[string]string),
 		}
-		hreq.GeneralBody = cache
+		req.GeneralBody = cache
 	}
-	t, ok := hreq.GeneralBody.(*jsonCache)
+	t, ok := req.GeneralBody.(*jsonCache)
 	if !ok {
 		return ""
 	}
@@ -151,13 +144,13 @@ func (hreq HTTPRequest) GetMapBody(key string) string {
 }
 
 // GetPostForm implements RequestGetter.GetPostForm of dynamicgo.
-func (hreq HTTPRequest) GetPostForm(key string) string {
-	return hreq.Request.PostFormValue(key)
+func (req HTTPRequest) GetPostForm(key string) string {
+	return req.Request.PostFormValue(key)
 }
 
 // GetUri implements RequestGetter.GetUri.
-func (hreq HTTPRequest) GetUri() string {
-	return hreq.Request.URL.String()
+func (req HTTPRequest) GetUri() string {
+	return req.Request.URL.String()
 }
 
 // HTTPResponse ...
@@ -181,21 +174,21 @@ func NewHTTPResponse() *HTTPResponse {
 }
 
 // SetStatusCode implements ResponseSetter.SetStatusCode of dynamicgo
-func (hresp *HTTPResponse) SetStatusCode(code int) error {
-	hresp.StatusCode = int32(code)
+func (resp *HTTPResponse) SetStatusCode(code int) error {
+	resp.StatusCode = int32(code)
 	return nil
 }
 
 // SetHeader implements ResponseSetter.SetHeader of dynamicgo
-func (hresp *HTTPResponse) SetHeader(key, val string) error {
-	hresp.Header.Set(key, val)
+func (resp *HTTPResponse) SetHeader(key, val string) error {
+	resp.Header.Set(key, val)
 	return nil
 }
 
 // SetCookie implements ResponseSetter.SetCookie of dynamicgo
-func (hresp *HTTPResponse) SetCookie(key, val string) error {
+func (resp *HTTPResponse) SetCookie(key, val string) error {
 	c := &http.Cookie{Name: key, Value: val}
-	hresp.Header.Add("Set-Cookie", c.String())
+	resp.Header.Add("Set-Cookie", c.String())
 	return nil
 }
 
@@ -205,8 +198,8 @@ type wrapBody struct {
 
 func (wrapBody) Close() error { return nil }
 
-func (hresp *HTTPResponse) SetRawBody(body []byte) error {
-	hresp.GeneralBody = wrapBody{bytes.NewReader(body)}
+func (resp *HTTPResponse) SetRawBody(body []byte) error {
+	resp.GeneralBody = wrapBody{bytes.NewReader(body)}
 	return nil
 }
 
