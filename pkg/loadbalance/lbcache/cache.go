@@ -31,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 const (
@@ -54,6 +55,9 @@ type Options struct {
 
 	// DiagnosisService is used register info for diagnosis
 	DiagnosisService diagnosis.Service
+
+	// Cacheable is used to indicate that if the factory could be shared between multi clients
+	Cacheable bool
 }
 
 func (v *Options) check() {
@@ -91,29 +95,37 @@ func cacheKey(resolver, balancer string, opts Options) string {
 	return fmt.Sprintf("%s|%s|{%s %s}", resolver, balancer, opts.RefreshInterval, opts.ExpireInterval)
 }
 
+func newBalancerFactory(resolver discovery.Resolver, balancer loadbalance.Loadbalancer, opts Options) *BalancerFactory {
+	b := &BalancerFactory{
+		opts:     opts,
+		resolver: resolver,
+		balancer: balancer,
+	}
+	if rb, ok := balancer.(loadbalance.Rebalancer); ok {
+		hrb := newHookRebalancer(rb)
+		b.rebalancer = hrb
+		b.Hookable = hrb
+	} else {
+		b.Hookable = noopHookRebalancer{}
+	}
+	go b.watcher()
+	return b
+}
+
 // NewBalancerFactory get or create a balancer factory for balancer instance
 // cache key with resolver name, balancer name and options
 func NewBalancerFactory(resolver discovery.Resolver, balancer loadbalance.Loadbalancer, opts Options) *BalancerFactory {
 	opts.check()
+	if !opts.Cacheable {
+		return newBalancerFactory(resolver, balancer, opts)
+	}
 	uniqueKey := cacheKey(resolver.Name(), balancer.Name(), opts)
 	val, ok := balancerFactories.Load(uniqueKey)
 	if ok {
 		return val.(*BalancerFactory)
 	}
 	val, _, _ = balancerFactoriesSfg.Do(uniqueKey, func() (interface{}, error) {
-		b := &BalancerFactory{
-			opts:     opts,
-			resolver: resolver,
-			balancer: balancer,
-		}
-		if rb, ok := balancer.(loadbalance.Rebalancer); ok {
-			hrb := newHookRebalancer(rb)
-			b.rebalancer = hrb
-			b.Hookable = hrb
-		} else {
-			b.Hookable = noopHookRebalancer{}
-		}
-		go b.watcher()
+		b := newBalancerFactory(resolver, balancer, opts)
 		balancerFactories.Store(uniqueKey, b)
 		return b, nil
 	})
@@ -178,10 +190,10 @@ type Balancer struct {
 	target       string       // a description returned from the resolver's Target method
 	res          atomic.Value // newest and previous discovery result
 	expire       int32        // 0 = normal, 1 = expire and collect next ticker
-	sharedTicker *sharedTicker
+	sharedTicker *utils.SharedTicker
 }
 
-func (bl *Balancer) refresh() {
+func (bl *Balancer) Refresh() {
 	res, err := bl.b.resolver.Resolve(context.Background(), bl.target)
 	if err != nil {
 		klog.Warnf("KITEX: resolver refresh failed, key=%s error=%s", bl.target, err.Error())
@@ -196,6 +208,11 @@ func (bl *Balancer) refresh() {
 	}
 	// replace previous result
 	bl.res.Store(res)
+}
+
+// Tick implements the interface utils.TickerTask.
+func (bl *Balancer) Tick() {
+	bl.Refresh()
 }
 
 // GetResult returns the discovery result that the Balancer holds.
@@ -225,7 +242,7 @@ func (bl *Balancer) close() {
 		})
 	}
 	// delete from sharedTicker
-	bl.sharedTicker.delete(bl)
+	bl.sharedTicker.Delete(bl)
 }
 
 const unknown = "unknown"

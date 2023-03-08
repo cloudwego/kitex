@@ -19,8 +19,10 @@ package connpool
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/connpool"
@@ -32,7 +34,27 @@ import (
 var (
 	_ net.Conn            = &longConn{}
 	_ remote.LongConnPool = &LongPool{}
+
+	// global shared tickers for different LongPool
+	sharedTickers sync.Map
 )
+
+const (
+	configDumpKey = "idle_config"
+)
+
+func getSharedTicker(p *LongPool, refreshInterval time.Duration) *utils.SharedTicker {
+	sti, ok := sharedTickers.Load(refreshInterval)
+	if ok {
+		st := sti.(*utils.SharedTicker)
+		st.Add(p)
+		return st
+	}
+	sti, _ = sharedTickers.LoadOrStore(refreshInterval, utils.NewSharedTicker(refreshInterval))
+	st := sti.(*utils.SharedTicker)
+	st.Add(p)
+	return st
+}
 
 // netAddr implements the net.Addr interface and comparability.
 type netAddr struct {
@@ -283,20 +305,22 @@ func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
 				idlConfig.MaxIdleTimeout,
 				limit)
 		},
-		closeCh: make(chan struct{}),
+		idleConfig: idlConfig,
 	}
-
-	go lp.Evict(idlConfig.MaxIdleTimeout)
+	// add this long pool into the sharedTicker
+	lp.sharedTicker = getSharedTicker(lp, idlConfig.MaxIdleTimeout)
 	return lp
 }
 
 // LongPool manages a pool of long connections.
 type LongPool struct {
-	reporter   Reporter
-	peerMap    sync.Map
-	newPeer    func(net.Addr) *peer
-	globalIdle *utils.MaxCounter
-	closeCh    chan struct{}
+	reporter     Reporter
+	peerMap      sync.Map
+	newPeer      func(net.Addr) *peer
+	globalIdle   *utils.MaxCounter
+	idleConfig   connpool.IdleConfig
+	sharedTicker *utils.SharedTicker
+	closed       int32 // active: 0, closed: 1
 }
 
 // Get pick or generate a net.Conn and return
@@ -345,6 +369,7 @@ func (lp *LongPool) Clean(network, address string) {
 // Dump is used to dump current long pool info when needed, like debug query.
 func (lp *LongPool) Dump() interface{} {
 	m := make(map[string]interface{})
+	m[configDumpKey] = lp.idleConfig
 	lp.peerMap.Range(func(key, value interface{}) bool {
 		t := value.(*peer).pool.Dump()
 		m[key.(netAddr).String()] = t
@@ -355,17 +380,18 @@ func (lp *LongPool) Dump() interface{} {
 
 // Close releases all peers in the pool, it is executed when client is closed.
 func (lp *LongPool) Close() error {
-	select {
-	case <-lp.closeCh:
-	default:
-		close(lp.closeCh)
+	if !atomic.CompareAndSwapInt32(&lp.closed, 0, 1) {
+		return fmt.Errorf("long pool is already closed")
 	}
+	// close all peers
 	lp.peerMap.Range(func(addr, value interface{}) bool {
 		lp.peerMap.Delete(addr)
 		v := value.(*peer)
 		v.Close()
 		return true
 	})
+	// remove from the shared ticker
+	lp.sharedTicker.Delete(lp)
 	return nil
 }
 
@@ -381,21 +407,20 @@ func (lp *LongPool) WarmUp(eh warmup.ErrorHandling, wuo *warmup.PoolOption, co r
 }
 
 // Evict cleanups the idle connections in peers.
-func (lp *LongPool) Evict(frequency time.Duration) {
-	t := time.NewTicker(frequency)
-	defer t.Stop()
-	for {
-		select {
-		case <-t.C:
-			lp.peerMap.Range(func(key, value interface{}) bool {
-				p := value.(*peer)
-				p.Evict()
-				return true
-			})
-		case <-lp.closeCh:
-			return
-		}
+func (lp *LongPool) Evict() {
+	if atomic.LoadInt32(&lp.closed) == 0 {
+		// Evict idle connections
+		lp.peerMap.Range(func(key, value interface{}) bool {
+			p := value.(*peer)
+			p.Evict()
+			return true
+		})
 	}
+}
+
+// Tick implements the interface utils.TickerTask.
+func (lp *LongPool) Tick() {
+	lp.Evict()
 }
 
 // getPeer gets a peer from the pool based on the addr, or create a new one if not exist.

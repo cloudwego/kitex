@@ -519,6 +519,10 @@ func (p *MockTestArgs) SetReq(val *MockReq) {
 	p.Req = val
 }
 
+func (p *MockTestArgs) GetFirstArgument() (interface{}) {
+	return p.Req
+}
+
 var fieldIDToName_MockTestArgs = map[int16]string{
 	1: "req",
 }
@@ -685,6 +689,10 @@ func (p *MockTestResult) GetSuccess() (v string) {
 }
 func (p *MockTestResult) SetSuccess(x interface{}) {
 	p.Success = x.(*string)
+}
+
+func (p *MockTestResult) GetResult() interface{} {
+	return p.Success
 }
 
 var fieldIDToName_MockTestResult = map[int16]string{

@@ -45,6 +45,7 @@ type PackageInfo struct {
 	ExternalKitexGen string
 	Features         []feature
 	FrugalPretouch   bool
+	Module           string
 }
 
 // AddImport .
@@ -100,7 +101,7 @@ type ServiceInfo struct {
 
 // AllMethods returns all methods that the service have.
 func (s *ServiceInfo) AllMethods() (ms []*MethodInfo) {
-	ms = s.Methods
+	ms = append(ms, s.Methods...)
 	for base := s.Base; base != nil; base = base.Base {
 		ms = append(base.Methods, ms...)
 	}
@@ -135,11 +136,14 @@ type Parameter struct {
 }
 
 var funcs = map[string]interface{}{
-	"ToLower":    strings.ToLower,
-	"LowerFirst": util.LowerFirst,
-	"UpperFirst": util.UpperFirst,
-	"NotPtr":     util.NotPtr,
-	"HasFeature": HasFeature,
+	"ToLower":       strings.ToLower,
+	"LowerFirst":    util.LowerFirst,
+	"UpperFirst":    util.UpperFirst,
+	"NotPtr":        util.NotPtr,
+	"ReplaceString": util.ReplaceString,
+	"SnakeString":   util.SnakeString,
+	"HasFeature":    HasFeature,
+	"FilterImports": FilterImports,
 }
 
 var templateNames = []string{
@@ -256,4 +260,41 @@ func (t *Task) Render(data interface{}) (*File, error) {
 		return nil, err
 	}
 	return &File{t.Path, buf.String()}, nil
+}
+
+func (t *Task) RenderString(data interface{}) (string, error) {
+	if t.Template == nil {
+		err := t.Build()
+		if err != nil {
+			return "", err
+		}
+	}
+
+	var buf bytes.Buffer
+	err := t.ExecuteTemplate(&buf, t.Name, data)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func FilterImports(Imports map[string]map[string]bool, ms []*MethodInfo) map[string]map[string]bool {
+	res := map[string]map[string]bool{}
+	for _, m := range ms {
+		if m.Resp != nil {
+			for _, dep := range m.Resp.Deps {
+				if _, ok := Imports[dep.ImportPath]; ok {
+					res[dep.ImportPath] = Imports[dep.ImportPath]
+				}
+			}
+		}
+		for _, arg := range m.Args {
+			for _, dep := range arg.Deps {
+				if _, ok := Imports[dep.ImportPath]; ok {
+					res[dep.ImportPath] = Imports[dep.ImportPath]
+				}
+			}
+		}
+	}
+	return res
 }

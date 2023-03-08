@@ -119,18 +119,6 @@ func (g *GenericServiceVoidImpl) GenericCall(ctx context.Context, method string,
 	return descriptor.Void{}, nil
 }
 
-// GenericServiceReadRequiredFiledImpl ...
-type GenericServiceReadRequiredFiledImpl struct{}
-
-// GenericCall ...
-func (g *GenericServiceReadRequiredFiledImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-	msg := request.(map[string]interface{})
-	fmt.Printf("Recv: %v\n", msg)
-	return map[string]interface{}{
-		"Msg": "world",
-	}, nil
-}
-
 var (
 	mockReq = map[string]interface{}{
 		"Msg": "hello",

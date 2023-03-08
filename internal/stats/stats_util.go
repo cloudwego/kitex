@@ -25,7 +25,7 @@ import (
 
 // Record records the event to RPCStats.
 func Record(ctx context.Context, ri rpcinfo.RPCInfo, event stats.Event, err error) {
-	if ctx == nil {
+	if ctx == nil || ri.Stats() == nil {
 		return
 	}
 	if err != nil {

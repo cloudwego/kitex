@@ -57,7 +57,7 @@ func FormatCode(code []byte) ([]byte, error) {
 func GetGOPATH() string {
 	goPath := os.Getenv("GOPATH")
 	// If there are many path in GOPATH, pick up the first one.
-	if GoPaths := strings.Split(goPath, ":"); len(GoPaths) > 1 {
+	if GoPaths := strings.Split(goPath, ":"); len(GoPaths) >= 1 {
 		return GoPaths[0]
 	}
 	// GOPATH not set through environment variables, try to get one by executing "go env GOPATH"
@@ -93,6 +93,29 @@ func LowerFirst(s string) string {
 	rs := []rune(s)
 	rs[0] = unicode.ToLower(rs[0])
 	return string(rs)
+}
+
+// ReplaceString be used in string substitution.
+func ReplaceString(s, old, new string, n int) string {
+	return strings.Replace(s, old, new, n)
+}
+
+// SnakeString converts the string 's' to a snake string
+func SnakeString(s string) string {
+	data := make([]byte, 0, len(s)*2)
+	j := false
+	for _, d := range []byte(s) {
+		if d >= 'A' && d <= 'Z' {
+			if j {
+				data = append(data, '_')
+				j = false
+			}
+		} else if d != '_' {
+			j = true
+		}
+		data = append(data, d)
+	}
+	return strings.ToLower(string(data))
 }
 
 // UpperFirst converts the first letter to upper case for the given string.
@@ -211,4 +234,23 @@ func RunGitCommand(gitLink string) (string, string, error) {
 	}
 
 	return gitPath, "", nil
+}
+
+// CombineOutputPath read the output and path variables and render them into the final path
+func CombineOutputPath(outputPath, ns string) string {
+	if ns != "" {
+		ns = strings.ReplaceAll(ns, ".", "/")
+	}
+	hasVarNs := strings.Contains(outputPath, "{namespace}")
+	hasVarNsUnderscore := strings.Contains(outputPath, "{namespaceUnderscore}")
+	if hasVarNs || hasVarNsUnderscore {
+		if hasVarNs {
+			outputPath = strings.ReplaceAll(outputPath, "{namespace}", ns)
+		} else if hasVarNsUnderscore {
+			outputPath = strings.ReplaceAll(outputPath, "{namespaceUnderscore}", strings.ReplaceAll(ns, "/", "_"))
+		}
+	} else {
+		outputPath = filepath.Join(outputPath, ns)
+	}
+	return outputPath
 }

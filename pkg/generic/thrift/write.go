@@ -684,10 +684,14 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 			continue
 		}
 		if !ok || elem == nil {
-			if field.Required {
-				return fmt.Errorf("required field (%d/%s) missing", field.ID, name)
+			if !field.Optional {
+				elem, _, err = getDefaultValueAndWriter(field.Type, opt)
+				if err != nil {
+					return fmt.Errorf("field (%d/%s) error: %w", field.ID, name, err)
+				}
+			} else {
+				continue
 			}
-			continue
 		}
 		if field.ValueMapping != nil {
 			elem, err = field.ValueMapping.Request(ctx, elem, field)
@@ -737,10 +741,14 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 			continue
 		}
 		if v == nil {
-			if field.Required {
-				return fmt.Errorf("required field (%d/%s) missing", field.ID, name)
+			if !field.Optional {
+				v, _, err = getDefaultValueAndWriter(field.Type, opt)
+				if err != nil {
+					return fmt.Errorf("field (%d/%s) error: %w", field.ID, name, err)
+				}
+			} else {
+				continue
 			}
-			continue
 		}
 		if field.ValueMapping != nil {
 			if v, err = field.ValueMapping.Request(ctx, v, field); err != nil {
@@ -784,10 +792,9 @@ func writeJSON(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 		}
 
 		if elem.Type == gjson.Null {
-			if field.Required {
-				return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("required field (%d/%s) missing", field.ID, name))
+			if field.Optional {
+				continue
 			}
-			continue
 		}
 
 		v, writer, err := nextJSONWriter(&elem, field.Type, opt)

@@ -36,13 +36,14 @@ const (
 
 	BuildFileName       = "build.sh"
 	BootstrapFileName   = "bootstrap.sh"
-	ToolVersionFileName = "kitex.yaml"
+	ToolVersionFileName = "kitex_info.yaml"
 	HandlerFileName     = "handler.go"
 	MainFileName        = "main.go"
 	ClientFileName      = "client.go"
 	ServerFileName      = "server.go"
 	InvokerFileName     = "invoker.go"
 	ServiceFileName     = "*service.go"
+	ExtensionFilename   = "extensions.yaml"
 
 	DefaultThriftPluginTimeLimit = time.Minute
 )
@@ -92,6 +93,7 @@ func AddGlobalDependency(ref, path string) bool {
 type Generator interface {
 	GenerateService(pkg *PackageInfo) ([]*File, error)
 	GenerateMainPackage(pkg *PackageInfo) ([]*File, error)
+	GenerateCustomPackage(pkg *PackageInfo) ([]*File, error)
 }
 
 // Config .
@@ -114,6 +116,7 @@ type Config struct {
 	CombineService        bool // combine services to one service
 	CopyIDL               bool
 	ThriftPlugins         util.StringSlice
+	ProtobufPlugins       util.StringSlice
 	Features              []feature
 	FrugalPretouch        bool
 	ThriftPluginTimeLimit time.Duration
@@ -123,6 +126,10 @@ type Config struct {
 
 	Record    bool
 	RecordCmd []string
+
+	TemplateDir string
+
+	GenPath string
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -232,13 +239,29 @@ func (c *Config) AddFeature(key string) bool {
 
 // ApplyExtension applies template extension.
 func (c *Config) ApplyExtension() error {
-	if c.ExtensionFile == "" {
+	templateExtExist := false
+	path := filepath.Join(c.TemplateDir, ExtensionFilename)
+	if c.TemplateDir != "" && util.Exists(path) {
+		templateExtExist = true
+	}
+
+	if c.ExtensionFile == "" && !templateExtExist {
 		return nil
 	}
 
 	ext := new(TemplateExtension)
-	if err := ext.FromJSONFile(c.ExtensionFile); err != nil {
-		return fmt.Errorf("read template extension %q failed: %s", c.ExtensionFile, err.Error())
+	if c.ExtensionFile != "" {
+		if err := ext.FromYAMLFile(c.ExtensionFile); err != nil {
+			return fmt.Errorf("read template extension %q failed: %s", c.ExtensionFile, err.Error())
+		}
+	}
+
+	if templateExtExist {
+		yamlExt := new(TemplateExtension)
+		if err := yamlExt.FromYAMLFile(path); err != nil {
+			return fmt.Errorf("read template extension %q failed: %s", path, err.Error())
+		}
+		ext.Merge(yamlExt)
 	}
 
 	for _, fn := range ext.FeatureNames {
@@ -361,10 +384,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 
 func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 	g.updatePackageInfo(pkg)
-	output := filepath.Join(g.OutputPath, KitexGenPath)
-	if pkg.Namespace != "" {
-		output = filepath.Join(output, strings.ReplaceAll(pkg.Namespace, ".", "/"))
-	}
+	output := filepath.Join(g.OutputPath, util.CombineOutputPath(g.GenPath, pkg.Namespace))
 	svcPkg := strings.ToLower(pkg.ServiceName)
 	output = filepath.Join(output, svcPkg)
 	ext := g.tmplExt
@@ -433,6 +453,7 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	pkg.Features = g.Features
 	pkg.ExternalKitexGen = g.Use
 	pkg.FrugalPretouch = g.FrugalPretouch
+	pkg.Module = g.ModuleName
 	if pkg.Dependencies == nil {
 		pkg.Dependencies = make(map[string]string)
 	}

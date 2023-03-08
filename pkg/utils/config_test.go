@@ -44,12 +44,22 @@ func TestGetConfFile(t *testing.T) {
 	test.Assert(t, confFile == path.Join(GetConfDir(), DefaultConfFile))
 }
 
+func TestGetEnvLogDir(t *testing.T) {
+	os.Setenv(EnvLogDir, "test_log")
+	logDir := GetEnvLogDir()
+	test.Assert(t, logDir == "test_log")
+
+	os.Unsetenv(EnvLogDir)
+	logDir = GetEnvLogDir()
+	test.Assert(t, logDir == "")
+}
+
 func TestGetLogDir(t *testing.T) {
 	os.Setenv(EnvLogDir, "test_log")
 	logDir := GetLogDir()
 	test.Assert(t, logDir == "test_log")
 
-	os.Setenv(EnvLogDir, "")
+	os.Unsetenv(EnvLogDir)
 	logDir = GetLogDir()
 	test.Assert(t, logDir == DefaultLogDir)
 }

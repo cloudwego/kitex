@@ -69,6 +69,7 @@ func TestThrift(t *testing.T) {
 			},
 			wantResp: map[string]interface{}{
 				"Msg": "hello",
+				"Foo": int32(0),
 				"TestList": []interface{}{
 					map[string]interface{}{
 						"Bar": "foo",
@@ -86,6 +87,12 @@ func TestThrift(t *testing.T) {
 					int64(123), int64(456),
 				},
 				"B": true,
+				"Base": map[string]interface{}{
+					"LogID":  "",
+					"Caller": "",
+					"Addr":   "",
+					"Client": "",
+				},
 			},
 		},
 		{
@@ -113,23 +120,35 @@ func TestThrift(t *testing.T) {
 			},
 			wantResp: map[string]interface{}{
 				"Msg": "hello",
+				"Foo": int32(0),
 				"TestList": []interface{}{
 					map[string]interface{}{
 						"Bar": "foo",
 					},
-					map[string]interface{}{},
+					map[string]interface{}{
+						"Bar": "",
+					},
 				},
 				"TestMap": map[interface{}]interface{}{
 					"l1": map[string]interface{}{
 						"Bar": "foo",
 					},
-					"l2": map[string]interface{}{},
+					"l2": map[string]interface{}{
+						"Bar": "",
+					},
 				},
 				"StrList": []interface{}{
 					"123", "",
 				},
 				"I64List": []interface{}{
 					int64(123), int64(0),
+				},
+				"B": false,
+				"Base": map[string]interface{}{
+					"LogID":  "",
+					"Caller": "",
+					"Addr":   "",
+					"Client": "",
 				},
 			},
 		},
@@ -152,17 +171,29 @@ func TestThrift(t *testing.T) {
 			},
 			wantResp: map[string]interface{}{
 				"Msg": "hello",
+				"Foo": int32(0),
 				"TestList": []interface{}{
-					map[string]interface{}{},
+					map[string]interface{}{
+						"Bar": "",
+					},
 				},
 				"TestMap": map[interface{}]interface{}{
-					"l2": map[string]interface{}{},
+					"l2": map[string]interface{}{
+						"Bar": "",
+					},
 				},
 				"StrList": []interface{}{
 					"",
 				},
 				"I64List": []interface{}{
 					int64(0),
+				},
+				"B": false,
+				"Base": map[string]interface{}{
+					"LogID":  "",
+					"Caller": "",
+					"Addr":   "",
+					"Client": "",
 				},
 			},
 		},
@@ -191,23 +222,35 @@ func TestThrift(t *testing.T) {
 			},
 			wantResp: map[string]interface{}{
 				"Msg": "hello",
+				"Foo": int32(0),
 				"TestList": []interface{}{
 					map[string]interface{}{
 						"Bar": "foo",
 					},
-					map[string]interface{}{},
+					map[string]interface{}{
+						"Bar": "",
+					},
 				},
 				"TestMap": map[interface{}]interface{}{
 					"l1": map[string]interface{}{
 						"Bar": "foo",
 					},
-					"l2": map[string]interface{}{},
+					"l2": map[string]interface{}{
+						"Bar": "",
+					},
 				},
 				"StrList": []interface{}{
 					"123", "",
 				},
 				"I64List": []interface{}{
 					int64(123), int64(0), int64(456),
+				},
+				"B": false,
+				"Base": map[string]interface{}{
+					"LogID":  "",
+					"Caller": "",
+					"Addr":   "",
+					"Client": "",
 				},
 			},
 		},
@@ -273,32 +316,6 @@ func TestThriftVoidMethod(t *testing.T) {
 	resp, err := cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	test.Assert(t, resp == descriptor.Void{})
-	svr.Stop()
-}
-
-func TestThriftReadRequiredField(t *testing.T) {
-	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9026", new(GenericServiceReadRequiredFiledImpl))
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClientByIDL(t, "127.0.0.1:9026", "./idl/example_check_read_required.thrift")
-
-	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err != nil, err)
-	test.Assert(t, strings.Contains(err.Error(), "required field (2/required_field) missing"), err.Error())
-	svr.Stop()
-}
-
-func TestThriftWriteRequiredField(t *testing.T) {
-	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9027", new(GenericServiceReadRequiredFiledImpl))
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClientByIDL(t, "127.0.0.1:9027", "./idl/example_check_write_required.thrift")
-
-	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err != nil, err)
-	test.Assert(t, strings.Contains(err.Error(), "required field (2/Foo) missing"), err.Error())
 	svr.Stop()
 }
 

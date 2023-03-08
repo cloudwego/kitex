@@ -28,6 +28,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
+const dataFrameHeaderLen = 5
+
 // gogoproto generate
 type marshaler interface {
 	MarshalTo(data []byte) (n int, err error)
@@ -46,6 +48,12 @@ func NewGRPCCodec() remote.Codec {
 	return new(grpcCodec)
 }
 
+func mallocWithFirstByteZeroed(size int) []byte {
+	data := mcache.Malloc(size)
+	data[0] = 0 // compressed flag = false
+	return data
+}
+
 func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
 	writer, ok := out.(remote.FrameWrite)
 	if !ok {
@@ -57,18 +65,18 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	case fastpb.Writer:
 		// TODO: reuse data buffer when we can free it safely
 		size := t.Size()
-		data = mcache.Malloc(size + 5)
-		t.FastWrite(data[5:])
-		binary.BigEndian.PutUint32(data[1:5], uint32(size))
+		data = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
+		t.FastWrite(data[dataFrameHeaderLen:])
+		binary.BigEndian.PutUint32(data[1:dataFrameHeaderLen], uint32(size))
 		return writer.WriteData(data)
 	case marshaler:
 		// TODO: reuse data buffer when we can free it safely
 		size := t.Size()
-		data = mcache.Malloc(size + 5)
-		if _, err = t.MarshalTo(data[5:]); err != nil {
+		data = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
+		if _, err = t.MarshalTo(data[dataFrameHeaderLen:]); err != nil {
 			return err
 		}
-		binary.BigEndian.PutUint32(data[1:5], uint32(size))
+		binary.BigEndian.PutUint32(data[1:dataFrameHeaderLen], uint32(size))
 		return writer.WriteData(data)
 	case protobufV2MsgCodec:
 		data, err = t.XXX_Marshal(nil, true)
@@ -100,10 +108,18 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	}
 	message.SetPayloadLen(dLen)
 	data := message.Data()
+	if t, ok := data.(fastpb.Reader); ok {
+		if len(d) == 0 {
+			// if all fields of a struct is default value, data will be nil
+			// In the implementation of fastpb, if data is nil, then fastpb will skip creating this struct, as a result user will get a nil pointer which is not expected.
+			// So, when data is nil, use default protobuf unmarshal method to decode the struct.
+			// todo: fix fastpb
+		} else {
+			_, err = fastpb.ReadMessage(d, fastpb.SkipTypeCheck, t)
+			return err
+		}
+	}
 	switch t := data.(type) {
-	case fastpb.Reader:
-		_, err = fastpb.ReadMessage(d, fastpb.SkipTypeCheck, t)
-		return err
 	case protobufV2MsgCodec:
 		return t.XXX_Unmarshal(d)
 	case proto.Message:

@@ -29,6 +29,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
+	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/http"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
@@ -98,6 +99,9 @@ type Options struct {
 	RetryContainer      *retry.Container
 	RetryWithResult     *retry.ShouldResultRetry
 
+	// fallback policy
+	Fallback *fallback.Policy
+
 	CloseCallbacks []func() error
 	WarmUpOption   *warmup.ClientOption
 
@@ -127,6 +131,7 @@ func NewOptions(opts []Option) *Options {
 	o := &Options{
 		Cli:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
 		Svr:          &rpcinfo.EndpointBasicInfo{Tags: make(map[string]string)},
+		MetaHandlers: []remote.MetaHandler{transmeta.MetainfoClientHandler},
 		RemoteOpt:    newClientRemoteOption(),
 		Configs:      rpcinfo.NewRPCConfig(),
 		Locks:        NewConfigLocks(),
@@ -142,7 +147,6 @@ func NewOptions(opts []Option) *Options {
 		GRPCConnectOpts: new(grpc.ConnectOptions),
 	}
 	o.Apply(opts)
-	o.MetaHandlers = append(o.MetaHandlers, transmeta.MetainfoClientHandler)
 
 	o.initRemoteOpt()
 

@@ -5,6 +5,7 @@ cd $(dirname "${BASH_SOURCE[0]}")
 # source file => output file => package name
 files=(
 ../../pkg/limiter/limiter.go limiter/limiter.go limiter
+../../pkg/stats/tracer.go stats/tracer.go stats
 ../../pkg/remote/trans_handler.go remote/trans_handler.go remote
 ../../pkg/remote/codec.go remote/codec.go remote
 ../../pkg/remote/connpool.go remote/connpool.go remote
@@ -18,6 +19,7 @@ files=(
 ../../pkg/discovery/discovery.go discovery/discovery.go discovery
 ../../pkg/loadbalance/loadbalancer.go loadbalance/loadbalancer.go loadbalance
 ../../pkg/proxy/proxy.go proxy/proxy.go proxy
+../../pkg/utils/sharedticker.go utils/sharedticker.go utils
 ../../../netpoll/connection.go netpoll/connection.go netpoll
 $GOROOT/src/net/net.go net/net.go net
 )
@@ -58,6 +60,7 @@ do
 \ * See the License for the specific language governing permissions and\
 \ * limitations under the License.\
 */\
+\
 \
 ' $outfile
     else

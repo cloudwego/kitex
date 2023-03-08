@@ -539,7 +539,7 @@ func TestWithFirstMetaHandler(t *testing.T) {
 func TestWithMetaHandler(t *testing.T) {
 	mockMetaHandler := &mock_remote.MockMetaHandler{}
 	opts := client.NewOptions([]client.Option{WithMetaHandler(mockMetaHandler)})
-	test.DeepEqual(t, opts.MetaHandlers[0], mockMetaHandler)
+	test.DeepEqual(t, opts.MetaHandlers[1], mockMetaHandler)
 }
 
 func TestWithConnPool(t *testing.T) {

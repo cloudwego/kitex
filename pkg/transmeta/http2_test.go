@@ -38,7 +38,6 @@ func TestIsGRPC(t *testing.T) {
 		args args
 		want bool
 	}{
-		// TODO: Add test cases.
 		{"with ttheader", args{ri: rpcinfo.NewRPCInfo(
 			nil,
 			nil,
@@ -75,6 +74,83 @@ func TestIsGRPC(t *testing.T) {
 			nil,
 		)}, true},
 
+		{"with http", args{ri: rpcinfo.NewRPCInfo(
+			nil,
+			nil,
+			nil,
+			func() rpcinfo.RPCConfig {
+				cfg := rpcinfo.NewRPCConfig()
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
+				return cfg
+			}(),
+			nil,
+		)}, false},
+
+		{"with ttheader and http", args{ri: rpcinfo.NewRPCInfo(
+			nil,
+			nil,
+			nil,
+			func() rpcinfo.RPCConfig {
+				cfg := rpcinfo.NewRPCConfig()
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
+				return cfg
+			}(),
+			nil,
+		)}, false},
+
+		{"with ttheader framed and http", args{ri: rpcinfo.NewRPCInfo(
+			nil,
+			nil,
+			nil,
+			func() rpcinfo.RPCConfig {
+				cfg := rpcinfo.NewRPCConfig()
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
+				return cfg
+			}(),
+			nil,
+		)}, false},
+
+		{"with ttheader and ttheader framed", args{ri: rpcinfo.NewRPCInfo(
+			nil,
+			nil,
+			nil,
+			func() rpcinfo.RPCConfig {
+				cfg := rpcinfo.NewRPCConfig()
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
+				return cfg
+			}(),
+			nil,
+		)}, false},
+
+		{"with http and grpc", args{ri: rpcinfo.NewRPCInfo(
+			nil,
+			nil,
+			nil,
+			func() rpcinfo.RPCConfig {
+				cfg := rpcinfo.NewRPCConfig()
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
+				return cfg
+			}(),
+			nil,
+		)}, true},
+
+		{"with ttheader and grpc", args{ri: rpcinfo.NewRPCInfo(
+			nil,
+			nil,
+			nil,
+			func() rpcinfo.RPCConfig {
+				cfg := rpcinfo.NewRPCConfig()
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
+				return cfg
+			}(),
+			nil,
+		)}, true},
+
 		{"with ttheader framed and grpc", args{ri: rpcinfo.NewRPCInfo(
 			nil,
 			nil,
@@ -82,6 +158,63 @@ func TestIsGRPC(t *testing.T) {
 			func() rpcinfo.RPCConfig {
 				cfg := rpcinfo.NewRPCConfig()
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
+				return cfg
+			}(),
+			nil,
+		)}, true},
+
+		{"with ttheader,http and grpc", args{ri: rpcinfo.NewRPCInfo(
+			nil,
+			nil,
+			nil,
+			func() rpcinfo.RPCConfig {
+				cfg := rpcinfo.NewRPCConfig()
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
+				return cfg
+			}(),
+			nil,
+		)}, true},
+
+		{"with ttheader framed,http and grpc", args{ri: rpcinfo.NewRPCInfo(
+			nil,
+			nil,
+			nil,
+			func() rpcinfo.RPCConfig {
+				cfg := rpcinfo.NewRPCConfig()
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
+				return cfg
+			}(),
+			nil,
+		)}, true},
+
+		{"with ttheader ,ttheader framed and http", args{ri: rpcinfo.NewRPCInfo(
+			nil,
+			nil,
+			nil,
+			func() rpcinfo.RPCConfig {
+				cfg := rpcinfo.NewRPCConfig()
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
+				return cfg
+			}(),
+			nil,
+		)}, false},
+
+		{"with ttheader ,ttheader framed,http and grpc", args{ri: rpcinfo.NewRPCInfo(
+			nil,
+			nil,
+			nil,
+			func() rpcinfo.RPCConfig {
+				cfg := rpcinfo.NewRPCConfig()
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeader)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
+				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.HTTP)
 				rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.GRPC)
 				return cfg
 			}(),

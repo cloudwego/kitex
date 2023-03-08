@@ -43,6 +43,7 @@ type RemoteInfo interface {
 	// SetRemoteAddr tries to set the network address of the discovery.Instance hold by RemoteInfo.
 	// The result indicates whether the modification is successful.
 	SetRemoteAddr(addr net.Addr) (ok bool)
+	CopyFrom(from RemoteInfo)
 	ImmutableView() rpcinfo.EndpointInfo
 }
 
@@ -170,6 +171,22 @@ func (ri *remoteInfo) ForceSetTag(key, value string) {
 	ri.Lock()
 	defer ri.Unlock()
 	ri.tags[key] = value
+}
+
+// CopyFrom copies the input RemoteInfo.
+// Not deepcopy.
+func (ri *remoteInfo) CopyFrom(from RemoteInfo) {
+	if from == nil {
+		return
+	}
+	ri.Lock()
+	f := from.(*remoteInfo)
+	ri.serviceName = f.serviceName
+	ri.instance = f.instance
+	ri.tags = f.tags
+	ri.method = f.method
+	ri.tagLocks = f.tagLocks
+	ri.Unlock()
 }
 
 // ImmutableView implements rpcinfo.MutableEndpointInfo.
