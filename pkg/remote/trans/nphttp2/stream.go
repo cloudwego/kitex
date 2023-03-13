@@ -98,8 +98,7 @@ func (s *stream) RecvMsg(m interface{}) error {
 	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
 	defer msg.Recycle()
 
-	ctx, err := s.handler.Read(s.ctx, s.conn, msg)
-	s.ctx = ctx
+	_, err := s.handler.Read(s.ctx, s.conn, msg)
 	return err
 }
 
@@ -110,8 +109,7 @@ func (s *stream) SendMsg(m interface{}) error {
 	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
 	defer msg.Recycle()
 
-	ctx, err := s.handler.Write(s.ctx, s.conn, msg)
-	s.ctx = ctx
+	_, err := s.handler.Write(s.ctx, s.conn, msg)
 	return err
 }
 
