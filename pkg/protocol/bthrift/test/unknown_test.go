@@ -18,7 +18,6 @@ package test
 
 import (
 	"bytes"
-	"fmt"
 	"strings"
 	"testing"
 
@@ -138,7 +137,6 @@ func TestPartialUnknownField(t *testing.T) {
 	if ll != l {
 		t.Fatal(ll)
 	}
-	fmt.Printf("unknown: %v\n", unknownStr(unknown.GetUnknown()))
 	if len(unknown.GetUnknown()) != 12 {
 		t.Fatal(len(unknown.GetUnknown()))
 	}
@@ -215,50 +213,4 @@ func TestCorruptRead(t *testing.T) {
 	if !strings.Contains(err.Error(), "unknown data type 200") {
 		t.Fatal(err)
 	}
-}
-
-func writeUF(f *unknown.Field) string {
-	var val string
-	switch f.Type {
-	case unknown.TBool:
-		val = fmt.Sprintf("%v", f.Value.(bool))
-	case unknown.TByte:
-		val = fmt.Sprintf("%v", f.Value.(int8))
-	case unknown.TDouble:
-		val = fmt.Sprintf("%v", f.Value.(float64))
-	case unknown.TI16:
-		val = fmt.Sprintf("%v", f.Value.(int16))
-	case unknown.TI32:
-		val = fmt.Sprintf("%v", f.Value.(int32))
-	case unknown.TI64:
-		val = fmt.Sprintf("%v", f.Value.(int64))
-	case unknown.TString:
-		val = fmt.Sprintf("\"%v\"", f.Value.(string))
-	case unknown.TSet:
-		fallthrough
-	case unknown.TList:
-		fallthrough
-	case unknown.TMap:
-		fallthrough
-	case unknown.TStruct:
-		val = unknownStr(f.Value.([]*unknown.Field))
-	default:
-		panic(fmt.Errorf("unknown data type %d", f.Type))
-	}
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("{Name: \"%v\" ID: %v Type: %v KType: %v VType: %v Value: %s}", f.Name, f.ID, f.Type, f.KeyType, f.ValType, val))
-	return sb.String()
-}
-
-func unknownStr(fs unknown.Fields) string {
-	var sb strings.Builder
-	sb.WriteString("[")
-	for i, f := range fs {
-		sb.WriteString(writeUF(f))
-		if i != len(fs)-1 {
-			sb.WriteString(", ")
-		}
-	}
-	sb.WriteString("]")
-	return sb.String()
 }
