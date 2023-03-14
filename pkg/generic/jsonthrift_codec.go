@@ -55,7 +55,7 @@ type jsonThriftCodec struct {
 	convOpts         conv.Options
 }
 
-func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...DynamicgoOptions) (*jsonThriftCodec, error) {
+func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...Options) (*jsonThriftCodec, error) {
 	svc := <-p.Provide()
 	var c *jsonThriftCodec
 	if opts == nil {

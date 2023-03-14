@@ -27,7 +27,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-type DynamicgoOptions struct {
+type Options struct {
 	ConvOpts                conv.Options
 	EnableDynamicgoHTTPResp bool
 }
@@ -83,7 +83,7 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 //
 //	g, err := generic.HTTPThriftGeneric(p)
 //	SetBinaryWithBase64(g, true)
-func HTTPThriftGeneric(p DescriptorProvider, opts ...DynamicgoOptions) (Generic, error) {
+func HTTPThriftGeneric(p DescriptorProvider, opts ...Options) (Generic, error) {
 	var codec *httpThriftCodec
 	var err error
 	if opts != nil {
@@ -117,7 +117,7 @@ func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generi
 //
 //	g, err := generic.JSONThriftGeneric(p)
 //	SetBinaryWithBase64(g, false)
-func JSONThriftGeneric(p DescriptorProvider, opts ...DynamicgoOptions) (Generic, error) {
+func JSONThriftGeneric(p DescriptorProvider, opts ...Options) (Generic, error) {
 	var codec *jsonThriftCodec
 	var err error
 	if opts != nil {

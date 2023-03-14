@@ -25,17 +25,12 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	athrift "github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/dynamicgo/conv"
-	"github.com/cloudwego/dynamicgo/conv/t2j"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -60,7 +55,7 @@ type httpThriftCodec struct {
 	convOpts            conv.Options
 }
 
-func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...DynamicgoOptions) (*httpThriftCodec, error) {
+func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...Options) (*httpThriftCodec, error) {
 	svc := <-p.Provide()
 	var c *httpThriftCodec
 	if opts == nil {
@@ -108,103 +103,7 @@ func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
 	return &Method{function.Name, function.Oneway}, nil
 }
 
-func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if !c.enableDynamicgoResp || msg.PayloadLen() == 0 {
-		return c.originalUnmarshal(ctx, msg, in)
-	}
-
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
-	}
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
-	}
-
-	tProt := cthrift.NewBinaryProtocol(in)
-	method, msgType, seqID, err := tProt.ReadMessageBegin()
-	if err != nil {
-		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageBegin failed: %s", err.Error()))
-	}
-	if err = codec.UpdateMsgType(uint32(msgType), msg); err != nil {
-		return err
-	}
-	// exception message
-	if msg.MessageType() == remote.Exception {
-		exception := athrift.NewTApplicationException(athrift.UNKNOWN_APPLICATION_EXCEPTION, "")
-		if err := exception.Read(tProt); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal Exception failed: %s", err.Error()))
-		}
-		if err := tProt.ReadMessageEnd(); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageEnd failed: %s", err.Error()))
-		}
-		return remote.NewTransError(exception.TypeId(), exception)
-	}
-	// Must check after Exception handle.
-	// For server side, the following error can be sent back and 'SetSeqID' should be executed first to ensure the seqID
-	// is right when return Exception back.
-	if err = codec.SetOrCheckSeqID(seqID, msg); err != nil {
-		return err
-	}
-	if err = codec.SetOrCheckMethodName(method, msg); err != nil {
-		return err
-	}
-
-	if err = codec.NewDataIfNeeded(method, msg); err != nil {
-		return err
-	}
-
-	sname, err := tProt.ReadStructBegin()
-	if err != nil {
-		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadStructBegin failed: %s", err.Error()))
-	}
-	fname, ftype, fid, err := tProt.ReadFieldBegin()
-	if err != nil {
-		return perrors.NewProtocolErrorWithErrMsg(err,
-			fmt.Sprintf("thrift unmarshal, ReadFieldBegin failed: %s", err.Error()))
-	}
-	msgBeginLen := bthrift.Binary.MessageBeginLength(method, msgType, seqID)
-	structBeginLen := bthrift.Binary.StructBeginLength(sname)
-	fieldBeginLen := bthrift.Binary.FieldBeginLength(fname, ftype, fid)
-	transBuff, err := in.ReadBinary(
-		msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength() -
-			structBeginLen - bthrift.Binary.StructEndLength() -
-			fieldBeginLen - bthrift.Binary.FieldEndLength() - bthrift.Binary.FieldStopLength())
-	if err != nil {
-		return err
-	}
-	if svcDsc.DynamicgoDsc == nil {
-		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
-	}
-	tyDsc := svcDsc.DynamicgoDsc.Functions()[method].Response().Struct().Fields()[0].Type()
-
-	buf := make([]byte, 0, len(transBuff)*2)
-	if err != nil {
-		panic(err)
-	}
-	resp := descriptor.NewHTTPResponse()
-	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, resp)
-	cv := t2j.NewBinaryConv(c.convOpts)
-	// decode with dynamicgo
-	// thrift []byte to json []byte
-	if err = cv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
-		return err
-	}
-
-	tProt.ReadFieldEnd()
-	in.ReadBinary(bthrift.Binary.FieldStopLength())
-	tProt.ReadStructEnd()
-	tProt.ReadMessageEnd()
-	tProt.Recycle()
-
-	gResult := msg.Data().(*Result)
-	resp.GeneralBody = string(buf)
-	gResult.Success = resp
-
-	return nil
-}
-
-func (c *httpThriftCodec) originalMarshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return fmt.Errorf("get parser ServiceDescriptor failed")
@@ -212,11 +111,19 @@ func (c *httpThriftCodec) originalMarshal(ctx context.Context, msg remote.Messag
 
 	inner := thrift.NewWriteHTTPRequest(svcDsc)
 	inner.SetBinaryWithBase64(c.binaryWithBase64)
+	inner.SetEnableDynamicgo(c.enableDynamicgoReq)
+	if c.enableDynamicgoReq {
+		inner.SetConvOptions(c.convOpts)
+	}
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Marshal(ctx, msg, out)
 }
 
-func (c *httpThriftCodec) originalUnmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
+	if msg.PayloadLen() == 0 {
+		c.enableDynamicgoResp = false
+	}
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
 	}
@@ -226,6 +133,11 @@ func (c *httpThriftCodec) originalUnmarshal(ctx context.Context, msg remote.Mess
 	}
 	inner := thrift.NewReadHTTPResponse(svcDsc)
 	inner.SetBase64Binary(c.binaryWithBase64)
+	inner.SetDynamicgoResp(c.enableDynamicgoResp)
+	if c.enableDynamicgoResp {
+		inner.SetConvOptions(c.convOpts)
+		inner.SetRemoteMessage(msg)
+	}
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Unmarshal(ctx, msg, in)
 }
@@ -241,7 +153,7 @@ func (c *httpThriftCodec) Close() error {
 	return c.provider.Close()
 }
 
-// FromHTTPRequest parse  HTTPRequest from http.Request
+// FromHTTPRequest parse HTTPRequest from http.Request
 func FromHTTPRequest(req *http.Request) (customReq *HTTPRequest, err error) {
 	customReq = &HTTPRequest{Request: req}
 	var b io.ReadCloser

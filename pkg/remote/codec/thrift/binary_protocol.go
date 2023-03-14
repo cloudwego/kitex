@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
@@ -500,6 +499,11 @@ func (p *BinaryProtocol) Skip(fieldType thrift.TType) (err error) {
 func (p *BinaryProtocol) Transport() thrift.TTransport {
 	// not support
 	return nil
+}
+
+// ByteBuffer ...
+func (p *BinaryProtocol) ByteBuffer() remote.ByteBuffer {
+	return p.trans
 }
 
 // next ...

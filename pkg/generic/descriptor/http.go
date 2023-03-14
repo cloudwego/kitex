@@ -104,6 +104,9 @@ func (req HTTPRequest) GetParam(key string) string {
 
 // GetMapBody implements RequestGetter.GetMapBody of dynamicgo
 func (req HTTPRequest) GetMapBody(key string) string {
+	if len(req.RawBody) == 0 {
+		return ""
+	}
 	if req.GeneralBody == nil && req.Request != nil {
 		body := req.RawBody
 		var s string

@@ -60,7 +60,7 @@ func TestJsonThriftCodec(t *testing.T) {
 func TestJsonDynamicgoThriftCodec(t *testing.T) {
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	jtc, err := newJsonThriftCodec(p, thriftCodec, DynamicgoOptions{})
+	jtc, err := newJsonThriftCodec(p, thriftCodec, Options{})
 	test.Assert(t, err == nil)
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONDynamicgoThrift")
@@ -77,7 +77,7 @@ func TestJsonDynamicgoThriftCodec(t *testing.T) {
 	err = jtc.Marshal(ctx, sendMsg, out)
 	test.Assert(t, err == nil)
 
-	// UnMarshal side
+	// Unmarshal side
 	recvMsg := initJsonRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil)
@@ -89,7 +89,7 @@ func TestJsonDynamicgoThriftCodec(t *testing.T) {
 	// can't use dynamicgo because the protocol is not TTHeader
 	p, err = NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	jtc, err = newJsonThriftCodec(p, thriftCodec, DynamicgoOptions{})
+	jtc, err = newJsonThriftCodec(p, thriftCodec, Options{})
 	test.Assert(t, err == nil)
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONDynamicgoThrift")
