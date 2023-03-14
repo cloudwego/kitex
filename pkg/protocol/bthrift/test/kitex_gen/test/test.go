@@ -858,7 +858,7 @@ func (p *Local) ReadField1(iprot thrift.TProtocol) error {
 
 func (p *Local) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
-	if err = oprot.WriteStructBegin("local"); err != nil {
+	if err = oprot.WriteStructBegin("Local"); err != nil {
 		goto WriteStructBeginError
 	}
 	if p != nil {
@@ -934,193 +934,7 @@ func (p *Local) Field1DeepEqual(src int32) bool {
 	return true
 }
 
-type Local2 struct {
-	L1             *Local `thrift:"l1,1,optional" frugal:"1,optional,Local" json:"l1,omitempty"`
-	_unknownFields unknown.Fields
-}
-
-func NewLocal2() *Local2 {
-	return &Local2{}
-}
-
-func (p *Local2) InitDefault() {
-	*p = Local2{}
-}
-
-var Local2_L1_DEFAULT *Local
-
-func (p *Local2) GetL1() (v *Local) {
-	if !p.IsSetL1() {
-		return Local2_L1_DEFAULT
-	}
-	return p.L1
-}
-func (p *Local2) SetL1(val *Local) {
-	p.L1 = val
-}
-
-func (p *Local2) CarryingUnknownFields() bool {
-	return len(p._unknownFields) > 0
-}
-
-var fieldIDToName_Local2 = map[int16]string{
-	1: "l1",
-}
-
-func (p *Local2) IsSetL1() bool {
-	return p.L1 != nil
-}
-
-func (p *Local2) Read(iprot thrift.TProtocol) (err error) {
-	var name string
-	var fieldTypeId thrift.TType
-	var fieldId int16
-
-	if _, err = iprot.ReadStructBegin(); err != nil {
-		goto ReadStructBeginError
-	}
-
-	for {
-		name, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
-		if err != nil {
-			goto ReadFieldBeginError
-		}
-		if fieldTypeId == thrift.STOP {
-			break
-		}
-
-		switch fieldId {
-		case 1:
-			if fieldTypeId == thrift.STRUCT {
-				if err = p.ReadField1(iprot); err != nil {
-					goto ReadFieldError
-				}
-			} else {
-				if err = iprot.Skip(fieldTypeId); err != nil {
-					goto SkipFieldError
-				}
-			}
-		default:
-			if err = p._unknownFields.Append(iprot, name, fieldTypeId, fieldId); err != nil {
-				goto UnknownFieldsAppendError
-			}
-		}
-
-		if err = iprot.ReadFieldEnd(); err != nil {
-			goto ReadFieldEndError
-		}
-	}
-	if err = iprot.ReadStructEnd(); err != nil {
-		goto ReadStructEndError
-	}
-
-	return nil
-ReadStructBeginError:
-	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
-ReadFieldBeginError:
-	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
-ReadFieldError:
-	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_Local2[fieldId]), err)
-SkipFieldError:
-	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
-UnknownFieldsAppendError:
-	return thrift.PrependError(fmt.Sprintf("%T append unknown field(name:%s type:%d id:%d) error: ", p, name, fieldTypeId, fieldId), err)
-
-ReadFieldEndError:
-	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
-ReadStructEndError:
-	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
-}
-
-func (p *Local2) ReadField1(iprot thrift.TProtocol) error {
-	p.L1 = NewLocal()
-	if err := p.L1.Read(iprot); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (p *Local2) Write(oprot thrift.TProtocol) (err error) {
-	var fieldId int16
-	if err = oprot.WriteStructBegin("local2"); err != nil {
-		goto WriteStructBeginError
-	}
-	if p != nil {
-		if err = p.writeField1(oprot); err != nil {
-			fieldId = 1
-			goto WriteFieldError
-		}
-
-		if err = p._unknownFields.Write(oprot); err != nil {
-			goto UnknownFieldsWriteError
-		}
-	}
-	if err = oprot.WriteFieldStop(); err != nil {
-		goto WriteFieldStopError
-	}
-	if err = oprot.WriteStructEnd(); err != nil {
-		goto WriteStructEndError
-	}
-	return nil
-WriteStructBeginError:
-	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
-WriteFieldError:
-	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
-WriteFieldStopError:
-	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
-WriteStructEndError:
-	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
-UnknownFieldsWriteError:
-	return thrift.PrependError(fmt.Sprintf("%T write unknown fields error: ", p), err)
-}
-
-func (p *Local2) writeField1(oprot thrift.TProtocol) (err error) {
-	if p.IsSetL1() {
-		if err = oprot.WriteFieldBegin("l1", thrift.STRUCT, 1); err != nil {
-			goto WriteFieldBeginError
-		}
-		if err := p.L1.Write(oprot); err != nil {
-			return err
-		}
-		if err = oprot.WriteFieldEnd(); err != nil {
-			goto WriteFieldEndError
-		}
-	}
-	return nil
-WriteFieldBeginError:
-	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
-WriteFieldEndError:
-	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
-}
-
-func (p *Local2) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("Local2(%+v)", *p)
-}
-
-func (p *Local2) DeepEqual(ano *Local2) bool {
-	if p == ano {
-		return true
-	} else if p == nil || ano == nil {
-		return false
-	}
-	if !p.Field1DeepEqual(ano.L1) {
-		return false
-	}
-	return true
-}
-
-func (p *Local2) Field1DeepEqual(src *Local) bool {
-
-	if !p.L1.DeepEqual(src) {
-		return false
-	}
-	return true
-}
-
-type TestStruct struct {
+type FullStruct struct {
 	Left           int32                              `thrift:"Left,1,required" frugal:"1,required,i32" json:"Left"`
 	Right          int32                              `thrift:"Right,2,optional" frugal:"2,optional,i32" json:"Right,omitempty"`
 	Dummy          []byte                             `thrift:"Dummy,3" frugal:"3,default,binary" json:"Dummy"`
@@ -1151,264 +965,264 @@ type TestStruct struct {
 	_unknownFields unknown.Fields
 }
 
-func NewTestStruct() *TestStruct {
-	return &TestStruct{
+func NewFullStruct() *FullStruct {
+	return &FullStruct{
 
 		Right: 3,
 	}
 }
 
-func (p *TestStruct) InitDefault() {
-	*p = TestStruct{
+func (p *FullStruct) InitDefault() {
+	*p = FullStruct{
 
 		Right: 3,
 	}
 }
 
-func (p *TestStruct) GetLeft() (v int32) {
+func (p *FullStruct) GetLeft() (v int32) {
 	return p.Left
 }
 
-var TestStruct_Right_DEFAULT int32 = 3
+var FullStruct_Right_DEFAULT int32 = 3
 
-func (p *TestStruct) GetRight() (v int32) {
+func (p *FullStruct) GetRight() (v int32) {
 	if !p.IsSetRight() {
-		return TestStruct_Right_DEFAULT
+		return FullStruct_Right_DEFAULT
 	}
 	return p.Right
 }
 
-func (p *TestStruct) GetDummy() (v []byte) {
+func (p *FullStruct) GetDummy() (v []byte) {
 	return p.Dummy
 }
 
-var TestStruct_InnerReq_DEFAULT *Inner
+var FullStruct_InnerReq_DEFAULT *Inner
 
-func (p *TestStruct) GetInnerReq() (v *Inner) {
+func (p *FullStruct) GetInnerReq() (v *Inner) {
 	if !p.IsSetInnerReq() {
-		return TestStruct_InnerReq_DEFAULT
+		return FullStruct_InnerReq_DEFAULT
 	}
 	return p.InnerReq
 }
 
-func (p *TestStruct) GetStatus() (v HTTPStatus) {
+func (p *FullStruct) GetStatus() (v HTTPStatus) {
 	return p.Status
 }
 
-func (p *TestStruct) GetStr() (v string) {
+func (p *FullStruct) GetStr() (v string) {
 	return p.Str
 }
 
-func (p *TestStruct) GetEnumList() (v []HTTPStatus) {
+func (p *FullStruct) GetEnumList() (v []HTTPStatus) {
 	return p.EnumList
 }
 
-var TestStruct_Strmap_DEFAULT map[int32]string
+var FullStruct_Strmap_DEFAULT map[int32]string
 
-func (p *TestStruct) GetStrmap() (v map[int32]string) {
+func (p *FullStruct) GetStrmap() (v map[int32]string) {
 	if !p.IsSetStrmap() {
-		return TestStruct_Strmap_DEFAULT
+		return FullStruct_Strmap_DEFAULT
 	}
 	return p.Strmap
 }
 
-func (p *TestStruct) GetInt64() (v int64) {
+func (p *FullStruct) GetInt64() (v int64) {
 	return p.Int64
 }
 
-var TestStruct_IntList_DEFAULT []int32
+var FullStruct_IntList_DEFAULT []int32
 
-func (p *TestStruct) GetIntList() (v []int32) {
+func (p *FullStruct) GetIntList() (v []int32) {
 	if !p.IsSetIntList() {
-		return TestStruct_IntList_DEFAULT
+		return FullStruct_IntList_DEFAULT
 	}
 	return p.IntList
 }
 
-func (p *TestStruct) GetLocalList() (v []*Local) {
+func (p *FullStruct) GetLocalList() (v []*Local) {
 	return p.LocalList
 }
 
-func (p *TestStruct) GetStrLocalMap() (v map[string]*Local) {
+func (p *FullStruct) GetStrLocalMap() (v map[string]*Local) {
 	return p.StrLocalMap
 }
 
-func (p *TestStruct) GetNestList() (v [][]int32) {
+func (p *FullStruct) GetNestList() (v [][]int32) {
 	return p.NestList
 }
 
-var TestStruct_RequiredIns_DEFAULT *Local
+var FullStruct_RequiredIns_DEFAULT *Local
 
-func (p *TestStruct) GetRequiredIns() (v *Local) {
+func (p *FullStruct) GetRequiredIns() (v *Local) {
 	if !p.IsSetRequiredIns() {
-		return TestStruct_RequiredIns_DEFAULT
+		return FullStruct_RequiredIns_DEFAULT
 	}
 	return p.RequiredIns
 }
 
-func (p *TestStruct) GetNestMap() (v map[string][]string) {
+func (p *FullStruct) GetNestMap() (v map[string][]string) {
 	return p.NestMap
 }
 
-func (p *TestStruct) GetNestMap2() (v []map[string]HTTPStatus) {
+func (p *FullStruct) GetNestMap2() (v []map[string]HTTPStatus) {
 	return p.NestMap2
 }
 
-func (p *TestStruct) GetEnumMap() (v map[int32]HTTPStatus) {
+func (p *FullStruct) GetEnumMap() (v map[int32]HTTPStatus) {
 	return p.EnumMap
 }
 
-func (p *TestStruct) GetStrlist() (v []string) {
+func (p *FullStruct) GetStrlist() (v []string) {
 	return p.Strlist
 }
 
-var TestStruct_OptionalIns_DEFAULT *Local
+var FullStruct_OptionalIns_DEFAULT *Local
 
-func (p *TestStruct) GetOptionalIns() (v *Local) {
+func (p *FullStruct) GetOptionalIns() (v *Local) {
 	if !p.IsSetOptionalIns() {
-		return TestStruct_OptionalIns_DEFAULT
+		return FullStruct_OptionalIns_DEFAULT
 	}
 	return p.OptionalIns
 }
 
-var TestStruct_AnotherInner_DEFAULT *Inner
+var FullStruct_AnotherInner_DEFAULT *Inner
 
-func (p *TestStruct) GetAnotherInner() (v *Inner) {
+func (p *FullStruct) GetAnotherInner() (v *Inner) {
 	if !p.IsSetAnotherInner() {
-		return TestStruct_AnotherInner_DEFAULT
+		return FullStruct_AnotherInner_DEFAULT
 	}
 	return p.AnotherInner
 }
 
-var TestStruct_OptNilList_DEFAULT []string
+var FullStruct_OptNilList_DEFAULT []string
 
-func (p *TestStruct) GetOptNilList() (v []string) {
+func (p *FullStruct) GetOptNilList() (v []string) {
 	if !p.IsSetOptNilList() {
-		return TestStruct_OptNilList_DEFAULT
+		return FullStruct_OptNilList_DEFAULT
 	}
 	return p.OptNilList
 }
 
-func (p *TestStruct) GetNilList() (v []string) {
+func (p *FullStruct) GetNilList() (v []string) {
 	return p.NilList
 }
 
-var TestStruct_OptNilInsList_DEFAULT []*Inner
+var FullStruct_OptNilInsList_DEFAULT []*Inner
 
-func (p *TestStruct) GetOptNilInsList() (v []*Inner) {
+func (p *FullStruct) GetOptNilInsList() (v []*Inner) {
 	if !p.IsSetOptNilInsList() {
-		return TestStruct_OptNilInsList_DEFAULT
+		return FullStruct_OptNilInsList_DEFAULT
 	}
 	return p.OptNilInsList
 }
 
-func (p *TestStruct) GetNilInsList() (v []*Inner) {
+func (p *FullStruct) GetNilInsList() (v []*Inner) {
 	return p.NilInsList
 }
 
-var TestStruct_OptStatus_DEFAULT HTTPStatus
+var FullStruct_OptStatus_DEFAULT HTTPStatus
 
-func (p *TestStruct) GetOptStatus() (v HTTPStatus) {
+func (p *FullStruct) GetOptStatus() (v HTTPStatus) {
 	if !p.IsSetOptStatus() {
-		return TestStruct_OptStatus_DEFAULT
+		return FullStruct_OptStatus_DEFAULT
 	}
 	return *p.OptStatus
 }
 
-func (p *TestStruct) GetEnumKeyMap() (v map[HTTPStatus]*Local) {
+func (p *FullStruct) GetEnumKeyMap() (v map[HTTPStatus]*Local) {
 	return p.EnumKeyMap
 }
 
-func (p *TestStruct) GetComplex() (v map[HTTPStatus][]map[string]*Local) {
+func (p *FullStruct) GetComplex() (v map[HTTPStatus][]map[string]*Local) {
 	return p.Complex
 }
-func (p *TestStruct) SetLeft(val int32) {
+func (p *FullStruct) SetLeft(val int32) {
 	p.Left = val
 }
-func (p *TestStruct) SetRight(val int32) {
+func (p *FullStruct) SetRight(val int32) {
 	p.Right = val
 }
-func (p *TestStruct) SetDummy(val []byte) {
+func (p *FullStruct) SetDummy(val []byte) {
 	p.Dummy = val
 }
-func (p *TestStruct) SetInnerReq(val *Inner) {
+func (p *FullStruct) SetInnerReq(val *Inner) {
 	p.InnerReq = val
 }
-func (p *TestStruct) SetStatus(val HTTPStatus) {
+func (p *FullStruct) SetStatus(val HTTPStatus) {
 	p.Status = val
 }
-func (p *TestStruct) SetStr(val string) {
+func (p *FullStruct) SetStr(val string) {
 	p.Str = val
 }
-func (p *TestStruct) SetEnumList(val []HTTPStatus) {
+func (p *FullStruct) SetEnumList(val []HTTPStatus) {
 	p.EnumList = val
 }
-func (p *TestStruct) SetStrmap(val map[int32]string) {
+func (p *FullStruct) SetStrmap(val map[int32]string) {
 	p.Strmap = val
 }
-func (p *TestStruct) SetInt64(val int64) {
+func (p *FullStruct) SetInt64(val int64) {
 	p.Int64 = val
 }
-func (p *TestStruct) SetIntList(val []int32) {
+func (p *FullStruct) SetIntList(val []int32) {
 	p.IntList = val
 }
-func (p *TestStruct) SetLocalList(val []*Local) {
+func (p *FullStruct) SetLocalList(val []*Local) {
 	p.LocalList = val
 }
-func (p *TestStruct) SetStrLocalMap(val map[string]*Local) {
+func (p *FullStruct) SetStrLocalMap(val map[string]*Local) {
 	p.StrLocalMap = val
 }
-func (p *TestStruct) SetNestList(val [][]int32) {
+func (p *FullStruct) SetNestList(val [][]int32) {
 	p.NestList = val
 }
-func (p *TestStruct) SetRequiredIns(val *Local) {
+func (p *FullStruct) SetRequiredIns(val *Local) {
 	p.RequiredIns = val
 }
-func (p *TestStruct) SetNestMap(val map[string][]string) {
+func (p *FullStruct) SetNestMap(val map[string][]string) {
 	p.NestMap = val
 }
-func (p *TestStruct) SetNestMap2(val []map[string]HTTPStatus) {
+func (p *FullStruct) SetNestMap2(val []map[string]HTTPStatus) {
 	p.NestMap2 = val
 }
-func (p *TestStruct) SetEnumMap(val map[int32]HTTPStatus) {
+func (p *FullStruct) SetEnumMap(val map[int32]HTTPStatus) {
 	p.EnumMap = val
 }
-func (p *TestStruct) SetStrlist(val []string) {
+func (p *FullStruct) SetStrlist(val []string) {
 	p.Strlist = val
 }
-func (p *TestStruct) SetOptionalIns(val *Local) {
+func (p *FullStruct) SetOptionalIns(val *Local) {
 	p.OptionalIns = val
 }
-func (p *TestStruct) SetAnotherInner(val *Inner) {
+func (p *FullStruct) SetAnotherInner(val *Inner) {
 	p.AnotherInner = val
 }
-func (p *TestStruct) SetOptNilList(val []string) {
+func (p *FullStruct) SetOptNilList(val []string) {
 	p.OptNilList = val
 }
-func (p *TestStruct) SetNilList(val []string) {
+func (p *FullStruct) SetNilList(val []string) {
 	p.NilList = val
 }
-func (p *TestStruct) SetOptNilInsList(val []*Inner) {
+func (p *FullStruct) SetOptNilInsList(val []*Inner) {
 	p.OptNilInsList = val
 }
-func (p *TestStruct) SetNilInsList(val []*Inner) {
+func (p *FullStruct) SetNilInsList(val []*Inner) {
 	p.NilInsList = val
 }
-func (p *TestStruct) SetOptStatus(val *HTTPStatus) {
+func (p *FullStruct) SetOptStatus(val *HTTPStatus) {
 	p.OptStatus = val
 }
-func (p *TestStruct) SetEnumKeyMap(val map[HTTPStatus]*Local) {
+func (p *FullStruct) SetEnumKeyMap(val map[HTTPStatus]*Local) {
 	p.EnumKeyMap = val
 }
-func (p *TestStruct) SetComplex(val map[HTTPStatus][]map[string]*Local) {
+func (p *FullStruct) SetComplex(val map[HTTPStatus][]map[string]*Local) {
 	p.Complex = val
 }
 
-func (p *TestStruct) CarryingUnknownFields() bool {
+func (p *FullStruct) CarryingUnknownFields() bool {
 	return len(p._unknownFields) > 0
 }
 
-var fieldIDToName_TestStruct = map[int16]string{
+var fieldIDToName_FullStruct = map[int16]string{
 	1:  "Left",
 	2:  "Right",
 	3:  "Dummy",
@@ -1438,47 +1252,47 @@ var fieldIDToName_TestStruct = map[int16]string{
 	28: "complex",
 }
 
-func (p *TestStruct) IsSetRight() bool {
-	return p.Right != TestStruct_Right_DEFAULT
+func (p *FullStruct) IsSetRight() bool {
+	return p.Right != FullStruct_Right_DEFAULT
 }
 
-func (p *TestStruct) IsSetInnerReq() bool {
+func (p *FullStruct) IsSetInnerReq() bool {
 	return p.InnerReq != nil
 }
 
-func (p *TestStruct) IsSetStrmap() bool {
+func (p *FullStruct) IsSetStrmap() bool {
 	return p.Strmap != nil
 }
 
-func (p *TestStruct) IsSetIntList() bool {
+func (p *FullStruct) IsSetIntList() bool {
 	return p.IntList != nil
 }
 
-func (p *TestStruct) IsSetRequiredIns() bool {
+func (p *FullStruct) IsSetRequiredIns() bool {
 	return p.RequiredIns != nil
 }
 
-func (p *TestStruct) IsSetOptionalIns() bool {
+func (p *FullStruct) IsSetOptionalIns() bool {
 	return p.OptionalIns != nil
 }
 
-func (p *TestStruct) IsSetAnotherInner() bool {
+func (p *FullStruct) IsSetAnotherInner() bool {
 	return p.AnotherInner != nil
 }
 
-func (p *TestStruct) IsSetOptNilList() bool {
+func (p *FullStruct) IsSetOptNilList() bool {
 	return p.OptNilList != nil
 }
 
-func (p *TestStruct) IsSetOptNilInsList() bool {
+func (p *FullStruct) IsSetOptNilInsList() bool {
 	return p.OptNilInsList != nil
 }
 
-func (p *TestStruct) IsSetOptStatus() bool {
+func (p *FullStruct) IsSetOptStatus() bool {
 	return p.OptStatus != nil
 }
 
-func (p *TestStruct) Read(iprot thrift.TProtocol) (err error) {
+func (p *FullStruct) Read(iprot thrift.TProtocol) (err error) {
 	var name string
 	var fieldTypeId thrift.TType
 	var fieldId int16
@@ -1800,7 +1614,7 @@ ReadStructBeginError:
 ReadFieldBeginError:
 	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_TestStruct[fieldId]), err)
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_FullStruct[fieldId]), err)
 SkipFieldError:
 	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 UnknownFieldsAppendError:
@@ -1811,10 +1625,10 @@ ReadFieldEndError:
 ReadStructEndError:
 	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
 RequiredFieldNotSetError:
-	return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_TestStruct[fieldId]))
+	return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_FullStruct[fieldId]))
 }
 
-func (p *TestStruct) ReadField1(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField1(iprot thrift.TProtocol) error {
 	if v, err := iprot.ReadI32(); err != nil {
 		return err
 	} else {
@@ -1823,7 +1637,7 @@ func (p *TestStruct) ReadField1(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField2(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField2(iprot thrift.TProtocol) error {
 	if v, err := iprot.ReadI32(); err != nil {
 		return err
 	} else {
@@ -1832,7 +1646,7 @@ func (p *TestStruct) ReadField2(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField3(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField3(iprot thrift.TProtocol) error {
 	if v, err := iprot.ReadBinary(); err != nil {
 		return err
 	} else {
@@ -1841,7 +1655,7 @@ func (p *TestStruct) ReadField3(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField4(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField4(iprot thrift.TProtocol) error {
 	p.InnerReq = NewInner()
 	if err := p.InnerReq.Read(iprot); err != nil {
 		return err
@@ -1849,7 +1663,7 @@ func (p *TestStruct) ReadField4(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField5(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField5(iprot thrift.TProtocol) error {
 	if v, err := iprot.ReadI32(); err != nil {
 		return err
 	} else {
@@ -1858,7 +1672,7 @@ func (p *TestStruct) ReadField5(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField6(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField6(iprot thrift.TProtocol) error {
 	if v, err := iprot.ReadString(); err != nil {
 		return err
 	} else {
@@ -1867,7 +1681,7 @@ func (p *TestStruct) ReadField6(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField7(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField7(iprot thrift.TProtocol) error {
 	_, size, err := iprot.ReadListBegin()
 	if err != nil {
 		return err
@@ -1889,7 +1703,7 @@ func (p *TestStruct) ReadField7(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField8(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField8(iprot thrift.TProtocol) error {
 	_, _, size, err := iprot.ReadMapBegin()
 	if err != nil {
 		return err
@@ -1918,7 +1732,7 @@ func (p *TestStruct) ReadField8(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField9(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField9(iprot thrift.TProtocol) error {
 	if v, err := iprot.ReadI64(); err != nil {
 		return err
 	} else {
@@ -1927,7 +1741,7 @@ func (p *TestStruct) ReadField9(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField10(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField10(iprot thrift.TProtocol) error {
 	_, size, err := iprot.ReadListBegin()
 	if err != nil {
 		return err
@@ -1949,7 +1763,7 @@ func (p *TestStruct) ReadField10(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField11(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField11(iprot thrift.TProtocol) error {
 	_, size, err := iprot.ReadListBegin()
 	if err != nil {
 		return err
@@ -1969,7 +1783,7 @@ func (p *TestStruct) ReadField11(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField12(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField12(iprot thrift.TProtocol) error {
 	_, _, size, err := iprot.ReadMapBegin()
 	if err != nil {
 		return err
@@ -1995,7 +1809,7 @@ func (p *TestStruct) ReadField12(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField13(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField13(iprot thrift.TProtocol) error {
 	_, size, err := iprot.ReadListBegin()
 	if err != nil {
 		return err
@@ -2029,7 +1843,7 @@ func (p *TestStruct) ReadField13(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField14(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField14(iprot thrift.TProtocol) error {
 	p.RequiredIns = NewLocal()
 	if err := p.RequiredIns.Read(iprot); err != nil {
 		return err
@@ -2037,7 +1851,7 @@ func (p *TestStruct) ReadField14(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField16(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField16(iprot thrift.TProtocol) error {
 	_, _, size, err := iprot.ReadMapBegin()
 	if err != nil {
 		return err
@@ -2078,7 +1892,7 @@ func (p *TestStruct) ReadField16(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField17(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField17(iprot thrift.TProtocol) error {
 	_, size, err := iprot.ReadListBegin()
 	if err != nil {
 		return err
@@ -2119,7 +1933,7 @@ func (p *TestStruct) ReadField17(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField18(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField18(iprot thrift.TProtocol) error {
 	_, _, size, err := iprot.ReadMapBegin()
 	if err != nil {
 		return err
@@ -2148,7 +1962,7 @@ func (p *TestStruct) ReadField18(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField19(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField19(iprot thrift.TProtocol) error {
 	_, size, err := iprot.ReadListBegin()
 	if err != nil {
 		return err
@@ -2170,7 +1984,7 @@ func (p *TestStruct) ReadField19(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField20(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField20(iprot thrift.TProtocol) error {
 	p.OptionalIns = NewLocal()
 	if err := p.OptionalIns.Read(iprot); err != nil {
 		return err
@@ -2178,7 +1992,7 @@ func (p *TestStruct) ReadField20(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField21(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField21(iprot thrift.TProtocol) error {
 	p.AnotherInner = NewInner()
 	if err := p.AnotherInner.Read(iprot); err != nil {
 		return err
@@ -2186,7 +2000,7 @@ func (p *TestStruct) ReadField21(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField22(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField22(iprot thrift.TProtocol) error {
 	_, size, err := iprot.ReadListBegin()
 	if err != nil {
 		return err
@@ -2208,7 +2022,7 @@ func (p *TestStruct) ReadField22(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField23(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField23(iprot thrift.TProtocol) error {
 	_, size, err := iprot.ReadListBegin()
 	if err != nil {
 		return err
@@ -2230,7 +2044,7 @@ func (p *TestStruct) ReadField23(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField24(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField24(iprot thrift.TProtocol) error {
 	_, size, err := iprot.ReadListBegin()
 	if err != nil {
 		return err
@@ -2250,7 +2064,7 @@ func (p *TestStruct) ReadField24(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField25(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField25(iprot thrift.TProtocol) error {
 	_, size, err := iprot.ReadListBegin()
 	if err != nil {
 		return err
@@ -2270,7 +2084,7 @@ func (p *TestStruct) ReadField25(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField26(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField26(iprot thrift.TProtocol) error {
 	if v, err := iprot.ReadI32(); err != nil {
 		return err
 	} else {
@@ -2280,7 +2094,7 @@ func (p *TestStruct) ReadField26(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField27(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField27(iprot thrift.TProtocol) error {
 	_, _, size, err := iprot.ReadMapBegin()
 	if err != nil {
 		return err
@@ -2306,7 +2120,7 @@ func (p *TestStruct) ReadField27(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) ReadField28(iprot thrift.TProtocol) error {
+func (p *FullStruct) ReadField28(iprot thrift.TProtocol) error {
 	_, _, size, err := iprot.ReadMapBegin()
 	if err != nil {
 		return err
@@ -2363,9 +2177,9 @@ func (p *TestStruct) ReadField28(iprot thrift.TProtocol) error {
 	return nil
 }
 
-func (p *TestStruct) Write(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) Write(oprot thrift.TProtocol) (err error) {
 	var fieldId int16
-	if err = oprot.WriteStructBegin("TestStruct"); err != nil {
+	if err = oprot.WriteStructBegin("FullStruct"); err != nil {
 		goto WriteStructBeginError
 	}
 	if p != nil {
@@ -2501,7 +2315,7 @@ UnknownFieldsWriteError:
 	return thrift.PrependError(fmt.Sprintf("%T write unknown fields error: ", p), err)
 }
 
-func (p *TestStruct) writeField1(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField1(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("Left", thrift.I32, 1); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2518,7 +2332,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField2(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField2(oprot thrift.TProtocol) (err error) {
 	if p.IsSetRight() {
 		if err = oprot.WriteFieldBegin("Right", thrift.I32, 2); err != nil {
 			goto WriteFieldBeginError
@@ -2537,7 +2351,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 2 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField3(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField3(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("Dummy", thrift.STRING, 3); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2554,7 +2368,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 3 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField4(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField4(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("InnerReq", thrift.STRUCT, 4); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2571,7 +2385,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 4 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField5(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField5(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("status", thrift.I32, 5); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2588,7 +2402,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 5 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField6(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField6(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("Str", thrift.STRING, 6); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2605,7 +2419,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 6 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField7(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField7(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("enum_list", thrift.LIST, 7); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2630,7 +2444,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 7 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField8(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField8(oprot thrift.TProtocol) (err error) {
 	if p.IsSetStrmap() {
 		if err = oprot.WriteFieldBegin("Strmap", thrift.MAP, 8); err != nil {
 			goto WriteFieldBeginError
@@ -2662,7 +2476,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 8 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField9(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField9(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("Int64", thrift.I64, 9); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2679,7 +2493,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 9 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField10(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField10(oprot thrift.TProtocol) (err error) {
 	if p.IsSetIntList() {
 		if err = oprot.WriteFieldBegin("IntList", thrift.LIST, 10); err != nil {
 			goto WriteFieldBeginError
@@ -2706,7 +2520,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 10 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField11(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField11(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("localList", thrift.LIST, 11); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2731,7 +2545,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 11 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField12(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField12(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("StrLocalMap", thrift.MAP, 12); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2761,7 +2575,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 12 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField13(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField13(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("nestList", thrift.LIST, 13); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2794,7 +2608,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 13 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField14(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField14(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("required_ins", thrift.STRUCT, 14); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2811,7 +2625,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 14 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField16(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField16(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("nestMap", thrift.MAP, 16); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2849,7 +2663,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 16 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField17(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField17(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("nestMap2", thrift.LIST, 17); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2887,7 +2701,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 17 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField18(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField18(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("enum_map", thrift.MAP, 18); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2917,7 +2731,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 18 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField19(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField19(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("Strlist", thrift.LIST, 19); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2942,7 +2756,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 19 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField20(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField20(oprot thrift.TProtocol) (err error) {
 	if p.IsSetOptionalIns() {
 		if err = oprot.WriteFieldBegin("optional_ins", thrift.STRUCT, 20); err != nil {
 			goto WriteFieldBeginError
@@ -2961,7 +2775,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 20 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField21(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField21(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("AnotherInner", thrift.STRUCT, 21); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -2978,7 +2792,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 21 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField22(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField22(oprot thrift.TProtocol) (err error) {
 	if p.IsSetOptNilList() {
 		if err = oprot.WriteFieldBegin("opt_nil_list", thrift.LIST, 22); err != nil {
 			goto WriteFieldBeginError
@@ -3005,7 +2819,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 22 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField23(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField23(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("nil_list", thrift.LIST, 23); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -3030,7 +2844,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 23 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField24(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField24(oprot thrift.TProtocol) (err error) {
 	if p.IsSetOptNilInsList() {
 		if err = oprot.WriteFieldBegin("opt_nil_ins_list", thrift.LIST, 24); err != nil {
 			goto WriteFieldBeginError
@@ -3057,7 +2871,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 24 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField25(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField25(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("nil_ins_list", thrift.LIST, 25); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -3082,7 +2896,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 25 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField26(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField26(oprot thrift.TProtocol) (err error) {
 	if p.IsSetOptStatus() {
 		if err = oprot.WriteFieldBegin("opt_status", thrift.I32, 26); err != nil {
 			goto WriteFieldBeginError
@@ -3101,7 +2915,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 26 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField27(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField27(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("enum_key_map", thrift.MAP, 27); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -3131,7 +2945,7 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 27 end error: ", p), err)
 }
 
-func (p *TestStruct) writeField28(oprot thrift.TProtocol) (err error) {
+func (p *FullStruct) writeField28(oprot thrift.TProtocol) (err error) {
 	if err = oprot.WriteFieldBegin("complex", thrift.MAP, 28); err != nil {
 		goto WriteFieldBeginError
 	}
@@ -3182,14 +2996,14 @@ WriteFieldEndError:
 	return thrift.PrependError(fmt.Sprintf("%T write field 28 end error: ", p), err)
 }
 
-func (p *TestStruct) String() string {
+func (p *FullStruct) String() string {
 	if p == nil {
 		return "<nil>"
 	}
-	return fmt.Sprintf("TestStruct(%+v)", *p)
+	return fmt.Sprintf("FullStruct(%+v)", *p)
 }
 
-func (p *TestStruct) DeepEqual(ano *TestStruct) bool {
+func (p *FullStruct) DeepEqual(ano *FullStruct) bool {
 	if p == ano {
 		return true
 	} else if p == nil || ano == nil {
@@ -3279,49 +3093,49 @@ func (p *TestStruct) DeepEqual(ano *TestStruct) bool {
 	return true
 }
 
-func (p *TestStruct) Field1DeepEqual(src int32) bool {
+func (p *FullStruct) Field1DeepEqual(src int32) bool {
 
 	if p.Left != src {
 		return false
 	}
 	return true
 }
-func (p *TestStruct) Field2DeepEqual(src int32) bool {
+func (p *FullStruct) Field2DeepEqual(src int32) bool {
 
 	if p.Right != src {
 		return false
 	}
 	return true
 }
-func (p *TestStruct) Field3DeepEqual(src []byte) bool {
+func (p *FullStruct) Field3DeepEqual(src []byte) bool {
 
 	if bytes.Compare(p.Dummy, src) != 0 {
 		return false
 	}
 	return true
 }
-func (p *TestStruct) Field4DeepEqual(src *Inner) bool {
+func (p *FullStruct) Field4DeepEqual(src *Inner) bool {
 
 	if !p.InnerReq.DeepEqual(src) {
 		return false
 	}
 	return true
 }
-func (p *TestStruct) Field5DeepEqual(src HTTPStatus) bool {
+func (p *FullStruct) Field5DeepEqual(src HTTPStatus) bool {
 
 	if p.Status != src {
 		return false
 	}
 	return true
 }
-func (p *TestStruct) Field6DeepEqual(src string) bool {
+func (p *FullStruct) Field6DeepEqual(src string) bool {
 
 	if strings.Compare(p.Str, src) != 0 {
 		return false
 	}
 	return true
 }
-func (p *TestStruct) Field7DeepEqual(src []HTTPStatus) bool {
+func (p *FullStruct) Field7DeepEqual(src []HTTPStatus) bool {
 
 	if len(p.EnumList) != len(src) {
 		return false
@@ -3334,7 +3148,7 @@ func (p *TestStruct) Field7DeepEqual(src []HTTPStatus) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field8DeepEqual(src map[int32]string) bool {
+func (p *FullStruct) Field8DeepEqual(src map[int32]string) bool {
 
 	if len(p.Strmap) != len(src) {
 		return false
@@ -3347,14 +3161,14 @@ func (p *TestStruct) Field8DeepEqual(src map[int32]string) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field9DeepEqual(src int64) bool {
+func (p *FullStruct) Field9DeepEqual(src int64) bool {
 
 	if p.Int64 != src {
 		return false
 	}
 	return true
 }
-func (p *TestStruct) Field10DeepEqual(src []int32) bool {
+func (p *FullStruct) Field10DeepEqual(src []int32) bool {
 
 	if len(p.IntList) != len(src) {
 		return false
@@ -3367,7 +3181,7 @@ func (p *TestStruct) Field10DeepEqual(src []int32) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field11DeepEqual(src []*Local) bool {
+func (p *FullStruct) Field11DeepEqual(src []*Local) bool {
 
 	if len(p.LocalList) != len(src) {
 		return false
@@ -3380,7 +3194,7 @@ func (p *TestStruct) Field11DeepEqual(src []*Local) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field12DeepEqual(src map[string]*Local) bool {
+func (p *FullStruct) Field12DeepEqual(src map[string]*Local) bool {
 
 	if len(p.StrLocalMap) != len(src) {
 		return false
@@ -3393,7 +3207,7 @@ func (p *TestStruct) Field12DeepEqual(src map[string]*Local) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field13DeepEqual(src [][]int32) bool {
+func (p *FullStruct) Field13DeepEqual(src [][]int32) bool {
 
 	if len(p.NestList) != len(src) {
 		return false
@@ -3412,14 +3226,14 @@ func (p *TestStruct) Field13DeepEqual(src [][]int32) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field14DeepEqual(src *Local) bool {
+func (p *FullStruct) Field14DeepEqual(src *Local) bool {
 
 	if !p.RequiredIns.DeepEqual(src) {
 		return false
 	}
 	return true
 }
-func (p *TestStruct) Field16DeepEqual(src map[string][]string) bool {
+func (p *FullStruct) Field16DeepEqual(src map[string][]string) bool {
 
 	if len(p.NestMap) != len(src) {
 		return false
@@ -3438,7 +3252,7 @@ func (p *TestStruct) Field16DeepEqual(src map[string][]string) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field17DeepEqual(src []map[string]HTTPStatus) bool {
+func (p *FullStruct) Field17DeepEqual(src []map[string]HTTPStatus) bool {
 
 	if len(p.NestMap2) != len(src) {
 		return false
@@ -3457,7 +3271,7 @@ func (p *TestStruct) Field17DeepEqual(src []map[string]HTTPStatus) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field18DeepEqual(src map[int32]HTTPStatus) bool {
+func (p *FullStruct) Field18DeepEqual(src map[int32]HTTPStatus) bool {
 
 	if len(p.EnumMap) != len(src) {
 		return false
@@ -3470,7 +3284,7 @@ func (p *TestStruct) Field18DeepEqual(src map[int32]HTTPStatus) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field19DeepEqual(src []string) bool {
+func (p *FullStruct) Field19DeepEqual(src []string) bool {
 
 	if len(p.Strlist) != len(src) {
 		return false
@@ -3483,21 +3297,21 @@ func (p *TestStruct) Field19DeepEqual(src []string) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field20DeepEqual(src *Local) bool {
+func (p *FullStruct) Field20DeepEqual(src *Local) bool {
 
 	if !p.OptionalIns.DeepEqual(src) {
 		return false
 	}
 	return true
 }
-func (p *TestStruct) Field21DeepEqual(src *Inner) bool {
+func (p *FullStruct) Field21DeepEqual(src *Inner) bool {
 
 	if !p.AnotherInner.DeepEqual(src) {
 		return false
 	}
 	return true
 }
-func (p *TestStruct) Field22DeepEqual(src []string) bool {
+func (p *FullStruct) Field22DeepEqual(src []string) bool {
 
 	if len(p.OptNilList) != len(src) {
 		return false
@@ -3510,7 +3324,7 @@ func (p *TestStruct) Field22DeepEqual(src []string) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field23DeepEqual(src []string) bool {
+func (p *FullStruct) Field23DeepEqual(src []string) bool {
 
 	if len(p.NilList) != len(src) {
 		return false
@@ -3523,7 +3337,7 @@ func (p *TestStruct) Field23DeepEqual(src []string) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field24DeepEqual(src []*Inner) bool {
+func (p *FullStruct) Field24DeepEqual(src []*Inner) bool {
 
 	if len(p.OptNilInsList) != len(src) {
 		return false
@@ -3536,7 +3350,7 @@ func (p *TestStruct) Field24DeepEqual(src []*Inner) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field25DeepEqual(src []*Inner) bool {
+func (p *FullStruct) Field25DeepEqual(src []*Inner) bool {
 
 	if len(p.NilInsList) != len(src) {
 		return false
@@ -3549,7 +3363,7 @@ func (p *TestStruct) Field25DeepEqual(src []*Inner) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field26DeepEqual(src *HTTPStatus) bool {
+func (p *FullStruct) Field26DeepEqual(src *HTTPStatus) bool {
 
 	if p.OptStatus == src {
 		return true
@@ -3561,7 +3375,7 @@ func (p *TestStruct) Field26DeepEqual(src *HTTPStatus) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field27DeepEqual(src map[HTTPStatus]*Local) bool {
+func (p *FullStruct) Field27DeepEqual(src map[HTTPStatus]*Local) bool {
 
 	if len(p.EnumKeyMap) != len(src) {
 		return false
@@ -3574,7 +3388,7 @@ func (p *TestStruct) Field27DeepEqual(src map[HTTPStatus]*Local) bool {
 	}
 	return true
 }
-func (p *TestStruct) Field28DeepEqual(src map[HTTPStatus][]map[string]*Local) bool {
+func (p *FullStruct) Field28DeepEqual(src map[HTTPStatus][]map[string]*Local) bool {
 
 	if len(p.Complex) != len(src) {
 		return false
@@ -3595,6 +3409,1146 @@ func (p *TestStruct) Field28DeepEqual(src map[HTTPStatus][]map[string]*Local) bo
 					return false
 				}
 			}
+		}
+	}
+	return true
+}
+
+type MixedStruct struct {
+	Left           int32                 `thrift:"Left,1,required" frugal:"1,required,i32" json:"Left"`
+	Dummy          []byte                `thrift:"Dummy,3" frugal:"3,default,binary" json:"Dummy"`
+	Str            string                `thrift:"Str,6" frugal:"6,default,string" json:"Str"`
+	EnumList       []HTTPStatus          `thrift:"enum_list,7" frugal:"7,default,list<HTTPStatus>" json:"enum_list"`
+	Int64          int64                 `thrift:"Int64,9" frugal:"9,default,i64" json:"Int64"`
+	IntList        []int32               `thrift:"IntList,10,optional" frugal:"10,optional,list<i32>" json:"IntList,omitempty"`
+	LocalList      []*Local              `thrift:"localList,11" frugal:"11,default,list<Local>" json:"localList"`
+	StrLocalMap    map[string]*Local     `thrift:"StrLocalMap,12" frugal:"12,default,map<string:Local>" json:"StrLocalMap"`
+	NestList       [][]int32             `thrift:"nestList,13" frugal:"13,default,list<list<i32>>" json:"nestList"`
+	RequiredIns    *Local                `thrift:"required_ins,14,required" frugal:"14,required,Local" json:"required_ins"`
+	OptionalIns    *Local                `thrift:"optional_ins,20,optional" frugal:"20,optional,Local" json:"optional_ins,omitempty"`
+	AnotherInner   *Inner                `thrift:"AnotherInner,21" frugal:"21,default,Inner" json:"AnotherInner"`
+	EnumKeyMap     map[HTTPStatus]*Local `thrift:"enum_key_map,27" frugal:"27,default,map<HTTPStatus:Local>" json:"enum_key_map"`
+	_unknownFields unknown.Fields
+}
+
+func NewMixedStruct() *MixedStruct {
+	return &MixedStruct{}
+}
+
+func (p *MixedStruct) InitDefault() {
+	*p = MixedStruct{}
+}
+
+func (p *MixedStruct) GetLeft() (v int32) {
+	return p.Left
+}
+
+func (p *MixedStruct) GetDummy() (v []byte) {
+	return p.Dummy
+}
+
+func (p *MixedStruct) GetStr() (v string) {
+	return p.Str
+}
+
+func (p *MixedStruct) GetEnumList() (v []HTTPStatus) {
+	return p.EnumList
+}
+
+func (p *MixedStruct) GetInt64() (v int64) {
+	return p.Int64
+}
+
+var MixedStruct_IntList_DEFAULT []int32
+
+func (p *MixedStruct) GetIntList() (v []int32) {
+	if !p.IsSetIntList() {
+		return MixedStruct_IntList_DEFAULT
+	}
+	return p.IntList
+}
+
+func (p *MixedStruct) GetLocalList() (v []*Local) {
+	return p.LocalList
+}
+
+func (p *MixedStruct) GetStrLocalMap() (v map[string]*Local) {
+	return p.StrLocalMap
+}
+
+func (p *MixedStruct) GetNestList() (v [][]int32) {
+	return p.NestList
+}
+
+var MixedStruct_RequiredIns_DEFAULT *Local
+
+func (p *MixedStruct) GetRequiredIns() (v *Local) {
+	if !p.IsSetRequiredIns() {
+		return MixedStruct_RequiredIns_DEFAULT
+	}
+	return p.RequiredIns
+}
+
+var MixedStruct_OptionalIns_DEFAULT *Local
+
+func (p *MixedStruct) GetOptionalIns() (v *Local) {
+	if !p.IsSetOptionalIns() {
+		return MixedStruct_OptionalIns_DEFAULT
+	}
+	return p.OptionalIns
+}
+
+var MixedStruct_AnotherInner_DEFAULT *Inner
+
+func (p *MixedStruct) GetAnotherInner() (v *Inner) {
+	if !p.IsSetAnotherInner() {
+		return MixedStruct_AnotherInner_DEFAULT
+	}
+	return p.AnotherInner
+}
+
+func (p *MixedStruct) GetEnumKeyMap() (v map[HTTPStatus]*Local) {
+	return p.EnumKeyMap
+}
+func (p *MixedStruct) SetLeft(val int32) {
+	p.Left = val
+}
+func (p *MixedStruct) SetDummy(val []byte) {
+	p.Dummy = val
+}
+func (p *MixedStruct) SetStr(val string) {
+	p.Str = val
+}
+func (p *MixedStruct) SetEnumList(val []HTTPStatus) {
+	p.EnumList = val
+}
+func (p *MixedStruct) SetInt64(val int64) {
+	p.Int64 = val
+}
+func (p *MixedStruct) SetIntList(val []int32) {
+	p.IntList = val
+}
+func (p *MixedStruct) SetLocalList(val []*Local) {
+	p.LocalList = val
+}
+func (p *MixedStruct) SetStrLocalMap(val map[string]*Local) {
+	p.StrLocalMap = val
+}
+func (p *MixedStruct) SetNestList(val [][]int32) {
+	p.NestList = val
+}
+func (p *MixedStruct) SetRequiredIns(val *Local) {
+	p.RequiredIns = val
+}
+func (p *MixedStruct) SetOptionalIns(val *Local) {
+	p.OptionalIns = val
+}
+func (p *MixedStruct) SetAnotherInner(val *Inner) {
+	p.AnotherInner = val
+}
+func (p *MixedStruct) SetEnumKeyMap(val map[HTTPStatus]*Local) {
+	p.EnumKeyMap = val
+}
+
+func (p *MixedStruct) CarryingUnknownFields() bool {
+	return len(p._unknownFields) > 0
+}
+
+var fieldIDToName_MixedStruct = map[int16]string{
+	1:  "Left",
+	3:  "Dummy",
+	6:  "Str",
+	7:  "enum_list",
+	9:  "Int64",
+	10: "IntList",
+	11: "localList",
+	12: "StrLocalMap",
+	13: "nestList",
+	14: "required_ins",
+	20: "optional_ins",
+	21: "AnotherInner",
+	27: "enum_key_map",
+}
+
+func (p *MixedStruct) IsSetIntList() bool {
+	return p.IntList != nil
+}
+
+func (p *MixedStruct) IsSetRequiredIns() bool {
+	return p.RequiredIns != nil
+}
+
+func (p *MixedStruct) IsSetOptionalIns() bool {
+	return p.OptionalIns != nil
+}
+
+func (p *MixedStruct) IsSetAnotherInner() bool {
+	return p.AnotherInner != nil
+}
+
+func (p *MixedStruct) Read(iprot thrift.TProtocol) (err error) {
+	var name string
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	var issetLeft bool = false
+	var issetRequiredIns bool = false
+
+	if _, err = iprot.ReadStructBegin(); err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		name, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.I32 {
+				if err = p.ReadField1(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetLeft = true
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 3:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField3(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 6:
+			if fieldTypeId == thrift.STRING {
+				if err = p.ReadField6(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 7:
+			if fieldTypeId == thrift.LIST {
+				if err = p.ReadField7(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 9:
+			if fieldTypeId == thrift.I64 {
+				if err = p.ReadField9(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 10:
+			if fieldTypeId == thrift.LIST {
+				if err = p.ReadField10(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 11:
+			if fieldTypeId == thrift.LIST {
+				if err = p.ReadField11(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 12:
+			if fieldTypeId == thrift.MAP {
+				if err = p.ReadField12(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 13:
+			if fieldTypeId == thrift.LIST {
+				if err = p.ReadField13(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 14:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField14(iprot); err != nil {
+					goto ReadFieldError
+				}
+				issetRequiredIns = true
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 20:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField20(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 21:
+			if fieldTypeId == thrift.STRUCT {
+				if err = p.ReadField21(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 27:
+			if fieldTypeId == thrift.MAP {
+				if err = p.ReadField27(iprot); err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				if err = iprot.Skip(fieldTypeId); err != nil {
+					goto SkipFieldError
+				}
+			}
+		default:
+			if err = p._unknownFields.Append(iprot, name, fieldTypeId, fieldId); err != nil {
+				goto UnknownFieldsAppendError
+			}
+		}
+
+		if err = iprot.ReadFieldEnd(); err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	if err = iprot.ReadStructEnd(); err != nil {
+		goto ReadStructEndError
+	}
+
+	if !issetLeft {
+		fieldId = 1
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetRequiredIns {
+		fieldId = 14
+		goto RequiredFieldNotSetError
+	}
+	return nil
+ReadStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MixedStruct[fieldId]), err)
+SkipFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+UnknownFieldsAppendError:
+	return thrift.PrependError(fmt.Sprintf("%T append unknown field(name:%s type:%d id:%d) error: ", p, name, fieldTypeId, fieldId), err)
+
+ReadFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+RequiredFieldNotSetError:
+	return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_MixedStruct[fieldId]))
+}
+
+func (p *MixedStruct) ReadField1(iprot thrift.TProtocol) error {
+	if v, err := iprot.ReadI32(); err != nil {
+		return err
+	} else {
+		p.Left = v
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField3(iprot thrift.TProtocol) error {
+	if v, err := iprot.ReadBinary(); err != nil {
+		return err
+	} else {
+		p.Dummy = []byte(v)
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField6(iprot thrift.TProtocol) error {
+	if v, err := iprot.ReadString(); err != nil {
+		return err
+	} else {
+		p.Str = v
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField7(iprot thrift.TProtocol) error {
+	_, size, err := iprot.ReadListBegin()
+	if err != nil {
+		return err
+	}
+	p.EnumList = make([]HTTPStatus, 0, size)
+	for i := 0; i < size; i++ {
+		var _elem HTTPStatus
+		if v, err := iprot.ReadI32(); err != nil {
+			return err
+		} else {
+			_elem = HTTPStatus(v)
+		}
+
+		p.EnumList = append(p.EnumList, _elem)
+	}
+	if err := iprot.ReadListEnd(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField9(iprot thrift.TProtocol) error {
+	if v, err := iprot.ReadI64(); err != nil {
+		return err
+	} else {
+		p.Int64 = v
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField10(iprot thrift.TProtocol) error {
+	_, size, err := iprot.ReadListBegin()
+	if err != nil {
+		return err
+	}
+	p.IntList = make([]int32, 0, size)
+	for i := 0; i < size; i++ {
+		var _elem int32
+		if v, err := iprot.ReadI32(); err != nil {
+			return err
+		} else {
+			_elem = v
+		}
+
+		p.IntList = append(p.IntList, _elem)
+	}
+	if err := iprot.ReadListEnd(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField11(iprot thrift.TProtocol) error {
+	_, size, err := iprot.ReadListBegin()
+	if err != nil {
+		return err
+	}
+	p.LocalList = make([]*Local, 0, size)
+	for i := 0; i < size; i++ {
+		_elem := NewLocal()
+		if err := _elem.Read(iprot); err != nil {
+			return err
+		}
+
+		p.LocalList = append(p.LocalList, _elem)
+	}
+	if err := iprot.ReadListEnd(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField12(iprot thrift.TProtocol) error {
+	_, _, size, err := iprot.ReadMapBegin()
+	if err != nil {
+		return err
+	}
+	p.StrLocalMap = make(map[string]*Local, size)
+	for i := 0; i < size; i++ {
+		var _key string
+		if v, err := iprot.ReadString(); err != nil {
+			return err
+		} else {
+			_key = v
+		}
+		_val := NewLocal()
+		if err := _val.Read(iprot); err != nil {
+			return err
+		}
+
+		p.StrLocalMap[_key] = _val
+	}
+	if err := iprot.ReadMapEnd(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField13(iprot thrift.TProtocol) error {
+	_, size, err := iprot.ReadListBegin()
+	if err != nil {
+		return err
+	}
+	p.NestList = make([][]int32, 0, size)
+	for i := 0; i < size; i++ {
+		_, size, err := iprot.ReadListBegin()
+		if err != nil {
+			return err
+		}
+		_elem := make([]int32, 0, size)
+		for i := 0; i < size; i++ {
+			var _elem1 int32
+			if v, err := iprot.ReadI32(); err != nil {
+				return err
+			} else {
+				_elem1 = v
+			}
+
+			_elem = append(_elem, _elem1)
+		}
+		if err := iprot.ReadListEnd(); err != nil {
+			return err
+		}
+
+		p.NestList = append(p.NestList, _elem)
+	}
+	if err := iprot.ReadListEnd(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField14(iprot thrift.TProtocol) error {
+	p.RequiredIns = NewLocal()
+	if err := p.RequiredIns.Read(iprot); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField20(iprot thrift.TProtocol) error {
+	p.OptionalIns = NewLocal()
+	if err := p.OptionalIns.Read(iprot); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField21(iprot thrift.TProtocol) error {
+	p.AnotherInner = NewInner()
+	if err := p.AnotherInner.Read(iprot); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *MixedStruct) ReadField27(iprot thrift.TProtocol) error {
+	_, _, size, err := iprot.ReadMapBegin()
+	if err != nil {
+		return err
+	}
+	p.EnumKeyMap = make(map[HTTPStatus]*Local, size)
+	for i := 0; i < size; i++ {
+		var _key HTTPStatus
+		if v, err := iprot.ReadI32(); err != nil {
+			return err
+		} else {
+			_key = HTTPStatus(v)
+		}
+		_val := NewLocal()
+		if err := _val.Read(iprot); err != nil {
+			return err
+		}
+
+		p.EnumKeyMap[_key] = _val
+	}
+	if err := iprot.ReadMapEnd(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (p *MixedStruct) Write(oprot thrift.TProtocol) (err error) {
+	var fieldId int16
+	if err = oprot.WriteStructBegin("MixedStruct"); err != nil {
+		goto WriteStructBeginError
+	}
+	if p != nil {
+		if err = p.writeField1(oprot); err != nil {
+			fieldId = 1
+			goto WriteFieldError
+		}
+		if err = p.writeField3(oprot); err != nil {
+			fieldId = 3
+			goto WriteFieldError
+		}
+		if err = p.writeField6(oprot); err != nil {
+			fieldId = 6
+			goto WriteFieldError
+		}
+		if err = p.writeField7(oprot); err != nil {
+			fieldId = 7
+			goto WriteFieldError
+		}
+		if err = p.writeField9(oprot); err != nil {
+			fieldId = 9
+			goto WriteFieldError
+		}
+		if err = p.writeField10(oprot); err != nil {
+			fieldId = 10
+			goto WriteFieldError
+		}
+		if err = p.writeField11(oprot); err != nil {
+			fieldId = 11
+			goto WriteFieldError
+		}
+		if err = p.writeField12(oprot); err != nil {
+			fieldId = 12
+			goto WriteFieldError
+		}
+		if err = p.writeField13(oprot); err != nil {
+			fieldId = 13
+			goto WriteFieldError
+		}
+		if err = p.writeField14(oprot); err != nil {
+			fieldId = 14
+			goto WriteFieldError
+		}
+		if err = p.writeField20(oprot); err != nil {
+			fieldId = 20
+			goto WriteFieldError
+		}
+		if err = p.writeField21(oprot); err != nil {
+			fieldId = 21
+			goto WriteFieldError
+		}
+		if err = p.writeField27(oprot); err != nil {
+			fieldId = 27
+			goto WriteFieldError
+		}
+
+		if err = p._unknownFields.Write(oprot); err != nil {
+			goto UnknownFieldsWriteError
+		}
+	}
+	if err = oprot.WriteFieldStop(); err != nil {
+		goto WriteFieldStopError
+	}
+	if err = oprot.WriteStructEnd(); err != nil {
+		goto WriteStructEndError
+	}
+	return nil
+WriteStructBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+WriteFieldError:
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+WriteFieldStopError:
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+WriteStructEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+UnknownFieldsWriteError:
+	return thrift.PrependError(fmt.Sprintf("%T write unknown fields error: ", p), err)
+}
+
+func (p *MixedStruct) writeField1(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("Left", thrift.I32, 1); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteI32(p.Left); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 1 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField3(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("Dummy", thrift.STRING, 3); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteBinary([]byte(p.Dummy)); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 3 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField6(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("Str", thrift.STRING, 6); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteString(p.Str); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 6 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 6 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField7(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("enum_list", thrift.LIST, 7); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteListBegin(thrift.I32, len(p.EnumList)); err != nil {
+		return err
+	}
+	for _, v := range p.EnumList {
+		if err := oprot.WriteI32(int32(v)); err != nil {
+			return err
+		}
+	}
+	if err := oprot.WriteListEnd(); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 7 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 7 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField9(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("Int64", thrift.I64, 9); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteI64(p.Int64); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 9 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 9 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField10(oprot thrift.TProtocol) (err error) {
+	if p.IsSetIntList() {
+		if err = oprot.WriteFieldBegin("IntList", thrift.LIST, 10); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := oprot.WriteListBegin(thrift.I32, len(p.IntList)); err != nil {
+			return err
+		}
+		for _, v := range p.IntList {
+			if err := oprot.WriteI32(v); err != nil {
+				return err
+			}
+		}
+		if err := oprot.WriteListEnd(); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 10 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 10 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField11(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("localList", thrift.LIST, 11); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteListBegin(thrift.STRUCT, len(p.LocalList)); err != nil {
+		return err
+	}
+	for _, v := range p.LocalList {
+		if err := v.Write(oprot); err != nil {
+			return err
+		}
+	}
+	if err := oprot.WriteListEnd(); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 11 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 11 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField12(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("StrLocalMap", thrift.MAP, 12); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteMapBegin(thrift.STRING, thrift.STRUCT, len(p.StrLocalMap)); err != nil {
+		return err
+	}
+	for k, v := range p.StrLocalMap {
+
+		if err := oprot.WriteString(k); err != nil {
+			return err
+		}
+
+		if err := v.Write(oprot); err != nil {
+			return err
+		}
+	}
+	if err := oprot.WriteMapEnd(); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 12 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 12 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField13(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("nestList", thrift.LIST, 13); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteListBegin(thrift.LIST, len(p.NestList)); err != nil {
+		return err
+	}
+	for _, v := range p.NestList {
+		if err := oprot.WriteListBegin(thrift.I32, len(v)); err != nil {
+			return err
+		}
+		for _, v := range v {
+			if err := oprot.WriteI32(v); err != nil {
+				return err
+			}
+		}
+		if err := oprot.WriteListEnd(); err != nil {
+			return err
+		}
+	}
+	if err := oprot.WriteListEnd(); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 13 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 13 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField14(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("required_ins", thrift.STRUCT, 14); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := p.RequiredIns.Write(oprot); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 14 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 14 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField20(oprot thrift.TProtocol) (err error) {
+	if p.IsSetOptionalIns() {
+		if err = oprot.WriteFieldBegin("optional_ins", thrift.STRUCT, 20); err != nil {
+			goto WriteFieldBeginError
+		}
+		if err := p.OptionalIns.Write(oprot); err != nil {
+			return err
+		}
+		if err = oprot.WriteFieldEnd(); err != nil {
+			goto WriteFieldEndError
+		}
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 20 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 20 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField21(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("AnotherInner", thrift.STRUCT, 21); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := p.AnotherInner.Write(oprot); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 21 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 21 end error: ", p), err)
+}
+
+func (p *MixedStruct) writeField27(oprot thrift.TProtocol) (err error) {
+	if err = oprot.WriteFieldBegin("enum_key_map", thrift.MAP, 27); err != nil {
+		goto WriteFieldBeginError
+	}
+	if err := oprot.WriteMapBegin(thrift.I32, thrift.STRUCT, len(p.EnumKeyMap)); err != nil {
+		return err
+	}
+	for k, v := range p.EnumKeyMap {
+
+		if err := oprot.WriteI32(int32(k)); err != nil {
+			return err
+		}
+
+		if err := v.Write(oprot); err != nil {
+			return err
+		}
+	}
+	if err := oprot.WriteMapEnd(); err != nil {
+		return err
+	}
+	if err = oprot.WriteFieldEnd(); err != nil {
+		goto WriteFieldEndError
+	}
+	return nil
+WriteFieldBeginError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 27 begin error: ", p), err)
+WriteFieldEndError:
+	return thrift.PrependError(fmt.Sprintf("%T write field 27 end error: ", p), err)
+}
+
+func (p *MixedStruct) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("MixedStruct(%+v)", *p)
+}
+
+func (p *MixedStruct) DeepEqual(ano *MixedStruct) bool {
+	if p == ano {
+		return true
+	} else if p == nil || ano == nil {
+		return false
+	}
+	if !p.Field1DeepEqual(ano.Left) {
+		return false
+	}
+	if !p.Field3DeepEqual(ano.Dummy) {
+		return false
+	}
+	if !p.Field6DeepEqual(ano.Str) {
+		return false
+	}
+	if !p.Field7DeepEqual(ano.EnumList) {
+		return false
+	}
+	if !p.Field9DeepEqual(ano.Int64) {
+		return false
+	}
+	if !p.Field10DeepEqual(ano.IntList) {
+		return false
+	}
+	if !p.Field11DeepEqual(ano.LocalList) {
+		return false
+	}
+	if !p.Field12DeepEqual(ano.StrLocalMap) {
+		return false
+	}
+	if !p.Field13DeepEqual(ano.NestList) {
+		return false
+	}
+	if !p.Field14DeepEqual(ano.RequiredIns) {
+		return false
+	}
+	if !p.Field20DeepEqual(ano.OptionalIns) {
+		return false
+	}
+	if !p.Field21DeepEqual(ano.AnotherInner) {
+		return false
+	}
+	if !p.Field27DeepEqual(ano.EnumKeyMap) {
+		return false
+	}
+	return true
+}
+
+func (p *MixedStruct) Field1DeepEqual(src int32) bool {
+
+	if p.Left != src {
+		return false
+	}
+	return true
+}
+func (p *MixedStruct) Field3DeepEqual(src []byte) bool {
+
+	if bytes.Compare(p.Dummy, src) != 0 {
+		return false
+	}
+	return true
+}
+func (p *MixedStruct) Field6DeepEqual(src string) bool {
+
+	if strings.Compare(p.Str, src) != 0 {
+		return false
+	}
+	return true
+}
+func (p *MixedStruct) Field7DeepEqual(src []HTTPStatus) bool {
+
+	if len(p.EnumList) != len(src) {
+		return false
+	}
+	for i, v := range p.EnumList {
+		_src := src[i]
+		if v != _src {
+			return false
+		}
+	}
+	return true
+}
+func (p *MixedStruct) Field9DeepEqual(src int64) bool {
+
+	if p.Int64 != src {
+		return false
+	}
+	return true
+}
+func (p *MixedStruct) Field10DeepEqual(src []int32) bool {
+
+	if len(p.IntList) != len(src) {
+		return false
+	}
+	for i, v := range p.IntList {
+		_src := src[i]
+		if v != _src {
+			return false
+		}
+	}
+	return true
+}
+func (p *MixedStruct) Field11DeepEqual(src []*Local) bool {
+
+	if len(p.LocalList) != len(src) {
+		return false
+	}
+	for i, v := range p.LocalList {
+		_src := src[i]
+		if !v.DeepEqual(_src) {
+			return false
+		}
+	}
+	return true
+}
+func (p *MixedStruct) Field12DeepEqual(src map[string]*Local) bool {
+
+	if len(p.StrLocalMap) != len(src) {
+		return false
+	}
+	for k, v := range p.StrLocalMap {
+		_src := src[k]
+		if !v.DeepEqual(_src) {
+			return false
+		}
+	}
+	return true
+}
+func (p *MixedStruct) Field13DeepEqual(src [][]int32) bool {
+
+	if len(p.NestList) != len(src) {
+		return false
+	}
+	for i, v := range p.NestList {
+		_src := src[i]
+		if len(v) != len(_src) {
+			return false
+		}
+		for i, v := range v {
+			_src1 := _src[i]
+			if v != _src1 {
+				return false
+			}
+		}
+	}
+	return true
+}
+func (p *MixedStruct) Field14DeepEqual(src *Local) bool {
+
+	if !p.RequiredIns.DeepEqual(src) {
+		return false
+	}
+	return true
+}
+func (p *MixedStruct) Field20DeepEqual(src *Local) bool {
+
+	if !p.OptionalIns.DeepEqual(src) {
+		return false
+	}
+	return true
+}
+func (p *MixedStruct) Field21DeepEqual(src *Inner) bool {
+
+	if !p.AnotherInner.DeepEqual(src) {
+		return false
+	}
+	return true
+}
+func (p *MixedStruct) Field27DeepEqual(src map[HTTPStatus]*Local) bool {
+
+	if len(p.EnumKeyMap) != len(src) {
+		return false
+	}
+	for k, v := range p.EnumKeyMap {
+		_src := src[k]
+		if !v.DeepEqual(_src) {
+			return false
 		}
 	}
 	return true

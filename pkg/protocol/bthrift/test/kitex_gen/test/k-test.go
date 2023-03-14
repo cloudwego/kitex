@@ -639,7 +639,7 @@ func (p *Local) FastWrite(buf []byte) int {
 
 func (p *Local) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "local")
+	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "Local")
 	if p != nil {
 		offset += p.fastWriteField1(buf[offset:], binaryWriter)
 		l, err := bthrift.WriteUnknownFields(buf[offset:], p._unknownFields)
@@ -655,7 +655,7 @@ func (p *Local) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) i
 
 func (p *Local) BLength() int {
 	l := 0
-	l += bthrift.Binary.StructBeginLength("local")
+	l += bthrift.Binary.StructBeginLength("Local")
 	if p != nil {
 		l += p.field1Length()
 		unknownL, err := bthrift.UnknownFieldsLength(p._unknownFields)
@@ -687,153 +687,7 @@ func (p *Local) field1Length() int {
 	return l
 }
 
-func (p *Local2) FastRead(buf []byte) (int, error) {
-	var err error
-	var offset int
-	var l int
-	var name string
-	var fieldTypeId thrift.TType
-	var fieldId int16
-	_, l, err = bthrift.Binary.ReadStructBegin(buf)
-	offset += l
-	if err != nil {
-		goto ReadStructBeginError
-	}
-
-	for {
-		name, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
-		offset += l
-		if err != nil {
-			goto ReadFieldBeginError
-		}
-		if fieldTypeId == thrift.STOP {
-			break
-		}
-		switch fieldId {
-		case 1:
-			if fieldTypeId == thrift.STRUCT {
-				l, err = p.FastReadField1(buf[offset:])
-				offset += l
-				if err != nil {
-					goto ReadFieldError
-				}
-			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
-				offset += l
-				if err != nil {
-					goto SkipFieldError
-				}
-			}
-		default:
-			l, f, err2 := bthrift.ReadUnknownField(buf[offset:], name, fieldTypeId, fieldId)
-			offset += l
-			if err2 != nil {
-				err = err2
-				goto UnknownFieldsAppendError
-			}
-			p._unknownFields = append(p._unknownFields, f)
-		}
-
-		l, err = bthrift.Binary.ReadFieldEnd(buf[offset:])
-		offset += l
-		if err != nil {
-			goto ReadFieldEndError
-		}
-	}
-	l, err = bthrift.Binary.ReadStructEnd(buf[offset:])
-	offset += l
-	if err != nil {
-		goto ReadStructEndError
-	}
-
-	return offset, nil
-ReadStructBeginError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
-ReadFieldBeginError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
-ReadFieldError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_Local2[fieldId]), err)
-SkipFieldError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
-UnknownFieldsAppendError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T append unknown field(name: %s type: %d id: %d) error: ", p, name, fieldTypeId, fieldId), err)
-ReadFieldEndError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
-ReadStructEndError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
-}
-
-func (p *Local2) FastReadField1(buf []byte) (int, error) {
-	offset := 0
-
-	tmp := NewLocal()
-	if l, err := tmp.FastRead(buf[offset:]); err != nil {
-		return offset, err
-	} else {
-		offset += l
-	}
-	p.L1 = tmp
-	return offset, nil
-}
-
-// for compatibility
-func (p *Local2) FastWrite(buf []byte) int {
-	return 0
-}
-
-func (p *Local2) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
-	offset := 0
-	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "local2")
-	if p != nil {
-		offset += p.fastWriteField1(buf[offset:], binaryWriter)
-		l, err := bthrift.WriteUnknownFields(buf[offset:], p._unknownFields)
-		if err != nil {
-			panic(fmt.Errorf("%T write unknown field: %s", p, err))
-		}
-		offset += l
-	}
-	offset += bthrift.Binary.WriteFieldStop(buf[offset:])
-	offset += bthrift.Binary.WriteStructEnd(buf[offset:])
-	return offset
-}
-
-func (p *Local2) BLength() int {
-	l := 0
-	l += bthrift.Binary.StructBeginLength("local2")
-	if p != nil {
-		l += p.field1Length()
-		unknownL, err := bthrift.UnknownFieldsLength(p._unknownFields)
-		if err != nil {
-			panic(fmt.Errorf("%T unknown fields length: %s", p, err))
-		}
-		l += unknownL
-	}
-	l += bthrift.Binary.FieldStopLength()
-	l += bthrift.Binary.StructEndLength()
-	return l
-}
-
-func (p *Local2) fastWriteField1(buf []byte, binaryWriter bthrift.BinaryWriter) int {
-	offset := 0
-	if p.IsSetL1() {
-		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "l1", thrift.STRUCT, 1)
-		offset += p.L1.FastWriteNocopy(buf[offset:], binaryWriter)
-		offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
-	}
-	return offset
-}
-
-func (p *Local2) field1Length() int {
-	l := 0
-	if p.IsSetL1() {
-		l += bthrift.Binary.FieldBeginLength("l1", thrift.STRUCT, 1)
-		l += p.L1.BLength()
-		l += bthrift.Binary.FieldEndLength()
-	}
-	return l
-}
-
-func (p *TestStruct) FastRead(buf []byte) (int, error) {
+func (p *FullStruct) FastRead(buf []byte) (int, error) {
 	var err error
 	var offset int
 	var l int
@@ -1275,7 +1129,7 @@ ReadStructBeginError:
 ReadFieldBeginError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_TestStruct[fieldId]), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_FullStruct[fieldId]), err)
 SkipFieldError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 UnknownFieldsAppendError:
@@ -1285,10 +1139,10 @@ ReadFieldEndError:
 ReadStructEndError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
 RequiredFieldNotSetError:
-	return offset, thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_TestStruct[fieldId]))
+	return offset, thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_FullStruct[fieldId]))
 }
 
-func (p *TestStruct) FastReadField1(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField1(buf []byte) (int, error) {
 	offset := 0
 
 	if v, l, err := bthrift.Binary.ReadI32(buf[offset:]); err != nil {
@@ -1302,7 +1156,7 @@ func (p *TestStruct) FastReadField1(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField2(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField2(buf []byte) (int, error) {
 	offset := 0
 
 	if v, l, err := bthrift.Binary.ReadI32(buf[offset:]); err != nil {
@@ -1316,7 +1170,7 @@ func (p *TestStruct) FastReadField2(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField3(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField3(buf []byte) (int, error) {
 	offset := 0
 
 	if v, l, err := bthrift.Binary.ReadBinary(buf[offset:]); err != nil {
@@ -1330,7 +1184,7 @@ func (p *TestStruct) FastReadField3(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField4(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField4(buf []byte) (int, error) {
 	offset := 0
 
 	tmp := NewInner()
@@ -1343,7 +1197,7 @@ func (p *TestStruct) FastReadField4(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField5(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField5(buf []byte) (int, error) {
 	offset := 0
 
 	if v, l, err := bthrift.Binary.ReadI32(buf[offset:]); err != nil {
@@ -1357,7 +1211,7 @@ func (p *TestStruct) FastReadField5(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField6(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField6(buf []byte) (int, error) {
 	offset := 0
 
 	if v, l, err := bthrift.Binary.ReadString(buf[offset:]); err != nil {
@@ -1371,7 +1225,7 @@ func (p *TestStruct) FastReadField6(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField7(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField7(buf []byte) (int, error) {
 	offset := 0
 
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
@@ -1401,7 +1255,7 @@ func (p *TestStruct) FastReadField7(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField8(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField8(buf []byte) (int, error) {
 	offset := 0
 
 	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
@@ -1441,7 +1295,7 @@ func (p *TestStruct) FastReadField8(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField9(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField9(buf []byte) (int, error) {
 	offset := 0
 
 	if v, l, err := bthrift.Binary.ReadI64(buf[offset:]); err != nil {
@@ -1455,7 +1309,7 @@ func (p *TestStruct) FastReadField9(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField10(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField10(buf []byte) (int, error) {
 	offset := 0
 
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
@@ -1485,7 +1339,7 @@ func (p *TestStruct) FastReadField10(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField11(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField11(buf []byte) (int, error) {
 	offset := 0
 
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
@@ -1512,7 +1366,7 @@ func (p *TestStruct) FastReadField11(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField12(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField12(buf []byte) (int, error) {
 	offset := 0
 
 	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
@@ -1548,7 +1402,7 @@ func (p *TestStruct) FastReadField12(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField13(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField13(buf []byte) (int, error) {
 	offset := 0
 
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
@@ -1593,7 +1447,7 @@ func (p *TestStruct) FastReadField13(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField14(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField14(buf []byte) (int, error) {
 	offset := 0
 
 	tmp := NewLocal()
@@ -1606,7 +1460,7 @@ func (p *TestStruct) FastReadField14(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField16(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField16(buf []byte) (int, error) {
 	offset := 0
 
 	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
@@ -1661,7 +1515,7 @@ func (p *TestStruct) FastReadField16(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField17(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField17(buf []byte) (int, error) {
 	offset := 0
 
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
@@ -1716,7 +1570,7 @@ func (p *TestStruct) FastReadField17(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField18(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField18(buf []byte) (int, error) {
 	offset := 0
 
 	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
@@ -1756,7 +1610,7 @@ func (p *TestStruct) FastReadField18(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField19(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField19(buf []byte) (int, error) {
 	offset := 0
 
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
@@ -1786,7 +1640,7 @@ func (p *TestStruct) FastReadField19(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField20(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField20(buf []byte) (int, error) {
 	offset := 0
 
 	tmp := NewLocal()
@@ -1799,7 +1653,7 @@ func (p *TestStruct) FastReadField20(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField21(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField21(buf []byte) (int, error) {
 	offset := 0
 
 	tmp := NewInner()
@@ -1812,7 +1666,7 @@ func (p *TestStruct) FastReadField21(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField22(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField22(buf []byte) (int, error) {
 	offset := 0
 
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
@@ -1842,7 +1696,7 @@ func (p *TestStruct) FastReadField22(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField23(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField23(buf []byte) (int, error) {
 	offset := 0
 
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
@@ -1872,7 +1726,7 @@ func (p *TestStruct) FastReadField23(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField24(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField24(buf []byte) (int, error) {
 	offset := 0
 
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
@@ -1899,7 +1753,7 @@ func (p *TestStruct) FastReadField24(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField25(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField25(buf []byte) (int, error) {
 	offset := 0
 
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
@@ -1926,7 +1780,7 @@ func (p *TestStruct) FastReadField25(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField26(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField26(buf []byte) (int, error) {
 	offset := 0
 
 	if v, l, err := bthrift.Binary.ReadI32(buf[offset:]); err != nil {
@@ -1941,7 +1795,7 @@ func (p *TestStruct) FastReadField26(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField27(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField27(buf []byte) (int, error) {
 	offset := 0
 
 	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
@@ -1977,7 +1831,7 @@ func (p *TestStruct) FastReadField27(buf []byte) (int, error) {
 	return offset, nil
 }
 
-func (p *TestStruct) FastReadField28(buf []byte) (int, error) {
+func (p *FullStruct) FastReadField28(buf []byte) (int, error) {
 	offset := 0
 
 	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
@@ -2054,13 +1908,13 @@ func (p *TestStruct) FastReadField28(buf []byte) (int, error) {
 }
 
 // for compatibility
-func (p *TestStruct) FastWrite(buf []byte) int {
+func (p *FullStruct) FastWrite(buf []byte) int {
 	return 0
 }
 
-func (p *TestStruct) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "TestStruct")
+	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "FullStruct")
 	if p != nil {
 		offset += p.fastWriteField1(buf[offset:], binaryWriter)
 		offset += p.fastWriteField2(buf[offset:], binaryWriter)
@@ -2100,9 +1954,9 @@ func (p *TestStruct) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWrit
 	return offset
 }
 
-func (p *TestStruct) BLength() int {
+func (p *FullStruct) BLength() int {
 	l := 0
-	l += bthrift.Binary.StructBeginLength("TestStruct")
+	l += bthrift.Binary.StructBeginLength("FullStruct")
 	if p != nil {
 		l += p.field1Length()
 		l += p.field2Length()
@@ -2142,7 +1996,7 @@ func (p *TestStruct) BLength() int {
 	return l
 }
 
-func (p *TestStruct) fastWriteField1(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField1(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Left", thrift.I32, 1)
 	offset += bthrift.Binary.WriteI32(buf[offset:], p.Left)
@@ -2151,7 +2005,7 @@ func (p *TestStruct) fastWriteField1(buf []byte, binaryWriter bthrift.BinaryWrit
 	return offset
 }
 
-func (p *TestStruct) fastWriteField2(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField2(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	if p.IsSetRight() {
 		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Right", thrift.I32, 2)
@@ -2162,7 +2016,7 @@ func (p *TestStruct) fastWriteField2(buf []byte, binaryWriter bthrift.BinaryWrit
 	return offset
 }
 
-func (p *TestStruct) fastWriteField3(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField3(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Dummy", thrift.STRING, 3)
 	offset += bthrift.Binary.WriteBinaryNocopy(buf[offset:], binaryWriter, []byte(p.Dummy))
@@ -2171,7 +2025,7 @@ func (p *TestStruct) fastWriteField3(buf []byte, binaryWriter bthrift.BinaryWrit
 	return offset
 }
 
-func (p *TestStruct) fastWriteField4(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField4(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "InnerReq", thrift.STRUCT, 4)
 	offset += p.InnerReq.FastWriteNocopy(buf[offset:], binaryWriter)
@@ -2179,7 +2033,7 @@ func (p *TestStruct) fastWriteField4(buf []byte, binaryWriter bthrift.BinaryWrit
 	return offset
 }
 
-func (p *TestStruct) fastWriteField5(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField5(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "status", thrift.I32, 5)
 	offset += bthrift.Binary.WriteI32(buf[offset:], int32(p.Status))
@@ -2188,7 +2042,7 @@ func (p *TestStruct) fastWriteField5(buf []byte, binaryWriter bthrift.BinaryWrit
 	return offset
 }
 
-func (p *TestStruct) fastWriteField6(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField6(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Str", thrift.STRING, 6)
 	offset += bthrift.Binary.WriteStringNocopy(buf[offset:], binaryWriter, p.Str)
@@ -2197,7 +2051,7 @@ func (p *TestStruct) fastWriteField6(buf []byte, binaryWriter bthrift.BinaryWrit
 	return offset
 }
 
-func (p *TestStruct) fastWriteField7(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField7(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "enum_list", thrift.LIST, 7)
 	listBeginOffset := offset
@@ -2214,7 +2068,7 @@ func (p *TestStruct) fastWriteField7(buf []byte, binaryWriter bthrift.BinaryWrit
 	return offset
 }
 
-func (p *TestStruct) fastWriteField8(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField8(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	if p.IsSetStrmap() {
 		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Strmap", thrift.MAP, 8)
@@ -2236,7 +2090,7 @@ func (p *TestStruct) fastWriteField8(buf []byte, binaryWriter bthrift.BinaryWrit
 	return offset
 }
 
-func (p *TestStruct) fastWriteField9(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField9(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Int64", thrift.I64, 9)
 	offset += bthrift.Binary.WriteI64(buf[offset:], p.Int64)
@@ -2245,7 +2099,7 @@ func (p *TestStruct) fastWriteField9(buf []byte, binaryWriter bthrift.BinaryWrit
 	return offset
 }
 
-func (p *TestStruct) fastWriteField10(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField10(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	if p.IsSetIntList() {
 		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "IntList", thrift.LIST, 10)
@@ -2264,7 +2118,7 @@ func (p *TestStruct) fastWriteField10(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField11(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField11(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "localList", thrift.LIST, 11)
 	listBeginOffset := offset
@@ -2280,7 +2134,7 @@ func (p *TestStruct) fastWriteField11(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField12(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField12(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "StrLocalMap", thrift.MAP, 12)
 	mapBeginOffset := offset
@@ -2299,7 +2153,7 @@ func (p *TestStruct) fastWriteField12(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField13(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField13(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "nestList", thrift.LIST, 13)
 	listBeginOffset := offset
@@ -2324,7 +2178,7 @@ func (p *TestStruct) fastWriteField13(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField14(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField14(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "required_ins", thrift.STRUCT, 14)
 	offset += p.RequiredIns.FastWriteNocopy(buf[offset:], binaryWriter)
@@ -2332,7 +2186,7 @@ func (p *TestStruct) fastWriteField14(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField16(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField16(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "nestMap", thrift.MAP, 16)
 	mapBeginOffset := offset
@@ -2360,7 +2214,7 @@ func (p *TestStruct) fastWriteField16(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField17(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField17(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "nestMap2", thrift.LIST, 17)
 	listBeginOffset := offset
@@ -2388,7 +2242,7 @@ func (p *TestStruct) fastWriteField17(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField18(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField18(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "enum_map", thrift.MAP, 18)
 	mapBeginOffset := offset
@@ -2408,7 +2262,7 @@ func (p *TestStruct) fastWriteField18(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField19(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField19(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Strlist", thrift.LIST, 19)
 	listBeginOffset := offset
@@ -2425,7 +2279,7 @@ func (p *TestStruct) fastWriteField19(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField20(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField20(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	if p.IsSetOptionalIns() {
 		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "optional_ins", thrift.STRUCT, 20)
@@ -2435,7 +2289,7 @@ func (p *TestStruct) fastWriteField20(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField21(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField21(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "AnotherInner", thrift.STRUCT, 21)
 	offset += p.AnotherInner.FastWriteNocopy(buf[offset:], binaryWriter)
@@ -2443,7 +2297,7 @@ func (p *TestStruct) fastWriteField21(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField22(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField22(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	if p.IsSetOptNilList() {
 		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "opt_nil_list", thrift.LIST, 22)
@@ -2462,7 +2316,7 @@ func (p *TestStruct) fastWriteField22(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField23(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField23(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "nil_list", thrift.LIST, 23)
 	listBeginOffset := offset
@@ -2479,7 +2333,7 @@ func (p *TestStruct) fastWriteField23(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField24(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField24(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	if p.IsSetOptNilInsList() {
 		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "opt_nil_ins_list", thrift.LIST, 24)
@@ -2497,7 +2351,7 @@ func (p *TestStruct) fastWriteField24(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField25(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField25(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "nil_ins_list", thrift.LIST, 25)
 	listBeginOffset := offset
@@ -2513,7 +2367,7 @@ func (p *TestStruct) fastWriteField25(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField26(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField26(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	if p.IsSetOptStatus() {
 		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "opt_status", thrift.I32, 26)
@@ -2524,7 +2378,7 @@ func (p *TestStruct) fastWriteField26(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField27(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField27(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "enum_key_map", thrift.MAP, 27)
 	mapBeginOffset := offset
@@ -2543,7 +2397,7 @@ func (p *TestStruct) fastWriteField27(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) fastWriteField28(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *FullStruct) fastWriteField28(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	offset := 0
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "complex", thrift.MAP, 28)
 	mapBeginOffset := offset
@@ -2581,7 +2435,7 @@ func (p *TestStruct) fastWriteField28(buf []byte, binaryWriter bthrift.BinaryWri
 	return offset
 }
 
-func (p *TestStruct) field1Length() int {
+func (p *FullStruct) field1Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("Left", thrift.I32, 1)
 	l += bthrift.Binary.I32Length(p.Left)
@@ -2590,7 +2444,7 @@ func (p *TestStruct) field1Length() int {
 	return l
 }
 
-func (p *TestStruct) field2Length() int {
+func (p *FullStruct) field2Length() int {
 	l := 0
 	if p.IsSetRight() {
 		l += bthrift.Binary.FieldBeginLength("Right", thrift.I32, 2)
@@ -2601,7 +2455,7 @@ func (p *TestStruct) field2Length() int {
 	return l
 }
 
-func (p *TestStruct) field3Length() int {
+func (p *FullStruct) field3Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("Dummy", thrift.STRING, 3)
 	l += bthrift.Binary.BinaryLengthNocopy([]byte(p.Dummy))
@@ -2610,7 +2464,7 @@ func (p *TestStruct) field3Length() int {
 	return l
 }
 
-func (p *TestStruct) field4Length() int {
+func (p *FullStruct) field4Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("InnerReq", thrift.STRUCT, 4)
 	l += p.InnerReq.BLength()
@@ -2618,7 +2472,7 @@ func (p *TestStruct) field4Length() int {
 	return l
 }
 
-func (p *TestStruct) field5Length() int {
+func (p *FullStruct) field5Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("status", thrift.I32, 5)
 	l += bthrift.Binary.I32Length(int32(p.Status))
@@ -2627,7 +2481,7 @@ func (p *TestStruct) field5Length() int {
 	return l
 }
 
-func (p *TestStruct) field6Length() int {
+func (p *FullStruct) field6Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("Str", thrift.STRING, 6)
 	l += bthrift.Binary.StringLengthNocopy(p.Str)
@@ -2636,7 +2490,7 @@ func (p *TestStruct) field6Length() int {
 	return l
 }
 
-func (p *TestStruct) field7Length() int {
+func (p *FullStruct) field7Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("enum_list", thrift.LIST, 7)
 	l += bthrift.Binary.ListBeginLength(thrift.I32, len(p.EnumList))
@@ -2649,7 +2503,7 @@ func (p *TestStruct) field7Length() int {
 	return l
 }
 
-func (p *TestStruct) field8Length() int {
+func (p *FullStruct) field8Length() int {
 	l := 0
 	if p.IsSetStrmap() {
 		l += bthrift.Binary.FieldBeginLength("Strmap", thrift.MAP, 8)
@@ -2667,7 +2521,7 @@ func (p *TestStruct) field8Length() int {
 	return l
 }
 
-func (p *TestStruct) field9Length() int {
+func (p *FullStruct) field9Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("Int64", thrift.I64, 9)
 	l += bthrift.Binary.I64Length(p.Int64)
@@ -2676,7 +2530,7 @@ func (p *TestStruct) field9Length() int {
 	return l
 }
 
-func (p *TestStruct) field10Length() int {
+func (p *FullStruct) field10Length() int {
 	l := 0
 	if p.IsSetIntList() {
 		l += bthrift.Binary.FieldBeginLength("IntList", thrift.LIST, 10)
@@ -2689,7 +2543,7 @@ func (p *TestStruct) field10Length() int {
 	return l
 }
 
-func (p *TestStruct) field11Length() int {
+func (p *FullStruct) field11Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("localList", thrift.LIST, 11)
 	l += bthrift.Binary.ListBeginLength(thrift.STRUCT, len(p.LocalList))
@@ -2701,7 +2555,7 @@ func (p *TestStruct) field11Length() int {
 	return l
 }
 
-func (p *TestStruct) field12Length() int {
+func (p *FullStruct) field12Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("StrLocalMap", thrift.MAP, 12)
 	l += bthrift.Binary.MapBeginLength(thrift.STRING, thrift.STRUCT, len(p.StrLocalMap))
@@ -2716,7 +2570,7 @@ func (p *TestStruct) field12Length() int {
 	return l
 }
 
-func (p *TestStruct) field13Length() int {
+func (p *FullStruct) field13Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("nestList", thrift.LIST, 13)
 	l += bthrift.Binary.ListBeginLength(thrift.LIST, len(p.NestList))
@@ -2731,7 +2585,7 @@ func (p *TestStruct) field13Length() int {
 	return l
 }
 
-func (p *TestStruct) field14Length() int {
+func (p *FullStruct) field14Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("required_ins", thrift.STRUCT, 14)
 	l += p.RequiredIns.BLength()
@@ -2739,7 +2593,7 @@ func (p *TestStruct) field14Length() int {
 	return l
 }
 
-func (p *TestStruct) field16Length() int {
+func (p *FullStruct) field16Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("nestMap", thrift.MAP, 16)
 	l += bthrift.Binary.MapBeginLength(thrift.STRING, thrift.LIST, len(p.NestMap))
@@ -2759,7 +2613,7 @@ func (p *TestStruct) field16Length() int {
 	return l
 }
 
-func (p *TestStruct) field17Length() int {
+func (p *FullStruct) field17Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("nestMap2", thrift.LIST, 17)
 	l += bthrift.Binary.ListBeginLength(thrift.MAP, len(p.NestMap2))
@@ -2779,7 +2633,7 @@ func (p *TestStruct) field17Length() int {
 	return l
 }
 
-func (p *TestStruct) field18Length() int {
+func (p *FullStruct) field18Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("enum_map", thrift.MAP, 18)
 	l += bthrift.Binary.MapBeginLength(thrift.I32, thrift.I32, len(p.EnumMap))
@@ -2795,7 +2649,7 @@ func (p *TestStruct) field18Length() int {
 	return l
 }
 
-func (p *TestStruct) field19Length() int {
+func (p *FullStruct) field19Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("Strlist", thrift.LIST, 19)
 	l += bthrift.Binary.ListBeginLength(thrift.STRING, len(p.Strlist))
@@ -2808,7 +2662,7 @@ func (p *TestStruct) field19Length() int {
 	return l
 }
 
-func (p *TestStruct) field20Length() int {
+func (p *FullStruct) field20Length() int {
 	l := 0
 	if p.IsSetOptionalIns() {
 		l += bthrift.Binary.FieldBeginLength("optional_ins", thrift.STRUCT, 20)
@@ -2818,7 +2672,7 @@ func (p *TestStruct) field20Length() int {
 	return l
 }
 
-func (p *TestStruct) field21Length() int {
+func (p *FullStruct) field21Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("AnotherInner", thrift.STRUCT, 21)
 	l += p.AnotherInner.BLength()
@@ -2826,7 +2680,7 @@ func (p *TestStruct) field21Length() int {
 	return l
 }
 
-func (p *TestStruct) field22Length() int {
+func (p *FullStruct) field22Length() int {
 	l := 0
 	if p.IsSetOptNilList() {
 		l += bthrift.Binary.FieldBeginLength("opt_nil_list", thrift.LIST, 22)
@@ -2841,7 +2695,7 @@ func (p *TestStruct) field22Length() int {
 	return l
 }
 
-func (p *TestStruct) field23Length() int {
+func (p *FullStruct) field23Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("nil_list", thrift.LIST, 23)
 	l += bthrift.Binary.ListBeginLength(thrift.STRING, len(p.NilList))
@@ -2854,7 +2708,7 @@ func (p *TestStruct) field23Length() int {
 	return l
 }
 
-func (p *TestStruct) field24Length() int {
+func (p *FullStruct) field24Length() int {
 	l := 0
 	if p.IsSetOptNilInsList() {
 		l += bthrift.Binary.FieldBeginLength("opt_nil_ins_list", thrift.LIST, 24)
@@ -2868,7 +2722,7 @@ func (p *TestStruct) field24Length() int {
 	return l
 }
 
-func (p *TestStruct) field25Length() int {
+func (p *FullStruct) field25Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("nil_ins_list", thrift.LIST, 25)
 	l += bthrift.Binary.ListBeginLength(thrift.STRUCT, len(p.NilInsList))
@@ -2880,7 +2734,7 @@ func (p *TestStruct) field25Length() int {
 	return l
 }
 
-func (p *TestStruct) field26Length() int {
+func (p *FullStruct) field26Length() int {
 	l := 0
 	if p.IsSetOptStatus() {
 		l += bthrift.Binary.FieldBeginLength("opt_status", thrift.I32, 26)
@@ -2891,7 +2745,7 @@ func (p *TestStruct) field26Length() int {
 	return l
 }
 
-func (p *TestStruct) field27Length() int {
+func (p *FullStruct) field27Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("enum_key_map", thrift.MAP, 27)
 	l += bthrift.Binary.MapBeginLength(thrift.I32, thrift.STRUCT, len(p.EnumKeyMap))
@@ -2906,7 +2760,7 @@ func (p *TestStruct) field27Length() int {
 	return l
 }
 
-func (p *TestStruct) field28Length() int {
+func (p *FullStruct) field28Length() int {
 	l := 0
 	l += bthrift.Binary.FieldBeginLength("complex", thrift.MAP, 28)
 	l += bthrift.Binary.MapBeginLength(thrift.I32, thrift.LIST, len(p.Complex))
@@ -2926,6 +2780,947 @@ func (p *TestStruct) field28Length() int {
 			l += bthrift.Binary.MapEndLength()
 		}
 		l += bthrift.Binary.ListEndLength()
+	}
+	l += bthrift.Binary.MapEndLength()
+	l += bthrift.Binary.FieldEndLength()
+	return l
+}
+
+func (p *MixedStruct) FastRead(buf []byte) (int, error) {
+	var err error
+	var offset int
+	var l int
+	var name string
+	var fieldTypeId thrift.TType
+	var fieldId int16
+	var issetLeft bool = false
+	var issetRequiredIns bool = false
+	_, l, err = bthrift.Binary.ReadStructBegin(buf)
+	offset += l
+	if err != nil {
+		goto ReadStructBeginError
+	}
+
+	for {
+		name, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
+		offset += l
+		if err != nil {
+			goto ReadFieldBeginError
+		}
+		if fieldTypeId == thrift.STOP {
+			break
+		}
+		switch fieldId {
+		case 1:
+			if fieldTypeId == thrift.I32 {
+				l, err = p.FastReadField1(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+				issetLeft = true
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 3:
+			if fieldTypeId == thrift.STRING {
+				l, err = p.FastReadField3(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 6:
+			if fieldTypeId == thrift.STRING {
+				l, err = p.FastReadField6(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 7:
+			if fieldTypeId == thrift.LIST {
+				l, err = p.FastReadField7(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 9:
+			if fieldTypeId == thrift.I64 {
+				l, err = p.FastReadField9(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 10:
+			if fieldTypeId == thrift.LIST {
+				l, err = p.FastReadField10(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 11:
+			if fieldTypeId == thrift.LIST {
+				l, err = p.FastReadField11(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 12:
+			if fieldTypeId == thrift.MAP {
+				l, err = p.FastReadField12(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 13:
+			if fieldTypeId == thrift.LIST {
+				l, err = p.FastReadField13(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 14:
+			if fieldTypeId == thrift.STRUCT {
+				l, err = p.FastReadField14(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+				issetRequiredIns = true
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 20:
+			if fieldTypeId == thrift.STRUCT {
+				l, err = p.FastReadField20(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 21:
+			if fieldTypeId == thrift.STRUCT {
+				l, err = p.FastReadField21(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		case 27:
+			if fieldTypeId == thrift.MAP {
+				l, err = p.FastReadField27(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
+		default:
+			l, f, err2 := bthrift.ReadUnknownField(buf[offset:], name, fieldTypeId, fieldId)
+			offset += l
+			if err2 != nil {
+				err = err2
+				goto UnknownFieldsAppendError
+			}
+			p._unknownFields = append(p._unknownFields, f)
+		}
+
+		l, err = bthrift.Binary.ReadFieldEnd(buf[offset:])
+		offset += l
+		if err != nil {
+			goto ReadFieldEndError
+		}
+	}
+	l, err = bthrift.Binary.ReadStructEnd(buf[offset:])
+	offset += l
+	if err != nil {
+		goto ReadStructEndError
+	}
+
+	if !issetLeft {
+		fieldId = 1
+		goto RequiredFieldNotSetError
+	}
+
+	if !issetRequiredIns {
+		fieldId = 14
+		goto RequiredFieldNotSetError
+	}
+	return offset, nil
+ReadStructBeginError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+ReadFieldBeginError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+ReadFieldError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MixedStruct[fieldId]), err)
+SkipFieldError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+UnknownFieldsAppendError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T append unknown field(name: %s type: %d id: %d) error: ", p, name, fieldTypeId, fieldId), err)
+ReadFieldEndError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+ReadStructEndError:
+	return offset, thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+RequiredFieldNotSetError:
+	return offset, thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_MixedStruct[fieldId]))
+}
+
+func (p *MixedStruct) FastReadField1(buf []byte) (int, error) {
+	offset := 0
+
+	if v, l, err := bthrift.Binary.ReadI32(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+
+		p.Left = v
+
+	}
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField3(buf []byte) (int, error) {
+	offset := 0
+
+	if v, l, err := bthrift.Binary.ReadBinary(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+
+		p.Dummy = []byte(v)
+
+	}
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField6(buf []byte) (int, error) {
+	offset := 0
+
+	if v, l, err := bthrift.Binary.ReadString(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+
+		p.Str = v
+
+	}
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField7(buf []byte) (int, error) {
+	offset := 0
+
+	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
+	offset += l
+	if err != nil {
+		return offset, err
+	}
+	p.EnumList = make([]HTTPStatus, 0, size)
+	for i := 0; i < size; i++ {
+		var _elem HTTPStatus
+		if v, l, err := bthrift.Binary.ReadI32(buf[offset:]); err != nil {
+			return offset, err
+		} else {
+			offset += l
+
+			_elem = HTTPStatus(v)
+
+		}
+
+		p.EnumList = append(p.EnumList, _elem)
+	}
+	if l, err := bthrift.Binary.ReadListEnd(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+	}
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField9(buf []byte) (int, error) {
+	offset := 0
+
+	if v, l, err := bthrift.Binary.ReadI64(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+
+		p.Int64 = v
+
+	}
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField10(buf []byte) (int, error) {
+	offset := 0
+
+	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
+	offset += l
+	if err != nil {
+		return offset, err
+	}
+	p.IntList = make([]int32, 0, size)
+	for i := 0; i < size; i++ {
+		var _elem int32
+		if v, l, err := bthrift.Binary.ReadI32(buf[offset:]); err != nil {
+			return offset, err
+		} else {
+			offset += l
+
+			_elem = v
+
+		}
+
+		p.IntList = append(p.IntList, _elem)
+	}
+	if l, err := bthrift.Binary.ReadListEnd(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+	}
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField11(buf []byte) (int, error) {
+	offset := 0
+
+	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
+	offset += l
+	if err != nil {
+		return offset, err
+	}
+	p.LocalList = make([]*Local, 0, size)
+	for i := 0; i < size; i++ {
+		_elem := NewLocal()
+		if l, err := _elem.FastRead(buf[offset:]); err != nil {
+			return offset, err
+		} else {
+			offset += l
+		}
+
+		p.LocalList = append(p.LocalList, _elem)
+	}
+	if l, err := bthrift.Binary.ReadListEnd(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+	}
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField12(buf []byte) (int, error) {
+	offset := 0
+
+	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
+	offset += l
+	if err != nil {
+		return offset, err
+	}
+	p.StrLocalMap = make(map[string]*Local, size)
+	for i := 0; i < size; i++ {
+		var _key string
+		if v, l, err := bthrift.Binary.ReadString(buf[offset:]); err != nil {
+			return offset, err
+		} else {
+			offset += l
+
+			_key = v
+
+		}
+		_val := NewLocal()
+		if l, err := _val.FastRead(buf[offset:]); err != nil {
+			return offset, err
+		} else {
+			offset += l
+		}
+
+		p.StrLocalMap[_key] = _val
+	}
+	if l, err := bthrift.Binary.ReadMapEnd(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+	}
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField13(buf []byte) (int, error) {
+	offset := 0
+
+	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
+	offset += l
+	if err != nil {
+		return offset, err
+	}
+	p.NestList = make([][]int32, 0, size)
+	for i := 0; i < size; i++ {
+		_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
+		offset += l
+		if err != nil {
+			return offset, err
+		}
+		_elem := make([]int32, 0, size)
+		for i := 0; i < size; i++ {
+			var _elem1 int32
+			if v, l, err := bthrift.Binary.ReadI32(buf[offset:]); err != nil {
+				return offset, err
+			} else {
+				offset += l
+
+				_elem1 = v
+
+			}
+
+			_elem = append(_elem, _elem1)
+		}
+		if l, err := bthrift.Binary.ReadListEnd(buf[offset:]); err != nil {
+			return offset, err
+		} else {
+			offset += l
+		}
+
+		p.NestList = append(p.NestList, _elem)
+	}
+	if l, err := bthrift.Binary.ReadListEnd(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+	}
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField14(buf []byte) (int, error) {
+	offset := 0
+
+	tmp := NewLocal()
+	if l, err := tmp.FastRead(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+	}
+	p.RequiredIns = tmp
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField20(buf []byte) (int, error) {
+	offset := 0
+
+	tmp := NewLocal()
+	if l, err := tmp.FastRead(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+	}
+	p.OptionalIns = tmp
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField21(buf []byte) (int, error) {
+	offset := 0
+
+	tmp := NewInner()
+	if l, err := tmp.FastRead(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+	}
+	p.AnotherInner = tmp
+	return offset, nil
+}
+
+func (p *MixedStruct) FastReadField27(buf []byte) (int, error) {
+	offset := 0
+
+	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
+	offset += l
+	if err != nil {
+		return offset, err
+	}
+	p.EnumKeyMap = make(map[HTTPStatus]*Local, size)
+	for i := 0; i < size; i++ {
+		var _key HTTPStatus
+		if v, l, err := bthrift.Binary.ReadI32(buf[offset:]); err != nil {
+			return offset, err
+		} else {
+			offset += l
+
+			_key = HTTPStatus(v)
+
+		}
+		_val := NewLocal()
+		if l, err := _val.FastRead(buf[offset:]); err != nil {
+			return offset, err
+		} else {
+			offset += l
+		}
+
+		p.EnumKeyMap[_key] = _val
+	}
+	if l, err := bthrift.Binary.ReadMapEnd(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+	}
+	return offset, nil
+}
+
+// for compatibility
+func (p *MixedStruct) FastWrite(buf []byte) int {
+	return 0
+}
+
+func (p *MixedStruct) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "MixedStruct")
+	if p != nil {
+		offset += p.fastWriteField1(buf[offset:], binaryWriter)
+		offset += p.fastWriteField9(buf[offset:], binaryWriter)
+		offset += p.fastWriteField3(buf[offset:], binaryWriter)
+		offset += p.fastWriteField6(buf[offset:], binaryWriter)
+		offset += p.fastWriteField7(buf[offset:], binaryWriter)
+		offset += p.fastWriteField10(buf[offset:], binaryWriter)
+		offset += p.fastWriteField11(buf[offset:], binaryWriter)
+		offset += p.fastWriteField12(buf[offset:], binaryWriter)
+		offset += p.fastWriteField13(buf[offset:], binaryWriter)
+		offset += p.fastWriteField14(buf[offset:], binaryWriter)
+		offset += p.fastWriteField20(buf[offset:], binaryWriter)
+		offset += p.fastWriteField21(buf[offset:], binaryWriter)
+		offset += p.fastWriteField27(buf[offset:], binaryWriter)
+		l, err := bthrift.WriteUnknownFields(buf[offset:], p._unknownFields)
+		if err != nil {
+			panic(fmt.Errorf("%T write unknown field: %s", p, err))
+		}
+		offset += l
+	}
+	offset += bthrift.Binary.WriteFieldStop(buf[offset:])
+	offset += bthrift.Binary.WriteStructEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) BLength() int {
+	l := 0
+	l += bthrift.Binary.StructBeginLength("MixedStruct")
+	if p != nil {
+		l += p.field1Length()
+		l += p.field3Length()
+		l += p.field6Length()
+		l += p.field7Length()
+		l += p.field9Length()
+		l += p.field10Length()
+		l += p.field11Length()
+		l += p.field12Length()
+		l += p.field13Length()
+		l += p.field14Length()
+		l += p.field20Length()
+		l += p.field21Length()
+		l += p.field27Length()
+		unknownL, err := bthrift.UnknownFieldsLength(p._unknownFields)
+		if err != nil {
+			panic(fmt.Errorf("%T unknown fields length: %s", p, err))
+		}
+		l += unknownL
+	}
+	l += bthrift.Binary.FieldStopLength()
+	l += bthrift.Binary.StructEndLength()
+	return l
+}
+
+func (p *MixedStruct) fastWriteField1(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Left", thrift.I32, 1)
+	offset += bthrift.Binary.WriteI32(buf[offset:], p.Left)
+
+	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField3(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Dummy", thrift.STRING, 3)
+	offset += bthrift.Binary.WriteBinaryNocopy(buf[offset:], binaryWriter, []byte(p.Dummy))
+
+	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField6(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Str", thrift.STRING, 6)
+	offset += bthrift.Binary.WriteStringNocopy(buf[offset:], binaryWriter, p.Str)
+
+	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField7(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "enum_list", thrift.LIST, 7)
+	listBeginOffset := offset
+	offset += bthrift.Binary.ListBeginLength(thrift.I32, 0)
+	var length int
+	for _, v := range p.EnumList {
+		length++
+		offset += bthrift.Binary.WriteI32(buf[offset:], int32(v))
+
+	}
+	bthrift.Binary.WriteListBegin(buf[listBeginOffset:], thrift.I32, length)
+	offset += bthrift.Binary.WriteListEnd(buf[offset:])
+	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField9(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Int64", thrift.I64, 9)
+	offset += bthrift.Binary.WriteI64(buf[offset:], p.Int64)
+
+	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField10(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	if p.IsSetIntList() {
+		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "IntList", thrift.LIST, 10)
+		listBeginOffset := offset
+		offset += bthrift.Binary.ListBeginLength(thrift.I32, 0)
+		var length int
+		for _, v := range p.IntList {
+			length++
+			offset += bthrift.Binary.WriteI32(buf[offset:], v)
+
+		}
+		bthrift.Binary.WriteListBegin(buf[listBeginOffset:], thrift.I32, length)
+		offset += bthrift.Binary.WriteListEnd(buf[offset:])
+		offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	}
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField11(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "localList", thrift.LIST, 11)
+	listBeginOffset := offset
+	offset += bthrift.Binary.ListBeginLength(thrift.STRUCT, 0)
+	var length int
+	for _, v := range p.LocalList {
+		length++
+		offset += v.FastWriteNocopy(buf[offset:], binaryWriter)
+	}
+	bthrift.Binary.WriteListBegin(buf[listBeginOffset:], thrift.STRUCT, length)
+	offset += bthrift.Binary.WriteListEnd(buf[offset:])
+	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField12(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "StrLocalMap", thrift.MAP, 12)
+	mapBeginOffset := offset
+	offset += bthrift.Binary.MapBeginLength(thrift.STRING, thrift.STRUCT, 0)
+	var length int
+	for k, v := range p.StrLocalMap {
+		length++
+
+		offset += bthrift.Binary.WriteStringNocopy(buf[offset:], binaryWriter, k)
+
+		offset += v.FastWriteNocopy(buf[offset:], binaryWriter)
+	}
+	bthrift.Binary.WriteMapBegin(buf[mapBeginOffset:], thrift.STRING, thrift.STRUCT, length)
+	offset += bthrift.Binary.WriteMapEnd(buf[offset:])
+	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField13(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "nestList", thrift.LIST, 13)
+	listBeginOffset := offset
+	offset += bthrift.Binary.ListBeginLength(thrift.LIST, 0)
+	var length int
+	for _, v := range p.NestList {
+		length++
+		listBeginOffset := offset
+		offset += bthrift.Binary.ListBeginLength(thrift.I32, 0)
+		var length int
+		for _, v := range v {
+			length++
+			offset += bthrift.Binary.WriteI32(buf[offset:], v)
+
+		}
+		bthrift.Binary.WriteListBegin(buf[listBeginOffset:], thrift.I32, length)
+		offset += bthrift.Binary.WriteListEnd(buf[offset:])
+	}
+	bthrift.Binary.WriteListBegin(buf[listBeginOffset:], thrift.LIST, length)
+	offset += bthrift.Binary.WriteListEnd(buf[offset:])
+	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField14(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "required_ins", thrift.STRUCT, 14)
+	offset += p.RequiredIns.FastWriteNocopy(buf[offset:], binaryWriter)
+	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField20(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	if p.IsSetOptionalIns() {
+		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "optional_ins", thrift.STRUCT, 20)
+		offset += p.OptionalIns.FastWriteNocopy(buf[offset:], binaryWriter)
+		offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	}
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField21(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "AnotherInner", thrift.STRUCT, 21)
+	offset += p.AnotherInner.FastWriteNocopy(buf[offset:], binaryWriter)
+	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) fastWriteField27(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+	offset := 0
+	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "enum_key_map", thrift.MAP, 27)
+	mapBeginOffset := offset
+	offset += bthrift.Binary.MapBeginLength(thrift.I32, thrift.STRUCT, 0)
+	var length int
+	for k, v := range p.EnumKeyMap {
+		length++
+
+		offset += bthrift.Binary.WriteI32(buf[offset:], int32(k))
+
+		offset += v.FastWriteNocopy(buf[offset:], binaryWriter)
+	}
+	bthrift.Binary.WriteMapBegin(buf[mapBeginOffset:], thrift.I32, thrift.STRUCT, length)
+	offset += bthrift.Binary.WriteMapEnd(buf[offset:])
+	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	return offset
+}
+
+func (p *MixedStruct) field1Length() int {
+	l := 0
+	l += bthrift.Binary.FieldBeginLength("Left", thrift.I32, 1)
+	l += bthrift.Binary.I32Length(p.Left)
+
+	l += bthrift.Binary.FieldEndLength()
+	return l
+}
+
+func (p *MixedStruct) field3Length() int {
+	l := 0
+	l += bthrift.Binary.FieldBeginLength("Dummy", thrift.STRING, 3)
+	l += bthrift.Binary.BinaryLengthNocopy([]byte(p.Dummy))
+
+	l += bthrift.Binary.FieldEndLength()
+	return l
+}
+
+func (p *MixedStruct) field6Length() int {
+	l := 0
+	l += bthrift.Binary.FieldBeginLength("Str", thrift.STRING, 6)
+	l += bthrift.Binary.StringLengthNocopy(p.Str)
+
+	l += bthrift.Binary.FieldEndLength()
+	return l
+}
+
+func (p *MixedStruct) field7Length() int {
+	l := 0
+	l += bthrift.Binary.FieldBeginLength("enum_list", thrift.LIST, 7)
+	l += bthrift.Binary.ListBeginLength(thrift.I32, len(p.EnumList))
+	for _, v := range p.EnumList {
+		l += bthrift.Binary.I32Length(int32(v))
+
+	}
+	l += bthrift.Binary.ListEndLength()
+	l += bthrift.Binary.FieldEndLength()
+	return l
+}
+
+func (p *MixedStruct) field9Length() int {
+	l := 0
+	l += bthrift.Binary.FieldBeginLength("Int64", thrift.I64, 9)
+	l += bthrift.Binary.I64Length(p.Int64)
+
+	l += bthrift.Binary.FieldEndLength()
+	return l
+}
+
+func (p *MixedStruct) field10Length() int {
+	l := 0
+	if p.IsSetIntList() {
+		l += bthrift.Binary.FieldBeginLength("IntList", thrift.LIST, 10)
+		l += bthrift.Binary.ListBeginLength(thrift.I32, len(p.IntList))
+		var tmpV int32
+		l += bthrift.Binary.I32Length(int32(tmpV)) * len(p.IntList)
+		l += bthrift.Binary.ListEndLength()
+		l += bthrift.Binary.FieldEndLength()
+	}
+	return l
+}
+
+func (p *MixedStruct) field11Length() int {
+	l := 0
+	l += bthrift.Binary.FieldBeginLength("localList", thrift.LIST, 11)
+	l += bthrift.Binary.ListBeginLength(thrift.STRUCT, len(p.LocalList))
+	for _, v := range p.LocalList {
+		l += v.BLength()
+	}
+	l += bthrift.Binary.ListEndLength()
+	l += bthrift.Binary.FieldEndLength()
+	return l
+}
+
+func (p *MixedStruct) field12Length() int {
+	l := 0
+	l += bthrift.Binary.FieldBeginLength("StrLocalMap", thrift.MAP, 12)
+	l += bthrift.Binary.MapBeginLength(thrift.STRING, thrift.STRUCT, len(p.StrLocalMap))
+	for k, v := range p.StrLocalMap {
+
+		l += bthrift.Binary.StringLengthNocopy(k)
+
+		l += v.BLength()
+	}
+	l += bthrift.Binary.MapEndLength()
+	l += bthrift.Binary.FieldEndLength()
+	return l
+}
+
+func (p *MixedStruct) field13Length() int {
+	l := 0
+	l += bthrift.Binary.FieldBeginLength("nestList", thrift.LIST, 13)
+	l += bthrift.Binary.ListBeginLength(thrift.LIST, len(p.NestList))
+	for _, v := range p.NestList {
+		l += bthrift.Binary.ListBeginLength(thrift.I32, len(v))
+		var tmpV int32
+		l += bthrift.Binary.I32Length(int32(tmpV)) * len(v)
+		l += bthrift.Binary.ListEndLength()
+	}
+	l += bthrift.Binary.ListEndLength()
+	l += bthrift.Binary.FieldEndLength()
+	return l
+}
+
+func (p *MixedStruct) field14Length() int {
+	l := 0
+	l += bthrift.Binary.FieldBeginLength("required_ins", thrift.STRUCT, 14)
+	l += p.RequiredIns.BLength()
+	l += bthrift.Binary.FieldEndLength()
+	return l
+}
+
+func (p *MixedStruct) field20Length() int {
+	l := 0
+	if p.IsSetOptionalIns() {
+		l += bthrift.Binary.FieldBeginLength("optional_ins", thrift.STRUCT, 20)
+		l += p.OptionalIns.BLength()
+		l += bthrift.Binary.FieldEndLength()
+	}
+	return l
+}
+
+func (p *MixedStruct) field21Length() int {
+	l := 0
+	l += bthrift.Binary.FieldBeginLength("AnotherInner", thrift.STRUCT, 21)
+	l += p.AnotherInner.BLength()
+	l += bthrift.Binary.FieldEndLength()
+	return l
+}
+
+func (p *MixedStruct) field27Length() int {
+	l := 0
+	l += bthrift.Binary.FieldBeginLength("enum_key_map", thrift.MAP, 27)
+	l += bthrift.Binary.MapBeginLength(thrift.I32, thrift.STRUCT, len(p.EnumKeyMap))
+	for k, v := range p.EnumKeyMap {
+
+		l += bthrift.Binary.I32Length(int32(k))
+
+		l += v.BLength()
 	}
 	l += bthrift.Binary.MapEndLength()
 	l += bthrift.Binary.FieldEndLength()
