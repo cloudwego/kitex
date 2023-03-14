@@ -18,6 +18,7 @@ package loadbalance
 
 import (
 	"context"
+	"sync"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -79,6 +80,29 @@ func TestWeightedRoundRobinPicker(t *testing.T) {
 	test.Assert(t, accessMap["addr1"] == round/6, accessMap)
 	test.Assert(t, accessMap["addr2"] == round/6*2, accessMap)
 	test.Assert(t, accessMap["addr3"] == round/6*3, accessMap)
+}
+
+func TestWeightedRoundRobinPickerLargeInstances(t *testing.T) {
+	ctx := context.Background()
+	var insList []discovery.Instance
+	insList = append(insList, makeNInstances(wrrVNodesBatchSize*5, 10)...)
+	insList = append(insList, discovery.NewInstance("tcp", "nbalance", 100, nil))
+
+	picker := newWeightedRoundRobinPicker(insList)
+	concurrency := wrrVNodesBatchSize * 2
+	round := len(insList)
+	var wg sync.WaitGroup
+	for c := 0; c < concurrency; c++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < round; i++ {
+				ins := picker.Next(ctx, nil)
+				test.Assert(t, ins != nil, ins)
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func TestNextWrrNode(t *testing.T) {

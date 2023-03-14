@@ -91,7 +91,7 @@ func TestConsistPicker_Replica(t *testing.T) {
 	opt.GetKey = func(ctx context.Context, request interface{}) string {
 		return "1234"
 	}
-	insList := makeNinstances(2)
+	insList := makeNInstances(2, 10)
 	e := discovery.Result{
 		Cacheable: false,
 		CacheKey:  "",
@@ -215,7 +215,7 @@ func TestConsistBalance(t *testing.T) {
 		Weighted:         false,
 		ExpireDuration:   0,
 	}
-	inss := makeNinstances(10)
+	inss := makeNInstances(10, 10)
 
 	m := make(map[discovery.Instance]int)
 	e := discovery.Result{
@@ -246,7 +246,7 @@ func TestWeightedConsistBalance(t *testing.T) {
 		Weighted:         true,
 		ExpireDuration:   0,
 	}
-	inss := makeNWeightedInstances(10)
+	inss := makeNInstances(10, 10)
 
 	m := make(map[discovery.Instance]int)
 	e := discovery.Result{
@@ -265,7 +265,7 @@ func TestWeightedConsistBalance(t *testing.T) {
 
 func TestConsistPicker_Reblance(t *testing.T) {
 	opt := NewConsistentHashOption(getKey)
-	insList := makeNWeightedInstances(10)
+	insList := makeNInstances(10, 10)
 	e := discovery.Result{
 		Cacheable: true,
 		CacheKey:  "4321",
@@ -301,7 +301,7 @@ func BenchmarkNewConsistPicker_NoCache(bb *testing.B) {
 
 	for i := 0; i < 4; i++ {
 		bb.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
-			inss := makeNinstances(n)
+			inss := makeNInstances(n, 10)
 			e := discovery.Result{
 				Cacheable: false,
 				CacheKey:  "",
@@ -331,7 +331,7 @@ func BenchmarkNewConsistPicker(bb *testing.B) {
 
 	for i := 0; i < 4; i++ {
 		bb.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
-			inss := makeNinstances(n)
+			inss := makeNInstances(n, 10)
 			e := discovery.Result{
 				Cacheable: true,
 				CacheKey:  "test",
