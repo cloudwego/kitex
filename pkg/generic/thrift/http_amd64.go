@@ -66,7 +66,6 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 			return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 		}
 		_, err = tProt.ByteBuffer().WriteBinary(buf)
-		tProt.Recycle()
 		return err
 	}
 	return w.originalWrite(ctx, out, msg, requestBase)

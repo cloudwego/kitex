@@ -213,8 +213,6 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 			}
 		}
 
-		tProt.Recycle()
-
 		return resp, nil
 	}
 	fnDsc, err := m.svc.LookupFunctionByMethod(method)

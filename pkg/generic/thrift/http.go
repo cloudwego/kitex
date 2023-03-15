@@ -154,8 +154,6 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 			return nil, err
 		}
 
-		tProt.Recycle()
-
 		if len(buf) > structWrapLen {
 			buf = buf[structWrapLen : len(buf)-1]
 		}
