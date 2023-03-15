@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2023 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,8 +21,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift/test/kitex_gen/test"
 	"github.com/cloudwego/thriftgo/generator/golang/extension/unknown"
+
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift/test/kitex_gen/test"
 )
 
 var fullReq *test.FullStruct
