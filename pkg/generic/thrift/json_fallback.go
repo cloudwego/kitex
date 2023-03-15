@@ -1,3 +1,6 @@
+//go:build !amd64
+// +build !amd64
+
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -14,7 +17,6 @@
  * limitations under the License.
  */
 
-// Package thrift provides thrift idl parser and codec for generic call
 package thrift
 
 import (
@@ -23,17 +25,7 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 )
 
-const (
-	structWrapLen = 4
-	fieldBeginLen = 3
-)
-
-// MessageReader read from thrift.TProtocol with method
-type MessageReader interface {
-	Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error)
-}
-
-// MessageWriter write to thrift.TProtocol
-type MessageWriter interface {
-	Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error
+// Write write json string to out thrift.TProtocol
+func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+	return m.originalWrite(ctx, out, msg, requestBase)
 }

@@ -23,6 +23,8 @@ import (
 	"unsafe"
 
 	"github.com/bytedance/sonic/ast"
+
+	"github.com/cloudwego/kitex/internal"
 )
 
 // MIMEType ...
@@ -32,17 +34,6 @@ const (
 	MIMEApplicationJson     = "application/json"
 	MIMEApplicationProtobuf = "application/x-protobuf"
 )
-
-type GoSlice struct {
-	Ptr unsafe.Pointer
-	Len int
-	Cap int
-}
-
-type GoString struct {
-	Ptr unsafe.Pointer
-	Len int
-}
 
 // HTTPRequest ...
 type HTTPRequest struct {
@@ -110,8 +101,8 @@ func (req HTTPRequest) GetMapBody(key string) string {
 	if req.GeneralBody == nil && req.Request != nil {
 		body := req.RawBody
 		var s string
-		(*GoString)(unsafe.Pointer(&s)).Len = (*GoSlice)(unsafe.Pointer(&body)).Len
-		(*GoString)(unsafe.Pointer(&s)).Ptr = (*GoSlice)(unsafe.Pointer(&body)).Ptr
+		(*internal.GoString)(unsafe.Pointer(&s)).Len = (*internal.GoSlice)(unsafe.Pointer(&body)).Len
+		(*internal.GoString)(unsafe.Pointer(&s)).Ptr = (*internal.GoSlice)(unsafe.Pointer(&body)).Ptr
 		node := ast.NewRaw(s)
 		cache := &jsonCache{
 			root: node,

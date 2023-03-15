@@ -83,8 +83,8 @@ func testDynamicgoThrift(t *testing.T) {
 	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceImpl), "./idl/example.thrift", dOpts)
 	time.Sleep(500 * time.Millisecond)
 
-	// marshal: dynamicgo (amd64), kitex original (arm)
-	// unmarshal: dynamicgo
+	// write: dynamicgo (amd64), kitex original (arm)
+	// read: dynamicgo
 	cli := initDynamicgoThriftClient(transport.TTHeader, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -92,8 +92,8 @@ func testDynamicgoThrift(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), "world")
 
-	// marshal: dynamicgo (amd64), kitex original (arm)
-	// unmarshal: kitex original
+	// write: dynamicgo (amd64), kitex original (arm)
+	// read: kitex original
 	cli = initDynamicgoThriftClient(transport.PurePayload, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 	resp, err = cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -229,8 +229,8 @@ func testDynamicgoThriftPingMethod(t *testing.T) {
 	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServicePingImpl), "./idl/example.thrift", dOpts)
 	time.Sleep(500 * time.Millisecond)
 
-	// marshal: dynamicgo (amd64), kitex original (arm)
-	// unmarshal: dynamicgo
+	// write: dynamicgo (amd64), kitex original (arm)
+	// read: dynamicgo
 	cli := initDynamicgoThriftClient(transport.TTHeader, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 	resp, err := cli.GenericCall(context.Background(), "Ping", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -238,8 +238,8 @@ func testDynamicgoThriftPingMethod(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(respMap, "hello"), respMap)
 
-	// marshal: dynamicgo (amd64), kitex original (arm)
-	// unmarshal: kitex original
+	// write: dynamicgo (amd64), kitex original (arm)
+	// read: kitex original
 	cli = initDynamicgoThriftClient(transport.PurePayload, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 	resp, err = cli.GenericCall(context.Background(), "Ping", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -269,13 +269,11 @@ func testDynamicgoThriftError(t *testing.T) {
 	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceErrorImpl), "./idl/example.thrift", dOpts)
 	time.Sleep(500 * time.Millisecond)
 
-	// unmarshal: dynamicgo
 	cli := initDynamicgoThriftClient(transport.TTHeader, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil)
 	test.Assert(t, strings.Contains(err.Error(), errResp), err.Error())
 
-	// unmarshal: kitex original
 	cli = initDynamicgoThriftClient(transport.PurePayload, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 	_, err = cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil)
@@ -303,15 +301,15 @@ func testDynamicgoThriftOnewayMethod(t *testing.T) {
 	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceOnewayImpl), "./idl/example.thrift", dOpts)
 	time.Sleep(500 * time.Millisecond)
 
-	// marshal: dynamicgo (amd64), kitex original (arm)
-	// unmarshal: dynamicgo
+	// write: dynamicgo (amd64), kitex original (arm)
+	// read: dynamicgo
 	cli := initDynamicgoThriftClient(transport.TTHeader, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 	resp, err := cli.GenericCall(context.Background(), "Oneway", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	test.Assert(t, resp == nil)
 
-	// marshal: dynamicgo (amd64), kitex original (arm)
-	// unmarshal: kitex original
+	// write: dynamicgo (amd64), kitex original (arm)
+	// read: kitex original
 	cli = initDynamicgoThriftClient(transport.PurePayload, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 	resp, err = cli.GenericCall(context.Background(), "Oneway", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -339,15 +337,15 @@ func testDynamicgoThriftVoidMethod(t *testing.T) {
 	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceVoidImpl), "./idl/example.thrift", dOpts)
 	time.Sleep(500 * time.Millisecond)
 
-	// marshal: dynamicgo (amd64), kitex original (arm)
-	// unmarshal: dynamicgo
+	// write: dynamicgo (amd64), kitex original (arm)
+	// read: dynamicgo
 	cli := initDynamicgoThriftClient(transport.TTHeader, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 	resp, err := cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	test.Assert(t, resp == descriptor.Void{})
 
-	// marshal: dynamicgo (amd64), kitex original (arm)
-	// unmarshal: kitex original
+	// write: dynamicgo (amd64), kitex original (arm)
+	// read: kitex original
 	cli = initDynamicgoThriftClient(transport.PurePayload, t, "127.0.0.1:8128", "./idl/example.thrift", dOpts)
 	resp, err = cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)

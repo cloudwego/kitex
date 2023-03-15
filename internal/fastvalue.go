@@ -1,6 +1,3 @@
-//go:build !amd64
-// +build !amd64
-
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -17,14 +14,17 @@
  * limitations under the License.
  */
 
-package generic
+package internal
 
-import (
-	"context"
+import "unsafe"
 
-	"github.com/cloudwego/kitex/pkg/remote"
-)
+type GoSlice struct {
+	Ptr unsafe.Pointer
+	Len int
+	Cap int
+}
 
-func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	return c.originalMarshal(ctx, msg, out)
+type GoString struct {
+	Ptr unsafe.Pointer
+	Len int
 }

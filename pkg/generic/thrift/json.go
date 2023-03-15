@@ -19,14 +19,23 @@ package thrift
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/dynamicgo/conv"
+	"github.com/cloudwego/dynamicgo/conv/t2j"
+	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
+
+const voidWholeLen = 5
 
 // NewWriteJSON build WriteJSON according to ServiceDescriptor
 func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*WriteJSON, error) {
@@ -38,19 +47,32 @@ func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient boo
 	if !isClient {
 		ty = fnDsc.Response
 	}
+	var dty *dthrift.TypeDescriptor
+	if svc.DynamicgoDsc != nil {
+		dty = svc.DynamicgoDsc.Functions()[method].Request().Struct().Fields()[0].Type()
+		if !isClient {
+			dty = svc.DynamicgoDsc.Functions()[method].Response().Struct().Fields()[0].Type()
+		}
+	}
 	ws := &WriteJSON{
 		ty:             ty,
+		dty:            dty,
 		hasRequestBase: fnDsc.HasRequestBase && isClient,
 		base64Binary:   true,
+		isClient:       isClient,
 	}
 	return ws, nil
 }
 
 // WriteJSON implement of MessageWriter
 type WriteJSON struct {
-	ty             *descriptor.TypeDescriptor
-	hasRequestBase bool
-	base64Binary   bool
+	ty              *descriptor.TypeDescriptor
+	dty             *dthrift.TypeDescriptor
+	hasRequestBase  bool
+	base64Binary    bool
+	enableDynamicgo bool
+	isClient        bool
+	opts            conv.Options
 }
 
 var _ MessageWriter = (*WriteJSON)(nil)
@@ -61,8 +83,17 @@ func (m *WriteJSON) SetBase64Binary(enable bool) {
 	m.base64Binary = enable
 }
 
-// Write write json string to out thrift.TProtocol
-func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+// SetEnableDynamicgo enable/disable dynamicgo encoding.
+func (m *WriteJSON) SetEnableDynamicgo(enable bool) {
+	m.enableDynamicgo = enable
+}
+
+// SetConvOptions set the options to be used for dynamicgo encoding.
+func (m *WriteJSON) SetConvOptions(opts conv.Options) {
+	m.opts = opts
+}
+
+func (m *WriteJSON) originalWrite(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
 	if !m.hasRequestBase {
 		requestBase = nil
 	}
@@ -105,6 +136,9 @@ type ReadJSON struct {
 	svc              *descriptor.ServiceDescriptor
 	isClient         bool
 	binaryWithBase64 bool
+	enableDynamicgo  bool
+	opts             conv.Options
+	msg              remote.Message
 }
 
 var _ MessageReader = (*ReadJSON)(nil)
@@ -115,8 +149,74 @@ func (m *ReadJSON) SetBinaryWithBase64(enable bool) {
 	m.binaryWithBase64 = enable
 }
 
+// SetEnableDynamicgo enable/disable dynamicgo decoding.
+func (m *ReadJSON) SetEnableDynamicgo(enable bool) {
+	m.enableDynamicgo = enable
+}
+
+// SetConvOptions set the options to be used for dynamicgo decoding.
+func (m *ReadJSON) SetConvOptions(opts conv.Options) {
+	m.opts = opts
+}
+
+// SetRemoteMessage set the remote message to be used for calculation of message length.
+func (m *ReadJSON) SetRemoteMessage(msg remote.Message) {
+	m.msg = msg
+}
+
 // Read read data from in thrift.TProtocol and convert to json string
 func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
+	if m.enableDynamicgo && m.msg.PayloadLen() != 0 {
+		tProt, ok := in.(*cthrift.BinaryProtocol)
+		if !ok {
+			return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
+		}
+
+		var tyDsc *dthrift.TypeDescriptor
+		if m.svc.DynamicgoDsc == nil {
+			return nil, perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
+		}
+		if m.msg.MessageType() == remote.Reply {
+			tyDsc = m.svc.DynamicgoDsc.Functions()[method].Response()
+		} else {
+			tyDsc = m.svc.DynamicgoDsc.Functions()[method].Request()
+		}
+		var resp interface{}
+		if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.VOID {
+			if _, err := tProt.ByteBuffer().ReadBinary(voidWholeLen); err != nil {
+				return nil, err
+			}
+			resp = descriptor.Void{}
+		} else {
+			msgBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(m.msg.MessageType()), m.msg.RPCInfo().Invocation().SeqID())
+			transBuff, err := tProt.ByteBuffer().ReadBinary(m.msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+			if err != nil {
+				return nil, err
+			}
+
+			buf := make([]byte, 0, len(transBuff)*2)
+			cv := t2j.NewBinaryConv(m.opts)
+			// thrift []byte to json []byte
+			if err := cv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
+				return nil, err
+			}
+			if len(buf) > structWrapLen {
+				buf = buf[structWrapLen : len(buf)-1]
+			}
+			resp = string(buf)
+			if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.STRING {
+				resp, err = strconv.Unquote(resp.(string))
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		tProt.Recycle()
+
+		return resp, nil
+	}
 	fnDsc, err := m.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err

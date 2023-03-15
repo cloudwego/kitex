@@ -1,3 +1,6 @@
+//go:build amd64
+// +build amd64
+
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -31,38 +34,40 @@ import (
 
 // Write ...
 func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	req := msg.(*descriptor.HTTPRequest)
-	fn, err := w.svc.Router.Lookup(req)
-	if err != nil {
-		return err
-	}
 	if w.enableDynamicgo {
+		req := msg.(*descriptor.HTTPRequest)
+		fn, err := w.svc.Router.Lookup(req)
+		if err != nil {
+			return err
+		}
+		if w.svc.DynamicgoDsc == nil {
+			return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
+		}
 		tyDsc := w.svc.DynamicgoDsc.Functions()[fn.Name].Request().Struct().Fields()[0].Type()
+
 		body := req.GetBody()
-		buf := make([]byte, bthrift.Binary.FieldBeginLength("", thrift.STRUCT, 1), len(body)+4)
-		bthrift.Binary.WriteFieldBegin(buf[0:], "", thrift.STRUCT, 1)
+		buf := make([]byte, fieldBeginLen, len(body)+structWrapLen)
+		offset := 0
+		offset += bthrift.Binary.WriteStructBegin(buf[offset:], "")
+		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "", thrift.STRUCT, 1)
 		ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
 		cv := j2t.NewBinaryConv(w.opts)
 		if err = cv.DoInto(ctx, tyDsc, body, &buf); err != nil {
 			return err
 		}
+		offset = len(buf)
+		offset += bthrift.Binary.WriteStructEnd(buf[offset:])
 		buf = append(buf, 0)
-		bthrift.Binary.WriteFieldStop(buf[len(buf)-1:])
+		offset += bthrift.Binary.WriteFieldStop(buf[offset:])
+		bthrift.Binary.WriteStructEnd(buf[offset:])
+
 		tProt, ok := out.(*cthrift.BinaryProtocol)
 		if !ok {
 			return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 		}
 		_, err = tProt.ByteBuffer().WriteBinary(buf)
+		tProt.Recycle()
 		return err
 	}
-	req.ContentType = descriptor.MIMEApplicationJson
-	if req.Body == nil && len(req.RawBody) != 0 {
-		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {
-			return err
-		}
-	}
-	if !fn.HasRequestBase {
-		requestBase = nil
-	}
-	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
+	return w.originalWrite(ctx, out, msg, requestBase)
 }

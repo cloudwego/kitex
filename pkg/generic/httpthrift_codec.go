@@ -63,13 +63,14 @@ func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ..
 	} else {
 		// codec with dynamicgo
 		convOpts := opts[0].ConvOpts
-		if !convOpts.EnableHttpMapping {
-			convOpts.EnableHttpMapping = true
-		}
 		binaryWithBase64 := false
 		if !convOpts.NoBase64Binary {
 			binaryWithBase64 = true
 		}
+		convOpts.EnableHttpMapping = true
+		convOpts.EnableValueMapping = true
+		convOpts.WriteRequireField = true
+		convOpts.WriteDefaultField = true
 		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: binaryWithBase64, enableDynamicgoReq: true, enableDynamicgoResp: opts[0].EnableDynamicgoHTTPResp, convOpts: convOpts}
 	}
 	c.svcDsc.Store(svc)
@@ -133,7 +134,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	}
 	inner := thrift.NewReadHTTPResponse(svcDsc)
 	inner.SetBase64Binary(c.binaryWithBase64)
-	inner.SetDynamicgoResp(c.enableDynamicgoResp)
+	inner.SetEnableDynamicgo(c.enableDynamicgoResp)
 	if c.enableDynamicgoResp {
 		inner.SetConvOptions(c.convOpts)
 		inner.SetRemoteMessage(msg)

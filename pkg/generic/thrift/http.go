@@ -23,9 +23,9 @@ import (
 	"context"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
-	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
@@ -42,11 +42,9 @@ type WriteHTTPRequest struct {
 	opts             conv.Options
 }
 
-const structWrapLen = 4
-
 var (
 	_          MessageWriter = (*WriteHTTPRequest)(nil)
-	customJson               = jsoniter.Config{
+	customJson               = sonic.Config{
 		EscapeHTML: true,
 		UseNumber:  true,
 	}.Froze()
@@ -58,18 +56,38 @@ func NewWriteHTTPRequest(svc *descriptor.ServiceDescriptor) *WriteHTTPRequest {
 	return &WriteHTTPRequest{svc, true, false, conv.Options{}}
 }
 
-// SetBase64Binary enable/disable Base64 decoding for binary.
+// SetBinaryWithBase64 enable/disable Base64 decoding for binary.
 // Note that this method is not concurrent-safe.
 func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 	w.binaryWithBase64 = enable
 }
 
+// SetEnableDynamicgo enable/disable dynamicgo encoding.
 func (w *WriteHTTPRequest) SetEnableDynamicgo(enable bool) {
 	w.enableDynamicgo = enable
 }
 
+// SetConvOptions set the options to be used for dynamicgo encoding.
 func (w *WriteHTTPRequest) SetConvOptions(opts conv.Options) {
 	w.opts = opts
+}
+
+func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+	req := msg.(*descriptor.HTTPRequest)
+	req.ContentType = descriptor.MIMEApplicationJson
+	if req.Body == nil && len(req.RawBody) != 0 {
+		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {
+			return err
+		}
+	}
+	fn, err := w.svc.Router.Lookup(req)
+	if err != nil {
+		return err
+	}
+	if !fn.HasRequestBase {
+		requestBase = nil
+	}
+	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
 }
 
 // ReadHTTPResponse implement of MessageReaderWithMethod
@@ -95,14 +113,17 @@ func (r *ReadHTTPResponse) SetBase64Binary(enable bool) {
 	r.base64Binary = enable
 }
 
-func (r *ReadHTTPResponse) SetDynamicgoResp(enable bool) {
+// SetEnableDynamicgo enable/disable dynamicgo decoding.
+func (r *ReadHTTPResponse) SetEnableDynamicgo(enable bool) {
 	r.enableDynamicgo = enable
 }
 
+// SetConvOptions set the options to be used for dynamicgo decoding.
 func (r *ReadHTTPResponse) SetConvOptions(opts conv.Options) {
 	r.opts = opts
 }
 
+// SetRemoteMessage set the remote message to be used for calculation of message length.
 func (r *ReadHTTPResponse) SetRemoteMessage(msg remote.Message) {
 	r.msg = msg
 }
@@ -114,17 +135,17 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		if !ok {
 			return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 		}
-		byteBuf := tProt.ByteBuffer()
-		msgBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
-		transBuf, err := byteBuf.ReadBinary(r.msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
-		if err != nil {
-			return nil, err
-		}
 
 		if r.svc.DynamicgoDsc == nil {
 			return nil, perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
 		}
 		tyDsc := r.svc.DynamicgoDsc.Functions()[method].Response()
+
+		msgBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
+		transBuf, err := tProt.ByteBuffer().ReadBinary(r.msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+		if err != nil {
+			return nil, err
+		}
 
 		buf := make([]byte, 0, len(transBuf)*2)
 		resp := descriptor.NewHTTPResponse()
