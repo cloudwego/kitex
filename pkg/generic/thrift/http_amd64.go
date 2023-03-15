@@ -36,14 +36,10 @@ import (
 func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
 	if w.enableDynamicgo {
 		req := msg.(*descriptor.HTTPRequest)
-		fn, err := w.svc.Router.Lookup(req)
-		if err != nil {
-			return err
-		}
 		if w.svc.DynamicgoDsc == nil {
 			return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
 		}
-		tyDsc := w.svc.DynamicgoDsc.Functions()[fn.Name].Request().Struct().Fields()[0].Type()
+		tyDsc := w.svc.DynamicgoDsc.Functions()[w.method].Request().Struct().Fields()[0].Type()
 
 		body := req.GetBody()
 		buf := make([]byte, fieldBeginLen, len(body)+structWrapLen)
@@ -52,7 +48,7 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		bthrift.Binary.WriteFieldBegin(buf[offset:], "", thrift.STRUCT, 1)
 		ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
 		cv := j2t.NewBinaryConv(w.opts)
-		if err = cv.DoInto(ctx, tyDsc, body, &buf); err != nil {
+		if err := cv.DoInto(ctx, tyDsc, body, &buf); err != nil {
 			return err
 		}
 		offset = len(buf)
@@ -65,7 +61,7 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		if !ok {
 			return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 		}
-		_, err = tProt.ByteBuffer().WriteBinary(buf)
+		_, err := tProt.ByteBuffer().WriteBinary(buf)
 		return err
 	}
 	return w.originalWrite(ctx, out, msg, requestBase)

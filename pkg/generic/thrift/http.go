@@ -37,6 +37,7 @@ type WriteHTTPRequest struct {
 	binaryWithBase64 bool
 	enableDynamicgo  bool
 	opts             conv.Options
+	method           string
 }
 
 var (
@@ -50,7 +51,7 @@ var (
 // NewWriteHTTPRequest ...
 // Base64 decoding for binary is enabled by default.
 func NewWriteHTTPRequest(svc *descriptor.ServiceDescriptor) *WriteHTTPRequest {
-	return &WriteHTTPRequest{svc, true, false, conv.Options{}}
+	return &WriteHTTPRequest{svc, true, false, conv.Options{}, ""}
 }
 
 // SetBinaryWithBase64 enable/disable Base64 decoding for binary.
@@ -67,6 +68,11 @@ func (w *WriteHTTPRequest) SetEnableDynamicgo(enable bool) {
 // SetConvOptions set the options to be used for dynamicgo encoding.
 func (w *WriteHTTPRequest) SetConvOptions(opts conv.Options) {
 	w.opts = opts
+}
+
+// SetMethodName set the method name.
+func (w *WriteHTTPRequest) SetMethodName(method string) {
+	w.method = method
 }
 
 func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {

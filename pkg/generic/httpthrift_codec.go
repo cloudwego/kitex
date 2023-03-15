@@ -115,6 +115,7 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	inner.SetEnableDynamicgo(c.enableDynamicgoReq)
 	if c.enableDynamicgoReq {
 		inner.SetConvOptions(c.convOpts)
+		inner.SetMethodName(msg.RPCInfo().Invocation().MethodName())
 	}
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Marshal(ctx, msg, out)
