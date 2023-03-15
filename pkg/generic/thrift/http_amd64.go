@@ -49,7 +49,7 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		buf := make([]byte, fieldBeginLen, len(body)+structWrapLen)
 		offset := 0
 		offset += bthrift.Binary.WriteStructBegin(buf[offset:], "")
-		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "", thrift.STRUCT, 1)
+		bthrift.Binary.WriteFieldBegin(buf[offset:], "", thrift.STRUCT, 1)
 		ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
 		cv := j2t.NewBinaryConv(w.opts)
 		if err = cv.DoInto(ctx, tyDsc, body, &buf); err != nil {

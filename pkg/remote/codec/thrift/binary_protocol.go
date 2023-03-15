@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/apache/thrift/lib/go/thrift"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
