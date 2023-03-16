@@ -40,6 +40,16 @@ func TestAbsPath(t *testing.T) {
 	})
 }
 
+func TestThriftFileProvider(t *testing.T) {
+	path := "http_test/idl/binary_echo.thrift"
+	p, err := NewThriftFileProvider(path)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicgoDsc != nil)
+}
+
 func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 	path := "a/b/main.thrift"
 	content := `
@@ -48,6 +58,13 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 	include "../y.thrift" 
 
 	service InboxService {}
+	`
+	newContent := `
+	namespace go kitex.test.server
+	include "x.thrift"
+	include "../y.thrift"
+
+	service UpdateService {}
 	`
 	includes := map[string]string{
 		path:           content,
@@ -63,8 +80,26 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 	defer p.Close()
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicgoDsc == nil)
 	err = p.UpdateIDL(path, includes)
 	test.Assert(t, err == nil)
+
+	opts := Options{}
+	p, err = NewThriftContentWithAbsIncludePathProvider(path, includes, opts)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicgoDsc != nil)
+	includes[path] = newContent
+	err = p.UpdateIDL(path, includes, opts)
+	defer p.Close()
+	tree = <-p.Provide()
+	test.Assert(t, err == nil)
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "UpdateService")
+	test.Assert(t, tree.DynamicgoDsc != nil)
+	test.Assert(t, tree.DynamicgoDsc.Name() == "UpdateService")
 }
 
 func TestCircularDependency(t *testing.T) {
@@ -95,4 +130,44 @@ func TestThriftContentProvider(t *testing.T) {
 	p, err := NewThriftContentProvider("test", nil)
 	test.Assert(t, err != nil)
 	test.Assert(t, p == nil)
+
+	content := `
+	namespace go kitex.test.server
+
+	service InboxService {}
+	`
+	newContent := `
+	namespace go kitex.test.server
+
+	service UpdateService {}
+	`
+	p, err = NewThriftContentProvider(content, nil)
+	test.Assert(t, err == nil, err)
+	defer p.Close()
+	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicgoDsc == nil)
+	err = p.UpdateIDL(newContent, nil)
+	defer p.Close()
+	tree = <-p.Provide()
+	test.Assert(t, err == nil)
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "UpdateService")
+	test.Assert(t, tree.DynamicgoDsc == nil)
+
+	opts := Options{}
+	p, err = NewThriftContentProvider(content, nil, opts)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicgoDsc != nil)
+	err = p.UpdateIDL(newContent, nil, opts)
+	defer p.Close()
+	tree = <-p.Provide()
+	test.Assert(t, err == nil)
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "UpdateService")
+	test.Assert(t, tree.DynamicgoDsc != nil)
+	test.Assert(t, tree.DynamicgoDsc.Name() == "UpdateService")
 }

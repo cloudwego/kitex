@@ -91,7 +91,7 @@ var _ DescriptorProvider = (*ThriftContentProvider)(nil)
 const defaultMainIDLPath = "main.thrift"
 
 // NewThriftContentProvider builder
-func NewThriftContentProvider(main string, includes map[string]string) (*ThriftContentProvider, error) {
+func NewThriftContentProvider(main string, includes map[string]string, opts ...Options) (*ThriftContentProvider, error) {
 	p := &ThriftContentProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
 	}
@@ -105,18 +105,20 @@ func NewThriftContentProvider(main string, includes map[string]string) (*ThriftC
 	}
 
 	// ServiceDescriptor of dynamicgo
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
-	if err != nil {
-		return nil, err
+	if opts != nil {
+		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
+		if err != nil {
+			return nil, err
+		}
+		svc.DynamicgoDsc = dsvc
 	}
-	svc.DynamicgoDsc = dsvc
 
 	p.svcs <- svc
 	return p, nil
 }
 
 // UpdateIDL ...
-func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]string) error {
+func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]string, opts ...Options) error {
 	var svc *descriptor.ServiceDescriptor
 	tree, err := ParseContent(defaultMainIDLPath, main, includes, false)
 	if err != nil {
@@ -127,11 +129,13 @@ func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]strin
 		return err
 	}
 
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
-	if err != nil {
-		return err
+	if opts != nil {
+		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
+		if err != nil {
+			return err
+		}
+		svc.DynamicgoDsc = dsvc
 	}
-	svc.DynamicgoDsc = dsvc
 
 	select {
 	case <-p.svcs:
@@ -223,7 +227,7 @@ type ThriftContentWithAbsIncludePathProvider struct {
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
 
 // NewThriftContentWithAbsIncludePathProvider create abs include path DescriptorProvider
-func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string) (*ThriftContentWithAbsIncludePathProvider, error) {
+func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string, opts ...Options) (*ThriftContentWithAbsIncludePathProvider, error) {
 	p := &ThriftContentWithAbsIncludePathProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
 	}
@@ -241,11 +245,13 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	}
 
 	// ServiceDescriptor of dynamicgo
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
-	if err != nil {
-		return nil, err
+	if opts != nil {
+		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
+		if err != nil {
+			return nil, err
+		}
+		svc.DynamicgoDsc = dsvc
 	}
-	svc.DynamicgoDsc = dsvc
 
 	p.svcs <- svc
 
@@ -253,7 +259,7 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 }
 
 // UpdateIDL update idl by given args
-func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, includes map[string]string) error {
+func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, includes map[string]string, opts ...Options) error {
 	mainIDLContent, ok := includes[mainIDLPath]
 	if !ok {
 		return fmt.Errorf("miss main IDL content for main IDL path: %s", mainIDLPath)
@@ -268,11 +274,13 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 		return err
 	}
 
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
-	if err != nil {
-		return err
+	if opts != nil {
+		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
+		if err != nil {
+			return err
+		}
+		svc.DynamicgoDsc = dsvc
 	}
-	svc.DynamicgoDsc = dsvc
 
 	// drain the channel
 	select {
