@@ -38,7 +38,7 @@ jobs:
   compatibility-test:
     strategy:
       matrix:
-        go: [ 1.15, 1.16, 1.18, 1.19 ]
+        go: [ 1.15, 1.16, 1.18, 1.19, "1.20" ]
         os: [ X64, ARM64 ]
     runs-on: ${{ matrix.os }}
     steps:
