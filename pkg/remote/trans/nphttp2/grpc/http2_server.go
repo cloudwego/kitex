@@ -378,7 +378,7 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 // HandleStreams receives incoming streams using the given handler. This is
 // typically run in a separate goroutine.
 // traceCtx attaches trace to ctx and returns the new context.
-func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.Context, string) context.Context) (err error) {
+func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.Context, string) context.Context) {
 	defer close(t.readerDone)
 	for {
 		t.controlBuf.throttle()
@@ -404,11 +404,11 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 			}
 			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, netpoll.ErrEOF) {
 				t.Close()
-				return err
+				return
 			}
 			klog.CtxWarnf(t.ctx, "transport: http2Server.HandleStreams failed to read frame: %v", err)
 			t.Close()
-			return err
+			return
 		}
 		switch frame := frame.(type) {
 		case *grpcframe.MetaHeadersFrame:

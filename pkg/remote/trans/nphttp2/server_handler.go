@@ -96,7 +96,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	svrTrans := ctx.Value(ctxKeySvrTransport).(*SvrTrans)
 	tr := svrTrans.tr
 
-	return tr.HandleStreams(func(s *grpcTransport.Stream) {
+	tr.HandleStreams(func(s *grpcTransport.Stream) {
 		gofunc.GoFunc(ctx, func() {
 			ri := svrTrans.pool.Get().(rpcinfo.RPCInfo)
 			rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
@@ -204,6 +204,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	}, func(ctx context.Context, method string) context.Context {
 		return ctx
 	})
+	return nil
 }
 
 // msg 是解码后的实例，如 Arg 或 Result, 触发上层处理，用于异步 和 服务端处理
