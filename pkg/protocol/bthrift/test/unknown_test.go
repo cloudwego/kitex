@@ -23,6 +23,7 @@ import (
 
 	"github.com/cloudwego/thriftgo/generator/golang/extension/unknown"
 
+	tt "github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift/test/kitex_gen/test"
 )
 
@@ -90,93 +91,91 @@ func init() {
 func TestOnlyUnknownField(t *testing.T) {
 	l := fullReq.BLength()
 	buf := make([]byte, l)
-	if ll := fullReq.FastWriteNocopy(buf, nil); ll != l {
-		t.Fatal(ll)
-	}
+	ll := fullReq.FastWriteNocopy(buf, nil)
+	tt.Assert(t, ll == l)
 
 	unknown := &test.EmptyStruct{}
 	ll, err := unknown.FastRead(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ll != l {
-		t.Fatal(ll)
-	}
+	tt.Assert(t, err == nil)
+	tt.Assert(t, ll == l)
 	unknownL := unknown.BLength()
-	if unknownL != l {
-		t.Fatal(unknownL)
-	}
+	tt.Assert(t, unknownL == l)
 	unknownBuf := make([]byte, unknownL)
 	writeL := unknown.FastWriteNocopy(unknownBuf, nil)
-	if writeL != l {
-		t.Fatal(writeL)
-	}
-
-	if !bytes.Equal(buf, unknownBuf) {
-		t.Fatal()
-	}
+	tt.Assert(t, writeL == l)
+	tt.Assert(t, bytes.Equal(buf, unknownBuf))
 }
 
 func TestPartialUnknownField(t *testing.T) {
 	l := fullReq.BLength()
 	buf := make([]byte, l)
-	if ll := fullReq.FastWriteNocopy(buf, nil); ll != l {
-		t.Fatal(ll)
-	}
+	ll := fullReq.FastWriteNocopy(buf, nil)
+	tt.Assert(t, ll == l)
 	compare := &test.FullStruct{}
-	if ll, err := compare.FastRead(buf); err != nil {
-		t.Fatal(err)
-	} else if ll != l {
-		t.Fatal(ll)
-	}
+	ll, err := compare.FastRead(buf)
+	tt.Assert(t, err == nil)
+	tt.Assert(t, ll == l)
 
 	unknown := &test.MixedStruct{}
-	ll, err := unknown.FastRead(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ll != l {
-		t.Fatal(ll)
-	}
-	if len(unknown.GetUnknown()) != 12 {
-		t.Fatal(len(unknown.GetUnknown()))
-	}
+	ll, err = unknown.FastRead(buf)
+	tt.Assert(t, err == nil)
+	tt.Assert(t, ll == l)
+	tt.Assert(t, len(unknown.GetUnknown()) == 12)
 	unknownL := unknown.BLength()
 	unknownBuf := make([]byte, unknownL)
 	writeL := unknown.FastWriteNocopy(unknownBuf, nil)
-	if writeL != unknownL {
-		t.Fatal(writeL)
-	}
+	tt.Assert(t, writeL == unknownL)
 	compare1 := &test.FullStruct{}
-	if ll, err := compare1.FastRead(unknownBuf); err != nil {
-		t.Fatal(err)
-	} else if ll != unknownL {
-		t.Fatal(ll)
-	}
-	if !compare1.DeepEqual(compare) {
-		t.Fatal(compare1)
-	}
+	ll, err = compare1.FastRead(unknownBuf)
+	tt.Assert(t, err == nil)
+	tt.Assert(t, ll == unknownL)
+	tt.Assert(t, compare1.DeepEqual(compare))
 }
 
 func TestNoUnknownField(t *testing.T) {
 	l := fullReq.BLength()
 	buf := make([]byte, l)
-	if ll := fullReq.FastWriteNocopy(buf, nil); ll != l {
-		t.Fatal(ll)
-	}
+	ll := fullReq.FastWriteNocopy(buf, nil)
+	tt.Assert(t, ll == l)
 
 	ori := &test.FullStruct{}
 	ll, err := ori.FastRead(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if ll != l {
-		t.Fatal(ll)
-	}
+	tt.Assert(t, err == nil)
+	tt.Assert(t, ll == l)
 
-	if ori.DeepEqual(fullReq) {
-		t.Fatal()
-	}
+	// required fields
+	ori.LocalList[1] = nil
+	ori.StrLocalMap["ddd"] = nil
+	ori.AnotherInner = nil
+	ori.Complex[test.HTTPStatus_OK][1]["c"] = nil
+
+	tt.Assert(t, ori.Field1DeepEqual(fullReq.Left))
+	tt.Assert(t, ori.Field2DeepEqual(fullReq.Right))
+	tt.Assert(t, ori.Field3DeepEqual(fullReq.Dummy))
+	tt.Assert(t, ori.Field4DeepEqual(fullReq.InnerReq))
+	tt.Assert(t, ori.Field5DeepEqual(fullReq.Status))
+	tt.Assert(t, ori.Field6DeepEqual(fullReq.Str))
+	tt.Assert(t, ori.Field7DeepEqual(fullReq.EnumList))
+	tt.Assert(t, ori.Field8DeepEqual(fullReq.Strmap))
+	tt.Assert(t, ori.Field9DeepEqual(fullReq.Int64))
+	tt.Assert(t, ori.Field10DeepEqual(fullReq.IntList))
+	tt.Assert(t, ori.Field11DeepEqual(fullReq.LocalList))
+	tt.Assert(t, ori.Field12DeepEqual(fullReq.StrLocalMap))
+	tt.Assert(t, ori.Field13DeepEqual(fullReq.NestList))
+	tt.Assert(t, ori.Field14DeepEqual(fullReq.RequiredIns))
+	tt.Assert(t, ori.Field16DeepEqual(fullReq.NestMap))
+	tt.Assert(t, ori.Field17DeepEqual(fullReq.NestMap2))
+	tt.Assert(t, ori.Field18DeepEqual(fullReq.EnumMap))
+	tt.Assert(t, ori.Field19DeepEqual(fullReq.Strlist))
+	tt.Assert(t, ori.Field20DeepEqual(fullReq.OptionalIns))
+	tt.Assert(t, ori.Field21DeepEqual(fullReq.AnotherInner))
+	tt.Assert(t, ori.Field22DeepEqual(fullReq.OptNilList))
+	tt.Assert(t, ori.Field23DeepEqual(fullReq.NilList))
+	tt.Assert(t, ori.Field24DeepEqual(fullReq.OptNilInsList))
+	tt.Assert(t, ori.Field25DeepEqual(fullReq.NilInsList))
+	tt.Assert(t, ori.Field26DeepEqual(fullReq.OptStatus))
+	tt.Assert(t, ori.Field27DeepEqual(fullReq.EnumKeyMap))
+	tt.Assert(t, ori.Field28DeepEqual(fullReq.Complex))
 }
 
 func TestCorruptWrite(t *testing.T) {
@@ -189,10 +188,10 @@ func TestCorruptWrite(t *testing.T) {
 		if strings.Contains(e.(error).Error(), "unknown data type 1000") {
 			return
 		}
-		panic(e)
+		tt.Assert(t, false, e)
 	}()
 	_ = local.BLength()
-	panic("not reachable")
+	tt.Assert(t, false)
 }
 
 func TestCorruptRead(t *testing.T) {
@@ -201,17 +200,12 @@ func TestCorruptRead(t *testing.T) {
 	local.SetUnknown(ufs)
 	l := local.BLength()
 	buf := make([]byte, l)
-	if ll := local.FastWriteNocopy(buf, nil); ll != l {
-		t.Fatal(ll)
-	}
+	ll := local.FastWriteNocopy(buf, nil)
+	tt.Assert(t, ll == l)
 	buf[7] = 200
 
 	var local2 test.Local
 	_, err := local2.FastRead(buf)
-	if err == nil {
-		t.Fatal()
-	}
-	if !strings.Contains(err.Error(), "unknown data type 200") {
-		t.Fatal(err)
-	}
+	tt.Assert(t, err != nil)
+	tt.Assert(t, strings.Contains(err.Error(), "unknown data type 200"))
 }
