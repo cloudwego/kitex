@@ -144,6 +144,19 @@ func TestNoUnknownField(t *testing.T) {
 	tt.Assert(t, ll == l)
 
 	// required fields
+	tt.Assert(t, ori.Field11DeepEqual([]*test.Local{{L: 33}, test.NewLocal()}))
+	tt.Assert(t, ori.Field12DeepEqual(map[string]*test.Local{
+		"bbb": {L: 22}, "ccc": {L: 11}, "ddd": {},
+	}))
+	tt.Assert(t, ori.Field21DeepEqual(test.NewInner()))
+	tt.Assert(t, ori.Field28DeepEqual(map[test.HTTPStatus][]map[string]*test.Local{
+		test.HTTPStatus_OK: {
+			{"": &test.Local{L: 3}},
+			{"c": {}, "d": &test.Local{L: 42}},
+			nil,
+		},
+		test.HTTPStatus_NOT_FOUND: nil,
+	}))
 	ori.LocalList[1] = nil
 	ori.StrLocalMap["ddd"] = nil
 	ori.AnotherInner = nil
