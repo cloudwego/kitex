@@ -156,9 +156,13 @@ func (c *httpThriftCodec) Close() error {
 }
 
 // FromHTTPRequest parse HTTPRequest from http.Request
-func FromHTTPRequest(req *http.Request) (customReq *HTTPRequest, err error) {
-	customReq = &HTTPRequest{Request: req}
+func FromHTTPRequest(req *http.Request) (*HTTPRequest, error) {
+	customReq := &HTTPRequest{
+		Request:     req,
+		ContentType: descriptor.MIMEApplicationJson,
+	}
 	var b io.ReadCloser
+	var err error
 	if req.GetBody != nil {
 		// req from ServerHTTP or create by http.NewRequest
 		if b, err = req.GetBody(); err != nil {

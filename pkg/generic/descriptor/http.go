@@ -110,31 +110,32 @@ func (req HTTPRequest) GetMapBody(key string) string {
 		}
 		req.GeneralBody = cache
 	}
-	t, ok := req.GeneralBody.(*jsonCache)
-	if !ok {
-		return ""
-	}
-	// fast path
-	if v, ok := t.m[key]; ok {
-		return v
-	}
-	// slow path
-	v := t.root.Get(key)
-	if v.Check() != nil {
-		return ""
-	}
-	j, e := v.Raw()
-	if e != nil {
-		return ""
-	}
-	if v.Type() == ast.V_STRING {
-		j, e = v.String()
+	switch t := req.GeneralBody.(type) {
+	case *jsonCache:
+		// fast path
+		if v, ok := t.m[key]; ok {
+			return v
+		}
+		// slow path
+		v := t.root.Get(key)
+		if v.Check() != nil {
+			return ""
+		}
+		j, e := v.Raw()
 		if e != nil {
 			return ""
 		}
+		if v.Type() == ast.V_STRING {
+			j, e = v.String()
+			if e != nil {
+				return ""
+			}
+		}
+		t.m[key] = j
+		return j
+	default:
+		return ""
 	}
-	t.m[key] = j
-	return j
 }
 
 // GetPostForm implements RequestGetter.GetPostForm of dynamicgo.

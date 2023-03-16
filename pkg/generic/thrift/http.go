@@ -77,7 +77,6 @@ func (w *WriteHTTPRequest) SetMethodName(method string) {
 
 func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
 	req := msg.(*descriptor.HTTPRequest)
-	req.ContentType = descriptor.MIMEApplicationJson
 	if req.Body == nil && len(req.RawBody) != 0 {
 		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {
 			return err
