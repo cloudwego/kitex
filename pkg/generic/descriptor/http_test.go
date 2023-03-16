@@ -27,7 +27,7 @@ import (
 )
 
 func TestJSONBody(t *testing.T) {
-	var data = []byte(`{"name":"foo","age":18}`)
+	data := []byte(`{"name":"foo","age":18}`)
 	req, err := http.NewRequest("POST", "http://localhost:8080/users?id=123", bytes.NewBuffer(data))
 	if err != nil {
 		t.Fatal(err)
