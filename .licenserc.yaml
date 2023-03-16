@@ -32,6 +32,5 @@ header:
     - pkg/generic/descriptor/tree_test.go
     - pkg/generic/httppb_test/idl/echo.pb.go
     - pkg/utils/json.go
-    - pkg/protocol/bthrift/test/kitex_gen/**
 
   comment: on-failure
