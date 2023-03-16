@@ -20,14 +20,15 @@ import (
 	"bytes"
 	"net/http"
 	"net/url"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestJSONBody(t *testing.T) {
 	var data = []byte(`{"name":"foo","age":18}`)
-	req, err := http.NewRequest("POST", "http://localhost:8080?id=123", bytes.NewBuffer(data))
+	req, err := http.NewRequest("POST", "http://localhost:8080/users?id=123", bytes.NewBuffer(data))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,6 +38,7 @@ func TestJSONBody(t *testing.T) {
 		Value: "some_token",
 	}
 	req.AddCookie(cookie)
+	req.URL.Path = "/users"
 	req.PostForm = url.Values{
 		"key1": {"val1", "val2"},
 	}
@@ -53,16 +55,16 @@ func TestJSONBody(t *testing.T) {
 		RawBody: data,
 		Params:  &params,
 	}
-	require.Equal(t, "application/json", r.GetHeader("Content-Type"))
-	require.Equal(t, "some_token", r.GetCookie("token"))
-	require.Equal(t, "123", r.GetQuery("id"))
-	require.Equal(t, "value1", r.GetParam("param1"))
-	require.Equal(t, data, r.GetBody())
-	require.Equal(t, "POST", r.GetMethod())
-	require.Equal(t, "", r.GetPath())
-	require.Equal(t, "localhost:8080", r.GetHost())
-	require.Equal(t, `foo`, r.GetMapBody("name"))
-	require.Equal(t, "18", r.GetMapBody("age"))
-	require.Equal(t, "val1", r.GetPostForm("key1"))
-	require.Equal(t, "http://localhost:8080?id=123", r.GetUri())
+	test.Assert(t, r.GetHeader("Content-Type") == "application/json")
+	test.Assert(t, r.GetCookie("token") == "some_token")
+	test.Assert(t, r.GetQuery("id") == "123")
+	test.Assert(t, r.GetParam("param1") == "value1")
+	test.Assert(t, reflect.DeepEqual(r.GetBody(), data))
+	test.Assert(t, r.GetMethod() == "POST")
+	test.Assert(t, r.GetPath() == "/users")
+	test.Assert(t, r.GetHost() == "localhost:8080")
+	test.Assert(t, r.GetMapBody("name") == `foo`)
+	test.Assert(t, r.GetMapBody("age") == "18")
+	test.Assert(t, r.GetPostForm("key1") == "val1")
+	test.Assert(t, r.GetUri() == "http://localhost:8080/users?id=123", r.GetUri())
 }
