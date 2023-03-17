@@ -34,8 +34,13 @@ func (r *round) Next() uint64 {
 }
 
 func newRound() *round {
+	r := &round{}
+	return r
+}
+
+func newRandomRound() *round {
 	r := &round{
-		state: fastrand.Uint64(), // every thread have a rand start order
+		state: fastrand.Uint64(),
 	}
 	return r
 }

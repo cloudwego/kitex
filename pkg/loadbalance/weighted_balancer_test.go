@@ -215,16 +215,9 @@ func TestWeightedPicker_NoMoreInstance(t *testing.T) {
 	}
 }
 
-func makeNinstances(n int) (res []discovery.Instance) {
+func makeNInstances(n, weight int) (res []discovery.Instance) {
 	for i := 0; i < n; i++ {
-		res = append(res, discovery.NewInstance("tcp", "addr"+strconv.Itoa(i), 10, nil))
-	}
-	return
-}
-
-func makeNWeightedInstances(n int) (res []discovery.Instance) {
-	for i := 0; i < n; i++ {
-		res = append(res, discovery.NewInstance("tcp", "addr"+strconv.Itoa(i), i, nil))
+		res = append(res, discovery.NewInstance("tcp", fmt.Sprintf("addr[%d]-weight[%d]", i, weight), weight, nil))
 	}
 	return
 }
@@ -239,7 +232,7 @@ func BenchmarkWeightedPicker(b *testing.B) {
 			n := 10
 			for i := 0; i < 4; i++ {
 				b.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
-					inss := makeNinstances(n)
+					inss := makeNInstances(n, 10)
 					e := discovery.Result{
 						Cacheable: true,
 						CacheKey:  "test",

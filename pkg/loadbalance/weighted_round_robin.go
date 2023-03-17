@@ -45,18 +45,16 @@ func newWeightedRoundRobinPicker(instances []discovery.Instance) Picker {
 	wrrp.size = uint64(len(instances))
 	wrrp.nodes = make([]*wrrNode, wrrp.size)
 	offset := fastrand.Uint64n(wrrp.size)
+	totalWeight := 0
 	for idx := uint64(0); idx < wrrp.size; idx++ {
+		ins := instances[(idx+offset)%wrrp.size]
+		totalWeight += ins.Weight()
 		wrrp.nodes[idx] = &wrrNode{
-			Instance: instances[(idx+offset)%wrrp.size],
+			Instance: ins,
 			current:  0,
 		}
 	}
 
-	// init vnodes
-	totalWeight := 0
-	for _, node := range instances {
-		totalWeight += node.Weight()
-	}
 	wrrp.vcapacity = uint64(totalWeight)
 	wrrp.vnodes = make([]discovery.Instance, wrrp.vcapacity)
 	wrrp.buildVirtualWrrNodes(wrrVNodesBatchSize)
@@ -66,22 +64,26 @@ func newWeightedRoundRobinPicker(instances []discovery.Instance) Picker {
 // WeightedRoundRobinPicker implement smooth weighted round-robin algorithm.
 // Refer from https://github.com/phusion/nginx/commit/27e94984486058d73157038f7950a0a36ecc6e35
 type WeightedRoundRobinPicker struct {
-	nodes []*wrrNode
-	size  uint64
+	nodes []*wrrNode // instance node with current weight
+	size  uint64     // size of wrrNodes
 
 	iterator  *round
-	vsize     uint64
-	vcapacity uint64
-	vnodes    []discovery.Instance
-	vlock     sync.Mutex
+	vsize     uint64               // size of valid vnodes
+	vcapacity uint64               // capacity of all vnodes
+	vnodes    []discovery.Instance // precalculated vnodes which order by swrr algorithm
+	vlock     sync.RWMutex         // mutex for vnodes
 }
 
 // Next implements the Picker interface.
 func (wp *WeightedRoundRobinPicker) Next(ctx context.Context, request interface{}) (ins discovery.Instance) {
+	// iterator must start from 0, because we need warmup the vnode at beginning
 	idx := wp.iterator.Next() % wp.vcapacity
 	// fast path
-	if wp.vnodes[idx] != nil {
-		return wp.vnodes[idx]
+	wp.vlock.RLock()
+	ins = wp.vnodes[idx]
+	wp.vlock.RUnlock()
+	if ins != nil {
+		return ins
 	}
 
 	// slow path
@@ -91,8 +93,9 @@ func (wp *WeightedRoundRobinPicker) Next(ctx context.Context, request interface{
 		return wp.vnodes[idx]
 	}
 	vtarget := wp.vsize + wrrVNodesBatchSize
-	if idx > vtarget {
-		vtarget = idx
+	// we must promise that idx < vtarget
+	if idx >= vtarget {
+		vtarget = idx + 1
 	}
 	wp.buildVirtualWrrNodes(vtarget)
 	return wp.vnodes[idx]
@@ -138,7 +141,7 @@ func newRoundRobinPicker(instances []discovery.Instance) Picker {
 	return &RoundRobinPicker{
 		size:      size,
 		instances: instances,
-		iterator:  newRound(),
+		iterator:  newRandomRound(),
 	}
 }
 
