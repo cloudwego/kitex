@@ -162,7 +162,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		if len(buf) > structWrapLen {
 			buf = buf[structWrapLen : len(buf)-1]
 		}
-		resp.GeneralBody = string(buf)
+		resp.GeneralBody = buf
 		return resp, nil
 	}
 	fnDsc, err := r.svc.LookupFunctionByMethod(method)

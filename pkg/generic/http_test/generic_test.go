@@ -231,7 +231,7 @@ func testThriftDynamicgo(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	gr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
-	test.Assert(t, reflect.DeepEqual(gjson.Get(gr.GeneralBody.(string), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(gr.GeneralBody.(string), "msg").String())
+	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.GeneralBody.([]byte)), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(string(gr.GeneralBody.([]byte)), "msg").String())
 
 	// write: dynamicgo (amd64), kitex original (arm)
 	// read: kitex original
@@ -336,7 +336,7 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 		test.Assert(&t, err == nil, err)
 		gr, ok := resp.(*generic.HTTPResponse)
 		test.Assert(&t, ok)
-		test.Assert(&t, reflect.DeepEqual(gjson.Get(gr.GeneralBody.(string), "I64Field").String(), strconv.Itoa(math.MaxInt64)), gjson.Get(gr.GeneralBody.(string), "I64Field").String())
+		test.Assert(&t, reflect.DeepEqual(gjson.Get(string(gr.GeneralBody.([]byte)), "I64Field").String(), strconv.Itoa(math.MaxInt64)), gjson.Get(string(gr.GeneralBody.([]byte)), "I64Field").String())
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -405,7 +405,7 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		test.Assert(&t, err == nil, err)
 		gr, ok := resp.(*generic.HTTPResponse)
 		test.Assert(&t, ok)
-		test.Assert(&t, reflect.DeepEqual(gjson.Get(gr.GeneralBody.(string), "I32").String(), strconv.Itoa(math.MaxInt32)), gjson.Get(gr.GeneralBody.(string), "I32").String())
+		test.Assert(&t, reflect.DeepEqual(gjson.Get(string(gr.GeneralBody.([]byte)), "I32").String(), strconv.Itoa(math.MaxInt32)), gjson.Get(string(gr.GeneralBody.([]byte)), "I32").String())
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
