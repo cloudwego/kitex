@@ -62,7 +62,7 @@ func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ..
 		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false}
 	} else {
 		// codec with dynamicgo
-		convOpts := opts[0].ConvOpts
+		convOpts := opts[0].DynamicgoConvOpts
 		binaryWithBase64 := false
 		if !convOpts.NoBase64Binary {
 			binaryWithBase64 = true

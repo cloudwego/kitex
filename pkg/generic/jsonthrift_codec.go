@@ -54,7 +54,7 @@ func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ..
 		c = &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true}
 	} else {
 		// codec with dynamicgo
-		convOpts := opts[0].ConvOpts
+		convOpts := opts[0].DynamicgoConvOpts
 		binaryWithBase64 := true
 		if convOpts.NoBase64Binary {
 			binaryWithBase64 = false

@@ -28,7 +28,7 @@ import (
 )
 
 type Options struct {
-	ConvOpts                conv.Options
+	DynamicgoConvOpts       conv.Options
 	EnableDynamicgoHTTPResp bool
 }
 
