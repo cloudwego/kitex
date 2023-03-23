@@ -19,6 +19,7 @@ package descriptor
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
@@ -133,8 +134,8 @@ func (m *apiCookie) Request(ctx context.Context, req *HTTPRequest, field *FieldD
 	return val, true, nil
 }
 
-func (*apiCookie) Response(ctx context.Context, resp *HTTPResponse, field *FieldDescriptor, val interface{}) error {
-	return nil
+func (m *apiCookie) Response(ctx context.Context, resp *HTTPResponse, field *FieldDescriptor, val interface{}) error {
+	return resp.SetCookie(m.value, fmt.Sprintf("%v", val))
 }
 
 // api.body = xx
