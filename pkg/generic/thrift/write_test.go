@@ -1109,6 +1109,102 @@ func Test_writeStruct(t *testing.T) {
 	}
 }
 
+func Test_StructCircular(t *testing.T) {
+	type args struct {
+		val interface{}
+		out thrift.TProtocol
+		t   *descriptor.TypeDescriptor
+		opt *writerOption
+	}
+	field := &descriptor.FieldDescriptor{
+		Name:        "Field",
+		Alias:       "",
+		ID:          1,
+		Required:    false,
+		IsException: false,
+		Type: &descriptor.TypeDescriptor{
+			Name:          "",
+			Type:          descriptor.STRUCT,
+			Key:           nil,
+			Elem:          nil,
+			Struct:        nil,
+			IsRequestBase: false,
+		},
+		HTTPMapping:  nil,
+		ValueMapping: nil,
+	}
+	ptr := &descriptor.StructDescriptor{
+		Name: "Demo",
+		FieldsByID: map[int32]*descriptor.FieldDescriptor{
+			1: field,
+		},
+		FieldsByName: map[string]*descriptor.FieldDescriptor{
+			"Field": field,
+		},
+		RequiredFields: nil,
+	}
+	field.Type.Struct = ptr
+	mockTTransport := &mocks.MockThriftTTransport{
+		WriteStructBeginFunc: func(name string) error {
+			test.Assert(t, name == "Demo")
+			return nil
+		},
+		WriteFieldBeginFunc: func(name string, typeID thrift.TType, id int16) error {
+			test.Assert(t, name == "Field")
+			test.Assert(t, typeID == thrift.STRUCT)
+			test.Assert(t, id == 1)
+			return nil
+		},
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			"writeStruct",
+			args{
+				val: map[string]interface{}{
+					"Field": map[string]interface{}{
+						"Field": map[string]interface{}{
+							"Field": map[string]interface{}{
+								"Field": map[string]interface{}{
+									"Field": map[string]interface{}{
+										"Field": nil,
+									},
+								},
+							},
+						},
+					},
+				},
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"Field": field,
+						},
+						RequiredFields: map[int32]*descriptor.FieldDescriptor{
+							1: nil,
+						},
+					},
+				},
+			},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := writeStruct(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+				t.Errorf("writeStruct() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func Test_writeHTTPRequest(t *testing.T) {
 	type args struct {
 		val interface{}
