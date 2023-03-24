@@ -1184,11 +1184,13 @@ func Test_StructCircular(t *testing.T) {
 					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
 					Struct: &descriptor.StructDescriptor{
 						Name: "Demo",
+						/*
+							struct Field {
+								1: Field Field,
+							}
+						*/
 						FieldsByName: map[string]*descriptor.FieldDescriptor{
 							"Field": field,
-						},
-						RequiredFields: map[int32]*descriptor.FieldDescriptor{
-							1: nil,
 						},
 					},
 				},

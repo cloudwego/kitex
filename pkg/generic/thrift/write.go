@@ -683,9 +683,7 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 			}
 			continue
 		}
-		if !ok {
-			continue
-		} else if elem == nil {
+		if !ok || elem == nil {
 			if !field.Optional {
 				elem, _, err = getDefaultValueAndWriter(field.Type, opt)
 				if err != nil {
