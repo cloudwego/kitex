@@ -441,12 +441,9 @@ func testRegression(t *testing.T) {
 	// dynamicgo
 	dOpts := generic.Options{DynamicgoConvOpts: conv.Options{}, EnableDynamicgoHTTPResp: true}
 	cli := initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8121", "../json_test/idl/baseline.thrift", dOpts)
-	resp, err := cli.GenericCall(context.Background(), "", customReq)
-	//resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	dgr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
-	fmt.Println(gjson.Get(string(dgr.GeneralBody.([]byte)), "Double").String())
-	fmt.Println(gjson.Get(string(dgr.GeneralBody.([]byte)), "ListI32").String())
 
 	// fallback
 	dOpts = generic.Options{DynamicgoConvOpts: conv.Options{}}
@@ -455,8 +452,6 @@ func testRegression(t *testing.T) {
 	fgr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 
-	fmt.Println(dgr.Header, dgr.StatusCode, dgr.ContentType)
-	fmt.Println(fgr.Header, fgr.StatusCode, fgr.ContentType)
 	test.Assert(t, reflect.DeepEqual(dgr.Header, fgr.Header))
 	test.Assert(t, reflect.DeepEqual(dgr.StatusCode, fgr.StatusCode))
 	test.Assert(t, reflect.DeepEqual(dgr.ContentType, fgr.ContentType))
@@ -467,6 +462,11 @@ func testRegression(t *testing.T) {
 		UseNumber:  true,
 	}.Froze()
 	err = customJson.Unmarshal(dgr.GeneralBody.([]byte), &dMapBody)
+	test.Assert(t, err == nil)
+	fBytes, err := customJson.Marshal(fgr.Body)
+	test.Assert(t, err == nil)
+	err = customJson.Unmarshal(fBytes, &fgr.Body)
+	test.Assert(t, err == nil)
 	test.Assert(t, isEqual(dMapBody, fgr.Body))
 
 	svr.Stop()
