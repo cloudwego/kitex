@@ -442,6 +442,7 @@ func testRegression(t *testing.T) {
 	dOpts := generic.Options{DynamicgoConvOpts: conv.Options{}, EnableDynamicgoHTTPResp: true}
 	cli := initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8121", "../json_test/idl/baseline.thrift", dOpts)
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil)
 	dgr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 
@@ -449,6 +450,7 @@ func testRegression(t *testing.T) {
 	dOpts = generic.Options{DynamicgoConvOpts: conv.Options{}}
 	cli = initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8121", "../json_test/idl/baseline.thrift", dOpts)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil)
 	fgr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 
