@@ -28,7 +28,16 @@ import (
 )
 
 type Options struct {
-	DynamicgoConvOpts       conv.Options
+	// options for dynamicgo conversion
+	DynamicgoConvOpts conv.Options
+	// basic options for dynamicgo conversion
+	// the following are set to true in the basic options:
+	// - json generic call
+	//     - WriteRequireField, WriteDefaultField
+	// - http generic call
+	//     - EnableHttpMapping, EnableValueMapping, WriteRequireField, WriteDefaultField, OmitHttpMappingErrors, NoBaseBinary
+	EnableBasicDynamicgoConvOpts bool
+	// flag to set whether to get response for http generic call using dynamicgo
 	EnableDynamicgoHTTPResp bool
 }
 

@@ -63,15 +63,18 @@ func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ..
 	} else {
 		// codec with dynamicgo
 		convOpts := opts[0].DynamicgoConvOpts
+		if opts[0].EnableBasicDynamicgoConvOpts {
+			convOpts.EnableHttpMapping = true
+			convOpts.EnableValueMapping = true
+			convOpts.WriteRequireField = true
+			convOpts.WriteDefaultField = true
+			convOpts.OmitHttpMappingErrors = true
+			convOpts.NoBase64Binary = true
+		}
 		binaryWithBase64 := false
 		if !convOpts.NoBase64Binary {
 			binaryWithBase64 = true
 		}
-		convOpts.EnableHttpMapping = true
-		convOpts.EnableValueMapping = true
-		convOpts.WriteRequireField = true
-		convOpts.WriteDefaultField = true
-		convOpts.OmitHttpMappingErrors = true
 		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: binaryWithBase64, enableDynamicgoReq: true, enableDynamicgoResp: opts[0].EnableDynamicgoHTTPResp, convOpts: convOpts}
 	}
 	c.svcDsc.Store(svc)

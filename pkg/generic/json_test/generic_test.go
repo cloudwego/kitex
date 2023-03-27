@@ -78,7 +78,7 @@ func testThrift(t *testing.T) {
 }
 
 func testDynamicgoThrift(t *testing.T) {
-	dOpts := generic.Options{}
+	dOpts := generic.Options{EnableBasicDynamicgoConvOpts: true}
 	time.Sleep(1 * time.Second)
 	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceImpl), "./idl/example.thrift", dOpts)
 	time.Sleep(500 * time.Millisecond)

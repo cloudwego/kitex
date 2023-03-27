@@ -202,7 +202,7 @@ func testThriftDynamicgo(t *testing.T) {
 	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	convOpts := conv.Options{EnableValueMapping: true, NoBase64Binary: true, NoCopyString: true}
+	convOpts := conv.Options{EnableValueMapping: true, NoBase64Binary: true}
 	dOpts := generic.Options{DynamicgoConvOpts: convOpts, EnableDynamicgoHTTPResp: true}
 
 	cli := initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8126", "./idl/binary_echo.thrift", dOpts)
@@ -234,7 +234,6 @@ func testThriftDynamicgo(t *testing.T) {
 	gr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.GeneralBody.([]byte)), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(string(gr.GeneralBody.([]byte)), "msg").String())
-	fmt.Println(gr.Header, gr.ContentType, gr.StatusCode)
 
 	// write: dynamicgo (amd64), fallback (arm)
 	// read: fallback
@@ -244,7 +243,6 @@ func testThriftDynamicgo(t *testing.T) {
 	gr, ok = resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 	test.Assert(t, gr.Body["msg"] == base64.StdEncoding.EncodeToString([]byte(mockMyMsg)))
-	fmt.Println(gr.Header, gr.ContentType, gr.StatusCode)
 
 	// write: dynamicgo (amd64), fallback (arm)
 	// read: fallback
@@ -324,8 +322,7 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 		time.Sleep(1 * time.Second)
 		svr := initOriginalThriftServer(&t, ":8128", new(GenericServiceBenchmarkImpl), "../json_test/idl/baseline.thrift")
 		time.Sleep(500 * time.Millisecond)
-		convOpts := conv.Options{NoBase64Binary: true}
-		dOpts := generic.Options{DynamicgoConvOpts: convOpts, EnableDynamicgoHTTPResp: true}
+		dOpts := generic.Options{EnableBasicDynamicgoConvOpts: true, EnableDynamicgoHTTPResp: true}
 		cli := initDynamicgoThriftClientByIDL(transport.TTHeader, &t, "127.0.0.1:8128", "../json_test/idl/baseline.thrift", dOpts)
 
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
@@ -344,7 +341,7 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			cli.GenericCall(context.Background(), "SimpleMethod", customReq, callopt.WithRPCTimeout(100*time.Second))
+			cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 		}
 		svr.Stop()
 	})
@@ -393,8 +390,7 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		time.Sleep(1 * time.Second)
 		svr := initOriginalThriftServer(&t, ":8128", new(GenericServiceBenchmarkImpl), "../json_test/idl/baseline.thrift")
 		time.Sleep(500 * time.Millisecond)
-		convOpts := conv.Options{NoBase64Binary: true}
-		dOpts := generic.Options{DynamicgoConvOpts: convOpts, EnableDynamicgoHTTPResp: true}
+		dOpts := generic.Options{EnableBasicDynamicgoConvOpts: true, EnableDynamicgoHTTPResp: true}
 		cli := initDynamicgoThriftClientByIDL(transport.TTHeader, &t, "127.0.0.1:8128", "../json_test/idl/baseline.thrift", dOpts)
 
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
@@ -413,7 +409,7 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			cli.GenericCall(context.Background(), "NestingMethod", customReq, callopt.WithRPCTimeout(100*time.Second))
+			cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 		}
 		svr.Stop()
 	})
@@ -439,15 +435,15 @@ func testRegression(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// dynamicgo
-	dOpts := generic.Options{DynamicgoConvOpts: conv.Options{}, EnableDynamicgoHTTPResp: true}
+	dOpts := generic.Options{EnableBasicDynamicgoConvOpts: true, EnableDynamicgoHTTPResp: true}
 	cli := initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8121", "../json_test/idl/baseline.thrift", dOpts)
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil)
 	dgr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 
-	// fallback
-	dOpts = generic.Options{DynamicgoConvOpts: conv.Options{}}
+	// fallback: only resp
+	dOpts = generic.Options{EnableBasicDynamicgoConvOpts: true}
 	cli = initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8121", "../json_test/idl/baseline.thrift", dOpts)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil)
@@ -466,6 +462,25 @@ func testRegression(t *testing.T) {
 	err = customJson.Unmarshal(dgr.GeneralBody.([]byte), &dMapBody)
 	test.Assert(t, err == nil)
 	fBytes, err := customJson.Marshal(fgr.Body)
+	test.Assert(t, err == nil)
+	err = customJson.Unmarshal(fBytes, &fgr.Body)
+	test.Assert(t, err == nil)
+	test.Assert(t, isEqual(dMapBody, fgr.Body))
+
+	// fallback: both req and resp
+	cli = initThriftClientByIDL(t, "127.0.0.1:8121", "../json_test/idl/baseline.thrift", false)
+	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil)
+	fgr, ok = resp.(*generic.HTTPResponse)
+	test.Assert(t, ok)
+
+	test.Assert(t, reflect.DeepEqual(dgr.Header, fgr.Header))
+	test.Assert(t, reflect.DeepEqual(dgr.StatusCode, fgr.StatusCode))
+	test.Assert(t, reflect.DeepEqual(dgr.ContentType, fgr.ContentType))
+
+	err = customJson.Unmarshal(dgr.GeneralBody.([]byte), &dMapBody)
+	test.Assert(t, err == nil)
+	fBytes, err = customJson.Marshal(fgr.Body)
 	test.Assert(t, err == nil)
 	err = customJson.Unmarshal(fBytes, &fgr.Body)
 	test.Assert(t, err == nil)

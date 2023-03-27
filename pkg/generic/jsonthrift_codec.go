@@ -55,12 +55,14 @@ func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ..
 	} else {
 		// codec with dynamicgo
 		convOpts := opts[0].DynamicgoConvOpts
+		if opts[0].EnableBasicDynamicgoConvOpts {
+			convOpts.WriteRequireField = true
+			convOpts.WriteDefaultField = true
+		}
 		binaryWithBase64 := true
 		if convOpts.NoBase64Binary {
 			binaryWithBase64 = false
 		}
-		convOpts.WriteRequireField = true
-		convOpts.WriteDefaultField = true
 		c = &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: binaryWithBase64, convOpts: convOpts, enableDynamicgo: true}
 	}
 	c.svcDsc.Store(svc)
