@@ -542,6 +542,65 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 	svr.Stop()
 }
 
+func TestThriftDynamicgoBase64BinaryEcho(t *testing.T) {
+	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
+	time.Sleep(500 * time.Millisecond)
+
+	convOpts := conv.Options{EnableValueMapping: true, NoBase64Binary: false}
+	dOpts := generic.Options{DynamicgoConvOpts: convOpts, EnableDynamicgoHTTPResp: true}
+
+	cli := initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8126", "./idl/binary_echo.thrift", dOpts)
+	url := "http://example.com/BinaryEcho"
+
+	// []byte value for binary field
+	body := map[string]interface{}{
+		"msg":        []byte(mockMyMsg),
+		"got_base64": false,
+		"num":        "0",
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
+	customReq, err := generic.FromHTTPRequest(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// write: dynamicgo (amd64), fallback (arm)
+	// read: dynamicgo
+	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	gr, ok := resp.(*generic.HTTPResponse)
+	test.Assert(t, ok)
+	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.GeneralBody.([]byte)), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(string(gr.GeneralBody.([]byte)), "msg").String())
+
+	// string value for binary field which should fail
+	body = map[string]interface{}{
+		"msg": string(mockMyMsg),
+	}
+	data, err = json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+	req, err = http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
+	customReq, err = generic.FromHTTPRequest(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, strings.Contains(err.Error(), "illegal base64 data"))
+
+	svr.Stop()
+}
+
 func isEqual(a, b interface{}) bool {
 	if reflect.TypeOf(a) != reflect.TypeOf(b) {
 		return false
