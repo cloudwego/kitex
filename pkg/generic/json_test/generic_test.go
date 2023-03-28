@@ -57,7 +57,9 @@ func TestRun(t *testing.T) {
 	t.Run("TestThrift2NormalServer", testThrift2NormalServer)
 	t.Run("TestJSONThriftGenericClientClose", TestJSONThriftGenericClientClose)
 	t.Run("TestThriftRawBinaryEcho", testThriftRawBinaryEcho)
+	t.Run("TestDynamicgoThriftRawBinaryEcho", testDynamicgoThriftRawBinaryEcho)
 	t.Run("TestThriftBase64BinaryEcho", testThriftBase64BinaryEcho)
+	t.Run("TestDynamicgoThriftBase64BinaryEcho", testDynamicgoThriftBase64BinaryEcho)
 	t.Run("TestJSONThriftGenericClientFinalizer", TestJSONThriftGenericClientFinalizer)
 }
 
@@ -383,6 +385,24 @@ func testThriftRawBinaryEcho(t *testing.T) {
 	svr.Stop()
 }
 
+func testDynamicgoThriftRawBinaryEcho(t *testing.T) {
+	dOpts := generic.Options{DynamicgoConvOpts: conv.Options{WriteRequireField: true, WriteDefaultField: true, NoBase64Binary: true}}
+	time.Sleep(1 * time.Second)
+	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", dOpts)
+	time.Sleep(500 * time.Millisecond)
+
+	cli := initDynamicgoThriftClient(transport.TTHeader, t, "127.0.0.1:8128", "./idl/binary_echo.thrift", dOpts)
+
+	req := "{\"msg\":\"" + mockMyMsg + "\", \"got_base64\":false}"
+	resp, err := cli.GenericCall(context.Background(), "BinaryEcho", req, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	sr, ok := resp.(string)
+	test.Assert(t, ok)
+	test.Assert(t, strings.Contains(sr, mockMyMsg))
+
+	svr.Stop()
+}
+
 func testThriftBase64BinaryEcho(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServerByIDL(t, ":8126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", nil)
@@ -392,6 +412,25 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 
 	base64MockMyMsg := base64.StdEncoding.EncodeToString([]byte(mockMyMsg))
 	req := "{\"msg\":\"" + base64MockMyMsg + "\", \"got_base64\":\"true\"}"
+	resp, err := cli.GenericCall(context.Background(), "BinaryEcho", req, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	sr, ok := resp.(string)
+	test.Assert(t, ok)
+	test.Assert(t, strings.Contains(sr, base64MockMyMsg))
+
+	svr.Stop()
+}
+
+func testDynamicgoThriftBase64BinaryEcho(t *testing.T) {
+	dOpts := generic.Options{DynamicgoConvOpts: conv.Options{WriteRequireField: true, WriteDefaultField: true, NoBase64Binary: false}}
+	time.Sleep(1 * time.Second)
+	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", dOpts)
+	time.Sleep(500 * time.Millisecond)
+
+	cli := initDynamicgoThriftClient(transport.TTHeader, t, "127.0.0.1:8128", "./idl/binary_echo.thrift", dOpts)
+
+	base64MockMyMsg := base64.StdEncoding.EncodeToString([]byte(mockMyMsg))
+	req := "{\"msg\":\"" + base64MockMyMsg + "\", \"got_base64\":true}"
 	resp, err := cli.GenericCall(context.Background(), "BinaryEcho", req, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	sr, ok := resp.(string)

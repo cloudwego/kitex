@@ -49,6 +49,7 @@ func TestRun(t *testing.T) {
 	t.Run("TestThriftDynamicgo", testThriftDynamicgo)
 	t.Run("TestRegression", testRegression)
 	t.Run("TestThriftBase64BinaryEcho", testThriftBase64BinaryEcho)
+	t.Run("TestDynamicgoThriftBase64BinaryEcho", testDynamicgoThriftBase64BinaryEcho)
 }
 
 func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary bool) genericclient.Client {
@@ -542,7 +543,7 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 	svr.Stop()
 }
 
-func TestThriftDynamicgoBase64BinaryEcho(t *testing.T) {
+func testDynamicgoThriftBase64BinaryEcho(t *testing.T) {
 	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
 	time.Sleep(500 * time.Millisecond)
 
