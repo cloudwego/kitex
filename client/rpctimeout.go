@@ -61,9 +61,14 @@ func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration)
 		errMsg = fmt.Sprintf("%s, remote=%s", errMsg, target.String())
 	}
 
+	needFineGrainedErrCode := rpctimeout.LoadGlobalNeedFineGrainedErrCode()
 	// cancel error
 	if ctx.Err() == context.Canceled {
-		return kerrors.ErrRPCTimeout.WithCause(fmt.Errorf("%s: %w by business", errMsg, ctx.Err()))
+		if needFineGrainedErrCode {
+			return kerrors.ErrCanceledByBusiness
+		} else {
+			return kerrors.ErrRPCTimeout.WithCause(fmt.Errorf("%s: %w by business", errMsg, ctx.Err()))
+		}
 	}
 
 	if ddl, ok := ctx.Deadline(); !ok {
@@ -75,8 +80,17 @@ func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration)
 		if roundTimeout >= 0 && ddl.Before(start.Add(roundTimeout)) {
 			errMsg = fmt.Sprintf("%s, context deadline earlier than timeout, actual=%v", errMsg, ddl.Sub(start))
 		}
+
+		if needFineGrainedErrCode && isBusinessTimeout(start, timeout, ddl, rpctimeout.LoadBusinessTimeoutThreshold()) {
+			return kerrors.ErrTimeoutByBusiness
+		}
 	}
 	return kerrors.ErrRPCTimeout.WithCause(errors.New(errMsg))
+}
+
+func isBusinessTimeout(start time.Time, kitexTimeout time.Duration, actualDDL time.Time, threshold time.Duration) bool {
+	kitexDDL := start.Add(kitexTimeout)
+	return actualDDL.Add(threshold).Before(kitexDDL)
 }
 
 func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
