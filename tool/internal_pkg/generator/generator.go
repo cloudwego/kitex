@@ -18,7 +18,6 @@ package generator
 import (
 	"fmt"
 	"go/token"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -72,7 +71,7 @@ func SetKitexImportPath(path string) {
 
 // ImportPathTo returns an import path to the specified package under kitex.
 func ImportPathTo(pkg string) string {
-	return filepath.Join(kitexImportPath, pkg)
+	return util.JoinPath(kitexImportPath, pkg)
 }
 
 // AddGlobalMiddleware adds middleware for all generators
@@ -240,7 +239,7 @@ func (c *Config) AddFeature(key string) bool {
 // ApplyExtension applies template extension.
 func (c *Config) ApplyExtension() error {
 	templateExtExist := false
-	path := filepath.Join(c.TemplateDir, ExtensionFilename)
+	path := util.JoinPath(c.TemplateDir, ExtensionFilename)
 	if c.TemplateDir != "" && util.Exists(path) {
 		templateExtExist = true
 	}
@@ -312,24 +311,24 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 	tasks := []*Task{
 		{
 			Name: BuildFileName,
-			Path: filepath.Join(g.OutputPath, BuildFileName),
+			Path: util.JoinPath(g.OutputPath, BuildFileName),
 			Text: tpl.BuildTpl,
 		},
 		{
 			Name: BootstrapFileName,
-			Path: filepath.Join(g.OutputPath, "script", BootstrapFileName),
+			Path: util.JoinPath(g.OutputPath, "script", BootstrapFileName),
 			Text: tpl.BootstrapTpl,
 		},
 		{
 			Name: ToolVersionFileName,
-			Path: filepath.Join(g.OutputPath, ToolVersionFileName),
+			Path: util.JoinPath(g.OutputPath, ToolVersionFileName),
 			Text: tpl.ToolVersionTpl,
 		},
 	}
 	if !g.Config.GenerateInvoker {
 		tasks = append(tasks, &Task{
 			Name: MainFileName,
-			Path: filepath.Join(g.OutputPath, MainFileName),
+			Path: util.JoinPath(g.OutputPath, MainFileName),
 			Text: tpl.MainTpl,
 		})
 	}
@@ -349,7 +348,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		fs = append(fs, f)
 	}
 
-	handlerFilePath := filepath.Join(g.OutputPath, HandlerFileName)
+	handlerFilePath := util.JoinPath(g.OutputPath, HandlerFileName)
 	if util.Exists(handlerFilePath) {
 		comp := newCompleter(
 			pkg.ServiceInfo.AllMethods(),
@@ -384,9 +383,9 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 
 func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 	g.updatePackageInfo(pkg)
-	output := filepath.Join(g.OutputPath, util.CombineOutputPath(g.GenPath, pkg.Namespace))
+	output := util.JoinPath(g.OutputPath, util.CombineOutputPath(g.GenPath, pkg.Namespace))
 	svcPkg := strings.ToLower(pkg.ServiceName)
-	output = filepath.Join(output, svcPkg)
+	output = util.JoinPath(output, svcPkg)
 	ext := g.tmplExt
 	if ext == nil {
 		ext = new(TemplateExtension)
@@ -395,25 +394,25 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 	tasks := []*Task{
 		{
 			Name: ClientFileName,
-			Path: filepath.Join(output, ClientFileName),
+			Path: util.JoinPath(output, ClientFileName),
 			Text: tpl.ClientTpl,
 			Ext:  ext.ExtendClient,
 		},
 		{
 			Name: ServerFileName,
-			Path: filepath.Join(output, ServerFileName),
+			Path: util.JoinPath(output, ServerFileName),
 			Text: tpl.ServerTpl,
 			Ext:  ext.ExtendServer,
 		},
 		{
 			Name: InvokerFileName,
-			Path: filepath.Join(output, InvokerFileName),
+			Path: util.JoinPath(output, InvokerFileName),
 			Text: tpl.InvokerTpl,
 			Ext:  ext.ExtendInvoker,
 		},
 		{
 			Name: ServiceFileName,
-			Path: filepath.Join(output, svcPkg+".go"),
+			Path: util.JoinPath(output, svcPkg+".go"),
 			Text: tpl.ServiceTpl,
 		},
 	}
@@ -541,6 +540,6 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 	case MainFileName:
 		pkg.AddImport("log", "log")
-		pkg.AddImport(pkg.PkgRefName, filepath.Join(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
+		pkg.AddImport(pkg.PkgRefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
 	}
 }

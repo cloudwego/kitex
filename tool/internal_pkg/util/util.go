@@ -24,6 +24,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"unicode"
 
@@ -150,10 +151,11 @@ func SearchGoMod(cwd string) (moduleName, path string, found bool) {
 		if !os.IsNotExist(err) {
 			return
 		}
-		if cwd == "/" {
+		parentCwd := filepath.Dir(cwd)
+		if parentCwd == cwd {
 			break
 		}
-		cwd = filepath.Dir(cwd)
+		cwd = parentCwd
 	}
 	return
 }
@@ -163,7 +165,7 @@ func RunGitCommand(gitLink string) (string, string, error) {
 	if err != nil {
 		return "", "Failed to get home dir", err
 	}
-	cachePath := filepath.Join(u.HomeDir, ".kitex", "cache")
+	cachePath := JoinPath(u.HomeDir, ".kitex", "cache")
 
 	branch := ""
 	if strings.Contains(gitLink, ".git@") {
@@ -188,9 +190,9 @@ func RunGitCommand(gitLink string) (string, string, error) {
 	if branch != "" {
 		branchSuffix = "@" + branch
 	}
-	gitPath := filepath.Join(cachePath, repoLink+branchSuffix)
+	gitPath := JoinPath(cachePath, repoLink+branchSuffix)
 
-	_, err = os.Stat(filepath.Join(gitPath, ".git"))
+	_, err = os.Stat(JoinPath(gitPath, ".git"))
 	if err != nil && !os.IsExist(err) {
 		err = os.MkdirAll(gitPath, os.ModePerm)
 		if err != nil {
@@ -250,7 +252,14 @@ func CombineOutputPath(outputPath, ns string) string {
 			outputPath = strings.ReplaceAll(outputPath, "{namespaceUnderscore}", strings.ReplaceAll(ns, "/", "_"))
 		}
 	} else {
-		outputPath = filepath.Join(outputPath, ns)
+		outputPath = JoinPath(outputPath, ns)
 	}
 	return outputPath
+}
+
+func JoinPath(elem ...string) string {
+	if runtime.GOOS == "windows" {
+		return strings.ReplaceAll(filepath.Join(elem...), "\\", "/")
+	}
+	return filepath.Join(elem...)
 }
