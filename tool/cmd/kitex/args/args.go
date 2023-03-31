@@ -211,7 +211,7 @@ func (a *Arguments) checkPath() {
 		os.Exit(1)
 	}
 
-	gosrc := filepath.Join(util.GetGOPATH(), "src")
+	gosrc := util.JoinPath(util.GetGOPATH(), "src")
 	gosrc, err = filepath.Abs(gosrc)
 	if err != nil {
 		log.Warn("Get GOPATH/src path failed:", err.Error())
@@ -228,7 +228,7 @@ func (a *Arguments) checkPath() {
 			log.Warn("Get GOPATH/src relpath failed:", err.Error())
 			os.Exit(1)
 		}
-		a.PackagePrefix = filepath.Join(a.PackagePrefix, a.GenPath)
+		a.PackagePrefix = util.JoinPath(a.PackagePrefix, a.GenPath)
 	} else {
 		if a.ModuleName == "" {
 			log.Warn("Outside of $GOPATH. Please specify a module name with the '-module' flag.")
@@ -249,13 +249,13 @@ func (a *Arguments) checkPath() {
 				log.Warn("Get package prefix failed:", err.Error())
 				os.Exit(1)
 			}
-			a.PackagePrefix = filepath.Join(a.ModuleName, a.PackagePrefix, a.GenPath)
+			a.PackagePrefix = util.JoinPath(a.ModuleName, a.PackagePrefix, a.GenPath)
 		} else {
 			if err = initGoMod(pathToGo, a.ModuleName); err != nil {
 				log.Warn("Init go mod failed:", err.Error())
 				os.Exit(1)
 			}
-			a.PackagePrefix = filepath.Join(a.ModuleName, a.GenPath)
+			a.PackagePrefix = util.JoinPath(a.ModuleName, a.GenPath)
 		}
 	}
 
@@ -330,7 +330,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 		for _, inc := range a.Includes {
 			cmd.Args = append(cmd.Args, "-I", inc)
 		}
-		outPath := filepath.Join(".", a.GenPath)
+		outPath := util.JoinPath(".", a.GenPath)
 		if a.Use == "" {
 			os.MkdirAll(outPath, 0o755)
 		} else {
@@ -372,7 +372,7 @@ func lookupTool(idlType string) string {
 	path, err := exec.LookPath(tool)
 	if err != nil {
 		log.Warnf("Failed to find %q from $PATH: %s. Try $GOPATH/bin/%s instead\n", path, err.Error(), tool)
-		path = filepath.Join(util.GetGOPATH(), "bin", tool)
+		path = util.JoinPath(util.GetGOPATH(), "bin", tool)
 	}
 	return path
 }
