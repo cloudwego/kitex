@@ -32,8 +32,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-func newFailureRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
-	fr := &failureRetryer{cbContainer: cbC}
+func newFailureRetryer(policy Policy, r *ShouldResultRetry, cbC *cbContainer) (Retryer, error) {
+	fr := &failureRetryer{specifiedResultRetry: r, cbContainer: cbC}
 	if err := fr.UpdatePolicy(policy); err != nil {
 		return nil, fmt.Errorf("newfailureRetryer failed, err=%w", err)
 	}
@@ -41,10 +41,11 @@ func newFailureRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
 }
 
 type failureRetryer struct {
-	enable      bool
-	policy      *FailurePolicy
-	backOff     BackOff
-	cbContainer *cbContainer
+	enable               bool
+	policy               *FailurePolicy
+	backOff              BackOff
+	cbContainer          *cbContainer
+	specifiedResultRetry *ShouldResultRetry
 	sync.RWMutex
 	errMsg string
 }
@@ -188,6 +189,7 @@ func (r *failureRetryer) UpdatePolicy(rp Policy) (err error) {
 		return err
 	}
 	r.policy = rp.FailurePolicy
+	r.setSpecifiedResultRetryIfNeeded(r.specifiedResultRetry)
 	if bo, e := initBackOff(rp.FailurePolicy.BackOffPolicy); e != nil {
 		r.errMsg = fmt.Sprintf("failureRetryer update BackOffPolicy failed, err=%s", e.Error())
 		klog.Warnf(r.errMsg)
@@ -283,4 +285,11 @@ func (r *failureRetryer) Dump() map[string]interface{} {
 		dm["errMsg"] = r.errMsg
 	}
 	return dm
+}
+
+func (r *failureRetryer) setSpecifiedResultRetryIfNeeded(rr *ShouldResultRetry) {
+	if r.policy != nil && r.policy.ShouldResultRetry == nil {
+		// the ShouldResultRetry priority of that config inside FailurePolicy is higher
+		r.policy.ShouldResultRetry = rr
+	}
 }
