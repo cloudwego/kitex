@@ -90,20 +90,19 @@ type FailurePolicy struct {
 	ShouldResultRetry *ShouldResultRetry `json:"-"`
 }
 
-// IsRespRetryNonNil is used to judge if RespRetry is nil
+// IsRespRetryNonNil is used to check if RespRetry is nil
 func (p FailurePolicy) IsRespRetryNonNil() bool {
-	if p.ShouldResultRetry != nil && p.ShouldResultRetry.RespRetry != nil {
-		return true
-	}
-	return false
+	return p.ShouldResultRetry != nil && p.ShouldResultRetry.RespRetry != nil
 }
 
-// IsErrorRetryNonNil is used to judge if ErrorRetry is nil
+// IsErrorRetryNonNil is used to check if ErrorRetry is nil
 func (p FailurePolicy) IsErrorRetryNonNil() bool {
-	if p.ShouldResultRetry != nil && p.ShouldResultRetry.ErrorRetry != nil {
-		return true
-	}
-	return false
+	return p.ShouldResultRetry != nil && p.ShouldResultRetry.ErrorRetry != nil
+}
+
+// IsRetryForTimeout is used to check if timeout error need to retry
+func (p FailurePolicy) IsRetryForTimeout() bool {
+	return p.ShouldResultRetry == nil || !p.ShouldResultRetry.NotRetryForTimeout
 }
 
 // BackupPolicy for backup request
@@ -166,6 +165,8 @@ const (
 type ShouldResultRetry struct {
 	ErrorRetry func(err error, ri rpcinfo.RPCInfo) bool
 	RespRetry  func(resp interface{}, ri rpcinfo.RPCInfo) bool
+	// disable the default timeout retry in specific scenarios (e.g. the requests are not non-idempotent)
+	NotRetryForTimeout bool
 }
 
 // Equals to check if policy is equal

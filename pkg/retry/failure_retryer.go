@@ -219,7 +219,7 @@ func (r *failureRetryer) isRetryErr(err error, ri rpcinfo.RPCInfo) bool {
 	// But CircuitBreak has been checked in ShouldRetry, it doesn't need to filter ServiceCircuitBreak.
 	// If there are some other specified errors that cannot be retried, it should be filtered here.
 
-	if kerrors.IsTimeoutError(err) {
+	if r.policy.IsRetryForTimeout() && kerrors.IsTimeoutError(err) {
 		return true
 	}
 	if r.policy.IsErrorRetryNonNil() && r.policy.ShouldResultRetry.ErrorRetry(err, ri) {
