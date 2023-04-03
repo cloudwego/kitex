@@ -288,8 +288,11 @@ func (r *failureRetryer) Dump() map[string]interface{} {
 }
 
 func (r *failureRetryer) setSpecifiedResultRetryIfNeeded(rr *ShouldResultRetry) {
+	if rr != nil {
+		r.specifiedResultRetry = rr
+	}
 	if r.policy != nil && r.policy.ShouldResultRetry == nil {
 		// the ShouldResultRetry priority of that config inside FailurePolicy is higher
-		r.policy.ShouldResultRetry = rr
+		r.policy.ShouldResultRetry = r.specifiedResultRetry
 	}
 }
