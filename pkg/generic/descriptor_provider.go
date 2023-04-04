@@ -16,11 +16,22 @@
 
 package generic
 
-import "github.com/cloudwego/kitex/pkg/generic/descriptor"
+import (
+	dthrift "github.com/cloudwego/dynamicgo/thrift"
+
+	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+)
 
 // DescriptorProvider provide service descriptor
 type DescriptorProvider interface {
 	Closer
 	// Provide return a channel for provide service descriptors
 	Provide() <-chan *descriptor.ServiceDescriptor
+}
+
+// DynamicgoDescriptorProvider provide service descriptor for Json generic call
+type DynamicgoDescriptorProvider interface {
+	Closer
+	// Provide return a channel for provide service descriptors
+	Provide() <-chan *dthrift.ServiceDescriptor
 }

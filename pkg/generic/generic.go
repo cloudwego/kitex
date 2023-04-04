@@ -19,11 +19,24 @@ package generic
 
 import (
 	"fmt"
+	"sync"
+
+	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
+
+const defaultBufferSize = 4096
+
+var bytesPool = sync.Pool{
+	New: func() interface{} {
+		// TODO: need to consider the size
+		b := make([]byte, 0, defaultBufferSize)
+		return &b
+	},
+}
 
 // Generic ...
 type Generic interface {
@@ -108,6 +121,15 @@ func JSONThriftGeneric(p DescriptorProvider) (Generic, error) {
 		return nil, err
 	}
 	return &jsonThriftGeneric{codec: codec}, nil
+}
+
+// JSONThriftDynamicgoGeneric json mapping Generic using dynamicgo.
+func JSONThriftDynamicgoGeneric(p DynamicgoDescriptorProvider, convOpts conv.Options) (Generic, error) {
+	codec, err := newJsonThriftDynamicgoCodec(p, thrift.NewThriftCodec(), convOpts)
+	if err != nil {
+		return nil, err
+	}
+	return &jsonThriftDynamicgoGeneric{codec: codec}, nil
 }
 
 // SetBinaryWithBase64 enable/disable Base64 codec for binary field.
@@ -199,6 +221,30 @@ func (g *jsonThriftGeneric) GetMethod(req interface{}, method string) (*Method, 
 }
 
 func (g *jsonThriftGeneric) Close() error {
+	return g.codec.Close()
+}
+
+type jsonThriftDynamicgoGeneric struct {
+	codec *jsonThriftDynamicgoCodec
+}
+
+func (g *jsonThriftDynamicgoGeneric) Framed() bool {
+	return false
+}
+
+func (g *jsonThriftDynamicgoGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
+	return serviceinfo.Thrift
+}
+
+func (g *jsonThriftDynamicgoGeneric) PayloadCodec() remote.PayloadCodec {
+	return g.codec
+}
+
+func (g *jsonThriftDynamicgoGeneric) GetMethod(req interface{}, method string) (*Method, error) {
+	return g.codec.getMethod(req, method)
+}
+
+func (g *jsonThriftDynamicgoGeneric) Close() error {
 	return g.codec.Close()
 }
 
