@@ -21,16 +21,15 @@ package thrift
 
 import (
 	"context"
-	"unsafe"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
 
-	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 // Write write json string to out thrift.TProtocol
@@ -62,10 +61,7 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		if isString {
 			// encode using dynamicgo
 			cv := j2t.NewBinaryConv(m.opts)
-			var v []byte
-			(*internal.GoSlice)(unsafe.Pointer(&v)).Cap = (*internal.GoString)(unsafe.Pointer(&transBuff)).Len
-			(*internal.GoSlice)(unsafe.Pointer(&v)).Len = (*internal.GoString)(unsafe.Pointer(&transBuff)).Len
-			(*internal.GoSlice)(unsafe.Pointer(&v)).Ptr = (*internal.GoString)(unsafe.Pointer(&transBuff)).Ptr
+			v := utils.StringToSliceByte(transBuff)
 			// json []byte to thrift []byte
 			err := cv.DoInto(ctx, m.dty, v, &buf)
 			if err != nil {

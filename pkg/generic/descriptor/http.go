@@ -20,11 +20,10 @@ import (
 	"bytes"
 	"io"
 	"net/http"
-	"unsafe"
 
 	"github.com/bytedance/sonic/ast"
 
-	"github.com/cloudwego/kitex/internal"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 // MIMEType ...
@@ -100,9 +99,7 @@ func (req HTTPRequest) GetMapBody(key string) string {
 	}
 	if req.GeneralBody == nil && req.Request != nil {
 		body := req.RawBody
-		var s string
-		(*internal.GoString)(unsafe.Pointer(&s)).Len = (*internal.GoSlice)(unsafe.Pointer(&body)).Len
-		(*internal.GoString)(unsafe.Pointer(&s)).Ptr = (*internal.GoSlice)(unsafe.Pointer(&body)).Ptr
+		s := utils.SliceByteToString(body)
 		node := ast.NewRaw(s)
 		cache := &jsonCache{
 			root: node,
