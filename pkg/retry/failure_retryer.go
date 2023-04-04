@@ -292,7 +292,7 @@ func (r *failureRetryer) setSpecifiedResultRetryIfNeeded(rr *ShouldResultRetry) 
 		r.specifiedResultRetry = rr
 	}
 	if r.policy != nil && r.policy.ShouldResultRetry == nil {
-		// the ShouldResultRetry priority of that config inside FailurePolicy is higher
+		// The priority of FailurePolicy.ShouldResultRetry is higher, so only update it when it's nil
 		r.policy.ShouldResultRetry = r.specifiedResultRetry
 	}
 }
