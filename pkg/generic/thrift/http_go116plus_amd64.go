@@ -23,6 +23,7 @@ import (
 	"context"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
 
@@ -39,29 +40,43 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		if w.svc.DynamicgoDsc == nil {
 			return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
 		}
-		tyDsc := w.svc.DynamicgoDsc.Functions()[w.method].Request().Struct().Fields()[0].Type()
+
+		t := w.svc.DynamicgoDsc.Functions()[w.method].Request()
 
 		body := req.GetBody()
-		buf := make([]byte, fieldBeginLen, len(body)+structWrapLen)
-		offset := 0
-		offset += bthrift.Binary.WriteStructBegin(buf[offset:], "")
-		bthrift.Binary.WriteFieldBegin(buf[offset:], "", thrift.STRUCT, 1)
-		ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
-		cv := j2t.NewBinaryConv(w.opts)
-		if err := cv.DoInto(ctx, tyDsc, body, &buf); err != nil {
-			return err
+		buf := mcache.Malloc(len(body) + structWrapLen)
+
+		var offset int
+		offset += bthrift.Binary.WriteStructBegin(buf[offset:], t.Struct().Name())
+
+		for _, field := range t.Struct().Fields() {
+			// TODO: support Exception
+			//if field.IsException {
+			//	// generic server ignore the exception, because no description for exception
+			//	// generic handler just return error
+			//	continue
+			//}
+			offset += bthrift.Binary.WriteFieldBegin(buf[offset:], field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID()))
+
+			ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
+			cv := j2t.NewBinaryConv(w.opts)
+			dbuf := buf[offset:offset]
+			if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
+				return err
+			} else {
+				offset += len(dbuf)
+			}
+
+			offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
 		}
-		offset = len(buf)
-		offset += bthrift.Binary.WriteStructEnd(buf[offset:])
-		buf = append(buf, 0)
 		offset += bthrift.Binary.WriteFieldStop(buf[offset:])
-		bthrift.Binary.WriteStructEnd(buf[offset:])
+		offset += bthrift.Binary.WriteStructEnd(buf[offset:])
 
 		tProt, ok := out.(*cthrift.BinaryProtocol)
 		if !ok {
 			return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 		}
-		_, err := tProt.ByteBuffer().WriteBinary(buf)
+		_, err := tProt.ByteBuffer().WriteBinary(buf[:offset])
 		return err
 	}
 	return w.originalWrite(ctx, out, msg, requestBase)
