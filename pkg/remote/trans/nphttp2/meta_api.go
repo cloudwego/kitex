@@ -116,15 +116,20 @@ func GRPCTrailer(ctx context.Context, md *metadata.MD) context.Context {
 	return context.WithValue(ctx, trailerKey{}, md)
 }
 
-func receiveHeaderAndTrailer(ctx context.Context, conn net.Conn) {
+func GetHeaderMetadataFromCtx(ctx context.Context) metadata.MD {
 	header := ctx.Value(headerKey{})
 	if header != nil {
-		headerMd := header.(*metadata.MD)
-		*headerMd, _ = conn.(*clientConn).Header()
+		return header.(metadata.MD)
 	}
-	tailer := ctx.Value(trailerKey{})
-	if tailer != nil {
-		tailerMd := tailer.(*metadata.MD)
-		*tailerMd = conn.(*clientConn).Trailer()
+	return metadata.MD{}
+}
+
+func receiveHeaderAndTrailer(ctx context.Context, conn net.Conn) context.Context {
+	if md, err := conn.(*clientConn).Header(); err == nil {
+		ctx = context.WithValue(ctx, headerKey{}, md)
 	}
+	if t := conn.(*clientConn).Trailer(); t != nil {
+		ctx = context.WithValue(ctx, trailerKey{}, t)
+	}
+	return ctx
 }

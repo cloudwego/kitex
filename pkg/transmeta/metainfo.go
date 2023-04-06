@@ -18,7 +18,6 @@ package transmeta
 
 import (
 	"context"
-
 	"github.com/bytedance/gopkg/cloud/metainfo"
 
 	"github.com/cloudwego/kitex/pkg/remote"
