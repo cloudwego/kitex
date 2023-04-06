@@ -23,10 +23,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"sync/atomic"
-
-	"github.com/cloudwego/kitex/pkg/reflection/thrift"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 
@@ -131,9 +128,6 @@ func (kc *kClient) init() (err error) {
 		return err
 	}
 	ctx := kc.initContext()
-	if kc.opt.ReflectionEnabled {
-		thriftreflection.RegisterReflectionMethod(kc.svcInfo)
-	}
 	kc.initMiddlewares(ctx)
 	kc.initDebugService()
 	kc.richRemoteOption()
@@ -144,15 +138,6 @@ func (kc *kClient) init() (err error) {
 		return err
 	}
 	kc.inited = true
-
-	// fixme: implement this part into rpal
-	if kc.opt.ReflectionEnabled {
-		err := kc.checkIDL()
-		if err != nil {
-			klog.Warnf("IDL Check:%v", err)
-		}
-	}
-
 	return nil
 }
 
@@ -674,57 +659,6 @@ func (kc *kClient) warmingUp() error {
 	}
 
 	return nil
-}
-
-// KitexReflectionQueryIDL send a RPC Call to query remote IDL info
-func KitexReflectionQueryIDL(kc Client, ctx context.Context, queryIDLRequest *thriftreflection.QueryIDLRequest, callOptions ...callopt.Option) (resp *thriftreflection.QueryIDLResponse, err error) {
-	req, err := queryIDLRequest.JsonEncode()
-	if err != nil {
-		return nil, err
-	}
-	ctx = NewCtxWithCallOptions(ctx, callOptions)
-	var _args thriftreflection.ReflectionServiceKitexReflectionQueryIDLArgs
-	_args.Req = req
-	var _result thriftreflection.ReflectionServiceKitexReflectionQueryIDLResult
-	if err = kc.Call(ctx, thriftreflection.ReflectionMethod, &_args, &_result); err != nil {
-		return
-	}
-	respStr := _result.GetSuccess()
-	return thriftreflection.DecodeQueryIDLResponse(respStr)
-}
-
-// checkIDL fixme: implement this part into rpal lib
-func (kc *kClient) checkIDL() error {
-	var req *thriftreflection.QueryIDLRequest
-	if kc.svcInfo.ServiceName == "CombineService" {
-		methods := []string{}
-		for methodName := range kc.svcInfo.Methods {
-			methods = append(methods, methodName)
-		}
-		req = &thriftreflection.QueryIDLRequest{QueryType: "BatchQueryMethods", QueryInput: strings.Join(methods, ",")}
-	} else {
-		req = &thriftreflection.QueryIDLRequest{QueryType: "QueryService", QueryInput: kc.svcInfo.ServiceName}
-	}
-	remoteResp, err := KitexReflectionQueryIDL(kc, context.Background(), req)
-	if err != nil {
-		return err
-	}
-	localResp, err := thriftreflection.QueryThriftIDL(req)
-	if err != nil {
-		return err
-	}
-	remoteSd := remoteResp.ServiceInfo
-	localSd := localResp.ServiceInfo
-	// compare each method
-	MethodConsistencyMap := map[string]bool{}
-	for _, localMethod := range localSd.Methods {
-		MethodConsistencyMap[localMethod.MethodName] = thriftreflection.CheckMethodIDLConsistency(localMethod, localSd, remoteSd)
-	}
-	// print or record method info into a map
-	for k, v := range MethodConsistencyMap {
-		fmt.Println(k, " - ", v)
-	}
-	return err
 }
 
 // return fallback policy from call option and client option.

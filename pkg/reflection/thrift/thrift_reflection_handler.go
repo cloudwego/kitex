@@ -21,8 +21,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/thriftgo/parser"
+
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 // ReflectionMethod name
@@ -55,12 +56,19 @@ func RegisterReflectionMethod(svcInfo *serviceinfo.ServiceInfo) {
 	if svcInfo == nil {
 		return
 	}
-	svcInfo.Methods[ReflectionMethod] = reflectionMethodInfo
+	methods := make(map[string]serviceinfo.MethodInfo, len(svcInfo.Methods)+1)
+	for k, v := range svcInfo.Methods {
+		methods[k] = v
+	}
+	methods[ReflectionMethod] = reflectionMethodInfo
+	svcInfo.Methods = methods
 }
 
 func QueryThriftIDL(req *QueryIDLRequest) (resp *QueryIDLResponse, err error) {
 	if req.QueryType == "QueryService" {
 		resp, err = QueryServiceIDL(req)
+	} else if req.QueryType == "BatchQueryServices" {
+		resp, err = BatchQueryServiceIDL(req)
 	} else if req.QueryType == "BatchQueryMethods" {
 		resp, err = BatchQueryMethodsIDL(req)
 	} else {
@@ -117,6 +125,56 @@ func QueryServiceIDL(req *QueryIDLRequest) (resp *QueryIDLResponse, err error) {
 	return
 }
 
+func BatchQueryServiceIDL(req *QueryIDLRequest) (resp *QueryIDLResponse, err error) {
+	svcNames := strings.Split(req.QueryInput, ",")
+	methods := map[string]*MethodDescriptor{}
+	usedStructs := map[string]*StructDescriptor{}
+	sd := &ServiceDescriptor{
+		Methods:     methods,
+		UsedStructs: usedStructs,
+	}
+
+	for _, svcName := range svcNames {
+		path, svc, svcExist := findSvcFromAll(svcName)
+		if !svcExist {
+			return nil, errors.New("No service found by given name:" + svcName)
+		}
+
+		for _, m := range svc.Functions {
+			md := NewMethodDescriptor(path, m)
+			methods[md.String()] = md
+		}
+
+		if len(svc.Extends) > 0 {
+			hasPrefix, prefix, rawName := parseName(svc.Extends)
+			findPath := path
+			if hasPrefix {
+				findPath = prefixToPath(path, prefix)
+			}
+			extSvc, ok := findSvc(findPath, rawName)
+			if ok {
+				for _, m := range extSvc.Functions {
+					md := NewMethodDescriptor(findPath, m)
+					methods[md.String()] = md
+				}
+			}
+		}
+
+		for idx, m := range methods {
+			is := m.IncludedStructs
+			for k, v := range is {
+				// only record names
+				methods[idx].IncludedStructs[k] = nil
+				usedStructs[k] = NewStructDescriptor(k, v)
+			}
+		}
+	}
+
+	resp = &QueryIDLResponse{ServiceInfo: sd}
+
+	return
+}
+
 func BatchQueryMethodsIDL(req *QueryIDLRequest) (resp *QueryIDLResponse, err error) {
 	methodNames := strings.Split(req.QueryInput, ",")
 	methods := map[string]*MethodDescriptor{}
@@ -135,11 +193,10 @@ func BatchQueryMethodsIDL(req *QueryIDLRequest) (resp *QueryIDLResponse, err err
 		methods[md.String()] = md
 	}
 
-	for idx, m := range methods {
-		is := m.IncludedStructs
-		for k, v := range is {
+	for _, m := range methods {
+		for k, v := range m.IncludedStructs {
 			// only record names
-			methods[idx].IncludedStructs[k] = nil
+			m.IncludedStructs[k] = nil
 			usedStructs[k] = NewStructDescriptor(k, v)
 		}
 	}

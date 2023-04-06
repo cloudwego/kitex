@@ -19,15 +19,15 @@ package server
 
 import (
 	"context"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"net"
 	"reflect"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
-
-	thriftreflection "github.com/cloudwego/kitex/pkg/reflection/thrift"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	internal_stats "github.com/cloudwego/kitex/internal/stats"
@@ -38,6 +38,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limiter"
+	thriftreflection "github.com/cloudwego/kitex/pkg/reflection/thrift"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
@@ -45,6 +46,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 // Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
@@ -183,10 +185,6 @@ func (s *server) GetServiceInfo() *serviceinfo.ServiceInfo {
 func (s *server) Run() (err error) {
 	if s.svcInfo == nil {
 		return errors.New("no service, use RegisterService to set one")
-	}
-
-	if s.opt.ReflectionEnabled {
-		thriftreflection.RegisterReflectionMethod(s.svcInfo)
 	}
 
 	if err = s.check(); err != nil {
@@ -480,6 +478,23 @@ func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
 	}
 	extra["address"] = lAddr
 	extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
+	if s.opt.ReflectionEnabled {
+		var services string
+		if s.svcInfo.ServiceName == "CombineService" {
+			services = strings.Join(extra["combined_services"].([]string), ",")
+		} else {
+			services = s.svcInfo.ServiceName
+		}
+		req := &thriftreflection.QueryIDLRequest{QueryType: "BatchQueryServices", QueryInput: services}
+		localResp, err := thriftreflection.QueryThriftIDL(req)
+		if err == nil {
+			// TODO: check whether the logic is used.
+			buf, _ := localResp.JsonEncode()
+			reflectionHash := fmt.Sprintf("%x", md5.Sum(utils.StringToSliceByte(buf)))
+			extra["reflectionHash"] = reflectionHash
+		}
+		thriftreflection.RegisterReflectionMethod(si)
+	}
 	si.Extra = extra
 	s.svcInfo = si
 }
