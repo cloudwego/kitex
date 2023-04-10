@@ -982,7 +982,9 @@ func (t *http2Client) reader() {
 	// Check the validity of server preface.
 	frame, err := t.framer.ReadFrame()
 	if err != nil {
-		klog.Errorf("KITEX: grpc readFrame failed, error=%s", err.Error())
+		// TODO(emma): comment this log temporarily, because when use short connection, 'resource temporarily unavailable' error will happen
+		// if the log need to be output, connection info should be appended
+		// klog.Errorf("KITEX: grpc readFrame failed, error=%s", err.Error())
 		t.Close() // this kicks off resetTransport, so must be last before return
 		return
 	}
@@ -1025,7 +1027,9 @@ func (t *http2Client) reader() {
 				continue
 			} else {
 				// Transport error.
-				klog.Errorf("KITEX: grpc readFrame failed, error=%s", err.Error())
+				// TODO(emma): comment this log temporarily, because when use short connection, 'resource temporarily unavailable' error will happen
+				// if the log need to be output, connection info should be appended
+				// klog.Errorf("KITEX: grpc readFrame failed, error=%s", err.Error())
 				t.Close()
 				return
 			}
