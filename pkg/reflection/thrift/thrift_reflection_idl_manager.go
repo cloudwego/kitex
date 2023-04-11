@@ -122,7 +122,7 @@ func (sd *ServiceDescriptor) MarshalJSON() ([]byte, error) {
 		buf.WriteString(`"` + method + `":`)
 		mdbuf, _ := sd.Methods[method].MarshalJSON()
 		buf.Write(mdbuf)
-		if i < len(method)-1 {
+		if i < len(methods)-1 {
 			buf.WriteByte(',')
 		}
 	}

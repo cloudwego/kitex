@@ -199,8 +199,8 @@ func (s *server) Run() (err error) {
 		}
 	}
 
-	s.richRemoteOption()
 	s.fillMoreServiceInfo(s.opt.RemoteOpt.Address)
+	s.richRemoteOption()
 	transHdlr, err := s.newSvrTransHandler()
 	if err != nil {
 		return err
@@ -481,7 +481,7 @@ func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
 	if s.opt.ReflectionEnabled {
 		var services string
 		if s.svcInfo.ServiceName == "CombineService" {
-			services = strings.Join(extra["combined_services"].([]string), ",")
+			services = strings.Join(extra["combined_service_list"].([]string), ",")
 		} else {
 			services = s.svcInfo.ServiceName
 		}
@@ -492,6 +492,8 @@ func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
 			buf, _ := localResp.JsonEncode()
 			reflectionHash := fmt.Sprintf("%x", md5.Sum(utils.StringToSliceByte(buf)))
 			extra["reflectionHash"] = reflectionHash
+		} else {
+			klog.Errorf("KITEX: err query thrift idl for reflection hash: %v", err)
 		}
 		thriftreflection.RegisterReflectionMethod(si)
 	}
