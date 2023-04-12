@@ -196,9 +196,10 @@ func TestCopyFromRace(t *testing.T) {
 	ri2 := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "service", Tags: map[string]string{key2: val2}}, "method1")
 	// do copyFrom ri2
 	ri1.CopyFrom(ri2)
-	v, ok = ri1.Tag(key1)
+	_, ok = ri1.Tag(key1)
 	test.Assert(t, !ok)
 	v, ok = ri1.Tag(key2)
+	test.Assert(t, ok)
 	test.Assert(t, v == val2)
 
 	// test the data race problem caused by tag modification
