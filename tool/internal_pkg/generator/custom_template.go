@@ -60,6 +60,8 @@ type Template struct {
 	// If set this field, kitex will generate file by cycle. For example:
 	// test_a/test_b/{{ .Name}}_test.go
 	LoopMethod bool `yaml:"loop_method,omitempty"`
+	// If both set this field and combine-service, kitex will generate service by cycle.
+	LoopService bool `yaml:"loop_service,omitempty"`
 }
 
 type customGenerator struct {
@@ -163,24 +165,38 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 	if err != nil {
 		return nil, err
 	}
-
-	cg := NewCustomGenerator(pkg, g.OutputPath)
 	for _, tpl := range t {
-		// special handling Methods field
-		if tpl.LoopMethod {
-			err = cg.loopGenerate(tpl)
-			if err != nil {
-				return cg.fs, err
+		if tpl.LoopService && g.CombineService {
+			svrInfo, cs := pkg.ServiceInfo, pkg.CombineServices
+			for i := range cs {
+				pkg.ServiceInfo = cs[i]
+				f, err := renderFile(pkg, g.OutputPath, tpl)
+				if err != nil {
+					return nil, err
+				}
+				fs = append(fs, f...)
 			}
+			pkg.ServiceInfo, pkg.CombineServices = svrInfo, cs
 		} else {
-			err = cg.commonGenerate(tpl)
+			f, err := renderFile(pkg, g.OutputPath, tpl)
 			if err != nil {
-				return cg.fs, err
+				return nil, err
 			}
+			fs = append(fs, f...)
 		}
 	}
+	return
+}
 
-	return cg.fs, nil
+func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File, err error) {
+	cg := NewCustomGenerator(pkg, outputPath)
+	// special handling Methods field
+	if tpl.LoopMethod {
+		err = cg.loopGenerate(tpl)
+	} else {
+		err = cg.commonGenerate(tpl)
+	}
+	return cg.fs, err
 }
 
 func readTemplates(dir string) ([]*Template, error) {
