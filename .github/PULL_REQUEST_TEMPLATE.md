@@ -23,7 +23,7 @@ Please check your PR title with the below requirements:
 -->
 - [ ] This PR title match the format: \<type\>(optional scope): \<description\>
 - [ ] The description of this PR title is user-oriented and clear enough for others to understand.
-- [ ] Attach the PR that updates the user docs, if current PR need user's awareness from use level. [User docs repo](https://github.com/cloudwego/cloudwego.github.io)
+- [ ] Attach the PR updating the user documentation if the current PR requires user awareness at the usage level. [User docs repo](https://github.com/cloudwego/cloudwego.github.io)
 
 
 #### (Optional) Translate the PR title into Chinese.
@@ -42,7 +42,7 @@ Automatically closes linked issue when PR is merged.
 Eg: `Fixes #<issue number>`, or `Fixes (paste link of issue)`.
 -->
 
-#### (optional) The PR that updates user docs:
+#### (optional) The PR that updates user documentation:
 <!--
-If current PR need user's awareness from use level, please submit a PR to update user docs. [User docs repo](https://github.com/cloudwego/cloudwego.github.io)
+If the current PR requires user awareness at the usage level, please submit a PR to update user docs. [User docs repo](https://github.com/cloudwego/cloudwego.github.io)
 -->
