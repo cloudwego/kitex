@@ -32,8 +32,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-func newFailureRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
-	fr := &failureRetryer{cbContainer: cbC}
+func newFailureRetryer(policy Policy, r *ShouldResultRetry, cbC *cbContainer) (Retryer, error) {
+	fr := &failureRetryer{specifiedResultRetry: r, cbContainer: cbC}
 	if err := fr.UpdatePolicy(policy); err != nil {
 		return nil, fmt.Errorf("newfailureRetryer failed, err=%w", err)
 	}
@@ -41,10 +41,11 @@ func newFailureRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
 }
 
 type failureRetryer struct {
-	enable      bool
-	policy      *FailurePolicy
-	backOff     BackOff
-	cbContainer *cbContainer
+	enable               bool
+	policy               *FailurePolicy
+	backOff              BackOff
+	cbContainer          *cbContainer
+	specifiedResultRetry *ShouldResultRetry
 	sync.RWMutex
 	errMsg string
 }
@@ -188,6 +189,7 @@ func (r *failureRetryer) UpdatePolicy(rp Policy) (err error) {
 		return err
 	}
 	r.policy = rp.FailurePolicy
+	r.setSpecifiedResultRetryIfNeeded(r.specifiedResultRetry)
 	if bo, e := initBackOff(rp.FailurePolicy.BackOffPolicy); e != nil {
 		r.errMsg = fmt.Sprintf("failureRetryer update BackOffPolicy failed, err=%s", e.Error())
 		klog.Warnf(r.errMsg)
@@ -219,7 +221,7 @@ func (r *failureRetryer) isRetryErr(err error, ri rpcinfo.RPCInfo) bool {
 	// But CircuitBreak has been checked in ShouldRetry, it doesn't need to filter ServiceCircuitBreak.
 	// If there are some other specified errors that cannot be retried, it should be filtered here.
 
-	if kerrors.IsTimeoutError(err) {
+	if r.policy.IsRetryForTimeout() && kerrors.IsTimeoutError(err) {
 		return true
 	}
 	if r.policy.IsErrorRetryNonNil() && r.policy.ShouldResultRetry.ErrorRetry(err, ri) {
@@ -283,4 +285,14 @@ func (r *failureRetryer) Dump() map[string]interface{} {
 		dm["errMsg"] = r.errMsg
 	}
 	return dm
+}
+
+func (r *failureRetryer) setSpecifiedResultRetryIfNeeded(rr *ShouldResultRetry) {
+	if rr != nil {
+		r.specifiedResultRetry = rr
+	}
+	if r.policy != nil && r.policy.ShouldResultRetry == nil {
+		// The priority of FailurePolicy.ShouldResultRetry is higher, so only update it when it's nil
+		r.policy.ShouldResultRetry = r.specifiedResultRetry
+	}
 }

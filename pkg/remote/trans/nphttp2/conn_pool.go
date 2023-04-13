@@ -91,10 +91,10 @@ func (t *transports) put(trans grpc.ClientTransport) {
 }
 
 // close all connections of the pool.
-func (c *transports) close() {
-	for i := range c.cliTransports {
-		if t := c.cliTransports[i]; t != nil {
-			t.GracefulClose()
+func (t *transports) close() {
+	for i := range t.cliTransports {
+		if c := t.cliTransports[i]; c != nil {
+			c.GracefulClose()
 		}
 	}
 }

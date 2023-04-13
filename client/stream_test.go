@@ -102,13 +102,24 @@ func TestStreaming(t *testing.T) {
 		kc:     kc,
 	}
 
-	// recv nil msg
-	err = stream.RecvMsg(nil)
-	test.Assert(t, err == nil, err)
+	for i := 0; i < 10; i++ {
+		ch := make(chan struct{})
+		// recv nil msg
+		go func() {
+			err := stream.RecvMsg(nil)
+			test.Assert(t, err == nil, err)
+			ch <- struct{}{}
+		}()
 
-	// send nil msg
-	err = stream.SendMsg(nil)
-	test.Assert(t, err == nil, err)
+		// send nil msg
+		go func() {
+			err := stream.SendMsg(nil)
+			test.Assert(t, err == nil, err)
+			ch <- struct{}{}
+		}()
+		<-ch
+		<-ch
+	}
 
 	// close
 	err = stream.Close()

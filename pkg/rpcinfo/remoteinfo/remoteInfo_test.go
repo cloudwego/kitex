@@ -17,8 +17,13 @@
 package remoteinfo_test
 
 import (
+	"sync"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
+	"github.com/cloudwego/kitex/internal"
+	mocksdiscovery "github.com/cloudwego/kitex/internal/mocks/discovery"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -129,4 +134,104 @@ func TestSetTag(t *testing.T) {
 	ri.ForceSetTag(unlockKey, "bb")
 	val, _ = ri.Tag(unlockKey)
 	test.Assert(t, val == "bb")
+}
+
+func TestGetTag(t *testing.T) {
+	clusterKey, idcKey, myCluster, myIDC, mock := "cluster", "idc", "myCluster", "myIDC", "mock"
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	inst := mocksdiscovery.NewMockInstance(ctrl)
+	inst.EXPECT().Tag(gomock.Any()).DoAndReturn(
+		func(key string) (string, bool) {
+			switch key {
+			case clusterKey:
+				return myCluster, true
+			case idcKey:
+				return myIDC, true
+			}
+			return "", false
+		}).AnyTimes()
+
+	bi := &rpcinfo.EndpointBasicInfo{
+		ServiceName: "service",
+	}
+	ri := remoteinfo.NewRemoteInfo(bi, "method1")
+
+	// case1: no cluster and idc
+	valCluster, clusterOk := ri.Tag(clusterKey)
+	valIDC, idcOk := ri.Tag(idcKey)
+	test.Assert(t, !clusterOk)
+	test.Assert(t, valCluster == "", valCluster)
+	test.Assert(t, !idcOk)
+	test.Assert(t, valIDC == "", valIDC)
+
+	// case2: have cluster and idc which value are from tag set
+	ri.SetTag(clusterKey, mock)
+	ri.SetTag(idcKey, mock)
+	valCluster, clusterOk = ri.Tag(clusterKey)
+	valIDC, idcOk = ri.Tag(idcKey)
+	test.Assert(t, clusterOk)
+	test.Assert(t, valCluster == mock, valCluster)
+	test.Assert(t, idcOk)
+	test.Assert(t, valIDC == mock, valIDC)
+
+	// case3: have cluster and idc which value are from instance, the priority of tags from instance is higher than tag set
+	ri.SetInstance(inst)
+	valCluster, clusterOk = ri.Tag(clusterKey)
+	valIDC, idcOk = ri.Tag(idcKey)
+	test.Assert(t, clusterOk)
+	test.Assert(t, valCluster == myCluster, valCluster)
+	test.Assert(t, idcOk)
+	test.Assert(t, valIDC == myIDC, valIDC)
+}
+
+func TestCopyFromRace(t *testing.T) {
+	key1, key2, val1, val2 := "key1", "key2", "val1", "val2"
+	ri1 := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "service", Tags: map[string]string{key1: val1}}, "method1")
+	v, ok := ri1.Tag(key1)
+	test.Assert(t, ok)
+	test.Assert(t, v == val1)
+
+	ri2 := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "service", Tags: map[string]string{key2: val2}}, "method1")
+	// do copyFrom ri2
+	ri1.CopyFrom(ri2)
+	_, ok = ri1.Tag(key1)
+	test.Assert(t, !ok)
+	v, ok = ri1.Tag(key2)
+	test.Assert(t, ok)
+	test.Assert(t, v == val2)
+
+	// test the data race problem caused by tag modification
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		ri2.ForceSetTag("key11", "val11")
+		wg.Done()
+	}()
+	go func() {
+		ri1.Tag("key2")
+		wg.Done()
+	}()
+	wg.Wait()
+
+	// test if dead lock
+	ri1.CopyFrom(ri1)
+}
+
+func TestRecycleRace(t *testing.T) {
+	ri := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "service", Tags: map[string]string{"key1": "val1"}}, "method1")
+
+	// test the data race problem caused by tag modification
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		ri.ForceSetTag("key11", "val11")
+		wg.Done()
+	}()
+	go func() {
+		ri.(internal.Reusable).Recycle()
+		wg.Done()
+	}()
+	wg.Wait()
 }

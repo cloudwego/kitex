@@ -544,11 +544,20 @@ func TestRetryWithResultRetry(t *testing.T) {
 
 	mockErr := errors.New("mock")
 	retryWithMockErr := false
-	var count int32
 	errMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+		var count int32
 		return func(ctx context.Context, req, resp interface{}) (err error) {
 			if atomic.CompareAndSwapInt32(&count, 0, 1) {
 				return mockErr
+			}
+			return nil
+		}
+	}
+	mockTimeoutMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+		var count int32
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			if atomic.CompareAndSwapInt32(&count, 0, 1) {
+				time.Sleep(300 * time.Millisecond)
 			}
 			return nil
 		}
@@ -561,7 +570,7 @@ func TestRetryWithResultRetry(t *testing.T) {
 		return false
 	}
 
-	// should timeout
+	// case 1: retry for mockErr
 	cli := newMockClient(t, ctrl,
 		WithMiddleware(errMW),
 		WithRPCTimeout(100*time.Millisecond),
@@ -580,6 +589,40 @@ func TestRetryWithResultRetry(t *testing.T) {
 	err := cli.Call(context.Background(), mtd, req, res)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, retryWithMockErr)
+
+	// case 1: retry for timeout
+	cli = newMockClient(t, ctrl,
+		WithMiddleware(mockTimeoutMW),
+		WithRPCTimeout(100*time.Millisecond),
+		WithFailureRetry(&retry.FailurePolicy{
+			StopPolicy: retry.StopPolicy{
+				MaxRetryTimes: 3,
+				CBPolicy: retry.CBPolicy{
+					ErrorRate: 0.1,
+				},
+			},
+			RetrySameNode:     true,
+			ShouldResultRetry: &retry.ShouldResultRetry{ErrorRetry: errRetryFunc},
+		}))
+	err = cli.Call(context.Background(), mtd, req, res)
+	test.Assert(t, err == nil, err)
+
+	// case 2: set NotRetryForTimeout as true, won't do retry for timeout
+	cli = newMockClient(t, ctrl,
+		WithMiddleware(mockTimeoutMW),
+		WithRPCTimeout(100*time.Millisecond),
+		WithFailureRetry(&retry.FailurePolicy{
+			StopPolicy: retry.StopPolicy{
+				MaxRetryTimes: 3,
+				CBPolicy: retry.CBPolicy{
+					ErrorRate: 0.1,
+				},
+			},
+			RetrySameNode:     true,
+			ShouldResultRetry: &retry.ShouldResultRetry{ErrorRetry: errRetryFunc, NotRetryForTimeout: true},
+		}))
+	err = cli.Call(context.Background(), mtd, req, res)
+	test.Assert(t, errors.Is(err, kerrors.ErrRPCTimeout))
 }
 
 func TestFallbackForError(t *testing.T) {

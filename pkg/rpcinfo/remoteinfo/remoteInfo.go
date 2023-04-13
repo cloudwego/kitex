@@ -113,10 +113,12 @@ func (ri *remoteInfo) Tag(key string) (value string, exist bool) {
 	ri.RLock()
 	defer ri.RUnlock()
 
-	value, exist = ri.tags[key]
-	if !exist && ri.instance != nil {
-		value, exist = ri.instance.Tag(key)
+	if ri.instance != nil {
+		if value, exist = ri.instance.Tag(key); exist {
+			return
+		}
 	}
+	value, exist = ri.tags[key]
 	return
 }
 
@@ -174,18 +176,18 @@ func (ri *remoteInfo) ForceSetTag(key, value string) {
 }
 
 // CopyFrom copies the input RemoteInfo.
-// Not deepcopy.
+// the `from` param may be modified, so must do deep copy to prevent race.
 func (ri *remoteInfo) CopyFrom(from RemoteInfo) {
-	if from == nil {
+	if from == nil || ri == from {
 		return
 	}
 	ri.Lock()
 	f := from.(*remoteInfo)
 	ri.serviceName = f.serviceName
 	ri.instance = f.instance
-	ri.tags = f.tags
 	ri.method = f.method
-	ri.tagLocks = f.tagLocks
+	ri.tags = f.copyTags()
+	ri.tagLocks = f.copyTagsLocks()
 	ri.Unlock()
 }
 
@@ -194,7 +196,29 @@ func (ri *remoteInfo) ImmutableView() rpcinfo.EndpointInfo {
 	return ri
 }
 
+func (ri *remoteInfo) copyTags() map[string]string {
+	ri.Lock()
+	defer ri.Unlock()
+	newTags := make(map[string]string, len(ri.tags))
+	for k, v := range ri.tags {
+		newTags[k] = v
+	}
+	return newTags
+}
+
+func (ri *remoteInfo) copyTagsLocks() map[string]struct{} {
+	ri.Lock()
+	defer ri.Unlock()
+	newTagLocks := make(map[string]struct{}, len(ri.tagLocks))
+	for k, v := range ri.tagLocks {
+		newTagLocks[k] = v
+	}
+	return newTagLocks
+}
+
 func (ri *remoteInfo) zero() {
+	ri.Lock()
+	defer ri.Unlock()
 	ri.serviceName = ""
 	ri.method = ""
 	ri.instance = nil
