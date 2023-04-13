@@ -66,7 +66,7 @@ func (mp *MuxPool) Get(ctx context.Context, network, address string, opt remote.
 		if ok {
 			cs = v.(*conns)
 		} else {
-			cs = &conns{size: mp.size, conns: make([]*muxCliConn, mp.size)}
+			cs = &conns{size: uint32(mp.size), conns: make([]*muxCliConn, mp.size)}
 		}
 		cs.put(connection)
 		mp.connMap.Store(address, cs)
@@ -113,13 +113,13 @@ func (mp *MuxPool) Close() error {
 }
 
 type conns struct {
-	index int32
-	size  int32
+	index uint32
+	size  uint32
 	conns []*muxCliConn
 }
 
 func (c *conns) get() *muxCliConn {
-	i := atomic.AddInt32(&c.index, 1)
+	i := atomic.AddUint32(&c.index, 1)
 	return c.conns[i%c.size]
 }
 
