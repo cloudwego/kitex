@@ -237,7 +237,7 @@ func testThriftDynamicgo(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	gr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
-	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.GeneralBody.([]byte)), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(string(gr.GeneralBody.([]byte)), "msg").String())
+	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(string(gr.RawBody), "msg").String())
 
 	// write: dynamicgo (amd64), fallback (arm)
 	// read: fallback
@@ -341,7 +341,7 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 		test.Assert(&t, err == nil, err)
 		gr, ok := resp.(*generic.HTTPResponse)
 		test.Assert(&t, ok)
-		test.Assert(&t, reflect.DeepEqual(gjson.Get(string(gr.GeneralBody.([]byte)), "I64Field").String(), strconv.Itoa(math.MaxInt64)), gjson.Get(string(gr.GeneralBody.([]byte)), "I64Field").String())
+		test.Assert(&t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "I64Field").String(), strconv.Itoa(math.MaxInt64)), gjson.Get(string(gr.RawBody), "I64Field").String())
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -409,7 +409,7 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		test.Assert(&t, err == nil, err)
 		gr, ok := resp.(*generic.HTTPResponse)
 		test.Assert(&t, ok)
-		test.Assert(&t, reflect.DeepEqual(gjson.Get(string(gr.GeneralBody.([]byte)), "I32").String(), strconv.Itoa(math.MaxInt32)), gjson.Get(string(gr.GeneralBody.([]byte)), "I32").String())
+		test.Assert(&t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "I32").String(), strconv.Itoa(math.MaxInt32)), gjson.Get(string(gr.RawBody), "I32").String())
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -463,7 +463,7 @@ func testRegression(t *testing.T) {
 		EscapeHTML: true,
 		UseNumber:  true,
 	}.Froze()
-	err = customJson.Unmarshal(dgr.GeneralBody.([]byte), &dMapBody)
+	err = customJson.Unmarshal(dgr.RawBody, &dMapBody)
 	test.Assert(t, err == nil)
 	fBytes, err := customJson.Marshal(fgr.Body)
 	test.Assert(t, err == nil)
@@ -482,7 +482,7 @@ func testRegression(t *testing.T) {
 	test.Assert(t, reflect.DeepEqual(dgr.StatusCode, fgr.StatusCode))
 	test.Assert(t, reflect.DeepEqual(dgr.ContentType, fgr.ContentType))
 
-	err = customJson.Unmarshal(dgr.GeneralBody.([]byte), &dMapBody)
+	err = customJson.Unmarshal(dgr.RawBody, &dMapBody)
 	test.Assert(t, err == nil)
 	fBytes, err = customJson.Marshal(fgr.Body)
 	test.Assert(t, err == nil)
@@ -581,7 +581,7 @@ func testDynamicgoThriftBase64BinaryEcho(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	gr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
-	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.GeneralBody.([]byte)), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(string(gr.GeneralBody.([]byte)), "msg").String())
+	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(string(gr.RawBody), "msg").String())
 
 	// string value for binary field which should fail
 	body = map[string]interface{}{

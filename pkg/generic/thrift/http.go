@@ -61,17 +61,9 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 }
 
 // SetEnableDynamicgo enable/disable dynamicgo encoding.
-func (w *WriteHTTPRequest) SetEnableDynamicgo(enable bool) {
+func (w *WriteHTTPRequest) SetEnableDynamicgo(enable bool, opts conv.Options, method string) {
 	w.enableDynamicgo = enable
-}
-
-// SetConvOptions set the options to be used for dynamicgo encoding.
-func (w *WriteHTTPRequest) SetConvOptions(opts conv.Options) {
 	w.opts = opts
-}
-
-// SetMethodName set the method name.
-func (w *WriteHTTPRequest) SetMethodName(method string) {
 	w.method = method
 }
 
@@ -116,17 +108,9 @@ func (r *ReadHTTPResponse) SetBase64Binary(enable bool) {
 }
 
 // SetEnableDynamicgo enable/disable dynamicgo decoding.
-func (r *ReadHTTPResponse) SetEnableDynamicgo(enable bool) {
+func (r *ReadHTTPResponse) SetEnableDynamicgo(enable bool, opts conv.Options, msg remote.Message) {
 	r.enableDynamicgo = enable
-}
-
-// SetConvOptions set the options to be used for dynamicgo decoding.
-func (r *ReadHTTPResponse) SetConvOptions(opts conv.Options) {
 	r.opts = opts
-}
-
-// SetRemoteMessage set the remote message to be used for calculation of message length.
-func (r *ReadHTTPResponse) SetRemoteMessage(msg remote.Message) {
 	r.msg = msg
 }
 
@@ -162,7 +146,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		if len(buf) > structWrapLen {
 			buf = buf[structWrapLen : len(buf)-1]
 		}
-		resp.GeneralBody = buf
+		resp.RawBody = buf
 		return resp, nil
 	}
 	fnDsc, err := r.svc.LookupFunctionByMethod(method)

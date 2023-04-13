@@ -155,6 +155,7 @@ func (req *HTTPRequest) GetUri() string {
 type HTTPResponse struct {
 	Header      http.Header
 	StatusCode  int32
+	RawBody     []byte
 	Body        map[string]interface{}
 	GeneralBody interface{} // body of other representation, used with ContentType
 	ContentType MIMEType
