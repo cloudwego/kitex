@@ -72,7 +72,7 @@ func TestHttpThriftCodec(t *testing.T) {
 	err = htc.Marshal(ctx, sendMsg, out)
 	test.Assert(t, err == nil)
 
-	// UnMarshal side
+	// Unmarshal side
 	recvMsg := initHttpRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil)

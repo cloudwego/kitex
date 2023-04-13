@@ -63,6 +63,9 @@ func TestRun(t *testing.T) {
 	t.Run("TestJSONThriftGenericClientFinalizer", TestJSONThriftGenericClientFinalizer)
 }
 
+// TODO: exception test for normal
+// TODO: exception test for dynamicgo
+
 func testThrift(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":8121", new(GenericServiceImpl))

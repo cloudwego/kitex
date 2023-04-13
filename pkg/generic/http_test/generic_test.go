@@ -52,6 +52,9 @@ func TestRun(t *testing.T) {
 	t.Run("TestDynamicgoThriftBase64BinaryEcho", testDynamicgoThriftBase64BinaryEcho)
 }
 
+// TODO: exception test for normal
+// TODO: exception test for dynamicgo
+
 func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary bool) genericclient.Client {
 	p, err := generic.NewThriftFileProvider(idl)
 	test.Assert(t, err == nil)

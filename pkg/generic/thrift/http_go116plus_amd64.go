@@ -44,18 +44,13 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		t := w.svc.DynamicgoDsc.Functions()[w.method].Request()
 
 		body := req.GetBody()
+		// TODO: implement malloc and mallocack, size
 		buf := mcache.Malloc(len(body) + structWrapLen)
 
 		var offset int
 		offset += bthrift.Binary.WriteStructBegin(buf[offset:], t.Struct().Name())
 
 		for _, field := range t.Struct().Fields() {
-			// TODO: support Exception
-			//if field.IsException {
-			//	// generic server ignore the exception, because no description for exception
-			//	// generic handler just return error
-			//	continue
-			//}
 			offset += bthrift.Binary.WriteFieldBegin(buf[offset:], field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID()))
 
 			ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
@@ -64,6 +59,9 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 			if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
 				return err
 			} else {
+				if offset+len(dbuf) > len(buf) {
+					// TODO: reallocate buf to expand len and copy the data of dbuf
+				}
 				offset += len(dbuf)
 			}
 

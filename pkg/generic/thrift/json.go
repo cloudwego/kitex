@@ -49,9 +49,9 @@ func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient boo
 	}
 	var dty *dthrift.TypeDescriptor
 	if svc.DynamicgoDsc != nil {
-		dty = svc.DynamicgoDsc.Functions()[method].Request().Struct().Fields()[0].Type()
+		dty = svc.DynamicgoDsc.Functions()[method].Request()
 		if !isClient {
-			dty = svc.DynamicgoDsc.Functions()[method].Response().Struct().Fields()[0].Type()
+			dty = svc.DynamicgoDsc.Functions()[method].Response()
 		}
 	}
 	ws := &WriteJSON{
@@ -182,6 +182,7 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 		} else {
 			tyDsc = m.svc.DynamicgoDsc.Functions()[method].Request()
 		}
+
 		var resp interface{}
 		if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.VOID {
 			if _, err := tProt.ByteBuffer().ReadBinary(voidWholeLen); err != nil {
@@ -196,6 +197,7 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 			}
 
 			buf := make([]byte, 0, len(transBuff)*2)
+			// TODO: enable conversion of exception field -> m.opts.ConvertException = true
 			cv := t2j.NewBinaryConv(m.opts)
 			// thrift []byte to json []byte
 			if err := cv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {

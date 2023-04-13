@@ -23,6 +23,7 @@ import (
 	"context"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -50,32 +51,47 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 			return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
 		}
 
-		buf := make([]byte, fieldBeginLen, msgLen+structWrapLen)
-		offset := 0
-		offset += bthrift.Binary.WriteStructBegin(buf[offset:], "")
-		if m.isClient {
-			offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "", m.dty.Type().ToThriftTType(), 1)
-		} else {
-			offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "", m.dty.Type().ToThriftTType(), 0)
-		}
-		if isString {
-			// encode using dynamicgo
-			cv := j2t.NewBinaryConv(m.opts)
-			v := utils.StringToSliceByte(transBuff)
-			// json []byte to thrift []byte
-			err := cv.DoInto(ctx, m.dty, v, &buf)
-			if err != nil {
-				return err
+		// TODO: implement malloc and mallocack (to reuse object) / `2*` is temporarily
+		buf := mcache.Malloc(2 * (msgLen + structWrapLen))
+
+		var offset int
+		offset += bthrift.Binary.WriteStructBegin(buf[offset:], m.dty.Struct().Name())
+
+		for _, field := range m.dty.Struct().Fields() {
+			if m.isClient {
+				offset += bthrift.Binary.WriteFieldBegin(buf[offset:], field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID()))
+			} else {
+				// Exception field
+				if field.ID() != 0 {
+					// generic server ignore the exception, because no description for exception
+					// generic handler just return error
+					continue
+				}
+				offset += bthrift.Binary.WriteFieldBegin(buf[offset:], field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID()))
 			}
-			offset = len(buf)
-		} else {
-			offset += bthrift.Binary.WriteStructEnd(buf[offset:])
-			buf = append(buf, 0)
-			offset += bthrift.Binary.WriteFieldStop(buf[offset:])
-			offset += bthrift.Binary.WriteStructEnd(buf[offset:])
+
+			if isString {
+				// encode using dynamicgo
+				cv := j2t.NewBinaryConv(m.opts)
+				v := utils.StringToSliceByte(transBuff)
+				// json []byte to thrift []byte
+				dbuf := buf[offset:offset]
+				if err := cv.DoInto(ctx, field.Type(), v, &dbuf); err != nil {
+					return err
+				} else {
+					if offset+len(dbuf) > len(buf) {
+						// TODO: reallocate buf to expand len and copy the data of dbuf
+					}
+					offset += len(dbuf)
+				}
+			} else {
+				offset += bthrift.Binary.WriteStructEnd(buf[offset:])
+				offset += bthrift.Binary.WriteFieldStop(buf[offset:])
+				offset += bthrift.Binary.WriteStructEnd(buf[offset:])
+			}
+			offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
 		}
-		offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
-		buf = append(buf, 0)
+
 		offset += bthrift.Binary.WriteFieldStop(buf[offset:])
 		bthrift.Binary.WriteStructEnd(buf[offset:])
 
@@ -83,7 +99,7 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		if !ok {
 			return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 		}
-		_, err := tProt.ByteBuffer().WriteBinary(buf)
+		_, err := tProt.ByteBuffer().WriteBinary(buf[:offset])
 		return err
 	}
 	return m.originalWrite(ctx, out, msg, requestBase)
