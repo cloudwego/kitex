@@ -79,6 +79,9 @@ func NewCustomGenerator(pkg *PackageInfo, basePath string) *customGenerator {
 
 func (c *customGenerator) loopGenerate(tpl *Template) error {
 	tmp := c.pkg.Methods
+	defer func() {
+		c.pkg.Methods = tmp
+	}()
 	m := c.pkg.AllMethods()
 	for _, method := range m {
 		c.pkg.Methods = []*MethodInfo{method}
@@ -105,11 +108,17 @@ func (c *customGenerator) loopGenerate(tpl *Template) error {
 		}
 		c.fs = append(c.fs, f)
 	}
-	c.pkg.Methods = tmp
 	return nil
 }
 
 func (c *customGenerator) commonGenerate(tpl *Template) error {
+	// Use all services including base service.
+	tmp := c.pkg.Methods
+	defer func() {
+		c.pkg.Methods = tmp
+	}()
+	c.pkg.Methods = c.pkg.AllMethods()
+
 	pathTask := &Task{
 		Text: tpl.Path,
 	}
@@ -123,7 +132,6 @@ func (c *customGenerator) commonGenerate(tpl *Template) error {
 		log.Infof("skip generate file %s", tpl.Path)
 		return nil
 	}
-
 	var f *File
 	if update && updateType(tpl.UpdateBehavior.Type) == incrementalUpdate {
 		cc := &commonCompleter{
@@ -168,6 +176,7 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 	for _, tpl := range t {
 		if tpl.LoopService && g.CombineService {
 			svrInfo, cs := pkg.ServiceInfo, pkg.CombineServices
+
 			for i := range cs {
 				pkg.ServiceInfo = cs[i]
 				f, err := renderFile(pkg, g.OutputPath, tpl)
@@ -185,7 +194,7 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 			fs = append(fs, f...)
 		}
 	}
-	return
+	return fs, nil
 }
 
 func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File, err error) {
@@ -195,6 +204,14 @@ func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File,
 		err = cg.loopGenerate(tpl)
 	} else {
 		err = cg.commonGenerate(tpl)
+	}
+	if err == errNoNewMethod {
+		_serviceName := pkg.PkgName
+		if pkg.Base != nil {
+			_serviceName = pkg.Base.PkgName
+		}
+		log.Warnf("service %s does not need to update template: %s ", _serviceName, tpl.Path)
+		err = nil
 	}
 	return cg.fs, err
 }
