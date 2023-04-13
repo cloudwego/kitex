@@ -328,7 +328,7 @@ func TestThriftReflect(t *testing.T) {
 	err = root.Load(false, DynamicgoOptions)
 	test.Assert(t, err == nil, err)
 	spew.Dump(root)
-	require_field2, err := root.Next[1].Node.String()
+	require_field2, err := root.Field(2, DynamicgoOptions).Node.String()
 	test.Assert(t, err == nil, err)
 	test.Assert(t, require_field2 == "pending", require_field2)
 
@@ -336,7 +336,7 @@ func TestThriftReflect(t *testing.T) {
 	err = root.Load(true, DynamicgoOptions)
 	test.Assert(t, err == nil, err)
 	spew.Dump(root)
-	logid, err := root.Next[2].Next[0].Node.String()
+	logid, err := root.Field(255, DynamicgoOptions).Field(1, DynamicgoOptions).Node.String()
 	test.Assert(t, logid == "1", logid)
 
 }
