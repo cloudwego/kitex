@@ -24,6 +24,11 @@ import (
 
 var isGoTagAliasDisabled = os.Getenv("KITEX_GENERIC_GOTAG_ALIAS_DISABLED") == "True"
 
+// SetGoTagAliasDisabled sets whether go.tag alias is disabled.
+func SetGoTagAliasDisabled(disable bool) {
+	isGoTagAliasDisabled = disable
+}
+
 // FieldDescriptor idl field descriptor
 type FieldDescriptor struct {
 	Name         string // field name
