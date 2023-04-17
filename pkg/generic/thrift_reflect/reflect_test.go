@@ -18,6 +18,7 @@ package test
 
 import (
 	"context"
+	"errors"
 	"math/rand"
 	"net"
 	"strconv"
@@ -45,6 +46,25 @@ func TestMain(m *testing.M)() {
 	m.Run()
 }
 
+var (
+	ExampleReqDesc *dt.TypeDescriptor
+	ExampleRespDesc *dt.TypeDescriptor
+    StrDesc *dt.TypeDescriptor
+    BaseLogidPath []dg.Path
+    DynamicgoOptions = &dg.Options{}
+)
+
+func initDescriptor() {
+	sdesc, err := dt.NewDescritorFromPath(context.Background(), "idl/example.thrift")
+	if err != nil {
+		panic(err)
+	}
+	ExampleReqDesc = sdesc.Functions()["ExampleMethod"].Request().Struct().FieldById(1).Type()
+	ExampleRespDesc = sdesc.Functions()["ExampleMethod"].Response().Struct().FieldById(0).Type()
+	StrDesc = ExampleReqDesc.Struct().FieldById(1).Type()
+	BaseLogidPath = []dg.Path{dg.NewPathFieldName("Base"), dg.NewPathFieldName("LogID")}
+}
+
 func initServer() {
 	// init special server
 	addr, _ := net.ResolveTCPAddr("tcp", ":9009")
@@ -65,25 +85,6 @@ func initClient() {
 	g := generic.BinaryThriftGeneric()
 	genericCli, _ := genericclient.NewClient("destServiceName", g, client.WithHostPorts("127.0.0.1:9009"))
 	cli = genericCli
-}
-
-var (
-	ExampleReqDesc *dt.TypeDescriptor
-	ExampleRespDesc *dt.TypeDescriptor
-    StrDesc *dt.TypeDescriptor
-    BaseLogid []dg.Path
-    DynamicgoOptions = &dg.Options{}
-)
-
-func initDescriptor() {
-	sdesc, err := dt.NewDescritorFromPath(context.Background(), "idl/example.thrift")
-	if err != nil {
-		panic(err)
-	}
-	ExampleReqDesc = sdesc.Functions()["ExampleMethod"].Request().Struct().FieldById(1).Type()
-	ExampleRespDesc = sdesc.Functions()["ExampleMethod"].Response().Struct().FieldById(0).Type()
-	StrDesc = ExampleReqDesc.Struct().FieldById(1).Type()
-	BaseLogid = []dg.Path{dg.NewPathFieldName("Base"), dg.NewPathFieldName("LogID")}
 }
 
 // exampleRespPool gives the thrift DOM used for make thrift message and set its initial values
@@ -275,20 +276,30 @@ type ExampleValueServiceImpl struct{}
 func (g *ExampleValueServiceImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
 	// get and unwrap body with message
 	in := request.([]byte)
+
+	// unwarp thrift message and get request body
 	methodName, _, seqID, _, body, err := dt.UnwrapBinaryMessage(in)
 
+	// biz logic
+	resp, err := ExampleServerHandler(body)
+
+	// wrap response as thrift REPLY message
+	return dt.WrapBinaryBody(resp, methodName, dt.REPLY, 0, seqID)
+}
+
+// biz logic
+func ExampleServerHandler(request []byte) (resp []byte, err error) {
 	// wrap body as Value
-	req := dg.NewValue(ExampleReqDesc, body)
+	req := dg.NewValue(ExampleReqDesc, request)
 	if err != nil {
 		return nil, err
 	}
 
-	// biz logic
 	required_field := ""
 	logid := ""
 	// if B == true then get logid and required_field
 	if b, err := req.FieldByName("B").Bool(); err == nil && b {
-		if e := req.GetByPath(BaseLogid...); e.Error() != ""{
+		if e := req.GetByPath(BaseLogidPath...); e.Error() != ""{
 			return nil, e
 		} else {
 			logid, _ = e.String()
@@ -301,16 +312,10 @@ func (g *ExampleValueServiceImpl) GenericCall(ctx context.Context, method string
 	}
 
 	// make response with checked values
-	resp, err := MakeExampleRespBinary(RespMsg, required_field, logid)
-	if err != nil {
-		return nil, err
-	}
-
-	// wrap response as thrift REPLY message
-	return dt.WrapBinaryBody(resp, methodName, dt.REPLY, 0, seqID)
+	return MakeExampleRespBinary(RespMsg, required_field, logid)
 }
 
-func TestThriftReflect(t *testing.T) {
+func ThriftReflectExample(t *testing.T) {
 	log_id := strconv.Itoa(rand.Int())
 
 	// make a request body
@@ -329,17 +334,33 @@ func TestThriftReflect(t *testing.T) {
 	_, _, _, _, body, err := dt.UnwrapBinaryMessage(out.([]byte))
 	test.Assert(t, err == nil, err)
 
+	// biz logic...
+	err = ExampleClientHandler(body, log_id)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// biz logic...
+func ExampleClientHandler(response []byte, log_id string) error {
 	// make dynamicgo/generic.Node with body
-	resp := dg.NewNode(dt.STRUCT, body)
-	test.Assert(t, err == nil, err)
+	resp := dg.NewNode(dt.STRUCT, response)
 
 	// check node values by Node APIs
 	msg, err := resp.Field(1).String()
-	test.Assert(t, err == nil, err)
-	test.Assert(t, msg == RespMsg, msg)
+	if err != nil {
+		return err
+	}
+	if  msg != RespMsg {
+		return errors.New("msg does not match")
+	}
 	require_field, err := resp.Field(2).String()
-	test.Assert(t, err == nil, err)
-	test.Assert(t, require_field == ReqMsg, require_field)
+	if err != nil {
+		return err
+	}
+	if require_field != ReqMsg {
+		return errors.New("require_field does not match")
+	}
 
 	// make dynamicgo/generic.PathNode with the node
 	root := dg.PathNode{
@@ -347,19 +368,58 @@ func TestThriftReflect(t *testing.T) {
 	}
 	// load **first layer** children
 	err = root.Load(false, DynamicgoOptions)
-	test.Assert(t, err == nil, err)
+	if err != nil {
+		return err
+	}
 	// spew.Dump(root) // -- only root.Next is set 
 	// check node values by PathNode APIs
 	require_field2, err := root.Field(2, DynamicgoOptions).Node.String()
-	test.Assert(t, err == nil, err)
-	test.Assert(t, require_field2 == ReqMsg, require_field2)
-
+	if err != nil {
+		return err
+	}
+	if require_field2 != ReqMsg {
+		return errors.New("require_field2 does not match")
+	}
 	// load **all layers** children
 	err = root.Load(true, DynamicgoOptions)
-	test.Assert(t, err == nil, err)
+	if err != nil {
+		return err
+	}
 	// spew.Dump(root) // -- every PathNode.Next will be set if it is a nesting-typed (LIST/SET/MAP/STRUCT)
 	// check node values by PathNode APIs
 	logid, err := root.Field(255, DynamicgoOptions).Field(1, DynamicgoOptions).Node.String()
-	test.Assert(t, logid == log_id, logid)
+	if logid != log_id {
+		return errors.New("logid not match")
+	}
+
+	return nil
+}
+
+
+func BenchmarkThriftReflect(b *testing.B) {
+
+	for i := 0; i < b.N; i++ {
+		log_id := strconv.Itoa(rand.Int())
+
+		// make a request body
+		req, err := MakeExampleReqBinary(true, ReqMsg, log_id)
+		test.Assert(b, err == nil, err)
+
+		// wrap request as thrift CALL message
+		buf, err := dt.WrapBinaryBody(req, Method, dt.CALL, 1, 0)
+		test.Assert(b, err == nil, err)
+
+		// generic call
+		out, err := cli.GenericCall(context.Background(), Method, buf, callopt.WithRPCTimeout(1*time.Second))
+		test.Assert(b, err == nil, err)
+
+		// unwrap REPLY message and get resp body
+		_, _, _, _, body, err := dt.UnwrapBinaryMessage(out.([]byte))
+		test.Assert(b, err == nil, err)
+
+		// biz logic...
+		err = ExampleClientHandler(body, log_id)
+		test.Assert(b, err == nil, err)
+	}
 
 }
