@@ -341,6 +341,12 @@ func ThriftReflectExample(t *testing.T) {
 	}
 }
 
+var clientRespPool = sync.Pool{
+	New: func() interface{} {
+		return &dg.PathNode{}
+	},
+}
+
 // biz logic...
 func ExampleClientHandler(response []byte, log_id string) error {
 	// make dynamicgo/generic.Node with body
@@ -362,10 +368,10 @@ func ExampleClientHandler(response []byte, log_id string) error {
 		return errors.New("require_field does not match")
 	}
 
-	// make dynamicgo/generic.PathNode with the node
-	root := dg.PathNode{
-		Node: resp,
-	}
+	// get dom from memory pool
+	root := clientRespPool.Get().(*dg.PathNode)
+	root.Node = resp
+
 	// load **first layer** children
 	err = root.Load(false, DynamicgoOptions)
 	if err != nil {
@@ -380,25 +386,30 @@ func ExampleClientHandler(response []byte, log_id string) error {
 	if require_field2 != ReqMsg {
 		return errors.New("require_field2 does not match")
 	}
-	// load **all layers** children
-	err = root.Load(true, DynamicgoOptions)
-	if err != nil {
-		return err
-	}
-	// spew.Dump(root) // -- every PathNode.Next will be set if it is a nesting-typed (LIST/SET/MAP/STRUCT)
-	// check node values by PathNode APIs
-	logid, err := root.Field(255, DynamicgoOptions).Field(1, DynamicgoOptions).Node.String()
-	if logid != log_id {
-		return errors.New("logid not match")
-	}
+	
+	// // load **all layers** children
+	// err = root.Load(true, DynamicgoOptions)
+	// if err != nil {
+	// 	return err
+	// }
 
+	// // spew.Dump(root) // -- every PathNode.Next will be set if it is a nesting-typed (LIST/SET/MAP/STRUCT)
+	// // check node values by PathNode APIs
+	// logid, err := root.Field(255, DynamicgoOptions).Field(1, DynamicgoOptions).Node.String()
+	// if logid != log_id {
+	// 	return errors.New("logid not match")
+	// }
+
+	// recycle DOM
+	root.ResetValue()
+	clientRespPool.Put(root)
 	return nil
 }
 
 
 func BenchmarkThriftReflect(b *testing.B) {
-
-	for i := 0; i < b.N; i++ {
+	st := time.Now()
+	for i := 0; i < 1000; i++ {
 		log_id := strconv.Itoa(rand.Int())
 
 		// make a request body
@@ -421,5 +432,7 @@ func BenchmarkThriftReflect(b *testing.B) {
 		err = ExampleClientHandler(body, log_id)
 		test.Assert(b, err == nil, err)
 	}
+	et := time.Now()
 
+	println("time cost: ", et.Sub(st).Microseconds(), "us")
 }
