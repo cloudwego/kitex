@@ -18,13 +18,14 @@ package test
 
 import (
 	"context"
+	"math/rand"
 	"net"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/davecgh/go-spew/spew"
 
 	dt "github.com/cloudwego/dynamicgo/thrift"
 	dg "github.com/cloudwego/dynamicgo/thrift/generic"
@@ -85,8 +86,7 @@ func initDescriptor() {
 	BaseLogid = []dg.Path{dg.NewPathFieldName("Base"), dg.NewPathFieldName("LogID")}
 }
 
-const RespMsg = "ok"
-
+// exampleRespPool gives the thrift DOM used for make thrift message and set its initial values
 var exampleRespPool = sync.Pool{
 	New: func() interface{} {
 		return &dg.PathNode{
@@ -124,16 +124,25 @@ var exampleRespPool = sync.Pool{
 				},
 			},
 		}
-		
 	},
 }
 
+// MakeExampleRespBinary make a Thrift-Binary-Encoding response using ExampleResp structed DOM
+// Except msg, requre_field and logid, which are reset everytime, 
+// all other fields keeps original values from exampleRespPool
 func MakeExampleRespBinary(msg string, require_field string, logid string) ([]byte, error) {
+	// get DOM from sync.Pool, which make sure no-reset fields keep same value
 	dom := exampleRespPool.Get().(*dg.PathNode)
-	dom.Next[0].Node = dg.NewNodeString(msg)
-	dom.Next[1].Node = dg.NewNodeString(require_field)
-	dom.Next[2].Next[0].Node = dg.NewNodeString(logid)
+
+	// set biz-logic-related fields' values on the DOM
+	dom.Field(1, DynamicgoOptions).Node = dg.NewNodeString(msg)
+	dom.Field(2, DynamicgoOptions).Node = dg.NewNodeString(require_field)
+	dom.Field(255, DynamicgoOptions).Field(1, DynamicgoOptions).Node = dg.NewNodeString(logid)
+
+	// marshal DOM into thrift binary
 	out, err := dom.Marshal(DynamicgoOptions)
+
+	// recycle the DOM 
 	exampleRespPool.Put(dom)
 	return out, err
 }
@@ -180,9 +189,6 @@ var exampleReqPool = sync.Pool{
 									Node: dg.NewNodeString(""),
 								},
 							},
-						},
-						{
-							Path: dg.NewPathIndex(1),
 						},
 					},
 				},
@@ -235,18 +241,32 @@ var exampleReqPool = sync.Pool{
 	},
 }
 
+// MakeExampleReqBinary make a Thrift-Binary-Encoding request using ExampleReq structed DOM
+// Except B, A and logid, which are reset everytime, 
+// all other fields keeps original values from exampleReqPool
 func MakeExampleReqBinary(B bool, A string, logid string) ([]byte, error) {
+	// get DOM from sync.Pool, which make sure no-reset fields keep same value
 	dom := exampleReqPool.Get().(*dg.PathNode)
+
+	// set biz-logic-related fields' values on the DOM
 	dom.Next[2].Next[0].Next[0].Node = dg.NewNodeString(A)
 	dom.Next[3].Next[0].Next[0].Node = dg.NewNodeString(A)
 	dom.Next[5].Node = dg.NewNodeBool(B)
 	dom.Next[6].Next[0].Node = dg.NewNodeString(logid)
+
+	// marshal DOM into thrift binary
 	out, err := dom.Marshal(DynamicgoOptions)
+
+	// recycle the DOM 
 	exampleReqPool.Put(dom)
-	any, err := dt.NewBinaryProtocol(out).ReadAnyWithDesc(ExampleReqDesc, false, false, true)
-	spew.Dump(any)
 	return out, err
 }
+
+const (
+	Method = "ExampleMethod"
+	ReqMsg = "pending"
+	RespMsg = "ok"
+)
 
 // ExampleValueServiceImpl ...
 type ExampleValueServiceImpl struct{}
@@ -266,9 +286,8 @@ func (g *ExampleValueServiceImpl) GenericCall(ctx context.Context, method string
 	// biz logic
 	required_field := ""
 	logid := ""
-	// if B == true then set I64List[0] = "ok"
+	// if B == true then get logid and required_field
 	if b, err := req.FieldByName("B").Bool(); err == nil && b {
-		// check if I64List_0 exists
 		if e := req.GetByPath(BaseLogid...); e.Error() != ""{
 			return nil, e
 		} else {
@@ -292,51 +311,55 @@ func (g *ExampleValueServiceImpl) GenericCall(ctx context.Context, method string
 }
 
 func TestThriftReflect(t *testing.T) {
-	// make a request
-	method := "ExampleMethod"
-	req, err := MakeExampleReqBinary(true, "pending", "1")
+	log_id := strconv.Itoa(rand.Int())
+
+	// make a request body
+	req, err := MakeExampleReqBinary(true, ReqMsg, log_id)
 	test.Assert(t, err == nil, err)
 
 	// wrap request as thrift CALL message
-	buf, err := dt.WrapBinaryBody(req, method, dt.CALL, 1, 0)
+	buf, err := dt.WrapBinaryBody(req, Method, dt.CALL, 1, 0)
 	test.Assert(t, err == nil, err)
 
 	// generic call
-	out, err := cli.GenericCall(context.Background(), method, buf, callopt.WithRPCTimeout(1*time.Second))
+	out, err := cli.GenericCall(context.Background(), Method, buf, callopt.WithRPCTimeout(1*time.Second))
 	test.Assert(t, err == nil, err)
 
-	// unwrap REPLY message 
+	// unwrap REPLY message and get resp body
 	_, _, _, _, body, err := dt.UnwrapBinaryMessage(out.([]byte))
 	test.Assert(t, err == nil, err)
 
-	// create dynamicgo/generic.Node with body bytes
+	// make dynamicgo/generic.Node with body
 	resp := dg.NewNode(dt.STRUCT, body)
 	test.Assert(t, err == nil, err)
-	// check Field1 value
+
+	// check node values by Node APIs
 	msg, err := resp.Field(1).String()
 	test.Assert(t, err == nil, err)
 	test.Assert(t, msg == RespMsg, msg)
 	require_field, err := resp.Field(2).String()
 	test.Assert(t, err == nil, err)
-	test.Assert(t, require_field == "pending", require_field)
+	test.Assert(t, require_field == ReqMsg, require_field)
 
-	// create dynamicgo/generic.PathNode with root node
+	// make dynamicgo/generic.PathNode with the node
 	root := dg.PathNode{
 		Node: resp,
 	}
-	// load first layer children
+	// load **first layer** children
 	err = root.Load(false, DynamicgoOptions)
 	test.Assert(t, err == nil, err)
-	spew.Dump(root)
+	// spew.Dump(root) // -- only root.Next is set 
+	// check node values by PathNode APIs
 	require_field2, err := root.Field(2, DynamicgoOptions).Node.String()
 	test.Assert(t, err == nil, err)
-	test.Assert(t, require_field2 == "pending", require_field2)
+	test.Assert(t, require_field2 == ReqMsg, require_field2)
 
-	// load all layers children
+	// load **all layers** children
 	err = root.Load(true, DynamicgoOptions)
 	test.Assert(t, err == nil, err)
-	spew.Dump(root)
+	// spew.Dump(root) // -- every PathNode.Next will be set if it is a nesting-typed (LIST/SET/MAP/STRUCT)
+	// check node values by PathNode APIs
 	logid, err := root.Field(255, DynamicgoOptions).Field(1, DynamicgoOptions).Node.String()
-	test.Assert(t, logid == "1", logid)
+	test.Assert(t, logid == log_id, logid)
 
 }
