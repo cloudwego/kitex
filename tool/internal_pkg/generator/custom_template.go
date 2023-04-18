@@ -206,11 +206,6 @@ func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File,
 		err = cg.commonGenerate(tpl)
 	}
 	if err == errNoNewMethod {
-		_serviceName := pkg.PkgName
-		if pkg.Base != nil {
-			_serviceName = pkg.Base.PkgName
-		}
-		log.Warnf("service %s does not need to update template: %s ", _serviceName, tpl.Path)
 		err = nil
 	}
 	return cg.fs, err
