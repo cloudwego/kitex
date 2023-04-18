@@ -52,17 +52,65 @@ func TestMain(m *testing.M) {
 	msvr.Stop()
 }
 
+var (
+	SampleListSize = 100
+	SampleMapSize = 100
+)
+
 func TestThriftReflectExample(t *testing.T) {
-	testThriftReflectExample(t)
+	testThriftReflectExample_Node(t)
+	testThriftReflectExample_DOM(t)
 }
 
-func BenchmarkThriftReflectExample(b *testing.B) {
+func BenchmarkThriftReflectExample_Node(b *testing.B) {
 	for i:=0; i<b.N; i++ {
-		testThriftReflectExample(b)
+		testThriftReflectExample_Node(b)
 	}
 }
 
-func testThriftReflectExample(t testing.TB) {
+func BenchmarkThriftReflectExample_DOM(b *testing.B) {
+	for i:=0; i<b.N; i++ {
+		testThriftReflectExample_DOM(b)
+	}
+}
+
+func testThriftReflectExample_Node(t testing.TB) {
+	log_id := strconv.Itoa(rand.Int())
+
+	// make a request body
+	req, err := MakeExampleReqBinary(true, ReqMsg, log_id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wrap request as thrift CALL message
+	buf, err := dt.WrapBinaryBody(req, Method, dt.CALL, 1, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// generic call
+	out, err := cli.GenericCall(context.Background(), Method, buf, callopt.WithRPCTimeout(1*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// println("data size:", len(out.([]byte)) + len(req), "B")
+
+	// unwrap REPLY message and get resp body
+	_, _, _, _, body, err := dt.UnwrapBinaryMessage(out.([]byte))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// biz logic...
+	err = ExampleClientHandler_Node(body, log_id)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func testThriftReflectExample_DOM(t testing.TB) {
 	log_id := strconv.Itoa(rand.Int())
 
 	// make a request body
@@ -90,7 +138,7 @@ func testThriftReflectExample(t testing.TB) {
 	}
 
 	// biz logic...
-	err = ExampleClientHandler(body, log_id)
+	err = ExampleClientHandler_DOM(body, log_id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,168 +186,153 @@ func initClient(addr string) {
 	cli = genericCli
 }
 
-// exampleRespPool gives the thrift DOM used for make thrift message and set its initial values
-var exampleRespPool = sync.Pool{
-	New: func() interface{} {
-		return &dg.PathNode{
-			Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
-			Next: []dg.PathNode{
-				{
-					Path: dg.NewPathFieldId(1),
-					Node: dg.NewNodeString(""),
-				},
-				{
-					Path: dg.NewPathFieldId(2),
-					Node: dg.NewNodeString(""),
-				},
-				{
-					Path: dg.NewPathFieldId(255),
-					Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
-					Next: []dg.PathNode{
-						{
-							Path: dg.NewPathFieldId(1),
-							Node: dg.NewNodeString(""),
-						},
-					},
-				},
-			},
-		}
-	},
-}
-
 // MakeExampleRespBinary make a Thrift-Binary-Encoding response using ExampleResp structed DOM
-// Except msg, requre_field and logid, which are reset everytime, 
-// all other fields keeps original values from exampleRespPool
+// Except msg, requre_field and logid, which are reset everytime
 func MakeExampleRespBinary(msg string, require_field string, logid string) ([]byte, error) {
-	// get DOM from sync.Pool, which make sure no-reset fields keep same value
-	dom := exampleRespPool.Get().(*dg.PathNode)
-
-	// set biz-logic-related fields' values on the DOM
-	dom.Field(1, DynamicgoOptions).Node = dg.NewNodeString(msg)
-	dom.Field(2, DynamicgoOptions).Node = dg.NewNodeString(require_field)
-	dom.Field(255, DynamicgoOptions).Field(1, DynamicgoOptions).Node = dg.NewNodeString(logid)
-
-	// marshal DOM into thrift binary
-	out, err := dom.Marshal(DynamicgoOptions)
-
-	// recycle the DOM 
-	exampleRespPool.Put(dom)
-	return out, err
-}
-
-var exampleReqPool = sync.Pool{
-	New: func() interface{} {
-		return &dg.PathNode{
-			Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
-			Next: []dg.PathNode{
-				{
-					Path: dg.NewPathFieldId(1),
-					Node: dg.NewNodeString("Hello"),
-				},
-				{
-					Path: dg.NewPathFieldId(2),
-					Node: dg.NewNodeInt32(1),
-				},
-				{
-					Path: dg.NewPathFieldId(3),
-					Node: dg.NewTypedNode(thrift.LIST, thrift.STRUCT, 0),
-					Next: []dg.PathNode{
-						{
-							Path: dg.NewPathIndex(0),
-							Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
-							Next: []dg.PathNode{
-								{
-									Path: dg.NewPathFieldId(1),
-									Node: dg.NewNodeString(""),
-								},
-							},
-						},
-					},
-				},
-				{
-					Path: dg.NewPathFieldId(4),
-					Node: dg.NewTypedNode(thrift.MAP, thrift.STRUCT, thrift.STRING),
-					Next: []dg.PathNode{
-						{
-							Path: dg.NewPathStrKey("a"),
-							Node:  dg.NewTypedNode(thrift.STRUCT, 0, 0),
-							Next: []dg.PathNode{
-								{
-									Path: dg.NewPathFieldId(1),
-									Node: dg.NewNodeString(""),
-								},
-							},
-						},
-					},
-				},
-				{
-					Path: dg.NewPathFieldId(6),
-					Node: dg.NewTypedNode(thrift.LIST,  thrift.I64, 0),
-					Next: []dg.PathNode{
-						{
-							Path: dg.NewPathIndex(0),
-							Node: dg.NewNodeInt64(1),
-						},
-						{
-							Path: dg.NewPathIndex(1),
-							Node: dg.NewNodeInt64(2),
-						},
-						{
-							Path: dg.NewPathIndex(2),
-							Node: dg.NewNodeInt64(3),
-						},
-					},
-				},
-				{
-					Path: dg.NewPathFieldId(7),
-					Node: dg.NewNodeBool(false),
-				},
-				{
-					Path: dg.NewPathFieldId(255),
-					Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
-					Next: []dg.PathNode{
-						{
-							Path: dg.NewPathFieldId(1),
-							Node: dg.NewNodeString(""),
-						},
-						{
-							Path: dg.NewPathFieldId(2),
-							Node: dg.NewNodeString("a.b.c"),
-						},
-						{
-							Path: dg.NewPathFieldId(3),
-							Node: dg.NewNodeString("127.0.0.1"),
-						},
-						{
-							Path: dg.NewPathFieldId(4),
-							Node: dg.NewNodeString("dynamicgo"),
-						},
+	dom := &dg.PathNode{
+		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+		Next: []dg.PathNode{
+			{
+				Path: dg.NewPathFieldId(1),
+				Node: dg.NewNodeString(msg),
+			},
+			{
+				Path: dg.NewPathFieldId(2),
+				Node: dg.NewNodeString(require_field),
+			},
+			{
+				Path: dg.NewPathFieldId(255),
+				Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+				Next: []dg.PathNode{
+					{
+						Path: dg.NewPathFieldId(1),
+						Node: dg.NewNodeString(logid),
 					},
 				},
 			},
-		}
-	},
+		},
+	}
+	return dom.Marshal(DynamicgoOptions)
 }
 
 // MakeExampleReqBinary make a Thrift-Binary-Encoding request using ExampleReq structed DOM
-// Except B, A and logid, which are reset everytime, 
-// all other fields keeps original values from exampleReqPool
+// Except B, A and logid, which are reset everytime
 func MakeExampleReqBinary(B bool, A string, logid string) ([]byte, error) {
-	// get DOM from sync.Pool, which make sure no-reset fields keep same value
-	dom := exampleReqPool.Get().(*dg.PathNode)
-
-	// set biz-logic-related fields' values on the DOM
-	dom.Next[2].Next[0].Next[0].Node = dg.NewNodeString(A)
-	dom.Next[3].Next[0].Next[0].Node = dg.NewNodeString(A)
-	dom.Next[5].Node = dg.NewNodeBool(B)
-	dom.Next[6].Next[0].Node = dg.NewNodeString(logid)
-
-	// marshal DOM into thrift binary
-	out, err := dom.Marshal(DynamicgoOptions)
-
-	// recycle the DOM 
-	exampleReqPool.Put(dom)
-	return out, err
+	list := make([]dg.PathNode, SampleListSize+1)
+	list[0] = dg.PathNode{
+		Path: dg.NewPathIndex(0),
+		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+		Next: []dg.PathNode{
+			{
+				Path: dg.NewPathFieldId(1),
+				Node: dg.NewNodeString(A),
+			},
+		},
+	}
+	for i:=1; i<len(list); i++ {
+		list[i] = dg.PathNode{
+			Path: dg.NewPathIndex(i),
+			Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+			Next: []dg.PathNode{
+				{
+					Path: dg.NewPathFieldId(1),
+					Node: dg.NewNodeString(A),
+				},
+			},
+		}
+	}
+	m := make([]dg.PathNode, SampleListSize+1)
+	m[0] = dg.PathNode{
+		Path: dg.NewPathStrKey("a"),
+		Node:  dg.NewTypedNode(thrift.STRUCT, 0, 0),
+		Next: []dg.PathNode{
+			{
+				Path: dg.NewPathFieldId(1),
+				Node: dg.NewNodeString(A),
+			},
+		},
+	}
+	for i:=1; i<len(list); i++ {
+		list[i] = dg.PathNode{
+			Path: dg.NewPathStrKey(strconv.Itoa(i)),
+			Node:  dg.NewTypedNode(thrift.STRUCT, 0, 0),
+			Next: []dg.PathNode{
+				{
+					Path: dg.NewPathFieldId(1),
+					Node: dg.NewNodeString(A),
+				},
+			},
+		}
+	}
+	
+	dom := dg.PathNode{
+		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+		Next: []dg.PathNode{
+			{
+				Path: dg.NewPathFieldId(1),
+				Node: dg.NewNodeString("Hello"),
+			},
+			{
+				Path: dg.NewPathFieldId(2),
+				Node: dg.NewNodeInt32(1),
+			},
+			{
+				Path: dg.NewPathFieldId(3),
+				Node: dg.NewTypedNode(thrift.LIST, thrift.STRUCT, 0),
+				Next: list,
+			},
+			{
+				Path: dg.NewPathFieldId(4),
+				Node: dg.NewTypedNode(thrift.MAP, thrift.STRUCT, thrift.STRING),
+				Next: m,
+			},
+			{
+				Path: dg.NewPathFieldId(6),
+				Node: dg.NewTypedNode(thrift.LIST,  thrift.I64, 0),
+				Next: []dg.PathNode{
+					{
+						Path: dg.NewPathIndex(0),
+						Node: dg.NewNodeInt64(1),
+					},
+					{
+						Path: dg.NewPathIndex(1),
+						Node: dg.NewNodeInt64(2),
+					},
+					{
+						Path: dg.NewPathIndex(2),
+						Node: dg.NewNodeInt64(3),
+					},
+				},
+			},
+			{
+				Path: dg.NewPathFieldId(7),
+				Node: dg.NewNodeBool(B),
+			},
+			{
+				Path: dg.NewPathFieldId(255),
+				Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+				Next: []dg.PathNode{
+					{
+						Path: dg.NewPathFieldId(1),
+						Node: dg.NewNodeString(logid),
+					},
+					{
+						Path: dg.NewPathFieldId(2),
+						Node: dg.NewNodeString("a.b.c"),
+					},
+					{
+						Path: dg.NewPathFieldId(3),
+						Node: dg.NewNodeString("127.0.0.1"),
+					},
+					{
+						Path: dg.NewPathFieldId(4),
+						Node: dg.NewNodeString("dynamicgo"),
+					},
+				},
+			},
+		},
+	}
+	return dom.Marshal(DynamicgoOptions)
 }
 
 const (
@@ -361,7 +394,7 @@ var clientRespPool = sync.Pool{
 }
 
 // biz logic...
-func ExampleClientHandler(response []byte, log_id string) error {
+func ExampleClientHandler_Node(response []byte, log_id string) error {
 	// make dynamicgo/generic.Node with body
 	resp := dg.NewNode(dt.STRUCT, response)
 
@@ -381,12 +414,16 @@ func ExampleClientHandler(response []byte, log_id string) error {
 		return errors.New("require_field does not match")
 	}
 
+	return nil
+}
+
+func ExampleClientHandler_DOM(response []byte, log_id string) error {
 	// get dom from memory pool
 	root := clientRespPool.Get().(*dg.PathNode)
-	root.Node = resp
+	root.Node = dg.NewNode(dt.STRUCT, response)
 
 	// load **first layer** children
-	err = root.Load(false, DynamicgoOptions)
+	err := root.Load(false, DynamicgoOptions)
 	if err != nil {
 		return err
 	}

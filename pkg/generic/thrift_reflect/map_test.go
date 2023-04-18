@@ -161,19 +161,29 @@ func MakeExampleRespMap(msg string, require_field string, logid string) (map[str
 }
 
 func MakeExampleReqMap(B bool, A string, logid string) map[string]interface{} {
+	list := make([]interface{}, SampleListSize+1)
+	list[0] = map[string]interface{}{
+		"Bar": A,
+	}
+	for i:=1; i<len(list); i++ {
+		list[i] = map[string]interface{}{
+			"Bar": A,
+		}
+	}
+	m := make(map[string]interface{}, SampleListSize+1)
+	m["a"] = map[string]interface{}{
+		"Bar": A,
+	}
+	for i:=1; i<len(list); i++ {
+		m[strconv.Itoa(i)] = map[string]interface{}{
+			"Bar": A,
+		}
+	}
 	return map[string]interface{} {
 		"Msg": "Hello",
 		"Foo": int32(1),
-		"TestList": []interface{}{
-			map[string]interface{}{
-				"Bar": A,
-			},
-		},
-		"TestMap": map[interface{}]interface{}{
-			"a": map[string]interface{}{
-				"Bar": A,
-			},
-		},
+		"TestList": list,
+		"TestMap": m,
 		"I64List": []interface{}{
 			int64(1), int64(2), int64(3),
 		},
