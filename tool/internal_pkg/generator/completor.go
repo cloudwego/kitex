@@ -273,8 +273,11 @@ func (c *commonCompleter) addImport(w io.Writer, newMethods []*MethodInfo, fset 
 		if err != nil {
 			return err
 		}
-		if _, ok := existImports[strings.Trim(content, "\"")]; !ok {
-			astutil.AddImport(fset, handlerAST, strings.Trim(content, "\""))
+		imports := c.parseImports(content)
+		for idx := range imports {
+			if _, ok := existImports[strings.Trim(imports[idx][1], "\"")]; !ok {
+				astutil.AddImport(fset, handlerAST, strings.Trim(imports[idx][1], "\""))
+			}
 		}
 	}
 	c.pkg.Methods = tmp
@@ -296,4 +299,35 @@ func (c *commonCompleter) addImplementations(w io.Writer, newMethods []*MethodIn
 	_, err = w.Write([]byte(content))
 	c.pkg.Methods = tmp
 	return err
+}
+
+// imports[2] is alias, import
+func (c *commonCompleter) parseImports(content string) (imports [][2]string) {
+	if !strings.Contains(content, "\"") {
+		imports = append(imports, [2]string{"", content})
+		return imports
+	}
+	for i := 0; i < len(content); i++ {
+		if content[i] == ' ' {
+			continue
+		}
+		isAlias := content[i] != '"'
+
+		start := i
+		for ; i < len(content); i++ {
+			if content[i] == ' ' {
+				break
+			}
+		}
+		sub := content[start:i]
+		switch {
+		case isAlias:
+			imports = append(imports, [2]string{sub, ""})
+		case len(imports) > 0 && imports[len(imports)-1][1] == "":
+			imports[len(imports)-1][1] = sub
+		default:
+			imports = append(imports, [2]string{"", sub})
+		}
+	}
+	return imports
 }
