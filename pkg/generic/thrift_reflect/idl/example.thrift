@@ -41,6 +41,7 @@ struct A {
 
 service ExampleService {
     ExampleReq ExampleMethod(1: ExampleReq req)throws(1: Exception err),
+    ExampleResp ExampleMethod2(1: ExampleReq req)throws(1: Exception err),
     A Foo(1: A req)
     string Ping(1: string msg)
     oneway void Oneway(1: string msg)
