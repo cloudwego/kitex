@@ -13,7 +13,6 @@ require (
 	github.com/cloudwego/frugal v0.1.6
 	github.com/cloudwego/netpoll v0.3.2
 	github.com/cloudwego/thriftgo v0.2.9
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/golang/mock v1.6.0
 	github.com/google/pprof v0.0.0-20220608213341-c488b8fa1db3
 	github.com/jhump/protoreflect v1.8.2
