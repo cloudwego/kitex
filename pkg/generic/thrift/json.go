@@ -198,6 +198,7 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 
 			buf := make([]byte, 0, len(transBuff)*2)
 			// TODO: enable conversion of exception field -> m.opts.ConvertException = true
+			//m.opts.ConvertException = true
 			cv := t2j.NewBinaryConv(m.opts)
 			// thrift []byte to json []byte
 			if err := cv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {

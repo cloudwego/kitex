@@ -84,7 +84,7 @@ func getBytes() []byte {
 	return bytes.Repeat([]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}, 2)
 }
 
-func GetSimpleValue() *Simple {
+func getSimpleValue() *Simple {
 	return &Simple{
 		ByteField:   math.MaxInt8,
 		I64Field:    math.MaxInt64,
@@ -95,7 +95,7 @@ func GetSimpleValue() *Simple {
 	}
 }
 
-func GetNestingValue() *Nesting {
+func getNestingValue() *Nesting {
 	ret := &Nesting{
 		String_:         getString(),
 		ListSimple:      []*Simple{},
@@ -104,7 +104,7 @@ func GetNestingValue() *Nesting {
 		ListI32:         []int32{},
 		I64:             math.MaxInt64,
 		MapStringString: map[string]string{},
-		SimpleStruct:    GetSimpleValue(),
+		SimpleStruct:    getSimpleValue(),
 		MapI32I64:       map[int32]int64{},
 		ListString:      []string{},
 		Binary:          getBytes(),
@@ -115,7 +115,7 @@ func GetNestingValue() *Nesting {
 	}
 
 	for i := 0; i < 16; i++ {
-		ret.ListSimple = append(ret.ListSimple, GetSimpleValue())
+		ret.ListSimple = append(ret.ListSimple, getSimpleValue())
 		ret.ListI32 = append(ret.ListI32, math.MinInt32)
 		ret.ListI64 = append(ret.ListI64, math.MinInt64)
 		ret.ListString = append(ret.ListString, getString())
@@ -125,7 +125,7 @@ func GetNestingValue() *Nesting {
 		ret.MapStringString[strconv.Itoa(i)] = getString()
 		ret.MapI32I64[int32(i)] = math.MinInt64
 		ret.MapI64String[int64(i)] = getString()
-		ret.MapStringSimple[strconv.Itoa(i)] = GetSimpleValue()
+		ret.MapStringSimple[strconv.Itoa(i)] = getSimpleValue()
 	}
 
 	return ret
@@ -242,8 +242,9 @@ func (g *GenericServiceBenchmarkImpl) GenericCall(ctx context.Context, method st
 }
 
 var (
-	mockReq  = `{"Msg":"hello","strMap":{"mk1":"mv1","mk2":"mv2"},"strList":["lv1","lv2"]} `
-	mockResp = "this is response"
+	mockReq       = `{"Msg":"hello","strMap":{"mk1":"mv1","mk2":"mv2"},"strList":["lv1","lv2"]} `
+	mockResp      = "this is response"
+	mockException = `{"code":"400","msg":"this is an exception"} `
 )
 
 // normal server
@@ -269,7 +270,8 @@ func serviceInfo() *serviceinfo.ServiceInfo {
 	destService := "Mock"
 	handlerType := (*kt.Mock)(nil)
 	methods := map[string]serviceinfo.MethodInfo{
-		"Test": serviceinfo.NewMethodInfo(testHandler, newMockTestArgs, newMockTestResult, false),
+		"Test":          serviceinfo.NewMethodInfo(testHandler, newMockTestArgs, newMockTestResult, false),
+		"ExceptionTest": serviceinfo.NewMethodInfo(exceptionHandler, newMockExceptionTestArgs, newMockExceptionTestResult, false),
 	}
 	svcInfo := &serviceinfo.ServiceInfo{
 		ServiceName: destService,
@@ -296,6 +298,31 @@ func testHandler(ctx context.Context, handler, arg, result interface{}) error {
 		return err
 	}
 	realResult.Success = &success
+	return nil
+}
+
+func newMockExceptionTestArgs() interface{} {
+	return kt.NewMockExceptionTestArgs()
+}
+
+func newMockExceptionTestResult() interface{} {
+	return &kt.MockExceptionTestResult{}
+}
+
+func exceptionHandler(ctx context.Context, handler, args, result interface{}) error {
+	a := args.(*kt.MockExceptionTestArgs)
+	r := result.(*kt.MockExceptionTestResult)
+	reply, err := handler.(kt.Mock).ExceptionTest(ctx, a.Req)
+	if err != nil {
+		switch v := err.(type) {
+		case *kt.Exception:
+			r.Err = v
+		default:
+			return err
+		}
+	} else {
+		r.Success = &reply
+	}
 	return nil
 }
 
@@ -328,4 +355,33 @@ func (m *mockImpl) Test(ctx context.Context, req *kt.MockReq) (r string, err err
 		}
 	}
 	return mockResp, nil
+}
+
+// ExceptionTest ...
+func (m *mockImpl) ExceptionTest(ctx context.Context, req *kt.MockReq) (r string, err error) {
+	msg := gjson.Get(mockReq, "Msg")
+	if req.Msg != msg.String() {
+		return "", fmt.Errorf("msg is not %s", mockReq)
+	}
+	strMap := gjson.Get(mockReq, "strMap")
+	if len(strMap.Map()) == 0 {
+		return "", fmt.Errorf("strmsg is not map[interface{}]interface{}")
+	}
+	for k, v := range strMap.Map() {
+		if req.StrMap[k] != v.String() {
+			return "", fmt.Errorf("strMsg is not %s", req.StrMap)
+		}
+	}
+
+	strList := gjson.Get(mockReq, "strList")
+	array := strList.Array()
+	if len(array) == 0 {
+		return "", fmt.Errorf("strlist is not %v", strList)
+	}
+	for idx := range array {
+		if array[idx].Value() != req.StrList[idx] {
+			return "", fmt.Errorf("strlist is not %s", mockReq)
+		}
+	}
+	return "", &kt.Exception{Code: 400, Msg: "this is an exception"}
 }

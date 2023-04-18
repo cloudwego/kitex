@@ -28,6 +28,6 @@ struct Nesting {
 }
 
 service BaselineService {
-    Simple SimpleMethod(1: Simple req)
-    Nesting NestingMethod(1: Nesting req)
+    Simple SimpleMethod(1: Simple req) (api.post = "/simple", api.baseurl = 'example.com')
+    Nesting NestingMethod(1: Nesting req) (api.post = "/nesting/:double", api.baseurl = 'example.com')
 }

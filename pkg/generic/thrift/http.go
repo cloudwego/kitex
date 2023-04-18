@@ -18,6 +18,7 @@ package thrift
 
 import (
 	"context"
+	"strings"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/sonic"
@@ -143,8 +144,12 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 			return nil, err
 		}
 
+		// unwrap one level of json string
 		if len(buf) > structWrapLen {
-			buf = buf[structWrapLen : len(buf)-1]
+			secondBracket := strings.Index(string(buf)[1:], "{") + 1
+			if secondBracket != 0 {
+				buf = buf[secondBracket : len(buf)-1]
+			}
 		}
 		resp.RawBody = buf
 		return resp, nil

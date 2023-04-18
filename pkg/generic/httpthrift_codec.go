@@ -124,10 +124,10 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 
 func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
-	if msg.PayloadLen() == 0 {
-		c.enableDynamicgoResp = false
-	} else {
+	if msg.PayloadLen() != 0 && c.enableDynamicgoResp {
 		c.enableDynamicgoResp = true
+	} else {
+		c.enableDynamicgoResp = false
 	}
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
