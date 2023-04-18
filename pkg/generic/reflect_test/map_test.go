@@ -41,7 +41,7 @@ func TestThriftMapExample(t *testing.T) {
 }
 
 func BenchmarkThriftMapExample(b *testing.B) {
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		testThriftMapExample(b)
 	}
 }
@@ -61,7 +61,7 @@ func testThriftMapExample(t testing.TB) {
 		t.Fail()
 	}
 	require_field, ok := resp["required_field"].(string)
-	if !ok || require_field != ReqMsg{
+	if !ok || require_field != ReqMsg {
 		t.Fail()
 	}
 	logid, ok := resp["BaseResp"].(map[string]interface{})["StatusMessage"]
@@ -93,7 +93,7 @@ func newGenericClient(destService string, g generic.Generic, targetIPPort string
 	return genericCli
 }
 
-func initThriftMapServer(address string, idl string, handler generic.Service) server.Server {
+func initThriftMapServer(address, idl string, handler generic.Service) server.Server {
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	p, err := generic.NewThriftFileProvider(idl)
 	if err != nil {
@@ -129,7 +129,7 @@ type ExampeServerImpl struct{}
 // GenericCall ...
 func (g *ExampeServerImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
 	buf := request.(map[string]interface{})
-	
+
 	required_field := ""
 	logid := ""
 	if b, ok := buf["B"].(bool); ok && b {
@@ -150,9 +150,9 @@ func (g *ExampeServerImpl) GenericCall(ctx context.Context, method string, reque
 	return MakeExampleRespMap(RespMsg, required_field, logid)
 }
 
-func MakeExampleRespMap(msg string, require_field string, logid string) (map[string]interface{}, error) {
+func MakeExampleRespMap(msg, require_field, logid string) (map[string]interface{}, error) {
 	return map[string]interface{}{
-		"Msg": msg,
+		"Msg":            msg,
 		"required_field": require_field,
 		"BaseResp": map[string]interface{}{
 			"StatusMessage": logid,
@@ -160,12 +160,12 @@ func MakeExampleRespMap(msg string, require_field string, logid string) (map[str
 	}, nil
 }
 
-func MakeExampleReqMap(B bool, A string, logid string) map[string]interface{} {
+func MakeExampleReqMap(B bool, A, logid string) map[string]interface{} {
 	list := make([]interface{}, SampleListSize+1)
 	list[0] = map[string]interface{}{
 		"Bar": A,
 	}
-	for i:=1; i<len(list); i++ {
+	for i := 1; i < len(list); i++ {
 		list[i] = map[string]interface{}{
 			"Bar": A,
 		}
@@ -174,24 +174,24 @@ func MakeExampleReqMap(B bool, A string, logid string) map[string]interface{} {
 	m["a"] = map[string]interface{}{
 		"Bar": A,
 	}
-	for i:=1; i<len(list); i++ {
+	for i := 1; i < len(list); i++ {
 		m[strconv.Itoa(i)] = map[string]interface{}{
 			"Bar": A,
 		}
 	}
-	return map[string]interface{} {
-		"Msg": "Hello",
-		"Foo": int32(1),
+	return map[string]interface{}{
+		"Msg":      "Hello",
+		"Foo":      int32(1),
 		"TestList": list,
-		"TestMap": m,
+		"TestMap":  m,
 		"I64List": []interface{}{
 			int64(1), int64(2), int64(3),
 		},
 		"B": B,
 		"Base": map[string]interface{}{
-			"LogID": logid,
+			"LogID":  logid,
 			"Caller": "d.e.f",
-			"Addr": "127.0.0.1",
+			"Addr":   "127.0.0.1",
 			"Client": "dynamicgo",
 		},
 	}

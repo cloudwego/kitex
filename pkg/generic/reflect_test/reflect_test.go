@@ -21,21 +21,22 @@ import (
 	"errors"
 	"math/rand"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/apache/thrift/lib/go/thrift"
-
-	dt "github.com/cloudwego/dynamicgo/thrift"
-	dg "github.com/cloudwego/dynamicgo/thrift/generic"
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/client/genericclient"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
+
+	"github.com/apache/thrift/lib/go/thrift"
+	dt "github.com/cloudwego/dynamicgo/thrift"
+	dg "github.com/cloudwego/dynamicgo/thrift/generic"
 )
 
 func TestMain(m *testing.M) {
@@ -46,15 +47,17 @@ func TestMain(m *testing.M) {
 	msvr := initThriftMapServer(":9021", "./idl/example.thrift", new(ExampeServerImpl))
 	mcli = initThriftMapClient("127.0.0.1:9021", "./idl/example.thrift")
 
-	m.Run()
+	ret := m.Run()
 
 	svr.Stop()
 	msvr.Stop()
+
+	os.Exit(ret)
 }
 
 var (
 	SampleListSize = 100
-	SampleMapSize = 100
+	SampleMapSize  = 100
 )
 
 func TestThriftReflectExample(t *testing.T) {
@@ -63,13 +66,13 @@ func TestThriftReflectExample(t *testing.T) {
 }
 
 func BenchmarkThriftReflectExample_Node(b *testing.B) {
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		testThriftReflectExample_Node(b)
 	}
 }
 
 func BenchmarkThriftReflectExample_DOM(b *testing.B) {
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		testThriftReflectExample_DOM(b)
 	}
 }
@@ -104,7 +107,7 @@ func testThriftReflectExample_Node(t testing.TB) {
 	}
 
 	// biz logic...
-	err = ExampleClientHandler_Node(body, log_id)
+	err = exampleClientHandler_Node(body, log_id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,18 +141,18 @@ func testThriftReflectExample_DOM(t testing.TB) {
 	}
 
 	// biz logic...
-	err = ExampleClientHandler_DOM(body, log_id)
+	err = exampleClientHandler_DOM(body, log_id)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
 var (
-	ExampleReqDesc *dt.TypeDescriptor
-	ExampleRespDesc *dt.TypeDescriptor
-    StrDesc *dt.TypeDescriptor
-    BaseLogidPath []dg.Path
-    DynamicgoOptions = &dg.Options{}
+	ExampleReqDesc   *dt.TypeDescriptor
+	ExampleRespDesc  *dt.TypeDescriptor
+	StrDesc          *dt.TypeDescriptor
+	BaseLogidPath    []dg.Path
+	DynamicgoOptions = &dg.Options{}
 )
 
 func initExampleDescriptor() {
@@ -188,7 +191,7 @@ func initClient(addr string) {
 
 // MakeExampleRespBinary make a Thrift-Binary-Encoding response using ExampleResp DOM
 // Except msg, require_field and logid, which are reset everytime
-func MakeExampleRespBinary(msg string, require_field string, logid string) ([]byte, error) {
+func MakeExampleRespBinary(msg, require_field, logid string) ([]byte, error) {
 	dom := &dg.PathNode{
 		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
 		Next: []dg.PathNode{
@@ -217,7 +220,7 @@ func MakeExampleRespBinary(msg string, require_field string, logid string) ([]by
 
 // MakeExampleReqBinary make a Thrift-Binary-Encoding request using ExampleReq DOM
 // Except B, A and logid, which are reset everytime
-func MakeExampleReqBinary(B bool, A string, logid string) ([]byte, error) {
+func MakeExampleReqBinary(B bool, A, logid string) ([]byte, error) {
 	list := make([]dg.PathNode, SampleListSize+1)
 	list[0] = dg.PathNode{
 		Path: dg.NewPathIndex(0),
@@ -229,7 +232,7 @@ func MakeExampleReqBinary(B bool, A string, logid string) ([]byte, error) {
 			},
 		},
 	}
-	for i:=1; i<len(list); i++ {
+	for i := 1; i < len(list); i++ {
 		list[i] = dg.PathNode{
 			Path: dg.NewPathIndex(i),
 			Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
@@ -244,7 +247,7 @@ func MakeExampleReqBinary(B bool, A string, logid string) ([]byte, error) {
 	m := make([]dg.PathNode, SampleListSize+1)
 	m[0] = dg.PathNode{
 		Path: dg.NewPathStrKey("a"),
-		Node:  dg.NewTypedNode(thrift.STRUCT, 0, 0),
+		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
 		Next: []dg.PathNode{
 			{
 				Path: dg.NewPathFieldId(1),
@@ -252,10 +255,10 @@ func MakeExampleReqBinary(B bool, A string, logid string) ([]byte, error) {
 			},
 		},
 	}
-	for i:=1; i<len(list); i++ {
+	for i := 1; i < len(list); i++ {
 		list[i] = dg.PathNode{
 			Path: dg.NewPathStrKey(strconv.Itoa(i)),
-			Node:  dg.NewTypedNode(thrift.STRUCT, 0, 0),
+			Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
 			Next: []dg.PathNode{
 				{
 					Path: dg.NewPathFieldId(1),
@@ -264,7 +267,7 @@ func MakeExampleReqBinary(B bool, A string, logid string) ([]byte, error) {
 			},
 		}
 	}
-	
+
 	dom := dg.PathNode{
 		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
 		Next: []dg.PathNode{
@@ -288,7 +291,7 @@ func MakeExampleReqBinary(B bool, A string, logid string) ([]byte, error) {
 			},
 			{
 				Path: dg.NewPathFieldId(6),
-				Node: dg.NewTypedNode(thrift.LIST,  thrift.I64, 0),
+				Node: dg.NewTypedNode(thrift.LIST, thrift.I64, 0),
 				Next: []dg.PathNode{
 					{
 						Path: dg.NewPathIndex(0),
@@ -336,8 +339,8 @@ func MakeExampleReqBinary(B bool, A string, logid string) ([]byte, error) {
 }
 
 const (
-	Method = "ExampleMethod2"
-	ReqMsg = "pending"
+	Method  = "ExampleMethod2"
+	ReqMsg  = "pending"
 	RespMsg = "ok"
 )
 
@@ -345,22 +348,28 @@ const (
 type ExampleValueServiceImpl struct{}
 
 // GenericCall ...
-func (g *ExampleValueServiceImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+func (g *ExampleValueServiceImpl) GenericCall(ctx context.Context, method string, request interface{}) (interface{}, error) {
 	// get and unwrap body with message
 	in := request.([]byte)
 
 	// unwarp thrift message and get request body
 	methodName, _, seqID, _, body, err := dt.UnwrapBinaryMessage(in)
+	if err != nil {
+		return nil, err
+	}
 
 	// biz logic
-	resp, err := ExampleServerHandler(body)
+	resp, err := exampleServerHandler(body)
+	if err != nil {
+		return nil, err
+	}
 
 	// wrap response as thrift REPLY message
 	return dt.WrapBinaryBody(resp, methodName, dt.REPLY, 0, seqID)
 }
 
 // biz logic
-func ExampleServerHandler(request []byte) (resp []byte, err error) {
+func exampleServerHandler(request []byte) (resp []byte, err error) {
 	// wrap body as Value
 	req := dg.NewValue(ExampleReqDesc, request)
 	if err != nil {
@@ -371,7 +380,7 @@ func ExampleServerHandler(request []byte) (resp []byte, err error) {
 	logid := ""
 	// if B == true then get logid and required_field
 	if b, err := req.FieldByName("B").Bool(); err == nil && b {
-		if e := req.GetByPath(BaseLogidPath...); e.Error() != ""{
+		if e := req.GetByPath(BaseLogidPath...); e.Error() != "" {
 			return nil, e
 		} else {
 			logid, _ = e.String()
@@ -394,7 +403,7 @@ var clientRespPool = sync.Pool{
 }
 
 // biz logic...
-func ExampleClientHandler_Node(response []byte, log_id string) error {
+func exampleClientHandler_Node(response []byte, log_id string) error {
 	// make dynamicgo/generic.Node with body
 	resp := dg.NewNode(dt.STRUCT, response)
 
@@ -417,7 +426,7 @@ func ExampleClientHandler_Node(response []byte, log_id string) error {
 	return nil
 }
 
-func ExampleClientHandler_DOM(response []byte, log_id string) error {
+func exampleClientHandler_DOM(response []byte, log_id string) error {
 	// get dom from memory pool
 	root := clientRespPool.Get().(*dg.PathNode)
 	root.Node = dg.NewNode(dt.STRUCT, response)
@@ -427,7 +436,7 @@ func ExampleClientHandler_DOM(response []byte, log_id string) error {
 	if err != nil {
 		return err
 	}
-	// spew.Dump(root) // -- only root.Next is set 
+	// spew.Dump(root) // -- only root.Next is set
 	// check node values by PathNode APIs
 	require_field2, err := root.Field(2, DynamicgoOptions).Node.String()
 	if err != nil {
@@ -436,7 +445,7 @@ func ExampleClientHandler_DOM(response []byte, log_id string) error {
 	if require_field2 != ReqMsg {
 		return errors.New("require_field2 does not match")
 	}
-	
+
 	// load **all layers** children
 	err = root.Load(true, DynamicgoOptions)
 	if err != nil {
@@ -446,6 +455,9 @@ func ExampleClientHandler_DOM(response []byte, log_id string) error {
 	// spew.Dump(root) // -- every PathNode.Next will be set if it is a nesting-typed (LIST/SET/MAP/STRUCT)
 	// check node values by PathNode APIs
 	logid, err := root.Field(255, DynamicgoOptions).Field(1, DynamicgoOptions).Node.String()
+	if err != nil {
+		return err
+	}
 	if logid != log_id {
 		return errors.New("logid not match")
 	}
