@@ -42,13 +42,15 @@ import (
 func TestMain(m *testing.M) {
 	initExampleDescriptor()
 	svr := initServer(":9090")
-	initClient("127.0.0.1:9090")
+	cli = initClient("127.0.0.1:9090")
 
-	msvr := initThriftMapServer(":9021", "./idl/example.thrift", new(ExampeServerImpl))
-	mcli = initThriftMapClient("127.0.0.1:9021", "./idl/example.thrift")
+	msvr := initThriftMapServer(":9101", "./idl/example.thrift", new(ExampeServerImpl))
+	mcli = initThriftMapClient("127.0.0.1:9101", "./idl/example.thrift")
 
 	ret := m.Run()
 
+	cli.Close()
+	mcli.Close()
 	svr.Stop()
 	msvr.Stop()
 
@@ -183,10 +185,10 @@ func initServer(addr string) server.Server {
 
 var cli genericclient.Client
 
-func initClient(addr string) {
+func initClient(addr string) genericclient.Client {
 	g := generic.BinaryThriftGeneric()
 	genericCli, _ := genericclient.NewClient("destServiceName", g, client.WithHostPorts(addr))
-	cli = genericCli
+	return genericCli
 }
 
 // MakeExampleRespBinary make a Thrift-Binary-Encoding response using ExampleResp DOM
