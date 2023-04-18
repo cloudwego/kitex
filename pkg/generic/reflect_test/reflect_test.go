@@ -186,8 +186,8 @@ func initClient(addr string) {
 	cli = genericCli
 }
 
-// MakeExampleRespBinary make a Thrift-Binary-Encoding response using ExampleResp structed DOM
-// Except msg, requre_field and logid, which are reset everytime
+// MakeExampleRespBinary make a Thrift-Binary-Encoding response using ExampleResp DOM
+// Except msg, require_field and logid, which are reset everytime
 func MakeExampleRespBinary(msg string, require_field string, logid string) ([]byte, error) {
 	dom := &dg.PathNode{
 		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
@@ -215,7 +215,7 @@ func MakeExampleRespBinary(msg string, require_field string, logid string) ([]by
 	return dom.Marshal(DynamicgoOptions)
 }
 
-// MakeExampleReqBinary make a Thrift-Binary-Encoding request using ExampleReq structed DOM
+// MakeExampleReqBinary make a Thrift-Binary-Encoding request using ExampleReq DOM
 // Except B, A and logid, which are reset everytime
 func MakeExampleReqBinary(B bool, A string, logid string) ([]byte, error) {
 	list := make([]dg.PathNode, SampleListSize+1)

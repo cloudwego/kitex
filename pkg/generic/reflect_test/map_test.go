@@ -139,7 +139,7 @@ func (g *ExampeServerImpl) GenericCall(ctx context.Context, method string, reque
 			logid, _ = base["LogID"].(string)
 		}
 		if testmap, ok := buf["TestMap"].(map[interface{}]interface{}); !ok {
-			return nil, errors.New("emtpy TestMap")
+			return nil, errors.New("empty TestMap")
 		} else if a, ok := testmap["a"].(map[string]interface{}); !ok {
 			return nil, errors.New("key 'a' not found")
 		} else {
