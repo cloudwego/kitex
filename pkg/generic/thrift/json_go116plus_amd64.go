@@ -79,9 +79,9 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 				if err := cv.DoInto(ctx, field.Type(), v, &dbuf); err != nil {
 					return err
 				} else {
-					if offset+len(dbuf) > len(buf) {
-						// TODO: reallocate buf to expand len and copy the data of dbuf
-					}
+					// TODO: reallocate buf to expand len and copy the data of dbuf
+					// if offset+len(dbuf) > len(buf) {
+					// }
 					offset += len(dbuf)
 				}
 			} else {

@@ -59,9 +59,9 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 			if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
 				return err
 			} else {
-				if offset+len(dbuf) > len(buf) {
-					// TODO: reallocate buf to expand len and copy the data of dbuf
-				}
+				// TODO: reallocate buf to expand len and copy the data of dbuf
+				// if offset+len(dbuf) > len(buf) {
+				// }
 				offset += len(dbuf)
 			}
 

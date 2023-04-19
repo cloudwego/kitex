@@ -242,9 +242,8 @@ func (g *GenericServiceBenchmarkImpl) GenericCall(ctx context.Context, method st
 }
 
 var (
-	mockReq       = `{"Msg":"hello","strMap":{"mk1":"mv1","mk2":"mv2"},"strList":["lv1","lv2"]} `
-	mockResp      = "this is response"
-	mockException = `{"code":"400","msg":"this is an exception"} `
+	mockReq  = `{"Msg":"hello","strMap":{"mk1":"mv1","mk2":"mv2"},"strList":["lv1","lv2"]} `
+	mockResp = "this is response"
 )
 
 // normal server
