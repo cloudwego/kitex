@@ -122,7 +122,9 @@ func TestHTTPDynamicgoThriftGeneric(t *testing.T) {
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
 
-	g, err := HTTPThriftGeneric(p, Options{})
+	var opts []Option
+	opts = append(opts, WithDefaultHTTPDynamicgoConvOpts(), EnableDynamicgoHTTPResp(true))
+	g, err := HTTPThriftGeneric(p, opts...)
 	test.Assert(t, err == nil)
 	defer g.Close()
 
@@ -177,7 +179,9 @@ func TestJSONDynamicgoThriftGeneric(t *testing.T) {
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 
-	g, err := JSONThriftGeneric(p, Options{})
+	var opts []Option
+	opts = append(opts, WithDefaultHTTPDynamicgoConvOpts(), EnableDynamicgoHTTPResp(true))
+	g, err := JSONThriftGeneric(p, opts...)
 	test.Assert(t, err == nil)
 	defer g.Close()
 

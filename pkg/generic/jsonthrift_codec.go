@@ -47,23 +47,19 @@ type jsonThriftCodec struct {
 	convOpts         conv.Options
 }
 
-func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...Options) (*jsonThriftCodec, error) {
+func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...Option) (*jsonThriftCodec, error) {
 	svc := <-p.Provide()
 	var c *jsonThriftCodec
 	if opts == nil {
 		c = &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true}
 	} else {
 		// codec with dynamicgo
-		convOpts := opts[0].DynamicgoConvOpts
-		if opts[0].EnableBasicDynamicgoConvOpts {
-			convOpts.WriteRequireField = true
-			convOpts.WriteDefaultField = true
-		}
+		gOpts := NewOptions(opts)
 		binaryWithBase64 := true
-		if convOpts.NoBase64Binary {
+		if !gOpts.dynamicgoConvOpts.NoBase64Binary {
 			binaryWithBase64 = false
 		}
-		c = &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: binaryWithBase64, convOpts: convOpts, enableDynamicgo: true}
+		c = &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: binaryWithBase64, convOpts: gOpts.dynamicgoConvOpts, enableDynamicgo: true}
 	}
 	c.svcDsc.Store(svc)
 	go c.update()

@@ -20,26 +20,10 @@ package generic
 import (
 	"fmt"
 
-	"github.com/cloudwego/dynamicgo/conv"
-
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
-
-type Options struct {
-	// options for dynamicgo conversion
-	DynamicgoConvOpts conv.Options
-	// basic options for dynamicgo conversion
-	// the following are set to true in the basic options:
-	// - json generic call
-	//     - WriteRequireField, WriteDefaultField
-	// - http generic call
-	//     - EnableHttpMapping, EnableValueMapping, WriteRequireField, WriteDefaultField, OmitHttpMappingErrors, NoBaseBinary
-	EnableBasicDynamicgoConvOpts bool
-	// flag to set whether to get response for http generic call using dynamicgo
-	EnableDynamicgoHTTPResp bool
-}
 
 // Generic ...
 type Generic interface {
@@ -92,12 +76,12 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 //
 //	g, err := generic.HTTPThriftGeneric(p)
 //	SetBinaryWithBase64(g, true)
-func HTTPThriftGeneric(p DescriptorProvider, opts ...Options) (Generic, error) {
+func HTTPThriftGeneric(p DescriptorProvider, opts ...Option) (Generic, error) {
 	var codec *httpThriftCodec
 	var err error
 	if opts != nil {
 		// generic with dynamicgo
-		codec, err = newHTTPThriftCodec(p, thriftCodec, opts[0])
+		codec, err = newHTTPThriftCodec(p, thriftCodec, opts...)
 		if err != nil {
 			return nil, err
 		}
@@ -126,12 +110,12 @@ func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generi
 //
 //	g, err := generic.JSONThriftGeneric(p)
 //	SetBinaryWithBase64(g, false)
-func JSONThriftGeneric(p DescriptorProvider, opts ...Options) (Generic, error) {
+func JSONThriftGeneric(p DescriptorProvider, opts ...Option) (Generic, error) {
 	var codec *jsonThriftCodec
 	var err error
 	if opts != nil {
 		// generic with dynamicgo
-		codec, err = newJsonThriftCodec(p, thriftCodec, opts[0])
+		codec, err = newJsonThriftCodec(p, thriftCodec, opts...)
 		if err != nil {
 			return nil, err
 		}

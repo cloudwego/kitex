@@ -55,27 +55,19 @@ type httpThriftCodec struct {
 	convOpts            conv.Options
 }
 
-func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...Options) (*httpThriftCodec, error) {
+func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...Option) (*httpThriftCodec, error) {
 	svc := <-p.Provide()
 	var c *httpThriftCodec
 	if opts == nil {
 		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false}
 	} else {
 		// codec with dynamicgo
-		convOpts := opts[0].DynamicgoConvOpts
-		if opts[0].EnableBasicDynamicgoConvOpts {
-			convOpts.EnableHttpMapping = true
-			convOpts.EnableValueMapping = true
-			convOpts.WriteRequireField = true
-			convOpts.WriteDefaultField = true
-			convOpts.OmitHttpMappingErrors = true
-			convOpts.NoBase64Binary = true
-		}
+		gOpts := NewOptions(opts)
 		binaryWithBase64 := false
-		if !convOpts.NoBase64Binary {
+		if !gOpts.dynamicgoConvOpts.NoBase64Binary {
 			binaryWithBase64 = true
 		}
-		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: binaryWithBase64, enableDynamicgoReq: true, enableDynamicgoResp: opts[0].EnableDynamicgoHTTPResp, convOpts: convOpts}
+		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: binaryWithBase64, enableDynamicgoReq: true, enableDynamicgoResp: gOpts.enableDynamicgoHTTPResp, convOpts: gOpts.dynamicgoConvOpts}
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
