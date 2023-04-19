@@ -56,7 +56,7 @@ func TestRun(t *testing.T) {
 	t.Run("TestDynamicgoThriftVoidMethod", testDynamicgoThriftVoidMethod)
 	t.Run("TestThrift2NormalServer", testThrift2NormalServer)
 	t.Run("TestThriftException", testThriftException)
-	//t.Run("TestDynamicgoThriftException", testDynamicgoThriftException)
+	// t.Run("TestDynamicgoThriftException", testDynamicgoThriftException)
 	t.Run("TestJSONThriftGenericClientClose", TestJSONThriftGenericClientClose)
 	t.Run("TestThriftRawBinaryEcho", testThriftRawBinaryEcho)
 	t.Run("TestDynamicgoThriftRawBinaryEcho", testDynamicgoThriftRawBinaryEcho)
