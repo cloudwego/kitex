@@ -44,7 +44,7 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		t := w.svc.DynamicgoDsc.Functions()[w.method].Request()
 
 		body := req.GetBody()
-		// TODO: implement malloc and mallocack, size
+		// TODO: use Malloc and MallocAck to replace WriteBinary
 		buf := mcache.Malloc(len(body) + structWrapLen)
 
 		var offset int
@@ -59,13 +59,19 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 			if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
 				return err
 			} else {
-				// TODO: reallocate buf to expand len and copy the data of dbuf
-				// if offset+len(dbuf) > len(buf) {
-				// }
+				// sometimes len of thrift []byte gets larger than len of json []byte when writing required/default fields
+				if offset+len(dbuf) > len(buf) {
+					buf = append(buf, dbuf[len(buf)-offset:]...)
+				}
 				offset += len(dbuf)
 			}
 
 			offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+		}
+
+		// in case there is no space to write field stop
+		if offset+writeFieldStopLen > len(buf) {
+			buf = append(buf, make([]byte, (offset+writeFieldStopLen)-len(buf))...)
 		}
 		offset += bthrift.Binary.WriteFieldStop(buf[offset:])
 		offset += bthrift.Binary.WriteStructEnd(buf[offset:])

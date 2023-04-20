@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	structWrapLen = 4
-	fieldBeginLen = 3
+	structWrapLen     = 4
+	writeFieldStopLen = 1
 )
 
 // MessageReader read from thrift.TProtocol with method

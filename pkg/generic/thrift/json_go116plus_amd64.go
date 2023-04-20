@@ -51,8 +51,8 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 			return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
 		}
 
-		// TODO: implement malloc and mallocack (to reuse object) / `2*` is temporarily
-		buf := mcache.Malloc(2 * (msgLen + structWrapLen))
+		// TODO: use Malloc and MallocAck to replace WriteBinary
+		buf := mcache.Malloc(msgLen + structWrapLen)
 
 		var offset int
 		offset += bthrift.Binary.WriteStructBegin(buf[offset:], m.dty.Struct().Name())
@@ -79,9 +79,10 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 				if err := cv.DoInto(ctx, field.Type(), v, &dbuf); err != nil {
 					return err
 				} else {
-					// TODO: reallocate buf to expand len and copy the data of dbuf
-					// if offset+len(dbuf) > len(buf) {
-					// }
+					// sometimes len of thrift []byte gets larger than len of json []byte when writing required/default fields
+					if offset+len(dbuf) > len(buf) {
+						buf = append(buf, dbuf[len(buf)-offset:]...)
+					}
 					offset += len(dbuf)
 				}
 			} else {
@@ -92,6 +93,10 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 			offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
 		}
 
+		// in case there is no space to write field stop
+		if offset+writeFieldStopLen > len(buf) {
+			buf = append(buf, make([]byte, (offset+writeFieldStopLen)-len(buf))...)
+		}
 		offset += bthrift.Binary.WriteFieldStop(buf[offset:])
 		bthrift.Binary.WriteStructEnd(buf[offset:])
 

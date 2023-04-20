@@ -57,7 +57,7 @@ func TestRun(t *testing.T) {
 	t.Run("TestThrift2NormalServer", testThrift2NormalServer)
 	t.Run("TestThriftException", testThriftException)
 	// t.Run("TestDynamicgoThriftException", testDynamicgoThriftException)
-	t.Run("TestJSONThriftGenericClientClose", TestJSONThriftGenericClientClose)
+	t.Run("TestJSONThriftGenericClientClose", testJSONThriftGenericClientClose)
 	t.Run("TestThriftRawBinaryEcho", testThriftRawBinaryEcho)
 	t.Run("TestDynamicgoThriftRawBinaryEcho", testDynamicgoThriftRawBinaryEcho)
 	t.Run("TestThriftBase64BinaryEcho", testThriftBase64BinaryEcho)
@@ -232,6 +232,7 @@ func testThriftPingMethod(t *testing.T) {
 
 func testDynamicgoThriftPingMethod(t *testing.T) {
 	var opts []generic.Option
+	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
 	time.Sleep(1 * time.Second)
 	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServicePingImpl), "./idl/example.thrift", opts)
 	time.Sleep(500 * time.Millisecond)
@@ -272,6 +273,7 @@ func testThriftError(t *testing.T) {
 
 func testDynamicgoThriftError(t *testing.T) {
 	var opts []generic.Option
+	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
 	time.Sleep(1 * time.Second)
 	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceErrorImpl), "./idl/example.thrift", opts)
 	time.Sleep(500 * time.Millisecond)
@@ -304,6 +306,7 @@ func testThriftOnewayMethod(t *testing.T) {
 
 func testDynamicgoThriftOnewayMethod(t *testing.T) {
 	var opts []generic.Option
+	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
 	time.Sleep(1 * time.Second)
 	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceOnewayImpl), "./idl/example.thrift", opts)
 	time.Sleep(500 * time.Millisecond)
@@ -340,6 +343,7 @@ func testThriftVoidMethod(t *testing.T) {
 
 func testDynamicgoThriftVoidMethod(t *testing.T) {
 	var opts []generic.Option
+	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
 	time.Sleep(1 * time.Second)
 	svr := initDynamicgoThriftServer(t, ":8128", new(GenericServiceVoidImpl), "./idl/example.thrift", opts)
 	time.Sleep(500 * time.Millisecond)
@@ -588,7 +592,7 @@ func initMockServer(t *testing.T, handler kt.Mock) server.Server {
 	return svr
 }
 
-func TestJSONThriftGenericClientClose(t *testing.T) {
+func testJSONThriftGenericClientClose(t *testing.T) {
 	debug.SetGCPercent(-1)
 	defer debug.SetGCPercent(100)
 
