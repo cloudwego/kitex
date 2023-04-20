@@ -22,7 +22,6 @@ import (
 	"errors"
 	"net"
 	"os"
-	"runtime/debug"
 	"sync"
 	"time"
 
@@ -87,9 +86,6 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 				ctx = context.Background()
 				err error
 			)
-			defer func() {
-				transRecover(ctx, conn, "OnRead")
-			}()
 			bc := newBufioConn(conn)
 			ctx, err = ts.transHdlr.OnActive(ctx, bc)
 			if err != nil {
@@ -200,15 +196,4 @@ func (bc *bufioConn) SetWriteDeadline(t time.Time) error {
 
 func (bc *bufioConn) Reader() netpoll.Reader {
 	return bc.r
-}
-
-func transRecover(ctx context.Context, conn net.Conn, funcName string) {
-	panicErr := recover()
-	if panicErr != nil {
-		if conn != nil {
-			klog.CtxErrorf(ctx, "KITEX: panic happened in %s, remoteAddress=%s, error=%v\nstack=%s", funcName, conn.RemoteAddr(), panicErr, string(debug.Stack()))
-		} else {
-			klog.CtxErrorf(ctx, "KITEX: panic happened in %s, error=%v\nstack=%s", funcName, panicErr, string(debug.Stack()))
-		}
-	}
 }

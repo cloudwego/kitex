@@ -121,18 +121,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 			var err error
 			start := time.Now()
 			done := make(chan error, 1)
-			workerPool.GoCtx(ctx, func() {
-				defer func() {
-					if panicInfo := recover(); panicInfo != nil {
-						e := panicToErr(ctx, panicInfo, ri)
-						done <- e
-					}
-					if err == nil || !errors.Is(err, kerrors.ErrRPCFinish) {
-						// Don't regards ErrRPCFinish as normal error, it happens in retry scene,
-						// ErrRPCFinish means previous call returns first but is decoding.
-						close(done)
-					}
-				}()
+			go func() {
 				err = next(ctx, request, response)
 				if err != nil && ctx.Err() != nil &&
 					!kerrors.IsTimeoutError(err) && !errors.Is(err, kerrors.ErrRPCFinish) {
@@ -151,7 +140,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 					}
 					klog.CtxErrorf(ctx, "%s", errMsg)
 				}
-			})
+			}()
 
 			select {
 			case panicErr := <-done:

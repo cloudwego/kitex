@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"runtime/debug"
 	"sync"
 
 	"github.com/cloudwego/netpoll"
@@ -145,7 +144,6 @@ func (t *svrTransHandler) readWithByteBuffer(ctx context.Context, bufReader remo
 // OnRead implements the remote.ServerTransHandler interface.
 // Returns write err only.
 func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) error {
-	defer t.tryRecover(muxSvrConnCtx, conn)
 	connection := conn.(netpoll.Connection)
 	r := connection.Reader()
 
@@ -206,21 +204,10 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	var sendMsg remote.Message
 	var closeConn bool
 	defer func() {
-		panicErr := recover()
-		if panicErr != nil {
-			if conn != nil {
-				ri := rpcinfo.GetRPCInfo(ctx)
-				rService, rAddr := getRemoteInfo(ri, conn)
-				klog.Errorf("KITEX: panic happened, close conn, remoteAddress=%s remoteService=%s error=%s\nstack=%s", rAddr, rService, panicErr, string(debug.Stack()))
-				closeConn = true
-			} else {
-				klog.Errorf("KITEX: panic happened, error=%s\nstack=%s", panicErr, string(debug.Stack()))
-			}
-		}
 		if closeConn && conn != nil {
 			conn.Close()
 		}
-		t.finishTracer(ctx, rpcInfo, err, panicErr)
+		t.finishTracer(ctx, rpcInfo, err, nil)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
 		// reset rpcinfo
@@ -417,22 +404,6 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		return true
 	}
 	return
-}
-
-func (t *svrTransHandler) tryRecover(ctx context.Context, conn net.Conn) {
-	if err := recover(); err != nil {
-		// rpcStat := internal.AsMutableRPCStats(t.rpcinfo.Stats())
-		// rpcStat.SetPanicked(err)
-		// t.opt.TracerCtl.DoFinish(ctx, klog)
-		// 这里不需要 Reset rpcStats 因为连接会关闭，会直接把 RPCInfo 进行 Recycle
-
-		if conn != nil {
-			conn.Close()
-			klog.CtxErrorf(ctx, "KITEX: panic happened, close conn[%s], %s\n%s", conn.RemoteAddr(), err, string(debug.Stack()))
-		} else {
-			klog.CtxErrorf(ctx, "KITEX: panic happened, %s\n%s", err, string(debug.Stack()))
-		}
-	}
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {

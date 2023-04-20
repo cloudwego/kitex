@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -118,15 +117,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			}
 			rCtx = t.startTracer(rCtx, ri)
 			defer func() {
-				panicErr := recover()
-				if panicErr != nil {
-					if conn != nil {
-						klog.CtxErrorf(rCtx, "KITEX: gRPC panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
-					} else {
-						klog.CtxErrorf(rCtx, "KITEX: gRPC panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
-					}
-				}
-				t.finishTracer(rCtx, ri, err, panicErr)
+				t.finishTracer(rCtx, ri, err, nil)
 			}()
 
 			ink := ri.Invocation().(rpcinfo.InvocationSetter)

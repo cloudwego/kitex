@@ -19,10 +19,6 @@ package trans
 import (
 	"context"
 	"errors"
-	"fmt"
-	"net"
-	"runtime/debug"
-
 	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -31,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"net"
 )
 
 // NewDefaultSvrTransHandler to provide default impl of svrTransHandler, it can be reused in netpoll, shm-ipc, framework-sdk extensions
@@ -119,32 +116,12 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	var sendMsg remote.Message
 	closeConnOutsideIfErr := true
 	defer func() {
-		panicErr := recover()
-		var wrapErr error
-		if panicErr != nil {
-			stack := string(debug.Stack())
-			if conn != nil {
-				ri := rpcinfo.GetRPCInfo(ctx)
-				rService, rAddr := getRemoteInfo(ri, conn)
-				klog.CtxErrorf(ctx, "KITEX: panic happened, remoteAddress=%s, remoteService=%s, error=%v\nstack=%s", rAddr, rService, panicErr, stack)
-			} else {
-				klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", panicErr, stack)
-			}
-			if err != nil {
-				wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %s, last error=%s", panicErr, err.Error()), stack)
-			} else {
-				wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in OnRead] %s", panicErr), stack)
-			}
-		}
-		t.finishTracer(ctx, ri, err, panicErr)
+		t.finishTracer(ctx, ri, err, nil)
 		t.finishProfiler(ctx)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
 		// reset rpcinfo
 		t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
-		if wrapErr != nil {
-			err = wrapErr
-		}
 		if err != nil && !closeConnOutsideIfErr {
 			err = nil
 		}

@@ -97,11 +97,6 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 	var callCosts strings.Builder
 	var cRI rpcinfo.RPCInfo
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
-	defer func() {
-		if panicInfo := recover(); panicInfo != nil {
-			err = panicToErr(ctx, panicInfo, firstRI)
-		}
-	}()
 	startTime := time.Now()
 	for i := 0; i <= retryTimes; i++ {
 		var resp interface{}

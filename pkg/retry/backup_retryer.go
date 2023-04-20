@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/circuitbreak"
-	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -97,19 +96,13 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	done := make(chan *resultWrapper, retryTimes+1)
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
 	timer := time.NewTimer(retryDelay)
-	defer func() {
-		if panicInfo := recover(); panicInfo != nil {
-			err = panicToErr(ctx, panicInfo, firstRI)
-		}
-		timer.Stop()
-	}()
 	// include first call, max loop is retryTimes + 1
 	doCall := true
 	for i := 0; ; {
 		if doCall {
 			doCall = false
 			i++
-			gofunc.GoFunc(ctx, func() {
+			go func() {
 				if atomic.LoadInt32(&abort) == 1 {
 					return
 				}
@@ -118,9 +111,6 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 					cRI rpcinfo.RPCInfo
 				)
 				defer func() {
-					if panicInfo := recover(); panicInfo != nil {
-						e = panicToErr(ctx, panicInfo, firstRI)
-					}
 					done <- &resultWrapper{cRI, e}
 				}()
 				ct := atomic.AddInt32(&callTimes, 1)
@@ -130,7 +120,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				if r.cbContainer.cbStat {
 					circuitbreak.RecordStat(ctx, req, nil, e, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 				}
-			})
+			}()
 		}
 		select {
 		case <-timer.C:
