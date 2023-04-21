@@ -56,7 +56,7 @@ func TestRun(t *testing.T) {
 	t.Run("TestDynamicgoThriftVoidMethod", testDynamicgoThriftVoidMethod)
 	t.Run("TestThrift2NormalServer", testThrift2NormalServer)
 	t.Run("TestThriftException", testThriftException)
-	// t.Run("TestDynamicgoThriftException", testDynamicgoThriftException)
+	t.Run("TestDynamicgoThriftException", testDynamicgoThriftException)
 	t.Run("TestJSONThriftGenericClientClose", testJSONThriftGenericClientClose)
 	t.Run("TestThriftRawBinaryEcho", testThriftRawBinaryEcho)
 	t.Run("TestDynamicgoThriftRawBinaryEcho", testDynamicgoThriftRawBinaryEcho)
@@ -391,20 +391,19 @@ func testThriftException(t *testing.T) {
 	svr.Stop()
 }
 
-// TODO: enable after pr (dynamicgo support exception field) is merged
-//func testDynamicgoThriftException(t *testing.T) {
-//	time.Sleep(4 * time.Second)
-//	svr := initMockServer(t, new(mockImpl))
-//	time.Sleep(500 * time.Millisecond)
-//
-//	cli := initDynamicgoThriftMockClient(t)
-//
-//	_, err := cli.GenericCall(context.Background(), "ExceptionTest", mockReq, callopt.WithRPCTimeout(100*time.Second))
-//	test.Assert(t, err != nil, err)
-//	test.DeepEqual(t, err.Error(), `remote or network error[remote]: {"code":400,"msg":"this is an exception"}`)
-//
-//	svr.Stop()
-//}
+func testDynamicgoThriftException(t *testing.T) {
+	time.Sleep(4 * time.Second)
+	svr := initMockServer(t, new(mockImpl))
+	time.Sleep(500 * time.Millisecond)
+
+	cli := initDynamicgoThriftMockClient(t)
+
+	_, err := cli.GenericCall(context.Background(), "ExceptionTest", mockReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err != nil, err)
+	test.DeepEqual(t, err.Error(), `remote or network error[remote]: {"code":400,"msg":"this is an exception"}`)
+
+	svr.Stop()
+}
 
 func testThriftRawBinaryEcho(t *testing.T) {
 	time.Sleep(1 * time.Second)
@@ -490,18 +489,17 @@ func initThriftMockClient(t *testing.T) genericclient.Client {
 	return cli
 }
 
-// TODO: enable after pr (dynamicgo support exception field) is merged
-//func initDynamicgoThriftMockClient(t *testing.T) genericclient.Client {
-//	p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
-//	test.Assert(t, err == nil)
-//	var opts []generic.Option
-//	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
-//	g, err := generic.JSONThriftGeneric(p, opts...)
-//	test.Assert(t, err == nil)
-//	cli := newGenericDynamicgoClient(transport.TTHeader, "destServiceName", g, "127.0.0.1:8128")
-//	test.Assert(t, err == nil)
-//	return cli
-//}
+func initDynamicgoThriftMockClient(t *testing.T) genericclient.Client {
+	p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
+	test.Assert(t, err == nil)
+	var opts []generic.Option
+	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
+	g, err := generic.JSONThriftGeneric(p, opts...)
+	test.Assert(t, err == nil)
+	cli := newGenericDynamicgoClient(transport.TTHeader, "destServiceName", g, "127.0.0.1:8128")
+	test.Assert(t, err == nil)
+	return cli
+}
 
 func initThriftClient(t *testing.T, addr string) genericclient.Client {
 	return initThriftClientByIDL(t, addr, "./idl/example.thrift", nil)
