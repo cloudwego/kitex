@@ -19,7 +19,6 @@ package client
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"runtime/debug"
 
@@ -85,7 +84,6 @@ func NewMergeClient(svcInfo *serviceinfo.ServiceInfo, s ServerMethod, opts ...Op
 	kc.serverEps = s.Endpoints()
 	kc.serverOpt = s.Option()
 	kc.serverOpt.RemoteOpt.SvcInfo = s.GetServiceInfo()
-
 	if err := kc.init(); err != nil {
 		_ = kc.Close()
 		return nil, err
@@ -291,26 +289,7 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		// server trace
 		serverCtx = svrTraceCtl.DoStart(serverCtx, svrRpcinfo)
 		defer func() {
-			panicErr := recover()
-			svrRpcStats := rpcinfo.AsMutableRPCStats(svrRpcinfo.Stats())
-			if svrRpcStats == nil {
-				return
-			}
-			var wrapErr error
-			if panicErr != nil {
-				stack := string(debug.Stack())
-				if err != nil {
-					wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in merge downstream server] %s, last error=%s", panicErr, err.Error()), stack)
-				} else {
-					wrapErr = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in merge downstream server] %s", panicErr), stack)
-				}
-				klog.CtxErrorf(ctx, "KITEX: panic happened, error=%v\nstack=%s", panicErr, stack)
-				svrRpcStats.SetPanicked(panicErr)
-			}
 			svrTraceCtl.DoFinish(serverCtx, svrRpcinfo, err)
-			if wrapErr != nil {
-				err = wrapErr
-			}
 		}()
 
 		// server logic
@@ -344,7 +323,6 @@ func (kc *mergeClient) initServerRpcInfo() rpcinfo.RPCInfo {
 	if kc.serverOpt.StatsLevel != nil {
 		rpcStats.SetLevel(*kc.serverOpt.StatsLevel)
 	}
-
 	// Export read-only views to external users and keep a mapping for internal users.
 	ri := rpcinfo.NewRPCInfo(
 		rpcinfo.EmptyEndpointInfo(),
