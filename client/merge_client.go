@@ -266,7 +266,7 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		kvs := make(map[string]string, 16)
 		metainfo.SaveMetaInfoToMap(ctx, kvs)
 		serverCtx = metainfo.SetMetaInfoFromMap(serverCtx, kvs)
-		metainfo.TransferForward(serverCtx)
+		serverCtx = metainfo.TransferForward(serverCtx)
 		// reverse transmission, backward mark
 		serverCtx = metainfo.WithBackwardValuesToSend(serverCtx)
 
