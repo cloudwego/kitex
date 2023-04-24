@@ -289,12 +289,6 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		internal_stats.Record(ctx, ri, stats.ServerHandleStart, nil)
 		err = implHandlerFunc(ctx, s.handler, args, resp)
 		if err != nil {
-			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
-				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
-					setter.SetBizStatusErr(bizErr)
-					return nil
-				}
-			}
 			err = kerrors.ErrBiz.WithCause(err)
 		}
 		return err

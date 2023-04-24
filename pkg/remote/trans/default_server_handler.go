@@ -199,6 +199,12 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 // msg is the decoded instance, such as Arg and Result.
 func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	err := t.inkHdlFunc(ctx, args.Data(), result.Data())
+	if bizErr, ok := kerrors.FromBizStatusError(err); ok {
+		if setter, ok := result.RPCInfo().Invocation().(rpcinfo.InvocationSetter); ok {
+			setter.SetBizStatusErr(bizErr)
+			return ctx, nil
+		}
+	}
 	return ctx, err
 }
 
