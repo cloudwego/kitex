@@ -274,10 +274,6 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		svrRpcinfo := kc.initServerRpcInfo()
 		serverCtx = rpcinfo.NewCtxWithRPCInfo(serverCtx, svrRpcinfo)
 
-		// rpcinfo handle
-		if kc.handleRpcInfo != nil {
-			serverCtx = kc.handleRpcInfo(ctx, serverCtx)
-		}
 		// handle common rpcinfo
 		method := cliRpcInfo.To().Method()
 		if ink, ok := svrRpcinfo.Invocation().(rpcinfo.InvocationSetter); ok {
@@ -285,12 +281,15 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 			ink.SetServiceName(kc.svcInfo.ServiceName)
 		}
 		rpcinfo.AsMutableEndpointInfo(svrRpcinfo.To()).SetMethod(method)
-
-		// server trace
 		serverCtx = svrTraceCtl.DoStart(serverCtx, svrRpcinfo)
+		// server trace
 		defer func() {
 			svrTraceCtl.DoFinish(serverCtx, svrRpcinfo, err)
 		}()
+		// rpcinfo handle
+		if kc.handleRpcInfo != nil {
+			serverCtx = kc.handleRpcInfo(ctx, serverCtx)
+		}
 
 		// server logic
 		err = kc.serverEps(serverCtx, req, resp)
