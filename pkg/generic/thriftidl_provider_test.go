@@ -146,3 +146,23 @@ func TestThriftContentProvider(t *testing.T) {
 	test.Assert(t, tree.DynamicgoDsc != nil)
 	test.Assert(t, tree.DynamicgoDsc.Name() == "UpdateService")
 }
+
+func TestDisableGoTagForDynamicgo(t *testing.T) {
+	path := "http_test/idl/binary_echo.thrift"
+	p, err := NewThriftFileProvider(path)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicgoDsc != nil)
+	test.Assert(t, tree.DynamicgoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "STR")
+
+	isDynamicgoGoTagAliasDisabled = true
+	p, err = NewThriftFileProvider(path)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicgoDsc != nil)
+	test.Assert(t, tree.DynamicgoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "str")
+}
