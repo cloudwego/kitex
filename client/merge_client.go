@@ -295,10 +295,6 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		err = kc.serverEps(serverCtx, req, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
-				if setter, ok := svrRpcinfo.Invocation().(rpcinfo.InvocationSetter); ok {
-					setter.SetBizStatusErr(bizErr)
-				}
-
 				if cliSetter, ok := cliRpcInfo.Invocation().(rpcinfo.InvocationSetter); ok {
 					if len(bizErr.BizExtra()) > 0 {
 						cliSetter.SetBizStatusErr(kerrors.NewBizStatusErrorWithExtra(bizErr.BizStatusCode(), bizErr.BizMessage(), bizErr.BizExtra()))
