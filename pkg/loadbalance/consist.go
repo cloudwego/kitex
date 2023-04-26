@@ -28,6 +28,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -278,7 +279,7 @@ func NewConsistBalancer(opt ConsistentHashOption) Loadbalancer {
 func (cb *consistBalancer) AddToDaemon() {
 	// do delete func
 	consistBalancerDaemonOnce.Do(func() {
-		go func() {
+		gofunc.GoFunc(context.Background(), func() {
 			for range time.Tick(2 * time.Minute) {
 				consistBalancersLock.RLock()
 				now := time.Now()
@@ -301,7 +302,7 @@ func (cb *consistBalancer) AddToDaemon() {
 				}
 				consistBalancersLock.RUnlock()
 			}
-		}()
+		})
 	})
 
 	consistBalancersLock.Lock()

@@ -17,10 +17,12 @@
 package remotesvr
 
 import (
+	"context"
 	"net"
 	"sync"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
@@ -65,7 +67,7 @@ func (s *server) Start() chan error {
 	s.listener = ln
 	s.Unlock()
 
-	go func() { errCh <- s.transSvr.BootstrapServer(ln) }()
+	gofunc.GoFunc(context.Background(), func() { errCh <- s.transSvr.BootstrapServer(ln) })
 	return errCh
 }
 

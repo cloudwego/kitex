@@ -17,6 +17,7 @@
 package thrift
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"runtime/debug"
@@ -25,6 +26,7 @@ import (
 	"github.com/cloudwego/thriftgo/semantic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 
@@ -114,7 +116,7 @@ func getAllFunctions(svc *parser.Service, tree *parser.Thrift, visitedSvcs map[*
 			visitedSvcs[svc] = true
 		}
 	}
-	go func() {
+	gofunc.GoFunc(context.Background(), func() {
 		addSvc(tree, svc)
 		for base := svc.Extends; base != ""; base = svc.Extends {
 			ref := svc.GetReference()
@@ -127,8 +129,8 @@ func getAllFunctions(svc *parser.Service, tree *parser.Thrift, visitedSvcs map[*
 			addSvc(tree, svc)
 		}
 		close(svcs)
-	}()
-	go func() {
+	})
+	gofunc.GoFunc(context.Background(), func() {
 		for p := range svcs {
 			svc := p.data.(*parser.Service)
 			for _, fn := range svc.Functions {
@@ -139,7 +141,7 @@ func getAllFunctions(svc *parser.Service, tree *parser.Thrift, visitedSvcs map[*
 			}
 		}
 		close(ch)
-	}()
+	})
 	return ch
 }
 

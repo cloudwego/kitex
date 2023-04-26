@@ -18,6 +18,7 @@
 package server
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -28,6 +29,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/limit"
 	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/proxy"
@@ -143,12 +145,12 @@ func ApplyOptions(opts []Option, o *Options) {
 
 func DefaultSysExitSignal() <-chan error {
 	errCh := make(chan error, 1)
-	go func() {
+	gofunc.GoFunc(context.Background(), func() {
 		sig := SysExitSignal()
 		defer signal.Stop(sig)
 		<-sig
 		errCh <- nil
-	}()
+	})
 	return errCh
 }
 

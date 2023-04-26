@@ -322,7 +322,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 
 	// wait until all notifications are sent and clients stop using those connections
 	done := make(chan struct{})
-	go func() {
+	gofunc.GoFunc(context.Background(), func() {
 		// 1. write control frames to all connections
 		t.conns.Range(func(k, v interface{}) bool {
 			sconn := v.(*muxSvrConn)
@@ -356,7 +356,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 		// 4. waiting all crrst packets received by client
 		time.Sleep(defaultExitWaitGracefulShutdownTime)
 		close(done)
-	}()
+	})
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
