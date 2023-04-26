@@ -42,19 +42,24 @@ import (
 */
 
 /*
-  type hints for sync.Map：
-	consistBalancer -> sync.Map[entry.CacheKey]*consistInfo
-	consistInfo -> sync.Map[hashed key]*consistResult
-	consistResult -> Primary, Replicas
-	consistPicker -> consistResult
+   type hints for sync.Map：
+	 consistBalancer -> sync.Map[entry.CacheKey]*consistInfo
+	 consistInfo -> sync.Map[hashed key]*consistResult
+	 consistResult -> Primary, Replicas
+	 consistPicker -> consistResult
 */
 
 // KeyFunc should return a non-empty string that stands for the request within the given context.
 type KeyFunc func(ctx context.Context, request interface{}) string
 
+// AddrFunc should return a custom name from instance addr for consistent hash.
+// If it is left for nil, original instance addr will be used.
+type AddrFunc func(addr string) string
+
 // ConsistentHashOption .
 type ConsistentHashOption struct {
-	GetKey KeyFunc
+	GetKey  KeyFunc
+	GetName AddrFunc
 
 	// If it is set, replicas will be used when connect to the primary node fails.
 	// This brings extra mem and cpu cost.
@@ -76,7 +81,7 @@ type ConsistentHashOption struct {
 	// It is recommended to set it to true, but be careful to reduce the VirtualFactor appropriately
 	Weighted bool
 
-	// Whether or not to perform expiration processing
+	// Whether to perform expiration processing
 	// The implementation will cache all the keys
 	// If never expired it may cause memory to keep growing and eventually OOM
 	// Setting expiration will result in additional performance overhead
@@ -89,6 +94,7 @@ type ConsistentHashOption struct {
 func NewConsistentHashOption(f KeyFunc) ConsistentHashOption {
 	return ConsistentHashOption{
 		GetKey:         f,
+		GetName:        nil,
 		Replica:        0,
 		VirtualFactor:  100,
 		Weighted:       true,
@@ -263,6 +269,11 @@ func NewConsistBalancer(opt ConsistentHashOption) Loadbalancer {
 	if opt.GetKey == nil {
 		panic("loadbalancer: new consistBalancer failed, getKey func cannot be nil")
 	}
+	if opt.GetName == nil {
+		opt.GetName = func(addr string) string {
+			return addr
+		}
+	}
 	if opt.VirtualFactor == 0 {
 		panic("loadbalancer: new consistBalancer failed, virtual factor must > 0")
 	}
@@ -358,8 +369,8 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 	}
 	maxLen := 0
 	for i := range rNodes {
-		if len(rNodes[i].Ins.Address().String()) > maxLen {
-			maxLen = len(rNodes[i].Ins.Address().String())
+		if len(cb.opt.GetName(rNodes[i].Ins.Address().String())) > maxLen {
+			maxLen = len(cb.opt.GetName(rNodes[i].Ins.Address().String()))
 		}
 	}
 	l := maxLen + 1 + cb.opt.virtualFactorLen // "$address + # + itoa(i)"
@@ -369,7 +380,7 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 	// record the start index.
 	cur := 0
 	for i := range rNodes {
-		bAddr := utils.StringToSliceByte(rNodes[i].Ins.Address().String())
+		bAddr := utils.StringToSliceByte(cb.opt.GetName(rNodes[i].Ins.Address().String()))
 		// Assign the first few bits of b to string.
 		copy(b, bAddr)
 
