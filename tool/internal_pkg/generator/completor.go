@@ -22,6 +22,8 @@ import (
 	"go/printer"
 	"go/token"
 	"io"
+	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -207,7 +209,7 @@ func (c *commonCompleter) Complete() (*File, error) {
 		return nil, err
 	}
 
-	newMethods, err := c.compare(f)
+	newMethods, err := c.compare()
 	if err != nil {
 		return nil, err
 	}
@@ -225,11 +227,9 @@ func (c *commonCompleter) Complete() (*File, error) {
 	return &File{Name: c.path, Content: w.String()}, nil
 }
 
-func (c *commonCompleter) compare(f *ast.File) ([]*MethodInfo, error) {
+func (c *commonCompleter) compare() ([]*MethodInfo, error) {
 	var newMethods []*MethodInfo
-	tmp := c.pkg.Methods
-	methods := c.pkg.AllMethods()
-	for _, m := range methods {
+	for _, m := range c.pkg.Methods {
 		c.pkg.Methods = []*MethodInfo{m}
 		keyTask := &Task{
 			Text: c.update.Key,
@@ -239,21 +239,51 @@ func (c *commonCompleter) compare(f *ast.File) ([]*MethodInfo, error) {
 			return newMethods, err
 		}
 		have := false
-		for _, d := range f.Decls {
-			if fd, ok := d.(*ast.FuncDecl); ok {
-				_, fn := parseFuncDecl(fd)
-				if fn == key {
-					have = true
-					break
+
+		dir := c.path
+		if strings.HasSuffix(c.path, ".go") {
+			dir = path.Dir(c.path)
+		}
+		filepath.Walk(dir, func(fullPath string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if path.Base(dir) == info.Name() && info.IsDir() {
+				return nil
+			}
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			if !strings.HasSuffix(fullPath, ".go") {
+				return nil
+			}
+			// get AST of main package
+			fset := token.NewFileSet()
+			f, err := parser.ParseFile(fset, fullPath, nil, parser.ParseComments)
+			if err != nil {
+				err = fmt.Errorf("go/parser failed to parse the file: %s, err: %v", c.path, err)
+				log.Warnf("NOTICE: This is not a bug. We cannot update the file %s because your codes failed to compile. Fix the compile errors and try again.\n%s", c.path, err.Error())
+				return err
+			}
+
+			for _, d := range f.Decls {
+				if fd, ok := d.(*ast.FuncDecl); ok {
+					_, fn := parseFuncDecl(fd)
+					if fn == key {
+						have = true
+						break
+					}
 				}
 			}
-		}
+			return nil
+		})
+
 		if !have {
 			newMethods = append(newMethods, m)
 		}
 	}
 
-	c.pkg.Methods = tmp
 	return newMethods, nil
 }
 
@@ -264,6 +294,9 @@ func (c *commonCompleter) addImport(w io.Writer, newMethods []*MethodInfo, fset 
 		existImports[strings.Trim(i.Path.Value, "\"")] = true
 	}
 	tmp := c.pkg.Methods
+	defer func() {
+		c.pkg.Methods = tmp
+	}()
 	c.pkg.Methods = newMethods
 	for _, i := range c.update.ImportTpl {
 		importTask := &Task{
@@ -273,17 +306,22 @@ func (c *commonCompleter) addImport(w io.Writer, newMethods []*MethodInfo, fset 
 		if err != nil {
 			return err
 		}
-		if _, ok := existImports[strings.Trim(content, "\"")]; !ok {
-			astutil.AddImport(fset, handlerAST, strings.Trim(content, "\""))
+		imports := c.parseImports(content)
+		for idx := range imports {
+			if _, ok := existImports[strings.Trim(imports[idx][1], "\"")]; !ok {
+				astutil.AddImport(fset, handlerAST, strings.Trim(imports[idx][1], "\""))
+			}
 		}
 	}
-	c.pkg.Methods = tmp
 	printer.Fprint(w, fset, handlerAST)
 	return nil
 }
 
 func (c *commonCompleter) addImplementations(w io.Writer, newMethods []*MethodInfo) error {
 	tmp := c.pkg.Methods
+	defer func() {
+		c.pkg.Methods = tmp
+	}()
 	c.pkg.Methods = newMethods
 	// generate implements of new methods
 	appendTask := &Task{
@@ -296,4 +334,35 @@ func (c *commonCompleter) addImplementations(w io.Writer, newMethods []*MethodIn
 	_, err = w.Write([]byte(content))
 	c.pkg.Methods = tmp
 	return err
+}
+
+// imports[2] is alias, import
+func (c *commonCompleter) parseImports(content string) (imports [][2]string) {
+	if !strings.Contains(content, "\"") {
+		imports = append(imports, [2]string{"", content})
+		return imports
+	}
+	for i := 0; i < len(content); i++ {
+		if content[i] == ' ' {
+			continue
+		}
+		isAlias := content[i] != '"'
+
+		start := i
+		for ; i < len(content); i++ {
+			if content[i] == ' ' {
+				break
+			}
+		}
+		sub := content[start:i]
+		switch {
+		case isAlias:
+			imports = append(imports, [2]string{sub, ""})
+		case len(imports) > 0 && imports[len(imports)-1][1] == "":
+			imports[len(imports)-1][1] = sub
+		default:
+			imports = append(imports, [2]string{"", sub})
+		}
+	}
+	return imports
 }
