@@ -481,19 +481,20 @@ func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
 	if s.opt.ReflectionEnabled {
 		var services string
 		if s.svcInfo.ServiceName == "CombineService" {
-			services = strings.Join(extra["combined_service_list"].([]string), ",")
+			csvs, _ := extra["combined_service_list"].([]string)
+			services = strings.Join(csvs, ",")
 		} else {
 			services = s.svcInfo.ServiceName
 		}
 		req := &thriftreflection.QueryIDLRequest{QueryType: "BatchQueryServices", QueryInput: services}
 		localResp, err := thriftreflection.QueryThriftIDL(req)
-		if err == nil {
+		if err == nil && localResp != nil && localResp.ServiceInfo != nil && len(localResp.ServiceInfo.Methods) != 0 {
 			// TODO: check whether the logic is used.
 			buf, _ := localResp.JsonEncode()
 			reflectionHash := fmt.Sprintf("%x", md5.Sum(utils.StringToSliceByte(buf)))
 			extra["reflectionHash"] = reflectionHash
 		} else {
-			klog.Errorf("KITEX: err query thrift idl for reflection hash: %v", err)
+			klog.Warnf("KITEX: err query thrift idl for reflection hash, err: %v", err)
 		}
 		thriftreflection.RegisterReflectionMethod(si)
 	}
