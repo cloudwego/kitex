@@ -22,7 +22,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"runtime/debug"
 )
 
 var logger FullLogger = &defaultLogger{
@@ -131,7 +130,6 @@ func CtxFatalf(ctx context.Context, format string, v ...interface{}) {
 
 // CtxErrorf calls the default logger's CtxErrorf method.
 func CtxErrorf(ctx context.Context, format string, v ...interface{}) {
-	logger.CtxWarnf(ctx, "call ctx errorf %s", debug.Stack())
 	logger.CtxErrorf(ctx, format, v...)
 }
 
