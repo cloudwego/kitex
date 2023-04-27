@@ -47,7 +47,7 @@ func init() {
 	localAddr = utils.NewNetAddr("tcp", "127.0.0.1")
 }
 
-type HandleRpcInfo func(ctx, svrCtx context.Context) context.Context
+type MergeMetaHandler func(ctx, svrCtx context.Context) context.Context
 
 type mergeClient struct {
 	svcInfo *serviceinfo.ServiceInfo
@@ -64,7 +64,7 @@ type mergeClient struct {
 	serverEps endpoint.Endpoint
 	serverOpt *internal_server.Options
 
-	handleRpcInfo HandleRpcInfo
+	mergeMetaHandler MergeMetaHandler
 }
 
 type ServerMethod interface {
@@ -91,8 +91,8 @@ func NewMergeClient(svcInfo *serviceinfo.ServiceInfo, s ServerMethod, opts ...Op
 	return kc, nil
 }
 
-func (kc *mergeClient) SetHandleRpcInfo(fn HandleRpcInfo) {
-	kc.handleRpcInfo = fn
+func (kc *mergeClient) SetMergeMetaHandler(fn MergeMetaHandler) {
+	kc.mergeMetaHandler = fn
 }
 
 func (kc *mergeClient) init() (err error) {
@@ -288,9 +288,9 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		defer func() {
 			svrTraceCtl.DoFinish(serverCtx, svrRpcinfo, err)
 		}()
-		// rpcinfo handle
-		if kc.handleRpcInfo != nil {
-			serverCtx = kc.handleRpcInfo(ctx, serverCtx)
+		// meta handler
+		if kc.mergeMetaHandler != nil {
+			serverCtx = kc.mergeMetaHandler(ctx, serverCtx)
 		}
 
 		// server logic
@@ -309,7 +309,6 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 
 		// forward key
 		kvs = metainfo.AllBackwardValuesToSend(serverCtx)
-		klog.CtxWarnf(serverCtx, "backward key: &#v", kvs)
 		if len(kvs) > 0 {
 			metainfo.SetBackwardValuesFromMap(ctx, kvs)
 		}
