@@ -265,7 +265,9 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		// forward transmission
 		kvs := make(map[string]string, 16)
 		metainfo.SaveMetaInfoToMap(ctx, kvs)
-		serverCtx = metainfo.SetMetaInfoFromMap(serverCtx, kvs)
+		if len(kvs) > 0 {
+			serverCtx = metainfo.SetMetaInfoFromMap(serverCtx, kvs)
+		}
 		serverCtx = metainfo.TransferForward(serverCtx)
 		// reverse transmission, backward mark
 		serverCtx = metainfo.WithBackwardValuesToSend(serverCtx)
@@ -307,7 +309,10 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 
 		// forward key
 		kvs = metainfo.AllBackwardValuesToSend(serverCtx)
-		metainfo.SetBackwardValuesFromMap(ctx, kvs)
+		klog.CtxWarnf(serverCtx, "backward key: &#v", kvs)
+		if len(kvs) > 0 {
+			metainfo.SetBackwardValuesFromMap(ctx, kvs)
+		}
 
 		return err
 	}, nil
