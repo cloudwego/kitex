@@ -103,42 +103,25 @@ func (req *HTTPRequest) GetMapBody(key string) string {
 	if len(req.RawBody) == 0 {
 		return ""
 	}
-	if req.GeneralBody == nil && req.Request != nil {
-		body := req.RawBody
-		s := utils.SliceByteToString(body)
-		node := ast.NewRaw(s)
-		cache := &jsonCache{
-			root: node,
-			m:    make(map[string]string),
-		}
-		req.GeneralBody = cache
+
+	body := req.RawBody
+	s := utils.SliceByteToString(body)
+	node := ast.NewRaw(s)
+	v := node.Get(key)
+	if v.Check() != nil {
+		return ""
 	}
-	switch t := req.GeneralBody.(type) {
-	case *jsonCache:
-		// fast path
-		if v, ok := t.m[key]; ok {
-			return v
-		}
-		// slow path
-		v := t.root.Get(key)
-		if v.Check() != nil {
-			return ""
-		}
-		j, e := v.Raw()
+	j, e := v.Raw()
+	if e != nil {
+		return ""
+	}
+	if v.Type() == ast.V_STRING {
+		j, e = v.String()
 		if e != nil {
 			return ""
 		}
-		if v.Type() == ast.V_STRING {
-			j, e = v.String()
-			if e != nil {
-				return ""
-			}
-		}
-		t.m[key] = j
-		return j
-	default:
-		return ""
 	}
+	return j
 }
 
 // GetPostForm implements http.RequestGetter of dynamicgo
