@@ -134,7 +134,7 @@ func (m *apiCookie) Request(ctx context.Context, req *HTTPRequest, field *FieldD
 }
 
 func (m *apiCookie) Response(ctx context.Context, resp *HTTPResponse, field *FieldDescriptor, val interface{}) error {
-	// TODO: SetCookie
+	// TODO: set cookie
 	return nil
 }
 

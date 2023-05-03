@@ -50,11 +50,6 @@ type HTTPRequest struct {
 	ContentType MIMEType
 }
 
-type jsonCache struct {
-	root ast.Node
-	m    map[string]string
-}
-
 // GetHeader implements http.RequestGetter of dynamicgo
 func (req *HTTPRequest) GetHeader(key string) string {
 	return req.Request.Header.Get(key)
@@ -169,8 +164,9 @@ func (resp *HTTPResponse) SetHeader(key, val string) error {
 
 // SetCookie implements http.ResponseSetter of dynamicgo
 func (resp *HTTPResponse) SetCookie(key, val string) error {
-	c := &http.Cookie{Name: key, Value: val}
-	resp.Header.Add("Set-Cookie", c.String())
+	// TODO: send Cookie along with Header
+	// c := &http.Cookie{Name: key, Value: val}
+	// resp.Header.Add("Set-Cookie", c.String())
 	return nil
 }
 
