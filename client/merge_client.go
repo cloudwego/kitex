@@ -313,6 +313,7 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 			metainfo.SetBackwardValuesFromMap(ctx, kvs)
 		}
 
+		klog.CtxWarnf(serverCtx, "reverse keys: %#v", kvs)
 		return err
 	}, nil
 }
