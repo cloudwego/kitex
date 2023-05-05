@@ -450,6 +450,9 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 		d.data.statsTrace = v
 		d.addMetadata(f.Name, string(v))
 	default:
+		if strings.HasPrefix(f.Name, "x-envoy-response-") {
+			klog.Warnf("KITEX-DEBUG: x-envoy-response-flag, key=%s, val=%s", f.Name, f.Value)
+		}
 		if isReservedHeader(f.Name) && !isWhitelistedHeader(f.Name) {
 			break
 		}
