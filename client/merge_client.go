@@ -73,7 +73,7 @@ type ServerMethod interface {
 	GetServiceInfo() *serviceinfo.ServiceInfo
 }
 
-// NewClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
+// NewMergeClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
 func NewMergeClient(svcInfo *serviceinfo.ServiceInfo, s ServerMethod, opts ...Option) (Client, error) {
 	if svcInfo == nil {
 		return nil, errors.New("NewClient: no service info")
@@ -310,10 +310,10 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		// forward key
 		kvs = metainfo.AllBackwardValuesToSend(serverCtx)
 		if len(kvs) > 0 {
+			ctx = metainfo.WithBackwardValues(ctx)
 			metainfo.SetBackwardValuesFromMap(ctx, kvs)
 		}
 
-		klog.CtxWarnf(serverCtx, "reverse keys: %#v", kvs)
 		return err
 	}, nil
 }
