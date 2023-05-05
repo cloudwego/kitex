@@ -117,10 +117,10 @@ func GRPCTrailer(ctx context.Context, md *metadata.MD) context.Context {
 }
 
 // GetHeaderMetadataFromCtx is used to get the metadata of stream Header from ctx.
-func GetHeaderMetadataFromCtx(ctx context.Context) metadata.MD {
+func GetHeaderMetadataFromCtx(ctx context.Context) *metadata.MD {
 	header := ctx.Value(headerKey{})
 	if header != nil {
-		return header.(metadata.MD)
+		return header.(*metadata.MD)
 	}
 	return nil
 }
@@ -128,10 +128,22 @@ func GetHeaderMetadataFromCtx(ctx context.Context) metadata.MD {
 // set header and trailer to the ctx by default.
 func receiveHeaderAndTrailer(ctx context.Context, conn net.Conn) context.Context {
 	if md, err := conn.(*clientConn).Header(); err == nil {
-		ctx = context.WithValue(ctx, headerKey{}, md)
+		if h := ctx.Value(headerKey{}); h != nil {
+			// If using GRPCHeader(), set the value directly
+			hd := h.(*metadata.MD)
+			*hd = md
+		} else {
+			ctx = context.WithValue(ctx, headerKey{}, &md)
+		}
 	}
-	if t := conn.(*clientConn).Trailer(); t != nil {
-		ctx = context.WithValue(ctx, trailerKey{}, t)
+	if md := conn.(*clientConn).Trailer(); md != nil {
+		if t := ctx.Value(trailerKey{}); t != nil {
+			// If using GRPCTrailer(), set the value directly
+			tr := t.(*metadata.MD)
+			*tr = md
+		} else {
+			ctx = context.WithValue(ctx, trailerKey{}, &md)
+		}
 	}
 	return ctx
 }
