@@ -20,8 +20,6 @@ const structLikeCodec = `
 
 {{template "StructLikeFastReadField" .}}
 
-{{template "StructLikeDeepCopy" .}}
-
 {{template "StructLikeFastWrite" .}}
 
 {{template "StructLikeFastWriteNocopy" .}}
@@ -32,6 +30,12 @@ const structLikeCodec = `
 
 {{template "StructLikeFieldLength" .}}
 {{- end}}{{/* define "StructLikeCodec" */}}
+`
+
+const deepCopyAPI = `
+{{define "DeepCopyAPI"}}
+{{template "StructLikeDeepCopy" .}}
+{{- end}}{{/* define "DeepCopyAPI" */}}
 `
 
 const structLikeFastRead = `
@@ -193,10 +197,12 @@ const structLikeDeepCopy = `
 {{define "StructLikeDeepCopy"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) DeepCopy(s interface{}) error {
+	{{if gt (len .Fields) 0 -}}
 	src, ok := s.(*{{$TypeName}})
 	if !ok {
 		return fmt.Errorf("%T's type not matched %T", s, p)
 	}
+	{{- end -}}
 	{{- range .Fields}}
 	{{- $ctx := MkRWCtx .}}
 	{{ template "FieldDeepCopy" $ctx}}
@@ -618,7 +624,7 @@ const fieldDeepCopyBaseType = `
 			}
 			{{- else if .Type.Category.IsString}}
 			if *{{$Src}} != "" {
-				tmp := StringDeepCopy(*{{$Src}})
+				tmp := kutils.StringDeepCopy(*{{$Src}})
 				{{.Target}} = &tmp
 			}
 			{{- else}}
@@ -635,7 +641,7 @@ const fieldDeepCopyBaseType = `
 		}
 		{{- else if .Type.Category.IsString}}
 		if {{$Src}} != "" {
-			{{.Target}} = StringDeepCopy({{$Src}})
+			{{.Target}} = kutils.StringDeepCopy({{$Src}})
 		}
 		{{- else}}
 		{{.Target}} = {{$Src}}

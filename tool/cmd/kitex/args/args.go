@@ -112,6 +112,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Use custom template to generate codes.")
 	f.StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
 		"Specify a code gen path.")
+	f.BoolVar(&a.NoDeepCopyAPI, "no-deep-copy-api", false,
+		"Generate codes without injecting deep copy method.")
 	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,

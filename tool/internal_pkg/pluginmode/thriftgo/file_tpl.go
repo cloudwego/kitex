@@ -34,11 +34,14 @@ import (
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	{{if GenerateFastAPIs}}
+	{{if GenerateFastAPIs -}}
 	"{{ImportPathTo "pkg/protocol/bthrift"}}"
 	{{- end}}
+	{{if GenerateDeepCopyAPIs -}}
+	kutils "{{ImportPathTo "pkg/utils"}}"
+	{{- end}}
 
-	{{- range $path, $alias := .Imports}}
+	{{range $path, $alias := .Imports}}
 	{{$alias }}"{{$path}}"
 	{{- end}}
 )
@@ -77,6 +80,12 @@ const body = `
 {{template "Processor" .}}
 {{- end}}
 {{- end}}{{/* if GenerateFastAPIs */}}
+
+{{if GenerateDeepCopyAPIs}}
+{{- range .Scope.StructLikes}}
+{{template "DeepCopyAPI" .}}
+{{- end}}
+{{- end}}{{/* if GenerateDeepCopyAPIs */}}
 
 {{template "ArgsAndResult" .}}
 

@@ -44,30 +44,22 @@ func AppendToTemplate(text string) {
 }
 
 const kitexUnusedProtection = `
-import "unsafe"
-
 // KitexUnusedProtection is used to prevent 'imported and not used' error.
 var KitexUnusedProtection = struct{}{}
-
-func StringDeepCopy(s string) string {
-	buf := []byte(s)
-	ns := (*string)(unsafe.Pointer(&buf))
-	return *ns
-}
-
 `
 
 //lint:ignore U1000 until protectionInsertionPoint is used
 var protectionInsertionPoint = "KitexUnusedProtection"
 
 type patcher struct {
-	noFastAPI bool
-	utils     *golang.CodeUtils
-	module    string
-	copyIDL   bool
-	version   string
-	record    bool
-	recordCmd []string
+	noFastAPI     bool
+	utils         *golang.CodeUtils
+	module        string
+	copyIDL       bool
+	version       string
+	record        bool
+	recordCmd     []string
+	noDeepCopyAPI bool
 
 	fileTpl *template.Template
 	refTpl  *template.Template
@@ -80,6 +72,7 @@ func (p *patcher) buildTemplates() (err error) {
 	m["IsBinaryOrStringType"] = p.isBinaryOrStringType
 	m["Version"] = func() string { return p.version }
 	m["GenerateFastAPIs"] = func() bool { return !p.noFastAPI && p.utils.Template() != "slim" }
+	m["GenerateDeepCopyAPIs"] = func() bool { return !p.noDeepCopyAPI && p.utils.Template() != "slim" }
 	m["GenerateArgsResultTypes"] = func() bool { return p.utils.Template() == "slim" }
 	m["ImportPathTo"] = generator.ImportPathTo
 	m["ToPackageNames"] = func(imports map[string]string) (res []string) {
@@ -124,6 +117,7 @@ func (p *patcher) buildTemplates() (err error) {
 			templates.FieldIsSet)
 	} else {
 		allTemplates = append(allTemplates, structLikeCodec,
+			deepCopyAPI,
 			structLikeFastRead,
 			structLikeFastReadField,
 			structLikeDeepCopy,
@@ -170,11 +164,7 @@ func (p *patcher) buildTemplates() (err error) {
 		)
 	}
 	for _, txt := range allTemplates {
-		tpl, err = tpl.Parse(txt)
-		if err != nil {
-			println(txt)
-			panic(err)
-		}
+		tpl = template.Must(tpl.Parse(txt))
 	}
 
 	ext := `{{define "ExtraTemplates"}}{{end}}`
@@ -250,8 +240,17 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		if err = fileTpl.ExecuteTemplate(&buf, "file", data); err != nil {
 			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
 		}
+		content := buf.String()
+		// if kutils is not used, remove the dependency.
+		if !strings.Contains(content, "kutils.StringDeepCopy") {
+			kutilsImp := `kutils "github.com/cloudwego/kitex/pkg/utils"`
+			idx := strings.Index(content, kutilsImp)
+			if idx > 0 {
+				content = content[:idx-1] + content[idx+len(kutilsImp):]
+			}
+		}
 		patches = append(patches, &plugin.Generated{
-			Content: buf.String(),
+			Content: content,
 			Name:    &target,
 		})
 

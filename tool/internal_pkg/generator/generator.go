@@ -129,6 +129,8 @@ type Config struct {
 	TemplateDir string
 
 	GenPath string
+
+	NoDeepCopyAPI bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
