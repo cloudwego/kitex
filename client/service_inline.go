@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2023 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"runtime/debug"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	internal_server "github.com/cloudwego/kitex/internal/server"
@@ -36,7 +37,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/bound"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
-	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -57,8 +57,6 @@ type mergeClient struct {
 
 	inited bool
 	closed bool
-
-	turboMode bool
 
 	// server info
 	serverEps endpoint.Endpoint
@@ -96,7 +94,6 @@ func (kc *mergeClient) SetMergeMetaHandler(fn MergeMetaHandler) {
 }
 
 func (kc *mergeClient) init() (err error) {
-	// initTransportProtocol(kc.svcInfo, kc.opt.Configs)
 	if err = kc.checkOptions(); err != nil {
 		return err
 	}
@@ -122,7 +119,6 @@ func (kc *mergeClient) initContext() context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, kc.opt.Bus)
 	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, kc.opt.Events)
-	ctx = context.WithValue(ctx, rpctimeout.TimeoutAdjustKey, &kc.opt.ExtraTimeout)
 	if chr, ok := kc.opt.Proxy.(proxy.ContextHandler); ok {
 		ctx = chr.HandleContext(ctx)
 	}
@@ -210,13 +206,6 @@ func (kc *mergeClient) Call(ctx context.Context, method string, request, respons
 	kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 	callOpts.Recycle()
 
-	// why need check recycleRI to decide if recycle RPCInfo?
-	// 1. no retry, rpc timeout happen will cause panic when response return
-	// 2. retry success, will cause panic when first call return
-	// 3. backup request may cause panic, cannot recycle first RPCInfo
-	// RPCInfo will be recycled after rpc is finished,
-	// holding RPCInfo in a new goroutine is forbidden.
-	// TODO: 如果没有 retry 的话，是不是就可以直接回收了
 	rpcinfo.PutRPCInfo(ri)
 	return err
 }
@@ -272,8 +261,10 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		// reverse transmission, backward mark
 		serverCtx = metainfo.WithBackwardValuesToSend(serverCtx)
 
-		// TODO: reuse server rpc info
 		svrRpcinfo := kc.initServerRpcInfo()
+		defer func() {
+			rpcinfo.PutRPCInfo(svrRpcinfo)
+		}()
 		serverCtx = rpcinfo.NewCtxWithRPCInfo(serverCtx, svrRpcinfo)
 
 		// handle common rpcinfo
