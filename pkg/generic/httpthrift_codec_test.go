@@ -21,6 +21,7 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -49,6 +50,7 @@ func TestFromHTTPRequest(t *testing.T) {
 }
 
 func TestHttpThriftCodec(t *testing.T) {
+	os.Setenv(UseDynamicgoConv, "False")
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
 	htc, err := newHTTPThriftCodec(p, thriftCodec)
@@ -83,6 +85,7 @@ func TestHttpThriftCodec(t *testing.T) {
 }
 
 func TestHttpThriftDynamicgoCodec(t *testing.T) {
+	os.Setenv(UseDynamicgoConv, "True")
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option

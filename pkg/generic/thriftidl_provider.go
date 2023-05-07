@@ -30,10 +30,15 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
+const (
+	GoTagDisabled    = "KITEX_GENERIC_GOTAG_ALIAS_DISABLED"
+	UseDynamicgoConv = "KITEX_GENERIC_USE_DYNAMICGO_CONVERSION"
+)
+
 var (
 	_                             Closer = &ThriftContentProvider{}
 	_                             Closer = &ThriftContentWithAbsIncludePathProvider{}
-	isDynamicgoGoTagAliasDisabled        = os.Getenv("KITEX_GENERIC_GOTAG_ALIAS_DISABLED") == "True"
+	isDynamicgoGoTagAliasDisabled        = os.Getenv(GoTagDisabled) == "True"
 )
 
 type thriftFileProvider struct {
@@ -55,15 +60,18 @@ func NewThriftFileProvider(path string, includeDirs ...string) (DescriptorProvid
 		return nil, err
 	}
 
-	if isDynamicgoGoTagAliasDisabled {
-		dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+	useDynamicgoConversion := os.Getenv(UseDynamicgoConv) == "True"
+	if useDynamicgoConversion {
+		if isDynamicgoGoTagAliasDisabled {
+			dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+		}
+		// ServiceDescriptor of dynamicgo
+		dsvc, err := dthrift.NewDescritorFromPath(context.Background(), path, includeDirs...)
+		if err != nil {
+			return nil, err
+		}
+		svc.DynamicgoDsc = dsvc
 	}
-	// ServiceDescriptor of dynamicgo
-	dsvc, err := dthrift.NewDescritorFromPath(context.Background(), path, includeDirs...)
-	if err != nil {
-		return nil, err
-	}
-	svc.DynamicgoDsc = dsvc
 
 	p.svcs <- svc
 	return p, nil
@@ -109,15 +117,18 @@ func NewThriftContentProvider(main string, includes map[string]string) (*ThriftC
 		return nil, err
 	}
 
-	if isDynamicgoGoTagAliasDisabled {
-		dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+	useDynamicgoConversion := os.Getenv(UseDynamicgoConv) == "True"
+	if useDynamicgoConversion {
+		if isDynamicgoGoTagAliasDisabled {
+			dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+		}
+		// ServiceDescriptor of dynamicgo
+		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
+		if err != nil {
+			return nil, err
+		}
+		svc.DynamicgoDsc = dsvc
 	}
-	// ServiceDescriptor of dynamicgo
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
-	if err != nil {
-		return nil, err
-	}
-	svc.DynamicgoDsc = dsvc
 
 	p.svcs <- svc
 	return p, nil
@@ -135,14 +146,17 @@ func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]strin
 		return err
 	}
 
-	if isDynamicgoGoTagAliasDisabled {
-		dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+	useDynamicgoConversion := os.Getenv(UseDynamicgoConv) == "True"
+	if useDynamicgoConversion {
+		if isDynamicgoGoTagAliasDisabled {
+			dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+		}
+		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
+		if err != nil {
+			return err
+		}
+		svc.DynamicgoDsc = dsvc
 	}
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
-	if err != nil {
-		return err
-	}
-	svc.DynamicgoDsc = dsvc
 
 	select {
 	case <-p.svcs:
@@ -251,15 +265,18 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 		return nil, err
 	}
 
-	if isDynamicgoGoTagAliasDisabled {
-		dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+	useDynamicgoConversion := os.Getenv(UseDynamicgoConv) == "True"
+	if useDynamicgoConversion {
+		if isDynamicgoGoTagAliasDisabled {
+			dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+		}
+		// ServiceDescriptor of dynamicgo
+		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
+		if err != nil {
+			return nil, err
+		}
+		svc.DynamicgoDsc = dsvc
 	}
-	// ServiceDescriptor of dynamicgo
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
-	if err != nil {
-		return nil, err
-	}
-	svc.DynamicgoDsc = dsvc
 
 	p.svcs <- svc
 
@@ -282,14 +299,17 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 		return err
 	}
 
-	if isDynamicgoGoTagAliasDisabled {
-		dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+	useDynamicgoConversion := os.Getenv(UseDynamicgoConv) == "True"
+	if useDynamicgoConversion {
+		if isDynamicgoGoTagAliasDisabled {
+			dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+		}
+		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
+		if err != nil {
+			return err
+		}
+		svc.DynamicgoDsc = dsvc
 	}
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
-	if err != nil {
-		return err
-	}
-	svc.DynamicgoDsc = dsvc
 
 	// drain the channel
 	select {

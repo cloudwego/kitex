@@ -18,6 +18,7 @@ package generic
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -28,6 +29,7 @@ import (
 )
 
 func TestJsonThriftCodec(t *testing.T) {
+	os.Setenv(UseDynamicgoConv, "False")
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 	jtc, err := newJsonThriftCodec(p, thriftCodec)
@@ -58,6 +60,7 @@ func TestJsonThriftCodec(t *testing.T) {
 }
 
 func TestJsonDynamicgoThriftCodec(t *testing.T) {
+	os.Setenv(UseDynamicgoConv, "True")
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 
@@ -114,6 +117,7 @@ func TestJsonDynamicgoThriftCodec(t *testing.T) {
 }
 
 func TestJsonExceptionError(t *testing.T) {
+	os.Setenv(UseDynamicgoConv, "False")
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 	jtc, err := newJsonThriftCodec(p, thriftCodec)

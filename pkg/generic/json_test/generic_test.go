@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"os"
 	"reflect"
 	"runtime"
 	"runtime/debug"
@@ -66,6 +67,7 @@ func TestRun(t *testing.T) {
 }
 
 func testThrift(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "False")
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":8121", new(GenericServiceImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -82,6 +84,7 @@ func testThrift(t *testing.T) {
 }
 
 func testDynamicgoThrift(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "True")
 	var opts []generic.Option
 	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
 	time.Sleep(1 * time.Second)
@@ -121,6 +124,7 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 
 	t := testing.T{}
 	b.Run("thrift_small", func(b *testing.B) {
+		os.Setenv(generic.UseDynamicgoConv, "False")
 		time.Sleep(1 * time.Second)
 		svr := initFallbackThriftServer(&t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift", nil)
 		time.Sleep(500 * time.Millisecond)
@@ -140,6 +144,7 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 	})
 
 	b.Run("dynamicgoThrift_small", func(b *testing.B) {
+		os.Setenv(generic.UseDynamicgoConv, "True")
 		var opts []generic.Option
 		convOpts := conv.Options{NoBase64Binary: true, EnableValueMapping: true}
 		opts = append(opts, generic.WithCustomDynamicgoConvOpts(convOpts))
@@ -175,6 +180,7 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 	t := testing.T{}
 
 	b.Run("thrift_medium", func(b *testing.B) {
+		os.Setenv(generic.UseDynamicgoConv, "False")
 		time.Sleep(1 * time.Second)
 		svr := initFallbackThriftServer(&t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift", nil)
 		time.Sleep(500 * time.Millisecond)
@@ -193,6 +199,7 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 	})
 
 	b.Run("dynamicgoThrift_medium", func(b *testing.B) {
+		os.Setenv(generic.UseDynamicgoConv, "True")
 		var opts []generic.Option
 		convOpts := conv.Options{NoBase64Binary: true, EnableValueMapping: true}
 		opts = append(opts, generic.WithCustomDynamicgoConvOpts(convOpts))
@@ -216,6 +223,7 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 }
 
 func testThriftPingMethod(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "False")
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":8122", new(GenericServicePingImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -231,6 +239,7 @@ func testThriftPingMethod(t *testing.T) {
 }
 
 func testDynamicgoThriftPingMethod(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "True")
 	var opts []generic.Option
 	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
 	time.Sleep(1 * time.Second)
@@ -259,6 +268,7 @@ func testDynamicgoThriftPingMethod(t *testing.T) {
 }
 
 func testThriftError(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "False")
 	time.Sleep(2 * time.Second)
 	svr := initThriftServer(t, ":8123", new(GenericServiceErrorImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -272,6 +282,7 @@ func testThriftError(t *testing.T) {
 }
 
 func testDynamicgoThriftError(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "True")
 	var opts []generic.Option
 	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
 	time.Sleep(1 * time.Second)
@@ -292,6 +303,7 @@ func testDynamicgoThriftError(t *testing.T) {
 }
 
 func testThriftOnewayMethod(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "False")
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":8124", new(GenericServiceOnewayImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -305,6 +317,7 @@ func testThriftOnewayMethod(t *testing.T) {
 }
 
 func testDynamicgoThriftOnewayMethod(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "True")
 	var opts []generic.Option
 	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
 	time.Sleep(1 * time.Second)
@@ -329,6 +342,7 @@ func testDynamicgoThriftOnewayMethod(t *testing.T) {
 }
 
 func testThriftVoidMethod(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "False")
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":8125", new(GenericServiceVoidImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -342,6 +356,7 @@ func testThriftVoidMethod(t *testing.T) {
 }
 
 func testDynamicgoThriftVoidMethod(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "True")
 	var opts []generic.Option
 	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
 	time.Sleep(1 * time.Second)
@@ -366,6 +381,7 @@ func testDynamicgoThriftVoidMethod(t *testing.T) {
 }
 
 func testThrift2NormalServer(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "False")
 	time.Sleep(4 * time.Second)
 	svr := initMockServer(t, new(mockImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -378,6 +394,7 @@ func testThrift2NormalServer(t *testing.T) {
 }
 
 func testThriftException(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "False")
 	time.Sleep(4 * time.Second)
 	svr := initMockServer(t, new(mockImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -392,6 +409,7 @@ func testThriftException(t *testing.T) {
 }
 
 func testDynamicgoThriftException(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "True")
 	time.Sleep(4 * time.Second)
 	svr := initMockServer(t, new(mockImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -406,6 +424,7 @@ func testDynamicgoThriftException(t *testing.T) {
 }
 
 func testThriftRawBinaryEcho(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "False")
 	time.Sleep(1 * time.Second)
 	svr := initThriftServerByIDL(t, ":8126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", &(&struct{ x bool }{false}).x)
 	time.Sleep(500 * time.Millisecond)
@@ -423,6 +442,7 @@ func testThriftRawBinaryEcho(t *testing.T) {
 }
 
 func testDynamicgoThriftRawBinaryEcho(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "True")
 	var opts []generic.Option
 	opts = append(opts, generic.WithCustomDynamicgoConvOpts(conv.Options{WriteRequireField: true, WriteDefaultField: true, NoBase64Binary: true}))
 	time.Sleep(1 * time.Second)
@@ -442,6 +462,7 @@ func testDynamicgoThriftRawBinaryEcho(t *testing.T) {
 }
 
 func testThriftBase64BinaryEcho(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "False")
 	time.Sleep(1 * time.Second)
 	svr := initThriftServerByIDL(t, ":8126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", nil)
 	time.Sleep(500 * time.Millisecond)
@@ -460,6 +481,7 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 }
 
 func testDynamicgoThriftBase64BinaryEcho(t *testing.T) {
+	os.Setenv(generic.UseDynamicgoConv, "True")
 	var opts []generic.Option
 	opts = append(opts, generic.WithCustomDynamicgoConvOpts(conv.Options{WriteRequireField: true, WriteDefaultField: true, NoBase64Binary: false}))
 	time.Sleep(1 * time.Second)
