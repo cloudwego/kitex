@@ -233,9 +233,12 @@ func TestCodecTypeNotMatchWithServiceInfoPayloadCodec(t *testing.T) {
 		PayloadCodec: serviceinfo.Thrift,
 	}
 	msg = remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Server)
-	msg.SetProtocolInfo(remote.ProtocolInfo{TransProto: transport.TTHeader, CodecType: serviceinfo.Thrift})
+	msg.SetProtocolInfo(remote.ProtocolInfo{TransProto: transport.TTHeader, CodecType: serviceinfo.Protobuf})
 	err = codec.Encode(context.Background(), msg, remote.NewWriterBuffer(256))
-	test.Assert(t, err == nil, err)
+	test.Assert(t, err != nil)
+	msg.SetProtocolInfo(remote.ProtocolInfo{TransProto: transport.Framed, CodecType: serviceinfo.Protobuf})
+	err = codec.Encode(context.Background(), msg, remote.NewWriterBuffer(256))
+	test.Assert(t, err == nil)
 }
 
 var mpc remote.PayloadCodec = mockPayloadCodec{}
