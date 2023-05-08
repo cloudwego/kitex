@@ -248,6 +248,7 @@ func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter, ad
 	c, reused, decNum := p.pool.Get()
 	p.globalIdle.DecN(int64(decNum))
 	if reused {
+		reporter.ReuseSucceed(Long, p.serviceName, p.addr)
 		return c, nil
 	}
 	// dial a new connection
