@@ -25,7 +25,6 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -107,7 +106,6 @@ func initDynamicgoThriftClientByIDL(tp transport.Protocol, t *testing.T, addr, i
 }
 
 func testThriftNormalBinaryEcho(t *testing.T) {
-	os.Setenv(generic.UseDynamicgoConv, "False")
 	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
 	time.Sleep(500 * time.Millisecond)
 
@@ -211,7 +209,6 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 }
 
 func testThriftDynamicgo(t *testing.T) {
-	os.Setenv(generic.UseDynamicgoConv, "True")
 	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
 	time.Sleep(500 * time.Millisecond)
 
@@ -308,7 +305,6 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 	t := testing.T{}
 
 	b.Run("thrift_small", func(b *testing.B) {
-		os.Setenv(generic.UseDynamicgoConv, "False")
 		time.Sleep(1 * time.Second)
 		svr := initFallbackThriftServer(&t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
 		time.Sleep(500 * time.Millisecond)
@@ -336,7 +332,6 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 	})
 
 	b.Run("dynaimcgoThrift_small", func(b *testing.B) {
-		os.Setenv(generic.UseDynamicgoConv, "True")
 		time.Sleep(1 * time.Second)
 		svr := initFallbackThriftServer(&t, ":8128", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
 		time.Sleep(500 * time.Millisecond)
@@ -379,7 +374,6 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 	t := testing.T{}
 
 	b.Run("thrift_medium", func(b *testing.B) {
-		os.Setenv(generic.UseDynamicgoConv, "False")
 		time.Sleep(1 * time.Second)
 		svr := initFallbackThriftServer(&t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
 		time.Sleep(500 * time.Millisecond)
@@ -407,7 +401,6 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 	})
 
 	b.Run("dynaimcgoThrift_medium", func(b *testing.B) {
-		os.Setenv(generic.UseDynamicgoConv, "True")
 		time.Sleep(1 * time.Second)
 		svr := initFallbackThriftServer(&t, ":8128", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
 		time.Sleep(500 * time.Millisecond)
@@ -438,7 +431,6 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 }
 
 func testThriftException(t *testing.T) {
-	os.Setenv(generic.UseDynamicgoConv, "False")
 	time.Sleep(4 * time.Second)
 	svr := initMockServer(t, new(mockImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -473,7 +465,6 @@ func testThriftException(t *testing.T) {
 }
 
 func testDynamicgoThriftException(t *testing.T) {
-	os.Setenv(generic.UseDynamicgoConv, "True")
 	time.Sleep(4 * time.Second)
 	svr := initMockServer(t, new(mockImpl))
 	time.Sleep(500 * time.Millisecond)
@@ -511,7 +502,6 @@ func testDynamicgoThriftException(t *testing.T) {
 }
 
 func testRegression(t *testing.T) {
-	os.Setenv(generic.UseDynamicgoConv, "True")
 	nobj := getNestingValue()
 	data, err := json.Marshal(nobj)
 	if err != nil {
@@ -588,7 +578,6 @@ func testRegression(t *testing.T) {
 }
 
 func testThriftBase64BinaryEcho(t *testing.T) {
-	os.Setenv(generic.UseDynamicgoConv, "False")
 	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
 	time.Sleep(500 * time.Millisecond)
 
@@ -642,7 +631,6 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 }
 
 func testDynamicgoThriftBase64BinaryEcho(t *testing.T) {
-	os.Setenv(generic.UseDynamicgoConv, "True")
 	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
 	time.Sleep(500 * time.Millisecond)
 

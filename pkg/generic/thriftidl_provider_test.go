@@ -17,7 +17,6 @@
 package generic
 
 import (
-	"os"
 	"strings"
 	"testing"
 
@@ -44,7 +43,7 @@ func TestAbsPath(t *testing.T) {
 }
 
 func TestThriftFileProvider(t *testing.T) {
-	os.Setenv(UseDynamicgoConv, "False")
+	isDynamicgoDisabled = true
 	path := "http_test/idl/binary_echo.thrift"
 	p, err := NewThriftFileProvider(path)
 	test.Assert(t, err == nil)
@@ -53,7 +52,7 @@ func TestThriftFileProvider(t *testing.T) {
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.DynamicgoDsc == nil)
 
-	os.Setenv(UseDynamicgoConv, "True")
+	isDynamicgoDisabled = false
 	p, err = NewThriftFileProvider(path)
 	test.Assert(t, err == nil)
 	defer p.Close()
@@ -87,7 +86,7 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 		`,
 		"a/z.thrift": "namespace go kitex.test.server",
 	}
-	os.Setenv(UseDynamicgoConv, "True")
+	isDynamicgoDisabled = false
 	p, err := NewThriftContentWithAbsIncludePathProvider(path, includes)
 	test.Assert(t, err == nil)
 	defer p.Close()
@@ -130,7 +129,7 @@ func TestCircularDependency(t *testing.T) {
 }
 
 func TestThriftContentProvider(t *testing.T) {
-	os.Setenv(UseDynamicgoConv, "False")
+	isDynamicgoDisabled = true
 	p, err := NewThriftContentProvider("test", nil)
 	test.Assert(t, err != nil)
 	test.Assert(t, p == nil)
@@ -146,7 +145,7 @@ func TestThriftContentProvider(t *testing.T) {
 	service UpdateService {}
 	`
 
-	os.Setenv(UseDynamicgoConv, "True")
+	isDynamicgoDisabled = false
 	p, err = NewThriftContentProvider(content, nil)
 	test.Assert(t, err == nil, err)
 	defer p.Close()
@@ -165,7 +164,7 @@ func TestThriftContentProvider(t *testing.T) {
 
 func TestDisableGoTagForDynamicgo(t *testing.T) {
 	path := "http_test/idl/binary_echo.thrift"
-	os.Setenv(UseDynamicgoConv, "True")
+	isDynamicgoDisabled = false
 	p, err := NewThriftFileProvider(path)
 	test.Assert(t, err == nil)
 	defer p.Close()

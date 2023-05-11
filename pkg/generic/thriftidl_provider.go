@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
@@ -30,13 +31,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
-const (
-	UseDynamicgoConv = "KITEX_GENERIC_USE_DYNAMICGO_CONVERSION"
-)
-
 var (
-	_ Closer = &ThriftContentProvider{}
-	_ Closer = &ThriftContentWithAbsIncludePathProvider{}
+	_                   Closer = &ThriftContentProvider{}
+	_                   Closer = &ThriftContentWithAbsIncludePathProvider{}
+	isDynamicgoDisabled        = strings.EqualFold(os.Getenv("KITEX_GENERIC_DISABLE_DYNAMICGO"), "true")
 )
 
 type thriftFileProvider struct {
@@ -58,8 +56,7 @@ func NewThriftFileProvider(path string, includeDirs ...string) (DescriptorProvid
 		return nil, err
 	}
 
-	useDynamicgoConversion := os.Getenv(UseDynamicgoConv) == "True"
-	if useDynamicgoConversion {
+	if !isDynamicgoDisabled {
 		// ServiceDescriptor of dynamicgo
 		dsvc, err := dthrift.NewDescritorFromPath(context.Background(), path, includeDirs...)
 		if err != nil {
@@ -112,8 +109,7 @@ func NewThriftContentProvider(main string, includes map[string]string) (*ThriftC
 		return nil, err
 	}
 
-	useDynamicgoConversion := os.Getenv(UseDynamicgoConv) == "True"
-	if useDynamicgoConversion {
+	if !isDynamicgoDisabled {
 		// ServiceDescriptor of dynamicgo
 		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
 		if err != nil {
@@ -138,8 +134,7 @@ func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]strin
 		return err
 	}
 
-	useDynamicgoConversion := os.Getenv(UseDynamicgoConv) == "True"
-	if useDynamicgoConversion {
+	if !isDynamicgoDisabled {
 		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
 		if err != nil {
 			return err
@@ -254,8 +249,7 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 		return nil, err
 	}
 
-	useDynamicgoConversion := os.Getenv(UseDynamicgoConv) == "True"
-	if useDynamicgoConversion {
+	if !isDynamicgoDisabled {
 		// ServiceDescriptor of dynamicgo
 		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
 		if err != nil {
@@ -285,8 +279,7 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 		return err
 	}
 
-	useDynamicgoConversion := os.Getenv(UseDynamicgoConv) == "True"
-	if useDynamicgoConversion {
+	if !isDynamicgoDisabled {
 		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
 		if err != nil {
 			return err
