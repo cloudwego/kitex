@@ -108,19 +108,13 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 
 	inner := thrift.NewWriteHTTPRequest(svcDsc)
 	inner.SetBinaryWithBase64(c.binaryWithBase64)
-	inner.SetEnableDynamicgo(c.enableDynamicgoReq, c.convOpts, msg.RPCInfo().Invocation().MethodName())
+	inner.SetEnableDynamicgo(c.enableDynamicgoReq, &c.convOpts, msg.RPCInfo().Invocation().MethodName())
 
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Marshal(ctx, msg, out)
 }
 
 func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
-	if msg.PayloadLen() != 0 && c.enableDynamicgoResp {
-		c.enableDynamicgoResp = true
-	} else {
-		c.enableDynamicgoResp = false
-	}
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
 	}
@@ -128,9 +122,10 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	if !ok {
 		return fmt.Errorf("get parser ServiceDescriptor failed")
 	}
+
 	inner := thrift.NewReadHTTPResponse(svcDsc)
 	inner.SetBase64Binary(c.binaryWithBase64)
-	inner.SetEnableDynamicgo(c.enableDynamicgoResp, c.convOpts, msg)
+	inner.SetEnableDynamicgo(c.enableDynamicgoResp, &c.convOpts, &msg)
 
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Unmarshal(ctx, msg, in)

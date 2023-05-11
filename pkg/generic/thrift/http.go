@@ -62,9 +62,9 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 }
 
 // SetEnableDynamicgo enable/disable dynamicgo encoding.
-func (w *WriteHTTPRequest) SetEnableDynamicgo(enable bool, opts conv.Options, method string) {
+func (w *WriteHTTPRequest) SetEnableDynamicgo(enable bool, opts *conv.Options, method string) {
 	w.enableDynamicgo = enable
-	w.opts = opts
+	w.opts = *opts
 	w.method = method
 }
 
@@ -109,55 +109,58 @@ func (r *ReadHTTPResponse) SetBase64Binary(enable bool) {
 }
 
 // SetEnableDynamicgo enable/disable dynamicgo decoding.
-func (r *ReadHTTPResponse) SetEnableDynamicgo(enable bool, opts conv.Options, msg remote.Message) {
+func (r *ReadHTTPResponse) SetEnableDynamicgo(enable bool, opts *conv.Options, msg *remote.Message) {
 	r.enableDynamicgo = enable
-	r.opts = opts
-	r.msg = msg
+	r.opts = *opts
+	r.msg = *msg
 }
 
 // Read ...
 func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
-	if r.enableDynamicgo {
-		tProt, ok := in.(*cthrift.BinaryProtocol)
-		if !ok {
-			return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
-		}
-
-		if r.svc.DynamicgoDsc == nil {
-			return nil, perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
-		}
-		tyDsc := r.svc.DynamicgoDsc.Functions()[method].Response()
-
-		msgBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
-		transBuf, err := tProt.ByteBuffer().ReadBinary(r.msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
+	if !r.enableDynamicgo || r.msg.PayloadLen() == 0 {
+		fnDsc, err := r.svc.LookupFunctionByMethod(method)
 		if err != nil {
 			return nil, err
 		}
-
-		buf := make([]byte, 0, len(transBuf)*2)
-		resp := descriptor.NewHTTPResponse()
-		ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, resp)
-		cv := t2j.NewBinaryConv(r.opts)
-		// decode with dynamicgo
-		// thrift []byte to json []byte
-		if err = cv.DoInto(ctx, tyDsc, transBuf, &buf); err != nil {
-			return nil, err
-		}
-
-		// unwrap one level of json string
-		if len(buf) > structWrapLen {
-			secondBracket := strings.Index(string(buf)[1:], "{") + 1
-			if secondBracket != 0 {
-				buf = buf[secondBracket : len(buf)-1]
-			}
-		}
-		resp.RawBody = buf
-		return resp, nil
+		fDsc := fnDsc.Response
+		return skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
 	}
-	fnDsc, err := r.svc.LookupFunctionByMethod(method)
+
+	// dynamicgo logic
+	tProt, ok := in.(*cthrift.BinaryProtocol)
+	if !ok {
+		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
+	}
+
+	if r.svc.DynamicgoDsc == nil {
+		return nil, perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
+	}
+	tyDsc := r.svc.DynamicgoDsc.Functions()[method].Response()
+
+	msgBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
+	transBuf, err := tProt.ByteBuffer().ReadBinary(r.msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
 	if err != nil {
 		return nil, err
 	}
-	fDsc := fnDsc.Response
-	return skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
+
+	buf := make([]byte, 0, len(transBuf)*2)
+	resp := descriptor.NewHTTPResponse()
+	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, resp)
+	cv := t2j.NewBinaryConv(r.opts)
+	// decode with dynamicgo
+	// thrift []byte to json []byte
+	if err = cv.DoInto(ctx, tyDsc, transBuf, &buf); err != nil {
+		return nil, err
+	}
+
+	// unwrap one level of json string
+	if len(buf) > structWrapLen {
+		secondBracket := strings.Index(string(buf)[1:], "{") + 1
+		if secondBracket != 0 {
+			buf = buf[secondBracket : len(buf)-1]
+		}
+	}
+	resp.RawBody = buf
+	return resp, nil
 }

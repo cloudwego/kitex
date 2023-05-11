@@ -88,15 +88,14 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
+
 	wm, err := thrift.NewWriteJSON(svcDsc, method, msg.RPCRole() == remote.Client)
 	if err != nil {
 		return err
 	}
 	wm.SetBase64Binary(c.binaryWithBase64)
-	wm.SetEnableDynamicgo(c.enableDynamicgo)
-	if c.enableDynamicgo {
-		wm.SetConvOptions(c.convOpts)
-	}
+	wm.SetEnableDynamicgo(c.enableDynamicgo, &c.convOpts)
+
 	msg.Data().(WithCodec).SetCodec(wm)
 	return c.codec.Marshal(ctx, msg, out)
 }
@@ -109,13 +108,11 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
+
 	rm := thrift.NewReadJSON(svcDsc, msg.RPCRole() == remote.Client)
 	rm.SetBinaryWithBase64(c.binaryWithBase64)
-	rm.SetEnableDynamicgo(c.enableDynamicgo)
-	if c.enableDynamicgo {
-		rm.SetConvOptions(c.convOpts)
-		rm.SetRemoteMessage(msg)
-	}
+	rm.SetEnableDynamicgo(c.enableDynamicgo, &c.convOpts, &msg)
+
 	msg.Data().(WithCodec).SetCodec(rm)
 	return c.codec.Unmarshal(ctx, msg, in)
 }

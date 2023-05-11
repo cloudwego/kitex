@@ -84,13 +84,9 @@ func (m *WriteJSON) SetBase64Binary(enable bool) {
 }
 
 // SetEnableDynamicgo enable/disable dynamicgo encoding.
-func (m *WriteJSON) SetEnableDynamicgo(enable bool) {
+func (m *WriteJSON) SetEnableDynamicgo(enable bool, opts *conv.Options) {
 	m.enableDynamicgo = enable
-}
-
-// SetConvOptions set the options to be used for dynamicgo encoding.
-func (m *WriteJSON) SetConvOptions(opts conv.Options) {
-	m.opts = opts
+	m.opts = *opts
 }
 
 func (m *WriteJSON) originalWrite(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
@@ -150,104 +146,98 @@ func (m *ReadJSON) SetBinaryWithBase64(enable bool) {
 }
 
 // SetEnableDynamicgo enable/disable dynamicgo decoding.
-func (m *ReadJSON) SetEnableDynamicgo(enable bool) {
+func (m *ReadJSON) SetEnableDynamicgo(enable bool, opts *conv.Options, msg *remote.Message) {
 	m.enableDynamicgo = enable
-}
-
-// SetConvOptions set the options to be used for dynamicgo decoding.
-func (m *ReadJSON) SetConvOptions(opts conv.Options) {
-	m.opts = opts
-}
-
-// SetRemoteMessage set the remote message to be used for calculation of message length.
-func (m *ReadJSON) SetRemoteMessage(msg remote.Message) {
-	m.msg = msg
+	m.opts = *opts
+	m.msg = *msg
 }
 
 // Read read data from in thrift.TProtocol and convert to json string
 func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
 	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
-	if m.enableDynamicgo && m.msg.PayloadLen() != 0 {
-		tProt, ok := in.(*cthrift.BinaryProtocol)
-		if !ok {
-			return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
+	if !m.enableDynamicgo || m.msg.PayloadLen() == 0 {
+		fnDsc, err := m.svc.LookupFunctionByMethod(method)
+		if err != nil {
+			return nil, err
+		}
+		fDsc := fnDsc.Response
+		if !m.isClient {
+			fDsc = fnDsc.Request
+		}
+		resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
+		if err != nil {
+			return nil, err
 		}
 
-		var tyDsc *dthrift.TypeDescriptor
-		if m.svc.DynamicgoDsc == nil {
-			return nil, perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
-		}
-		if m.msg.MessageType() == remote.Reply {
-			tyDsc = m.svc.DynamicgoDsc.Functions()[method].Response()
-		} else {
-			tyDsc = m.svc.DynamicgoDsc.Functions()[method].Request()
+		// resp is void
+		if _, ok := resp.(descriptor.Void); ok {
+			return resp, nil
 		}
 
-		var resp interface{}
-		if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.VOID {
-			if _, err := tProt.ByteBuffer().ReadBinary(voidWholeLen); err != nil {
-				return nil, err
-			}
-			resp = descriptor.Void{}
-		} else {
-			msgBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(m.msg.MessageType()), m.msg.RPCInfo().Invocation().SeqID())
-			transBuff, err := tProt.ByteBuffer().ReadBinary(m.msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+		// resp is string
+		if _, ok := resp.(string); ok {
+			return resp, nil
+		}
+
+		// resp is map
+		respNode, err := jsoniter.Marshal(resp)
+		if err != nil {
+			return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v", err))
+		}
+
+		return string(respNode), nil
+	}
+
+	// dynamicgo logic
+	tProt, ok := in.(*cthrift.BinaryProtocol)
+	if !ok {
+		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
+	}
+
+	var tyDsc *dthrift.TypeDescriptor
+	if m.svc.DynamicgoDsc == nil {
+		return nil, perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
+	}
+	if m.msg.MessageType() == remote.Reply {
+		tyDsc = m.svc.DynamicgoDsc.Functions()[method].Response()
+	} else {
+		tyDsc = m.svc.DynamicgoDsc.Functions()[method].Request()
+	}
+
+	var resp interface{}
+	if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.VOID {
+		if _, err := tProt.ByteBuffer().ReadBinary(voidWholeLen); err != nil {
+			return nil, err
+		}
+		resp = descriptor.Void{}
+	} else {
+		msgBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(m.msg.MessageType()), m.msg.RPCInfo().Invocation().SeqID())
+		transBuff, err := tProt.ByteBuffer().ReadBinary(m.msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+		if err != nil {
+			return nil, err
+		}
+
+		buf := make([]byte, 0, len(transBuff)*2)
+		// set dynamicgo option to handle an exception field
+		if m.isClient {
+			m.opts.ConvertException = true
+		}
+		cv := t2j.NewBinaryConv(m.opts)
+		// thrift []byte to json []byte
+		if err := cv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
+			return nil, err
+		}
+		if len(buf) > structWrapLen {
+			buf = buf[structWrapLen : len(buf)-1]
+		}
+		resp = string(buf)
+		if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.STRING {
+			resp, err = strconv.Unquote(resp.(string))
 			if err != nil {
 				return nil, err
 			}
-
-			buf := make([]byte, 0, len(transBuff)*2)
-			// set dynamicgo option to handle an exception field
-			if m.isClient {
-				m.opts.ConvertException = true
-			}
-			cv := t2j.NewBinaryConv(m.opts)
-			// thrift []byte to json []byte
-			if err := cv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
-				return nil, err
-			}
-			if len(buf) > structWrapLen {
-				buf = buf[structWrapLen : len(buf)-1]
-			}
-			resp = string(buf)
-			if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.STRING {
-				resp, err = strconv.Unquote(resp.(string))
-				if err != nil {
-					return nil, err
-				}
-			}
 		}
-
-		return resp, nil
-	}
-	fnDsc, err := m.svc.LookupFunctionByMethod(method)
-	if err != nil {
-		return nil, err
-	}
-	fDsc := fnDsc.Response
-	if !m.isClient {
-		fDsc = fnDsc.Request
-	}
-	resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
-	if err != nil {
-		return nil, err
 	}
 
-	// resp is void
-	if _, ok := resp.(descriptor.Void); ok {
-		return resp, nil
-	}
-
-	// resp is string
-	if _, ok := resp.(string); ok {
-		return resp, nil
-	}
-
-	// resp is map
-	respNode, err := jsoniter.Marshal(resp)
-	if err != nil {
-		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v", err))
-	}
-
-	return string(respNode), nil
+	return resp, nil
 }
