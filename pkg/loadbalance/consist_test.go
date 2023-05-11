@@ -209,11 +209,10 @@ func TestConsistBalance(t *testing.T) {
 		GetKey: func(ctx context.Context, request interface{}) string {
 			return strconv.Itoa(fastrand.Intn(100000))
 		},
-		Replica:          0,
-		VirtualFactor:    1000,
-		virtualFactorLen: 0,
-		Weighted:         false,
-		ExpireDuration:   0,
+		Replica:        0,
+		VirtualFactor:  1000,
+		Weighted:       false,
+		ExpireDuration: 0,
 	}
 	inss := makeNInstances(10, 10)
 
@@ -240,11 +239,10 @@ func TestWeightedConsistBalance(t *testing.T) {
 		GetKey: func(ctx context.Context, request interface{}) string {
 			return strconv.Itoa(fastrand.Intn(100000))
 		},
-		Replica:          0,
-		VirtualFactor:    1000,
-		virtualFactorLen: 0,
-		Weighted:         true,
-		ExpireDuration:   0,
+		Replica:        0,
+		VirtualFactor:  1000,
+		Weighted:       true,
+		ExpireDuration: 0,
 	}
 	inss := makeNInstances(10, 10)
 

@@ -66,8 +66,7 @@ type ConsistentHashOption struct {
 	// When the number of nodes is large, it can be set smaller; conversely, it can be set larger
 	// The median VirtualFactor * Weight (if Weighted is true) is recommended to be around 1000
 	// The recommended total number of virtual nodes is within 2000W (it takes 250ms to build once in the 1000W case, but it is theoretically fine to build in the background within 3s)
-	VirtualFactor    uint32
-	virtualFactorLen int
+	VirtualFactor uint32
 
 	// Whether to follow Weight for load balancing
 	// If false, Weight is ignored for each instance, and VirtualFactor virtual nodes are generated for indiscriminate load balancing
@@ -269,7 +268,6 @@ func NewConsistBalancer(opt ConsistentHashOption) Loadbalancer {
 	cb := &consistBalancer{
 		opt: opt,
 	}
-	cb.opt.virtualFactorLen = utils.GetUIntLen(uint64(opt.VirtualFactor))
 	if cb.opt.ExpireDuration > 0 {
 		cb.AddToDaemon()
 	}
@@ -356,13 +354,16 @@ func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
 	if totalLen == 0 {
 		return ret
 	}
-	maxLen := 0
+	maxLen, maxSerial := 0, 0
 	for i := range rNodes {
 		if len(rNodes[i].Ins.Address().String()) > maxLen {
 			maxLen = len(rNodes[i].Ins.Address().String())
 		}
+		if vNodeLen := cb.getVirtualNodeLen(rNodes[i]); vNodeLen > maxSerial {
+			maxSerial = vNodeLen
+		}
 	}
-	l := maxLen + 1 + cb.opt.virtualFactorLen // "$address + # + itoa(i)"
+	l := maxLen + 1 + utils.GetUIntLen(uint64(maxSerial)) // "$address + # + itoa(i)"
 	// pre-allocate []byte here, and reuse it to prevent memory allocation.
 	b := make([]byte, l)
 
