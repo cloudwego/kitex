@@ -17,8 +17,6 @@
 package descriptor
 
 import (
-	"bytes"
-	"io"
 	"net/http"
 
 	"github.com/bytedance/sonic/ast"
@@ -170,15 +168,9 @@ func (resp *HTTPResponse) SetCookie(key, val string) error {
 	return nil
 }
 
-type wrapBody struct {
-	io.Reader
-}
-
-func (wrapBody) Close() error { return nil }
-
 // SetRawBody implements http.ResponseSetter of dynamicgo
 func (resp *HTTPResponse) SetRawBody(body []byte) error {
-	resp.GeneralBody = wrapBody{bytes.NewReader(body)}
+	resp.RawBody = body
 	return nil
 }
 

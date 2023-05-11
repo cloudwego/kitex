@@ -76,5 +76,5 @@ func TestJSONBody(t *testing.T) {
 	test.Assert(t, resp.StatusCode == 200)
 	test.Assert(t, resp.Header.Get("Content-Type") == "application/json")
 	test.Assert(t, resp.ContentType == "application/json")
-	test.Assert(t, reflect.DeepEqual(resp.GeneralBody, wrapBody{bytes.NewReader(data)}))
+	test.Assert(t, reflect.DeepEqual(resp.RawBody, data))
 }
