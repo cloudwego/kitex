@@ -109,13 +109,8 @@ func NewThriftContentProvider(main string, includes map[string]string) (*ThriftC
 		return nil, err
 	}
 
-	if !isDynamicgoDisabled {
-		// ServiceDescriptor of dynamicgo
-		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
-		if err != nil {
-			return nil, err
-		}
-		svc.DynamicgoDsc = dsvc
+	if err = newDynamicgoDscFromContent(svc, defaultMainIDLPath, main, includes, false); err != nil {
+		return nil, err
 	}
 
 	p.svcs <- svc
@@ -134,12 +129,8 @@ func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]strin
 		return err
 	}
 
-	if !isDynamicgoDisabled {
-		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), defaultMainIDLPath, main, includes, false)
-		if err != nil {
-			return err
-		}
-		svc.DynamicgoDsc = dsvc
+	if err = newDynamicgoDscFromContent(svc, defaultMainIDLPath, main, includes, false); err != nil {
+		return err
 	}
 
 	select {
@@ -249,13 +240,8 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 		return nil, err
 	}
 
-	if !isDynamicgoDisabled {
-		// ServiceDescriptor of dynamicgo
-		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
-		if err != nil {
-			return nil, err
-		}
-		svc.DynamicgoDsc = dsvc
+	if err = newDynamicgoDscFromContent(svc, mainIDLPath, mainIDLContent, includes, true); err != nil {
+		return nil, err
 	}
 
 	p.svcs <- svc
@@ -279,12 +265,8 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 		return err
 	}
 
-	if !isDynamicgoDisabled {
-		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), mainIDLPath, mainIDLContent, includes, true)
-		if err != nil {
-			return err
-		}
-		svc.DynamicgoDsc = dsvc
+	if err = newDynamicgoDscFromContent(svc, mainIDLPath, mainIDLContent, includes, true); err != nil {
+		return err
 	}
 
 	// drain the channel
@@ -309,5 +291,17 @@ func (p *ThriftContentWithAbsIncludePathProvider) Close() error {
 	p.closeOnce.Do(func() {
 		close(p.svcs)
 	})
+	return nil
+}
+
+func newDynamicgoDscFromContent(svc *descriptor.ServiceDescriptor, path string, content string, includes map[string]string, isAbsIncludePath bool) error {
+	if !isDynamicgoDisabled {
+		// ServiceDescriptor of dynamicgo
+		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
+		if err != nil {
+			return err
+		}
+		svc.DynamicgoDsc = dsvc
+	}
 	return nil
 }
