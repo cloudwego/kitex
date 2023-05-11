@@ -24,8 +24,10 @@ import (
 	"testing"
 
 	mocksklog "github.com/cloudwego/kitex/internal/mocks/klog"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 
 	"github.com/golang/mock/gomock"
 
@@ -38,6 +40,15 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
+
+var prefaceReadAtMost = func() int {
+	// min(len(ClientPreface), len(flagBuf))
+	// len(flagBuf) = 2 * codec.Size32
+	if 2*codec.Size32 < grpc.ClientPrefaceLen {
+		return 2 * codec.Size32
+	}
+	return grpc.ClientPrefaceLen
+}()
 
 func TestServerHandlerCall(t *testing.T) {
 	transHdler, _ := NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()).NewTransHandler(&remote.ServerOption{
