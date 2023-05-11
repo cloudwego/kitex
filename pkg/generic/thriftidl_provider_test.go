@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	dthrift "github.com/cloudwego/dynamicgo/thrift"
+
 	"github.com/cloudwego/kitex/internal/test"
 )
 
@@ -172,7 +174,7 @@ func TestDisableGoTagForDynamicgo(t *testing.T) {
 	test.Assert(t, tree.DynamicgoDsc != nil)
 	test.Assert(t, tree.DynamicgoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "STR")
 
-	isDynamicgoGoTagAliasDisabled = true
+	dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
 	p, err = NewThriftFileProvider(path)
 	test.Assert(t, err == nil)
 	defer p.Close()
