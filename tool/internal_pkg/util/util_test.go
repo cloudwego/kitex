@@ -15,6 +15,7 @@
 package util
 
 import (
+	"os"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -31,4 +32,16 @@ func TestCombineOutputPath(t *testing.T) {
 	path3 := "kitex_path/{namespaceUnderscore}/code"
 	output3 := CombineOutputPath(path3, ns)
 	test.Assert(t, output3 == "kitex_path/aaa_bbb_ccc/code")
+}
+
+func TestGetGOPATH(t *testing.T) {
+	orig := os.Getenv("GOPATH")
+	defer func() {
+		os.Setenv("GOPATH", orig)
+	}()
+
+	os.Setenv("GOPATH", "/usr/bin/go:/usr/local/bin/go")
+	test.Assert(t, GetGOPATH() == "/usr/bin/go")
+	os.Setenv("GOPATH", "")
+	test.Assert(t, GetGOPATH() != "")
 }
