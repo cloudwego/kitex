@@ -36,6 +36,8 @@ import (
 
 const voidWholeLen = 5
 
+var _ = wrapJSONWriter
+
 // NewWriteJSON build WriteJSON according to ServiceDescriptor
 func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*WriteJSON, error) {
 	fnDsc, err := svc.LookupFunctionByMethod(method)
