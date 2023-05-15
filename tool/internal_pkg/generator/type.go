@@ -17,10 +17,10 @@ package generator
 import (
 	"bytes"
 	"fmt"
-	"github.com/Masterminds/sprig/v3"
 	"strings"
 	"text/template"
 
+	"github.com/Masterminds/sprig/v3"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -157,7 +157,6 @@ var funcs = func() map[string]interface{} {
 	}
 	return m
 }()
-
 
 var templateNames = []string{
 	"@client.go-NewClient-option",
