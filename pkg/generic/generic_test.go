@@ -87,8 +87,9 @@ func TestHTTPThriftGeneric(t *testing.T) {
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
 
-	// new
-	g, err := HTTPThriftGeneric(p)
+	var opts []Option
+	opts = append(opts, WithDefaultHTTPDynamicgoConvOpts(), EnableDynamicgoHTTPResp(true))
+	g, err := HTTPThriftGeneric(p, opts...)
 	test.Assert(t, err == nil)
 	defer g.Close()
 
@@ -118,76 +119,19 @@ func TestHTTPThriftGeneric(t *testing.T) {
 	test.Assert(t, method.Name == "BinaryEcho")
 }
 
-func TestHTTPDynamicgoThriftGeneric(t *testing.T) {
-	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
-	test.Assert(t, err == nil)
-
-	var opts []Option
-	opts = append(opts, WithDefaultHTTPDynamicgoConvOpts(), EnableDynamicgoHTTPResp(true))
-	g, err := HTTPThriftGeneric(p, opts...)
-	test.Assert(t, err == nil)
-	defer g.Close()
-
-	test.Assert(t, g.PayloadCodec().Name() == "HttpDynamicgoThrift")
-
-	err = SetBinaryWithBase64(g, true)
-	test.Assert(t, err == nil)
-
-	test.Assert(t, g.Framed() == false)
-
-	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
-
-	url := "https://example.com/BinaryEcho"
-	body := map[string]interface{}{
-		"msg": "Test",
-	}
-	data, err := json.Marshal(body)
-	test.Assert(t, err == nil)
-	// NewRequest
-	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
-	test.Assert(t, err == nil)
-	customReq, err := FromHTTPRequest(req)
-	test.Assert(t, err == nil)
-
-	method, err := g.GetMethod(customReq, "Test")
-	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "BinaryEcho")
-}
-
 func TestJSONThriftGeneric(t *testing.T) {
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 
-	g, err := JSONThriftGeneric(p)
+	var opts []Option
+	opts = append(opts, WithDefaultJSONDynamicgoConvOpts())
+	g, err := JSONThriftGeneric(p, opts...)
 	test.Assert(t, err == nil)
 	defer g.Close()
 
 	test.Assert(t, g.PayloadCodec().Name() == "JSONThrift")
 
-	err = SetBinaryWithBase64(g, true)
-	test.Assert(t, err == nil)
-	test.Assert(t, g.Framed() == false)
-
-	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
-
-	method, err := g.GetMethod(nil, "Test")
-	test.Assert(t, err == nil)
-	test.Assert(t, method.Name == "Test")
-}
-
-func TestJSONDynamicgoThriftGeneric(t *testing.T) {
-	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
-	test.Assert(t, err == nil)
-
-	var opts []Option
-	opts = append(opts, WithDefaultHTTPDynamicgoConvOpts(), EnableDynamicgoHTTPResp(true))
-	g, err := JSONThriftGeneric(p, opts...)
-	test.Assert(t, err == nil)
-	defer g.Close()
-
-	test.Assert(t, g.PayloadCodec().Name() == "JSONDynamicgoThrift")
-
-	err = SetBinaryWithBase64(g, true)
+	err = SetBinaryWithBase64(g, false)
 	test.Assert(t, err == nil)
 	test.Assert(t, g.Framed() == false)
 

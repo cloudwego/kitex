@@ -35,11 +35,6 @@ import (
 
 // Write write json string to out thrift.TProtocol
 func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	if !m.enableDynamicgo {
-		return m.originalWrite(ctx, out, msg, requestBase)
-	}
-
-	// dynamicgo logic
 	var msgLen int
 	_, isVoid := msg.(descriptor.Void)
 	transBuff, isString := msg.(string)
@@ -76,7 +71,7 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 
 		if isString {
 			// encode using dynamicgo
-			cv := j2t.NewBinaryConv(m.opts)
+			cv := j2t.NewBinaryConv(*m.dyOpts)
 			v := utils.StringToSliceByte(transBuff)
 			// json []byte to thrift []byte
 			dbuf := buf[offset:offset]

@@ -51,7 +51,8 @@ func TestFromHTTPRequest(t *testing.T) {
 func TestHttpThriftCodec(t *testing.T) {
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
-	htc, err := newHTTPThriftCodec(p, thriftCodec)
+	var opts []Option
+	htc, err := newHTTPThriftCodec(p, thriftCodec, NewOptions(opts))
 	test.Assert(t, err == nil)
 	defer htc.Close()
 	test.Assert(t, htc.Name() == "HttpThrift")
@@ -86,11 +87,11 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option
-	opts = append(opts, WithCustomDynamicgoConvOpts(conv.Options{EnableValueMapping: true}), EnableDynamicgoHTTPResp(true))
-	htc, err := newHTTPThriftCodec(p, thriftCodec, opts...)
+	opts = append(opts, WithCustomDynamicgoConvOpts(&conv.Options{EnableValueMapping: true}), EnableDynamicgoHTTPResp(true))
+	htc, err := newHTTPThriftCodec(p, thriftCodec, NewOptions(opts))
 	test.Assert(t, err == nil)
 	defer htc.Close()
-	test.Assert(t, htc.Name() == "HttpDynamicgoThrift")
+	test.Assert(t, htc.Name() == "HttpThrift")
 
 	url := "http://example.com/BinaryEcho"
 	// []byte value for binary field
@@ -114,7 +115,7 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
 
 	ctx := context.Background()
-	sendMsg := initDynamicgoHttpSendMsg(transport.TTHeader)
+	sendMsg := initHttpSendMsg(transport.TTHeader)
 
 	// Marshal side
 	out := remote.NewWriterBuffer(256)
@@ -130,7 +131,7 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 	err = htc.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil)
 
-	sendMsg = initDynamicgoHttpSendMsg(transport.PurePayload)
+	sendMsg = initHttpSendMsg(transport.PurePayload)
 
 	// Marshal side
 	out = remote.NewWriterBuffer(256)
@@ -147,30 +148,6 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 }
 
 func initHttpSendMsg(tp transport.Protocol) remote.Message {
-	req := &Args{
-		Request: &descriptor.HTTPRequest{Request: getStdHttpRequest()},
-		Method:  "BinaryEcho",
-	}
-	svcInfo := mocks.ServiceInfo()
-	ink := rpcinfo.NewInvocation("", "BinaryEcho")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
-	return msg
-}
-
-func initHttpRecvMsg() remote.Message {
-	req := &Args{
-		Request: "Test",
-		Method:  "BinaryEcho",
-	}
-	ink := rpcinfo.NewInvocation("", "BinaryEcho")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
-	return msg
-}
-
-func initDynamicgoHttpSendMsg(tp transport.Protocol) remote.Message {
 	stdReq := getStdHttpRequest()
 	b, err := stdReq.GetBody()
 	if err != nil {
@@ -192,6 +169,17 @@ func initDynamicgoHttpSendMsg(tp transport.Protocol) remote.Message {
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
+	return msg
+}
+
+func initHttpRecvMsg() remote.Message {
+	req := &Args{
+		Request: "Test",
+		Method:  "BinaryEcho",
+	}
+	ink := rpcinfo.NewInvocation("", "BinaryEcho")
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
+	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
 	return msg
 }
 

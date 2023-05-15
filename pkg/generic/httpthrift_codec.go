@@ -25,8 +25,6 @@ import (
 	"net/http"
 	"sync/atomic"
 
-	"github.com/cloudwego/dynamicgo/conv"
-
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -46,29 +44,20 @@ type HTTPRequest = descriptor.HTTPRequest
 type HTTPResponse = descriptor.HTTPResponse
 
 type httpThriftCodec struct {
-	svcDsc              atomic.Value // *idl
-	provider            DescriptorProvider
-	codec               remote.PayloadCodec
-	binaryWithBase64    bool
-	enableDynamicgoReq  bool
-	enableDynamicgoResp bool
-	convOpts            conv.Options
+	svcDsc   atomic.Value // *idl
+	provider DescriptorProvider
+	codec    remote.PayloadCodec
+	opts     *Options
 }
 
-func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts ...Option) (*httpThriftCodec, error) {
+func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*httpThriftCodec, error) {
 	svc := <-p.Provide()
-	var c *httpThriftCodec
-	if opts == nil {
-		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false}
-	} else {
-		// codec with dynamicgo
-		gOpts := NewOptions(opts)
-		binaryWithBase64 := false
-		if !gOpts.dynamicgoConvOpts.NoBase64Binary {
-			binaryWithBase64 = true
-		}
-		c = &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: binaryWithBase64, enableDynamicgoReq: true, enableDynamicgoResp: gOpts.enableDynamicgoHTTPResp, convOpts: gOpts.dynamicgoConvOpts}
+	// set default dynamicgo conv.Options if it is not specified
+	if !opts.isSetdynamicgoConvOpts {
+		opts.dynamicgoConvOpts = defaultHTTPDynamicgoConvOpts
+		opts.isSetdynamicgoConvOpts = true
 	}
+	c := &httpThriftCodec{codec: codec, provider: p, opts: opts}
 	c.svcDsc.Store(svc)
 	go c.update()
 	return c, nil
@@ -107,8 +96,7 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	}
 
 	inner := thrift.NewWriteHTTPRequest(svcDsc)
-	inner.SetBinaryWithBase64(c.binaryWithBase64)
-	inner.SetEnableDynamicgo(c.enableDynamicgoReq, &c.convOpts, msg.RPCInfo().Invocation().MethodName())
+	inner.SetWriteHTTPRequest(&c.opts.dynamicgoConvOpts, msg.RPCInfo().Invocation().MethodName())
 
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Marshal(ctx, msg, out)
@@ -124,17 +112,13 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	}
 
 	inner := thrift.NewReadHTTPResponse(svcDsc)
-	inner.SetBase64Binary(c.binaryWithBase64)
-	inner.SetEnableDynamicgo(c.enableDynamicgoResp, &c.convOpts, &msg)
+	inner.SetReadHTTPResponse(c.opts.enableDynamicgoHTTPResp, &c.opts.dynamicgoConvOpts, msg)
 
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Unmarshal(ctx, msg, in)
 }
 
 func (c *httpThriftCodec) Name() string {
-	if c.enableDynamicgoReq {
-		return "HttpDynamicgoThrift"
-	}
 	return "HttpThrift"
 }
 

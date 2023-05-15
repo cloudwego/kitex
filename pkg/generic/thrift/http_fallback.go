@@ -23,9 +23,24 @@ import (
 	"context"
 
 	"github.com/apache/thrift/lib/go/thrift"
+
+	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
 // Write ...
 func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	return w.originalWrite(ctx, out, msg, requestBase)
+	req := msg.(*descriptor.HTTPRequest)
+	if req.Body == nil && len(req.RawBody) != 0 {
+		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {
+			return err
+		}
+	}
+	fn, err := w.svc.Router.Lookup(req)
+	if err != nil {
+		return err
+	}
+	if !fn.HasRequestBase {
+		requestBase = nil
+	}
+	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: !w.dyOpts.NoBase64Binary})
 }

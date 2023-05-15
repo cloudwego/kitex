@@ -26,7 +26,6 @@ import (
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	jsoniter "github.com/json-iterator/go"
-	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
@@ -58,7 +57,6 @@ func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient boo
 		ty:             ty,
 		dty:            dty,
 		hasRequestBase: fnDsc.HasRequestBase && isClient,
-		base64Binary:   true,
 		isClient:       isClient,
 	}
 	return ws, nil
@@ -66,96 +64,48 @@ func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient boo
 
 // WriteJSON implement of MessageWriter
 type WriteJSON struct {
-	ty              *descriptor.TypeDescriptor
-	dty             *dthrift.TypeDescriptor
-	hasRequestBase  bool
-	base64Binary    bool
-	enableDynamicgo bool
-	isClient        bool
-	opts            conv.Options
+	ty             *descriptor.TypeDescriptor
+	dty            *dthrift.TypeDescriptor
+	hasRequestBase bool
+	isClient       bool
+	dyOpts         *conv.Options
 }
 
 var _ MessageWriter = (*WriteJSON)(nil)
 
-// SetBase64Binary enable/disable Base64 decoding for binary.
-// Note that this method is not concurrent-safe.
-func (m *WriteJSON) SetBase64Binary(enable bool) {
-	m.base64Binary = enable
-}
-
-// SetEnableDynamicgo enable/disable dynamicgo encoding.
-func (m *WriteJSON) SetEnableDynamicgo(enable bool, opts *conv.Options) {
-	m.enableDynamicgo = enable
-	m.opts = *opts
-}
-
-func (m *WriteJSON) originalWrite(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	if !m.hasRequestBase {
-		requestBase = nil
-	}
-
-	// msg is void
-	if _, ok := msg.(descriptor.Void); ok {
-		return wrapStructWriter(ctx, msg, out, m.ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary})
-	}
-
-	// msg is string
-	s, ok := msg.(string)
-	if !ok {
-		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
-	}
-
-	body := gjson.Parse(s)
-	if body.Type == gjson.Null {
-		body = gjson.Result{
-			Type:  gjson.String,
-			Raw:   s,
-			Str:   s,
-			Num:   0,
-			Index: 0,
-		}
-	}
-	return wrapJSONWriter(ctx, &body, out, m.ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary})
+// SetWriteJSON ...
+func (m *WriteJSON) SetWriteJSON(opts *conv.Options) {
+	m.dyOpts = opts
 }
 
 // NewReadJSON build ReadJSON according to ServiceDescriptor
 func NewReadJSON(svc *descriptor.ServiceDescriptor, isClient bool) *ReadJSON {
 	return &ReadJSON{
-		svc:              svc,
-		isClient:         isClient,
-		binaryWithBase64: true,
+		svc:      svc,
+		isClient: isClient,
 	}
 }
 
 // ReadJSON implement of MessageReaderWithMethod
 type ReadJSON struct {
-	svc              *descriptor.ServiceDescriptor
-	isClient         bool
-	binaryWithBase64 bool
-	enableDynamicgo  bool
-	opts             conv.Options
-	msg              remote.Message
+	svc      *descriptor.ServiceDescriptor
+	isClient bool
+	dyOpts   *conv.Options
+	msg      remote.Message
 }
 
 var _ MessageReader = (*ReadJSON)(nil)
 
-// SetBinaryWithBase64 enable/disable Base64 encoding for binary.
-// Note that this method is not concurrent-safe.
-func (m *ReadJSON) SetBinaryWithBase64(enable bool) {
-	m.binaryWithBase64 = enable
-}
-
-// SetEnableDynamicgo enable/disable dynamicgo decoding.
-func (m *ReadJSON) SetEnableDynamicgo(enable bool, opts *conv.Options, msg *remote.Message) {
-	m.enableDynamicgo = enable
-	m.opts = *opts
-	m.msg = *msg
+// SetReadJSON ...
+func (m *ReadJSON) SetReadJSON(opts *conv.Options, msg remote.Message) {
+	m.dyOpts = opts
+	m.msg = msg
 }
 
 // Read read data from in thrift.TProtocol and convert to json string
 func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
 	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
-	if !m.enableDynamicgo || m.msg.PayloadLen() == 0 {
+	if m.msg.PayloadLen() == 0 {
 		fnDsc, err := m.svc.LookupFunctionByMethod(method)
 		if err != nil {
 			return nil, err
@@ -164,7 +114,7 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 		if !m.isClient {
 			fDsc = fnDsc.Request
 		}
-		resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
+		resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: !m.dyOpts.NoBase64Binary})
 		if err != nil {
 			return nil, err
 		}
@@ -220,9 +170,9 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 		buf := make([]byte, 0, len(transBuff)*2)
 		// set dynamicgo option to handle an exception field
 		if m.isClient {
-			m.opts.ConvertException = true
+			m.dyOpts.ConvertException = true
 		}
-		cv := t2j.NewBinaryConv(m.opts)
+		cv := t2j.NewBinaryConv(*m.dyOpts)
 		// thrift []byte to json []byte
 		if err := cv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
 			return nil, err

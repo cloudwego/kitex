@@ -47,38 +47,24 @@ import (
 
 func TestRun(t *testing.T) {
 	t.Run("TestThriftNormalBinaryEcho", testThriftNormalBinaryEcho)
-	t.Run("TestThriftDynamicgo", testThriftDynamicgo)
 	t.Run("TestThriftException", testThriftException)
-	t.Run("TestDynamicgoThriftException", testDynamicgoThriftException)
 	t.Run("TestRegression", testRegression)
 	t.Run("TestThriftBase64BinaryEcho", testThriftBase64BinaryEcho)
-	t.Run("TestDynamicgoThriftBase64BinaryEcho", testDynamicgoThriftBase64BinaryEcho)
 }
 
-func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary bool) genericclient.Client {
+func initThriftClientByIDL(t *testing.T, tp transport.Protocol, addr, idl string, opts []generic.Option, base64Binary bool) genericclient.Client {
 	p, err := generic.NewThriftFileProvider(idl)
 	test.Assert(t, err == nil)
-	g, err := generic.HTTPThriftGeneric(p)
+	g, err := generic.HTTPThriftGeneric(p, opts...)
 	test.Assert(t, err == nil)
 	err = generic.SetBinaryWithBase64(g, base64Binary)
 	test.Assert(t, err == nil)
-	cli := newGenericClient("destServiceName", g, addr)
+	cli := newGenericClient(tp, "destServiceName", g, addr)
 	test.Assert(t, err == nil)
 	return cli
 }
 
-func initThriftServer(t *testing.T, address string, handler generic.Service) server.Server {
-	addr, _ := net.ResolveTCPAddr("tcp", address)
-	p, err := generic.NewThriftFileProvider("./idl/binary_echo.thrift")
-	test.Assert(t, err == nil)
-	g, err := generic.MapThriftGeneric(p)
-	test.Assert(t, err == nil)
-	svr := newGenericServer(g, addr, handler)
-	test.Assert(t, err == nil)
-	return svr
-}
-
-func initFallbackThriftServer(t *testing.T, address string, handler generic.Service, idlPath string) server.Server {
+func initThriftServer(t *testing.T, address string, handler generic.Service, idlPath string) server.Server {
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	p, err := generic.NewThriftFileProvider(idlPath)
 	test.Assert(t, err == nil)
@@ -95,128 +81,10 @@ func initMockServer(t *testing.T, handler kt.Mock) server.Server {
 	return svr
 }
 
-func initDynamicgoThriftClientByIDL(tp transport.Protocol, t *testing.T, addr, idl string, opts []generic.Option) genericclient.Client {
-	p, err := generic.NewThriftFileProvider(idl)
-	test.Assert(t, err == nil)
-	g, err := generic.HTTPThriftGeneric(p, opts...)
-	test.Assert(t, err == nil)
-	cli := newGenericDynamicgoClient(tp, "destServiceName", g, addr)
-	test.Assert(t, err == nil)
-	return cli
-}
-
 func testThriftNormalBinaryEcho(t *testing.T) {
-	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
+	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift")
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClientByIDL(t, "127.0.0.1:8126", "./idl/binary_echo.thrift", false)
-	url := "http://example.com/BinaryEcho"
-
-	// []byte value for binary field
-	body := map[string]interface{}{
-		"msg":        []byte(mockMyMsg),
-		"got_base64": true,
-		"num":        "",
-	}
-	data, err := json.Marshal(body)
-	if err != nil {
-		panic(err)
-	}
-	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
-	if err != nil {
-		panic(err)
-	}
-	customReq, err := generic.FromHTTPRequest(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err == nil, err)
-	gr, ok := resp.(*generic.HTTPResponse)
-	test.Assert(t, ok)
-	test.Assert(t, gr.Body["msg"] == base64.StdEncoding.EncodeToString([]byte(mockMyMsg)))
-	test.Assert(t, gr.Body["num"] == "0")
-
-	// string value for binary field which should fail
-	body = map[string]interface{}{
-		"msg":        string(mockMyMsg),
-		"got_base64": false,
-		"num":        0,
-	}
-	data, err = json.Marshal(body)
-	if err != nil {
-		panic(err)
-	}
-	req, err = http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
-	if err != nil {
-		panic(err)
-	}
-	customReq, err = generic.FromHTTPRequest(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err == nil, err)
-	gr, ok = resp.(*generic.HTTPResponse)
-	test.Assert(t, ok)
-	test.Assert(t, gr.Body["msg"] == mockMyMsg)
-
-	// []byte value for binary field
-	body = map[string]interface{}{
-		"msg":        []byte(mockMyMsg),
-		"got_base64": true,
-	}
-	data, err = json.Marshal(body)
-	if err != nil {
-		panic(err)
-	}
-	req, err = http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
-	if err != nil {
-		panic(err)
-	}
-	customReq, err = generic.FromHTTPRequest(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err == nil, err)
-	gr, ok = resp.(*generic.HTTPResponse)
-	test.Assert(t, ok)
-	test.Assert(t, gr.Body["msg"] == base64.StdEncoding.EncodeToString([]byte(mockMyMsg)))
-	test.Assert(t, gr.Body["num"] == "0")
-
-	body = map[string]interface{}{
-		"msg":        []byte(mockMyMsg),
-		"got_base64": true,
-		"num":        "123",
-	}
-	data, err = json.Marshal(body)
-	if err != nil {
-		panic(err)
-	}
-	req, err = http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
-	if err != nil {
-		panic(err)
-	}
-	customReq, err = generic.FromHTTPRequest(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err.Error() == "remote or network error[remote]: biz error: call failed, incorrect num")
-
-	svr.Stop()
-}
-
-func testThriftDynamicgo(t *testing.T) {
-	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
-	time.Sleep(500 * time.Millisecond)
-
-	var opts []generic.Option
-	convOpts := conv.Options{EnableValueMapping: true, NoBase64Binary: true}
-	opts = append(opts, generic.WithCustomDynamicgoConvOpts(convOpts), generic.EnableDynamicgoHTTPResp(true))
-
-	cli := initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts)
 	url := "http://example.com/BinaryEcho"
 
 	// []byte value for binary field
@@ -240,31 +108,79 @@ func testThriftDynamicgo(t *testing.T) {
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: dynamicgo
+	var opts []generic.Option
+	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
+	cli := initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false)
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	gr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(string(gr.RawBody), "msg").String())
+	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "num").String(), "0"), gjson.Get(string(gr.RawBody), "num").String())
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: fallback
-	cli = initDynamicgoThriftClientByIDL(transport.PurePayload, t, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts)
+	cli = initThriftClientByIDL(t, transport.PurePayload, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	gr, ok = resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 	test.Assert(t, gr.Body["msg"] == base64.StdEncoding.EncodeToString([]byte(mockMyMsg)))
+	test.Assert(t, gr.Body["num"] == "0")
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: fallback
 	opts = opts[:0]
-	opts = append(opts, generic.WithCustomDynamicgoConvOpts(convOpts))
-	cli = initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts)
+	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts())
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	gr, ok = resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 	test.Assert(t, gr.Body["msg"] == base64.StdEncoding.EncodeToString([]byte(mockMyMsg)))
+	test.Assert(t, gr.Body["num"] == "0")
+
+	body = map[string]interface{}{
+		"msg":        string(mockMyMsg),
+		"got_base64": false,
+		"num":        0,
+	}
+	data, err = json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+	req, err = http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
+	if err != nil {
+		panic(err)
+	}
+	customReq, err = generic.FromHTTPRequest(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
+	// read: dynamicgo
+	opts = opts[:0]
+	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false)
+	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	gr, ok = resp.(*generic.HTTPResponse)
+	test.Assert(t, ok)
+	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "msg").String(), mockMyMsg), gjson.Get(string(gr.RawBody), "msg").String())
+	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "num").String(), "0"), gjson.Get(string(gr.RawBody), "num").String())
+
+	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
+	// read: fallback
+	opts = opts[:0]
+	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts())
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false)
+	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	gr, ok = resp.(*generic.HTTPResponse)
+	test.Assert(t, ok)
+	test.Assert(t, gr.Body["msg"] == mockMyMsg)
+	test.Assert(t, gr.Body["num"] == "0")
 
 	body = map[string]interface{}{
 		"msg":        []byte(mockMyMsg),
@@ -283,16 +199,19 @@ func testThriftDynamicgo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
+	// read: dynamicgo
 	opts = opts[:0]
-	opts = append(opts, generic.WithCustomDynamicgoConvOpts(convOpts), generic.EnableDynamicgoHTTPResp(true))
-	cli = initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts)
+	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false)
 	_, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err.Error() == "remote or network error[remote]: biz error: call failed, incorrect num", err.Error())
 
 	svr.Stop()
 }
 
-func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
+func BenchmarkCompareDefaultAndFallback_Small(b *testing.B) {
 	// small data
 	sobj := getSimpleValue()
 	data, err := json.Marshal(sobj)
@@ -303,41 +222,14 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 	url := "http://example.com/simple"
 
 	t := testing.T{}
+	var opts []generic.Option
+	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
 
-	b.Run("thrift_small", func(b *testing.B) {
+	b.Run("thrift_small_default", func(b *testing.B) {
 		time.Sleep(1 * time.Second)
-		svr := initFallbackThriftServer(&t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
+		svr := initThriftServer(&t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
 		time.Sleep(500 * time.Millisecond)
-		cli := initThriftClientByIDL(&t, "127.0.0.1:8121", "./idl/baseline.thrift", false)
-
-		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
-		if err != nil {
-			panic(err)
-		}
-		customReq, err := generic.FromHTTPRequest(req)
-		if err != nil {
-			t.Fatal(err)
-		}
-		resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-		test.Assert(&t, err == nil, err)
-		gr, ok := resp.(*generic.HTTPResponse)
-		test.Assert(&t, ok)
-		test.Assert(&t, reflect.DeepEqual(gr.Body["I64Field"].(string), strconv.Itoa(math.MaxInt64)), gr.Body["I64Field"].(string))
-
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-		}
-		svr.Stop()
-	})
-
-	b.Run("dynaimcgoThrift_small", func(b *testing.B) {
-		time.Sleep(1 * time.Second)
-		svr := initFallbackThriftServer(&t, ":8128", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
-		time.Sleep(500 * time.Millisecond)
-		var opts []generic.Option
-		opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
-		cli := initDynamicgoThriftClientByIDL(transport.TTHeader, &t, "127.0.0.1:8128", "./idl/baseline.thrift", opts)
+		cli := initThriftClientByIDL(&t, transport.TTHeader, "127.0.0.1:8121", "./idl/baseline.thrift", opts, false)
 
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
 		if err != nil {
@@ -359,25 +251,12 @@ func BenchmarkCompareKitexAndDynamicgo_Small(b *testing.B) {
 		}
 		svr.Stop()
 	})
-}
 
-func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
-	// medium data
-	nobj := getNestingValue()
-	data, err := json.Marshal(nobj)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("medium data size: ", len(string(data)))
-	url := "http://example.com/nesting/100"
-
-	t := testing.T{}
-
-	b.Run("thrift_medium", func(b *testing.B) {
+	b.Run("thrift_small_fallback", func(b *testing.B) {
 		time.Sleep(1 * time.Second)
-		svr := initFallbackThriftServer(&t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
+		svr := initThriftServer(&t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
 		time.Sleep(500 * time.Millisecond)
-		cli := initThriftClientByIDL(&t, "127.0.0.1:8121", "./idl/baseline.thrift", false)
+		cli := initThriftClientByIDL(&t, transport.PurePayload, "127.0.0.1:8121", "./idl/baseline.thrift", opts, false)
 
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
 		if err != nil {
@@ -391,7 +270,7 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		test.Assert(&t, err == nil, err)
 		gr, ok := resp.(*generic.HTTPResponse)
 		test.Assert(&t, ok)
-		test.Assert(&t, gr.Body["I32"].(int32) == math.MaxInt32, gr.Body["I32"].(int32))
+		test.Assert(&t, reflect.DeepEqual(gr.Body["I64Field"].(string), strconv.Itoa(math.MaxInt64)), gr.Body["I64Field"].(string))
 
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
@@ -399,14 +278,27 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		}
 		svr.Stop()
 	})
+}
 
-	b.Run("dynaimcgoThrift_medium", func(b *testing.B) {
+func BenchmarkCompareDefaultAndFallback_Medium(b *testing.B) {
+	// medium data
+	nobj := getNestingValue()
+	data, err := json.Marshal(nobj)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("medium data size: ", len(string(data)))
+	url := "http://example.com/nesting/100"
+
+	t := testing.T{}
+	var opts []generic.Option
+	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
+
+	b.Run("thrift_medium_default", func(b *testing.B) {
 		time.Sleep(1 * time.Second)
-		svr := initFallbackThriftServer(&t, ":8128", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
+		svr := initThriftServer(&t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
 		time.Sleep(500 * time.Millisecond)
-		var opts []generic.Option
-		opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
-		cli := initDynamicgoThriftClientByIDL(transport.TTHeader, &t, "127.0.0.1:8128", "./idl/baseline.thrift", opts)
+		cli := initThriftClientByIDL(&t, transport.TTHeader, "127.0.0.1:8121", "./idl/baseline.thrift", opts, false)
 
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
 		if err != nil {
@@ -428,6 +320,33 @@ func BenchmarkCompareKitexAndDynamicgo_Medium(b *testing.B) {
 		}
 		svr.Stop()
 	})
+
+	b.Run("dynaimcgoThrift_medium", func(b *testing.B) {
+		time.Sleep(1 * time.Second)
+		svr := initThriftServer(&t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
+		time.Sleep(500 * time.Millisecond)
+		cli := initThriftClientByIDL(&t, transport.PurePayload, "127.0.0.1:8121", "./idl/baseline.thrift", opts, false)
+
+		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
+		if err != nil {
+			panic(err)
+		}
+		customReq, err := generic.FromHTTPRequest(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+		test.Assert(&t, err == nil, err)
+		gr, ok := resp.(*generic.HTTPResponse)
+		test.Assert(&t, ok)
+		test.Assert(&t, gr.Body["I32"].(int32) == math.MaxInt32, gr.Body["I32"].(int32))
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+		}
+		svr.Stop()
+	})
 }
 
 func testThriftException(t *testing.T) {
@@ -435,8 +354,6 @@ func testThriftException(t *testing.T) {
 	svr := initMockServer(t, new(mockImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClientByIDL(t, "127.0.0.1:8128", "./idl/mock.thrift", false)
-
 	body := map[string]interface{}{
 		"Msg":     "hello",
 		"strMap":  map[string]interface{}{"mk1": "mv1", "mk2": "mv2"},
@@ -456,47 +373,27 @@ func testThriftException(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err == nil, err)
-	test.DeepEqual(t, resp.(*descriptor.HTTPResponse).Body["code"].(int32), int32(400))
-	test.DeepEqual(t, resp.(*descriptor.HTTPResponse).Body["msg"], "this is an exception")
-
-	svr.Stop()
-}
-
-func testDynamicgoThriftException(t *testing.T) {
-	time.Sleep(4 * time.Second)
-	svr := initMockServer(t, new(mockImpl))
-	time.Sleep(500 * time.Millisecond)
-
+	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
+	// read: dynamicgo
 	var opts []generic.Option
 	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
-	cli := initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8128", "./idl/mock.thrift", opts)
-
-	body := map[string]interface{}{
-		"Msg":     "hello",
-		"strMap":  map[string]interface{}{"mk1": "mv1", "mk2": "mv2"},
-		"strList": []string{"lv1", "lv2"},
-	}
-	data, err := json.Marshal(body)
-	if err != nil {
-		panic(err)
-	}
-	url := "http://example.com/ExceptionTest"
-	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
-	if err != nil {
-		panic(err)
-	}
-	customReq, err := generic.FromHTTPRequest(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	cli := initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8128", "./idl/mock.thrift", opts, false)
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	fmt.Println(string(resp.(*descriptor.HTTPResponse).RawBody))
 	test.DeepEqual(t, gjson.Get(string(resp.(*descriptor.HTTPResponse).RawBody), "code").Int(), int64(400))
 	test.DeepEqual(t, gjson.Get(string(resp.(*descriptor.HTTPResponse).RawBody), "msg").String(), "this is an exception")
+
+	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
+	// read: fallback
+	opts = opts[:0]
+	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts())
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8128", "./idl/mock.thrift", opts, false)
+	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	fmt.Println(string(resp.(*descriptor.HTTPResponse).RawBody))
+	test.DeepEqual(t, resp.(*descriptor.HTTPResponse).Body["code"].(int32), int32(400))
+	test.DeepEqual(t, resp.(*descriptor.HTTPResponse).Body["msg"], "this is an exception")
 
 	svr.Stop()
 }
@@ -517,22 +414,24 @@ func testRegression(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svr := initFallbackThriftServer(t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
+	svr := initThriftServer(t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
 	time.Sleep(500 * time.Millisecond)
 
-	// dynamicgo
+	/// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
+	// read: dynamicgo
 	var opts []generic.Option
 	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
-	cli := initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8121", "./idl/baseline.thrift", opts)
+	cli := initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8121", "./idl/baseline.thrift", opts, false)
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil)
 	dgr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 
-	// fallback: only resp
+	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
+	// read: fallback
 	opts = opts[:0]
 	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts())
-	cli = initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8121", "./idl/baseline.thrift", opts)
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8121", "./idl/baseline.thrift", opts, false)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil)
 	fgr, ok := resp.(*generic.HTTPResponse)
@@ -555,90 +454,17 @@ func testRegression(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, isEqual(dMapBody, fgr.Body))
 
-	// fallback: both req and resp
-	cli = initThriftClientByIDL(t, "127.0.0.1:8121", "./idl/baseline.thrift", false)
-	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err == nil)
-	fgr, ok = resp.(*generic.HTTPResponse)
-	test.Assert(t, ok)
-
-	test.Assert(t, reflect.DeepEqual(dgr.Header, fgr.Header))
-	test.Assert(t, reflect.DeepEqual(dgr.StatusCode, fgr.StatusCode))
-	test.Assert(t, reflect.DeepEqual(dgr.ContentType, fgr.ContentType))
-
-	err = customJson.Unmarshal(dgr.RawBody, &dMapBody)
-	test.Assert(t, err == nil)
-	fBytes, err = customJson.Marshal(fgr.Body)
-	test.Assert(t, err == nil)
-	err = customJson.Unmarshal(fBytes, &fgr.Body)
-	test.Assert(t, err == nil)
-	test.Assert(t, isEqual(dMapBody, fgr.Body))
-
 	svr.Stop()
 }
 
 func testThriftBase64BinaryEcho(t *testing.T) {
-	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClientByIDL(t, "127.0.0.1:8126", "./idl/binary_echo.thrift", true)
-	url := "http://example.com/BinaryEcho"
-
-	// []byte value for binary field
-	body := map[string]interface{}{
-		"msg":        []byte(mockMyMsg),
-		"got_base64": false,
-		"num":        "0",
-	}
-	data, err := json.Marshal(body)
-	if err != nil {
-		panic(err)
-	}
-	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
-	if err != nil {
-		panic(err)
-	}
-	customReq, err := generic.FromHTTPRequest(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err == nil, err)
-	gr, ok := resp.(*generic.HTTPResponse)
-	test.Assert(t, ok)
-	test.Assert(t, gr.Body["msg"] == base64.StdEncoding.EncodeToString(body["msg"].([]byte)))
-
-	// string value for binary field which should fail
-	body = map[string]interface{}{
-		"msg": string(mockMyMsg),
-	}
-	data, err = json.Marshal(body)
-	if err != nil {
-		panic(err)
-	}
-	req, err = http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
-	if err != nil {
-		panic(err)
-	}
-	customReq, err = generic.FromHTTPRequest(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, strings.Contains(err.Error(), "illegal base64 data"))
-
-	svr.Stop()
-}
-
-func testDynamicgoThriftBase64BinaryEcho(t *testing.T) {
-	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl))
+	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift")
 	time.Sleep(500 * time.Millisecond)
 
 	var opts []generic.Option
 	convOpts := conv.Options{EnableValueMapping: true, NoBase64Binary: false}
-	opts = append(opts, generic.WithCustomDynamicgoConvOpts(convOpts), generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.WithCustomDynamicgoConvOpts(&convOpts), generic.EnableDynamicgoHTTPResp(true))
 
-	cli := initDynamicgoThriftClientByIDL(transport.TTHeader, t, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts)
 	url := "http://example.com/BinaryEcho"
 
 	// []byte value for binary field
@@ -662,11 +488,21 @@ func testDynamicgoThriftBase64BinaryEcho(t *testing.T) {
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: dynamicgo
+	cli := initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, true)
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	gr, ok := resp.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(string(gr.RawBody), "msg").String())
+
+	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
+	// read: fallback
+	cli = initThriftClientByIDL(t, transport.PurePayload, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, true)
+	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	gr, ok = resp.(*generic.HTTPResponse)
+	test.Assert(t, ok)
+	test.Assert(t, gr.Body["msg"] == base64.StdEncoding.EncodeToString(body["msg"].([]byte)))
 
 	// string value for binary field which should fail
 	body = map[string]interface{}{
@@ -684,6 +520,16 @@ func testDynamicgoThriftBase64BinaryEcho(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
+	// read: dynamicgo
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, true)
+	_, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, strings.Contains(err.Error(), "illegal base64 data"))
+
+	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
+	// read: fallback
+	cli = initThriftClientByIDL(t, transport.PurePayload, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, true)
 	_, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, strings.Contains(err.Error(), "illegal base64 data"))
 

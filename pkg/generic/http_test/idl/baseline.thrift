@@ -22,7 +22,7 @@ struct Nesting {
     10: list<string> ListString
     11: binary Binary
     12: map<i64, string> MapI64String
-    13: list<i64> ListI64 (api.cookie = "list_i64"),
+    13: list<i64> ListI64 (api.cookie = "list_i64")
     14: byte Byte
     15: map<string, Simple> MapStringSimple
 }

@@ -2,7 +2,7 @@ namespace go baseline
 
 struct Simple {
     1: byte ByteField
-    2: i64 I64Field (api.js_conv = "")
+    2: i64 I64Field
     3: double DoubleField
     4: i32 I32Field
     5: string StringField,
@@ -10,11 +10,11 @@ struct Simple {
 }
 
 struct Nesting {
-    1: string String (api.header = "String")
+    1: string String
     2: list<Simple> ListSimple
-    3: double Double (api.path = "double")
-    4: i32 I32 (api.body = "I32")
-    5: list<i32> ListI32 (api.query = "ListI32")
+    3: double Double
+    4: i32 I32
+    5: list<i32> ListI32
     6: i64 I64
     7: map<string, string> MapStringString
     8: Simple SimpleStruct
@@ -22,7 +22,7 @@ struct Nesting {
     10: list<string> ListString
     11: binary Binary
     12: map<i64, string> MapI64String
-    13: list<i64> ListI64 (api.cookie = "list_i64"),
+    13: list<i64> ListI64
     14: byte Byte
     15: map<string, Simple> MapStringSimple
 }

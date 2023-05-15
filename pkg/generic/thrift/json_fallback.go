@@ -23,9 +23,38 @@ import (
 	"context"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/tidwall/gjson"
+
+	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
 // Write write json string to out thrift.TProtocol
 func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	return m.originalWrite(ctx, out, msg, requestBase)
+	if !m.hasRequestBase {
+		requestBase = nil
+	}
+
+	// msg is void
+	if _, ok := msg.(descriptor.Void); ok {
+		return wrapStructWriter(ctx, msg, out, m.ty, &writerOption{requestBase: requestBase, binaryWithBase64: !m.dyOpts.NoBase64Binary})
+	}
+
+	// msg is string
+	s, ok := msg.(string)
+	if !ok {
+		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
+	}
+
+	body := gjson.Parse(s)
+	if body.Type == gjson.Null {
+		body = gjson.Result{
+			Type:  gjson.String,
+			Raw:   s,
+			Str:   s,
+			Num:   0,
+			Index: 0,
+		}
+	}
+	return wrapJSONWriter(ctx, &body, out, m.ty, &writerOption{requestBase: requestBase, binaryWithBase64: !m.dyOpts.NoBase64Binary})
 }

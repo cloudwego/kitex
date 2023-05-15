@@ -79,17 +79,10 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 func HTTPThriftGeneric(p DescriptorProvider, opts ...Option) (Generic, error) {
 	var codec *httpThriftCodec
 	var err error
-	if opts != nil {
-		// generic with dynamicgo
-		codec, err = newHTTPThriftCodec(p, thriftCodec, opts...)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		codec, err = newHTTPThriftCodec(p, thriftCodec)
-		if err != nil {
-			return nil, err
-		}
+	gOpts := NewOptions(opts)
+	codec, err = newHTTPThriftCodec(p, thriftCodec, gOpts)
+	if err != nil {
+		return nil, err
 	}
 	return &httpThriftGeneric{codec: codec}, nil
 }
@@ -113,17 +106,10 @@ func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generi
 func JSONThriftGeneric(p DescriptorProvider, opts ...Option) (Generic, error) {
 	var codec *jsonThriftCodec
 	var err error
-	if opts != nil {
-		// generic with dynamicgo
-		codec, err = newJsonThriftCodec(p, thriftCodec, opts...)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		codec, err = newJsonThriftCodec(p, thriftCodec)
-		if err != nil {
-			return nil, err
-		}
+	gOpts := NewOptions(opts)
+	codec, err = newJsonThriftCodec(p, thriftCodec, gOpts)
+	if err != nil {
+		return nil, err
 	}
 	return &jsonThriftGeneric{codec: codec}, nil
 }
@@ -135,14 +121,12 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 		if c.codec == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
-		c.codec.binaryWithBase64 = enable
-		c.codec.convOpts.NoBase64Binary = !enable
+		c.codec.opts.dynamicgoConvOpts.NoBase64Binary = !enable
 	case *jsonThriftGeneric:
 		if c.codec == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
-		c.codec.binaryWithBase64 = enable
-		c.codec.convOpts.NoBase64Binary = !enable
+		c.codec.opts.dynamicgoConvOpts.NoBase64Binary = !enable
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
 	}
