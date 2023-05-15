@@ -294,7 +294,7 @@ func (p *ThriftContentWithAbsIncludePathProvider) Close() error {
 	return nil
 }
 
-func newDynamicgoDscFromContent(svc *descriptor.ServiceDescriptor, path string, content string, includes map[string]string, isAbsIncludePath bool) error {
+func newDynamicgoDscFromContent(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, isAbsIncludePath bool) error {
 	if !isDynamicgoDisabled {
 		// ServiceDescriptor of dynamicgo
 		dsvc, err := dthrift.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
