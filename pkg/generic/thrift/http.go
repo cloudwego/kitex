@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 
@@ -39,13 +38,7 @@ type WriteHTTPRequest struct {
 	method string
 }
 
-var (
-	_          MessageWriter = (*WriteHTTPRequest)(nil)
-	customJson               = sonic.Config{
-		EscapeHTML: true,
-		UseNumber:  true,
-	}.Froze()
-)
+var _ MessageWriter = (*WriteHTTPRequest)(nil)
 
 // NewWriteHTTPRequest ...
 // Base64 decoding for binary is enabled by default.
