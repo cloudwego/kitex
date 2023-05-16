@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/apache/thrift/lib/go/thrift"
+
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 )
 
@@ -247,10 +248,7 @@ func (p *ReflectionServiceKitexReflectionQueryIDLArgs) DeepEqual(ano *Reflection
 }
 
 func (p *ReflectionServiceKitexReflectionQueryIDLArgs) Field1DeepEqual(src string) bool {
-	if strings.Compare(p.Req, src) != 0 {
-		return false
-	}
-	return true
+	return strings.Compare(p.Req, src) == 0
 }
 
 type ReflectionServiceKitexReflectionQueryIDLResult struct {
