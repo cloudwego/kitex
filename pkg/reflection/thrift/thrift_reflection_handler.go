@@ -27,7 +27,7 @@ import (
 )
 
 // ReflectionMethod name
-var ReflectionMethod = "$KitexReflectionMethod"
+const ReflectionMethod = "$KitexReflectionMethod"
 
 var reflectionMethodInfo = serviceinfo.NewMethodInfo(func(ctx context.Context, handler, arg, result interface{}) error {
 	realArg := arg.(*ReflectionServiceKitexReflectionQueryIDLArgs)

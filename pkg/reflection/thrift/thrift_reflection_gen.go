@@ -61,7 +61,7 @@ type QueryIDLResponse struct {
 }
 
 func (r *QueryIDLResponse) JsonEncode() (string, error) {
-	data, err := json.MarshalIndent(r, "", " ")
+	data, err := json.Marshal(r)
 	if err != nil {
 		return "", err
 	}

@@ -17,11 +17,8 @@
 package thriftreflection
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/cloudwego/thriftgo/parser"
@@ -69,34 +66,6 @@ type MethodDescriptor struct {
 	IncludedStructs map[string]*parser.StructLike `json:"IncludedStructs"`
 }
 
-func (md *MethodDescriptor) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	buf.WriteString("{\"MethodIDLPath\":\"")
-	buf.WriteString(md.MethodIDLPath)
-	buf.WriteString("\",\"MethodName\":\"")
-	buf.WriteString(md.MethodName)
-	buf.WriteString("\",\"MethodSignature\":\"")
-	buf.WriteString(md.MethodSignature)
-	buf.WriteString("\",\"IncludedStructs\":{")
-	snames := make([]string, 0, len(md.IncludedStructs))
-	for n := range md.IncludedStructs {
-		snames = append(snames, n)
-	}
-	sort.Slice(snames, func(i, j int) bool {
-		return snames[i] < snames[j]
-	})
-	for i, sn := range snames {
-		buf.WriteString("\"" + sn + "\":")
-		sbuf, _ := json.Marshal(md.IncludedStructs[sn])
-		buf.Write(sbuf)
-		if i < len(snames)-1 {
-			buf.WriteByte(',')
-		}
-	}
-	buf.WriteString("}}")
-	return buf.Bytes(), nil
-}
-
 type StructDescriptor struct {
 	StructIDLPath   string `json:"StructIDLPath"`
 	StructName      string `json:"StructName"`
@@ -106,44 +75,6 @@ type StructDescriptor struct {
 type ServiceDescriptor struct {
 	Methods     map[string]*MethodDescriptor `json:"Methods"`
 	UsedStructs map[string]*StructDescriptor `json:"UsedStructs"`
-}
-
-func (sd *ServiceDescriptor) MarshalJSON() ([]byte, error) {
-	buf := bytes.NewBuffer(nil)
-	buf.WriteString(`{"Methods":{`)
-	methods := make([]string, 0, len(sd.Methods))
-	for m := range sd.Methods {
-		methods = append(methods, m)
-	}
-	sort.Slice(methods, func(i, j int) bool {
-		return methods[i] < methods[j]
-	})
-	for i, method := range methods {
-		buf.WriteString(`"` + method + `":`)
-		mdbuf, _ := sd.Methods[method].MarshalJSON()
-		buf.Write(mdbuf)
-		if i < len(methods)-1 {
-			buf.WriteByte(',')
-		}
-	}
-	buf.WriteString(`},"UsedStructs":{`)
-	structNames := make([]string, 0, len(sd.UsedStructs))
-	for sn := range sd.UsedStructs {
-		structNames = append(structNames, sn)
-	}
-	sort.Slice(structNames, func(i, j int) bool {
-		return structNames[i] < structNames[j]
-	})
-	for i, sn := range structNames {
-		buf.WriteString(`"` + sn + `":`)
-		sdbuf, _ := json.Marshal(sd.UsedStructs[sn])
-		buf.Write(sdbuf)
-		if i < len(structNames)-1 {
-			buf.WriteByte(',')
-		}
-	}
-	buf.WriteString(`}}`)
-	return buf.Bytes(), nil
 }
 
 func NewMethodDescriptor(path string, m *parser.Function) *MethodDescriptor {
