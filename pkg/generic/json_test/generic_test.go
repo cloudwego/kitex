@@ -292,7 +292,7 @@ func testThrift2NormalServer(t *testing.T) {
 	svr := initMockServer(t, new(mockImpl))
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftMockClient(t)
+	cli := initThriftMockClient(t, transport.TTHeader)
 
 	_, err := cli.GenericCall(context.Background(), "Test", mockReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -305,14 +305,14 @@ func testThriftException(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// dynamicgo
-	cli := initDynamicgoThriftMockClient(t, transport.TTHeader)
+	cli := initThriftMockClient(t, transport.TTHeader)
 
 	_, err := cli.GenericCall(context.Background(), "ExceptionTest", mockReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil, err)
 	test.DeepEqual(t, err.Error(), `remote or network error[remote]: {"code":400,"msg":"this is an exception"}`)
 
 	// fallback
-	cli = initDynamicgoThriftMockClient(t, transport.PurePayload)
+	cli = initThriftMockClient(t, transport.PurePayload)
 
 	_, err = cli.GenericCall(context.Background(), "ExceptionTest", mockReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil, err)
@@ -383,24 +383,12 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 	svr.Stop()
 }
 
-func initThriftMockClient(t *testing.T) genericclient.Client {
+func initThriftMockClient(t *testing.T, tp transport.Protocol) genericclient.Client {
 	p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
 	test.Assert(t, err == nil)
 	g, err := generic.JSONThriftGeneric(p)
 	test.Assert(t, err == nil)
-	cli := newGenericClient("destServiceName", g, "127.0.0.1:8128")
-	test.Assert(t, err == nil)
-	return cli
-}
-
-func initDynamicgoThriftMockClient(t *testing.T, tp transport.Protocol) genericclient.Client {
-	p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
-	test.Assert(t, err == nil)
-	var opts []generic.Option
-	opts = append(opts, generic.WithDefaultJSONDynamicgoConvOpts())
-	g, err := generic.JSONThriftGeneric(p, opts...)
-	test.Assert(t, err == nil)
-	cli := newGenericDynamicgoClient(tp, "destServiceName", g, "127.0.0.1:8128")
+	cli := newGenericClient(tp, "destServiceName", g, "127.0.0.1:8128")
 	test.Assert(t, err == nil)
 	return cli
 }
@@ -413,7 +401,7 @@ func initThriftClient(tp transport.Protocol, t *testing.T, addr, idl string, opt
 	if base64Binary != nil {
 		generic.SetBinaryWithBase64(g, *base64Binary)
 	}
-	cli := newGenericDynamicgoClient(tp, "destServiceName", g, addr)
+	cli := newGenericClient(tp, "destServiceName", g, addr)
 	test.Assert(t, err == nil)
 	return cli
 }
@@ -454,7 +442,7 @@ func testJSONThriftGenericClientClose(t *testing.T) {
 		test.Assertf(t, err == nil, "generic NewThriftFileProvider failed, err=%v", err)
 		g, err := generic.JSONThriftGeneric(p)
 		test.Assertf(t, err == nil, "generic JSONThriftGeneric failed, err=%v", err)
-		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:8129")
+		clis[i] = newGenericClient(transport.TTHeader, "destServiceName", g, "127.0.0.1:8129")
 	}
 
 	runtime.ReadMemStats(&ms)
@@ -494,7 +482,7 @@ func testJSONThriftGenericClientFinalizer(t *testing.T) {
 		test.Assert(t, err == nil, "generic NewThriftFileProvider failed, err=%v", err)
 		g, err := generic.JSONThriftGeneric(p)
 		test.Assert(t, err == nil, "generic JSONThriftGeneric failed, err=%v", err)
-		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:8130")
+		clis[i] = newGenericClient(transport.TTHeader, "destServiceName", g, "127.0.0.1:8130")
 	}
 
 	runtime.ReadMemStats(&ms)

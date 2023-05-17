@@ -131,9 +131,9 @@ func getNestingValue() *Nesting {
 	return ret
 }
 
-func newGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
+func newGenericClient(tp transport.Protocol, destService string, g generic.Generic, targetIPPort string) genericclient.Client {
 	var opts []client.Option
-	opts = append(opts, client.WithHostPorts(targetIPPort))
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(tp))
 	genericCli, _ := genericclient.NewClient(destService, g, opts...)
 	return genericCli
 }
@@ -149,13 +149,6 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 		}
 	}()
 	return svr
-}
-
-func newGenericDynamicgoClient(tp transport.Protocol, destService string, g generic.Generic, targetIPPort string) genericclient.Client {
-	var opts []client.Option
-	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(tp))
-	genericCli, _ := genericclient.NewClient(destService, g, opts...)
-	return genericCli
 }
 
 // GenericServiceImpl ...
