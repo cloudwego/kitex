@@ -52,14 +52,14 @@ var KitexUnusedProtection = struct{}{}
 var protectionInsertionPoint = "KitexUnusedProtection"
 
 type patcher struct {
-	noFastAPI     bool
-	utils         *golang.CodeUtils
-	module        string
-	copyIDL       bool
-	version       string
-	record        bool
-	recordCmd     []string
-	noDeepCopyAPI bool
+	noFastAPI   bool
+	utils       *golang.CodeUtils
+	module      string
+	copyIDL     bool
+	version     string
+	record      bool
+	recordCmd   []string
+	deepCopyAPI bool
 
 	fileTpl *template.Template
 	refTpl  *template.Template
@@ -72,7 +72,7 @@ func (p *patcher) buildTemplates() (err error) {
 	m["IsBinaryOrStringType"] = p.isBinaryOrStringType
 	m["Version"] = func() string { return p.version }
 	m["GenerateFastAPIs"] = func() bool { return !p.noFastAPI && p.utils.Template() != "slim" }
-	m["GenerateDeepCopyAPIs"] = func() bool { return !p.noDeepCopyAPI && p.utils.Template() != "slim" }
+	m["GenerateDeepCopyAPIs"] = func() bool { return p.deepCopyAPI && p.utils.Template() != "slim" }
 	m["GenerateArgsResultTypes"] = func() bool { return p.utils.Template() == "slim" }
 	m["ImportPathTo"] = generator.ImportPathTo
 	m["ToPackageNames"] = func(imports map[string]string) (res []string) {

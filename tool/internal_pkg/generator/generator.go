@@ -130,7 +130,7 @@ type Config struct {
 
 	GenPath string
 
-	NoDeepCopyAPI bool
+	DeepCopyAPI bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
