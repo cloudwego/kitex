@@ -17,26 +17,22 @@
 package thriftreflection
 
 import (
-	"sync"
+	"testing"
 
 	"github.com/cloudwego/thriftgo/reflection"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
-// Files is a registry for looking up or iterating over files and the
-// descriptors contained within them.
-type Files struct {
-	FilesByPath map[string]*reflection.FileDescriptor
-}
+func TestRegistry(t *testing.T) {
+	GlobalFiles.Register(&reflection.FileDescriptor{
+		Filename: "testa",
+	})
+	test.Assert(t, GlobalFiles.GetFileDescriptors()["testa"] != nil)
 
-var globalMutex sync.RWMutex
-
-// GlobalFiles is a global registry of file descriptors.
-var GlobalFiles = new(Files)
-
-func RegisterIDL(bytes []byte) {
-	AST := reflection.Decode(bytes)
-	// TODO: check conflict
-	globalMutex.Lock()
-	defer globalMutex.Unlock()
-	GlobalFiles.FilesByPath[AST.Filename] = AST
+	f := NewFiles()
+	f.Register(&reflection.FileDescriptor{
+		Filename: "testb",
+	})
+	test.Assert(t, f.GetFileDescriptors()["testb"] != nil)
 }

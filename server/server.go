@@ -182,7 +182,6 @@ func (s *server) Run() (err error) {
 	if s.svcInfo == nil {
 		return errors.New("no service, use RegisterService to set one")
 	}
-
 	if err = s.check(); err != nil {
 		return err
 	}
