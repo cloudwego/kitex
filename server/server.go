@@ -19,13 +19,11 @@ package server
 
 import (
 	"context"
-	"crypto/md5"
 	"errors"
 	"fmt"
 	"net"
 	"reflect"
 	"runtime/debug"
-	"strings"
 	"sync"
 	"time"
 
@@ -46,7 +44,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 // Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
@@ -479,23 +476,8 @@ func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
 	extra["address"] = lAddr
 	extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
 	if s.opt.ReflectionEnabled {
-		var services string
-		if s.svcInfo.ServiceName == "CombineService" {
-			csvs, _ := extra["combined_service_list"].([]string)
-			services = strings.Join(csvs, ",")
-		} else {
-			services = s.svcInfo.ServiceName
-		}
-		req := &thriftreflection.QueryIDLRequest{QueryType: "BatchQueryServices", QueryInput: services}
-		localResp, err := thriftreflection.QueryThriftIDL(req)
-		if err == nil && localResp != nil && localResp.ServiceInfo != nil && len(localResp.ServiceInfo.Methods) != 0 {
-			// TODO: check whether the logic is used.
-			buf, _ := localResp.JsonEncode()
-			reflectionHash := fmt.Sprintf("%x", md5.Sum(utils.StringToSliceByte(buf)))
-			extra["reflectionHash"] = reflectionHash
-		} else {
-			klog.Warnf("KITEX: err query thrift idl for reflection hash, err: %v", err)
-		}
+		// NOTICE: It's a solution that temporarily supports thrift reflection,
+		// and subsequent iterations do not guarantee interface compatibility.
 		thriftreflection.RegisterReflectionMethod(si)
 	}
 	si.Extra = extra
