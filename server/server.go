@@ -194,8 +194,8 @@ func (s *server) Run() (err error) {
 		}
 	}
 
-	s.richRemoteOption()
 	s.fillMoreServiceInfo(s.opt.RemoteOpt.Address)
+	s.richRemoteOption()
 	transHdlr, err := s.newSvrTransHandler()
 	if err != nil {
 		return err
