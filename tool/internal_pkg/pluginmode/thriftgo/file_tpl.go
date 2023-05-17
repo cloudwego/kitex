@@ -34,14 +34,13 @@ import (
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	{{if GenerateFastAPIs -}}
+	{{if GenerateDeepCopyAPIs -}}
+	kutils "github.com/cloudwego/kitex/pkg/utils"
+	{{- end}}
+	{{if GenerateFastAPIs}}
 	"{{ImportPathTo "pkg/protocol/bthrift"}}"
 	{{- end}}
-	{{if GenerateDeepCopyAPIs -}}
-	kutils "{{ImportPathTo "pkg/utils"}}"
-	{{- end}}
-
-	{{range $path, $alias := .Imports}}
+	{{- range $path, $alias := .Imports}}
 	{{$alias }}"{{$path}}"
 	{{- end}}
 )

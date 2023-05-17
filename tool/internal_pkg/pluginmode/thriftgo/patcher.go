@@ -72,7 +72,7 @@ func (p *patcher) buildTemplates() (err error) {
 	m["IsBinaryOrStringType"] = p.isBinaryOrStringType
 	m["Version"] = func() string { return p.version }
 	m["GenerateFastAPIs"] = func() bool { return !p.noFastAPI && p.utils.Template() != "slim" }
-	m["GenerateDeepCopyAPIs"] = func() bool { return p.deepCopyAPI && p.utils.Template() != "slim" }
+	m["GenerateDeepCopyAPIs"] = func() bool { return p.deepCopyAPI }
 	m["GenerateArgsResultTypes"] = func() bool { return p.utils.Template() == "slim" }
 	m["ImportPathTo"] = generator.ImportPathTo
 	m["ToPackageNames"] = func(imports map[string]string) (res []string) {
