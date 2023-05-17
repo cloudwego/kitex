@@ -32,6 +32,12 @@ const structLikeCodec = `
 {{- end}}{{/* define "StructLikeCodec" */}}
 `
 
+const deepCopyAPI = `
+{{define "DeepCopyAPI"}}
+{{template "StructLikeDeepCopy" .}}
+{{- end}}{{/* define "DeepCopyAPI" */}}
+`
+
 const structLikeFastRead = `
 {{define "StructLikeFastRead"}}
 {{- $TypeName := .GoName}}
@@ -184,6 +190,27 @@ func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte) (int, error) {
 }
 {{- end}}{{/* range .Fields */}}
 {{- end}}{{/* define "StructLikeFastReadField" */}}
+`
+
+// TODO: check required
+const structLikeDeepCopy = `
+{{define "StructLikeDeepCopy"}}
+{{- $TypeName := .GoName}}
+func (p *{{$TypeName}}) DeepCopy(s interface{}) error {
+	{{if gt (len .Fields) 0 -}}
+	src, ok := s.(*{{$TypeName}})
+	if !ok {
+		return fmt.Errorf("%T's type not matched %T", s, p)
+	}
+	{{- end -}}
+	{{- range .Fields}}
+	{{- $ctx := MkRWCtx .}}
+	{{ template "FieldDeepCopy" $ctx}}
+	{{- end}}{{/* range .Fields */}}
+	{{/* line break */}}
+	return nil
+}
+{{- end}}{{/* define "StructLikeDeepCopy" */}}
 `
 
 const structLikeFastWrite = `
@@ -470,6 +497,157 @@ const fieldFastReadList = `
 		offset += l
 	}
 {{- end}}{{/* define "FieldFastReadList" */}}
+`
+
+const fieldDeepCopy = `
+{{define "FieldDeepCopy"}}
+	{{- if .Type.Category.IsStructLike}}
+		{{- template "FieldDeepCopyStructLike" .}}
+	{{- else if .Type.Category.IsContainerType}}
+		{{- template "FieldDeepCopyContainer" .}}
+	{{- else}}{{/* IsBaseType */}}
+		{{- template "FieldDeepCopyBaseType" .}}
+	{{- end}}
+{{- end}}{{/* define "FieldDeepCopy" */}}
+`
+
+const fieldDeepCopyStructLike = `
+{{define "FieldDeepCopyStructLike"}}
+{{- $Src := SourceTarget .Target}}
+	{{- if .NeedDecl}}
+	var {{.Target}} *{{.TypeName.Deref}}
+	{{- else}}
+	var _{{FieldName .Target}} *{{.TypeName.Deref}}
+	{{- end}}
+	if {{$Src}} != nil {
+		{{- if .NeedDecl}}{{.Target}}{{else}}_{{FieldName .Target}}{{end}} = &{{.TypeName.Deref}}{}
+		if err := {{- if .NeedDecl}}{{.Target}}{{else}}_{{FieldName .Target}}{{end}}.DeepCopy({{$Src}}); err != nil {
+			return err
+		}
+	}
+	{{if not .NeedDecl}}{{- .Target}} = _{{FieldName .Target}}{{end}}
+{{- end}}{{/* define "FieldDeepCopyStructLike" */}} 
+`
+
+const fieldDeepCopyContainer = `
+{{define "FieldDeepCopyContainer"}}
+	{{- if eq "Map" .TypeID}}
+	     {{- template "FieldDeepCopyMap" .}}
+	{{- else if eq "List" .TypeID}}
+	     {{- template "FieldDeepCopyList" .}}
+	{{- else}}
+	     {{- template "FieldDeepCopySet" .}}
+	{{- end}}
+{{- end}}{{/* define "FieldDeepCopyContainer" */}}
+`
+
+const fieldDeepCopyMap = `
+{{define "FieldDeepCopyMap"}}
+{{- $Src := SourceTarget .Target}}
+	{{- if .NeedDecl}}var {{.Target}} {{.TypeName}}{{- end}}
+	if {{$Src}} != nil {
+		{{.Target}} = make({{.TypeName}}, len({{$Src}}))
+		{{- $key := .GenID "_key"}}
+		{{- $val := .GenID "_val"}}
+		for {{SourceTarget $key}}, {{SourceTarget $val}} := range {{$Src}} {
+			{{- $ctx := .KeyCtx.WithDecl.WithTarget $key}}
+			{{- template "FieldDeepCopy" $ctx}}
+			{{/* line break */}}
+			{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
+			{{- template "FieldDeepCopy" $ctx}}
+
+			{{- if and .ValCtx.Type.Category.IsStructLike Features.ValueTypeForSIC}}
+				{{$val = printf "*%s" $val}}
+			{{- end}}
+
+			{{.Target}}[{{$key}}] = {{$val}}
+		}
+	}
+{{- end}}{{/* define "FieldDeepCopyMap" */}}
+`
+
+const fieldDeepCopyList = `
+{{define "FieldDeepCopyList"}}
+{{- $Src := SourceTarget .Target}}
+	{{if .NeedDecl}}var {{.Target}} {{.TypeName}}{{end}}
+	if {{$Src}} != nil {
+		{{.Target}} = make({{.TypeName}}, 0, len({{$Src}}))
+		{{- $val := .GenID "_elem"}}
+		for _, {{SourceTarget $val}} := range {{$Src}} {
+			{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
+			{{- template "FieldDeepCopy" $ctx}}
+
+			{{- if and .ValCtx.Type.Category.IsStructLike Features.ValueTypeForSIC}}
+				{{$val = printf "*%s" $val}}
+			{{- end}}
+
+			{{.Target}} = append({{.Target}}, {{$val}})
+		}
+	}
+{{- end}}{{/* define "FieldDeepCopyList" */}}
+`
+
+const fieldDeepCopySet = `
+{{define "FieldDeepCopySet"}}
+{{- $Src := SourceTarget .Target}}
+	{{if .NeedDecl}}var {{.Target}} {{.TypeName}}{{end}}
+	if {{$Src}} != nil {
+		{{.Target}} = make({{.TypeName}}, 0, len({{$Src}}))
+		{{- $val := .GenID "_elem"}}
+		for _, {{SourceTarget $val}} := range {{$Src}} {
+			{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
+			{{- template "FieldDeepCopy" $ctx}}
+
+			{{- if and .ValCtx.Type.Category.IsStructLike Features.ValueTypeForSIC}}
+				{{$val = printf "*%s" $val}}
+			{{- end}}
+
+			{{.Target}} = append({{.Target}}, {{$val}})
+		}
+	}
+{{- end}}{{/* define "FieldDeepCopySet" */}}
+`
+
+const fieldDeepCopyBaseType = `
+{{define "FieldDeepCopyBaseType"}}
+{{- $Src := SourceTarget .Target}}
+	{{- if .NeedDecl}}
+	var {{.Target}} {{.TypeName}}
+	{{- end}}
+	{{- if .IsPointer}}
+		if {{$Src}} != nil {
+			{{- if .Type.Category.IsBinary}}
+			if len(*{{$Src}}) != 0 {
+				tmp := make([]byte, len(*{{$Src}}))
+				copy(tmp, *{{$Src}})
+				{{.Target}} = &tmp
+			}
+			{{- else if .Type.Category.IsString}}
+			if *{{$Src}} != "" {
+				tmp := kutils.StringDeepCopy(*{{$Src}})
+				{{.Target}} = &tmp
+			}
+			{{- else}}
+			tmp := *{{$Src}}
+			{{.Target}} = &tmp
+			{{- end}}
+		}
+	{{- else}}
+		{{- if .Type.Category.IsBinary}}
+		if len({{$Src}}) != 0 {
+			tmp := make([]byte, len({{$Src}}))
+			copy(tmp, {{$Src}})
+			{{.Target}} = tmp
+		}
+		{{- else if .Type.Category.IsString}}
+		if {{$Src}} != "" {
+			{{.Target}} = kutils.StringDeepCopy({{$Src}})
+		}
+		{{- else}}
+		{{.Target}} = {{$Src}}
+		{{- end}}
+	{{- end}}
+{{- end}}{{/* define "FieldDeepCopyBaseType" */}}
 `
 
 const fieldFastWrite = `

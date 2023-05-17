@@ -116,13 +116,14 @@ func Run() int {
 	}
 
 	p := &patcher{
-		noFastAPI: conv.Config.NoFastAPI,
-		utils:     conv.Utils,
-		module:    conv.Config.ModuleName,
-		copyIDL:   conv.Config.CopyIDL,
-		version:   conv.Config.Version,
-		record:    conv.Config.Record,
-		recordCmd: conv.Config.RecordCmd,
+		noFastAPI:   conv.Config.NoFastAPI,
+		utils:       conv.Utils,
+		module:      conv.Config.ModuleName,
+		copyIDL:     conv.Config.CopyIDL,
+		version:     conv.Config.Version,
+		record:      conv.Config.Record,
+		recordCmd:   conv.Config.RecordCmd,
+		deepCopyAPI: conv.Config.DeepCopyAPI,
 	}
 	patches, err := p.patch(req)
 	if err != nil {
