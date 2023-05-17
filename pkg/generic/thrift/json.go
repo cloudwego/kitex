@@ -32,37 +32,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 const voidWholeLen = 5
 
 var _ = wrapJSONWriter
-
-// NewWriteJSON build WriteJSON according to ServiceDescriptor
-func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*WriteJSON, error) {
-	fnDsc, err := svc.LookupFunctionByMethod(method)
-	if err != nil {
-		return nil, err
-	}
-	ty := fnDsc.Request
-	if !isClient {
-		ty = fnDsc.Response
-	}
-	var dty *dthrift.TypeDescriptor
-	if svc.DynamicgoDsc != nil {
-		dty = svc.DynamicgoDsc.Functions()[method].Request()
-		if !isClient {
-			dty = svc.DynamicgoDsc.Functions()[method].Response()
-		}
-	}
-	ws := &WriteJSON{
-		ty:             ty,
-		dty:            dty,
-		hasRequestBase: fnDsc.HasRequestBase && isClient,
-		isClient:       isClient,
-	}
-	return ws, nil
-}
 
 // WriteJSON implement of MessageWriter
 type WriteJSON struct {
@@ -99,14 +74,20 @@ type ReadJSON struct {
 var _ MessageReader = (*ReadJSON)(nil)
 
 // SetReadJSON ...
-func (m *ReadJSON) SetReadJSON(opts *conv.Options, msg remote.Message) {
+func (m *ReadJSON) SetReadJSON(opts *conv.Options, msg remote.Message) error {
 	m.dyOpts = opts
 	m.msg = msg
+	// dynamicgo ServiceDescriptor is required for dynamicgo conversion
+	if msg.PayloadLen() != 0 && m.svc.DynamicgoDsc == nil {
+		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
+	}
+	return nil
 }
 
 // Read read data from in thrift.TProtocol and convert to json string
 func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
 	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
+	// fallback logic
 	if m.msg.PayloadLen() == 0 {
 		fnDsc, err := m.svc.LookupFunctionByMethod(method)
 		if err != nil {
@@ -147,9 +128,6 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 	}
 
 	var tyDsc *dthrift.TypeDescriptor
-	if m.svc.DynamicgoDsc == nil {
-		return nil, perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
-	}
 	if m.msg.MessageType() == remote.Reply {
 		tyDsc = m.svc.DynamicgoDsc.Functions()[method].Response()
 	} else {
@@ -182,9 +160,10 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 		if len(buf) > structWrapLen {
 			buf = buf[structWrapLen : len(buf)-1]
 		}
-		resp = string(buf)
+		resp = utils.SliceByteToString(buf)
 		if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.STRING {
-			resp, err = strconv.Unquote(resp.(string))
+			strresp := resp.(string)
+			resp, err = strconv.Unquote(strresp)
 			if err != nil {
 				return nil, err
 			}

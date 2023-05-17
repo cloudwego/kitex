@@ -46,12 +46,6 @@ func NewWriteHTTPRequest(svc *descriptor.ServiceDescriptor) *WriteHTTPRequest {
 	return &WriteHTTPRequest{svc, &conv.Options{}, ""}
 }
 
-// SetWriteHTTPRequest ...
-func (w *WriteHTTPRequest) SetWriteHTTPRequest(opts *conv.Options, method string) {
-	w.dyOpts = opts
-	w.method = method
-}
-
 // ReadHTTPResponse implement of MessageReaderWithMethod
 type ReadHTTPResponse struct {
 	svc             *descriptor.ServiceDescriptor
@@ -69,15 +63,20 @@ func NewReadHTTPResponse(svc *descriptor.ServiceDescriptor) *ReadHTTPResponse {
 }
 
 // SetReadHTTPResponse ...
-func (r *ReadHTTPResponse) SetReadHTTPResponse(enable bool, opts *conv.Options, msg remote.Message) {
+func (r *ReadHTTPResponse) SetReadHTTPResponse(enable bool, opts *conv.Options, msg remote.Message) error {
 	r.enableDynamicgo = enable
 	r.dyOpts = opts
 	r.msg = msg
+	if r.enableDynamicgo && r.msg.PayloadLen() != 0 && r.svc.DynamicgoDsc == nil {
+		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
+	}
+	return nil
 }
 
 // Read ...
 func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
 	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
+	// fallback logic
 	if !r.enableDynamicgo || r.msg.PayloadLen() == 0 {
 		fnDsc, err := r.svc.LookupFunctionByMethod(method)
 		if err != nil {
@@ -93,9 +92,6 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
 
-	if r.svc.DynamicgoDsc == nil {
-		return nil, perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
-	}
 	tyDsc := r.svc.DynamicgoDsc.Functions()[method].Response()
 
 	msgBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
@@ -114,7 +110,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		return nil, err
 	}
 
-	// unwrap one level of json string
+	// unwrap one level of json string to make resp compatible with the resp in fallback way
 	if len(buf) > structWrapLen {
 		secondBracket := strings.Index(string(buf)[1:], "{") + 1
 		if secondBracket != 0 {

@@ -28,58 +28,76 @@ import (
 	"github.com/cloudwego/dynamicgo/conv/j2t"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
 
-// Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	req := msg.(*descriptor.HTTPRequest)
+// SetWriteHTTPRequest ...
+func (w *WriteHTTPRequest) SetWriteHTTPRequest(opts *conv.Options, method string) error {
+	w.dyOpts = opts
+	w.method = method
 	if w.svc.DynamicgoDsc == nil {
 		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
 	}
+	return nil
+}
 
-	t := w.svc.DynamicgoDsc.Functions()[w.method].Request()
+// Write ...
+func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+	req := msg.(*descriptor.HTTPRequest)
+
+	fn := w.svc.DynamicgoDsc.Functions()[w.method]
+	if !fn.HasRequestBase() {
+		requestBase = nil
+	}
+	if requestBase != nil {
+		w.dyOpts.EnableThriftBase = true
+	}
+	ty := fn.Request()
 
 	body := req.GetBody()
-	// TODO: use Malloc and MallocAck to replace WriteBinary
-	buf := mcache.Malloc(len(body) + structWrapLen)
-
-	var offset int
-	offset += bthrift.Binary.WriteStructBegin(buf[offset:], t.Struct().Name())
 
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
 	cv := j2t.NewBinaryConv(*w.dyOpts)
-
-	for _, field := range t.Struct().Fields() {
-		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID()))
-
-		dbuf := buf[offset:offset]
-		if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
-			return err
-		} else {
-			// sometimes len of thrift []byte gets larger than len of json []byte when writing required/default fields
-			if offset+len(dbuf) > len(buf) {
-				buf = append(buf, dbuf[len(buf)-offset:]...)
-			}
-			offset += len(dbuf)
-		}
-
-		offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
-	}
-
-	// in case there is no space to write field stop
-	if offset+writeFieldStopLen > len(buf) {
-		buf = append(buf, make([]byte, (offset+writeFieldStopLen)-len(buf))...)
-	}
-	offset += bthrift.Binary.WriteFieldStop(buf[offset:])
-	offset += bthrift.Binary.WriteStructEnd(buf[offset:])
 
 	tProt, ok := out.(*cthrift.BinaryProtocol)
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
-	_, err := tProt.ByteBuffer().WriteBinary(buf[:offset])
-	return err
+
+	if err := out.WriteStructBegin(ty.Struct().Name()); err != nil {
+		return err
+	}
+
+	for _, field := range ty.Struct().Fields() {
+		if err := out.WriteFieldBegin(field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID())); err != nil {
+			return err
+		}
+
+		// TODO: use Malloc and MallocAck
+		dbuf := mcache.Malloc(len(body))[0:0]
+		// json []byte to thrift []byte
+		if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
+			return err
+		}
+		buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
+		if err != nil {
+			return err
+		} else {
+			copy(buf, dbuf)
+		}
+		mcache.Free(dbuf)
+
+		if err := out.WriteFieldEnd(); err != nil {
+			return err
+		}
+	}
+
+	if err := out.WriteFieldStop(); err != nil {
+		return err
+	}
+	if err := out.WriteStructEnd(); err != nil {
+		return err
+	}
+	return nil
 }

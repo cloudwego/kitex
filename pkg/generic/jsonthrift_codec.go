@@ -99,7 +99,9 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	}
 
 	rm := thrift.NewReadJSON(svcDsc, msg.RPCRole() == remote.Client)
-	rm.SetReadJSON(&c.opts.dynamicgoConvOpts, msg)
+	if err := rm.SetReadJSON(&c.opts.dynamicgoConvOpts, msg); err != nil {
+		return err
+	}
 
 	msg.Data().(WithCodec).SetCodec(rm)
 	return c.codec.Unmarshal(ctx, msg, in)

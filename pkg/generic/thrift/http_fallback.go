@@ -24,6 +24,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/sonic"
+	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
@@ -34,6 +35,12 @@ var (
 		UseNumber:  true,
 	}.Froze()
 )
+
+// SetWriteHTTPRequest ...
+func (w *WriteHTTPRequest) SetWriteHTTPRequest(opts *conv.Options, method string) error {
+	w.dyOpts = opts
+	return nil
+}
 
 // Write ...
 func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {

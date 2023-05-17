@@ -96,7 +96,9 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	}
 
 	inner := thrift.NewWriteHTTPRequest(svcDsc)
-	inner.SetWriteHTTPRequest(&c.opts.dynamicgoConvOpts, msg.RPCInfo().Invocation().MethodName())
+	if err := inner.SetWriteHTTPRequest(&c.opts.dynamicgoConvOpts, msg.RPCInfo().Invocation().MethodName()); err != nil {
+		return err
+	}
 
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Marshal(ctx, msg, out)
@@ -112,7 +114,9 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	}
 
 	inner := thrift.NewReadHTTPResponse(svcDsc)
-	inner.SetReadHTTPResponse(c.opts.enableDynamicgoHTTPResp, &c.opts.dynamicgoConvOpts, msg)
+	if err := inner.SetReadHTTPResponse(c.opts.enableDynamicgoHTTPResp, &c.opts.dynamicgoConvOpts, msg); err != nil {
+		return err
+	}
 
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Unmarshal(ctx, msg, in)

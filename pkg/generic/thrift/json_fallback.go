@@ -29,6 +29,23 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
+// NewWriteJSON build WriteJSON according to ServiceDescriptor
+func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*WriteJSON, error) {
+	fnDsc, err := svc.LookupFunctionByMethod(method)
+	if err != nil {
+		return nil, err
+	}
+	ty := fnDsc.Request
+	if !isClient {
+		ty = fnDsc.Response
+	}
+	ws := &WriteJSON{
+		ty:             ty,
+		hasRequestBase: fnDsc.HasRequestBase && isClient,
+	}
+	return ws, nil
+}
+
 // Write write json string to out thrift.TProtocol
 func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
 	if !m.hasRequestBase {
