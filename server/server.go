@@ -36,7 +36,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limiter"
-	thriftreflection "github.com/cloudwego/kitex/pkg/reflection/thrift"
 	"github.com/cloudwego/kitex/pkg/registry"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
@@ -475,11 +474,6 @@ func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
 	}
 	extra["address"] = lAddr
 	extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
-	if s.opt.ReflectionEnabled {
-		// NOTICE: It's a solution that temporarily supports thrift reflection,
-		// and subsequent iterations do not guarantee interface compatibility.
-		thriftreflection.RegisterReflectionMethod(si)
-	}
 	si.Extra = extra
 	s.svcInfo = si
 }

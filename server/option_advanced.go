@@ -263,11 +263,3 @@ func WithProfilerMessageTagging(tagging remote.MessageTagging) Option {
 		}
 	}}
 }
-
-// WithThriftReflectionEnable sets reflection method into server.
-func WithThriftReflectionEnable() Option {
-	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		di.Push("WithThriftReflectionEnable")
-		o.ReflectionEnabled = true
-	}}
-}
