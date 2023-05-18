@@ -70,7 +70,6 @@ var (
 const body = `
 {{define "body"}}
 
-{{if GenerateFastAPIs}}
 {{- range .Scope.StructLikes}}
 {{template "StructLikeCodec" .}}
 {{- end}}
@@ -78,13 +77,6 @@ const body = `
 {{- range .Scope.Services}}
 {{template "Processor" .}}
 {{- end}}
-{{- end}}{{/* if GenerateFastAPIs */}}
-
-{{if GenerateDeepCopyAPIs}}
-{{- range .Scope.StructLikes}}
-{{template "DeepCopyAPI" .}}
-{{- end}}
-{{- end}}{{/* if GenerateDeepCopyAPIs */}}
 
 {{template "ArgsAndResult" .}}
 
