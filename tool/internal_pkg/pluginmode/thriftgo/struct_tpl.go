@@ -16,6 +16,7 @@ package thriftgo
 
 const structLikeCodec = `
 {{define "StructLikeCodec"}}
+{{if GenerateFastAPIs}}
 {{template "StructLikeFastRead" .}}
 
 {{template "StructLikeFastReadField" .}}
@@ -29,13 +30,12 @@ const structLikeCodec = `
 {{template "StructLikeFastWriteField" .}}
 
 {{template "StructLikeFieldLength" .}}
-{{- end}}{{/* define "StructLikeCodec" */}}
-`
+{{- end}}{{/* if GenerateFastAPIs */}}
 
-const deepCopyAPI = `
-{{define "DeepCopyAPI"}}
+{{if GenerateDeepCopyAPIs}}
 {{template "StructLikeDeepCopy" .}}
-{{- end}}{{/* define "DeepCopyAPI" */}}
+{{- end}}{{/* if GenerateDeepCopyAPIs */}}
+{{- end}}{{/* define "StructLikeCodec" */}}
 `
 
 const structLikeFastRead = `

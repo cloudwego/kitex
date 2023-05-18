@@ -117,7 +117,6 @@ func (p *patcher) buildTemplates() (err error) {
 			templates.FieldIsSet)
 	} else {
 		allTemplates = append(allTemplates, structLikeCodec,
-			deepCopyAPI,
 			structLikeFastRead,
 			structLikeFastReadField,
 			structLikeDeepCopy,
