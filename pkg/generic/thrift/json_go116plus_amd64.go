@@ -108,7 +108,7 @@ const (
 	String
 )
 
-func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgType MsgType, cv *j2t.BinaryConv, transBuff []byte, dbuf []byte) error {
+func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgType MsgType, cv *j2t.BinaryConv, transBuff, dbuf []byte) error {
 	for _, field := range m.dty.Struct().Fields() {
 		// Exception field
 		if !m.isClient && field.ID() != 0 {
