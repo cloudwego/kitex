@@ -18,11 +18,11 @@ package thrift
 
 import (
 	"context"
-	"strings"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
+	dthrift "github.com/cloudwego/dynamicgo/thrift"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
@@ -94,8 +94,19 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 
 	tyDsc := r.svc.DynamicgoDsc.Functions()[method].Response()
 
-	msgBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
-	transBuf, err := tProt.ByteBuffer().ReadBinary(r.msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+	mBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
+	sName, err := in.ReadStructBegin()
+	if err != nil {
+		return nil, err
+	}
+	sBeginLen := bthrift.Binary.StructBeginLength(sName)
+	fName, typeId, id, err := in.ReadFieldBegin()
+	if err != nil {
+		return nil, err
+	}
+	fBeginLen := bthrift.Binary.FieldBeginLength(fName, typeId, id)
+	transBuf, err := tProt.ByteBuffer().ReadBinary(r.msg.PayloadLen() - mBeginLen - sBeginLen - fBeginLen -
+		bthrift.Binary.FieldStopLength() - bthrift.Binary.FieldEndLength() - bthrift.Binary.StructEndLength() - bthrift.Binary.MessageEndLength())
 	if err != nil {
 		return nil, err
 	}
@@ -104,17 +115,16 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 	resp := descriptor.NewHTTPResponse()
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, resp)
 	cv := t2j.NewBinaryConv(*r.dyOpts)
-	// decode with dynamicgo
-	// thrift []byte to json []byte
-	if err = cv.DoInto(ctx, tyDsc, transBuf, &buf); err != nil {
-		return nil, err
-	}
+	fid := dthrift.FieldID(id)
 
-	// unwrap one level of json string to make resp compatible with the resp in fallback way
-	if len(buf) > structWrapLen {
-		secondBracket := strings.Index(string(buf)[1:], "{") + 1
-		if secondBracket != 0 {
-			buf = buf[secondBracket : len(buf)-1]
+	for _, field := range tyDsc.Struct().Fields() {
+		if fid == field.ID() {
+			// decode with dynamicgo
+			// thrift []byte to json []byte
+			if err = cv.DoInto(ctx, field.Type(), transBuf, &buf); err != nil {
+				return nil, err
+			}
+			break
 		}
 	}
 	resp.RawBody = buf
