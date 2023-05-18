@@ -122,9 +122,8 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 			buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
 			if err != nil {
 				return err
-			} else {
-				copy(buf, dbuf)
 			}
+			copy(buf, dbuf)
 			mcache.Free(dbuf)
 		}
 
