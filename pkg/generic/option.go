@@ -85,8 +85,8 @@ func WithCustomDynamicgoConvOpts(opts *conv.Options) Option {
 }
 
 // EnableDynamicgoHTTPResp set whether to get response for http generic call using dynamicgo
-// body of http generic call response is stored as a map in HTTPResponse.Body by default
-// when dynamicgo HTTP response is enabled, body will be stored as a byte slice in HTTPResponse.RawBody
+//   - enable : false (default) -> body of http generic call response : HTTPResponse.Body
+//   - enable : true -> body of http generic call response : HTTPResponse.RawBody
 func EnableDynamicgoHTTPResp(enable bool) Option {
 	return Option{F: func(opt *Options) {
 		opt.enableDynamicgoHTTPResp = enable
