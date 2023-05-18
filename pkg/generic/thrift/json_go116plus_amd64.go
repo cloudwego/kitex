@@ -71,21 +71,44 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		m.dyOpts.EnableThriftBase = true
 	}
 
-	_, isVoid := msg.(descriptor.Void)
-	transBuff, isString := msg.(string)
-	if !isVoid && !isString {
-		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is neither void nor string")
+	// msg is void
+	if _, ok := msg.(descriptor.Void); ok {
+		if err := m.writeHead(out); err != nil {
+			return err
+		}
+		if err := m.writeFields(ctx, out, Void, nil, nil, nil); err != nil {
+			return err
+		}
+		return writeTail(out)
 	}
 
-	tProt, ok := out.(*cthrift.BinaryProtocol)
+	// msg is string
+	s, ok := msg.(string)
 	if !ok {
-		return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
+		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
 	}
 
-	if err := out.WriteStructBegin(m.dty.Struct().Name()); err != nil {
+	cv := j2t.NewBinaryConv(*m.dyOpts)
+	transBuff := utils.StringToSliceByte(s)
+	dbuf := mcache.Malloc(len(transBuff))[0:0]
+
+	if err := m.writeHead(out); err != nil {
 		return err
 	}
+	if err := m.writeFields(ctx, out, String, &cv, transBuff, dbuf); err != nil {
+		return err
+	}
+	return writeTail(out)
+}
 
+type MsgType int
+
+const (
+	Void MsgType = iota
+	String
+)
+
+func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgType MsgType, cv *j2t.BinaryConv, transBuff []byte, dbuf []byte) error {
 	for _, field := range m.dty.Struct().Fields() {
 		// Exception field
 		if !m.isClient && field.ID() != 0 {
@@ -97,8 +120,8 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		if err := out.WriteFieldBegin(field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID())); err != nil {
 			return err
 		}
-
-		if isVoid { // msg is void
+		switch msgType {
+		case Void:
 			if err := out.WriteStructBegin(field.Name()); err != nil {
 				return err
 			}
@@ -108,30 +131,43 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 			if err := out.WriteStructEnd(); err != nil {
 				return err
 			}
-		} else { // msg is string
+		case String:
 			// encode using dynamicgo
-			cv := j2t.NewBinaryConv(*m.dyOpts)
-			v := utils.StringToSliceByte(transBuff)
-
-			// TODO: use Malloc and MallocAck
-			dbuf := mcache.Malloc(len(transBuff))[0:0]
 			// json []byte to thrift []byte
-			if err := cv.DoInto(ctx, field.Type(), v, &dbuf); err != nil {
+			if err := cv.DoInto(ctx, field.Type(), transBuff, &dbuf); err != nil {
 				return err
 			}
-			buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
-			if err != nil {
-				return err
-			}
-			copy(buf, dbuf)
-			mcache.Free(dbuf)
 		}
-
-		if err := out.WriteFieldEnd(); err != nil {
-			return err
-		}
+		// WriteFieldEnd has no content
+		// if err := out.WriteFieldEnd(); err != nil {
+		// 	return err
+		// }
 	}
+	if msgType == String {
+		tProt, ok := out.(*cthrift.BinaryProtocol)
+		if !ok {
+			return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
+		}
+		buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
+		if err != nil {
+			return err
+		} else {
+			// TODO: implement MallocAck() to achieve zero copy
+			copy(buf, dbuf)
+		}
+		mcache.Free(dbuf)
+	}
+	return nil
+}
 
+func (m *WriteJSON) writeHead(out thrift.TProtocol) error {
+	if err := out.WriteStructBegin(m.dty.Struct().Name()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeTail(out thrift.TProtocol) error {
 	if err := out.WriteFieldStop(); err != nil {
 		return err
 	}

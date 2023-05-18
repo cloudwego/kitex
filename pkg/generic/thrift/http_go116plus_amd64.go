@@ -26,7 +26,6 @@ import (
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
-
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
@@ -69,29 +68,32 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		return err
 	}
 
+	dbuf := mcache.Malloc(len(body))[0:0]
+
 	for _, field := range ty.Struct().Fields() {
 		if err := out.WriteFieldBegin(field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID())); err != nil {
 			return err
 		}
 
-		// TODO: use Malloc and MallocAck
-		dbuf := mcache.Malloc(len(body))[0:0]
 		// json []byte to thrift []byte
 		if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
 			return err
 		}
-		buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
-		if err != nil {
-			return err
-		} else {
-			copy(buf, dbuf)
-		}
-		mcache.Free(dbuf)
 
-		if err := out.WriteFieldEnd(); err != nil {
-			return err
-		}
+		// WriteFieldEnd has no content
+		// if err := out.WriteFieldEnd(); err != nil {
+		// 	return err
+		// }
 	}
+
+	buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
+	if err != nil {
+		return err
+	} else {
+		// TODO: implement MallocAck() to achieve zero copy
+		copy(buf, dbuf)
+	}
+	mcache.Free(dbuf)
 
 	if err := out.WriteFieldStop(); err != nil {
 		return err
