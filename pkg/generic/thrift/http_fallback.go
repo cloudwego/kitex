@@ -23,17 +23,9 @@ import (
 	"context"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-)
-
-var (
-	customJson = sonic.Config{
-		EscapeHTML: true,
-		UseNumber:  true,
-	}.Froze()
 )
 
 // SetWriteHTTPRequest ...

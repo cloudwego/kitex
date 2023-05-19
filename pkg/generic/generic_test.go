@@ -106,7 +106,7 @@ func TestHTTPThriftGeneric(t *testing.T) {
 	body := map[string]interface{}{
 		"msg": "Test",
 	}
-	data, err := json.Marshal(body)
+	data, err := customJson.Marshal(body)
 	test.Assert(t, err == nil)
 	// NewRequest
 	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))

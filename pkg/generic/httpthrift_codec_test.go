@@ -23,8 +23,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
-	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
@@ -34,7 +34,7 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-var json = jsoniter.Config{
+var customJson = sonic.Config{
 	EscapeHTML: true,
 	UseNumber:  true,
 }.Froze()
@@ -100,7 +100,7 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 		"got_base64": true,
 		"num":        0,
 	}
-	data, err := json.Marshal(body)
+	data, err := customJson.Marshal(body)
 	test.Assert(t, err == nil)
 	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
 	test.Assert(t, err == nil)
@@ -199,7 +199,7 @@ func getStdHttpRequest() *http.Request {
 		"got_base64": true,
 		"num":        "",
 	}
-	data, err := json.Marshal(body)
+	data, err := customJson.Marshal(body)
 	if err != nil {
 		panic(err)
 	}

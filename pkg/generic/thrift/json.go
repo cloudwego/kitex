@@ -25,7 +25,6 @@ import (
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
-	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
@@ -113,7 +112,7 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 		}
 
 		// resp is map
-		respNode, err := jsoniter.Marshal(resp)
+		respNode, err := customJson.Marshal(resp)
 		if err != nil {
 			return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v", err))
 		}
