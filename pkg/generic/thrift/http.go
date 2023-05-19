@@ -105,17 +105,16 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		return nil, err
 	}
 	fBeginLen := bthrift.Binary.FieldBeginLength(fName, typeId, id)
-	transBuf, err := tProt.ByteBuffer().ReadBinary(r.msg.PayloadLen() - mBeginLen - sBeginLen - fBeginLen -
-		bthrift.Binary.FieldStopLength() - bthrift.Binary.FieldEndLength() - bthrift.Binary.StructEndLength() - bthrift.Binary.MessageEndLength())
+	transBuf, err := tProt.ByteBuffer().ReadBinary(r.msg.PayloadLen() - mBeginLen - sBeginLen - fBeginLen - bthrift.Binary.MessageEndLength())
 	if err != nil {
 		return nil, err
 	}
+	fid := dthrift.FieldID(id)
 
 	buf := make([]byte, 0, len(transBuf)*2)
 	resp := descriptor.NewHTTPResponse()
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, resp)
 	cv := t2j.NewBinaryConv(*r.dyOpts)
-	fid := dthrift.FieldID(id)
 
 	for _, field := range tyDsc.Struct().Fields() {
 		if fid == field.ID() {
