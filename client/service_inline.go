@@ -33,8 +33,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/proxy"
-	"github.com/cloudwego/kitex/pkg/remote/bound"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -47,9 +45,9 @@ func init() {
 	localAddr = utils.NewNetAddr("tcp", "127.0.0.1")
 }
 
-type MergeMetaHandler func(ctx, svrCtx context.Context) context.Context
+type ServiceInlineMetaHandler func(ctx, svrCtx context.Context) (newSvrCtx context.Context)
 
-type mergeClient struct {
+type serviceInlineClient struct {
 	svcInfo *serviceinfo.ServiceInfo
 	mws     []endpoint.Middleware
 	eps     endpoint.Endpoint
@@ -62,21 +60,21 @@ type mergeClient struct {
 	serverEps endpoint.Endpoint
 	serverOpt *internal_server.Options
 
-	mergeMetaHandler MergeMetaHandler
+	serviceInlineMetaHandler ServiceInlineMetaHandler
 }
 
-type ServerMethod interface {
+type ServerInitialInfo interface {
 	Endpoints() endpoint.Endpoint
 	Option() *internal_server.Options
 	GetServiceInfo() *serviceinfo.ServiceInfo
 }
 
-// NewMergeClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
-func NewMergeClient(svcInfo *serviceinfo.ServiceInfo, s ServerMethod, opts ...Option) (Client, error) {
+// NewServiceInlineClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
+func NewServiceInlineClient(svcInfo *serviceinfo.ServiceInfo, s ServerInitialInfo, opts ...Option) (Client, error) {
 	if svcInfo == nil {
 		return nil, errors.New("NewClient: no service info")
 	}
-	kc := &mergeClient{}
+	kc := &serviceInlineClient{}
 	kc.svcInfo = svcInfo
 	kc.opt = client.NewOptions(opts)
 	kc.serverEps = s.Endpoints()
@@ -89,11 +87,11 @@ func NewMergeClient(svcInfo *serviceinfo.ServiceInfo, s ServerMethod, opts ...Op
 	return kc, nil
 }
 
-func (kc *mergeClient) SetMergeMetaHandler(fn MergeMetaHandler) {
-	kc.mergeMetaHandler = fn
+func (kc *serviceInlineClient) SetServiceInlineMetaHandler(fn ServiceInlineMetaHandler) {
+	kc.serviceInlineMetaHandler = fn
 }
 
-func (kc *mergeClient) init() (err error) {
+func (kc *serviceInlineClient) init() (err error) {
 	if err = kc.checkOptions(); err != nil {
 		return err
 	}
@@ -108,32 +106,28 @@ func (kc *mergeClient) init() (err error) {
 	return nil
 }
 
-func (kc *mergeClient) checkOptions() (err error) {
+func (kc *serviceInlineClient) checkOptions() (err error) {
 	if kc.opt.Svr.ServiceName == "" {
 		return errors.New("service name is required")
 	}
 	return nil
 }
 
-func (kc *mergeClient) initContext() context.Context {
+func (kc *serviceInlineClient) initContext() context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, kc.opt.Bus)
 	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, kc.opt.Events)
-	if chr, ok := kc.opt.Proxy.(proxy.ContextHandler); ok {
-		ctx = chr.HandleContext(ctx)
-	}
 	return ctx
 }
 
-func (kc *mergeClient) initMiddlewares(ctx context.Context) {
+func (kc *serviceInlineClient) initMiddlewares(ctx context.Context) {
 	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
 	kc.mws = append(kc.mws, contextMW)
 	kc.mws = append(kc.mws, builderMWs...)
-	kc.mws = append(kc.mws, richMWsWithBuilder(ctx, kc.opt.IMWBs)...)
 }
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
-func (kc *mergeClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+func (kc *serviceInlineClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
 	cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
 	rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, method)
 	var callOpts *callopt.CallOptions
@@ -173,7 +167,7 @@ func (kc *mergeClient) initRPCInfo(ctx context.Context, method string) (context.
 	return ctx, ri, callOpts
 }
 
-func (kc *mergeClient) applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo) (context.Context, *callopt.CallOptions) {
+func (kc *serviceInlineClient) applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo) (context.Context, *callopt.CallOptions) {
 	cos := CallOptionsFromCtx(ctx)
 	if len(cos) > 0 {
 		info, callOpts := callopt.Apply(cos, cfg, svr, kc.opt.Locks, kc.opt.HTTPResolver)
@@ -185,7 +179,7 @@ func (kc *mergeClient) applyCallOptions(ctx context.Context, cfg rpcinfo.Mutable
 }
 
 // Call implements the Client interface .
-func (kc *mergeClient) Call(ctx context.Context, method string, request, response interface{}) error {
+func (kc *serviceInlineClient) Call(ctx context.Context, method string, request, response interface{}) error {
 	if !kc.inited {
 		panic("client not initialized")
 	}
@@ -210,7 +204,7 @@ func (kc *mergeClient) Call(ctx context.Context, method string, request, respons
 	return err
 }
 
-func (kc *mergeClient) initDebugService() {
+func (kc *serviceInlineClient) initDebugService() {
 	if ds := kc.opt.DebugService; ds != nil {
 		ds.RegisterProbeFunc(diagnosis.DestServiceKey, diagnosis.WrapAsProbeFunc(kc.opt.Svr.ServiceName))
 		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(kc.opt.DebugInfo))
@@ -219,19 +213,11 @@ func (kc *mergeClient) initDebugService() {
 	}
 }
 
-func (kc *mergeClient) richRemoteOption() {
+func (kc *serviceInlineClient) richRemoteOption() {
 	kc.opt.RemoteOpt.SvcInfo = kc.svcInfo
-	// for client trans info handler
-	if len(kc.opt.MetaHandlers) > 0 {
-		// TODO in stream situations, meta is only assembled when the stream creates
-		// metaHandler needs to be called separately.
-		// (newClientStreamer: call WriteMeta before remotecli.NewClient)
-		transInfoHdlr := bound.NewTransMetaHandler(kc.opt.MetaHandlers)
-		kc.opt.RemoteOpt.PrependBoundHandler(transInfoHdlr)
-	}
 }
 
-func (kc *mergeClient) buildInvokeChain() error {
+func (kc *serviceInlineClient) buildInvokeChain() error {
 	innerHandlerEp, err := kc.invokeHandleEndpoint()
 	if err != nil {
 		return err
@@ -240,7 +226,7 @@ func (kc *mergeClient) buildInvokeChain() error {
 	return nil
 }
 
-func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
+func (kc *serviceInlineClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 	// handle trace
 	svrTraceCtl := kc.serverOpt.TracerCtl
 	if svrTraceCtl == nil {
@@ -280,8 +266,8 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 			svrTraceCtl.DoFinish(serverCtx, svrRpcinfo, err)
 		}()
 		// meta handler
-		if kc.mergeMetaHandler != nil {
-			serverCtx = kc.mergeMetaHandler(ctx, serverCtx)
+		if kc.serviceInlineMetaHandler != nil {
+			serverCtx = kc.serviceInlineMetaHandler(ctx, serverCtx)
 		}
 
 		// server logic
@@ -309,7 +295,7 @@ func (kc *mergeClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 	}, nil
 }
 
-func (kc *mergeClient) initServerRpcInfo() rpcinfo.RPCInfo {
+func (kc *serviceInlineClient) initServerRpcInfo() rpcinfo.RPCInfo {
 	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 	if kc.serverOpt.StatsLevel != nil {
 		rpcStats.SetLevel(*kc.serverOpt.StatsLevel)
@@ -327,7 +313,7 @@ func (kc *mergeClient) initServerRpcInfo() rpcinfo.RPCInfo {
 }
 
 // Close is not concurrency safe.
-func (kc *mergeClient) Close() error {
+func (kc *serviceInlineClient) Close() error {
 	defer func() {
 		if err := recover(); err != nil {
 			klog.Warnf("KITEX: panic when close client, error=%s, stack=%s", err, string(debug.Stack()))
@@ -340,11 +326,6 @@ func (kc *mergeClient) Close() error {
 	var errs utils.ErrChain
 	for _, cb := range kc.opt.CloseCallbacks {
 		if err := cb(); err != nil {
-			errs.Append(err)
-		}
-	}
-	if kc.opt.CBSuite != nil {
-		if err := kc.opt.CBSuite.Close(); err != nil {
 			errs.Append(err)
 		}
 	}
