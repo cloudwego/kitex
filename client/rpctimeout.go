@@ -100,9 +100,14 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 	}
 
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
-		return func(ctx context.Context, request, response interface{}) error {
+		return func(ctx context.Context, request, response interface{}) (err error) {
 			ri := rpcinfo.GetRPCInfo(ctx)
 			if ri.Config().InteractionMode() == rpcinfo.Streaming {
+				defer func() {
+					if panicInfo := recover(); panicInfo != nil {
+						err = panicToErr(ctx, panicInfo, ri)
+					}
+				}()
 				return next(ctx, request, response)
 			}
 
@@ -115,10 +120,15 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 			}
 			// Fast path for ctx without timeout
 			if ctx.Done() == nil {
+				defer func() {
+					if panicInfo := recover(); panicInfo != nil {
+						err = panicToErr(ctx, panicInfo, ri)
+					}
+				}()
 				return next(ctx, request, response)
 			}
 
-			var err error
+			var err2 error
 			start := time.Now()
 			done := make(chan error, 1)
 			workerPool.GoCtx(ctx, func() {
@@ -127,15 +137,15 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 						e := panicToErr(ctx, panicInfo, ri)
 						done <- e
 					}
-					if err == nil || !errors.Is(err, kerrors.ErrRPCFinish) {
+					if err2 == nil || !errors.Is(err2, kerrors.ErrRPCFinish) {
 						// Don't regards ErrRPCFinish as normal error, it happens in retry scene,
 						// ErrRPCFinish means previous call returns first but is decoding.
 						close(done)
 					}
 				}()
-				err = next(ctx, request, response)
-				if err != nil && ctx.Err() != nil &&
-					!kerrors.IsTimeoutError(err) && !errors.Is(err, kerrors.ErrRPCFinish) {
+				err2 = next(ctx, request, response)
+				if err2 != nil && ctx.Err() != nil &&
+					!kerrors.IsTimeoutError(err2) && !errors.Is(err2, kerrors.ErrRPCFinish) {
 					// error occurs after the wait goroutine returns(RPCTimeout happens),
 					// we should log this error for troubleshooting, or it will be discarded.
 					// but ErrRPCTimeout and ErrRPCFinish can be ignored:
@@ -144,10 +154,10 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 					var errMsg string
 					if ri.To().Address() != nil {
 						errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s addr=%s error=%s",
-							ri.To().ServiceName(), ri.To().Method(), ri.To().Address(), err.Error())
+							ri.To().ServiceName(), ri.To().Method(), ri.To().Address(), err2.Error())
 					} else {
 						errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s error=%s",
-							ri.To().ServiceName(), ri.To().Method(), err.Error())
+							ri.To().ServiceName(), ri.To().Method(), err2.Error())
 					}
 					klog.CtxErrorf(ctx, "%s", errMsg)
 				}
@@ -158,7 +168,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 				if panicErr != nil {
 					return panicErr
 				}
-				return err
+				return err2
 			case <-ctx.Done():
 				return makeTimeoutErr(ctx, start, tm)
 			}
