@@ -279,9 +279,10 @@ func (kc *serviceInlineClient) invokeHandleEndpoint() (endpoint.Endpoint, error)
 		err = kc.serverEps(serverCtx, req, resp)
 		// meta handler
 		if kc.contextServiceInlineHandler != nil {
-			ctx, err = kc.contextServiceInlineHandler.ReadMeta(ctx, serverCtx, resp)
-			if err != nil {
-				return err
+			var err1 error
+			ctx, err1 = kc.contextServiceInlineHandler.ReadMeta(ctx, serverCtx, resp)
+			if err1 != nil {
+				return err1
 			}
 		}
 
