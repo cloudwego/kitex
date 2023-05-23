@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime/debug"
 	"time"
 
 	"github.com/cloudwego/kitex/internal/stats"
@@ -41,15 +40,6 @@ func init() {
 		128,
 		time.Minute,
 	)
-}
-
-func panicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo) error {
-	e := fmt.Errorf("KITEX: panic, to_service=%s to_method=%s error=%v\nstack=%s",
-		ri.To().ServiceName(), ri.To().Method(), panicInfo, debug.Stack())
-	klog.CtxErrorf(ctx, "%s", e.Error())
-	rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
-	rpcStats.SetPanicked(e)
-	return e
 }
 
 func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration) error {

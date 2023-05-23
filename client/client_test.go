@@ -934,7 +934,6 @@ func TestPanicInMiddleware(t *testing.T) {
 	test.Assert(t, err != nil)
 	test.Assert(t, strings.Contains(err.Error(), panicMsg), err)
 	test.Assert(t, reportPanic, err)
-
 }
 
 func mb(byteSize uint64) float32 {
