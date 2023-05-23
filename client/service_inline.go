@@ -31,7 +31,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
-	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
@@ -45,7 +44,10 @@ func init() {
 	localAddr = utils.NewNetAddr("tcp", "127.0.0.1")
 }
 
-type ServiceInlineMetaHandler func(ctx, svrCtx context.Context) (newSvrCtx context.Context)
+type ContextServiceInlineHandler interface {
+	WriteMeta(cliCtx context.Context, svrCtx context.Context, req interface{}) (newSvrCtx context.Context, err error)
+	ReadMeta(cliCtx context.Context, svrCtx context.Context, resp interface{}) (newCliCtx context.Context, err error)
+}
 
 type serviceInlineClient struct {
 	svcInfo *serviceinfo.ServiceInfo
@@ -60,7 +62,7 @@ type serviceInlineClient struct {
 	serverEps endpoint.Endpoint
 	serverOpt *internal_server.Options
 
-	serviceInlineMetaHandler ServiceInlineMetaHandler
+	contextServiceInlineHandler ContextServiceInlineHandler
 }
 
 type ServerInitialInfo interface {
@@ -87,8 +89,8 @@ func NewServiceInlineClient(svcInfo *serviceinfo.ServiceInfo, s ServerInitialInf
 	return kc, nil
 }
 
-func (kc *serviceInlineClient) SetServiceInlineMetaHandler(fn ServiceInlineMetaHandler) {
-	kc.serviceInlineMetaHandler = fn
+func (kc *serviceInlineClient) SetContextServiceInlineHandler(simh ContextServiceInlineHandler) {
+	kc.contextServiceInlineHandler = simh
 }
 
 func (kc *serviceInlineClient) init() (err error) {
@@ -266,28 +268,26 @@ func (kc *serviceInlineClient) invokeHandleEndpoint() (endpoint.Endpoint, error)
 			svrTraceCtl.DoFinish(serverCtx, svrRpcinfo, err)
 		}()
 		// meta handler
-		if kc.serviceInlineMetaHandler != nil {
-			serverCtx = kc.serviceInlineMetaHandler(ctx, serverCtx)
+		if kc.contextServiceInlineHandler != nil {
+			serverCtx, err = kc.contextServiceInlineHandler.WriteMeta(ctx, serverCtx, req)
+			if err != nil {
+				return err
+			}
 		}
 
 		// server logic
 		err = kc.serverEps(serverCtx, req, resp)
-		if err != nil {
-			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
-				if cliSetter, ok := cliRpcInfo.Invocation().(rpcinfo.InvocationSetter); ok {
-					if len(bizErr.BizExtra()) > 0 {
-						cliSetter.SetBizStatusErr(kerrors.NewBizStatusErrorWithExtra(bizErr.BizStatusCode(), bizErr.BizMessage(), bizErr.BizExtra()))
-					} else {
-						cliSetter.SetBizStatusErr(kerrors.NewBizStatusError(bizErr.BizStatusCode(), bizErr.BizMessage()))
-					}
-				}
+		// meta handler
+		if kc.contextServiceInlineHandler != nil {
+			ctx, err = kc.contextServiceInlineHandler.ReadMeta(ctx, serverCtx, resp)
+			if err != nil {
+				return err
 			}
 		}
 
 		// forward key
 		kvs = metainfo.AllBackwardValuesToSend(serverCtx)
 		if len(kvs) > 0 {
-			ctx = metainfo.WithBackwardValues(ctx)
 			metainfo.SetBackwardValuesFromMap(ctx, kvs)
 		}
 
