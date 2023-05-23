@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/internal/stats"
@@ -664,7 +665,8 @@ func initRetryAndFallbackWithCallopts(callOpts *callopt.CallOptions) (callOptRet
 	return
 }
 
-func doFallbackIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, request interface{}, response interface{}, oriErr error, callOptFallback *fallback.Policy, cliFallback *fallback.Policy) (err, reportErr error) {
+func doFallbackIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, request interface{}, response interface{}, oriErr error,
+	callOptFallback *fallback.Policy, cliFallback *fallback.Policy) (err, reportErr error) {
 	fallback, hasFallback := getFallbackPolicy(callOptFallback, cliFallback)
 	err = oriErr
 	reportErr = oriErr
