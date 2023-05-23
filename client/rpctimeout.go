@@ -23,6 +23,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/wpool"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -100,14 +101,9 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 	}
 
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
-		return func(ctx context.Context, request, response interface{}) (err error) {
+		return func(ctx context.Context, request, response interface{}) error {
 			ri := rpcinfo.GetRPCInfo(ctx)
 			if ri.Config().InteractionMode() == rpcinfo.Streaming {
-				defer func() {
-					if panicInfo := recover(); panicInfo != nil {
-						err = panicToErr(ctx, panicInfo, ri)
-					}
-				}()
 				return next(ctx, request, response)
 			}
 
@@ -120,32 +116,27 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 			}
 			// Fast path for ctx without timeout
 			if ctx.Done() == nil {
-				defer func() {
-					if panicInfo := recover(); panicInfo != nil {
-						err = panicToErr(ctx, panicInfo, ri)
-					}
-				}()
 				return next(ctx, request, response)
 			}
 
-			var err2 error
+			var err error
 			start := time.Now()
 			done := make(chan error, 1)
 			workerPool.GoCtx(ctx, func() {
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
-						e := panicToErr(ctx, panicInfo, ri)
+						e := stats.ClientPanicToErr(ctx, panicInfo, ri, true)
 						done <- e
 					}
-					if err2 == nil || !errors.Is(err2, kerrors.ErrRPCFinish) {
+					if err == nil || !errors.Is(err, kerrors.ErrRPCFinish) {
 						// Don't regards ErrRPCFinish as normal error, it happens in retry scene,
 						// ErrRPCFinish means previous call returns first but is decoding.
 						close(done)
 					}
 				}()
-				err2 = next(ctx, request, response)
-				if err2 != nil && ctx.Err() != nil &&
-					!kerrors.IsTimeoutError(err2) && !errors.Is(err2, kerrors.ErrRPCFinish) {
+				err = next(ctx, request, response)
+				if err != nil && ctx.Err() != nil &&
+					!kerrors.IsTimeoutError(err) && !errors.Is(err, kerrors.ErrRPCFinish) {
 					// error occurs after the wait goroutine returns(RPCTimeout happens),
 					// we should log this error for troubleshooting, or it will be discarded.
 					// but ErrRPCTimeout and ErrRPCFinish can be ignored:
@@ -154,10 +145,10 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 					var errMsg string
 					if ri.To().Address() != nil {
 						errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s addr=%s error=%s",
-							ri.To().ServiceName(), ri.To().Method(), ri.To().Address(), err2.Error())
+							ri.To().ServiceName(), ri.To().Method(), ri.To().Address(), err.Error())
 					} else {
 						errMsg = fmt.Sprintf("KITEX: to_service=%s method=%s error=%s",
-							ri.To().ServiceName(), ri.To().Method(), err2.Error())
+							ri.To().ServiceName(), ri.To().Method(), err.Error())
 					}
 					klog.CtxErrorf(ctx, "%s", errMsg)
 				}
@@ -168,7 +159,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 				if panicErr != nil {
 					return panicErr
 				}
-				return err2
+				return err
 			case <-ctx.Done():
 				return makeTimeoutErr(ctx, start, tm)
 			}

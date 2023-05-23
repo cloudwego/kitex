@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/kitex/internal/stats"
 
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
@@ -353,94 +354,75 @@ func (kc *kClient) applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCC
 }
 
 // Call implements the Client interface .
-func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) error {
-	if !kc.inited {
-		panic("client not initialized")
-	}
-	if kc.closed {
-		panic("client is already closed")
-	}
-	if ctx == nil {
-		panic("ctx is nil")
-	}
+func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) (err error) {
+	kc.validateForCall(ctx)
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
 	ctx, ri, callOpts = kc.initRPCInfo(ctx, method)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
-
-	var callOptRetry retry.Policy
-	var callOptFallback *fallback.Policy
-	if callOpts != nil {
-		callOptFallback = callOpts.Fallback
-		if callOpts.RetryPolicy.Enable {
-			callOptRetry = callOpts.RetryPolicy
+	var reportErr error
+	var recycleRI bool
+	defer func() {
+		if panicInfo := recover(); panicInfo != nil {
+			err = stats.ClientPanicToErr(ctx, panicInfo, ri, false)
+			reportErr = err
 		}
-	}
+		kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
+		if recycleRI {
+			// why need check recycleRI to decide if recycle RPCInfo?
+			// 1. no retry, rpc timeout happen will cause panic when response return
+			// 2. retry success, will cause panic when first call return
+			// 3. backup request may cause panic, cannot recycle first RPCInfo
+			// RPCInfo will be recycled after rpc is finished,
+			// holding RPCInfo in a new goroutine is forbidden.
+			rpcinfo.PutRPCInfo(ri)
+		}
+		callOpts.Recycle()
+	}()
+
+	callOptRetry, callOptFallback := initRetryAndFallbackWithCallopts(callOpts)
 	if kc.opt.RetryContainer == nil && callOptRetry.Enable {
 		// setup retry in callopt
 		kc.opt.RetryContainer = retry.NewRetryContainer()
 	}
 
-	var err error
-	var recycleRI bool
 	if kc.opt.RetryContainer == nil {
+		// call without retry policy
 		err = kc.eps(ctx, request, response)
 		if err == nil {
 			recycleRI = true
 		}
 	} else {
-		var callTimes int32
-		// prevRI represents a value of rpcinfo.RPCInfo type.
-		var prevRI atomic.Value
-		recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
-			currCallTimes := int(atomic.AddInt32(&callTimes, 1))
-			retryCtx := ctx
-			cRI := ri
-			if currCallTimes > 1 {
-				retryCtx, cRI, _ = kc.initRPCInfo(ctx, method)
-				retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
-				if prevRI.Load() == nil {
-					prevRI.Store(ri)
-				}
-				r.Prepare(retryCtx, prevRI.Load().(rpcinfo.RPCInfo), cRI)
-				prevRI.Store(cRI)
-			}
-			err := kc.eps(retryCtx, request, response)
-			return cRI, response, err
-		}, ri, request)
+		recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
 	}
 
 	// do fallback if with setup
-	fallback, hasFallback := getFallbackPolicy(callOptFallback, kc.opt.Fallback)
-	var fbErr error
-	reportErr := err
-	if hasFallback {
-		reportAsFB := false
-		// Notice: If rpc err is nil, rpcStatAsFB will always be false, even if it's set to true by user.
-		fbErr, reportAsFB = fallback.DoIfNeeded(ctx, ri, request, response, err)
-		if reportAsFB {
-			reportErr = fbErr
-		}
-		err = fbErr
-	}
-
-	kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
-	callOpts.Recycle()
-	if err == nil && !hasFallback {
-		err = ri.Invocation().BizStatusErr()
-	}
-
-	if recycleRI {
-		// why need check recycleRI to decide if recycle RPCInfo?
-		// 1. no retry, rpc timeout happen will cause panic when response return
-		// 2. retry success, will cause panic when first call return
-		// 3. backup request may cause panic, cannot recycle first RPCInfo
-		// RPCInfo will be recycled after rpc is finished,
-		// holding RPCInfo in a new goroutine is forbidden.
-		rpcinfo.PutRPCInfo(ri)
-	}
+	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, callOptFallback, kc.opt.Fallback)
 	return err
+}
+
+func (kc *kClient) rpcCallWithRetry(ri rpcinfo.RPCInfo, method string, request, response interface{}) retry.RPCCallFunc {
+	// call with retry policy
+	var callTimes int32
+	// prevRI represents a value of rpcinfo.RPCInfo type.
+	var prevRI atomic.Value
+	return func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
+		retryCtx := ctx
+		cRI := ri
+		if currCallTimes > 1 {
+			retryCtx, cRI, _ = kc.initRPCInfo(ctx, method)
+			retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
+			if prevRI.Load() == nil {
+				prevRI.Store(ri)
+			}
+			r.Prepare(retryCtx, prevRI.Load().(rpcinfo.RPCInfo), cRI)
+			prevRI.Store(cRI)
+		}
+		callErr := kc.eps(retryCtx, request, response)
+		return cRI, response, callErr
+	}
 }
 
 func (kc *kClient) initDebugService() {
@@ -659,6 +641,49 @@ func (kc *kClient) warmingUp() error {
 	}
 
 	return nil
+}
+
+func (kc *kClient) validateForCall(ctx context.Context) {
+	if !kc.inited {
+		panic("client not initialized")
+	}
+	if kc.closed {
+		panic("client is already closed")
+	}
+	if ctx == nil {
+		panic("ctx is nil")
+	}
+}
+
+func initRetryAndFallbackWithCallopts(callOpts *callopt.CallOptions) (callOptRetry retry.Policy, callOptFallback *fallback.Policy) {
+	if callOpts != nil {
+		callOptFallback = callOpts.Fallback
+		if callOpts.RetryPolicy.Enable {
+			callOptRetry = callOpts.RetryPolicy
+		}
+	}
+	return
+}
+
+func doFallbackIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, request interface{}, response interface{}, oriErr error, callOptFallback *fallback.Policy, cliFallback *fallback.Policy) (err error, reportErr error) {
+	fallback, hasFallback := getFallbackPolicy(callOptFallback, cliFallback)
+	err = oriErr
+	reportErr = oriErr
+	var fbErr error
+	if hasFallback {
+		reportAsFB := false
+		// Notice: If rpc err is nil, rpcStatAsFB will always be false, even if it's set to true by user.
+		fbErr, reportAsFB = fallback.DoIfNeeded(ctx, ri, request, response, oriErr)
+		if reportAsFB {
+			reportErr = fbErr
+		}
+		err = fbErr
+	}
+
+	if err == nil && !hasFallback {
+		err = ri.Invocation().BizStatusErr()
+	}
+	return
 }
 
 // return fallback policy from call option and client option.

@@ -92,7 +92,7 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	err = mw1(mw2(block))(cancelCtx, nil, nil)
 	test.Assert(t, errors.Is(err, context.Canceled), err)
 
-	// 5. panic with timeout
+	// 5. panic with timeout, the panic is recovered
 	// < v1.1.* panic happen, >=v1.1* wrap panic to error
 	m.SetRPCTimeout(time.Millisecond * 500)
 	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
@@ -100,20 +100,18 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	err = mw1(mw2(panicEp))(ctx, nil, nil)
 	test.Assert(t, strings.Contains(err.Error(), panicMsg))
 
-	// 6. panic without timeout
+	// 6. panic without timeout, panic won't be recovered in timeout mw, but it will be recoverd in client.Call
 	m.SetRPCTimeout(0)
 	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
 	mw2 = rpcTimeoutMW(mwCtx)
-	err = mw1(mw2(panicEp))(ctx, nil, nil)
-	test.Assert(t, err != nil, strings.Contains(err.Error(), panicMsg))
+	test.Panic(t, func() { mw1(mw2(panicEp))(ctx, nil, nil) })
 
-	// 7. panic with streaming
+	// 7. panic with streaming, panic won't be recovered in timeout mw, but it will be recoverd in client.Call
 	m = rpcinfo.AsMutableRPCConfig(c)
 	m.SetInteractionMode(rpcinfo.Streaming)
 	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
 	mw2 = rpcTimeoutMW(mwCtx)
-	err = mw1(mw2(panicEp))(ctx, nil, nil)
-	test.Assert(t, strings.Contains(err.Error(), panicMsg))
+	test.Panic(t, func() { mw1(mw2(panicEp))(ctx, nil, nil) })
 }
 
 func TestIsBusinessTimeout(t *testing.T) {
