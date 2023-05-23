@@ -39,8 +39,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-type serverInitialInfoImpl struct {
-}
+type serverInitialInfoImpl struct{}
 
 func (s serverInitialInfoImpl) Endpoints() endpoint.Endpoint {
 	return func(ctx context.Context, req, resp interface{}) (err error) {
@@ -55,8 +54,6 @@ func (s serverInitialInfoImpl) Option() *internal_server.Options {
 func (s serverInitialInfoImpl) GetServiceInfo() *serviceinfo.ServiceInfo {
 	return nil
 }
-
-var s ServerInitialInfo = &serverInitialInfoImpl{}
 
 func newMockServerInitialInfo() ServerInitialInfo {
 	return &serverInitialInfoImpl{}

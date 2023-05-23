@@ -45,8 +45,8 @@ func init() {
 }
 
 type ContextServiceInlineHandler interface {
-	WriteMeta(cliCtx context.Context, svrCtx context.Context, req interface{}) (newSvrCtx context.Context, err error)
-	ReadMeta(cliCtx context.Context, svrCtx context.Context, resp interface{}) (newCliCtx context.Context, err error)
+	WriteMeta(cliCtx, svrCtx context.Context, req interface{}) (newSvrCtx context.Context, err error)
+	ReadMeta(cliCtx, svrCtx context.Context, resp interface{}) (newCliCtx context.Context, err error)
 }
 
 type serviceInlineClient struct {
@@ -228,75 +228,22 @@ func (kc *serviceInlineClient) buildInvokeChain() error {
 	return nil
 }
 
-func (kc *serviceInlineClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
-	// handle trace
-	svrTraceCtl := kc.serverOpt.TracerCtl
-	if svrTraceCtl == nil {
-		svrTraceCtl = &stats.Controller{}
+func (kc *serviceInlineClient) constructServerCtxWithMetadata(cliCtx context.Context) (serverCtx context.Context) {
+	serverCtx = context.Background()
+	// metainfo
+	// forward transmission
+	kvs := make(map[string]string, 16)
+	metainfo.SaveMetaInfoToMap(cliCtx, kvs)
+	if len(kvs) > 0 {
+		serverCtx = metainfo.SetMetaInfoFromMap(serverCtx, kvs)
 	}
-
-	return func(ctx context.Context, req, resp interface{}) (err error) {
-		serverCtx := context.Background()
-		cliRpcInfo := rpcinfo.GetRPCInfo(ctx)
-		// metainfo
-		// forward transmission
-		kvs := make(map[string]string, 16)
-		metainfo.SaveMetaInfoToMap(ctx, kvs)
-		if len(kvs) > 0 {
-			serverCtx = metainfo.SetMetaInfoFromMap(serverCtx, kvs)
-		}
-		serverCtx = metainfo.TransferForward(serverCtx)
-		// reverse transmission, backward mark
-		serverCtx = metainfo.WithBackwardValuesToSend(serverCtx)
-
-		svrRpcinfo := kc.initServerRpcInfo()
-		defer func() {
-			rpcinfo.PutRPCInfo(svrRpcinfo)
-		}()
-		serverCtx = rpcinfo.NewCtxWithRPCInfo(serverCtx, svrRpcinfo)
-
-		// handle common rpcinfo
-		method := cliRpcInfo.To().Method()
-		if ink, ok := svrRpcinfo.Invocation().(rpcinfo.InvocationSetter); ok {
-			ink.SetMethodName(method)
-			ink.SetServiceName(kc.svcInfo.ServiceName)
-		}
-		rpcinfo.AsMutableEndpointInfo(svrRpcinfo.To()).SetMethod(method)
-		serverCtx = svrTraceCtl.DoStart(serverCtx, svrRpcinfo)
-		// server trace
-		defer func() {
-			svrTraceCtl.DoFinish(serverCtx, svrRpcinfo, err)
-		}()
-		// meta handler
-		if kc.contextServiceInlineHandler != nil {
-			serverCtx, err = kc.contextServiceInlineHandler.WriteMeta(ctx, serverCtx, req)
-			if err != nil {
-				return err
-			}
-		}
-
-		// server logic
-		err = kc.serverEps(serverCtx, req, resp)
-		// meta handler
-		if kc.contextServiceInlineHandler != nil {
-			var err1 error
-			ctx, err1 = kc.contextServiceInlineHandler.ReadMeta(ctx, serverCtx, resp)
-			if err1 != nil {
-				return err1
-			}
-		}
-
-		// forward key
-		kvs = metainfo.AllBackwardValuesToSend(serverCtx)
-		if len(kvs) > 0 {
-			metainfo.SetBackwardValuesFromMap(ctx, kvs)
-		}
-
-		return err
-	}, nil
+	serverCtx = metainfo.TransferForward(serverCtx)
+	// reverse transmission, backward mark
+	serverCtx = metainfo.WithBackwardValuesToSend(serverCtx)
+	return serverCtx
 }
 
-func (kc *serviceInlineClient) initServerRpcInfo() rpcinfo.RPCInfo {
+func (kc *serviceInlineClient) constructServerRpcInfo(svrCtx, cliCtx context.Context) (newServerCtx context.Context, svrRpcInfo rpcinfo.RPCInfo) {
 	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 	if kc.serverOpt.StatsLevel != nil {
 		rpcStats.SetLevel(*kc.serverOpt.StatsLevel)
@@ -310,7 +257,64 @@ func (kc *serviceInlineClient) initServerRpcInfo() rpcinfo.RPCInfo {
 		rpcStats.ImmutableView(),
 	)
 	rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(localAddr)
-	return ri
+	svrCtx = rpcinfo.NewCtxWithRPCInfo(svrCtx, ri)
+
+	cliRpcInfo := rpcinfo.GetRPCInfo(cliCtx)
+	// handle common rpcinfo
+	method := cliRpcInfo.To().Method()
+	if ink, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+		ink.SetMethodName(method)
+		ink.SetServiceName(kc.svcInfo.ServiceName)
+	}
+	rpcinfo.AsMutableEndpointInfo(ri.To()).SetMethod(method)
+	return svrCtx, ri
+}
+
+func (kc *serviceInlineClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
+	svrTraceCtl := kc.serverOpt.TracerCtl
+	if svrTraceCtl == nil {
+		svrTraceCtl = &stats.Controller{}
+	}
+
+	return func(ctx context.Context, req, resp interface{}) (err error) {
+		serverCtx := kc.constructServerCtxWithMetadata(ctx)
+		defer func() {
+			// backward key
+			kvs := metainfo.AllBackwardValuesToSend(serverCtx)
+			if len(kvs) > 0 {
+				metainfo.SetBackwardValuesFromMap(ctx, kvs)
+			}
+		}()
+		serverCtx, svrRpcinfo := kc.constructServerRpcInfo(serverCtx, ctx)
+		defer func() {
+			rpcinfo.PutRPCInfo(svrRpcinfo)
+		}()
+
+		// server trace
+		serverCtx = svrTraceCtl.DoStart(serverCtx, svrRpcinfo)
+
+		if kc.contextServiceInlineHandler != nil {
+			serverCtx, err = kc.contextServiceInlineHandler.WriteMeta(ctx, serverCtx, req)
+			if err != nil {
+				return err
+			}
+		}
+
+		// server logic
+		err = kc.serverEps(serverCtx, req, resp)
+		// finish server trace
+		// contextServiceInlineHandler may convert nil err to non nil err, so handle trace here
+		svrTraceCtl.DoFinish(serverCtx, svrRpcinfo, err)
+
+		if kc.contextServiceInlineHandler != nil {
+			var err1 error
+			ctx, err1 = kc.contextServiceInlineHandler.ReadMeta(ctx, serverCtx, resp)
+			if err1 != nil {
+				return err1
+			}
+		}
+		return err
+	}, nil
 }
 
 // Close is not concurrency safe.
