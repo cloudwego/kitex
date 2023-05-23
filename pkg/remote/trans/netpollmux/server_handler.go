@@ -23,6 +23,7 @@ import (
 	"net"
 	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/cloudwego/netpoll"
 
@@ -40,6 +41,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/transport"
 )
+
+const defaultExitWaitGracefulShutdownTime = 1 * time.Second
 
 type svrTransHandlerFactory struct{}
 
@@ -350,15 +353,15 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 			}
 			return true
 		})
+		// 4. waiting all crrst packets received by client
+		time.Sleep(defaultExitWaitGracefulShutdownTime)
 		close(done)
 	}()
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-done:
-			return nil
-		}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return nil
 	}
 }
 
