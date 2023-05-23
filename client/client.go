@@ -666,7 +666,7 @@ func initRetryAndFallbackWithCallopts(callOpts *callopt.CallOptions) (callOptRet
 }
 
 func doFallbackIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, request, response interface{}, oriErr error,
-	callOptFallback *fallback.Policy, cliFallback *fallback.Policy) (err, reportErr error) {
+	callOptFallback, cliFallback *fallback.Policy) (err, reportErr error) {
 	fallback, hasFallback := getFallbackPolicy(callOptFallback, cliFallback)
 	err = oriErr
 	reportErr = oriErr
