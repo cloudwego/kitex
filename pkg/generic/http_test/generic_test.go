@@ -109,7 +109,7 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: dynamicgo
 	var opts []generic.Option
-	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.EnableDynamicgoHTTPResp(true))
 	cli := initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false)
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -130,9 +130,7 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: fallback
-	opts = opts[:0]
-	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts())
-	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false)
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", nil, false)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	gr, ok = resp.(*generic.HTTPResponse)
@@ -160,8 +158,6 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: dynamicgo
-	opts = opts[:0]
-	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
 	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -172,9 +168,7 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: fallback
-	opts = opts[:0]
-	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts())
-	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false)
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", nil, false)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	gr, ok = resp.(*generic.HTTPResponse)
@@ -202,8 +196,6 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: dynamicgo
-	opts = opts[:0]
-	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
 	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false)
 	_, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err.Error() == "remote or network error[remote]: biz error: call failed, incorrect num", err.Error())
@@ -223,7 +215,7 @@ func BenchmarkCompareDefaultAndFallback_Small(b *testing.B) {
 
 	t := testing.T{}
 	var opts []generic.Option
-	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.EnableDynamicgoHTTPResp(true))
 
 	b.Run("thrift_small_default", func(b *testing.B) {
 		time.Sleep(1 * time.Second)
@@ -292,7 +284,7 @@ func BenchmarkCompareDefaultAndFallback_Medium(b *testing.B) {
 
 	t := testing.T{}
 	var opts []generic.Option
-	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.EnableDynamicgoHTTPResp(true))
 
 	b.Run("thrift_medium_default", func(b *testing.B) {
 		time.Sleep(1 * time.Second)
@@ -376,7 +368,7 @@ func testThriftException(t *testing.T) {
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: dynamicgo
 	var opts []generic.Option
-	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.EnableDynamicgoHTTPResp(true))
 	cli := initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8128", "./idl/mock.thrift", opts, false)
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -386,9 +378,7 @@ func testThriftException(t *testing.T) {
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: fallback
-	opts = opts[:0]
-	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts())
-	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8128", "./idl/mock.thrift", opts, false)
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8128", "./idl/mock.thrift", nil, false)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	fmt.Println(string(resp.(*descriptor.HTTPResponse).RawBody))
@@ -420,7 +410,7 @@ func testRegression(t *testing.T) {
 	/// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: dynamicgo
 	var opts []generic.Option
-	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts(), generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.EnableDynamicgoHTTPResp(true))
 	cli := initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8121", "./idl/baseline.thrift", opts, false)
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil)
@@ -429,9 +419,7 @@ func testRegression(t *testing.T) {
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: fallback
-	opts = opts[:0]
-	opts = append(opts, generic.WithDefaultHTTPDynamicgoConvOpts())
-	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8121", "./idl/baseline.thrift", opts, false)
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8121", "./idl/baseline.thrift", nil, false)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil)
 	fgr, ok := resp.(*generic.HTTPResponse)

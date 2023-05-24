@@ -60,22 +60,6 @@ func (o *Options) apply(opts []Option) {
 	}
 }
 
-// WithDefaultJSONDynamicgoConvOpts sets the default conv.Options for json generic call
-func WithDefaultJSONDynamicgoConvOpts() Option {
-	return Option{F: func(opt *Options) {
-		opt.dynamicgoConvOpts = defaultJSONDynamicgoConvOpts
-		opt.isSetdynamicgoConvOpts = true
-	}}
-}
-
-// WithDefaultHTTPDynamicgoConvOpts sets the default conv.Options for http generic call
-func WithDefaultHTTPDynamicgoConvOpts() Option {
-	return Option{F: func(opt *Options) {
-		opt.dynamicgoConvOpts = defaultHTTPDynamicgoConvOpts
-		opt.isSetdynamicgoConvOpts = true
-	}}
-}
-
 // WithCustomDynamicgoConvOpts sets custom conv.Options
 func WithCustomDynamicgoConvOpts(opts *conv.Options) Option {
 	return Option{F: func(opt *Options) {
