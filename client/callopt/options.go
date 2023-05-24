@@ -31,7 +31,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 var callOptionsPool = sync.Pool{
@@ -132,9 +131,7 @@ func WithHTTPHost(host string) Option {
 // client.WithTimeoutProvider is specified.
 func WithRPCTimeout(d time.Duration) Option {
 	return Option{func(o *CallOptions, di *strings.Builder) {
-		di.WriteString("WithRPCTimeout(")
-		utils.WriteInt64ToStringBuilder(di, d.Milliseconds())
-		di.WriteString("ms)")
+		di.WriteString("WithRPCTimeout()")
 
 		o.configs.SetRPCTimeout(d)
 		o.locks.Bits |= rpcinfo.BitRPCTimeout
@@ -148,9 +145,7 @@ func WithRPCTimeout(d time.Duration) Option {
 // WithConnectTimeout specifies the connection timeout for a RPC call.
 func WithConnectTimeout(d time.Duration) Option {
 	return Option{func(o *CallOptions, di *strings.Builder) {
-		di.WriteString("WithConnectTimeout(")
-		utils.WriteInt64ToStringBuilder(di, d.Milliseconds())
-		di.WriteString("ms)")
+		di.WriteString("WithConnectTimeout()")
 
 		o.configs.SetConnectTimeout(d)
 		o.locks.Bits |= rpcinfo.BitConnectTimeout
@@ -218,6 +213,7 @@ func WithFallback(fb *fallback.Policy) Option {
 // This function is for internal purpose only.
 func Apply(cos []Option, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo, locks *client.ConfigLocks, httpResolver http.Resolver) (string, *CallOptions) {
 	var buf strings.Builder
+	buf.Grow(64)
 
 	co := callOptionsPool.Get().(*CallOptions)
 	co.configs = cfg
