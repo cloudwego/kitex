@@ -21,6 +21,7 @@ import (
 
 	"github.com/cloudwego/configmanager/iface"
 	"github.com/cloudwego/configmanager/util"
+
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
