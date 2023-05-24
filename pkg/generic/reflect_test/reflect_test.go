@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2023 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ func TestMain(m *testing.M) {
 	svr := initServer(":9090")
 	cli = initClient("127.0.0.1:9090")
 
-	msvr := initThriftMapServer(":9101", "./idl/example.thrift", new(ExampeServerImpl))
+	msvr := initThriftMapServer(":9101", "./idl/example.thrift", new(exampeServerImpl))
 	mcli = initThriftMapClient("127.0.0.1:9101", "./idl/example.thrift")
 
 	ret := m.Run()
@@ -83,19 +83,19 @@ func testThriftReflectExample_Node(t testing.TB) {
 	log_id := strconv.Itoa(rand.Int())
 
 	// make a request body
-	req, err := MakeExampleReqBinary(true, ReqMsg, log_id)
+	req, err := makeExampleReqBinary(true, reqMsg, log_id)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// wrap request as thrift CALL message
-	buf, err := dt.WrapBinaryBody(req, Method, dt.CALL, 1, 0)
+	buf, err := dt.WrapBinaryBody(req, method, dt.CALL, 1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// generic call
-	out, err := cli.GenericCall(context.Background(), Method, buf, callopt.WithRPCTimeout(1*time.Second))
+	out, err := cli.GenericCall(context.Background(), method, buf, callopt.WithRPCTimeout(1*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,19 +119,19 @@ func testThriftReflectExample_DOM(t testing.TB) {
 	log_id := strconv.Itoa(rand.Int())
 
 	// make a request body
-	req, err := MakeExampleReqBinary(true, ReqMsg, log_id)
+	req, err := makeExampleReqBinary(true, reqMsg, log_id)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// wrap request as thrift CALL message
-	buf, err := dt.WrapBinaryBody(req, Method, dt.CALL, 1, 0)
+	buf, err := dt.WrapBinaryBody(req, method, dt.CALL, 1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// generic call
-	out, err := cli.GenericCall(context.Background(), Method, buf, callopt.WithRPCTimeout(1*time.Second))
+	out, err := cli.GenericCall(context.Background(), method, buf, callopt.WithRPCTimeout(1*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,11 +150,11 @@ func testThriftReflectExample_DOM(t testing.TB) {
 }
 
 var (
-	ExampleReqDesc   *dt.TypeDescriptor
-	ExampleRespDesc  *dt.TypeDescriptor
-	StrDesc          *dt.TypeDescriptor
-	BaseLogidPath    []dg.Path
-	DynamicgoOptions = &dg.Options{}
+	exampleReqDesc   *dt.TypeDescriptor
+	exampleRespDesc  *dt.TypeDescriptor
+	strDesc          *dt.TypeDescriptor
+	baseLogidPath    []dg.Path
+	dynamicgoOptions = &dg.Options{}
 )
 
 func initExampleDescriptor() {
@@ -162,10 +162,10 @@ func initExampleDescriptor() {
 	if err != nil {
 		panic(err)
 	}
-	ExampleReqDesc = sdesc.Functions()["ExampleMethod"].Request().Struct().FieldById(1).Type()
-	ExampleRespDesc = sdesc.Functions()["ExampleMethod"].Response().Struct().FieldById(0).Type()
-	StrDesc = ExampleReqDesc.Struct().FieldById(1).Type()
-	BaseLogidPath = []dg.Path{dg.NewPathFieldName("Base"), dg.NewPathFieldName("LogID")}
+	exampleReqDesc = sdesc.Functions()["ExampleMethod"].Request().Struct().FieldById(1).Type()
+	exampleRespDesc = sdesc.Functions()["ExampleMethod"].Response().Struct().FieldById(0).Type()
+	strDesc = exampleReqDesc.Struct().FieldById(1).Type()
+	baseLogidPath = []dg.Path{dg.NewPathFieldName("Base"), dg.NewPathFieldName("LogID")}
 }
 
 func initServer(addr string) server.Server {
@@ -191,9 +191,9 @@ func initClient(addr string) genericclient.Client {
 	return genericCli
 }
 
-// MakeExampleRespBinary make a Thrift-Binary-Encoding response using ExampleResp DOM
+// makeExampleRespBinary make a Thrift-Binary-Encoding response using ExampleResp DOM
 // Except msg, require_field and logid, which are reset everytime
-func MakeExampleRespBinary(msg, require_field, logid string) ([]byte, error) {
+func makeExampleRespBinary(msg, require_field, logid string) ([]byte, error) {
 	dom := &dg.PathNode{
 		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
 		Next: []dg.PathNode{
@@ -217,12 +217,12 @@ func MakeExampleRespBinary(msg, require_field, logid string) ([]byte, error) {
 			},
 		},
 	}
-	return dom.Marshal(DynamicgoOptions)
+	return dom.Marshal(dynamicgoOptions)
 }
 
-// MakeExampleReqBinary make a Thrift-Binary-Encoding request using ExampleReq DOM
+// makeExampleReqBinary make a Thrift-Binary-Encoding request using ExampleReq DOM
 // Except B, A and logid, which are reset everytime
-func MakeExampleReqBinary(B bool, A, logid string) ([]byte, error) {
+func makeExampleReqBinary(B bool, A, logid string) ([]byte, error) {
 	list := make([]dg.PathNode, SampleListSize+1)
 	list[0] = dg.PathNode{
 		Path: dg.NewPathIndex(0),
@@ -337,13 +337,13 @@ func MakeExampleReqBinary(B bool, A, logid string) ([]byte, error) {
 			},
 		},
 	}
-	return dom.Marshal(DynamicgoOptions)
+	return dom.Marshal(dynamicgoOptions)
 }
 
 const (
-	Method  = "ExampleMethod2"
-	ReqMsg  = "pending"
-	RespMsg = "ok"
+	method  = "ExampleMethod2"
+	reqMsg  = "pending"
+	respMsg = "ok"
 )
 
 // ExampleValueServiceImpl ...
@@ -373,7 +373,7 @@ func (g *ExampleValueServiceImpl) GenericCall(ctx context.Context, method string
 // biz logic
 func exampleServerHandler(request []byte) (resp []byte, err error) {
 	// wrap body as Value
-	req := dg.NewValue(ExampleReqDesc, request)
+	req := dg.NewValue(exampleReqDesc, request)
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +382,7 @@ func exampleServerHandler(request []byte) (resp []byte, err error) {
 	logid := ""
 	// if B == true then get logid and required_field
 	if b, err := req.FieldByName("B").Bool(); err == nil && b {
-		if e := req.GetByPath(BaseLogidPath...); e.Error() != "" {
+		if e := req.GetByPath(baseLogidPath...); e.Error() != "" {
 			return nil, e
 		} else {
 			logid, _ = e.String()
@@ -395,7 +395,7 @@ func exampleServerHandler(request []byte) (resp []byte, err error) {
 	}
 
 	// make response with checked values
-	return MakeExampleRespBinary(RespMsg, required_field, logid)
+	return makeExampleRespBinary(respMsg, required_field, logid)
 }
 
 var clientRespPool = sync.Pool{
@@ -414,14 +414,14 @@ func exampleClientHandler_Node(response []byte, log_id string) error {
 	if err != nil {
 		return err
 	}
-	if msg != RespMsg {
+	if msg != respMsg {
 		return errors.New("msg does not match")
 	}
 	require_field, err := resp.Field(2).String()
 	if err != nil {
 		return err
 	}
-	if require_field != ReqMsg {
+	if require_field != reqMsg {
 		return errors.New("require_field does not match")
 	}
 
@@ -434,29 +434,29 @@ func exampleClientHandler_DOM(response []byte, log_id string) error {
 	root.Node = dg.NewNode(dt.STRUCT, response)
 
 	// load **first layer** children
-	err := root.Load(false, DynamicgoOptions)
+	err := root.Load(false, dynamicgoOptions)
 	if err != nil {
 		return err
 	}
 	// spew.Dump(root) // -- only root.Next is set
 	// check node values by PathNode APIs
-	require_field2, err := root.Field(2, DynamicgoOptions).Node.String()
+	require_field2, err := root.Field(2, dynamicgoOptions).Node.String()
 	if err != nil {
 		return err
 	}
-	if require_field2 != ReqMsg {
+	if require_field2 != reqMsg {
 		return errors.New("require_field2 does not match")
 	}
 
 	// load **all layers** children
-	err = root.Load(true, DynamicgoOptions)
+	err = root.Load(true, dynamicgoOptions)
 	if err != nil {
 		return err
 	}
 
 	// spew.Dump(root) // -- every PathNode.Next will be set if it is a nesting-typed (LIST/SET/MAP/STRUCT)
 	// check node values by PathNode APIs
-	logid, err := root.Field(255, DynamicgoOptions).Field(1, DynamicgoOptions).Node.String()
+	logid, err := root.Field(255, dynamicgoOptions).Field(1, dynamicgoOptions).Node.String()
 	if err != nil {
 		return err
 	}

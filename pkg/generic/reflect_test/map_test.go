@@ -49,19 +49,19 @@ func BenchmarkThriftMapExample(b *testing.B) {
 func testThriftMapExample(t testing.TB) {
 	log_id := strconv.Itoa(rand.Int())
 
-	req := MakeExampleReqMap(true, ReqMsg, log_id)
+	req := makeExampleReqMap(true, reqMsg, log_id)
 
-	out, err := mcli.GenericCall(context.Background(), Method, req, callopt.WithRPCTimeout(100*time.Second))
+	out, err := mcli.GenericCall(context.Background(), method, req, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	resp, ok := out.(map[string]interface{})
 	test.Assert(t, ok)
 
 	msg, ok := resp["Msg"].(string)
-	if !ok || msg != RespMsg {
+	if !ok || msg != respMsg {
 		t.Fail()
 	}
 	require_field, ok := resp["required_field"].(string)
-	if !ok || require_field != ReqMsg {
+	if !ok || require_field != reqMsg {
 		t.Fail()
 	}
 	logid, ok := resp["BaseResp"].(map[string]interface{})["StatusMessage"]
@@ -124,10 +124,10 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 	return svr
 }
 
-type ExampeServerImpl struct{}
+type exampeServerImpl struct{}
 
 // GenericCall ...
-func (g *ExampeServerImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+func (g *exampeServerImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
 	buf := request.(map[string]interface{})
 
 	required_field := ""
@@ -147,10 +147,10 @@ func (g *ExampeServerImpl) GenericCall(ctx context.Context, method string, reque
 		}
 	}
 
-	return MakeExampleRespMap(RespMsg, required_field, logid)
+	return makeExampleRespMap(respMsg, required_field, logid)
 }
 
-func MakeExampleRespMap(msg, require_field, logid string) (map[string]interface{}, error) {
+func makeExampleRespMap(msg, require_field, logid string) (map[string]interface{}, error) {
 	return map[string]interface{}{
 		"Msg":            msg,
 		"required_field": require_field,
@@ -160,7 +160,7 @@ func MakeExampleRespMap(msg, require_field, logid string) (map[string]interface{
 	}, nil
 }
 
-func MakeExampleReqMap(B bool, A, logid string) map[string]interface{} {
+func makeExampleReqMap(B bool, A, logid string) map[string]interface{} {
 	list := make([]interface{}, SampleListSize+1)
 	list[0] = map[string]interface{}{
 		"Bar": A,
