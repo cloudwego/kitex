@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	
+
 	"github.com/cloudwego/configmanager/iface"
 	"github.com/cloudwego/configmanager/util"
 )
