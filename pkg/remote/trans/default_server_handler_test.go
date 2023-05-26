@@ -186,6 +186,8 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 
 	svrHandler, err := NewDefaultSvrTransHandler(opt, ext)
 	test.Assert(t, err == nil)
+	pl := remote.NewTransPipeline(svrHandler)
+	svrHandler.SetPipeline(pl)
 	err = svrHandler.OnRead(ctx, &mocks.Conn{})
 	test.Assert(t, err != nil)
 	test.Assert(t, errors.Is(err, mockErr))
