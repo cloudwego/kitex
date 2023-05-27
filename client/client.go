@@ -301,12 +301,16 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) 
 	return
 }
 
-// initRPCInfo initializes the RPCInfo structure and attaches it to context.
-func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+type initRpcInfoVar struct {
+	opt     *client.Options
+	svcInfo *serviceinfo.ServiceInfo
+}
+
+func initRpcInfo(ctx context.Context, method string, kc initRpcInfoVar) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
 	cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
 	rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, method)
 	var callOpts *callopt.CallOptions
-	ctx, callOpts = kc.applyCallOptions(ctx, cfg, rmt)
+	ctx, callOpts = applyCallOptions(ctx, cfg, rmt, kc.opt)
 	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 	if kc.opt.StatsLevel != nil {
 		rpcStats.SetLevel(*kc.opt.StatsLevel)
@@ -342,14 +346,20 @@ func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Cont
 	return ctx, ri, callOpts
 }
 
-func (kc *kClient) applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo) (context.Context, *callopt.CallOptions) {
+// initRPCInfo initializes the RPCInfo structure and attaches it to context.
+func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+	iriv := initRpcInfoVar{svcInfo: kc.svcInfo, opt: kc.opt}
+	return initRpcInfo(ctx, method, iriv)
+}
+
+func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo, opt *client.Options) (context.Context, *callopt.CallOptions) {
 	cos := CallOptionsFromCtx(ctx)
 	if len(cos) > 0 {
-		info, callOpts := callopt.Apply(cos, cfg, svr, kc.opt.Locks, kc.opt.HTTPResolver)
+		info, callOpts := callopt.Apply(cos, cfg, svr, opt.Locks, opt.HTTPResolver)
 		ctx = context.WithValue(ctx, ctxCallOptionInfoKey, info)
 		return ctx, callOpts
 	}
-	kc.opt.Locks.ApplyLocks(cfg, svr)
+	opt.Locks.ApplyLocks(cfg, svr)
 	return ctx, nil
 }
 
@@ -580,7 +590,7 @@ func (kc *kClient) warmingUp() error {
 		// build a default destination for the resolver
 		cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
 		rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, "*")
-		ctx, _ = kc.applyCallOptions(ctx, cfg, rmt)
+		ctx, _ = applyCallOptions(ctx, cfg, rmt, kc.opt)
 		dests = append(dests, rmt.ImmutableView())
 	}
 

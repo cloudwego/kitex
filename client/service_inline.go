@@ -28,11 +28,9 @@ import (
 	"github.com/cloudwego/kitex/internal/client"
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/stats"
-	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -129,54 +127,8 @@ func (kc *serviceInlineClient) initMiddlewares(ctx context.Context) {
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
 func (kc *serviceInlineClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
-	rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, method)
-	var callOpts *callopt.CallOptions
-	ctx, callOpts = kc.applyCallOptions(ctx, cfg, rmt)
-	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
-	if kc.opt.StatsLevel != nil {
-		rpcStats.SetLevel(*kc.opt.StatsLevel)
-	}
-
-	mi := kc.svcInfo.MethodInfo(method)
-	if mi != nil && mi.OneWay() {
-		cfg.SetInteractionMode(rpcinfo.Oneway)
-	}
-
-	// Export read-only views to external users.
-	ri := rpcinfo.NewRPCInfo(
-		rpcinfo.FromBasicInfo(kc.opt.Cli),
-		rmt.ImmutableView(),
-		rpcinfo.NewInvocation(kc.svcInfo.ServiceName, method, kc.svcInfo.GetPackageName()),
-		cfg.ImmutableView(),
-		rpcStats.ImmutableView(),
-	)
-
-	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
-		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
-	}
-
-	if p := kc.opt.Timeouts; p != nil {
-		if c := p.Timeouts(ri); c != nil {
-			_ = cfg.SetRPCTimeout(c.RPCTimeout())
-			_ = cfg.SetConnectTimeout(c.ConnectTimeout())
-			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
-		}
-	}
-
-	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	return ctx, ri, callOpts
-}
-
-func (kc *serviceInlineClient) applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo) (context.Context, *callopt.CallOptions) {
-	cos := CallOptionsFromCtx(ctx)
-	if len(cos) > 0 {
-		info, callOpts := callopt.Apply(cos, cfg, svr, kc.opt.Locks, kc.opt.HTTPResolver)
-		ctx = context.WithValue(ctx, ctxCallOptionInfoKey, info)
-		return ctx, callOpts
-	}
-	kc.opt.Locks.ApplyLocks(cfg, svr)
-	return ctx, nil
+	iriv := initRpcInfoVar{svcInfo: kc.svcInfo, opt: kc.opt}
+	return initRpcInfo(ctx, method, iriv)
 }
 
 // Call implements the Client interface .
