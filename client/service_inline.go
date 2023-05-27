@@ -29,7 +29,6 @@ import (
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/consts"
-	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -207,12 +206,13 @@ func (kc *serviceInlineClient) Call(ctx context.Context, method string, request,
 }
 
 func (kc *serviceInlineClient) initDebugService() {
-	if ds := kc.opt.DebugService; ds != nil {
-		ds.RegisterProbeFunc(diagnosis.DestServiceKey, diagnosis.WrapAsProbeFunc(kc.opt.Svr.ServiceName))
-		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(kc.opt.DebugInfo))
-		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, kc.opt.Events.Dump)
-		ds.RegisterProbeFunc(diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(kc.svcInfo))
+	cdi := clientDebugInfo{
+		serviceName: kc.opt.Svr.ServiceName,
+		debugInfo:   kc.opt.DebugInfo,
+		evt:         kc.opt.Events,
+		svcInfo:     kc.svcInfo,
 	}
+	initDebugService(kc.opt.DebugService, cdi)
 }
 
 func (kc *serviceInlineClient) richRemoteOption() {
