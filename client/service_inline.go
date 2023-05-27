@@ -152,7 +152,9 @@ func (kc *serviceInlineClient) Call(ctx context.Context, method string, request,
 
 	kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 	callOpts.Recycle()
-
+	if err == nil {
+		err = ri.Invocation().BizStatusErr()
+	}
 	rpcinfo.PutRPCInfo(ri)
 	return err
 }
