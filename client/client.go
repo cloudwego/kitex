@@ -381,8 +381,8 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		callOpts.Recycle()
 	}()
 
-	callOptRetry, callOptFallback := initRetryAndFallbackWithCallopts(callOpts)
-	if kc.opt.RetryContainer == nil && callOptRetry.Enable {
+	callOptRetry := initRetryAndFallbackWithCallopts(callOpts)
+	if kc.opt.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
 		// setup retry in callopt
 		kc.opt.RetryContainer = retry.NewRetryContainer()
 	}
@@ -398,7 +398,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}
 
 	// do fallback if with setup
-	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, callOptFallback, kc.opt.Fallback)
+	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, kc.opt.Fallback, callOpts)
 	return err
 }
 
@@ -409,18 +409,17 @@ func (kc *kClient) rpcCallWithRetry(ri rpcinfo.RPCInfo, method string, request, 
 	var prevRI atomic.Value
 	return func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
-		retryCtx := ctx
 		cRI := ri
 		if currCallTimes > 1 {
-			retryCtx, cRI, _ = kc.initRPCInfo(ctx, method)
-			retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
+			ctx, cRI, _ = kc.initRPCInfo(ctx, method)
+			ctx = metainfo.WithPersistentValue(ctx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
 			if prevRI.Load() == nil {
 				prevRI.Store(ri)
 			}
-			r.Prepare(retryCtx, prevRI.Load().(rpcinfo.RPCInfo), cRI)
+			r.Prepare(ctx, prevRI.Load().(rpcinfo.RPCInfo), cRI)
 			prevRI.Store(cRI)
 		}
-		callErr := kc.eps(retryCtx, request, response)
+		callErr := kc.eps(ctx, request, response)
 		return cRI, response, callErr
 	}
 }
@@ -655,18 +654,17 @@ func (kc *kClient) validateForCall(ctx context.Context) {
 	}
 }
 
-func initRetryAndFallbackWithCallopts(callOpts *callopt.CallOptions) (callOptRetry retry.Policy, callOptFallback *fallback.Policy) {
+func initRetryAndFallbackWithCallopts(callOpts *callopt.CallOptions) (callOptRetry *retry.Policy) {
 	if callOpts != nil {
-		callOptFallback = callOpts.Fallback
 		if callOpts.RetryPolicy.Enable {
-			callOptRetry = callOpts.RetryPolicy
+			callOptRetry = &callOpts.RetryPolicy
 		}
 	}
 	return
 }
 
-func doFallbackIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, request, response interface{}, oriErr error, callOptFallback, cliFallback *fallback.Policy) (err, reportErr error) {
-	fallback, hasFallback := getFallbackPolicy(callOptFallback, cliFallback)
+func doFallbackIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, request, response interface{}, oriErr error, cliFallback *fallback.Policy, callOpts *callopt.CallOptions) (err, reportErr error) {
+	fallback, hasFallback := getFallbackPolicy(cliFallback, callOpts)
 	err = oriErr
 	reportErr = oriErr
 	var fbErr error
@@ -687,7 +685,11 @@ func doFallbackIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, request, respon
 }
 
 // return fallback policy from call option and client option.
-func getFallbackPolicy(callOptFB, cliOptFB *fallback.Policy) (fb *fallback.Policy, hasFallback bool) {
+func getFallbackPolicy(cliOptFB *fallback.Policy, callOpts *callopt.CallOptions) (fb *fallback.Policy, hasFallback bool) {
+	var callOptFB *fallback.Policy
+	if callOpts != nil {
+		callOptFB = callOpts.Fallback
+	}
 	if callOptFB != nil {
 		return callOptFB, true
 	}
