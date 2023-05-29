@@ -18,6 +18,7 @@ package generator
 import (
 	"fmt"
 	"go/token"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -350,7 +351,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		fs = append(fs, f)
 	}
 
-	handlerFilePath := util.JoinPath(g.OutputPath, HandlerFileName)
+	handlerFilePath := filepath.Join(g.OutputPath, HandlerFileName)
 	if util.Exists(handlerFilePath) {
 		comp := newCompleter(
 			pkg.ServiceInfo.AllMethods(),
