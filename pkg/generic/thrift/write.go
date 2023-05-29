@@ -262,18 +262,20 @@ func wrapStructWriter(ctx context.Context, val interface{}, out thrift.TProtocol
 			// generic handler just return error
 			continue
 		}
-		if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
-			return err
-		}
-		writer, err := nextWriter(val, field.Type, opt)
-		if err != nil {
-			return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
-		}
-		if err := writer(ctx, val, out, field.Type, opt); err != nil {
-			return fmt.Errorf("writer of field[%s] error %w", name, err)
-		}
-		if err := out.WriteFieldEnd(); err != nil {
-			return err
+		if val != nil {
+			if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
+				return err
+			}
+			writer, err := nextWriter(val, field.Type, opt)
+			if err != nil {
+				return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
+			}
+			if err := writer(ctx, val, out, field.Type, opt); err != nil {
+				return fmt.Errorf("writer of field[%s] error %w", name, err)
+			}
+			if err := out.WriteFieldEnd(); err != nil {
+				return err
+			}
 		}
 	}
 	if err := out.WriteFieldStop(); err != nil {
