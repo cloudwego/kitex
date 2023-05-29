@@ -257,6 +257,7 @@ func CombineOutputPath(outputPath, ns string) string {
 	return outputPath
 }
 
+// JoinPath joins dirs as golang import format, such as xx/xx/xx
 func JoinPath(elem ...string) string {
 	if runtime.GOOS == "windows" {
 		return strings.ReplaceAll(filepath.Join(elem...), "\\", "/")
