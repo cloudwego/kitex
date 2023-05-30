@@ -100,7 +100,6 @@ func (ts *transServer) BootstrapServer(ln net.Listener) (err error) {
 				ts.refreshDeadline(rpcinfo.GetRPCInfo(ctx), bc)
 				err := ts.transHdlr.OnRead(ctx, bc)
 				if err != nil {
-					klog.CtxErrorf(ctx, "KITEX: OnRead Error: %s\n", err.Error())
 					ts.onError(ctx, err, bc)
 					_ = bc.Close()
 					return
