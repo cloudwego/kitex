@@ -381,7 +381,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 		callOpts.Recycle()
 	}()
 
-	callOptRetry := initRetryAndFallbackWithCallopts(callOpts)
+	callOptRetry := getCalloptRetryPolicy(callOpts)
 	if kc.opt.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
 		// setup retry in callopt
 		kc.opt.RetryContainer = retry.NewRetryContainer()
@@ -654,7 +654,7 @@ func (kc *kClient) validateForCall(ctx context.Context) {
 	}
 }
 
-func initRetryAndFallbackWithCallopts(callOpts *callopt.CallOptions) (callOptRetry *retry.Policy) {
+func getCalloptRetryPolicy(callOpts *callopt.CallOptions) (callOptRetry *retry.Policy) {
 	if callOpts != nil {
 		if callOpts.RetryPolicy.Enable {
 			callOptRetry = &callOpts.RetryPolicy
