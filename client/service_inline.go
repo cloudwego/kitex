@@ -96,7 +96,6 @@ func (kc *serviceInlineClient) init() (err error) {
 	}
 	ctx := kc.initContext()
 	kc.initMiddlewares(ctx)
-	kc.initDebugService()
 	kc.richRemoteOption()
 	if err = kc.buildInvokeChain(); err != nil {
 		return err
@@ -127,46 +126,34 @@ func (kc *serviceInlineClient) initMiddlewares(ctx context.Context) {
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
 func (kc *serviceInlineClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	iriv := initRpcInfoVar{svcInfo: kc.svcInfo, opt: kc.opt}
-	return initRpcInfo(ctx, method, iriv)
+	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo)
 }
 
 // Call implements the Client interface .
-func (kc *serviceInlineClient) Call(ctx context.Context, method string, request, response interface{}) error {
-	if !kc.inited {
-		panic("client not initialized")
-	}
-	if kc.closed {
-		panic("client is already closed")
-	}
-	if ctx == nil {
-		panic("ctx is nil")
-	}
+func (kc *serviceInlineClient) Call(ctx context.Context, method string, request, response interface{}) (err error) {
+	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
 	ctx, ri, callOpts = kc.initRPCInfo(ctx, method)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
+	var reportErr error
+	defer func() {
+		if panicInfo := recover(); panicInfo != nil {
+			reportErr = stats.ClientPanicToErr(ctx, panicInfo, ri, false)
+		}
+		kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
+		rpcinfo.PutRPCInfo(ri)
+		callOpts.Recycle()
+	}()
+	reportErr = kc.eps(ctx, request, response)
 
-	err := kc.eps(ctx, request, response)
-
-	kc.opt.TracerCtl.DoFinish(ctx, ri, err)
-	callOpts.Recycle()
-	if err == nil {
+	if reportErr == nil {
 		err = ri.Invocation().BizStatusErr()
+	} else {
+		err = reportErr
 	}
-	rpcinfo.PutRPCInfo(ri)
 	return err
-}
-
-func (kc *serviceInlineClient) initDebugService() {
-	cdi := clientDebugInfo{
-		serviceName: kc.opt.Svr.ServiceName,
-		debugInfo:   kc.opt.DebugInfo,
-		evt:         kc.opt.Events,
-		svcInfo:     kc.svcInfo,
-	}
-	initDebugService(kc.opt.DebugService, cdi)
 }
 
 func (kc *serviceInlineClient) richRemoteOption() {
@@ -197,7 +184,7 @@ func (kc *serviceInlineClient) constructServerCtxWithMetadata(cliCtx context.Con
 	return serverCtx
 }
 
-func (kc *serviceInlineClient) constructServerRpcInfo(svrCtx, cliCtx context.Context) (newServerCtx context.Context, svrRpcInfo rpcinfo.RPCInfo) {
+func (kc *serviceInlineClient) constructServerRPCInfo(svrCtx, cliCtx context.Context) (newServerCtx context.Context, svrRPCInfo rpcinfo.RPCInfo) {
 	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 	if kc.serverOpt.StatsLevel != nil {
 		rpcStats.SetLevel(*kc.serverOpt.StatsLevel)
@@ -239,13 +226,13 @@ func (kc *serviceInlineClient) invokeHandleEndpoint() (endpoint.Endpoint, error)
 				metainfo.SetBackwardValuesFromMap(ctx, kvs)
 			}
 		}()
-		serverCtx, svrRpcinfo := kc.constructServerRpcInfo(serverCtx, ctx)
+		serverCtx, svrRPCInfo := kc.constructServerRPCInfo(serverCtx, ctx)
 		defer func() {
-			rpcinfo.PutRPCInfo(svrRpcinfo)
+			rpcinfo.PutRPCInfo(svrRPCInfo)
 		}()
 
 		// server trace
-		serverCtx = svrTraceCtl.DoStart(serverCtx, svrRpcinfo)
+		serverCtx = svrTraceCtl.DoStart(serverCtx, svrRPCInfo)
 
 		if kc.contextServiceInlineHandler != nil {
 			serverCtx, err = kc.contextServiceInlineHandler.WriteMeta(ctx, serverCtx, req)
@@ -258,7 +245,7 @@ func (kc *serviceInlineClient) invokeHandleEndpoint() (endpoint.Endpoint, error)
 		err = kc.serverEps(serverCtx, req, resp)
 		// finish server trace
 		// contextServiceInlineHandler may convert nil err to non nil err, so handle trace here
-		svrTraceCtl.DoFinish(serverCtx, svrRpcinfo, err)
+		svrTraceCtl.DoFinish(serverCtx, svrRPCInfo, err)
 
 		if kc.contextServiceInlineHandler != nil {
 			var err1 error

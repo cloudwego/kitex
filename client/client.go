@@ -301,55 +301,9 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) 
 	return
 }
 
-type initRpcInfoVar struct {
-	opt     *client.Options
-	svcInfo *serviceinfo.ServiceInfo
-}
-
-func initRpcInfo(ctx context.Context, method string, kc initRpcInfoVar) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
-	rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, method)
-	var callOpts *callopt.CallOptions
-	ctx, callOpts = applyCallOptions(ctx, cfg, rmt, kc.opt)
-	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
-	if kc.opt.StatsLevel != nil {
-		rpcStats.SetLevel(*kc.opt.StatsLevel)
-	}
-
-	mi := kc.svcInfo.MethodInfo(method)
-	if mi != nil && mi.OneWay() {
-		cfg.SetInteractionMode(rpcinfo.Oneway)
-	}
-
-	// Export read-only views to external users.
-	ri := rpcinfo.NewRPCInfo(
-		rpcinfo.FromBasicInfo(kc.opt.Cli),
-		rmt.ImmutableView(),
-		rpcinfo.NewInvocation(kc.svcInfo.ServiceName, method, kc.svcInfo.GetPackageName()),
-		cfg.ImmutableView(),
-		rpcStats.ImmutableView(),
-	)
-
-	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
-		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
-	}
-
-	if p := kc.opt.Timeouts; p != nil {
-		if c := p.Timeouts(ri); c != nil {
-			_ = cfg.SetRPCTimeout(c.RPCTimeout())
-			_ = cfg.SetConnectTimeout(c.ConnectTimeout())
-			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
-		}
-	}
-
-	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	return ctx, ri, callOpts
-}
-
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
 func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	iriv := initRpcInfoVar{svcInfo: kc.svcInfo, opt: kc.opt}
-	return initRpcInfo(ctx, method, iriv)
+	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo)
 }
 
 func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo, opt *client.Options) (context.Context, *callopt.CallOptions) {
@@ -365,7 +319,7 @@ func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr rem
 
 // Call implements the Client interface .
 func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) (err error) {
-	kc.validateForCall(ctx)
+	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
 	ctx, ri, callOpts = kc.initRPCInfo(ctx, method)
@@ -652,11 +606,11 @@ func (kc *kClient) warmingUp() error {
 	return nil
 }
 
-func (kc *kClient) validateForCall(ctx context.Context) {
-	if !kc.inited {
+func validateForCall(ctx context.Context, inited, closed bool) {
+	if !inited {
 		panic("client not initialized")
 	}
-	if kc.closed {
+	if closed {
 		panic("client is already closed")
 	}
 	if ctx == nil {
@@ -707,4 +661,44 @@ func getFallbackPolicy(cliOptFB *fallback.Policy, callOpts *callopt.CallOptions)
 		return cliOptFB, true
 	}
 	return nil, false
+}
+
+func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+	cfg := rpcinfo.AsMutableRPCConfig(opt.Configs).Clone()
+	rmt := remoteinfo.NewRemoteInfo(opt.Svr, method)
+	var callOpts *callopt.CallOptions
+	ctx, callOpts = applyCallOptions(ctx, cfg, rmt, opt)
+	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
+	if opt.StatsLevel != nil {
+		rpcStats.SetLevel(*opt.StatsLevel)
+	}
+
+	mi := svcInfo.MethodInfo(method)
+	if mi != nil && mi.OneWay() {
+		cfg.SetInteractionMode(rpcinfo.Oneway)
+	}
+
+	// Export read-only views to external users.
+	ri := rpcinfo.NewRPCInfo(
+		rpcinfo.FromBasicInfo(opt.Cli),
+		rmt.ImmutableView(),
+		rpcinfo.NewInvocation(svcInfo.ServiceName, method, svcInfo.GetPackageName()),
+		cfg.ImmutableView(),
+		rpcStats.ImmutableView(),
+	)
+
+	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
+		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
+	}
+
+	if p := opt.Timeouts; p != nil {
+		if c := p.Timeouts(ri); c != nil {
+			_ = cfg.SetRPCTimeout(c.RPCTimeout())
+			_ = cfg.SetConnectTimeout(c.ConnectTimeout())
+			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
+		}
+	}
+
+	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+	return ctx, ri, callOpts
 }
