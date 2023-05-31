@@ -18,7 +18,10 @@ package stats
 
 import (
 	"context"
+	"fmt"
+	"runtime/debug"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
@@ -41,4 +44,16 @@ func CalcEventCostUs(start, end rpcinfo.Event) uint64 {
 		return 0
 	}
 	return uint64(end.Time().Sub(start.Time()).Microseconds())
+}
+
+// ClientPanicToErr to transform the panic info to error, and output the error if needed.
+func ClientPanicToErr(ctx context.Context, panicInfo interface{}, ri rpcinfo.RPCInfo, logErr bool) error {
+	e := fmt.Errorf("KITEX: client panic, to_service=%s to_method=%s error=%v\nstack=%s",
+		ri.To().ServiceName(), ri.To().Method(), panicInfo, debug.Stack())
+	rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
+	rpcStats.SetPanicked(e)
+	if logErr {
+		klog.CtxErrorf(ctx, "%s", e.Error())
+	}
+	return e
 }

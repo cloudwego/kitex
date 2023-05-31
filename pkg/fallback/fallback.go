@@ -119,7 +119,8 @@ func (p *Policy) DoIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, args, resul
 	fbErr = p.fallbackFunc(ctx, ka, kr, err)
 
 	if fbErr == nil && reflect.ValueOf(kr.GetResult()).IsNil() {
-		klog.Warn("KITEX: both fallback resp and error are nil, return original err")
+		klog.Warnf("KITEX: both fallback resp and error are nil, return original err=%v, to_service=%s to_method=%s",
+			err, ri.To().ServiceName(), ri.To().Method())
 		return err, false
 	}
 	return fbErr, reportAsFallback
