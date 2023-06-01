@@ -185,10 +185,7 @@ type jsonThriftGeneric struct {
 }
 
 func (g *jsonThriftGeneric) Framed() bool {
-	if g.codec.dynamicgoEnabled {
-		return true
-	}
-	return false
+	return g.codec.dynamicgoEnabled
 }
 
 func (g *jsonThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
@@ -212,10 +209,7 @@ type httpThriftGeneric struct {
 }
 
 func (g *httpThriftGeneric) Framed() bool {
-	if g.codec.dynamicgoEnabled {
-		return true
-	}
-	return false
+	return g.codec.dynamicgoEnabled
 }
 
 func (g *httpThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {

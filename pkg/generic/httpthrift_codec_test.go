@@ -158,16 +158,6 @@ func initHttpRecvMsg() remote.Message {
 	return msg
 }
 
-func initDynamicgoHttpRecvMsg(tp transport.Protocol) remote.Message {
-	req := &Result{}
-	ink := rpcinfo.NewInvocation("", "BinaryEcho")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
-	svcInfo := mocks.ServiceInfo()
-	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
-	return msg
-}
-
 func getStdHttpRequest() *http.Request {
 	body := map[string]interface{}{
 		"msg":        []byte("hello"),
