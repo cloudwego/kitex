@@ -21,6 +21,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/dynamicgo/conv"
+	"github.com/cloudwego/dynamicgo/conv/j2t"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 
@@ -33,9 +34,12 @@ import (
 
 // WriteHTTPRequest implement of MessageWriter
 type WriteHTTPRequest struct {
-	svc    *descriptor.ServiceDescriptor
-	dyOpts *conv.Options
-	method string
+	svc              *descriptor.ServiceDescriptor
+	binaryWithBase64 bool
+	dyOpts           *conv.Options
+	method           string
+	dynamicgoEnabled bool
+	cv               j2t.BinaryConv
 }
 
 var _ MessageWriter = (*WriteHTTPRequest)(nil)
@@ -43,15 +47,50 @@ var _ MessageWriter = (*WriteHTTPRequest)(nil)
 // NewWriteHTTPRequest ...
 // Base64 decoding for binary is enabled by default.
 func NewWriteHTTPRequest(svc *descriptor.ServiceDescriptor) *WriteHTTPRequest {
-	return &WriteHTTPRequest{svc, &conv.Options{}, ""}
+	return &WriteHTTPRequest{svc: svc, binaryWithBase64: true, dynamicgoEnabled: false}
+}
+
+// SetBinaryWithBase64 enable/disable Base64 decoding for binary.
+// Note that this method is not concurrent-safe.
+func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
+	w.binaryWithBase64 = enable
+}
+
+// SetDynamicGo ...
+func (w *WriteHTTPRequest) SetDynamicGo(opts *conv.Options, method string) {
+	w.dyOpts = opts
+	w.method = method
+	w.dynamicgoEnabled = true
+	w.cv = j2t.NewBinaryConv(*w.dyOpts)
+}
+
+// originalWrite ...
+func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+	req := msg.(*descriptor.HTTPRequest)
+	if req.Body == nil && len(req.RawBody) != 0 {
+		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {
+			return err
+		}
+	}
+	fn, err := w.svc.Router.Lookup(req)
+	if err != nil {
+		return err
+	}
+	if !fn.HasRequestBase {
+		requestBase = nil
+	}
+	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
 }
 
 // ReadHTTPResponse implement of MessageReaderWithMethod
 type ReadHTTPResponse struct {
-	svc             *descriptor.ServiceDescriptor
-	enableDynamicgo bool
-	dyOpts          *conv.Options
-	msg             remote.Message
+	svc              *descriptor.ServiceDescriptor
+	base64Binary     bool
+	dyOpts           *conv.Options
+	msg              remote.Message
+	dynamicgoEnabled bool
+	fallback         bool
+	cv               t2j.BinaryConv
 }
 
 var _ MessageReader = (*ReadHTTPResponse)(nil)
@@ -59,34 +98,54 @@ var _ MessageReader = (*ReadHTTPResponse)(nil)
 // NewReadHTTPResponse ...
 // Base64 encoding for binary is enabled by default.
 func NewReadHTTPResponse(svc *descriptor.ServiceDescriptor) *ReadHTTPResponse {
-	return &ReadHTTPResponse{svc, false, &conv.Options{}, nil}
+	return &ReadHTTPResponse{svc: svc, base64Binary: true, dynamicgoEnabled: false, fallback: false}
 }
 
-// SetReadHTTPResponse ...
-func (r *ReadHTTPResponse) SetReadHTTPResponse(enable bool, opts *conv.Options, msg remote.Message) error {
-	r.enableDynamicgo = enable
+// SetBase64Binary enable/disable Base64 encoding for binary.
+// Note that this method is not concurrent-safe.
+func (r *ReadHTTPResponse) SetBase64Binary(enable bool) {
+	r.base64Binary = enable
+}
+
+func (r *ReadHTTPResponse) SetFallback(fallback bool) {
+	r.fallback = fallback
+}
+
+// SetDynamicGo ...
+func (r *ReadHTTPResponse) SetDynamicGo(opts *conv.Options, msg remote.Message) {
 	r.dyOpts = opts
 	r.msg = msg
-	if r.enableDynamicgo && r.msg.PayloadLen() != 0 && r.svc.DynamicgoDsc == nil {
-		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
-	}
-	return nil
+	r.dynamicgoEnabled = true
+	r.cv = t2j.NewBinaryConv(*r.dyOpts)
 }
 
 // Read ...
 func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
-	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
 	// fallback logic
-	if !r.enableDynamicgo || r.msg.PayloadLen() == 0 {
+	if !r.dynamicgoEnabled {
 		fnDsc, err := r.svc.LookupFunctionByMethod(method)
 		if err != nil {
 			return nil, err
 		}
 		fDsc := fnDsc.Response
-		return skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: !r.dyOpts.NoBase64Binary})
+		resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
+		if r.fallback {
+			if httpResp, ok := resp.(*descriptor.HTTPResponse); ok && httpResp.Body != nil {
+				rawBody, err := customJson.Marshal(httpResp)
+				if err != nil {
+					return nil, err
+				}
+				httpResp.RawBody = rawBody
+			}
+		}
+		return resp, err
 	}
 
 	// dynamicgo logic
+	if r.msg.PayloadLen() == 0 {
+		return nil, perrors.NewProtocolErrorWithMsg("msg.PayloadLen should always be greater than zero")
+	}
+
 	tProt, ok := in.(*cthrift.BinaryProtocol)
 	if !ok {
 		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
@@ -114,13 +173,12 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 	buf := make([]byte, 0, len(transBuf)*2)
 	resp := descriptor.NewHTTPResponse()
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, resp)
-	cv := t2j.NewBinaryConv(*r.dyOpts)
 
 	for _, field := range tyDsc.Struct().Fields() {
 		if fid == field.ID() {
 			// decode with dynamicgo
 			// thrift []byte to json []byte
-			if err = cv.DoInto(ctx, field.Type(), transBuf, &buf); err != nil {
+			if err = r.cv.DoInto(ctx, field.Type(), transBuf, &buf); err != nil {
 				return nil, err
 			}
 			break

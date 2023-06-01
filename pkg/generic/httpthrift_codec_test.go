@@ -24,7 +24,6 @@ import (
 	"testing"
 
 	"github.com/bytedance/sonic"
-	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
@@ -49,11 +48,13 @@ func TestFromHTTPRequest(t *testing.T) {
 }
 
 func TestHttpThriftCodec(t *testing.T) {
+	// without dynamicgo
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option
 	htc, err := newHTTPThriftCodec(p, thriftCodec, NewOptions(opts))
 	test.Assert(t, err == nil)
+	test.Assert(t, !htc.dynamicgoEnabled)
 	defer htc.Close()
 	test.Assert(t, htc.Name() == "HttpThrift")
 
@@ -66,7 +67,7 @@ func TestHttpThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
 
 	ctx := context.Background()
-	sendMsg := initHttpSendMsg(transport.TTHeader)
+	sendMsg := initHttpSendMsg()
 
 	// Marshal side
 	out := remote.NewWriterBuffer(256)
@@ -83,39 +84,28 @@ func TestHttpThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil)
 }
 
-func TestHttpThriftDynamicgoCodec(t *testing.T) {
-	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
+func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
+	// with dynamicgo
+	p, err := NewThriftFileProviderWithDynamicGo("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option
-	opts = append(opts, WithCustomDynamicgoConvOpts(&conv.Options{EnableValueMapping: true}), EnableDynamicgoHTTPResp(true))
+	opts = append(opts, EnableDynamicgoHTTPResp(true))
 	htc, err := newHTTPThriftCodec(p, thriftCodec, NewOptions(opts))
 	test.Assert(t, err == nil)
+	test.Assert(t, htc.dynamicgoEnabled)
 	defer htc.Close()
 	test.Assert(t, htc.Name() == "HttpThrift")
 
-	url := "http://example.com/BinaryEcho"
-	// []byte value for binary field
-	body := map[string]interface{}{
-		"msg":        []byte("hello"),
-		"got_base64": true,
-		"num":        0,
-	}
-	data, err := customJson.Marshal(body)
-	test.Assert(t, err == nil)
-	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
-	test.Assert(t, err == nil)
-	customReq, err := FromHTTPRequest(req)
-	test.Assert(t, err == nil)
-
+	req := &HTTPRequest{Request: getStdHttpRequest()}
 	// wrong
 	method, err := htc.getMethod("test")
 	test.Assert(t, err.Error() == "req is invalid, need descriptor.HTTPRequest" && method == nil)
 	// right
-	method, err = htc.getMethod(customReq)
+	method, err = htc.getMethod(req)
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
 
 	ctx := context.Background()
-	sendMsg := initHttpSendMsg(transport.TTHeader)
+	sendMsg := initHttpSendMsg()
 
 	// Marshal side
 	out := remote.NewWriterBuffer(256)
@@ -123,31 +113,16 @@ func TestHttpThriftDynamicgoCodec(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	// Unmarshal side
-	recvMsg := initDynamicgoHttpRecvMsg(transport.TTHeader)
+	recvMsg := initHttpRecvMsg()
 	buf, err := out.Bytes()
 	test.Assert(t, err == nil)
 	recvMsg.SetPayloadLen(len(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = htc.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil)
-
-	sendMsg = initHttpSendMsg(transport.PurePayload)
-
-	// Marshal side
-	out = remote.NewWriterBuffer(256)
-	err = htc.Marshal(ctx, sendMsg, out)
-	test.Assert(t, err == nil)
-
-	// Unmarshal side
-	recvMsg = initDynamicgoHttpRecvMsg(transport.PurePayload)
-	buf, err = out.Bytes()
-	test.Assert(t, err == nil)
-	in = remote.NewReaderBuffer(buf)
-	err = htc.Unmarshal(ctx, recvMsg, in)
-	test.Assert(t, err == nil)
 }
 
-func initHttpSendMsg(tp transport.Protocol) remote.Message {
+func initHttpSendMsg() remote.Message {
 	stdReq := getStdHttpRequest()
 	b, err := stdReq.GetBody()
 	if err != nil {
@@ -168,7 +143,7 @@ func initHttpSendMsg(tp transport.Protocol) remote.Message {
 	ink := rpcinfo.NewInvocation("", "BinaryEcho")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
+	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, svcInfo.PayloadCodec))
 	return msg
 }
 

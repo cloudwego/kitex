@@ -185,7 +185,7 @@ type jsonThriftGeneric struct {
 }
 
 func (g *jsonThriftGeneric) Framed() bool {
-	if dp, ok := g.codec.provider.(GetProviderOption); ok && dp.Option().DynamicGoExpected {
+	if g.codec.dynamicgoEnabled {
 		return true
 	}
 	return false
@@ -212,7 +212,7 @@ type httpThriftGeneric struct {
 }
 
 func (g *httpThriftGeneric) Framed() bool {
-	if dp, ok := g.codec.provider.(GetProviderOption); ok && dp.Option().DynamicGoExpected {
+	if g.codec.dynamicgoEnabled {
 		return true
 	}
 	return false

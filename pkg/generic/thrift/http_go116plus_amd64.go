@@ -25,25 +25,19 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
-	"github.com/cloudwego/dynamicgo/conv/j2t"
-
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
 
-// SetWriteHTTPRequest ...
-func (w *WriteHTTPRequest) SetWriteHTTPRequest(opts *conv.Options, method string) error {
-	w.dyOpts = opts
-	w.method = method
-	if w.svc.DynamicgoDsc == nil {
-		return perrors.NewProtocolErrorWithMsg("svcDsc.DynamicgoDsc is nil")
-	}
-	return nil
-}
-
 // Write ...
 func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+	// fallback logic
+	if !w.dynamicgoEnabled {
+		return w.originalWrite(ctx, out, msg, requestBase)
+	}
+
+	// dynamicgo logic
 	req := msg.(*descriptor.HTTPRequest)
 
 	fn := w.svc.DynamicgoDsc.Functions()[w.method]
@@ -58,7 +52,6 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 	body := req.GetBody()
 
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
-	cv := j2t.NewBinaryConv(*w.dyOpts)
 
 	tProt, ok := out.(*cthrift.BinaryProtocol)
 	if !ok {
@@ -77,7 +70,7 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		}
 
 		// json []byte to thrift []byte
-		if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
+		if err := w.cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
 			return err
 		}
 

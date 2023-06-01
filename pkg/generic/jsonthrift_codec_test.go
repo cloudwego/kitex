@@ -28,7 +28,7 @@ import (
 )
 
 func TestJsonThriftCodec(t *testing.T) {
-	// json generic call without dynamicgo
+	// without dynamicgo
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option
@@ -60,8 +60,8 @@ func TestJsonThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
-func TestJsonThriftCodecWithDynamicgo(t *testing.T) {
-	// json generic call with dynamicgo
+func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
+	// with dynamicgo
 	p, err := NewThriftFileProviderWithDynamicGo("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option
@@ -92,7 +92,7 @@ func TestJsonThriftCodecWithDynamicgo(t *testing.T) {
 	err = jtc.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)
 
-	// disable unmarshal using dynamicgo because the payload length is 0
+	// disable unmarshal With dynamicgo because the payload length is 0
 	sendMsg = initJsonSendMsg(transport.PurePayload)
 
 	// Marshal side
@@ -110,6 +110,7 @@ func TestJsonThriftCodecWithDynamicgo(t *testing.T) {
 }
 
 func TestJsonExceptionError(t *testing.T) {
+	// without dynamicgo
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option

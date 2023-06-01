@@ -34,11 +34,12 @@ import (
 
 // Write write json string to out thrift.TProtocol
 func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	// fallback
+	// fallback logic
 	if !m.dynamicgoEnabled {
 		return m.originalWrite(ctx, out, msg, requestBase)
 	}
 
+	// dynamicgo logic
 	if !m.hasRequestBase {
 		requestBase = nil
 	}
@@ -66,6 +67,7 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 	cv := j2t.NewBinaryConv(*m.dyOpts)
 	transBuff := utils.StringToSliceByte(s)
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
+	defer mcache.Free(dbuf)
 
 	if err := m.writeHead(out); err != nil {
 		return err
@@ -130,7 +132,6 @@ func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgTy
 			// TODO: implement MallocAck() to achieve zero copy
 			copy(buf, dbuf)
 		}
-		mcache.Free(dbuf)
 	}
 	return nil
 }
