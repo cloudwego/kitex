@@ -139,7 +139,7 @@ func WithGeneric(g generic.Generic) Option {
 }
 
 // WithErrorHandler sets the error handler.
-func WithErrorHandler(f func(error) error) Option {
+func WithErrorHandler(f func(context.Context, error) error) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithErrorHandler(%+v)", utils.GetFuncName(f)))

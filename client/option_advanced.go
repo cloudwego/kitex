@@ -20,6 +20,7 @@ package client
 // It is used for customized extension.
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"reflect"
@@ -193,7 +194,7 @@ func WithCloseCallbacks(callback func() error) Option {
 }
 
 // WithErrorHandler sets the error handler.
-func WithErrorHandler(f func(error) error) Option {
+func WithErrorHandler(f func(context.Context, error) error) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		o.Once.OnceOrPanic()
 		di.Push(fmt.Sprintf("WithErrorHandler(%+v)", utils.GetFuncName(f)))

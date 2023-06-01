@@ -18,6 +18,7 @@
 package server
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -63,7 +64,7 @@ type Options struct {
 	MetaHandlers []remote.MetaHandler
 
 	RemoteOpt  *remote.ServerOption
-	ErrHandle  func(error) error
+	ErrHandle  func(context.Context, error) error
 	ExitSignal func() <-chan error
 	Proxy      proxy.ReverseProxy
 
