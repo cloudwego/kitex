@@ -28,14 +28,15 @@ import (
 )
 
 func TestJsonThriftCodec(t *testing.T) {
+	// json generic call without dynamicgo
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option
 	jtc, err := newJsonThriftCodec(p, thriftCodec, NewOptions(opts))
 	test.Assert(t, err == nil)
+	test.Assert(t, !jtc.dynamicgoEnabled)
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONThrift")
-	test.DeepEqual(t, jtc.opts.dynamicgoConvOpts, defaultJSONDynamicgoConvOpts)
 
 	method, err := jtc.getMethod(nil, "Test")
 	test.Assert(t, err == nil)
@@ -56,7 +57,40 @@ func TestJsonThriftCodec(t *testing.T) {
 	recvMsg.SetPayloadLen(len(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = jtc.Unmarshal(ctx, recvMsg, in)
+	test.Assert(t, err == nil, err)
+}
+
+func TestJsonThriftCodecWithDynamicgo(t *testing.T) {
+	// json generic call with dynamicgo
+	p, err := NewThriftFileProviderWithDynamicGo("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
+	var opts []Option
+	jtc, err := newJsonThriftCodec(p, thriftCodec, NewOptions(opts))
+	test.Assert(t, err == nil)
+	test.Assert(t, jtc.dynamicgoEnabled)
+	defer jtc.Close()
+	test.Assert(t, jtc.Name() == "JSONThrift")
+
+	method, err := jtc.getMethod(nil, "Test")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
+
+	ctx := context.Background()
+	sendMsg := initJsonSendMsg(transport.TTHeader)
+
+	// Marshal side
+	out := remote.NewWriterBuffer(256)
+	err = jtc.Marshal(ctx, sendMsg, out)
+	test.Assert(t, err == nil, err)
+
+	// Unmarshal side
+	recvMsg := initJsonRecvMsg()
+	buf, err := out.Bytes()
+	test.Assert(t, err == nil)
+	recvMsg.SetPayloadLen(len(buf))
+	in := remote.NewReaderBuffer(buf)
+	err = jtc.Unmarshal(ctx, recvMsg, in)
+	test.Assert(t, err == nil, err)
 
 	// disable unmarshal using dynamicgo because the payload length is 0
 	sendMsg = initJsonSendMsg(transport.PurePayload)
@@ -88,7 +122,6 @@ func TestJsonExceptionError(t *testing.T) {
 	emptyMethodInk := rpcinfo.NewInvocation("", "")
 	emptyMethodRi := rpcinfo.NewRPCInfo(nil, nil, emptyMethodInk, nil, nil)
 	emptyMethodMsg := remote.NewMessage(nil, nil, emptyMethodRi, remote.Exception, remote.Client)
-	// Marshal side
 	err = jtc.Marshal(ctx, emptyMethodMsg, out)
 	test.Assert(t, err.Error() == "empty methodName in thrift Marshal")
 
@@ -96,7 +129,18 @@ func TestJsonExceptionError(t *testing.T) {
 	exceptionMsgTypeInk := rpcinfo.NewInvocation("", "Test")
 	exceptionMsgTypeRi := rpcinfo.NewRPCInfo(nil, nil, exceptionMsgTypeInk, nil, nil)
 	exceptionMsgTypeMsg := remote.NewMessage(&remote.TransError{}, nil, exceptionMsgTypeRi, remote.Exception, remote.Client)
-	// Marshal side
+	err = jtc.Marshal(ctx, exceptionMsgTypeMsg, out)
+	test.Assert(t, err == nil)
+
+	// with dynamicgo
+	p, err = NewThriftFileProviderWithDynamicGo("./json_test/idl/mock.thrift")
+	test.Assert(t, err == nil)
+	jtc, err = newJsonThriftCodec(p, thriftCodec, NewOptions(opts))
+	test.Assert(t, err == nil)
+	// empty method test
+	err = jtc.Marshal(ctx, emptyMethodMsg, out)
+	test.Assert(t, err.Error() == "empty methodName in thrift Marshal")
+	// Exception MsgType test
 	err = jtc.Marshal(ctx, exceptionMsgTypeMsg, out)
 	test.Assert(t, err == nil)
 }

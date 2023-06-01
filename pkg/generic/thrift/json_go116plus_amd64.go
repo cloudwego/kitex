@@ -25,7 +25,6 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
-	dthrift "github.com/cloudwego/dynamicgo/thrift"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -33,37 +32,13 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-// NewWriteJSON build WriteJSON according to ServiceDescriptor
-func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*WriteJSON, error) {
-	fnDsc, err := svc.LookupFunctionByMethod(method)
-	if err != nil {
-		return nil, err
-	}
-	ty := fnDsc.Request
-	if !isClient {
-		ty = fnDsc.Response
-	}
-	var dty *dthrift.TypeDescriptor
-	if svc.DynamicgoDsc != nil {
-		dty = svc.DynamicgoDsc.Functions()[method].Request()
-		if !isClient {
-			dty = svc.DynamicgoDsc.Functions()[method].Response()
-		}
-		if dty == nil {
-			return nil, perrors.NewProtocolErrorWithMsg("dynamicgo TypeDescriptor is nil")
-		}
-	}
-	ws := &WriteJSON{
-		ty:             ty,
-		dty:            dty,
-		hasRequestBase: fnDsc.HasRequestBase && isClient,
-		isClient:       isClient,
-	}
-	return ws, nil
-}
-
 // Write write json string to out thrift.TProtocol
 func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+	// fallback
+	if !m.dynamicgoEnabled {
+		return m.originalWrite(ctx, out, msg, requestBase)
+	}
+
 	if !m.hasRequestBase {
 		requestBase = nil
 	}

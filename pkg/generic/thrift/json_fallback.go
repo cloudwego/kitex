@@ -23,55 +23,9 @@ import (
 	"context"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/tidwall/gjson"
-
-	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
-
-// NewWriteJSON build WriteJSON according to ServiceDescriptor
-func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*WriteJSON, error) {
-	fnDsc, err := svc.LookupFunctionByMethod(method)
-	if err != nil {
-		return nil, err
-	}
-	ty := fnDsc.Request
-	if !isClient {
-		ty = fnDsc.Response
-	}
-	ws := &WriteJSON{
-		ty:             ty,
-		hasRequestBase: fnDsc.HasRequestBase && isClient,
-	}
-	return ws, nil
-}
 
 // Write write json string to out thrift.TProtocol
 func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	if !m.hasRequestBase {
-		requestBase = nil
-	}
-
-	// msg is void
-	if _, ok := msg.(descriptor.Void); ok {
-		return wrapStructWriter(ctx, msg, out, m.ty, &writerOption{requestBase: requestBase, binaryWithBase64: !m.dyOpts.NoBase64Binary})
-	}
-
-	// msg is string
-	s, ok := msg.(string)
-	if !ok {
-		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
-	}
-
-	body := gjson.Parse(s)
-	if body.Type == gjson.Null {
-		body = gjson.Result{
-			Type:  gjson.String,
-			Raw:   s,
-			Str:   s,
-			Num:   0,
-			Index: 0,
-		}
-	}
-	return wrapJSONWriter(ctx, &body, out, m.ty, &writerOption{requestBase: requestBase, binaryWithBase64: !m.dyOpts.NoBase64Binary})
+	return m.originalWrite(ctx, out, msg, requestBase)
 }

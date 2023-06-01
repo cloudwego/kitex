@@ -37,20 +37,26 @@ var (
 type JSONRequest = string
 
 type jsonThriftCodec struct {
-	svcDsc   atomic.Value // *idl
-	provider DescriptorProvider
-	codec    remote.PayloadCodec
-	opts     *Options
+	svcDsc           atomic.Value // *idl
+	provider         DescriptorProvider
+	codec            remote.PayloadCodec
+	binaryWithBase64 bool
+	opts             *Options
+	dynamicgoEnabled bool
 }
 
 func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*jsonThriftCodec, error) {
 	svc := <-p.Provide()
-	// set default dynamicgo conv.Options if it is not specified
-	if !opts.isSetdynamicgoConvOpts {
-		opts.dynamicgoConvOpts = defaultJSONDynamicgoConvOpts
-		opts.isSetdynamicgoConvOpts = true
+	dynamicgoEnabled := false
+	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoExpected && svc.DynamicgoDsc != nil {
+		dynamicgoEnabled = true
+		if !opts.isSetdynamicgoConvOpts {
+			// set default dynamicgo conv.Options if it is not specified
+			opts.dynamicgoConvOpts = defaultJSONDynamicgoConvOpts
+			opts.isSetdynamicgoConvOpts = true
+		}
 	}
-	c := &jsonThriftCodec{codec: codec, provider: p, opts: opts}
+	c := &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true, opts: opts, dynamicgoEnabled: dynamicgoEnabled}
 	c.svcDsc.Store(svc)
 	go c.update()
 	return c, nil
@@ -83,7 +89,10 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	if err != nil {
 		return err
 	}
-	wm.SetWriteJSON(&c.opts.dynamicgoConvOpts)
+	wm.SetBase64Binary(c.binaryWithBase64)
+	if c.dynamicgoEnabled {
+		wm.SetDynamicGo(svcDsc, method, &c.opts.dynamicgoConvOpts)
+	}
 
 	msg.Data().(WithCodec).SetCodec(wm)
 	return c.codec.Marshal(ctx, msg, out)
@@ -99,8 +108,10 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	}
 
 	rm := thrift.NewReadJSON(svcDsc, msg.RPCRole() == remote.Client)
-	if err := rm.SetReadJSON(&c.opts.dynamicgoConvOpts, msg); err != nil {
-		return err
+	rm.SetBinaryWithBase64(c.binaryWithBase64)
+	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
+	if c.dynamicgoEnabled && msg.PayloadLen() != 0 {
+		rm.SetDynamicGo(&c.opts.dynamicgoConvOpts, msg)
 	}
 
 	msg.Data().(WithCodec).SetCodec(rm)

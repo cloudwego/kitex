@@ -117,11 +117,13 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 		if c.codec == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
+		c.codec.binaryWithBase64 = enable
 		c.codec.opts.dynamicgoConvOpts.NoBase64Binary = !enable
 	case *jsonThriftGeneric:
 		if c.codec == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
+		c.codec.binaryWithBase64 = enable
 		c.codec.opts.dynamicgoConvOpts.NoBase64Binary = !enable
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
@@ -183,6 +185,9 @@ type jsonThriftGeneric struct {
 }
 
 func (g *jsonThriftGeneric) Framed() bool {
+	if dp, ok := g.codec.provider.(GetProviderOption); ok && dp.Option().DynamicGoExpected {
+		return true
+	}
 	return false
 }
 
@@ -207,6 +212,9 @@ type httpThriftGeneric struct {
 }
 
 func (g *httpThriftGeneric) Framed() bool {
+	if dp, ok := g.codec.provider.(GetProviderOption); ok && dp.Option().DynamicGoExpected {
+		return true
+	}
 	return false
 }
 
