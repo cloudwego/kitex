@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package stats
+package rpcinfo
 
 import (
 	"context"
@@ -25,7 +25,6 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 type mockTracer struct {
@@ -51,16 +50,16 @@ func (mt *mockTracer) Finish(ctx context.Context) {
 }
 
 func TestOrder(t *testing.T) {
-	var c Controller
+	var c TraceController
 	var stack []int
 	t1 := &mockTracer{order: 1, stack: &stack}
 	t2 := &mockTracer{order: 2, stack: &stack}
-	ri := rpcinfo.NewRPCInfo(
-		rpcinfo.NewEndpointInfo("client", "client_method", nil, nil),
-		rpcinfo.NewEndpointInfo("server", "server_method", nil, nil),
-		rpcinfo.NewInvocation("service", "method"),
-		rpcinfo.NewRPCConfig(),
-		rpcinfo.NewRPCStats(),
+	ri := NewRPCInfo(
+		NewEndpointInfo("client", "client_method", nil, nil),
+		NewEndpointInfo("server", "server_method", nil, nil),
+		NewInvocation("service", "method"),
+		NewRPCConfig(),
+		NewRPCStats(),
 	)
 	klog.SetOutput(io.MultiWriter())
 
@@ -77,16 +76,16 @@ func TestOrder(t *testing.T) {
 }
 
 func TestPanic(t *testing.T) {
-	var c Controller
+	var c TraceController
 	var stack []int
 	t1 := &mockTracer{order: 1, stack: &stack, panicAtStart: true, panicAtFinish: true}
 	t2 := &mockTracer{order: 2, stack: &stack}
-	ri := rpcinfo.NewRPCInfo(
-		rpcinfo.NewEndpointInfo("client", "client_method", nil, nil),
-		rpcinfo.NewEndpointInfo("server", "server_method", nil, nil),
-		rpcinfo.NewInvocation("service", "method"),
-		rpcinfo.NewRPCConfig(),
-		rpcinfo.NewRPCStats(),
+	ri := NewRPCInfo(
+		NewEndpointInfo("client", "client_method", nil, nil),
+		NewEndpointInfo("server", "server_method", nil, nil),
+		NewInvocation("service", "method"),
+		NewRPCConfig(),
+		NewRPCStats(),
 	)
 	klog.SetOutput(io.MultiWriter())
 

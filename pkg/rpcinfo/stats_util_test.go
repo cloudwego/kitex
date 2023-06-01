@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package stats
+package rpcinfo
 
 import (
 	"context"
@@ -22,19 +22,18 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
 func TestUtil(t *testing.T) {
 	test.Assert(t, CalcEventCostUs(nil, nil) == 0)
 
-	ri := rpcinfo.NewRPCInfo(
-		rpcinfo.NewEndpointInfo("client", "client_method", nil, nil),
-		rpcinfo.NewEndpointInfo("server", "server_method", nil, nil),
-		rpcinfo.NewInvocation("service", "method"),
-		rpcinfo.NewRPCConfig(),
-		rpcinfo.NewRPCStats(),
+	ri := NewRPCInfo(
+		NewEndpointInfo("client", "client_method", nil, nil),
+		NewEndpointInfo("server", "server_method", nil, nil),
+		NewInvocation("service", "method"),
+		NewRPCConfig(),
+		NewRPCStats(),
 	)
 
 	// nil context

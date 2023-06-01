@@ -27,7 +27,6 @@ import (
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	internal_server "github.com/cloudwego/kitex/internal/server"
-	"github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -140,7 +139,7 @@ func (kc *serviceInlineClient) Call(ctx context.Context, method string, request,
 	var reportErr error
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
-			reportErr = stats.ClientPanicToErr(ctx, panicInfo, ri, false)
+			reportErr = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, false)
 		}
 		kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
 		rpcinfo.PutRPCInfo(ri)
@@ -214,7 +213,7 @@ func (kc *serviceInlineClient) constructServerRPCInfo(svrCtx, cliCtx context.Con
 func (kc *serviceInlineClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 	svrTraceCtl := kc.serverOpt.TracerCtl
 	if svrTraceCtl == nil {
-		svrTraceCtl = &stats.Controller{}
+		svrTraceCtl = &rpcinfo.TraceController{}
 	}
 
 	return func(ctx context.Context, req, resp interface{}) (err error) {

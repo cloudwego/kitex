@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	STATS "github.com/cloudwego/kitex/pkg/stats"
@@ -41,9 +40,9 @@ func TestCalculateEventCost(t *testing.T) {
 	st := ri.Stats()
 	st.(interface{ SetLevel(STATS.Level) }).SetLevel(STATS.LevelBase)
 
-	stats.Record(ctx, ri, STATS.RPCStart, nil)
+	rpcinfo.Record(ctx, ri, STATS.RPCStart, nil)
 	time.Sleep(time.Millisecond)
-	stats.Record(ctx, ri, STATS.RPCFinish, nil)
+	rpcinfo.Record(ctx, ri, STATS.RPCFinish, nil)
 	start, finish := st.GetEvent(STATS.RPCStart), st.GetEvent(STATS.RPCFinish)
 
 	test.Assert(t, CalculateEventCost(st, start.Event(), finish.Event()) > 0)

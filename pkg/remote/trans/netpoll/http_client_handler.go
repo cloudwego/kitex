@@ -30,7 +30,6 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
-	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -58,10 +57,10 @@ type httpCliTransHandler struct {
 func (t *httpCliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	var bufWriter remote.ByteBuffer
 	ri := sendMsg.RPCInfo()
-	stats2.Record(ctx, ri, stats.WriteStart, nil)
+	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
 	defer func() {
 		t.ext.ReleaseBuffer(bufWriter, err)
-		stats2.Record(ctx, ri, stats.WriteFinish, err)
+		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
 	}()
 
 	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
@@ -103,10 +102,10 @@ func (t *httpCliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg 
 // Read implements the remote.ClientTransHandler interface. Read is blocked.
 func (t *httpCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	var bufReader remote.ByteBuffer
-	stats2.Record(ctx, msg.RPCInfo(), stats.ReadStart, nil)
+	rpcinfo.Record(ctx, msg.RPCInfo(), stats.ReadStart, nil)
 	defer func() {
 		t.ext.ReleaseBuffer(bufReader, err)
-		stats2.Record(ctx, msg.RPCInfo(), stats.ReadFinish, err)
+		rpcinfo.Record(ctx, msg.RPCInfo(), stats.ReadFinish, err)
 	}()
 
 	t.ext.SetReadTimeout(ctx, conn, msg.RPCInfo().Config(), remote.Client)

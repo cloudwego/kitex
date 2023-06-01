@@ -26,7 +26,6 @@ import (
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/mocks/stats"
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -105,7 +104,7 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 		},
 	}
 
-	tracerCtl := &internal_stats.Controller{}
+	tracerCtl := &rpcinfo.TraceController{}
 	tracerCtl.Append(mockTracer)
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
@@ -162,7 +161,7 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 	}
 
 	mockErr := errors.New("mock")
-	tracerCtl := &internal_stats.Controller{}
+	tracerCtl := &rpcinfo.TraceController{}
 	tracerCtl.Append(mockTracer)
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{

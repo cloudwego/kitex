@@ -28,7 +28,6 @@ import (
 	"time"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -295,10 +294,10 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 				rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
 				rpcStats.SetPanicked(err)
 			}
-			internal_stats.Record(ctx, ri, stats.ServerHandleFinish, err)
+			rpcinfo.Record(ctx, ri, stats.ServerHandleFinish, err)
 		}()
 		implHandlerFunc := s.svcInfo.MethodInfo(methodName).Handler()
-		internal_stats.Record(ctx, ri, stats.ServerHandleStart, nil)
+		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		err = implHandlerFunc(ctx, s.handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
