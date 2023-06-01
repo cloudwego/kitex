@@ -43,7 +43,6 @@ func TestAbsPath(t *testing.T) {
 }
 
 func TestThriftFileProvider(t *testing.T) {
-	isDynamicgoDisabled = true
 	path := "http_test/idl/binary_echo.thrift"
 	p, err := NewThriftFileProvider(path)
 	test.Assert(t, err == nil)
@@ -52,8 +51,7 @@ func TestThriftFileProvider(t *testing.T) {
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.DynamicgoDsc == nil)
 
-	isDynamicgoDisabled = false
-	p, err = NewThriftFileProvider(path)
+	p, err = NewThriftFileProviderWithDynamicGo(path)
 	test.Assert(t, err == nil)
 	defer p.Close()
 	tree = <-p.Provide()
@@ -86,13 +84,32 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 		`,
 		"a/z.thrift": "namespace go kitex.test.server",
 	}
-	isDynamicgoDisabled = false
+
 	p, err := NewThriftContentWithAbsIncludePathProvider(path, includes)
 	test.Assert(t, err == nil)
 	defer p.Close()
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "InboxService")
+	test.Assert(t, tree.DynamicgoDsc == nil)
+	includes[path] = newContent
+	err = p.UpdateIDL(path, includes)
+	defer p.Close()
+	tree = <-p.Provide()
+	test.Assert(t, err == nil)
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "UpdateService")
+	test.Assert(t, tree.DynamicgoDsc == nil)
+
+	includes[path] = content
+	p, err = NewThriftContentWithAbsIncludePathProviderWithDynamicgo(path, includes)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "InboxService")
 	test.Assert(t, tree.DynamicgoDsc != nil)
+	test.Assert(t, tree.DynamicgoDsc.Name() == "InboxService")
 	includes[path] = newContent
 	err = p.UpdateIDL(path, includes)
 	defer p.Close()
@@ -129,7 +146,6 @@ func TestCircularDependency(t *testing.T) {
 }
 
 func TestThriftContentProvider(t *testing.T) {
-	isDynamicgoDisabled = true
 	p, err := NewThriftContentProvider("test", nil)
 	test.Assert(t, err != nil)
 	test.Assert(t, p == nil)
@@ -145,11 +161,25 @@ func TestThriftContentProvider(t *testing.T) {
 	service UpdateService {}
 	`
 
-	isDynamicgoDisabled = false
 	p, err = NewThriftContentProvider(content, nil)
 	test.Assert(t, err == nil, err)
 	defer p.Close()
 	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "InboxService")
+	test.Assert(t, tree.DynamicgoDsc == nil)
+	err = p.UpdateIDL(newContent, nil)
+	defer p.Close()
+	tree = <-p.Provide()
+	test.Assert(t, err == nil)
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "UpdateService")
+	test.Assert(t, tree.DynamicgoDsc == nil)
+
+	p, err = NewThriftContentProviderWithDynamicGo(content, nil)
+	test.Assert(t, err == nil, err)
+	defer p.Close()
+	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.DynamicgoDsc != nil)
 	err = p.UpdateIDL(newContent, nil)
@@ -162,10 +192,9 @@ func TestThriftContentProvider(t *testing.T) {
 	test.Assert(t, tree.DynamicgoDsc.Name() == "UpdateService")
 }
 
-func TestDisableGoTagForDynamicgo(t *testing.T) {
+func TestDisableGoTagForDynamicGo(t *testing.T) {
 	path := "http_test/idl/binary_echo.thrift"
-	isDynamicgoDisabled = false
-	p, err := NewThriftFileProvider(path)
+	p, err := NewThriftFileProviderWithDynamicGo(path)
 	test.Assert(t, err == nil)
 	defer p.Close()
 	tree := <-p.Provide()
@@ -174,7 +203,7 @@ func TestDisableGoTagForDynamicgo(t *testing.T) {
 	test.Assert(t, tree.DynamicgoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "STR")
 
 	dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
-	p, err = NewThriftFileProvider(path)
+	p, err = NewThriftFileProviderWithDynamicGo(path)
 	test.Assert(t, err == nil)
 	defer p.Close()
 	tree = <-p.Provide()

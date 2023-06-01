@@ -24,3 +24,13 @@ type DescriptorProvider interface {
 	// Provide return a channel for provide service descriptors
 	Provide() <-chan *descriptor.ServiceDescriptor
 }
+
+// GetProviderOption provide options for descriptor provider
+type GetProviderOption interface {
+	Option() ProviderOption
+}
+
+type ProviderOption struct {
+	// DynamicGoExpected is if the user expects to use dynamicgo or not
+	DynamicGoExpected bool
+}
