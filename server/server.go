@@ -120,14 +120,14 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder, 
 }
 
 // newErrorHandleMW provides a hook point for server error handling.
-func newErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
+func newErrorHandleMW(errHandle func(context.Context, error) error) endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response interface{}) error {
 			err := next(ctx, request, response)
 			if err == nil {
 				return nil
 			}
-			return errHandle(err)
+			return errHandle(ctx, err)
 		}
 	}
 }

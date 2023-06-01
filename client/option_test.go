@@ -568,7 +568,7 @@ func TestWithCloseCallbacks(t *testing.T) {
 }
 
 func TestWithErrorHandler(t *testing.T) {
-	errHandler := func(err error) error { return nil }
+	errHandler := func(context.Context, error) error { return nil }
 	opts := client.NewOptions([]client.Option{WithErrorHandler(errHandler)})
 	test.Assert(t, reflect.ValueOf(opts.ErrHandle).Pointer() == reflect.ValueOf(errHandler).Pointer())
 }

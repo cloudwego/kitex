@@ -18,6 +18,7 @@
 package client
 
 import (
+	"context"
 	"time"
 
 	"github.com/cloudwego/kitex/internal/configutil"
@@ -72,7 +73,7 @@ type Options struct {
 	Balancer         loadbalance.Loadbalancer
 	BalancerCacheOpt *lbcache.Options
 	PoolCfg          *connpool2.IdleConfig
-	ErrHandle        func(error) error
+	ErrHandle        func(context.Context, error) error
 	Targets          string
 	CBSuite          *circuitbreak.CBSuite
 	Timeouts         rpcinfo.TimeoutProvider
