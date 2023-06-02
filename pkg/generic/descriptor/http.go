@@ -45,8 +45,8 @@ type HTTPRequest struct {
 	RawBody     []byte
 	Body        map[string]interface{}
 	GeneralBody interface{} // body of other representation, used with ContentType
-	BodyMap     interface{}
 	ContentType MIMEType
+	bodyMap     *ast.Node
 }
 
 // GetHeader implements http.RequestGetter of dynamicgo
@@ -94,20 +94,17 @@ func (req *HTTPRequest) GetParam(key string) string {
 
 // GetMapBody implements http.RequestGetter of dynamicgo
 func (req *HTTPRequest) GetMapBody(key string) string {
-	if req.BodyMap == nil {
+	if req.bodyMap == nil {
 		if len(req.RawBody) == 0 {
 			return ""
 		}
 		body := req.RawBody
 		s := utils.SliceByteToString(body)
-		req.BodyMap = ast.NewRaw(s)
+		node := ast.NewRaw(s)
+		req.bodyMap = &node
 	}
 
-	node, ok := req.BodyMap.(ast.Node)
-	if !ok {
-		return ""
-	}
-	v := node.Get(key)
+	v := req.bodyMap.Get(key)
 	if v.Check() != nil {
 		return ""
 	}
