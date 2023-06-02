@@ -23,11 +23,11 @@ import (
 	"sync"
 
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/thriftgo/parser"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 var (
