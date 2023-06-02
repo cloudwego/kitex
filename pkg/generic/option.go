@@ -33,13 +33,6 @@ var (
 	}
 )
 
-type genericType int
-
-const (
-	JSON genericType = iota
-	HTTP
-)
-
 type Options struct {
 	// options for dynamicgo conversion
 	dynamicgoConvOpts conv.Options
@@ -49,19 +42,6 @@ type Options struct {
 
 type Option struct {
 	F func(opt *Options)
-}
-
-// NewOptions creates a new option
-func NewOptions(opts []Option, genericType genericType) *Options {
-	o := &Options{}
-	switch genericType {
-	case JSON:
-		o.dynamicgoConvOpts = defaultJSONDynamicGoConvOpts
-	case HTTP:
-		o.dynamicgoConvOpts = defaultHTTPDynamicGoConvOpts
-	}
-	o.apply(opts)
-	return o
 }
 
 // apply applies all options
