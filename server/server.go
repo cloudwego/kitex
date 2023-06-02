@@ -32,6 +32,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limiter"
@@ -220,13 +221,13 @@ func (s *server) Run() (err error) {
 
 	// start profiler
 	if s.opt.RemoteOpt.Profiler != nil {
-		go func() {
+		gofunc.GoFunc(context.Background(), func() {
 			klog.Info("KITEX: server starting profiler")
 			err := s.opt.RemoteOpt.Profiler.Run(context.Background())
 			if err != nil {
 				klog.Errorf("KITEX: server started profiler error: error=%s", err.Error())
 			}
-		}()
+		})
 	}
 
 	errCh := s.svr.Start()
