@@ -57,9 +57,9 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 }
 
 // SetDynamicGo ...
-func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithException *conv.Options, method string) {
+func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options, method string) {
 	w.dyConvOpts = convOpts
-	w.dyConvOptsWithThriftBase = convOptsWithException
+	w.dyConvOptsWithThriftBase = convOptsWithThriftBase
 	w.dynamicgoEnabled = true
 	fn := w.svc.DynamicGoDsc.Functions()[method]
 	w.hasRequestBase = fn.HasRequestBase()
