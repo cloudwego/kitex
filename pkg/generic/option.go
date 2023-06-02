@@ -38,8 +38,8 @@ type Options struct {
 	dynamicgoConvOpts conv.Options
 	// whether dynamicgoConvOpts is specified
 	isSetDynamicGoConvOpts bool
-	// flag to set whether to get response for http generic call using dynamicgo
-	enableDynamicGoHTTPResp bool
+	// flag to set whether to store http resp body into HTTPResponse.RawBody
+	useRawBodyForHTTPResp bool
 }
 
 type Option struct {
@@ -68,11 +68,10 @@ func WithCustomDynamicGoConvOpts(opts *conv.Options) Option {
 	}}
 }
 
-// EnableDynamicGoHTTPResp set whether to get response for http generic call using dynamicgo
-//   - enable : false (default) -> body of http generic call response : HTTPResponse.Body
-//   - enable : true -> body of http generic call response : HTTPResponse.RawBody
-func EnableDynamicGoHTTPResp(enable bool) Option {
+// UseRawBodyForHTTPResp sets whether to set body of response for http generic call into HTTPResponse.RawBody or not.
+// if this is disabled, the body will be stored only into HTTPResponse.Body
+func UseRawBodyForHTTPResp(enable bool) Option {
 	return Option{F: func(opt *Options) {
-		opt.enableDynamicGoHTTPResp = enable
+		opt.useRawBodyForHTTPResp = enable
 	}}
 }
