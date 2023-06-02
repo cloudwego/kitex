@@ -56,31 +56,24 @@ type httpThriftCodec struct {
 	t2jBinaryConv            t2j.BinaryConv
 	dynamicgoEnabled         bool
 	enableDynamicGoHTTPResp  bool
-	fallback                 bool // fallback will be true when dynamicgo is expected to be used but it cannot be
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*httpThriftCodec, error) {
 	svc := <-p.Provide()
-	c := &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false, dynamicgoEnabled: false, fallback: false}
-	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoExpected {
-		if dp.Option().FallbackFromDynamicGo {
-			c.fallback = true
-		} else {
-			c.dynamicgoEnabled = true
-			c.enableDynamicGoHTTPResp = opts.enableDynamicGoHTTPResp
-			// set default dynamicgo conv.Options if it is not specified
-			if !opts.isSetDynamicGoConvOpts {
-				opts.dynamicgoConvOpts = defaultHTTPDynamicGoConvOpts
-				opts.isSetDynamicGoConvOpts = true
-			}
-			c.dyConvOpts = opts.dynamicgoConvOpts
-			c.t2jBinaryConv = t2j.NewBinaryConv(opts.dynamicgoConvOpts)
-
-			convOptsWithThriftBase := opts.dynamicgoConvOpts
-			convOptsWithThriftBase.EnableThriftBase = true
-			c.dyConvOptsWithThriftBase = convOptsWithThriftBase
-
+	c := &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false, dynamicgoEnabled: false, enableDynamicGoHTTPResp: opts.enableDynamicGoHTTPResp}
+	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoExpected && !dp.Option().FallbackFromDynamicGo {
+		c.dynamicgoEnabled = true
+		// set default dynamicgo conv.Options if it is not specified
+		if !opts.isSetDynamicGoConvOpts {
+			opts.dynamicgoConvOpts = defaultHTTPDynamicGoConvOpts
+			opts.isSetDynamicGoConvOpts = true
 		}
+		c.dyConvOpts = opts.dynamicgoConvOpts
+		c.t2jBinaryConv = t2j.NewBinaryConv(opts.dynamicgoConvOpts)
+
+		convOptsWithThriftBase := opts.dynamicgoConvOpts
+		convOptsWithThriftBase.EnableThriftBase = true
+		c.dyConvOptsWithThriftBase = convOptsWithThriftBase
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
@@ -140,10 +133,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 
 	inner := thrift.NewReadHTTPResponse(svcDsc)
 	inner.SetBase64Binary(c.binaryWithBase64)
-	inner.SetFallback(c.fallback)
-	if c.dynamicgoEnabled && c.enableDynamicGoHTTPResp {
-		inner.SetDynamicGo(c.t2jBinaryConv, msg)
-	}
+	inner.SetDynamicGo(c.t2jBinaryConv, msg, c.dynamicgoEnabled, c.enableDynamicGoHTTPResp)
 
 	msg.Data().(WithCodec).SetCodec(inner)
 	return c.codec.Unmarshal(ctx, msg, in)

@@ -86,12 +86,12 @@ func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out thrift.TProtoc
 
 // ReadHTTPResponse implement of MessageReaderWithMethod
 type ReadHTTPResponse struct {
-	svc              *descriptor.ServiceDescriptor
-	base64Binary     bool
-	msg              remote.Message
-	dynamicgoEnabled bool
-	fallback         bool
-	cv               t2j.BinaryConv
+	svc                     *descriptor.ServiceDescriptor
+	base64Binary            bool
+	msg                     remote.Message
+	dynamicgoEnabled        bool
+	enableDynamicGoHTTPResp bool
+	cv                      t2j.BinaryConv
 }
 
 var _ MessageReader = (*ReadHTTPResponse)(nil)
@@ -99,7 +99,7 @@ var _ MessageReader = (*ReadHTTPResponse)(nil)
 // NewReadHTTPResponse ...
 // Base64 encoding for binary is enabled by default.
 func NewReadHTTPResponse(svc *descriptor.ServiceDescriptor) *ReadHTTPResponse {
-	return &ReadHTTPResponse{svc: svc, base64Binary: true, dynamicgoEnabled: false, fallback: false}
+	return &ReadHTTPResponse{svc: svc, base64Binary: true, dynamicgoEnabled: false, enableDynamicGoHTTPResp: false}
 }
 
 // SetBase64Binary enable/disable Base64 encoding for binary.
@@ -108,15 +108,14 @@ func (r *ReadHTTPResponse) SetBase64Binary(enable bool) {
 	r.base64Binary = enable
 }
 
-func (r *ReadHTTPResponse) SetFallback(fallback bool) {
-	r.fallback = fallback
-}
-
 // SetDynamicGo ...
-func (r *ReadHTTPResponse) SetDynamicGo(cv t2j.BinaryConv, msg remote.Message) {
-	r.msg = msg
-	r.dynamicgoEnabled = true
-	r.cv = cv
+func (r *ReadHTTPResponse) SetDynamicGo(cv t2j.BinaryConv, msg remote.Message, dynamicgoEnabled, enableDynamicGoHTTPResp bool) {
+	r.enableDynamicGoHTTPResp = enableDynamicGoHTTPResp
+	if dynamicgoEnabled && enableDynamicGoHTTPResp {
+		r.dynamicgoEnabled = true
+		r.cv = cv
+		r.msg = msg
+	}
 }
 
 // Read ...
@@ -129,7 +128,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		}
 		fDsc := fnDsc.Response
 		resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
-		if r.fallback {
+		if r.enableDynamicGoHTTPResp {
 			if httpResp, ok := resp.(*descriptor.HTTPResponse); ok && httpResp.Body != nil {
 				rawBody, err := customJson.Marshal(httpResp.Body)
 				if err != nil {
