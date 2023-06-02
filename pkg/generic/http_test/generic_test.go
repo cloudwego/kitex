@@ -45,12 +45,10 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-var (
-	customJson = sonic.Config{
-		EscapeHTML: true,
-		UseNumber:  true,
-	}.Froze()
-)
+var customJson = sonic.Config{
+	EscapeHTML: true,
+	UseNumber:  true,
+}.Froze()
 
 func TestRun(t *testing.T) {
 	t.Run("TestThriftNormalBinaryEcho", testThriftNormalBinaryEcho)
