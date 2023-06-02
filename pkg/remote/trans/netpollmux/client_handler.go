@@ -25,13 +25,13 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
-	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	np "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
@@ -69,7 +69,7 @@ type cliTransHandler struct {
 // Write implements the remote.ClientTransHandler interface.
 func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	ri := sendMsg.RPCInfo()
-	stats2.Record(ctx, ri, stats.WriteStart, nil)
+	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
 	buf := netpoll.NewLinkBuffer()
 	bufWriter := np.NewWriterByteBuffer(buf)
 	defer func() {
@@ -77,7 +77,7 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 			buf.Close()
 			bufWriter.Release(err)
 		}
-		stats2.Record(ctx, ri, stats.WriteFinish, nil)
+		rpcinfo.Record(ctx, ri, stats.WriteFinish, nil)
 	}()
 
 	// Set header flag = 1
@@ -143,7 +143,7 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 		if bufReader == nil {
 			return ctx, ErrConnClosed
 		}
-		stats2.Record(ctx, ri, stats.ReadStart, nil)
+		rpcinfo.Record(ctx, ri, stats.ReadStart, nil)
 		msg.SetPayloadCodec(t.opt.PayloadCodec)
 		err := t.codec.Decode(ctx, msg, bufReader)
 		if err != nil && errors.Is(err, netpoll.ErrReadTimeout) {
@@ -153,7 +153,7 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 			bufReader.Skip(l)
 		}
 		bufReader.Release(nil)
-		stats2.Record(ctx, ri, stats.ReadFinish, err)
+		rpcinfo.Record(ctx, ri, stats.ReadFinish, err)
 		return ctx, err
 	}
 }

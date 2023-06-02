@@ -24,7 +24,6 @@ import (
 	"syscall"
 
 	"github.com/cloudwego/kitex/internal/configutil"
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -88,7 +87,7 @@ type Options struct {
 	DebugService diagnosis.Service
 
 	// Observability
-	TracerCtl  *internal_stats.Controller
+	TracerCtl  *rpcinfo.TraceController
 	StatsLevel *stats.Level
 }
 
@@ -120,7 +119,7 @@ func NewOptions(opts []Option) *Options {
 
 		SupportedTransportsFunc: DefaultSupportedTransportsFunc,
 
-		TracerCtl: &internal_stats.Controller{},
+		TracerCtl: &rpcinfo.TraceController{},
 		Registry:  registry.NoopRegistry,
 	}
 	ApplyOptions(opts, o)

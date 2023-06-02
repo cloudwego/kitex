@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/configutil"
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/circuitbreak"
 	connpool2 "github.com/cloudwego/kitex/pkg/connpool"
@@ -92,7 +91,7 @@ type Options struct {
 	DebugService diagnosis.Service
 
 	// Observability
-	TracerCtl  *internal_stats.Controller
+	TracerCtl  *rpcinfo.TraceController
 	StatsLevel *stats.Level
 
 	// retry policy
@@ -143,7 +142,7 @@ func NewOptions(opts []Option) *Options {
 		Bus:    event.NewEventBus(),
 		Events: event.NewQueue(event.MaxEventNum),
 
-		TracerCtl: &internal_stats.Controller{},
+		TracerCtl: &rpcinfo.TraceController{},
 
 		GRPCConnectOpts: new(grpc.ConnectOptions),
 	}

@@ -23,11 +23,11 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
@@ -174,9 +174,9 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	if c.hyperMessageUnmarshalEnabled() && hyperMessageUnmarshalAvailable(data, message) {
 		msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
 		ri := message.RPCInfo()
-		internal_stats.Record(ctx, ri, stats.WaitReadStart, nil)
+		rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
 		buf, err := tProt.next(message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
-		internal_stats.Record(ctx, ri, stats.WaitReadFinish, err)
+		rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
 		if err != nil {
 			return remote.NewTransError(remote.ProtocolError, err)
 		}
@@ -197,9 +197,9 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 		if msg, ok := data.(ThriftMsgFastCodec); ok && message.PayloadLen() != 0 {
 			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
 			ri := message.RPCInfo()
-			internal_stats.Record(ctx, ri, stats.WaitReadStart, nil)
+			rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
 			buf, err := tProt.next(message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
-			internal_stats.Record(ctx, ri, stats.WaitReadFinish, err)
+			rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
 			if err != nil {
 				return remote.NewTransError(remote.ProtocolError, err)
 			}

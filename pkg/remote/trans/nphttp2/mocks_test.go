@@ -30,7 +30,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/runtime/protoimpl"
 
-	"github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -311,7 +310,7 @@ func newMockServerOption() *remote.ServerOption {
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			return newMockRPCInfo()
 		},
-		TracerCtl: &stats.Controller{},
+		TracerCtl: &rpcinfo.TraceController{},
 		GRPCCfg: &grpc.ServerConfig{
 			MaxStreams:                 0,
 			KeepaliveParams:            grpc.ServerKeepalive{},
