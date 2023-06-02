@@ -60,6 +60,7 @@ func TestRun(t *testing.T) {
 	t.Run("TestThriftException", testThriftException)
 	t.Run("TestRegression", testRegression)
 	t.Run("TestThriftBase64BinaryEcho", testThriftBase64BinaryEcho)
+	t.Run("TestFallbackFromDynamicGo", testFallbackFromDynamicGo)
 }
 
 func initThriftClientByIDL(t *testing.T, tp transport.Protocol, addr, idl string, opts []generic.Option, base64Binary, enableDynamicgo bool) genericclient.Client {
@@ -544,7 +545,7 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 	svr.Stop()
 }
 
-func TestFallbackFromDynamicGo(t *testing.T) {
+func testFallbackFromDynamicGo(t *testing.T) {
 	svr := initThriftServer(t, ":8127", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift")
 	time.Sleep(500 * time.Millisecond)
 
