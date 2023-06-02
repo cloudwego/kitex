@@ -89,7 +89,7 @@ func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
 	p, err := NewThriftFileProviderWithDynamicGo("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option
-	opts = append(opts, EnableDynamicgoHTTPResp(true))
+	opts = append(opts, EnableDynamicGoHTTPResp(true))
 	htc, err := newHTTPThriftCodec(p, thriftCodec, NewOptions(opts))
 	test.Assert(t, err == nil)
 	test.Assert(t, htc.dynamicgoEnabled)

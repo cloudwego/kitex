@@ -98,7 +98,7 @@ type ServiceDescriptor struct {
 	Name         string
 	Functions    map[string]*FunctionDescriptor
 	Router       Router
-	DynamicgoDsc *dthrift.ServiceDescriptor
+	DynamicGoDsc *dthrift.ServiceDescriptor
 }
 
 // LookupFunctionByMethod lookup function by method

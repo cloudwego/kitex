@@ -19,7 +19,7 @@ package generic
 import "github.com/cloudwego/dynamicgo/conv"
 
 var (
-	defaultHTTPDynamicgoConvOpts = conv.Options{
+	defaultHTTPDynamicGoConvOpts = conv.Options{
 		EnableHttpMapping:     true,
 		EnableValueMapping:    true,
 		WriteRequireField:     true,
@@ -27,7 +27,7 @@ var (
 		OmitHttpMappingErrors: true,
 		NoBase64Binary:        true,
 	}
-	defaultJSONDynamicgoConvOpts = conv.Options{
+	defaultJSONDynamicGoConvOpts = conv.Options{
 		WriteRequireField: true,
 		WriteDefaultField: true,
 	}
@@ -37,9 +37,9 @@ type Options struct {
 	// options for dynamicgo conversion
 	dynamicgoConvOpts conv.Options
 	// whether dynamicgoConvOpts is specified
-	isSetdynamicgoConvOpts bool
+	isSetDynamicGoConvOpts bool
 	// flag to set whether to get response for http generic call using dynamicgo
-	enableDynamicgoHTTPResp bool
+	enableDynamicGoHTTPResp bool
 }
 
 type Option struct {
@@ -60,19 +60,19 @@ func (o *Options) apply(opts []Option) {
 	}
 }
 
-// WithCustomDynamicgoConvOpts sets custom conv.Options
-func WithCustomDynamicgoConvOpts(opts *conv.Options) Option {
+// WithCustomDynamicGoConvOpts sets custom conv.Options
+func WithCustomDynamicGoConvOpts(opts *conv.Options) Option {
 	return Option{F: func(opt *Options) {
 		opt.dynamicgoConvOpts = *opts
-		opt.isSetdynamicgoConvOpts = true
+		opt.isSetDynamicGoConvOpts = true
 	}}
 }
 
-// EnableDynamicgoHTTPResp set whether to get response for http generic call using dynamicgo
+// EnableDynamicGoHTTPResp set whether to get response for http generic call using dynamicgo
 //   - enable : false (default) -> body of http generic call response : HTTPResponse.Body
 //   - enable : true -> body of http generic call response : HTTPResponse.RawBody
-func EnableDynamicgoHTTPResp(enable bool) Option {
+func EnableDynamicGoHTTPResp(enable bool) Option {
 	return Option{F: func(opt *Options) {
-		opt.enableDynamicgoHTTPResp = enable
+		opt.enableDynamicGoHTTPResp = enable
 	}}
 }

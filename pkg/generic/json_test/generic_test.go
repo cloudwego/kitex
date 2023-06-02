@@ -449,7 +449,7 @@ func testThriftException(t *testing.T) {
 
 func testThriftRawBinaryEcho(t *testing.T) {
 	var opts []generic.Option
-	opts = append(opts, generic.WithCustomDynamicgoConvOpts(&conv.Options{WriteRequireField: true, WriteDefaultField: true, NoBase64Binary: true}))
+	opts = append(opts, generic.WithCustomDynamicGoConvOpts(&conv.Options{WriteRequireField: true, WriteDefaultField: true, NoBase64Binary: true}))
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", opts, &(&struct{ x bool }{false}).x, false)
 	time.Sleep(500 * time.Millisecond)
@@ -479,7 +479,7 @@ func testThriftRawBinaryEcho(t *testing.T) {
 
 func testThriftBase64BinaryEcho(t *testing.T) {
 	var opts []generic.Option
-	opts = append(opts, generic.WithCustomDynamicgoConvOpts(&conv.Options{WriteRequireField: true, WriteDefaultField: true, NoBase64Binary: false}))
+	opts = append(opts, generic.WithCustomDynamicGoConvOpts(&conv.Options{WriteRequireField: true, WriteDefaultField: true, NoBase64Binary: false}))
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":8126", new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift", opts, nil, false)
 	time.Sleep(500 * time.Millisecond)

@@ -61,7 +61,7 @@ func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithException *conv.Op
 	w.dyConvOpts = convOpts
 	w.dyConvOptsWithThriftBase = convOptsWithException
 	w.dynamicgoEnabled = true
-	fn := w.svc.DynamicgoDsc.Functions()[method]
+	fn := w.svc.DynamicGoDsc.Functions()[method]
 	w.hasRequestBase = fn.HasRequestBase()
 	w.ty = fn.Request()
 }
@@ -151,7 +151,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
 
-	tyDsc := r.svc.DynamicgoDsc.Functions()[method].Response()
+	tyDsc := r.svc.DynamicGoDsc.Functions()[method].Response()
 
 	mBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
 	sName, err := in.ReadStructBegin()

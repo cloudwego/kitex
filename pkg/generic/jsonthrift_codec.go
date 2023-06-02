@@ -52,12 +52,12 @@ type jsonThriftCodec struct {
 func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*jsonThriftCodec, error) {
 	svc := <-p.Provide()
 	c := &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true, dynamicgoEnabled: false}
-	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoExpected && svc.DynamicgoDsc != nil {
+	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoExpected && svc.DynamicGoDsc != nil {
 		c.dynamicgoEnabled = true
-		if !opts.isSetdynamicgoConvOpts {
+		if !opts.isSetDynamicGoConvOpts {
 			// set default dynamicgo conv.Options if it is not specified
-			opts.dynamicgoConvOpts = defaultJSONDynamicgoConvOpts
-			opts.isSetdynamicgoConvOpts = true
+			opts.dynamicgoConvOpts = defaultJSONDynamicGoConvOpts
+			opts.isSetDynamicGoConvOpts = true
 		}
 		c.dyConvOpts = opts.dynamicgoConvOpts
 

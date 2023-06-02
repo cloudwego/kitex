@@ -63,10 +63,10 @@ func TestRun(t *testing.T) {
 	t.Run("TestFallbackFromDynamicGo", testFallbackFromDynamicGo)
 }
 
-func initThriftClientByIDL(t *testing.T, tp transport.Protocol, addr, idl string, opts []generic.Option, base64Binary, enableDynamicgo bool) genericclient.Client {
+func initThriftClientByIDL(t *testing.T, tp transport.Protocol, addr, idl string, opts []generic.Option, base64Binary, enableDynamicGo bool) genericclient.Client {
 	var p generic.DescriptorProvider
 	var err error
-	if enableDynamicgo {
+	if enableDynamicGo {
 		p, err = generic.NewThriftFileProviderWithDynamicGo(idl)
 	} else {
 		p, err = generic.NewThriftFileProvider(idl)
@@ -135,7 +135,7 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: dynamicgo
-	opts = append(opts, generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.EnableDynamicGoHTTPResp(true))
 	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8126", "./idl/binary_echo.thrift", opts, false, true)
 	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -241,7 +241,7 @@ func BenchmarkCompareDynamicgoAndOriginal_Small(b *testing.B) {
 
 	t := testing.T{}
 	var opts []generic.Option
-	opts = append(opts, generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.EnableDynamicGoHTTPResp(true))
 
 	b.Run("thrift_small_dynamicgo", func(b *testing.B) {
 		time.Sleep(1 * time.Second)
@@ -310,7 +310,7 @@ func BenchmarkCompareDynamicgoAndOriginal_Medium(b *testing.B) {
 
 	t := testing.T{}
 	var opts []generic.Option
-	opts = append(opts, generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.EnableDynamicGoHTTPResp(true))
 
 	b.Run("thrift_medium_dynamicgo", func(b *testing.B) {
 		time.Sleep(1 * time.Second)
@@ -394,7 +394,7 @@ func testThriftException(t *testing.T) {
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: dynamicgo
 	var opts []generic.Option
-	opts = append(opts, generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.EnableDynamicGoHTTPResp(true))
 	cli := initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8128", "./idl/mock.thrift", opts, false, true)
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -436,7 +436,7 @@ func testRegression(t *testing.T) {
 	/// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: dynamicgo
 	var opts []generic.Option
-	opts = append(opts, generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.EnableDynamicGoHTTPResp(true))
 	cli := initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8121", "./idl/baseline.thrift", opts, false, true)
 	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil)
@@ -472,7 +472,7 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 
 	var opts []generic.Option
 	convOpts := conv.Options{EnableValueMapping: true, NoBase64Binary: false}
-	opts = append(opts, generic.WithCustomDynamicgoConvOpts(&convOpts), generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.WithCustomDynamicGoConvOpts(&convOpts), generic.EnableDynamicGoHTTPResp(true))
 
 	url := "http://example.com/BinaryEcho"
 
@@ -571,7 +571,7 @@ func testFallbackFromDynamicGo(t *testing.T) {
 	}
 
 	var opts []generic.Option
-	opts = append(opts, generic.EnableDynamicgoHTTPResp(true))
+	opts = append(opts, generic.EnableDynamicGoHTTPResp(true))
 	p, err := newCustomThriftFileProviderWithFallback("./idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
 	g, err := generic.HTTPThriftGeneric(p, opts...)

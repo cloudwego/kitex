@@ -75,7 +75,7 @@ func NewThriftFileProviderWithDynamicGo(path string, includeDirs ...string) (Des
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
 		return p, nil
 	}
-	svc.DynamicgoDsc = dsvc
+	svc.DynamicGoDsc = dsvc
 
 	p.svcs <- svc
 	return p, nil
@@ -296,8 +296,8 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	return p, nil
 }
 
-// NewThriftContentWithAbsIncludePathProviderWithDynamicgo create abs include path DescriptorProvider with dynamicgo
-func NewThriftContentWithAbsIncludePathProviderWithDynamicgo(mainIDLPath string, includes map[string]string) (*ThriftContentWithAbsIncludePathProvider, error) {
+// NewThriftContentWithAbsIncludePathProviderWithDynamicGo create abs include path DescriptorProvider with dynamicgo
+func NewThriftContentWithAbsIncludePathProviderWithDynamicGo(mainIDLPath string, includes map[string]string) (*ThriftContentWithAbsIncludePathProvider, error) {
 	p := &ThriftContentWithAbsIncludePathProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
 		opts: &ProviderOption{DynamicGoExpected: true, FallbackFromDynamicGo: false},
@@ -395,6 +395,6 @@ func newDynamicgoDscFromContent(svc *descriptor.ServiceDescriptor, path, content
 	if err != nil {
 		return err
 	}
-	svc.DynamicgoDsc = dsvc
+	svc.DynamicGoDsc = dsvc
 	return nil
 }

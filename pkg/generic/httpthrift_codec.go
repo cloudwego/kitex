@@ -67,11 +67,11 @@ func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *O
 			c.fallback = true
 		} else {
 			c.dynamicgoEnabled = true
-			c.enableDynamicGoHTTPResp = opts.enableDynamicgoHTTPResp
+			c.enableDynamicGoHTTPResp = opts.enableDynamicGoHTTPResp
 			// set default dynamicgo conv.Options if it is not specified
-			if !opts.isSetdynamicgoConvOpts {
-				opts.dynamicgoConvOpts = defaultHTTPDynamicgoConvOpts
-				opts.isSetdynamicgoConvOpts = true
+			if !opts.isSetDynamicGoConvOpts {
+				opts.dynamicgoConvOpts = defaultHTTPDynamicGoConvOpts
+				opts.isSetDynamicGoConvOpts = true
 			}
 			c.dyConvOpts = opts.dynamicgoConvOpts
 			c.t2jBinaryConv = t2j.NewBinaryConv(opts.dynamicgoConvOpts)

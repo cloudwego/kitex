@@ -49,14 +49,14 @@ func TestThriftFileProvider(t *testing.T) {
 	defer p.Close()
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.DynamicgoDsc == nil)
+	test.Assert(t, tree.DynamicGoDsc == nil)
 
 	p, err = NewThriftFileProviderWithDynamicGo(path)
 	test.Assert(t, err == nil)
 	defer p.Close()
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.DynamicgoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc != nil)
 }
 
 func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
@@ -91,7 +91,7 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "InboxService")
-	test.Assert(t, tree.DynamicgoDsc == nil)
+	test.Assert(t, tree.DynamicGoDsc == nil)
 	includes[path] = newContent
 	err = p.UpdateIDL(path, includes)
 	defer p.Close()
@@ -99,17 +99,17 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "UpdateService")
-	test.Assert(t, tree.DynamicgoDsc == nil)
+	test.Assert(t, tree.DynamicGoDsc == nil)
 
 	includes[path] = content
-	p, err = NewThriftContentWithAbsIncludePathProviderWithDynamicgo(path, includes)
+	p, err = NewThriftContentWithAbsIncludePathProviderWithDynamicGo(path, includes)
 	test.Assert(t, err == nil)
 	defer p.Close()
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "InboxService")
-	test.Assert(t, tree.DynamicgoDsc != nil)
-	test.Assert(t, tree.DynamicgoDsc.Name() == "InboxService")
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Name() == "InboxService")
 	includes[path] = newContent
 	err = p.UpdateIDL(path, includes)
 	defer p.Close()
@@ -117,8 +117,8 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "UpdateService")
-	test.Assert(t, tree.DynamicgoDsc != nil)
-	test.Assert(t, tree.DynamicgoDsc.Name() == "UpdateService")
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Name() == "UpdateService")
 }
 
 func TestCircularDependency(t *testing.T) {
@@ -167,29 +167,29 @@ func TestThriftContentProvider(t *testing.T) {
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "InboxService")
-	test.Assert(t, tree.DynamicgoDsc == nil)
+	test.Assert(t, tree.DynamicGoDsc == nil)
 	err = p.UpdateIDL(newContent, nil)
 	defer p.Close()
 	tree = <-p.Provide()
 	test.Assert(t, err == nil)
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "UpdateService")
-	test.Assert(t, tree.DynamicgoDsc == nil)
+	test.Assert(t, tree.DynamicGoDsc == nil)
 
 	p, err = NewThriftContentProviderWithDynamicGo(content, nil)
 	test.Assert(t, err == nil, err)
 	defer p.Close()
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.DynamicgoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc != nil)
 	err = p.UpdateIDL(newContent, nil)
 	defer p.Close()
 	tree = <-p.Provide()
 	test.Assert(t, err == nil)
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "UpdateService")
-	test.Assert(t, tree.DynamicgoDsc != nil)
-	test.Assert(t, tree.DynamicgoDsc.Name() == "UpdateService")
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Name() == "UpdateService")
 }
 
 func TestDisableGoTagForDynamicGo(t *testing.T) {
@@ -199,8 +199,8 @@ func TestDisableGoTagForDynamicGo(t *testing.T) {
 	defer p.Close()
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.DynamicgoDsc != nil)
-	test.Assert(t, tree.DynamicgoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "STR")
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "STR")
 
 	dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
 	p, err = NewThriftFileProviderWithDynamicGo(path)
@@ -208,6 +208,6 @@ func TestDisableGoTagForDynamicGo(t *testing.T) {
 	defer p.Close()
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.DynamicgoDsc != nil)
-	test.Assert(t, tree.DynamicgoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "str")
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "str")
 }

@@ -88,7 +88,7 @@ func TestHTTPThriftGeneric(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	var opts []Option
-	opts = append(opts, EnableDynamicgoHTTPResp(true))
+	opts = append(opts, EnableDynamicGoHTTPResp(true))
 	g, err := HTTPThriftGeneric(p, opts...)
 	test.Assert(t, err == nil)
 	defer g.Close()

@@ -83,9 +83,9 @@ func (m *WriteJSON) SetBase64Binary(enable bool) {
 func (m *WriteJSON) SetDynamicGo(svc *descriptor.ServiceDescriptor, method string, convOpts, convOptsWithTHriftBase *conv.Options) {
 	var dty *dthrift.TypeDescriptor
 	if m.isClient {
-		dty = svc.DynamicgoDsc.Functions()[method].Request()
+		dty = svc.DynamicGoDsc.Functions()[method].Request()
 	} else {
-		dty = svc.DynamicgoDsc.Functions()[method].Response()
+		dty = svc.DynamicGoDsc.Functions()[method].Response()
 	}
 	m.dty = dty
 	m.dyConvOpts = convOpts
@@ -206,9 +206,9 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 
 	var tyDsc *dthrift.TypeDescriptor
 	if m.msg.MessageType() == remote.Reply {
-		tyDsc = m.svc.DynamicgoDsc.Functions()[method].Response()
+		tyDsc = m.svc.DynamicGoDsc.Functions()[method].Response()
 	} else {
-		tyDsc = m.svc.DynamicgoDsc.Functions()[method].Request()
+		tyDsc = m.svc.DynamicGoDsc.Functions()[method].Request()
 	}
 
 	var resp interface{}
