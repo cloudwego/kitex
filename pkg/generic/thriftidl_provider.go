@@ -45,7 +45,7 @@ type thriftFileProvider struct {
 func NewThriftFileProvider(path string, includeDirs ...string) (DescriptorProvider, error) {
 	p := &thriftFileProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-		opts: &ProviderOption{DynamicGoExpected: false},
+		opts: &ProviderOption{DynamicGoExpected: false, FallbackFromDynamicGo: false},
 	}
 	svc, err := newServiceDescriptorFromPath(path, includeDirs...)
 	if err != nil {
@@ -59,7 +59,7 @@ func NewThriftFileProvider(path string, includeDirs ...string) (DescriptorProvid
 func NewThriftFileProviderWithDynamicGo(path string, includeDirs ...string) (DescriptorProvider, error) {
 	p := &thriftFileProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-		opts: &ProviderOption{DynamicGoExpected: true},
+		opts: &ProviderOption{DynamicGoExpected: true, FallbackFromDynamicGo: false},
 	}
 
 	svc, err := newServiceDescriptorFromPath(path, includeDirs...)
@@ -71,6 +71,7 @@ func NewThriftFileProviderWithDynamicGo(path string, includeDirs ...string) (Des
 	dsvc, err := dthrift.NewDescritorFromPath(context.Background(), path, includeDirs...)
 	if err != nil {
 		// fall back to the original way (without dynamicgo)
+		p.opts.FallbackFromDynamicGo = true
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
 		return p, nil
 	}
@@ -142,7 +143,7 @@ func NewThriftContentProvider(main string, includes map[string]string) (*ThriftC
 func NewThriftContentProviderWithDynamicGo(main string, includes map[string]string) (*ThriftContentProvider, error) {
 	p := &ThriftContentProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-		opts: &ProviderOption{DynamicGoExpected: true},
+		opts: &ProviderOption{DynamicGoExpected: true, FallbackFromDynamicGo: false},
 	}
 	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false)
 	if err != nil {
@@ -151,6 +152,7 @@ func NewThriftContentProviderWithDynamicGo(main string, includes map[string]stri
 
 	if err = newDynamicgoDscFromContent(svc, defaultMainIDLPath, main, includes, false); err != nil {
 		// fall back to the original way (without dynamicgo)
+		p.opts.FallbackFromDynamicGo = true
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
 		return p, nil
 	}
@@ -173,7 +175,10 @@ func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]strin
 
 	if p.opts.DynamicGoExpected {
 		if err = newDynamicgoDscFromContent(svc, defaultMainIDLPath, main, includes, false); err != nil {
-			return err
+			p.opts.FallbackFromDynamicGo = true
+			klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
+		} else {
+			p.opts.FallbackFromDynamicGo = false
 		}
 	}
 
@@ -276,7 +281,7 @@ var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
 func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map[string]string) (*ThriftContentWithAbsIncludePathProvider, error) {
 	p := &ThriftContentWithAbsIncludePathProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-		opts: &ProviderOption{DynamicGoExpected: false},
+		opts: &ProviderOption{DynamicGoExpected: false, FallbackFromDynamicGo: false},
 	}
 	mainIDLContent, ok := includes[mainIDLPath]
 	if !ok {
@@ -295,7 +300,7 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 func NewThriftContentWithAbsIncludePathProviderWithDynamicgo(mainIDLPath string, includes map[string]string) (*ThriftContentWithAbsIncludePathProvider, error) {
 	p := &ThriftContentWithAbsIncludePathProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-		opts: &ProviderOption{DynamicGoExpected: true},
+		opts: &ProviderOption{DynamicGoExpected: true, FallbackFromDynamicGo: false},
 	}
 	mainIDLContent, ok := includes[mainIDLPath]
 	if !ok {
@@ -308,6 +313,7 @@ func NewThriftContentWithAbsIncludePathProviderWithDynamicgo(mainIDLPath string,
 
 	if err = newDynamicgoDscFromContent(svc, mainIDLPath, mainIDLContent, includes, true); err != nil {
 		// fall back to the original way (without dynamicgo)
+		p.opts.FallbackFromDynamicGo = true
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
 		return p, nil
 	}
@@ -334,7 +340,10 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 
 	if p.opts.DynamicGoExpected {
 		if err = newDynamicgoDscFromContent(svc, mainIDLPath, mainIDLContent, includes, true); err != nil {
-			return err
+			p.opts.FallbackFromDynamicGo = true
+			klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
+		} else {
+			p.opts.FallbackFromDynamicGo = false
 		}
 	}
 

@@ -603,7 +603,7 @@ type thriftFileProvider struct {
 func newCustomThriftFileProviderWithFallback(path string, includeDirs ...string) (generic.DescriptorProvider, error) {
 	p := &thriftFileProvider{
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-		opts: &generic.ProviderOption{DynamicGoExpected: true},
+		opts: &generic.ProviderOption{DynamicGoExpected: true, FallbackFromDynamicGo: true},
 	}
 
 	tree, err := parser.ParseFile(path, includeDirs, true)

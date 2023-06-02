@@ -39,12 +39,15 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		return m.originalWrite(ctx, out, msg, requestBase)
 	}
 
+	var cv j2t.BinaryConv
 	// dynamicgo logic
 	if !m.hasRequestBase {
 		requestBase = nil
 	}
 	if requestBase != nil {
-		m.dyOpts.EnableThriftBase = true
+		cv = j2t.NewBinaryConv(*m.dyConvOptsWithThriftBase)
+	} else {
+		cv = j2t.NewBinaryConv(*m.dyConvOpts)
 	}
 
 	// msg is void
@@ -64,7 +67,6 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
 	}
 
-	cv := j2t.NewBinaryConv(*m.dyOpts)
 	transBuff := utils.StringToSliceByte(s)
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
 	defer mcache.Free(dbuf)

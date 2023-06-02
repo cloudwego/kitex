@@ -25,6 +25,8 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
+	"github.com/cloudwego/dynamicgo/conv/j2t"
+
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
@@ -40,14 +42,15 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 	// dynamicgo logic
 	req := msg.(*descriptor.HTTPRequest)
 
-	fn := w.svc.DynamicgoDsc.Functions()[w.method]
-	if !fn.HasRequestBase() {
+	var cv j2t.BinaryConv
+	if !w.hasRequestBase {
 		requestBase = nil
 	}
 	if requestBase != nil {
-		w.dyOpts.EnableThriftBase = true
+		cv = j2t.NewBinaryConv(*w.dyConvOptsWithThriftBase)
+	} else {
+		cv = j2t.NewBinaryConv(*w.dyConvOpts)
 	}
-	ty := fn.Request()
 
 	body := req.GetBody()
 
@@ -58,19 +61,19 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
 
-	if err := out.WriteStructBegin(ty.Struct().Name()); err != nil {
+	if err := out.WriteStructBegin(w.ty.Struct().Name()); err != nil {
 		return err
 	}
 
 	dbuf := mcache.Malloc(len(body))[0:0]
 
-	for _, field := range ty.Struct().Fields() {
+	for _, field := range w.ty.Struct().Fields() {
 		if err := out.WriteFieldBegin(field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID())); err != nil {
 			return err
 		}
 
 		// json []byte to thrift []byte
-		if err := w.cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
+		if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
 			return err
 		}
 

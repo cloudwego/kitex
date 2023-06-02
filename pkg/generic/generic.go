@@ -118,13 +118,20 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
 		c.codec.binaryWithBase64 = enable
-		c.codec.opts.dynamicgoConvOpts.NoBase64Binary = !enable
+		if c.codec.dynamicgoEnabled {
+			c.codec.dyConvOpts.NoBase64Binary = !enable
+			c.codec.dyConvOptsWithThriftBase.NoBase64Binary = !enable
+		}
 	case *jsonThriftGeneric:
 		if c.codec == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
 		c.codec.binaryWithBase64 = enable
-		c.codec.opts.dynamicgoConvOpts.NoBase64Binary = !enable
+		if c.codec.dynamicgoEnabled {
+			c.codec.dyConvOpts.NoBase64Binary = !enable
+			c.codec.dyConvOptsWithThriftBase.NoBase64Binary = !enable
+			c.codec.dyConvOptsWithException.NoBase64Binary = !enable
+		}
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
 	}

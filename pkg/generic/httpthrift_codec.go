@@ -25,6 +25,9 @@ import (
 	"net/http"
 	"sync/atomic"
 
+	"github.com/cloudwego/dynamicgo/conv"
+	"github.com/cloudwego/dynamicgo/conv/t2j"
+
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -44,33 +47,41 @@ type HTTPRequest = descriptor.HTTPRequest
 type HTTPResponse = descriptor.HTTPResponse
 
 type httpThriftCodec struct {
-	svcDsc           atomic.Value // *idl
-	provider         DescriptorProvider
-	codec            remote.PayloadCodec
-	binaryWithBase64 bool
-	opts             *Options
-	dynamicgoEnabled bool
-	// fallback will be true when dynamicgo is expected to be used but it cannot be
-	fallback bool
+	svcDsc                   atomic.Value // *idl
+	provider                 DescriptorProvider
+	codec                    remote.PayloadCodec
+	binaryWithBase64         bool
+	dyConvOpts               conv.Options
+	dyConvOptsWithThriftBase conv.Options
+	t2jBinaryConv            t2j.BinaryConv
+	dynamicgoEnabled         bool
+	enableDynamicGoHTTPResp  bool
+	fallback                 bool // fallback will be true when dynamicgo is expected to be used but it cannot be
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*httpThriftCodec, error) {
 	svc := <-p.Provide()
-	dynamicgoEnabled := false
-	fallback := false
+	c := &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false, dynamicgoEnabled: false, fallback: false}
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoExpected {
-		if svc.DynamicgoDsc == nil {
-			fallback = true
+		if dp.Option().FallbackFromDynamicGo {
+			c.fallback = true
 		} else {
-			dynamicgoEnabled = true
+			c.dynamicgoEnabled = true
+			c.enableDynamicGoHTTPResp = opts.enableDynamicgoHTTPResp
 			// set default dynamicgo conv.Options if it is not specified
 			if !opts.isSetdynamicgoConvOpts {
 				opts.dynamicgoConvOpts = defaultHTTPDynamicgoConvOpts
 				opts.isSetdynamicgoConvOpts = true
 			}
+			c.dyConvOpts = opts.dynamicgoConvOpts
+			c.t2jBinaryConv = t2j.NewBinaryConv(opts.dynamicgoConvOpts)
+
+			convOptsWithThriftBase := opts.dynamicgoConvOpts
+			convOptsWithThriftBase.EnableThriftBase = true
+			c.dyConvOptsWithThriftBase = convOptsWithThriftBase
+
 		}
 	}
-	c := &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false, opts: opts, dynamicgoEnabled: dynamicgoEnabled, fallback: fallback}
 	c.svcDsc.Store(svc)
 	go c.update()
 	return c, nil
@@ -109,10 +120,9 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	}
 
 	inner := thrift.NewWriteHTTPRequest(svcDsc)
+	inner.SetBinaryWithBase64(c.binaryWithBase64)
 	if c.dynamicgoEnabled {
-		inner.SetDynamicGo(&c.opts.dynamicgoConvOpts, msg.RPCInfo().Invocation().MethodName())
-	} else {
-		inner.SetBinaryWithBase64(c.binaryWithBase64)
+		inner.SetDynamicGo(&c.dyConvOpts, &c.dyConvOptsWithThriftBase, msg.RPCInfo().Invocation().MethodName())
 	}
 
 	msg.Data().(WithCodec).SetCodec(inner)
@@ -131,8 +141,8 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	inner := thrift.NewReadHTTPResponse(svcDsc)
 	inner.SetBase64Binary(c.binaryWithBase64)
 	inner.SetFallback(c.fallback)
-	if c.dynamicgoEnabled && c.opts.enableDynamicgoHTTPResp {
-		inner.SetDynamicGo(&c.opts.dynamicgoConvOpts, msg)
+	if c.dynamicgoEnabled && c.enableDynamicGoHTTPResp {
+		inner.SetDynamicGo(c.t2jBinaryConv, msg)
 	}
 
 	msg.Data().(WithCodec).SetCodec(inner)

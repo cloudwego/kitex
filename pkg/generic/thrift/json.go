@@ -61,13 +61,14 @@ var _ = wrapJSONWriter
 
 // WriteJSON implement of MessageWriter
 type WriteJSON struct {
-	ty               *descriptor.TypeDescriptor
-	dty              *dthrift.TypeDescriptor
-	hasRequestBase   bool
-	base64Binary     bool
-	isClient         bool
-	dyOpts           *conv.Options
-	dynamicgoEnabled bool
+	ty                       *descriptor.TypeDescriptor
+	dty                      *dthrift.TypeDescriptor
+	hasRequestBase           bool
+	base64Binary             bool
+	isClient                 bool
+	dyConvOpts               *conv.Options
+	dyConvOptsWithThriftBase *conv.Options
+	dynamicgoEnabled         bool
 }
 
 var _ MessageWriter = (*WriteJSON)(nil)
@@ -79,8 +80,7 @@ func (m *WriteJSON) SetBase64Binary(enable bool) {
 }
 
 // SetDynamicGo ...
-func (m *WriteJSON) SetDynamicGo(svc *descriptor.ServiceDescriptor, method string, opts *conv.Options) {
-	m.dyOpts = opts
+func (m *WriteJSON) SetDynamicGo(svc *descriptor.ServiceDescriptor, method string, convOpts, convOptsWithTHriftBase *conv.Options) {
 	var dty *dthrift.TypeDescriptor
 	if m.isClient {
 		dty = svc.DynamicgoDsc.Functions()[method].Request()
@@ -88,6 +88,8 @@ func (m *WriteJSON) SetDynamicGo(svc *descriptor.ServiceDescriptor, method strin
 		dty = svc.DynamicgoDsc.Functions()[method].Response()
 	}
 	m.dty = dty
+	m.dyConvOpts = convOpts
+	m.dyConvOptsWithThriftBase = convOptsWithTHriftBase
 	m.dynamicgoEnabled = true
 }
 
@@ -135,8 +137,8 @@ type ReadJSON struct {
 	svc              *descriptor.ServiceDescriptor
 	isClient         bool
 	binaryWithBase64 bool
-	dyOpts           *conv.Options
 	msg              remote.Message
+	cv               t2j.BinaryConv
 	useDynamicgo     bool
 }
 
@@ -149,10 +151,15 @@ func (m *ReadJSON) SetBinaryWithBase64(enable bool) {
 }
 
 // SetDynamicGo ...
-func (m *ReadJSON) SetDynamicGo(opts *conv.Options, msg remote.Message) {
-	m.dyOpts = opts
+func (m *ReadJSON) SetDynamicGo(convOpts, convOptsWithException *conv.Options, msg remote.Message) {
 	m.msg = msg
 	m.useDynamicgo = true
+	if m.isClient {
+		// set dynamicgo option to handle an exception field
+		m.cv = t2j.NewBinaryConv(*convOptsWithException)
+	} else {
+		m.cv = t2j.NewBinaryConv(*convOpts)
+	}
 }
 
 // Read read data from in thrift.TProtocol and convert to json string
@@ -218,13 +225,8 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 		}
 
 		buf := make([]byte, 0, len(transBuff)*2)
-		// set dynamicgo option to handle an exception field
-		if m.isClient {
-			m.dyOpts.ConvertException = true
-		}
-		cv := t2j.NewBinaryConv(*m.dyOpts)
 		// thrift []byte to json []byte
-		if err := cv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
+		if err := m.cv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
 			return nil, err
 		}
 		if len(buf) > structWrapLen {

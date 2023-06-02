@@ -33,4 +33,6 @@ type GetProviderOption interface {
 type ProviderOption struct {
 	// DynamicGoExpected is if the user expects to use dynamicgo or not
 	DynamicGoExpected bool
+	// FallbackFromDynamicGo is whether dynamicgo was expected but fallback is needed for some reason
+	FallbackFromDynamicGo bool
 }
