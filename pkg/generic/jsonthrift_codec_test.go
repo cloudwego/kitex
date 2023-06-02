@@ -32,7 +32,7 @@ func TestJsonThriftCodec(t *testing.T) {
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option
-	jtc, err := newJsonThriftCodec(p, thriftCodec, NewOptions(opts))
+	jtc, err := newJsonThriftCodec(p, thriftCodec, NewOptions(opts, JSON))
 	test.Assert(t, err == nil)
 	test.Assert(t, !jtc.dynamicgoEnabled)
 	defer jtc.Close()
@@ -65,7 +65,7 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	p, err := NewThriftFileProviderWithDynamicGo("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option
-	jtc, err := newJsonThriftCodec(p, thriftCodec, NewOptions(opts))
+	jtc, err := newJsonThriftCodec(p, thriftCodec, NewOptions(opts, JSON))
 	test.Assert(t, err == nil)
 	test.Assert(t, jtc.dynamicgoEnabled)
 	defer jtc.Close()
@@ -114,7 +114,7 @@ func TestJsonExceptionError(t *testing.T) {
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
 	var opts []Option
-	jtc, err := newJsonThriftCodec(p, thriftCodec, NewOptions(opts))
+	jtc, err := newJsonThriftCodec(p, thriftCodec, NewOptions(opts, JSON))
 	test.Assert(t, err == nil)
 
 	ctx := context.Background()
@@ -136,7 +136,7 @@ func TestJsonExceptionError(t *testing.T) {
 	// with dynamicgo
 	p, err = NewThriftFileProviderWithDynamicGo("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	jtc, err = newJsonThriftCodec(p, thriftCodec, NewOptions(opts))
+	jtc, err = newJsonThriftCodec(p, thriftCodec, NewOptions(opts, JSON))
 	test.Assert(t, err == nil)
 	// empty method test
 	err = jtc.Marshal(ctx, emptyMethodMsg, out)

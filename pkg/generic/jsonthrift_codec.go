@@ -54,11 +54,7 @@ func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *O
 	c := &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true, dynamicgoEnabled: false}
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoExpected {
 		c.dynamicgoEnabled = true
-		if !opts.isSetDynamicGoConvOpts {
-			// set default dynamicgo conv.Options if it is not specified
-			opts.dynamicgoConvOpts = defaultJSONDynamicGoConvOpts
-			opts.isSetDynamicGoConvOpts = true
-		}
+
 		c.dyConvOpts = opts.dynamicgoConvOpts
 
 		convOptsWithThriftBase := opts.dynamicgoConvOpts

@@ -33,11 +33,16 @@ var (
 	}
 )
 
+type genericType int
+
+const (
+	JSON genericType = iota
+	HTTP
+)
+
 type Options struct {
 	// options for dynamicgo conversion
 	dynamicgoConvOpts conv.Options
-	// whether dynamicgoConvOpts is specified
-	isSetDynamicGoConvOpts bool
 	// flag to set whether to store http resp body into HTTPResponse.RawBody
 	useRawBodyForHTTPResp bool
 }
@@ -47,8 +52,14 @@ type Option struct {
 }
 
 // NewOptions creates a new option
-func NewOptions(opts []Option) *Options {
+func NewOptions(opts []Option, genericType genericType) *Options {
 	o := &Options{}
+	switch genericType {
+	case JSON:
+		o.dynamicgoConvOpts = defaultJSONDynamicGoConvOpts
+	case HTTP:
+		o.dynamicgoConvOpts = defaultHTTPDynamicGoConvOpts
+	}
 	o.apply(opts)
 	return o
 }
@@ -64,7 +75,6 @@ func (o *Options) apply(opts []Option) {
 func WithCustomDynamicGoConvOpts(opts *conv.Options) Option {
 	return Option{F: func(opt *Options) {
 		opt.dynamicgoConvOpts = *opts
-		opt.isSetDynamicGoConvOpts = true
 	}}
 }
 
