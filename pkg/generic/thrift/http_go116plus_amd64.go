@@ -2,7 +2,7 @@
 // +build amd64,go1.16
 
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2023 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,9 +47,9 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		requestBase = nil
 	}
 	if requestBase != nil {
-		cv = j2t.NewBinaryConv(*w.dyConvOptsWithThriftBase)
+		cv = j2t.NewBinaryConv(*w.dynamicgoConvOptsWithThriftBase)
 	} else {
-		cv = j2t.NewBinaryConv(*w.dyConvOpts)
+		cv = j2t.NewBinaryConv(*w.dynamicgoConvOpts)
 	}
 
 	body := req.GetBody()
@@ -61,13 +61,13 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
 
-	if err := out.WriteStructBegin(w.ty.Struct().Name()); err != nil {
+	if err := out.WriteStructBegin(w.dynamicgoTy.Struct().Name()); err != nil {
 		return err
 	}
 
 	dbuf := mcache.Malloc(len(body))[0:0]
 
-	for _, field := range w.ty.Struct().Fields() {
+	for _, field := range w.dynamicgoTy.Struct().Fields() {
 		if err := out.WriteFieldBegin(field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID())); err != nil {
 			return err
 		}

@@ -135,7 +135,7 @@ func (req *HTTPRequest) GetUri() string {
 type HTTPResponse struct {
 	Header      http.Header
 	StatusCode  int32
-	RawBody     []byte
+	RawBody     []byte // this field is set only when generic.UseRawBodyForHTTPResp(true) is set
 	Body        map[string]interface{}
 	GeneralBody interface{} // body of other representation, used with ContentType
 	ContentType MIMEType
@@ -166,9 +166,7 @@ func (resp *HTTPResponse) SetHeader(key, val string) error {
 
 // SetCookie implements http.ResponseSetter of dynamicgo
 func (resp *HTTPResponse) SetCookie(key, val string) error {
-	// TODO: send Cookie along with Header
-	// c := &http.Cookie{Name: key, Value: val}
-	// resp.Header.Add("Set-Cookie", c.String())
+	// kitex generic call does not care about Cookie
 	return nil
 }
 

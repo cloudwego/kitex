@@ -39,14 +39,14 @@ var (
 type JSONRequest = string
 
 type jsonThriftCodec struct {
-	svcDsc                   atomic.Value // *idl
-	provider                 DescriptorProvider
-	codec                    remote.PayloadCodec
-	binaryWithBase64         bool
-	dyConvOpts               conv.Options
-	dyConvOptsWithThriftBase conv.Options
-	dyConvOptsWithException  conv.Options
-	dynamicgoEnabled         bool
+	svcDsc                          atomic.Value // *idl
+	provider                        DescriptorProvider
+	codec                           remote.PayloadCodec
+	binaryWithBase64                bool
+	dynamicgoConvOpts               conv.Options // conversion options for dynamicgo
+	dynamicgoConvOptsWithThriftBase conv.Options // conversion options for dynamicgo with EnableThriftBase turned on
+	dynamicgoConvOptsWithException  conv.Options // conversion options for dynamicgo with ConvertException turned on
+	dynamicgoEnabled                bool
 }
 
 func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*jsonThriftCodec, error) {
@@ -55,15 +55,15 @@ func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *O
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoExpected {
 		c.dynamicgoEnabled = true
 
-		c.dyConvOpts = opts.dynamicgoConvOpts
+		c.dynamicgoConvOpts = opts.dynamicgoConvOpts
 
 		convOptsWithThriftBase := opts.dynamicgoConvOpts
 		convOptsWithThriftBase.EnableThriftBase = true
-		c.dyConvOptsWithThriftBase = convOptsWithThriftBase
+		c.dynamicgoConvOptsWithThriftBase = convOptsWithThriftBase
 
 		convOptsWithException := opts.dynamicgoConvOpts
 		convOptsWithException.ConvertException = true
-		c.dyConvOptsWithException = convOptsWithException
+		c.dynamicgoConvOptsWithException = convOptsWithException
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
@@ -99,7 +99,7 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	}
 	wm.SetBase64Binary(c.binaryWithBase64)
 	if c.dynamicgoEnabled {
-		wm.SetDynamicGo(svcDsc, method, &c.dyConvOpts, &c.dyConvOptsWithThriftBase)
+		wm.SetDynamicGo(svcDsc, method, &c.dynamicgoConvOpts, &c.dynamicgoConvOptsWithThriftBase)
 	}
 
 	msg.Data().(WithCodec).SetCodec(wm)
@@ -119,7 +119,7 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	rm.SetBinaryWithBase64(c.binaryWithBase64)
 	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
 	if c.dynamicgoEnabled && msg.PayloadLen() != 0 {
-		rm.SetDynamicGo(&c.dyConvOpts, &c.dyConvOptsWithException, msg)
+		rm.SetDynamicGo(&c.dynamicgoConvOpts, &c.dynamicgoConvOptsWithException, msg)
 	}
 
 	msg.Data().(WithCodec).SetCodec(rm)

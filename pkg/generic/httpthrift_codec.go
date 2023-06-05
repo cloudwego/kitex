@@ -47,15 +47,15 @@ type HTTPRequest = descriptor.HTTPRequest
 type HTTPResponse = descriptor.HTTPResponse
 
 type httpThriftCodec struct {
-	svcDsc                   atomic.Value // *idl
-	provider                 DescriptorProvider
-	codec                    remote.PayloadCodec
-	binaryWithBase64         bool
-	dyConvOpts               conv.Options
-	dyConvOptsWithThriftBase conv.Options
-	t2jBinaryConv            t2j.BinaryConv
-	dynamicgoEnabled         bool
-	useRawBodyForHTTPResp    bool
+	svcDsc                          atomic.Value // *idl
+	provider                        DescriptorProvider
+	codec                           remote.PayloadCodec
+	binaryWithBase64                bool
+	dynamicgoConvOpts               conv.Options   // conversion options for dynamicgo
+	dynamicgoConvOptsWithThriftBase conv.Options   // conversion options for dynamicgo with EnableThriftBase turned on
+	binaryConv                      t2j.BinaryConv // used for dynamicgo thrift to json conversion
+	dynamicgoEnabled                bool
+	useRawBodyForHTTPResp           bool
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*httpThriftCodec, error) {
@@ -64,12 +64,12 @@ func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *O
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoExpected {
 		c.dynamicgoEnabled = true
 
-		c.dyConvOpts = opts.dynamicgoConvOpts
-		c.t2jBinaryConv = t2j.NewBinaryConv(opts.dynamicgoConvOpts)
+		c.dynamicgoConvOpts = opts.dynamicgoConvOpts
+		c.binaryConv = t2j.NewBinaryConv(opts.dynamicgoConvOpts)
 
 		convOptsWithThriftBase := opts.dynamicgoConvOpts
 		convOptsWithThriftBase.EnableThriftBase = true
-		c.dyConvOptsWithThriftBase = convOptsWithThriftBase
+		c.dynamicgoConvOptsWithThriftBase = convOptsWithThriftBase
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
@@ -111,7 +111,7 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	inner := thrift.NewWriteHTTPRequest(svcDsc)
 	inner.SetBinaryWithBase64(c.binaryWithBase64)
 	if c.dynamicgoEnabled {
-		inner.SetDynamicGo(&c.dyConvOpts, &c.dyConvOptsWithThriftBase, msg.RPCInfo().Invocation().MethodName())
+		inner.SetDynamicGo(&c.dynamicgoConvOpts, &c.dynamicgoConvOptsWithThriftBase, msg.RPCInfo().Invocation().MethodName())
 	}
 
 	msg.Data().(WithCodec).SetCodec(inner)
@@ -131,7 +131,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	inner.SetBase64Binary(c.binaryWithBase64)
 	inner.SetUseRawBodyForHTTPResp(c.useRawBodyForHTTPResp)
 	if c.dynamicgoEnabled && c.useRawBodyForHTTPResp {
-		inner.SetDynamicGo(c.t2jBinaryConv, msg)
+		inner.SetDynamicGo(c.binaryConv, msg)
 	}
 
 	msg.Data().(WithCodec).SetCodec(inner)

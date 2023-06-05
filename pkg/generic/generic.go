@@ -123,9 +123,9 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 		}
 		c.codec.binaryWithBase64 = enable
 		if c.codec.dynamicgoEnabled {
-			c.codec.dyConvOpts.NoBase64Binary = !enable
-			c.codec.t2jBinaryConv = t2j.NewBinaryConv(c.codec.dyConvOpts)
-			c.codec.dyConvOptsWithThriftBase.NoBase64Binary = !enable
+			c.codec.dynamicgoConvOpts.NoBase64Binary = !enable
+			c.codec.binaryConv = t2j.NewBinaryConv(c.codec.dynamicgoConvOpts)
+			c.codec.dynamicgoConvOptsWithThriftBase.NoBase64Binary = !enable
 		}
 	case *jsonThriftGeneric:
 		if c.codec == nil {
@@ -133,9 +133,9 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 		}
 		c.codec.binaryWithBase64 = enable
 		if c.codec.dynamicgoEnabled {
-			c.codec.dyConvOpts.NoBase64Binary = !enable
-			c.codec.dyConvOptsWithThriftBase.NoBase64Binary = !enable
-			c.codec.dyConvOptsWithException.NoBase64Binary = !enable
+			c.codec.dynamicgoConvOpts.NoBase64Binary = !enable
+			c.codec.dynamicgoConvOptsWithThriftBase.NoBase64Binary = !enable
+			c.codec.dynamicgoConvOptsWithException.NoBase64Binary = !enable
 		}
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)

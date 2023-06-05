@@ -2,7 +2,7 @@
 // +build amd64,go1.16
 
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2023 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,9 +45,9 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		requestBase = nil
 	}
 	if requestBase != nil {
-		cv = j2t.NewBinaryConv(*m.dyConvOptsWithThriftBase)
+		cv = j2t.NewBinaryConv(*m.dynamicgoConvOptsWithThriftBase)
 	} else {
-		cv = j2t.NewBinaryConv(*m.dyConvOpts)
+		cv = j2t.NewBinaryConv(*m.dynamicgoConvOpts)
 	}
 
 	// msg is void
@@ -88,7 +88,7 @@ const (
 )
 
 func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgType MsgType, cv *j2t.BinaryConv, transBuff, dbuf []byte) error {
-	for _, field := range m.dty.Struct().Fields() {
+	for _, field := range m.dynamicgoTy.Struct().Fields() {
 		// Exception field
 		if !m.isClient && field.ID() != 0 {
 			// generic server ignore the exception, because no description for exception
@@ -139,7 +139,7 @@ func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgTy
 }
 
 func (m *WriteJSON) writeHead(out thrift.TProtocol) error {
-	if err := out.WriteStructBegin(m.dty.Struct().Name()); err != nil {
+	if err := out.WriteStructBegin(m.dynamicgoTy.Struct().Name()); err != nil {
 		return err
 	}
 	return nil

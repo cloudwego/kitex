@@ -33,13 +33,13 @@ import (
 
 // WriteHTTPRequest implement of MessageWriter
 type WriteHTTPRequest struct {
-	svc                      *descriptor.ServiceDescriptor
-	ty                       *dthrift.TypeDescriptor
-	binaryWithBase64         bool
-	dyConvOpts               *conv.Options
-	dyConvOptsWithThriftBase *conv.Options
-	hasRequestBase           bool
-	dynamicgoEnabled         bool
+	svc                             *descriptor.ServiceDescriptor
+	dynamicgoTy                     *dthrift.TypeDescriptor
+	binaryWithBase64                bool
+	dynamicgoConvOpts               *conv.Options // conversion options for dynamicgo
+	dynamicgoConvOptsWithThriftBase *conv.Options // conversion options for dynamicgo with EnableThriftBase turned on
+	hasRequestBase                  bool
+	dynamicgoEnabled                bool
 }
 
 var _ MessageWriter = (*WriteHTTPRequest)(nil)
@@ -58,12 +58,12 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 
 // SetDynamicGo ...
 func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options, method string) {
-	w.dyConvOpts = convOpts
-	w.dyConvOptsWithThriftBase = convOptsWithThriftBase
+	w.dynamicgoConvOpts = convOpts
+	w.dynamicgoConvOptsWithThriftBase = convOptsWithThriftBase
 	w.dynamicgoEnabled = true
 	fn := w.svc.DynamicGoDsc.Functions()[method]
 	w.hasRequestBase = fn.HasRequestBase()
-	w.ty = fn.Request()
+	w.dynamicgoTy = fn.Request()
 }
 
 // originalWrite ...
@@ -91,7 +91,7 @@ type ReadHTTPResponse struct {
 	msg                   remote.Message
 	dynamicgoEnabled      bool
 	useRawBodyForHTTPResp bool
-	cv                    t2j.BinaryConv
+	cv                    t2j.BinaryConv // used for dynamicgo thrift to json conversion
 }
 
 var _ MessageReader = (*ReadHTTPResponse)(nil)
