@@ -31,6 +31,6 @@ type GetProviderOption interface {
 }
 
 type ProviderOption struct {
-	// DynamicGoExpected is if dynamicgo is expected to be used
-	DynamicGoExpected bool
+	// DynamicGoEnabled is if dynamicgo is enabled or not
+	DynamicGoEnabled bool
 }

@@ -61,7 +61,7 @@ type httpThriftCodec struct {
 func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*httpThriftCodec, error) {
 	svc := <-p.Provide()
 	c := &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false, dynamicgoEnabled: false, useRawBodyForHTTPResp: opts.useRawBodyForHTTPResp}
-	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoExpected {
+	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoEnabled {
 		c.dynamicgoEnabled = true
 
 		c.dynamicgoConvOpts = opts.dynamicgoConvOpts
