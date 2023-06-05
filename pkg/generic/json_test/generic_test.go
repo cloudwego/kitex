@@ -218,7 +218,6 @@ func BenchmarkCompareDynamicGoAndOriginal_Medium(b *testing.B) {
 	})
 }
 
-// TODO:
 func testThriftPingMethod(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":8122", new(GenericServicePingImpl), "./idl/example.thrift", nil, nil, false)
