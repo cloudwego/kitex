@@ -19,7 +19,7 @@ package generic
 import "github.com/cloudwego/dynamicgo/conv"
 
 var (
-	defaultHTTPDynamicGoConvOpts = conv.Options{
+	DefaultHTTPDynamicGoConvOpts = conv.Options{
 		EnableHttpMapping:     true,
 		EnableValueMapping:    true,
 		WriteRequireField:     true,
@@ -27,7 +27,7 @@ var (
 		OmitHttpMappingErrors: true,
 		NoBase64Binary:        true,
 	}
-	defaultJSONDynamicGoConvOpts = conv.Options{
+	DefaultJSONDynamicGoConvOpts = conv.Options{
 		WriteRequireField: true,
 		WriteDefaultField: true,
 	}

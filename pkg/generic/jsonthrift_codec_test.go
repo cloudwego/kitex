@@ -31,7 +31,7 @@ func TestJsonThriftCodec(t *testing.T) {
 	// without dynamicgo
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	gOpts := &Options{dynamicgoConvOpts: defaultJSONDynamicGoConvOpts}
+	gOpts := &Options{dynamicgoConvOpts: DefaultJSONDynamicGoConvOpts}
 	jtc, err := newJsonThriftCodec(p, thriftCodec, gOpts)
 	test.Assert(t, err == nil)
 	test.Assert(t, !jtc.dynamicgoEnabled)
@@ -64,7 +64,7 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	// with dynamicgo
 	p, err := NewThriftFileProviderWithDynamicGo("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	gOpts := &Options{dynamicgoConvOpts: defaultJSONDynamicGoConvOpts}
+	gOpts := &Options{dynamicgoConvOpts: DefaultJSONDynamicGoConvOpts}
 	jtc, err := newJsonThriftCodec(p, thriftCodec, gOpts)
 	test.Assert(t, err == nil)
 	test.Assert(t, jtc.dynamicgoEnabled)
@@ -113,7 +113,7 @@ func TestJsonExceptionError(t *testing.T) {
 	// without dynamicgo
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	gOpts := &Options{dynamicgoConvOpts: defaultJSONDynamicGoConvOpts}
+	gOpts := &Options{dynamicgoConvOpts: DefaultJSONDynamicGoConvOpts}
 	jtc, err := newJsonThriftCodec(p, thriftCodec, gOpts)
 	test.Assert(t, err == nil)
 
