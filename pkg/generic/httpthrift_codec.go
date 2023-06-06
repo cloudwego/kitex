@@ -132,7 +132,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	inner.SetBase64Binary(c.binaryWithBase64)
 	inner.SetUseRawBodyForHTTPResp(c.useRawBodyForHTTPResp)
 	if c.dynamicgoEnabled && c.useRawBodyForHTTPResp {
-		inner.SetDynamicGo(c.t2jBinaryConv, msg)
+		inner.SetDynamicGo(&c.t2jBinaryConv, msg)
 	}
 
 	msg.Data().(WithCodec).SetCodec(inner)

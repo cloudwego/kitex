@@ -45,9 +45,9 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		requestBase = nil
 	}
 	if requestBase != nil {
-		cv = j2t.NewBinaryConv(*m.dynamicgoConvOptsWithThriftBase)
+		cv = m.j2tBinaryConvWithThriftBase
 	} else {
-		cv = j2t.NewBinaryConv(*m.dynamicgoConvOpts)
+		cv = m.j2tBinaryConv
 	}
 
 	// msg is void

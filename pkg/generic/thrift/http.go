@@ -93,7 +93,7 @@ type ReadHTTPResponse struct {
 	msg                   remote.Message
 	dynamicgoEnabled      bool
 	useRawBodyForHTTPResp bool
-	cv                    t2j.BinaryConv // used for dynamicgo thrift to json conversion
+	t2jBinaryConv         t2j.BinaryConv // used for dynamicgo thrift to json conversion
 }
 
 var _ MessageReader = (*ReadHTTPResponse)(nil)
@@ -116,8 +116,8 @@ func (r *ReadHTTPResponse) SetUseRawBodyForHTTPResp(useRawBodyForHTTPResp bool) 
 }
 
 // SetDynamicGo ...
-func (r *ReadHTTPResponse) SetDynamicGo(cv t2j.BinaryConv, msg remote.Message) {
-	r.cv = cv
+func (r *ReadHTTPResponse) SetDynamicGo(t2jBinaryConv *t2j.BinaryConv, msg remote.Message) {
+	r.t2jBinaryConv = *t2jBinaryConv
 	r.msg = msg
 	r.dynamicgoEnabled = true
 }
@@ -166,7 +166,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		if fid == field.ID() {
 			// decode with dynamicgo
 			// thrift []byte to json []byte
-			if err = r.cv.DoInto(ctx, field.Type(), transBuf, &buf); err != nil {
+			if err = r.t2jBinaryConv.DoInto(ctx, field.Type(), transBuf, &buf); err != nil {
 				return nil, err
 			}
 			break

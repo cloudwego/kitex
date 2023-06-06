@@ -138,9 +138,18 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 		}
 		c.codec.binaryWithBase64 = enable
 		if c.codec.dynamicgoEnabled {
-			c.codec.dynamicgoConvOpts.NoBase64Binary = !enable
-			c.codec.dynamicgoConvOptsWithThriftBase.NoBase64Binary = !enable
-			c.codec.dynamicgoConvOptsWithException.NoBase64Binary = !enable
+			convOpts := c.codec.opts.dynamicgoConvOpts
+			convOpts.NoBase64Binary = !enable
+			c.codec.j2tBinaryConv = j2t.NewBinaryConv(convOpts)
+			c.codec.t2jBinaryConv = t2j.NewBinaryConv(convOpts)
+
+			convOptsWithThriftBase := convOpts
+			convOptsWithThriftBase.EnableThriftBase = true
+			c.codec.j2tBinaryConvWithThriftBase = j2t.NewBinaryConv(convOptsWithThriftBase)
+
+			convOptsWithException := convOpts
+			convOptsWithException.ConvertException = true
+			c.codec.t2jBinaryConvWithException = t2j.NewBinaryConv(convOptsWithException)
 		}
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
