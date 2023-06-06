@@ -46,7 +46,7 @@ func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient boo
 		ty = fnDsc.Response
 	}
 	ws := &WriteJSON{
-		typeDesc:         ty,
+		typeDsc:          ty,
 		hasRequestBase:   fnDsc.HasRequestBase && isClient,
 		base64Binary:     true,
 		isClient:         isClient,
@@ -61,8 +61,8 @@ var _ = wrapJSONWriter
 
 // WriteJSON implement of MessageWriter
 type WriteJSON struct {
-	typeDesc                        *descriptor.TypeDescriptor
-	dynamicgoTypeDesc               *dthrift.TypeDescriptor
+	typeDsc                         *descriptor.TypeDescriptor
+	dynamicgoTypeDsc                *dthrift.TypeDescriptor
 	hasRequestBase                  bool
 	base64Binary                    bool
 	isClient                        bool
@@ -87,7 +87,7 @@ func (m *WriteJSON) SetDynamicGo(svc *descriptor.ServiceDescriptor, method strin
 	} else {
 		dty = svc.DynamicGoDsc.Functions()[method].Response()
 	}
-	m.dynamicgoTypeDesc = dty
+	m.dynamicgoTypeDsc = dty
 	m.dynamicgoConvOpts = convOpts
 	m.dynamicgoConvOptsWithThriftBase = convOptsWithTHriftBase
 	m.dynamicgoEnabled = true
@@ -100,7 +100,7 @@ func (m *WriteJSON) originalWrite(ctx context.Context, out thrift.TProtocol, msg
 
 	// msg is void
 	if _, ok := msg.(descriptor.Void); ok {
-		return wrapStructWriter(ctx, msg, out, m.typeDesc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary})
+		return wrapStructWriter(ctx, msg, out, m.typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary})
 	}
 
 	// msg is string
@@ -119,7 +119,7 @@ func (m *WriteJSON) originalWrite(ctx context.Context, out thrift.TProtocol, msg
 			Index: 0,
 		}
 	}
-	return wrapJSONWriter(ctx, &body, out, m.typeDesc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary})
+	return wrapJSONWriter(ctx, &body, out, m.typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary})
 }
 
 // NewReadJSON build ReadJSON according to ServiceDescriptor

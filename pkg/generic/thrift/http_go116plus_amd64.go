@@ -61,13 +61,13 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
 
-	if err := out.WriteStructBegin(w.dynamicgoTypeDesc.Struct().Name()); err != nil {
+	if err := out.WriteStructBegin(w.dynamicgoTypeDsc.Struct().Name()); err != nil {
 		return err
 	}
 
 	dbuf := mcache.Malloc(len(body))[0:0]
 
-	for _, field := range w.dynamicgoTypeDesc.Struct().Fields() {
+	for _, field := range w.dynamicgoTypeDsc.Struct().Fields() {
 		if err := out.WriteFieldBegin(field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID())); err != nil {
 			return err
 		}
