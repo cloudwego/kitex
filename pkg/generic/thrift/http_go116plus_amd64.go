@@ -47,9 +47,9 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		requestBase = nil
 	}
 	if requestBase != nil {
-		cv = j2t.NewBinaryConv(*w.dynamicgoConvOptsWithThriftBase)
+		cv = w.j2tBinaryConvWithThriftBase
 	} else {
-		cv = j2t.NewBinaryConv(*w.dynamicgoConvOpts)
+		cv = w.j2tBinaryConv
 	}
 
 	if err := out.WriteStructBegin(w.dynamicgoTypeDsc.Struct().Name()); err != nil {

@@ -22,6 +22,7 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
+	"github.com/cloudwego/dynamicgo/conv/j2t"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 
@@ -34,13 +35,13 @@ import (
 
 // WriteHTTPRequest implement of MessageWriter
 type WriteHTTPRequest struct {
-	svc                             *descriptor.ServiceDescriptor
-	dynamicgoTypeDsc                *dthrift.TypeDescriptor
-	binaryWithBase64                bool
-	dynamicgoConvOpts               *conv.Options // conversion options for dynamicgo
-	dynamicgoConvOptsWithThriftBase *conv.Options // conversion options for dynamicgo with EnableThriftBase turned on
-	hasRequestBase                  bool
-	dynamicgoEnabled                bool
+	svc                         *descriptor.ServiceDescriptor
+	dynamicgoTypeDsc            *dthrift.TypeDescriptor
+	binaryWithBase64            bool
+	j2tBinaryConv               j2t.BinaryConv // used for dynamicgo json to thrift conversion
+	j2tBinaryConvWithThriftBase j2t.BinaryConv // used for dynamicgo json to thrift conversion with EnableThriftBase turned on
+	hasRequestBase              bool
+	dynamicgoEnabled            bool
 }
 
 var _ MessageWriter = (*WriteHTTPRequest)(nil)
@@ -58,9 +59,9 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 }
 
 // SetDynamicGo ...
-func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options, method string) {
-	w.dynamicgoConvOpts = convOpts
-	w.dynamicgoConvOptsWithThriftBase = convOptsWithThriftBase
+func (w *WriteHTTPRequest) SetDynamicGo(j2tBinaryConv, j2tBinaryConvWithThriftBase *j2t.BinaryConv, method string) {
+	w.j2tBinaryConv = *j2tBinaryConv
+	w.j2tBinaryConvWithThriftBase = *j2tBinaryConvWithThriftBase
 	w.dynamicgoEnabled = true
 	fn := w.svc.DynamicGoDsc.Functions()[method]
 	w.hasRequestBase = fn.HasRequestBase()

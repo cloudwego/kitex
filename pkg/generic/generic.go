@@ -20,6 +20,7 @@ package generic
 import (
 	"fmt"
 
+	"github.com/cloudwego/dynamicgo/conv/j2t"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -123,9 +124,13 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 		}
 		c.codec.binaryWithBase64 = enable
 		if c.codec.dynamicgoEnabled {
-			c.codec.dynamicgoConvOpts.NoBase64Binary = !enable
-			c.codec.binaryConv = t2j.NewBinaryConv(c.codec.dynamicgoConvOpts)
-			c.codec.dynamicgoConvOptsWithThriftBase.NoBase64Binary = !enable
+			convOpts := c.codec.opts.dynamicgoConvOpts
+			convOpts.NoBase64Binary = !enable
+			c.codec.j2tBinaryConv = j2t.NewBinaryConv(convOpts)
+			c.codec.t2jBinaryConv = t2j.NewBinaryConv(convOpts)
+
+			convOpts.EnableThriftBase = true
+			c.codec.j2tBinaryConvWithThriftBase = j2t.NewBinaryConv(convOpts)
 		}
 	case *jsonThriftGeneric:
 		if c.codec == nil {

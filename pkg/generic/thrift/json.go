@@ -129,7 +129,7 @@ func NewReadJSON(svc *descriptor.ServiceDescriptor, isClient bool) *ReadJSON {
 		svc:              svc,
 		isClient:         isClient,
 		binaryWithBase64: true,
-		useDynamicGo:     false,
+		dynamicgoEnabled: false,
 	}
 }
 
@@ -140,7 +140,7 @@ type ReadJSON struct {
 	binaryWithBase64 bool
 	msg              remote.Message
 	cv               t2j.BinaryConv // used for dynamicgo thrift to json conversion
-	useDynamicGo     bool
+	dynamicgoEnabled bool
 }
 
 var _ MessageReader = (*ReadJSON)(nil)
@@ -154,7 +154,7 @@ func (m *ReadJSON) SetBinaryWithBase64(enable bool) {
 // SetDynamicGo ...
 func (m *ReadJSON) SetDynamicGo(convOpts, convOptsWithException *conv.Options, msg remote.Message) {
 	m.msg = msg
-	m.useDynamicGo = true
+	m.dynamicgoEnabled = true
 	if m.isClient {
 		// set dynamicgo option to handle an exception field
 		m.cv = t2j.NewBinaryConv(*convOptsWithException)
@@ -166,7 +166,7 @@ func (m *ReadJSON) SetDynamicGo(convOpts, convOptsWithException *conv.Options, m
 // Read read data from in thrift.TProtocol and convert to json string
 func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
 	// fallback logic
-	if !m.useDynamicGo {
+	if !m.dynamicgoEnabled {
 		return m.originalRead(ctx, method, in)
 	}
 
