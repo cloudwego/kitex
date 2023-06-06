@@ -309,7 +309,14 @@ func writeBool(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 }
 
 func writeInt8(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
-	return out.WriteByte(val.(int8))
+	switch val := val.(type) {
+	case int8:
+		return out.WriteByte(val)
+	case uint8:
+		return out.WriteByte(int8(val))
+	default:
+		return fmt.Errorf("unsupported type: %T", val)
+	}
 }
 
 func writeJSONNumber(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
