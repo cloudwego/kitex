@@ -88,7 +88,7 @@ const (
 )
 
 func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgType MsgType, cv *j2t.BinaryConv, transBuff, dbuf []byte) error {
-	for _, field := range m.dynamicgoTy.Struct().Fields() {
+	for _, field := range m.dynamicgoTypeDesc.Struct().Fields() {
 		// Exception field
 		if !m.isClient && field.ID() != 0 {
 			// generic server ignore the exception, because no description for exception
@@ -139,7 +139,7 @@ func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgTy
 }
 
 func (m *WriteJSON) writeHead(out thrift.TProtocol) error {
-	if err := out.WriteStructBegin(m.dynamicgoTy.Struct().Name()); err != nil {
+	if err := out.WriteStructBegin(m.dynamicgoTypeDesc.Struct().Name()); err != nil {
 		return err
 	}
 	return nil

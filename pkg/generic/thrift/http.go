@@ -34,7 +34,7 @@ import (
 // WriteHTTPRequest implement of MessageWriter
 type WriteHTTPRequest struct {
 	svc                             *descriptor.ServiceDescriptor
-	dynamicgoTy                     *dthrift.TypeDescriptor
+	dynamicgoTypeDesc               *dthrift.TypeDescriptor
 	binaryWithBase64                bool
 	dynamicgoConvOpts               *conv.Options // conversion options for dynamicgo
 	dynamicgoConvOptsWithThriftBase *conv.Options // conversion options for dynamicgo with EnableThriftBase turned on
@@ -63,7 +63,7 @@ func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.O
 	w.dynamicgoEnabled = true
 	fn := w.svc.DynamicGoDsc.Functions()[method]
 	w.hasRequestBase = fn.HasRequestBase()
-	w.dynamicgoTy = fn.Request()
+	w.dynamicgoTypeDesc = fn.Request()
 }
 
 // originalWrite ...
