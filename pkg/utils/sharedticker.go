@@ -17,8 +17,11 @@
 package utils
 
 import (
+	"context"
 	"sync"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/gofunc"
 )
 
 type TickerTask interface {
@@ -88,10 +91,11 @@ func (t *SharedTicker) Tick(interval time.Duration) {
 			t.Lock()
 			for b := range t.tasks {
 				wg.Add(1)
-				go func(b TickerTask) {
+				task := b
+				gofunc.GoFunc(context.Background(), func() {
 					defer wg.Done()
-					b.Tick()
-				}(b)
+					task.Tick()
+				})
 			}
 			t.Unlock()
 			wg.Wait()

@@ -29,7 +29,6 @@ import (
 
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
-	"github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -329,7 +328,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	var recycleRI bool
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
-			err = stats.ClientPanicToErr(ctx, panicInfo, ri, false)
+			err = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, false)
 			reportErr = err
 		}
 		kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)

@@ -88,7 +88,7 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
-	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
+	test.Assert(t, flag == HeaderFlagSupportOutOfOrder)
 }
 
 func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
@@ -121,7 +121,7 @@ func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
 	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
-	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
+	test.Assert(t, flag == HeaderFlagSupportOutOfOrder)
 }
 
 func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
@@ -155,7 +155,7 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 	test.DeepEqual(t, strKVInfoRecv, map[string]string{transmeta.GDPRToken: "test token"})
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
-	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
+	test.Assert(t, flag == HeaderFlagSupportOutOfOrder)
 }
 
 func TestFillBasicInfoOfTTHeader(t *testing.T) {
@@ -259,7 +259,7 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 			test.DeepEqual(b, strKVInfoRecv, strKVInfo)
 			flag := recvMsg.Tags()[HeaderFlagsKey]
 			test.Assert(b, flag != nil)
-			test.Assert(b, flag == uint16(HeaderFlagSupportOutOfOrder))
+			test.Assert(b, flag == HeaderFlagSupportOutOfOrder)
 		}
 	})
 }
@@ -481,4 +481,24 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 		return perrors.NewProtocolError(err)
 	}
 	return err
+}
+
+func TestHeaderFlags(t *testing.T) {
+	// case 1: correct HeaderFlags
+	msg := initClientSendMsg(transport.TTHeader)
+	msg.Tags()[HeaderFlagsKey] = HeaderFlagSASL | HeaderFlagSupportOutOfOrder
+	hfs := getFlags(msg)
+	test.Assert(t, hfs == HeaderFlagSASL|HeaderFlagSupportOutOfOrder)
+
+	// case 2: invalid type for HeaderFlagsKey
+	msg = initClientSendMsg(transport.TTHeader)
+	msg.Tags()[HeaderFlagsKey] = 1
+	hfs = getFlags(msg)
+	test.Assert(t, hfs == 0)
+
+	// case 3: setFlags then get Flags
+	msg = initClientSendMsg(transport.TTHeader)
+	setFlags(uint16(HeaderFlagSupportOutOfOrder), msg)
+	hfs = getFlags(msg)
+	test.Assert(t, hfs == HeaderFlagSupportOutOfOrder, hfs)
 }

@@ -29,7 +29,6 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -196,7 +195,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			if targetMethod == nil {
 				unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
 				if unknownServiceHandlerFunc != nil {
-					internal_stats.Record(rCtx, ri, stats.ServerHandleStart, nil)
+					rpcinfo.Record(rCtx, ri, stats.ServerHandleStart, nil)
 					err = unknownServiceHandlerFunc(rCtx, methodName, st)
 					if err != nil {
 						err = kerrors.ErrBiz.WithCause(err)

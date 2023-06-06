@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/mocks"
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -58,7 +57,7 @@ func TestMain(m *testing.M) {
 			DecodeFunc: nil,
 		},
 		SvcInfo:   mocks.ServiceInfo(),
-		TracerCtl: &internal_stats.Controller{},
+		TracerCtl: &rpcinfo.TraceController{},
 	}
 	svrTransHdlr, _ = newSvrTransHandler(svrOpt)
 	transSvr = NewTransServerFactory().NewTransServer(svrOpt, svrTransHdlr).(*transServer)

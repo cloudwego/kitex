@@ -126,11 +126,13 @@ func Test_writeInt8(t *testing.T) {
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
-	mockTTransport := &mocks.MockThriftTTransport{
-		WriteByteFunc: func(val int8) error {
-			test.Assert(t, val == 1)
-			return nil
-		},
+	mockTTransport := func(v int8) *mocks.MockThriftTTransport {
+		return &mocks.MockThriftTTransport{
+			WriteByteFunc: func(val int8) error {
+				test.Assert(t, val == v)
+				return nil
+			},
+		}
 	}
 	tests := []struct {
 		name    string
@@ -142,13 +144,37 @@ func Test_writeInt8(t *testing.T) {
 			"writeInt8",
 			args{
 				val: int8(1),
-				out: mockTTransport,
+				out: mockTTransport(1),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
 				},
 			},
 			false,
+		},
+		{
+			name: "writeInt8 byte",
+			args: args{
+				val: byte(128),
+				out: mockTTransport(-128), // overflow
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I08,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "writeInt8 error",
+			args: args{
+				val: int16(2),
+				out: mockTTransport(2),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I16,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

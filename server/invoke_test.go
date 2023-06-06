@@ -17,6 +17,7 @@
 package server
 
 import (
+	"context"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -32,7 +33,7 @@ import (
 // TestInvokerCall tests Invoker, call Kitex server just like SDK.
 func TestInvokerCall(t *testing.T) {
 	var gotErr atomic.Value
-	invoker := NewInvoker(WithMetaHandler(noopMetahandler{}), WithErrorHandler(func(err error) error {
+	invoker := NewInvoker(WithMetaHandler(noopMetahandler{}), WithErrorHandler(func(ctx context.Context, err error) error {
 		gotErr.Store(err)
 		return err
 	}))

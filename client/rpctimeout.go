@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/wpool"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -115,7 +114,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 			workerPool.GoCtx(ctx, func() {
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
-						e := stats.ClientPanicToErr(ctx, panicInfo, ri, true)
+						e := rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, true)
 						done <- e
 					}
 					if err == nil || !errors.Is(err, kerrors.ErrRPCFinish) {
