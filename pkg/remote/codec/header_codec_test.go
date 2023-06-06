@@ -88,7 +88,7 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
-	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
+	test.Assert(t, flag == HeaderFlagSupportOutOfOrder)
 }
 
 func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
@@ -121,7 +121,7 @@ func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
 	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
-	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
+	test.Assert(t, flag == HeaderFlagSupportOutOfOrder)
 }
 
 func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
@@ -155,7 +155,7 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 	test.DeepEqual(t, strKVInfoRecv, map[string]string{transmeta.GDPRToken: "test token"})
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
-	test.Assert(t, flag == uint16(HeaderFlagSupportOutOfOrder))
+	test.Assert(t, flag == HeaderFlagSupportOutOfOrder)
 }
 
 func TestFillBasicInfoOfTTHeader(t *testing.T) {
