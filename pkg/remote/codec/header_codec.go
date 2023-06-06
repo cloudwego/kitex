@@ -164,7 +164,7 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 	totalLen := Bytes2Uint32NoCheck(headerMeta[:Size32])
 
 	flags := Bytes2Uint16NoCheck(headerMeta[Size16*3:])
-	setFlags(flags, message)
+	setFlags(HeaderFlags(flags), message)
 
 	seqID := Bytes2Uint32NoCheck(headerMeta[Size32*2 : Size32*3])
 	if err = SetOrCheckSeqID(int32(seqID), message); err != nil {
@@ -395,7 +395,7 @@ func getFlags(message remote.Message) HeaderFlags {
 	return headerFlags
 }
 
-func setFlags(flags uint16, message remote.Message) {
+func setFlags(flags HeaderFlags, message remote.Message) {
 	if message.MessageType() == remote.Call {
 		message.Tags()[HeaderFlagsKey] = flags
 	}

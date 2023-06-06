@@ -482,3 +482,10 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	}
 	return err
 }
+
+func TestSetFlags(t *testing.T) {
+	msg := remote.NewMessage(nil, nil, nil, remote.Call, remote.Client)
+	setFlags(HeaderFlagSupportOutOfOrder, msg)
+	f := getFlags(msg)
+	test.Assert(t, f == HeaderFlagSupportOutOfOrder)
+}
