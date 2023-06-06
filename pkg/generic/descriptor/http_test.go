@@ -102,6 +102,15 @@ func TestGetCookie(t *testing.T) {
 	test.Assert(t, r.cookies != nil)
 }
 
+func TestGetPath(t *testing.T) {
+	r, err := createHTTPRequestWithNoURL([]byte(""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	test.Assert(t, r.Request.URL == nil)
+	test.Assert(t, r.GetPath() == "")
+}
+
 func createHTTPRequestWithNoURL(data []byte) (*HTTPRequest, error) {
 	req, err := http.NewRequest("POST", "", bytes.NewBuffer(data))
 	if err != nil {

@@ -92,6 +92,9 @@ func (req *HTTPRequest) GetMethod() string {
 
 // GetPath implements http.RequestGetter of dynamicgo
 func (req *HTTPRequest) GetPath() string {
+	if req.Request.URL == nil {
+		return ""
+	}
 	return req.Request.URL.Path
 }
 
