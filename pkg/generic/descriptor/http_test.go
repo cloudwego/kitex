@@ -75,6 +75,7 @@ func TestMapBody(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, r.bodyMap != nil)
 	test.Assert(t, r.GetMapBody("name") == `foo`)
+	test.Assert(t, r.GetMapBody("test") == "")
 }
 
 func TestGetQuery(t *testing.T) {

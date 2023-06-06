@@ -111,12 +111,11 @@ func (req *HTTPRequest) GetMapBody(key string) string {
 	if v.Check() != nil {
 		return ""
 	}
-	j, e := v.Raw()
-	if e != nil {
+	if _, err := v.Raw(); err != nil {
 		return ""
 	}
-	j, e = v.String()
-	if e != nil {
+	j, err := v.String()
+	if err != nil {
 		return ""
 	}
 	return j
