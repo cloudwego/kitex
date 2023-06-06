@@ -77,13 +77,7 @@ func TestMapBody(t *testing.T) {
 }
 
 func TestGetQuery(t *testing.T) {
-	data := []byte(`{"name":"foo","age":18}`)
-	r, err := createHTTPRequestWithNoURL(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	test.Assert(t, r.GetQuery("id") == "")
-	r, err = createHTTPRequest(data)
+	r, err := createHTTPRequest([]byte(`{"name":"foo","age":18}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,13 +96,15 @@ func TestGetCookie(t *testing.T) {
 	test.Assert(t, r.cookies != nil)
 }
 
-func TestGetPath(t *testing.T) {
+func TestNilURL(t *testing.T) {
 	r, err := createHTTPRequestWithNoURL([]byte(""))
 	if err != nil {
 		t.Fatal(err)
 	}
 	test.Assert(t, r.Request.URL == nil)
+	test.Assert(t, r.GetQuery("") == "")
 	test.Assert(t, r.GetPath() == "")
+	test.Assert(t, r.GetUri() == "")
 }
 
 func createHTTPRequestWithNoURL(data []byte) (*HTTPRequest, error) {

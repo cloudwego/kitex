@@ -135,6 +135,9 @@ func (req *HTTPRequest) GetPostForm(key string) string {
 
 // GetUri implements http.RequestGetter of dynamicgo
 func (req *HTTPRequest) GetUri() string {
+	if req.Request.URL == nil {
+		return ""
+	}
 	return req.Request.URL.String()
 }
 
