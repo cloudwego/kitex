@@ -150,10 +150,7 @@ func NewThriftContentProviderWithDynamicGo(main string, includes map[string]stri
 		return nil, err
 	}
 
-	if err = newDynamicgoDscFromContent(svc, defaultMainIDLPath, main, includes, false); err != nil {
-		// fall back to the original way (without dynamicgo)
-		p.opts.DynamicGoEnabled = false
-		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
+	if err = p.newDynamicGoDsc(svc, defaultMainIDLPath, main, includes); err != nil {
 		return p, nil
 	}
 
@@ -174,10 +171,7 @@ func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]strin
 	}
 
 	if p.opts.DynamicGoEnabled {
-		if err = newDynamicgoDscFromContent(svc, defaultMainIDLPath, main, includes, false); err != nil {
-			p.opts.DynamicGoEnabled = false
-			klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
-		}
+		p.newDynamicGoDsc(svc, defaultMainIDLPath, main, includes)
 	}
 
 	select {
@@ -207,6 +201,14 @@ func (p *ThriftContentProvider) Close() error {
 // Option ...
 func (p *ThriftContentProvider) Option() ProviderOption {
 	return *p.opts
+}
+
+func (p *ThriftContentProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string) error {
+	if err := newDynamicGoDscFromContent(svc, path, content, includes, false); err != nil {
+		p.opts.DynamicGoEnabled = false
+		return err
+	}
+	return nil
 }
 
 func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, sources map[string]string, isAbsIncludePath bool) (err error) {
@@ -309,10 +311,7 @@ func NewThriftContentWithAbsIncludePathProviderWithDynamicGo(mainIDLPath string,
 		return nil, err
 	}
 
-	if err = newDynamicgoDscFromContent(svc, mainIDLPath, mainIDLContent, includes, true); err != nil {
-		// fall back to the original way (without dynamicgo)
-		p.opts.DynamicGoEnabled = false
-		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
+	if p.newDynamicGoDsc(svc, mainIDLPath, mainIDLContent, includes); err != nil {
 		return p, nil
 	}
 
@@ -337,10 +336,7 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 	}
 
 	if p.opts.DynamicGoEnabled {
-		if err = newDynamicgoDscFromContent(svc, mainIDLPath, mainIDLContent, includes, true); err != nil {
-			p.opts.DynamicGoEnabled = false
-			klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
-		}
+		p.newDynamicGoDsc(svc, mainIDLPath, mainIDLContent, includes)
 	}
 
 	// drain the channel
@@ -373,6 +369,14 @@ func (p *ThriftContentWithAbsIncludePathProvider) Option() ProviderOption {
 	return *p.opts
 }
 
+func (p *ThriftContentWithAbsIncludePathProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string) error {
+	if err := newDynamicGoDscFromContent(svc, path, content, includes, true); err != nil {
+		p.opts.DynamicGoEnabled = false
+		return err
+	}
+	return nil
+}
+
 func newServiceDescriptorFromContent(path, content string, includes map[string]string, isAbsIncludePath bool) (*descriptor.ServiceDescriptor, error) {
 	tree, err := ParseContent(path, content, includes, isAbsIncludePath)
 	if err != nil {
@@ -385,10 +389,11 @@ func newServiceDescriptorFromContent(path, content string, includes map[string]s
 	return svc, nil
 }
 
-func newDynamicgoDscFromContent(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, isAbsIncludePath bool) error {
+func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, isAbsIncludePath bool) error {
 	// ServiceDescriptor of dynamicgo
 	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
 	if err != nil {
+		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
 		return err
 	}
 	svc.DynamicGoDsc = dsvc
