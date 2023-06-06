@@ -192,16 +192,17 @@ func (a *Arguments) checkIDL(files []string) {
 }
 
 func (a *Arguments) checkServiceName() {
-	if a.ServiceName == "" {
+	if a.ServiceName == "" && a.TemplateDir == "" {
 		if a.Use != "" {
-			log.Warn("-use must be used with -service")
+			log.Warn("-use must be used with -service or -template-dir")
 			os.Exit(2)
 		}
-	} else {
-		if a.TemplateDir != "" {
-			log.Warn("-template-dir and -service cannot be specified at the same time")
-			os.Exit(2)
-		}
+	}
+	if a.ServiceName != "" && a.TemplateDir != "" {
+		log.Warn("-template-dir and -service cannot be specified at the same time")
+		os.Exit(2)
+	}
+	if a.ServiceName != "" {
 		a.GenerateMain = true
 	}
 }

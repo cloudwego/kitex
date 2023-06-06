@@ -169,6 +169,7 @@ func (c *customGenerator) commonGenerate(tpl *Template) error {
 func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err error) {
 	g.updatePackageInfo(pkg)
 
+	g.setImports(HandlerFileName, pkg)
 	t, err := readTemplates(g.TemplateDir)
 	if err != nil {
 		return nil, err
