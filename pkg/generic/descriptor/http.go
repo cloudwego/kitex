@@ -48,8 +48,9 @@ type HTTPRequest struct {
 	Body        map[string]interface{}
 	GeneralBody interface{} // body of other representation, used with ContentType
 	ContentType MIMEType
-	bodyMap     *ast.Node
+	cookies     map[string]string
 	query       url.Values
+	bodyMap     *ast.Node
 }
 
 // GetHeader implements http.RequestGetter of dynamicgo
@@ -59,10 +60,13 @@ func (req *HTTPRequest) GetHeader(key string) string {
 
 // GetCookie implements http.RequestGetter of dynamicgo
 func (req *HTTPRequest) GetCookie(key string) string {
-	if c, err := req.Request.Cookie(key); err == nil {
-		return c.Value
+	if req.cookies == nil {
+		req.cookies = map[string]string{}
+		for _, cookie := range req.Request.Cookies() {
+			req.cookies[cookie.Name] = cookie.Value
+		}
 	}
-	return ""
+	return req.cookies[key]
 }
 
 // GetQuery implements http.RequestGetter of dynamicgo

@@ -57,16 +57,14 @@ func TestJSONBody(t *testing.T) {
 }
 
 func TestMapBody(t *testing.T) {
-	data := []byte(``)
-	r, err := createHTTPRequest(data)
+	r, err := createHTTPRequest([]byte(``))
 	if err != nil {
 		t.Fatal(err)
 	}
 	err = r.initializeBodyMap()
 	test.Assert(t, err != nil)
 	test.Assert(t, r.GetMapBody("test") == "")
-	data = []byte(`{"name":"foo","age":18}`)
-	r, err = createHTTPRequest(data)
+	r, err = createHTTPRequest([]byte(`{"name":"foo","age":18}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,6 +90,16 @@ func TestGetQuery(t *testing.T) {
 	test.Assert(t, r.query == nil)
 	test.Assert(t, r.GetQuery("id") == "123")
 	test.Assert(t, r.query != nil)
+}
+
+func TestGetCookie(t *testing.T) {
+	r, err := createHTTPRequest([]byte(`{"name":"foo","age":18}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	test.Assert(t, r.cookies == nil)
+	test.Assert(t, r.GetCookie("token") == "some_token")
+	test.Assert(t, r.cookies != nil)
 }
 
 func createHTTPRequestWithNoURL(data []byte) (*HTTPRequest, error) {
