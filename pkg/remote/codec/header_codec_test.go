@@ -259,7 +259,7 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 			test.DeepEqual(b, strKVInfoRecv, strKVInfo)
 			flag := recvMsg.Tags()[HeaderFlagsKey]
 			test.Assert(b, flag != nil)
-			test.Assert(b, flag == uint16(HeaderFlagSupportOutOfOrder))
+			test.Assert(b, flag == HeaderFlagSupportOutOfOrder)
 		}
 	})
 }
