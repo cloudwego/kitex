@@ -390,14 +390,18 @@ func readACLToken(idx *int, buf []byte, info map[string]string) error {
 func getFlags(message remote.Message) HeaderFlags {
 	var headerFlags HeaderFlags
 	if message.Tags() != nil && message.Tags()[HeaderFlagsKey] != nil {
-		headerFlags = message.Tags()[HeaderFlagsKey].(HeaderFlags)
+		if hfs, ok := message.Tags()[HeaderFlagsKey].(HeaderFlags); ok {
+			headerFlags = hfs
+		} else {
+			klog.Warnf("KITEX: the type of headerFlags is invalid, %T", message.Tags()[HeaderFlagsKey])
+		}
 	}
 	return headerFlags
 }
 
 func setFlags(flags uint16, message remote.Message) {
 	if message.MessageType() == remote.Call {
-		message.Tags()[HeaderFlagsKey] = flags
+		message.Tags()[HeaderFlagsKey] = HeaderFlags(flags)
 	}
 }
 

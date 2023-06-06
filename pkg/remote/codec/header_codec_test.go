@@ -482,3 +482,23 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	}
 	return err
 }
+
+func TestHeaderFlags(t *testing.T) {
+	// case 1: correct HeaderFlags
+	msg := initClientSendMsg(transport.TTHeader)
+	msg.Tags()[HeaderFlagsKey] = HeaderFlagSASL | HeaderFlagSupportOutOfOrder
+	hfs := getFlags(msg)
+	test.Assert(t, hfs == HeaderFlagSASL|HeaderFlagSupportOutOfOrder)
+
+	// case 2: invalid type for HeaderFlagsKey
+	msg = initClientSendMsg(transport.TTHeader)
+	msg.Tags()[HeaderFlagsKey] = 1
+	hfs = getFlags(msg)
+	test.Assert(t, hfs == 0)
+
+	// case 3: setFlags then get Flags
+	msg = initClientSendMsg(transport.TTHeader)
+	setFlags(uint16(HeaderFlagSupportOutOfOrder), msg)
+	hfs = getFlags(msg)
+	test.Assert(t, hfs == HeaderFlagSupportOutOfOrder, hfs)
+}
