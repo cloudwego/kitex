@@ -166,36 +166,7 @@ func (m *ReadJSON) SetDynamicGo(convOpts, convOptsWithException *conv.Options, m
 func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
 	// fallback logic
 	if !m.useDynamicGo {
-		fnDsc, err := m.svc.LookupFunctionByMethod(method)
-		if err != nil {
-			return nil, err
-		}
-		fDsc := fnDsc.Response
-		if !m.isClient {
-			fDsc = fnDsc.Request
-		}
-		resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
-		if err != nil {
-			return nil, err
-		}
-
-		// resp is void
-		if _, ok := resp.(descriptor.Void); ok {
-			return resp, nil
-		}
-
-		// resp is string
-		if _, ok := resp.(string); ok {
-			return resp, nil
-		}
-
-		// resp is map
-		respNode, err := customJson.Marshal(resp)
-		if err != nil {
-			return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v", err))
-		}
-
-		return string(respNode), nil
+		return m.originalRead(ctx, method, in)
 	}
 
 	// dynamicgo logic
@@ -243,4 +214,37 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 	}
 
 	return resp, nil
+}
+
+func (m *ReadJSON) originalRead(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+	fnDsc, err := m.svc.LookupFunctionByMethod(method)
+	if err != nil {
+		return nil, err
+	}
+	fDsc := fnDsc.Response
+	if !m.isClient {
+		fDsc = fnDsc.Request
+	}
+	resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
+	if err != nil {
+		return nil, err
+	}
+
+	// resp is void
+	if _, ok := resp.(descriptor.Void); ok {
+		return resp, nil
+	}
+
+	// resp is string
+	if _, ok := resp.(string); ok {
+		return resp, nil
+	}
+
+	// resp is map
+	respNode, err := customJson.Marshal(resp)
+	if err != nil {
+		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v", err))
+	}
+
+	return string(respNode), nil
 }

@@ -52,10 +52,6 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		cv = j2t.NewBinaryConv(*w.dynamicgoConvOpts)
 	}
 
-	body := req.GetBody()
-
-	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
-
 	tProt, ok := out.(*cthrift.BinaryProtocol)
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
@@ -65,7 +61,10 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		return err
 	}
 
+	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
+	body := req.GetBody()
 	dbuf := mcache.Malloc(len(body))[0:0]
+	defer mcache.Free(dbuf)
 
 	for _, field := range w.dynamicgoTypeDsc.Struct().Fields() {
 		if err := out.WriteFieldBegin(field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID())); err != nil {
@@ -90,7 +89,6 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		// TODO: implement MallocAck() to achieve zero copy
 		copy(buf, dbuf)
 	}
-	mcache.Free(dbuf)
 
 	if err := out.WriteFieldStop(); err != nil {
 		return err

@@ -124,22 +124,7 @@ func (r *ReadHTTPResponse) SetDynamicGo(cv t2j.BinaryConv, msg remote.Message) {
 func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
 	// fallback logic
 	if !r.dynamicgoEnabled {
-		fnDsc, err := r.svc.LookupFunctionByMethod(method)
-		if err != nil {
-			return nil, err
-		}
-		fDsc := fnDsc.Response
-		resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
-		if r.useRawBodyForHTTPResp {
-			if httpResp, ok := resp.(*descriptor.HTTPResponse); ok && httpResp.Body != nil {
-				rawBody, err := customJson.Marshal(httpResp.Body)
-				if err != nil {
-					return nil, err
-				}
-				httpResp.RawBody = rawBody
-			}
-		}
-		return resp, err
+		return r.originalRead(ctx, method, in)
 	}
 
 	// dynamicgo logic
@@ -151,9 +136,6 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 	if !ok {
 		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
-
-	tyDsc := r.svc.DynamicGoDsc.Functions()[method].Response()
-
 	mBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
 	sName, err := in.ReadStructBegin()
 	if err != nil {
@@ -174,6 +156,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 	buf := make([]byte, 0, len(transBuf)*2)
 	resp := descriptor.NewHTTPResponse()
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, resp)
+	tyDsc := r.svc.DynamicGoDsc.Functions()[method].Response()
 
 	for _, field := range tyDsc.Struct().Fields() {
 		if fid == field.ID() {
@@ -187,4 +170,23 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 	}
 	resp.RawBody = buf
 	return resp, nil
+}
+
+func (r *ReadHTTPResponse) originalRead(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+	fnDsc, err := r.svc.LookupFunctionByMethod(method)
+	if err != nil {
+		return nil, err
+	}
+	fDsc := fnDsc.Response
+	resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
+	if r.useRawBodyForHTTPResp {
+		if httpResp, ok := resp.(*descriptor.HTTPResponse); ok && httpResp.Body != nil {
+			rawBody, err := customJson.Marshal(httpResp.Body)
+			if err != nil {
+				return nil, err
+			}
+			httpResp.RawBody = rawBody
+		}
+	}
+	return resp, err
 }
