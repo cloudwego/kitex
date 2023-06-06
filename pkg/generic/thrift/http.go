@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
@@ -153,10 +154,12 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 	}
 	fid := dthrift.FieldID(id)
 
-	buf := make([]byte, 0, len(transBuf)*2)
 	resp := descriptor.NewHTTPResponse()
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, resp)
 	tyDsc := r.svc.DynamicGoDsc.Functions()[method].Response()
+	// json size is usually 2 times larger than equivalent thrift data
+	buf := mcache.Malloc(len(transBuf) * 2)[0:0]
+	defer mcache.Free(buf)
 
 	for _, field := range tyDsc.Struct().Fields() {
 		if fid == field.ID() {

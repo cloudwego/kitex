@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
@@ -195,7 +196,9 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 			return nil, err
 		}
 
-		buf := make([]byte, 0, len(transBuff)*2)
+		// json size is usually 2 times larger than equivalent thrift data
+		buf := mcache.Malloc(len(transBuff) * 2)[0:0]
+		defer mcache.Free(buf)
 		// thrift []byte to json []byte
 		if err := m.cv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
 			return nil, err

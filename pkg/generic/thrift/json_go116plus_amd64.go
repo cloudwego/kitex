@@ -130,10 +130,9 @@ func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgTy
 		buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
 		if err != nil {
 			return err
-		} else {
-			// TODO: implement MallocAck() to achieve zero copy
-			copy(buf, dbuf)
 		}
+		// TODO: implement MallocAck() to achieve zero copy
+		copy(buf, dbuf)
 	}
 	return nil
 }
