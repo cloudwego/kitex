@@ -148,8 +148,5 @@ func writeTail(out thrift.TProtocol) error {
 	if err := out.WriteFieldStop(); err != nil {
 		return err
 	}
-	if err := out.WriteStructEnd(); err != nil {
-		return err
-	}
-	return nil
+	return out.WriteStructEnd()
 }
