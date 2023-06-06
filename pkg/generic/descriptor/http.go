@@ -17,7 +17,9 @@
 package descriptor
 
 import (
+	"errors"
 	"net/http"
+	"net/url"
 
 	"github.com/bytedance/sonic/ast"
 	dhttp "github.com/cloudwego/dynamicgo/http"
@@ -47,6 +49,7 @@ type HTTPRequest struct {
 	GeneralBody interface{} // body of other representation, used with ContentType
 	ContentType MIMEType
 	bodyMap     *ast.Node
+	query       url.Values
 }
 
 // GetHeader implements http.RequestGetter of dynamicgo
@@ -64,7 +67,13 @@ func (req *HTTPRequest) GetCookie(key string) string {
 
 // GetQuery implements http.RequestGetter of dynamicgo
 func (req *HTTPRequest) GetQuery(key string) string {
-	return req.Request.URL.Query().Get(key)
+	if req.Request.URL == nil {
+		return ""
+	}
+	if req.query == nil {
+		req.query = req.Request.URL.Query()
+	}
+	return req.query.Get(key)
 }
 
 // GetBody implements http.RequestGetter of dynamicgo
@@ -94,14 +103,8 @@ func (req *HTTPRequest) GetParam(key string) string {
 
 // GetMapBody implements http.RequestGetter of dynamicgo
 func (req *HTTPRequest) GetMapBody(key string) string {
-	if req.bodyMap == nil {
-		if len(req.RawBody) == 0 {
-			return ""
-		}
-		body := req.RawBody
-		s := utils.SliceByteToString(body)
-		node := ast.NewRaw(s)
-		req.bodyMap = &node
+	if err := req.initializeBodyMap(); err != nil {
+		return ""
 	}
 
 	v := req.bodyMap.Get(key)
@@ -112,11 +115,9 @@ func (req *HTTPRequest) GetMapBody(key string) string {
 	if e != nil {
 		return ""
 	}
-	if v.Type() == ast.V_STRING {
-		j, e = v.String()
-		if e != nil {
-			return ""
-		}
+	j, e = v.String()
+	if e != nil {
+		return ""
 	}
 	return j
 }
@@ -129,6 +130,19 @@ func (req *HTTPRequest) GetPostForm(key string) string {
 // GetUri implements http.RequestGetter of dynamicgo
 func (req *HTTPRequest) GetUri() string {
 	return req.Request.URL.String()
+}
+
+func (req *HTTPRequest) initializeBodyMap() error {
+	if req.bodyMap == nil {
+		if len(req.RawBody) == 0 {
+			return errors.New("the length of RawBody is 0")
+		}
+		body := req.RawBody
+		s := utils.SliceByteToString(body)
+		node := ast.NewRaw(s)
+		req.bodyMap = &node
+	}
+	return nil
 }
 
 // HTTPResponse ...
