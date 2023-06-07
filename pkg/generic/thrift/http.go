@@ -22,7 +22,6 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
-	"github.com/cloudwego/dynamicgo/conv/j2t"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 
@@ -35,13 +34,13 @@ import (
 
 // WriteHTTPRequest implement of MessageWriter
 type WriteHTTPRequest struct {
-	svc                         *descriptor.ServiceDescriptor
-	dynamicgoTypeDsc            *dthrift.TypeDescriptor
-	binaryWithBase64            bool
-	j2tBinaryConv               j2t.BinaryConv // used for dynamicgo json to thrift conversion
-	j2tBinaryConvWithThriftBase j2t.BinaryConv // used for dynamicgo json to thrift conversion with EnableThriftBase turned on
-	hasRequestBase              bool
-	dynamicgoEnabled            bool
+	svc                    *descriptor.ServiceDescriptor
+	dynamicgoTypeDsc       *dthrift.TypeDescriptor
+	binaryWithBase64       bool
+	convOpts               conv.Options // used for dynamicgo conversion
+	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
+	hasRequestBase         bool
+	dynamicgoEnabled       bool
 }
 
 var _ MessageWriter = (*WriteHTTPRequest)(nil)
@@ -59,9 +58,9 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 }
 
 // SetDynamicGo ...
-func (w *WriteHTTPRequest) SetDynamicGo(j2tBinaryConv, j2tBinaryConvWithThriftBase *j2t.BinaryConv, method string) {
-	w.j2tBinaryConv = *j2tBinaryConv
-	w.j2tBinaryConvWithThriftBase = *j2tBinaryConvWithThriftBase
+func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options, method string) {
+	w.convOpts = *convOpts
+	w.convOptsWithThriftBase = *convOptsWithThriftBase
 	w.dynamicgoEnabled = true
 	fn := w.svc.DynamicGoDsc.Functions()[method]
 	w.hasRequestBase = fn.HasRequestBase()
@@ -116,8 +115,8 @@ func (r *ReadHTTPResponse) SetUseRawBodyForHTTPResp(useRawBodyForHTTPResp bool) 
 }
 
 // SetDynamicGo ...
-func (r *ReadHTTPResponse) SetDynamicGo(t2jBinaryConv *t2j.BinaryConv, msg remote.Message) {
-	r.t2jBinaryConv = *t2jBinaryConv
+func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options, msg remote.Message) {
+	r.t2jBinaryConv = t2j.NewBinaryConv(*convOpts)
 	r.msg = msg
 	r.dynamicgoEnabled = true
 }

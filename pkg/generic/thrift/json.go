@@ -23,7 +23,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/mcache"
-	"github.com/cloudwego/dynamicgo/conv/j2t"
+	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	"github.com/tidwall/gjson"
@@ -62,14 +62,14 @@ var _ = wrapJSONWriter
 
 // WriteJSON implement of MessageWriter
 type WriteJSON struct {
-	typeDsc                     *descriptor.TypeDescriptor
-	dynamicgoTypeDsc            *dthrift.TypeDescriptor
-	hasRequestBase              bool
-	base64Binary                bool
-	isClient                    bool
-	j2tBinaryConv               j2t.BinaryConv // used for dynamicgo json to thrift conversion
-	j2tBinaryConvWithThriftBase j2t.BinaryConv // used for dynamicgo json to thrift conversion with EnableThriftBase turned on
-	dynamicgoEnabled            bool
+	typeDsc                *descriptor.TypeDescriptor
+	dynamicgoTypeDsc       *dthrift.TypeDescriptor
+	hasRequestBase         bool
+	base64Binary           bool
+	isClient               bool
+	convOpts               conv.Options // used for dynamicgo conversion
+	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
+	dynamicgoEnabled       bool
 }
 
 var _ MessageWriter = (*WriteJSON)(nil)
@@ -81,7 +81,7 @@ func (m *WriteJSON) SetBase64Binary(enable bool) {
 }
 
 // SetDynamicGo ...
-func (m *WriteJSON) SetDynamicGo(svc *descriptor.ServiceDescriptor, method string, j2tBinaryConv, j2tBinaryConvWithThriftBase *j2t.BinaryConv) {
+func (m *WriteJSON) SetDynamicGo(svc *descriptor.ServiceDescriptor, method string, convOpts, convOptsWithThriftBase *conv.Options) {
 	var dty *dthrift.TypeDescriptor
 	if m.isClient {
 		dty = svc.DynamicGoDsc.Functions()[method].Request()
@@ -89,8 +89,8 @@ func (m *WriteJSON) SetDynamicGo(svc *descriptor.ServiceDescriptor, method strin
 		dty = svc.DynamicGoDsc.Functions()[method].Response()
 	}
 	m.dynamicgoTypeDsc = dty
-	m.j2tBinaryConv = *j2tBinaryConv
-	m.j2tBinaryConvWithThriftBase = *j2tBinaryConvWithThriftBase
+	m.convOpts = *convOpts
+	m.convOptsWithThriftBase = *convOptsWithThriftBase
 	m.dynamicgoEnabled = true
 }
 
@@ -152,14 +152,14 @@ func (m *ReadJSON) SetBinaryWithBase64(enable bool) {
 }
 
 // SetDynamicGo ...
-func (m *ReadJSON) SetDynamicGo(t2jBinaryConv, t2jBinaryConvWithException *t2j.BinaryConv, msg remote.Message) {
+func (m *ReadJSON) SetDynamicGo(convOpts, convOptsWithException *conv.Options, msg remote.Message) {
 	m.msg = msg
 	m.dynamicgoEnabled = true
 	if m.isClient {
 		// set binary conv to handle an exception field
-		m.t2jBinaryConv = *t2jBinaryConvWithException
+		m.t2jBinaryConv = t2j.NewBinaryConv(*convOptsWithException)
 	} else {
-		m.t2jBinaryConv = *t2jBinaryConv
+		m.t2jBinaryConv = t2j.NewBinaryConv(*convOpts)
 	}
 }
 

@@ -20,9 +20,6 @@ package generic
 import (
 	"fmt"
 
-	"github.com/cloudwego/dynamicgo/conv/j2t"
-	"github.com/cloudwego/dynamicgo/conv/t2j"
-
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -124,13 +121,8 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 		}
 		c.codec.binaryWithBase64 = enable
 		if c.codec.dynamicgoEnabled {
-			convOpts := c.codec.opts.dynamicgoConvOpts
-			convOpts.NoBase64Binary = !enable
-			c.codec.j2tBinaryConv = j2t.NewBinaryConv(convOpts)
-			c.codec.t2jBinaryConv = t2j.NewBinaryConv(convOpts)
-
-			convOpts.EnableThriftBase = true
-			c.codec.j2tBinaryConvWithThriftBase = j2t.NewBinaryConv(convOpts)
+			c.codec.convOpts.NoBase64Binary = !enable
+			c.codec.convOptsWithThriftBase.NoBase64Binary = !enable
 		}
 	case *jsonThriftGeneric:
 		if c.codec == nil {
@@ -138,18 +130,9 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 		}
 		c.codec.binaryWithBase64 = enable
 		if c.codec.dynamicgoEnabled {
-			convOpts := c.codec.opts.dynamicgoConvOpts
-			convOpts.NoBase64Binary = !enable
-			c.codec.j2tBinaryConv = j2t.NewBinaryConv(convOpts)
-			c.codec.t2jBinaryConv = t2j.NewBinaryConv(convOpts)
-
-			convOptsWithThriftBase := convOpts
-			convOptsWithThriftBase.EnableThriftBase = true
-			c.codec.j2tBinaryConvWithThriftBase = j2t.NewBinaryConv(convOptsWithThriftBase)
-
-			convOptsWithException := convOpts
-			convOptsWithException.ConvertException = true
-			c.codec.t2jBinaryConvWithException = t2j.NewBinaryConv(convOptsWithException)
+			c.codec.convOpts.NoBase64Binary = !enable
+			c.codec.convOptsWithThriftBase.NoBase64Binary = !enable
+			c.codec.convOptsWithException.NoBase64Binary = !enable
 		}
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)

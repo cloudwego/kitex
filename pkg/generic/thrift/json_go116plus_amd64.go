@@ -39,15 +39,15 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		return m.originalWrite(ctx, out, msg, requestBase)
 	}
 
-	var cv j2t.BinaryConv
 	// dynamicgo logic
+	var cv j2t.BinaryConv
 	if !m.hasRequestBase {
 		requestBase = nil
 	}
 	if requestBase != nil {
-		cv = m.j2tBinaryConvWithThriftBase
+		cv = j2t.NewBinaryConv(m.convOptsWithThriftBase)
 	} else {
-		cv = m.j2tBinaryConv
+		cv = j2t.NewBinaryConv(m.convOpts)
 	}
 
 	// msg is void

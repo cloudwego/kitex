@@ -20,8 +20,7 @@ import (
 	"context"
 	"sync/atomic"
 
-	"github.com/cloudwego/dynamicgo/conv/j2t"
-	"github.com/cloudwego/dynamicgo/conv/t2j"
+	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
@@ -40,16 +39,15 @@ var (
 type JSONRequest = string
 
 type jsonThriftCodec struct {
-	svcDsc                      atomic.Value // *idl
-	provider                    DescriptorProvider
-	codec                       remote.PayloadCodec
-	binaryWithBase64            bool
-	opts                        *Options
-	j2tBinaryConv               j2t.BinaryConv // used for dynamicgo json to thrift conversion
-	j2tBinaryConvWithThriftBase j2t.BinaryConv // used for dynamicgo json to thrift conversion with EnableThriftBase turned on
-	t2jBinaryConv               t2j.BinaryConv // used for dynamicgo thrift to json conversion
-	t2jBinaryConvWithException  t2j.BinaryConv // used for dynamicgo thrift to json conversion with ConvertException turned on
-	dynamicgoEnabled            bool
+	svcDsc                 atomic.Value // *idl
+	provider               DescriptorProvider
+	codec                  remote.PayloadCodec
+	binaryWithBase64       bool
+	opts                   *Options
+	convOpts               conv.Options // used for dynamicgo conversion
+	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
+	convOptsWithException  conv.Options // used for dynamicgo conversion with ConvertException turned on
+	dynamicgoEnabled       bool
 }
 
 func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*jsonThriftCodec, error) {
@@ -59,16 +57,15 @@ func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *O
 		c.dynamicgoEnabled = true
 
 		convOpts := opts.dynamicgoConvOpts
-		c.j2tBinaryConv = j2t.NewBinaryConv(convOpts)
-		c.t2jBinaryConv = t2j.NewBinaryConv(convOpts)
+		c.convOpts = convOpts
 
 		convOptsWithThriftBase := convOpts
 		convOptsWithThriftBase.EnableThriftBase = true
-		c.j2tBinaryConvWithThriftBase = j2t.NewBinaryConv(convOptsWithThriftBase)
+		c.convOptsWithThriftBase = convOptsWithThriftBase
 
 		convOptsWithException := convOpts
 		convOptsWithException.ConvertException = true
-		c.t2jBinaryConvWithException = t2j.NewBinaryConv(convOptsWithException)
+		c.convOptsWithException = convOptsWithException
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
@@ -104,7 +101,7 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	}
 	wm.SetBase64Binary(c.binaryWithBase64)
 	if c.dynamicgoEnabled {
-		wm.SetDynamicGo(svcDsc, method, &c.j2tBinaryConv, &c.j2tBinaryConvWithThriftBase)
+		wm.SetDynamicGo(svcDsc, method, &c.convOpts, &c.convOptsWithThriftBase)
 	}
 
 	msg.Data().(WithCodec).SetCodec(wm)
@@ -124,7 +121,7 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	rm.SetBinaryWithBase64(c.binaryWithBase64)
 	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
 	if c.dynamicgoEnabled && msg.PayloadLen() != 0 {
-		rm.SetDynamicGo(&c.t2jBinaryConv, &c.t2jBinaryConvWithException, msg)
+		rm.SetDynamicGo(&c.convOpts, &c.convOptsWithException, msg)
 	}
 
 	msg.Data().(WithCodec).SetCodec(rm)
