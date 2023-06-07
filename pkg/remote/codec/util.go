@@ -95,6 +95,11 @@ func UpdateMsgType(msgType uint32, message remote.Message) error {
 		if mt != remote.Call && mt != remote.Oneway && mt != remote.Stream {
 			return remote.NewTransErrorWithMsg(remote.InvalidMessageTypeException, fmt.Sprintf("server side, invalid message type %d", mt))
 		}
+		if mt != message.MessageType() {
+			// server should receive messages with the same message type with its local definition
+			return remote.NewTransErrorWithMsg(remote.InvalidMessageTypeException, fmt.Sprintf("server sice, received message type does not match the local definition"))
+		}
+
 	} else {
 		if mt != remote.Reply && mt != remote.Exception && mt != remote.Stream {
 			return remote.NewTransErrorWithMsg(remote.InvalidMessageTypeException, fmt.Sprintf("client side, invalid message type %d", mt))
