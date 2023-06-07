@@ -101,7 +101,9 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	}
 	wm.SetBase64Binary(c.binaryWithBase64)
 	if c.dynamicgoEnabled {
-		wm.SetDynamicGo(svcDsc, method, &c.convOpts, &c.convOptsWithThriftBase)
+		if err = wm.SetDynamicGo(svcDsc, method, &c.convOpts, &c.convOptsWithThriftBase); err != nil {
+			return err
+		}
 	}
 
 	msg.Data().(WithCodec).SetCodec(wm)

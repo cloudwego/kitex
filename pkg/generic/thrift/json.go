@@ -80,17 +80,20 @@ func (m *WriteJSON) SetBase64Binary(enable bool) {
 }
 
 // SetDynamicGo ...
-func (m *WriteJSON) SetDynamicGo(svc *descriptor.ServiceDescriptor, method string, convOpts, convOptsWithThriftBase *conv.Options) {
-	var dty *dthrift.TypeDescriptor
-	if m.isClient {
-		dty = svc.DynamicGoDsc.Functions()[method].Request()
-	} else {
-		dty = svc.DynamicGoDsc.Functions()[method].Response()
+func (m *WriteJSON) SetDynamicGo(svc *descriptor.ServiceDescriptor, method string, convOpts, convOptsWithThriftBase *conv.Options) error {
+	fnDsc := svc.DynamicGoDsc.Functions()[method]
+	if fnDsc == nil {
+		return fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, svc.DynamicGoDsc.Name())
 	}
-	m.dynamicgoTypeDsc = dty
+	if m.isClient {
+		m.dynamicgoTypeDsc = fnDsc.Request()
+	} else {
+		m.dynamicgoTypeDsc = fnDsc.Response()
+	}
 	m.convOpts = *convOpts
 	m.convOptsWithThriftBase = *convOptsWithThriftBase
 	m.dynamicgoEnabled = true
+	return nil
 }
 
 func (m *WriteJSON) originalWrite(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
@@ -175,11 +178,15 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
 
+	fnDsc := m.svc.DynamicGoDsc.Functions()[method]
+	if fnDsc == nil {
+		return nil, fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, m.svc.DynamicGoDsc.Name())
+	}
 	var tyDsc *dthrift.TypeDescriptor
 	if m.msg.MessageType() == remote.Reply {
-		tyDsc = m.svc.DynamicGoDsc.Functions()[method].Response()
+		tyDsc = fnDsc.Response()
 	} else {
-		tyDsc = m.svc.DynamicGoDsc.Functions()[method].Request()
+		tyDsc = fnDsc.Request()
 	}
 
 	var resp interface{}

@@ -18,6 +18,7 @@ package thrift
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/dynamicgo/conv"
@@ -57,13 +58,17 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 }
 
 // SetDynamicGo ...
-func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options, method string) {
+func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options, method string) error {
 	w.convOpts = *convOpts
 	w.convOptsWithThriftBase = *convOptsWithThriftBase
 	w.dynamicgoEnabled = true
-	fn := w.svc.DynamicGoDsc.Functions()[method]
-	w.hasRequestBase = fn.HasRequestBase()
-	w.dynamicgoTypeDsc = fn.Request()
+	fnDsc := w.svc.DynamicGoDsc.Functions()[method]
+	if fnDsc == nil {
+		return fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, w.svc.DynamicGoDsc.Name())
+	}
+	w.hasRequestBase = fnDsc.HasRequestBase()
+	w.dynamicgoTypeDsc = fnDsc.Request()
+	return nil
 }
 
 // originalWrite ...
@@ -155,7 +160,11 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 
 	resp := descriptor.NewHTTPResponse()
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPResponse, resp)
-	tyDsc := r.svc.DynamicGoDsc.Functions()[method].Response()
+	fnDsc := r.svc.DynamicGoDsc.Functions()[method]
+	if fnDsc == nil {
+		return nil, fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, r.svc.DynamicGoDsc.Name())
+	}
+	tyDsc := fnDsc.Response()
 	// json size is usually 2 times larger than equivalent thrift data
 	buf := make([]byte, 0, len(transBuf)*2)
 

@@ -108,7 +108,9 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	inner := thrift.NewWriteHTTPRequest(svcDsc)
 	inner.SetBinaryWithBase64(c.binaryWithBase64)
 	if c.dynamicgoEnabled {
-		inner.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase, msg.RPCInfo().Invocation().MethodName())
+		if err := inner.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase, msg.RPCInfo().Invocation().MethodName()); err != nil {
+			return err
+		}
 	}
 
 	msg.Data().(WithCodec).SetCodec(inner)
