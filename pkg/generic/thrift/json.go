@@ -209,9 +209,6 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 			return nil, err
 		}
 		buf = removePrefixAndSuffix(buf)
-		//if len(buf) > structWrapLen {
-		//	buf = buf[structWrapLen : len(buf)-1]
-		//}
 		resp = utils.SliceByteToString(buf)
 		if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.STRING {
 			strresp := resp.(string)
