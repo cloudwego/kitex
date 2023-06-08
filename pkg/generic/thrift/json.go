@@ -208,9 +208,10 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 		if err := m.t2jBinaryConv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
 			return nil, err
 		}
-		if len(buf) > structWrapLen {
-			buf = buf[structWrapLen : len(buf)-1]
-		}
+		buf = removePrefixAndSuffix(buf)
+		//if len(buf) > structWrapLen {
+		//	buf = buf[structWrapLen : len(buf)-1]
+		//}
 		resp = utils.SliceByteToString(buf)
 		if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.STRING {
 			strresp := resp.(string)
@@ -255,4 +256,12 @@ func (m *ReadJSON) originalRead(ctx context.Context, method string, in thrift.TP
 	}
 
 	return string(respNode), nil
+}
+
+// removePrefixAndSuffix removes json []byte from prefix `{"":` and suffix `}`
+func removePrefixAndSuffix(buf []byte) []byte {
+	if len(buf) > structWrapLen {
+		return buf[structWrapLen : len(buf)-1]
+	}
+	return buf
 }
