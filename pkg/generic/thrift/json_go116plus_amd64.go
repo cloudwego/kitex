@@ -55,7 +55,7 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		if err := m.writeHead(out); err != nil {
 			return err
 		}
-		if err := m.writeFields(ctx, out, Void, nil, nil, nil); err != nil {
+		if err := m.writeFields(ctx, out, Void, nil, nil); err != nil {
 			return err
 		}
 		return writeTail(out)
@@ -66,15 +66,12 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 	if !ok {
 		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
 	}
-
 	transBuff := utils.StringToSliceByte(s)
-	dbuf := mcache.Malloc(len(transBuff))[0:0]
-	defer mcache.Free(dbuf)
 
 	if err := m.writeHead(out); err != nil {
 		return err
 	}
-	if err := m.writeFields(ctx, out, String, &cv, transBuff, dbuf); err != nil {
+	if err := m.writeFields(ctx, out, String, &cv, transBuff); err != nil {
 		return err
 	}
 	return writeTail(out)
@@ -87,7 +84,10 @@ const (
 	String
 )
 
-func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgType MsgType, cv *j2t.BinaryConv, transBuff, dbuf []byte) error {
+func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgType MsgType, cv *j2t.BinaryConv, transBuff []byte) error {
+	dbuf := mcache.Malloc(len(transBuff))[0:0]
+	defer mcache.Free(dbuf)
+
 	for _, field := range m.dynamicgoTypeDsc.Struct().Fields() {
 		// Exception field
 		if !m.isClient && field.ID() != 0 {
