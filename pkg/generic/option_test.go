@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/dynamicgo/conv"
+
 	"github.com/cloudwego/kitex/internal/test"
 )
 
