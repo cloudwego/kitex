@@ -21,11 +21,13 @@ package thrift
 
 import (
 	"context"
+	"unsafe"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
+	"github.com/cloudwego/dynamicgo/thrift/base"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -47,6 +49,8 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		requestBase = nil
 	}
 	if requestBase != nil {
+		base := (*base.Base)(unsafe.Pointer(requestBase))
+		ctx = context.WithValue(ctx, conv.CtxKeyThriftReqBase, base)
 		cv = j2t.NewBinaryConv(w.convOptsWithThriftBase)
 	} else {
 		cv = j2t.NewBinaryConv(w.convOpts)
