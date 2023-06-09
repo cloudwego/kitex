@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/bytedance/sonic"
+	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
@@ -55,6 +56,9 @@ func TestHttpThriftCodec(t *testing.T) {
 	htc, err := newHTTPThriftCodec(p, thriftCodec, gOpts)
 	test.Assert(t, err == nil)
 	test.Assert(t, !htc.dynamicgoEnabled)
+	test.Assert(t, !htc.useRawBodyForHTTPResp)
+	test.DeepEqual(t, htc.convOpts, conv.Options{})
+	test.DeepEqual(t, htc.convOptsWithThriftBase, conv.Options{})
 	defer htc.Close()
 	test.Assert(t, htc.Name() == "HttpThrift")
 
@@ -92,6 +96,11 @@ func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
 	htc, err := newHTTPThriftCodec(p, thriftCodec, gOpts)
 	test.Assert(t, err == nil)
 	test.Assert(t, htc.dynamicgoEnabled)
+	test.Assert(t, htc.useRawBodyForHTTPResp)
+	test.DeepEqual(t, htc.convOpts, DefaultHTTPDynamicGoConvOpts)
+	convOptsWithThriftBase := DefaultHTTPDynamicGoConvOpts
+	convOptsWithThriftBase.EnableThriftBase = true
+	test.DeepEqual(t, htc.convOptsWithThriftBase, convOptsWithThriftBase)
 	defer htc.Close()
 	test.Assert(t, htc.Name() == "HttpThrift")
 

@@ -20,6 +20,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/cloudwego/dynamicgo/conv"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -35,6 +37,9 @@ func TestJsonThriftCodec(t *testing.T) {
 	jtc, err := newJsonThriftCodec(p, thriftCodec, gOpts)
 	test.Assert(t, err == nil)
 	test.Assert(t, !jtc.dynamicgoEnabled)
+	test.DeepEqual(t, jtc.convOpts, conv.Options{})
+	test.DeepEqual(t, jtc.convOptsWithThriftBase, conv.Options{})
+	test.DeepEqual(t, jtc.convOptsWithException, conv.Options{})
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONThrift")
 
@@ -68,6 +73,13 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	jtc, err := newJsonThriftCodec(p, thriftCodec, gOpts)
 	test.Assert(t, err == nil)
 	test.Assert(t, jtc.dynamicgoEnabled)
+	test.DeepEqual(t, jtc.convOpts, DefaultJSONDynamicGoConvOpts)
+	convOptsWithThriftBase := DefaultJSONDynamicGoConvOpts
+	convOptsWithThriftBase.EnableThriftBase = true
+	test.DeepEqual(t, jtc.convOptsWithThriftBase, convOptsWithThriftBase)
+	convOptsWithException := DefaultJSONDynamicGoConvOpts
+	convOptsWithException.ConvertException = true
+	test.DeepEqual(t, jtc.convOptsWithException, convOptsWithException)
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONThrift")
 
