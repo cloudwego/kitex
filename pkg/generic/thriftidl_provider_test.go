@@ -45,15 +45,21 @@ func TestAbsPath(t *testing.T) {
 func TestThriftFileProvider(t *testing.T) {
 	path := "http_test/idl/binary_echo.thrift"
 	p, err := NewThriftFileProvider(path)
-	test.Assert(t, err == nil)
 	defer p.Close()
+	test.Assert(t, err == nil)
+	pd, ok := p.(GetProviderOption)
+	test.Assert(t, ok)
+	test.Assert(t, !pd.Option().DynamicGoEnabled)
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.DynamicGoDsc == nil)
 
 	p, err = NewThriftFileProviderWithDynamicGo(path)
-	test.Assert(t, err == nil)
 	defer p.Close()
+	test.Assert(t, err == nil)
+	pd, ok = p.(GetProviderOption)
+	test.Assert(t, ok)
+	test.Assert(t, pd.Option().DynamicGoEnabled)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.DynamicGoDsc != nil)
@@ -86,8 +92,9 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 	}
 
 	p, err := NewThriftContentWithAbsIncludePathProvider(path, includes)
-	test.Assert(t, err == nil)
 	defer p.Close()
+	test.Assert(t, err == nil)
+	test.Assert(t, !p.opts.DynamicGoEnabled)
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "InboxService")
@@ -103,8 +110,9 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 
 	includes[path] = content
 	p, err = NewThriftContentWithAbsIncludePathProviderWithDynamicGo(path, includes)
-	test.Assert(t, err == nil)
 	defer p.Close()
+	test.Assert(t, err == nil)
+	test.Assert(t, p.opts.DynamicGoEnabled)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "InboxService")
@@ -162,8 +170,9 @@ func TestThriftContentProvider(t *testing.T) {
 	`
 
 	p, err = NewThriftContentProvider(content, nil)
-	test.Assert(t, err == nil, err)
 	defer p.Close()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, !p.opts.DynamicGoEnabled)
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "InboxService")
@@ -177,8 +186,9 @@ func TestThriftContentProvider(t *testing.T) {
 	test.Assert(t, tree.DynamicGoDsc == nil)
 
 	p, err = NewThriftContentProviderWithDynamicGo(content, nil)
-	test.Assert(t, err == nil, err)
 	defer p.Close()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, p.opts.DynamicGoEnabled)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.DynamicGoDsc != nil)
