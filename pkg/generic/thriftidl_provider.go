@@ -68,7 +68,8 @@ func NewThriftFileProviderWithDynamicGo(path string, includeDirs ...string) (Des
 	}
 
 	// ServiceDescriptor of dynamicgo
-	dsvc, err := dthrift.NewDescritorFromPath(context.Background(), path, includeDirs...)
+	dOpts := dthrift.Options{EnableThriftBase: true}
+	dsvc, err := dOpts.NewDescritorFromPath(context.Background(), path, includeDirs...)
 	if err != nil {
 		// fall back to the original way (without dynamicgo)
 		p.opts.DynamicGoEnabled = false
@@ -391,7 +392,8 @@ func newServiceDescriptorFromContent(path, content string, includes map[string]s
 
 func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, isAbsIncludePath bool) error {
 	// ServiceDescriptor of dynamicgo
-	dsvc, err := dthrift.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
+	dOpts := dthrift.Options{EnableThriftBase: true}
+	dsvc, err := dOpts.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
 	if err != nil {
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
 		return err
