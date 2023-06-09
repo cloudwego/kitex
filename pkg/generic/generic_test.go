@@ -139,3 +139,25 @@ func TestJSONThriftGeneric(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Test")
 }
+
+func TestHttpThriftGeneric_Framed(t *testing.T) {
+	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
+	test.Assert(t, err == nil)
+
+	g, err := HTTPThriftGeneric(p)
+	test.Assert(t, err == nil)
+	defer g.Close()
+
+	test.Assert(t, !g.Framed())
+}
+
+func TestJsonThriftGeneric_Framed(t *testing.T) {
+	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
+	test.Assert(t, err == nil)
+
+	g, err := JSONThriftGeneric(p)
+	test.Assert(t, err == nil)
+	defer g.Close()
+
+	test.Assert(t, !g.Framed())
+}
