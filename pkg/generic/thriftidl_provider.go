@@ -73,6 +73,7 @@ func NewThriftFileProviderWithDynamicGo(path string, includeDirs ...string) (Des
 	if err != nil {
 		// fall back to the original way (without dynamicgo)
 		p.opts.DynamicGoEnabled = false
+		p.svcs <- svc
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)
 		return p, nil
 	}
@@ -151,9 +152,7 @@ func NewThriftContentProviderWithDynamicGo(main string, includes map[string]stri
 		return nil, err
 	}
 
-	if err = p.newDynamicGoDsc(svc, defaultMainIDLPath, main, includes); err != nil {
-		return p, nil
-	}
+	p.newDynamicGoDsc(svc, defaultMainIDLPath, main, includes)
 
 	p.svcs <- svc
 	return p, nil
@@ -204,12 +203,10 @@ func (p *ThriftContentProvider) Option() ProviderOption {
 	return *p.opts
 }
 
-func (p *ThriftContentProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string) error {
+func (p *ThriftContentProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string) {
 	if err := newDynamicGoDscFromContent(svc, path, content, includes, false); err != nil {
 		p.opts.DynamicGoEnabled = false
-		return err
 	}
-	return nil
 }
 
 func parseIncludes(tree *parser.Thrift, parsed map[string]*parser.Thrift, sources map[string]string, isAbsIncludePath bool) (err error) {
@@ -312,9 +309,7 @@ func NewThriftContentWithAbsIncludePathProviderWithDynamicGo(mainIDLPath string,
 		return nil, err
 	}
 
-	if p.newDynamicGoDsc(svc, mainIDLPath, mainIDLContent, includes); err != nil {
-		return p, nil
-	}
+	p.newDynamicGoDsc(svc, mainIDLPath, mainIDLContent, includes)
 
 	p.svcs <- svc
 	return p, nil
@@ -370,12 +365,10 @@ func (p *ThriftContentWithAbsIncludePathProvider) Option() ProviderOption {
 	return *p.opts
 }
 
-func (p *ThriftContentWithAbsIncludePathProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string) error {
+func (p *ThriftContentWithAbsIncludePathProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string) {
 	if err := newDynamicGoDscFromContent(svc, path, content, includes, true); err != nil {
 		p.opts.DynamicGoEnabled = false
-		return err
 	}
-	return nil
 }
 
 func newServiceDescriptorFromContent(path, content string, includes map[string]string, isAbsIncludePath bool) (*descriptor.ServiceDescriptor, error) {
