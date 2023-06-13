@@ -21,6 +21,7 @@ import (
 	"net"
 	"sync"
 
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
@@ -118,11 +119,12 @@ func (m *manager) watch() {
 			m.errLock.Unlock()
 
 			if m.ErrorHandling == FailFast {
-				m.cancel()  // stop workers
-				go func() { // clean up
+				m.cancel() // stop workers
+				gofunc.GoFunc(context.Background(), func() {
+					// clean up
 					discard(m.errs)
 					discard(m.jobs)
-				}()
+				})
 				return
 			}
 		default:
@@ -138,7 +140,7 @@ func discard(ch chan *job) {
 
 func split(targets map[string][]string, dup int) (js chan *job) {
 	js = make(chan *job)
-	go func() {
+	gofunc.GoFunc(context.Background(), func() {
 		for network, addresses := range targets {
 			for _, address := range addresses {
 				for i := 0; i < dup; i++ {
@@ -147,7 +149,7 @@ func split(targets map[string][]string, dup int) (js chan *job) {
 			}
 		}
 		close(js)
-	}()
+	})
 	return
 }
 

@@ -28,7 +28,6 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
-	"github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
@@ -80,7 +79,7 @@ func init() {
 			},
 		},
 		SvcInfo:          mocks.ServiceInfo(),
-		TracerCtl:        &stats.Controller{},
+		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
 }
@@ -468,7 +467,7 @@ func TestInvokeError(t *testing.T) {
 			},
 		},
 		SvcInfo:          mocks.ServiceInfo(),
-		TracerCtl:        &stats.Controller{},
+		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
 

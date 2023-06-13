@@ -121,7 +121,7 @@ func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out r
 		}
 		payloadLen = out.MallocLen() - headerLen
 		binary.BigEndian.PutUint32(framedLenField, uint32(payloadLen))
-	} else if message.ServiceInfo().PayloadCodec == serviceinfo.Protobuf {
+	} else if message.ProtocolInfo().CodecType == serviceinfo.Protobuf {
 		return perrors.NewProtocolErrorWithMsg("protobuf just support 'framed' trans proto")
 	}
 	// 5. fill totalLen field for header if needed

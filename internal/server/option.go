@@ -18,16 +18,17 @@
 package server
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/cloudwego/kitex/internal/configutil"
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/limit"
 	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/proxy"
@@ -63,7 +64,7 @@ type Options struct {
 	MetaHandlers []remote.MetaHandler
 
 	RemoteOpt  *remote.ServerOption
-	ErrHandle  func(error) error
+	ErrHandle  func(context.Context, error) error
 	ExitSignal func() <-chan error
 	Proxy      proxy.ReverseProxy
 
@@ -87,7 +88,7 @@ type Options struct {
 	DebugService diagnosis.Service
 
 	// Observability
-	TracerCtl  *internal_stats.Controller
+	TracerCtl  *rpcinfo.TraceController
 	StatsLevel *stats.Level
 }
 
@@ -119,7 +120,7 @@ func NewOptions(opts []Option) *Options {
 
 		SupportedTransportsFunc: DefaultSupportedTransportsFunc,
 
-		TracerCtl: &internal_stats.Controller{},
+		TracerCtl: &rpcinfo.TraceController{},
 		Registry:  registry.NoopRegistry,
 	}
 	ApplyOptions(opts, o)
@@ -143,12 +144,12 @@ func ApplyOptions(opts []Option, o *Options) {
 
 func DefaultSysExitSignal() <-chan error {
 	errCh := make(chan error, 1)
-	go func() {
+	gofunc.GoFunc(context.Background(), func() {
 		sig := SysExitSignal()
 		defer signal.Stop(sig)
 		<-sig
 		errCh <- nil
-	}()
+	})
 	return errCh
 }
 

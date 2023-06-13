@@ -302,145 +302,89 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) 
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
 func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
-	rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, method)
-	var callOpts *callopt.CallOptions
-	ctx, callOpts = kc.applyCallOptions(ctx, cfg, rmt)
-	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
-	if kc.opt.StatsLevel != nil {
-		rpcStats.SetLevel(*kc.opt.StatsLevel)
-	}
-
-	mi := kc.svcInfo.MethodInfo(method)
-	if mi != nil && mi.OneWay() {
-		cfg.SetInteractionMode(rpcinfo.Oneway)
-	}
-
-	// Export read-only views to external users.
-	ri := rpcinfo.NewRPCInfo(
-		rpcinfo.FromBasicInfo(kc.opt.Cli),
-		rmt.ImmutableView(),
-		rpcinfo.NewInvocation(kc.svcInfo.ServiceName, method, kc.svcInfo.GetPackageName()),
-		cfg.ImmutableView(),
-		rpcStats.ImmutableView(),
-	)
-
-	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
-		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
-	}
-
-	if p := kc.opt.Timeouts; p != nil {
-		if c := p.Timeouts(ri); c != nil {
-			_ = cfg.SetRPCTimeout(c.RPCTimeout())
-			_ = cfg.SetConnectTimeout(c.ConnectTimeout())
-			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
-		}
-	}
-
-	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-	return ctx, ri, callOpts
+	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo)
 }
 
-func (kc *kClient) applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo) (context.Context, *callopt.CallOptions) {
+func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo, opt *client.Options) (context.Context, *callopt.CallOptions) {
 	cos := CallOptionsFromCtx(ctx)
 	if len(cos) > 0 {
-		info, callOpts := callopt.Apply(cos, cfg, svr, kc.opt.Locks, kc.opt.HTTPResolver)
+		info, callOpts := callopt.Apply(cos, cfg, svr, opt.Locks, opt.HTTPResolver)
 		ctx = context.WithValue(ctx, ctxCallOptionInfoKey, info)
 		return ctx, callOpts
 	}
-	kc.opt.Locks.ApplyLocks(cfg, svr)
+	opt.Locks.ApplyLocks(cfg, svr)
 	return ctx, nil
 }
 
 // Call implements the Client interface .
-func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) error {
-	if !kc.inited {
-		panic("client not initialized")
-	}
-	if kc.closed {
-		panic("client is already closed")
-	}
-	if ctx == nil {
-		panic("ctx is nil")
-	}
+func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) (err error) {
+	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
 	ctx, ri, callOpts = kc.initRPCInfo(ctx, method)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
-
-	var callOptRetry retry.Policy
-	var callOptFallback *fallback.Policy
-	if callOpts != nil {
-		callOptFallback = callOpts.Fallback
-		if callOpts.RetryPolicy.Enable {
-			callOptRetry = callOpts.RetryPolicy
+	var reportErr error
+	var recycleRI bool
+	defer func() {
+		if panicInfo := recover(); panicInfo != nil {
+			err = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, false)
+			reportErr = err
 		}
-	}
-	if kc.opt.RetryContainer == nil && callOptRetry.Enable {
+		kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
+		if recycleRI {
+			// why need check recycleRI to decide if recycle RPCInfo?
+			// 1. no retry, rpc timeout happen will cause panic when response return
+			// 2. retry success, will cause panic when first call return
+			// 3. backup request may cause panic, cannot recycle first RPCInfo
+			// RPCInfo will be recycled after rpc is finished,
+			// holding RPCInfo in a new goroutine is forbidden.
+			rpcinfo.PutRPCInfo(ri)
+		}
+		callOpts.Recycle()
+	}()
+
+	callOptRetry := getCalloptRetryPolicy(callOpts)
+	if kc.opt.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
 		// setup retry in callopt
 		kc.opt.RetryContainer = retry.NewRetryContainer()
 	}
 
-	var err error
-	var recycleRI bool
 	if kc.opt.RetryContainer == nil {
+		// call without retry policy
 		err = kc.eps(ctx, request, response)
 		if err == nil {
 			recycleRI = true
 		}
 	} else {
-		var callTimes int32
-		// prevRI represents a value of rpcinfo.RPCInfo type.
-		var prevRI atomic.Value
-		recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
-			currCallTimes := int(atomic.AddInt32(&callTimes, 1))
-			retryCtx := ctx
-			cRI := ri
-			if currCallTimes > 1 {
-				retryCtx, cRI, _ = kc.initRPCInfo(ctx, method)
-				retryCtx = metainfo.WithPersistentValue(retryCtx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
-				if prevRI.Load() == nil {
-					prevRI.Store(ri)
-				}
-				r.Prepare(retryCtx, prevRI.Load().(rpcinfo.RPCInfo), cRI)
-				prevRI.Store(cRI)
-			}
-			err := kc.eps(retryCtx, request, response)
-			return cRI, response, err
-		}, ri, request)
+		recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
 	}
 
 	// do fallback if with setup
-	fallback, hasFallback := getFallbackPolicy(callOptFallback, kc.opt.Fallback)
-	var fbErr error
-	reportErr := err
-	if hasFallback {
-		reportAsFB := false
-		// Notice: If rpc err is nil, rpcStatAsFB will always be false, even if it's set to true by user.
-		fbErr, reportAsFB = fallback.DoIfNeeded(ctx, ri, request, response, err)
-		if reportAsFB {
-			reportErr = fbErr
-		}
-		err = fbErr
-	}
-
-	kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
-	callOpts.Recycle()
-	if err == nil && !hasFallback {
-		err = ri.Invocation().BizStatusErr()
-	}
-
-	if recycleRI {
-		// why need check recycleRI to decide if recycle RPCInfo?
-		// 1. no retry, rpc timeout happen will cause panic when response return
-		// 2. retry success, will cause panic when first call return
-		// 3. backup request may cause panic, cannot recycle first RPCInfo
-		// RPCInfo will be recycled after rpc is finished,
-		// holding RPCInfo in a new goroutine is forbidden.
-		rpcinfo.PutRPCInfo(ri)
-	}
+	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, kc.opt.Fallback, callOpts)
 	return err
+}
+
+func (kc *kClient) rpcCallWithRetry(ri rpcinfo.RPCInfo, method string, request, response interface{}) retry.RPCCallFunc {
+	// call with retry policy
+	var callTimes int32
+	// prevRI represents a value of rpcinfo.RPCInfo type.
+	var prevRI atomic.Value
+	return func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
+		cRI := ri
+		if currCallTimes > 1 {
+			ctx, cRI, _ = kc.initRPCInfo(ctx, method)
+			ctx = metainfo.WithPersistentValue(ctx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
+			if prevRI.Load() == nil {
+				prevRI.Store(ri)
+			}
+			r.Prepare(ctx, prevRI.Load().(rpcinfo.RPCInfo), cRI)
+			prevRI.Store(cRI)
+		}
+		callErr := kc.eps(ctx, request, response)
+		return cRI, response, callErr
+	}
 }
 
 func (kc *kClient) initDebugService() {
@@ -599,7 +543,7 @@ func (kc *kClient) warmingUp() error {
 		// build a default destination for the resolver
 		cfg := rpcinfo.AsMutableRPCConfig(kc.opt.Configs).Clone()
 		rmt := remoteinfo.NewRemoteInfo(kc.opt.Svr, "*")
-		ctx, _ = kc.applyCallOptions(ctx, cfg, rmt)
+		ctx, _ = applyCallOptions(ctx, cfg, rmt, kc.opt)
 		dests = append(dests, rmt.ImmutableView())
 	}
 
@@ -661,8 +605,54 @@ func (kc *kClient) warmingUp() error {
 	return nil
 }
 
+func validateForCall(ctx context.Context, inited, closed bool) {
+	if !inited {
+		panic("client not initialized")
+	}
+	if closed {
+		panic("client is already closed")
+	}
+	if ctx == nil {
+		panic("ctx is nil")
+	}
+}
+
+func getCalloptRetryPolicy(callOpts *callopt.CallOptions) (callOptRetry *retry.Policy) {
+	if callOpts != nil {
+		if callOpts.RetryPolicy.Enable {
+			callOptRetry = &callOpts.RetryPolicy
+		}
+	}
+	return
+}
+
+func doFallbackIfNeeded(ctx context.Context, ri rpcinfo.RPCInfo, request, response interface{}, oriErr error, cliFallback *fallback.Policy, callOpts *callopt.CallOptions) (err, reportErr error) {
+	fallback, hasFallback := getFallbackPolicy(cliFallback, callOpts)
+	err = oriErr
+	reportErr = oriErr
+	var fbErr error
+	if hasFallback {
+		reportAsFB := false
+		// Notice: If rpc err is nil, rpcStatAsFB will always be false, even if it's set to true by user.
+		fbErr, reportAsFB = fallback.DoIfNeeded(ctx, ri, request, response, oriErr)
+		if reportAsFB {
+			reportErr = fbErr
+		}
+		err = fbErr
+	}
+
+	if err == nil && !hasFallback {
+		err = ri.Invocation().BizStatusErr()
+	}
+	return
+}
+
 // return fallback policy from call option and client option.
-func getFallbackPolicy(callOptFB, cliOptFB *fallback.Policy) (fb *fallback.Policy, hasFallback bool) {
+func getFallbackPolicy(cliOptFB *fallback.Policy, callOpts *callopt.CallOptions) (fb *fallback.Policy, hasFallback bool) {
+	var callOptFB *fallback.Policy
+	if callOpts != nil {
+		callOptFB = callOpts.Fallback
+	}
 	if callOptFB != nil {
 		return callOptFB, true
 	}
@@ -670,4 +660,44 @@ func getFallbackPolicy(callOptFB, cliOptFB *fallback.Policy) (fb *fallback.Polic
 		return cliOptFB, true
 	}
 	return nil, false
+}
+
+func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+	cfg := rpcinfo.AsMutableRPCConfig(opt.Configs).Clone()
+	rmt := remoteinfo.NewRemoteInfo(opt.Svr, method)
+	var callOpts *callopt.CallOptions
+	ctx, callOpts = applyCallOptions(ctx, cfg, rmt, opt)
+	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
+	if opt.StatsLevel != nil {
+		rpcStats.SetLevel(*opt.StatsLevel)
+	}
+
+	mi := svcInfo.MethodInfo(method)
+	if mi != nil && mi.OneWay() {
+		cfg.SetInteractionMode(rpcinfo.Oneway)
+	}
+
+	// Export read-only views to external users.
+	ri := rpcinfo.NewRPCInfo(
+		rpcinfo.FromBasicInfo(opt.Cli),
+		rmt.ImmutableView(),
+		rpcinfo.NewInvocation(svcInfo.ServiceName, method, svcInfo.GetPackageName()),
+		cfg.ImmutableView(),
+		rpcStats.ImmutableView(),
+	)
+
+	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
+		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
+	}
+
+	if p := opt.Timeouts; p != nil {
+		if c := p.Timeouts(ri); c != nil {
+			_ = cfg.SetRPCTimeout(c.RPCTimeout())
+			_ = cfg.SetConnectTimeout(c.ConnectTimeout())
+			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
+		}
+	}
+
+	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+	return ctx, ri, callOpts
 }

@@ -58,8 +58,8 @@ func FormatCode(code []byte) ([]byte, error) {
 func GetGOPATH() string {
 	goPath := os.Getenv("GOPATH")
 	// If there are many path in GOPATH, pick up the first one.
-	if GoPaths := strings.Split(goPath, ":"); len(GoPaths) >= 1 {
-		return GoPaths[0]
+	if GoPaths := strings.Split(goPath, ":"); len(GoPaths) >= 1 && strings.TrimSpace(GoPaths[0]) != "" {
+		return strings.TrimSpace(GoPaths[0])
 	}
 	// GOPATH not set through environment variables, try to get one by executing "go env GOPATH"
 	output, err := exec.Command("go", "env", "GOPATH").Output()
@@ -257,6 +257,7 @@ func CombineOutputPath(outputPath, ns string) string {
 	return outputPath
 }
 
+// JoinPath joins dirs as golang import format, such as xx/xx/xx
 func JoinPath(elem ...string) string {
 	if runtime.GOOS == "windows" {
 		return strings.ReplaceAll(filepath.Join(elem...), "\\", "/")

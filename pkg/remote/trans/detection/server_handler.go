@@ -19,26 +19,35 @@
 package detection
 
 import (
-	"bytes"
 	"context"
 	"net"
 
-	"github.com/cloudwego/netpoll"
-
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 )
 
-// NewSvrTransHandlerFactory detection factory construction
-func NewSvrTransHandlerFactory(nonHttp2, http2 remote.ServerTransHandlerFactory) remote.ServerTransHandlerFactory {
-	return &svrTransHandlerFactory{nonHttp2, http2}
+// DetectableServerTransHandler implements an additional method ProtocolMatch to help
+// DetectionHandler to judge which serverHandler should handle the request data.
+type DetectableServerTransHandler interface {
+	remote.ServerTransHandler
+	ProtocolMatch(ctx context.Context, conn net.Conn) (err error)
+}
+
+// NewSvrTransHandlerFactory detection factory construction. Each detectableHandlerFactory should return
+// a ServerTransHandler which implements DetectableServerTransHandler after called NewTransHandler.
+func NewSvrTransHandlerFactory(defaultHandlerFactory remote.ServerTransHandlerFactory,
+	detectableHandlerFactory ...remote.ServerTransHandlerFactory,
+) remote.ServerTransHandlerFactory {
+	return &svrTransHandlerFactory{
+		defaultHandlerFactory:    defaultHandlerFactory,
+		detectableHandlerFactory: detectableHandlerFactory,
+	}
 }
 
 type svrTransHandlerFactory struct {
-	defaultHandlerFactory remote.ServerTransHandlerFactory
-	http2HandlerFactory   remote.ServerTransHandlerFactory
+	defaultHandlerFactory    remote.ServerTransHandlerFactory
+	detectableHandlerFactory []remote.ServerTransHandlerFactory
 }
 
 func (f *svrTransHandlerFactory) MuxEnabled() bool {
@@ -48,8 +57,17 @@ func (f *svrTransHandlerFactory) MuxEnabled() bool {
 func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
 	t := &svrTransHandler{}
 	var err error
-	if t.http2Handler, err = f.http2HandlerFactory.NewTransHandler(opt); err != nil {
-		return nil, err
+	for i := range f.detectableHandlerFactory {
+		h, err := f.detectableHandlerFactory[i].NewTransHandler(opt)
+		if err != nil {
+			return nil, err
+		}
+		handler, ok := h.(DetectableServerTransHandler)
+		if !ok {
+			klog.Errorf("KITEX: failed to append detection server trans handler: %T", h)
+			continue
+		}
+		t.registered = append(t.registered, handler)
 	}
 	if t.defaultHandler, err = f.defaultHandlerFactory.NewTransHandler(opt); err != nil {
 		return nil, err
@@ -59,7 +77,7 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 
 type svrTransHandler struct {
 	defaultHandler remote.ServerTransHandler
-	http2Handler   remote.ServerTransHandler
+	registered     []DetectableServerTransHandler
 }
 
 func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error) {
@@ -70,45 +88,34 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 	return t.which(ctx).Read(ctx, conn, msg)
 }
 
-var prefaceReadAtMost = func() int {
-	// min(len(ClientPreface), len(flagBuf))
-	// len(flagBuf) = 2 * codec.Size32
-	if 2*codec.Size32 < grpc.ClientPrefaceLen {
-		return 2 * codec.Size32
-	}
-	return grpc.ClientPrefaceLen
-}()
-
-func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
+func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
 	// only need detect once when connection is reused
 	r := ctx.Value(handlerKey{}).(*handlerWrapper)
 	if r.handler != nil {
 		return r.handler.OnRead(r.ctx, conn)
 	}
-	// Check the validity of client preface.
-	var (
-		preface []byte
-		err     error
-	)
-	npReader := conn.(interface{ Reader() netpoll.Reader }).Reader()
-	if preface, err = npReader.Peek(prefaceReadAtMost); err != nil {
-		return err
-	}
 	// compare preface one by one
-	which := t.defaultHandler
-	if bytes.Equal(preface[:prefaceReadAtMost], grpc.ClientPreface[:prefaceReadAtMost]) {
-		which = t.http2Handler
+	var which remote.ServerTransHandler
+	for i := range t.registered {
+		if t.registered[i].ProtocolMatch(ctx, conn) == nil {
+			which = t.registered[i]
+			break
+		}
+	}
+	if which != nil {
 		ctx, err = which.OnActive(ctx, conn)
 		if err != nil {
 			return err
 		}
+	} else {
+		which = t.defaultHandler
 	}
 	r.ctx, r.handler = ctx, which
 	return which.OnRead(ctx, conn)
 }
 
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
-	// t.http2HandlerFactory should use the ctx returned by OnActive in r.ctx
+	// Should use the ctx returned by OnActive in r.ctx
 	if r, ok := ctx.Value(handlerKey{}).(*handlerWrapper); ok && r.ctx != nil {
 		ctx = r.ctx
 	}
@@ -132,13 +139,17 @@ func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
 }
 
 func (t *svrTransHandler) SetPipeline(pipeline *remote.TransPipeline) {
-	t.http2Handler.SetPipeline(pipeline)
+	for i := range t.registered {
+		t.registered[i].SetPipeline(pipeline)
+	}
 	t.defaultHandler.SetPipeline(pipeline)
 }
 
 func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
-	if t, ok := t.http2Handler.(remote.InvokeHandleFuncSetter); ok {
-		t.SetInvokeHandleFunc(inkHdlFunc)
+	for i := range t.registered {
+		if s, ok := t.registered[i].(remote.InvokeHandleFuncSetter); ok {
+			s.SetInvokeHandleFunc(inkHdlFunc)
+		}
 	}
 	if t, ok := t.defaultHandler.(remote.InvokeHandleFuncSetter); ok {
 		t.SetInvokeHandleFunc(inkHdlFunc)
@@ -150,11 +161,23 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	if err != nil {
 		return nil, err
 	}
-	// svrTransHandler wraps two kinds of ServerTransHandler: http2HandlerFactory, none-http2HandlerFactory.
+	// svrTransHandler wraps multi kinds of ServerTransHandler.
 	// We think that one connection only use one type, it doesn't need to do protocol detection for every request.
 	// And ctx is initialized with a new connection, so we put a handlerWrapper into ctx, which for recording
-	// the actual handler, then the later request don't need to do http2HandlerFactory detection.
+	// the actual handler, then the later request don't need to do detection.
 	return context.WithValue(ctx, handlerKey{}, &handlerWrapper{}), nil
+}
+
+func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
+	for i := range t.registered {
+		if g, ok := t.registered[i].(remote.GracefulShutdown); ok {
+			g.GracefulShutdown(ctx)
+		}
+	}
+	if g, ok := t.defaultHandler.(remote.GracefulShutdown); ok {
+		g.GracefulShutdown(ctx)
+	}
+	return nil
 }
 
 type handlerKey struct{}

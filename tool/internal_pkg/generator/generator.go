@@ -18,6 +18,7 @@ package generator
 import (
 	"fmt"
 	"go/token"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -129,6 +130,8 @@ type Config struct {
 	TemplateDir string
 
 	GenPath string
+
+	DeepCopyAPI bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -348,7 +351,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		fs = append(fs, f)
 	}
 
-	handlerFilePath := util.JoinPath(g.OutputPath, HandlerFileName)
+	handlerFilePath := filepath.Join(g.OutputPath, HandlerFileName)
 	if util.Exists(handlerFilePath) {
 		comp := newCompleter(
 			pkg.ServiceInfo.AllMethods(),

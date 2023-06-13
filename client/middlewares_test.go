@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"errors"
+	"net"
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -49,6 +50,7 @@ var (
 		ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, event.NewQueue(10))
 		return ctx
 	}()
+	tcpAddrStr = "127.0.0.1:9909"
 )
 
 func resolver404(ctrl *gomock.Controller) discovery.Resolver {
@@ -130,29 +132,52 @@ func TestResolverMWOutOfInstance(t *testing.T) {
 }
 
 func TestDefaultErrorHandler(t *testing.T) {
+	tcpAddr, _ := net.ResolveTCPAddr("tcp", tcpAddrStr)
+	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("mockService", "mockMethod", tcpAddr, nil),
+		rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
+	reqCtx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+
 	// Test TApplicationException
-	err := DefaultClientErrorHandler(thrift.NewTApplicationException(100, "mock"))
+	err := DefaultClientErrorHandler(context.Background(), thrift.NewTApplicationException(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error[remote]: mock", err.Error())
 	var te thrift.TApplicationException
 	ok := errors.As(err, &te)
 	test.Assert(t, ok)
 	test.Assert(t, te.TypeId() == 100)
+	// Test TApplicationException with remote addr
+	err = ClientErrorHandlerWithAddr(reqCtx, thrift.NewTApplicationException(100, "mock"))
+	test.Assert(t, err.Error() == "remote or network error[remote-"+tcpAddrStr+"]: mock", err.Error())
+	ok = errors.As(err, &te)
+	test.Assert(t, ok)
+	test.Assert(t, te.TypeId() == 100)
 
 	// Test PbError
-	err = DefaultClientErrorHandler(protobuf.NewPbError(100, "mock"))
+	err = DefaultClientErrorHandler(context.Background(), protobuf.NewPbError(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error[remote]: mock")
 	var pe protobuf.PBError
 	ok = errors.As(err, &pe)
 	test.Assert(t, ok)
 	test.Assert(t, te.TypeId() == 100)
+	// Test PbError with remote addr
+	err = ClientErrorHandlerWithAddr(reqCtx, protobuf.NewPbError(100, "mock"))
+	test.Assert(t, err.Error() == "remote or network error[remote-"+tcpAddrStr+"]: mock", err.Error())
+	ok = errors.As(err, &pe)
+	test.Assert(t, ok)
+	test.Assert(t, te.TypeId() == 100)
 
 	// Test status.Error
-	err = DefaultClientErrorHandler(status.Err(100, "mock"))
+	err = DefaultClientErrorHandler(context.Background(), status.Err(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error: rpc error: code = 100 desc = mock", err.Error())
+	// Test status.Error with remote addr
+	err = ClientErrorHandlerWithAddr(reqCtx, status.Err(100, "mock"))
+	test.Assert(t, err.Error() == "remote or network error["+tcpAddrStr+"]: rpc error: code = 100 desc = mock", err.Error())
 
 	// Test other error
-	err = DefaultClientErrorHandler(errors.New("mock"))
+	err = DefaultClientErrorHandler(context.Background(), errors.New("mock"))
 	test.Assert(t, err.Error() == "remote or network error: mock")
+	// Test other error with remote addr
+	err = ClientErrorHandlerWithAddr(reqCtx, errors.New("mock"))
+	test.Assert(t, err.Error() == "remote or network error["+tcpAddrStr+"]: mock")
 }
 
 func BenchmarkResolverMW(b *testing.B) {

@@ -19,6 +19,7 @@ package callopt
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,14 +77,14 @@ func TestApply(t *testing.T) {
 	// WithRPCTimeout
 	option = WithRPCTimeout(mockRPCTimeout)
 	applyRes, _ = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
-	test.Assert(t, applyRes == fmt.Sprintf("[WithRPCTimeout(%s)]", mockRPCTimeoutStr), mockRPCTimeout)
+	test.Assert(t, applyRes == "[WithRPCTimeout()]", applyRes)
 	test.Assert(t, rpcConfig.ImmutableView().RPCTimeout() == mockRPCTimeout, rpcConfig.ImmutableView().RPCTimeout())
 	test.Assert(t, rpcConfig.ImmutableView().ReadWriteTimeout() == mockRPCTimeout, rpcConfig.ImmutableView().ReadWriteTimeout())
 
 	// WithConnectTimeout
 	option = WithConnectTimeout(mockConnectTimeout)
 	applyRes, _ = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
-	test.Assert(t, applyRes == fmt.Sprintf("[WithConnectTimeout(%s)]", mockConnectTimeoutStr), mockConnectTimeout)
+	test.Assert(t, applyRes == "[WithConnectTimeout()]", applyRes)
 	test.Assert(t, rpcConfig.ImmutableView().ConnectTimeout() == mockConnectTimeout, rpcConfig.ImmutableView().ConnectTimeout())
 
 	// WithTag
@@ -115,4 +116,32 @@ func TestApply(t *testing.T) {
 	option = WithFallback(nil)
 	_, co = Apply([]Option{option}, rpcConfig, remoteInfo, client.NewConfigLocks(), http.NewDefaultResolver())
 	test.Assert(t, co.Fallback == nil)
+}
+
+func BenchmarkStringsBuilder(b *testing.B) {
+	var cos []Option
+	cos = append(cos, WithRPCTimeout(time.Second))
+	cos = append(cos, WithTag("cluster", "mock"))
+	cos = append(cos, WithTag("idc", "mock"))
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			co := callOptionsPool.Get().(*CallOptions)
+			co.configs = rpcinfo.NewRPCConfig().(rpcinfo.MutableRPCConfig)
+			co.svr = remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{}, "method")
+			var buf strings.Builder
+			buf.Grow(64)
+
+			buf.WriteByte('[')
+			for i := range cos {
+				if i > 0 {
+					buf.WriteByte(',')
+				}
+				cos[i].f(co, &buf)
+			}
+			buf.WriteByte(']')
+			_ = buf.String()
+		}
+	})
 }

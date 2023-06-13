@@ -139,7 +139,7 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 }
 
 // newIOErrorHandleMW provides a hook point for io error handling.
-func newIOErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
+func newIOErrorHandleMW(errHandle func(context.Context, error) error) endpoint.Middleware {
 	if errHandle == nil {
 		errHandle = DefaultClientErrorHandler
 	}
@@ -149,7 +149,7 @@ func newIOErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
 			if err == nil {
 				return
 			}
-			return errHandle(err)
+			return errHandle(ctx, err)
 		}
 	}
 }
@@ -157,7 +157,7 @@ func newIOErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
 // DefaultClientErrorHandler is Default ErrorHandler for client
 // when no ErrorHandler is specified with Option `client.WithErrorHandler`, this ErrorHandler will be injected.
 // for thrift、KitexProtobuf, >= v0.4.0 wrap protocol error to TransError, which will be more friendly.
-func DefaultClientErrorHandler(err error) error {
+func DefaultClientErrorHandler(ctx context.Context, err error) error {
 	switch err.(type) {
 	// for thrift、KitexProtobuf, actually check *remote.TransError is enough
 	case *remote.TransError, thrift.TApplicationException, protobuf.PBError:
@@ -166,6 +166,23 @@ func DefaultClientErrorHandler(err error) error {
 		return kerrors.ErrRemoteOrNetwork.WithCauseAndExtraMsg(err, "remote")
 	}
 	return kerrors.ErrRemoteOrNetwork.WithCause(err)
+}
+
+// ClientErrorHandlerWithAddr is ErrorHandler for client, which will add remote addr info into error
+func ClientErrorHandlerWithAddr(ctx context.Context, err error) error {
+	addrStr := getRemoteAddr(ctx)
+	switch err.(type) {
+	// for thrift、KitexProtobuf, actually check *remote.TransError is enough
+	case *remote.TransError, thrift.TApplicationException, protobuf.PBError:
+		// Add 'remote' prefix to distinguish with local err.
+		// Because it cannot make sure which side err when decode err happen
+		extraMsg := "remote"
+		if addrStr != "" {
+			extraMsg = "remote-" + addrStr
+		}
+		return kerrors.ErrRemoteOrNetwork.WithCauseAndExtraMsg(err, extraMsg)
+	}
+	return kerrors.ErrRemoteOrNetwork.WithCauseAndExtraMsg(err, addrStr)
 }
 
 type instInfo struct {
@@ -188,4 +205,11 @@ func wrapInstances(insts []discovery.Instance) []*instInfo {
 
 func retryable(err error) bool {
 	return errors.Is(err, kerrors.ErrGetConnection) || errors.Is(err, kerrors.ErrCircuitBreak)
+}
+
+func getRemoteAddr(ctx context.Context) string {
+	if ri := rpcinfo.GetRPCInfo(ctx); ri != nil && ri.To() != nil && ri.To().Address() != nil {
+		return ri.To().Address().String()
+	}
+	return ""
 }

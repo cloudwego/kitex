@@ -25,7 +25,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limit"
@@ -171,7 +170,7 @@ func WithTracer(c stats.Tracer) Option {
 		di.Push(fmt.Sprintf("WithTracer(%T{%+v})", c, c))
 
 		if o.TracerCtl == nil {
-			o.TracerCtl = &internal_stats.Controller{}
+			o.TracerCtl = &rpcinfo.TraceController{}
 		}
 		o.TracerCtl.Append(c)
 	}}

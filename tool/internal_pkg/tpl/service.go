@@ -59,6 +59,9 @@ func NewServiceInfo() *kitex.ServiceInfo {
 	}
 	{{- if gt (len .CombineServices) 0}}
 	extra["combine_service"] = true
+	extra["combined_service_list"] = []string{
+		{{- range  .CombineServices}}"{{.ServiceName}}",{{- end}}
+	}
 	{{- end}}
 	{{- if .HasStreaming}}
 	extra["streaming"] = true

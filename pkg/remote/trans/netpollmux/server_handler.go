@@ -23,10 +23,10 @@ import (
 	"net"
 	"runtime/debug"
 	"sync"
+	"time"
 
 	"github.com/cloudwego/netpoll"
 
-	stats2 "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -40,6 +40,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/transport"
 )
+
+const defaultExitWaitGracefulShutdownTime = 1 * time.Second
 
 type svrTransHandlerFactory struct{}
 
@@ -68,7 +70,7 @@ func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	}
 	if svrHdlr.opt.TracerCtl == nil {
 		// init TraceCtl when it is nil, or it will lead some unit tests panic
-		svrHdlr.opt.TracerCtl = &stats2.Controller{}
+		svrHdlr.opt.TracerCtl = &rpcinfo.TraceController{}
 	}
 	svrHdlr.funcPool.New = func() interface{} {
 		fs := make([]func(), 0, 64) // 64 is defined casually, no special meaning
@@ -94,9 +96,9 @@ type svrTransHandler struct {
 // Write implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
-	stats2.Record(ctx, ri, stats.WriteStart, nil)
+	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
 	defer func() {
-		stats2.Record(ctx, ri, stats.WriteFinish, nil)
+		rpcinfo.Record(ctx, ri, stats.WriteFinish, nil)
 	}()
 
 	if methodInfo, _ := trans.GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
@@ -130,9 +132,9 @@ func (t *svrTransHandler) readWithByteBuffer(ctx context.Context, bufReader remo
 			}
 			bufReader.Release(err)
 		}
-		stats2.Record(ctx, msg.RPCInfo(), stats.ReadFinish, err)
+		rpcinfo.Record(ctx, msg.RPCInfo(), stats.ReadFinish, err)
 	}()
-	stats2.Record(ctx, msg.RPCInfo(), stats.ReadStart, nil)
+	rpcinfo.Record(ctx, msg.RPCInfo(), stats.ReadStart, nil)
 
 	err = t.codec.Decode(ctx, msg, bufReader)
 	if err != nil {
@@ -319,7 +321,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 
 	// wait until all notifications are sent and clients stop using those connections
 	done := make(chan struct{})
-	go func() {
+	gofunc.GoFunc(context.Background(), func() {
 		// 1. write control frames to all connections
 		t.conns.Range(func(k, v interface{}) bool {
 			sconn := v.(*muxSvrConn)
@@ -350,15 +352,15 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 			}
 			return true
 		})
+		// 4. waiting all crrst packets received by client
+		time.Sleep(defaultExitWaitGracefulShutdownTime)
 		close(done)
-	}()
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-done:
-			return nil
-		}
+	})
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-done:
+		return nil
 	}
 }
 

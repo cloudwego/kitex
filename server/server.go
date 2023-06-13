@@ -28,11 +28,11 @@ import (
 	"time"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
-	internal_stats "github.com/cloudwego/kitex/internal/stats"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limiter"
@@ -93,6 +93,18 @@ func (s *server) init() {
 	s.buildInvokeChain()
 }
 
+func (s *server) Endpoints() endpoint.Endpoint {
+	return s.eps
+}
+
+func (s *server) SetEndpoints(e endpoint.Endpoint) {
+	s.eps = e
+}
+
+func (s *server) Option() *internal_server.Options {
+	return s.opt
+}
+
 func fillContext(opt *internal_server.Options) context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
@@ -108,14 +120,14 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder, 
 }
 
 // newErrorHandleMW provides a hook point for server error handling.
-func newErrorHandleMW(errHandle func(error) error) endpoint.Middleware {
+func newErrorHandleMW(errHandle func(context.Context, error) error) endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response interface{}) error {
 			err := next(ctx, request, response)
 			if err == nil {
 				return nil
 			}
-			return errHandle(err)
+			return errHandle(ctx, err)
 		}
 	}
 }
@@ -194,8 +206,8 @@ func (s *server) Run() (err error) {
 		}
 	}
 
-	s.richRemoteOption()
 	s.fillMoreServiceInfo(s.opt.RemoteOpt.Address)
+	s.richRemoteOption()
 	transHdlr, err := s.newSvrTransHandler()
 	if err != nil {
 		return err
@@ -209,13 +221,13 @@ func (s *server) Run() (err error) {
 
 	// start profiler
 	if s.opt.RemoteOpt.Profiler != nil {
-		go func() {
+		gofunc.GoFunc(context.Background(), func() {
 			klog.Info("KITEX: server starting profiler")
 			err := s.opt.RemoteOpt.Profiler.Run(context.Background())
 			if err != nil {
 				klog.Errorf("KITEX: server started profiler error: error=%s", err.Error())
 			}
-		}()
+		})
 	}
 
 	errCh := s.svr.Start()
@@ -283,10 +295,10 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 				rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
 				rpcStats.SetPanicked(err)
 			}
-			internal_stats.Record(ctx, ri, stats.ServerHandleFinish, err)
+			rpcinfo.Record(ctx, ri, stats.ServerHandleFinish, err)
 		}()
 		implHandlerFunc := s.svcInfo.MethodInfo(methodName).Handler()
-		internal_stats.Record(ctx, ri, stats.ServerHandleStart, nil)
+		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		err = implHandlerFunc(ctx, s.handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {

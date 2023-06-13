@@ -221,7 +221,7 @@ func TestPanicAfterRead(t *testing.T) {
 
 	err = svrTransHdlr.OnRead(ctx, conn)
 	test.Assert(t, err != nil, err)
-	test.Assert(t, isReaderBufReleased)
+	test.Assert(t, !isReaderBufReleased)
 	test.Assert(t, !isWriteBufFlushed)
 	test.Assert(t, !isInvoked)
 	test.Assert(t, !isClosed)

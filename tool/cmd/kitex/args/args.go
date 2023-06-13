@@ -112,6 +112,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Use custom template to generate codes.")
 	f.StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
 		"Specify a code gen path.")
+	f.BoolVar(&a.DeepCopyAPI, "deep-copy-api", false,
+		"Generate codes with injecting deep copy method.")
 	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
@@ -190,16 +192,17 @@ func (a *Arguments) checkIDL(files []string) {
 }
 
 func (a *Arguments) checkServiceName() {
-	if a.ServiceName == "" {
+	if a.ServiceName == "" && a.TemplateDir == "" {
 		if a.Use != "" {
-			log.Warn("-use must be used with -service")
+			log.Warn("-use must be used with -service or -template-dir")
 			os.Exit(2)
 		}
-	} else {
-		if a.TemplateDir != "" {
-			log.Warn("-template-dir and -service cannot be specified at the same time")
-			os.Exit(2)
-		}
+	}
+	if a.ServiceName != "" && a.TemplateDir != "" {
+		log.Warn("-template-dir and -service cannot be specified at the same time")
+		os.Exit(2)
+	}
+	if a.ServiceName != "" {
 		a.GenerateMain = true
 	}
 }

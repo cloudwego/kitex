@@ -34,10 +34,12 @@ import (
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	{{if GenerateDeepCopyAPIs -}}
+	kutils "github.com/cloudwego/kitex/pkg/utils"
+	{{- end}}
 	{{if GenerateFastAPIs}}
 	"{{ImportPathTo "pkg/protocol/bthrift"}}"
 	{{- end}}
-
 	{{- range $path, $alias := .Imports}}
 	{{$alias }}"{{$path}}"
 	{{- end}}
@@ -68,7 +70,6 @@ var (
 const body = `
 {{define "body"}}
 
-{{if GenerateFastAPIs}}
 {{- range .Scope.StructLikes}}
 {{template "StructLikeCodec" .}}
 {{- end}}
@@ -76,7 +77,6 @@ const body = `
 {{- range .Scope.Services}}
 {{template "Processor" .}}
 {{- end}}
-{{- end}}{{/* if GenerateFastAPIs */}}
 
 {{template "ArgsAndResult" .}}
 

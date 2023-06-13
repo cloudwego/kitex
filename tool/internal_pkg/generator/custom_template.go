@@ -60,6 +60,8 @@ type Template struct {
 	// If set this field, kitex will generate file by cycle. For example:
 	// test_a/test_b/{{ .Name}}_test.go
 	LoopMethod bool `yaml:"loop_method,omitempty"`
+	// If both set this field and combine-service, kitex will generate service by cycle.
+	LoopService bool `yaml:"loop_service,omitempty"`
 }
 
 type customGenerator struct {
@@ -77,6 +79,9 @@ func NewCustomGenerator(pkg *PackageInfo, basePath string) *customGenerator {
 
 func (c *customGenerator) loopGenerate(tpl *Template) error {
 	tmp := c.pkg.Methods
+	defer func() {
+		c.pkg.Methods = tmp
+	}()
 	m := c.pkg.AllMethods()
 	for _, method := range m {
 		c.pkg.Methods = []*MethodInfo{method}
@@ -103,11 +108,17 @@ func (c *customGenerator) loopGenerate(tpl *Template) error {
 		}
 		c.fs = append(c.fs, f)
 	}
-	c.pkg.Methods = tmp
 	return nil
 }
 
 func (c *customGenerator) commonGenerate(tpl *Template) error {
+	// Use all services including base service.
+	tmp := c.pkg.Methods
+	defer func() {
+		c.pkg.Methods = tmp
+	}()
+	c.pkg.Methods = c.pkg.AllMethods()
+
 	pathTask := &Task{
 		Text: tpl.Path,
 	}
@@ -121,7 +132,6 @@ func (c *customGenerator) commonGenerate(tpl *Template) error {
 		log.Infof("skip generate file %s", tpl.Path)
 		return nil
 	}
-
 	var f *File
 	if update && updateType(tpl.UpdateBehavior.Type) == incrementalUpdate {
 		cc := &commonCompleter{
@@ -159,28 +169,47 @@ func (c *customGenerator) commonGenerate(tpl *Template) error {
 func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err error) {
 	g.updatePackageInfo(pkg)
 
+	g.setImports(HandlerFileName, pkg)
 	t, err := readTemplates(g.TemplateDir)
 	if err != nil {
 		return nil, err
 	}
-
-	cg := NewCustomGenerator(pkg, g.OutputPath)
 	for _, tpl := range t {
-		// special handling Methods field
-		if tpl.LoopMethod {
-			err = cg.loopGenerate(tpl)
-			if err != nil {
-				return cg.fs, err
+		if tpl.LoopService && g.CombineService {
+			svrInfo, cs := pkg.ServiceInfo, pkg.CombineServices
+
+			for i := range cs {
+				pkg.ServiceInfo = cs[i]
+				f, err := renderFile(pkg, g.OutputPath, tpl)
+				if err != nil {
+					return nil, err
+				}
+				fs = append(fs, f...)
 			}
+			pkg.ServiceInfo, pkg.CombineServices = svrInfo, cs
 		} else {
-			err = cg.commonGenerate(tpl)
+			f, err := renderFile(pkg, g.OutputPath, tpl)
 			if err != nil {
-				return cg.fs, err
+				return nil, err
 			}
+			fs = append(fs, f...)
 		}
 	}
+	return fs, nil
+}
 
-	return cg.fs, nil
+func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File, err error) {
+	cg := NewCustomGenerator(pkg, outputPath)
+	// special handling Methods field
+	if tpl.LoopMethod {
+		err = cg.loopGenerate(tpl)
+	} else {
+		err = cg.commonGenerate(tpl)
+	}
+	if err == errNoNewMethod {
+		err = nil
+	}
+	return cg.fs, err
 }
 
 func readTemplates(dir string) ([]*Template, error) {

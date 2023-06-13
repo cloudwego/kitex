@@ -30,7 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 )
 
-var panicMsg = "hello world"
+var panicMsg = "mock panic"
 
 func block(ctx context.Context, request, response interface{}) (err error) {
 	time.Sleep(1 * time.Second)
@@ -42,7 +42,7 @@ func pass(ctx context.Context, request, response interface{}) (err error) {
 	return nil
 }
 
-func ache(ctx context.Context, request, response interface{}) (err error) {
+func panicEp(ctx context.Context, request, response interface{}) (err error) {
 	panic(panicMsg)
 }
 
@@ -82,14 +82,7 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	err = mw1(mw2(block))(ctx, nil, nil)
 	test.Assert(t, err == nil)
 
-	// 4. mock panic happen
-	// < v1.1.* panic happen, >=v1.1* wrap panic to error
-	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
-	mw2 = rpcTimeoutMW(mwCtx)
-	err = mw1(mw2(ache))(ctx, nil, nil)
-	test.Assert(t, strings.Contains(err.Error(), panicMsg))
-
-	// 5. cancel
+	// 4. cancel
 	cancelCtx, cancelFunc := context.WithCancel(ctx)
 	time.AfterFunc(100*time.Millisecond, func() {
 		cancelFunc()
@@ -98,6 +91,27 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 	mw2 = rpcTimeoutMW(mwCtx)
 	err = mw1(mw2(block))(cancelCtx, nil, nil)
 	test.Assert(t, errors.Is(err, context.Canceled), err)
+
+	// 5. panic with timeout, the panic is recovered
+	// < v1.1.* panic happen, >=v1.1* wrap panic to error
+	m.SetRPCTimeout(time.Millisecond * 500)
+	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
+	mw2 = rpcTimeoutMW(mwCtx)
+	err = mw1(mw2(panicEp))(ctx, nil, nil)
+	test.Assert(t, strings.Contains(err.Error(), panicMsg))
+
+	// 6. panic without timeout, panic won't be recovered in timeout mw, but it will be recoverd in client.Call
+	m.SetRPCTimeout(0)
+	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
+	mw2 = rpcTimeoutMW(mwCtx)
+	test.Panic(t, func() { mw1(mw2(panicEp))(ctx, nil, nil) })
+
+	// 7. panic with streaming, panic won't be recovered in timeout mw, but it will be recoverd in client.Call
+	m = rpcinfo.AsMutableRPCConfig(c)
+	m.SetInteractionMode(rpcinfo.Streaming)
+	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
+	mw2 = rpcTimeoutMW(mwCtx)
+	test.Panic(t, func() { mw1(mw2(panicEp))(ctx, nil, nil) })
 }
 
 func TestIsBusinessTimeout(t *testing.T) {
