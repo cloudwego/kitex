@@ -23,7 +23,6 @@ package grpc
 import (
 	"bytes"
 	"fmt"
-	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -529,7 +528,6 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 		if _, err = l.processData(); err != nil {
 			return err
 		}
-		gosched := true
 	hasdata:
 		for {
 			it, err := l.cbuf.get(false)
@@ -552,14 +550,9 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 			if !isEmpty {
 				continue hasdata
 			}
-			if gosched {
-				gosched = false
-				if l.framer.writer.offset < minBatchSize {
-					runtime.Gosched()
-					continue hasdata
-				}
+			if l.framer.writer.offset > 0 {
+				l.framer.writer.Flush()
 			}
-			l.framer.writer.Flush()
 			break hasdata
 		}
 	}
