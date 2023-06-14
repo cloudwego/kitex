@@ -463,6 +463,7 @@ func (t *http2Server) adjustWindow(s *Stream, n uint32) {
 // for the transport and the stream based on the current bdp
 // estimation.
 func (t *http2Server) updateFlowControl(n uint32) {
+	println("flow control limit", n)
 	t.mu.Lock()
 	for _, s := range t.activeStreams {
 		s.fc.newLimit(n)
