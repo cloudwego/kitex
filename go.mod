@@ -26,3 +26,5 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+replace github.com/cloudwego/netpoll => github.com/joway/netpoll v0.0.4-0.20230614055637-65e1340a2ee8
