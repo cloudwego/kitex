@@ -111,12 +111,18 @@ func (p *patcher) buildTemplates() (err error) {
 	tpl := template.New("kitex").Funcs(m)
 	allTemplates := basicTemplates
 	if p.utils.Template() == "slim" {
-		allTemplates = append(allTemplates, slim.StructLike,
+		allTemplates = append(allTemplates,
+			// fix issue: #986
+			structLikeCodec,
+			processor,
+
+			slim.StructLike,
 			templates.StructLikeDefault,
 			templates.FieldGetOrSet,
 			templates.FieldIsSet)
 	} else {
-		allTemplates = append(allTemplates, structLikeCodec,
+		allTemplates = append(allTemplates,
+			structLikeCodec,
 			structLikeFastRead,
 			structLikeFastReadField,
 			structLikeDeepCopy,

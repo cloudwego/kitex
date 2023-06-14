@@ -69,7 +69,6 @@ var (
 
 const body = `
 {{define "body"}}
-
 {{- range .Scope.StructLikes}}
 {{template "StructLikeCodec" .}}
 {{- end}}
