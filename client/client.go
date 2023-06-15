@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -322,6 +323,9 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
 	ctx, ri, callOpts = kc.initRPCInfo(ctx, method)
+
+	// todo 换个位置
+	ctx = protobuf.SetSendCompressor(ctx, callOpts.CompressorName)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	var reportErr error

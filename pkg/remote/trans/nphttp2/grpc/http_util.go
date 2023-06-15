@@ -107,7 +107,8 @@ var (
 )
 
 type parsedHeaderData struct {
-	encoding string
+	encoding       string
+	acceptEncoding string
 	// statusGen caches the stream status received from the trailer the server
 	// sent.  Client side only.  Do not access directly.  After all trailers are
 	// parsed, use the status method to retrieve the status.
@@ -383,6 +384,8 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 		d.data.isGRPC = true
 	case "grpc-encoding":
 		d.data.encoding = f.Value
+	case "grpc-accept-encoding":
+		d.data.acceptEncoding = f.Value
 	case "grpc-status":
 		code, err := strconv.Atoi(f.Value)
 		if err != nil {

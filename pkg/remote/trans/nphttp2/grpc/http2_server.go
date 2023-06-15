@@ -302,6 +302,7 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 		buf:            buf,
 		fc:             &inFlow{limit: uint32(t.initialWindowSize)},
 		recvCompress:   state.data.encoding,
+		sendCompress:   state.data.acceptEncoding,
 		method:         state.data.method,
 		contentSubtype: state.data.contentSubtype,
 	}

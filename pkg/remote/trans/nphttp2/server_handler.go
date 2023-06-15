@@ -184,6 +184,11 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				ink.SetServiceName(sm[idx+1 : pos])
 			}
 
+			// set compress name into ctx
+			rCtx = protobuf.SetRecvCompressor(rCtx, s.RecvCompress())
+			// todo send compress 能不能设置成别的？
+			rCtx = protobuf.SetSendCompressor(rCtx, s.SendCompress())
+
 			st := NewStream(rCtx, t.svcInfo, newServerConn(tr, s), t)
 			streamArg := &streaming.Args{Stream: st}
 

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"io"
 	"net"
 	"net/url"
@@ -74,7 +75,8 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 	s, err := tr.NewStream(ctx, &grpc.CallHdr{
 		Host: host,
 		// grpc method format /package.Service/Method
-		Method: fmt.Sprintf("/%s/%s", svcName, ri.Invocation().MethodName()),
+		Method:       fmt.Sprintf("/%s/%s", svcName, ri.Invocation().MethodName()),
+		SendCompress: protobuf.GetSendCompressor(ctx),
 	})
 	if err != nil {
 		return nil, err
@@ -133,3 +135,4 @@ func (c *clientConn) Close() error {
 
 func (c *clientConn) Header() (metadata.MD, error) { return c.s.Header() }
 func (c *clientConn) Trailer() metadata.MD         { return c.s.Trailer() }
+func (c *clientConn) GetRecvCompress() string      { return c.s.RecvCompress() }

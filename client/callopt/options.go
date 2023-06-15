@@ -44,8 +44,9 @@ type CallOptions struct {
 	httpResolver http.Resolver
 
 	// export field for using in client
-	RetryPolicy retry.Policy
-	Fallback    *fallback.Policy
+	RetryPolicy    retry.Policy
+	Fallback       *fallback.Policy
+	CompressorName string
 }
 
 func newOptions() interface{} {
@@ -205,6 +206,16 @@ func WithFallback(fb *fallback.Policy) Option {
 		}
 		di.WriteString("WithFallback")
 		o.Fallback = fb
+	}}
+}
+
+func WithGRPCCompressor(compressorName string) Option {
+	return Option{f: func(o *CallOptions, di *strings.Builder) {
+		di.WriteString("WithGRPCCompressor")
+		di.WriteByte('(')
+		di.WriteString(compressorName)
+		di.WriteByte(')')
+		o.CompressorName = compressorName
 	}}
 }
 
