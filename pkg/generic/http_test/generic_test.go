@@ -410,53 +410,74 @@ func testThriftException(t *testing.T) {
 }
 
 func testRegression(t *testing.T) {
-	nobj := getNestingValue()
-	data, err := json.Marshal(nobj)
+	svr := initThriftServer(t, ":8121", new(GenericServiceAnnotationImpl), "./idl/http_annotation.thrift")
+	time.Sleep(500 * time.Millisecond)
+
+	body := map[string]interface{}{
+		"text": "text",
+		"req_items_map": map[string]interface{}{
+			"1": map[string]interface{}{
+				"MyID": "1",
+				"text": "text",
+			},
+		},
+		"some": map[string]interface{}{
+			"MyID": "1",
+			"text": "text",
+		},
+	}
+	data, err := json.Marshal(body)
 	if err != nil {
 		panic(err)
 	}
-	url := "http://example.com/nesting/100"
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
+	url := "http://example.com/life/client/1/1?v_int64=1&req_items=item1,item2,item3&cids=1,2,3&vids=1,2,3"
+	req, err := http.NewRequest(http.MethodGet, url, bytes.NewBuffer(data))
 	if err != nil {
 		panic(err)
 	}
+	req.Header.Set("token", "1")
+	cookie := &http.Cookie{
+		Name:  "cookie",
+		Value: "cookie_val",
+	}
+	req.AddCookie(cookie)
 	customReq, err := generic.FromHTTPRequest(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	svr := initThriftServer(t, ":8121", new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
-	time.Sleep(500 * time.Millisecond)
+	// client without dynamicgo
+	cli := initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8121", "./idl/http_annotation.thrift", nil, false, false)
+	respI, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	resp, ok := respI.(*generic.HTTPResponse)
+	test.Assert(t, ok)
 
-	/// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
-	// read: dynamicgo
+	// client with dynamicgo
 	var opts []generic.Option
 	opts = append(opts, generic.UseRawBodyForHTTPResp(true))
-	cli := initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8121", "./idl/baseline.thrift", opts, false, true)
-	resp, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err == nil)
-	dgr, ok := resp.(*generic.HTTPResponse)
+	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8121", "./idl/http_annotation.thrift", opts, false, true)
+	respI, err = cli.GenericCall(context.Background(), "", customReq)
+	//respI, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	dresp, ok := respI.(*generic.HTTPResponse)
 	test.Assert(t, ok)
 
-	// normal way
-	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8121", "./idl/baseline.thrift", nil, false, false)
-	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err == nil)
-	fgr, ok := resp.(*generic.HTTPResponse)
-	test.Assert(t, ok)
-
-	test.Assert(t, reflect.DeepEqual(dgr.Header, fgr.Header))
-	test.Assert(t, reflect.DeepEqual(dgr.StatusCode, fgr.StatusCode))
-	test.Assert(t, reflect.DeepEqual(dgr.ContentType, fgr.ContentType))
-
+	// check body
 	var dMapBody map[string]interface{}
-	err = customJson.Unmarshal(dgr.RawBody, &dMapBody)
+	err = customJson.Unmarshal(dresp.RawBody, &dMapBody)
 	test.Assert(t, err == nil)
-	fBytes, err := customJson.Marshal(fgr.Body)
+	bytes, err := customJson.Marshal(resp.Body)
 	test.Assert(t, err == nil)
-	err = customJson.Unmarshal(fBytes, &fgr.Body)
-	test.Assert(t, err == nil)
-	test.Assert(t, isEqual(dMapBody, fgr.Body))
+	err = customJson.Unmarshal(bytes, &resp.Body)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, isEqual(dMapBody, resp.Body))
+
+	test.DeepEqual(t, resp.StatusCode, dresp.StatusCode)
+	test.DeepEqual(t, resp.ContentType, dresp.ContentType)
+
+	checkHeader(t, resp)
+	checkHeader(t, dresp)
 
 	svr.Stop()
 }
@@ -618,4 +639,18 @@ func isEqual(a, b interface{}) bool {
 	default:
 		return reflect.DeepEqual(a, b)
 	}
+}
+
+func checkHeader(t *testing.T, resp *generic.HTTPResponse) {
+	test.Assert(t, resp.Header.Get("b") == "true")
+	test.Assert(t, resp.Header.Get("eight") == "8")
+	test.Assert(t, resp.Header.Get("sixteen") == "16")
+	test.Assert(t, resp.Header.Get("thirtytwo") == "32")
+	test.Assert(t, resp.Header.Get("sixtyfour") == "64")
+	test.Assert(t, resp.Header.Get("d") == "123.45")
+	test.Assert(t, resp.Header.Get("T") == "1")
+	test.Assert(t, resp.Header.Get("item_count") == "1,2,3")
+	test.Assert(t, resp.Header.Get("header_map") == "map[map1:1 map2:2]")
+	test.Assert(t, resp.Header.Get("header_struct") == "map[item_id:1 text:1]")
+	test.Assert(t, resp.Header.Get("string_set") == "a,b,c")
 }
