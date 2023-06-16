@@ -71,7 +71,7 @@ func NewThriftFileProviderWithDynamicGo(path string, includeDirs ...string) (Des
 	// ServiceDescriptor of dynamicgo
 	dOpts := dthrift.Options{EnableThriftBase: true}
 	// TODO: move this logic into dynamicgo
-	annotation.RegisterHttpMaping(annotation.APIHeader, annotation.HttpMapingHandler{Req: annotation.ApiheaderKitexRequest, Resp: annotation.ApiheaderKitexResponse, Enc: annotation.ApiHeaderKitexEncoding})
+	annotation.RegisterHttpMapping(annotation.APIHeader, annotation.HttpMappingHandler{Req: annotation.ApiheaderKitexRequest, Resp: annotation.ApiheaderKitexResponse, Enc: annotation.ApiHeaderKitexEncoding})
 	dsvc, err := dOpts.NewDescritorFromPath(context.Background(), path, includeDirs...)
 	if err != nil {
 		// fall back to the original way (without dynamicgo)
@@ -390,7 +390,7 @@ func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content
 	// ServiceDescriptor of dynamicgo
 	dOpts := dthrift.Options{EnableThriftBase: true}
 	// TODO: move this logic into dynamicgo
-	annotation.RegisterHttpMaping(annotation.APIHeader, annotation.HttpMapingHandler{Req: annotation.ApiheaderKitexRequest, Resp: annotation.ApiheaderKitexResponse, Enc: annotation.ApiHeaderKitexEncoding})
+	annotation.RegisterHttpMapping(annotation.APIHeader, annotation.HttpMappingHandler{Req: annotation.ApiheaderKitexRequest, Resp: annotation.ApiheaderKitexResponse, Enc: annotation.ApiHeaderKitexEncoding})
 	dsvc, err := dOpts.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
 	if err != nil {
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)

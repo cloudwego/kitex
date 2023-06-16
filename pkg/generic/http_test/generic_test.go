@@ -457,8 +457,7 @@ func testRegression(t *testing.T) {
 	var opts []generic.Option
 	opts = append(opts, generic.UseRawBodyForHTTPResp(true))
 	cli = initThriftClientByIDL(t, transport.TTHeader, "127.0.0.1:8121", "./idl/http_annotation.thrift", opts, false, true)
-	respI, err = cli.GenericCall(context.Background(), "", customReq)
-	//respI, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	respI, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	dresp, ok := respI.(*generic.HTTPResponse)
 	test.Assert(t, ok)
