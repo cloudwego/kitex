@@ -71,6 +71,9 @@ func (b *buffer) growRbuf(n int) {
 		n = minMallocSize
 	}
 	buf := mcache.Malloc(0, n)
+	if cap(b.rbuf) > 0 {
+		mcache.Free(b.rbuf)
+	}
 	b.rbuf = buf
 }
 
@@ -101,7 +104,7 @@ func (b *buffer) Flush() (err error) {
 }
 
 func (b *buffer) Release(e error) (err error) {
-	if len(b.rbuf) != 0 {
+	if cap(b.rbuf) > 0 {
 		mcache.Free(b.rbuf)
 	}
 	b.conn = nil

@@ -74,7 +74,7 @@ func TestMain(m *testing.M) {
 // TestCreateListener test trans_server CreateListener success
 func TestCreateListener(t *testing.T) {
 	// tcp init
-	addrStr := "127.0.0.1:9090"
+	addrStr := "127.0.0.1:9091"
 	addr = utils.NewNetAddr("tcp", addrStr)
 
 	// test
@@ -98,7 +98,7 @@ func TestCreateListener(t *testing.T) {
 // TestBootStrap test trans_server BootstrapServer success
 func TestBootStrap(t *testing.T) {
 	// tcp init
-	addrStr := "127.0.0.1:9090"
+	addrStr := "127.0.0.1:9092"
 	addr = utils.NewNetAddr("tcp", addrStr)
 
 	// test
