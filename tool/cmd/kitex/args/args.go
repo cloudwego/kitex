@@ -283,7 +283,8 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 				if errMsg == "" {
 					errMsg = gitErr.Error()
 				}
-				log.Warn("Failed to pull IDL from git:", errMsg)
+				log.Warn("failed to pull IDL from git:", errMsg)
+				log.Warn("You can execute 'rm -rf ~/.kitex' to clean the git cache and try again.")
 				os.Exit(1)
 			}
 			a.Includes[i] = localGitPath
