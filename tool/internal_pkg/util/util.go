@@ -214,23 +214,9 @@ func RunGitCommand(gitLink string) (string, string, error) {
 		}
 	}
 
-	cmdFetch := exec.Command("git", "fetch", "--all")
-	cmdFetch.Dir = gitPath
-	out, gitErr := cmdFetch.CombinedOutput()
-	if gitErr != nil {
-		return "", string(out), gitErr
-	}
-
-	cmdReset := exec.Command("git", "reset", "--hard", "master")
-	cmdReset.Dir = gitPath
-	out, gitErr = cmdReset.CombinedOutput()
-	if gitErr != nil {
-		return "", string(out), gitErr
-	}
-
 	cmdPull := exec.Command("git", "pull")
 	cmdPull.Dir = gitPath
-	out, gitErr = cmdPull.CombinedOutput()
+	out, gitErr := cmdPull.CombinedOutput()
 	if gitErr != nil {
 		return "", string(out), gitErr
 	}
