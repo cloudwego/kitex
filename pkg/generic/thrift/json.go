@@ -250,7 +250,7 @@ func (m *ReadJSON) originalRead(ctx context.Context, method string, in thrift.TP
 	// resp is map
 	respNode, err := sonic.Marshal(resp)
 	if err != nil {
-		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v, data:%#v", err, resp))
+		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v", err))
 	}
 
 	return string(respNode), nil

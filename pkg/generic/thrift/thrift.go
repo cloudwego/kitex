@@ -21,17 +21,11 @@ import (
 	"context"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/bytedance/sonic"
 )
 
 const (
 	structWrapLen = 4
 )
-
-var customJson = sonic.Config{
-	EscapeHTML: true,
-	UseNumber:  true,
-}.Froze()
 
 // MessageReader read from thrift.TProtocol with method
 type MessageReader interface {
