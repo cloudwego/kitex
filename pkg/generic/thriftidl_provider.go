@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
-	"github.com/cloudwego/dynamicgo/thrift/annotation"
 	"github.com/cloudwego/thriftgo/parser"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -70,8 +69,6 @@ func NewThriftFileProviderWithDynamicGo(path string, includeDirs ...string) (Des
 
 	// ServiceDescriptor of dynamicgo
 	dOpts := dthrift.Options{EnableThriftBase: true}
-	// TODO: move this logic into dynamicgo
-	annotation.RegisterHttpMapping(annotation.APIHeader, annotation.HttpMappingHandler{Req: annotation.ApiheaderKitexRequest, Resp: annotation.ApiheaderKitexResponse, Enc: annotation.ApiHeaderKitexEncoding})
 	dsvc, err := dOpts.NewDescritorFromPath(context.Background(), path, includeDirs...)
 	if err != nil {
 		// fall back to the original way (without dynamicgo)
@@ -389,8 +386,6 @@ func newServiceDescriptorFromContent(path, content string, includes map[string]s
 func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, isAbsIncludePath bool) error {
 	// ServiceDescriptor of dynamicgo
 	dOpts := dthrift.Options{EnableThriftBase: true}
-	// TODO: move this logic into dynamicgo
-	annotation.RegisterHttpMapping(annotation.APIHeader, annotation.HttpMappingHandler{Req: annotation.ApiheaderKitexRequest, Resp: annotation.ApiheaderKitexResponse, Enc: annotation.ApiHeaderKitexEncoding})
 	dsvc, err := dOpts.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
 	if err != nil {
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)

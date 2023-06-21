@@ -26,6 +26,7 @@ var (
 		WriteDefaultField:     true,
 		OmitHttpMappingErrors: true,
 		NoBase64Binary:        true,
+		UseKitexHttpEncoding:  true,
 	}
 	DefaultJSONDynamicGoConvOpts = conv.Options{
 		WriteRequireField: true,
