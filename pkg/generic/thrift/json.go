@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
@@ -247,7 +248,7 @@ func (m *ReadJSON) originalRead(ctx context.Context, method string, in thrift.TP
 	}
 
 	// resp is map
-	respNode, err := customJson.Marshal(resp)
+	respNode, err := sonic.Marshal(resp)
 	if err != nil {
 		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v", err))
 	}
