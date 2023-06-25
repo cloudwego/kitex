@@ -83,6 +83,7 @@ type Message interface {
 	ServiceInfo() *serviceinfo.ServiceInfo
 	Data() interface{}
 	NewData(method string) (ok bool)
+	SetData(data interface{})
 	MessageType() MessageType
 	SetMessageType(MessageType)
 	RPCRole() RPCRole
@@ -190,6 +191,11 @@ func (m *message) NewData(method string) (ok bool) {
 		return false
 	}
 	return true
+}
+
+// NewData implements the Message interface, and is used to manually set the value of the Data in Message
+func (m *message) SetData(data interface{}) {
+	m.data = data
 }
 
 // MessageType implements the Message interface.

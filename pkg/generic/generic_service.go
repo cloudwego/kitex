@@ -98,6 +98,10 @@ func (g *Args) SetCodec(inner interface{}) {
 	g.inner = inner
 }
 
+func (g *Args) GetCodec() interface{} {
+	return g.inner
+}
+
 func (g *Args) GetOrSetBase() interface{} {
 	if g.base == nil {
 		g.base = gthrift.NewBase()

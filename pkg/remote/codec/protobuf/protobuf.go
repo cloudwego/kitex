@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/jhump/protoreflect/dynamic"
 
 	"github.com/cloudwego/fastpb"
 
@@ -79,7 +80,21 @@ func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out 
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("protobuf marshal, write seqID failed: %s", err.Error()))
 	}
 
+	// If Using Generics
+	genmsg, ok := data.(*dynamic.Message)
+	if ok {
+		var actualMsgBuf []byte
+		if actualMsgBuf, err = genmsg.Marshal(); err != nil {
+			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("protobuf marshal message failed: %s", err.Error()))
+		}
+		if _, err = out.WriteBinary(actualMsgBuf); err != nil {
+			return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("protobuf marshal, write message buffer failed: %s", err.Error()))
+		}
+		return nil
+	}
+
 	// 4. write actual message buf
+
 	msg, ok := data.(protobufMsgCodec)
 	if !ok {
 		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "encode failed, codec msg type not match with protobufCodec")

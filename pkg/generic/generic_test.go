@@ -138,3 +138,47 @@ func TestJSONThriftGeneric(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Test")
 }
+
+func TestJSONPbGeneric(t *testing.T) {
+	path := "./jsonpb_test/idl/echo.proto"
+	content := `syntax = "proto3";
+	package pbapi;
+	// The greeting service definition.
+	option go_package = "pbapi";
+	
+	message Request {
+	  string message = 1;
+	}
+	
+	message Response {
+	  string message = 1;
+	}
+	
+	service Echo {
+	  rpc Echo (Request) returns (Response) {}
+	}`
+
+	includes := map[string]string{
+		path: content,
+	}
+
+	//get pb generic
+	p, err := NewPbContentProvider(path, includes)
+	test.Assert(t, err == nil)
+
+	g, err := JSONPbGeneric(p)
+	test.Assert(t, err == nil)
+	defer g.Close()
+
+	test.Assert(t, g.PayloadCodec().Name() == "JSONPb")
+
+	//err = SetBinaryWithBase64(g, true)
+	//test.Assert(t, err == nil)
+	test.Assert(t, g.Framed() == false)
+
+	test.Assert(t, g.PayloadCodecType() == serviceinfo.Protobuf)
+
+	method, err := g.GetMethod(nil, "Echo")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Echo")
+}
