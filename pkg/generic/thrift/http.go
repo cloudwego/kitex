@@ -21,10 +21,10 @@ import (
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
+	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
@@ -46,7 +46,7 @@ type WriteHTTPRequest struct {
 
 var (
 	_          MessageWriter = (*WriteHTTPRequest)(nil)
-	customJson               = sonic.Config{
+	customJson               = jsoniter.Config{
 		EscapeHTML: true,
 		UseNumber:  true,
 	}.Froze()
