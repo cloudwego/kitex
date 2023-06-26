@@ -18,13 +18,12 @@ package test
 
 import (
 	"bytes"
-	"strings"
 	"testing"
-
-	"github.com/cloudwego/thriftgo/generator/golang/extension/unknown"
 
 	tt "github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift/test/kitex_gen/test"
+	"github.com/cloudwego/kitex/pkg/remote"
+	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
 
 var fullReq *test.FullStruct
@@ -104,6 +103,24 @@ func TestOnlyUnknownField(t *testing.T) {
 	writeL := unknown.FastWriteNocopy(unknownBuf, nil)
 	tt.Assert(t, writeL == l)
 	tt.Assert(t, bytes.Equal(buf, unknownBuf))
+
+	// thrift read/write without fast api
+	trans := remote.NewReaderWriterBuffer(-1)
+	prot := codecThrift.NewBinaryProtocol(trans)
+	err = fullReq.Write(prot)
+	tt.Assert(t, err == nil)
+	unknown1 := &test.EmptyStruct{}
+	err = unknown1.Read(prot)
+	tt.Assert(t, err == nil)
+	tt.Assert(t, unknown.BLength() == unknown1.BLength())
+	trans = remote.NewReaderWriterBuffer(-1)
+	prot = codecThrift.NewBinaryProtocol(trans)
+	err = unknown1.Write(prot)
+	tt.Assert(t, err == nil)
+	unknown1 = &test.EmptyStruct{}
+	err = unknown1.Read(prot)
+	tt.Assert(t, err == nil)
+	tt.Assert(t, unknown.BLength() == unknown1.BLength())
 }
 
 func TestPartialUnknownField(t *testing.T) {
@@ -120,7 +137,6 @@ func TestPartialUnknownField(t *testing.T) {
 	ll, err = unknown.FastRead(buf)
 	tt.Assert(t, err == nil)
 	tt.Assert(t, ll == l)
-	tt.Assert(t, len(unknown.GetUnknown()) == 12)
 	unknownL := unknown.BLength()
 	unknownBuf := make([]byte, unknownL)
 	writeL := unknown.FastWriteNocopy(unknownBuf, nil)
@@ -130,6 +146,24 @@ func TestPartialUnknownField(t *testing.T) {
 	tt.Assert(t, err == nil)
 	tt.Assert(t, ll == unknownL)
 	tt.Assert(t, compare1.DeepEqual(compare))
+
+	// thrift read/write without fast api
+	trans := remote.NewReaderWriterBuffer(-1)
+	prot := codecThrift.NewBinaryProtocol(trans)
+	err = fullReq.Write(prot)
+	tt.Assert(t, err == nil)
+	unknown1 := &test.MixedStruct{}
+	err = unknown1.Read(prot)
+	tt.Assert(t, err == nil)
+	tt.Assert(t, unknown.BLength() == unknown1.BLength())
+	trans = remote.NewReaderWriterBuffer(-1)
+	prot = codecThrift.NewBinaryProtocol(trans)
+	err = unknown1.Write(prot)
+	tt.Assert(t, err == nil)
+	unknown1 = &test.MixedStruct{}
+	err = unknown1.Read(prot)
+	tt.Assert(t, err == nil)
+	tt.Assert(t, unknown.BLength() == unknown1.BLength())
 }
 
 func TestNoUnknownField(t *testing.T) {
@@ -191,34 +225,48 @@ func TestNoUnknownField(t *testing.T) {
 	tt.Assert(t, ori.Field28DeepEqual(fullReq.Complex))
 }
 
-func TestCorruptWrite(t *testing.T) {
-	local := &test.Local{L: 3}
-	ufs := unknown.Fields{&unknown.Field{Type: 1000}}
-	local.SetUnknown(ufs)
-
-	defer func() {
-		e := recover()
-		if strings.Contains(e.(error).Error(), "unknown data type 1000") {
-			return
-		}
-		tt.Assert(t, false, e)
-	}()
-	_ = local.BLength()
-	tt.Assert(t, false)
-}
-
-func TestCorruptRead(t *testing.T) {
-	local := &test.Local{L: 3}
-	ufs := unknown.Fields{&unknown.Field{Name: "test", Type: unknown.TString, Value: "str"}}
-	local.SetUnknown(ufs)
-	l := local.BLength()
+func BenchmarkOnlyUnknownField(b *testing.B) {
+	l := fullReq.BLength()
 	buf := make([]byte, l)
-	ll := local.FastWriteNocopy(buf, nil)
-	tt.Assert(t, ll == l)
-	buf[7] = 200
+	ll := fullReq.FastWriteNocopy(buf, nil)
+	tt.Assert(b, ll == l)
 
-	var local2 test.Local
-	_, err := local2.FastRead(buf)
-	tt.Assert(t, err != nil)
-	tt.Assert(t, strings.Contains(err.Error(), "unknown data type 200"))
+	unknownBuf := make([]byte, l)
+	for i := 0; i < b.N; i++ {
+		unknown := &test.EmptyStruct{}
+		_, _ = unknown.FastRead(buf)
+		unknown.FastWriteNocopy(unknownBuf, nil)
+	}
 }
+
+//func TestCorruptWrite(t *testing.T) {
+//	local := &test.Local{L: 3}
+//	ufs := unknown.Fields{&unknown.Field{Type: 1000}}
+//	local.SetUnknown(ufs)
+//
+//	defer func() {
+//		e := recover()
+//		if strings.Contains(e.(error).Error(), "unknown data type 1000") {
+//			return
+//		}
+//		tt.Assert(t, false, e)
+//	}()
+//	_ = local.BLength()
+//	tt.Assert(t, false)
+//}
+//
+//func TestCorruptRead(t *testing.T) {
+//	local := &test.Local{L: 3}
+//	ufs := unknown.Fields{&unknown.Field{Name: "test", Type: unknown.TString, Value: "str"}}
+//	local.SetUnknown(ufs)
+//	l := local.BLength()
+//	buf := make([]byte, l)
+//	ll := local.FastWriteNocopy(buf, nil)
+//	tt.Assert(t, ll == l)
+//	buf[7] = 200
+//
+//	var local2 test.Local
+//	_, err := local2.FastRead(buf)
+//	tt.Assert(t, err != nil)
+//	tt.Assert(t, strings.Contains(err.Error(), "unknown data type 200"))
+//}
