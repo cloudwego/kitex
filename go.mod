@@ -8,7 +8,7 @@ require (
 	github.com/bytedance/mockey v1.2.0
 	github.com/choleraehyq/pid v0.0.16
 	github.com/cloudwego/configmanager v0.2.0
-	github.com/cloudwego/dynamicgo v0.1.0
+	github.com/cloudwego/dynamicgo v0.1.1
 	github.com/cloudwego/fastpb v0.0.4
 	github.com/cloudwego/frugal v0.1.7
 	github.com/cloudwego/netpoll v0.4.1
