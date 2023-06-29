@@ -18,9 +18,20 @@ package rpcinfo
 
 import (
 	"context"
+	"time"
 
 	"github.com/cloudwego/kitex/internal"
+
+	"github.com/bytedance/gopkg/util/session"
 )
+
+func init() {
+	session.SetDefaultManager(session.NewSessionManager(session.ManagerOptions{
+		EnableTransparentTransmitAsync: false,
+		ShardNumber: 10,
+		GCInterval: time.Second + 1,
+	}))
+}
 
 type ctxRPCInfoKeyType struct{}
 
@@ -29,7 +40,9 @@ var ctxRPCInfoKey ctxRPCInfoKeyType
 // NewCtxWithRPCInfo creates a new context with the RPCInfo given.
 func NewCtxWithRPCInfo(ctx context.Context, ri RPCInfo) context.Context {
 	if ri != nil {
-		return context.WithValue(ctx, ctxRPCInfoKey, ri)
+		ctx := context.WithValue(ctx, ctxRPCInfoKey, ri)
+		session.BindSession(session.NewSessionCtx(ctx))
+		return ctx
 	}
 	return ctx
 }
@@ -40,11 +53,18 @@ func GetRPCInfo(ctx context.Context) RPCInfo {
 	if ri, ok := ctx.Value(ctxRPCInfoKey).(RPCInfo); ok {
 		return ri
 	}
+	s, ok := session.CurSession()
+	if ok && s.IsValid() {
+		if ri, ok := s.Get(ctxRPCInfoKey).(RPCInfo); ok {
+			return ri
+		}
+	}
 	return nil
 }
 
 // PutRPCInfo recycles the RPCInfo. This function is for internal use only.
 func PutRPCInfo(ri RPCInfo) {
+	session.UnbindSession()
 	if v, ok := ri.(internal.Reusable); ok {
 		v.Recycle()
 	}

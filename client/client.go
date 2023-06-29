@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/bytedance/gopkg/util/session"
 
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
@@ -340,6 +341,8 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 			// RPCInfo will be recycled after rpc is finished,
 			// holding RPCInfo in a new goroutine is forbidden.
 			rpcinfo.PutRPCInfo(ri)
+		} else {
+			session.UnbindSession()
 		}
 		callOpts.Recycle()
 	}()
