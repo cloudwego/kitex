@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytedance/gopkg/util/session"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -560,6 +561,80 @@ func TestServerBoundHandler(t *testing.T) {
 		test.Assert(t, reflect.DeepEqual(iSvr.opt.RemoteOpt.Outbounds, tcase.wantOutbounds))
 		svr.Stop()
 	}
+}
+
+func TestInvokeHandlerWithSession(t *testing.T) {
+	callMethod := "mock"
+	var opts []Option
+	mwExec := false
+	opts = append(opts, WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			mwExec = true
+			return next(ctx, req, resp)
+		}
+	}))
+	opts = append(opts, WithCodec(&mockCodec{}))
+	transHdlrFact := &mockSvrTransHandlerFactory{}
+	svcInfo := mocks.ServiceInfo()
+	exitCh := make(chan bool)
+	var ln net.Listener
+	transSvr := &mocks.MockTransServer{
+		BootstrapServerFunc: func(net.Listener) error {
+			{ // mock server call
+				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
+				rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+				recvMsg := remote.NewMessageWithNewer(svcInfo, ri, remote.Call, remote.Server)
+				recvMsg.NewData(callMethod)
+				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
+
+				// assert session has been set
+				_, ok := session.CurSession()
+				test.Assert(t, ok, "can't get current session")
+
+				// pass emtpy context here
+				_, err := transHdlrFact.hdlr.OnMessage(context.Background(), recvMsg, sendMsg)
+				test.Assert(t, err == nil, err)
+			}
+			<-exitCh
+			return nil
+		},
+		ShutdownFunc: func() error {
+			if ln != nil {
+				ln.Close()
+			}
+			exitCh <- true
+			return nil
+		},
+		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
+			var err error
+			ln, err = net.Listen("tcp", ":8888")
+			return ln, err
+		},
+	}
+	opts = append(opts, WithTransServerFactory(mocks.NewMockTransServerFactory(transSvr)))
+	opts = append(opts, WithTransHandlerFactory(transHdlrFact))
+
+	svr := NewServer(opts...)
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	serviceHandler := false
+	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MockFuncHandler(func(ctx context.Context, req *mocks.MyRequest) (r *mocks.MyResponse, err error) {
+		serviceHandler = true
+
+		// assert session has been set
+		_, ok := session.CurSession()
+		test.Assert(t, ok, "can't get current session")
+		test.Assert(t, rpcinfo.GetRPCInfo(ctx) != nil, "can't get rpcinfo")
+		test.Assert(t, rpcinfo.GetRPCInfo(context.Background()) != nil, "can't get rpcinfo")
+		return &mocks.MyResponse{Name: "mock"}, nil
+	}))
+	test.Assert(t, err == nil)
+	err = svr.Run()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, mwExec)
+	test.Assert(t, serviceHandler)
 }
 
 func TestInvokeHandlerExec(t *testing.T) {

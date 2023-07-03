@@ -18,6 +18,9 @@ package rpcinfo
 
 import (
 	"context"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/kitex/internal"
@@ -25,11 +28,34 @@ import (
 	"github.com/bytedance/gopkg/util/session"
 )
 
+const KITEX_SESSION_CONFIG_KEY = "KITEX_SESSION_CONFIG"
+
 func init() {
+	opts := strings.Split(os.Getenv(KITEX_SESSION_CONFIG_KEY), ",")
+	if len(opts) == 0 {
+		return
+	}
+	shards := 100
+	// parse first option as ShardNumber
+	if opt, err := strconv.Atoi(opts[0]); err == nil {
+		shards = opt
+	}
+	async := false
+	// parse second option as EnableTransparentTransmitAsync
+	if len(opts) > 1 && strings.ToLower(opts[1]) == "async" {
+		async = true
+	}
+	GCInterval := time.Hour
+	// parse third option as EnableTransparentTransmitAsync
+	if len(opts) > 2 {
+		if d, err := time.ParseDuration(opts[2]); err == nil && d > time.Second {
+			GCInterval = d
+		}
+	}
 	session.SetDefaultManager(session.NewSessionManager(session.ManagerOptions{
-		EnableTransparentTransmitAsync: false,
-		ShardNumber: 10,
-		GCInterval: time.Second + 1,
+		EnableTransparentTransmitAsync: async,
+		ShardNumber:                    shards,
+		GCInterval:                     GCInterval,
 	}))
 }
 
