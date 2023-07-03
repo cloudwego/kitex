@@ -7,7 +7,7 @@ require (
 	github.com/bytedance/gopkg v0.0.0-20230531144706-a12972768317
 	github.com/bytedance/mockey v1.2.0
 	github.com/bytedance/sonic v1.9.1
-	github.com/choleraehyq/pid v0.0.16
+	github.com/choleraehyq/pid v0.0.17
 	github.com/cloudwego/configmanager v0.2.0
 	github.com/cloudwego/dynamicgo v0.1.1
 	github.com/cloudwego/fastpb v0.0.4
