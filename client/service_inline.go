@@ -34,6 +34,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+const serviceInlineTag = "service_inline"
+
 var localAddr net.Addr
 
 func init() {
@@ -124,8 +126,10 @@ func (kc *serviceInlineClient) initMiddlewares(ctx context.Context) {
 }
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
-func (kc *serviceInlineClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo)
+func (kc *serviceInlineClient) initRPCInfo(ctx context.Context, method string) (c context.Context, ri rpcinfo.RPCInfo, co *callopt.CallOptions) {
+	c, ri, co = initRPCInfo(ctx, method, kc.opt, kc.svcInfo)
+	rpcinfo.AsMutableEndpointInfo(ri.To()).SetTag(serviceInlineTag, "1")
+	return
 }
 
 // Call implements the Client interface .
