@@ -143,18 +143,9 @@ func (c *httpPbThriftCodec) Close() error {
 // FromHTTPPbRequest parse  HTTPRequest from http.Request
 func FromHTTPPbRequest(req *http.Request) (*HTTPRequest, error) {
 	customReq := &HTTPRequest{
-		Header:      req.Header,
-		Query:       req.URL.Query(),
-		Cookies:     descriptor.Cookies{},
-		Method:      req.Method,
-		Host:        req.Host,
-		Path:        req.URL.Path,
+		Request:     req,
 		ContentType: descriptor.MIMEApplicationProtobuf,
 	}
-	for _, cookie := range req.Cookies() {
-		customReq.Cookies[cookie.Name] = cookie.Value
-	}
-	// copy the request body, maybe user used it after parse
 	var b io.ReadCloser
 	var err error
 	if req.GetBody != nil {

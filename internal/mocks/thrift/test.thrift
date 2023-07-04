@@ -6,8 +6,12 @@ struct MockReq {
 	3: list<string> strList,
 }
 
-service Mock {
-    string Test(1:MockReq req)
+exception Exception {
+    1: i32 code
+    255: string msg
 }
 
-
+service Mock {
+    string Test(1:MockReq req)
+    string ExceptionTest(1:MockReq req)throws(1: Exception err)
+}

@@ -36,7 +36,7 @@ func TestFromHTTPPbRequest(t *testing.T) {
 		hreq, err := FromHTTPPbRequest(req)
 		test.Assert(t, err == nil)
 		test.Assert(t, reflect.DeepEqual(hreq.RawBody, []byte("123")), string(hreq.RawBody))
-		test.Assert(t, hreq.Method == "POST")
-		test.Assert(t, hreq.Path == "/far/boo")
+		test.Assert(t, hreq.GetMethod() == "POST")
+		test.Assert(t, hreq.GetPath() == "/far/boo")
 	})
 }

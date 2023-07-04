@@ -171,6 +171,11 @@ func (m *MockImpl) Test(ctx context.Context, req *kt.MockReq) (r string, err err
 	return respMsg, nil
 }
 
+// ExceptionTest ...
+func (m *MockImpl) ExceptionTest(ctx context.Context, req *kt.MockReq) (r string, err error) {
+	return "", kt.NewException()
+}
+
 func genBinaryResp(method string) []byte {
 	idx := 0
 	buf := make([]byte, 12+len(method)+len(respMsg))

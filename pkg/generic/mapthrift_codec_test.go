@@ -127,7 +127,6 @@ func initMapSendMsg(tp transport.Protocol) remote.Message {
 					"Test1": "Test2",
 				},
 			},
-			Method: "Test",
 		},
 		Method: "Test",
 	}

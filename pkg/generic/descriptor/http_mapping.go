@@ -68,7 +68,7 @@ var NewAPIQuery NewHTTPMapping = func(value string) HTTPMapping {
 }
 
 func (m *apiQuery) Request(ctx context.Context, req *HTTPRequest, field *FieldDescriptor) (interface{}, bool, error) {
-	val := req.Query.Get(m.value)
+	val := req.GetQuery(m.value)
 	return val, val != "", nil
 }
 
@@ -106,7 +106,7 @@ var NewAPIHeader NewHTTPMapping = func(value string) HTTPMapping {
 }
 
 func (m *apiHeader) Request(ctx context.Context, req *HTTPRequest, field *FieldDescriptor) (interface{}, bool, error) {
-	val := req.Header.Get(m.value)
+	val := req.GetHeader(m.value)
 	return val, val != "", nil
 }
 
@@ -126,11 +126,14 @@ var NewAPICookie NewHTTPMapping = func(value string) HTTPMapping {
 }
 
 func (m *apiCookie) Request(ctx context.Context, req *HTTPRequest, field *FieldDescriptor) (interface{}, bool, error) {
-	val, ok := req.Cookies[m.value]
-	return val, ok, nil
+	val := req.GetCookie(m.value)
+	if val == "" {
+		return val, false, nil
+	}
+	return val, true, nil
 }
 
-func (*apiCookie) Response(ctx context.Context, resp *HTTPResponse, field *FieldDescriptor, val interface{}) error {
+func (m *apiCookie) Response(ctx context.Context, resp *HTTPResponse, field *FieldDescriptor, val interface{}) error {
 	return nil
 }
 

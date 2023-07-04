@@ -20,9 +20,18 @@ package descriptor
 import (
 	"fmt"
 	"os"
+
+	dthrift "github.com/cloudwego/dynamicgo/thrift"
 )
 
 var isGoTagAliasDisabled = os.Getenv("KITEX_GENERIC_GOTAG_ALIAS_DISABLED") == "True"
+
+func init() {
+	if isGoTagAliasDisabled {
+		// disable go.tag for dynamicgo
+		dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
+	}
+}
 
 // FieldDescriptor idl field descriptor
 type FieldDescriptor struct {
@@ -86,9 +95,10 @@ type FunctionDescriptor struct {
 
 // ServiceDescriptor idl service descriptor
 type ServiceDescriptor struct {
-	Name      string
-	Functions map[string]*FunctionDescriptor
-	Router    Router
+	Name         string
+	Functions    map[string]*FunctionDescriptor
+	Router       Router
+	DynamicGoDsc *dthrift.ServiceDescriptor
 }
 
 // LookupFunctionByMethod lookup function by method
