@@ -154,6 +154,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		return nil, err
 	}
 	sBeginLen := bthrift.Binary.StructBeginLength(sName)
+	// TODO: support exception field
 	fName, typeId, id, err := in.ReadFieldBegin()
 	if err != nil {
 		return nil, err
