@@ -17,12 +17,15 @@
 package descriptor
 
 import (
+	"errors"
 	"net/http"
 	"net/url"
-)
 
-// Cookies ...
-type Cookies map[string]string
+	"github.com/bytedance/sonic/ast"
+	dhttp "github.com/cloudwego/dynamicgo/http"
+
+	"github.com/cloudwego/kitex/pkg/utils"
+)
 
 // MIMEType ...
 type MIMEType string
@@ -32,25 +35,130 @@ const (
 	MIMEApplicationProtobuf = "application/x-protobuf"
 )
 
+var (
+	_ dhttp.RequestGetter  = &HTTPRequest{}
+	_ dhttp.ResponseSetter = &HTTPResponse{}
+)
+
 // HTTPRequest ...
 type HTTPRequest struct {
-	Header      http.Header
-	Query       url.Values
-	Cookies     Cookies
-	Method      string
-	Host        string
-	Path        string
 	Params      *Params // path params
+	Request     *http.Request
 	RawBody     []byte
 	Body        map[string]interface{}
 	GeneralBody interface{} // body of other representation, used with ContentType
 	ContentType MIMEType
+	cookies     map[string]string
+	query       url.Values
+	bodyMap     *ast.Node
+}
+
+// GetHeader implements http.RequestGetter of dynamicgo
+func (req *HTTPRequest) GetHeader(key string) string {
+	return req.Request.Header.Get(key)
+}
+
+// GetCookie implements http.RequestGetter of dynamicgo
+func (req *HTTPRequest) GetCookie(key string) string {
+	if req.cookies == nil {
+		req.cookies = map[string]string{}
+		for _, cookie := range req.Request.Cookies() {
+			req.cookies[cookie.Name] = cookie.Value
+		}
+	}
+	return req.cookies[key]
+}
+
+// GetQuery implements http.RequestGetter of dynamicgo
+func (req *HTTPRequest) GetQuery(key string) string {
+	if req.Request.URL == nil {
+		return ""
+	}
+	if req.query == nil {
+		req.query = req.Request.URL.Query()
+	}
+	return req.query.Get(key)
+}
+
+// GetBody implements http.RequestGetter of dynamicgo
+func (req *HTTPRequest) GetBody() []byte {
+	return req.RawBody
+}
+
+// GetMethod implements http.RequestGetter of dynamicgo
+func (req *HTTPRequest) GetMethod() string {
+	return req.Request.Method
+}
+
+// GetPath implements http.RequestGetter of dynamicgo
+func (req *HTTPRequest) GetPath() string {
+	if req.Request.URL == nil {
+		return ""
+	}
+	return req.Request.URL.Path
+}
+
+// GetHost implements http.RequestGetter of dynamicgo
+func (req *HTTPRequest) GetHost() string {
+	return req.Request.Host
+}
+
+// GetParam implements http.RequestGetter of dynamicgo
+func (req *HTTPRequest) GetParam(key string) string {
+	return req.Params.ByName(key)
+}
+
+// GetMapBody implements http.RequestGetter of dynamicgo
+func (req *HTTPRequest) GetMapBody(key string) string {
+	if err := req.initializeBodyMap(); err != nil {
+		return ""
+	}
+
+	v := req.bodyMap.Get(key)
+	if v.Check() != nil {
+		return ""
+	}
+	if _, err := v.Raw(); err != nil {
+		return ""
+	}
+	j, err := v.String()
+	if err != nil {
+		return ""
+	}
+	return j
+}
+
+// GetPostForm implements http.RequestGetter of dynamicgo
+func (req *HTTPRequest) GetPostForm(key string) string {
+	return req.Request.PostFormValue(key)
+}
+
+// GetUri implements http.RequestGetter of dynamicgo
+func (req *HTTPRequest) GetUri() string {
+	if req.Request.URL == nil {
+		return ""
+	}
+	return req.Request.URL.String()
+}
+
+func (req *HTTPRequest) initializeBodyMap() error {
+	if req.bodyMap == nil {
+		if len(req.RawBody) == 0 {
+			return errors.New("the length of RawBody is 0")
+		}
+		body := req.RawBody
+		s := utils.SliceByteToString(body)
+		node := ast.NewRaw(s)
+		req.bodyMap = &node
+	}
+	return nil
 }
 
 // HTTPResponse ...
 type HTTPResponse struct {
 	Header      http.Header
 	StatusCode  int32
+	RawBody     []byte // this field is set only when generic.UseRawBodyForHTTPResp(true) is set
 	Body        map[string]interface{}
 	GeneralBody interface{} // body of other representation, used with ContentType
 	ContentType MIMEType
@@ -65,6 +173,30 @@ func NewHTTPResponse() *HTTPResponse {
 		Body:        map[string]interface{}{},
 		Renderer:    JsonRenderer{},
 	}
+}
+
+// SetStatusCode implements http.ResponseSetter of dynamicgo
+func (resp *HTTPResponse) SetStatusCode(code int) error {
+	resp.StatusCode = int32(code)
+	return nil
+}
+
+// SetHeader implements http.ResponseSetter of dynamicgo
+func (resp *HTTPResponse) SetHeader(key, val string) error {
+	resp.Header.Set(key, val)
+	return nil
+}
+
+// SetCookie implements http.ResponseSetter of dynamicgo
+func (resp *HTTPResponse) SetCookie(key, val string) error {
+	// kitex generic call does not care about Cookie
+	return nil
+}
+
+// SetRawBody implements http.ResponseSetter of dynamicgo
+func (resp *HTTPResponse) SetRawBody(body []byte) error {
+	resp.RawBody = body
+	return nil
 }
 
 func NewHTTPPbResponse(initBody interface{}) *HTTPResponse {
