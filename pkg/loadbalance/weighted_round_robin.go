@@ -46,16 +46,18 @@ func newWeightedRoundRobinPicker(instances []discovery.Instance) Picker {
 	wrrp.nodes = make([]*wrrNode, wrrp.size)
 	offset := fastrand.Uint64n(wrrp.size)
 	totalWeight := 0
+	gcd := 0
 	for idx := uint64(0); idx < wrrp.size; idx++ {
 		ins := instances[(idx+offset)%wrrp.size]
 		totalWeight += ins.Weight()
+		gcd = gcdInt(gcd, ins.Weight())
 		wrrp.nodes[idx] = &wrrNode{
 			Instance: ins,
 			current:  0,
 		}
 	}
 
-	wrrp.vcapacity = uint64(totalWeight)
+	wrrp.vcapacity = uint64(totalWeight / gcd)
 	wrrp.vnodes = make([]discovery.Instance, wrrp.vcapacity)
 	wrrp.buildVirtualWrrNodes(wrrVNodesBatchSize)
 	return wrrp
@@ -153,4 +155,13 @@ func (rp *RoundRobinPicker) Next(ctx context.Context, request interface{}) (ins 
 	idx := rp.iterator.Next() % rp.size
 	ins = rp.instances[idx]
 	return ins
+}
+
+func gcdInt(a, b int) int {
+	for b != 0 {
+		r := a % b
+		a = b
+		b = r
+	}
+	return a
 }
