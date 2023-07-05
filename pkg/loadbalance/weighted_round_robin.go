@@ -159,9 +159,7 @@ func (rp *RoundRobinPicker) Next(ctx context.Context, request interface{}) (ins 
 
 func gcdInt(a, b int) int {
 	for b != 0 {
-		r := a % b
-		a = b
-		b = r
+		a, b = b, a%b
 	}
 	return a
 }
