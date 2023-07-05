@@ -36,6 +36,7 @@ type balancerTestcase struct {
 var balancerTestcases = []*balancerTestcase{
 	{Name: "weight_round_robin", factory: NewWeightedRoundRobinBalancer},
 	{Name: "weight_random", factory: NewWeightedRandomBalancer},
+	{Name: "interleaved_weighted_round_robin", factory: NewInterleavedWeightedRoundRobinBalancer},
 }
 
 func TestWeightedBalancer_GetPicker(t *testing.T) {
