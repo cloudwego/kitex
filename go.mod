@@ -28,4 +28,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-replace github.com/bytedance/gopkg => github.com/AsterDY/gopkg v0.0.0-20230629103721-95c045873855
+replace github.com/bytedance/gopkg => github.com/AsterDY/gopkg v0.0.0-20230706084157-4ddcdbd263bc
