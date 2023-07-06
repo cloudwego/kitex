@@ -565,16 +565,18 @@ func TestServerBoundHandler(t *testing.T) {
 }
 
 func TestInvokeHandlerWithSession(t *testing.T) {
-	// t.Run("default", func(t *testing.T) {
-	// 	testInvokeHandlerWithSession(t, ":8888")
-	// 	opts := session.GetDefaultManager().Options()
-	// 	test.Assert(t, opts.EnableTransparentTransmitAsync == session.DefaultEnableTransparentTransmitAsync)
-	// 	test.Assert(t, opts.GCInterval == session.DefaultGCInterval)
-	// 	test.Assert(t, opts.ShardNumber == session.DefaultShardNum)
-	// })
-	// since session use sync.Once, we can not test above test both
+	t.Run("default", func(t *testing.T) {
+		rpcinfo.InitSession()
+		testInvokeHandlerWithSession(t, ":8888")
+		opts := session.GetDefaultManager().Options()
+		test.Assert(t, opts.EnableTransparentTransmitAsync == session.DefaultEnableTransparentTransmitAsync)
+		test.Assert(t, opts.GCInterval == session.DefaultGCInterval)
+		test.Assert(t, opts.ShardNumber == session.DefaultShardNum)
+	})
+
 	t.Run("env", func(t *testing.T) {
 		os.Setenv(rpcinfo.KITEX_SESSION_CONFIG_KEY, "10,async,1m")
+		rpcinfo.InitSession()
 		testInvokeHandlerWithSession(t, ":8889")
 		opts := session.GetDefaultManager().Options()
 		test.Assert(t, opts.EnableTransparentTransmitAsync)

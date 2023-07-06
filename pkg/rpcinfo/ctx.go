@@ -21,7 +21,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cloudwego/kitex/internal"
@@ -31,10 +30,11 @@ import (
 
 const KITEX_SESSION_CONFIG_KEY = "KITEX_SESSION_CONFIG"
 
-var sessionOnce sync.Once
+// var sessionOnce sync.Once
+var sessionEnabled bool
 
-func initSession() {
-	sessionOnce.Do(func() {
+func InitSession() {
+	// sessionOnce.Do(func() {
 		opts := strings.Split(os.Getenv(KITEX_SESSION_CONFIG_KEY), ",")
 		if len(opts) == 0 {
 			return
@@ -61,23 +61,30 @@ func initSession() {
 			ShardNumber:                    shards,
 			GCInterval:                     GCInterval,
 		}))
-	})
+		sessionEnabled = true
+	// })
 }
 
 func curSession() (gs.Session, bool) {
-	initSession()
+	if !sessionEnabled {
+		return nil, false
+	}
 	return gs.CurSession()
 }
 
-func bindSession(s gs.Session) {
-	initSession()
-	gs.BindSession(s)
+func bindSession(ctx context.Context) {
+	if !sessionEnabled {
+		return
+	}
+	gs.BindSession(gs.NewSessionCtx(ctx))
 }
 
 func unbindSession() {
+	if !sessionEnabled {
+		return
+	}
 	gs.UnbindSession()
 }
-
 
 type ctxRPCInfoKeyType struct{}
 
@@ -87,7 +94,7 @@ var ctxRPCInfoKey ctxRPCInfoKeyType
 func NewCtxWithRPCInfo(ctx context.Context, ri RPCInfo) context.Context {
 	if ri != nil {
 		ctx := context.WithValue(ctx, ctxRPCInfoKey, ri)
-		bindSession(gs.NewSessionCtx(ctx))
+		bindSession(ctx)
 		return ctx
 	}
 	return ctx

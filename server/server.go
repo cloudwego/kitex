@@ -78,6 +78,7 @@ func NewServer(ops ...Option) Server {
 }
 
 func (s *server) init() {
+	rpcinfo.InitSession()
 	ctx := fillContext(s.opt)
 	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)
 	s.mws = append(s.mws, acl.NewACLMiddleware(s.opt.ACLRules))
