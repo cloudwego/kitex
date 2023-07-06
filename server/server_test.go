@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -564,6 +565,26 @@ func TestServerBoundHandler(t *testing.T) {
 }
 
 func TestInvokeHandlerWithSession(t *testing.T) {
+	// t.Run("default", func(t *testing.T) {
+	// 	testInvokeHandlerWithSession(t, ":8888")
+	// 	opts := session.GetDefaultManager().Options()
+	// 	test.Assert(t, opts.EnableTransparentTransmitAsync == session.DefaultEnableTransparentTransmitAsync)
+	// 	test.Assert(t, opts.GCInterval == session.DefaultGCInterval)
+	// 	test.Assert(t, opts.ShardNumber == session.DefaultShardNum)
+	// })
+	// since session use sync.Once, we can not test above test both
+	t.Run("env", func(t *testing.T) {
+		os.Setenv(rpcinfo.KITEX_SESSION_CONFIG_KEY, "10,async,1m")
+		testInvokeHandlerWithSession(t, ":8889")
+		opts := session.GetDefaultManager().Options()
+		test.Assert(t, opts.EnableTransparentTransmitAsync)
+		test.Assert(t, opts.GCInterval == time.Minute)
+		test.Assert(t, opts.ShardNumber == 10)
+		os.Unsetenv(rpcinfo.KITEX_SESSION_CONFIG_KEY)
+	})
+}
+
+func testInvokeHandlerWithSession(t *testing.T, ad string) {
 	callMethod := "mock"
 	var opts []Option
 	mwExec := false
@@ -607,7 +628,7 @@ func TestInvokeHandlerWithSession(t *testing.T) {
 		},
 		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
 			var err error
-			ln, err = net.Listen("tcp", ":8888")
+			ln, err = net.Listen("tcp", ad)
 			return ln, err
 		},
 	}

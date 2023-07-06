@@ -21,43 +21,63 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudwego/kitex/internal"
 
-	"github.com/bytedance/gopkg/util/session"
+	gs "github.com/bytedance/gopkg/util/session"
 )
 
 const KITEX_SESSION_CONFIG_KEY = "KITEX_SESSION_CONFIG"
 
-func init() {
-	opts := strings.Split(os.Getenv(KITEX_SESSION_CONFIG_KEY), ",")
-	if len(opts) == 0 {
-		return
-	}
-	shards := 100
-	// parse first option as ShardNumber
-	if opt, err := strconv.Atoi(opts[0]); err == nil {
-		shards = opt
-	}
-	async := false
-	// parse second option as EnableTransparentTransmitAsync
-	if len(opts) > 1 && strings.ToLower(opts[1]) == "async" {
-		async = true
-	}
-	GCInterval := time.Hour
-	// parse third option as EnableTransparentTransmitAsync
-	if len(opts) > 2 {
-		if d, err := time.ParseDuration(opts[2]); err == nil && d > time.Second {
-			GCInterval = d
+var sessionOnce sync.Once
+
+func initSession() {
+	sessionOnce.Do(func() {
+		opts := strings.Split(os.Getenv(KITEX_SESSION_CONFIG_KEY), ",")
+		if len(opts) == 0 {
+			return
 		}
-	}
-	session.SetDefaultManager(session.NewSessionManager(session.ManagerOptions{
-		EnableTransparentTransmitAsync: async,
-		ShardNumber:                    shards,
-		GCInterval:                     GCInterval,
-	}))
+		shards := gs.DefaultShardNum
+		// parse first option as ShardNumber
+		if opt, err := strconv.Atoi(opts[0]); err == nil {
+			shards = opt
+		}
+		async := false
+		// parse second option as EnableTransparentTransmitAsync
+		if len(opts) > 1 && strings.ToLower(opts[1]) == "async" {
+			async = true
+		}
+		GCInterval := gs.DefaultGCInterval
+		// parse third option as EnableTransparentTransmitAsync
+		if len(opts) > 2 {
+			if d, err := time.ParseDuration(opts[2]); err == nil && d > time.Second {
+				GCInterval = d
+			}
+		}
+		gs.SetDefaultManager(gs.NewSessionManager(gs.ManagerOptions{
+			EnableTransparentTransmitAsync: async,
+			ShardNumber:                    shards,
+			GCInterval:                     GCInterval,
+		}))
+	})
 }
+
+func curSession() (gs.Session, bool) {
+	initSession()
+	return gs.CurSession()
+}
+
+func bindSession(s gs.Session) {
+	initSession()
+	gs.BindSession(s)
+}
+
+func unbindSession() {
+	gs.UnbindSession()
+}
+
 
 type ctxRPCInfoKeyType struct{}
 
@@ -67,7 +87,7 @@ var ctxRPCInfoKey ctxRPCInfoKeyType
 func NewCtxWithRPCInfo(ctx context.Context, ri RPCInfo) context.Context {
 	if ri != nil {
 		ctx := context.WithValue(ctx, ctxRPCInfoKey, ri)
-		session.BindSession(session.NewSessionCtx(ctx))
+		bindSession(gs.NewSessionCtx(ctx))
 		return ctx
 	}
 	return ctx
@@ -79,7 +99,7 @@ func GetRPCInfo(ctx context.Context) RPCInfo {
 	if ri, ok := ctx.Value(ctxRPCInfoKey).(RPCInfo); ok {
 		return ri
 	}
-	s, ok := session.CurSession()
+	s, ok := curSession()
 	if ok && s.IsValid() {
 		if ri, ok := s.Get(ctxRPCInfoKey).(RPCInfo); ok {
 			return ri
@@ -90,7 +110,7 @@ func GetRPCInfo(ctx context.Context) RPCInfo {
 
 // PutRPCInfo recycles the RPCInfo. This function is for internal use only.
 func PutRPCInfo(ri RPCInfo) {
-	session.UnbindSession()
+	unbindSession()
 	if v, ok := ri.(internal.Reusable); ok {
 		v.Recycle()
 	}
