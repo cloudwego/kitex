@@ -40,6 +40,7 @@ type iwrrQueue struct {
 type InterleavedWeightedRoundRobinPicker struct {
 	current *iwrrQueue
 	next    *iwrrQueue
+	gcd     int
 
 	lock sync.Mutex
 }
@@ -51,14 +52,18 @@ func newInterleavedWeightedRoundRobinPicker(instances []discovery.Instance) Pick
 
 	size := uint64(len(instances))
 	offset := fastrand.Uint64n(size)
+	gcd := 0
 	for idx := uint64(0); idx < size; idx++ {
 		ins := instances[(idx+offset)%size]
+		gcd = gcdInt(gcd, ins.Weight())
 
 		iwrrp.current.enqueue(&iwrrNode{
 			Instance:  ins,
 			remainder: ins.Weight(),
 		})
 	}
+
+	iwrrp.gcd = gcd
 
 	return iwrrp
 }
@@ -72,7 +77,7 @@ func (ip *InterleavedWeightedRoundRobinPicker) Next(ctx context.Context, request
 	}
 
 	node := ip.current.dequeue()
-	node.remainder--
+	node.remainder -= ip.gcd
 
 	if node.remainder > 0 {
 		ip.current.enqueue(node)
