@@ -35,33 +35,33 @@ var sessionEnabled bool
 
 func InitSession() {
 	// sessionOnce.Do(func() {
-		opts := strings.Split(os.Getenv(KITEX_SESSION_CONFIG_KEY), ",")
-		if len(opts) == 0 {
-			return
+	opts := strings.Split(os.Getenv(KITEX_SESSION_CONFIG_KEY), ",")
+	if len(opts) == 0 {
+		return
+	}
+	shards := gs.DefaultShardNum
+	// parse first option as ShardNumber
+	if opt, err := strconv.Atoi(opts[0]); err == nil {
+		shards = opt
+	}
+	async := false
+	// parse second option as EnableTransparentTransmitAsync
+	if len(opts) > 1 && strings.ToLower(opts[1]) == "async" {
+		async = true
+	}
+	GCInterval := gs.DefaultGCInterval
+	// parse third option as EnableTransparentTransmitAsync
+	if len(opts) > 2 {
+		if d, err := time.ParseDuration(opts[2]); err == nil && d > time.Second {
+			GCInterval = d
 		}
-		shards := gs.DefaultShardNum
-		// parse first option as ShardNumber
-		if opt, err := strconv.Atoi(opts[0]); err == nil {
-			shards = opt
-		}
-		async := false
-		// parse second option as EnableTransparentTransmitAsync
-		if len(opts) > 1 && strings.ToLower(opts[1]) == "async" {
-			async = true
-		}
-		GCInterval := gs.DefaultGCInterval
-		// parse third option as EnableTransparentTransmitAsync
-		if len(opts) > 2 {
-			if d, err := time.ParseDuration(opts[2]); err == nil && d > time.Second {
-				GCInterval = d
-			}
-		}
-		gs.SetDefaultManager(gs.NewSessionManager(gs.ManagerOptions{
-			EnableTransparentTransmitAsync: async,
-			ShardNumber:                    shards,
-			GCInterval:                     GCInterval,
-		}))
-		sessionEnabled = true
+	}
+	gs.SetDefaultManager(gs.NewSessionManager(gs.ManagerOptions{
+		EnableTransparentTransmitAsync: async,
+		ShardNumber:                    shards,
+		GCInterval:                     GCInterval,
+	}))
+	sessionEnabled = true
 	// })
 }
 

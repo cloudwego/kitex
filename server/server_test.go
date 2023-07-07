@@ -614,7 +614,7 @@ func testInvokeHandlerWithSession(t *testing.T, ad string) {
 				_, ok := session.CurSession()
 				test.Assert(t, ok, "can't get current session")
 
-				// pass emtpy context here
+				// pass empty context here
 				_, err := transHdlrFact.hdlr.OnMessage(context.Background(), recvMsg, sendMsg)
 				test.Assert(t, err == nil, err)
 			}
