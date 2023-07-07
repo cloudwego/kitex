@@ -21,8 +21,6 @@ import (
 	"runtime/debug"
 	"sync"
 
-	"github.com/bytedance/gopkg/util/gopool"
-
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/profiler"
 )
@@ -35,11 +33,11 @@ var GoFunc GoTask
 
 func init() {
 	GoFunc = func(ctx context.Context, f func()) {
-		gopool.CtxGo(ctx, func() {
+		go func() {
 			profiler.Tag(ctx)
 			f()
 			profiler.Untag(ctx)
-		})
+		}()
 	}
 }
 
