@@ -448,7 +448,9 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		defer cli.Recycle()
 		config := ri.Config()
 		m := kc.svcInfo.MethodInfo(methodName)
-		if m.OneWay() {
+		if m == nil {
+			return fmt.Errorf("method info is nil, methodName=%s, serviceInfo=%+v", methodName, kc.svcInfo)
+		} else if m.OneWay() {
 			sendMsg = remote.NewMessage(req, kc.svcInfo, ri, remote.Oneway, remote.Client)
 		} else {
 			sendMsg = remote.NewMessage(req, kc.svcInfo, ri, remote.Call, remote.Client)
