@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"net"
 	"runtime/debug"
+	"sync/atomic"
 
+	"github.com/cloudwego/kitex/internal/runtimex"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -112,6 +114,9 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 // OnRead implements the remote.ServerTransHandler interface.
 // The connection should be closed after returning error.
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
+	runtimex.Pin()
+	var pined int32 = 1
+
 	ri := rpcinfo.GetRPCInfo(ctx)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var recvMsg remote.Message
@@ -146,6 +151,10 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		}
 		if err != nil && !closeConnOutsideIfErr {
 			err = nil
+		}
+		// unlock if still pined
+		if atomic.CompareAndSwapInt32(&pined, 1, 0) {
+			runtimex.Unpin()
 		}
 	}()
 	ctx = t.startTracer(ctx, ri)
