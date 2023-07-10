@@ -36,8 +36,8 @@ func (p *Inner) FastRead(buf []byte) (int, error) {
 	}
 
 	for {
-		var beginOff = offset
-		var isUnknownField bool
+		var beginOff int = offset
+		var isUnknownField bool = false
 		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
@@ -548,8 +548,8 @@ func (p *Local) FastRead(buf []byte) (int, error) {
 	}
 
 	for {
-		var beginOff = offset
-		var isUnknownField bool
+		var beginOff int = offset
+		var isUnknownField bool = false
 		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
@@ -688,8 +688,8 @@ func (p *FullStruct) FastRead(buf []byte) (int, error) {
 	}
 
 	for {
-		var beginOff = offset
-		var isUnknownField bool
+		var beginOff int = offset
+		var isUnknownField bool = false
 		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
@@ -2475,7 +2475,6 @@ func (p *FullStruct) field7Length() int {
 	l += bthrift.Binary.ListBeginLength(thrift.I32, len(p.EnumList))
 	for _, v := range p.EnumList {
 		l += bthrift.Binary.I32Length(int32(v))
-
 	}
 	l += bthrift.Binary.ListEndLength()
 	l += bthrift.Binary.FieldEndLength()
@@ -2583,7 +2582,6 @@ func (p *FullStruct) field16Length() int {
 		l += bthrift.Binary.ListBeginLength(thrift.STRING, len(v))
 		for _, v := range v {
 			l += bthrift.Binary.StringLengthNocopy(v)
-
 		}
 		l += bthrift.Binary.ListEndLength()
 	}
@@ -2634,7 +2632,6 @@ func (p *FullStruct) field19Length() int {
 	l += bthrift.Binary.ListBeginLength(thrift.STRING, len(p.Strlist))
 	for _, v := range p.Strlist {
 		l += bthrift.Binary.StringLengthNocopy(v)
-
 	}
 	l += bthrift.Binary.ListEndLength()
 	l += bthrift.Binary.FieldEndLength()
@@ -2666,7 +2663,6 @@ func (p *FullStruct) field22Length() int {
 		l += bthrift.Binary.ListBeginLength(thrift.STRING, len(p.OptNilList))
 		for _, v := range p.OptNilList {
 			l += bthrift.Binary.StringLengthNocopy(v)
-
 		}
 		l += bthrift.Binary.ListEndLength()
 		l += bthrift.Binary.FieldEndLength()
@@ -2680,7 +2676,6 @@ func (p *FullStruct) field23Length() int {
 	l += bthrift.Binary.ListBeginLength(thrift.STRING, len(p.NilList))
 	for _, v := range p.NilList {
 		l += bthrift.Binary.StringLengthNocopy(v)
-
 	}
 	l += bthrift.Binary.ListEndLength()
 	l += bthrift.Binary.FieldEndLength()
@@ -2780,8 +2775,8 @@ func (p *MixedStruct) FastRead(buf []byte) (int, error) {
 	}
 
 	for {
-		var beginOff = offset
-		var isUnknownField bool
+		var beginOff int = offset
+		var isUnknownField bool = false
 		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
@@ -3587,7 +3582,6 @@ func (p *MixedStruct) field7Length() int {
 	l += bthrift.Binary.ListBeginLength(thrift.I32, len(p.EnumList))
 	for _, v := range p.EnumList {
 		l += bthrift.Binary.I32Length(int32(v))
-
 	}
 	l += bthrift.Binary.ListEndLength()
 	l += bthrift.Binary.FieldEndLength()
@@ -3712,7 +3706,7 @@ func (p *EmptyStruct) FastRead(buf []byte) (int, error) {
 	}
 
 	for {
-		var beginOff = offset
+		var beginOff int = offset
 		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
