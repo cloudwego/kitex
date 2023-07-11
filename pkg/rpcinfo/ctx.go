@@ -18,73 +18,10 @@ package rpcinfo
 
 import (
 	"context"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/cloudwego/kitex/internal"
-
-	gs "github.com/bytedance/gopkg/util/session"
+	"github.com/cloudwego/kitex/pkg/session"
 )
-
-const KITEX_SESSION_CONFIG_KEY = "KITEX_SESSION_CONFIG"
-
-// var sessionOnce sync.Once
-var sessionEnabled bool
-
-func InitSession() {
-	// sessionOnce.Do(func() {
-	opts := strings.Split(os.Getenv(KITEX_SESSION_CONFIG_KEY), ",")
-	if len(opts) == 0 {
-		return
-	}
-	shards := gs.DefaultShardNum
-	// parse first option as ShardNumber
-	if opt, err := strconv.Atoi(opts[0]); err == nil {
-		shards = opt
-	}
-	async := false
-	// parse second option as EnableTransparentTransmitAsync
-	if len(opts) > 1 && strings.ToLower(opts[1]) == "async" {
-		async = true
-	}
-	GCInterval := gs.DefaultGCInterval
-	// parse third option as EnableTransparentTransmitAsync
-	if len(opts) > 2 {
-		if d, err := time.ParseDuration(opts[2]); err == nil && d > time.Second {
-			GCInterval = d
-		}
-	}
-	gs.SetDefaultManager(gs.NewSessionManager(gs.ManagerOptions{
-		EnableTransparentTransmitAsync: async,
-		ShardNumber:                    shards,
-		GCInterval:                     GCInterval,
-	}))
-	sessionEnabled = true
-	// })
-}
-
-func curSession() (gs.Session, bool) {
-	if !sessionEnabled {
-		return nil, false
-	}
-	return gs.CurSession()
-}
-
-func bindSession(ctx context.Context) {
-	if !sessionEnabled {
-		return
-	}
-	gs.BindSession(gs.NewSessionCtx(ctx))
-}
-
-func unbindSession() {
-	if !sessionEnabled {
-		return
-	}
-	gs.UnbindSession()
-}
 
 type ctxRPCInfoKeyType struct{}
 
@@ -93,9 +30,7 @@ var ctxRPCInfoKey ctxRPCInfoKeyType
 // NewCtxWithRPCInfo creates a new context with the RPCInfo given.
 func NewCtxWithRPCInfo(ctx context.Context, ri RPCInfo) context.Context {
 	if ri != nil {
-		ctx := context.WithValue(ctx, ctxRPCInfoKey, ri)
-		bindSession(ctx)
-		return ctx
+		return context.WithValue(ctx, ctxRPCInfoKey, ri)
 	}
 	return ctx
 }
@@ -106,8 +41,8 @@ func GetRPCInfo(ctx context.Context) RPCInfo {
 	if ri, ok := ctx.Value(ctxRPCInfoKey).(RPCInfo); ok {
 		return ri
 	}
-	s, ok := curSession()
-	if ok && s.IsValid() {
+	// fallback: get rpcinfo from GLS
+	if s, ok := session.CurSession(); ok && s.IsValid() {
 		if ri, ok := s.Get(ctxRPCInfoKey).(RPCInfo); ok {
 			return ri
 		}
@@ -117,7 +52,6 @@ func GetRPCInfo(ctx context.Context) RPCInfo {
 
 // PutRPCInfo recycles the RPCInfo. This function is for internal use only.
 func PutRPCInfo(ri RPCInfo) {
-	unbindSession()
 	if v, ok := ri.(internal.Reusable); ok {
 		v.Recycle()
 	}

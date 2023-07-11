@@ -42,6 +42,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/remotesvr"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/session"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
@@ -78,7 +79,6 @@ func NewServer(ops ...Option) Server {
 }
 
 func (s *server) init() {
-	rpcinfo.InitSession()
 	ctx := fillContext(s.opt)
 	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)
 	s.mws = append(s.mws, acl.NewACLMiddleware(s.opt.ACLRules))
@@ -91,6 +91,7 @@ func (s *server) init() {
 		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(s.opt.DebugInfo))
 		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
 	}
+	session.Init(s.opt.SessionOpt)
 	s.buildInvokeChain()
 }
 
@@ -297,9 +298,13 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 				rpcStats.SetPanicked(err)
 			}
 			rpcinfo.Record(ctx, ri, stats.ServerHandleFinish, err)
+			// clear session
+			session.UnbindSession()
 		}()
 		implHandlerFunc := s.svcInfo.MethodInfo(methodName).Handler()
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
+		// set session
+		session.BindSession(ctx)
 		err = implHandlerFunc(ctx, s.handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {

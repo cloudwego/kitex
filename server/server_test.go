@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bytedance/gopkg/util/session"
+	gs "github.com/bytedance/gopkg/util/session"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -44,6 +44,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/session"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -565,28 +566,22 @@ func TestServerBoundHandler(t *testing.T) {
 }
 
 func TestInvokeHandlerWithSession(t *testing.T) {
-	t.Run("default", func(t *testing.T) {
-		rpcinfo.InitSession()
-		testInvokeHandlerWithSession(t, ":8888")
-		opts := session.GetDefaultManager().Options()
-		test.Assert(t, opts.EnableTransparentTransmitAsync == session.DefaultEnableTransparentTransmitAsync)
-		test.Assert(t, opts.GCInterval == session.DefaultGCInterval)
-		test.Assert(t, opts.ShardNumber == session.DefaultShardNum)
+	t.Run("disabled", func(t *testing.T) {
+		testInvokeHandlerWithSession(t, true, ":8888")
 	})
 
 	t.Run("env", func(t *testing.T) {
-		os.Setenv(rpcinfo.KITEX_SESSION_CONFIG_KEY, "10,async,1m")
-		rpcinfo.InitSession()
-		testInvokeHandlerWithSession(t, ":8889")
-		opts := session.GetDefaultManager().Options()
+		os.Setenv(session.KITEX_SESSION_CONFIG_KEY, "10,async,1m")
+		testInvokeHandlerWithSession(t, false, ":8889")
+		opts := gs.GetDefaultManager().Options()
 		test.Assert(t, opts.EnableTransparentTransmitAsync)
 		test.Assert(t, opts.GCInterval == time.Minute)
 		test.Assert(t, opts.ShardNumber == 10)
-		os.Unsetenv(rpcinfo.KITEX_SESSION_CONFIG_KEY)
+		os.Unsetenv(session.KITEX_SESSION_CONFIG_KEY)
 	})
 }
 
-func testInvokeHandlerWithSession(t *testing.T, ad string) {
+func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 	callMethod := "mock"
 	var opts []Option
 	mwExec := false
@@ -605,17 +600,12 @@ func testInvokeHandlerWithSession(t *testing.T, ad string) {
 		BootstrapServerFunc: func(net.Listener) error {
 			{ // mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
-				rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 				recvMsg := remote.NewMessageWithNewer(svcInfo, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
-				// assert session has been set
-				_, ok := session.CurSession()
-				test.Assert(t, ok, "can't get current session")
-
-				// pass empty context here
-				_, err := transHdlrFact.hdlr.OnMessage(context.Background(), recvMsg, sendMsg)
+				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
 				test.Assert(t, err == nil, err)
 			}
 			<-exitCh
@@ -645,12 +635,15 @@ func testInvokeHandlerWithSession(t *testing.T, ad string) {
 	serviceHandler := false
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MockFuncHandler(func(ctx context.Context, req *mocks.MyRequest) (r *mocks.MyResponse, err error) {
 		serviceHandler = true
-
-		// assert session has been set
 		_, ok := session.CurSession()
-		test.Assert(t, ok, "can't get current session")
-		test.Assert(t, rpcinfo.GetRPCInfo(ctx) != nil, "can't get rpcinfo")
-		test.Assert(t, rpcinfo.GetRPCInfo(context.Background()) != nil, "can't get rpcinfo")
+		if !fail {
+			// assert session has been set
+			test.Assert(t, ok, "can't get current session")
+			test.Assert(t, rpcinfo.GetRPCInfo(context.Background()) != nil, "can't get rpcinfo")
+		} else {
+			test.Assert(t, !ok, "get current session")
+			test.Assert(t, rpcinfo.GetRPCInfo(context.Background()) == nil, "get rpcinfo")
+		}
 		return &mocks.MyResponse{Name: "mock"}, nil
 	}))
 	test.Assert(t, err == nil)

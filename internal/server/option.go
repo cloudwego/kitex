@@ -39,6 +39,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/session"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -90,6 +91,8 @@ type Options struct {
 	// Observability
 	TracerCtl  *rpcinfo.TraceController
 	StatsLevel *stats.Level
+
+	SessionOpt *session.Options
 }
 
 type Limit struct {
