@@ -569,7 +569,7 @@ func Skip(buf []byte, self BTProtocol, fieldType thrift.TType, maxDepth int) (le
 				err = e
 				return
 			}
-			l, e = self.Skip(buf[length:], valueType)
+			l, e = Skip(buf[length:], self, valueType, maxDepth-1)
 			length += l
 			if e != nil {
 				err = e

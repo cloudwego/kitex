@@ -60,10 +60,10 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 
 	for {
 		{{- if Features.KeepUnknownFields}}
-		var beginOff int = offset
 		{{- if gt (len .Fields) 0}}
-		var isUnknownField bool = false
+		var isUnknownField bool
 		{{- end}}
+		var beginOff int = offset
 		{{- end}}
 		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
