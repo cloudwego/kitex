@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	gproto "github.com/cloudwego/kitex/pkg/generic/proto"
 
 	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
@@ -98,6 +99,10 @@ func (g *Args) SetCodec(inner interface{}) {
 	g.inner = inner
 }
 
+func (g *Args) GetCodec() interface{} {
+	return g.inner
+}
+
 func (g *Args) GetOrSetBase() interface{} {
 	if g.base == nil {
 		g.base = gthrift.NewBase()
@@ -113,9 +118,26 @@ func (g *Args) Write(ctx context.Context, out thrift.TProtocol) error {
 	return fmt.Errorf("unexpected Args writer type: %T", g.inner)
 }
 
+func (g *Args) WritePb(ctx context.Context) (interface{}, error) {
+	if w, ok := g.inner.(gproto.MessageWriter); ok {
+		return w.Write(ctx, g.Request)
+	}
+	return nil, fmt.Errorf("unexpected Args writer type: %T", g.inner)
+}
+
 // Read ...
 func (g *Args) Read(ctx context.Context, method string, in thrift.TProtocol) error {
 	if w, ok := g.inner.(gthrift.MessageReader); ok {
+		g.Method = method
+		var err error
+		g.Request, err = w.Read(ctx, method, in)
+		return err
+	}
+	return fmt.Errorf("unexpected Args reader type: %T", g.inner)
+}
+
+func (g *Args) ReadPb(ctx context.Context, method string, in []byte) error {
+	if w, ok := g.inner.(gproto.MessageReader); ok {
 		g.Method = method
 		var err error
 		g.Request, err = w.Read(ctx, method, in)
@@ -154,9 +176,25 @@ func (r *Result) Write(ctx context.Context, out thrift.TProtocol) error {
 	return fmt.Errorf("unexpected Result writer type: %T", r.inner)
 }
 
+func (r *Result) WritePb(ctx context.Context) (interface{}, error) {
+	if w, ok := r.inner.(gproto.MessageWriter); ok {
+		return w.Write(ctx, r.Success)
+	}
+	return nil, fmt.Errorf("unexpected Result writer type: %T", r.inner)
+}
+
 // Read ...
 func (r *Result) Read(ctx context.Context, method string, in thrift.TProtocol) error {
 	if w, ok := r.inner.(gthrift.MessageReader); ok {
+		var err error
+		r.Success, err = w.Read(ctx, method, in)
+		return err
+	}
+	return fmt.Errorf("unexpected Result reader type: %T", r.inner)
+}
+
+func (r *Result) ReadPb(ctx context.Context, method string, in []byte) error {
+	if w, ok := r.inner.(gproto.MessageReader); ok {
 		var err error
 		r.Success, err = w.Read(ctx, method, in)
 		return err
