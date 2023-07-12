@@ -20,11 +20,12 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"io"
 	"net"
 	"net/url"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/remote"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
@@ -76,7 +77,7 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 		Host: host,
 		// grpc method format /package.Service/Method
 		Method:       fmt.Sprintf("/%s/%s", svcName, ri.Invocation().MethodName()),
-		SendCompress: protobuf.GetSendCompressor(ctx),
+		SendCompress: remote.GetSendCompressor(ctx),
 	})
 	if err != nil {
 		return nil, err
