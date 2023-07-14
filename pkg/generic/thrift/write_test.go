@@ -27,13 +27,12 @@ import (
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/jhump/protoreflect/desc/protoparse"
-	"github.com/tidwall/gjson"
-
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/proto"
+	"github.com/jhump/protoreflect/desc/protoparse"
+	"github.com/tidwall/gjson"
 )
 
 func Test_writeVoid(t *testing.T) {

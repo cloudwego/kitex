@@ -208,7 +208,7 @@ func nextJSONWriter(data *gjson.Result, t *descriptor.TypeDescriptor, opt *write
 	return v, fn, nil
 }
 
-func getDefaultValue(t *descriptor.TypeDescriptor, opt *writerOption) (interface{}, error) {
+func getEmptyValue(t *descriptor.TypeDescriptor, opt *writerOption) (interface{}, error) {
 	switch t.Type {
 	case descriptor.BOOL:
 		return false, nil
@@ -714,13 +714,15 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 			}
 			continue
 		}
-		if !ok || elem == nil {
-			elem, err = getDefaultValue(field.Type, opt)
-			if err != nil {
-				return err
-			}
-		}
+
 		if field.ValueMapping != nil {
+			if !ok { // only get default value for non-successful fg()
+				elem, err = getEmptyValue(field.Type, opt)
+				if err != nil {
+					return err
+				}
+				
+			}
 			elem, err = field.ValueMapping.Request(ctx, elem, field)
 			if err != nil {
 				return err
@@ -756,7 +758,7 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 			return err
 		}
 	}
-	
+
 	if err := out.WriteFieldStop(); err != nil {
 		return err
 	}
@@ -784,13 +786,14 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 			}
 			continue
 		}
-		if v == nil {
-			v, err = getDefaultValue(field.Type, opt)
-			if err != nil {
-				return err
-			}
-		}
+		
 		if field.ValueMapping != nil {
+			if v == nil {
+				v, err = getEmptyValue(field.Type, opt)
+				if err != nil {
+					return err
+				}
+			}
 			if v, err = field.ValueMapping.Request(ctx, v, field); err != nil {
 				return err
 			}
