@@ -534,9 +534,9 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 		return out.WriteMapEnd()
 	}
 	var (
-		keyWriter         writer
-		elemWriter        writer
-		err               error
+		keyWriter  writer
+		elemWriter writer
+		err        error
 	)
 	for key, elem := range m {
 		if keyWriter == nil {
