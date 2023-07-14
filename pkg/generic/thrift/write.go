@@ -804,7 +804,6 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 				if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
 					return err
 				}
-				
 				if err := writeEmptyValue(out, field.Type, opt); err != nil {
 					return fmt.Errorf("field (%d/%s) error: %w", field.ID, name, err)
 				} 
@@ -813,6 +812,9 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 				continue
 			}
 		} else {
+			if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
+				return err
+			}
 			writer, err := nextWriter(v, field.Type, opt)
 			if err != nil {
 				return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
