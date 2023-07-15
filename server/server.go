@@ -474,6 +474,9 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 	if info.Weight == 0 {
 		info.Weight = discovery.DefaultWeight
 	}
+	if info.Tags == nil {
+		info.Tags = s.opt.Svr.Tags
+	}
 }
 
 func (s *server) fillMoreServiceInfo(lAddr net.Addr) {

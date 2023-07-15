@@ -354,7 +354,49 @@ func TestServiceRegistryNoInitInfo(t *testing.T) {
 	test.Assert(t, rCount == 1)
 	test.Assert(t, drCount == 1)
 }
+func TestServiceRegistryInfoWithOutTags(t *testing.T) {
+	registryInfo := &registry.Info{
+		Weight: 100,
+	}
+	checkInfo := func(info *registry.Info) {
+		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
+		test.Assert(t, info.Addr.String() == "[::]:8888", info.Addr)
+		test.Assert(t, info.Weight == registryInfo.Weight, info.Weight)
+		test.Assert(t, info.Tags["aa"] == "bb", info.Tags)
+	}
+	var rCount int
+	var drCount int
+	mockRegistry := MockRegistry{
+		RegisterFunc: func(info *registry.Info) error {
+			checkInfo(info)
+			rCount++
+			return nil
+		},
+		DeregisterFunc: func(info *registry.Info) error {
+			checkInfo(info)
+			drCount++
+			return nil
+		},
+	}
+	var opts []Option
+	opts = append(opts, WithRegistry(mockRegistry))
+	opts = append(opts, WithRegistryInfo(registryInfo))
+	opts = append(opts, WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
+		Tags: map[string]string{"aa": "bb"},
+	}))
+	svr := NewServer(opts...)
+	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil)
 
+	time.AfterFunc(3500*time.Millisecond, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr.Run()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, rCount == 1)
+	test.Assert(t, drCount == 1)
+}
 func TestServerBoundHandler(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
