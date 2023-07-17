@@ -721,14 +721,13 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 				if err != nil {
 					return err
 				}
-				
 			}
 			elem, err = field.ValueMapping.Request(ctx, elem, field)
 			if err != nil {
 				return err
 			}
 		}
-		
+
 		if elem == nil {
 			if !field.Optional {
 				if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
@@ -753,7 +752,7 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 				return fmt.Errorf("writer of field[%s] error %w", name, err)
 			}
 		}
-		
+
 		if err := out.WriteFieldEnd(); err != nil {
 			return err
 		}
@@ -786,7 +785,7 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 			}
 			continue
 		}
-		
+
 		if field.ValueMapping != nil {
 			if v == nil {
 				v, err = getEmptyValue(field.Type, opt)
@@ -806,7 +805,7 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 				}
 				if err := writeEmptyValue(out, field.Type, opt); err != nil {
 					return fmt.Errorf("field (%d/%s) error: %w", field.ID, name, err)
-				} 
+				}
 				// goto WriteFieldEnd()
 			} else {
 				continue
