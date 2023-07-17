@@ -576,8 +576,8 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 	}
 
 	var (
-		keyWriter         writer
-		elemWriter        writer
+		keyWriter  writer
+		elemWriter writer
 	)
 	for key, elem := range m {
 		_key, err := buildinTypeFromString(key, t.Key)
