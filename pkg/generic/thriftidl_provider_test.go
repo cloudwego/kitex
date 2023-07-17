@@ -209,11 +209,11 @@ func TestFallback(t *testing.T) {
 	defer p.Close()
 	pd, ok := p.(GetProviderOption)
 	test.Assert(t, ok)
-	test.Assert(t, !pd.Option().DynamicGoEnabled)
+	test.Assert(t, pd.Option().DynamicGoEnabled)
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Functions["BinaryEcho"].Request.Struct.FieldsByName["req"].Type.Struct.FieldsByID[int32(1)].Alias == "STR")
-	test.Assert(t, tree.DynamicGoDsc == nil)
+	test.Assert(t, tree.DynamicGoDsc != nil)
 }
 
 func TestDisableGoTagForDynamicGo(t *testing.T) {
