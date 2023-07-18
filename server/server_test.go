@@ -354,6 +354,7 @@ func TestServiceRegistryNoInitInfo(t *testing.T) {
 	test.Assert(t, rCount == 1)
 	test.Assert(t, drCount == 1)
 }
+
 func TestServiceRegistryInfoWithOutTags(t *testing.T) {
 	registryInfo := &registry.Info{
 		Weight: 100,
@@ -397,6 +398,7 @@ func TestServiceRegistryInfoWithOutTags(t *testing.T) {
 	test.Assert(t, rCount == 1)
 	test.Assert(t, drCount == 1)
 }
+
 func TestServerBoundHandler(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
