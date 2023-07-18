@@ -208,38 +208,6 @@ func nextJSONWriter(data *gjson.Result, t *descriptor.TypeDescriptor, opt *write
 	return v, fn, nil
 }
 
-func getEmptyValue(t *descriptor.TypeDescriptor, opt *writerOption) (interface{}, error) {
-	switch t.Type {
-	case descriptor.BOOL:
-		return false, nil
-	case descriptor.I08:
-		return int8(0), nil
-	case descriptor.I16:
-		return int16(0), nil
-	case descriptor.I32:
-		return int32(0), nil
-	case descriptor.I64:
-		return int64(0), nil
-	case descriptor.DOUBLE:
-		return float64(0), nil
-	case descriptor.STRING:
-		if t.Name == "binary" && opt.binaryWithBase64 {
-			return []byte{}, nil
-		} else {
-			return "", nil
-		}
-	case descriptor.LIST, descriptor.SET:
-		return []interface{}{}, nil
-	case descriptor.MAP:
-		return map[interface{}]interface{}{}, nil
-	case descriptor.STRUCT:
-		return map[string]interface{}{}, nil
-	case descriptor.VOID:
-		return descriptor.Void{}, nil
-	}
-	return nil, fmt.Errorf("unsupported type:%T", t)
-}
-
 func writeEmptyValue(out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	switch t.Type {
 	case descriptor.BOOL:
@@ -716,31 +684,33 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 		}
 
 		if field.ValueMapping != nil {
-			if !ok { // only get default value for non-successful fg()
-				elem, err = getEmptyValue(field.Type, opt)
-				if err != nil {
-					return err
-				}
-			}
 			elem, err = field.ValueMapping.Request(ctx, elem, field)
 			if err != nil {
 				return err
 			}
 		}
 
-		if elem == nil {
+		// empty fields
+		if elem == nil || !ok {
 			if !field.Optional {
+				// empty fields don't need value-mapping here, since writeEmptyValue decides zero value based on Thrift type
 				if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
 					return err
 				}
 				if err := writeEmptyValue(out, field.Type, opt); err != nil {
 					return fmt.Errorf("field (%d/%s) error: %w", field.ID, name, err)
 				}
-				// goto WriteFieldEnd()
-			} else {
-				continue
+				if err := out.WriteFieldEnd(); err != nil {
+					return err
+				}
 			}
-		} else {
+		} else { // normal fields
+			if field.ValueMapping != nil {
+				elem, err = field.ValueMapping.Request(ctx, elem, field)
+				if err != nil {
+					return err
+				}
+			}
 			if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
 				return err
 			}
@@ -751,10 +721,9 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 			if err := writer(ctx, elem, out, field.Type, opt); err != nil {
 				return fmt.Errorf("writer of field[%s] error %w", name, err)
 			}
-		}
-
-		if err := out.WriteFieldEnd(); err != nil {
-			return err
+			if err := out.WriteFieldEnd(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -786,18 +755,6 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 			continue
 		}
 
-		if field.ValueMapping != nil {
-			if v == nil {
-				v, err = getEmptyValue(field.Type, opt)
-				if err != nil {
-					return err
-				}
-			}
-			if v, err = field.ValueMapping.Request(ctx, v, field); err != nil {
-				return err
-			}
-		}
-
 		if v == nil {
 			if !field.Optional {
 				if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
@@ -806,11 +763,17 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 				if err := writeEmptyValue(out, field.Type, opt); err != nil {
 					return fmt.Errorf("field (%d/%s) error: %w", field.ID, name, err)
 				}
-				// goto WriteFieldEnd()
-			} else {
-				continue
+				if err := out.WriteFieldEnd(); err != nil {
+					return err
+				}
 			}
 		} else {
+			if field.ValueMapping != nil {
+				v, err = field.ValueMapping.Request(ctx, v, field)
+				if err != nil {
+					return err
+				}
+			}
 			if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
 				return err
 			}
@@ -821,10 +784,9 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 			if err := writer(ctx, v, out, field.Type, opt); err != nil {
 				return fmt.Errorf("writer of field[%s] error %w", name, err)
 			}
-		}
-
-		if err := out.WriteFieldEnd(); err != nil {
-			return err
+			if err := out.WriteFieldEnd(); err != nil {
+				return err
+			}
 		}
 	}
 
