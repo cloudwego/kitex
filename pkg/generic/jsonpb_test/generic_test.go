@@ -1,3 +1,19 @@
+/*
+ * Copyright 2023 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package test
 
 import (
@@ -33,30 +49,12 @@ var (
 	service Echo {
 	  rpc Echo (Request) returns (Response) {}
 	}`
-
-	includes = map[string]string{
-		path: content,
-	}
-
-	destSvcName = "Echo"
-
-	addr = "0.0.0.0:8888"
 )
 
 func TestRun(t *testing.T) {
 	t.Run("testPbEchoServiceEcho", testPbEchoServiceEcho)
 	t.Run("testPbExampleServiceExampleMethod", testPbExampleServiceExampleMethod)
 	t.Run("testPbExampleServiceVoid", testPbExampleServiceVoid)
-}
-
-func initPbClientByPbContentProvider(t *testing.T, addr, destSvcName string, path string, includes map[string]string) genericclient.Client {
-	pbp, err := generic.NewPbContentProvider(path, includes)
-	test.Assert(t, err == nil)
-	g, err := generic.JSONPbGeneric(pbp)
-	test.Assert(t, err == nil)
-	cli := newGenericClient(destSvcName, g, addr)
-	test.Assert(t, err == nil)
-	return cli
 }
 
 func initPbClientByIDL(t *testing.T, addr, destSvcName string, pbIdl string) genericclient.Client {
@@ -90,18 +88,6 @@ func initPbServerByIDL(t *testing.T, address string, handler generic.Service, pb
 	return svr
 }
 
-func initPbServerByPbContentProvider(t *testing.T, address string, handler generic.Service, idlPath string, includes map[string]string) server.Server {
-	addr, _ := net.ResolveTCPAddr("tcp", address)
-	p, err := generic.NewPbContentProvider(idlPath, includes)
-	test.Assert(t, err == nil)
-	g, err := generic.JSONPbGeneric(p)
-	test.Assert(t, err == nil)
-
-	svr := newGenericServer(g, addr, handler)
-	test.Assert(t, err == nil)
-	return svr
-}
-
 func testPbEchoServiceEcho(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDL(t, ":8128", new(GenericServiceImpl), "./idl/echo.proto")
@@ -124,7 +110,7 @@ func testPbEchoServiceEcho(t *testing.T) {
 
 func testPbExampleServiceExampleMethod(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initPbServerByIDL(t, "127.0.0.1:8128", new(ExampleGenericServiceImpl), "./idl/example.proto")
+	svr := initPbServerByIDL(t, ":8128", new(ExampleGenericServiceImpl), "./idl/example.proto")
 	time.Sleep(500 * time.Millisecond)
 
 	cli := initPbClientByIDL(t, "127.0.0.1:8128", "ExampleService", "./idl/example.proto")
@@ -144,7 +130,7 @@ func testPbExampleServiceExampleMethod(t *testing.T) {
 
 func testPbExampleServiceVoid(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initPbServerByIDL(t, "127.0.0.1:8128", new(ExampleVoidGenericServiceImpl), "./idl/example.proto")
+	svr := initPbServerByIDL(t, ":8128", new(ExampleVoidGenericServiceImpl), "./idl/example.proto")
 	time.Sleep(500 * time.Millisecond)
 
 	cli := initPbClientByIDL(t, "127.0.0.1:8128", "ExampleService", "./idl/example.proto")
