@@ -1,0 +1,51 @@
+name: Tests
+
+on: [ push, pull_request ]
+
+jobs:
+  unit-scenario-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.17'
+      - name: Unit Test
+        run: go test -gcflags=-l -race -covermode=atomic -coverprofile=coverage.txt ./...
+      - name: Scenario Tests
+        run: |
+          cd ..
+          rm -rf kitex-tests
+          git clone https://github.com/cloudwego/kitex-tests.git
+          cd kitex-tests
+          ./run.sh ${{github.workspace}}
+          cd ${{github.workspace}}
+      - name: Codecov
+        run: bash <(curl -s https://codecov.io/bash)
+
+  benchmark-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.17'
+      - name: Benchmark
+        run: go test -gcflags='all=-N -l' -bench=. -benchmem -run=none ./...
+
+  compatibility-test:
+    strategy:
+      matrix:
+        go: [ 1.15, 1.16, 1.18, 1.19, "1.20" ]
+        os: [ X64, ARM64 ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Unit Test
+        run: go test -gcflags=-l -race -covermode=atomic ./...
