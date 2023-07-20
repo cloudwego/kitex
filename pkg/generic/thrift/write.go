@@ -683,13 +683,6 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 			continue
 		}
 
-		if field.ValueMapping != nil {
-			elem, err = field.ValueMapping.Request(ctx, elem, field)
-			if err != nil {
-				return err
-			}
-		}
-
 		// empty fields
 		if elem == nil || !ok {
 			if !field.Optional {
