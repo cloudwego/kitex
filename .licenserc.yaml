@@ -9,8 +9,8 @@ header:
 
   paths-ignore:
     - internal/mocks/thrift/test.go
-    - pkg/remote/codec/thrift/thrift_frugal.go
-    - pkg/remote/codec/thrift/thrift_frugal_test.go
+    - pkg/remote/codec/thrift/thrift_frugal_amd64.go
+    - pkg/remote/codec/thrift/thrift_frugal_amd64_test.go
     - pkg/remote/codec/thrift/thrift_others.go
     - pkg/remote/trans/nphttp2/codes/codes.go
     - pkg/remote/trans/nphttp2/grpc/grpcframe/
