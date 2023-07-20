@@ -65,6 +65,70 @@ func TestJsonThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
+func TestJsonThriftCodec_SelfRef(t *testing.T) {
+	t.Run("old way", func(t *testing.T) {
+		p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
+		test.Assert(t, err == nil)
+		gOpts := &Options{dynamicgoConvOpts: DefaultJSONDynamicGoConvOpts}
+		jtc, err := newJsonThriftCodec(p, thriftCodec, gOpts)
+		test.Assert(t, err == nil)
+		defer jtc.Close()
+		test.Assert(t, jtc.Name() == "JSONThrift")
+
+		method, err := jtc.getMethod(nil, "Test")
+		test.Assert(t, err == nil)
+		test.Assert(t, method.Name == "Test")
+
+		ctx := context.Background()
+		sendMsg := initJsonSendMsg(transport.TTHeader)
+
+		// Marshal side
+		out := remote.NewWriterBuffer(256)
+		err = jtc.Marshal(ctx, sendMsg, out)
+		test.Assert(t, err == nil, err)
+
+		// Unmarshal side
+		recvMsg := initJsonRecvMsg()
+		buf, err := out.Bytes()
+		test.Assert(t, err == nil)
+		recvMsg.SetPayloadLen(len(buf))
+		in := remote.NewReaderBuffer(buf)
+		err = jtc.Unmarshal(ctx, recvMsg, in)
+		test.Assert(t, err == nil, err)
+	})
+
+	t.Run("old way", func(t *testing.T) {
+		p, err := NewThriftFileProviderWithDynamicGo("./json_test/idl/mock.thrift")
+		test.Assert(t, err == nil)
+		gOpts := &Options{dynamicgoConvOpts: DefaultJSONDynamicGoConvOpts}
+		jtc, err := newJsonThriftCodec(p, thriftCodec, gOpts)
+		test.Assert(t, err == nil)
+		defer jtc.Close()
+		test.Assert(t, jtc.Name() == "JSONThrift")
+
+		method, err := jtc.getMethod(nil, "Test")
+		test.Assert(t, err == nil)
+		test.Assert(t, method.Name == "Test")
+
+		ctx := context.Background()
+		sendMsg := initJsonSendMsg(transport.TTHeader)
+
+		// Marshal side
+		out := remote.NewWriterBuffer(256)
+		err = jtc.Marshal(ctx, sendMsg, out)
+		test.Assert(t, err == nil, err)
+
+		// Unmarshal side
+		recvMsg := initJsonRecvMsg()
+		buf, err := out.Bytes()
+		test.Assert(t, err == nil)
+		recvMsg.SetPayloadLen(len(buf))
+		in := remote.NewReaderBuffer(buf)
+		err = jtc.Unmarshal(ctx, recvMsg, in)
+		test.Assert(t, err == nil, err)
+	})
+}
+
 func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	// with dynamicgo
 	p, err := NewThriftFileProviderWithDynamicGo("./json_test/idl/mock.thrift")
@@ -160,7 +224,7 @@ func TestJsonExceptionError(t *testing.T) {
 
 func initJsonSendMsg(tp transport.Protocol) remote.Message {
 	req := &Args{
-		Request: `{"Msg": "Hello"}`,
+		Request: `{"extra": "Hello"}`,
 		Method:  "Test",
 	}
 	svcInfo := mocks.ServiceInfo()
