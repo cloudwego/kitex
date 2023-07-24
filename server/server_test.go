@@ -355,7 +355,9 @@ func TestServiceRegistryNoInitInfo(t *testing.T) {
 	test.Assert(t, drCount == 1)
 }
 
-func TestServiceRegistryInfoWithOutTags(t *testing.T) {
+// TestServiceRegistryInfoWithNilTags is to check the Tags val. If Tags of RegistryInfo is nil,
+// the Tags of ServerBasicInfo will be assigned to Tags of RegistryInfo
+func TestServiceRegistryInfoWithNilTags(t *testing.T) {
 	registryInfo := &registry.Info{
 		Weight: 100,
 	}
