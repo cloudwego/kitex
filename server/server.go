@@ -28,6 +28,7 @@ import (
 	"time"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
+	"github.com/cloudwego/kitex/internal/session"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -42,7 +43,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/remotesvr"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/session"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 

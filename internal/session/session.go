@@ -42,12 +42,10 @@ type Options struct {
 }
 
 // Init session Manager
+// It uses env config first, the key is KITEX_SESSION_CONFIG_KEY
 func Init(opts *Options) {
-	if opts == nil {
-		env := os.Getenv(KITEX_SESSION_CONFIG_KEY)
-		if env == "" {
-			return
-		}
+	// check env first
+	if env := os.Getenv(KITEX_SESSION_CONFIG_KEY); env != "" {
 		envs := strings.Split(env, ",")
 		op := gs.ManagerOptions{}
 		op.ShardNumber = gs.DefaultShardNum
@@ -71,6 +69,9 @@ func Init(opts *Options) {
 			Enable:         true,
 			ManagerOptions: op,
 		}
+		// no env found, then check argument
+	} else if opts == nil {
+		return
 	}
 
 	if opts.Enable {

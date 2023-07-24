@@ -20,7 +20,7 @@ import (
 	"context"
 
 	"github.com/cloudwego/kitex/internal"
-	"github.com/cloudwego/kitex/pkg/session"
+	"github.com/cloudwego/kitex/internal/session"
 )
 
 type ctxRPCInfoKeyType struct{}

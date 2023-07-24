@@ -24,6 +24,7 @@ import (
 	"syscall"
 
 	"github.com/cloudwego/kitex/internal/configutil"
+	"github.com/cloudwego/kitex/internal/session"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -39,7 +40,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/session"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
