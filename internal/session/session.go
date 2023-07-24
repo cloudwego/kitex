@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	gs "github.com/bytedance/gopkg/util/session"
+	gs "github.com/cloudwego/localsession"
 )
 
 // Session Env config key
@@ -37,8 +37,10 @@ var (
 
 // Options
 type Options struct {
-	Enable bool
-	gs.ManagerOptions
+	Enable        bool
+	ImplicitAsnyc bool
+	ShardNumber   int
+	GCInterval    time.Duration
 }
 
 // Init session Manager
@@ -53,10 +55,10 @@ func Init(opts *Options) {
 		if opt, err := strconv.Atoi(envs[0]); err == nil {
 			op.ShardNumber = opt
 		}
-		op.EnableTransparentTransmitAsync = false
+		op.EnableImplicitlyTransmitAsync = false
 		// parse second option as EnableTransparentTransmitAsync
 		if len(envs) > 1 && strings.ToLower(envs[1]) == "async" {
-			op.EnableTransparentTransmitAsync = true
+			op.EnableImplicitlyTransmitAsync = true
 		}
 		op.GCInterval = gs.DefaultGCInterval
 		// parse third option as EnableTransparentTransmitAsync
@@ -66,8 +68,10 @@ func Init(opts *Options) {
 			}
 		}
 		opts = &Options{
-			Enable:         true,
-			ManagerOptions: op,
+			Enable:        true,
+			GCInterval:    op.GCInterval,
+			ImplicitAsnyc: op.EnableImplicitlyTransmitAsync,
+			ShardNumber:   op.ShardNumber,
 		}
 		// no env found, then check argument
 	} else if opts == nil {
@@ -76,7 +80,11 @@ func Init(opts *Options) {
 
 	if opts.Enable {
 		sessionOnce.Do(func() {
-			gs.SetDefaultManager(gs.NewSessionManager(gs.ManagerOptions(opts.ManagerOptions)))
+			gs.SetDefaultManager(gs.NewSessionManager(gs.ManagerOptions{
+				EnableImplicitlyTransmitAsync: opts.ImplicitAsnyc,
+				GCInterval:                    opts.GCInterval,
+				ShardNumber:                   opts.ShardNumber,
+			}))
 		})
 		sessionEnabled = true
 	} else {

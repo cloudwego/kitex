@@ -12,6 +12,7 @@ require (
 	github.com/cloudwego/dynamicgo v0.1.2
 	github.com/cloudwego/fastpb v0.0.4
 	github.com/cloudwego/frugal v0.1.7
+	github.com/cloudwego/localsession v0.0.1
 	github.com/cloudwego/netpoll v0.4.1
 	github.com/cloudwego/thriftgo v0.2.11
 	github.com/golang/mock v1.6.0
@@ -27,5 +28,3 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v3 v3.0.1
 )
-
-replace github.com/bytedance/gopkg => github.com/AsterDY/gopkg v0.0.0-20230711094545-2ce5dc634fb5

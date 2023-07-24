@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/bytedance/gopkg/util/session"
+	gs "github.com/cloudwego/localsession"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -574,7 +574,7 @@ func TestInvokeHandlerWithSession(t *testing.T) {
 		os.Setenv(session.KITEX_SESSION_CONFIG_KEY, "10,async,1m")
 		testInvokeHandlerWithSession(t, false, ":8889")
 		opts := gs.GetDefaultManager().Options()
-		test.Assert(t, opts.EnableTransparentTransmitAsync)
+		test.Assert(t, opts.EnableImplicitlyTransmitAsync)
 		test.Assert(t, opts.GCInterval == time.Minute)
 		test.Assert(t, opts.ShardNumber == 10)
 		os.Unsetenv(session.KITEX_SESSION_CONFIG_KEY)

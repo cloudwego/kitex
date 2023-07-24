@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
+	"github.com/cloudwego/kitex/internal/session"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limit"
@@ -340,5 +341,16 @@ func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 		di.Push(fmt.Sprintf("WithConcurrencyLimiter(%T{%+v})", conLimit, conLimit))
 
 		o.Limit.ConLimit = conLimit
+	}}
+}
+
+func WithLocalSessionOptions(enable bool, shardNum int, implicitAsync bool) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithLocalSessionOptions({%+v, %+v})", shardNum, implicitAsync))
+
+		o.SessionOpt = &session.Options{
+			Enable: enable,
+			
+		}
 	}}
 }
