@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/localsession"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/session"
@@ -36,6 +36,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -344,13 +345,15 @@ func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 	}}
 }
 
-func WithLocalSessionOptions(enable bool, shardNum int, implicitAsync bool) Option {
+// WithLocalSession set options for kitex's local session
+// see https://github.com/cloudwego/localsession
+func WithLocalSession(enable bool, opts localsession.ManagerOptions) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithLocalSessionOptions({%+v, %+v})", shardNum, implicitAsync))
+		di.Push(fmt.Sprintf("WithLocalSessionOptions({%+v})", opts))
 
 		o.SessionOpt = &session.Options{
-			Enable: enable,
-			
+			Enable:         enable,
+			ManagerOptions: opts,
 		}
 	}}
 }

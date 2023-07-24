@@ -37,10 +37,20 @@ var (
 
 // Options
 type Options struct {
-	Enable        bool
-	ImplicitAsnyc bool
-	ShardNumber   int
-	GCInterval    time.Duration
+	Enable bool
+	gs.ManagerOptions
+}
+
+// Default Options
+func NewDefaultOptions() *Options {
+	return &Options{
+		Enable: true,
+		ManagerOptions: gs.ManagerOptions{
+			EnableImplicitlyTransmitAsync: false,
+			ShardNumber:                   100,
+			GCInterval:                    time.Hour,
+		},
+	}
 }
 
 // Init session Manager
@@ -68,10 +78,8 @@ func Init(opts *Options) {
 			}
 		}
 		opts = &Options{
-			Enable:        true,
-			GCInterval:    op.GCInterval,
-			ImplicitAsnyc: op.EnableImplicitlyTransmitAsync,
-			ShardNumber:   op.ShardNumber,
+			Enable:         true,
+			ManagerOptions: op,
 		}
 		// no env found, then check argument
 	} else if opts == nil {
@@ -80,11 +88,7 @@ func Init(opts *Options) {
 
 	if opts.Enable {
 		sessionOnce.Do(func() {
-			gs.SetDefaultManager(gs.NewSessionManager(gs.ManagerOptions{
-				EnableImplicitlyTransmitAsync: opts.ImplicitAsnyc,
-				GCInterval:                    opts.GCInterval,
-				ShardNumber:                   opts.ShardNumber,
-			}))
+			gs.SetDefaultManager(gs.NewSessionManager(opts.ManagerOptions))
 		})
 		sessionEnabled = true
 	} else {
