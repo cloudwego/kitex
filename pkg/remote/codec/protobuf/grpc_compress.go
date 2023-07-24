@@ -24,6 +24,7 @@ import (
 	"io"
 
 	"github.com/bytedance/gopkg/lang/mcache"
+
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 
 	"github.com/cloudwego/kitex/pkg/remote"
