@@ -431,6 +431,14 @@ func Test_readMap(t *testing.T) {
 			return "world", nil
 		},
 	}
+	mockTTransportWithInt16Key := &mocks.MockThriftTTransport{
+		ReadMapBeginFunc: func() (keyType, valueType thrift.TType, size int, err error) {
+			return thrift.I16, thrift.BOOL, 1, nil
+		},
+		ReadI16Func: func() (int16, error) {
+			return 16, nil
+		},
+	}
 	tests := []struct {
 		name    string
 		args    args
@@ -448,6 +456,12 @@ func Test_readMap(t *testing.T) {
 			"readJsonMap",
 			args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}, opt: &readerOption{forJSON: true}},
 			map[string]interface{}{"hello": "world"},
+			false,
+		},
+		{
+			"readJsonMapWithInt16Key",
+			args{in: mockTTransportWithInt16Key, t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.I16}, Elem: &descriptor.TypeDescriptor{Type: descriptor.BOOL}}, opt: &readerOption{forJSON: true}},
+			map[string]interface{}{"16": false},
 			false,
 		},
 	}
