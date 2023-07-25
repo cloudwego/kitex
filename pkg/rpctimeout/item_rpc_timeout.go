@@ -27,8 +27,9 @@ import (
 )
 
 var (
-	_ iface.ConfigValueItem = (*RPCTimeout)(nil)
-	_ rpcinfo.Timeouts      = (*RPCTimeout)(nil)
+	_ iface.ConfigValueItem   = (*RPCTimeout)(nil)
+	_ rpcinfo.Timeouts        = (*RPCTimeout)(nil)
+	_ rpcinfo.TimeoutProvider = (*Container)(nil)
 )
 
 // TypeRPCTimeout is used as itemKey in ConfigValueImpl
@@ -134,7 +135,7 @@ func (c *Container) NotifyPolicyChange(configs map[string]*RPCTimeout) {
 }
 
 // Timeouts return the rpc timeout config by the method name of rpc info.
-func (c *Container) Timeouts(ri rpcinfo.RPCInfo) *RPCTimeout {
+func (c *Container) Timeouts(ri rpcinfo.RPCInfo) rpcinfo.Timeouts {
 	rtc := c.config.Load().(*rpcTimeoutConfig)
 	if config, ok := rtc.configs[ri.Invocation().MethodName()]; ok {
 		return config
