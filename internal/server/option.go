@@ -125,8 +125,6 @@ func NewOptions(opts []Option) *Options {
 
 		TracerCtl: &rpcinfo.TraceController{},
 		Registry:  registry.NoopRegistry,
-
-		SessionOpt: session.NewDefaultOptions(),
 	}
 	ApplyOptions(opts, o)
 	rpcinfo.AsMutableRPCConfig(o.Configs).LockConfig(o.LockBits)

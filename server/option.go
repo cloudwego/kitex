@@ -22,8 +22,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/cloudwego/localsession"
-
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/session"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -345,15 +343,15 @@ func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 	}}
 }
 
-// WithLocalSession set options for kitex's local session
-// see https://github.com/cloudwego/localsession
-func WithLocalSession(enable bool, opts localsession.ManagerOptions) Option {
+// WithLocalSession enables kitex's local session
+func WithLocalSession(enable, async bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithLocalSessionOptions({%+v})", opts))
+		di.Push(fmt.Sprintf("WithLocalSession({%+v})", enable))
 
 		o.SessionOpt = &session.Options{
 			Enable:         enable,
-			ManagerOptions: opts,
+			ManagerOptions: session.NewManagerOptions(),
 		}
+		o.SessionOpt.EnableImplicitlyTransmitAsync = async
 	}}
 }

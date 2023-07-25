@@ -42,19 +42,18 @@ type Options struct {
 }
 
 // Default Options
-func NewDefaultOptions() *Options {
-	return &Options{
-		Enable: true,
-		ManagerOptions: gs.ManagerOptions{
-			EnableImplicitlyTransmitAsync: false,
-			ShardNumber:                   100,
-			GCInterval:                    time.Hour,
-		},
+func NewManagerOptions() gs.ManagerOptions {
+	return gs.ManagerOptions{
+		EnableImplicitlyTransmitAsync: false,
+		ShardNumber:                   100,
+		GCInterval:                    time.Hour,
 	}
 }
 
 // Init session Manager
 // It uses env config first, the key is KITEX_SESSION_CONFIG_KEY
+//
+//go:nocheckptr
 func Init(opts *Options) {
 	// check env first
 	if env := os.Getenv(KITEX_SESSION_CONFIG_KEY); env != "" {
