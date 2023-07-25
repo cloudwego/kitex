@@ -17,6 +17,7 @@
 package rpctimeout
 
 import (
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/configmanager/iface"
@@ -32,6 +33,8 @@ var (
 
 // TypeRPCTimeout is used as itemKey in ConfigValueImpl
 const TypeRPCTimeout iface.ItemType = "rpc_timeout"
+
+const wildcardMethod = "*"
 
 var defaultRPCTimeout = &RPCTimeout{
 	RPCTimeoutMS:  1000,
@@ -83,4 +86,48 @@ func (r *RPCTimeout) ConnectTimeout() time.Duration {
 // ReadWriteTimeout implements rpcinfo.Timeouts
 func (r *RPCTimeout) ReadWriteTimeout() time.Duration {
 	return time.Duration(r.RPCTimeoutMS) * time.Millisecond
+}
+
+// NewContainer build Container for timeout provider.
+func NewContainer() *Container {
+	c := &Container{}
+	rtc := &rpcTimeoutConfig{
+		configs:      map[string]*RPCTimeout{},
+		globalConfig: CopyDefaultRPCTimeout().(*RPCTimeout),
+	}
+	c.config.Store(rtc)
+	return c
+}
+
+type rpcTimeoutConfig struct {
+	configs      map[string]*RPCTimeout
+	globalConfig *RPCTimeout
+}
+
+// Container the implementation of timeout provider..
+type Container struct {
+	config atomic.Value
+}
+
+// NotifyPolicyChange to receive policy when it changes
+func (c *Container) NotifyPolicyChange(configs map[string]*RPCTimeout) {
+	rtc := &rpcTimeoutConfig{
+		configs:      configs,
+		globalConfig: CopyDefaultRPCTimeout().(*RPCTimeout),
+	}
+
+	// if has wildcardMethod rpctimeout config, overwrite the default one.
+	if config, ok := configs[wildcardMethod]; ok {
+		rtc.globalConfig = config
+	}
+	c.config.Store(rtc)
+}
+
+// Timeouts return the rpc timeout config by the method name of rpc info.
+func (c *Container) Timeouts(ri rpcinfo.RPCInfo) *RPCTimeout {
+	rtc := c.config.Load().(*rpcTimeoutConfig)
+	if config, ok := rtc.configs[ri.Invocation().MethodName()]; ok {
+		return config
+	}
+	return rtc.globalConfig
 }
