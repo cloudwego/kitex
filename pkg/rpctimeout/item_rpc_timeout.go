@@ -104,7 +104,9 @@ type rpcTimeoutConfig struct {
 	globalConfig *RPCTimeout
 }
 
-// Container the implementation of timeout provider..
+// Container is the implementation of rpcinfo.TimeoutProvider.
+// Provide the ability to dynamically configure the rpctimeout
+// config on the method hierarchy.
 type Container struct {
 	config atomic.Value
 }
