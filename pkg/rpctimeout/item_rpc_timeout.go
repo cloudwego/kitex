@@ -114,14 +114,22 @@ type Container struct {
 // NotifyPolicyChange to receive policy when it changes
 func (c *Container) NotifyPolicyChange(configs map[string]*RPCTimeout) {
 	rtc := &rpcTimeoutConfig{
-		configs:      configs,
+		configs:      map[string]*RPCTimeout{},
 		globalConfig: CopyDefaultRPCTimeout().(*RPCTimeout),
 	}
 
-	// if has wildcardMethod rpctimeout config, overwrite the default one.
-	if config, ok := configs[wildcardMethod]; ok {
-		rtc.globalConfig = config
+	for method, cfg := range configs {
+		// The configs may be modified by the container invoker,
+		// copy them to avoid data race.
+		rt := cfg.DeepCopy().(*RPCTimeout)
+
+		// if has wildcardMethod rpctimeout config, overwrite the default one.
+		if method == wildcardMethod {
+			rtc.globalConfig = rt
+		}
+		rtc.configs[method] = rt
 	}
+
 	c.config.Store(rtc)
 }
 
