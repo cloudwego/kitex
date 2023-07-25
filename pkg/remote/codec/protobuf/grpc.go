@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/fastpb"
 	"google.golang.org/protobuf/proto"
 
@@ -55,12 +54,10 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	var payload []byte
 	switch t := message.Data().(type) {
 	case fastpb.Writer:
-		// TODO: reuse data buffer when we can free it safely
-		payload = mcache.Malloc(t.Size())
+		payload = make([]byte, t.Size())
 		t.FastWrite(payload)
 	case marshaler:
-		// TODO: reuse data buffer when we can free it safely
-		payload = mcache.Malloc(t.Size())
+		payload = make([]byte, t.Size())
 		_, err = t.MarshalTo(payload)
 	case protobufV2MsgCodec:
 		payload, err = t.XXX_Marshal(nil, true)
@@ -72,10 +69,17 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	if err != nil {
 		return err
 	}
-	data, er := buildGRPCFrame(ctx, payload)
+
+	hdr, data, er := buildGRPCFrame(ctx, payload)
 	if er != nil {
 		return er
 	}
+
+	err = writer.WriteHeader(hdr)
+	if err != nil {
+		return err
+	}
+
 	return writer.WriteData(data)
 }
 

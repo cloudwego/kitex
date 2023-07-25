@@ -23,29 +23,24 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/bytedance/gopkg/lang/mcache"
-
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-func buildGRPCFrame(ctx context.Context, payload []byte) ([]byte, error) {
+func buildGRPCFrame(ctx context.Context, payload []byte) (hdr, data []byte, err error) {
 	data, isCompressed, er := compress(ctx, payload)
 	if er != nil {
-		return nil, er
+		return nil, nil, er
 	}
-	header := mcache.Malloc(dataFrameHeaderLen)
+	header := make([]byte, dataFrameHeaderLen)
 	if isCompressed {
 		header[0] = 1
 	} else {
 		header[0] = 0
 	}
 	binary.BigEndian.PutUint32(header[1:dataFrameHeaderLen], uint32(len(data)))
-	frame := make([]byte, dataFrameHeaderLen+len(data))
-	copy(frame, header)
-	copy(frame[dataFrameHeaderLen:], data)
-	return frame, nil
+	return header, data, nil
 }
 
 func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) {
