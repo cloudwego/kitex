@@ -129,6 +129,8 @@ func buildinTypeIntoString(val interface{}) string {
 		return strconv.FormatBool(v)
 	case int8:
 		return strconv.FormatInt(int64(v), 10)
+	case int16:
+		return strconv.FormatInt(int64(v), 10)
 	case int32:
 		return strconv.FormatInt(int64(v), 10)
 	case int64:
