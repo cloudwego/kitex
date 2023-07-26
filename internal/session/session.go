@@ -18,7 +18,6 @@ package session
 
 import (
 	"context"
-	"time"
 
 	"github.com/cloudwego/localsession"
 )
@@ -33,11 +32,7 @@ type Options struct {
 
 // Default Options
 func NewManagerOptions() localsession.ManagerOptions {
-	return localsession.ManagerOptions{
-		EnableImplicitlyTransmitAsync: false,
-		ShardNumber:                   100,
-		GCInterval:                    time.Hour,
-	}
+	return localsession.DefaultManagerOptions()
 }
 
 // Init session Manager
