@@ -41,14 +41,14 @@ func SetSendCompressor(ctx context.Context, compressorName string) context.Conte
 }
 
 func GetSendCompressor(ctx context.Context) string {
-	if v, ok := ctx.Value(sendCompressorKey{}).(string); ok && v != "" {
+	if v, ok := ctx.Value(sendCompressorKey{}).(string); ok {
 		return v
 	}
 	return ""
 }
 
 func GetRecvCompressor(ctx context.Context) string {
-	if v, ok := ctx.Value(recvCompressorKey{}).(string); ok && v != "" {
+	if v, ok := ctx.Value(recvCompressorKey{}).(string); ok {
 		return v
 	}
 	return ""

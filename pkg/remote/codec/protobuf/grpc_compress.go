@@ -28,10 +28,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-func buildGRPCFrame(ctx context.Context, payload []byte) (hdr, data []byte, err error) {
-	data, isCompressed, er := compress(ctx, payload)
-	if er != nil {
-		return nil, nil, er
+func buildGRPCFrame(ctx context.Context, payload []byte) ([]byte, []byte, error) {
+	data, isCompressed, err := compress(ctx, payload)
+	if err != nil {
+		return nil, nil, err
 	}
 	header := make([]byte, dataFrameHeaderLen)
 	if isCompressed {
@@ -84,7 +84,7 @@ func compress(ctx context.Context, data []byte) ([]byte, bool, error) {
 }
 
 func decompress(ctx context.Context, data []byte) ([]byte, error) {
-	cname := remote.GetSendCompressor(ctx)
+	cname := remote.GetRecvCompressor(ctx)
 	compressor := encoding.GetCompressor(cname)
 	if compressor == nil {
 		return nil, fmt.Errorf("no compressor registered found for:%v", cname)
