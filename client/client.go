@@ -26,9 +26,11 @@ import (
 	"sync/atomic"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/localsession"
 
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
+	"github.com/cloudwego/kitex/internal/session"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -318,6 +320,15 @@ func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr rem
 
 // Call implements the Client interface .
 func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) (err error) {
+	// use backup context if no meta info found
+	if !metainfo.HasMetaInfo(ctx) {
+		if s, ok := session.CurSession(); ok {
+			if c, ok := s.(localsession.SessionCtx); ok {
+				ctx = c.Export()
+			}
+		}
+	}
+
 	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions

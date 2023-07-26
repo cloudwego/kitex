@@ -66,6 +66,10 @@ github.com/cloudwego/localsession v0.0.2-0.20230726095014-01310891b28c h1:Po0U2n
 github.com/cloudwego/localsession v0.0.2-0.20230726095014-01310891b28c/go.mod h1:kVIPS67Y4inlOFomNNrGNxpUnmT7QpZYP2hhhZK5RiM=
 github.com/cloudwego/localsession v0.0.2-beta h1:oPszwm4a4PMZb2YOHE6o6RvwegZ2SJB6N24LnQiGLu4=
 github.com/cloudwego/localsession v0.0.2-beta/go.mod h1:kVIPS67Y4inlOFomNNrGNxpUnmT7QpZYP2hhhZK5RiM=
+github.com/cloudwego/localsession v0.0.2-beta.0.20230726143552-86a53bb2b639 h1:xVMj0bJMZXkRaQGj+xzhCe6tqKALyttSnhgDDaRG2mo=
+github.com/cloudwego/localsession v0.0.2-beta.0.20230726143552-86a53bb2b639/go.mod h1:kVIPS67Y4inlOFomNNrGNxpUnmT7QpZYP2hhhZK5RiM=
+github.com/cloudwego/localsession v0.0.2-beta.0.20230726144150-f4dee8138f95 h1:gWllcC9FOrn4eVIyZEHqXf2rIXIFvBGsO/+6ol3BCCc=
+github.com/cloudwego/localsession v0.0.2-beta.0.20230726144150-f4dee8138f95/go.mod h1:kVIPS67Y4inlOFomNNrGNxpUnmT7QpZYP2hhhZK5RiM=
 github.com/cloudwego/netpoll v0.2.4/go.mod h1:1T2WVuQ+MQw6h6DpE45MohSvDTKdy2DlzCx2KsnPI4E=
 github.com/cloudwego/netpoll v0.3.1/go.mod h1:1T2WVuQ+MQw6h6DpE45MohSvDTKdy2DlzCx2KsnPI4E=
 github.com/cloudwego/netpoll v0.4.0/go.mod h1:xVefXptcyheopwNDZjDPcfU6kIjZXZ4nY550k1yH9eQ=
