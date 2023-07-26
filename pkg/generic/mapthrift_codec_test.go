@@ -18,6 +18,7 @@ package generic
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -56,6 +57,42 @@ func TestMapThriftCodec(t *testing.T) {
 	in := remote.NewReaderBuffer(buf)
 	err = mtc.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil)
+}
+
+func TestMapThriftCodecSelfRef(t *testing.T) {
+	p, err := NewThriftFileProvider("./map_test/idl/self_ref.thrift")
+	test.Assert(t, err == nil)
+	mtc, err := newMapThriftCodec(p, thriftCodec)
+	test.Assert(t, err == nil)
+	defer mtc.Close()
+	test.Assert(t, mtc.Name() == "MapThrift")
+
+	method, err := mtc.getMethod(nil, "Test")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
+
+	ctx := context.Background()
+	sendMsg := initNilMapSendMsg(transport.TTHeader)
+
+	// Marshal side
+	out := remote.NewWriterBuffer(0)
+	err = mtc.Marshal(ctx, sendMsg, out)
+	test.Assert(t, err == nil)
+
+	// UnMarshal side
+	recvMsg := initMapRecvMsg()
+	buf, err := out.Bytes()
+	test.Assert(t, err == nil)
+	recvMsg.SetPayloadLen(len(buf))
+	in := remote.NewReaderBuffer(buf)
+	err = mtc.Unmarshal(ctx, recvMsg, in)
+	test.Assert(t, err == nil)
+	exp := map[string]interface{}{
+		"self":  map[string]interface{}{},
+		"extra": "",
+	}
+	act := recvMsg.Data().(*Args).Request
+	test.Assert(t, reflect.DeepEqual(exp, act))
 }
 
 func TestMapThriftCodecForJSON(t *testing.T) {
@@ -127,7 +164,23 @@ func initMapSendMsg(tp transport.Protocol) remote.Message {
 					"Test1": "Test2",
 				},
 			},
-			Method: "Test",
+		},
+		Method: "Test",
+	}
+	svcInfo := mocks.ServiceInfo()
+	ink := rpcinfo.NewInvocation("", "Test")
+	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
+	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
+	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
+	return msg
+}
+
+func initNilMapSendMsg(tp transport.Protocol) remote.Message {
+	req := &Args{
+		Request: &descriptor.HTTPRequest{
+			Body: map[string]interface{}{
+				"self": nil,
+			},
 		},
 		Method: "Test",
 	}

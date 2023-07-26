@@ -208,36 +208,48 @@ func nextJSONWriter(data *gjson.Result, t *descriptor.TypeDescriptor, opt *write
 	return v, fn, nil
 }
 
-func getDefaultValueAndWriter(t *descriptor.TypeDescriptor, opt *writerOption) (interface{}, writer, error) {
+func writeEmptyValue(out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	switch t.Type {
 	case descriptor.BOOL:
-		return false, writeBool, nil
+		return out.WriteBool(false)
 	case descriptor.I08:
-		return int8(0), writeInt8, nil
+		return out.WriteByte(0)
 	case descriptor.I16:
-		return int16(0), writeInt16, nil
+		return out.WriteI16(0)
 	case descriptor.I32:
-		return int32(0), writeInt32, nil
+		return out.WriteI32(0)
 	case descriptor.I64:
-		return int64(0), writeInt64, nil
+		return out.WriteI64(0)
 	case descriptor.DOUBLE:
-		return float64(0), writeJSONFloat64, nil
+		return out.WriteDouble(0)
 	case descriptor.STRING:
 		if t.Name == "binary" && opt.binaryWithBase64 {
-			return "", writeBase64Binary, nil
+			return out.WriteBinary([]byte{})
 		} else {
-			return "", writeString, nil
+			return out.WriteString("")
 		}
 	case descriptor.LIST, descriptor.SET:
-		return []interface{}{}, writeList, nil
+		if err := out.WriteListBegin(t.Elem.Type.ToThriftTType(), 0); err != nil {
+			return err
+		}
+		return out.WriteListEnd()
 	case descriptor.MAP:
-		return map[interface{}]interface{}{}, writeInterfaceMap, nil
+		if err := out.WriteMapBegin(t.Key.Type.ToThriftTType(), t.Elem.Type.ToThriftTType(), 0); err != nil {
+			return err
+		}
+		return out.WriteMapEnd()
 	case descriptor.STRUCT:
-		return map[string]interface{}{}, writeStruct, nil
+		if err := out.WriteStructBegin(t.Name); err != nil {
+			return err
+		}
+		if err := out.WriteFieldStop(); err != nil {
+			return err
+		}
+		return out.WriteStructEnd()
 	case descriptor.VOID:
-		return descriptor.Void{}, writeVoid, nil
+		return nil
 	}
-	return nil, nil, fmt.Errorf("unsupported type:%T", t)
+	return fmt.Errorf("unsupported type:%T", t)
 }
 
 func wrapStructWriter(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
@@ -437,18 +449,12 @@ func writeList(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 		return out.WriteListEnd()
 	}
 	var (
-		writer, defaultWriter writer
-		zeroValue             interface{}
-		err                   error
+		writer writer
+		err    error
 	)
 	for _, elem := range l {
 		if elem == nil {
-			if defaultWriter == nil {
-				if zeroValue, defaultWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
-					return err
-				}
-			}
-			if err := defaultWriter(ctx, zeroValue, out, t.Elem, opt); err != nil {
+			if err = writeEmptyValue(out, t.Elem, opt); err != nil {
 				return err
 			}
 		} else {
@@ -496,11 +502,9 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 		return out.WriteMapEnd()
 	}
 	var (
-		keyWriter         writer
-		elemWriter        writer
-		elemDefaultWriter writer
-		elemZeroValue     interface{}
-		err               error
+		keyWriter  writer
+		elemWriter writer
+		err        error
 	)
 	for key, elem := range m {
 		if keyWriter == nil {
@@ -512,12 +516,7 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out thrift.TProtoco
 			return err
 		}
 		if elem == nil {
-			if elemDefaultWriter == nil {
-				if elemZeroValue, elemDefaultWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
-					return err
-				}
-			}
-			if err := elemDefaultWriter(ctx, elemZeroValue, out, t.Elem, opt); err != nil {
+			if err = writeEmptyValue(out, t.Elem, opt); err != nil {
 				return err
 			}
 		} else {
@@ -545,10 +544,8 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 	}
 
 	var (
-		keyWriter         writer
-		elemWriter        writer
-		elemDefaultWriter writer
-		elemZeroValue     interface{}
+		keyWriter  writer
+		elemWriter writer
 	)
 	for key, elem := range m {
 		_key, err := buildinTypeFromString(key, t.Key)
@@ -564,12 +561,7 @@ func writeStringMap(ctx context.Context, val interface{}, out thrift.TProtocol, 
 			return err
 		}
 		if elem == nil {
-			if elemDefaultWriter == nil {
-				if elemZeroValue, elemDefaultWriter, err = getDefaultValueAndWriter(t.Elem, opt); err != nil {
-					return err
-				}
-			}
-			if err := elemDefaultWriter(ctx, elemZeroValue, out, t.Elem, opt); err != nil {
+			if err = writeEmptyValue(out, t.Elem, opt); err != nil {
 				return err
 			}
 		} else {
@@ -690,36 +682,44 @@ func writeStruct(ctx context.Context, val interface{}, out thrift.TProtocol, t *
 			}
 			continue
 		}
-		if !ok || elem == nil {
+
+		// empty fields
+		if elem == nil || !ok {
 			if !field.Optional {
-				elem, _, err = getDefaultValueAndWriter(field.Type, opt)
-				if err != nil {
+				// empty fields don't need value-mapping here, since writeEmptyValue decides zero value based on Thrift type
+				if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
+					return err
+				}
+				if err := writeEmptyValue(out, field.Type, opt); err != nil {
 					return fmt.Errorf("field (%d/%s) error: %w", field.ID, name, err)
 				}
-			} else {
-				continue
+				if err := out.WriteFieldEnd(); err != nil {
+					return err
+				}
 			}
-		}
-		if field.ValueMapping != nil {
-			elem, err = field.ValueMapping.Request(ctx, elem, field)
+		} else { // normal fields
+			if field.ValueMapping != nil {
+				elem, err = field.ValueMapping.Request(ctx, elem, field)
+				if err != nil {
+					return err
+				}
+			}
+			if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
+				return err
+			}
+			writer, err := nextWriter(elem, field.Type, opt)
 			if err != nil {
+				return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
+			}
+			if err := writer(ctx, elem, out, field.Type, opt); err != nil {
+				return fmt.Errorf("writer of field[%s] error %w", name, err)
+			}
+			if err := out.WriteFieldEnd(); err != nil {
 				return err
 			}
 		}
-		writer, err := nextWriter(elem, field.Type, opt)
-		if err != nil {
-			return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
-		}
-		if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
-			return err
-		}
-		if err := writer(ctx, elem, out, field.Type, opt); err != nil {
-			return fmt.Errorf("writer of field[%s] error %w", name, err)
-		}
-		if err := out.WriteFieldEnd(); err != nil {
-			return err
-		}
 	}
+
 	if err := out.WriteFieldStop(); err != nil {
 		return err
 	}
@@ -747,35 +747,42 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out thrift.TProtocol
 			}
 			continue
 		}
+
 		if v == nil {
 			if !field.Optional {
-				v, _, err = getDefaultValueAndWriter(field.Type, opt)
-				if err != nil {
+				if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
+					return err
+				}
+				if err := writeEmptyValue(out, field.Type, opt); err != nil {
 					return fmt.Errorf("field (%d/%s) error: %w", field.ID, name, err)
 				}
-			} else {
-				continue
+				if err := out.WriteFieldEnd(); err != nil {
+					return err
+				}
 			}
-		}
-		if field.ValueMapping != nil {
-			if v, err = field.ValueMapping.Request(ctx, v, field); err != nil {
+		} else {
+			if field.ValueMapping != nil {
+				v, err = field.ValueMapping.Request(ctx, v, field)
+				if err != nil {
+					return err
+				}
+			}
+			if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
+				return err
+			}
+			writer, err := nextWriter(v, field.Type, opt)
+			if err != nil {
+				return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
+			}
+			if err := writer(ctx, v, out, field.Type, opt); err != nil {
+				return fmt.Errorf("writer of field[%s] error %w", name, err)
+			}
+			if err := out.WriteFieldEnd(); err != nil {
 				return err
 			}
 		}
-		writer, err := nextWriter(v, field.Type, opt)
-		if err != nil {
-			return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
-		}
-		if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
-			return err
-		}
-		if err := writer(ctx, v, out, field.Type, opt); err != nil {
-			return fmt.Errorf("writer of field[%s] error %w", name, err)
-		}
-		if err := out.WriteFieldEnd(); err != nil {
-			return err
-		}
 	}
+
 	if err := out.WriteFieldStop(); err != nil {
 		return err
 	}
@@ -799,26 +806,34 @@ func writeJSON(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 		}
 
 		if elem.Type == gjson.Null {
-			if field.Optional {
-				continue
+			if !field.Optional {
+				if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
+					return err
+				}
+				if err := writeEmptyValue(out, field.Type, opt); err != nil {
+					return fmt.Errorf("field (%d/%s) error: %w", field.ID, name, err)
+				}
+				if err := out.WriteFieldEnd(); err != nil {
+					return err
+				}
+			}
+		} else {
+			v, writer, err := nextJSONWriter(&elem, field.Type, opt)
+			if err != nil {
+				return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
+			}
+			if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
+				return err
+			}
+			if err := writer(ctx, v, out, field.Type, opt); err != nil {
+				return fmt.Errorf("writer of field[%s] error %w", name, err)
+			}
+			if err := out.WriteFieldEnd(); err != nil {
+				return err
 			}
 		}
-
-		v, writer, err := nextJSONWriter(&elem, field.Type, opt)
-		if err != nil {
-			return fmt.Errorf("nextWriter of field[%s] error %w", name, err)
-		}
-		if err := out.WriteFieldBegin(field.Name, field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
-			return err
-		}
-		if err := writer(ctx, v, out, field.Type, opt); err != nil {
-			return fmt.Errorf("writer of field[%s] error %w", name, err)
-		}
-		if err := out.WriteFieldEnd(); err != nil {
-			return err
-		}
-
 	}
+
 	if err := out.WriteFieldStop(); err != nil {
 		return err
 	}
