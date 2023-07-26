@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	gs "github.com/cloudwego/localsession"
+	"github.com/cloudwego/localsession"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -571,13 +571,8 @@ func TestInvokeHandlerWithSession(t *testing.T) {
 	})
 
 	t.Run("env", func(t *testing.T) {
-		os.Setenv(session.KITEX_SESSION_CONFIG_KEY, "10,async,1m")
+		os.Setenv(localsession.SESSION_CONFIG_KEY, "100,async,1h")
 		testInvokeHandlerWithSession(t, false, ":8889")
-		opts := gs.GetDefaultManager().Options()
-		test.Assert(t, opts.EnableImplicitlyTransmitAsync)
-		test.Assert(t, opts.GCInterval == time.Minute)
-		test.Assert(t, opts.ShardNumber == 10)
-		os.Unsetenv(session.KITEX_SESSION_CONFIG_KEY)
 	})
 }
 
@@ -591,6 +586,9 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 			return next(ctx, req, resp)
 		}
 	}))
+	if !fail {
+		opts = append(opts, WithLocalSession(true, true))
+	}
 	opts = append(opts, WithCodec(&mockCodec{}))
 	transHdlrFact := &mockSvrTransHandlerFactory{}
 	svcInfo := mocks.ServiceInfo()

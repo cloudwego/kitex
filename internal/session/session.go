@@ -18,22 +18,13 @@ package session
 
 import (
 	"context"
-	"os"
-	"strconv"
-	"strings"
-	"sync"
 	"time"
 
+	"github.com/cloudwego/localsession"
 	gs "github.com/cloudwego/localsession"
 )
 
-// Session Env config key
-const KITEX_SESSION_CONFIG_KEY = "KITEX_SESSION_CONFIG"
-
-var (
-	sessionEnabled bool
-	sessionOnce    sync.Once
-)
+var sessionEnabled bool
 
 // Options
 type Options struct {
@@ -51,44 +42,12 @@ func NewManagerOptions() gs.ManagerOptions {
 }
 
 // Init session Manager
-// It uses env config first, the key is KITEX_SESSION_CONFIG_KEY
+// It uses env config first, the key is localsession.SESSION_CONFIG_KEY
 //
 //go:nocheckptr
-func Init(opts *Options) {
-	// check env first
-	if env := os.Getenv(KITEX_SESSION_CONFIG_KEY); env != "" {
-		envs := strings.Split(env, ",")
-		op := gs.ManagerOptions{}
-		op.ShardNumber = gs.DefaultShardNum
-		// parse first option as ShardNumber
-		if opt, err := strconv.Atoi(envs[0]); err == nil {
-			op.ShardNumber = opt
-		}
-		op.EnableImplicitlyTransmitAsync = false
-		// parse second option as EnableTransparentTransmitAsync
-		if len(envs) > 1 && strings.ToLower(envs[1]) == "async" {
-			op.EnableImplicitlyTransmitAsync = true
-		}
-		op.GCInterval = gs.DefaultGCInterval
-		// parse third option as EnableTransparentTransmitAsync
-		if len(envs) > 2 {
-			if d, err := time.ParseDuration(envs[2]); err == nil && d > time.Second {
-				op.GCInterval = d
-			}
-		}
-		opts = &Options{
-			Enable:         true,
-			ManagerOptions: op,
-		}
-		// no env found, then check argument
-	} else if opts == nil {
-		return
-	}
-
+func Init(opts Options) {
 	if opts.Enable {
-		sessionOnce.Do(func() {
-			gs.SetDefaultManager(gs.NewSessionManager(opts.ManagerOptions))
-		})
+		localsession.ResetDefaultManager(&opts.ManagerOptions)
 		sessionEnabled = true
 	} else {
 		sessionEnabled = false

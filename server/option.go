@@ -348,7 +348,7 @@ func WithLocalSession(enable, async bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithLocalSession({%+v})", enable))
 
-		o.SessionOpt = &session.Options{
+		o.SessionOpt = session.Options{
 			Enable:         enable,
 			ManagerOptions: session.NewManagerOptions(),
 		}

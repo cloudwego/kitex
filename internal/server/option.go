@@ -92,7 +92,7 @@ type Options struct {
 	TracerCtl  *rpcinfo.TraceController
 	StatsLevel *stats.Level
 
-	SessionOpt *session.Options
+	SessionOpt session.Options
 }
 
 type Limit struct {
