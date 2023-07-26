@@ -346,7 +346,7 @@ func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 // WithLocalSession enables kitex's local session
 func WithLocalSession(enable, async bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithLocalSession({%+v})", enable))
+		di.Push(fmt.Sprintf("WithLocalSession({%+v, %+v})", enable, async))
 
 		o.SessionOpt = session.Options{
 			Enable:         enable,

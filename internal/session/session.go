@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/localsession"
-	gs "github.com/cloudwego/localsession"
 )
 
 var sessionEnabled bool
@@ -29,12 +28,12 @@ var sessionEnabled bool
 // Options
 type Options struct {
 	Enable bool
-	gs.ManagerOptions
+	localsession.ManagerOptions
 }
 
 // Default Options
-func NewManagerOptions() gs.ManagerOptions {
-	return gs.ManagerOptions{
+func NewManagerOptions() localsession.ManagerOptions {
+	return localsession.ManagerOptions{
 		EnableImplicitlyTransmitAsync: false,
 		ShardNumber:                   100,
 		GCInterval:                    time.Hour,
@@ -47,7 +46,7 @@ func NewManagerOptions() gs.ManagerOptions {
 //go:nocheckptr
 func Init(opts Options) {
 	if opts.Enable {
-		localsession.ResetDefaultManager(&opts.ManagerOptions)
+		localsession.ResetDefaultManager(opts.ManagerOptions)
 		sessionEnabled = true
 	} else if sessionEnabled {
 		sessionEnabled = false
@@ -55,11 +54,11 @@ func Init(opts Options) {
 }
 
 // Get current session
-func CurSession() (gs.Session, bool) {
+func CurSession() (localsession.Session, bool) {
 	if !sessionEnabled {
 		return nil, false
 	}
-	return gs.CurSession()
+	return localsession.CurSession()
 }
 
 // Set current Sessioin
@@ -67,7 +66,7 @@ func BindSession(ctx context.Context) {
 	if !sessionEnabled {
 		return
 	}
-	gs.BindSession(gs.NewSessionCtx(ctx))
+	localsession.BindSession(localsession.NewSessionCtx(ctx))
 }
 
 // Unset current Session
@@ -75,5 +74,5 @@ func UnbindSession() {
 	if !sessionEnabled {
 		return
 	}
-	gs.UnbindSession()
+	localsession.UnbindSession()
 }

@@ -572,7 +572,7 @@ func TestInvokeHandlerWithSession(t *testing.T) {
 	})
 
 	t.Run("env", func(t *testing.T) {
-		os.Setenv(localsession.SESSION_CONFIG_KEY, "100,async,1h")
+		os.Setenv(localsession.SESSION_CONFIG_KEY, "true,100,1h")
 		testInvokeHandlerWithSession(t, false, ":8889")
 	})
 }
@@ -634,15 +634,23 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 	serviceHandler := false
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MockFuncHandler(func(ctx context.Context, req *mocks.MyRequest) (r *mocks.MyResponse, err error) {
 		serviceHandler = true
-		_, ok := session.CurSession()
-		if !fail {
-			// assert session has been set
-			test.Assert(t, ok, "can't get current session")
-			test.Assert(t, rpcinfo.GetRPCInfo(context.Background()) != nil, "can't get rpcinfo")
-		} else {
-			test.Assert(t, !ok, "get current session")
-			test.Assert(t, rpcinfo.GetRPCInfo(context.Background()) == nil, "get rpcinfo")
-		}
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, ok := session.CurSession()
+			if !fail {
+				// assert session has been set
+				test.Assert(t, ok, "can't get current session")
+				test.Assert(t, rpcinfo.GetRPCInfo(context.Background()) != nil, "can't get rpcinfo")
+			} else {
+				test.Assert(t, !ok, "get current session")
+				test.Assert(t, rpcinfo.GetRPCInfo(context.Background()) == nil, "get rpcinfo")
+			}
+		}()
+		wg.Wait()
+
 		return &mocks.MyResponse{Name: "mock"}, nil
 	}))
 	test.Assert(t, err == nil)
