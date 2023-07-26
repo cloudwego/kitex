@@ -49,7 +49,7 @@ func Init(opts Options) {
 	if opts.Enable {
 		localsession.ResetDefaultManager(&opts.ManagerOptions)
 		sessionEnabled = true
-	} else {
+	} else if sessionEnabled {
 		sessionEnabled = false
 	}
 }

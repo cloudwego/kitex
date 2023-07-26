@@ -565,6 +565,7 @@ func TestServerBoundHandler(t *testing.T) {
 	}
 }
 
+//go:nocheckptr
 func TestInvokeHandlerWithSession(t *testing.T) {
 	t.Run("disabled", func(t *testing.T) {
 		testInvokeHandlerWithSession(t, true, ":8888")
