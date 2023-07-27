@@ -72,13 +72,15 @@ func CurSession(ctx context.Context) context.Context {
 		return ctx
 	}
 	c2 := c.Export()
+
+	// two-way merge all persistent kvs, incoming ctx is prior to session
 	if metainfo.HasMetaInfo(ctx) {
 		kvs := make([]string, 0, 16) // opt: get kvs size from metainfo API
 		metainfo.RangePersistentValues(ctx, func(k, v string) bool {
 			kvs = append(kvs, k, v)
 			return true
 		})
-		c2 = metainfo.WithValues(c2, kvs...)
+		c2 = metainfo.WithPersistentValues(c2, kvs...)
 	}
 	return c2
 }
