@@ -319,12 +319,8 @@ func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr rem
 
 // Call implements the Client interface .
 func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) (err error) {
-	// use backup context if no meta info found
-	if !metainfo.HasMetaInfo(ctx) {
-		if s, ok := session.CurSession(); ok {
-			ctx = s
-		}
-	}
+	// use backup context if no metainfo found
+	ctx = session.CurSession(ctx)
 
 	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo

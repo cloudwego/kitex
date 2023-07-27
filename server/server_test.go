@@ -28,6 +28,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession"
 	"github.com/golang/mock/gomock"
 
@@ -588,7 +589,7 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 		}
 	}))
 	if !fail {
-		opts = append(opts, WithLocalSession(true, true))
+		opts = append(opts, WithContextBackup(true, true, nil))
 	}
 	opts = append(opts, WithCodec(&mockCodec{}))
 	transHdlrFact := &mockSvrTransHandlerFactory{}
@@ -603,7 +604,7 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 				recvMsg := remote.NewMessageWithNewer(svcInfo, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
-
+				ctx = metainfo.WithValue(ctx, "a", "b")
 				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
 				test.Assert(t, err == nil, err)
 			}
@@ -639,13 +640,14 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ctx, ok := session.CurSession()
+			ctx := session.CurSession(context.Background())
 			if !fail {
 				// assert session has been set
-				test.Assert(t, ok, "can't get current session")
 				test.Assert(t, rpcinfo.GetRPCInfo(ctx) != nil, "can't get rpcinfo")
+				b, _ := metainfo.GetValue(ctx, "a")
+				test.Assert(t, b == "b", "can't get metainfo")
 			} else {
-				test.Assert(t, !ok, "get current session")
+				test.Assert(t, rpcinfo.GetRPCInfo(ctx) == nil, "can get rpcinfo")
 			}
 		}()
 		wg.Wait()

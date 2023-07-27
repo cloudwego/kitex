@@ -343,8 +343,12 @@ func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 	}}
 }
 
-// WithLocalSession enables kitex's local session
-func WithLocalSession(enable, async bool) Option {
+// WithContextBackup enables local-session to backup kitex server's context,
+// in case of user don't correctly pass context into next RPC call.
+//   - enable means enable context backup
+//   - async means backup session will propagate to children goroutines, otherwise it only works on the same goroutine handler
+//   - shouldUseSession pass a handler to decide if backup context should be used given current one, nil means using kitex's default logic
+func WithContextBackup(enable, async bool, shouldUseSession func(context.Context) bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithLocalSession({%+v, %+v})", enable, async))
 
@@ -353,5 +357,6 @@ func WithLocalSession(enable, async bool) Option {
 			ManagerOptions: session.NewManagerOptions(),
 		}
 		o.SessionOpt.EnableImplicitlyTransmitAsync = async
+		o.SessionOpt.ShouldUseSession = shouldUseSession
 	}}
 }

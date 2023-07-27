@@ -19,14 +19,21 @@ package session
 import (
 	"context"
 
+	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession"
 )
 
-var sessionEnabled bool
+var (
+	sessionEnabled   bool
+	shouldUseSession = func(ctx context.Context) bool {
+		return !metainfo.HasMetaInfo(ctx)
+	}
+)
 
 // Options
 type Options struct {
-	Enable bool
+	Enable           bool
+	ShouldUseSession func(ctx context.Context) bool
 	localsession.ManagerOptions
 }
 
@@ -43,22 +50,37 @@ func Init(opts Options) {
 	if opts.Enable {
 		localsession.ResetDefaultManager(opts.ManagerOptions)
 		sessionEnabled = true
+		if opts.ShouldUseSession != nil {
+			shouldUseSession = opts.ShouldUseSession
+		}
 	} else if sessionEnabled {
 		sessionEnabled = false
 	}
 }
 
 // Get current session
-func CurSession() (context.Context, bool) {
+func CurSession(ctx context.Context) context.Context {
+	if !shouldUseSession(ctx) {
+		return ctx
+	}
 	s, ok := localsession.CurSession()
 	if !ok {
-		return nil, false
+		return ctx
 	}
-	ctx, ok := s.(localsession.SessionCtx)
+	c, ok := s.(localsession.SessionCtx)
 	if !ok {
-		return nil, false
+		return ctx
 	}
-	return ctx.Export(), true
+	c2 := c.Export()
+	if metainfo.HasMetaInfo(ctx) {
+		kvs := make([]string, 0, 16) // opt: get kvs size from metainfo API
+		metainfo.RangePersistentValues(ctx, func(k, v string) bool {
+			kvs = append(kvs, k, v)
+			return true
+		})
+		c2 = metainfo.WithValues(c2, kvs...)
+	}
+	return c2
 }
 
 // Set current Sessioin
