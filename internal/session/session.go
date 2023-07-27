@@ -18,16 +18,17 @@ package session
 
 import (
 	"context"
+	"sync"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession"
 )
 
 var (
-	sessionEnabled   bool
 	shouldUseSession = func(ctx context.Context) bool {
 		return !metainfo.HasMetaInfo(ctx)
 	}
+	initOnce sync.Once
 )
 
 // Options
@@ -48,13 +49,12 @@ func NewManagerOptions() localsession.ManagerOptions {
 //go:nocheckptr
 func Init(opts Options) {
 	if opts.Enable {
-		localsession.ResetDefaultManager(opts.ManagerOptions)
-		sessionEnabled = true
-		if opts.ShouldUseSession != nil {
-			shouldUseSession = opts.ShouldUseSession
-		}
-	} else if sessionEnabled {
-		sessionEnabled = false
+		initOnce.Do(func() {
+			localsession.InitDefaultManager(opts.ManagerOptions)
+			if opts.ShouldUseSession != nil {
+				shouldUseSession = opts.ShouldUseSession
+			}
+		})
 	}
 }
 
@@ -85,16 +85,10 @@ func CurSession(ctx context.Context) context.Context {
 
 // Set current Sessioin
 func BindSession(ctx context.Context) {
-	if !sessionEnabled {
-		return
-	}
 	localsession.BindSession(localsession.NewSessionCtx(ctx))
 }
 
 // Unset current Session
 func UnbindSession() {
-	if !sessionEnabled {
-		return
-	}
 	localsession.UnbindSession()
 }
