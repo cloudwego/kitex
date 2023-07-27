@@ -639,14 +639,13 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, ok := session.CurSession()
+			ctx, ok := session.CurSession()
 			if !fail {
 				// assert session has been set
 				test.Assert(t, ok, "can't get current session")
-				test.Assert(t, rpcinfo.GetRPCInfo(context.Background()) != nil, "can't get rpcinfo")
+				test.Assert(t, rpcinfo.GetRPCInfo(ctx) != nil, "can't get rpcinfo")
 			} else {
 				test.Assert(t, !ok, "get current session")
-				test.Assert(t, rpcinfo.GetRPCInfo(context.Background()) == nil, "get rpcinfo")
 			}
 		}()
 		wg.Wait()

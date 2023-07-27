@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"github.com/cloudwego/kitex/internal"
-	"github.com/cloudwego/kitex/internal/session"
 )
 
 type ctxRPCInfoKeyType struct{}
@@ -40,12 +39,6 @@ func NewCtxWithRPCInfo(ctx context.Context, ri RPCInfo) context.Context {
 func GetRPCInfo(ctx context.Context) RPCInfo {
 	if ri, ok := ctx.Value(ctxRPCInfoKey).(RPCInfo); ok {
 		return ri
-	}
-	// fallback: get rpcinfo from GLS
-	if s, ok := session.CurSession(); ok && s.IsValid() {
-		if ri, ok := s.Get(ctxRPCInfoKey).(RPCInfo); ok {
-			return ri
-		}
 	}
 	return nil
 }

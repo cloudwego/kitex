@@ -49,11 +49,16 @@ func Init(opts Options) {
 }
 
 // Get current session
-func CurSession() (localsession.Session, bool) {
-	if !sessionEnabled {
+func CurSession() (context.Context, bool) {
+	s, ok := localsession.CurSession()
+	if !ok {
 		return nil, false
 	}
-	return localsession.CurSession()
+	ctx, ok := s.(localsession.SessionCtx)
+	if !ok {
+		return nil, false
+	}
+	return ctx.Export(), true
 }
 
 // Set current Sessioin
