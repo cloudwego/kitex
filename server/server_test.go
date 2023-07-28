@@ -566,7 +566,6 @@ func TestServerBoundHandler(t *testing.T) {
 	}
 }
 
-//go:nocheckptr
 func TestInvokeHandlerWithContextBackup(t *testing.T) {
 	t.Run("disabled", func(t *testing.T) {
 		testInvokeHandlerWithSession(t, true, ":8888")
@@ -588,9 +587,18 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 			return next(ctx, req, resp)
 		}
 	}))
+
+	k1, v1 := "1", "1"
 	if !fail {
-		opts = append(opts, WithContextBackup(true, true, nil))
+		opts = append(opts, WithContextBackup(true, true, nil, func(prev, cur context.Context) context.Context {
+			v := prev.Value(k1)
+			if v != nil {
+				cur = context.WithValue(cur, k1, v)
+			}
+			return cur
+		}))
 	}
+
 	opts = append(opts, WithCodec(&mockCodec{}))
 	transHdlrFact := &mockSvrTransHandlerFactory{}
 	svcInfo := mocks.ServiceInfo()
@@ -605,8 +613,9 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
-				// inject metainfo here
+				// inject kvs here
 				ctx = metainfo.WithPersistentValue(ctx, "a", "b")
+				ctx = context.WithValue(ctx, k1, v1)
 
 				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
 				test.Assert(t, err == nil, err)
@@ -645,14 +654,16 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 			defer wg.Done()
 
 			// miss context here
-			ctx := backup.CurCtx(context.Background())
+			ctx := backup.RecoverCtxOndemands(context.Background())
 
 			if !fail {
 				b, _ := metainfo.GetPersistentValue(ctx, "a")
 				test.Assert(t, b == "b", "can't get metainfo")
+				test.Assert(t, ctx.Value(k1) == v1, "can't get v1")
 			} else {
 				_, ok := metainfo.GetPersistentValue(ctx, "a")
 				test.Assert(t, !ok, "can get metainfo")
+				test.Assert(t, ctx.Value(k1) != v1, "can get v1")
 			}
 		}()
 		wg.Wait()

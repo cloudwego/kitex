@@ -348,15 +348,18 @@ func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 //   - enable means enable context backup
 //   - async means backup session will propagate to children goroutines, otherwise it only works on the same goroutine handler
 //   - shouldUseSession pass a handler to decide if backup context should be used according to current context, nil func means using kitex's default logic
-func WithContextBackup(enable, async bool, shouldUseSession func(context.Context) bool) Option {
+func WithContextBackup(enable, async bool, shouldUseSession func(context.Context) bool, backupHandler func(prev, cur context.Context) context.Context) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithLocalSession({%+v, %+v})", enable, async))
 
-		o.BackupOpt = backup.Options{
-			Enable:         enable,
-			ManagerOptions: backup.NewManagerOptions(),
-		}
+		o.BackupOpt = backup.DefaultOptions()
+		o.BackupOpt.Enable = enable
 		o.BackupOpt.EnableImplicitlyTransmitAsync = async
-		o.BackupOpt.ShouldUseSession = shouldUseSession
+		if shouldUseSession != nil {
+			o.BackupOpt.ShouldUseSession = shouldUseSession
+		}
+		if backupHandler != nil {
+			o.BackupOpt.BackupHandler = backupHandler
+		}
 	}}
 }

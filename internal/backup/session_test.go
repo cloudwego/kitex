@@ -25,15 +25,13 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	opts := NewManagerOptions()
+	opts := DefaultOptions()
 	opts.EnableImplicitlyTransmitAsync = true
-	Init(Options{
-		Enable:         true,
-		ManagerOptions: opts,
-		ShouldUseSession: func(ctx context.Context) bool {
-			return true
-		},
-	})
+	opts.Enable = true
+	opts.ShouldUseSession = func(ctx context.Context) bool {
+		return true
+	}
+	Init(opts)
 	os.Exit(m.Run())
 }
 
@@ -57,7 +55,7 @@ func TestCurSession(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CurCtx(tt.args.ctx); got != nil {
+			if got := RecoverCtxOndemands(tt.args.ctx); got != nil {
 				a, _ := metainfo.GetPersistentValue(got, "a")
 				ae, _ := metainfo.GetPersistentValue(tt.want, "a")
 				if a != ae {
