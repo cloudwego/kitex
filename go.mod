@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/apache/thrift v0.13.0
-	github.com/bytedance/gopkg v0.0.0-20230531144706-a12972768317
+	github.com/bytedance/gopkg v0.0.0-20230728082804-614d0af6619b
 	github.com/bytedance/mockey v1.2.0
 	github.com/bytedance/sonic v1.9.1
 	github.com/choleraehyq/pid v0.0.17
@@ -28,5 +28,3 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v3 v3.0.1
 )
-
-replace github.com/bytedance/gopkg => github.com/AsterDY/gopkg v0.0.0-20230728042045-ff952314a806
