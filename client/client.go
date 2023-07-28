@@ -28,8 +28,8 @@ import (
 	"github.com/bytedance/gopkg/cloud/metainfo"
 
 	"github.com/cloudwego/kitex/client/callopt"
+	"github.com/cloudwego/kitex/internal/backup"
 	"github.com/cloudwego/kitex/internal/client"
-	"github.com/cloudwego/kitex/internal/session"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -320,7 +320,7 @@ func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr rem
 // Call implements the Client interface .
 func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) (err error) {
 	// use backup context if no metainfo found
-	ctx = session.CurSession(ctx)
+	ctx = backup.CurCtx(ctx)
 
 	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo

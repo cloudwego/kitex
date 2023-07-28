@@ -32,10 +32,10 @@ import (
 	"github.com/cloudwego/localsession"
 	"github.com/golang/mock/gomock"
 
+	"github.com/cloudwego/kitex/internal/backup"
 	"github.com/cloudwego/kitex/internal/mocks"
 	mockslimiter "github.com/cloudwego/kitex/internal/mocks/limiter"
 	internal_server "github.com/cloudwego/kitex/internal/server"
-	"github.com/cloudwego/kitex/internal/session"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/limit"
@@ -567,7 +567,7 @@ func TestServerBoundHandler(t *testing.T) {
 }
 
 //go:nocheckptr
-func TestInvokeHandlerWithSession(t *testing.T) {
+func TestInvokeHandlerWithContextBackup(t *testing.T) {
 	t.Run("disabled", func(t *testing.T) {
 		testInvokeHandlerWithSession(t, true, ":8888")
 	})
@@ -604,7 +604,10 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 				recvMsg := remote.NewMessageWithNewer(svcInfo, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
-				ctx = metainfo.WithValue(ctx, "a", "b")
+
+				// inject metainfo here
+				ctx = metainfo.WithPersistentValue(ctx, "a", "b")
+
 				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
 				test.Assert(t, err == nil, err)
 			}
@@ -640,14 +643,16 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			ctx := session.CurSession(context.Background())
+
+			// miss context here
+			ctx := backup.CurCtx(context.Background())
+
 			if !fail {
-				// assert session has been set
-				test.Assert(t, rpcinfo.GetRPCInfo(ctx) != nil, "can't get rpcinfo")
-				b, _ := metainfo.GetValue(ctx, "a")
+				b, _ := metainfo.GetPersistentValue(ctx, "a")
 				test.Assert(t, b == "b", "can't get metainfo")
 			} else {
-				test.Assert(t, rpcinfo.GetRPCInfo(ctx) == nil, "can get rpcinfo")
+				_, ok := metainfo.GetPersistentValue(ctx, "a")
+				test.Assert(t, !ok, "can get metainfo")
 			}
 		}()
 		wg.Wait()

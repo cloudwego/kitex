@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package session
+package backup
 
 import (
 	"context"
@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestCurSession(t *testing.T) {
-	BindSession(metainfo.WithPersistentValues(context.Background(), "a", "a", "b", "b"))
+	BackupCtx(metainfo.WithPersistentValues(context.Background(), "a", "a", "b", "b"))
 	type args struct {
 		ctx context.Context
 	}
@@ -57,7 +57,7 @@ func TestCurSession(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CurSession(tt.args.ctx); got != nil {
+			if got := CurCtx(tt.args.ctx); got != nil {
 				a, _ := metainfo.GetPersistentValue(got, "a")
 				ae, _ := metainfo.GetPersistentValue(tt.want, "a")
 				if a != ae {

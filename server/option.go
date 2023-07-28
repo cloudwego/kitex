@@ -22,8 +22,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/kitex/internal/backup"
 	internal_server "github.com/cloudwego/kitex/internal/server"
-	"github.com/cloudwego/kitex/internal/session"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limit"
@@ -352,11 +352,11 @@ func WithContextBackup(enable, async bool, shouldUseSession func(context.Context
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithLocalSession({%+v, %+v})", enable, async))
 
-		o.SessionOpt = session.Options{
+		o.BackupOpt = backup.Options{
 			Enable:         enable,
-			ManagerOptions: session.NewManagerOptions(),
+			ManagerOptions: backup.NewManagerOptions(),
 		}
-		o.SessionOpt.EnableImplicitlyTransmitAsync = async
-		o.SessionOpt.ShouldUseSession = shouldUseSession
+		o.BackupOpt.EnableImplicitlyTransmitAsync = async
+		o.BackupOpt.ShouldUseSession = shouldUseSession
 	}}
 }

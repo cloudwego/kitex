@@ -23,8 +23,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/cloudwego/kitex/internal/backup"
 	"github.com/cloudwego/kitex/internal/configutil"
-	"github.com/cloudwego/kitex/internal/session"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -92,7 +92,7 @@ type Options struct {
 	TracerCtl  *rpcinfo.TraceController
 	StatsLevel *stats.Level
 
-	SessionOpt session.Options
+	BackupOpt backup.Options
 }
 
 type Limit struct {

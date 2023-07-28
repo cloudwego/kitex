@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package session
+package backup
 
 import (
 	"context"
@@ -45,8 +45,6 @@ func NewManagerOptions() localsession.ManagerOptions {
 
 // Init session Manager
 // It uses env config first, the key is localsession.SESSION_CONFIG_KEY
-//
-//go:nocheckptr
 func Init(opts Options) {
 	if opts.Enable {
 		initOnce.Do(func() {
@@ -58,8 +56,8 @@ func Init(opts Options) {
 	}
 }
 
-// Get current session
-func CurSession(ctx context.Context) context.Context {
+// Get current ctx
+func CurCtx(ctx context.Context) context.Context {
 	if !shouldUseSession(ctx) {
 		return ctx
 	}
@@ -71,39 +69,40 @@ func CurSession(ctx context.Context) context.Context {
 	if !ok {
 		return ctx
 	}
-	c2 := c.Export()
+	c1 := c.Export()
 
-	// two-way merge all kvs, incoming ctx is prior to session
-	if metainfo.HasMetaInfo(ctx) {
+	// two-way merge all persistent kvs
+	if n := metainfo.CountPersistentValues(c1); n > 0 {
 		// persistent kvs
-		pn := metainfo.CountPersistentValues(ctx) * 2
-		n := metainfo.CountValues(ctx) * 2
-		if pn > n {
-			n = pn
+		kvs := make([]string, 0, n*2)
+		mkvs := metainfo.GetAllPersistentValues(ctx)
+
+		// incoming ctx is prior to session
+		if mkvs == nil {
+			metainfo.RangePersistentValues(c1, func(k, v string) bool {
+				kvs = append(kvs, k, v)
+				return true
+			})
+		} else {
+			kvs = make([]string, 0, n*2)
+			metainfo.RangePersistentValues(c1, func(k, v string) bool {
+				if _, ok := mkvs[k]; !ok {
+					kvs = append(kvs, k, v)
+				}
+				return true
+			})
 		}
-		kvs := make([]string, 0, n)
-		metainfo.RangePersistentValues(ctx, func(k, v string) bool {
-			kvs = append(kvs, k, v)
-			return true
-		})
-		c2 = metainfo.WithPersistentValues(c2, kvs...)
-		// transisent kvs
-		kvs = kvs[:0]
-		metainfo.RangeValues(ctx, func(k, v string) bool {
-			kvs = append(kvs, k, v)
-			return true
-		})
-		c2 = metainfo.WithValues(c2, kvs...)
+		ctx = metainfo.WithPersistentValues(ctx, kvs...)
 	}
-	return c2
+	return ctx
 }
 
 // Set current Sessioin
-func BindSession(ctx context.Context) {
+func BackupCtx(ctx context.Context) {
 	localsession.BindSession(localsession.NewSessionCtx(ctx))
 }
 
 // Unset current Session
-func UnbindSession() {
+func ClearCtx() {
 	localsession.UnbindSession()
 }
