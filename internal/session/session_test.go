@@ -18,6 +18,7 @@ package session
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
@@ -33,7 +34,7 @@ func TestMain(m *testing.M) {
 			return true
 		},
 	})
-	m.Run()
+	os.Exit(m.Run())
 }
 
 func TestCurSession(t *testing.T) {
