@@ -73,14 +73,27 @@ func CurSession(ctx context.Context) context.Context {
 	}
 	c2 := c.Export()
 
-	// two-way merge all persistent kvs, incoming ctx is prior to session
-	if n := metainfo.CountPersistentValues(ctx); n > 0 {
-		kvs := make([]string, 0, n*2)
+	// two-way merge all kvs, incoming ctx is prior to session
+	if metainfo.HasMetaInfo(ctx) {
+		// persistent kvs
+		pn := metainfo.CountPersistentValues(ctx) * 2
+		n := metainfo.CountValues(ctx) * 2
+		if pn > n {
+			n = pn
+		}
+		kvs := make([]string, 0, n)
 		metainfo.RangePersistentValues(ctx, func(k, v string) bool {
 			kvs = append(kvs, k, v)
 			return true
 		})
 		c2 = metainfo.WithPersistentValues(c2, kvs...)
+		// transisent kvs
+		kvs = kvs[:0]
+		metainfo.RangeValues(ctx, func(k, v string) bool {
+			kvs = append(kvs, k, v)
+			return true
+		})
+		c2 = metainfo.WithValues(c2, kvs...)
 	}
 	return c2
 }
