@@ -22,7 +22,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/backup"
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -36,6 +35,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/localsession/backup"
 )
 
 // Option is the only way to config server.

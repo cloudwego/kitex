@@ -26,9 +26,9 @@ import (
 	"sync/atomic"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/localsession/backup"
 
 	"github.com/cloudwego/kitex/client/callopt"
-	"github.com/cloudwego/kitex/internal/backup"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/consts"

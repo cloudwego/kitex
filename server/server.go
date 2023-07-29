@@ -27,7 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/kitex/internal/backup"
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -44,6 +43,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/localsession/backup"
 )
 
 // Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
@@ -91,7 +91,7 @@ func (s *server) init() {
 		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(s.opt.DebugInfo))
 		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
 	}
-	backup.Init(s.opt.BackupOpt)
+	backup.Enable(s.opt.BackupOpt)
 	s.buildInvokeChain()
 }
 

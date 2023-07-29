@@ -32,7 +32,6 @@ import (
 	"github.com/cloudwego/localsession"
 	"github.com/golang/mock/gomock"
 
-	"github.com/cloudwego/kitex/internal/backup"
 	"github.com/cloudwego/kitex/internal/mocks"
 	mockslimiter "github.com/cloudwego/kitex/internal/mocks/limiter"
 	internal_server "github.com/cloudwego/kitex/internal/server"
@@ -50,6 +49,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
+	"github.com/cloudwego/localsession/backup"
 )
 
 func TestServerRun(t *testing.T) {

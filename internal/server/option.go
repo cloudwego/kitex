@@ -23,7 +23,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/cloudwego/kitex/internal/backup"
+	"github.com/cloudwego/localsession/backup"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
