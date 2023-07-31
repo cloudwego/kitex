@@ -96,6 +96,7 @@ type ServiceInfo struct {
 	Methods         []*MethodInfo
 	CombineServices []*ServiceInfo
 	HasStreaming    bool
+	ServiceFilePath string
 }
 
 // AllMethods returns all methods that the service have.
