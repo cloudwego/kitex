@@ -1,0 +1,30 @@
+syntax="proto3";
+package proto;
+
+
+option go_package = "proto";
+
+enum TestEnum {
+  Zero = 0;
+  First = 1;
+}
+
+message Elem {
+  bool ok = 1;
+}
+
+message Msg {
+  int32 tiny = 1;
+  int64 large = 2;
+  TestEnum tenum = 3;
+  string str = 4;
+  map<string, Elem> elems = 5;
+  repeated Elem els = 6;
+  // map<int32, Elem> els = 7;
+}
+
+service ExampleService {
+  rpc Echo(Msg) returns(Msg);
+}
+
+// protoc --go_out=$GOPATH/src kitex/pkg/generic/httppb_test/idl/echo.proto
