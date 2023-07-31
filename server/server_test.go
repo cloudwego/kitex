@@ -30,6 +30,7 @@ import (
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession"
+	"github.com/cloudwego/localsession/backup"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -49,7 +50,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
-	"github.com/cloudwego/localsession/backup"
 )
 
 func TestServerRun(t *testing.T) {
@@ -590,14 +590,15 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 
 	k1, v1 := "1", "1"
 	if !fail {
-		opts = append(opts, WithContextBackup(true, true, func(prev, cur context.Context) (context.Context, bool) {
+		opts = append(opts, WithContextBackup(true, true))
+		backup.SetBackupHandler(func(prev, cur context.Context) (context.Context, bool) {
 			v := prev.Value(k1)
 			if v != nil {
 				cur = context.WithValue(cur, k1, v)
 				return cur, true
 			}
 			return cur, true
-		}))
+		})
 	}
 
 	opts = append(opts, WithCodec(&mockCodec{}))

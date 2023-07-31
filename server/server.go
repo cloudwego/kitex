@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/localsession/backup"
+
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -43,7 +45,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
-	"github.com/cloudwego/localsession/backup"
 )
 
 // Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service

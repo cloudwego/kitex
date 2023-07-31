@@ -22,6 +22,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/localsession/backup"
+
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -35,7 +37,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/localsession/backup"
 )
 
 // Option is the only way to config server.
@@ -347,16 +348,11 @@ func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 // in case of user don't correctly pass context into next RPC call.
 //   - enable means enable context backup
 //   - async means backup session will propagate to children goroutines, otherwise it only works on the same goroutine handler
-//   - backupHandler pass a handler to check and handler user-defined key-values according to current context, returning backup==false means no need futher operations.
-func WithContextBackup(enable, async bool, backupHandler func(prev, cur context.Context) (ctx context.Context, backup bool)) Option {
+func WithContextBackup(enable, async bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithLocalSession({%+v, %+v})", enable, async))
-
 		o.BackupOpt = backup.DefaultOptions()
 		o.BackupOpt.Enable = enable
 		o.BackupOpt.EnableImplicitlyTransmitAsync = async
-		if backupHandler != nil {
-			o.BackupOpt.BackupHandler = backupHandler
-		}
 	}}
 }
