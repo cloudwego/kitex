@@ -347,17 +347,14 @@ func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 // in case of user don't correctly pass context into next RPC call.
 //   - enable means enable context backup
 //   - async means backup session will propagate to children goroutines, otherwise it only works on the same goroutine handler
-//   - shouldUseSession pass a handler to decide if backup context should be used according to current context, nil func means using kitex's default logic
-func WithContextBackup(enable, async bool, shouldUseSession func(context.Context) bool, backupHandler func(prev, cur context.Context) context.Context) Option {
+//   - backupHandler pass a handler to check and handler user-defined key-values according to current context, returning backup==false means no need futher operations.
+func WithContextBackup(enable, async bool, backupHandler func(prev, cur context.Context) (ctx context.Context, backup bool)) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithLocalSession({%+v, %+v})", enable, async))
 
 		o.BackupOpt = backup.DefaultOptions()
 		o.BackupOpt.Enable = enable
 		o.BackupOpt.EnableImplicitlyTransmitAsync = async
-		if shouldUseSession != nil {
-			o.BackupOpt.ShouldUseSession = shouldUseSession
-		}
 		if backupHandler != nil {
 			o.BackupOpt.BackupHandler = backupHandler
 		}

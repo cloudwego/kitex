@@ -590,12 +590,13 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 
 	k1, v1 := "1", "1"
 	if !fail {
-		opts = append(opts, WithContextBackup(true, true, nil, func(prev, cur context.Context) context.Context {
+		opts = append(opts, WithContextBackup(true, true, func(prev, cur context.Context) (context.Context, bool) {
 			v := prev.Value(k1)
 			if v != nil {
 				cur = context.WithValue(cur, k1, v)
+				return cur, true
 			}
-			return cur
+			return cur, true
 		}))
 	}
 
