@@ -567,14 +567,9 @@ func TestServerBoundHandler(t *testing.T) {
 }
 
 func TestInvokeHandlerWithContextBackup(t *testing.T) {
-	t.Run("disabled", func(t *testing.T) {
-		testInvokeHandlerWithSession(t, true, ":8888")
-	})
-
-	t.Run("env", func(t *testing.T) {
-		os.Setenv(localsession.SESSION_CONFIG_KEY, "true,100,1h")
-		testInvokeHandlerWithSession(t, false, ":8889")
-	})
+	testInvokeHandlerWithSession(t, true, ":8888")
+	os.Setenv(localsession.SESSION_CONFIG_KEY, "true,100,1h")
+	testInvokeHandlerWithSession(t, false, ":8889")
 }
 
 func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
