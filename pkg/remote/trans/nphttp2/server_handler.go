@@ -321,7 +321,8 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 }
 
 func execUnknownServiceHandleFunc(ctx context.Context, ri rpcinfo.RPCInfo, method string, st streaming.Stream,
-	unknownServiceHandlerFunc func(context.Context, string, streaming.Stream) error) error {
+	unknownServiceHandlerFunc func(context.Context, string, streaming.Stream) error,
+) error {
 	rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 	err := unknownServiceHandlerFunc(ctx, method, st)
 	if err != nil {

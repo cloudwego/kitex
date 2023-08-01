@@ -48,8 +48,7 @@ func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.
 }
 
 type svrTransHandler struct {
-	opt *remote.ServerOption
-	//svcInfo    *serviceinfo.ServiceInfo
+	opt        *remote.ServerOption
 	svcInfoMap map[string]*serviceinfo.ServiceInfo
 	inkHdlFunc endpoint.Endpoint
 	codec      remote.Codec
