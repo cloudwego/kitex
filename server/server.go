@@ -51,21 +51,21 @@ import (
 // registered to it.
 type Server interface {
 	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error
-	GetServiceInfo() *serviceinfo.ServiceInfo
+	GetServiceInfo() map[string]*serviceinfo.ServiceInfo
 	Run() error
 	Stop() error
 }
 
 type server struct {
-	opt     *internal_server.Options
-	svcInfo *serviceinfo.ServiceInfo
+	opt        *internal_server.Options
+	svcInfoMap map[string]*serviceinfo.ServiceInfo // service name -> service info
 
 	// actual rpc service implement of biz
-	handler interface{}
-	eps     endpoint.Endpoint
-	mws     []endpoint.Middleware
-	svr     remotesvr.Server
-	stopped sync.Once
+	handlerMap map[string]interface{} // service name -> handler
+	eps        endpoint.Endpoint
+	mws        []endpoint.Middleware
+	svr        remotesvr.Server
+	stopped    sync.Once
 
 	sync.Mutex
 }
@@ -73,7 +73,9 @@ type server struct {
 // NewServer creates a server with the given Options.
 func NewServer(ops ...Option) Server {
 	s := &server{
-		opt: internal_server.NewOptions(ops),
+		opt:        internal_server.NewOptions(ops),
+		svcInfoMap: map[string]*serviceinfo.ServiceInfo{},
+		handlerMap: map[string]interface{}{},
 	}
 	s.init()
 	return s
@@ -179,24 +181,29 @@ func (s *server) buildInvokeChain() {
 
 // RegisterService should not be called by users directly.
 func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error {
-	if s.svcInfo != nil {
-		panic(fmt.Sprintf("Service[%s] is already defined", s.svcInfo.ServiceName))
+	if svcInfo == nil {
+		return errors.New("svcInfo is nil. please specify non-nil svcInfo")
 	}
-	s.svcInfo = svcInfo
-	s.handler = handler
-	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcInfo))
+	if handler == nil || reflect.ValueOf(handler).IsNil() {
+		return errors.New("handler is nil. please specify non-nil handler")
+	}
+	if s.svcInfoMap[svcInfo.ServiceName] != nil {
+		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
+	}
+	s.Lock()
+	s.svcInfoMap[svcInfo.ServiceName] = svcInfo
+	s.handlerMap[svcInfo.ServiceName] = handler
+	s.Unlock()
+	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcInfoMap[svcInfo.ServiceName]))
 	return nil
 }
 
-func (s *server) GetServiceInfo() *serviceinfo.ServiceInfo {
-	return s.svcInfo
+func (s *server) GetServiceInfo() map[string]*serviceinfo.ServiceInfo {
+	return s.svcInfoMap
 }
 
 // Run runs the server.
 func (s *server) Run() (err error) {
-	if s.svcInfo == nil {
-		return errors.New("no service, use RegisterService to set one")
-	}
 	if err = s.check(); err != nil {
 		return err
 	}
@@ -246,7 +253,10 @@ func (s *server) Run() (err error) {
 	}
 	muStartHooks.Unlock()
 	s.Lock()
-	s.buildRegistryInfo(s.svr.Address())
+	err = s.buildRegistryInfo(s.svr.Address())
+	if err != nil {
+		klog.Error(err.Error())
+	}
 	s.Unlock()
 
 	if err = s.waitExit(errCh); err != nil {
@@ -289,8 +299,17 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 	return func(ctx context.Context, args, resp interface{}) (err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()
-		if methodName == "" && s.svcInfo.ServiceName != serviceinfo.GenericService {
+		serviceName := ri.Invocation().ServiceName()
+		svcInfo := s.svcInfoMap[serviceName]
+		handler := s.handlerMap[serviceName]
+		if svcInfo == nil {
+			return fmt.Errorf("service[%s] is not registered, should not happen", serviceName)
+		}
+		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
 			return errors.New("method name is empty in rpcinfo, should not happen")
+		}
+		if handler == nil || reflect.ValueOf(handler).IsNil() {
+			return fmt.Errorf("handler of service[%s] is nil, should not happen", serviceName)
 		}
 		defer func() {
 			if handlerErr := recover(); handlerErr != nil {
@@ -302,11 +321,11 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 			// clear session
 			backup.ClearCtx()
 		}()
-		implHandlerFunc := s.svcInfo.MethodInfo(methodName).Handler()
+		implHandlerFunc := svcInfo.MethodInfo(methodName).Handler()
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)
-		err = implHandlerFunc(ctx, s.handler, args, resp)
+		err = implHandlerFunc(ctx, handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
 				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
@@ -322,7 +341,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
-	remoteOpt.SvcInfo = s.svcInfo
+	remoteOpt.SvcInfoMap = s.svcInfoMap
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
@@ -404,11 +423,11 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 }
 
 func (s *server) check() error {
-	if s.svcInfo == nil {
+	if len(s.svcInfoMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
-	if s.handler == nil || reflect.ValueOf(s.handler).IsNil() {
-		return errors.New("run: handler is nil")
+	if len(s.handlerMap) == 0 {
+		return errors.New("run: no handler. Use RegisterService to set one")
 	}
 	return nil
 }
@@ -465,7 +484,7 @@ func (s *server) newSvrTransHandler() (handler remote.ServerTransHandler, err er
 	return transPl, nil
 }
 
-func (s *server) buildRegistryInfo(lAddr net.Addr) {
+func (s *server) buildRegistryInfo(lAddr net.Addr) error {
 	if s.opt.RegistryInfo == nil {
 		s.opt.RegistryInfo = &registry.Info{}
 	}
@@ -476,7 +495,18 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}
 	if info.PayloadCodec == "" {
-		info.PayloadCodec = s.opt.RemoteOpt.SvcInfo.PayloadCodec.String()
+		if info.ServiceName == "" {
+			var svcInfo *serviceinfo.ServiceInfo
+			for _, elem := range s.opt.RemoteOpt.SvcInfoMap {
+				svcInfo = elem
+				break
+			}
+			info.PayloadCodec = svcInfo.PayloadCodec.String()
+		} else if s.opt.RemoteOpt.SvcInfoMap[info.ServiceName] == nil {
+			return fmt.Errorf("service[%s] is not registered", info.ServiceName)
+		} else {
+			info.PayloadCodec = s.opt.RemoteOpt.SvcInfoMap[info.ServiceName].PayloadCodec.String()
+		}
 	}
 	if info.Weight == 0 {
 		info.Weight = discovery.DefaultWeight
@@ -484,19 +514,24 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 	if info.Tags == nil {
 		info.Tags = s.opt.Svr.Tags
 	}
+	return nil
 }
 
 func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
-	ni := *s.svcInfo
-	si := &ni
-	extra := make(map[string]interface{}, len(si.Extra)+2)
-	for k, v := range si.Extra {
-		extra[k] = v
+	for svcName, svcInfo := range s.svcInfoMap {
+		ni := *svcInfo
+		si := &ni
+		extra := make(map[string]interface{}, len(si.Extra)+2)
+		for k, v := range si.Extra {
+			extra[k] = v
+		}
+		extra["address"] = lAddr
+		extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
+		si.Extra = extra
+		s.Lock()
+		s.svcInfoMap[svcName] = si
+		s.Unlock()
 	}
-	extra["address"] = lAddr
-	extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
-	si.Extra = extra
-	s.svcInfo = si
 }
 
 func (s *server) waitExit(errCh chan error) error {

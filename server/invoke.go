@@ -48,7 +48,9 @@ type tInvoker struct {
 // NewInvoker creates new Invoker.
 func NewInvoker(opts ...Option) Invoker {
 	s := &server{
-		opt: internal_server.NewOptions(opts),
+		opt:        internal_server.NewOptions(opts),
+		svcInfoMap: map[string]*serviceinfo.ServiceInfo{},
+		handlerMap: map[string]interface{}{},
 	}
 	s.init()
 	return &tInvoker{
@@ -58,7 +60,7 @@ func NewInvoker(opts ...Option) Invoker {
 
 // Init does initialization job for invoker.
 func (s *tInvoker) Init() (err error) {
-	if s.server.svcInfo == nil {
+	if len(s.server.svcInfoMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
 	s.initBasicRemoteOption()

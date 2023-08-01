@@ -64,7 +64,7 @@ type serviceInlineClient struct {
 type ServerInitialInfo interface {
 	Endpoints() endpoint.Endpoint
 	Option() *internal_server.Options
-	GetServiceInfo() *serviceinfo.ServiceInfo
+	GetServiceInfo() map[string]*serviceinfo.ServiceInfo
 }
 
 // NewServiceInlineClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
@@ -77,7 +77,7 @@ func NewServiceInlineClient(svcInfo *serviceinfo.ServiceInfo, s ServerInitialInf
 	kc.opt = client.NewOptions(opts)
 	kc.serverEps = s.Endpoints()
 	kc.serverOpt = s.Option()
-	kc.serverOpt.RemoteOpt.SvcInfo = s.GetServiceInfo()
+	kc.serverOpt.RemoteOpt.SvcInfoMap = s.GetServiceInfo()
 	if err := kc.init(); err != nil {
 		_ = kc.Close()
 		return nil, err
