@@ -19,7 +19,6 @@ package generic
 import (
 	"bytes"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -48,10 +47,14 @@ func TestMapThriftGeneric(t *testing.T) {
 	test.Assert(t, err == nil)
 	defer g.Close()
 
+	mg, ok := g.(*mapThriftGeneric)
+	test.Assert(t, ok)
+
 	test.Assert(t, g.PayloadCodec().Name() == "MapThrift")
 
 	err = SetBinaryWithBase64(g, true)
-	test.Assert(t, strings.Contains(err.Error(), "Base64Binary is unavailable"))
+	test.Assert(t, err == nil)
+	test.Assert(t, mg.codec.binaryWithBase64)
 	test.Assert(t, g.Framed() == false)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
@@ -70,10 +73,14 @@ func TestMapThriftGenericForJSON(t *testing.T) {
 	test.Assert(t, err == nil)
 	defer g.Close()
 
+	mg, ok := g.(*mapThriftGeneric)
+	test.Assert(t, ok)
+
 	test.Assert(t, g.PayloadCodec().Name() == "MapThrift")
 
 	err = SetBinaryWithBase64(g, true)
-	test.Assert(t, strings.Contains(err.Error(), "Base64Binary is unavailable"))
+	test.Assert(t, err == nil)
+	test.Assert(t, mg.codec.binaryWithBase64)
 	test.Assert(t, g.Framed() == false)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
