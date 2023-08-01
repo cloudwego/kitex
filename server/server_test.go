@@ -44,6 +44,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -111,7 +112,9 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	rwTimeout := time.Millisecond
 	opts = append(opts, WithReadWriteTimeout(rwTimeout))
 	svr := &server{
-		opt: internal_server.NewOptions(opts),
+		opt:        internal_server.NewOptions(opts),
+		svcInfoMap: map[string]*serviceinfo.ServiceInfo{},
+		handlerMap: map[string]interface{}{},
 	}
 	svr.init()
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
@@ -403,6 +406,24 @@ func TestServiceRegistryInfoWithNilTags(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, rCount == 1)
 	test.Assert(t, drCount == 1)
+}
+
+func TestGRPCServerMultipleServices(t *testing.T) {
+	var opts []Option
+	opts = append(opts, withGRPCTransport())
+	svr := NewServer(opts...)
+	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil)
+	err = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil)
+	test.DeepEqual(t, svr.GetServiceInfo()[mocks.ServiceInfo().ServiceName], mocks.ServiceInfo())
+	test.DeepEqual(t, svr.GetServiceInfo()[mocks.Service2Info().ServiceName], mocks.Service2Info())
+	time.AfterFunc(3500*time.Millisecond, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr.Run()
+	test.Assert(t, err == nil, err)
 }
 
 func TestServerBoundHandler(t *testing.T) {
@@ -871,8 +892,8 @@ func (m *mockCodec) Decode(ctx context.Context, msg remote.Message, in remote.By
 
 func TestDuplicatedRegisterInfoPanic(t *testing.T) {
 	s := &server{
-		svcInfo: mocks.ServiceInfo(),
-		opt:     internal_server.NewOptions(nil),
+		svcInfoMap: map[string]*serviceinfo.ServiceInfo{mocks.ServiceInfo().ServiceName: mocks.ServiceInfo()},
+		opt:        internal_server.NewOptions(nil),
 	}
 	s.init()
 
@@ -901,4 +922,10 @@ func inboundDeepEqual(inbound1, inbound2 []remote.InboundHandler) bool {
 		}
 	}
 	return true
+}
+
+func withGRPCTransport() Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.RemoteOpt.SvrHandlerFactory = nphttp2.NewSvrTransHandlerFactory()
+	}}
 }

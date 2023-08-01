@@ -51,7 +51,7 @@ func (s serverInitialInfoImpl) Option() *internal_server.Options {
 	return internal_server.NewOptions(nil)
 }
 
-func (s serverInitialInfoImpl) GetServiceInfo() *serviceinfo.ServiceInfo {
+func (s serverInitialInfoImpl) GetServiceInfo() map[string]*serviceinfo.ServiceInfo {
 	return nil
 }
 

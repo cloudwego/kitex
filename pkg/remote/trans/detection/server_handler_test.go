@@ -23,36 +23,40 @@ import (
 	"net"
 	"testing"
 
+	"github.com/golang/mock/gomock"
+
+	"github.com/cloudwego/kitex/internal/mocks"
 	mocksklog "github.com/cloudwego/kitex/internal/mocks/klog"
+	npmocks "github.com/cloudwego/kitex/internal/mocks/netpoll"
+	remote_mocks "github.com/cloudwego/kitex/internal/mocks/remote"
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
-
-	"github.com/golang/mock/gomock"
-
-	npmocks "github.com/cloudwego/kitex/internal/mocks/netpoll"
-	remote_mocks "github.com/cloudwego/kitex/internal/mocks/remote"
-
-	"github.com/cloudwego/kitex/internal/mocks"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-var prefaceReadAtMost = func() int {
-	// min(len(ClientPreface), len(flagBuf))
-	// len(flagBuf) = 2 * codec.Size32
-	if 2*codec.Size32 < grpc.ClientPrefaceLen {
-		return 2 * codec.Size32
+var (
+	prefaceReadAtMost = func() int {
+		// min(len(ClientPreface), len(flagBuf))
+		// len(flagBuf) = 2 * codec.Size32
+		if 2*codec.Size32 < grpc.ClientPrefaceLen {
+			return 2 * codec.Size32
+		}
+		return grpc.ClientPrefaceLen
+	}()
+	svcInfoMap = map[string]*serviceinfo.ServiceInfo{
+		mocks.MockServiceName: mocks.ServiceInfo(),
 	}
-	return grpc.ClientPrefaceLen
-}()
+)
 
 func TestServerHandlerCall(t *testing.T) {
 	transHdler, _ := NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()).NewTransHandler(&remote.ServerOption{
-		SvcInfo: mocks.ServiceInfo(),
+		SvcInfoMap: svcInfoMap,
 	})
 
 	ctrl := gomock.NewController(t)
@@ -121,7 +125,7 @@ func TestOnError(t *testing.T) {
 		ctrl.Finish()
 	}()
 	transHdler, err := NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()).NewTransHandler(&remote.ServerOption{
-		SvcInfo: mocks.ServiceInfo(),
+		SvcInfoMap: svcInfoMap,
 	})
 	test.Assert(t, err == nil)
 
@@ -150,7 +154,7 @@ func TestOnError(t *testing.T) {
 // TestOnInactive covers onInactive() codes to check panic
 func TestOnInactive(t *testing.T) {
 	transHdler, err := NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()).NewTransHandler(&remote.ServerOption{
-		SvcInfo: mocks.ServiceInfo(),
+		SvcInfoMap: svcInfoMap,
 	})
 	test.Assert(t, err == nil)
 
