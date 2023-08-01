@@ -196,21 +196,23 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
 			rCtx = context.WithValue(rCtx, streamKey{}, st)
 
-			// check grpc method
-			targetMethod := svcInfo.MethodInfo(methodName)
-			if targetMethod == nil {
-				unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
-				if unknownServiceHandlerFunc != nil {
-					rpcinfo.Record(rCtx, ri, stats.ServerHandleStart, nil)
-					err = unknownServiceHandlerFunc(rCtx, methodName, st)
-					if err != nil {
-						err = kerrors.ErrBiz.WithCause(err)
+			unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
+			if svcInfo != nil {
+				if svcInfo.MethodInfo(methodName) == nil {
+					if unknownServiceHandlerFunc != nil {
+						err = execUnknownServiceHandleFunc(rCtx, ri, methodName, st, unknownServiceHandlerFunc)
+					} else {
+						err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 					}
 				} else {
-					err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
+					err = t.inkHdlFunc(rCtx, streamArg, nil)
 				}
 			} else {
-				err = t.inkHdlFunc(rCtx, streamArg, nil)
+				if unknownServiceHandlerFunc != nil {
+					err = execUnknownServiceHandleFunc(rCtx, ri, methodName, st, unknownServiceHandlerFunc)
+				} else {
+					err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", serviceName))
+				}
 			}
 
 			if err != nil {
@@ -314,4 +316,14 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	}
 	t.opt.TracerCtl.DoFinish(ctx, ri, err)
 	rpcStats.Reset()
+}
+
+func execUnknownServiceHandleFunc(ctx context.Context, ri rpcinfo.RPCInfo, method string, st streaming.Stream,
+	unknownServiceHandlerFunc func(context.Context, string, streaming.Stream) error) error {
+	rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
+	err := unknownServiceHandlerFunc(ctx, method, st)
+	if err != nil {
+		err = kerrors.ErrBiz.WithCause(err)
+	}
+	return err
 }

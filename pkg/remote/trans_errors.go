@@ -36,6 +36,7 @@ const (
 	InvalidTransform            = 8
 	InvalidProtocol             = 9
 	UnsupportedClientType       = 10
+	UnknownService              = 11
 )
 
 var defaultTransErrorMessage = map[int32]string{
@@ -50,6 +51,7 @@ var defaultTransErrorMessage = map[int32]string{
 	InvalidTransform:            "Invalid transform",
 	InvalidProtocol:             "Invalid protocol",
 	UnsupportedClientType:       "Unsupported client type",
+	UnknownService:              "unknown service",
 }
 
 // TransError is the error that can be transmitted, it corresponds to TApplicationException in Thrift
