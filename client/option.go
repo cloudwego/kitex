@@ -521,7 +521,7 @@ func WithXDSSuite(suite xds.ClientSuite) Option {
 
 // WithContextBackup enables local-session to retrieve context backuped by server,
 // in case of user don't correctly pass context into next RPC call.
-//   - backupHandler pass a handler to check and handler user-defined key-values according to current context, returning backup==false means no need futher operations.
+//   - backupHandler pass a handler to check and handler user-defined key-values according to current context, returning backup==false means no need further operations.
 func WithContextBackup(backupHandler func(prev, cur context.Context) (ctx context.Context, backup bool)) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithContextBackup({%v})", reflect.TypeOf(backupHandler).String()))
