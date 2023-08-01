@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 func TestDefaultSvrTransHandler(t *testing.T) {
@@ -57,7 +58,7 @@ func TestDefaultSvrTransHandler(t *testing.T) {
 				return nil
 			},
 		},
-		SvcInfo: mocks.ServiceInfo(),
+		SvcInfoMap: map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
 	}
 
 	handler, err := NewDefaultSvrTransHandler(opt, ext)
@@ -115,8 +116,8 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 				return nil
 			},
 		},
-		SvcInfo:   mocks.ServiceInfo(),
-		TracerCtl: tracerCtl,
+		SvcInfoMap: map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
+		TracerCtl:  tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
 			return ri
@@ -172,8 +173,8 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 				return mockErr
 			},
 		},
-		SvcInfo:   mocks.ServiceInfo(),
-		TracerCtl: tracerCtl,
+		SvcInfoMap: map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
+		TracerCtl:  tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
 			return ri

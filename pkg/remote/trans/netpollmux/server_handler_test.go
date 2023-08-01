@@ -78,7 +78,7 @@ func init() {
 				return err
 			},
 		},
-		SvcInfo:          mocks.ServiceInfo(),
+		SvcInfoMap:       map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -466,7 +466,7 @@ func TestInvokeError(t *testing.T) {
 				return err
 			},
 		},
-		SvcInfo:          mocks.ServiceInfo(),
+		SvcInfoMap:       map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -624,7 +624,12 @@ func TestInvokeNoMethod(t *testing.T) {
 	pl := remote.NewTransPipeline(svrTransHdlr)
 	svrTransHdlr.SetPipeline(pl)
 
-	delete(opt.SvcInfo.Methods, method)
+	var svcInfo *serviceinfo.ServiceInfo
+	for _, elem := range opt.SvcInfoMap {
+		svcInfo = elem
+		break
+	}
+	delete(svcInfo.Methods, method)
 
 	if setter, ok := svrTransHdlr.(remote.InvokeHandleFuncSetter); ok {
 		setter.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {

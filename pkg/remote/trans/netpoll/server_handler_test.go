@@ -22,6 +22,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -266,7 +267,12 @@ func TestNoMethodInfo(t *testing.T) {
 		},
 	}
 	remote.NewTransPipeline(svrTransHdlr)
-	delete(svrOpt.SvcInfo.Methods, method)
+	var svcInfo *serviceinfo.ServiceInfo
+	for _, elem := range svrOpt.SvcInfoMap {
+		svcInfo = elem
+		break
+	}
+	delete(svcInfo.Methods, method)
 
 	// 2. test
 	ctx := context.Background()
