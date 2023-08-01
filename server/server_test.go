@@ -763,7 +763,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
 				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
-				test.Assert(t, strings.Contains(err.Error(), "happened in biz handler"))
+				test.Assert(t, strings.Contains(err.Error(), "happened in biz handler, method=mock"))
 			}
 			<-exitCh
 			return nil

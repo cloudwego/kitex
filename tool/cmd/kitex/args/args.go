@@ -182,7 +182,7 @@ func (a *Arguments) checkIDL(files []string) {
 		if typ, ok := a.guessIDLType(); ok {
 			a.IDLType = typ
 		} else {
-			log.Warn("Can not guess an IDL type from %q, please specify with the '-type' flag.", a.IDL)
+			log.Warnf("Can not guess an IDL type from %q (unknown suffix), please specify with the '-type' flag.", a.IDL)
 			os.Exit(2)
 		}
 	default:
