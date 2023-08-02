@@ -92,7 +92,7 @@ func (s *server) init() {
 		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(s.opt.DebugInfo))
 		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
 	}
-	backup.Enable(s.opt.BackupOpt)
+	backup.Init(s.opt.BackupOpt)
 	s.buildInvokeChain()
 }
 

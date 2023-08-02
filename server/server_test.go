@@ -584,16 +584,17 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 	}))
 
 	k1, v1 := "1", "1"
+	var backupHandler backup.BackupHandler
 	if !fail {
 		opts = append(opts, WithContextBackup(true, true))
-		backup.SetBackupHandler(func(prev, cur context.Context) (context.Context, bool) {
+		backupHandler = func(prev, cur context.Context) (context.Context, bool) {
 			v := prev.Value(k1)
 			if v != nil {
 				cur = context.WithValue(cur, k1, v)
 				return cur, true
 			}
 			return cur, true
-		})
+		}
 	}
 
 	opts = append(opts, WithCodec(&mockCodec{}))
@@ -651,7 +652,7 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 			defer wg.Done()
 
 			// miss context here
-			ctx := backup.RecoverCtxOndemands(context.Background())
+			ctx := backup.RecoverCtxOndemands(context.Background(), backupHandler)
 
 			if !fail {
 				b, _ := metainfo.GetPersistentValue(ctx, "a")

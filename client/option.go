@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/localsession/backup"
-
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/circuitbreak"
 	"github.com/cloudwego/kitex/pkg/connpool"
@@ -525,6 +523,6 @@ func WithXDSSuite(suite xds.ClientSuite) Option {
 func WithContextBackup(backupHandler func(prev, cur context.Context) (ctx context.Context, backup bool)) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithContextBackup({%v})", reflect.TypeOf(backupHandler).String()))
-		backup.SetBackupHandler(backupHandler)
+		o.CtxBackupHandler = backupHandler
 	}}
 }

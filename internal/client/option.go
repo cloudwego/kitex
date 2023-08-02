@@ -21,6 +21,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/cloudwego/localsession/backup"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/circuitbreak"
@@ -112,6 +114,9 @@ type Options struct {
 	// XDS
 	XDSEnabled          bool
 	XDSRouterMiddleware endpoint.Middleware
+
+	// Context backup
+	CtxBackupHandler backup.BackupHandler
 }
 
 // Apply applies all options.
