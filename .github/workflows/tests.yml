@@ -17,7 +17,7 @@ jobs:
         run: |
           cd ..
           rm -rf kitex-tests
-          git clone https://github.com/cloudwego/kitex-tests.git
+          git clone -b feat/grpc_multi_service https://github.com/Marina-Sakai/kitex-tests.git
           cd kitex-tests
           ./run.sh ${{github.workspace}}
           cd ${{github.workspace}}
