@@ -652,7 +652,7 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 			defer wg.Done()
 
 			// miss context here
-			ctx := backup.RecoverCtxOndemands(context.Background(), backupHandler)
+			ctx := backup.RecoverCtxOnDemands(context.Background(), backupHandler)
 
 			if !fail {
 				b, _ := metainfo.GetPersistentValue(ctx, "a")

@@ -12,7 +12,7 @@ require (
 	github.com/cloudwego/dynamicgo v0.1.2
 	github.com/cloudwego/fastpb v0.0.4
 	github.com/cloudwego/frugal v0.1.7
-	github.com/cloudwego/localsession v0.0.2-beta.0.20230802050711-24c02255f338
+	github.com/cloudwego/localsession v0.0.2-beta.0.20230802053006-16e41b3db4c9
 	github.com/cloudwego/netpoll v0.4.1
 	github.com/cloudwego/thriftgo v0.2.11
 	github.com/golang/mock v1.6.0
