@@ -155,7 +155,11 @@ func DefaultSysExitSignal() <-chan error {
 
 func SysExitSignal() chan os.Signal {
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
+	notifications := []os.Signal{syscall.SIGINT, syscall.SIGTERM}
+	if !signal.Ignored(syscall.SIGHUP) {
+		notifications = append(notifications, syscall.SIGHUP)
+	}
+	signal.Notify(signals, notifications...)
 	return signals
 }
 
