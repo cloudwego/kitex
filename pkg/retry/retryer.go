@@ -268,14 +268,10 @@ func (rc *Container) initRetryer(method string, p Policy) error {
 		klog.Warnf(errMsg)
 		return err
 	}
-	// NewRetryer can return nil if policy is nil
-	if retryer != nil {
-		rc.retryerMap.Store(method, retryer)
-		if p.Enable {
-			rc.msg = fmt.Sprintf("new retryer[%s-%s] at %s", method, retryer.Type(), time.Now())
-		} else {
-			rc.msg = fmt.Sprintf("disable retryer[%s-%s](enable=%t) %s", method, p.Type, p.Enable, time.Now())
-		}
+
+	rc.retryerMap.Store(method, retryer)
+	if p.Enable {
+		rc.msg = fmt.Sprintf("new retryer[%s-%s] at %s", method, retryer.Type(), time.Now())
 	} else {
 		rc.msg = fmt.Sprintf("disable retryer[%s-%s](enable=%t) %s", method, p.Type, p.Enable, time.Now())
 	}
