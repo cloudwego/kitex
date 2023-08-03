@@ -43,18 +43,25 @@ func NewWriteStruct(svc *descriptor.ServiceDescriptor, method string, isClient b
 
 // WriteStruct implement of MessageWriter
 type WriteStruct struct {
-	ty             *descriptor.TypeDescriptor
-	hasRequestBase bool
+	ty               *descriptor.TypeDescriptor
+	hasRequestBase   bool
+	binaryWithBase64 bool
 }
 
 var _ MessageWriter = (*WriteStruct)(nil)
+
+// SetBinaryWithBase64 enable/disable Base64 decoding for binary.
+// Note that this method is not concurrent-safe.
+func (m *WriteStruct) SetBinaryWithBase64(enable bool) {
+	m.binaryWithBase64 = enable
+}
 
 // Write ...
 func (m *WriteStruct) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
 	if !m.hasRequestBase {
 		requestBase = nil
 	}
-	return wrapStructWriter(ctx, msg, out, m.ty, &writerOption{requestBase: requestBase})
+	return wrapStructWriter(ctx, msg, out, m.ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.binaryWithBase64})
 }
 
 // NewReadStruct ...
@@ -75,12 +82,19 @@ func NewReadStructForJSON(svc *descriptor.ServiceDescriptor, isClient bool) *Rea
 
 // ReadStruct implement of MessageReaderWithMethod
 type ReadStruct struct {
-	svc      *descriptor.ServiceDescriptor
-	isClient bool
-	forJSON  bool
+	svc              *descriptor.ServiceDescriptor
+	isClient         bool
+	forJSON          bool
+	binaryWithBase64 bool
 }
 
 var _ MessageReader = (*ReadStruct)(nil)
+
+// SetBinaryWithBase64 enable/disable Base64 encoding for binary.
+// Note that this method is not concurrent-safe.
+func (m *ReadStruct) SetBinaryWithBase64(enable bool) {
+	m.binaryWithBase64 = enable
+}
 
 // Read ...
 func (m *ReadStruct) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
@@ -92,5 +106,5 @@ func (m *ReadStruct) Read(ctx context.Context, method string, in thrift.TProtoco
 	if !m.isClient {
 		fDsc = fnDsc.Request
 	}
-	return skipStructReader(ctx, in, fDsc, &readerOption{throwException: true, forJSON: m.forJSON})
+	return skipStructReader(ctx, in, fDsc, &readerOption{throwException: true, forJSON: m.forJSON, binaryWithBase64: m.binaryWithBase64})
 }

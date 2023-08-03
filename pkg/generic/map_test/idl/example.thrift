@@ -22,6 +22,7 @@ struct ExampleReq {
     5: list<string> StrList,
     6: list<i64> I64List = [1, 2, 3],
     7: bool B,
+    8: optional binary BinaryMsg,
     255: base.Base Base,
 }
 struct ExampleResp {

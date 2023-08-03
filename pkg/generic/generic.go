@@ -50,6 +50,11 @@ func BinaryThriftGeneric() Generic {
 }
 
 // MapThriftGeneric map mapping generic
+// Base64 codec for binary field is disabled by default. You can change this option with SetBinaryWithBase64.
+// eg:
+//
+//	g, err := generic.MapThriftGeneric(p)
+//	SetBinaryWithBase64(g, true)
 func MapThriftGeneric(p DescriptorProvider) (Generic, error) {
 	codec, err := newMapThriftCodec(p, thriftCodec)
 	if err != nil {
@@ -134,6 +139,11 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 			c.codec.convOptsWithThriftBase.NoBase64Binary = !enable
 			c.codec.convOptsWithException.NoBase64Binary = !enable
 		}
+	case *mapThriftGeneric:
+		if c.codec == nil {
+			return fmt.Errorf("empty codec for %#v", c)
+		}
+		c.codec.binaryWithBase64 = enable
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
 	}
