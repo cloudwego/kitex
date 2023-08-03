@@ -498,17 +498,9 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) error {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}
 	if info.PayloadCodec == "" {
-		if info.ServiceName == "" {
-			var svcInfo *serviceinfo.ServiceInfo
-			for _, elem := range s.opt.RemoteOpt.SvcInfoMap {
-				svcInfo = elem
-				break
-			}
+		for _, svcInfo := range s.svcInfoMap {
 			info.PayloadCodec = svcInfo.PayloadCodec.String()
-		} else if s.opt.RemoteOpt.SvcInfoMap[info.ServiceName] == nil {
-			return fmt.Errorf("service[%s] is not registered", info.ServiceName)
-		} else {
-			info.PayloadCodec = s.opt.RemoteOpt.SvcInfoMap[info.ServiceName].PayloadCodec.String()
+			break
 		}
 	}
 	if info.Weight == 0 {
