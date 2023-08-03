@@ -253,10 +253,7 @@ func (s *server) Run() (err error) {
 	}
 	muStartHooks.Unlock()
 	s.Lock()
-	err = s.buildRegistryInfo(s.svr.Address())
-	if err != nil {
-		klog.Error(err.Error())
-	}
+	s.buildRegistryInfo(s.svr.Address())
 	s.Unlock()
 
 	if err = s.waitExit(errCh); err != nil {
@@ -484,7 +481,7 @@ func (s *server) newSvrTransHandler() (handler remote.ServerTransHandler, err er
 	return transPl, nil
 }
 
-func (s *server) buildRegistryInfo(lAddr net.Addr) error {
+func (s *server) buildRegistryInfo(lAddr net.Addr) {
 	if s.opt.RegistryInfo == nil {
 		s.opt.RegistryInfo = &registry.Info{}
 	}
@@ -495,7 +492,7 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) error {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}
 	if info.PayloadCodec == "" {
-		for _, svcInfo := range s.svcInfoMap {
+		for _, svcInfo := range s.opt.RemoteOpt.SvcInfoMap {
 			info.PayloadCodec = svcInfo.PayloadCodec.String()
 			break
 		}
@@ -506,7 +503,6 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) error {
 	if info.Tags == nil {
 		info.Tags = s.opt.Svr.Tags
 	}
-	return nil
 }
 
 func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
