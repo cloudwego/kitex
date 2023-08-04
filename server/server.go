@@ -27,6 +27,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/localsession/backup"
+
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -90,6 +92,7 @@ func (s *server) init() {
 		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(s.opt.DebugInfo))
 		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
 	}
+	backup.Init(s.opt.BackupOpt)
 	s.buildInvokeChain()
 }
 
@@ -296,9 +299,13 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 				rpcStats.SetPanicked(err)
 			}
 			rpcinfo.Record(ctx, ri, stats.ServerHandleFinish, err)
+			// clear session
+			backup.ClearCtx()
 		}()
 		implHandlerFunc := s.svcInfo.MethodInfo(methodName).Handler()
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
+		// set session
+		backup.BackupCtx(ctx)
 		err = implHandlerFunc(ctx, s.handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {

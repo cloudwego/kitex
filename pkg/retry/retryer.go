@@ -236,9 +236,6 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 
 // NewRetryer build a retryer with policy
 func NewRetryer(p Policy, r *ShouldResultRetry, cbC *cbContainer) (retryer Retryer, err error) {
-	if !p.Enable {
-		return nil, nil
-	}
 	// just one retry policy can be enabled at same time
 	if p.Type == BackupType {
 		retryer, err = newBackupRetryer(p, cbC)
@@ -287,9 +284,9 @@ func (rc *Container) initRetryer(method string, p Policy) error {
 		klog.Warnf(errMsg)
 		return err
 	}
-	// NewRetryer can return nil if policy is nil
-	if retryer != nil {
-		rc.retryerMap.Store(method, retryer)
+
+	rc.retryerMap.Store(method, retryer)
+	if p.Enable {
 		rc.msg = fmt.Sprintf("new retryer[%s-%s] at %s", method, retryer.Type(), time.Now())
 	} else {
 		rc.msg = fmt.Sprintf("disable retryer[%s-%s](enable=%t) %s", method, p.Type, p.Enable, time.Now())

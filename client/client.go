@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/localsession/backup"
 
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
@@ -318,6 +319,9 @@ func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr rem
 
 // Call implements the Client interface .
 func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) (err error) {
+	// merge backup context if no metainfo found in ctx
+	ctx = backup.RecoverCtxOnDemands(ctx, kc.opt.CtxBackupHandler)
+
 	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions

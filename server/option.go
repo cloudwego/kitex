@@ -22,7 +22,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/localsession/backup"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -35,6 +35,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -340,5 +341,18 @@ func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 		di.Push(fmt.Sprintf("WithConcurrencyLimiter(%T{%+v})", conLimit, conLimit))
 
 		o.Limit.ConLimit = conLimit
+	}}
+}
+
+// WithContextBackup enables local-session to backup kitex server's context,
+// in case of user don't correctly pass context into next RPC call.
+//   - enable means enable context backup
+//   - async means backup session will propagate to children goroutines, otherwise it only works on the same goroutine handler
+func WithContextBackup(enable, async bool) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithLocalSession({%+v, %+v})", enable, async))
+		o.BackupOpt = backup.DefaultOptions()
+		o.BackupOpt.Enable = enable
+		o.BackupOpt.EnableImplicitlyTransmitAsync = async
 	}}
 }

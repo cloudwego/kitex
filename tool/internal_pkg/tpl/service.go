@@ -56,6 +56,7 @@ func NewServiceInfo() *kitex.ServiceInfo {
 	}
 	extra := map[string]interface{}{
 		"PackageName":	 "{{.PkgInfo.PkgName}}",
+		"ServiceFilePath": "{{.ServiceFilePath}}",
 	}
 	{{- if gt (len .CombineServices) 0}}
 	extra["combine_service"] = true

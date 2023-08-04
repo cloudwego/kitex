@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/apache/thrift v0.13.0
-	github.com/bytedance/gopkg v0.0.0-20230531144706-a12972768317
+	github.com/bytedance/gopkg v0.0.0-20230728082804-614d0af6619b
 	github.com/bytedance/mockey v1.2.0
 	github.com/bytedance/sonic v1.9.1
 	github.com/choleraehyq/pid v0.0.17
@@ -12,8 +12,9 @@ require (
 	github.com/cloudwego/dynamicgo v0.1.2
 	github.com/cloudwego/fastpb v0.0.4
 	github.com/cloudwego/frugal v0.1.7
+	github.com/cloudwego/localsession v0.0.2
 	github.com/cloudwego/netpoll v0.4.1
-	github.com/cloudwego/thriftgo v0.2.11
+	github.com/cloudwego/thriftgo v0.2.13-0.20230803090847-3db44b44369c
 	github.com/golang/mock v1.6.0
 	github.com/google/pprof v0.0.0-20220608213341-c488b8fa1db3
 	github.com/jhump/protoreflect v1.8.2
