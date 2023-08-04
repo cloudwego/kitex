@@ -509,8 +509,11 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 			pkg.AddImports("context")
 		}
 		for _, m := range pkg.ServiceInfo.AllMethods() {
+			if m.ClientStreaming || m.ServerStreaming {
+				pkg.AddImports("fmt")
+			}
 			if m.GenArgResultStruct {
-				pkg.AddImports("fmt", "proto")
+				pkg.AddImports("proto")
 			} else {
 				// for method Arg and Result
 				pkg.AddImport(m.PkgRefName, m.ImportPath)
