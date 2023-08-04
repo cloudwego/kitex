@@ -23,6 +23,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/cloudwego/localsession/backup"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -90,6 +92,8 @@ type Options struct {
 	// Observability
 	TracerCtl  *rpcinfo.TraceController
 	StatsLevel *stats.Level
+
+	BackupOpt backup.Options
 }
 
 type Limit struct {
