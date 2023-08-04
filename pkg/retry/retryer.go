@@ -134,6 +134,22 @@ func (rc *Container) InitWithPolicies(methodPolicies map[string]Policy) error {
 	return nil
 }
 
+// DeletePolicy to delete the method by method.
+func (rc *Container) DeletePolicy(method string) {
+	rc.Lock()
+	defer rc.Unlock()
+	rc.msg = ""
+	if rc.hasCodeCfg {
+		// the priority of user setup code policy is higher than remote config
+		return
+	}
+	_, ok := rc.retryerMap.Load(method)
+	if ok {
+		rc.retryerMap.Delete(method)
+		rc.msg = fmt.Sprintf("delete retryer[%s] at %s", method, time.Now())
+	}
+}
+
 // NotifyPolicyChange to receive policy when it changes
 func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 	rc.Lock()

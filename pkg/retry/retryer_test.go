@@ -265,6 +265,10 @@ func TestNewRetryContainer(t *testing.T) {
 		},
 	}}, nil)
 	test.Assert(t, err != nil, err)
+
+	rc.DeletePolicy(method)
+	r = rc.getRetryer(genRPCInfo())
+	test.Assert(t, r == nil)
 }
 
 // test container dump
