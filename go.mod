@@ -14,7 +14,7 @@ require (
 	github.com/cloudwego/frugal v0.1.7
 	github.com/cloudwego/localsession v0.0.2
 	github.com/cloudwego/netpoll v0.4.1
-	github.com/cloudwego/thriftgo v0.2.13-0.20230803090847-3db44b44369c
+	github.com/cloudwego/thriftgo v0.2.13-0.20230804030519-2ce040e1b8ba
 	github.com/golang/mock v1.6.0
 	github.com/google/pprof v0.0.0-20220608213341-c488b8fa1db3
 	github.com/jhump/protoreflect v1.8.2
