@@ -810,7 +810,7 @@ func (p *MockTestArgs) SetReq(val *MockReq) {
 	p.Req = val
 }
 
-func (p *MockTestArgs) GetFirstArgument() (interface{}) {
+func (p *MockTestArgs) GetFirstArgument() interface{} {
 	return p.Req
 }
 
