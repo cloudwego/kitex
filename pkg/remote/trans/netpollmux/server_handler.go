@@ -63,10 +63,10 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	svrHdlr := &svrTransHandler{
-		opt:        opt,
-		codec:      opt.Codec,
-		svcInfoMap: opt.SvcInfoMap,
-		ext:        np.NewNetpollConnExtension(),
+		opt:    opt,
+		codec:  opt.Codec,
+		svcMap: opt.SvcMap,
+		ext:    np.NewNetpollConnExtension(),
 	}
 	if svrHdlr.opt.TracerCtl == nil {
 		// init TraceCtl when it is nil, or it will lead some unit tests panic
@@ -83,7 +83,7 @@ var _ remote.ServerTransHandler = &svrTransHandler{}
 
 type svrTransHandler struct {
 	opt        *remote.ServerOption
-	svcInfoMap map[string]*serviceinfo.ServiceInfo
+	svcMap     map[string]*serviceinfo.Service
 	inkHdlFunc endpoint.Endpoint
 	codec      remote.Codec
 	transPipe  *remote.TransPipeline
@@ -503,8 +503,8 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 }
 
 func (t *svrTransHandler) getFirstSvcInfo() (svcInfo *serviceinfo.ServiceInfo) {
-	for _, value := range t.svcInfoMap {
-		svcInfo = value
+	for _, svc := range t.svcMap {
+		svcInfo = svc.GetServiceInfo()
 		break
 	}
 	return svcInfo

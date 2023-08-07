@@ -61,6 +61,7 @@ func newTestRpcInfo() rpcinfo.RPCInfo {
 func init() {
 	body := "hello world"
 	rpcInfo := newTestRpcInfo()
+	svc := serviceinfo.NewService(mocks.ServiceInfo(), nil)
 
 	opt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
@@ -78,7 +79,7 @@ func init() {
 				return err
 			},
 		},
-		SvcInfoMap:       map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
+		SvcMap:           map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -442,6 +443,7 @@ func TestInvokeError(t *testing.T) {
 	}
 
 	body := "hello world"
+	svc := serviceinfo.NewService(mocks.ServiceInfo(), nil)
 	opt := &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(rpcInfo rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
@@ -466,7 +468,7 @@ func TestInvokeError(t *testing.T) {
 				return err
 			},
 		},
-		SvcInfoMap:       map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
+		SvcMap:           map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -625,8 +627,8 @@ func TestInvokeNoMethod(t *testing.T) {
 	svrTransHdlr.SetPipeline(pl)
 
 	var svcInfo *serviceinfo.ServiceInfo
-	for _, elem := range opt.SvcInfoMap {
-		svcInfo = elem
+	for _, svc := range opt.SvcMap {
+		svcInfo = svc.GetServiceInfo()
 		break
 	}
 	delete(svcInfo.Methods, method)
