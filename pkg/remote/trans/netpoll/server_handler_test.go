@@ -268,8 +268,8 @@ func TestNoMethodInfo(t *testing.T) {
 	}
 	remote.NewTransPipeline(svrTransHdlr)
 	var svcInfo *serviceinfo.ServiceInfo
-	for _, elem := range svrOpt.SvcInfoMap {
-		svcInfo = elem
+	for _, svc := range svrOpt.SvcMap {
+		svcInfo = svc.GetServiceInfo()
 		break
 	}
 	delete(svcInfo.Methods, method)

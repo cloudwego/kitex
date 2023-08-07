@@ -37,6 +37,23 @@ const (
 	GenericMethod = "$GenericCall"
 )
 
+type Service struct {
+	svcInfo *ServiceInfo
+	handler interface{}
+}
+
+func NewService(svcInfo *ServiceInfo, handler interface{}) Service {
+	return Service{svcInfo: svcInfo, handler: handler}
+}
+
+func (s *Service) GetServiceInfo() *ServiceInfo {
+	return s.svcInfo
+}
+
+func (s *Service) GetHandler() interface{} {
+	return s.handler
+}
+
 // ServiceInfo to record meta info of service
 type ServiceInfo struct {
 	// deprecated, for compatibility

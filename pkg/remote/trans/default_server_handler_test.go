@@ -45,6 +45,7 @@ func TestDefaultSvrTransHandler(t *testing.T) {
 	}
 
 	tagEncode, tagDecode := 0, 0
+	svc := serviceinfo.NewService(mocks.ServiceInfo(), nil)
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
 			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
@@ -58,7 +59,7 @@ func TestDefaultSvrTransHandler(t *testing.T) {
 				return nil
 			},
 		},
-		SvcInfoMap: map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
+		SvcMap: map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
 	}
 
 	handler, err := NewDefaultSvrTransHandler(opt, ext)
@@ -107,6 +108,7 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 
 	tracerCtl := &rpcinfo.TraceController{}
 	tracerCtl.Append(mockTracer)
+	svc := serviceinfo.NewService(mocks.ServiceInfo(), nil)
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
 			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
@@ -116,8 +118,8 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 				return nil
 			},
 		},
-		SvcInfoMap: map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
-		TracerCtl:  tracerCtl,
+		SvcMap:    map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
+		TracerCtl: tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
 			return ri
@@ -164,6 +166,7 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 	mockErr := errors.New("mock")
 	tracerCtl := &rpcinfo.TraceController{}
 	tracerCtl.Append(mockTracer)
+	svc := serviceinfo.NewService(mocks.ServiceInfo(), nil)
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
 			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
@@ -173,8 +176,8 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 				return mockErr
 			},
 		},
-		SvcInfoMap: map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
-		TracerCtl:  tracerCtl,
+		SvcMap:    map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
+		TracerCtl: tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
 			return ri
