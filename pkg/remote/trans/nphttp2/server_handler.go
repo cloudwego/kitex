@@ -191,15 +191,20 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			// set send grpc compressor at server to encode reply pack
 			remote.SetSendCompressor(ri, s.SendCompress())
 
-			svcInfo := t.svcMap[serviceName].GetServiceInfo()
-			st := NewStream(rCtx, svcInfo, newServerConn(tr, s), t)
-			streamArg := &streaming.Args{Stream: st}
-
-			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
-			rCtx = context.WithValue(rCtx, streamKey{}, st)
-
+			svc := t.svcMap[serviceName]
 			unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
-			if svcInfo != nil {
+			var st streaming.Stream
+			if svc == nil {
+				if unknownServiceHandlerFunc != nil {
+					st, rCtx = t.bindStreamIntoCtx(nil, rCtx, tr, s)
+					err = execUnknownServiceHandleFunc(rCtx, ri, methodName, st, unknownServiceHandlerFunc)
+				} else {
+					err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", serviceName))
+				}
+			} else {
+				svcInfo := svc.GetServiceInfo()
+				st, rCtx = t.bindStreamIntoCtx(svc.GetServiceInfo(), rCtx, tr, s)
+
 				if svcInfo.MethodInfo(methodName) == nil {
 					if unknownServiceHandlerFunc != nil {
 						err = execUnknownServiceHandleFunc(rCtx, ri, methodName, st, unknownServiceHandlerFunc)
@@ -207,13 +212,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 						err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 					}
 				} else {
-					err = t.inkHdlFunc(rCtx, streamArg, nil)
-				}
-			} else {
-				if unknownServiceHandlerFunc != nil {
-					err = execUnknownServiceHandleFunc(rCtx, ri, methodName, st, unknownServiceHandlerFunc)
-				} else {
-					err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", serviceName))
+					err = t.inkHdlFunc(rCtx, &streaming.Args{Stream: st}, nil)
 				}
 			}
 
@@ -320,9 +319,14 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	rpcStats.Reset()
 }
 
-func execUnknownServiceHandleFunc(ctx context.Context, ri rpcinfo.RPCInfo, method string, st streaming.Stream,
-	unknownServiceHandlerFunc func(context.Context, string, streaming.Stream) error,
-) error {
+func (t *svrTransHandler) bindStreamIntoCtx(svcInfo *serviceinfo.ServiceInfo, ctx context.Context, tr grpcTransport.ServerTransport, s *grpcTransport.Stream) (st streaming.Stream, rCtx context.Context) {
+	st = NewStream(ctx, svcInfo, newServerConn(tr, s), t)
+	// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
+	rCtx = context.WithValue(ctx, streamKey{}, st)
+	return
+}
+
+func execUnknownServiceHandleFunc(ctx context.Context, ri rpcinfo.RPCInfo, method string, st streaming.Stream, unknownServiceHandlerFunc func(context.Context, string, streaming.Stream) error) error {
 	rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 	err := unknownServiceHandlerFunc(ctx, method, st)
 	if err != nil {
