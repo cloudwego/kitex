@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
-	"github.com/cloudwego/kitex/internal/mocks/rpc_info"
 	"github.com/cloudwego/localsession"
 	"github.com/cloudwego/localsession/backup"
 	"github.com/cloudwego/netpoll"
@@ -39,6 +38,7 @@ import (
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
+	"github.com/cloudwego/kitex/internal/mocks/rpc_info"
 	mocksstats "github.com/cloudwego/kitex/internal/mocks/stats"
 	mockthrift "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
