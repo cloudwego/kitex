@@ -38,6 +38,7 @@ import (
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksnetpoll "github.com/cloudwego/kitex/internal/mocks/netpoll"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
+	"github.com/cloudwego/kitex/internal/mocks/rpc_info"
 	mocksstats "github.com/cloudwego/kitex/internal/mocks/stats"
 	mockthrift "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
@@ -557,19 +558,106 @@ func TestRetry(t *testing.T) {
 	defer ctrl.Finish()
 
 	var count int32
-	sleepMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+	tp := rpc_info.NewMockTimeoutProvider(ctrl)
+	tp.EXPECT().Timeouts(gomock.Any()).DoAndReturn(func(ri rpcinfo.RPCInfo) rpcinfo.Timeouts {
+		retryTimeStr, ok := ri.To().Tag(rpcinfo.RetryTag)
+		if atomic.AddInt32(&count, 1) == 1 {
+			// first request
+			test.Assert(t, !ok)
+		} else {
+			// retry request
+			test.Assert(t, retryTimeStr == "1", retryTimeStr)
+		}
+		return ri.Config()
+	}).AnyTimes()
+	mockTimeoutMW := func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, resp interface{}) (err error) {
-			if atomic.CompareAndSwapInt32(&count, 0, 1) {
-				time.Sleep(300 * time.Millisecond)
+			ri := rpcinfo.GetRPCInfo(ctx)
+			if atomic.LoadInt32(&count) == 1 {
+				return kerrors.ErrRPCTimeout
+			} else {
+				retryTimeStr := ri.To().DefaultTag(rpcinfo.RetryTag, "0")
+				test.Assert(t, retryTimeStr == "1", retryTimeStr)
+				r, _ := metainfo.GetPersistentValue(ctx, retry.TransitKey)
+				test.Assert(t, r == "1", r)
 			}
 			return nil
 		}
 	}
 
-	// should timeout
+	// case1: return timeout
 	cli := newMockClient(t, ctrl,
-		WithMiddleware(sleepMW),
-		WithRPCTimeout(100*time.Millisecond),
+		WithTimeoutProvider(tp),
+		WithMiddleware(mockTimeoutMW))
+	mtd := mocks.MockMethod
+	req, res := new(MockTStruct), new(MockTStruct)
+	err := cli.Call(context.Background(), mtd, req, res)
+	test.Assert(t, errors.Is(err, kerrors.ErrRPCTimeout))
+	test.Assert(t, count == 1, count)
+
+	// case 2: have timeout retry, return success
+	count = 0
+	cli = newMockClient(t, ctrl,
+		WithTimeoutProvider(tp),
+		WithMiddleware(mockTimeoutMW),
+		WithFailureRetry(&retry.FailurePolicy{
+			StopPolicy: retry.StopPolicy{
+				MaxRetryTimes: 3,
+				CBPolicy: retry.CBPolicy{
+					ErrorRate: 0.1,
+				},
+			},
+			RetrySameNode: true,
+		}))
+	err = cli.Call(context.Background(), mtd, req, res)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, count == 2, count)
+}
+
+func TestRetryWithDifferentTimeout(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var count int32
+	tp := rpc_info.NewMockTimeoutProvider(ctrl)
+	tp.EXPECT().Timeouts(gomock.Any()).DoAndReturn(func(ri rpcinfo.RPCInfo) rpcinfo.Timeouts {
+		cfg := rpcinfo.AsMutableRPCConfig(ri.Config()).Clone()
+		retryTimeStr, ok := ri.To().Tag(rpcinfo.RetryTag)
+		if atomic.AddInt32(&count, 1) == 1 {
+			// first request
+			test.Assert(t, !ok)
+			cfg.SetRPCTimeout(100 * time.Millisecond)
+		} else {
+			// retry request
+			test.Assert(t, retryTimeStr == "1", retryTimeStr)
+			// reset rpc timeout for retry request
+			cfg.SetRPCTimeout(500 * time.Millisecond)
+		}
+		return cfg.ImmutableView()
+	}).AnyTimes()
+	mockTimeoutMW := func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			ri := rpcinfo.GetRPCInfo(ctx)
+			if atomic.LoadInt32(&count) == 1 {
+				test.Assert(t, ri.Config().RPCTimeout().Milliseconds() == 100, ri.Config().RPCTimeout().Milliseconds())
+			} else {
+				retryTimeStr := ri.To().DefaultTag(rpcinfo.RetryTag, "0")
+				test.Assert(t, retryTimeStr == "1", retryTimeStr)
+				r, _ := metainfo.GetPersistentValue(ctx, retry.TransitKey)
+				test.Assert(t, r == "1", r)
+				test.Assert(t, ri.Config().RPCTimeout().Milliseconds() == 500, ri.Config().RPCTimeout().Milliseconds())
+			}
+			time.Sleep(200 * time.Millisecond)
+			return nil
+		}
+	}
+
+	// case: sleep 200ms
+	//   first request timeout is 100 then the timeout happens
+	//   retry request timeout is 500 then success
+	cli := newMockClient(t, ctrl,
+		WithTimeoutProvider(tp),
+		WithMiddleware(mockTimeoutMW),
 		WithFailureRetry(&retry.FailurePolicy{
 			StopPolicy: retry.StopPolicy{
 				MaxRetryTimes: 3,
@@ -583,6 +671,7 @@ func TestRetry(t *testing.T) {
 	req, res := new(MockTStruct), new(MockTStruct)
 	err := cli.Call(context.Background(), mtd, req, res)
 	test.Assert(t, err == nil, err)
+	test.Assert(t, count == 2, count)
 }
 
 func TestRetryWithResultRetry(t *testing.T) {
