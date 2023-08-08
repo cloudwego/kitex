@@ -149,6 +149,9 @@ func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote
 		return nil, perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader write kv info failed, %s", err.Error()))
 	}
 
+	if uint32(headerInfoSize) > MaxHeaderSize {
+		return nil, perrors.NewProtocolErrorWithMsg(fmt.Sprintf("invalid header length[%d]", headerInfoSize))
+	}
 	binary.BigEndian.PutUint16(headerInfoSizeField, uint16(headerInfoSize/4))
 	return totalLenField, err
 }
