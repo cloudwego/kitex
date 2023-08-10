@@ -449,6 +449,25 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 	return fs, nil
 }
 
+func (g *generator) GenerateServerWithMultiService(pkg *PackageInfo) (fs []*File, err error) {
+	g.setImports(ServerWithMultiServiceFileName, pkg)
+	task := &Task{
+		Name: ServerWithMultiServiceFileName,
+		Path: util.JoinPath(g.OutputPath, util.CombineOutputPath(g.GenPath, pkg.Namespace), ServerWithMultiServiceFileName),
+		Text: tpl.ServiceWithMultiServiceTpl,
+	}
+	handle := func(task *Task, pkg *PackageInfo) (*File, error) {
+		return task.Render(pkg)
+	}
+	f, err := g.chainMWs(handle)(task, pkg)
+	if err != nil {
+		return nil, err
+	}
+	fs = append(fs, f)
+
+	return fs, nil
+}
+
 func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	pkg.NoFastAPI = g.NoFastAPI
 	pkg.Codec = g.IDLType
