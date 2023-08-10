@@ -78,11 +78,11 @@ func NewServiceInfo() *kitex.ServiceInfo {
 	return svcInfo
 }
 
-{{- if .HasStreaming}}
+{{if .HasStreaming}}
 func Build{{UpperFirst .ServiceName}}Service(handler {{call .ServiceTypeName}}) kitex.Service {
 	return kitex.NewService(serviceInfo(), handler)
 }
-{{- end}}
+{{end}}
 
 {{range .AllMethods}}
 {{- $isStreaming := or .ClientStreaming .ServerStreaming}}

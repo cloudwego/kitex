@@ -34,16 +34,17 @@ const (
 	KitexGenPath = "kitex_gen"
 	DefaultCodec = "thrift"
 
-	BuildFileName       = "build.sh"
-	BootstrapFileName   = "bootstrap.sh"
-	ToolVersionFileName = "kitex_info.yaml"
-	HandlerFileName     = "handler.go"
-	MainFileName        = "main.go"
-	ClientFileName      = "client.go"
-	ServerFileName      = "server.go"
-	InvokerFileName     = "invoker.go"
-	ServiceFileName     = "*service.go"
-	ExtensionFilename   = "extensions.yaml"
+	BuildFileName                  = "build.sh"
+	BootstrapFileName              = "bootstrap.sh"
+	ToolVersionFileName            = "kitex_info.yaml"
+	HandlerFileName                = "handler.go"
+	MainFileName                   = "main.go"
+	ClientFileName                 = "client.go"
+	ServerFileName                 = "server.go"
+	InvokerFileName                = "invoker.go"
+	ServiceFileName                = "*service.go"
+	ExtensionFilename              = "extensions.yaml"
+	ServerWithMultiServiceFileName = "server_with_multi_service.go"
 
 	DefaultThriftPluginTimeLimit = time.Minute
 )
@@ -94,6 +95,7 @@ type Generator interface {
 	GenerateService(pkg *PackageInfo) ([]*File, error)
 	GenerateMainPackage(pkg *PackageInfo) ([]*File, error)
 	GenerateCustomPackage(pkg *PackageInfo) ([]*File, error)
+	GenerateServerWithMultiService(pkg *PackageInfo) ([]*File, error)
 }
 
 // Config .
@@ -547,5 +549,8 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 	case MainFileName:
 		pkg.AddImport("log", "log")
 		pkg.AddImport(pkg.PkgRefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
+	case ServerWithMultiServiceFileName:
+		pkg.AddImports("server")
+		pkg.AddImport("kitex", ImportPathTo("pkg/serviceinfo"))
 	}
 }
