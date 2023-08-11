@@ -187,8 +187,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			rCtx = remote.SetRecvCompressor(rCtx, s.RecvCompress())
 			rCtx = remote.SetSendCompressor(rCtx, s.SendCompress())
 
-			isStreaming := ri.Config().InteractionMode() == rpcinfo.Streaming
-			st := NewStream(rCtx, t.svcInfo, newServerConn(tr, s, &streamDesc{isStreaming: isStreaming}), t)
+			st := NewStream(rCtx, t.svcInfo, newServerConn(tr, s), t)
 			streamArg := &streaming.Args{Stream: st}
 
 			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go

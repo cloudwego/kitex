@@ -29,18 +29,16 @@ import (
 )
 
 type serverConn struct {
-	tr   grpc.ServerTransport
-	s    *grpc.Stream
-	desc *streamDesc
+	tr grpc.ServerTransport
+	s  *grpc.Stream
 }
 
 var _ GRPCConn = (*serverConn)(nil)
 
-func newServerConn(tr grpc.ServerTransport, s *grpc.Stream, desc *streamDesc) *serverConn {
+func newServerConn(tr grpc.ServerTransport, s *grpc.Stream) *serverConn {
 	return &serverConn{
-		tr:   tr,
-		s:    s,
-		desc: desc,
+		tr: tr,
+		s:  s,
 	}
 }
 
