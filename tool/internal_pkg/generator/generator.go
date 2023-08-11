@@ -456,7 +456,7 @@ func (g *generator) GenerateServerWithMultiService(pkg *PackageInfo) (fs []*File
 	task := &Task{
 		Name: ServerWithMultiServiceFileName,
 		Path: util.JoinPath(g.OutputPath, util.CombineOutputPath(g.GenPath, pkg.Namespace), ServerWithMultiServiceFileName),
-		Text: tpl.ServiceWithMultiServiceTpl,
+		Text: tpl.ServerWithMultiServiceTpl,
 	}
 	handle := func(task *Task, pkg *PackageInfo) (*File, error) {
 		return task.Render(pkg)
