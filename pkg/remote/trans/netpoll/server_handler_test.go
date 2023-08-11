@@ -27,7 +27,6 @@ import (
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 // TestOnActive test server_handler OnActive success
@@ -267,11 +266,7 @@ func TestNoMethodInfo(t *testing.T) {
 		},
 	}
 	remote.NewTransPipeline(svrTransHdlr)
-	var svcInfo *serviceinfo.ServiceInfo
-	for _, svc := range svrOpt.SvcMap {
-		svcInfo = svc.GetServiceInfo()
-		break
-	}
+	svcInfo := svrOpt.SvcMap[mocks.MockServiceName].GetServiceInfo()
 	delete(svcInfo.Methods, method)
 
 	// 2. test

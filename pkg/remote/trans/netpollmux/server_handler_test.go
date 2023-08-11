@@ -626,11 +626,7 @@ func TestInvokeNoMethod(t *testing.T) {
 	pl := remote.NewTransPipeline(svrTransHdlr)
 	svrTransHdlr.SetPipeline(pl)
 
-	var svcInfo *serviceinfo.ServiceInfo
-	for _, svc := range opt.SvcMap {
-		svcInfo = svc.GetServiceInfo()
-		break
-	}
+	svcInfo := opt.SvcMap[mocks.MockServiceName].GetServiceInfo()
 	delete(svcInfo.Methods, method)
 
 	if setter, ok := svrTransHdlr.(remote.InvokeHandleFuncSetter); ok {

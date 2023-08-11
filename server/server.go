@@ -513,8 +513,8 @@ func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
 		extra["address"] = lAddr
 		extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
 		si.Extra = extra
-		s.Lock()
 		service := serviceinfo.NewService(si, svc.GetHandler())
+		s.Lock()
 		s.svcMap[svcName] = &service
 		s.Unlock()
 	}
