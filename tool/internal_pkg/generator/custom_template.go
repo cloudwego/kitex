@@ -195,7 +195,6 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 			fs = append(fs, f...)
 		}
 	}
-
 	return fs, nil
 }
 
