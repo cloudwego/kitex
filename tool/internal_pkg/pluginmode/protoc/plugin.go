@@ -241,8 +241,8 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 	}
 
 	if isEnabledServerWithMultiService(pp.Services) {
-		// generate a server with multi-services
-		fs, err := pp.kg.GenerateServerWithMultiService(&pp.PackageInfo)
+		// generate a server and invoker with multi-services
+		fs, err := pp.kg.GenerateMultiServicePackage(&pp.PackageInfo)
 		if err != nil {
 			pp.err = err
 		}

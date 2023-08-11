@@ -34,17 +34,18 @@ const (
 	KitexGenPath = "kitex_gen"
 	DefaultCodec = "thrift"
 
-	BuildFileName                  = "build.sh"
-	BootstrapFileName              = "bootstrap.sh"
-	ToolVersionFileName            = "kitex_info.yaml"
-	HandlerFileName                = "handler.go"
-	MainFileName                   = "main.go"
-	ClientFileName                 = "client.go"
-	ServerFileName                 = "server.go"
-	InvokerFileName                = "invoker.go"
-	ServiceFileName                = "*service.go"
-	ExtensionFilename              = "extensions.yaml"
-	ServerWithMultiServiceFileName = "server_with_multi_service.go"
+	BuildFileName                   = "build.sh"
+	BootstrapFileName               = "bootstrap.sh"
+	ToolVersionFileName             = "kitex_info.yaml"
+	HandlerFileName                 = "handler.go"
+	MainFileName                    = "main.go"
+	ClientFileName                  = "client.go"
+	ServerFileName                  = "server.go"
+	InvokerFileName                 = "invoker.go"
+	ServiceFileName                 = "*service.go"
+	ExtensionFilename               = "extensions.yaml"
+	ServerWithMultiServiceFileName  = "server_with_multi_service.go"
+	InvokerWithMultiServiceFileName = "invoker_with_multi_service.go"
 
 	DefaultThriftPluginTimeLimit = time.Minute
 )
@@ -95,7 +96,7 @@ type Generator interface {
 	GenerateService(pkg *PackageInfo) ([]*File, error)
 	GenerateMainPackage(pkg *PackageInfo) ([]*File, error)
 	GenerateCustomPackage(pkg *PackageInfo) ([]*File, error)
-	GenerateServerWithMultiService(pkg *PackageInfo) ([]*File, error)
+	GenerateMultiServicePackage(pkg *PackageInfo) ([]*File, error)
 }
 
 // Config .
@@ -449,22 +450,38 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 	return fs, nil
 }
 
-func (g *generator) GenerateServerWithMultiService(pkg *PackageInfo) (fs []*File, err error) {
-	g.setImports(ServerWithMultiServiceFileName, pkg)
-	task := &Task{
-		Name: ServerWithMultiServiceFileName,
-		Path: util.JoinPath(g.OutputPath, util.CombineOutputPath(g.GenPath, pkg.Namespace), ServerWithMultiServiceFileName),
-		Text: tpl.ServerWithMultiServiceTpl,
-	}
-	handle := func(task *Task, pkg *PackageInfo) (*File, error) {
-		return task.Render(pkg)
-	}
-	f, err := g.chainMWs(handle)(task, pkg)
-	if err != nil {
-		return nil, err
-	}
-	fs = append(fs, f)
+func (g *generator) GenerateMultiServicePackage(pkg *PackageInfo) (fs []*File, err error) {
+	g.updatePackageInfo(pkg)
+	output := util.JoinPath(g.OutputPath, util.CombineOutputPath(g.GenPath, pkg.Namespace))
 
+	tasks := []*Task{
+		{
+			Name: ServerWithMultiServiceFileName,
+			Path: util.JoinPath(output, ServerWithMultiServiceFileName),
+			Text: tpl.ServerWithMultiServiceTpl,
+		},
+		{
+			Name: InvokerWithMultiServiceFileName,
+			Path: util.JoinPath(output, InvokerWithMultiServiceFileName),
+			Text: tpl.InvokerWithMultiServiceTpl,
+		},
+	}
+
+	for _, t := range tasks {
+		if err = t.Build(); err != nil {
+			err = fmt.Errorf("build %s failed: %w", t.Name, err)
+			return nil, err
+		}
+		g.setImports(t.Name, pkg)
+		handle := func(task *Task, pkg *PackageInfo) (*File, error) {
+			return task.Render(pkg)
+		}
+		f, err := g.chainMWs(handle)(t, pkg)
+		if err != nil {
+			return nil, err
+		}
+		fs = append(fs, f)
+	}
 	return fs, nil
 }
 
@@ -568,7 +585,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 	case MainFileName:
 		pkg.AddImport("log", "log")
 		pkg.AddImport(pkg.PkgRefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
-	case ServerWithMultiServiceFileName:
+	case ServerWithMultiServiceFileName, InvokerWithMultiServiceFileName:
 		pkg.AddImports("server")
 		pkg.AddImport("kitex", ImportPathTo("pkg/serviceinfo"))
 	}
