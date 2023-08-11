@@ -29,7 +29,8 @@ func TestEmbedOK(t *testing.T) {
 	test.Assert(t, len(InvokerTpl) > 0)
 	test.Assert(t, len(MainTpl) > 0)
 	test.Assert(t, len(ServerTpl) > 0)
-	test.Assert(t, len(ServerWithMultiServiceTpl) > 0)
 	test.Assert(t, len(ServiceTpl) > 0)
 	test.Assert(t, len(ToolVersionTpl) > 0)
+	test.Assert(t, len(ServerWithMultiServiceTpl) > 0)
+	test.Assert(t, len(InvokerWithMultiServiceTpl) > 0)
 }
