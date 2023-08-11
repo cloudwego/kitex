@@ -34,7 +34,7 @@ func TestServerHandler(t *testing.T) {
 	tr, err := newMockServerTransport(npConn)
 	test.Assert(t, err == nil, err)
 	s := grpc.CreateStream(1, func(i int) {})
-	serverConn := newServerConn(tr, s)
+	serverConn := newServerConn(tr, s, &streamDesc{false})
 	defer serverConn.Close()
 
 	// test NewTransHandler()
