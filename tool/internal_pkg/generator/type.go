@@ -21,6 +21,7 @@ import (
 	"text/template"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/cloudwego/kitex/transport"
 )
 
 // File .
@@ -45,6 +46,7 @@ type PackageInfo struct {
 	Features         []feature
 	FrugalPretouch   bool
 	Module           string
+	Protocol         transport.Protocol
 }
 
 // AddImport .
@@ -97,6 +99,7 @@ type ServiceInfo struct {
 	CombineServices []*ServiceInfo
 	HasStreaming    bool
 	ServiceFilePath string
+	Protocol        string
 }
 
 // AllMethods returns all methods that the service have.

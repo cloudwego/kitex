@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/cloudwego/kitex/transport"
 
 	"github.com/cloudwego/thriftgo/generator/backend"
 	"github.com/cloudwego/thriftgo/generator/golang"
@@ -188,10 +189,9 @@ func (c *converter) copyTypeWithRef(t *parser.Type, ref string) (res *parser.Typ
 	default:
 		if strings.Contains(t.Name, ".") {
 			return &parser.Type{
-				Name:        t.Name,
-				KeyType:     t.KeyType,
-				ValueType:   t.ValueType,
-				Annotations: t.Annotations,
+				Name:      t.Name,
+				KeyType:   t.KeyType,
+				ValueType: t.ValueType,
 			}
 		}
 		return &parser.Type{
@@ -353,8 +353,10 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 		}
 		// combine service
 		if ast == req.AST && c.Config.CombineService && len(ast.Services) > 0 {
-			var svcs []*generator.ServiceInfo
-			var methods []*generator.MethodInfo
+			var (
+				svcs    []*generator.ServiceInfo
+				methods []*generator.MethodInfo
+			)
 			for _, s := range all[ast.Filename] {
 				svcs = append(svcs, s)
 				methods = append(methods, s.AllMethods()...)
@@ -376,6 +378,11 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				Methods:         methods,
 				ServiceFilePath: ast.Filename,
 			}
+
+			if c.IsHessian2() {
+				si.Protocol = transport.HESSIAN2.String()
+			}
+
 			si.ServiceTypeName = func() string { return si.ServiceName }
 			all[ast.Filename] = append(all[ast.Filename], si)
 			c.svc2ast[si] = ast
@@ -403,6 +410,10 @@ func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*ge
 			return nil, err
 		}
 		si.Methods = append(si.Methods, mi)
+	}
+
+	if c.IsHessian2() {
+		si.Protocol = transport.HESSIAN2.String()
 	}
 	return si, nil
 }
@@ -483,4 +494,8 @@ func (c *converter) getCombineServiceName(name string, svcs []*generator.Service
 		}
 	}
 	return name
+}
+
+func (c *converter) IsHessian2() bool {
+	return strings.EqualFold(c.Config.Protocol, transport.HESSIAN2.String())
 }

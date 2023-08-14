@@ -29,6 +29,7 @@ const (
 	Framed
 	HTTP
 	GRPC
+	HESSIAN2
 
 	TTHeaderFramed = TTHeader | Framed
 )
@@ -51,6 +52,8 @@ func (tp Protocol) String() string {
 		return "TTHeaderFramed"
 	case GRPC:
 		return "GRPC"
+	case HESSIAN2:
+		return "Hessian2"
 	}
 	return Unknown
 }

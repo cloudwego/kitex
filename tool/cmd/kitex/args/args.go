@@ -114,6 +114,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Specify a code gen path.")
 	f.BoolVar(&a.DeepCopyAPI, "deep-copy-api", false,
 		"Generate codes with injecting deep copy method.")
+	f.StringVar(&a.Protocol, "protocol", "",
+		"Specify a protocol for codec")
 	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
@@ -298,11 +300,15 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 		Stdout: io.MultiWriter(out, os.Stdout),
 		Stderr: io.MultiWriter(out, os.Stderr),
 	}
+
 	if a.IDLType == "thrift" {
 		os.Setenv(EnvPluginMode, thriftgo.PluginName)
 		cmd.Args = append(cmd.Args, "thriftgo")
 		for _, inc := range a.Includes {
 			cmd.Args = append(cmd.Args, "-i", inc)
+		}
+		if strings.EqualFold(a.Protocol, "hessian2") {
+			a.ThriftOptions = append(a.ThriftOptions, "template=slim")
 		}
 		a.ThriftOptions = append(a.ThriftOptions, "package_prefix="+a.PackagePrefix)
 		gas := "go:" + strings.Join(a.ThriftOptions, ",")
