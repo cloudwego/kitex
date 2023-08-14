@@ -114,6 +114,14 @@ func (p *patcher) buildTemplates() (err error) {
 			templates.StructLikeDefault,
 			templates.FieldGetOrSet,
 			templates.FieldIsSet,
+			structLikeDeepCopy,
+			fieldDeepCopy,
+			fieldDeepCopyStructLike,
+			fieldDeepCopyContainer,
+			fieldDeepCopyMap,
+			fieldDeepCopyList,
+			fieldDeepCopySet,
+			fieldDeepCopyBaseType,
 			structLikeCodec,
 			processor)
 	} else {
