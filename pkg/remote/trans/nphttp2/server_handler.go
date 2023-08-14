@@ -184,6 +184,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				ink.SetServiceName(sm[idx+1 : pos])
 			}
 
+			rCtx = remote.SetRecvCompressor(rCtx, s.RecvCompress())
+			rCtx = remote.SetSendCompressor(rCtx, s.SendCompress())
+
 			st := NewStream(rCtx, t.svcInfo, newServerConn(tr, s), t)
 			streamArg := &streaming.Args{Stream: st}
 

@@ -62,7 +62,6 @@ type patcher struct {
 	deepCopyAPI bool
 
 	fileTpl *template.Template
-	refTpl  *template.Template
 }
 
 func (p *patcher) buildTemplates() (err error) {
@@ -115,6 +114,14 @@ func (p *patcher) buildTemplates() (err error) {
 			templates.StructLikeDefault,
 			templates.FieldGetOrSet,
 			templates.FieldIsSet,
+			structLikeDeepCopy,
+			fieldDeepCopy,
+			fieldDeepCopyStructLike,
+			fieldDeepCopyContainer,
+			fieldDeepCopyMap,
+			fieldDeepCopyList,
+			fieldDeepCopySet,
+			fieldDeepCopyBaseType,
 			structLikeCodec,
 			processor)
 	} else {
@@ -178,14 +185,6 @@ func (p *patcher) buildTemplates() (err error) {
 		return fmt.Errorf("failed to parse extra templates: %w: %q", err, ext)
 	}
 	p.fileTpl = tpl
-
-	refAll := template.New("kitex").Funcs(m)
-	refTpls := []string{emptyFile}
-	for _, refTpl := range refTpls {
-		refAll = template.Must(refAll.Parse(refTpl))
-	}
-	p.refTpl = refAll
-
 	return nil
 }
 
@@ -197,13 +196,14 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 
 	for ast := range req.AST.DepthFirstSearch() {
 
-		scope, err := golang.BuildScope(p.utils, ast)
+		// scope, err := golang.BuildScope(p.utils, ast)
+		scope, _, err := golang.BuildRefScope(p.utils, ast)
 		if err != nil {
 			return nil, fmt.Errorf("build scope for ast %q: %w", ast.Filename, err)
 		}
 		p.utils.SetRootScope(scope)
 
-		pkgName := p.utils.RootScope().FilePackage()
+		pkgName := golang.GetImportPackage(golang.GetImportPath(p.utils, ast))
 
 		path := p.utils.CombineOutputPath(req.OutputPath, ast)
 		base := p.utils.GetFilename(ast)
@@ -223,9 +223,9 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 
 		buf.Reset()
 
-		fileTpl := p.fileTpl
-		if ok, _ := golang.DoRef(ast.Filename); ok {
-			fileTpl = p.refTpl
+		// if all scopes are ref, don't generate k-xxx
+		if scope == nil {
+			continue
 		}
 
 		data := &struct {
@@ -238,7 +238,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
 		}
 		p.filterStdLib(data.Imports)
-		if err = fileTpl.ExecuteTemplate(&buf, "file", data); err != nil {
+		if err = p.fileTpl.ExecuteTemplate(&buf, "file", data); err != nil {
 			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
 		}
 		content := buf.String()

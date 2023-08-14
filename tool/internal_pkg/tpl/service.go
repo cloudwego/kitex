@@ -56,6 +56,7 @@ func NewServiceInfo() *kitex.ServiceInfo {
 	}
 	extra := map[string]interface{}{
 		"PackageName":	 "{{.PkgInfo.PkgName}}",
+		"ServiceFilePath": "{{.ServiceFilePath}}",
 	}
 	{{- if gt (len .CombineServices) 0}}
 	extra["combine_service"] = true
@@ -245,12 +246,15 @@ func (p *{{.ArgStructName}}) Size() (n int) {
 
 func (p *{{.ArgStructName}}) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetReq() {
-	   return out, fmt.Errorf("No req in {{.ArgStructName}}")
+	   return out, nil
 	}
 	return proto.Marshal(p.Req)
 }
 
 func (p *{{.ArgStructName}}) Unmarshal(in []byte) error {
+	if len(in) == 0 {
+		return nil
+	}
 	msg := new({{NotPtr $arg.Type}})
 	if err := proto.Unmarshal(in, msg); err != nil {
 	   return err
@@ -307,12 +311,15 @@ func (p *{{.ResStructName}}) Size() (n int) {
 
 func (p *{{.ResStructName}}) Marshal(out []byte) ([]byte, error) {
 	if !p.IsSetSuccess() {
-	   return out, fmt.Errorf("No req in {{.ResStructName}}")
+	   return out, nil
 	}
 	return proto.Marshal(p.Success)
 }
 
 func (p *{{.ResStructName}}) Unmarshal(in []byte) error {
+	if len(in) == 0 {
+		return nil
+	}
 	msg := new({{NotPtr .Resp.Type}})
 	if err := proto.Unmarshal(in, msg); err != nil {
 	   return err

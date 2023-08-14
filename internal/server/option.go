@@ -23,6 +23,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/cloudwego/localsession/backup"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -90,6 +92,8 @@ type Options struct {
 	// Observability
 	TracerCtl  *rpcinfo.TraceController
 	StatsLevel *stats.Level
+
+	BackupOpt backup.Options
 }
 
 type Limit struct {
@@ -155,7 +159,11 @@ func DefaultSysExitSignal() <-chan error {
 
 func SysExitSignal() chan os.Signal {
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGHUP, syscall.SIGTERM)
+	notifications := []os.Signal{syscall.SIGINT, syscall.SIGTERM}
+	if !signal.Ignored(syscall.SIGHUP) {
+		notifications = append(notifications, syscall.SIGHUP)
+	}
+	signal.Notify(signals, notifications...)
 	return signals
 }
 

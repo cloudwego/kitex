@@ -45,9 +45,6 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 	var err error
 	var offset int
 	var l int
-	{{- if Features.KeepUnknownFields}}
-	var name string
-	{{- end}}
 	var fieldTypeId thrift.TType
 	var fieldId int16
 	{{- range .Fields}}
@@ -62,7 +59,13 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 	}
 
 	for {
-		{{if Features.KeepUnknownFields}}name{{else}}_{{end}}, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
+		{{- if Features.KeepUnknownFields}}
+		{{- if gt (len .Fields) 0}}
+		var isUnknownField bool
+		{{- end}}
+		var beginOff int = offset
+		{{- end}}
+		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
 			goto ReadFieldBeginError
@@ -92,37 +95,21 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 			}
 		{{- end}}{{/* range .Fields */}}
 		default:
-			{{- if Features.KeepUnknownFields}}
-			l, f, err2 := bthrift.ReadUnknownField(buf[offset:], name, fieldTypeId, fieldId)
-			offset += l
-			if err2 != nil {
-				err = err2
-				goto UnknownFieldsAppendError
-			}
-			p._unknownFields = append(p._unknownFields, f)
-			{{- else}}
 			l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
 			if err != nil {
 				goto SkipFieldError
 			}
+			{{- if Features.KeepUnknownFields}}
+			isUnknownField = true
 			{{- end}}{{/* if Features.KeepUnknownFields */}}
 		}
 		{{- else -}}
-		{{- if Features.KeepUnknownFields}}
-		l, f, err := bthrift.ReadUnknownField(buf[offset:], name, fieldTypeId, fieldId)
-		offset += l
-		if err != nil {
-			goto UnknownFieldsAppendError
-		}
-		p._unknownFields = append(p._unknownFields, f)
-		{{- else}}
 		l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
 		offset += l
 		if err != nil {
-			goto SkipFieldTypeError
+			goto SkipFieldError
 		}
-		{{- end}}{{/* if Features.KeepUnknownFields */}}
 		{{- end}}{{/* if len(.Fields) > 0 */}}
 
 		l, err = bthrift.Binary.ReadFieldEnd(buf[offset:])
@@ -130,6 +117,16 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 		if err != nil {
 		  goto ReadFieldEndError
 		}
+
+		{{- if Features.KeepUnknownFields}}
+		{{if gt (len .Fields) 0 -}}
+		if isUnknownField {
+			p._unknownFields = append(p._unknownFields, buf[beginOff:offset]...)
+		}
+		{{- else -}}
+		p._unknownFields = append(p._unknownFields, buf[beginOff:offset]...)
+		{{- end}}
+		{{- end}}{{/* if Features.KeepUnknownFields */}}
 	}
 	l, err = bthrift.Binary.ReadStructEnd(buf[offset:])
 	offset += l
@@ -151,20 +148,12 @@ ReadStructBeginError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
 ReadFieldBeginError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
-{{if gt (len .Fields) 0 -}}
+{{- if gt (len .Fields) 0}}
 ReadFieldError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_{{$TypeName}}[fieldId]), err)
+{{- end}}
 SkipFieldError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
-{{- else if Features.KeepUnknownFields -}}
-{{- else -}}
-SkipFieldTypeError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T skip field type %d error", p, fieldTypeId), err)
-{{ end -}}
-{{- if Features.KeepUnknownFields}}
-UnknownFieldsAppendError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T append unknown field(name: %s type: %d id: %d) error: ", p, name, fieldTypeId, fieldId), err)
-{{- end}}{{/* if Features.KeepUnknownFields */}}
 ReadFieldEndError:
 	return offset, thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
 ReadStructEndError:
@@ -243,11 +232,7 @@ func (p *{{$TypeName}}) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryW
 		offset += p.fastWriteField{{Str .ID}}(buf[offset:], binaryWriter)
 		{{- end}}
 		{{- if Features.KeepUnknownFields}}
-		l, err := bthrift.WriteUnknownFields(buf[offset:], p._unknownFields)
-		if err != nil {
-			panic(fmt.Errorf("%T write unknown field: %s", p, err))
-		}
-		offset += l
+		offset += copy(buf[offset:], p._unknownFields)
 		{{- end}}{{/* if Features.KeepUnknownFields */}}
 	}
 	offset += bthrift.Binary.WriteFieldStop(buf[offset:])
@@ -280,11 +265,7 @@ func (p *{{$TypeName}}) BLength() int {
 		l += p.field{{Str .ID}}Length()
 		{{- end}}
 		{{- if Features.KeepUnknownFields}}
-		unknownL, err := bthrift.UnknownFieldsLength(p._unknownFields)
-		if err != nil {
-			panic(fmt.Errorf("%T unknown fields length: %s", p, err))
-		}
-		l += unknownL
+		l += len(p._unknownFields)
 		{{- end}}{{/* if Features.KeepUnknownFields */}}
 	}
 	l += bthrift.Binary.FieldStopLength()

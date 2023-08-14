@@ -335,6 +335,13 @@ func (s *Stream) RecvCompress() string {
 	return s.recvCompress
 }
 
+// SendCompress returns the compression algorithm applied to the outbound
+// message. It is empty string if there is no compression applied.
+func (s *Stream) SendCompress() string {
+	s.waitOnHeader()
+	return s.sendCompress
+}
+
 // SetSendCompress sets the compression algorithm to the stream.
 func (s *Stream) SetSendCompress(str string) {
 	s.sendCompress = str

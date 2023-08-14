@@ -25,6 +25,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/remote"
+
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
@@ -74,7 +76,8 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 	s, err := tr.NewStream(ctx, &grpc.CallHdr{
 		Host: host,
 		// grpc method format /package.Service/Method
-		Method: fmt.Sprintf("/%s/%s", svcName, ri.Invocation().MethodName()),
+		Method:       fmt.Sprintf("/%s/%s", svcName, ri.Invocation().MethodName()),
+		SendCompress: remote.GetSendCompressor(ctx),
 	})
 	if err != nil {
 		return nil, err
@@ -133,3 +136,4 @@ func (c *clientConn) Close() error {
 
 func (c *clientConn) Header() (metadata.MD, error) { return c.s.Header() }
 func (c *clientConn) Trailer() metadata.MD         { return c.s.Trailer() }
+func (c *clientConn) GetRecvCompress() string      { return c.s.RecvCompress() }
