@@ -27,3 +27,28 @@ func TestValid(t *testing.T) {
 	test.Assert(t, (&Option{MaxConnections: 1, MaxQPS: 0}).Valid() == true)
 	test.Assert(t, (&Option{MaxConnections: 0, MaxQPS: 1}).Valid() == true)
 }
+
+type fakeUpdater struct {
+	connectionLimit int
+	qpsLimit        int
+}
+
+func (fu *fakeUpdater) UpdateLimit(opt *Option) (updated bool) {
+	if opt == nil {
+		return false
+	}
+	fu.connectionLimit = opt.MaxConnections
+	fu.qpsLimit = opt.MaxQPS
+	return true
+}
+
+func TestUpdateLimitConfig(t *testing.T) {
+	fu := &fakeUpdater{}
+	opt := DefaultOption()
+	opt.UpdateControl(fu)
+
+	updated := opt.UpdateLimitConfig(10, 100)
+	test.Assert(t, updated == true)
+	test.Assert(t, fu.connectionLimit == 10)
+	test.Assert(t, fu.qpsLimit == 100)
+}

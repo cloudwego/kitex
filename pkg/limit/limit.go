@@ -16,6 +16,10 @@
 
 package limit
 
+import (
+	"sync/atomic"
+)
+
 // Updater is used to update the limit dynamically.
 type Updater interface {
 	UpdateLimit(opt *Option) (updated bool)
@@ -23,9 +27,10 @@ type Updater interface {
 
 // Option is used to config the limiter.
 type Option struct {
+	updater atomic.Value
+
 	MaxConnections int
 	MaxQPS         int
-
 	// UpdateControl receives a Updater which gives the limitation provider
 	// the ability to update limit dynamically.
 	UpdateControl func(u Updater)
@@ -34,4 +39,38 @@ type Option struct {
 // Valid checks if the option is valid.
 func (lo *Option) Valid() bool {
 	return lo.MaxConnections > 0 || lo.MaxQPS > 0
+}
+
+// UpdateLimitConfig the wrapper of updater's UpdateLimit.
+func (opt *Option) UpdateLimitConfig(maxConnections, maxQPS int) bool {
+	opt.MaxConnections = maxConnections
+	opt.MaxQPS = maxQPS
+
+	if !opt.Valid() {
+		return false
+	}
+
+	updater := opt.updater.Load()
+	// can not guarantee the bootstrap order of the config and updater, you
+	// should make sure the updater is initialized before update config.
+	if updater == nil {
+		return false
+	}
+	u, ok := updater.(Updater)
+	if !ok {
+		return false
+	}
+	return u.UpdateLimit(opt)
+}
+
+// DefaultOption initialize the UpdateControl function.
+func DefaultOption() *Option {
+	opt := &Option{}
+	opt.UpdateControl = func(u Updater) {
+		opt.updater.Store(u)
+		if opt.Valid() {
+			u.UpdateLimit(opt)
+		}
+	}
+	return opt
 }
