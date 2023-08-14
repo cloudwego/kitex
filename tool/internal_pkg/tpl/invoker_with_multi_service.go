@@ -42,7 +42,7 @@ func NewInvokerWithMultiServices(services []kitex.Service, opts ...server.Option
 			panic(err)
 		}
 	}
-	if err := s.Init(); err != nil {
+	if err := svr.Init(); err != nil {
 		panic(err)
 	}
 	return svr
