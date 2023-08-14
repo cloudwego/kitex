@@ -160,8 +160,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	}
 
 	// heartbeat processing
+	// recvMsg.MessageType would be set to remote.Heartbeat in previous Read procedure
+	// if specified codec support heartbeat
 	if recvMsg.MessageType() == remote.Heartbeat {
-		// todo(DMwangnima): pass tags?
 		sendMsg = remote.NewMessage(nil, t.svcInfo, ri, remote.Heartbeat, remote.Server)
 	} else {
 		// reply processing
