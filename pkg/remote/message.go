@@ -51,6 +51,8 @@ const (
 	Oneway MessageType = 4
 
 	Stream MessageType = 5
+
+	Heartbeat MessageType = 6
 )
 
 const (
