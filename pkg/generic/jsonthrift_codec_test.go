@@ -65,7 +65,7 @@ func TestJsonThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
-func TestJsonThriftCodec_SelfRef(t *testing.T) {
+func TestJsonThriftCodec_SelfRef_Old(t *testing.T) {
 	t.Run("old way", func(t *testing.T) {
 		p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 		test.Assert(t, err == nil)
@@ -183,6 +183,36 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	in = remote.NewReaderBuffer(buf)
 	err = jtc.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil)
+}
+
+func TestJsonThriftCodec_SelfRef(t *testing.T) {
+	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
+	test.Assert(t, err == nil)
+	jtc, err := newJsonThriftCodec(p, thriftCodec, nil)
+	test.Assert(t, err == nil)
+	defer jtc.Close()
+	test.Assert(t, jtc.Name() == "JSONThrift")
+
+	method, err := jtc.getMethod(nil, "Test")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Test")
+
+	ctx := context.Background()
+	sendMsg := initJsonSendMsg(transport.TTHeader)
+
+	// Marshal side
+	out := remote.NewWriterBuffer(256)
+	err = jtc.Marshal(ctx, sendMsg, out)
+	test.Assert(t, err == nil, err)
+
+	// Unmarshal side
+	recvMsg := initJsonRecvMsg()
+	buf, err := out.Bytes()
+	test.Assert(t, err == nil)
+	recvMsg.SetPayloadLen(len(buf))
+	in := remote.NewReaderBuffer(buf)
+	err = jtc.Unmarshal(ctx, recvMsg, in)
+	test.Assert(t, err == nil, err)
 }
 
 func TestJsonExceptionError(t *testing.T) {
