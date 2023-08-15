@@ -220,7 +220,7 @@ func TestRetryPolicyBothNil(t *testing.T) {
 	rc.NotifyPolicyChange(ri.To().Method(), p2)
 
 	r := rc.getRetryer(ri)
-	test.Assert(t, r == nil, r)
+	test.Assert(t, r != nil, r)
 }
 
 // test failurePolicy update

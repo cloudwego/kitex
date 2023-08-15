@@ -20,6 +20,8 @@ import (
 	"context"
 	"sync/atomic"
 
+	"github.com/cloudwego/dynamicgo/conv"
+
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -37,15 +39,34 @@ var (
 type JSONRequest = string
 
 type jsonThriftCodec struct {
-	svcDsc           atomic.Value // *idl
-	provider         DescriptorProvider
-	codec            remote.PayloadCodec
-	binaryWithBase64 bool
+	svcDsc                 atomic.Value // *idl
+	provider               DescriptorProvider
+	codec                  remote.PayloadCodec
+	binaryWithBase64       bool
+	opts                   *Options
+	convOpts               conv.Options // used for dynamicgo conversion
+	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
+	convOptsWithException  conv.Options // used for dynamicgo conversion with ConvertException turned on
+	dynamicgoEnabled       bool
 }
 
-func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*jsonThriftCodec, error) {
+func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*jsonThriftCodec, error) {
 	svc := <-p.Provide()
-	c := &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true}
+	c := &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true, opts: opts, dynamicgoEnabled: false}
+	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoEnabled {
+		c.dynamicgoEnabled = true
+
+		convOpts := opts.dynamicgoConvOpts
+		c.convOpts = convOpts
+
+		convOptsWithThriftBase := convOpts
+		convOptsWithThriftBase.EnableThriftBase = true
+		c.convOptsWithThriftBase = convOptsWithThriftBase
+
+		convOptsWithException := convOpts
+		convOptsWithException.ConvertException = true
+		c.convOptsWithException = convOptsWithException
+	}
 	c.svcDsc.Store(svc)
 	go c.update()
 	return c, nil
@@ -73,11 +94,18 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
+
 	wm, err := thrift.NewWriteJSON(svcDsc, method, msg.RPCRole() == remote.Client)
 	if err != nil {
 		return err
 	}
 	wm.SetBase64Binary(c.binaryWithBase64)
+	if c.dynamicgoEnabled {
+		if err = wm.SetDynamicGo(svcDsc, method, &c.convOpts, &c.convOptsWithThriftBase); err != nil {
+			return err
+		}
+	}
+
 	msg.Data().(WithCodec).SetCodec(wm)
 	return c.codec.Marshal(ctx, msg, out)
 }
@@ -90,8 +118,14 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
 	}
+
 	rm := thrift.NewReadJSON(svcDsc, msg.RPCRole() == remote.Client)
 	rm.SetBinaryWithBase64(c.binaryWithBase64)
+	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
+	if c.dynamicgoEnabled && msg.PayloadLen() != 0 {
+		rm.SetDynamicGo(&c.convOpts, &c.convOptsWithException, msg)
+	}
+
 	msg.Data().(WithCodec).SetCodec(rm)
 	return c.codec.Unmarshal(ctx, msg, in)
 }

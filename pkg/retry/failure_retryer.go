@@ -277,9 +277,11 @@ func (r *failureRetryer) Dump() map[string]interface{} {
 	dm := make(map[string]interface{})
 	dm["enable"] = r.enable
 	dm["failure_retry"] = r.policy
-	dm["specified_result_retry"] = map[string]bool{
-		"error_retry": r.policy.IsErrorRetryNonNil(),
-		"resp_retry":  r.policy.IsRespRetryNonNil(),
+	if r.policy != nil {
+		dm["specified_result_retry"] = map[string]bool{
+			"error_retry": r.policy.IsErrorRetryNonNil(),
+			"resp_retry":  r.policy.IsRespRetryNonNil(),
+		}
 	}
 	if r.errMsg != "" {
 		dm["errMsg"] = r.errMsg

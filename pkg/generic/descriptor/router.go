@@ -95,14 +95,14 @@ func (r *router) Handle(rt Route) {
 }
 
 func (r *router) Lookup(req *HTTPRequest) (*FunctionDescriptor, error) {
-	root, ok := r.trees[req.Method]
+	root, ok := r.trees[req.GetMethod()]
 	if !ok {
-		return nil, fmt.Errorf("function lookup failed, no root with method=%s", req.Method)
+		return nil, fmt.Errorf("function lookup failed, no root with method=%s", req.GetMethod())
 	}
-	fn, ps, _ := root.getValue(req.Path, r.getParams, false)
+	fn, ps, _ := root.getValue(req.GetPath(), r.getParams, false)
 	if fn == nil {
 		r.putParams(ps)
-		return nil, fmt.Errorf("function lookup failed, path=%s", req.Path)
+		return nil, fmt.Errorf("function lookup failed, path=%s", req.GetPath())
 	}
 	req.Params = ps
 	return fn, nil

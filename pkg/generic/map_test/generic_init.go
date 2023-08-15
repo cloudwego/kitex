@@ -213,3 +213,8 @@ func (m *mockImpl) Test(ctx context.Context, req *kt.MockReq) (r string, err err
 	}
 	return mockResp, nil
 }
+
+// ExceptionTest ...
+func (m *mockImpl) ExceptionTest(ctx context.Context, req *kt.MockReq) (r string, err error) {
+	return "", kt.NewException()
+}

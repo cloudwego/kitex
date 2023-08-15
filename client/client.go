@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/localsession/backup"
 
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
@@ -301,8 +302,8 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) 
 }
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
-func (kc *kClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo)
+func (kc *kClient) initRPCInfo(ctx context.Context, method string, retryTimes int) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, retryTimes)
 }
 
 func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo, opt *client.Options) (context.Context, *callopt.CallOptions) {
@@ -318,10 +319,16 @@ func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr rem
 
 // Call implements the Client interface .
 func (kc *kClient) Call(ctx context.Context, method string, request, response interface{}) (err error) {
+	// merge backup context if no metainfo found in ctx
+	ctx = backup.RecoverCtxOnDemands(ctx, kc.opt.CtxBackupHandler)
+
 	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
-	ctx, ri, callOpts = kc.initRPCInfo(ctx, method)
+	ctx, ri, callOpts = kc.initRPCInfo(ctx, method, 0)
+	if callOpts != nil && callOpts.CompressorName != "" {
+		ctx = remote.SetSendCompressor(ctx, callOpts.CompressorName)
+	}
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	var reportErr error
@@ -374,7 +381,7 @@ func (kc *kClient) rpcCallWithRetry(ri rpcinfo.RPCInfo, method string, request, 
 		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
 		cRI := ri
 		if currCallTimes > 1 {
-			ctx, cRI, _ = kc.initRPCInfo(ctx, method)
+			ctx, cRI, _ = kc.initRPCInfo(ctx, method, currCallTimes-1)
 			ctx = metainfo.WithPersistentValue(ctx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
 			if prevRI.Load() == nil {
 				prevRI.Store(ri)
@@ -448,7 +455,9 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		defer cli.Recycle()
 		config := ri.Config()
 		m := kc.svcInfo.MethodInfo(methodName)
-		if m.OneWay() {
+		if m == nil {
+			return fmt.Errorf("method info is nil, methodName=%s, serviceInfo=%+v", methodName, kc.svcInfo)
+		} else if m.OneWay() {
 			sendMsg = remote.NewMessage(req, kc.svcInfo, ri, remote.Oneway, remote.Client)
 		} else {
 			sendMsg = remote.NewMessage(req, kc.svcInfo, ri, remote.Call, remote.Client)
@@ -662,7 +671,7 @@ func getFallbackPolicy(cliOptFB *fallback.Policy, callOpts *callopt.CallOptions)
 	return nil, false
 }
 
-func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo, retryTimes int) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
 	cfg := rpcinfo.AsMutableRPCConfig(opt.Configs).Clone()
 	rmt := remoteinfo.NewRemoteInfo(opt.Svr, method)
 	var callOpts *callopt.CallOptions
@@ -675,6 +684,10 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	mi := svcInfo.MethodInfo(method)
 	if mi != nil && mi.OneWay() {
 		cfg.SetInteractionMode(rpcinfo.Oneway)
+	}
+	if retryTimes > 0 {
+		// it is used to distinguish the request is a local retry request.
+		rmt.SetTag(rpcinfo.RetryTag, strconv.Itoa(retryTimes))
 	}
 
 	// Export read-only views to external users.

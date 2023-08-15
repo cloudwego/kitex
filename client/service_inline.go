@@ -125,7 +125,7 @@ func (kc *serviceInlineClient) initMiddlewares(ctx context.Context) {
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
 func (kc *serviceInlineClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo)
+	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, 0)
 }
 
 // Call implements the Client interface .

@@ -324,6 +324,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 		}
 		for _, svc := range scope.Services() {
 			si, err := c.makeService(pi, svc)
+			si.ServiceFilePath = ast.Filename
 			if err != nil {
 				return fmt.Errorf("%s: makeService '%s': %w", ast.Filename, svc.Name, err)
 			}
@@ -373,6 +374,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				RawServiceName:  svcName,
 				CombineServices: svcs,
 				Methods:         methods,
+				ServiceFilePath: ast.Filename,
 			}
 			si.ServiceTypeName = func() string { return si.ServiceName }
 			all[ast.Filename] = append(all[ast.Filename], si)

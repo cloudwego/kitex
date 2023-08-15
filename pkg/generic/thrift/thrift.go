@@ -23,6 +23,10 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 )
 
+const (
+	structWrapLen = 4
+)
+
 // MessageReader read from thrift.TProtocol with method
 type MessageReader interface {
 	Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error)

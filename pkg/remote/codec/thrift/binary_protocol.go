@@ -502,6 +502,11 @@ func (p *BinaryProtocol) Transport() thrift.TTransport {
 	return nil
 }
 
+// ByteBuffer ...
+func (p *BinaryProtocol) ByteBuffer() remote.ByteBuffer {
+	return p.trans
+}
+
 // next ...
 func (p *BinaryProtocol) next(size int) ([]byte, error) {
 	buf, err := p.trans.Next(size)

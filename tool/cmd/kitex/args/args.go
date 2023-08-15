@@ -182,7 +182,7 @@ func (a *Arguments) checkIDL(files []string) {
 		if typ, ok := a.guessIDLType(); ok {
 			a.IDLType = typ
 		} else {
-			log.Warn("Can not guess an IDL type from %q, please specify with the '-type' flag.", a.IDL)
+			log.Warnf("Can not guess an IDL type from %q (unknown suffix), please specify with the '-type' flag.", a.IDL)
 			os.Exit(2)
 		}
 	default:
@@ -283,7 +283,8 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 				if errMsg == "" {
 					errMsg = gitErr.Error()
 				}
-				log.Warn("Failed to pull IDL from git:", errMsg)
+				log.Warn("failed to pull IDL from git:", errMsg)
+				log.Warn("You can execute 'rm -rf ~/.kitex' to clean the git cache and try again.")
 				os.Exit(1)
 			}
 			a.Includes[i] = localGitPath

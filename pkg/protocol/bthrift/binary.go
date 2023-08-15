@@ -498,32 +498,27 @@ func Skip(buf []byte, self BTProtocol, fieldType thrift.TType, maxDepth int) (le
 	var l int
 	switch fieldType {
 	case thrift.BOOL:
-		_, l, err = self.ReadBool(buf)
-		length += l
+		length += 1
 		return
 	case thrift.BYTE:
-		_, l, err = self.ReadByte(buf)
-		length += l
+		length += 1
 		return
 	case thrift.I16:
-		_, l, err = self.ReadI16(buf)
-		length += l
+		length += 2
 		return
 	case thrift.I32:
-		_, l, err = self.ReadI32(buf)
-		length += l
+		length += 4
 		return
 	case thrift.I64:
-		_, l, err = self.ReadI64(buf)
-		length += l
+		length += 8
 		return
 	case thrift.DOUBLE:
-		_, l, err = self.ReadDouble(buf)
-		length += l
+		length += 8
 		return
 	case thrift.STRING:
-		_, l, err = self.ReadString(buf)
-		length += l
+		var sl int32
+		sl, l, err = self.ReadI32(buf)
+		length += l + int(sl)
 		return
 	case thrift.STRUCT:
 		_, l, err = self.ReadStructBegin(buf)
@@ -574,7 +569,7 @@ func Skip(buf []byte, self BTProtocol, fieldType thrift.TType, maxDepth int) (le
 				err = e
 				return
 			}
-			l, e = self.Skip(buf[length:], valueType)
+			l, e = Skip(buf[length:], self, valueType, maxDepth-1)
 			length += l
 			if e != nil {
 				err = e

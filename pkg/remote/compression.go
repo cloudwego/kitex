@@ -16,6 +16,8 @@
 
 package remote
 
+import "context"
+
 // CompressType tells compression type for a message.
 type CompressType int32
 
@@ -25,3 +27,29 @@ const (
 	NoCompress CompressType = iota
 	GZip
 )
+
+type recvCompressorKey struct{}
+
+type sendCompressorKey struct{}
+
+func SetRecvCompressor(ctx context.Context, compressorName string) context.Context {
+	return context.WithValue(ctx, recvCompressorKey{}, compressorName)
+}
+
+func SetSendCompressor(ctx context.Context, compressorName string) context.Context {
+	return context.WithValue(ctx, sendCompressorKey{}, compressorName)
+}
+
+func GetSendCompressor(ctx context.Context) string {
+	if v, ok := ctx.Value(sendCompressorKey{}).(string); ok {
+		return v
+	}
+	return ""
+}
+
+func GetRecvCompressor(ctx context.Context) string {
+	if v, ok := ctx.Value(recvCompressorKey{}).(string); ok {
+		return v
+	}
+	return ""
+}
