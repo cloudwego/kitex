@@ -65,7 +65,7 @@ func TestJsonThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
-func TestJsonThriftCodec_SelfRef(t *testing.T) {
+func TestJsonThriftCodec_SelfRef_Old(t *testing.T) {
 	t.Run("old way", func(t *testing.T) {
 		p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 		test.Assert(t, err == nil)
@@ -188,7 +188,7 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 func TestJsonThriftCodec_SelfRef(t *testing.T) {
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	jtc, err := newJsonThriftCodec(p, thriftCodec)
+	jtc, err := newJsonThriftCodec(p, thriftCodec, nil)
 	test.Assert(t, err == nil)
 	defer jtc.Close()
 	test.Assert(t, jtc.Name() == "JSONThrift")
