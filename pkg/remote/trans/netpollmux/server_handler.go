@@ -243,25 +243,29 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		return
 	}
 
-	var methodInfo serviceinfo.MethodInfo
-	if methodInfo, err = trans.GetMethodInfo(rpcInfo, t.svcInfo); err != nil {
-		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, true)
-		t.OnError(ctx, err, muxSvrConn)
-		return
-	}
-	if methodInfo.OneWay() {
-		sendMsg = remote.NewMessage(nil, t.svcInfo, rpcInfo, remote.Reply, remote.Server)
+	if recvMsg.MessageType() == remote.Heartbeat {
+		sendMsg = remote.NewMessage(nil, t.svcInfo, rpcInfo, remote.Heartbeat, remote.Server)
 	} else {
-		sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, rpcInfo, remote.Reply, remote.Server)
-	}
+		var methodInfo serviceinfo.MethodInfo
+		if methodInfo, err = trans.GetMethodInfo(rpcInfo, t.svcInfo); err != nil {
+			closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, true)
+			t.OnError(ctx, err, muxSvrConn)
+			return
+		}
+		if methodInfo.OneWay() {
+			sendMsg = remote.NewMessage(nil, t.svcInfo, rpcInfo, remote.Reply, remote.Server)
+		} else {
+			sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, rpcInfo, remote.Reply, remote.Server)
+		}
 
-	ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
-	if err != nil {
-		// error cannot be wrapped to print here, so it must exec before NewTransError
-		t.OnError(ctx, err, muxSvrConn)
-		err = remote.NewTransError(remote.InternalError, err)
-		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, false)
-		return
+		ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
+		if err != nil {
+			// error cannot be wrapped to print here, so it must exec before NewTransError
+			t.OnError(ctx, err, muxSvrConn)
+			err = remote.NewTransError(remote.InternalError, err)
+			closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, false)
+			return
+		}
 	}
 
 	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
