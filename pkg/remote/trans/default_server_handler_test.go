@@ -219,6 +219,7 @@ func TestSvrTransHandlerOnReadHeartbeat(t *testing.T) {
 
 	tracerCtl := &rpcinfo.TraceController{}
 	tracerCtl.Append(mockTracer)
+	svc := serviceinfo.NewService(mocks.ServiceInfo(), nil)
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
 			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
@@ -232,7 +233,7 @@ func TestSvrTransHandlerOnReadHeartbeat(t *testing.T) {
 				return nil
 			},
 		},
-		SvcInfo:   mocks.ServiceInfo(),
+		SvcMap:    map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
 		TracerCtl: tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(addr)
