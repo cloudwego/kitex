@@ -674,6 +674,7 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
 
 	// use newOpt cause we need to add heartbeat logic to EncodeFunc and DecodeFunc
+	svc := serviceinfo.NewService(mocks.ServiceInfo(), nil)
 	newOpt := &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			return rpcInfo
@@ -700,7 +701,7 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 				return err
 			},
 		},
-		SvcInfo:          mocks.ServiceInfo(),
+		SvcMap:           map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
