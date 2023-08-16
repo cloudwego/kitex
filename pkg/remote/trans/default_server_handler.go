@@ -66,7 +66,7 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
 	}()
 
-	svcInfo := t.getFirstSvcInfo()
+	svcInfo := t.getDefaultSvcInfo()
 	if svcInfo == nil {
 		t.OnError(ctx, errors.New("service is not registered"), conn)
 		return
@@ -157,7 +157,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
 
-	svcInfo := t.getFirstSvcInfo()
+	svcInfo := t.getDefaultSvcInfo()
 	if svcInfo == nil {
 		t.OnError(ctx, errors.New("service is not registered"), conn)
 		return
@@ -274,7 +274,7 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		return
 	}
 
-	svcInfo := t.getFirstSvcInfo()
+	svcInfo := t.getDefaultSvcInfo()
 	if svcInfo == nil {
 		t.OnError(ctx, errors.New("service is not registered"), conn)
 		return
@@ -354,7 +354,7 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 	return ri.From().ServiceName(), rAddr
 }
 
-func (t *svrTransHandler) getFirstSvcInfo() (svcInfo *serviceinfo.ServiceInfo) {
+func (t *svrTransHandler) getDefaultSvcInfo() (svcInfo *serviceinfo.ServiceInfo) {
 	for _, svc := range t.svcMap {
 		svcInfo = svc.GetServiceInfo()
 		break

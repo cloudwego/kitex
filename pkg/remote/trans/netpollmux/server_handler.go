@@ -101,7 +101,7 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, nil)
 	}()
 
-	svcInfo := t.getFirstSvcInfo()
+	svcInfo := t.getDefaultSvcInfo()
 	if svcInfo == nil {
 		t.OnError(ctx, errors.New("service is not registered"), conn)
 		return
@@ -236,7 +236,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		muxSvrConn.pool.Put(rpcInfo)
 	}()
 
-	svcInfo := t.getFirstSvcInfo()
+	svcInfo := t.getDefaultSvcInfo()
 	if svcInfo == nil {
 		t.OnError(ctx, errors.New("service is not registered"), conn)
 		return
@@ -332,7 +332,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
 	data := NewControlFrame()
 
-	svcInfo := t.getFirstSvcInfo()
+	svcInfo := t.getDefaultSvcInfo()
 	if svcInfo == nil {
 		return errors.New("service is not registered")
 	}
@@ -420,7 +420,7 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 func (t *svrTransHandler) writeErrorReplyIfNeeded(
 	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool,
 ) (shouldCloseConn bool) {
-	svcInfo := t.getFirstSvcInfo()
+	svcInfo := t.getDefaultSvcInfo()
 	if svcInfo == nil {
 		t.OnError(ctx, errors.New("service is not registered"), conn)
 		return
@@ -502,7 +502,7 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 	return ri.From().ServiceName(), rAddr
 }
 
-func (t *svrTransHandler) getFirstSvcInfo() (svcInfo *serviceinfo.ServiceInfo) {
+func (t *svrTransHandler) getDefaultSvcInfo() (svcInfo *serviceinfo.ServiceInfo) {
 	for _, svc := range t.svcMap {
 		svcInfo = svc.GetServiceInfo()
 		break
