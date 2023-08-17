@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"unsafe"
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/jhump/protoreflect/desc"
@@ -65,7 +67,7 @@ func (m *WriteJSON) Write(ctx context.Context, msg interface{}) (interface{}, er
 
 	// Convert string into json
 	var jsonMap map[string]interface{}
-	err := json.Unmarshal([]byte(s), &jsonMap)
+	err := json.Unmarshal(stringToByteSliceUnsafe(s), &jsonMap)
 	if err != nil {
 		return nil, perrors.NewProtocolErrorWithMsg("Incorrect JSON format")
 	}
@@ -135,4 +137,13 @@ func (m *ReadJSON) Read(ctx context.Context, method string, actualMsgBuf []byte)
 		return nil, err
 	}
 	return string(buf), nil
+}
+
+func stringToByteSliceUnsafe(s string) []byte {
+	stringHeader := (*reflect.StringHeader)(unsafe.Pointer(&s))
+	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
+		Data: stringHeader.Data,
+		Len:  stringHeader.Len,
+		Cap:  stringHeader.Len,
+	}))
 }

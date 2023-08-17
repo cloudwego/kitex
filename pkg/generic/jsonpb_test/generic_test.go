@@ -36,6 +36,7 @@ func TestRun(t *testing.T) {
 	t.Run("testPbEchoServiceEcho", testPbEchoServiceEcho)
 	t.Run("testPbExampleServiceExampleMethod", testPbExampleServiceExampleMethod)
 	t.Run("testPbExampleServiceVoid", testPbExampleServiceVoid)
+	// t.Run("testPbExampleServiceWithBaseExampleMethodWithBase", testPbExampleServiceWithBaseExampleMethodWithBase)
 }
 
 func initPbClientByIDL(t *testing.T, addr, destSvcName, pbIdl string) genericclient.Client {
@@ -129,3 +130,23 @@ func testPbExampleServiceVoid(t *testing.T) {
 
 	svr.Stop()
 }
+
+//func testPbExampleServiceWithBaseExampleMethodWithBase(t *testing.T) {
+//	time.Sleep(1 * time.Second)
+//	svr := initPbServerByIDL(t, ":8129", new(ExampleGenericServiceImpl), "./idl/base.proto")
+//	time.Sleep(500 * time.Millisecond)
+//
+//	cli := initPbClientByIDL(t, "127.0.0.1:8129", "ExampleServiceWithBase", "./idl/base.proto")
+//
+//	ctx := context.Background()
+//
+//	// 'ExampleMethod' method name must be passed as param
+//	resp, err := cli.GenericCall(ctx, "ExampleMethodWithBase", `{"reqs":["req_one","req_two","req_three"],"reqbase":{"Status":"req status msg"}}`)
+//	// resp is a JSON string
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//	fmt.Println(resp)
+//
+//	svr.Stop()
+//}

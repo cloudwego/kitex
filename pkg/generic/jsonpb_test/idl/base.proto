@@ -1,0 +1,22 @@
+syntax = "proto3";
+package test;
+// The greeting service definition with modifications
+option go_package = "./";
+
+message Base {
+  string status = 1;
+}
+
+message ExampleReqWithBase {
+  repeated string reqs = 1;
+  Base reqbase = 2;
+}
+
+message ExampleRespWithBase {
+  repeated string resps = 1;
+  Base respbase = 2;
+}
+
+service ExampleServiceWithBase {
+  rpc ExampleMethodWithBase(ExampleReqWithBase) returns (ExampleRespWithBase);
+}

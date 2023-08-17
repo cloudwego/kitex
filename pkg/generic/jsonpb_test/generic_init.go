@@ -60,7 +60,7 @@ func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, req
 	fmt.Printf("Method from Ctx: %s\n", rpcinfo.Invocation().MethodName())
 	fmt.Printf("Recv: %v\n", buf)
 	fmt.Printf("Method: %s\n", method)
-	return "{\"message\": \"this is the response\"}", nil
+	return `{"message": "this is the response"}`, nil
 }
 
 // GenericService for example.proto
@@ -88,3 +88,16 @@ func (g *ExampleVoidGenericServiceImpl) GenericCall(ctx context.Context, method 
 	fmt.Printf("Method: %s\n", method)
 	return `{}`, nil
 }
+
+//// GenericService for base.proto
+//type ExampleBaseGenericServiceImpl struct{}
+//
+//// GenericCall ...
+//func (g *ExampleBaseGenericServiceImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+//	buf := request.(string)
+//	rpcinfo := rpcinfo.GetRPCInfo(ctx)
+//	fmt.Printf("Method from Ctx: %s\n", rpcinfo.Invocation().MethodName())
+//	fmt.Printf("Recv: %v\n", buf)
+//	fmt.Printf("Method: %s\n", method)
+//	return `{"resps":["res_one","res_two","res_three"],"respbase":{"Status":"res status msg"}}`, nil
+//}
