@@ -34,6 +34,7 @@ import (
 func NewInvokerWithMultiServices(services []kitex.Service, opts ...server.Option) server.Invoker {
 	var options []server.Option
 
+	{{template "@invoker_with_multi_service.go-NewInvoker-option" .}}
 	options = append(options, opts...)
 
 	svr := server.NewInvoker(options...)
@@ -47,4 +48,5 @@ func NewInvokerWithMultiServices(services []kitex.Service, opts ...server.Option
 	}
 	return svr
 }
+{{template "@invoker_with_multi_service.go-EOF" .}}
 `

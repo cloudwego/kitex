@@ -34,6 +34,7 @@ import (
 func NewServerWithMultiServices(services []kitex.Service, opts ...server.Option) server.Server {
 	var options []server.Option
 
+	{{template "@server_with_multi_service.go-NewServer-option" .}}
 	options = append(options, opts...)
 
 	svr := server.NewServer(options...)
@@ -44,4 +45,5 @@ func NewServerWithMultiServices(services []kitex.Service, opts ...server.Option)
 	}
 	return svr
 }
+{{template "@server_with_multi_service.go-EOF" .}}
 `
