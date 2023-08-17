@@ -153,6 +153,10 @@ var templateNames = []string{
 	"@server.go-EOF",
 	"@invoker.go-NewInvoker-option",
 	"@invoker.go-EOF",
+	"@server_with_multi_service.go-NewServer-option",
+	"@server_with_multi_service.go-EOF",
+	"@invoker_with_multi_service.go-NewInvoker-option",
+	"@invoker_with_multi_service.go-EOF",
 }
 
 func wrapTemplate(point, content string) string {
