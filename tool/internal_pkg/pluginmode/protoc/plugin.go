@@ -240,15 +240,13 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 		}
 	}
 
-	if isEnabledServerWithMultiService(pp.Services) {
-		// generate a server and invoker with multi-services
-		fs, err := pp.kg.GenerateMultiServicePackage(&pp.PackageInfo)
-		if err != nil {
-			pp.err = err
-		}
-		for _, f := range fs {
-			gen.NewGeneratedFile(pp.adjustPath(f.Name), "").P(f.Content)
-		}
+	// generate a server and invoker with multi-services
+	fs, err := pp.kg.GenerateMultiServicePackage(&pp.PackageInfo)
+	if err != nil {
+		pp.err = err
+	}
+	for _, f := range fs {
+		gen.NewGeneratedFile(pp.adjustPath(f.Name), "").P(f.Content)
 	}
 
 	if pp.err != nil {
@@ -418,15 +416,4 @@ func (pp *protocPlugin) adjustPath(path string) (ret string) {
 func (pp *protocPlugin) fixImport(path string) string {
 	path = strings.Trim(path, "\"")
 	return path
-}
-
-func isEnabledServerWithMultiService(svcs []*generator.ServiceInfo) bool {
-	enable := false
-	for _, svcInfo := range svcs {
-		if svcInfo.HasStreaming {
-			enable = true
-			break
-		}
-	}
-	return enable
 }

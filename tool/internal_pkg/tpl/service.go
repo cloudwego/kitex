@@ -80,7 +80,7 @@ func NewServiceInfo() *kitex.ServiceInfo {
 	return svcInfo
 }
 
-{{if .HasStreaming}}
+{{if eq $.Codec "protobuf"}} {{/* protobuf logic */}}
 func Build{{UpperFirst .ServiceName}}Service(handler {{call .ServiceTypeName}}) kitex.Service {
 	return kitex.NewService(serviceInfo(), handler)
 }
