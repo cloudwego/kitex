@@ -14,11 +14,13 @@ struct ExampleReq {
     1: required string Msg,
     2: FOO Foo,
     3: InnerBase InnerBase,
+    4: i64 Num,
     255: base.Base Base,
 }
 struct ExampleResp {
     1: required string Msg,
-    2: string required_field
+    2: string required_field,
+    3: i64 Num,
     255: base.BaseResp BaseResp,
 }
 exception Exception {

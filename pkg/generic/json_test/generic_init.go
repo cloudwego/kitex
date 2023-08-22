@@ -43,9 +43,9 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-var reqMsg = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"}}`
+var reqMsg = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}},"Num":"64","Base":{"LogID":"log_id"}}`
 
-var respMsgWithExtra = `{"Msg":"world","required_field":"required_field","extra_field":"extra_field"}`
+var respMsgWithExtra = `{"Msg":"world","required_field":"required_field","Num":"64","extra_field":"extra_field"}`
 
 var errResp = "Test Error"
 

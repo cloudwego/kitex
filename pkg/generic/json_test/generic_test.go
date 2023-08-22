@@ -73,6 +73,7 @@ func testThrift(t *testing.T) {
 	respStr, ok := resp.(string)
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), "world")
+	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Num").Int(), int64(64)), int64(64))
 
 	svr.Stop()
 }
@@ -90,6 +91,7 @@ func testThriftWithDynamicGo(t *testing.T) {
 	respStr, ok := resp.(string)
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), "world")
+	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Num").Int(), int64(64)), int64(64))
 
 	// client without dynamicgo
 

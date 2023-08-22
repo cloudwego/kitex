@@ -31,6 +31,7 @@ var (
 	DefaultJSONDynamicGoConvOpts = conv.Options{
 		WriteRequireField: true,
 		WriteDefaultField: true,
+		String2Int64:      true,
 	}
 )
 
