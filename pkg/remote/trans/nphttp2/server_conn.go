@@ -85,6 +85,7 @@ func (c *serverConn) Write(b []byte) (n int, err error) {
 }
 
 func (c *serverConn) WriteFrame(hdr, data []byte) (n int, err error) {
+	// server sets the END_STREAM flag in trailer when writeStatus
 	err = c.tr.Write(c.s, hdr, data, &grpc.Options{})
 	return len(hdr) + len(data), err
 }
