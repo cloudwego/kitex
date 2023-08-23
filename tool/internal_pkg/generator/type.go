@@ -33,6 +33,7 @@ type File struct {
 // PackageInfo contains information to generate a package for a service.
 type PackageInfo struct {
 	Namespace    string            // a dot-separated string for generating service package under kitex_gen
+	PackageName  string            // a dot-separated string for generating service package under kitex_gen without slash prefix
 	Dependencies map[string]string // package name => import path, used for searching imports
 	*ServiceInfo                   // the target service
 
