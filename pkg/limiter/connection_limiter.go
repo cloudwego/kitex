@@ -42,12 +42,20 @@ func NewConcurrencyLimiter(lim int) ConcurrencyLimiter {
 // Acquired is executed in `OnActive` which is called when a new connection is accepted, so even if the limit is reached
 // the count is still need increase, but return false will lead the connection is closed then Release also be executed.
 func (ml *connectionLimiter) Acquire(ctx context.Context) bool {
+	limit := atomic.LoadInt32(&ml.lim)
+	if limit <= 0 {
+		return true
+	}
 	x := atomic.AddInt32(&ml.curr, 1)
-	return x <= atomic.LoadInt32(&ml.lim)
+	return x <= limit
 }
 
 // Release decrease the connection counter.
 func (ml *connectionLimiter) Release(ctx context.Context) {
+	limit := atomic.LoadInt32(&ml.lim)
+	if limit <= 0 {
+		return
+	}
 	atomic.AddInt32(&ml.curr, -1)
 }
 
