@@ -131,11 +131,7 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		gopkg = parts[0] // remove package alias from file path
 	}
 	pp.Namespace = strings.TrimPrefix(gopkg, pp.PackagePrefix)
-	if strings.HasPrefix(pp.Namespace, "/") {
-		pp.PackageName = strings.TrimPrefix(pp.Namespace, "/")
-	} else {
-		pp.PackageName = pp.Namespace
-	}
+	pp.PackageName = getLastSuffix(gopkg)
 
 	ss := pp.convertTypes(file)
 	pp.Services = append(pp.Services, ss...)
@@ -421,4 +417,9 @@ func (pp *protocPlugin) adjustPath(path string) (ret string) {
 func (pp *protocPlugin) fixImport(path string) string {
 	path = strings.Trim(path, "\"")
 	return path
+}
+
+func getLastSuffix(str string) string {
+	parts := strings.Split(str, "/")
+	return parts[len(parts)-1]
 }
