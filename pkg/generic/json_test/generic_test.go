@@ -58,6 +58,7 @@ func TestRun(t *testing.T) {
 	t.Run("TestJSONThriftGenericClientClose", testJSONThriftGenericClientClose)
 	t.Run("TestThriftRawBinaryEcho", testThriftRawBinaryEcho)
 	t.Run("TestThriftBase64BinaryEcho", testThriftBase64BinaryEcho)
+	t.Run("TestRegression", testRegression)
 	t.Run("TestJSONThriftGenericClientFinalizer", testJSONThriftGenericClientFinalizer)
 }
 
@@ -504,6 +505,32 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 	sr, ok = resp.(string)
 	test.Assert(t, ok)
 	test.Assert(t, strings.Contains(sr, base64MockMyMsg))
+
+	svr.Stop()
+}
+
+func testRegression(t *testing.T) {
+	time.Sleep(1 * time.Second)
+	svr := initThriftServer(t, ":8127", new(GenericRegressionImpl), "./idl/example.thrift", nil, nil, false)
+	time.Sleep(500 * time.Millisecond)
+
+	// normal way
+	cli := initThriftClient(transport.TTHeader, t, "127.0.0.1:8127", "./idl/example.thrift", nil, nil, false)
+	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	respStr, ok := resp.(string)
+	test.Assert(t, ok)
+	test.Assert(t, gjson.Get(respStr, "num").Type == gjson.String)
+	test.Assert(t, gjson.Get(respStr, "num").String() == "64")
+
+	// dynamicgo way
+	cli = initThriftClient(transport.TTHeader, t, "127.0.0.1:8127", "./idl/example.thrift", nil, nil, true)
+	resp, err = cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	respStr, ok = resp.(string)
+	test.Assert(t, ok)
+	test.Assert(t, gjson.Get(respStr, "num").Type == gjson.String)
+	test.Assert(t, gjson.Get(respStr, "num").String() == "64")
 
 	svr.Stop()
 }

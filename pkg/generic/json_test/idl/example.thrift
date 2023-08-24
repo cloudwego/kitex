@@ -18,7 +18,8 @@ struct ExampleReq {
 }
 struct ExampleResp {
     1: required string Msg,
-    2: string required_field
+    2: string required_field,
+    3: optional i64 num (api.js_conv="true"),
     255: base.BaseResp BaseResp,
 }
 exception Exception {
