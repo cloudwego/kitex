@@ -139,14 +139,14 @@ func TestQPSLimiter(t *testing.T) {
 	test.Assert(t, limiter.(*qpsLimiter).once == int32(float64(qps)/(time.Second.Seconds()/interval.Seconds())), limiter.(*qpsLimiter).once)
 	test.Assert(t, itv == interval)
 	wg.Add(concurrent)
-	var faliedCount int32
+	var failedCount int32
 	stopFlag = 0
 	now = time.Now()
 	for i := 0; i < concurrent; i++ {
 		go func() {
 			for atomic.LoadInt32(&stopFlag) == 0 {
 				if !limiter.Acquire(ctx) {
-					atomic.AddInt32(&faliedCount, 1)
+					atomic.AddInt32(&failedCount, 1)
 				}
 			}
 			wg.Done()
@@ -156,7 +156,7 @@ func TestQPSLimiter(t *testing.T) {
 		atomic.StoreInt32(&stopFlag, 1)
 	})
 	wg.Wait()
-	test.Assert(t, faliedCount == 0)
+	test.Assert(t, failedCount == 0)
 }
 
 func TestCalcOnce(t *testing.T) {
