@@ -533,7 +533,6 @@ func testRegression(t *testing.T) {
 	test.Assert(t, gjson.Get(respStr, "num").String() == "64")
 
 	svr.Stop()
-
 }
 
 func initThriftMockClient(t *testing.T, tp transport.Protocol, enableDynamicGo bool) genericclient.Client {
