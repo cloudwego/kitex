@@ -141,7 +141,6 @@ func TestQPSLimiter(t *testing.T) {
 	wg.Add(concurrent)
 	var failedCount int32
 	stopFlag = 0
-	now = time.Now()
 	for i := 0; i < concurrent; i++ {
 		go func() {
 			for atomic.LoadInt32(&stopFlag) == 0 {
