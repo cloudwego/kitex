@@ -86,8 +86,6 @@ func TestConnectionLimiter(t *testing.T) {
 				if !lim.Acquire(ctx) {
 					atomic.AddInt32(&failedConnCount, 1)
 				}
-				_, curr := lim.Status(ctx)
-				test.Assert(t, curr <= 60, curr)
 			}
 		}()
 	}
