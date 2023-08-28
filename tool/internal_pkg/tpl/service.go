@@ -252,9 +252,6 @@ func (p *{{.ArgStructName}}) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *{{.ArgStructName}}) Unmarshal(in []byte) error {
-	if len(in) == 0 {
-		return nil
-	}
 	msg := new({{NotPtr $arg.Type}})
 	if err := proto.Unmarshal(in, msg); err != nil {
 	   return err
@@ -317,9 +314,6 @@ func (p *{{.ResStructName}}) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *{{.ResStructName}}) Unmarshal(in []byte) error {
-	if len(in) == 0 {
-		return nil
-	}
 	msg := new({{NotPtr .Resp.Type}})
 	if err := proto.Unmarshal(in, msg); err != nil {
 	   return err

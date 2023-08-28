@@ -209,9 +209,6 @@ func (p *MockReqArgs) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *MockReqArgs) Unmarshal(in []byte) error {
-	if len(in) == 0 {
-		return nil
-	}
 	msg := new(MockReq)
 	if err := proto.Unmarshal(in, msg); err != nil {
 		return err
