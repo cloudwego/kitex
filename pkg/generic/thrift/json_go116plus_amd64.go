@@ -61,7 +61,7 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		if err := m.writeHead(out); err != nil {
 			return err
 		}
-		if err := m.writeFields(ctx, out, Void, nil, nil); err != nil {
+		if err := m.writeFields(ctx, out, nil, nil); err != nil {
 			return err
 		}
 		return writeTail(out)
@@ -77,7 +77,7 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 	if err := m.writeHead(out); err != nil {
 		return err
 	}
-	if err := m.writeFields(ctx, out, String, &cv, transBuff); err != nil {
+	if err := m.writeFields(ctx, out, &cv, transBuff); err != nil {
 		return err
 	}
 	return writeTail(out)
@@ -90,7 +90,7 @@ const (
 	String
 )
 
-func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgType MsgType, cv *j2t.BinaryConv, transBuff []byte) error {
+func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, cv *j2t.BinaryConv, transBuff []byte) error {
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
 	defer mcache.Free(dbuf)
 
@@ -105,19 +105,13 @@ func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgTy
 		if err := out.WriteFieldBegin(field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID())); err != nil {
 			return err
 		}
-		switch msgType {
-		case Void:
+		// if the field type is void, just write void and return
+		if field.Type().Type() == dthrift.VOID {
 			if err := writeFieldForVoid(field.Name(), out); err != nil {
 				return err
 			}
-		case String:
-			// if the field type is void, write void instead of calling dynamicgo with string
-			if field.Type().Type() == dthrift.VOID {
-				if err := writeFieldForVoid(field.Name(), out); err != nil {
-					return err
-				}
-				return nil
-			}
+			return nil
+		} else {
 			// encode using dynamicgo
 			// json []byte to thrift []byte
 			if err := cv.DoInto(ctx, field.Type(), transBuff, &dbuf); err != nil {
@@ -129,18 +123,16 @@ func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgTy
 		// 	return err
 		// }
 	}
-	if msgType == String {
-		tProt, ok := out.(*cthrift.BinaryProtocol)
-		if !ok {
-			return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
-		}
-		buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
-		if err != nil {
-			return err
-		}
-		// TODO: implement MallocAck() to achieve zero copy
-		copy(buf, dbuf)
+	tProt, ok := out.(*cthrift.BinaryProtocol)
+	if !ok {
+		return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
+	buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
+	if err != nil {
+		return err
+	}
+	// TODO: implement MallocAck() to achieve zero copy
+	copy(buf, dbuf)
 	return nil
 }
 
