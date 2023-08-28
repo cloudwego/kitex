@@ -372,6 +372,15 @@ func testThriftVoidMethod(t *testing.T) {
 	test.Assert(t, resp == descriptor.Void{})
 
 	svr.Stop()
+
+	time.Sleep(1 * time.Second)
+	svr = initThriftServer(t, ":8125", new(GenericServiceVoidWithStringImpl), "./idl/example.thrift", nil, nil, false)
+	time.Sleep(500 * time.Millisecond)
+	resp, err = cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	test.Assert(t, resp == descriptor.Void{})
+
+	svr.Stop()
 }
 
 func testThriftVoidMethodWithDynamicGo(t *testing.T) {
@@ -400,6 +409,15 @@ func testThriftVoidMethodWithDynamicGo(t *testing.T) {
 	//  write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	//  read: fallback
 	cli = initThriftClient(transport.PurePayload, t, "127.0.0.1:8125", "./idl/example.thrift", nil, nil, false)
+	resp, err = cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	test.Assert(t, resp == descriptor.Void{})
+
+	svr.Stop()
+
+	time.Sleep(1 * time.Second)
+	svr = initThriftServer(t, ":8125", new(GenericServiceVoidWithStringImpl), "./idl/example.thrift", nil, nil, true)
+	time.Sleep(500 * time.Millisecond)
 	resp, err = cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	test.Assert(t, resp == descriptor.Void{})

@@ -27,6 +27,7 @@ import (
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
+	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	"github.com/cloudwego/dynamicgo/thrift/base"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -106,16 +107,17 @@ func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, msgTy
 		}
 		switch msgType {
 		case Void:
-			if err := out.WriteStructBegin(field.Name()); err != nil {
-				return err
-			}
-			if err := out.WriteFieldStop(); err != nil {
-				return err
-			}
-			if err := out.WriteStructEnd(); err != nil {
+			if err := writeFieldForVoid(field.Name(), out); err != nil {
 				return err
 			}
 		case String:
+			// if the field type is void, write void instead of calling dynamicgo with string
+			if field.Type().Type() == dthrift.VOID {
+				if err := writeFieldForVoid(field.Name(), out); err != nil {
+					return err
+				}
+				return nil
+			}
 			// encode using dynamicgo
 			// json []byte to thrift []byte
 			if err := cv.DoInto(ctx, field.Type(), transBuff, &dbuf); err != nil {
@@ -154,4 +156,17 @@ func writeTail(out thrift.TProtocol) error {
 		return err
 	}
 	return out.WriteStructEnd()
+}
+
+func writeFieldForVoid(name string, out thrift.TProtocol) error {
+	if err := out.WriteStructBegin(name); err != nil {
+		return err
+	}
+	if err := out.WriteFieldStop(); err != nil {
+		return err
+	}
+	if err := out.WriteStructEnd(); err != nil {
+		return err
+	}
+	return nil
 }
