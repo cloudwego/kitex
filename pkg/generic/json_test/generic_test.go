@@ -516,21 +516,40 @@ func testRegression(t *testing.T) {
 
 	// normal way
 	cli := initThriftClient(transport.TTHeader, t, "127.0.0.1:8127", "./idl/example.thrift", nil, nil, false)
-	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
+	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqRegression, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	respStr, ok := resp.(string)
 	test.Assert(t, ok)
 	test.Assert(t, gjson.Get(respStr, "num").Type == gjson.String)
 	test.Assert(t, gjson.Get(respStr, "num").String() == "64")
+	test.Assert(t, gjson.Get(respStr, "I8").Type == gjson.Number)
+	test.Assert(t, gjson.Get(respStr, "I8").Int() == int64(8))
+	test.Assert(t, gjson.Get(respStr, "I16").Type == gjson.Number)
+	test.Assert(t, gjson.Get(respStr, "I32").Type == gjson.Number)
+	test.Assert(t, gjson.Get(respStr, "I64").Type == gjson.Number)
+	test.Assert(t, gjson.Get(respStr, "Double").Type == gjson.Number)
+	test.Assert(t, gjson.Get(respStr, "Double").Float() == 12.3)
+
+	svr.Stop()
+
+	time.Sleep(1 * time.Second)
+	svr = initThriftServer(t, ":8127", new(GenericRegressionImpl), "./idl/example.thrift", nil, nil, true)
 
 	// dynamicgo way
 	cli = initThriftClient(transport.TTHeader, t, "127.0.0.1:8127", "./idl/example.thrift", nil, nil, true)
-	resp, err = cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
+	resp, err = cli.GenericCall(context.Background(), "ExampleMethod", reqRegression, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	respStr, ok = resp.(string)
 	test.Assert(t, ok)
 	test.Assert(t, gjson.Get(respStr, "num").Type == gjson.String)
 	test.Assert(t, gjson.Get(respStr, "num").String() == "64")
+	test.Assert(t, gjson.Get(respStr, "I8").Type == gjson.Number)
+	test.Assert(t, gjson.Get(respStr, "I8").Int() == int64(8))
+	test.Assert(t, gjson.Get(respStr, "I16").Type == gjson.Number)
+	test.Assert(t, gjson.Get(respStr, "I32").Type == gjson.Number)
+	test.Assert(t, gjson.Get(respStr, "I64").Type == gjson.Number)
+	test.Assert(t, gjson.Get(respStr, "Double").Type == gjson.Number)
+	test.Assert(t, gjson.Get(respStr, "Double").Float() == 12.3)
 
 	svr.Stop()
 }
