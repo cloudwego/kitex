@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	internal_server "github.com/cloudwego/kitex/internal/server"
+	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -207,6 +208,7 @@ func (kc *serviceInlineClient) constructServerRPCInfo(svrCtx, cliCtx context.Con
 		ink.SetServiceName(kc.svcInfo.ServiceName)
 	}
 	rpcinfo.AsMutableEndpointInfo(ri.To()).SetMethod(method)
+	svrCtx = context.WithValue(svrCtx, consts.CtxKeyMethod, method)
 	return svrCtx, ri
 }
 
