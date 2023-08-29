@@ -67,6 +67,9 @@ struct FullStruct {
   26: optional HTTPStatus opt_status,
   27: map<HTTPStatus, Local> enum_key_map,
   28: map<HTTPStatus, list<map<string, Local>>> complex,
+  29: set<i64> i64Set,
+  30: i16 Int16,
+  31: bool isSet,
 }
 
 struct MixedStruct {
