@@ -204,6 +204,16 @@ func (g *GenericServiceVoidImpl) GenericCall(ctx context.Context, method string,
 	return descriptor.Void{}, nil
 }
 
+// GenericServiceVoidWithStringImpl ...
+type GenericServiceVoidWithStringImpl struct{}
+
+// GenericCall ...
+func (g *GenericServiceVoidWithStringImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	msg := request.(string)
+	fmt.Printf("Recv: %v\n", msg)
+	return "Void", nil
+}
+
 // GenericServiceBinaryEchoImpl ...
 type GenericServiceBinaryEchoImpl struct{}
 
