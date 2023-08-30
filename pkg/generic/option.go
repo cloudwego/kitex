@@ -32,6 +32,7 @@ var (
 		WriteRequireField:  true,
 		WriteDefaultField:  true,
 		EnableValueMapping: true,
+		String2Int64:       true,
 	}
 )
 
