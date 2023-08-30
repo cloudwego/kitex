@@ -45,6 +45,8 @@ import (
 
 var reqMsg = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"}}`
 
+var reqRegression = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"},"I8":"8","I16":"16","I32":"32","I64":"64","Double":"12.3"}`
+
 var respMsgWithExtra = `{"Msg":"world","required_field":"required_field","extra_field":"extra_field"}`
 
 var errResp = "Test Error"
@@ -398,6 +400,6 @@ func (g *GenericRegressionImpl) GenericCall(ctx context.Context, method string, 
 	fmt.Printf("Method from Ctx: %s\n", rpcinfo.Invocation().MethodName())
 	fmt.Printf("Recv: %v\n", buf)
 	fmt.Printf("Method: %s\n", method)
-	respMsg := `{"Msg":"world","required_field":"required_field", "num": 64}`
+	respMsg := `{"Msg":"world","required_field":"required_field","num":64,"I8":"8","I16":"16","I32":"32","I64":"64","Double":"12.3"}`
 	return respMsg, nil
 }
