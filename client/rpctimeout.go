@@ -45,7 +45,8 @@ func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration)
 	ri := rpcinfo.GetRPCInfo(ctx)
 	to := ri.To()
 
-	errMsg := fmt.Sprintf("timeout=%v, to=%s, method=%s", timeout, to.ServiceName(), to.Method())
+	errMsg := fmt.Sprintf("timeout=%v, to=%s, method=%s, location=%s",
+		timeout, to.ServiceName(), to.Method(), "kitex.rpcTimeoutMW")
 	target := to.Address()
 	if target != nil {
 		errMsg = fmt.Sprintf("%s, remote=%s", errMsg, target.String())
@@ -55,7 +56,7 @@ func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration)
 	// cancel error
 	if ctx.Err() == context.Canceled {
 		if needFineGrainedErrCode {
-			return kerrors.ErrCanceledByBusiness
+			return kerrors.ErrCanceledByBusiness.WithCause(errors.New(errMsg))
 		} else {
 			return kerrors.ErrRPCTimeout.WithCause(fmt.Errorf("%s: %w by business", errMsg, ctx.Err()))
 		}
@@ -66,19 +67,23 @@ func makeTimeoutErr(ctx context.Context, start time.Time, timeout time.Duration)
 	} else {
 		// Go's timer implementation is not so accurate,
 		// so if we need to check ctx deadline earlier than our timeout, we should consider the accuracy
-		roundTimeout := timeout - time.Millisecond
-		if roundTimeout >= 0 && ddl.Before(start.Add(roundTimeout)) {
+		if timeout <= 0 {
+			errMsg = fmt.Sprintf("%s, timeout by business, actual=%s", errMsg, ddl.Sub(start))
+		} else if roundTimeout := timeout - time.Millisecond; roundTimeout >= 0 && ddl.Before(start.Add(roundTimeout)) {
 			errMsg = fmt.Sprintf("%s, context deadline earlier than timeout, actual=%v", errMsg, ddl.Sub(start))
 		}
 
 		if needFineGrainedErrCode && isBusinessTimeout(start, timeout, ddl, rpctimeout.LoadBusinessTimeoutThreshold()) {
-			return kerrors.ErrTimeoutByBusiness
+			return kerrors.ErrTimeoutByBusiness.WithCause(errors.New(errMsg))
 		}
 	}
 	return kerrors.ErrRPCTimeout.WithCause(errors.New(errMsg))
 }
 
 func isBusinessTimeout(start time.Time, kitexTimeout time.Duration, actualDDL time.Time, threshold time.Duration) bool {
+	if kitexTimeout <= 0 {
+		return true
+	}
 	kitexDDL := start.Add(kitexTimeout)
 	return actualDDL.Add(threshold).Before(kitexDDL)
 }

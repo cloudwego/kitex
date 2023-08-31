@@ -45,6 +45,8 @@ import (
 
 var reqMsg = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"}}`
 
+var reqRegression = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}},"Base":{"LogID":"log_id"},"I8":"8","I16":"16","I32":"32","I64":"64","Double":"12.3"}`
+
 var respMsgWithExtra = `{"Msg":"world","required_field":"required_field","extra_field":"extra_field"}`
 
 var errResp = "Test Error"
@@ -200,6 +202,16 @@ func (g *GenericServiceVoidImpl) GenericCall(ctx context.Context, method string,
 	msg := request.(string)
 	fmt.Printf("Recv: %v\n", msg)
 	return descriptor.Void{}, nil
+}
+
+// GenericServiceVoidWithStringImpl ...
+type GenericServiceVoidWithStringImpl struct{}
+
+// GenericCall ...
+func (g *GenericServiceVoidWithStringImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	msg := request.(string)
+	fmt.Printf("Recv: %v\n", msg)
+	return "Void", nil
 }
 
 // GenericServiceBinaryEchoImpl ...
@@ -376,4 +388,18 @@ func (m *mockImpl) ExceptionTest(ctx context.Context, req *kt.MockReq) (r string
 		}
 	}
 	return "", &kt.Exception{Code: 400, Msg: "this is an exception"}
+}
+
+// GenericRegressionImpl ...
+type GenericRegressionImpl struct{}
+
+// GenericCall ...
+func (g *GenericRegressionImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	buf := request.(string)
+	rpcinfo := rpcinfo.GetRPCInfo(ctx)
+	fmt.Printf("Method from Ctx: %s\n", rpcinfo.Invocation().MethodName())
+	fmt.Printf("Recv: %v\n", buf)
+	fmt.Printf("Method: %s\n", method)
+	respMsg := `{"Msg":"world","required_field":"required_field","num":64,"I8":"8","I16":"16","I32":"32","I64":"64","Double":"12.3"}`
+	return respMsg, nil
 }

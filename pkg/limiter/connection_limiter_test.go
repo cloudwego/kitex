@@ -74,4 +74,21 @@ func TestConnectionLimiter(t *testing.T) {
 		}
 	}
 	test.Assert(t, newConnCount == 10)
+
+	lim.(Updatable).UpdateLimit(0)
+	var failedConnCount int32
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 10; j++ {
+				if !lim.Acquire(ctx) {
+					atomic.AddInt32(&failedConnCount, 1)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	test.Assert(t, failedConnCount == 0)
 }

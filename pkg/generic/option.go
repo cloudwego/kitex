@@ -29,8 +29,10 @@ var (
 		UseKitexHttpEncoding:  true,
 	}
 	DefaultJSONDynamicGoConvOpts = conv.Options{
-		WriteRequireField: true,
-		WriteDefaultField: true,
+		WriteRequireField:  true,
+		WriteDefaultField:  true,
+		EnableValueMapping: true,
+		String2Int64:       true,
 	}
 )
 

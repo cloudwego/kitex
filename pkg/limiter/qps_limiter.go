@@ -70,6 +70,9 @@ func (l *qpsLimiter) UpdateQPSLimit(interval time.Duration, limit int) {
 
 // Acquire one token.
 func (l *qpsLimiter) Acquire(ctx context.Context) bool {
+	if atomic.LoadInt32(&l.limit) <= 0 {
+		return true
+	}
 	if atomic.LoadInt32(&l.tokens) <= 0 {
 		return false
 	}

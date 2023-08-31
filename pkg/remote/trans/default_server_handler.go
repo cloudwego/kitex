@@ -159,31 +159,39 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		return err
 	}
 
-	var methodInfo serviceinfo.MethodInfo
-	if methodInfo, err = GetMethodInfo(ri, t.svcInfo); err != nil {
-		// it won't be err, because the method has been checked in decode, err check here just do defensive inspection
-		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
-		// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded
-		t.OnError(ctx, err, conn)
-		return err
-	}
-	if methodInfo.OneWay() {
-		sendMsg = remote.NewMessage(nil, t.svcInfo, ri, remote.Reply, remote.Server)
+	// heartbeat processing
+	// recvMsg.MessageType would be set to remote.Heartbeat in previous Read procedure
+	// if specified codec support heartbeat
+	if recvMsg.MessageType() == remote.Heartbeat {
+		sendMsg = remote.NewMessage(nil, t.svcInfo, ri, remote.Heartbeat, remote.Server)
 	} else {
-		sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, ri, remote.Reply, remote.Server)
-	}
-
-	ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
-	if err != nil {
-		// error cannot be wrapped to print here, so it must exec before NewTransError
-		t.OnError(ctx, err, conn)
-		err = remote.NewTransError(remote.InternalError, err)
-		if closeConn := t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false); closeConn {
+		// reply processing
+		var methodInfo serviceinfo.MethodInfo
+		if methodInfo, err = GetMethodInfo(ri, t.svcInfo); err != nil {
+			// it won't be err, because the method has been checked in decode, err check here just do defensive inspection
+			t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
+			// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded
+			t.OnError(ctx, err, conn)
 			return err
 		}
-		// connection don't need to be closed when the error is return by the server handler
-		closeConnOutsideIfErr = false
-		return
+		if methodInfo.OneWay() {
+			sendMsg = remote.NewMessage(nil, t.svcInfo, ri, remote.Reply, remote.Server)
+		} else {
+			sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, ri, remote.Reply, remote.Server)
+		}
+
+		ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
+		if err != nil {
+			// error cannot be wrapped to print here, so it must exec before NewTransError
+			t.OnError(ctx, err, conn)
+			err = remote.NewTransError(remote.InternalError, err)
+			if closeConn := t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, false); closeConn {
+				return err
+			}
+			// connection don't need to be closed when the error is return by the server handler
+			closeConnOutsideIfErr = false
+			return
+		}
 	}
 
 	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
