@@ -16,7 +16,11 @@
 
 package test
 
-import "reflect"
+import (
+	"fmt"
+	"reflect"
+	"testing"
+)
 
 // testingTB is a subset of common methods between *testing.T and *testing.B.
 type testingTB interface {
@@ -78,4 +82,25 @@ func PanicAt(t testingTB, fn func(), expect func(err interface{}) bool) {
 		}
 	}()
 	fn()
+}
+
+func AssertEqual(t *testing.T, expected, got interface{}, format string, args ...interface{}) {
+	info := fmt.Sprintf(format, args...)
+	Assertf(t, reflect.DeepEqual(expected, got), "assertEqual: expected=%v, got=%v, info=%v", expected, got, info)
+}
+
+func IsNil(got interface{}) bool {
+	if got == nil {
+		return true
+	}
+	v := reflect.ValueOf(got)
+	return v.Kind() == reflect.Ptr && v.IsNil()
+}
+
+func AssertNil(t *testing.T, got interface{}, format string, args ...interface{}) {
+	Assertf(t, IsNil(got), "assertNil: got=%v, info=%v", got, fmt.Sprintf(format, args...))
+}
+
+func AssertNonNil(t *testing.T, got interface{}, format string, args ...interface{}) {
+	Assertf(t, !IsNil(got), "assertNonNil: got=%v, info=%v", got, fmt.Sprintf(format, args...))
 }

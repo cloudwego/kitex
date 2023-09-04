@@ -55,6 +55,8 @@ const (
 	OpDone
 )
 
+var tagValueFirstTry = "0"
+
 // DDLStopFunc is the definition of ddlStop func
 type DDLStopFunc func(ctx context.Context, policy StopPolicy) (bool, string)
 
@@ -169,4 +171,11 @@ func recordRetryInfo(firstRI, lastRI rpcinfo.RPCInfo, callTimes int32, lastCosts
 			firstRe.SetTag(rpcinfo.RetryLastCostTag, lastCosts)
 		}
 	}
+}
+
+// IsRetryRequest determines whether it's a retry request by checking the RetryTag
+func IsRetryRequest(ctx context.Context, request, response interface{}) bool {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	retryCountStr := ri.To().DefaultTag(rpcinfo.RetryTag, tagValueFirstTry)
+	return retryCountStr != tagValueFirstTry
 }
