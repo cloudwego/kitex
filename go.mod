@@ -28,3 +28,5 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+replace github.com/bytedance/gopkg => github.com/joway/gopkg v0.0.0-20230906115402-0f83b5f4bc16

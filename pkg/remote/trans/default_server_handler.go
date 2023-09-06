@@ -23,6 +23,8 @@ import (
 	"net"
 	"runtime/debug"
 
+	"github.com/bytedance/gopkg/lang/runtimex"
+
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -112,12 +114,14 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 // OnRead implements the remote.ServerTransHandler interface.
 // The connection should be closed after returning error.
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
+	runtimex.MPreemptOff()
 	ri := rpcinfo.GetRPCInfo(ctx)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var recvMsg remote.Message
 	var sendMsg remote.Message
 	closeConnOutsideIfErr := true
 	defer func() {
+		runtimex.MPreemptOn()
 		panicErr := recover()
 		var wrapErr error
 		if panicErr != nil {
