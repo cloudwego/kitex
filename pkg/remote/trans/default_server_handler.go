@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"runtime/debug"
 
 	"github.com/bytedance/gopkg/lang/runtimex"
@@ -111,17 +112,23 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 	return ctx, nil
 }
 
+var preemptOff = os.Getenv("PREEMPT_OFF") != ""
+
 // OnRead implements the remote.ServerTransHandler interface.
 // The connection should be closed after returning error.
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
-	runtimex.MPreemptOff()
+	if preemptOff {
+		runtimex.MPreemptOff()
+	}
 	ri := rpcinfo.GetRPCInfo(ctx)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var recvMsg remote.Message
 	var sendMsg remote.Message
 	closeConnOutsideIfErr := true
 	defer func() {
-		runtimex.MPreemptOn()
+		if preemptOff {
+			runtimex.MPreemptOn()
+		}
 		panicErr := recover()
 		var wrapErr error
 		if panicErr != nil {

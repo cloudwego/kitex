@@ -126,8 +126,8 @@ github.com/iancoleman/strcase v0.2.0/go.mod h1:iwCmte+B7n89clKwxIoIXy/HfoL7AsD47
 github.com/ianlancetaylor/demangle v0.0.0-20220319035150-800ac71e25c2/go.mod h1:aYm2/VgdVmcIU8iMfdMvDMsRAQjcfZSKFby6HOFvi/w=
 github.com/jhump/protoreflect v1.8.2 h1:k2xE7wcUomeqwY0LDCYA16y4WWfyTcMx5mKhk0d4ua0=
 github.com/jhump/protoreflect v1.8.2/go.mod h1:7GcYQDdMU/O/BBrl/cX6PNHpXh6cenjd8pneu5yW7Tg=
-github.com/joway/gopkg v0.0.0-20230906115402-0f83b5f4bc16 h1:ZWrqAWDvImsPFpxLBJDdgm2cOxrNTDnH7lGl8cku7NI=
-github.com/joway/gopkg v0.0.0-20230906115402-0f83b5f4bc16/go.mod h1:/dgj+7LAVLBHBxmeg0T4GQ3LKzmhLl/UfQPzH+td0II=
+github.com/joway/gopkg v0.0.0-20230907054100-569f849c4fca h1:CPcKBVeCoZ69f/HKeTIR+ZGHag7yc2DotktErLGicOA=
+github.com/joway/gopkg v0.0.0-20230907054100-569f849c4fca/go.mod h1:MEzwcDHKDRhHG0C6N4KjGY93hZcmfjjj40AfjcasL5I=
 github.com/json-iterator/go v1.1.10/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/uOdHXbAo4=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
