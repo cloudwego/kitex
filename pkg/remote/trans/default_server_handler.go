@@ -126,9 +126,6 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	var sendMsg remote.Message
 	closeConnOutsideIfErr := true
 	defer func() {
-		if preemptOff {
-			runtimex.MPreemptOn()
-		}
 		panicErr := recover()
 		var wrapErr error
 		if panicErr != nil {
