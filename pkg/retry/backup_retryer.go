@@ -125,9 +125,13 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				}()
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
+				if r.cbContainer.enablePercentageLimit {
+					// record stat before call since requests may be slow, making the limiter more accurate
+					recordRetryStat(cbKey, r.cbContainer.cbPanel, ct)
+				}
 				cRI, _, e = rpcCall(ctx, r)
 				recordCost(ct, callStart, &recordCostDoing, &callCosts, &abort, e)
-				if r.cbContainer.cbStat {
+				if !r.cbContainer.enablePercentageLimit && r.cbContainer.cbStat {
 					circuitbreak.RecordStat(ctx, req, nil, e, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 				}
 			})

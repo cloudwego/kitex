@@ -57,7 +57,7 @@ type Retryer interface {
 }
 
 // NewRetryContainerWithCB build Container that doesn't do circuit breaker statistic but get statistic result.
-// Which is used in case that circuit breaker is enable.
+// Which is used in case that circuit breaker is enabled.
 // eg:
 //
 //	   cbs := circuitbreak.NewCBSuite(circuitbreak.RPCInfo2Key)
@@ -67,9 +67,11 @@ type Retryer interface {
 //	   // enable service circuit breaker
 //		  opts = append(opts, client.WithMiddleware(cbs.ServiceCBMW()))
 func NewRetryContainerWithCB(cc *circuitbreak.Control, cp circuitbreaker.Panel) *Container {
-	return &Container{
-		cbContainer: &cbContainer{cbCtl: cc, cbPanel: cp}, retryerMap: sync.Map{},
-	}
+	return NewRetryContainer(WithContainerCBControl(cc), WithContainerCBPanel(cp))
+}
+
+func newCBSuite() *circuitbreak.CBSuite {
+	return circuitbreak.NewCBSuite(circuitbreak.RPCInfo2Key)
 }
 
 // NewRetryContainerWithCBStat build Container that need to do circuit breaker statistic.
@@ -79,15 +81,91 @@ func NewRetryContainerWithCB(cc *circuitbreak.Control, cp circuitbreaker.Panel) 
 //	cbs := circuitbreak.NewCBSuite(YourGenServiceCBKeyFunc)
 //	retry.NewRetryContainerWithCBStat(cbs.ServiceControl(), cbs.ServicePanel())
 func NewRetryContainerWithCBStat(cc *circuitbreak.Control, cp circuitbreaker.Panel) *Container {
-	return &Container{
-		cbContainer: &cbContainer{cbCtl: cc, cbPanel: cp, cbStat: true}, retryerMap: sync.Map{},
+	return NewRetryContainer(WithContainerCBControl(cc), WithContainerCBPanel(cp), WithContainerCBStat())
+}
+
+// NewRetryContainerWithPercentageLimit build a Container to limiting the percentage of retry requests;
+// This is the RECOMMENDED initializer if you want to control PRECISELY the percentage of retry requests.
+func NewRetryContainerWithPercentageLimit() *Container {
+	return NewRetryContainer(WithContainerEnablePercentageLimit())
+}
+
+// ContainerOption is used when initializing a Container
+type ContainerOption func(rc *Container)
+
+// WithContainerCBSuite specifies the CBSuite used in the retry circuitbreak
+// retryer will use its ServiceControl and ServicePanel
+// Its priority is lower than WithContainerCBControl and WithContainerCBPanel
+func WithContainerCBSuite(cbs *circuitbreak.CBSuite) ContainerOption {
+	return func(rc *Container) {
+		rc.cbContainer.cbSuite = cbs
+	}
+}
+
+// WithContainerCBControl is specifies the circuitbreak.Control used in the retry circuitbreaker
+// It's user's responsibility to make sure it's paired with panel
+func WithContainerCBControl(ctrl *circuitbreak.Control) ContainerOption {
+	return func(rc *Container) {
+		rc.cbContainer.cbCtl = ctrl
+	}
+}
+
+// WithContainerCBPanel is specifies the circuitbreaker.Panel used in the retry circuitbreaker
+// It's user's responsibility to make sure it's paired with control
+func WithContainerCBPanel(panel circuitbreaker.Panel) ContainerOption {
+	return func(rc *Container) {
+		rc.cbContainer.cbPanel = panel
+	}
+}
+
+// WithContainerCBStat instructs the circuitbreak.RecordStat is called within the retryer
+func WithContainerCBStat() ContainerOption {
+	return func(rc *Container) {
+		rc.cbContainer.cbStat = true
+	}
+}
+
+// WithContainerEnablePercentageLimit should be called for limiting the percentage of retry requests
+func WithContainerEnablePercentageLimit() ContainerOption {
+	return func(rc *Container) {
+		rc.cbContainer.enablePercentageLimit = true
 	}
 }
 
 // NewRetryContainer build Container that need to build circuit breaker and do circuit breaker statistic.
-func NewRetryContainer() *Container {
-	cbs := circuitbreak.NewCBSuite(circuitbreak.RPCInfo2Key)
-	return NewRetryContainerWithCBStat(cbs.ServiceControl(), cbs.ServicePanel())
+// The caller is responsible for calling Container.Close() to release resources referenced.
+func NewRetryContainer(opts ...ContainerOption) *Container {
+	rc := &Container{
+		cbContainer: &cbContainer{
+			cbSuite: nil,
+		},
+		retryerMap: sync.Map{},
+	}
+	for _, opt := range opts {
+		opt(rc)
+	}
+
+	if rc.cbContainer.enablePercentageLimit {
+		// ignore cbSuite/cbCtl/cbPanel options
+		rc.cbContainer = &cbContainer{
+			enablePercentageLimit: true,
+			cbSuite:               newCBSuite(),
+		}
+	}
+
+	container := rc.cbContainer
+	if container.cbCtl == nil && container.cbPanel == nil {
+		if container.cbSuite == nil {
+			container.cbSuite = newCBSuite()
+			container.cbStat = true
+		}
+		container.cbCtl = container.cbSuite.ServiceControl()
+		container.cbPanel = container.cbSuite.ServicePanel()
+	}
+	if !container.IsValid() {
+		panic("KITEX: invalid container")
+	}
+	return rc
 }
 
 // Container is a wrapper for Retryer.
@@ -102,10 +180,32 @@ type Container struct {
 	shouldResultRetry *ShouldResultRetry
 }
 
+// Recommended usage: NewRetryContainerWithPercentageLimit()
+// For more details, refer to the following comments for each field.
 type cbContainer struct {
+	// In NewRetryContainer, if cbCtrl & cbPanel are not set, Kitex will use cbSuite.ServiceControl() and
+	// cbSuite.ServicePanel(); If cbSuite is nil, Kitex will create one.
+	cbSuite *circuitbreak.CBSuite
+
+	// It's more recommended to rely on the cbSuite than specifying cbCtl & cbPanel with corresponding options,
+	// since cbCtl & cbPanel should be correctly paired, and with the cbSuite, Kitex will ensure it by using the
+	// cbSuite.ServiceControl() and cbSuite.ServicePanel().
 	cbCtl   *circuitbreak.Control
 	cbPanel circuitbreaker.Panel
-	cbStat  bool
+
+	// If cbStat && !enablePercentageLimit, retryer will call `circuitbreak.RecordStat` after rpcCall to record
+	// rpc failures/timeouts, for cutting down on the retry requests when the error rate is beyond the threshold.
+	cbStat bool
+
+	// If enabled, Kitex will always create a cbSuite and use its cbCtl & cbPanel, and retryer will call
+	// recordRetryStat before rpcCall, to precisely control the percentage of retry requests over all requests.
+	enablePercentageLimit bool
+}
+
+// IsValid returns true when both cbCtl & cbPanel are not nil
+// It's the user's responsibility to guarantee that cbCtl & cbPanel are correctly paired.
+func (c *cbContainer) IsValid() bool {
+	return c.cbCtl != nil && c.cbPanel != nil
 }
 
 // InitWithPolicies to init Retryer with methodPolicies
@@ -307,4 +407,12 @@ func (rc *Container) updateRetryer(rr *ShouldResultRetry) {
 			return true
 		})
 	}
+}
+
+// Close releases all possible resources referenced.
+func (rc *Container) Close() (err error) {
+	if rc.cbContainer != nil && rc.cbContainer.cbSuite != nil {
+		err = rc.cbContainer.cbSuite.Close()
+	}
+	return
 }
