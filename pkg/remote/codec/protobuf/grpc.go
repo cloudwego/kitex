@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/bytedance/gopkg/lang/mcache"
-	"os"
-
 	"github.com/cloudwego/fastpb"
 	"google.golang.org/protobuf/proto"
 
@@ -48,12 +46,7 @@ func NewGRPCCodec() remote.Codec {
 	return new(grpcCodec)
 }
 
-var useMake = os.Getenv("KITEX_GRPC_USE_MAKE") == "1"
-
 func mallocBytes(size int) []byte {
-	if useMake {
-		return make([]byte, size)
-	}
 	return mcache.Malloc(size)
 }
 
@@ -69,7 +62,9 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 		t.FastWrite(payload)
 	case marshaler:
 		payload = mallocBytes(t.Size())
-		_, err = t.MarshalTo(payload)
+		if _, err = t.MarshalTo(payload); err != nil {
+			return err
+		}
 	case protobufV2MsgCodec:
 		payload, err = t.XXX_Marshal(nil, true)
 	case proto.Message:

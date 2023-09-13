@@ -33,14 +33,14 @@ func buildGRPCFrame(ctx context.Context, payload []byte) ([]byte, []byte, error)
 	if err != nil {
 		return nil, nil, err
 	}
-	header := mallocBytes(dataFrameHeaderLen)
+	var header [5]byte
 	if isCompressed {
 		header[0] = 1
 	} else {
 		header[0] = 0
 	}
 	binary.BigEndian.PutUint32(header[1:dataFrameHeaderLen], uint32(len(data)))
-	return header, data, nil
+	return header[:], data, nil
 }
 
 func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) {
