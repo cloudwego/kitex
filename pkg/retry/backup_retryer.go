@@ -83,7 +83,7 @@ func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (recycleRI bool, err error) {
+func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}, container *Container) (recycleRI bool, err error) {
 	r.RLock()
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes
 	retryDelay := r.retryDelay
@@ -125,9 +125,13 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				}()
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
+				if container.enablePercentageLimit {
+					// record stat before call since requests may be slow, making the limiter more accurate
+					recordRetryStat(cbKey, r.cbContainer.cbPanel, ct)
+				}
 				cRI, _, e = rpcCall(ctx, r)
 				recordCost(ct, callStart, &recordCostDoing, &callCosts, &abort, e)
-				if r.cbContainer.cbStat {
+				if !container.enablePercentageLimit && r.cbContainer.cbStat {
 					circuitbreak.RecordStat(ctx, req, nil, e, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 				}
 			})
