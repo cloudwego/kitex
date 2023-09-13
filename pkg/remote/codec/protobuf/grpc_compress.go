@@ -33,7 +33,7 @@ func buildGRPCFrame(ctx context.Context, payload []byte) ([]byte, []byte, error)
 	if err != nil {
 		return nil, nil, err
 	}
-	header := make([]byte, dataFrameHeaderLen)
+	header := mallocBytes(dataFrameHeaderLen)
 	if isCompressed {
 		header[0] = 1
 	} else {
