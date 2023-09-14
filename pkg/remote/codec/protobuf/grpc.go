@@ -50,12 +50,6 @@ func mallocBytes(size int) []byte {
 	return mcache.Malloc(size)
 }
 
-func mallocWithFirstByteZeroed(size int) []byte {
-	data := mcache.Malloc(size)
-	data[0] = 0 // compressed flag = false
-	return data
-}
-
 func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
 	writer, ok := out.(remote.FrameWrite)
 	if !ok {
@@ -64,17 +58,13 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	var payload []byte
 	switch t := message.Data().(type) {
 	case fastpb.Writer:
-		payload = mallocBytes(t.Size() + dataFrameHeaderLen)
+		payload = mallocBytes(t.Size())
 		t.FastWrite(payload)
-		buildGRPCHeader(false, t.Size(), payload[0:dataFrameHeaderLen])
-		return writer.WriteData(payload)
 	case marshaler:
-		payload = mallocBytes(t.Size() + dataFrameHeaderLen)
+		payload = mallocBytes(t.Size())
 		if _, err = t.MarshalTo(payload); err != nil {
 			return err
 		}
-		buildGRPCHeader(false, t.Size(), payload[0:dataFrameHeaderLen])
-		return writer.WriteData(payload)
 	case protobufV2MsgCodec:
 		payload, err = t.XXX_Marshal(nil, true)
 	case proto.Message:
