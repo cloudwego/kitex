@@ -18,6 +18,7 @@ package protobuf
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/fastpb"
@@ -50,51 +51,134 @@ func mallocBytes(size int) []byte {
 	return mcache.Malloc(size)
 }
 
+//
+//func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
+//	writer, ok := out.(remote.FrameWrite)
+//	if !ok {
+//		return fmt.Errorf("output buffer must implement FrameWrite")
+//	}
+//	var payload []byte
+//	switch t := message.Data().(type) {
+//	case fastpb.Writer:
+//		payload = mallocBytes(t.Size())
+//		t.FastWrite(payload)
+//	case marshaler:
+//		payload = mallocBytes(t.Size())
+//		if _, err = t.MarshalTo(payload); err != nil {
+//			return err
+//		}
+//	case protobufV2MsgCodec:
+//		payload, err = t.XXX_Marshal(nil, true)
+//	case proto.Message:
+//		payload, err = proto.Marshal(t)
+//	case protobufMsgCodec:
+//		payload, err = t.Marshal(nil)
+//	}
+//	if err != nil {
+//		return err
+//	}
+//
+//	hdr, data, er := buildGRPCFrame(ctx, payload)
+//	if er != nil {
+//		return er
+//	}
+//
+//	err = writer.WriteHeader(hdr)
+//	if err != nil {
+//		return err
+//	}
+//
+//	return writer.WriteData(data)
+//}
+//
+//func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
+//	d, err := decodeGRPCFrame(ctx, in)
+//	if err != nil {
+//		return err
+//	}
+//	message.SetPayloadLen(len(d))
+//	data := message.Data()
+//	if t, ok := data.(fastpb.Reader); ok {
+//		if len(d) == 0 {
+//			// if all fields of a struct is default value, data will be nil
+//			// In the implementation of fastpb, if data is nil, then fastpb will skip creating this struct, as a result user will get a nil pointer which is not expected.
+//			// So, when data is nil, use default protobuf unmarshal method to decode the struct.
+//			// todo: fix fastpb
+//		} else {
+//			_, err = fastpb.ReadMessage(d, fastpb.SkipTypeCheck, t)
+//			return err
+//		}
+//	}
+//	switch t := data.(type) {
+//	case protobufV2MsgCodec:
+//		return t.XXX_Unmarshal(d)
+//	case proto.Message:
+//		return proto.Unmarshal(d, t)
+//	case protobufMsgCodec:
+//		return t.Unmarshal(d)
+//	}
+//	return nil
+//}
+
+func mallocWithFirstByteZeroed(size int) []byte {
+	data := mcache.Malloc(size)
+	data[0] = 0 // compressed flag = false
+	return data
+}
+
 func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
 	writer, ok := out.(remote.FrameWrite)
 	if !ok {
 		return fmt.Errorf("output buffer must implement FrameWrite")
 	}
-	var payload []byte
+
+	var data []byte
 	switch t := message.Data().(type) {
 	case fastpb.Writer:
-		payload = mallocBytes(t.Size())
-		t.FastWrite(payload)
+		// TODO: reuse data buffer when we can free it safely
+		size := t.Size()
+		data = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
+		t.FastWrite(data[dataFrameHeaderLen:])
+		binary.BigEndian.PutUint32(data[1:dataFrameHeaderLen], uint32(size))
+		return writer.WriteData(data)
 	case marshaler:
-		payload = mallocBytes(t.Size())
-		if _, err = t.MarshalTo(payload); err != nil {
+		// TODO: reuse data buffer when we can free it safely
+		size := t.Size()
+		data = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
+		if _, err = t.MarshalTo(data[dataFrameHeaderLen:]); err != nil {
 			return err
 		}
+		binary.BigEndian.PutUint32(data[1:dataFrameHeaderLen], uint32(size))
+		return writer.WriteData(data)
 	case protobufV2MsgCodec:
-		payload, err = t.XXX_Marshal(nil, true)
+		data, err = t.XXX_Marshal(nil, true)
 	case proto.Message:
-		payload, err = proto.Marshal(t)
+		data, err = proto.Marshal(t)
 	case protobufMsgCodec:
-		payload, err = t.Marshal(nil)
+		data, err = t.Marshal(nil)
 	}
 	if err != nil {
 		return err
 	}
-
-	hdr, data, er := buildGRPCFrame(ctx, payload)
-	if er != nil {
-		return er
-	}
-
-	err = writer.WriteHeader(hdr)
-	if err != nil {
+	if err = writer.WriteData(data); err != nil {
 		return err
 	}
-
-	return writer.WriteData(data)
+	var header [5]byte
+	binary.BigEndian.PutUint32(header[1:5], uint32(len(data)))
+	return writer.WriteHeader(header[:])
 }
 
 func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
-	d, err := decodeGRPCFrame(ctx, in)
+	hdr, err := in.Next(5)
 	if err != nil {
 		return err
 	}
-	message.SetPayloadLen(len(d))
+	dLen := int(binary.BigEndian.Uint32(hdr[1:]))
+	d, err := in.Next(dLen)
+	if err != nil {
+		return err
+	}
+	message.SetPayloadLen(dLen)
 	data := message.Data()
 	if t, ok := data.(fastpb.Reader); ok {
 		if len(d) == 0 {
