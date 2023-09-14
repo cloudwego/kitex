@@ -95,11 +95,7 @@ func (s *stream) RecvMsg(m interface{}) error {
 	ri := rpcinfo.GetRPCInfo(s.ctx)
 
 	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
-	if s.svcInfo == nil {
-		msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), serviceinfo.Protobuf))
-	} else {
-		msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
-	}
+	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
 	defer msg.Recycle()
 
 	_, err := s.handler.Read(s.ctx, s.conn, msg)
