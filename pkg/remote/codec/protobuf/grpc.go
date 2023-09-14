@@ -91,34 +91,6 @@ func mallocBytes(size int) []byte {
 //	return writer.WriteData(data)
 //}
 //
-//func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
-//	d, err := decodeGRPCFrame(ctx, in)
-//	if err != nil {
-//		return err
-//	}
-//	message.SetPayloadLen(len(d))
-//	data := message.Data()
-//	if t, ok := data.(fastpb.Reader); ok {
-//		if len(d) == 0 {
-//			// if all fields of a struct is default value, data will be nil
-//			// In the implementation of fastpb, if data is nil, then fastpb will skip creating this struct, as a result user will get a nil pointer which is not expected.
-//			// So, when data is nil, use default protobuf unmarshal method to decode the struct.
-//			// todo: fix fastpb
-//		} else {
-//			_, err = fastpb.ReadMessage(d, fastpb.SkipTypeCheck, t)
-//			return err
-//		}
-//	}
-//	switch t := data.(type) {
-//	case protobufV2MsgCodec:
-//		return t.XXX_Unmarshal(d)
-//	case proto.Message:
-//		return proto.Unmarshal(d, t)
-//	case protobufMsgCodec:
-//		return t.Unmarshal(d)
-//	}
-//	return nil
-//}
 
 func mallocWithFirstByteZeroed(size int) []byte {
 	data := mcache.Malloc(size)
@@ -169,16 +141,11 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 }
 
 func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
-	hdr, err := in.Next(5)
+	d, err := decodeGRPCFrame(ctx, in)
 	if err != nil {
 		return err
 	}
-	dLen := int(binary.BigEndian.Uint32(hdr[1:]))
-	d, err := in.Next(dLen)
-	if err != nil {
-		return err
-	}
-	message.SetPayloadLen(dLen)
+	message.SetPayloadLen(len(d))
 	data := message.Data()
 	if t, ok := data.(fastpb.Reader); ok {
 		if len(d) == 0 {
@@ -201,6 +168,41 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	}
 	return nil
 }
+
+//
+//func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
+//	hdr, err := in.Next(5)
+//	if err != nil {
+//		return err
+//	}
+//	dLen := int(binary.BigEndian.Uint32(hdr[1:]))
+//	d, err := in.Next(dLen)
+//	if err != nil {
+//		return err
+//	}
+//	message.SetPayloadLen(dLen)
+//	data := message.Data()
+//	if t, ok := data.(fastpb.Reader); ok {
+//		if len(d) == 0 {
+//			// if all fields of a struct is default value, data will be nil
+//			// In the implementation of fastpb, if data is nil, then fastpb will skip creating this struct, as a result user will get a nil pointer which is not expected.
+//			// So, when data is nil, use default protobuf unmarshal method to decode the struct.
+//			// todo: fix fastpb
+//		} else {
+//			_, err = fastpb.ReadMessage(d, fastpb.SkipTypeCheck, t)
+//			return err
+//		}
+//	}
+//	switch t := data.(type) {
+//	case protobufV2MsgCodec:
+//		return t.XXX_Unmarshal(d)
+//	case proto.Message:
+//		return proto.Unmarshal(d, t)
+//	case protobufMsgCodec:
+//		return t.Unmarshal(d)
+//	}
+//	return nil
+//}
 
 func (c *grpcCodec) Name() string {
 	return "grpc"
