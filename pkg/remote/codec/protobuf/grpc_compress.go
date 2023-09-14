@@ -28,12 +28,21 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
+func buildGRPCHeader(isCompressed bool, dataLen int, header []byte) {
+	if isCompressed {
+		header[0] = 1
+	} else {
+		header[0] = 0
+	}
+	binary.BigEndian.PutUint32(header[1:dataFrameHeaderLen], uint32(dataLen))
+}
+
 func buildGRPCFrame(ctx context.Context, payload []byte) ([]byte, []byte, error) {
 	data, isCompressed, err := compress(ctx, payload)
 	if err != nil {
 		return nil, nil, err
 	}
-	var header [5]byte
+	var header [dataFrameHeaderLen]byte
 	if isCompressed {
 		header[0] = 1
 	} else {
