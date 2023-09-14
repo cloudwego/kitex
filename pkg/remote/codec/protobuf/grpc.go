@@ -66,25 +66,15 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	case fastpb.Writer:
 		payload = mallocBytes(t.Size() + dataFrameHeaderLen)
 		t.FastWrite(payload)
-		data, isCompressed, er := compress(ctx, payload)
-		if er != nil {
-			return er
-		}
-		// todo fix this
-		buildGRPCHeader(isCompressed, t.Size(), data[0:dataFrameHeaderLen])
-		return writer.WriteData(data)
+		buildGRPCHeader(false, t.Size(), payload[0:dataFrameHeaderLen])
+		return writer.WriteData(payload)
 	case marshaler:
 		payload = mallocBytes(t.Size() + dataFrameHeaderLen)
 		if _, err = t.MarshalTo(payload); err != nil {
 			return err
 		}
-		data, isCompressed, er := compress(ctx, payload)
-		if er != nil {
-			return er
-		}
-		// todo fix this
-		buildGRPCHeader(isCompressed, t.Size(), data[0:dataFrameHeaderLen])
-		return writer.WriteData(data)
+		buildGRPCHeader(false, t.Size(), payload[0:dataFrameHeaderLen])
+		return writer.WriteData(payload)
 	case protobufV2MsgCodec:
 		payload, err = t.XXX_Marshal(nil, true)
 	case proto.Message:
@@ -106,49 +96,6 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 
 	return writer.WriteData(data)
 }
-
-//
-//func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
-//	writer, ok := out.(remote.FrameWrite)
-//	if !ok {
-//		return fmt.Errorf("output buffer must implement FrameWrite")
-//	}
-//
-//	var data []byte
-//	switch t := message.Data().(type) {
-//	case fastpb.Writer:
-//		// TODO: reuse data buffer when we can free it safely
-//		size := t.Size()
-//		data = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
-//		t.FastWrite(data[dataFrameHeaderLen:])
-//		binary.BigEndian.PutUint32(data[1:dataFrameHeaderLen], uint32(size))
-//		return writer.WriteData(data)
-//	case marshaler:
-//		// TODO: reuse data buffer when we can free it safely
-//		size := t.Size()
-//		data = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
-//		if _, err = t.MarshalTo(data[dataFrameHeaderLen:]); err != nil {
-//			return err
-//		}
-//		binary.BigEndian.PutUint32(data[1:dataFrameHeaderLen], uint32(size))
-//		return writer.WriteData(data)
-//	case protobufV2MsgCodec:
-//		data, err = t.XXX_Marshal(nil, true)
-//	case proto.Message:
-//		data, err = proto.Marshal(t)
-//	case protobufMsgCodec:
-//		data, err = t.Marshal(nil)
-//	}
-//	if err != nil {
-//		return err
-//	}
-//	if err = writer.WriteData(data); err != nil {
-//		return err
-//	}
-//	var header [5]byte
-//	binary.BigEndian.PutUint32(header[1:5], uint32(len(data)))
-//	return writer.WriteHeader(header[:])
-//}
 
 func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
 	d, err := decodeGRPCFrame(ctx, in)
