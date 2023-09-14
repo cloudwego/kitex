@@ -71,31 +71,31 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	var payload []byte
 	switch t := message.Data().(type) {
 	case fastpb.Writer:
-		if isCompressed {
-			payload = mallocBytes(t.Size())
-			t.FastWrite(payload)
-		} else {
-			size := t.Size()
-			payload = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
-			t.FastWrite(payload[dataFrameHeaderLen:])
-			binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(size))
-			return writer.WriteData(payload)
-		}
+		size := t.Size()
+		//if isCompressed {
+		payload = mallocBytes(size)
+		t.FastWrite(payload)
+		//} else {
+		//	payload = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
+		//	t.FastWrite(payload[dataFrameHeaderLen:])
+		//	binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(size))
+		//	return writer.WriteData(payload)
+		//}
 	case marshaler:
-		if isCompressed {
-			payload = mallocBytes(t.Size())
-			if _, err = t.MarshalTo(payload); err != nil {
-				return err
-			}
-		} else {
-			size := t.Size()
-			payload = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
-			if _, err = t.MarshalTo(payload[dataFrameHeaderLen:]); err != nil {
-				return err
-			}
-			binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(size))
-			return writer.WriteData(payload)
+		size := t.Size()
+		//if isCompressed {
+		payload = mallocBytes(size)
+		if _, err = t.MarshalTo(payload); err != nil {
+			return err
 		}
+		//} else {
+		//	payload = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
+		//	if _, err = t.MarshalTo(payload[dataFrameHeaderLen:]); err != nil {
+		//		return err
+		//	}
+		//	binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(size))
+		//	return writer.WriteData(payload)
+		//}
 	case protobufV2MsgCodec:
 		payload, err = t.XXX_Marshal(nil, true)
 	case proto.Message:
