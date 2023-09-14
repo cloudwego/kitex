@@ -28,28 +28,18 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-func buildGRPCHeader(isCompressed bool, dataLen int, header []byte) {
-	if isCompressed {
-		header[0] = 1
-	} else {
-		header[0] = 0
+func getCompressor(ctx context.Context) (encoding.Compressor, error) {
+	cname := remote.GetSendCompressor(ctx)
+	if cname == "" {
+		// if no compressor set, don't use compressor
+		return nil, nil
 	}
-	binary.BigEndian.PutUint32(header[1:dataFrameHeaderLen], uint32(dataLen))
-}
-
-func buildGRPCFrame(ctx context.Context, payload []byte) ([]byte, []byte, error) {
-	data, isCompressed, err := compress(ctx, payload)
-	if err != nil {
-		return nil, nil, err
+	compressor := encoding.GetCompressor(cname)
+	if compressor == nil {
+		// if comporessor set but not found, return err
+		return nil, fmt.Errorf("no compressor registered for: %s", cname)
 	}
-	var header [dataFrameHeaderLen]byte
-	if isCompressed {
-		header[0] = 1
-	} else {
-		header[0] = 0
-	}
-	binary.BigEndian.PutUint32(header[1:dataFrameHeaderLen], uint32(len(data)))
-	return header[:], data, nil
+	return compressor, nil
 }
 
 func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) {
@@ -69,27 +59,19 @@ func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) 
 	return d, nil
 }
 
-func compress(ctx context.Context, data []byte) ([]byte, bool, error) {
-	cname := remote.GetSendCompressor(ctx)
-	if cname == "" {
-		return data, false, nil
-	}
-	compressor := encoding.GetCompressor(cname)
-	if compressor == nil {
-		return nil, false, fmt.Errorf("no compressor registered for: %s", cname)
-	}
+func compress(compressor encoding.Compressor, data []byte) ([]byte, error) {
 	cbuf := &bytes.Buffer{}
 	z, err := compressor.Compress(cbuf)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if _, err = z.Write(data); err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	if err = z.Close(); err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	return cbuf.Bytes(), true, nil
+	return cbuf.Bytes(), nil
 }
 
 func decompress(ctx context.Context, data []byte) ([]byte, error) {

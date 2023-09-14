@@ -18,6 +18,7 @@ package protobuf
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/fastpb"
@@ -50,20 +51,50 @@ func mallocBytes(size int) []byte {
 	return mcache.Malloc(size)
 }
 
+func mallocWithFirstByteZeroed(size int) []byte {
+	data := mcache.Malloc(size)
+	data[0] = 0 // compressed flag = false
+	return data
+}
+
 func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
 	writer, ok := out.(remote.FrameWrite)
 	if !ok {
 		return fmt.Errorf("output buffer must implement FrameWrite")
 	}
+	compressor, err := getCompressor(ctx)
+	if err != nil {
+		return err
+	}
+	isCompressed := compressor != nil
+
 	var payload []byte
 	switch t := message.Data().(type) {
 	case fastpb.Writer:
-		payload = mallocBytes(t.Size())
-		t.FastWrite(payload)
+		if isCompressed {
+			payload = mallocBytes(t.Size())
+			t.FastWrite(payload)
+		} else {
+			size := t.Size()
+			payload = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
+			t.FastWrite(payload[dataFrameHeaderLen:])
+			binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(size))
+			return writer.WriteData(payload)
+		}
 	case marshaler:
-		payload = mallocBytes(t.Size())
-		if _, err = t.MarshalTo(payload); err != nil {
-			return err
+		if isCompressed {
+			payload = mallocBytes(t.Size())
+			if _, err = t.MarshalTo(payload); err != nil {
+				return err
+			}
+		} else {
+			size := t.Size()
+			payload = mallocWithFirstByteZeroed(size + dataFrameHeaderLen)
+			if _, err = t.MarshalTo(payload[dataFrameHeaderLen:]); err != nil {
+				return err
+			}
+			binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(size))
+			return writer.WriteData(payload)
 		}
 	case protobufV2MsgCodec:
 		payload, err = t.XXX_Marshal(nil, true)
@@ -75,16 +106,22 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	if err != nil {
 		return err
 	}
-	hdr, data, er := buildGRPCFrame(ctx, payload)
-	if er != nil {
-		return er
+	var header [dataFrameHeaderLen]byte
+	if isCompressed {
+		payload, err = compress(compressor, payload)
+		if err != nil {
+			return err
+		}
+		header[0] = 1
+	} else {
+		header[0] = 0
 	}
-	err = writer.WriteHeader(hdr)
+	binary.BigEndian.PutUint32(header[1:dataFrameHeaderLen], uint32(len(payload)))
+	err = writer.WriteHeader(header[:])
 	if err != nil {
 		return err
 	}
-
-	return writer.WriteData(data)
+	return writer.WriteData(payload)
 }
 
 func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
