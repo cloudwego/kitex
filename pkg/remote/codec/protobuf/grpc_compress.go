@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/bytedance/gopkg/lang/mcache"
 	"io"
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
@@ -71,6 +72,7 @@ func compress(compressor encoding.Compressor, data []byte) ([]byte, error) {
 	if err = z.Close(); err != nil {
 		return nil, err
 	}
+	mcache.Free(data)
 	return cbuf.Bytes(), nil
 }
 
