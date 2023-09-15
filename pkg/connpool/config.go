@@ -30,6 +30,7 @@ const (
 	defaultMaxIdleTimeout = 30 * time.Second
 	minMaxIdleTimeout     = 2 * time.Second
 	maxMinIdlePerAddress  = 5
+	defaultMaxIdleGlobal  = 1 << 20 // no limit
 )
 
 // CheckPoolConfig to check invalid param.
@@ -58,9 +59,8 @@ func CheckPoolConfig(config IdleConfig) *IdleConfig {
 
 	// globalIdle
 	if config.MaxIdleGlobal <= 0 {
-		config.MaxIdleGlobal = 1
-	}
-	if config.MaxIdleGlobal < config.MaxIdlePerAddress {
+		config.MaxIdleGlobal = defaultMaxIdleGlobal
+	} else if config.MaxIdleGlobal < config.MaxIdlePerAddress {
 		config.MaxIdleGlobal = config.MaxIdlePerAddress
 	}
 	return &config
