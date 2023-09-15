@@ -31,6 +31,7 @@ import (
 	{{- end}}
 )
 
+// NewInvokerWithMultiServices is only available with kitex gRPC
 func NewInvokerWithMultiServices(services []kitex.Service, opts ...server.Option) server.Invoker {
 	var options []server.Option
 

@@ -31,6 +31,7 @@ import (
 	{{- end}}
 )
 
+// NewServerWithMultiServices is only available with kitex gRPC
 func NewServerWithMultiServices(services []kitex.Service, opts ...server.Option) server.Server {
 	var options []server.Option
 
