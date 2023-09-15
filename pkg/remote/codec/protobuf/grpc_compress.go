@@ -20,30 +20,25 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"github.com/bytedance/gopkg/lang/mcache"
-	"io"
-
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
+	"io"
+	"strings"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-func getCompressor(ctx context.Context) (encoding.Compressor, error) {
-	cname := remote.GetSendCompressor(ctx)
-	if cname == "" {
-		// if no compressor set, don't use compressor
-		return nil, nil
-	}
-	compressor := encoding.GetCompressor(cname)
-	if compressor == nil {
-		// if comporessor set but not found, return err
-		return nil, fmt.Errorf("no compressor registered for: %s", cname)
-	}
-	return compressor, nil
+func getSendCompressor(ctx context.Context) (encoding.Compressor, error) {
+	return getCompressor(remote.GetSendCompressor(ctx))
 }
 
 func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) {
+	compressor, err := getCompressor(remote.GetRecvCompressor(ctx))
+	if err != nil {
+		return nil, err
+	}
 	hdr, err := in.Next(5)
 	if err != nil {
 		return nil, err
@@ -55,6 +50,9 @@ func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) 
 		return nil, err
 	}
 	if compressFlag == 1 {
+		if compressor == nil {
+			return nil, errors.New("kitex compression algorithm not found")
+		}
 		return decompress(ctx, d)
 	}
 	return d, nil
@@ -77,19 +75,47 @@ func compress(compressor encoding.Compressor, data []byte) ([]byte, error) {
 }
 
 func decompress(ctx context.Context, data []byte) ([]byte, error) {
-	cname := remote.GetRecvCompressor(ctx)
-	compressor := encoding.GetCompressor(cname)
+	compressor, err := getCompressor(remote.GetRecvCompressor(ctx))
+	if err != nil {
+		return nil, err
+	}
 	if compressor == nil {
-		return nil, fmt.Errorf("no compressor registered found for:%v", cname)
+		return data, err
 	}
 	dcReader, er := compressor.Decompress(bytes.NewReader(data))
 	if er != nil {
 		return nil, er
 	}
 	var buf bytes.Buffer
-	_, err := io.Copy(&buf, dcReader)
+	_, err = io.Copy(&buf, dcReader)
 	if err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func getCompressor(cname string) (compressor encoding.Compressor, err error) {
+	// if cname is empty, it means there's no compressor
+	if cname == "" {
+		return nil, nil
+	}
+	// cname can be an array, such as "identity,deflate,gzip", which means there should be at least one compressor registered.
+	// found available compressors
+	var hasIdentity bool
+	for _, name := range strings.Split(cname, ",") {
+		if name == encoding.Identity {
+			hasIdentity = true
+		}
+		compressor = encoding.GetCompressor(name)
+		if compressor != nil {
+			break
+		}
+	}
+	if compressor == nil {
+		if hasIdentity {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("no kitex compressor registered found for:%v", cname)
+	}
+	return compressor, nil
 }

@@ -58,7 +58,7 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	if !ok {
 		return fmt.Errorf("output buffer must implement FrameWrite")
 	}
-	compressor, err := getCompressor(ctx)
+	compressor, err := getSendCompressor(ctx)
 	if err != nil {
 		return err
 	}
