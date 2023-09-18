@@ -17,6 +17,7 @@ package generator
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"strings"
 	"text/template"
 
@@ -45,6 +46,7 @@ type PackageInfo struct {
 	Features         []feature
 	FrugalPretouch   bool
 	Module           string
+	TemplateData     map[string]interface{}
 }
 
 // AddImport .
@@ -145,6 +147,7 @@ var funcs = map[string]interface{}{
 	"HasFeature":    HasFeature,
 	"FilterImports": FilterImports,
 	"backquoted":    BackQuoted,
+	"GetEnv":        os.Getenv,
 }
 
 var templateNames = []string{

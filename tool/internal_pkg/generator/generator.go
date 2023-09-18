@@ -127,7 +127,8 @@ type Config struct {
 	Record    bool
 	RecordCmd []string
 
-	TemplateDir string
+	TemplateDir  string
+	TemplateData string
 
 	GenPath string
 

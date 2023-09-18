@@ -16,6 +16,7 @@ package protoc
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
@@ -229,6 +230,13 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 		if len(pp.Services) == 0 {
 			gen.Error(errors.New("no service defined"))
 			return
+		}
+		if len(pp.Config.TemplateData) != 0 {
+			var m map[string]interface{}
+			if err := json.Unmarshal([]byte(pp.Config.TemplateData), &m); err != nil {
+				pp.err = err
+			}
+			pp.PackageInfo.TemplateData = m
 		}
 		pp.ServiceInfo = pp.Services[len(pp.Services)-1]
 		fs, err := pp.kg.GenerateCustomPackage(&pp.PackageInfo)

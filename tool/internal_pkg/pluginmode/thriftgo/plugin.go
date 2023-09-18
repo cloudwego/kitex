@@ -15,6 +15,7 @@
 package thriftgo
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -88,6 +89,13 @@ func Run() int {
 	if conv.Config.TemplateDir != "" {
 		if len(conv.Services) == 0 {
 			return conv.fail(errors.New("no service defined in the IDL"))
+		}
+		if len(conv.Config.TemplateData) != 0 {
+			var m map[string]interface{}
+			if err := json.Unmarshal([]byte(conv.Config.TemplateData), &m); err != nil {
+				return conv.fail(err)
+			}
+			conv.Package.TemplateData = m
 		}
 		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
 		fs, err := gen.GenerateCustomPackage(&conv.Package)

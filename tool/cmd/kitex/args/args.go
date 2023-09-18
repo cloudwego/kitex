@@ -110,6 +110,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Record Kitex cmd into kitex-all.sh.")
 	f.StringVar(&a.TemplateDir, "template-dir", "",
 		"Use custom template to generate codes.")
+	f.StringVar(&a.TemplateData, "template-data", "",
+		"Pass a JSON string to a custom template for use")
 	f.StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
 		"Specify a code gen path.")
 	f.BoolVar(&a.DeepCopyAPI, "deep-copy-api", false,
