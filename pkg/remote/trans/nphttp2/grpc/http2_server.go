@@ -25,7 +25,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 	"io"
 	"math"
 	"math/rand"
@@ -34,6 +33,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
