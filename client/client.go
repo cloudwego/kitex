@@ -326,6 +326,10 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
 	ctx, ri, callOpts = kc.initRPCInfo(ctx, method, 0)
+
+	// Remove compressor information from ctx because this information should not be passed to the next hop.
+	ctx = remote.SetSendCompressor(ctx, "")
+	ctx = remote.SetRecvCompressor(ctx, "")
 	if callOpts != nil && callOpts.CompressorName != "" {
 		ctx = remote.SetSendCompressor(ctx, callOpts.CompressorName)
 	}
