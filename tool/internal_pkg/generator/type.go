@@ -17,7 +17,7 @@ package generator
 import (
 	"bytes"
 	"fmt"
-	"os"
+	"github.com/Masterminds/sprig/v3"
 	"strings"
 	"text/template"
 
@@ -137,18 +137,25 @@ type Parameter struct {
 	Type    string // *PkgA.StructB
 }
 
-var funcs = map[string]interface{}{
-	"ToLower":       strings.ToLower,
-	"LowerFirst":    util.LowerFirst,
-	"UpperFirst":    util.UpperFirst,
-	"NotPtr":        util.NotPtr,
-	"ReplaceString": util.ReplaceString,
-	"SnakeString":   util.SnakeString,
-	"HasFeature":    HasFeature,
-	"FilterImports": FilterImports,
-	"backquoted":    BackQuoted,
-	"GetEnv":        os.Getenv,
-}
+var funcs = func() template.FuncMap {
+	m := template.FuncMap{
+		"ToLower":       strings.ToLower,
+		"LowerFirst":    util.LowerFirst,
+		"UpperFirst":    util.UpperFirst,
+		"NotPtr":        util.NotPtr,
+		"ReplaceString": util.ReplaceString,
+		"SnakeString":   util.SnakeString,
+		"HasFeature":    HasFeature,
+		"FilterImports": FilterImports,
+		"backquoted":    BackQuoted,
+	}
+	for key, f := range sprig.TxtFuncMap() {
+		if _, ok := m[key]; !ok {
+			m[key] = f
+		}
+	}
+	return m
+}()
 
 var templateNames = []string{
 	"@client.go-NewClient-option",
