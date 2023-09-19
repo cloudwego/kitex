@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/kitex/pkg/discovery"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -103,15 +104,19 @@ func circuitBreakerStop(ctx context.Context, policy StopPolicy, cbC *cbContainer
 }
 
 func handleRetryInstance(retrySameNode bool, prevRI, retryRI rpcinfo.RPCInfo) {
-	calledInst := remoteinfo.AsRemoteInfo(prevRI.To()).GetInstance()
+	prevRemoteInfo := remoteinfo.AsRemoteInfo(prevRI.To())
+	calledInst := prevRemoteInfo.GetInstance()
 	if calledInst == nil {
 		return
 	}
 	if retrySameNode {
+		if retryableInstance, ok := calledInst.(discovery.RetryableInstance); ok {
+			calledInst = retryableInstance.CopyForRetry()
+		}
 		remoteinfo.AsRemoteInfo(retryRI.To()).SetInstance(calledInst)
 	} else {
 		if me := remoteinfo.AsRemoteInfo(retryRI.To()); me != nil {
-			me.SetTag(rpcinfo.RetryPrevInstTag, calledInst.Address().String())
+			me.SetTag(rpcinfo.RetryPrevInstTag, prevRemoteInfo.Address().String())
 		}
 	}
 }

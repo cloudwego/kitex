@@ -172,3 +172,12 @@ type Instance interface {
 	Weight() int
 	Tag(key string) (value string, exist bool)
 }
+
+// RetryableInstance is used to get a copy from the instance of previous request.
+// In some cases, we need this interface to avoid race conflicts with previous request.
+// e.g. We reset the actual remote address returned by the proxy and retry the request
+// using this remote address, which bypasses the proxy directly and causes issues.
+type RetryableInstance interface {
+	Instance
+	CopyForRetry() Instance
+}
