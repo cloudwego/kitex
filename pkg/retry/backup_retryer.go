@@ -83,7 +83,7 @@ func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (recycleRI bool, err error) {
+func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (lastRI rpcinfo.RPCInfo, err error) {
 	r.RLock()
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes
 	retryDelay := r.retryDelay
@@ -145,8 +145,8 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				continue
 			}
 			atomic.StoreInt32(&abort, 1)
-			recordRetryInfo(firstRI, res.ri, atomic.LoadInt32(&callTimes), callCosts.String())
-			return false, res.err
+			recordRetryInfo(res.ri, atomic.LoadInt32(&callTimes), callCosts.String())
+			return res.ri, res.err
 		}
 	}
 }

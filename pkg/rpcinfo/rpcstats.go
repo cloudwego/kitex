@@ -170,6 +170,19 @@ func (r *rpcStats) Level() stats.Level {
 	return r.level
 }
 
+// CopyForRetry implements the RPCStaats interface, it copies a RPCStats from the origin one
+// to pass through info of the first request to retrying requests.
+func (r *rpcStats) CopyForRetry() RPCStats {
+	// Copied rpc stats is for request retrying and cannot be reused, so no need to get from pool.
+	nr := newRPCStats().(*rpcStats)
+	r.Lock()
+	for i := 0; i < len(nr.eventMap); i++ {
+		nr.eventMap[i] = r.eventMap[i]
+	}
+	r.Unlock()
+	return nr
+}
+
 // SetSendSize sets send size.
 func (r *rpcStats) SetSendSize(size uint64) {
 	atomic.StoreUint64(&r.sendSize, size)
