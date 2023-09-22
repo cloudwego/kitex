@@ -43,6 +43,9 @@ func SetSendCompressor(ctx context.Context, compressorName string) {
 
 func GetSendCompressor(ctx context.Context) string {
 	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri == nil {
+		return ""
+	}
 	v, exist := ri.From().Tag("send-compressor")
 	if exist {
 		return v
@@ -52,6 +55,9 @@ func GetSendCompressor(ctx context.Context) string {
 
 func GetRecvCompressor(ctx context.Context) string {
 	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri == nil {
+		return ""
+	}
 	v, exist := ri.From().Tag("recv-compressor")
 	if exist {
 		return v
