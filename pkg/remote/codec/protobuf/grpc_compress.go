@@ -23,6 +23,8 @@ import (
 	"errors"
 	"io"
 
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+
 	"github.com/bytedance/gopkg/lang/mcache"
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
@@ -31,11 +33,13 @@ import (
 )
 
 func getSendCompressor(ctx context.Context) (encoding.Compressor, error) {
-	return encoding.FindCompressor(remote.GetSendCompressor(ctx))
+	ri := rpcinfo.GetRPCInfo(ctx)
+	return encoding.FindCompressor(remote.GetSendCompressor(ri))
 }
 
 func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) {
-	compressor, err := encoding.FindCompressor(remote.GetRecvCompressor(ctx))
+	ri := rpcinfo.GetRPCInfo(ctx)
+	compressor, err := encoding.FindCompressor(remote.GetRecvCompressor(ri))
 	if err != nil {
 		return nil, err
 	}
