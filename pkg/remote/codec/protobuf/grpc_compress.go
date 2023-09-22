@@ -21,8 +21,9 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"github.com/bytedance/gopkg/lang/mcache"
 	"io"
+
+	"github.com/bytedance/gopkg/lang/mcache"
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 
