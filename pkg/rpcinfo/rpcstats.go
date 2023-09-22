@@ -170,14 +170,19 @@ func (r *rpcStats) Level() stats.Level {
 	return r.level
 }
 
-// CopyForRetry implements the RPCStaats interface, it copies a RPCStats from the origin one
+// CopyForRetry implements the RPCStats interface, it copies a RPCStats from the origin one
 // to pass through info of the first request to retrying requests.
 func (r *rpcStats) CopyForRetry() RPCStats {
 	// Copied rpc stats is for request retrying and cannot be reused, so no need to get from pool.
 	nr := newRPCStats().(*rpcStats)
 	r.Lock()
+	startIdx := int(stats.RPCStart.Index())
+	userIdx := stats.PredefinedEventNum()
 	for i := 0; i < len(nr.eventMap); i++ {
-		nr.eventMap[i] = r.eventMap[i]
+		// Ignore none RPCStart events to avoid incorrect tracing.
+		if i == startIdx || i >= userIdx {
+			nr.eventMap[i] = r.eventMap[i]
+		}
 	}
 	r.Unlock()
 	return nr

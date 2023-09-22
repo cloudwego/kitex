@@ -179,26 +179,6 @@ func (ri *remoteInfo) ImmutableView() rpcinfo.EndpointInfo {
 	return ri
 }
 
-func (ri *remoteInfo) copyTags() map[string]string {
-	ri.Lock()
-	defer ri.Unlock()
-	newTags := make(map[string]string, len(ri.tags))
-	for k, v := range ri.tags {
-		newTags[k] = v
-	}
-	return newTags
-}
-
-func (ri *remoteInfo) copyTagsLocks() map[string]struct{} {
-	ri.Lock()
-	defer ri.Unlock()
-	newTagLocks := make(map[string]struct{}, len(ri.tagLocks))
-	for k, v := range ri.tagLocks {
-		newTagLocks[k] = v
-	}
-	return newTagLocks
-}
-
 func (ri *remoteInfo) zero() {
 	ri.Lock()
 	defer ri.Unlock()

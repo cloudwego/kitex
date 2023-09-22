@@ -302,8 +302,8 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) 
 }
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
-func (kc *kClient) initRPCInfo(ctx context.Context, method string, retryTimes int, firstStats rpcinfo.RPCStats) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, retryTimes, firstStats)
+func (kc *kClient) initRPCInfo(ctx context.Context, method string, retryTimes int, firstRI rpcinfo.RPCInfo) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, retryTimes, firstRI)
 }
 
 func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo, opt *client.Options) (context.Context, *callopt.CallOptions) {
@@ -361,10 +361,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 			recycleRI = true
 		}
 	} else {
-		var lastRI rpcinfo.RPCInfo
-		lastRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
-		recycleRI = lastRI == ri && err == nil
-		ri = lastRI
+		ri, recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
 	}
 
 	// do fallback if with setup
@@ -377,12 +374,11 @@ func (kc *kClient) rpcCallWithRetry(ri rpcinfo.RPCInfo, method string, request, 
 	var callTimes int32
 	// prevRI represents a value of rpcinfo.RPCInfo type.
 	var prevRI atomic.Value
-	firstStats := ri.Stats().CopyForRetry()
 	return func(ctx context.Context, r retry.Retryer) (rpcinfo.RPCInfo, interface{}, error) {
 		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
 		cRI := ri
 		if currCallTimes > 1 {
-			ctx, cRI, _ = kc.initRPCInfo(ctx, method, currCallTimes-1, firstStats)
+			ctx, cRI, _ = kc.initRPCInfo(ctx, method, currCallTimes-1, ri)
 			ctx = metainfo.WithPersistentValue(ctx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
 			if prevRI.Load() == nil {
 				prevRI.Store(ri)
@@ -672,14 +668,14 @@ func getFallbackPolicy(cliOptFB *fallback.Policy, callOpts *callopt.CallOptions)
 	return nil, false
 }
 
-func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo, retryTimes int, firstStats rpcinfo.RPCStats) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo, retryTimes int, firstRI rpcinfo.RPCInfo) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
 	cfg := rpcinfo.AsMutableRPCConfig(opt.Configs).Clone()
 	rmt := remoteinfo.NewRemoteInfo(opt.Svr, method)
 	var callOpts *callopt.CallOptions
 	ctx, callOpts = applyCallOptions(ctx, cfg, rmt, opt)
 	var rpcStats rpcinfo.MutableRPCStats
-	if firstStats != nil {
-		rpcStats = rpcinfo.AsMutableRPCStats(firstStats.CopyForRetry())
+	if firstRI != nil {
+		rpcStats = rpcinfo.AsMutableRPCStats(firstRI.Stats().CopyForRetry())
 	} else {
 		rpcStats = rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 	}
