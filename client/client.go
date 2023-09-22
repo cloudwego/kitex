@@ -326,9 +326,6 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
 	ctx, ri, callOpts = kc.initRPCInfo(ctx, method, 0)
-	if callOpts != nil && callOpts.CompressorName != "" {
-		ctx = remote.SetSendCompressor(ctx, callOpts.CompressorName)
-	}
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	var reportErr error
@@ -712,5 +709,11 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	}
 
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+
+	if callOpts != nil && callOpts.CompressorName != "" {
+		// set send grpc compressor at client to tell how to server decode
+		remote.SetSendCompressor(ri, callOpts.CompressorName)
+	}
+
 	return ctx, ri, callOpts
 }
