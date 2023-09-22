@@ -17,8 +17,6 @@
 package remote
 
 import (
-	"context"
-
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
@@ -32,18 +30,21 @@ const (
 	GZip
 )
 
-func SetRecvCompressor(ctx context.Context, compressorName string) {
-	ri := rpcinfo.GetRPCInfo(ctx)
+func SetRecvCompressor(ri rpcinfo.RPCInfo, compressorName string) {
+	if ri == nil {
+		return
+	}
 	rpcinfo.AsMutableEndpointInfo(ri.From()).SetTag("recv-compressor", compressorName)
 }
 
-func SetSendCompressor(ctx context.Context, compressorName string) {
-	ri := rpcinfo.GetRPCInfo(ctx)
+func SetSendCompressor(ri rpcinfo.RPCInfo, compressorName string) {
+	if ri == nil {
+		return
+	}
 	rpcinfo.AsMutableEndpointInfo(ri.From()).SetTag("send-compressor", compressorName)
 }
 
-func GetSendCompressor(ctx context.Context) string {
-	ri := rpcinfo.GetRPCInfo(ctx)
+func GetSendCompressor(ri rpcinfo.RPCInfo) string {
 	if ri == nil {
 		return ""
 	}
@@ -54,8 +55,7 @@ func GetSendCompressor(ctx context.Context) string {
 	return ""
 }
 
-func GetRecvCompressor(ctx context.Context) string {
-	ri := rpcinfo.GetRPCInfo(ctx)
+func GetRecvCompressor(ri rpcinfo.RPCInfo) string {
 	if ri == nil {
 		return ""
 	}
