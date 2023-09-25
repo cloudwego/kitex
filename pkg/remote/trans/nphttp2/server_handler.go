@@ -192,28 +192,33 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			remote.SetSendCompressor(ri, s.SendCompress())
 
 			svc := t.svcMap[serviceName]
-			unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
-			var st streaming.Stream
-			if svc == nil {
-				if unknownServiceHandlerFunc != nil {
-					st, rCtx = t.bindStreamIntoCtx(nil, rCtx, tr, s)
-					err = execUnknownServiceHandleFunc(rCtx, ri, methodName, st, unknownServiceHandlerFunc)
-				} else {
-					err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", serviceName))
-				}
-			} else {
-				svcInfo := svc.GetServiceInfo()
-				st, rCtx = t.bindStreamIntoCtx(svc.GetServiceInfo(), rCtx, tr, s)
 
-				if svcInfo.MethodInfo(methodName) == nil {
-					if unknownServiceHandlerFunc != nil {
-						err = execUnknownServiceHandleFunc(rCtx, ri, methodName, st, unknownServiceHandlerFunc)
+			var svcInfo *serviceinfo.ServiceInfo
+			if svc != nil {
+				svcInfo = svc.GetServiceInfo()
+			}
+
+			st := NewStream(ctx, svcInfo, newServerConn(tr, s), t)
+			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
+			rCtx = context.WithValue(ctx, streamKey{}, st)
+
+			if svc == nil || svcInfo.MethodInfo(methodName) == nil {
+				unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
+				if unknownServiceHandlerFunc != nil {
+					rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
+					err = unknownServiceHandlerFunc(ctx, methodName, st)
+					if err != nil {
+						err = kerrors.ErrBiz.WithCause(err)
+					}
+				} else {
+					if svc == nil {
+						err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", serviceName))
 					} else {
 						err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 					}
-				} else {
-					err = t.inkHdlFunc(rCtx, &streaming.Args{Stream: st}, nil)
 				}
+			} else {
+				err = t.inkHdlFunc(rCtx, &streaming.Args{Stream: st}, nil)
 			}
 
 			if err != nil {
