@@ -45,7 +45,7 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 		panic("ctx is nil")
 	}
 	var ri rpcinfo.RPCInfo
-	ctx, ri, _ = kc.initRPCInfo(ctx, method, 0)
+	ctx, ri, _ = kc.initRPCInfo(ctx, method, 0, nil)
 
 	rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.Streaming)
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)

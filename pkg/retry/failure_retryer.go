@@ -84,7 +84,7 @@ func (r *failureRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (recycleRI bool, err error) {
+func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
 	r.RLock()
 	var maxDuration time.Duration
 	if r.policy.StopPolicy.MaxDurationMS > 0 {
@@ -149,11 +149,11 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			}
 		}
 	}
-	recordRetryInfo(firstRI, cRI, callTimes, callCosts.String())
+	recordRetryInfo(cRI, callTimes, callCosts.String())
 	if err == nil && callTimes == 1 {
-		return true, nil
+		return cRI, true, nil
 	}
-	return false, err
+	return cRI, false, err
 }
 
 // UpdatePolicy implements the Retryer interface.

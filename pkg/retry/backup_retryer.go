@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 func newBackupRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
@@ -83,13 +83,13 @@ func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (recycleRI bool, err error) {
+func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
 	r.RLock()
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes
 	retryDelay := r.retryDelay
 	r.RUnlock()
 	var callTimes int32 = 0
-	var callCosts strings.Builder
+	var callCosts utils.StringBuilder
 	callCosts.Grow(32)
 	var recordCostDoing int32 = 0
 	var abort int32 = 0
@@ -145,8 +145,8 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				continue
 			}
 			atomic.StoreInt32(&abort, 1)
-			recordRetryInfo(firstRI, res.ri, atomic.LoadInt32(&callTimes), callCosts.String())
-			return false, res.err
+			recordRetryInfo(res.ri, atomic.LoadInt32(&callTimes), callCosts.String())
+			return res.ri, false, res.err
 		}
 	}
 }
@@ -222,7 +222,7 @@ func (r *backupRetryer) Type() Type {
 }
 
 // record request cost, it may execute concurrent
-func recordCost(ct int32, start time.Time, recordCostDoing *int32, sb *strings.Builder, abort *int32, err error) {
+func recordCost(ct int32, start time.Time, recordCostDoing *int32, sb *utils.StringBuilder, abort *int32, err error) {
 	if atomic.LoadInt32(abort) == 1 {
 		return
 	}

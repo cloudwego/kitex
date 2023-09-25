@@ -93,3 +93,4 @@ func (m *MockRPCStats) Error() error                                            
 func (m *MockRPCStats) Panicked() (yes bool, val interface{})                     { return }
 func (m *MockRPCStats) GetEvent(event stats.Event) (e rpcinfo.Event)              { return }
 func (m *MockRPCStats) Level() (lv stats.Level)                                   { return }
+func (m *MockRPCStats) CopyForRetry() rpcinfo.RPCStats                            { return nil }
