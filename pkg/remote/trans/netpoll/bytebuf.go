@@ -255,8 +255,10 @@ func (b *netpollByteBuffer) Release(e error) (err error) {
 }
 
 func (b *netpollByteBuffer) zero() {
-	b.status = 0
 	b.writer = nil
 	b.reader = nil
+	b.ioReader = nil
+	b.ioWriter = nil
+	b.status = 0
 	b.readSize = 0
 }
