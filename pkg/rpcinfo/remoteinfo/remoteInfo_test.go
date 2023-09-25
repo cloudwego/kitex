@@ -186,39 +186,6 @@ func TestGetTag(t *testing.T) {
 	test.Assert(t, valIDC == myIDC, valIDC)
 }
 
-func TestCopyFromRace(t *testing.T) {
-	key1, key2, val1, val2 := "key1", "key2", "val1", "val2"
-	ri1 := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "service", Tags: map[string]string{key1: val1}}, "method1")
-	v, ok := ri1.Tag(key1)
-	test.Assert(t, ok)
-	test.Assert(t, v == val1)
-
-	ri2 := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "service", Tags: map[string]string{key2: val2}}, "method1")
-	// do copyFrom ri2
-	ri1.CopyFrom(ri2)
-	_, ok = ri1.Tag(key1)
-	test.Assert(t, !ok)
-	v, ok = ri1.Tag(key2)
-	test.Assert(t, ok)
-	test.Assert(t, v == val2)
-
-	// test the data race problem caused by tag modification
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		ri2.ForceSetTag("key11", "val11")
-		wg.Done()
-	}()
-	go func() {
-		ri1.Tag("key2")
-		wg.Done()
-	}()
-	wg.Wait()
-
-	// test if dead lock
-	ri1.CopyFrom(ri1)
-}
-
 func TestRecycleRace(t *testing.T) {
 	ri := remoteinfo.NewRemoteInfo(&rpcinfo.EndpointBasicInfo{ServiceName: "service", Tags: map[string]string{"key1": "val1"}}, "method1")
 

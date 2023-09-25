@@ -353,10 +353,9 @@ func (s *server) addBoundHandlers(opt *remote.ServerOption) {
 		}
 	}
 
-	// for server limiter, the handler should be added as first one
 	limitHdlr := s.buildLimiterWithOpt()
 	if limitHdlr != nil {
-		doAddBoundHandlerToHead(limitHdlr, opt)
+		doAddBoundHandler(limitHdlr, opt)
 	}
 }
 

@@ -47,7 +47,7 @@ type Retryer interface {
 	UpdatePolicy(policy Policy) error
 
 	// Retry policy execute func. recycleRI is to decide if the firstRI can be recycled.
-	Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request interface{}) (recycleRI bool, err error)
+	Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error)
 	AppendErrMsgIfNeeded(err error, ri rpcinfo.RPCInfo, msg string)
 
 	// Prepare to do something needed before retry call.
@@ -188,7 +188,7 @@ func (rc *Container) Init(mp map[string]Policy, rr *ShouldResultRetry) (err erro
 
 // WithRetryIfNeeded to check if there is a retryer can be used and if current call can retry.
 // When the retry condition is satisfied, use retryer to call
-func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy, rpcCall RPCCallFunc, ri rpcinfo.RPCInfo, request interface{}) (recycleRI bool, err error) {
+func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy, rpcCall RPCCallFunc, ri rpcinfo.RPCInfo, request interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
 	var retryer Retryer
 	if callOptRetry != nil && callOptRetry.Enable {
 		// build retryer for call level if retry policy is set up with callopt
@@ -202,20 +202,20 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 	// case 1(default): no retry policy
 	if retryer == nil {
 		if _, _, err = rpcCall(ctx, nil); err == nil {
-			return true, nil
+			return ri, true, nil
 		}
-		return false, err
+		return ri, false, err
 	}
 
 	// case 2: setup retry policy, but not satisfy retry condition eg: circuit, retry times == 0, chain stop, ddl
 	if msg, ok := retryer.AllowRetry(ctx); !ok {
 		if _, _, err = rpcCall(ctx, retryer); err == nil {
-			return true, err
+			return ri, true, err
 		}
 		if msg != "" {
 			retryer.AppendErrMsgIfNeeded(err, ri, msg)
 		}
-		return false, err
+		return ri, false, err
 	}
 
 	// case 3: retry
@@ -227,7 +227,7 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 	ctx = context.WithValue(ctx, CtxRespOp, &respOp)
 
 	// do rpc call with retry policy
-	recycleRI, err = retryer.Do(ctx, rpcCall, ri, request)
+	lastRI, recycleRI, err = retryer.Do(ctx, rpcCall, ri, request)
 
 	// the rpc call has finished, modify respOp to done state.
 	atomic.StoreInt32(&respOp, OpDone)
