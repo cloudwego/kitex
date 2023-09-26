@@ -57,7 +57,7 @@ var (
 )
 
 type remoteInfo struct {
-	sync.RWMutex
+	sync.Mutex
 	serviceName string
 	method      string
 	tags        map[string]string
@@ -79,9 +79,9 @@ func newRemoteInfo() interface{} {
 
 // GetInstance implements the RemoteInfo interface.
 func (ri *remoteInfo) GetInstance() (ins discovery.Instance) {
-	ri.RLock()
+	ri.Lock()
 	ins = ri.instance
-	ri.RUnlock()
+	ri.Unlock()
 	return
 }
 
@@ -109,8 +109,8 @@ func (ri *remoteInfo) Method() string {
 
 // Tag implements the rpcinfo.EndpointInfo interface.
 func (ri *remoteInfo) Tag(key string) (value string, exist bool) {
-	ri.RLock()
-	defer ri.RUnlock()
+	ri.Lock()
+	defer ri.Unlock()
 
 	if ri.instance != nil {
 		if value, exist = ri.instance.Tag(key); exist {
@@ -141,8 +141,8 @@ func (ri *remoteInfo) SetRemoteAddr(addr net.Addr) bool {
 
 // Address implements the rpcinfo.EndpointInfo interface.
 func (ri *remoteInfo) Address() net.Addr {
-	ri.RLock()
-	defer ri.RUnlock()
+	ri.Lock()
+	defer ri.Unlock()
 	if ri.instance != nil {
 		return ri.instance.Address()
 	}

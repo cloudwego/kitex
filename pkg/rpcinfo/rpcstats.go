@@ -91,7 +91,7 @@ type atomicPanicErr struct {
 }
 
 type rpcStats struct {
-	sync.RWMutex
+	sync.Mutex
 	level stats.Level
 
 	eventMap []Event
@@ -156,9 +156,9 @@ func (r *rpcStats) Panicked() (bool, interface{}) {
 // GetEvent implements the RPCStats interface.
 func (r *rpcStats) GetEvent(e stats.Event) Event {
 	idx := e.Index()
-	r.RLock()
+	r.Lock()
 	evt := r.eventMap[idx]
-	r.RUnlock()
+	r.Unlock()
 	if evt == nil || evt.IsNil() {
 		return nil
 	}
