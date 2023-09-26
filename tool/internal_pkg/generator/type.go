@@ -33,7 +33,6 @@ type File struct {
 // PackageInfo contains information to generate a package for a service.
 type PackageInfo struct {
 	Namespace    string            // a dot-separated string for generating service package under kitex_gen
-	PackageName  string            // package name at the end of the dot-separated string for generating service package under kitex-gen
 	Dependencies map[string]string // package name => import path, used for searching imports
 	*ServiceInfo                   // the target service
 
@@ -158,10 +157,6 @@ var templateNames = []string{
 	"@server.go-EOF",
 	"@invoker.go-NewInvoker-option",
 	"@invoker.go-EOF",
-	"@server_with_multi_service.go-NewServer-option",
-	"@server_with_multi_service.go-EOF",
-	"@invoker_with_multi_service.go-NewInvoker-option",
-	"@invoker_with_multi_service.go-EOF",
 }
 
 func wrapTemplate(point, content string) string {

@@ -79,6 +79,21 @@ func NewServer(ops ...Option) Server {
 	return s
 }
 
+// NewServerWithMultiServices is only available with kitex gRPC.
+func NewServerWithMultiServices(services []serviceinfo.Service, opts ...Option) Server {
+	var options []Option
+
+	options = append(options, opts...)
+
+	svr := NewServer(options...)
+	for _, svc := range services {
+		if err := svr.RegisterService(svc.GetServiceInfo(), svc.GetHandler()); err != nil {
+			panic(err)
+		}
+	}
+	return svr
+}
+
 func (s *server) init() {
 	ctx := fillContext(s.opt)
 	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)

@@ -131,7 +131,6 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		gopkg = parts[0] // remove package alias from file path
 	}
 	pp.Namespace = strings.TrimPrefix(gopkg, pp.PackagePrefix)
-	pp.PackageName = getLastSuffix(gopkg)
 
 	ss := pp.convertTypes(file)
 	pp.Services = append(pp.Services, ss...)
@@ -239,15 +238,6 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 		for _, f := range fs {
 			gen.NewGeneratedFile(pp.adjustPath(f.Name), "").P(f.Content)
 		}
-	}
-
-	// generate a server and invoker with multi-services
-	fs, err := pp.kg.GenerateMultiServicePackage(&pp.PackageInfo)
-	if err != nil {
-		pp.err = err
-	}
-	for _, f := range fs {
-		gen.NewGeneratedFile(pp.adjustPath(f.Name), "").P(f.Content)
 	}
 
 	if pp.err != nil {
@@ -417,9 +407,4 @@ func (pp *protocPlugin) adjustPath(path string) (ret string) {
 func (pp *protocPlugin) fixImport(path string) string {
 	path = strings.Trim(path, "\"")
 	return path
-}
-
-func getLastSuffix(str string) string {
-	parts := strings.Split(str, "/")
-	return parts[len(parts)-1]
 }
