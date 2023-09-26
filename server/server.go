@@ -180,10 +180,10 @@ func (s *server) buildInvokeChain() {
 // RegisterService should not be called by users directly.
 func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error {
 	if svcInfo == nil {
-		return errors.New("svcInfo is nil. please specify non-nil svcInfo")
+		panic("svcInfo is nil. please specify non-nil svcInfo")
 	}
 	if handler == nil || reflect.ValueOf(handler).IsNil() {
-		return errors.New("handler is nil. please specify non-nil handler")
+		panic("handler is nil. please specify non-nil handler")
 	}
 	if s.svcMap[svcInfo.ServiceName] != nil {
 		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
@@ -300,12 +300,8 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 			return fmt.Errorf("service[%s] is not registered, should not happen", serviceName)
 		}
 		svcInfo := svc.GetServiceInfo()
-		handler := svc.GetHandler()
 		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
 			return errors.New("method name is empty in rpcinfo, should not happen")
-		}
-		if handler == nil || reflect.ValueOf(handler).IsNil() {
-			return fmt.Errorf("handler of service[%s] is nil, should not happen", serviceName)
 		}
 		defer func() {
 			if handlerErr := recover(); handlerErr != nil {
@@ -321,7 +317,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)
-		err = implHandlerFunc(ctx, handler, args, resp)
+		err = implHandlerFunc(ctx, svc.GetHandler(), args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
 				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {

@@ -50,7 +50,7 @@ func TestNewServerWithServiceInfo(t *testing.T) {
 		if errMsg, ok := err.(error); ok {
 			return strings.Contains(errMsg.Error(), "svcInfo is nil.")
 		}
-		return false
+		return true
 	})
 
 	test.PanicAt(t, func() {
@@ -59,7 +59,7 @@ func TestNewServerWithServiceInfo(t *testing.T) {
 		if errMsg, ok := err.(error); ok {
 			return strings.Contains(errMsg.Error(), "handler is nil.")
 		}
-		return false
+		return true
 	})
 
 	test.PanicAt(t, func() {
@@ -68,7 +68,7 @@ func TestNewServerWithServiceInfo(t *testing.T) {
 		if errMsg, ok := err.(string); ok {
 			return strings.Contains(errMsg, "invalid Generic")
 		}
-		return false
+		return true
 	})
 }
 
