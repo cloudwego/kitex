@@ -49,3 +49,31 @@ jobs:
           go-version: ${{ matrix.go }}
       - name: Unit Test
         run: go test -gcflags=-l -race -covermode=atomic ./...
+
+  codegen-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.17'
+      - name: Prepare
+        run: |  
+          go install github.com/cloudwego/thriftgo@main
+          go install ./tool/cmd/kitex
+          LOCAL_REPO=$(pwd)
+          cd ..
+          git clone https://github.com/cloudwego/kitex-tests.git 
+          cd kitex-tests/codegen
+          go mod init codegen-test
+          go mod edit -replace=github.com/apache/thrift=github.com/apache/thrift@v0.13.0
+          go mod edit -replace code.byted.org/kite/kitex=${LOCAL_REPO}
+          go mod tidy
+          bash -version
+          bash ./codegen_install_check.sh
+      - name: CodeGen
+        run: | 
+          cd ../kitex-tests/codegen
+          tree
+          bash ./codegen_run.sh        
