@@ -200,13 +200,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 
 			st := NewStream(ctx, svcInfo, newServerConn(tr, s), t)
 			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
-			rCtx = context.WithValue(ctx, streamKey{}, st)
+			rCtx = context.WithValue(rCtx, streamKey{}, st)
 
 			if svc == nil || svcInfo.MethodInfo(methodName) == nil {
 				unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
 				if unknownServiceHandlerFunc != nil {
-					rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
-					err = unknownServiceHandlerFunc(ctx, methodName, st)
+					rpcinfo.Record(rCtx, ri, stats.ServerHandleStart, nil)
+					err = unknownServiceHandlerFunc(rCtx, methodName, st)
 					if err != nil {
 						err = kerrors.ErrBiz.WithCause(err)
 					}
