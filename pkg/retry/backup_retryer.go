@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -90,7 +91,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	r.RUnlock()
 	var callTimes int32 = 0
 	var callCosts utils.StringBuilder
-	callCosts.Grow(32)
+	callCosts.RawStringBuilder().Grow(32)
 	var recordCostDoing int32 = 0
 	var abort int32 = 0
 	// notice: buff num of chan is very important here, it cannot less than call times, or the below chan receive will block
@@ -233,16 +234,19 @@ func recordCost(ct int32, start time.Time, recordCostDoing *int32, sb *utils.Str
 	for !atomic.CompareAndSwapInt32(recordCostDoing, 0, 1) {
 		runtime.Gosched()
 	}
-	if sb.Len() > 0 {
-		sb.WriteByte(',')
-	}
-	sb.WriteString(strconv.Itoa(int(ct)))
-	sb.WriteByte('-')
-	sb.WriteString(strconv.FormatInt(time.Since(start).Microseconds(), 10))
-	if err != nil && errors.Is(err, kerrors.ErrRPCFinish) {
-		// ErrRPCFinish means previous call returns first but is decoding.
-		// Add ignore to distinguish.
-		sb.WriteString("(ignore)")
-	}
+	sb.WithLocked(func(b *strings.Builder) error {
+		if b.Len() > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(strconv.Itoa(int(ct)))
+		b.WriteByte('-')
+		b.WriteString(strconv.FormatInt(time.Since(start).Microseconds(), 10))
+		if err != nil && errors.Is(err, kerrors.ErrRPCFinish) {
+			// ErrRPCFinish means previous call returns first but is decoding.
+			// Add ignore to distinguish.
+			b.WriteString("(ignore)")
+		}
+		return nil
+	})
 	atomic.StoreInt32(recordCostDoing, 0)
 }
