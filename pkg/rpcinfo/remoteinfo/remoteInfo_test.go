@@ -87,7 +87,7 @@ func TestAsRemoteInfo(t *testing.T) {
 	na := ri.Address()
 	test.Assert(t, na.Network() == "n" && na.String() == "a")
 
-	_, ok := ins.(remoteinfo.RemoteAddrSetter)
+	_, ok := ins.(remoteinfo.RefreshableInstance)
 	na = utils.NewNetAddr("nnn", "aaa")
 	test.Assert(t, ri2.SetRemoteAddr(na) == ok)
 	if ok {
