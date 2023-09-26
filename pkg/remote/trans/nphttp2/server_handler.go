@@ -323,19 +323,3 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	t.opt.TracerCtl.DoFinish(ctx, ri, err)
 	rpcStats.Reset()
 }
-
-func (t *svrTransHandler) bindStreamIntoCtx(svcInfo *serviceinfo.ServiceInfo, ctx context.Context, tr grpcTransport.ServerTransport, s *grpcTransport.Stream) (st streaming.Stream, rCtx context.Context) {
-	st = NewStream(ctx, svcInfo, newServerConn(tr, s), t)
-	// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
-	rCtx = context.WithValue(ctx, streamKey{}, st)
-	return
-}
-
-func execUnknownServiceHandleFunc(ctx context.Context, ri rpcinfo.RPCInfo, method string, st streaming.Stream, unknownServiceHandlerFunc func(context.Context, string, streaming.Stream) error) error {
-	rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
-	err := unknownServiceHandlerFunc(ctx, method, st)
-	if err != nil {
-		err = kerrors.ErrBiz.WithCause(err)
-	}
-	return err
-}
