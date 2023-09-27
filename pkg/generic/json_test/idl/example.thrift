@@ -1,5 +1,6 @@
 include "base.thrift"
 include "self_ref.thrift"
+include "extend.thrift"
 namespace go kitex.test.server
 
 enum FOO {
@@ -42,7 +43,7 @@ struct A {
     2: self_ref.A a
 }
 
-service ExampleService {
+service ExampleService extends extend.ExtendService {
     ExampleResp ExampleMethod(1: ExampleReq req)throws(1: Exception err),
     A Foo(1: A req)
     string Ping(1: string msg)

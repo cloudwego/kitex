@@ -1,4 +1,4 @@
-namespace go kitex.test.server
+namespace go self_ref
 
 struct A {
     1: A self

@@ -49,6 +49,8 @@ var reqRegression = `{"Msg":"hello","InnerBase":{"Base":{"LogID":"log_id_inner"}
 
 var respMsgWithExtra = `{"Msg":"world","required_field":"required_field","extra_field":"extra_field"}`
 
+var reqExtendMsg = `{"Msg":123}`
+
 var errResp = "Test Error"
 
 type Simple struct {
@@ -158,6 +160,9 @@ type GenericServiceImpl struct{}
 
 // GenericCall ...
 func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	if method == "ExtendMethod" {
+		return request, nil
+	}
 	buf := request.(string)
 	rpcinfo := rpcinfo.GetRPCInfo(ctx)
 	fmt.Printf("Method from Ctx: %s\n", rpcinfo.Invocation().MethodName())
