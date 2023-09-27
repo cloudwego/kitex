@@ -74,7 +74,6 @@ func NewServer(ops ...Option) Server {
 	s := &server{
 		opt:  internal_server.NewOptions(ops),
 		svcs: serviceinfo.NewServices(),
-		//svcMap: map[string]*serviceinfo.Service{},
 	}
 	s.init()
 	return s

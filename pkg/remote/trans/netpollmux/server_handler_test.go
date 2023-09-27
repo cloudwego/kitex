@@ -80,8 +80,7 @@ func init() {
 				return err
 			},
 		},
-		Svcs: svcs,
-		//SvcMap:           map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
+		Svcs:             svcs,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
