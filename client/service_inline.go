@@ -27,7 +27,6 @@ import (
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	internal_server "github.com/cloudwego/kitex/internal/server"
-	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -126,7 +125,7 @@ func (kc *serviceInlineClient) initMiddlewares(ctx context.Context) {
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
 func (kc *serviceInlineClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, 0, nil)
+	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, 0)
 }
 
 // Call implements the Client interface .
@@ -208,7 +207,6 @@ func (kc *serviceInlineClient) constructServerRPCInfo(svrCtx, cliCtx context.Con
 		ink.SetServiceName(kc.svcInfo.ServiceName)
 	}
 	rpcinfo.AsMutableEndpointInfo(ri.To()).SetMethod(method)
-	svrCtx = context.WithValue(svrCtx, consts.CtxKeyMethod, method)
 	return svrCtx, ri
 }
 

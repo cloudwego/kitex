@@ -33,14 +33,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-type streamDesc struct {
-	isStreaming bool
-}
-
 type clientConn struct {
-	tr   grpc.ClientTransport
-	s    *grpc.Stream
-	desc *streamDesc
+	tr grpc.ClientTransport
+	s  *grpc.Stream
 }
 
 var _ GRPCConn = (*clientConn)(nil)
@@ -68,6 +63,7 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 	} else {
 		svcName = fmt.Sprintf("%s.%s", ri.Invocation().PackageName(), ri.Invocation().ServiceName())
 	}
+
 	host := ri.To().ServiceName()
 	if rawURL, ok := ri.To().Tag(rpcinfo.HTTPURL); ok {
 		u, err := url.Parse(rawURL)
@@ -76,20 +72,19 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 		}
 		host = u.Host
 	}
-	isStreaming := ri.Config().InteractionMode() == rpcinfo.Streaming
+
 	s, err := tr.NewStream(ctx, &grpc.CallHdr{
 		Host: host,
 		// grpc method format /package.Service/Method
 		Method:       fmt.Sprintf("/%s/%s", svcName, ri.Invocation().MethodName()),
-		SendCompress: remote.GetSendCompressor(ri),
+		SendCompress: remote.GetSendCompressor(ctx),
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &clientConn{
-		tr:   tr,
-		s:    s,
-		desc: &streamDesc{isStreaming: isStreaming},
+		tr: tr,
+		s:  s,
 	}, nil
 }
 
@@ -116,7 +111,11 @@ func (c *clientConn) Write(b []byte) (n int, err error) {
 }
 
 func (c *clientConn) WriteFrame(hdr, data []byte) (n int, err error) {
-	grpcConnOpt := &grpc.Options{Last: !c.desc.isStreaming}
+	grpcConnOpt := &grpc.Options{}
+	// When there's no more data frame, add END_STREAM flag to this empty frame.
+	if hdr == nil && data == nil {
+		grpcConnOpt.Last = true
+	}
 	err = c.tr.Write(c.s, hdr, data, grpcConnOpt)
 	return len(hdr) + len(data), err
 }

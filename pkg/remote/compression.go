@@ -16,9 +16,7 @@
 
 package remote
 
-import (
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-)
+import "context"
 
 // CompressType tells compression type for a message.
 type CompressType int32
@@ -30,37 +28,27 @@ const (
 	GZip
 )
 
-func SetRecvCompressor(ri rpcinfo.RPCInfo, compressorName string) {
-	if ri == nil {
-		return
-	}
-	rpcinfo.AsMutableEndpointInfo(ri.From()).SetTag("recv-compressor", compressorName)
+type recvCompressorKey struct{}
+
+type sendCompressorKey struct{}
+
+func SetRecvCompressor(ctx context.Context, compressorName string) context.Context {
+	return context.WithValue(ctx, recvCompressorKey{}, compressorName)
 }
 
-func SetSendCompressor(ri rpcinfo.RPCInfo, compressorName string) {
-	if ri == nil {
-		return
-	}
-	rpcinfo.AsMutableEndpointInfo(ri.From()).SetTag("send-compressor", compressorName)
+func SetSendCompressor(ctx context.Context, compressorName string) context.Context {
+	return context.WithValue(ctx, sendCompressorKey{}, compressorName)
 }
 
-func GetSendCompressor(ri rpcinfo.RPCInfo) string {
-	if ri == nil {
-		return ""
-	}
-	v, exist := ri.From().Tag("send-compressor")
-	if exist {
+func GetSendCompressor(ctx context.Context) string {
+	if v, ok := ctx.Value(sendCompressorKey{}).(string); ok {
 		return v
 	}
 	return ""
 }
 
-func GetRecvCompressor(ri rpcinfo.RPCInfo) string {
-	if ri == nil {
-		return ""
-	}
-	v, exist := ri.From().Tag("recv-compressor")
-	if exist {
+func GetRecvCompressor(ctx context.Context) string {
+	if v, ok := ctx.Value(recvCompressorKey{}).(string); ok {
 		return v
 	}
 	return ""

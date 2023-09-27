@@ -84,7 +84,7 @@ func (r *failureRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
+func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (recycleRI bool, err error) {
 	r.RLock()
 	var maxDuration time.Duration
 	if r.policy.StopPolicy.MaxDurationMS > 0 {
@@ -127,14 +127,10 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			}
 		}
 		callTimes++
-		if r.cbContainer.enablePercentageLimit {
-			// record stat before call since requests may be slow, making the limiter more accurate
-			recordRetryStat(cbKey, r.cbContainer.cbPanel, callTimes)
-		}
 		cRI, resp, err = rpcCall(ctx, r)
 		callCosts.WriteString(strconv.FormatInt(time.Since(callStart).Microseconds(), 10))
 
-		if !r.cbContainer.enablePercentageLimit && r.cbContainer.cbStat {
+		if r.cbContainer.cbStat {
 			circuitbreak.RecordStat(ctx, req, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 		}
 		if err == nil {
@@ -153,11 +149,11 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			}
 		}
 	}
-	recordRetryInfo(cRI, callTimes, callCosts.String())
+	recordRetryInfo(firstRI, cRI, callTimes, callCosts.String())
 	if err == nil && callTimes == 1 {
-		return cRI, true, nil
+		return true, nil
 	}
-	return cRI, false, err
+	return false, err
 }
 
 // UpdatePolicy implements the Retryer interface.

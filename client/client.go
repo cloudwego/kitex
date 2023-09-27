@@ -302,8 +302,8 @@ func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) 
 }
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
-func (kc *kClient) initRPCInfo(ctx context.Context, method string, retryTimes int, firstRI rpcinfo.RPCInfo) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, retryTimes, firstRI)
+func (kc *kClient) initRPCInfo(ctx context.Context, method string, retryTimes int) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, retryTimes)
 }
 
 func applyCallOptions(ctx context.Context, cfg rpcinfo.MutableRPCConfig, svr remoteinfo.RemoteInfo, opt *client.Options) (context.Context, *callopt.CallOptions) {
@@ -325,7 +325,10 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	validateForCall(ctx, kc.inited, kc.closed)
 	var ri rpcinfo.RPCInfo
 	var callOpts *callopt.CallOptions
-	ctx, ri, callOpts = kc.initRPCInfo(ctx, method, 0, nil)
+	ctx, ri, callOpts = kc.initRPCInfo(ctx, method, 0)
+	if callOpts != nil && callOpts.CompressorName != "" {
+		ctx = remote.SetSendCompressor(ctx, callOpts.CompressorName)
+	}
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	var reportErr error
@@ -361,7 +364,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 			recycleRI = true
 		}
 	} else {
-		ri, recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
+		recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
 	}
 
 	// do fallback if with setup
@@ -378,7 +381,7 @@ func (kc *kClient) rpcCallWithRetry(ri rpcinfo.RPCInfo, method string, request, 
 		currCallTimes := int(atomic.AddInt32(&callTimes, 1))
 		cRI := ri
 		if currCallTimes > 1 {
-			ctx, cRI, _ = kc.initRPCInfo(ctx, method, currCallTimes-1, ri)
+			ctx, cRI, _ = kc.initRPCInfo(ctx, method, currCallTimes-1)
 			ctx = metainfo.WithPersistentValue(ctx, retry.TransitKey, strconv.Itoa(currCallTimes-1))
 			if prevRI.Load() == nil {
 				prevRI.Store(ri)
@@ -668,17 +671,12 @@ func getFallbackPolicy(cliOptFB *fallback.Policy, callOpts *callopt.CallOptions)
 	return nil, false
 }
 
-func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo, retryTimes int, firstRI rpcinfo.RPCInfo) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
+func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInfo *serviceinfo.ServiceInfo, retryTimes int) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
 	cfg := rpcinfo.AsMutableRPCConfig(opt.Configs).Clone()
 	rmt := remoteinfo.NewRemoteInfo(opt.Svr, method)
 	var callOpts *callopt.CallOptions
 	ctx, callOpts = applyCallOptions(ctx, cfg, rmt, opt)
-	var rpcStats rpcinfo.MutableRPCStats
-	if firstRI != nil {
-		rpcStats = rpcinfo.AsMutableRPCStats(firstRI.Stats().CopyForRetry())
-	} else {
-		rpcStats = rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
-	}
+	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 	if opt.StatsLevel != nil {
 		rpcStats.SetLevel(*opt.StatsLevel)
 	}
@@ -714,11 +712,5 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	}
 
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
-
-	if callOpts != nil && callOpts.CompressorName != "" {
-		// set send grpc compressor at client to tell how to server decode
-		remote.SetSendCompressor(ri, callOpts.CompressorName)
-	}
-
 	return ctx, ri, callOpts
 }

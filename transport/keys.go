@@ -21,6 +21,7 @@ package transport
 type Protocol int
 
 // Predefined transport protocols.
+// Framed is suggested.
 const (
 	PurePayload Protocol = 0
 

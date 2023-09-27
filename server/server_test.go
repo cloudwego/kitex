@@ -424,8 +424,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithMetaHandler(noopMetahandler{}),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler, noopMetahandler{}}),
 				bound.NewServerLimiterHandler(limiter.NewConnectionLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil, false),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler, noopMetahandler{}}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler, noopMetahandler{}}),
@@ -436,8 +436,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithConnectionLimiter(mockslimiter.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), &limiter.DummyRateLimiter{}, nil, false),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -448,8 +448,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithQPSLimiter(mockslimiter.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 				bound.NewServerLimiterHandler(&limiter.DummyConcurrencyLimiter{}, mockslimiter.NewMockRateLimiter(ctrl), nil, true),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -461,8 +461,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithQPSLimiter(mockslimiter.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -477,8 +477,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithConnectionLimiter(mockslimiter.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), limiter.NewQPSLimiter(interval, 10000), nil, false),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -494,8 +494,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithQPSLimiter(mockslimiter.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -512,8 +512,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithMuxTransport(),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -528,8 +528,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithMuxTransport(),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 				bound.NewServerLimiterHandler(limiter.NewConnectionLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil, true),
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),

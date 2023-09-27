@@ -144,7 +144,6 @@ var funcs = map[string]interface{}{
 	"SnakeString":   util.SnakeString,
 	"HasFeature":    HasFeature,
 	"FilterImports": FilterImports,
-	"backquoted":    BackQuoted,
 }
 
 var templateNames = []string{
@@ -298,8 +297,4 @@ func FilterImports(Imports map[string]map[string]bool, ms []*MethodInfo) map[str
 		}
 	}
 	return res
-}
-
-func BackQuoted(s string) string {
-	return "`" + s + "`"
 }
