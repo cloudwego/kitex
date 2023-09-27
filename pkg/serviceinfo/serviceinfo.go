@@ -73,18 +73,24 @@ func (s *Services) SetService(svcInfo *ServiceInfo, handler interface{}) {
 	if s.defaultSvc == nil {
 		s.defaultSvc = &svc
 	}
-	s.svcs[svcInfo.ServiceName] = &svc // TODO: lock???
+	s.svcs[svcInfo.ServiceName] = &svc
 }
 
 func (s *Services) GetService(svcName string) *Service {
+	s.Lock()
+	defer s.Unlock()
 	return s.svcs[svcName]
 }
 
 func (s *Services) GetServices() map[string]*Service {
+	s.Lock()
+	defer s.Unlock()
 	return s.svcs
 }
 
 func (s *Services) GetDefaultService() *Service {
+	s.Lock()
+	defer s.Unlock()
 	return s.defaultSvc
 }
 
