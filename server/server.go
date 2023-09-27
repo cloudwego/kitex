@@ -207,8 +207,6 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	s.Lock()
 	defer s.Unlock()
 	s.svcs.SetService(svcInfo, handler)
-	// TODO: check the probe func
-	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcs))
 	return nil
 }
 
@@ -221,6 +219,7 @@ func (s *server) Run() (err error) {
 	if err = s.check(); err != nil {
 		return err
 	}
+	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcs))
 	svrCfg := s.opt.RemoteOpt
 	addr := svrCfg.Address // should not be nil
 	if s.opt.Proxy != nil {
