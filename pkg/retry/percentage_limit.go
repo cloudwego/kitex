@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2023 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,10 +14,18 @@
  * limitations under the License.
  */
 
-package kitex
+package retry
 
-// Name and Version info of this framework, used for statistics and debug
-const (
-	Name    = "Kitex"
-	Version = "v0.7.2"
+import (
+	"github.com/bytedance/gopkg/cloud/circuitbreaker"
 )
+
+// treat retry as 'error' for limiting the percentage of retry requests.
+// callTimes == 1 means it's the first request, not a retry.
+func recordRetryStat(cbKey string, panel circuitbreaker.Panel, callTimes int32) {
+	if callTimes > 1 {
+		panel.Fail(cbKey)
+	} else {
+		panel.Succeed(cbKey)
+	}
+}

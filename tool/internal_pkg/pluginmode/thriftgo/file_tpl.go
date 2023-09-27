@@ -33,6 +33,13 @@ import (
 	{{if GenerateFastAPIs}}
 	"{{ImportPathTo "pkg/protocol/bthrift"}}"
 	{{- end}}
+	{{if GenerateArgsResultTypes}}
+		{{if Features.KeepUnknownFields}}
+			{{- if ne (len .Scope.Services) 0}}
+				unknown "github.com/cloudwego/thriftgo/generator/golang/extension/unknown"
+			{{- end}}
+		{{- end}}
+	{{- end}}
 	{{- range $path, $alias := .Imports}}
 	{{$alias }}"{{$path}}"
 	{{- end}}

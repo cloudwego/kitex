@@ -55,6 +55,8 @@ const (
 	OpDone
 )
 
+var tagValueFirstTry = "0"
+
 // DDLStopFunc is the definition of ddlStop func
 type DDLStopFunc func(ctx context.Context, policy StopPolicy) (bool, string)
 
@@ -83,7 +85,7 @@ func chainStop(ctx context.Context, policy StopPolicy) (bool, string) {
 	if policy.DisableChainStop {
 		return false, ""
 	}
-	if _, exist := metainfo.GetPersistentValue(ctx, TransitKey); !exist {
+	if !IsRemoteRetryRequest(ctx) {
 		return false, ""
 	}
 	return true, "chain stop retry"
@@ -154,19 +156,27 @@ func appendErrMsg(err error, msg string) {
 	}
 }
 
-func recordRetryInfo(firstRI, lastRI rpcinfo.RPCInfo, callTimes int32, lastCosts string) {
+func recordRetryInfo(ri rpcinfo.RPCInfo, callTimes int32, lastCosts string) {
 	if callTimes > 1 {
-		if firstRe := remoteinfo.AsRemoteInfo(firstRI.To()); firstRe != nil {
-			// use the remoteInfo of the RPCCall that returns finally, in case the remoteInfo is modified during the call.
-			if lastRI != nil {
-				if lastRe := remoteinfo.AsRemoteInfo(lastRI.To()); lastRe != nil {
-					firstRe.CopyFrom(lastRe)
-				}
-			}
-
-			firstRe.SetTag(rpcinfo.RetryTag, strconv.Itoa(int(callTimes)-1))
+		if re := remoteinfo.AsRemoteInfo(ri.To()); re != nil {
+			re.SetTag(rpcinfo.RetryTag, strconv.Itoa(int(callTimes)-1))
 			// record last cost
-			firstRe.SetTag(rpcinfo.RetryLastCostTag, lastCosts)
+			re.SetTag(rpcinfo.RetryLastCostTag, lastCosts)
 		}
 	}
+}
+
+// IsLocalRetryRequest checks whether it's a retry request by checking the RetryTag set in rpcinfo
+// It's supposed to be used in client middlewares
+func IsLocalRetryRequest(ctx context.Context) bool {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	retryCountStr := ri.To().DefaultTag(rpcinfo.RetryTag, tagValueFirstTry)
+	return retryCountStr != tagValueFirstTry
+}
+
+// IsRemoteRetryRequest checks whether it's a retry request by checking the TransitKey in metainfo
+// It's supposed to be used in server side (handler/middleware)
+func IsRemoteRetryRequest(ctx context.Context) bool {
+	_, isRetry := metainfo.GetPersistentValue(ctx, TransitKey)
+	return isRetry
 }
