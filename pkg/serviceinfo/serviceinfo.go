@@ -18,6 +18,7 @@ package serviceinfo
 
 import (
 	"context"
+	"sync"
 )
 
 // PayloadCodec alias type
@@ -52,6 +53,39 @@ func (s *Service) GetServiceInfo() *ServiceInfo {
 
 func (s *Service) GetHandler() interface{} {
 	return s.handler
+}
+
+type Services struct {
+	svcs       map[string]*Service
+	defaultSvc *Service
+
+	sync.Mutex
+}
+
+func NewServices() *Services {
+	return &Services{svcs: map[string]*Service{}}
+}
+
+func (s *Services) SetService(svcInfo *ServiceInfo, handler interface{}) {
+	svc := NewService(svcInfo, handler)
+	s.Lock()
+	defer s.Unlock()
+	if s.defaultSvc == nil {
+		s.defaultSvc = &svc
+	}
+	s.svcs[svcInfo.ServiceName] = &svc // TODO: lock???
+}
+
+func (s *Services) GetService(svcName string) *Service {
+	return s.svcs[svcName]
+}
+
+func (s *Services) GetServices() map[string]*Service {
+	return s.svcs
+}
+
+func (s *Services) GetDefaultService() *Service {
+	return s.defaultSvc
 }
 
 // ServiceInfo to record meta info of service

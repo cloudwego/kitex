@@ -51,14 +51,14 @@ import (
 // registered to it.
 type Server interface {
 	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error
-	GetServices() map[string]*serviceinfo.Service
+	GetServiceInfo() map[string]*serviceinfo.Service
 	Run() error
 	Stop() error
 }
 
 type server struct {
-	opt    *internal_server.Options
-	svcMap map[string]*serviceinfo.Service // service name -> service
+	opt  *internal_server.Options
+	svcs *serviceinfo.Services
 
 	// actual rpc service implement of biz
 	eps     endpoint.Endpoint
@@ -72,8 +72,9 @@ type server struct {
 // NewServer creates a server with the given Options.
 func NewServer(ops ...Option) Server {
 	s := &server{
-		opt:    internal_server.NewOptions(ops),
-		svcMap: map[string]*serviceinfo.Service{},
+		opt:  internal_server.NewOptions(ops),
+		svcs: serviceinfo.NewServices(),
+		//svcMap: map[string]*serviceinfo.Service{},
 	}
 	s.init()
 	return s
@@ -200,19 +201,20 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	if handler == nil || reflect.ValueOf(handler).IsNil() {
 		panic("handler is nil. please specify non-nil handler")
 	}
-	if s.svcMap[svcInfo.ServiceName] != nil {
+	if s.svcs.GetService(svcInfo.ServiceName) != nil {
 		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
 	}
+
 	s.Lock()
-	svc := serviceinfo.NewService(svcInfo, handler)
-	s.svcMap[svcInfo.ServiceName] = &svc
-	s.Unlock()
-	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcMap[svcInfo.ServiceName].GetServiceInfo()))
+	defer s.Unlock()
+	s.svcs.SetService(svcInfo, handler)
+	// TODO: check the probe func
+	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcs))
 	return nil
 }
 
-func (s *server) GetServices() map[string]*serviceinfo.Service {
-	return s.svcMap
+func (s *server) GetServiceInfo() map[string]*serviceinfo.Service {
+	return s.svcs.GetServices()
 }
 
 // Run runs the server.
@@ -310,9 +312,9 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()
 		serviceName := ri.Invocation().ServiceName()
-		svc := s.svcMap[serviceName]
+		svc := s.svcs.GetService(serviceName)
 		if svc == nil {
-			return fmt.Errorf("service[%s] is not registered, should not happen", serviceName)
+			svc = s.svcs.GetDefaultService()
 		}
 		svcInfo := svc.GetServiceInfo()
 		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
@@ -348,7 +350,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
-	remoteOpt.SvcMap = s.svcMap
+	remoteOpt.Svcs = s.svcs
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
@@ -433,7 +435,7 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 }
 
 func (s *server) check() error {
-	if len(s.svcMap) == 0 {
+	if len(s.svcs.GetServices()) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
 	return nil
@@ -502,11 +504,7 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}
 	if info.PayloadCodec == "" {
-		for _, svc := range s.opt.RemoteOpt.SvcMap {
-			svcInfo := svc.GetServiceInfo()
-			info.PayloadCodec = svcInfo.PayloadCodec.String()
-			break
-		}
+		info.PayloadCodec = s.svcs.GetDefaultService().GetServiceInfo().PayloadCodec.String()
 	}
 	if info.Weight == 0 {
 		info.Weight = discovery.DefaultWeight
@@ -517,7 +515,7 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 }
 
 func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
-	for svcName, svc := range s.svcMap {
+	for _, svc := range s.svcs.GetServices() {
 		ni := *svc.GetServiceInfo()
 		si := &ni
 		extra := make(map[string]interface{}, len(si.Extra)+2)
@@ -527,9 +525,8 @@ func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
 		extra["address"] = lAddr
 		extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
 		si.Extra = extra
-		service := serviceinfo.NewService(si, svc.GetHandler())
 		s.Lock()
-		s.svcMap[svcName] = &service
+		s.svcs.SetService(si, svc.GetHandler())
 		s.Unlock()
 	}
 }

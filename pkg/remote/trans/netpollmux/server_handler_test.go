@@ -61,7 +61,8 @@ func newTestRpcInfo() rpcinfo.RPCInfo {
 func init() {
 	body := "hello world"
 	rpcInfo := newTestRpcInfo()
-	svc := serviceinfo.NewService(mocks.ServiceInfo(), nil)
+	svcs := serviceinfo.NewServices()
+	svcs.SetService(mocks.ServiceInfo(), nil)
 
 	opt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
@@ -79,7 +80,8 @@ func init() {
 				return err
 			},
 		},
-		SvcMap:           map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
+		Svcs: svcs,
+		//SvcMap:           map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -443,7 +445,8 @@ func TestInvokeError(t *testing.T) {
 	}
 
 	body := "hello world"
-	svc := serviceinfo.NewService(mocks.ServiceInfo(), nil)
+	svcs := serviceinfo.NewServices()
+	svcs.SetService(mocks.ServiceInfo(), nil)
 	opt := &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(rpcInfo rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
@@ -468,7 +471,7 @@ func TestInvokeError(t *testing.T) {
 				return err
 			},
 		},
-		SvcMap:           map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
+		Svcs:             svcs,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -626,7 +629,7 @@ func TestInvokeNoMethod(t *testing.T) {
 	pl := remote.NewTransPipeline(svrTransHdlr)
 	svrTransHdlr.SetPipeline(pl)
 
-	svcInfo := opt.SvcMap[mocks.MockServiceName].GetServiceInfo()
+	svcInfo := opt.Svcs.GetService(mocks.MockServiceName).GetServiceInfo()
 	delete(svcInfo.Methods, method)
 
 	if setter, ok := svrTransHdlr.(remote.InvokeHandleFuncSetter); ok {
@@ -674,7 +677,8 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
 
 	// use newOpt cause we need to add heartbeat logic to EncodeFunc and DecodeFunc
-	svc := serviceinfo.NewService(mocks.ServiceInfo(), nil)
+	svcs := serviceinfo.NewServices()
+	svcs.SetService(mocks.ServiceInfo(), nil)
 	newOpt := &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			return rpcInfo
@@ -701,7 +705,7 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 				return err
 			},
 		},
-		SvcMap:           map[string]*serviceinfo.Service{mocks.MockServiceName: &svc},
+		Svcs:             svcs,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}

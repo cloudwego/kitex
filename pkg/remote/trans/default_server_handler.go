@@ -35,10 +35,10 @@ import (
 // NewDefaultSvrTransHandler to provide default impl of svrTransHandler, it can be reused in netpoll, shm-ipc, framework-sdk extensions
 func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.ServerTransHandler, error) {
 	svrHdlr := &svrTransHandler{
-		opt:    opt,
-		codec:  opt.Codec,
-		svcMap: opt.SvcMap,
-		ext:    ext,
+		opt:   opt,
+		codec: opt.Codec,
+		svcs:  opt.Svcs,
+		ext:   ext,
 	}
 	if svrHdlr.opt.TracerCtl == nil {
 		// init TraceCtl when it is nil, or it will lead some unit tests panic
@@ -49,7 +49,7 @@ func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.
 
 type svrTransHandler struct {
 	opt        *remote.ServerOption
-	svcMap     map[string]*serviceinfo.Service
+	svcs       *serviceinfo.Services
 	inkHdlFunc endpoint.Endpoint
 	codec      remote.Codec
 	transPipe  *remote.TransPipeline
@@ -66,12 +66,7 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
 	}()
 
-	svcInfo := t.getDefaultSvcInfo()
-	if svcInfo == nil {
-		t.OnError(ctx, errors.New("service is not registered"), conn)
-		return
-	}
-
+	svcInfo := t.svcs.GetDefaultService().GetServiceInfo()
 	if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return ctx, nil
@@ -157,11 +152,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
 
-	svcInfo := t.getDefaultSvcInfo()
-	if svcInfo == nil {
-		t.OnError(ctx, errors.New("service is not registered"), conn)
-		return
-	}
+	svcInfo := t.svcs.GetDefaultService().GetServiceInfo()
 
 	recvMsg = remote.NewMessageWithNewer(svcInfo, ri, remote.Call, remote.Server)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
@@ -274,11 +265,7 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		return
 	}
 
-	svcInfo := t.getDefaultSvcInfo()
-	if svcInfo == nil {
-		t.OnError(ctx, errors.New("service is not registered"), conn)
-		return
-	}
+	svcInfo := t.svcs.GetDefaultService().GetServiceInfo()
 
 	if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
@@ -352,12 +339,4 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 		}
 	}
 	return ri.From().ServiceName(), rAddr
-}
-
-func (t *svrTransHandler) getDefaultSvcInfo() (svcInfo *serviceinfo.ServiceInfo) {
-	for _, svc := range t.svcMap {
-		svcInfo = svc.GetServiceInfo()
-		break
-	}
-	return svcInfo
 }

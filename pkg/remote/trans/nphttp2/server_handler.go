@@ -59,9 +59,9 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	return &svrTransHandler{
-		opt:    opt,
-		svcMap: opt.SvcMap,
-		codec:  protobuf.NewGRPCCodec(),
+		opt:   opt,
+		svcs:  opt.Svcs,
+		codec: protobuf.NewGRPCCodec(),
 	}, nil
 }
 
@@ -69,7 +69,7 @@ var _ remote.ServerTransHandler = &svrTransHandler{}
 
 type svrTransHandler struct {
 	opt        *remote.ServerOption
-	svcMap     map[string]*serviceinfo.Service
+	svcs       *serviceinfo.Services
 	inkHdlFunc endpoint.Endpoint
 	codec      remote.Codec
 }
@@ -191,11 +191,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			// set send grpc compressor at server to encode reply pack
 			remote.SetSendCompressor(ri, s.SendCompress())
 
-			svc := t.svcMap[serviceName]
+			svc := t.svcs.GetService(serviceName)
 
 			var svcInfo *serviceinfo.ServiceInfo
 			if svc != nil {
 				svcInfo = svc.GetServiceInfo()
+			} else {
+				svcInfo = t.svcs.GetDefaultService().GetServiceInfo()
 			}
 
 			st := NewStream(ctx, svcInfo, newServerConn(tr, s), t)

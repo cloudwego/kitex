@@ -112,8 +112,8 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	rwTimeout := time.Millisecond
 	opts = append(opts, WithReadWriteTimeout(rwTimeout))
 	svr := &server{
-		opt:    internal_server.NewOptions(opts),
-		svcMap: map[string]*serviceinfo.Service{},
+		opt:  internal_server.NewOptions(opts),
+		svcs: serviceinfo.NewServices(),
 	}
 	svr.init()
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
@@ -415,8 +415,8 @@ func TestGRPCServerMultipleServices(t *testing.T) {
 	test.Assert(t, err == nil)
 	err = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
-	test.DeepEqual(t, svr.GetServices()[mocks.ServiceInfo().ServiceName].GetServiceInfo(), mocks.ServiceInfo())
-	test.DeepEqual(t, svr.GetServices()[mocks.Service2Info().ServiceName].GetServiceInfo(), mocks.Service2Info())
+	test.DeepEqual(t, svr.GetServiceInfo()[mocks.ServiceInfo().ServiceName].GetServiceInfo(), mocks.ServiceInfo())
+	test.DeepEqual(t, svr.GetServiceInfo()[mocks.Service2Info().ServiceName].GetServiceInfo(), mocks.Service2Info())
 	time.AfterFunc(3500*time.Millisecond, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
@@ -890,10 +890,11 @@ func (m *mockCodec) Decode(ctx context.Context, msg remote.Message, in remote.By
 }
 
 func TestDuplicatedRegisterInfoPanic(t *testing.T) {
-	svc := serviceinfo.NewService(mocks.ServiceInfo(), nil)
+	svcs := serviceinfo.NewServices()
+	svcs.SetService(mocks.ServiceInfo(), nil)
 	s := &server{
-		svcMap: map[string]*serviceinfo.Service{mocks.ServiceInfo().ServiceName: &svc},
-		opt:    internal_server.NewOptions(nil),
+		opt:  internal_server.NewOptions(nil),
+		svcs: svcs,
 	}
 	s.init()
 
