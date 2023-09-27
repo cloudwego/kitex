@@ -85,12 +85,8 @@ func (c *serverConn) Write(b []byte) (n int, err error) {
 }
 
 func (c *serverConn) WriteFrame(hdr, data []byte) (n int, err error) {
-	grpcConnOpt := &grpc.Options{}
-	// When there's no more data frame, add END_STREAM flag to this empty frame.
-	if hdr == nil && data == nil {
-		grpcConnOpt.Last = true
-	}
-	err = c.tr.Write(c.s, hdr, data, grpcConnOpt)
+	// server sets the END_STREAM flag in trailer when writeStatus
+	err = c.tr.Write(c.s, hdr, data, &grpc.Options{})
 	return len(hdr) + len(data), err
 }
 

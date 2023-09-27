@@ -34,6 +34,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
+
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
@@ -722,8 +724,9 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 	headerFields := make([]hpack.HeaderField, 0, 3+s.header.Len()) // at least :status, content-type will be there if none else.
 	headerFields = append(headerFields, hpack.HeaderField{Name: ":status", Value: "200"})
 	headerFields = append(headerFields, hpack.HeaderField{Name: "content-type", Value: contentType(s.contentSubtype)})
-	if s.sendCompress != "" {
-		headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-encoding", Value: s.sendCompress})
+	sendCompress := encoding.FindCompressorName(s.sendCompress)
+	if sendCompress != "" {
+		headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-encoding", Value: sendCompress})
 	}
 	headerFields = appendHeaderFieldsFromMD(headerFields, s.header)
 	success, err := t.controlBuf.executeAndPut(t.checkForHeaderListSize, &headerFrame{
