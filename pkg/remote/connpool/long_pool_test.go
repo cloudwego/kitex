@@ -561,7 +561,7 @@ func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	idleTime := time.Second
+	idleTime := time.Millisecond
 	p := newLongPoolForTest(0, 2, 5, idleTime)
 	defer p.Close()
 

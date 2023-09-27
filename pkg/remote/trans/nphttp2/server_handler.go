@@ -184,10 +184,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				ink.SetServiceName(sm[idx+1 : pos])
 			}
 
-			// set recv grpc compressor at server to decode the pack from client
-			remote.SetRecvCompressor(ri, s.RecvCompress())
-			// set send grpc compressor at server to encode reply pack
-			remote.SetSendCompressor(ri, s.SendCompress())
+			rCtx = remote.SetRecvCompressor(rCtx, s.RecvCompress())
+			rCtx = remote.SetSendCompressor(rCtx, s.SendCompress())
 
 			st := NewStream(rCtx, t.svcInfo, newServerConn(tr, s), t)
 			streamArg := &streaming.Args{Stream: st}

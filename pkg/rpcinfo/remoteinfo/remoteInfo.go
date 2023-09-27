@@ -43,12 +43,13 @@ type RemoteInfo interface {
 	// SetRemoteAddr tries to set the network address of the discovery.Instance hold by RemoteInfo.
 	// The result indicates whether the modification is successful.
 	SetRemoteAddr(addr net.Addr) (ok bool)
+	CopyFrom(from RemoteInfo)
 	ImmutableView() rpcinfo.EndpointInfo
 }
 
-// RefreshableInstance declares an interface which can return an instance containing the new address.
-type RefreshableInstance interface {
-	RefreshInstanceWithAddr(addr net.Addr) (newInstance discovery.Instance)
+// RemoteAddrSetter is used to set remote addr.
+type RemoteAddrSetter interface {
+	SetRemoteAddr(addr net.Addr) (ok bool)
 }
 
 var (
@@ -129,13 +130,12 @@ func (ri *remoteInfo) DefaultTag(key, def string) string {
 	return def
 }
 
-// SetRemoteAddr implements the RemoteInfo interface.
+// SetRemoteAddr implements the RemoteAddrSetter interface.
 func (ri *remoteInfo) SetRemoteAddr(addr net.Addr) bool {
-	ri.Lock()
-	defer ri.Unlock()
-	if ins, ok := ri.instance.(RefreshableInstance); ok {
-		ri.instance = ins.RefreshInstanceWithAddr(addr)
-		return true
+	if ins, ok := ri.instance.(RemoteAddrSetter); ok {
+		ri.Lock()
+		defer ri.Unlock()
+		return ins.SetRemoteAddr(addr)
 	}
 	return false
 }
@@ -175,9 +175,45 @@ func (ri *remoteInfo) ForceSetTag(key, value string) {
 	ri.tags[key] = value
 }
 
+// CopyFrom copies the input RemoteInfo.
+// the `from` param may be modified, so must do deep copy to prevent race.
+func (ri *remoteInfo) CopyFrom(from RemoteInfo) {
+	if from == nil || ri == from {
+		return
+	}
+	ri.Lock()
+	f := from.(*remoteInfo)
+	ri.serviceName = f.serviceName
+	ri.instance = f.instance
+	ri.method = f.method
+	ri.tags = f.copyTags()
+	ri.tagLocks = f.copyTagsLocks()
+	ri.Unlock()
+}
+
 // ImmutableView implements rpcinfo.MutableEndpointInfo.
 func (ri *remoteInfo) ImmutableView() rpcinfo.EndpointInfo {
 	return ri
+}
+
+func (ri *remoteInfo) copyTags() map[string]string {
+	ri.Lock()
+	defer ri.Unlock()
+	newTags := make(map[string]string, len(ri.tags))
+	for k, v := range ri.tags {
+		newTags[k] = v
+	}
+	return newTags
+}
+
+func (ri *remoteInfo) copyTagsLocks() map[string]struct{} {
+	ri.Lock()
+	defer ri.Unlock()
+	newTagLocks := make(map[string]struct{}, len(ri.tagLocks))
+	for k, v := range ri.tagLocks {
+		newTagLocks[k] = v
+	}
+	return newTagLocks
 }
 
 func (ri *remoteInfo) zero() {

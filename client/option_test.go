@@ -650,7 +650,7 @@ func TestWithLongConnectionOption(t *testing.T) {
 	opts := client.NewOptions(options)
 	test.Assert(t, opts.PoolCfg.MaxIdleTimeout == 30*time.Second) // defaultMaxIdleTimeout
 	test.Assert(t, opts.PoolCfg.MaxIdlePerAddress == 1)           // default
-	test.Assert(t, opts.PoolCfg.MaxIdleGlobal == 1<<20)           // default
+	test.Assert(t, opts.PoolCfg.MaxIdleGlobal == 1)               // default
 }
 
 func TestWithWarmingUpOption(t *testing.T) {

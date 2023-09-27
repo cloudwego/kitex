@@ -20,29 +20,30 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"errors"
+	"fmt"
 	"io"
-
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-
-	"github.com/bytedance/gopkg/lang/mcache"
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-func getSendCompressor(ctx context.Context) (encoding.Compressor, error) {
-	ri := rpcinfo.GetRPCInfo(ctx)
-	return encoding.FindCompressor(remote.GetSendCompressor(ri))
+func buildGRPCFrame(ctx context.Context, payload []byte) ([]byte, []byte, error) {
+	data, isCompressed, err := compress(ctx, payload)
+	if err != nil {
+		return nil, nil, err
+	}
+	header := make([]byte, dataFrameHeaderLen)
+	if isCompressed {
+		header[0] = 1
+	} else {
+		header[0] = 0
+	}
+	binary.BigEndian.PutUint32(header[1:dataFrameHeaderLen], uint32(len(data)))
+	return header, data, nil
 }
 
 func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) {
-	ri := rpcinfo.GetRPCInfo(ctx)
-	compressor, err := encoding.FindCompressor(remote.GetRecvCompressor(ri))
-	if err != nil {
-		return nil, err
-	}
 	hdr, err := in.Next(5)
 	if err != nil {
 		return nil, err
@@ -54,31 +55,40 @@ func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) 
 		return nil, err
 	}
 	if compressFlag == 1 {
-		if compressor == nil {
-			return nil, errors.New("kitex compression algorithm not found")
-		}
-		return decompress(compressor, d)
+		return decompress(ctx, d)
 	}
 	return d, nil
 }
 
-func compress(compressor encoding.Compressor, data []byte) ([]byte, error) {
-	defer mcache.Free(data)
+func compress(ctx context.Context, data []byte) ([]byte, bool, error) {
+	cname := remote.GetSendCompressor(ctx)
+	if cname == "" {
+		return data, false, nil
+	}
+	compressor := encoding.GetCompressor(cname)
+	if compressor == nil {
+		return nil, false, fmt.Errorf("no compressor registered for: %s", cname)
+	}
 	cbuf := &bytes.Buffer{}
 	z, err := compressor.Compress(cbuf)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if _, err = z.Write(data); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if err = z.Close(); err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return cbuf.Bytes(), nil
+	return cbuf.Bytes(), true, nil
 }
 
-func decompress(compressor encoding.Compressor, data []byte) ([]byte, error) {
+func decompress(ctx context.Context, data []byte) ([]byte, error) {
+	cname := remote.GetRecvCompressor(ctx)
+	compressor := encoding.GetCompressor(cname)
+	if compressor == nil {
+		return nil, fmt.Errorf("no compressor registered found for:%v", cname)
+	}
 	dcReader, er := compressor.Decompress(bytes.NewReader(data))
 	if er != nil {
 		return nil, er

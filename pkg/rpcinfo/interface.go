@@ -44,7 +44,6 @@ type RPCStats interface {
 	Panicked() (bool, interface{})
 	GetEvent(event stats.Event) Event
 	Level() stats.Level
-	CopyForRetry() RPCStats
 }
 
 // Event is the abstraction of an event happened at a specific time.

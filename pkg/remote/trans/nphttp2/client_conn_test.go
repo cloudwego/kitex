@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 func TestClientConn(t *testing.T) {
@@ -59,29 +58,4 @@ func TestClientConn(t *testing.T) {
 	n, err = clientConn.Write([]byte(""))
 	test.Assert(t, err != nil, err)
 	test.Assert(t, n == 0)
-}
-
-func TestClientConnStreamDesc(t *testing.T) {
-	connPool := newMockConnPool()
-
-	// streaming
-	ctx := newMockCtxWithRPCInfo()
-	ri := rpcinfo.GetRPCInfo(ctx)
-	test.Assert(t, ri != nil)
-	rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.Streaming)
-	conn, err := connPool.Get(ctx, "tcp", mockAddr0, newMockConnOption())
-	test.Assert(t, err == nil, err)
-	defer conn.Close()
-	cn := conn.(*clientConn)
-	test.Assert(t, cn != nil)
-	test.Assert(t, cn.desc.isStreaming == true)
-
-	// pingpong
-	rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.PingPong)
-	conn, err = connPool.Get(ctx, "tcp", mockAddr0, newMockConnOption())
-	test.Assert(t, err == nil, err)
-	defer conn.Close()
-	cn = conn.(*clientConn)
-	test.Assert(t, cn != nil)
-	test.Assert(t, cn.desc.isStreaming == false)
 }

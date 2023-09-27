@@ -63,19 +63,3 @@ func TestRPCStats(t *testing.T) {
 	ok, err = st.Panicked()
 	test.Assert(t, !ok && err == nil)
 }
-
-func BenchmarkCopyForRetry(b *testing.B) {
-	b.Run("BenchmarkNewRPCStats", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
-			_ = rpcinfo.NewRPCStats()
-		}
-	})
-
-	s := rpcinfo.NewRPCStats()
-	b.Run("BenchmarkCopyForRetry", func(b *testing.B) {
-		s.Record(context.Background(), stats.RPCStart, stats.StatusInfo, "")
-		for i := 0; i < b.N; i++ {
-			_ = s.CopyForRetry()
-		}
-	})
-}

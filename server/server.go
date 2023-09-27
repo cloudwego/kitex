@@ -194,6 +194,9 @@ func (s *server) GetServiceInfo() *serviceinfo.ServiceInfo {
 
 // Run runs the server.
 func (s *server) Run() (err error) {
+	if s.svcInfo == nil {
+		return errors.New("no service, use RegisterService to set one")
+	}
 	if err = s.check(); err != nil {
 		return err
 	}
@@ -350,9 +353,10 @@ func (s *server) addBoundHandlers(opt *remote.ServerOption) {
 		}
 	}
 
+	// for server limiter, the handler should be added as first one
 	limitHdlr := s.buildLimiterWithOpt()
 	if limitHdlr != nil {
-		doAddBoundHandler(limitHdlr, opt)
+		doAddBoundHandlerToHead(limitHdlr, opt)
 	}
 }
 

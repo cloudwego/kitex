@@ -32,7 +32,6 @@ import (
 	"github.com/cloudwego/kitex/internal/mocks"
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -40,14 +39,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-type serverInitialInfoImpl struct {
-	EndpointsFunc func(ctx context.Context, req, resp interface{}) (err error)
-}
+type serverInitialInfoImpl struct{}
 
 func (s serverInitialInfoImpl) Endpoints() endpoint.Endpoint {
-	if s.EndpointsFunc != nil {
-		return s.EndpointsFunc
-	}
 	return func(ctx context.Context, req, resp interface{}) (err error) {
 		return nil
 	}
@@ -73,8 +67,8 @@ func newMockServiceInlineClient(tb testing.TB, ctrl *gomock.Controller, extra ..
 		WithDestService("destService"),
 	}
 	opts = append(opts, extra...)
-	svcInfo := mocks.ServiceInfo()
 
+	svcInfo := mocks.ServiceInfo()
 	cli, err := NewServiceInlineClient(svcInfo, newMockServerInitialInfo(), opts...)
 	test.Assert(tb, err == nil)
 
@@ -346,29 +340,4 @@ func TestServiceInlineClientFinalizer(t *testing.T) {
 	secondGCHeapAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
 	t.Logf("After second GC, allocation: %f Mb, Number of allocation: %d\n", secondGCHeapAlloc, secondGCHeapObjects)
 	test.Assert(t, secondGCHeapAlloc < firstGCHeapAlloc/2 && secondGCHeapObjects < firstGCHeapObjects/2)
-}
-
-func TestServiceInlineMethodKeyCall(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	mtd := mocks.MockMethod
-	opts := []Option{
-		WithTransHandlerFactory(newMockCliTransHandlerFactory(ctrl)),
-		WithResolver(resolver404(ctrl)),
-		WithDialer(newDialer(ctrl)),
-		WithDestService("destService"),
-	}
-	svcInfo := mocks.ServiceInfo()
-	s := serverInitialInfoImpl{}
-	s.EndpointsFunc = func(ctx context.Context, req, resp interface{}) (err error) {
-		test.Assert(t, ctx.Value(consts.CtxKeyMethod) == mtd)
-		return nil
-	}
-	cli, err := NewServiceInlineClient(svcInfo, s, opts...)
-	test.Assert(t, err == nil)
-	ctx := context.Background()
-	req := new(MockTStruct)
-	res := new(MockTStruct)
-	err = cli.Call(ctx, mtd, req, res)
-	test.Assert(t, err == nil, err)
 }
