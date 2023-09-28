@@ -18,7 +18,6 @@ package serviceinfo
 
 import (
 	"context"
-	"sync"
 )
 
 // PayloadCodec alias type
@@ -58,8 +57,6 @@ func (s *Service) GetHandler() interface{} {
 type Services struct {
 	svcs       map[string]*Service
 	defaultSvc *Service
-
-	sync.Mutex
 }
 
 func NewServices() *Services {
@@ -68,8 +65,6 @@ func NewServices() *Services {
 
 func (s *Services) SetService(svcInfo *ServiceInfo, handler interface{}) {
 	svc := NewService(svcInfo, handler)
-	s.Lock()
-	defer s.Unlock()
 	if s.defaultSvc == nil {
 		s.defaultSvc = &svc
 	}
@@ -77,20 +72,14 @@ func (s *Services) SetService(svcInfo *ServiceInfo, handler interface{}) {
 }
 
 func (s *Services) GetService(svcName string) *Service {
-	s.Lock()
-	defer s.Unlock()
 	return s.svcs[svcName]
 }
 
 func (s *Services) GetServices() map[string]*Service {
-	s.Lock()
-	defer s.Unlock()
 	return s.svcs
 }
 
 func (s *Services) GetDefaultService() *Service {
-	s.Lock()
-	defer s.Unlock()
 	return s.defaultSvc
 }
 

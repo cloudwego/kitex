@@ -204,8 +204,6 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
 	}
 
-	s.Lock()
-	defer s.Unlock()
 	s.svcs.SetService(svcInfo, handler)
 	return nil
 }
