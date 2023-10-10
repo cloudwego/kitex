@@ -486,10 +486,10 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 		fallthrough
 	case HandlerFileName:
-		if len(pkg.AllMethods()) > 0 {
-			pkg.AddImports("context")
-		}
 		for _, m := range pkg.ServiceInfo.AllMethods() {
+			if !m.ServerStreaming && !m.ClientStreaming {
+				pkg.AddImports("context")
+			}
 			for _, a := range m.Args {
 				for _, dep := range a.Deps {
 					pkg.AddImport(dep.PkgRefName, dep.ImportPath)
