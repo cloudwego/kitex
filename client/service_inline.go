@@ -142,7 +142,9 @@ func (kc *serviceInlineClient) Call(ctx context.Context, method string, request,
 			reportErr = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, false)
 		}
 		kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
-		rpcinfo.PutRPCInfo(ri)
+		if reportErr == nil {
+			rpcinfo.PutRPCInfo(ri)
+		}
 		callOpts.Recycle()
 	}()
 	reportErr = kc.eps(ctx, request, response)
