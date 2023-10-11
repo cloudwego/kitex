@@ -142,6 +142,10 @@ func (kc *serviceInlineClient) Call(ctx context.Context, method string, request,
 			reportErr = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, false)
 		}
 		kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
+		// If the user start a new goroutine and return before endpoint finished, it may cause panic.
+		// For example,, if the user writes a timeout Middleware and times out, rpcinfo will be recycled,
+		// but in fact, rpcinfo is still being used when it is executed inside
+		// So if endpoint returns err, client won't recycle rpcinfo.
 		if reportErr == nil {
 			rpcinfo.PutRPCInfo(ri)
 		}
