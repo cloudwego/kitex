@@ -19,7 +19,13 @@ package endpoint
 import "context"
 
 // Endpoint represent one method for calling from remote.
-type Endpoint func(ctx context.Context, req, resp interface{}) (err error)
+// Note:
+//
+//	`kitexArgs` should be an implementation of `utils.KitexArgs` (for Thrift/Protobuf)
+//	- It should encapsulate the method's all arguments
+//	`kitexResult should be an implementation of `utils.KitexResult` (for Thrift/Protobuf)
+//	- It should allow replacing the whole response by calling its `SetSuccess(response)`
+type Endpoint func(ctx context.Context, kitexArgs, kitexResult interface{}) (err error)
 
 // Middleware deal with input Endpoint and output Endpoint.
 type Middleware func(Endpoint) Endpoint
@@ -53,7 +59,7 @@ func DummyMiddleware(next Endpoint) Endpoint {
 }
 
 // DummyEndpoint is a dummy endpoint.
-func DummyEndpoint(ctx context.Context, req, resp interface{}) (err error) {
+func DummyEndpoint(ctx context.Context, args, result interface{}) (err error) {
 	return nil
 }
 
