@@ -717,7 +717,7 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 
 	if callOpts != nil && callOpts.CompressorName != "" {
 		// set send grpc compressor at client to tell how to server decode
-		remote.SetSendCompressor(ri, callOpts.CompressorName)
+		remote.SetSendCompressor(ri, callOpts.CompressorName, true)
 	}
 
 	return ctx, ri, callOpts
