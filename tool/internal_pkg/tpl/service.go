@@ -71,7 +71,9 @@ func NewServiceInfo() *kitex.ServiceInfo {
 		ServiceName: 	 serviceName,
 		HandlerType: 	 handlerType,
 		Methods:     	 methods,
+	{{- if ne "Hessian2" .ServiceInfo.Protocol}}
 		PayloadCodec:  	 kitex.{{.Codec | UpperFirst}},
+	{{- end}}
 		KiteXGenVersion: "{{.Version}}",
 		Extra:           extra,
 	}

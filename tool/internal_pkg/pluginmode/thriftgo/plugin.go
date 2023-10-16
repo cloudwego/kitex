@@ -114,7 +114,6 @@ func Run() int {
 		}
 		return conv.fail(err)
 	}
-
 	p := &patcher{
 		noFastAPI:   conv.Config.NoFastAPI,
 		utils:       conv.Utils,
@@ -124,6 +123,7 @@ func Run() int {
 		record:      conv.Config.Record,
 		recordCmd:   conv.Config.RecordCmd,
 		deepCopyAPI: conv.Config.DeepCopyAPI,
+		protocol:    conv.Config.Protocol,
 	}
 	patches, err := p.patch(req)
 	if err != nil {

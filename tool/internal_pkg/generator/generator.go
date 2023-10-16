@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/cloudwego/kitex/transport"
 )
 
 // Constants .
@@ -132,6 +133,7 @@ type Config struct {
 	GenPath string
 
 	DeepCopyAPI bool
+	Protocol    string
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -456,6 +458,9 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	pkg.ExternalKitexGen = g.Use
 	pkg.FrugalPretouch = g.FrugalPretouch
 	pkg.Module = g.ModuleName
+	if strings.EqualFold(g.Protocol, transport.HESSIAN2.String()) {
+		pkg.Protocol = transport.HESSIAN2
+	}
 	if pkg.Dependencies == nil {
 		pkg.Dependencies = make(map[string]string)
 	}

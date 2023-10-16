@@ -27,6 +27,7 @@ import (
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
+
 	{{if GenerateDeepCopyAPIs -}}
 	kutils "github.com/cloudwego/kitex/pkg/utils"
 	{{- end}}
@@ -92,6 +93,7 @@ const patchArgsAndResult = `
 {{$argType := .ArgType}}
 {{$resType := .ResType}}
 
+
 {{- if GenerateArgsResultTypes}}
 {{template "StructLike" $argType}}
 {{- end}}{{/* if GenerateArgsResultTypes */}}
@@ -106,6 +108,7 @@ func (p *{{$argType.GoName}}) GetFirstArgument() interface{} {
 func (p *{{$resType.GoName}}) GetResult() interface{} {
 	return {{if .Void}}nil{{else}}p.Success{{end}}
 }
+
 {{- end}}{{/* if not .Oneway */}}
 {{- end}}{{/* range Functions */}}
 {{- end}}{{/* range .Scope.Service */}}
@@ -116,4 +119,5 @@ var basicTemplates = []string{
 	patchArgsAndResult,
 	file,
 	body,
+	registerHessian,
 }

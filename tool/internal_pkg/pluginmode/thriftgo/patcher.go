@@ -60,6 +60,7 @@ type patcher struct {
 	record      bool
 	recordCmd   []string
 	deepCopyAPI bool
+	protocol    string
 
 	fileTpl *template.Template
 }
@@ -106,6 +107,9 @@ func (p *patcher) buildTemplates() (err error) {
 		// p.XXX
 		return strings.ToLower(s[2:3]) + s[3:]
 	}
+	m["IsHessian"] = func() bool {
+		return p.IsHessian2()
+	}
 
 	tpl := template.New("kitex").Funcs(m)
 	allTemplates := basicTemplates
@@ -123,6 +127,8 @@ func (p *patcher) buildTemplates() (err error) {
 			fieldDeepCopySet,
 			fieldDeepCopyBaseType,
 			structLikeCodec,
+			structLikeProtocol,
+			javaClassName,
 			processor)
 	} else {
 		allTemplates = append(allTemplates, structLikeCodec,
@@ -134,6 +140,8 @@ func (p *patcher) buildTemplates() (err error) {
 			structLikeLength,
 			structLikeFastWriteField,
 			structLikeFieldLength,
+			structLikeProtocol,
+			javaClassName,
 			fieldFastRead,
 			fieldFastReadStructLike,
 			fieldFastReadBaseType,
@@ -184,6 +192,14 @@ func (p *patcher) buildTemplates() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to parse extra templates: %w: %q", err, ext)
 	}
+
+	if p.IsHessian2() {
+		tpl, err = tpl.Parse(registerHessian)
+		if err != nil {
+			return fmt.Errorf("failed to parse hessian2 templates: %w: %q", err, registerHessian)
+		}
+	}
+
 	p.fileTpl = tpl
 	return nil
 }
@@ -195,7 +211,6 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 	protection := make(map[string]*plugin.Generated)
 
 	for ast := range req.AST.DepthFirstSearch() {
-
 		// scope, err := golang.BuildScope(p.utils, ast)
 		scope, _, err := golang.BuildRefScope(p.utils, ast)
 		if err != nil {
@@ -226,6 +241,17 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		// if all scopes are ref, don't generate k-xxx
 		if scope == nil {
 			continue
+		}
+
+		if p.IsHessian2() {
+			register := util.JoinPath(path, fmt.Sprintf("hessian2-register-%s", base))
+			patch, err := p.patchHessian(path, scope, pkgName, base)
+			if err != nil {
+				return nil, fmt.Errorf("patch hessian fail for %q: %w", ast.Filename, err)
+			}
+
+			patches = append(patches, patch)
+			protection[register] = patch
 		}
 
 		data := &struct {
@@ -275,8 +301,35 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 				Name:    &bashPath,
 			})
 		}
+
 	}
 	return
+}
+
+func (p *patcher) patchHessian(path string, scope *golang.Scope, pkgName, base string) (patch *plugin.Generated, err error) {
+	buf := strings.Builder{}
+	resigterIDLName := fmt.Sprintf("hessian2-register-%s", base)
+	register := util.JoinPath(path, resigterIDLName)
+	data := &struct {
+		Scope   *golang.Scope
+		PkgName string
+		Imports map[string]string
+		GoName  string
+		IDLName string
+	}{Scope: scope, PkgName: pkgName, IDLName: util.UpperFirst(strings.Replace(base, ".go", "", -1))}
+	data.Imports, err = scope.ResolveImports()
+	if err != nil {
+		return nil, err
+	}
+
+	if err = p.fileTpl.ExecuteTemplate(&buf, "register", data); err != nil {
+		return nil, err
+	}
+	patch = &plugin.Generated{
+		Content: buf.String(),
+		Name:    &register,
+	}
+	return patch, nil
 }
 
 func getBashPath() string {
@@ -368,6 +421,10 @@ func (p *patcher) filterStdLib(imports map[string]string) {
 
 func (p *patcher) isBinaryOrStringType(t *parser.Type) bool {
 	return t.Category.IsBinary() || t.Category.IsString()
+}
+
+func (p *patcher) IsHessian2() bool {
+	return strings.EqualFold(p.protocol, "hessian2")
 }
 
 var typeIDToGoType = map[string]string{
