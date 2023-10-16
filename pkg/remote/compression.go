@@ -30,30 +30,18 @@ const (
 	GZip
 )
 
-func SetRecvCompressor(ri rpcinfo.RPCInfo, compressorName string, isClient bool) {
+func SetRecvCompressor(ri rpcinfo.RPCInfo, compressorName string) {
 	if ri == nil || compressorName == "" {
 		return
 	}
-	var mi rpcinfo.MutableEndpointInfo
-	if isClient {
-		mi = rpcinfo.AsMutableEndpointInfo(ri.To())
-	} else {
-		mi = rpcinfo.AsMutableEndpointInfo(ri.From())
-	}
-	mi.SetTag("recv-compressor", compressorName)
+	rpcinfo.AsMutableEndpointInfo(ri.From()).SetTag("recv-compressor", compressorName)
 }
 
-func SetSendCompressor(ri rpcinfo.RPCInfo, compressorName string, isClient bool) {
+func SetSendCompressor(ri rpcinfo.RPCInfo, compressorName string) {
 	if ri == nil || compressorName == "" {
 		return
 	}
-	var mi rpcinfo.MutableEndpointInfo
-	if isClient {
-		mi = rpcinfo.AsMutableEndpointInfo(ri.To())
-	} else {
-		mi = rpcinfo.AsMutableEndpointInfo(ri.From())
-	}
-	mi.SetTag("send-compressor", compressorName)
+	rpcinfo.AsMutableEndpointInfo(ri.From()).SetTag("send-compressor", compressorName)
 }
 
 func GetSendCompressor(ri rpcinfo.RPCInfo) string {

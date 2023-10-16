@@ -28,6 +28,7 @@ var (
 )
 
 type endpointInfo struct {
+	sync.RWMutex
 	serviceName string
 	method      string
 	address     net.Addr
@@ -59,6 +60,8 @@ func (ei *endpointInfo) Address() net.Addr {
 
 // Tag implements the EndpointInfo interface.
 func (ei *endpointInfo) Tag(key string) (value string, exist bool) {
+	ei.RLock()
+	defer ei.RUnlock()
 	value, exist = ei.tags[key]
 	return
 }
@@ -91,6 +94,8 @@ func (ei *endpointInfo) SetAddress(addr net.Addr) error {
 
 // SetTag implements the MutableEndpointInfo interface.
 func (ei *endpointInfo) SetTag(key, value string) error {
+	ei.Lock()
+	defer ei.Unlock()
 	ei.tags[key] = value
 	return nil
 }
