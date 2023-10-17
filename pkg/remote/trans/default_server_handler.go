@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/ktrace"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -60,6 +61,7 @@ type svrTransHandler struct {
 func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	var bufWriter remote.ByteBuffer
 	ri := sendMsg.RPCInfo()
+	defer ktrace.NewRegion(ctx, ktrace.ServerWrite).End()
 	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
 	defer func() {
 		t.ext.ReleaseBuffer(bufWriter, err)
@@ -73,7 +75,9 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	}
 
 	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
+	region := ktrace.NewRegion(ctx, ktrace.ServerEncode)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
+	region.End()
 	if err != nil {
 		return ctx, err
 	}
@@ -87,9 +91,14 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 		t.ext.ReleaseBuffer(bufReader, err)
 		rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadFinish, err)
 	}()
+	defer ktrace.NewRegion(ctx, ktrace.ServerRead).End()
 	rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadStart, nil)
 
 	bufReader = t.ext.NewReadByteBuffer(ctx, conn, recvMsg)
+	region := ktrace.NewRegion(ctx, ktrace.ServerWaitRead)
+	_, _ = bufReader.Peek(1)
+	region.End()
+	region = ktrace.NewRegion(ctx, ktrace.ServerDecode)
 	if codec, ok := t.codec.(remote.MetaDecoder); ok {
 		if err = codec.DecodeMeta(ctx, recvMsg, bufReader); err == nil {
 			if t.opt.Profiler != nil && t.opt.ProfilerTransInfoTagging != nil && recvMsg.TransInfo() != nil {
@@ -102,6 +111,7 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 	} else {
 		err = t.codec.Decode(ctx, recvMsg, bufReader)
 	}
+	region.End()
 	if err != nil {
 		recvMsg.Tags()[remote.ReadFailed] = true
 		return ctx, err
@@ -113,6 +123,7 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 // The connection should be closed after returning error.
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
+	ctx, ttask := ktrace.NewTask(ctx, ktrace.Server)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var recvMsg remote.Message
 	var sendMsg remote.Message
@@ -147,6 +158,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		if err != nil && !closeConnOutsideIfErr {
 			err = nil
 		}
+		ttask.End()
 	}()
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)

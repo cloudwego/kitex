@@ -35,10 +35,10 @@ type ConnPool interface {
 
 	// Put puts the connection back to pool.
 	// Note that the Close method of conn may already be invoked.
-	Put(conn net.Conn) error
+	Put(ctx context.Context, conn net.Conn) error
 
 	// Discard discards the connection rather than putting it to the pool.
-	Discard(conn net.Conn) error
+	Discard(ctx context.Context, conn net.Conn) error
 
 	// Close is to release resource of ConnPool, it is executed when client is closed.
 	Close() error

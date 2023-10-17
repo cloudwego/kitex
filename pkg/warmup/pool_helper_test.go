@@ -72,7 +72,7 @@ func (p *mockPool) Get(ctx context.Context, network, address string, opt remote.
 }
 
 // Put implements the remote.ConnPool interface.
-func (p *mockPool) Put(conn net.Conn) error {
+func (p *mockPool) Put(ctx context.Context, conn net.Conn) error {
 	if mock, ok := conn.(*mockConn); ok {
 		p.put.set(mock.network, mock.address)
 	} else {

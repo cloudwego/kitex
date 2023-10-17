@@ -309,7 +309,7 @@ func TestLongConnPoolReuse(t *testing.T) {
 	for i := 0; i < getCnt; i++ {
 		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
-		err = p.Put(c)
+		err = p.Put(context.TODO(), c)
 		test.Assert(t, err == nil)
 		count[c]++
 	}
@@ -322,13 +322,13 @@ func TestLongConnPoolReuse(t *testing.T) {
 	for i := 0; i < getCnt; i++ {
 		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
-		err = p.Put(c)
+		err = p.Put(context.TODO(), c)
 		test.Assert(t, err == nil)
 		count[c]++
 
 		c, err = p.Get(context.TODO(), "tcp", addr2, opt)
 		test.Assert(t, err == nil)
-		err = p.Put(c)
+		err = p.Put(context.TODO(), c)
 		test.Assert(t, err == nil)
 		count[c]++
 	}
@@ -342,7 +342,7 @@ func TestLongConnPoolReuse(t *testing.T) {
 		time.Sleep(idleTime * 3)
 		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
-		err = p.Put(c)
+		err = p.Put(context.TODO(), c)
 		test.Assert(t, err == nil)
 		count[c]++
 	}
@@ -382,7 +382,7 @@ func TestLongConnPoolMaxIdle(t *testing.T) {
 	test.Assert(t, len(count) == 10)
 
 	for _, c := range conns {
-		err := p.Put(c)
+		err := p.Put(context.TODO(), c)
 		test.Assert(t, err == nil)
 	}
 
@@ -430,7 +430,7 @@ func TestLongConnPoolGlobalMaxIdle(t *testing.T) {
 	test.Assert(t, len(count) == 20)
 
 	for _, c := range conns {
-		err := p.Put(c)
+		err := p.Put(context.TODO(), c)
 		test.Assert(t, err == nil)
 	}
 
@@ -477,7 +477,7 @@ func TestLongConnPoolCloseOnDiscard(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
-	err = p.Put(c)
+	err = p.Put(context.TODO(), c)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
@@ -486,7 +486,7 @@ func TestLongConnPoolCloseOnDiscard(t *testing.T) {
 	test.Assert(t, c == c2)
 	test.Assert(t, !closed)
 
-	err = p.Discard(c2)
+	err = p.Discard(context.TODO(), c2)
 	test.Assert(t, err == nil)
 	test.Assert(t, closed)
 
@@ -539,7 +539,7 @@ func TestLongConnPoolCloseOnError(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
-	err = p.Put(c)
+	err = p.Put(context.TODO(), c)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
@@ -589,7 +589,7 @@ func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
-	err = p.Put(c)
+	err = p.Put(context.TODO(), c)
 	test.Assert(t, err == nil)
 	test.Assert(t, !closed)
 
@@ -640,7 +640,7 @@ func TestLongConnPoolCloseOnClean(t *testing.T) {
 	test.Assert(t, !closed)
 	mu.RUnlock()
 
-	err = p.Put(c)
+	err = p.Put(context.TODO(), c)
 	test.Assert(t, err == nil)
 	mu.RLock()
 	test.Assert(t, !closed)
@@ -688,7 +688,7 @@ func TestLongConnPoolDiscardUnknownConnection(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, lc.Conn == conn)
 
-	err = p.Discard(lc.Conn)
+	err = p.Discard(context.TODO(), lc.Conn)
 	test.Assert(t, err == nil)
 	test.Assert(t, closed)
 }
@@ -716,12 +716,12 @@ func TestConnPoolClose(t *testing.T) {
 	network, address := "tcp", mockAddr0
 	conn0, err := p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
 	test.Assert(t, err == nil)
-	p.Put(conn0)
+	p.Put(context.TODO(), conn0)
 
 	network, address = "tcp", mockAddr1
 	conn1, err := p.Get(context.TODO(), network, address, dialer.ConnOption{Dialer: d})
 	test.Assert(t, err == nil)
-	p.Put(conn1)
+	p.Put(context.TODO(), conn1)
 
 	connCount := 0
 	p.peerMap.Range(func(key, value interface{}) bool {
@@ -798,7 +798,7 @@ func TestLongConnPoolPutUnknownConnection(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, lc.Conn == conn)
 
-	err = p.Put(lc.Conn)
+	err = p.Put(context.TODO(), lc.Conn)
 	test.Assert(t, err == nil)
 	test.Assert(t, closed)
 }
@@ -838,7 +838,7 @@ func TestLongConnPoolEvict(t *testing.T) {
 	}
 	for i := 0; i < maxIdle; i++ {
 		// put conn back to the pool
-		err := p.Put(conns[i])
+		err := p.Put(context.TODO(), conns[i])
 		test.Assert(t, err == nil)
 	}
 
@@ -861,7 +861,7 @@ func TestLongConnPoolEvict(t *testing.T) {
 	}
 	for i := 0; i < maxIdle; i++ {
 		// put conn back to the pool
-		err := p.Put(conns[i])
+		err := p.Put(context.TODO(), conns[i])
 		test.Assert(t, err == nil)
 	}
 }
@@ -889,7 +889,7 @@ func TestLongConnPoolDump(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// put conn back to the pool
-	err = p.Put(conn)
+	err = p.Put(context.TODO(), conn)
 	test.Assert(t, err == nil, err)
 
 	// test Dump() to get conn pool info

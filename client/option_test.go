@@ -160,8 +160,8 @@ func TestForwardProxy(t *testing.T) {
 	mockLongPool.EXPECT().Close().Do(func() {
 		closed = true
 	}).AnyTimes()
-	mockLongPool.EXPECT().Put(gomock.Any()).Return(nil).AnyTimes()
-	mockLongPool.EXPECT().Discard(gomock.Any()).Return(nil).AnyTimes()
+	mockLongPool.EXPECT().Put(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockLongPool.EXPECT().Discard(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	opts = append(opts, WithConnPool(mockLongPool))
 	cli, err := NewClient(svcInfo, opts...)
 	test.Assert(t, err == nil)
@@ -325,8 +325,8 @@ func TestProxyWithConnPool(t *testing.T) {
 	fp.EXPECT().Configure(gomock.Any()).DoAndReturn(func(cfg *proxy.Config) error {
 		cp := mock_remote.NewMockLongConnPool(ctrl)
 		cp.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(mocksnetpoll.NewMockConnection(ctrl), nil).Times(1)
-		cp.EXPECT().Put(gomock.Any()).Return(nil).AnyTimes()
-		cp.EXPECT().Discard(gomock.Any()).Return(nil).AnyTimes()
+		cp.EXPECT().Put(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+		cp.EXPECT().Discard(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 		cp.EXPECT().Close().Return(nil).Times(1)
 		rp := mock_remote.NewMockConnPoolReporter(ctrl)
 		rp.EXPECT().EnableReporter().Times(1)
@@ -348,8 +348,8 @@ func TestProxyWithConnPool(t *testing.T) {
 	mockLongPool.EXPECT().Close().Do(func() {
 		closed = true
 	}).AnyTimes()
-	mockLongPool.EXPECT().Put(gomock.Any()).Return(nil).AnyTimes()
-	mockLongPool.EXPECT().Discard(gomock.Any()).Return(nil).AnyTimes()
+	mockLongPool.EXPECT().Put(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mockLongPool.EXPECT().Discard(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	opts = append(opts, WithConnPool(mockLongPool))
 
 	svcInfo := mocks.ServiceInfo()

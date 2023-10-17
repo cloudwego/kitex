@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/ktrace"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -46,6 +47,7 @@ type cliTransHandler struct {
 // Write implements the remote.ClientTransHandler interface.
 func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
 	var bufWriter remote.ByteBuffer
+	defer ktrace.NewRegion(ctx, ktrace.ClientWrite).End()
 	rpcinfo.Record(ctx, sendMsg.RPCInfo(), stats.WriteStart, nil)
 	defer func() {
 		t.ext.ReleaseBuffer(bufWriter, err)
@@ -54,7 +56,9 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 
 	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
 	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
+	region := ktrace.NewRegion(ctx, ktrace.ClientEncode)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
+	region.End()
 	if err != nil {
 		return ctx, err
 	}
@@ -64,16 +68,24 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 // Read implements the remote.ClientTransHandler interface.
 func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remote.Message) (nctx context.Context, err error) {
 	var bufReader remote.ByteBuffer
+	defer ktrace.NewRegion(ctx, ktrace.ClientRead).End()
+
 	rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadStart, nil)
 	defer func() {
 		t.ext.ReleaseBuffer(bufReader, err)
 		rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadFinish, err)
 	}()
-
 	t.ext.SetReadTimeout(ctx, conn, recvMsg.RPCInfo().Config(), recvMsg.RPCRole())
 	bufReader = t.ext.NewReadByteBuffer(ctx, conn, recvMsg)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
+
+	// wait read first bytes
+	region := ktrace.NewRegion(ctx, ktrace.ClientWaitRead)
+	_, _ = bufReader.Peek(1)
+	region.End()
+	region = ktrace.NewRegion(ctx, ktrace.ClientDecode)
 	err = t.codec.Decode(ctx, recvMsg, bufReader)
+	region.End()
 	if err != nil {
 		if t.ext.IsTimeoutErr(err) {
 			err = kerrors.ErrRPCTimeout.WithCause(err)

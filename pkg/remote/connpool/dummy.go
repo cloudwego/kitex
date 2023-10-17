@@ -38,10 +38,10 @@ func (p *DummyPool) Get(ctx context.Context, network, address string, opt remote
 }
 
 // Put implements the remote.ConnPool interface.
-func (p *DummyPool) Put(conn net.Conn) error { return nil }
+func (p *DummyPool) Put(ctx context.Context, conn net.Conn) error { return nil }
 
 // Discard implements the remote.ConnPool interface.
-func (p *DummyPool) Discard(conn net.Conn) error { return nil }
+func (p *DummyPool) Discard(ctx context.Context, conn net.Conn) error { return nil }
 
 // Clean implements the remote.LongConnPool interface.
 func (p *DummyPool) Clean(network, address string) {}

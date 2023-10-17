@@ -171,7 +171,7 @@ func (w *worker) fire(ctx context.Context) {
 	var conns []net.Conn
 	defer func() {
 		for _, conn := range conns {
-			w.pool.Put(conn)
+			w.pool.Put(ctx, conn)
 		}
 	}()
 	for {

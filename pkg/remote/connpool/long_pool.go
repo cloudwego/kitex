@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/connpool"
+	"github.com/cloudwego/kitex/pkg/ktrace"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
@@ -333,9 +334,10 @@ func (lp *LongPool) Get(ctx context.Context, network, address string, opt remote
 }
 
 // Put implements the ConnPool interface.
-func (lp *LongPool) Put(conn net.Conn) error {
+func (lp *LongPool) Put(ctx context.Context, conn net.Conn) error {
 	c, ok := conn.(*longConn)
 	if !ok {
+		defer ktrace.NewRegion(ctx, ktrace.ClientDisconnect).End()
 		return conn.Close()
 	}
 
@@ -346,11 +348,13 @@ func (lp *LongPool) Put(conn net.Conn) error {
 		p.(*peer).Put(c)
 		return nil
 	}
+	defer ktrace.NewRegion(ctx, ktrace.ClientDisconnect).End()
 	return c.Conn.Close()
 }
 
 // Discard implements the ConnPool interface.
-func (lp *LongPool) Discard(conn net.Conn) error {
+func (lp *LongPool) Discard(ctx context.Context, conn net.Conn) error {
+	defer ktrace.NewRegion(ctx, ktrace.ClientDisconnect).End()
 	c, ok := conn.(*longConn)
 	if ok {
 		return c.Close()

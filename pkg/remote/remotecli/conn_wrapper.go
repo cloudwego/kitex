@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/ktrace"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -71,7 +72,7 @@ func (cm *ConnWrapper) GetConn(ctx context.Context, d remote.Dialer, ri rpcinfo.
 
 // ReleaseConn should notice that ri may nil when oneway
 // TODO duplicate release may cause problem?
-func (cm *ConnWrapper) ReleaseConn(err error, ri rpcinfo.RPCInfo) {
+func (cm *ConnWrapper) ReleaseConn(ctx context.Context, err error, ri rpcinfo.RPCInfo) {
 	if cm.conn == nil {
 		return
 	}
@@ -79,12 +80,12 @@ func (cm *ConnWrapper) ReleaseConn(err error, ri rpcinfo.RPCInfo) {
 		if err == nil {
 			_, ok := ri.To().Tag(rpcinfo.ConnResetTag)
 			if ok || ri.Config().InteractionMode() == rpcinfo.Oneway {
-				cm.connPool.Discard(cm.conn)
+				cm.connPool.Discard(ctx, cm.conn)
 			} else {
-				cm.connPool.Put(cm.conn)
+				cm.connPool.Put(ctx, cm.conn)
 			}
 		} else {
-			cm.connPool.Discard(cm.conn)
+			cm.connPool.Discard(ctx, cm.conn)
 		}
 	} else {
 		cm.conn.Close()
@@ -112,6 +113,7 @@ func (cm *ConnWrapper) getConnWithPool(ctx context.Context, cp remote.ConnPool, 
 	}
 	opt := remote.ConnOption{Dialer: d, ConnectTimeout: timeout}
 	ri.Stats().Record(ctx, stats.ClientConnStart, stats.StatusInfo, "")
+	defer ktrace.NewRegion(ctx, ktrace.ClientConnect).End()
 	conn, err := cp.Get(ctx, addr.Network(), addr.String(), opt)
 	if err != nil {
 		ri.Stats().Record(ctx, stats.ClientConnFinish, stats.StatusError, err.Error())
@@ -130,6 +132,7 @@ func (cm *ConnWrapper) getConnWithDialer(ctx context.Context, d remote.Dialer,
 	}
 
 	ri.Stats().Record(ctx, stats.ClientConnStart, stats.StatusInfo, "")
+	defer ktrace.NewRegion(ctx, ktrace.ClientConnect).End()
 	conn, err := d.DialTimeout(addr.Network(), addr.String(), timeout)
 	if err != nil {
 		ri.Stats().Record(ctx, stats.ClientConnFinish, stats.StatusError, err.Error())

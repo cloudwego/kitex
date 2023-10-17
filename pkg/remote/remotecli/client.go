@@ -88,7 +88,7 @@ func (c *client) init(handler remote.TransHandler, cm *ConnWrapper, conn net.Con
 func (c *client) Send(ctx context.Context, ri rpcinfo.RPCInfo, req remote.Message) (err error) {
 	_, err = c.transHdlr.Write(ctx, c.conn, req)
 	if err != nil {
-		c.connManager.ReleaseConn(err, ri)
+		c.connManager.ReleaseConn(ctx, err, ri)
 	}
 	return err
 }
@@ -105,6 +105,6 @@ func (c *client) Recv(ctx context.Context, ri rpcinfo.RPCInfo, resp remote.Messa
 		time.Sleep(time.Millisecond / 2)
 	}
 
-	c.connManager.ReleaseConn(err, ri)
+	c.connManager.ReleaseConn(ctx, err, ri)
 	return err
 }

@@ -102,7 +102,7 @@ func TestMuxConnPoolReuse(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
-		err = p.Put(c)
+		err = p.Put(context.TODO(), c)
 		test.Assert(t, err == nil)
 		count[c]++
 	}
@@ -112,13 +112,13 @@ func TestMuxConnPoolReuse(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		c, err := p.Get(context.TODO(), "tcp", addr1, opt)
 		test.Assert(t, err == nil)
-		err = p.Put(c)
+		err = p.Put(context.TODO(), c)
 		test.Assert(t, err == nil)
 		count[c]++
 
 		c, err = p.Get(context.TODO(), "tcp", addr2, opt)
 		test.Assert(t, err == nil)
-		err = p.Put(c)
+		err = p.Put(context.TODO(), c)
 		test.Assert(t, err == nil)
 		count[c]++
 	}
@@ -150,7 +150,7 @@ func TestMuxConnPoolDiscardClean(t *testing.T) {
 		conns = append(conns, conn)
 	}
 	for i := 0; i < 128; i++ {
-		p.Discard(conns[i])
+		p.Discard(context.TODO(), conns[i])
 	}
 	conn.EXPECT().Close().Return(nil).Times(size)
 	p.Clean(network, address)

@@ -29,6 +29,7 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/ktrace"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -139,8 +140,11 @@ func (ts *transServer) ConnCount() utils.AtomicInt {
 func (ts *transServer) onConnActive(conn netpoll.Connection) context.Context {
 	ctx := context.Background()
 	defer transRecover(ctx, conn, "OnActive")
+	defer ktrace.NewRegion(ctx, ktrace.ServerConnect).End()
 	conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		ts.onConnInactive(ctx, conn)
+		region := ktrace.NewRegion(ctx, ktrace.ServerDisconnect)
+		region.End()
 		return nil
 	})
 	ts.connCount.Inc()

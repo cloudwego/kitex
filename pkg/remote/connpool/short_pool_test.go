@@ -72,7 +72,7 @@ func TestShortPoolPut(t *testing.T) {
 	test.Assert(t, y.Conn == conn)
 	test.Assert(t, !y.closed)
 
-	err = p.Put(x)
+	err = p.Put(context.TODO(), x)
 	test.Assert(t, err == nil)
 	test.Assert(t, y.closed)
 }
@@ -115,6 +115,6 @@ func TestShortPoolPutClosed(t *testing.T) {
 	err = y.Close()
 	test.Assert(t, err == nil)
 
-	err = p.Put(x)
+	err = p.Put(context.TODO(), x)
 	test.Assert(t, err == nil)
 }

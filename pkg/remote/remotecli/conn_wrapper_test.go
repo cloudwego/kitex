@@ -100,7 +100,7 @@ func TestGetConnByPool(t *testing.T) {
 		conn2, err := connW.GetConn(ctx, dialer, ri)
 		test.Assert(t, err == nil, err)
 		test.Assert(t, conn == conn2)
-		connW.ReleaseConn(nil, ri)
+		connW.ReleaseConn(ctx, nil, ri)
 
 	}
 
@@ -146,13 +146,13 @@ func BenchmarkGetConn(b *testing.B) {
 		conn2, err := connW.GetConn(ctx, longConnDialer, ri)
 		test.Assert(b, err == nil, err)
 		test.Assert(b, conn == conn2)
-		connW.ReleaseConn(nil, ri)
+		connW.ReleaseConn(ctx, nil, ri)
 
 		connW2 := NewConnWrapper(nil)
 		conn2, err = connW2.GetConn(ctx, shortConnDialer, ri)
 		test.Assert(b, err == nil, err)
 		test.Assert(b, conn == conn2)
-		connW.ReleaseConn(nil, ri)
+		connW.ReleaseConn(ctx, nil, ri)
 	}
 }
 
@@ -163,7 +163,7 @@ func TestReleaseConnUseNilConn(t *testing.T) {
 	connPool := connpool.NewLongPool("destService", poolCfg)
 	connW := NewConnWrapper(connPool)
 
-	connW.ReleaseConn(nil, ri)
+	connW.ReleaseConn(context.Background(), nil, ri)
 }
 
 // TestReleaseConn test release conn
@@ -187,5 +187,5 @@ func TestReleaseConn(t *testing.T) {
 	conn2, err := connW.GetConn(ctx, dialer, ri)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, conn == conn2)
-	connW.ReleaseConn(nil, ri)
+	connW.ReleaseConn(ctx, nil, ri)
 }

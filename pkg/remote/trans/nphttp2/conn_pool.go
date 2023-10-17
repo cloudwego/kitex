@@ -177,7 +177,7 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 }
 
 // Put implements the ConnPool interface.
-func (p *connPool) Put(conn net.Conn) error {
+func (p *connPool) Put(ctx context.Context, conn net.Conn) error {
 	if p.connOpts.ShortConn {
 		return p.release(conn)
 	}
@@ -201,7 +201,7 @@ func (p *connPool) createShortConn(ctx context.Context, network, address string,
 }
 
 // Discard implements the ConnPool interface.
-func (p *connPool) Discard(conn net.Conn) error {
+func (p *connPool) Discard(ctx context.Context, conn net.Conn) error {
 	return nil
 }
 

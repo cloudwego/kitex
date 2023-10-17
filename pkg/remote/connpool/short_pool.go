@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/cloudwego/kitex/pkg/ktrace"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -75,18 +76,19 @@ func (p *ShortPool) Get(ctx context.Context, network, address string, opt remote
 	return &shortConn{Conn: conn}, nil
 }
 
-func (p *ShortPool) release(conn net.Conn) error {
+func (p *ShortPool) release(ctx context.Context, conn net.Conn) error {
+	defer ktrace.NewRegion(ctx, ktrace.ClientDisconnect).End()
 	return conn.Close()
 }
 
 // Put implements the ConnPool interface.
-func (p *ShortPool) Put(conn net.Conn) error {
-	return p.release(conn)
+func (p *ShortPool) Put(ctx context.Context, conn net.Conn) error {
+	return p.release(ctx, conn)
 }
 
 // Discard implements the ConnPool interface.
-func (p *ShortPool) Discard(conn net.Conn) error {
-	return p.release(conn)
+func (p *ShortPool) Discard(ctx context.Context, conn net.Conn) error {
+	return p.release(ctx, conn)
 }
 
 // Close is to release resource of ConnPool, it is executed when client is closed.

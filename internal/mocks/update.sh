@@ -61,7 +61,6 @@ do
 \ * limitations under the License.\
 */\
 \
-\
 ' $outfile
     else
       sed -i '' -e '1i /*\
@@ -83,3 +82,5 @@ do
 ' $outfile
     fi
 done
+
+sed -i "" 's/std\/net/net/g' net/net.go

@@ -79,7 +79,7 @@ func (mp *MuxPool) Get(ctx context.Context, network, address string, opt remote.
 }
 
 // Put implements the ConnPool interface.
-func (mp *MuxPool) Put(conn net.Conn) error {
+func (mp *MuxPool) Put(ctx context.Context, conn net.Conn) error {
 	if _, ok := conn.(*muxCliConn); ok {
 		return nil
 	}
@@ -87,7 +87,7 @@ func (mp *MuxPool) Put(conn net.Conn) error {
 }
 
 // Discard implements the ConnPool interface.
-func (mp *MuxPool) Discard(conn net.Conn) error {
+func (mp *MuxPool) Discard(ctx context.Context, conn net.Conn) error {
 	if _, ok := conn.(*muxCliConn); ok {
 		return nil
 	}

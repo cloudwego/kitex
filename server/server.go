@@ -29,6 +29,8 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
+	"github.com/cloudwego/kitex/pkg/ktrace"
+
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -301,6 +303,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		}()
 		implHandlerFunc := s.svcInfo.MethodInfo(methodName).Handler()
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
+		defer ktrace.NewRegion(ctx, fmt.Sprintf("%s_%s", ktrace.ServerHandle, methodName)).End()
 		// set session
 		backup.BackupCtx(ctx)
 		err = implHandlerFunc(ctx, s.handler, args, resp)

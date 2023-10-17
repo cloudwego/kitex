@@ -39,6 +39,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/ktrace"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/loadbalance/lbcache"
 	"github.com/cloudwego/kitex/pkg/proxy"
@@ -328,8 +329,12 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	ctx, ri, callOpts = kc.initRPCInfo(ctx, method, 0, nil)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
+	var task *ktrace.Task
 	var reportErr error
 	var recycleRI bool
+	ctx, task = ktrace.NewTask(ctx, ktrace.Client)
+	defer ktrace.NewRegion(ctx, fmt.Sprintf("%s_%s", ktrace.ClientCall, method)).End()
+
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
 			err = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, false)
@@ -345,6 +350,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 			// holding RPCInfo in a new goroutine is forbidden.
 			rpcinfo.PutRPCInfo(ri)
 		}
+		task.End()
 		callOpts.Recycle()
 	}()
 

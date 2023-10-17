@@ -68,17 +68,17 @@ func (mr *MockConnPoolMockRecorder) Close() *gomock.Call {
 }
 
 // Discard mocks base method.
-func (m *MockConnPool) Discard(conn net.Conn) error {
+func (m *MockConnPool) Discard(ctx context.Context, conn net.Conn) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Discard", conn)
+	ret := m.ctrl.Call(m, "Discard", ctx, conn)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Discard indicates an expected call of Discard.
-func (mr *MockConnPoolMockRecorder) Discard(conn interface{}) *gomock.Call {
+func (mr *MockConnPoolMockRecorder) Discard(ctx, conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Discard", reflect.TypeOf((*MockConnPool)(nil).Discard), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Discard", reflect.TypeOf((*MockConnPool)(nil).Discard), ctx, conn)
 }
 
 // Get mocks base method.
@@ -97,17 +97,17 @@ func (mr *MockConnPoolMockRecorder) Get(ctx, network, address, opt interface{}) 
 }
 
 // Put mocks base method.
-func (m *MockConnPool) Put(conn net.Conn) error {
+func (m *MockConnPool) Put(ctx context.Context, conn net.Conn) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Put", conn)
+	ret := m.ctrl.Call(m, "Put", ctx, conn)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Put indicates an expected call of Put.
-func (mr *MockConnPoolMockRecorder) Put(conn interface{}) *gomock.Call {
+func (mr *MockConnPoolMockRecorder) Put(ctx, conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockConnPool)(nil).Put), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockConnPool)(nil).Put), ctx, conn)
 }
 
 // MockLongConnPool is a mock of LongConnPool interface.
@@ -160,17 +160,17 @@ func (mr *MockLongConnPoolMockRecorder) Close() *gomock.Call {
 }
 
 // Discard mocks base method.
-func (m *MockLongConnPool) Discard(conn net.Conn) error {
+func (m *MockLongConnPool) Discard(ctx context.Context, conn net.Conn) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Discard", conn)
+	ret := m.ctrl.Call(m, "Discard", ctx, conn)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Discard indicates an expected call of Discard.
-func (mr *MockLongConnPoolMockRecorder) Discard(conn interface{}) *gomock.Call {
+func (mr *MockLongConnPoolMockRecorder) Discard(ctx, conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Discard", reflect.TypeOf((*MockLongConnPool)(nil).Discard), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Discard", reflect.TypeOf((*MockLongConnPool)(nil).Discard), ctx, conn)
 }
 
 // Get mocks base method.
@@ -189,17 +189,17 @@ func (mr *MockLongConnPoolMockRecorder) Get(ctx, network, address, opt interface
 }
 
 // Put mocks base method.
-func (m *MockLongConnPool) Put(conn net.Conn) error {
+func (m *MockLongConnPool) Put(ctx context.Context, conn net.Conn) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Put", conn)
+	ret := m.ctrl.Call(m, "Put", ctx, conn)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Put indicates an expected call of Put.
-func (mr *MockLongConnPoolMockRecorder) Put(conn interface{}) *gomock.Call {
+func (mr *MockLongConnPoolMockRecorder) Put(ctx, conn interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockLongConnPool)(nil).Put), conn)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockLongConnPool)(nil).Put), ctx, conn)
 }
 
 // MockConnPoolReporter is a mock of ConnPoolReporter interface.
