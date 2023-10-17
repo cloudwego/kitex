@@ -41,7 +41,16 @@ type InvocationSetter interface {
 	SetMethodName(name string)
 	SetSeqID(seqID int32)
 	SetBizStatusErr(err kerrors.BizStatusErrorIface)
+	SetExtra(key string, value interface{})
 	Reset()
+}
+
+// AsInvocationSetter converts an object into a InvocationSetter. Returns nil if impossible.
+func AsInvocationSetter(i interface{}) InvocationSetter {
+	if v, ok := i.(InvocationSetter); ok {
+		return v
+	}
+	return nil
 }
 
 type invocation struct {
@@ -138,7 +147,10 @@ func (i *invocation) SetExtra(key string, value interface{}) {
 	i.extra[key] = value
 }
 
-func (i *invocation) GetExtra(key string) interface{} {
+func (i *invocation) Extra(key string) interface{} {
+	if i.extra == nil {
+		return nil
+	}
 	return i.extra[key]
 }
 
@@ -159,5 +171,7 @@ func (i *invocation) zero() {
 	i.serviceName = ""
 	i.methodName = ""
 	i.bizErr = nil
-	i.extra = nil
+	for key := range i.extra {
+		delete(i.extra, key)
+	}
 }

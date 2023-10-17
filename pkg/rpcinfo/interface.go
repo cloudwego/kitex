@@ -83,6 +83,7 @@ type Invocation interface {
 	MethodName() string
 	SeqID() int32
 	BizStatusErr() kerrors.BizStatusErrorIface
+	Extra(key string) interface{}
 }
 
 // RPCInfo is the core abstraction of information about an RPC in Kitex.
