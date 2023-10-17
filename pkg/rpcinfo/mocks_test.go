@@ -86,11 +86,13 @@ func (m *MockRPCConfig) TransportProtocol() (r transport.Protocol) {
 
 type MockRPCStats struct{}
 
-func (m *MockRPCStats) Record(context.Context, stats.Event, stats.Status, string) {}
-func (m *MockRPCStats) SendSize() uint64                                          { return 0 }
-func (m *MockRPCStats) RecvSize() uint64                                          { return 0 }
-func (m *MockRPCStats) Error() error                                              { return nil }
-func (m *MockRPCStats) Panicked() (yes bool, val interface{})                     { return }
-func (m *MockRPCStats) GetEvent(event stats.Event) (e rpcinfo.Event)              { return }
-func (m *MockRPCStats) Level() (lv stats.Level)                                   { return }
-func (m *MockRPCStats) CopyForRetry() rpcinfo.RPCStats                            { return nil }
+func (m *MockRPCStats) Record(ctx context.Context, _ stats.Event, _ stats.Status, _ string) context.Context {
+	return ctx
+}
+func (m *MockRPCStats) SendSize() uint64                             { return 0 }
+func (m *MockRPCStats) RecvSize() uint64                             { return 0 }
+func (m *MockRPCStats) Error() error                                 { return nil }
+func (m *MockRPCStats) Panicked() (yes bool, val interface{})        { return }
+func (m *MockRPCStats) GetEvent(event stats.Event) (e rpcinfo.Event) { return }
+func (m *MockRPCStats) Level() (lv stats.Level)                      { return }
+func (m *MockRPCStats) CopyForRetry() rpcinfo.RPCStats               { return nil }

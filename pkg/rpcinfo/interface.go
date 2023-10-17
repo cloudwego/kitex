@@ -37,7 +37,7 @@ type EndpointInfo interface {
 
 // RPCStats is used to collect statistics about the RPC.
 type RPCStats interface {
-	Record(ctx context.Context, event stats.Event, status stats.Status, info string)
+	Record(ctx context.Context, event stats.Event, status stats.Status, info string) context.Context
 	SendSize() uint64
 	RecvSize() uint64
 	Error() error

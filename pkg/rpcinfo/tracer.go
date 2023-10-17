@@ -37,7 +37,7 @@ func (c *TraceController) Append(col stats.Tracer) {
 // DoStart starts the tracers.
 func (c *TraceController) DoStart(ctx context.Context, ri RPCInfo) context.Context {
 	defer c.tryRecover(ctx)
-	Record(ctx, ri, stats.RPCStart, nil)
+	ctx = Record(ctx, ri, stats.RPCStart, nil)
 
 	for _, col := range c.tracers {
 		ctx = col.Start(ctx)
@@ -48,7 +48,7 @@ func (c *TraceController) DoStart(ctx context.Context, ri RPCInfo) context.Conte
 // DoFinish calls the tracers in reversed order.
 func (c *TraceController) DoFinish(ctx context.Context, ri RPCInfo, err error) {
 	defer c.tryRecover(ctx)
-	Record(ctx, ri, stats.RPCFinish, err)
+	ctx = Record(ctx, ri, stats.RPCFinish, err)
 	if err != nil {
 		rpcStats := AsMutableRPCStats(ri.Stats())
 		rpcStats.SetError(err)

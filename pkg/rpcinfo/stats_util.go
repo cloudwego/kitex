@@ -26,15 +26,16 @@ import (
 )
 
 // Record records the event to RPCStats.
-func Record(ctx context.Context, ri RPCInfo, event stats.Event, err error) {
+func Record(ctx context.Context, ri RPCInfo, event stats.Event, err error) context.Context {
 	if ctx == nil || ri.Stats() == nil {
-		return
+		return ctx
 	}
 	if err != nil {
-		ri.Stats().Record(ctx, event, stats.StatusError, err.Error())
+		ctx = ri.Stats().Record(ctx, event, stats.StatusError, err.Error())
 	} else {
-		ri.Stats().Record(ctx, event, stats.StatusInfo, "")
+		ctx = ri.Stats().Record(ctx, event, stats.StatusInfo, "")
 	}
+	return ctx
 }
 
 // CalcEventCostUs calculates the duration between start and end and returns in microsecond.

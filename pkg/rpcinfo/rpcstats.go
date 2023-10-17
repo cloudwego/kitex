@@ -18,6 +18,7 @@ package rpcinfo
 
 import (
 	"context"
+	"runtime/trace"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -94,7 +95,9 @@ type rpcStats struct {
 	sync.RWMutex
 	level stats.Level
 
-	eventMap []Event
+	eventMap  []Event
+	task      *trace.Task
+	regionMap []*trace.Region
 
 	sendSize uint64
 	recvSize uint64
@@ -110,14 +113,15 @@ func init() {
 
 func newRPCStats() interface{} {
 	return &rpcStats{
-		eventMap: make([]Event, maxEventNum),
+		eventMap:  make([]Event, maxEventNum),
+		regionMap: make([]*trace.Region, maxEventNum),
 	}
 }
 
 // Record implements the RPCStats interface.
-func (r *rpcStats) Record(ctx context.Context, e stats.Event, status stats.Status, info string) {
+func (r *rpcStats) Record(ctx context.Context, e stats.Event, status stats.Status, info string) context.Context {
 	if e.Level() > r.level {
-		return
+		return ctx
 	}
 	eve := eventPool.Get().(*event)
 	eve.event = e
@@ -128,7 +132,9 @@ func (r *rpcStats) Record(ctx context.Context, e stats.Event, status stats.Statu
 	idx := e.Index()
 	r.Lock()
 	r.eventMap[idx] = eve
+	ctx = r.tracing(ctx, e)
 	r.Unlock()
+	return ctx
 }
 
 // SendSize implements the RPCStats interface.
@@ -241,6 +247,56 @@ func (r *rpcStats) ImmutableView() RPCStats {
 func (r *rpcStats) Recycle() {
 	r.Reset()
 	rpcStatsPool.Put(r)
+}
+
+// tracing use go-trace tool to track rpc stats
+func (r *rpcStats) tracing(ctx context.Context, e stats.Event) context.Context {
+	if !trace.IsEnabled() {
+		return ctx
+	}
+	eindex := e.Index()
+	switch e {
+	case stats.RPCStart:
+		ctx, task := trace.NewTask(ctx, "RPC")
+		r.task = task
+		return ctx
+	case stats.RPCFinish:
+		if r.task != nil {
+			r.task.End()
+		}
+		return ctx
+	case stats.ServerHandleStart:
+		r.regionMap[eindex] = trace.StartRegion(ctx, "ServerHandle")
+		return ctx
+	case stats.ServerHandleFinish:
+		eindex = stats.ServerHandleStart.Index()
+	case stats.ClientConnStart:
+		r.regionMap[eindex] = trace.StartRegion(ctx, "ClientConnect")
+		return ctx
+	case stats.ClientConnFinish:
+		eindex = stats.ClientConnStart.Index()
+	case stats.ReadStart:
+		r.regionMap[eindex] = trace.StartRegion(ctx, "Read")
+		return ctx
+	case stats.ReadFinish:
+		eindex = stats.ReadStart.Index()
+	case stats.WaitReadStart:
+		r.regionMap[eindex] = trace.StartRegion(ctx, "WaitRead")
+		return ctx
+	case stats.WaitReadFinish:
+		eindex = stats.WaitReadStart.Index()
+	case stats.WriteStart:
+		r.regionMap[eindex] = trace.StartRegion(ctx, "Write")
+		return ctx
+	case stats.WriteFinish:
+		eindex = stats.WriteStart.Index()
+	}
+
+	region := r.regionMap[eindex]
+	if region != nil {
+		region.End()
+	}
+	return ctx
 }
 
 // NewRPCStats creates a new RPCStats.
