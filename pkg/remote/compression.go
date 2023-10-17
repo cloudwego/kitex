@@ -34,14 +34,18 @@ func SetRecvCompressor(ri rpcinfo.RPCInfo, compressorName string) {
 	if ri == nil || compressorName == "" {
 		return
 	}
-	rpcinfo.AsInvocationSetter(ri.Invocation()).SetExtra("recv-compressor", compressorName)
+	if v, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+		v.SetExtra("recv-compressor", compressorName)
+	}
 }
 
 func SetSendCompressor(ri rpcinfo.RPCInfo, compressorName string) {
 	if ri == nil || compressorName == "" {
 		return
 	}
-	rpcinfo.AsInvocationSetter(ri.Invocation()).SetExtra("send-compressor", compressorName)
+	if v, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+		v.SetExtra("send-compressor", compressorName)
+	}
 }
 
 func GetSendCompressor(ri rpcinfo.RPCInfo) string {

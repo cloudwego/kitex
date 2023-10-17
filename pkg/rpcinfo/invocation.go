@@ -44,15 +44,6 @@ type InvocationSetter interface {
 	SetExtra(key string, value interface{})
 	Reset()
 }
-
-// AsInvocationSetter converts an object into a InvocationSetter. Returns nil if impossible.
-func AsInvocationSetter(i interface{}) InvocationSetter {
-	if v, ok := i.(InvocationSetter); ok {
-		return v
-	}
-	return nil
-}
-
 type invocation struct {
 	packageName string
 	serviceName string
