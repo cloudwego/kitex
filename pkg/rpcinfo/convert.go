@@ -16,6 +16,20 @@
 
 package rpcinfo
 
+// Extrable is a type that supports getting and setting extra kv.
+type Extrable interface {
+	SetExtra(key string, value interface{})
+	GetExtra(key string) interface{}
+}
+
+// AsExtrable converts an object into a Extrable. Returns nil if impossible.
+func AsExtrable(i interface{}) Extrable {
+	if v, ok := i.(Extrable); ok {
+		return v
+	}
+	return nil
+}
+
 // Taggable is a type that supports setting tag.
 type Taggable interface {
 	SetTag(key, value string) error
