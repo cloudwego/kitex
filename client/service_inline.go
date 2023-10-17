@@ -140,7 +140,7 @@ func (kc *serviceInlineClient) Call(ctx context.Context, method string, request,
 	var reportErr error
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
-			reportErr = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, false)
+			reportErr = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, true)
 		}
 		kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
 		// If the user start a new goroutine and return before endpoint finished, it may cause panic.
