@@ -62,11 +62,12 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 }
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
+	svcInfo := getDefaultSvcInfo(opt.SvcMap)
 	svrHdlr := &svrTransHandler{
-		opt:   opt,
-		codec: opt.Codec,
-		svcs:  opt.Svcs,
-		ext:   np.NewNetpollConnExtension(),
+		opt:     opt,
+		codec:   opt.Codec,
+		svcInfo: svcInfo,
+		ext:     np.NewNetpollConnExtension(),
 	}
 	if svrHdlr.opt.TracerCtl == nil {
 		// init TraceCtl when it is nil, or it will lead some unit tests panic
@@ -83,7 +84,7 @@ var _ remote.ServerTransHandler = &svrTransHandler{}
 
 type svrTransHandler struct {
 	opt        *remote.ServerOption
-	svcs       *serviceinfo.Services
+	svcInfo    *serviceinfo.ServiceInfo
 	inkHdlFunc endpoint.Endpoint
 	codec      remote.Codec
 	transPipe  *remote.TransPipeline
@@ -101,7 +102,7 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, nil)
 	}()
 
-	svcInfo := t.svcs.GetDefaultService().GetServiceInfo()
+	svcInfo := t.svcInfo
 	if methodInfo, _ := trans.GetMethodInfo(ri, svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return ctx, nil
@@ -231,7 +232,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		muxSvrConn.pool.Put(rpcInfo)
 	}()
 
-	svcInfo := t.svcs.GetDefaultService().GetServiceInfo()
+	svcInfo := t.svcInfo
 
 	// read
 	recvMsg = remote.NewMessageWithNewer(svcInfo, rpcInfo, remote.Call, remote.Server)
@@ -323,7 +324,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
 	data := NewControlFrame()
 
-	svcInfo := t.svcs.GetDefaultService().GetServiceInfo()
+	svcInfo := t.svcInfo
 
 	msg := remote.NewMessage(data, svcInfo, ri, remote.Reply, remote.Server)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
@@ -408,7 +409,7 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 func (t *svrTransHandler) writeErrorReplyIfNeeded(
 	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool,
 ) (shouldCloseConn bool) {
-	svcInfo := t.svcs.GetDefaultService().GetServiceInfo()
+	svcInfo := t.svcInfo
 	if methodInfo, _ := trans.GetMethodInfo(ri, svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return
@@ -483,4 +484,13 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 		}
 	}
 	return ri.From().ServiceName(), rAddr
+}
+
+func getDefaultSvcInfo(svcMap map[string]*serviceinfo.ServiceInfo) *serviceinfo.ServiceInfo {
+	var svcInfo *serviceinfo.ServiceInfo
+	for _, si := range svcMap {
+		svcInfo = si
+		break
+	}
+	return svcInfo
 }

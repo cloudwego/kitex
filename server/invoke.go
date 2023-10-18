@@ -49,7 +49,7 @@ type tInvoker struct {
 func NewInvoker(opts ...Option) Invoker {
 	s := &server{
 		opt:  internal_server.NewOptions(opts),
-		svcs: serviceinfo.NewServices(),
+		svcs: newServices(),
 	}
 	s.init()
 	return &tInvoker{
@@ -57,27 +57,9 @@ func NewInvoker(opts ...Option) Invoker {
 	}
 }
 
-// NewInvokerWithMultiServices is only available with kitex gRPC.
-func NewInvokerWithMultiServices(services []serviceinfo.Service, opts ...Option) Invoker {
-	var options []Option
-
-	options = append(options, opts...)
-
-	svr := NewInvoker(options...)
-	for _, svc := range services {
-		if err := svr.RegisterService(svc.GetServiceInfo(), svc.GetHandler()); err != nil {
-			panic(err)
-		}
-	}
-	if err := svr.Init(); err != nil {
-		panic(err)
-	}
-	return svr
-}
-
 // Init does initialization job for invoker.
 func (s *tInvoker) Init() (err error) {
-	if len(s.server.svcs.GetServices()) == 0 {
+	if len(s.server.svcs.svcMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
 	s.initBasicRemoteOption()

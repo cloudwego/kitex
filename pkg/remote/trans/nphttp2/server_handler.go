@@ -59,9 +59,9 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	return &svrTransHandler{
-		opt:   opt,
-		svcs:  opt.Svcs,
-		codec: protobuf.NewGRPCCodec(),
+		opt:    opt,
+		svcMap: opt.SvcMap,
+		codec:  protobuf.NewGRPCCodec(),
 	}, nil
 }
 
@@ -69,7 +69,7 @@ var _ remote.ServerTransHandler = &svrTransHandler{}
 
 type svrTransHandler struct {
 	opt        *remote.ServerOption
-	svcs       *serviceinfo.Services
+	svcMap     map[string]*serviceinfo.ServiceInfo
 	inkHdlFunc endpoint.Endpoint
 	codec      remote.Codec
 }
@@ -191,20 +191,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			// set send grpc compressor at server to encode reply pack
 			remote.SetSendCompressor(ri, s.SendCompress())
 
-			svc := t.svcs.GetService(serviceName)
-
-			var svcInfo *serviceinfo.ServiceInfo
-			if svc != nil {
-				svcInfo = svc.GetServiceInfo()
-			} else {
-				svcInfo = t.svcs.GetDefaultService().GetServiceInfo()
-			}
+			svcInfo := t.svcMap[serviceName]
 
 			st := NewStream(ctx, svcInfo, newServerConn(tr, s), t)
 			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
 			rCtx = context.WithValue(rCtx, streamKey{}, st)
 
-			if svc == nil || svcInfo.MethodInfo(methodName) == nil {
+			if svcInfo == nil || svcInfo.MethodInfo(methodName) == nil {
 				unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
 				if unknownServiceHandlerFunc != nil {
 					rpcinfo.Record(rCtx, ri, stats.ServerHandleStart, nil)
@@ -213,7 +206,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 						err = kerrors.ErrBiz.WithCause(err)
 					}
 				} else {
-					if svc == nil {
+					if svcInfo == nil {
 						err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", serviceName))
 					} else {
 						err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))

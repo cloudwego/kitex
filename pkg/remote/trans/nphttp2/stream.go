@@ -18,6 +18,7 @@ package nphttp2
 
 import (
 	"context"
+	"errors"
 	"net"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
@@ -94,6 +95,9 @@ func (s *stream) SetTrailer(md metadata.MD) {
 func (s *stream) RecvMsg(m interface{}) error {
 	ri := rpcinfo.GetRPCInfo(s.ctx)
 
+	if s.svcInfo == nil {
+		return errors.New("service info should not be nil")
+	}
 	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
 	defer msg.Recycle()
@@ -105,6 +109,9 @@ func (s *stream) RecvMsg(m interface{}) error {
 func (s *stream) SendMsg(m interface{}) error {
 	ri := rpcinfo.GetRPCInfo(s.ctx)
 
+	if s.svcInfo == nil {
+		return errors.New("service info should not be nil")
+	}
 	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
 	defer msg.Recycle()

@@ -41,8 +41,6 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	svcs := serviceinfo.NewServices()
-	svcs.SetService(mocks.ServiceInfo(), nil)
 	svrOpt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
@@ -59,7 +57,7 @@ func TestMain(m *testing.M) {
 			EncodeFunc: nil,
 			DecodeFunc: nil,
 		},
-		Svcs:      svcs,
+		SvcMap:    map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
 		TracerCtl: &rpcinfo.TraceController{},
 	}
 	svrTransHdlr, _ = newSvrTransHandler(svrOpt)

@@ -49,16 +49,12 @@ var (
 		}
 		return grpc.ClientPrefaceLen
 	}()
-	svcs = serviceinfo.NewServices()
+	svcMap = map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()}
 )
-
-func init() {
-	svcs.SetService(mocks.ServiceInfo(), nil)
-}
 
 func TestServerHandlerCall(t *testing.T) {
 	transHdler, _ := NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()).NewTransHandler(&remote.ServerOption{
-		Svcs: svcs,
+		SvcMap: svcMap,
 	})
 
 	ctrl := gomock.NewController(t)
@@ -127,7 +123,7 @@ func TestOnError(t *testing.T) {
 		ctrl.Finish()
 	}()
 	transHdler, err := NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()).NewTransHandler(&remote.ServerOption{
-		Svcs: svcs,
+		SvcMap: svcMap,
 	})
 	test.Assert(t, err == nil)
 
@@ -156,7 +152,7 @@ func TestOnError(t *testing.T) {
 // TestOnInactive covers onInactive() codes to check panic
 func TestOnInactive(t *testing.T) {
 	transHdler, err := NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()).NewTransHandler(&remote.ServerOption{
-		Svcs: svcs,
+		SvcMap: svcMap,
 	})
 	test.Assert(t, err == nil)
 

@@ -37,52 +37,6 @@ const (
 	GenericMethod = "$GenericCall"
 )
 
-type Service struct {
-	svcInfo *ServiceInfo
-	handler interface{}
-}
-
-func NewService(svcInfo *ServiceInfo, handler interface{}) Service {
-	return Service{svcInfo: svcInfo, handler: handler}
-}
-
-func (s *Service) GetServiceInfo() *ServiceInfo {
-	return s.svcInfo
-}
-
-func (s *Service) GetHandler() interface{} {
-	return s.handler
-}
-
-type Services struct {
-	svcs       map[string]*Service
-	defaultSvc *Service
-}
-
-func NewServices() *Services {
-	return &Services{svcs: map[string]*Service{}}
-}
-
-func (s *Services) SetService(svcInfo *ServiceInfo, handler interface{}) {
-	svc := NewService(svcInfo, handler)
-	if s.defaultSvc == nil {
-		s.defaultSvc = &svc
-	}
-	s.svcs[svcInfo.ServiceName] = &svc
-}
-
-func (s *Services) GetService(svcName string) *Service {
-	return s.svcs[svcName]
-}
-
-func (s *Services) GetServices() map[string]*Service {
-	return s.svcs
-}
-
-func (s *Services) GetDefaultService() *Service {
-	return s.defaultSvc
-}
-
 // ServiceInfo to record meta info of service
 type ServiceInfo struct {
 	// deprecated, for compatibility

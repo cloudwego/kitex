@@ -61,8 +61,8 @@ func newTestRpcInfo() rpcinfo.RPCInfo {
 func init() {
 	body := "hello world"
 	rpcInfo := newTestRpcInfo()
-	svcs := serviceinfo.NewServices()
-	svcs.SetService(mocks.ServiceInfo(), nil)
+	svcMap := map[string]*serviceinfo.ServiceInfo{}
+	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
 
 	opt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
@@ -80,7 +80,7 @@ func init() {
 				return err
 			},
 		},
-		Svcs:             svcs,
+		SvcMap:           svcMap,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -444,8 +444,8 @@ func TestInvokeError(t *testing.T) {
 	}
 
 	body := "hello world"
-	svcs := serviceinfo.NewServices()
-	svcs.SetService(mocks.ServiceInfo(), nil)
+	svcMap := map[string]*serviceinfo.ServiceInfo{}
+	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
 	opt := &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(rpcInfo rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
@@ -470,7 +470,7 @@ func TestInvokeError(t *testing.T) {
 				return err
 			},
 		},
-		Svcs:             svcs,
+		SvcMap:           svcMap,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -628,7 +628,7 @@ func TestInvokeNoMethod(t *testing.T) {
 	pl := remote.NewTransPipeline(svrTransHdlr)
 	svrTransHdlr.SetPipeline(pl)
 
-	svcInfo := opt.Svcs.GetService(mocks.MockServiceName).GetServiceInfo()
+	svcInfo := opt.SvcMap[mocks.MockServiceName]
 	delete(svcInfo.Methods, method)
 
 	if setter, ok := svrTransHdlr.(remote.InvokeHandleFuncSetter); ok {
@@ -676,8 +676,8 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
 
 	// use newOpt cause we need to add heartbeat logic to EncodeFunc and DecodeFunc
-	svcs := serviceinfo.NewServices()
-	svcs.SetService(mocks.ServiceInfo(), nil)
+	svcMap := map[string]*serviceinfo.ServiceInfo{}
+	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
 	newOpt := &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			return rpcInfo
@@ -704,7 +704,7 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 				return err
 			},
 		},
-		Svcs:             svcs,
+		SvcMap:           svcMap,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}

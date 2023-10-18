@@ -34,11 +34,12 @@ import (
 
 // NewDefaultSvrTransHandler to provide default impl of svrTransHandler, it can be reused in netpoll, shm-ipc, framework-sdk extensions
 func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.ServerTransHandler, error) {
+	svcInfo := getDefaultSvcInfo(opt.SvcMap)
 	svrHdlr := &svrTransHandler{
-		opt:   opt,
-		codec: opt.Codec,
-		svcs:  opt.Svcs,
-		ext:   ext,
+		opt:     opt,
+		codec:   opt.Codec,
+		svcInfo: svcInfo,
+		ext:     ext,
 	}
 	if svrHdlr.opt.TracerCtl == nil {
 		// init TraceCtl when it is nil, or it will lead some unit tests panic
@@ -49,7 +50,7 @@ func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.
 
 type svrTransHandler struct {
 	opt        *remote.ServerOption
-	svcs       *serviceinfo.Services
+	svcInfo    *serviceinfo.ServiceInfo
 	inkHdlFunc endpoint.Endpoint
 	codec      remote.Codec
 	transPipe  *remote.TransPipeline
@@ -66,7 +67,7 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
 	}()
 
-	svcInfo := t.svcs.GetDefaultService().GetServiceInfo()
+	svcInfo := t.svcInfo
 	if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return ctx, nil
@@ -152,7 +153,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
 
-	svcInfo := t.svcs.GetDefaultService().GetServiceInfo()
+	svcInfo := t.svcInfo
 
 	recvMsg = remote.NewMessageWithNewer(svcInfo, ri, remote.Call, remote.Server)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
@@ -265,7 +266,7 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		return
 	}
 
-	svcInfo := t.svcs.GetDefaultService().GetServiceInfo()
+	svcInfo := t.svcInfo
 
 	if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
@@ -339,4 +340,13 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 		}
 	}
 	return ri.From().ServiceName(), rAddr
+}
+
+func getDefaultSvcInfo(svcMap map[string]*serviceinfo.ServiceInfo) *serviceinfo.ServiceInfo {
+	var svcInfo *serviceinfo.ServiceInfo
+	for _, si := range svcMap {
+		svcInfo = si
+		break
+	}
+	return svcInfo
 }

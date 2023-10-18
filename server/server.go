@@ -51,14 +51,52 @@ import (
 // registered to it.
 type Server interface {
 	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error
-	GetServiceInfo() map[string]*serviceinfo.Service
+	GetServiceInfo() map[string]*serviceinfo.ServiceInfo
 	Run() error
 	Stop() error
 }
 
+type service struct {
+	svcInfo *serviceinfo.ServiceInfo
+	handler interface{}
+}
+
+func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) service {
+	return service{svcInfo: svcInfo, handler: handler}
+}
+
+type services struct {
+	svcMap     map[string]*service
+	defaultSvc *service
+}
+
+func newServices() *services {
+	return &services{svcMap: map[string]*service{}}
+}
+
+func (s *services) setService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) {
+	svc := newService(svcInfo, handler)
+	if s.defaultSvc == nil {
+		s.defaultSvc = &svc
+	}
+	s.svcMap[svcInfo.ServiceName] = &svc
+}
+
+func (s *services) getService(svcName string) *service {
+	return s.svcMap[svcName]
+}
+
+func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
+	svcInfoMap := map[string]*serviceinfo.ServiceInfo{}
+	for name, svc := range s.svcMap {
+		svcInfoMap[name] = svc.svcInfo
+	}
+	return svcInfoMap
+}
+
 type server struct {
 	opt  *internal_server.Options
-	svcs *serviceinfo.Services
+	svcs *services
 
 	// actual rpc service implement of biz
 	eps     endpoint.Endpoint
@@ -73,25 +111,10 @@ type server struct {
 func NewServer(ops ...Option) Server {
 	s := &server{
 		opt:  internal_server.NewOptions(ops),
-		svcs: serviceinfo.NewServices(),
+		svcs: newServices(),
 	}
 	s.init()
 	return s
-}
-
-// NewServerWithMultiServices is only available with kitex gRPC.
-func NewServerWithMultiServices(services []serviceinfo.Service, opts ...Option) Server {
-	var options []Option
-
-	options = append(options, opts...)
-
-	svr := NewServer(options...)
-	for _, svc := range services {
-		if err := svr.RegisterService(svc.GetServiceInfo(), svc.GetHandler()); err != nil {
-			panic(err)
-		}
-	}
-	return svr
 }
 
 func (s *server) init() {
@@ -200,16 +223,16 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	if handler == nil || reflect.ValueOf(handler).IsNil() {
 		panic("handler is nil. please specify non-nil handler")
 	}
-	if s.svcs.GetService(svcInfo.ServiceName) != nil {
+	if s.svcs.getService(svcInfo.ServiceName) != nil {
 		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
 	}
 
-	s.svcs.SetService(svcInfo, handler)
+	s.svcs.setService(svcInfo, handler)
 	return nil
 }
 
-func (s *server) GetServiceInfo() map[string]*serviceinfo.Service {
-	return s.svcs.GetServices()
+func (s *server) GetServiceInfo() map[string]*serviceinfo.ServiceInfo {
+	return s.svcs.getSvcInfoMap()
 }
 
 // Run runs the server.
@@ -308,11 +331,11 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()
 		serviceName := ri.Invocation().ServiceName()
-		svc := s.svcs.GetService(serviceName)
+		svc := s.svcs.getService(serviceName)
 		if svc == nil {
-			svc = s.svcs.GetDefaultService()
+			svc = s.svcs.defaultSvc
 		}
-		svcInfo := svc.GetServiceInfo()
+		svcInfo := svc.svcInfo
 		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
 			return errors.New("method name is empty in rpcinfo, should not happen")
 		}
@@ -330,7 +353,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)
-		err = implHandlerFunc(ctx, svc.GetHandler(), args, resp)
+		err = implHandlerFunc(ctx, svc.handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
 				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
@@ -346,7 +369,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
-	remoteOpt.Svcs = s.svcs
+	remoteOpt.SvcMap = s.svcs.getSvcInfoMap()
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
@@ -431,7 +454,7 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 }
 
 func (s *server) check() error {
-	if len(s.svcs.GetServices()) == 0 {
+	if len(s.svcs.svcMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
 	return nil
@@ -500,7 +523,7 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}
 	if info.PayloadCodec == "" {
-		info.PayloadCodec = s.svcs.GetDefaultService().GetServiceInfo().PayloadCodec.String()
+		info.PayloadCodec = s.svcs.defaultSvc.svcInfo.PayloadCodec.String()
 	}
 	if info.Weight == 0 {
 		info.Weight = discovery.DefaultWeight
@@ -511,8 +534,8 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 }
 
 func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
-	for _, svc := range s.svcs.GetServices() {
-		ni := *svc.GetServiceInfo()
+	for _, svc := range s.svcs.svcMap {
+		ni := *svc.svcInfo
 		si := &ni
 		extra := make(map[string]interface{}, len(si.Extra)+2)
 		for k, v := range si.Extra {
@@ -521,9 +544,7 @@ func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
 		extra["address"] = lAddr
 		extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
 		si.Extra = extra
-		s.Lock()
-		s.svcs.SetService(si, svc.GetHandler())
-		s.Unlock()
+		s.svcs.setService(si, svc.handler)
 	}
 }
 
