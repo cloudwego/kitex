@@ -31,26 +31,30 @@ const (
 )
 
 func SetRecvCompressor(ri rpcinfo.RPCInfo, compressorName string) {
-	if ri == nil {
+	if ri == nil || compressorName == "" {
 		return
 	}
-	rpcinfo.AsMutableEndpointInfo(ri.From()).SetTag("recv-compressor", compressorName)
+	if v, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+		v.SetExtra("recv-compressor", compressorName)
+	}
 }
 
 func SetSendCompressor(ri rpcinfo.RPCInfo, compressorName string) {
-	if ri == nil {
+	if ri == nil || compressorName == "" {
 		return
 	}
-	rpcinfo.AsMutableEndpointInfo(ri.From()).SetTag("send-compressor", compressorName)
+	if v, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+		v.SetExtra("send-compressor", compressorName)
+	}
 }
 
 func GetSendCompressor(ri rpcinfo.RPCInfo) string {
 	if ri == nil {
 		return ""
 	}
-	v, exist := ri.From().Tag("send-compressor")
-	if exist {
-		return v
+	v := ri.Invocation().Extra("send-compressor")
+	if name, ok := v.(string); ok {
+		return name
 	}
 	return ""
 }
@@ -59,9 +63,9 @@ func GetRecvCompressor(ri rpcinfo.RPCInfo) string {
 	if ri == nil {
 		return ""
 	}
-	v, exist := ri.From().Tag("recv-compressor")
-	if exist {
-		return v
+	v := ri.Invocation().Extra("recv-compressor")
+	if name, ok := v.(string); ok {
+		return name
 	}
 	return ""
 }

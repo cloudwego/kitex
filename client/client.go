@@ -361,7 +361,13 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 			recycleRI = true
 		}
 	} else {
-		ri, recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
+		var lastRI rpcinfo.RPCInfo
+		lastRI, recycleRI, err = kc.opt.RetryContainer.WithRetryIfNeeded(ctx, callOptRetry, kc.rpcCallWithRetry(ri, method, request, response), ri, request)
+		if ri != lastRI {
+			// reset ri of ctx to lastRI
+			ctx = rpcinfo.NewCtxWithRPCInfo(ctx, lastRI)
+		}
+		ri = lastRI
 	}
 
 	// do fallback if with setup

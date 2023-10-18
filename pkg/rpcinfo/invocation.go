@@ -41,15 +41,16 @@ type InvocationSetter interface {
 	SetMethodName(name string)
 	SetSeqID(seqID int32)
 	SetBizStatusErr(err kerrors.BizStatusErrorIface)
+	SetExtra(key string, value interface{})
 	Reset()
 }
-
 type invocation struct {
 	packageName string
 	serviceName string
 	methodName  string
 	seqID       int32
 	bizErr      kerrors.BizStatusErrorIface
+	extra       map[string]interface{}
 }
 
 // NewInvocation creates a new Invocation with the given service, method and optional package.
@@ -130,6 +131,20 @@ func (i *invocation) SetBizStatusErr(err kerrors.BizStatusErrorIface) {
 	i.bizErr = err
 }
 
+func (i *invocation) SetExtra(key string, value interface{}) {
+	if i.extra == nil {
+		i.extra = map[string]interface{}{}
+	}
+	i.extra[key] = value
+}
+
+func (i *invocation) Extra(key string) interface{} {
+	if i.extra == nil {
+		return nil
+	}
+	return i.extra[key]
+}
+
 // Reset implements the InvocationSetter interface.
 func (i *invocation) Reset() {
 	i.zero()
@@ -147,4 +162,7 @@ func (i *invocation) zero() {
 	i.serviceName = ""
 	i.methodName = ""
 	i.bizErr = nil
+	for key := range i.extra {
+		delete(i.extra, key)
+	}
 }
