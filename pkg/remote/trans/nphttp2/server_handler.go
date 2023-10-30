@@ -193,7 +193,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 
 			svcInfo := t.svcMap[serviceName]
 
-			st := NewStream(ctx, svcInfo, newServerConn(tr, s), t)
+			st := NewStream(rCtx, svcInfo, newServerConn(tr, s), t)
 			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
 			rCtx = context.WithValue(rCtx, streamKey{}, st)
 
