@@ -483,6 +483,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 		if len(pkg.AllMethods()) > 0 {
 			pkg.AddImports("callopt")
+			pkg.AddImports("context")
 		}
 		fallthrough
 	case HandlerFileName:
