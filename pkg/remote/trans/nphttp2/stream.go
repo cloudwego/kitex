@@ -18,7 +18,6 @@ package nphttp2
 
 import (
 	"context"
-	"fmt"
 	"net"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
@@ -136,9 +135,7 @@ func (s *stream) getPayloadCodecFromContentType() (serviceinfo.PayloadCodec, err
 		subType = sc.s.ContentSubtype()
 	}
 	switch subType {
-	case "":
-		return serviceinfo.Protobuf, nil
 	default:
-		return -1, fmt.Errorf("unsupported content subtype: %s", subType)
+		return serviceinfo.Protobuf, nil
 	}
 }
