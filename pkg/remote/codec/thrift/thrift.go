@@ -84,10 +84,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	// encode with hyper codec
 	// NOTE: to ensure hyperMarshalEnabled is inlined so split the check logic, or it may cause performance loss
 	if c.hyperMarshalEnabled() && hyperMarshalAvailable(data) {
-		if err := c.hyperMarshal(data, message, out); err != nil {
-			return err
-		}
-		return nil
+		return c.hyperMarshal(data, message, out)
 	}
 
 	msgType := message.MessageType()
@@ -124,6 +121,10 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 		}
 	default:
+		// fallback to frugal if possible
+		if hyperMarshalAvailable(data) {
+			return c.hyperMarshal(data, message, out)
+		}
 		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "encode failed, codec msg type not match with thriftCodec")
 	}
 	if err := tProt.WriteMessageEnd(); err != nil {
@@ -172,24 +173,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 
 	// decode with hyper unmarshal
 	if c.hyperMessageUnmarshalEnabled() && hyperMessageUnmarshalAvailable(data, message) {
-		msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
-		ri := message.RPCInfo()
-		rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
-		buf, err := tProt.next(message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
-		rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
-		if err != nil {
-			return remote.NewTransError(remote.ProtocolError, err)
-		}
-		err = c.hyperMessageUnmarshal(buf, data)
-		if err != nil {
-			return err
-		}
-		err = tProt.ReadMessageEnd()
-		if err != nil {
-			return remote.NewTransError(remote.ProtocolError, err)
-		}
-		tProt.Recycle()
-		return nil
+		return c.hyperUnmarshal(ctx, message, methodName, tProt)
 	}
 
 	// decode with FastRead
@@ -227,11 +211,34 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 			return remote.NewTransError(remote.ProtocolError, err)
 		}
 	default:
+		// fallback to frugal if possible
+		if hyperMessageUnmarshalAvailable(data, message) {
+			return c.hyperUnmarshal(ctx, message, methodName, tProt)
+		}
 		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "decode failed, codec msg type not match with thriftCodec")
 	}
-	tProt.ReadMessageEnd()
+	_ = tProt.ReadMessageEnd()
 	tProt.Recycle()
 	return err
+}
+
+func (c thriftCodec) hyperUnmarshal(ctx context.Context, message remote.Message, methodName string, tProt *BinaryProtocol) error {
+	msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.REPLY, 0)
+	ri := message.RPCInfo()
+	rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
+	buf, err := tProt.next(message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+	rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
+	if err != nil {
+		return remote.NewTransError(remote.ProtocolError, err)
+	}
+	if err = c.hyperMessageUnmarshal(buf, message.Data()); err != nil {
+		return err
+	}
+	if err = tProt.ReadMessageEnd(); err != nil {
+		return remote.NewTransError(remote.ProtocolError, err)
+	}
+	tProt.Recycle()
+	return nil
 }
 
 // Name implements the remote.PayloadCodec interface.
