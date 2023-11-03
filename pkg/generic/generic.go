@@ -59,7 +59,7 @@ func BinaryThriftGeneric() Generic {
 // String value is returned for binary field by default. You can change the return value to []byte for binary field with SetBinaryWithByteSlice.
 // eg:
 //
-//  SetBinaryWithByteSlice(g, true)
+//	SetBinaryWithByteSlice(g, true)
 func MapThriftGeneric(p DescriptorProvider) (Generic, error) {
 	codec, err := newMapThriftCodec(p, thriftCodec)
 	if err != nil {
