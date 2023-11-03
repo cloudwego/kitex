@@ -93,7 +93,7 @@ var _ MessageReader = (*ReadStruct)(nil)
 
 // SetBinaryOption enable/disable Base64 encoding or returning []byte for binary.
 // Note that this method is not concurrent-safe.
-func (m *ReadStruct) SetBinaryOption(base64 bool, byteSlice bool) {
+func (m *ReadStruct) SetBinaryOption(base64, byteSlice bool) {
 	m.binaryWithBase64 = base64
 	m.binaryWithByteSlice = byteSlice
 }
