@@ -337,6 +337,43 @@ func Test_readString(t *testing.T) {
 	}
 }
 
+func Test_readBinary(t *testing.T) {
+	type args struct {
+		in  thrift.TProtocol
+		t   *descriptor.TypeDescriptor
+		opt *readerOption
+	}
+	mockTTransport := &mocks.MockThriftTTransport{
+		ReadStringFunc: func() (string, error) {
+			return stringInput, nil
+		},
+		ReadBinaryFunc: func() ([]byte, error) {
+			return binaryInput, nil
+		},
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    interface{}
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+		{"readBinary", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Name: "binary", Type: descriptor.STRING}}, binaryInput, false}, // read base64 string from binary field
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readBinary(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readString() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_readBase64String(t *testing.T) {
 	type args struct {
 		in  thrift.TProtocol

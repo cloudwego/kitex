@@ -19,6 +19,7 @@ package test
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net"
 	"reflect"
 	"runtime"
@@ -38,10 +39,10 @@ import (
 
 func TestThrift(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9021", new(GenericServiceImpl))
+	svr := initThriftServer(t, ":9021", new(GenericServiceImpl), false, false)
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClient(t, "127.0.0.1:9021", false)
+	cli := initThriftClient(t, "127.0.0.1:9021", false, false)
 
 	cases := []struct {
 		reqMsg   interface{}
@@ -268,10 +269,10 @@ func TestThrift(t *testing.T) {
 
 func TestThriftPingMethod(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9022", new(GenericServicePingImpl))
+	svr := initThriftServer(t, ":9022", new(GenericServicePingImpl), false, false)
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClient(t, "127.0.0.1:9022", false)
+	cli := initThriftClient(t, "127.0.0.1:9022", false, false)
 
 	resp, err := cli.GenericCall(context.Background(), "Ping", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -283,10 +284,10 @@ func TestThriftPingMethod(t *testing.T) {
 
 func TestThriftError(t *testing.T) {
 	time.Sleep(2 * time.Second)
-	svr := initThriftServer(t, ":9023", new(GenericServiceErrorImpl))
+	svr := initThriftServer(t, ":9023", new(GenericServiceErrorImpl), false, false)
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClient(t, "127.0.0.1:9023", false)
+	cli := initThriftClient(t, "127.0.0.1:9023", false, false)
 
 	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil)
@@ -296,10 +297,10 @@ func TestThriftError(t *testing.T) {
 
 func TestThriftOnewayMethod(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9024", new(GenericServiceOnewayImpl))
+	svr := initThriftServer(t, ":9024", new(GenericServiceOnewayImpl), false, false)
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClient(t, "127.0.0.1:9024", false)
+	cli := initThriftClient(t, "127.0.0.1:9024", false, false)
 
 	resp, err := cli.GenericCall(context.Background(), "Oneway", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -309,10 +310,10 @@ func TestThriftOnewayMethod(t *testing.T) {
 
 func TestThriftVoidMethod(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9025", new(GenericServiceVoidImpl))
+	svr := initThriftServer(t, ":9025", new(GenericServiceVoidImpl), false, false)
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClient(t, "127.0.0.1:9025", false)
+	cli := initThriftClient(t, "127.0.0.1:9025", false, false)
 
 	resp, err := cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -322,10 +323,10 @@ func TestThriftVoidMethod(t *testing.T) {
 
 func TestBase64Binary(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9026", new(GenericServiceImpl))
+	svr := initThriftServer(t, ":9026", new(GenericServiceWithBase64Binary), true, false)
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initThriftClient(t, "127.0.0.1:9026", true)
+	cli := initThriftClient(t, "127.0.0.1:9026", true, false)
 
 	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
@@ -334,6 +335,23 @@ func TestBase64Binary(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gr["BinaryMsg"], base64.StdEncoding.EncodeToString([]byte("hello"))))
 
+	svr.Stop()
+}
+
+func TestBinaryWithByteSliceOption(t *testing.T) {
+	time.Sleep(1 * time.Second)
+	svr := initThriftServer(t, ":9026", new(GenericServiceWithByteSliceImpl), false, true)
+	time.Sleep(500 * time.Millisecond)
+
+	cli := initThriftClient(t, "127.0.0.1:9026", false, false)
+
+	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
+	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	gr, ok := resp.(map[string]interface{})
+	test.Assert(t, ok)
+	fmt.Println(gr["BinaryMsg"])
+	test.Assert(t, reflect.DeepEqual(gr["BinaryMsg"], "hello"))
 	svr.Stop()
 }
 
@@ -359,27 +377,33 @@ func initThriftMockClient(t *testing.T) genericclient.Client {
 	return cli
 }
 
-func initThriftClient(t *testing.T, addr string, base64Binary bool) genericclient.Client {
-	return initThriftClientByIDL(t, addr, "./idl/example.thrift", base64Binary)
+func initThriftClient(t *testing.T, addr string, base64Binary, byteSlice bool) genericclient.Client {
+	return initThriftClientByIDL(t, addr, "./idl/example.thrift", base64Binary, byteSlice)
 }
 
-func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary bool) genericclient.Client {
+func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary, byteSlice bool) genericclient.Client {
 	p, err := generic.NewThriftFileProvider(idl)
 	test.Assert(t, err == nil)
 	g, err := generic.MapThriftGeneric(p)
 	test.Assert(t, err == nil)
 	err = generic.SetBinaryWithBase64(g, base64Binary)
 	test.Assert(t, err == nil)
+	err = generic.SetBinaryWithByteSlice(g, byteSlice)
+	test.Assert(t, err == nil)
 	cli := newGenericClient("destServiceName", g, addr)
 	test.Assert(t, err == nil)
 	return cli
 }
 
-func initThriftServer(t *testing.T, address string, handler generic.Service) server.Server {
+func initThriftServer(t *testing.T, address string, handler generic.Service, base64Binary, byteSlice bool) server.Server {
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	p, err := generic.NewThriftFileProvider("./idl/example.thrift")
 	test.Assert(t, err == nil)
 	g, err := generic.MapThriftGeneric(p)
+	test.Assert(t, err == nil)
+	err = generic.SetBinaryWithBase64(g, base64Binary)
+	test.Assert(t, err == nil)
+	err = generic.SetBinaryWithByteSlice(g, byteSlice)
 	test.Assert(t, err == nil)
 	svr := newGenericServer(g, addr, handler)
 	test.Assert(t, err == nil)

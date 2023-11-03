@@ -150,6 +150,19 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 	return nil
 }
 
+func SetBinaryWithByteSlice(g Generic, enable bool) error {
+	switch c := g.(type) {
+	case *mapThriftGeneric:
+		if c.codec == nil {
+			return fmt.Errorf("empty codec for %#v", c)
+		}
+		c.codec.binaryWithByteSlice = enable
+	default:
+		return fmt.Errorf("returning []byte for binary fields is unavailable for %#v", g)
+	}
+	return nil
+}
+
 var thriftCodec = thrift.NewThriftCodec()
 
 type binaryThriftGeneric struct{}
