@@ -19,7 +19,6 @@ package test
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"net"
 	"reflect"
 	"runtime"
@@ -350,8 +349,24 @@ func TestBinaryWithByteSliceOption(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	gr, ok := resp.(map[string]interface{})
 	test.Assert(t, ok)
-	fmt.Println(gr["BinaryMsg"])
 	test.Assert(t, reflect.DeepEqual(gr["BinaryMsg"], "hello"))
+	svr.Stop()
+}
+
+func TestBinaryWithBase64ByteSliceOption(t *testing.T) {
+	time.Sleep(1 * time.Second)
+	svr := initThriftServer(t, ":9026", new(GenericServiceWithBase64ByteSliceImpl), true, true)
+	time.Sleep(500 * time.Millisecond)
+
+	cli := initThriftClient(t, "127.0.0.1:9026", true, true)
+
+	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
+	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	gr, ok := resp.(map[string]interface{})
+	test.Assert(t, ok)
+	str := base64.StdEncoding.EncodeToString([]byte("hello"))
+	test.Assert(t, reflect.DeepEqual(gr["BinaryMsg"], []byte(base64.StdEncoding.EncodeToString([]byte(str)))))
 	svr.Stop()
 }
 

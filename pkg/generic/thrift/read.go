@@ -78,10 +78,12 @@ func nextReader(tt descriptor.Type, t *descriptor.TypeDescriptor, opt *readerOpt
 		return readInt64, nil
 	case descriptor.STRING:
 		if t.Name == "binary" {
-			if opt.binaryWithByteSlice {
-				return readBinary, nil
+			if opt.binaryWithBase64 && opt.binaryWithByteSlice {
+				return readBase64BinaryWithByteSlice, nil
 			} else if opt.binaryWithBase64 {
 				return readBase64Binary, nil
+			} else if opt.binaryWithByteSlice {
+				return readBinary, nil
 			}
 		}
 		return readString, nil
@@ -215,6 +217,15 @@ func readBase64Binary(ctx context.Context, in thrift.TProtocol, t *descriptor.Ty
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(bytes), nil
+}
+
+func readBase64BinaryWithByteSlice(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+	bytes, err := in.ReadBinary()
+	if err != nil {
+		return "", err
+	}
+	str := base64.StdEncoding.EncodeToString(bytes)
+	return []byte(str), nil
 }
 
 func readList(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
