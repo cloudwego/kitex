@@ -44,6 +44,7 @@ const (
 	// Common
 	ChangeEventsKey ProbeName = "events"
 	ServiceInfoKey  ProbeName = "service_info"
+	ServiceInfosKey ProbeName = "service_infos"
 	OptionsKey      ProbeName = "options"
 
 	// Client
