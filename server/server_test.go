@@ -415,8 +415,8 @@ func TestGRPCServerMultipleServices(t *testing.T) {
 	test.Assert(t, err == nil)
 	err = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
-	test.DeepEqual(t, svr.GetServiceInfo()[mocks.ServiceInfo().ServiceName], mocks.ServiceInfo())
-	test.DeepEqual(t, svr.GetServiceInfo()[mocks.Service2Info().ServiceName], mocks.Service2Info())
+	test.DeepEqual(t, svr.GetServiceInfos()[mocks.ServiceInfo().ServiceName], mocks.ServiceInfo())
+	test.DeepEqual(t, svr.GetServiceInfos()[mocks.Service2Info().ServiceName], mocks.Service2Info())
 	time.AfterFunc(3500*time.Millisecond, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
@@ -891,7 +891,7 @@ func (m *mockCodec) Decode(ctx context.Context, msg remote.Message, in remote.By
 
 func TestDuplicatedRegisterInfoPanic(t *testing.T) {
 	svcs := newServices()
-	svcs.setService(mocks.ServiceInfo(), nil)
+	svcs.addService(mocks.ServiceInfo(), nil)
 	s := &server{
 		opt:  internal_server.NewOptions(nil),
 		svcs: svcs,

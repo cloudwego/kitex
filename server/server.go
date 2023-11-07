@@ -51,7 +51,7 @@ import (
 // registered to it.
 type Server interface {
 	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error
-	GetServiceInfo() map[string]*serviceinfo.ServiceInfo
+	GetServiceInfos() map[string]*serviceinfo.ServiceInfo
 	Run() error
 	Stop() error
 }
@@ -193,7 +193,7 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	return nil
 }
 
-func (s *server) GetServiceInfo() map[string]*serviceinfo.ServiceInfo {
+func (s *server) GetServiceInfos() map[string]*serviceinfo.ServiceInfo {
 	return s.svcs.getSvcInfoMap()
 }
 
