@@ -34,7 +34,7 @@ import (
 
 // NewDefaultSvrTransHandler to provide default impl of svrTransHandler, it can be reused in netpoll, shm-ipc, framework-sdk extensions
 func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.ServerTransHandler, error) {
-	svcInfo := getDefaultSvcInfo(opt.SvcMap)
+	svcInfo := GetDefaultSvcInfo(opt.SvcMap)
 	svrHdlr := &svrTransHandler{
 		opt:     opt,
 		codec:   opt.Codec,
@@ -335,13 +335,4 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 		}
 	}
 	return ri.From().ServiceName(), rAddr
-}
-
-func getDefaultSvcInfo(svcMap map[string]*serviceinfo.ServiceInfo) *serviceinfo.ServiceInfo {
-	var svcInfo *serviceinfo.ServiceInfo
-	for _, si := range svcMap {
-		svcInfo = si
-		break
-	}
-	return svcInfo
 }

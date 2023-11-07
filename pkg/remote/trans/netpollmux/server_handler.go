@@ -62,7 +62,7 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 }
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
-	svcInfo := getDefaultSvcInfo(opt.SvcMap)
+	svcInfo := trans.GetDefaultSvcInfo(opt.SvcMap)
 	svrHdlr := &svrTransHandler{
 		opt:     opt,
 		codec:   opt.Codec,
@@ -477,13 +477,4 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 		}
 	}
 	return ri.From().ServiceName(), rAddr
-}
-
-func getDefaultSvcInfo(svcMap map[string]*serviceinfo.ServiceInfo) *serviceinfo.ServiceInfo {
-	var svcInfo *serviceinfo.ServiceInfo
-	for _, si := range svcMap {
-		svcInfo = si
-		break
-	}
-	return svcInfo
 }

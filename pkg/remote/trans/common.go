@@ -66,3 +66,13 @@ func GetMethodInfo(ri rpcinfo.RPCInfo, svcInfo *serviceinfo.ServiceInfo) (servic
 type MuxEnabledFlag interface {
 	MuxEnabled() bool
 }
+
+// GetDefaultSvcInfo is used to get one ServiceInfo from map which is supposed to have one ServiceInfo
+func GetDefaultSvcInfo(svcMap map[string]*serviceinfo.ServiceInfo) *serviceinfo.ServiceInfo {
+	var svcInfo *serviceinfo.ServiceInfo
+	for _, si := range svcMap {
+		svcInfo = si
+		break
+	}
+	return svcInfo
+}
