@@ -56,44 +56,6 @@ type Server interface {
 	Stop() error
 }
 
-type service struct {
-	svcInfo *serviceinfo.ServiceInfo
-	handler interface{}
-}
-
-func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) service {
-	return service{svcInfo: svcInfo, handler: handler}
-}
-
-type services struct {
-	svcMap     map[string]*service
-	defaultSvc *service
-}
-
-func newServices() *services {
-	return &services{svcMap: map[string]*service{}}
-}
-
-func (s *services) setService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) {
-	svc := newService(svcInfo, handler)
-	if s.defaultSvc == nil {
-		s.defaultSvc = &svc
-	}
-	s.svcMap[svcInfo.ServiceName] = &svc
-}
-
-func (s *services) getService(svcName string) *service {
-	return s.svcMap[svcName]
-}
-
-func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
-	svcInfoMap := map[string]*serviceinfo.ServiceInfo{}
-	for name, svc := range s.svcMap {
-		svcInfoMap[name] = svc.svcInfo
-	}
-	return svcInfoMap
-}
-
 type server struct {
 	opt  *internal_server.Options
 	svcs *services
@@ -227,7 +189,7 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
 	}
 
-	s.svcs.setService(svcInfo, handler)
+	s.svcs.addService(svcInfo, handler)
 	return nil
 }
 
@@ -544,7 +506,7 @@ func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
 		extra["address"] = lAddr
 		extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
 		si.Extra = extra
-		s.svcs.setService(si, svc.handler)
+		s.svcs.addService(si, svc.handler)
 	}
 }
 
