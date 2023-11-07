@@ -36,7 +36,8 @@ const (
 	InvalidTransform            = 8
 	InvalidProtocol             = 9
 	UnsupportedClientType       = 10
-	UnknownService              = 11
+	// kitex's own type id from number 20
+	UnknownService = 20
 )
 
 var defaultTransErrorMessage = map[int32]string{
