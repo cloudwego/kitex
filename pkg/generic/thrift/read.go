@@ -224,8 +224,9 @@ func readBase64BinaryWithByteSlice(ctx context.Context, in thrift.TProtocol, t *
 	if err != nil {
 		return "", err
 	}
-	str := base64.StdEncoding.EncodeToString(bytes)
-	return []byte(str), nil
+	encodedData := make([]byte, base64.StdEncoding.EncodedLen(len(bytes)))
+	base64.StdEncoding.Encode(encodedData, bytes)
+	return encodedData, nil
 }
 
 func readList(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
