@@ -151,7 +151,6 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	}()
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
-
 	recvMsg = remote.NewMessageWithNewer(t.svcInfo, ri, remote.Call, remote.Server)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
@@ -262,7 +261,6 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		// conn is closed, no need reply
 		return
 	}
-
 	if methodInfo, _ := GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return
