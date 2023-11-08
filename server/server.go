@@ -409,7 +409,7 @@ func (s *server) check() error {
 	}
 	// compiler will do interface impl check, therr just check whether it is nil
 	switch val := reflect.ValueOf(s.handler); val.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice, reflect.UnsafePointer:
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice, reflect.UnsafePointer:
 		// port from $GOROOT/src/reflect/value.go  IsZero
 		if val.IsNil() {
 			return errors.New("run: handler is nil")
