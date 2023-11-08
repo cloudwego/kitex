@@ -113,21 +113,6 @@ func (g *GenericServiceWithByteSliceImpl) GenericCall(ctx context.Context, metho
 	return buf, nil
 }
 
-type GenericServiceWithBase64ByteSliceImpl struct{}
-
-// GenericCall ...
-func (g *GenericServiceWithBase64ByteSliceImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-	buf := request.(map[string]interface{})
-	rpcinfo := rpcinfo.GetRPCInfo(ctx)
-	fmt.Printf("Method from Ctx: %s\n", rpcinfo.Invocation().MethodName())
-	fmt.Printf("Recv: %v\n", buf)
-	fmt.Printf("Method: %s\n", method)
-	if !reflect.DeepEqual(buf["BinaryMsg"], []byte(base64.StdEncoding.EncodeToString([]byte("hello")))) {
-		return "", fmt.Errorf("BinaryMsg is not %s but %s", []byte("hello"), buf["BinaryMsg"])
-	}
-	return buf, nil
-}
-
 // GenericServiceErrorImpl ...
 type GenericServiceErrorImpl struct{}
 

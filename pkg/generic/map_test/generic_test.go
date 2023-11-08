@@ -337,7 +337,7 @@ func TestBase64Binary(t *testing.T) {
 	svr.Stop()
 }
 
-func TestBinaryWithByteSliceOption(t *testing.T) {
+func TestBinaryWithByteSlice(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	svr := initThriftServer(t, ":9026", new(GenericServiceWithByteSliceImpl), false, true)
 	time.Sleep(500 * time.Millisecond)
@@ -353,9 +353,9 @@ func TestBinaryWithByteSliceOption(t *testing.T) {
 	svr.Stop()
 }
 
-func TestBinaryWithBase64ByteSliceOption(t *testing.T) {
+func TestBinaryWithBase64AndByteSlice(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9026", new(GenericServiceWithBase64ByteSliceImpl), true, true)
+	svr := initThriftServer(t, ":9026", new(GenericServiceWithByteSliceImpl), true, true)
 	time.Sleep(500 * time.Millisecond)
 
 	cli := initThriftClient(t, "127.0.0.1:9026", true, true)
@@ -365,8 +365,7 @@ func TestBinaryWithBase64ByteSliceOption(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	gr, ok := resp.(map[string]interface{})
 	test.Assert(t, ok)
-	str := base64.StdEncoding.EncodeToString([]byte("hello"))
-	test.Assert(t, reflect.DeepEqual(gr["BinaryMsg"], []byte(base64.StdEncoding.EncodeToString([]byte(str)))))
+	test.Assert(t, reflect.DeepEqual(gr["BinaryMsg"], []byte("hello")))
 	svr.Stop()
 }
 
