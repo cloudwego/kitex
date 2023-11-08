@@ -37,8 +37,9 @@ type readerOption struct {
 	// return exception as error
 	throwException bool
 	// read http response
-	http             bool
-	binaryWithBase64 bool
+	http                bool
+	binaryWithBase64    bool
+	binaryWithByteSlice bool
 	// describe struct of current level
 	pbDsc proto.MessageDescriptor
 }
@@ -76,8 +77,12 @@ func nextReader(tt descriptor.Type, t *descriptor.TypeDescriptor, opt *readerOpt
 	case descriptor.I64:
 		return readInt64, nil
 	case descriptor.STRING:
-		if t.Name == "binary" && opt.binaryWithBase64 {
-			return readBase64Binary, nil
+		if t.Name == "binary" {
+			if opt.binaryWithByteSlice {
+				return readBinary, nil
+			} else if opt.binaryWithBase64 {
+				return readBase64Binary, nil
+			}
 		}
 		return readString, nil
 	case descriptor.DOUBLE:
@@ -194,6 +199,14 @@ func readInt64(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescr
 
 func readString(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	return in.ReadString()
+}
+
+func readBinary(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+	bytes, err := in.ReadBinary()
+	if err != nil {
+		return "", err
+	}
+	return bytes, nil
 }
 
 func readBase64Binary(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {

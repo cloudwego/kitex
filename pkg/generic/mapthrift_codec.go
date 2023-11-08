@@ -35,19 +35,21 @@ var (
 )
 
 type mapThriftCodec struct {
-	svcDsc           atomic.Value // *idl
-	provider         DescriptorProvider
-	codec            remote.PayloadCodec
-	forJSON          bool
-	binaryWithBase64 bool
+	svcDsc              atomic.Value // *idl
+	provider            DescriptorProvider
+	codec               remote.PayloadCodec
+	forJSON             bool
+	binaryWithBase64    bool
+	binaryWithByteSlice bool
 }
 
 func newMapThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*mapThriftCodec, error) {
 	svc := <-p.Provide()
 	c := &mapThriftCodec{
-		codec:            codec,
-		provider:         p,
-		binaryWithBase64: false,
+		codec:               codec,
+		provider:            p,
+		binaryWithBase64:    false,
+		binaryWithByteSlice: false,
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
@@ -108,7 +110,7 @@ func (c *mapThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in r
 	} else {
 		rm = thrift.NewReadStruct(svcDsc, msg.RPCRole() == remote.Client)
 	}
-	rm.SetBinaryWithBase64(c.binaryWithBase64)
+	rm.SetBinaryOption(c.binaryWithBase64, c.binaryWithByteSlice)
 	msg.Data().(WithCodec).SetCodec(rm)
 	return c.codec.Unmarshal(ctx, msg, in)
 }
