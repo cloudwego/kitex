@@ -902,3 +902,28 @@ func inboundDeepEqual(inbound1, inbound2 []remote.InboundHandler) bool {
 	}
 	return true
 }
+
+func TestRunServiceWithNilHandler(t *testing.T) {
+	var sliceNil []byte
+	var structPtrNil *struct{}
+	var structZero struct{}
+
+	errHandler := []interface{}{
+		nil,
+		sliceNil,
+		structPtrNil,
+	}
+	svr := NewServer().(*server)
+	svr.svcInfo = mocks.ServiceInfo()
+
+	for _, handler := range errHandler {
+		svr.handler = handler
+		err := svr.check()
+		test.Assert(t, err != nil)
+		test.Assert(t, strings.Contains(err.Error(), "handler is nil"))
+	}
+
+	svr.handler = structZero
+	err := svr.check()
+	test.Assert(t, err == nil)
+}
