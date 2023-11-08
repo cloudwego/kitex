@@ -43,7 +43,6 @@ func RegisterProbeFunc(svc Service, name ProbeName, pf ProbeFunc) {
 const (
 	// Common
 	ChangeEventsKey ProbeName = "events"
-	ServiceInfoKey  ProbeName = "service_info"
 	ServiceInfosKey ProbeName = "service_infos"
 	OptionsKey      ProbeName = "options"
 
