@@ -21,6 +21,7 @@ import (
 	"net"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
+	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/loadbalance"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -43,6 +44,12 @@ type ForwardProxy interface {
 
 	// ResolveProxyInstance set instance for remote endpoint.
 	ResolveProxyInstance(ctx context.Context) error
+}
+
+// WithMiddleware provides function to customize proxy middleware implementation.
+type WithMiddleware interface {
+	// ProxyMiddleware returns a middleware which implement proxy logic.
+	ProxyMiddleware() endpoint.Middleware
 }
 
 // ReverseProxy replaces the listen address with another one.
