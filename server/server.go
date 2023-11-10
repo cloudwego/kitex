@@ -205,6 +205,9 @@ func (s *server) GetServiceInfos() map[string]*serviceinfo.ServiceInfo {
 
 // Run runs the server.
 func (s *server) Run() (err error) {
+	s.Lock()
+	s.isRun = true
+	s.Unlock()
 	if err = s.check(); err != nil {
 		return err
 	}
@@ -256,7 +259,6 @@ func (s *server) Run() (err error) {
 	muStartHooks.Unlock()
 	s.Lock()
 	s.buildRegistryInfo(s.svr.Address())
-	s.isRun = true
 	s.Unlock()
 
 	if err = s.waitExit(errCh); err != nil {
