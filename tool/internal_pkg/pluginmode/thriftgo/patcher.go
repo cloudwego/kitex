@@ -110,6 +110,9 @@ func (p *patcher) buildTemplates() (err error) {
 	m["IsHessian"] = func() bool {
 		return p.IsHessian2()
 	}
+	m["IsGoStringType"] = func(typeName golang.TypeName) bool {
+		return typeName == "string" || typeName == "*string"
+	}
 
 	tpl := template.New("kitex").Funcs(m)
 	allTemplates := basicTemplates
