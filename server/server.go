@@ -61,10 +61,11 @@ type server struct {
 	svcs *services
 
 	// actual rpc service implement of biz
-	eps     endpoint.Endpoint
-	mws     []endpoint.Middleware
-	svr     remotesvr.Server
-	stopped sync.Once
+	eps       endpoint.Endpoint
+	mws       []endpoint.Middleware
+	svr       remotesvr.Server
+	stopped   sync.Once
+	isStarted bool
 
 	sync.Mutex
 }
@@ -179,6 +180,9 @@ func (s *server) buildInvokeChain() {
 
 // RegisterService should not be called by users directly.
 func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error {
+	if s.isStarted {
+		panic("service cannot be registered while server is running")
+	}
 	if svcInfo == nil {
 		panic("svcInfo is nil. please specify non-nil svcInfo")
 	}
@@ -250,6 +254,7 @@ func (s *server) Run() (err error) {
 	muStartHooks.Unlock()
 	s.Lock()
 	s.buildRegistryInfo(s.svr.Address())
+	s.isStarted = true
 	s.Unlock()
 
 	if err = s.waitExit(errCh); err != nil {
@@ -283,6 +288,7 @@ func (s *server) Stop() (err error) {
 				err = e
 			}
 			s.svr = nil
+			s.isStarted = false
 		}
 	})
 	return
