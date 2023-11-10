@@ -180,6 +180,8 @@ func (s *server) buildInvokeChain() {
 
 // RegisterService should not be called by users directly.
 func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error {
+	s.Lock()
+	defer s.Unlock()
 	if s.isRun {
 		panic("service cannot be registered while server is running")
 	}
@@ -193,8 +195,6 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
 	}
 
-	s.Lock()
-	defer s.Unlock()
 	s.svcs.addService(svcInfo, handler)
 	return nil
 }
