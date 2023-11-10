@@ -18,7 +18,9 @@ import (
 	"fmt"
 	"go/build"
 	"go/format"
+	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
@@ -249,4 +251,29 @@ func JoinPath(elem ...string) string {
 		return strings.ReplaceAll(filepath.Join(elem...), "\\", "/")
 	}
 	return filepath.Join(elem...)
+}
+
+// DownloadFile Download file to local
+func DownloadFile(remotePath, localPath string) error {
+	resp, err := http.Get(remotePath)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download file, http status: %s", resp.Status)
+	}
+
+	file, err := os.OpenFile(localPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		return err
+	}
+	return nil
 }
