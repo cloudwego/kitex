@@ -18,6 +18,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/cloudwego/thriftgo/config"
 	"gopkg.in/yaml.v3"
@@ -43,6 +45,19 @@ func Hessian2PreHook(cfg *generator.Config) {
 	for _, opt := range cfg.Hessian2Options {
 		runOption(cfg, opt)
 	}
+}
+
+func IsHessian2(a generator.Config) bool {
+	return strings.EqualFold(a.Protocol, "hessian2")
+}
+
+func EnableJavaExtension(a generator.Config) bool {
+	for _, v := range a.Hessian2Options {
+		if strings.EqualFold(v, JavaExtensionOption) {
+			return true
+		}
+	}
+	return false
 }
 
 // runOption Execute the corresponding function according to the option
@@ -123,4 +138,48 @@ func loadIDLRefConfig(file *os.File) *config.RawConfig {
 	}
 
 	return idlRefCfg
+}
+
+var JavaObjectRe = regexp.MustCompile(`\*java\.Object\b`)
+
+// ReplaceObject args is the arguments from command, subDirPath used for xx/xx/xx
+func ReplaceObject(args generator.Config, subDirPath string) error {
+	output := args.OutputPath
+	newPath := util.JoinPath(output, args.GenPath, subDirPath)
+	fs, err := ioutil.ReadDir(newPath)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range fs {
+		fileName := util.JoinPath(args.OutputPath, args.GenPath, subDirPath, f.Name())
+		if f.IsDir() {
+			subDirPath := util.JoinPath(subDirPath, f.Name())
+			if err = ReplaceObject(args, subDirPath); err != nil {
+				return err
+			}
+		} else if strings.HasSuffix(f.Name(), ".go") {
+			data, err := ioutil.ReadFile(fileName)
+			if err != nil {
+				return err
+			}
+
+			if err = replaceJavaObject(data, fileName); err != nil {
+				return err
+			}
+		}
+	}
+
+	handlerName := util.JoinPath(output, "handler.go")
+	handler, err := ioutil.ReadFile(handlerName)
+	if err != nil {
+		return err
+	}
+
+	return replaceJavaObject(handler, handlerName)
+}
+
+func replaceJavaObject(content []byte, fileName string) error {
+	content = JavaObjectRe.ReplaceAll(content, []byte("java.Object"))
+	return ioutil.WriteFile(fileName, content, 0o644)
 }
