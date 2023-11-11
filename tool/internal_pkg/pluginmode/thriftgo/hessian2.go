@@ -55,14 +55,25 @@ func runOption(cfg *generator.Config, opt string) {
 // runJavaExtensionOption Pull the extension file of java class from remote
 func runJavaExtensionOption(cfg *generator.Config) {
 	// get java.thrift
-	if p := util.JoinPath(filepath.Dir(cfg.IDL), "java.thrift"); !util.Exists(p) {
-		if err := util.DownloadFile(JavaThrift, p); err != nil {
+	if path := util.JoinPath(filepath.Dir(cfg.IDL), "java.thrift"); !util.Exists(path) {
+		if err := util.DownloadFile(JavaThrift, path); err != nil {
 			log.Warn("Downloading java.thrift file failed:", err.Error())
+			abs, err := filepath.Abs(path)
+			if err != nil {
+				abs = path
+			}
+			log.Warnf("You can try to download again. If the download still fails, you can choose to manually download \"%s\" to the local path \"%s\".", JavaThrift, abs)
 			os.Exit(1)
 		}
 	}
 
-	// load / create the idl-ref config file
+	// merge idl-ref configuration patch
+	patchIDLRefConfig(cfg)
+}
+
+// patchIDLRefConfig merge idl-ref configuration patch
+func patchIDLRefConfig(cfg *generator.Config) {
+	// load the idl-ref config file (create it first if it does not exist)
 	idlRef := filepath.Join(filepath.Dir(cfg.IDL), "idl-ref.yaml")
 	if !util.Exists(idlRef) {
 		idlRef = filepath.Join(filepath.Dir(cfg.IDL), "idl-ref.yml")
@@ -73,7 +84,7 @@ func runJavaExtensionOption(cfg *generator.Config) {
 		os.Exit(1)
 	}
 	defer file.Close()
-	idlRefCfg := loadIdlRefConfig(file)
+	idlRefCfg := loadIDLRefConfig(file)
 
 	// update the idl-ref config file
 	idlRefCfg.Ref["java.thrift"] = DubboCodec + "/java"
@@ -89,8 +100,8 @@ func runJavaExtensionOption(cfg *generator.Config) {
 	}
 }
 
-// loadIdlRefConfig load idl-ref config from file object
-func loadIdlRefConfig(file *os.File) *config.RawConfig {
+// loadIDLRefConfig load idl-ref config from file object
+func loadIDLRefConfig(file *os.File) *config.RawConfig {
 	data, err := io.ReadAll(file)
 	if err != nil {
 		log.Warnf("Read %s file failed: %s\n", file.Name(), err.Error())
