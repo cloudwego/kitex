@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"go/build"
 	"go/format"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -264,11 +263,11 @@ func DownloadFile(remotePath, localPath string) error {
 		return fmt.Errorf("failed to download file, http status: %s", resp.Status)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-	err = os.WriteFile(localPath, body, 0644)
+	err = ioutil.WriteFile(localPath, body, 0o644)
 	if err != nil {
 		return err
 	}

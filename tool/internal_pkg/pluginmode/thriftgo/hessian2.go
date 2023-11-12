@@ -15,15 +15,16 @@
 package thriftgo
 
 import (
-	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/cloudwego/thriftgo/config"
+	"gopkg.in/yaml.v3"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
-	"github.com/cloudwego/thriftgo/config"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -78,7 +79,7 @@ func patchIDLRefConfig(cfg *generator.Config) {
 	if !util.Exists(idlRef) {
 		idlRef = filepath.Join(filepath.Dir(cfg.IDL), "idl-ref.yml")
 	}
-	file, err := os.OpenFile(idlRef, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0644)
+	file, err := os.OpenFile(idlRef, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0o644)
 	if err != nil {
 		log.Warnf("Open %s file failed: %s\n", idlRef, err.Error())
 		os.Exit(1)
@@ -102,7 +103,7 @@ func patchIDLRefConfig(cfg *generator.Config) {
 
 // loadIDLRefConfig load idl-ref config from file object
 func loadIDLRefConfig(file *os.File) *config.RawConfig {
-	data, err := io.ReadAll(file)
+	data, err := ioutil.ReadAll(file)
 	if err != nil {
 		log.Warnf("Read %s file failed: %s\n", file.Name(), err.Error())
 		os.Exit(1)
