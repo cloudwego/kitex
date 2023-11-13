@@ -201,6 +201,7 @@ func (s *CBSuite) initServiceCB() {
 	}
 	opts := circuitbreaker.Options{
 		ShouldTripWithKey: s.svcTripFunc,
+		EnableShardP:      true,
 	}
 	s.servicePanel, _ = circuitbreaker.NewPanel(s.onServiceStateChange, opts)
 
@@ -226,6 +227,7 @@ func (s *CBSuite) initInstanceCB() {
 	}
 	opts := circuitbreaker.Options{
 		ShouldTripWithKey: s.insTripFunc,
+		EnableShardP:      true,
 	}
 	s.instancePanel, _ = circuitbreaker.NewPanel(s.onInstanceStateChange, opts)
 
