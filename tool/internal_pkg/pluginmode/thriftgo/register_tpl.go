@@ -57,7 +57,9 @@ func Get{{.GoName}}IDLAnnotations() map[string][]string {
 {{$resType := .ResType}}
 
 func (p *{{$argType.GoName}}) Encode(e codec.Encoder) error {
-    var err error
+{{- if gt (len $argType.Fields) 0}}
+	var err error
+{{- end}}
 {{- range $argType.Fields}}
 {{- $FieldName := .GoName}}
 	err = e.Encode(p.{{$FieldName}})
@@ -69,10 +71,12 @@ func (p *{{$argType.GoName}}) Encode(e codec.Encoder) error {
 }
 
 func (p *{{$argType.GoName}}) Decode(d codec.Decoder) error {
+{{- if gt (len $argType.Fields) 0}}
     var (
 		err error
 		v interface{}
 	)
+{{- end}}
 {{- range $argType.Fields}}
 {{- $Type := .Type }}
 {{- $FieldName := .GoName}}
@@ -90,7 +94,9 @@ func (p *{{$argType.GoName}}) Decode(d codec.Decoder) error {
 } {{/* encode decode */}}
 
 func (p *{{$resType.GoName}}) Encode(e codec.Encoder) error {
+{{- if gt (len $argType.Fields) 0}}
     var err error
+{{- end}}
 {{- range $resType.Fields}}
 {{- $FieldName := .GoName}}
 	err = e.Encode(p.{{$FieldName}})
@@ -102,10 +108,12 @@ func (p *{{$resType.GoName}}) Encode(e codec.Encoder) error {
 }
 
 func (p *{{$resType.GoName}}) Decode(d codec.Decoder) error {
+{{- if gt (len $argType.Fields) 0}}
     var (
 		err error
 		v interface{}
 	)
+{{- end}}
 {{- range $resType.Fields}}
 {{- $Type := .Type }}
 {{- $FieldName := .GoName}}
@@ -132,7 +140,9 @@ const structLikeProtocol = `
 {{define "StructLikeProtocol"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) Encode(e codec.Encoder) error {
+{{- if gt (len .Fields) 0}}
     var err error
+{{- end}}
 {{- range .Fields}}
 {{- $FieldName := .GoName}}
 	err = e.Encode(p.{{$FieldName}})
@@ -144,10 +154,12 @@ func (p *{{$TypeName}}) Encode(e codec.Encoder) error {
 }
 
 func (p *{{$TypeName}}) Decode(d codec.Decoder) error {
-    var (
+{{- if gt (len .Fields) 0}}
+	var (
 		err error
 		v interface{}
 	)
+{{- end}}
 {{- range .Fields}}
 {{- $Type := .Type }}
 {{- $FieldName := .GoName}}
