@@ -32,6 +32,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -46,6 +47,8 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	svcMap := map[string]*serviceinfo.ServiceInfo{}
+	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
 	svrOpt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
@@ -62,7 +65,7 @@ func TestMain(m *testing.M) {
 			EncodeFunc: nil,
 			DecodeFunc: nil,
 		},
-		SvcInfo:   mocks.ServiceInfo(),
+		SvcMap:    svcMap,
 		TracerCtl: &rpcinfo.TraceController{},
 	}
 	svrTransHdlr, _ = newSvrTransHandler(svrOpt)

@@ -266,7 +266,8 @@ func TestNoMethodInfo(t *testing.T) {
 		},
 	}
 	remote.NewTransPipeline(svrTransHdlr)
-	delete(svrOpt.SvcInfo.Methods, method)
+	svcInfo := svrOpt.SvcMap[mocks.MockServiceName]
+	delete(svcInfo.Methods, method)
 
 	// 2. test
 	ctx := context.Background()

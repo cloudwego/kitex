@@ -95,10 +95,14 @@ func (s *stream) RecvMsg(m interface{}) error {
 	ri := rpcinfo.GetRPCInfo(s.ctx)
 
 	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
+	payloadCodec, err := s.getPayloadCodecFromContentType()
+	if err != nil {
+		return err
+	}
+	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), payloadCodec))
 	defer msg.Recycle()
 
-	_, err := s.handler.Read(s.ctx, s.conn, msg)
+	_, err = s.handler.Read(s.ctx, s.conn, msg)
 	return err
 }
 
@@ -106,13 +110,32 @@ func (s *stream) SendMsg(m interface{}) error {
 	ri := rpcinfo.GetRPCInfo(s.ctx)
 
 	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), s.svcInfo.PayloadCodec))
+	payloadCodec, err := s.getPayloadCodecFromContentType()
+	if err != nil {
+		return err
+	}
+	msg.SetProtocolInfo(remote.NewProtocolInfo(ri.Config().TransportProtocol(), payloadCodec))
 	defer msg.Recycle()
 
-	_, err := s.handler.Write(s.ctx, s.conn, msg)
+	_, err = s.handler.Write(s.ctx, s.conn, msg)
 	return err
 }
 
 func (s *stream) Close() error {
 	return s.conn.Close()
+}
+
+func (s *stream) getPayloadCodecFromContentType() (serviceinfo.PayloadCodec, error) {
+	// TODO: handle other protocols in the future. currently only supports grpc
+	var subType string
+	switch sc := s.conn.(type) {
+	case *clientConn:
+		subType = sc.s.ContentSubtype()
+	case *serverConn:
+		subType = sc.s.ContentSubtype()
+	}
+	switch subType {
+	default:
+		return serviceinfo.Protobuf, nil
+	}
 }

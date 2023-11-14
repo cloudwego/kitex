@@ -29,7 +29,9 @@ import (
 // method name of mock
 const (
 	MockServiceName            = "MockService"
+	MockService2Name           = "MockService2"
 	MockMethod          string = "mock"
+	Mock2Method         string = "mock2"
 	MockExceptionMethod string = "mockException"
 	MockErrorMethod     string = "mockError"
 	MockOnewayMethod    string = "mockOneway"
@@ -60,7 +62,40 @@ func newServiceInfo() *serviceinfo.ServiceInfo {
 	return svcInfo
 }
 
+// ServiceInfo return mock serviceInfo
+func Service2Info() *serviceinfo.ServiceInfo {
+	return myServiceService2Info
+}
+
+var myServiceService2Info = newService2Info()
+
+func newService2Info() *serviceinfo.ServiceInfo {
+	methods := map[string]serviceinfo.MethodInfo{
+		"mock2": serviceinfo.NewMethodInfo(mock2Handler, NewMockArgs, NewMockResult, false),
+	}
+
+	svcInfo := &serviceinfo.ServiceInfo{
+		ServiceName: MockService2Name,
+		Methods:     methods,
+		Extra: map[string]interface{}{
+			"PackageName": "mock2",
+		},
+	}
+	return svcInfo
+}
+
 func mockHandler(ctx context.Context, handler, args, result interface{}) error {
+	a := args.(*myServiceMockArgs)
+	r := result.(*myServiceMockResult)
+	reply, err := handler.(MyService).Mock(ctx, a.Req)
+	if err != nil {
+		return err
+	}
+	r.Success = reply
+	return nil
+}
+
+func mock2Handler(ctx context.Context, handler, args, result interface{}) error {
 	a := args.(*myServiceMockArgs)
 	r := result.(*myServiceMockResult)
 	reply, err := handler.(MyService).Mock(ctx, a.Req)
@@ -126,6 +161,7 @@ type MyService interface {
 	MockException(ctx context.Context, req *MyRequest) (r *MyResponse, err error)
 	MockError(ctx context.Context, req *MyRequest) (r *MyResponse, err error)
 	MockOneway(ctx context.Context, req *MyRequest) (err error)
+	Mock2(ctx context.Context, req *MyRequest) (r *MyResponse, err error)
 }
 
 type myServiceMockArgs struct {
@@ -203,6 +239,13 @@ func (h *myServiceHandler) Mock(ctx context.Context, req *MyRequest) (r *MyRespo
 		return h.mockFunc(ctx, req)
 	}
 	return &MyResponse{Name: MockMethod}, nil
+}
+
+func (h *myServiceHandler) Mock2(ctx context.Context, req *MyRequest) (r *MyResponse, err error) {
+	if h.mockFunc != nil {
+		return h.mockFunc(ctx, req)
+	}
+	return &MyResponse{Name: Mock2Method}, nil
 }
 
 func (h *myServiceHandler) MockException(ctx context.Context, req *MyRequest) (r *MyResponse, err error) {

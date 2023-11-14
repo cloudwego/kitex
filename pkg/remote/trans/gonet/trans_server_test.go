@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -56,7 +57,7 @@ func TestMain(m *testing.M) {
 			EncodeFunc: nil,
 			DecodeFunc: nil,
 		},
-		SvcInfo:   mocks.ServiceInfo(),
+		SvcMap:    map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
 		TracerCtl: &rpcinfo.TraceController{},
 	}
 	svrTransHdlr, _ = newSvrTransHandler(svrOpt)
