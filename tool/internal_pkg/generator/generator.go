@@ -111,6 +111,7 @@ type Config struct {
 	Includes              util.StringSlice
 	ThriftOptions         util.StringSlice
 	ProtobufOptions       util.StringSlice
+	Hessian2Options       util.StringSlice
 	IDL                   string // the IDL file passed on the command line
 	OutputPath            string // the output path for main pkg and kitex_gen
 	PackagePrefix         string
