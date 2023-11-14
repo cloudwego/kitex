@@ -292,7 +292,6 @@ func (s *server) Stop() (err error) {
 				err = e
 			}
 			s.svr = nil
-			s.isRun = false
 		}
 	})
 	return
@@ -516,7 +515,7 @@ func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
 		extra["address"] = lAddr
 		extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
 		si.Extra = extra
-		s.svcs.addService(si, svc.handler)
+		svc.svcInfo = si
 	}
 }
 
