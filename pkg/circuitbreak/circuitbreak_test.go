@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/bytedance/gopkg/cloud/circuitbreaker"
 
@@ -88,6 +89,36 @@ func (m *mockPanel) Succeed(key string) {
 	m.succeedRecorded = true
 }
 
+func (m *mockPanel) DumpBreakers() map[string]circuitbreaker.Breaker {
+	return map[string]circuitbreaker.Breaker{
+		"Breaker": &mockBreaker{},
+	}
+}
+
+type mockBreaker struct {
+	circuitbreaker.Breaker
+}
+
+func (b *mockBreaker) State() circuitbreaker.State {
+	return circuitbreaker.Closed
+}
+
+func (b *mockBreaker) Metricer() circuitbreaker.Metricer {
+	return &mockMetricer{}
+}
+
+type mockMetricer struct {
+	circuitbreaker.Metricer
+}
+
+func (m *mockMetricer) Failures() int64 {
+	return 0
+}
+
+func (m *mockMetricer) Timeouts() int64 {
+	return 0
+}
+
 func TestNewCircuitBreakerMW(t *testing.T) {
 	ctl := Control{
 		GetKey:        mockGetKey,
@@ -100,8 +131,13 @@ func TestNewCircuitBreakerMW(t *testing.T) {
 	}
 	mp := &mockPanel{Panel: panel}
 	cbMW := NewCircuitBreakerMW(ctl, mp)
-	// test disabled
 	ctx := context.Background()
+	ctx = context.WithValue(ctx, ctxKey, allowed)
+	ctx = context.WithValue(ctx, ctxEnabled, true)
+	ctx = context.WithValue(ctx, ctxErrorType, TypeFailure)
+	test.Assert(t, errors.Is(cbMW(invoke)(ctx, nil, nil), errFake))
+	test.Assert(t, !mp.judged)
+	// test disabled
 	ctx = context.WithValue(ctx, ctxKey, allowed)
 	ctx = context.WithValue(ctx, ctxEnabled, false)
 	test.Assert(t, errors.Is(cbMW(invoke)(ctx, nil, nil), errFake))
@@ -147,6 +183,10 @@ func TestRecordStat(t *testing.T) {
 	cbMW(invoke)(ctx, nil, nil)
 	test.Assert(t, mp.failRecorded)
 	// test success
+	ctx = context.WithValue(ctx, ctxErrorType, TypeSuccess)
+	cbMW(invoke)(ctx, nil, nil)
+	test.Assert(t, mp.succeedRecorded)
+	// test success
 	mp = &mockPanel{Panel: panel}
 	cbMW = NewCircuitBreakerMW(ctl, mp)
 	ctx = context.Background()
@@ -154,7 +194,40 @@ func TestRecordStat(t *testing.T) {
 	ctx = context.WithValue(ctx, ctxEnabled, true)
 	ctx = context.WithValue(ctx, ctxErrorType, TypeSuccess)
 	cbMW(invoke)(ctx, nil, nil)
+	test.Assert(t, !mp.succeedRecorded)
+}
+
+func TestCircuitBreakerTick(t *testing.T) {
+	ctl := Control{
+		GetKey:        mockGetKey,
+		GetErrorType:  mockGetErrorType,
+		DecorateError: mockDecorateError,
+	}
+	panel, err := circuitbreaker.NewPanel(nil, circuitbreaker.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// test timeout
+	mp := &mockPanel{Panel: panel}
+	cbMW := NewCircuitBreakerMW(ctl, mp)
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, ctxKey, allowed)
+	ctx = context.WithValue(ctx, ctxEnabled, true)
+	ctx = context.WithValue(ctx, ctxErrorType, TypeFailure)
+	cbMW(invoke)(ctx, nil, nil)
+	test.Assert(t, !mp.judged)
+	test.Assert(t, mp.failRecorded)
+	// test success
+	ctx = context.WithValue(ctx, ctxErrorType, TypeSuccess)
+	cbMW(invoke)(ctx, nil, nil)
+	test.Assert(t, mp.judged)
 	test.Assert(t, mp.succeedRecorded)
+	mp.judged = false
+	mp.succeedRecorded = false
+	time.Sleep(cbTickDuration + time.Second)
+	cbMW(invoke)(ctx, nil, nil)
+	test.Assert(t, !mp.judged)
+	test.Assert(t, !mp.succeedRecorded)
 }
 
 func TestErrorType(t *testing.T) {
