@@ -308,7 +308,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 		for _, inc := range a.Includes {
 			cmd.Args = append(cmd.Args, "-i", inc)
 		}
-		if strings.EqualFold(a.Protocol, "hessian2") {
+		if thriftgo.IsHessian2(a.Config) {
 			thriftgo.Hessian2PreHook(&a.Config)
 		}
 		a.ThriftOptions = append(a.ThriftOptions, "package_prefix="+a.PackagePrefix)
