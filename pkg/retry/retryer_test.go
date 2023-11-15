@@ -422,86 +422,93 @@ func TestRetryWithOneTimePolicy(t *testing.T) {
 
 // test specified error to retry
 func TestSpecifiedErrorRetry(t *testing.T) {
-	var callTimes int32
-	retryWithTransError := func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
-		newVal := atomic.AddInt32(&callTimes, 1)
-		if newVal == 1 {
-			return genRPCInfo(), nil, remote.NewTransErrorWithMsg(1000, "mock")
-		} else {
-			return genRPCInfoWithRemoteTag(remoteTags), nil, nil
+	retryWithTransError := func(callTimes int32) RPCCallFunc {
+		// fails for the first call if callTimes is initialized to 0
+		return func(ctx context.Context, r Retryer) (rpcinfo.RPCInfo, interface{}, error) {
+			newVal := atomic.AddInt32(&callTimes, 1)
+			if newVal == 1 {
+				return genRPCInfo(), nil, remote.NewTransErrorWithMsg(1000, "mock")
+			} else {
+				return genRPCInfoWithRemoteTag(remoteTags), nil, nil
+			}
 		}
 	}
-	ctx := context.Background()
 	ri := genRPCInfo()
-	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+
 	// case1: specified method retry with error
-	rc := NewRetryContainer()
-	shouldResultRetry := &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
-		if ri.To().Method() == method {
-			if te, ok := err.(*remote.TransError); ok && te.TypeID() == 1000 {
-				return true
+	t.Run("case1", func(t *testing.T) {
+		rc := NewRetryContainer()
+		shouldResultRetry := &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+			if ri.To().Method() == method {
+				if te, ok := err.(*remote.TransError); ok && te.TypeID() == 1000 {
+					return true
+				}
 			}
-		}
-		return false
-	}}
-	err := rc.Init(map[string]Policy{Wildcard: BuildFailurePolicy(NewFailurePolicy())}, shouldResultRetry)
-	test.Assert(t, err == nil, err)
-	ri, ok, err := rc.WithRetryIfNeeded(ctx, &Policy{}, retryWithTransError, ri, nil)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, !ok)
-	v, ok := ri.To().Tag(remoteTagKey)
-	test.Assert(t, ok)
-	test.Assert(t, v == remoteTagValue)
+			return false
+		}}
+		err := rc.Init(map[string]Policy{Wildcard: BuildFailurePolicy(NewFailurePolicy())}, shouldResultRetry)
+		test.Assert(t, err == nil, err)
+		ri, ok, err := rc.WithRetryIfNeeded(ctx, &Policy{}, retryWithTransError(0), ri, nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, !ok)
+		v, ok := ri.To().Tag(remoteTagKey)
+		test.Assert(t, ok)
+		test.Assert(t, v == remoteTagValue)
+	})
 
 	// case2: specified method retry with error, but use backup request config cannot be effective
-	atomic.StoreInt32(&callTimes, 0)
-	shouldResultRetry = &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
-		if ri.To().Method() == method {
-			if te, ok := err.(*remote.TransError); ok && te.TypeID() == 1000 {
-				return true
+	t.Run("case2", func(t *testing.T) {
+		shouldResultRetry := &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+			if ri.To().Method() == method {
+				if te, ok := err.(*remote.TransError); ok && te.TypeID() == 1000 {
+					return true
+				}
 			}
-		}
-		return false
-	}}
-	rc = NewRetryContainer()
-	err = rc.Init(map[string]Policy{Wildcard: BuildBackupRequest(NewBackupPolicy(10))}, shouldResultRetry)
-	test.Assert(t, err == nil, err)
-	ri = genRPCInfo()
-	_, ok, err = rc.WithRetryIfNeeded(ctx, &Policy{}, retryWithTransError, ri, nil)
-	test.Assert(t, err != nil, err)
-	test.Assert(t, !ok)
+			return false
+		}}
+		rc := NewRetryContainer()
+		err := rc.Init(map[string]Policy{Wildcard: BuildBackupRequest(NewBackupPolicy(10))}, shouldResultRetry)
+		test.Assert(t, err == nil, err)
+		ri = genRPCInfo()
+		_, ok, err := rc.WithRetryIfNeeded(ctx, &Policy{}, retryWithTransError(0), ri, nil)
+		test.Assert(t, err != nil, err)
+		test.Assert(t, !ok)
+	})
 
 	// case3: specified method retry with error, but method not match
-	atomic.StoreInt32(&callTimes, 0)
-	shouldResultRetry = &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
-		if ri.To().Method() != method {
-			if te, ok := err.(*remote.TransError); ok && te.TypeID() == 1000 {
-				return true
+	t.Run("case3", func(t *testing.T) {
+		shouldResultRetry := &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+			if ri.To().Method() != method {
+				if te, ok := err.(*remote.TransError); ok && te.TypeID() == 1000 {
+					return true
+				}
 			}
-		}
-		return false
-	}}
-	rc = NewRetryContainer()
-	err = rc.Init(map[string]Policy{method: BuildFailurePolicy(NewFailurePolicy())}, shouldResultRetry)
-	test.Assert(t, err == nil, err)
-	ri = genRPCInfo()
-	ri, ok, err = rc.WithRetryIfNeeded(ctx, &Policy{}, retryWithTransError, ri, nil)
-	test.Assert(t, err != nil)
-	test.Assert(t, !ok)
-	_, ok = ri.To().Tag(remoteTagKey)
-	test.Assert(t, !ok)
+			return false
+		}}
+		rc := NewRetryContainer()
+		err := rc.Init(map[string]Policy{method: BuildFailurePolicy(NewFailurePolicy())}, shouldResultRetry)
+		test.Assert(t, err == nil, err)
+		ri = genRPCInfo()
+		ri, ok, err := rc.WithRetryIfNeeded(ctx, &Policy{}, retryWithTransError(0), ri, nil)
+		test.Assert(t, err != nil)
+		test.Assert(t, !ok)
+		_, ok = ri.To().Tag(remoteTagKey)
+		test.Assert(t, !ok)
+	})
 
 	// case4: all error retry
-	atomic.StoreInt32(&callTimes, 0)
-	rc = NewRetryContainer()
-	p := BuildFailurePolicy(NewFailurePolicyWithResultRetry(AllErrorRetry()))
-	ri = genRPCInfo()
-	ri, ok, err = rc.WithRetryIfNeeded(ctx, &p, retryWithTransError, ri, nil)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, !ok)
-	v, ok = ri.To().Tag(remoteTagKey)
-	test.Assert(t, ok)
-	test.Assert(t, v == remoteTagValue)
+	t.Run("case4", func(t *testing.T) {
+		rc := NewRetryContainer()
+		p := BuildFailurePolicy(NewFailurePolicyWithResultRetry(AllErrorRetry()))
+		ri = genRPCInfo()
+		ri, ok, err := rc.WithRetryIfNeeded(ctx, &p, retryWithTransError(0), ri, nil)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, !ok)
+		v, ok := ri.To().Tag(remoteTagKey)
+		test.Assert(t, ok)
+		test.Assert(t, v == remoteTagValue)
+	})
 }
 
 // test specified resp to retry
