@@ -23,6 +23,7 @@ import (
 	"net"
 	"runtime/debug"
 
+	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -159,6 +160,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		return err
 	}
 
+	var result interface{}
 	// heartbeat processing
 	// recvMsg.MessageType would be set to remote.Heartbeat in previous Read procedure
 	// if specified codec support heartbeat
@@ -177,7 +179,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		if methodInfo.OneWay() {
 			sendMsg = remote.NewMessage(nil, t.svcInfo, ri, remote.Reply, remote.Server)
 		} else {
-			sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, ri, remote.Reply, remote.Server)
+			result = methodInfo.NewResult()
+			sendMsg = remote.NewMessage(result, t.svcInfo, ri, remote.Reply, remote.Server)
 		}
 
 		ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
@@ -198,6 +201,11 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	if ctx, err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
 		t.OnError(ctx, err, conn)
 		return err
+	}
+	if result != nil {
+		if rr, ok := result.(internal.Reusable); ok {
+			rr.Recycle()
+		}
 	}
 	return
 }
