@@ -295,10 +295,12 @@ func (r *failureRetryer) Dump() map[string]interface{} {
 
 func (r *failureRetryer) setSpecifiedResultRetryIfNeeded(rr *ShouldResultRetry) {
 	if rr != nil {
+		// save the object specified by client.WithSpecifiedResultRetry(..)
 		r.specifiedResultRetry = rr
 	}
-	if r.policy != nil && r.policy.ShouldResultRetry == nil {
-		// The priority of FailurePolicy.ShouldResultRetry is higher, so only update it when it's nil
+	if r.policy != nil && r.specifiedResultRetry != nil {
+		// The priority of client.WithSpecifiedResultRetry(..) is higher, so always update it
+		// NOTE: client.WithSpecifiedResultRetry(..) will always reject a nil object
 		r.policy.ShouldResultRetry = r.specifiedResultRetry
 	}
 }
