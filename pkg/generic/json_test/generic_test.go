@@ -75,6 +75,13 @@ func testThrift(t *testing.T) {
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), "world")
 
+	// extend method
+	resp, err = cli.GenericCall(context.Background(), "ExtendMethod", reqExtendMsg, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	respStr, ok = resp.(string)
+	test.Assert(t, ok)
+	test.Assert(t, respStr == reqExtendMsg)
+
 	svr.Stop()
 }
 
