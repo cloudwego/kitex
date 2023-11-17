@@ -17,12 +17,24 @@
 package rpcinfo
 
 import (
+	"os"
 	"sync"
+
+	goid "github.com/choleraehyq/pid"
 
 	"github.com/cloudwego/kitex/internal"
 )
 
-var rpcInfoPool sync.Pool
+var (
+	rpcInfoPool sync.Pool
+	forceCheck  = true
+)
+
+func init() {
+	if os.Getenv("KITEX_RPCINFO_DISABLE_CHECK") != "" {
+		forceCheck = false
+	}
+}
 
 type rpcInfo struct {
 	from       EndpointInfo
@@ -30,22 +42,46 @@ type rpcInfo struct {
 	invocation Invocation
 	config     RPCConfig
 	stats      RPCStats
+	gid        int64
+}
+
+func (r *rpcInfo) checkGid() {
+	if forceCheck && goid.Get() != r.gid {
+		panic("unexpected reference of RPCInfo in another goroutine. " +
+			"Please use the return value of FreezeRPCInfo(rpcinfo) before passing rpcinfo to new goroutines, " +
+			"or disable the pool by `rpcinfo.EnablePool(false)`")
+	}
 }
 
 // From implements the RPCInfo interface.
-func (r *rpcInfo) From() EndpointInfo { return r.from }
+func (r *rpcInfo) From() EndpointInfo {
+	r.checkGid()
+	return r.from
+}
 
 // To implements the RPCInfo interface.
-func (r *rpcInfo) To() EndpointInfo { return r.to }
+func (r *rpcInfo) To() EndpointInfo {
+	r.checkGid()
+	return r.to
+}
 
 // Config implements the RPCInfo interface.
-func (r *rpcInfo) Config() RPCConfig { return r.config }
+func (r *rpcInfo) Config() RPCConfig {
+	r.checkGid()
+	return r.config
+}
 
 // Invocation implements the RPCInfo interface.
-func (r *rpcInfo) Invocation() Invocation { return r.invocation }
+func (r *rpcInfo) Invocation() Invocation {
+	r.checkGid()
+	return r.invocation
+}
 
 // Stats implements the RPCInfo interface.
-func (r *rpcInfo) Stats() RPCStats { return r.stats }
+func (r *rpcInfo) Stats() RPCStats {
+	r.checkGid()
+	return r.stats
+}
 
 func (r *rpcInfo) zero() {
 	r.from = nil
@@ -88,6 +124,7 @@ func NewRPCInfo(from, to EndpointInfo, ink Invocation, config RPCConfig, stats R
 	r.invocation = ink
 	r.config = config
 	r.stats = stats
+	r.gid = goid.Get()
 	return r
 }
 
