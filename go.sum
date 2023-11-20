@@ -48,8 +48,8 @@ github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDk
 github.com/cloudwego/configmanager v0.2.0 h1:niVpVg+wQ+npNqnH3dup96SMbR02Pk+tNErubYCJqKo=
 github.com/cloudwego/configmanager v0.2.0/go.mod h1:FLIQTjxsZRGjnmDhTttWQTy6f6DghPTatfBVOs2gQLk=
 github.com/cloudwego/dynamicgo v0.1.0/go.mod h1:Mdsz0XGsIImi15vxhZaHZpspNChEmBMIiWkUfD6JDKg=
-github.com/cloudwego/dynamicgo v0.1.4 h1:CFb2nOZbAHw1YZLyn5laStReTYuh3AP0lLs5aRkGDuo=
-github.com/cloudwego/dynamicgo v0.1.4/go.mod h1:WzbIYLbhR4tjUhEMmRZRNIQXZu5J18oPurGDj5UmU9I=
+github.com/cloudwego/dynamicgo v0.1.5 h1:HLyPL31uFbdWlZl/a2h3eLW5hF6lGr/K/XDnwXQlCSc=
+github.com/cloudwego/dynamicgo v0.1.5/go.mod h1:WzbIYLbhR4tjUhEMmRZRNIQXZu5J18oPurGDj5UmU9I=
 github.com/cloudwego/fastpb v0.0.3/go.mod h1:/V13XFTq2TUkxj2qWReV8MwfPC4NnPcy6FsrojnsSG0=
 github.com/cloudwego/fastpb v0.0.4 h1:/ROVVfoFtpfc+1pkQLzGs+azjxUbSOsAqSY4tAAx4mg=
 github.com/cloudwego/fastpb v0.0.4/go.mod h1:/V13XFTq2TUkxj2qWReV8MwfPC4NnPcy6FsrojnsSG0=
