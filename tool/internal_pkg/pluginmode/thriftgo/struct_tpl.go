@@ -76,8 +76,12 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 		{{if gt (len .Fields) 0 -}}
 		switch fieldId {
 		{{- range .Fields}}
+		{{- $isBaseVal := .Type | IsBaseType}}
 		case {{.ID}}:
 			if fieldTypeId == thrift.{{.Type | GetTypeIDConstant }} {
+				{{- if Features.WithFieldMask}}
+				if {{if $isBaseVal}}_{{else}}nfm{{end}}, ex := p._fieldmask.Field(fieldId); ex {
+				{{- end}}
 				l, err = p.FastReadField{{Str .ID}}(buf[offset:])
 				offset += l
 				if err != nil {
@@ -86,12 +90,15 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 				{{- if .Requiredness.IsRequired}}
 				isset{{.GoName}} = true
 				{{- end}}
-			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
-				offset += l
-				if err != nil {
-					goto SkipFieldError
+				break
+				{{- if Features.WithFieldMask}}
 				}
+				{{- end}}
+			}
+			l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+			offset += l
+			if err != nil {
+				goto SkipFieldError
 			}
 		{{- end}}{{/* range .Fields */}}
 		default:
@@ -171,9 +178,10 @@ const structLikeFastReadField = `
 {{- $TypeName := .GoName}}
 {{- range .Fields}}
 {{$FieldName := .GoName}}
-func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte) (int, error) {
+{{- $isBaseVal := .Type | IsBaseType -}}
+func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte{{if and Features.WithFieldMask (not $isBaseVal)}}, fm *fieldmask.FieldMask{{end}}) (int, error) {
 	offset := 0
-	{{- $ctx := MkRWCtx .}}
+	{{- $ctx := (MkRWCtx .).WithFieldMask "fm" -}}
 	{{ template "FieldFastRead" $ctx}}
 	return offset, nil
 }
@@ -229,7 +237,14 @@ func (p *{{$TypeName}}) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryW
 	if p != nil {
 		{{- $reorderedFields := ReorderStructFields .Fields}}
 		{{- range $reorderedFields}}
-		offset += p.fastWriteField{{Str .ID}}(buf[offset:], binaryWriter)
+		{{- $isBaseVal := .Type | IsBaseType}}
+		{{- if Features.WithFieldMask}}
+		if {{if $isBaseVal}}_{{else}}nfm{{end}}, ex := p._fieldmask.Field({{.ID}}); ex { 
+		{{- end}}
+		offset += p.fastWriteField{{Str .ID}}(buf[offset:], binaryWriter{{if and Features.WithFieldMask (not $isBaseVal)}}, nfm{{end}})
+		{{- if Features.WithFieldMask}}
+		}
+		{{- end}}
 		{{- end}}
 		{{- if Features.KeepUnknownFields}}
 		offset += copy(buf[offset:], p._unknownFields)
@@ -285,13 +300,14 @@ const structLikeFastWriteField = `
 {{- range .Fields}}
 {{- $FieldName := .GoName}}
 {{- $TypeID := .Type | GetTypeIDConstant }}
-func (p *{{$TypeName}}) fastWriteField{{Str .ID}}(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+{{- $isBaseVal := .Type | IsBaseType -}}
+func (p *{{$TypeName}}) fastWriteField{{Str .ID}}(buf []byte, binaryWriter bthrift.BinaryWriter{{if and Features.WithFieldMask (not $isBaseVal)}}, fm *fieldmask.FieldMask{{end}}) int {
 	offset := 0
 	{{- if .Requiredness.IsOptional}}
 	if p.{{.IsSetter}}() {
 	{{- end}}
 	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "{{.Name}}", thrift.{{$TypeID}}, {{.ID}})
-	{{- $ctx := MkRWCtx .}}
+	{{- $ctx := (MkRWCtx .).WithFieldMask "fm"}}
 	{{- template "FieldFastWrite" $ctx}}
 	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
 	{{- if .Requiredness.IsOptional}}
@@ -346,6 +362,9 @@ const fieldFastReadStructLike = `
 	{{- else}}
 	tmp := {{.TypeName.Deref.NewFunc}}()
 	{{- end}}
+	{{- if Features.WithFieldMask}}
+	{{.Target}}.SetFieldMask({{.FieldMask}})
+	{{- end}}
 	if l, err := {{- if .NeedDecl}}{{.Target}}{{else}}tmp{{end}}.FastRead(buf[offset:]); err != nil {
 		return offset, err
 	} else {
@@ -397,6 +416,10 @@ const fieldFastReadContainer = `
 
 const fieldFastReadMap = `
 {{define "FieldFastReadMap"}}
+{{- $isIntKey := .KeyCtx.Type | IsIntType -}}
+{{- $isStrKey := .KeyCtx.Type | IsStrType -}}
+{{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
+{{- $curFieldMask := .FieldMask -}}
 	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
 	offset += l
 	if err != nil {
@@ -407,9 +430,30 @@ const fieldFastReadMap = `
 		{{- $key := .GenID "_key"}}
 		{{- $ctx := .KeyCtx.WithDecl.WithTarget $key}}
 		{{- template "FieldFastRead" $ctx}}
+		{{- if Features.WithFieldMask}}
+		{{- if $isIntKey}}
+		{{- $curFieldMask = "nfm"}}
+		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(int({{$key}})); !ex {
+			if err := iprot.Skip(thrift.{{.ValCtx.Type | GetTypeIDConstant}}); err != nil {
+				return err
+			}
+			continue
+		} else {
+		{{- else if $isStrKey}}
+		{{- $curFieldMask = "nfm"}}
+		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Str(string({{$key}})); !ex {
+			if err := iprot.Skip(thrift.{{.ValCtx.Type | GetTypeIDConstant}}); err != nil {
+				return err
+			}
+			continue
+		} else {
+		{{- else}}
+		{{$curFieldMask}} = nil
+		{{- end}}
+		{{- end}}{{/* end WithFieldMask */}}
 		{{/* line break */}}
 		{{- $val := .GenID "_val"}}
-		{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
+		{{- $ctx := (.ValCtx.WithDecl.WithTarget $val).WithFieldMask $curFieldMask}}
 		{{- template "FieldFastRead" $ctx}}
 
 		{{if and .ValCtx.Type.Category.IsStructLike Features.ValueTypeForSIC}}
@@ -417,6 +461,9 @@ const fieldFastReadMap = `
 		{{end}}
 
 		{{.Target}}[{{$key}}] = {{$val}}
+		{{- if and Features.WithFieldMask (or $isIntKey $isStrKey)}}
+		}
+		{{- end}}
 	}
 	if l, err := bthrift.Binary.ReadMapEnd(buf[offset:]); err != nil {
 		return offset, err
@@ -428,6 +475,8 @@ const fieldFastReadMap = `
 
 const fieldFastReadSet = `
 {{define "FieldFastReadSet"}}
+{{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
+{{- $curFieldMask := .FieldMask -}}
 	_, size, l, err := bthrift.Binary.ReadSetBegin(buf[offset:])
 	offset += l
 	if err != nil {
@@ -436,7 +485,16 @@ const fieldFastReadSet = `
 	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, 0, size)
 	for i := 0; i < size; i++ {
 		{{- $val := .GenID "_elem"}}
-		{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
+		{{- if Features.WithFieldMask}}
+		{{- $curFieldMask = "nfm"}}
+		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(i); !ex {
+			if err := iprot.Skip(thrift.{{.ValCtx.Type | GetTypeIDConstant}}); err != nil {
+				return err
+			}
+			continue
+		} else {
+		{{- end}}
+		{{- $ctx := (.ValCtx.WithDecl.WithTarget $val).WithFieldMask $curFieldMask}}
 		{{- template "FieldFastRead" $ctx}}
 
 		{{if and .ValCtx.Type.Category.IsStructLike Features.ValueTypeForSIC}}
@@ -444,6 +502,9 @@ const fieldFastReadSet = `
 		{{end}}
 
 		{{.Target}} = append({{.Target}}, {{$val}})
+		{{- if Features.WithFieldMask}}
+		}
+		{{- end}}
 	}
 	if l, err := bthrift.Binary.ReadSetEnd(buf[offset:]); err != nil {
 		return offset, err
@@ -455,6 +516,8 @@ const fieldFastReadSet = `
 
 const fieldFastReadList = `
 {{define "FieldFastReadList"}}
+{{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
+{{- $curFieldMask := .FieldMask -}}
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
 	offset += l
 	if err != nil {
@@ -463,7 +526,16 @@ const fieldFastReadList = `
 	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, 0, size)
 	for i := 0; i < size; i++ {
 		{{- $val := .GenID "_elem"}}
-		{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
+		{{- if Features.WithFieldMask}}
+		{{- $curFieldMask = "nfm"}}
+		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(i); !ex {
+			if err := iprot.Skip(thrift.{{.ValCtx.Type | GetTypeIDConstant}}); err != nil {
+				return err
+			}
+			continue
+		} else {
+		{{- end}}
+		{{- $ctx := (.ValCtx.WithDecl.WithTarget $val).WithFieldMask $curFieldMask}}
 		{{- template "FieldFastRead" $ctx}}
 
 		{{if and .ValCtx.Type.Category.IsStructLike Features.ValueTypeForSIC}}
@@ -471,6 +543,9 @@ const fieldFastReadList = `
 		{{end}}
 
 		{{.Target}} = append({{.Target}}, {{$val}})
+		{{- if Features.WithFieldMask}}
+		}
+		{{- end}}
 	}
 	if l, err := bthrift.Binary.ReadListEnd(buf[offset:]); err != nil {
 		return offset, err
@@ -657,12 +732,22 @@ const fieldLength = `
 
 const fieldFastWriteStructLike = `
 {{define "FieldFastWriteStructLike"}}
+	{{- if Features.WithFieldMask}}
+	if {{.Target}} != nil {
+		{{.Target}}.SetFieldMask({{.FieldMask}})
+	}
+	{{- end}}
 	offset += {{.Target}}.FastWriteNocopy(buf[offset:], binaryWriter)
 {{- end}}{{/* define "FieldFastWriteStructLike" */}}
 `
 
 const fieldStructLikeLength = `
 {{define "FieldStructLikeLength"}}
+{{- if Features.WithFieldMask}}
+	if {{.Target}} != nil {
+		{{.Target}}.SetFieldMask({{.FieldMask}})
+	}
+	{{- end}}
 	l += {{.Target}}.BLength()
 {{- end}}{{/* define "FieldStructLikeLength" */}}
 `
@@ -728,17 +813,42 @@ const fieldContainerLength = `
 
 const fieldFastWriteMap = `
 {{define "FieldFastWriteMap"}}
+{{- $isIntKey := .KeyCtx.Type | IsIntType -}}
+{{- $isStrKey := .KeyCtx.Type | IsStrType -}}
+{{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
+{{- $curFieldMask := .FieldMask -}}
+	{{- if and Features.WithFieldMask (or $isIntKey $isStrKey) }}
+	{{- }}
 	mapBeginOffset := offset
 	offset += bthrift.Binary.MapBeginLength(thrift.
 	{{- .KeyCtx.Type | GetTypeIDConstant -}}
 	, thrift.{{- .ValCtx.Type | GetTypeIDConstant -}}, 0)
 	var length int
 	for k, v := range {{.Target}}{
+		{{- if Features.WithFieldMask}}
+		{{- if $isIntKey}}
+		{{- $curFieldMask = "nfm"}}
+		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(int(k)); !ex {
+			continue
+		} else {
+		{{- else if $isStrKey}}
+		{{- $curFieldMask = "nfm"}}
+		ks := string(k)
+		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Str(ks); !ex {
+			continue
+		} else {
+		{{- else}}
+		{{$curFieldMask}} = nil
+		{{- end}}
+		{{- end}}{{/* end Features.WithFieldMask */}}
 		length++
 		{{$ctx := .KeyCtx.WithTarget "k"}}
 		{{- template "FieldFastWrite" $ctx}}
-		{{$ctx := .ValCtx.WithTarget "v"}}
+		{{- $ctx := (.ValCtx.WithTarget "v").WithFieldMask $curFieldMask -}}
 		{{- template "FieldFastWrite" $ctx}}
+		{{- if and Features.WithFieldMask (or $isIntKey $isStrKey)}}
+		}
+		{{- end}}
 	}
 	bthrift.Binary.WriteMapBegin(buf[mapBeginOffset:], thrift.
 		{{- .KeyCtx.Type | GetTypeIDConstant -}}
@@ -750,6 +860,10 @@ const fieldFastWriteMap = `
 
 const fieldMapLength = `
 {{define "FieldMapLength"}}
+{{- $isIntKey := .KeyCtx.Type | IsIntType -}}
+{{- $isStrKey := .KeyCtx.Type | IsStrType -}}
+{{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
+{{- $curFieldMask := .FieldMask -}}
 	l += bthrift.Binary.MapBeginLength(thrift.
 		{{- .KeyCtx.Type | GetTypeIDConstant -}}
 		, thrift.{{- .ValCtx.Type | GetTypeIDConstant -}}
@@ -763,10 +877,29 @@ const fieldMapLength = `
 		{{- template "FieldFixedLengthTypeLength" $ctx}}) * len({{.Target}})
 	{{- else}}
 	for k, v := range {{.Target}}{
+		{{- if Features.WithFieldMask}}
+		{{- if $isIntKey}}
+		{{- $curFieldMask = "nfm"}}
+		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(int(k)); !ex {
+			continue
+		} else {
+		{{- else if $isStrKey}}
+		{{- $curFieldMask = "nfm"}}
+		ks := string(k)
+		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Str(ks); !ex {
+			continue
+		} else {
+		{{- else}}
+		{{$curFieldMask}} = nil
+		{{- end}}
+		{{- end}}{{/* end Features.WithFieldMask */}}
 		{{$ctx := .KeyCtx.WithTarget "k"}}
 		{{- template "FieldLength" $ctx}}
-		{{$ctx := .ValCtx.WithTarget "v"}}
+		{{- $ctx := (.ValCtx.WithTarget "v").WithFieldMask $curFieldMask -}}
 		{{- template "FieldLength" $ctx}}
+		{{- if and Features.WithFieldMask (or $isIntKey $isStrKey)}}
+		}
+		{{- end}}
 	}
 	{{- end}}{{/* if */}}
 	l += bthrift.Binary.MapEndLength()
@@ -775,15 +908,26 @@ const fieldMapLength = `
 
 const fieldFastWriteSet = `
 {{define "FieldFastWriteSet"}}
+{{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
+{{- $curFieldMask := .FieldMask -}}
 		setBeginOffset := offset
 		offset += bthrift.Binary.SetBeginLength(thrift.
 		{{- .ValCtx.Type | GetTypeIDConstant -}}, 0)
 		{{template "ValidateSet" .}}
 		var length int
-		for _, v := range {{.Target}} {
+		for {{if Features.WithFieldMask}}i{{else}}_{{end}}, v := range {{.Target}} {
+			{{- if Features.WithFieldMask}}
+			{{- $curFieldMask = "nfm"}}
+			if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(i); !ex {
+				continue
+			} else {
+			{{- end}}
 			length++
-			{{- $ctx := .ValCtx.WithTarget "v"}}
+			{{- $ctx := (.ValCtx.WithTarget "v").WithFieldMask $curFieldMask -}}
 			{{- template "FieldFastWrite" $ctx}}
+			{{- if Features.WithFieldMask}}
+			}
+			{{- end}}
 		}
 		bthrift.Binary.WriteSetBegin(buf[setBeginOffset:], thrift.
 		{{- .ValCtx.Type | GetTypeIDConstant -}}
@@ -794,6 +938,8 @@ const fieldFastWriteSet = `
 
 const fieldSetLength = `
 {{define "FieldSetLength"}}
+{{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
+{{- $curFieldMask := .FieldMask -}}
 		l += bthrift.Binary.SetBeginLength(thrift.
 		{{- .ValCtx.Type | GetTypeIDConstant -}}
 		, len({{.Target}}))
@@ -804,8 +950,17 @@ const fieldSetLength = `
 			{{- template "FieldFixedLengthTypeLength" $ctx -}} * len({{.Target}})
 		{{- else}}
 		for _, v := range {{.Target}} {
-			{{- $ctx := .ValCtx.WithTarget "v"}}
+			{{- if Features.WithFieldMask}}
+			{{- $curFieldMask = "nfm"}}
+			if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(i); !ex {
+				continue
+			} else {
+			{{- end}}
+			{{- $ctx := (.ValCtx.WithTarget "v").WithFieldMask $curFieldMask -}}
 			{{- template "FieldLength" $ctx}}
+			{{- if Features.WithFieldMask}}
+			}
+			{{- end}}
 		}
 		{{- end}}{{/* if */}}
 		l += bthrift.Binary.SetEndLength()
@@ -814,14 +969,25 @@ const fieldSetLength = `
 
 const fieldFastWriteList = `
 {{define "FieldFastWriteList"}}
+{{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
+{{- $curFieldMask := .FieldMask -}}
 		listBeginOffset := offset
 		offset += bthrift.Binary.ListBeginLength(thrift.
 		{{- .ValCtx.Type | GetTypeIDConstant -}}, 0)
 		var length int
-		for _, v := range {{.Target}} {
+		for {{if Features.WithFieldMask}}i{{else}}_{{end}}, v := range {{.Target}} {
+			{{- if Features.WithFieldMask}}
+			{{- $curFieldMask = "nfm"}}
+			if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(i); !ex {
+				continue
+			} else {
+			{{- end}}
 			length++
-			{{- $ctx := .ValCtx.WithTarget "v"}}
+			{{- $ctx := (.ValCtx.WithTarget "v").WithFieldMask $curFieldMask -}}
 			{{- template "FieldFastWrite" $ctx}}
+			{{- if Features.WithFieldMask}}
+			}
+			{{- end}}
 		}
 		bthrift.Binary.WriteListBegin(buf[listBeginOffset:], thrift.
 		{{- .ValCtx.Type | GetTypeIDConstant -}}
@@ -832,6 +998,8 @@ const fieldFastWriteList = `
 
 const fieldListLength = `
 {{define "FieldListLength"}}
+{{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
+{{- $curFieldMask := .FieldMask -}}
 		l += bthrift.Binary.ListBeginLength(thrift.
 		{{- .ValCtx.Type | GetTypeIDConstant -}}
 		, len({{.Target}}))
@@ -840,9 +1008,18 @@ const fieldListLength = `
 		l += {{- $ctx := .ValCtx.WithTarget "tmpV" -}}
 			{{- template "FieldFixedLengthTypeLength" $ctx -}} * len({{.Target}})
 		{{- else}}
-		for _, v := range {{.Target}} {
-			{{- $ctx := .ValCtx.WithTarget "v"}}
+		for {{if Features.WithFieldMask}}i{{else}}_{{end}}, v := range {{.Target}} {
+			{{- if Features.WithFieldMask}}
+			{{- $curFieldMask = "nfm"}}
+			if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(i); !ex {
+				continue
+			} else {
+			{{- end}}
+			{{- $ctx := (.ValCtx.WithTarget "v").WithFieldMask $curFieldMask -}}
 			{{- template "FieldLength" $ctx}}
+			{{- if Features.WithFieldMask}}
+			}
+			{{- end}}
 		}
 		{{- end}}{{/* if */}}
 		l += bthrift.Binary.ListEndLength()
