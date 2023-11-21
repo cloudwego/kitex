@@ -39,17 +39,18 @@ func convertStatus(err error) *status.Status {
 		return status.New(codes.OK, "")
 	}
 	// biz error should add biz info which is convenient to be recognized by client side
-	if errors.Is(err, kerrors.ErrBiz) {
-		ie := errors.Unwrap(err)
-		if se, ok := ie.(status.Iface); ok {
+	var dErr *kerrors.DetailedError
+	if errors.As(err, &dErr) && dErr.Is(kerrors.ErrBiz) {
+		bizErr := dErr.Unwrap()
+		if se, ok := bizErr.(status.Iface); ok {
 			gs := se.GRPCStatus()
 			gs.AppendMessage(fmt.Sprintf("[%s]", kerrors.ErrBiz.Error())).Err()
 			return gs
 		}
-		if te, ok := ie.(*remote.TransError); ok {
-			return status.New(codes.Code(te.TypeID()), fmt.Sprintf("%s [%s]", ie.Error(), kerrors.ErrBiz.Error()))
+		if te, ok := bizErr.(*remote.TransError); ok {
+			return status.New(codes.Code(te.TypeID()), fmt.Sprintf("%s [%s]", bizErr.Error(), kerrors.ErrBiz.Error()))
 		}
-		return status.New(codes.Internal, fmt.Sprintf("%s [%s]", ie.Error(), kerrors.ErrBiz.Error()))
+		return status.New(codes.Internal, fmt.Sprintf("%s [%s]", bizErr.Error(), kerrors.ErrBiz.Error()))
 	}
 	// return GRPCStatus() if err is built with status.Error
 	if se, ok := err.(interface{ GRPCStatus() *status.Status }); ok {
