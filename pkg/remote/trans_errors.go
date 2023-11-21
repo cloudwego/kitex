@@ -107,8 +107,10 @@ func NewTransError(typeID int32, err error) *TransError {
 		return e
 	}
 	// biz error should add biz info which is convenient to be recognized by client side
-	if errors.Is(err, kerrors.ErrBiz) {
-		if e, ok := errors.Unwrap(err).(*TransError); ok {
+	var dErr *kerrors.DetailedError
+	if errors.As(err, &dErr) && dErr.Is(kerrors.ErrBiz) {
+		bizErr := dErr.Unwrap()
+		if e, ok := bizErr.(*TransError); ok {
 			e = e.AppendMessage(fmt.Sprintf("[%s]", kerrors.ErrBiz.Error()))
 			return e
 		}
