@@ -33,17 +33,17 @@ const (
 func GetLocalAddress() string {
 start:
 	nextPort := curPort + 1
-	addr := "127.0.0.1:" + strconv.Itoa(int(nextPort))
-	for IsAddressInUse(addr) {
-		nextPort += 1
-		addr = "127.0.0.1:" + strconv.Itoa(int(nextPort))
-	}
 	if nextPort > UnixUserPortEnd {
 		panic("too much cocurrent local addresses are being used!")
 	}
 	if !atomic.CompareAndSwapInt32(&curPort, curPort, nextPort) {
 		goto start
 	}
+	addr := "127.0.0.1:" + strconv.Itoa(int(nextPort))
+	if IsAddressInUse(addr) {
+		goto start
+	}
+
 	return addr
 }
 
