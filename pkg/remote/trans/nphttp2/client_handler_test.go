@@ -22,6 +22,8 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func TestClientHandler(t *testing.T) {
@@ -29,6 +31,9 @@ func TestClientHandler(t *testing.T) {
 	opt := newMockClientOption()
 	ctx := newMockCtxWithRPCInfo()
 	msg := newMockNewMessage()
+	msg.ProtocolInfoFunc = func() remote.ProtocolInfo {
+		return remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Protobuf)
+	}
 	conn, err := opt.ConnPool.Get(ctx, "tcp", mockAddr0, remote.ConnOption{Dialer: opt.Dialer, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil, err)
 

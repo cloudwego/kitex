@@ -130,6 +130,7 @@ func (kc *kClient) init() (err error) {
 	}
 	ctx := kc.initContext()
 	kc.initMiddlewares(ctx)
+	kc.initStreamMiddlewares(ctx)
 	kc.initDebugService()
 	kc.richRemoteOption()
 	if err = kc.buildInvokeChain(); err != nil {
@@ -292,6 +293,11 @@ func (kc *kClient) initMiddlewares(ctx context.Context) {
 		kc.mws = append(kc.mws, newProxyMW(kc.opt.Proxy))
 	}
 	kc.mws = append(kc.mws, newIOErrorHandleMW(kc.opt.ErrHandle))
+}
+
+func (kc *kClient) initStreamMiddlewares(ctx context.Context) {
+	// TODO: governance(e.g. timeout) & observation(e.g. trace) middlewares
+	kc.opt.Streaming.InitMiddlewares(ctx)
 }
 
 func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) (mws []endpoint.Middleware) {
@@ -468,7 +474,8 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		} else {
 			sendMsg = remote.NewMessage(req, kc.svcInfo, ri, remote.Call, remote.Client)
 		}
-		sendMsg.SetProtocolInfo(remote.NewProtocolInfo(config.TransportProtocol(), kc.svcInfo.PayloadCodec))
+		protocolInfo := remote.NewProtocolInfo(config.TransportProtocol(), kc.svcInfo.PayloadCodec)
+		sendMsg.SetProtocolInfo(protocolInfo)
 
 		if err = cli.Send(ctx, ri, sendMsg); err != nil {
 			return
@@ -479,6 +486,7 @@ func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
 		}
 
 		recvMsg = remote.NewMessage(resp, kc.opt.RemoteOpt.SvcInfo, ri, remote.Reply, remote.Client)
+		recvMsg.SetProtocolInfo(protocolInfo)
 		err = cli.Recv(ctx, ri, recvMsg)
 		return err
 	}, nil
@@ -528,9 +536,11 @@ func newCliTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, er
 }
 
 func initTransportProtocol(svcInfo *serviceinfo.ServiceInfo, cfg rpcinfo.RPCConfig) {
+	mutableRPCConfig := rpcinfo.AsMutableRPCConfig(cfg)
+	mutableRPCConfig.SetPayloadCodec(svcInfo.PayloadCodec)
 	if svcInfo.PayloadCodec == serviceinfo.Protobuf && cfg.TransportProtocol()&transport.GRPC != transport.GRPC {
 		// pb use ttheader framed by default
-		rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.TTHeaderFramed)
+		mutableRPCConfig.SetTransportProtocol(transport.TTHeaderFramed)
 	}
 }
 

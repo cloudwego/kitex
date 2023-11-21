@@ -22,13 +22,19 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func TestServerHandler(t *testing.T) {
 	// init
 	opt := newMockServerOption()
 	msg := newMockNewMessage()
+	msg.ProtocolInfoFunc = func() remote.ProtocolInfo {
+		return remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Protobuf)
+	}
 	npConn := newMockNpConn(mockAddr0)
 	npConn.mockSettingFrame()
 	tr, err := newMockServerTransport(npConn)

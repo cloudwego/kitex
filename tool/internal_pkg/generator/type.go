@@ -20,6 +20,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/cloudwego/thriftgo/generator/golang/streaming"
+
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -122,6 +124,7 @@ type MethodInfo struct {
 	Oneway                 bool
 	Void                   bool
 	Args                   []*Parameter
+	ArgsLength             int
 	Resp                   *Parameter
 	Exceptions             []*Parameter
 	ArgStructName          string
@@ -130,6 +133,7 @@ type MethodInfo struct {
 	GenArgResultStruct     bool
 	ClientStreaming        bool
 	ServerStreaming        bool
+	Streaming              *streaming.Streaming
 }
 
 // Parameter .
@@ -158,6 +162,7 @@ func AddTemplateFunc(key string, f interface{}) {
 
 var templateNames = []string{
 	"@client.go-NewClient-option",
+	"@client.go-NewStreamClient-option",
 	"@client.go-EOF",
 	"@server.go-NewServer-option",
 	"@server.go-EOF",

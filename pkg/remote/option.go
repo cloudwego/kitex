@@ -21,6 +21,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/profiler"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -111,6 +112,14 @@ type ServerOption struct {
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
 
 	Option
+
+	// invoking chain with recv/send middlewares for streaming APIs
+	RecvEndpoint endpoint.RecvEndpoint
+	SendEndpoint endpoint.SendEndpoint
+
+	// for thrift streaming, this is enabled by default
+	// for grpc(protobuf) streaming, it's disabled by default, enable with server.WithCompatibleMiddlewareForUnary
+	CompatibleMiddlewareForUnary bool
 }
 
 // ClientOption is used to init the remote client.

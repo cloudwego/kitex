@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -35,6 +36,11 @@ type MockRPCConfig struct {
 	IOBufferSizeFunc      func() (r int)
 	TransportProtocolFunc func() transport.Protocol
 	InteractionModeFunc   func() (r rpcinfo.InteractionMode)
+}
+
+func (m *MockRPCConfig) PayloadCodec() serviceinfo.PayloadCodec {
+	// TODO implement me
+	panic("implement me")
 }
 
 func (m *MockRPCConfig) InteractionMode() (r rpcinfo.InteractionMode) {

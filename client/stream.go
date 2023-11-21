@@ -54,6 +54,18 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	return kc.sEps(ctx, request, response)
 }
 
+func (kc *kClient) invokeSendEndpoint() endpoint.SendEndpoint {
+	return func(stream streaming.Stream, req interface{}) (err error) {
+		return stream.SendMsg(req)
+	}
+}
+
+func (kc *kClient) invokeRecvEndpoint() endpoint.RecvEndpoint {
+	return func(stream streaming.Stream, resp interface{}) (err error) {
+		return stream.RecvMsg(resp)
+	}
+}
+
 func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 	handler, err := kc.opt.RemoteOpt.CliHandlerFactory.NewTransHandler(kc.opt.RemoteOpt)
 	if err != nil {
@@ -64,6 +76,10 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 			kc.opt.RemoteOpt.StreamingMetaHandlers = append(kc.opt.RemoteOpt.StreamingMetaHandlers, shdlr)
 		}
 	}
+
+	recvEndpoint := kc.opt.Streaming.BuildRecvInvokeChain(kc.invokeRecvEndpoint())
+	sendEndpoint := kc.opt.Streaming.BuildSendInvokeChain(kc.invokeSendEndpoint())
+
 	return func(ctx context.Context, req, resp interface{}) (err error) {
 		// req and resp as &streaming.Stream
 		ri := rpcinfo.GetRPCInfo(ctx)
@@ -71,8 +87,8 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 		if err != nil {
 			return
 		}
-		st = &stream{stream: st, kc: kc}
-		resp.(*streaming.Result).Stream = st
+		clientStream := newStream(st, kc, sendEndpoint, recvEndpoint)
+		resp.(*streaming.Result).Stream = clientStream
 		return
 	}, nil
 }
@@ -80,6 +96,18 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 type stream struct {
 	stream streaming.Stream
 	kc     *kClient
+
+	sendEndpoint endpoint.SendEndpoint
+	recvEndpoint endpoint.RecvEndpoint
+}
+
+func newStream(s streaming.Stream, kc *kClient, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint) *stream {
+	return &stream{
+		stream:       s,
+		kc:           kc,
+		sendEndpoint: sendEP,
+		recvEndpoint: recvEP,
+	}
 }
 
 func (s *stream) SetTrailer(metadata.MD) {
@@ -107,11 +135,11 @@ func (s *stream) Context() context.Context {
 }
 
 func (s *stream) RecvMsg(m interface{}) error {
-	return s.stream.RecvMsg(m)
+	return s.recvEndpoint(s.stream, m)
 }
 
 func (s *stream) SendMsg(m interface{}) error {
-	return s.stream.SendMsg(m)
+	return s.sendEndpoint(s.stream, m)
 }
 
 func (s *stream) Close() error {
