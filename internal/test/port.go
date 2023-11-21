@@ -36,6 +36,7 @@ start:
 	addr := "127.0.0.1:" + strconv.Itoa(int(nextPort))
 	for IsAddressInUse(addr) {
 		nextPort += 1
+		addr = "127.0.0.1:" + strconv.Itoa(int(nextPort))
 	}
 	if nextPort > UnixUserPortEnd {
 		panic("too much cocurrent local addresses are being used!")
