@@ -78,8 +78,6 @@ func (a *Arguments) guessIDLType() (string, bool) {
 
 func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f := flag.NewFlagSet(os.Args[0], flag.ContinueOnError)
-	f.BoolVar(&a.WithFieldMask, "with-field-mask", false,
-		"Generate codes with field mask functions.")
 	f.BoolVar(&a.NoFastAPI, "no-fast-api", false,
 		"Generate codes without injecting fast method.")
 	f.StringVar(&a.ModuleName, "module", "",

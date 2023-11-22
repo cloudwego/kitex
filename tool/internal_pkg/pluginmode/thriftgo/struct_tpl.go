@@ -817,8 +817,6 @@ const fieldFastWriteMap = `
 {{- $isStrKey := .KeyCtx.Type | IsStrType -}}
 {{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
 {{- $curFieldMask := .FieldMask -}}
-	{{- if and Features.WithFieldMask (or $isIntKey $isStrKey) }}
-	{{- }}
 	mapBeginOffset := offset
 	offset += bthrift.Binary.MapBeginLength(thrift.
 	{{- .KeyCtx.Type | GetTypeIDConstant -}}
