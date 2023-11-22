@@ -473,6 +473,7 @@ func (m meshHeader) decode(ctx context.Context, message remote.Message, in remot
 	if _, err = readStrKVInfo(&idx, headerInfo, mapInfo); err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("meshHeader read kv info failed, %s", err.Error()))
 	}
+	fillBasicInfoOfTTHeader(message)
 	return nil
 }
 
