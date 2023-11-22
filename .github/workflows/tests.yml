@@ -48,7 +48,7 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
       - name: Unit Test
-        run: go test -run=^$ ./...
+        run: go test -gcflags=-l -race -covermode=atomic ./...
 
   compatibility-windows-test:
     runs-on: windows-latest
@@ -59,7 +59,7 @@ jobs:
         with:
           go-version: '1.19'
       - name: Unit Test
-        run: go test -gcflags=-l -race -covermode=atomic ./...
+        run: go test -run=^$ ./...
 
   codegen-test:
     runs-on: ubuntu-latest
