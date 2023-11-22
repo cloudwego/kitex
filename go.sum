@@ -72,8 +72,8 @@ github.com/cloudwego/thriftgo v0.1.2/go.mod h1:LzeafuLSiHA9JTiWC8TIMIq64iadeObgR
 github.com/cloudwego/thriftgo v0.2.4/go.mod h1:8i9AF5uDdWHGqzUhXDlubCjx4MEfKvWXGQlMWyR0tM4=
 github.com/cloudwego/thriftgo v0.2.7/go.mod h1:8i9AF5uDdWHGqzUhXDlubCjx4MEfKvWXGQlMWyR0tM4=
 github.com/cloudwego/thriftgo v0.2.11/go.mod h1:dAyXHEmKXo0LfMCrblVEY3mUZsdeuA5+i0vF5f09j7E=
-github.com/cloudwego/thriftgo v0.3.3-0.20231121125014-4fc8a6f41303 h1:wvL8AYfSj29oD53uFKEfrbndPN8CCjnUYfEVZU7yit4=
-github.com/cloudwego/thriftgo v0.3.3-0.20231121125014-4fc8a6f41303/go.mod h1:29ukiySoAMd0vXMYIduAY9dph/7dmChvOS11YLotFb8=
+github.com/cloudwego/thriftgo v0.3.3-0.20231122064957-14e5dc2a52bf h1:w66OAPdxnLh3my/3LzORNIA9UD/Kcc/O07AlNojr74A=
+github.com/cloudwego/thriftgo v0.3.3-0.20231122064957-14e5dc2a52bf/go.mod h1:29ukiySoAMd0vXMYIduAY9dph/7dmChvOS11YLotFb8=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
