@@ -15,8 +15,10 @@
 package thriftgo
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -209,6 +211,8 @@ func (p *patcher) buildTemplates() (err error) {
 }
 
 func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err error) {
+	rj, _ := json.Marshal(req)
+	_ = os.WriteFile("./dump_req.json", rj, 0666)
 	p.buildTemplates()
 	var buf strings.Builder
 
