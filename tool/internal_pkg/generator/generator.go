@@ -137,7 +137,7 @@ type Config struct {
 	Protocol              string
 	HandlerReturnKeepResp bool
 
-	WithFieldmask bool
+	WithFieldMask bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
