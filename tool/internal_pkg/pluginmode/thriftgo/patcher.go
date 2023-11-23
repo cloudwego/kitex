@@ -183,8 +183,18 @@ func (p *patcher) buildTemplates() (err error) {
 			processor,
 		)
 	}
-	for _, txt := range allTemplates {
-		tpl = template.Must(tpl.Parse(txt))
+	for i, txt := range allTemplates {
+		tpl, err = tpl.Parse(txt)
+		if err != nil {
+			name := strconv.Itoa(i)
+			if ix := strings.Index(txt, "{{define "); ix >= 0 {
+				ex := strings.Index(txt, "}}")
+				if ex >= 0 {
+					name = txt[ix+len("{{define ") : ex]
+				}
+			}
+			return fmt.Errorf("parse template %s failed: %v", name, err)
+		}
 	}
 
 	ext := `{{define "ExtraTemplates"}}{{end}}`
@@ -208,10 +218,15 @@ func (p *patcher) buildTemplates() (err error) {
 	return nil
 }
 
+const importInsertPoint = "// imports insert-point"
+
 func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err error) {
 	// rj, _ := json.Marshal(req)
 	// _ = os.WriteFile("./dump_req.json", rj, 0666)
-	p.buildTemplates()
+	if err := p.buildTemplates(); err != nil {
+		return nil, err
+	}
+
 	var buf strings.Builder
 
 	protection := make(map[string]*plugin.Generated)
@@ -260,21 +275,46 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			protection[register] = patch
 		}
 
+		// fd, e := os.OpenFile("dump_scope.txt", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+		// if e == nil {
+		// 	fmt.Fprintf(fd, "ast:%#v\n", ast)
+		// 	spew.Fdump(fd, "scope", scope)
+		// }
+		// defer fd.Close()
+
 		data := &struct {
 			Scope   *golang.Scope
 			PkgName string
 			Imports map[string]string
 		}{Scope: scope, PkgName: pkgName}
-		data.Imports, err = scope.ResolveImports()
-		if err != nil {
-			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
-		}
-		p.filterStdLib(data.Imports)
+
 		if err = p.fileTpl.ExecuteTemplate(&buf, "file", data); err != nil {
 			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
 		}
 		content := buf.String()
+
+		data.Imports, err = scope.ResolveImports()
+		if err != nil {
+			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
+		}
+		// p.filterStdLib(data.Imports)
+		// if e == nil {
+		// 	fmt.Fprintf(fd, "fieltered data.Imports, %+v", data.Imports)
+		// }
+
+		// replace imports insert-pointer with newly rendered output
+		buf.Reset()
+		if err = p.fileTpl.ExecuteTemplate(&buf, "imports", data); err != nil {
+			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
+		}
+		imports := buf.String()
+		if i := strings.Index(content, importInsertPoint); i >= 0 {
+			content = strings.Replace(content, importInsertPoint, imports, 1)
+		} else {
+			return nil, fmt.Errorf("replace imports failed")
+		}
 		// if kutils is not used, remove the dependency.
+		// OPT: use UseStdLib tmpl func
 		if !strings.Contains(content, "kutils.StringDeepCopy") {
 			kutilsImp := `kutils "github.com/cloudwego/kitex/pkg/utils"`
 			idx := strings.Index(content, kutilsImp)
@@ -282,10 +322,15 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 				content = content[:idx-1] + content[idx+len(kutilsImp):]
 			}
 		}
+
 		patches = append(patches, &plugin.Generated{
 			Content: content,
 			Name:    &target,
 		})
+
+		// if e == nil {
+		// 	fmt.Fprintf(fd, "patches: %+v\n", patches)
+		// }
 
 		if p.copyIDL {
 			content, err := ioutil.ReadFile(ast.Filename)

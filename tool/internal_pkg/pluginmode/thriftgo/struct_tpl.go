@@ -40,7 +40,6 @@ const structLikeCodec = `
 
 const structLikeFastRead = `
 {{define "StructLikeFastRead"}}
-{{- if Features.WithFieldMask}}{{UseStdLibrary "fieldmask"}}{{- end}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 	var err error
@@ -180,7 +179,7 @@ const structLikeFastReadField = `
 {{- range .Fields}}
 {{$FieldName := .GoName}}
 {{- $isBaseVal := .Type | IsBaseType}}
-func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte{{if and Features.WithFieldMask (not $isBaseVal)}}, fm *fieldmask.FieldMask{{end}}) (int, error) {
+func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte{{if and Features.WithFieldMask (not $isBaseVal)}}{{UseStdLibrary "fieldmask"}}, fm *fieldmask.FieldMask{{end}}) (int, error) {
 	offset := 0
 	{{- $ctx := (MkRWCtx .).WithFieldMask "fm" -}}
 	{{ template "FieldFastRead" $ctx}}
@@ -280,7 +279,7 @@ func (p *{{$TypeName}}) BLength() int {
 		{{- range .Fields}}
 		{{- $isBaseVal := .Type | IsBaseType}}
 		{{- if Features.WithFieldMask}}
-		if {{if $isBaseVal}}_{{else}}nfm{{end}}, ex := p._fieldmask.Field(fieldId); ex {
+		if {{if $isBaseVal}}_{{else}}nfm{{end}}, ex := p._fieldmask.Field({{.ID}}); ex {
 		{{- end}}
 		l += p.field{{Str .ID}}Length({{if and Features.WithFieldMask (not $isBaseVal)}}nfm{{end}})
 		{{- if Features.WithFieldMask}}

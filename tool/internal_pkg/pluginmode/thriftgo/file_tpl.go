@@ -20,6 +20,32 @@ const file = `
 
 package {{.PkgName}}
 
+` + importInsertPoint + `
+
+{{InsertionPoint "KitexUnusedProtection"}}
+
+// unused protection
+var (
+	_ = fmt.Formatter(nil)
+	_ = (*bytes.Buffer)(nil)
+	_ = (*strings.Builder)(nil)
+	_ = reflect.Type(nil)
+	_ = thrift.TProtocol(nil)
+	{{- if GenerateFastAPIs}}
+	_ = bthrift.BinaryWriter(nil)
+	{{- end}}
+	{{- range .Imports | ToPackageNames}}
+	_ = {{.}}.KitexUnusedProtection
+	{{- end}}
+)
+
+{{template "body" .}}
+
+{{end}}{{/* define "file" */}}
+`
+
+const imports = `
+{{define "imports"}}
 import (
 	"fmt"
 	"bytes"
@@ -45,27 +71,7 @@ import (
 	{{$alias }}"{{$path}}"
 	{{- end}}
 )
-
-{{InsertionPoint "KitexUnusedProtection"}}
-
-// unused protection
-var (
-	_ = fmt.Formatter(nil)
-	_ = (*bytes.Buffer)(nil)
-	_ = (*strings.Builder)(nil)
-	_ = reflect.Type(nil)
-	_ = thrift.TProtocol(nil)
-	{{- if GenerateFastAPIs}}
-	_ = bthrift.BinaryWriter(nil)
-	{{- end}}
-	{{- range .Imports | ToPackageNames}}
-	_ = {{.}}.KitexUnusedProtection
-	{{- end}}
-)
-
-{{template "body" .}}
-
-{{end}}{{/* define "file" */}}
+{{end}}{{/* define "imports" */}}
 `
 
 const body = `
@@ -118,6 +124,7 @@ func (p *{{$resType.GoName}}) GetResult() interface{} {
 var basicTemplates = []string{
 	patchArgsAndResult,
 	file,
+	imports,
 	body,
 	registerHessian,
 }
