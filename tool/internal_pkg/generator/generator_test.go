@@ -57,6 +57,7 @@ func TestConfig_Pack(t *testing.T) {
 		HandlerReturnKeepResp bool
 		WithFieldMask         bool
 	}
+
 	tests := []struct {
 		name    string
 		fields  fields
