@@ -24,34 +24,15 @@ package {{.PkgName}}
 {{- UseStdLibrary "strings"}}
 {{- UseStdLibrary "reflect"}}
 {{- UseStdLibrary "thrift"}}
-
-` + importInsertPoint + `
-
-{{template "body" .}}
-
-{{end}}{{/* define "file" */}}
-`
-
-const imports = `
-{{define "imports"}}
-import (
-	{{- range $path, $alias := .Imports}}
-	{{$alias }}"{{$path}}"
-	{{- end}}
-	{{if GenerateDeepCopyAPIs -}}
-	kutils "{{ImportPathTo "pkg/utils"}}"
-	{{- end}}
-	{{if GenerateFastAPIs}}
-	"{{ImportPathTo "pkg/protocol/bthrift"}}"
-	{{- end}}
-	{{if GenerateArgsResultTypes}}
-		{{if Features.KeepUnknownFields}}
-			{{- if ne (len .Scope.Services) 0}}
-				{{- UseStdLibrary "unknown" -}}
-			{{- end}}
+{{- if GenerateArgsResultTypes}}
+	{{if Features.KeepUnknownFields}}
+		{{- if ne (len .Scope.Services) 0}}
+			{{- UseStdLibrary "unknown" -}}
 		{{- end}}
 	{{- end}}
-)
+{{- end}}
+
+` + importInsertPoint + `
 
 {{InsertionPoint "KitexUnusedProtection"}}
 // unused protection
@@ -66,6 +47,25 @@ var (
 	{{- end}}
 	{{- range .Scope.Includes }}
 	_ = {{.PackageName}}.KitexUnusedProtection
+	{{- end}}
+)
+
+{{template "body" .}}
+
+{{end}}{{/* define "file" */}}
+`
+
+const imports = `
+{{define "imports"}}
+import (
+	{{- range .Imports}}
+	{{.Alias}} "{{.Path}}"
+	{{- end}}
+	{{- if GenerateDeepCopyAPIs}}
+	kutils "{{ImportPathTo "pkg/utils"}}"
+	{{- end}}
+	{{- if GenerateFastAPIs}}
+	"{{ImportPathTo "pkg/protocol/bthrift"}}"
 	{{- end}}
 )
 {{end}}{{/* define "imports" */}}

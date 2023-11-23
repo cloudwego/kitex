@@ -287,7 +287,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		data := &struct {
 			Scope   *golang.Scope
 			PkgName string
-			Imports map[string]string
+			Imports []util.Import
 		}{Scope: scope, PkgName: pkgName}
 
 		if err = p.fileTpl.ExecuteTemplate(&buf, "file", data); err != nil {
@@ -298,10 +298,11 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			fmt.Fprintf(fd, "content %s", content)
 		}
 
-		data.Imports, err = scope.ResolveImports()
+		imps, err := scope.ResolveImports()
 		if err != nil {
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
 		}
+		data.Imports = util.SortImports(imps, p.module)
 		// p.filterStdLib(data.Imports)
 		if e == nil {
 			fmt.Fprintf(fd, "scope: %v data.Imports: %+v", scope.IDLName(), data.Imports)

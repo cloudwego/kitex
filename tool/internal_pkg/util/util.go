@@ -273,3 +273,27 @@ func DownloadFile(remotePath, localPath string) error {
 	}
 	return nil
 }
+
+type Import struct {
+	Alias string
+	Path  string
+}
+
+func SortImports(imps map[string]string, localPrefix string) (ret []Import) {
+	stds := make([]Import, 0, len(imps))
+	locals := make([]Import, 0, len(imps))
+	thirds := make([]Import, 0, len(imps))
+	for path, alias := range imps {
+		if !strings.Contains(".", path) {
+			stds = append(stds, Import{alias, path})
+		} else if strings.HasPrefix(path, localPrefix) {
+			locals = append(locals, Import{alias, path})
+		} else {
+			thirds = append(thirds, Import{alias, path})
+		}
+	}
+	ret = append(ret, stds...)
+	ret = append(ret, thirds...)
+	ret = append(ret, locals...)
+	return ret
+}
