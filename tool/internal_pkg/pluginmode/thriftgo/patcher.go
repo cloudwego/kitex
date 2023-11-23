@@ -17,6 +17,7 @@ package thriftgo
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -26,6 +27,7 @@ import (
 	"text/template"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/davecgh/go-spew/spew"
 
 	"github.com/cloudwego/thriftgo/generator/golang"
 	"github.com/cloudwego/thriftgo/generator/golang/templates"
@@ -229,6 +231,9 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 
 	var buf strings.Builder
 
+	fd, e := os.OpenFile("dump_scope.txt", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	defer fd.Close()
+
 	protection := make(map[string]*plugin.Generated)
 
 	for ast := range req.AST.DepthFirstSearch() {
@@ -238,7 +243,6 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			return nil, fmt.Errorf("build scope for ast %q: %w", ast.Filename, err)
 		}
 		p.utils.SetRootScope(scope)
-
 		pkgName := golang.GetImportPackage(golang.GetImportPath(p.utils, ast))
 
 		path := p.utils.CombineOutputPath(req.OutputPath, ast)
@@ -275,12 +279,10 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			protection[register] = patch
 		}
 
-		// fd, e := os.OpenFile("dump_scope.txt", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-		// if e == nil {
-		// 	fmt.Fprintf(fd, "ast:%#v\n", ast)
-		// 	spew.Fdump(fd, "scope", scope)
-		// }
-		// defer fd.Close()
+		if e == nil {
+			fmt.Fprintf(fd, "ast:%#v\n", ast)
+			spew.Fdump(fd, "scope", scope)
+		}
 
 		data := &struct {
 			Scope   *golang.Scope
@@ -292,16 +294,18 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
 		}
 		content := buf.String()
+		if e == nil {
+			fmt.Fprintf(fd, "content %s", content)
+		}
 
 		data.Imports, err = scope.ResolveImports()
 		if err != nil {
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
 		}
 		// p.filterStdLib(data.Imports)
-		// if e == nil {
-		// 	fmt.Fprintf(fd, "fieltered data.Imports, %+v", data.Imports)
-		// }
-
+		if e == nil {
+			fmt.Fprintf(fd, "scope: %v data.Imports: %+v", scope.IDLName(), data.Imports)
+		}
 		// replace imports insert-pointer with newly rendered output
 		buf.Reset()
 		if err = p.fileTpl.ExecuteTemplate(&buf, "imports", data); err != nil {
@@ -328,9 +332,9 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			Name:    &target,
 		})
 
-		// if e == nil {
-		// 	fmt.Fprintf(fd, "patches: %+v\n", patches)
-		// }
+		if e == nil {
+			fmt.Fprintf(fd, "patches len %v\n", len(patches))
+		}
 
 		if p.copyIDL {
 			content, err := ioutil.ReadFile(ast.Filename)
