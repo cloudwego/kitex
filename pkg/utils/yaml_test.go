@@ -18,6 +18,7 @@ package utils
 
 import (
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -83,7 +84,10 @@ func deleteTestYamlFile(t *testing.T, path string) {
 	}
 }
 
-func init() {
+func TestMain(m *testing.M) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	t := &testing.T{}
 	createTestYamlFile(t, TestYamlFile)
 	defer func() {
