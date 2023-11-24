@@ -303,7 +303,6 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
 		}
 		data.Imports = util.SortImports(imps, p.module)
-		// p.filterStdLib(data.Imports)
 		if e == nil {
 			fmt.Fprintf(fd, "scope: %v data.Imports: %+v", scope.IDLName(), data.Imports)
 		}
@@ -454,25 +453,6 @@ func (p *patcher) reorderStructFields(fields []*golang.Field) ([]*golang.Field, 
 	}
 
 	return sortedFields, nil
-}
-
-func (p *patcher) filterStdLib(imports map[string]string) {
-	// remove std libs and thrift to prevent duplicate import.
-	prefix := p.module + "/"
-	for pth := range imports {
-		if strings.HasPrefix(pth, prefix) { // local module
-			continue
-		}
-		if pth == "github.com/apache/thrift/lib/go/thrift" {
-			delete(imports, pth)
-		}
-		if strings.HasPrefix(pth, "github.com/cloudwego/thriftgo") {
-			delete(imports, pth)
-		}
-		if !strings.Contains(pth, ".") { // std lib
-			delete(imports, pth)
-		}
-	}
 }
 
 func (p *patcher) isBinaryOrStringType(t *parser.Type) bool {
