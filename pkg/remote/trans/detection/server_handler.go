@@ -109,6 +109,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		}
 	} else {
 		which = t.defaultHandler
+		klog.CtxErrorf(ctx, "Cannot find which")
 	}
 	r.ctx, r.handler = ctx, which
 	return which.OnRead(ctx, conn)
@@ -117,7 +118,10 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	// Should use the ctx returned by OnActive in r.ctx
 	if r, ok := ctx.Value(handlerKey{}).(*handlerWrapper); ok && r.ctx != nil {
+		klog.CtxErrorf(ctx, "Change ctx from r.ctx")
 		ctx = r.ctx
+	} else {
+		klog.CtxErrorf(ctx, "Using native ctx")
 	}
 	t.which(ctx).OnInactive(ctx, conn)
 }
@@ -134,6 +138,7 @@ func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
 	if r, ok := ctx.Value(handlerKey{}).(*handlerWrapper); ok && r.handler != nil {
 		return r.handler
 	}
+	klog.CtxErrorf(ctx, "Cannot find trans handler")
 	// use noop transHandler
 	return noopHandler
 }
@@ -159,6 +164,7 @@ func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	ctx, err := t.defaultHandler.OnActive(ctx, conn)
 	if err != nil {
+		klog.CtxErrorf(ctx, "OnActive failed: %v", err)
 		return nil, err
 	}
 	// svrTransHandler wraps multi kinds of ServerTransHandler.

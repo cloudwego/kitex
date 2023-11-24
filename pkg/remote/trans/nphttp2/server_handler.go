@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync"
@@ -268,12 +269,22 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	if err != nil {
 		return nil, err
 	}
+	runtime.SetFinalizer(tr, func(tr interface{}) {
+		klog.Warnf("tr is finalized: %v", tr)
+	})
 	pool := &sync.Pool{
 		New: func() interface{} {
 			// init rpcinfo
 			ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
 			return ri
 		},
+	}
+	if x := ctx.Value(ctxKeySvrTransport); x != nil {
+		if st, _ := x.(*SvrTrans); st != nil {
+			klog.CtxErrorf(ctx, "Invalid ctx: %v", st)
+		} else {
+			klog.CtxErrorf(ctx, "Ctx is not nil: %v", x)
+		}
 	}
 	ctx = context.WithValue(ctx, ctxKeySvrTransport, &SvrTrans{tr: tr, pool: pool})
 	return ctx, nil
@@ -282,6 +293,7 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 // 连接关闭时回调
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	tr := ctx.Value(ctxKeySvrTransport).(*SvrTrans).tr
+	klog.CtxErrorf(ctx, "OnInactive: %v", tr)
 	tr.Close()
 }
 

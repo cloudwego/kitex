@@ -405,7 +405,10 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				}
 				continue
 			}
-			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, netpoll.ErrEOF) {
+			if err == io.EOF ||
+				err == io.ErrUnexpectedEOF ||
+				errors.Is(err, netpoll.ErrEOF) ||
+				errors.Is(err, netpoll.ErrConnClosed) {
 				t.Close()
 				return
 			}
@@ -948,6 +951,7 @@ func (t *http2Server) keepalive() {
 // TODO(zhaoq): Now the destruction is not blocked on any pending streams. This
 // could cause some resource issue. Revisit this later.
 func (t *http2Server) Close() error {
+	klog.Errorf("Close: %v", t)
 	t.mu.Lock()
 	if t.state == closing {
 		t.mu.Unlock()

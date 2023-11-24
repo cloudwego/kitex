@@ -172,30 +172,37 @@ func NewOptions(opts []Option) *Options {
 func (o *Options) initRemoteOpt() {
 	var zero connpool2.IdleConfig
 
+	// gRPC conn pool
 	if o.Configs.TransportProtocol()&transport.GRPC == transport.GRPC {
-		if o.PoolCfg != nil && *o.PoolCfg == zero {
-			// grpc unary short connection
+		// gRPC using long connection by default
+		// if called WithShortConnection, will force gRPC use short connection in unary mode
+		if o.PoolCfg != nil && *o.PoolCfg == zero && o.GRPCConnPoolSize == 0 {
 			o.GRPCConnectOpts.ShortConn = true
 		}
 		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
+		return
 	}
-	if o.RemoteOpt.ConnPool == nil {
-		if o.PoolCfg != nil {
-			if *o.PoolCfg == zero {
-				o.RemoteOpt.ConnPool = connpool.NewShortPool(o.Svr.ServiceName)
-			} else {
-				o.RemoteOpt.ConnPool = connpool.NewLongPool(o.Svr.ServiceName, *o.PoolCfg)
-			}
+	// user's custom conn pool
+	if o.RemoteOpt.ConnPool != nil {
+		return
+	}
+	// configured conn pool
+	if o.PoolCfg != nil {
+		if *o.PoolCfg == zero {
+			o.RemoteOpt.ConnPool = connpool.NewShortPool(o.Svr.ServiceName)
 		} else {
-			o.RemoteOpt.ConnPool = connpool.NewLongPool(
-				o.Svr.ServiceName,
-				connpool2.IdleConfig{
-					MaxIdlePerAddress: 10,
-					MaxIdleGlobal:     100,
-					MaxIdleTimeout:    time.Minute,
-				},
-			)
+			o.RemoteOpt.ConnPool = connpool.NewLongPool(o.Svr.ServiceName, *o.PoolCfg)
 		}
+		return
 	}
+	// default conn pool
+	o.RemoteOpt.ConnPool = connpool.NewLongPool(
+		o.Svr.ServiceName,
+		connpool2.IdleConfig{
+			MaxIdlePerAddress: 10,
+			MaxIdleGlobal:     100,
+			MaxIdleTimeout:    time.Minute,
+		},
+	)
 }

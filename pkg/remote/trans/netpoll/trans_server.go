@@ -139,12 +139,14 @@ func (ts *transServer) ConnCount() utils.AtomicInt {
 func (ts *transServer) onConnActive(conn netpoll.Connection) context.Context {
 	ctx := context.Background()
 	defer transRecover(ctx, conn, "OnActive")
+	ts.connCount.Inc()
+	var err error
+	ctx, err = ts.transHdlr.OnActive(ctx, conn)
 	conn.AddCloseCallback(func(connection netpoll.Connection) error {
-		ts.onConnInactive(ctx, conn)
+		klog.CtxErrorf(ctx, "CloseCallback Start: %d %d", connection.Reader().Len(), connection.Reader().Len())
+		ts.onConnInactive(ctx, connection)
 		return nil
 	})
-	ts.connCount.Inc()
-	ctx, err := ts.transHdlr.OnActive(ctx, conn)
 	if err != nil {
 		ts.onError(ctx, err, conn)
 		conn.Close()
