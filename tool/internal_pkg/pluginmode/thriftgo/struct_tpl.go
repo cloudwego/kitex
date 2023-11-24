@@ -967,7 +967,7 @@ const fieldSetLength = `
 		l += {{- $ctx := .ValCtx.WithTarget "tmpV" -}}
 			{{- template "FieldFixedLengthTypeLength" $ctx -}} * len({{.Target}})
 		{{- else}}
-		for _, v := range {{.Target}} {
+		for {{if Features.WithFieldMask}}i{{else}}_{{end}}, v := range {{.Target}} {
 			{{- if Features.WithFieldMask}}
 			{{- $curFieldMask = "nfm"}}
 			if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(i); !ex {
