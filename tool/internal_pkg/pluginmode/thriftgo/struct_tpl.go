@@ -371,11 +371,16 @@ const fieldFastReadStructLike = `
 {{define "FieldFastReadStructLike"}}
 	{{- if .NeedDecl}}
 	{{- .Target}} := {{.TypeName.Deref.NewFunc}}()
-	{{- else}}
-	tmp := {{.TypeName.Deref.NewFunc}}()
-	{{- end}}
 	{{- if Features.WithFieldMask}}
 	{{.Target}}.SetFieldMask({{.FieldMask}})
+	{{- end}}
+	{{- else}}
+	tmp := {{.TypeName.Deref.NewFunc}}()
+	{{- if Features.WithFieldMask}}
+	tmp.SetFieldMask({{.FieldMask}})
+	{{- end}}
+	{{- end}}
+	{{- if Features.WithFieldMask}}
 	{{- end}}
 	if l, err := {{- if .NeedDecl}}{{.Target}}{{else}}tmp{{end}}.FastRead(buf[offset:]); err != nil {
 		return offset, err
@@ -763,7 +768,7 @@ const fieldFastWriteStructLike = `
 
 const fieldStructLikeLength = `
 {{define "FieldStructLikeLength"}}
-{{- if Features.WithFieldMask}}
+	{{- if Features.WithFieldMask}}
 	if {{.Target}} != nil {
 		{{.Target}}.SetFieldMask({{.FieldMask}})
 	}

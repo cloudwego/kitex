@@ -17,7 +17,6 @@ package thriftgo
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -27,7 +26,6 @@ import (
 	"text/template"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
-	"github.com/davecgh/go-spew/spew"
 
 	"github.com/cloudwego/thriftgo/generator/golang"
 	"github.com/cloudwego/thriftgo/generator/golang/templates"
@@ -223,16 +221,14 @@ func (p *patcher) buildTemplates() (err error) {
 const importInsertPoint = "// imports insert-point"
 
 func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err error) {
-	// rj, _ := json.Marshal(req)
-	// _ = os.WriteFile("./dump_req.json", rj, 0666)
 	if err := p.buildTemplates(); err != nil {
 		return nil, err
 	}
 
 	var buf strings.Builder
 
-	fd, e := os.OpenFile("dump_scope.txt", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-	defer fd.Close()
+	// fd, e := os.OpenFile("dump_scope.txt", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	// defer fd.Close()
 
 	protection := make(map[string]*plugin.Generated)
 
@@ -279,10 +275,10 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			protection[register] = patch
 		}
 
-		if e == nil {
-			fmt.Fprintf(fd, "ast:%#v\n", ast)
-			spew.Fdump(fd, "scope", scope)
-		}
+		// if e == nil {
+		// 	fmt.Fprintf(fd, "ast:%#v\n", ast)
+		// 	spew.Fdump(fd, "scope", scope)
+		// }
 
 		data := &struct {
 			Scope   *golang.Scope
@@ -294,18 +290,13 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
 		}
 		content := buf.String()
-		if e == nil {
-			fmt.Fprintf(fd, "content %s", content)
-		}
 
 		imps, err := scope.ResolveImports()
 		if err != nil {
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
 		}
 		data.Imports = util.SortImports(imps, p.module)
-		if e == nil {
-			fmt.Fprintf(fd, "scope: %v data.Imports: %+v", scope.IDLName(), data.Imports)
-		}
+
 		// replace imports insert-pointer with newly rendered output
 		buf.Reset()
 		if err = p.fileTpl.ExecuteTemplate(&buf, "imports", data); err != nil {
@@ -331,10 +322,6 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			Content: content,
 			Name:    &target,
 		})
-
-		if e == nil {
-			fmt.Fprintf(fd, "patches len %v\n", len(patches))
-		}
 
 		if p.copyIDL {
 			content, err := ioutil.ReadFile(ast.Filename)
