@@ -179,7 +179,9 @@ const structLikeFastReadField = `
 {{- range .Fields}}
 {{$FieldName := .GoName}}
 {{- $isBaseVal := .Type | IsBaseType}}
-func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte{{if and Features.WithFieldMask (not $isBaseVal)}}{{UseStdLibrary "fieldmask"}}, fm *fieldmask.FieldMask{{end}}) (int, error) {
+func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte
+	{{- if and Features.WithFieldMask (not $isBaseVal)}}{{UseStdLibrary "fieldmask"}}, fm *fieldmask.FieldMask
+	{{- end}}) (int, error) {
 	offset := 0
 	{{- $ctx := (MkRWCtx .).WithFieldMask "fm" -}}
 	{{ template "FieldFastRead" $ctx}}
@@ -308,7 +310,8 @@ const structLikeFastWriteField = `
 {{- $FieldName := .GoName}}
 {{- $TypeID := .Type | GetTypeIDConstant }}
 {{- $isBaseVal := .Type | IsBaseType}}
-func (p *{{$TypeName}}) fastWriteField{{Str .ID}}(buf []byte, binaryWriter bthrift.BinaryWriter{{if and Features.WithFieldMask (not $isBaseVal)}}, fm *fieldmask.FieldMask{{end}}) int {
+func (p *{{$TypeName}}) fastWriteField{{Str .ID}}(buf []byte, binaryWriter bthrift.BinaryWriter
+	{{- if and Features.WithFieldMask (not $isBaseVal)}}{{UseStdLibrary "fieldmask"}}, fm *fieldmask.FieldMask{{end}}) int {
 	offset := 0
 	{{- if .Requiredness.IsOptional}}
 	if p.{{.IsSetter}}() {
@@ -333,7 +336,8 @@ const structLikeFieldLength = `
 {{- $FieldName := .GoName}}
 {{- $TypeID := .Type | GetTypeIDConstant }}
 {{- $isBaseVal := .Type | IsBaseType}}
-func (p *{{$TypeName}}) field{{Str .ID}}Length({{if and Features.WithFieldMask (not $isBaseVal)}}fm *fieldmask.FieldMask{{end}}) int {
+func (p *{{$TypeName}}) field{{Str .ID}}Length(
+	{{- if and Features.WithFieldMask (not $isBaseVal)}}{{UseStdLibrary "fieldmask"}}fm *fieldmask.FieldMask{{end}}) int {
 	l := 0
 	{{- if .Requiredness.IsOptional}}
 	if p.{{.IsSetter}}() {
