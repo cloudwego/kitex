@@ -52,16 +52,16 @@ var KitexUnusedProtection = struct{}{}
 var protectionInsertionPoint = "KitexUnusedProtection"
 
 type patcher struct {
-	noFastAPI   bool
-	utils       *golang.CodeUtils
-	module      string
-	copyIDL     bool
-	version     string
-	record      bool
-	recordCmd   []string
-	deepCopyAPI bool
-	protocol    string
-	keepResp    bool
+	noFastAPI             bool
+	utils                 *golang.CodeUtils
+	module                string
+	copyIDL               bool
+	version               string
+	record                bool
+	recordCmd             []string
+	deepCopyAPI           bool
+	protocol              string
+	handlerReturnKeepResp bool
 
 	fileTpl *template.Template
 }

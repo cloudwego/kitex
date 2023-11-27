@@ -133,9 +133,9 @@ type Config struct {
 
 	GenPath string
 
-	DeepCopyAPI bool
-	Protocol    string
-	KeepResp    bool
+	DeepCopyAPI           bool
+	Protocol              string
+	HandlerReturnKeepResp bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.

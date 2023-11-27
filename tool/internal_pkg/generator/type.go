@@ -91,16 +91,16 @@ type PkgInfo struct {
 // ServiceInfo .
 type ServiceInfo struct {
 	PkgInfo
-	ServiceName     string
-	RawServiceName  string
-	ServiceTypeName func() string
-	Base            *ServiceInfo
-	Methods         []*MethodInfo
-	CombineServices []*ServiceInfo
-	HasStreaming    bool
-	ServiceFilePath string
-	Protocol        string
-	KeepResp        bool
+	ServiceName           string
+	RawServiceName        string
+	ServiceTypeName       func() string
+	Base                  *ServiceInfo
+	Methods               []*MethodInfo
+	CombineServices       []*ServiceInfo
+	HasStreaming          bool
+	ServiceFilePath       string
+	Protocol              string
+	HandlerReturnKeepResp bool
 }
 
 // AllMethods returns all methods that the service have.
