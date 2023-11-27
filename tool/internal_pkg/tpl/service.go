@@ -136,7 +136,7 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 	{{end -}}
 	if err != nil {
 	{{- if $KeepResp }}
-		// kite tool
+		// still keep resp when err is not nil
 		{{if not .Void}}realResult.Success = {{if .IsResponseNeedRedirect}}&{{end}}success{{- end}}
 	{{- end }}
 	{{if .Exceptions -}}
