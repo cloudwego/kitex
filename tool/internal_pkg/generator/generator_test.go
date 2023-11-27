@@ -54,6 +54,7 @@ func TestConfig_Pack(t *testing.T) {
 		ThriftPluginTimeLimit time.Duration
 		TemplateDir           string
 		Protocol              string
+		HandlerReturnKeepResp bool
 	}
 	tests := []struct {
 		name    string
@@ -64,7 +65,7 @@ func TestConfig_Pack(t *testing.T) {
 		{
 			name:    "some",
 			fields:  fields{Features: []feature{feature(999)}, ThriftPluginTimeLimit: 30 * time.Second},
-			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "Hessian2Options=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "ProtobufPlugins=", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "ExtensionFile=", "Record=false", "RecordCmd=", "TemplateDir=", "GenPath=", "DeepCopyAPI=false", "Protocol="},
+			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "Hessian2Options=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "ProtobufPlugins=", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "ExtensionFile=", "Record=false", "RecordCmd=", "TemplateDir=", "GenPath=", "DeepCopyAPI=false", "Protocol=", "HandlerReturnKeepResp=false"},
 		},
 	}
 	for _, tt := range tests {
@@ -103,27 +104,28 @@ func TestConfig_Pack(t *testing.T) {
 
 func TestConfig_Unpack(t *testing.T) {
 	type fields struct {
-		Verbose         bool
-		GenerateMain    bool
-		GenerateInvoker bool
-		Version         string
-		NoFastAPI       bool
-		ModuleName      string
-		ServiceName     string
-		Use             string
-		IDLType         string
-		Includes        util.StringSlice
-		ThriftOptions   util.StringSlice
-		ProtobufOptions util.StringSlice
-		IDL             string
-		OutputPath      string
-		PackagePrefix   string
-		CombineService  bool
-		CopyIDL         bool
-		Features        []feature
-		FrugalPretouch  bool
-		TemplateDir     string
-		Protocol        string
+		Verbose               bool
+		GenerateMain          bool
+		GenerateInvoker       bool
+		Version               string
+		NoFastAPI             bool
+		ModuleName            string
+		ServiceName           string
+		Use                   string
+		IDLType               string
+		Includes              util.StringSlice
+		ThriftOptions         util.StringSlice
+		ProtobufOptions       util.StringSlice
+		IDL                   string
+		OutputPath            string
+		PackagePrefix         string
+		CombineService        bool
+		CopyIDL               bool
+		Features              []feature
+		FrugalPretouch        bool
+		TemplateDir           string
+		Protocol              string
+		HandlerReturnKeepResp bool
 	}
 	type args struct {
 		args []string
@@ -145,27 +147,28 @@ func TestConfig_Unpack(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Config{
-				Verbose:         tt.fields.Verbose,
-				GenerateMain:    tt.fields.GenerateMain,
-				GenerateInvoker: tt.fields.GenerateInvoker,
-				Version:         tt.fields.Version,
-				NoFastAPI:       tt.fields.NoFastAPI,
-				ModuleName:      tt.fields.ModuleName,
-				ServiceName:     tt.fields.ServiceName,
-				Use:             tt.fields.Use,
-				IDLType:         tt.fields.IDLType,
-				Includes:        tt.fields.Includes,
-				ThriftOptions:   tt.fields.ThriftOptions,
-				ProtobufOptions: tt.fields.ProtobufOptions,
-				IDL:             tt.fields.IDL,
-				OutputPath:      tt.fields.OutputPath,
-				PackagePrefix:   tt.fields.PackagePrefix,
-				CombineService:  tt.fields.CombineService,
-				CopyIDL:         tt.fields.CopyIDL,
-				Features:        tt.fields.Features,
-				FrugalPretouch:  tt.fields.FrugalPretouch,
-				TemplateDir:     tt.fields.TemplateDir,
-				Protocol:        tt.fields.Protocol,
+				Verbose:               tt.fields.Verbose,
+				GenerateMain:          tt.fields.GenerateMain,
+				GenerateInvoker:       tt.fields.GenerateInvoker,
+				Version:               tt.fields.Version,
+				NoFastAPI:             tt.fields.NoFastAPI,
+				ModuleName:            tt.fields.ModuleName,
+				ServiceName:           tt.fields.ServiceName,
+				Use:                   tt.fields.Use,
+				IDLType:               tt.fields.IDLType,
+				Includes:              tt.fields.Includes,
+				ThriftOptions:         tt.fields.ThriftOptions,
+				ProtobufOptions:       tt.fields.ProtobufOptions,
+				IDL:                   tt.fields.IDL,
+				OutputPath:            tt.fields.OutputPath,
+				PackagePrefix:         tt.fields.PackagePrefix,
+				CombineService:        tt.fields.CombineService,
+				CopyIDL:               tt.fields.CopyIDL,
+				Features:              tt.fields.Features,
+				FrugalPretouch:        tt.fields.FrugalPretouch,
+				TemplateDir:           tt.fields.TemplateDir,
+				Protocol:              tt.fields.Protocol,
+				HandlerReturnKeepResp: tt.fields.HandlerReturnKeepResp,
 			}
 			if err := c.Unpack(tt.args.args); (err != nil) != tt.wantErr {
 				t.Errorf("Config.Unpack() error = %v, wantErr %v", err, tt.wantErr)
