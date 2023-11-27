@@ -54,6 +54,7 @@ func TestConfig_Pack(t *testing.T) {
 		ThriftPluginTimeLimit time.Duration
 		TemplateDir           string
 		Protocol              string
+		KeepResp              bool
 	}
 	tests := []struct {
 		name    string
@@ -64,7 +65,7 @@ func TestConfig_Pack(t *testing.T) {
 		{
 			name:    "some",
 			fields:  fields{Features: []feature{feature(999)}, ThriftPluginTimeLimit: 30 * time.Second},
-			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "ProtobufPlugins=", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "ExtensionFile=", "Record=false", "RecordCmd=", "TemplateDir=", "GenPath=", "DeepCopyAPI=false", "Protocol="},
+			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "ProtobufPlugins=", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "ExtensionFile=", "Record=false", "RecordCmd=", "TemplateDir=", "GenPath=", "DeepCopyAPI=false", "Protocol=", "KeepResp=false"},
 		},
 	}
 	for _, tt := range tests {
@@ -124,6 +125,7 @@ func TestConfig_Unpack(t *testing.T) {
 		FrugalPretouch  bool
 		TemplateDir     string
 		Protocol        string
+		KeepResp        bool
 	}
 	type args struct {
 		args []string
@@ -166,6 +168,7 @@ func TestConfig_Unpack(t *testing.T) {
 				FrugalPretouch:  tt.fields.FrugalPretouch,
 				TemplateDir:     tt.fields.TemplateDir,
 				Protocol:        tt.fields.Protocol,
+				KeepResp:        tt.fields.KeepResp,
 			}
 			if err := c.Unpack(tt.args.args); (err != nil) != tt.wantErr {
 				t.Errorf("Config.Unpack() error = %v, wantErr %v", err, tt.wantErr)

@@ -102,6 +102,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Combine services in root thrift file.")
 	f.BoolVar(&a.CopyIDL, "copy-idl", false,
 		"Copy each IDL file to the output path.")
+	f.BoolVar(&a.KeepResp, "keep-resp", false,
+		"When rpc error,keep resp.")
 	f.StringVar(&a.ExtensionFile, "template-extension", a.ExtensionFile,
 		"Specify a file for template extension.")
 	f.BoolVar(&a.FrugalPretouch, "frugal-pretouch", false,

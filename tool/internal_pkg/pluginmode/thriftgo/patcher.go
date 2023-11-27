@@ -61,6 +61,7 @@ type patcher struct {
 	recordCmd   []string
 	deepCopyAPI bool
 	protocol    string
+	keepResp    bool
 
 	fileTpl *template.Template
 }

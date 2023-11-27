@@ -124,6 +124,7 @@ func Run() int {
 		recordCmd:   conv.Config.RecordCmd,
 		deepCopyAPI: conv.Config.DeepCopyAPI,
 		protocol:    conv.Config.Protocol,
+		keepResp:    conv.Config.KeepResp,
 	}
 	patches, err := p.patch(req)
 	if err != nil {

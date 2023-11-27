@@ -134,6 +134,7 @@ type Config struct {
 
 	DeepCopyAPI bool
 	Protocol    string
+	KeepResp    bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.

@@ -100,6 +100,7 @@ type ServiceInfo struct {
 	HasStreaming    bool
 	ServiceFilePath string
 	Protocol        string
+	KeepResp        bool
 }
 
 // AllMethods returns all methods that the service have.
