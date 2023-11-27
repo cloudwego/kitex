@@ -17,7 +17,6 @@ package protoc
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +27,7 @@ import (
 	"google.golang.org/protobuf/types/pluginpb"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 // PluginName .
@@ -45,7 +45,7 @@ func Run() int {
 
 func run(opts protogen.Options) error {
 	// unmarshal request from stdin
-	in, err := ioutil.ReadAll(os.Stdin)
+	in, err := util.ReadInput()
 	if err != nil {
 		return err
 	}

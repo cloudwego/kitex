@@ -92,6 +92,7 @@ func TestFailureRetryPolicy(t *testing.T) {
 				ErrorRate: defaultCBErrRate,
 			},
 		},
+		Extra: "{}",
 	}
 	jsonRet, err = jsoni.MarshalToString(fp)
 	test.Assert(t, err == nil, err)
@@ -147,6 +148,16 @@ func TestFailureRetryPolicyWithResultRetry(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, fp.Equals(&fp10), fp10)
 	test.Assert(t, fp10.ShouldResultRetry == nil)
+
+	t.Run("not-equal-extra", func(t *testing.T) {
+		p1 := &FailurePolicy{
+			Extra: "1",
+		}
+		p2 := &FailurePolicy{
+			Extra: "2",
+		}
+		test.Assert(t, !p1.Equals(p2))
+	})
 }
 
 // test new backupPolicy
@@ -654,6 +665,7 @@ func TestFailurePolicy_DeepCopy(t *testing.T) {
 					BackOffPolicy:     &BackOffPolicy{},
 					RetrySameNode:     true,
 					ShouldResultRetry: &ShouldResultRetry{},
+					Extra:             "{}",
 				},
 			},
 			want: &FailurePolicy{
@@ -661,6 +673,7 @@ func TestFailurePolicy_DeepCopy(t *testing.T) {
 				BackOffPolicy:     &BackOffPolicy{},
 				RetrySameNode:     true,
 				ShouldResultRetry: &ShouldResultRetry{},
+				Extra:             "{}",
 			},
 		},
 	}
@@ -704,6 +717,7 @@ func TestPolicy_DeepCopy(t *testing.T) {
 					Type:   BackupType,
 					FailurePolicy: &FailurePolicy{
 						RetrySameNode: true,
+						Extra:         "{}",
 					},
 					BackupPolicy: &BackupPolicy{
 						RetryDelayMS: 1000,
@@ -715,6 +729,7 @@ func TestPolicy_DeepCopy(t *testing.T) {
 				Type:   BackupType,
 				FailurePolicy: &FailurePolicy{
 					RetrySameNode: true,
+					Extra:         "{}",
 				},
 				BackupPolicy: &BackupPolicy{
 					RetryDelayMS: 1000,

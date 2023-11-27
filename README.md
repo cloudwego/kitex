@@ -38,7 +38,7 @@ Kitex supports **PingPong**, **One-way**, and **Bidirectional Streaming**. Among
 
 - **Service Governance**
 
-Kitex integrates service governance modules such as service registry, service discovery, load balancing, circuit breaker, rate limiting, retry, monitoring, tracing, logging, diagnosis, etc. Most of these have been provided with default extensions, and users can choose to integrate.
+Kitex integrates service governance modules such as service registry, service discovery, load balancing, circuit breaker, rate limiting, retry, monitoring, tracing, logging, diagnosis, etc. Most of these have been provided with default extensions, giving users the option to integrate them as desired.
 
 - **Code Generation**
 
@@ -88,10 +88,12 @@ We provide the [kitex-benchmark](https://github.com/cloudwego/kitex-benchmark) p
 
 - [Netpoll](https://github.com/cloudwego/netpoll): A high-performance network library.
 - [kitex-contrib](https://github.com/kitex-contrib): A partial extension library of Kitex, which users can integrate into Kitex through options according to their needs.
-- [Example](https://github.com/cloudwego/kitex-examples): Use examples of Kitex.
+- [kitex-examples](https://github.com/cloudwego/kitex-examples): Examples of Kitex showcasing various features.
+- [biz-demo](https://github.com/cloudwego/biz-demo): Business demos using Kitex.
 
 ## Blogs
-
+- [CloudWeGo: A leading practice for building enterprise cloud native middleware!](https://www.cloudwego.io/blog/2023/06/15/cloudwego-a-leading-practice-for-building-enterprise-cloud-native-middleware/)
+- [Kitex: Unifying Open Source Practice for a High-Performance RPC Framework](https://www.cloudwego.io/blog/2022/09/30/kitex-unifying-open-source-practice-for-a-high-performance-rpc-framework/)
 - [Performance Optimization on Kitex](https://www.cloudwego.io/blog/2021/09/23/performance-optimization-on-kitex/)
 - [ByteDance Practice on Go Network Library](https://www.cloudwego.io/blog/2021/10/09/bytedance-practices-on-go-network-library/)
 - [Getting Started With Kitex's Practice: Performance Testing Guide](https://www.cloudwego.io/blog/2021/11/24/getting-started-with-kitexs-practice-performance-testing-guide/)

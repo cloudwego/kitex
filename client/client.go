@@ -402,7 +402,7 @@ func (kc *kClient) initDebugService() {
 		ds.RegisterProbeFunc(diagnosis.DestServiceKey, diagnosis.WrapAsProbeFunc(kc.opt.Svr.ServiceName))
 		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(kc.opt.DebugInfo))
 		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, kc.opt.Events.Dump)
-		ds.RegisterProbeFunc(diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(kc.svcInfo))
+		ds.RegisterProbeFunc(diagnosis.ServiceInfosKey, diagnosis.WrapAsProbeFunc(map[string]*serviceinfo.ServiceInfo{kc.svcInfo.ServiceName: kc.svcInfo}))
 	}
 }
 

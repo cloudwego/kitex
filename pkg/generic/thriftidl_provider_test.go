@@ -31,14 +31,14 @@ func TestAbsPath(t *testing.T) {
 		includePath := "../d.thrift"
 		result := "/a/d.thrift"
 		p := absPath(path, includePath)
-		test.Assert(t, result == p)
+		test.DeepEqual(t, result, p)
 	})
 	t.Run("abs include path", func(t *testing.T) {
 		path := "/a/b/c.thrift"
 		includePath := "/a/d.thrift"
 		result := "/a/d.thrift"
 		p := absPath(path, includePath)
-		test.Assert(t, result == p)
+		test.DeepEqual(t, result, p)
 	})
 }
 
@@ -92,7 +92,7 @@ func TestThriftContentWithAbsIncludePathProvider(t *testing.T) {
 	}
 
 	p, err := NewThriftContentWithAbsIncludePathProvider(path, includes)
-	test.Assert(t, err == nil)
+	test.DeepEqual(t, nil, err)
 	defer p.Close()
 	test.Assert(t, !p.opts.DynamicGoEnabled)
 	tree := <-p.Provide()

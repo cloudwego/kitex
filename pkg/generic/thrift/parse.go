@@ -75,8 +75,6 @@ func Parse(tree *parser.Thrift, mode ParseMode) (*descriptor.ServiceDescriptor, 
 		Router:    descriptor.NewRouter(),
 	}
 
-	structsCache := map[string]*descriptor.TypeDescriptor{}
-
 	// support one service
 	svcs := tree.Services
 	switch mode {
@@ -92,10 +90,13 @@ func Parse(tree *parser.Thrift, mode ParseMode) (*descriptor.ServiceDescriptor, 
 
 	visitedSvcs := make(map[*parser.Service]bool, len(tree.Services))
 	for _, svc := range svcs {
-		for p := range getAllFunctions(svc, tree, visitedSvcs) {
-			fn := p.data.(*parser.Function)
-			if err := addFunction(fn, p.tree, sDsc, structsCache); err != nil {
-				return nil, err
+		for p := range getAllSvcs(svc, tree, visitedSvcs) {
+			svc := p.data.(*parser.Service)
+			structsCache := map[string]*descriptor.TypeDescriptor{}
+			for _, fn := range svc.Functions {
+				if err := addFunction(fn, p.tree, sDsc, structsCache); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -107,8 +108,7 @@ type pair struct {
 	data interface{}
 }
 
-func getAllFunctions(svc *parser.Service, tree *parser.Thrift, visitedSvcs map[*parser.Service]bool) chan *pair {
-	ch := make(chan *pair)
+func getAllSvcs(svc *parser.Service, tree *parser.Thrift, visitedSvcs map[*parser.Service]bool) chan *pair {
 	svcs := make(chan *pair)
 	addSvc := func(tree *parser.Thrift, svc *parser.Service) {
 		if exist := visitedSvcs[svc]; !exist {
@@ -130,19 +130,7 @@ func getAllFunctions(svc *parser.Service, tree *parser.Thrift, visitedSvcs map[*
 		}
 		close(svcs)
 	})
-	gofunc.GoFunc(context.Background(), func() {
-		for p := range svcs {
-			svc := p.data.(*parser.Service)
-			for _, fn := range svc.Functions {
-				ch <- &pair{
-					tree: p.tree,
-					data: fn,
-				}
-			}
-		}
-		close(ch)
-	})
-	return ch
+	return svcs
 }
 
 func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.ServiceDescriptor, structsCache map[string]*descriptor.TypeDescriptor) (err error) {

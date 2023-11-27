@@ -242,8 +242,17 @@ func TestWithSupportedTransportsFunc(t *testing.T) {
 	var svr Server
 	for _, tcase := range cases {
 		svr = NewServer(tcase.options...)
-		svr.RegisterService(mocks.ServiceInfo(), nil)
+		svcInfo := mocks.ServiceInfo()
+		svr.RegisterService(svcInfo, new(mockImpl))
 		svr.(*server).fillMoreServiceInfo(nil)
-		test.Assert(t, reflect.DeepEqual(svr.GetServiceInfo().Extra["transports"], tcase.wantTransports))
+		test.Assert(t, reflect.DeepEqual(svr.GetServiceInfos()[svcInfo.ServiceName].Extra["transports"], tcase.wantTransports))
 	}
+}
+
+// GenericServiceImpl ...
+type mockImpl struct{}
+
+// GenericCall ...
+func (g *mockImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	return nil, nil
 }

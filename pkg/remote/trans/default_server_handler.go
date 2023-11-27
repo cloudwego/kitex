@@ -34,10 +34,11 @@ import (
 
 // NewDefaultSvrTransHandler to provide default impl of svrTransHandler, it can be reused in netpoll, shm-ipc, framework-sdk extensions
 func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.ServerTransHandler, error) {
+	svcInfo := GetDefaultSvcInfo(opt.SvcMap)
 	svrHdlr := &svrTransHandler{
 		opt:     opt,
 		codec:   opt.Codec,
-		svcInfo: opt.SvcInfo,
+		svcInfo: svcInfo,
 		ext:     ext,
 	}
 	if svrHdlr.opt.TracerCtl == nil {

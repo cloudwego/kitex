@@ -82,18 +82,20 @@ func NewReadStructForJSON(svc *descriptor.ServiceDescriptor, isClient bool) *Rea
 
 // ReadStruct implement of MessageReaderWithMethod
 type ReadStruct struct {
-	svc              *descriptor.ServiceDescriptor
-	isClient         bool
-	forJSON          bool
-	binaryWithBase64 bool
+	svc                 *descriptor.ServiceDescriptor
+	isClient            bool
+	forJSON             bool
+	binaryWithBase64    bool
+	binaryWithByteSlice bool
 }
 
 var _ MessageReader = (*ReadStruct)(nil)
 
-// SetBinaryWithBase64 enable/disable Base64 encoding for binary.
+// SetBinaryOption enable/disable Base64 encoding or returning []byte for binary.
 // Note that this method is not concurrent-safe.
-func (m *ReadStruct) SetBinaryWithBase64(enable bool) {
-	m.binaryWithBase64 = enable
+func (m *ReadStruct) SetBinaryOption(base64, byteSlice bool) {
+	m.binaryWithBase64 = base64
+	m.binaryWithByteSlice = byteSlice
 }
 
 // Read ...
@@ -106,5 +108,5 @@ func (m *ReadStruct) Read(ctx context.Context, method string, in thrift.TProtoco
 	if !m.isClient {
 		fDsc = fnDsc.Request
 	}
-	return skipStructReader(ctx, in, fDsc, &readerOption{throwException: true, forJSON: m.forJSON, binaryWithBase64: m.binaryWithBase64})
+	return skipStructReader(ctx, in, fDsc, &readerOption{throwException: true, forJSON: m.forJSON, binaryWithBase64: m.binaryWithBase64, binaryWithByteSlice: m.binaryWithByteSlice})
 }

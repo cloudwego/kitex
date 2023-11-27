@@ -57,6 +57,10 @@ func TestMapThriftGeneric(t *testing.T) {
 	test.Assert(t, mg.codec.binaryWithBase64)
 	test.Assert(t, g.Framed() == false)
 
+	err = SetBinaryWithByteSlice(g, true)
+	test.Assert(t, err == nil)
+	test.Assert(t, mg.codec.binaryWithByteSlice)
+
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
 	method, err := g.GetMethod(nil, "Test")
