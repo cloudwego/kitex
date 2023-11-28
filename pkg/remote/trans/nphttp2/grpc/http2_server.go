@@ -29,6 +29,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"reflect"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -243,6 +244,7 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		// grpc server implementation to recognize this scenario and suppress
 		// logging to reduce spam.
 		if err == io.EOF {
+			klog.CtxErrorf(ctx, "io ReadFull get EOF: %v", err)
 			return nil, io.EOF
 		}
 		return nil, connectionErrorf(false, err, "transport: http2Server.HandleStreams failed to receive the preface from client: %v", err)
@@ -253,6 +255,7 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 
 	frame, err := t.framer.ReadFrame()
 	if err == io.EOF || err == io.ErrUnexpectedEOF {
+		klog.CtxErrorf(ctx, "ReadFrame get EOF: %v", err)
 		return nil, err
 	}
 	if err != nil {
@@ -406,10 +409,11 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				continue
 			}
 			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, netpoll.ErrEOF) || errors.Is(err, netpoll.ErrConnClosed) {
+				klog.CtxWarnf(t.ctx, "transport: http2Server.HandleStreams get EOF: %v", err)
 				t.Close()
 				return
 			}
-			klog.CtxWarnf(t.ctx, "transport: http2Server.HandleStreams failed to read frame: %v", err)
+			klog.CtxWarnf(t.ctx, "transport: http2Server.HandleStreams failed to read frame: %v %s", err, reflect.TypeOf(err))
 			t.Close()
 			return
 		}
