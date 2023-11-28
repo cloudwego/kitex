@@ -408,6 +408,8 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				}
 				continue
 			}
+			klog.CtxWarnf(t.ctx, "transport: release reader: %v", t.framer.reader.Len())
+			t.framer.reader.Release()
 			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, netpoll.ErrEOF) || errors.Is(err, netpoll.ErrConnClosed) {
 				klog.CtxWarnf(t.ctx, "transport: http2Server.HandleStreams get EOF: %v", err)
 				t.Close()
