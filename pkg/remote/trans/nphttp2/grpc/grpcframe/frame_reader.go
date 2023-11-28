@@ -23,6 +23,8 @@ import (
 	"golang.org/x/net/http/httpguts"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
+
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 // A Framer reads and writes Frames.
@@ -147,6 +149,7 @@ func (fr *Framer) ReadFrame() (http2.Frame, error) {
 
 	fh, err := readFrameHeader(fr.reader)
 	if err != nil {
+		klog.Errorf("readFrameHeader err: %v", err)
 		return nil, err
 	}
 	if fh.Length > fr.maxReadSize {
@@ -308,6 +311,7 @@ func (fr *Framer) readMetaFrame(hf *HeadersFrame) (*MetaHeadersFrame, error) {
 			break
 		}
 		if f, err := fr.ReadFrame(); err != nil {
+			klog.Errorf("readMetaFrame readFrameHeader err: %v", err)
 			return nil, err
 		} else {
 			hc = f.(*ContinuationFrame) // guaranteed by checkFrameOrder

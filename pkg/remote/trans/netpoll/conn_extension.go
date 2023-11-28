@@ -19,6 +19,7 @@ package netpoll
 import (
 	"context"
 	"errors"
+	"log"
 	"net"
 	"syscall"
 
@@ -74,5 +75,6 @@ func (e *netpollConnExtension) IsRemoteClosedErr(err error) bool {
 	if err == nil {
 		return false
 	}
-	return errors.Is(err, netpoll.ErrConnClosed) || errors.Is(err, syscall.EPIPE)
+	log.Println("IsRemoteClosedErr", err)
+	return errors.Is(err, netpoll.ErrConnClosed) || errors.Is(err, netpoll.ErrEOF) || errors.Is(err, syscall.EPIPE)
 }
