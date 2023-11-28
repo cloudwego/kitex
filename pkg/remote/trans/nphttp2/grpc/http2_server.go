@@ -410,6 +410,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 			}
 			klog.CtxWarnf(t.ctx, "transport: release reader: %v", t.framer.reader.Len())
 			t.framer.reader.Release()
+			t.framer.writer.Reset()
 			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, netpoll.ErrEOF) || errors.Is(err, netpoll.ErrConnClosed) {
 				klog.CtxWarnf(t.ctx, "transport: http2Server.HandleStreams get EOF: %v", err)
 				t.Close()
@@ -422,6 +423,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 		switch frame := frame.(type) {
 		case *grpcframe.MetaHeadersFrame:
 			if t.operateHeaders(frame, handle, traceCtx) {
+				klog.CtxErrorf(t.ctx, "MetaHeadersFrame operateHeaders")
 				t.Close()
 				break
 			}

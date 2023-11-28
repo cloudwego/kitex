@@ -100,3 +100,7 @@ func (w *bufWriter) Flush() error {
 	w.offset = 0
 	return w.err
 }
+
+func (w *bufWriter) Reset() {
+	w.buf = nil
+}
