@@ -405,7 +405,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				}
 				continue
 			}
-			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, netpoll.ErrEOF) {
+			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, netpoll.ErrEOF) || errors.Is(err, netpoll.ErrConnClosed) {
 				t.Close()
 				return
 			}
