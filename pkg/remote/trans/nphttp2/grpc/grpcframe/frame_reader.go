@@ -150,7 +150,7 @@ func (fr *Framer) ReadFrame() (http2.Frame, error) {
 	fh, err := readFrameHeader(fr.reader)
 	if err != nil {
 		klog.Errorf("readFrameHeader err: %v", err)
-		return nil, err
+		return nil, netpoll.Exception(netpoll.ErrConnClosed, "read frame")
 	}
 	if fh.Length > fr.maxReadSize {
 		return nil, http2.ErrFrameTooLarge
