@@ -14,10 +14,23 @@
  * limitations under the License.
  */
 
-package kitex
+package rpcinfo
 
-// Name and Version info of this framework, used for statistics and debug
-const (
-	Name    = "Kitex"
-	Version = "v0.8.0"
+import (
+	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
+
+func TestEnablePool(t *testing.T) {
+	t.Run("disable", func(t *testing.T) {
+		EnablePool(false)
+		test.Assert(t, !poolEnabled())
+	})
+
+	t.Run("disable-enable", func(t *testing.T) {
+		EnablePool(false)
+		EnablePool(true)
+		test.Assert(t, poolEnabled())
+	})
+}

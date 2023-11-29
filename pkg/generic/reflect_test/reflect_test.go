@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"testing"
@@ -40,6 +41,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	initExampleDescriptor()
 	svr := initServer(":9090")
 	cli = initClient("127.0.0.1:9090")

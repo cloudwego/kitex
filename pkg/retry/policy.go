@@ -88,6 +88,11 @@ type FailurePolicy struct {
 	BackOffPolicy     *BackOffPolicy     `json:"backoff_policy,omitempty"`
 	RetrySameNode     bool               `json:"retry_same_node"`
 	ShouldResultRetry *ShouldResultRetry `json:"-"`
+
+	// Extra is not used directly by kitex. It's used for better integrating your own config source.
+	// After loading FailurePolicy from your config source, `Extra` can be decoded into a user-defined schema,
+	// with which, more complex strategies can be implemented, such as modifying the `ShouldResultRetry`.
+	Extra string `json:"extra"`
 }
 
 // IsRespRetryNonNil is used to check if RespRetry is nil
@@ -203,6 +208,9 @@ func (p *FailurePolicy) Equals(np *FailurePolicy) bool {
 	if p.RetrySameNode != np.RetrySameNode {
 		return false
 	}
+	if p.Extra != np.Extra {
+		return false
+	}
 	// don't need to check `ShouldResultRetry`, ShouldResultRetry is only setup by option
 	// in remote config case will always return false if check it
 	return true
@@ -217,6 +225,7 @@ func (p *FailurePolicy) DeepCopy() *FailurePolicy {
 		BackOffPolicy:     p.BackOffPolicy.DeepCopy(),
 		RetrySameNode:     p.RetrySameNode,
 		ShouldResultRetry: p.ShouldResultRetry, // don't need DeepCopy
+		Extra:             p.Extra,
 	}
 }
 

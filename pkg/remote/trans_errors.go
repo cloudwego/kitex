@@ -36,6 +36,8 @@ const (
 	InvalidTransform            = 8
 	InvalidProtocol             = 9
 	UnsupportedClientType       = 10
+	// kitex's own type id from number 20
+	UnknownService = 20
 )
 
 var defaultTransErrorMessage = map[int32]string{
@@ -50,6 +52,7 @@ var defaultTransErrorMessage = map[int32]string{
 	InvalidTransform:            "Invalid transform",
 	InvalidProtocol:             "Invalid protocol",
 	UnsupportedClientType:       "Unsupported client type",
+	UnknownService:              "unknown service",
 }
 
 // TransError is the error that can be transmitted, it corresponds to TApplicationException in Thrift
@@ -104,8 +107,9 @@ func NewTransError(typeID int32, err error) *TransError {
 		return e
 	}
 	// biz error should add biz info which is convenient to be recognized by client side
-	if errors.Is(err, kerrors.ErrBiz) {
-		if e, ok := errors.Unwrap(err).(*TransError); ok {
+	var dErr *kerrors.DetailedError
+	if errors.As(err, &dErr) && dErr.Is(kerrors.ErrBiz) {
+		if e, ok := dErr.Unwrap().(*TransError); ok {
 			e = e.AppendMessage(fmt.Sprintf("[%s]", kerrors.ErrBiz.Error()))
 			return e
 		}

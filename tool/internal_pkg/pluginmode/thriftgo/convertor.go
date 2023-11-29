@@ -383,6 +383,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				si.Protocol = transport.HESSIAN2.String()
 			}
 
+			si.HandlerReturnKeepResp = c.Config.HandlerReturnKeepResp
 			si.ServiceTypeName = func() string { return si.ServiceName }
 			all[ast.Filename] = append(all[ast.Filename], si)
 			c.svc2ast[si] = ast
@@ -415,6 +416,7 @@ func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*ge
 	if c.IsHessian2() {
 		si.Protocol = transport.HESSIAN2.String()
 	}
+	si.HandlerReturnKeepResp = c.Config.HandlerReturnKeepResp
 	return si, nil
 }
 

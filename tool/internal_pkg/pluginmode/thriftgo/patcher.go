@@ -52,15 +52,16 @@ var KitexUnusedProtection = struct{}{}
 var protectionInsertionPoint = "KitexUnusedProtection"
 
 type patcher struct {
-	noFastAPI   bool
-	utils       *golang.CodeUtils
-	module      string
-	copyIDL     bool
-	version     string
-	record      bool
-	recordCmd   []string
-	deepCopyAPI bool
-	protocol    string
+	noFastAPI             bool
+	utils                 *golang.CodeUtils
+	module                string
+	copyIDL               bool
+	version               string
+	record                bool
+	recordCmd             []string
+	deepCopyAPI           bool
+	protocol              string
+	handlerReturnKeepResp bool
 
 	fileTpl *template.Template
 }
@@ -109,6 +110,9 @@ func (p *patcher) buildTemplates() (err error) {
 	}
 	m["IsHessian"] = func() bool {
 		return p.IsHessian2()
+	}
+	m["IsGoStringType"] = func(typeName golang.TypeName) bool {
+		return typeName == "string" || typeName == "*string"
 	}
 
 	tpl := template.New("kitex").Funcs(m)

@@ -111,6 +111,7 @@ type Config struct {
 	Includes              util.StringSlice
 	ThriftOptions         util.StringSlice
 	ProtobufOptions       util.StringSlice
+	Hessian2Options       util.StringSlice
 	IDL                   string // the IDL file passed on the command line
 	OutputPath            string // the output path for main pkg and kitex_gen
 	PackagePrefix         string
@@ -132,8 +133,9 @@ type Config struct {
 
 	GenPath string
 
-	DeepCopyAPI bool
-	Protocol    string
+	DeepCopyAPI           bool
+	Protocol              string
+	HandlerReturnKeepResp bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -483,6 +485,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 		if len(pkg.AllMethods()) > 0 {
 			pkg.AddImports("callopt")
+			pkg.AddImports("context")
 		}
 		fallthrough
 	case HandlerFileName:

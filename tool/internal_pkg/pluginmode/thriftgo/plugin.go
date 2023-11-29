@@ -17,12 +17,12 @@ package thriftgo
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/cloudwego/thriftgo/plugin"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 // PluginName is the link name when the kitex binary is used as a plugin for thriftgo.
@@ -34,7 +34,7 @@ const TheUseOptionMessage = "kitex_gen is not generated due to the -use option"
 // Run is an entry of the plugin mode of kitex for thriftgo.
 // It reads a plugin request from the standard input and writes out a response.
 func Run() int {
-	data, err := ioutil.ReadAll(os.Stdin)
+	data, err := util.ReadInput()
 	if err != nil {
 		println("Failed to get input:", err.Error())
 		return 1
@@ -115,15 +115,16 @@ func Run() int {
 		return conv.fail(err)
 	}
 	p := &patcher{
-		noFastAPI:   conv.Config.NoFastAPI,
-		utils:       conv.Utils,
-		module:      conv.Config.ModuleName,
-		copyIDL:     conv.Config.CopyIDL,
-		version:     conv.Config.Version,
-		record:      conv.Config.Record,
-		recordCmd:   conv.Config.RecordCmd,
-		deepCopyAPI: conv.Config.DeepCopyAPI,
-		protocol:    conv.Config.Protocol,
+		noFastAPI:             conv.Config.NoFastAPI,
+		utils:                 conv.Utils,
+		module:                conv.Config.ModuleName,
+		copyIDL:               conv.Config.CopyIDL,
+		version:               conv.Config.Version,
+		record:                conv.Config.Record,
+		recordCmd:             conv.Config.RecordCmd,
+		deepCopyAPI:           conv.Config.DeepCopyAPI,
+		protocol:              conv.Config.Protocol,
+		handlerReturnKeepResp: conv.Config.HandlerReturnKeepResp,
 	}
 	patches, err := p.patch(req)
 	if err != nil {

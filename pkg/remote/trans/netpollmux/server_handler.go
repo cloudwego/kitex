@@ -62,10 +62,11 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 }
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
+	svcInfo := trans.GetDefaultSvcInfo(opt.SvcMap)
 	svrHdlr := &svrTransHandler{
 		opt:     opt,
 		codec:   opt.Codec,
-		svcInfo: opt.SvcInfo,
+		svcInfo: svcInfo,
 		ext:     np.NewNetpollConnExtension(),
 	}
 	if svrHdlr.opt.TracerCtl == nil {

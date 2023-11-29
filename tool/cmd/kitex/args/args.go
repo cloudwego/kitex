@@ -94,6 +94,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")
 	f.Var(&a.Includes, "I", "Add an IDL search path for includes.")
 	f.Var(&a.ThriftOptions, "thrift", "Specify arguments for the thrift go compiler.")
+	f.Var(&a.Hessian2Options, "hessian2", "Specify arguments for the hessian2 codec.")
 	f.DurationVar(&a.ThriftPluginTimeLimit, "thrift-plugin-time-limit", generator.DefaultThriftPluginTimeLimit, "Specify thrift plugin execution time limit.")
 	f.Var(&a.ThriftPlugins, "thrift-plugin", "Specify thrift plugin arguments for the thrift compiler.")
 	f.Var(&a.ProtobufOptions, "protobuf", "Specify arguments for the protobuf compiler.")
@@ -102,6 +103,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Combine services in root thrift file.")
 	f.BoolVar(&a.CopyIDL, "copy-idl", false,
 		"Copy each IDL file to the output path.")
+	f.BoolVar(&a.HandlerReturnKeepResp, "handler-return-keep-resp", false,
+		"When the server-side handler returns both err and resp, the resp return is retained for use in middleware where both err and resp can be used simultaneously. Note: At the RPC communication level, if the handler returns an err, the framework still only returns err to the client without resp.")
 	f.StringVar(&a.ExtensionFile, "template-extension", a.ExtensionFile,
 		"Specify a file for template extension.")
 	f.BoolVar(&a.FrugalPretouch, "frugal-pretouch", false,
@@ -307,8 +310,8 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 		for _, inc := range a.Includes {
 			cmd.Args = append(cmd.Args, "-i", inc)
 		}
-		if strings.EqualFold(a.Protocol, "hessian2") {
-			a.ThriftOptions = append(a.ThriftOptions, "template=slim")
+		if thriftgo.IsHessian2(a.Config) {
+			thriftgo.Hessian2PreHook(&a.Config)
 		}
 		a.ThriftOptions = append(a.ThriftOptions, "package_prefix="+a.PackagePrefix)
 		gas := "go:" + strings.Join(a.ThriftOptions, ",")
