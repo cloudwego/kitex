@@ -199,3 +199,11 @@ func (o *Options) initRemoteOpt() {
 		}
 	}
 }
+
+// InitRetryContainer init retry container and add close callback
+func (o *Options) InitRetryContainer() {
+	if o.RetryContainer == nil {
+		o.RetryContainer = retry.NewRetryContainerWithPercentageLimit()
+		o.CloseCallbacks = append(o.CloseCallbacks, o.RetryContainer.Close)
+	}
+}

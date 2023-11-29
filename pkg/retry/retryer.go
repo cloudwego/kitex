@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/bytedance/gopkg/cloud/circuitbreaker"
@@ -286,6 +285,22 @@ func (rc *Container) Init(mp map[string]Policy, rr *ShouldResultRetry) (err erro
 	return nil
 }
 
+// PrepareRetryContext adds necessary keys to context for retry
+// These keys should be added to `ctx` no matter whether there's a need to retry, to avoid sharing the same
+// object objects with another method call, since `ctx` might be reused in user-defined middlewares.
+func PrepareRetryContext(ctx context.Context) context.Context {
+	// reqOp can be used to avoid multiple writes to the request object.
+	// If a blocking write is needed, implement a lock based on it (spin-lock for example).
+	reqOp := OpNo
+	ctx = context.WithValue(ctx, CtxReqOp, &reqOp)
+
+	// `respOp` is used to avoid concurrent write/read on the response object, especially for backup requests.
+	// If `respOp` is modified by one request of this method call, all other requests will skip decoding.
+	respOp := OpNo
+	ctx = context.WithValue(ctx, CtxRespOp, &respOp)
+	return ctx
+}
+
 // WithRetryIfNeeded to check if there is a retryer can be used and if current call can retry.
 // When the retry condition is satisfied, use retryer to call
 func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy, rpcCall RPCCallFunc, ri rpcinfo.RPCInfo, request interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
@@ -299,7 +314,7 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 		retryer = rc.getRetryer(ri)
 	}
 
-	// case 1(default): no retry policy
+	// case 1(default, fast path): no retry policy
 	if retryer == nil {
 		if _, _, err = rpcCall(ctx, nil); err == nil {
 			return ri, true, nil
@@ -318,19 +333,8 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 		return ri, false, err
 	}
 
-	// case 3: retry
-	// reqOp is used to ignore req concurrent write
-	reqOp := OpNo
-	// respOp is used to ignore resp concurrent write and read, especially in backup request
-	respOp := OpNo
-	ctx = context.WithValue(ctx, CtxReqOp, &reqOp)
-	ctx = context.WithValue(ctx, CtxRespOp, &respOp)
-
-	// do rpc call with retry policy
+	// case 3: do rpc call with retry policy
 	lastRI, recycleRI, err = retryer.Do(ctx, rpcCall, ri, request)
-
-	// the rpc call has finished, modify respOp to done state.
-	atomic.StoreInt32(&respOp, OpDone)
 	return
 }
 
