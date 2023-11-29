@@ -19,6 +19,7 @@ package kitexutil
 import (
 	"context"
 	"net"
+	"os"
 	"reflect"
 	"testing"
 
@@ -54,7 +55,7 @@ func TestMain(m *testing.M) {
 	testCtx = rpcinfo.NewCtxWithRPCInfo(testCtx, testRi)
 	panicCtx = rpcinfo.NewCtxWithRPCInfo(context.Background(), &panicRPCInfo{})
 
-	m.Run()
+	os.Exit(m.Run())
 }
 
 func TestGetCaller(t *testing.T) {
