@@ -161,7 +161,7 @@ func (kc *kClient) initRetryer() error {
 		if kc.opt.RetryMethodPolicies == nil {
 			return nil
 		}
-		kc.opt.RetryContainer = retry.NewRetryContainer()
+		kc.opt.InitRetryContainer()
 	}
 	return kc.opt.RetryContainer.Init(kc.opt.RetryMethodPolicies, kc.opt.RetryWithResult)
 }
@@ -351,7 +351,7 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	callOptRetry := getCalloptRetryPolicy(callOpts)
 	if kc.opt.RetryContainer == nil && callOptRetry != nil && callOptRetry.Enable {
 		// setup retry in callopt
-		kc.opt.RetryContainer = retry.NewRetryContainer()
+		kc.opt.InitRetryContainer()
 	}
 
 	if kc.opt.RetryContainer == nil {
