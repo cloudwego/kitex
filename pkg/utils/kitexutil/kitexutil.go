@@ -58,7 +58,7 @@ func GetCallerHandlerMethod(ctx context.Context) (string, bool) {
 	if ri == nil {
 		return "", false
 	}
-	return ri.To().Method(), true
+	return ri.From().Method(), true
 }
 
 // GetIDLServiceName gets the serviceName which defined in IDL.

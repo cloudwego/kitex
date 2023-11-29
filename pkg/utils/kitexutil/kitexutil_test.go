@@ -28,20 +28,22 @@ import (
 )
 
 var (
-	testRi   rpcinfo.RPCInfo
-	testCtx  context.Context
-	panicCtx context.Context
-	caller   = "kitexutil.from.service"
-	callee   = "kitexutil.to.service"
-	fromAddr = utils.NewNetAddr("test", "127.0.0.1:12345")
-	method   = "method"
-	tp       = transport.TTHeader
+	testRi         rpcinfo.RPCInfo
+	testCtx        context.Context
+	panicCtx       context.Context
+	caller         = "kitexutil.from.service"
+	callee         = "kitexutil.to.service"
+	idlServiceName = "MockService"
+	fromAddr       = utils.NewNetAddr("test", "127.0.0.1:12345")
+	fromMethod     = "from_method"
+	method         = "method"
+	tp             = transport.TTHeader
 )
 
 func TestMain(m *testing.M) {
-	from := rpcinfo.NewEndpointInfo(caller, "-", fromAddr, nil)
+	from := rpcinfo.NewEndpointInfo(caller, fromMethod, fromAddr, nil)
 	to := rpcinfo.NewEndpointInfo(callee, method, nil, nil)
-	ink := rpcinfo.NewInvocation(callee, method)
+	ink := rpcinfo.NewInvocation(idlServiceName, method)
 	config := rpcinfo.NewRPCConfig()
 	config.(rpcinfo.MutableRPCConfig).SetTransportProtocol(tp)
 
@@ -130,6 +132,60 @@ func TestGetMethod(t *testing.T) {
 			}
 			if got1 != tt.want1 {
 				t.Errorf("GetMethod() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func TestGetCallerHandlerMethod(t *testing.T) {
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  string
+		want1 bool
+	}{
+		{name: "Success", args: args{testCtx}, want: fromMethod, want1: true},
+		{name: "Failure", args: args{context.Background()}, want: "", want1: false},
+		{name: "Panic recovered", args: args{panicCtx}, want: "", want1: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := GetCallerHandlerMethod(tt.args.ctx)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetCallerHandlerMethod() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("GetCallerHandlerMethod() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func TestGetIDLServiceName(t *testing.T) {
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  string
+		want1 bool
+	}{
+		{name: "Success", args: args{testCtx}, want: idlServiceName, want1: true},
+		{name: "Failure", args: args{context.Background()}, want: "", want1: false},
+		{name: "Panic recovered", args: args{panicCtx}, want: "", want1: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := GetIDLServiceName(tt.args.ctx)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetCallerHandlerMethod() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("GetCallerHandlerMethod() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
