@@ -35,6 +35,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+var errUnexpectedFinish = errors.New("backup request: all retries finished unexpectedly, " +
+	"please submit an issue to https://github.com/cloudwego/kitex/issues")
+
 func newBackupRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
 	br := &backupRetryer{cbContainer: cbC}
 	if err := br.UpdatePolicy(policy); err != nil {
@@ -94,6 +97,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	callCosts.RawStringBuilder().Grow(32)
 	var recordCostDoing int32 = 0
 	var abort int32 = 0
+	var finishedCount = 0
 	// notice: buff num of chan is very important here, it cannot less than call times, or the below chan receive will block
 	done := make(chan *resultWrapper, retryTimes+1)
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
@@ -145,8 +149,13 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 			}
 		case res := <-done:
 			if res.err != nil && errors.Is(res.err, kerrors.ErrRPCFinish) {
-				// To ignore resp concurrent write, the later response won't do decode and return ErrRPCFinish.
-				// But if the cost of decode is long, ErrRPCFinish will return before previous normal call.
+				// There will be only one request (goroutine) pass the `checkRPCState`, others will skip decoding
+				// and return `ErrRPCFinish`, to avoid concurrent write to response and save the cost of decoding.
+				// We can safely ignore this error and wait for the response of the passed goroutine.
+				if finishedCount++; finishedCount >= retryTimes+1 {
+					// But if all requests return this error, it must be a bug, preventive panic to avoid dead loop
+					panic(errUnexpectedFinish)
+				}
 				continue
 			}
 			atomic.StoreInt32(&abort, 1)
