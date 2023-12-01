@@ -97,7 +97,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	callCosts.RawStringBuilder().Grow(32)
 	var recordCostDoing int32 = 0
 	var abort int32 = 0
-	var finishedCount = 0
+	finishedCount := 0
 	// notice: buff num of chan is very important here, it cannot less than call times, or the below chan receive will block
 	done := make(chan *resultWrapper, retryTimes+1)
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
