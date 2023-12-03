@@ -68,6 +68,8 @@ type patcher struct {
 
 func (p *patcher) buildTemplates() (err error) {
 	m := p.utils.BuildFuncMap()
+	m["ZeroWriter"] = ZeroWriter
+	m["ZeroBLength"] = ZeroBLength
 	m["ReorderStructFields"] = p.reorderStructFields
 	m["TypeIDToGoType"] = func(t string) string { return typeIDToGoType[t] }
 	m["IsBinaryOrStringType"] = p.isBinaryOrStringType

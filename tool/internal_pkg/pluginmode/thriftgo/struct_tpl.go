@@ -313,7 +313,13 @@ func (p *{{$TypeName}}) fastWriteField{{Str .ID}}(buf []byte, binaryWriter bthri
 			{{- template "FieldFastWrite" $ctx}}
 			offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
 		{{- if Features.WithFieldMask}}
+		} 
+		{{- if .Requiredness.IsRequired}} else {
+			offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "{{.Name}}", thrift.{{$TypeID}}, {{.ID}})
+			{{ ZeroWriter .Type "bthrift.Binary" "buf[offset:]" "offset" -}}
+			offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
 		}
+		{{- end}}
 		{{- end}}
 	{{- if .Requiredness.IsOptional}}
 	}
@@ -345,6 +351,12 @@ func (p *{{$TypeName}}) field{{Str .ID}}Length() int {
 			l += bthrift.Binary.FieldEndLength()
 		{{- if Features.WithFieldMask}}
 		}
+		{{- if .Requiredness.IsRequired}} else {
+			l += bthrift.Binary.FieldBeginLength("{{.Name}}", thrift.{{$TypeID}}, {{.ID}})
+			{{ ZeroBLength .Type "bthrift.Binary" "l" -}}
+			l += bthrift.Binary.FieldEndLength()
+		}
+		{{- end}}
 		{{- end}}
 	{{- if .Requiredness.IsOptional}}
 	}
