@@ -371,13 +371,13 @@ const fieldFastReadStructLike = `
 {{define "FieldFastReadStructLike"}}
 	{{- if .NeedDecl}}
 	{{- .Target}} := {{.TypeName.Deref.NewFunc}}()
-	{{- if Features.WithFieldMask}}
-	{{.Target}}.Set_FieldMask({{.FieldMask}})
+	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
+	{{.Target}}.Pass_FieldMask({{.FieldMask}})
 	{{- end}}
 	{{- else}}
 	tmp := {{.TypeName.Deref.NewFunc}}()
-	{{- if Features.WithFieldMask}}
-	tmp.Set_FieldMask({{.FieldMask}})
+	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
+	tmp.Pass_FieldMask({{.FieldMask}})
 	{{- end}}
 	{{- end}}
 	{{- if Features.WithFieldMask}}
@@ -445,8 +445,7 @@ const fieldFastReadMap = `
 	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, size)
 	for i := 0; i < size; i++ {
 		{{- $key := .GenID "_key"}}
-		{{- UseStdLibrary "fieldmask" -}}
-		{{- $ctx := (.KeyCtx.WithDecl.WithTarget $key).WithFieldMask "(*fieldmask.FieldMask)(nil)"}}
+		{{- $ctx := (.KeyCtx.WithDecl.WithTarget $key).WithFieldMask ""}}
 		{{- template "FieldFastRead" $ctx}}
 		{{- if Features.WithFieldMask}}
 		{{- if $isIntKey}}
@@ -761,10 +760,8 @@ const fieldLength = `
 
 const fieldFastWriteStructLike = `
 {{define "FieldFastWriteStructLike"}}
-	{{- if Features.WithFieldMask}}
-	if {{.Target}} != nil {
-		{{.Target}}.Set_FieldMask({{.FieldMask}})
-	}
+	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
+	{{.Target}}.Pass_FieldMask({{.FieldMask}})
 	{{- end}}
 	offset += {{.Target}}.FastWriteNocopy(buf[offset:], binaryWriter)
 {{- end}}{{/* define "FieldFastWriteStructLike" */}}
@@ -772,10 +769,8 @@ const fieldFastWriteStructLike = `
 
 const fieldStructLikeLength = `
 {{define "FieldStructLikeLength"}}
-	{{- if Features.WithFieldMask}}
-	if {{.Target}} != nil {
-		{{.Target}}.Set_FieldMask({{.FieldMask}})
-	}
+	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
+	{{.Target}}.Pass_FieldMask({{.FieldMask}})
 	{{- end}}
 	l += {{.Target}}.BLength()
 {{- end}}{{/* define "FieldStructLikeLength" */}}
@@ -868,8 +863,7 @@ const fieldFastWriteMap = `
 		{{- end}}
 		{{- end}}{{/* end Features.WithFieldMask */}}
 		length++
-		{{- UseStdLibrary "fieldmask" -}}
-		{{- $ctx := (.KeyCtx.WithTarget "k").WithFieldMask "(*fieldmask.FieldMask)(nil)"}}
+		{{- $ctx := (.KeyCtx.WithTarget "k").WithFieldMask ""}}
 		{{- template "FieldFastWrite" $ctx}}
 		{{- $ctx := (.ValCtx.WithTarget "v").WithFieldMask $curFieldMask}}
 		{{- template "FieldFastWrite" $ctx}}
@@ -905,26 +899,26 @@ const fieldMapLength = `
 	{{- else}}
 	for k, v := range {{.Target}}{
 		{{- if Features.WithFieldMask}}
-		{{- if $isIntKey}}
 		{{- $curFieldMask = "nfm"}}
+		{{- if $isIntKey}}
 		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(int(k)); !ex {
 			continue
 		} else {
 		{{- else if $isStrKey}}
-		{{- $curFieldMask = "nfm"}}
-		ks := string(k)
-		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Str(ks); !ex {
+		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Str(string(k)); !ex {
 			continue
 		} else {
 		{{- else}}
-		{{$curFieldMask}} = nil
+		if {{if $isBaseVal}}_{{else}}{{$curFieldMask}}{{end}}, ex := {{.FieldMask}}.Int(0); !ex {
+			continue
+		} else {
 		{{- end}}
 		{{- end}}{{/* end Features.WithFieldMask */}}
-		{{$ctx := .KeyCtx.WithTarget "k"}}
+		{{$ctx := (.KeyCtx.WithTarget "k").WithFieldMask ""}}
 		{{- template "FieldLength" $ctx}}
 		{{- $ctx := (.ValCtx.WithTarget "v").WithFieldMask $curFieldMask -}}
 		{{- template "FieldLength" $ctx}}
-		{{- if and Features.WithFieldMask (or $isIntKey $isStrKey)}}
+		{{- if and Features.WithFieldMask}}
 		}
 		{{- end}}
 	}
