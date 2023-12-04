@@ -31,4 +31,4 @@ require (
 
 replace github.com/apache/thrift => github.com/apache/thrift v0.13.0
 
-replace github.com/cloudwego/thriftgo => /Users/admin/GOPATH/work/thriftgo
+replace github.com/cloudwego/thriftgo => github.com/cloudwego/thriftgo v0.3.4-0.20231204123438-8456d5c6b677
