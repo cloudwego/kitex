@@ -384,12 +384,20 @@ const fieldFastReadStructLike = `
 	{{- if .NeedDecl}}
 	{{- .Target}} := {{.TypeName.Deref.NewFunc}}()
 	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
+	{{- if Features.FieldMaskHalfway}}
 	{{.Target}}.Pass_FieldMask({{.FieldMask}})
+	{{- else}}
+	{{.Target}}.Set_FieldMask({{.FieldMask}})
+	{{- end}}
 	{{- end}}
 	{{- else}}
 	tmp := {{.TypeName.Deref.NewFunc}}()
 	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
+	{{- if Features.FieldMaskHalfway}}
 	tmp.Pass_FieldMask({{.FieldMask}})
+	{{- else}}
+	tmp.Set_FieldMask({{.FieldMask}})
+	{{- end}}
 	{{- end}}
 	{{- end}}
 	{{- if Features.WithFieldMask}}
@@ -773,7 +781,11 @@ const fieldLength = `
 const fieldFastWriteStructLike = `
 {{define "FieldFastWriteStructLike"}}
 	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
+	{{- if Features.FieldMaskHalfway}}
 	{{.Target}}.Pass_FieldMask({{.FieldMask}})
+	{{- else}}
+	{{.Target}}.Set_FieldMask({{.FieldMask}})
+	{{- end}}
 	{{- end}}
 	offset += {{.Target}}.FastWriteNocopy(buf[offset:], binaryWriter)
 {{- end}}{{/* define "FieldFastWriteStructLike" */}}
@@ -782,7 +794,11 @@ const fieldFastWriteStructLike = `
 const fieldStructLikeLength = `
 {{define "FieldStructLikeLength"}}
 	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
+	{{- if Features.FieldMaskHalfway}}
 	{{.Target}}.Pass_FieldMask({{.FieldMask}})
+	{{- else}}
+	{{.Target}}.Set_FieldMask({{.FieldMask}})
+	{{- end}}
 	{{- end}}
 	l += {{.Target}}.BLength()
 {{- end}}{{/* define "FieldStructLikeLength" */}}

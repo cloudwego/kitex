@@ -137,8 +137,6 @@ type Config struct {
 	DeepCopyAPI           bool
 	Protocol              string
 	HandlerReturnKeepResp bool
-
-	WithFieldMask bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
