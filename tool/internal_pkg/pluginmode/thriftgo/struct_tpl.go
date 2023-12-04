@@ -1079,10 +1079,14 @@ const processor = `
 {{define "Processor"}}
 {{- range .Functions}}
 {{$ArgsType := .ArgType}}
+{{- $withFieldMask := (SetWithFieldMask false) }}
 {{template "StructLikeCodec" $ArgsType}}
+{{- $_ := (SetWithFieldMask $withFieldMask) }}
 {{- if not .Oneway}}
 	{{$ResType := .ResType}}
+	{{- $withFieldMask := (SetWithFieldMask false) }}
 	{{template "StructLikeCodec" $ResType}}
+	{{- $_ := (SetWithFieldMask $withFieldMask) }}
 {{- end}}
 {{- end}}{{/* range .Functions */}}
 {{- end}}{{/* define "Processor" */}}

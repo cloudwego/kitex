@@ -98,7 +98,9 @@ const patchArgsAndResult = `
 
 
 {{- if GenerateArgsResultTypes}}
+{{- $withFieldMask := (SetWithFieldMask false) }}
 {{template "StructLike" $argType}}
+{{- $_ := (SetWithFieldMask $withFieldMask) }}
 {{- end}}{{/* if GenerateArgsResultTypes */}}
 func (p *{{$argType.GoName}}) GetFirstArgument() interface{} {
 	return {{if .Arguments}}p.{{(index $argType.Fields 0).GoName}}{{else}}nil{{end}}
@@ -106,7 +108,9 @@ func (p *{{$argType.GoName}}) GetFirstArgument() interface{} {
 
 {{if not .Oneway}}
 {{- if GenerateArgsResultTypes}}
+{{- $withFieldMask := (SetWithFieldMask false) }}
 {{template "StructLike" $resType}}
+{{- $_ := (SetWithFieldMask $withFieldMask) }}
 {{- end}}{{/* if GenerateArgsResultTypes */}}
 func (p *{{$resType.GoName}}) GetResult() interface{} {
 	return {{if .Void}}nil{{else}}p.Success{{end}}
