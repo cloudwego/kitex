@@ -62,7 +62,7 @@ import (
 	{{.Alias}} "{{.Path}}"
 	{{- end}}
 	{{- if GenerateDeepCopyAPIs}}
-	kutils "{{ImportPathTo "pkg/utils"}}"
+	kutils "github.com/cloudwego/kitex/pkg/utils"
 	{{- end}}
 	{{- if GenerateFastAPIs}}
 	"{{ImportPathTo "pkg/protocol/bthrift"}}"
