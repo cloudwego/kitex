@@ -54,11 +54,12 @@ var (
 
 	globalMiddlewares  []Middleware
 	globalDependencies = map[string]string{
-		"kitex":   kitexImportPath,
-		"client":  ImportPathTo("client"),
-		"server":  ImportPathTo("server"),
-		"callopt": ImportPathTo("client/callopt"),
-		"frugal":  "github.com/cloudwego/frugal",
+		"kitex":     kitexImportPath,
+		"client":    ImportPathTo("client"),
+		"server":    ImportPathTo("server"),
+		"callopt":   ImportPathTo("client/callopt"),
+		"frugal":    "github.com/cloudwego/frugal",
+		"fieldmask": "github.com/cloudwego/thriftgo/fieldmask",
 	}
 )
 
