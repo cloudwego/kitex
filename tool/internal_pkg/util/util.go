@@ -297,3 +297,11 @@ func SortImports(imps map[string]string, localPrefix string) (ret []Import) {
 	ret = append(ret, locals...)
 	return ret
 }
+
+func (i Import) PackageName() string {
+	if i.Alias != "" {
+		return i.Alias
+	} else {
+		return strings.ToLower(filepath.Base(i.Path))
+	}
+}

@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -78,17 +77,6 @@ func (p *patcher) buildTemplates() (err error) {
 	m["GenerateDeepCopyAPIs"] = func() bool { return p.deepCopyAPI }
 	m["GenerateArgsResultTypes"] = func() bool { return p.utils.Template() == "slim" }
 	m["ImportPathTo"] = generator.ImportPathTo
-	m["ToPackageNames"] = func(imports map[string]string) (res []string) {
-		for pth, alias := range imports {
-			if alias != "" {
-				res = append(res, alias)
-			} else {
-				res = append(res, strings.ToLower(filepath.Base(pth)))
-			}
-		}
-		sort.Strings(res)
-		return
-	}
 	m["Str"] = func(id int32) string {
 		if id < 0 {
 			return "_" + strconv.Itoa(-int(id))
@@ -229,7 +217,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 
 	var buf strings.Builder
 
-	// fd, e := os.OpenFile("dump_scope.txt", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	// fd, _ := os.OpenFile("dump.txt", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	// defer fd.Close()
 
 	protection := make(map[string]*plugin.Generated)
@@ -283,9 +271,10 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		// }
 
 		data := &struct {
-			Scope   *golang.Scope
-			PkgName string
-			Imports []util.Import
+			Scope    *golang.Scope
+			PkgName  string
+			Imports  []util.Import
+			Includes []util.Import
 		}{Scope: scope, PkgName: pkgName}
 
 		if err = p.fileTpl.ExecuteTemplate(&buf, "file", data); err != nil {
@@ -297,7 +286,14 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		if err != nil {
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
 		}
+		// ss := strings.Builder{}
+		// ss.WriteString(ast.GetFilename())
+		// ss.WriteString(fmt.Sprintf("\nimps: %#v\n", imps))
 		data.Imports = util.SortImports(imps, p.module)
+		data.Includes = p.filterStdLib(data.Imports)
+		// ss.WriteString(fmt.Sprintf(".Imports: %#v\n", data.Imports))
+		// ss.WriteString(fmt.Sprintf(".Includes: %#v\n", data.Includes))
+		// fd.Write([]byte(ss.String()))
 
 		// replace imports insert-pointer with newly rendered output
 		buf.Reset()
@@ -381,6 +377,34 @@ func getBashPath() string {
 		return "kitex-all.bat"
 	}
 	return "kitex-all.sh"
+}
+
+func (p *patcher) filterStdLib(imports []util.Import) []util.Import {
+	var ret = make([]util.Import, 0)
+	prefix := p.module + "/"
+	// remove std libs and thrift to prevent duplicate import.
+	for _, v := range imports {
+		if strings.HasPrefix(v.Path, prefix) { // local module
+			ret = append(ret, v)
+			continue
+		}
+
+		// this lib has been unused protected
+		if v.Path == "github.com/apache/thrift/lib/go/thrift" {
+			continue
+		}
+		// thriftgo std lib has been imported using UseStdLibrary
+		if strings.HasPrefix(v.Path, "github.com/cloudwego/thriftgo") {
+			continue
+		}
+		// std libs has been unused protected
+		if !strings.Contains(v.Path, ".") {
+			continue
+		}
+
+		ret = append(ret, v)
+	}
+	return ret
 }
 
 // DoRecord records current cmd into kitex-all.sh

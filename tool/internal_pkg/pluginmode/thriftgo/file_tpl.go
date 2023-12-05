@@ -45,9 +45,6 @@ var (
 	{{- if GenerateFastAPIs}}
 	_ = bthrift.BinaryWriter(nil)
 	{{- end}}
-	{{- range .Scope.Includes }}
-	_ = {{.PackageName}}.KitexUnusedProtection
-	{{- end}}
 )
 
 {{template "body" .}}
@@ -68,6 +65,14 @@ import (
 	"{{ImportPathTo "pkg/protocol/bthrift"}}"
 	{{- end}}
 )
+
+{{- if gt (len .Includes) 0}}
+var (
+	{{- range .Includes }}
+	_ = {{.PackageName}}.KitexUnusedProtection
+	{{- end}}
+)
+{{- end}}
 {{end}}{{/* define "imports" */}}
 `
 
