@@ -68,8 +68,16 @@ github.com/cloudwego/netpoll v0.3.1/go.mod h1:1T2WVuQ+MQw6h6DpE45MohSvDTKdy2DlzC
 github.com/cloudwego/netpoll v0.4.0/go.mod h1:xVefXptcyheopwNDZjDPcfU6kIjZXZ4nY550k1yH9eQ=
 github.com/cloudwego/netpoll v0.5.1 h1:zDUF7xF0C97I10fGlQFJ4jg65khZZMUvSu/TWX44Ohc=
 github.com/cloudwego/netpoll v0.5.1/go.mod h1:xVefXptcyheopwNDZjDPcfU6kIjZXZ4nY550k1yH9eQ=
+github.com/cloudwego/thriftgo v0.1.2/go.mod h1:LzeafuLSiHA9JTiWC8TIMIq64iadeObgRUhmVG1OC/w=
+github.com/cloudwego/thriftgo v0.2.4/go.mod h1:8i9AF5uDdWHGqzUhXDlubCjx4MEfKvWXGQlMWyR0tM4=
+github.com/cloudwego/thriftgo v0.2.7/go.mod h1:8i9AF5uDdWHGqzUhXDlubCjx4MEfKvWXGQlMWyR0tM4=
+github.com/cloudwego/thriftgo v0.2.11/go.mod h1:dAyXHEmKXo0LfMCrblVEY3mUZsdeuA5+i0vF5f09j7E=
+github.com/cloudwego/thriftgo v0.3.3 h1:dqdB5wXnw9icTXdb+/13dVZhSEf83UVsa75Yr05vTVE=
+github.com/cloudwego/thriftgo v0.3.3/go.mod h1:29ukiySoAMd0vXMYIduAY9dph/7dmChvOS11YLotFb8=
 github.com/cloudwego/thriftgo v0.3.4-0.20231204123438-8456d5c6b677 h1:4DeXjuNf+bta5xUcL799Y8yiz9O0a7Ym5Y7QpuzZ4RY=
 github.com/cloudwego/thriftgo v0.3.4-0.20231204123438-8456d5c6b677/go.mod h1:29ukiySoAMd0vXMYIduAY9dph/7dmChvOS11YLotFb8=
+github.com/cloudwego/thriftgo v0.3.4 h1:AMB/9r/NVxe7mLlqibcobtlRKYCbfYZmKm8rSHfNqGI=
+github.com/cloudwego/thriftgo v0.3.4/go.mod h1:29ukiySoAMd0vXMYIduAY9dph/7dmChvOS11YLotFb8=
 github.com/cncf/udpa/go v0.0.0-20201120205902-5459f2c99403/go.mod h1:WmhPx2Nbnhtbo57+VJT5O0JRkEi1Wbu0z5j0R8u5Hbk=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
