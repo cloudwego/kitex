@@ -54,7 +54,7 @@ func ZeroWriter(t *parser.Type, oprot string, buf string, offset string) string 
 		return offsetTPL(oprot+".WriteStructBegin("+buf+", \"\")", offset) + offsetTPL(oprot+".WriteFieldStop("+buf+")", offset) +
 			offsetTPL(oprot+".WriteStructEnd("+buf+")", offset)
 	default:
-		panic("unsuported type zero writer for" + t.Name)
+		panic("unsupported type zero writer for" + t.Name)
 	}
 }
 
@@ -89,6 +89,6 @@ func ZeroBLength(t *parser.Type, oprot string, offset string) string {
 		return offsetTPL(oprot+".StructBeginLength(\"\")", offset) + offsetTPL(oprot+".FieldStopLength()", offset) +
 			offsetTPL(oprot+".StructEndLength()", offset)
 	default:
-		panic("unsuported type zero writer for" + t.Name)
+		panic("unsupported type zero writer for" + t.Name)
 	}
 }
