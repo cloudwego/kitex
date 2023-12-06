@@ -112,6 +112,33 @@ func TestGetCallerAddr(t *testing.T) {
 	}
 }
 
+func TestGetCallerIP(t *testing.T) {
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  string
+		want1 bool
+	}{
+		{name: "Success", args: args{testCtx}, want: "127.0.0.1", want1: true},
+		{name: "Failure", args: args{context.Background()}, want: "", want1: false},
+		{name: "Panic recovered", args: args{panicCtx}, want: "", want1: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := GetCallerIP(tt.args.ctx)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetCallerAddr() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("GetCallerAddr() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
 func TestGetMethod(t *testing.T) {
 	type args struct {
 		ctx context.Context
