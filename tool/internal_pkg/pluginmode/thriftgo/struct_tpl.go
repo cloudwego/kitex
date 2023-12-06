@@ -306,18 +306,26 @@ func (p *{{$TypeName}}) fastWriteField{{Str .ID}}(buf []byte, binaryWriter bthri
 	if p.{{.IsSetter}}() {
 	{{- end}}
 		{{- if Features.WithFieldMask}}
+		{{- if and .Requiredness.IsRequired (not Features.FieldMaskZeroRequired)}}
+		{{- if not $isBaseVal}}
+		fm, _ := p._fieldmask.Field({{.ID}})
+		{{- end}}
+		{{- else}}
 		if {{if $isBaseVal}}_{{else}}fm{{end}}, ex := p._fieldmask.Field({{.ID}}); ex { 
+		{{- end}}
 		{{- end}}
 			offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "{{.Name}}", thrift.{{$TypeID}}, {{.ID}})
 			{{- $ctx := (MkRWCtx .).WithFieldMask "fm"}}
 			{{- template "FieldFastWrite" $ctx}}
 			offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
 		{{- if Features.WithFieldMask}}
-		} 
-		{{- if .Requiredness.IsRequired}} else {
+		{{- if Features.FieldMaskZeroRequired}}
+		} else {
 			offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "{{.Name}}", thrift.{{$TypeID}}, {{.ID}})
 			{{ ZeroWriter .Type "bthrift.Binary" "buf[offset:]" "offset" -}}
 			offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+		}
+		{{- else if not .Requiredness.IsRequired}}
 		}
 		{{- end}}
 		{{- end}}
@@ -343,18 +351,26 @@ func (p *{{$TypeName}}) field{{Str .ID}}Length() int {
 	if p.{{.IsSetter}}() {
 	{{- end}}
 		{{- if Features.WithFieldMask}}
+		{{- if and .Requiredness.IsRequired (not Features.FieldMaskZeroRequired)}}
+		{{- if not $isBaseVal}}
+		fm, _ := p._fieldmask.Field({{.ID}})
+		{{- end}}
+		{{- else}}
 		if {{if $isBaseVal}}_{{else}}fm{{end}}, ex := p._fieldmask.Field({{.ID}}); ex {
+		{{- end}}
 		{{- end}}
 			l += bthrift.Binary.FieldBeginLength("{{.Name}}", thrift.{{$TypeID}}, {{.ID}})
 			{{- $ctx := (MkRWCtx .).WithFieldMask "fm"}}
 			{{- template "FieldLength" $ctx}}
 			l += bthrift.Binary.FieldEndLength()
 		{{- if Features.WithFieldMask}}
-		}
-		{{- if .Requiredness.IsRequired}} else {
+		{{- if Features.FieldMaskZeroRequired}}
+		} else {
 			l += bthrift.Binary.FieldBeginLength("{{.Name}}", thrift.{{$TypeID}}, {{.ID}})
 			{{ ZeroBLength .Type "bthrift.Binary" "l" -}}
 			l += bthrift.Binary.FieldEndLength()
+		}
+		{{- else if not .Requiredness.IsRequired}}
 		}
 		{{- end}}
 		{{- end}}
