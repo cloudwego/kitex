@@ -272,8 +272,8 @@ func buildRPCInfo() rpcinfo.RPCInfo {
 	config.(rpcinfo.MutableRPCConfig).SetTransportProtocol(tp)
 
 	stats := rpcinfo.NewRPCStats()
-	testRi = rpcinfo.NewRPCInfo(from, to, ink, config, stats)
-	return testRi
+	ri := rpcinfo.NewRPCInfo(from, to, ink, config, stats)
+	return ri
 }
 
 type panicRPCInfo struct{}
