@@ -129,18 +129,18 @@ func GetRPCInfo(ctx context.Context) (rpcinfo.RPCInfo, bool) {
 	return ri, true
 }
 
-// GetRealRequest assert the req to be KitexArgs and return the real request if succeeded, otherwise return nil.
+// GetRealReqFromKitexArgs assert the req to be KitexArgs and return the real request if succeeded, otherwise return nil.
 // This method should be used in the middleware.
-func GetRealRequest(req interface{}) interface{} {
+func GetRealReqFromKitexArgs(req interface{}) interface{} {
 	if arg, ok := req.(utils.KitexArgs); ok {
 		return arg.GetFirstArgument()
 	}
 	return nil
 }
 
-// GetRealResponse assert the req to be KitexResult and return the real response if succeeded, otherwise return nil.
+// GetRealRespFromKitexResult assert the req to be KitexResult and return the real response if succeeded, otherwise return nil.
 // This method should be used in the middleware.
-func GetRealResponse(resp interface{}) interface{} {
+func GetRealRespFromKitexResult(resp interface{}) interface{} {
 	if res, ok := resp.(utils.KitexResult); ok {
 		return res.GetResult()
 	}

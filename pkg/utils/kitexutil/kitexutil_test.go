@@ -282,8 +282,8 @@ func TestGetRealRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetRealRequest(tt.args.req); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetRealRequest() = %v, want %v", got, tt.want)
+			if got := GetRealReqFromKitexArgs(tt.args.req); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetRealReqFromKitexArgs() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -306,8 +306,8 @@ func TestGetRealResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetRealResponse(tt.args.resp); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetRealResponse() = %v, want %v", got, tt.want)
+			if got := GetRealRespFromKitexResult(tt.args.resp); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetRealRespFromKitexResult() = %v, want %v", got, tt.want)
 			}
 		})
 	}
