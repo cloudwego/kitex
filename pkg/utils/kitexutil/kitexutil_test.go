@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"testing"
 
+	mocks "github.com/cloudwego/kitex/internal/mocks/thrift/fast"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -259,6 +260,54 @@ func TestGetCtxTransportProtocol(t *testing.T) {
 			}
 			if got1 != tt.want1 {
 				t.Errorf("GetTransportProtocol() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func TestGetRealRequest(t *testing.T) {
+	req := &mocks.MockReq{}
+	arg := &mocks.MockTestArgs{Req: req}
+	type args struct {
+		req interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want interface{}
+	}{
+		{name: "success", args: args{arg}, want: req},
+		{name: "nil input", args: args{nil}, want: nil},
+		{name: "wrong interface", args: args{req}, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetRealRequest(tt.args.req); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetRealRequest() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetRealResponse(t *testing.T) {
+	success := "success"
+	result := &mocks.MockTestResult{Success: &success}
+	type args struct {
+		resp interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want interface{}
+	}{
+		{name: "success", args: args{result}, want: &success},
+		{name: "nil input", args: args{nil}, want: nil},
+		{name: "wrong interface", args: args{success}, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetRealResponse(tt.args.resp); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetRealResponse() = %v, want %v", got, tt.want)
 			}
 		})
 	}
