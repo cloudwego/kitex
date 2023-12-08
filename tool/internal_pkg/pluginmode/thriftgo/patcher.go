@@ -63,10 +63,18 @@ type patcher struct {
 	handlerReturnKeepResp bool
 
 	fileTpl *template.Template
+	libs    map[string]string
 }
 
 func (p *patcher) buildTemplates() (err error) {
 	m := p.utils.BuildFuncMap()
+	m["UseLib"] = func(path string, alias string) string {
+		if p.libs == nil {
+			p.libs = make(map[string]string)
+		}
+		p.libs[path] = alias
+		return ""
+	}
 	m["ZeroWriter"] = ZeroWriter
 	m["ZeroBLength"] = ZeroBLength
 	m["ReorderStructFields"] = p.reorderStructFields
@@ -223,6 +231,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 	protection := make(map[string]*plugin.Generated)
 
 	for ast := range req.AST.DepthFirstSearch() {
+		// fd.WriteString(p.utils.GetFilename(ast) + "\n")
 		// scope, err := golang.BuildScope(p.utils, ast)
 		scope, _, err := golang.BuildRefScope(p.utils, ast)
 		if err != nil {
@@ -282,9 +291,18 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		}
 		content := buf.String()
 
+		// if kutils is not used, remove the dependency.
+		// OPT: use UseStdLib tmpl func
+		if !strings.Contains(content, "kutils.StringDeepCopy") {
+			delete(p.libs, "github.com/cloudwego/kitex/pkg/utils")
+		}
+
 		imps, err := scope.ResolveImports()
 		if err != nil {
 			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
+		}
+		for path, alias := range p.libs {
+			imps[path] = alias
 		}
 		// ss := strings.Builder{}
 		// ss.WriteString(ast.GetFilename())
@@ -306,20 +324,13 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		} else {
 			return nil, fmt.Errorf("replace imports failed")
 		}
-		// if kutils is not used, remove the dependency.
-		// OPT: use UseStdLib tmpl func
-		if !strings.Contains(content, "kutils.StringDeepCopy") {
-			kutilsImp := `kutils "github.com/cloudwego/kitex/pkg/utils"`
-			idx := strings.Index(content, kutilsImp)
-			if idx > 0 {
-				content = content[:idx-1] + content[idx+len(kutilsImp):]
-			}
-		}
 
 		patches = append(patches, &plugin.Generated{
 			Content: content,
 			Name:    &target,
 		})
+		// fd.WriteString("patched: " + target + "\n")
+		// fd.WriteString("content: " + content + "\nend\n")
 
 		if p.copyIDL {
 			content, err := ioutil.ReadFile(ast.Filename)
@@ -384,19 +395,22 @@ func (p *patcher) filterStdLib(imports []util.Import) []util.Import {
 	prefix := p.module + "/"
 	// remove std libs and thrift to prevent duplicate import.
 	for _, v := range imports {
-		if strings.HasPrefix(v.Path, prefix) { // local module
+		// local packages
+		if strings.HasPrefix(v.Path, prefix) {
 			ret = append(ret, v)
 			continue
 		}
 
-		// this lib has been unused protected
-		if v.Path == "github.com/apache/thrift/lib/go/thrift" {
+		// thrift lib has been unused protected
+		if v.Path == "github.com/apache/thrift/lib/go/thrift" || strings.HasPrefix(v.Path, "github.com/cloudwego/thriftgo") {
 			continue
 		}
-		// thriftgo std lib has been imported using UseStdLibrary
-		if strings.HasPrefix(v.Path, "github.com/cloudwego/thriftgo") {
+
+		// explicitly imported by UseLib like bthrift...
+		if _, ok := p.libs[v.Path]; ok {
 			continue
 		}
+
 		// std libs has been unused protected
 		if !strings.Contains(v.Path, ".") {
 			continue
