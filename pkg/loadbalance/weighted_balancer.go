@@ -125,7 +125,7 @@ func (wb *weightedBalancer) createPicker(e discovery.Result) (picker Picker) {
 		if balance {
 			picker = newRandomPicker(instances)
 		} else {
-			picker = newAliasMethodPicker(instances)
+			picker = newAliasMethodPicker(instances, weightSum)
 		}
 	default: // random
 		if balance {

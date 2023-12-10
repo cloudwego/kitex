@@ -24,13 +24,15 @@ import (
 
 type AliseMethodPicker struct {
 	instances []discovery.Instance
+	weightSum int
 	alise     []int
 	prob      []float64
 }
 
-func newAliasMethodPicker(instances []discovery.Instance) Picker {
+func newAliasMethodPicker(instances []discovery.Instance, weightSum int) Picker {
 	picker := &AliseMethodPicker{
 		instances: instances,
+		weightSum: weightSum,
 	}
 	picker.init()
 	return picker
@@ -42,10 +44,7 @@ func (a *AliseMethodPicker) init() {
 	a.alise = make([]int, n)
 	a.prob = make([]float64, n)
 
-	totalWeight := 0
-	for _, instance := range a.instances {
-		totalWeight += instance.Weight()
-	}
+	totalWeight := a.weightSum
 
 	scaledProb := make([]float64, n)
 	small := make([]int, 0)
