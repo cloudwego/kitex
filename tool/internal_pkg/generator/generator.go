@@ -133,7 +133,9 @@ type Config struct {
 
 	GenPath string
 
-	DeepCopyAPI           bool
+	DeepCopyAPI    bool
+	GenStrDeepCopy bool
+
 	Protocol              string
 	HandlerReturnKeepResp bool
 }

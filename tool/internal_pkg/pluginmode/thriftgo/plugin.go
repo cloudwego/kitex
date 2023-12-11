@@ -123,6 +123,7 @@ func Run() int {
 		record:                conv.Config.Record,
 		recordCmd:             conv.Config.RecordCmd,
 		deepCopyAPI:           conv.Config.DeepCopyAPI,
+		genStrDeepCopy:        conv.Config.GenStrDeepCopy,
 		protocol:              conv.Config.Protocol,
 		handlerReturnKeepResp: conv.Config.HandlerReturnKeepResp,
 	}

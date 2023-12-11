@@ -117,6 +117,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Specify a code gen path.")
 	f.BoolVar(&a.DeepCopyAPI, "deep-copy-api", false,
 		"Generate codes with injecting deep copy method.")
+	f.BoolVar(&a.GenStrDeepCopy, "gen-str-deep-copy", false,
+		"Generate StringDeepCopy function to avoid depending kutil package.")
 	f.StringVar(&a.Protocol, "protocol", "",
 		"Specify a protocol for codec")
 	a.RecordCmd = os.Args
