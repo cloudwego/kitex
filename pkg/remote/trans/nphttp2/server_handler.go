@@ -125,9 +125,11 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			ri := svrTrans.pool.Get().(rpcinfo.RPCInfo)
 			rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
 			defer func() {
-				// reset rpcinfo
+				// reset rpcinfo for performance (PR #584)
 				ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
-				svrTrans.pool.Put(ri)
+				if rpcinfo.PoolEnabled() {
+					svrTrans.pool.Put(ri)
+				}
 			}()
 
 			// set grpc transport flag before execute metahandler
