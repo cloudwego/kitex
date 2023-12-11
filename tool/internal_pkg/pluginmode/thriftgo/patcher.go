@@ -66,27 +66,18 @@ type patcher struct {
 	libs    map[string]string
 }
 
+func (p *patcher) UseLib(path string, alias string) string {
+	if p.libs == nil {
+		p.libs = make(map[string]string)
+	}
+	p.libs[path] = alias
+	return ""
+}
+
 func (p *patcher) buildTemplates() (err error) {
 	m := p.utils.BuildFuncMap()
-	m["PrintImports"] = func(imports []util.Import) string {
-		var builder = strings.Builder{}
-		for _, v := range imports {
-			if v.Path != "" {
-				builder.WriteString(fmt.Sprintf("%s %q\n", v.Alias, v.Path))
-			} else {
-				builder.WriteString("\n")
-			}
-		}
-		return builder.String()
-	}
-
-	m["UseLib"] = func(path string, alias string) string {
-		if p.libs == nil {
-			p.libs = make(map[string]string)
-		}
-		p.libs[path] = alias
-		return ""
-	}
+	m["PrintImports"] = util.PrintlImports
+	m["UseLib"] = p.UseLib
 	m["ZeroWriter"] = ZeroWriter
 	m["ZeroBLength"] = ZeroBLength
 	m["ReorderStructFields"] = p.reorderStructFields

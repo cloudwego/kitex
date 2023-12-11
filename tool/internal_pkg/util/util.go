@@ -322,3 +322,15 @@ func (i Import) PackageName() string {
 		return strings.ToLower(filepath.Base(i.Path))
 	}
 }
+
+func PrintlImports(imports []Import) string {
+	builder := strings.Builder{}
+	for _, v := range imports {
+		if v.Path != "" {
+			builder.WriteString(fmt.Sprintf("%s %q\n", v.Alias, v.Path))
+		} else {
+			builder.WriteString("\n")
+		}
+	}
+	return builder.String()
+}
