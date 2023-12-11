@@ -599,7 +599,11 @@ const fieldDeepCopyBaseType = `
 		if {{$Src}} != nil {
 			{{- if IsGoStringType .TypeName}}
 			if *{{$Src}} != "" {
+				{{- if GenStrDeepCopy}}
+				tmp := StringDeepCopy(*{{$Src}})
+				{{- else}}
 				tmp := kutils.StringDeepCopy(*{{$Src}})
+				{{- end}}
 				{{.Target}} = &tmp
 			}
 			{{- else if .Type.Category.IsBinary}}
@@ -616,7 +620,11 @@ const fieldDeepCopyBaseType = `
 	{{- else}}
 		{{- if IsGoStringType .TypeName}}
 		if {{$Src}} != "" {
+			{{- if GenStrDeepCopy}}
+			{{.Target}} = StringDeepCopy({{$Src}})
+			{{- else}}
 			{{.Target}} = kutils.StringDeepCopy({{$Src}})
+			{{- end}}
 		}
 		{{- else if .Type.Category.IsBinary}}
 		if len({{$Src}}) != 0 {
