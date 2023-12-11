@@ -50,9 +50,7 @@ var (
 const imports = `
 {{define "imports"}}
 import (
-	{{- range .Imports}}
-	{{.Alias}} "{{.Path}}"
-	{{- end}}
+	{{PrintImports .Imports}}
 )
 
 {{- if gt (len .Includes) 0}}

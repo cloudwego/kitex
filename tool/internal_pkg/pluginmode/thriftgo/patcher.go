@@ -68,6 +68,18 @@ type patcher struct {
 
 func (p *patcher) buildTemplates() (err error) {
 	m := p.utils.BuildFuncMap()
+	m["PrintImports"] = func(imports []util.Import) string {
+		var builder = strings.Builder{}
+		for _, v := range imports {
+			if v.Path != "" {
+				builder.WriteString(fmt.Sprintf("%s %q\n", v.Alias, v.Path))
+			} else {
+				builder.WriteString("\n")
+			}
+		}
+		return builder.String()
+	}
+
 	m["UseLib"] = func(path string, alias string) string {
 		if p.libs == nil {
 			p.libs = make(map[string]string)
@@ -274,11 +286,6 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			protection[register] = patch
 		}
 
-		// if e == nil {
-		// 	fmt.Fprintf(fd, "ast:%#v\n", ast)
-		// 	spew.Fdump(fd, "scope", scope)
-		// }
-
 		data := &struct {
 			Scope    *golang.Scope
 			PkgName  string
@@ -304,14 +311,8 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		for path, alias := range p.libs {
 			imps[path] = alias
 		}
-		// ss := strings.Builder{}
-		// ss.WriteString(ast.GetFilename())
-		// ss.WriteString(fmt.Sprintf("\nimps: %#v\n", imps))
 		data.Imports = util.SortImports(imps, p.module)
-		data.Includes = p.filterStdLib(data.Imports)
-		// ss.WriteString(fmt.Sprintf(".Imports: %#v\n", data.Imports))
-		// ss.WriteString(fmt.Sprintf(".Includes: %#v\n", data.Includes))
-		// fd.Write([]byte(ss.String()))
+		data.Includes = p.extractLocalLibs(data.Imports)
 
 		// replace imports insert-pointer with newly rendered output
 		buf.Reset()
@@ -390,7 +391,7 @@ func getBashPath() string {
 	return "kitex-all.sh"
 }
 
-func (p *patcher) filterStdLib(imports []util.Import) []util.Import {
+func (p *patcher) extractLocalLibs(imports []util.Import) []util.Import {
 	var ret = make([]util.Import, 0)
 	prefix := p.module + "/"
 	// remove std libs and thrift to prevent duplicate import.
@@ -400,23 +401,6 @@ func (p *patcher) filterStdLib(imports []util.Import) []util.Import {
 			ret = append(ret, v)
 			continue
 		}
-
-		// thrift lib has been unused protected
-		if v.Path == "github.com/apache/thrift/lib/go/thrift" || strings.HasPrefix(v.Path, "github.com/cloudwego/thriftgo") {
-			continue
-		}
-
-		// explicitly imported by UseLib like bthrift...
-		if _, ok := p.libs[v.Path]; ok {
-			continue
-		}
-
-		// std libs has been unused protected
-		if !strings.Contains(v.Path, ".") {
-			continue
-		}
-
-		ret = append(ret, v)
 	}
 	return ret
 }
