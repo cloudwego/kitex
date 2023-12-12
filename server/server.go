@@ -138,8 +138,8 @@ func newErrorHandleMW(errHandle func(context.Context, error) error) endpoint.Mid
 
 func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinfo.RPCInfo {
 	return func(ri rpcinfo.RPCInfo, rAddr net.Addr) rpcinfo.RPCInfo {
-		// Reset rpcinfo if it exists in ctx.
-		if ri != nil {
+		// Reset existing rpcinfo to improve performance for long connections (PR #584).
+		if ri != nil && rpcinfo.PoolEnabled() {
 			fi := rpcinfo.AsMutableEndpointInfo(ri.From())
 			fi.Reset()
 			fi.SetAddress(rAddr)
@@ -155,6 +155,8 @@ func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinf
 			}
 			return ri
 		}
+
+		// allocate a new rpcinfo if it's the connection's first request or rpcInfoPool is disabled
 		rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 		if s.opt.StatsLevel != nil {
 			rpcStats.SetLevel(*s.opt.StatsLevel)

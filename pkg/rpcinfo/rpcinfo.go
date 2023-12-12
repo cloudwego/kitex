@@ -51,7 +51,8 @@ func EnablePool(enable bool) {
 	}
 }
 
-func poolEnabled() bool {
+// PoolEnabled returns true if rpcInfoPool is enabled.
+func PoolEnabled() bool {
 	return atomic.LoadInt32(&enablePool) == 1
 }
 
@@ -88,7 +89,7 @@ func (r *rpcInfo) zero() {
 
 // Recycle reuses the rpcInfo.
 func (r *rpcInfo) Recycle() {
-	if !poolEnabled() {
+	if !PoolEnabled() {
 		return
 	}
 	if v, ok := r.from.(internal.Reusable); ok {
