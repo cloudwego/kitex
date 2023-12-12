@@ -48,8 +48,8 @@ func (a *AliseMethodPicker) init() {
 	totalWeight := a.weightSum
 
 	scaledProb := make([]float64, n)
-	small := make([]int, 0)
-	large := make([]int, 0)
+	small := make([]int, 0, n)
+	large := make([]int, 0, n)
 
 	for i, instance := range a.instances {
 		scaledProb[i] = float64(instance.Weight()) * float64(n) / float64(totalWeight)
