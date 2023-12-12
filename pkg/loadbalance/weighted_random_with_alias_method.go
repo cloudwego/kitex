@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/bytedance/gopkg/lang/fastrand"
+
 	"github.com/cloudwego/kitex/pkg/discovery"
 )
 
