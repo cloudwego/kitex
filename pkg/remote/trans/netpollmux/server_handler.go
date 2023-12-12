@@ -226,9 +226,11 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		t.finishTracer(ctx, rpcInfo, err, panicErr)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
-		// reset rpcinfo
-		rpcInfo = t.opt.InitOrResetRPCInfoFunc(rpcInfo, conn.RemoteAddr())
-		muxSvrConn.pool.Put(rpcInfo)
+		// reset rpcinfo for reuse
+		if rpcinfo.PoolEnabled() {
+			rpcInfo = t.opt.InitOrResetRPCInfoFunc(rpcInfo, conn.RemoteAddr())
+			muxSvrConn.pool.Put(rpcInfo)
+		}
 	}()
 
 	// read

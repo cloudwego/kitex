@@ -126,8 +126,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
 			defer func() {
 				// reset rpcinfo for performance (PR #584)
-				ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
 				if rpcinfo.PoolEnabled() {
+					ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
 					svrTrans.pool.Put(ri)
 				}
 			}()
