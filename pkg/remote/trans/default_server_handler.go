@@ -110,10 +110,20 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 	return ctx, nil
 }
 
+func (t *svrTransHandler) newCtxWithRPCInfo(ctx context.Context, conn net.Conn) (context.Context, rpcinfo.RPCInfo) {
+	if rpcinfo.PoolEnabled() { // reuse per-connection rpcinfo
+		return ctx, rpcinfo.GetRPCInfo(ctx)
+		// delayed reinitialize for faster response
+	}
+	// new rpcinfo if reuse is disabled
+	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
+	return rpcinfo.NewCtxWithRPCInfo(ctx, ri), ri
+}
+
 // OnRead implements the remote.ServerTransHandler interface.
 // The connection should be closed after returning error.
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
-	ri := rpcinfo.GetRPCInfo(ctx)
+	ctx, ri := t.newCtxWithRPCInfo(ctx, conn)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	var recvMsg remote.Message
 	var sendMsg remote.Message
@@ -140,8 +150,10 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		t.finishProfiler(ctx)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
-		// reset rpcinfo
-		t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
+		// reset rpcinfo for reuse
+		if rpcinfo.PoolEnabled() {
+			t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
+		}
 		if wrapErr != nil {
 			err = wrapErr
 		}
