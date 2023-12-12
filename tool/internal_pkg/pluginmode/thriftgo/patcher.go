@@ -48,19 +48,33 @@ const kitexUnusedProtection = `
 var KitexUnusedProtection = struct{}{}
 `
 
+const kitexUnusedProtectionWithStringDeepCopy = `
+import "unsafe"
+
+// KitexUnusedProtection is used to prevent 'imported and not used' error.
+var KitexUnusedProtection = struct{}{}
+
+func StringDeepCopy(s string) string {
+	buf := []byte(s)
+	ns := (*string)(unsafe.Pointer(&buf))
+	return *ns
+}
+`
+
 //lint:ignore U1000 until protectionInsertionPoint is used
 var protectionInsertionPoint = "KitexUnusedProtection"
 
 type patcher struct {
-	noFastAPI   bool
-	utils       *golang.CodeUtils
-	module      string
-	copyIDL     bool
-	version     string
-	record      bool
-	recordCmd   []string
-	deepCopyAPI bool
-	protocol    string
+	noFastAPI      bool
+	utils          *golang.CodeUtils
+	module         string
+	copyIDL        bool
+	version        string
+	record         bool
+	recordCmd      []string
+	deepCopyAPI    bool
+	genStrDeepCopy bool
+	protocol       string
 
 	fileTpl *template.Template
 }
@@ -73,6 +87,7 @@ func (p *patcher) buildTemplates() (err error) {
 	m["Version"] = func() string { return p.version }
 	m["GenerateFastAPIs"] = func() bool { return !p.noFastAPI && p.utils.Template() != "slim" }
 	m["GenerateDeepCopyAPIs"] = func() bool { return p.deepCopyAPI }
+	m["GenStrDeepCopy"] = func() bool { return p.genStrDeepCopy }
 	m["GenerateArgsResultTypes"] = func() bool { return p.utils.Template() == "slim" }
 	m["ImportPathTo"] = generator.ImportPathTo
 	m["ToPackageNames"] = func(imports map[string]string) (res []string) {
@@ -109,6 +124,9 @@ func (p *patcher) buildTemplates() (err error) {
 	}
 	m["IsHessian"] = func() bool {
 		return p.IsHessian2()
+	}
+	m["IsGoStringType"] = func(typeName golang.TypeName) bool {
+		return typeName == "string" || typeName == "*string"
 	}
 
 	tpl := template.New("kitex").Funcs(m)
@@ -229,8 +247,12 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		consts := util.JoinPath(path, "k-consts.go")
 		if protection[consts] == nil {
 			patch := &plugin.Generated{
-				Content: "package " + pkgName + "\n" + kitexUnusedProtection,
-				Name:    &consts,
+				Name: &consts,
+			}
+			if p.genStrDeepCopy {
+				patch.Content = "package " + pkgName + "\n" + kitexUnusedProtectionWithStringDeepCopy
+			} else {
+				patch.Content = "package " + pkgName + "\n" + kitexUnusedProtection
 			}
 			patches = append(patches, patch)
 			protection[consts] = patch
