@@ -24,15 +24,15 @@ import (
 	"github.com/cloudwego/kitex/pkg/discovery"
 )
 
-type AliseMethodPicker struct {
+type AliasMethodPicker struct {
 	instances []discovery.Instance
 	weightSum int
-	alise     []int
+	alias     []int
 	prob      []float64
 }
 
 func newAliasMethodPicker(instances []discovery.Instance, weightSum int) Picker {
-	picker := &AliseMethodPicker{
+	picker := &AliasMethodPicker{
 		instances: instances,
 		weightSum: weightSum,
 	}
@@ -40,10 +40,10 @@ func newAliasMethodPicker(instances []discovery.Instance, weightSum int) Picker 
 	return picker
 }
 
-// Alise Method need to init before use and after update instances
-func (a *AliseMethodPicker) init() {
+// Alias Method need to init before use and after update instances
+func (a *AliasMethodPicker) init() {
 	n := len(a.instances)
-	a.alise = make([]int, n)
+	a.alias = make([]int, n)
 	a.prob = make([]float64, n)
 
 	totalWeight := a.weightSum
@@ -68,7 +68,7 @@ func (a *AliseMethodPicker) init() {
 		large = large[:len(large)-1]
 
 		a.prob[l] = scaledProb[l]
-		a.alise[l] = g
+		a.alias[l] = g
 
 		scaledProb[g] -= 1.0 - scaledProb[l]
 		if scaledProb[g] < 1.0 {
@@ -92,10 +92,10 @@ func (a *AliseMethodPicker) init() {
 }
 
 // Next implements the Picker interface.
-func (a *AliseMethodPicker) Next(ctx context.Context, request interface{}) discovery.Instance {
+func (a *AliasMethodPicker) Next(ctx context.Context, request interface{}) discovery.Instance {
 	i := fastrand.Intn(len(a.instances))
 	if fastrand.Float64() < a.prob[i] {
 		return a.instances[i]
 	}
-	return a.instances[a.alise[i]]
+	return a.instances[a.alias[i]]
 }
