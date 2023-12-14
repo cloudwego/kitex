@@ -34,3 +34,11 @@ func TestSetTemplateExtension(t *testing.T) {
 	c, set := templateExtensions[a]
 	test.Assert(t, set && c == b)
 }
+
+func TestAddTemplateFunc(t *testing.T) {
+	key := "demo"
+	f := func() {}
+	AddTemplateFunc(key, f)
+	_, ok := funcs[key]
+	test.Assert(t, ok)
+}
