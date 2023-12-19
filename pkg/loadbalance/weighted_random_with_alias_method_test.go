@@ -22,7 +22,6 @@ import (
 )
 
 func BenchmarkAliasMethodPickerInit(b *testing.B) {
-
 	n := 10
 	for i := 0; i < 4; i++ {
 		b.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
