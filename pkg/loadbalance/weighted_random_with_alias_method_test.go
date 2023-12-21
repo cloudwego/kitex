@@ -17,8 +17,11 @@
 package loadbalance
 
 import (
+	"context"
 	"fmt"
 	"testing"
+
+	"github.com/cloudwego/kitex/pkg/discovery"
 )
 
 func BenchmarkAliasMethodPickerInit(b *testing.B) {
@@ -40,4 +43,38 @@ func BenchmarkAliasMethodPickerInit(b *testing.B) {
 		})
 		n *= 10
 	}
+}
+
+func BenchmarkAliasMethodPickerNext(b *testing.B) {
+	ctx := context.Background()
+
+	makeNInstances := func(n, base int, seq []int) (res []discovery.Instance) {
+		for i := 0; i < n; i++ {
+			weight := seq[i%len(seq)] * base
+			res = append(res, discovery.NewInstance("tcp", fmt.Sprintf("addr[%d]-weight[%d]", i, weight), weight, nil))
+		}
+		return
+	}
+	tc := &balancerTestcase{Name: "weight_random_with_alias_method", factory: NewWeightedRandomWithAliasMethodBalancer}
+	b.Run(tc.Name, func(b *testing.B) {
+		balancer := tc.factory()
+
+		n := 10
+		for i := 0; i < 4; i++ {
+			b.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
+				inss := makeNInstances(n, 1000, []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+				e := discovery.Result{
+					Cacheable: true,
+					CacheKey:  "test",
+					Instances: inss,
+				}
+				picker := balancer.GetPicker(e)
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					picker.Next(ctx, nil)
+				}
+			})
+			n *= 10
+		}
+	})
 }
