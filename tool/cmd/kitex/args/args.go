@@ -353,6 +353,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 			"--plugin=protoc-gen-kitex="+exe,
 			"--kitex_out="+outPath,
 			"--kitex_opt="+kas,
+			"--experimental_allow_proto3_optional",
 		)
 		for _, po := range a.ProtobufOptions {
 			cmd.Args = append(cmd.Args, "--kitex_opt="+po)
