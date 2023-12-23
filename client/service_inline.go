@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	internal_server "github.com/cloudwego/kitex/internal/server"
+	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -64,7 +65,7 @@ type serviceInlineClient struct {
 type ServerInitialInfo interface {
 	Endpoints() endpoint.Endpoint
 	Option() *internal_server.Options
-	GetServiceInfo() *serviceinfo.ServiceInfo
+	GetServiceInfos() map[string]*serviceinfo.ServiceInfo
 }
 
 // NewServiceInlineClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
@@ -77,7 +78,7 @@ func NewServiceInlineClient(svcInfo *serviceinfo.ServiceInfo, s ServerInitialInf
 	kc.opt = client.NewOptions(opts)
 	kc.serverEps = s.Endpoints()
 	kc.serverOpt = s.Option()
-	kc.serverOpt.RemoteOpt.SvcInfo = s.GetServiceInfo()
+	kc.serverOpt.RemoteOpt.SvcMap = s.GetServiceInfos()
 	if err := kc.init(); err != nil {
 		_ = kc.Close()
 		return nil, err
@@ -125,7 +126,7 @@ func (kc *serviceInlineClient) initMiddlewares(ctx context.Context) {
 
 // initRPCInfo initializes the RPCInfo structure and attaches it to context.
 func (kc *serviceInlineClient) initRPCInfo(ctx context.Context, method string) (context.Context, rpcinfo.RPCInfo, *callopt.CallOptions) {
-	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, 0)
+	return initRPCInfo(ctx, method, kc.opt, kc.svcInfo, 0, nil)
 }
 
 // Call implements the Client interface .
@@ -139,10 +140,16 @@ func (kc *serviceInlineClient) Call(ctx context.Context, method string, request,
 	var reportErr error
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
-			reportErr = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, false)
+			reportErr = rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, true)
 		}
 		kc.opt.TracerCtl.DoFinish(ctx, ri, reportErr)
-		rpcinfo.PutRPCInfo(ri)
+		// If the user start a new goroutine and return before endpoint finished, it may cause panic.
+		// For example,, if the user writes a timeout Middleware and times out, rpcinfo will be recycled,
+		// but in fact, rpcinfo is still being used when it is executed inside
+		// So if endpoint returns err, client won't recycle rpcinfo.
+		if reportErr == nil {
+			rpcinfo.PutRPCInfo(ri)
+		}
 		callOpts.Recycle()
 	}()
 	reportErr = kc.eps(ctx, request, response)
@@ -207,6 +214,7 @@ func (kc *serviceInlineClient) constructServerRPCInfo(svrCtx, cliCtx context.Con
 		ink.SetServiceName(kc.svcInfo.ServiceName)
 	}
 	rpcinfo.AsMutableEndpointInfo(ri.To()).SetMethod(method)
+	svrCtx = context.WithValue(svrCtx, consts.CtxKeyMethod, method)
 	return svrCtx, ri
 }
 

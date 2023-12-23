@@ -1,5 +1,5 @@
-//go:build amd64 && !windows && go1.16 && !go1.21
-// +build amd64,!windows,go1.16,!go1.21
+//go:build amd64 && !windows && go1.16 && !go1.22 && !disablefrugal
+// +build amd64,!windows,go1.16,!go1.22,!disablefrugal
 
 /*
  * Copyright 2021 CloudWeGo Authors

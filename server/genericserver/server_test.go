@@ -44,13 +44,23 @@ func TestNewServer(t *testing.T) {
 // TestNewServerWithServiceInfo tests the creation of a new server with service info
 func TestNewServerWithServiceInfo(t *testing.T) {
 	g := generic.BinaryThriftGeneric()
-	svr := NewServerWithServiceInfo(new(mockImpl), g, nil)
-	err := svr.Run()
-	test.Assert(t, strings.Contains(err.Error(), "no service"))
+	test.PanicAt(t, func() {
+		NewServerWithServiceInfo(new(mockImpl), g, nil)
+	}, func(err interface{}) bool {
+		if errMsg, ok := err.(error); ok {
+			return strings.Contains(errMsg.Error(), "svcInfo is nil.")
+		}
+		return true
+	})
 
-	svr = NewServerWithServiceInfo(nil, g, generic.ServiceInfo(g.PayloadCodecType()))
-	err = svr.Run()
-	test.Assert(t, strings.Contains(err.Error(), "handler is nil"))
+	test.PanicAt(t, func() {
+		NewServerWithServiceInfo(nil, g, generic.ServiceInfo(g.PayloadCodecType()))
+	}, func(err interface{}) bool {
+		if errMsg, ok := err.(error); ok {
+			return strings.Contains(errMsg.Error(), "handler is nil.")
+		}
+		return true
+	})
 
 	test.PanicAt(t, func() {
 		NewServerWithServiceInfo(nil, nil, nil)
@@ -58,7 +68,7 @@ func TestNewServerWithServiceInfo(t *testing.T) {
 		if errMsg, ok := err.(string); ok {
 			return strings.Contains(errMsg, "invalid Generic")
 		}
-		return false
+		return true
 	})
 }
 

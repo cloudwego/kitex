@@ -32,7 +32,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
+
+var errUnexpectedFinish = errors.New("backup request: all retries finished unexpectedly, " +
+	"please submit an issue to https://github.com/cloudwego/kitex/issues")
 
 func newBackupRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
 	br := &backupRetryer{cbContainer: cbC}
@@ -83,16 +87,17 @@ func (r *backupRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (recycleRI bool, err error) {
+func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
 	r.RLock()
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes
 	retryDelay := r.retryDelay
 	r.RUnlock()
 	var callTimes int32 = 0
-	var callCosts strings.Builder
-	callCosts.Grow(32)
+	var callCosts utils.StringBuilder
+	callCosts.RawStringBuilder().Grow(32)
 	var recordCostDoing int32 = 0
 	var abort int32 = 0
+	finishedCount := 0
 	// notice: buff num of chan is very important here, it cannot less than call times, or the below chan receive will block
 	done := make(chan *resultWrapper, retryTimes+1)
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
@@ -125,9 +130,13 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				}()
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
+				if r.cbContainer.enablePercentageLimit {
+					// record stat before call since requests may be slow, making the limiter more accurate
+					recordRetryStat(cbKey, r.cbContainer.cbPanel, ct)
+				}
 				cRI, _, e = rpcCall(ctx, r)
 				recordCost(ct, callStart, &recordCostDoing, &callCosts, &abort, e)
-				if r.cbContainer.cbStat {
+				if !r.cbContainer.enablePercentageLimit && r.cbContainer.cbStat {
 					circuitbreak.RecordStat(ctx, req, nil, e, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 				}
 			})
@@ -140,13 +149,18 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 			}
 		case res := <-done:
 			if res.err != nil && errors.Is(res.err, kerrors.ErrRPCFinish) {
-				// To ignore resp concurrent write, the later response won't do decode and return ErrRPCFinish.
-				// But if the cost of decode is long, ErrRPCFinish will return before previous normal call.
+				// There will be only one request (goroutine) pass the `checkRPCState`, others will skip decoding
+				// and return `ErrRPCFinish`, to avoid concurrent write to response and save the cost of decoding.
+				// We can safely ignore this error and wait for the response of the passed goroutine.
+				if finishedCount++; finishedCount >= retryTimes+1 {
+					// But if all requests return this error, it must be a bug, preventive panic to avoid dead loop
+					panic(errUnexpectedFinish)
+				}
 				continue
 			}
 			atomic.StoreInt32(&abort, 1)
-			recordRetryInfo(firstRI, res.ri, atomic.LoadInt32(&callTimes), callCosts.String())
-			return false, res.err
+			recordRetryInfo(res.ri, atomic.LoadInt32(&callTimes), callCosts.String())
+			return res.ri, false, res.err
 		}
 	}
 }
@@ -222,23 +236,26 @@ func (r *backupRetryer) Type() Type {
 }
 
 // record request cost, it may execute concurrent
-func recordCost(ct int32, start time.Time, recordCostDoing *int32, sb *strings.Builder, abort *int32, err error) {
+func recordCost(ct int32, start time.Time, recordCostDoing *int32, sb *utils.StringBuilder, abort *int32, err error) {
 	if atomic.LoadInt32(abort) == 1 {
 		return
 	}
 	for !atomic.CompareAndSwapInt32(recordCostDoing, 0, 1) {
 		runtime.Gosched()
 	}
-	if sb.Len() > 0 {
-		sb.WriteByte(',')
-	}
-	sb.WriteString(strconv.Itoa(int(ct)))
-	sb.WriteByte('-')
-	sb.WriteString(strconv.FormatInt(time.Since(start).Microseconds(), 10))
-	if err != nil && errors.Is(err, kerrors.ErrRPCFinish) {
-		// ErrRPCFinish means previous call returns first but is decoding.
-		// Add ignore to distinguish.
-		sb.WriteString("(ignore)")
-	}
+	sb.WithLocked(func(b *strings.Builder) error {
+		if b.Len() > 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(strconv.Itoa(int(ct)))
+		b.WriteByte('-')
+		b.WriteString(strconv.FormatInt(time.Since(start).Microseconds(), 10))
+		if err != nil && errors.Is(err, kerrors.ErrRPCFinish) {
+			// ErrRPCFinish means previous call returns first but is decoding.
+			// Add ignore to distinguish.
+			b.WriteString("(ignore)")
+		}
+		return nil
+	})
 	atomic.StoreInt32(recordCostDoing, 0)
 }

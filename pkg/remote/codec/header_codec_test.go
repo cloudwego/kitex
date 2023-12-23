@@ -343,9 +343,9 @@ func (m *mockInst) Address() net.Addr {
 	return m.addr
 }
 
-func (m *mockInst) SetRemoteAddr(addr net.Addr) (ok bool) {
+func (m *mockInst) RefreshInstanceWithAddr(addr net.Addr) discovery.Instance {
 	m.addr = addr
-	return true
+	return m
 }
 
 func (m *mockInst) Weight() int {

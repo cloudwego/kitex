@@ -27,6 +27,7 @@ type PayloadCodec int
 const (
 	Thrift PayloadCodec = iota
 	Protobuf
+	Hessian2
 )
 
 const (

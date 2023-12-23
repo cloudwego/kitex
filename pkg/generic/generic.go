@@ -57,6 +57,11 @@ func BinaryThriftGeneric() Generic {
 //
 //	g, err := generic.MapThriftGeneric(p)
 //	SetBinaryWithBase64(g, true)
+//
+// String value is returned for binary field by default. You can change the return value to []byte for binary field with SetBinaryWithByteSlice.
+// eg:
+//
+//	SetBinaryWithByteSlice(g, true)
 func MapThriftGeneric(p DescriptorProvider) (Generic, error) {
 	codec, err := newMapThriftCodec(p, thriftCodec)
 	if err != nil {
@@ -156,6 +161,20 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 		c.codec.binaryWithBase64 = enable
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
+	}
+	return nil
+}
+
+// SetBinaryWithByteSlice enable/disable returning []byte for binary field.
+func SetBinaryWithByteSlice(g Generic, enable bool) error {
+	switch c := g.(type) {
+	case *mapThriftGeneric:
+		if c.codec == nil {
+			return fmt.Errorf("empty codec for %#v", c)
+		}
+		c.codec.binaryWithByteSlice = enable
+	default:
+		return fmt.Errorf("returning []byte for binary fields is unavailable for %#v", g)
 	}
 	return nil
 }

@@ -84,7 +84,7 @@ func (r *failureRetryer) AllowRetry(ctx context.Context) (string, bool) {
 }
 
 // Do implement the Retryer interface.
-func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (recycleRI bool, err error) {
+func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, req interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error) {
 	r.RLock()
 	var maxDuration time.Duration
 	if r.policy.StopPolicy.MaxDurationMS > 0 {
@@ -127,10 +127,14 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			}
 		}
 		callTimes++
+		if r.cbContainer.enablePercentageLimit {
+			// record stat before call since requests may be slow, making the limiter more accurate
+			recordRetryStat(cbKey, r.cbContainer.cbPanel, callTimes)
+		}
 		cRI, resp, err = rpcCall(ctx, r)
 		callCosts.WriteString(strconv.FormatInt(time.Since(callStart).Microseconds(), 10))
 
-		if r.cbContainer.cbStat {
+		if !r.cbContainer.enablePercentageLimit && r.cbContainer.cbStat {
 			circuitbreak.RecordStat(ctx, req, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 		}
 		if err == nil {
@@ -149,11 +153,11 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			}
 		}
 	}
-	recordRetryInfo(firstRI, cRI, callTimes, callCosts.String())
+	recordRetryInfo(cRI, callTimes, callCosts.String())
 	if err == nil && callTimes == 1 {
-		return true, nil
+		return cRI, true, nil
 	}
-	return false, err
+	return cRI, false, err
 }
 
 // UpdatePolicy implements the Retryer interface.
@@ -291,10 +295,12 @@ func (r *failureRetryer) Dump() map[string]interface{} {
 
 func (r *failureRetryer) setSpecifiedResultRetryIfNeeded(rr *ShouldResultRetry) {
 	if rr != nil {
+		// save the object specified by client.WithSpecifiedResultRetry(..)
 		r.specifiedResultRetry = rr
 	}
-	if r.policy != nil && r.policy.ShouldResultRetry == nil {
-		// The priority of FailurePolicy.ShouldResultRetry is higher, so only update it when it's nil
+	if r.policy != nil && r.specifiedResultRetry != nil {
+		// The priority of client.WithSpecifiedResultRetry(..) is higher, so always update it
+		// NOTE: client.WithSpecifiedResultRetry(..) will always reject a nil object
 		r.policy.ShouldResultRetry = r.specifiedResultRetry
 	}
 }

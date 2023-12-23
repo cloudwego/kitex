@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/cloudwego/kitex/transport"
 )
 
 // Constants .
@@ -110,6 +111,7 @@ type Config struct {
 	Includes              util.StringSlice
 	ThriftOptions         util.StringSlice
 	ProtobufOptions       util.StringSlice
+	Hessian2Options       util.StringSlice
 	IDL                   string // the IDL file passed on the command line
 	OutputPath            string // the output path for main pkg and kitex_gen
 	PackagePrefix         string
@@ -131,7 +133,9 @@ type Config struct {
 
 	GenPath string
 
-	DeepCopyAPI bool
+	DeepCopyAPI           bool
+	Protocol              string
+	HandlerReturnKeepResp bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -456,6 +460,9 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	pkg.ExternalKitexGen = g.Use
 	pkg.FrugalPretouch = g.FrugalPretouch
 	pkg.Module = g.ModuleName
+	if strings.EqualFold(g.Protocol, transport.HESSIAN2.String()) {
+		pkg.Protocol = transport.HESSIAN2
+	}
 	if pkg.Dependencies == nil {
 		pkg.Dependencies = make(map[string]string)
 	}
@@ -478,13 +485,14 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 		if len(pkg.AllMethods()) > 0 {
 			pkg.AddImports("callopt")
+			pkg.AddImports("context")
 		}
 		fallthrough
 	case HandlerFileName:
-		if len(pkg.AllMethods()) > 0 {
-			pkg.AddImports("context")
-		}
 		for _, m := range pkg.ServiceInfo.AllMethods() {
+			if !m.ServerStreaming && !m.ClientStreaming {
+				pkg.AddImports("context")
+			}
 			for _, a := range m.Args {
 				for _, dep := range a.Deps {
 					pkg.AddImport(dep.PkgRefName, dep.ImportPath)

@@ -52,9 +52,6 @@ func (p *pbError) Marshal(out []byte) ([]byte, error) {
 }
 
 func (p *pbError) Unmarshal(in []byte) error {
-	if len(in) == 0 {
-		return nil
-	}
 	err := new(ErrorProto)
 	if err := proto.Unmarshal(in, err); err != nil {
 		return err

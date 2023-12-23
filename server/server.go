@@ -51,21 +51,21 @@ import (
 // registered to it.
 type Server interface {
 	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error
-	GetServiceInfo() *serviceinfo.ServiceInfo
+	GetServiceInfos() map[string]*serviceinfo.ServiceInfo
 	Run() error
 	Stop() error
 }
 
 type server struct {
-	opt     *internal_server.Options
-	svcInfo *serviceinfo.ServiceInfo
+	opt  *internal_server.Options
+	svcs *services
 
 	// actual rpc service implement of biz
-	handler interface{}
 	eps     endpoint.Endpoint
 	mws     []endpoint.Middleware
 	svr     remotesvr.Server
 	stopped sync.Once
+	isRun   bool
 
 	sync.Mutex
 }
@@ -73,7 +73,8 @@ type server struct {
 // NewServer creates a server with the given Options.
 func NewServer(ops ...Option) Server {
 	s := &server{
-		opt: internal_server.NewOptions(ops),
+		opt:  internal_server.NewOptions(ops),
+		svcs: newServices(),
 	}
 	s.init()
 	return s
@@ -137,8 +138,8 @@ func newErrorHandleMW(errHandle func(context.Context, error) error) endpoint.Mid
 
 func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinfo.RPCInfo {
 	return func(ri rpcinfo.RPCInfo, rAddr net.Addr) rpcinfo.RPCInfo {
-		// Reset rpcinfo if it exists in ctx.
-		if ri != nil {
+		// Reset existing rpcinfo to improve performance for long connections (PR #584).
+		if ri != nil && rpcinfo.PoolEnabled() {
 			fi := rpcinfo.AsMutableEndpointInfo(ri.From())
 			fi.Reset()
 			fi.SetAddress(rAddr)
@@ -154,6 +155,8 @@ func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinf
 			}
 			return ri
 		}
+
+		// allocate a new rpcinfo if it's the connection's first request or rpcInfoPool is disabled
 		rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
 		if s.opt.StatsLevel != nil {
 			rpcStats.SetLevel(*s.opt.StatsLevel)
@@ -179,27 +182,38 @@ func (s *server) buildInvokeChain() {
 
 // RegisterService should not be called by users directly.
 func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error {
-	if s.svcInfo != nil {
-		panic(fmt.Sprintf("Service[%s] is already defined", s.svcInfo.ServiceName))
+	s.Lock()
+	defer s.Unlock()
+	if s.isRun {
+		panic("service cannot be registered while server is running")
 	}
-	s.svcInfo = svcInfo
-	s.handler = handler
-	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfoKey, diagnosis.WrapAsProbeFunc(s.svcInfo))
+	if svcInfo == nil {
+		panic("svcInfo is nil. please specify non-nil svcInfo")
+	}
+	if handler == nil || reflect.ValueOf(handler).IsNil() {
+		panic("handler is nil. please specify non-nil handler")
+	}
+	if s.svcs.getService(svcInfo.ServiceName) != nil {
+		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
+	}
+
+	s.svcs.addService(svcInfo, handler)
 	return nil
 }
 
-func (s *server) GetServiceInfo() *serviceinfo.ServiceInfo {
-	return s.svcInfo
+func (s *server) GetServiceInfos() map[string]*serviceinfo.ServiceInfo {
+	return s.svcs.getSvcInfoMap()
 }
 
 // Run runs the server.
 func (s *server) Run() (err error) {
-	if s.svcInfo == nil {
-		return errors.New("no service, use RegisterService to set one")
-	}
+	s.Lock()
+	s.isRun = true
+	s.Unlock()
 	if err = s.check(); err != nil {
 		return err
 	}
+	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfosKey, diagnosis.WrapAsProbeFunc(s.svcs.getSvcInfoMap()))
 	svrCfg := s.opt.RemoteOpt
 	addr := svrCfg.Address // should not be nil
 	if s.opt.Proxy != nil {
@@ -289,12 +303,22 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 	return func(ctx context.Context, args, resp interface{}) (err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()
-		if methodName == "" && s.svcInfo.ServiceName != serviceinfo.GenericService {
+		serviceName := ri.Invocation().ServiceName()
+		svc := s.svcs.getService(serviceName)
+		if svc == nil {
+			svc = s.svcs.defaultSvc
+		}
+		svcInfo := svc.svcInfo
+		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
 			return errors.New("method name is empty in rpcinfo, should not happen")
 		}
 		defer func() {
 			if handlerErr := recover(); handlerErr != nil {
-				err = kerrors.ErrPanic.WithCauseAndStack(fmt.Errorf("[happened in biz handler, method=%s] %s", methodName, handlerErr), string(debug.Stack()))
+				err = kerrors.ErrPanic.WithCauseAndStack(
+					fmt.Errorf(
+						"[happened in biz handler, method=%s.%s, please check the panic at the server side] %s",
+						svcInfo.ServiceName, methodName, handlerErr),
+					string(debug.Stack()))
 				rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
 				rpcStats.SetPanicked(err)
 			}
@@ -302,11 +326,11 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 			// clear session
 			backup.ClearCtx()
 		}()
-		implHandlerFunc := s.svcInfo.MethodInfo(methodName).Handler()
+		implHandlerFunc := svcInfo.MethodInfo(methodName).Handler()
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)
-		err = implHandlerFunc(ctx, s.handler, args, resp)
+		err = implHandlerFunc(ctx, svc.handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
 				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
@@ -322,7 +346,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
-	remoteOpt.SvcInfo = s.svcInfo
+	remoteOpt.SvcMap = s.svcs.getSvcInfoMap()
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
@@ -353,10 +377,9 @@ func (s *server) addBoundHandlers(opt *remote.ServerOption) {
 		}
 	}
 
-	// for server limiter, the handler should be added as first one
 	limitHdlr := s.buildLimiterWithOpt()
 	if limitHdlr != nil {
-		doAddBoundHandlerToHead(limitHdlr, opt)
+		doAddBoundHandler(limitHdlr, opt)
 	}
 }
 
@@ -377,15 +400,17 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 	if limits == nil && connLimit == nil && qpsLimit == nil {
 		return
 	}
+
 	if connLimit == nil {
-		if limits != nil && limits.MaxConnections > 0 {
+		if limits != nil {
 			connLimit = limiter.NewConnectionLimiter(limits.MaxConnections)
 		} else {
 			connLimit = &limiter.DummyConcurrencyLimiter{}
 		}
 	}
+
 	if qpsLimit == nil {
-		if limits != nil && limits.MaxQPS > 0 {
+		if limits != nil {
 			interval := time.Millisecond * 100 // FIXME: should not care this implementation-specific parameter
 			qpsLimit = limiter.NewQPSLimiter(interval, limits.MaxQPS)
 		} else {
@@ -394,21 +419,20 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 	} else {
 		s.opt.Limit.QPSLimitPostDecode = true
 	}
+
 	if limits != nil && limits.UpdateControl != nil {
 		updater := limiter.NewLimiterWrapper(connLimit, qpsLimit)
 		limits.UpdateControl(updater)
 	}
+
 	handler = bound.NewServerLimiterHandler(connLimit, qpsLimit, s.opt.Limit.LimitReporter, s.opt.Limit.QPSLimitPostDecode)
 	// TODO: gRPC limiter
 	return
 }
 
 func (s *server) check() error {
-	if s.svcInfo == nil {
+	if len(s.svcs.svcMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
-	}
-	if s.handler == nil || reflect.ValueOf(s.handler).IsNil() {
-		return errors.New("run: handler is nil")
 	}
 	return nil
 }
@@ -476,7 +500,7 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}
 	if info.PayloadCodec == "" {
-		info.PayloadCodec = s.opt.RemoteOpt.SvcInfo.PayloadCodec.String()
+		info.PayloadCodec = s.svcs.defaultSvc.svcInfo.PayloadCodec.String()
 	}
 	if info.Weight == 0 {
 		info.Weight = discovery.DefaultWeight
@@ -487,16 +511,18 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 }
 
 func (s *server) fillMoreServiceInfo(lAddr net.Addr) {
-	ni := *s.svcInfo
-	si := &ni
-	extra := make(map[string]interface{}, len(si.Extra)+2)
-	for k, v := range si.Extra {
-		extra[k] = v
+	for _, svc := range s.svcs.svcMap {
+		ni := *svc.svcInfo
+		si := &ni
+		extra := make(map[string]interface{}, len(si.Extra)+2)
+		for k, v := range si.Extra {
+			extra[k] = v
+		}
+		extra["address"] = lAddr
+		extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
+		si.Extra = extra
+		svc.svcInfo = si
 	}
-	extra["address"] = lAddr
-	extra["transports"] = s.opt.SupportedTransportsFunc(*s.opt.RemoteOpt)
-	si.Extra = extra
-	s.svcInfo = si
 }
 
 func (s *server) waitExit(errCh chan error) error {

@@ -19,6 +19,7 @@ import (
 	"go/build"
 	"go/format"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/user"
@@ -249,4 +250,26 @@ func JoinPath(elem ...string) string {
 		return strings.ReplaceAll(filepath.Join(elem...), "\\", "/")
 	}
 	return filepath.Join(elem...)
+}
+
+// DownloadFile Download file to local
+func DownloadFile(remotePath, localPath string) error {
+	resp, err := http.Get(remotePath)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download file, http status: %s", resp.Status)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile(localPath, body, 0o644)
+	if err != nil {
+		return err
+	}
+	return nil
 }

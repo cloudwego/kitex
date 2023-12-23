@@ -18,9 +18,11 @@ package test
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 
 	tt "github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift/test/kitex_gen/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
@@ -84,6 +86,9 @@ func init() {
 			},
 			test.HTTPStatus_NOT_FOUND: nil,
 		},
+		I64Set: []int64{1, 2, 3},
+		Int16:  98,
+		IsSet:  true,
 	}
 }
 
@@ -121,6 +126,16 @@ func TestOnlyUnknownField(t *testing.T) {
 	err = unknown1.Read(prot)
 	tt.Assert(t, err == nil)
 	tt.Assert(t, unknown.BLength() == unknown1.BLength())
+
+	// test get unknown fields
+	fields, err := bthrift.GetUnknownFields(unknown)
+	tt.Assert(t, err == nil)
+	l, err = bthrift.UnknownFieldsLength(fields)
+	tt.Assert(t, err == nil)
+	buf = make([]byte, l)
+	_, err = bthrift.WriteUnknownFields(buf, fields)
+	tt.Assert(t, err == nil)
+	tt.Assert(t, bytes.Equal(buf, reflect.ValueOf(unknown).Elem().FieldByName("_unknownFields").Bytes()))
 }
 
 func TestPartialUnknownField(t *testing.T) {

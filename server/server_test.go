@@ -44,6 +44,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -111,7 +112,8 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	rwTimeout := time.Millisecond
 	opts = append(opts, WithReadWriteTimeout(rwTimeout))
 	svr := &server{
-		opt: internal_server.NewOptions(opts),
+		opt:  internal_server.NewOptions(opts),
+		svcs: newServices(),
 	}
 	svr.init()
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
@@ -192,7 +194,10 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	test.Assert(t, ri.Stats().Level() == stats.LevelDetailed)
 
 	// test reset
+	pOld := reflect.ValueOf(ri).Pointer()
 	ri = rpcInfoInitFunc(ri, conn.RemoteAddr())
+	pNew := reflect.ValueOf(ri).Pointer()
+	test.Assert(t, pOld == pNew, pOld, pNew)
 	test.Assert(t, ri.From().Address().String() == remoteAddr.String())
 	test.Assert(t, ri.Config().ReadWriteTimeout() == rwTimeout)
 
@@ -224,6 +229,17 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	test.Assert(t, panicked == nil)
 	test.Assert(t, ri.Stats().Error() == nil)
 	test.Assert(t, ri.Stats().Level() == 0)
+
+	// test reset after rpcInfoPool is disabled
+	t.Run("reset with pool disabled", func(t *testing.T) {
+		backupState := rpcinfo.PoolEnabled()
+		defer rpcinfo.EnablePool(backupState)
+		rpcinfo.EnablePool(false)
+
+		riNew := rpcInfoInitFunc(ri, conn.RemoteAddr())
+		pOld, pNew := reflect.ValueOf(ri).Pointer(), reflect.ValueOf(riNew).Pointer()
+		test.Assert(t, pOld != pNew, pOld, pNew)
+	})
 }
 
 func TestServiceRegisterFailed(t *testing.T) {
@@ -405,6 +421,24 @@ func TestServiceRegistryInfoWithNilTags(t *testing.T) {
 	test.Assert(t, drCount == 1)
 }
 
+func TestGRPCServerMultipleServices(t *testing.T) {
+	var opts []Option
+	opts = append(opts, withGRPCTransport())
+	svr := NewServer(opts...)
+	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil)
+	err = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil)
+	test.DeepEqual(t, svr.GetServiceInfos()[mocks.ServiceInfo().ServiceName], mocks.ServiceInfo())
+	test.DeepEqual(t, svr.GetServiceInfos()[mocks.Service2Info().ServiceName], mocks.Service2Info())
+	time.AfterFunc(3500*time.Millisecond, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr.Run()
+	test.Assert(t, err == nil, err)
+}
+
 func TestServerBoundHandler(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -424,8 +458,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithMetaHandler(noopMetahandler{}),
 			},
 			wantInbounds: []remote.InboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler, noopMetahandler{}}),
 				bound.NewServerLimiterHandler(limiter.NewConnectionLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil, false),
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler, noopMetahandler{}}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler, noopMetahandler{}}),
@@ -436,8 +470,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithConnectionLimiter(mockslimiter.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), &limiter.DummyRateLimiter{}, nil, false),
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -448,8 +482,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithQPSLimiter(mockslimiter.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 				bound.NewServerLimiterHandler(&limiter.DummyConcurrencyLimiter{}, mockslimiter.NewMockRateLimiter(ctrl), nil, true),
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -461,8 +495,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithQPSLimiter(mockslimiter.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -477,8 +511,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithConnectionLimiter(mockslimiter.NewMockConcurrencyLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), limiter.NewQPSLimiter(interval, 10000), nil, false),
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -494,8 +528,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithQPSLimiter(mockslimiter.NewMockRateLimiter(ctrl)),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -512,8 +546,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithMuxTransport(),
 			},
 			wantInbounds: []remote.InboundHandler{
-				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
+				bound.NewServerLimiterHandler(mockslimiter.NewMockConcurrencyLimiter(ctrl), mockslimiter.NewMockRateLimiter(ctrl), nil, true),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -528,8 +562,8 @@ func TestServerBoundHandler(t *testing.T) {
 				WithMuxTransport(),
 			},
 			wantInbounds: []remote.InboundHandler{
+				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 				bound.NewServerLimiterHandler(limiter.NewConnectionLimiter(1000), limiter.NewQPSLimiter(interval, 10000), nil, true),
-				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
 			},
 			wantOutbounds: []remote.OutboundHandler{
 				bound.NewTransMetaHandler([]remote.MetaHandler{transmeta.MetainfoServerHandler}),
@@ -764,7 +798,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
 				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
-				test.Assert(t, strings.Contains(err.Error(), "happened in biz handler, method=mock"))
+				test.Assert(t, strings.Contains(err.Error(), "happened in biz handler"))
 			}
 			<-exitCh
 			return nil
@@ -870,9 +904,11 @@ func (m *mockCodec) Decode(ctx context.Context, msg remote.Message, in remote.By
 }
 
 func TestDuplicatedRegisterInfoPanic(t *testing.T) {
+	svcs := newServices()
+	svcs.addService(mocks.ServiceInfo(), nil)
 	s := &server{
-		svcInfo: mocks.ServiceInfo(),
-		opt:     internal_server.NewOptions(nil),
+		opt:  internal_server.NewOptions(nil),
+		svcs: svcs,
 	}
 	s.init()
 
@@ -901,4 +937,10 @@ func inboundDeepEqual(inbound1, inbound2 []remote.InboundHandler) bool {
 		}
 	}
 	return true
+}
+
+func withGRPCTransport() Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.RemoteOpt.SvrHandlerFactory = nphttp2.NewSvrTransHandlerFactory()
+	}}
 }

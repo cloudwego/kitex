@@ -62,10 +62,11 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 }
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
+	svcInfo := trans.GetDefaultSvcInfo(opt.SvcMap)
 	svrHdlr := &svrTransHandler{
 		opt:     opt,
 		codec:   opt.Codec,
-		svcInfo: opt.SvcInfo,
+		svcInfo: svcInfo,
 		ext:     np.NewNetpollConnExtension(),
 	}
 	if svrHdlr.opt.TracerCtl == nil {
@@ -225,9 +226,11 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		t.finishTracer(ctx, rpcInfo, err, panicErr)
 		remote.RecycleMessage(recvMsg)
 		remote.RecycleMessage(sendMsg)
-		// reset rpcinfo
-		rpcInfo = t.opt.InitOrResetRPCInfoFunc(rpcInfo, conn.RemoteAddr())
-		muxSvrConn.pool.Put(rpcInfo)
+		// reset rpcinfo for reuse
+		if rpcinfo.PoolEnabled() {
+			rpcInfo = t.opt.InitOrResetRPCInfoFunc(rpcInfo, conn.RemoteAddr())
+			muxSvrConn.pool.Put(rpcInfo)
+		}
 	}()
 
 	// read

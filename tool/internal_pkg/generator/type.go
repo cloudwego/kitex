@@ -21,6 +21,7 @@ import (
 	"text/template"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/cloudwego/kitex/transport"
 )
 
 // File .
@@ -45,6 +46,7 @@ type PackageInfo struct {
 	Features         []feature
 	FrugalPretouch   bool
 	Module           string
+	Protocol         transport.Protocol
 }
 
 // AddImport .
@@ -89,14 +91,16 @@ type PkgInfo struct {
 // ServiceInfo .
 type ServiceInfo struct {
 	PkgInfo
-	ServiceName     string
-	RawServiceName  string
-	ServiceTypeName func() string
-	Base            *ServiceInfo
-	Methods         []*MethodInfo
-	CombineServices []*ServiceInfo
-	HasStreaming    bool
-	ServiceFilePath string
+	ServiceName           string
+	RawServiceName        string
+	ServiceTypeName       func() string
+	Base                  *ServiceInfo
+	Methods               []*MethodInfo
+	CombineServices       []*ServiceInfo
+	HasStreaming          bool
+	ServiceFilePath       string
+	Protocol              string
+	HandlerReturnKeepResp bool
 }
 
 // AllMethods returns all methods that the service have.
@@ -144,6 +148,7 @@ var funcs = map[string]interface{}{
 	"SnakeString":   util.SnakeString,
 	"HasFeature":    HasFeature,
 	"FilterImports": FilterImports,
+	"backquoted":    BackQuoted,
 }
 
 var templateNames = []string{
@@ -297,4 +302,8 @@ func FilterImports(Imports map[string]map[string]bool, ms []*MethodInfo) map[str
 		}
 	}
 	return res
+}
+
+func BackQuoted(s string) string {
+	return "`" + s + "`"
 }

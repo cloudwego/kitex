@@ -59,9 +59,9 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	return &svrTransHandler{
-		opt:     opt,
-		svcInfo: opt.SvcInfo,
-		codec:   protobuf.NewGRPCCodec(),
+		opt:    opt,
+		svcMap: opt.SvcMap,
+		codec:  protobuf.NewGRPCCodec(),
 	}, nil
 }
 
@@ -69,7 +69,7 @@ var _ remote.ServerTransHandler = &svrTransHandler{}
 
 type svrTransHandler struct {
 	opt        *remote.ServerOption
-	svcInfo    *serviceinfo.ServiceInfo
+	svcMap     map[string]*serviceinfo.ServiceInfo
 	inkHdlFunc endpoint.Endpoint
 	codec      remote.Codec
 }
@@ -125,9 +125,11 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			ri := svrTrans.pool.Get().(rpcinfo.RPCInfo)
 			rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
 			defer func() {
-				// reset rpcinfo
-				ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
-				svrTrans.pool.Put(ri)
+				// reset rpcinfo for performance (PR #584)
+				if rpcinfo.PoolEnabled() {
+					ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
+					svrTrans.pool.Put(ri)
+				}
 			}()
 
 			// set grpc transport flag before execute metahandler
@@ -175,27 +177,29 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 				}
 			}
 
+			var serviceName string
 			idx := strings.LastIndex(sm[:pos], ".")
 			if idx == -1 {
 				ink.SetPackageName("")
-				ink.SetServiceName(sm[0:pos])
+				serviceName = sm[0:pos]
 			} else {
 				ink.SetPackageName(sm[:idx])
-				ink.SetServiceName(sm[idx+1 : pos])
+				serviceName = sm[idx+1 : pos]
 			}
+			ink.SetServiceName(serviceName)
 
-			rCtx = remote.SetRecvCompressor(rCtx, s.RecvCompress())
-			rCtx = remote.SetSendCompressor(rCtx, s.SendCompress())
+			// set recv grpc compressor at server to decode the pack from client
+			remote.SetRecvCompressor(ri, s.RecvCompress())
+			// set send grpc compressor at server to encode reply pack
+			remote.SetSendCompressor(ri, s.SendCompress())
 
-			st := NewStream(rCtx, t.svcInfo, newServerConn(tr, s), t)
-			streamArg := &streaming.Args{Stream: st}
+			svcInfo := t.svcMap[serviceName]
 
+			st := NewStream(rCtx, svcInfo, newServerConn(tr, s), t)
 			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
 			rCtx = context.WithValue(rCtx, streamKey{}, st)
 
-			// check grpc method
-			targetMethod := t.svcInfo.MethodInfo(methodName)
-			if targetMethod == nil {
+			if svcInfo == nil || svcInfo.MethodInfo(methodName) == nil {
 				unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
 				if unknownServiceHandlerFunc != nil {
 					rpcinfo.Record(rCtx, ri, stats.ServerHandleStart, nil)
@@ -204,10 +208,14 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 						err = kerrors.ErrBiz.WithCause(err)
 					}
 				} else {
-					err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
+					if svcInfo == nil {
+						err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", serviceName))
+					} else {
+						err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
+					}
 				}
 			} else {
-				err = t.inkHdlFunc(rCtx, streamArg, nil)
+				err = t.inkHdlFunc(rCtx, &streaming.Args{Stream: st}, nil)
 			}
 
 			if err != nil {

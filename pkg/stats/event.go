@@ -133,6 +133,11 @@ func MaxEventNum() int {
 	return maxEventNum
 }
 
+// PredefinedEventNum returns the number of predefined events of kitex.
+func PredefinedEventNum() int {
+	return int(predefinedEventNum)
+}
+
 func newEvent(idx EventIndex, level Level) Event {
 	return event{
 		idx:   idx,
