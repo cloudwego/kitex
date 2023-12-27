@@ -21,6 +21,9 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/cloudwego/dynamicgo/conv"
+	dproto "github.com/cloudwego/dynamicgo/proto"
+
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
@@ -36,14 +39,21 @@ var (
 
 type jsonPbCodec struct {
 	svcDsc           atomic.Value // *idl
+	dynamicgoSvcDsc  *dproto.ServiceDescriptor
 	provider         PbDescriptorProvider
 	codec            remote.PayloadCodec
 	binaryWithBase64 bool
+	opts             *Options
+	convOpts         conv.Options // used for dynamicgo conversion
+	dynamicgoEnabled bool         // currently set to true by default
 }
 
-func newJsonPbCodec(p PbDescriptorProvider, codec remote.PayloadCodec) (*jsonPbCodec, error) {
+func newJsonPbCodec(p PbDescriptorProvider, dp *dproto.ServiceDescriptor, codec remote.PayloadCodec, opts *Options) (*jsonPbCodec, error) {
 	svc := <-p.Provide()
-	c := &jsonPbCodec{codec: codec, provider: p, binaryWithBase64: true}
+	c := &jsonPbCodec{codec: codec, provider: p, dynamicgoSvcDsc: dp, binaryWithBase64: true, opts: opts, dynamicgoEnabled: true}
+	convOpts := opts.dynamicgoConvOpts
+	c.convOpts = convOpts
+
 	c.svcDsc.Store(svc)
 	go c.update()
 	return c, nil
@@ -67,9 +77,10 @@ func (c *jsonPbCodec) Marshal(ctx context.Context, msg remote.Message, out remot
 	if msg.MessageType() == remote.Exception {
 		return c.codec.Marshal(ctx, msg, out)
 	}
-	pbSvc := c.svcDsc.Load().(*desc.ServiceDescriptor)
+	// pbSvc := c.svcDsc.Load().(*desc.ServiceDescriptor)
+	pbSvc := c.dynamicgoSvcDsc
 
-	wm, err := proto.NewWriteJSON(pbSvc, method, msg.RPCRole() == remote.Client)
+	wm, err := proto.NewWriteJSON(pbSvc, method, msg.RPCRole() == remote.Client, &c.convOpts)
 	if err != nil {
 		return err
 	}
@@ -84,9 +95,9 @@ func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in remo
 		return err
 	}
 
-	pbSvc := c.svcDsc.Load().(*desc.ServiceDescriptor)
+	pbSvc := c.dynamicgoSvcDsc
 
-	wm, err := proto.NewReadJSON(pbSvc, msg.RPCRole() == remote.Client)
+	wm, err := proto.NewReadJSON(pbSvc, msg.RPCRole() == remote.Client, &c.convOpts)
 	if err != nil {
 		return err
 	}

@@ -18,41 +18,44 @@ package proto
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"unsafe"
 
+	"github.com/cloudwego/dynamicgo/conv"
+	dconvj2p "github.com/cloudwego/dynamicgo/conv/j2p"
+	dconvp2j "github.com/cloudwego/dynamicgo/conv/p2j"
+	dproto "github.com/cloudwego/dynamicgo/proto"
+
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
 )
 
 // NewWriteJSON build WriteJSON according to ServiceDescriptor
-func NewWriteJSON(svc *desc.ServiceDescriptor, method string, isClient bool) (*WriteJSON, error) {
-	fnDsc := svc.FindMethodByName(method)
+func NewWriteJSON(svc *dproto.ServiceDescriptor, method string, isClient bool, convOpts *conv.Options) (*WriteJSON, error) {
+	fnDsc := svc.LookupMethodByName(method)
 	if fnDsc == nil {
-		return nil, fmt.Errorf("missing method: %s in service: %s", method, svc.GetFullyQualifiedName())
+		return nil, fmt.Errorf("missing method: %s in service: %s", method, svc.Name())
 	}
 
-	// create dynamic message, get InputType if client, get OutputType if server
-	msgDescriptor := fnDsc.GetInputType()
+	// from the proto.ServiceDescriptor, get the TypeDescriptor
+	typeDescriptor := fnDsc.Input()
 	if !isClient {
-		msgDescriptor = fnDsc.GetOutputType()
+		typeDescriptor = fnDsc.Output()
 	}
-	inputMessage := dynamic.NewMessage(msgDescriptor)
 
 	ws := &WriteJSON{
-		dynamicMessage: *inputMessage,
-		isClient:       isClient,
+		dynamicgoConvOpts: convOpts,
+		dynamicgoTypeDsc:  typeDescriptor,
+		isClient:          isClient,
 	}
 	return ws, nil
 }
 
 // WriteJSON implement of MessageWriter
 type WriteJSON struct {
-	dynamicMessage dynamic.Message
-	isClient       bool
+	dynamicgoConvOpts *conv.Options
+	dynamicgoTypeDsc  *dproto.TypeDescriptor
+	isClient          bool
 }
 
 var _ MessageWriter = (*WriteJSON)(nil)
@@ -65,22 +68,10 @@ func (m *WriteJSON) Write(ctx context.Context, msg interface{}) (interface{}, er
 		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
 	}
 
-	// Convert string into json
-	var jsonMap map[string]interface{}
-	err := json.Unmarshal(stringToByteSliceUnsafe(s), &jsonMap)
-	if err != nil {
-		return nil, perrors.NewProtocolErrorWithMsg("Incorrect JSON format")
-	}
+	cv := dconvj2p.NewBinaryConv(*m.dynamicgoConvOpts)
 
-	// map data into inputMessage
-	for fieldName, fieldValue := range jsonMap {
-		err = m.dynamicMessage.TrySetFieldByName(fieldName, fieldValue)
-		if err != nil {
-			return nil, perrors.NewProtocolErrorWithMsg("Incorrect JSON format")
-		}
-	}
-
-	actualMsgBuf, err := m.dynamicMessage.Marshal()
+	// get protobuf-encode bytes
+	actualMsgBuf, err := cv.Do(ctx, m.dynamicgoTypeDsc, stringToByteSliceUnsafe(s))
 	if err != nil {
 		return nil, perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("protobuf marshal message failed: %s", err.Error()))
 	}
@@ -88,18 +79,20 @@ func (m *WriteJSON) Write(ctx context.Context, msg interface{}) (interface{}, er
 }
 
 // NewReadJSON build ReadJSON according to ServiceDescriptor
-func NewReadJSON(svc *desc.ServiceDescriptor, isClient bool) (*ReadJSON, error) {
-	// extract svc to be used to create dynamic message later
+func NewReadJSON(svc *dproto.ServiceDescriptor, isClient bool, convOpts *conv.Options) (*ReadJSON, error) {
+	// extract svc to be used to convert later
 	return &ReadJSON{
-		svc:      svc,
-		isClient: isClient,
+		dynamicgoConvOpts: convOpts,
+		dynamicgoSvcDsc:   svc,
+		isClient:          isClient,
 	}, nil
 }
 
 // ReadJSON implement of MessageReaderWithMethod
 type ReadJSON struct {
-	svc      *desc.ServiceDescriptor
-	isClient bool
+	dynamicgoConvOpts *conv.Options
+	dynamicgoSvcDsc   *dproto.ServiceDescriptor
+	isClient          bool
 }
 
 var _ MessageReader = (*ReadJSON)(nil)
@@ -113,30 +106,24 @@ var _ MessageReader = (*ReadJSON)(nil)
 // Read read data from actualMsgBuf and convert to json string
 func (m *ReadJSON) Read(ctx context.Context, method string, actualMsgBuf []byte) (interface{}, error) {
 	// create dynamic message here, once method string has been extracted
-	fnDsc := m.svc.FindMethodByName(method)
+	fnDsc := m.dynamicgoSvcDsc.LookupMethodByName(method)
 	if fnDsc == nil {
-		return nil, fmt.Errorf("missing method: %s in service: %s", method, m.svc.GetFullyQualifiedName())
+		return nil, fmt.Errorf("missing method: %s in service: %s", method, m.dynamicgoSvcDsc.Name())
 	}
 
-	// create dynamic message, get InputType if client, get OutputType if server
-	msgDescriptor := fnDsc.GetInputType()
+	// from the proto.ServiceDescriptor, get the TypeDescriptor
+	typeDescriptor := fnDsc.Input()
 	if !m.isClient {
-		msgDescriptor = fnDsc.GetOutputType()
+		typeDescriptor = fnDsc.Output()
 	}
 
-	// create dynamic message
-	dynamicMessage := dynamic.NewMessage(msgDescriptor)
-
-	err := dynamicMessage.Unmarshal(actualMsgBuf)
+	cv := dconvp2j.NewBinaryConv(*m.dynamicgoConvOpts)
+	out, err := cv.Do(context.Background(), typeDescriptor, actualMsgBuf)
 	if err != nil {
 		return nil, err
 	}
 
-	buf, err := dynamicMessage.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	return string(buf), nil
+	return string(out), nil
 }
 
 func stringToByteSliceUnsafe(s string) []byte {

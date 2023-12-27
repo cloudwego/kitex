@@ -18,8 +18,13 @@ package generic
 
 import (
 	"bytes"
+	"context"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"testing"
+
+	"github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -256,42 +261,43 @@ func TestJSONThriftGenericWithDynamicGo(t *testing.T) {
 
 func TestJSONPbGeneric(t *testing.T) {
 	path := "./jsonpb_test/idl/echo.proto"
-	content := `syntax = "proto3";
-	package pbapi;
-	// The greeting service definition.
-	option go_package = "pbapi";
-	
-	message Request {
-	  string message = 1;
-	}
-	
-	message Response {
-	  string message = 1;
-	}
-	
-	service Echo {
-	  rpc Echo (Request) returns (Response) {}
-	}`
 
-	includes := map[string]string{
-		path: content,
-	}
-
-	// get pb generic
-	p, err := NewPbContentProvider(path, includes)
+	pbf, err := os.Open(path)
 	test.Assert(t, err == nil)
 
-	g, err := JSONPbGeneric(p)
+	// initialise dynamicgo proto.ServiceDescriptor
+	opts := proto.Options{}
+	svc, err := opts.NewDescriptorFromPath(context.Background(), path)
+	if err != nil {
+		panic(err)
+	}
+	test.Assert(t, err == nil)
+
+	// initialise kitex proto.ServiceDescriptor
+	pbContent, err := ioutil.ReadAll(pbf)
+	test.Assert(t, err == nil)
+	pbf.Close()
+	p, err := NewPbContentProvider(path, map[string]string{path: string(pbContent)})
+	test.Assert(t, err == nil)
+
+	g, err := JSONPbGeneric(p, svc)
 	test.Assert(t, err == nil)
 	defer g.Close()
 
 	test.Assert(t, g.PayloadCodec().Name() == "JSONPb")
 
-	// err = SetBinaryWithBase64(g, true)
-	// test.Assert(t, err == nil)
 	test.Assert(t, g.Framed() == false)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Protobuf)
+
+	jg, ok := g.(*jsonPbGeneric)
+	test.Assert(t, ok)
+
+	test.Assert(t, jg.codec.dynamicgoEnabled == true)
+	test.Assert(t, jg.codec.binaryWithBase64)
+	test.Assert(t, !jg.codec.convOpts.NoBase64Binary)
+
+	test.Assert(t, err == nil)
 
 	method, err := g.GetMethod(nil, "Echo")
 	test.Assert(t, err == nil)

@@ -22,6 +22,9 @@ import (
 	"os"
 	"testing"
 
+	"github.com/cloudwego/dynamicgo/conv"
+	"github.com/cloudwego/dynamicgo/proto"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -29,16 +32,26 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
+const (
+	echoIDLPath = "./jsonpb_test/idl/echo.proto"
+)
+
 func TestRun(t *testing.T) {
 	t.Run("TestJsonPbCodec", TestJsonPbCodec)
 }
 
 func TestJsonPbCodec(t *testing.T) {
-	// jpc: json pb codec
-	p, err := initPbDescriptorProviderByIDL("./jsonpb_test/idl/echo.proto")
+	p, err := initPbDescriptorProviderByIDL(echoIDLPath)
 	test.Assert(t, err == nil)
-	jpc, err := newJsonPbCodec(p, pbCodec)
+
+	svc, err := initDynamicGoServiceDescriptorByIDL(echoIDLPath)
 	test.Assert(t, err == nil)
+
+	gOpts := &Options{dynamicgoConvOpts: conv.Options{}}
+
+	jpc, err := newJsonPbCodec(p, svc, pbCodec, gOpts)
+	test.Assert(t, err == nil)
+
 	defer jpc.Close()
 	test.Assert(t, jpc.Name() == "JSONPb")
 
@@ -67,7 +80,7 @@ func TestJsonPbCodec(t *testing.T) {
 
 func initJsonPbSendMsg(tp transport.Protocol) remote.Message {
 	req := &Args{
-		Request: `{"message": "send hellos"}`,
+		Request: `{"message": "send hello"}`,
 		Method:  "Echo",
 	}
 	svcInfo := mocks.ServiceInfo()
@@ -80,7 +93,7 @@ func initJsonPbSendMsg(tp transport.Protocol) remote.Message {
 
 func initJsonPbRecvMsg() remote.Message {
 	req := &Args{
-		Request: `{"message": "recv hellos"}`,
+		Request: `{"message": "recv hello"}`,
 		Method:  "Echo",
 	}
 	ink := rpcinfo.NewInvocation("", "Echo")
@@ -90,8 +103,8 @@ func initJsonPbRecvMsg() remote.Message {
 }
 
 // Helper Methods
-func initPbDescriptorProviderByIDL(pbIdl string) (PbDescriptorProvider, error) {
-	pbf, err := os.Open(pbIdl)
+func initPbDescriptorProviderByIDL(idlpath string) (PbDescriptorProvider, error) {
+	pbf, err := os.Open(idlpath)
 	if err != nil {
 		return nil, err
 	}
@@ -101,10 +114,22 @@ func initPbDescriptorProviderByIDL(pbIdl string) (PbDescriptorProvider, error) {
 		return nil, err
 	}
 	pbf.Close()
-	pbp, err := NewPbContentProvider(pbIdl, map[string]string{pbIdl: string(pbContent)})
+
+	pbp, err := NewPbContentProvider(idlpath, map[string]string{idlpath: string(pbContent)})
 	if err != nil {
 		return nil, err
 	}
 
 	return pbp, nil
+}
+
+func initDynamicGoServiceDescriptorByIDL(idlpath string) (*proto.ServiceDescriptor, error) {
+	// initialise dynamicgo proto.ServiceDescriptor
+	opts := proto.Options{}
+	svc, err := opts.NewDescriptorFromPath(context.Background(), idlpath)
+	if err != nil {
+		return nil, err
+	}
+
+	return svc, nil
 }
