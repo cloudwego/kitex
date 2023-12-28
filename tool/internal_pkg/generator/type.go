@@ -151,6 +151,10 @@ var funcs = map[string]interface{}{
 	"backquoted":    BackQuoted,
 }
 
+func AddTemplateFunc(key string, f interface{}) {
+	funcs[key] = f
+}
+
 var templateNames = []string{
 	"@client.go-NewClient-option",
 	"@client.go-EOF",
