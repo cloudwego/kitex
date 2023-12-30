@@ -186,7 +186,6 @@ func ReplaceObject(args generator.Config, subDirPath string) error {
 
 	handler = replaceJavaObject(handler)
 	return ioutil.WriteFile(handlerName, handler, 0o644)
-
 }
 
 func replaceJavaObject(content []byte) []byte {
@@ -200,18 +199,18 @@ func replaceJavaException(content []byte) []byte {
 // replaceJavaExceptionEmptyVerification is used to resolve this issue:
 // After generating nested struct, the generated struct would be:
 //
-//	type CustomizedException struct {
-//      *java.Exception
-//  }
+//	 type CustomizedException struct {
+//	     *java.Exception
+//	 }
 //
-//  It has a method:
-//  func (p *EchoCustomizedException) IsSetException() bool {
-//	    return p.Exception != nil
-//  }
+//	 It has a method:
+//	 func (p *EchoCustomizedException) IsSetException() bool {
+//		    return p.Exception != nil
+//	 }
 //
-//  After invoking replaceJavaException, *java.Exception would be converted
-//  to java.Exception and IsSetException became invalid. We convert the statement
-//  to `return true` to ignore this problem.
+//	 After invoking replaceJavaException, *java.Exception would be converted
+//	 to java.Exception and IsSetException became invalid. We convert the statement
+//	 to `return true` to ignore this problem.
 func replaceJavaExceptionEmptyVerification(content []byte) []byte {
 	return JavaExceptionEmptyVerificationRe.ReplaceAll(content, []byte("return true"))
 }
