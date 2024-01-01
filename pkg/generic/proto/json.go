@@ -60,7 +60,7 @@ type WriteJSON struct {
 
 var _ MessageWriter = (*WriteJSON)(nil)
 
-// Write writes to a dynamic message and returns an output bytebuffer
+// Write converts msg to protobuf wire format and returns an output bytebuffer
 func (m *WriteJSON) Write(ctx context.Context, msg interface{}) (interface{}, error) {
 	// msg is string
 	s, ok := msg.(string)

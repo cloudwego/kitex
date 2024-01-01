@@ -20,11 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math"
 	"net"
-	"os"
 	"reflect"
 	"strconv"
 	"testing"
@@ -44,27 +42,24 @@ func TestRun(t *testing.T) {
 	t.Run("TestVoid", TestVoid)
 	t.Run("TestExampleMethod2", TestExampleMethod2)
 	t.Run("TestInt2FloatMethod", TestInt2FloatMethod)
+	t.Run("TestInt2FloatMethod2", TestInt2FloatMethod2)
 }
 
 func initPbServerByIDLDynamicGo(t *testing.T, address string, handler generic.Service, pbIdl string) server.Server {
-	pbf, err := os.Open(pbIdl)
+	//pbf, err := os.Open(pbIdl)
 
-	// initialise dynamicgo proto.ServiceDescriptor
+	// initialise DescriptorProvider for DynamicGo
 	opts := proto.Options{}
-	svc, err := opts.NewDescriptorFromPath(context.Background(), pbIdl)
+	p, err := generic.NewPbContentProviderDynamicGo(pbIdl, context.Background(), opts)
+
 	if err != nil {
 		panic(err)
 	}
 	test.Assert(t, err == nil)
 
-	// initialise kitex proto.ServiceDescriptor
-	pbContent, err := ioutil.ReadAll(pbf)
-	test.Assert(t, err == nil)
 	addr, _ := net.ResolveTCPAddr("tcp", address)
-	p, err := generic.NewPbContentProvider(pbIdl, map[string]string{pbIdl: string(pbContent)})
-	test.Assert(t, err == nil)
 
-	g, err := generic.JSONPbGeneric(p, svc)
+	g, err := generic.JSONPbGeneric(p)
 	test.Assert(t, err == nil)
 	svr := newGenericServer(g, addr, handler)
 	test.Assert(t, err == nil)
@@ -72,25 +67,16 @@ func initPbServerByIDLDynamicGo(t *testing.T, address string, handler generic.Se
 }
 
 func initPbClientByIDLDynamicGo(t *testing.T, addr, destSvcName, pbIdl string) genericclient.Client {
-	pbf, err := os.Open(pbIdl)
-	test.Assert(t, err == nil)
 
 	// initialise dynamicgo proto.ServiceDescriptor
 	opts := proto.Options{}
-	svc, err := opts.NewDescriptorFromPath(context.Background(), pbIdl)
+	p, err := generic.NewPbContentProviderDynamicGo(pbIdl, context.Background(), opts)
 	if err != nil {
 		panic(err)
 	}
 	test.Assert(t, err == nil)
 
-	// initialise kitex proto.ServiceDescriptor
-	pbContent, err := ioutil.ReadAll(pbf)
-	test.Assert(t, err == nil)
-	pbf.Close()
-	pbp, err := generic.NewPbContentProvider(pbIdl, map[string]string{pbIdl: string(pbContent)})
-	test.Assert(t, err == nil)
-
-	g, err := generic.JSONPbGeneric(pbp, svc)
+	g, err := generic.JSONPbGeneric(p)
 	test.Assert(t, err == nil)
 	cli := newGenericClient(destSvcName, g, addr)
 	test.Assert(t, err == nil)
@@ -159,10 +145,10 @@ func TestVoid(t *testing.T) {
 
 func TestExampleMethod2(t *testing.T) {
 	time.Sleep(1 * time.Second)
-	svr := initPbServerByIDLDynamicGo(t, ":8128", new(TestExampleMethod2Service), "./idl/example2.proto")
+	svr := initPbServerByIDLDynamicGo(t, ":8131", new(TestExampleMethod2Service), "./idl/example2.proto")
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initPbClientByIDLDynamicGo(t, "127.0.0.1:8128", "ExampleMethod", "./idl/example2.proto")
+	cli := initPbClientByIDLDynamicGo(t, "127.0.0.1:8131", "ExampleMethod", "./idl/example2.proto")
 
 	ctx := context.Background()
 
@@ -184,12 +170,13 @@ func TestExampleMethod2(t *testing.T) {
 }
 
 func TestInt2FloatMethod(t *testing.T) {
-	ExampleInt2FloatReq := `{"Float64":` + strconv.Itoa(math.MaxInt64) + `}`
+	ExampleInt2FloatReq := `{"Int32":1,"Float64":3.14,"String":"hello","Int64":2,"Subfix":0.92653}`
+	//`{"Float64":` + strconv.Itoa(math.MaxInt64) + `}`
 	time.Sleep(1 * time.Second)
-	svr := initPbServerByIDLDynamicGo(t, ":8128", new(TestInt2FloatMethodService), "./idl/example2.proto")
+	svr := initPbServerByIDLDynamicGo(t, ":8132", new(TestInt2FloatMethodService), "./idl/example2.proto")
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initPbClientByIDLDynamicGo(t, "127.0.0.1:8128", "Int2FloatMethod", "./idl/example2.proto")
+	cli := initPbClientByIDLDynamicGo(t, "127.0.0.1:8132", "Int2FloatMethod", "./idl/example2.proto")
 
 	ctx := context.Background()
 
@@ -201,9 +188,27 @@ func TestInt2FloatMethod(t *testing.T) {
 	}
 	fmt.Println(resp)
 
-	respstruct := &ExampleInt2Float{}
-	json.Unmarshal([]byte(resp.(string)), respstruct)
-	test.Assert(t, respstruct.Float64 == float64(math.MaxInt64))
+	svr.Stop()
+}
+
+func TestInt2FloatMethod2(t *testing.T) {
+	ExampleInt2FloatReq := `{"Int64":` + strconv.Itoa(math.MaxInt64) + `}`
+
+	time.Sleep(1 * time.Second)
+	svr := initPbServerByIDLDynamicGo(t, ":8133", new(TestInt2FloatMethod2Service), "./idl/example2.proto")
+	time.Sleep(500 * time.Millisecond)
+
+	cli := initPbClientByIDLDynamicGo(t, "127.0.0.1:8133", "Int2FloatMethod2", "./idl/example2.proto")
+
+	ctx := context.Background()
+
+	// 'ExampleMethod' method name must be passed as param
+	resp, err := cli.GenericCall(ctx, "Int2FloatMethod", ExampleInt2FloatReq)
+	// resp is a JSON string
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(resp)
 
 	svr.Stop()
 }

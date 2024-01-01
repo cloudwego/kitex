@@ -17,7 +17,9 @@
 package generic
 
 import (
+	"context"
 	"errors"
+	dproto "github.com/cloudwego/dynamicgo/proto"
 	"sync"
 
 	"github.com/jhump/protoreflect/desc/protoparse"
@@ -30,7 +32,13 @@ type PbContentProvider struct {
 	svcs      chan proto.ServiceDescriptor
 }
 
+type PbContentProviderDynamicGo struct {
+	closeOnce sync.Once
+	svcs      chan *dproto.ServiceDescriptor
+}
+
 var _ PbDescriptorProvider = (*PbContentProvider)(nil)
+var _ PbDescriptorProviderDynamicGo = (*PbContentProviderDynamicGo)(nil)
 
 func NewPbContentProvider(main string, includes map[string]string) (PbDescriptorProvider, error) {
 	p := &PbContentProvider{
@@ -92,6 +100,32 @@ func (p *PbContentProvider) Provide() <-chan proto.ServiceDescriptor {
 }
 
 func (p *PbContentProvider) Close() error {
+	p.closeOnce.Do(func() {
+		close(p.svcs)
+	})
+	return nil
+}
+
+// PbContentProviderDynamicGo
+func NewPbContentProviderDynamicGo(main string, ctx context.Context, options dproto.Options) (PbDescriptorProviderDynamicGo, error) {
+	p := &PbContentProviderDynamicGo{
+		svcs: make(chan *dproto.ServiceDescriptor, 1),
+	}
+
+	svc, err := options.NewDescriptorFromPath(ctx, main)
+	if err != nil {
+		return nil, err
+	}
+	p.svcs <- svc
+
+	return p, nil
+}
+
+func (p *PbContentProviderDynamicGo) Provide() <-chan *dproto.ServiceDescriptor {
+	return p.svcs
+}
+
+func (p *PbContentProviderDynamicGo) Close() error {
 	p.closeOnce.Do(func() {
 		close(p.svcs)
 	})

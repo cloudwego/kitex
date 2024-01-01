@@ -18,14 +18,12 @@ package test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"math"
 	"net"
 	"strconv"
-
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/genericclient"
@@ -182,16 +180,31 @@ type ExampleInt2Float struct {
 // GenericCall ...
 func (g *TestInt2FloatMethodService) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
 	buf := request.(string)
-	req := &ExampleInt2Float{}
-	json.Unmarshal([]byte(request.(string)), req)
 
 	rpcinfo := rpcinfo.GetRPCInfo(ctx)
 	fmt.Printf("Method from Ctx: %s\n", rpcinfo.Invocation().MethodName())
 	fmt.Printf("Recv: %v\n", buf)
 	fmt.Printf("Method: %s\n", method)
-	resp := `{"Float64":` + strconv.Itoa(math.MaxInt64) + `}`
-	if req.Float64 == float64(math.MaxInt64) {
-		return nil, errors.New("call failed, incorrect float64 data in request")
+	resp := `{"Int32":1,"Float64":3.14,"String":"hello","Int64":2,"Subfix":0.92653}`
+
+	if resp != buf {
+		return nil, errors.New("call failed")
 	}
+	return resp, nil
+}
+
+// GenericService for TestInt2FloatMethod2
+type TestInt2FloatMethod2Service struct{}
+
+// GenericCall ...
+func (g *TestInt2FloatMethod2Service) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	buf := request.(string)
+
+	rpcinfo := rpcinfo.GetRPCInfo(ctx)
+	fmt.Printf("Method from Ctx: %s\n", rpcinfo.Invocation().MethodName())
+	fmt.Printf("Recv: %v\n", buf)
+	fmt.Printf("Method: %s\n", method)
+	resp := `{"Int64":` + strconv.Itoa(math.MaxInt64) + `}`
+
 	return resp, nil
 }

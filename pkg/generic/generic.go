@@ -21,8 +21,6 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/dynamicgo/conv"
-	dproto "github.com/cloudwego/dynamicgo/proto"
-
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -127,11 +125,11 @@ func JSONThriftGeneric(p DescriptorProvider, opts ...Option) (Generic, error) {
 	return &jsonThriftGeneric{codec: codec}, nil
 }
 
-func JSONPbGeneric(p PbDescriptorProvider, dp *dproto.ServiceDescriptor, opts ...Option) (Generic, error) {
+func JSONPbGeneric(p PbDescriptorProviderDynamicGo, opts ...Option) (Generic, error) {
 	gOpts := &Options{dynamicgoConvOpts: conv.Options{}}
 	gOpts.apply(opts)
 
-	codec, err := newJsonPbCodec(p, dp, pbCodec, gOpts)
+	codec, err := newJsonPbCodec(p, pbCodec, gOpts)
 	if err != nil {
 		return nil, err
 	}

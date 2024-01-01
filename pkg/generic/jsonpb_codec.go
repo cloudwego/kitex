@@ -19,17 +19,15 @@ package generic
 import (
 	"context"
 	"fmt"
+	dproto "github.com/cloudwego/dynamicgo/proto"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
-	dproto "github.com/cloudwego/dynamicgo/proto"
-
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	perrors "github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/jhump/protoreflect/desc"
 )
 
 var (
@@ -39,8 +37,7 @@ var (
 
 type jsonPbCodec struct {
 	svcDsc           atomic.Value // *idl
-	dynamicgoSvcDsc  *dproto.ServiceDescriptor
-	provider         PbDescriptorProvider
+	provider         PbDescriptorProviderDynamicGo
 	codec            remote.PayloadCodec
 	binaryWithBase64 bool
 	opts             *Options
@@ -48,9 +45,9 @@ type jsonPbCodec struct {
 	dynamicgoEnabled bool         // currently set to true by default
 }
 
-func newJsonPbCodec(p PbDescriptorProvider, dp *dproto.ServiceDescriptor, codec remote.PayloadCodec, opts *Options) (*jsonPbCodec, error) {
+func newJsonPbCodec(p PbDescriptorProviderDynamicGo, codec remote.PayloadCodec, opts *Options) (*jsonPbCodec, error) {
 	svc := <-p.Provide()
-	c := &jsonPbCodec{codec: codec, provider: p, dynamicgoSvcDsc: dp, binaryWithBase64: true, opts: opts, dynamicgoEnabled: true}
+	c := &jsonPbCodec{codec: codec, provider: p, binaryWithBase64: true, opts: opts, dynamicgoEnabled: true}
 	convOpts := opts.dynamicgoConvOpts
 	c.convOpts = convOpts
 
@@ -77,8 +74,8 @@ func (c *jsonPbCodec) Marshal(ctx context.Context, msg remote.Message, out remot
 	if msg.MessageType() == remote.Exception {
 		return c.codec.Marshal(ctx, msg, out)
 	}
-	// pbSvc := c.svcDsc.Load().(*desc.ServiceDescriptor)
-	pbSvc := c.dynamicgoSvcDsc
+
+	pbSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor)
 
 	wm, err := proto.NewWriteJSON(pbSvc, method, msg.RPCRole() == remote.Client, &c.convOpts)
 	if err != nil {
@@ -95,7 +92,7 @@ func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in remo
 		return err
 	}
 
-	pbSvc := c.dynamicgoSvcDsc
+	pbSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor)
 
 	wm, err := proto.NewReadJSON(pbSvc, msg.RPCRole() == remote.Client, &c.convOpts)
 	if err != nil {
@@ -108,12 +105,13 @@ func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in remo
 }
 
 func (c *jsonPbCodec) getMethod(req interface{}, method string) (*Method, error) {
-	fnSvc := c.svcDsc.Load().(*desc.ServiceDescriptor).FindMethodByName(method)
+	fnSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor).LookupMethodByName(method)
 	if fnSvc == nil {
 		return nil, fmt.Errorf("missing method: %s in service", method)
 	}
 
-	return &Method{method, fnSvc.IsClientStreaming() || fnSvc.IsServerStreaming()}, nil
+	// protobuf does not have oneway methods
+	return &Method{method, false}, nil
 }
 
 func (c *jsonPbCodec) Name() string {

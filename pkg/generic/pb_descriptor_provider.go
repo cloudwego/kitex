@@ -17,6 +17,7 @@
 package generic
 
 import (
+	dproto "github.com/cloudwego/dynamicgo/proto"
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
@@ -25,4 +26,11 @@ type PbDescriptorProvider interface {
 	Closer
 	// Provide return a channel for provide service descriptors
 	Provide() <-chan proto.ServiceDescriptor
+}
+
+// PbDescriptorProvider provide service descriptor
+type PbDescriptorProviderDynamicGo interface {
+	Closer
+	// Provide return a channel for provide service descriptors
+	Provide() <-chan *dproto.ServiceDescriptor
 }

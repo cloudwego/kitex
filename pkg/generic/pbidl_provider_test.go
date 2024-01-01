@@ -17,6 +17,8 @@
 package generic
 
 import (
+	"context"
+	dproto "github.com/cloudwego/dynamicgo/proto"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -44,4 +46,16 @@ func TestPbContentProvider(t *testing.T) {
 	test.Assert(t, err == nil)
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
+}
+
+func TestPbContentProviderDynamicGo(t *testing.T) {
+	path := "./jsonpb_test/idl/echo.proto"
+
+	opts := dproto.Options{}
+	p, err := NewPbContentProviderDynamicGo(path, context.Background(), opts)
+
+	test.Assert(t, err == nil)
+
+	svcDsc := <-p.Provide()
+	test.Assert(t, svcDsc != nil)
 }

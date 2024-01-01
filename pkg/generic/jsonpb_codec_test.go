@@ -18,12 +18,10 @@ package generic
 
 import (
 	"context"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/cloudwego/dynamicgo/conv"
-	"github.com/cloudwego/dynamicgo/proto"
+	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
@@ -41,15 +39,14 @@ func TestRun(t *testing.T) {
 }
 
 func TestJsonPbCodec(t *testing.T) {
-	p, err := initPbDescriptorProviderByIDL(echoIDLPath)
-	test.Assert(t, err == nil)
-
-	svc, err := initDynamicGoServiceDescriptorByIDL(echoIDLPath)
-	test.Assert(t, err == nil)
-
 	gOpts := &Options{dynamicgoConvOpts: conv.Options{}}
 
-	jpc, err := newJsonPbCodec(p, svc, pbCodec, gOpts)
+	opts := dproto.Options{}
+	p, err := NewPbContentProviderDynamicGo(echoIDLPath, context.Background(), opts)
+
+	test.Assert(t, err == nil)
+
+	jpc, err := newJsonPbCodec(p, pbCodec, gOpts)
 	test.Assert(t, err == nil)
 
 	defer jpc.Close()
@@ -100,36 +97,4 @@ func initJsonPbRecvMsg() remote.Message {
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
 	return msg
-}
-
-// Helper Methods
-func initPbDescriptorProviderByIDL(idlpath string) (PbDescriptorProvider, error) {
-	pbf, err := os.Open(idlpath)
-	if err != nil {
-		return nil, err
-	}
-
-	pbContent, err := ioutil.ReadAll(pbf)
-	if err != nil {
-		return nil, err
-	}
-	pbf.Close()
-
-	pbp, err := NewPbContentProvider(idlpath, map[string]string{idlpath: string(pbContent)})
-	if err != nil {
-		return nil, err
-	}
-
-	return pbp, nil
-}
-
-func initDynamicGoServiceDescriptorByIDL(idlpath string) (*proto.ServiceDescriptor, error) {
-	// initialise dynamicgo proto.ServiceDescriptor
-	opts := proto.Options{}
-	svc, err := opts.NewDescriptorFromPath(context.Background(), idlpath)
-	if err != nil {
-		return nil, err
-	}
-
-	return svc, nil
 }
