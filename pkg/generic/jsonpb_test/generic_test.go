@@ -46,8 +46,6 @@ func TestRun(t *testing.T) {
 }
 
 func initPbServerByIDLDynamicGo(t *testing.T, address string, handler generic.Service, pbIdl string) server.Server {
-	// pbf, err := os.Open(pbIdl)
-
 	// initialise DescriptorProvider for DynamicGo
 	opts := proto.Options{}
 	p, err := generic.NewPbContentProviderDynamicGo(pbIdl, context.Background(), opts)
@@ -82,11 +80,12 @@ func initPbClientByIDLDynamicGo(t *testing.T, addr, destSvcName, pbIdl string) g
 }
 
 func TestEcho(t *testing.T) {
+	addr := test.GetLocalAddress()
 	time.Sleep(1 * time.Second)
-	svr := initPbServerByIDLDynamicGo(t, ":8128", new(TestEchoService), "./idl/echo.proto")
+	svr := initPbServerByIDLDynamicGo(t, addr, new(TestEchoService), "./idl/echo.proto")
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initPbClientByIDLDynamicGo(t, "127.0.0.1:8128", "EchoService", "./idl/echo.proto")
+	cli := initPbClientByIDLDynamicGo(t, addr, "EchoService", "./idl/echo.proto")
 
 	ctx := context.Background()
 
@@ -102,11 +101,12 @@ func TestEcho(t *testing.T) {
 }
 
 func TestExampleMethod(t *testing.T) {
+	addr := test.GetLocalAddress()
 	time.Sleep(1 * time.Second)
-	svr := initPbServerByIDLDynamicGo(t, ":8129", new(TestExampleMethodService), "./idl/example.proto")
+	svr := initPbServerByIDLDynamicGo(t, addr, new(TestExampleMethodService), "./idl/example.proto")
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initPbClientByIDLDynamicGo(t, "127.0.0.1:8129", "ExampleService", "./idl/example.proto")
+	cli := initPbClientByIDLDynamicGo(t, addr, "ExampleService", "./idl/example.proto")
 
 	ctx := context.Background()
 
@@ -122,11 +122,12 @@ func TestExampleMethod(t *testing.T) {
 }
 
 func TestVoid(t *testing.T) {
+	addr := test.GetLocalAddress()
 	time.Sleep(1 * time.Second)
-	svr := initPbServerByIDLDynamicGo(t, ":8130", new(TestVoidService), "./idl/example.proto")
+	svr := initPbServerByIDLDynamicGo(t, addr, new(TestVoidService), "./idl/example.proto")
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initPbClientByIDLDynamicGo(t, "127.0.0.1:8130", "ExampleService", "./idl/example.proto")
+	cli := initPbClientByIDLDynamicGo(t, addr, "ExampleService", "./idl/example.proto")
 
 	ctx := context.Background()
 
@@ -142,11 +143,12 @@ func TestVoid(t *testing.T) {
 }
 
 func TestExampleMethod2(t *testing.T) {
+	addr := test.GetLocalAddress()
 	time.Sleep(1 * time.Second)
-	svr := initPbServerByIDLDynamicGo(t, ":8131", new(TestExampleMethod2Service), "./idl/example2.proto")
+	svr := initPbServerByIDLDynamicGo(t, addr, new(TestExampleMethod2Service), "./idl/example2.proto")
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initPbClientByIDLDynamicGo(t, "127.0.0.1:8131", "ExampleMethod", "./idl/example2.proto")
+	cli := initPbClientByIDLDynamicGo(t, addr, "ExampleMethod", "./idl/example2.proto")
 
 	ctx := context.Background()
 
@@ -168,13 +170,14 @@ func TestExampleMethod2(t *testing.T) {
 }
 
 func TestInt2FloatMethod(t *testing.T) {
+	addr := test.GetLocalAddress()
 	ExampleInt2FloatReq := `{"Int32":1,"Float64":3.14,"String":"hello","Int64":2,"Subfix":0.92653}`
 	//`{"Float64":` + strconv.Itoa(math.MaxInt64) + `}`
 	time.Sleep(1 * time.Second)
-	svr := initPbServerByIDLDynamicGo(t, ":8132", new(TestInt2FloatMethodService), "./idl/example2.proto")
+	svr := initPbServerByIDLDynamicGo(t, addr, new(TestInt2FloatMethodService), "./idl/example2.proto")
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initPbClientByIDLDynamicGo(t, "127.0.0.1:8132", "Int2FloatMethod", "./idl/example2.proto")
+	cli := initPbClientByIDLDynamicGo(t, addr, "Int2FloatMethod", "./idl/example2.proto")
 
 	ctx := context.Background()
 
@@ -190,13 +193,14 @@ func TestInt2FloatMethod(t *testing.T) {
 }
 
 func TestInt2FloatMethod2(t *testing.T) {
+	addr := test.GetLocalAddress()
 	ExampleInt2FloatReq := `{"Int64":` + strconv.Itoa(math.MaxInt64) + `}`
 
 	time.Sleep(1 * time.Second)
-	svr := initPbServerByIDLDynamicGo(t, ":8133", new(TestInt2FloatMethod2Service), "./idl/example2.proto")
+	svr := initPbServerByIDLDynamicGo(t, addr, new(TestInt2FloatMethod2Service), "./idl/example2.proto")
 	time.Sleep(500 * time.Millisecond)
 
-	cli := initPbClientByIDLDynamicGo(t, "127.0.0.1:8133", "Int2FloatMethod2", "./idl/example2.proto")
+	cli := initPbClientByIDLDynamicGo(t, addr, "Int2FloatMethod2", "./idl/example2.proto")
 
 	ctx := context.Background()
 

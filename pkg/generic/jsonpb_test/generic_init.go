@@ -149,23 +149,6 @@ func getExampleReq() string {
 }`
 }
 
-func getExampleResp() string {
-	return `{
-    "Msg": "messagefirst",
-    "required_field": "hello",
-    "BaseResp": {
-        "StatusMessage": "status1",
-        "StatusCode": 32,
-        "Extra": {
-            "1b": "aaa",
-            "2b": "bbb",
-            "3b": "ccc",
-            "4b": "ddd"
-        }
-    }
-}`
-}
-
 // GenericService for TestInt2FloatMethod
 type TestInt2FloatMethodService struct{}
 

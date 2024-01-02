@@ -24,10 +24,10 @@ import (
 
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/proto"
+	"github.com/cloudwego/dynamicgo/testdata/kitex_gen/pb/example2"
 	"github.com/stretchr/testify/require"
 	goprotowire "google.golang.org/protobuf/encoding/protowire"
 
-	"github.com/cloudwego/dynamicgo/testdata/kitex_gen/pb/example2"
 	"github.com/cloudwego/kitex/internal/test"
 )
 
@@ -50,6 +50,7 @@ func TestWrite(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	wm, err := NewWriteJSON(svc, method, true, &conv.Options{})
+	test.Assert(t, err == nil)
 
 	msg := getExampleReq()
 
@@ -98,9 +99,11 @@ func TestRead(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	rm, err := NewReadJSON(svc, false, &conv.Options{})
+	test.Assert(t, err == nil)
 
 	// unmarshal protobuf wire format into json string using Read
 	out, err := rm.Read(context.Background(), method, in)
+	test.Assert(t, err == nil)
 
 	// get expected json struct
 	exp := &example2.ExampleReq{}

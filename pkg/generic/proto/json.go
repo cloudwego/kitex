@@ -19,8 +19,6 @@ package proto
 import (
 	"context"
 	"fmt"
-	"reflect"
-	"unsafe"
 
 	"github.com/cloudwego/dynamicgo/conv"
 	dconvj2p "github.com/cloudwego/dynamicgo/conv/j2p"
@@ -28,6 +26,7 @@ import (
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 // NewWriteJSON build WriteJSON according to ServiceDescriptor
@@ -71,7 +70,7 @@ func (m *WriteJSON) Write(ctx context.Context, msg interface{}) (interface{}, er
 	cv := dconvj2p.NewBinaryConv(*m.dynamicgoConvOpts)
 
 	// get protobuf-encode bytes
-	actualMsgBuf, err := cv.Do(ctx, m.dynamicgoTypeDsc, stringToByteSliceUnsafe(s))
+	actualMsgBuf, err := cv.Do(ctx, m.dynamicgoTypeDsc, utils.StringToSliceByte(s))
 	if err != nil {
 		return nil, perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("protobuf marshal message failed: %s", err.Error()))
 	}
@@ -118,13 +117,4 @@ func (m *ReadJSON) Read(ctx context.Context, method string, actualMsgBuf []byte)
 	}
 
 	return string(out), nil
-}
-
-func stringToByteSliceUnsafe(s string) []byte {
-	stringHeader := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	return *(*[]byte)(unsafe.Pointer(&reflect.SliceHeader{
-		Data: stringHeader.Data,
-		Len:  stringHeader.Len,
-		Cap:  stringHeader.Len,
-	}))
 }
