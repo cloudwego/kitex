@@ -19,9 +19,9 @@ package generic
 import (
 	"context"
 	"errors"
-	dproto "github.com/cloudwego/dynamicgo/proto"
 	"sync"
 
+	dproto "github.com/cloudwego/dynamicgo/proto"
 	"github.com/jhump/protoreflect/desc/protoparse"
 
 	"github.com/cloudwego/kitex/pkg/generic/proto"
@@ -37,8 +37,10 @@ type PbContentProviderDynamicGo struct {
 	svcs      chan *dproto.ServiceDescriptor
 }
 
-var _ PbDescriptorProvider = (*PbContentProvider)(nil)
-var _ PbDescriptorProviderDynamicGo = (*PbContentProviderDynamicGo)(nil)
+var (
+	_ PbDescriptorProvider          = (*PbContentProvider)(nil)
+	_ PbDescriptorProviderDynamicGo = (*PbContentProviderDynamicGo)(nil)
+)
 
 func NewPbContentProvider(main string, includes map[string]string) (PbDescriptorProvider, error) {
 	p := &PbContentProvider{

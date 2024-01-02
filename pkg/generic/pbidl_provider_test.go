@@ -18,8 +18,9 @@ package generic
 
 import (
 	"context"
-	dproto "github.com/cloudwego/dynamicgo/proto"
 	"testing"
+
+	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/internal/test"
 )

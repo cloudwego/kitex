@@ -97,13 +97,7 @@ type ReadJSON struct {
 
 var _ MessageReader = (*ReadJSON)(nil)
 
-//// SetBinaryWithBase64 enable/disable Base64 encoding for binary.
-//// Note that this method is not concurrent-safe.
-//func (m *ReadJSON) SetBinaryWithBase64(enable bool) {
-//	m.binaryWithBase64 = enable
-//}
-
-// Read read data from actualMsgBuf and convert to json string
+// Read reads data from actualMsgBuf and convert to json string
 func (m *ReadJSON) Read(ctx context.Context, method string, actualMsgBuf []byte) (interface{}, error) {
 	// create dynamic message here, once method string has been extracted
 	fnDsc := m.dynamicgoSvcDsc.LookupMethodByName(method)
@@ -111,7 +105,7 @@ func (m *ReadJSON) Read(ctx context.Context, method string, actualMsgBuf []byte)
 		return nil, fmt.Errorf("missing method: %s in service: %s", method, m.dynamicgoSvcDsc.Name())
 	}
 
-	// from the proto.ServiceDescriptor, get the TypeDescriptor
+	// from the dproto.ServiceDescriptor, get the TypeDescriptor
 	typeDescriptor := fnDsc.Input()
 	if !m.isClient {
 		typeDescriptor = fnDsc.Output()

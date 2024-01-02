@@ -19,14 +19,16 @@ package proto
 import (
 	"context"
 	"encoding/json"
-	"github.com/cloudwego/dynamicgo/conv"
-	"github.com/cloudwego/dynamicgo/proto"
-	"github.com/cloudwego/dynamicgo/testdata/kitex_gen/pb/example2"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/stretchr/testify/require"
-	goprotowire "google.golang.org/protobuf/encoding/protowire"
 	"io/ioutil"
 	"testing"
+
+	"github.com/cloudwego/dynamicgo/conv"
+	"github.com/cloudwego/dynamicgo/proto"
+	"github.com/stretchr/testify/require"
+	goprotowire "google.golang.org/protobuf/encoding/protowire"
+
+	"github.com/cloudwego/dynamicgo/testdata/kitex_gen/pb/example2"
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 var (

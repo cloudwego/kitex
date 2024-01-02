@@ -46,12 +46,11 @@ func TestRun(t *testing.T) {
 }
 
 func initPbServerByIDLDynamicGo(t *testing.T, address string, handler generic.Service, pbIdl string) server.Server {
-	//pbf, err := os.Open(pbIdl)
+	// pbf, err := os.Open(pbIdl)
 
 	// initialise DescriptorProvider for DynamicGo
 	opts := proto.Options{}
 	p, err := generic.NewPbContentProviderDynamicGo(pbIdl, context.Background(), opts)
-
 	if err != nil {
 		panic(err)
 	}
@@ -67,7 +66,6 @@ func initPbServerByIDLDynamicGo(t *testing.T, address string, handler generic.Se
 }
 
 func initPbClientByIDLDynamicGo(t *testing.T, addr, destSvcName, pbIdl string) genericclient.Client {
-
 	// initialise dynamicgo proto.ServiceDescriptor
 	opts := proto.Options{}
 	p, err := generic.NewPbContentProviderDynamicGo(pbIdl, context.Background(), opts)
@@ -202,9 +200,7 @@ func TestInt2FloatMethod2(t *testing.T) {
 
 	ctx := context.Background()
 
-	// 'ExampleMethod' method name must be passed as param
 	resp, err := cli.GenericCall(ctx, "Int2FloatMethod", ExampleInt2FloatReq)
-	// resp is a JSON string
 	if err != nil {
 		log.Fatal(err)
 	}

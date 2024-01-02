@@ -19,14 +19,15 @@ package generic
 import (
 	"context"
 	"fmt"
-	dproto "github.com/cloudwego/dynamicgo/proto"
 	"sync/atomic"
+
+	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
-	perrors "github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 

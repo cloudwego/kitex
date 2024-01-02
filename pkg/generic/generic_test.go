@@ -260,13 +260,9 @@ func TestJSONThriftGenericWithDynamicGo(t *testing.T) {
 func TestJSONPbGeneric(t *testing.T) {
 	path := "./jsonpb_test/idl/echo.proto"
 
-	//pbf, err := os.Open(path)
-	//test.Assert(t, err == nil)
-
 	// initialise dynamicgo proto.ServiceDescriptor
 	opts := dproto.Options{}
 	p, err := NewPbContentProviderDynamicGo(path, context.Background(), opts)
-
 	if err != nil {
 		panic(err)
 	}
