@@ -142,13 +142,13 @@ func loadIDLRefConfig(file *os.File) *config.RawConfig {
 }
 
 var (
-	JavaObjectRe                     = regexp.MustCompile(`\*java\.Object\b`)
-	JavaExceptionRe                  = regexp.MustCompile(`\*java\.Exception\b`)
-	JavaExceptionEmptyVerificationRe = regexp.MustCompile(`return p\.Exception != nil\b`)
+	javaObjectRe                     = regexp.MustCompile(`\*java\.Object\b`)
+	javaExceptionRe                  = regexp.MustCompile(`\*java\.Exception\b`)
+	javaExceptionEmptyVerificationRe = regexp.MustCompile(`return p\.Exception != nil\b`)
 )
 
-// ReplaceObject args is the arguments from command, subDirPath used for xx/xx/xx
-func ReplaceObject(args generator.Config, subDirPath string) error {
+// Hessian2PatchByReplace args is the arguments from command, subDirPath used for xx/xx/xx
+func Hessian2PatchByReplace(args generator.Config, subDirPath string) error {
 	output := args.OutputPath
 	newPath := util.JoinPath(output, args.GenPath, subDirPath)
 	fs, err := ioutil.ReadDir(newPath)
@@ -160,7 +160,7 @@ func ReplaceObject(args generator.Config, subDirPath string) error {
 		fileName := util.JoinPath(args.OutputPath, args.GenPath, subDirPath, f.Name())
 		if f.IsDir() {
 			subDirPath := util.JoinPath(subDirPath, f.Name())
-			if err = ReplaceObject(args, subDirPath); err != nil {
+			if err = Hessian2PatchByReplace(args, subDirPath); err != nil {
 				return err
 			}
 		} else if strings.HasSuffix(f.Name(), ".go") {
@@ -189,11 +189,11 @@ func ReplaceObject(args generator.Config, subDirPath string) error {
 }
 
 func replaceJavaObject(content []byte) []byte {
-	return JavaObjectRe.ReplaceAll(content, []byte("java.Object"))
+	return javaObjectRe.ReplaceAll(content, []byte("java.Object"))
 }
 
 func replaceJavaException(content []byte) []byte {
-	return JavaExceptionRe.ReplaceAll(content, []byte("java.Exception"))
+	return javaExceptionRe.ReplaceAll(content, []byte("java.Exception"))
 }
 
 // replaceJavaExceptionEmptyVerification is used to resolve this issue:
@@ -212,5 +212,5 @@ func replaceJavaException(content []byte) []byte {
 //	 to java.Exception and IsSetException became invalid. We convert the statement
 //	 to `return true` to ignore this problem.
 func replaceJavaExceptionEmptyVerification(content []byte) []byte {
-	return JavaExceptionEmptyVerificationRe.ReplaceAll(content, []byte("return true"))
+	return javaExceptionEmptyVerificationRe.ReplaceAll(content, []byte("return true"))
 }

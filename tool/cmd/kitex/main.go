@@ -94,7 +94,7 @@ NormalExit:
 
 	// If hessian option is java_extension, replace *java.Object to java.Object
 	if thriftgo.EnableJavaExtension(args.Config) {
-		if err = thriftgo.ReplaceObject(args.Config, ""); err != nil {
+		if err = thriftgo.Hessian2PatchByReplace(args.Config, ""); err != nil {
 			log.Warn("replace java object fail, you can fix it then regenerate", err)
 		}
 	}

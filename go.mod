@@ -28,5 +28,3 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v3 v3.0.1
 )
-
-replace github.com/cloudwego/thriftgo v0.3.3 => github.com/cloudwego/thriftgo v0.3.3-0.20231109063722-dcdc2cf9165d
