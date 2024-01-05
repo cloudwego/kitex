@@ -35,6 +35,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -440,7 +441,10 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 	to := rpcinfo.NewEndpointInfo("callee", "method", nil, nil)
 	ri := rpcinfo.NewRPCInfo(from, to, nil, nil, nil)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	msg := remote.NewMessageWithNewer(mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+	svcInfo := mocks.ServiceInfo()
+	svcInfoMap := map[string]*serviceinfo.ServiceInfo{"MockService": svcInfo}
+	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
+	msg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, ri, remote.Call, remote.Server)
 
 	newCtx, tags := iSvr.opt.RemoteOpt.ProfilerMessageTagging(ctx, msg)
 	test.Assert(t, len(tags) == 8)

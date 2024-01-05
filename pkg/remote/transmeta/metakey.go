@@ -51,6 +51,7 @@ const (
 
 // key of header transport
 const (
+	HeaderIDLServiceName      = "isn"
 	HeaderTransRemoteAddr     = "rip"
 	HeaderTransToCluster      = "tc"
 	HeaderTransToIDC          = "ti"

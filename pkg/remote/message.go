@@ -17,8 +17,10 @@
 package remote
 
 import (
+	"fmt"
 	"sync"
 
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
@@ -83,6 +85,8 @@ func NewProtocolInfo(tp transport.Protocol, ct serviceinfo.PayloadCodec) Protoco
 type Message interface {
 	RPCInfo() rpcinfo.RPCInfo
 	ServiceInfo() *serviceinfo.ServiceInfo
+	ServiceInfoByServiceName(svcName string) *serviceinfo.ServiceInfo                        // break change
+	ServiceInfoByMethodName(methodName string) (svcInfo *serviceinfo.ServiceInfo, err error) // break change
 	Data() interface{}
 	NewData(method string) (ok bool)
 	MessageType() MessageType
@@ -96,7 +100,9 @@ type Message interface {
 	SetProtocolInfo(ProtocolInfo)
 	PayloadCodec() PayloadCodec
 	SetPayloadCodec(pc PayloadCodec)
+	SetGeneric(isGeneric bool)
 	Recycle()
+	SetServiceInfo(svcInfo *serviceinfo.ServiceInfo) // TODO: only for test. think the way to delete this
 }
 
 // NewMessage creates a new Message using the given info.
@@ -104,18 +110,23 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 	msg := messagePool.Get().(*message)
 	msg.data = data
 	msg.rpcInfo = ri
-	msg.svcInfo = svcInfo
+	msg.targetSvcInfo = svcInfo
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
-	msg.transInfo = transInfoPool.Get().(*transInfo)
+	ti := transInfoPool.Get().(*transInfo)
+	if rpcRole == Client && isMultiServiceAvailable(msg) {
+		ti.strInfo[transmeta.HeaderIDLServiceName] = ri.Invocation().ServiceName()
+	}
+	msg.transInfo = ti
 	return msg
 }
 
 // NewMessageWithNewer creates a new Message and set data later.
-func NewMessageWithNewer(svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole) Message {
+func NewMessageWithNewer(svcInfoMap map[string]*serviceinfo.ServiceInfo, methodSvcMap map[string]*serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole) Message {
 	msg := messagePool.Get().(*message)
 	msg.rpcInfo = ri
-	msg.svcInfo = svcInfo
+	msg.svcInfoMap = svcInfoMap
+	msg.methodSvcMap = methodSvcMap
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
 	msg.transInfo = transInfoPool.Get().(*transInfo)
@@ -129,29 +140,49 @@ func RecycleMessage(msg Message) {
 	}
 }
 
+func isMultiServiceAvailable(msg Message) bool {
+	if !IsTTHeader(msg) {
+		return false
+	}
+	switch msg.ProtocolInfo().CodecType {
+	case serviceinfo.Thrift, serviceinfo.Protobuf:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsTTHeader(msg Message) bool {
+	transProto := msg.ProtocolInfo().TransProto
+	return transProto&transport.TTHeader == transport.TTHeader
+}
+
 func newMessage() interface{} {
 	return &message{tags: make(map[string]interface{})}
 }
 
 type message struct {
-	msgType      MessageType
-	data         interface{}
-	rpcInfo      rpcinfo.RPCInfo
-	svcInfo      *serviceinfo.ServiceInfo
-	rpcRole      RPCRole
-	compressType CompressType
-	payloadSize  int
-	transInfo    TransInfo
-	tags         map[string]interface{}
-	protocol     ProtocolInfo
-	payloadCodec PayloadCodec
+	msgType       MessageType
+	data          interface{}
+	rpcInfo       rpcinfo.RPCInfo
+	targetSvcInfo *serviceinfo.ServiceInfo            // targetSvcInfo is easier to understand?
+	svcInfoMap    map[string]*serviceinfo.ServiceInfo // service name -> serviceInfo
+	methodSvcMap  map[string]*serviceinfo.ServiceInfo // method name -> serviceInfo
+	rpcRole       RPCRole
+	compressType  CompressType
+	payloadSize   int
+	transInfo     TransInfo
+	tags          map[string]interface{}
+	protocol      ProtocolInfo
+	payloadCodec  PayloadCodec
+	isGeneric     bool
 }
 
 func (m *message) zero() {
 	m.msgType = InvalidMessageType
 	m.data = nil
 	m.rpcInfo = nil
-	m.svcInfo = &emptyServiceInfo
+	m.targetSvcInfo = &emptyServiceInfo
 	m.rpcRole = -1
 	m.compressType = NoCompress
 	m.payloadSize = 0
@@ -172,7 +203,29 @@ func (m *message) RPCInfo() rpcinfo.RPCInfo {
 
 // ServiceInfo implements the Message interface.
 func (m *message) ServiceInfo() *serviceinfo.ServiceInfo {
-	return m.svcInfo
+	return m.targetSvcInfo
+}
+
+// ServiceInfoByServiceName implements the Message interface.
+func (m *message) ServiceInfoByServiceName(svcName string) *serviceinfo.ServiceInfo {
+	svcInfo := m.svcInfoMap[svcName]
+	if svcInfo == nil && m.isGeneric {
+		svcInfo = m.svcInfoMap[serviceinfo.GenericService]
+	}
+	m.targetSvcInfo = svcInfo
+	return svcInfo
+}
+
+func (m *message) ServiceInfoByMethodName(methodName string) (svcInfo *serviceinfo.ServiceInfo, err error) {
+	svcInfo = m.methodSvcMap[methodName]
+	if svcInfo == nil {
+		if m.isGeneric {
+			svcInfo = m.methodSvcMap[serviceinfo.GenericMethod]
+		}
+		return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
+	}
+	m.targetSvcInfo = svcInfo
+	return svcInfo, nil
 }
 
 // Data implements the Message interface.
@@ -185,7 +238,7 @@ func (m *message) NewData(method string) (ok bool) {
 	if m.data != nil {
 		return false
 	}
-	if mt := m.svcInfo.MethodInfo(method); mt != nil {
+	if mt := m.methodSvcMap[method].MethodInfo(method); mt != nil {
 		m.data = mt.NewArgs()
 	}
 	if m.data == nil {
@@ -249,10 +302,20 @@ func (m *message) SetPayloadCodec(pc PayloadCodec) {
 	m.payloadCodec = pc
 }
 
+// SetGeneric
+func (m *message) SetGeneric(isGeneric bool) {
+	m.isGeneric = isGeneric
+}
+
 // Recycle is used to recycle the message.
 func (m *message) Recycle() {
 	m.zero()
 	messagePool.Put(m)
+}
+
+// TODO: delete
+func (m *message) SetServiceInfo(svcInfo *serviceinfo.ServiceInfo) {
+	m.targetSvcInfo = svcInfo
 }
 
 // TransInfo contains transport information.
