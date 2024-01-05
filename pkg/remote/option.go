@@ -72,6 +72,8 @@ func (o *Option) AppendBoundHandler(h BoundHandler) {
 type ServerOption struct {
 	SvcMap map[string]*serviceinfo.ServiceInfo
 
+	MethodSvcMap map[string]*serviceinfo.ServiceInfo
+
 	TransServerFactory TransServerFactory
 
 	SvrHandlerFactory ServerTransHandlerFactory
@@ -110,6 +112,8 @@ type ServerOption struct {
 	GRPCCfg *grpc.ServerConfig
 
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
+
+	WithOnlyAcceptingHTTP2Traffic bool
 
 	Option
 

@@ -97,6 +97,8 @@ type Options struct {
 	BackupOpt backup.Options
 
 	Streaming stream.StreamingConfig
+
+	WithOnlyAcceptingHTTP2Traffic bool
 }
 
 type Limit struct {
