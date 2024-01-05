@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
@@ -306,8 +307,10 @@ var (
 )
 
 func initServerRecvMsg() remote.Message {
-	var req interface{}
-	msg := remote.NewMessage(req, mocks.ServiceInfo(), mockSvrRPCInfo, remote.Call, remote.Server)
+	svcInfo := mocks.ServiceInfo()
+	svcInfoMap := map[string]*serviceinfo.ServiceInfo{"MockService": svcInfo}
+	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
+	msg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, mockSvrRPCInfo, remote.Call, remote.Server)
 	return msg
 }
 

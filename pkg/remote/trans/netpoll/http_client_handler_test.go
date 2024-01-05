@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -118,10 +119,12 @@ func TestHTTPRead(t *testing.T) {
 func TestHTTPOnMessage(t *testing.T) {
 	// 1. prepare mock data
 	svcInfo := mocks.ServiceInfo()
+	svcInfoMap := map[string]*serviceinfo.ServiceInfo{"MockService": svcInfo}
+	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
 
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, method), nil, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	recvMsg := remote.NewMessageWithNewer(svcInfo, ri, remote.Call, remote.Server)
+	recvMsg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, ri, remote.Call, remote.Server)
 	sendMsg := remote.NewMessage(svcInfo.MethodInfo(method).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
 	// 2. test
