@@ -148,7 +148,11 @@ func TestMuxSvrWrite(t *testing.T) {
 			return rpcInfo
 		},
 		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return mocks.ServiceInfo()
+			return &serviceinfo.ServiceInfo{
+				Methods: map[string]serviceinfo.MethodInfo{
+					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
+				},
+			}
 		},
 	}
 
@@ -195,7 +199,11 @@ func TestMuxSvrOnRead(t *testing.T) {
 			return rpcInfo
 		},
 		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return mocks.ServiceInfo()
+			return &serviceinfo.ServiceInfo{
+				Methods: map[string]serviceinfo.MethodInfo{
+					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
+				},
+			}
 		},
 	}
 
@@ -280,7 +288,11 @@ func TestPanicAfterMuxSvrOnRead(t *testing.T) {
 			return rpcInfo
 		},
 		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return mocks.ServiceInfo()
+			return &serviceinfo.ServiceInfo{
+				Methods: map[string]serviceinfo.MethodInfo{
+					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
+				},
+			}
 		},
 	}
 
@@ -431,7 +443,11 @@ func TestInvokeError(t *testing.T) {
 			return rpcInfo
 		},
 		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return mocks.ServiceInfo()
+			return &serviceinfo.ServiceInfo{
+				Methods: map[string]serviceinfo.MethodInfo{
+					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
+				},
+			}
 		},
 	}
 

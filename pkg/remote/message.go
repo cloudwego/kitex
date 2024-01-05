@@ -165,7 +165,7 @@ type message struct {
 	msgType       MessageType
 	data          interface{}
 	rpcInfo       rpcinfo.RPCInfo
-	targetSvcInfo *serviceinfo.ServiceInfo            // targetSvcInfo is easier to understand?
+	targetSvcInfo *serviceinfo.ServiceInfo
 	svcInfoMap    map[string]*serviceinfo.ServiceInfo // service name -> serviceInfo
 	methodSvcMap  map[string]*serviceinfo.ServiceInfo // method name -> serviceInfo
 	rpcRole       RPCRole
@@ -299,7 +299,7 @@ func (m *message) SetPayloadCodec(pc PayloadCodec) {
 	m.payloadCodec = pc
 }
 
-// SetGeneric
+// SetGeneric implements the Message interface.
 func (m *message) SetGeneric(isGeneric bool) {
 	m.isGeneric = isGeneric
 }
