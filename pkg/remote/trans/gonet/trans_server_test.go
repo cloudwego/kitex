@@ -17,6 +17,7 @@
 package gonet
 
 import (
+	"context"
 	"net"
 	"os"
 	"testing"
@@ -41,6 +42,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	svcInfo := mocks.ServiceInfo()
 	svrOpt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
@@ -55,9 +57,12 @@ func TestMain(m *testing.M) {
 		},
 		Codec: &MockCodec{
 			EncodeFunc: nil,
-			DecodeFunc: nil,
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				msg.SetServiceInfo(svcInfo)
+				return nil
+			},
 		},
-		SvcMap:    map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()},
+		SvcMap:    map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo},
 		TracerCtl: &rpcinfo.TraceController{},
 	}
 	svrTransHdlr, _ = newSvrTransHandler(svrOpt)
