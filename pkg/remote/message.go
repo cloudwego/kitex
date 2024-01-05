@@ -219,9 +219,6 @@ func (m *message) ServiceInfoByServiceName(svcName string) *serviceinfo.ServiceI
 func (m *message) ServiceInfoByMethodName(methodName string) (svcInfo *serviceinfo.ServiceInfo, err error) {
 	svcInfo = m.methodSvcMap[methodName]
 	if svcInfo == nil {
-		if m.isGeneric {
-			svcInfo = m.methodSvcMap[serviceinfo.GenericMethod]
-		}
 		return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 	}
 	m.targetSvcInfo = svcInfo
