@@ -21,7 +21,9 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 const (
@@ -45,7 +47,10 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 	if message.RPCRole() == remote.Client {
 		return fmt.Errorf("wrong method name, expect=%s, actual=%s", callMethodName, methodName)
 	}
-	svcInfo := message.ServiceInfo()
+	svcInfo, err := getServiceInfo(message, methodName)
+	if err != nil {
+		return err
+	}
 	if ink, ok := ink.(rpcinfo.InvocationSetter); ok {
 		ink.SetMethodName(methodName)
 		ink.SetPackageName(svcInfo.GetPackageName())
@@ -60,6 +65,18 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 	// unknown method doesn't set methodName for RPCInfo.To(), or lead inconsistent with old version
 	rpcinfo.AsMutableEndpointInfo(ri.To()).SetMethod(methodName)
 	return nil
+}
+
+func getServiceInfo(message remote.Message, methodName string) (svcInfo *serviceinfo.ServiceInfo, err error) {
+	svcName := message.TransInfo().TransStrInfo()[transmeta.HeaderIDLServiceName]
+	svcInfo = message.ServiceInfoByServiceName(svcName)
+	if svcInfo == nil {
+		svcInfo, err = message.ServiceInfoByMethodName(methodName)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return svcInfo, nil
 }
 
 // SetOrCheckSeqID is used to check the sequence ID.
