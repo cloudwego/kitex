@@ -122,7 +122,7 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 }
 
 // NewMessageWithNewer creates a new Message and set data later.
-func NewMessageWithNewer(svcInfoMap map[string]*serviceinfo.ServiceInfo, methodSvcMap map[string]*serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole) Message {
+func NewMessageWithNewer(svcInfoMap, methodSvcMap map[string]*serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole) Message {
 	msg := messagePool.Get().(*message)
 	msg.rpcInfo = ri
 	msg.svcInfoMap = svcInfoMap
