@@ -50,7 +50,7 @@ import (
 // Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
 // registered to it.
 type Server interface {
-	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error
+	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, isFallbackService ...bool) error
 	GetServiceInfos() map[string]*serviceinfo.ServiceInfo
 	Run() error
 	Stop() error
@@ -183,7 +183,7 @@ func (s *server) buildInvokeChain() {
 }
 
 // RegisterService should not be called by users directly.
-func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error {
+func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, isFallbackService ...bool) error {
 	s.Lock()
 	defer s.Unlock()
 	if s.isRun {
@@ -199,7 +199,9 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
 	}
 
-	s.svcs.addService(svcInfo, handler)
+	if err := s.svcs.addService(svcInfo, handler, isFallbackService...); err != nil {
+		panic(err.Error())
+	}
 	return nil
 }
 
@@ -308,7 +310,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		serviceName := ri.Invocation().ServiceName()
 		svc := s.svcs.getService(serviceName)
 		if svc == nil {
-			svc = s.svcs.defaultSvc
+			svc = s.svcs.getServiceByMethodName(methodName) // NOTE: svc should always be not nil here
 		}
 		svcInfo := svc.svcInfo
 		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
@@ -349,6 +351,8 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
 	remoteOpt.SvcMap = s.svcs.getSvcInfoMap()
+	remoteOpt.MethodSvcMap = s.svcs.getMethodNameSvcInfoMap()
+	remoteOpt.WithOnlyAcceptingHTTP2Traffic = s.opt.WithOnlyAcceptingHTTP2Traffic
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
@@ -436,6 +440,9 @@ func (s *server) check() error {
 	if len(s.svcs.svcMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
+	if err := checkFallbackServiceForConflictingMethods(s.svcs.conflictingMethodHasFallbackSvcMap, s.opt.WithOnlyAcceptingHTTP2Traffic); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -502,7 +509,8 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}
 	if info.PayloadCodec == "" {
-		info.PayloadCodec = s.svcs.defaultSvc.svcInfo.PayloadCodec.String()
+		// TODO: which to choose?
+		info.PayloadCodec = getDefaultSvc(s.svcs.svcMap).svcInfo.PayloadCodec.String()
 	}
 	if info.Weight == 0 {
 		info.Weight = discovery.DefaultWeight
@@ -547,4 +555,21 @@ func (s *server) waitExit(errCh chan error) error {
 			s.Unlock()
 		}
 	}
+}
+
+// getDefaultSvc is used to get one ServiceInfo from map
+func getDefaultSvc(svcMap map[string]*service) *service {
+	for _, svc := range svcMap {
+		return svc
+	}
+	return nil
+}
+
+func checkFallbackServiceForConflictingMethods(conflictingMethodHasFallbackSvcMap map[string]bool, WithOnlyAcceptingHTTP2Traffic bool) error {
+	for name, hasFallbackSvc := range conflictingMethodHasFallbackSvcMap {
+		if !hasFallbackSvc && !WithOnlyAcceptingHTTP2Traffic {
+			return fmt.Errorf("method name [%s] is conflicted between services but no fallback service is specified", name)
+		}
+	}
+	return nil
 }

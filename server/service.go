@@ -16,11 +16,16 @@
 
 package server
 
-import "github.com/cloudwego/kitex/pkg/serviceinfo"
+import (
+	"fmt"
+
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+)
 
 type service struct {
-	svcInfo *serviceinfo.ServiceInfo
-	handler interface{}
+	svcInfo    *serviceinfo.ServiceInfo
+	handler    interface{}
+	isFallback bool
 }
 
 func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) *service {
@@ -28,24 +33,50 @@ func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) *service 
 }
 
 type services struct {
-	svcMap     map[string]*service
-	defaultSvc *service
+	svcMap                             map[string]*service
+	methodSvcMap                       map[string]*service
+	conflictingMethodHasFallbackSvcMap map[string]bool
+	fallbackSvc                        *service
 }
 
 func newServices() *services {
-	return &services{svcMap: map[string]*service{}}
+	return &services{svcMap: map[string]*service{}, methodSvcMap: map[string]*service{}, conflictingMethodHasFallbackSvcMap: map[string]bool{}}
 }
 
-func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) {
+func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, isFallbackService ...bool) error {
 	svc := newService(svcInfo, handler)
-	if s.defaultSvc == nil {
-		s.defaultSvc = svc
+
+	if len(isFallbackService) > 0 && isFallbackService[0] {
+		if s.fallbackSvc != nil {
+			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)
+		}
+		s.fallbackSvc = svc
+		svc.isFallback = true
 	}
 	s.svcMap[svcInfo.ServiceName] = svc
+	for name, _ := range svcInfo.Methods {
+		// conflicting method check
+		if svcFromMap, ok := s.methodSvcMap[name]; ok {
+			if _, ok := s.conflictingMethodHasFallbackSvcMap[name]; !ok {
+				s.conflictingMethodHasFallbackSvcMap[name] = svcFromMap.isFallback
+			}
+			if svc.isFallback {
+				s.methodSvcMap[name] = svc
+				s.conflictingMethodHasFallbackSvcMap[name] = true
+			}
+		} else {
+			s.methodSvcMap[name] = svc
+		}
+	}
+	return nil
 }
 
 func (s *services) getService(svcName string) *service {
 	return s.svcMap[svcName]
+}
+
+func (s *services) getServiceByMethodName(methodName string) *service {
+	return s.methodSvcMap[methodName]
 }
 
 func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
@@ -54,4 +85,13 @@ func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
 		svcInfoMap[name] = svc.svcInfo
 	}
 	return svcInfoMap
+}
+
+// TODO: time consuming?
+func (s *services) getMethodNameSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
+	methodNameSvcInfoMap := map[string]*serviceinfo.ServiceInfo{}
+	for methodName, svc := range s.methodSvcMap {
+		methodNameSvcInfoMap[methodName] = svc.svcInfo
+	}
+	return methodNameSvcInfoMap
 }
