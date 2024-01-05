@@ -61,8 +61,8 @@ func newTestRpcInfo() rpcinfo.RPCInfo {
 func init() {
 	body := "hello world"
 	rpcInfo := newTestRpcInfo()
-	svcMap := map[string]*serviceinfo.ServiceInfo{}
-	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
+	svcInfo := mocks.ServiceInfo()
+	svcMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
 
 	opt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
@@ -77,6 +77,7 @@ func init() {
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 				in.Skip(3 * codec.Size32)
 				_, err := in.ReadString(len(body))
+				msg.SetServiceInfo(svcInfo)
 				return err
 			},
 		},
@@ -146,6 +147,9 @@ func TestMuxSvrWrite(t *testing.T) {
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return rpcInfo
 		},
+		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
+			return mocks.ServiceInfo()
+		},
 	}
 
 	// 2. test
@@ -191,11 +195,7 @@ func TestMuxSvrOnRead(t *testing.T) {
 			return rpcInfo
 		},
 		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
+			return mocks.ServiceInfo()
 		},
 	}
 
@@ -280,11 +280,7 @@ func TestPanicAfterMuxSvrOnRead(t *testing.T) {
 			return rpcInfo
 		},
 		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
+			return mocks.ServiceInfo()
 		},
 	}
 
@@ -435,17 +431,13 @@ func TestInvokeError(t *testing.T) {
 			return rpcInfo
 		},
 		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return &serviceinfo.ServiceInfo{
-				Methods: map[string]serviceinfo.MethodInfo{
-					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
-				},
-			}
+			return mocks.ServiceInfo()
 		},
 	}
 
 	body := "hello world"
-	svcMap := map[string]*serviceinfo.ServiceInfo{}
-	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
+	svcInfo := mocks.ServiceInfo()
+	svcMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
 	opt := &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(rpcInfo rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
@@ -467,6 +459,7 @@ func TestInvokeError(t *testing.T) {
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 				in.Skip(3 * codec.Size32)
 				_, err := in.ReadString(len(body))
+				msg.SetServiceInfo(svcInfo)
 				return err
 			},
 		},

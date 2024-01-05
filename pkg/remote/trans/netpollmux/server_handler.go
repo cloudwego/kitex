@@ -62,12 +62,15 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 }
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
-	svcInfo := trans.GetDefaultSvcInfo(opt.SvcMap)
+	if opt.WithOnlyAcceptingHTTP2Traffic {
+		return nil, remote.NewTransErrorWithMsg(remote.InvalidProtocol, "only http2 traffic is accepted")
+	}
 	svrHdlr := &svrTransHandler{
-		opt:     opt,
-		codec:   opt.Codec,
-		svcInfo: svcInfo,
-		ext:     np.NewNetpollConnExtension(),
+		opt:          opt,
+		codec:        opt.Codec,
+		svcInfoMap:   opt.SvcMap,
+		methodSvcMap: opt.MethodSvcMap,
+		ext:          np.NewNetpollConnExtension(),
 	}
 	if svrHdlr.opt.TracerCtl == nil {
 		// init TraceCtl when it is nil, or it will lead some unit tests panic
@@ -83,15 +86,16 @@ func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 var _ remote.ServerTransHandler = &svrTransHandler{}
 
 type svrTransHandler struct {
-	opt        *remote.ServerOption
-	svcInfo    *serviceinfo.ServiceInfo
-	inkHdlFunc endpoint.Endpoint
-	codec      remote.Codec
-	transPipe  *remote.TransPipeline
-	ext        trans.Extension
-	funcPool   sync.Pool
-	conns      sync.Map
-	tasks      sync.WaitGroup
+	opt          *remote.ServerOption
+	svcInfoMap   map[string]*serviceinfo.ServiceInfo
+	methodSvcMap map[string]*serviceinfo.ServiceInfo
+	inkHdlFunc   endpoint.Endpoint
+	codec        remote.Codec
+	transPipe    *remote.TransPipeline
+	ext          trans.Extension
+	funcPool     sync.Pool
+	conns        sync.Map
+	tasks        sync.WaitGroup
 }
 
 // Write implements the remote.ServerTransHandler interface.
@@ -102,7 +106,7 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, nil)
 	}()
 
-	if methodInfo, _ := trans.GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
+	if methodInfo, _ := trans.GetMethodInfo(ri, sendMsg.ServiceInfo()); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return ctx, nil
 		}
@@ -234,7 +238,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	}()
 
 	// read
-	recvMsg = remote.NewMessageWithNewer(t.svcInfo, rpcInfo, remote.Call, remote.Server)
+	recvMsg = remote.NewMessageWithNewer(t.svcInfoMap, t.methodSvcMap, rpcInfo, remote.Call, remote.Server)
 	bufReader := np.NewReaderByteBuffer(reader)
 	err = t.readWithByteBuffer(ctx, bufReader, recvMsg)
 	if err != nil {
@@ -246,19 +250,20 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		return
 	}
 
+	svcInfo := recvMsg.ServiceInfo()
 	if recvMsg.MessageType() == remote.Heartbeat {
-		sendMsg = remote.NewMessage(nil, t.svcInfo, rpcInfo, remote.Heartbeat, remote.Server)
+		sendMsg = remote.NewMessage(nil, svcInfo, rpcInfo, remote.Heartbeat, remote.Server)
 	} else {
 		var methodInfo serviceinfo.MethodInfo
-		if methodInfo, err = trans.GetMethodInfo(rpcInfo, t.svcInfo); err != nil {
+		if methodInfo, err = trans.GetMethodInfo(rpcInfo, svcInfo); err != nil {
 			closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, true)
 			t.OnError(ctx, err, muxSvrConn)
 			return
 		}
 		if methodInfo.OneWay() {
-			sendMsg = remote.NewMessage(nil, t.svcInfo, rpcInfo, remote.Reply, remote.Server)
+			sendMsg = remote.NewMessage(nil, svcInfo, rpcInfo, remote.Reply, remote.Server)
 		} else {
-			sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, rpcInfo, remote.Reply, remote.Server)
+			sendMsg = remote.NewMessage(methodInfo.NewResult(), svcInfo, rpcInfo, remote.Reply, remote.Server)
 		}
 
 		ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
@@ -322,7 +327,9 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	iv.SetSeqID(0)
 	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
 	data := NewControlFrame()
-	msg := remote.NewMessage(data, t.svcInfo, ri, remote.Reply, remote.Server)
+	// TODO: which to select?
+	svcInfo := getDefaultSvcInfo(t.svcInfoMap)
+	msg := remote.NewMessage(data, svcInfo, ri, remote.Reply, remote.Server)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
 	msg.TransInfo().TransStrInfo()[transmeta.HeaderConnectionReadyToReset] = "1"
 
@@ -405,7 +412,8 @@ func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 func (t *svrTransHandler) writeErrorReplyIfNeeded(
 	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool,
 ) (shouldCloseConn bool) {
-	if methodInfo, _ := trans.GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
+	svcInfo := recvMsg.ServiceInfo()
+	if methodInfo, _ := trans.GetMethodInfo(ri, svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return
 		}
@@ -414,7 +422,7 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 	if !isTransErr {
 		return
 	}
-	errMsg := remote.NewMessage(transErr, t.svcInfo, ri, remote.Exception, remote.Server)
+	errMsg := remote.NewMessage(transErr, svcInfo, ri, remote.Exception, remote.Server)
 	remote.FillSendMsgFromRecvMsg(recvMsg, errMsg)
 	if doOnMessage {
 		// if error happen before normal OnMessage, exec it to transfer header trans info into rpcinfo
@@ -479,4 +487,12 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 		}
 	}
 	return ri.From().ServiceName(), rAddr
+}
+
+// getDefaultSvcInfo is used to get one ServiceInfo from map
+func getDefaultSvcInfo(svcMap map[string]*serviceinfo.ServiceInfo) *serviceinfo.ServiceInfo {
+	for _, svcInfo := range svcMap {
+		return svcInfo
+	}
+	return nil
 }

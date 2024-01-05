@@ -34,12 +34,15 @@ import (
 
 // NewDefaultSvrTransHandler to provide default impl of svrTransHandler, it can be reused in netpoll, shm-ipc, framework-sdk extensions
 func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.ServerTransHandler, error) {
-	svcInfo := GetDefaultSvcInfo(opt.SvcMap)
+	if opt.WithOnlyAcceptingHTTP2Traffic {
+		return nil, remote.NewTransErrorWithMsg(remote.InvalidProtocol, "only http2 traffic is accepted")
+	}
 	svrHdlr := &svrTransHandler{
-		opt:     opt,
-		codec:   opt.Codec,
-		svcInfo: svcInfo,
-		ext:     ext,
+		opt:          opt,
+		codec:        opt.Codec,
+		svcInfoMap:   opt.SvcMap,
+		methodSvcMap: opt.MethodSvcMap,
+		ext:          ext,
 	}
 	if svrHdlr.opt.TracerCtl == nil {
 		// init TraceCtl when it is nil, or it will lead some unit tests panic
@@ -49,12 +52,13 @@ func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.
 }
 
 type svrTransHandler struct {
-	opt        *remote.ServerOption
-	svcInfo    *serviceinfo.ServiceInfo
-	inkHdlFunc endpoint.Endpoint
-	codec      remote.Codec
-	transPipe  *remote.TransPipeline
-	ext        Extension
+	opt          *remote.ServerOption
+	svcInfoMap   map[string]*serviceinfo.ServiceInfo
+	methodSvcMap map[string]*serviceinfo.ServiceInfo
+	inkHdlFunc   endpoint.Endpoint
+	codec        remote.Codec
+	transPipe    *remote.TransPipeline
+	ext          Extension
 }
 
 // Write implements the remote.ServerTransHandler interface.
@@ -67,7 +71,7 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
 	}()
 
-	if methodInfo, _ := GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
+	if methodInfo, _ := GetMethodInfo(ri, sendMsg.ServiceInfo()); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return ctx, nil
 		}
@@ -163,7 +167,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	}()
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
-	recvMsg = remote.NewMessageWithNewer(t.svcInfo, ri, remote.Call, remote.Server)
+	recvMsg = remote.NewMessageWithNewer(t.svcInfoMap, t.methodSvcMap, ri, remote.Call, remote.Server)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {
@@ -172,15 +176,16 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		return err
 	}
 
+	svcInfo := recvMsg.ServiceInfo()
 	// heartbeat processing
 	// recvMsg.MessageType would be set to remote.Heartbeat in previous Read procedure
 	// if specified codec support heartbeat
 	if recvMsg.MessageType() == remote.Heartbeat {
-		sendMsg = remote.NewMessage(nil, t.svcInfo, ri, remote.Heartbeat, remote.Server)
+		sendMsg = remote.NewMessage(nil, svcInfo, ri, remote.Heartbeat, remote.Server)
 	} else {
 		// reply processing
 		var methodInfo serviceinfo.MethodInfo
-		if methodInfo, err = GetMethodInfo(ri, t.svcInfo); err != nil {
+		if methodInfo, err = GetMethodInfo(ri, svcInfo); err != nil {
 			// it won't be err, because the method has been checked in decode, err check here just do defensive inspection
 			t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
 			// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded
@@ -188,9 +193,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 			return err
 		}
 		if methodInfo.OneWay() {
-			sendMsg = remote.NewMessage(nil, t.svcInfo, ri, remote.Reply, remote.Server)
+			sendMsg = remote.NewMessage(nil, svcInfo, ri, remote.Reply, remote.Server)
 		} else {
-			sendMsg = remote.NewMessage(methodInfo.NewResult(), t.svcInfo, ri, remote.Reply, remote.Server)
+			sendMsg = remote.NewMessage(methodInfo.NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 		}
 
 		ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
@@ -273,7 +278,8 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		// conn is closed, no need reply
 		return
 	}
-	if methodInfo, _ := GetMethodInfo(ri, t.svcInfo); methodInfo != nil {
+	svcInfo := recvMsg.ServiceInfo()
+	if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return
 		}
@@ -282,7 +288,7 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 	if !isTransErr {
 		return
 	}
-	errMsg := remote.NewMessage(transErr, t.svcInfo, ri, remote.Exception, remote.Server)
+	errMsg := remote.NewMessage(transErr, svcInfo, ri, remote.Exception, remote.Server)
 	remote.FillSendMsgFromRecvMsg(recvMsg, errMsg)
 	if doOnMessage {
 		// if error happen before normal OnMessage, exec it to transfer header trans info into rpcinfo

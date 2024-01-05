@@ -45,8 +45,7 @@ func TestDefaultSvrTransHandler(t *testing.T) {
 	}
 
 	tagEncode, tagDecode := 0, 0
-	svcMap := map[string]*serviceinfo.ServiceInfo{}
-	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
+	svcMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()}
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
 			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
@@ -71,6 +70,13 @@ func TestDefaultSvrTransHandler(t *testing.T) {
 	msg := &MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return newMockRPCInfo()
+		},
+		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
+			return &serviceinfo.ServiceInfo{
+				Methods: map[string]serviceinfo.MethodInfo{
+					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
+				},
+			}
 		},
 	}
 	ctx, err = handler.Write(ctx, conn, msg)
@@ -109,14 +115,15 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 
 	tracerCtl := &rpcinfo.TraceController{}
 	tracerCtl.Append(mockTracer)
-	svcMap := map[string]*serviceinfo.ServiceInfo{}
-	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
+	svcInfo := mocks.ServiceInfo()
+	svcMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
 			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 				return nil
 			},
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				msg.SetServiceInfo(svcInfo)
 				return nil
 			},
 		},
@@ -168,14 +175,15 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 	mockErr := errors.New("mock")
 	tracerCtl := &rpcinfo.TraceController{}
 	tracerCtl.Append(mockTracer)
-	svcMap := map[string]*serviceinfo.ServiceInfo{}
-	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
+	svcInfo := mocks.ServiceInfo()
+	svcMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
 			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 				return nil
 			},
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				msg.SetServiceInfo(svcInfo)
 				return mockErr
 			},
 		},
@@ -222,8 +230,8 @@ func TestSvrTransHandlerOnReadHeartbeat(t *testing.T) {
 
 	tracerCtl := &rpcinfo.TraceController{}
 	tracerCtl.Append(mockTracer)
-	svcMap := map[string]*serviceinfo.ServiceInfo{}
-	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
+	svcInfo := mocks.ServiceInfo()
+	svcMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
 			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
@@ -234,6 +242,7 @@ func TestSvrTransHandlerOnReadHeartbeat(t *testing.T) {
 			},
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 				msg.SetMessageType(remote.Heartbeat)
+				msg.SetServiceInfo(svcInfo)
 				return nil
 			},
 		},
