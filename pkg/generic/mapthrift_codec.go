@@ -112,6 +112,7 @@ func (c *mapThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in r
 	}
 	rm.SetBinaryOption(c.binaryWithBase64, c.binaryWithByteSlice)
 	msg.Data().(WithCodec).SetCodec(rm)
+	msg.SetGeneric(true)
 	return c.codec.Unmarshal(ctx, msg, in)
 }
 

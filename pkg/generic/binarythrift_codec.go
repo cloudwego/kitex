@@ -78,6 +78,7 @@ func (c *binaryThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, i
 		return err
 	}
 	msgType := magicAndMsgType & codec.FrontMask
+	msg.SetGeneric(true)
 	if msgType == uint32(remote.Exception) {
 		return c.thriftCodec.Unmarshal(ctx, msg, in)
 	}

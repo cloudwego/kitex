@@ -134,6 +134,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	}
 
 	msg.Data().(WithCodec).SetCodec(inner)
+	msg.SetGeneric(true)
 	return c.codec.Unmarshal(ctx, msg, in)
 }
 

@@ -56,7 +56,8 @@ func rawThriftBinary(t *testing.T) {
 	method := "myMethod"
 	buf := genBinaryReqBuf(method)
 
-	resp, err := cli.GenericCall(context.Background(), method, buf, callopt.WithRPCTimeout(1*time.Second))
+	//resp, err := cli.GenericCall(context.Background(), method, buf, callopt.WithRPCTimeout(1*time.Second))
+	resp, err := cli.GenericCall(context.Background(), method, buf)
 	test.Assert(t, err == nil, err)
 	respBuf, ok := resp.([]byte)
 	test.Assert(t, ok)

@@ -441,12 +441,16 @@ func testRegression(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	fmt.Println(">>>")
+
 	// client without dynamicgo
 	cli := initThriftClientByIDL(t, transport.TTHeader, addr, "./idl/http_annotation.thrift", nil, false, false)
 	respI, err := cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	resp, ok := respI.(*generic.HTTPResponse)
 	test.Assert(t, ok)
+
+	fmt.Println("A")
 
 	// client with dynamicgo
 	var opts []generic.Option
@@ -456,6 +460,8 @@ func testRegression(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	dresp, ok := respI.(*generic.HTTPResponse)
 	test.Assert(t, ok)
+
+	fmt.Println("B")
 
 	// check body
 	var dMapBody map[string]interface{}
