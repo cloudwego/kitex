@@ -18,6 +18,7 @@ package test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -29,7 +30,6 @@ import (
 	"github.com/cloudwego/kitex/client/genericclient"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
 )
@@ -116,10 +116,16 @@ func (g *TestExampleMethod2Service) GenericCall(ctx context.Context, method stri
 	fmt.Printf("Recv: %v\n", buf)
 	fmt.Printf("Method: %s\n", method)
 	// Check that request received is correct
-	var jsonMapResp map[string]string
-	var jsonMapOriginal map[string]string
-	jsonMapResp, err = utils.JSONStr2Map(buf)
-	jsonMapOriginal, err = utils.JSONStr2Map(getExampleMethod2Req())
+	var jsonMapResp map[string]interface{}
+	var jsonMapOriginal map[string]interface{}
+	err = json.Unmarshal([]byte(buf), &jsonMapResp)
+	if err != nil {
+		return nil, errors.New("json str to map conversion error")
+	}
+	err = json.Unmarshal([]byte(getExampleMethod2Req()), &jsonMapOriginal)
+	if err != nil {
+		return nil, errors.New("json str to map conversion error")
+	}
 	if !reflect.DeepEqual(jsonMapResp, jsonMapOriginal) {
 		return nil, errors.New("incorrect request received")
 	}

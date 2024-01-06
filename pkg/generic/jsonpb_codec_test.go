@@ -58,7 +58,6 @@ func TestJsonPbCodec(t *testing.T) {
 	// Marshal side
 	out := remote.NewWriterBuffer(256)
 	err = jpc.Marshal(ctx, sendMsg, out)
-
 	test.Assert(t, err == nil)
 
 	// UnMarshal side
@@ -68,14 +67,15 @@ func TestJsonPbCodec(t *testing.T) {
 	recvMsg.SetPayloadLen(len(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = jpc.Unmarshal(ctx, recvMsg, in)
+	test.Assert(t, err == nil)
 	args, ok := recvMsg.Data().(*Args)
 	test.Assert(t, ok)
-	test.Assert(t, args.Request == `{"message": "hello world!"}`)
+	test.Assert(t, args.Request == `{"message":"hello world!"}`)
 }
 
 func initJsonPbSendMsg(tp transport.Protocol) remote.Message {
 	req := &Args{
-		Request: `{"message": "hello world!"}`,
+		Request: `{"message":"hello world!"}`,
 		Method:  "Echo",
 	}
 	svcInfo := mocks.ServiceInfo()
