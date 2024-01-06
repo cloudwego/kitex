@@ -30,9 +30,7 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-const (
-	echoIDLPath = "./jsonpb_test/idl/echo.proto"
-)
+var echoIDLPath = "./jsonpb_test/idl/echo.proto"
 
 func TestRun(t *testing.T) {
 	t.Run("TestJsonPbCodec", TestJsonPbCodec)
@@ -40,18 +38,16 @@ func TestRun(t *testing.T) {
 
 func TestJsonPbCodec(t *testing.T) {
 	gOpts := &Options{dynamicgoConvOpts: conv.Options{}}
-
 	opts := dproto.Options{}
 	p, err := NewPbContentProviderDynamicGo(echoIDLPath, context.Background(), opts)
-
 	test.Assert(t, err == nil)
 
 	jpc, err := newJsonPbCodec(p, pbCodec, gOpts)
 	test.Assert(t, err == nil)
 
 	defer jpc.Close()
-	test.Assert(t, jpc.Name() == "JSONPb")
 
+	test.Assert(t, jpc.Name() == "JSONPb")
 	method, err := jpc.getMethod(nil, "Echo")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Echo")
@@ -72,12 +68,14 @@ func TestJsonPbCodec(t *testing.T) {
 	recvMsg.SetPayloadLen(len(buf))
 	in := remote.NewReaderBuffer(buf)
 	err = jpc.Unmarshal(ctx, recvMsg, in)
-	test.Assert(t, err == nil)
+	args, ok := recvMsg.Data().(*Args)
+	test.Assert(t, ok)
+	test.Assert(t, args.Request == `{"message": "hello world!"}`)
 }
 
 func initJsonPbSendMsg(tp transport.Protocol) remote.Message {
 	req := &Args{
-		Request: `{"message": "send hello"}`,
+		Request: `{"message": "hello world!"}`,
 		Method:  "Echo",
 	}
 	svcInfo := mocks.ServiceInfo()
@@ -89,12 +87,9 @@ func initJsonPbSendMsg(tp transport.Protocol) remote.Message {
 }
 
 func initJsonPbRecvMsg() remote.Message {
-	req := &Args{
-		Request: `{"message": "recv hello"}`,
-		Method:  "Echo",
-	}
+	resp := &Args{}
 	ink := rpcinfo.NewInvocation("", "Echo")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+	msg := remote.NewMessage(resp, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
 	return msg
 }

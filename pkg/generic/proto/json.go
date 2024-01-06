@@ -105,9 +105,9 @@ func (m *ReadJSON) Read(ctx context.Context, method string, actualMsgBuf []byte)
 	}
 
 	// from the dproto.ServiceDescriptor, get the TypeDescriptor
-	typeDescriptor := fnDsc.Input()
+	typeDescriptor := fnDsc.Output()
 	if !m.isClient {
-		typeDescriptor = fnDsc.Output()
+		typeDescriptor = fnDsc.Input()
 	}
 
 	cv := dconvp2j.NewBinaryConv(*m.dynamicgoConvOpts)

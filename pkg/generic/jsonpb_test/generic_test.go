@@ -20,11 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
-	"math"
 	"net"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
@@ -49,9 +46,7 @@ func initPbServerByIDLDynamicGo(t *testing.T, address string, handler generic.Se
 	// initialise DescriptorProvider for DynamicGo
 	opts := proto.Options{}
 	p, err := generic.NewPbContentProviderDynamicGo(pbIdl, context.Background(), opts)
-	if err != nil {
-		panic(err)
-	}
+
 	test.Assert(t, err == nil)
 
 	addr, _ := net.ResolveTCPAddr("tcp", address)
@@ -59,7 +54,6 @@ func initPbServerByIDLDynamicGo(t *testing.T, address string, handler generic.Se
 	g, err := generic.JSONPbGeneric(p)
 	test.Assert(t, err == nil)
 	svr := newGenericServer(g, addr, handler)
-	test.Assert(t, err == nil)
 	return svr
 }
 
@@ -67,20 +61,19 @@ func initPbClientByIDLDynamicGo(t *testing.T, addr, destSvcName, pbIdl string) g
 	// initialise dynamicgo proto.ServiceDescriptor
 	opts := proto.Options{}
 	p, err := generic.NewPbContentProviderDynamicGo(pbIdl, context.Background(), opts)
-	if err != nil {
-		panic(err)
-	}
+
 	test.Assert(t, err == nil)
 
 	g, err := generic.JSONPbGeneric(p)
 	test.Assert(t, err == nil)
 	cli := newGenericClient(destSvcName, g, addr)
-	test.Assert(t, err == nil)
+
 	return cli
 }
 
 func TestEcho(t *testing.T) {
 	addr := test.GetLocalAddress()
+
 	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestEchoService), "./idl/echo.proto")
 	time.Sleep(500 * time.Millisecond)
@@ -90,18 +83,21 @@ func TestEcho(t *testing.T) {
 	ctx := context.Background()
 
 	// 'ExampleMethod' method name must be passed as param
-	resp, err := cli.GenericCall(ctx, "Echo", `{"message": "this is the request"}`)
+	resp, err := cli.GenericCall(ctx, "Echo", getEchoReq())
 	// resp is a JSON string
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(resp)
+	test.Assert(t, err == nil)
+	respMap, ok := resp.(string)
+	test.Assert(t, ok)
+
+	fmt.Println(respMap)
+	test.Assert(t, reflect.DeepEqual(respMap, getEchoRes()), respMap)
 
 	svr.Stop()
 }
 
 func TestExampleMethod(t *testing.T) {
 	addr := test.GetLocalAddress()
+
 	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestExampleMethodService), "./idl/example.proto")
 	time.Sleep(500 * time.Millisecond)
@@ -111,18 +107,21 @@ func TestExampleMethod(t *testing.T) {
 	ctx := context.Background()
 
 	// 'ExampleMethod' method name must be passed as param
-	resp, err := cli.GenericCall(ctx, "ExampleMethod", `{"reqs":["req_one","req_two","req_three"]}`)
+	resp, err := cli.GenericCall(ctx, "ExampleMethod", getExampleMethodReq())
 	// resp is a JSON string
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(resp)
+	test.Assert(t, err == nil)
+	respMap, ok := resp.(string)
+	test.Assert(t, ok)
+
+	fmt.Println(respMap)
+	test.Assert(t, reflect.DeepEqual(respMap, getExampleMethodRes()), respMap)
 
 	svr.Stop()
 }
 
 func TestVoid(t *testing.T) {
 	addr := test.GetLocalAddress()
+
 	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestVoidService), "./idl/example.proto")
 	time.Sleep(500 * time.Millisecond)
@@ -132,18 +131,20 @@ func TestVoid(t *testing.T) {
 	ctx := context.Background()
 
 	// 'ExampleMethod' method name must be passed as param
-	resp, err := cli.GenericCall(ctx, "VoidMethod", `{}`)
-	// resp is a JSON string
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(resp)
+	resp, err := cli.GenericCall(ctx, "VoidMethod", getVoidReq())
+	test.Assert(t, err == nil)
+	respMap, ok := resp.(string)
+	test.Assert(t, ok)
+
+	fmt.Println(respMap)
+	test.Assert(t, reflect.DeepEqual(respMap, getVoidRes()), respMap)
 
 	svr.Stop()
 }
 
 func TestExampleMethod2(t *testing.T) {
 	addr := test.GetLocalAddress()
+
 	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestExampleMethod2Service), "./idl/example2.proto")
 	time.Sleep(500 * time.Millisecond)
@@ -153,26 +154,26 @@ func TestExampleMethod2(t *testing.T) {
 	ctx := context.Background()
 
 	// 'ExampleMethod' method name must be passed as param
-	resp, err := cli.GenericCall(ctx, "ExampleMethod", getExampleReq())
+	resp, err := cli.GenericCall(ctx, "ExampleMethod", getExampleMethod2Req())
 	// resp is a JSON string
-	if err != nil {
-		log.Fatal(err)
-	}
+	test.Assert(t, err == nil, err)
+
 	fmt.Println(resp)
 
 	var jsonMapResp map[string]interface{}
 	var jsonMapOriginal map[string]interface{}
-	json.Unmarshal([]byte(resp.(string)), &jsonMapResp)
-	json.Unmarshal([]byte(getExampleReq()), &jsonMapOriginal)
-	test.Assert(t, mapsEqual(jsonMapResp, jsonMapOriginal))
+	err = json.Unmarshal([]byte(resp.(string)), &jsonMapResp)
+	test.Assert(t, err == nil)
+	err = json.Unmarshal([]byte(getExampleMethod2Res()), &jsonMapOriginal)
+	test.Assert(t, err == nil)
+	test.Assert(t, MapsEqual(jsonMapResp, jsonMapOriginal))
 
 	svr.Stop()
 }
 
 func TestInt2FloatMethod(t *testing.T) {
 	addr := test.GetLocalAddress()
-	ExampleInt2FloatReq := `{"Int32":1,"Float64":3.14,"String":"hello","Int64":2,"Subfix":0.92653}`
-	//`{"Float64":` + strconv.Itoa(math.MaxInt64) + `}`
+
 	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestInt2FloatMethodService), "./idl/example2.proto")
 	time.Sleep(500 * time.Millisecond)
@@ -182,19 +183,20 @@ func TestInt2FloatMethod(t *testing.T) {
 	ctx := context.Background()
 
 	// 'ExampleMethod' method name must be passed as param
-	resp, err := cli.GenericCall(ctx, "Int2FloatMethod", ExampleInt2FloatReq)
+	resp, err := cli.GenericCall(ctx, "Int2FloatMethod", getInt2FloatMethodReq())
 	// resp is a JSON string
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(resp)
+	test.Assert(t, err == nil)
+	respMap, ok := resp.(string)
+	test.Assert(t, ok)
+
+	fmt.Println(respMap)
+	test.Assert(t, reflect.DeepEqual(respMap, getInt2FloatMethodRes()), respMap)
 
 	svr.Stop()
 }
 
 func TestInt2FloatMethod2(t *testing.T) {
 	addr := test.GetLocalAddress()
-	ExampleInt2FloatReq := `{"Int64":` + strconv.Itoa(math.MaxInt64) + `}`
 
 	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestInt2FloatMethod2Service), "./idl/example2.proto")
@@ -204,16 +206,18 @@ func TestInt2FloatMethod2(t *testing.T) {
 
 	ctx := context.Background()
 
-	resp, err := cli.GenericCall(ctx, "Int2FloatMethod", ExampleInt2FloatReq)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(resp)
+	resp, err := cli.GenericCall(ctx, "Int2FloatMethod", getInt2FloatMethod2Req())
+	test.Assert(t, err == nil)
+	respMap, ok := resp.(string)
+	test.Assert(t, ok)
+
+	fmt.Println(respMap)
+	test.Assert(t, reflect.DeepEqual(respMap, getInt2FloatMethod2Res()), respMap)
 
 	svr.Stop()
 }
 
-func mapsEqual(map1, map2 map[string]interface{}) bool {
+func MapsEqual(map1, map2 map[string]interface{}) bool {
 	if len(map1) != len(map2) {
 		return false
 	}
