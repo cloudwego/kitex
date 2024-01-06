@@ -101,6 +101,7 @@ type ServiceInfo struct {
 	ServiceFilePath       string
 	Protocol              string
 	HandlerReturnKeepResp bool
+	UseThriftReflection   bool
 }
 
 // AllMethods returns all methods that the service have.
