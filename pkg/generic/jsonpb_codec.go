@@ -40,7 +40,6 @@ type jsonPbCodec struct {
 	svcDsc           atomic.Value // *idl
 	provider         PbDescriptorProviderDynamicGo
 	codec            remote.PayloadCodec
-	binaryWithBase64 bool
 	opts             *Options
 	convOpts         conv.Options // used for dynamicgo conversion
 	dynamicgoEnabled bool         // currently set to true by default
@@ -48,7 +47,7 @@ type jsonPbCodec struct {
 
 func newJsonPbCodec(p PbDescriptorProviderDynamicGo, codec remote.PayloadCodec, opts *Options) (*jsonPbCodec, error) {
 	svc := <-p.Provide()
-	c := &jsonPbCodec{codec: codec, provider: p, binaryWithBase64: true, opts: opts, dynamicgoEnabled: true}
+	c := &jsonPbCodec{codec: codec, provider: p, opts: opts, dynamicgoEnabled: true}
 	convOpts := opts.dynamicgoConvOpts
 	c.convOpts = convOpts
 

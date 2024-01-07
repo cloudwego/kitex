@@ -279,7 +279,6 @@ func TestJSONPbGeneric(t *testing.T) {
 	test.Assert(t, ok)
 
 	test.Assert(t, jg.codec.dynamicgoEnabled == true)
-	test.Assert(t, jg.codec.binaryWithBase64)
 	test.Assert(t, !jg.codec.convOpts.NoBase64Binary)
 
 	test.Assert(t, err == nil)

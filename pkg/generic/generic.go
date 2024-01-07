@@ -125,6 +125,8 @@ func JSONThriftGeneric(p DescriptorProvider, opts ...Option) (Generic, error) {
 	return &jsonThriftGeneric{codec: codec}, nil
 }
 
+// JSONPbGeneric json mapping generic.
+// Uses dynamicgo for json to protobufs conversion, so DynamicGo field is true by default.
 func JSONPbGeneric(p PbDescriptorProviderDynamicGo, opts ...Option) (Generic, error) {
 	gOpts := &Options{dynamicgoConvOpts: conv.Options{}}
 	gOpts.apply(opts)

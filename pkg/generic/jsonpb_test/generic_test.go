@@ -82,7 +82,7 @@ func TestEcho(t *testing.T) {
 
 	ctx := context.Background()
 
-	// 'ExampleMethod' method name must be passed as param
+	// 'Echo' method name must be passed as param
 	resp, err := cli.GenericCall(ctx, "Echo", getEchoReq())
 	// resp is a JSON string
 	test.Assert(t, err == nil)
@@ -130,7 +130,7 @@ func TestVoid(t *testing.T) {
 
 	ctx := context.Background()
 
-	// 'ExampleMethod' method name must be passed as param
+	// 'VoidMethod' method name must be passed as param
 	resp, err := cli.GenericCall(ctx, "VoidMethod", getVoidReq())
 	test.Assert(t, err == nil)
 	respMap, ok := resp.(string)
@@ -182,7 +182,7 @@ func TestInt2FloatMethod(t *testing.T) {
 
 	ctx := context.Background()
 
-	// 'ExampleMethod' method name must be passed as param
+	// 'Int2FloatMethod' method name must be passed as param
 	resp, err := cli.GenericCall(ctx, "Int2FloatMethod", getInt2FloatMethodReq())
 	// resp is a JSON string
 	test.Assert(t, err == nil)
@@ -206,6 +206,7 @@ func TestInt2FloatMethod2(t *testing.T) {
 
 	ctx := context.Background()
 
+	// 'Int2FloatMethod' method name must be passed as param
 	resp, err := cli.GenericCall(ctx, "Int2FloatMethod", getInt2FloatMethod2Req())
 	test.Assert(t, err == nil)
 	respMap, ok := resp.(string)
