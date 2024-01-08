@@ -153,7 +153,7 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
 	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
 	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
-	test.DeepEqual(t, strKVInfoRecv, map[string]string{transmeta.GDPRToken: "test token"})
+	test.DeepEqual(t, strKVInfoRecv, map[string]string{transmeta.GDPRToken: "test token", transmeta.HeaderIDLServiceName: ""})
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
 	test.Assert(t, flag == HeaderFlagSupportOutOfOrder)
@@ -370,7 +370,7 @@ func prepareIntKVInfo() map[uint16]string {
 }
 
 func prepareStrKVInfo() map[string]string {
-	kvInfo := map[string]string{}
+	kvInfo := map[string]string{transmeta.HeaderIDLServiceName: mocks.MockServiceName}
 	return kvInfo
 }
 
@@ -378,6 +378,7 @@ func prepareStrKVInfoWithGDPRToken() map[string]string {
 	kvInfo := map[string]string{
 		transmeta.GDPRToken:             "mockToken",
 		transmeta.HeaderTransRemoteAddr: "mockRemoteAddr",
+		transmeta.HeaderIDLServiceName:  mocks.MockServiceName,
 	}
 	return kvInfo
 }

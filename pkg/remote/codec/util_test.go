@@ -40,4 +40,9 @@ func TestSetOrCheckMethodName(t *testing.T) {
 	test.Assert(t, ri.Invocation().PackageName() == "mock")
 	test.Assert(t, ri.Invocation().MethodName() == "mock")
 	test.Assert(t, ri.To().Method() == "mock")
+
+	msg = remote.NewMessageWithNewer(svcInfoMap, map[string]*serviceinfo.ServiceInfo{}, ri, remote.Call, remote.Server)
+	err = SetOrCheckMethodName("dummy", msg)
+	test.Assert(t, err != nil)
+	test.Assert(t, err.Error() == "unknown method dummy")
 }

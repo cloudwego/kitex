@@ -85,8 +85,8 @@ func NewProtocolInfo(tp transport.Protocol, ct serviceinfo.PayloadCodec) Protoco
 type Message interface {
 	RPCInfo() rpcinfo.RPCInfo
 	ServiceInfo() *serviceinfo.ServiceInfo
-	ServiceInfoByServiceName(svcName string) *serviceinfo.ServiceInfo                        // break change
-	ServiceInfoByMethodName(methodName string) (svcInfo *serviceinfo.ServiceInfo, err error) // break change
+	ServiceInfoByServiceName(svcName string) *serviceinfo.ServiceInfo
+	ServiceInfoByMethodName(methodName string) (svcInfo *serviceinfo.ServiceInfo, err error)
 	Data() interface{}
 	NewData(method string) (ok bool)
 	MessageType() MessageType
@@ -114,7 +114,7 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
 	ti := transInfoPool.Get().(*transInfo)
-	if rpcRole == Client && isMultiServiceAvailable(msg) {
+	if rpcRole == Client && ri != nil && ri.Invocation() != nil {
 		ti.strInfo[transmeta.HeaderIDLServiceName] = ri.Invocation().ServiceName()
 	}
 	msg.transInfo = ti
@@ -138,23 +138,6 @@ func RecycleMessage(msg Message) {
 	if msg != nil {
 		msg.Recycle()
 	}
-}
-
-func isMultiServiceAvailable(msg Message) bool {
-	if !IsTTHeader(msg) {
-		return false
-	}
-	switch msg.ProtocolInfo().CodecType {
-	case serviceinfo.Thrift, serviceinfo.Protobuf:
-		return true
-	default:
-		return false
-	}
-}
-
-func IsTTHeader(msg Message) bool {
-	transProto := msg.ProtocolInfo().TransProto
-	return transProto&transport.TTHeader == transport.TTHeader
 }
 
 func newMessage() interface{} {

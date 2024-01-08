@@ -36,13 +36,13 @@ func TestIsTTHeader(t *testing.T) {
 		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
 		msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
 		msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
-		test.Assert(t, remote.IsTTHeader(msg))
+		test.Assert(t, isTTHeader(msg))
 	})
 	t.Run("with ttheader framed", func(t *testing.T) {
 		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
 		msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
 		msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeaderFramed, serviceinfo.Thrift))
-		test.Assert(t, remote.IsTTHeader(msg))
+		test.Assert(t, isTTHeader(msg))
 	})
 }
 

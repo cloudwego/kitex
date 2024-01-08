@@ -54,8 +54,9 @@ func TestClientReadMetainfo(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	kvs = metainfo.RecvAllBackwardValues(ctx)
-	test.Assert(t, len(kvs) == 1)
+	test.Assert(t, len(kvs) == 2)
 	test.Assert(t, kvs["hello"] == "world")
+	test.Assert(t, kvs[transmeta.HeaderIDLServiceName] == "")
 }
 
 func TestClientWriteMetainfo(t *testing.T) {
@@ -70,18 +71,20 @@ func TestClientWriteMetainfo(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	kvs := msg.TransInfo().TransStrInfo()
-	test.Assert(t, len(kvs) == 2, kvs)
+	test.Assert(t, len(kvs) == 3, kvs)
 	test.Assert(t, kvs[metainfo.PrefixTransient+"tk"] == "tv")
 	test.Assert(t, kvs[metainfo.PrefixPersistent+"pk"] == "pv")
+	test.Assert(t, kvs[transmeta.HeaderIDLServiceName] == "")
 
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
 	_, err = MetainfoClientHandler.WriteMeta(ctx, msg)
 	test.Assert(t, err == nil)
 
 	kvs = msg.TransInfo().TransStrInfo()
-	test.Assert(t, len(kvs) == 2, kvs)
+	test.Assert(t, len(kvs) == 3, kvs)
 	test.Assert(t, kvs[metainfo.PrefixTransient+"tk"] == "tv")
 	test.Assert(t, kvs[metainfo.PrefixPersistent+"pk"] == "pv")
+	test.Assert(t, kvs[transmeta.HeaderIDLServiceName] == "")
 }
 
 func TestServerReadMetainfo(t *testing.T) {
@@ -135,13 +138,13 @@ func TestServerWriteMetainfo(t *testing.T) {
 	ctx, err := MetainfoServerHandler.WriteMeta(ctx, msg)
 	test.Assert(t, err == nil)
 	kvs := msg.TransInfo().TransStrInfo()
-	test.Assert(t, len(kvs) == 1 && kvs["bk"] == "bv", kvs)
+	test.Assert(t, len(kvs) == 2 && kvs["bk"] == "bv", kvs)
 
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
 	_, err = MetainfoServerHandler.WriteMeta(ctx, msg)
 	test.Assert(t, err == nil)
 	kvs = msg.TransInfo().TransStrInfo()
-	test.Assert(t, len(kvs) == 1 && kvs["bk"] == "bv", kvs)
+	test.Assert(t, len(kvs) == 2 && kvs["bk"] == "bv", kvs)
 }
 
 func Test_addStreamID(t *testing.T) {
