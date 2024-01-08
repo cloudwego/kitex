@@ -76,8 +76,8 @@ type defaultCodec struct {
 	maxSize int
 }
 
-// Encode implements the remote.Codec interface, it does complete message encode include header and payload.
-func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
+// EncodePayload encode payload
+func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
 	defer func() {
 		// notice: mallocLen() must exec before flush, or it will be reset
 		if ri := message.RPCInfo(); ri != nil {
@@ -87,20 +87,11 @@ func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out r
 		}
 	}()
 	var err error
-	var totalLenField []byte
 	var framedLenField []byte
-	var headerLen int
+	headerLen := out.MallocLen()
 	tp := message.ProtocolInfo().TransProto
 
-	// 1. encode header and return totalLenField if needed
-	// totalLenField will be filled after payload encoded
-	if tp&transport.TTHeader == transport.TTHeader {
-		if totalLenField, err = ttHeaderCodec.encode(ctx, message, out); err != nil {
-			return err
-		}
-		headerLen = out.MallocLen()
-	}
-	// 2. malloc framed field if needed
+	// 1. malloc framed field if needed
 	if tp&transport.Framed == transport.Framed {
 		if framedLenField, err = out.Malloc(Size32); err != nil {
 			return err
@@ -108,12 +99,12 @@ func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out r
 		headerLen += Size32
 	}
 
-	// 3. encode payload
-	if err := c.encodePayload(ctx, message, out); err != nil {
+	// 2. encode payload
+	if err = c.encodePayload(ctx, message, out); err != nil {
 		return err
 	}
 
-	// 4. fill framed field if needed
+	// 3. fill framed field if needed
 	var payloadLen int
 	if tp&transport.Framed == transport.Framed {
 		if framedLenField == nil {
@@ -124,15 +115,44 @@ func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out r
 	} else if message.ProtocolInfo().CodecType == serviceinfo.Protobuf {
 		return perrors.NewProtocolErrorWithMsg("protobuf just support 'framed' trans proto")
 	}
-	// 5. fill totalLen field for header if needed
+	if tp&transport.TTHeader == transport.TTHeader {
+		payloadLen = out.MallocLen() - Size32
+	}
+	err = checkPayloadSize(payloadLen, c.maxSize)
+	return err
+}
+
+// EncodeMetaAndPayload encode meta and payload
+func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
+	var err error
+	var totalLenField []byte
+	tp := message.ProtocolInfo().TransProto
+
+	// 1. encode header and return totalLenField if needed
+	// totalLenField will be filled after payload encoded
+	if tp&transport.TTHeader == transport.TTHeader {
+		if totalLenField, err = ttHeaderCodec.encode(ctx, message, out); err != nil {
+			return err
+		}
+	}
+	// 2. encode payload
+	if err = me.EncodePayload(ctx, message, out); err != nil {
+		return err
+	}
+	// 3. fill totalLen field for header if needed
 	if tp&transport.TTHeader == transport.TTHeader {
 		if totalLenField == nil {
 			return perrors.NewProtocolErrorWithMsg("no buffer allocated for the header length field")
 		}
-		payloadLen = out.MallocLen() - Size32
+		payloadLen := out.MallocLen() - Size32
 		binary.BigEndian.PutUint32(totalLenField, uint32(payloadLen))
 	}
-	return checkPayloadSize(payloadLen, c.maxSize)
+	return nil
+}
+
+// Encode implements the remote.Codec interface, it does complete message encode include header and payload.
+func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
+	return c.EncodeMetaAndPayload(ctx, message, out, c)
 }
 
 // DecodeMeta decode header
