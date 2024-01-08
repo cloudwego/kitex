@@ -842,6 +842,95 @@ func TestInvokeHandlerPanic(t *testing.T) {
 	test.Assert(t, serviceHandler)
 }
 
+func TestRegisterService(t *testing.T) {
+	svr := NewServer()
+	time.AfterFunc(time.Second, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+
+	svr.Run()
+
+	test.PanicAt(t, func() {
+		_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	}, func(err interface{}) bool {
+		if errMsg, ok := err.(string); ok {
+			return strings.Contains(errMsg, "server is running")
+		}
+		return true
+	})
+	svr.Stop()
+
+	svr = NewServer()
+	time.AfterFunc(time.Second, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+
+	test.PanicAt(t, func() {
+		_ = svr.RegisterService(nil, mocks.MyServiceHandler())
+	}, func(err interface{}) bool {
+		if errMsg, ok := err.(string); ok {
+			return strings.Contains(errMsg, "svcInfo is nil")
+		}
+		return true
+	})
+
+	test.PanicAt(t, func() {
+		_ = svr.RegisterService(mocks.ServiceInfo(), nil)
+	}, func(err interface{}) bool {
+		if errMsg, ok := err.(string); ok {
+			return strings.Contains(errMsg, "handler is nil")
+		}
+		return true
+	})
+
+	test.PanicAt(t, func() {
+		_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler(), true)
+		_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	}, func(err interface{}) bool {
+		if errMsg, ok := err.(string); ok {
+			return strings.Contains(errMsg, "Service[MockService] is already defined")
+		}
+		return true
+	})
+
+	test.PanicAt(t, func() {
+		_ = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler(), true)
+	}, func(err interface{}) bool {
+		if errMsg, ok := err.(string); ok {
+			return strings.Contains(errMsg, "multiple fallback services cannot be registered")
+		}
+		return true
+	})
+	svr.Stop()
+
+	svr = NewServer()
+	time.AfterFunc(time.Second, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+
+	_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	_ = svr.RegisterService(mocks.Service3Info(), mocks.MyServiceHandler())
+	err := svr.Run()
+	test.Assert(t, err != nil)
+	test.Assert(t, err.Error() == "method name [mock] is conflicted between services but no fallback service is specified")
+	svr.Stop()
+
+	svr = NewServer(WithOnlyAcceptingHTTP2Traffic(true))
+	time.AfterFunc(time.Second, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	_ = svr.RegisterService(mocks.Service3Info(), mocks.MyServiceHandler())
+	err = svr.Run()
+	test.Assert(t, err != nil)
+	test.Assert(t, err.Error() == "only http2 traffic is accepted")
+	svr.Stop()
+}
+
 type noopMetahandler struct{}
 
 func (noopMetahandler) WriteMeta(ctx context.Context, msg remote.Message) (context.Context, error) {

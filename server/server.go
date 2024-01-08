@@ -310,7 +310,8 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		serviceName := ri.Invocation().ServiceName()
 		svc := s.svcs.getService(serviceName)
 		if svc == nil {
-			svc = s.svcs.getServiceByMethodName(methodName) // NOTE: svc should always be not nil here
+			// NOTE: svc should always be non-nil here
+			svc = s.svcs.getServiceByMethodName(methodName)
 		}
 		svcInfo := svc.svcInfo
 		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {

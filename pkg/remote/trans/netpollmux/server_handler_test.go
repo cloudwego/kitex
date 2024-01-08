@@ -92,6 +92,10 @@ func TestNewTransHandler(t *testing.T) {
 	handler, err := NewSvrTransHandlerFactory().NewTransHandler(&remote.ServerOption{})
 	test.Assert(t, err == nil, err)
 	test.Assert(t, handler != nil)
+
+	handler, err = NewSvrTransHandlerFactory().NewTransHandler(&remote.ServerOption{WithOnlyAcceptingHTTP2Traffic: true})
+	test.Assert(t, err != nil, err)
+	test.Assert(t, err.Error() == "only http2 traffic is accepted")
 }
 
 // TestOnActive test ServerTransHandler OnActive

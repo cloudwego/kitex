@@ -357,8 +357,9 @@ func WithContextBackup(enable, async bool) Option {
 	}}
 }
 
+// WithOnlyAcceptingHTTP2Traffic returns an Option that accepts only http2 traffic.
 func WithOnlyAcceptingHTTP2Traffic(enable bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.WithOnlyAcceptingHTTP2Traffic = true
+		o.WithOnlyAcceptingHTTP2Traffic = enable
 	}}
 }
