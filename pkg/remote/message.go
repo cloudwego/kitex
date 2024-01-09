@@ -156,7 +156,6 @@ type message struct {
 	tags          map[string]interface{}
 	protocol      ProtocolInfo
 	payloadCodec  PayloadCodec
-	isGeneric     bool
 }
 
 func (m *message) zero() {
