@@ -510,8 +510,7 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}
 	if info.PayloadCodec == "" {
-		// TODO: which to choose?
-		info.PayloadCodec = getDefaultSvc(s.svcs.svcMap).svcInfo.PayloadCodec.String()
+		info.PayloadCodec = getDefaultSvc(s.svcs).svcInfo.PayloadCodec.String()
 	}
 	if info.Weight == 0 {
 		info.Weight = discovery.DefaultWeight
@@ -559,8 +558,11 @@ func (s *server) waitExit(errCh chan error) error {
 }
 
 // getDefaultSvc is used to get one ServiceInfo from map
-func getDefaultSvc(svcMap map[string]*service) *service {
-	for _, svc := range svcMap {
+func getDefaultSvc(svcs *services) *service {
+	if svcs.fallbackSvc != nil {
+		return svcs.fallbackSvc
+	}
+	for _, svc := range svcs.svcMap {
 		return svc
 	}
 	return nil
