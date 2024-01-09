@@ -87,7 +87,6 @@ func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
 	return svcInfoMap
 }
 
-// TODO: time consuming?
 func (s *services) getMethodNameSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
 	methodNameSvcInfoMap := map[string]*serviceinfo.ServiceInfo{}
 	for methodName, svc := range s.methodSvcMap {
