@@ -278,15 +278,6 @@ func newMockServer(handler kt.Mock, addr net.Addr, opts ...server.Option) server
 	return svr
 }
 
-//type MockImpl struct{}
-//
-//func (g *MockImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-//	req := &kt.MockReq{}
-//	json.Unmarshal([]byte(request.(string)), req)
-//	fmt.Printf("Recv: %s\n", req.Msg)
-//	return mockResp, nil
-//}
-
 func serviceInfo() *serviceinfo.ServiceInfo {
 	destService := "Mock"
 	handlerType := (*kt.Mock)(nil)

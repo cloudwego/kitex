@@ -117,7 +117,6 @@ func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, i
 
 	inner := thrift.NewReadHTTPPbResponse(svcDsc, pbSvcDsc)
 	msg.Data().(WithCodec).SetCodec(inner)
-	msg.SetGeneric(true)
 	return c.codec.Unmarshal(ctx, msg, in)
 }
 

@@ -127,7 +127,6 @@ func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	}
 
 	msg.Data().(WithCodec).SetCodec(rm)
-	msg.SetGeneric(true)
 	return c.codec.Unmarshal(ctx, msg, in)
 }
 

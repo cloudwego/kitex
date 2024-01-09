@@ -100,7 +100,6 @@ type Message interface {
 	SetProtocolInfo(ProtocolInfo)
 	PayloadCodec() PayloadCodec
 	SetPayloadCodec(pc PayloadCodec)
-	SetGeneric(isGeneric bool)
 	Recycle()
 }
 
@@ -191,7 +190,7 @@ func (m *message) ServiceInfo() *serviceinfo.ServiceInfo {
 // ServiceInfoByServiceName implements the Message interface.
 func (m *message) ServiceInfoByServiceName(svcName string) *serviceinfo.ServiceInfo {
 	svcInfo := m.svcInfoMap[svcName]
-	if svcInfo == nil && m.isGeneric {
+	if svcInfo == nil {
 		svcInfo = m.svcInfoMap[serviceinfo.GenericService]
 	}
 	m.targetSvcInfo = svcInfo
@@ -279,11 +278,6 @@ func (m *message) PayloadCodec() PayloadCodec {
 // SetPayloadCodec implements the Message interface.
 func (m *message) SetPayloadCodec(pc PayloadCodec) {
 	m.payloadCodec = pc
-}
-
-// SetGeneric implements the Message interface.
-func (m *message) SetGeneric(isGeneric bool) {
-	m.isGeneric = isGeneric
 }
 
 // Recycle is used to recycle the message.

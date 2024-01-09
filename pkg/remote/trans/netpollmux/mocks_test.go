@@ -87,7 +87,6 @@ type MockMessage struct {
 	SetProtocolInfoFunc          func(remote.ProtocolInfo)
 	PayloadCodecFunc             func() remote.PayloadCodec
 	SetPayloadCodecFunc          func(pc remote.PayloadCodec)
-	SetGenericFunc               func(isGeneric bool)
 	RecycleFunc                  func()
 }
 
@@ -203,12 +202,6 @@ func (m *MockMessage) PayloadCodec() remote.PayloadCodec {
 func (m *MockMessage) SetPayloadCodec(pc remote.PayloadCodec) {
 	if m.SetPayloadCodecFunc != nil {
 		m.SetPayloadCodecFunc(pc)
-	}
-}
-
-func (m *MockMessage) SetGeneric(isGeneric bool) {
-	if m.SetGenericFunc != nil {
-		m.SetGenericFunc(isGeneric)
 	}
 }
 
