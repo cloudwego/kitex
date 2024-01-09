@@ -105,7 +105,7 @@ func newService3Info() *serviceinfo.ServiceInfo {
 		ServiceName: MockService3Name,
 		Methods:     methods,
 		Extra: map[string]interface{}{
-			"PackageName": "mock2",
+			"PackageName": "mock",
 		},
 	}
 	return svcInfo
