@@ -128,7 +128,7 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 				return nil
 			},
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				msg.SetServiceInfo(svcInfo)
+				msg.ServiceInfoByServiceName(mocks.MockServiceName)
 				return nil
 			},
 		},
@@ -188,7 +188,7 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 				return nil
 			},
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				msg.SetServiceInfo(svcInfo)
+				msg.ServiceInfoByServiceName(mocks.MockServiceName)
 				return mockErr
 			},
 		},
@@ -247,7 +247,7 @@ func TestSvrTransHandlerOnReadHeartbeat(t *testing.T) {
 			},
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 				msg.SetMessageType(remote.Heartbeat)
-				msg.SetServiceInfo(svcInfo)
+				msg.ServiceInfoByServiceName(mocks.MockServiceName)
 				return nil
 			},
 		},

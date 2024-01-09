@@ -102,7 +102,6 @@ type Message interface {
 	SetPayloadCodec(pc PayloadCodec)
 	SetGeneric(isGeneric bool)
 	Recycle()
-	SetServiceInfo(svcInfo *serviceinfo.ServiceInfo) // TODO: only for test. think the way to delete this
 }
 
 // NewMessage creates a new Message using the given info.
@@ -291,11 +290,6 @@ func (m *message) SetGeneric(isGeneric bool) {
 func (m *message) Recycle() {
 	m.zero()
 	messagePool.Put(m)
-}
-
-// TODO: delete
-func (m *message) SetServiceInfo(svcInfo *serviceinfo.ServiceInfo) {
-	m.targetSvcInfo = svcInfo
 }
 
 // TransInfo contains transport information.

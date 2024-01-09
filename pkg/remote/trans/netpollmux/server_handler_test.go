@@ -77,7 +77,7 @@ func init() {
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 				in.Skip(3 * codec.Size32)
 				_, err := in.ReadString(len(body))
-				msg.SetServiceInfo(svcInfo)
+				msg.ServiceInfoByServiceName(mocks.MockServiceName)
 				return err
 			},
 		},
@@ -479,7 +479,7 @@ func TestInvokeError(t *testing.T) {
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 				in.Skip(3 * codec.Size32)
 				_, err := in.ReadString(len(body))
-				msg.SetServiceInfo(svcInfo)
+				msg.ServiceInfoByServiceName(mocks.MockServiceName)
 				return err
 			},
 		},

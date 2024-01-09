@@ -185,7 +185,6 @@ type mockMessage struct {
 	SetPayloadCodecFunc          func(pc remote.PayloadCodec)
 	SetGenericFunc               func(isGeneric bool)
 	RecycleFunc                  func()
-	SetServiceInfoFunc           func(svcInfo *serviceinfo.ServiceInfo) // TODO: delete
 }
 
 func (m *mockMessage) RPCInfo() rpcinfo.RPCInfo {
@@ -312,12 +311,5 @@ func (m *mockMessage) SetGeneric(isGeneric bool) {
 func (m *mockMessage) Recycle() {
 	if m.RecycleFunc != nil {
 		m.RecycleFunc()
-	}
-}
-
-// TODO: delete
-func (m *mockMessage) SetServiceInfo(svcInfo *serviceinfo.ServiceInfo) {
-	if m.SetServiceInfoFunc != nil {
-		m.SetServiceInfoFunc(svcInfo)
 	}
 }
