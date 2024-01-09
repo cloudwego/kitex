@@ -327,7 +327,6 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	iv.SetSeqID(0)
 	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
 	data := NewControlFrame()
-	// TODO: which to select?
 	svcInfo := getDefaultSvcInfo(t.svcInfoMap)
 	msg := remote.NewMessage(data, svcInfo, ri, remote.Reply, remote.Server)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
