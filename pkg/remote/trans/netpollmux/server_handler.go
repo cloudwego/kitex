@@ -327,7 +327,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	iv.SetSeqID(0)
 	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
 	data := NewControlFrame()
-	svcInfo := getDefaultSvcInfo(t.svcInfoMap)
+	svcInfo := getRandomSvcInfo(t.svcInfoMap)
 	msg := remote.NewMessage(data, svcInfo, ri, remote.Reply, remote.Server)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
 	msg.TransInfo().TransStrInfo()[transmeta.HeaderConnectionReadyToReset] = "1"
@@ -488,8 +488,8 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 	return ri.From().ServiceName(), rAddr
 }
 
-// getDefaultSvcInfo is used to get one ServiceInfo from map
-func getDefaultSvcInfo(svcMap map[string]*serviceinfo.ServiceInfo) *serviceinfo.ServiceInfo {
+// getRandomSvcInfo is used to get one ServiceInfo from map
+func getRandomSvcInfo(svcMap map[string]*serviceinfo.ServiceInfo) *serviceinfo.ServiceInfo {
 	for _, svcInfo := range svcMap {
 		return svcInfo
 	}
