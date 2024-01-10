@@ -279,9 +279,11 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		return
 	}
 	svcInfo := recvMsg.ServiceInfo()
-	if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
-		if methodInfo.OneWay() {
-			return
+	if svcInfo != nil {
+		if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
+			if methodInfo.OneWay() {
+				return
+			}
 		}
 	}
 	transErr, isTransErr := err.(*remote.TransError)
