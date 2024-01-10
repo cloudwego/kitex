@@ -30,7 +30,7 @@ func TestSetOrCheckMethodName(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil),
 		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	svcInfo := mocks.ServiceInfo()
-	svcInfoMap := map[string]*serviceinfo.ServiceInfo{"MockService": svcInfo}
+	svcInfoMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
 	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
 	msg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, ri, remote.Call, remote.Server)
 	err := SetOrCheckMethodName("mock", msg)

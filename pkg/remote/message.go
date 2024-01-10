@@ -112,7 +112,7 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
 	ti := transInfoPool.Get().(*transInfo)
-	if rpcRole == Client && ri != nil && ri.Invocation() != nil {
+	if rpcRole == Client && (msgType == Call || msgType == Oneway) && ri != nil && ri.Invocation() != nil {
 		ti.strInfo[transmeta.HeaderIDLServiceName] = ri.Invocation().ServiceName()
 	}
 	msg.transInfo = ti

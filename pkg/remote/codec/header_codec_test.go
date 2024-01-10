@@ -308,7 +308,7 @@ var (
 
 func initServerRecvMsg() remote.Message {
 	svcInfo := mocks.ServiceInfo()
-	svcInfoMap := map[string]*serviceinfo.ServiceInfo{"MockService": svcInfo}
+	svcInfoMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
 	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
 	msg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, mockSvrRPCInfo, remote.Call, remote.Server)
 	return msg

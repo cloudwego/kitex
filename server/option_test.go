@@ -442,7 +442,7 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(from, to, nil, nil, nil)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	svcInfo := mocks.ServiceInfo()
-	svcInfoMap := map[string]*serviceinfo.ServiceInfo{"MockService": svcInfo}
+	svcInfoMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
 	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
 	msg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, ri, remote.Call, remote.Server)
 
