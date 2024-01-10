@@ -229,14 +229,13 @@ func BenchmarkWeightedPicker(b *testing.B) {
 	for _, tc := range balancerTestcases {
 		b.Run(tc.Name, func(b *testing.B) {
 			balancer := tc.factory()
-
 			n := 10
 			for i := 0; i < 4; i++ {
 				b.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
 					inss := makeNInstances(n, 10)
 					e := discovery.Result{
 						Cacheable: true,
-						CacheKey:  "test",
+						CacheKey:  fmt.Sprintf("test-%d", n),
 						Instances: inss,
 					}
 					picker := balancer.GetPicker(e)
@@ -290,14 +289,13 @@ func BenchmarkWeightedPicker_Next(b *testing.B) {
 	for _, tc := range balancerTestcases {
 		b.Run(tc.Name, func(b *testing.B) {
 			balancer := tc.factory()
-
 			n := 10
 			for i := 0; i < 4; i++ {
 				b.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
 					inss := makeNInstances(n, 1000, []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 					e := discovery.Result{
 						Cacheable: true,
-						CacheKey:  "test",
+						CacheKey:  fmt.Sprintf("test-%d", n),
 						Instances: inss,
 					}
 					picker := balancer.GetPicker(e)

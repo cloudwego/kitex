@@ -40,6 +40,7 @@ const (
 func Hessian2PreHook(cfg *generator.Config) {
 	// add thrift option
 	cfg.ThriftOptions = append(cfg.ThriftOptions, "template=slim,with_reflection,code_ref")
+	cfg.ThriftOptions = append(cfg.ThriftOptions, "enable_nested_struct")
 
 	// run hessian2 options
 	for _, opt := range cfg.Hessian2Options {
@@ -140,10 +141,14 @@ func loadIDLRefConfig(file *os.File) *config.RawConfig {
 	return idlRefCfg
 }
 
-var JavaObjectRe = regexp.MustCompile(`\*java\.Object\b`)
+var (
+	javaObjectRe                     = regexp.MustCompile(`\*java\.Object\b`)
+	javaExceptionRe                  = regexp.MustCompile(`\*java\.Exception\b`)
+	javaExceptionEmptyVerificationRe = regexp.MustCompile(`return p\.Exception != nil\b`)
+)
 
-// ReplaceObject args is the arguments from command, subDirPath used for xx/xx/xx
-func ReplaceObject(args generator.Config, subDirPath string) error {
+// Hessian2PatchByReplace args is the arguments from command, subDirPath used for xx/xx/xx
+func Hessian2PatchByReplace(args generator.Config, subDirPath string) error {
 	output := args.OutputPath
 	newPath := util.JoinPath(output, args.GenPath, subDirPath)
 	fs, err := ioutil.ReadDir(newPath)
@@ -155,7 +160,7 @@ func ReplaceObject(args generator.Config, subDirPath string) error {
 		fileName := util.JoinPath(args.OutputPath, args.GenPath, subDirPath, f.Name())
 		if f.IsDir() {
 			subDirPath := util.JoinPath(subDirPath, f.Name())
-			if err = ReplaceObject(args, subDirPath); err != nil {
+			if err = Hessian2PatchByReplace(args, subDirPath); err != nil {
 				return err
 			}
 		} else if strings.HasSuffix(f.Name(), ".go") {
@@ -164,7 +169,10 @@ func ReplaceObject(args generator.Config, subDirPath string) error {
 				return err
 			}
 
-			if err = replaceJavaObject(data, fileName); err != nil {
+			data = replaceJavaObject(data)
+			data = replaceJavaException(data)
+			data = replaceJavaExceptionEmptyVerification(data)
+			if err = ioutil.WriteFile(fileName, data, 0o644); err != nil {
 				return err
 			}
 		}
@@ -176,10 +184,33 @@ func ReplaceObject(args generator.Config, subDirPath string) error {
 		return err
 	}
 
-	return replaceJavaObject(handler, handlerName)
+	handler = replaceJavaObject(handler)
+	return ioutil.WriteFile(handlerName, handler, 0o644)
 }
 
-func replaceJavaObject(content []byte, fileName string) error {
-	content = JavaObjectRe.ReplaceAll(content, []byte("java.Object"))
-	return ioutil.WriteFile(fileName, content, 0o644)
+func replaceJavaObject(content []byte) []byte {
+	return javaObjectRe.ReplaceAll(content, []byte("java.Object"))
+}
+
+func replaceJavaException(content []byte) []byte {
+	return javaExceptionRe.ReplaceAll(content, []byte("java.Exception"))
+}
+
+// replaceJavaExceptionEmptyVerification is used to resolve this issue:
+// After generating nested struct, the generated struct would be:
+//
+//	 type CustomizedException struct {
+//	     *java.Exception
+//	 }
+//
+//	 It has a method:
+//	 func (p *EchoCustomizedException) IsSetException() bool {
+//		    return p.Exception != nil
+//	 }
+//
+//	 After invoking replaceJavaException, *java.Exception would be converted
+//	 to java.Exception and IsSetException became invalid. We convert the statement
+//	 to `return true` to ignore this problem.
+func replaceJavaExceptionEmptyVerification(content []byte) []byte {
+	return javaExceptionEmptyVerificationRe.ReplaceAll(content, []byte("return true"))
 }
