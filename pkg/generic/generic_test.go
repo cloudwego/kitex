@@ -262,7 +262,7 @@ func TestJSONPbGeneric(t *testing.T) {
 
 	// initialise dynamicgo proto.ServiceDescriptor
 	opts := dproto.Options{}
-	p, err := NewPbContentProviderDynamicGo(path, context.Background(), opts)
+	p, err := NewPbFileProviderWithDynamicGo(path, context.Background(), opts)
 	if err != nil {
 		panic(err)
 	}

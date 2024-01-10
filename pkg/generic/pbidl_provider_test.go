@@ -53,7 +53,7 @@ func TestPbContentProviderDynamicGo(t *testing.T) {
 	path := "./jsonpb_test/idl/echo.proto"
 
 	opts := dproto.Options{}
-	p, err := NewPbContentProviderDynamicGo(path, context.Background(), opts)
+	p, err := NewPbFileProviderWithDynamicGo(path, context.Background(), opts)
 
 	test.Assert(t, err == nil)
 

@@ -39,7 +39,7 @@ func TestRun(t *testing.T) {
 func TestJsonPbCodec(t *testing.T) {
 	gOpts := &Options{dynamicgoConvOpts: conv.Options{}}
 	opts := dproto.Options{}
-	p, err := NewPbContentProviderDynamicGo(echoIDLPath, context.Background(), opts)
+	p, err := NewPbFileProviderWithDynamicGo(echoIDLPath, context.Background(), opts)
 	test.Assert(t, err == nil)
 
 	jpc, err := newJsonPbCodec(p, pbCodec, gOpts)

@@ -32,14 +32,14 @@ type PbContentProvider struct {
 	svcs      chan proto.ServiceDescriptor
 }
 
-type PbContentProviderDynamicGo struct {
+type PbFileProviderWithDynamicGo struct {
 	closeOnce sync.Once
 	svcs      chan *dproto.ServiceDescriptor
 }
 
 var (
 	_ PbDescriptorProvider          = (*PbContentProvider)(nil)
-	_ PbDescriptorProviderDynamicGo = (*PbContentProviderDynamicGo)(nil)
+	_ PbDescriptorProviderDynamicGo = (*PbFileProviderWithDynamicGo)(nil)
 )
 
 func NewPbContentProvider(main string, includes map[string]string) (PbDescriptorProvider, error) {
@@ -108,9 +108,9 @@ func (p *PbContentProvider) Close() error {
 	return nil
 }
 
-// PbContentProviderDynamicGo
-func NewPbContentProviderDynamicGo(main string, ctx context.Context, options dproto.Options) (PbDescriptorProviderDynamicGo, error) {
-	p := &PbContentProviderDynamicGo{
+// PbFileProviderWithDynamicGo
+func NewPbFileProviderWithDynamicGo(main string, ctx context.Context, options dproto.Options) (PbDescriptorProviderDynamicGo, error) {
+	p := &PbFileProviderWithDynamicGo{
 		svcs: make(chan *dproto.ServiceDescriptor, 1),
 	}
 
@@ -123,11 +123,11 @@ func NewPbContentProviderDynamicGo(main string, ctx context.Context, options dpr
 	return p, nil
 }
 
-func (p *PbContentProviderDynamicGo) Provide() <-chan *dproto.ServiceDescriptor {
+func (p *PbFileProviderWithDynamicGo) Provide() <-chan *dproto.ServiceDescriptor {
 	return p.svcs
 }
 
-func (p *PbContentProviderDynamicGo) Close() error {
+func (p *PbFileProviderWithDynamicGo) Close() error {
 	p.closeOnce.Do(func() {
 		close(p.svcs)
 	})

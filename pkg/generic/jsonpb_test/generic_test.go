@@ -45,7 +45,7 @@ func TestRun(t *testing.T) {
 func initPbServerByIDLDynamicGo(t *testing.T, address string, handler generic.Service, pbIdl string) server.Server {
 	// initialise DescriptorProvider for DynamicGo
 	opts := proto.Options{}
-	p, err := generic.NewPbContentProviderDynamicGo(pbIdl, context.Background(), opts)
+	p, err := generic.NewPbFileProviderWithDynamicGo(pbIdl, context.Background(), opts)
 
 	test.Assert(t, err == nil)
 
@@ -60,7 +60,7 @@ func initPbServerByIDLDynamicGo(t *testing.T, address string, handler generic.Se
 func initPbClientByIDLDynamicGo(t *testing.T, addr, destSvcName, pbIdl string) genericclient.Client {
 	// initialise dynamicgo proto.ServiceDescriptor
 	opts := proto.Options{}
-	p, err := generic.NewPbContentProviderDynamicGo(pbIdl, context.Background(), opts)
+	p, err := generic.NewPbFileProviderWithDynamicGo(pbIdl, context.Background(), opts)
 
 	test.Assert(t, err == nil)
 
