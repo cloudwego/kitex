@@ -50,7 +50,7 @@ func NewServer(handler {{call .ServiceTypeName}}, opts ...server.Option) server.
 }
 {{template "@server.go-EOF" .}}
 
-func RegisterService(svr server.Server, handler {{call .ServiceTypeName}}, isFallbackService ...bool) error {
+func RegisterService(svr {{.ServerPkg}}.Server, handler {{call .ServiceTypeName}}, isFallbackService ...bool) error {
 	if err := svr.RegisterService(serviceInfo(), handler, isFallbackService...); err != nil {
 		return err
 	}

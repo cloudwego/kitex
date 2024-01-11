@@ -50,6 +50,7 @@ type PackageInfo struct {
 	Module           string
 	Protocol         transport.Protocol
 	IDLName          string
+	ServerPkg        string
 }
 
 // AddImport .

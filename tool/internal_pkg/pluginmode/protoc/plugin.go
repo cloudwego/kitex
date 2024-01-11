@@ -141,6 +141,8 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		return
 	}
 
+	pp.ServerPkg = "server"
+
 	hasStreaming := false
 	// generate service package
 	for _, si := range ss {
