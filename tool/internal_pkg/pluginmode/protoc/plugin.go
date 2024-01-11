@@ -52,6 +52,7 @@ func (pp *protocPlugin) init() {
 	pp.Dependencies = map[string]string{
 		"proto": "google.golang.org/protobuf/proto",
 	}
+	pp.ServerPkg = "server"
 }
 
 // parse the 'M*' option
@@ -140,8 +141,6 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 	if pp.Config.Use != "" {
 		return
 	}
-
-	pp.ServerPkg = "server"
 
 	hasStreaming := false
 	// generate service package
