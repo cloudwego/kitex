@@ -39,11 +39,15 @@ func (c thriftCodec) hyperMessageUnmarshalEnabled() bool {
 }
 
 // hyperMessageUnmarshalAvailable indicates that if high priority message codec is available.
-func hyperMessageUnmarshalAvailable(data interface{}, message remote.Message) bool {
+func hyperMessageUnmarshalAvailable(data interface{}, payloadLen int) bool {
 	return false
 }
 
-func (c thriftCodec) hyperMarshal(data interface{}, message remote.Message, out remote.ByteBuffer) error {
+func (c thriftCodec) hyperMarshal(out remote.ByteBuffer, methodName string, msgType remote.MessageType, seqID int32, data interface{}) error {
+	panic("unreachable code")
+}
+
+func (c thriftCodec) hyperMarshalBody(data interface{}) (buf []byte, err error) {
 	panic("unreachable code")
 }
 

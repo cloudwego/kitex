@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package protobuf
+package grpc
 
 import (
 	"bytes"

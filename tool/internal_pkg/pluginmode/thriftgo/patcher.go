@@ -25,8 +25,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/cloudwego/kitex/tool/internal_pkg/util"
-
 	"github.com/cloudwego/thriftgo/generator/golang"
 	"github.com/cloudwego/thriftgo/generator/golang/templates"
 	"github.com/cloudwego/thriftgo/generator/golang/templates/slim"
@@ -34,6 +32,7 @@ import (
 	"github.com/cloudwego/thriftgo/plugin"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
 var extraTemplates []string
@@ -133,7 +132,8 @@ func (p *patcher) buildTemplates() (err error) {
 			structLikeCodec,
 			structLikeProtocol,
 			javaClassName,
-			processor)
+			processor,
+		)
 	} else {
 		allTemplates = append(allTemplates, structLikeCodec,
 			structLikeFastRead,

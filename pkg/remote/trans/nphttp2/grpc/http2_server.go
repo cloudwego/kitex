@@ -702,7 +702,7 @@ func (t *http2Server) WriteHeader(s *Stream, md metadata.MD) error {
 	s.hdrMu.Lock()
 	if md.Len() > 0 {
 		if s.header.Len() > 0 {
-			s.header = metadata.Join(s.header, md)
+			s.header = metadata.AppendMD(s.header, md)
 		} else {
 			s.header = md
 		}

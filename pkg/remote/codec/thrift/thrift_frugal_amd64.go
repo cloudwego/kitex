@@ -24,6 +24,7 @@ import (
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/frugal"
 
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
@@ -32,9 +33,11 @@ import (
 )
 
 const (
-	// 0x1 0x10 used for FastWrite and FastRead, so Frugal starts from 0x100
-	FrugalWrite CodecType = 1 << (iota + 2)
-	FrugalRead
+	// 0b0001 and 0b0010 are used for FastWrite and FastRead, so Frugal starts from 0b0100
+	FrugalWrite CodecType = 0b0100
+	FrugalRead  CodecType = 0b1000
+
+	FrugalReadWrite = FrugalWrite | FrugalRead
 )
 
 // hyperMarshalEnabled indicates that if there are high priority message codec for current platform.
@@ -57,8 +60,8 @@ func (c thriftCodec) hyperMessageUnmarshalEnabled() bool {
 }
 
 // hyperMessageUnmarshalAvailable indicates that if high priority message codec is available.
-func hyperMessageUnmarshalAvailable(data interface{}, message remote.Message) bool {
-	if message.PayloadLen() == 0 {
+func hyperMessageUnmarshalAvailable(data interface{}, payloadLen int) bool {
+	if payloadLen == 0 {
 		return false
 	}
 	dt := reflect.TypeOf(data).Elem()
@@ -68,12 +71,9 @@ func hyperMessageUnmarshalAvailable(data interface{}, message remote.Message) bo
 	return true
 }
 
-func (c thriftCodec) hyperMarshal(data interface{}, message remote.Message, out remote.ByteBuffer) error {
-	// prepare message info
-	methodName := message.RPCInfo().Invocation().MethodName()
-	msgType := message.MessageType()
-	seqID := message.RPCInfo().Invocation().SeqID()
-
+func (c thriftCodec) hyperMarshal(out remote.ByteBuffer, methodName string, msgType remote.MessageType,
+	seqID int32, data interface{},
+) error {
 	// calculate and malloc message buffer
 	msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
 	msgEndLen := bthrift.Binary.MessageEndLength()
@@ -93,6 +93,13 @@ func (c thriftCodec) hyperMarshal(data interface{}, message remote.Message, out 
 	offset += writeLen
 	bthrift.Binary.WriteMessageEnd(buf[offset:])
 	return nil
+}
+
+func (c thriftCodec) hyperMarshalBody(data interface{}) (buf []byte, err error) {
+	objectLen := frugal.EncodedSize(data)
+	buf = mcache.Malloc(objectLen)
+	_, err = frugal.EncodeObject(buf, nil, data)
+	return buf, err
 }
 
 func (c thriftCodec) hyperMessageUnmarshal(buf []byte, data interface{}) error {

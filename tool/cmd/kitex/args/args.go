@@ -21,8 +21,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
@@ -96,6 +99,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.Var(&a.ThriftOptions, "thrift", "Specify arguments for the thrift go compiler.")
 	f.Var(&a.Hessian2Options, "hessian2", "Specify arguments for the hessian2 codec.")
 	f.DurationVar(&a.ThriftPluginTimeLimit, "thrift-plugin-time-limit", generator.DefaultThriftPluginTimeLimit, "Specify thrift plugin execution time limit.")
+	f.StringVar(&a.CompilerPath, "compiler-path", "", "Specify the path of thriftgo/protoc.")
 	f.Var(&a.ThriftPlugins, "thrift-plugin", "Specify thrift plugin arguments for the thrift compiler.")
 	f.Var(&a.ProtobufOptions, "protobuf", "Specify arguments for the protobuf compiler.")
 	f.Var(&a.ProtobufPlugins, "protobuf-plugin", "Specify protobuf plugin arguments for the protobuf compiler.(plugin_name:options:out_dir)")
@@ -128,6 +132,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"gen_deep_equal",
 		"compatible_names",
 		"frugal_tag",
+		"thrift_streaming",
 	)
 
 	for _, e := range a.extends {
@@ -172,11 +177,13 @@ func (a *Arguments) ParseArgs(version string) {
 
 func (a *Arguments) checkIDL(files []string) {
 	if len(files) == 0 {
-		log.Warn("No IDL file found.")
+		log.Warn("No IDL file found; Please make your IDL file the last parameter, for example: " +
+			"\"kitex -service demo idl.thrift\".")
 		os.Exit(2)
 	}
 	if len(files) != 1 {
-		log.Warn("Require exactly 1 IDL file.")
+		log.Warn("Require exactly 1 IDL file; Please make your IDL file the last parameter, for example: " +
+			"\"kitex -service demo idl.thrift\".")
 		os.Exit(2)
 	}
 	a.IDL = files[0]
@@ -298,11 +305,13 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 
 	kas := strings.Join(a.Config.Pack(), ",")
 	cmd := &exec.Cmd{
-		Path:   lookupTool(a.IDLType),
+		Path:   LookupTool(a.IDLType, a.CompilerPath),
 		Stdin:  os.Stdin,
 		Stdout: io.MultiWriter(out, os.Stdout),
 		Stderr: io.MultiWriter(out, os.Stderr),
 	}
+
+	ValidateCMD(cmd.Path, a.IDLType)
 
 	if a.IDLType == "thrift" {
 		os.Setenv(EnvPluginMode, thriftgo.PluginName)
@@ -376,15 +385,102 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 	return cmd
 }
 
-func lookupTool(idlType string) string {
+// ValidateCMD check if the path exists and if the version is satisfied
+func ValidateCMD(path, idlType string) {
+	// check if the path exists
+	if _, err := os.Stat(path); err != nil {
+		tool := "thriftgo"
+		if idlType == "protobuf" {
+			tool = "protoc"
+		}
+		log.Warnf("[ERROR] %s is also unavailable, please install %s first.\n", path, tool)
+		if idlType == "thrift" {
+			log.Warn("Refer to https://github.com/cloudwego/thriftgo, or simple run:\n")
+			log.Warn("  go install -v github.com/cloudwego/thriftgo@latest\n")
+		} else {
+			log.Warn("Refer to https://github.com/protocolbuffers/protobuf\n")
+		}
+		os.Exit(1)
+	}
+
+	// check if the version is satisfied
+	if idlType == "thrift" {
+		// run `thriftgo -versions and get the output
+		cmd := exec.Command(path, "-version")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Warnf("Failed to get thriftgo version: %s\n", err.Error())
+			os.Exit(1)
+		}
+		if !strings.HasPrefix(string(out), "thriftgo ") {
+			log.Warnf("thriftgo -version returns '%s', please reinstall thriftgo first.\n", string(out))
+			os.Exit(1)
+		}
+		version := strings.Replace(strings.TrimSuffix(string(out), "\n"), "thriftgo ", "", 1)
+		if !versionSatisfied(version, requiredThriftGoVersion) {
+			log.Warnf("[ERROR] thriftgo version(%s) not satisfied, please install version >= %s\n",
+				version, requiredThriftGoVersion)
+			os.Exit(1)
+		}
+		return
+	}
+}
+
+var versionSuffixPattern = regexp.MustCompile(`-.*$`)
+
+func removeVersionPrefixAndSuffix(version string) string {
+	version = strings.TrimPrefix(version, "v")
+	version = strings.TrimSuffix(version, "\n")
+	version = versionSuffixPattern.ReplaceAllString(version, "")
+	return version
+}
+
+func versionSatisfied(current, required string) bool {
+	currentSegments := strings.SplitN(removeVersionPrefixAndSuffix(current), ".", 3)
+	requiredSegments := strings.SplitN(removeVersionPrefixAndSuffix(required), ".", 3)
+
+	requiredHasSuffix := versionSuffixPattern.MatchString(required)
+	if requiredHasSuffix {
+		return false // required version should be a formal version
+	}
+
+	for i := 0; i < 3; i++ {
+		var currentSeg, minimalSeg int
+		var err error
+		if currentSeg, err = strconv.Atoi(currentSegments[i]); err != nil {
+			klog.Warnf("invalid current version: %s, seg=%v, err=%v", current, currentSegments[i], err)
+			return false
+		}
+		if minimalSeg, err = strconv.Atoi(requiredSegments[i]); err != nil {
+			klog.Warnf("invalid required version: %s, seg=%v, err=%v", required, requiredSegments[i], err)
+			return false
+		}
+		if currentSeg > minimalSeg {
+			return true
+		} else if currentSeg < minimalSeg {
+			return false
+		}
+	}
+	if currentHasSuffix := versionSuffixPattern.MatchString(current); currentHasSuffix {
+		return false
+	}
+	return true
+}
+
+// LookupTool returns the compiler path found in $PATH; if not found, returns $GOPATH/bin/$tool
+func LookupTool(idlType, compilerPath string) string {
 	tool := "thriftgo"
 	if idlType == "protobuf" {
 		tool = "protoc"
 	}
+	if compilerPath != "" {
+		log.Infof("Will use the specified %s: %s\n", tool, compilerPath)
+		return compilerPath
+	}
 
 	path, err := exec.LookPath(tool)
 	if err != nil {
-		log.Warnf("Failed to find %q from $PATH: %s. Try $GOPATH/bin/%s instead\n", path, err.Error(), tool)
+		log.Warnf("Failed to find %q from $PATH: %s.\nTry $GOPATH/bin/%s instead\n", path, err.Error(), tool)
 		path = util.JoinPath(util.GetGOPATH(), "bin", tool)
 	}
 	return path

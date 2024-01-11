@@ -25,6 +25,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -259,6 +260,49 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	return t, nil
 }
 
+type preAllocatedStreamFields struct {
+	recvBuffer *recvBuffer
+	writeQuota *writeQuota
+}
+
+var (
+	preallocateChan = make(chan preAllocatedStreamFields, 256)
+	preallocateInit sync.Once
+)
+
+func fillStreamFields(s *Stream) {
+	preallocateInit.Do(func() {
+		go preallocateForStream()
+	})
+	var fields preAllocatedStreamFields
+	select {
+	case fields = <-preallocateChan:
+	default: // won't block even the producer is not fast enough
+		fields = allocateStreamFields()
+	}
+	s.buf = fields.recvBuffer
+	s.wq = fields.writeQuota
+	s.wq.done = s.done
+}
+
+func preallocateForStream() {
+	defer func() {
+		if err := recover(); err != nil {
+			klog.Warnf("grpc.preallocateForStream panic, error=%v, stack=%s", err, debug.Stack())
+		}
+	}()
+	for {
+		preallocateChan <- allocateStreamFields()
+	}
+}
+
+func allocateStreamFields() preAllocatedStreamFields {
+	return preAllocatedStreamFields{
+		recvBuffer: newRecvBuffer(),
+		writeQuota: newWriteQuota(defaultWriteQuota, nil),
+	}
+}
+
 func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 	s := &Stream{
 		ctx:            ctx,
@@ -266,11 +310,10 @@ func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 		done:           make(chan struct{}),
 		method:         callHdr.Method,
 		sendCompress:   callHdr.SendCompress,
-		buf:            newRecvBuffer(),
 		headerChan:     make(chan struct{}),
 		contentSubtype: callHdr.ContentSubtype,
 	}
-	s.wq = newWriteQuota(defaultWriteQuota, s.done)
+	fillStreamFields(s)
 	s.requestRead = func(n int) {
 		t.adjustWindow(s, uint32(n))
 	}

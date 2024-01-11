@@ -80,6 +80,9 @@ func (i *ServiceInfo) GetPackageName() (pkg string) {
 
 // MethodInfo gets MethodInfo.
 func (i *ServiceInfo) MethodInfo(name string) MethodInfo {
+	if i == nil {
+		return nil
+	}
 	if i.ServiceName == GenericService {
 		if i.GenericMethod != nil {
 			return i.GenericMethod(name)
@@ -89,25 +92,54 @@ func (i *ServiceInfo) MethodInfo(name string) MethodInfo {
 	return i.Methods[name]
 }
 
+type StreamingMode int
+
+const (
+	StreamingNone          StreamingMode = 0b0000 // KitexPB/KitexThrift
+	StreamingUnary         StreamingMode = 0b0001 // underlying protocol for streaming, like HTTP2
+	StreamingClient        StreamingMode = 0b0010
+	StreamingServer        StreamingMode = 0b0100
+	StreamingBidirectional StreamingMode = 0b0110
+)
+
 // MethodInfo to record meta info of unary method
 type MethodInfo interface {
 	Handler() MethodHandler
 	NewArgs() interface{}
 	NewResult() interface{}
 	OneWay() bool
+	IsStreaming() bool
+	StreamingMode() StreamingMode
 }
 
 // MethodHandler is corresponding to the handler wrapper func that in generated code
 type MethodHandler func(ctx context.Context, handler, args, result interface{}) error
 
+// MethodInfoOption modifies the given MethodInfo
+type MethodInfoOption func(*methodInfo)
+
+// WithStreamingMode sets the streaming mode and update the streaming flag accordingly
+func WithStreamingMode(mode StreamingMode) MethodInfoOption {
+	return func(m *methodInfo) {
+		m.streamingMode = mode
+		m.isStreaming = mode != StreamingNone
+	}
+}
+
 // NewMethodInfo is called in generated code to build method info
-func NewMethodInfo(methodHandler MethodHandler, newArgsFunc, newResultFunc func() interface{}, oneWay bool) MethodInfo {
-	return methodInfo{
+func NewMethodInfo(methodHandler MethodHandler, newArgsFunc, newResultFunc func() interface{}, oneWay bool, opts ...MethodInfoOption) MethodInfo {
+	mi := methodInfo{
 		handler:       methodHandler,
 		newArgsFunc:   newArgsFunc,
 		newResultFunc: newResultFunc,
 		oneWay:        oneWay,
+		isStreaming:   false,
+		streamingMode: StreamingNone,
 	}
+	for _, opt := range opts {
+		opt(&mi)
+	}
+	return &mi
 }
 
 type methodInfo struct {
@@ -115,6 +147,8 @@ type methodInfo struct {
 	newArgsFunc   func() interface{}
 	newResultFunc func() interface{}
 	oneWay        bool
+	isStreaming   bool
+	streamingMode StreamingMode
 }
 
 // Handler implements the MethodInfo interface.
@@ -137,13 +171,23 @@ func (m methodInfo) OneWay() bool {
 	return m.oneWay
 }
 
-// String prints human readable information.
+func (m methodInfo) IsStreaming() bool {
+	return m.isStreaming
+}
+
+func (m methodInfo) StreamingMode() StreamingMode {
+	return m.streamingMode
+}
+
+// String prints human-readable information.
 func (p PayloadCodec) String() string {
 	switch p {
 	case Thrift:
 		return "Thrift"
 	case Protobuf:
 		return "Protobuf"
+	case Hessian2:
+		return "Hessian2"
 	}
 	panic("unknown payload type")
 }

@@ -32,6 +32,8 @@ import (
 	{{- end}}
 )
 
+var errInvalidMessageType = errors.New("invalid message type for service method handler")
+
 {{- if gt (len .CombineServices) 0}}
 type {{call .ServiceTypeName}} interface {
 {{- range .CombineServices}}
@@ -40,20 +42,76 @@ type {{call .ServiceTypeName}} interface {
 }
 {{- end}}
 
+var serviceMethods = map[string]kitex.MethodInfo{
+	{{- range .AllMethods}}
+		"{{.RawName}}": kitex.NewMethodInfo(
+			{{LowerFirst .Name}}Handler,
+			new{{.ArgStructName}},
+			{{if .Oneway}}nil{{else}}new{{.ResStructName}}{{end}},
+			{{if .Oneway}}true{{else}}false{{end}},
+			kitex.WithStreamingMode(
+				{{- if and .ServerStreaming .ClientStreaming -}} kitex.StreamingBidirectional
+				{{- else if .ServerStreaming -}} kitex.StreamingServer
+				{{- else if .ClientStreaming -}} kitex.StreamingClient
+				{{- else -}}
+					 {{- if or (eq $.Codec "protobuf") (eq .Streaming.Mode "unary") -}} kitex.StreamingUnary
+					 {{- else -}} kitex.StreamingNone
+					 {{- end -}}
+				{{- end}}),
+		),
+	{{- end}}
+}
+
+var (
+	{{LowerFirst .ServiceName}}ServiceInfo = NewServiceInfo()
+	{{LowerFirst .ServiceName}}ServiceInfoForClient = NewServiceInfoForClient()
+	{{LowerFirst .ServiceName}}ServiceInfoForStreamClient = NewServiceInfoForStreamClient()
+)
+
+// for server
 func serviceInfo() *kitex.ServiceInfo {
 	return {{LowerFirst .ServiceName}}ServiceInfo
- }
+}
 
-var {{LowerFirst .ServiceName}}ServiceInfo = NewServiceInfo()
+// for client
+func serviceInfoForStreamClient() *kitex.ServiceInfo {
+	return {{LowerFirst .ServiceName}}ServiceInfoForStreamClient
+}
 
+// for stream client
+func serviceInfoForClient() *kitex.ServiceInfo {
+	return {{LowerFirst .ServiceName}}ServiceInfoForClient
+}
+
+// NewServiceInfo creates a new ServiceInfo containing all methods
+{{- /* It's for the Server (providing both streaming/non-streaming APIs), or for the grpc client */}}
 func NewServiceInfo() *kitex.ServiceInfo {
+	return newServiceInfo({{- if .HasStreaming}}true{{else}}false{{end}}, true, true)
+}
+
+// NewServiceInfo creates a new ServiceInfo containing non-streaming methods
+{{- /* It's for the KitexThrift Client with only non-streaming APIs */}}
+func NewServiceInfoForClient() *kitex.ServiceInfo {
+	return newServiceInfo(false, false, true)
+}
+
+{{- /* It's for the StreamClient with only streaming APIs */}}
+func NewServiceInfoForStreamClient() *kitex.ServiceInfo {
+	return newServiceInfo(true, true, false)
+}
+
+func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreamingMethods bool) *kitex.ServiceInfo {
 	serviceName := "{{.RawServiceName}}"
 	handlerType := (*{{call .ServiceTypeName}})(nil)
-	methods := map[string]kitex.MethodInfo{
-	{{- range .AllMethods}}
-		"{{.RawName}}":
-			kitex.NewMethodInfo({{LowerFirst .Name}}Handler, new{{.ArgStructName}}, {{if .Oneway}}nil{{else}}new{{.ResStructName}}{{end}}, {{if .Oneway}}true{{else}}false{{end}}),
-	{{- end}}
+	methods := map[string]kitex.MethodInfo{}
+	for name, m := range serviceMethods {
+		if m.IsStreaming() && !keepStreamingMethods {
+			continue
+		}
+		if !m.IsStreaming() && !keepNonStreamingMethods {
+			continue
+		}
+		methods[name] = m
 	}
 	extra := map[string]interface{}{
 		"PackageName":	 "{{.PkgInfo.PkgName}}",
@@ -67,9 +125,9 @@ func NewServiceInfo() *kitex.ServiceInfo {
 		{{- range  .CombineServices}}"{{.ServiceName}}",{{- end}}
 	}
 	{{- end}}
-	{{- if .HasStreaming}}
-	extra["streaming"] = true
-	{{- end}}
+	if hasStreaming {
+		extra["streaming"] = hasStreaming
+	}
 	svcInfo := &kitex.ServiceInfo{
 		ServiceName: 	 serviceName,
 		HandlerType: 	 handlerType,
@@ -90,8 +148,8 @@ func NewServiceInfo() *kitex.ServiceInfo {
 {{- $serverSide := and (not .ClientStreaming) .ServerStreaming}}
 {{- $bidiSide := and .ClientStreaming .ServerStreaming}}
 {{- $arg := "" }}
-{{- if eq $.Codec "protobuf" }}
-{{- $arg = index .Args 0}}
+{{- if or (eq $.Codec "protobuf") ($isStreaming) }}
+{{- $arg = index .Args 0}}{{/* streaming api only supports exactly one argument */}}
 {{- end}}
 
 func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, result interface{}) error {
@@ -108,9 +166,7 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 		if err != nil {
 			return err
 		}
-		if err := st.SendMsg(resp); err != nil {
-			return err
-		}
+		return st.SendMsg(resp)
 	case *{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}}:
 		success, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, s.{{.Name}}{{end}})
 		if err != nil {
@@ -118,8 +174,10 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 		}
 		realResult := result.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ResStructName}})
 		realResult.Success = {{if .IsResponseNeedRedirect}}&{{end}}success
+		return nil
+	default:
+		return errInvalidMessageType
 	}
-	return nil
 	{{- else}}{{/* streaming logic */}}
 		st := arg.(*streaming.Args).Stream
 		stream := &{{LowerFirst .ServiceName}}{{.RawName}}Server{st}
@@ -132,7 +190,13 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 		return handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}({{if $serverSide}}req, {{end}}stream)
 	{{- end}} {{/* $unary end */}}
 	{{- else}} {{/* thrift logic */}}
-	{{if .Args}}realArg := arg.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}}){{end}}
+	{{- if $unary}} {{/* unary logic */}}
+	{{- if eq .Streaming.Mode "unary"}}
+	if streaming.GetStream(ctx) == nil {
+		return errors.New("{{.ServiceName}}.{{.Name}} is a thrift streaming unary method, please call with Kitex StreamClient or remove the annotation streaming.mode")
+	}
+	{{- end}}
+	{{if gt .ArgsLength 0}}realArg := {{else}}_ = {{end}}arg.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ArgStructName}})
 	{{if or (not .Void) .Exceptions}}realResult := result.(*{{if not .GenArgResultStruct}}{{.PkgRefName}}.{{end}}{{.ResStructName}}){{end}}
 	{{if .Void}}err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, realArg.{{.Name}}{{end}})
 	{{else}}success, err := handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(ctx{{range .Args}}, realArg.{{.Name}}{{end}})
@@ -147,10 +211,10 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 		switch v := err.(type) {
 		{{range .Exceptions -}}
 		case {{.Type}}:
-			realResult.{{.Name}} = v
+			 realResult.{{.Name}} = v
 		{{end -}}
 		default:
-			return err
+			 return err
 		}
 	} else {
 	{{else -}}
@@ -160,6 +224,23 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 	{{if not .Void}}realResult.Success = {{if .IsResponseNeedRedirect}}&{{end}}success{{end}}
 	{{- if .Exceptions}}}{{end}}
 	return nil
+	{{- else}} {{/* $isStreaming */}}
+	st, ok := arg.(*streaming.Args)
+	if !ok {
+		return errors.New("{{.ServiceName}}.{{.Name}} is a thrift streaming method, please call with Kitex StreamClient")
+	}
+	stream := &{{LowerFirst .ServiceName}}{{.Name}}Server{st.Stream}
+		{{- if not $serverSide}}
+	return handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(stream)
+		{{- else}} {{/* !$serverSide */}}
+		{{- $RequestType := $arg.Type}}
+	req := new({{NotPtr $RequestType}})
+	if err := st.Stream.RecvMsg(req); err != nil {
+		return err
+	}
+	return handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(req, stream)
+		{{- end}} {{/* $serverSide end*/}}
+	{{- end}} {{/* thrift end */}}
 	{{- end}} {{/* protobuf end */}}
 }
 
@@ -378,7 +459,8 @@ func (p *kClient) {{.Name}}(ctx context.Context{{if not .ClientStreaming}}{{rang
 	}
 	stream := &{{LowerFirst .ServiceName}}{{.RawName}}Client{res.Stream}
 	{{if not .ClientStreaming -}}
-	if err := stream.Stream.SendMsg(req); err != nil {
+	{{$arg := index .Args 0}}
+	if err := stream.Stream.SendMsg({{LowerFirst $arg.Name}}); err != nil {
 		return nil, err
 	}
 	if err := stream.Stream.Close(); err != nil {
