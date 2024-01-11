@@ -22,7 +22,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/bytedance/mockey"
+	"github.com/golang/mock/gomock"
+
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -162,9 +166,14 @@ func TestDefaultCodec_Encode_Decode(t *testing.T) {
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
 
-	// encode
-	out := remote.NewWriterBuffer(256)
+	// test encode err
+	out := remote.NewReaderBuffer([]byte{})
 	err := dc.Encode(ctx, sendMsg, out)
+	test.Assert(t, err != nil)
+
+	// encode
+	out = remote.NewWriterBuffer(256)
+	err = dc.Encode(ctx, sendMsg, out)
 	test.Assert(t, err == nil, err)
 
 	// decode
@@ -284,4 +293,27 @@ func (m mockPayloadCodec) Unmarshal(ctx context.Context, message remote.Message,
 
 func (m mockPayloadCodec) Name() string {
 	return "mock"
+}
+
+func TestCornerCase(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	sendMsg := initClientSendMsg(transport.TTHeader)
+	sendMsg.SetProtocolInfo(remote.NewProtocolInfo(transport.Framed, serviceinfo.Thrift))
+
+	buffer := mocksremote.NewMockByteBuffer(ctrl)
+	buffer.EXPECT().MallocLen().Return(1024).AnyTimes()
+	buffer.EXPECT().Malloc(gomock.Any()).Return(nil, errors.New("error malloc")).AnyTimes()
+	err := (&defaultCodec{}).EncodePayload(context.Background(), sendMsg, buffer)
+	test.Assert(t, err.Error() == "error malloc")
+
+	mockey.PatchConvey("", t, func() {
+		mockey.Mock(remote.GetPayloadCodec).Return(nil, errors.New("err get payload codec")).Build()
+		buffer = mocksremote.NewMockByteBuffer(ctrl)
+		buffer.EXPECT().MallocLen().Return(1024).AnyTimes()
+		buffer.EXPECT().Malloc(gomock.Any()).Return(nil, nil).AnyTimes()
+		err := (&defaultCodec{}).EncodePayload(context.Background(), sendMsg, buffer)
+		test.Assert(t, err.Error() == "err get payload codec")
+	})
 }
