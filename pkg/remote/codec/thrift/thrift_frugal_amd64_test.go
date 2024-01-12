@@ -119,13 +119,23 @@ func TestFrugalCodec(t *testing.T) {
 	})
 	t.Run("fallback to frugal and data has tag", func(t *testing.T) {
 		ctx := context.Background()
-		codec := &thriftCodec{}
+		codec := NewThriftCodec()
 
 		testFrugalDataConversion(t, ctx, codec)
 	})
+	t.Run("configure BasicCodec to disable frugal fallback", func(t *testing.T) {
+		ctx := context.Background()
+		codec := NewThriftCodecWithConfig(Basic)
+
+		// MockNoTagArgs cannot be marshaled
+		sendMsg := initNoTagSendMsg(transport.TTHeader)
+		out := remote.NewWriterBuffer(256)
+		err := codec.Marshal(ctx, sendMsg, out)
+		test.Assert(t, err != nil)
+	})
 }
 
-func testFrugalDataConversion(t *testing.T, ctx context.Context, codec *thriftCodec) {
+func testFrugalDataConversion(t *testing.T, ctx context.Context, codec remote.PayloadCodec) {
 	// encode client side
 	sendMsg := initFrugalTagSendMsg(transport.TTHeader)
 	out := remote.NewWriterBuffer(256)
