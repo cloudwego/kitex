@@ -210,7 +210,7 @@ func Test_verifyMarshalThriftDataFrugal(t *testing.T) {
 
 func Test_verifyUnmarshalThriftDataFrugal(t *testing.T) {
 	err := verifyUnmarshalBasicThriftDataType(&MockFrugalTagArgs{})
-	test.Assert(t, err == errEncodeMismatchMsgType, err)
+	test.Assert(t, err == errDecodeMismatchMsgType, err)
 	err = verifyUnmarshalBasicThriftDataType(&MockNoTagArgs{})
-	test.Assert(t, err == errEncodeMismatchMsgType, err)
+	test.Assert(t, err == errDecodeMismatchMsgType, err)
 }
