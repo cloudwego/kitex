@@ -59,9 +59,13 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 		}
 	}
 
-	if hyperMarshalFallback(data) {
-		// fallback to frugal
-		return c.hyperMarshalBody(data)
+	if err := verifyMarshalBasicThriftDataType(data); err != nil {
+		// Basic can be used for disabling frugal, we need to check it
+		if c.CodecType&Basic == 0 && hyperMarshalAvailable(data) {
+			// fallback to frugal when the generated code is using slim template
+			return c.hyperMarshalBody(data)
+		}
+		return nil, err
 	}
 
 	// fallback to old thrift way (slow)
@@ -71,6 +75,17 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 		return nil, err
 	}
 	return transport.Bytes(), nil
+}
+
+// verifyMarshalBasicThriftDataType verifies whether data could be marshaled by old thrift way
+func verifyMarshalBasicThriftDataType(data interface{}) error {
+	switch data.(type) {
+	case MessageWriter:
+	case MessageWriterWithContext:
+	default:
+		return errEncodeMismatchMsgType
+	}
+	return nil
 }
 
 // marshalBasicThriftData only encodes the data (without the prepending method, msgType, seqId)
@@ -86,7 +101,7 @@ func marshalBasicThriftData(ctx context.Context, tProt thrift.TProtocol, data in
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 		}
 	default:
-		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "encode failed, codec msg type not match with thriftCodec")
+		return errEncodeMismatchMsgType
 	}
 	return nil
 }
@@ -142,8 +157,13 @@ func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProto
 		}
 	}
 
-	if hyperUnmarshalFallback(data, dataLen) {
-		return c.hyperUnmarshal(tProt, data, dataLen)
+	if err := verifyUnmarshalBasicThriftDataType(data); err != nil {
+		// Basic can be used for disabling frugal, we need to check it
+		if c.CodecType&Basic == 0 && hyperMessageUnmarshalAvailable(data, dataLen) {
+			// fallback to frugal when the generated code is using slim template
+			return c.hyperUnmarshal(tProt, data, dataLen)
+		}
+		return err
 	}
 
 	// fallback to old thrift way (slow)
@@ -156,6 +176,17 @@ func (c thriftCodec) hyperUnmarshal(tProt *BinaryProtocol, data interface{}, dat
 		return remote.NewTransError(remote.ProtocolError, err)
 	}
 	return c.hyperMessageUnmarshal(buf, data)
+}
+
+// verifyUnmarshalBasicThriftDataType verifies whether data could be unmarshal by old thrift way
+func verifyUnmarshalBasicThriftDataType(data interface{}) error {
+	switch data.(type) {
+	case MessageReader:
+	case MessageReaderWithMethodWithContext:
+	default:
+		return errDecodeMismatchMsgType
+	}
+	return nil
 }
 
 // decodeBasicThriftData decode thrift body the old way (slow)
@@ -172,8 +203,7 @@ func decodeBasicThriftData(ctx context.Context, tProt thrift.TProtocol, method s
 			return remote.NewTransError(remote.ProtocolError, err)
 		}
 	default:
-		return remote.NewTransErrorWithMsg(remote.InvalidProtocol,
-			"decode failed, codec msg type not match with thriftCodec")
+		return errDecodeMismatchMsgType
 	}
 	return nil
 }
