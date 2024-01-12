@@ -108,6 +108,11 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 		}
 	}
 
+	if hyperMarshalFallback(data) {
+		// fallback to frugal
+		return c.hyperMarshal(out, methodName, msgType, seqID, data)
+	}
+
 	// fallback to old thrift way (slow)
 	return encodeBasicThrift(out, ctx, methodName, msgType, seqID, data)
 }
@@ -125,6 +130,21 @@ func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.M
 	offset += msg.FastWriteNocopy(buf[offset:], nil)
 	bthrift.Binary.WriteMessageEnd(buf[offset:])
 	return nil
+}
+
+// hyperMarshalFallback indicates whether fallback to frugal is needed.
+// when the generated code is using slim template, it would return true.
+func hyperMarshalFallback(data interface{}) bool {
+	switch data.(type) {
+	case MessageWriter:
+	case MessageWriterWithContext:
+	default:
+		if hyperMarshalAvailable(data) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // encodeBasicThrift encode with the old thrift way (slow)
@@ -181,6 +201,21 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	}
 	tProt.Recycle()
 	return err
+}
+
+// hyperUnmarshalFallback indicates whether fallback to frugal is needed.
+// when the generated code is using slim template, it would return true.
+func hyperUnmarshalFallback(data interface{}, dataLen int) bool {
+	switch data.(type) {
+	case MessageReader:
+	case MessageReaderWithMethodWithContext:
+	default:
+		if hyperMessageUnmarshalAvailable(data, dataLen) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // validateMessageBeforeDecode validate message before decode

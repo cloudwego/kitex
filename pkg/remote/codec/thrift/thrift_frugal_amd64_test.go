@@ -101,20 +101,35 @@ func TestHyperCodecCheck(t *testing.T) {
 }
 
 func TestFrugalCodec(t *testing.T) {
-	ctx := context.Background()
-	frugalCodec := &thriftCodec{FrugalRead | FrugalWrite}
+	t.Run("configure frugal but data has not tag", func(t *testing.T) {
+		ctx := context.Background()
+		codec := &thriftCodec{FrugalRead | FrugalWrite}
 
+		// MockNoTagArgs cannot be marshaled
+		sendMsg := initNoTagSendMsg(transport.TTHeader)
+		out := remote.NewWriterBuffer(256)
+		err := codec.Marshal(ctx, sendMsg, out)
+		test.Assert(t, err != nil)
+	})
+	t.Run("configure frugal and data has tag", func(t *testing.T) {
+		ctx := context.Background()
+		codec := &thriftCodec{FrugalRead | FrugalWrite}
+
+		testFrugalDataConversion(t, ctx, codec)
+	})
+	t.Run("fallback to frugal and data has tag", func(t *testing.T) {
+		ctx := context.Background()
+		codec := &thriftCodec{}
+
+		testFrugalDataConversion(t, ctx, codec)
+	})
+}
+
+func testFrugalDataConversion(t *testing.T, ctx context.Context, codec *thriftCodec) {
 	// encode client side
-	// MockNoTagArgs cannot be marshaled
-	sendMsg := initNoTagSendMsg(transport.TTHeader)
+	sendMsg := initFrugalTagSendMsg(transport.TTHeader)
 	out := remote.NewWriterBuffer(256)
-	err := frugalCodec.Marshal(ctx, sendMsg, out)
-	test.Assert(t, err != nil)
-
-	// MockFrugalTagArgs can be marshaled by frugal
-	sendMsg = initFrugalTagSendMsg(transport.TTHeader)
-	out = remote.NewWriterBuffer(256)
-	err = frugalCodec.Marshal(ctx, sendMsg, out)
+	err := codec.Marshal(ctx, sendMsg, out)
 	test.Assert(t, err == nil, err)
 
 	// decode server side
@@ -123,7 +138,7 @@ func TestFrugalCodec(t *testing.T) {
 	recvMsg.SetPayloadLen(len(buf))
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
-	err = frugalCodec.Unmarshal(ctx, recvMsg, in)
+	err = codec.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)
 
 	// compare Args
@@ -157,4 +172,17 @@ func TestUnmarshalThriftDataFrugal(t *testing.T) {
 		StrList: req.StrList,
 		StrMap:  req.StrMap,
 	})
+}
+
+func TestHyperCodecFallbackCheck(t *testing.T) {
+	// test hyperMarshalFallback
+	test.Assert(t, hyperMarshalFallback(&MockNoTagArgs{}) == false)
+	test.Assert(t, hyperMarshalFallback(&mockWithContext{}) == false)
+	test.Assert(t, hyperMarshalFallback(&MockFrugalTagArgs{}) == true)
+
+	// test hyperUnmarshalFallback
+	test.Assert(t, hyperUnmarshalFallback(&MockNoTagArgs{}, 1) == false)
+	test.Assert(t, hyperUnmarshalFallback(&MockNoTagArgs{}, 0) == false)
+	test.Assert(t, hyperUnmarshalFallback(&mockWithContext{}, 1) == false)
+	test.Assert(t, hyperUnmarshalFallback(&MockFrugalTagArgs{}, 1) == true)
 }

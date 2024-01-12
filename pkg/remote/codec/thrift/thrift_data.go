@@ -59,6 +59,11 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 		}
 	}
 
+	if hyperMarshalFallback(data) {
+		// fallback to frugal
+		return c.hyperMarshalBody(data)
+	}
+
 	// fallback to old thrift way (slow)
 	transport := thrift.NewTMemoryBufferLen(marshalThriftBufferSize)
 	tProt := thrift.NewTBinaryProtocol(transport, true, true)
@@ -122,11 +127,7 @@ func UnmarshalThriftData(ctx context.Context, codec remote.PayloadCodec, method 
 func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProtocol, method string, data interface{}, dataLen int) error {
 	// decode with hyper unmarshal
 	if c.hyperMessageUnmarshalEnabled() && hyperMessageUnmarshalAvailable(data, dataLen) {
-		buf, err := tProt.next(dataLen - bthrift.Binary.MessageEndLength())
-		if err != nil {
-			return remote.NewTransError(remote.ProtocolError, err)
-		}
-		return c.hyperMessageUnmarshal(buf, data)
+		return c.hyperUnmarshal(tProt, data, dataLen)
 	}
 
 	// decode with FastRead
@@ -141,8 +142,20 @@ func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProto
 		}
 	}
 
+	if hyperUnmarshalFallback(data, dataLen) {
+		return c.hyperUnmarshal(tProt, data, dataLen)
+	}
+
 	// fallback to old thrift way (slow)
 	return decodeBasicThriftData(ctx, tProt, method, data)
+}
+
+func (c thriftCodec) hyperUnmarshal(tProt *BinaryProtocol, data interface{}, dataLen int) error {
+	buf, err := tProt.next(dataLen - bthrift.Binary.MessageEndLength())
+	if err != nil {
+		return remote.NewTransError(remote.ProtocolError, err)
+	}
+	return c.hyperMessageUnmarshal(buf, data)
 }
 
 // decodeBasicThriftData decode thrift body the old way (slow)
