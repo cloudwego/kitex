@@ -215,7 +215,13 @@ func (m *message) NewData(method string) (ok bool) {
 	if m.data != nil {
 		return false
 	}
-	if mt := m.methodSvcMap[method].MethodInfo(method); mt != nil {
+	var svcInfo *serviceinfo.ServiceInfo
+	if method == serviceinfo.GenericMethod || m.targetSvcInfo == nil {
+		svcInfo = m.methodSvcMap[method]
+	} else {
+		svcInfo = m.targetSvcInfo
+	}
+	if mt := svcInfo.MethodInfo(method); mt != nil {
 		m.data = mt.NewArgs()
 	}
 	if m.data == nil {
