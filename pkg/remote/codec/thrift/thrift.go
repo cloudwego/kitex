@@ -118,7 +118,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	// fallback to old thrift way (slow)
 	if err := encodeBasicThrift(out, ctx, methodName, msgType, seqID, data); err != nil {
 		// Basic can be used for disabling frugal, we need to check it
-		if err == errEncodeMismatchMsgType && c.CodecType == Basic && hyperMarshalAvailable(data) {
+		if err == errEncodeMismatchMsgType && c.CodecType != Basic && hyperMarshalAvailable(data) {
 			// fallback to frugal when the generated code is using slim template
 			return c.hyperMarshal(out, methodName, msgType, seqID, data)
 		}

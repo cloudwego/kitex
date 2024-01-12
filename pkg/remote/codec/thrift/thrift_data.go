@@ -61,7 +61,7 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 
 	if err := verifyMarshalBasicThriftDataType(data); err != nil {
 		// Basic can be used for disabling frugal, we need to check it
-		if c.CodecType == Basic && hyperMarshalAvailable(data) {
+		if c.CodecType != Basic && hyperMarshalAvailable(data) {
 			// fallback to frugal when the generated code is using slim template
 			return c.hyperMarshalBody(data)
 		}
@@ -159,7 +159,7 @@ func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProto
 
 	if err := verifyUnmarshalBasicThriftDataType(data); err != nil {
 		// Basic can be used for disabling frugal, we need to check it
-		if c.CodecType == Basic && hyperMessageUnmarshalAvailable(data, dataLen) {
+		if c.CodecType != Basic && hyperMessageUnmarshalAvailable(data, dataLen) {
 			// fallback to frugal when the generated code is using slim template
 			return c.hyperUnmarshal(tProt, data, dataLen)
 		}
