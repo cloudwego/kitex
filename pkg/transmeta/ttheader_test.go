@@ -20,6 +20,7 @@ import (
 	"context"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
@@ -48,9 +49,14 @@ func TestIsTTHeader(t *testing.T) {
 func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	ctx := context.Background()
 
+	cfg := rpcinfo.NewRPCConfig()
+	cfgMutable := rpcinfo.AsMutableRPCConfig(cfg)
+	cfgMutable.SetRPCTimeout(time.Millisecond * 100)
+	cfgMutable.LockConfig(rpcinfo.BitRPCTimeout)
+
 	fromInfo := rpcinfo.NewEndpointInfo("fromServiceName", "fromMethod", nil, nil)
 	toInfo := rpcinfo.NewEndpointInfo("toServiceName", "toMethod", nil, nil)
-	ri := rpcinfo.NewRPCInfo(fromInfo, toInfo, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(fromInfo, toInfo, rpcinfo.NewInvocation("", ""), cfg, rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
 
 	// pure paylod, no effect
@@ -72,16 +78,19 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	test.Assert(t, kvs[transmeta.ToMethod] == toInfo.Method())
 	test.Assert(t, kvs[transmeta.MsgType] == strconv.Itoa(int(remote.Call)))
 	test.Assert(t, kvs[transmeta.TransportType] == unframedTransportType)
+	test.Assert(t, kvs[transmeta.RPCTimeout] == "100")
 }
 
 func TestTTHeaderServerReadMetainfo(t *testing.T) {
 	ctx := context.Background()
-	ri := rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(), nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(rpcinfo.EmptyEndpointInfo(), nil, rpcinfo.NewInvocation("", ""),
+		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
 
 	hd := map[uint16]string{
 		transmeta.FromService: "fromService",
 		transmeta.FromMethod:  "fromMethod",
+		transmeta.RPCTimeout:  "100",
 	}
 	msg.TransInfo().PutTransIntInfo(hd)
 
@@ -97,11 +106,13 @@ func TestTTHeaderServerReadMetainfo(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, msg.RPCInfo().From().ServiceName() == hd[transmeta.FromService])
 	test.Assert(t, msg.RPCInfo().From().Method() == hd[transmeta.FromMethod])
+	test.Assert(t, ri.Config().RPCTimeout() == 100*time.Millisecond)
 }
 
 func TestTTHeaderServerWriteMetainfo(t *testing.T) {
 	ctx := context.Background()
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, rpcinfo.NewRPCStats())
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""),
+		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
 
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Thrift))

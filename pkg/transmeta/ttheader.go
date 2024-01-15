@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -67,6 +68,11 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 		hd[transmeta.TransportType] = framedTransportType
 	} else {
 		hd[transmeta.TransportType] = unframedTransportType
+	}
+
+	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	if cfg.IsRPCTimeoutLocked() {
+		hd[transmeta.RPCTimeout] = strconv.Itoa(int(ri.Config().RPCTimeout().Milliseconds()))
 	}
 
 	transInfo.PutTransIntInfo(hd)
@@ -117,6 +123,13 @@ func (sh *serverTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 		}
 		if v := intInfo[transmeta.FromMethod]; v != "" {
 			ci.SetMethod(v)
+		}
+	}
+
+	if cfg := rpcinfo.AsMutableRPCConfig(ri.Config()); cfg != nil {
+		timeout := intInfo[transmeta.RPCTimeout]
+		if timeoutMS, err := strconv.Atoi(timeout); err == nil {
+			cfg.SetRPCTimeout(time.Duration(timeoutMS) * time.Millisecond)
 		}
 	}
 	return ctx, nil
