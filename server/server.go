@@ -353,7 +353,7 @@ func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
 	remoteOpt.SvcMap = s.svcs.getSvcInfoMap()
 	remoteOpt.MethodSvcMap = s.svcs.getMethodNameSvcInfoMap()
-	remoteOpt.WithOnlyAcceptingHTTP2Traffic = s.opt.WithOnlyAcceptingHTTP2Traffic
+	remoteOpt.OnlyAcceptingHTTP2Traffic = s.opt.OnlyAcceptingHTTP2Traffic
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
@@ -441,7 +441,7 @@ func (s *server) check() error {
 	if len(s.svcs.svcMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
-	if err := checkFallbackServiceForConflictingMethods(s.svcs.conflictingMethodHasFallbackSvcMap, s.opt.WithOnlyAcceptingHTTP2Traffic); err != nil {
+	if err := checkFallbackServiceForConflictingMethods(s.svcs.conflictingMethodHasFallbackSvcMap, s.opt.OnlyAcceptingHTTP2Traffic); err != nil {
 		return err
 	}
 	return nil

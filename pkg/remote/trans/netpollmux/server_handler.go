@@ -62,7 +62,7 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 }
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
-	if opt.WithOnlyAcceptingHTTP2Traffic {
+	if opt.OnlyAcceptingHTTP2Traffic {
 		return nil, remote.NewTransErrorWithMsg(remote.InvalidProtocol, "only http2 traffic is accepted")
 	}
 	svrHdlr := &svrTransHandler{
@@ -412,6 +412,9 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool,
 ) (shouldCloseConn bool) {
 	svcInfo := recvMsg.ServiceInfo()
+	if svcInfo == nil {
+		return
+	}
 	if methodInfo, _ := trans.GetMethodInfo(ri, svcInfo); methodInfo != nil {
 		if methodInfo.OneWay() {
 			return

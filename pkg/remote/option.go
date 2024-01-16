@@ -113,7 +113,7 @@ type ServerOption struct {
 
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
 
-	WithOnlyAcceptingHTTP2Traffic bool
+	OnlyAcceptingHTTP2Traffic bool
 
 	Option
 

@@ -98,7 +98,7 @@ type Options struct {
 
 	Streaming stream.StreamingConfig
 
-	WithOnlyAcceptingHTTP2Traffic bool
+	OnlyAcceptingHTTP2Traffic bool
 }
 
 type Limit struct {
