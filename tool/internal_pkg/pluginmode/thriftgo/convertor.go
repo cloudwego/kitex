@@ -359,8 +359,10 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				svcs    []*generator.ServiceInfo
 				methods []*generator.MethodInfo
 			)
+			hasStreaming := false
 			for _, s := range all[ast.Filename] {
 				svcs = append(svcs, s)
+				hasStreaming = hasStreaming || s.HasStreaming
 				methods = append(methods, s.AllMethods()...)
 			}
 			// check method name conflict
@@ -379,6 +381,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				CombineServices: svcs,
 				Methods:         methods,
 				ServiceFilePath: ast.Filename,
+				HasStreaming:    hasStreaming,
 			}
 
 			if c.IsHessian2() {

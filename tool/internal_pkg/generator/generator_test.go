@@ -19,6 +19,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/thriftgo/generator/golang/streaming"
+
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
@@ -175,4 +178,55 @@ func TestConfig_Unpack(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_needCallOpt(t *testing.T) {
+	t.Run("protobuf", func(t *testing.T) {
+		pkg := &PackageInfo{
+			Codec: "protobuf",
+		}
+		test.Assert(t, needCallOpt(pkg))
+	})
+	t.Run("thrift-no-methods", func(t *testing.T) {
+		pkg := &PackageInfo{
+			Codec: "thrift",
+			ServiceInfo: &ServiceInfo{
+				Methods: nil,
+			},
+		}
+		test.Assert(t, !needCallOpt(pkg))
+	})
+	t.Run("thrift-with-only-streaming-methods", func(t *testing.T) {
+		pkg := &PackageInfo{
+			Codec: "thrift",
+			ServiceInfo: &ServiceInfo{
+				Methods: []*MethodInfo{{
+					Streaming: &streaming.Streaming{
+						IsStreaming: true,
+					},
+				}},
+			},
+		}
+		test.Assert(t, !needCallOpt(pkg))
+	})
+	t.Run("thrift-with-ping-pong-methods", func(t *testing.T) {
+		pkg := &PackageInfo{
+			Codec: "thrift",
+			ServiceInfo: &ServiceInfo{
+				Methods: []*MethodInfo{
+					{
+						Streaming: &streaming.Streaming{
+							IsStreaming: true,
+						},
+					},
+					{
+						Streaming: &streaming.Streaming{
+							IsStreaming: false,
+						},
+					},
+				},
+			},
+		}
+		test.Assert(t, needCallOpt(pkg))
+	})
 }
