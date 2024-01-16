@@ -84,6 +84,7 @@ func (s *server) init() {
 	ctx := fillContext(s.opt)
 	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)
 	s.mws = append(s.mws, acl.NewACLMiddleware(s.opt.ACLRules))
+	s.initStreamMiddlewares(ctx)
 	if s.opt.ErrHandle != nil {
 		// errorHandleMW must be the last middleware,
 		// to ensure it only catches the server handler's error.
@@ -95,6 +96,7 @@ func (s *server) init() {
 	}
 	backup.Init(s.opt.BackupOpt)
 	s.buildInvokeChain()
+	s.buildStreamInvokeChain()
 }
 
 func (s *server) Endpoints() endpoint.Endpoint {

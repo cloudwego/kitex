@@ -21,8 +21,10 @@ package thrift
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
+	"github.com/cloudwego/kitex/internal/mocks/thrift/fast"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -92,10 +94,10 @@ func TestHyperCodecCheck(t *testing.T) {
 
 	// test hyperMessageUnmarshal check
 	codec = &thriftCodec{FrugalRead}
-	test.Assert(t, hyperMessageUnmarshalAvailable(&MockNoTagArgs{}, msg) == false)
-	test.Assert(t, hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg) == false)
+	test.Assert(t, hyperMessageUnmarshalAvailable(&MockNoTagArgs{}, msg.PayloadLen()) == false)
+	test.Assert(t, hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg.PayloadLen()) == false)
 	msg.SetPayloadLen(1)
-	test.Assert(t, hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg) == true)
+	test.Assert(t, hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg.PayloadLen()) == true)
 }
 
 func TestFrugalCodec(t *testing.T) {
@@ -136,4 +138,23 @@ func TestFrugalCodec(t *testing.T) {
 	for k := range sendReq.StrMap {
 		test.Assert(t, sendReq.StrMap[k] == recvReq.StrMap[k])
 	}
+}
+
+func TestMarshalThriftDataFrugal(t *testing.T) {
+	mockReqFrugal := &MockFrugalTagReq{
+		Msg: "hello",
+	}
+	buf, err := MarshalThriftData(context.Background(), NewThriftCodecWithConfig(FrugalWrite), mockReqFrugal)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, reflect.DeepEqual(buf, mockReqThrift), buf)
+}
+
+func TestUnmarshalThriftDataFrugal(t *testing.T) {
+	req := &MockFrugalTagReq{}
+	err := UnmarshalThriftData(context.Background(), NewThriftCodecWithConfig(FrugalRead), "mock", mockReqThrift, req)
+	checkDecodeResult(t, err, &fast.MockReq{
+		Msg:     req.Msg,
+		StrList: req.StrList,
+		StrMap:  req.StrMap,
+	})
 }

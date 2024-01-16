@@ -20,6 +20,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -50,6 +51,7 @@ type MutableRPCConfig interface {
 	Clone() MutableRPCConfig
 	CopyFrom(from RPCConfig)
 	ImmutableView() RPCConfig
+	SetPayloadCodec(codec serviceinfo.PayloadCodec)
 }
 
 // MutableRPCStats is used to change the information in the RPCStats.

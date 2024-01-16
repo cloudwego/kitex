@@ -94,11 +94,8 @@ func SetTrailer(ctx context.Context, md metadata.MD) error {
 	return nil
 }
 
-type streamKey struct{}
-
 func serverTransportStreamFromContext(ctx context.Context) streaming.Stream {
-	s, _ := ctx.Value(streamKey{}).(streaming.Stream)
-	return s
+	return streaming.GetStream(ctx)
 }
 
 type (

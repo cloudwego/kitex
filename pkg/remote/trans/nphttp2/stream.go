@@ -135,6 +135,8 @@ func (s *stream) getPayloadCodecFromContentType() (serviceinfo.PayloadCodec, err
 		subType = sc.s.ContentSubtype()
 	}
 	switch subType {
+	case contentSubTypeThrift:
+		return serviceinfo.Thrift, nil
 	default:
 		return serviceinfo.Protobuf, nil
 	}

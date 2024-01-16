@@ -24,6 +24,7 @@ import (
 	"text/template"
 
 	genfastpb "github.com/cloudwego/fastpb/protoc-gen-fastpb/generator"
+	"github.com/cloudwego/thriftgo/generator/golang/streaming"
 	gengo "google.golang.org/protobuf/cmd/protoc-gen-go/internal_gengo"
 	"google.golang.org/protobuf/compiler/protogen"
 
@@ -163,7 +164,7 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		f.QualifiedGoIdent(protogen.GoIdent{GoImportPath: "context"})
 		if hasStreaming {
 			f.QualifiedGoIdent(protogen.GoIdent{
-				GoImportPath: protogen.GoImportPath(generator.ImportPathTo("pkg/streaming")),
+				GoImportPath: "github.com/cloudwego/kitex/pkg/streaming",
 			})
 		}
 		f.P("var _ context.Context")
@@ -286,6 +287,9 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 				si.HasStreaming = true
 			}
 		}
+		for _, m := range si.Methods {
+			BuildStreaming(m, si.HasStreaming)
+		}
 		ss = append(ss, si)
 	}
 	// combine service
@@ -325,6 +329,29 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 		ss = append(ss, si)
 	}
 	return
+}
+
+// BuildStreaming builds protobuf MethodInfo.Streaming as for Thrift, to simplify codegen
+func BuildStreaming(mi *generator.MethodInfo, serviceHasStreaming bool) {
+	s := &streaming.Streaming{
+		// pb: if one method is streaming, then the service is streaming, making all methods streaming
+		IsStreaming: serviceHasStreaming,
+	}
+	if mi.ClientStreaming && mi.ServerStreaming {
+		s.Mode = streaming.StreamingBidirectional
+		s.BidirectionalStreaming = true
+		s.ClientStreaming = true
+		s.ServerStreaming = true
+	} else if mi.ClientStreaming && !mi.ServerStreaming {
+		s.Mode = streaming.StreamingClientSide
+		s.ClientStreaming = true
+	} else if !mi.ClientStreaming && mi.ServerStreaming {
+		s.Mode = streaming.StreamingServerSide
+		s.ServerStreaming = true
+	} else if serviceHasStreaming {
+		s.Mode = streaming.StreamingUnary // Unary APIs over HTTP2
+	}
+	mi.Streaming = s
 }
 
 func (pp *protocPlugin) getCombineServiceName(name string, svcs []*generator.ServiceInfo) string {

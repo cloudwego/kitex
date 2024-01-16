@@ -28,17 +28,37 @@ import (
 			{{- end}}
 		{{- end}}
 	{{- end}}
+	{{- if .HasStreaming}}
+	"github.com/cloudwego/kitex/client/streamclient"
+	"github.com/cloudwego/kitex/client/callopt/streamcall"
+    {{- end}}
 )
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
 {{- range .AllMethods}}
-{{- if or .ClientStreaming .ServerStreaming}}
+{{- if and (eq $.Codec "protobuf") (or .ClientStreaming .ServerStreaming)}}{{/* protobuf: generate streaming calls in Client, to keep compatibility */}}
 	{{.Name}}(ctx context.Context {{if not .ClientStreaming}}{{range .Args}}, {{.RawName}} {{.Type}}{{end}}{{end}}, callOptions ...callopt.Option ) (stream {{.ServiceName}}_{{.RawName}}Client, err error)
 {{- else}}
+	{{- if or (eq $.Codec "protobuf") (eq .Streaming.Mode "")}}
 	{{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callOptions ...callopt.Option ) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error)
+	{{- end}}
 {{- end}}
 {{- end}}
 }
+
+{{- if .HasStreaming}}
+// StreamClient is designed to provide Interface for Streaming APIs.
+type StreamClient interface {
+{{- range .AllMethods}}
+{{- if or .ClientStreaming .ServerStreaming}}
+	{{.Name}}(ctx context.Context {{if not .ClientStreaming}}{{range .Args}}, {{.RawName}} {{.Type}}{{end}}{{end}}, callOptions ...streamcall.Option ) (stream {{.ServiceName}}_{{.RawName}}Client, err error)
+{{- else if .Streaming.Unary}}
+	{{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callOptions ...streamcall.Option ) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error)
+{{- end}}
+{{- end}}
+}
+{{- end}}
+
 {{range .AllMethods}}
 {{- if or .ClientStreaming .ServerStreaming}}
 type {{.ServiceName}}_{{.RawName}}Client interface {
@@ -61,12 +81,14 @@ func NewClient(destService string, opts ...client.Option) (Client, error) {
 	var options []client.Option
 	options = append(options, client.WithDestService(destService))
     {{template "@client.go-NewClient-option" .}}
-	{{if .HasStreaming}}
+	{{if and (eq $.Codec "protobuf") .HasStreaming}}{{/* Thrift Streaming only in StreamClient */}}
 	options = append(options, client.WithTransportProtocol(transport.GRPC))
 	{{end}}
 	options = append(options, opts...)
 
-	kc, err := client.NewClient(serviceInfo(), options...)
+	kc, err := client.NewClient(
+		{{- if eq $.Codec "protobuf"}}serviceInfo(){{else}}serviceInfoForClient(){{end -}}
+		, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -77,6 +99,7 @@ func NewClient(destService string, opts ...client.Option) (Client, error) {
 		kClient: newServiceClient(kc),
 	}, nil
 }
+
 // MustNewClient creates a client for the service defined in IDL. It panics if any error occurs.
 func MustNewClient(destService string, opts ...client.Option) Client {
 	kc, err := NewClient(destService, opts...)
@@ -85,22 +108,77 @@ func MustNewClient(destService string, opts ...client.Option) Client {
 	}
 	return kc
 }
+
 type k{{.ServiceName}}Client struct {
 	*kClient
 }
 
 {{range .AllMethods}}
+{{- /* Thrift Client only support non-streaming methods */}}
 {{- if or .ClientStreaming .ServerStreaming}}
+{{- if eq $.Codec "protobuf"}}
 func (p *k{{$.ServiceName}}Client) {{.Name}}(ctx context.Context {{if not .ClientStreaming}}{{range .Args}}, {{.RawName}} {{.Type}}{{end}}{{end}}, callOptions ...callopt.Option ) (stream {{.ServiceName}}_{{.RawName}}Client, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.{{.Name}}(ctx{{if not .ClientStreaming}}{{range .Args}}, {{.RawName}}{{end}}{{end}})
 }
+{{- end}}
 {{- else}}
+{{- if or (eq $.Codec "protobuf") (eq .Streaming.Mode "")}}
 func (p *k{{$.ServiceName}}Client) {{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callOptions ...callopt.Option ) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.{{.Name}}(ctx{{range .Args}}, {{.RawName}}{{end}})
 }
 {{- end}}
+{{- end}}
 {{end}}
+
+{{- if .HasStreaming}}
+// NewStreamClient creates a stream client for the service's streaming APIs defined in IDL.
+func NewStreamClient(destService string, opts ...streamclient.Option) (StreamClient, error) {
+	var options []client.Option
+	options = append(options, client.WithDestService(destService))
+    {{- template "@client.go-NewStreamClient-option" .}}
+	options = append(options, client.WithTransportProtocol(transport.GRPC))
+    options = append(options, streamclient.GetClientOptions(opts)...)
+
+	kc, err := client.NewClient(serviceInfoForStreamClient(), options...)
+	if err != nil {
+		return nil, err
+	}
+	{{- if .FrugalPretouch}}
+	pretouch()
+	{{- end}}{{/* if .FrugalPretouch */}}
+	return &k{{.ServiceName}}StreamClient{
+		kClient: newServiceClient(kc),
+	}, nil
+}
+
+// MustNewStreamClient creates a stream client for the service's streaming APIs defined in IDL.
+// It panics if any error occurs.
+func MustNewStreamClient(destService string, opts ...streamclient.Option) StreamClient {
+	kc, err := NewStreamClient(destService, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return kc
+}
+
+type k{{.ServiceName}}StreamClient struct {
+	*kClient
+}
+{{- range .AllMethods}}
+{{if or .ClientStreaming .ServerStreaming}}
+func (p *k{{$.ServiceName}}StreamClient) {{.Name}}(ctx context.Context {{if not .ClientStreaming}}{{range .Args}}, {{.RawName}} {{.Type}}{{end}}{{end}}, callOptions ...streamcall.Option ) (stream {{.ServiceName}}_{{.RawName}}Client, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, streamcall.GetCallOptions(callOptions))
+	return p.kClient.{{.Name}}(ctx{{if not .ClientStreaming}}{{range .Args}}, {{.RawName}}{{end}}{{end}})
+}
+{{else if .Streaming.Unary}}
+func (p *k{{$.ServiceName}}StreamClient) {{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callOptions ...streamcall.Option ) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, streamcall.GetCallOptions(callOptions))
+	return p.kClient.{{.Name}}(ctx{{range .Args}}, {{.RawName}}{{end}})
+}
+{{- end}}
+{{end}}
+{{- end}}
 {{template "@client.go-EOF" .}}
 `

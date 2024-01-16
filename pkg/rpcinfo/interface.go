@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -74,6 +75,7 @@ type RPCConfig interface {
 	IOBufferSize() int
 	TransportProtocol() transport.Protocol
 	InteractionMode() InteractionMode
+	PayloadCodec() serviceinfo.PayloadCodec
 }
 
 // Invocation contains specific information about the call.

@@ -80,7 +80,7 @@ func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out 
 	}
 
 	// 4. write actual message buf
-	msg, ok := data.(protobufMsgCodec)
+	msg, ok := data.(ProtobufMsgCodec)
 	if !ok {
 		// If Using Generics
 		// if data is a MessageWriterWithContext
@@ -199,7 +199,7 @@ func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in
 		return nil
 	}
 
-	msg, ok := data.(protobufMsgCodec)
+	msg, ok := data.(ProtobufMsgCodec)
 	if !ok {
 		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "decode failed, codec msg type not match with protobufCodec")
 	}
@@ -223,7 +223,7 @@ type MessageReaderWithMethodWithContext interface {
 	ReadPb(ctx context.Context, method string, in []byte) error
 }
 
-type protobufMsgCodec interface {
+type ProtobufMsgCodec interface {
 	Marshal(out []byte) ([]byte, error)
 	Unmarshal(in []byte) error
 }

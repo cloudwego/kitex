@@ -97,10 +97,15 @@ func TestStreaming(t *testing.T) {
 	connpool.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil)
 	cliInfo.ConnPool = connpool
 	s, _ := remotecli.NewStream(ctx, mockRPCInfo, new(mocks.MockCliTransHandler), cliInfo)
-	stream := &stream{
-		stream: s,
-		kc:     kc,
-	}
+	stream := newStream(
+		s, kc,
+		func(stream streaming.Stream, message interface{}) (err error) {
+			return stream.SendMsg(message)
+		},
+		func(stream streaming.Stream, message interface{}) (err error) {
+			return stream.RecvMsg(message)
+		},
+	)
 
 	for i := 0; i < 10; i++ {
 		ch := make(chan struct{})

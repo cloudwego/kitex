@@ -28,6 +28,8 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
+// TestFromHTTPPbRequest this test is to make sure mockey can work.
+// If it fails, please run this test with `-gcflags="all=-N -l"`
 func TestFromHTTPPbRequest(t *testing.T) {
 	mockey.PatchConvey("TestFromHTTPPbRequest", t, func() {
 		req, err := http.NewRequest("POST", "/far/boo", bytes.NewBuffer([]byte("321")))

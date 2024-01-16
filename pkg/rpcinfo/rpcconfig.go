@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -64,6 +65,7 @@ type rpcConfig struct {
 	ioBufferSize      int
 	transportProtocol transport.Protocol
 	interactionMode   InteractionMode
+	payloadCodec      serviceinfo.PayloadCodec
 }
 
 func init() {
@@ -175,6 +177,14 @@ func (r *rpcConfig) SetInteractionMode(mode InteractionMode) error {
 
 func (r *rpcConfig) InteractionMode() InteractionMode {
 	return r.interactionMode
+}
+
+func (r *rpcConfig) SetPayloadCodec(codec serviceinfo.PayloadCodec) {
+	r.payloadCodec = codec
+}
+
+func (r *rpcConfig) PayloadCodec() serviceinfo.PayloadCodec {
+	return r.payloadCodec
 }
 
 // Clone returns a copy of the current rpcConfig.
