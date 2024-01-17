@@ -118,24 +118,23 @@ func (m *MockExtension) IsRemoteClosedErr(err error) bool {
 var _ remote.Message = &MockMessage{}
 
 type MockMessage struct {
-	RPCInfoFunc                  func() rpcinfo.RPCInfo
-	ServiceInfoFunc              func() *serviceinfo.ServiceInfo
-	ServiceInfoByServiceNameFunc func(string) *serviceinfo.ServiceInfo
-	ServiceInfoByMethodNameFunc  func(string) (*serviceinfo.ServiceInfo, error)
-	DataFunc                     func() interface{}
-	NewDataFunc                  func(method string) (ok bool)
-	MessageTypeFunc              func() remote.MessageType
-	SetMessageTypeFunc           func(remote.MessageType)
-	RPCRoleFunc                  func() remote.RPCRole
-	PayloadLenFunc               func() int
-	SetPayloadLenFunc            func(size int)
-	TransInfoFunc                func() remote.TransInfo
-	TagsFunc                     func() map[string]interface{}
-	ProtocolInfoFunc             func() remote.ProtocolInfo
-	SetProtocolInfoFunc          func(remote.ProtocolInfo)
-	PayloadCodecFunc             func() remote.PayloadCodec
-	SetPayloadCodecFunc          func(pc remote.PayloadCodec)
-	RecycleFunc                  func()
+	RPCInfoFunc         func() rpcinfo.RPCInfo
+	ServiceInfoFunc     func() *serviceinfo.ServiceInfo
+	SetServiceInfoFunc  func(svcName, methodName string) (*serviceinfo.ServiceInfo, error)
+	DataFunc            func() interface{}
+	NewDataFunc         func(method string) (ok bool)
+	MessageTypeFunc     func() remote.MessageType
+	SetMessageTypeFunc  func(remote.MessageType)
+	RPCRoleFunc         func() remote.RPCRole
+	PayloadLenFunc      func() int
+	SetPayloadLenFunc   func(size int)
+	TransInfoFunc       func() remote.TransInfo
+	TagsFunc            func() map[string]interface{}
+	ProtocolInfoFunc    func() remote.ProtocolInfo
+	SetProtocolInfoFunc func(remote.ProtocolInfo)
+	PayloadCodecFunc    func() remote.PayloadCodec
+	SetPayloadCodecFunc func(pc remote.PayloadCodec)
+	RecycleFunc         func()
 }
 
 func (m *MockMessage) RPCInfo() rpcinfo.RPCInfo {
@@ -152,16 +151,9 @@ func (m *MockMessage) ServiceInfo() (si *serviceinfo.ServiceInfo) {
 	return
 }
 
-func (m *MockMessage) ServiceInfoByServiceName(svcName string) (si *serviceinfo.ServiceInfo) {
-	if m.ServiceInfoByServiceNameFunc != nil {
-		m.ServiceInfoByServiceNameFunc(svcName)
-	}
-	return nil
-}
-
-func (m *MockMessage) ServiceInfoByMethodName(methodName string) (si *serviceinfo.ServiceInfo, err error) {
-	if m.ServiceInfoByMethodNameFunc != nil {
-		m.ServiceInfoByMethodNameFunc(methodName)
+func (m *MockMessage) SetServiceInfo(svcName, methodName string) (si *serviceinfo.ServiceInfo, err error) {
+	if m.SetServiceInfoFunc != nil {
+		return m.SetServiceInfoFunc(svcName, methodName)
 	}
 	return nil, nil
 }

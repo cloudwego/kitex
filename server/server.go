@@ -57,8 +57,9 @@ type Server interface {
 }
 
 type server struct {
-	opt  *internal_server.Options
-	svcs *services
+	opt           *internal_server.Options
+	svcs          *services
+	targetSvcInfo *serviceinfo.ServiceInfo
 
 	// actual rpc service implement of biz
 	eps     endpoint.Endpoint
@@ -195,7 +196,7 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	if handler == nil || reflect.ValueOf(handler).IsNil() {
 		panic("handler is nil. please specify non-nil handler")
 	}
-	if s.svcs.getService(svcInfo.ServiceName) != nil {
+	if s.svcs.svcMap[svcInfo.ServiceName] != nil {
 		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
 	}
 
@@ -206,7 +207,7 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 }
 
 func (s *server) GetServiceInfos() map[string]*serviceinfo.ServiceInfo {
-	return s.svcs.getSvcInfoMap()
+	return s.svcs.getSvcInfoSearchMap()
 }
 
 // Run runs the server.
@@ -308,10 +309,10 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()
 		serviceName := ri.Invocation().ServiceName()
-		svc := s.svcs.getService(serviceName)
+		svc := s.svcs.svcMap[serviceName]
 		if svc == nil {
 			// NOTE: svc should always be non-nil here
-			svc = s.svcs.getServiceByMethodName(methodName)
+			svc = s.svcs.svcSearchMap[methodName]
 		}
 		svcInfo := svc.svcInfo
 		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
@@ -351,8 +352,8 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
-	remoteOpt.SvcMap = s.svcs.getSvcInfoMap()
-	remoteOpt.MethodSvcMap = s.svcs.getMethodNameSvcInfoMap()
+	remoteOpt.TargetSvcInfo = s.targetSvcInfo
+	remoteOpt.SvcSearchMap = s.svcs.getSvcInfoSearchMap()
 	remoteOpt.OnlyAcceptingHTTP2Traffic = s.opt.OnlyAcceptingHTTP2Traffic
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
@@ -438,13 +439,15 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 }
 
 func (s *server) check() error {
-	if len(s.svcs.svcMap) == 0 {
+	numOfSvcs := len(s.svcs.svcMap)
+	if numOfSvcs == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
-	if err := checkFallbackServiceForConflictingMethods(s.svcs.conflictingMethodHasFallbackSvcMap, s.opt.OnlyAcceptingHTTP2Traffic); err != nil {
-		return err
+	if numOfSvcs == 1 {
+		s.targetSvcInfo = getDefaultSvcInfo(s.svcs)
+		return nil
 	}
-	return nil
+	return checkFallbackServiceForConflictingMethods(s.svcs.conflictingMethodHasFallbackSvcMap, s.opt.OnlyAcceptingHTTP2Traffic)
 }
 
 func doAddBoundHandlerToHead(h remote.BoundHandler, opt *remote.ServerOption) {
@@ -510,7 +513,7 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}
 	if info.PayloadCodec == "" {
-		info.PayloadCodec = getDefaultSvc(s.svcs).svcInfo.PayloadCodec.String()
+		info.PayloadCodec = getDefaultSvcInfo(s.svcs).PayloadCodec.String()
 	}
 	if info.Weight == 0 {
 		info.Weight = discovery.DefaultWeight
@@ -558,19 +561,22 @@ func (s *server) waitExit(errCh chan error) error {
 }
 
 // getDefaultSvc is used to get one ServiceInfo from map
-func getDefaultSvc(svcs *services) *service {
-	if svcs.fallbackSvc != nil {
-		return svcs.fallbackSvc
+func getDefaultSvcInfo(svcs *services) *serviceinfo.ServiceInfo {
+	if len(svcs.svcMap) > 1 && svcs.fallbackSvc != nil {
+		return svcs.fallbackSvc.svcInfo
 	}
 	for _, svc := range svcs.svcMap {
-		return svc
+		return svc.svcInfo
 	}
 	return nil
 }
 
-func checkFallbackServiceForConflictingMethods(conflictingMethodHasFallbackSvcMap map[string]bool, WithOnlyAcceptingHTTP2Traffic bool) error {
+func checkFallbackServiceForConflictingMethods(conflictingMethodHasFallbackSvcMap map[string]bool, onlyAcceptingHTTP2Traffic bool) error {
+	if onlyAcceptingHTTP2Traffic {
+		return nil
+	}
 	for name, hasFallbackSvc := range conflictingMethodHasFallbackSvcMap {
-		if !hasFallbackSvc && !WithOnlyAcceptingHTTP2Traffic {
+		if !hasFallbackSvc {
 			return fmt.Errorf("method name [%s] is conflicted between services but no fallback service is specified", name)
 		}
 	}

@@ -17,6 +17,7 @@
 package codec
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -30,9 +31,17 @@ func TestSetOrCheckMethodName(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(nil, rpcinfo.NewEndpointInfo("", "mock", nil, nil),
 		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	svcInfo := mocks.ServiceInfo()
-	svcInfoMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
-	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
-	msg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, ri, remote.Call, remote.Server)
+	svcSearchMap := map[string]*serviceinfo.ServiceInfo{
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockMethod):          svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
+		mocks.MockMethod:          svcInfo,
+		mocks.MockExceptionMethod: svcInfo,
+		mocks.MockErrorMethod:     svcInfo,
+		mocks.MockOnewayMethod:    svcInfo,
+	}
+	msg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server)
 	err := SetOrCheckMethodName("mock", msg)
 	test.Assert(t, err == nil)
 	ri = msg.RPCInfo()
@@ -41,7 +50,7 @@ func TestSetOrCheckMethodName(t *testing.T) {
 	test.Assert(t, ri.Invocation().MethodName() == "mock")
 	test.Assert(t, ri.To().Method() == "mock")
 
-	msg = remote.NewMessageWithNewer(svcInfoMap, map[string]*serviceinfo.ServiceInfo{}, ri, remote.Call, remote.Server)
+	msg = remote.NewMessageWithNewer(svcInfo, map[string]*serviceinfo.ServiceInfo{}, ri, remote.Call, remote.Server)
 	err = SetOrCheckMethodName("dummy", msg)
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "unknown method dummy")

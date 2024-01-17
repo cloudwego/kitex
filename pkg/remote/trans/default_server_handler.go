@@ -38,11 +38,11 @@ func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.
 		return nil, remote.NewTransErrorWithMsg(remote.InvalidProtocol, "only http2 traffic is accepted")
 	}
 	svrHdlr := &svrTransHandler{
-		opt:          opt,
-		codec:        opt.Codec,
-		svcInfoMap:   opt.SvcMap,
-		methodSvcMap: opt.MethodSvcMap,
-		ext:          ext,
+		opt:           opt,
+		codec:         opt.Codec,
+		svcSearchMap:  opt.SvcSearchMap,
+		targetSvcInfo: opt.TargetSvcInfo,
+		ext:           ext,
 	}
 	if svrHdlr.opt.TracerCtl == nil {
 		// init TraceCtl when it is nil, or it will lead some unit tests panic
@@ -52,13 +52,13 @@ func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.
 }
 
 type svrTransHandler struct {
-	opt          *remote.ServerOption
-	svcInfoMap   map[string]*serviceinfo.ServiceInfo
-	methodSvcMap map[string]*serviceinfo.ServiceInfo
-	inkHdlFunc   endpoint.Endpoint
-	codec        remote.Codec
-	transPipe    *remote.TransPipeline
-	ext          Extension
+	opt           *remote.ServerOption
+	svcSearchMap  map[string]*serviceinfo.ServiceInfo
+	targetSvcInfo *serviceinfo.ServiceInfo
+	inkHdlFunc    endpoint.Endpoint
+	codec         remote.Codec
+	transPipe     *remote.TransPipeline
+	ext           Extension
 }
 
 // Write implements the remote.ServerTransHandler interface.
@@ -167,7 +167,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	}()
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
-	recvMsg = remote.NewMessageWithNewer(t.svcInfoMap, t.methodSvcMap, ri, remote.Call, remote.Server)
+	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearchMap, ri, remote.Call, remote.Server)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {

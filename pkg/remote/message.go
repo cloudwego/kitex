@@ -85,8 +85,7 @@ func NewProtocolInfo(tp transport.Protocol, ct serviceinfo.PayloadCodec) Protoco
 type Message interface {
 	RPCInfo() rpcinfo.RPCInfo
 	ServiceInfo() *serviceinfo.ServiceInfo
-	ServiceInfoByServiceName(svcName string) *serviceinfo.ServiceInfo
-	ServiceInfoByMethodName(methodName string) (svcInfo *serviceinfo.ServiceInfo, err error)
+	SetServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error)
 	Data() interface{}
 	NewData(method string) (ok bool)
 	MessageType() MessageType
@@ -112,6 +111,7 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
 	ti := transInfoPool.Get().(*transInfo)
+	// TODO: figure out where to put
 	if rpcRole == Client && (msgType == Call || msgType == Oneway) && ri != nil && ri.Invocation() != nil {
 		ti.strInfo[transmeta.HeaderIDLServiceName] = ri.Invocation().ServiceName()
 	}
@@ -120,11 +120,11 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 }
 
 // NewMessageWithNewer creates a new Message and set data later.
-func NewMessageWithNewer(svcInfoMap, methodSvcMap map[string]*serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole) Message {
+func NewMessageWithNewer(targetSvcInfo *serviceinfo.ServiceInfo, svcSearchMap map[string]*serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole) Message {
 	msg := messagePool.Get().(*message)
 	msg.rpcInfo = ri
-	msg.svcInfoMap = svcInfoMap
-	msg.methodSvcMap = methodSvcMap
+	msg.targetSvcInfo = targetSvcInfo
+	msg.svcSearchMap = svcSearchMap
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
 	msg.transInfo = transInfoPool.Get().(*transInfo)
@@ -147,8 +147,7 @@ type message struct {
 	data          interface{}
 	rpcInfo       rpcinfo.RPCInfo
 	targetSvcInfo *serviceinfo.ServiceInfo
-	svcInfoMap    map[string]*serviceinfo.ServiceInfo // service name -> serviceInfo
-	methodSvcMap  map[string]*serviceinfo.ServiceInfo // method name -> serviceInfo
+	svcSearchMap  map[string]*serviceinfo.ServiceInfo
 	rpcRole       RPCRole
 	compressType  CompressType
 	payloadSize   int
@@ -186,18 +185,21 @@ func (m *message) ServiceInfo() *serviceinfo.ServiceInfo {
 	return m.targetSvcInfo
 }
 
-// ServiceInfoByServiceName implements the Message interface.
-func (m *message) ServiceInfoByServiceName(svcName string) *serviceinfo.ServiceInfo {
-	svcInfo := m.svcInfoMap[svcName]
-	if svcInfo == nil {
-		svcInfo = m.svcInfoMap[serviceinfo.GenericService]
+func (m *message) SetServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error) {
+	// for non-multi-service including generic server scenario
+	if m.targetSvcInfo != nil {
+		if mt := m.targetSvcInfo.MethodInfo(methodName); mt == nil {
+			return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
+		}
+		return m.targetSvcInfo, nil
 	}
-	m.targetSvcInfo = svcInfo
-	return svcInfo
-}
-
-func (m *message) ServiceInfoByMethodName(methodName string) (svcInfo *serviceinfo.ServiceInfo, err error) {
-	svcInfo = m.methodSvcMap[methodName]
+	var key string
+	if svcName == serviceinfo.GenericService || svcName == "" {
+		key = methodName
+	} else {
+		key = fmt.Sprintf("%s.%s", svcName, methodName)
+	}
+	svcInfo := m.svcSearchMap[key]
 	if svcInfo == nil {
 		return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 	}
@@ -212,16 +214,10 @@ func (m *message) Data() interface{} {
 
 // NewData implements the Message interface.
 func (m *message) NewData(method string) (ok bool) {
-	if m.data != nil {
+	if m.data != nil || m.targetSvcInfo == nil {
 		return false
 	}
-	var svcInfo *serviceinfo.ServiceInfo
-	if method == serviceinfo.GenericMethod || m.targetSvcInfo == nil {
-		svcInfo = m.methodSvcMap[method]
-	} else {
-		svcInfo = m.targetSvcInfo
-	}
-	if mt := svcInfo.MethodInfo(method); mt != nil {
+	if mt := m.targetSvcInfo.MethodInfo(method); mt != nil {
 		m.data = mt.NewArgs()
 	}
 	if m.data == nil {

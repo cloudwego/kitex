@@ -33,19 +33,24 @@ func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) *service 
 }
 
 type services struct {
-	svcMap                             map[string]*service
-	methodSvcMap                       map[string]*service
+	svcSearchMap                       map[string]*service // key: "svcName.methodName" and "methodName", value: svcInfo
+	svcMap                             map[string]*service // key: service name, value: svcInfo
 	conflictingMethodHasFallbackSvcMap map[string]bool
 	fallbackSvc                        *service
 }
 
 func newServices() *services {
-	return &services{svcMap: map[string]*service{}, methodSvcMap: map[string]*service{}, conflictingMethodHasFallbackSvcMap: map[string]bool{}}
+	return &services{
+		svcSearchMap:                       map[string]*service{},
+		svcMap:                             map[string]*service{},
+		conflictingMethodHasFallbackSvcMap: map[string]bool{},
+	}
 }
 
 func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, isFallbackService ...bool) error {
 	svc := newService(svcInfo, handler)
 
+	// TODO: isFallbackService -> RegisterOption
 	if len(isFallbackService) > 0 && isFallbackService[0] {
 		if s.fallbackSvc != nil {
 			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)
@@ -55,28 +60,21 @@ func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interfac
 	}
 	s.svcMap[svcInfo.ServiceName] = svc
 	for methodName := range svcInfo.Methods {
+		s.svcSearchMap[fmt.Sprintf("%s.%s", svcInfo.ServiceName, methodName)] = svc
 		// conflicting method check
-		if svcFromMap, ok := s.methodSvcMap[methodName]; ok {
+		if svcFromMap, ok := s.svcSearchMap[methodName]; ok {
 			if _, ok := s.conflictingMethodHasFallbackSvcMap[methodName]; !ok {
 				s.conflictingMethodHasFallbackSvcMap[methodName] = svcFromMap.isFallback
 			}
 			if svc.isFallback {
-				s.methodSvcMap[methodName] = svc
+				s.svcSearchMap[methodName] = svc
 				s.conflictingMethodHasFallbackSvcMap[methodName] = true
 			}
 		} else {
-			s.methodSvcMap[methodName] = svc
+			s.svcSearchMap[methodName] = svc
 		}
 	}
 	return nil
-}
-
-func (s *services) getService(svcName string) *service {
-	return s.svcMap[svcName]
-}
-
-func (s *services) getServiceByMethodName(methodName string) *service {
-	return s.methodSvcMap[methodName]
 }
 
 func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
@@ -87,10 +85,10 @@ func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
 	return svcInfoMap
 }
 
-func (s *services) getMethodNameSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
-	methodNameSvcInfoMap := map[string]*serviceinfo.ServiceInfo{}
-	for methodName, svc := range s.methodSvcMap {
-		methodNameSvcInfoMap[methodName] = svc.svcInfo
+func (s *services) getSvcInfoSearchMap() map[string]*serviceinfo.ServiceInfo {
+	svcInfoSearchMap := map[string]*serviceinfo.ServiceInfo{}
+	for name, svc := range s.svcSearchMap {
+		svcInfoSearchMap[name] = svc.svcInfo
 	}
-	return methodNameSvcInfoMap
+	return svcInfoSearchMap
 }

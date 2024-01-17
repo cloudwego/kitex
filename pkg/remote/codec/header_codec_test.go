@@ -19,6 +19,7 @@ package codec
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"testing"
 
@@ -308,9 +309,17 @@ var (
 
 func initServerRecvMsg() remote.Message {
 	svcInfo := mocks.ServiceInfo()
-	svcInfoMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
-	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
-	msg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, mockSvrRPCInfo, remote.Call, remote.Server)
+	svcSearchMap := map[string]*serviceinfo.ServiceInfo{
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockMethod):          svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
+		mocks.MockMethod:          svcInfo,
+		mocks.MockExceptionMethod: svcInfo,
+		mocks.MockErrorMethod:     svcInfo,
+		mocks.MockOnewayMethod:    svcInfo,
+	}
+	msg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, mockSvrRPCInfo, remote.Call, remote.Server)
 	return msg
 }
 

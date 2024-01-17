@@ -70,9 +70,9 @@ func (o *Option) AppendBoundHandler(h BoundHandler) {
 
 // ServerOption contains option that is used to init the remote server.
 type ServerOption struct {
-	SvcMap map[string]*serviceinfo.ServiceInfo
+	TargetSvcInfo *serviceinfo.ServiceInfo
 
-	MethodSvcMap map[string]*serviceinfo.ServiceInfo
+	SvcSearchMap map[string]*serviceinfo.ServiceInfo
 
 	TransServerFactory TransServerFactory
 

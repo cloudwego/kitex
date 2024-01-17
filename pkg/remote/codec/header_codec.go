@@ -492,6 +492,9 @@ func fillBasicInfoOfTTHeader(msg remote.Message) {
 				fi.SetServiceName(v)
 			}
 		}
+		if ink, ok := msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter); ok {
+			ink.SetServiceName(msg.TransInfo().TransStrInfo()[transmeta.HeaderIDLServiceName])
+		}
 	} else {
 		ti := remoteinfo.AsRemoteInfo(msg.RPCInfo().To())
 		if ti != nil {

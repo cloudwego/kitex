@@ -78,7 +78,8 @@ func NewServiceInlineClient(svcInfo *serviceinfo.ServiceInfo, s ServerInitialInf
 	kc.opt = client.NewOptions(opts)
 	kc.serverEps = s.Endpoints()
 	kc.serverOpt = s.Option()
-	kc.serverOpt.RemoteOpt.SvcMap = s.GetServiceInfos()
+	kc.serverOpt.RemoteOpt.TargetSvcInfo = svcInfo
+	kc.serverOpt.RemoteOpt.SvcSearchMap = s.GetServiceInfos()
 	if err := kc.init(); err != nil {
 		_ = kc.Close()
 		return nil, err

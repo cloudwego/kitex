@@ -28,14 +28,14 @@ func TestAddService(t *testing.T) {
 	err := svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 	test.Assert(t, len(svcs.svcMap) == 1)
-	test.Assert(t, len(svcs.methodSvcMap) == 4)
+	test.Assert(t, len(svcs.svcSearchMap) == 8)
 	test.Assert(t, len(svcs.conflictingMethodHasFallbackSvcMap) == 0)
 	test.Assert(t, svcs.fallbackSvc == nil)
 
 	err = svcs.addService(mocks.Service3Info(), mocks.MyServiceHandler(), true)
 	test.Assert(t, err == nil)
 	test.Assert(t, len(svcs.svcMap) == 2)
-	test.Assert(t, len(svcs.methodSvcMap) == 4)
+	test.Assert(t, len(svcs.svcSearchMap) == 9)
 	test.Assert(t, len(svcs.conflictingMethodHasFallbackSvcMap) == 1)
 	test.Assert(t, svcs.conflictingMethodHasFallbackSvcMap["mock"])
 

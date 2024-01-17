@@ -18,6 +18,7 @@ package gonet
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"testing"
@@ -58,12 +59,22 @@ func TestMain(m *testing.M) {
 		Codec: &MockCodec{
 			EncodeFunc: nil,
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				msg.ServiceInfoByServiceName(mocks.MockServiceName)
+				msg.SetServiceInfo(mocks.MockServiceName, mocks.MockMethod)
 				return nil
 			},
 		},
-		SvcMap:    map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo},
-		TracerCtl: &rpcinfo.TraceController{},
+		SvcSearchMap: map[string]*serviceinfo.ServiceInfo{
+			fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockMethod):          svcInfo,
+			fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
+			fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
+			fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
+			mocks.MockMethod:          svcInfo,
+			mocks.MockExceptionMethod: svcInfo,
+			mocks.MockErrorMethod:     svcInfo,
+			mocks.MockOnewayMethod:    svcInfo,
+		},
+		TargetSvcInfo: svcInfo,
+		TracerCtl:     &rpcinfo.TraceController{},
 	}
 	svrTransHdlr, _ = newSvrTransHandler(svrOpt)
 	transSvr = NewTransServerFactory().NewTransServer(svrOpt, svrTransHdlr).(*transServer)

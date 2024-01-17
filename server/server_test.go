@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"reflect"
@@ -51,6 +52,20 @@ import (
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
+)
+
+var (
+	svcInfo      = mocks.ServiceInfo()
+	svcSearchMap = map[string]*serviceinfo.ServiceInfo{
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockMethod):          svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
+		mocks.MockMethod:          svcInfo,
+		mocks.MockExceptionMethod: svcInfo,
+		mocks.MockErrorMethod:     svcInfo,
+		mocks.MockOnewayMethod:    svcInfo,
+	}
 )
 
 func TestServerRun(t *testing.T) {
@@ -430,8 +445,8 @@ func TestGRPCServerMultipleServices(t *testing.T) {
 	test.Assert(t, err == nil)
 	err = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
-	test.DeepEqual(t, svr.GetServiceInfos()[mocks.ServiceInfo().ServiceName], mocks.ServiceInfo())
-	test.DeepEqual(t, svr.GetServiceInfos()[mocks.Service2Info().ServiceName], mocks.Service2Info())
+	test.DeepEqual(t, svr.GetServiceInfos()[mocks.MockMethod], mocks.ServiceInfo())
+	test.DeepEqual(t, svr.GetServiceInfos()[mocks.Mock2Method], mocks.Service2Info())
 	time.AfterFunc(1000*time.Millisecond, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
@@ -635,9 +650,6 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 
 	opts = append(opts, WithCodec(&mockCodec{}))
 	transHdlrFact := &mockSvrTransHandlerFactory{}
-	svcInfo := mocks.ServiceInfo()
-	svcInfoMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
-	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
 	exitCh := make(chan bool)
 	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
@@ -645,7 +657,7 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 			{ // mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-				recvMsg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, ri, remote.Call, remote.Server)
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
@@ -725,9 +737,6 @@ func TestInvokeHandlerExec(t *testing.T) {
 	}))
 	opts = append(opts, WithCodec(&mockCodec{}))
 	transHdlrFact := &mockSvrTransHandlerFactory{}
-	svcInfo := mocks.ServiceInfo()
-	svcInfoMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
-	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
 	exitCh := make(chan bool)
 	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
@@ -735,7 +744,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 			{ // mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-				recvMsg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, ri, remote.Call, remote.Server)
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
@@ -790,9 +799,6 @@ func TestInvokeHandlerPanic(t *testing.T) {
 	}))
 	opts = append(opts, WithCodec(&mockCodec{}))
 	transHdlrFact := &mockSvrTransHandlerFactory{}
-	svcInfo := mocks.ServiceInfo()
-	svcInfoMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
-	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
 	exitCh := make(chan bool)
 	var ln net.Listener
 	transSvr := &mocks.MockTransServer{
@@ -801,7 +807,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 				// mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-				recvMsg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, ri, remote.Call, remote.Server)
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 

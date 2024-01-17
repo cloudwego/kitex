@@ -19,6 +19,7 @@ package netpollmux
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -42,6 +43,18 @@ var (
 	addrStr   = "test addr"
 	addr      = utils.NewNetAddr("tcp", addrStr)
 	method    = "mock"
+
+	svcInfo      = mocks.ServiceInfo()
+	svcSearchMap = map[string]*serviceinfo.ServiceInfo{
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockMethod):          svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
+		mocks.MockMethod:          svcInfo,
+		mocks.MockExceptionMethod: svcInfo,
+		mocks.MockErrorMethod:     svcInfo,
+		mocks.MockOnewayMethod:    svcInfo,
+	}
 )
 
 func newTestRpcInfo() rpcinfo.RPCInfo {
@@ -61,8 +74,6 @@ func newTestRpcInfo() rpcinfo.RPCInfo {
 func init() {
 	body := "hello world"
 	rpcInfo := newTestRpcInfo()
-	svcInfo := mocks.ServiceInfo()
-	svcMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
 
 	opt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
@@ -77,11 +88,12 @@ func init() {
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 				in.Skip(3 * codec.Size32)
 				_, err := in.ReadString(len(body))
-				msg.ServiceInfoByServiceName(mocks.MockServiceName)
+				msg.SetServiceInfo(mocks.MockServiceName, mocks.MockMethod)
 				return err
 			},
 		},
-		SvcMap:           svcMap,
+		SvcSearchMap:     svcSearchMap,
+		TargetSvcInfo:    svcInfo,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -456,8 +468,6 @@ func TestInvokeError(t *testing.T) {
 	}
 
 	body := "hello world"
-	svcInfo := mocks.ServiceInfo()
-	svcMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
 	opt := &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(rpcInfo rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
@@ -479,11 +489,12 @@ func TestInvokeError(t *testing.T) {
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 				in.Skip(3 * codec.Size32)
 				_, err := in.ReadString(len(body))
-				msg.ServiceInfoByServiceName(mocks.MockServiceName)
+				msg.SetServiceInfo(mocks.MockServiceName, mocks.MockMethod)
 				return err
 			},
 		},
-		SvcMap:           svcMap,
+		SvcSearchMap:     svcSearchMap,
+		TargetSvcInfo:    svcInfo,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}
@@ -641,7 +652,7 @@ func TestInvokeNoMethod(t *testing.T) {
 	pl := remote.NewTransPipeline(svrTransHdlr)
 	svrTransHdlr.SetPipeline(pl)
 
-	svcInfo := opt.SvcMap[mocks.MockServiceName]
+	svcInfo = opt.TargetSvcInfo
 	delete(svcInfo.Methods, method)
 
 	if setter, ok := svrTransHdlr.(remote.InvokeHandleFuncSetter); ok {
@@ -689,8 +700,6 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, rpcInfo)
 
 	// use newOpt cause we need to add heartbeat logic to EncodeFunc and DecodeFunc
-	svcMap := map[string]*serviceinfo.ServiceInfo{}
-	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
 	newOpt := &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			return rpcInfo
@@ -717,7 +726,8 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 				return err
 			},
 		},
-		SvcMap:           svcMap,
+		SvcSearchMap:     svcSearchMap,
+		TargetSvcInfo:    svcInfo,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
 	}

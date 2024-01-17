@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -245,7 +246,7 @@ func TestWithSupportedTransportsFunc(t *testing.T) {
 		svcInfo := mocks.ServiceInfo()
 		svr.RegisterService(svcInfo, new(mockImpl))
 		svr.(*server).fillMoreServiceInfo(nil)
-		test.Assert(t, reflect.DeepEqual(svr.GetServiceInfos()[svcInfo.ServiceName].Extra["transports"], tcase.wantTransports))
+		test.Assert(t, reflect.DeepEqual(svr.GetServiceInfos()[fmt.Sprintf("%s.%s", svcInfo.ServiceName, mocks.MockMethod)].Extra["transports"], tcase.wantTransports))
 	}
 }
 

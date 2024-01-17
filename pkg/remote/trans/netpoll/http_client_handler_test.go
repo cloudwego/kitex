@@ -18,6 +18,7 @@ package netpoll
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -119,12 +120,19 @@ func TestHTTPRead(t *testing.T) {
 func TestHTTPOnMessage(t *testing.T) {
 	// 1. prepare mock data
 	svcInfo := mocks.ServiceInfo()
-	svcInfoMap := map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: svcInfo}
-	methodSvcMap := map[string]*serviceinfo.ServiceInfo{"mock": svcInfo, "mockException": svcInfo, "mockError": svcInfo, "mockOneway": svcInfo}
-
+	svcSearchMap := map[string]*serviceinfo.ServiceInfo{
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockMethod):          svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
+		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
+		mocks.MockMethod:          svcInfo,
+		mocks.MockExceptionMethod: svcInfo,
+		mocks.MockErrorMethod:     svcInfo,
+		mocks.MockOnewayMethod:    svcInfo,
+	}
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, method), nil, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	recvMsg := remote.NewMessageWithNewer(svcInfoMap, methodSvcMap, ri, remote.Call, remote.Server)
+	recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server)
 	sendMsg := remote.NewMessage(svcInfo.MethodInfo(method).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
 	// 2. test

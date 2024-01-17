@@ -296,7 +296,7 @@ func newMockConnOption() remote.ConnOption {
 
 func newMockServerOption() *remote.ServerOption {
 	return &remote.ServerOption{
-		SvcMap:                nil,
+		SvcSearchMap:          nil,
 		TransServerFactory:    nil,
 		SvrHandlerFactory:     nil,
 		Codec:                 nil,
@@ -407,24 +407,23 @@ func newMockStreamRecvHelloRequest(s *grpc.Stream) {
 var _ remote.Message = &mockMessage{}
 
 type mockMessage struct {
-	RPCInfoFunc                  func() rpcinfo.RPCInfo
-	ServiceInfoFunc              func() *serviceinfo.ServiceInfo
-	ServiceInfoByServiceNameFunc func(string) *serviceinfo.ServiceInfo
-	ServiceInfoByMethodNameFunc  func(string) (*serviceinfo.ServiceInfo, error)
-	DataFunc                     func() interface{}
-	NewDataFunc                  func(method string) (ok bool)
-	MessageTypeFunc              func() remote.MessageType
-	SetMessageTypeFunc           func(remote.MessageType)
-	RPCRoleFunc                  func() remote.RPCRole
-	PayloadLenFunc               func() int
-	SetPayloadLenFunc            func(size int)
-	TransInfoFunc                func() remote.TransInfo
-	TagsFunc                     func() map[string]interface{}
-	ProtocolInfoFunc             func() remote.ProtocolInfo
-	SetProtocolInfoFunc          func(remote.ProtocolInfo)
-	PayloadCodecFunc             func() remote.PayloadCodec
-	SetPayloadCodecFunc          func(pc remote.PayloadCodec)
-	RecycleFunc                  func()
+	RPCInfoFunc         func() rpcinfo.RPCInfo
+	ServiceInfoFunc     func() *serviceinfo.ServiceInfo
+	SetServiceInfoFunc  func(svcName, methodName string) (*serviceinfo.ServiceInfo, error)
+	DataFunc            func() interface{}
+	NewDataFunc         func(method string) (ok bool)
+	MessageTypeFunc     func() remote.MessageType
+	SetMessageTypeFunc  func(remote.MessageType)
+	RPCRoleFunc         func() remote.RPCRole
+	PayloadLenFunc      func() int
+	SetPayloadLenFunc   func(size int)
+	TransInfoFunc       func() remote.TransInfo
+	TagsFunc            func() map[string]interface{}
+	ProtocolInfoFunc    func() remote.ProtocolInfo
+	SetProtocolInfoFunc func(remote.ProtocolInfo)
+	PayloadCodecFunc    func() remote.PayloadCodec
+	SetPayloadCodecFunc func(pc remote.PayloadCodec)
+	RecycleFunc         func()
 }
 
 func (m *mockMessage) RPCInfo() rpcinfo.RPCInfo {
@@ -441,16 +440,9 @@ func (m *mockMessage) ServiceInfo() (si *serviceinfo.ServiceInfo) {
 	return
 }
 
-func (m *mockMessage) ServiceInfoByServiceName(svcName string) (si *serviceinfo.ServiceInfo) {
-	if m.ServiceInfoByServiceNameFunc != nil {
-		m.ServiceInfoByServiceNameFunc(svcName)
-	}
-	return nil
-}
-
-func (m *mockMessage) ServiceInfoByMethodName(methodName string) (si *serviceinfo.ServiceInfo, err error) {
-	if m.ServiceInfoByMethodNameFunc != nil {
-		m.ServiceInfoByMethodNameFunc(methodName)
+func (m *mockMessage) SetServiceInfo(svcName, methodName string) (si *serviceinfo.ServiceInfo, err error) {
+	if m.SetServiceInfoFunc != nil {
+		return m.SetServiceInfoFunc(svcName, methodName)
 	}
 	return nil, nil
 }
