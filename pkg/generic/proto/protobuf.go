@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2023 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,24 +14,18 @@
  * limitations under the License.
  */
 
-package generic
+package proto
 
 import (
-	dproto "github.com/cloudwego/dynamicgo/proto"
-
-	"github.com/cloudwego/kitex/pkg/generic/proto"
+	"context"
 )
 
-// PbDescriptorProvider provide service descriptor
-type PbDescriptorProvider interface {
-	Closer
-	// Provide return a channel for provide service descriptors
-	Provide() <-chan proto.ServiceDescriptor
+// MessageReader read from ActualMsgBuf with method and returns a string
+type MessageReader interface {
+	Read(ctx context.Context, method string, actualMsgBuf []byte) (interface{}, error)
 }
 
-// PbDescriptorProvider provide service descriptor
-type PbDescriptorProviderDynamicGo interface {
-	Closer
-	// Provide return a channel for provide service descriptors
-	Provide() <-chan *dproto.ServiceDescriptor
+// MessageWriter writes to a converts json to protobufs wireformat and returns an output bytebuffer
+type MessageWriter interface {
+	Write(ctx context.Context, msg interface{}) (interface{}, error)
 }

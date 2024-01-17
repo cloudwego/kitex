@@ -18,8 +18,11 @@ package generic
 
 import (
 	"bytes"
+	"context"
 	"net/http"
 	"testing"
+
+	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -252,4 +255,35 @@ func TestJSONThriftGenericWithDynamicGo(t *testing.T) {
 	method, err := g.GetMethod(nil, "Test")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Test")
+}
+
+func TestJSONPbGeneric(t *testing.T) {
+	path := "./jsonpb_test/idl/echo.proto"
+
+	// initialise dynamicgo proto.ServiceDescriptor
+	opts := dproto.Options{}
+	p, err := NewPbFileProviderWithDynamicGo(path, context.Background(), opts)
+	if err != nil {
+		panic(err)
+	}
+
+	g, err := JSONPbGeneric(p)
+	test.Assert(t, err == nil)
+	defer g.Close()
+
+	test.Assert(t, g.PayloadCodec().Name() == "JSONPb")
+
+	test.Assert(t, g.PayloadCodecType() == serviceinfo.Protobuf)
+
+	jg, ok := g.(*jsonPbGeneric)
+	test.Assert(t, ok)
+
+	test.Assert(t, jg.codec.dynamicgoEnabled == true)
+	test.Assert(t, !jg.codec.convOpts.NoBase64Binary)
+
+	test.Assert(t, err == nil)
+
+	method, err := g.GetMethod(nil, "Echo")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "Echo")
 }
