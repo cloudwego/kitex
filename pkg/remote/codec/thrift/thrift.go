@@ -23,6 +23,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 
+	"github.com/cloudwego/kitex/pkg/allocator"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
@@ -198,12 +199,15 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
 			ri := message.RPCInfo()
 			rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
-			buf, err := tProt.next(message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+			dataLen := message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength()
+			buf, err := tProt.next(dataLen)
 			rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
 			if err != nil {
 				return remote.NewTransError(remote.ProtocolError, err)
 			}
-			_, err = msg.FastRead(buf)
+			ac := allocator.NewAllocator(dataLen)
+			bp := bthrift.NewABinaryProtocol(ac)
+			_, err = msg.FastRead(bp, buf)
 			if err != nil {
 				return remote.NewTransError(remote.ProtocolError, err)
 			}
@@ -262,7 +266,7 @@ type MessageReaderWithMethodWithContext interface {
 type ThriftMsgFastCodec interface {
 	BLength() int
 	FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int
-	FastRead(buf []byte) (int, error)
+	FastRead(bp bthrift.BTProtocol, buf []byte) (int, error)
 }
 
 func getValidData(methodName string, message remote.Message) (interface{}, error) {

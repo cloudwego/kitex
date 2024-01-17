@@ -19,6 +19,8 @@ package bthrift
 
 import (
 	"github.com/apache/thrift/lib/go/thrift"
+
+	"github.com/cloudwego/kitex/pkg/allocator"
 )
 
 // BinaryWriter .
@@ -29,6 +31,7 @@ type BinaryWriter interface {
 
 // BTProtocol .
 type BTProtocol interface {
+	Allocator() allocator.Allocator
 	WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int
 	WriteMessageEnd(buf []byte) int
 	WriteStructBegin(buf []byte, name string) int

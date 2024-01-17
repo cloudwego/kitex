@@ -25,6 +25,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 
+	"github.com/cloudwego/kitex/pkg/allocator"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -35,6 +36,10 @@ var Binary binaryProtocol
 var _ BTProtocol = binaryProtocol{}
 
 type binaryProtocol struct{}
+
+func (p binaryProtocol) Allocator() allocator.Allocator {
+	return nil
+}
 
 func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int {
 	offset := 0

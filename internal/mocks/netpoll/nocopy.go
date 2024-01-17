@@ -170,7 +170,7 @@ func (mr *MockReaderMockRecorder) Skip(n interface{}) *gomock.Call {
 // Slice mocks base method.
 func (m *MockReader) Slice(n int) (netpoll.Reader, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Slice", n)
+	ret := m.ctrl.Call(m, "slice", n)
 	ret0, _ := ret[0].(netpoll.Reader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
@@ -179,7 +179,7 @@ func (m *MockReader) Slice(n int) (netpoll.Reader, error) {
 // Slice indicates an expected call of Slice.
 func (mr *MockReaderMockRecorder) Slice(n interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Slice", reflect.TypeOf((*MockReader)(nil).Slice), n)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "slice", reflect.TypeOf((*MockReader)(nil).Slice), n)
 }
 
 // Until mocks base method.
@@ -563,7 +563,7 @@ func (mr *MockReadWriterMockRecorder) Skip(n interface{}) *gomock.Call {
 // Slice mocks base method.
 func (m *MockReadWriter) Slice(n int) (netpoll.Reader, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Slice", n)
+	ret := m.ctrl.Call(m, "slice", n)
 	ret0, _ := ret[0].(netpoll.Reader)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
@@ -572,7 +572,7 @@ func (m *MockReadWriter) Slice(n int) (netpoll.Reader, error) {
 // Slice indicates an expected call of Slice.
 func (mr *MockReadWriterMockRecorder) Slice(n interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Slice", reflect.TypeOf((*MockReadWriter)(nil).Slice), n)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "slice", reflect.TypeOf((*MockReadWriter)(nil).Slice), n)
 }
 
 // Until mocks base method.

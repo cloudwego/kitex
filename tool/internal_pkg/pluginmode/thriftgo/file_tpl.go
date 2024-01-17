@@ -27,6 +27,7 @@ import (
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/kitex/pkg/allocator"
 
 	{{if GenerateDeepCopyAPIs -}}
 	kutils "github.com/cloudwego/kitex/pkg/utils"
@@ -55,6 +56,7 @@ var (
 	_ = (*strings.Builder)(nil)
 	_ = reflect.Type(nil)
 	_ = thrift.TProtocol(nil)
+	_ allocator.Allocator
 	{{- if GenerateFastAPIs}}
 	_ = bthrift.BinaryWriter(nil)
 	{{- end}}

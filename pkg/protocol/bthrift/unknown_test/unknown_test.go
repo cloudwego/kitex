@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package test
+package unknown_test
 
 import (
 	"bytes"
@@ -23,7 +23,7 @@ import (
 
 	tt "github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift/test/kitex_gen/test"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift/unknown_test/kitex_gen/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )

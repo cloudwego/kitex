@@ -41,7 +41,7 @@ const structLikeCodec = `
 const structLikeFastRead = `
 {{define "StructLikeFastRead"}}
 {{- $TypeName := .GoName}}
-func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
+func (p *{{$TypeName}}) FastRead(bp bthrift.BTProtocol, buf []byte) (int, error) {
 	var err error
 	var offset int
 	var l int
@@ -52,7 +52,7 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 	var isset{{.GoName}} bool = false
 	{{- end}}
 	{{- end}}
-	_, l, err = bthrift.Binary.ReadStructBegin(buf)
+	_, l, err = bp.ReadStructBegin(buf)
 	offset += l
 	if err != nil {
 		goto ReadStructBeginError
@@ -65,7 +65,7 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 		{{- end}}
 		var beginOff int = offset
 		{{- end}}
-		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
+		_, fieldTypeId, fieldId, l, err = bp.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
 			goto ReadFieldBeginError
@@ -78,7 +78,7 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 		{{- range .Fields}}
 		case {{.ID}}:
 			if fieldTypeId == thrift.{{.Type | GetTypeIDConstant }} {
-				l, err = p.FastReadField{{Str .ID}}(buf[offset:])
+				l, err = p.FastReadField{{Str .ID}}(bp, buf[offset:])
 				offset += l
 				if err != nil {
 					goto ReadFieldError
@@ -87,7 +87,7 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 				isset{{.GoName}} = true
 				{{- end}}
 			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				l, err = bp.Skip(buf[offset:], fieldTypeId)
 				offset += l
 				if err != nil {
 					goto SkipFieldError
@@ -95,7 +95,7 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 			}
 		{{- end}}{{/* range .Fields */}}
 		default:
-			l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+			l, err = bp.Skip(buf[offset:], fieldTypeId)
 			offset += l
 			if err != nil {
 				goto SkipFieldError
@@ -105,14 +105,14 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 			{{- end}}{{/* if Features.KeepUnknownFields */}}
 		}
 		{{- else -}}
-		l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+		l, err = bp.Skip(buf[offset:], fieldTypeId)
 		offset += l
 		if err != nil {
 			goto SkipFieldError
 		}
 		{{- end}}{{/* if len(.Fields) > 0 */}}
 
-		l, err = bthrift.Binary.ReadFieldEnd(buf[offset:])
+		l, err = bp.ReadFieldEnd(buf[offset:])
 		offset += l
 		if err != nil {
 		  goto ReadFieldEndError
@@ -128,7 +128,7 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 		{{- end}}
 		{{- end}}{{/* if Features.KeepUnknownFields */}}
 	}
-	l, err = bthrift.Binary.ReadStructEnd(buf[offset:])
+	l, err = bp.ReadStructEnd(buf[offset:])
 	offset += l
 	if err != nil {
 		goto ReadStructEndError
@@ -171,7 +171,7 @@ const structLikeFastReadField = `
 {{- $TypeName := .GoName}}
 {{- range .Fields}}
 {{$FieldName := .GoName}}
-func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte) (int, error) {
+func (p *{{$TypeName}}) FastReadField{{Str .ID}}(bp bthrift.BTProtocol, buf []byte) (int, error) {
 	offset := 0
 	{{- $ctx := MkRWCtx .}}
 	{{ template "FieldFastRead" $ctx}}
@@ -344,9 +344,9 @@ const fieldFastReadStructLike = `
 	{{- if .NeedDecl}}
 	{{- .Target}} := {{.TypeName.Deref.NewFunc}}()
 	{{- else}}
-	tmp := {{.TypeName.Deref.NewFunc}}()
+	tmp := allocator.New[{{.TypeName.Deref}}](bp.Allocator())
 	{{- end}}
-	if l, err := {{- if .NeedDecl}}{{.Target}}{{else}}tmp{{end}}.FastRead(buf[offset:]); err != nil {
+	if l, err := {{- if .NeedDecl}}{{.Target}}{{else}}tmp{{end}}.FastRead(bp, buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
@@ -361,7 +361,7 @@ const fieldFastReadBaseType = `
 	{{- if .NeedDecl}}
 	var {{.Target}} {{.TypeName}}
 	{{- end}}
-	if v, l, err := bthrift.Binary.Read{{.TypeID}}(buf[offset:]); err != nil {
+	if v, l, err := bp.Read{{.TypeID}}(buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
@@ -397,12 +397,13 @@ const fieldFastReadContainer = `
 
 const fieldFastReadMap = `
 {{define "FieldFastReadMap"}}
-	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
+	_, _, size, l, err := bp.ReadMapBegin(buf[offset:])
 	offset += l
 	if err != nil {
 		return offset, err
 	}
-	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, size)
+	{{.Target}} {{if .NeedDecl}}:{{end}}= allocator.NewMap[{{.KeyCtx.TypeName}}, {{.ValCtx.TypeName}}](bp.Allocator(), size)
+	bp = bthrift.Binary
 	for i := 0; i < size; i++ {
 		{{- $key := .GenID "_key"}}
 		{{- $ctx := .KeyCtx.WithDecl.WithTarget $key}}
@@ -418,7 +419,7 @@ const fieldFastReadMap = `
 
 		{{.Target}}[{{$key}}] = {{$val}}
 	}
-	if l, err := bthrift.Binary.ReadMapEnd(buf[offset:]); err != nil {
+	if l, err := bp.ReadMapEnd(buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
@@ -428,12 +429,12 @@ const fieldFastReadMap = `
 
 const fieldFastReadSet = `
 {{define "FieldFastReadSet"}}
-	_, size, l, err := bthrift.Binary.ReadSetBegin(buf[offset:])
+	_, size, l, err := bp.ReadSetBegin(buf[offset:])
 	offset += l
 	if err != nil {
 		return offset, err
 	}
-	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, 0, size)
+	{{.Target}} {{if .NeedDecl}}:{{end}}= allocator.NewSlice[{{.ValCtx.TypeName}}](bp.Allocator(), size)
 	for i := 0; i < size; i++ {
 		{{- $val := .GenID "_elem"}}
 		{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
@@ -443,9 +444,9 @@ const fieldFastReadSet = `
 			{{$val = printf "*%s" $val}}
 		{{end}}
 
-		{{.Target}} = append({{.Target}}, {{$val}})
+		{{.Target}}[i] = {{$val}}
 	}
-	if l, err := bthrift.Binary.ReadSetEnd(buf[offset:]); err != nil {
+	if l, err := bp.ReadSetEnd(buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
@@ -455,12 +456,12 @@ const fieldFastReadSet = `
 
 const fieldFastReadList = `
 {{define "FieldFastReadList"}}
-	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
+	_, size, l, err := bp.ReadListBegin(buf[offset:])
 	offset += l
 	if err != nil {
 		return offset, err
 	}
-	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, 0, size)
+	{{.Target}} {{if .NeedDecl}}:{{end}}= allocator.NewSlice[{{.ValCtx.TypeName}}](bp.Allocator(), size)
 	for i := 0; i < size; i++ {
 		{{- $val := .GenID "_elem"}}
 		{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
@@ -470,9 +471,9 @@ const fieldFastReadList = `
 			{{$val = printf "*%s" $val}}
 		{{end}}
 
-		{{.Target}} = append({{.Target}}, {{$val}})
+		{{.Target}}[i] = {{$val}}
 	}
-	if l, err := bthrift.Binary.ReadListEnd(buf[offset:]); err != nil {
+	if l, err := bp.ReadListEnd(buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
