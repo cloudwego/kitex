@@ -296,7 +296,7 @@ func (kc *kClient) initMiddlewares(ctx context.Context) {
 }
 
 func (kc *kClient) initStreamMiddlewares(ctx context.Context) {
-	// TODO: governance(e.g. timeout) & observation(e.g. trace) middlewares
+	kc.opt.Streaming.EventHandler = kc.opt.TracerCtl.GetStreamEventHandler()
 	kc.opt.Streaming.InitMiddlewares(ctx)
 }
 

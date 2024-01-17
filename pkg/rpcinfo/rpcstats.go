@@ -22,11 +22,15 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
 var (
-	_            RPCStats = &rpcStats{}
+	_            RPCStats          = (*rpcStats)(nil)
+	_            MutableRPCStats   = &rpcStats{}
+	_            internal.Reusable = (*rpcStats)(nil)
+	_            internal.Reusable = (*event)(nil)
 	rpcStatsPool sync.Pool
 	eventPool    sync.Pool
 	once         sync.Once
@@ -96,8 +100,10 @@ type rpcStats struct {
 
 	eventMap []Event
 
-	sendSize uint64
-	recvSize uint64
+	sendSize     uint64
+	lastSendSize uint64 // for Streaming APIs, record the size of the last sent message
+	recvSize     uint64
+	lastRecvSize uint64 // for Streaming APIs, record the size of the last received message
 
 	err      atomic.Value
 	panicErr atomic.Value
@@ -119,16 +125,21 @@ func (r *rpcStats) Record(ctx context.Context, e stats.Event, status stats.Statu
 	if e.Level() > r.level {
 		return
 	}
-	eve := eventPool.Get().(*event)
-	eve.event = e
-	eve.status = status
-	eve.info = info
-	eve.time = time.Now()
-
+	eve := NewEvent(e, status, info)
 	idx := e.Index()
 	r.Lock()
 	r.eventMap[idx] = eve
 	r.Unlock()
+}
+
+// NewEvent creates a new Event based on the given event, status and info.
+func NewEvent(statsEvent stats.Event, status stats.Status, info string) Event {
+	eve := eventPool.Get().(*event)
+	eve.event = statsEvent
+	eve.status = status
+	eve.info = info
+	eve.time = time.Now()
+	return eve
 }
 
 // SendSize implements the RPCStats interface.
@@ -136,9 +147,19 @@ func (r *rpcStats) SendSize() uint64 {
 	return atomic.LoadUint64(&r.sendSize)
 }
 
+// LastSendSize implements the RPCStats interface.
+func (r *rpcStats) LastSendSize() uint64 {
+	return atomic.LoadUint64(&r.lastSendSize)
+}
+
 // RecvSize implements the RPCStats interface.
 func (r *rpcStats) RecvSize() uint64 {
 	return atomic.LoadUint64(&r.recvSize)
+}
+
+// LastRecvSize implements the RPCStats interface.
+func (r *rpcStats) LastRecvSize() uint64 {
+	return atomic.LoadUint64(&r.lastRecvSize)
 }
 
 // Error implements the RPCStats interface.
@@ -189,13 +210,29 @@ func (r *rpcStats) CopyForRetry() RPCStats {
 }
 
 // SetSendSize sets send size.
+// This should be called by Ping-Pong APIs which only send once.
 func (r *rpcStats) SetSendSize(size uint64) {
 	atomic.StoreUint64(&r.sendSize, size)
 }
 
+// IncrSendSize increments send size.
+// This should be called by Streaming APIs which may send multiple times.
+func (r *rpcStats) IncrSendSize(size uint64) {
+	atomic.AddUint64(&r.sendSize, size)
+	atomic.StoreUint64(&r.lastSendSize, size)
+}
+
 // SetRecvSize sets recv size.
+// This should be called by Ping-Pong APIs which only recv once.
 func (r *rpcStats) SetRecvSize(size uint64) {
 	atomic.StoreUint64(&r.recvSize, size)
+}
+
+// IncrRecvSize increments recv size.
+// This should be called by Streaming APIs which may recv multiple times.
+func (r *rpcStats) IncrRecvSize(size uint64) {
+	atomic.AddUint64(&r.recvSize, size)
+	atomic.StoreUint64(&r.lastRecvSize, size)
 }
 
 // SetError sets error.

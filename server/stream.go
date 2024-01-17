@@ -24,7 +24,7 @@ import (
 )
 
 func (s *server) initStreamMiddlewares(ctx context.Context) {
-	// TODO: governance(e.g. timeout) & observation(e.g. trace) middlewares
+	s.opt.Streaming.EventHandler = s.opt.TracerCtl.GetStreamEventHandler()
 	s.opt.Streaming.InitMiddlewares(ctx)
 }
 

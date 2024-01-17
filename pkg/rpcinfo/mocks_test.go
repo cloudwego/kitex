@@ -100,3 +100,5 @@ func (m *MockRPCStats) Panicked() (yes bool, val interface{})                   
 func (m *MockRPCStats) GetEvent(event stats.Event) (e rpcinfo.Event)              { return }
 func (m *MockRPCStats) Level() (lv stats.Level)                                   { return }
 func (m *MockRPCStats) CopyForRetry() rpcinfo.RPCStats                            { return nil }
+func (m *MockRPCStats) LastSendSize() uint64                                      { return 0 }
+func (m *MockRPCStats) LastRecvSize() uint64                                      { return 0 }

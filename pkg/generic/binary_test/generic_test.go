@@ -38,6 +38,8 @@ import (
 	"github.com/cloudwego/kitex/server"
 )
 
+var addr = test.GetLocalAddress()
+
 func TestRun(t *testing.T) {
 	t.Run("RawThriftBinary", rawThriftBinary)
 	t.Run("RawThriftBinaryError", rawThriftBinaryError)
@@ -48,7 +50,6 @@ func TestRun(t *testing.T) {
 func rawThriftBinary(t *testing.T) {
 	svr := initRawThriftBinaryServer(new(GenericServiceImpl))
 	defer svr.Stop()
-	time.Sleep(500 * time.Millisecond)
 
 	cli := initRawThriftBinaryClient()
 
@@ -65,7 +66,6 @@ func rawThriftBinary(t *testing.T) {
 func rawThriftBinaryError(t *testing.T) {
 	svr := initRawThriftBinaryServer(new(GenericServiceErrorImpl))
 	defer svr.Stop()
-	time.Sleep(500 * time.Millisecond)
 
 	cli := initRawThriftBinaryClient()
 
@@ -80,7 +80,6 @@ func rawThriftBinaryError(t *testing.T) {
 func rawThriftBinaryMockReq(t *testing.T) {
 	svr := initRawThriftBinaryServer(new(GenericServiceMockImpl))
 	defer svr.Stop()
-	time.Sleep(500 * time.Millisecond)
 
 	cli := initRawThriftBinaryClient()
 
@@ -118,7 +117,6 @@ func rawThriftBinaryMockReq(t *testing.T) {
 func rawThriftBinary2NormalServer(t *testing.T) {
 	svr := initMockServer(new(MockImpl))
 	defer svr.Stop()
-	time.Sleep(500 * time.Millisecond)
 
 	cli := initRawThriftBinaryClient()
 
@@ -152,20 +150,20 @@ func rawThriftBinary2NormalServer(t *testing.T) {
 
 func initRawThriftBinaryClient() genericclient.Client {
 	g := generic.BinaryThriftGeneric()
-	cli := newGenericClient("destServiceName", g, "127.0.0.1:9009")
+	cli := newGenericClient("destServiceName", g, addr)
 	return cli
 }
 
 func initRawThriftBinaryServer(handler generic.Service) server.Server {
-	addr, _ := net.ResolveTCPAddr("tcp", ":9009")
+	addr, _ := net.ResolveTCPAddr("tcp", addr)
 	g := generic.BinaryThriftGeneric()
 	svr := newGenericServer(g, addr, handler)
 	return svr
 }
 
 func initMockServer(handler kt.Mock) server.Server {
-	addr, _ := net.ResolveTCPAddr("tcp", ":9009")
-	svr := NewMockServer(handler, addr)
+	tcpAddr, _ := net.ResolveTCPAddr("tcp", addr)
+	svr := NewMockServer(handler, tcpAddr)
 	return svr
 }
 
@@ -197,7 +195,7 @@ func TestBinaryThriftGenericClientClose(t *testing.T) {
 	clis := make([]genericclient.Client, cliCnt)
 	for i := 0; i < cliCnt; i++ {
 		g := generic.BinaryThriftGeneric()
-		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009", client.WithShortConnection())
+		clis[i] = newGenericClient("destServiceName", g, addr, client.WithShortConnection())
 	}
 
 	runtime.ReadMemStats(&ms)
@@ -234,7 +232,7 @@ func TestBinaryThriftGenericClientFinalizer(t *testing.T) {
 	clis := make([]genericclient.Client, cliCnt)
 	for i := 0; i < cliCnt; i++ {
 		g := generic.BinaryThriftGeneric()
-		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9009", client.WithShortConnection())
+		clis[i] = newGenericClient("destServiceName", g, addr, client.WithShortConnection())
 	}
 
 	runtime.ReadMemStats(&ms)

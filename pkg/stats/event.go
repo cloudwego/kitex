@@ -70,6 +70,10 @@ const (
 	waitReadFinish
 	writeStart
 	writeFinish
+	streamRecv
+	streamSend
+
+	// NOTE: add new events before this line
 	predefinedEventNum
 )
 
@@ -88,6 +92,10 @@ var (
 	WaitReadFinish     = newEvent(waitReadFinish, LevelDetailed)
 	WriteStart         = newEvent(writeStart, LevelDetailed)
 	WriteFinish        = newEvent(writeFinish, LevelDetailed)
+
+	// Streaming Events
+	StreamRecv = newEvent(streamRecv, LevelDetailed)
+	StreamSend = newEvent(streamSend, LevelDetailed)
 )
 
 // errors

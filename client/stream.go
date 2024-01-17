@@ -18,8 +18,11 @@ package client
 
 import (
 	"context"
+	"io"
+	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -87,26 +90,41 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 		if err != nil {
 			return
 		}
-		clientStream := newStream(st, kc, sendEndpoint, recvEndpoint)
+		clientStream := newStream(st, kc, kc.getStreamingMode(ri), sendEndpoint, recvEndpoint)
 		resp.(*streaming.Result).Stream = clientStream
 		return
 	}, nil
+}
+
+func (kc *kClient) getStreamingMode(ri rpcinfo.RPCInfo) serviceinfo.StreamingMode {
+	methodInfo := kc.svcInfo.MethodInfo(ri.Invocation().MethodName())
+	if methodInfo == nil {
+		return serviceinfo.StreamingNone
+	}
+	return methodInfo.StreamingMode()
 }
 
 type stream struct {
 	stream streaming.Stream
 	kc     *kClient
 
-	sendEndpoint endpoint.SendEndpoint
-	recvEndpoint endpoint.RecvEndpoint
+	streamingMode serviceinfo.StreamingMode
+	sendEndpoint  endpoint.SendEndpoint
+	recvEndpoint  endpoint.RecvEndpoint
+	finished      uint32
 }
 
-func newStream(s streaming.Stream, kc *kClient, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint) *stream {
+var _ streaming.WithDoFinish = (*stream)(nil)
+
+func newStream(s streaming.Stream, kc *kClient, mode serviceinfo.StreamingMode,
+	sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint,
+) *stream {
 	return &stream{
-		stream:       s,
-		kc:           kc,
-		sendEndpoint: sendEP,
-		recvEndpoint: recvEP,
+		stream:        s,
+		kc:            kc,
+		streamingMode: mode,
+		sendEndpoint:  sendEP,
+		recvEndpoint:  recvEP,
 	}
 }
 
@@ -122,8 +140,13 @@ func (s *stream) SendHeader(metadata.MD) error {
 	panic("this method should only be used in server side stream!")
 }
 
-func (s *stream) Header() (metadata.MD, error) {
-	return s.stream.Header()
+// Header returns the header metadata sent by the server if any.
+// If a non-nil error is returned, stream.DoFinish() will be called to record the EndOfStream
+func (s *stream) Header() (md metadata.MD, err error) {
+	if md, err = s.stream.Header(); err != nil {
+		s.DoFinish(err)
+	}
+	return
 }
 
 func (s *stream) Trailer() metadata.MD {
@@ -134,17 +157,41 @@ func (s *stream) Context() context.Context {
 	return s.stream.Context()
 }
 
-func (s *stream) RecvMsg(m interface{}) error {
-	return s.recvEndpoint(s.stream, m)
+// RecvMsg receives a message from the server.
+// If an error is returned, stream.DoFinish() will be called to record the end of stream
+func (s *stream) RecvMsg(m interface{}) (err error) {
+	err = s.recvEndpoint(s.stream, m)
+	if err != nil || s.streamingMode == serviceinfo.StreamingClient {
+		s.DoFinish(err)
+	}
+	return
 }
 
-func (s *stream) SendMsg(m interface{}) error {
-	return s.sendEndpoint(s.stream, m)
+// SendMsg sends a message to the server.
+// If an error is returned, stream.DoFinish() will be called to record the end of stream
+func (s *stream) SendMsg(m interface{}) (err error) {
+	if err = s.sendEndpoint(s.stream, m); err != nil {
+		s.DoFinish(err)
+	}
+	return
 }
 
+// Close will send a frame with EndStream=true to the server.
+// It will always return a nil
 func (s *stream) Close() error {
-	ctx := s.stream.Context()
-	ri := rpcinfo.GetRPCInfo(ctx)
-	s.kc.opt.TracerCtl.DoFinish(ctx, ri, nil)
 	return s.stream.Close()
+}
+
+// DoFinish implements the streaming.WithDoFinish interface, and it records the end of stream
+func (s *stream) DoFinish(err error) {
+	if atomic.SwapUint32(&s.finished, 1) == 1 {
+		// already called
+		return
+	}
+	if err == io.EOF {
+		err = nil
+	}
+	ctx := s.Context()
+	ri := rpcinfo.GetRPCInfo(ctx)
+	s.kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 }

@@ -58,7 +58,7 @@ func TestServerRun(t *testing.T) {
 	opts = append(opts, WithMetaHandler(noopMetahandler{}))
 	svr := NewServer(opts...)
 
-	time.AfterFunc(time.Second, func() {
+	time.AfterFunc(time.Millisecond*500, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
 	})
@@ -82,10 +82,11 @@ func TestServerRun(t *testing.T) {
 }
 
 func TestReusePortServerRun(t *testing.T) {
-	addr, _ := net.ResolveTCPAddr("tcp", ":19999")
+	hostPort := test.GetLocalAddress()
+	addr, _ := net.ResolveTCPAddr("tcp", hostPort)
 	var opts []Option
 	opts = append(opts, WithReusePort(true))
-	opts = append(opts, WithServiceAddr(addr))
+	opts = append(opts, WithServiceAddr(addr), WithExitWaitTime(time.Microsecond*10))
 
 	var wg sync.WaitGroup
 	for i := 0; i < 8; i++ {
@@ -288,7 +289,7 @@ func TestServiceDeregisterFailed(t *testing.T) {
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
-	time.AfterFunc(3500*time.Millisecond, func() {
+	time.AfterFunc(2000*time.Millisecond, func() {
 		err := svr.Stop()
 		test.Assert(t, strings.Contains(err.Error(), mockDeregErr.Error()))
 	})
@@ -330,7 +331,7 @@ func TestServiceRegistryInfo(t *testing.T) {
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
-	time.AfterFunc(3500*time.Millisecond, func() {
+	time.AfterFunc(2000*time.Millisecond, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
 	})
@@ -365,7 +366,7 @@ func TestServiceRegistryNoInitInfo(t *testing.T) {
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
-	time.AfterFunc(3500*time.Millisecond, func() {
+	time.AfterFunc(2000*time.Millisecond, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
 	})
@@ -411,7 +412,7 @@ func TestServiceRegistryInfoWithNilTags(t *testing.T) {
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
-	time.AfterFunc(3500*time.Millisecond, func() {
+	time.AfterFunc(2000*time.Millisecond, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
 	})
@@ -431,7 +432,7 @@ func TestGRPCServerMultipleServices(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.DeepEqual(t, svr.GetServiceInfos()[mocks.ServiceInfo().ServiceName], mocks.ServiceInfo())
 	test.DeepEqual(t, svr.GetServiceInfos()[mocks.Service2Info().ServiceName], mocks.Service2Info())
-	time.AfterFunc(3500*time.Millisecond, func() {
+	time.AfterFunc(1000*time.Millisecond, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
 	})
@@ -582,7 +583,8 @@ func TestServerBoundHandler(t *testing.T) {
 		},
 	}
 	for _, tcase := range cases {
-		svr := NewServer(tcase.opts...)
+		opts := append(tcase.opts, WithExitWaitTime(time.Millisecond*10))
+		svr := NewServer(opts...)
 
 		time.AfterFunc(100*time.Millisecond, func() {
 			err := svr.Stop()

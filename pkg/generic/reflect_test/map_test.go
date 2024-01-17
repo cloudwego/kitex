@@ -104,16 +104,12 @@ func initThriftMapServer(address, idl string, handler generic.Service) server.Se
 		panic(err)
 	}
 	svr := newGenericServer(g, addr, handler)
-	if err != nil {
-		panic(err)
-	}
-	time.Sleep(500 * time.Millisecond)
 	return svr
 }
 
 func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service) server.Server {
 	var opts []server.Option
-	opts = append(opts, server.WithServiceAddr(addr))
+	opts = append(opts, server.WithServiceAddr(addr), server.WithExitWaitTime(time.Microsecond*10))
 	svr := genericserver.NewServer(handler, g, opts...)
 	go func() {
 		err := svr.Run()
@@ -121,6 +117,7 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 			panic(err)
 		}
 	}()
+	test.WaitServerStart(addr.String())
 	return svr
 }
 

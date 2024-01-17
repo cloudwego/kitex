@@ -29,6 +29,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -78,6 +79,14 @@ func mallocWithFirstByteZeroed(size int) []byte {
 }
 
 func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
+	var payload []byte
+	defer func() {
+		// record send size, even when err != nil (0 is recorded to the lastSendSize)
+		if rpcStats := rpcinfo.AsMutableRPCStats(message.RPCInfo().Stats()); rpcStats != nil {
+			rpcStats.IncrSendSize(uint64(len(payload)))
+		}
+	}()
+
 	writer, ok := out.(remote.FrameWrite)
 	if !ok {
 		return fmt.Errorf("output buffer must implement FrameWrite")
@@ -88,7 +97,6 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	}
 	isCompressed := compressor != nil
 
-	var payload []byte
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
 		payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
@@ -155,6 +163,10 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 
 func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
 	d, err := decodeGRPCFrame(ctx, in)
+	if rpcStats := rpcinfo.AsMutableRPCStats(message.RPCInfo().Stats()); rpcStats != nil {
+		// record recv size, even when err != nil (0 is recorded to the lastRecvSize)
+		rpcStats.IncrRecvSize(uint64(len(d)))
+	}
 	if err != nil {
 		return err
 	}

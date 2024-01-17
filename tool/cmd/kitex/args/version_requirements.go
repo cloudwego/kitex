@@ -14,4 +14,4 @@
 
 package args
 
-var requiredThriftGoVersion = "v0.3.5"
+var requiredThriftGoVersion = "v0.3.6"

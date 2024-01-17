@@ -96,7 +96,6 @@ func initMockServer(t *testing.T, handler kt.Mock, address string) server.Server
 func testThriftNormalBinaryEcho(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift")
-	time.Sleep(500 * time.Millisecond)
 
 	url := "http://example.com/BinaryEcho"
 
@@ -241,9 +240,7 @@ func BenchmarkCompareDynamicgoAndOriginal_Small(b *testing.B) {
 
 	b.Run("thrift_small_dynamicgo", func(b *testing.B) {
 		addr := test.GetLocalAddress()
-		time.Sleep(1 * time.Second)
 		svr := initThriftServer(&t, addr, new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
-		time.Sleep(500 * time.Millisecond)
 		cli := initThriftClientByIDL(&t, transport.TTHeader, addr, "./idl/baseline.thrift", opts, false, true)
 
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
@@ -269,9 +266,7 @@ func BenchmarkCompareDynamicgoAndOriginal_Small(b *testing.B) {
 
 	b.Run("thrift_small_original", func(b *testing.B) {
 		addr := test.GetLocalAddress()
-		time.Sleep(1 * time.Second)
 		svr := initThriftServer(&t, addr, new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
-		time.Sleep(500 * time.Millisecond)
 		cli := initThriftClientByIDL(&t, transport.TTHeader, addr, "./idl/baseline.thrift", nil, false, false)
 
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
@@ -312,9 +307,7 @@ func BenchmarkCompareDynamicgoAndOriginal_Medium(b *testing.B) {
 
 	b.Run("thrift_medium_dynamicgo", func(b *testing.B) {
 		addr := test.GetLocalAddress()
-		time.Sleep(1 * time.Second)
 		svr := initThriftServer(&t, addr, new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
-		time.Sleep(500 * time.Millisecond)
 		cli := initThriftClientByIDL(&t, transport.TTHeader, addr, "./idl/baseline.thrift", opts, false, true)
 
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
@@ -340,9 +333,7 @@ func BenchmarkCompareDynamicgoAndOriginal_Medium(b *testing.B) {
 
 	b.Run("thrift_medium_original", func(b *testing.B) {
 		addr := test.GetLocalAddress()
-		time.Sleep(1 * time.Second)
 		svr := initThriftServer(&t, addr, new(GenericServiceBenchmarkImpl), "./idl/baseline.thrift")
-		time.Sleep(500 * time.Millisecond)
 		cli := initThriftClientByIDL(&t, transport.TTHeader, addr, "./idl/baseline.thrift", nil, false, false)
 
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(data))
@@ -369,9 +360,7 @@ func BenchmarkCompareDynamicgoAndOriginal_Medium(b *testing.B) {
 
 func testThriftException(t *testing.T) {
 	addr := test.GetLocalAddress()
-	time.Sleep(4 * time.Second)
 	svr := initMockServer(t, new(mockImpl), addr)
-	time.Sleep(500 * time.Millisecond)
 
 	body := map[string]interface{}{
 		"Msg":     "hello",
@@ -418,7 +407,6 @@ func testThriftException(t *testing.T) {
 func testRegression(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceAnnotationImpl), "./idl/http_annotation.thrift")
-	time.Sleep(500 * time.Millisecond)
 
 	body := map[string]interface{}{
 		"text": "text",
@@ -491,7 +479,6 @@ func testRegression(t *testing.T) {
 func testThriftBase64BinaryEcho(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift")
-	time.Sleep(500 * time.Millisecond)
 
 	var opts []generic.Option
 	convOpts := conv.Options{EnableValueMapping: true, NoBase64Binary: false}
@@ -571,7 +558,6 @@ func testThriftBase64BinaryEcho(t *testing.T) {
 func testUseRawBodyAndBodyCompatibility(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceBinaryEchoImpl), "./idl/binary_echo.thrift")
-	time.Sleep(500 * time.Millisecond)
 
 	url := "http://example.com/BinaryEcho"
 

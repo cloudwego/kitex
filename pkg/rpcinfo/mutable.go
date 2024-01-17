@@ -63,4 +63,6 @@ type MutableRPCStats interface {
 	SetLevel(level stats.Level)
 	Reset()
 	ImmutableView() RPCStats
+	IncrSendSize(size uint64)
+	IncrRecvSize(size uint64)
 }

@@ -171,3 +171,15 @@ func (c *clientConn) Close() error {
 func (c *clientConn) Header() (metadata.MD, error) { return c.s.Header() }
 func (c *clientConn) Trailer() metadata.MD         { return c.s.Trailer() }
 func (c *clientConn) GetRecvCompress() string      { return c.s.RecvCompress() }
+
+type hasGetRecvCompress interface {
+	GetRecvCompress() string
+}
+
+type hasHeader interface {
+	Header() (metadata.MD, error)
+}
+
+type hasTrailer interface {
+	Trailer() metadata.MD
+}

@@ -124,7 +124,7 @@ func GetHeaderMetadataFromCtx(ctx context.Context) *metadata.MD {
 
 // set header and trailer to the ctx by default.
 func receiveHeaderAndTrailer(ctx context.Context, conn net.Conn) context.Context {
-	if md, err := conn.(*clientConn).Header(); err == nil {
+	if md, err := conn.(hasHeader).Header(); err == nil {
 		if h := ctx.Value(headerKey{}); h != nil {
 			// If using GRPCHeader(), set the value directly
 			hd := h.(*metadata.MD)
@@ -133,7 +133,7 @@ func receiveHeaderAndTrailer(ctx context.Context, conn net.Conn) context.Context
 			ctx = context.WithValue(ctx, headerKey{}, &md)
 		}
 	}
-	if md := conn.(*clientConn).Trailer(); md != nil {
+	if md := conn.(hasTrailer).Trailer(); md != nil {
 		if t := ctx.Value(trailerKey{}); t != nil {
 			// If using GRPCTrailer(), set the value directly
 			tr := t.(*metadata.MD)
