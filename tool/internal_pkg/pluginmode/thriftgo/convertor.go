@@ -353,6 +353,9 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				}
 			}
 		}
+
+		c.fixStreamingForExtendedServices(ast, all)
+
 		// combine service
 		if ast == req.AST && c.Config.CombineService && len(ast.Services) > 0 {
 			var (
@@ -398,6 +401,18 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 		c.Services = append(c.Services, all[ast.Filename]...)
 	}
 	return nil
+}
+
+func (c *converter) fixStreamingForExtendedServices(ast *parser.Thrift, all ast2svc) {
+	for i, svc := range ast.Services {
+		if svc.Extends == "" {
+			continue
+		}
+		si := all[ast.Filename][i]
+		if si.Base != nil {
+			si.FixHasStreamingForExtendedService()
+		}
+	}
 }
 
 func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*generator.ServiceInfo, error) {
