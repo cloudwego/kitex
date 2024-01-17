@@ -15,6 +15,7 @@
 package thriftgo
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -95,19 +96,29 @@ func patchIDLRefConfig(cfg *generator.Config) {
 	if !util.Exists(idlRef) {
 		idlRef = filepath.Join(filepath.Dir(cfg.IDL), "idl-ref.yml")
 	}
-	file, err := os.OpenFile(idlRef, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0o644)
+	file, err := os.OpenFile(idlRef, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
 		log.Warnf("Open %s file failed: %s\n", idlRef, err.Error())
 		os.Exit(1)
 	}
 	defer file.Close()
-	idlRefCfg := loadIDLRefConfig(file)
+	idlRefCfg := loadIDLRefConfig(file.Name(), file)
 
 	// update the idl-ref config file
 	idlRefCfg.Ref["java.thrift"] = DubboCodec + "/java"
 	out, err := yaml.Marshal(idlRefCfg)
 	if err != nil {
 		log.Warn("Marshal configuration failed:", err.Error())
+		os.Exit(1)
+	}
+	// clear the file content
+	if err := file.Truncate(0); err != nil {
+		log.Warnf("Truncate file %s failed: %s", idlRef, err.Error())
+		os.Exit(1)
+	}
+	// set the file offset
+	if _, err := file.Seek(0, 0); err != nil {
+		log.Warnf("Seek file %s failed: %s", idlRef, err.Error())
 		os.Exit(1)
 	}
 	_, err = file.Write(out)
@@ -118,10 +129,10 @@ func patchIDLRefConfig(cfg *generator.Config) {
 }
 
 // loadIDLRefConfig load idl-ref config from file object
-func loadIDLRefConfig(file *os.File) *config.RawConfig {
-	data, err := ioutil.ReadAll(file)
+func loadIDLRefConfig(fileName string, reader io.Reader) *config.RawConfig {
+	data, err := ioutil.ReadAll(reader)
 	if err != nil {
-		log.Warnf("Read %s file failed: %s\n", file.Name(), err.Error())
+		log.Warnf("Read %s file failed: %s\n", fileName, err.Error())
 		os.Exit(1)
 	}
 
@@ -132,7 +143,7 @@ func loadIDLRefConfig(file *os.File) *config.RawConfig {
 	} else {
 		err := yaml.Unmarshal(data, idlRefCfg)
 		if err != nil {
-			log.Warnf("Parse %s file failed: %s\n", file.Name(), err.Error())
+			log.Warnf("Parse %s file failed: %s\n", fileName, err.Error())
 			log.Warn("Please check whether the idl ref configuration is correct.")
 			os.Exit(2)
 		}
