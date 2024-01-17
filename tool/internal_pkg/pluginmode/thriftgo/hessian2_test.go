@@ -15,12 +15,13 @@
 package thriftgo
 
 import (
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/thriftgo/config"
 	"io"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/thriftgo/config"
 )
 
 func Test_loadIDLRefConfig(t *testing.T) {
