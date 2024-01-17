@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
+
 	"github.com/cloudwego/thriftgo/config"
 )
 
