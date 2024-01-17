@@ -485,7 +485,9 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 			pkg.AddImport("transport", "github.com/cloudwego/kitex/transport")
 		}
 		if len(pkg.AllMethods()) > 0 {
-			pkg.AddImports("callopt")
+			if needCallOpt(pkg) {
+				pkg.AddImports("callopt")
+			}
 			pkg.AddImports("context")
 		}
 		fallthrough
@@ -559,4 +561,21 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		pkg.AddImport("log", "log")
 		pkg.AddImport(pkg.PkgRefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
 	}
+}
+
+func needCallOpt(pkg *PackageInfo) bool {
+	// callopt is referenced only by non-streaming methods
+	needCallOpt := false
+	switch pkg.Codec {
+	case "thrift":
+		for _, m := range pkg.ServiceInfo.AllMethods() {
+			if !m.Streaming.IsStreaming {
+				needCallOpt = true
+				break
+			}
+		}
+	case "protobuf":
+		needCallOpt = true
+	}
+	return needCallOpt
 }
