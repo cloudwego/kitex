@@ -208,7 +208,7 @@ func (m *message) Data() interface{} {
 
 // NewData implements the Message interface.
 func (m *message) NewData(method string) (ok bool) {
-	if m.data != nil || m.targetSvcInfo == nil {
+	if m.data != nil {
 		return false
 	}
 	if mt := m.targetSvcInfo.MethodInfo(method); mt != nil {
