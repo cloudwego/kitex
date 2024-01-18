@@ -47,10 +47,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
-// Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
+// Server is an abstraction of an RPC server. It accepts connections and dispatches them to the service
 // registered to it.
 type Server interface {
-	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, isFallbackService ...bool) error
+	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, opts ...RegisterOption) error
 	GetServiceInfos() map[string]*serviceinfo.ServiceInfo
 	Run() error
 	Stop() error
@@ -184,7 +184,7 @@ func (s *server) buildInvokeChain() {
 }
 
 // RegisterService should not be called by users directly.
-func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, isFallbackService ...bool) error {
+func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, opts ...RegisterOption) error {
 	s.Lock()
 	defer s.Unlock()
 	if s.isRun {
@@ -200,7 +200,8 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
 	}
 
-	if err := s.svcs.addService(svcInfo, handler, isFallbackService...); err != nil {
+	registerOpts := internal_server.NewRegisterOptions(opts)
+	if err := s.svcs.addService(svcInfo, handler, registerOpts.IsFallbackService); err != nil {
 		panic(err.Error())
 	}
 	return nil

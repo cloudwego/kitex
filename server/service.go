@@ -47,11 +47,10 @@ func newServices() *services {
 	}
 }
 
-func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, isFallbackService ...bool) error {
+func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, isFallbackService bool) error {
 	svc := newService(svcInfo, handler)
 
-	// TODO: isFallbackService -> RegisterOption
-	if len(isFallbackService) > 0 && isFallbackService[0] {
+	if isFallbackService {
 		if s.fallbackSvc != nil {
 			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)
 		}

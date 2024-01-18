@@ -25,7 +25,7 @@ import (
 
 func TestAddService(t *testing.T) {
 	svcs := newServices()
-	err := svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	err := svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler(), false)
 	test.Assert(t, err == nil)
 	test.Assert(t, len(svcs.svcMap) == 1)
 	test.Assert(t, len(svcs.svcSearchMap) == 8)

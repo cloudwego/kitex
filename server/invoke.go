@@ -35,7 +35,7 @@ type InvokeCaller interface {
 
 // Invoker is the abstraction for invoker.
 type Invoker interface {
-	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, isFallbackService ...bool) error
+	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, opts ...RegisterOption) error
 	Init() (err error)
 	InvokeCaller
 }

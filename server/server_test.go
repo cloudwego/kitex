@@ -892,7 +892,7 @@ func TestRegisterService(t *testing.T) {
 	})
 
 	test.PanicAt(t, func() {
-		_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler(), true)
+		_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler(), WithFallbackService())
 		_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	}, func(err interface{}) bool {
 		if errMsg, ok := err.(string); ok {
@@ -902,7 +902,7 @@ func TestRegisterService(t *testing.T) {
 	})
 
 	test.PanicAt(t, func() {
-		_ = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler(), true)
+		_ = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler(), WithFallbackService())
 	}, func(err interface{}) bool {
 		if errMsg, ok := err.(string); ok {
 			return strings.Contains(errMsg, "multiple fallback services cannot be registered")
@@ -1008,7 +1008,7 @@ func (m *mockCodec) Decode(ctx context.Context, msg remote.Message, in remote.By
 
 func TestDuplicatedRegisterInfoPanic(t *testing.T) {
 	svcs := newServices()
-	svcs.addService(mocks.ServiceInfo(), nil)
+	svcs.addService(mocks.ServiceInfo(), nil, false)
 	s := &server{
 		opt:  internal_server.NewOptions(nil),
 		svcs: svcs,
