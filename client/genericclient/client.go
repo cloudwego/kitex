@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
 var _ Client = &genericServiceClient{}
@@ -40,6 +41,7 @@ func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *se
 	var options []client.Option
 	options = append(options, client.WithGeneric(g))
 	options = append(options, client.WithDestService(destService))
+	options = append(options, client.WithMetaHandler(transmeta.ClientTTHeaderHandler))
 	options = append(options, opts...)
 
 	kc, err := client.NewClient(svcInfo, options...)

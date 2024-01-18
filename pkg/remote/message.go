@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
@@ -110,12 +109,7 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 	msg.targetSvcInfo = svcInfo
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
-	ti := transInfoPool.Get().(*transInfo)
-	// TODO: figure out where to put
-	if rpcRole == Client && (msgType == Call || msgType == Oneway) && ri != nil && ri.Invocation() != nil {
-		ti.strInfo[transmeta.HeaderIDLServiceName] = ri.Invocation().ServiceName()
-	}
-	msg.transInfo = ti
+	msg.transInfo = transInfoPool.Get().(*transInfo)
 	return msg
 }
 

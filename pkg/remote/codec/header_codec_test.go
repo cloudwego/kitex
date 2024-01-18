@@ -154,7 +154,7 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
 	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
 	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
-	test.DeepEqual(t, strKVInfoRecv, map[string]string{transmeta.GDPRToken: "test token", transmeta.HeaderIDLServiceName: ""})
+	test.DeepEqual(t, strKVInfoRecv, map[string]string{transmeta.GDPRToken: "test token"})
 	flag := recvMsg.Tags()[HeaderFlagsKey]
 	test.Assert(t, flag != nil)
 	test.Assert(t, flag == HeaderFlagSupportOutOfOrder)

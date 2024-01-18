@@ -32,6 +32,9 @@ import (
 	"github.com/cloudwego/kitex/client/streamclient"
 	"github.com/cloudwego/kitex/client/callopt/streamcall"
     {{- end}}
+	{{- if and .IsExternal (not .HasStreaming)}}
+	"github.com/cloudwego/kitex/pkg/transmeta"
+	{{- end}}
 )
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
 type Client interface {
@@ -80,6 +83,10 @@ type {{.ServiceName}}_{{.RawName}}Client interface {
 func NewClient(destService string, opts ...client.Option) (Client, error) {
 	var options []client.Option
 	options = append(options, client.WithDestService(destService))
+
+	{{if and .IsExternal (not .HasStreaming)}}
+	options = append(options, client.WithMetaHandler(transmeta.ClientTTHeaderHandler))
+	{{end}}
     {{template "@client.go-NewClient-option" .}}
 	{{if and (eq $.Codec "protobuf") .HasStreaming}}{{/* Thrift Streaming only in StreamClient */}}
 	options = append(options, client.WithTransportProtocol(transport.GRPC))

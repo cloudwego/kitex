@@ -461,6 +461,7 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	pkg.ExternalKitexGen = g.Use
 	pkg.FrugalPretouch = g.FrugalPretouch
 	pkg.Module = g.ModuleName
+	pkg.IsExternal = true
 	if strings.EqualFold(g.Protocol, transport.HESSIAN2.String()) {
 		pkg.Protocol = transport.HESSIAN2
 	}
