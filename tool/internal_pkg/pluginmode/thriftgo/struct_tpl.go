@@ -344,7 +344,7 @@ const fieldFastReadStructLike = `
 	{{- if .NeedDecl}}
 	{{- .Target}} := {{.TypeName.Deref.NewFunc}}()
 	{{- else}}
-	tmp := allocator.New[{{.TypeName.Deref}}](bp.Allocator())
+	tmp := {{.TypeName.Deref.NewFunc}}()
 	{{- end}}
 	if l, err := {{- if .NeedDecl}}{{.Target}}{{else}}tmp{{end}}.FastRead(bp, buf[offset:]); err != nil {
 		return offset, err
@@ -402,8 +402,7 @@ const fieldFastReadMap = `
 	if err != nil {
 		return offset, err
 	}
-	{{.Target}} {{if .NeedDecl}}:{{end}}= allocator.NewMap[{{.KeyCtx.TypeName}}, {{.ValCtx.TypeName}}](bp.Allocator(), size)
-	bp = bthrift.Binary
+	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, size)
 	for i := 0; i < size; i++ {
 		{{- $key := .GenID "_key"}}
 		{{- $ctx := .KeyCtx.WithDecl.WithTarget $key}}
@@ -434,7 +433,7 @@ const fieldFastReadSet = `
 	if err != nil {
 		return offset, err
 	}
-	{{.Target}} {{if .NeedDecl}}:{{end}}= allocator.NewSlice[{{.ValCtx.TypeName}}](bp.Allocator(), size)
+	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, size)
 	for i := 0; i < size; i++ {
 		{{- $val := .GenID "_elem"}}
 		{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
@@ -461,7 +460,7 @@ const fieldFastReadList = `
 	if err != nil {
 		return offset, err
 	}
-	{{.Target}} {{if .NeedDecl}}:{{end}}= allocator.NewSlice[{{.ValCtx.TypeName}}](bp.Allocator(), size)
+	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, size)
 	for i := 0; i < size; i++ {
 		{{- $val := .GenID "_elem"}}
 		{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}

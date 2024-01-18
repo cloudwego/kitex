@@ -185,37 +185,86 @@ func TestAllocator(t *testing.T) {
 
 func TestAllocatorLifecycle(t *testing.T) {
 	for i := 0; i < 100; i++ {
-		var hold *testObject
+		var object *testObject
+		var objectField map[string]*testSubObject
+		var objectFiledElement *testSubObject
 		var state int32
 		go func() {
 			ac := NewAllocator(1024, WithFinalizer(func() {
 				atomic.StoreInt32(&state, -1)
 				//t.Logf("allocator finalizer finished")
 			}))
-			hold = allocObject(ac)
+			object = New[testObject](ac)
+			object.PointerList = NewSlice[*testSubObject](ac, 1)
+			object.PointerList[0] = new(testSubObject) // should new object natively
+			object.PointerList[0].String = "123"
+			object.PointerMap = NewMap[string, *testSubObject](ac, 1)
+			object.PointerMap["a"] = new(testSubObject) // should new object natively
+			object.PointerMap["a"].String = "123"
+
+			objectField = object.PointerMap
+			objectFiledElement = object.PointerList[0]
+			runtime.SetFinalizer(objectFiledElement, func(o interface{}) {
+				atomic.StoreInt32(&state, -2)
+			})
 			atomic.StoreInt32(&state, 1)
 		}()
 		// wait for alloc
 		for atomic.LoadInt32(&state) == 0 {
 			runtime.Gosched()
 		}
-		//t.Logf("%v", hold)
+		test.DeepEqual(t, atomic.LoadInt32(&state), int32(1))
+
+		// nothing should happen
+		object.PointerList = nil
+		object.PointerMap = nil
 		for i := 0; i < 10; i++ {
 			runtime.GC()
+			runtime.Gosched()
 		}
 		test.DeepEqual(t, atomic.LoadInt32(&state), int32(1))
-		hold = nil
-		// wait for gc
-		for atomic.LoadInt32(&state) >= 0 {
+		test.DeepEqual(t, len(objectField), 1)
+		test.DeepEqual(t, objectField["a"].String, "123")
+
+		// nothing should happen
+		object = nil
+		objectField = nil
+		for i := 0; i < 10; i++ {
 			runtime.GC()
+			runtime.Gosched()
 		}
 		test.DeepEqual(t, atomic.LoadInt32(&state), int32(-1))
-		_ = hold
+		test.DeepEqual(t, objectFiledElement.String, "123")
+
+		// field element should be gc
+		objectFiledElement = nil
+		for atomic.LoadInt32(&state) == int32(-1) {
+			runtime.GC()
+		}
+		test.DeepEqual(t, atomic.LoadInt32(&state), int32(-2))
 	}
+}
+
+func TestAllocatorMapField(t *testing.T) {
+	type temp struct {
+		Map map[string]string
+	}
+	ac := NewAllocator(1024)
+	object := New[temp](ac)
+	test.DeepEqual(t, len(object.Map), 0)
+	object.Map = NewMap[string, string](ac, 1)
+	test.DeepEqual(t, len(object.Map), 0)
+	object.Map["a"] = "1"
+	test.DeepEqual(t, len(object.Map), 1)
+	object.Map["a"] = "2"
+	test.DeepEqual(t, len(object.Map), 1)
+	object.Map["b"] = "2"
+	test.DeepEqual(t, len(object.Map), 2)
 }
 
 func allocObject(ac Allocator) *testObject {
 	object := New[testObject](ac)
+
 	object.Int = 123
 	object.String = ac.String("123")
 

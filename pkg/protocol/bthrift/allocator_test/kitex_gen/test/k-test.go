@@ -201,8 +201,7 @@ func (p *Inner) FastReadField3(bp bthrift.BTProtocol, buf []byte) (int, error) {
 	if err != nil {
 		return offset, err
 	}
-	p.MapOfList = allocator.NewMap[int64, []int64](bp.Allocator(), size)
-	bp = bthrift.Binary
+	p.MapOfList = make(map[int64][]int64, size)
 	for i := 0; i < size; i++ {
 		var _key int64
 		if v, l, err := bp.ReadI64(buf[offset:]); err != nil {
@@ -219,7 +218,7 @@ func (p *Inner) FastReadField3(bp bthrift.BTProtocol, buf []byte) (int, error) {
 		if err != nil {
 			return offset, err
 		}
-		_val := allocator.NewSlice[int64](bp.Allocator(), size)
+		_val := make([]int64, size)
 		for i := 0; i < size; i++ {
 			var _elem int64
 			if v, l, err := bp.ReadI64(buf[offset:]); err != nil {
@@ -257,8 +256,7 @@ func (p *Inner) FastReadField4(bp bthrift.BTProtocol, buf []byte) (int, error) {
 	if err != nil {
 		return offset, err
 	}
-	p.MapOfEnumKey = allocator.NewMap[AEnum, int64](bp.Allocator(), size)
-	bp = bthrift.Binary
+	p.MapOfEnumKey = make(map[AEnum]int64, size)
 	for i := 0; i < size; i++ {
 		var _key AEnum
 		if v, l, err := bp.ReadI32(buf[offset:]); err != nil {
@@ -1198,7 +1196,7 @@ func (p *FullStruct) FastReadField3(bp bthrift.BTProtocol, buf []byte) (int, err
 func (p *FullStruct) FastReadField4(bp bthrift.BTProtocol, buf []byte) (int, error) {
 	offset := 0
 
-	tmp := allocator.New[Inner](bp.Allocator())
+	tmp := NewInner()
 	if l, err := tmp.FastRead(bp, buf[offset:]); err != nil {
 		return offset, err
 	} else {
@@ -1244,7 +1242,7 @@ func (p *FullStruct) FastReadField7(bp bthrift.BTProtocol, buf []byte) (int, err
 	if err != nil {
 		return offset, err
 	}
-	p.EnumList = allocator.NewSlice[HTTPStatus](bp.Allocator(), size)
+	p.EnumList = make([]HTTPStatus, size)
 	for i := 0; i < size; i++ {
 		var _elem HTTPStatus
 		if v, l, err := bp.ReadI32(buf[offset:]); err != nil {
@@ -1274,8 +1272,7 @@ func (p *FullStruct) FastReadField8(bp bthrift.BTProtocol, buf []byte) (int, err
 	if err != nil {
 		return offset, err
 	}
-	p.Strmap = allocator.NewMap[int32, string](bp.Allocator(), size)
-	bp = bthrift.Binary
+	p.Strmap = make(map[int32]string, size)
 	for i := 0; i < size; i++ {
 		var _key int32
 		if v, l, err := bp.ReadI32(buf[offset:]); err != nil {
@@ -1329,7 +1326,7 @@ func (p *FullStruct) FastReadField10(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.IntList = allocator.NewSlice[int32](bp.Allocator(), size)
+	p.IntList = make([]int32, size)
 	for i := 0; i < size; i++ {
 		var _elem int32
 		if v, l, err := bp.ReadI32(buf[offset:]); err != nil {
@@ -1359,7 +1356,7 @@ func (p *FullStruct) FastReadField11(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.LocalList = allocator.NewSlice[*Local](bp.Allocator(), size)
+	p.LocalList = make([]*Local, size)
 	for i := 0; i < size; i++ {
 		_elem := NewLocal()
 		if l, err := _elem.FastRead(bp, buf[offset:]); err != nil {
@@ -1386,8 +1383,7 @@ func (p *FullStruct) FastReadField12(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.StrLocalMap = allocator.NewMap[string, *Local](bp.Allocator(), size)
-	bp = bthrift.Binary
+	p.StrLocalMap = make(map[string]*Local, size)
 	for i := 0; i < size; i++ {
 		var _key string
 		if v, l, err := bp.ReadString(buf[offset:]); err != nil {
@@ -1423,14 +1419,14 @@ func (p *FullStruct) FastReadField13(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.NestList = allocator.NewSlice[[]int32](bp.Allocator(), size)
+	p.NestList = make([][]int32, size)
 	for i := 0; i < size; i++ {
 		_, size, l, err := bp.ReadListBegin(buf[offset:])
 		offset += l
 		if err != nil {
 			return offset, err
 		}
-		_elem := allocator.NewSlice[int32](bp.Allocator(), size)
+		_elem := make([]int32, size)
 		for i := 0; i < size; i++ {
 			var _elem1 int32
 			if v, l, err := bp.ReadI32(buf[offset:]); err != nil {
@@ -1463,7 +1459,7 @@ func (p *FullStruct) FastReadField13(bp bthrift.BTProtocol, buf []byte) (int, er
 func (p *FullStruct) FastReadField14(bp bthrift.BTProtocol, buf []byte) (int, error) {
 	offset := 0
 
-	tmp := allocator.New[Local](bp.Allocator())
+	tmp := NewLocal()
 	if l, err := tmp.FastRead(bp, buf[offset:]); err != nil {
 		return offset, err
 	} else {
@@ -1481,8 +1477,7 @@ func (p *FullStruct) FastReadField16(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.NestMap = allocator.NewMap[string, []string](bp.Allocator(), size)
-	bp = bthrift.Binary
+	p.NestMap = make(map[string][]string, size)
 	for i := 0; i < size; i++ {
 		var _key string
 		if v, l, err := bp.ReadString(buf[offset:]); err != nil {
@@ -1499,7 +1494,7 @@ func (p *FullStruct) FastReadField16(bp bthrift.BTProtocol, buf []byte) (int, er
 		if err != nil {
 			return offset, err
 		}
-		_val := allocator.NewSlice[string](bp.Allocator(), size)
+		_val := make([]string, size)
 		for i := 0; i < size; i++ {
 			var _elem string
 			if v, l, err := bp.ReadString(buf[offset:]); err != nil {
@@ -1537,15 +1532,14 @@ func (p *FullStruct) FastReadField17(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.NestMap2 = allocator.NewSlice[map[string]HTTPStatus](bp.Allocator(), size)
+	p.NestMap2 = make([]map[string]HTTPStatus, size)
 	for i := 0; i < size; i++ {
 		_, _, size, l, err := bp.ReadMapBegin(buf[offset:])
 		offset += l
 		if err != nil {
 			return offset, err
 		}
-		_elem := allocator.NewMap[string, HTTPStatus](bp.Allocator(), size)
-		bp = bthrift.Binary
+		_elem := make(map[string]HTTPStatus, size)
 		for i := 0; i < size; i++ {
 			var _key string
 			if v, l, err := bp.ReadString(buf[offset:]); err != nil {
@@ -1593,8 +1587,7 @@ func (p *FullStruct) FastReadField18(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.EnumMap = allocator.NewMap[int32, HTTPStatus](bp.Allocator(), size)
-	bp = bthrift.Binary
+	p.EnumMap = make(map[int32]HTTPStatus, size)
 	for i := 0; i < size; i++ {
 		var _key int32
 		if v, l, err := bp.ReadI32(buf[offset:]); err != nil {
@@ -1634,7 +1627,7 @@ func (p *FullStruct) FastReadField19(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.Strlist = allocator.NewSlice[string](bp.Allocator(), size)
+	p.Strlist = make([]string, size)
 	for i := 0; i < size; i++ {
 		var _elem string
 		if v, l, err := bp.ReadString(buf[offset:]); err != nil {
@@ -1659,7 +1652,7 @@ func (p *FullStruct) FastReadField19(bp bthrift.BTProtocol, buf []byte) (int, er
 func (p *FullStruct) FastReadField20(bp bthrift.BTProtocol, buf []byte) (int, error) {
 	offset := 0
 
-	tmp := allocator.New[Local](bp.Allocator())
+	tmp := NewLocal()
 	if l, err := tmp.FastRead(bp, buf[offset:]); err != nil {
 		return offset, err
 	} else {
@@ -1672,7 +1665,7 @@ func (p *FullStruct) FastReadField20(bp bthrift.BTProtocol, buf []byte) (int, er
 func (p *FullStruct) FastReadField21(bp bthrift.BTProtocol, buf []byte) (int, error) {
 	offset := 0
 
-	tmp := allocator.New[Inner](bp.Allocator())
+	tmp := NewInner()
 	if l, err := tmp.FastRead(bp, buf[offset:]); err != nil {
 		return offset, err
 	} else {
@@ -1690,7 +1683,7 @@ func (p *FullStruct) FastReadField22(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.OptNilList = allocator.NewSlice[string](bp.Allocator(), size)
+	p.OptNilList = make([]string, size)
 	for i := 0; i < size; i++ {
 		var _elem string
 		if v, l, err := bp.ReadString(buf[offset:]); err != nil {
@@ -1720,7 +1713,7 @@ func (p *FullStruct) FastReadField23(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.NilList = allocator.NewSlice[string](bp.Allocator(), size)
+	p.NilList = make([]string, size)
 	for i := 0; i < size; i++ {
 		var _elem string
 		if v, l, err := bp.ReadString(buf[offset:]); err != nil {
@@ -1750,7 +1743,7 @@ func (p *FullStruct) FastReadField24(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.OptNilInsList = allocator.NewSlice[*Inner](bp.Allocator(), size)
+	p.OptNilInsList = make([]*Inner, size)
 	for i := 0; i < size; i++ {
 		_elem := NewInner()
 		if l, err := _elem.FastRead(bp, buf[offset:]); err != nil {
@@ -1777,7 +1770,7 @@ func (p *FullStruct) FastReadField25(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.NilInsList = allocator.NewSlice[*Inner](bp.Allocator(), size)
+	p.NilInsList = make([]*Inner, size)
 	for i := 0; i < size; i++ {
 		_elem := NewInner()
 		if l, err := _elem.FastRead(bp, buf[offset:]); err != nil {
@@ -1819,8 +1812,7 @@ func (p *FullStruct) FastReadField27(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.EnumKeyMap = allocator.NewMap[HTTPStatus, *Local](bp.Allocator(), size)
-	bp = bthrift.Binary
+	p.EnumKeyMap = make(map[HTTPStatus]*Local, size)
 	for i := 0; i < size; i++ {
 		var _key HTTPStatus
 		if v, l, err := bp.ReadI32(buf[offset:]); err != nil {
@@ -1856,8 +1848,7 @@ func (p *FullStruct) FastReadField28(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.Complex = allocator.NewMap[HTTPStatus, []map[string]*Local](bp.Allocator(), size)
-	bp = bthrift.Binary
+	p.Complex = make(map[HTTPStatus][]map[string]*Local, size)
 	for i := 0; i < size; i++ {
 		var _key HTTPStatus
 		if v, l, err := bp.ReadI32(buf[offset:]); err != nil {
@@ -1874,15 +1865,14 @@ func (p *FullStruct) FastReadField28(bp bthrift.BTProtocol, buf []byte) (int, er
 		if err != nil {
 			return offset, err
 		}
-		_val := allocator.NewSlice[map[string]*Local](bp.Allocator(), size)
+		_val := make([]map[string]*Local, size)
 		for i := 0; i < size; i++ {
 			_, _, size, l, err := bp.ReadMapBegin(buf[offset:])
 			offset += l
 			if err != nil {
 				return offset, err
 			}
-			_elem := allocator.NewMap[string, *Local](bp.Allocator(), size)
-			bp = bthrift.Binary
+			_elem := make(map[string]*Local, size)
 			for i := 0; i < size; i++ {
 				var _key1 string
 				if v, l, err := bp.ReadString(buf[offset:]); err != nil {
@@ -1934,7 +1924,7 @@ func (p *FullStruct) FastReadField29(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.I64Set = allocator.NewSlice[int64](bp.Allocator(), size)
+	p.I64Set = make([]int64, size)
 	for i := 0; i < size; i++ {
 		var _elem int64
 		if v, l, err := bp.ReadI64(buf[offset:]); err != nil {
@@ -3253,7 +3243,7 @@ func (p *MixedStruct) FastReadField7(bp bthrift.BTProtocol, buf []byte) (int, er
 	if err != nil {
 		return offset, err
 	}
-	p.EnumList = allocator.NewSlice[HTTPStatus](bp.Allocator(), size)
+	p.EnumList = make([]HTTPStatus, size)
 	for i := 0; i < size; i++ {
 		var _elem HTTPStatus
 		if v, l, err := bp.ReadI32(buf[offset:]); err != nil {
@@ -3297,7 +3287,7 @@ func (p *MixedStruct) FastReadField10(bp bthrift.BTProtocol, buf []byte) (int, e
 	if err != nil {
 		return offset, err
 	}
-	p.IntList = allocator.NewSlice[int32](bp.Allocator(), size)
+	p.IntList = make([]int32, size)
 	for i := 0; i < size; i++ {
 		var _elem int32
 		if v, l, err := bp.ReadI32(buf[offset:]); err != nil {
@@ -3327,7 +3317,7 @@ func (p *MixedStruct) FastReadField11(bp bthrift.BTProtocol, buf []byte) (int, e
 	if err != nil {
 		return offset, err
 	}
-	p.LocalList = allocator.NewSlice[*Local](bp.Allocator(), size)
+	p.LocalList = make([]*Local, size)
 	for i := 0; i < size; i++ {
 		_elem := NewLocal()
 		if l, err := _elem.FastRead(bp, buf[offset:]); err != nil {
@@ -3354,8 +3344,7 @@ func (p *MixedStruct) FastReadField12(bp bthrift.BTProtocol, buf []byte) (int, e
 	if err != nil {
 		return offset, err
 	}
-	p.StrLocalMap = allocator.NewMap[string, *Local](bp.Allocator(), size)
-	bp = bthrift.Binary
+	p.StrLocalMap = make(map[string]*Local, size)
 	for i := 0; i < size; i++ {
 		var _key string
 		if v, l, err := bp.ReadString(buf[offset:]); err != nil {
@@ -3391,14 +3380,14 @@ func (p *MixedStruct) FastReadField13(bp bthrift.BTProtocol, buf []byte) (int, e
 	if err != nil {
 		return offset, err
 	}
-	p.NestList = allocator.NewSlice[[]int32](bp.Allocator(), size)
+	p.NestList = make([][]int32, size)
 	for i := 0; i < size; i++ {
 		_, size, l, err := bp.ReadListBegin(buf[offset:])
 		offset += l
 		if err != nil {
 			return offset, err
 		}
-		_elem := allocator.NewSlice[int32](bp.Allocator(), size)
+		_elem := make([]int32, size)
 		for i := 0; i < size; i++ {
 			var _elem1 int32
 			if v, l, err := bp.ReadI32(buf[offset:]); err != nil {
@@ -3431,7 +3420,7 @@ func (p *MixedStruct) FastReadField13(bp bthrift.BTProtocol, buf []byte) (int, e
 func (p *MixedStruct) FastReadField14(bp bthrift.BTProtocol, buf []byte) (int, error) {
 	offset := 0
 
-	tmp := allocator.New[Local](bp.Allocator())
+	tmp := NewLocal()
 	if l, err := tmp.FastRead(bp, buf[offset:]); err != nil {
 		return offset, err
 	} else {
@@ -3444,7 +3433,7 @@ func (p *MixedStruct) FastReadField14(bp bthrift.BTProtocol, buf []byte) (int, e
 func (p *MixedStruct) FastReadField20(bp bthrift.BTProtocol, buf []byte) (int, error) {
 	offset := 0
 
-	tmp := allocator.New[Local](bp.Allocator())
+	tmp := NewLocal()
 	if l, err := tmp.FastRead(bp, buf[offset:]); err != nil {
 		return offset, err
 	} else {
@@ -3457,7 +3446,7 @@ func (p *MixedStruct) FastReadField20(bp bthrift.BTProtocol, buf []byte) (int, e
 func (p *MixedStruct) FastReadField21(bp bthrift.BTProtocol, buf []byte) (int, error) {
 	offset := 0
 
-	tmp := allocator.New[Inner](bp.Allocator())
+	tmp := NewInner()
 	if l, err := tmp.FastRead(bp, buf[offset:]); err != nil {
 		return offset, err
 	} else {
@@ -3475,8 +3464,7 @@ func (p *MixedStruct) FastReadField27(bp bthrift.BTProtocol, buf []byte) (int, e
 	if err != nil {
 		return offset, err
 	}
-	p.EnumKeyMap = allocator.NewMap[HTTPStatus, *Local](bp.Allocator(), size)
-	bp = bthrift.Binary
+	p.EnumKeyMap = make(map[HTTPStatus]*Local, size)
 	for i := 0; i < size; i++ {
 		var _key HTTPStatus
 		if v, l, err := bp.ReadI32(buf[offset:]); err != nil {

@@ -154,8 +154,10 @@ func (a *allocator) Refer(obj interface{}) {
 }
 
 func (a *allocator) refer(ptr unsafe.Pointer, kind Kind) {
-	link := &refnode{ptr: ptr, kind: kind}
-	a.externalrefs.tail.next = link
+	rn := linkNodePool.Get().(*refnode)
+	rn.ptr = ptr
+	rn.kind = kind
+	a.externalrefs.tail.next = rn
 	a.externalrefs.tail = a.externalrefs.tail.next
 }
 
@@ -166,11 +168,7 @@ func (a *allocator) alloc(size int, align bool) (ptr unsafe.Pointer) {
 	}
 	if size > (a.Cap - a.Len) {
 		println("not enough", size, a.Cap, a.Len)
-		// not enough
-		buf := make([]byte, size)
-		bufptr := unsafe.Pointer(&buf)
-		a.refer(bufptr, Memory)
-		return (*sliceHeader)(bufptr).Data
+		return nil
 	}
 	ptr = unsafe.Add(a.Data, a.Len)
 	a.Len += size
