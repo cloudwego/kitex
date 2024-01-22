@@ -114,7 +114,7 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 }
 
 // NewMessageWithNewer creates a new Message and set data later.
-func NewMessageWithNewer(targetSvcInfo *serviceinfo.ServiceInfo, svcSearchMap map[string]*serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole) Message {
+func NewMessageWithNewer(targetSvcInfo *serviceinfo.ServiceInfo, svcSearchMap map[string]*serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole, refuseTrafficWithoutServiceName bool) Message {
 	msg := messagePool.Get().(*message)
 	msg.rpcInfo = ri
 	msg.targetSvcInfo = targetSvcInfo
@@ -122,6 +122,7 @@ func NewMessageWithNewer(targetSvcInfo *serviceinfo.ServiceInfo, svcSearchMap ma
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
 	msg.transInfo = transInfoPool.Get().(*transInfo)
+	msg.refuseTrafficWithoutServiceName = refuseTrafficWithoutServiceName
 	return msg
 }
 
@@ -137,18 +138,19 @@ func newMessage() interface{} {
 }
 
 type message struct {
-	msgType       MessageType
-	data          interface{}
-	rpcInfo       rpcinfo.RPCInfo
-	targetSvcInfo *serviceinfo.ServiceInfo
-	svcSearchMap  map[string]*serviceinfo.ServiceInfo
-	rpcRole       RPCRole
-	compressType  CompressType
-	payloadSize   int
-	transInfo     TransInfo
-	tags          map[string]interface{}
-	protocol      ProtocolInfo
-	payloadCodec  PayloadCodec
+	msgType                         MessageType
+	data                            interface{}
+	rpcInfo                         rpcinfo.RPCInfo
+	targetSvcInfo                   *serviceinfo.ServiceInfo
+	svcSearchMap                    map[string]*serviceinfo.ServiceInfo
+	rpcRole                         RPCRole
+	compressType                    CompressType
+	payloadSize                     int
+	transInfo                       TransInfo
+	tags                            map[string]interface{}
+	protocol                        ProtocolInfo
+	payloadCodec                    PayloadCodec
+	refuseTrafficWithoutServiceName bool
 }
 
 func (m *message) zero() {
@@ -186,6 +188,9 @@ func (m *message) SetServiceInfo(svcName, methodName string) (*serviceinfo.Servi
 			return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 		}
 		return m.targetSvcInfo, nil
+	}
+	if svcName == "" && m.refuseTrafficWithoutServiceName {
+		return nil, NewTransErrorWithMsg(NoServiceName, "no service name while the server has WithRefuseTrafficWithoutServiceName option enabled")
 	}
 	var key string
 	if svcName == serviceinfo.GenericService || svcName == "" {

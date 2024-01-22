@@ -41,7 +41,7 @@ func TestSetOrCheckMethodName(t *testing.T) {
 		mocks.MockErrorMethod:     svcInfo,
 		mocks.MockOnewayMethod:    svcInfo,
 	}
-	msg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server)
+	msg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server, false)
 	err := SetOrCheckMethodName("mock", msg)
 	test.Assert(t, err == nil)
 	ri = msg.RPCInfo()
@@ -50,7 +50,7 @@ func TestSetOrCheckMethodName(t *testing.T) {
 	test.Assert(t, ri.Invocation().MethodName() == "mock")
 	test.Assert(t, ri.To().Method() == "mock")
 
-	msg = remote.NewMessageWithNewer(svcInfo, map[string]*serviceinfo.ServiceInfo{}, ri, remote.Call, remote.Server)
+	msg = remote.NewMessageWithNewer(svcInfo, map[string]*serviceinfo.ServiceInfo{}, ri, remote.Call, remote.Server, false)
 	err = SetOrCheckMethodName("dummy", msg)
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "unknown method dummy")

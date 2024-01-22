@@ -34,9 +34,6 @@ import (
 
 // NewDefaultSvrTransHandler to provide default impl of svrTransHandler, it can be reused in netpoll, shm-ipc, framework-sdk extensions
 func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.ServerTransHandler, error) {
-	if opt.OnlyAcceptingHTTP2Traffic {
-		return nil, remote.NewTransErrorWithMsg(remote.InvalidProtocol, "only http2 traffic is accepted")
-	}
 	svrHdlr := &svrTransHandler{
 		opt:           opt,
 		codec:         opt.Codec,
@@ -167,7 +164,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	}()
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
-	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearchMap, ri, remote.Call, remote.Server)
+	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearchMap, ri, remote.Call, remote.Server, t.opt.RefuseTrafficWithoutServiceName)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {

@@ -355,7 +355,7 @@ func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
 	remoteOpt.TargetSvcInfo = s.targetSvcInfo
 	remoteOpt.SvcSearchMap = s.svcs.getSvcInfoSearchMap()
-	remoteOpt.OnlyAcceptingHTTP2Traffic = s.opt.OnlyAcceptingHTTP2Traffic
+	remoteOpt.RefuseTrafficWithoutServiceName = s.opt.RefuseTrafficWithoutServiceName
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
@@ -448,7 +448,7 @@ func (s *server) check() error {
 		s.targetSvcInfo = getDefaultSvcInfo(s.svcs)
 		return nil
 	}
-	return checkFallbackServiceForConflictingMethods(s.svcs.conflictingMethodHasFallbackSvcMap, s.opt.OnlyAcceptingHTTP2Traffic)
+	return checkFallbackServiceForConflictingMethods(s.svcs.conflictingMethodHasFallbackSvcMap, s.opt.RefuseTrafficWithoutServiceName)
 }
 
 func doAddBoundHandlerToHead(h remote.BoundHandler, opt *remote.ServerOption) {
@@ -572,8 +572,8 @@ func getDefaultSvcInfo(svcs *services) *serviceinfo.ServiceInfo {
 	return nil
 }
 
-func checkFallbackServiceForConflictingMethods(conflictingMethodHasFallbackSvcMap map[string]bool, onlyAcceptingHTTP2Traffic bool) error {
-	if onlyAcceptingHTTP2Traffic {
+func checkFallbackServiceForConflictingMethods(conflictingMethodHasFallbackSvcMap map[string]bool, refuseTrafficWithoutServiceName bool) error {
+	if refuseTrafficWithoutServiceName {
 		return nil
 	}
 	for name, hasFallbackSvc := range conflictingMethodHasFallbackSvcMap {

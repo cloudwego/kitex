@@ -319,7 +319,7 @@ func initServerRecvMsg() remote.Message {
 		mocks.MockErrorMethod:     svcInfo,
 		mocks.MockOnewayMethod:    svcInfo,
 	}
-	msg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, mockSvrRPCInfo, remote.Call, remote.Server)
+	msg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, mockSvrRPCInfo, remote.Call, remote.Server, false)
 	return msg
 }
 

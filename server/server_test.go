@@ -657,7 +657,7 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 			{ // mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server)
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server, false)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
@@ -744,7 +744,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 			{ // mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server)
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server, false)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
@@ -807,7 +807,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 				// mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server)
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server, false)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
@@ -922,18 +922,6 @@ func TestRegisterService(t *testing.T) {
 	err := svr.Run()
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "method name [mock] is conflicted between services but no fallback service is specified")
-	svr.Stop()
-
-	svr = NewServer(WithOnlyAcceptingHTTP2Traffic(true))
-	time.AfterFunc(time.Second, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
-	_ = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	_ = svr.RegisterService(mocks.Service3Info(), mocks.MyServiceHandler())
-	err = svr.Run()
-	test.Assert(t, err != nil)
-	test.Assert(t, err.Error() == "only http2 traffic is accepted")
 	svr.Stop()
 }
 

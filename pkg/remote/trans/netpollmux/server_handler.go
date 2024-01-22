@@ -62,9 +62,6 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 }
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
-	if opt.OnlyAcceptingHTTP2Traffic {
-		return nil, remote.NewTransErrorWithMsg(remote.InvalidProtocol, "only http2 traffic is accepted")
-	}
 	svrHdlr := &svrTransHandler{
 		opt:           opt,
 		codec:         opt.Codec,
@@ -238,7 +235,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	}()
 
 	// read
-	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearchMap, rpcInfo, remote.Call, remote.Server)
+	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearchMap, rpcInfo, remote.Call, remote.Server, t.opt.RefuseTrafficWithoutServiceName)
 	bufReader := np.NewReaderByteBuffer(reader)
 	err = t.readWithByteBuffer(ctx, bufReader, recvMsg)
 	if err != nil {

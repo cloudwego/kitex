@@ -105,11 +105,6 @@ func TestDefaultSvrTransHandler(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, tagEncode == 1, tagEncode)
 	test.Assert(t, tagDecode == 1, tagDecode)
-
-	opt = &remote.ServerOption{OnlyAcceptingHTTP2Traffic: true}
-	_, err = NewDefaultSvrTransHandler(opt, ext)
-	test.Assert(t, err != nil)
-	test.Assert(t, err.Error() == "only http2 traffic is accepted")
 }
 
 func TestSvrTransHandlerBizError(t *testing.T) {

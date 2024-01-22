@@ -453,11 +453,25 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 		mocks.MockErrorMethod:     svcInfo,
 		mocks.MockOnewayMethod:    svcInfo,
 	}
-	msg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server)
+	msg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server, false)
 
 	newCtx, tags := iSvr.opt.RemoteOpt.ProfilerMessageTagging(ctx, msg)
 	test.Assert(t, len(tags) == 8)
 	test.DeepEqual(t, tags, []string{"b", "2", "c", "2", "a", "1", "b", "1"})
 	test.Assert(t, newCtx.Value("ctx1").(int) == 1)
 	test.Assert(t, newCtx.Value("ctx2").(int) == 2)
+}
+
+func TestRefuseTrafficWithoutServiceNamOption(t *testing.T) {
+	svr := NewServer(WithRefuseTrafficWithoutServiceName(true))
+	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil, err)
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr.Run()
+	test.Assert(t, err == nil, err)
+	iSvr := svr.(*server)
+	test.Assert(t, iSvr.opt.RefuseTrafficWithoutServiceName)
 }

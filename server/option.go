@@ -357,9 +357,11 @@ func WithContextBackup(enable, async bool) Option {
 	}}
 }
 
-// WithOnlyAcceptingHTTP2Traffic returns an Option that accepts only http2 traffic.
-func WithOnlyAcceptingHTTP2Traffic(enable bool) Option {
+// WithRefuseTrafficWithoutServiceName returns an Option that only accepts traffics with service name.
+// This is used for a server with multi services and is one of the options to avoid a server startup error
+// when having conflicting method names between services without specifying a fallback service for the method.
+func WithRefuseTrafficWithoutServiceName(enable bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.OnlyAcceptingHTTP2Traffic = enable
+		o.RefuseTrafficWithoutServiceName = enable
 	}}
 }
