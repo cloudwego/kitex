@@ -311,10 +311,6 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		methodName := ri.Invocation().MethodName()
 		serviceName := ri.Invocation().ServiceName()
 		svc := s.svcs.svcMap[serviceName]
-		if svc == nil {
-			// NOTE: svc should always be non-nil here
-			svc = s.svcs.svcSearchMap[methodName]
-		}
 		svcInfo := svc.svcInfo
 		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
 			return errors.New("method name is empty in rpcinfo, should not happen")
