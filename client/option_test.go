@@ -18,6 +18,7 @@ package client
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"reflect"
 	"testing"
@@ -700,4 +701,10 @@ func TestWithXDSSuite(t *testing.T) {
 	test.Assert(t, opt.XDSEnabled == true)
 	test.Assert(t, opt.XDSRouterMiddleware != nil)
 	test.Assert(t, opt.Resolver != nil)
+}
+
+func TestWithGRPCTLSConfig(t *testing.T) {
+	cfg := &tls.Config{}
+	opts := client.NewOptions([]client.Option{WithGRPCTLSConfig(cfg)})
+	test.Assert(t, opts.GRPCConnectOpts != nil)
 }

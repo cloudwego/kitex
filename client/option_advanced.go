@@ -33,6 +33,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -237,7 +238,10 @@ func WithBoundHandler(h remote.BoundHandler) Option {
 // WithGRPCTLSConfig sets the TLS config for gRPC client.
 func WithGRPCTLSConfig(tlsConfig *tls.Config) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
+		if tlsConfig == nil {
+			panic("invalid TLS config: nil")
+		}
 		di.Push("WithGRPCTLSConfig")
-		o.GRPCConnectOpts.TLSConfig = tlsConfig
+		o.GRPCConnectOpts.TLSConfig = grpc.TLSConfig(tlsConfig)
 	}}
 }
