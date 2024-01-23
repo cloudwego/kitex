@@ -101,20 +101,45 @@ func TestHyperCodecCheck(t *testing.T) {
 }
 
 func TestFrugalCodec(t *testing.T) {
-	ctx := context.Background()
-	frugalCodec := &thriftCodec{FrugalRead | FrugalWrite}
+	t.Run("configure frugal but data has not tag", func(t *testing.T) {
+		ctx := context.Background()
+		codec := &thriftCodec{FrugalRead | FrugalWrite}
 
+		// MockNoTagArgs cannot be marshaled
+		sendMsg := initNoTagSendMsg(transport.TTHeader)
+		out := remote.NewWriterBuffer(256)
+		err := codec.Marshal(ctx, sendMsg, out)
+		test.Assert(t, err != nil)
+	})
+	t.Run("configure frugal and data has tag", func(t *testing.T) {
+		ctx := context.Background()
+		codec := &thriftCodec{FrugalRead | FrugalWrite}
+
+		testFrugalDataConversion(t, ctx, codec)
+	})
+	t.Run("fallback to frugal and data has tag", func(t *testing.T) {
+		ctx := context.Background()
+		codec := NewThriftCodec()
+
+		testFrugalDataConversion(t, ctx, codec)
+	})
+	t.Run("configure BasicCodec to disable frugal fallback", func(t *testing.T) {
+		ctx := context.Background()
+		codec := NewThriftCodecWithConfig(Basic)
+
+		// MockNoTagArgs cannot be marshaled
+		sendMsg := initNoTagSendMsg(transport.TTHeader)
+		out := remote.NewWriterBuffer(256)
+		err := codec.Marshal(ctx, sendMsg, out)
+		test.Assert(t, err != nil)
+	})
+}
+
+func testFrugalDataConversion(t *testing.T, ctx context.Context, codec remote.PayloadCodec) {
 	// encode client side
-	// MockNoTagArgs cannot be marshaled
-	sendMsg := initNoTagSendMsg(transport.TTHeader)
+	sendMsg := initFrugalTagSendMsg(transport.TTHeader)
 	out := remote.NewWriterBuffer(256)
-	err := frugalCodec.Marshal(ctx, sendMsg, out)
-	test.Assert(t, err != nil)
-
-	// MockFrugalTagArgs can be marshaled by frugal
-	sendMsg = initFrugalTagSendMsg(transport.TTHeader)
-	out = remote.NewWriterBuffer(256)
-	err = frugalCodec.Marshal(ctx, sendMsg, out)
+	err := codec.Marshal(ctx, sendMsg, out)
 	test.Assert(t, err == nil, err)
 
 	// decode server side
@@ -123,7 +148,7 @@ func TestFrugalCodec(t *testing.T) {
 	recvMsg.SetPayloadLen(len(buf))
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
-	err = frugalCodec.Unmarshal(ctx, recvMsg, in)
+	err = codec.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)
 
 	// compare Args
@@ -144,17 +169,58 @@ func TestMarshalThriftDataFrugal(t *testing.T) {
 	mockReqFrugal := &MockFrugalTagReq{
 		Msg: "hello",
 	}
-	buf, err := MarshalThriftData(context.Background(), NewThriftCodecWithConfig(FrugalWrite), mockReqFrugal)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, reflect.DeepEqual(buf, mockReqThrift), buf)
+	successfulCodecs := []remote.PayloadCodec{
+		NewThriftCodecWithConfig(FrugalWrite),
+		// fallback to frugal
+		nil,
+		// fallback to frugal
+		NewThriftCodec(),
+	}
+	for _, codec := range successfulCodecs {
+		buf, err := MarshalThriftData(context.Background(), codec, mockReqFrugal)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, reflect.DeepEqual(buf, mockReqThrift), buf)
+	}
+
+	// Basic can be used for disabling frugal
+	_, err := MarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), mockReqFrugal)
+	test.Assert(t, err != nil, err)
 }
 
 func TestUnmarshalThriftDataFrugal(t *testing.T) {
 	req := &MockFrugalTagReq{}
-	err := UnmarshalThriftData(context.Background(), NewThriftCodecWithConfig(FrugalRead), "mock", mockReqThrift, req)
-	checkDecodeResult(t, err, &fast.MockReq{
-		Msg:     req.Msg,
-		StrList: req.StrList,
-		StrMap:  req.StrMap,
-	})
+	successfulCodecs := []remote.PayloadCodec{
+		NewThriftCodecWithConfig(FrugalRead),
+		// fallback to frugal
+		nil,
+		// fallback to frugal
+		NewThriftCodec(),
+	}
+	for _, codec := range successfulCodecs {
+		err := UnmarshalThriftData(context.Background(), codec, "mock", mockReqThrift, req)
+		checkDecodeResult(t, err, &fast.MockReq{
+			Msg:     req.Msg,
+			StrList: req.StrList,
+			StrMap:  req.StrMap,
+		})
+
+	}
+
+	// Basic can be used for disabling frugal
+	err := UnmarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), "mock", mockReqThrift, req)
+	test.Assert(t, err != nil, err)
+}
+
+func Test_verifyMarshalThriftDataFrugal(t *testing.T) {
+	err := verifyMarshalBasicThriftDataType(&MockFrugalTagArgs{})
+	test.Assert(t, err == errEncodeMismatchMsgType, err)
+	err = verifyMarshalBasicThriftDataType(&MockNoTagArgs{})
+	test.Assert(t, err == errEncodeMismatchMsgType, err)
+}
+
+func Test_verifyUnmarshalThriftDataFrugal(t *testing.T) {
+	err := verifyUnmarshalBasicThriftDataType(&MockFrugalTagArgs{})
+	test.Assert(t, err == errDecodeMismatchMsgType, err)
+	err = verifyUnmarshalBasicThriftDataType(&MockNoTagArgs{})
+	test.Assert(t, err == errDecodeMismatchMsgType, err)
 }

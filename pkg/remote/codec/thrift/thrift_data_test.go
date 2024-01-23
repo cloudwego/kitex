@@ -43,7 +43,7 @@ var (
 func TestMarshalBasicThriftData(t *testing.T) {
 	t.Run("invalid-data", func(t *testing.T) {
 		err := marshalBasicThriftData(context.Background(), nil, 0)
-		test.Assert(t, err != nil, err)
+		test.Assert(t, err == errEncodeMismatchMsgType, err)
 	})
 	t.Run("valid-data", func(t *testing.T) {
 		transport := thrift.NewTMemoryBufferLen(1024)
@@ -137,4 +137,16 @@ func TestUnmarshalThriftException(t *testing.T) {
 	test.Assert(t, ok, err)
 	test.Assert(t, transErr.TypeID() == thrift.INVALID_PROTOCOL, transErr)
 	test.Assert(t, transErr.Error() == errMessage, transErr)
+}
+
+func Test_verifyMarshalBasicThriftDataType(t *testing.T) {
+	err := verifyMarshalBasicThriftDataType(&mockWithContext{})
+	test.Assert(t, err == nil, err)
+	// data that is not part of basic thrift: in thrift_frugal_amd64_test.go: Test_verifyMarshalThriftDataFrugal
+}
+
+func Test_verifyUnmarshalBasicThriftDataType(t *testing.T) {
+	err := verifyUnmarshalBasicThriftDataType(&mockWithContext{})
+	test.Assert(t, err == nil, err)
+	// data that is not part of basic thrift: in thrift_frugal_amd64_test.go: Test_verifyUnmarshalThriftDataFrugal
 }
