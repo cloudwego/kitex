@@ -84,7 +84,7 @@ func NewProtocolInfo(tp transport.Protocol, ct serviceinfo.PayloadCodec) Protoco
 type Message interface {
 	RPCInfo() rpcinfo.RPCInfo
 	ServiceInfo() *serviceinfo.ServiceInfo
-	SetServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error)
+	SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error)
 	Data() interface{}
 	NewData(method string) (ok bool)
 	MessageType() MessageType
@@ -181,7 +181,7 @@ func (m *message) ServiceInfo() *serviceinfo.ServiceInfo {
 	return m.targetSvcInfo
 }
 
-func (m *message) SetServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error) {
+func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error) {
 	// for non-multi-service including generic server scenario
 	if m.targetSvcInfo != nil {
 		if mt := m.targetSvcInfo.MethodInfo(methodName); mt == nil {

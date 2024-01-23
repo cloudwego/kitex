@@ -151,7 +151,7 @@ func (m *MockMessage) ServiceInfo() (si *serviceinfo.ServiceInfo) {
 	return
 }
 
-func (m *MockMessage) SetServiceInfo(svcName, methodName string) (si *serviceinfo.ServiceInfo, err error) {
+func (m *MockMessage) SpecifyServiceInfo(svcName, methodName string) (si *serviceinfo.ServiceInfo, err error) {
 	if m.SetServiceInfoFunc != nil {
 		return m.SetServiceInfoFunc(svcName, methodName)
 	}

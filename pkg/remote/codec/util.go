@@ -45,7 +45,7 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 	if message.RPCRole() == remote.Client {
 		return fmt.Errorf("wrong method name, expect=%s, actual=%s", callMethodName, methodName)
 	}
-	svcInfo, err := message.SetServiceInfo(ink.ServiceName(), methodName)
+	svcInfo, err := message.SpecifyServiceInfo(ink.ServiceName(), methodName)
 	if err != nil {
 		return err
 	}

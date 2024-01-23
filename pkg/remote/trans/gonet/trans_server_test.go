@@ -59,7 +59,7 @@ func TestMain(m *testing.M) {
 		Codec: &MockCodec{
 			EncodeFunc: nil,
 			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				msg.SetServiceInfo(mocks.MockServiceName, mocks.MockMethod)
+				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
 				return nil
 			},
 		},
