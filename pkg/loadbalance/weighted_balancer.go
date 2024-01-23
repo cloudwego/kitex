@@ -29,6 +29,7 @@ const (
 	lbKindRoundRobin = iota
 	lbKindInterleaved
 	lbKindRandom
+	lbKindRandomWithAliasMethod
 )
 
 type weightedBalancer struct {
@@ -57,6 +58,12 @@ func NewInterleavedWeightedRoundRobinBalancer() Loadbalancer {
 // NewWeightedRandomBalancer creates a loadbalancer using weighted-random algorithm.
 func NewWeightedRandomBalancer() Loadbalancer {
 	lb := &weightedBalancer{kind: lbKindRandom}
+	return lb
+}
+
+// NewWeightedRandomWithAliasMethodBalancer creates a loadbalancer using alias-method algorithm.
+func NewWeightedRandomWithAliasMethodBalancer() Loadbalancer {
+	lb := &weightedBalancer{kind: lbKindRandomWithAliasMethod}
 	return lb
 }
 
@@ -114,6 +121,12 @@ func (wb *weightedBalancer) createPicker(e discovery.Result) (picker Picker) {
 		} else {
 			picker = newInterleavedWeightedRoundRobinPicker(instances)
 		}
+	case lbKindRandomWithAliasMethod:
+		if balance {
+			picker = newRandomPicker(instances)
+		} else {
+			picker = newAliasMethodPicker(instances, weightSum)
+		}
 	default: // random
 		if balance {
 			picker = newRandomPicker(instances)
@@ -146,6 +159,8 @@ func (wb *weightedBalancer) Name() string {
 		return "weight_round_robin"
 	case lbKindInterleaved:
 		return "interleaved_weighted_round_robin"
+	case lbKindRandomWithAliasMethod:
+		return "weight_random_with_alias_method"
 	default:
 		return "weight_random"
 	}

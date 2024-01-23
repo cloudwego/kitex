@@ -36,6 +36,7 @@ type balancerTestcase struct {
 var balancerTestcases = []*balancerTestcase{
 	{Name: "weight_round_robin", factory: NewWeightedRoundRobinBalancer},
 	{Name: "weight_random", factory: NewWeightedRandomBalancer},
+	{Name: "weight_random_with_alias_method", factory: NewWeightedRandomWithAliasMethodBalancer},
 	{Name: "interleaved_weighted_round_robin", factory: NewInterleavedWeightedRoundRobinBalancer},
 }
 
