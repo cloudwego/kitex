@@ -30,10 +30,11 @@ import (
 
 // TestNewServer tests the creation of a new server
 func TestNewServer(t *testing.T) {
-	addr, _ := net.ResolveTCPAddr("tcp", ":9999")
+	hostPort := test.GetLocalAddress()
+	addr, _ := net.ResolveTCPAddr("tcp", hostPort)
 	g := generic.BinaryThriftGeneric()
-	svr := NewServer(new(mockImpl), g, server.WithServiceAddr(addr))
-	time.AfterFunc(time.Second, func() {
+	svr := NewServer(new(mockImpl), g, server.WithServiceAddr(addr), server.WithExitWaitTime(time.Microsecond*10))
+	time.AfterFunc(time.Millisecond*500, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
 	})

@@ -31,7 +31,9 @@ import (
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/client/genericclient"
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
 
@@ -42,14 +44,17 @@ import (
 
 func TestMain(m *testing.M) {
 	if runtime.GOOS == "windows" {
+		klog.Infof("skip generic reflect_test on windows")
 		return
 	}
 	initExampleDescriptor()
-	svr := initServer(":9090")
-	cli = initClient("127.0.0.1:9090")
+	addr := test.GetLocalAddress()
+	svr := initServer(addr)
+	cli = initClient(addr)
 
-	msvr := initThriftMapServer(":9101", "./idl/example.thrift", new(exampeServerImpl))
-	mcli = initThriftMapClient("127.0.0.1:9101", "./idl/example.thrift")
+	mAddr := test.GetLocalAddress()
+	msvr := initThriftMapServer(mAddr, "./idl/example.thrift", new(exampeServerImpl))
+	mcli = initThriftMapClient(mAddr, "./idl/example.thrift")
 
 	ret := m.Run()
 
@@ -176,14 +181,15 @@ func initServer(addr string) server.Server {
 	// init special server
 	ip, _ := net.ResolveTCPAddr("tcp", addr)
 	g := generic.BinaryThriftGeneric()
-	svr := genericserver.NewServer(new(ExampleValueServiceImpl), g, server.WithServiceAddr(ip))
+	svr := genericserver.NewServer(new(ExampleValueServiceImpl), g,
+		server.WithServiceAddr(ip), server.WithExitWaitTime(time.Millisecond*10))
 	go func() {
 		err := svr.Run()
 		if err != nil {
 			panic(err)
 		}
 	}()
-	time.Sleep(500 * time.Millisecond)
+	test.WaitServerStart(addr)
 	return svr
 }
 

@@ -179,7 +179,11 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 		return errInvalidMessageType
 	}
 	{{- else}}{{/* streaming logic */}}
-		st := arg.(*streaming.Args).Stream
+		streamingArgs, ok := arg.(*streaming.Args)
+		if !ok {
+			return errInvalidMessageType
+		}
+		st := streamingArgs.Stream
 		stream := &{{LowerFirst .ServiceName}}{{.RawName}}Server{st}
 		{{- if $serverSide}}
 		req := new({{NotPtr $arg.Type}})

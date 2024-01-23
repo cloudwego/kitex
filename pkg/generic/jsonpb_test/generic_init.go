@@ -25,9 +25,11 @@ import (
 	"net"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/genericclient"
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/server"
@@ -43,7 +45,7 @@ func newGenericClient(destService string, g generic.Generic, targetIPPort string
 
 func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service) server.Server {
 	var opts []server.Option
-	opts = append(opts, server.WithServiceAddr(addr))
+	opts = append(opts, server.WithServiceAddr(addr), server.WithExitWaitTime(time.Microsecond*10))
 	svr := genericserver.NewServer(handler, g, opts...)
 	go func() {
 		err := svr.Run()
@@ -51,6 +53,7 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 			panic(err)
 		}
 	}()
+	test.WaitServerStart(addr.String())
 	return svr
 }
 

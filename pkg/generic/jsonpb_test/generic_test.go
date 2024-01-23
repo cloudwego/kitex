@@ -23,7 +23,6 @@ import (
 	"net"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/cloudwego/dynamicgo/proto"
 
@@ -73,11 +72,7 @@ func initPbClientByIDLDynamicGo(t *testing.T, addr, destSvcName, pbIdl string) g
 
 func TestEcho(t *testing.T) {
 	addr := test.GetLocalAddress()
-
-	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestEchoService), "./idl/echo.proto")
-	time.Sleep(500 * time.Millisecond)
-
 	cli := initPbClientByIDLDynamicGo(t, addr, "EchoService", "./idl/echo.proto")
 
 	ctx := context.Background()
@@ -97,11 +92,7 @@ func TestEcho(t *testing.T) {
 
 func TestExampleMethod(t *testing.T) {
 	addr := test.GetLocalAddress()
-
-	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestExampleMethodService), "./idl/example.proto")
-	time.Sleep(500 * time.Millisecond)
-
 	cli := initPbClientByIDLDynamicGo(t, addr, "ExampleService", "./idl/example.proto")
 
 	ctx := context.Background()
@@ -121,11 +112,7 @@ func TestExampleMethod(t *testing.T) {
 
 func TestVoid(t *testing.T) {
 	addr := test.GetLocalAddress()
-
-	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestVoidService), "./idl/example.proto")
-	time.Sleep(500 * time.Millisecond)
-
 	cli := initPbClientByIDLDynamicGo(t, addr, "ExampleService", "./idl/example.proto")
 
 	ctx := context.Background()
@@ -144,11 +131,7 @@ func TestVoid(t *testing.T) {
 
 func TestExampleMethod2(t *testing.T) {
 	addr := test.GetLocalAddress()
-
-	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestExampleMethod2Service), "./idl/example2.proto")
-	time.Sleep(500 * time.Millisecond)
-
 	cli := initPbClientByIDLDynamicGo(t, addr, "ExampleMethod", "./idl/example2.proto")
 
 	ctx := context.Background()
@@ -173,11 +156,7 @@ func TestExampleMethod2(t *testing.T) {
 
 func TestInt2FloatMethod(t *testing.T) {
 	addr := test.GetLocalAddress()
-
-	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestInt2FloatMethodService), "./idl/example2.proto")
-	time.Sleep(500 * time.Millisecond)
-
 	cli := initPbClientByIDLDynamicGo(t, addr, "Int2FloatMethod", "./idl/example2.proto")
 
 	ctx := context.Background()
@@ -197,11 +176,7 @@ func TestInt2FloatMethod(t *testing.T) {
 
 func TestInt2FloatMethod2(t *testing.T) {
 	addr := test.GetLocalAddress()
-
-	time.Sleep(1 * time.Second)
 	svr := initPbServerByIDLDynamicGo(t, addr, new(TestInt2FloatMethod2Service), "./idl/example2.proto")
-	time.Sleep(500 * time.Millisecond)
-
 	cli := initPbClientByIDLDynamicGo(t, addr, "Int2FloatMethod2", "./idl/example2.proto")
 
 	ctx := context.Background()

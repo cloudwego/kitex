@@ -20,6 +20,7 @@ package test
 import (
 	"context"
 	"net"
+	"time"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/genericclient"
@@ -37,7 +38,7 @@ func newGenericClient(destService string, g generic.Generic, targetIPPort string
 
 func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service) server.Server {
 	var opts []server.Option
-	opts = append(opts, server.WithServiceAddr(addr))
+	opts = append(opts, server.WithServiceAddr(addr), server.WithExitWaitTime(time.Millisecond*10))
 	svr := genericserver.NewServer(handler, g, opts...)
 	go func() {
 		err := svr.Run()
