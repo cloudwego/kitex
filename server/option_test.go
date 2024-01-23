@@ -463,7 +463,7 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 }
 
 func TestRefuseTrafficWithoutServiceNamOption(t *testing.T) {
-	svr := NewServer(WithRefuseTrafficWithoutServiceName(true))
+	svr := NewServer(WithRefuseTrafficWithoutServiceName())
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {
