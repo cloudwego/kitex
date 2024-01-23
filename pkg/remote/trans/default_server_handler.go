@@ -68,9 +68,12 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
 	}()
 
-	if methodInfo, _ := GetMethodInfo(ri, sendMsg.ServiceInfo()); methodInfo != nil {
-		if methodInfo.OneWay() {
-			return ctx, nil
+	svcInfo := sendMsg.ServiceInfo()
+	if svcInfo != nil {
+		if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
+			if methodInfo.OneWay() {
+				return ctx, nil
+			}
 		}
 	}
 
@@ -276,14 +279,14 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 		return
 	}
 	svcInfo := recvMsg.ServiceInfo()
-	if svcInfo == nil {
-		return
-	}
-	if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
-		if methodInfo.OneWay() {
-			return
+	if svcInfo != nil {
+		if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
+			if methodInfo.OneWay() {
+				return
+			}
 		}
 	}
+
 	transErr, isTransErr := err.(*remote.TransError)
 	if !isTransErr {
 		return

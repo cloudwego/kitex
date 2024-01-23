@@ -103,11 +103,15 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, nil)
 	}()
 
-	if methodInfo, _ := trans.GetMethodInfo(ri, sendMsg.ServiceInfo()); methodInfo != nil {
-		if methodInfo.OneWay() {
-			return ctx, nil
+	svcInfo := sendMsg.ServiceInfo()
+	if svcInfo != nil {
+		if methodInfo, _ := trans.GetMethodInfo(ri, svcInfo); methodInfo != nil {
+			if methodInfo.OneWay() {
+				return ctx, nil
+			}
 		}
 	}
+
 	wbuf := netpoll.NewLinkBuffer()
 	bufWriter := np.NewWriterByteBuffer(wbuf)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
@@ -410,12 +414,11 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool,
 ) (shouldCloseConn bool) {
 	svcInfo := recvMsg.ServiceInfo()
-	if svcInfo == nil {
-		return
-	}
-	if methodInfo, _ := trans.GetMethodInfo(ri, svcInfo); methodInfo != nil {
-		if methodInfo.OneWay() {
-			return
+	if svcInfo != nil {
+		if methodInfo, _ := trans.GetMethodInfo(ri, svcInfo); methodInfo != nil {
+			if methodInfo.OneWay() {
+				return
+			}
 		}
 	}
 	transErr, isTransErr := err.(*remote.TransError)
