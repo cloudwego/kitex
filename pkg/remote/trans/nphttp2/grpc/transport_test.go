@@ -23,6 +23,7 @@ package grpc
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -40,6 +41,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/testutils"
@@ -2038,4 +2040,22 @@ func TestHeaderTblSize(t *testing.T) {
 	if i == 1000 {
 		t.Fatalf("expected len(limits) = 2 within 10s, got != 2")
 	}
+}
+
+func TestTLSConfig(t *testing.T) {
+	cfg := &tls.Config{}
+	newCfg := TLSConfig(cfg)
+	test.Assert(t, len(cfg.NextProtos) == 0)
+	test.Assert(t, len(newCfg.NextProtos) == 1)
+	test.Assert(t, newCfg.NextProtos[0] == alpnProtoStrH2)
+	test.Assert(t, newCfg.MinVersion == tls.VersionTLS12)
+}
+
+func TestTlsAppendH2ToALPNProtocols(t *testing.T) {
+	var ps []string
+	appended := tlsAppendH2ToALPNProtocols(ps)
+	test.Assert(t, len(appended) == 1)
+	test.Assert(t, appended[0] == alpnProtoStrH2)
+	appended = tlsAppendH2ToALPNProtocols(appended)
+	test.Assert(t, len(appended) == 1)
 }
