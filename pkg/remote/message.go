@@ -193,7 +193,7 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 		return nil, NewTransErrorWithMsg(NoServiceName, "no service name while the server has WithRefuseTrafficWithoutServiceName option enabled")
 	}
 	var key string
-	if svcName == serviceinfo.GenericService || svcName == "" {
+	if svcName == "" {
 		key = methodName
 	} else {
 		key = fmt.Sprintf("%s.%s", svcName, methodName)
