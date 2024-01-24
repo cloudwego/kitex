@@ -189,6 +189,11 @@ func Hessian2PatchByReplace(args generator.Config, subDirPath string) error {
 		}
 	}
 
+	// users do not specify -service flag, we do not need to replace
+	if args.ServiceName == "" {
+		return nil
+	}
+
 	handlerName := util.JoinPath(output, "handler.go")
 	handler, err := ioutil.ReadFile(handlerName)
 	if err != nil {
