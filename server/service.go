@@ -23,9 +23,8 @@ import (
 )
 
 type service struct {
-	svcInfo    *serviceinfo.ServiceInfo
-	handler    interface{}
-	isFallback bool
+	svcInfo *serviceinfo.ServiceInfo
+	handler interface{}
 }
 
 func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) *service {
@@ -55,7 +54,6 @@ func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interfac
 			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)
 		}
 		s.fallbackSvc = svc
-		svc.isFallback = true
 	}
 	s.svcMap[svcInfo.ServiceName] = svc
 	for methodName := range svcInfo.Methods {
@@ -63,9 +61,13 @@ func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interfac
 		// conflicting method check
 		if svcFromMap, ok := s.svcSearchMap[methodName]; ok {
 			if _, ok := s.conflictingMethodHasFallbackSvcMap[methodName]; !ok {
-				s.conflictingMethodHasFallbackSvcMap[methodName] = svcFromMap.isFallback
+				if s.fallbackSvc != nil && svcFromMap.svcInfo.ServiceName == s.fallbackSvc.svcInfo.ServiceName {
+					s.conflictingMethodHasFallbackSvcMap[methodName] = true
+				} else {
+					s.conflictingMethodHasFallbackSvcMap[methodName] = false
+				}
 			}
-			if svc.isFallback {
+			if isFallbackService {
 				s.svcSearchMap[methodName] = svc
 				s.conflictingMethodHasFallbackSvcMap[methodName] = true
 			}
