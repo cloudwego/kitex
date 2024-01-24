@@ -17,6 +17,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -36,6 +37,7 @@ type services struct {
 	svcMap                             map[string]*service // key: service name, value: svcInfo
 	conflictingMethodHasFallbackSvcMap map[string]bool
 	fallbackSvc                        *service
+	hasCombineService                  bool
 }
 
 func newServices() *services {
@@ -48,6 +50,13 @@ func newServices() *services {
 
 func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, isFallbackService bool) error {
 	svc := newService(svcInfo, handler)
+
+	// combine service check
+	if svcInfo.ServiceName == "CombineService" {
+		s.hasCombineService = true
+	} else if s.hasCombineService {
+		return errors.New("combine service cannot be registered with other services. please register services without using combine service or register only combine service")
+	}
 
 	if isFallbackService {
 		if s.fallbackSvc != nil {
