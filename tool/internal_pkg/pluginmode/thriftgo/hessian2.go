@@ -73,7 +73,7 @@ func runOption(cfg *generator.Config, opt string) {
 
 // runJavaExtensionOption Pull the extension file of java class from remote
 func runJavaExtensionOption(cfg *generator.Config) {
-	// get java.thrift, we need to put java.thrift in project root directory
+	// get java.thrift, we assume java.thrift and IDL in the same directory so that IDL just needs to include "java.thrift"
 	if path := util.JoinPath(filepath.Dir(cfg.IDL), JavaThrift); !util.Exists(path) {
 		if err := util.DownloadFile(JavaThriftAddress, path); err != nil {
 			log.Warn("Downloading java.thrift file failed:", err.Error())
@@ -106,7 +106,7 @@ func patchIDLRefConfig(cfg *generator.Config) {
 	defer file.Close()
 	idlRefCfg := loadIDLRefConfig(file.Name(), file)
 
-	// update the idl-ref config file
+	// assume java.thrift and IDL are in the same directory
 	javaRef := filepath.Join(filepath.Dir(cfg.IDL), JavaThrift)
 	idlRefCfg.Ref[javaRef] = DubboCodec + "/java"
 	out, err := yaml.Marshal(idlRefCfg)
