@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"os"
 	"runtime/debug"
 	"sync"
 	"syscall"
@@ -68,6 +69,12 @@ func (ts *transServer) CreateListener(addr net.Addr) (net.Listener, error) {
 	if addr.Network() == "unix" {
 		syscall.Unlink(addr.String())
 	}
+	dpuOpt := os.Getenv("RUN_WITH_DPU")
+	klog.Infof("RUN_WITH_DPU=%s", dpuOpt)
+	if dpuOpt == "1" {
+		return netpoll.CreateListener(addr.Network(), addr.String())
+	}
+
 	// The network must be "tcp", "tcp4", "tcp6" or "unix".
 	ln, err := ts.lncfg.Listen(context.Background(), addr.Network(), addr.String())
 	return ln, err
