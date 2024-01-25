@@ -72,8 +72,8 @@ func runOption(cfg *generator.Config, opt string) {
 
 // runJavaExtensionOption Pull the extension file of java class from remote
 func runJavaExtensionOption(cfg *generator.Config) {
-	// get java.thrift
-	if path := util.JoinPath(filepath.Dir(cfg.IDL), "java.thrift"); !util.Exists(path) {
+	// get java.thrift, we need to put java.thrift in project root directory
+	if path := util.JoinPath(cfg.OutputPath, "java.thrift"); !util.Exists(path) {
 		if err := util.DownloadFile(JavaThrift, path); err != nil {
 			log.Warn("Downloading java.thrift file failed:", err.Error())
 			abs, err := filepath.Abs(path)
@@ -92,9 +92,10 @@ func runJavaExtensionOption(cfg *generator.Config) {
 // patchIDLRefConfig merge idl-ref configuration patch
 func patchIDLRefConfig(cfg *generator.Config) {
 	// load the idl-ref config file (create it first if it does not exist)
-	idlRef := filepath.Join(filepath.Dir(cfg.IDL), "idl-ref.yaml")
+	// for making use of idl-ref of thriftgo, we need to check the project root directory
+	idlRef := filepath.Join(cfg.OutputPath, "idl-ref.yaml")
 	if !util.Exists(idlRef) {
-		idlRef = filepath.Join(filepath.Dir(cfg.IDL), "idl-ref.yml")
+		idlRef = filepath.Join(cfg.OutputPath, "idl-ref.yml")
 	}
 	file, err := os.OpenFile(idlRef, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
