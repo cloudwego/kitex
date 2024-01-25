@@ -132,6 +132,7 @@ func (pp *protocPlugin) GenerateFile(gen *protogen.Plugin, file *protogen.File) 
 		gopkg = parts[0] // remove package alias from file path
 	}
 	pp.Namespace = strings.TrimPrefix(gopkg, pp.PackagePrefix)
+	pp.IDLName = util.IDLName(pp.Config.IDL)
 
 	ss := pp.convertTypes(file)
 	pp.Services = append(pp.Services, ss...)
