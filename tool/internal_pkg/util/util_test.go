@@ -45,3 +45,22 @@ func TestGetGOPATH(t *testing.T) {
 	os.Setenv("GOPATH", "")
 	test.Assert(t, GetGOPATH() != "")
 }
+
+func TestIDLName(t *testing.T) {
+	tests := []struct {
+		filename string
+		want     string
+	}{
+		{"test.thrift", "test"},
+		{"Test.thrift", "test"},
+		{"testP.thrift", "test_p"},
+		{"../../test_p.thrift", "test_p"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.filename, func(t *testing.T) {
+			if got := IDLName(tt.filename); got != tt.want {
+				t.Errorf("IDLName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
