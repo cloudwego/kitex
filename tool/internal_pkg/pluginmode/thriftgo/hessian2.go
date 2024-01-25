@@ -33,8 +33,9 @@ import (
 const (
 	JavaExtensionOption = "java_extension"
 
-	DubboCodec = "github.com/kitex-contrib/codec-dubbo"
-	JavaThrift = "https://raw.githubusercontent.com/kitex-contrib/codec-dubbo/main/java/java.thrift"
+	DubboCodec        = "github.com/kitex-contrib/codec-dubbo"
+	JavaThrift        = "java.thrift"
+	JavaThriftAddress = "https://raw.githubusercontent.com/kitex-contrib/codec-dubbo/main/java/java.thrift"
 )
 
 // Hessian2PreHook Hook before building cmd
@@ -73,14 +74,14 @@ func runOption(cfg *generator.Config, opt string) {
 // runJavaExtensionOption Pull the extension file of java class from remote
 func runJavaExtensionOption(cfg *generator.Config) {
 	// get java.thrift, we need to put java.thrift in project root directory
-	if path := util.JoinPath(cfg.OutputPath, "java.thrift"); !util.Exists(path) {
-		if err := util.DownloadFile(JavaThrift, path); err != nil {
+	if path := util.JoinPath(filepath.Dir(cfg.IDL), JavaThrift); !util.Exists(path) {
+		if err := util.DownloadFile(JavaThriftAddress, path); err != nil {
 			log.Warn("Downloading java.thrift file failed:", err.Error())
 			abs, err := filepath.Abs(path)
 			if err != nil {
 				abs = path
 			}
-			log.Warnf("You can try to download again. If the download still fails, you can choose to manually download \"%s\" to the local path \"%s\".", JavaThrift, abs)
+			log.Warnf("You can try to download again. If the download still fails, you can choose to manually download \"%s\" to the local path \"%s\".", JavaThriftAddress, abs)
 			os.Exit(1)
 		}
 	}
@@ -106,7 +107,8 @@ func patchIDLRefConfig(cfg *generator.Config) {
 	idlRefCfg := loadIDLRefConfig(file.Name(), file)
 
 	// update the idl-ref config file
-	idlRefCfg.Ref["java.thrift"] = DubboCodec + "/java"
+	javaRef := filepath.Join(filepath.Dir(cfg.IDL), JavaThrift)
+	idlRefCfg.Ref[javaRef] = DubboCodec + "/java"
 	out, err := yaml.Marshal(idlRefCfg)
 	if err != nil {
 		log.Warn("Marshal configuration failed:", err.Error())
