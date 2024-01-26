@@ -90,7 +90,7 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 		if err != nil {
 			return
 		}
-		clientStream := newStream(st, kc, kc.getStreamingMode(ri), sendEndpoint, recvEndpoint)
+		clientStream := newStream(st, kc, ri, kc.getStreamingMode(ri), sendEndpoint, recvEndpoint)
 		resp.(*streaming.Result).Stream = clientStream
 		return
 	}, nil
@@ -107,6 +107,7 @@ func (kc *kClient) getStreamingMode(ri rpcinfo.RPCInfo) serviceinfo.StreamingMod
 type stream struct {
 	stream streaming.Stream
 	kc     *kClient
+	ri     rpcinfo.RPCInfo
 
 	streamingMode serviceinfo.StreamingMode
 	sendEndpoint  endpoint.SendEndpoint
@@ -116,12 +117,13 @@ type stream struct {
 
 var _ streaming.WithDoFinish = (*stream)(nil)
 
-func newStream(s streaming.Stream, kc *kClient, mode serviceinfo.StreamingMode,
-	sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint,
+func newStream(s streaming.Stream, kc *kClient, ri rpcinfo.RPCInfo,
+	mode serviceinfo.StreamingMode, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint,
 ) *stream {
 	return &stream{
 		stream:        s,
 		kc:            kc,
+		ri:            ri,
 		streamingMode: mode,
 		sendEndpoint:  sendEP,
 		recvEndpoint:  recvEP,
@@ -161,6 +163,9 @@ func (s *stream) Context() context.Context {
 // If an error is returned, stream.DoFinish() will be called to record the end of stream
 func (s *stream) RecvMsg(m interface{}) (err error) {
 	err = s.recvEndpoint(s.stream, m)
+	if err == nil {
+		err = s.ri.Invocation().BizStatusErr()
+	}
 	if err != nil || s.streamingMode == serviceinfo.StreamingClient {
 		s.DoFinish(err)
 	}

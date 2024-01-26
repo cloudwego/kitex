@@ -50,6 +50,10 @@ func newServiceInfo() *serviceinfo.ServiceInfo {
 		"mockException": serviceinfo.NewMethodInfo(mockExceptionHandler, NewMockArgs, newMockExceptionResult, false),
 		"mockError":     serviceinfo.NewMethodInfo(mockErrorHandler, NewMockArgs, NewMockResult, false),
 		"mockOneway":    serviceinfo.NewMethodInfo(mockOnewayHandler, NewMockArgs, nil, true),
+		"mockStreaming": serviceinfo.NewMethodInfo(
+			nil, nil, nil, false,
+			serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
+		),
 	}
 
 	svcInfo := &serviceinfo.ServiceInfo{
