@@ -25,21 +25,21 @@ import (
 
 func TestAddService(t *testing.T) {
 	svcs := newServices()
-	err := svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler(), false)
+	err := svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler(), &RegisterOptions{})
 	test.Assert(t, err == nil)
 	test.Assert(t, len(svcs.svcMap) == 1)
 	test.Assert(t, len(svcs.svcSearchMap) == 8)
 	test.Assert(t, len(svcs.conflictingMethodHasFallbackSvcMap) == 0)
 	test.Assert(t, svcs.fallbackSvc == nil)
 
-	err = svcs.addService(mocks.Service3Info(), mocks.MyServiceHandler(), true)
+	err = svcs.addService(mocks.Service3Info(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
 	test.Assert(t, err == nil)
 	test.Assert(t, len(svcs.svcMap) == 2)
 	test.Assert(t, len(svcs.svcSearchMap) == 9)
 	test.Assert(t, len(svcs.conflictingMethodHasFallbackSvcMap) == 1)
 	test.Assert(t, svcs.conflictingMethodHasFallbackSvcMap["mock"])
 
-	err = svcs.addService(mocks.Service2Info(), mocks.MyServiceHandler(), true)
+	err = svcs.addService(mocks.Service2Info(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "multiple fallback services cannot be registered. [MockService3] is already registered as a fallback service")
 }

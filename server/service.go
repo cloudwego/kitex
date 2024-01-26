@@ -50,17 +50,40 @@ func newServices() *services {
 func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, registerOpts *RegisterOptions) error {
 	svc := newService(svcInfo, handler)
 
-	if err := s.checkCombineService(svcInfo); err != nil {
+	if err := s.checkCombineServiceWithOtherService(svcInfo); err != nil {
 		return err
 	}
 
+	if err := s.checkMultipleFallbackService(registerOpts, svc); err != nil {
+		return err
+	}
+
+	s.svcMap[svcInfo.ServiceName] = svc
+	s.createSearchMap(svcInfo, svc, registerOpts)
+	return nil
+}
+
+// when registering combine service, it does not allow the registration of other services
+func (s *services) checkCombineServiceWithOtherService(svcInfo *serviceinfo.ServiceInfo) error {
+	if len(s.svcMap) > 0 {
+		if _, ok := s.svcMap["CombineService"]; ok || svcInfo.ServiceName == "CombineService" {
+			return errors.New("only one service can be registered when registering combine service")
+		}
+	}
+	return nil
+}
+
+func (s *services) checkMultipleFallbackService(registerOpts *RegisterOptions, svc *service) error {
 	if registerOpts.IsFallbackService {
 		if s.fallbackSvc != nil {
 			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)
 		}
 		s.fallbackSvc = svc
 	}
-	s.svcMap[svcInfo.ServiceName] = svc
+	return nil
+}
+
+func (s *services) createSearchMap(svcInfo *serviceinfo.ServiceInfo, svc *service, registerOpts *RegisterOptions) {
 	for methodName := range svcInfo.Methods {
 		s.svcSearchMap[fmt.Sprintf("%s.%s", svcInfo.ServiceName, methodName)] = svc
 		// conflicting method check
@@ -72,7 +95,7 @@ func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interfac
 					s.conflictingMethodHasFallbackSvcMap[methodName] = false
 				}
 			}
-			if isFallbackService {
+			if registerOpts.IsFallbackService {
 				s.svcSearchMap[methodName] = svc
 				s.conflictingMethodHasFallbackSvcMap[methodName] = true
 			}
@@ -80,17 +103,6 @@ func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interfac
 			s.svcSearchMap[methodName] = svc
 		}
 	}
-	return nil
-}
-
-// when registering combine service, it does not allow the registration of other services
-func (s *services) checkCombineService(svcInfo *serviceinfo.ServiceInfo) error {
-	if len(s.svcMap) > 0 {
-		if _, ok := s.svcMap["CombineService"]; ok || svcInfo.ServiceName == "CombineService" {
-			return errors.New("only one service can be registered when registering combine service")
-		}
-	}
-	return nil
 }
 
 func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {

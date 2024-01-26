@@ -996,7 +996,7 @@ func (m *mockCodec) Decode(ctx context.Context, msg remote.Message, in remote.By
 
 func TestDuplicatedRegisterInfoPanic(t *testing.T) {
 	svcs := newServices()
-	svcs.addService(mocks.ServiceInfo(), nil, false)
+	svcs.addService(mocks.ServiceInfo(), nil, &RegisterOptions{})
 	s := &server{
 		opt:  internal_server.NewOptions(nil),
 		svcs: svcs,
