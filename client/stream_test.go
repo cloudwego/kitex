@@ -103,7 +103,7 @@ func TestStreaming(t *testing.T) {
 	cliInfo.ConnPool = connpool
 	s, _ := remotecli.NewStream(ctx, mockRPCInfo, new(mocks.MockCliTransHandler), cliInfo)
 	stream := newStream(
-		s, kc, serviceinfo.StreamingBidirectional,
+		s, kc, mockRPCInfo, serviceinfo.StreamingBidirectional,
 		func(stream streaming.Stream, message interface{}) (err error) {
 			return stream.SendMsg(message)
 		},
@@ -214,6 +214,7 @@ func Test_newStream(t *testing.T) {
 	s := newStream(
 		st,
 		kc,
+		ri,
 		serviceinfo.StreamingClient,
 		func(stream streaming.Stream, message interface{}) (err error) {
 			return sendErr
@@ -247,7 +248,7 @@ func Test_stream_Header(t *testing.T) {
 			},
 		}
 
-		s := newStream(st, &kClient{}, serviceinfo.StreamingBidirectional, nil, nil)
+		s := newStream(st, &kClient{}, nil, serviceinfo.StreamingBidirectional, nil, nil)
 		md, err := s.Header()
 
 		test.Assert(t, err == nil)
@@ -278,7 +279,7 @@ func Test_stream_Header(t *testing.T) {
 			},
 		}
 
-		s := newStream(st, kc, serviceinfo.StreamingBidirectional, nil, nil)
+		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
 		md, err := s.Header()
 
 		test.Assert(t, err == headerErr)
@@ -289,7 +290,8 @@ func Test_stream_Header(t *testing.T) {
 
 func Test_stream_RecvMsg(t *testing.T) {
 	t.Run("no-error", func(t *testing.T) {
-		s := newStream(&mockStream{}, &kClient{}, serviceinfo.StreamingBidirectional, nil,
+		mockRPCInfo := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), nil, nil)
+		s := newStream(&mockStream{}, &kClient{}, mockRPCInfo, serviceinfo.StreamingBidirectional, nil,
 			func(stream streaming.Stream, message interface{}) (err error) {
 				return nil
 			},
@@ -301,7 +303,7 @@ func Test_stream_RecvMsg(t *testing.T) {
 	})
 
 	t.Run("no-error-client-streaming", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), nil, rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -319,7 +321,7 @@ func Test_stream_RecvMsg(t *testing.T) {
 			},
 		}
 
-		s := newStream(st, kc, serviceinfo.StreamingClient, nil,
+		s := newStream(st, kc, ri, serviceinfo.StreamingClient, nil,
 			func(stream streaming.Stream, message interface{}) (err error) {
 				return nil
 			},
@@ -350,7 +352,7 @@ func Test_stream_RecvMsg(t *testing.T) {
 			},
 		}
 
-		s := newStream(st, kc, serviceinfo.StreamingBidirectional, nil,
+		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional, nil,
 			func(stream streaming.Stream, message interface{}) (err error) {
 				return recvErr
 			},
@@ -364,7 +366,7 @@ func Test_stream_RecvMsg(t *testing.T) {
 
 func Test_stream_SendMsg(t *testing.T) {
 	t.Run("no-error", func(t *testing.T) {
-		s := newStream(&mockStream{}, &kClient{}, serviceinfo.StreamingBidirectional,
+		s := newStream(&mockStream{}, &kClient{}, nil, serviceinfo.StreamingBidirectional,
 			func(stream streaming.Stream, message interface{}) (err error) {
 				return nil
 			},
@@ -396,7 +398,7 @@ func Test_stream_SendMsg(t *testing.T) {
 			},
 		}
 
-		s := newStream(st, kc, serviceinfo.StreamingBidirectional,
+		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional,
 			func(stream streaming.Stream, message interface{}) (err error) {
 				return sendErr
 			},
@@ -416,7 +418,7 @@ func Test_stream_Close(t *testing.T) {
 			called = true
 			return nil
 		},
-	}, &kClient{}, serviceinfo.StreamingBidirectional, nil, nil)
+	}, &kClient{}, nil, serviceinfo.StreamingBidirectional, nil, nil)
 
 	err := s.Close()
 
@@ -438,7 +440,7 @@ func Test_stream_DoFinish(t *testing.T) {
 				TracerCtl: ctl,
 			},
 		}
-		s := newStream(st, kc, serviceinfo.StreamingBidirectional, nil, nil)
+		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
 
 		finishCalled := false
 		err := errors.New("any err")
@@ -465,7 +467,7 @@ func Test_stream_DoFinish(t *testing.T) {
 				TracerCtl: ctl,
 			},
 		}
-		s := newStream(st, kc, serviceinfo.StreamingBidirectional, nil, nil)
+		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
 
 		finishCalled := false
 		err := errors.New("any err")
@@ -492,7 +494,7 @@ func Test_stream_DoFinish(t *testing.T) {
 				TracerCtl: ctl,
 			},
 		}
-		s := newStream(st, kc, serviceinfo.StreamingBidirectional, nil, nil)
+		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
 
 		finishCalled := false
 		expectedErr := errors.New("error")
