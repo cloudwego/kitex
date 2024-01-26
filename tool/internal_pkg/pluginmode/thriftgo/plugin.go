@@ -67,7 +67,6 @@ func Run() int {
 			conv.Package.Dependencies = make(map[string]string)
 			conv.Package.ServiceInfo = s
 			conv.Package.Namespace = conv.svc2ast[s].GetNamespaceOrReferenceName("go")
-			conv.Package.ServerPkg = "server"
 			fs, err := gen.GenerateService(&conv.Package)
 			if err != nil {
 				return conv.fail(err)

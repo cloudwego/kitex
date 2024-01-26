@@ -51,7 +51,6 @@ type PackageInfo struct {
 	Protocol         transport.Protocol
 	IDLName          string
 	ServerPkg        string
-	IsExternal       bool
 }
 
 // AddImport .

@@ -52,7 +52,6 @@ func (pp *protocPlugin) init() {
 	pp.Dependencies = map[string]string{
 		"proto": "google.golang.org/protobuf/proto",
 	}
-	pp.ServerPkg = "server"
 }
 
 // parse the 'M*' option
