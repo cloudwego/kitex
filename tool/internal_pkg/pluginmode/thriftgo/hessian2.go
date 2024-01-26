@@ -33,8 +33,9 @@ import (
 const (
 	JavaExtensionOption = "java_extension"
 
-	DubboCodec = "github.com/kitex-contrib/codec-dubbo"
-	JavaThrift = "https://raw.githubusercontent.com/kitex-contrib/codec-dubbo/main/java/java.thrift"
+	DubboCodec        = "github.com/kitex-contrib/codec-dubbo"
+	JavaThrift        = "java.thrift"
+	JavaThriftAddress = "https://raw.githubusercontent.com/kitex-contrib/codec-dubbo/main/java/java.thrift"
 )
 
 // Hessian2PreHook Hook before building cmd
@@ -72,15 +73,15 @@ func runOption(cfg *generator.Config, opt string) {
 
 // runJavaExtensionOption Pull the extension file of java class from remote
 func runJavaExtensionOption(cfg *generator.Config) {
-	// get java.thrift
-	if path := util.JoinPath(filepath.Dir(cfg.IDL), "java.thrift"); !util.Exists(path) {
-		if err := util.DownloadFile(JavaThrift, path); err != nil {
+	// get java.thrift, we assume java.thrift and IDL in the same directory so that IDL just needs to include "java.thrift"
+	if path := util.JoinPath(filepath.Dir(cfg.IDL), JavaThrift); !util.Exists(path) {
+		if err := util.DownloadFile(JavaThriftAddress, path); err != nil {
 			log.Warn("Downloading java.thrift file failed:", err.Error())
 			abs, err := filepath.Abs(path)
 			if err != nil {
 				abs = path
 			}
-			log.Warnf("You can try to download again. If the download still fails, you can choose to manually download \"%s\" to the local path \"%s\".", JavaThrift, abs)
+			log.Warnf("You can try to download again. If the download still fails, you can choose to manually download \"%s\" to the local path \"%s\".", JavaThriftAddress, abs)
 			os.Exit(1)
 		}
 	}
@@ -92,9 +93,10 @@ func runJavaExtensionOption(cfg *generator.Config) {
 // patchIDLRefConfig merge idl-ref configuration patch
 func patchIDLRefConfig(cfg *generator.Config) {
 	// load the idl-ref config file (create it first if it does not exist)
-	idlRef := filepath.Join(filepath.Dir(cfg.IDL), "idl-ref.yaml")
+	// for making use of idl-ref of thriftgo, we need to check the project root directory
+	idlRef := filepath.Join(cfg.OutputPath, "idl-ref.yaml")
 	if !util.Exists(idlRef) {
-		idlRef = filepath.Join(filepath.Dir(cfg.IDL), "idl-ref.yml")
+		idlRef = filepath.Join(cfg.OutputPath, "idl-ref.yml")
 	}
 	file, err := os.OpenFile(idlRef, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
@@ -104,8 +106,9 @@ func patchIDLRefConfig(cfg *generator.Config) {
 	defer file.Close()
 	idlRefCfg := loadIDLRefConfig(file.Name(), file)
 
-	// update the idl-ref config file
-	idlRefCfg.Ref["java.thrift"] = DubboCodec + "/java"
+	// assume java.thrift and IDL are in the same directory
+	javaRef := filepath.Join(filepath.Dir(cfg.IDL), JavaThrift)
+	idlRefCfg.Ref[javaRef] = DubboCodec + "/java"
 	out, err := yaml.Marshal(idlRefCfg)
 	if err != nil {
 		log.Warn("Marshal configuration failed:", err.Error())
