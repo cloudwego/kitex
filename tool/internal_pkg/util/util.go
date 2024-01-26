@@ -277,12 +277,9 @@ func DownloadFile(remotePath, localPath string) error {
 // IDLName returns the name of the IDL file.
 func IDLName(filename string) string {
 	var idlName string
-	dotIndex := strings.LastIndex(filename, ".")
-	if dotIndex != -1 {
-		idlName = filename[:dotIndex]
-	}
-	arr := strings.Split(idlName, string(filepath.Separator))
-	idlName = SnakeString(arr[len(arr)-1])
+	filename = strings.ReplaceAll(filename, "\\", "/")
+	idlName = strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename))
+	idlName = SnakeString(idlName)
 	idlName = strings.ReplaceAll(idlName, "-", "_")
 	idlName = strings.ReplaceAll(idlName, ".", "_")
 	return idlName

@@ -55,6 +55,8 @@ func TestIDLName(t *testing.T) {
 		{"Test.thrift", "test"},
 		{"testP.thrift", "test_p"},
 		{"../../test_p.thrift", "test_p"},
+		{"C:\\\\Users\\Username\\Documents\\file.txt", "file"},
+		{"a.b.c.thrift", "a_b_c"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.filename, func(t *testing.T) {
