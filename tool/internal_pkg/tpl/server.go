@@ -51,9 +51,6 @@ func NewServer(handler {{call .ServiceTypeName}}, opts ...server.Option) server.
 {{template "@server.go-EOF" .}}
 
 func RegisterService(svr server.Server, handler {{call .ServiceTypeName}}, opts ...server.RegisterOption) error {
-	if err := svr.RegisterService(serviceInfo(), handler, opts...); err != nil {
-		return err
-	}
-	return nil
+	return svr.RegisterService(serviceInfo(), handler, opts...)
 }
 `
