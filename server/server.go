@@ -201,7 +201,7 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	}
 
 	registerOpts := internal_server.NewRegisterOptions(opts)
-	if err := s.svcs.addService(svcInfo, handler, registerOpts.IsFallbackService); err != nil {
+	if err := s.svcs.addService(svcInfo, handler, registerOpts); err != nil {
 		panic(err.Error())
 	}
 	return nil

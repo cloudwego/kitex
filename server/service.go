@@ -37,7 +37,6 @@ type services struct {
 	svcMap                             map[string]*service // key: service name, value: svcInfo
 	conflictingMethodHasFallbackSvcMap map[string]bool
 	fallbackSvc                        *service
-	hasCombineService                  bool
 }
 
 func newServices() *services {
@@ -48,17 +47,14 @@ func newServices() *services {
 	}
 }
 
-func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, isFallbackService bool) error {
+func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, registerOpts *RegisterOptions) error {
 	svc := newService(svcInfo, handler)
 
-	// combine service check
-	if svcInfo.ServiceName == "CombineService" {
-		s.hasCombineService = true
-	} else if s.hasCombineService {
-		return errors.New("combine service cannot be registered with other services. please register services without using combine service or register only combine service")
+	if err := s.checkCombineService(svcInfo); err != nil {
+		return err
 	}
 
-	if isFallbackService {
+	if registerOpts.IsFallbackService {
 		if s.fallbackSvc != nil {
 			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)
 		}
@@ -82,6 +78,16 @@ func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interfac
 			}
 		} else {
 			s.svcSearchMap[methodName] = svc
+		}
+	}
+	return nil
+}
+
+// when registering combine service, it does not allow the registration of other services
+func (s *services) checkCombineService(svcInfo *serviceinfo.ServiceInfo) error {
+	if len(s.svcMap) > 0 {
+		if _, ok := s.svcMap["CombineService"]; ok || svcInfo.ServiceName == "CombineService" {
+			return errors.New("only one service can be registered when registering combine service")
 		}
 	}
 	return nil
