@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/connpool"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
@@ -140,6 +141,7 @@ func (p *pool) Get() (*longConn, bool, int) {
 		}
 		// inactive object
 		o.Close()
+		klog.Warnf("KITEX: address=%s is closed, ddl=%v", o.address, o.deadline)
 	}
 	// in case all objects are inactive
 	if i < 0 {
@@ -172,6 +174,7 @@ func (p *pool) Evict() int {
 			break
 		}
 		// close the inactive object
+		klog.Warnf("KITEX: address=%s is closed, ddl=%v, because is expired", p.idleList[i].address, p.idleList[i].deadline)
 		p.idleList[i].Close()
 	}
 	p.idleList = p.idleList[i:]
@@ -267,9 +270,11 @@ func (p *peer) Get(d remote.Dialer, timeout time.Duration, reporter Reporter, ad
 // Put puts a connection back to the peer.
 func (p *peer) Put(c *longConn) error {
 	if !p.globalIdle.Inc() {
+		klog.Warnf("KITEX: peer put failed, exceed globalIdle, curr=%d, conn=%s closed", p.globalIdle.Now(), c.address)
 		return c.Close()
 	}
 	if !p.pool.Put(c) {
+		klog.Warnf("KITEX: peer put failed, exceed maxIdle, curr=%d, maxIdle=%d, conn=%s closed", len(p.pool.idleList), p.pool.maxIdle, c.address)
 		p.globalIdle.Dec()
 		return c.Close()
 	}
@@ -336,6 +341,7 @@ func (lp *LongPool) Get(ctx context.Context, network, address string, opt remote
 func (lp *LongPool) Put(conn net.Conn) error {
 	c, ok := conn.(*longConn)
 	if !ok {
+		klog.Warn("KITEX: peer put failed, not longConn")
 		return conn.Close()
 	}
 
@@ -345,6 +351,8 @@ func (lp *LongPool) Put(conn net.Conn) error {
 	if ok {
 		p.(*peer).Put(c)
 		return nil
+	} else {
+		klog.Warnf("KITEX: LongPool put failed, network=%s, address=%s", addr.Network(), addr.String())
 	}
 	return c.Conn.Close()
 }
