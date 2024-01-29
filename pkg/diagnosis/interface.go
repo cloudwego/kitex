@@ -42,9 +42,10 @@ func RegisterProbeFunc(svc Service, name ProbeName, pf ProbeFunc) {
 // If you want to register other info, please use RegisterProbeFunc(ProbeName, ProbeFunc) to do that.
 const (
 	// Common
-	ChangeEventsKey ProbeName = "events"
-	ServiceInfosKey ProbeName = "service_infos"
-	OptionsKey      ProbeName = "options"
+	ChangeEventsKey    ProbeName = "events"
+	ServiceInfosKey    ProbeName = "service_infos"
+	FallbackServiceKey ProbeName = "fallback_service"
+	OptionsKey         ProbeName = "options"
 
 	// Client
 	DestServiceKey ProbeName = "dest_service"

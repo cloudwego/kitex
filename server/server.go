@@ -220,6 +220,9 @@ func (s *server) Run() (err error) {
 		return err
 	}
 	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfosKey, diagnosis.WrapAsProbeFunc(s.svcs.getSvcInfoMap()))
+	if s.svcs.fallbackSvc != nil {
+		diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.FallbackServiceKey, diagnosis.WrapAsProbeFunc(s.svcs.fallbackSvc.svcInfo.ServiceName))
+	}
 	svrCfg := s.opt.RemoteOpt
 	addr := svrCfg.Address // should not be nil
 	if s.opt.Proxy != nil {
