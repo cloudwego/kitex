@@ -17,7 +17,6 @@
 package codec
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -32,10 +31,10 @@ func TestSetOrCheckMethodName(t *testing.T) {
 		rpcinfo.NewServerInvocation(), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 	svcInfo := mocks.ServiceInfo()
 	svcSearchMap := map[string]*serviceinfo.ServiceInfo{
-		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockMethod):          svcInfo,
-		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
-		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
-		fmt.Sprintf("%s.%s", mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
+		remote.CreateConcatKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
+		remote.CreateConcatKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
+		remote.CreateConcatKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
+		remote.CreateConcatKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
 		mocks.MockMethod:          svcInfo,
 		mocks.MockExceptionMethod: svcInfo,
 		mocks.MockErrorMethod:     svcInfo,

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -85,23 +86,35 @@ func (s *services) checkMultipleFallbackService(registerOpts *RegisterOptions, s
 
 func (s *services) createSearchMap(svcInfo *serviceinfo.ServiceInfo, svc *service, registerOpts *RegisterOptions) {
 	for methodName := range svcInfo.Methods {
-		s.svcSearchMap[fmt.Sprintf("%s.%s", svcInfo.ServiceName, methodName)] = svc
-		// conflicting method check
+		s.svcSearchMap[remote.CreateConcatKey(svcInfo.ServiceName, methodName)] = svc
 		if svcFromMap, ok := s.svcSearchMap[methodName]; ok {
-			if _, ok := s.conflictingMethodHasFallbackSvcMap[methodName]; !ok {
-				if s.fallbackSvc != nil && svcFromMap.svcInfo.ServiceName == s.fallbackSvc.svcInfo.ServiceName {
-					s.conflictingMethodHasFallbackSvcMap[methodName] = true
-				} else {
-					s.conflictingMethodHasFallbackSvcMap[methodName] = false
-				}
-			}
-			if registerOpts.IsFallbackService {
-				s.svcSearchMap[methodName] = svc
-				s.conflictingMethodHasFallbackSvcMap[methodName] = true
-			}
+			s.handleConflictingMethod(svcFromMap, svc, methodName, registerOpts)
 		} else {
 			s.svcSearchMap[methodName] = svc
 		}
+	}
+}
+
+func (s *services) handleConflictingMethod(svcFromMap, svc *service, methodName string, registerOpts *RegisterOptions) {
+	s.registerConflictingMethodHasFallbackSvcMap(svcFromMap, methodName)
+	s.updateWithFallbackSvc(registerOpts, svc, methodName)
+}
+
+func (s *services) registerConflictingMethodHasFallbackSvcMap(svcFromMap *service, methodName string) {
+	if _, ok := s.conflictingMethodHasFallbackSvcMap[methodName]; !ok {
+		if s.fallbackSvc != nil && svcFromMap.svcInfo.ServiceName == s.fallbackSvc.svcInfo.ServiceName {
+			// svc which is already registered is a fallback service
+			s.conflictingMethodHasFallbackSvcMap[methodName] = true
+		} else {
+			s.conflictingMethodHasFallbackSvcMap[methodName] = false
+		}
+	}
+}
+
+func (s *services) updateWithFallbackSvc(registerOpts *RegisterOptions, svc *service, methodName string) {
+	if registerOpts.IsFallbackService {
+		s.svcSearchMap[methodName] = svc
+		s.conflictingMethodHasFallbackSvcMap[methodName] = true
 	}
 }
 

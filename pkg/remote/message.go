@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -196,7 +197,7 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 	if svcName == "" {
 		key = methodName
 	} else {
-		key = fmt.Sprintf("%s.%s", svcName, methodName)
+		key = CreateConcatKey(svcName, methodName)
 	}
 	svcInfo := m.svcSearchMap[key]
 	if svcInfo == nil {
@@ -364,4 +365,13 @@ func (ti *transInfo) Recycle() {
 func FillSendMsgFromRecvMsg(recvMsg, sendMsg Message) {
 	sendMsg.SetProtocolInfo(recvMsg.ProtocolInfo())
 	sendMsg.SetPayloadCodec(recvMsg.PayloadCodec())
+}
+
+func CreateConcatKey(serviceName, methodName string) string {
+	var builder utils.StringBuilder
+	builder.Grow(len(serviceName) + len(methodName) + 1)
+	builder.WriteString(serviceName)
+	builder.WriteString(".")
+	builder.WriteString(methodName)
+	return builder.String()
 }
