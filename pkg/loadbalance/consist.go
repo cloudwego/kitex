@@ -173,6 +173,11 @@ func (cp *consistPicker) Recycle() {
 // Next is not concurrency safe.
 func (cp *consistPicker) Next(ctx context.Context, request interface{}) discovery.Instance {
 	t0 := time.Now()
+	lb_start := ctx.Value("lb_start")
+	cost := time.Duration(0)
+	if lbt, ok := lb_start.(time.Time); ok {
+		cost = t0.Sub(lbt)
+	}
 	if len(cp.info.realNodes) == 0 {
 		return nil
 	}
@@ -186,7 +191,7 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 		hkey := xxhash3.HashString(key)
 		t3 := time.Now()
 		cp.result = cp.getConsistResult(hkey)
-		klog.Infof("KITEX: getConsistResult cost=%v, GetKeyCost=%v, HashString=%v", time.Since(t0), t2.Sub(t1), t3.Sub(t2))
+		klog.CtxInfof(ctx, "KITEX: getConsistResult cost=%v, fromMW2Here=%v, GetKeyCost=%v, HashString=%v", time.Since(t0), cost, t2.Sub(t1), t3.Sub(t2))
 		cp.index = 0
 		return cp.result.Primary
 	}

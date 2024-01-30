@@ -121,6 +121,7 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 					lbt := time.Now()
 					picker := lb.GetPicker()
 					nt := time.Now()
+					ctx := context.WithValue(ctx, "lb_start", nt)
 					ins := picker.Next(ctx, request)
 					if ins == nil {
 						err = kerrors.ErrNoMoreInstance.WithCause(fmt.Errorf("last error: %w", lastErr))
