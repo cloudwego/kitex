@@ -309,10 +309,10 @@ var (
 func initServerRecvMsg() remote.Message {
 	svcInfo := mocks.ServiceInfo()
 	svcSearchMap := map[string]*serviceinfo.ServiceInfo{
-		remote.CreateConcatKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
-		remote.CreateConcatKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
-		remote.CreateConcatKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
-		remote.CreateConcatKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
 		mocks.MockMethod:          svcInfo,
 		mocks.MockExceptionMethod: svcInfo,
 		mocks.MockErrorMethod:     svcInfo,

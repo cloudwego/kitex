@@ -86,7 +86,7 @@ func (s *services) checkMultipleFallbackService(registerOpts *RegisterOptions, s
 
 func (s *services) createSearchMap(svcInfo *serviceinfo.ServiceInfo, svc *service, registerOpts *RegisterOptions) {
 	for methodName := range svcInfo.Methods {
-		s.svcSearchMap[remote.CreateConcatKey(svcInfo.ServiceName, methodName)] = svc
+		s.svcSearchMap[remote.BuildMultiServiceKey(svcInfo.ServiceName, methodName)] = svc
 		if svcFromMap, ok := s.svcSearchMap[methodName]; ok {
 			s.handleConflictingMethod(svcFromMap, svc, methodName, registerOpts)
 		} else {

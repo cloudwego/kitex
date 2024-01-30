@@ -193,7 +193,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			// set send grpc compressor at server to encode reply pack
 			remote.SetSendCompressor(ri, s.SendCompress())
 
-			svcInfo := t.svcSearchMap[remote.CreateConcatKey(serviceName, methodName)]
+			svcInfo := t.svcSearchMap[remote.BuildMultiServiceKey(serviceName, methodName)]
 			var methodInfo serviceinfo.MethodInfo
 			if svcInfo != nil {
 				methodInfo = svcInfo.MethodInfo(methodName)

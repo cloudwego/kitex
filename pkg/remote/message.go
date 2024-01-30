@@ -197,7 +197,7 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 	if svcName == "" {
 		key = methodName
 	} else {
-		key = CreateConcatKey(svcName, methodName)
+		key = BuildMultiServiceKey(svcName, methodName)
 	}
 	svcInfo := m.svcSearchMap[key]
 	if svcInfo == nil {
@@ -367,7 +367,8 @@ func FillSendMsgFromRecvMsg(recvMsg, sendMsg Message) {
 	sendMsg.SetPayloadCodec(recvMsg.PayloadCodec())
 }
 
-func CreateConcatKey(serviceName, methodName string) string {
+// BuildMultiServiceKey is used to create a key to search svcInfo from svcSearchMap.
+func BuildMultiServiceKey(serviceName, methodName string) string {
 	var builder utils.StringBuilder
 	builder.Grow(len(serviceName) + len(methodName) + 1)
 	builder.WriteString(serviceName)
