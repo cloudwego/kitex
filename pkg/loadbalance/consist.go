@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/bytedance/gopkg/util/xxhash3"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -179,7 +180,10 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 		if key == "" {
 			return nil
 		}
-		cp.result = cp.getConsistResult(xxhash3.HashString(key))
+		hkey := xxhash3.HashString(key)
+		start := time.Now()
+		cp.result = cp.getConsistResult(hkey)
+		klog.Infof("KITEX: getConsistResult cost=%v", time.Since(start))
 		cp.index = 0
 		return cp.result.Primary
 	}

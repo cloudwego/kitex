@@ -128,7 +128,7 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 						remote.SetInstance(ins)
 						// TODO: generalize retry strategy
 						now := time.Now()
-						klog.CtxInfof(ctx, "KITEX: newResolveMWBuilder cost=%v, balance2LB=%s, lbCost=%s, nextCost=%s",
+						klog.CtxInfof(ctx, "KITEX: newResolveMWBuilder cost=%v, balance2LB=%v, lbCost=%v, nextCost=%v",
 							now.Sub(start), lbt.Sub(blt), now.Sub(lbt), now.Sub(nt))
 						err = next(ctx, request, response)
 					}
