@@ -125,9 +125,9 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 					if ins == nil {
 						err = kerrors.ErrNoMoreInstance.WithCause(fmt.Errorf("last error: %w", lastErr))
 					} else {
+						now := time.Now()
 						remote.SetInstance(ins)
 						// TODO: generalize retry strategy
-						now := time.Now()
 						klog.CtxInfof(ctx, "KITEX: newResolveMWBuilder cost=%v, balance2LB=%v, lbCost=%v, nextCost=%v",
 							now.Sub(start), lbt.Sub(blt), now.Sub(lbt), now.Sub(nt))
 						err = next(ctx, request, response)
