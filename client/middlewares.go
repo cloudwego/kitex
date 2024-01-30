@@ -85,6 +85,7 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 	return func(ctx context.Context) endpoint.Middleware {
 		return func(next endpoint.Endpoint) endpoint.Endpoint {
 			return func(ctx context.Context, request, response interface{}) error {
+				start := time.Now()
 				rpcInfo := rpcinfo.GetRPCInfo(ctx)
 
 				dest := rpcInfo.To()
@@ -122,6 +123,7 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 					} else {
 						remote.SetInstance(ins)
 						// TODO: generalize retry strategy
+						klog.CtxInfof(ctx, "KITEX: newResolveMWBuilder cost=%v", time.Since(start))
 						err = next(ctx, request, response)
 					}
 					if r, ok := picker.(internal.Reusable); ok {

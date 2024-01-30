@@ -123,7 +123,7 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 						done <- e
 					}
 					if err == nil || !errors.Is(err, kerrors.ErrRPCFinish) {
-						// Don't regards ErrRPCFinish as normal error, it happens in retry scene,
+						// Don't regard ErrRPCFinish as normal error, it happens in retry scene,
 						// ErrRPCFinish means previous call returns first but is decoding.
 						close(done)
 					}
