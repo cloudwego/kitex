@@ -20,11 +20,13 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"hash/crc32"
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -36,6 +38,8 @@ const (
 	Size32 = 4
 	Size16 = 2
 )
+
+var crcTable = crc32.MakeTable(0xD5828281)
 
 const (
 	// ThriftV1Magic is the magic code for thrift.VERSION_1
@@ -71,9 +75,15 @@ func NewDefaultCodecWithSizeLimit(maxSize int) remote.Codec {
 	}
 }
 
+// NewDefaultCodecWithCRC32 creates the default protocol sniffing codec supporting thrift and protobuf with crc32 check.
+func NewDefaultCodecWithCRC32() remote.Codec {
+	return &defaultCodec{crc32Check: true}
+}
+
 type defaultCodec struct {
 	// maxSize limits the max size of the payload
-	maxSize int
+	maxSize    int
+	crc32Check bool
 }
 
 // EncodePayload encode payload
@@ -150,8 +160,53 @@ func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.
 	return nil
 }
 
+func (c *defaultCodec) EncodeMetaAndPayloadWithCRC32C(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
+	var err error
+	var totalLenField []byte
+
+	// 1. encode payload and calculate crc32 checksum
+	newPayloadOut := remote.NewWriterBuffer(0)
+	if err = me.EncodePayload(ctx, message, newPayloadOut); err != nil {
+		return err
+	}
+	pb, err := newPayloadOut.Bytes()
+	if err != nil {
+		return err
+	}
+	cs := crc32.Checksum(pb, crcTable)
+	strinfo := message.TransInfo().TransStrInfo()
+	csb := make([]byte, Size32)
+	binary.BigEndian.PutUint32(csb, cs)
+	strinfo[transmeta.HeaderCRC32C] = string(csb)
+
+	// 2. encode header and return totalLenField if needed
+	// totalLenField will be filled after payload encoded
+	if totalLenField, err = ttHeaderCodec.encode(ctx, message, out); err != nil {
+		return err
+	}
+
+	// 3. write payload to the buffer after ttheader
+	_, err = out.WriteBinary(pb)
+	if err != nil {
+		return err
+	}
+
+	// 4. fill totalLen field for header if needed
+	if totalLenField == nil {
+		return perrors.NewProtocolErrorWithMsg("no buffer allocated for the header length field")
+	}
+	payloadLen := out.MallocLen() - Size32
+	binary.BigEndian.PutUint32(totalLenField, uint32(payloadLen))
+
+	return nil
+}
+
 // Encode implements the remote.Codec interface, it does complete message encode include header and payload.
 func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
+	tp := message.ProtocolInfo().TransProto
+	if c.crc32Check && tp&transport.TTHeader == transport.TTHeader {
+		return c.EncodeMetaAndPayloadWithCRC32C(ctx, message, out, c)
+	}
 	return c.EncodeMetaAndPayload(ctx, message, out, c)
 }
 
@@ -175,6 +230,9 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 		}
 		if flagBuf, err = in.Peek(2 * Size32); err != nil {
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("ttheader read payload first 8 byte failed: %s", err.Error()))
+		}
+		if err = c.checkCRC32C(message, in); err != nil {
+			return err
 		}
 	} else if isMeshHeader(flagBuf) {
 		message.Tags()[remote.MeshHeader] = true
@@ -236,6 +294,23 @@ func (c *defaultCodec) encodePayload(ctx context.Context, message remote.Message
 		return err
 	}
 	return pCodec.Marshal(ctx, message, out)
+}
+
+func (c *defaultCodec) checkCRC32C(message remote.Message, in remote.ByteBuffer) error {
+	crc32byte := message.TransInfo().TransStrInfo()[transmeta.HeaderCRC32C]
+	if len(crc32byte) != 0 {
+		expectedChecksum := binary.BigEndian.Uint32([]byte(crc32byte))
+		payloadLen := message.PayloadLen()
+		payload, err := in.Peek(payloadLen)
+		if err != nil {
+			return err
+		}
+		realChecksum := crc32.Checksum(payload, crcTable)
+		if realChecksum != expectedChecksum {
+			return perrors.NewProtocolErrorWithMsg("crc32c check failed")
+		}
+	}
+	return nil
 }
 
 /**

@@ -63,6 +63,7 @@ const (
 	// the connection peer will shutdown later,so it send back the header to tell client to close the connection.
 	HeaderConnectionReadyToReset = "crrst"
 	HeaderProcessAtTime          = "K_ProcessAtTime"
+	HeaderCRC32C                 = "crc32c"
 )
 
 // key of acl token

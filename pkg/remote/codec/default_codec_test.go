@@ -221,6 +221,42 @@ func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
+func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
+	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
+
+	dc := NewDefaultCodecWithCRC32()
+	ctx := context.Background()
+	intKVInfo := prepareIntKVInfo()
+	strKVInfo := prepareStrKVInfo()
+	sendMsg := initClientSendMsg(transport.TTHeader)
+	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
+	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
+
+	// test encode err
+	out := remote.NewReaderBuffer([]byte{})
+	err := dc.Encode(ctx, sendMsg, out)
+	test.Assert(t, err != nil)
+
+	// encode
+	out = remote.NewWriterBuffer(256)
+	err = dc.Encode(ctx, sendMsg, out)
+	test.Assert(t, err == nil, err)
+
+	// decode
+	recvMsg := initServerRecvMsg()
+	buf, err := out.Bytes()
+	test.Assert(t, err == nil, err)
+	in := remote.NewReaderBuffer(buf)
+	err = dc.Decode(ctx, recvMsg, in)
+	test.Assert(t, err == nil, err)
+
+	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
+	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
+	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
+	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
+	test.Assert(t, sendMsg.RPCInfo().Invocation().SeqID() == recvMsg.RPCInfo().Invocation().SeqID())
+}
+
 func TestCodecTypeNotMatchWithServiceInfoPayloadCodec(t *testing.T) {
 	var req interface{}
 	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
