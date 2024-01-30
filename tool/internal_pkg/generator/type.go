@@ -49,6 +49,7 @@ type PackageInfo struct {
 	FrugalPretouch   bool
 	Module           string
 	Protocol         transport.Protocol
+	IDLName          string
 }
 
 // AddImport .

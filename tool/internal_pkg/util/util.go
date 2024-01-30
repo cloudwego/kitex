@@ -273,3 +273,8 @@ func DownloadFile(remotePath, localPath string) error {
 	}
 	return nil
 }
+
+// IDLName returns the name of the IDL file.
+func IDLName(filename string) string {
+	return filepath.Base(filename)
+}

@@ -60,6 +60,8 @@ func Run() int {
 	var files []*generator.File
 	gen := generator.NewGenerator(&conv.Config, nil)
 
+	conv.Package.IDLName = util.IDLName(conv.Config.IDL)
+
 	if conv.Config.Use == "" {
 		for _, s := range conv.Services {
 			conv.Package.Dependencies = make(map[string]string)
