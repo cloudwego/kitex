@@ -101,6 +101,8 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 				if remote.GetInstance() != nil {
 					return next(ctx, request, response)
 				}
+
+				blt := time.Now()
 				lb, err := lbf.Get(ctx, dest)
 				if err != nil {
 					return kerrors.ErrServiceDiscovery.WithCause(err)
@@ -116,14 +118,18 @@ func newResolveMWBuilder(lbf *lbcache.BalancerFactory) endpoint.MiddlewareBuilde
 
 					// we always need to get a new picker every time, because when downstream update deployment,
 					// we may get an old picker that include all outdated instances which will cause connect always failed.
+					lbt := time.Now()
 					picker := lb.GetPicker()
+					nt := time.Now()
 					ins := picker.Next(ctx, request)
 					if ins == nil {
 						err = kerrors.ErrNoMoreInstance.WithCause(fmt.Errorf("last error: %w", lastErr))
 					} else {
 						remote.SetInstance(ins)
 						// TODO: generalize retry strategy
-						klog.CtxInfof(ctx, "KITEX: newResolveMWBuilder cost=%v", time.Since(start))
+						now := time.Now()
+						klog.CtxInfof(ctx, "KITEX: newResolveMWBuilder cost=%v, balance2LB=%s, lbCost=%s, nextCost=%s",
+							now.Sub(start), lbt.Sub(blt), now.Sub(lbt), now.Sub(nt))
 						err = next(ctx, request, response)
 					}
 					if r, ok := picker.(internal.Reusable); ok {
