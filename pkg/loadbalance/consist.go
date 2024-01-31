@@ -205,30 +205,35 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 
 func (cp *consistPicker) getConsistResult(ctx context.Context, key uint64, strKey string) *consistResult {
 	t0 := time.Now()
-	t1, t2 := t0, t0
 	isBuild := false
 	var cr *consistResult
 	cri, ok := cp.info.cachedConsistResult.Load(key)
+	t1 := time.Now()
+	t2, t3, t4, t5 := t1, t1, t1, t1
+	shared := false
 	if !ok {
-		cri, _, _ = cp.info.sfg.Do(strconv.FormatUint(key, 10), func() (interface{}, error) {
-			t1 = time.Now()
+		cri, _, shared = cp.info.sfg.Do(strconv.FormatUint(key, 10), func() (interface{}, error) {
+			t2 = time.Now()
 			cr := buildConsistResult(cp.cb, cp.info, key)
 			if cp.cb.opt.ExpireDuration > 0 {
 				cr.Touch.Store(time.Now())
 			}
-			t2 = time.Now()
+			t3 = time.Now()
 			isBuild = true
 			return cr, nil
 		})
+		t4 = time.Now()
 		cp.info.cachedConsistResult.Store(key, cri)
+		t5 = time.Now()
 	}
 	cr = cri.(*consistResult)
 	if cp.cb.opt.ExpireDuration > 0 {
 		cr.Touch.Store(time.Now())
 	}
-	klog.CtxInfof(ctx, "KITEX: getConsistResult=%v,[isBuildConsist=%v beforeBuild=%v buildConsistResult=%v,%v, key=%d,%s]",
-		time.Since(t0), isBuild, t1.Sub(t0),
-		t2.Sub(t1), time.Since(t1), key, strKey)
+	klog.CtxInfof(ctx, "KITEX: getConsistResult=%v[isBuildConsist=%v, shared%v, key=%d,%s], "+
+		"load=%v intoSFGFunc=%v buildConsistResult=%v finishBuild=%v, store=%v, last=%v",
+		time.Since(t0), isBuild, shared, key, strKey,
+		t1.Sub(t0), t2.Sub(t1), t3.Sub(t2), t4.Sub(t3), t5.Sub(t4), time.Since(t5))
 	return cr
 }
 
