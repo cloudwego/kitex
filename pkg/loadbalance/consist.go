@@ -190,7 +190,7 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 		t2 := time.Now()
 		hkey := xxhash3.HashString(key)
 		t3 := time.Now()
-		cp.result = cp.getConsistResult(ctx, hkey)
+		cp.result = cp.getConsistResult(ctx, hkey, key)
 		t4 := time.Now()
 		klog.CtxInfof(ctx, "KITEX: fromMW2Here=%v, start2GetKey=%v, GetKeyCost=%v, HashString=%v, getConsistResultCost=%v,%v", cost, t1.Sub(t0), t2.Sub(t1), t3.Sub(t2), t4.Sub(t3), time.Since(t3))
 		cp.index = 0
@@ -203,18 +203,21 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 	return nil
 }
 
-func (cp *consistPicker) getConsistResult(ctx context.Context, key uint64) *consistResult {
+func (cp *consistPicker) getConsistResult(ctx context.Context, key uint64, strKey string) *consistResult {
+	t0 := time.Now()
+	t1, t2 := t0, t0
+	isBuild := false
 	var cr *consistResult
 	cri, ok := cp.info.cachedConsistResult.Load(key)
 	if !ok {
 		cri, _, _ = cp.info.sfg.Do(strconv.FormatUint(key, 10), func() (interface{}, error) {
-			t1 := time.Now()
+			t1 = time.Now()
 			cr := buildConsistResult(cp.cb, cp.info, key)
 			if cp.cb.opt.ExpireDuration > 0 {
 				cr.Touch.Store(time.Now())
 			}
-			t2 := time.Now()
-			klog.CtxInfof(ctx, "KITEX: buildConsistResult=%v,%v, key=%d", t2.Sub(t1), time.Since(t1), key)
+			t2 = time.Now()
+			isBuild = true
 			return cr, nil
 		})
 		cp.info.cachedConsistResult.Store(key, cri)
@@ -223,6 +226,9 @@ func (cp *consistPicker) getConsistResult(ctx context.Context, key uint64) *cons
 	if cp.cb.opt.ExpireDuration > 0 {
 		cr.Touch.Store(time.Now())
 	}
+	klog.CtxInfof(ctx, "KITEX: getConsistResult=%v,[isBuildConsist=%v beforeBuild=%v buildConsistResult=%v,%v, key=%d,%s]",
+		time.Since(t0), isBuild, t1.Sub(t0),
+		t2.Sub(t1), time.Since(t1), key, strKey)
 	return cr
 }
 
