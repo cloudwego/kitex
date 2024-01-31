@@ -166,43 +166,36 @@ func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.
 
 func (c *defaultCodec) EncodeMetaAndPayloadWithCRC32C(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
 	var err error
-	var totalLenField []byte
 
 	// 1. encode payload and calculate crc32c checksum
 	newPayloadOut := remote.NewWriterBuffer(0)
+	defer newPayloadOut.Release(nil)
+
 	if err = me.EncodePayload(ctx, message, newPayloadOut); err != nil {
 		return err
 	}
-	pb, err := newPayloadOut.Bytes()
+	payload, err := newPayloadOut.Bytes()
 	if err != nil {
 		return err
 	}
-	cs := crc32.Checksum(pb, crc32cTable)
-	csb := make([]byte, Size32)
-	binary.BigEndian.PutUint32(csb, cs)
+	crc32c := getCRC32C(payload)
 	if strInfo := message.TransInfo().TransStrInfo(); strInfo != nil {
-		strInfo[transmeta.HeaderCRC32C] = string(csb)
+		strInfo[transmeta.HeaderCRC32C] = string(crc32c)
 	}
+	// set payload length before encode TTHeader.
+	message.SetPayloadLen(len(payload))
 
-	message.SetPayloadLen(len(pb))
 	// 2. encode header and return totalLenField if needed
 	// totalLenField will be filled after payload encoded
-	if totalLenField, err = ttHeaderCodec.encode(ctx, message, out); err != nil {
+	if _, err = ttHeaderCodec.encode(ctx, message, out); err != nil {
 		return err
 	}
 
 	// 3. write payload to the buffer after TTHeader
-	_, err = out.WriteBinary(pb)
+	_, err = out.WriteBinary(payload)
 	if err != nil {
 		return err
 	}
-
-	// 4. fill totalLen field for header if needed
-	if totalLenField == nil {
-		return perrors.NewProtocolErrorWithMsg("no buffer allocated for the header length field")
-	}
-	payloadLen := out.MallocLen() - Size32
-	binary.BigEndian.PutUint32(totalLenField, uint32(payloadLen))
 
 	return nil
 }
@@ -302,23 +295,6 @@ func (c *defaultCodec) encodePayload(ctx context.Context, message remote.Message
 		return err
 	}
 	return pCodec.Marshal(ctx, message, out)
-}
-
-func checkCRC32C(message remote.Message, in remote.ByteBuffer) error {
-	crc32byte := message.TransInfo().TransStrInfo()[transmeta.HeaderCRC32C]
-	if len(crc32byte) != 0 {
-		expectedChecksum := binary.BigEndian.Uint32([]byte(crc32byte))
-		payloadLen := message.PayloadLen() // total length
-		payload, err := in.Peek(payloadLen)
-		if err != nil {
-			return err
-		}
-		realChecksum := crc32.Checksum(payload, crc32cTable)
-		if realChecksum != expectedChecksum {
-			return perrors.NewProtocolErrorWithType(perrors.InvalidData, "crc32c payload check failed")
-		}
-	}
-	return nil
 }
 
 /**
@@ -453,6 +429,31 @@ func checkPayloadSize(payloadLen, maxSize int) error {
 			perrors.InvalidData,
 			fmt.Sprintf("invalid data: payload size(%d) larger than the limit(%d)", payloadLen, maxSize),
 		)
+	}
+	return nil
+}
+
+// getCRC32C calculates the crc32c checksum of the input bytes
+func getCRC32C(payload []byte) []byte {
+	csb := make([]byte, Size32)
+	binary.BigEndian.PutUint32(csb, crc32.Checksum(payload, crc32cTable))
+	return csb
+}
+
+// checkCRC32C validates the crc32c checksum in the header
+func checkCRC32C(message remote.Message, in remote.ByteBuffer) error {
+	crc32byte := message.TransInfo().TransStrInfo()[transmeta.HeaderCRC32C]
+	if len(crc32byte) != 0 {
+		expectedChecksum := binary.BigEndian.Uint32([]byte(crc32byte))
+		payloadLen := message.PayloadLen() // total length
+		payload, err := in.Peek(payloadLen)
+		if err != nil {
+			return err
+		}
+		realChecksum := crc32.Checksum(payload, crc32cTable)
+		if realChecksum != expectedChecksum {
+			return perrors.NewProtocolErrorWithType(perrors.InvalidData, "crc32c payload check failed")
+		}
 	}
 	return nil
 }

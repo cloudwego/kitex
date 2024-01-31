@@ -291,20 +291,20 @@ func BenchmarkTestEncodeDecodeWithCRC32C(b *testing.B) {
 	ctx := context.Background()
 	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
 	type factory func() remote.Codec
-	testCases := map[string]factory{"normal": NewDefaultCodec} //, "crc32c": NewDefaultCodecWithCRC32}
+	testCases := map[string]factory{"normal": NewDefaultCodec, "crc32c": NewDefaultCodecWithCRC32}
 
 	for name, f := range testCases {
 		b.Run(name, func(b *testing.B) {
-			for i := 3; i < 4; i++ {
-				msgLen := i * 1024
+			msgLen := 1
+			for i := 0; i < 6; i++ {
 				b.ReportAllocs()
 				b.ResetTimer()
-				b.Run(fmt.Sprintf("%dsize", msgLen), func(b *testing.B) {
+				b.Run(fmt.Sprintf("payload-%d", msgLen), func(b *testing.B) {
 					for j := 0; j < b.N; j++ {
 						codec := f()
 						sendMsg := initClientSendMsg(transport.TTHeader, msgLen)
 						// encode
-						out := remote.NewWriterBuffer(256)
+						out := remote.NewWriterBuffer((i + 1) * 1024)
 						err := codec.Encode(ctx, sendMsg, out)
 						test.Assert(b, err == nil, err)
 
@@ -317,6 +317,7 @@ func BenchmarkTestEncodeDecodeWithCRC32C(b *testing.B) {
 						test.Assert(b, err == nil, err)
 					}
 				})
+				msgLen *= 10
 			}
 		})
 	}
