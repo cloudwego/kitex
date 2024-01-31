@@ -191,7 +191,7 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 		hkey := xxhash3.HashString(key)
 		t3 := time.Now()
 		cp.result = cp.getConsistResult(hkey)
-		klog.CtxInfof(ctx, "KITEX: getConsistResult cost=%v, fromMW2Here=%v, GetKeyCost=%v, HashString=%v", time.Since(t0), cost, t2.Sub(t1), t3.Sub(t2))
+		klog.CtxInfof(ctx, "KITEX: fromMW2Here=%v, start2GetKey=%v, GetKeyCost=%v, HashString=%v, getConsistResultCost=%v", cost, t1.Sub(t0), t2.Sub(t1), t3.Sub(t2), time.Since(t3))
 		cp.index = 0
 		return cp.result.Primary
 	}
