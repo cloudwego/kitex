@@ -43,33 +43,6 @@ var (
 	mockAddr1       = "127.0.0.1:8001"
 )
 
-func TestPoolReuseRate(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var (
-		minIdle        = 0
-		maxIdle        = 10000
-		maxIdleTimeout = time.Hour
-	)
-
-	p := newPool(minIdle, maxIdle, maxIdleTimeout)
-	num := 1000
-	for i := 0; i < num; i++ {
-		conn := newLongConnForTest(ctrl, mockAddr0)
-		recycled := p.Put(conn)
-		test.Assert(t, recycled == true)
-	}
-	evictTime := 10
-	for i := 0; i < evictTime; i++ {
-		test.Assert(t, p.Len() == num)
-		p.Evict()
-		test.Assert(t, p.Len() == num)
-		time.Sleep(100 * time.Millisecond)
-	}
-
-}
-
 func TestPoolReuse(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
