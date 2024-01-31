@@ -164,6 +164,7 @@ func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.
 	return nil
 }
 
+// EncodeMetaAndPayloadWithCRC32C encode payload and meta with crc32c checksum of the payload.
 func (c *defaultCodec) EncodeMetaAndPayloadWithCRC32C(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
 	var err error
 
@@ -186,7 +187,7 @@ func (c *defaultCodec) EncodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 	message.SetPayloadLen(len(payload))
 
 	// 2. encode header and return totalLenField if needed
-	// totalLenField will be filled after payload encoded
+	// In this case, set total length during TTHeader encode
 	if _, err = ttHeaderCodec.encode(ctx, message, out); err != nil {
 		return err
 	}
