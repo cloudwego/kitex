@@ -19,7 +19,6 @@ package loadbalance
 import (
 	"context"
 	"sort"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -173,11 +172,6 @@ func (cp *consistPicker) Recycle() {
 // Next is not concurrency safe.
 func (cp *consistPicker) Next(ctx context.Context, request interface{}) discovery.Instance {
 	t0 := time.Now()
-	lb_start := ctx.Value("lb_start")
-	cost := time.Duration(0)
-	if lbt, ok := lb_start.(time.Time); ok {
-		cost = t0.Sub(lbt)
-	}
 	if len(cp.info.realNodes) == 0 {
 		return nil
 	}
@@ -192,7 +186,7 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 		t3 := time.Now()
 		cp.result = cp.getConsistResult(ctx, hkey, key)
 		t4 := time.Now()
-		klog.CtxInfof(ctx, "KITEX: fromMW2Here=%v, start2GetKey=%v, GetKeyCost=%v, HashString=%v, getConsistResultCost=%v,%v", cost, t1.Sub(t0), t2.Sub(t1), t3.Sub(t2), t4.Sub(t3), time.Since(t3))
+		klog.CtxInfof(ctx, "KITEX: start2GetKey=%v, GetKeyCost=%v, HashString=%v, getConsistResultCost=%v,%v", t1.Sub(t0), t2.Sub(t1), t3.Sub(t2), t4.Sub(t3), time.Since(t3))
 		cp.index = 0
 		return cp.result.Primary
 	}
@@ -204,37 +198,10 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 }
 
 func (cp *consistPicker) getConsistResult(ctx context.Context, key uint64, strKey string) *consistResult {
-	t0 := time.Now()
-	isBuild := false
-	var cr *consistResult
-	cri, ok := cp.info.cachedConsistResult.Load(key)
-	t1 := time.Now()
-	t2, t3, t4, t5 := t1, t1, t1, t1
-	shared := false
-	if !ok {
-		cri, _, shared = cp.info.sfg.Do(strconv.FormatUint(key, 10), func() (interface{}, error) {
-			t2 = time.Now()
-			cr := buildConsistResult(cp.cb, cp.info, key)
-			if cp.cb.opt.ExpireDuration > 0 {
-				cr.Touch.Store(time.Now())
-			}
-			t3 = time.Now()
-			isBuild = true
-			return cr, nil
-		})
-		t4 = time.Now()
-		cp.info.cachedConsistResult.Store(key, cri)
-		t5 = time.Now()
-	}
-	cr = cri.(*consistResult)
-	if cp.cb.opt.ExpireDuration > 0 {
-		cr.Touch.Store(time.Now())
-	}
-	klog.CtxInfof(ctx, "KITEX: getConsistResult=%v[isBuildConsist=%v, shared%v, key=%d,%s], "+
-		"load=%v intoSFGFunc=%v buildConsistResult=%v finishBuild=%v, store=%v, last=%v",
-		time.Since(t0), isBuild, shared, key, strKey,
-		t1.Sub(t0), t2.Sub(t1), t3.Sub(t2), t4.Sub(t3), t5.Sub(t4), time.Since(t5))
-	return cr
+	start := time.Now()
+	cri := buildConsistResult(cp.cb, cp.info, key)
+	klog.CtxInfof(ctx, "KITEX: getConsistResultCost=%v", time.Since(start))
+	return cri
 }
 
 func buildConsistResult(cb *consistBalancer, info *consistInfo, key uint64) *consistResult {
