@@ -219,6 +219,7 @@ func (s *server) Run() (err error) {
 	if err = s.check(); err != nil {
 		return err
 	}
+	s.findAndSetDefaultService()
 	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfosKey, diagnosis.WrapAsProbeFunc(s.svcs.getSvcInfoMap()))
 	if s.svcs.fallbackSvc != nil {
 		diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.FallbackServiceKey, diagnosis.WrapAsProbeFunc(s.svcs.fallbackSvc.svcInfo.ServiceName))
@@ -439,13 +440,8 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 }
 
 func (s *server) check() error {
-	numOfSvcs := len(s.svcs.svcMap)
-	if numOfSvcs == 0 {
+	if len(s.svcs.svcMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
-	}
-	if numOfSvcs == 1 {
-		s.targetSvcInfo = getDefaultSvcInfo(s.svcs)
-		return nil
 	}
 	return checkFallbackServiceForConflictingMethods(s.svcs.conflictingMethodHasFallbackSvcMap, s.opt.RefuseTrafficWithoutServiceName)
 }
@@ -557,6 +553,12 @@ func (s *server) waitExit(errCh chan error) error {
 			}
 			s.Unlock()
 		}
+	}
+}
+
+func (s *server) findAndSetDefaultService() {
+	if len(s.svcs.svcMap) == 1 {
+		s.targetSvcInfo = getDefaultSvcInfo(s.svcs)
 	}
 }
 
