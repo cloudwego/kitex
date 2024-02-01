@@ -80,6 +80,7 @@ type {{.ServiceName}}_{{.RawName}}Client interface {
 func NewClient(destService string, opts ...client.Option) (Client, error) {
 	var options []client.Option
 	options = append(options, client.WithDestService(destService))
+
     {{template "@client.go-NewClient-option" .}}
 	{{if and (eq $.Codec "protobuf") .HasStreaming}}{{/* Thrift Streaming only in StreamClient */}}
 	options = append(options, client.WithTransportProtocol(transport.GRPC))

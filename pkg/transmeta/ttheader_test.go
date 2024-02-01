@@ -65,6 +65,8 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	kvs := msg.TransInfo().TransIntInfo()
 	test.Assert(t, err == nil)
 	test.Assert(t, len(kvs) == 0)
+	strKvs := msg.TransInfo().TransStrInfo()
+	test.Assert(t, len(strKvs) == 0)
 
 	// ttheader
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
@@ -79,6 +81,9 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	test.Assert(t, kvs[transmeta.MsgType] == strconv.Itoa(int(remote.Call)))
 	test.Assert(t, kvs[transmeta.TransportType] == unframedTransportType)
 	test.Assert(t, kvs[transmeta.RPCTimeout] == "100")
+	strKvs = msg.TransInfo().TransStrInfo()
+	test.Assert(t, len(strKvs) == 1)
+	test.Assert(t, strKvs[transmeta.HeaderIDLServiceName] == "")
 }
 
 func TestTTHeaderServerReadMetainfo(t *testing.T) {

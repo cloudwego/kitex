@@ -97,6 +97,8 @@ type Options struct {
 	BackupOpt backup.Options
 
 	Streaming stream.StreamingConfig
+
+	RefuseTrafficWithoutServiceName bool
 }
 
 type Limit struct {

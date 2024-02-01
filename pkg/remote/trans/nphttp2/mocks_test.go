@@ -296,7 +296,7 @@ func newMockConnOption() remote.ConnOption {
 
 func newMockServerOption() *remote.ServerOption {
 	return &remote.ServerOption{
-		SvcMap:                nil,
+		SvcSearchMap:          nil,
 		TransServerFactory:    nil,
 		SvrHandlerFactory:     nil,
 		Codec:                 nil,
@@ -409,6 +409,7 @@ var _ remote.Message = &mockMessage{}
 type mockMessage struct {
 	RPCInfoFunc         func() rpcinfo.RPCInfo
 	ServiceInfoFunc     func() *serviceinfo.ServiceInfo
+	SetServiceInfoFunc  func(svcName, methodName string) (*serviceinfo.ServiceInfo, error)
 	DataFunc            func() interface{}
 	NewDataFunc         func(method string) (ok bool)
 	MessageTypeFunc     func() remote.MessageType
@@ -437,6 +438,13 @@ func (m *mockMessage) ServiceInfo() (si *serviceinfo.ServiceInfo) {
 		return m.ServiceInfoFunc()
 	}
 	return
+}
+
+func (m *mockMessage) SpecifyServiceInfo(svcName, methodName string) (si *serviceinfo.ServiceInfo, err error) {
+	if m.SetServiceInfoFunc != nil {
+		return m.SetServiceInfoFunc(svcName, methodName)
+	}
+	return nil, nil
 }
 
 func (m *mockMessage) Data() interface{} {

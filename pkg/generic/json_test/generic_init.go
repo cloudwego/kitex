@@ -34,6 +34,7 @@ import (
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/genericclient"
+	"github.com/cloudwego/kitex/internal/mocks"
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
@@ -267,6 +268,9 @@ func newMockServer(handler kt.Mock, addr net.Addr, opts ...server.Option) server
 
 	svr := server.NewServer(options...)
 	if err := svr.RegisterService(serviceInfo(), handler); err != nil {
+		panic(err)
+	}
+	if err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler()); err != nil {
 		panic(err)
 	}
 	go func() {

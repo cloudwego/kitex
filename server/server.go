@@ -47,18 +47,19 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
-// Server is a abstraction of a RPC server. It accepts connections and dispatches them to the service
+// Server is an abstraction of an RPC server. It accepts connections and dispatches them to the service
 // registered to it.
 type Server interface {
-	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error
+	RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, opts ...RegisterOption) error
 	GetServiceInfos() map[string]*serviceinfo.ServiceInfo
 	Run() error
 	Stop() error
 }
 
 type server struct {
-	opt  *internal_server.Options
-	svcs *services
+	opt           *internal_server.Options
+	svcs          *services
+	targetSvcInfo *serviceinfo.ServiceInfo
 
 	// actual rpc service implement of biz
 	eps     endpoint.Endpoint
@@ -183,7 +184,7 @@ func (s *server) buildInvokeChain() {
 }
 
 // RegisterService should not be called by users directly.
-func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) error {
+func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, opts ...RegisterOption) error {
 	s.Lock()
 	defer s.Unlock()
 	if s.isRun {
@@ -195,16 +196,19 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	if handler == nil || reflect.ValueOf(handler).IsNil() {
 		panic("handler is nil. please specify non-nil handler")
 	}
-	if s.svcs.getService(svcInfo.ServiceName) != nil {
+	if s.svcs.svcMap[svcInfo.ServiceName] != nil {
 		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
 	}
 
-	s.svcs.addService(svcInfo, handler)
+	registerOpts := internal_server.NewRegisterOptions(opts)
+	if err := s.svcs.addService(svcInfo, handler, registerOpts); err != nil {
+		panic(err.Error())
+	}
 	return nil
 }
 
 func (s *server) GetServiceInfos() map[string]*serviceinfo.ServiceInfo {
-	return s.svcs.getSvcInfoMap()
+	return s.svcs.getSvcInfoSearchMap()
 }
 
 // Run runs the server.
@@ -215,7 +219,11 @@ func (s *server) Run() (err error) {
 	if err = s.check(); err != nil {
 		return err
 	}
+	s.findAndSetDefaultService()
 	diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.ServiceInfosKey, diagnosis.WrapAsProbeFunc(s.svcs.getSvcInfoMap()))
+	if s.svcs.fallbackSvc != nil {
+		diagnosis.RegisterProbeFunc(s.opt.DebugService, diagnosis.FallbackServiceKey, diagnosis.WrapAsProbeFunc(s.svcs.fallbackSvc.svcInfo.ServiceName))
+	}
 	svrCfg := s.opt.RemoteOpt
 	addr := svrCfg.Address // should not be nil
 	if s.opt.Proxy != nil {
@@ -306,10 +314,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()
 		serviceName := ri.Invocation().ServiceName()
-		svc := s.svcs.getService(serviceName)
-		if svc == nil {
-			svc = s.svcs.defaultSvc
-		}
+		svc := s.svcs.svcMap[serviceName]
 		svcInfo := svc.svcInfo
 		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
 			return errors.New("method name is empty in rpcinfo, should not happen")
@@ -348,7 +353,9 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
-	remoteOpt.SvcMap = s.svcs.getSvcInfoMap()
+	remoteOpt.TargetSvcInfo = s.targetSvcInfo
+	remoteOpt.SvcSearchMap = s.svcs.getSvcInfoSearchMap()
+	remoteOpt.RefuseTrafficWithoutServiceName = s.opt.RefuseTrafficWithoutServiceName
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
@@ -436,7 +443,7 @@ func (s *server) check() error {
 	if len(s.svcs.svcMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
-	return nil
+	return checkFallbackServiceForConflictingMethods(s.svcs.conflictingMethodHasFallbackSvcMap, s.opt.RefuseTrafficWithoutServiceName)
 }
 
 func doAddBoundHandlerToHead(h remote.BoundHandler, opt *remote.ServerOption) {
@@ -502,7 +509,7 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}
 	if info.PayloadCodec == "" {
-		info.PayloadCodec = s.svcs.defaultSvc.svcInfo.PayloadCodec.String()
+		info.PayloadCodec = getDefaultSvcInfo(s.svcs).PayloadCodec.String()
 	}
 	if info.Weight == 0 {
 		info.Weight = discovery.DefaultWeight
@@ -547,4 +554,33 @@ func (s *server) waitExit(errCh chan error) error {
 			s.Unlock()
 		}
 	}
+}
+
+func (s *server) findAndSetDefaultService() {
+	if len(s.svcs.svcMap) == 1 {
+		s.targetSvcInfo = getDefaultSvcInfo(s.svcs)
+	}
+}
+
+// getDefaultSvc is used to get one ServiceInfo from map
+func getDefaultSvcInfo(svcs *services) *serviceinfo.ServiceInfo {
+	if len(svcs.svcMap) > 1 && svcs.fallbackSvc != nil {
+		return svcs.fallbackSvc.svcInfo
+	}
+	for _, svc := range svcs.svcMap {
+		return svc.svcInfo
+	}
+	return nil
+}
+
+func checkFallbackServiceForConflictingMethods(conflictingMethodHasFallbackSvcMap map[string]bool, refuseTrafficWithoutServiceName bool) error {
+	if refuseTrafficWithoutServiceName {
+		return nil
+	}
+	for name, hasFallbackSvc := range conflictingMethodHasFallbackSvcMap {
+		if !hasFallbackSvc {
+			return fmt.Errorf("method name [%s] is conflicted between services but no fallback service is specified", name)
+		}
+	}
+	return nil
 }

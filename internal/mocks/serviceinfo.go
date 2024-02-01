@@ -30,6 +30,7 @@ import (
 const (
 	MockServiceName            = "MockService"
 	MockService2Name           = "MockService2"
+	MockService3Name           = "MockService3"
 	MockMethod          string = "mock"
 	Mock2Method         string = "mock2"
 	MockExceptionMethod string = "mockException"
@@ -66,7 +67,7 @@ func newServiceInfo() *serviceinfo.ServiceInfo {
 	return svcInfo
 }
 
-// ServiceInfo return mock serviceInfo
+// Service2Info return mock serviceInfo
 func Service2Info() *serviceinfo.ServiceInfo {
 	return myServiceService2Info
 }
@@ -83,6 +84,28 @@ func newService2Info() *serviceinfo.ServiceInfo {
 		Methods:     methods,
 		Extra: map[string]interface{}{
 			"PackageName": "mock2",
+		},
+	}
+	return svcInfo
+}
+
+// Service3Info return mock serviceInfo
+func Service3Info() *serviceinfo.ServiceInfo {
+	return myServiceService3Info
+}
+
+var myServiceService3Info = newService3Info()
+
+func newService3Info() *serviceinfo.ServiceInfo {
+	methods := map[string]serviceinfo.MethodInfo{
+		"mock": serviceinfo.NewMethodInfo(mockHandler, NewMockArgs, NewMockResult, false),
+	}
+
+	svcInfo := &serviceinfo.ServiceInfo{
+		ServiceName: MockService3Name,
+		Methods:     methods,
+		Extra: map[string]interface{}{
+			"PackageName": "mock",
 		},
 	}
 	return svcInfo

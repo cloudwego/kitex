@@ -76,6 +76,7 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 	}
 
 	transInfo.PutTransIntInfo(hd)
+	transInfo.PutTransStrInfo(map[string]string{transmeta.HeaderIDLServiceName: ri.Invocation().ServiceName()})
 	return ctx, nil
 }
 

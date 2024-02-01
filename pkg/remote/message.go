@@ -17,10 +17,12 @@
 package remote
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -83,6 +85,7 @@ func NewProtocolInfo(tp transport.Protocol, ct serviceinfo.PayloadCodec) Protoco
 type Message interface {
 	RPCInfo() rpcinfo.RPCInfo
 	ServiceInfo() *serviceinfo.ServiceInfo
+	SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error)
 	Data() interface{}
 	NewData(method string) (ok bool)
 	MessageType() MessageType
@@ -104,7 +107,7 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 	msg := messagePool.Get().(*message)
 	msg.data = data
 	msg.rpcInfo = ri
-	msg.svcInfo = svcInfo
+	msg.targetSvcInfo = svcInfo
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
 	msg.transInfo = transInfoPool.Get().(*transInfo)
@@ -112,13 +115,15 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 }
 
 // NewMessageWithNewer creates a new Message and set data later.
-func NewMessageWithNewer(svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole) Message {
+func NewMessageWithNewer(targetSvcInfo *serviceinfo.ServiceInfo, svcSearchMap map[string]*serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole, refuseTrafficWithoutServiceName bool) Message {
 	msg := messagePool.Get().(*message)
 	msg.rpcInfo = ri
-	msg.svcInfo = svcInfo
+	msg.targetSvcInfo = targetSvcInfo
+	msg.svcSearchMap = svcSearchMap
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
 	msg.transInfo = transInfoPool.Get().(*transInfo)
+	msg.refuseTrafficWithoutServiceName = refuseTrafficWithoutServiceName
 	return msg
 }
 
@@ -134,24 +139,26 @@ func newMessage() interface{} {
 }
 
 type message struct {
-	msgType      MessageType
-	data         interface{}
-	rpcInfo      rpcinfo.RPCInfo
-	svcInfo      *serviceinfo.ServiceInfo
-	rpcRole      RPCRole
-	compressType CompressType
-	payloadSize  int
-	transInfo    TransInfo
-	tags         map[string]interface{}
-	protocol     ProtocolInfo
-	payloadCodec PayloadCodec
+	msgType                         MessageType
+	data                            interface{}
+	rpcInfo                         rpcinfo.RPCInfo
+	targetSvcInfo                   *serviceinfo.ServiceInfo
+	svcSearchMap                    map[string]*serviceinfo.ServiceInfo
+	rpcRole                         RPCRole
+	compressType                    CompressType
+	payloadSize                     int
+	transInfo                       TransInfo
+	tags                            map[string]interface{}
+	protocol                        ProtocolInfo
+	payloadCodec                    PayloadCodec
+	refuseTrafficWithoutServiceName bool
 }
 
 func (m *message) zero() {
 	m.msgType = InvalidMessageType
 	m.data = nil
 	m.rpcInfo = nil
-	m.svcInfo = &emptyServiceInfo
+	m.targetSvcInfo = &emptyServiceInfo
 	m.rpcRole = -1
 	m.compressType = NoCompress
 	m.payloadSize = 0
@@ -172,7 +179,32 @@ func (m *message) RPCInfo() rpcinfo.RPCInfo {
 
 // ServiceInfo implements the Message interface.
 func (m *message) ServiceInfo() *serviceinfo.ServiceInfo {
-	return m.svcInfo
+	return m.targetSvcInfo
+}
+
+func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error) {
+	// for non-multi-service including generic server scenario
+	if m.targetSvcInfo != nil {
+		if mt := m.targetSvcInfo.MethodInfo(methodName); mt == nil {
+			return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
+		}
+		return m.targetSvcInfo, nil
+	}
+	if svcName == "" && m.refuseTrafficWithoutServiceName {
+		return nil, NewTransErrorWithMsg(NoServiceName, "no service name while the server has WithRefuseTrafficWithoutServiceName option enabled")
+	}
+	var key string
+	if svcName == "" {
+		key = methodName
+	} else {
+		key = BuildMultiServiceKey(svcName, methodName)
+	}
+	svcInfo := m.svcSearchMap[key]
+	if svcInfo == nil {
+		return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
+	}
+	m.targetSvcInfo = svcInfo
+	return svcInfo, nil
 }
 
 // Data implements the Message interface.
@@ -185,7 +217,7 @@ func (m *message) NewData(method string) (ok bool) {
 	if m.data != nil {
 		return false
 	}
-	if mt := m.svcInfo.MethodInfo(method); mt != nil {
+	if mt := m.targetSvcInfo.MethodInfo(method); mt != nil {
 		m.data = mt.NewArgs()
 	}
 	if m.data == nil {
@@ -333,4 +365,14 @@ func (ti *transInfo) Recycle() {
 func FillSendMsgFromRecvMsg(recvMsg, sendMsg Message) {
 	sendMsg.SetProtocolInfo(recvMsg.ProtocolInfo())
 	sendMsg.SetPayloadCodec(recvMsg.PayloadCodec())
+}
+
+// BuildMultiServiceKey is used to create a key to search svcInfo from svcSearchMap.
+func BuildMultiServiceKey(serviceName, methodName string) string {
+	var builder utils.StringBuilder
+	builder.Grow(len(serviceName) + len(methodName) + 1)
+	builder.WriteString(serviceName)
+	builder.WriteString(".")
+	builder.WriteString(methodName)
+	return builder.String()
 }

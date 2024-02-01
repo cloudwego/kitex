@@ -356,3 +356,12 @@ func WithContextBackup(enable, async bool) Option {
 		o.BackupOpt.EnableImplicitlyTransmitAsync = async
 	}}
 }
+
+// WithRefuseTrafficWithoutServiceName returns an Option that only accepts traffics with service name.
+// This is used for a server with multi services and is one of the options to avoid a server startup error
+// when having conflicting method names between services without specifying a fallback service for the method.
+func WithRefuseTrafficWithoutServiceName() Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.RefuseTrafficWithoutServiceName = true
+	}}
+}

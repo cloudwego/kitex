@@ -47,8 +47,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	svcMap := map[string]*serviceinfo.ServiceInfo{}
-	svcMap[mocks.MockServiceName] = mocks.ServiceInfo()
+	svcInfo := mocks.ServiceInfo()
 	svrOpt = &remote.ServerOption{
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
 			fromInfo := rpcinfo.EmptyEndpointInfo()
@@ -63,10 +62,23 @@ func TestMain(m *testing.M) {
 		},
 		Codec: &MockCodec{
 			EncodeFunc: nil,
-			DecodeFunc: nil,
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
+				return nil
+			},
 		},
-		SvcMap:    svcMap,
-		TracerCtl: &rpcinfo.TraceController{},
+		SvcSearchMap: map[string]*serviceinfo.ServiceInfo{
+			remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
+			remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
+			remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
+			remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
+			mocks.MockMethod:          svcInfo,
+			mocks.MockExceptionMethod: svcInfo,
+			mocks.MockErrorMethod:     svcInfo,
+			mocks.MockOnewayMethod:    svcInfo,
+		},
+		TargetSvcInfo: svcInfo,
+		TracerCtl:     &rpcinfo.TraceController{},
 	}
 	svrTransHdlr, _ = newSvrTransHandler(svrOpt)
 	transSvr = NewTransServerFactory().NewTransServer(svrOpt, svrTransHdlr).(*transServer)
