@@ -39,7 +39,7 @@ func (f *cliTransHandlerFactory) NewTransHandler(opt *remote.ClientOption) (remo
 }
 
 func newCliTransHandler(opt *remote.ClientOption) (*cliTransHandler, error) {
-	if opt.Codec.Name() == "grpcGenericCodec" {
+	if opt.Codec != nil && opt.Codec.Name() == "grpcGenericCodec" {
 		return &cliTransHandler{
 			opt:   opt,
 			codec: opt.Codec,
