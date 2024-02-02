@@ -83,7 +83,8 @@ func (i *ServiceInfo) MethodInfo(name string) MethodInfo {
 	if i == nil {
 		return nil
 	}
-	if i.ServiceName == GenericService {
+	grpcGeneric, ok := i.Extra["grpcGeneric"]
+	if i.ServiceName == GenericService || (ok && grpcGeneric.(bool)) {
 		if i.GenericMethod != nil {
 			return i.GenericMethod(name)
 		}
