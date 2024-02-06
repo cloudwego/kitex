@@ -195,7 +195,6 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 
 	// 1. encode payload and calculate crc32c checksum
 	newPayloadOut := remote.NewWriterBuffer(PayloadBufferSize)
-	defer newPayloadOut.Release(nil)
 
 	if err = me.EncodePayload(ctx, message, newPayloadOut); err != nil {
 		return err
@@ -207,6 +206,7 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 	} else {
 		payload, err = newPayloadOut.Bytes()
 	}
+	newPayloadOut.Release(err)
 	if err != nil {
 		return err
 	}
