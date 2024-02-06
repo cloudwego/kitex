@@ -225,7 +225,7 @@ func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
 	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
 
-	dc := NewDefaultCodecWithCRC32()
+	dc := NewDefaultCodecWithConfig(CodecConfig{crc32Check: true})
 	ctx := context.Background()
 	intKVInfo := prepareIntKVInfo()
 	strKVInfo := prepareStrKVInfo()
@@ -299,11 +299,11 @@ func TestCodecTypeNotMatchWithServiceInfoPayloadCodec(t *testing.T) {
 	test.Assert(t, err == nil)
 }
 
-func BenchmarkTestEncodeDecodeWithCRC32C(b *testing.B) {
+func BenchmarkDefaultEncodeDecode(b *testing.B) {
 	ctx := context.Background()
 	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
 	type factory func() remote.Codec
-	testCases := map[string]factory{"normal": NewDefaultCodec, "crc32c": NewDefaultCodecWithCRC32}
+	testCases := map[string]factory{"normal": NewDefaultCodec, "crc32c": func() remote.Codec { return NewDefaultCodecWithConfig(CodecConfig{crc32Check: true}) }}
 
 	for name, f := range testCases {
 		b.Run(name, func(b *testing.B) {
@@ -316,7 +316,7 @@ func BenchmarkTestEncodeDecodeWithCRC32C(b *testing.B) {
 						codec := f()
 						sendMsg := initClientSendMsg(transport.TTHeader, msgLen)
 						// encode
-						out := remote.NewWriterBuffer((i + 1) * 1024)
+						out := remote.NewWriterBuffer(1024)
 						err := codec.Encode(ctx, sendMsg, out)
 						test.Assert(b, err == nil, err)
 

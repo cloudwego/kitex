@@ -269,8 +269,18 @@ func (b *defaultByteBuffer) AppendBuffer(buf ByteBuffer) (err error) {
 	return
 }
 
-// Bytes is used to get the bytes written with nocopy.
+// Bytes is used to get the bytes written.
 func (b *defaultByteBuffer) Bytes() (buf []byte, err error) {
+	if b.status&BitWritable == 0 {
+		return nil, errors.New("unwritable buffer, cannot support Bytes")
+	}
+	buf = make([]byte, b.writeIdx)
+	copy(buf, b.buff[:b.writeIdx])
+	return buf, nil
+}
+
+// BytesNocopy is used to get the bytes written with nocopy.
+func (b *defaultByteBuffer) BytesNocopy() (buf []byte, err error) {
 	if b.status&BitWritable == 0 {
 		return nil, errors.New("unwritable buffer, cannot support Bytes")
 	}
