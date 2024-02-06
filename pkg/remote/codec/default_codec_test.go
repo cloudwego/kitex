@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/bytedance/mockey"
@@ -228,7 +229,7 @@ func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
 	ctx := context.Background()
 	intKVInfo := prepareIntKVInfo()
 	strKVInfo := prepareStrKVInfo()
-	sendMsg := initClientSendMsg(transport.TTHeader)
+	sendMsg := initClientSendMsg(transport.TTHeader, 3*1024)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
 
@@ -286,6 +287,41 @@ func TestCodecTypeNotMatchWithServiceInfoPayloadCodec(t *testing.T) {
 	test.Assert(t, err == nil)
 }
 
+func BenchmarkTestEncodeDecodeWithCRC32C(b *testing.B) {
+	ctx := context.Background()
+	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
+	type factory func() remote.Codec
+	testCases := map[string]factory{"normal": NewDefaultCodec} //, "crc32c": NewDefaultCodecWithCRC32}
+
+	for name, f := range testCases {
+		b.Run(name, func(b *testing.B) {
+			for i := 3; i < 4; i++ {
+				msgLen := i * 1024
+				b.ReportAllocs()
+				b.ResetTimer()
+				b.Run(fmt.Sprintf("%dsize", msgLen), func(b *testing.B) {
+					for j := 0; j < b.N; j++ {
+						codec := f()
+						sendMsg := initClientSendMsg(transport.TTHeader, msgLen)
+						// encode
+						out := remote.NewWriterBuffer(256)
+						err := codec.Encode(ctx, sendMsg, out)
+						test.Assert(b, err == nil, err)
+
+						// decode
+						recvMsg := initServerRecvMsgWithMockMsg()
+						buf, err := out.Bytes()
+						test.Assert(b, err == nil, err)
+						in := remote.NewReaderBuffer(buf)
+						err = codec.Decode(ctx, recvMsg, in)
+						test.Assert(b, err == nil, err)
+					}
+				})
+			}
+		})
+	}
+}
+
 var mpc remote.PayloadCodec = mockPayloadCodec{}
 
 type mockPayloadCodec struct{}
@@ -294,6 +330,23 @@ func (m mockPayloadCodec) Marshal(ctx context.Context, message remote.Message, o
 	WriteUint32(ThriftV1Magic+uint32(message.MessageType()), out)
 	WriteString(message.RPCInfo().Invocation().MethodName(), out)
 	WriteUint32(uint32(message.RPCInfo().Invocation().SeqID()), out)
+	var (
+		dataLen uint32
+		dataStr string
+	)
+	// write data
+	if data := message.Data(); data != nil {
+		if mm, ok := data.(*mockMsg); ok {
+			if len(mm.msg) != 0 {
+				dataStr = mm.msg
+				dataLen = uint32(len(mm.msg))
+			}
+		}
+	}
+	WriteUint32(dataLen, out)
+	if dataLen > 0 {
+		WriteString(dataStr, out)
+	}
 	return nil
 }
 
@@ -322,6 +375,18 @@ func (m mockPayloadCodec) Unmarshal(ctx context.Context, message remote.Message,
 		return err
 	}
 	if err = SetOrCheckSeqID(int32(seqID), message); err != nil && msgType != uint32(remote.Exception) {
+		return err
+	}
+	// read data
+	dataLen, err := PeekUint32(in)
+	if err != nil {
+		return err
+	}
+	if dataLen == 0 {
+		// no data
+		return nil
+	}
+	if _, _, err = ReadString(in); err != nil {
 		return err
 	}
 	return nil

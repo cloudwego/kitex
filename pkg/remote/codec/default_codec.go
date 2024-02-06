@@ -184,6 +184,7 @@ func (c *defaultCodec) EncodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 		strInfo[transmeta.HeaderCRC32C] = string(csb)
 	}
 
+	message.SetPayloadLen(len(pb))
 	// 2. encode header and return totalLenField if needed
 	// totalLenField will be filled after payload encoded
 	if totalLenField, err = ttHeaderCodec.encode(ctx, message, out); err != nil {
