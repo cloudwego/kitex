@@ -20,6 +20,7 @@ package connpool
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -293,6 +294,7 @@ func (p *peer) Close() {
 
 // NewLongPool creates a long pool using the given IdleConfig.
 func NewLongPool(serviceName string, idlConfig connpool.IdleConfig) *LongPool {
+	log.Printf("KITEX: [DEBUG] NewLongPool(%s) %v\n", serviceName, idlConfig)
 	limit := utils.NewMaxCounter(idlConfig.MaxIdleGlobal)
 	lp := &LongPool{
 		reporter:   &DummyReporter{},
