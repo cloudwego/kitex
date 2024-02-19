@@ -159,6 +159,8 @@ var (
 	javaObjectRe                     = regexp.MustCompile(`\*java\.Object\b`)
 	javaExceptionRe                  = regexp.MustCompile(`\*java\.Exception\b`)
 	javaExceptionEmptyVerificationRe = regexp.MustCompile(`return p\.Exception != nil\b`)
+	javaBigDecimalRe                 = regexp.MustCompile(`\*java\.BigDecimal\b`)
+	javaBigIntegerRe                 = regexp.MustCompile(`\*java\.BigInteger\b`)
 )
 
 // Hessian2PatchByReplace args is the arguments from command, subDirPath used for xx/xx/xx
@@ -186,6 +188,8 @@ func Hessian2PatchByReplace(args generator.Config, subDirPath string) error {
 			data = replaceJavaObject(data)
 			data = replaceJavaException(data)
 			data = replaceJavaExceptionEmptyVerification(data)
+			data = replaceJavaBigDecimal(data)
+			data = replaceJavaBigInteger(data)
 			if err = ioutil.WriteFile(fileName, data, 0o644); err != nil {
 				return err
 			}
@@ -204,6 +208,8 @@ func Hessian2PatchByReplace(args generator.Config, subDirPath string) error {
 	}
 
 	handler = replaceJavaObject(handler)
+	handler = replaceJavaBigDecimal(handler)
+	handler = replaceJavaBigInteger(handler)
 	return ioutil.WriteFile(handlerName, handler, 0o644)
 }
 
@@ -232,4 +238,12 @@ func replaceJavaException(content []byte) []byte {
 //	 to `return true` to ignore this problem.
 func replaceJavaExceptionEmptyVerification(content []byte) []byte {
 	return javaExceptionEmptyVerificationRe.ReplaceAll(content, []byte("return true"))
+}
+
+func replaceJavaBigDecimal(content []byte) []byte {
+	return javaBigDecimalRe.ReplaceAll(content, []byte("java.BigDecimal"))
+}
+
+func replaceJavaBigInteger(content []byte) []byte {
+	return javaBigIntegerRe.ReplaceAll(content, []byte("java.BigInteger"))
 }
