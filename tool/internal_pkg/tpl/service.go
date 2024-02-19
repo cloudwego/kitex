@@ -233,7 +233,7 @@ func {{LowerFirst .Name}}Handler(ctx context.Context, handler interface{}, arg, 
 	if !ok {
 		return errors.New("{{.ServiceName}}.{{.Name}} is a thrift streaming method, please call with Kitex StreamClient")
 	}
-	stream := &{{LowerFirst .ServiceName}}{{.Name}}Server{st.Stream}
+	stream := &{{LowerFirst .ServiceName}}{{.RawName}}Server{st.Stream}
 		{{- if not $serverSide}}
 	return handler.({{.PkgRefName}}.{{.ServiceName}}).{{.Name}}(stream)
 		{{- else}} {{/* !$serverSide */}}
