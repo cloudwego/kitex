@@ -86,21 +86,21 @@ func NewDefaultCodecWithSizeLimit(maxSize int) remote.Codec {
 
 // NewDefaultCodecWithConfig creates the default protocol sniffing codec supporting thrift and protobuf with the input config.
 func NewDefaultCodecWithConfig(cfg CodecConfig) remote.Codec {
-	if cfg.crc32Check {
+	if cfg.CRC32Check {
 		crc32TableOnce.Do(func() {
 			crc32cTable = crc32.MakeTable(crc32.Castagnoli)
 		})
 	}
 	return &defaultCodec{
-		maxSize:    cfg.maxSize,
-		crc32Check: cfg.crc32Check,
+		maxSize:    cfg.MaxSize,
+		crc32Check: cfg.CRC32Check,
 	}
 }
 
 // CodecConfig is the config of defaultCodec
 type CodecConfig struct {
-	maxSize    int
-	crc32Check bool
+	MaxSize    int
+	CRC32Check bool
 }
 
 type defaultCodec struct {
