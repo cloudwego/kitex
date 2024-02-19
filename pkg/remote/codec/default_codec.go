@@ -19,12 +19,14 @@ package codec
 import (
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"hash/crc32"
 	"sync"
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
@@ -211,8 +213,9 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 		return err
 	}
 	crc32c := getCRC32C(payload)
-	if strInfo := message.TransInfo().TransStrInfo(); strInfo != nil {
-		strInfo[transmeta.HeaderCRC32C] = string(crc32c)
+	strInfo := message.TransInfo().TransStrInfo()
+	if crc32c != "" && strInfo != nil {
+		strInfo[transmeta.HeaderCRC32C] = crc32c
 	}
 	// set payload length before encode TTHeader.
 	message.SetPayloadLen(len(payload))
@@ -461,25 +464,31 @@ func checkPayloadSize(payloadLen, maxSize int) error {
 	return nil
 }
 
-// getCRC32C calculates the crc32c checksum of the input bytes
-func getCRC32C(payload []byte) []byte {
+// getCRC32C calculates the crc32c checksum of the input bytes.
+// the checksum will be converted into big-endian format and encoded into hex string.
+func getCRC32C(payload []byte) string {
 	if crc32cTable == nil {
-		return nil
+		return ""
 	}
 	csb := make([]byte, Size32)
 	binary.BigEndian.PutUint32(csb, crc32.Checksum(payload, crc32cTable))
-	return csb
+	return hex.EncodeToString(csb)
 }
 
-// checkCRC32C validates the crc32c checksum in the header
+// checkCRC32C validates the crc32c checksum in the header.
 func checkCRC32C(message remote.Message, in remote.ByteBuffer) error {
 	strInfo := message.TransInfo().TransStrInfo()
 	if strInfo == nil {
 		return nil
 	}
-	crc32byte := strInfo[transmeta.HeaderCRC32C]
-	if len(crc32byte) != 0 {
-		expectedChecksum := binary.BigEndian.Uint32([]byte(crc32byte))
+	crc32HexString := strInfo[transmeta.HeaderCRC32C]
+	if len(crc32HexString) != 0 {
+		crc32Byte, err := hex.DecodeString(crc32HexString)
+		if err != nil {
+			klog.Warnf("KITEX: crc32c key found in TTHeader, value is not a valid hex string")
+			return nil
+		}
+		expectedChecksum := binary.BigEndian.Uint32(crc32Byte)
 		payloadLen := message.PayloadLen() // total length
 		payload, err := in.Peek(payloadLen)
 		if err != nil {
@@ -487,7 +496,7 @@ func checkCRC32C(message remote.Message, in remote.ByteBuffer) error {
 		}
 		realChecksum := crc32.Checksum(payload, crc32cTable)
 		if realChecksum != expectedChecksum {
-			return perrors.NewProtocolErrorWithType(perrors.InvalidData, "crc32c payload check failed")
+			return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("crc32c payload check failed, expected=%d, actual=%d", expectedChecksum, realChecksum))
 		}
 	}
 	return nil
