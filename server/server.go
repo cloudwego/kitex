@@ -83,6 +83,10 @@ func NewServer(ops ...Option) Server {
 
 func (s *server) init() {
 	ctx := fillContext(s.opt)
+	if s.opt.EnableContextTimeout {
+		// prepend for adding timeout to the context for all middlewares and the handler
+		s.opt.MWBs = append([]endpoint.MiddlewareBuilder{serverTimeoutMW}, s.opt.MWBs...)
+	}
 	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)
 	s.mws = append(s.mws, acl.NewACLMiddleware(s.opt.ACLRules))
 	s.initStreamMiddlewares(ctx)
