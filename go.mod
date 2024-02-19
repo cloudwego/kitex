@@ -21,9 +21,9 @@ require (
 	github.com/json-iterator/go v1.1.12
 	github.com/stretchr/testify v1.8.2
 	github.com/tidwall/gjson v1.9.3
-	golang.org/x/net v0.0.0-20221014081412-f15817d10f9b
+	golang.org/x/net v0.1.0
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	golang.org/x/sys v0.0.0-20220817070843-5a390386f1f2
+	golang.org/x/sys v0.1.0
 	golang.org/x/tools v0.1.12
 	google.golang.org/genproto v0.0.0-20210513213006-bf773b8c8384
 	google.golang.org/protobuf v1.28.1
