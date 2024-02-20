@@ -56,8 +56,8 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		cv = j2t.NewBinaryConv(m.convOpts)
 	}
 
-	// msg is void
-	if _, ok := msg.(descriptor.Void); ok {
+	// msg is void or nil
+	if _, ok := msg.(descriptor.Void); ok || msg == nil {
 		if err := m.writeHead(out); err != nil {
 			return err
 		}

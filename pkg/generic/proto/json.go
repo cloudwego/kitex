@@ -61,10 +61,16 @@ var _ MessageWriter = (*WriteJSON)(nil)
 
 // Write converts msg to protobuf wire format and returns an output bytebuffer
 func (m *WriteJSON) Write(ctx context.Context, msg interface{}) (interface{}, error) {
-	// msg is string
-	s, ok := msg.(string)
-	if !ok {
-		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
+	var s string
+	if msg == nil {
+		s = "{}"
+	} else {
+		// msg is string
+		var ok bool
+		s, ok = msg.(string)
+		if !ok {
+			return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, "decode msg failed, is not string")
+		}
 	}
 
 	cv := dconvj2p.NewBinaryConv(*m.dynamicgoConvOpts)

@@ -31,21 +31,24 @@ import (
 	"github.com/cloudwego/kitex/client/genericclient"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func newGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
 	var opts []client.Option
-	opts = append(opts, client.WithHostPorts(targetIPPort))
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithMetaHandler(transmeta.ClientTTHeaderHandler), client.WithTransportProtocol(transport.TTHeader))
 	genericCli, _ := genericclient.NewClient(destService, g, opts...)
 	return genericCli
 }
 
 func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service) server.Server {
 	var opts []server.Option
-	opts = append(opts, server.WithServiceAddr(addr), server.WithExitWaitTime(time.Microsecond*10))
+	opts = append(opts, server.WithServiceAddr(addr), server.WithExitWaitTime(time.Microsecond*10), server.WithMetaHandler(transmeta.ServerTTHeaderHandler))
 	svr := genericserver.NewServer(handler, g, opts...)
 	go func() {
 		err := svr.Run()
@@ -63,6 +66,9 @@ type TestEchoService struct{}
 // GenericCall ...
 func (g *TestEchoService) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
 	buf := request.(string)
+	if buf == getBizErrReq() {
+		return nil, kerrors.NewBizStatusError(404, "not found")
+	}
 	rpcinfo := rpcinfo.GetRPCInfo(ctx)
 	fmt.Printf("Method from Ctx: %s\n", rpcinfo.Invocation().MethodName())
 	fmt.Printf("Recv: %v\n", buf)
@@ -181,6 +187,10 @@ func (g *TestInt2FloatMethod2Service) GenericCall(ctx context.Context, method st
 
 func getEchoReq() string {
 	return `{"message":"this is the request"}`
+}
+
+func getBizErrReq() string {
+	return `{"message":"return biz error"}`
 }
 
 func getEchoRes() string {
