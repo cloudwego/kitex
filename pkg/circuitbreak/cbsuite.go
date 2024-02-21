@@ -101,14 +101,27 @@ type CBSuite struct {
 	instanceCBConfig instanceCBConfig
 
 	events event.Queue
+
+	config CBSuiteConfig
 }
 
 // NewCBSuite to build a new CBSuite.
 // Notice: Should NewCBSuite for every client in this version,
 // because event.Queue and event.Bus are not shared with all clients now.
-func NewCBSuite(genKey GenServiceCBKeyFunc) *CBSuite {
-	s := &CBSuite{genServiceCBKey: genKey}
-	s.instanceCBConfig = instanceCBConfig{CBConfig: defaultCBConfig}
+func NewCBSuite(genKey GenServiceCBKeyFunc, options ...CBSuiteOption) *CBSuite {
+	s := &CBSuite{
+		genServiceCBKey: genKey,
+		instanceCBConfig: instanceCBConfig{
+			CBConfig: defaultCBConfig,
+		},
+		config: CBSuiteConfig{
+			serviceGetErrorTypeFunc:  ErrorTypeOnServiceLevel,
+			instanceGetErrorTypeFunc: ErrorTypeOnInstanceLevel,
+		},
+	}
+	for _, option := range options {
+		option(&s.config)
+	}
 	return s
 }
 
@@ -130,7 +143,7 @@ func (s *CBSuite) InstanceCBMW() endpoint.Middleware {
 	return NewCircuitBreakerMW(*s.instanceControl, s.instancePanel)
 }
 
-// ServicePanel return return cb Panel of service
+// ServicePanel return cb Panel of service
 func (s *CBSuite) ServicePanel() circuitbreaker.Panel {
 	if s.servicePanel == nil {
 		s.initServiceCB()
@@ -213,7 +226,7 @@ func (s *CBSuite) initServiceCB() {
 	}
 	s.serviceControl = &Control{
 		GetKey:       svcKey,
-		GetErrorType: ErrorTypeOnServiceLevel,
+		GetErrorType: s.config.serviceGetErrorTypeFunc,
 		DecorateError: func(ctx context.Context, request interface{}, err error) error {
 			return kerrors.ErrServiceCircuitBreak
 		},
@@ -239,7 +252,7 @@ func (s *CBSuite) initInstanceCB() {
 	}
 	s.instanceControl = &Control{
 		GetKey:       instanceKey,
-		GetErrorType: ErrorTypeOnInstanceLevel,
+		GetErrorType: s.config.instanceGetErrorTypeFunc,
 		DecorateError: func(ctx context.Context, request interface{}, err error) error {
 			return kerrors.ErrInstanceCircuitBreak
 		},
