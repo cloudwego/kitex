@@ -25,10 +25,13 @@ import (
 	"sync"
 	"sync/atomic"
 
+	netpoll2 "github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -164,7 +167,7 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
 	tp := message.ProtocolInfo().TransProto
 	if c.crc32Check && tp&transport.TTHeader == transport.TTHeader {
-		return c.encodeMetaAndPayloadWithCRC32C(ctx, message, out, c)
+		return c.encodeMetaAndPayloadWithCRC32C(ctx, message, out, me)
 	}
 
 	var err error
@@ -196,22 +199,26 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 	var err error
 
 	// 1. encode payload and calculate crc32c checksum
-	newPayloadOut := remote.NewWriterBuffer(PayloadBufferSize)
+	payloadOut := netpoll.NewWriterByteBuffer(netpoll2.NewLinkBuffer())
 
-	if err = me.EncodePayload(ctx, message, newPayloadOut); err != nil {
+	if err = me.EncodePayload(ctx, message, payloadOut); err != nil {
 		return err
 	}
 	// get the payload from buffer
 	var payload []byte
-	if nc, ok := newPayloadOut.(remote.NocopyWrittenBytesGetter); ok {
-		payload, err = nc.BytesNocopy()
-	} else {
-		payload, err = newPayloadOut.Bytes()
-	}
-	newPayloadOut.Release(err)
+	payload, err = payloadOut.Bytes()
 	if err != nil {
+		// release if err
+		payloadOut.Release(err)
 		return err
 	}
+	outIsNetpollBuffer := netpoll.IsNetpollByteBuffer(out)
+	if !outIsNetpollBuffer {
+		// release payloadOut if the original out is not a netpoll buffer
+		// because it won't be used later.
+		payloadOut.Release(nil)
+	}
+
 	crc32c := getCRC32C(payload)
 	strInfo := message.TransInfo().TransStrInfo()
 	if crc32c != "" && strInfo != nil {
@@ -227,10 +234,16 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 	}
 
 	// 3. write payload to the buffer after TTHeader
-	if ncWriter, ok := out.(remote.NocopyWrite); ok {
-		err = ncWriter.WriteDirect(payload, 0)
+	if outIsNetpollBuffer {
+		// append buffer only if the input buffer is a netpollByteBuffer
+		// release will be executed in AppendBuffer
+		err = out.AppendBuffer(payloadOut)
 	} else {
-		_, err = out.WriteBinary(payload)
+		if ncWriter, ok := out.(remote.NocopyWrite); ok {
+			err = ncWriter.WriteDirect(payload, 0)
+		} else {
+			_, err = out.WriteBinary(payload)
+		}
 	}
 	return err
 }

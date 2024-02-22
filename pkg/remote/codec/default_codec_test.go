@@ -24,12 +24,14 @@ import (
 	"testing"
 
 	"github.com/bytedance/mockey"
+	netpoll2 "github.com/cloudwego/netpoll"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
@@ -229,24 +231,25 @@ func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
 	ctx := context.Background()
 	intKVInfo := prepareIntKVInfo()
 	strKVInfo := prepareStrKVInfo()
-	sendMsg := initClientSendMsg(transport.TTHeader, 3*1024)
+	sendMsg := initClientSendMsg(transport.TTHeaderFramed, 3*1024)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
 
 	// test encode err
-	out := remote.NewReaderBuffer([]byte{})
-	err := dc.Encode(ctx, sendMsg, out)
+	badOut := netpoll.NewReaderByteBuffer(netpoll2.NewLinkBuffer())
+	err := dc.Encode(ctx, sendMsg, badOut)
 	test.Assert(t, err != nil)
 
 	// encode
-	out = remote.NewWriterBuffer(256)
-	err = dc.Encode(ctx, sendMsg, out)
+	npBuffer := netpoll.NewReaderWriterByteBuffer(netpoll2.NewLinkBuffer())
+	err = dc.Encode(ctx, sendMsg, npBuffer)
 	test.Assert(t, err == nil, err)
 
 	// decode, succeed
 	recvMsg := initServerRecvMsg()
-	buf, err := out.Bytes()
+	buf, err := npBuffer.Bytes()
 	test.Assert(t, err == nil, err)
+
 	in := remote.NewReaderBuffer(buf)
 	err = dc.Decode(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)
@@ -257,7 +260,6 @@ func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
 	test.Assert(t, sendMsg.RPCInfo().Invocation().SeqID() == recvMsg.RPCInfo().Invocation().SeqID())
 
 	// decode, crc32c check failed
-	buf, err = out.Bytes()
 	test.Assert(t, err == nil, err)
 	bufLen := len(buf)
 	modifiedBuf := make([]byte, bufLen)
