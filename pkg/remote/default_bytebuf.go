@@ -36,6 +36,7 @@ func init() {
 }
 
 // NewWriterBuffer is used to create a defaultByteBuffer using the given size.
+// NOTICE: defaultByteBuffer is only used for testing.
 func NewWriterBuffer(size int) ByteBuffer {
 	return newWriterByteBuffer(size)
 }
@@ -276,14 +277,6 @@ func (b *defaultByteBuffer) Bytes() (buf []byte, err error) {
 	buf = make([]byte, b.writeIdx)
 	copy(buf, b.buff[:b.writeIdx])
 	return buf, nil
-}
-
-// BytesNocopy is used to get the bytes written with nocopy.
-func (b *defaultByteBuffer) BytesNocopy() (buf []byte, err error) {
-	if b.status&BitWritable == 0 {
-		return nil, errors.New("unwritable buffer, cannot support Bytes")
-	}
-	return b.buff[:b.writeIdx], nil
 }
 
 // NewBuffer returns a new writable remote.ByteBuffer.

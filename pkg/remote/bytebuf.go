@@ -34,12 +34,6 @@ type NocopyWrite interface {
 	WriteDirect(buf []byte, remainCap int) error
 }
 
-// NocopyWrittenBytesGetter is used to get the written bytes from the buffer without copy.
-type NocopyWrittenBytesGetter interface {
-	// BytesNocopy is used to get the bytes written with nocopy.
-	BytesNocopy() (buf []byte, err error)
-}
-
 // FrameWrite is to write header and data buffer separately to avoid memory copy
 type FrameWrite interface {
 	// WriteHeader set header buffer without copy
