@@ -39,7 +39,7 @@ import (
 func TestThrift(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceImpl), false, false)
-	cli := initThriftClient(t, addr, false, false)
+	cli := initThriftClient(t, addr, false, false, false)
 
 	cases := []struct {
 		reqMsg   interface{}
@@ -267,7 +267,7 @@ func TestThrift(t *testing.T) {
 func TestThriftPingMethod(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServicePingImpl), false, false)
-	cli := initThriftClient(t, addr, false, false)
+	cli := initThriftClient(t, addr, false, false, false)
 
 	resp, err := cli.GenericCall(context.Background(), "Ping", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -280,7 +280,7 @@ func TestThriftPingMethod(t *testing.T) {
 func TestThriftError(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceErrorImpl), false, false)
-	cli := initThriftClient(t, addr, false, false)
+	cli := initThriftClient(t, addr, false, false, false)
 
 	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil)
@@ -291,7 +291,7 @@ func TestThriftError(t *testing.T) {
 func TestThriftOnewayMethod(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceOnewayImpl), false, false)
-	cli := initThriftClient(t, addr, false, false)
+	cli := initThriftClient(t, addr, false, false, false)
 
 	resp, err := cli.GenericCall(context.Background(), "Oneway", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -302,7 +302,7 @@ func TestThriftOnewayMethod(t *testing.T) {
 func TestThriftVoidMethod(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceVoidImpl), false, false)
-	cli := initThriftClient(t, addr, false, false)
+	cli := initThriftClient(t, addr, false, false, false)
 
 	resp, err := cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -313,7 +313,7 @@ func TestThriftVoidMethod(t *testing.T) {
 func TestBase64Binary(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceWithBase64Binary), true, false)
-	cli := initThriftClient(t, addr, true, false)
+	cli := initThriftClient(t, addr, true, false, false)
 
 	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
@@ -328,7 +328,7 @@ func TestBase64Binary(t *testing.T) {
 func TestBinaryWithByteSlice(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceWithByteSliceImpl), false, true)
-	cli := initThriftClient(t, addr, false, false)
+	cli := initThriftClient(t, addr, false, false, false)
 
 	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
@@ -342,7 +342,7 @@ func TestBinaryWithByteSlice(t *testing.T) {
 func TestBinaryWithBase64AndByteSlice(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceWithByteSliceImpl), true, true)
-	cli := initThriftClient(t, addr, true, true)
+	cli := initThriftClient(t, addr, true, true, false)
 
 	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
@@ -373,11 +373,11 @@ func initThriftMockClient(t *testing.T, address string) genericclient.Client {
 	return cli
 }
 
-func initThriftClient(t *testing.T, addr string, base64Binary, byteSlice bool) genericclient.Client {
-	return initThriftClientByIDL(t, addr, "./idl/example.thrift", base64Binary, byteSlice)
+func initThriftClient(t *testing.T, addr string, base64Binary, byteSlice bool, setEmptyStruct bool) genericclient.Client {
+	return initThriftClientByIDL(t, addr, "./idl/example.thrift", base64Binary, byteSlice, setEmptyStruct)
 }
 
-func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary, byteSlice bool) genericclient.Client {
+func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary, byteSlice bool, setEmptyStruct bool) genericclient.Client {
 	p, err := generic.NewThriftFileProvider(idl)
 	test.Assert(t, err == nil)
 	g, err := generic.MapThriftGeneric(p)
@@ -385,6 +385,8 @@ func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary, byteSli
 	err = generic.SetBinaryWithBase64(g, base64Binary)
 	test.Assert(t, err == nil)
 	err = generic.SetBinaryWithByteSlice(g, byteSlice)
+	test.Assert(t, err == nil)
+	err = generic.SetSetFieldsForEmptyStruct(g, setEmptyStruct)
 	test.Assert(t, err == nil)
 	cli := newGenericClient("destServiceName", g, addr)
 	test.Assert(t, err == nil)

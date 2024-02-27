@@ -185,6 +185,24 @@ func SetBinaryWithByteSlice(g Generic, enable bool) error {
 	return nil
 }
 
+// SetSetFieldsForEmptyStruct enable/disable set all fields in map-generic even if a struct is empty.
+//
+//	mode == 0 means disable
+//	mode == 1 means only set required and default fields
+//	mode == 2 means set all fields
+func SetSetFieldsForEmptyStruct(g Generic, mode uint8) error {
+	switch c := g.(type) {
+	case *mapThriftGeneric:
+		if c.codec == nil {
+			return fmt.Errorf("empty codec for %#v", c)
+		}
+		c.codec.setFieldsForEmptyStruct = mode
+	default:
+		return fmt.Errorf("SetFieldsForEmptyStruct only supports map-generic at present")
+	}
+	return nil
+}
+
 var thriftCodec = thrift.NewThriftCodec()
 
 var pbCodec = protobuf.NewProtobufCodec()
