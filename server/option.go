@@ -386,6 +386,15 @@ func WithRefuseTrafficWithoutServiceName() Option {
 // so there's no need to use this option.
 func WithEnableContextTimeout(enable bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithEnableContextTimeout({%+v})", enable))
 		o.EnableContextTimeout = enable
+	}}
+}
+
+// WithEnableStreamingContextPassThrough enables passing through context modified by server middleware to handler.
+func WithEnableStreamingContextPassThrough() Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("EnableStreamingContextPassThrough()"))
+		o.EnableStreamingContextPassThrough = true
 	}}
 }

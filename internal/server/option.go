@@ -100,6 +100,8 @@ type Options struct {
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool
+
+	EnableStreamingContextPassThrough bool
 }
 
 type Limit struct {
