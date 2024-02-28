@@ -19,7 +19,9 @@
 
 package thrift
 
-import "github.com/cloudwego/kitex/pkg/remote"
+import (
+	"github.com/cloudwego/kitex/pkg/remote"
+)
 
 // hyperMarshalEnabled indicates that if there are high priority message codec for current platform.
 func (c thriftCodec) hyperMarshalEnabled() bool {
