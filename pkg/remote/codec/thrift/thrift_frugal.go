@@ -1,3 +1,6 @@
+//go:build !windows && go1.16 && !go1.23 && !disablefrugal
+// +build !windows,go1.16,!go1.23,!disablefrugal
+
 /*
  * Copyright 2024 CloudWeGo Authors
  *

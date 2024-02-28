@@ -30,4 +30,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-replace github.com/cloudwego/frugal => /Users/bytedance/go/src/github.com/cloudwego/frugal
+// TODO: replace frugal with the newest commit
