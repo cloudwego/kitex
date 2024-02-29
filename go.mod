@@ -11,7 +11,7 @@ require (
 	github.com/cloudwego/configmanager v0.2.0
 	github.com/cloudwego/dynamicgo v0.2.0
 	github.com/cloudwego/fastpb v0.0.4
-	github.com/cloudwego/frugal v0.1.13
+	github.com/cloudwego/frugal v0.1.14-0.20240228092322-657cf8689f17
 	github.com/cloudwego/localsession v0.0.2
 	github.com/cloudwego/netpoll v0.5.2-0.20240220090456-7ba622bf763b
 	github.com/cloudwego/thriftgo v0.3.6
@@ -29,5 +29,3 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v3 v3.0.1
 )
-
-replace github.com/cloudwego/frugal => github.com/cloudwego/frugal v0.1.14-0.20240228092322-657cf8689f17
