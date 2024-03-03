@@ -172,7 +172,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {
 		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
-		t.OnError(ctx, err, conn)
+		// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
 		return err
 	}
 
@@ -188,8 +188,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 		if methodInfo, err = GetMethodInfo(ri, svcInfo); err != nil {
 			// it won't be err, because the method has been checked in decode, err check here just do defensive inspection
 			t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
-			// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded
-			t.OnError(ctx, err, conn)
+			// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded,
+			// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
 			return err
 		}
 		if methodInfo.OneWay() {
@@ -214,7 +214,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 
 	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
 	if ctx, err = t.transPipe.Write(ctx, conn, sendMsg); err != nil {
-		t.OnError(ctx, err, conn)
+		// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
 		return err
 	}
 	return
