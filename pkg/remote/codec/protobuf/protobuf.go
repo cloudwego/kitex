@@ -80,8 +80,28 @@ func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out 
 	}
 
 	// 4. write actual message buf
-	msg, ok := data.(protobufMsgCodec)
+	msg, ok := data.(ProtobufMsgCodec)
 	if !ok {
+		// If Using Generics
+		// if data is a MessageWriterWithContext
+		// Do msg.WritePb(ctx context.Context, out remote.ByteBuffer)
+		genmsg, isgen := data.(MessageWriterWithContext)
+		if isgen {
+			actualMsg, err := genmsg.WritePb(ctx)
+			if err != nil {
+				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("protobuf marshal message failed: %s", err.Error()))
+			}
+			actualMsgBuf, ok := actualMsg.([]byte)
+			if !ok {
+				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("protobuf marshal message failed: %s", err.Error()))
+			}
+			_, err = out.WriteBinary(actualMsgBuf)
+			if err != nil {
+				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("protobuf marshal, write message buffer failed: %s", err.Error()))
+			}
+			return nil
+		}
+		// return error otherwise
 		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "encode failed, codec msg type not match with protobufCodec")
 	}
 
@@ -153,6 +173,7 @@ func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in
 		return err
 	}
 	data := message.Data()
+
 	// fast read
 	if msg, ok := data.(fastpb.Reader); ok {
 		if len(actualMsgBuf) == 0 {
@@ -168,7 +189,17 @@ func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in
 			return nil
 		}
 	}
-	msg, ok := data.(protobufMsgCodec)
+
+	// JSONPB Generic Case
+	if msg, ok := data.(MessageReaderWithMethodWithContext); ok {
+		err := msg.ReadPb(ctx, methodName, actualMsgBuf)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	msg, ok := data.(ProtobufMsgCodec)
 	if !ok {
 		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "decode failed, codec msg type not match with protobufCodec")
 	}
@@ -182,7 +213,17 @@ func (c protobufCodec) Name() string {
 	return "protobuf"
 }
 
-type protobufMsgCodec interface {
+// MessageWriterWithContext  writes to output bytebuffer
+type MessageWriterWithContext interface {
+	WritePb(ctx context.Context) (interface{}, error)
+}
+
+// MessageReaderWithMethodWithContext read from ActualMsgBuf with method
+type MessageReaderWithMethodWithContext interface {
+	ReadPb(ctx context.Context, method string, in []byte) error
+}
+
+type ProtobufMsgCodec interface {
 	Marshal(out []byte) ([]byte, error)
 	Unmarshal(in []byte) error
 }

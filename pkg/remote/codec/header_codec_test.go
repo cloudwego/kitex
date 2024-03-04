@@ -32,6 +32,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	tm "github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -306,8 +307,18 @@ var (
 )
 
 func initServerRecvMsg() remote.Message {
-	var req interface{}
-	msg := remote.NewMessage(req, mocks.ServiceInfo(), mockSvrRPCInfo, remote.Call, remote.Server)
+	svcInfo := mocks.ServiceInfo()
+	svcSearchMap := map[string]*serviceinfo.ServiceInfo{
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
+		mocks.MockMethod:          svcInfo,
+		mocks.MockExceptionMethod: svcInfo,
+		mocks.MockErrorMethod:     svcInfo,
+		mocks.MockOnewayMethod:    svcInfo,
+	}
+	msg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, mockSvrRPCInfo, remote.Call, remote.Server, false)
 	return msg
 }
 
@@ -367,7 +378,7 @@ func prepareIntKVInfo() map[uint16]string {
 }
 
 func prepareStrKVInfo() map[string]string {
-	kvInfo := map[string]string{}
+	kvInfo := map[string]string{transmeta.HeaderIDLServiceName: mocks.MockServiceName}
 	return kvInfo
 }
 
@@ -375,6 +386,7 @@ func prepareStrKVInfoWithGDPRToken() map[string]string {
 	kvInfo := map[string]string{
 		transmeta.GDPRToken:             "mockToken",
 		transmeta.HeaderTransRemoteAddr: "mockRemoteAddr",
+		transmeta.HeaderIDLServiceName:  mocks.MockServiceName,
 	}
 	return kvInfo
 }

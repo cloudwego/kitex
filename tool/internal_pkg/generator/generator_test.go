@@ -19,6 +19,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/thriftgo/generator/golang/streaming"
+
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 )
 
@@ -65,7 +68,7 @@ func TestConfig_Pack(t *testing.T) {
 		{
 			name:    "some",
 			fields:  fields{Features: []feature{feature(999)}, ThriftPluginTimeLimit: 30 * time.Second},
-			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "Hessian2Options=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "ProtobufPlugins=", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "ExtensionFile=", "Record=false", "RecordCmd=", "TemplateDir=", "GenPath=", "DeepCopyAPI=false", "Protocol=", "HandlerReturnKeepResp=false"},
+			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "Hessian2Options=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "ProtobufPlugins=", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "CompilerPath=", "ExtensionFile=", "Record=false", "RecordCmd=", "TemplateDir=", "GenPath=", "DeepCopyAPI=false", "Protocol=", "HandlerReturnKeepResp=false"},
 		},
 	}
 	for _, tt := range tests {
@@ -175,4 +178,55 @@ func TestConfig_Unpack(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_needCallOpt(t *testing.T) {
+	t.Run("protobuf", func(t *testing.T) {
+		pkg := &PackageInfo{
+			Codec: "protobuf",
+		}
+		test.Assert(t, needCallOpt(pkg))
+	})
+	t.Run("thrift-no-methods", func(t *testing.T) {
+		pkg := &PackageInfo{
+			Codec: "thrift",
+			ServiceInfo: &ServiceInfo{
+				Methods: nil,
+			},
+		}
+		test.Assert(t, !needCallOpt(pkg))
+	})
+	t.Run("thrift-with-only-streaming-methods", func(t *testing.T) {
+		pkg := &PackageInfo{
+			Codec: "thrift",
+			ServiceInfo: &ServiceInfo{
+				Methods: []*MethodInfo{{
+					Streaming: &streaming.Streaming{
+						IsStreaming: true,
+					},
+				}},
+			},
+		}
+		test.Assert(t, !needCallOpt(pkg))
+	})
+	t.Run("thrift-with-ping-pong-methods", func(t *testing.T) {
+		pkg := &PackageInfo{
+			Codec: "thrift",
+			ServiceInfo: &ServiceInfo{
+				Methods: []*MethodInfo{
+					{
+						Streaming: &streaming.Streaming{
+							IsStreaming: true,
+						},
+					},
+					{
+						Streaming: &streaming.Streaming{
+							IsStreaming: false,
+						},
+					},
+				},
+			},
+		}
+		test.Assert(t, needCallOpt(pkg))
+	})
 }

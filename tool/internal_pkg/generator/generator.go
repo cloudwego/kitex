@@ -122,6 +122,7 @@ type Config struct {
 	Features              []feature
 	FrugalPretouch        bool
 	ThriftPluginTimeLimit time.Duration
+	CompilerPath          string // specify the path of thriftgo or protoc
 
 	ExtensionFile string
 	tmplExt       *TemplateExtension
@@ -480,11 +481,13 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 	case ClientFileName:
 		pkg.AddImports("client")
 		if pkg.HasStreaming {
-			pkg.AddImport("streaming", ImportPathTo("pkg/streaming"))
-			pkg.AddImport("transport", ImportPathTo("transport"))
+			pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
+			pkg.AddImport("transport", "github.com/cloudwego/kitex/transport")
 		}
 		if len(pkg.AllMethods()) > 0 {
-			pkg.AddImports("callopt")
+			if needCallOpt(pkg) {
+				pkg.AddImports("callopt")
+			}
 			pkg.AddImports("context")
 		}
 		fallthrough
@@ -510,8 +513,9 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 		pkg.AddImports("server")
 	case ServiceFileName:
+		pkg.AddImports("errors")
 		pkg.AddImports("client")
-		pkg.AddImport("kitex", ImportPathTo("pkg/serviceinfo"))
+		pkg.AddImport("kitex", "github.com/cloudwego/kitex/pkg/serviceinfo")
 		pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)
 		if len(pkg.AllMethods()) > 0 {
 			pkg.AddImports("context")
@@ -531,8 +535,9 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 					pkg.AddImport(dep.PkgRefName, dep.ImportPath)
 				}
 			}
-			if pkg.Codec == "protobuf" {
-				pkg.AddImport("streaming", ImportPathTo("pkg/streaming"))
+			if m.Streaming.IsStreaming || pkg.Codec == "protobuf" {
+				// protobuf handler support both PingPong and Unary (streaming) requests
+				pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
 			}
 			if !m.Void && m.Resp != nil {
 				for _, dep := range m.Resp.Deps {
@@ -556,4 +561,21 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		pkg.AddImport("log", "log")
 		pkg.AddImport(pkg.PkgRefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
 	}
+}
+
+func needCallOpt(pkg *PackageInfo) bool {
+	// callopt is referenced only by non-streaming methods
+	needCallOpt := false
+	switch pkg.Codec {
+	case "thrift":
+		for _, m := range pkg.ServiceInfo.AllMethods() {
+			if !m.Streaming.IsStreaming {
+				needCallOpt = true
+				break
+			}
+		}
+	case "protobuf":
+		needCallOpt = true
+	}
+	return needCallOpt
 }

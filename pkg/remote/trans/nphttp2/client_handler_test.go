@@ -17,11 +17,18 @@
 package nphttp2
 
 import (
+	"context"
+	"net"
 	"testing"
 	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func TestClientHandler(t *testing.T) {
@@ -29,6 +36,12 @@ func TestClientHandler(t *testing.T) {
 	opt := newMockClientOption()
 	ctx := newMockCtxWithRPCInfo()
 	msg := newMockNewMessage()
+	msg.ProtocolInfoFunc = func() remote.ProtocolInfo {
+		return remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Protobuf)
+	}
+	msg.RPCInfoFunc = func() rpcinfo.RPCInfo {
+		return newMockRPCInfo()
+	}
 	conn, err := opt.ConnPool.Get(ctx, "tcp", mockAddr0, remote.ConnOption{Dialer: opt.Dialer, ConnectTimeout: time.Second})
 	test.Assert(t, err == nil, err)
 
@@ -45,4 +58,89 @@ func TestClientHandler(t *testing.T) {
 	ctx, err = cliTransHandler.Write(ctx, conn, msg)
 	test.Assert(t, ctx != nil, ctx)
 	test.Assert(t, err == nil, err)
+}
+
+type mockCodec struct {
+	remote.Codec
+	encode func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error
+	decode func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error
+}
+
+func (c *mockCodec) Encode(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	return c.encode(ctx, msg, out)
+}
+
+func (c *mockCodec) Decode(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	return c.decode(ctx, msg, in)
+}
+
+var (
+	_ hasTrailer         = (*mockConnForRead)(nil)
+	_ hasHeader          = (*mockConnForRead)(nil)
+	_ hasGetRecvCompress = (*mockConnForRead)(nil)
+	_ GRPCConn           = (*mockConnForRead)(nil)
+)
+
+type mockConnForRead struct {
+	net.Conn
+}
+
+func (m *mockConnForRead) WriteFrame(hdr, data []byte) (n int, err error) {
+	return 0, nil
+}
+
+func (m *mockConnForRead) ReadFrame() (hdr, data []byte, err error) {
+	return nil, nil, nil
+}
+
+func (m *mockConnForRead) GetRecvCompress() string {
+	return ""
+}
+
+func (m *mockConnForRead) Header() (metadata.MD, error) {
+	return nil, nil
+}
+
+func (m *mockConnForRead) Trailer() metadata.MD {
+	return nil
+}
+
+func Test_cliTransHandler_Read(t *testing.T) {
+	t.Run("no error", func(t *testing.T) {
+		h := &cliTransHandler{
+			codec: &mockCodec{
+				decode: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+					return nil
+				},
+			},
+		}
+		msg := newMockNewMessage()
+		ivk := rpcinfo.NewInvocation("service", "method")
+		ri := rpcinfo.NewRPCInfo(nil, nil, ivk, nil, nil)
+		msg.RPCInfoFunc = func() rpcinfo.RPCInfo {
+			return ri
+		}
+		_, err := h.Read(context.Background(), &mockConnForRead{}, msg)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, ivk.BizStatusErr() == nil)
+	})
+
+	t.Run("biz error", func(t *testing.T) {
+		h := &cliTransHandler{
+			codec: &mockCodec{
+				decode: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+					return kerrors.NewBizStatusError(100, "biz error")
+				},
+			},
+		}
+		msg := newMockNewMessage()
+		ivk := rpcinfo.NewInvocation("service", "method")
+		ri := rpcinfo.NewRPCInfo(nil, nil, ivk, nil, nil)
+		msg.RPCInfoFunc = func() rpcinfo.RPCInfo {
+			return ri
+		}
+		_, err := h.Read(context.Background(), &mockConnForRead{}, msg)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, ivk.BizStatusErr().BizStatusCode() == 100)
+	})
 }

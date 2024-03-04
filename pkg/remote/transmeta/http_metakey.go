@@ -25,4 +25,6 @@ const (
 	// supply metadata
 	HTTPDestMethod   = "destination-method"
 	HTTPSourceMethod = "source-method"
+
+	HTTPStreamLogID = "stream-log-id"
 )

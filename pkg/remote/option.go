@@ -21,6 +21,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/profiler"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -69,7 +70,9 @@ func (o *Option) AppendBoundHandler(h BoundHandler) {
 
 // ServerOption contains option that is used to init the remote server.
 type ServerOption struct {
-	SvcMap map[string]*serviceinfo.ServiceInfo
+	TargetSvcInfo *serviceinfo.ServiceInfo
+
+	SvcSearchMap map[string]*serviceinfo.ServiceInfo
 
 	TransServerFactory TransServerFactory
 
@@ -110,7 +113,18 @@ type ServerOption struct {
 
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
 
+	// RefuseTrafficWithoutServiceName is used for a server with multi services
+	RefuseTrafficWithoutServiceName bool
+
 	Option
+
+	// invoking chain with recv/send middlewares for streaming APIs
+	RecvEndpoint endpoint.RecvEndpoint
+	SendEndpoint endpoint.SendEndpoint
+
+	// for thrift streaming, this is enabled by default
+	// for grpc(protobuf) streaming, it's disabled by default, enable with server.WithCompatibleMiddlewareForUnary
+	CompatibleMiddlewareForUnary bool
 }
 
 // ClientOption is used to init the remote client.

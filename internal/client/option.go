@@ -24,6 +24,7 @@ import (
 	"github.com/cloudwego/localsession/backup"
 
 	"github.com/cloudwego/kitex/internal/configutil"
+	"github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/circuitbreak"
 	connpool2 "github.com/cloudwego/kitex/pkg/connpool"
@@ -88,7 +89,7 @@ type Options struct {
 	Events       event.Queue
 	ExtraTimeout time.Duration
 
-	// DebugInfo should only contains objects that are suitable for json serialization.
+	// DebugInfo should only contain objects that are suitable for json serialization.
 	DebugInfo    utils.Slice
 	DebugService diagnosis.Service
 
@@ -117,6 +118,8 @@ type Options struct {
 
 	// Context backup
 	CtxBackupHandler backup.BackupHandler
+
+	Streaming stream.StreamingConfig
 }
 
 // Apply applies all options.
@@ -197,5 +200,13 @@ func (o *Options) initRemoteOpt() {
 				},
 			)
 		}
+	}
+}
+
+// InitRetryContainer init retry container and add close callback
+func (o *Options) InitRetryContainer() {
+	if o.RetryContainer == nil {
+		o.RetryContainer = retry.NewRetryContainerWithPercentageLimit()
+		o.CloseCallbacks = append(o.CloseCallbacks, o.RetryContainer.Close)
 	}
 }

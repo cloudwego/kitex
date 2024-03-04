@@ -266,7 +266,7 @@ func TestNoMethodInfo(t *testing.T) {
 		},
 	}
 	remote.NewTransPipeline(svrTransHdlr)
-	svcInfo := svrOpt.SvcMap[mocks.MockServiceName]
+	svcInfo := svrOpt.TargetSvcInfo
 	delete(svcInfo.Methods, method)
 
 	// 2. test

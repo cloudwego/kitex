@@ -35,13 +35,32 @@ import (
 type CodecType int
 
 const (
-	FastWrite CodecType = 1 << iota
-	FastRead
+	// Basic can be used for disabling fastCodec and frugal
+	Basic     CodecType = 0b0000
+	FastWrite CodecType = 0b0001
+	FastRead  CodecType = 0b0010
+
+	FastReadWrite = FastRead | FastWrite
+)
+
+var (
+	defaultCodec = NewThriftCodec().(*thriftCodec)
+
+	errEncodeMismatchMsgType = remote.NewTransErrorWithMsg(remote.InvalidProtocol,
+		"encode failed, codec msg type not match with thriftCodec")
+	errDecodeMismatchMsgType = remote.NewTransErrorWithMsg(remote.InvalidProtocol,
+		"decode failed, codec msg type not match with thriftCodec")
 )
 
 // NewThriftCodec creates the thrift binary codec.
 func NewThriftCodec() remote.PayloadCodec {
 	return &thriftCodec{FastWrite | FastRead}
+}
+
+// IsThriftCodec checks if the codec is thriftCodec
+func IsThriftCodec(c remote.PayloadCodec) bool {
+	_, ok := c.(*thriftCodec)
+	return ok
 }
 
 // NewThriftFrugalCodec creates the thrift binary codec powered by frugal.
@@ -70,61 +89,72 @@ type thriftCodec struct {
 
 // Marshal implements the remote.PayloadCodec interface.
 func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
-	// 1. prepare info
+	// prepare info
 	methodName := message.RPCInfo().Invocation().MethodName()
 	if methodName == "" {
 		return errors.New("empty methodName in thrift Marshal")
 	}
+	msgType := message.MessageType()
+	seqID := message.RPCInfo().Invocation().SeqID()
+
 	data, err := getValidData(methodName, message)
 	if err != nil {
 		return err
 	}
 
-	// 2. encode thrift
 	// encode with hyper codec
 	// NOTE: to ensure hyperMarshalEnabled is inlined so split the check logic, or it may cause performance loss
 	if c.hyperMarshalEnabled() && hyperMarshalAvailable(data) {
-		if err := c.hyperMarshal(data, message, out); err != nil {
-			return err
-		}
-		return nil
+		return c.hyperMarshal(out, methodName, msgType, seqID, data)
 	}
 
-	msgType := message.MessageType()
-	seqID := message.RPCInfo().Invocation().SeqID()
 	// encode with FastWrite
 	if c.CodecType&FastWrite != 0 {
 		if msg, ok := data.(ThriftMsgFastCodec); ok {
-			// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
-			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
-			msgEndLen := bthrift.Binary.MessageEndLength()
-			buf, err := out.Malloc(msgBeginLen + msg.BLength() + msgEndLen)
-			if err != nil {
-				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
-			}
-			offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
-			offset += msg.FastWriteNocopy(buf[offset:], nil)
-			bthrift.Binary.WriteMessageEnd(buf[offset:])
-			return nil
+			return encodeFastThrift(out, methodName, msgType, seqID, msg)
 		}
 	}
 
-	// encode with normal way
+	// fallback to old thrift way (slow)
+	if err = encodeBasicThrift(out, ctx, methodName, msgType, seqID, data); err == nil || err != errEncodeMismatchMsgType {
+		return err
+	}
+
+	// Basic can be used for disabling frugal, we need to check it
+	if c.CodecType != Basic && hyperMarshalAvailable(data) {
+		// fallback to frugal when the generated code is using slim template
+		return c.hyperMarshal(out, methodName, msgType, seqID, data)
+	}
+
+	return errEncodeMismatchMsgType
+}
+
+// encodeFastThrift encode with the FastCodec way
+func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.MessageType, seqID int32, msg ThriftMsgFastCodec) error {
+	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
+	msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
+	msgEndLen := bthrift.Binary.MessageEndLength()
+	buf, err := out.Malloc(msgBeginLen + msg.BLength() + msgEndLen)
+	if err != nil {
+		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
+	}
+	offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
+	offset += msg.FastWriteNocopy(buf[offset:], nil)
+	bthrift.Binary.WriteMessageEnd(buf[offset:])
+	return nil
+}
+
+// encodeBasicThrift encode with the old thrift way (slow)
+func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}) error {
+	if err := verifyMarshalBasicThriftDataType(data); err != nil {
+		return err
+	}
 	tProt := NewBinaryProtocol(out)
-	if err := tProt.WriteMessageBegin(methodName, thrift.TMessageType(msgType), seqID); err != nil {
+	if err := tProt.WriteMessageBegin(method, thrift.TMessageType(msgType), seqID); err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageBegin failed: %s", err.Error()))
 	}
-	switch msg := data.(type) {
-	case MessageWriter:
-		if err := msg.Write(tProt); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
-		}
-	case MessageWriterWithContext:
-		if err := msg.Write(ctx, tProt); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
-		}
-	default:
-		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "encode failed, codec msg type not match with thriftCodec")
+	if err := marshalBasicThriftData(ctx, tProt, data); err != nil {
+		return err
 	}
 	if err := tProt.WriteMessageEnd(); err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageEnd failed: %s", err.Error()))
@@ -143,23 +173,44 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	if err = codec.UpdateMsgType(uint32(msgType), message); err != nil {
 		return err
 	}
+
 	// exception message
 	if message.MessageType() == remote.Exception {
-		exception := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
-		if err := exception.Read(tProt); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal Exception failed: %s", err.Error()))
-		}
-		if err := tProt.ReadMessageEnd(); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageEnd failed: %s", err.Error()))
-		}
-		return remote.NewTransError(exception.TypeId(), exception)
+		return UnmarshalThriftException(tProt)
 	}
-	// Must check after Exception handle.
+
+	if err = validateMessageBeforeDecode(message, seqID, methodName); err != nil {
+		return err
+	}
+
+	// decode thrift data
+	data := message.Data()
+	msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
+	dataLen := message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength()
+
+	ri := message.RPCInfo()
+	rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
+	err = c.unmarshalThriftData(ctx, tProt, methodName, data, dataLen)
+	rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
+	if err != nil {
+		return err
+	}
+
+	if err = tProt.ReadMessageEnd(); err != nil {
+		return remote.NewTransError(remote.ProtocolError, err)
+	}
+	tProt.Recycle()
+	return err
+}
+
+// validateMessageBeforeDecode validate message before decode
+func validateMessageBeforeDecode(message remote.Message, seqID int32, methodName string) (err error) {
 	// For server side, the following error can be sent back and 'SetSeqID' should be executed first to ensure the seqID
 	// is right when return Exception back.
 	if err = codec.SetOrCheckSeqID(seqID, message); err != nil {
 		return err
 	}
+
 	if err = codec.SetOrCheckMethodName(methodName, message); err != nil {
 		return err
 	}
@@ -167,71 +218,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	if err = codec.NewDataIfNeeded(methodName, message); err != nil {
 		return err
 	}
-	// decode thrift
-	data := message.Data()
-
-	// decode with hyper unmarshal
-	if c.hyperMessageUnmarshalEnabled() && hyperMessageUnmarshalAvailable(data, message) {
-		msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
-		ri := message.RPCInfo()
-		rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
-		buf, err := tProt.next(message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
-		rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
-		if err != nil {
-			return remote.NewTransError(remote.ProtocolError, err)
-		}
-		err = c.hyperMessageUnmarshal(buf, data)
-		if err != nil {
-			return err
-		}
-		err = tProt.ReadMessageEnd()
-		if err != nil {
-			return remote.NewTransError(remote.ProtocolError, err)
-		}
-		tProt.Recycle()
-		return nil
-	}
-
-	// decode with FastRead
-	if c.CodecType&FastRead != 0 {
-		if msg, ok := data.(ThriftMsgFastCodec); ok && message.PayloadLen() != 0 {
-			msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
-			ri := message.RPCInfo()
-			rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
-			buf, err := tProt.next(message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
-			rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
-			if err != nil {
-				return remote.NewTransError(remote.ProtocolError, err)
-			}
-			_, err = msg.FastRead(buf)
-			if err != nil {
-				return remote.NewTransError(remote.ProtocolError, err)
-			}
-			err = tProt.ReadMessageEnd()
-			if err != nil {
-				return remote.NewTransError(remote.ProtocolError, err)
-			}
-			tProt.Recycle()
-			return err
-		}
-	}
-
-	// decode with normal way
-	switch t := data.(type) {
-	case MessageReader:
-		if err = t.Read(tProt); err != nil {
-			return remote.NewTransError(remote.ProtocolError, err)
-		}
-	case MessageReaderWithMethodWithContext:
-		if err = t.Read(ctx, methodName, tProt); err != nil {
-			return remote.NewTransError(remote.ProtocolError, err)
-		}
-	default:
-		return remote.NewTransErrorWithMsg(remote.InvalidProtocol, "decode failed, codec msg type not match with thriftCodec")
-	}
-	tProt.ReadMessageEnd()
-	tProt.Recycle()
-	return err
+	return nil
 }
 
 // Name implements the remote.PayloadCodec interface.

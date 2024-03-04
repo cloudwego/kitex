@@ -20,6 +20,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/cloudwego/thriftgo/generator/golang/streaming"
+
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -47,6 +49,8 @@ type PackageInfo struct {
 	FrugalPretouch   bool
 	Module           string
 	Protocol         transport.Protocol
+	IDLName          string
+	ServerPkg        string
 }
 
 // AddImport .
@@ -101,6 +105,7 @@ type ServiceInfo struct {
 	ServiceFilePath       string
 	Protocol              string
 	HandlerReturnKeepResp bool
+	UseThriftReflection   bool
 }
 
 // AllMethods returns all methods that the service have.
@@ -112,6 +117,29 @@ func (s *ServiceInfo) AllMethods() (ms []*MethodInfo) {
 	return ms
 }
 
+// FixHasStreamingForExtendedService updates the HasStreaming field for extended services.
+func (s *ServiceInfo) FixHasStreamingForExtendedService() {
+	if s.Base == nil {
+		return
+	}
+	if s.HasStreaming {
+		return
+	}
+	s.Base.FixHasStreamingForExtendedService()
+	s.HasStreaming = s.Base.HasStreamingRecursive()
+}
+
+// HasStreamingRecursive recursively check if the service has streaming method
+func (s *ServiceInfo) HasStreamingRecursive() bool {
+	if s.HasStreaming {
+		return true
+	}
+	if s.Base == nil {
+		return false
+	}
+	return s.Base.HasStreamingRecursive()
+}
+
 // MethodInfo .
 type MethodInfo struct {
 	PkgInfo
@@ -121,6 +149,7 @@ type MethodInfo struct {
 	Oneway                 bool
 	Void                   bool
 	Args                   []*Parameter
+	ArgsLength             int
 	Resp                   *Parameter
 	Exceptions             []*Parameter
 	ArgStructName          string
@@ -129,6 +158,7 @@ type MethodInfo struct {
 	GenArgResultStruct     bool
 	ClientStreaming        bool
 	ServerStreaming        bool
+	Streaming              *streaming.Streaming
 }
 
 // Parameter .
@@ -151,8 +181,13 @@ var funcs = map[string]interface{}{
 	"backquoted":    BackQuoted,
 }
 
+func AddTemplateFunc(key string, f interface{}) {
+	funcs[key] = f
+}
+
 var templateNames = []string{
 	"@client.go-NewClient-option",
+	"@client.go-NewStreamClient-option",
 	"@client.go-EOF",
 	"@server.go-NewServer-option",
 	"@server.go-EOF",

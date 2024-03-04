@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -39,7 +40,11 @@ type EndpointInfo interface {
 type RPCStats interface {
 	Record(ctx context.Context, event stats.Event, status stats.Status, info string)
 	SendSize() uint64
+	// LastSendSize returns the size of the last sent message in a stream.
+	LastSendSize() uint64
 	RecvSize() uint64
+	// LastRecvSize returns the size of the last received message in a stream.
+	LastRecvSize() uint64
 	Error() error
 	Panicked() (bool, interface{})
 	GetEvent(event stats.Event) Event
@@ -74,6 +79,7 @@ type RPCConfig interface {
 	IOBufferSize() int
 	TransportProtocol() transport.Protocol
 	InteractionMode() InteractionMode
+	PayloadCodec() serviceinfo.PayloadCodec
 }
 
 // Invocation contains specific information about the call.

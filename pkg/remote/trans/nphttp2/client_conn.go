@@ -19,18 +19,23 @@ package nphttp2
 import (
 	"context"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"net"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/remote"
-
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+)
+
+const (
+	contentSubTypeThrift   = "thrift"
+	contentSubTypeProtobuf = "protobuf"
 )
 
 type streamDesc struct {
@@ -60,14 +65,19 @@ func (c *clientConn) ReadFrame() (hdr, data []byte, err error) {
 	return hdr, data, nil
 }
 
+func getContentSubType(codec serviceinfo.PayloadCodec) string {
+	switch codec {
+	case serviceinfo.Thrift:
+		return contentSubTypeThrift
+	case serviceinfo.Protobuf:
+		fallthrough
+	default:
+		return "" // default is protobuf, keep for backward compatibility
+	}
+}
+
 func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*clientConn, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
-	var svcName string
-	if ri.Invocation().PackageName() == "" {
-		svcName = ri.Invocation().ServiceName()
-	} else {
-		svcName = fmt.Sprintf("%s.%s", ri.Invocation().PackageName(), ri.Invocation().ServiceName())
-	}
 	host := ri.To().ServiceName()
 	if rawURL, ok := ri.To().Tag(rpcinfo.HTTPURL); ok {
 		u, err := url.Parse(rawURL)
@@ -77,12 +87,16 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 		host = u.Host
 	}
 	isStreaming := ri.Config().InteractionMode() == rpcinfo.Streaming
-	s, err := tr.NewStream(ctx, &grpc.CallHdr{
+	invocation := ri.Invocation()
+	callHdr := &grpc.CallHdr{
 		Host: host,
 		// grpc method format /package.Service/Method
-		Method:       fmt.Sprintf("/%s/%s", svcName, ri.Invocation().MethodName()),
-		SendCompress: remote.GetSendCompressor(ri),
-	})
+		Method:         fullMethodName(invocation.PackageName(), invocation.ServiceName(), invocation.MethodName()),
+		SendCompress:   remote.GetSendCompressor(ri),
+		ContentSubtype: getContentSubType(ri.Config().PayloadCodec()),
+	}
+
+	s, err := tr.NewStream(ctx, callHdr)
 	if err != nil {
 		return nil, err
 	}
@@ -91,6 +105,25 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 		s:    s,
 		desc: &streamDesc{isStreaming: isStreaming},
 	}, nil
+}
+
+// fullMethodName returns in the format of "/[$pkg.]$svc/$methodName".
+func fullMethodName(pkg, svc, method string) string {
+	sb := strings.Builder{}
+	if pkg == "" {
+		sb.Grow(len(svc) + len(method) + 2)
+	} else {
+		sb.Grow(len(pkg) + len(svc) + len(method) + 3)
+	}
+	sb.WriteByte('/')
+	if pkg != "" {
+		sb.WriteString(pkg)
+		sb.WriteByte('.')
+	}
+	sb.WriteString(svc)
+	sb.WriteByte('/')
+	sb.WriteString(method)
+	return sb.String()
 }
 
 // impl net.Conn
@@ -138,3 +171,15 @@ func (c *clientConn) Close() error {
 func (c *clientConn) Header() (metadata.MD, error) { return c.s.Header() }
 func (c *clientConn) Trailer() metadata.MD         { return c.s.Trailer() }
 func (c *clientConn) GetRecvCompress() string      { return c.s.RecvCompress() }
+
+type hasGetRecvCompress interface {
+	GetRecvCompress() string
+}
+
+type hasHeader interface {
+	Header() (metadata.MD, error)
+}
+
+type hasTrailer interface {
+	Trailer() metadata.MD
+}

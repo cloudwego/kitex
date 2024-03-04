@@ -437,7 +437,7 @@ func (s *Stream) SetHeader(md metadata.MD) error {
 		return ErrIllegalHeaderWrite
 	}
 	s.hdrMu.Lock()
-	s.header = metadata.Join(s.header, md)
+	s.header = metadata.AppendMD(s.header, md)
 	s.hdrMu.Unlock()
 	return nil
 }
@@ -460,7 +460,7 @@ func (s *Stream) SetTrailer(md metadata.MD) error {
 		return ErrIllegalHeaderWrite
 	}
 	s.hdrMu.Lock()
-	s.trailer = metadata.Join(s.trailer, md)
+	s.trailer = metadata.AppendMD(s.trailer, md)
 	s.hdrMu.Unlock()
 	return nil
 }
@@ -761,13 +761,16 @@ func (e ConnectionError) Origin() error {
 var (
 	// ErrConnClosing indicates that the transport is closing.
 	ErrConnClosing = connectionErrorf(true, nil, "transport is closing")
+
+	// errStreamDone is returned from write at the client side to indicate application
+	// layer of an error.
+	errStreamDone = errors.New("the stream is done")
+
 	// errStreamDrain indicates that the stream is rejected because the
 	// connection is draining. This could be caused by goaway or balancer
 	// removing the address.
 	errStreamDrain = status.New(codes.Unavailable, "the connection is draining").Err()
-	// errStreamDone is returned from write at the client side to indiacte application
-	// layer of an error.
-	errStreamDone = errors.New("the stream is done")
+
 	// StatusGoAway indicates that the server sent a GOAWAY that included this
 	// stream's ID in unprocessed RPCs.
 	statusGoAway = status.New(codes.Unavailable, "the stream is rejected because server is draining the connection")
@@ -796,4 +799,38 @@ func ContextErr(err error) error {
 		return status.New(codes.Canceled, err.Error()).Err()
 	}
 	return status.Errorf(codes.Internal, "Unexpected error from context packet: %v", err)
+}
+
+// IsStreamDoneErr returns true if the error indicates that the stream is done.
+func IsStreamDoneErr(err error) bool {
+	return errors.Is(err, errStreamDone)
+}
+
+// TLSConfig checks and supplement the tls config provided by user.
+func TLSConfig(tlsConfig *tls.Config) *tls.Config {
+	cfg := tlsConfig.Clone()
+	// When multiple application protocols are supported on a single server-side port number,
+	// the client and the server need to negotiate an application protocol for use with each connection.
+	// For gRPC, "h2" should be appended to "application_layer_protocol_negotiation" field.
+	cfg.NextProtos = tlsAppendH2ToALPNProtocols(cfg.NextProtos)
+
+	// Implementations of HTTP/2 MUST use TLS version 1.2 [TLS12] or higher for HTTP/2 over TLS.
+	// https://datatracker.ietf.org/doc/html/rfc7540#section-9.2
+	if cfg.MinVersion == 0 && (cfg.MaxVersion == 0 || cfg.MaxVersion >= tls.VersionTLS12) {
+		cfg.MinVersion = tls.VersionTLS12
+	}
+	return cfg
+}
+
+const alpnProtoStrH2 = "h2"
+
+func tlsAppendH2ToALPNProtocols(ps []string) []string {
+	for _, p := range ps {
+		if p == alpnProtoStrH2 {
+			return ps
+		}
+	}
+	ret := make([]string, 0, len(ps)+1)
+	ret = append(ret, ps...)
+	return append(ret, alpnProtoStrH2)
 }

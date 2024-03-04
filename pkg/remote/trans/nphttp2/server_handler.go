@@ -35,7 +35,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
+	"github.com/cloudwego/kitex/pkg/remote/codec/grpc"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	grpcTransport "github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
@@ -59,19 +59,19 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	return &svrTransHandler{
-		opt:    opt,
-		svcMap: opt.SvcMap,
-		codec:  protobuf.NewGRPCCodec(),
+		opt:          opt,
+		svcSearchMap: opt.SvcSearchMap,
+		codec:        grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec)),
 	}, nil
 }
 
 var _ remote.ServerTransHandler = &svrTransHandler{}
 
 type svrTransHandler struct {
-	opt        *remote.ServerOption
-	svcMap     map[string]*serviceinfo.ServiceInfo
-	inkHdlFunc endpoint.Endpoint
-	codec      remote.Codec
+	opt          *remote.ServerOption
+	svcSearchMap map[string]*serviceinfo.ServiceInfo
+	inkHdlFunc   endpoint.Endpoint
+	codec        remote.Codec
 }
 
 var prefaceReadAtMost = func() int {
@@ -125,9 +125,11 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			ri := svrTrans.pool.Get().(rpcinfo.RPCInfo)
 			rCtx := rpcinfo.NewCtxWithRPCInfo(s.Context(), ri)
 			defer func() {
-				// reset rpcinfo
-				ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
-				svrTrans.pool.Put(ri)
+				// reset rpcinfo for performance (PR #584)
+				if rpcinfo.PoolEnabled() {
+					ri = t.opt.InitOrResetRPCInfoFunc(ri, conn.RemoteAddr())
+					svrTrans.pool.Put(ri)
+				}
 			}()
 
 			// set grpc transport flag before execute metahandler
@@ -191,13 +193,19 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			// set send grpc compressor at server to encode reply pack
 			remote.SetSendCompressor(ri, s.SendCompress())
 
-			svcInfo := t.svcMap[serviceName]
+			svcInfo := t.svcSearchMap[remote.BuildMultiServiceKey(serviceName, methodName)]
+			var methodInfo serviceinfo.MethodInfo
+			if svcInfo != nil {
+				methodInfo = svcInfo.MethodInfo(methodName)
+			}
 
-			st := NewStream(rCtx, svcInfo, newServerConn(tr, s), t)
+			rawStream := NewStream(rCtx, svcInfo, newServerConn(tr, s), t)
+			st := newStreamWithMiddleware(rawStream, t.opt.RecvEndpoint, t.opt.SendEndpoint)
+
 			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
-			rCtx = context.WithValue(rCtx, streamKey{}, st)
+			rCtx = streaming.NewCtxWithStream(rCtx, st)
 
-			if svcInfo == nil || svcInfo.MethodInfo(methodName) == nil {
+			if methodInfo == nil {
 				unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
 				if unknownServiceHandlerFunc != nil {
 					rpcinfo.Record(rCtx, ri, stats.ServerHandleStart, nil)
@@ -213,7 +221,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 					}
 				}
 			} else {
-				err = t.inkHdlFunc(rCtx, &streaming.Args{Stream: st}, nil)
+				if streaming.UnaryCompatibleMiddleware(methodInfo.StreamingMode(), t.opt.CompatibleMiddlewareForUnary) {
+					// making streaming unary APIs capable of using the same server middleware as non-streaming APIs
+					// note: rawStream skips recv/send middleware for unary API requests to avoid confusion
+					err = invokeStreamUnaryHandler(rCtx, rawStream, methodInfo, t.inkHdlFunc, ri)
+				} else {
+					err = t.inkHdlFunc(rCtx, &streaming.Args{Stream: st}, nil)
+				}
 			}
 
 			if err != nil {
@@ -238,6 +252,26 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		return ctx
 	})
 	return nil
+}
+
+// invokeStreamUnaryHandler allows unary APIs over HTTP2 to use the same server middleware as non-streaming APIs.
+// For thrift unary APIs over HTTP2, it's enabled by default.
+// For grpc(protobuf) unary APIs, it's disabled by default to keep backward compatibility.
+func invokeStreamUnaryHandler(ctx context.Context, st streaming.Stream, mi serviceinfo.MethodInfo,
+	handler endpoint.Endpoint, ri rpcinfo.RPCInfo,
+) (err error) {
+	realArgs, realResp := mi.NewArgs(), mi.NewResult()
+	if err = st.RecvMsg(realArgs); err != nil {
+		return err
+	}
+	if err = handler(ctx, realArgs, realResp); err != nil {
+		return err
+	}
+	if ri != nil && ri.Invocation().BizStatusErr() != nil {
+		// BizError: do not send the message
+		return nil
+	}
+	return st.SendMsg(realResp)
 }
 
 // msg 是解码后的实例，如 Arg 或 Result, 触发上层处理，用于异步 和 服务端处理

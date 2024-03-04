@@ -49,12 +49,23 @@ var (
 		}
 		return grpc.ClientPrefaceLen
 	}()
-	svcMap = map[string]*serviceinfo.ServiceInfo{mocks.MockServiceName: mocks.ServiceInfo()}
+	svcInfo      = mocks.ServiceInfo()
+	svcSearchMap = map[string]*serviceinfo.ServiceInfo{
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
+		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
+		mocks.MockMethod:          svcInfo,
+		mocks.MockExceptionMethod: svcInfo,
+		mocks.MockErrorMethod:     svcInfo,
+		mocks.MockOnewayMethod:    svcInfo,
+	}
 )
 
 func TestServerHandlerCall(t *testing.T) {
 	transHdler, _ := NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()).NewTransHandler(&remote.ServerOption{
-		SvcMap: svcMap,
+		SvcSearchMap:  svcSearchMap,
+		TargetSvcInfo: svcInfo,
 	})
 
 	ctrl := gomock.NewController(t)
@@ -123,7 +134,8 @@ func TestOnError(t *testing.T) {
 		ctrl.Finish()
 	}()
 	transHdler, err := NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()).NewTransHandler(&remote.ServerOption{
-		SvcMap: svcMap,
+		SvcSearchMap:  svcSearchMap,
+		TargetSvcInfo: svcInfo,
 	})
 	test.Assert(t, err == nil)
 
@@ -152,7 +164,8 @@ func TestOnError(t *testing.T) {
 // TestOnInactive covers onInactive() codes to check panic
 func TestOnInactive(t *testing.T) {
 	transHdler, err := NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()).NewTransHandler(&remote.ServerOption{
-		SvcMap: svcMap,
+		SvcSearchMap:  svcSearchMap,
+		TargetSvcInfo: svcInfo,
 	})
 	test.Assert(t, err == nil)
 

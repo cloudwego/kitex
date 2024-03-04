@@ -28,12 +28,14 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/genericclient"
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
@@ -132,7 +134,7 @@ func newGenericClient(tp transport.Protocol, destService string, g generic.Gener
 
 func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service) server.Server {
 	var opts []server.Option
-	opts = append(opts, server.WithServiceAddr(addr))
+	opts = append(opts, server.WithServiceAddr(addr), server.WithExitWaitTime(time.Microsecond*10))
 	svr := genericserver.NewServer(handler, g, opts...)
 	go func() {
 		err := svr.Run()
@@ -140,6 +142,7 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 			panic(err)
 		}
 	}()
+	test.WaitServerStart(addr.String())
 	return svr
 }
 
@@ -271,7 +274,7 @@ var (
 // normal server
 func newMockServer(handler kt.Mock, addr net.Addr, opts ...server.Option) server.Server {
 	var options []server.Option
-	opts = append(opts, server.WithServiceAddr(addr))
+	opts = append(opts, server.WithServiceAddr(addr), server.WithExitWaitTime(time.Millisecond*10))
 	options = append(options, opts...)
 
 	svr := server.NewServer(options...)
@@ -284,6 +287,7 @@ func newMockServer(handler kt.Mock, addr net.Addr, opts ...server.Option) server
 			panic(err)
 		}
 	}()
+	test.WaitServerStart(addr.String())
 	return svr
 }
 

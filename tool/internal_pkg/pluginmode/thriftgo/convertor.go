@@ -24,17 +24,17 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cloudwego/kitex/tool/internal_pkg/util"
-	"github.com/cloudwego/kitex/transport"
-
 	"github.com/cloudwego/thriftgo/generator/backend"
 	"github.com/cloudwego/thriftgo/generator/golang"
+	"github.com/cloudwego/thriftgo/generator/golang/streaming"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/plugin"
 	"github.com/cloudwego/thriftgo/semantic"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	internal_log "github.com/cloudwego/kitex/tool/internal_pkg/log"
+	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/cloudwego/kitex/transport"
 )
 
 var (
@@ -123,6 +123,7 @@ func (c *converter) avoidIncludeConflict(ast *parser.Thrift, ref string) (*parse
 	return ast, ref
 }
 
+// TODO: copy by marshal & unmarshal? to avoid missing fields.
 func (c *converter) copyTreeWithRef(ast *parser.Thrift, ref string) *parser.Thrift {
 	ast, ref = c.avoidIncludeConflict(ast, ref)
 
@@ -155,6 +156,7 @@ func (c *converter) copyFunctionWithRef(f *parser.Function, ref string) *parser.
 		Oneway:       f.Oneway,
 		Void:         f.Void,
 		FunctionType: c.copyTypeWithRef(f.FunctionType, ref),
+		Annotations:  c.copyAnnotations(f.Annotations),
 	}
 	for _, x := range f.Arguments {
 		y := *x
@@ -324,10 +326,10 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 		}
 		for _, svc := range scope.Services() {
 			si, err := c.makeService(pi, svc)
-			si.ServiceFilePath = ast.Filename
 			if err != nil {
 				return fmt.Errorf("%s: makeService '%s': %w", ast.Filename, svc.Name, err)
 			}
+			si.ServiceFilePath = ast.Filename
 			all[ast.Filename] = append(all[ast.Filename], si)
 			c.svc2ast[si] = ast
 		}
@@ -351,14 +353,19 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				}
 			}
 		}
+
+		c.fixStreamingForExtendedServices(ast, all)
+
 		// combine service
 		if ast == req.AST && c.Config.CombineService && len(ast.Services) > 0 {
 			var (
 				svcs    []*generator.ServiceInfo
 				methods []*generator.MethodInfo
 			)
+			hasStreaming := false
 			for _, s := range all[ast.Filename] {
 				svcs = append(svcs, s)
+				hasStreaming = hasStreaming || s.HasStreaming
 				methods = append(methods, s.AllMethods()...)
 			}
 			// check method name conflict
@@ -377,6 +384,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				CombineServices: svcs,
 				Methods:         methods,
 				ServiceFilePath: ast.Filename,
+				HasStreaming:    hasStreaming,
 			}
 
 			if c.IsHessian2() {
@@ -384,6 +392,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 			}
 
 			si.HandlerReturnKeepResp = c.Config.HandlerReturnKeepResp
+			si.UseThriftReflection = c.Utils.Features().WithReflection
 			si.ServiceTypeName = func() string { return si.ServiceName }
 			all[ast.Filename] = append(all[ast.Filename], si)
 			c.svc2ast[si] = ast
@@ -392,6 +401,18 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 		c.Services = append(c.Services, all[ast.Filename]...)
 	}
 	return nil
+}
+
+func (c *converter) fixStreamingForExtendedServices(ast *parser.Thrift, all ast2svc) {
+	for i, svc := range ast.Services {
+		if svc.Extends == "" {
+			continue
+		}
+		si := all[ast.Filename][i]
+		if si.Base != nil {
+			si.FixHasStreamingForExtendedService()
+		}
+	}
 }
 
 func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*generator.ServiceInfo, error) {
@@ -417,10 +438,15 @@ func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*ge
 		si.Protocol = transport.HESSIAN2.String()
 	}
 	si.HandlerReturnKeepResp = c.Config.HandlerReturnKeepResp
+	si.UseThriftReflection = c.Utils.Features().WithReflection
 	return si, nil
 }
 
 func (c *converter) makeMethod(si *generator.ServiceInfo, f *golang.Function) (*generator.MethodInfo, error) {
+	st, err := streaming.ParseStreaming(f.Function)
+	if err != nil {
+		return nil, err
+	}
 	mi := &generator.MethodInfo{
 		PkgInfo:            si.PkgInfo,
 		ServiceName:        si.ServiceName,
@@ -430,6 +456,13 @@ func (c *converter) makeMethod(si *generator.ServiceInfo, f *golang.Function) (*
 		Void:               f.Void,
 		ArgStructName:      f.ArgType().GoName().String(),
 		GenArgResultStruct: false,
+		Streaming:          st,
+		ClientStreaming:    st.ClientStreaming,
+		ServerStreaming:    st.ServerStreaming,
+		ArgsLength:         len(f.Arguments()),
+	}
+	if st.IsStreaming {
+		si.HasStreaming = true
 	}
 
 	if !f.Oneway {
@@ -500,4 +533,17 @@ func (c *converter) getCombineServiceName(name string, svcs []*generator.Service
 
 func (c *converter) IsHessian2() bool {
 	return strings.EqualFold(c.Config.Protocol, transport.HESSIAN2.String())
+}
+
+func (c *converter) copyAnnotations(annotations parser.Annotations) parser.Annotations {
+	copied := make(parser.Annotations, 0, len(annotations))
+	for _, annotation := range annotations {
+		values := make([]string, 0, len(annotation.Values))
+		values = append(values, annotation.Values...)
+		copied = append(copied, &parser.Annotation{
+			Key:    annotation.Key,
+			Values: values,
+		})
+	}
+	return copied
 }

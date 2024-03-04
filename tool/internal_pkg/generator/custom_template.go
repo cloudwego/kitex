@@ -20,6 +20,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -216,17 +217,18 @@ func readTemplates(dir string) ([]*Template, error) {
 	files, _ := ioutil.ReadDir(dir)
 	var ts []*Template
 	for _, f := range files {
-		if f.Name() != ExtensionFilename {
-			path := filepath.Join(dir, f.Name())
-			tplData, err := ioutil.ReadFile(path)
+		// filter dir and non-yaml files
+		if f.Name() != ExtensionFilename && !f.IsDir() && (strings.HasSuffix(f.Name(), "yaml") || strings.HasSuffix(f.Name(), "yml")) {
+			p := filepath.Join(dir, f.Name())
+			tplData, err := ioutil.ReadFile(p)
 			if err != nil {
-				return nil, fmt.Errorf("read layout config from  %s failed, err: %v", path, err.Error())
+				return nil, fmt.Errorf("read layout config from  %s failed, err: %v", p, err.Error())
 			}
 			t := &Template{
 				UpdateBehavior: &Update{Type: string(skip)},
 			}
 			if err = yaml.Unmarshal(tplData, t); err != nil {
-				return nil, fmt.Errorf("unmarshal layout config failed, err: %v", err.Error())
+				return nil, fmt.Errorf("%s: unmarshal layout config failed, err: %s", f.Name(), err.Error())
 			}
 			ts = append(ts, t)
 		}

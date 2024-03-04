@@ -25,6 +25,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -54,6 +55,7 @@ type http2Client struct {
 	loopy      *loopyWriter
 	remoteAddr net.Addr
 	localAddr  net.Addr
+	scheme     string
 
 	readerDone chan struct{} // sync point to enable testing.
 	writerDone chan struct{} // sync point to enable testing.
@@ -114,6 +116,10 @@ type http2Client struct {
 func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	remoteService string, onGoAway func(GoAwayReason), onClose func(),
 ) (_ *http2Client, err error) {
+	scheme := "http"
+	if opts.TLSConfig != nil {
+		scheme = "https"
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		if err != nil {
@@ -162,6 +168,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		cancel:                cancel,
 		remoteAddr:            conn.RemoteAddr(),
 		localAddr:             conn.LocalAddr(),
+		scheme:                scheme,
 		readerDone:            make(chan struct{}),
 		writerDone:            make(chan struct{}),
 		goAway:                make(chan struct{}),
@@ -259,6 +266,49 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 	return t, nil
 }
 
+type preAllocatedStreamFields struct {
+	recvBuffer *recvBuffer
+	writeQuota *writeQuota
+}
+
+var (
+	preallocateChan = make(chan preAllocatedStreamFields, 256)
+	preallocateInit sync.Once
+)
+
+func fillStreamFields(s *Stream) {
+	preallocateInit.Do(func() {
+		go preallocateForStream()
+	})
+	var fields preAllocatedStreamFields
+	select {
+	case fields = <-preallocateChan:
+	default: // won't block even the producer is not fast enough
+		fields = allocateStreamFields()
+	}
+	s.buf = fields.recvBuffer
+	s.wq = fields.writeQuota
+	s.wq.done = s.done
+}
+
+func preallocateForStream() {
+	defer func() {
+		if err := recover(); err != nil {
+			klog.Warnf("grpc.preallocateForStream panic, error=%v, stack=%s", err, debug.Stack())
+		}
+	}()
+	for {
+		preallocateChan <- allocateStreamFields()
+	}
+}
+
+func allocateStreamFields() preAllocatedStreamFields {
+	return preAllocatedStreamFields{
+		recvBuffer: newRecvBuffer(),
+		writeQuota: newWriteQuota(defaultWriteQuota, nil),
+	}
+}
+
 func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 	s := &Stream{
 		ctx:            ctx,
@@ -266,11 +316,10 @@ func (t *http2Client) newStream(ctx context.Context, callHdr *CallHdr) *Stream {
 		done:           make(chan struct{}),
 		method:         callHdr.Method,
 		sendCompress:   callHdr.SendCompress,
-		buf:            newRecvBuffer(),
 		headerChan:     make(chan struct{}),
 		contentSubtype: callHdr.ContentSubtype,
 	}
-	s.wq = newWriteQuota(defaultWriteQuota, s.done)
+	fillStreamFields(s)
 	s.requestRead = func(n int) {
 		t.adjustWindow(s, uint32(n))
 	}
@@ -296,7 +345,7 @@ func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) 
 	hfLen := 7 // :method, :scheme, :path, :authority, content-type, user-agent, te
 	headerFields := make([]hpack.HeaderField, 0, hfLen)
 	headerFields = append(headerFields, hpack.HeaderField{Name: ":method", Value: "POST"})
-	headerFields = append(headerFields, hpack.HeaderField{Name: ":scheme", Value: "http"})
+	headerFields = append(headerFields, hpack.HeaderField{Name: ":scheme", Value: t.scheme})
 	headerFields = append(headerFields, hpack.HeaderField{Name: ":path", Value: callHdr.Method})
 	headerFields = append(headerFields, hpack.HeaderField{Name: ":authority", Value: callHdr.Host})
 	headerFields = append(headerFields, hpack.HeaderField{Name: "content-type", Value: contentType(callHdr.ContentSubtype)})

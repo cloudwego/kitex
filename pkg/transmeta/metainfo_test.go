@@ -24,7 +24,10 @@ import (
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/logid"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
@@ -139,4 +142,26 @@ func TestServerWriteMetainfo(t *testing.T) {
 	test.Assert(t, err == nil)
 	kvs = msg.TransInfo().TransStrInfo()
 	test.Assert(t, len(kvs) == 1 && kvs["bk"] == "bv", kvs)
+}
+
+func Test_addStreamID(t *testing.T) {
+	t.Run("without-stream-log-id", func(t *testing.T) {
+		md := metadata.MD{
+			transmeta.HTTPStreamLogID: nil,
+		}
+		ctx := context.Background()
+		ctx = addStreamIDToContext(ctx, md)
+		logID := logid.GetStreamLogID(ctx)
+		test.Assert(t, logID == "", logID) // won't generate a new one
+	})
+
+	t.Run("with-stream-log-id", func(t *testing.T) {
+		md := metadata.MD{
+			transmeta.HTTPStreamLogID: []string{"test"},
+		}
+		ctx := context.Background()
+		ctx = addStreamIDToContext(ctx, md)
+		logID := logid.GetStreamLogID(ctx)
+		test.Assert(t, logID == "test", logID)
+	})
 }

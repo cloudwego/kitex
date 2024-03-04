@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"testing"
 
+	mocks "github.com/cloudwego/kitex/internal/mocks/thrift/fast"
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
@@ -42,14 +44,7 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	from := rpcinfo.NewEndpointInfo(caller, fromMethod, fromAddr, nil)
-	to := rpcinfo.NewEndpointInfo(callee, method, nil, nil)
-	ink := rpcinfo.NewInvocation(idlServiceName, method)
-	config := rpcinfo.NewRPCConfig()
-	config.(rpcinfo.MutableRPCConfig).SetTransportProtocol(tp)
-
-	stats := rpcinfo.NewRPCStats()
-	testRi = rpcinfo.NewRPCInfo(from, to, ink, config, stats)
+	testRi = buildRPCInfo()
 
 	testCtx = context.Background()
 	testCtx = rpcinfo.NewCtxWithRPCInfo(testCtx, testRi)
@@ -110,6 +105,31 @@ func TestGetCallerAddr(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetCallerIP(t *testing.T) {
+	ip, ok := GetCallerIP(testCtx)
+	test.Assert(t, ok)
+	test.Assert(t, ip == "127.0.0.1", ip)
+
+	ri := buildRPCInfo()
+	rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(utils.NewNetAddr("test", "127.0.0.1"))
+	ip, ok = GetCallerIP(rpcinfo.NewCtxWithRPCInfo(context.Background(), ri))
+	test.Assert(t, ok)
+	test.Assert(t, ip == "127.0.0.1", ip)
+
+	ip, ok = GetCallerIP(context.Background())
+	test.Assert(t, !ok)
+	test.Assert(t, ip == "", ip)
+
+	ip, ok = GetCallerIP(panicCtx)
+	test.Assert(t, !ok)
+	test.Assert(t, ip == "", ip)
+
+	rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(utils.NewNetAddr("test", ""))
+	ip, ok = GetCallerIP(rpcinfo.NewCtxWithRPCInfo(context.Background(), ri))
+	test.Assert(t, !ok)
+	test.Assert(t, ip == "", ip)
 }
 
 func TestGetMethod(t *testing.T) {
@@ -243,6 +263,66 @@ func TestGetCtxTransportProtocol(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetRealRequest(t *testing.T) {
+	req := &mocks.MockReq{}
+	arg := &mocks.MockTestArgs{Req: req}
+	type args struct {
+		req interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want interface{}
+	}{
+		{name: "success", args: args{arg}, want: req},
+		{name: "nil input", args: args{nil}, want: nil},
+		{name: "wrong interface", args: args{req}, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetRealReqFromKitexArgs(tt.args.req); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetRealReqFromKitexArgs() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGetRealResponse(t *testing.T) {
+	success := "success"
+	result := &mocks.MockTestResult{Success: &success}
+	type args struct {
+		resp interface{}
+	}
+	tests := []struct {
+		name string
+		args args
+		want interface{}
+	}{
+		{name: "success", args: args{result}, want: &success},
+		{name: "nil input", args: args{nil}, want: nil},
+		{name: "wrong interface", args: args{success}, want: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetRealRespFromKitexResult(tt.args.resp); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetRealRespFromKitexResult() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func buildRPCInfo() rpcinfo.RPCInfo {
+	from := rpcinfo.NewEndpointInfo(caller, fromMethod, fromAddr, nil)
+	to := rpcinfo.NewEndpointInfo(callee, method, nil, nil)
+	ink := rpcinfo.NewInvocation(idlServiceName, method)
+	config := rpcinfo.NewRPCConfig()
+	config.(rpcinfo.MutableRPCConfig).SetTransportProtocol(tp)
+
+	stats := rpcinfo.NewRPCStats()
+	ri := rpcinfo.NewRPCInfo(from, to, ink, config, stats)
+	return ri
 }
 
 type panicRPCInfo struct{}

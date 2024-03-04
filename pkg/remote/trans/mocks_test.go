@@ -120,6 +120,7 @@ var _ remote.Message = &MockMessage{}
 type MockMessage struct {
 	RPCInfoFunc         func() rpcinfo.RPCInfo
 	ServiceInfoFunc     func() *serviceinfo.ServiceInfo
+	SetServiceInfoFunc  func(svcName, methodName string) (*serviceinfo.ServiceInfo, error)
 	DataFunc            func() interface{}
 	NewDataFunc         func(method string) (ok bool)
 	MessageTypeFunc     func() remote.MessageType
@@ -148,6 +149,13 @@ func (m *MockMessage) ServiceInfo() (si *serviceinfo.ServiceInfo) {
 		return m.ServiceInfoFunc()
 	}
 	return
+}
+
+func (m *MockMessage) SpecifyServiceInfo(svcName, methodName string) (si *serviceinfo.ServiceInfo, err error) {
+	if m.SetServiceInfoFunc != nil {
+		return m.SetServiceInfoFunc(svcName, methodName)
+	}
+	return nil, nil
 }
 
 func (m *MockMessage) Data() interface{} {

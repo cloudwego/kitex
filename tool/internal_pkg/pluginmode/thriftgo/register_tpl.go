@@ -94,7 +94,7 @@ func (p *{{$argType.GoName}}) Decode(d codec.Decoder) error {
 } {{/* encode decode */}}
 
 func (p *{{$resType.GoName}}) Encode(e codec.Encoder) error {
-{{- if gt (len $argType.Fields) 0}}
+{{- if gt (len $resType.Fields) 0}}
     var err error
 {{- end}}
 {{- range $resType.Fields}}
@@ -108,7 +108,7 @@ func (p *{{$resType.GoName}}) Encode(e codec.Encoder) error {
 }
 
 func (p *{{$resType.GoName}}) Decode(d codec.Decoder) error {
-{{- if gt (len $argType.Fields) 0}}
+{{- if gt (len $resType.Fields) 0}}
     var (
 		err error
 		v interface{}

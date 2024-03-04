@@ -37,11 +37,9 @@ import (
 )
 
 func TestThrift(t *testing.T) {
-	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9021", new(GenericServiceImpl), false, false)
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClient(t, "127.0.0.1:9021", false, false)
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServiceImpl), false, false)
+	cli := initThriftClient(t, addr, false, false)
 
 	cases := []struct {
 		reqMsg   interface{}
@@ -267,11 +265,9 @@ func TestThrift(t *testing.T) {
 }
 
 func TestThriftPingMethod(t *testing.T) {
-	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9022", new(GenericServicePingImpl), false, false)
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClient(t, "127.0.0.1:9022", false, false)
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServicePingImpl), false, false)
+	cli := initThriftClient(t, addr, false, false)
 
 	resp, err := cli.GenericCall(context.Background(), "Ping", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -282,11 +278,9 @@ func TestThriftPingMethod(t *testing.T) {
 }
 
 func TestThriftError(t *testing.T) {
-	time.Sleep(2 * time.Second)
-	svr := initThriftServer(t, ":9023", new(GenericServiceErrorImpl), false, false)
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClient(t, "127.0.0.1:9023", false, false)
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServiceErrorImpl), false, false)
+	cli := initThriftClient(t, addr, false, false)
 
 	_, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil)
@@ -295,11 +289,9 @@ func TestThriftError(t *testing.T) {
 }
 
 func TestThriftOnewayMethod(t *testing.T) {
-	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9024", new(GenericServiceOnewayImpl), false, false)
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClient(t, "127.0.0.1:9024", false, false)
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServiceOnewayImpl), false, false)
+	cli := initThriftClient(t, addr, false, false)
 
 	resp, err := cli.GenericCall(context.Background(), "Oneway", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -308,11 +300,9 @@ func TestThriftOnewayMethod(t *testing.T) {
 }
 
 func TestThriftVoidMethod(t *testing.T) {
-	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9025", new(GenericServiceVoidImpl), false, false)
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClient(t, "127.0.0.1:9025", false, false)
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServiceVoidImpl), false, false)
+	cli := initThriftClient(t, addr, false, false)
 
 	resp, err := cli.GenericCall(context.Background(), "Void", "hello", callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
@@ -321,11 +311,9 @@ func TestThriftVoidMethod(t *testing.T) {
 }
 
 func TestBase64Binary(t *testing.T) {
-	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9026", new(GenericServiceWithBase64Binary), true, false)
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClient(t, "127.0.0.1:9026", true, false)
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServiceWithBase64Binary), true, false)
+	cli := initThriftClient(t, addr, true, false)
 
 	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
@@ -338,11 +326,9 @@ func TestBase64Binary(t *testing.T) {
 }
 
 func TestBinaryWithByteSlice(t *testing.T) {
-	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9026", new(GenericServiceWithByteSliceImpl), false, true)
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClient(t, "127.0.0.1:9026", false, false)
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServiceWithByteSliceImpl), false, true)
+	cli := initThriftClient(t, addr, false, false)
 
 	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
@@ -354,11 +340,9 @@ func TestBinaryWithByteSlice(t *testing.T) {
 }
 
 func TestBinaryWithBase64AndByteSlice(t *testing.T) {
-	time.Sleep(1 * time.Second)
-	svr := initThriftServer(t, ":9026", new(GenericServiceWithByteSliceImpl), true, true)
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftClient(t, "127.0.0.1:9026", true, true)
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServiceWithByteSliceImpl), true, true)
+	cli := initThriftClient(t, addr, true, true)
 
 	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
@@ -370,23 +354,21 @@ func TestBinaryWithBase64AndByteSlice(t *testing.T) {
 }
 
 func TestThrift2NormalServer(t *testing.T) {
-	time.Sleep(4 * time.Second)
-	svr := initMockServer(t, new(mockImpl))
-	time.Sleep(500 * time.Millisecond)
-
-	cli := initThriftMockClient(t)
+	addr := test.GetLocalAddress()
+	svr := initMockServer(t, new(mockImpl), addr)
+	cli := initThriftMockClient(t, addr)
 
 	_, err := cli.GenericCall(context.Background(), "Test", mockReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	svr.Stop()
 }
 
-func initThriftMockClient(t *testing.T) genericclient.Client {
+func initThriftMockClient(t *testing.T, address string) genericclient.Client {
 	p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
 	test.Assert(t, err == nil)
 	g, err := generic.MapThriftGeneric(p)
 	test.Assert(t, err == nil)
-	cli := newGenericClient("destServiceName", g, "127.0.0.1:9019")
+	cli := newGenericClient("destServiceName", g, address)
 	test.Assert(t, err == nil)
 	return cli
 }
@@ -424,8 +406,8 @@ func initThriftServer(t *testing.T, address string, handler generic.Service, bas
 	return svr
 }
 
-func initMockServer(t *testing.T, handler kt.Mock) server.Server {
-	addr, _ := net.ResolveTCPAddr("tcp", ":9019")
+func initMockServer(t *testing.T, handler kt.Mock, address string) server.Server {
+	addr, _ := net.ResolveTCPAddr("tcp", address)
 	svr := newMockServer(handler, addr)
 	return svr
 }

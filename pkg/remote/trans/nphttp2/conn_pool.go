@@ -109,7 +109,11 @@ func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, netwo
 		return nil, err
 	}
 	if opts.TLSConfig != nil {
-		conn = tls.Client(conn, opts.TLSConfig)
+		tlsConn, err := newTLSConn(conn, opts.TLSConfig)
+		if err != nil {
+			return nil, err
+		}
+		conn = tlsConn
 	}
 	return grpc.NewClientTransport(
 		ctx,
@@ -221,4 +225,13 @@ func (p *connPool) Close() error {
 		return true
 	})
 	return nil
+}
+
+// newTLSConn constructs a client-side TLS connection and performs handshake.
+func newTLSConn(conn net.Conn, tlsCfg *tls.Config) (net.Conn, error) {
+	tlsConn := tls.Client(conn, tlsCfg)
+	if err := tlsConn.Handshake(); err != nil {
+		return nil, err
+	}
+	return tlsConn, nil
 }

@@ -25,12 +25,12 @@ import (
 func TestEnablePool(t *testing.T) {
 	t.Run("disable", func(t *testing.T) {
 		EnablePool(false)
-		test.Assert(t, !poolEnabled())
+		test.Assert(t, !PoolEnabled())
 	})
 
 	t.Run("disable-enable", func(t *testing.T) {
 		EnablePool(false)
 		EnablePool(true)
-		test.Assert(t, poolEnabled())
+		test.Assert(t, PoolEnabled())
 	})
 }

@@ -15,6 +15,7 @@
 package thriftgo
 
 import (
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -32,14 +33,16 @@ import (
 const (
 	JavaExtensionOption = "java_extension"
 
-	DubboCodec = "github.com/kitex-contrib/codec-dubbo"
-	JavaThrift = "https://raw.githubusercontent.com/kitex-contrib/codec-dubbo/main/java/java.thrift"
+	DubboCodec        = "github.com/kitex-contrib/codec-dubbo"
+	JavaThrift        = "java.thrift"
+	JavaThriftAddress = "https://raw.githubusercontent.com/kitex-contrib/codec-dubbo/main/java/java.thrift"
 )
 
 // Hessian2PreHook Hook before building cmd
 func Hessian2PreHook(cfg *generator.Config) {
 	// add thrift option
 	cfg.ThriftOptions = append(cfg.ThriftOptions, "template=slim,with_reflection,code_ref")
+	cfg.ThriftOptions = append(cfg.ThriftOptions, "enable_nested_struct")
 
 	// run hessian2 options
 	for _, opt := range cfg.Hessian2Options {
@@ -70,15 +73,15 @@ func runOption(cfg *generator.Config, opt string) {
 
 // runJavaExtensionOption Pull the extension file of java class from remote
 func runJavaExtensionOption(cfg *generator.Config) {
-	// get java.thrift
-	if path := util.JoinPath(filepath.Dir(cfg.IDL), "java.thrift"); !util.Exists(path) {
-		if err := util.DownloadFile(JavaThrift, path); err != nil {
+	// get java.thrift, we assume java.thrift and IDL in the same directory so that IDL just needs to include "java.thrift"
+	if path := util.JoinPath(filepath.Dir(cfg.IDL), JavaThrift); !util.Exists(path) {
+		if err := util.DownloadFile(JavaThriftAddress, path); err != nil {
 			log.Warn("Downloading java.thrift file failed:", err.Error())
 			abs, err := filepath.Abs(path)
 			if err != nil {
 				abs = path
 			}
-			log.Warnf("You can try to download again. If the download still fails, you can choose to manually download \"%s\" to the local path \"%s\".", JavaThrift, abs)
+			log.Warnf("You can try to download again. If the download still fails, you can choose to manually download \"%s\" to the local path \"%s\".", JavaThriftAddress, abs)
 			os.Exit(1)
 		}
 	}
@@ -90,23 +93,35 @@ func runJavaExtensionOption(cfg *generator.Config) {
 // patchIDLRefConfig merge idl-ref configuration patch
 func patchIDLRefConfig(cfg *generator.Config) {
 	// load the idl-ref config file (create it first if it does not exist)
-	idlRef := filepath.Join(filepath.Dir(cfg.IDL), "idl-ref.yaml")
+	// for making use of idl-ref of thriftgo, we need to check the project root directory
+	idlRef := filepath.Join(cfg.OutputPath, "idl-ref.yaml")
 	if !util.Exists(idlRef) {
-		idlRef = filepath.Join(filepath.Dir(cfg.IDL), "idl-ref.yml")
+		idlRef = filepath.Join(cfg.OutputPath, "idl-ref.yml")
 	}
-	file, err := os.OpenFile(idlRef, os.O_RDWR|os.O_TRUNC|os.O_CREATE, 0o644)
+	file, err := os.OpenFile(idlRef, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
 		log.Warnf("Open %s file failed: %s\n", idlRef, err.Error())
 		os.Exit(1)
 	}
 	defer file.Close()
-	idlRefCfg := loadIDLRefConfig(file)
+	idlRefCfg := loadIDLRefConfig(file.Name(), file)
 
-	// update the idl-ref config file
-	idlRefCfg.Ref["java.thrift"] = DubboCodec + "/java"
+	// assume java.thrift and IDL are in the same directory
+	javaRef := filepath.Join(filepath.Dir(cfg.IDL), JavaThrift)
+	idlRefCfg.Ref[javaRef] = DubboCodec + "/java"
 	out, err := yaml.Marshal(idlRefCfg)
 	if err != nil {
 		log.Warn("Marshal configuration failed:", err.Error())
+		os.Exit(1)
+	}
+	// clear the file content
+	if err := file.Truncate(0); err != nil {
+		log.Warnf("Truncate file %s failed: %s", idlRef, err.Error())
+		os.Exit(1)
+	}
+	// set the file offset
+	if _, err := file.Seek(0, 0); err != nil {
+		log.Warnf("Seek file %s failed: %s", idlRef, err.Error())
 		os.Exit(1)
 	}
 	_, err = file.Write(out)
@@ -117,10 +132,10 @@ func patchIDLRefConfig(cfg *generator.Config) {
 }
 
 // loadIDLRefConfig load idl-ref config from file object
-func loadIDLRefConfig(file *os.File) *config.RawConfig {
-	data, err := ioutil.ReadAll(file)
+func loadIDLRefConfig(fileName string, reader io.Reader) *config.RawConfig {
+	data, err := ioutil.ReadAll(reader)
 	if err != nil {
-		log.Warnf("Read %s file failed: %s\n", file.Name(), err.Error())
+		log.Warnf("Read %s file failed: %s\n", fileName, err.Error())
 		os.Exit(1)
 	}
 
@@ -131,7 +146,7 @@ func loadIDLRefConfig(file *os.File) *config.RawConfig {
 	} else {
 		err := yaml.Unmarshal(data, idlRefCfg)
 		if err != nil {
-			log.Warnf("Parse %s file failed: %s\n", file.Name(), err.Error())
+			log.Warnf("Parse %s file failed: %s\n", fileName, err.Error())
 			log.Warn("Please check whether the idl ref configuration is correct.")
 			os.Exit(2)
 		}
@@ -140,10 +155,14 @@ func loadIDLRefConfig(file *os.File) *config.RawConfig {
 	return idlRefCfg
 }
 
-var JavaObjectRe = regexp.MustCompile(`\*java\.Object\b`)
+var (
+	javaObjectRe                     = regexp.MustCompile(`\*java\.Object\b`)
+	javaExceptionRe                  = regexp.MustCompile(`\*java\.Exception\b`)
+	javaExceptionEmptyVerificationRe = regexp.MustCompile(`return p\.Exception != nil\b`)
+)
 
-// ReplaceObject args is the arguments from command, subDirPath used for xx/xx/xx
-func ReplaceObject(args generator.Config, subDirPath string) error {
+// Hessian2PatchByReplace args is the arguments from command, subDirPath used for xx/xx/xx
+func Hessian2PatchByReplace(args generator.Config, subDirPath string) error {
 	output := args.OutputPath
 	newPath := util.JoinPath(output, args.GenPath, subDirPath)
 	fs, err := ioutil.ReadDir(newPath)
@@ -155,7 +174,7 @@ func ReplaceObject(args generator.Config, subDirPath string) error {
 		fileName := util.JoinPath(args.OutputPath, args.GenPath, subDirPath, f.Name())
 		if f.IsDir() {
 			subDirPath := util.JoinPath(subDirPath, f.Name())
-			if err = ReplaceObject(args, subDirPath); err != nil {
+			if err = Hessian2PatchByReplace(args, subDirPath); err != nil {
 				return err
 			}
 		} else if strings.HasSuffix(f.Name(), ".go") {
@@ -164,10 +183,18 @@ func ReplaceObject(args generator.Config, subDirPath string) error {
 				return err
 			}
 
-			if err = replaceJavaObject(data, fileName); err != nil {
+			data = replaceJavaObject(data)
+			data = replaceJavaException(data)
+			data = replaceJavaExceptionEmptyVerification(data)
+			if err = ioutil.WriteFile(fileName, data, 0o644); err != nil {
 				return err
 			}
 		}
+	}
+
+	// users do not specify -service flag, we do not need to replace
+	if args.ServiceName == "" {
+		return nil
 	}
 
 	handlerName := util.JoinPath(output, "handler.go")
@@ -176,10 +203,33 @@ func ReplaceObject(args generator.Config, subDirPath string) error {
 		return err
 	}
 
-	return replaceJavaObject(handler, handlerName)
+	handler = replaceJavaObject(handler)
+	return ioutil.WriteFile(handlerName, handler, 0o644)
 }
 
-func replaceJavaObject(content []byte, fileName string) error {
-	content = JavaObjectRe.ReplaceAll(content, []byte("java.Object"))
-	return ioutil.WriteFile(fileName, content, 0o644)
+func replaceJavaObject(content []byte) []byte {
+	return javaObjectRe.ReplaceAll(content, []byte("java.Object"))
+}
+
+func replaceJavaException(content []byte) []byte {
+	return javaExceptionRe.ReplaceAll(content, []byte("java.Exception"))
+}
+
+// replaceJavaExceptionEmptyVerification is used to resolve this issue:
+// After generating nested struct, the generated struct would be:
+//
+//	 type CustomizedException struct {
+//	     *java.Exception
+//	 }
+//
+//	 It has a method:
+//	 func (p *EchoCustomizedException) IsSetException() bool {
+//		    return p.Exception != nil
+//	 }
+//
+//	 After invoking replaceJavaException, *java.Exception would be converted
+//	 to java.Exception and IsSetException became invalid. We convert the statement
+//	 to `return true` to ignore this problem.
+func replaceJavaExceptionEmptyVerification(content []byte) []byte {
+	return javaExceptionEmptyVerificationRe.ReplaceAll(content, []byte("return true"))
 }
