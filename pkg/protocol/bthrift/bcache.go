@@ -18,7 +18,6 @@ package bthrift
 
 import (
 	"math/bits"
-	"sync"
 	"sync/atomic"
 )
 
@@ -31,8 +30,10 @@ const (
 
 var spanClassStart = spanClass(minCachedBytes)
 
-var BCache = newBCache(cachedSpanSize)
-var BSpan = newSpan(cachedSpanSize)
+var (
+	BCache = newBCache(cachedSpanSize)
+	BSpan  = newSpan(cachedSpanSize)
+)
 
 type bCache struct {
 	spans [cachedSpans]*span
@@ -77,7 +78,7 @@ func newSpan(size int) *span {
 }
 
 type span struct {
-	lock   sync.Mutex
+	lock   uint64
 	buffer []byte
 	read   uint64 // read index of buffer
 	size   uint64 // size of buffer
@@ -94,7 +95,7 @@ START:
 		return b.buffer[read-uint64(n) : read]
 	}
 	// slow path
-	if !b.lock.TryLock() {
+	if !atomic.CompareAndSwapUint64(&b.lock, 0, 1) {
 		// fallback to make a new byte slice if current goroutine cannot get the lock
 		return make([]byte, n)
 	}
@@ -102,7 +103,7 @@ START:
 	b.buffer = make([]byte, b.size)
 	// reset read index to let other goroutine could consume new buffer
 	atomic.StoreUint64(&b.read, 0)
-	b.lock.Unlock()
+	atomic.StoreUint64(&b.lock, 0)
 
 	goto START
 }
