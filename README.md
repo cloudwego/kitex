@@ -30,11 +30,11 @@ Kitex is designed to be extensible to support multiple RPC messaging protocols. 
 
 - **Multi-transport Protocol**
 
-For service governance, Kitex supports **TTHeader** and **HTTP2**. TTHeader can be used in conjunction with Thrift and Kitex Protobuf; HTTP2 is currently mainly used with the gRPC protocol, and it will support Thrift in the future.
+For service governance, Kitex supports **TTHeader** and **HTTP2**. TTHeader can be used in conjunction with Thrift and Kitex Protobuf.
 
 - **Multi-message Type**
 
-Kitex supports **PingPong**, **One-way**, and **Bidirectional Streaming**. Among them, One-way currently only supports Thrift protocol, two-way Streaming only supports gRPC, and Kitex will support Thrift's two-way Streaming in the future.
+Kitex supports **PingPong**, **One-way**, and **Bidirectional Streaming**. Among them, One-way currently only supports Thrift protocol.
 
 - **Service Governance**
 
@@ -73,7 +73,10 @@ Kitex has built-in code generation tools that support generating **Thrift**, **P
 - **Reference**
 
   - For Transport Protocol, Exception Instruction and Version Specification, please refer to [doc](https://www.cloudwego.io/docs/kitex/reference/).
-  
+
+- **Best Practice**
+  - Kitex best practices in production, such as graceful shutdown, error handling, integration testing. [More](https://www.cloudwego.io/docs/kitex/best-practice/)
+
 - **FAQ**
 
   - Please refer to [FAQ](https://www.cloudwego.io/docs/kitex/faq/).
@@ -92,6 +95,7 @@ We provide the [kitex-benchmark](https://github.com/cloudwego/kitex-benchmark) p
 - [biz-demo](https://github.com/cloudwego/biz-demo): Business demos using Kitex.
 
 ## Blogs
+- [Enhancing Performance in Microservice Architecture with Kitex](https://www.cloudwego.io/blog/2024/01/29/enhancing-performance-in-microservice-architecture-with-kitex/)
 - [CloudWeGo: A leading practice for building enterprise cloud native middleware!](https://www.cloudwego.io/blog/2023/06/15/cloudwego-a-leading-practice-for-building-enterprise-cloud-native-middleware/)
 - [Kitex: Unifying Open Source Practice for a High-Performance RPC Framework](https://www.cloudwego.io/blog/2022/09/30/kitex-unifying-open-source-practice-for-a-high-performance-rpc-framework/)
 - [Performance Optimization on Kitex](https://www.cloudwego.io/blog/2021/09/23/performance-optimization-on-kitex/)
@@ -100,7 +104,7 @@ We provide the [kitex-benchmark](https://github.com/cloudwego/kitex-benchmark) p
 
 ## Contributing
 
-[Contributing](https://github.com/cloudwego/kitex/blob/develop/CONTRIBUTING.md).
+Contributor guide: [Contributing](https://github.com/cloudwego/kitex/blob/develop/CONTRIBUTING.md).
 
 ## License
 
@@ -118,7 +122,7 @@ Kitex is distributed under the [Apache License, version 2.0](https://github.com/
 ## Landscapes
 
 <p align="center">
-<img src="https://landscape.cncf.io/images/left-logo.svg" width="150"/>&nbsp;&nbsp;<img src="https://landscape.cncf.io/images/right-logo.svg" width="200"/>
+<img src="https://landscape.cncf.io/images/cncf-landscape-horizontal-color.svg" width="150"/>&nbsp;&nbsp;<img src="https://www.cncf.io/wp-content/uploads/2023/04/cncf-main-site-logo.svg" width="200"/>
 <br/><br/>
 CloudWeGo enriches the <a href="https://landscape.cncf.io/">CNCF CLOUD NATIVE Landscape</a>.
 </p>
