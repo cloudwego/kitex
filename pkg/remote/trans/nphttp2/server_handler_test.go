@@ -19,6 +19,7 @@ package nphttp2
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,12 +30,39 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/pkg/utils/kitexutil"
 	"github.com/cloudwego/kitex/transport"
 )
 
+var _ remote.StreamingMetaHandler = &mockMetaHandler{}
+
+type mockMetaHandler struct {
+	onReadStream func(ctx context.Context) (context.Context, error)
+}
+
+func (m mockMetaHandler) OnConnectStream(ctx context.Context) (context.Context, error) {
+	return ctx, nil
+}
+
+func (m mockMetaHandler) OnReadStream(ctx context.Context) (context.Context, error) {
+	return m.onReadStream(ctx)
+}
+
 func TestServerHandler(t *testing.T) {
+	var serviceName, methodName atomic.Value
+	serviceName.Store("")
+	methodName.Store("")
 	// init
 	opt := newMockServerOption()
+	opt.StreamingMetaHandlers = append(opt.StreamingMetaHandlers, &mockMetaHandler{
+		onReadStream: func(ctx context.Context) (context.Context, error) {
+			service, _ := kitexutil.GetIDLServiceName(ctx)
+			serviceName.Store(service)
+			method, _ := kitexutil.GetMethod(ctx)
+			methodName.Store(method)
+			return ctx, nil
+		},
+	})
 	msg := newMockNewMessage()
 	msg.ProtocolInfoFunc = func() remote.ProtocolInfo {
 		return remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Protobuf)
@@ -90,6 +118,8 @@ func TestServerHandler(t *testing.T) {
 
 	// sleep 50 mills so server can handle metaHeader frame
 	time.Sleep(time.Millisecond * 50)
+	test.Assert(t, serviceName.Load().(string) == "Greeter", serviceName.Load())
+	test.Assert(t, methodName.Load().(string) == "SayHello", methodName.Load())
 
 	// test OnError()
 	handler.OnError(context.Background(), context.Canceled, npConn)
