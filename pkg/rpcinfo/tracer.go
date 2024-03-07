@@ -18,6 +18,7 @@ package rpcinfo
 
 import (
 	"context"
+	"io"
 	"runtime/debug"
 
 	"github.com/cloudwego/kitex/internal"
@@ -74,7 +75,7 @@ func (c *TraceController) DoFinish(ctx context.Context, ri RPCInfo, err error) {
 }
 
 func buildStreamingEvent(statsEvent stats.Event, err error) Event {
-	if err == nil {
+	if err == nil || err == io.EOF {
 		return NewEvent(statsEvent, stats.StatusInfo, "")
 	} else {
 		return NewEvent(statsEvent, stats.StatusError, err.Error())
