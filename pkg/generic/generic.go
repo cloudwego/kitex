@@ -185,7 +185,8 @@ func SetBinaryWithByteSlice(g Generic, enable bool) error {
 	return nil
 }
 
-// SetSetFieldsForEmptyStruct enable/disable set all fields in map-generic even if a struct is empty.
+// SetSetFieldsForEmptyStruct enable/disable set all fields of a struct even if it is empty. 
+// This option is only applicable to map-generic response (reading) now.
 //
 //	mode == 0 means disable
 //	mode == 1 means only set required and default fields
