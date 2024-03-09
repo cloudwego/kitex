@@ -132,6 +132,10 @@ func Test_writeInt8(t *testing.T) {
 				test.Assert(t, val == v)
 				return nil
 			},
+			WriteI16Func: func(val int16) error {
+				test.Assert(t, val == int16(v))
+				return nil
+			},
 		}
 	}
 	tests := []struct {
@@ -175,6 +179,18 @@ func Test_writeInt8(t *testing.T) {
 				},
 			},
 			wantErr: true,
+		},
+		{
+			name: "writeInt8 to i16",
+			args: args{
+				val: int8(2),
+				out: mockTTransport(2),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I16,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
