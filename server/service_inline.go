@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"net"
 	"unsafe"
 
@@ -92,13 +91,10 @@ func (s *server) BuildServiceInlineInvokeChain() endpoint.Endpoint {
 			err = next(serverCtx, req, resp)
 
 			bizErr := svrRPCInfo.Invocation().BizStatusErr()
-			klog.CtxWarnf(ctx, "svr biz error: %v", err)
 			if bizErr != nil {
-				klog.CtxWarnf(ctx, "biz error not nil, msg:%s", bizErr.BizMessage())
-				//if cliSetter, ok := cliRPCInfo.Invocation().(rpcinfo.InvocationSetter); ok {
-				cliRPCInfo.Invocation().(rpcinfo.InvocationSetter).SetBizStatusErr(bizErr)
-				klog.CtxWarnf(ctx, "client set biz error: %v", err)
-				//}
+				if cliSetter, ok := cliRPCInfo.Invocation().(rpcinfo.InvocationSetter); ok {
+					cliSetter.SetBizStatusErr(bizErr)
+				}
 			}
 			// finish server trace
 			// contextServiceInlineHandler may convert nil err to non nil err, so handle trace here
