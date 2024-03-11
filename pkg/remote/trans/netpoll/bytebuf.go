@@ -74,6 +74,7 @@ func NewReaderWriterByteBuffer(rw netpoll.ReadWriter) remote.ByteBuffer {
 	return bytebuf
 }
 
+// IsNetpollByteBuffer checks if b is a netpollByteBuffer
 func IsNetpollByteBuffer(b remote.ByteBuffer) bool {
 	_, ok := b.(*netpollByteBuffer)
 	return ok
@@ -259,6 +260,7 @@ func (b *netpollByteBuffer) Bytes() (buf []byte, err error) {
 	return lb.Bytes(), nil
 }
 
+// GetBytes gets all written bytes of the buffer.
 func (b *netpollByteBuffer) GetBytes() ([][]byte, int, error) {
 	lb := b.writer.(*netpoll.LinkBuffer)
 	if err := lb.Flush(); err != nil {

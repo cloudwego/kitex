@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/cloudwego/netpoll"
@@ -270,7 +271,8 @@ func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
 	ctx := context.Background()
 	intKVInfo := prepareIntKVInfo()
 	strKVInfo := prepareStrKVInfo()
-	sendMsg := initClientSendMsg(transport.TTHeaderFramed, 32*1024)
+	payloadLen := 32 * 1024
+	sendMsg := initClientSendMsg(transport.TTHeaderFramed, payloadLen)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
 
@@ -512,4 +514,27 @@ func TestCornerCase(t *testing.T) {
 	buffer.EXPECT().Malloc(gomock.Any()).Return(nil, errors.New("error malloc")).AnyTimes()
 	err := (&defaultCodec{}).EncodePayload(context.Background(), sendMsg, buffer)
 	test.Assert(t, err.Error() == "error malloc")
+}
+
+func TestFlatten2DSlice(t *testing.T) {
+	var (
+		b2         [][]byte
+		expectedB1 []byte
+	)
+	row, column := 10, 10
+	for i := 0; i < row; i++ {
+		var b []byte
+		for j := 0; j < column; j++ {
+			curr := rand.Int()
+			b = append(b, byte(curr))
+			expectedB1 = append(expectedB1, byte(curr))
+		}
+		b2 = append(b2, b)
+	}
+	length := row * column
+	actualB1 := flatten2DSlice(b2, length)
+	test.Assert(t, len(actualB1) == length)
+	for i := 0; i < length; i++ {
+		test.Assert(t, actualB1[i] == expectedB1[i])
+	}
 }
