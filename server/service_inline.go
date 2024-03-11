@@ -2,28 +2,20 @@ package server
 
 import (
 	"context"
-	"net"
 	"reflect"
 	"unsafe"
 
-	"github.com/cloudwego/kitex/pkg/consts"
-	"github.com/cloudwego/kitex/pkg/utils"
-
 	"github.com/bytedance/gopkg/cloud/metainfo"
 
+	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-var localAddr net.Addr
+var localAddr = utils.NewNetAddr("tcp", "127.0.0.1")
 
-var invocationType reflect.Type
-
-func init() {
-	localAddr = utils.NewNetAddr("tcp", "127.0.0.1")
-
-	invocationType = reflect.TypeOf(rpcinfo.NewServerInvocation()).Elem()
-}
+var invocationType = reflect.TypeOf(rpcinfo.NewServerInvocation()).Elem()
 
 func constructServerCtxWithMetadata(cliCtx context.Context) (serverCtx context.Context) {
 	serverCtx = context.Background()
@@ -98,10 +90,10 @@ func (s *server) BuildServiceInlineInvokeChain() endpoint.Endpoint {
 
 			bizErr := svrRPCInfo.Invocation().BizStatusErr()
 			if bizErr != nil {
-				// Because our rpcinfo.RPCInfo is forcibly converted through unsafe.Pointer
-				// So the _type in iface still points to the upstream type, which makes
-				// cliRPCInfo.Invocation().(rpcinfo.InvocationSetter) unable to pass the
-				// type assertion
+				// In service inline scenario, cliRPCInfo is upstream rpcinfo and the dep is isolated.
+				// We forcibly converted it to downstream rpcinfo through unsafe.Pointer,
+				// so the _type in iface still points to the upstream type, which makes
+				// cliRPCInfo.Invocation().(rpcinfo.InvocationSetter) cannot be asserted.
 				//
 				// To solve this problem, we need init a new invocation from reflect.NewAt to
 				// pass the type assertion

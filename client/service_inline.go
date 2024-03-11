@@ -34,7 +34,7 @@ import (
 
 type ContextServiceInlineHandler interface {
 	WriteMeta(cliCtx context.Context, req interface{}) (newCliCtx context.Context, err error)
-	ReadMeta(cliCtx context.Context, resp interface{}) (newCliCtx context.Context, err error)
+	ReadMeta(cliCtx context.Context, resp interface{}) (err error)
 }
 
 type serviceInlineClient struct {
@@ -179,8 +179,7 @@ func (kc *serviceInlineClient) invokeHandleEndpoint() (endpoint.Endpoint, error)
 		err = kc.serverEps(ctx, req, resp)
 
 		if kc.contextServiceInlineHandler != nil {
-			var err1 error
-			ctx, err1 = kc.contextServiceInlineHandler.ReadMeta(ctx, resp)
+			err1 := kc.contextServiceInlineHandler.ReadMeta(ctx, resp)
 			if err1 != nil {
 				return err1
 			}
