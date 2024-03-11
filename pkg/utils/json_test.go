@@ -39,6 +39,7 @@ func BenchmarkMap2JSONStr(b *testing.B) {
 func BenchmarkJSONStr2Map(b *testing.B) {
 	mapInfo := prepareMap()
 	jsonRet, _ := jsoni.MarshalToString(mapInfo)
+	println(jsonRet)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -108,26 +109,24 @@ func TestMap2JSONStr(t *testing.T) {
 	mapInfo = nil
 	jsonRetNil, err := Map2JSONStr(mapInfo)
 	test.Assert(t, err == nil)
-	test.Assert(t, jsonRetNil == "{}")
+	test.Assert(t, jsonRetNil == "{}", jsonRetNil)
 
 	mapRet := map[string]string{
 		"\u4f60\u597d": "\u5468\u6770\u4f26",
 	}
 	act, err := Map2JSONStr(mapRet)
-	test.Assert(t, err == nil, err.Error())
+	test.Assert(t, err == nil)
 	test.Assert(t, act == `{"你好":"周杰伦"}`)
 
-	key := "\u4f60\u597d"
-	val := "\u5468\u6770\u4f26"
+	key := []byte("\u4f60\u597d")
+	val := []byte("\u5468\u6770\u4f26")
 	illegalUnicodeMapRet := map[string]string{
-		key: val,
+		SliceByteToString(key): SliceByteToString(val),
 	}
-	ks := StringToSliceByte(key)
-	ks[0] = 255
-	ks[1] = 255
-	vs := StringToSliceByte(key)
-	vs[0] = 255
-	vs[1] = 255
+	key[0] = 255
+	key[1] = 255
+	val[0] = 255
+	val[1] = 255
 	act, err = Map2JSONStr(illegalUnicodeMapRet)
 	test.Assert(t, err == nil, err.Error())
 	test.Assert(t, act == `{"\uffd好":"\uffd杰伦"}`)
@@ -137,6 +136,7 @@ func TestMap2JSONStr(t *testing.T) {
 func TestJSONStr2Map(t *testing.T) {
 	mapInfo := prepareMap()
 	jsonRet, _ := json.Marshal(mapInfo)
+	println(string(jsonRet))
 	mapRet, err := JSONStr2Map(string(jsonRet))
 	test.Assert(t, err == nil)
 
