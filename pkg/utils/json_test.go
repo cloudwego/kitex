@@ -109,6 +109,28 @@ func TestMap2JSONStr(t *testing.T) {
 	jsonRetNil, err := Map2JSONStr(mapInfo)
 	test.Assert(t, err == nil)
 	test.Assert(t, jsonRetNil == "{}")
+
+	mapRet := map[string]string{
+		"\u4f60\u597d": "\u5468\u6770\u4f26",
+	}
+	act, err := Map2JSONStr(mapRet)
+	test.Assert(t, err == nil, err.Error())
+	test.Assert(t, act == `{"你好":"周杰伦"}`)
+
+	key := "\u4f60\u597d"
+	val := "\u5468\u6770\u4f26"
+	illegalUnicodeMapRet := map[string]string{
+		key: val,
+	}
+	ks := StringToSliceByte(key)
+	ks[0] = 255
+	ks[1] = 255
+	vs := StringToSliceByte(key)
+	vs[0] = 255
+	vs[1] = 255
+	act, err = Map2JSONStr(illegalUnicodeMapRet)
+	test.Assert(t, err == nil, err.Error())
+	test.Assert(t, act == `{"\uffd好":"\uffd杰伦"}`)
 }
 
 // TestJSONStr2Map test convert json string to map
@@ -166,17 +188,17 @@ func TestJSONStr2Map(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, mapRet["aaa你好aaa"] == "周杰伦")
 
-	illegalUnicodeStr := `{"aaa\u4z60\u597daaa": "加油"}`
+	illegalUnicodeStr := `{"a":"b", "aaa\u4z60\u597daaa": "加油"}`
 	illegalUnicodeMapRet, err := JSONStr2Map(illegalUnicodeStr)
 	test.Assert(t, err != nil)
 	test.Assert(t, len(illegalUnicodeMapRet) == 0)
 
-	surrogateUnicodeStr := `{"\u4F60\u597D": "\uDFFF\uD800"}`
+	surrogateUnicodeStr := `{"a":"b", "\u4F60\u597D": "\uDFFF\uD800"}`
 	surrogateUnicodeMapRet, err := JSONStr2Map(surrogateUnicodeStr)
 	test.Assert(t, err == nil)
 	test.Assert(t, surrogateUnicodeMapRet != nil)
 
-	illegalEscapeCharStr := `{"\x4F60\x597D": "\uDFqwdFF\uD800"}`
+	illegalEscapeCharStr := `{"a":"b", "\x4F60\x597D": "\uDFqwdFF\uD800"}`
 	illegalEscapeCharMapRet, err := JSONStr2Map(illegalEscapeCharStr)
 	test.Assert(t, err != nil)
 	test.Assert(t, len(illegalEscapeCharMapRet) == 0)
