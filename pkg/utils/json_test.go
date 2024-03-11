@@ -28,6 +28,71 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
+func changeJSONLib(sonic bool) {
+	if sonic {
+		Map2JSONStr = _Map2JSONStr_sonic
+		JSONStr2Map = _JSONStr2Map_sonic
+	} else {
+		Map2JSONStr = _Map2JSONStr_old
+		JSONStr2Map = _JSONStr2Map_old
+	}
+}
+
+func FuzzJSONStr2Map(f *testing.F) {
+	mapInfo := prepareMap()
+	jsonRet, _ := jsoni.MarshalToString(mapInfo)
+	f.Add(`null`)
+	f.Add(`{}`)
+	f.Add(`{"":""}`)
+	f.Add(jsonRet)
+	f.Add(`{"\u4f60\u597d": "\u5468\u6770\u4f26"}`)
+	f.Fuzz(func(t *testing.T, data string) {
+		if !json.Valid([]byte(data)) {
+			return
+		}
+		changeJSONLib(true)
+		map1, err1 := _JSONStr2Map_sonic(data)
+		changeJSONLib(false)
+		map2, err2 := _JSONStr2Map_old(data)
+		require.Equal(t, err2 == nil, err1 == nil, "json: %v", data)
+		if err2 == nil {
+			require.Equal(t, map2, map1, "json:%v", data)
+		}
+	})
+}
+
+func FuzzMap2JSON(f *testing.F) {
+	mapInfo := prepareMap()
+	jsonRet, _ := jsoni.Marshal(mapInfo)
+	f.Add([]byte(`null`))
+	f.Add([]byte(`{}`))
+	f.Add([]byte(`{"":""}`))
+	f.Add([]byte(jsonRet))
+	f.Add([]byte(`{"\u4f60\u597d": "\u5468\u6770\u4f26"}`))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		m := map[string]string{}
+		if err := json.Unmarshal(data, &m); err != nil {
+			return
+		}
+		changeJSONLib(true)
+		map1, err1 := _Map2JSONStr_sonic(m)
+		changeJSONLib(false)
+		map2, err2 := _Map2JSONStr_old(m)
+		require.Equal(t, err2 == nil, err1 == nil, "json: %v", data)
+		if err2 == nil {
+			m2 := map[string]string{}
+			if err := json.Unmarshal([]byte(map1), &m2); err != nil {
+				return
+			}
+			m3 := map[string]string{}
+			if err := json.Unmarshal([]byte(map2), &m3); err != nil {
+				return
+			}
+			require.Equal(t, m2, m3, "json:%v", data)
+		}
+	})
+}
+
 var jsoni = jsoniter.ConfigCompatibleWithStandardLibrary
 
 var samples = []struct {
@@ -102,30 +167,6 @@ func BenchmarkJSONIterUnmarshal(b *testing.B) {
 		var map1 map[string]string
 		jsoni.UnmarshalFromString(jsonRet, &map1)
 	}
-}
-
-func changeJSONLib(sonic bool) {
-	if sonic {
-		Map2JSONStr = _Map2JSONStr_sonic
-		JSONStr2Map = _JSONStr2Map_sonic
-	} else {
-		Map2JSONStr = _Map2JSONStr_old
-		JSONStr2Map = _JSONStr2Map_old
-	}
-}
-
-func FuzzJSONStr2Map(f *testing.F) {
-	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.MarshalToString(mapInfo)
-	f.Add(jsonRet)
-	f.Fuzz(func(t *testing.T, data string) {
-		changeJSONLib(true)
-		map1, err1 := JSONStr2Map(data)
-		changeJSONLib(false)
-		map2, err2 := JSONStr2Map(data)
-		require.Equal(t, err2 == nil, err1 == nil)
-		require.Equal(t, map2, map1)
-	})
 }
 
 // TestMap2JSONStr test convert map to json string

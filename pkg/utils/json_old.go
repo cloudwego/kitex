@@ -130,7 +130,7 @@ func _JSONStr2Map_old(jsonStr string) (mapInfo map[string]string, err error) {
 	if idx, isNull = checkNull(c, data, idx, lastIdx); isNull {
 		return
 	}
-	if c != LeftBrace || data[size-1] != RightBrace {
+	if c != LeftBrace {
 		err = fmt.Errorf("json str is invalid")
 		return
 	}

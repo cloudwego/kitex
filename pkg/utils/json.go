@@ -80,5 +80,8 @@ func _JSONStr2Map_sonic(jsonStr string) (mapInfo map[string]string, err error) {
 		}
 	}()
 	err = sonicConifg.UnmarshalFromString(jsonStr, &mapInfo)
+	if len(mapInfo) == 0 {
+		mapInfo = nil
+	}
 	return mapInfo, err
 }
