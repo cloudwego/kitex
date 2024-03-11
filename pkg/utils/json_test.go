@@ -18,32 +18,49 @@ package utils
 
 import (
 	"encoding/json"
+	"strconv"
+	"strings"
 	"testing"
 
 	jsoniter "github.com/json-iterator/go"
+	"github.com/stretchr/testify/require"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
 
 var jsoni = jsoniter.ConfigCompatibleWithStandardLibrary
 
+var samples = []struct {
+	name string
+	m    map[string]string
+}{
+	{"10x", prepareMap2(10, 10, 10, 4)},
+	{"100x", prepareMap2(10, 100, 100, 4)},
+	{"1000x", prepareMap2(10, 1000, 1000, 4)},
+}
+
 func BenchmarkMap2JSONStr(b *testing.B) {
-	mapInfo := prepareMap()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		Map2JSONStr(mapInfo)
+	for _, s := range samples {
+		b.Run(s.name, func(b *testing.B) {
+			_, _ = _Map2JSONStr_sonic(s.m)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _ = _Map2JSONStr_sonic(s.m)
+			}
+		})
 	}
 }
 
 func BenchmarkJSONStr2Map(b *testing.B) {
-	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.MarshalToString(mapInfo)
-	println(jsonRet)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		JSONStr2Map(jsonRet)
+	for _, s := range samples {
+		b.Run(s.name, func(b *testing.B) {
+			j, _ := jsoni.MarshalToString(s.m)
+			_, _ = _JSONStr2Map_sonic(j)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _ = _JSONStr2Map_sonic(j)
+			}
+		})
 	}
 }
 
@@ -85,6 +102,30 @@ func BenchmarkJSONIterUnmarshal(b *testing.B) {
 		var map1 map[string]string
 		jsoni.UnmarshalFromString(jsonRet, &map1)
 	}
+}
+
+func changeJSONLib(sonic bool) {
+	if sonic {
+		Map2JSONStr = _Map2JSONStr_sonic
+		JSONStr2Map = _JSONStr2Map_sonic
+	} else {
+		Map2JSONStr = _Map2JSONStr_old
+		JSONStr2Map = _JSONStr2Map_old
+	}
+}
+
+func FuzzJSONStr2Map(f *testing.F) {
+	mapInfo := prepareMap()
+	jsonRet, _ := jsoni.MarshalToString(mapInfo)
+	f.Add(jsonRet)
+	f.Fuzz(func(t *testing.T, data string) {
+		changeJSONLib(true)
+		map1, err1 := JSONStr2Map(data)
+		changeJSONLib(false)
+		map2, err2 := JSONStr2Map(data)
+		require.Equal(t, err2 == nil, err1 == nil)
+		require.Equal(t, map2, map1)
+	})
 }
 
 // TestMap2JSONStr test convert map to json string
@@ -258,6 +299,24 @@ func prepareMap() map[string]string {
 	mapInfo["m, m\":"] = "n	n\":\"n"
 	mapInfo["m, &m\":"] = "n<!	>n\":\"n"
 	mapInfo[`{"aaa\u4f60\u597daaa": ":\\\u5468\u6770\u4f26"  ,  "加油 \u52a0\u6cb9" : "Come on \u52a0\u6cb9"}`] = `{"aaa\u4f60\u597daaa": ":\\\u5468\u6770\u4f26"  ,  "加油 \u52a0\u6cb9" : "Come on \u52a0\u6cb9"}`
+	return mapInfo
+}
+
+func prepareMap2(keyLen, valLen, count, escaped int) map[string]string {
+	mapInfo := make(map[string]string, count)
+	for i := 0; i < count; i++ {
+		key := strings.Repeat("a", keyLen) + strconv.Itoa(i)
+		if i%escaped == 0 {
+			// get escaped
+			key += ","
+		}
+		val := strings.Repeat("b", keyLen)
+		if i%escaped == 0 {
+			// get escaped
+			val += ","
+		}
+		mapInfo[string(key)] = string(val)
+	}
 	return mapInfo
 }
 
