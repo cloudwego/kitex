@@ -29,16 +29,30 @@ package utils
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/bytedance/sonic"
 )
+
+// Map2JSONStr transform map[string]string to json str, perf is better than use json lib directly
+var Map2JSONStr func(mapInfo map[string]string) (str string, err error) = _Map2JSONStr_old
+
+// JSONStr2Map transform json str to map[string]string, perf is better than use json lib directly
+var JSONStr2Map func(jsonStr string) (mapInfo map[string]string, err error) = _JSONStr2Map_old
+
+func init() {
+	if os.Getenv("KITEX_UTILS_JSON") == "sonic" {
+		Map2JSONStr = _Map2JSONStr_sonic
+		JSONStr2Map = _JSONStr2Map_sonic
+	}
+}
 
 var sonicConifg = sonic.Config{
 	EscapeHTML: true,
 }.Froze()
 
 // Map2JSONStr transform map[string]string to json str, perf is better than use json lib directly
-func Map2JSONStr(mapInfo map[string]string) (str string, err error) {
+func _Map2JSONStr_sonic(mapInfo map[string]string) (str string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(error); ok {
@@ -55,7 +69,7 @@ func Map2JSONStr(mapInfo map[string]string) (str string, err error) {
 }
 
 // JSONStr2Map transform json str to map[string]string, perf is better than use json lib directly
-func JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
+func _JSONStr2Map_sonic(jsonStr string) (mapInfo map[string]string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			if e, ok := r.(error); ok {
