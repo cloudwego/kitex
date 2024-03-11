@@ -34,6 +34,12 @@ type NocopyWrite interface {
 	WriteDirect(buf []byte, remainCap int) error
 }
 
+// NocopyRead is to read [][]byte without copying.
+// It is used with linked buffer.
+type NocopyRead interface {
+	GetBytes() ([][]byte, int, error)
+}
+
 // FrameWrite is to write header and data buffer separately to avoid memory copy
 type FrameWrite interface {
 	// WriteHeader set header buffer without copy

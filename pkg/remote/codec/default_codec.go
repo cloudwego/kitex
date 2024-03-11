@@ -201,7 +201,7 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 		return err
 	}
 	// get the payload from buffer
-	payload, payloadLen, err := payloadOut.(interface{ GetBytes() ([][]byte, int, error) }).GetBytes()
+	payload, payloadLen, err := payloadOut.(remote.NocopyRead).GetBytes()
 	if err != nil {
 		// release if err
 		payloadOut.Release(err)
@@ -229,7 +229,7 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 		err = out.AppendBuffer(payloadOut)
 	} else {
 		// convert [][]byte to []byte
-		p := convert(payload, payloadLen)
+		p := flatten2DSlice(payload, payloadLen)
 		if ncWriter, ok := out.(remote.NocopyWrite); ok {
 			err = ncWriter.WriteDirect(p, 0)
 		} else {
@@ -484,16 +484,6 @@ func getCRC32C(payload [][]byte) string {
 	return hex.EncodeToString(csb)
 }
 
-func convert(b2 [][]byte, length int) []byte {
-	b1 := make([]byte, length)
-	off := 0
-	for i := 0; i < len(b2); i++ {
-		copy(b1[off:off+len(b2[i])], b2[i])
-		off += len(b2[i])
-	}
-	return b1
-}
-
 // checkCRC32C validates the crc32c checksum in the header.
 func checkCRC32C(message remote.Message, in remote.ByteBuffer) error {
 	strInfo := message.TransInfo().TransStrInfo()
@@ -519,4 +509,15 @@ func checkCRC32C(message remote.Message, in remote.ByteBuffer) error {
 		}
 	}
 	return nil
+}
+
+// flatten2DSlice converts 2d slice to 1d.
+// total length should be provided.
+func flatten2DSlice(b2 [][]byte, length int) []byte {
+	b1 := make([]byte, length)
+	off := 0
+	for i := 0; i < len(b2); i++ {
+		off += copy(b1[off:], b2[i])
+	}
+	return b1
 }
