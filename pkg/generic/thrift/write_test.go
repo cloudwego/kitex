@@ -37,6 +37,7 @@ import (
 )
 
 func Test_nextWriter(t *testing.T) {
+	// add some testcases
 	type args struct {
 		val interface{}
 		out thrift.TProtocol
