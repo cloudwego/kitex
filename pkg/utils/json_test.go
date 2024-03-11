@@ -23,75 +23,9 @@ import (
 	"testing"
 
 	jsoniter "github.com/json-iterator/go"
-	"github.com/stretchr/testify/require"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
-
-func changeJSONLib(sonic bool) {
-	if sonic {
-		Map2JSONStr = _Map2JSONStr_sonic
-		JSONStr2Map = _JSONStr2Map_sonic
-	} else {
-		Map2JSONStr = _Map2JSONStr_old
-		JSONStr2Map = _JSONStr2Map_old
-	}
-}
-
-func FuzzJSONStr2Map(f *testing.F) {
-	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.MarshalToString(mapInfo)
-	f.Add(`null`)
-	f.Add(`{}`)
-	f.Add(`{"":""}`)
-	f.Add(jsonRet)
-	f.Add(`{"\u4f60\u597d": "\u5468\u6770\u4f26"}`)
-	f.Fuzz(func(t *testing.T, data string) {
-		if !json.Valid([]byte(data)) {
-			return
-		}
-		changeJSONLib(true)
-		map1, err1 := _JSONStr2Map_sonic(data)
-		changeJSONLib(false)
-		map2, err2 := _JSONStr2Map_old(data)
-		require.Equal(t, err2 == nil, err1 == nil, "json: %v", data)
-		if err2 == nil {
-			require.Equal(t, map2, map1, "json:%v", data)
-		}
-	})
-}
-
-func FuzzMap2JSON(f *testing.F) {
-	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.Marshal(mapInfo)
-	f.Add([]byte(`null`))
-	f.Add([]byte(`{}`))
-	f.Add([]byte(`{"":""}`))
-	f.Add([]byte(jsonRet))
-	f.Add([]byte(`{"\u4f60\u597d": "\u5468\u6770\u4f26"}`))
-	f.Fuzz(func(t *testing.T, data []byte) {
-		m := map[string]string{}
-		if err := json.Unmarshal(data, &m); err != nil {
-			return
-		}
-		changeJSONLib(true)
-		map1, err1 := _Map2JSONStr_sonic(m)
-		changeJSONLib(false)
-		map2, err2 := _Map2JSONStr_old(m)
-		require.Equal(t, err2 == nil, err1 == nil, "json: %v", data)
-		if err2 == nil {
-			m2 := map[string]string{}
-			if err := json.Unmarshal([]byte(map1), &m2); err != nil {
-				return
-			}
-			m3 := map[string]string{}
-			if err := json.Unmarshal([]byte(map2), &m3); err != nil {
-				return
-			}
-			require.Equal(t, m2, m3, "json:%v", data)
-		}
-	})
-}
 
 var jsoni = jsoniter.ConfigCompatibleWithStandardLibrary
 
@@ -107,10 +41,10 @@ var samples = []struct {
 func BenchmarkMap2JSONStr(b *testing.B) {
 	for _, s := range samples {
 		b.Run(s.name, func(b *testing.B) {
-			_, _ = _Map2JSONStr_sonic(s.m)
+			_, _ = Map2JSONStr(s.m)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, _ = _Map2JSONStr_sonic(s.m)
+				_, _ = Map2JSONStr(s.m)
 			}
 		})
 	}
@@ -120,10 +54,10 @@ func BenchmarkJSONStr2Map(b *testing.B) {
 	for _, s := range samples {
 		b.Run(s.name, func(b *testing.B) {
 			j, _ := jsoni.MarshalToString(s.m)
-			_, _ = _JSONStr2Map_sonic(j)
+			_, _ = JSONStr2Map(j)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, _ = _JSONStr2Map_sonic(j)
+				_, _ = JSONStr2Map(j)
 			}
 		})
 	}
@@ -206,19 +140,16 @@ func TestMap2JSONStr(t *testing.T) {
 		SliceByteToString(key): SliceByteToString(val),
 	}
 	key[0] = 255
-	key[1] = 255
 	val[0] = 255
-	val[1] = 255
 	act, err = Map2JSONStr(illegalUnicodeMapRet)
-	test.Assert(t, err == nil, err.Error())
-	test.Assert(t, act == `{"\uffd好":"\uffd杰伦"}`)
+	test.Assert(t, err == nil)
+	test.Assert(t, act == `{"\ufffd\ufffd\ufffd好":"\ufffd\ufffd\ufffd杰伦"}`, act)
 }
 
 // TestJSONStr2Map test convert json string to map
 func TestJSONStr2Map(t *testing.T) {
 	mapInfo := prepareMap()
 	jsonRet, _ := json.Marshal(mapInfo)
-	println(string(jsonRet))
 	mapRet, err := JSONStr2Map(string(jsonRet))
 	test.Assert(t, err == nil)
 
@@ -270,17 +201,17 @@ func TestJSONStr2Map(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, mapRet["aaa你好aaa"] == "周杰伦")
 
-	illegalUnicodeStr := `{"a":"b", "aaa\u4z60\u597daaa": "加油"}`
+	illegalUnicodeStr := `{"aaa\u4z60\u597daaa": "加油"}`
 	illegalUnicodeMapRet, err := JSONStr2Map(illegalUnicodeStr)
 	test.Assert(t, err != nil)
 	test.Assert(t, len(illegalUnicodeMapRet) == 0)
 
-	surrogateUnicodeStr := `{"a":"b", "\u4F60\u597D": "\uDFFF\uD800"}`
+	surrogateUnicodeStr := `{"\u4F60\u597D": "\uDFFF\uD800"}`
 	surrogateUnicodeMapRet, err := JSONStr2Map(surrogateUnicodeStr)
 	test.Assert(t, err == nil)
 	test.Assert(t, surrogateUnicodeMapRet != nil)
 
-	illegalEscapeCharStr := `{"a":"b", "\x4F60\x597D": "\uDFqwdFF\uD800"}`
+	illegalEscapeCharStr := `{"\x4F60\x597D": "\uDFqwdFF\uD800"}`
 	illegalEscapeCharMapRet, err := JSONStr2Map(illegalEscapeCharStr)
 	test.Assert(t, err != nil)
 	test.Assert(t, len(illegalEscapeCharMapRet) == 0)
@@ -351,7 +282,7 @@ func prepareMap2(keyLen, valLen, count, escaped int) map[string]string {
 			// get escaped
 			key += ","
 		}
-		val := strings.Repeat("b", keyLen)
+		val := strings.Repeat("b", valLen)
 		if i%escaped == 0 {
 			// get escaped
 			val += ","
