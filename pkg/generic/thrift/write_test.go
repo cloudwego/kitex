@@ -44,22 +44,47 @@ func Test_nextWriter(t *testing.T) {
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
-	mockTTransport := func(v int64) *mocks.MockThriftTTransport {
+	mockTTransport := func(v interface{}) *mocks.MockThriftTTransport {
+		toint := func(i interface{}) int64 {
+			switch ti := i.(type) {
+			case int8:
+				return int64(ti)
+			case int16:
+				return int64(ti)
+			case int32:
+				return int64(ti)
+			case int64:
+				return int64(ti)
+			case int:
+				return int64(ti)
+			default:
+				t.Errorf("type %v not support toint", reflect.TypeOf(v))
+			}
+			return 0
+		}
 		return &mocks.MockThriftTTransport{
 			WriteByteFunc: func(val int8) error {
-				test.Assert(t, val == int8(v))
+				test.Assert(t, val == int8(toint(v)))
 				return nil
 			},
 			WriteI16Func: func(val int16) error {
-				test.Assert(t, val == int16(v))
+				test.Assert(t, val == int16(toint(v)))
 				return nil
 			},
 			WriteI32Func: func(val int32) error {
-				test.Assert(t, val == int32(v))
+				test.Assert(t, val == int32(toint(v)))
 				return nil
 			},
 			WriteI64Func: func(val int64) error {
-				test.Assert(t, val == v)
+				test.Assert(t, val == toint(v))
+				return nil
+			},
+			WriteDoubleFunc: func(val float64) error {
+				test.Assert(t, val == v.(float64))
+				return nil
+			},
+			WriteBoolFunc: func(val bool) error {
+				test.Assert(t, val == v.(bool))
 				return nil
 			},
 		}
@@ -72,7 +97,7 @@ func Test_nextWriter(t *testing.T) {
 	}{
 		// TODO: Add test cases.
 		{
-			"nextWriteri8 success",
+			"nextWriteri8 Success",
 			args{
 				val: int8(1),
 				out: mockTTransport(1),
@@ -88,7 +113,7 @@ func Test_nextWriter(t *testing.T) {
 			false,
 		},
 		{
-			"nextWriteri16 success",
+			"nextWriteri16 Success",
 			args{
 				val: int16(1),
 				out: mockTTransport(1),
@@ -104,7 +129,7 @@ func Test_nextWriter(t *testing.T) {
 			false,
 		},
 		{
-			"nextWriteri32 success",
+			"nextWriteri32 Success",
 			args{
 				val: int32(1),
 				out: mockTTransport(1),
@@ -120,7 +145,7 @@ func Test_nextWriter(t *testing.T) {
 			false,
 		},
 		{
-			"nextWriteri64 success",
+			"nextWriteri64 Success",
 			args{
 				val: int64(1),
 				out: mockTTransport(1),
@@ -136,7 +161,39 @@ func Test_nextWriter(t *testing.T) {
 			false,
 		},
 		{
-			"nextWriteri8 failed",
+			"nextWriterbool Success",
+			args{
+				val: true,
+				out: mockTTransport(true),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.BOOL,
+					Struct: &descriptor.StructDescriptor{},
+				},
+				opt: &writerOption{
+					requestBase:      &Base{},
+					binaryWithBase64: false,
+				},
+			},
+			false,
+		},
+		{
+			"nextWriterdouble Success",
+			args{
+				val: float64(1.0),
+				out: mockTTransport(float64(1.0)),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.DOUBLE,
+					Struct: &descriptor.StructDescriptor{},
+				},
+				opt: &writerOption{
+					requestBase:      &Base{},
+					binaryWithBase64: false,
+				},
+			},
+			false,
+		},
+		{
+			"nextWriteri8 Failed",
 			args{
 				val: 10000000,
 				out: mockTTransport(10000000),
@@ -152,7 +209,7 @@ func Test_nextWriter(t *testing.T) {
 			true,
 		},
 		{
-			"nextWriteri16 failed",
+			"nextWriteri16 Failed",
 			args{
 				val: 10000000,
 				out: mockTTransport(10000000),
@@ -168,7 +225,7 @@ func Test_nextWriter(t *testing.T) {
 			true,
 		},
 		{
-			"nextWriteri32 failed",
+			"nextWriteri32 Failed",
 			args{
 				val: 10000000,
 				out: mockTTransport(10000000),
@@ -184,7 +241,7 @@ func Test_nextWriter(t *testing.T) {
 			true,
 		},
 		{
-			"nextWriteri64 failed",
+			"nextWriteri64 Failed",
 			args{
 				val: "10000000",
 				out: mockTTransport(10000000),
@@ -377,6 +434,42 @@ func Test_writeInt8(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "writeInt8 to i32",
+			args: args{
+				val: int8(2),
+				out: mockTTransport(2),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I32,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "writeInt8 to i64",
+			args: args{
+				val: int8(2),
+				out: mockTTransport(2),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I64,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "writeInt8 to i64",
+			args: args{
+				val: int8(2),
+				out: mockTTransport(2),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.DOUBLE,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -458,6 +551,18 @@ func Test_writeJSONFloat64(t *testing.T) {
 				},
 			},
 			false,
+		},
+		{
+			"writeJSONFloat64 bool Failed",
+			args{
+				val: 1.0,
+				out: mockTTransport,
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.BOOL,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			true,
 		},
 	}
 	for _, tt := range tests {
@@ -546,6 +651,30 @@ func Test_writeInt16(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"writeInt16toInt64 Success",
+			args{
+				val: int16(10000),
+				out: mockTTransport(10000),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I64,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			false,
+		},
+		{
+			"writeInt16 Failed",
+			args{
+				val: int16(10000),
+				out: mockTTransport(10000),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.DOUBLE,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -591,19 +720,7 @@ func Test_writeInt32(t *testing.T) {
 	}{
 		// TODO: Add test cases.
 		{
-			"writeInt32",
-			args{
-				val: int32(1),
-				out: mockTTransport(1),
-				t: &descriptor.TypeDescriptor{
-					Type:   descriptor.I08,
-					Struct: &descriptor.StructDescriptor{},
-				},
-			},
-			false,
-		},
-		{
-			"writeInt32",
+			"writeInt32 Success",
 			args{
 				val: int32(1),
 				out: mockTTransport(1),
@@ -615,7 +732,19 @@ func Test_writeInt32(t *testing.T) {
 			false,
 		},
 		{
-			"writeInt32ToInt08 success",
+			"writeInt32 Failed",
+			args{
+				val: int32(1),
+				out: mockTTransport(1),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.DOUBLE,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			true,
+		},
+		{
+			"writeInt32ToInt8 Success",
 			args{
 				val: int32(1),
 				out: mockTTransport(1),
@@ -625,6 +754,18 @@ func Test_writeInt32(t *testing.T) {
 				},
 			},
 			false,
+		},
+		{
+			"writeInt32ToInt8 Failed",
+			args{
+				val: int32(100000),
+				out: mockTTransport(100000),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I08,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			true,
 		},
 		{
 			"writeInt32ToInt16 success",
@@ -639,7 +780,7 @@ func Test_writeInt32(t *testing.T) {
 			false,
 		},
 		{
-			"writeInt32ToInt16 failed",
+			"writeInt32ToInt16 Failed",
 			args{
 				val: int32(100000),
 				out: mockTTransport(100000),
@@ -706,7 +847,7 @@ func Test_writeInt64(t *testing.T) {
 	}{
 		// TODO: Add test cases.
 		{
-			"writeInt64",
+			"writeInt64 Success",
 			args{
 				val: int64(1),
 				out: mockTTransport(1),
@@ -716,6 +857,18 @@ func Test_writeInt64(t *testing.T) {
 				},
 			},
 			false,
+		},
+		{
+			"writeInt64 Failed",
+			args{
+				val: int64(1),
+				out: mockTTransport(1),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.DOUBLE,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			true,
 		},
 		{
 			"writeInt64ToInt8 Success",
@@ -736,6 +889,54 @@ func Test_writeInt64(t *testing.T) {
 				out: mockTTransport(1000),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			true,
+		},
+		{
+			"writeInt64ToInt16 Success",
+			args{
+				val: int64(1),
+				out: mockTTransport(1),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I16,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			false,
+		},
+		{
+			"writeInt64ToInt16 failed",
+			args{
+				val: int64(100000000000),
+				out: mockTTransport(100000000000),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I16,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			true,
+		},
+		{
+			"writeInt64ToInt32 Success",
+			args{
+				val: int64(1),
+				out: mockTTransport(1),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I32,
+					Struct: &descriptor.StructDescriptor{},
+				},
+			},
+			false,
+		},
+		{
+			"writeInt64ToInt32 failed",
+			args{
+				val: int64(100000000000),
+				out: mockTTransport(100000000000),
+				t: &descriptor.TypeDescriptor{
+					Type:   descriptor.I32,
 					Struct: &descriptor.StructDescriptor{},
 				},
 			},
