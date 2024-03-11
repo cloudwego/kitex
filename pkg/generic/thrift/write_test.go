@@ -730,7 +730,7 @@ func Test_writeInt64(t *testing.T) {
 			false,
 		},
 		{
-			"writeInt64ToInt8 Faild",
+			"writeInt64ToInt8 failed",
 			args{
 				val: int64(1000),
 				out: mockTTransport(1000),
