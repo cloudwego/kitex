@@ -54,31 +54,29 @@ var pbGetter fieldGetter = func(val interface{}, field *descriptor.FieldDescript
 
 func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption) (descriptor.Type, writer, error) {
 	tt := t.Type
-	switch v := sample.(type) {
+	switch sample.(type) {
 	case bool:
 		return descriptor.BOOL, writeBool, nil
 	case int8, byte:
-		return descriptor.I08, writeInt8, nil
-	case int16:
-		return descriptor.I16, writeInt16, nil
-	case int32:
-		var err error
-		// data from pb decode
 		switch tt {
-		case descriptor.I08:
-			if v&0xff != v {
-				err = fmt.Errorf("value is beyond range of i8: %v", v)
-			}
-			return tt, writeInt32AsInt8, err
-		case descriptor.I16:
-			if v&0xffff != v {
-				err = fmt.Errorf("value is beyond range of i16: %v", v)
-			}
-			return tt, writeInt32AsInt16, err
+		case descriptor.I08, descriptor.I16, descriptor.I32, descriptor.I64:
+			return tt, writeInt8, nil
 		}
-		return descriptor.I32, writeInt32, nil
+	case int16:
+		switch tt {
+		case descriptor.I08, descriptor.I16, descriptor.I32, descriptor.I64:
+			return tt, writeInt16, nil
+		}
+	case int32:
+		switch tt {
+		case descriptor.I08, descriptor.I16, descriptor.I32, descriptor.I64:
+			return tt, writeInt32, nil
+		}
 	case int64:
-		return descriptor.I64, writeInt64, nil
+		switch tt {
+		case descriptor.I08, descriptor.I16, descriptor.I32, descriptor.I64:
+			return tt, writeInt64, nil
+		}
 	case float64:
 		// maybe come from json decode
 		switch tt {
@@ -323,14 +321,93 @@ func writeBool(ctx context.Context, val interface{}, out thrift.TProtocol, t *de
 }
 
 func writeInt8(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	var i int8
 	switch val := val.(type) {
 	case int8:
-		return out.WriteByte(val)
+		i = val
 	case uint8:
-		return out.WriteByte(int8(val))
+		i = int8(val)
 	default:
 		return fmt.Errorf("unsupported type: %T", val)
 	}
+	// compatible with lossless conversion
+	switch t.Type {
+	case thrift.I08:
+		return out.WriteByte(i)
+	case thrift.I16:
+		return out.WriteI16(int16(i))
+	case thrift.I32:
+		return out.WriteI32(int32(i))
+	case thrift.I64:
+		return out.WriteI64(int64(i))
+	}
+	return fmt.Errorf("need int type, but got: %s", t.Type)
+}
+
+func writeInt16(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	// compatible with lossless conversion
+	i := val.(int16)
+	switch t.Type {
+	case thrift.I08:
+		if i&0xff != i {
+			return fmt.Errorf("value is beyond range of i8: %v", i)
+		}
+		return out.WriteByte(int8(i))
+	case thrift.I16:
+		return out.WriteI16(i)
+	case thrift.I32:
+		return out.WriteI32(int32(i))
+	case thrift.I64:
+		return out.WriteI64(int64(i))
+	}
+	return fmt.Errorf("need int type, but got: %s", t.Type)
+}
+
+func writeInt32(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	// compatible with lossless conversion
+	i := val.(int32)
+	switch t.Type {
+	case thrift.I08:
+		if i&0xff != i {
+			return fmt.Errorf("value is beyond range of i8: %v", i)
+		}
+		return out.WriteByte(int8(i))
+	case thrift.I16:
+		if i&0xffff != i {
+			return fmt.Errorf("value is beyond range of i16: %v", i)
+		}
+		return out.WriteI16(int16(i))
+	case thrift.I32:
+		return out.WriteI32(i)
+	case thrift.I64:
+		return out.WriteI64(int64(i))
+	}
+	return fmt.Errorf("need int type, but got: %s", t.Type)
+}
+
+func writeInt64(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
+	// compatible with lossless conversion
+	i := val.(int64)
+	switch t.Type {
+	case thrift.I08:
+		if i&0xff != i {
+			return fmt.Errorf("value is beyond range of i8: %v", i)
+		}
+		return out.WriteByte(int8(i))
+	case thrift.I16:
+		if i&0xffff != i {
+			return fmt.Errorf("value is beyond range of i16: %v", i)
+		}
+		return out.WriteI16(int16(i))
+	case thrift.I32:
+		if i&0xffffffff != i {
+			return fmt.Errorf("value is beyond range of i32: %v", i)
+		}
+		return out.WriteI32(int32(i))
+	case thrift.I64:
+		return out.WriteI64(i)
+	}
+	return fmt.Errorf("need int type, but got: %s", t.Type)
 }
 
 func writeJSONNumber(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
@@ -385,26 +462,6 @@ func writeJSONFloat64(ctx context.Context, val interface{}, out thrift.TProtocol
 		return writeFloat64(ctx, i, out, t, opt)
 	}
 	return fmt.Errorf("need number type, but got: %s", t.Type)
-}
-
-func writeInt16(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
-	return out.WriteI16(val.(int16))
-}
-
-func writeInt32(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
-	return out.WriteI32(val.(int32))
-}
-
-func writeInt32AsInt8(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
-	return out.WriteByte(int8(val.(int32)))
-}
-
-func writeInt32AsInt16(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
-	return out.WriteI16(int16(val.(int32)))
-}
-
-func writeInt64(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
-	return out.WriteI64(val.(int64))
 }
 
 func writeFloat64(ctx context.Context, val interface{}, out thrift.TProtocol, t *descriptor.TypeDescriptor, opt *writerOption) error {
