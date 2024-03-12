@@ -28,7 +28,7 @@
 package utils
 
 import (
-	"fmt"
+	"encoding/json"
 
 	"github.com/bytedance/sonic"
 )
@@ -42,10 +42,12 @@ var sonicConifg = sonic.Config{
 func Map2JSONStr(mapInfo map[string]string) (str string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			if e, ok := r.(error); ok {
-				err = fmt.Errorf("Map2JSONStr panic: %w", e)
+			if out, e := json.Marshal(mapInfo); e != nil {
+				str = ""
+				err = e
 			} else {
-				err = fmt.Errorf("Map2JSONStr panic: %+v", r)
+				str = string(out)
+				err = nil
 			}
 		}
 	}()
@@ -59,10 +61,12 @@ func Map2JSONStr(mapInfo map[string]string) (str string, err error) {
 func JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			if e, ok := r.(error); ok {
-				err = fmt.Errorf("JSONStr2Map panic: %w", e)
+			mapInfo = map[string]string{}
+			if e := json.Unmarshal([]byte(jsonStr), &mapInfo); e != nil {
+				mapInfo = nil
+				err = e
 			} else {
-				err = fmt.Errorf("JSONStr2Map panic: %+v", r)
+				err = nil
 			}
 		}
 	}()
