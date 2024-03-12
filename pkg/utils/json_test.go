@@ -154,7 +154,9 @@ func TestJSONStr2Map(t *testing.T) {
 	jsonRet, _ := json.Marshal(mapInfo)
 	mapRet, err := JSONStr2Map(string(jsonRet))
 	test.Assert(t, err == nil)
-
+	mapRet2, err := _JSONStr2Map(string(jsonRet))
+	test.Assert(t, err == nil)
+	test.Assert(t, reflect.DeepEqual(mapRet, mapRet2))
 	test.Assert(t, len(mapInfo) == len(mapRet))
 	for k := range mapInfo {
 		test.Assert(t, mapInfo[k] == mapRet[k])
@@ -225,17 +227,22 @@ func TestJSONUtil(t *testing.T) {
 	jsonRet1, _ := json.Marshal(mapInfo)
 	jsonRet2, _ := jsoni.MarshalToString(mapInfo)
 	jsonRet, _ := Map2JSONStr(mapInfo)
+	jsonRet3, _ := _Map2JSONStr(mapInfo)
 
 	var map1 map[string]string
 	json.Unmarshal(jsonRet1, &map1)
 	var map2 map[string]string
 	json.Unmarshal([]byte(jsonRet2), &map2)
+	var map0 map[string]string
+	json.Unmarshal([]byte(jsonRet), &map0)
 	var map3 map[string]string
-	json.Unmarshal([]byte(jsonRet), &map3)
+	json.Unmarshal([]byte(jsonRet3), &map3)
 
-	test.Assert(t, len(map1) == len(map3))
-	test.Assert(t, len(map2) == len(map3))
+	test.Assert(t, len(map1) == len(map0))
+	test.Assert(t, len(map2) == len(map0))
+	test.Assert(t, len(map3) == len(map0))
 	for k := range map1 {
+		test.Assert(t, map2[k] == map0[k])
 		test.Assert(t, map2[k] == map3[k])
 	}
 
