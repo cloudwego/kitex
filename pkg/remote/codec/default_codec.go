@@ -196,7 +196,6 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 
 	// 1. encode payload and calculate crc32c checksum
 	payloadOut := netpoll.NewWriterByteBuffer(netpoll2.NewLinkBuffer())
-
 	if err = me.EncodePayload(ctx, message, payloadOut); err != nil {
 		return err
 	}
@@ -207,7 +206,6 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 		payloadOut.Release(err)
 		return err
 	}
-
 	crc32c := getCRC32C(payload)
 	strInfo := message.TransInfo().TransStrInfo()
 	if crc32c != "" && strInfo != nil {
