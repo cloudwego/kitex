@@ -226,54 +226,44 @@ func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 }
 
 func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
-	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
+	// netpoll
+	crc32CodecTest(
+		t,
+		func() remote.ByteBuffer {
+			return netpoll.NewReaderWriterByteBuffer(netpoll2.NewLinkBuffer())
+		},
+		func(bytes []byte) remote.ByteBuffer {
+			buf := netpoll2.NewLinkBuffer()
+			buf.WriteBinary(bytes)
+			buf.Flush()
+			return netpoll.NewReaderByteBuffer(buf)
+		},
+	)
 
-	dc := NewDefaultCodecWithConfig(CodecConfig{CRC32Check: true})
-	ctx := context.Background()
-	intKVInfo := prepareIntKVInfo()
-	strKVInfo := prepareStrKVInfo()
-	payloadLen := 32 * 1024
-	sendMsg := initClientSendMsg(transport.TTHeaderFramed, payloadLen)
-	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
-	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
+	// non-netpoll, without writeDirect
+	crc32CodecTest(
+		t,
+		func() remote.ByteBuffer {
+			return remote.NewWriterBuffer(0)
+		},
+		func(bytes []byte) remote.ByteBuffer {
+			return remote.NewReaderBuffer(bytes)
+		},
+	)
 
-	// test encode err
-	badOut := netpoll.NewReaderByteBuffer(netpoll2.NewLinkBuffer())
-	err := dc.Encode(ctx, sendMsg, badOut)
-	test.Assert(t, err != nil)
-
-	// encode with netpollBytebuffer
-	npBuffer := netpoll.NewReaderWriterByteBuffer(netpoll2.NewLinkBuffer())
-	err = dc.Encode(ctx, sendMsg, npBuffer)
-	test.Assert(t, err == nil, err)
-
-	// decode, succeed
-	recvMsg := initServerRecvMsg()
-	buf, err := npBuffer.Bytes()
-	test.Assert(t, err == nil, err)
-	in := remote.NewReaderBuffer(buf)
-	err = dc.Decode(ctx, recvMsg, in)
-	test.Assert(t, err == nil, err)
-	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
-	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
-	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
-	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
-	test.Assert(t, sendMsg.RPCInfo().Invocation().SeqID() == recvMsg.RPCInfo().Invocation().SeqID())
-
-	// decode, crc32c check failed
-	test.Assert(t, err == nil, err)
-	bufLen := len(buf)
-	modifiedBuf := make([]byte, bufLen)
-	copy(modifiedBuf, buf)
-	for i := bufLen - 1; i > bufLen-10; i-- {
-		modifiedBuf[i] = 123
-	}
-	in = remote.NewReaderBuffer(modifiedBuf)
-	err = dc.Decode(ctx, recvMsg, in)
-	test.Assert(t, err != nil, err)
+	// non-netpoll, with writeDirect
+	crc32CodecTest(
+		t,
+		func() remote.ByteBuffer {
+			return NewMockNocopyWriter(netpoll.NewReaderWriterByteBuffer(netpoll2.NewLinkBuffer()))
+		},
+		func(bytes []byte) remote.ByteBuffer {
+			return remote.NewReaderBuffer(bytes)
+		},
+	)
 }
 
-func TestDefaultCodecWithCRC32EncodeDecodeWithNonNetpollBuffer(t *testing.T) {
+func crc32CodecTest(t *testing.T, outBufferBuilder func() remote.ByteBuffer, inBufferBuilder func([]byte) remote.ByteBuffer) {
 	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
 
 	dc := NewDefaultCodecWithConfig(CodecConfig{CRC32Check: true})
@@ -290,7 +280,7 @@ func TestDefaultCodecWithCRC32EncodeDecodeWithNonNetpollBuffer(t *testing.T) {
 	test.Assert(t, err != nil)
 
 	// encode with defaultByteBuffer
-	byteBuffer := remote.NewWriterBuffer(0)
+	byteBuffer := outBufferBuilder()
 	err = dc.Encode(ctx, sendMsg, byteBuffer)
 	test.Assert(t, err == nil, err)
 
@@ -298,7 +288,7 @@ func TestDefaultCodecWithCRC32EncodeDecodeWithNonNetpollBuffer(t *testing.T) {
 	recvMsg := initServerRecvMsg()
 	buf, err := byteBuffer.Bytes()
 	test.Assert(t, err == nil, err)
-	in := remote.NewReaderBuffer(buf)
+	in := inBufferBuilder(buf)
 	err = dc.Decode(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)
 	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
@@ -383,6 +373,19 @@ func BenchmarkDefaultEncodeDecode(b *testing.B) {
 			}
 		})
 	}
+}
+
+// mockNocopyWriter mocks the NocopyWrite interface based on netpollByteBuffer
+// only use for test
+type mockNocopyWriter struct {
+	remote.ByteBuffer // this should be netpollBytebuffer
+}
+
+func NewMockNocopyWriter(buffer remote.ByteBuffer) *mockNocopyWriter {
+	if netpoll.IsNetpollByteBuffer(buffer) {
+		return &mockNocopyWriter{ByteBuffer: buffer}
+	}
+	panic("unimplemented")
 }
 
 var mpc remote.PayloadCodec = mockPayloadCodec{}

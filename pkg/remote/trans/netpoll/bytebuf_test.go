@@ -203,3 +203,37 @@ func checkUnreadable(t *testing.T, buf remote.ByteBuffer) {
 	_, err = buf.Read(nil)
 	test.Assert(t, err != nil)
 }
+
+func TestIsNetpollByteBuffer(t *testing.T) {
+	defaultBuff := remote.NewReaderWriterBuffer(0)
+	test.Assert(t, IsNetpollByteBuffer(defaultBuff) == false)
+
+	netpollBuff := NewReaderWriterByteBuffer(netpoll.NewLinkBuffer())
+	test.Assert(t, IsNetpollByteBuffer(netpollBuff) == true)
+}
+
+func TestBytes(t *testing.T) {
+	netpollBuff := NewReaderWriterByteBuffer(netpoll.NewLinkBuffer())
+	b := "testBytes"
+	n, err := netpollBuff.WriteString(b)
+	test.Assert(t, n == len(b))
+	test.Assert(t, err == nil)
+
+	// Bytes
+	b1, err := netpollBuff.Bytes()
+	test.Assert(t, err == nil)
+	test.Assert(t, string(b1) == b)
+
+	// GetBytes
+	b2, n, err := netpollBuff.(remote.NocopyRead).GetBytes()
+	test.Assert(t, n == len(b))
+	test.Assert(t, err == nil)
+	actual := make([]byte, n)
+	off := 0
+	for i := 0; i < len(b2); i++ {
+		off += copy(actual[off:], b2[i])
+	}
+	for i := 0; i < n; i++ {
+		test.Assert(t, actual[i] == b[i])
+	}
+}

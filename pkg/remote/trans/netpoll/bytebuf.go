@@ -243,7 +243,7 @@ func (b *netpollByteBuffer) AppendBuffer(buf remote.ByteBuffer) (err error) {
 	return
 }
 
-// Bytes are not supported in netpoll bytebuf.
+// Bytes gets all written bytes.
 func (b *netpollByteBuffer) Bytes() (buf []byte, err error) {
 	lb := b.writer.(*netpoll.LinkBuffer)
 	if err = lb.Flush(); err != nil {
@@ -252,7 +252,8 @@ func (b *netpollByteBuffer) Bytes() (buf []byte, err error) {
 	return lb.Bytes(), nil
 }
 
-// GetBytes gets all written bytes of the buffer.
+// GetBytes gets all written bytes and return 2d slice.
+// It uses GetBytes() of link buffer.
 func (b *netpollByteBuffer) GetBytes() ([][]byte, int, error) {
 	lb := b.writer.(*netpoll.LinkBuffer)
 	if err := lb.Flush(); err != nil {
