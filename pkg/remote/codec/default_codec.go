@@ -200,7 +200,7 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 		return err
 	}
 	// get the payload from buffer
-	payload, payloadLen, err := payloadOut.(remote.NocopyRead).GetBytes()
+	payload, payloadLen, err := payloadOut.(remote.NocopyRead).GetBytesNoCopy()
 	if err != nil {
 		// release if err
 		payloadOut.Release(err)

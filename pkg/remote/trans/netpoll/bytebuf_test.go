@@ -224,8 +224,8 @@ func TestBytes(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, string(b1) == b)
 
-	// GetBytes
-	b2, n, err := netpollBuff.(remote.NocopyRead).GetBytes()
+	// GetBytesNoCopy
+	b2, n, err := netpollBuff.(remote.NocopyRead).GetBytesNoCopy()
 	test.Assert(t, n == len(b))
 	test.Assert(t, err == nil)
 	actual := make([]byte, n)
