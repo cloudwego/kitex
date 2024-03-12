@@ -15,6 +15,7 @@
 package args
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -24,6 +25,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
@@ -393,14 +395,20 @@ func ValidateCMD(path, idlType string) {
 		if idlType == "protobuf" {
 			tool = "protoc"
 		}
-		log.Warnf("[ERROR] %s is also unavailable, please install %s first.\n", path, tool)
+
 		if idlType == "thrift" {
-			log.Warn("Refer to https://github.com/cloudwego/thriftgo, or simple run:\n")
-			log.Warn("  go install -v github.com/cloudwego/thriftgo@latest\n")
+			_, err = runCommand("go install github.com/cloudwego/thriftgo@latest")
+			if err != nil {
+				log.Warnf("[ERROR] %s is also unavailable, please install %s first.\n", path, tool)
+				log.Warn("Refer to https://github.com/cloudwego/thriftgo, or simple run:\n")
+				log.Warn("  go install -v github.com/cloudwego/thriftgo@latest\n")
+				os.Exit(1)
+			}
 		} else {
+			log.Warnf("[ERROR] %s is also unavailable, please install %s first.\n", path, tool)
 			log.Warn("Refer to https://github.com/protocolbuffers/protobuf\n")
+			os.Exit(1)
 		}
-		os.Exit(1)
 	}
 
 	// check if the version is satisfied
@@ -418,9 +426,12 @@ func ValidateCMD(path, idlType string) {
 		}
 		version := strings.Replace(strings.TrimSuffix(string(out), "\n"), "thriftgo ", "", 1)
 		if !versionSatisfied(version, requiredThriftGoVersion) {
-			log.Warnf("[ERROR] thriftgo version(%s) not satisfied, please install version >= %s\n",
-				version, requiredThriftGoVersion)
-			os.Exit(1)
+			_, err = runCommand("go install github.com/cloudwego/thriftgo@latest")
+			if err != nil {
+				log.Warnf("[ERROR] thriftgo version(%s) not satisfied, please install version >= %s\n",
+					version, requiredThriftGoVersion)
+				os.Exit(1)
+			}
 		}
 		return
 	}
@@ -480,7 +491,7 @@ func LookupTool(idlType, compilerPath string) string {
 
 	path, err := exec.LookPath(tool)
 	if err != nil {
-		log.Warnf("Failed to find %q from $PATH: %s.\nTry $GOPATH/bin/%s instead\n", path, err.Error(), tool)
+		// log.Warnf("Failed to find %q from $PATH: %s.\nTry $GOPATH/bin/%s instead\n", path, err.Error(), tool)
 		path = util.JoinPath(util.GetGOPATH(), "bin", tool)
 	}
 	return path
@@ -499,4 +510,22 @@ func initGoMod(pathToGo, module string) error {
 		Stderr: os.Stderr,
 	}
 	return cmd.Run()
+}
+
+func runCommand(input string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	arr := strings.Split(input, " ")
+	var cmd *exec.Cmd
+	if len(arr) > 1 {
+		cmd = exec.CommandContext(ctx, arr[0], arr[1:]...)
+	} else {
+		cmd = exec.CommandContext(ctx, arr[0])
+	}
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	result := strings.TrimSpace(string(output))
+	return result, nil
 }
