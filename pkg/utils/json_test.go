@@ -18,9 +18,11 @@ package utils
 
 import (
 	"encoding/json"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+	"unsafe"
 
 	jsoniter "github.com/json-iterator/go"
 
@@ -295,4 +297,15 @@ func prepareMap2(keyLen, valLen, count, escaped int) map[string]string {
 func jsonMarshal(userExtraMap map[string]string) (string, error) {
 	ret, err := json.Marshal(userExtraMap)
 	return string(ret), err
+}
+
+func TestJSONRecover(t *testing.T) {
+	var in string
+	(*reflect.StringHeader)(unsafe.Pointer(&in)).Len = 10
+	_, e := JSONStr2Map(in)
+	test.Assert(t, e != nil)
+	_, ee := Map2JSONStr(map[string]string{
+		"a": in,
+	})
+	test.Assert(t, ee != nil)
 }
