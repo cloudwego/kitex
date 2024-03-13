@@ -237,3 +237,9 @@ func TestBytes(t *testing.T) {
 		test.Assert(t, actual[i] == b[i])
 	}
 }
+
+func TestRelease(t *testing.T) {
+	buf := NewReaderWriterByteBuffer(netpoll.NewLinkBuffer())
+	buf.Release(nil)
+	buf.Release(nil)
+}

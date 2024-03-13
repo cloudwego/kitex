@@ -226,9 +226,11 @@ func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 }
 
 func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
+	payloadLen := 1024 * 1024
 	// netpoll
 	crc32CodecTest(
 		t,
+		payloadLen,
 		func() remote.ByteBuffer {
 			return netpoll.NewReaderWriterByteBuffer(netpoll2.NewLinkBuffer())
 		},
@@ -243,6 +245,7 @@ func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
 	// non-netpoll, without writeDirect
 	crc32CodecTest(
 		t,
+		payloadLen,
 		func() remote.ByteBuffer {
 			return remote.NewWriterBuffer(0)
 		},
@@ -254,6 +257,7 @@ func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
 	// non-netpoll, with writeDirect
 	crc32CodecTest(
 		t,
+		payloadLen,
 		func() remote.ByteBuffer {
 			return NewMockNocopyWriter(netpoll.NewReaderWriterByteBuffer(netpoll2.NewLinkBuffer()))
 		},
@@ -263,14 +267,14 @@ func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
 	)
 }
 
-func crc32CodecTest(t *testing.T, outBufferBuilder func() remote.ByteBuffer, inBufferBuilder func([]byte) remote.ByteBuffer) {
+func crc32CodecTest(t *testing.T, payloadLen int, outBufferBuilder func() remote.ByteBuffer, inBufferBuilder func([]byte) remote.ByteBuffer) {
 	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
 
 	dc := NewDefaultCodecWithConfig(CodecConfig{CRC32Check: true})
 	ctx := context.Background()
 	intKVInfo := prepareIntKVInfo()
 	strKVInfo := prepareStrKVInfo()
-	sendMsg := initClientSendMsg(transport.TTHeaderFramed, 32*1024)
+	sendMsg := initClientSendMsg(transport.TTHeaderFramed, payloadLen)
 	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
 
@@ -356,7 +360,7 @@ func BenchmarkDefaultEncodeDecode(b *testing.B) {
 						codec := f()
 						sendMsg := initClientSendMsg(transport.TTHeader, msgLen)
 						// encode
-						out := remote.NewWriterBuffer(1024)
+						out := netpoll.NewWriterByteBuffer(netpoll2.NewLinkBuffer())
 						err := codec.Encode(ctx, sendMsg, out)
 						test.Assert(b, err == nil, err)
 
@@ -486,24 +490,29 @@ func TestCornerCase(t *testing.T) {
 }
 
 func TestFlatten2DSlice(t *testing.T) {
-	var (
-		b2         [][]byte
-		expectedB1 []byte
-	)
 	row, column := 10, 10
-	for i := 0; i < row; i++ {
-		var b []byte
-		for j := 0; j < column; j++ {
-			curr := rand.Int()
-			b = append(b, byte(curr))
-			expectedB1 = append(expectedB1, byte(curr))
-		}
-		b2 = append(b2, b)
-	}
+	b2, expectedB1 := generateSlices(row, column)
 	length := row * column
 	actualB1 := flatten2DSlice(b2, length)
 	test.Assert(t, len(actualB1) == length)
 	for i := 0; i < length; i++ {
 		test.Assert(t, actualB1[i] == expectedB1[i])
 	}
+}
+
+func generateSlices(row, column int) ([][]byte, []byte) {
+	var (
+		b2 [][]byte
+		b1 []byte
+	)
+	for i := 0; i < row; i++ {
+		var b []byte
+		for j := 0; j < column; j++ {
+			curr := rand.Int()
+			b = append(b, byte(curr))
+			b1 = append(b1, byte(curr))
+		}
+		b2 = append(b2, b)
+	}
+	return b2, b1
 }
