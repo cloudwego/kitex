@@ -19,8 +19,9 @@ package utils
 import (
 	"runtime/debug"
 
-	"github.com/bytedance/sonic"
 	"github.com/cloudwego/kitex/pkg/klog"
+
+	"github.com/bytedance/sonic"
 )
 
 var sonicConifg = sonic.Config{

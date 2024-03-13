@@ -87,11 +87,7 @@ const (
 func _Map2JSONStr(mapInfo map[string]string) (str string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			if e, ok := r.(error); ok {
-				err = fmt.Errorf("Map2JSONStr panic: %w", e)
-			} else {
-				err = fmt.Errorf("Map2JSONStr panic: %+v", r)
-			}
+			err = fmt.Errorf("Map2JSONStr panic: %+v", r)
 		}
 	}()
 	size := len(mapInfo)
@@ -127,11 +123,7 @@ func _Map2JSONStr(mapInfo map[string]string) (str string, err error) {
 func _JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			if e, ok := r.(error); ok {
-				err = fmt.Errorf("JSONStr2Map panic: %w", e)
-			} else {
-				err = fmt.Errorf("JSONStr2Map panic: %+v", r)
-			}
+			err = fmt.Errorf("JSONStr2Map panic: %+v", r)
 		}
 	}()
 	data := []byte(jsonStr)

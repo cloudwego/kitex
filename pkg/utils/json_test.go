@@ -107,6 +107,10 @@ func BenchmarkJSONIterUnmarshal(b *testing.B) {
 
 // TestMap2JSONStr test convert map to json string
 func TestMap2JSONStr(t *testing.T) {
+	j, e := Map2JSONStr(map[string]string{})
+	test.Assert(t, e == nil)
+	test.Assert(t, j == EmptyJSON)
+
 	mapInfo := prepareMap()
 
 	jsonRet1, err := Map2JSONStr(mapInfo)
