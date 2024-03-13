@@ -260,7 +260,7 @@ func (b *netpollByteBuffer) Bytes() (buf []byte, err error) {
 	return lb.Bytes(), nil
 }
 
-// GetBytes gets all written bytes and return 2d slice.
+// GetBytesNoCopy gets all written bytes and return 2d slice.
 // It uses GetBytes() of link buffer.
 func (b *netpollByteBuffer) GetBytesNoCopy() ([][]byte, int, error) {
 	lb := b.writer.(*netpoll.LinkBuffer)

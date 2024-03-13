@@ -191,19 +191,23 @@ func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.
 }
 
 // encodeMetaAndPayloadWithCRC32C encodes payload and meta with crc32c checksum of the payload.
-func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
-	var err error
-
+func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) (err error) {
+	var (
+		payloadOut  = netpoll.NewWriterByteBuffer(netpoll2.NewLinkBuffer())
+		needRelease = true
+	)
+	defer func() {
+		if needRelease {
+			payloadOut.Release(err)
+		}
+	}()
 	// 1. encode payload and calculate crc32c checksum
-	payloadOut := netpoll.NewWriterByteBuffer(netpoll2.NewLinkBuffer())
 	if err = me.EncodePayload(ctx, message, payloadOut); err != nil {
 		return err
 	}
 	// get the payload from buffer
 	payload, payloadLen, err := payloadOut.(remote.NocopyRead).GetBytesNoCopy()
 	if err != nil {
-		// release if err
-		payloadOut.Release(err)
 		return err
 	}
 	crc32c := getCRC32C(payload)
@@ -211,7 +215,7 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 	if crc32c != "" && strInfo != nil {
 		strInfo[transmeta.HeaderCRC32C] = crc32c
 	}
-	// set payload length before encode TTHeader.
+	// set payload length before encode TTHeader
 	message.SetPayloadLen(payloadLen)
 
 	// 2. encode header and return totalLenField if needed
@@ -223,8 +227,9 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 	// 3. write payload to the buffer after TTHeader
 	if netpoll.IsNetpollByteBuffer(out) {
 		// append buffer only if the input buffer is a netpollByteBuffer
-		// release will be executed in AppendBuffer
+		// release will be executed in AppendBuffer, and thus set needRelease to false
 		err = out.AppendBuffer(payloadOut)
+		needRelease = false
 	} else {
 		// convert [][]byte to []byte
 		p := flatten2DSlice(payload, payloadLen)
@@ -233,7 +238,6 @@ func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, messa
 		} else {
 			_, err = out.WriteBinary(p)
 		}
-		payloadOut.Release(err)
 	}
 	return err
 }
