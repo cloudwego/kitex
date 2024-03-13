@@ -18,6 +18,7 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
@@ -140,6 +141,13 @@ func TestMap2JSONStr(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, act == `{"你好":"周杰伦"}`)
 
+	htmlEsc := map[string]string{
+		"&<>\u2028\u2029": "&<>\u2028\u2029",
+	}
+	htmlAct, err := Map2JSONStr(htmlEsc)
+	test.Assert(t, err == nil)
+	test.Assert(t, htmlAct == `{"\u0026\u003c\u003e\u2028\u2029":"\u0026\u003c\u003e\u2028\u2029"}`, htmlAct)
+
 	key := []byte("\u4f60\u597d")
 	val := []byte("\u5468\u6770\u4f26")
 	illegalUnicodeMapRet := map[string]string{
@@ -223,6 +231,11 @@ func TestJSONStr2Map(t *testing.T) {
 	illegalEscapeCharMapRet, err := JSONStr2Map(illegalEscapeCharStr)
 	test.Assert(t, err != nil)
 	test.Assert(t, len(illegalEscapeCharMapRet) == 0)
+
+	htmlEscapeCharStr := `{"\u0026\u003c\u003e\u2028\u2029":"\u0026\u003c\u003e\u2028\u2029"}`
+	htmlEscapeCharMapRet, err := JSONStr2Map(htmlEscapeCharStr)
+	test.Assert(t, err == nil)
+	test.Assert(t, htmlEscapeCharMapRet["&<>\u2028\u2029"] == "&<>\u2028\u2029", fmt.Sprintf("%+v", htmlEscapeCharMapRet))
 }
 
 // TestJSONUtil compare return between encoding/json, json-iterator and json.go
