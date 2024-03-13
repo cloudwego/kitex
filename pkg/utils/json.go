@@ -17,7 +17,10 @@
 package utils
 
 import (
+	"runtime/debug"
+
 	"github.com/bytedance/sonic"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 var sonicConifg = sonic.Config{
@@ -30,6 +33,7 @@ func Map2JSONStr(mapInfo map[string]string) (str string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			str, err = _Map2JSONStr(mapInfo)
+			klog.Warnf("KITEX: panic when Map2JSONStr, msg=%v, stack=%s", r, string(debug.Stack()))
 		}
 	}()
 	if len(mapInfo) == 0 {
@@ -43,6 +47,7 @@ func JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			mapInfo, err = _JSONStr2Map(jsonStr)
+			klog.Warnf("KITEX: panic when JSONStr2Map, msg=%v, stack=%s", r, string(debug.Stack()))
 		}
 	}()
 	err = sonicConifg.UnmarshalFromString(jsonStr, &mapInfo)
