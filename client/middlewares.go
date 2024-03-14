@@ -161,8 +161,17 @@ func newIOErrorHandleMW(errHandle func(context.Context, error) error) endpoint.M
 
 // DefaultClientErrorHandler is Default ErrorHandler for client
 // when no ErrorHandler is specified with Option `client.WithErrorHandler`, this ErrorHandler will be injected.
-// for thrift、KitexProtobuf, >= v0.4.0 wrap protocol error to TransError, which will be more friendly.
+// For thrift、KitexProtobuf >= v0.4.0, wraps protocol error to TransError, which will be more friendly.
+// For thrift、KitexProtobuf >= v0.8.1, returns BizStatusError directly if it is set.
 func DefaultClientErrorHandler(ctx context.Context, err error) error {
+	rpcInfo := rpcinfo.GetRPCInfo(ctx)
+	// If BizStatusErr is not nil, it means that the business logic has been processed and the error has been set
+	// and transmitted to the client. In this case, just return the bizErr directly.
+	bizErr := rpcInfo.Invocation().BizStatusErr()
+	if bizErr != nil {
+		return bizErr
+	}
+
 	switch err.(type) {
 	// for thrift、KitexProtobuf, actually check *remote.TransError is enough
 	case *remote.TransError, thrift.TApplicationException, protobuf.PBError:
