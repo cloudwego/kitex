@@ -19,14 +19,11 @@ package client
 import (
 	"context"
 	"errors"
-	"net"
 	"runtime/debug"
-
-	"github.com/bytedance/gopkg/cloud/metainfo"
+	"unsafe"
 
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
-	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -35,15 +32,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-var localAddr net.Addr
-
-func init() {
-	localAddr = utils.NewNetAddr("tcp", "127.0.0.1")
-}
-
 type ContextServiceInlineHandler interface {
-	WriteMeta(cliCtx, svrCtx context.Context, req interface{}) (newSvrCtx context.Context, err error)
-	ReadMeta(cliCtx, svrCtx context.Context, resp interface{}) (newCliCtx context.Context, err error)
+	WriteMeta(cliCtx context.Context, req interface{}) (newCliCtx context.Context, err error)
+	ReadMeta(cliCtx context.Context, resp interface{}) (err error)
 }
 
 type serviceInlineClient struct {
@@ -57,15 +48,12 @@ type serviceInlineClient struct {
 
 	// server info
 	serverEps endpoint.Endpoint
-	serverOpt *internal_server.Options
 
 	contextServiceInlineHandler ContextServiceInlineHandler
 }
 
 type ServerInitialInfo interface {
-	Endpoints() endpoint.Endpoint
-	Option() *internal_server.Options
-	GetServiceInfos() map[string]*serviceinfo.ServiceInfo
+	BuildServiceInlineInvokeChain() endpoint.Endpoint
 }
 
 // NewServiceInlineClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
@@ -76,10 +64,7 @@ func NewServiceInlineClient(svcInfo *serviceinfo.ServiceInfo, s ServerInitialInf
 	kc := &serviceInlineClient{}
 	kc.svcInfo = svcInfo
 	kc.opt = client.NewOptions(opts)
-	kc.serverEps = s.Endpoints()
-	kc.serverOpt = s.Option()
-	kc.serverOpt.RemoteOpt.TargetSvcInfo = svcInfo
-	kc.serverOpt.RemoteOpt.SvcSearchMap = s.GetServiceInfos()
+	kc.serverEps = s.BuildServiceInlineInvokeChain()
 	if err := kc.init(); err != nil {
 		_ = kc.Close()
 		return nil, err
@@ -176,88 +161,25 @@ func (kc *serviceInlineClient) buildInvokeChain() error {
 	return nil
 }
 
-func (kc *serviceInlineClient) constructServerCtxWithMetadata(cliCtx context.Context) (serverCtx context.Context) {
-	serverCtx = context.Background()
-	// metainfo
-	// forward transmission
-	kvs := make(map[string]string, 16)
-	metainfo.SaveMetaInfoToMap(cliCtx, kvs)
-	if len(kvs) > 0 {
-		serverCtx = metainfo.SetMetaInfoFromMap(serverCtx, kvs)
-	}
-	serverCtx = metainfo.TransferForward(serverCtx)
-	// reverse transmission, backward mark
-	serverCtx = metainfo.WithBackwardValuesToSend(serverCtx)
-	return serverCtx
-}
-
-func (kc *serviceInlineClient) constructServerRPCInfo(svrCtx, cliCtx context.Context) (newServerCtx context.Context, svrRPCInfo rpcinfo.RPCInfo) {
-	rpcStats := rpcinfo.AsMutableRPCStats(rpcinfo.NewRPCStats())
-	if kc.serverOpt.StatsLevel != nil {
-		rpcStats.SetLevel(*kc.serverOpt.StatsLevel)
-	}
-	// Export read-only views to external users and keep a mapping for internal users.
-	ri := rpcinfo.NewRPCInfo(
-		rpcinfo.EmptyEndpointInfo(),
-		rpcinfo.FromBasicInfo(kc.serverOpt.Svr),
-		rpcinfo.NewServerInvocation(),
-		rpcinfo.AsMutableRPCConfig(kc.serverOpt.Configs).Clone().ImmutableView(),
-		rpcStats.ImmutableView(),
-	)
-	rpcinfo.AsMutableEndpointInfo(ri.From()).SetAddress(localAddr)
-	svrCtx = rpcinfo.NewCtxWithRPCInfo(svrCtx, ri)
-
-	cliRpcInfo := rpcinfo.GetRPCInfo(cliCtx)
-	// handle common rpcinfo
-	method := cliRpcInfo.To().Method()
-	if ink, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
-		ink.SetMethodName(method)
-		ink.SetServiceName(kc.svcInfo.ServiceName)
-	}
-	rpcinfo.AsMutableEndpointInfo(ri.To()).SetMethod(method)
-	svrCtx = context.WithValue(svrCtx, consts.CtxKeyMethod, method)
-	return svrCtx, ri
-}
-
 func (kc *serviceInlineClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
-	svrTraceCtl := kc.serverOpt.TracerCtl
-	if svrTraceCtl == nil {
-		svrTraceCtl = &rpcinfo.TraceController{}
-	}
-
 	return func(ctx context.Context, req, resp interface{}) (err error) {
-		serverCtx := kc.constructServerCtxWithMetadata(ctx)
-		defer func() {
-			// backward key
-			kvs := metainfo.AllBackwardValuesToSend(serverCtx)
-			if len(kvs) > 0 {
-				metainfo.SetBackwardValuesFromMap(ctx, kvs)
-			}
-		}()
-		serverCtx, svrRPCInfo := kc.constructServerRPCInfo(serverCtx, ctx)
-		defer func() {
-			rpcinfo.PutRPCInfo(svrRPCInfo)
-		}()
-
-		// server trace
-		serverCtx = svrTraceCtl.DoStart(serverCtx, svrRPCInfo)
-
+		cliRpcInfo := rpcinfo.GetRPCInfo(ctx)
+		if v, ok := cliRpcInfo.Invocation().(rpcinfo.InvocationSetter); ok {
+			v.SetExtra(consts.SERVICE_INLINE_SERVICE_NAME, kc.svcInfo.ServiceName)
+		}
+		ctx = context.WithValue(ctx, consts.SERVICE_INLINE_RPCINFO_KEY, unsafe.Pointer(&cliRpcInfo))
 		if kc.contextServiceInlineHandler != nil {
-			serverCtx, err = kc.contextServiceInlineHandler.WriteMeta(ctx, serverCtx, req)
+			ctx, err = kc.contextServiceInlineHandler.WriteMeta(ctx, req)
 			if err != nil {
 				return err
 			}
 		}
 
 		// server logic
-		err = kc.serverEps(serverCtx, req, resp)
-		// finish server trace
-		// contextServiceInlineHandler may convert nil err to non nil err, so handle trace here
-		svrTraceCtl.DoFinish(serverCtx, svrRPCInfo, err)
+		err = kc.serverEps(ctx, req, resp)
 
 		if kc.contextServiceInlineHandler != nil {
-			var err1 error
-			ctx, err1 = kc.contextServiceInlineHandler.ReadMeta(ctx, serverCtx, resp)
+			err1 := kc.contextServiceInlineHandler.ReadMeta(ctx, resp)
 			if err1 != nil {
 				return err1
 			}
