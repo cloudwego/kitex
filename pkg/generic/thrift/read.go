@@ -349,7 +349,7 @@ func readStruct(ctx context.Context, in thrift.TProtocol, t *descriptor.TypeDesc
 						continue
 					}
 				}
-				if err := fs(field, readEmptyValue(field.Type, opt)); err != nil {
+				if err := fs(field, readEmptyValue(field.Type)); err != nil {
 					return nil, err
 				}
 			}
@@ -521,12 +521,38 @@ func unnestPb(opt *readerOption, fieldId int32) func() {
 	}
 }
 
-func readEmptyValue(t *descriptor.TypeDescriptor, opt *readerOption) interface{} {
-	rtype := getRType(t)
-	if rtype == nil {
-		return nil
+func readEmptyValue(t *descriptor.TypeDescriptor) interface{} {
+	switch t.Type {
+	case descriptor.BOOL:
+		return false
+	case descriptor.I08:
+		if t.Name == "byte" {
+			return byte(0)
+		}
+		return int8(0)
+	case descriptor.I16:
+		return int16(0)
+	case descriptor.I32:
+		return int32(0)
+	case descriptor.I64:
+		return int64(0)
+	case descriptor.DOUBLE:
+		return float64(0)
+	case descriptor.STRING:
+		if t.Name == "binary" {
+			return []byte(nil)
+		} else {
+			return ""
+		}
+	case descriptor.LIST, descriptor.SET:
+		return reflect.New(reflect.SliceOf(getRType(t.Elem))).Elem().Interface()
+	case descriptor.MAP:
+		return reflect.New(reflect.MapOf(getRType(t.Key), getRType(t.Elem))).Elem().Interface()
+	case descriptor.STRUCT:
+		return map[string]interface{}(nil)
+	default:
+		panic("unsupported type" + t.Type.String())
 	}
-	return reflect.New(rtype).Elem().Interface()
 }
 
 func getRType(t *descriptor.TypeDescriptor) reflect.Type {
@@ -559,6 +585,6 @@ func getRType(t *descriptor.TypeDescriptor) reflect.Type {
 	case descriptor.STRUCT:
 		return reflect.TypeOf(map[string]interface{}{})
 	default:
-		return nil
+		panic("unsupported type" + t.Type.String())
 	}
 }
