@@ -18,7 +18,12 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
+	"reflect"
+	"strconv"
+	"strings"
 	"testing"
+	"unsafe"
 
 	jsoniter "github.com/json-iterator/go"
 
@@ -27,22 +32,37 @@ import (
 
 var jsoni = jsoniter.ConfigCompatibleWithStandardLibrary
 
+var samples = []struct {
+	name string
+	m    map[string]string
+}{
+	{"10x", prepareMap2(10, 10, 10, 4)},
+	{"100x", prepareMap2(10, 100, 100, 4)},
+	{"1000x", prepareMap2(10, 1000, 1000, 4)},
+}
+
 func BenchmarkMap2JSONStr(b *testing.B) {
-	mapInfo := prepareMap()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		Map2JSONStr(mapInfo)
+	for _, s := range samples {
+		b.Run(s.name, func(b *testing.B) {
+			_, _ = Map2JSONStr(s.m)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _ = Map2JSONStr(s.m)
+			}
+		})
 	}
 }
 
 func BenchmarkJSONStr2Map(b *testing.B) {
-	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.MarshalToString(mapInfo)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		JSONStr2Map(jsonRet)
+	for _, s := range samples {
+		b.Run(s.name, func(b *testing.B) {
+			j, _ := jsoni.MarshalToString(s.m)
+			_, _ = JSONStr2Map(j)
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, _ = JSONStr2Map(j)
+			}
+		})
 	}
 }
 
@@ -88,6 +108,10 @@ func BenchmarkJSONIterUnmarshal(b *testing.B) {
 
 // TestMap2JSONStr test convert map to json string
 func TestMap2JSONStr(t *testing.T) {
+	j, e := Map2JSONStr(map[string]string{})
+	test.Assert(t, e == nil)
+	test.Assert(t, j == EmptyJSON)
+
 	mapInfo := prepareMap()
 
 	jsonRet1, err := Map2JSONStr(mapInfo)
@@ -108,7 +132,32 @@ func TestMap2JSONStr(t *testing.T) {
 	mapInfo = nil
 	jsonRetNil, err := Map2JSONStr(mapInfo)
 	test.Assert(t, err == nil)
-	test.Assert(t, jsonRetNil == "{}")
+	test.Assert(t, jsonRetNil == "{}", jsonRetNil)
+
+	mapRet := map[string]string{
+		"\u4f60\u597d": "\u5468\u6770\u4f26",
+	}
+	act, err := Map2JSONStr(mapRet)
+	test.Assert(t, err == nil)
+	test.Assert(t, act == `{"你好":"周杰伦"}`)
+
+	htmlEsc := map[string]string{
+		"&<>\u2028\u2029": "&<>\u2028\u2029",
+	}
+	htmlAct, err := Map2JSONStr(htmlEsc)
+	test.Assert(t, err == nil)
+	test.Assert(t, htmlAct == `{"\u0026\u003c\u003e\u2028\u2029":"\u0026\u003c\u003e\u2028\u2029"}`, htmlAct)
+
+	key := []byte("\u4f60\u597d")
+	val := []byte("\u5468\u6770\u4f26")
+	illegalUnicodeMapRet := map[string]string{
+		SliceByteToString(key): SliceByteToString(val),
+	}
+	key[0] = 255
+	val[0] = 255
+	act, err = Map2JSONStr(illegalUnicodeMapRet)
+	test.Assert(t, err == nil)
+	test.Assert(t, act == `{"\ufffd\ufffd\ufffd好":"\ufffd\ufffd\ufffd杰伦"}`, act)
 }
 
 // TestJSONStr2Map test convert json string to map
@@ -117,7 +166,9 @@ func TestJSONStr2Map(t *testing.T) {
 	jsonRet, _ := json.Marshal(mapInfo)
 	mapRet, err := JSONStr2Map(string(jsonRet))
 	test.Assert(t, err == nil)
-
+	mapRet2, err := _JSONStr2Map(string(jsonRet))
+	test.Assert(t, err == nil)
+	test.Assert(t, reflect.DeepEqual(mapRet, mapRet2))
 	test.Assert(t, len(mapInfo) == len(mapRet))
 	for k := range mapInfo {
 		test.Assert(t, mapInfo[k] == mapRet[k])
@@ -180,6 +231,11 @@ func TestJSONStr2Map(t *testing.T) {
 	illegalEscapeCharMapRet, err := JSONStr2Map(illegalEscapeCharStr)
 	test.Assert(t, err != nil)
 	test.Assert(t, len(illegalEscapeCharMapRet) == 0)
+
+	htmlEscapeCharStr := `{"\u0026\u003c\u003e\u2028\u2029":"\u0026\u003c\u003e\u2028\u2029"}`
+	htmlEscapeCharMapRet, err := JSONStr2Map(htmlEscapeCharStr)
+	test.Assert(t, err == nil)
+	test.Assert(t, htmlEscapeCharMapRet["&<>\u2028\u2029"] == "&<>\u2028\u2029", fmt.Sprintf("%+v", htmlEscapeCharMapRet))
 }
 
 // TestJSONUtil compare return between encoding/json, json-iterator and json.go
@@ -188,17 +244,22 @@ func TestJSONUtil(t *testing.T) {
 	jsonRet1, _ := json.Marshal(mapInfo)
 	jsonRet2, _ := jsoni.MarshalToString(mapInfo)
 	jsonRet, _ := Map2JSONStr(mapInfo)
+	jsonRet3, _ := _Map2JSONStr(mapInfo)
 
 	var map1 map[string]string
 	json.Unmarshal(jsonRet1, &map1)
 	var map2 map[string]string
 	json.Unmarshal([]byte(jsonRet2), &map2)
+	var map0 map[string]string
+	json.Unmarshal([]byte(jsonRet), &map0)
 	var map3 map[string]string
-	json.Unmarshal([]byte(jsonRet), &map3)
+	json.Unmarshal([]byte(jsonRet3), &map3)
 
-	test.Assert(t, len(map1) == len(map3))
-	test.Assert(t, len(map2) == len(map3))
+	test.Assert(t, len(map1) == len(map0))
+	test.Assert(t, len(map2) == len(map0))
+	test.Assert(t, len(map3) == len(map0))
 	for k := range map1 {
+		test.Assert(t, map2[k] == map0[k])
 		test.Assert(t, map2[k] == map3[k])
 	}
 
@@ -239,7 +300,36 @@ func prepareMap() map[string]string {
 	return mapInfo
 }
 
+func prepareMap2(keyLen, valLen, count, escaped int) map[string]string {
+	mapInfo := make(map[string]string, count)
+	for i := 0; i < count; i++ {
+		key := strings.Repeat("a", keyLen) + strconv.Itoa(i)
+		if i%escaped == 0 {
+			// get escaped
+			key += ","
+		}
+		val := strings.Repeat("b", valLen)
+		if i%escaped == 0 {
+			// get escaped
+			val += ","
+		}
+		mapInfo[string(key)] = string(val)
+	}
+	return mapInfo
+}
+
 func jsonMarshal(userExtraMap map[string]string) (string, error) {
 	ret, err := json.Marshal(userExtraMap)
 	return string(ret), err
+}
+
+func TestJSONRecover(t *testing.T) {
+	var in string
+	(*reflect.StringHeader)(unsafe.Pointer(&in)).Len = 10
+	_, e := JSONStr2Map(in)
+	test.Assert(t, e != nil)
+	_, ee := Map2JSONStr(map[string]string{
+		"a": in,
+	})
+	test.Assert(t, ee != nil)
 }
