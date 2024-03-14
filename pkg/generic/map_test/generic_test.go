@@ -405,7 +405,7 @@ func initThriftClientByIDL(t *testing.T, addr, idl string, base64Binary, byteSli
 	test.Assert(t, err == nil)
 	err = generic.SetBinaryWithByteSlice(g, byteSlice)
 	test.Assert(t, err == nil)
-	err = generic.SetSetFieldsForEmptyStruct(g, setEmptyStruct)
+	err = generic.EnableSetFieldsForEmptyStruct(g, generic.SetFieldsForEmptyStructMode(setEmptyStruct))
 	test.Assert(t, err == nil)
 	cli := newGenericClient("destServiceName", g, addr)
 	test.Assert(t, err == nil)
