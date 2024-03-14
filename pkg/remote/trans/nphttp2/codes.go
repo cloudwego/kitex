@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
 
+// only kitex errors will be converted
 var kitexErrConvTab = map[error]codes.Code{
 	kerrors.ErrInternalException: codes.Internal,
 	kerrors.ErrOverlimit:         codes.ResourceExhausted,
@@ -38,19 +39,22 @@ func convertStatus(err error) *status.Status {
 	if err == nil {
 		return status.New(codes.OK, "")
 	}
-	// biz error should add biz info which is convenient to be recognized by client side
-	var dErr *kerrors.DetailedError
-	if errors.As(err, &dErr) && dErr.Is(kerrors.ErrBiz) {
-		bizErr := dErr.Unwrap()
-		if se, ok := bizErr.(status.Iface); ok {
-			gs := se.GRPCStatus()
-			gs.AppendMessage(fmt.Sprintf("[%s]", kerrors.ErrBiz.Error())).Err()
-			return gs
+	// covert from kitex error
+	if kerrors.IsKitexError(err) {
+		var basicError error
+		var detailedError *kerrors.DetailedError
+		if errors.As(err, &detailedError) {
+			basicError = detailedError.ErrorType()
+			// biz error should add biz info which is convenient to be recognized by client side
+			if st := getStatusForBizErr(detailedError); st != nil {
+				return st
+			}
+		} else {
+			basicError = err
 		}
-		if te, ok := bizErr.(*remote.TransError); ok {
-			return status.New(codes.Code(te.TypeID()), fmt.Sprintf("%s [%s]", bizErr.Error(), kerrors.ErrBiz.Error()))
+		if c, ok := kitexErrConvTab[basicError]; ok {
+			return status.New(c, err.Error())
 		}
-		return status.New(codes.Internal, fmt.Sprintf("%s [%s]", bizErr.Error(), kerrors.ErrBiz.Error()))
 	}
 	// return GRPCStatus() if err is built with status.Error
 	if se, ok := err.(interface{ GRPCStatus() *status.Status }); ok {
@@ -60,9 +64,21 @@ func convertStatus(err error) *status.Status {
 	if te, ok := err.(*remote.TransError); ok {
 		return status.New(codes.Code(te.TypeID()), err.Error())
 	}
-	// covert from kitex error
-	if c, ok := kitexErrConvTab[err]; ok {
-		return status.New(c, err.Error())
-	}
 	return status.New(codes.Internal, err.Error())
+}
+
+func getStatusForBizErr(dErr *kerrors.DetailedError) *status.Status {
+	if !dErr.Is(kerrors.ErrBiz) {
+		return nil
+	}
+	bizErr := dErr.Unwrap()
+	if se, ok := bizErr.(status.Iface); ok {
+		gs := se.GRPCStatus()
+		gs.AppendMessage(fmt.Sprintf("[%s]", kerrors.ErrBiz.Error())).Err()
+		return gs
+	}
+	if te, ok := bizErr.(*remote.TransError); ok {
+		return status.New(codes.Code(te.TypeID()), fmt.Sprintf("%s [%s]", bizErr.Error(), kerrors.ErrBiz.Error()))
+	}
+	return status.New(codes.Internal, fmt.Sprintf("%s [%s]", bizErr.Error(), kerrors.ErrBiz.Error()))
 }
