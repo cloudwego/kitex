@@ -45,6 +45,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // Server is an abstraction of an RPC server. It accepts connections and dispatches them to the service
@@ -337,7 +338,16 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 			// clear session
 			backup.ClearCtx()
 		}()
-		implHandlerFunc := svcInfo.MethodInfo(methodName).Handler()
+		methodInfo := svcInfo.MethodInfo(methodName)
+		if methodInfo.IsStreaming() && s.opt.EnableStreamingContextPassThrough {
+			if sArg, ok := args.(*streaming.Args); ok {
+				sArg.Stream = &contextStream{
+					Stream: sArg.Stream,
+					ctx:    ctx,
+				}
+			}
+		}
+		implHandlerFunc := methodInfo.Handler()
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)
@@ -353,6 +363,17 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		}
 		return err
 	}
+}
+
+// contextStream is used to return the ctx node passed in by server middlewares which might contain new key/values
+type contextStream struct {
+	streaming.Stream
+	ctx context.Context
+}
+
+// Context implements streaming.Stream
+func (s *contextStream) Context() context.Context {
+	return s.ctx
 }
 
 func (s *server) initBasicRemoteOption() {
