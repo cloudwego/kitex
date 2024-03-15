@@ -21,6 +21,7 @@ import (
 	"io"
 	"sync/atomic"
 
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 
@@ -164,6 +165,8 @@ func (s *stream) Context() context.Context {
 func (s *stream) RecvMsg(m interface{}) (err error) {
 	err = s.recvEndpoint(s.stream, m)
 	if err == nil {
+		// BizStatusErr is returned by the server handle, meaning the stream is ended;
+		// And it should be returned to the calling business code for error handling
 		err = s.ri.Invocation().BizStatusErr()
 	}
 	if err != nil || s.streamingMode == serviceinfo.StreamingClient {
@@ -193,10 +196,23 @@ func (s *stream) DoFinish(err error) {
 		// already called
 		return
 	}
-	if err == io.EOF {
+	if !isRPCError(err) {
+		// only rpc errors are reported
 		err = nil
 	}
 	ctx := s.Context()
 	ri := rpcinfo.GetRPCInfo(ctx)
 	s.kc.opt.TracerCtl.DoFinish(ctx, ri, err)
+}
+
+func isRPCError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if err == io.EOF {
+		return false
+	}
+	_, isBizStatusError := err.(kerrors.BizStatusErrorIface)
+	// if a tracer needs to get the BizStatusError, it should read from rpcinfo.invocation.bizStatusErr
+	return !isBizStatusError
 }

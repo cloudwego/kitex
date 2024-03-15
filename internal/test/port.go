@@ -17,6 +17,7 @@ package test
 import (
 	"fmt"
 	"hash/fnv"
+	"math/rand"
 	"net"
 	"os"
 	"runtime/debug"
@@ -44,7 +45,8 @@ var curPort uint32 = UnixUserPortStart + hashInt(os.Getpid())%200*200
 // This API ensures no repeated addr returned in one UNIX OS
 func GetLocalAddress() string {
 	for {
-		port := atomic.AddUint32(&curPort, 1)
+		time.Sleep(time.Millisecond * time.Duration(1+rand.Intn(10)))
+		port := atomic.AddUint32(&curPort, 1+uint32(rand.Intn(10)))
 		addr := "127.0.0.1:" + strconv.Itoa(int(port))
 		if !IsAddressInUse(addr) {
 			trace := strings.Split(string(debug.Stack()), "\n")
@@ -59,7 +61,7 @@ func GetLocalAddress() string {
 // tells if a net address is already in use.
 func IsAddressInUse(address string) bool {
 	// Attempt to establish a TCP connection to the address
-	conn, err := net.DialTimeout("tcp", address, 1*time.Second)
+	conn, err := net.DialTimeout("tcp", address, time.Duration(1+rand.Intn(10))*100*time.Millisecond)
 	if err != nil {
 		// If there's an error, the address is likely not in use or not reachable
 		return false

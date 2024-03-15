@@ -1,4 +1,18 @@
 /*
+ * Copyright 2024 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  * MIT License
  *
  * Copyright (c) 2016 json-iterator
@@ -70,14 +84,10 @@ const (
 )
 
 // Map2JSONStr transform map[string]string to json str, perf is better than use json lib directly
-func Map2JSONStr(mapInfo map[string]string) (str string, err error) {
+func _Map2JSONStr(mapInfo map[string]string) (str string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			if e, ok := r.(error); ok {
-				err = fmt.Errorf("Map2JSONStr panic: %w", e)
-			} else {
-				err = fmt.Errorf("Map2JSONStr panic: %+v", r)
-			}
+			err = fmt.Errorf("Map2JSONStr panic: %+v", r)
 		}
 	}()
 	size := len(mapInfo)
@@ -110,14 +120,10 @@ func Map2JSONStr(mapInfo map[string]string) (str string, err error) {
 }
 
 // JSONStr2Map transform json str to map[string]string, perf is better than use json lib directly
-func JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
+func _JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			if e, ok := r.(error); ok {
-				err = fmt.Errorf("JSONStr2Map panic: %w", e)
-			} else {
-				err = fmt.Errorf("JSONStr2Map panic: %+v", r)
-			}
+			err = fmt.Errorf("JSONStr2Map panic: %+v", r)
 		}
 	}()
 	data := []byte(jsonStr)
@@ -132,7 +138,7 @@ func JSONStr2Map(jsonStr string) (mapInfo map[string]string, err error) {
 	if idx, isNull = checkNull(c, data, idx, lastIdx); isNull {
 		return
 	}
-	if c != LeftBrace || data[size-1] != RightBrace {
+	if c != LeftBrace {
 		err = fmt.Errorf("json str is invalid")
 		return
 	}

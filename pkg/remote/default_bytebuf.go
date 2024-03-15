@@ -36,7 +36,6 @@ func init() {
 }
 
 // NewWriterBuffer is used to create a defaultByteBuffer using the given size.
-// NOTICE: defaultByteBuffer is only used for testing.
 func NewWriterBuffer(size int) ByteBuffer {
 	return newWriterByteBuffer(size)
 }

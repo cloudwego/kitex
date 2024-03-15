@@ -82,11 +82,12 @@ func NewReadStructForJSON(svc *descriptor.ServiceDescriptor, isClient bool) *Rea
 
 // ReadStruct implement of MessageReaderWithMethod
 type ReadStruct struct {
-	svc                 *descriptor.ServiceDescriptor
-	isClient            bool
-	forJSON             bool
-	binaryWithBase64    bool
-	binaryWithByteSlice bool
+	svc                     *descriptor.ServiceDescriptor
+	isClient                bool
+	forJSON                 bool
+	binaryWithBase64        bool
+	binaryWithByteSlice     bool
+	setFieldsForEmptyStruct uint8
 }
 
 var _ MessageReader = (*ReadStruct)(nil)
@@ -96,6 +97,15 @@ var _ MessageReader = (*ReadStruct)(nil)
 func (m *ReadStruct) SetBinaryOption(base64, byteSlice bool) {
 	m.binaryWithBase64 = base64
 	m.binaryWithByteSlice = byteSlice
+}
+
+// SetBinaryOption enable/disable set all fields in map-generic even if a struct is empty
+//
+//	mode == 0 means disable
+//	mode == 1 means only set required and default fields
+//	mode == 2 means set all fields
+func (m *ReadStruct) SetSetFieldsForEmptyStruct(mode uint8) {
+	m.setFieldsForEmptyStruct = mode
 }
 
 // Read ...
@@ -108,5 +118,5 @@ func (m *ReadStruct) Read(ctx context.Context, method string, in thrift.TProtoco
 	if !m.isClient {
 		fDsc = fnDsc.Request
 	}
-	return skipStructReader(ctx, in, fDsc, &readerOption{throwException: true, forJSON: m.forJSON, binaryWithBase64: m.binaryWithBase64, binaryWithByteSlice: m.binaryWithByteSlice})
+	return skipStructReader(ctx, in, fDsc, &readerOption{throwException: true, forJSON: m.forJSON, binaryWithBase64: m.binaryWithBase64, binaryWithByteSlice: m.binaryWithByteSlice, setFieldsForEmptyStruct: m.setFieldsForEmptyStruct})
 }

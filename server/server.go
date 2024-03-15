@@ -104,18 +104,6 @@ func (s *server) init() {
 	s.buildStreamInvokeChain()
 }
 
-func (s *server) Endpoints() endpoint.Endpoint {
-	return s.eps
-}
-
-func (s *server) SetEndpoints(e endpoint.Endpoint) {
-	s.eps = e
-}
-
-func (s *server) Option() *internal_server.Options {
-	return s.opt
-}
-
 func fillContext(opt *internal_server.Options) context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
