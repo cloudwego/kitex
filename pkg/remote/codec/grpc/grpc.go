@@ -24,6 +24,7 @@ import (
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/fastpb"
+	"github.com/cloudwego/kitex/pkg/generic"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -132,6 +133,15 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 			payload, err = proto.Marshal(t)
 		case protobuf.ProtobufMsgCodec:
 			payload, err = t.Marshal(nil)
+		case *generic.Args:
+			//TODO: handle compress
+			if !isCompressed {
+				req := t.Request.([]byte)
+				payload = mallocWithFirstByteZeroed(len(req) + dataFrameHeaderLen)
+				binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(len(req)))
+				copy(payload[dataFrameHeaderLen:], req)
+			}
+			return writer.WriteData(payload)
 		default:
 			return ErrInvalidPayload
 		}
@@ -194,6 +204,9 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 			return proto.Unmarshal(d, t)
 		case protobuf.ProtobufMsgCodec:
 			return t.Unmarshal(d)
+		case *generic.Result:
+			t.Success = d
+			return nil
 		default:
 			return ErrInvalidPayload
 		}
