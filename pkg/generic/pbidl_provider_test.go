@@ -60,3 +60,15 @@ func TestPbContentProviderDynamicGo(t *testing.T) {
 	svcDsc := <-p.Provide()
 	test.Assert(t, svcDsc != nil)
 }
+
+func TestPbFileProviderWithDynamicGo(t *testing.T) {
+	path := "./jsonpb_test/idl/echo_import.proto"
+
+	opts := dproto.Options{}
+	p, err := NewPbFileProviderWithDynamicGo(path, context.Background(), opts, "./jsonpb_test/idl")
+
+	test.Assert(t, err == nil)
+
+	svcDsc := <-p.Provide()
+	test.Assert(t, svcDsc != nil)
+}

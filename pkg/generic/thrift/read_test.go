@@ -26,6 +26,7 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/jhump/protoreflect/desc/protoparse"
+	"github.com/stretchr/testify/require"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -538,6 +539,17 @@ func Test_readStruct(t *testing.T) {
 			return "world", nil
 		},
 	}
+	mockTTransport2 := &mocks.MockThriftTTransport{
+		ReadStructBeginFunc: func() (name string, err error) {
+			return "Demo", nil
+		},
+		ReadFieldBeginFunc: func() (name string, typeID thrift.TType, id int16, err error) {
+			return "", thrift.STOP, 0, nil
+		},
+		ReadStringFunc: func() (string, error) {
+			return "world", nil
+		},
+	}
 	readError := false
 	mockTTransportError := &mocks.MockThriftTTransport{
 		ReadStructBeginFunc: func() (name string, err error) {
@@ -564,6 +576,78 @@ func Test_readStruct(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
+		{
+			"readStruct with setFieldsForEmptyStruct",
+			args{in: mockTTransport2, t: &descriptor.TypeDescriptor{
+				Type: descriptor.STRUCT,
+				Struct: &descriptor.StructDescriptor{
+					FieldsByID: map[int32]*descriptor.FieldDescriptor{
+						1:  {Name: "string", Type: &descriptor.TypeDescriptor{Type: descriptor.STRING, Name: "string"}},
+						2:  {Name: "byte", Type: &descriptor.TypeDescriptor{Type: descriptor.BYTE, Name: "byte"}},
+						3:  {Name: "i8", Type: &descriptor.TypeDescriptor{Type: descriptor.I08, Name: "i8"}},
+						4:  {Name: "i16", Type: &descriptor.TypeDescriptor{Type: descriptor.I16, Name: "i16"}},
+						5:  {Name: "i32", Type: &descriptor.TypeDescriptor{Type: descriptor.I32, Name: "i32"}},
+						6:  {Name: "i64", Type: &descriptor.TypeDescriptor{Type: descriptor.I64, Name: "i64"}},
+						7:  {Name: "double", Type: &descriptor.TypeDescriptor{Type: descriptor.DOUBLE, Name: "double"}},
+						8:  {Name: "list", Type: &descriptor.TypeDescriptor{Type: descriptor.LIST, Name: "list", Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING, Name: "binary"}}},
+						9:  {Name: "set", Type: &descriptor.TypeDescriptor{Type: descriptor.SET, Name: "set", Elem: &descriptor.TypeDescriptor{Type: descriptor.BOOL}}},
+						10: {Name: "map", Type: &descriptor.TypeDescriptor{Type: descriptor.MAP, Name: "map", Key: &descriptor.TypeDescriptor{Type: descriptor.STRING, Name: "string"}, Elem: &descriptor.TypeDescriptor{Type: descriptor.DOUBLE}}},
+						11: {Name: "struct", Type: &descriptor.TypeDescriptor{Type: descriptor.STRUCT}},
+						12: {Name: "list-list", Type: &descriptor.TypeDescriptor{Type: descriptor.LIST, Name: "list", Elem: &descriptor.TypeDescriptor{Type: descriptor.LIST, Name: "list", Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING, Name: "binary"}}}},
+						13: {Name: "map-list", Type: &descriptor.TypeDescriptor{Type: descriptor.MAP, Name: "map", Key: &descriptor.TypeDescriptor{Type: descriptor.STRING, Name: "string"}, Elem: &descriptor.TypeDescriptor{Type: descriptor.LIST, Name: "list", Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING, Name: "binary"}}}},
+					},
+				},
+			}, opt: &readerOption{setFieldsForEmptyStruct: 1}},
+			map[string]interface{}{
+				"string":    "",
+				"byte":      byte(0),
+				"i8":        int8(0),
+				"i16":       int16(0),
+				"i32":       int32(0),
+				"i64":       int64(0),
+				"double":    float64(0),
+				"list":      [][]byte(nil),
+				"set":       []bool(nil),
+				"map":       map[string]float64(nil),
+				"struct":    map[string]interface{}(nil),
+				"list-list": [][][]byte(nil),
+				"map-list":  map[string][][]byte(nil),
+			},
+			false,
+		},
+		{
+			"readStruct with setFieldsForEmptyStruct optional",
+			args{in: mockTTransport2, t: &descriptor.TypeDescriptor{
+				Type: descriptor.STRUCT,
+				Struct: &descriptor.StructDescriptor{
+					FieldsByID: map[int32]*descriptor.FieldDescriptor{
+						1:  {Name: "string", Type: &descriptor.TypeDescriptor{Type: descriptor.STRING, Name: "string"}},
+						2:  {Name: "byte", Type: &descriptor.TypeDescriptor{Type: descriptor.BYTE, Name: "byte"}, Optional: true},
+						3:  {Name: "i8", Type: &descriptor.TypeDescriptor{Type: descriptor.I08, Name: "i8"}},
+						4:  {Name: "i16", Type: &descriptor.TypeDescriptor{Type: descriptor.I16, Name: "i16"}},
+						5:  {Name: "i32", Type: &descriptor.TypeDescriptor{Type: descriptor.I32, Name: "i32"}},
+						6:  {Name: "i64", Type: &descriptor.TypeDescriptor{Type: descriptor.I64, Name: "i64"}},
+						7:  {Name: "double", Type: &descriptor.TypeDescriptor{Type: descriptor.DOUBLE, Name: "double"}},
+						8:  {Name: "list", Type: &descriptor.TypeDescriptor{Type: descriptor.LIST, Name: "list", Elem: &descriptor.TypeDescriptor{Type: descriptor.I08}}},
+						9:  {Name: "set", Type: &descriptor.TypeDescriptor{Type: descriptor.SET, Name: "set", Elem: &descriptor.TypeDescriptor{Type: descriptor.I16}}},
+						10: {Name: "map", Type: &descriptor.TypeDescriptor{Type: descriptor.MAP, Name: "map", Key: &descriptor.TypeDescriptor{Type: descriptor.I32}, Elem: &descriptor.TypeDescriptor{Type: descriptor.I64}}},
+						11: {Name: "struct", Type: &descriptor.TypeDescriptor{Type: descriptor.STRUCT}, Optional: true},
+					},
+				},
+			}, opt: &readerOption{setFieldsForEmptyStruct: 1}},
+			map[string]interface{}{
+				"string": "",
+				"i8":     int8(0),
+				"i16":    int16(0),
+				"i32":    int32(0),
+				"i64":    int64(0),
+				"double": float64(0),
+				"list":   []int8(nil),
+				"set":    []int16(nil),
+				"map":    map[int32]int64(nil),
+			},
+			false,
+		},
 		{
 			"readStruct",
 			args{in: mockTTransport, t: &descriptor.TypeDescriptor{
@@ -598,9 +682,7 @@ func Test_readStruct(t *testing.T) {
 				t.Errorf("readStruct() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readStruct() = %v, want %v", got, tt.want)
-			}
+			require.Equal(t, tt.want, got)
 		})
 	}
 }

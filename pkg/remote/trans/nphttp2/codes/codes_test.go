@@ -17,6 +17,7 @@
 package codes
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -49,4 +50,11 @@ func TestUnmarshalJSON(t *testing.T) {
 	code = nil
 	err = code.UnmarshalJSON([]byte("\"DATA_LOSS\""))
 	test.Assert(t, err != nil, err)
+}
+
+func TestCodeString(t *testing.T) {
+	c := OK
+	test.Assert(t, c.String() == "OK")
+	c = _maxCode
+	test.Assert(t, c.String() == "Code("+strconv.FormatInt(int64(c), 10)+")")
 }

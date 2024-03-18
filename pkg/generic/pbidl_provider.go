@@ -109,12 +109,12 @@ func (p *PbContentProvider) Close() error {
 }
 
 // PbFileProviderWithDynamicGo
-func NewPbFileProviderWithDynamicGo(main string, ctx context.Context, options dproto.Options) (PbDescriptorProviderDynamicGo, error) {
+func NewPbFileProviderWithDynamicGo(main string, ctx context.Context, options dproto.Options, importDirs ...string) (PbDescriptorProviderDynamicGo, error) {
 	p := &PbFileProviderWithDynamicGo{
 		svcs: make(chan *dproto.ServiceDescriptor, 1),
 	}
 
-	svc, err := options.NewDescriptorFromPath(ctx, main)
+	svc, err := options.NewDescriptorFromPath(ctx, main, importDirs...)
 	if err != nil {
 		return nil, err
 	}

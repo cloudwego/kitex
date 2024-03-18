@@ -30,11 +30,11 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
 - **多传输协议**
 
-  传输协议封装消息协议进行 RPC 互通，传输协议可以额外透传元信息，用于服务治理，Kitex 支持的传输协议有 **TTHeader**、**HTTP2**。TTHeader 可以和 Thrift、Kitex Protobuf 结合使用；HTTP2 目前主要是结合 gRPC 协议使用，后续也会支持 Thrift。
+  传输协议封装消息协议进行 RPC 互通，传输协议可以额外透传元信息，用于服务治理，Kitex 支持的传输协议有 **TTHeader**、**HTTP2**。TTHeader 可以和 Thrift、Kitex Protobuf 结合使用。
 
 - **多种消息类型**
 
-  支持 **PingPong**、**Oneway**、**双向 Streaming**。其中 Oneway 目前只对 Thrift 协议支持，双向 Streaming 只对 gRPC 支持，后续会考虑支持 Thrift 的双向 Streaming。
+  支持 **PingPong**、**Oneway**、**双向 Streaming**。其中 Oneway 目前只对 Thrift 协议支持。
 
 - **服务治理**
 
@@ -74,6 +74,9 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
     - 关于应用层传输协议 TTHeader、异常说明与版本管理，请参考[文档](https://www.cloudwego.io/zh/docs/kitex/reference/)。
 
+  - **最佳实践**
+    - Kitex 在生产环境下的最佳实践，如优雅停机、错误处理、集成测试，详见：[文档](https://www.cloudwego.io/zh/docs/kitex/best-practice/)
+
   - **FAQ**
     - 请参考 [FAQ](https://www.cloudwego.io/zh/docs/kitex/faq/)。
 ## 框架性能
@@ -91,6 +94,7 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
 ## 相关文章
 
+- [Kitex 两周年回顾 — 能力升级、社区合作与未来展望](https://www.cloudwego.io/zh/blog/2023/11/30/kitex-%E4%B8%A4%E5%91%A8%E5%B9%B4%E5%9B%9E%E9%A1%BE-%E8%83%BD%E5%8A%9B%E5%8D%87%E7%BA%A7%E7%A4%BE%E5%8C%BA%E5%90%88%E4%BD%9C%E4%B8%8E%E6%9C%AA%E6%9D%A5%E5%B1%95%E6%9C%9B/)
 - [高性能 RPC 框架 CloudWeGo-Kitex 内外统一的开源实践](https://www.cloudwego.io/zh/blog/2022/09/20/%E9%AB%98%E6%80%A7%E8%83%BD-rpc-%E6%A1%86%E6%9E%B6-cloudwego-kitex-%E5%86%85%E5%A4%96%E7%BB%9F%E4%B8%80%E7%9A%84%E5%BC%80%E6%BA%90%E5%AE%9E%E8%B7%B5/)
 - [字节跳动 Go RPC 框架 Kitex 性能优化实践](https://www.cloudwego.io/zh/blog/2021/09/23/%E5%AD%97%E8%8A%82%E8%B7%B3%E5%8A%A8-go-rpc-%E6%A1%86%E6%9E%B6-kitex-%E6%80%A7%E8%83%BD%E4%BC%98%E5%8C%96%E5%AE%9E%E8%B7%B5/)
 - [字节跳动在 Go 网络库上的实践](https://www.cloudwego.io/zh/blog/2021/10/09/%E5%AD%97%E8%8A%82%E8%B7%B3%E5%8A%A8%E5%9C%A8-go-%E7%BD%91%E7%BB%9C%E5%BA%93%E4%B8%8A%E7%9A%84%E5%AE%9E%E8%B7%B5/)
@@ -98,7 +102,7 @@ Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高
 
 ## 贡献代码
 
-[Contributing](CONTRIBUTING.md)。
+贡献者指南：[Contributing](CONTRIBUTING.md)。
 
 ## 开源许可
 
@@ -109,14 +113,14 @@ Kitex 基于[Apache License 2.0](LICENSE) 许可证，其依赖的三方组件�
 - 如何成为 member: [COMMUNITY MEMBERSHIP](https://github.com/cloudwego/community/blob/main/COMMUNITY_MEMBERSHIP.md)
 - Issues: [Issues](https://github.com/cloudwego/kitex/issues)
 - Slack: 加入我们的 [Slack 频道](https://join.slack.com/t/cloudwego/shared_invite/zt-tmcbzewn-UjXMF3ZQsPhl7W3tEDZboA)
-- 飞书用户群（[注册飞书](https://www.feishu.cn/)进群）
+- 飞书用户群（[注册飞书](https://www.feishu.cn/)后扫码进群）
 
   ![LarkGroup](images/lark_group_cn.png)
 
 ## Landscapes
 
 <p align="center">
-<img src="https://landscape.cncf.io/images/left-logo.svg" width="150"/>&nbsp;&nbsp;<img src="https://landscape.cncf.io/images/right-logo.svg" width="200"/>
+<img src="https://landscape.cncf.io/images/cncf-landscape-horizontal-color.svg" width="150"/>&nbsp;&nbsp;<img src="https://www.cncf.io/wp-content/uploads/2023/04/cncf-main-site-logo.svg" width="200"/>
 <br/><br/>
 CloudWeGo 丰富了 <a href="https://landscape.cncf.io/">CNCF 云原生生态</a>。
 </p>

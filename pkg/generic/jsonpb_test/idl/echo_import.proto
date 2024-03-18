@@ -1,0 +1,11 @@
+syntax = "proto3";
+package test;
+
+import "echo.proto";
+// The greeting service definition.
+option go_package = "./";
+
+
+service EchoService {
+  rpc Echo (test.Request) returns (test.Response) {}
+}
