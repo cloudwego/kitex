@@ -22,9 +22,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"unsafe"
 
 	"github.com/apache/thrift/lib/go/thrift"
 
+	"github.com/cloudwego/kitex/internal/sys"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -296,6 +298,7 @@ func (binaryProtocol) ReadStructEnd(buf []byte) (int, error) {
 }
 
 func (binaryProtocol) ReadFieldBegin(buf []byte) (name string, typeID thrift.TType, id int16, length int, err error) {
+	sys.Prefetch(uintptr(unsafe.Pointer(&buf[0])))
 	t, l, e := Binary.ReadByte(buf)
 	length += l
 	typeID = thrift.TType(t)
