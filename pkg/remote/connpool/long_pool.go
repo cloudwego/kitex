@@ -117,7 +117,7 @@ func newPool(minIdle, maxIdle int, maxIdleTimeout time.Duration) *pool {
 
 // pool implements a pool of long connections.
 type pool struct {
-	idleList []*longConn
+	idleList []*longConn // idleList Get/Put by FILO(stack) but Evict by FIFO(queue)
 	mu       sync.RWMutex
 	// config
 	minIdle        int
@@ -130,24 +130,26 @@ func (p *pool) Get() (*longConn, bool, int) {
 	p.mu.Lock()
 	// Get the first active one
 	n := len(p.idleList)
-	i := n - 1
-	for ; i >= 0; i-- {
-		o := p.idleList[i]
+	selected := n - 1
+	for ; selected >= 0; selected-- {
+		o := p.idleList[selected]
+		// reset slice element to nil, active conn object only could be hold reference by user function
+		p.idleList[selected] = nil
 		if o.IsActive() {
-			p.idleList = p.idleList[:i]
+			p.idleList = p.idleList[:selected]
 			p.mu.Unlock()
-			return o, true, n - i
+			return o, true, n - selected
 		}
 		// inactive object
 		o.Close()
 	}
 	// in case all objects are inactive
-	if i < 0 {
-		i = 0
+	if selected < 0 {
+		selected = 0
 	}
-	p.idleList = p.idleList[:i]
+	p.idleList = p.idleList[:selected]
 	p.mu.Unlock()
-	return nil, false, n - i
+	return nil, false, n - selected
 }
 
 // Put puts back a connection to the pool.
@@ -164,19 +166,24 @@ func (p *pool) Put(o *longConn) bool {
 }
 
 // Evict cleanups the expired connections.
-func (p *pool) Evict() int {
+// Evict returns how many connections has been evicted.
+func (p *pool) Evict() (evicted int) {
 	p.mu.Lock()
-	i := 0
-	for ; i < len(p.idleList)-p.minIdle; i++ {
-		if !p.idleList[i].Expired() {
+	nonIdle := len(p.idleList) - p.minIdle
+	// clear non idle connections
+	for ; evicted < nonIdle; evicted++ {
+		if !p.idleList[evicted].Expired() {
 			break
 		}
 		// close the inactive object
-		p.idleList[i].Close()
+		p.idleList[evicted].Close()
+		// reset slice element to nil, otherwise it will cause the connections will never be destroyed
+		// TODO: use clear(unused_slice) when we no need to care about < go1.18
+		p.idleList[evicted] = nil
 	}
-	p.idleList = p.idleList[i:]
+	p.idleList = p.idleList[evicted:]
 	p.mu.Unlock()
-	return i
+	return evicted
 }
 
 // Len returns the length of the pool.
