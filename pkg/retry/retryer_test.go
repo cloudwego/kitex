@@ -18,12 +18,14 @@ package retry
 
 import (
 	"context"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/circuitbreak"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -915,7 +917,7 @@ func TestNewRetryContainerWithOptions(t *testing.T) {
 	})
 
 	t.Run("percentage_limit&&cbOptions", func(t *testing.T) {
-		cbSuite := newCBSuite()
+		cbSuite := newCBSuite(nil)
 		rc := NewRetryContainer(
 			WithContainerEnablePercentageLimit(),
 			WithContainerCBSuite(cbSuite),
@@ -934,23 +936,57 @@ func TestNewRetryContainerWithOptions(t *testing.T) {
 	})
 
 	t.Run("cb_suite", func(t *testing.T) {
-		cbs := newCBSuite()
+		cbs := newCBSuite(nil)
 		rc := NewRetryContainer(WithContainerCBSuite(cbs))
 		test.Assert(t, rc.cbContainer.cbSuite == cbs, "cbSuite expected %p, got %p", cbs, rc.cbContainer.cbSuite)
 	})
 
 	t.Run("cb_control&cb_panel", func(t *testing.T) {
-		cbs := newCBSuite()
+		cbs := newCBSuite(nil)
 		rc := NewRetryContainer(
 			WithContainerCBControl(cbs.ServiceControl()),
 			WithContainerCBPanel(cbs.ServicePanel()))
 		test.Assert(t, rc.cbContainer.cbCtl == cbs.ServiceControl(), "cbControl not match")
 		test.Assert(t, rc.cbContainer.cbPanel == cbs.ServicePanel(), "cbPanel not match")
 	})
+
+	t.Run("CBSuiteOptions", func(t *testing.T) {
+		f := func(ctx context.Context, request, response interface{}, err error) circuitbreak.ErrorType {
+			return circuitbreak.TypeSuccess
+		}
+		opts := []circuitbreak.CBSuiteOption{
+			circuitbreak.WithServiceGetErrorType(f),
+		}
+
+		// test
+		rc := NewRetryContainer(WithContainerCBSuiteOptions(opts...))
+		serviceControl := rc.cbContainer.cbSuite.ServiceControl()
+
+		// check
+		test.Assert(t, len(rc.cbContainer.cbSuiteOptions) == 1)
+		test.Assert(t, reflect.ValueOf(serviceControl.GetErrorType).Pointer() == reflect.ValueOf(f).Pointer())
+	})
+
+	t.Run("CBSuiteOptions&PercentageLimit", func(t *testing.T) {
+		f := func(ctx context.Context, request, response interface{}, err error) circuitbreak.ErrorType {
+			return circuitbreak.TypeSuccess
+		}
+		opts := []circuitbreak.CBSuiteOption{
+			circuitbreak.WithServiceGetErrorType(f),
+		}
+
+		// test
+		rc := NewRetryContainer(WithContainerEnablePercentageLimit(), WithContainerCBSuiteOptions(opts...))
+		serviceControl := rc.cbContainer.cbSuite.ServiceControl()
+
+		// check
+		test.Assert(t, len(rc.cbContainer.cbSuiteOptions) == 1)
+		test.Assert(t, reflect.ValueOf(serviceControl.GetErrorType).Pointer() == reflect.ValueOf(f).Pointer())
+	})
 }
 
 func TestNewRetryContainerWithCBStat(t *testing.T) {
-	cbs := newCBSuite()
+	cbs := newCBSuite(nil)
 	rc := NewRetryContainerWithCBStat(cbs.ServiceControl(), cbs.ServicePanel())
 	test.Assert(t, rc.cbContainer.cbCtl == cbs.ServiceControl(), "cbControl not match")
 	test.Assert(t, rc.cbContainer.cbPanel == cbs.ServicePanel(), "cbPanel not match")
@@ -959,7 +995,7 @@ func TestNewRetryContainerWithCBStat(t *testing.T) {
 }
 
 func TestNewRetryContainerWithCB(t *testing.T) {
-	cbs := newCBSuite()
+	cbs := newCBSuite(nil)
 	rc := NewRetryContainerWithCB(cbs.ServiceControl(), cbs.ServicePanel())
 	test.Assert(t, rc.cbContainer.cbCtl == cbs.ServiceControl(), "cbControl not match")
 	test.Assert(t, rc.cbContainer.cbPanel == cbs.ServicePanel(), "cbPanel not match")
