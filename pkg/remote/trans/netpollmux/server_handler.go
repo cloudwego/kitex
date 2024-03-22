@@ -252,7 +252,6 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	}
 
 	svcInfo := recvMsg.ServiceInfo()
-	t.targetSvcInfo = svcInfo
 	if recvMsg.MessageType() == remote.Heartbeat {
 		sendMsg = remote.NewMessage(nil, svcInfo, rpcInfo, remote.Heartbeat, remote.Server)
 	} else {
