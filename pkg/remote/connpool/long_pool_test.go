@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -831,8 +833,12 @@ func TestLongConnPoolEvict(t *testing.T) {
 	opt := dialer.ConnOption{Dialer: d, ConnectTimeout: time.Second}
 	// get a new conn
 	var conns []net.Conn
+	aliveconns := int32(maxIdle)
 	for i := 0; i < maxIdle; i++ {
 		c, err := p.Get(context.TODO(), network, address, opt)
+		runtime.SetFinalizer(c, func(_ interface{}) {
+			atomic.AddInt32(&aliveconns, -1)
+		})
 		test.Assert(t, err == nil)
 		conns = append(conns, c)
 	}
@@ -841,6 +847,7 @@ func TestLongConnPoolEvict(t *testing.T) {
 		err := p.Put(conns[i])
 		test.Assert(t, err == nil)
 	}
+	conns = []net.Conn{}
 
 	// only `minIdle` of connections should be kept in the pool
 	// 3 times of idleTime to make sure the eviction goroutine can be done
@@ -850,10 +857,17 @@ func TestLongConnPoolEvict(t *testing.T) {
 		test.Assert(t, v.Len() == minIdle)
 		return true
 	})
+	for i := 0; i < 3; i++ {
+		runtime.GC()
+		if atomic.LoadInt32(&aliveconns) == int32(minIdle) {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	test.DeepEqual(t, atomic.LoadInt32(&aliveconns), int32(minIdle))
 	// globalIdle should also be decreased when evicting
 	test.Assert(t, int(p.globalIdle.Now()) == minIdle, p.globalIdle.Now())
 	// get after eviction
-	conns = []net.Conn{}
 	for i := 0; i < maxIdle; i++ {
 		c, err := p.Get(context.TODO(), network, address, opt)
 		test.Assert(t, err == nil)
