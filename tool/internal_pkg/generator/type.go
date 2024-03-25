@@ -187,7 +187,6 @@ func AddTemplateFunc(key string, f interface{}) {
 
 var templateNames = []string{
 	"@client.go-NewClient-option",
-	"@client.go-NewStreamClient-option",
 	"@client.go-EOF",
 	"@server.go-NewServer-option",
 	"@server.go-EOF",
