@@ -26,6 +26,7 @@ package thrift
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks/thrift/fast"
@@ -98,10 +99,10 @@ func TestHyperCodecCheck(t *testing.T) {
 
 	// test hyperMessageUnmarshal check
 	codec = &thriftCodec{FrugalRead}
-	test.Assert(t, hyperMessageUnmarshalAvailable(&MockNoTagArgs{}, msg.PayloadLen()) == false)
-	test.Assert(t, hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg.PayloadLen()) == false)
+	test.Assert(t, codec.hyperMessageUnmarshalAvailable(&MockNoTagArgs{}, msg.PayloadLen()) == false)
+	test.Assert(t, codec.hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg.PayloadLen()) == false)
 	msg.SetPayloadLen(1)
-	test.Assert(t, hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg.PayloadLen()) == true)
+	test.Assert(t, codec.hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg.PayloadLen()) == true)
 }
 
 func TestFrugalCodec(t *testing.T) {
@@ -213,6 +214,43 @@ func TestUnmarshalThriftDataFrugal(t *testing.T) {
 	// Basic can be used for disabling frugal
 	err := UnmarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), "mock", mockReqThrift, req)
 	test.Assert(t, err != nil, err)
+}
+
+func TestThriftCodec_unmarshalThriftDataFrugal(t *testing.T) {
+	t.Run("Frugal with SkipDecoder enabled", func(t *testing.T) {
+		req := &MockFrugalTagReq{}
+		codec := &thriftCodec{FrugalRead | EnableSkipDecoder}
+		tProt := NewBinaryProtocol(remote.NewReaderBuffer(mockReqThrift))
+		defer tProt.Recycle()
+		// specify dataLen with 0 so that skipDecoder works
+		err := codec.unmarshalThriftData(context.Background(), tProt, "mock", req, 0)
+		checkDecodeResult(t, err, &fast.MockReq{
+			Msg:     req.Msg,
+			StrList: req.StrList,
+			StrMap:  req.StrMap,
+		})
+	})
+
+	t.Run("Frugal with SkipDecoder enabled, failed in using SkipDecoder Buffer", func(t *testing.T) {
+		req := &MockFrugalTagReq{}
+		codec := &thriftCodec{FrugalRead | EnableSkipDecoder}
+		// these bytes are mapped to
+		//  Msg     string            `thrift:"Msg,1" json:"Msg"`
+		//	StrMap  map[string]string `thrift:"strMap,2" json:"strMap"`
+		//	I16List []int16           `thrift:"I16List,3" json:"i16List"`
+		faultMockReqThrift := []byte{
+			11 /* string */, 0, 1 /* id=1 */, 0, 0, 0, 5 /* length=5 */, 104, 101, 108, 108, 111, /* "hello" */
+			13 /* map */, 0, 2 /* id=2 */, 11 /* key:string*/, 11 /* value:string */, 0, 0, 0, 0, /* map size=0 */
+			15 /* list */, 0, 3 /* id=3 */, 6 /* item:I16 */, 0, 0, 0, 1 /* length=1 */, 0, 1, /* I16=1 */
+			0, /* end of struct */
+		}
+		tProt := NewBinaryProtocol(remote.NewReaderBuffer(faultMockReqThrift))
+		defer tProt.Recycle()
+		// specify dataLen with 0 so that skipDecoder works
+		err := codec.unmarshalThriftData(context.Background(), tProt, "mock", req, 0)
+		test.Assert(t, err != nil, err)
+		test.Assert(t, strings.Contains(err.Error(), "caught in Frugal using SkipDecoder Buffer"))
+	})
 }
 
 func Test_verifyMarshalThriftDataFrugal(t *testing.T) {

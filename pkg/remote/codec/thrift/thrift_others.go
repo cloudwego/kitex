@@ -39,7 +39,7 @@ func (c thriftCodec) hyperMessageUnmarshalEnabled() bool {
 }
 
 // hyperMessageUnmarshalAvailable indicates that if high priority message codec is available.
-func hyperMessageUnmarshalAvailable(data interface{}, payloadLen int) bool {
+func (c thriftCodec) hyperMessageUnmarshalAvailable(data interface{}, payloadLen int) bool {
 	return false
 }
 
