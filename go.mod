@@ -4,7 +4,7 @@ go 1.13
 
 require (
 	github.com/apache/thrift v0.13.0
-	github.com/bytedance/gopkg v0.0.0-20230728082804-614d0af6619b
+	github.com/bytedance/gopkg v0.0.0-20240514070511-01b2cbcf35e1
 	github.com/bytedance/mockey v1.2.7
 	github.com/bytedance/sonic v1.11.6
 	github.com/cloudwego/configmanager v0.2.2

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/gopkg/lang/dirtmake"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
@@ -174,7 +175,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 	}
 	tyDsc := fnDsc.Response()
 	// json size is usually 2 times larger than equivalent thrift data
-	buf := make([]byte, 0, len(transBuf)*2)
+	buf := dirtmake.Bytes(0, len(transBuf)*2)
 
 	for _, field := range tyDsc.Struct().Fields() {
 		if fid == field.ID() {

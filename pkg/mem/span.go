@@ -19,6 +19,8 @@ package mem
 import (
 	"math/bits"
 	"sync/atomic"
+
+	"github.com/bytedance/gopkg/lang/dirtmake"
 )
 
 const (
@@ -32,6 +34,8 @@ type spanCache struct {
 	spans [spanCacheSize]*span
 }
 
+// NewSpanCache returns *spanCache with the given spanSize,
+// each span is used to allocate a binary of a specific size level.
 func NewSpanCache(spanSize int) *spanCache {
 	c := new(spanCache)
 	for i := 0; i < len(c.spans); i++ {
@@ -40,10 +44,12 @@ func NewSpanCache(spanSize int) *spanCache {
 	return c
 }
 
+// Make allocates a binary but does not clear the memory it references.
+// NOTE: MUST set any byte element before it's read.
 func (c *spanCache) Make(n int) []byte {
 	sclass := spanClass(n) - minSpanClass
 	if sclass < 0 || sclass >= len(c.spans) {
-		return make([]byte, n)
+		return dirtmake.Bytes(n, n)
 	}
 	return c.spans[sclass].Make(n)
 }
@@ -57,7 +63,7 @@ func (c *spanCache) Copy(buf []byte) (p []byte) {
 func NewSpan(size int) *span {
 	sp := new(span)
 	sp.size = uint32(size)
-	sp.buffer = make([]byte, 0, size)
+	sp.buffer = dirtmake.Bytes(0, size)
 	return sp
 }
 
@@ -72,7 +78,7 @@ func (b *span) Make(_n int) []byte {
 	n := uint32(_n)
 	if n >= b.size || !atomic.CompareAndSwapUint32(&b.lock, 0, 1) {
 		// fallback path: make a new byte slice if current goroutine cannot get the lock or n is out of size
-		return make([]byte, n)
+		return dirtmake.Bytes(int(n), int(n))
 	}
 START:
 	b.read += n
@@ -83,7 +89,7 @@ START:
 		return buf
 	}
 	// slow path: create a new buffer
-	b.buffer = make([]byte, b.size)
+	b.buffer = dirtmake.Bytes(int(b.size), int(b.size))
 	b.read = 0
 	goto START
 }

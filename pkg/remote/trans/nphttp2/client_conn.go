@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bytedance/gopkg/lang/dirtmake"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
@@ -51,13 +53,13 @@ type clientConn struct {
 var _ GRPCConn = (*clientConn)(nil)
 
 func (c *clientConn) ReadFrame() (hdr, data []byte, err error) {
-	hdr = make([]byte, 5)
+	hdr = dirtmake.Bytes(5, 5)
 	_, err = c.Read(hdr)
 	if err != nil {
 		return nil, nil, err
 	}
 	dLen := int(binary.BigEndian.Uint32(hdr[1:]))
-	data = make([]byte, dLen)
+	data = dirtmake.Bytes(dLen, dLen)
 	_, err = c.Read(data)
 	if err != nil {
 		return nil, nil, err

@@ -474,17 +474,18 @@ func (binaryProtocol) ReadString(buf []byte) (value string, length int, err erro
 }
 
 func (binaryProtocol) ReadBinary(buf []byte) (value []byte, length int, err error) {
-	size, l, e := Binary.ReadI32(buf)
+	_size, l, e := Binary.ReadI32(buf)
 	length += l
 	if e != nil {
 		err = e
 		return
 	}
-	if size < 0 || int(size) > len(buf) {
+	size := int(_size)
+	if size < 0 || size > len(buf) {
 		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadBinary] the binary size greater than buf length")
 	}
-	value = spanCache.Copy(buf[length : length+int(size)])
-	length += int(size)
+	value = spanCache.Copy(buf[length : length+size])
+	length += size
 	return
 }
 
