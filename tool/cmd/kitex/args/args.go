@@ -131,7 +131,6 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"naming_style=golint",
 		"ignore_initialisms",
 		"gen_setter",
-		"gen_deep_equal",
 		"compatible_names",
 		"frugal_tag",
 		"thrift_streaming",
