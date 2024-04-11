@@ -174,7 +174,11 @@ const structLikeFastReadField = `
 func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte) (int, error) {
 	offset := 0
 	{{- $ctx := MkRWCtx .}}
+	{{- $target := print $ctx.Target }}
+	{{- $ctx = $ctx.WithDecl.WithTarget "_field"}}
 	{{ template "FieldFastRead" $ctx}}
+	{{/* line break */}}
+	{{- $target}} = _field
 	return offset, nil
 }
 {{- end}}{{/* range .Fields */}}
@@ -343,15 +347,12 @@ const fieldFastReadStructLike = `
 {{define "FieldFastReadStructLike"}}
 	{{- if .NeedDecl}}
 	{{- .Target}} := {{.TypeName.Deref.NewFunc}}()
-	{{- else}}
-	tmp := {{.TypeName.Deref.NewFunc}}()
 	{{- end}}
-	if l, err := {{- if .NeedDecl}}{{.Target}}{{else}}tmp{{end}}.FastRead(buf[offset:]); err != nil {
+	if l, err := {{- .Target}}.FastRead(buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
 	}
-	{{if not .NeedDecl}}{{- .Target}} = tmp{{end}}
 {{- end}}{{/* define "FieldFastReadStructLike" */}} 
 `
 
@@ -397,19 +398,28 @@ const fieldFastReadContainer = `
 
 const fieldFastReadMap = `
 {{define "FieldFastReadMap"}}
+{{- $isStructVal := .ValCtx.Type.Category.IsStructLike -}}
 	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
 	offset += l
 	if err != nil {
 		return offset, err
 	}
 	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, size)
+	{{- if $isStructVal}}
+	values := make([]{{.ValCtx.TypeName.Deref}}, size)
+	{{- end}}
 	for i := 0; i < size; i++ {
 		{{- $key := .GenID "_key"}}
 		{{- $ctx := .KeyCtx.WithDecl.WithTarget $key}}
 		{{- template "FieldFastRead" $ctx}}
 		{{/* line break */}}
 		{{- $val := .GenID "_val"}}
-		{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
+		{{- $ctx := .ValCtx.WithTarget $val}}
+		{{- if $isStructVal}}
+		{{$val}} := &values[i]
+		{{- else}}
+		{{- $ctx = $ctx.WithDecl}}
+		{{- end}}
 		{{- template "FieldFastRead" $ctx}}
 
 		{{if and .ValCtx.Type.Category.IsStructLike Features.ValueTypeForSIC}}
@@ -428,21 +438,28 @@ const fieldFastReadMap = `
 
 const fieldFastReadSet = `
 {{define "FieldFastReadSet"}}
+{{- $isStructVal := .ValCtx.Type.Category.IsStructLike -}}
 	_, size, l, err := bthrift.Binary.ReadSetBegin(buf[offset:])
 	offset += l
 	if err != nil {
 		return offset, err
 	}
 	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, 0, size)
+	{{- if $isStructVal}}
+	values := make([]{{.ValCtx.TypeName.Deref}}, size)
+	{{- end}}
 	for i := 0; i < size; i++ {
 		{{- $val := .GenID "_elem"}}
-		{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
+		{{- $ctx := .ValCtx.WithTarget $val}}
+		{{- if $isStructVal}}
+		{{$val}} := &values[i]
+		{{- else}}
+		{{- $ctx = $ctx.WithDecl}}
+		{{- end}}
 		{{- template "FieldFastRead" $ctx}}
-
 		{{if and .ValCtx.Type.Category.IsStructLike Features.ValueTypeForSIC}}
 			{{$val = printf "*%s" $val}}
 		{{end}}
-
 		{{.Target}} = append({{.Target}}, {{$val}})
 	}
 	if l, err := bthrift.Binary.ReadSetEnd(buf[offset:]); err != nil {
@@ -455,21 +472,28 @@ const fieldFastReadSet = `
 
 const fieldFastReadList = `
 {{define "FieldFastReadList"}}
+{{- $isStructVal := .ValCtx.Type.Category.IsStructLike -}}
 	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
 	offset += l
 	if err != nil {
 		return offset, err
 	}
 	{{.Target}} {{if .NeedDecl}}:{{end}}= make({{.TypeName}}, 0, size)
+	{{- if $isStructVal}}
+	values := make([]{{.ValCtx.TypeName.Deref}}, size)
+	{{- end}}
 	for i := 0; i < size; i++ {
 		{{- $val := .GenID "_elem"}}
-		{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
+		{{- $ctx := .ValCtx.WithTarget $val}}
+		{{- if $isStructVal}}
+		{{$val}} := &values[i]
+		{{- else}}
+		{{- $ctx = $ctx.WithDecl}}
+		{{- end}}
 		{{- template "FieldFastRead" $ctx}}
-
 		{{if and .ValCtx.Type.Category.IsStructLike Features.ValueTypeForSIC}}
 			{{$val = printf "*%s" $val}}
 		{{end}}
-
 		{{.Target}} = append({{.Target}}, {{$val}})
 	}
 	if l, err := bthrift.Binary.ReadListEnd(buf[offset:]); err != nil {
@@ -557,11 +581,9 @@ const fieldDeepCopyList = `
 		for _, {{SourceTarget $val}} := range {{$Src}} {
 			{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
 			{{- template "FieldDeepCopy" $ctx}}
-
 			{{- if and .ValCtx.Type.Category.IsStructLike Features.ValueTypeForSIC}}
 				{{$val = printf "*%s" $val}}
 			{{- end}}
-
 			{{.Target}} = append({{.Target}}, {{$val}})
 		}
 	}
@@ -578,11 +600,9 @@ const fieldDeepCopySet = `
 		for _, {{SourceTarget $val}} := range {{$Src}} {
 			{{- $ctx := .ValCtx.WithDecl.WithTarget $val}}
 			{{- template "FieldDeepCopy" $ctx}}
-
 			{{- if and .ValCtx.Type.Category.IsStructLike Features.ValueTypeForSIC}}
 				{{$val = printf "*%s" $val}}
 			{{- end}}
-
 			{{.Target}} = append({{.Target}}, {{$val}})
 		}
 	}
