@@ -6,10 +6,10 @@ require (
 	github.com/apache/thrift v0.13.0
 	github.com/bytedance/gopkg v0.0.0-20230728082804-614d0af6619b
 	github.com/bytedance/mockey v1.2.7
-	github.com/bytedance/sonic v1.11.2
+	github.com/bytedance/sonic v1.11.4
 	github.com/choleraehyq/pid v0.0.18
 	github.com/cloudwego/configmanager v0.2.0
-	github.com/cloudwego/dynamicgo v0.2.0
+	github.com/cloudwego/dynamicgo v0.2.1
 	github.com/cloudwego/fastpb v0.0.4
 	github.com/cloudwego/frugal v0.1.15
 	github.com/cloudwego/localsession v0.0.2
