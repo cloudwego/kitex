@@ -23,6 +23,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"reflect"
 
 	"github.com/cloudwego/kitex/internal/client"
@@ -244,4 +245,15 @@ func WithGRPCTLSConfig(tlsConfig *tls.Config) Option {
 		di.Push("WithGRPCTLSConfig")
 		o.GRPCConnectOpts.TLSConfig = grpc.TLSConfig(tlsConfig)
 	}}
+}
+
+// WithMetaHandlerToCallServerWithMultiService is used for calling a server with multiple services
+func WithMetaHandlerToCallServerWithMultiService(idlServiceName string) client.Option {
+	return WithMetaHandler(remote.NewCustomMetaHandler(
+		remote.WithWriteMeta(func(ctx context.Context, msg remote.Message) (context.Context, error) {
+			strInfo := msg.TransInfo().TransStrInfo()
+			strInfo[transmeta.HeaderIDLServiceName] = idlServiceName
+			return ctx, nil
+		}),
+	))
 }
