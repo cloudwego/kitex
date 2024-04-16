@@ -132,6 +132,8 @@ func (p *patcher) buildTemplates() (err error) {
 			structLikeCodec,
 			structLikeProtocol,
 			javaClassName,
+			enumJavaClassName,
+			enumStructLikeProtocol,
 			processor,
 		)
 	} else {
@@ -146,6 +148,8 @@ func (p *patcher) buildTemplates() (err error) {
 			structLikeFieldLength,
 			structLikeProtocol,
 			javaClassName,
+			enumJavaClassName,
+			enumStructLikeProtocol,
 			fieldFastRead,
 			fieldFastReadStructLike,
 			fieldFastReadBaseType,
