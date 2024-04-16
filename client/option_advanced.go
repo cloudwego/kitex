@@ -23,7 +23,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"reflect"
 
 	"github.com/cloudwego/kitex/internal/client"
@@ -35,6 +34,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
