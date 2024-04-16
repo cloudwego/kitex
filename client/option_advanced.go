@@ -248,6 +248,7 @@ func WithGRPCTLSConfig(tlsConfig *tls.Config) Option {
 }
 
 // WithMetaHandlerToCallServerWithMultiService is used for calling a server with multiple services
+// This option should be used with TTHeader transport protocol.
 func WithMetaHandlerToCallServerWithMultiService(idlServiceName string) client.Option {
 	return WithMetaHandler(remote.NewCustomMetaHandler(
 		remote.WithWriteMeta(func(ctx context.Context, msg remote.Message) (context.Context, error) {
