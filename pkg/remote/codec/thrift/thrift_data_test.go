@@ -19,6 +19,7 @@ package thrift
 import (
 	"context"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -121,6 +122,43 @@ func TestUnmarshalThriftData(t *testing.T) {
 	// FrugalCodec: in thrift_frugal_amd64_test.go: TestUnmarshalThriftDataFrugal
 }
 
+func TestThriftCodec_unmarshalThriftData(t *testing.T) {
+	t.Run("FastCodec with SkipDecoder enabled", func(t *testing.T) {
+		req := &fast.MockReq{}
+		codec := &thriftCodec{FastRead | EnableSkipDecoder}
+		tProt := NewBinaryProtocol(remote.NewReaderBuffer(mockReqThrift))
+		defer tProt.Recycle()
+		// specify dataLen with 0 so that skipDecoder works
+		err := codec.unmarshalThriftData(context.Background(), tProt, "mock", req, 0)
+		checkDecodeResult(t, err, &fast.MockReq{
+			Msg:     req.Msg,
+			StrList: req.StrList,
+			StrMap:  req.StrMap,
+		})
+	})
+
+	t.Run("FastCodec with SkipDecoder enabled, failed in using SkipDecoder Buffer", func(t *testing.T) {
+		req := &fast.MockReq{}
+		codec := &thriftCodec{FastRead | EnableSkipDecoder}
+		// these bytes are mapped to
+		//  Msg     string            `thrift:"Msg,1" json:"Msg"`
+		//	StrMap  map[string]string `thrift:"strMap,2" json:"strMap"`
+		//	I16List []int16           `thrift:"I16List,3" json:"i16List"`
+		faultMockReqThrift := []byte{
+			11 /* string */, 0, 1 /* id=1 */, 0, 0, 0, 5 /* length=5 */, 104, 101, 108, 108, 111, /* "hello" */
+			13 /* map */, 0, 2 /* id=2 */, 11 /* key:string*/, 11 /* value:string */, 0, 0, 0, 0, /* map size=0 */
+			15 /* list */, 0, 3 /* id=3 */, 6 /* item:I16 */, 0, 0, 0, 1 /* length=1 */, 0, 1, /* I16=1 */
+			0, /* end of struct */
+		}
+		tProt := NewBinaryProtocol(remote.NewReaderBuffer(faultMockReqThrift))
+		defer tProt.Recycle()
+		// specify dataLen with 0 so that skipDecoder works
+		err := codec.unmarshalThriftData(context.Background(), tProt, "mock", req, 0)
+		test.Assert(t, err != nil, err)
+		test.Assert(t, strings.Contains(err.Error(), "caught in FastCodec using SkipDecoder Buffer"))
+	})
+}
+
 func TestUnmarshalThriftException(t *testing.T) {
 	// prepare exception thrift binary
 	transport := thrift.NewTMemoryBufferLen(marshalThriftBufferSize)
@@ -149,4 +187,15 @@ func Test_verifyUnmarshalBasicThriftDataType(t *testing.T) {
 	err := verifyUnmarshalBasicThriftDataType(&mockWithContext{})
 	test.Assert(t, err == nil, err)
 	// data that is not part of basic thrift: in thrift_frugal_amd64_test.go: Test_verifyUnmarshalThriftDataFrugal
+}
+
+func Test_getSkippedStructBuffer(t *testing.T) {
+	// string length is 6 but only got "hello"
+	faultThrift := []byte{
+		11 /* string */, 0, 1 /* id=1 */, 0, 0, 0, 6 /* length=6 */, 104, 101, 108, 108, 111, /* "hello" */
+	}
+	tProt := NewBinaryProtocol(remote.NewReaderBuffer(faultThrift))
+	_, err := getSkippedStructBuffer(tProt)
+	test.Assert(t, err != nil, err)
+	test.Assert(t, strings.Contains(err.Error(), "caught in SkipDecoder SkipStruct phase"))
 }
