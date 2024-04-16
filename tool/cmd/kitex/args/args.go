@@ -134,6 +134,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"compatible_names",
 		"frugal_tag",
 		"thrift_streaming",
+		"no_processor",
 	)
 
 	for _, e := range a.extends {
