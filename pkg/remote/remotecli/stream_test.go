@@ -47,6 +47,6 @@ func TestNewStream(t *testing.T) {
 		},
 	}
 
-	_, err := NewStream(ctx, ri, hdlr, opt)
+	_, _, err := NewStream(ctx, ri, hdlr, opt)
 	test.Assert(t, err == nil, err)
 }
