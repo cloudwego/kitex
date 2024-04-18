@@ -9,7 +9,7 @@ require (
 	github.com/bytedance/sonic v1.11.5
 	github.com/choleraehyq/pid v0.0.18
 	github.com/cloudwego/configmanager v0.2.1
-	github.com/cloudwego/dynamicgo v0.2.2-dep //test
+	github.com/cloudwego/dynamicgo v0.2.2-dep2 //test
 	github.com/cloudwego/fastpb v0.0.4
 	github.com/cloudwego/frugal v0.1.15
 	github.com/cloudwego/localsession v0.0.2
