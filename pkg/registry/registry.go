@@ -37,6 +37,8 @@ type Info struct {
 	ServiceName string
 	// Addr will be set in kitex by default
 	Addr net.Addr
+	// SkipListenAddr is used to prevent the listen addr from overriding the Addr
+	SkipListenAddr bool
 	// PayloadCodec will be set in kitex by default, like thrift, protobuf
 	PayloadCodec string
 

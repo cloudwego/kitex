@@ -232,6 +232,14 @@ func WithRegistryInfo(info *registry.Info) Option {
 	}}
 }
 
+func WithRegistryInfoAvoidListenAddr(skipListenAddr bool) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithRegistryInfoAvoidListenAddr(%+v)", skipListenAddr))
+
+		o.RegistryInfo.SkipListenAddr = skipListenAddr
+	}}
+}
+
 // WithGRPCWriteBufferSize determines how much data can be batched before doing a write on the wire.
 // The corresponding memory allocation for this buffer will be twice the size to keep syscalls low.
 // The default value for this buffer is 32KB.
@@ -332,6 +340,13 @@ func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCUnknownServiceHandler(%+v)", utils.GetFuncName(f)))
 		o.RemoteOpt.GRPCUnknownServiceHandler = f
+	}}
+}
+
+func WithUnknownMethodHandler(f func(ctx context.Context, message remote.ByteBuffer) error) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithUnknownMethodHandler(%+v)", utils.GetFuncName(f)))
+		o.RemoteOpt.UnknownMethodHandler = f
 	}}
 }
 
