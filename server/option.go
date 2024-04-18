@@ -232,7 +232,7 @@ func WithRegistryInfo(info *registry.Info) Option {
 	}}
 }
 
-func WithRegistryInfoAvoidListenAddr(skipListenAddr bool) Option {
+func WithRegistryInfoSkipListenAddr(skipListenAddr bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithRegistryInfoAvoidListenAddr(%+v)", skipListenAddr))
 
