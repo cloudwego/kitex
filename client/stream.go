@@ -107,7 +107,7 @@ func (kc *kClient) getStreamingMode(ri rpcinfo.RPCInfo) serviceinfo.StreamingMod
 
 type stream struct {
 	stream streaming.Stream
-	cr     remotecli.ConnReleaser
+	cr     *remotecli.StreamConnManager
 	kc     *kClient
 	ri     rpcinfo.RPCInfo
 
@@ -119,7 +119,7 @@ type stream struct {
 
 var _ streaming.WithDoFinish = (*stream)(nil)
 
-func newStream(s streaming.Stream, cr remotecli.ConnReleaser, kc *kClient, ri rpcinfo.RPCInfo,
+func newStream(s streaming.Stream, cr *remotecli.StreamConnManager, kc *kClient, ri rpcinfo.RPCInfo,
 	mode serviceinfo.StreamingMode, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint,
 ) *stream {
 	return &stream{
