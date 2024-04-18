@@ -59,7 +59,7 @@ type Arguments struct {
 const cmdExample = `  # Generate client codes or update kitex_gen codes when a project is in $GOPATH:
   kitex {{path/to/IDL_file.thrift}}
 
-  # Generate client codes or update kitex_gen codes  when a project is not in $GOPATH:
+  # Generate client codes or update kitex_gen codes when a project is not in $GOPATH:
   kitex -module {{github.com/xxx_org/xxx_name}} {{path/to/IDL_file.thrift}}
 
   # Generate server codes:
