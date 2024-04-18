@@ -343,13 +343,6 @@ func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string
 	}}
 }
 
-func WithUnknownMethodHandler(f func(ctx context.Context, message remote.ByteBuffer) error) Option {
-	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("WithUnknownMethodHandler(%+v)", utils.GetFuncName(f)))
-		o.RemoteOpt.UnknownMethodHandler = f
-	}}
-}
-
 // Deprecated: Use WithConnectionLimiter instead.
 func WithConcurrencyLimiter(conLimit limiter.ConcurrencyLimiter) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
