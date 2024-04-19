@@ -87,11 +87,11 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 	return func(ctx context.Context, req, resp interface{}) (err error) {
 		// req and resp as &streaming.Stream
 		ri := rpcinfo.GetRPCInfo(ctx)
-		st, cr, err := remotecli.NewStream(ctx, ri, handler, kc.opt.RemoteOpt)
+		st, scm, err := remotecli.NewStream(ctx, ri, handler, kc.opt.RemoteOpt)
 		if err != nil {
 			return
 		}
-		clientStream := newStream(st, cr, kc, ri, kc.getStreamingMode(ri), sendEndpoint, recvEndpoint)
+		clientStream := newStream(st, scm, kc, ri, kc.getStreamingMode(ri), sendEndpoint, recvEndpoint)
 		resp.(*streaming.Result).Stream = clientStream
 		return
 	}, nil
@@ -107,7 +107,7 @@ func (kc *kClient) getStreamingMode(ri rpcinfo.RPCInfo) serviceinfo.StreamingMod
 
 type stream struct {
 	stream streaming.Stream
-	cr     *remotecli.StreamConnManager
+	scm    *remotecli.StreamConnManager
 	kc     *kClient
 	ri     rpcinfo.RPCInfo
 
@@ -119,12 +119,12 @@ type stream struct {
 
 var _ streaming.WithDoFinish = (*stream)(nil)
 
-func newStream(s streaming.Stream, cr *remotecli.StreamConnManager, kc *kClient, ri rpcinfo.RPCInfo,
+func newStream(s streaming.Stream, scm *remotecli.StreamConnManager, kc *kClient, ri rpcinfo.RPCInfo,
 	mode serviceinfo.StreamingMode, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint,
 ) *stream {
 	return &stream{
 		stream:        s,
-		cr:            cr,
+		scm:           scm,
 		kc:            kc,
 		ri:            ri,
 		streamingMode: mode,
@@ -203,8 +203,8 @@ func (s *stream) DoFinish(err error) {
 		// only rpc errors are reported
 		err = nil
 	}
-	if s.cr != nil {
-		s.cr.ReleaseConn(err, s.ri)
+	if s.scm != nil {
+		s.scm.ReleaseConn(err, s.ri)
 	}
 	s.kc.opt.TracerCtl.DoFinish(s.Context(), s.ri, err)
 }
