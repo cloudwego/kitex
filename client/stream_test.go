@@ -102,9 +102,9 @@ func TestStreaming(t *testing.T) {
 	connpool := mock_remote.NewMockConnPool(ctrl)
 	connpool.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil)
 	cliInfo.ConnPool = connpool
-	s, _ := remotecli.NewStream(ctx, mockRPCInfo, new(mocks.MockCliTransHandler), cliInfo)
+	s, cr, _ := remotecli.NewStream(ctx, mockRPCInfo, new(mocks.MockCliTransHandler), cliInfo)
 	stream := newStream(
-		s, kc, mockRPCInfo, serviceinfo.StreamingBidirectional,
+		s, cr, kc, mockRPCInfo, serviceinfo.StreamingBidirectional,
 		func(stream streaming.Stream, message interface{}) (err error) {
 			return stream.SendMsg(message)
 		},
@@ -211,9 +211,14 @@ func Test_newStream(t *testing.T) {
 			TracerCtl: &rpcinfo.TraceController{},
 		},
 	}
-
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cr := mock_remote.NewMockConnReleaser(ctrl)
+	cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+	scr := remotecli.NewStreamConnManager(cr)
 	s := newStream(
 		st,
+		scr,
 		kc,
 		ri,
 		serviceinfo.StreamingClient,
@@ -241,6 +246,9 @@ func (m *mockTracer) Finish(ctx context.Context) {
 }
 
 func Test_stream_Header(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	t.Run("no-error", func(t *testing.T) {
 		headers := metadata.MD{"k": []string{"v"}}
 		st := &mockStream{
@@ -248,8 +256,10 @@ func Test_stream_Header(t *testing.T) {
 				return headers, nil
 			},
 		}
-
-		s := newStream(st, &kClient{}, nil, serviceinfo.StreamingBidirectional, nil, nil)
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(0)
+		scr := remotecli.NewStreamConnManager(cr)
+		s := newStream(st, scr, &kClient{}, nil, serviceinfo.StreamingBidirectional, nil, nil)
 		md, err := s.Header()
 
 		test.Assert(t, err == nil)
@@ -279,8 +289,10 @@ func Test_stream_Header(t *testing.T) {
 				TracerCtl: ctl,
 			},
 		}
-
-		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+		scr := remotecli.NewStreamConnManager(cr)
+		s := newStream(st, scr, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
 		md, err := s.Header()
 
 		test.Assert(t, err == headerErr)
@@ -290,9 +302,15 @@ func Test_stream_Header(t *testing.T) {
 }
 
 func Test_stream_RecvMsg(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	t.Run("no-error", func(t *testing.T) {
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(0)
+		scm := remotecli.NewStreamConnManager(cr)
 		mockRPCInfo := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), nil, nil)
-		s := newStream(&mockStream{}, &kClient{}, mockRPCInfo, serviceinfo.StreamingBidirectional, nil,
+		s := newStream(&mockStream{}, scm, &kClient{}, mockRPCInfo, serviceinfo.StreamingBidirectional, nil,
 			func(stream streaming.Stream, message interface{}) (err error) {
 				return nil
 			},
@@ -321,8 +339,11 @@ func Test_stream_RecvMsg(t *testing.T) {
 				TracerCtl: ctl,
 			},
 		}
-
-		s := newStream(st, kc, ri, serviceinfo.StreamingClient, nil,
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		// client streaming should release connection after RecvMsg
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+		scm := remotecli.NewStreamConnManager(cr)
+		s := newStream(st, scm, kc, ri, serviceinfo.StreamingClient, nil,
 			func(stream streaming.Stream, message interface{}) (err error) {
 				return nil
 			},
@@ -353,7 +374,10 @@ func Test_stream_RecvMsg(t *testing.T) {
 			},
 		}
 
-		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional, nil,
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+		scm := remotecli.NewStreamConnManager(cr)
+		s := newStream(st, scm, kc, ri, serviceinfo.StreamingBidirectional, nil,
 			func(stream streaming.Stream, message interface{}) (err error) {
 				return recvErr
 			},
@@ -366,8 +390,14 @@ func Test_stream_RecvMsg(t *testing.T) {
 }
 
 func Test_stream_SendMsg(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	t.Run("no-error", func(t *testing.T) {
-		s := newStream(&mockStream{}, &kClient{}, nil, serviceinfo.StreamingBidirectional,
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(0)
+		scm := remotecli.NewStreamConnManager(cr)
+		s := newStream(&mockStream{}, scm, &kClient{}, nil, serviceinfo.StreamingBidirectional,
 			func(stream streaming.Stream, message interface{}) (err error) {
 				return nil
 			},
@@ -380,6 +410,9 @@ func Test_stream_SendMsg(t *testing.T) {
 	})
 
 	t.Run("error", func(t *testing.T) {
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+		scm := remotecli.NewStreamConnManager(cr)
 		sendErr := errors.New("recv error")
 		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
 		st := &mockStream{
@@ -399,7 +432,7 @@ func Test_stream_SendMsg(t *testing.T) {
 			},
 		}
 
-		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional,
+		s := newStream(st, scm, kc, ri, serviceinfo.StreamingBidirectional,
 			func(stream streaming.Stream, message interface{}) (err error) {
 				return sendErr
 			},
@@ -413,13 +446,18 @@ func Test_stream_SendMsg(t *testing.T) {
 }
 
 func Test_stream_Close(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cr := mock_remote.NewMockConnReleaser(ctrl)
+	cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(0)
+	scm := remotecli.NewStreamConnManager(cr)
 	called := false
 	s := newStream(&mockStream{
 		close: func() error {
 			called = true
 			return nil
 		},
-	}, &kClient{}, nil, serviceinfo.StreamingBidirectional, nil, nil)
+	}, scm, &kClient{}, nil, serviceinfo.StreamingBidirectional, nil, nil)
 
 	err := s.Close()
 
@@ -428,6 +466,9 @@ func Test_stream_Close(t *testing.T) {
 }
 
 func Test_stream_DoFinish(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
 	t.Run("no-error", func(t *testing.T) {
 		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
 		st := &mockStream{
@@ -441,7 +482,10 @@ func Test_stream_DoFinish(t *testing.T) {
 				TracerCtl: ctl,
 			},
 		}
-		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+		scm := remotecli.NewStreamConnManager(cr)
+		s := newStream(st, scm, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
 
 		finishCalled := false
 		err := errors.New("any err")
@@ -468,7 +512,10 @@ func Test_stream_DoFinish(t *testing.T) {
 				TracerCtl: ctl,
 			},
 		}
-		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+		scm := remotecli.NewStreamConnManager(cr)
+		s := newStream(st, scm, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
 
 		finishCalled := false
 		err := errors.New("any err")
@@ -495,7 +542,10 @@ func Test_stream_DoFinish(t *testing.T) {
 				TracerCtl: ctl,
 			},
 		}
-		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+		scm := remotecli.NewStreamConnManager(cr)
+		s := newStream(st, scm, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
 
 		finishCalled := false
 		var err error
@@ -522,7 +572,10 @@ func Test_stream_DoFinish(t *testing.T) {
 				TracerCtl: ctl,
 			},
 		}
-		s := newStream(st, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
+		cr := mock_remote.NewMockConnReleaser(ctrl)
+		cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+		scm := remotecli.NewStreamConnManager(cr)
+		s := newStream(st, scm, kc, ri, serviceinfo.StreamingBidirectional, nil, nil)
 
 		finishCalled := false
 		expectedErr := errors.New("error")
