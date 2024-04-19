@@ -23,6 +23,7 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -47,6 +48,18 @@ func TestNewStream(t *testing.T) {
 		},
 	}
 
-	_, err := NewStream(ctx, ri, hdlr, opt)
+	_, _, err := NewStream(ctx, ri, hdlr, opt)
 	test.Assert(t, err == nil, err)
+}
+
+func TestStreamConnManagerReleaseConn(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	cr := mock_remote.NewMockConnReleaser(ctrl)
+	cr.EXPECT().ReleaseConn(gomock.Any(), gomock.Any()).Times(1)
+
+	scr := NewStreamConnManager(cr)
+	test.Assert(t, scr != nil)
+	test.Assert(t, scr.ConnReleaser == cr)
+	scr.ReleaseConn(nil, nil)
 }
