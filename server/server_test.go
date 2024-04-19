@@ -481,7 +481,6 @@ func TestServiceRegistryInfoWithSkipListenAddr(t *testing.T) {
 
 func TestServiceRegistryInfoWithoutSkipListenAddr(t *testing.T) {
 	realAddr := utils.NewNetAddr("tcp", test.GetLocalAddress())
-	println(realAddr)
 	registryInfo := &registry.Info{
 		Weight: 100,
 		Addr:   realAddr,
