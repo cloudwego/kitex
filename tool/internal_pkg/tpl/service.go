@@ -73,12 +73,12 @@ func serviceInfo() *kitex.ServiceInfo {
 	return {{LowerFirst .ServiceName}}ServiceInfo
 }
 
-// for client
+// for stream client
 func serviceInfoForStreamClient() *kitex.ServiceInfo {
 	return {{LowerFirst .ServiceName}}ServiceInfoForStreamClient
 }
 
-// for stream client
+// for client
 func serviceInfoForClient() *kitex.ServiceInfo {
 	return {{LowerFirst .ServiceName}}ServiceInfoForClient
 }
