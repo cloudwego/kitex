@@ -27,18 +27,33 @@ import (
 )
 
 // NewStream create a client side stream
-func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTransHandler, opt *remote.ClientOption) (streaming.Stream, error) {
+func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTransHandler, opt *remote.ClientOption) (streaming.Stream, *StreamConnManager, error) {
 	cm := NewConnWrapper(opt.ConnPool)
 	var err error
 	for _, shdlr := range opt.StreamingMetaHandlers {
 		ctx, err = shdlr.OnConnectStream(ctx)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	rawConn, err := cm.GetConn(ctx, opt.Dialer, ri)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return nphttp2.NewStream(ctx, opt.SvcInfo, rawConn, handler), nil
+	return nphttp2.NewStream(ctx, opt.SvcInfo, rawConn, handler), &StreamConnManager{cm}, nil
+}
+
+// NewStreamConnManager returns a new StreamConnManager
+func NewStreamConnManager(cr ConnReleaser) *StreamConnManager {
+	return &StreamConnManager{ConnReleaser: cr}
+}
+
+// StreamConnManager manages the underlying connection of the stream
+type StreamConnManager struct {
+	ConnReleaser
+}
+
+// ReleaseConn releases the raw connection of the stream
+func (scm *StreamConnManager) ReleaseConn(err error, ri rpcinfo.RPCInfo) {
+	scm.ConnReleaser.ReleaseConn(err, ri)
 }
