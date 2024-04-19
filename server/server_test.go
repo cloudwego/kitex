@@ -436,9 +436,9 @@ func TestServiceRegistryInfoWithNilTags(t *testing.T) {
 	test.Assert(t, drCount == 1)
 }
 
-func TestServiceRegistryInfoSkipListenAddr(t *testing.T) {
-	realAddr := utils.NewNetAddr("tcp", "127.0.0.1:9999")
-	registryInfo := registry.Info{
+func TestServiceRegistryInfoWithSkipListenAddr(t *testing.T) {
+	realAddr := utils.NewNetAddr("tcp", test.GetLocalAddress())
+	registryInfo := &registry.Info{
 		Weight:         100,
 		Addr:           realAddr,
 		SkipListenAddr: true,
@@ -446,7 +446,7 @@ func TestServiceRegistryInfoSkipListenAddr(t *testing.T) {
 	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.Weight == registryInfo.Weight, info.Weight)
 		test.Assert(t, info.SkipListenAddr, info.SkipListenAddr)
-		test.DeepEqual(t, info.Addr, realAddr)
+		test.Assert(t, info.Addr.String() == realAddr.String(), info.Addr)
 	}
 	var rCount int
 	var drCount int
@@ -464,12 +464,55 @@ func TestServiceRegistryInfoSkipListenAddr(t *testing.T) {
 	}
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
-	opts = append(opts, WithRegistryInfo(&registryInfo))
+	opts = append(opts, WithRegistryInfo(registryInfo))
 	svr := NewServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
-	time.AfterFunc(2000*time.Millisecond, func() {
+	time.AfterFunc(time.Second, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err = svr.Run()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, rCount == 1)
+	test.Assert(t, drCount == 1)
+}
+
+func TestServiceRegistryInfoWithoutSkipListenAddr(t *testing.T) {
+	realAddr := utils.NewNetAddr("tcp", test.GetLocalAddress())
+	println(realAddr)
+	registryInfo := &registry.Info{
+		Weight: 100,
+		Addr:   realAddr,
+	}
+	checkInfo := func(info *registry.Info) {
+		test.Assert(t, info.Weight == registryInfo.Weight, info.Weight)
+		test.Assert(t, !info.SkipListenAddr, info.SkipListenAddr)
+		test.Assert(t, info.Addr.String() != realAddr.String(), info.Addr)
+	}
+	var rCount int
+	var drCount int
+	mockRegistry := MockRegistry{
+		RegisterFunc: func(info *registry.Info) error {
+			checkInfo(info)
+			rCount++
+			return nil
+		},
+		DeregisterFunc: func(info *registry.Info) error {
+			checkInfo(info)
+			drCount++
+			return nil
+		},
+	}
+	var opts []Option
+	opts = append(opts, WithRegistry(mockRegistry))
+	opts = append(opts, WithRegistryInfo(registryInfo))
+	svr := NewServer(opts...)
+	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+	test.Assert(t, err == nil)
+
+	time.AfterFunc(time.Second, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
 	})
