@@ -514,7 +514,7 @@ func (l *loopyWriter) run(remoteAddr string) (err error) {
 			// 1. When the connection is closed by some other known issue.
 			// 2. User closed the connection.
 			// 3. A graceful close of connection.
-			klog.Debugf("KITEX: grpc transport loopyWriter.run returning, error=%v, remoteAddr=%s", err, remoteAddr)
+			klog.Errorf("[DEBUG-gRPC] KITEX: grpc transport loopyWriter.run returning, error=%v, remoteAddr=%s", err, remoteAddr)
 			err = nil
 		}
 	}()

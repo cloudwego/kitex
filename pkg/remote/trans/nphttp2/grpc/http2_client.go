@@ -616,6 +616,7 @@ func (t *http2Client) Close() error {
 	t.controlBuf.finish()
 	t.cancel()
 	err := t.conn.Close()
+	klog.Errorf("[DEBUG-gRPC] http2Client Close, stack=%s", debug.Stack())
 	// Notify all active streams.
 	for _, s := range streams {
 		t.closeStream(s, ErrConnClosing, false, http2.ErrCodeNo, status.New(codes.Unavailable, ErrConnClosing.Desc), nil, false)
@@ -1034,6 +1035,11 @@ func (t *http2Client) reader() {
 		// TODO(emma): comment this log temporarily, because when use short connection, 'resource temporarily unavailable' error will happen
 		// if the log need to be output, connection info should be appended
 		// klog.Errorf("KITEX: grpc readFrame failed, error=%s", err.Error())
+		var rAddr string
+		if t.conn != nil {
+			rAddr = t.conn.RemoteAddr().String()
+		}
+		klog.Errorf("[DEBUG-gRPC] KITEX: grpc readFrame failed, remoteAddress=%s, error=%s", rAddr, err.Error())
 		t.Close() // this kicks off resetTransport, so must be last before return
 		return
 	}
@@ -1079,6 +1085,11 @@ func (t *http2Client) reader() {
 				// TODO(emma): comment this log temporarily, because when use short connection, 'resource temporarily unavailable' error will happen
 				// if the log need to be output, connection info should be appended
 				// klog.Errorf("KITEX: grpc readFrame failed, error=%s", err.Error())
+				var rAddr string
+				if t.conn != nil {
+					rAddr = t.conn.RemoteAddr().String()
+				}
+				klog.Errorf("[DEBUG-gRPC] KITEX: grpc readFrame failed, remoteAddress=%s, error=%s", rAddr, err.Error())
 				t.Close()
 				return
 			}
@@ -1204,4 +1215,39 @@ func (t *http2Client) IsActive() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.state == reachable
+}
+
+type ClientTransportDump struct {
+	State            transportState `json:"transport_state"`
+	LocalAddress     string         `json:"local_address"`
+	ActiveStreams    []StreamDump   `json:"active_streams"`
+	KeepAliveEnabled bool           `json:"keepalive_enabled"`
+	LastRead         int64          `json:"last_read"`
+}
+
+type StreamDump struct {
+	ID     uint32      `json:"id"`
+	Method string      `json:"method"`
+	State  streamState `json:"stream_state"`
+}
+
+func (t *http2Client) Dump() interface{} {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	var activeStreams = make([]StreamDump, 0, len(t.activeStreams))
+	for _, v := range t.activeStreams {
+		activeStreams = append(activeStreams, StreamDump{
+			ID:     v.id,
+			Method: v.method,
+			State:  v.state,
+		})
+	}
+	return ClientTransportDump{
+		State:            t.state,
+		LocalAddress:     t.LocalAddr().String(),
+		ActiveStreams:    activeStreams,
+		KeepAliveEnabled: t.keepaliveEnabled,
+		LastRead:         atomic.LoadInt64(&t.lastRead),
+	}
 }

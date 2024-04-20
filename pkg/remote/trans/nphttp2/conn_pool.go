@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"net"
 	"runtime"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -225,6 +226,32 @@ func (p *connPool) Close() error {
 		return true
 	})
 	return nil
+}
+
+// Dump dumps the connection pool with the details of the underlying transport.
+func (p *connPool) Dump() interface{} {
+	defer func() {
+		if panicErr := recover(); panicErr != nil {
+			klog.Errorf("KITEX: dump gRPC client connection pool panic, err=%v, stack=%s", panicErr, string(debug.Stack()))
+		}
+	}()
+	res := make(map[string]interface{})
+	p.conns.Range(func(k, v interface{}) bool {
+		addr := k.(string)
+		ts := v.(*transports)
+		var transportsDump = make([]interface{}, 0, len(ts.cliTransports))
+		for _, t := range ts.cliTransports {
+			if t == nil {
+				continue
+			}
+			if dumper, ok := t.(interface{ Dump() interface{} }); ok {
+				transportsDump = append(transportsDump, dumper.Dump())
+			}
+		}
+		res[addr] = transportsDump
+		return true
+	})
+	return res
 }
 
 // newTLSConn constructs a client-side TLS connection and performs handshake.
