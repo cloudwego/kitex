@@ -22,6 +22,7 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -1034,6 +1035,12 @@ func (t *http2Client) reader() {
 		// TODO(emma): comment this log temporarily, because when use short connection, 'resource temporarily unavailable' error will happen
 		// if the log need to be output, connection info should be appended
 		// klog.Errorf("KITEX: grpc readFrame failed, error=%s", err.Error())
+		var rAddr string
+		if t.conn != nil {
+			rAddr = t.conn.RemoteAddr().String()
+		}
+		fmt.Println(err)
+		klog.Errorf("KITEX: grpc readFrame failed, remoteAddress=%s, error=%s", rAddr, err.Error())
 		t.Close() // this kicks off resetTransport, so must be last before return
 		return
 	}
@@ -1079,6 +1086,12 @@ func (t *http2Client) reader() {
 				// TODO(emma): comment this log temporarily, because when use short connection, 'resource temporarily unavailable' error will happen
 				// if the log need to be output, connection info should be appended
 				// klog.Errorf("KITEX: grpc readFrame failed, error=%s", err.Error())
+				var rAddr string
+				if t.conn != nil {
+					rAddr = t.conn.RemoteAddr().String()
+				}
+				fmt.Println(err)
+				klog.Errorf("KITEX: grpc readFrame failed, remoteAddress=%s, error=%s", rAddr, err.Error())
 				t.Close()
 				return
 			}
