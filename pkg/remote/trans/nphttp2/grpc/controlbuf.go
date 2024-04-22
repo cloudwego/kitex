@@ -121,7 +121,7 @@ type headerFrame struct {
 }
 
 func (h *headerFrame) isTransportResponseFrame() bool {
-	return h.cleanup != nil && h.cleanup.rst // Results in a RST_STREAM
+	return h.cleanup != nil && h.cleanup.rst // Results in an RST_STREAM
 }
 
 type cleanupStream struct {
@@ -131,7 +131,7 @@ type cleanupStream struct {
 	onWrite  func()
 }
 
-func (c *cleanupStream) isTransportResponseFrame() bool { return c.rst } // Results in a RST_STREAM
+func (c *cleanupStream) isTransportResponseFrame() bool { return c.rst } // Results in an RST_STREAM
 
 type dataFrame struct {
 	streamID  uint32
@@ -734,7 +734,7 @@ func (l *loopyWriter) cleanupStreamHandler(c *cleanupStream) error {
 	c.onWrite()
 	if str, ok := l.estdStreams[c.streamID]; ok {
 		// On the server side it could be a trailers-only response or
-		// a RST_STREAM before stream initialization thus the stream might
+		// an RST_STREAM before stream initialization thus the stream might
 		// not be established yet.
 		delete(l.estdStreams, c.streamID)
 		str.deleteSelf()

@@ -189,7 +189,7 @@ func (h *testStreamHandler) handleStreamMisbehave(t *testing.T, s *Stream) {
 }
 
 func (h *testStreamHandler) handleStreamEncodingRequiredStatus(t *testing.T, s *Stream) {
-	// raw newline is not accepted by http2 framer so it must be encoded.
+	// raw newline is not accepted by http2 framer, so it must be encoded.
 	h.t.WriteStatus(s, encodingTestStatus)
 }
 
@@ -473,7 +473,7 @@ func setUpWithNoPingServer(t *testing.T, copts ConnectOptions, connCh chan net.C
 	}
 	go func() {
 		exitCh := make(chan struct{}, 1)
-		// Launch a non responsive server.
+		// Launch a non-responsive server.
 		eventLoop, err := netpoll.NewEventLoop(func(ctx context.Context, connection netpoll.Connection) error {
 			defer lis.Close()
 			connCh <- connection.(net.Conn)

@@ -269,7 +269,7 @@ func (b *defaultByteBuffer) AppendBuffer(buf ByteBuffer) (err error) {
 	return
 }
 
-// Bytes is used to get the bytes written.
+// Bytes are used to get the bytes written.
 func (b *defaultByteBuffer) Bytes() (buf []byte, err error) {
 	if b.status&BitWritable == 0 {
 		return nil, errors.New("unwritable buffer, cannot support Bytes")

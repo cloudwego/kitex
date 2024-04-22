@@ -231,7 +231,7 @@ func buildConsistResult(cb *consistBalancer, info *consistInfo, key uint64) *con
 		cr.Replicas = make([]discovery.Instance, replicas)
 		for i := 0; i < replicas; i++ {
 			// find the next instance which is not used
-			// replicas are adjusted before so we can guarantee that we can find one
+			// replicas are adjusted before, so we can guarantee that we can find one
 			for {
 				index++
 				if index == len(info.virtualNodes) {

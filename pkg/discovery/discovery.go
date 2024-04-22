@@ -120,7 +120,7 @@ func (i *instance) Tag(key string) (value string, exist bool) {
 	return
 }
 
-// NewInstance creates a Instance using the given network, address and tags
+// NewInstance creates an Instance using the given network, address and tags
 func NewInstance(network, address string, weight int, tags map[string]string) Instance {
 	return &instance{
 		addr:   utils.NewNetAddr(network, address),

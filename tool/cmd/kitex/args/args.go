@@ -142,7 +142,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		e.Apply(f)
 	}
 	f.Usage = func() {
-		fmt.Fprintf(os.Stderr, `Version %s
+		_, _ = fmt.Fprintf(os.Stderr, `Version %s
 Usage: %s [flags] IDL
 
 Examples:
@@ -317,7 +317,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 	ValidateCMD(cmd.Path, a.IDLType)
 
 	if a.IDLType == "thrift" {
-		os.Setenv(EnvPluginMode, thriftgo.PluginName)
+		_ = os.Setenv(EnvPluginMode, thriftgo.PluginName)
 		cmd.Args = append(cmd.Args, "thriftgo")
 		for _, inc := range a.Includes {
 			cmd.Args = append(cmd.Args, "-i", inc)
@@ -348,7 +348,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 		}
 		cmd.Args = append(cmd.Args, a.IDL)
 	} else {
-		os.Setenv(EnvPluginMode, protoc.PluginName)
+		_ = os.Setenv(EnvPluginMode, protoc.PluginName)
 		a.ThriftOptions = a.ThriftOptions[:0]
 		// "protobuf"
 		cmd.Args = append(cmd.Args, "protoc")
@@ -357,7 +357,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 		}
 		outPath := util.JoinPath(".", a.GenPath)
 		if a.Use == "" {
-			os.MkdirAll(outPath, 0o755)
+			_ = os.MkdirAll(outPath, 0o755)
 		} else {
 			outPath = "."
 		}
@@ -372,7 +372,7 @@ func (a *Arguments) BuildCmd(out io.Writer) *exec.Cmd {
 		for _, p := range a.ProtobufPlugins {
 			pluginParams := strings.Split(p, ":")
 			if len(pluginParams) != 3 {
-				log.Warnf("Failed to get the correct protoc plugin parameters for %. Please specify the protoc plugin in the form of \"plugin_name:options:out_dir\"", p)
+				log.Warnf("Failed to get the correct protoc plugin parameters for %s. Please specify the protoc plugin in the form of \"plugin_name:options:out_dir\"", p)
 				os.Exit(1)
 			}
 			// pluginParams[0] -> plugin name, pluginParams[1] -> plugin options, pluginParams[2] -> out_dir

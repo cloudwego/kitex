@@ -16,7 +16,7 @@ package thriftgo
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -286,7 +286,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		})
 
 		if p.copyIDL {
-			content, err := ioutil.ReadFile(ast.Filename)
+			content, err := os.ReadFile(ast.Filename)
 			if err != nil {
 				return nil, fmt.Errorf("read %q: %w", ast.Filename, err)
 			}
@@ -345,7 +345,7 @@ func getBashPath() string {
 
 // DoRecord records current cmd into kitex-all.sh
 func doRecord(recordCmd []string) string {
-	bytes, err := ioutil.ReadFile(getBashPath())
+	bytes, err := os.ReadFile(getBashPath())
 	content := string(bytes)
 	if err != nil {
 		content = "#! /usr/bin/env bash\n"

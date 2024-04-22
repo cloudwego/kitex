@@ -57,7 +57,7 @@ import (
 
 // Client is the core interface abstraction of kitex client.
 // It is designed for generated codes and should not be used directly.
-// Parameter method specifies the method of a RPC call.
+// Parameter method specifies the method of an RPC call.
 // Request is a packing of request parameters in the actual method defined in IDL, consist of zero, one
 // or multiple arguments. So is response to the actual result type.
 // Response may be nil to address oneway calls.
