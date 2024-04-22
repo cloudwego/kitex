@@ -15,6 +15,7 @@
 package util
 
 import (
+	"io"
 	"os"
 )
 
@@ -26,7 +27,7 @@ func ReadInput() ([]byte, error) {
 	if dumpFileName := os.Getenv("KITEX_TOOL_STDIN_LOAD_FILE"); dumpFileName != "" {
 		return os.ReadFile(dumpFileName)
 	}
-	data, err := os.ReadAll(os.Stdin)
+	data, err := io.ReadAll(os.Stdin)
 	if err == nil {
 		if dumpFileName := os.Getenv("KITEX_TOOL_STDIN_DUMP_FILE"); dumpFileName != "" {
 			_ = os.WriteFile(dumpFileName, data, 0o644)

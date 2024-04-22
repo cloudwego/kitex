@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"go/build"
 	"go/format"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -262,7 +263,7 @@ func DownloadFile(remotePath, localPath string) error {
 		return fmt.Errorf("failed to download file, http status: %s", resp.Status)
 	}
 
-	body, err := os.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

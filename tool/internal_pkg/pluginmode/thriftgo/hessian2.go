@@ -132,7 +132,7 @@ func patchIDLRefConfig(cfg *generator.Config) {
 
 // loadIDLRefConfig load idl-ref config from file object
 func loadIDLRefConfig(fileName string, reader io.Reader) *config.RawConfig {
-	data, err := os.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		log.Warnf("Read %s file failed: %s\n", fileName, err.Error())
 		os.Exit(1)

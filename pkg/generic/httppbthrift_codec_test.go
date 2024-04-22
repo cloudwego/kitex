@@ -18,7 +18,7 @@ package generic
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"reflect"
 	"testing"
@@ -34,7 +34,7 @@ func TestFromHTTPPbRequest(t *testing.T) {
 	mockey.PatchConvey("TestFromHTTPPbRequest", t, func() {
 		req, err := http.NewRequest("POST", "/far/boo", bytes.NewBuffer([]byte("321")))
 		test.Assert(t, err == nil)
-		mockey.Mock(ioutil.ReadAll).Return([]byte("123"), nil).Build()
+		mockey.Mock(io.ReadAll).Return([]byte("123"), nil).Build()
 		hreq, err := FromHTTPPbRequest(req)
 		test.Assert(t, err == nil)
 		test.Assert(t, reflect.DeepEqual(hreq.RawBody, []byte("123")), string(hreq.RawBody))
