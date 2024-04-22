@@ -270,6 +270,8 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
 		if err := t.loopy.run(conn.RemoteAddr().String()); err != nil {
 			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=%v", err)
+		} else {
+			klog.CtxErrorf(ctx, "KITEX: grpc server loopyWriter.run returning, error=nil")
 		}
 		t.conn.Close()
 		close(t.writerDone)
