@@ -617,6 +617,7 @@ func (t *http2Client) Close() error {
 	t.controlBuf.finish()
 	t.cancel()
 	err := t.conn.Close()
+	klog.Errorf("[DEBUG] http2Client Close, stack=%s", debug.Stack())
 	// Notify all active streams.
 	for _, s := range streams {
 		t.closeStream(s, ErrConnClosing, false, http2.ErrCodeNo, status.New(codes.Unavailable, ErrConnClosing.Desc), nil, false)
