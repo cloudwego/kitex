@@ -403,22 +403,13 @@ const fieldFastReadStructLike = `
 {{define "FieldFastReadStructLike"}}
 	{{- if .NeedDecl}}
 	{{- .Target}} := {{.TypeName.Deref.NewFunc}}()
+	{{- end}}
 	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
-	{{- if Features.FieldMaskHalfway}}
-	{{.Target}}.Pass_FieldMask({{.FieldMask}})
-	{{- else}}
-	{{.Target}}.Set_FieldMask({{.FieldMask}})
-	{{- end}}
-	{{- end}}
-	{{- else}}
-	tmp := {{.TypeName.Deref.NewFunc}}()
-	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
-	{{- if Features.FieldMaskHalfway}}
-	tmp.Pass_FieldMask({{.FieldMask}})
-	{{- else}}
-	tmp.Set_FieldMask({{.FieldMask}})
-	{{- end}}
-	{{- end}}
+		{{- if Features.FieldMaskHalfway}}
+		{{.Target}}.Pass_FieldMask({{.FieldMask}})
+		{{- else}}
+		{{.Target}}.Set_FieldMask({{.FieldMask}})
+		{{- end}}
 	{{- end}}
 	if l, err := {{- .Target}}.FastRead(buf[offset:]); err != nil {
 		return offset, err
@@ -520,7 +511,7 @@ const fieldFastReadMap = `
 		{{- end}}{{/* end WithFieldMask */}}
 		{{/* line break */}}
 		{{- $val := .GenID "_val"}}
-		{{- $ctx := (.ValCtx.WithDecl.WithTarget $val).WithFieldMask $curFieldMask}}
+		{{- $ctx := (.ValCtx.WithTarget $val).WithFieldMask $curFieldMask}}
 		{{- if $isStructVal}}
 		{{$val}} := &values[i]
 		{{- else}}
@@ -570,7 +561,7 @@ const fieldFastReadSet = `
 			continue
 		} else {
 		{{- end}}
-		{{- $ctx := (.ValCtx.WithDecl.WithTarget $val).WithFieldMask $curFieldMask}}
+		{{- $ctx := (.ValCtx.WithTarget $val).WithFieldMask $curFieldMask}}
 		{{- if $isStructVal}}
 		{{$val}} := &values[i]
 		{{- else}}
@@ -620,7 +611,7 @@ const fieldFastReadList = `
 			continue
 		} else {
 		{{- end}}
-		{{- $ctx := (.ValCtx.WithDecl.WithTarget $val).WithFieldMask $curFieldMask}}
+		{{- $ctx := (.ValCtx.WithTarget $val).WithFieldMask $curFieldMask}}
 		{{- if $isStructVal}}
 		{{$val}} := &values[i]
 		{{- else}}
