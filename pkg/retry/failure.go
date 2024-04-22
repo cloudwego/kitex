@@ -111,7 +111,7 @@ func (p *FailurePolicy) WithSpecifiedResultRetry(rr *ShouldResultRetry) {
 	}
 }
 
-// String prints human readable information.
+// String prints human-readable information.
 func (p FailurePolicy) String() string {
 	return fmt.Sprintf("{StopPolicy:%+v BackOffPolicy:%+v RetrySameNode:%+v "+
 		"ShouldResultRetry:{ErrorRetry:%t, RespRetry:%t}}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode, p.IsErrorRetryNonNil(), p.IsRespRetryNonNil())
@@ -147,7 +147,7 @@ func newRandomBackOff(minMS, maxMS int) BackOff {
 
 type noneBackOff struct{}
 
-// String prints human readable information.
+// String prints human-readable information.
 func (p noneBackOff) String() string {
 	return "NoneBackOff"
 }
@@ -165,7 +165,7 @@ func (p *fixedBackOff) Wait(callTimes int) {
 	time.Sleep(time.Duration(p.fixMS) * time.Millisecond)
 }
 
-// String prints human readable information.
+// String prints human-readable information.
 func (p fixedBackOff) String() string {
 	return fmt.Sprintf("FixedBackOff(%dms)", p.fixMS)
 }
@@ -184,7 +184,7 @@ func (p *randomBackOff) Wait(callTimes int) {
 	time.Sleep(p.randomDuration())
 }
 
-// String prints human readable information.
+// String prints human-readable information.
 func (p randomBackOff) String() string {
 	return fmt.Sprintf("RandomBackOff(%dms-%dms)", p.minMS, p.maxMS)
 }

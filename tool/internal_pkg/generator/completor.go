@@ -21,6 +21,7 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
+	"go/types"
 	"io"
 	"os"
 	"path"
@@ -66,7 +67,7 @@ func parseFuncDecl(fd *ast.FuncDecl) (recvName, funcName string) {
 	return
 }
 
-func (c *completer) compare(pkg *ast.Package) []*MethodInfo {
+func (c *completer) compare(pkg *types.Package) []*MethodInfo {
 	var newMethods []*MethodInfo
 	for _, m := range c.allMethods {
 		var have bool

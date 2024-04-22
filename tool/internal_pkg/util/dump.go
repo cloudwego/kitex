@@ -15,7 +15,6 @@
 package util
 
 import (
-	"io/ioutil"
 	"os"
 )
 
@@ -25,12 +24,12 @@ import (
 // This feature makes it easier to debug kitex tool.
 func ReadInput() ([]byte, error) {
 	if dumpFileName := os.Getenv("KITEX_TOOL_STDIN_LOAD_FILE"); dumpFileName != "" {
-		return ioutil.ReadFile(dumpFileName)
+		return os.ReadFile(dumpFileName)
 	}
-	data, err := ioutil.ReadAll(os.Stdin)
+	data, err := os.ReadAll(os.Stdin)
 	if err == nil {
 		if dumpFileName := os.Getenv("KITEX_TOOL_STDIN_DUMP_FILE"); dumpFileName != "" {
-			ioutil.WriteFile(dumpFileName, data, 0o644)
+			_ = os.WriteFile(dumpFileName, data, 0o644)
 		}
 	}
 	return data, err
