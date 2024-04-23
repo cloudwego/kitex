@@ -37,6 +37,8 @@ var (
 	spanCache            = mem.NewSpanCache(1024 * 1024) // 1MB
 )
 
+const binaryInplaceThreshold = 4096 // 4k
+
 type binaryProtocol struct{}
 
 func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int {
@@ -149,6 +151,10 @@ func (binaryProtocol) WriteStringNocopy(buf []byte, binaryWriter BinaryWriter, v
 
 func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, value []byte) int {
 	l := Binary.WriteI32(buf, int32(len(value)))
+	if binaryWriter != nil && len(value) > binaryInplaceThreshold {
+		binaryWriter.WriteDirect(value, len(buf[l:]))
+		return l
+	}
 	copy(buf[l:], value)
 	return l + len(value)
 }

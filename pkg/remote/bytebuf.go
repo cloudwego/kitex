@@ -29,9 +29,11 @@ type ByteBufferFactory interface {
 // NocopyWrite is to write []byte without copying, and splits the original buffer.
 // It is used with linked buffer implement.
 type NocopyWrite interface {
-	// the buf will be wrapped as a new data node no copy, then insert into the linked buffer.
+	// WriteDirect will wrap buf as a new data node no copy, then insert into the linked buffer.
 	// remainCap is the remain capacity of origin buff.
 	WriteDirect(buf []byte, remainCap int) error
+	// MallocAck correct the real malloc len to n
+	MallocAck(n int) error
 }
 
 // FrameWrite is to write header and data buffer separately to avoid memory copy

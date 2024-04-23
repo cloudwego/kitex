@@ -167,6 +167,14 @@ func (b *netpollByteBuffer) Malloc(n int) (buf []byte, err error) {
 	return b.writer.Malloc(n)
 }
 
+// MallocAck n bytes in the writer buffer.
+func (b *netpollByteBuffer) MallocAck(n int) (err error) {
+	if b.status&remote.BitWritable == 0 {
+		return errors.New("unwritable buffer, cannot support MallocAck")
+	}
+	return b.writer.MallocAck(n)
+}
+
 // MallocLen returns the total length of the buffer malloced.
 func (b *netpollByteBuffer) MallocLen() (length int) {
 	if b.status&remote.BitWritable == 0 {
@@ -239,6 +247,9 @@ func (b *netpollByteBuffer) AppendBuffer(buf remote.ByteBuffer) (err error) {
 
 // Bytes are not supported in netpoll bytebuf.
 func (b *netpollByteBuffer) Bytes() (buf []byte, err error) {
+	if b.reader != nil {
+		return b.reader.Peek(b.reader.Len())
+	}
 	return nil, errors.New("method Bytes() not support in netpoll bytebuf")
 }
 

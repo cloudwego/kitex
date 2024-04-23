@@ -106,67 +106,76 @@ func TestHyperCodecCheck(t *testing.T) {
 }
 
 func TestFrugalCodec(t *testing.T) {
-	t.Run("configure frugal but data has not tag", func(t *testing.T) {
-		ctx := context.Background()
-		codec := &thriftCodec{FrugalRead | FrugalWrite}
+	for _, tb := range transportBuffers {
+		t.Run(tb.Name, func(t *testing.T) {
+			t.Run("configure frugal but data has not tag", func(t *testing.T) {
+				ctx := context.Background()
+				codec := &thriftCodec{FrugalRead | FrugalWrite}
 
-		// MockNoTagArgs cannot be marshaled
-		sendMsg := initNoTagSendMsg(transport.TTHeader)
-		out := remote.NewWriterBuffer(256)
-		err := codec.Marshal(ctx, sendMsg, out)
-		test.Assert(t, err != nil)
-	})
-	t.Run("configure frugal and data has tag", func(t *testing.T) {
-		ctx := context.Background()
-		codec := &thriftCodec{FrugalRead | FrugalWrite}
+				// MockNoTagArgs cannot be marshaled
+				sendMsg := initNoTagSendMsg(transport.TTHeader)
+				out := tb.NewBuffer()
+				err := codec.Marshal(ctx, sendMsg, out)
+				test.Assert(t, err != nil)
+				out.Flush()
+			})
+			t.Run("configure frugal and data has tag", func(t *testing.T) {
+				ctx := context.Background()
+				codec := &thriftCodec{FrugalRead | FrugalWrite}
 
-		testFrugalDataConversion(t, ctx, codec)
-	})
-	t.Run("fallback to frugal and data has tag", func(t *testing.T) {
-		ctx := context.Background()
-		codec := NewThriftCodec()
+				testFrugalDataConversion(t, ctx, codec)
+			})
+			t.Run("fallback to frugal and data has tag", func(t *testing.T) {
+				ctx := context.Background()
+				codec := NewThriftCodec()
 
-		testFrugalDataConversion(t, ctx, codec)
-	})
-	t.Run("configure BasicCodec to disable frugal fallback", func(t *testing.T) {
-		ctx := context.Background()
-		codec := NewThriftCodecWithConfig(Basic)
+				testFrugalDataConversion(t, ctx, codec)
+			})
+			t.Run("configure BasicCodec to disable frugal fallback", func(t *testing.T) {
+				ctx := context.Background()
+				codec := NewThriftCodecWithConfig(Basic)
 
-		// MockNoTagArgs cannot be marshaled
-		sendMsg := initNoTagSendMsg(transport.TTHeader)
-		out := remote.NewWriterBuffer(256)
-		err := codec.Marshal(ctx, sendMsg, out)
-		test.Assert(t, err != nil)
-	})
+				// MockNoTagArgs cannot be marshaled
+				sendMsg := initNoTagSendMsg(transport.TTHeader)
+				out := tb.NewBuffer()
+				err := codec.Marshal(ctx, sendMsg, out)
+				out.Flush()
+				test.Assert(t, err != nil)
+			})
+		})
+	}
 }
 
 func testFrugalDataConversion(t *testing.T, ctx context.Context, codec remote.PayloadCodec) {
-	// encode client side
-	sendMsg := initFrugalTagSendMsg(transport.TTHeader)
-	out := remote.NewWriterBuffer(256)
-	err := codec.Marshal(ctx, sendMsg, out)
-	test.Assert(t, err == nil, err)
+	for _, tb := range transportBuffers {
+		t.Run(tb.Name, func(t *testing.T) {
+			// encode client side
+			sendMsg := initFrugalTagSendMsg(transport.TTHeader)
+			buf := tb.NewBuffer()
+			err := codec.Marshal(ctx, sendMsg, buf)
+			test.Assert(t, err == nil, err)
+			buf.Flush()
 
-	// decode server side
-	recvMsg := initFrugalTagRecvMsg()
-	buf, err := out.Bytes()
-	recvMsg.SetPayloadLen(len(buf))
-	test.Assert(t, err == nil, err)
-	in := remote.NewReaderBuffer(buf)
-	err = codec.Unmarshal(ctx, recvMsg, in)
-	test.Assert(t, err == nil, err)
+			// decode server side
+			recvMsg := initFrugalTagRecvMsg()
+			recvMsg.SetPayloadLen(buf.ReadableLen())
+			test.Assert(t, err == nil, err)
+			err = codec.Unmarshal(ctx, recvMsg, buf)
+			test.Assert(t, err == nil, err)
 
-	// compare Args
-	sendReq := (sendMsg.Data()).(*MockFrugalTagArgs).Req
-	recvReq := (recvMsg.Data()).(*MockFrugalTagArgs).Req
-	test.Assert(t, sendReq.Msg == recvReq.Msg)
-	test.Assert(t, len(sendReq.StrList) == len(recvReq.StrList))
-	test.Assert(t, len(sendReq.StrMap) == len(recvReq.StrMap))
-	for i, item := range sendReq.StrList {
-		test.Assert(t, item == recvReq.StrList[i])
-	}
-	for k := range sendReq.StrMap {
-		test.Assert(t, sendReq.StrMap[k] == recvReq.StrMap[k])
+			// compare Args
+			sendReq := (sendMsg.Data()).(*MockFrugalTagArgs).Req
+			recvReq := (recvMsg.Data()).(*MockFrugalTagArgs).Req
+			test.Assert(t, sendReq.Msg == recvReq.Msg)
+			test.Assert(t, len(sendReq.StrList) == len(recvReq.StrList))
+			test.Assert(t, len(sendReq.StrMap) == len(recvReq.StrMap))
+			for i, item := range sendReq.StrList {
+				test.Assert(t, item == recvReq.StrList[i])
+			}
+			for k := range sendReq.StrMap {
+				test.Assert(t, sendReq.StrMap[k] == recvReq.StrMap[k])
+			}
+		})
 	}
 }
 
