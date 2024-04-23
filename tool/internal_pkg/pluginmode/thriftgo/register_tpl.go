@@ -20,7 +20,9 @@ package {{ .PkgName}}
 
 import (
     "fmt"
+	{{- if gt (len .Scope.Enums) 0}}
     "github.com/kitex-contrib/codec-dubbo/pkg/hessian2/enum" 	 
+    {{- end}}
 
 	"github.com/pkg/errors"
 	"github.com/kitex-contrib/codec-dubbo/pkg/hessian2"
