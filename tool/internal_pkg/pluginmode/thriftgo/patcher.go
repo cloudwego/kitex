@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
-	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -63,10 +62,23 @@ type patcher struct {
 	handlerReturnKeepResp bool
 
 	fileTpl *template.Template
+	libs    map[string]string
+}
+
+func (p *patcher) UseLib(path string, alias string) string {
+	if p.libs == nil {
+		p.libs = make(map[string]string)
+	}
+	p.libs[path] = alias
+	return ""
 }
 
 func (p *patcher) buildTemplates() (err error) {
 	m := p.utils.BuildFuncMap()
+	m["PrintImports"] = util.PrintlImports
+	m["UseLib"] = p.UseLib
+	m["ZeroWriter"] = ZeroWriter
+	m["ZeroBLength"] = ZeroBLength
 	m["ReorderStructFields"] = p.reorderStructFields
 	m["TypeIDToGoType"] = func(t string) string { return typeIDToGoType[t] }
 	m["IsBinaryOrStringType"] = p.isBinaryOrStringType
@@ -75,17 +87,6 @@ func (p *patcher) buildTemplates() (err error) {
 	m["GenerateDeepCopyAPIs"] = func() bool { return p.deepCopyAPI }
 	m["GenerateArgsResultTypes"] = func() bool { return p.utils.Template() == "slim" }
 	m["ImportPathTo"] = generator.ImportPathTo
-	m["ToPackageNames"] = func(imports map[string]string) (res []string) {
-		for pth, alias := range imports {
-			if alias != "" {
-				res = append(res, alias)
-			} else {
-				res = append(res, strings.ToLower(filepath.Base(pth)))
-			}
-		}
-		sort.Strings(res)
-		return
-	}
 	m["Str"] = func(id int32) string {
 		if id < 0 {
 			return "_" + strconv.Itoa(-int(id))
@@ -183,8 +184,18 @@ func (p *patcher) buildTemplates() (err error) {
 			processor,
 		)
 	}
-	for _, txt := range allTemplates {
-		tpl = template.Must(tpl.Parse(txt))
+	for i, txt := range allTemplates {
+		tpl, err = tpl.Parse(txt)
+		if err != nil {
+			name := strconv.Itoa(i)
+			if ix := strings.Index(txt, "{{define "); ix >= 0 {
+				ex := strings.Index(txt, "}}")
+				if ex >= 0 {
+					name = txt[ix+len("{{define ") : ex]
+				}
+			}
+			return fmt.Errorf("parse template %s failed: %v", name, err)
+		}
 	}
 
 	ext := `{{define "ExtraTemplates"}}{{end}}`
@@ -208,20 +219,28 @@ func (p *patcher) buildTemplates() (err error) {
 	return nil
 }
 
+const importInsertPoint = "// imports insert-point"
+
 func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err error) {
-	p.buildTemplates()
+	if err := p.buildTemplates(); err != nil {
+		return nil, err
+	}
+
 	var buf strings.Builder
+
+	// fd, _ := os.OpenFile("dump.txt", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	// defer fd.Close()
 
 	protection := make(map[string]*plugin.Generated)
 
 	for ast := range req.AST.DepthFirstSearch() {
+		// fd.WriteString(p.utils.GetFilename(ast) + "\n")
 		// scope, err := golang.BuildScope(p.utils, ast)
 		scope, _, err := golang.BuildRefScope(p.utils, ast)
 		if err != nil {
 			return nil, fmt.Errorf("build scope for ast %q: %w", ast.Filename, err)
 		}
 		p.utils.SetRootScope(scope)
-
 		pkgName := golang.GetImportPackage(golang.GetImportPath(p.utils, ast))
 
 		path := p.utils.CombineOutputPath(req.OutputPath, ast)
@@ -259,31 +278,51 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		}
 
 		data := &struct {
-			Scope   *golang.Scope
-			PkgName string
-			Imports map[string]string
+			Scope    *golang.Scope
+			PkgName  string
+			Imports  []util.Import
+			Includes []util.Import
 		}{Scope: scope, PkgName: pkgName}
-		data.Imports, err = scope.ResolveImports()
-		if err != nil {
-			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
-		}
-		p.filterStdLib(data.Imports)
+
 		if err = p.fileTpl.ExecuteTemplate(&buf, "file", data); err != nil {
 			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
 		}
 		content := buf.String()
+
 		// if kutils is not used, remove the dependency.
+		// OPT: use UseStdLib tmpl func
 		if !strings.Contains(content, "kutils.StringDeepCopy") {
-			kutilsImp := `kutils "github.com/cloudwego/kitex/pkg/utils"`
-			idx := strings.Index(content, kutilsImp)
-			if idx > 0 {
-				content = content[:idx-1] + content[idx+len(kutilsImp):]
-			}
+			delete(p.libs, "github.com/cloudwego/kitex/pkg/utils")
 		}
+
+		imps, err := scope.ResolveImports()
+		if err != nil {
+			return nil, fmt.Errorf("resolve imports failed for %q: %w", ast.Filename, err)
+		}
+		for path, alias := range p.libs {
+			imps[path] = alias
+		}
+		data.Imports = util.SortImports(imps, p.module)
+		data.Includes = p.extractLocalLibs(data.Imports)
+
+		// replace imports insert-pointer with newly rendered output
+		buf.Reset()
+		if err = p.fileTpl.ExecuteTemplate(&buf, "imports", data); err != nil {
+			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
+		}
+		imports := buf.String()
+		if i := strings.Index(content, importInsertPoint); i >= 0 {
+			content = strings.Replace(content, importInsertPoint, imports, 1)
+		} else {
+			return nil, fmt.Errorf("replace imports failed")
+		}
+
 		patches = append(patches, &plugin.Generated{
 			Content: content,
 			Name:    &target,
 		})
+		// fd.WriteString("patched: " + target + "\n")
+		// fd.WriteString("content: " + content + "\nend\n")
 
 		if p.copyIDL {
 			content, err := ioutil.ReadFile(ast.Filename)
@@ -341,6 +380,20 @@ func getBashPath() string {
 		return "kitex-all.bat"
 	}
 	return "kitex-all.sh"
+}
+
+func (p *patcher) extractLocalLibs(imports []util.Import) []util.Import {
+	var ret = make([]util.Import, 0)
+	prefix := p.module + "/"
+	// remove std libs and thrift to prevent duplicate import.
+	for _, v := range imports {
+		// local packages
+		if strings.HasPrefix(v.Path, prefix) {
+			ret = append(ret, v)
+			continue
+		}
+	}
+	return ret
 }
 
 // DoRecord records current cmd into kitex-all.sh
@@ -402,25 +455,6 @@ func (p *patcher) reorderStructFields(fields []*golang.Field) ([]*golang.Field, 
 	}
 
 	return sortedFields, nil
-}
-
-func (p *patcher) filterStdLib(imports map[string]string) {
-	// remove std libs and thrift to prevent duplicate import.
-	prefix := p.module + "/"
-	for pth := range imports {
-		if strings.HasPrefix(pth, prefix) { // local module
-			continue
-		}
-		if pth == "github.com/apache/thrift/lib/go/thrift" {
-			delete(imports, pth)
-		}
-		if strings.HasPrefix(pth, "github.com/cloudwego/thriftgo") {
-			delete(imports, pth)
-		}
-		if !strings.Contains(pth, ".") { // std lib
-			delete(imports, pth)
-		}
-	}
 }
 
 func (p *patcher) isBinaryOrStringType(t *parser.Type) bool {

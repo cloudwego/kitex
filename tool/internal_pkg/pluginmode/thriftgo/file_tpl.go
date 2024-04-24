@@ -20,52 +20,47 @@ const file = `
 
 package {{.PkgName}}
 
-import (
-	"fmt"
-	"bytes"
-	"strings"
-	"reflect"
-
-	"github.com/apache/thrift/lib/go/thrift"
-
-	{{if GenerateDeepCopyAPIs -}}
-	kutils "github.com/cloudwego/kitex/pkg/utils"
-	{{- end}}
-	{{if GenerateFastAPIs}}
-	"{{ImportPathTo "pkg/protocol/bthrift"}}"
-	{{- end}}
-	{{if GenerateArgsResultTypes}}
-		{{if Features.KeepUnknownFields}}
-			{{- if ne (len .Scope.Services) 0}}
-				unknown "github.com/cloudwego/thriftgo/generator/golang/extension/unknown"
-			{{- end}}
-		{{- end}}
-	{{- end}}
-	{{- range $path, $alias := .Imports}}
-	{{$alias }}"{{$path}}"
-	{{- end}}
-)
+` + importInsertPoint + `
 
 {{InsertionPoint "KitexUnusedProtection"}}
-
 // unused protection
 var (
-	_ = fmt.Formatter(nil)
-	_ = (*bytes.Buffer)(nil)
-	_ = (*strings.Builder)(nil)
-	_ = reflect.Type(nil)
-	_ = thrift.TProtocol(nil)
+	_ = fmt.Formatter(nil) {{- UseStdLibrary "fmt"}}
+	_ = (*bytes.Buffer)(nil) {{- UseStdLibrary "bytes"}}
+	_ = (*strings.Builder)(nil) {{- UseStdLibrary "strings"}}
+	_ = reflect.Type(nil) {{- UseStdLibrary "reflect"}}
+	_ = thrift.TProtocol(nil) {{- UseStdLibrary "thrift"}}
 	{{- if GenerateFastAPIs}}
+	{{- UseLib (ImportPathTo "pkg/protocol/bthrift") ""}}
 	_ = bthrift.BinaryWriter(nil)
 	{{- end}}
-	{{- range .Imports | ToPackageNames}}
-	_ = {{.}}.KitexUnusedProtection
+	{{- if GenerateDeepCopyAPIs}}
+	{{- UseLib "github.com/cloudwego/kitex/pkg/utils" "kutils"}}
+	{{- end}}
+	{{- if and (and GenerateArgsResultTypes Features.KeepUnknownFields) (ne (len .Scope.Services) 0)}}
+	{{- UseStdLibrary "unknown"}}
 	{{- end}}
 )
 
 {{template "body" .}}
 
 {{end}}{{/* define "file" */}}
+`
+
+const imports = `
+{{define "imports"}}
+import (
+	{{PrintImports .Imports}}
+)
+
+{{- if gt (len .Includes) 0}}
+var (
+	{{- range .Includes }}
+	_ = {{.PackageName}}.KitexUnusedProtection
+	{{- end}}
+)
+{{- end}}
+{{end}}{{/* define "imports" */}}
 `
 
 const body = `
@@ -95,7 +90,9 @@ const patchArgsAndResult = `
 
 
 {{- if GenerateArgsResultTypes}}
+{{- $withFieldMask := (SetWithFieldMask false) }}
 {{template "StructLike" $argType}}
+{{- $_ := (SetWithFieldMask $withFieldMask) }}
 {{- end}}{{/* if GenerateArgsResultTypes */}}
 func (p *{{$argType.GoName}}) GetFirstArgument() interface{} {
 	return {{if .Arguments}}p.{{(index $argType.Fields 0).GoName}}{{else}}nil{{end}}
@@ -103,7 +100,9 @@ func (p *{{$argType.GoName}}) GetFirstArgument() interface{} {
 
 {{if not .Oneway}}
 {{- if GenerateArgsResultTypes}}
+{{- $withFieldMask := (SetWithFieldMask false) }}
 {{template "StructLike" $resType}}
+{{- $_ := (SetWithFieldMask $withFieldMask) }}
 {{- end}}{{/* if GenerateArgsResultTypes */}}
 func (p *{{$resType.GoName}}) GetResult() interface{} {
 	return {{if .Void}}nil{{else}}p.Success{{end}}
@@ -118,6 +117,7 @@ func (p *{{$resType.GoName}}) GetResult() interface{} {
 var basicTemplates = []string{
 	patchArgsAndResult,
 	file,
+	imports,
 	body,
 	registerHessian,
 }

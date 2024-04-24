@@ -59,6 +59,7 @@ func TestConfig_Pack(t *testing.T) {
 		Protocol              string
 		HandlerReturnKeepResp bool
 	}
+
 	tests := []struct {
 		name    string
 		fields  fields
