@@ -19,11 +19,11 @@ import (
 	"github.com/cloudwego/thriftgo/parser"
 )
 
-func offsetTPL(assign string, offset string) string {
+func offsetTPL(assign, offset string) string {
 	return offset + " += " + assign + "\n"
 }
 
-func ZeroWriter(t *parser.Type, oprot string, buf string, offset string) string {
+func ZeroWriter(t *parser.Type, oprot, buf, offset string) string {
 	switch t.GetCategory() {
 	case parser.Category_Bool:
 		return offsetTPL(oprot+".WriteBool("+buf+", false)", offset)
@@ -58,7 +58,7 @@ func ZeroWriter(t *parser.Type, oprot string, buf string, offset string) string 
 	}
 }
 
-func ZeroBLength(t *parser.Type, oprot string, offset string) string {
+func ZeroBLength(t *parser.Type, oprot, offset string) string {
 	switch t.GetCategory() {
 	case parser.Category_Bool:
 		return offsetTPL(oprot+".BoolLength(false)", offset)
