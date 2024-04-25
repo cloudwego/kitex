@@ -20,6 +20,9 @@ package {{ .PkgName}}
 
 import (
     "fmt"
+	{{- if gt (len .Scope.Enums) 0}}
+    "github.com/kitex-contrib/codec-dubbo/pkg/hessian2/enum" 	 
+    {{- end}}
 
 	"github.com/pkg/errors"
 	"github.com/kitex-contrib/codec-dubbo/pkg/hessian2"
@@ -30,6 +33,13 @@ var objects{{ .IDLName}} = []interface{}{
 {{- range .Scope.StructLikes}}
     &{{ .GoName}}{},
 {{- end}} 
+
+{{- range .Scope.Enums}}
+  {{- range .Values}}
+    {{ .GoName}},   
+  {{- end}} 
+{{- end}} 
+
 }
 
 func init() {
@@ -46,9 +56,18 @@ func Get{{.GoName}}IDLAnnotations() map[string][]string {
 }
 {{- end}}
 
+
+{{- $Scope := .Scope}}
+{{/*Store the current context for later use*/}}
+    
+
 {{- range .Scope.StructLikes}}
 {{template "StructLikeProtocol" .}}
 {{- end}}
+
+
+{{template "EnumStructLikeProtocol" .}}
+
 
 {{- range .Scope.Services}}
 {{- range .Functions}}
@@ -191,4 +210,42 @@ func (p *{{$TypeName}}) JavaClassName() string {
 }
 {{- end}}{{/* end if */}}
 {{- end}}{{/* end JavaClassName */}}
+`
+
+const enumJavaClassName = `
+{{define "EnumJavaClassName"}}
+{{- $TypeName := .GetName}}
+{{- $anno := .Annotations }}
+{{- $value := $anno.ILocValueByKey "JavaClassName" 0}}
+  {{- if ne "" $value}}
+  func ({{$TypeName}}) JavaClassName() string {
+    return "{{$value}}"
+  }
+  {{- end}}{{/* end if */}}
+{{- end}}{{/* end JavaClassName */}}
+`
+
+const enumStructLikeProtocol = `
+{{define "EnumStructLikeProtocol"}}
+{{- range .Scope.Enums}}
+{{- $EnumOfCur :=  . }}
+{{- if gt (len $EnumOfCur.Values) 0}} 
+var {{$EnumOfCur.GetName}}Values = map[string]{{$EnumOfCur.GetName}}{
+{{- range $idx , $EnumValSub := $EnumOfCur.Values }}
+	"{{$EnumValSub.GetName}}":     {{$EnumValSub.GoName}},
+{{- end}}
+}
+
+{{- template "EnumJavaClassName" $EnumOfCur}}
+{{/* EnumValue() method */}}
+func ({{$EnumOfCur.GetName}}) EnumValue(s string) enum.JavaEnum {
+	v, ok := {{$EnumOfCur.GetName -}}Values[s]
+	if ok {
+	return enum.JavaEnum(v)
+  }
+  return enum.InvalidJavaEnum
+}   
+{{- end}}
+{{- end}}	
+{{- end}} 
 `
