@@ -86,16 +86,20 @@ func (c thriftCodec) hyperMarshal(out remote.ByteBuffer, methodName string, msgT
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
 	}
+	mallocLen := out.MallocLen()
 
 	// encode message
 	offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
-	var writeLen int
-	writeLen, err = frugal.EncodeObject(buf[offset:], nil, data)
+	nw, _ := out.(remote.NocopyWrite)
+	writeLen, err := frugal.EncodeObject(buf[offset:], nw, data)
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Encode failed: %s", err.Error()))
 	}
 	offset += writeLen
 	bthrift.Binary.WriteMessageEnd(buf[offset:])
+	if nw != nil {
+		return nw.MallocAck(mallocLen)
+	}
 	return nil
 }
 
