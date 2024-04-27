@@ -437,7 +437,7 @@ func TestServiceRegistryInfoWithNilTags(t *testing.T) {
 }
 
 func TestServiceRegistryInfoWithSkipListenAddr(t *testing.T) {
-	realAddr := utils.NewNetAddr("tcp", test.GetLocalAddress())
+	realAddr, _ := net.ResolveTCPAddr("tcp", test.GetLocalAddress())
 	registryInfo := &registry.Info{
 		Weight:         100,
 		Addr:           realAddr,
@@ -469,7 +469,7 @@ func TestServiceRegistryInfoWithSkipListenAddr(t *testing.T) {
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
-	time.AfterFunc(time.Second, func() {
+	time.AfterFunc(1500*time.Millisecond, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
 	})
@@ -480,7 +480,7 @@ func TestServiceRegistryInfoWithSkipListenAddr(t *testing.T) {
 }
 
 func TestServiceRegistryInfoWithoutSkipListenAddr(t *testing.T) {
-	realAddr := utils.NewNetAddr("tcp", test.GetLocalAddress())
+	realAddr, _ := net.ResolveTCPAddr("tcp", test.GetLocalAddress())
 	registryInfo := &registry.Info{
 		Weight: 100,
 		Addr:   realAddr,
@@ -511,7 +511,7 @@ func TestServiceRegistryInfoWithoutSkipListenAddr(t *testing.T) {
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
-	time.AfterFunc(time.Second, func() {
+	time.AfterFunc(1500*time.Millisecond, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
 	})
