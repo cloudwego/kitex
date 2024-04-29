@@ -137,14 +137,15 @@ func (p *patcher) buildTemplates() (err error) {
 		)
 	} else {
 		allTemplates = append(allTemplates, structLikeCodec,
+			structLikeDefinitions,
 			structLikeFastRead,
 			structLikeFastReadField,
 			structLikeDeepCopy,
 			structLikeFastWrite,
 			structLikeFastWriteNocopy,
 			structLikeLength,
-			structLikeFastWriteField,
-			structLikeFieldLength,
+			fastWriteFieldInline,
+			fieldLengthInline,
 			structLikeProtocol,
 			javaClassName,
 			fieldFastRead,
