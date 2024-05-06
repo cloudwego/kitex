@@ -21,9 +21,9 @@ import (
 	"errors"
 
 	"github.com/bytedance/gopkg/cloud/circuitbreaker"
-
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 // Parameter contains parameters for circuit breaker.
@@ -98,6 +98,7 @@ func RecordStat(ctx context.Context, request, response interface{}, err error, c
 	case TypeTimeout:
 		panel.Timeout(cbKey)
 	case TypeFailure:
+		klog.Infof("KITEX[DEBUG]: count failure, err=%v", err)
 		panel.Fail(cbKey)
 	case TypeSuccess:
 		panel.Succeed(cbKey)
