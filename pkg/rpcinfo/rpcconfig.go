@@ -17,6 +17,7 @@
 package rpcinfo
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -166,12 +167,17 @@ func (r *rpcConfig) TransportProtocol() transport.Protocol {
 
 // SetTransportProtocol implements MutableRPCConfig interface.
 func (r *rpcConfig) SetTransportProtocol(tp transport.Protocol) error {
-	// PurePayload would override all the bits set before
-	// since in previous implementation, r.transport |= transport.PurePayload would not take effect
-	if tp == transport.PurePayload {
-		r.transportProtocol = tp
-	} else {
+	if tp&transport.TTHeaderFramed != 0 {
+		if tp&(^transport.TTHeaderFramed) != 0 {
+			panic(fmt.Sprintf("invalid transport protocol: %b", tp))
+		}
+		// TTHeader and Framed can be combined for [TTHeader + [FramedSize + Payload]]
+		r.transportProtocol &= transport.TTHeaderFramed // clear bits except TTHeader | Framed
 		r.transportProtocol |= tp
+	} else {
+		// other transports are mutually exclusive
+		// it's user's responsibility to set only one transport, not an OR-ed combination of multiple transports
+		r.transportProtocol = tp
 	}
 	return nil
 }

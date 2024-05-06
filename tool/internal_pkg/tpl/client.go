@@ -83,7 +83,7 @@ func NewClient(destService string, opts ...client.Option) (Client, error) {
 
     {{template "@client.go-NewClient-option" .}}
 	{{if and (eq $.Codec "protobuf") .HasStreaming}}{{/* Thrift Streaming only in StreamClient */}}
-	options = append(options, client.WithTransportProtocol(transport.GRPC))
+	options = append(options, client.WithTransportProtocol(transport.{{.StreamingTransport}}))
 	{{end}}
 	options = append(options, opts...)
 
@@ -139,7 +139,7 @@ func NewStreamClient(destService string, opts ...streamclient.Option) (StreamCli
 	var options []client.Option
 	options = append(options, client.WithDestService(destService))
     {{- template "@client.go-NewStreamClient-option" .}}
-	options = append(options, client.WithTransportProtocol(transport.GRPC))
+	options = append(options, client.WithTransportProtocol(transport.{{.StreamingTransport}}))
     options = append(options, streamclient.GetClientOptions(opts)...)
 
 	kc, err := client.NewClient(serviceInfoForStreamClient(), options...)

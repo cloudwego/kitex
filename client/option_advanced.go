@@ -245,3 +245,11 @@ func WithGRPCTLSConfig(tlsConfig *tls.Config) Option {
 		o.GRPCConnectOpts.TLSConfig = grpc.TLSConfig(tlsConfig)
 	}}
 }
+
+// WithTTHeaderFrameMetaHandler sets the FrameMetaHandler for TTHeader Streaming
+func WithTTHeaderFrameMetaHandler(h remote.FrameMetaHandler) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithTTHeaderFrameMetaHandler(%T)", h))
+		o.RemoteOpt.TTHeaderFrameMetaHandler = h
+	}}
+}

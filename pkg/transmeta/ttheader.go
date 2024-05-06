@@ -115,20 +115,26 @@ func (ch *clientTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 	transInfo := msg.TransInfo()
 	strInfo := transInfo.TransStrInfo()
 
-	if code, err := strconv.Atoi(strInfo[bizStatus]); err == nil && code != 0 {
-		if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
-			if bizExtra := strInfo[bizExtra]; bizExtra != "" {
-				extra, err := utils.JSONStr2Map(bizExtra)
-				if err != nil {
-					return ctx, fmt.Errorf("malformed header info, extra: %s", bizExtra)
-				}
-				setter.SetBizStatusErr(kerrors.NewBizStatusErrorWithExtra(int32(code), strInfo[bizMessage], extra))
-			} else {
-				setter.SetBizStatusErr(kerrors.NewBizStatusError(int32(code), strInfo[bizMessage]))
-			}
-		}
+	if err := ParseBizStatusErrorToRPCInfo(strInfo, ri); err != nil {
+		return nil, err
 	}
 	return ctx, nil
+}
+
+// ParseBizStatusErrorToRPCInfo parse biz status error from strInfo and set it to rpcinfo.Invocation
+func ParseBizStatusErrorToRPCInfo(strInfo map[string]string, ri rpcinfo.RPCInfo) (err error) {
+	if code, err := strconv.Atoi(strInfo[bizStatus]); err == nil && code != 0 {
+		if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+			var extra map[string]string
+			if bizExtra := strInfo[bizExtra]; bizExtra != "" {
+				if extra, err = utils.JSONStr2Map(bizExtra); err != nil {
+					return fmt.Errorf("malformed header info, extra: %s", bizExtra)
+				}
+			}
+			setter.SetBizStatusErr(kerrors.NewBizStatusErrorWithExtra(int32(code), strInfo[bizMessage], extra))
+		}
+	}
+	return nil
 }
 
 // serverTTHeaderHandler implement remote.MetaHandler
@@ -173,16 +179,19 @@ func (sh *serverTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 	strInfo := transInfo.TransStrInfo()
 
 	intInfo[transmeta.MsgType] = strconv.Itoa(int(msg.MessageType()))
-
-	if bizErr := ri.Invocation().BizStatusErr(); bizErr != nil {
-		strInfo[bizStatus] = strconv.Itoa(int(bizErr.BizStatusCode()))
-		strInfo[bizMessage] = bizErr.BizMessage()
-		if len(bizErr.BizExtra()) != 0 {
-			strInfo[bizExtra], _ = utils.Map2JSONStr(bizErr.BizExtra())
-		}
-	}
-
+	InjectBizStatusError(strInfo, ri.Invocation().BizStatusErr())
 	return ctx, nil
+}
+
+func InjectBizStatusError(strInfo map[string]string, bizErr kerrors.BizStatusErrorIface) {
+	if bizErr == nil {
+		return
+	}
+	strInfo[bizStatus] = strconv.Itoa(int(bizErr.BizStatusCode()))
+	strInfo[bizMessage] = bizErr.BizMessage()
+	if len(bizErr.BizExtra()) != 0 {
+		strInfo[bizExtra], _ = utils.Map2JSONStr(bizErr.BizExtra())
+	}
 }
 
 func isTTHeader(msg remote.Message) bool {

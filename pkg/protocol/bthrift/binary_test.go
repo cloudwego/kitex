@@ -21,8 +21,12 @@ import (
 	"fmt"
 	"testing"
 
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift/internal/test"
+	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/netpoll"
+
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll/bytebuf"
 )
 
 // TestWriteMessageEnd test binary WriteMessageEnd function
@@ -315,7 +319,9 @@ func TestWriteStringNocopy(t *testing.T) {
 	buf := make([]byte, 128)
 	exceptWs := "0000000c6d657373616765426567696e"
 	exceptSize := 16
-	wn := Binary.WriteStringNocopy(buf, nil, "messageBegin")
+	out := bytebuf.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(0))
+	nw, _ := out.(remote.NocopyWrite)
+	wn := Binary.WriteStringNocopy(buf, nw, "messageBegin")
 	ws := fmt.Sprintf("%x", buf[:wn])
 	test.Assert(t, wn == exceptSize, wn, exceptSize)
 	test.Assert(t, ws == exceptWs, ws, exceptWs)
@@ -326,7 +332,9 @@ func TestWriteBinaryNocopy(t *testing.T) {
 	buf := make([]byte, 128)
 	exceptWs := "0000000c6d657373616765426567696e"
 	exceptSize := 16
-	wn := Binary.WriteBinaryNocopy(buf, nil, []byte("messageBegin"))
+	out := bytebuf.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(0))
+	nw, _ := out.(remote.NocopyWrite)
+	wn := Binary.WriteBinaryNocopy(buf, nw, []byte("messageBegin"))
 	ws := fmt.Sprintf("%x", buf[:wn])
 	test.Assert(t, wn == exceptSize, wn, exceptSize)
 	test.Assert(t, ws == exceptWs, ws, exceptWs)

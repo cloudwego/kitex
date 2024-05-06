@@ -18,60 +18,27 @@ package generic
 
 import (
 	"bytes"
-	"io"
+	"io/ioutil"
 	"net/http"
-	"os"
 	"reflect"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/generic/thrift"
+	"github.com/bytedance/mockey"
+
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
+// TestFromHTTPPbRequest this test is to make sure mockey can work.
+// If it fails, please run this test with `-gcflags="all=-N -l"`
 func TestFromHTTPPbRequest(t *testing.T) {
-	req, err := http.NewRequest("POST", "/far/boo", bytes.NewBuffer([]byte("321")))
-	test.Assert(t, err == nil)
-	hreq, err := FromHTTPPbRequest(req)
-	test.Assert(t, err == nil)
-	test.Assert(t, reflect.DeepEqual(hreq.RawBody, []byte("321")), string(hreq.RawBody))
-	test.Assert(t, hreq.GetMethod() == "POST")
-	test.Assert(t, hreq.GetPath() == "/far/boo")
-}
-
-func TestHTTPPbThriftCodec(t *testing.T) {
-	p, err := NewThriftFileProvider("./httppb_test/idl/echo.thrift")
-	test.Assert(t, err == nil)
-	pbIdl := "./httppb_test/idl/echo.proto"
-	pbf, err := os.Open(pbIdl)
-	test.Assert(t, err == nil)
-	pbContent, err := io.ReadAll(pbf)
-	test.Assert(t, err == nil)
-	pbf.Close()
-	pbp, err := NewPbContentProvider(pbIdl, map[string]string{pbIdl: string(pbContent)})
-	test.Assert(t, err == nil)
-
-	htc := newHTTPPbThriftCodec(p, pbp)
-	defer htc.Close()
-	test.Assert(t, htc.Name() == "HttpPbThrift")
-
-	req, err := http.NewRequest("GET", "/Echo", bytes.NewBuffer([]byte("321")))
-	test.Assert(t, err == nil)
-	hreq, err := FromHTTPPbRequest(req)
-	test.Assert(t, err == nil)
-	// wrong
-	method, err := htc.getMethod("test")
-	test.Assert(t, err.Error() == "req is invalid, need descriptor.HTTPRequest" && method == nil)
-	// right
-	method, err = htc.getMethod(hreq)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, method.Name == "Echo")
-	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
-	test.Assert(t, htc.svcName == "ExampleService")
-
-	rw := htc.getMessageReaderWriter()
-	_, ok := rw.(thrift.MessageWriter)
-	test.Assert(t, ok)
-	_, ok = rw.(thrift.MessageReader)
-	test.Assert(t, ok)
+	mockey.PatchConvey("TestFromHTTPPbRequest", t, func() {
+		req, err := http.NewRequest("POST", "/far/boo", bytes.NewBuffer([]byte("321")))
+		test.Assert(t, err == nil)
+		mockey.Mock(ioutil.ReadAll).Return([]byte("123"), nil).Build()
+		hreq, err := FromHTTPPbRequest(req)
+		test.Assert(t, err == nil)
+		test.Assert(t, reflect.DeepEqual(hreq.RawBody, []byte("123")), "should run with `-gcflags=\"all=-N -l\"`")
+		test.Assert(t, hreq.GetMethod() == "POST")
+		test.Assert(t, hreq.GetPath() == "/far/boo")
+	})
 }

@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package nphttp2
+package endpoint
 
 import (
-	ep "github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
@@ -25,11 +24,12 @@ import (
 type streamWithMiddleware struct {
 	streaming.Stream
 
-	recvEndpoint ep.RecvEndpoint
-	sendEndpoint ep.SendEndpoint
+	recvEndpoint RecvEndpoint
+	sendEndpoint SendEndpoint
 }
 
-func newStreamWithMiddleware(st streaming.Stream, recv ep.RecvEndpoint, send ep.SendEndpoint) *streamWithMiddleware {
+// NewStreamWithMiddleware creates a new Stream with recv/send middleware support
+func NewStreamWithMiddleware(st streaming.Stream, recv RecvEndpoint, send SendEndpoint) streaming.Stream {
 	return &streamWithMiddleware{
 		Stream:       st,
 		recvEndpoint: recv,
@@ -37,10 +37,12 @@ func newStreamWithMiddleware(st streaming.Stream, recv ep.RecvEndpoint, send ep.
 	}
 }
 
+// RecvMsg implements the streaming.Stream interface with recv middlewares
 func (s *streamWithMiddleware) RecvMsg(m interface{}) error {
 	return s.recvEndpoint(s.Stream, m)
 }
 
+// SendMsg implements the streaming.Stream interface with send middlewares
 func (s *streamWithMiddleware) SendMsg(m interface{}) error {
 	return s.sendEndpoint(s.Stream, m)
 }

@@ -55,6 +55,10 @@ var (
 	_ remote.MetaDecoder = (*defaultCodec)(nil)
 )
 
+func TTHeaderCodec() ttHeader {
+	return ttHeaderCodec
+}
+
 // NewDefaultCodec creates the default protocol sniffing codec supporting thrift and protobuf.
 func NewDefaultCodec() remote.Codec {
 	// No size limit by default

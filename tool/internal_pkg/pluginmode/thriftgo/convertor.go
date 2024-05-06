@@ -132,8 +132,9 @@ func (c *converter) copyTreeWithRef(ast *parser.Thrift, ref string) *parser.Thri
 
 	for _, s := range ast.Services {
 		ss := &parser.Service{
-			Name:    s.Name,
-			Extends: s.Extends,
+			Name:        s.Name,
+			Extends:     s.Extends,
+			Annotations: c.copyAnnotations(s.Annotations),
 		}
 		for _, f := range s.Functions {
 			ff := c.copyFunctionWithRef(f, ref)
@@ -362,6 +363,12 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				hasStreaming = hasStreaming || s.HasStreaming
 				methods = append(methods, s.AllMethods()...)
 			}
+
+			streamingTransport, err := getCombineServiceStreamingTransport(all[ast.Filename])
+			if err != nil {
+				return err
+			}
+
 			// check method name conflict
 			mm := make(map[string]*generator.MethodInfo)
 			for _, m := range methods {
@@ -372,13 +379,14 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 			}
 			svcName := c.getCombineServiceName("CombineService", all[ast.Filename])
 			si := &generator.ServiceInfo{
-				PkgInfo:         pi,
-				ServiceName:     svcName,
-				RawServiceName:  svcName,
-				CombineServices: svcs,
-				Methods:         methods,
-				ServiceFilePath: ast.Filename,
-				HasStreaming:    hasStreaming,
+				PkgInfo:            pi,
+				ServiceName:        svcName,
+				RawServiceName:     svcName,
+				CombineServices:    svcs,
+				Methods:            methods,
+				ServiceFilePath:    ast.Filename,
+				HasStreaming:       hasStreaming,
+				StreamingTransport: streamingTransport,
 			}
 
 			if c.IsHessian2() {
@@ -397,6 +405,24 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 	return nil
 }
 
+// getCombineServiceStreamingTransport returns the common streaming transport for all services
+// If the streaming transports are not the same, it returns an error
+func getCombineServiceStreamingTransport(services []*generator.ServiceInfo) (string, error) {
+	var streamingTransport string
+	for _, s := range services {
+		if streamingTransport == "" {
+			streamingTransport = s.StreamingTransport
+		} else if streamingTransport != s.StreamingTransport {
+			return "", fmt.Errorf("service %s has different streaming transport: %s",
+				s.ServiceName, s.StreamingTransport)
+		}
+	}
+	if streamingTransport == "" {
+		streamingTransport = generator.GRPC // default
+	}
+	return streamingTransport, nil
+}
+
 func (c *converter) fixStreamingForExtendedServices(ast *parser.Thrift, all ast2svc) {
 	for i, svc := range ast.Services {
 		if svc.Extends == "" {
@@ -409,13 +435,17 @@ func (c *converter) fixStreamingForExtendedServices(ast *parser.Thrift, all ast2
 	}
 }
 
-func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*generator.ServiceInfo, error) {
-	si := &generator.ServiceInfo{
+func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (si *generator.ServiceInfo, err error) {
+	si = &generator.ServiceInfo{
 		PkgInfo:        pkg,
 		ServiceName:    svc.GoName().String(),
 		RawServiceName: svc.Name,
 	}
 	si.ServiceTypeName = func() string { return si.PkgRefName + "." + si.ServiceName }
+
+	if si.StreamingTransport, err = parseStreamingTransport(svc.Annotations); err != nil {
+		return nil, err
+	}
 
 	for _, f := range svc.Functions() {
 		if strings.HasPrefix(f.Name, "_") {
@@ -434,6 +464,23 @@ func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*ge
 	si.HandlerReturnKeepResp = c.Config.HandlerReturnKeepResp
 	si.UseThriftReflection = c.Utils.Features().WithReflection
 	return si, nil
+}
+
+func parseStreamingTransport(annotations parser.Annotations) (string, error) {
+	for _, anno := range annotations {
+		if anno.Key != generator.AnnotationKeyStreamingTransport {
+			continue
+		}
+		if len(anno.Values) != 1 {
+			return "", fmt.Errorf("invalid streaming.transport (should be exact 1 value): %v", anno.Values)
+		}
+		if protocol, err := generator.GetStreamingTransport(anno.Values[0]); err != nil {
+			return "", err
+		} else {
+			return protocol, nil
+		}
+	}
+	return generator.GRPC, nil // if not specified
 }
 
 func (c *converter) makeMethod(si *generator.ServiceInfo, f *golang.Function) (*generator.MethodInfo, error) {

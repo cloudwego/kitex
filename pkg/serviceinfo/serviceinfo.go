@@ -28,6 +28,7 @@ const (
 	Thrift PayloadCodec = iota
 	Protobuf
 	Hessian2
+	NotSpecified PayloadCodec = 255
 )
 
 const (
