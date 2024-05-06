@@ -65,7 +65,7 @@ type patcher struct {
 	libs    map[string]string
 }
 
-func (p *patcher) UseLib(path string, alias string) string {
+func (p *patcher) UseLib(path, alias string) string {
 	if p.libs == nil {
 		p.libs = make(map[string]string)
 	}
@@ -383,7 +383,7 @@ func getBashPath() string {
 }
 
 func (p *patcher) extractLocalLibs(imports []util.Import) []util.Import {
-	var ret = make([]util.Import, 0)
+	ret := make([]util.Import, 0)
 	prefix := p.module + "/"
 	// remove std libs and thrift to prevent duplicate import.
 	for _, v := range imports {

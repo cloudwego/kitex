@@ -46,6 +46,9 @@ type Info struct {
 
 	// extend other infos with Tags.
 	Tags map[string]string
+
+	// SkipListenAddr is used to prevent the listen addr from overriding the Addr
+	SkipListenAddr bool
 }
 
 // NoopRegistry is an empty implement of Registry
