@@ -31,8 +31,14 @@ import (
 
 func newServerRemoteOption() *remote.ServerOption {
 	return &remote.ServerOption{
-		TransServerFactory:    gonet.NewTransServerFactory(),
-		SvrHandlerFactory:     detection.NewSvrTransHandlerFactory(gonet.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()),
+		TransServerFactory: gonet.NewTransServerFactory(),
+		SvrHandlerFactory: detection.NewSvrTransHandlerFactory(
+			// default transHandler
+			gonet.NewSvrTransHandlerFactory(),
+			// detectable transHandlers
+			gonet.NewTTHeaderStreamingSvrTransHandlerFactory(),
+			nphttp2.NewSvrTransHandlerFactory(),
+		),
 		Codec:                 codec.NewDefaultCodec(),
 		Address:               defaultAddress,
 		ExitWaitTime:          defaultExitWaitTime,

@@ -32,6 +32,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -72,6 +73,11 @@ func TestStream(t *testing.T) {
 	test.Assert(t, err == nil, err)
 }
 
+func init() {
+	mocks.DefaultNewStreamFunc = nphttp2.NewStream
+	mocks.DefaultNewStreamTransHandlerFunc = nphttp2.NewCliTransHandlerFactory().NewTransHandler
+}
+
 func TestStreaming(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -102,7 +108,8 @@ func TestStreaming(t *testing.T) {
 	connpool := mock_remote.NewMockConnPool(ctrl)
 	connpool.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(conn, nil)
 	cliInfo.ConnPool = connpool
-	s, cr, _ := remotecli.NewStream(ctx, mockRPCInfo, new(mocks.MockCliTransHandler), cliInfo)
+	handler := new(mocks.MockCliTransHandler)
+	s, cr, _ := remotecli.NewStream(ctx, mockRPCInfo, handler, cliInfo)
 	stream := newStream(
 		s, cr, kc, mockRPCInfo, serviceinfo.StreamingBidirectional,
 		func(stream streaming.Stream, message interface{}) (err error) {
@@ -177,10 +184,11 @@ func TestClosedClient(t *testing.T) {
 
 type mockStream struct {
 	streaming.Stream
-	ctx    context.Context
-	close  func() error
-	header func() (metadata.MD, error)
-	recv   func(msg interface{}) error
+	ctx     context.Context
+	trailer func() metadata.MD
+	close   func() error
+	header  func() (metadata.MD, error)
+	recv    func(msg interface{}) error
 }
 
 func (s *mockStream) Context() context.Context {
@@ -193,6 +201,10 @@ func (s *mockStream) Header() (metadata.MD, error) {
 
 func (s *mockStream) RecvMsg(msg interface{}) error {
 	return s.recv(msg)
+}
+
+func (s *mockStream) Trailer() metadata.MD {
+	return s.trailer()
 }
 
 func (s *mockStream) Close() error {
@@ -322,7 +334,8 @@ func Test_stream_RecvMsg(t *testing.T) {
 	})
 
 	t.Run("no-error-client-streaming", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), nil, rpcinfo.NewRPCStats())
+		cfg := rpcinfo.NewRPCConfig()
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("mock_service", "mock_method"), cfg, rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -470,7 +483,7 @@ func Test_stream_DoFinish(t *testing.T) {
 	defer ctrl.Finish()
 
 	t.Run("no-error", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -500,7 +513,7 @@ func Test_stream_DoFinish(t *testing.T) {
 	})
 
 	t.Run("EOF", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -530,7 +543,7 @@ func Test_stream_DoFinish(t *testing.T) {
 	})
 
 	t.Run("biz-status-error", func(t *testing.T) {
-		ri := rpcinfo.NewRPCInfo(nil, nil, nil, nil, rpcinfo.NewRPCStats())
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 		st := &mockStream{
 			ctx: rpcinfo.NewCtxWithRPCInfo(context.Background(), ri),
 		}
@@ -635,5 +648,44 @@ func Test_isRPCError(t *testing.T) {
 	})
 	t.Run("error", func(t *testing.T) {
 		test.Assert(t, isRPCError(errors.New("error")))
+	})
+}
+
+type mockHandlerFactory struct {
+	remote.ClientTransHandlerFactory
+}
+
+var _ remote.ClientStreamTransHandlerFactory = (*mockHandlerFactoryWithNewStream)(nil)
+
+type mockHandlerFactoryWithNewStream struct {
+	remote.ClientTransHandlerFactory
+}
+
+func (m mockHandlerFactoryWithNewStream) NewStreamTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, error) {
+	return nil, nil
+}
+
+func Test_kClient_newStreamClientTransHandler(t *testing.T) {
+	t.Run("not-implemented-NewStream", func(t *testing.T) {
+		kc := &kClient{
+			opt: &client.Options{
+				RemoteOpt: &remote.ClientOption{
+					CliHandlerFactory: &mockHandlerFactory{},
+				},
+			},
+		}
+		_, err := kc.newStreamClientTransHandler()
+		test.Assert(t, err != nil, err) // not implemented
+	})
+	t.Run("implemented-NewStream", func(t *testing.T) {
+		kc := &kClient{
+			opt: &client.Options{
+				RemoteOpt: &remote.ClientOption{
+					CliHandlerFactory: &mockHandlerFactoryWithNewStream{},
+				},
+			},
+		}
+		_, err := kc.newStreamClientTransHandler()
+		test.Assert(t, err == nil)
 	})
 }

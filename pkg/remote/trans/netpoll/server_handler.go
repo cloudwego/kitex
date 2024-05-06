@@ -19,6 +19,7 @@ package netpoll
 import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
+	"github.com/cloudwego/kitex/pkg/remote/trans/ttheaderstreaming"
 )
 
 type svrTransHandlerFactory struct{}
@@ -35,4 +36,14 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 
 func newSvrTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
 	return trans.NewDefaultSvrTransHandler(opt, NewNetpollConnExtension())
+}
+
+type ttheaderStreamingSvrTransHandlerFactory struct{}
+
+func (s *ttheaderStreamingSvrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
+	return ttheaderstreaming.NewSvrTransHandler(opt, NewNetpollConnExtension())
+}
+
+func NewTTHeaderStreamingSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
+	return &ttheaderStreamingSvrTransHandlerFactory{}
 }

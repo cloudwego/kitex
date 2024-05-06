@@ -293,7 +293,10 @@ func TestMuxTransportOption(t *testing.T) {
 	err = svr1.Run()
 	test.Assert(t, err == nil, err)
 	iSvr1 := svr1.(*server)
-	test.DeepEqual(t, iSvr1.opt.RemoteOpt.SvrHandlerFactory, detection.NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()))
+	test.DeepEqual(t, iSvr1.opt.RemoteOpt.SvrHandlerFactory,
+		detection.NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(),
+			netpoll.NewTTHeaderStreamingSvrTransHandlerFactory(),
+			nphttp2.NewSvrTransHandlerFactory()))
 
 	svr2 := NewServer(WithMuxTransport())
 	time.AfterFunc(100*time.Millisecond, func() {

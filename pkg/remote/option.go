@@ -35,7 +35,8 @@ type Option struct {
 
 	Inbounds []InboundHandler
 
-	StreamingMetaHandlers []StreamingMetaHandler
+	StreamingMetaHandlers    []StreamingMetaHandler
+	TTHeaderFrameMetaHandler FrameMetaHandler
 }
 
 // PrependBoundHandler adds a BoundHandler to the head.
@@ -144,4 +145,7 @@ type ClientOption struct {
 	Option
 
 	EnableConnPoolReporter bool
+
+	TTHeaderStreamingWaitMetaFrame  bool
+	TTHeaderStreamingGRPCCompatible bool // not enabled by default for performance issue
 }

@@ -24,6 +24,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -131,4 +132,67 @@ func TestTTHeaderServerWriteMetainfo(t *testing.T) {
 	test.Assert(t, err == nil)
 	kvs = msg.TransInfo().TransIntInfo()
 	test.Assert(t, kvs[transmeta.MsgType] == strconv.Itoa(int(remote.Call)))
+}
+
+func TestInjectBizStatusError(t *testing.T) {
+	t.Run("nil-err", func(t *testing.T) {
+		strInfo := map[string]string{}
+		InjectBizStatusError(strInfo, nil)
+		test.Assert(t, len(strInfo) == 0)
+	})
+	t.Run("biz-err", func(t *testing.T) {
+		strInfo := map[string]string{}
+		bizErr := kerrors.NewBizStatusErrorWithExtra(int32(100), "biz-err", map[string]string{"k1": "v1"})
+		InjectBizStatusError(strInfo, bizErr)
+		test.Assert(t, len(strInfo) == 3)
+		test.Assert(t, strInfo[bizStatus] == "100")
+		test.Assert(t, strInfo[bizMessage] == "biz-err")
+		test.Assert(t, strInfo[bizExtra] == `{"k1":"v1"}`)
+	})
+}
+
+func TestParseBizStatusErrorToRPCInfo(t *testing.T) {
+	t.Run("no-biz-err", func(t *testing.T) {
+		strInfo := map[string]string{}
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, nil)
+		err := ParseBizStatusErrorToRPCInfo(strInfo, ri)
+		test.Assert(t, err == nil)
+	})
+	t.Run("biz-err", func(t *testing.T) {
+		strInfo := map[string]string{
+			bizStatus:  "100",
+			bizMessage: "biz-err",
+			bizExtra:   `{"k1":"v1"}`,
+		}
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, nil)
+		err := ParseBizStatusErrorToRPCInfo(strInfo, ri)
+		test.Assert(t, err == nil)
+		bizErr := ri.Invocation().BizStatusErr()
+		test.Assert(t, bizErr != nil)
+		test.Assert(t, bizErr.BizStatusCode() == 100)
+		test.Assert(t, bizErr.BizMessage() == "biz-err")
+		test.Assert(t, bizErr.BizExtra()["k1"] == "v1")
+	})
+	t.Run("biz-err:code=0", func(t *testing.T) {
+		strInfo := map[string]string{
+			bizStatus:  "0",
+			bizMessage: "biz-err",
+			bizExtra:   `{"k1":"v1"}`,
+		}
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, nil)
+		err := ParseBizStatusErrorToRPCInfo(strInfo, ri)
+		test.Assert(t, err == nil)
+		bizErr := ri.Invocation().BizStatusErr()
+		test.Assert(t, bizErr == nil)
+	})
+	t.Run("invalid-extra", func(t *testing.T) {
+		strInfo := map[string]string{
+			bizStatus:  "100",
+			bizMessage: "biz-err",
+			bizExtra:   `invalid`,
+		}
+		ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), nil, nil)
+		err := ParseBizStatusErrorToRPCInfo(strInfo, ri)
+		test.Assert(t, err != nil)
+	})
 }

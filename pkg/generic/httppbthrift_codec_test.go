@@ -37,7 +37,7 @@ func TestFromHTTPPbRequest(t *testing.T) {
 		mockey.Mock(ioutil.ReadAll).Return([]byte("123"), nil).Build()
 		hreq, err := FromHTTPPbRequest(req)
 		test.Assert(t, err == nil)
-		test.Assert(t, reflect.DeepEqual(hreq.RawBody, []byte("123")), string(hreq.RawBody))
+		test.Assert(t, reflect.DeepEqual(hreq.RawBody, []byte("123")), "should run with `-gcflags=\"all=-N -l\"`")
 		test.Assert(t, hreq.GetMethod() == "POST")
 		test.Assert(t, hreq.GetPath() == "/far/boo")
 	})
