@@ -495,8 +495,10 @@ func (s *server) buildRegistryInfo(lAddr net.Addr) {
 		s.opt.RegistryInfo = &registry.Info{}
 	}
 	info := s.opt.RegistryInfo
-	// notice: lAddr may be nil when listen failed
-	info.Addr = lAddr
+	if !info.SkipListenAddr {
+		// notice: lAddr may be nil when listen failed
+		info.Addr = lAddr
+	}
 	if info.ServiceName == "" {
 		info.ServiceName = s.opt.Svr.ServiceName
 	}
