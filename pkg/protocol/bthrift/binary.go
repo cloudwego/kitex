@@ -37,7 +37,37 @@ var (
 	spanCache            = mem.NewSpanCache(1024 * 1024) // 1MB
 )
 
-const binaryInplaceThreshold = 4096 // 4k
+const (
+	binaryInplaceThreshold = 4096 // 4k
+
+	// === constant binary protocol offset ===
+	ByteLength   = 1
+	BoolLength   = 1
+	I16Length    = 2
+	I32Length    = 4
+	I64Length    = 8
+	DoubleLength = 8
+
+	WriteMessageEnd   = 0
+	WriteStructBegin  = 0
+	WriteStructEnd    = 0
+	WriteFieldEnd     = 0
+	WriteMapEnd       = 0
+	WriteListEnd      = 0
+	WriteSetEnd       = 0
+	MessageEndLength  = 0
+	StructBeginLength = 0
+	StructEndLength   = 0
+	FieldBeginLength  = ByteLength + I16Length
+	FieldEndLength    = 0
+	FieldStopLength   = ByteLength
+	MapBeginLength    = ByteLength + ByteLength + I32Length
+	MapEndLength      = 0
+	ListBeginLength   = ByteLength + I32Length
+	ListEndLength     = 0
+	SetBeginLength    = ByteLength + I32Length
+	SetEndLength      = 0
+)
 
 type binaryProtocol struct{}
 
@@ -51,15 +81,15 @@ func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.T
 }
 
 func (binaryProtocol) WriteMessageEnd(buf []byte) int {
-	return 0
+	return WriteMessageEnd
 }
 
 func (binaryProtocol) WriteStructBegin(buf []byte, name string) int {
-	return 0
+	return WriteStructBegin
 }
 
 func (binaryProtocol) WriteStructEnd(buf []byte) int {
-	return 0
+	return WriteStructEnd
 }
 
 func (binaryProtocol) WriteFieldBegin(buf []byte, name string, typeID thrift.TType, id int16) int {
@@ -67,7 +97,7 @@ func (binaryProtocol) WriteFieldBegin(buf []byte, name string, typeID thrift.TTy
 }
 
 func (binaryProtocol) WriteFieldEnd(buf []byte) int {
-	return 0
+	return WriteFieldEnd
 }
 
 func (binaryProtocol) WriteFieldStop(buf []byte) int {
@@ -81,7 +111,7 @@ func (binaryProtocol) WriteMapBegin(buf []byte, keyType, valueType thrift.TType,
 }
 
 func (binaryProtocol) WriteMapEnd(buf []byte) int {
-	return 0
+	return WriteMapEnd
 }
 
 func (binaryProtocol) WriteListBegin(buf []byte, elemType thrift.TType, size int) int {
@@ -90,7 +120,7 @@ func (binaryProtocol) WriteListBegin(buf []byte, elemType thrift.TType, size int
 }
 
 func (binaryProtocol) WriteListEnd(buf []byte) int {
-	return 0
+	return WriteListEnd
 }
 
 func (binaryProtocol) WriteSetBegin(buf []byte, elemType thrift.TType, size int) int {
@@ -99,7 +129,7 @@ func (binaryProtocol) WriteSetBegin(buf []byte, elemType thrift.TType, size int)
 }
 
 func (binaryProtocol) WriteSetEnd(buf []byte) int {
-	return 0
+	return WriteSetEnd
 }
 
 func (binaryProtocol) WriteBool(buf []byte, value bool) int {
@@ -165,99 +195,91 @@ func (binaryProtocol) MessageBeginLength(name string, typeID thrift.TMessageType
 }
 
 func (binaryProtocol) MessageEndLength() int {
-	return 0
+	return MessageEndLength
 }
 
 func (binaryProtocol) StructBeginLength(name string) int {
-	return 0
+	return StructBeginLength
 }
 
 func (binaryProtocol) StructEndLength() int {
-	return 0
+	return StructEndLength
 }
 
 func (binaryProtocol) FieldBeginLength(name string, typeID thrift.TType, id int16) int {
-	return Binary.ByteLength(int8(typeID)) + Binary.I16Length(id)
+	return FieldBeginLength
 }
 
 func (binaryProtocol) FieldEndLength() int {
-	return 0
+	return FieldEndLength
 }
 
 func (binaryProtocol) FieldStopLength() int {
-	return Binary.ByteLength(thrift.STOP)
+	return FieldStopLength
 }
 
 func (binaryProtocol) MapBeginLength(keyType, valueType thrift.TType, size int) int {
-	return Binary.ByteLength(int8(keyType)) +
-		Binary.ByteLength(int8(valueType)) +
-		Binary.I32Length(int32(size))
+	return MapBeginLength
 }
 
 func (binaryProtocol) MapEndLength() int {
-	return 0
+	return MapEndLength
 }
 
 func (binaryProtocol) ListBeginLength(elemType thrift.TType, size int) int {
-	return Binary.ByteLength(int8(elemType)) +
-		Binary.I32Length(int32(size))
+	return ListBeginLength
 }
 
 func (binaryProtocol) ListEndLength() int {
-	return 0
+	return ListEndLength
 }
 
 func (binaryProtocol) SetBeginLength(elemType thrift.TType, size int) int {
-	return Binary.ByteLength(int8(elemType)) +
-		Binary.I32Length(int32(size))
+	return SetBeginLength
 }
 
 func (binaryProtocol) SetEndLength() int {
-	return 0
+	return SetEndLength
 }
 
 func (binaryProtocol) BoolLength(value bool) int {
-	if value {
-		return Binary.ByteLength(1)
-	}
-	return Binary.ByteLength(0)
+	return BoolLength
 }
 
 func (binaryProtocol) ByteLength(value int8) int {
-	return 1
+	return ByteLength
 }
 
 func (binaryProtocol) I16Length(value int16) int {
-	return 2
+	return I16Length
 }
 
 func (binaryProtocol) I32Length(value int32) int {
-	return 4
+	return I32Length
 }
 
 func (binaryProtocol) I64Length(value int64) int {
-	return 8
+	return I64Length
 }
 
 func (binaryProtocol) DoubleLength(value float64) int {
-	return Binary.I64Length(int64(math.Float64bits(value)))
+	return DoubleLength
 }
 
 func (binaryProtocol) StringLength(value string) int {
-	return Binary.I32Length(int32(len(value))) + len(value)
+	return I32Length + len(value)
 }
 
 func (binaryProtocol) BinaryLength(value []byte) int {
-	return Binary.I32Length(int32(len(value))) + len(value)
+	return I32Length + len(value)
 }
 
 func (binaryProtocol) StringLengthNocopy(value string) int {
-	return Binary.BinaryLengthNocopy(utils.StringToSliceByte(value))
+	return I32Length + len(value)
 }
 
 func (binaryProtocol) BinaryLengthNocopy(value []byte) int {
-	l := Binary.I32Length(int32(len(value)))
-	return l + len(value)
+	return I32Length + len(value)
 }
 
 func (binaryProtocol) ReadMessageBegin(buf []byte) (name string, typeID thrift.TMessageType, seqid int32, length int, err error) {
