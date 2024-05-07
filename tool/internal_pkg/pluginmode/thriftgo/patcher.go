@@ -122,66 +122,66 @@ func (p *patcher) buildTemplates() (err error) {
 			templates.StructLikeDefault,
 			templates.FieldGetOrSet,
 			templates.FieldIsSet,
-			structLikeDeepCopy,
-			fieldDeepCopy,
-			fieldDeepCopyStructLike,
-			fieldDeepCopyContainer,
-			fieldDeepCopyMap,
-			fieldDeepCopyList,
-			fieldDeepCopySet,
-			fieldDeepCopyBaseType,
-			structLikeCodec,
-			structLikeProtocol,
-			javaClassName,
-			processor,
+			StructLikeDeepCopy,
+			FieldDeepCopy,
+			FieldDeepCopyStructLike,
+			FieldDeepCopyContainer,
+			FieldDeepCopyMap,
+			FieldDeepCopyList,
+			FieldDeepCopySet,
+			FieldDeepCopyBaseType,
+			StructLikeCodec,
+			StructLikeProtocol,
+			JavaClassName,
+			Processor,
 		)
 	} else {
-		allTemplates = append(allTemplates, structLikeCodec,
-			structLikeFastRead,
-			structLikeFastReadField,
-			structLikeDeepCopy,
-			structLikeFastWrite,
-			structLikeFastWriteNocopy,
-			structLikeLength,
-			structLikeFastWriteField,
-			structLikeFieldLength,
-			structLikeProtocol,
-			javaClassName,
-			fieldFastRead,
-			fieldFastReadStructLike,
-			fieldFastReadBaseType,
-			fieldFastReadContainer,
-			fieldFastReadMap,
-			fieldFastReadSet,
-			fieldFastReadList,
-			fieldDeepCopy,
-			fieldDeepCopyStructLike,
-			fieldDeepCopyContainer,
-			fieldDeepCopyMap,
-			fieldDeepCopyList,
-			fieldDeepCopySet,
-			fieldDeepCopyBaseType,
-			fieldFastWrite,
-			fieldLength,
-			fieldFastWriteStructLike,
-			fieldStructLikeLength,
-			fieldFastWriteBaseType,
-			fieldBaseTypeLength,
-			fieldFixedLengthTypeLength,
-			fieldFastWriteContainer,
-			fieldContainerLength,
-			fieldFastWriteMap,
-			fieldMapLength,
-			fieldFastWriteSet,
-			fieldSetLength,
-			fieldFastWriteList,
-			fieldListLength,
+		allTemplates = append(allTemplates, StructLikeCodec,
+			StructLikeFastReadField,
+			StructLikeDeepCopy,
+			StructLikeFastWrite,
+			StructLikeFastRead,
+			StructLikeFastWriteNocopy,
+			StructLikeLength,
+			StructLikeFastWriteField,
+			StructLikeFieldLength,
+			StructLikeProtocol,
+			JavaClassName,
+			FieldFastRead,
+			FieldFastReadStructLike,
+			FieldFastReadBaseType,
+			FieldFastReadContainer,
+			FieldFastReadMap,
+			FieldFastReadSet,
+			FieldFastReadList,
+			FieldDeepCopy,
+			FieldDeepCopyStructLike,
+			FieldDeepCopyContainer,
+			FieldDeepCopyMap,
+			FieldDeepCopyList,
+			FieldDeepCopySet,
+			FieldDeepCopyBaseType,
+			FieldFastWrite,
+			FieldLength,
+			FieldFastWriteStructLike,
+			FieldStructLikeLength,
+			FieldFastWriteBaseType,
+			FieldBaseTypeLength,
+			FieldFixedLengthTypeLength,
+			FieldFastWriteContainer,
+			FieldContainerLength,
+			FieldFastWriteMap,
+			FieldMapLength,
+			FieldFastWriteSet,
+			FieldSetLength,
+			FieldFastWriteList,
+			FieldListLength,
 			templates.FieldDeepEqual,
 			templates.FieldDeepEqualBase,
 			templates.FieldDeepEqualStructLike,
 			templates.FieldDeepEqualContainer,
-			validateSet,
-			processor,
+			ValidateSet,
+			Processor,
 		)
 	}
 	for i, txt := range allTemplates {
@@ -209,9 +209,9 @@ func (p *patcher) buildTemplates() (err error) {
 	}
 
 	if p.IsHessian2() {
-		tpl, err = tpl.Parse(registerHessian)
+		tpl, err = tpl.Parse(RegisterHessian)
 		if err != nil {
-			return fmt.Errorf("failed to parse hessian2 templates: %w: %q", err, registerHessian)
+			return fmt.Errorf("failed to parse hessian2 templates: %w: %q", err, RegisterHessian)
 		}
 	}
 
@@ -219,7 +219,7 @@ func (p *patcher) buildTemplates() (err error) {
 	return nil
 }
 
-const importInsertPoint = "// imports insert-point"
+const ImportInsertPoint = "// imports insert-point"
 
 func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err error) {
 	if err := p.buildTemplates(); err != nil {
@@ -311,8 +311,8 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 			return nil, fmt.Errorf("%q: %w", ast.Filename, err)
 		}
 		imports := buf.String()
-		if i := strings.Index(content, importInsertPoint); i >= 0 {
-			content = strings.Replace(content, importInsertPoint, imports, 1)
+		if i := strings.Index(content, ImportInsertPoint); i >= 0 {
+			content = strings.Replace(content, ImportInsertPoint, imports, 1)
 		} else {
 			return nil, fmt.Errorf("replace imports failed")
 		}
