@@ -14,7 +14,7 @@
 
 package thriftgo
 
-const structLikeCodec = `
+const StructLikeCodec = `
 {{define "StructLikeCodec"}}
 {{if GenerateFastAPIs}}
 {{template "StructLikeFastRead" .}}
@@ -38,7 +38,7 @@ const structLikeCodec = `
 {{- end}}{{/* define "StructLikeCodec" */}}
 `
 
-const structLikeFastRead = `
+const StructLikeFastRead = `
 {{define "StructLikeFastRead"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
@@ -166,7 +166,7 @@ RequiredFieldNotSetError:
 {{- end}}{{/* define "StructLikeFastRead" */}}
 `
 
-const structLikeFastReadField = `
+const StructLikeFastReadField = `
 {{define "StructLikeFastReadField"}}
 {{- $TypeName := .GoName}}
 {{- range .Fields}}
@@ -199,7 +199,7 @@ func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte) (int, error) {
 `
 
 // TODO: check required
-const structLikeDeepCopy = `
+const StructLikeDeepCopy = `
 {{define "StructLikeDeepCopy"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) DeepCopy(s interface{}) error {
@@ -219,7 +219,7 @@ func (p *{{$TypeName}}) DeepCopy(s interface{}) error {
 {{- end}}{{/* define "StructLikeDeepCopy" */}}
 `
 
-const structLikeFastWrite = `
+const StructLikeFastWrite = `
 {{define "StructLikeFastWrite"}}
 {{- $TypeName := .GoName}}
 // for compatibility
@@ -229,7 +229,7 @@ func (p *{{$TypeName}}) FastWrite(buf []byte) int {
 {{- end}}{{/* define "StructLikeFastWrite" */}}
 `
 
-const structLikeFastWriteNocopy = `
+const StructLikeFastWriteNocopy = `
 {{define "StructLikeFastWriteNocopy"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
@@ -263,7 +263,7 @@ CountSetFieldsError:
 {{- end}}{{/* define "StructLikeFastWriteNocopy" */}}
 `
 
-const structLikeLength = `
+const StructLikeLength = `
 {{define "StructLikeLength"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) BLength() int {
@@ -297,7 +297,7 @@ CountSetFieldsError:
 {{- end}}{{/* define "StructLikeLength" */}}
 `
 
-const structLikeFastWriteField = `
+const StructLikeFastWriteField = `
 {{define "StructLikeFastWriteField"}}
 {{- $TypeName := .GoName}}
 {{- range .Fields}}
@@ -342,7 +342,7 @@ func (p *{{$TypeName}}) fastWriteField{{Str .ID}}(buf []byte, binaryWriter bthri
 {{- end}}{{/* define "StructLikeFastWriteField" */}}
 `
 
-const structLikeFieldLength = `
+const StructLikeFieldLength = `
 {{define "StructLikeFieldLength"}}
 {{- $TypeName := .GoName}}
 {{- range .Fields}}
@@ -387,7 +387,7 @@ func (p *{{$TypeName}}) field{{Str .ID}}Length() int {
 {{- end}}{{/* define "StructLikeFieldLength" */}}
 `
 
-const fieldFastRead = `
+const FieldFastRead = `
 {{define "FieldFastRead"}}
 	{{- if .Type.Category.IsStructLike}}
 		{{- template "FieldFastReadStructLike" .}}
@@ -399,7 +399,7 @@ const fieldFastRead = `
 {{- end}}{{/* define "FieldFastRead" */}}
 `
 
-const fieldFastReadStructLike = `
+const FieldFastReadStructLike = `
 {{define "FieldFastReadStructLike"}}
 	{{- if .NeedDecl}}
 	{{- .Target}} := {{.TypeName.Deref.NewFunc}}()
@@ -419,7 +419,7 @@ const fieldFastReadStructLike = `
 {{- end}}{{/* define "FieldFastReadStructLike" */}} 
 `
 
-const fieldFastReadBaseType = `
+const FieldFastReadBaseType = `
 {{define "FieldFastReadBaseType"}}
 	{{- $DiffType := or .Type.Category.IsEnum .Type.Category.IsBinary}}
 	{{- if .NeedDecl}}
@@ -447,7 +447,7 @@ const fieldFastReadBaseType = `
 {{- end}}{{/* define "FieldFastReadBaseType" */}}
 `
 
-const fieldFastReadContainer = `
+const FieldFastReadContainer = `
 {{define "FieldFastReadContainer"}}
 	{{- if eq "Map" .TypeID}}
 	     {{- template "FieldFastReadMap" .}}
@@ -459,7 +459,7 @@ const fieldFastReadContainer = `
 {{- end}}{{/* define "FieldFastReadContainer" */}}
 `
 
-const fieldFastReadMap = `
+const FieldFastReadMap = `
 {{define "FieldFastReadMap"}}
 {{- $isStructVal := .ValCtx.Type.Category.IsStructLike -}}
 {{- $isIntKey := .KeyCtx.Type | IsIntType -}}
@@ -534,7 +534,7 @@ const fieldFastReadMap = `
 {{- end}}{{/* define "FieldFastReadMap" */}}
 `
 
-const fieldFastReadSet = `
+const FieldFastReadSet = `
 {{define "FieldFastReadSet"}}
 {{- $isStructVal := .ValCtx.Type.Category.IsStructLike -}}
 {{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
@@ -584,7 +584,7 @@ const fieldFastReadSet = `
 {{- end}}{{/* define "FieldFastReadSet" */}}
 `
 
-const fieldFastReadList = `
+const FieldFastReadList = `
 {{define "FieldFastReadList"}}
 {{- $isStructVal := .ValCtx.Type.Category.IsStructLike -}}
 {{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
@@ -634,7 +634,7 @@ const fieldFastReadList = `
 {{- end}}{{/* define "FieldFastReadList" */}}
 `
 
-const fieldDeepCopy = `
+const FieldDeepCopy = `
 {{define "FieldDeepCopy"}}
 	{{- if .Type.Category.IsStructLike}}
 		{{- template "FieldDeepCopyStructLike" .}}
@@ -646,7 +646,7 @@ const fieldDeepCopy = `
 {{- end}}{{/* define "FieldDeepCopy" */}}
 `
 
-const fieldDeepCopyStructLike = `
+const FieldDeepCopyStructLike = `
 {{define "FieldDeepCopyStructLike"}}
 {{- $Src := SourceTarget .Target}}
 	{{- if .NeedDecl}}
@@ -664,7 +664,7 @@ const fieldDeepCopyStructLike = `
 {{- end}}{{/* define "FieldDeepCopyStructLike" */}} 
 `
 
-const fieldDeepCopyContainer = `
+const FieldDeepCopyContainer = `
 {{define "FieldDeepCopyContainer"}}
 	{{- if eq "Map" .TypeID}}
 	     {{- template "FieldDeepCopyMap" .}}
@@ -676,7 +676,7 @@ const fieldDeepCopyContainer = `
 {{- end}}{{/* define "FieldDeepCopyContainer" */}}
 `
 
-const fieldDeepCopyMap = `
+const FieldDeepCopyMap = `
 {{define "FieldDeepCopyMap"}}
 {{- $Src := SourceTarget .Target}}
 	{{- if .NeedDecl}}var {{.Target}} {{.TypeName}}{{- end}}
@@ -701,7 +701,7 @@ const fieldDeepCopyMap = `
 {{- end}}{{/* define "FieldDeepCopyMap" */}}
 `
 
-const fieldDeepCopyList = `
+const FieldDeepCopyList = `
 {{define "FieldDeepCopyList"}}
 {{- $Src := SourceTarget .Target}}
 	{{if .NeedDecl}}var {{.Target}} {{.TypeName}}{{end}}
@@ -720,7 +720,7 @@ const fieldDeepCopyList = `
 {{- end}}{{/* define "FieldDeepCopyList" */}}
 `
 
-const fieldDeepCopySet = `
+const FieldDeepCopySet = `
 {{define "FieldDeepCopySet"}}
 {{- $Src := SourceTarget .Target}}
 	{{if .NeedDecl}}var {{.Target}} {{.TypeName}}{{end}}
@@ -739,7 +739,7 @@ const fieldDeepCopySet = `
 {{- end}}{{/* define "FieldDeepCopySet" */}}
 `
 
-const fieldDeepCopyBaseType = `
+const FieldDeepCopyBaseType = `
 {{define "FieldDeepCopyBaseType"}}
 {{- $Src := SourceTarget .Target}}
 	{{- if .NeedDecl}}
@@ -781,7 +781,7 @@ const fieldDeepCopyBaseType = `
 {{- end}}{{/* define "FieldDeepCopyBaseType" */}}
 `
 
-const fieldFastWrite = `
+const FieldFastWrite = `
 {{define "FieldFastWrite"}}
 	{{- if .Type.Category.IsStructLike}}
 		{{- template "FieldFastWriteStructLike" . -}}
@@ -793,7 +793,7 @@ const fieldFastWrite = `
 {{- end}}{{/* define "FieldFastWrite" */}}
 `
 
-const fieldLength = `
+const FieldLength = `
 {{define "FieldLength"}}
 	{{- if .Type.Category.IsStructLike}}
 		{{- template "FieldStructLikeLength" . -}}
@@ -805,7 +805,7 @@ const fieldLength = `
 {{- end}}{{/* define "FieldLength" */}}
 `
 
-const fieldFastWriteStructLike = `
+const FieldFastWriteStructLike = `
 {{define "FieldFastWriteStructLike"}}
 	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
 	{{- if Features.FieldMaskHalfway}}
@@ -818,7 +818,7 @@ const fieldFastWriteStructLike = `
 {{- end}}{{/* define "FieldFastWriteStructLike" */}}
 `
 
-const fieldStructLikeLength = `
+const FieldStructLikeLength = `
 {{define "FieldStructLikeLength"}}
 	{{- if and (Features.WithFieldMask) .NeedFieldMask}}
 	{{- if Features.FieldMaskHalfway}}
@@ -831,7 +831,7 @@ const fieldStructLikeLength = `
 {{- end}}{{/* define "FieldStructLikeLength" */}}
 `
 
-const fieldFastWriteBaseType = `
+const FieldFastWriteBaseType = `
 {{define "FieldFastWriteBaseType"}}
 {{- $Value := .Target}}
 {{- if .IsPointer}}{{$Value = printf "*%s" $Value}}{{end}}
@@ -845,7 +845,7 @@ const fieldFastWriteBaseType = `
 {{- end}}{{/* define "FieldFastWriteBaseType" */}}
 `
 
-const fieldBaseTypeLength = `
+const FieldBaseTypeLength = `
 {{define "FieldBaseTypeLength"}}
 {{- $Value := .Target}}
 {{- if .IsPointer}}{{$Value = printf "*%s" $Value}}{{end}}
@@ -859,14 +859,14 @@ const fieldBaseTypeLength = `
 {{- end}}{{/* define "FieldBaseTypeLength" */}}
 `
 
-const fieldFixedLengthTypeLength = `
+const FieldFixedLengthTypeLength = `
 {{define "FieldFixedLengthTypeLength"}}
 {{- $Value := .Target -}}
 bthrift.Binary.{{.TypeID}}Length({{TypeIDToGoType .TypeID}}({{$Value}}))
 {{- end -}}{{/* define "FieldFixedLengthTypeLength" */}}
 `
 
-const fieldFastWriteContainer = `
+const FieldFastWriteContainer = `
 {{define "FieldFastWriteContainer"}}
 	{{- if eq "Map" .TypeID}}
 		{{- template "FieldFastWriteMap" .}}
@@ -878,7 +878,7 @@ const fieldFastWriteContainer = `
 {{- end}}{{/* define "FieldFastWriteContainer" */}}
 `
 
-const fieldContainerLength = `
+const FieldContainerLength = `
 {{define "FieldContainerLength"}}
 	{{- if eq "Map" .TypeID}}
 		{{- template "FieldMapLength" .}}
@@ -890,7 +890,7 @@ const fieldContainerLength = `
 {{- end}}{{/* define "FieldContainerLength" */}}
 `
 
-const fieldFastWriteMap = `
+const FieldFastWriteMap = `
 {{define "FieldFastWriteMap"}}
 {{- $isIntKey := .KeyCtx.Type | IsIntType -}}
 {{- $isStrKey := .KeyCtx.Type | IsStrType -}}
@@ -934,7 +934,7 @@ const fieldFastWriteMap = `
 {{- end}}{{/* define "FieldFastWriteMap" */}}
 `
 
-const fieldMapLength = `
+const FieldMapLength = `
 {{define "FieldMapLength"}}
 {{- $isIntKey := .KeyCtx.Type | IsIntType -}}
 {{- $isStrKey := .KeyCtx.Type | IsStrType -}}
@@ -982,7 +982,7 @@ const fieldMapLength = `
 {{- end}}{{/* define "FieldMapLength" */}}
 `
 
-const fieldFastWriteSet = `
+const FieldFastWriteSet = `
 {{define "FieldFastWriteSet"}}
 {{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
 {{- $curFieldMask := .FieldMask}}
@@ -1012,7 +1012,7 @@ const fieldFastWriteSet = `
 {{- end}}{{/* define "FieldFastWriteSet" */}}
 `
 
-const fieldSetLength = `
+const FieldSetLength = `
 {{define "FieldSetLength"}}
 {{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
 {{- $curFieldMask := .FieldMask}}
@@ -1043,7 +1043,7 @@ const fieldSetLength = `
 {{- end}}{{/* define "FieldSetLength" */}}
 `
 
-const fieldFastWriteList = `
+const FieldFastWriteList = `
 {{define "FieldFastWriteList"}}
 {{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
 {{- $curFieldMask := .FieldMask}}
@@ -1072,7 +1072,7 @@ const fieldFastWriteList = `
 {{- end}}{{/* define "FieldFastWriteList" */}}
 `
 
-const fieldListLength = `
+const FieldListLength = `
 {{define "FieldListLength"}}
 {{- $isBaseVal := .ValCtx.Type | IsBaseType -}}
 {{- $curFieldMask := .FieldMask}}
@@ -1102,7 +1102,7 @@ const fieldListLength = `
 {{- end}}{{/* define "FieldListLength" */}}
 `
 
-const processor = `
+const Processor = `
 {{define "Processor"}}
 {{- range .Functions}}
 {{$ArgsType := .ArgType}}
@@ -1119,7 +1119,7 @@ const processor = `
 {{- end}}{{/* define "Processor" */}}
 `
 
-const validateSet = `
+const ValidateSet = `
 {{define "ValidateSet"}}
 {{- if Features.ValidateSet}}
 {{- $ctx := (.ValCtx.WithTarget "tgt").WithSource "src"}}
