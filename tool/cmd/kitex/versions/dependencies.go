@@ -27,6 +27,10 @@ import (
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 )
 
+const (
+	CompatibilityCheckExitCode = 3
+)
+
 var dm *dependencyManager
 
 func init() {

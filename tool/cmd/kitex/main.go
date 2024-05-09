@@ -53,7 +53,7 @@ func init() {
 		},
 	); err != nil {
 		log.Warn(err)
-		os.Exit(3)
+		os.Exit(versions.CompatibilityCheckExitCode)
 	}
 }
 
@@ -75,7 +75,7 @@ func main() {
 	if !args.NoDependencyCheck {
 		// check dependency compatibility between kitex cmd tool and dependency in go.mod
 		if err := versions.DefaultCheckDependencyAndProcess(); err != nil {
-			os.Exit(3)
+			os.Exit(versions.CompatibilityCheckExitCode)
 		}
 	}
 
