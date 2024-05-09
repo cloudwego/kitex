@@ -46,12 +46,15 @@ func init() {
 			}
 		},
 	})
-	versions.RegisterMinDepVersion(
+	if err := versions.RegisterMinDepVersion(
 		&versions.MinDepVersion{
 			RefPath: "github.com/cloudwego/kitex",
 			Version: "v0.9.0",
 		},
-	)
+	); err != nil {
+		log.Warn(err)
+		os.Exit(3)
+	}
 }
 
 func main() {
@@ -71,7 +74,9 @@ func main() {
 
 	if !args.NoDependencyCheck {
 		// check dependency compatibility between kitex cmd tool and dependency in go.mod
-		versions.DefaultCheckDependencyAndProcess()
+		if err := versions.DefaultCheckDependencyAndProcess(); err != nil {
+			os.Exit(3)
+		}
 	}
 
 	out := new(bytes.Buffer)

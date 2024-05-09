@@ -96,6 +96,16 @@ func TestVersion_lessThan(t *testing.T) {
 			other:    "v1.0.0",
 			expected: true,
 		},
+		{
+			base:     "v1.0.0",
+			other:    "v1.0.0",
+			expected: false,
+		},
+		{
+			base:     "v0.2.1",
+			other:    "v1.0.0",
+			expected: true,
+		},
 	}
 
 	for _, tc := range testcases {

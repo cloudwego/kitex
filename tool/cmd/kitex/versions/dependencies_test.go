@@ -27,9 +27,9 @@ import (
 func TestRegisterMinDepVersion(t *testing.T) {
 	refPath := "github.com/cloudwego/kitex"
 	testcases := []struct {
-		desc        string
-		depVer      *MinDepVersion
-		expectPanic bool
+		desc      string
+		depVer    *MinDepVersion
+		expectErr bool
 	}{
 		{
 			desc: "correct MinDepVersion",
@@ -39,11 +39,18 @@ func TestRegisterMinDepVersion(t *testing.T) {
 			},
 		},
 		{
+			desc: "correct MinDepVersion with prerelease information",
+			depVer: &MinDepVersion{
+				RefPath: refPath,
+				Version: "v0.9.0-rc1",
+			},
+		},
+		{
 			desc: "MinDepVersion missing RefPath",
 			depVer: &MinDepVersion{
 				RefPath: "",
 			},
-			expectPanic: true,
+			expectErr: true,
 		},
 		{
 			desc: "MinDepVersion missing Version",
@@ -51,7 +58,7 @@ func TestRegisterMinDepVersion(t *testing.T) {
 				RefPath: refPath,
 				Version: "",
 			},
-			expectPanic: true,
+			expectErr: true,
 		},
 		{
 			desc: "MinDepVersion with non-semantic MinimalVersion",
@@ -59,21 +66,18 @@ func TestRegisterMinDepVersion(t *testing.T) {
 				RefPath: refPath,
 				Version: "0.9.0",
 			},
-			expectPanic: true,
+			expectErr: true,
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.desc, func(t *testing.T) {
-			defer func() {
-				err := recover()
-				if !tc.expectPanic {
-					test.Assert(t, err == nil, err)
-				} else {
-					test.Assert(t, err != nil)
-				}
-			}()
-			RegisterMinDepVersion(tc.depVer)
+			err := RegisterMinDepVersion(tc.depVer)
+			if tc.expectErr {
+				test.Assert(t, err != nil)
+			} else {
+				test.Assert(t, err == nil)
+			}
 		})
 	}
 }
@@ -96,6 +100,20 @@ func TestCheckDependencies(t *testing.T) {
 				test.Assert(t, cr.GoModVersion() != "")
 				test.Assert(t, cr.MinDepVersion().RefPath == "github.com/cloudwego/thriftgo")
 				test.Assert(t, cr.MinDepVersion().Version == "v0.3.6")
+			},
+		},
+		{
+			desc: "Dependency is compatible with prerelease information",
+			depVer: &MinDepVersion{
+				RefPath: "github.com/cloudwego/thriftgo",
+				Version: "v0.3.6-rc1",
+			},
+			expectFunc: func(t *testing.T, cr *CheckResult) {
+				test.Assert(t, cr != nil)
+				test.Assert(t, cr.Err() == nil)
+				test.Assert(t, cr.GoModVersion() != "")
+				test.Assert(t, cr.MinDepVersion().RefPath == "github.com/cloudwego/thriftgo")
+				test.Assert(t, cr.MinDepVersion().Version == "v0.3.6-rc1")
 			},
 		},
 		{

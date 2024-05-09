@@ -18,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -35,10 +34,8 @@ func init() {
 }
 
 // RegisterMinDepVersion registers Minimal Dependency Version to be checked
-func RegisterMinDepVersion(depVer *MinDepVersion) {
-	if err := dm.Register(depVer); err != nil {
-		panic(err)
-	}
+func RegisterMinDepVersion(depVer *MinDepVersion) error {
+	return dm.Register(depVer)
 }
 
 // CheckDependency is responsible for checking the compatibility of dependency
@@ -70,18 +67,19 @@ func CheckDependency() *CheckResult {
 
 // DefaultCheckDependencyAndProcess provided default processing procedure to parse
 // CheckResult and prompt users
-func DefaultCheckDependencyAndProcess() {
+func DefaultCheckDependencyAndProcess() error {
 	cr := CheckDependency()
 	if cr == nil {
-		return
+		return nil
 	}
 	res, shouldExit := defaultParseCheckResult(cr)
 	if res != "" {
 		log.Warn(res)
 	}
 	if shouldExit {
-		os.Exit(3)
+		return errors.New("kitex cmd tool dependency compatibility check failed")
 	}
+	return nil
 }
 
 func defaultParseCheckResult(cr *CheckResult) (prompt string, shouldExit bool) {
