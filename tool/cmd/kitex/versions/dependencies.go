@@ -90,21 +90,7 @@ func defaultParseCheckResult(cr *CheckResult) (prompt string, shouldExit bool) {
 	if cr == nil {
 		return
 	}
-	err := cr.Err()
-	switch {
-	case err == nil:
-		return
-	// ignore ErrGoCmdNotFound
-	case errors.Is(err, ErrGoCmdNotFound):
-	// ignore ErrGoModNotFound
-	case errors.Is(err, ErrGoModNotFound):
-	// ignore ErrDependencyNotFound
-	case errors.Is(err, ErrDependencyNotFound):
-	// ignore ErrDependencyReplacedWithLocalRepo
-	case errors.Is(err, ErrDependencyReplacedWithLocalRepo):
-	// ignore ErrDependencyVersionNotSemantic
-	case errors.Is(err, ErrDependencyVersionNotSemantic):
-	case errors.Is(err, ErrDependencyVersionNotCompatible):
+	if err := cr.Err(); err != nil && (errors.Is(err, ErrDependencyVersionNotCompatible)) {
 		prompt = defaultPromptWithCheckResult(cr)
 		shouldExit = true
 	}
