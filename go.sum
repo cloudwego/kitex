@@ -24,7 +24,6 @@ github.com/bytedance/sonic/loader v0.1.0/go.mod h1:UmRT+IRTGKz/DAkzcEGzyVqQFJ7H9
 github.com/bytedance/sonic/loader v0.1.1 h1:c+e5Pt1k/cy5wMveRDyk2X4B9hF4g7an8N3zCYjJFNM=
 github.com/bytedance/sonic/loader v0.1.1/go.mod h1:ncP89zfokxS5LZrJxl5z0UJcsk4M4yY2JpfqGeCtNLU=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
-github.com/choleraehyq/pid v0.0.18 h1:O7LLxPoOyt3YtonlCC8BmNrF9P6Hc8B509UOqlPSVhw=
 github.com/choleraehyq/pid v0.0.18/go.mod h1:uhzeFgxJZWQsZulelVQZwdASxQ9TIPZYL4TPkQMtL/U=
 github.com/chzyer/logex v1.2.0/go.mod h1:9+9sk7u7pGNWYMkh0hdiL++6OeibzJccyQU4p4MedaY=
 github.com/chzyer/readline v1.5.0/go.mod h1:x22KAscuvRqlLoK9CsoYsmxoXZMMFVyOl86cAH8qUic=
@@ -53,6 +52,14 @@ github.com/cloudwego/localsession v0.0.2 h1:N9/IDtCPj1fCL9bCTP+DbXx3f40YjVYWcwkJ
 github.com/cloudwego/localsession v0.0.2/go.mod h1:kiJxmvAcy4PLgKtEnPS5AXed3xCiXcs7Z+KBHP72Wv8=
 github.com/cloudwego/netpoll v0.6.0 h1:JRMkrA1o8k/4quxzg6Q1XM+zIhwZsyoWlq6ef+ht31U=
 github.com/cloudwego/netpoll v0.6.0/go.mod h1:xVefXptcyheopwNDZjDPcfU6kIjZXZ4nY550k1yH9eQ=
+github.com/cloudwego/runtimex v0.0.1 h1:4pOxIZcHpFdTsoOhZs5U3o/97U1WK9fbXJfNv99qN0A=
+github.com/cloudwego/runtimex v0.0.1/go.mod h1:23vL/HGV0W8nSCHbe084AgEBdDV4rvXenEUMnUNvUd8=
+github.com/cloudwego/runtimex v0.0.2-0.20240513094229-37575d93634d h1:HIJkGeccv893nfxJ2pC1x8ugHYp/PUDo+KLe1JKvdTM=
+github.com/cloudwego/runtimex v0.0.2-0.20240513094229-37575d93634d/go.mod h1:23vL/HGV0W8nSCHbe084AgEBdDV4rvXenEUMnUNvUd8=
+github.com/cloudwego/runtimex v0.0.2-0.20240513094422-b9b227c3b236 h1:G3vCf9n/8IImBrWJ+SSIjbRTsxTr1V3BwFIVswk0NsI=
+github.com/cloudwego/runtimex v0.0.2-0.20240513094422-b9b227c3b236/go.mod h1:23vL/HGV0W8nSCHbe084AgEBdDV4rvXenEUMnUNvUd8=
+github.com/cloudwego/runtimex v0.0.2 h1:TTt/RtT8vrVC+PuoCuO2/qpjPeen7rsOhGtIeecdoxM=
+github.com/cloudwego/runtimex v0.0.2/go.mod h1:23vL/HGV0W8nSCHbe084AgEBdDV4rvXenEUMnUNvUd8=
 github.com/cloudwego/thriftgo v0.2.11/go.mod h1:dAyXHEmKXo0LfMCrblVEY3mUZsdeuA5+i0vF5f09j7E=
 github.com/cloudwego/thriftgo v0.3.6 h1:gHHW8Ag3cAEQ/awP4emTJiRPr5yQjbANhcsmV8/Epbw=
 github.com/cloudwego/thriftgo v0.3.6/go.mod h1:29ukiySoAMd0vXMYIduAY9dph/7dmChvOS11YLotFb8=
