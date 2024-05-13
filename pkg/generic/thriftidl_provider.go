@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/cloudwego/dynamicgo/meta"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	"github.com/cloudwego/thriftgo/parser"
 
@@ -31,14 +32,24 @@ import (
 )
 
 var (
-	_ Closer = &ThriftContentProvider{}
-	_ Closer = &ThriftContentWithAbsIncludePathProvider{}
+	_                         Closer = &ThriftContentProvider{}
+	_                         Closer = &ThriftContentWithAbsIncludePathProvider{}
+	defaultDynamicGoParseMode        = meta.LastServiceOnly
 )
 
 type thriftFileProvider struct {
 	closeOnce sync.Once
 	svcs      chan *descriptor.ServiceDescriptor
 	opts      *ProviderOption
+}
+
+func DynamicGoDefaultParseMode() meta.ParseServiceMode {
+	return defaultDynamicGoParseMode
+}
+
+func SetDynamicGoThriftParseMode(mode meta.ParseServiceMode) {
+	defaultDynamicGoParseMode = mode
+	thrift.SetDefaultParseMode(thrift.ParseMode(mode))
 }
 
 // NewThriftFileProvider create a ThriftIDLProvider by given path and include dirs
@@ -68,7 +79,7 @@ func NewThriftFileProviderWithDynamicGo(path string, includeDirs ...string) (Des
 	}
 
 	// ServiceDescriptor of dynamicgo
-	dOpts := dthrift.Options{EnableThriftBase: true}
+	dOpts := dthrift.Options{EnableThriftBase: true, ParseServiceMode: DynamicGoDefaultParseMode()}
 	dsvc, err := dOpts.NewDescritorFromPath(context.Background(), path, includeDirs...)
 	if err != nil {
 		// fall back to the original way (without dynamicgo)

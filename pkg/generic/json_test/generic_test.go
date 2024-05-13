@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/dynamicgo/conv"
+	"github.com/cloudwego/dynamicgo/meta"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/client/callopt"
@@ -60,6 +61,7 @@ func TestRun(t *testing.T) {
 	t.Run("TestThriftBase64BinaryEcho", testThriftBase64BinaryEcho)
 	t.Run("TestRegression", testRegression)
 	t.Run("TestJSONThriftGenericClientFinalizer", testJSONThriftGenericClientFinalizer)
+	t.Run("TestParseModeWithDynamicGo", testParseModeWithDynamicGo)
 }
 
 func testThrift(t *testing.T) {
@@ -702,6 +704,23 @@ func testJSONThriftGenericClientFinalizer(t *testing.T) {
 	thirddGCHeapAlloc, thirdGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
 	t.Logf("After third GC, allocation: %f Mb, Number of allocation: %d\n", thirddGCHeapAlloc, thirdGCHeapObjects)
 	test.Assert(t, thirddGCHeapAlloc < secondGCHeapAlloc/2 && thirdGCHeapObjects < secondGCHeapObjects/2)
+}
+
+func testParseModeWithDynamicGo(t *testing.T) {
+	addr := test.GetLocalAddress()
+	generic.SetDynamicGoThriftParseMode(meta.FirstServiceOnly)
+	svr := initThriftServer(t, addr, new(GenericServiceImpl), "./idl/example_multi_service.thrift", nil, nil, true)
+
+	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
+	// read: dynamicgo
+	cli := initThriftClient(transport.TTHeader, t, addr, "./idl/example_multi_service.thrift", nil, nil, true)
+	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	respStr, ok := resp.(string)
+	test.Assert(t, ok)
+	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), "world")
+
+	svr.Stop()
 }
 
 func mb(byteSize uint64) float32 {

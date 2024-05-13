@@ -20,9 +20,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cloudwego/dynamicgo/meta"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
 func TestAbsPath(t *testing.T) {
@@ -234,4 +236,31 @@ func TestDisableGoTagForDynamicGo(t *testing.T) {
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.DynamicGoDsc != nil)
 	test.Assert(t, tree.DynamicGoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "str")
+}
+
+func TestParseMode(t *testing.T) {
+	path := "json_test/idl/example_multi_service.thrift"
+	p, err := NewThriftFileProviderWithDynamicGo(path)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "Example2Service")
+	test.Assert(t, tree.DynamicGoDsc.Name() == "Example2Service")
+
+	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
+	p, err = NewThriftFileProviderWithDynamicGo(path)
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "ExampleService")
+	test.Assert(t, tree.DynamicGoDsc.Name() == "Example2Service")
+
+	SetDynamicGoThriftParseMode(meta.FirstServiceOnly)
+	p, err = NewThriftFileProviderWithDynamicGo(path)
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "ExampleService")
+	test.Assert(t, tree.DynamicGoDsc.Name() == "ExampleService")
 }
