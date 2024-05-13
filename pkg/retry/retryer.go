@@ -47,7 +47,7 @@ type Retryer interface {
 
 	// Retry policy execute func. recycleRI is to decide if the firstRI can be recycled.
 	Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error)
-	AppendErrMsgIfNeeded(err error, ri rpcinfo.RPCInfo, msg string)
+	AppendErrMsgIfNeeded(ctx context.Context, err error, ri rpcinfo.RPCInfo, msg string)
 
 	// Prepare to do something needed before retry call.
 	Prepare(ctx context.Context, prevRI, retryRI rpcinfo.RPCInfo)
@@ -339,7 +339,7 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 			return ri, true, err
 		}
 		if msg != "" {
-			retryer.AppendErrMsgIfNeeded(err, ri, msg)
+			retryer.AppendErrMsgIfNeeded(ctx, err, ri, msg)
 		}
 		return ri, false, err
 	}

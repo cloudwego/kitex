@@ -17,6 +17,7 @@
 package retry
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -95,21 +96,6 @@ type FailurePolicy struct {
 	Extra string `json:"extra"`
 }
 
-// IsRespRetryNonNil is used to check if RespRetry is nil
-func (p FailurePolicy) IsRespRetryNonNil() bool {
-	return p.ShouldResultRetry != nil && p.ShouldResultRetry.RespRetry != nil
-}
-
-// IsErrorRetryNonNil is used to check if ErrorRetry is nil
-func (p FailurePolicy) IsErrorRetryNonNil() bool {
-	return p.ShouldResultRetry != nil && p.ShouldResultRetry.ErrorRetry != nil
-}
-
-// IsRetryForTimeout is used to check if timeout error need to retry
-func (p FailurePolicy) IsRetryForTimeout() bool {
-	return p.ShouldResultRetry == nil || !p.ShouldResultRetry.NotRetryForTimeout
-}
-
 // BackupPolicy for backup request
 // DON'T FORGET to update Equals() and DeepCopy() if you add new fields
 type BackupPolicy struct {
@@ -168,8 +154,16 @@ const (
 
 // ShouldResultRetry is used for specifying which error or resp need to be retried
 type ShouldResultRetry struct {
+	// ErrorRetryWithCtx is added in v0.10.0, passing ctx is more convenient for user
+	ErrorRetryWithCtx func(ctx context.Context, err error, ri rpcinfo.RPCInfo) bool
+	// RespRetryWithCtx is added in v0.10.0, passing ctx is more convenient for user
+	RespRetryWithCtx func(ctx context.Context, resp interface{}, ri rpcinfo.RPCInfo) bool
+
+	// Deprecated: please use ErrorRetryWithCtx instead of ErrorRetry
 	ErrorRetry func(err error, ri rpcinfo.RPCInfo) bool
-	RespRetry  func(resp interface{}, ri rpcinfo.RPCInfo) bool
+	// Deprecated: please use RespRetryWithCtx instead of RespRetry
+	RespRetry func(resp interface{}, ri rpcinfo.RPCInfo) bool
+
 	// disable the default timeout retry in specific scenarios (e.g. the requests are not non-idempotent)
 	NotRetryForTimeout bool
 }
@@ -226,6 +220,65 @@ func (p *FailurePolicy) DeepCopy() *FailurePolicy {
 		RetrySameNode:     p.RetrySameNode,
 		ShouldResultRetry: p.ShouldResultRetry, // don't need DeepCopy
 		Extra:             p.Extra,
+	}
+}
+
+// IsRespRetryWithCtxNonNil is used to check if RespRetryWithCtx is nil.
+func (p *FailurePolicy) IsRespRetryWithCtxNonNil() bool {
+	return p.ShouldResultRetry != nil && p.ShouldResultRetry.RespRetryWithCtx != nil
+}
+
+// IsErrorRetryWithCtxNonNil is used to check if ErrorRetryWithCtx is nil
+func (p *FailurePolicy) IsErrorRetryWithCtxNonNil() bool {
+	return p.ShouldResultRetry != nil && p.ShouldResultRetry.ErrorRetryWithCtx != nil
+}
+
+// IsRespRetryNonNil is used to check if RespRetry is nil.
+// Deprecated: please use IsRespRetryWithCtxNonNil instead of IsRespRetryNonNil.
+func (p *FailurePolicy) IsRespRetryNonNil() bool {
+	return p.ShouldResultRetry != nil && p.ShouldResultRetry.RespRetry != nil
+}
+
+// IsErrorRetryNonNil is used to check if ErrorRetry is nil.
+// Deprecated: please use IsErrorRetryWithCtxNonNil instead of IsErrorRetryNonNil.
+func (p *FailurePolicy) IsErrorRetryNonNil() bool {
+	return p.ShouldResultRetry != nil && p.ShouldResultRetry.ErrorRetry != nil
+}
+
+// IsRetryForTimeout is used to check if timeout error need to retry
+func (p *FailurePolicy) IsRetryForTimeout() bool {
+	return p.ShouldResultRetry == nil || !p.ShouldResultRetry.NotRetryForTimeout
+}
+
+// IsRespRetry is used to check if the resp need to do retry.
+func (p *FailurePolicy) IsRespRetry(ctx context.Context, resp interface{}, ri rpcinfo.RPCInfo) bool {
+	// note: actually, it is better to check IsRespRetry to ignore the bad cases,
+	// but IsRespRetry is a deprecated definition and here will be executed for every call, depends on ConvertResultRetry to ensure the compatibility
+	return p.IsRespRetryWithCtxNonNil() && p.ShouldResultRetry.RespRetryWithCtx(ctx, resp, ri)
+}
+
+// IsErrorRetry is used to check if the error need to do retry.
+func (p *FailurePolicy) IsErrorRetry(ctx context.Context, err error, ri rpcinfo.RPCInfo) bool {
+	// note: actually, it is better to check IsErrorRetry to ignore the bad cases,
+	// but IsErrorRetry is a deprecated definition and here will be executed for every call, depends on ConvertResultRetry to ensure the compatibility
+	return p.IsErrorRetryWithCtxNonNil() && p.ShouldResultRetry.ErrorRetryWithCtx(ctx, err, ri)
+}
+
+// ConvertResultRetry is used to convert 'ErrorRetry and RespRetry' to 'ErrorRetryWithCtx and RespRetryWithCtx'
+func (p *FailurePolicy) ConvertResultRetry() {
+	if p == nil || p.ShouldResultRetry == nil {
+		return
+	}
+	rr := p.ShouldResultRetry
+	if rr.ErrorRetry != nil && rr.ErrorRetryWithCtx == nil {
+		rr.ErrorRetryWithCtx = func(ctx context.Context, err error, ri rpcinfo.RPCInfo) bool {
+			return rr.ErrorRetry(err, ri)
+		}
+	}
+	if rr.RespRetry != nil && rr.RespRetryWithCtx == nil {
+		rr.RespRetryWithCtx = func(ctx context.Context, resp interface{}, ri rpcinfo.RPCInfo) bool {
+			return rr.RespRetry(resp, ri)
+		}
 	}
 }
 

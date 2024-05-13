@@ -68,6 +68,6 @@ func (p *BackupPolicy) WithRetrySameNode() {
 }
 
 // String is used to print human readable debug info.
-func (p BackupPolicy) String() string {
+func (p *BackupPolicy) String() string {
 	return fmt.Sprintf("{RetryDelayMS:%+v StopPolicy:%+v RetrySameNode:%+v}", p.RetryDelayMS, p.StopPolicy, p.RetrySameNode)
 }
