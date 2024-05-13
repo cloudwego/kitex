@@ -20,7 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloudwego/dynamicgo/meta"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -249,14 +248,6 @@ func TestParseMode(t *testing.T) {
 	test.Assert(t, tree.DynamicGoDsc.Name() == "Example2Service")
 
 	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
-	p, err = NewThriftFileProviderWithDynamicGo(path)
-	test.Assert(t, err == nil)
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "ExampleService")
-	test.Assert(t, tree.DynamicGoDsc.Name() == "Example2Service")
-
-	SetDynamicGoThriftParseMode(meta.FirstServiceOnly)
 	p, err = NewThriftFileProviderWithDynamicGo(path)
 	test.Assert(t, err == nil)
 	tree = <-p.Provide()

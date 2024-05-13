@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"math"
 	"net"
 	"reflect"
@@ -31,7 +32,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/dynamicgo/conv"
-	"github.com/cloudwego/dynamicgo/meta"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/client/callopt"
@@ -708,7 +708,7 @@ func testJSONThriftGenericClientFinalizer(t *testing.T) {
 
 func testParseModeWithDynamicGo(t *testing.T) {
 	addr := test.GetLocalAddress()
-	generic.SetDynamicGoThriftParseMode(meta.FirstServiceOnly)
+	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
 	svr := initThriftServer(t, addr, new(GenericServiceImpl), "./idl/example_multi_service.thrift", nil, nil, true)
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
