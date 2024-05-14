@@ -24,6 +24,7 @@ import (
 // ErrRingFull means the ring is full.
 var ErrRingFull = errors.New("ring is full")
 
+// Deprecated: it's not used by kitex anymore.
 // NewRing creates a ringbuffer with fixed size.
 func NewRing(size int) *Ring {
 	if size <= 0 {
@@ -50,6 +51,7 @@ func NewRing(size int) *Ring {
 	return r
 }
 
+// Deprecated: it's not used by kitex anymore.
 // Ring implements a fixed size hash list to manage data
 type Ring struct {
 	length int

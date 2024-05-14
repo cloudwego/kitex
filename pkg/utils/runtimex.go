@@ -21,10 +21,14 @@ import (
 	"github.com/cloudwego/runtimex"
 )
 
+// GoroutineID return current G's ID, it will fall back to get a random int
 func GoroutineID() int {
 	gid, err := runtimex.GID()
 	if err != nil {
 		gid = fastrand.Int()
+		if gid < 0 {
+			gid = -gid
+		}
 	}
 	return gid
 }
