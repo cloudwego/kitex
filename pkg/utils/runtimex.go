@@ -21,14 +21,17 @@ import (
 	"github.com/cloudwego/runtimex"
 )
 
-// GoroutineID return current G's ID, it will fall back to get a random int
-func GoroutineID() int {
+// getGoroutineID return current G's ID, it will fall back to get a random int,
+// the caller should make sure it's ok if it cannot get correct goroutine id.
+func getGoroutineID() int {
 	gid, err := runtimex.GID()
-	if err != nil {
-		gid = fastrand.Int()
-		if gid < 0 {
-			gid = -gid
-		}
+	if err == nil {
+		return gid
+	}
+	// We use a Unit Test to ensure kitex should compatible with new Go versions, so it will have a rare choice to meet the rand fallback
+	gid = fastrand.Int()
+	if gid < 0 {
+		gid = -gid
 	}
 	return gid
 }
