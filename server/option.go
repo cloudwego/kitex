@@ -19,6 +19,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/cloudwego/kitex/transport"
 	"net"
 	"time"
 
@@ -387,5 +388,13 @@ func WithRefuseTrafficWithoutServiceName() Option {
 func WithEnableContextTimeout(enable bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		o.EnableContextTimeout = enable
+	}}
+}
+
+func WithReflectionServer(prot transport.Protocol) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		if prot|transport.GRPC == transport.GRPC {
+			o.EnableGrpcReflection = true
+		}
 	}}
 }

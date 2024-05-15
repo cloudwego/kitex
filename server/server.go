@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/reflection/grpc"
 	"net"
 	"reflect"
 	"runtime/debug"
@@ -199,6 +200,13 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	return nil
 }
 
+func (s *server) registerReflectionService() {
+	registerOpts := internal_server.NewRegisterOptions(nil)
+	if err := s.svcs.addService(grpc.NewV1ServiceInfo(), grpc.NewV1Handler(s.svcs.getSvcInfoMap()), registerOpts); err != nil {
+		panic(err.Error())
+	}
+}
+
 func (s *server) GetServiceInfos() map[string]*serviceinfo.ServiceInfo {
 	return s.svcs.getSvcInfoSearchMap()
 }
@@ -225,6 +233,7 @@ func (s *server) Run() (err error) {
 		}
 	}
 
+	s.registerReflectionService()
 	s.fillMoreServiceInfo(s.opt.RemoteOpt.Address)
 	s.richRemoteOption()
 	transHdlr, err := s.newSvrTransHandler()
