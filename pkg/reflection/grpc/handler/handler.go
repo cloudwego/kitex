@@ -30,12 +30,6 @@ import (
 	"sort"
 )
 
-//// ServiceInfoProvider is an interface used to retrieve metadata about the
-//// services to expose.
-//type ServiceInfoProvider interface {
-//	GetServiceInfo() map[string]*serviceinfo.ServiceInfo
-//}
-
 // ExtensionResolver is the interface used to query details about extensions.
 // This interface is satisfied by protoregistry.GlobalTypes.
 type ExtensionResolver interface {
@@ -43,17 +37,25 @@ type ExtensionResolver interface {
 	RangeExtensionsByMessage(message protoreflect.FullName, f func(protoreflect.ExtensionType) bool)
 }
 
-// ServerReflectionServer is the server API for ServerReflection service.
-type ServerReflectionServer struct {
-	Svcs         map[string]*serviceinfo.ServiceInfo
+// serverReflectionImpl implements ServerReflection interface.
+type serverReflectionImpl struct {
+	svcs         map[string]*serviceinfo.ServiceInfo
 	DescResolver protodesc.Resolver
 	ExtResolver  ExtensionResolver
+}
+
+func NewServerReflection(svcs map[string]*serviceinfo.ServiceInfo, descRes protodesc.Resolver, extRes ExtensionResolver) reflection_v1.ServerReflection {
+	return &serverReflectionImpl{
+		svcs:         svcs,
+		DescResolver: descRes,
+		ExtResolver:  extRes,
+	}
 }
 
 // FileDescWithDependencies returns a slice of serialized fileDescriptors in
 // wire format ([]byte). The fileDescriptors will include fd and all the
 // transitive dependencies of fd with names not in sentFileDescriptors.
-func (s *ServerReflectionServer) FileDescWithDependencies(fd protoreflect.FileDescriptor, sentFileDescriptors map[string]bool) ([][]byte, error) {
+func (s *serverReflectionImpl) FileDescWithDependencies(fd protoreflect.FileDescriptor, sentFileDescriptors map[string]bool) ([][]byte, error) {
 	if fd.IsPlaceholder() {
 		// If the given root file is a placeholder, treat it
 		// as missing instead of serializing it.
@@ -88,18 +90,18 @@ func (s *ServerReflectionServer) FileDescWithDependencies(fd protoreflect.FileDe
 // given symbol, finds all of its previously unsent transitive dependencies,
 // does marshalling on them, and returns the marshalled result. The given symbol
 // can be a type, a service or a method.
-func (s *ServerReflectionServer) FileDescEncodingContainingSymbol(name string, sentFileDescriptors map[string]bool) ([][]byte, error) {
+func (s *serverReflectionImpl) FileDescEncodingContainingSymbol(name string, fdMap map[string]bool) ([][]byte, error) {
 	d, err := s.DescResolver.FindDescriptorByName(protoreflect.FullName(name))
 	if err != nil {
 		return nil, err
 	}
-	return s.FileDescWithDependencies(d.ParentFile(), sentFileDescriptors)
+	return s.FileDescWithDependencies(d.ParentFile(), fdMap)
 }
 
 // FileDescEncodingContainingExtension finds the file descriptor containing
 // given extension, finds all of its previously unsent transitive dependencies,
 // does marshalling on them, and returns the marshalled result.
-func (s *ServerReflectionServer) FileDescEncodingContainingExtension(typeName string, extNum int32, sentFileDescriptors map[string]bool) ([][]byte, error) {
+func (s *serverReflectionImpl) FileDescEncodingContainingExtension(typeName string, extNum int32, sentFileDescriptors map[string]bool) ([][]byte, error) {
 	xt, err := s.ExtResolver.FindExtensionByNumber(protoreflect.FullName(typeName), protoreflect.FieldNumber(extNum))
 	if err != nil {
 		return nil, err
@@ -108,7 +110,7 @@ func (s *ServerReflectionServer) FileDescEncodingContainingExtension(typeName st
 }
 
 // AllExtensionNumbersForTypeName returns all extension numbers for the given type.
-func (s *ServerReflectionServer) AllExtensionNumbersForTypeName(name string) ([]int32, error) {
+func (s *serverReflectionImpl) AllExtensionNumbersForTypeName(name string) ([]int32, error) {
 	var numbers []int32
 	s.ExtResolver.RangeExtensionsByMessage(protoreflect.FullName(name), func(xt protoreflect.ExtensionType) bool {
 		numbers = append(numbers, int32(xt.TypeDescriptor().Number()))
@@ -126,23 +128,23 @@ func (s *ServerReflectionServer) AllExtensionNumbersForTypeName(name string) ([]
 	return numbers, nil
 }
 
-// ListServices returns the names of services this server exposes.
-func (s *ServerReflectionServer) ListServices() []*reflection_v1.ServiceResponse {
-	resp := make([]*reflection_v1.ServiceResponse, 0, len(s.Svcs))
-	for svc := range s.Svcs {
-		resp = append(resp, &reflection_v1.ServiceResponse{Name: svc})
+// listServices returns the names of services this server exposes.
+func (s *serverReflectionImpl) listServices() []*reflection_v1.ServiceResponse {
+	res := make([]*reflection_v1.ServiceResponse, 0, len(s.svcs))
+	for name := range s.svcs {
+		res = append(res, &reflection_v1.ServiceResponse{Name: name})
 	}
-	sort.Slice(resp, func(i, j int) bool {
-		return resp[i].Name < resp[j].Name
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Name < res[j].Name
 	})
-	return resp
+	return res
 }
 
 // ServerReflectionInfo is the reflection service handler.
-func (s *ServerReflectionServer) ServerReflectionInfo(stream reflection_v1.ServerReflection_ServerReflectionInfoServer) error {
-	sentFileDescriptors := make(map[string]bool)
+func (s *serverReflectionImpl) ServerReflectionInfo(stream reflection_v1.ServerReflection_ServerReflectionInfoServer) error {
+	fdMap := make(map[string]bool)
 	for {
-		in, err := stream.Recv()
+		req, err := stream.Recv()
 		if err == io.EOF {
 			return nil
 		}
@@ -150,87 +152,89 @@ func (s *ServerReflectionServer) ServerReflectionInfo(stream reflection_v1.Serve
 			return err
 		}
 
-		out := &reflection_v1.ServerReflectionResponse{
-			ValidHost:       in.Host,
-			OriginalRequest: in,
+		resp := &reflection_v1.ServerReflectionResponse{
+			ValidHost:       req.Host,
+			OriginalRequest: req,
 		}
-		switch req := in.MessageRequest.(type) {
+		switch msg := req.MessageRequest.(type) {
 		case *reflection_v1.ServerReflectionRequest_FileByFilename:
-			var b [][]byte
-			fd, err := s.DescResolver.FindFileByPath(req.FileByFilename)
+			var buf [][]byte
+			fd, err := s.DescResolver.FindFileByPath(msg.FileByFilename)
 			if err == nil {
-				b, err = s.FileDescWithDependencies(fd, sentFileDescriptors)
+				buf, err = s.FileDescWithDependencies(fd, fdMap)
 			}
 			if err != nil {
-				out.MessageResponse = &reflection_v1.ServerReflectionResponse_ErrorResponse{
+				resp.MessageResponse = &reflection_v1.ServerReflectionResponse_ErrorResponse{
 					ErrorResponse: &reflection_v1.ErrorResponse{
 						ErrorCode:    int32(codes.NotFound),
 						ErrorMessage: err.Error(),
 					},
 				}
 			} else {
-				out.MessageResponse = &reflection_v1.ServerReflectionResponse_FileDescriptorResponse{
-					FileDescriptorResponse: &reflection_v1.FileDescriptorResponse{FileDescriptorProto: b},
+				resp.MessageResponse = &reflection_v1.ServerReflectionResponse_FileDescriptorResponse{
+					FileDescriptorResponse: &reflection_v1.FileDescriptorResponse{
+						FileDescriptorProto: buf,
+					},
 				}
 			}
 		case *reflection_v1.ServerReflectionRequest_FileContainingSymbol:
-			b, err := s.FileDescEncodingContainingSymbol(req.FileContainingSymbol, sentFileDescriptors)
+			b, err := s.FileDescEncodingContainingSymbol(msg.FileContainingSymbol, fdMap)
 			if err != nil {
-				out.MessageResponse = &reflection_v1.ServerReflectionResponse_ErrorResponse{
+				resp.MessageResponse = &reflection_v1.ServerReflectionResponse_ErrorResponse{
 					ErrorResponse: &reflection_v1.ErrorResponse{
 						ErrorCode:    int32(codes.NotFound),
 						ErrorMessage: err.Error(),
 					},
 				}
 			} else {
-				out.MessageResponse = &reflection_v1.ServerReflectionResponse_FileDescriptorResponse{
+				resp.MessageResponse = &reflection_v1.ServerReflectionResponse_FileDescriptorResponse{
 					FileDescriptorResponse: &reflection_v1.FileDescriptorResponse{FileDescriptorProto: b},
 				}
 			}
 		case *reflection_v1.ServerReflectionRequest_FileContainingExtension:
-			typeName := req.FileContainingExtension.ContainingType
-			extNum := req.FileContainingExtension.ExtensionNumber
-			b, err := s.FileDescEncodingContainingExtension(typeName, extNum, sentFileDescriptors)
+			typeName := msg.FileContainingExtension.ContainingType
+			extNum := msg.FileContainingExtension.ExtensionNumber
+			b, err := s.FileDescEncodingContainingExtension(typeName, extNum, fdMap)
 			if err != nil {
-				out.MessageResponse = &reflection_v1.ServerReflectionResponse_ErrorResponse{
+				resp.MessageResponse = &reflection_v1.ServerReflectionResponse_ErrorResponse{
 					ErrorResponse: &reflection_v1.ErrorResponse{
 						ErrorCode:    int32(codes.NotFound),
 						ErrorMessage: err.Error(),
 					},
 				}
 			} else {
-				out.MessageResponse = &reflection_v1.ServerReflectionResponse_FileDescriptorResponse{
+				resp.MessageResponse = &reflection_v1.ServerReflectionResponse_FileDescriptorResponse{
 					FileDescriptorResponse: &reflection_v1.FileDescriptorResponse{FileDescriptorProto: b},
 				}
 			}
 		case *reflection_v1.ServerReflectionRequest_AllExtensionNumbersOfType:
-			extNums, err := s.AllExtensionNumbersForTypeName(req.AllExtensionNumbersOfType)
+			extNums, err := s.AllExtensionNumbersForTypeName(msg.AllExtensionNumbersOfType)
 			if err != nil {
-				out.MessageResponse = &reflection_v1.ServerReflectionResponse_ErrorResponse{
+				resp.MessageResponse = &reflection_v1.ServerReflectionResponse_ErrorResponse{
 					ErrorResponse: &reflection_v1.ErrorResponse{
 						ErrorCode:    int32(codes.NotFound),
 						ErrorMessage: err.Error(),
 					},
 				}
 			} else {
-				out.MessageResponse = &reflection_v1.ServerReflectionResponse_AllExtensionNumbersResponse{
+				resp.MessageResponse = &reflection_v1.ServerReflectionResponse_AllExtensionNumbersResponse{
 					AllExtensionNumbersResponse: &reflection_v1.ExtensionNumberResponse{
-						BaseTypeName:    req.AllExtensionNumbersOfType,
+						BaseTypeName:    msg.AllExtensionNumbersOfType,
 						ExtensionNumber: extNums,
 					},
 				}
 			}
 		case *reflection_v1.ServerReflectionRequest_ListServices:
-			out.MessageResponse = &reflection_v1.ServerReflectionResponse_ListServicesResponse{
+			resp.MessageResponse = &reflection_v1.ServerReflectionResponse_ListServicesResponse{
 				ListServicesResponse: &reflection_v1.ListServiceResponse{
-					Service: s.ListServices(),
+					Service: s.listServices(),
 				},
 			}
 		default:
-			return status.Errorf(codes.InvalidArgument, "invalid MessageRequest: %v", in.MessageRequest)
+			return status.Errorf(codes.InvalidArgument, "invalid MessageRequest: %v", req.MessageRequest)
 		}
 
-		if err := stream.Send(out); err != nil {
+		if err := stream.Send(resp); err != nil {
 			return err
 		}
 	}

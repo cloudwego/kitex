@@ -202,7 +202,12 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 
 func (s *server) registerReflectionService() {
 	registerOpts := internal_server.NewRegisterOptions(nil)
+	// register v1 reflection service
 	if err := s.svcs.addService(grpc.NewV1ServiceInfo(), grpc.NewV1Handler(s.svcs.getSvcInfoMap()), registerOpts); err != nil {
+		panic(err.Error())
+	}
+	// register v1alpha reflection service
+	if err := s.svcs.addService(grpc.NewV1AlphaServiceInfo(), grpc.NewV1alphaHandler(s.svcs.getSvcInfoMap()), registerOpts); err != nil {
 		panic(err.Error())
 	}
 }
