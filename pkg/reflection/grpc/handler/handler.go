@@ -17,8 +17,8 @@
 package handler
 
 import (
-	"github.com/cloudwego/kitex/pkg/reflection/grpc/reflection_v1"
-	"github.com/cloudwego/kitex/pkg/reflection/grpc/reflection_v1alpha"
+	reflection_v1 "github.com/cloudwego/kitex/pkg/reflection/grpc/reflection/v1"
+	reflection_v1alpha "github.com/cloudwego/kitex/pkg/reflection/grpc/reflection/v1alpha"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
