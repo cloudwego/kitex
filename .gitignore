@@ -49,3 +49,6 @@ tool/cmd/kitex/kitex
 
 # remote dump file
 *.json
+base1.go
+dump.txt
+base2.go

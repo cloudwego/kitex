@@ -24,6 +24,7 @@ import (
 
 	"github.com/cloudwego/kitex"
 	kargs "github.com/cloudwego/kitex/tool/cmd/kitex/args"
+	"github.com/cloudwego/kitex/tool/cmd/kitex/versions"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
@@ -45,6 +46,15 @@ func init() {
 			}
 		},
 	})
+	if err := versions.RegisterMinDepVersion(
+		&versions.MinDepVersion{
+			RefPath: "github.com/cloudwego/kitex",
+			Version: "v0.9.0",
+		},
+	); err != nil {
+		log.Warn(err)
+		os.Exit(versions.CompatibilityCheckExitCode)
+	}
 }
 
 func main() {
@@ -61,6 +71,13 @@ func main() {
 
 	// run as kitex
 	args.ParseArgs(kitex.Version)
+
+	if !args.NoDependencyCheck {
+		// check dependency compatibility between kitex cmd tool and dependency in go.mod
+		if err := versions.DefaultCheckDependencyAndProcess(); err != nil {
+			os.Exit(versions.CompatibilityCheckExitCode)
+		}
+	}
 
 	out := new(bytes.Buffer)
 	cmd := args.BuildCmd(out)

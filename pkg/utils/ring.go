@@ -19,13 +19,12 @@ package utils
 import (
 	"errors"
 	"runtime"
-
-	goid "github.com/choleraehyq/pid"
 )
 
 // ErrRingFull means the ring is full.
 var ErrRingFull = errors.New("ring is full")
 
+// Deprecated: it's not used by kitex anymore.
 // NewRing creates a ringbuffer with fixed size.
 func NewRing(size int) *Ring {
 	if size <= 0 {
@@ -52,6 +51,7 @@ func NewRing(size int) *Ring {
 	return r
 }
 
+// Deprecated: it's not used by kitex anymore.
 // Ring implements a fixed size hash list to manage data
 type Ring struct {
 	length int
@@ -64,7 +64,7 @@ func (r *Ring) Push(obj interface{}) error {
 		return r.rings[0].Push(obj)
 	}
 
-	idx := goid.GetPid() % r.length
+	idx := getGoroutineID() % r.length
 	for i := 0; i < r.length; i, idx = i+1, (idx+1)%r.length {
 		err := r.rings[idx].Push(obj)
 		if err == nil {
@@ -80,7 +80,7 @@ func (r *Ring) Pop() interface{} {
 		return r.rings[0].Pop()
 	}
 
-	idx := goid.GetPid() % r.length
+	idx := getGoroutineID() % r.length
 	for i := 0; i < r.length; i, idx = i+1, (idx+1)%r.length {
 		obj := r.rings[idx].Pop()
 		if obj != nil {
@@ -94,7 +94,7 @@ func (r *Ring) Pop() interface{} {
 func (r *Ring) Dump() interface{} {
 	m := &ringDump{}
 	dumpList := make([]*ringDump, 0, r.length)
-	idx := goid.GetPid() % r.length
+	idx := getGoroutineID() % r.length
 	for i := 0; i < r.length; i, idx = i+1, (idx+1)%r.length {
 		curDump := &ringDump{}
 		r.rings[idx].Dump(curDump)

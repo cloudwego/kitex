@@ -125,6 +125,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Generate codes with injecting deep copy method.")
 	f.StringVar(&a.Protocol, "protocol", "",
 		"Specify a protocol for codec")
+	f.BoolVar(&a.NoDependencyCheck, "no-dependency-check", false,
+		"Skip dependency checking.")
 	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
