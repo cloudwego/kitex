@@ -63,7 +63,7 @@ func PutRPCInfo(ri RPCInfo) {
 //	        ...
 //	        ri := rpcinfo.GetRPCInfo(ctx) // not concurrent-safe
 //	        ...
-//	    }(ctx2)
+//	    }(ctx)
 //
 //	    ctx2 := rpcinfo.FreezeRPCInfo(ctx) // this creates a read-only copy of `ri` and attaches it to the new context
 //	    go func(ctx context.Context) {
