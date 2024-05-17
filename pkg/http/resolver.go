@@ -23,16 +23,48 @@ import (
 	"strconv"
 )
 
+const (
+	tcp  = "tcp"
+	tcp4 = "tcp4"
+	tcp6 = "tcp6"
+)
+
 // Resolver resolves url to address.
 type Resolver interface {
 	Resolve(string) (string, error)
 }
 
-type defaultResolver struct{}
+type ResolverOption func(cfg *resolverConfig)
+
+// WithIPv4 configures the resolver to resolve ipv4 address only.
+func WithIPv4() ResolverOption {
+	return func(cfg *resolverConfig) {
+		cfg.network = tcp4
+	}
+}
+
+// WithIPv6 configures the resolver to resolve ipv6 address only.
+func WithIPv6() ResolverOption {
+	return func(cfg *resolverConfig) {
+		cfg.network = tcp6
+	}
+}
+
+type resolverConfig struct {
+	network string
+}
+
+type defaultResolver struct {
+	*resolverConfig
+}
 
 // NewDefaultResolver creates a default resolver.
-func NewDefaultResolver() Resolver {
-	return &defaultResolver{}
+func NewDefaultResolver(options ...ResolverOption) Resolver {
+	cfg := &resolverConfig{tcp}
+	for _, option := range options {
+		option(cfg)
+	}
+	return &defaultResolver{cfg}
 }
 
 // Resolve implements the Resolver interface.
@@ -49,7 +81,7 @@ func (p *defaultResolver) Resolve(URL string) (string, error) {
 			port = "80"
 		}
 	}
-	addr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(host, port))
+	addr, err := net.ResolveTCPAddr(p.network, net.JoinHostPort(host, port))
 	if err != nil {
 		return "", err
 	}
