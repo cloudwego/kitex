@@ -323,9 +323,9 @@ func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
 	var de *kerrors.DetailedError
 	if ok := errors.As(err, &de); ok && de.Stack() != "" {
-		klog.Errorf("KITEX: processing gRPC request error, remoteAddr=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), de.Stack())
+		klog.CtxErrorf(ctx, "KITEX: processing gRPC request error, remoteAddr=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), de.Stack())
 	} else {
-		klog.Errorf("KITEX: processing gRPC request error, remoteAddr=%s, error=%s", conn.RemoteAddr(), err.Error())
+		klog.CtxErrorf(ctx, "KITEX: processing gRPC request error, remoteAddr=%s, error=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 
