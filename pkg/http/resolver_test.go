@@ -37,19 +37,8 @@ func TestResolve(t *testing.T) {
 }
 
 func TestResolverWithIPPolicy(t *testing.T) {
-	// panic for invalid policy that disables both version
-	var panicErr interface{}
-	f := func() {
-		defer func() {
-			panicErr = recover()
-		}()
-		NewResolverWithIPPolicy(IPPolicy{DisableV4: true, DisableV6: true})
-	}
-	f()
-	test.Assert(t, panicErr != nil)
-
 	// resolve ipv6 only
-	v6Resolver := NewResolverWithIPPolicy(IPPolicy{DisableV4: true})
+	v6Resolver := NewDefaultResolver(WithIPv6())
 	test.Assert(t, v6Resolver.(*defaultResolver).network == tcp6)
 	resolvableURL := "http://www.google.com"
 	ipPort, err := v6Resolver.Resolve(resolvableURL)
@@ -66,7 +55,7 @@ func TestResolverWithIPPolicy(t *testing.T) {
 	test.Assert(t, err != nil)
 
 	// resolve ipv4 only
-	v4Resolver := NewResolverWithIPPolicy(IPPolicy{DisableV6: true})
+	v4Resolver := NewDefaultResolver(WithIPv4())
 	test.Assert(t, v4Resolver.(*defaultResolver).network == tcp4)
 	ipPort, err = v4Resolver.Resolve(resolvableURL)
 	test.Assert(t, err == nil)
@@ -75,24 +64,13 @@ func TestResolverWithIPPolicy(t *testing.T) {
 	test.Assert(t, isV4(ip))
 
 	// dual
-	dualResolver := NewResolverWithIPPolicy(IPPolicy{})
+	dualResolver := NewDefaultResolver()
 	test.Assert(t, dualResolver.(*defaultResolver).network == tcp)
 	ipPort, err = dualResolver.Resolve(resolvableURL)
 	test.Assert(t, err == nil)
 	ip, err = parseIPPort(ipPort)
 	test.Assert(t, err == nil)
 	test.Assert(t, ip != nil)
-}
-
-func TestGetNetwork(t *testing.T) {
-	v4only := IPPolicy{DisableV6: true}
-	test.Assert(t, getNetwork(v4only) == tcp4)
-
-	v6only := IPPolicy{DisableV4: true}
-	test.Assert(t, getNetwork(v6only) == tcp6)
-
-	dual := IPPolicy{}
-	test.Assert(t, getNetwork(dual) == tcp)
 }
 
 func parseIPPort(ipPort string) (net.IP, error) {

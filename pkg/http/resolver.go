@@ -34,33 +34,37 @@ type Resolver interface {
 	Resolve(string) (string, error)
 }
 
-// IPPolicy specifies the ip version for HTTP Resolver
-type IPPolicy struct {
-	DisableV4 bool
-	DisableV6 bool
+type ResolverOption func(cfg *resolverConfig)
+
+// WithIPv4 configures the resolver to resolve ipv4 address only.
+func WithIPv4() ResolverOption {
+	return func(cfg *resolverConfig) {
+		cfg.network = tcp4
+	}
 }
 
-// if both v4 and v6 are disabled, return false
-func (p IPPolicy) legal() bool {
-	return !(p.DisableV6 && p.DisableV4)
+// WithIPv6 configures the resolver to resolve ipv6 address only.
+func WithIPv6() ResolverOption {
+	return func(cfg *resolverConfig) {
+		cfg.network = tcp6
+	}
 }
 
-type defaultResolver struct {
+type resolverConfig struct {
 	network string
 }
 
-// NewDefaultResolver creates a default resolver.
-func NewDefaultResolver() Resolver {
-	return &defaultResolver{network: tcp}
+type defaultResolver struct {
+	*resolverConfig
 }
 
-// NewResolverWithIPPolicy creates a resolver with ip policy.
-func NewResolverWithIPPolicy(p IPPolicy) Resolver {
-	if !p.legal() {
-		panic("Illegal IP policy for resolver, at least one of v4, v6 should be enabled")
+// NewDefaultResolver creates a default resolver.
+func NewDefaultResolver(options ...ResolverOption) Resolver {
+	cfg := &resolverConfig{tcp}
+	for _, option := range options {
+		option(cfg)
 	}
-	network := getNetwork(p)
-	return &defaultResolver{network}
+	return &defaultResolver{cfg}
 }
 
 // Resolve implements the Resolver interface.
@@ -82,15 +86,4 @@ func (p *defaultResolver) Resolve(URL string) (string, error) {
 		return "", err
 	}
 	return net.JoinHostPort(addr.IP.String(), strconv.Itoa(addr.Port)), nil
-}
-
-func getNetwork(policy IPPolicy) string {
-	v4, v6 := !policy.DisableV4, !policy.DisableV6
-	if v4 && v6 {
-		return tcp
-	} else if v4 {
-		return tcp4
-	} else {
-		return tcp6
-	}
 }
