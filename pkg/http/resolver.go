@@ -18,9 +18,16 @@
 package http
 
 import (
+	"fmt"
 	"net"
 	"net/url"
 	"strconv"
+)
+
+const (
+	tcp  = "tcp"
+	tcp4 = "tcp4"
+	tcp6 = "tcp6"
 )
 
 // Resolver resolves url to address.
@@ -28,11 +35,33 @@ type Resolver interface {
 	Resolve(string) (string, error)
 }
 
-type defaultResolver struct{}
+// IPPolicy specifies the ip version for HTTP Resolver
+type IPPolicy struct {
+	DisableV4 bool
+	DisableV6 bool
+}
+
+// if both v4 and v6 are disabled, return false
+func (p IPPolicy) legal() bool {
+	return !(p.DisableV6 && p.DisableV4)
+}
+
+type defaultResolver struct {
+	network string
+}
 
 // NewDefaultResolver creates a default resolver.
 func NewDefaultResolver() Resolver {
-	return &defaultResolver{}
+	return &defaultResolver{network: tcp}
+}
+
+// NewResolverWithIPPolicy creates a resolver with ip policy.
+func NewResolverWithIPPolicy(p IPPolicy) Resolver {
+	if !p.legal() {
+		panic(fmt.Sprintf("Illegal IP policy for resolver, at least one of v4, v6 should be enabled"))
+	}
+	network := getNetwork(p)
+	return &defaultResolver{network}
 }
 
 // Resolve implements the Resolver interface.
@@ -49,9 +78,20 @@ func (p *defaultResolver) Resolve(URL string) (string, error) {
 			port = "80"
 		}
 	}
-	addr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(host, port))
+	addr, err := net.ResolveTCPAddr(p.network, net.JoinHostPort(host, port))
 	if err != nil {
 		return "", err
 	}
 	return net.JoinHostPort(addr.IP.String(), strconv.Itoa(addr.Port)), nil
+}
+
+func getNetwork(policy IPPolicy) string {
+	v4, v6 := !policy.DisableV4, !policy.DisableV6
+	if v4 && v6 {
+		return tcp
+	} else if v4 {
+		return tcp4
+	} else {
+		return tcp6
+	}
 }
