@@ -18,7 +18,6 @@
 package http
 
 import (
-	"fmt"
 	"net"
 	"net/url"
 	"strconv"
@@ -58,7 +57,7 @@ func NewDefaultResolver() Resolver {
 // NewResolverWithIPPolicy creates a resolver with ip policy.
 func NewResolverWithIPPolicy(p IPPolicy) Resolver {
 	if !p.legal() {
-		panic(fmt.Sprintf("Illegal IP policy for resolver, at least one of v4, v6 should be enabled"))
+		panic("Illegal IP policy for resolver, at least one of v4, v6 should be enabled")
 	}
 	network := getNetwork(p)
 	return &defaultResolver{network}

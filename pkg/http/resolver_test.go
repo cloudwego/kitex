@@ -81,6 +81,7 @@ func TestResolverWithIPPolicy(t *testing.T) {
 	test.Assert(t, err == nil)
 	ip, err = parseIPPort(ipPort)
 	test.Assert(t, err == nil)
+	test.Assert(t, ip != nil)
 }
 
 func TestGetNetwork(t *testing.T) {
