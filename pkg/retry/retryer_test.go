@@ -682,8 +682,7 @@ func TestSpecifiedErrorRetryWithCtx(t *testing.T) {
 	ctxKeyVal := "ctxKeyVal"
 	t.Run("case5", func(t *testing.T) {
 		shouldResultRetry := &ShouldResultRetry{ErrorRetryWithCtx: func(ctx context.Context, err error, ri rpcinfo.RPCInfo) bool {
-			val := ctx.Value(ctxKeyVal)
-			if ri.To().Method() == method && val == ctxKeyVal {
+			if ri.To().Method() == method && ctx.Value(ctxKeyVal) == ctxKeyVal {
 				if te, ok := err.(*remote.TransError); ok && te.TypeID() == 1000 {
 					return true
 				}
@@ -845,8 +844,7 @@ func TestSpecifiedRespRetryWithCtx(t *testing.T) {
 	ctxKeyVal := "ctxKeyVal"
 	atomic.StoreInt32(&callTimes, 0)
 	shouldResultRetry2 := &ShouldResultRetry{RespRetryWithCtx: func(ctx context.Context, resp interface{}, ri rpcinfo.RPCInfo) bool {
-		val := ctx.Value(ctxKeyVal)
-		if ri.To().Method() == method && val == ctxKeyVal {
+		if ri.To().Method() == method && ctx.Value(ctxKeyVal) == ctxKeyVal {
 			if r, ok := resp.(*mockResult); ok && r.GetResult() == retryResp {
 				return true
 			}
