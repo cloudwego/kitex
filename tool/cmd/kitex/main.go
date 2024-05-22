@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/cloudwego/kitex"
@@ -59,12 +60,25 @@ func main() {
 		}
 	}
 
+	curpath, err := filepath.Abs(".")
+	if err != nil {
+		log.Warn("Get current path failed:", err.Error())
+		os.Exit(1)
+	}
 	// run as kitex
-	args.ParseArgs(kitex.Version)
+	err = args.ParseArgs(kitex.Version, os.Args[1:], curpath, true)
+	if err != nil {
+		log.Warn(err)
+		os.Exit(1)
+	}
 
 	out := new(bytes.Buffer)
-	cmd := args.BuildCmd(out)
-	err := cmd.Run()
+	cmd, err := args.BuildCmd(out, false)
+	if err != nil {
+		log.Warn(err)
+		os.Exit(1)
+	}
+	err = cmd.Run()
 	if err != nil {
 		if args.Use != "" {
 			out := strings.TrimSpace(out.String())

@@ -99,8 +99,12 @@ func (c *converter) initLogs() backend.LogFunc {
 }
 
 func (c *converter) fail(err error) int {
-	res := plugin.BuildErrorResponse(err.Error(), c.Warnings...)
+	res := c.failResp(err)
 	return exit(res)
+}
+
+func (c *converter) failResp(err error) *plugin.Response {
+	return plugin.BuildErrorResponse(err.Error(), c.Warnings...)
 }
 
 func (c *converter) avoidIncludeConflict(ast *parser.Thrift, ref string) (*parser.Thrift, string) {

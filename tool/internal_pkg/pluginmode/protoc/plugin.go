@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -424,6 +425,10 @@ func (pp *protocPlugin) adjustPath(path string) (ret string) {
 	}
 	if pp.ModuleName == "" {
 		gopath := util.GetGOPATH()
+		if gopath == "" {
+			log.Warn("Fail to get go path")
+			os.Exit(1)
+		}
 		path = util.JoinPath(gopath, "src", path)
 		path, _ = filepath.Rel(cur, path)
 	} else {
