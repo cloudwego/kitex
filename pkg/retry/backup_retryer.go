@@ -209,7 +209,7 @@ func (r *backupRetryer) UpdatePolicy(rp Policy) (err error) {
 }
 
 // AppendErrMsgIfNeeded implements the Retryer interface.
-func (r *backupRetryer) AppendErrMsgIfNeeded(err error, ri rpcinfo.RPCInfo, msg string) {
+func (r *backupRetryer) AppendErrMsgIfNeeded(ctx context.Context, err error, ri rpcinfo.RPCInfo, msg string) {
 	if kerrors.IsTimeoutError(err) {
 		// Add additional reason to the error message when timeout occurs but the backup request is not sent.
 		appendErrMsg(err, msg)

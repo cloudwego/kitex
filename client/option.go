@@ -382,7 +382,7 @@ func WithRetryMethodPolicies(mp map[string]retry.Policy) Option {
 // But if your retry policy is enabled by remote config, WithSpecifiedResultRetry is useful.
 func WithSpecifiedResultRetry(rr *retry.ShouldResultRetry) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
-		if rr == nil || (rr.RespRetry == nil && rr.ErrorRetry == nil) {
+		if rr == nil || !rr.IsValid() {
 			panic(fmt.Errorf("WithSpecifiedResultRetry: invalid '%+v'", rr))
 		}
 		di.Push(fmt.Sprintf("WithSpecifiedResultRetry(%+v)", rr))
