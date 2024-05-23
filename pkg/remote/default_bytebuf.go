@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	"github.com/bytedance/gopkg/lang/dirtmake"
 )
 
 // Mask bits.
@@ -78,7 +80,7 @@ func newWriterByteBuffer(estimatedLength int) ByteBuffer {
 		estimatedLength = 256 // default buffer size
 	}
 	bytebuf := bytebufPool.Get().(*defaultByteBuffer)
-	bytebuf.buff = make([]byte, estimatedLength)
+	bytebuf.buff = dirtmake.Bytes(estimatedLength, estimatedLength)
 	bytebuf.status = BitWritable
 	bytebuf.writeIdx = 0
 	return bytebuf
@@ -89,7 +91,7 @@ func newReaderWriterByteBuffer(estimatedLength int) ByteBuffer {
 		estimatedLength = 256 // default buffer size
 	}
 	bytebuf := bytebufPool.Get().(*defaultByteBuffer)
-	bytebuf.buff = make([]byte, estimatedLength)
+	bytebuf.buff = dirtmake.Bytes(estimatedLength, estimatedLength)
 	bytebuf.readIdx = 0
 	bytebuf.writeIdx = 0
 	bytebuf.status = BitReadable | BitWritable
@@ -188,7 +190,7 @@ func (b *defaultByteBuffer) ReadBinary(n int) (p []byte, err error) {
 	if buf, err = b.Next(n); err != nil {
 		return p, err
 	}
-	p = make([]byte, n)
+	p = dirtmake.Bytes(n, n)
 	copy(p, buf)
 	return p, nil
 }
@@ -274,7 +276,7 @@ func (b *defaultByteBuffer) Bytes() (buf []byte, err error) {
 	if b.status&BitWritable == 0 {
 		return nil, errors.New("unwritable buffer, cannot support Bytes")
 	}
-	buf = make([]byte, b.writeIdx)
+	buf = dirtmake.Bytes(b.writeIdx, b.writeIdx)
 	copy(buf, b.buff[:b.writeIdx])
 	return buf, nil
 }
@@ -327,7 +329,7 @@ func (b *defaultByteBuffer) ensureWritable(minWritableBytes int) {
 		newCapacity <<= 1
 	}
 
-	buf := make([]byte, newCapacity)
+	buf := dirtmake.Bytes(newCapacity, newCapacity)
 	copy(buf, b.buff)
 	b.buff = buf
 }

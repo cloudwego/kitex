@@ -20,6 +20,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/bytedance/gopkg/lang/dirtmake"
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/net/http2/hpack"
 
@@ -64,7 +65,7 @@ type bufWriter struct {
 
 func newBufWriter(writer io.Writer, batchSize int) *bufWriter {
 	return &bufWriter{
-		buf:       make([]byte, batchSize*2),
+		buf:       dirtmake.Bytes(batchSize*2, batchSize*2),
 		batchSize: batchSize,
 		writer:    writer,
 	}
