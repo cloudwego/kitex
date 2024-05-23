@@ -19,7 +19,7 @@ package generic
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"testing"
 
@@ -136,7 +136,7 @@ func initHttpSendMsg() remote.Message {
 	if err != nil {
 		panic(err)
 	}
-	rawBody, err := ioutil.ReadAll(b)
+	rawBody, err := io.ReadAll(b)
 	if err != nil {
 		panic(err)
 	}

@@ -17,7 +17,7 @@ package generator
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"gopkg.in/yaml.v3"
 )
@@ -63,7 +63,7 @@ func (p *TemplateExtension) FromJSONFile(filename string) error {
 	if p == nil {
 		return nil
 	}
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func (p *TemplateExtension) ToJSONFile(filename string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filename, data, 0o644)
+	return os.WriteFile(filename, data, 0o644)
 }
 
 // FromYAMLFile unmarshals a TemplateExtension with YAML format from the given file.
@@ -84,7 +84,7 @@ func (p *TemplateExtension) FromYAMLFile(filename string) error {
 	if p == nil {
 		return nil
 	}
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (p *TemplateExtension) ToYAMLFile(filename string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filename, data, 0o644)
+	return os.WriteFile(filename, data, 0o644)
 }
 
 func (p *TemplateExtension) Merge(other *TemplateExtension) {

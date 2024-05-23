@@ -17,7 +17,7 @@
 package utils
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"time"
 
@@ -45,7 +45,7 @@ func ReadYamlConfigFile(yamlFile string) (*YamlConfig, error) {
 	}
 	defer fd.Close()
 
-	b, err := ioutil.ReadAll(fd)
+	b, err := io.ReadAll(fd)
 	if err != nil {
 		return nil, err
 	}

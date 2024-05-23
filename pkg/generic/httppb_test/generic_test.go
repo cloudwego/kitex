@@ -19,7 +19,7 @@ package test
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -47,7 +47,7 @@ func initThriftClientByIDL(t *testing.T, addr, idl, pbIdl string) genericclient.
 	test.Assert(t, err == nil)
 	pbf, err := os.Open(pbIdl)
 	test.Assert(t, err == nil)
-	pbContent, err := ioutil.ReadAll(pbf)
+	pbContent, err := io.ReadAll(pbf)
 	test.Assert(t, err == nil)
 	pbf.Close()
 	pbp, err := generic.NewPbContentProvider(pbIdl, map[string]string{pbIdl: string(pbContent)})

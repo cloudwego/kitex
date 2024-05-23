@@ -122,7 +122,7 @@ func (n *node) addRoute(path string, function *FunctionDescriptor) {
 			i, lcpIndex = j, len(path)
 
 			if i == lcpIndex {
-				// path node is last fragment of route path. ie. `/users/:id`
+				// path node is last fragment of route path. i.e. `/users/:id`
 				n.insert(path[:i], function, param, ppath, pnames)
 				return
 			} else {
