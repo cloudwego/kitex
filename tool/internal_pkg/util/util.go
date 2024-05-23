@@ -29,8 +29,6 @@ import (
 	"sort"
 	"strings"
 	"unicode"
-
-	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 )
 
 // StringSlice implements the flag.Value interface on string slices
@@ -57,17 +55,16 @@ func FormatCode(code []byte) ([]byte, error) {
 }
 
 // GetGOPATH retrieves the GOPATH from environment variables or the `go env` command.
-func GetGOPATH() string {
+func GetGOPATH() (string, error) {
 	goPath := os.Getenv("GOPATH")
 	// If there are many path in GOPATH, pick up the first one.
 	if GoPaths := strings.Split(goPath, ":"); len(GoPaths) >= 1 && strings.TrimSpace(GoPaths[0]) != "" {
-		return strings.TrimSpace(GoPaths[0])
+		return strings.TrimSpace(GoPaths[0]), nil
 	}
 	// GOPATH not set through environment variables, try to get one by executing "go env GOPATH"
 	output, err := exec.Command("go", "env", "GOPATH").Output()
 	if err != nil {
-		log.Warn(err)
-		os.Exit(1)
+		return "", err
 	}
 
 	goPath = strings.TrimSpace(string(output))
@@ -77,9 +74,9 @@ func GetGOPATH() string {
 	}
 
 	if len(goPath) == 0 {
-		panic("GOPATH not found")
+		return "", fmt.Errorf("GOPATH not found")
 	}
-	return goPath
+	return goPath, nil
 }
 
 // Exists reports whether a file exists.

@@ -46,13 +46,22 @@ func Run() int {
 		return 1
 	}
 
+	return exit(HandleRequest(req))
+}
+
+func (c *converter) failResp(err error) *plugin.Response {
+	return plugin.BuildErrorResponse(err.Error(), c.Warnings...)
+}
+
+func HandleRequest(req *plugin.Request) *plugin.Response {
+
 	var conv converter
-	if err = conv.init(req); err != nil {
-		return conv.fail(err)
+	if err := conv.init(req); err != nil {
+		return conv.failResp(err)
 	}
 
-	if err = conv.convertTypes(req); err != nil {
-		return conv.fail(err)
+	if err := conv.convertTypes(req); err != nil {
+		return conv.failResp(err)
 	}
 
 	conv.fixImportConflicts()
@@ -69,7 +78,7 @@ func Run() int {
 			conv.Package.Namespace = conv.svc2ast[s].GetNamespaceOrReferenceName("go")
 			fs, err := gen.GenerateService(&conv.Package)
 			if err != nil {
-				return conv.fail(err)
+				return conv.failResp(err)
 			}
 			files = append(files, fs...)
 		}
@@ -77,24 +86,24 @@ func Run() int {
 
 	if conv.Config.GenerateMain {
 		if len(conv.Services) == 0 {
-			return conv.fail(errors.New("no service defined in the IDL"))
+			return conv.failResp(errors.New("no service defined in the IDL"))
 		}
 		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
 		fs, err := gen.GenerateMainPackage(&conv.Package)
 		if err != nil {
-			return conv.fail(err)
+			return conv.failResp(err)
 		}
 		files = append(files, fs...)
 	}
 
 	if conv.Config.TemplateDir != "" {
 		if len(conv.Services) == 0 {
-			return conv.fail(errors.New("no service defined in the IDL"))
+			return conv.failResp(errors.New("no service defined in the IDL"))
 		}
 		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
 		fs, err := gen.GenerateCustomPackage(&conv.Package)
 		if err != nil {
-			return conv.fail(err)
+			return conv.failResp(err)
 		}
 		files = append(files, fs...)
 	}
@@ -110,11 +119,11 @@ func Run() int {
 	}
 
 	if conv.Config.Use != "" {
-		err = conv.persist(res)
+		err := conv.persist(res)
 		if err == nil {
 			err = errors.New(TheUseOptionMessage)
 		}
-		return conv.fail(err)
+		return conv.failResp(err)
 	}
 	p := &patcher{
 		noFastAPI:             conv.Config.NoFastAPI,
@@ -134,11 +143,11 @@ func Run() int {
 	}
 	patches, err := p.patch(req)
 	if err != nil {
-		return conv.fail(fmt.Errorf("patch: %w", err))
+		return conv.failResp(fmt.Errorf("patch: %w", err))
 	}
 	res.Contents = append(res.Contents, patches...)
 
-	return exit(res)
+	return res
 }
 
 func exit(res *plugin.Response) int {
