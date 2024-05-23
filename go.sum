@@ -14,6 +14,7 @@ github.com/boombuler/barcode v1.0.0/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl
 github.com/boombuler/barcode v1.0.1/go.mod h1:paBWMcWSl3LHKBqUq+rly7CNSldXjb2rDl3JlRe0mD8=
 github.com/bytedance/gopkg v0.0.0-20220413063733-65bf48ffb3a7/go.mod h1:2ZlV9BaUH4+NXIBF0aMdKKAnHTzqH+iMU4KUjAbL23Q=
 github.com/bytedance/gopkg v0.0.0-20230728082804-614d0af6619b/go.mod h1:FtQG3YbQG9L/91pbKSw787yBQPutC+457AvDW77fgUQ=
+github.com/bytedance/gopkg v0.0.0-20240507064146-197ded923ae3/go.mod h1:FtQG3YbQG9L/91pbKSw787yBQPutC+457AvDW77fgUQ=
 github.com/bytedance/gopkg v0.0.0-20240514070511-01b2cbcf35e1 h1:rT7Mm6uUpHeZQzfs2v0Mlj0SL02CzyVi+EB7VYPM/z4=
 github.com/bytedance/gopkg v0.0.0-20240514070511-01b2cbcf35e1/go.mod h1:FtQG3YbQG9L/91pbKSw787yBQPutC+457AvDW77fgUQ=
 github.com/bytedance/mockey v1.2.7 h1:8j4yCqS5OmMe2dQCxPit4FVkwTK9nrykIgbOZN3s28o=
@@ -51,8 +52,9 @@ github.com/cloudwego/kitex v0.9.3-dep3/go.mod h1:87pfgsZMaso0tFISQZzMhwmh6pajfVm
 github.com/cloudwego/kitex v0.9.3-rc/go.mod h1:QurmwA8Wh/s7qz6C+Da9sc9B4TRW6q4TN6Y56mu90SE=
 github.com/cloudwego/localsession v0.0.2 h1:N9/IDtCPj1fCL9bCTP+DbXx3f40YjVYWcwkJG0YhQkY=
 github.com/cloudwego/localsession v0.0.2/go.mod h1:kiJxmvAcy4PLgKtEnPS5AXed3xCiXcs7Z+KBHP72Wv8=
-github.com/cloudwego/netpoll v0.6.0 h1:JRMkrA1o8k/4quxzg6Q1XM+zIhwZsyoWlq6ef+ht31U=
 github.com/cloudwego/netpoll v0.6.0/go.mod h1:xVefXptcyheopwNDZjDPcfU6kIjZXZ4nY550k1yH9eQ=
+github.com/cloudwego/netpoll v0.6.1-0.20240516030022-a9a224c3e494 h1:o43pLtNAhtgucplmqwPNHMNTJEmkJ9bcZKpx9dBCu4Y=
+github.com/cloudwego/netpoll v0.6.1-0.20240516030022-a9a224c3e494/go.mod h1:kaqvfZ70qd4T2WtIIpCOi5Cxyob8viEpzLhCrTrz3HM=
 github.com/cloudwego/runtimex v0.1.0 h1:HG+WxWoj5/CDChDZ7D99ROwvSMkuNXAqt6hnhTTZDiI=
 github.com/cloudwego/runtimex v0.1.0/go.mod h1:23vL/HGV0W8nSCHbe084AgEBdDV4rvXenEUMnUNvUd8=
 github.com/cloudwego/thriftgo v0.2.11/go.mod h1:dAyXHEmKXo0LfMCrblVEY3mUZsdeuA5+i0vF5f09j7E=
