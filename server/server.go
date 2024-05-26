@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	unknowns "github.com/cloudwego/kitex/pkg/remote/codec/unknown/service"
 	"net"
 	"reflect"
 	"runtime/debug"
@@ -205,6 +206,9 @@ func (s *server) GetServiceInfos() map[string]*serviceinfo.ServiceInfo {
 
 // Run runs the server.
 func (s *server) Run() (err error) {
+	if err = s.unknownMethodHandler(); err != nil {
+		return err
+	}
 	s.Lock()
 	s.isRun = true
 	s.Unlock()
@@ -554,6 +558,23 @@ func (s *server) findAndSetDefaultService() {
 	if len(s.svcs.svcMap) == 1 {
 		s.targetSvcInfo = getDefaultSvcInfo(s.svcs)
 	}
+}
+
+func (s *server) unknownMethodHandler() error {
+	if s.opt.RemoteOpt.UnknownMethodHandler != nil {
+		if len(s.svcs.svcMap) == 1 && s.svcs.svcMap[serviceinfo.GenericService] != nil {
+			return errors.New("generic services do not support handling of unknown methods")
+		} else {
+			serviceInfo := unknowns.NewServiceInfo(serviceinfo.Thrift, unknowns.UnknownService, unknowns.UnknownMethod)
+			if err := s.RegisterService(serviceInfo, s.opt.RemoteOpt.UnknownMethodHandler); err != nil {
+				return err
+			}
+		}
+		/*if s.opt.RemoteOpt.PayloadCodec != nil {
+			s.opt.RemoteOpt.PayloadCodec = unknown.NewUnknownCodec(s.opt.RemoteOpt.PayloadCodec)
+		}*/
+	}
+	return nil
 }
 
 // getDefaultSvc is used to get one ServiceInfo from map

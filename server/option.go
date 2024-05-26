@@ -33,6 +33,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
+	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/remote/codec/unknown"
+	unknowns "github.com/cloudwego/kitex/pkg/remote/codec/unknown/service"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -345,6 +349,15 @@ func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCUnknownServiceHandler(%+v)", utils.GetFuncName(f)))
 		o.RemoteOpt.GRPCUnknownServiceHandler = f
+	}}
+}
+
+func WithUnknownMethodHandler(f unknowns.UnknownMethodService) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithUnknownMethodHandler(%+v)", utils.GetFuncName(f)))
+		o.RemoteOpt.UnknownMethodHandler = f
+		remote.PutPayloadCode(serviceinfo.Thrift, unknown.NewUnknownCodec(thrift.NewThriftCodec()))
+		remote.PutPayloadCode(serviceinfo.Protobuf, unknown.NewUnknownCodec(protobuf.NewProtobufCodec()))
 	}}
 }
 
