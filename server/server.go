@@ -206,7 +206,7 @@ func (s *server) GetServiceInfos() map[string]*serviceinfo.ServiceInfo {
 
 // Run runs the server.
 func (s *server) Run() (err error) {
-	if err = s.unknownMethodHandler(); err != nil {
+	if err = s.registerUnknownMethodHandler(); err != nil {
 		return err
 	}
 	s.Lock()
@@ -560,7 +560,7 @@ func (s *server) findAndSetDefaultService() {
 	}
 }
 
-func (s *server) unknownMethodHandler() error {
+func (s *server) registerUnknownMethodHandler() error {
 	if s.opt.RemoteOpt.UnknownMethodHandler != nil {
 		if len(s.svcs.svcMap) == 1 && s.svcs.svcMap[serviceinfo.GenericService] != nil {
 			return errors.New("generic services do not support handling of unknown methods")
@@ -570,9 +570,6 @@ func (s *server) unknownMethodHandler() error {
 				return err
 			}
 		}
-		/*if s.opt.RemoteOpt.PayloadCodec != nil {
-			s.opt.RemoteOpt.PayloadCodec = unknown.NewUnknownCodec(s.opt.RemoteOpt.PayloadCodec)
-		}*/
 	}
 	return nil
 }

@@ -352,6 +352,7 @@ func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string
 	}}
 }
 
+// WithUnknownMethodHandler Inject an implementation of a method for handling unknown requests
 func WithUnknownMethodHandler(f unknowns.UnknownMethodService) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithUnknownMethodHandler(%+v)", utils.GetFuncName(f)))
