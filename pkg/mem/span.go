@@ -23,6 +23,13 @@ import (
 	"github.com/bytedance/gopkg/lang/dirtmake"
 )
 
+/* Span Cache: A thread-safe linear allocator
+
+Design:
+1. [GC Friendly]: Centralize a batch of small bytes slice into a big size bytes slice to avoid malloc too many objects
+2. [Thread Safe]: Multi thread may share a same span, but it should fall back to the native allocator if lock conflict
+*/
+
 const (
 	spanCacheSize = 10
 	minSpanObject = 128                                  // 128 B
@@ -34,7 +41,7 @@ type spanCache struct {
 	spans [spanCacheSize]*span
 }
 
-// NewSpanCache returns *spanCache with the given spanSize,
+// NewSpanCache returns a spanCache with the given spanSize,
 // each span is used to allocate a binary of a specific size level.
 func NewSpanCache(spanSize int) *spanCache {
 	c := new(spanCache)
@@ -44,8 +51,8 @@ func NewSpanCache(spanSize int) *spanCache {
 	return c
 }
 
-// Make allocates a binary but does not clear the memory it references.
-// NOTE: MUST set any byte element before it's read.
+// Make returns a [:n:n] bytes slice from a cached buffer
+// NOTE: Make will not clear the underlay bytes for performance concern. So caller MUST set every byte before read.
 func (c *spanCache) Make(n int) []byte {
 	sclass := spanClass(n) - minSpanClass
 	if sclass < 0 || sclass >= len(c.spans) {
@@ -54,12 +61,14 @@ func (c *spanCache) Make(n int) []byte {
 	return c.spans[sclass].Make(n)
 }
 
+// Copy is an alias function for make-and-copy pattern
 func (c *spanCache) Copy(buf []byte) (p []byte) {
 	p = c.Make(len(buf))
 	copy(p, buf)
 	return p
 }
 
+// NewSpan returns a span with given size
 func NewSpan(size int) *span {
 	sp := new(span)
 	sp.size = uint32(size)
@@ -74,6 +83,8 @@ type span struct {
 	buffer []byte
 }
 
+// Make returns a [:n:n] bytes slice from a cached buffer
+// NOTE: Make will not clear the underlay bytes for performance concern. So caller MUST set every byte before read.
 func (b *span) Make(_n int) []byte {
 	n := uint32(_n)
 	if n >= b.size || !atomic.CompareAndSwapUint32(&b.lock, 0, 1) {
@@ -84,7 +95,7 @@ START:
 	b.read += n
 	// fast path
 	if b.read <= b.size {
-		buf := b.buffer[b.read-n : b.read]
+		buf := b.buffer[b.read-n : b.read : b.read]
 		atomic.StoreUint32(&b.lock, 0)
 		return buf
 	}
@@ -94,6 +105,7 @@ START:
 	goto START
 }
 
+// Copy is an alias function for make-and-copy pattern
 func (b *span) Copy(buf []byte) (p []byte) {
 	p = b.Make(len(buf))
 	copy(p, buf)
