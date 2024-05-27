@@ -139,7 +139,7 @@ func NewPbContentProviderWithDynamicGo(ctx context.Context, options dproto.Optio
 	return p, nil
 }
 
-func (p PbFileProviderWithDynamicGo) UpdateIDL(ctx context.Context, options dproto.Options, mainPath, mainContent string, includes map[string]string) error {
+func (p *PbFileProviderWithDynamicGo) UpdateIDL(ctx context.Context, options dproto.Options, mainPath, mainContent string, includes map[string]string) error {
 	sd, err := options.NewDesccriptorFromContent(ctx, mainPath, mainContent, includes)
 	if err != nil {
 		return err
