@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
@@ -231,7 +232,7 @@ func validateMessageBeforeDecode(message remote.Message, seqID int32, methodName
 
 // Name implements the remote.PayloadCodec interface.
 func (c thriftCodec) Name() string {
-	return "thrift"
+	return serviceinfo.Thrift.String()
 }
 
 // MessageWriterWithContext write to thrift.TProtocol
