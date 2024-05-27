@@ -125,7 +125,7 @@ func NewPbFileProviderWithDynamicGo(main string, ctx context.Context, options dp
 
 // NewPbContentProviderWithDynamicGo creates PbFileProviderWithDynamicGo from memory.
 // NOTICE: mainPath is used to store mainContent in includes, thus it MUST NOT conflict with original includes
-func NewPbContentProviderWithDynamicGo(ctx context.Context, options dproto.Options, mainPath string, mainContent string, includes map[string]string) (PbDescriptorProviderDynamicGo, error) {
+func NewPbContentProviderWithDynamicGo(ctx context.Context, options dproto.Options, mainPath, mainContent string, includes map[string]string) (PbDescriptorProviderDynamicGo, error) {
 	p := &PbFileProviderWithDynamicGo{
 		svcs: make(chan *dproto.ServiceDescriptor, 1),
 	}
@@ -139,7 +139,7 @@ func NewPbContentProviderWithDynamicGo(ctx context.Context, options dproto.Optio
 	return p, nil
 }
 
-func (p PbFileProviderWithDynamicGo) UpdateIDL(ctx context.Context, options dproto.Options, mainPath string, mainContent string, includes map[string]string) error {
+func (p PbFileProviderWithDynamicGo) UpdateIDL(ctx context.Context, options dproto.Options, mainPath, mainContent string, includes map[string]string) error {
 	sd, err := options.NewDesccriptorFromContent(ctx, mainPath, mainContent, includes)
 	if err != nil {
 		return err
