@@ -130,12 +130,7 @@ func JSONThriftGeneric(p DescriptorProvider, opts ...Option) (Generic, error) {
 func JSONPbGeneric(p PbDescriptorProviderDynamicGo, opts ...Option) (Generic, error) {
 	gOpts := &Options{dynamicgoConvOpts: conv.Options{}}
 	gOpts.apply(opts)
-
-	codec, err := newJsonPbCodec(p, pbCodec, gOpts)
-	if err != nil {
-		return nil, err
-	}
-	return &jsonPbGeneric{codec: codec}, nil
+	return &jsonPbGeneric{codecInfo: newJsonPbCodec(p, pbCodec, gOpts)}, nil
 }
 
 // SetBinaryWithBase64 enable/disable Base64 codec for binary field.
@@ -305,7 +300,7 @@ func (g *jsonThriftGeneric) CodecInfo() serviceinfo.CodecInfo {
 }
 
 type jsonPbGeneric struct {
-	codec *jsonPbCodec
+	codecInfo *jsonPbCodec
 }
 
 func (g *jsonPbGeneric) Framed() bool {
@@ -317,19 +312,19 @@ func (g *jsonPbGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 }
 
 func (g *jsonPbGeneric) PayloadCodec() remote.PayloadCodec {
-	return g.codec
+	return nil
 }
 
 func (g *jsonPbGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return g.codec.getMethod(req, method)
+	return g.codecInfo.getMethod(req, method)
 }
 
 func (g *jsonPbGeneric) Close() error {
-	return g.codec.Close()
+	return g.codecInfo.Close()
 }
 
 func (g *jsonPbGeneric) CodecInfo() serviceinfo.CodecInfo {
-	return nil
+	return g.codecInfo
 }
 
 type httpThriftGeneric struct {

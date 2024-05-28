@@ -29,6 +29,20 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+type JSONReaderWriter struct {
+	*ReadJSON
+	*WriteJSON
+}
+
+func NewJsonReaderWriter(svc *dproto.ServiceDescriptor, method string, isClient bool, convOpts *conv.Options) (*JSONReaderWriter, error) {
+	reader, err := NewReadJSON(svc, isClient, convOpts)
+	if err != nil {
+		return nil, err
+	}
+	writer, err := NewWriteJSON(svc, method, isClient, convOpts)
+	return &JSONReaderWriter{ReadJSON: reader, WriteJSON: writer}, nil
+}
+
 // NewWriteJSON build WriteJSON according to ServiceDescriptor
 func NewWriteJSON(svc *dproto.ServiceDescriptor, method string, isClient bool, convOpts *conv.Options) (*WriteJSON, error) {
 	fnDsc := svc.LookupMethodByName(method)

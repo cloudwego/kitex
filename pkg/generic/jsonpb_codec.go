@@ -17,7 +17,6 @@
 package generic
 
 import (
-	"context"
 	"fmt"
 	"sync/atomic"
 
@@ -26,14 +25,13 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var (
-	_ remote.PayloadCodec = &jsonPbCodec{}
-	_ Closer              = &jsonPbCodec{}
+	//_ remote.PayloadCodec   = &jsonPbCodec{}
+	_ Closer                = &jsonPbCodec{}
+	_ serviceinfo.CodecInfo = &jsonPbCodec{}
 )
 
 type jsonPbCodec struct {
@@ -43,17 +41,20 @@ type jsonPbCodec struct {
 	opts             *Options
 	convOpts         conv.Options // used for dynamicgo conversion
 	dynamicgoEnabled bool         // currently set to true by default
+	svcName          string
+	method           string
+	isClient         bool
 }
 
-func newJsonPbCodec(p PbDescriptorProviderDynamicGo, codec remote.PayloadCodec, opts *Options) (*jsonPbCodec, error) {
+func newJsonPbCodec(p PbDescriptorProviderDynamicGo, codec remote.PayloadCodec, opts *Options) *jsonPbCodec {
 	svc := <-p.Provide()
-	c := &jsonPbCodec{codec: codec, provider: p, opts: opts, dynamicgoEnabled: true}
+	c := &jsonPbCodec{codec: codec, provider: p, opts: opts, dynamicgoEnabled: true, svcName: svc.Name()}
 	convOpts := opts.dynamicgoConvOpts
 	c.convOpts = convOpts
 
 	c.svcDsc.Store(svc)
 	go c.update()
-	return c, nil
+	return c
 }
 
 func (c *jsonPbCodec) update() {
@@ -62,46 +63,32 @@ func (c *jsonPbCodec) update() {
 		if !ok {
 			return
 		}
+		c.svcName = svc.Name()
 		c.svcDsc.Store(svc)
 	}
 }
 
-func (c *jsonPbCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	method := msg.RPCInfo().Invocation().MethodName()
-	if method == "" {
-		return perrors.NewProtocolErrorWithMsg("empty methodName in protobuf Marshal")
-	}
-	if msg.MessageType() == remote.Exception {
-		return c.codec.Marshal(ctx, msg, out)
-	}
-
+func (c *jsonPbCodec) GetMessageReaderWriter() interface{} {
 	pbSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor)
 
-	wm, err := proto.NewWriteJSON(pbSvc, method, msg.RPCRole() == remote.Client, &c.convOpts)
+	rw, err := proto.NewJsonReaderWriter(pbSvc, c.method, c.isClient, &c.convOpts)
 	if err != nil {
-		return err
+		return nil
+		// return nil, err
 	}
-
-	msg.Data().(WithCodec).SetCodec(wm)
-
-	return c.codec.Marshal(ctx, msg, out)
+	return rw
 }
 
-func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
-	}
+func (c *jsonPbCodec) SetMethod(method string) {
+	c.method = method
+}
 
-	pbSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor)
+func (c *jsonPbCodec) SetIsClient(isClient bool) {
+	c.isClient = isClient
+}
 
-	wm, err := proto.NewReadJSON(pbSvc, msg.RPCRole() == remote.Client, &c.convOpts)
-	if err != nil {
-		return err
-	}
-
-	msg.Data().(WithCodec).SetCodec(wm)
-
-	return c.codec.Unmarshal(ctx, msg, in)
+func (c *jsonPbCodec) GetIDLServiceName() string {
+	return c.svcName
 }
 
 func (c *jsonPbCodec) getMethod(req interface{}, method string) (*Method, error) {
