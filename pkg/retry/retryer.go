@@ -33,6 +33,10 @@ import (
 // RPCCallFunc is the definition with wrap rpc call
 type RPCCallFunc func(context.Context, Retryer) (rpcinfo rpcinfo.RPCInfo, resp interface{}, err error)
 
+// GenRetryKeyFunc to generate retry key through rpcinfo.
+// You can customize the config key according to your config center.
+type GenRetryKeyFunc func(ri rpcinfo.RPCInfo) string
+
 // Retryer is the interface for Retry implements
 type Retryer interface {
 	// AllowRetry to check if current request satisfy retry condition[eg: circuit, retry times == 0, chain stop, ddl].
@@ -98,6 +102,13 @@ type ContainerOption func(rc *Container)
 func WithContainerCBSuite(cbs *circuitbreak.CBSuite) ContainerOption {
 	return func(rc *Container) {
 		rc.cbContainer.cbSuite = cbs
+	}
+}
+
+// WithCustomizeKeyFunc specifies the GenRetryKeyFunc to customize retry key
+func WithCustomizeKeyFunc(fn GenRetryKeyFunc) ContainerOption {
+	return func(rc *Container) {
+		rc.genRetryKey = fn
 	}
 }
 
@@ -175,6 +186,10 @@ func NewRetryContainer(opts ...ContainerOption) *Container {
 	return rc
 }
 
+func defaultGenRetryKey(rpcInfo rpcinfo.RPCInfo) string {
+	return rpcInfo.To().Method()
+}
+
 // Container is a wrapper for Retryer.
 type Container struct {
 	hasCodeCfg  bool
@@ -182,6 +197,8 @@ type Container struct {
 	cbContainer *cbContainer
 	msg         string
 	sync.RWMutex
+
+	genRetryKey GenRetryKeyFunc
 
 	// shouldResultRetry is only used with FailureRetry
 	shouldResultRetry *ShouldResultRetry
@@ -245,7 +262,7 @@ func (rc *Container) InitWithPolicies(methodPolicies map[string]Policy) error {
 }
 
 // DeletePolicy to delete the method by method.
-func (rc *Container) DeletePolicy(method string) {
+func (rc *Container) DeletePolicy(key string) {
 	rc.Lock()
 	defer rc.Unlock()
 	rc.msg = ""
@@ -253,15 +270,15 @@ func (rc *Container) DeletePolicy(method string) {
 		// the priority of user setup code policy is higher than remote config
 		return
 	}
-	_, ok := rc.retryerMap.Load(method)
+	_, ok := rc.retryerMap.Load(key)
 	if ok {
-		rc.retryerMap.Delete(method)
-		rc.msg = fmt.Sprintf("delete retryer[%s] at %s", method, time.Now())
+		rc.retryerMap.Delete(key)
+		rc.msg = fmt.Sprintf("delete retryer[%s] at %s", key, time.Now())
 	}
 }
 
 // NotifyPolicyChange to receive policy when it changes
-func (rc *Container) NotifyPolicyChange(method string, p Policy) {
+func (rc *Container) NotifyPolicyChange(key string, p Policy) {
 	rc.Lock()
 	defer rc.Unlock()
 	rc.msg = ""
@@ -269,20 +286,20 @@ func (rc *Container) NotifyPolicyChange(method string, p Policy) {
 		// the priority of user setup code policy is higher than remote config
 		return
 	}
-	r, ok := rc.retryerMap.Load(method)
+	r, ok := rc.retryerMap.Load(key)
 	if ok && r != nil {
 		retryer, ok := r.(Retryer)
 		if ok {
 			if retryer.Type() == p.Type {
 				retryer.UpdatePolicy(p)
-				rc.msg = fmt.Sprintf("update retryer[%s-%s] at %s", method, retryer.Type(), time.Now())
+				rc.msg = fmt.Sprintf("update retryer[%s-%s] at %s", key, retryer.Type(), time.Now())
 				return
 			}
-			rc.retryerMap.Delete(method)
-			rc.msg = fmt.Sprintf("delete retryer[%s-%s] at %s", method, retryer.Type(), time.Now())
+			rc.retryerMap.Delete(key)
+			rc.msg = fmt.Sprintf("delete retryer[%s-%s] at %s", key, retryer.Type(), time.Now())
 		}
 	}
-	rc.initRetryer(method, p)
+	rc.initRetryer(key, p)
 }
 
 // Init to build Retryer with code config.
@@ -361,8 +378,12 @@ func NewRetryer(p Policy, r *ShouldResultRetry, cbC *cbContainer) (retryer Retry
 }
 
 func (rc *Container) getRetryer(ri rpcinfo.RPCInfo) Retryer {
+	keyFunc := defaultGenRetryKey
+	if rc.genRetryKey != nil {
+		keyFunc = rc.genRetryKey
+	}
 	// the priority of specific method is high
-	r, ok := rc.retryerMap.Load(ri.To().Method())
+	r, ok := rc.retryerMap.Load(keyFunc(ri))
 	if ok {
 		return r.(Retryer)
 	}
