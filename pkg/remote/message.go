@@ -188,6 +188,7 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 		if mt := m.targetSvcInfo.MethodInfo(methodName); mt == nil {
 			return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 		}
+		m.setMethodForGeneric(methodName)
 		return m.targetSvcInfo, nil
 	}
 	if svcName == "" && m.refuseTrafficWithoutServiceName {
@@ -205,6 +206,7 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 		return nil, NewTransErrorWithMsg(UnknownService, fmt.Sprintf("unknown service %s, method %s", svcName, methodName))
 	}
 	m.targetSvcInfo = svcInfo
+	m.setMethodForGeneric(methodName)
 	return svcInfo, nil
 }
 
@@ -286,6 +288,15 @@ func (m *message) SetPayloadCodec(pc PayloadCodec) {
 func (m *message) Recycle() {
 	m.zero()
 	messagePool.Put(m)
+}
+
+func (m *message) setMethodForGeneric(methodName string) {
+	if m.targetSvcInfo == nil {
+		return
+	}
+	if codec := m.targetSvcInfo.GenericCodec; codec != nil {
+		codec.SetMethod(methodName)
+	}
 }
 
 // TransInfo contains transport information.
