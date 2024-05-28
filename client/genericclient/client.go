@@ -102,29 +102,12 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 	if err != nil {
 		return nil, err
 	}
-<<<<<<< HEAD
-=======
-	codec := gc.g.CodecInfo()
-	if codec != nil {
-		codec.SetMethod(mt.Name)
-		codec.SetIsClient(true)
-		_args.SetCodec(codec.GetMessageReaderWriter())
-	}
->>>>>>> a231864 (test: add and fix tests)
 	if mt.Oneway {
 		return nil, gc.kClient.Call(ctx, mt.Name, _args, nil)
 	}
-<<<<<<< HEAD
 
 	_result := gc.svcInfo.MethodInfo(method).NewResult().(*generic.Result)
 	if err = gc.kClient.Call(ctx, mt.Name, _args, _result); err != nil {
-=======
-	var _result generic.Result
-	if codec != nil {
-		_result.SetCodec(codec.GetMessageReaderWriter())
-	}
-	if err = gc.kClient.Call(ctx, mt.Name, &_args, &_result); err != nil {
->>>>>>> a231864 (test: add and fix tests)
 		return
 	}
 	return _result.GetSuccess(), nil
