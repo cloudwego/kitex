@@ -68,22 +68,22 @@ func BinaryThriftGeneric() Generic {
 //
 //	SetBinaryWithByteSlice(g, true)
 func MapThriftGeneric(p DescriptorProvider) (Generic, error) {
-	codec, err := newMapThriftCodec(p, thriftCodec)
+	codecInfo, err := newMapThriftCodec(p)
 	if err != nil {
 		return nil, err
 	}
 	return &mapThriftGeneric{
-		codec: codec,
+		codecInfo: codecInfo,
 	}, nil
 }
 
 func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
-	codec, err := newMapThriftCodecForJSON(p, thriftCodec)
+	codecInfo, err := newMapThriftCodecForJSON(p)
 	if err != nil {
 		return nil, err
 	}
 	return &mapThriftGeneric{
-		codec: codec,
+		codecInfo: codecInfo,
 	}, nil
 }
 
@@ -96,11 +96,7 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 func HTTPThriftGeneric(p DescriptorProvider, opts ...Option) (Generic, error) {
 	gOpts := &Options{dynamicgoConvOpts: DefaultHTTPDynamicGoConvOpts}
 	gOpts.apply(opts)
-	codec, err := newHTTPThriftCodec(p, thriftCodec, gOpts)
-	if err != nil {
-		return nil, err
-	}
-	return &httpThriftGeneric{codec: codec}, nil
+	return &httpThriftGeneric{codecInfo: newHTTPThriftCodec(p, thriftCodec, gOpts)}, nil
 }
 
 func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generic, error) {
@@ -137,13 +133,13 @@ func JSONPbGeneric(p PbDescriptorProviderDynamicGo, opts ...Option) (Generic, er
 func SetBinaryWithBase64(g Generic, enable bool) error {
 	switch c := g.(type) {
 	case *httpThriftGeneric:
-		if c.codec == nil {
+		if c.codecInfo == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
-		c.codec.binaryWithBase64 = enable
-		if c.codec.dynamicgoEnabled {
-			c.codec.convOpts.NoBase64Binary = !enable
-			c.codec.convOptsWithThriftBase.NoBase64Binary = !enable
+		c.codecInfo.binaryWithBase64 = enable
+		if c.codecInfo.dynamicgoEnabled {
+			c.codecInfo.convOpts.NoBase64Binary = !enable
+			c.codecInfo.convOptsWithThriftBase.NoBase64Binary = !enable
 		}
 	case *jsonThriftGeneric:
 		if c.codecInfo == nil {
@@ -156,10 +152,10 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 			c.codecInfo.convOptsWithException.NoBase64Binary = !enable
 		}
 	case *mapThriftGeneric:
-		if c.codec == nil {
+		if c.codecInfo == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
-		c.codec.binaryWithBase64 = enable
+		c.codecInfo.binaryWithBase64 = enable
 	default:
 		return fmt.Errorf("Base64Binary is unavailable for %#v", g)
 	}
@@ -170,10 +166,10 @@ func SetBinaryWithBase64(g Generic, enable bool) error {
 func SetBinaryWithByteSlice(g Generic, enable bool) error {
 	switch c := g.(type) {
 	case *mapThriftGeneric:
-		if c.codec == nil {
+		if c.codecInfo == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
-		c.codec.binaryWithByteSlice = enable
+		c.codecInfo.binaryWithByteSlice = enable
 	default:
 		return fmt.Errorf("returning []byte for binary fields is unavailable for %#v", g)
 	}
@@ -201,10 +197,10 @@ const (
 func EnableSetFieldsForEmptyStruct(g Generic, mode SetFieldsForEmptyStructMode) error {
 	switch c := g.(type) {
 	case *mapThriftGeneric:
-		if c.codec == nil {
+		if c.codecInfo == nil {
 			return fmt.Errorf("empty codec for %#v", c)
 		}
-		c.codec.setFieldsForEmptyStruct = uint8(mode)
+		c.codecInfo.setFieldsForEmptyStruct = uint8(mode)
 	default:
 		return fmt.Errorf("SetFieldsForEmptyStruct only supports map-generic at present")
 	}
@@ -243,7 +239,7 @@ func (g *binaryThriftGeneric) CodecInfo() serviceinfo.CodecInfo {
 }
 
 type mapThriftGeneric struct {
-	codec *mapThriftCodec
+	codecInfo *mapThriftCodec
 }
 
 func (g *mapThriftGeneric) Framed() bool {
@@ -255,19 +251,19 @@ func (g *mapThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 }
 
 func (g *mapThriftGeneric) PayloadCodec() remote.PayloadCodec {
-	return g.codec
+	return nil
 }
 
 func (g *mapThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return g.codec.getMethod(req, method)
+	return g.codecInfo.getMethod(req, method)
 }
 
 func (g *mapThriftGeneric) Close() error {
-	return g.codec.Close()
+	return g.codecInfo.Close()
 }
 
 func (g *mapThriftGeneric) CodecInfo() serviceinfo.CodecInfo {
-	return nil
+	return g.codecInfo
 }
 
 type jsonThriftGeneric struct {
@@ -328,11 +324,11 @@ func (g *jsonPbGeneric) CodecInfo() serviceinfo.CodecInfo {
 }
 
 type httpThriftGeneric struct {
-	codec *httpThriftCodec
+	codecInfo *httpThriftCodec
 }
 
 func (g *httpThriftGeneric) Framed() bool {
-	return g.codec.dynamicgoEnabled
+	return g.codecInfo.dynamicgoEnabled
 }
 
 func (g *httpThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
@@ -340,19 +336,19 @@ func (g *httpThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 }
 
 func (g *httpThriftGeneric) PayloadCodec() remote.PayloadCodec {
-	return g.codec
+	return nil
 }
 
 func (g *httpThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return g.codec.getMethod(req)
+	return g.codecInfo.getMethod(req)
 }
 
 func (g *httpThriftGeneric) Close() error {
-	return g.codec.Close()
+	return g.codecInfo.Close()
 }
 
 func (g *httpThriftGeneric) CodecInfo() serviceinfo.CodecInfo {
-	return nil
+	return g.codecInfo
 }
 
 type httpPbThriftGeneric struct {

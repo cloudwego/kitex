@@ -95,10 +95,6 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 	var _args generic.Args
 	_args.Method = method
 	_args.Request = request
-	codec := gc.g.CodecInfo()
-	codec.SetMethod(method)
-	codec.SetIsClient(true)
-	_args.SetCodec(codec.GetMessageReaderWriter())
 	mt, err := gc.g.GetMethod(request, method)
 	if err != nil {
 		return nil, err
@@ -106,6 +102,10 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 	if mt.Oneway {
 		return nil, gc.kClient.Call(ctx, mt.Name, &_args, nil)
 	}
+	codec := gc.g.CodecInfo()
+	codec.SetMethod(mt.Name)
+	codec.SetIsClient(true)
+	_args.SetCodec(codec.GetMessageReaderWriter())
 	var _result generic.Result
 	_result.SetCodec(codec.GetMessageReaderWriter())
 	if err = gc.kClient.Call(ctx, mt.Name, &_args, &_result); err != nil {

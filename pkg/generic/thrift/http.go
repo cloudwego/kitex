@@ -34,6 +34,15 @@ import (
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
 
+type HTTPReaderWriter struct {
+	*ReadHTTPResponse
+	*WriteHTTPRequest
+}
+
+func NewHTTPReaderWriter(svc *descriptor.ServiceDescriptor) *HTTPReaderWriter {
+	return &HTTPReaderWriter{ReadHTTPResponse: NewReadHTTPResponse(svc), WriteHTTPRequest: NewWriteHTTPRequest(svc)}
+}
+
 // WriteHTTPRequest implement of MessageWriter
 type WriteHTTPRequest struct {
 	svc                    *descriptor.ServiceDescriptor
@@ -101,7 +110,6 @@ func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out thrift.TProtoc
 type ReadHTTPResponse struct {
 	svc                   *descriptor.ServiceDescriptor
 	base64Binary          bool
-	msg                   remote.Message
 	dynamicgoEnabled      bool
 	useRawBodyForHTTPResp bool
 	t2jBinaryConv         t2j.BinaryConv // used for dynamicgo thrift to json conversion
@@ -127,9 +135,8 @@ func (r *ReadHTTPResponse) SetUseRawBodyForHTTPResp(useRawBodyForHTTPResp bool) 
 }
 
 // SetDynamicGo ...
-func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options, msg remote.Message) {
+func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options) {
 	r.t2jBinaryConv = t2j.NewBinaryConv(*convOpts)
-	r.msg = msg
 	r.dynamicgoEnabled = true
 }
 
@@ -141,7 +148,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, msgType remo
 	}
 
 	// dynamicgo logic
-	if r.msg.PayloadLen() == 0 {
+	if dataLen == 0 {
 		return nil, perrors.NewProtocolErrorWithMsg("msg.PayloadLen should always be greater than zero")
 	}
 
@@ -149,7 +156,6 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, msgType remo
 	if !ok {
 		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
-	mBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
 	sName, err := in.ReadStructBegin()
 	if err != nil {
 		return nil, err
@@ -161,7 +167,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, msgType remo
 		return nil, err
 	}
 	fBeginLen := bthrift.Binary.FieldBeginLength(fName, typeId, id)
-	transBuf, err := tProt.ByteBuffer().ReadBinary(r.msg.PayloadLen() - mBeginLen - sBeginLen - fBeginLen - bthrift.Binary.MessageEndLength())
+	transBuf, err := tProt.ByteBuffer().ReadBinary(dataLen - sBeginLen - fBeginLen)
 	if err != nil {
 		return nil, err
 	}

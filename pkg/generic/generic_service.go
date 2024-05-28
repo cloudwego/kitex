@@ -150,8 +150,6 @@ func (g *Args) WritePb(ctx context.Context) (interface{}, error) {
 // Read ...
 func (g *Args) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, in thrift.TProtocol) error {
 	if rw, ok := g.inner.(gthrift.MessageReaderWriter); ok {
-		//if j, ok := g.inner.(*gthrift.ReadJSON); ok {
-		//}
 		g.Method = method
 		var err error
 		g.Request, err = rw.Read(ctx, method, msgType, dataLen, in)

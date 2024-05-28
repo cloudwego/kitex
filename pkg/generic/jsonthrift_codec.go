@@ -91,16 +91,16 @@ func (c *jsonThriftCodec) GetMessageReaderWriter() interface{} {
 		//return nil, err
 	}
 
-	if err = c.configureJSONWriter(rw.WriteJSON, c.binaryWithBase64, svcDsc); err != nil {
+	if err = c.configureJSONWriter(rw.WriteJSON, svcDsc); err != nil {
 		return nil
 		//return nil, err
 	}
-	c.configureJSONReader(rw.ReadJSON, c.binaryWithBase64)
+	c.configureJSONReader(rw.ReadJSON)
 	return rw
 }
 
-func (c *jsonThriftCodec) configureJSONWriter(writer *thrift.WriteJSON, binaryWithBase64 bool, svcDsc *descriptor.ServiceDescriptor) error {
-	writer.SetBase64Binary(binaryWithBase64)
+func (c *jsonThriftCodec) configureJSONWriter(writer *thrift.WriteJSON, svcDsc *descriptor.ServiceDescriptor) error {
+	writer.SetBase64Binary(c.binaryWithBase64)
 	if c.dynamicgoEnabled {
 		if err := writer.SetDynamicGo(svcDsc, c.method, &c.convOpts, &c.convOptsWithThriftBase); err != nil {
 			return err
@@ -109,8 +109,8 @@ func (c *jsonThriftCodec) configureJSONWriter(writer *thrift.WriteJSON, binaryWi
 	return nil
 }
 
-func (c *jsonThriftCodec) configureJSONReader(reader *thrift.ReadJSON, binaryWithBase64 bool) {
-	reader.SetBinaryWithBase64(binaryWithBase64)
+func (c *jsonThriftCodec) configureJSONReader(reader *thrift.ReadJSON) {
+	reader.SetBinaryWithBase64(c.binaryWithBase64)
 	if c.dynamicgoEnabled {
 		reader.SetDynamicGo(&c.convOpts, &c.convOptsWithException)
 	}

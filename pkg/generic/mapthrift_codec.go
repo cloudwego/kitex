@@ -17,48 +17,45 @@
 package generic
 
 import (
-	"context"
-	"errors"
-	"fmt"
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var (
-	_ remote.PayloadCodec = &mapThriftCodec{}
-	_ Closer              = &mapThriftCodec{}
+	_ Closer                = &mapThriftCodec{}
+	_ serviceinfo.CodecInfo = &mapThriftCodec{}
 )
 
 type mapThriftCodec struct {
 	svcDsc                  atomic.Value // *idl
 	provider                DescriptorProvider
-	codec                   remote.PayloadCodec
 	forJSON                 bool
 	binaryWithBase64        bool
 	binaryWithByteSlice     bool
 	setFieldsForEmptyStruct uint8
+	svcName                 string
+	method                  string
+	isClient                bool
 }
 
-func newMapThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*mapThriftCodec, error) {
+func newMapThriftCodec(p DescriptorProvider) (*mapThriftCodec, error) {
 	svc := <-p.Provide()
 	c := &mapThriftCodec{
-		codec:               codec,
 		provider:            p,
 		binaryWithBase64:    false,
 		binaryWithByteSlice: false,
+		svcName:             svc.Name,
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
 	return c, nil
 }
 
-func newMapThriftCodecForJSON(p DescriptorProvider, codec remote.PayloadCodec) (*mapThriftCodec, error) {
-	c, err := newMapThriftCodec(p, codec)
+func newMapThriftCodecForJSON(p DescriptorProvider) (*mapThriftCodec, error) {
+	c, err := newMapThriftCodec(p)
 	if err != nil {
 		return nil, err
 	}
@@ -72,49 +69,53 @@ func (c *mapThriftCodec) update() {
 		if !ok {
 			return
 		}
+		c.svcName = svc.Name
 		c.svcDsc.Store(svc)
 	}
 }
 
-func (c *mapThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	method := msg.RPCInfo().Invocation().MethodName()
-	if method == "" {
-		return errors.New("empty methodName in thrift Marshal")
-	}
-	if msg.MessageType() == remote.Exception {
-		return c.codec.Marshal(ctx, msg, out)
-	}
+func (c *mapThriftCodec) GetMessageReaderWriter() interface{} {
+	// TODO: error
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
+		return nil
+		//return nil, fmt.Errorf("get parser ServiceDescriptor failed")
 	}
-	wm, err := thrift.NewWriteStruct(svcDsc, method, msg.RPCRole() == remote.Client)
+	var rw *thrift.StructReaderWriter
+	var err error
+	if c.forJSON {
+		rw, err = thrift.NewStructReaderWriterForJSON(svcDsc, c.method, c.isClient)
+	} else {
+		rw, err = thrift.NewStructReaderWriter(svcDsc, c.method, c.isClient)
+	}
 	if err != nil {
-		return err
+		return nil
+		// return nil, err
 	}
-	wm.SetBinaryWithBase64(c.binaryWithBase64)
-	msg.Data().(WithCodec).SetCodec(wm)
-	return c.codec.Marshal(ctx, msg, out)
+	c.configureStructWriter(rw.WriteStruct)
+	c.configureStructReader(rw.ReadStruct)
+	return rw
 }
 
-func (c *mapThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
-	}
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
-	}
-	var rm *thrift.ReadStruct
-	if c.forJSON {
-		rm = thrift.NewReadStructForJSON(svcDsc, msg.RPCRole() == remote.Client)
-	} else {
-		rm = thrift.NewReadStruct(svcDsc, msg.RPCRole() == remote.Client)
-	}
-	rm.SetBinaryOption(c.binaryWithBase64, c.binaryWithByteSlice)
-	rm.SetSetFieldsForEmptyStruct(c.setFieldsForEmptyStruct)
-	msg.Data().(WithCodec).SetCodec(rm)
-	return c.codec.Unmarshal(ctx, msg, in)
+func (c *mapThriftCodec) configureStructWriter(writer *thrift.WriteStruct) {
+	writer.SetBinaryWithBase64(c.binaryWithBase64)
+}
+
+func (c *mapThriftCodec) configureStructReader(reader *thrift.ReadStruct) {
+	reader.SetBinaryOption(c.binaryWithBase64, c.binaryWithByteSlice)
+	reader.SetSetFieldsForEmptyStruct(c.setFieldsForEmptyStruct)
+}
+
+func (c *mapThriftCodec) SetMethod(method string) {
+	c.method = method
+}
+
+func (c *mapThriftCodec) SetIsClient(isClient bool) {
+	c.isClient = isClient
+}
+
+func (c *mapThriftCodec) GetIDLServiceName() string {
+	return c.svcName
 }
 
 func (c *mapThriftCodec) getMethod(req interface{}, method string) (*Method, error) {

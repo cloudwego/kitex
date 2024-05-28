@@ -25,6 +25,27 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
+type StructReaderWriter struct {
+	*ReadStruct
+	*WriteStruct
+}
+
+func NewStructReaderWriter(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*StructReaderWriter, error) {
+	writer, err := NewWriteStruct(svc, method, isClient)
+	if err != nil {
+		return nil, err
+	}
+	return &StructReaderWriter{ReadStruct: NewReadStruct(svc, isClient), WriteStruct: writer}, nil
+}
+
+func NewStructReaderWriterForJSON(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*StructReaderWriter, error) {
+	writer, err := NewWriteStruct(svc, method, isClient)
+	if err != nil {
+		return nil, err
+	}
+	return &StructReaderWriter{ReadStruct: NewReadStructForJSON(svc, isClient), WriteStruct: writer}, nil
+}
+
 // NewWriteStruct ...
 func NewWriteStruct(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*WriteStruct, error) {
 	fnDsc, err := svc.LookupFunctionByMethod(method)

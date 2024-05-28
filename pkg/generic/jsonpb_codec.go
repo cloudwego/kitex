@@ -29,7 +29,6 @@ import (
 )
 
 var (
-	//_ remote.PayloadCodec   = &jsonPbCodec{}
 	_ Closer                = &jsonPbCodec{}
 	_ serviceinfo.CodecInfo = &jsonPbCodec{}
 )
