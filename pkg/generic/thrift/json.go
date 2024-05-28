@@ -30,12 +30,26 @@ import (
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
+
+type JSONReaderWriter struct {
+	*ReadJSON
+	*WriteJSON
+	// TODO: error when calling from jsonThriftCodec?
+	initError error
+}
+
+func NewJsonReaderWriter(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*JSONReaderWriter, error) {
+	writer, err := NewWriteJSON(svc, method, isClient) // can be internal? (also NewReadJSON)
+	if err != nil {
+		return nil, err
+	}
+	return &JSONReaderWriter{ReadJSON: NewReadJSON(svc, isClient), WriteJSON: writer}, nil
+}
 
 // NewWriteJSON build WriteJSON according to ServiceDescriptor
 func NewWriteJSON(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*WriteJSON, error) {
@@ -142,7 +156,6 @@ type ReadJSON struct {
 	svc              *descriptor.ServiceDescriptor
 	isClient         bool
 	binaryWithBase64 bool
-	msg              remote.Message
 	t2jBinaryConv    t2j.BinaryConv // used for dynamicgo thrift to json conversion
 	dynamicgoEnabled bool
 }
@@ -156,8 +169,7 @@ func (m *ReadJSON) SetBinaryWithBase64(enable bool) {
 }
 
 // SetDynamicGo ...
-func (m *ReadJSON) SetDynamicGo(convOpts, convOptsWithException *conv.Options, msg remote.Message) {
-	m.msg = msg
+func (m *ReadJSON) SetDynamicGo(convOpts, convOptsWithException *conv.Options) {
 	m.dynamicgoEnabled = true
 	if m.isClient {
 		// set binary conv to handle an exception field
@@ -168,9 +180,9 @@ func (m *ReadJSON) SetDynamicGo(convOpts, convOptsWithException *conv.Options, m
 }
 
 // Read read data from in thrift.TProtocol and convert to json string
-func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+func (m *ReadJSON) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, in thrift.TProtocol) (interface{}, error) {
 	// fallback logic
-	if !m.dynamicgoEnabled {
+	if !m.dynamicgoEnabled || dataLen <= 0 {
 		return m.originalRead(ctx, method, in)
 	}
 
@@ -185,7 +197,7 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 		return nil, fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, m.svc.DynamicGoDsc.Name())
 	}
 	var tyDsc *dthrift.TypeDescriptor
-	if m.msg.MessageType() == remote.Reply {
+	if msgType == remote.Reply {
 		tyDsc = fnDsc.Response()
 	} else {
 		tyDsc = fnDsc.Request()
@@ -198,8 +210,7 @@ func (m *ReadJSON) Read(ctx context.Context, method string, in thrift.TProtocol)
 		}
 		resp = descriptor.Void{}
 	} else {
-		msgBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(m.msg.MessageType()), m.msg.RPCInfo().Invocation().SeqID())
-		transBuff, err := tProt.ByteBuffer().ReadBinary(m.msg.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength())
+		transBuff, err := tProt.ByteBuffer().ReadBinary(dataLen)
 		if err != nil {
 			return nil, err
 		}

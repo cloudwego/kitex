@@ -31,7 +31,7 @@ var _ Client = &genericServiceClient{}
 
 // NewClient create a generic client
 func NewClient(destService string, g generic.Generic, opts ...client.Option) (Client, error) {
-	svcInfo := generic.ServiceInfo(g.PayloadCodecType())
+	svcInfo := generic.ServiceInfo(g.PayloadCodecType(), g.CodecInfo())
 	return NewClientWithServiceInfo(destService, g, svcInfo, opts...)
 }
 
@@ -95,6 +95,10 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 	var _args generic.Args
 	_args.Method = method
 	_args.Request = request
+	codec := gc.g.CodecInfo()
+	codec.SetMethod(method)
+	codec.SetIsClient(true)
+	_args.SetCodec(codec.GetMessageReaderWriter())
 	mt, err := gc.g.GetMethod(request, method)
 	if err != nil {
 		return nil, err
@@ -103,6 +107,7 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 		return nil, gc.kClient.Call(ctx, mt.Name, &_args, nil)
 	}
 	var _result generic.Result
+	_result.SetCodec(codec.GetMessageReaderWriter())
 	if err = gc.kClient.Call(ctx, mt.Name, &_args, &_result); err != nil {
 		return
 	}

@@ -65,6 +65,9 @@ type ServiceInfo struct {
 	// GenericMethod returns a MethodInfo for the given name.
 	// It is used by generic calls only.
 	GenericMethod func(name string) MethodInfo
+
+	// GenericCodec returns a CodecInfo for generic calls.
+	GenericCodec CodecInfo
 }
 
 // GetPackageName returns the PackageName.
@@ -83,7 +86,7 @@ func (i *ServiceInfo) MethodInfo(name string) MethodInfo {
 	if i == nil {
 		return nil
 	}
-	if i.ServiceName == GenericService {
+	if _, ok := i.Extra["generic"]; ok {
 		if i.GenericMethod != nil {
 			return i.GenericMethod(name)
 		}
@@ -177,6 +180,15 @@ func (m methodInfo) IsStreaming() bool {
 
 func (m methodInfo) StreamingMode() StreamingMode {
 	return m.streamingMode
+}
+
+// TODO: better design?
+type CodecInfo interface {
+	// TODO: gthrift.MessageReaderWriter or gproto.MessageReaderWriter
+	GetMessageReaderWriter() interface{}
+	GetIDLServiceName() string
+	SetMethod(method string)
+	SetIsClient(isClient bool)
 }
 
 // String prints human-readable information.

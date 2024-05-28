@@ -134,7 +134,7 @@ func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options, msg remote.Messa
 }
 
 // Read ...
-func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPResponse) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, in thrift.TProtocol) (interface{}, error) {
 	// fallback logic
 	if !r.dynamicgoEnabled {
 		return r.originalRead(ctx, method, in)

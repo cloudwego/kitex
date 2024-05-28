@@ -17,42 +17,36 @@
 package generic
 
 import (
-	"context"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var (
-	_ remote.PayloadCodec = &jsonThriftCodec{}
-	_ Closer              = &jsonThriftCodec{}
+	_ Closer                = &jsonThriftCodec{}
+	_ serviceinfo.CodecInfo = &jsonThriftCodec{}
 )
 
-// JSONRequest alias of string
-type JSONRequest = string
-
 type jsonThriftCodec struct {
-	svcDsc                 atomic.Value // *idl
+	svcDsc                 atomic.Value
 	provider               DescriptorProvider
-	codec                  remote.PayloadCodec
 	binaryWithBase64       bool
-	opts                   *Options
+	dynamicgoEnabled       bool
 	convOpts               conv.Options // used for dynamicgo conversion
 	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
 	convOptsWithException  conv.Options // used for dynamicgo conversion with ConvertException turned on
-	dynamicgoEnabled       bool
+	svcName                string
+	method                 string
+	isClient               bool
 }
 
-func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*jsonThriftCodec, error) {
+func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
 	svc := <-p.Provide()
-	c := &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true, opts: opts, dynamicgoEnabled: false}
+	c := &jsonThriftCodec{provider: p, binaryWithBase64: true, dynamicgoEnabled: false, svcName: svc.Name}
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoEnabled {
 		c.dynamicgoEnabled = true
 
@@ -69,7 +63,7 @@ func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *O
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
-	return c, nil
+	return c
 }
 
 func (c *jsonThriftCodec) update() {
@@ -78,56 +72,60 @@ func (c *jsonThriftCodec) update() {
 		if !ok {
 			return
 		}
+		c.svcName = svc.Name
 		c.svcDsc.Store(svc)
 	}
 }
 
-func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	method := msg.RPCInfo().Invocation().MethodName()
-	if method == "" {
-		return perrors.NewProtocolErrorWithMsg("empty methodName in thrift Marshal")
-	}
-	if msg.MessageType() == remote.Exception {
-		return c.codec.Marshal(ctx, msg, out)
-	}
+func (c *jsonThriftCodec) GetMessageReaderWriter() interface{} {
+	// TODO: error
+	var err error
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
+		return nil
+		//return nil, perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
+	}
+	rw, err := thrift.NewJsonReaderWriter(svcDsc, c.method, c.isClient)
+	if err != nil {
+		return nil
+		//return nil, err
 	}
 
-	wm, err := thrift.NewWriteJSON(svcDsc, method, msg.RPCRole() == remote.Client)
-	if err != nil {
-		return err
+	if err = c.configureJSONWriter(rw.WriteJSON, c.binaryWithBase64, svcDsc); err != nil {
+		return nil
+		//return nil, err
 	}
-	wm.SetBase64Binary(c.binaryWithBase64)
+	c.configureJSONReader(rw.ReadJSON, c.binaryWithBase64)
+	return rw
+}
+
+func (c *jsonThriftCodec) configureJSONWriter(writer *thrift.WriteJSON, binaryWithBase64 bool, svcDsc *descriptor.ServiceDescriptor) error {
+	writer.SetBase64Binary(binaryWithBase64)
 	if c.dynamicgoEnabled {
-		if err = wm.SetDynamicGo(svcDsc, method, &c.convOpts, &c.convOptsWithThriftBase); err != nil {
+		if err := writer.SetDynamicGo(svcDsc, c.method, &c.convOpts, &c.convOptsWithThriftBase); err != nil {
 			return err
 		}
 	}
-
-	msg.Data().(WithCodec).SetCodec(wm)
-	return c.codec.Marshal(ctx, msg, out)
+	return nil
 }
 
-func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
+func (c *jsonThriftCodec) configureJSONReader(reader *thrift.ReadJSON, binaryWithBase64 bool) {
+	reader.SetBinaryWithBase64(binaryWithBase64)
+	if c.dynamicgoEnabled {
+		reader.SetDynamicGo(&c.convOpts, &c.convOptsWithException)
 	}
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
-	}
+}
 
-	rm := thrift.NewReadJSON(svcDsc, msg.RPCRole() == remote.Client)
-	rm.SetBinaryWithBase64(c.binaryWithBase64)
-	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
-	if c.dynamicgoEnabled && msg.PayloadLen() != 0 {
-		rm.SetDynamicGo(&c.convOpts, &c.convOptsWithException, msg)
-	}
+func (c *jsonThriftCodec) SetMethod(method string) {
+	c.method = method
+}
 
-	msg.Data().(WithCodec).SetCodec(rm)
-	return c.codec.Unmarshal(ctx, msg, in)
+func (c *jsonThriftCodec) SetIsClient(isClient bool) {
+	c.isClient = isClient
+}
+
+func (c *jsonThriftCodec) GetIDLServiceName() string {
+	return c.svcName
 }
 
 func (c *jsonThriftCodec) getMethod(req interface{}, method string) (*Method, error) {

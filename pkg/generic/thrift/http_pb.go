@@ -27,6 +27,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/proto"
+	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 // WriteHTTPPbRequest implement of MessageWriter
@@ -84,7 +85,7 @@ func NewReadHTTPPbResponse(svc *descriptor.ServiceDescriptor, pbSvc proto.Servic
 }
 
 // Read ...
-func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, in thrift.TProtocol) (interface{}, error) {
 	fnDsc, err := r.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err

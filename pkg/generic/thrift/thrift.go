@@ -19,6 +19,7 @@ package thrift
 
 import (
 	"context"
+	"github.com/cloudwego/kitex/pkg/remote"
 
 	"github.com/apache/thrift/lib/go/thrift"
 )
@@ -29,10 +30,15 @@ const (
 
 // MessageReader read from thrift.TProtocol with method
 type MessageReader interface {
-	Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error)
+	Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, in thrift.TProtocol) (interface{}, error)
 }
 
 // MessageWriter write to thrift.TProtocol
 type MessageWriter interface {
 	Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error
+}
+
+type MessageReaderWriter interface {
+	MessageReader
+	MessageWriter
 }

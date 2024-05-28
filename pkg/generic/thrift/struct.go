@@ -22,6 +22,7 @@ import (
 	"github.com/apache/thrift/lib/go/thrift"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 // NewWriteStruct ...
@@ -109,7 +110,7 @@ func (m *ReadStruct) SetSetFieldsForEmptyStruct(mode uint8) {
 }
 
 // Read ...
-func (m *ReadStruct) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+func (m *ReadStruct) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, in thrift.TProtocol) (interface{}, error) {
 	fnDsc, err := m.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err

@@ -130,7 +130,7 @@ func UnmarshalThriftData(ctx context.Context, codec remote.PayloadCodec, method 
 		c = defaultCodec
 	}
 	tProt := NewBinaryProtocol(remote.NewReaderBuffer(buf))
-	err := c.unmarshalThriftData(ctx, tProt, method, data, len(buf))
+	err := c.unmarshalThriftData(ctx, tProt, method, -1, data, len(buf))
 	if err == nil {
 		tProt.Recycle()
 	}
@@ -175,7 +175,7 @@ func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, data
 
 // unmarshalThriftData only decodes the data (after methodName, msgType and seqId)
 // method is only used for generic calls
-func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProtocol, method string, data interface{}, dataLen int) error {
+func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProtocol, method string, msgType remote.MessageType, data interface{}, dataLen int) error {
 	// decode with hyper unmarshal
 	if c.hyperMessageUnmarshalEnabled() && c.hyperMessageUnmarshalAvailable(data, dataLen) {
 		return c.hyperUnmarshal(tProt, data, dataLen)
@@ -196,7 +196,7 @@ func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProto
 	}
 
 	// fallback to old thrift way (slow)
-	return decodeBasicThriftData(ctx, tProt, method, data)
+	return decodeBasicThriftData(ctx, tProt, method, msgType, dataLen, data)
 }
 
 func (c thriftCodec) hyperUnmarshal(tProt *BinaryProtocol, data interface{}, dataLen int) error {
@@ -233,7 +233,7 @@ func verifyUnmarshalBasicThriftDataType(data interface{}) error {
 }
 
 // decodeBasicThriftData decode thrift body the old way (slow)
-func decodeBasicThriftData(ctx context.Context, tProt thrift.TProtocol, method string, data interface{}) error {
+func decodeBasicThriftData(ctx context.Context, tProt thrift.TProtocol, method string, msgType remote.MessageType, dataLen int, data interface{}) error {
 	var err error
 	switch t := data.(type) {
 	case MessageReader:
@@ -242,7 +242,7 @@ func decodeBasicThriftData(ctx context.Context, tProt thrift.TProtocol, method s
 		}
 	case MessageReaderWithMethodWithContext:
 		// methodName is necessary for generic calls to methodInfo from serviceInfo
-		if err = t.Read(ctx, method, tProt); err != nil {
+		if err = t.Read(ctx, method, msgType, dataLen, tProt); err != nil {
 			return remote.NewTransError(remote.ProtocolError, err)
 		}
 	default:

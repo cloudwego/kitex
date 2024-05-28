@@ -204,7 +204,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 
 	ri := message.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
-	err = c.unmarshalThriftData(ctx, tProt, methodName, data, dataLen)
+	err = c.unmarshalThriftData(ctx, tProt, methodName, message.MessageType(), data, dataLen)
 	rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
 	if err != nil {
 		return err
@@ -257,7 +257,7 @@ type MessageReader interface {
 
 // MessageReaderWithMethodWithContext read from thrift.TProtocol with method
 type MessageReaderWithMethodWithContext interface {
-	Read(ctx context.Context, method string, oprot thrift.TProtocol) error
+	Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, oprot thrift.TProtocol) error
 }
 
 type ThriftMsgFastCodec interface {
