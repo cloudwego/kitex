@@ -30,7 +30,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
+<<<<<<< HEAD
 	"github.com/cloudwego/kitex/pkg/remote/codec"
+=======
+>>>>>>> cd1ec84 (add err handling)
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -88,7 +91,11 @@ func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
 	return &Method{function.Name, function.Oneway, function.StreamingMode}, nil
 }
 
+<<<<<<< HEAD
 func (c *httpPbThriftCodec) getMessageReaderWriter() interface{} {
+=======
+func (c *httpPbThriftCodec) GetMessageReaderWriter() interface{} {
+>>>>>>> cd1ec84 (add err handling)
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return errors.New("get parser ServiceDescriptor failed")
