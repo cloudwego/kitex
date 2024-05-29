@@ -100,12 +100,12 @@ func HTTPThriftGeneric(p DescriptorProvider, opts ...Option) (Generic, error) {
 }
 
 func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generic, error) {
-	codec, err := newHTTPPbThriftCodec(p, pbp, thriftCodec)
+	codecInfo, err := newHTTPPbThriftCodec(p, pbp, thriftCodec)
 	if err != nil {
 		return nil, err
 	}
 	return &httpPbThriftGeneric{
-		codec: codec,
+		codecInfo: codecInfo,
 	}, nil
 }
 
@@ -352,7 +352,7 @@ func (g *httpThriftGeneric) CodecInfo() serviceinfo.CodecInfo {
 }
 
 type httpPbThriftGeneric struct {
-	codec *httpPbThriftCodec
+	codecInfo *httpPbThriftCodec
 }
 
 func (g *httpPbThriftGeneric) Framed() bool {
@@ -364,15 +364,15 @@ func (g *httpPbThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 }
 
 func (g *httpPbThriftGeneric) PayloadCodec() remote.PayloadCodec {
-	return g.codec
+	return nil
 }
 
 func (g *httpPbThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return g.codec.getMethod(req)
+	return g.codecInfo.getMethod(req)
 }
 
 func (g *httpPbThriftGeneric) Close() error {
-	return g.codec.Close()
+	return g.codecInfo.Close()
 }
 
 func (g *httpPbThriftGeneric) CodecInfo() serviceinfo.CodecInfo {

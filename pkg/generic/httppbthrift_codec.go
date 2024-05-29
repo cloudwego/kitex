@@ -17,9 +17,9 @@
 package generic
 
 import (
-	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -29,11 +29,13 @@ import (
 	"github.com/jhump/protoreflect/desc"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
+)
+
+var (
+	_ Closer                = &httpPbThriftCodec{}
+	_ serviceinfo.CodecInfo = &httpPbThriftCodec{}
 )
 
 type httpPbThriftCodec struct {
@@ -42,6 +44,8 @@ type httpPbThriftCodec struct {
 	provider   DescriptorProvider
 	pbProvider PbDescriptorProvider
 	codec      remote.PayloadCodec
+	svcName    string
+	method     string
 }
 
 func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider, codec remote.PayloadCodec) (*httpPbThriftCodec, error) {
@@ -87,37 +91,32 @@ func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
 	return &Method{function.Name, function.Oneway}, nil
 }
 
-func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *httpPbThriftCodec) GetMessageReaderWriter() interface{} {
+	// TODO: error
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
+		return nil
+		// return nil, fmt.Errorf("get parser ServiceDescriptor failed")
 	}
 	pbSvcDsc, ok := c.pbSvcDsc.Load().(*desc.ServiceDescriptor)
 	if !ok {
 		return fmt.Errorf("get parser PbServiceDescriptor failed")
 	}
 
-	inner := thrift.NewWriteHTTPPbRequest(svcDsc, pbSvcDsc)
-	msg.Data().(WithCodec).SetCodec(inner)
-	return c.codec.Marshal(ctx, msg, out)
+	return thrift.NewHTTPPbReaderWriter(svcDsc, pbSvcDsc)
 }
 
-func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
-	}
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
-	}
-	pbSvcDsc, ok := c.pbSvcDsc.Load().(proto.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser PbServiceDescriptor failed")
-	}
+func (c *httpPbThriftCodec) SetMethod(method string) {
+	c.method = method
+}
 
-	inner := thrift.NewReadHTTPPbResponse(svcDsc, pbSvcDsc)
-	msg.Data().(WithCodec).SetCodec(inner)
-	return c.codec.Unmarshal(ctx, msg, in)
+// SetIsClient for httpPb generic does nothing because httpPb generic is only for client
+func (c *httpPbThriftCodec) SetIsClient(isClient bool) {
+	return
+}
+
+func (c *httpPbThriftCodec) GetIDLServiceName() string {
+	return c.svcName
 }
 
 func (c *httpPbThriftCodec) Name() string {

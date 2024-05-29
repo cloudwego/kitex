@@ -30,6 +30,15 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
+type HTTPPbReaderWriter struct {
+	*ReadHTTPPbResponse
+	*WriteHTTPPbRequest
+}
+
+func NewHTTPPbReaderWriter(svc *descriptor.ServiceDescriptor, pbsvc proto.ServiceDescriptor) *HTTPPbReaderWriter {
+	return &HTTPPbReaderWriter{ReadHTTPPbResponse: NewReadHTTPPbResponse(svc, pbsvc), WriteHTTPPbRequest: NewWriteHTTPPbRequest(svc, pbsvc)}
+}
+
 // WriteHTTPPbRequest implement of MessageWriter
 type WriteHTTPPbRequest struct {
 	svc   *descriptor.ServiceDescriptor
@@ -70,7 +79,7 @@ func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, ms
 	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase})
 }
 
-// ReadHTTPResponse implement of MessageReaderWithMethod
+// ReadHTTPPbResponse implement of MessageReaderWithMethod
 type ReadHTTPPbResponse struct {
 	svc   *descriptor.ServiceDescriptor
 	pbSvc proto.ServiceDescriptor
@@ -78,7 +87,7 @@ type ReadHTTPPbResponse struct {
 
 var _ MessageReader = (*ReadHTTPResponse)(nil)
 
-// NewReadHTTPResponse ...
+// NewReadHTTPPbResponse ...
 // Base64 encoding for binary is enabled by default.
 func NewReadHTTPPbResponse(svc *descriptor.ServiceDescriptor, pbSvc proto.ServiceDescriptor) *ReadHTTPPbResponse {
 	return &ReadHTTPPbResponse{svc, pbSvc}
