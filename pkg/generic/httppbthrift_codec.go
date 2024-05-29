@@ -18,8 +18,6 @@ package generic
 
 import (
 	"errors"
-	"fmt"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -31,6 +29,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var (
@@ -43,7 +42,6 @@ type httpPbThriftCodec struct {
 	pbSvcDsc   atomic.Value // *pbIdl
 	provider   DescriptorProvider
 	pbProvider PbDescriptorProvider
-	codec      remote.PayloadCodec
 	svcName    string
 	method     string
 }
@@ -51,7 +49,7 @@ type httpPbThriftCodec struct {
 func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider, codec remote.PayloadCodec) (*httpPbThriftCodec, error) {
 	svc := <-p.Provide()
 	pbSvc := <-pbp.Provide()
-	c := &httpPbThriftCodec{codec: codec, provider: p, pbProvider: pbp}
+	c := &httpPbThriftCodec{provider: p, pbProvider: pbp, svcName: svc.Name}
 	c.svcDsc.Store(svc)
 	c.pbSvcDsc.Store(pbSvc)
 	go c.update()
@@ -70,6 +68,7 @@ func (c *httpPbThriftCodec) update() {
 			return
 		}
 
+		c.svcName = svc.Name
 		c.svcDsc.Store(svc)
 		c.pbSvcDsc.Store(pbSvc)
 	}
@@ -92,15 +91,13 @@ func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
 }
 
 func (c *httpPbThriftCodec) GetMessageReaderWriter() interface{} {
-	// TODO: error
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return nil
-		// return nil, fmt.Errorf("get parser ServiceDescriptor failed")
+		return errors.New("get parser ServiceDescriptor failed")
 	}
 	pbSvcDsc, ok := c.pbSvcDsc.Load().(*desc.ServiceDescriptor)
 	if !ok {
-		return fmt.Errorf("get parser PbServiceDescriptor failed")
+		return errors.New("get parser PbServiceDescriptor failed")
 	}
 
 	return thrift.NewHTTPPbReaderWriter(svcDsc, pbSvcDsc)

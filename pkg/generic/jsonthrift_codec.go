@@ -17,6 +17,7 @@
 package generic
 
 import (
+	"errors"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -78,22 +79,17 @@ func (c *jsonThriftCodec) update() {
 }
 
 func (c *jsonThriftCodec) GetMessageReaderWriter() interface{} {
-	// TODO: error
-	var err error
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return nil
-		//return nil, perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
+		return errors.New("get parser ServiceDescriptor failed")
 	}
 	rw, err := thrift.NewJsonReaderWriter(svcDsc, c.method, c.isClient)
 	if err != nil {
-		return nil
-		//return nil, err
+		return err
 	}
 
 	if err = c.configureJSONWriter(rw.WriteJSON, svcDsc); err != nil {
-		return nil
-		//return nil, err
+		return err
 	}
 	c.configureJSONReader(rw.ReadJSON)
 	return rw

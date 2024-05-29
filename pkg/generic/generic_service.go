@@ -128,43 +128,43 @@ func (g *Args) GetOrSetBase() interface{} {
 
 // Write ...
 func (g *Args) Write(ctx context.Context, out thrift.TProtocol) error {
-	if rw, ok := g.inner.(gthrift.MessageReaderWriter); ok {
+	if err, ok := g.inner.(error); ok {
+		return err
+	}
+	if rw, ok := g.inner.(gthrift.MessageWriter); ok {
 		return rw.Write(ctx, out, g.Request, g.base)
 	}
-	//if w, ok := g.inner.(gthrift.MessageWriter); ok {
-	//	return w.Write(ctx, out, g.Request, g.base)
-	//}
 	return fmt.Errorf("unexpected Args writer type: %T", g.inner)
 }
 
 func (g *Args) WritePb(ctx context.Context) (interface{}, error) {
-	if rw, ok := g.inner.(gproto.MessageReaderWriter); ok {
+	if err, ok := g.inner.(error); ok {
+		return nil, err
+	}
+	if rw, ok := g.inner.(gproto.MessageWriter); ok {
 		return rw.Write(ctx, g.Request)
 	}
-	//if w, ok := g.inner.(gproto.MessageWriter); ok {
-	//	return w.Write(ctx, g.Request)
-	//}
 	return nil, fmt.Errorf("unexpected Args writer type: %T", g.inner)
 }
 
 // Read ...
 func (g *Args) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, in thrift.TProtocol) error {
-	if rw, ok := g.inner.(gthrift.MessageReaderWriter); ok {
+	if err, ok := g.inner.(error); ok {
+		return err
+	}
+	if rw, ok := g.inner.(gthrift.MessageReader); ok {
 		g.Method = method
 		var err error
 		g.Request, err = rw.Read(ctx, method, msgType, dataLen, in)
 		return err
 	}
-	//if w, ok := g.inner.(gthrift.MessageReader); ok {
-	//	g.Method = method
-	//	var err error
-	//	g.Request, err = w.Read(ctx, method, in)
-	//	return err
-	//}
 	return fmt.Errorf("unexpected Args reader type: %T", g.inner)
 }
 
 func (g *Args) ReadPb(ctx context.Context, method string, in []byte) error {
+	if err, ok := g.inner.(error); ok {
+		return err
+	}
 	if w, ok := g.inner.(gproto.MessageReader); ok {
 		g.Method = method
 		var err error
@@ -198,6 +198,9 @@ func (r *Result) SetCodec(inner interface{}) {
 
 // Write ...
 func (r *Result) Write(ctx context.Context, out thrift.TProtocol) error {
+	if err, ok := r.inner.(error); ok {
+		return err
+	}
 	if w, ok := r.inner.(gthrift.MessageWriter); ok {
 		return w.Write(ctx, out, r.Success, nil)
 	}
@@ -205,6 +208,9 @@ func (r *Result) Write(ctx context.Context, out thrift.TProtocol) error {
 }
 
 func (r *Result) WritePb(ctx context.Context) (interface{}, error) {
+	if err, ok := r.inner.(error); ok {
+		return nil, err
+	}
 	if w, ok := r.inner.(gproto.MessageWriter); ok {
 		return w.Write(ctx, r.Success)
 	}
@@ -213,20 +219,21 @@ func (r *Result) WritePb(ctx context.Context) (interface{}, error) {
 
 // Read ...
 func (r *Result) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, in thrift.TProtocol) error {
-	if w, ok := r.inner.(gthrift.MessageReaderWriter); ok {
+	if err, ok := r.inner.(error); ok {
+		return err
+	}
+	if w, ok := r.inner.(gthrift.MessageReader); ok {
 		var err error
 		r.Success, err = w.Read(ctx, method, msgType, dataLen, in)
 		return err
 	}
-	//if w, ok := r.inner.(gthrift.MessageReader); ok {
-	//	var err error
-	//	r.Success, err = w.Read(ctx, method, in)
-	//	return err
-	//}
 	return fmt.Errorf("unexpected Result reader type: %T", r.inner)
 }
 
 func (r *Result) ReadPb(ctx context.Context, method string, in []byte) error {
+	if err, ok := r.inner.(error); ok {
+		return err
+	}
 	if w, ok := r.inner.(gproto.MessageReader); ok {
 		var err error
 		r.Success, err = w.Read(ctx, method, in)

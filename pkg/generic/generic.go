@@ -376,5 +376,5 @@ func (g *httpPbThriftGeneric) Close() error {
 }
 
 func (g *httpPbThriftGeneric) CodecInfo() serviceinfo.CodecInfo {
-	return nil
+	return g.codecInfo
 }

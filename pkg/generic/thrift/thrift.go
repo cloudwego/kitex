@@ -37,8 +37,3 @@ type MessageReader interface {
 type MessageWriter interface {
 	Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error
 }
-
-type MessageReaderWriter interface {
-	MessageReader
-	MessageWriter
-}

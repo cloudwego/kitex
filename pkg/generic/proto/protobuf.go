@@ -29,8 +29,3 @@ type MessageReader interface {
 type MessageWriter interface {
 	Write(ctx context.Context, msg interface{}) (interface{}, error)
 }
-
-type MessageReaderWriter interface {
-	MessageReader
-	MessageWriter
-}

@@ -17,6 +17,7 @@
 package generic
 
 import (
+	"errors"
 	"fmt"
 	"sync/atomic"
 
@@ -68,12 +69,14 @@ func (c *jsonPbCodec) update() {
 }
 
 func (c *jsonPbCodec) GetMessageReaderWriter() interface{} {
-	pbSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor)
+	pbSvc, ok := c.svcDsc.Load().(*dproto.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser dynamicgo ServiceDescriptor failed")
+	}
 
 	rw, err := proto.NewJsonReaderWriter(pbSvc, c.method, c.isClient, &c.convOpts)
 	if err != nil {
-		return nil
-		// return nil, err
+		return err
 	}
 	return rw
 }
