@@ -36,7 +36,6 @@ type Service interface {
 }
 
 // ServiceInfo create a generic ServiceInfo
-// TODO: if cannot change, can add a new interface
 func ServiceInfo(pcType serviceinfo.PayloadCodec, codec serviceinfo.CodecInfo) *serviceinfo.ServiceInfo {
 	return newServiceInfo(pcType, codec)
 }
@@ -131,8 +130,8 @@ func (g *Args) Write(ctx context.Context, out thrift.TProtocol) error {
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
-	if rw, ok := g.inner.(gthrift.MessageWriter); ok {
-		return rw.Write(ctx, out, g.Request, g.base)
+	if w, ok := g.inner.(gthrift.MessageWriter); ok {
+		return w.Write(ctx, out, g.Request, g.base)
 	}
 	return fmt.Errorf("unexpected Args writer type: %T", g.inner)
 }
@@ -141,8 +140,8 @@ func (g *Args) WritePb(ctx context.Context) (interface{}, error) {
 	if err, ok := g.inner.(error); ok {
 		return nil, err
 	}
-	if rw, ok := g.inner.(gproto.MessageWriter); ok {
-		return rw.Write(ctx, g.Request)
+	if w, ok := g.inner.(gproto.MessageWriter); ok {
+		return w.Write(ctx, g.Request)
 	}
 	return nil, fmt.Errorf("unexpected Args writer type: %T", g.inner)
 }
