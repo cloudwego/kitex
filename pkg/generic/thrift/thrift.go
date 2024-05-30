@@ -19,9 +19,9 @@ package thrift
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/pkg/remote"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 const (
