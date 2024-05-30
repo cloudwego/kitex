@@ -31,8 +31,8 @@ import (
 )
 
 var (
-	_ Closer                = &httpThriftCodec{}
 	_ serviceinfo.CodecInfo = &httpThriftCodec{}
+	_ Closer                = &httpThriftCodec{}
 )
 
 // HTTPRequest alias of descriptor HTTPRequest

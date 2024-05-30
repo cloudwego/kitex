@@ -25,8 +25,8 @@ import (
 )
 
 var (
-	_ Closer                = &mapThriftCodec{}
 	_ serviceinfo.CodecInfo = &mapThriftCodec{}
+	_ Closer                = &mapThriftCodec{}
 )
 
 type mapThriftCodec struct {

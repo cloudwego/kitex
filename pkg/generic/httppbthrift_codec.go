@@ -32,8 +32,8 @@ import (
 )
 
 var (
-	_ Closer                = &httpPbThriftCodec{}
 	_ serviceinfo.CodecInfo = &httpPbThriftCodec{}
+	_ Closer                = &httpPbThriftCodec{}
 )
 
 type httpPbThriftCodec struct {

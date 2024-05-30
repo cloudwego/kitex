@@ -28,12 +28,12 @@ import (
 )
 
 var (
-	_ Closer                = &jsonThriftCodec{}
 	_ serviceinfo.CodecInfo = &jsonThriftCodec{}
+	_ Closer                = &jsonThriftCodec{}
 )
 
 type jsonThriftCodec struct {
-	svcDsc                 atomic.Value
+	svcDsc                 atomic.Value // *idl
 	provider               DescriptorProvider
 	binaryWithBase64       bool
 	dynamicgoEnabled       bool

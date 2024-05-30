@@ -182,9 +182,7 @@ func (m methodInfo) StreamingMode() StreamingMode {
 	return m.streamingMode
 }
 
-// TODO: better design?
 type CodecInfo interface {
-	// TODO: gthrift.MessageReaderWriter or gproto.MessageReaderWriter
 	GetMessageReaderWriter() interface{}
 	GetIDLServiceName() string
 	SetMethod(method string)

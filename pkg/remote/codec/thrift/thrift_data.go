@@ -130,7 +130,7 @@ func UnmarshalThriftData(ctx context.Context, codec remote.PayloadCodec, method 
 		c = defaultCodec
 	}
 	tProt := NewBinaryProtocol(remote.NewReaderBuffer(buf))
-	err := c.unmarshalThriftData(ctx, tProt, method, -1, data, len(buf))
+	err := c.unmarshalThriftData(ctx, tProt, method, data, -1, len(buf))
 	if err == nil {
 		tProt.Recycle()
 	}
@@ -175,7 +175,7 @@ func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, data
 
 // unmarshalThriftData only decodes the data (after methodName, msgType and seqId)
 // method is only used for generic calls
-func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProtocol, method string, msgType remote.MessageType, data interface{}, dataLen int) error {
+func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProtocol, method string, data interface{}, msgType remote.MessageType, dataLen int) error {
 	// decode with hyper unmarshal
 	if c.hyperMessageUnmarshalEnabled() && c.hyperMessageUnmarshalAvailable(data, dataLen) {
 		return c.hyperUnmarshal(tProt, data, dataLen)

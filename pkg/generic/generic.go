@@ -23,7 +23,6 @@ import (
 	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -196,8 +195,6 @@ func EnableSetFieldsForEmptyStruct(g Generic, mode SetFieldsForEmptyStructMode) 
 }
 
 var thriftCodec = thrift.NewThriftCodec()
-
-var pbCodec = protobuf.NewProtobufCodec()
 
 type binaryThriftGeneric struct{}
 

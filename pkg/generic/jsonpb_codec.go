@@ -29,8 +29,8 @@ import (
 )
 
 var (
-	_ Closer                = &jsonPbCodec{}
 	_ serviceinfo.CodecInfo = &jsonPbCodec{}
+	_ Closer                = &jsonPbCodec{}
 )
 
 type jsonPbCodec struct {
