@@ -80,7 +80,6 @@ func (c *httpThriftCodec) update() {
 	}
 }
 
-<<<<<<< HEAD
 func (c *httpThriftCodec) getMessageReaderWriter() interface{} {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
@@ -88,17 +87,6 @@ func (c *httpThriftCodec) getMessageReaderWriter() interface{} {
 	}
 	rw := thrift.NewHTTPReaderWriter(svcDsc)
 	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
-=======
-func (c *httpThriftCodec) GetMessageReaderWriter() interface{} {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return errors.New("get method name failed, no ServiceDescriptor")
-	}
-	rw := thrift.NewHTTPReaderWriter(svcDsc)
-	if err := c.configureHTTPRequestWriter(rw.WriteHTTPRequest); err != nil {
-		return err
-	}
->>>>>>> cd1ec84 (add err handling)
 	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
 	return rw
 }
