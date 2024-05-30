@@ -63,10 +63,9 @@ func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) 
 }
 
 func compress(compressor encoding.Compressor, data []byte) ([]byte, error) {
-	if len(data) == 0 {
-		return data, nil
+	if len(data) != 0 {
+		defer mcache.Free(data)
 	}
-	defer mcache.Free(data)
 	cbuf := &bytes.Buffer{}
 	z, err := compressor.Compress(cbuf)
 	if err != nil {
