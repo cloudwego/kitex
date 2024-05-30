@@ -79,10 +79,29 @@ func GetKiteXSDKPlugin(pwd string, rawKiteXArgs []string) (*KiteXSDKPlugin, erro
 
 	kitexPlugin := &KiteXSDKPlugin{}
 
-	kitexPluginParams := strings.Split(cmd.Args[len(cmd.Args)-2], ":")[1]
-	kitexPlugin.KitexParams = strings.Split(kitexPluginParams, ",")
-	kitexPlugin.ThriftgoParams = append([]string{}, cmd.Args[1:len(cmd.Args)-3]...)
-	kitexPlugin.ThriftgoParams = append(kitexPlugin.ThriftgoParams, cmd.Args[len(cmd.Args)-1])
+	thriftgoParams := []string{}
+	findKitex := false
+	kitexParams := []string{}
+
+	for i, arg := range cmd.Args {
+		if i == 0 {
+			continue
+		}
+		if arg == "-p" {
+			findKitex = true
+			continue
+		}
+		if findKitex {
+			kitexParams = strings.Split(arg, ",")
+			findKitex = false
+		} else {
+			thriftgoParams = append(thriftgoParams, arg)
+		}
+	}
+
+	kitexPlugin.ThriftgoParams = thriftgoParams
+	kitexPlugin.KitexParams = kitexParams
+
 	kitexPlugin.Pwd = pwd
 
 	return kitexPlugin, nil
