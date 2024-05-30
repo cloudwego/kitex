@@ -17,7 +17,7 @@
 package generic
 
 import (
-	"github.com/pkg/errors"
+	"errors"
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
