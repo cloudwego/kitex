@@ -108,7 +108,6 @@ func (c *httpPbThriftCodec) SetMethod(method string) {
 
 // SetIsClient for httpPb generic does nothing because httpPb generic is only for client
 func (c *httpPbThriftCodec) SetIsClient(isClient bool) {
-	return
 }
 
 func (c *httpPbThriftCodec) GetIDLServiceName() string {
