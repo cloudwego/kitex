@@ -23,9 +23,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-
 	"github.com/bytedance/gopkg/lang/mcache"
+
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
 
@@ -63,11 +63,10 @@ func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) 
 }
 
 func compress(compressor encoding.Compressor, data []byte) ([]byte, error) {
-	defer func() {
-		if len(data) > 0 {
-			mcache.Free(data)
-		}
-	}()
+	if len(data) == 0 {
+		return data, nil
+	}
+	defer mcache.Free(data)
 	cbuf := &bytes.Buffer{}
 	z, err := compressor.Compress(cbuf)
 	if err != nil {
