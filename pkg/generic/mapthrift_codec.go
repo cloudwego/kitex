@@ -17,6 +17,7 @@
 package generic
 
 import (
+	"github.com/pkg/errors"
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -74,8 +75,7 @@ func (c *mapThriftCodec) update() {
 func (c *mapThriftCodec) GetMessageReaderWriter() interface{} {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return nil
-		//return nil, fmt.Errorf("get parser ServiceDescriptor failed")
+		return errors.New("get parser ServiceDescriptor failed")
 	}
 	var rw *thrift.StructReaderWriter
 	var err error

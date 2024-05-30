@@ -265,7 +265,6 @@ func (g *jsonThriftGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
 
 func (g *jsonThriftGeneric) PayloadCodec() remote.PayloadCodec {
 	return nil
-	//return g.codec
 }
 
 func (g *jsonThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {

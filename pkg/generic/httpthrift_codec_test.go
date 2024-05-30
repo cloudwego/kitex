@@ -66,7 +66,7 @@ func TestHttpThriftCodec(t *testing.T) {
 	test.Assert(t, htc.GetIDLServiceName() == "ExampleService")
 
 	rw := htc.GetMessageReaderWriter()
-	err, ok := rw.(error)
+	_, ok := rw.(error)
 	test.Assert(t, !ok)
 
 	htc.SetMethod(method.Name)
