@@ -55,7 +55,7 @@ func TestNewServerWithServiceInfo(t *testing.T) {
 	})
 
 	test.PanicAt(t, func() {
-		NewServerWithServiceInfo(nil, g, generic.ServiceInfo(g.PayloadCodecType()))
+		NewServerWithServiceInfo(nil, g, generic.ServiceInfo(g.PayloadCodecType(), nil))
 	}, func(err interface{}) bool {
 		if errMsg, ok := err.(error); ok {
 			return strings.Contains(errMsg.Error(), "handler is nil.")

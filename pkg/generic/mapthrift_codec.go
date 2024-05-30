@@ -41,7 +41,7 @@ type mapThriftCodec struct {
 	isClient                bool
 }
 
-func newMapThriftCodec(p DescriptorProvider) (*mapThriftCodec, error) {
+func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
 	svc := <-p.Provide()
 	c := &mapThriftCodec{
 		provider:            p,
@@ -51,16 +51,13 @@ func newMapThriftCodec(p DescriptorProvider) (*mapThriftCodec, error) {
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
-	return c, nil
+	return c
 }
 
-func newMapThriftCodecForJSON(p DescriptorProvider) (*mapThriftCodec, error) {
-	c, err := newMapThriftCodec(p)
-	if err != nil {
-		return nil, err
-	}
+func newMapThriftCodecForJSON(p DescriptorProvider) *mapThriftCodec {
+	c := newMapThriftCodec(p)
 	c.forJSON = true
-	return c, nil
+	return c
 }
 
 func (c *mapThriftCodec) update() {
@@ -75,7 +72,6 @@ func (c *mapThriftCodec) update() {
 }
 
 func (c *mapThriftCodec) GetMessageReaderWriter() interface{} {
-	// TODO: error
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return nil
@@ -89,8 +85,7 @@ func (c *mapThriftCodec) GetMessageReaderWriter() interface{} {
 		rw, err = thrift.NewStructReaderWriter(svcDsc, c.method, c.isClient)
 	}
 	if err != nil {
-		return nil
-		// return nil, err
+		return err
 	}
 	c.configureStructWriter(rw.WriteStruct)
 	c.configureStructReader(rw.ReadStruct)

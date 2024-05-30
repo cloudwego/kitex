@@ -18,11 +18,14 @@ package generic
 
 import (
 	"bytes"
+	"io"
 	"net/http"
+	"os"
 	"reflect"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
+	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
 func TestFromHTTPPbRequest(t *testing.T) {
@@ -33,4 +36,40 @@ func TestFromHTTPPbRequest(t *testing.T) {
 	test.Assert(t, reflect.DeepEqual(hreq.RawBody, []byte("321")), string(hreq.RawBody))
 	test.Assert(t, hreq.GetMethod() == "POST")
 	test.Assert(t, hreq.GetPath() == "/far/boo")
+}
+
+func TestHTTPPbThriftCodec(t *testing.T) {
+	p, err := NewThriftFileProvider("./httppb_test/idl/echo.thrift")
+	test.Assert(t, err == nil)
+	pbIdl := "./httppb_test/idl/echo.proto"
+	pbf, err := os.Open(pbIdl)
+	test.Assert(t, err == nil)
+	pbContent, err := io.ReadAll(pbf)
+	test.Assert(t, err == nil)
+	pbf.Close()
+	pbp, err := NewPbContentProvider(pbIdl, map[string]string{pbIdl: string(pbContent)})
+	test.Assert(t, err == nil)
+
+	htc := newHTTPPbThriftCodec(p, pbp)
+	defer htc.Close()
+	test.Assert(t, htc.Name() == "HttpPbThrift")
+
+	req, err := http.NewRequest("GET", "/Echo", bytes.NewBuffer([]byte("321")))
+	test.Assert(t, err == nil)
+	hreq, err := FromHTTPPbRequest(req)
+	test.Assert(t, err == nil)
+	// wrong
+	method, err := htc.getMethod("test")
+	test.Assert(t, err.Error() == "req is invalid, need descriptor.HTTPRequest" && method == nil)
+	// right
+	method, err = htc.getMethod(hreq)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, method.Name == "Echo")
+	test.Assert(t, htc.GetIDLServiceName() == "ExampleService")
+
+	rw := htc.GetMessageReaderWriter()
+	_, ok := rw.(gthrift.MessageWriter)
+	test.Assert(t, ok)
+	_, ok = rw.(gthrift.MessageReader)
+	test.Assert(t, ok)
 }

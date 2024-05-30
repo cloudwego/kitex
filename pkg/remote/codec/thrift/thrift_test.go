@@ -62,13 +62,13 @@ func init() {
 }
 
 type mockWithContext struct {
-	ReadFunc  func(ctx context.Context, method string, oprot thrift.TProtocol) error
+	ReadFunc  func(ctx context.Context, method string, msgType remote.MessageType, dataLen int, oprot thrift.TProtocol) error
 	WriteFunc func(ctx context.Context, oprot thrift.TProtocol) error
 }
 
-func (m *mockWithContext) Read(ctx context.Context, method string, oprot thrift.TProtocol) error {
+func (m *mockWithContext) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, oprot thrift.TProtocol) error {
 	if m.ReadFunc != nil {
-		return m.ReadFunc(ctx, method, oprot)
+		return m.ReadFunc(ctx, method, -1, 0, oprot)
 	}
 	return nil
 }
@@ -98,7 +98,9 @@ func TestWithContext(t *testing.T) {
 			buf.Flush()
 
 			{
-				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, oprot thrift.TProtocol) error { return nil }}
+				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, msgType remote.MessageType, dataLen int, oprot thrift.TProtocol) error {
+					return nil
+				}}
 				ink := rpcinfo.NewInvocation("", "mock")
 				ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
 				msg := remote.NewMessage(resp, svcInfo, ri, remote.Call, remote.Client)

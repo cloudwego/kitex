@@ -40,6 +40,9 @@ func NewJsonReaderWriter(svc *dproto.ServiceDescriptor, method string, isClient 
 		return nil, err
 	}
 	writer, err := NewWriteJSON(svc, method, isClient, convOpts)
+	if err != nil {
+		return nil, err
+	}
 	return &JSONReaderWriter{ReadJSON: reader, WriteJSON: writer}, nil
 }
 

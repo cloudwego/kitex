@@ -28,7 +28,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -46,14 +45,14 @@ type httpPbThriftCodec struct {
 	method     string
 }
 
-func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider, codec remote.PayloadCodec) (*httpPbThriftCodec, error) {
+func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider) *httpPbThriftCodec {
 	svc := <-p.Provide()
 	pbSvc := <-pbp.Provide()
 	c := &httpPbThriftCodec{provider: p, pbProvider: pbp, svcName: svc.Name}
 	c.svcDsc.Store(svc)
 	c.pbSvcDsc.Store(pbSvc)
 	go c.update()
-	return c, nil
+	return c
 }
 
 func (c *httpPbThriftCodec) update() {

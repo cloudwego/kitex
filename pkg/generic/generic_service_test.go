@@ -66,11 +66,11 @@ func TestGenericService(t *testing.T) {
 	err = a.Write(ctx, tProto)
 	test.Assert(t, err == nil)
 	// read not ok
-	err = a.Read(ctx, method, tProto)
+	err = a.Read(ctx, method, -1, 0, tProto)
 	test.Assert(t, strings.Contains(err.Error(), "unexpected Args reader type"))
 	// read ok
 	a.SetCodec(rInner)
-	err = a.Read(ctx, method, tProto)
+	err = a.Read(ctx, method, -1, 0, tProto)
 	test.Assert(t, err == nil)
 
 	// Result...
@@ -88,11 +88,11 @@ func TestGenericService(t *testing.T) {
 	err = r.Write(ctx, tProto)
 	test.Assert(t, err == nil)
 	// read not ok
-	err = r.Read(ctx, method, tProto)
+	err = r.Read(ctx, method, -1, 0, tProto)
 	test.Assert(t, strings.Contains(err.Error(), "unexpected Result reader type"))
 	// read ok
 	r.SetCodec(rInner)
-	err = r.Read(ctx, method, tProto)
+	err = r.Read(ctx, method, -1, 0, tProto)
 	test.Assert(t, err == nil)
 
 	r.SetSuccess(nil)
@@ -122,8 +122,15 @@ func TestGenericService(t *testing.T) {
 }
 
 func TestServiceInfo(t *testing.T) {
-	s := ServiceInfo(serviceinfo.Thrift)
+	s := ServiceInfo(serviceinfo.Thrift, nil)
 	test.Assert(t, s.ServiceName == "$GenericService")
+
+	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
+	test.Assert(t, err == nil)
+	gOpts := &Options{dynamicgoConvOpts: DefaultJSONDynamicGoConvOpts}
+	codec := newJsonThriftCodec(p, gOpts)
+	s = ServiceInfo(serviceinfo.Thrift, codec)
+	test.Assert(t, s.ServiceName == "Mock")
 }
 
 func TestArgsResult(t *testing.T) {

@@ -28,6 +28,7 @@ import (
 	thrift "github.com/apache/thrift/lib/go/thrift"
 	thrift0 "github.com/cloudwego/kitex/pkg/generic/thrift"
 	gomock "github.com/golang/mock/gomock"
+	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 // MockMessageReader is a mock of MessageReader interface.
@@ -54,7 +55,7 @@ func (m *MockMessageReader) EXPECT() *MockMessageReaderMockRecorder {
 }
 
 // Read mocks base method.
-func (m *MockMessageReader) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+func (m *MockMessageReader) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, in thrift.TProtocol) (interface{}, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Read", ctx, method, in)
 	ret0, _ := ret[0].(interface{})

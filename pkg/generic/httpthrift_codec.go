@@ -27,7 +27,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -54,7 +53,7 @@ type httpThriftCodec struct {
 	method                 string
 }
 
-func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) *httpThriftCodec {
+func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
 	svc := <-p.Provide()
 	c := &httpThriftCodec{provider: p, binaryWithBase64: false, dynamicgoEnabled: false, useRawBodyForHTTPResp: opts.useRawBodyForHTTPResp, svcName: svc.Name}
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoEnabled {

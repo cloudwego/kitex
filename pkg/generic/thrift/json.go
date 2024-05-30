@@ -39,8 +39,6 @@ import (
 type JSONReaderWriter struct {
 	*ReadJSON
 	*WriteJSON
-	// TODO: error when calling from jsonThriftCodec?
-	initError error
 }
 
 func NewJsonReaderWriter(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*JSONReaderWriter, error) {

@@ -35,6 +35,7 @@ func TestBinaryThriftGeneric(t *testing.T) {
 	test.Assert(t, g.Framed() == true)
 	test.Assert(t, g.PayloadCodec().Name() == "RawThriftBinary")
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
+	test.Assert(t, g.CodecInfo() == nil)
 
 	method, err := g.GetMethod(nil, "Test")
 	test.Assert(t, err == nil)
@@ -53,16 +54,17 @@ func TestMapThriftGeneric(t *testing.T) {
 	mg, ok := g.(*mapThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec().Name() == "MapThrift")
+	test.Assert(t, g.PayloadCodec() == nil)
+	test.Assert(t, g.CodecInfo().GetIDLServiceName() == "Mock")
 
 	err = SetBinaryWithBase64(g, true)
 	test.Assert(t, err == nil)
-	test.Assert(t, mg.codec.binaryWithBase64)
+	test.Assert(t, mg.codecInfo.binaryWithBase64)
 	test.Assert(t, g.Framed() == false)
 
 	err = SetBinaryWithByteSlice(g, true)
 	test.Assert(t, err == nil)
-	test.Assert(t, mg.codec.binaryWithByteSlice)
+	test.Assert(t, mg.codecInfo.binaryWithByteSlice)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
 
@@ -83,11 +85,12 @@ func TestMapThriftGenericForJSON(t *testing.T) {
 	mg, ok := g.(*mapThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec().Name() == "MapThrift")
+	test.Assert(t, g.PayloadCodec() == nil)
+	test.Assert(t, g.CodecInfo().GetIDLServiceName() == "Mock")
 
 	err = SetBinaryWithBase64(g, true)
 	test.Assert(t, err == nil)
-	test.Assert(t, mg.codec.binaryWithBase64)
+	test.Assert(t, mg.codecInfo.binaryWithBase64)
 	test.Assert(t, g.Framed() == false)
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
@@ -110,19 +113,20 @@ func TestHTTPThriftGeneric(t *testing.T) {
 	hg, ok := g.(*httpThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec().Name() == "HttpThrift")
+	test.Assert(t, g.PayloadCodec() == nil)
+	test.Assert(t, g.CodecInfo().GetIDLServiceName() == "ExampleService")
 
-	test.Assert(t, !hg.codec.dynamicgoEnabled)
-	test.Assert(t, hg.codec.useRawBodyForHTTPResp)
-	test.Assert(t, !hg.codec.binaryWithBase64)
-	test.Assert(t, !hg.codec.convOpts.NoBase64Binary)
-	test.Assert(t, !hg.codec.convOptsWithThriftBase.NoBase64Binary)
+	test.Assert(t, !hg.codecInfo.dynamicgoEnabled)
+	test.Assert(t, hg.codecInfo.useRawBodyForHTTPResp)
+	test.Assert(t, !hg.codecInfo.binaryWithBase64)
+	test.Assert(t, !hg.codecInfo.convOpts.NoBase64Binary)
+	test.Assert(t, !hg.codecInfo.convOptsWithThriftBase.NoBase64Binary)
 
 	err = SetBinaryWithBase64(g, true)
 	test.Assert(t, err == nil)
-	test.Assert(t, hg.codec.binaryWithBase64)
-	test.Assert(t, !hg.codec.convOpts.NoBase64Binary)
-	test.Assert(t, !hg.codec.convOptsWithThriftBase.NoBase64Binary)
+	test.Assert(t, hg.codecInfo.binaryWithBase64)
+	test.Assert(t, !hg.codecInfo.convOpts.NoBase64Binary)
+	test.Assert(t, !hg.codecInfo.convOptsWithThriftBase.NoBase64Binary)
 
 	test.Assert(t, g.Framed() == false)
 
@@ -156,19 +160,20 @@ func TestHTTPThriftGenericWithDynamicGo(t *testing.T) {
 	hg, ok := g.(*httpThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec().Name() == "HttpThrift")
+	test.Assert(t, g.PayloadCodec() == nil)
+	test.Assert(t, g.CodecInfo().GetIDLServiceName() == "ExampleService")
 
-	test.Assert(t, hg.codec.dynamicgoEnabled)
-	test.Assert(t, !hg.codec.useRawBodyForHTTPResp)
-	test.Assert(t, !hg.codec.binaryWithBase64)
-	test.Assert(t, hg.codec.convOpts.NoBase64Binary)
-	test.Assert(t, hg.codec.convOptsWithThriftBase.NoBase64Binary)
+	test.Assert(t, hg.codecInfo.dynamicgoEnabled)
+	test.Assert(t, !hg.codecInfo.useRawBodyForHTTPResp)
+	test.Assert(t, !hg.codecInfo.binaryWithBase64)
+	test.Assert(t, hg.codecInfo.convOpts.NoBase64Binary)
+	test.Assert(t, hg.codecInfo.convOptsWithThriftBase.NoBase64Binary)
 
 	err = SetBinaryWithBase64(g, true)
 	test.Assert(t, err == nil)
-	test.Assert(t, hg.codec.binaryWithBase64)
-	test.Assert(t, !hg.codec.convOpts.NoBase64Binary)
-	test.Assert(t, !hg.codec.convOptsWithThriftBase.NoBase64Binary)
+	test.Assert(t, hg.codecInfo.binaryWithBase64)
+	test.Assert(t, !hg.codecInfo.convOpts.NoBase64Binary)
+	test.Assert(t, !hg.codecInfo.convOptsWithThriftBase.NoBase64Binary)
 
 	test.Assert(t, g.Framed() == true)
 
@@ -202,18 +207,19 @@ func TestJSONThriftGeneric(t *testing.T) {
 	jg, ok := g.(*jsonThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec().Name() == "JSONThrift")
+	test.Assert(t, g.PayloadCodec() == nil)
+	test.Assert(t, g.CodecInfo().GetIDLServiceName() == "Mock")
 
-	test.Assert(t, !jg.codec.dynamicgoEnabled)
-	test.Assert(t, jg.codec.binaryWithBase64)
-	test.Assert(t, !jg.codec.convOpts.NoBase64Binary)
-	test.Assert(t, !jg.codec.convOptsWithThriftBase.NoBase64Binary)
+	test.Assert(t, !jg.codecInfo.dynamicgoEnabled)
+	test.Assert(t, jg.codecInfo.binaryWithBase64)
+	test.Assert(t, !jg.codecInfo.convOpts.NoBase64Binary)
+	test.Assert(t, !jg.codecInfo.convOptsWithThriftBase.NoBase64Binary)
 
 	err = SetBinaryWithBase64(g, false)
 	test.Assert(t, err == nil)
-	test.Assert(t, !jg.codec.binaryWithBase64)
-	test.Assert(t, !jg.codec.convOpts.NoBase64Binary)
-	test.Assert(t, !jg.codec.convOptsWithThriftBase.NoBase64Binary)
+	test.Assert(t, !jg.codecInfo.binaryWithBase64)
+	test.Assert(t, !jg.codecInfo.convOpts.NoBase64Binary)
+	test.Assert(t, !jg.codecInfo.convOptsWithThriftBase.NoBase64Binary)
 
 	test.Assert(t, g.Framed() == false)
 
@@ -235,18 +241,19 @@ func TestJSONThriftGenericWithDynamicGo(t *testing.T) {
 	jg, ok := g.(*jsonThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec().Name() == "JSONThrift")
+	test.Assert(t, g.PayloadCodec() == nil)
+	test.Assert(t, g.CodecInfo().GetIDLServiceName() == "Mock")
 
-	test.Assert(t, jg.codec.dynamicgoEnabled)
-	test.Assert(t, jg.codec.binaryWithBase64)
-	test.Assert(t, !jg.codec.convOpts.NoBase64Binary)
-	test.Assert(t, !jg.codec.convOptsWithThriftBase.NoBase64Binary)
+	test.Assert(t, jg.codecInfo.dynamicgoEnabled)
+	test.Assert(t, jg.codecInfo.binaryWithBase64)
+	test.Assert(t, !jg.codecInfo.convOpts.NoBase64Binary)
+	test.Assert(t, !jg.codecInfo.convOptsWithThriftBase.NoBase64Binary)
 
 	err = SetBinaryWithBase64(g, false)
 	test.Assert(t, err == nil)
-	test.Assert(t, !jg.codec.binaryWithBase64)
-	test.Assert(t, jg.codec.convOpts.NoBase64Binary)
-	test.Assert(t, jg.codec.convOptsWithThriftBase.NoBase64Binary)
+	test.Assert(t, !jg.codecInfo.binaryWithBase64)
+	test.Assert(t, jg.codecInfo.convOpts.NoBase64Binary)
+	test.Assert(t, jg.codecInfo.convOptsWithThriftBase.NoBase64Binary)
 
 	test.Assert(t, g.Framed() == true)
 
@@ -271,15 +278,16 @@ func TestJSONPbGeneric(t *testing.T) {
 	test.Assert(t, err == nil)
 	defer g.Close()
 
-	test.Assert(t, g.PayloadCodec().Name() == "JSONPb")
+	test.Assert(t, g.PayloadCodec() == nil)
+	test.Assert(t, g.CodecInfo().GetIDLServiceName() == "Echo")
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Protobuf)
 
 	jg, ok := g.(*jsonPbGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, jg.codec.dynamicgoEnabled == true)
-	test.Assert(t, !jg.codec.convOpts.NoBase64Binary)
+	test.Assert(t, jg.codecInfo.dynamicgoEnabled == true)
+	test.Assert(t, !jg.codecInfo.convOpts.NoBase64Binary)
 
 	test.Assert(t, err == nil)
 

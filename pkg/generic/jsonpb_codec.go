@@ -25,7 +25,6 @@ import (
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/pkg/generic/proto"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -37,7 +36,6 @@ var (
 type jsonPbCodec struct {
 	svcDsc           atomic.Value // *idl
 	provider         PbDescriptorProviderDynamicGo
-	codec            remote.PayloadCodec
 	opts             *Options
 	convOpts         conv.Options // used for dynamicgo conversion
 	dynamicgoEnabled bool         // currently set to true by default
@@ -46,9 +44,9 @@ type jsonPbCodec struct {
 	isClient         bool
 }
 
-func newJsonPbCodec(p PbDescriptorProviderDynamicGo, codec remote.PayloadCodec, opts *Options) *jsonPbCodec {
+func newJsonPbCodec(p PbDescriptorProviderDynamicGo, opts *Options) *jsonPbCodec {
 	svc := <-p.Provide()
-	c := &jsonPbCodec{codec: codec, provider: p, opts: opts, dynamicgoEnabled: true, svcName: svc.Name()}
+	c := &jsonPbCodec{provider: p, opts: opts, dynamicgoEnabled: true, svcName: svc.Name()}
 	convOpts := opts.dynamicgoConvOpts
 	c.convOpts = convOpts
 

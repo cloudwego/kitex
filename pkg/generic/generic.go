@@ -68,22 +68,14 @@ func BinaryThriftGeneric() Generic {
 //
 //	SetBinaryWithByteSlice(g, true)
 func MapThriftGeneric(p DescriptorProvider) (Generic, error) {
-	codecInfo, err := newMapThriftCodec(p)
-	if err != nil {
-		return nil, err
-	}
 	return &mapThriftGeneric{
-		codecInfo: codecInfo,
+		codecInfo: newMapThriftCodec(p),
 	}, nil
 }
 
 func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
-	codecInfo, err := newMapThriftCodecForJSON(p)
-	if err != nil {
-		return nil, err
-	}
 	return &mapThriftGeneric{
-		codecInfo: codecInfo,
+		codecInfo: newMapThriftCodecForJSON(p),
 	}, nil
 }
 
@@ -96,16 +88,12 @@ func MapThriftGenericForJSON(p DescriptorProvider) (Generic, error) {
 func HTTPThriftGeneric(p DescriptorProvider, opts ...Option) (Generic, error) {
 	gOpts := &Options{dynamicgoConvOpts: DefaultHTTPDynamicGoConvOpts}
 	gOpts.apply(opts)
-	return &httpThriftGeneric{codecInfo: newHTTPThriftCodec(p, thriftCodec, gOpts)}, nil
+	return &httpThriftGeneric{codecInfo: newHTTPThriftCodec(p, gOpts)}, nil
 }
 
 func HTTPPbThriftGeneric(p DescriptorProvider, pbp PbDescriptorProvider) (Generic, error) {
-	codecInfo, err := newHTTPPbThriftCodec(p, pbp, thriftCodec)
-	if err != nil {
-		return nil, err
-	}
 	return &httpPbThriftGeneric{
-		codecInfo: codecInfo,
+		codecInfo: newHTTPPbThriftCodec(p, pbp),
 	}, nil
 }
 
@@ -126,7 +114,7 @@ func JSONThriftGeneric(p DescriptorProvider, opts ...Option) (Generic, error) {
 func JSONPbGeneric(p PbDescriptorProviderDynamicGo, opts ...Option) (Generic, error) {
 	gOpts := &Options{dynamicgoConvOpts: conv.Options{}}
 	gOpts.apply(opts)
-	return &jsonPbGeneric{codecInfo: newJsonPbCodec(p, pbCodec, gOpts)}, nil
+	return &jsonPbGeneric{codecInfo: newJsonPbCodec(p, gOpts)}, nil
 }
 
 // SetBinaryWithBase64 enable/disable Base64 codec for binary field.
