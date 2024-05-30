@@ -28,8 +28,11 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
+<<<<<<< HEAD
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
+=======
+>>>>>>> a231864 (test: add and fix tests)
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
