@@ -215,7 +215,14 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 					}
 				} else {
 					if svcInfo == nil {
-						err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", serviceName))
+						var errMsg string
+						if serviceName == "CombineService" {
+							errMsg = fmt.Sprintf("unknown service %s: client is using CombineService, but the server hasn't registered it. "+
+								"Use the pre-combined service or set up a metahandler with the pre-combined service name on the client side.", serviceName)
+						} else {
+							errMsg = fmt.Sprintf("unknown service %s", serviceName)
+						}
+						err = remote.NewTransErrorWithMsg(remote.UnknownService, errMsg)
 					} else {
 						err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 					}
