@@ -20,6 +20,7 @@ import (
 	"context"
 	"math/rand"
 	"net"
+	"reflect"
 	"testing"
 	"time"
 
@@ -27,8 +28,10 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
+	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
@@ -38,6 +41,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/transport"
 )
 
 // TestOptionDebugInfo tests the creation of a server with DebugService option
@@ -307,30 +311,115 @@ func TestMuxTransportOption(t *testing.T) {
 
 // TestPayloadCodecOption tests the creation of a server with RemoteOpt.PayloadCodec option
 func TestPayloadCodecOption(t *testing.T) {
-	svr1 := NewServer()
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr1.Stop()
+	t.Run("NotSetPayloadCodec", func(t *testing.T) {
+		svr := NewServer()
+		time.AfterFunc(100*time.Millisecond, func() {
+			err := svr.Stop()
+			test.Assert(t, err == nil, err)
+		})
+		err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 		test.Assert(t, err == nil, err)
-	})
-	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	test.Assert(t, err == nil, err)
-	err = svr1.Run()
-	test.Assert(t, err == nil, err)
-	iSvr1 := svr1.(*server)
-	test.Assert(t, iSvr1.opt.RemoteOpt.PayloadCodec == nil)
+		err = svr.Run()
+		test.Assert(t, err == nil, err)
+		iSvr := svr.(*server)
+		test.Assert(t, iSvr.opt.RemoteOpt.PayloadCodec == nil)
 
-	svr2 := NewServer(WithPayloadCodec(protobuf.NewProtobufCodec()))
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr2.Stop()
-		test.Assert(t, err == nil, err)
+		tRecvMsg := NewRemoteMsgWithPayloadType(serviceinfo.Thrift)
+		tRecvMsg.SetPayloadCodec(iSvr.opt.RemoteOpt.PayloadCodec)
+		pc, err := remote.GetPayloadCodec(tRecvMsg)
+		test.Assert(t, err == nil)
+		test.Assert(t, thrift.IsThriftCodec(pc))
+
+		pRecvMsg := NewRemoteMsgWithPayloadType(serviceinfo.Protobuf)
+		pRecvMsg.SetPayloadCodec(iSvr.opt.RemoteOpt.PayloadCodec)
+		pc, err = remote.GetPayloadCodec(pRecvMsg)
+		test.Assert(t, err == nil)
+		test.Assert(t, protobuf.IsProtobufCodec(pc))
 	})
-	err = svr2.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	test.Assert(t, err == nil, err)
-	err = svr2.Run()
-	test.Assert(t, err == nil, err)
-	iSvr2 := svr2.(*server)
-	test.Assert(t, iSvr2.opt.RemoteOpt.PayloadCodec != nil)
-	test.DeepEqual(t, iSvr2.opt.RemoteOpt.PayloadCodec, protobuf.NewProtobufCodec())
+	t.Run("SetPreRegisteredProtobufCodec", func(t *testing.T) {
+		svr := NewServer(WithPayloadCodec(protobuf.NewProtobufCodec()))
+		time.AfterFunc(100*time.Millisecond, func() {
+			err := svr.Stop()
+			test.Assert(t, err == nil, err)
+		})
+		err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+		test.Assert(t, err == nil, err)
+		err = svr.Run()
+		test.Assert(t, err == nil, err)
+		iSvr := svr.(*server)
+		test.Assert(t, iSvr.opt.RemoteOpt.PayloadCodec == nil)
+
+		tRecvMsg := NewRemoteMsgWithPayloadType(serviceinfo.Thrift)
+		tRecvMsg.SetPayloadCodec(iSvr.opt.RemoteOpt.PayloadCodec)
+		pc, err := remote.GetPayloadCodec(tRecvMsg)
+		test.Assert(t, err == nil)
+		test.Assert(t, thrift.IsThriftCodec(pc))
+
+		pRecvMsg := NewRemoteMsgWithPayloadType(serviceinfo.Protobuf)
+		pRecvMsg.SetPayloadCodec(iSvr.opt.RemoteOpt.PayloadCodec)
+		pc, err = remote.GetPayloadCodec(pRecvMsg)
+		test.Assert(t, err == nil)
+		test.Assert(t, protobuf.IsProtobufCodec(pc))
+	})
+
+	t.Run("SetPreRegisteredThriftCodec", func(t *testing.T) {
+		thriftCodec := thrift.NewThriftCodecDisableFastMode(false, true)
+		svr := NewServer(WithPayloadCodec(thriftCodec))
+		time.AfterFunc(100*time.Millisecond, func() {
+			err := svr.Stop()
+			test.Assert(t, err == nil, err)
+		})
+		err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+		test.Assert(t, err == nil, err)
+		err = svr.Run()
+		test.Assert(t, err == nil, err)
+		iSvr := svr.(*server)
+		test.Assert(t, iSvr.opt.RemoteOpt.PayloadCodec == nil)
+
+		tRecvMsg := NewRemoteMsgWithPayloadType(serviceinfo.Thrift)
+		tRecvMsg.SetPayloadCodec(iSvr.opt.RemoteOpt.PayloadCodec)
+		pc, err := remote.GetPayloadCodec(tRecvMsg)
+		test.Assert(t, err == nil)
+		test.Assert(t, thrift.IsThriftCodec(pc))
+		test.Assert(t, reflect.DeepEqual(pc, thriftCodec))
+
+		pRecvMsg := NewRemoteMsgWithPayloadType(serviceinfo.Protobuf)
+		pRecvMsg.SetPayloadCodec(iSvr.opt.RemoteOpt.PayloadCodec)
+		pc, err = remote.GetPayloadCodec(pRecvMsg)
+		test.Assert(t, err == nil)
+		test.Assert(t, protobuf.IsProtobufCodec(pc))
+	})
+
+	t.Run("SetNonPreRegisteredCodec", func(t *testing.T) {
+		// generic.BinaryThriftGeneric().PayloadCodec() is not the pre registered codec, RemoteOpt.PayloadCodec won't be nil
+		binaryThriftCodec := generic.BinaryThriftGeneric().PayloadCodec()
+		svr := NewServer(WithPayloadCodec(binaryThriftCodec))
+		time.AfterFunc(100*time.Millisecond, func() {
+			err := svr.Stop()
+			test.Assert(t, err == nil, err)
+		})
+		err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
+		test.Assert(t, err == nil, err)
+		err = svr.Run()
+		test.Assert(t, err == nil, err)
+		iSvr := svr.(*server)
+		test.Assert(t, iSvr.opt.RemoteOpt.PayloadCodec != nil)
+		test.DeepEqual(t, iSvr.opt.RemoteOpt.PayloadCodec, binaryThriftCodec)
+
+		tRecvMsg := NewRemoteMsgWithPayloadType(serviceinfo.Thrift)
+		tRecvMsg.SetPayloadCodec(iSvr.opt.RemoteOpt.PayloadCodec)
+		pc, err := remote.GetPayloadCodec(tRecvMsg)
+		test.Assert(t, err == nil)
+		test.Assert(t, !thrift.IsThriftCodec(pc))
+		test.Assert(t, reflect.DeepEqual(pc, binaryThriftCodec))
+
+		pRecvMsg := NewRemoteMsgWithPayloadType(serviceinfo.Protobuf)
+		pRecvMsg.SetPayloadCodec(iSvr.opt.RemoteOpt.PayloadCodec)
+		pc, err = remote.GetPayloadCodec(pRecvMsg)
+		test.Assert(t, err == nil)
+		test.Assert(t, !protobuf.IsProtobufCodec(pc))
+		test.Assert(t, reflect.DeepEqual(pc, binaryThriftCodec))
+	})
 }
 
 // TestRemoteOptGRPCCfgUintValueOption tests the creation of a server with RemoteOpt.GRPCCfg option
@@ -473,4 +562,10 @@ func TestRefuseTrafficWithoutServiceNamOption(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	iSvr := svr.(*server)
 	test.Assert(t, iSvr.opt.RefuseTrafficWithoutServiceName)
+}
+
+func NewRemoteMsgWithPayloadType(ct serviceinfo.PayloadCodec) remote.Message {
+	remoteMsg := remote.NewMessage(nil, nil, nil, remote.Call, remote.Server)
+	remoteMsg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, ct))
+	return remoteMsg
 }
