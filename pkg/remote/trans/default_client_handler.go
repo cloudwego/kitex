@@ -53,7 +53,9 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	}()
 
 	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
-	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
+	if t.opt.PayloadCodec != nil {
+		sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
+	}
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
 		return ctx, err
@@ -72,7 +74,9 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remot
 
 	t.ext.SetReadTimeout(ctx, conn, recvMsg.RPCInfo().Config(), recvMsg.RPCRole())
 	bufReader = t.ext.NewReadByteBuffer(ctx, conn, recvMsg)
-	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
+	if t.opt.PayloadCodec != nil {
+		recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
+	}
 	err = t.codec.Decode(ctx, recvMsg, bufReader)
 	if err != nil {
 		if t.ext.IsTimeoutErr(err) {

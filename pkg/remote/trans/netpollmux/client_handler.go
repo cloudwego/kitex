@@ -88,7 +88,9 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	tags[codec.HeaderFlagsKey] = codec.HeaderFlagSupportOutOfOrder
 
 	// encode
-	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
+	if t.opt.PayloadCodec != nil {
+		sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
+	}
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
 		return ctx, err
@@ -144,7 +146,9 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 			return ctx, ErrConnClosed
 		}
 		rpcinfo.Record(ctx, ri, stats.ReadStart, nil)
-		msg.SetPayloadCodec(t.opt.PayloadCodec)
+		if t.opt.PayloadCodec != nil {
+			msg.SetPayloadCodec(t.opt.PayloadCodec)
+		}
 		err := t.codec.Decode(ctx, msg, bufReader)
 		if err != nil && errors.Is(err, netpoll.ErrReadTimeout) {
 			err = kerrors.ErrRPCTimeout.WithCause(err)

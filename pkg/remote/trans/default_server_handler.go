@@ -168,7 +168,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
 	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearchMap, ri, remote.Call, remote.Server, t.opt.RefuseTrafficWithoutServiceName)
-	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
+	if t.opt.PayloadCodec != nil {
+		recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
+	}
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {
 		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
