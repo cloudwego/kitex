@@ -25,23 +25,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
-func TestSkipBuffer(t *testing.T) {
-	buf := []byte{1, 2, 3}
-	rb := remote.NewReaderBuffer(buf)
-	sb := newSkipBuffer(rb)
-	peekData, err := sb.Next(3)
-	test.Assert(t, err == nil)
-	test.DeepEqual(t, buf, peekData[:len(buf)])
-	test.Assert(t, sb.readNum == len(buf))
-	test.Assert(t, rb.ReadLen() == 0)
-
-	data, err := sb.Buffer()
-	test.Assert(t, err == nil)
-	test.DeepEqual(t, buf, data[:len(buf)])
-	test.Assert(t, rb.ReadLen() == len(buf))
-}
-
-func TestSkipDecoder_SkipStruct(t *testing.T) {
+func makeByteBufferForSkipDecoderTest() remote.ByteBuffer {
 	tProt := NewBinaryProtocol(remote.NewReaderWriterBuffer(1024))
 	defer tProt.Recycle()
 	tProt.WriteStructBegin("testStruct")
@@ -95,17 +79,29 @@ func TestSkipDecoder_SkipStruct(t *testing.T) {
 
 	tProt.WriteFieldStop()
 	tProt.WriteStructEnd()
+	return tProt.ByteBuffer()
+}
 
-	length := tProt.ByteBuffer().ReadableLen()
-	sd := newSkipDecoder(tProt.ByteBuffer())
-	defer sd.Recycle()
-	err := sd.SkipStruct()
+func TestSkipDecoder_NextStruct(t *testing.T) {
+	buf := makeByteBufferForSkipDecoderTest()
+	defer buf.Release(nil)
+	length := buf.ReadableLen()
+	sd := skipDecoder{ByteBuffer: buf}
+	b, err := sd.NextStruct()
 	test.Assert(t, err == nil)
-	test.Assert(t, sd.sb.readNum == length)
-	test.Assert(t, sd.sb.ReadLen() == 0)
-	test.Assert(t, sd.sb.ReadableLen() == length)
-	_, err = sd.Buffer()
-	test.Assert(t, err == nil)
-	test.Assert(t, sd.sb.ReadLen() == length)
-	test.Assert(t, sd.sb.ReadableLen() == 0)
+	test.Assert(t, len(b) == length)
+}
+
+func BenchmarkSkipDecoder(b *testing.B) {
+	buf := makeByteBufferForSkipDecoderTest()
+	for i := 0; i < b.N; i++ {
+		b, _ := buf.Peek(buf.ReadableLen())
+		bb := remote.NewReaderBuffer(b)
+
+		sd := skipDecoder{ByteBuffer: bb}
+		sd.NextStruct()
+
+		bb.Release(nil)
+	}
+	buf.Release(nil)
 }

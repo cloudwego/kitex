@@ -252,14 +252,10 @@ func decodeBasicThriftData(ctx context.Context, tProt thrift.TProtocol, method s
 }
 
 func getSkippedStructBuffer(tProt *BinaryProtocol) ([]byte, error) {
-	sd := newSkipDecoder(tProt.trans)
-	defer sd.Recycle()
-	if err := sd.SkipStruct(); err != nil {
-		return nil, remote.NewTransError(remote.ProtocolError, err).AppendMessage("caught in SkipDecoder SkipStruct phase")
-	}
-	buf, err := sd.Buffer()
+	sd := skipDecoder{ByteBuffer: tProt.trans}
+	buf, err := sd.NextStruct()
 	if err != nil {
-		return nil, remote.NewTransError(remote.ProtocolError, err).AppendMessage("caught in SkipDecoder Buffer phase")
+		return nil, remote.NewTransError(remote.ProtocolError, err).AppendMessage("caught in SkipDecoder NextStruct phase")
 	}
 	return buf, nil
 }
