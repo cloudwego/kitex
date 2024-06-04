@@ -17,7 +17,6 @@
 package generic
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -37,15 +36,7 @@ func TestMapThriftCodec(t *testing.T) {
 	test.Assert(t, mtc.GetIDLServiceName() == "Mock")
 
 	rw := mtc.GetMessageReaderWriter()
-	err, ok := rw.(error)
-	test.Assert(t, ok)
-	test.Assert(t, strings.Contains(err.Error(), "missing method"))
-
-	mtc.SetMethod(method.Name)
-	test.Assert(t, mtc.method == "Test")
-
-	rw = mtc.GetMessageReaderWriter()
-	_, ok = rw.(thrift.MessageWriter)
+	_, ok := rw.(thrift.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(thrift.MessageReader)
 	test.Assert(t, ok)
@@ -64,15 +55,7 @@ func TestMapThriftCodecSelfRef(t *testing.T) {
 	test.Assert(t, mtc.GetIDLServiceName() == "Mock")
 
 	rw := mtc.GetMessageReaderWriter()
-	err, ok := rw.(error)
-	test.Assert(t, ok)
-	test.Assert(t, strings.Contains(err.Error(), "missing method"))
-
-	mtc.SetMethod(method.Name)
-	test.Assert(t, mtc.method == "Test")
-
-	rw = mtc.GetMessageReaderWriter()
-	_, ok = rw.(thrift.MessageWriter)
+	_, ok := rw.(thrift.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(thrift.MessageReader)
 	test.Assert(t, ok)
@@ -91,15 +74,7 @@ func TestMapThriftCodecForJSON(t *testing.T) {
 	test.Assert(t, mtc.GetIDLServiceName() == "Mock")
 
 	rw := mtc.GetMessageReaderWriter()
-	err, ok := rw.(error)
-	test.Assert(t, ok)
-	test.Assert(t, strings.Contains(err.Error(), "missing method"))
-
-	mtc.SetMethod(method.Name)
-	test.Assert(t, mtc.method == "Test")
-
-	rw = mtc.GetMessageReaderWriter()
-	_, ok = rw.(thrift.MessageWriter)
+	_, ok := rw.(thrift.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(thrift.MessageReader)
 	test.Assert(t, ok)

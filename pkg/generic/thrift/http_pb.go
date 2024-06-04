@@ -27,7 +27,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/proto"
-	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 type HTTPPbReaderWriter struct {
@@ -54,7 +53,7 @@ func NewWriteHTTPPbRequest(svc *descriptor.ServiceDescriptor, pbSvc *desc.Servic
 }
 
 // Write ...
-func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, method string, isClient bool, requestBase *Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	fn, err := w.svc.Router.Lookup(req)
 	if err != nil {
@@ -85,7 +84,7 @@ type ReadHTTPPbResponse struct {
 	pbSvc proto.ServiceDescriptor
 }
 
-var _ MessageReader = (*ReadHTTPResponse)(nil)
+var _ MessageReader = (*ReadHTTPPbResponse)(nil)
 
 // NewReadHTTPPbResponse ...
 // Base64 encoding for binary is enabled by default.
@@ -94,7 +93,7 @@ func NewReadHTTPPbResponse(svc *descriptor.ServiceDescriptor, pbSvc proto.Servic
 }
 
 // Read ...
-func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in thrift.TProtocol) (interface{}, error) {
 	fnDsc, err := r.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err

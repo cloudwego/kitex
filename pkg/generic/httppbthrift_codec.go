@@ -42,7 +42,6 @@ type httpPbThriftCodec struct {
 	provider   DescriptorProvider
 	pbProvider PbDescriptorProvider
 	svcName    string
-	method     string
 }
 
 func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider) *httpPbThriftCodec {
@@ -100,14 +99,6 @@ func (c *httpPbThriftCodec) GetMessageReaderWriter() interface{} {
 	}
 
 	return thrift.NewHTTPPbReaderWriter(svcDsc, pbSvcDsc)
-}
-
-func (c *httpPbThriftCodec) SetMethod(method string) {
-	c.method = method
-}
-
-// SetIsClient for httpPb generic does nothing because httpPb generic is only for client
-func (c *httpPbThriftCodec) SetIsClient(isClient bool) {
 }
 
 func (c *httpPbThriftCodec) GetIDLServiceName() string {

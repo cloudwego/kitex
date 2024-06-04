@@ -50,7 +50,6 @@ type httpThriftCodec struct {
 	dynamicgoEnabled       bool
 	useRawBodyForHTTPResp  bool
 	svcName                string
-	method                 string
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
@@ -84,24 +83,19 @@ func (c *httpThriftCodec) update() {
 func (c *httpThriftCodec) GetMessageReaderWriter() interface{} {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return errors.New("get method name failed, no ServiceDescriptor")
+		return errors.New("get parser ServiceDescriptor failed")
 	}
 	rw := thrift.NewHTTPReaderWriter(svcDsc)
-	if err := c.configureHTTPRequestWriter(rw.WriteHTTPRequest); err != nil {
-		return err
-	}
+	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
 	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
 	return rw
 }
 
-func (c *httpThriftCodec) configureHTTPRequestWriter(writer *thrift.WriteHTTPRequest) error {
+func (c *httpThriftCodec) configureHTTPRequestWriter(writer *thrift.WriteHTTPRequest) {
 	writer.SetBinaryWithBase64(c.binaryWithBase64)
 	if c.dynamicgoEnabled {
-		if err := writer.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase, c.method); err != nil {
-			return err
-		}
+		writer.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase)
 	}
-	return nil
 }
 
 func (c *httpThriftCodec) configureHTTPResponseReader(reader *thrift.ReadHTTPResponse) {
@@ -110,14 +104,6 @@ func (c *httpThriftCodec) configureHTTPResponseReader(reader *thrift.ReadHTTPRes
 	if c.dynamicgoEnabled && c.useRawBodyForHTTPResp {
 		reader.SetDynamicGo(&c.convOptsWithThriftBase)
 	}
-}
-
-func (c *httpThriftCodec) SetMethod(method string) {
-	c.method = method
-}
-
-// SetIsClient for http generic does nothing because http generic is only for client
-func (c *httpThriftCodec) SetIsClient(isClient bool) {
 }
 
 func (c *httpThriftCodec) GetIDLServiceName() string {

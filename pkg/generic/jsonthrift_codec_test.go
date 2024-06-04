@@ -17,7 +17,6 @@
 package generic
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -44,15 +43,7 @@ func TestJsonThriftCodec(t *testing.T) {
 	test.Assert(t, jtc.GetIDLServiceName() == "Mock")
 
 	rw := jtc.GetMessageReaderWriter()
-	err, ok := rw.(error)
-	test.Assert(t, ok)
-	test.Assert(t, strings.Contains(err.Error(), "missing method"))
-
-	jtc.SetMethod(method.Name)
-	test.Assert(t, jtc.method == "Test")
-
-	rw = jtc.GetMessageReaderWriter()
-	_, ok = rw.(thrift.MessageWriter)
+	_, ok := rw.(thrift.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(thrift.MessageReader)
 	test.Assert(t, ok)
@@ -80,15 +71,7 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	test.Assert(t, method.Name == "Test")
 
 	rw := jtc.GetMessageReaderWriter()
-	err, ok := rw.(error)
-	test.Assert(t, ok)
-	test.Assert(t, strings.Contains(err.Error(), "missing method"))
-
-	jtc.SetMethod(method.Name)
-	test.Assert(t, jtc.method == "Test")
-
-	rw = jtc.GetMessageReaderWriter()
-	_, ok = rw.(thrift.MessageWriter)
+	_, ok := rw.(thrift.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(thrift.MessageReader)
 	test.Assert(t, ok)
@@ -107,15 +90,7 @@ func TestJsonThriftCodec_SelfRef(t *testing.T) {
 		test.Assert(t, method.Name == "Test")
 
 		rw := jtc.GetMessageReaderWriter()
-		err, ok := rw.(error)
-		test.Assert(t, ok)
-		test.Assert(t, strings.Contains(err.Error(), "missing method"))
-
-		jtc.SetMethod(method.Name)
-		test.Assert(t, jtc.method == "Test")
-
-		rw = jtc.GetMessageReaderWriter()
-		_, ok = rw.(thrift.MessageWriter)
+		_, ok := rw.(thrift.MessageWriter)
 		test.Assert(t, ok)
 		_, ok = rw.(thrift.MessageReader)
 		test.Assert(t, ok)
@@ -135,15 +110,7 @@ func TestJsonThriftCodec_SelfRef(t *testing.T) {
 		test.Assert(t, jtc.GetIDLServiceName() == "Mock")
 
 		rw := jtc.GetMessageReaderWriter()
-		err, ok := rw.(error)
-		test.Assert(t, ok)
-		test.Assert(t, strings.Contains(err.Error(), "missing method"))
-
-		jtc.SetMethod(method.Name)
-		test.Assert(t, jtc.method == "Test")
-
-		rw = jtc.GetMessageReaderWriter()
-		_, ok = rw.(thrift.MessageWriter)
+		_, ok := rw.(thrift.MessageWriter)
 		test.Assert(t, ok)
 		_, ok = rw.(thrift.MessageReader)
 		test.Assert(t, ok)

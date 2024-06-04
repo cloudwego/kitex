@@ -29,7 +29,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
@@ -46,11 +45,9 @@ func NewHTTPReaderWriter(svc *descriptor.ServiceDescriptor) *HTTPReaderWriter {
 // WriteHTTPRequest implement of MessageWriter
 type WriteHTTPRequest struct {
 	svc                    *descriptor.ServiceDescriptor
-	dynamicgoTypeDsc       *dthrift.TypeDescriptor
 	binaryWithBase64       bool
 	convOpts               conv.Options // used for dynamicgo conversion
 	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
-	hasRequestBase         bool
 	dynamicgoEnabled       bool
 }
 
@@ -75,17 +72,10 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 }
 
 // SetDynamicGo ...
-func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options, method string) error {
+func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options) {
 	w.convOpts = *convOpts
 	w.convOptsWithThriftBase = *convOptsWithThriftBase
 	w.dynamicgoEnabled = true
-	fnDsc := w.svc.DynamicGoDsc.Functions()[method]
-	if fnDsc == nil {
-		return fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, w.svc.DynamicGoDsc.Name())
-	}
-	w.hasRequestBase = fnDsc.HasRequestBase()
-	w.dynamicgoTypeDsc = fnDsc.Request()
-	return nil
 }
 
 // originalWrite ...
@@ -141,7 +131,7 @@ func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options) {
 }
 
 // Read ...
-func (r *ReadHTTPResponse) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in thrift.TProtocol) (interface{}, error) {
 	// fallback logic
 	if !r.dynamicgoEnabled {
 		return r.originalRead(ctx, method, in)

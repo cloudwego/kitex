@@ -47,6 +47,7 @@ func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *se
 		return nil, err
 	}
 	cli := &genericServiceClient{
+		svcInfo: svcInfo,
 		kClient: kc,
 		g:       g,
 	}
@@ -86,33 +87,27 @@ type Client interface {
 }
 
 type genericServiceClient struct {
+	svcInfo *serviceinfo.ServiceInfo
 	kClient client.Client
 	g       generic.Generic
 }
 
 func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, request interface{}, callOptions ...callopt.Option) (response interface{}, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	var _args generic.Args
+	_args := gc.svcInfo.MethodInfo(serviceinfo.GenericService).NewArgs().(*generic.Args)
 	_args.Method = method
 	_args.Request = request
+
 	mt, err := gc.g.GetMethod(request, method)
 	if err != nil {
 		return nil, err
 	}
-	codec := gc.g.CodecInfo()
-	if codec != nil {
-		codec.SetMethod(mt.Name)
-		codec.SetIsClient(true)
-		_args.SetCodec(codec.GetMessageReaderWriter())
-	}
 	if mt.Oneway {
-		return nil, gc.kClient.Call(ctx, mt.Name, &_args, nil)
+		return nil, gc.kClient.Call(ctx, mt.Name, _args, nil)
 	}
-	var _result generic.Result
-	if codec != nil {
-		_result.SetCodec(codec.GetMessageReaderWriter())
-	}
-	if err = gc.kClient.Call(ctx, mt.Name, &_args, &_result); err != nil {
+
+	_result := gc.svcInfo.MethodInfo(serviceinfo.GenericService).NewResult().(*generic.Result)
+	if err = gc.kClient.Call(ctx, mt.Name, _args, _result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

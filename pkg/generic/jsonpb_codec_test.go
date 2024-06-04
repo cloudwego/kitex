@@ -18,7 +18,6 @@ package generic
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -50,15 +49,7 @@ func TestJsonPbCodec(t *testing.T) {
 	test.Assert(t, jpc.GetIDLServiceName() == "Echo")
 
 	rw := jpc.GetMessageReaderWriter()
-	err, ok := rw.(error)
-	test.Assert(t, ok)
-	test.Assert(t, strings.Contains(err.Error(), "missing method"))
-
-	jpc.SetMethod(method.Name)
-	test.Assert(t, jpc.method == "Echo")
-
-	rw = jpc.GetMessageReaderWriter()
-	_, ok = rw.(gproto.MessageWriter)
+	_, ok := rw.(gproto.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(gproto.MessageReader)
 	test.Assert(t, ok)

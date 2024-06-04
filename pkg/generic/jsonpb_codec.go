@@ -40,8 +40,6 @@ type jsonPbCodec struct {
 	convOpts         conv.Options // used for dynamicgo conversion
 	dynamicgoEnabled bool         // currently set to true by default
 	svcName          string
-	method           string
-	isClient         bool
 }
 
 func newJsonPbCodec(p PbDescriptorProviderDynamicGo, opts *Options) *jsonPbCodec {
@@ -72,19 +70,7 @@ func (c *jsonPbCodec) GetMessageReaderWriter() interface{} {
 		return errors.New("get parser dynamicgo ServiceDescriptor failed")
 	}
 
-	rw, err := proto.NewJsonReaderWriter(pbSvc, c.method, c.isClient, &c.convOpts)
-	if err != nil {
-		return err
-	}
-	return rw
-}
-
-func (c *jsonPbCodec) SetMethod(method string) {
-	c.method = method
-}
-
-func (c *jsonPbCodec) SetIsClient(isClient bool) {
-	c.isClient = isClient
+	return proto.NewJsonReaderWriter(pbSvc, &c.convOpts)
 }
 
 func (c *jsonPbCodec) GetIDLServiceName() string {

@@ -62,20 +62,20 @@ func init() {
 }
 
 type mockWithContext struct {
-	ReadFunc  func(ctx context.Context, method string, msgType remote.MessageType, dataLen int, oprot thrift.TProtocol) error
-	WriteFunc func(ctx context.Context, oprot thrift.TProtocol) error
+	ReadFunc  func(ctx context.Context, method string, isClient bool, dataLen int, oprot thrift.TProtocol) error
+	WriteFunc func(ctx context.Context, method string, isClient bool, oprot thrift.TProtocol) error
 }
 
-func (m *mockWithContext) Read(ctx context.Context, method string, msgType remote.MessageType, dataLen int, oprot thrift.TProtocol) error {
+func (m *mockWithContext) Read(ctx context.Context, method string, isClient bool, dataLen int, oprot thrift.TProtocol) error {
 	if m.ReadFunc != nil {
-		return m.ReadFunc(ctx, method, -1, 0, oprot)
+		return m.ReadFunc(ctx, method, isClient, dataLen, oprot)
 	}
 	return nil
 }
 
-func (m *mockWithContext) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (m *mockWithContext) Write(ctx context.Context, method string, isClient bool, oprot thrift.TProtocol) error {
 	if m.WriteFunc != nil {
-		return m.WriteFunc(ctx, oprot)
+		return m.WriteFunc(ctx, method, isClient, oprot)
 	}
 	return nil
 }
@@ -85,7 +85,7 @@ func TestWithContext(t *testing.T) {
 		t.Run(tb.Name, func(t *testing.T) {
 			ctx := context.Background()
 
-			req := &mockWithContext{WriteFunc: func(ctx context.Context, oprot thrift.TProtocol) error {
+			req := &mockWithContext{WriteFunc: func(ctx context.Context, method string, isClinet bool, oprot thrift.TProtocol) error {
 				return nil
 			}}
 			ink := rpcinfo.NewInvocation("", "mock")
@@ -98,7 +98,7 @@ func TestWithContext(t *testing.T) {
 			buf.Flush()
 
 			{
-				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, msgType remote.MessageType, dataLen int, oprot thrift.TProtocol) error {
+				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, isClient bool, dataLen int, oprot thrift.TProtocol) error {
 					return nil
 				}}
 				ink := rpcinfo.NewInvocation("", "mock")

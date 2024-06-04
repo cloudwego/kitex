@@ -41,8 +41,6 @@ type jsonThriftCodec struct {
 	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
 	convOptsWithException  conv.Options // used for dynamicgo conversion with ConvertException turned on
 	svcName                string
-	method                 string
-	isClient               bool
 }
 
 func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
@@ -83,26 +81,18 @@ func (c *jsonThriftCodec) GetMessageReaderWriter() interface{} {
 	if !ok {
 		return errors.New("get parser ServiceDescriptor failed")
 	}
-	rw, err := thrift.NewJsonReaderWriter(svcDsc, c.method, c.isClient)
-	if err != nil {
-		return err
-	}
 
-	if err = c.configureJSONWriter(rw.WriteJSON, svcDsc); err != nil {
-		return err
-	}
+	rw := thrift.NewJsonReaderWriter(svcDsc)
+	c.configureJSONWriter(rw.WriteJSON)
 	c.configureJSONReader(rw.ReadJSON)
 	return rw
 }
 
-func (c *jsonThriftCodec) configureJSONWriter(writer *thrift.WriteJSON, svcDsc *descriptor.ServiceDescriptor) error {
+func (c *jsonThriftCodec) configureJSONWriter(writer *thrift.WriteJSON) {
 	writer.SetBase64Binary(c.binaryWithBase64)
 	if c.dynamicgoEnabled {
-		if err := writer.SetDynamicGo(svcDsc, c.method, &c.convOpts, &c.convOptsWithThriftBase); err != nil {
-			return err
-		}
+		writer.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase)
 	}
-	return nil
 }
 
 func (c *jsonThriftCodec) configureJSONReader(reader *thrift.ReadJSON) {
@@ -110,14 +100,6 @@ func (c *jsonThriftCodec) configureJSONReader(reader *thrift.ReadJSON) {
 	if c.dynamicgoEnabled {
 		reader.SetDynamicGo(&c.convOpts, &c.convOptsWithException)
 	}
-}
-
-func (c *jsonThriftCodec) SetMethod(method string) {
-	c.method = method
-}
-
-func (c *jsonThriftCodec) SetIsClient(isClient bool) {
-	c.isClient = isClient
 }
 
 func (c *jsonThriftCodec) GetIDLServiceName() string {

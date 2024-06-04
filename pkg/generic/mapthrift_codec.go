@@ -38,8 +38,6 @@ type mapThriftCodec struct {
 	binaryWithByteSlice     bool
 	setFieldsForEmptyStruct uint8
 	svcName                 string
-	method                  string
-	isClient                bool
 }
 
 func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
@@ -78,14 +76,10 @@ func (c *mapThriftCodec) GetMessageReaderWriter() interface{} {
 		return errors.New("get parser ServiceDescriptor failed")
 	}
 	var rw *thrift.StructReaderWriter
-	var err error
 	if c.forJSON {
-		rw, err = thrift.NewStructReaderWriterForJSON(svcDsc, c.method, c.isClient)
+		rw = thrift.NewStructReaderWriterForJSON(svcDsc)
 	} else {
-		rw, err = thrift.NewStructReaderWriter(svcDsc, c.method, c.isClient)
-	}
-	if err != nil {
-		return err
+		rw = thrift.NewStructReaderWriter(svcDsc)
 	}
 	c.configureStructWriter(rw.WriteStruct)
 	c.configureStructReader(rw.ReadStruct)
@@ -99,14 +93,6 @@ func (c *mapThriftCodec) configureStructWriter(writer *thrift.WriteStruct) {
 func (c *mapThriftCodec) configureStructReader(reader *thrift.ReadStruct) {
 	reader.SetBinaryOption(c.binaryWithBase64, c.binaryWithByteSlice)
 	reader.SetSetFieldsForEmptyStruct(c.setFieldsForEmptyStruct)
-}
-
-func (c *mapThriftCodec) SetMethod(method string) {
-	c.method = method
-}
-
-func (c *mapThriftCodec) SetIsClient(isClient bool) {
-	c.isClient = isClient
 }
 
 func (c *mapThriftCodec) GetIDLServiceName() string {
