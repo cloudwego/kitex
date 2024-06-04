@@ -185,8 +185,6 @@ func (m methodInfo) StreamingMode() StreamingMode {
 type CodecInfo interface {
 	GetMessageReaderWriter() interface{}
 	GetIDLServiceName() string
-	SetMethod(method string)
-	SetIsClient(isClient bool)
 }
 
 // String prints human-readable information.
