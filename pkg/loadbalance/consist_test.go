@@ -44,8 +44,14 @@ func getKey(ctx context.Context, request interface{}) string {
 
 func newTestConsistentHashOption() ConsistentHashOption {
 	opt := NewConsistentHashOption(getKey)
-	opt.ExpireDuration = 0
 	return opt
+}
+
+func TestNewConsistHashOption(t *testing.T) {
+	opt := NewConsistentHashOption(getKey)
+	test.Assert(t, opt.GetKey != nil)
+	test.Assert(t, opt.VirtualFactor == 100)
+	test.Assert(t, opt.Weighted)
 }
 
 func TestNewConsistBalancer(t *testing.T) {
@@ -84,44 +90,45 @@ func TestConsistPicker_Next_Nil(t *testing.T) {
 	test.Assert(t, cb.Name() == "consist")
 }
 
-func TestConsistPicker_Replica(t *testing.T) {
-	opt := NewConsistentHashOption(getKey)
-	opt.Replica = 1
-	opt.ExpireDuration = 0
-	opt.GetKey = func(ctx context.Context, request interface{}) string {
-		return "1234"
-	}
-	insList := makeNInstances(2, 10)
-	e := discovery.Result{
-		Cacheable: false,
-		CacheKey:  "",
-		Instances: insList,
-	}
+// Replica related test
+//func TestConsistPicker_Replica(t *testing.T) {
+//	opt := NewConsistentHashOption(getKey)
+//	opt.Replica = 1
+//	opt.GetKey = func(ctx context.Context, request interface{}) string {
+//		return "1234"
+//	}
+//	insList := makeNInstances(2, 10)
+//	e := discovery.Result{
+//		Cacheable: false,
+//		CacheKey:  "",
+//		Instances: insList,
+//	}
+//
+//	cb := NewConsistBalancer(opt)
+//	picker := cb.GetPicker(e)
+//	first := picker.Next(context.TODO(), nil)
+//	second := picker.Next(context.TODO(), nil)
+//	test.Assert(t, first != second)
+//}
 
-	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
-	first := picker.Next(context.TODO(), nil)
-	second := picker.Next(context.TODO(), nil)
-	test.Assert(t, first != second)
-}
-
-func TestConsistPicker_Next_NoCache(t *testing.T) {
-	opt := newTestConsistentHashOption()
-	ins := discovery.NewInstance("tcp", "addr1", 10, nil)
-	insList := []discovery.Instance{
-		ins,
-	}
-	e := discovery.Result{
-		Cacheable: false,
-		CacheKey:  "",
-		Instances: insList,
-	}
-
-	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
-	test.Assert(t, picker.Next(context.TODO(), nil) == ins)
-	test.Assert(t, picker.Next(context.TODO(), nil) == nil)
-}
+// Replica related test
+//func TestConsistPicker_Next_NoCache(t *testing.T) {
+//	opt := newTestConsistentHashOption()
+//	ins := discovery.NewInstance("tcp", "addr1", 10, nil)
+//	insList := []discovery.Instance{
+//		ins,
+//	}
+//	e := discovery.Result{
+//		Cacheable: false,
+//		CacheKey:  "",
+//		Instances: insList,
+//	}
+//
+//	cb := NewConsistBalancer(opt)
+//	picker := cb.GetPicker(e)
+//	test.Assert(t, picker.Next(context.TODO(), nil) == ins)
+//	test.Assert(t, picker.Next(context.TODO(), nil) == nil)
+//}
 
 func TestConsistPicker_Next_NoCache_Consist(t *testing.T) {
 	opt := newTestConsistentHashOption()
@@ -209,10 +216,9 @@ func TestConsistBalance(t *testing.T) {
 		GetKey: func(ctx context.Context, request interface{}) string {
 			return strconv.Itoa(fastrand.Intn(100000))
 		},
-		Replica:        0,
-		VirtualFactor:  1000,
-		Weighted:       false,
-		ExpireDuration: 0,
+		Replica:       0,
+		VirtualFactor: 1000,
+		Weighted:      false,
 	}
 	inss := makeNInstances(10, 10)
 
@@ -239,10 +245,9 @@ func TestWeightedConsistBalance(t *testing.T) {
 		GetKey: func(ctx context.Context, request interface{}) string {
 			return strconv.Itoa(fastrand.Intn(100000))
 		},
-		Replica:        0,
-		VirtualFactor:  1000,
-		Weighted:       true,
-		ExpireDuration: 0,
+		Replica:       0,
+		VirtualFactor: 1000,
+		Weighted:      true,
 	}
 	inss := makeNInstances(10, 10)
 
