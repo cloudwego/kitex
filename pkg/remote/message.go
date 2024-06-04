@@ -195,7 +195,8 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 	}
 	// TODO: modify logic when supporting multi-service for generic
 	var key string
-	if svcName == "" {
+	// TODO: delete the GenericService check for binary generic when supporting multi-service feature for generic
+	if svcName == "" || svcName == serviceinfo.GenericService {
 		key = methodName
 	} else {
 		key = BuildMultiServiceKey(svcName, methodName)
