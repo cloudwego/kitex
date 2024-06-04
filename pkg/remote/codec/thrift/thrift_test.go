@@ -85,7 +85,7 @@ func TestWithContext(t *testing.T) {
 		t.Run(tb.Name, func(t *testing.T) {
 			ctx := context.Background()
 
-			req := &mockWithContext{WriteFunc: func(ctx context.Context, method string, isClinet bool, oprot thrift.TProtocol) error {
+			req := &mockWithContext{WriteFunc: func(ctx context.Context, method string, isClient bool, oprot thrift.TProtocol) error {
 				return nil
 			}}
 			ink := rpcinfo.NewInvocation("", "mock")
