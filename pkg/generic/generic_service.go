@@ -34,9 +34,15 @@ type Service interface {
 	GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error)
 }
 
-// ServiceInfo create a generic ServiceInfo
-func ServiceInfo(pcType serviceinfo.PayloadCodec, codec serviceinfo.CodecInfo) *serviceinfo.ServiceInfo {
+// ServiceInfoWithCodecInfo create a generic ServiceInfo with CodecInfo
+func ServiceInfoWithCodecInfo(pcType serviceinfo.PayloadCodec, codec serviceinfo.CodecInfo) *serviceinfo.ServiceInfo {
 	return newServiceInfo(pcType, codec)
+}
+
+// Deprecated: it's not used by kitex anymore.
+// ServiceInfo create a generic ServiceInfo
+func ServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
+	return newServiceInfo(pcType, nil)
 }
 
 func newServiceInfo(pcType serviceinfo.PayloadCodec, codec serviceinfo.CodecInfo) *serviceinfo.ServiceInfo {

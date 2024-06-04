@@ -17,6 +17,7 @@
 package generic
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -25,6 +26,9 @@ import (
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/pkg/generic/proto"
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
+	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -93,4 +97,36 @@ func (c *jsonPbCodec) Name() string {
 
 func (c *jsonPbCodec) Close() error {
 	return c.provider.Close()
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+func (c *jsonPbCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	method := msg.RPCInfo().Invocation().MethodName()
+	if method == "" {
+		return perrors.NewProtocolErrorWithMsg("empty methodName in protobuf Marshal")
+	}
+	if msg.MessageType() == remote.Exception {
+		return pbCodec.Marshal(ctx, msg, out)
+	}
+
+	pbSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor)
+
+	wm := proto.NewWriteJSON(pbSvc, &c.convOpts)
+	msg.Data().(WithCodec).SetCodec(wm)
+
+	return pbCodec.Marshal(ctx, msg, out)
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
+		return err
+	}
+
+	pbSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor)
+
+	wm := proto.NewReadJSON(pbSvc, &c.convOpts)
+	msg.Data().(WithCodec).SetCodec(wm)
+
+	return pbCodec.Unmarshal(ctx, msg, in)
 }

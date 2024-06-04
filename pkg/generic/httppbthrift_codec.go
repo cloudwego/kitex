@@ -17,6 +17,7 @@
 package generic
 
 import (
+	"context"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -27,7 +28,10 @@ import (
 	"github.com/jhump/protoreflect/desc"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -123,6 +127,41 @@ func (c *httpPbThriftCodec) Close() error {
 	} else {
 		return errors.New(strings.Join(errs, ";"))
 	}
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	pbSvcDsc, ok := c.pbSvcDsc.Load().(*desc.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser PbServiceDescriptor failed")
+	}
+
+	inner := thrift.NewWriteHTTPPbRequest(svcDsc, pbSvcDsc)
+	msg.Data().(WithCodec).SetCodec(inner)
+	return thriftCodec.Marshal(ctx, msg, out)
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
+		return err
+	}
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	pbSvcDsc, ok := c.pbSvcDsc.Load().(proto.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser PbServiceDescriptor failed")
+	}
+
+	inner := thrift.NewReadHTTPPbResponse(svcDsc, pbSvcDsc)
+	msg.Data().(WithCodec).SetCodec(inner)
+	return thriftCodec.Unmarshal(ctx, msg, in)
 }
 
 // FromHTTPPbRequest parse  HTTPRequest from http.Request

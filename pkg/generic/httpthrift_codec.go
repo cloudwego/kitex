@@ -17,6 +17,7 @@
 package generic
 
 import (
+	"context"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -27,6 +28,8 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -132,6 +135,44 @@ func (c *httpThriftCodec) Name() string {
 
 func (c *httpThriftCodec) Close() error {
 	return c.provider.Close()
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+
+	inner := thrift.NewWriteHTTPRequest(svcDsc)
+	inner.SetBinaryWithBase64(c.binaryWithBase64)
+	if c.dynamicgoEnabled {
+		inner.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase)
+	}
+
+	msg.Data().(WithCodec).SetCodec(inner)
+	return thriftCodec.Marshal(ctx, msg, out)
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
+		return err
+	}
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+
+	inner := thrift.NewReadHTTPResponse(svcDsc)
+	inner.SetBase64Binary(c.binaryWithBase64)
+	inner.SetUseRawBodyForHTTPResp(c.useRawBodyForHTTPResp)
+	if c.dynamicgoEnabled && c.useRawBodyForHTTPResp {
+		inner.SetDynamicGo(&c.convOpts)
+	}
+
+	msg.Data().(WithCodec).SetCodec(inner)
+	return thriftCodec.Unmarshal(ctx, msg, in)
 }
 
 // FromHTTPRequest parse HTTPRequest from http.Request
