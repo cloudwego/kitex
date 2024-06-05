@@ -19,6 +19,7 @@ package transmeta
 import (
 	"context"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"strconv"
 	"time"
 
@@ -78,7 +79,9 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 		hd[transmeta.ConnectTimeout] = strconv.Itoa(int(ri.Config().ConnectTimeout().Milliseconds()))
 	}
 	transInfo.PutTransIntInfo(hd)
-	transInfo.PutTransStrInfo(map[string]string{transmeta.HeaderIDLServiceName: ri.Invocation().ServiceName()})
+	if ri.Invocation().ServiceName() != serviceinfo.GenericService {
+		transInfo.PutTransStrInfo(map[string]string{transmeta.HeaderIDLServiceName: ri.Invocation().ServiceName()})
+	}
 	return ctx, nil
 }
 
