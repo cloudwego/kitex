@@ -197,5 +197,5 @@ func Test_getSkippedStructBuffer(t *testing.T) {
 	tProt := NewBinaryProtocol(remote.NewReaderBuffer(faultThrift))
 	_, err := getSkippedStructBuffer(tProt)
 	test.Assert(t, err != nil, err)
-	test.Assert(t, strings.Contains(err.Error(), "caught in SkipDecoder SkipStruct phase"))
+	test.Assert(t, strings.Contains(err.Error(), "caught in SkipDecoder NextStruct phase"))
 }

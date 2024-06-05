@@ -17,6 +17,7 @@
 package thrift
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -30,172 +31,142 @@ const (
 	EnableSkipDecoder CodecType = 0b10000
 )
 
-// skipBuffer wraps remote.ByteBuffer and reimplement the Next method.
-// Next method would not advance the reader in the underlying buffer until Buffer method is called.
-// It is used to fit in BinaryProtocol and reduce memory allocation.
-type skipBuffer struct {
-	remote.ByteBuffer
-	readNum int
-}
-
-func (b *skipBuffer) Next(n int) ([]byte, error) {
-	prev := b.readNum
-	next := prev + n
-	buf, err := b.ByteBuffer.Peek(next)
-	if err != nil {
-		return nil, err
-	}
-	b.readNum = next
-	return buf[prev:next], nil
-}
-
-func (b *skipBuffer) Buffer() ([]byte, error) {
-	return b.ByteBuffer.Next(b.readNum)
-}
-
-func newSkipBuffer(bb remote.ByteBuffer) *skipBuffer {
-	return &skipBuffer{
-		ByteBuffer: bb,
-	}
-}
-
 // skipDecoder is used to parse the input byte-by-byte and skip the thrift payload
 // for making use of Frugal and FastCodec in standard Thrift Binary Protocol scenario.
 type skipDecoder struct {
-	tprot *BinaryProtocol
-	sb    *skipBuffer
+	remote.ByteBuffer
+
+	r   int
+	buf []byte
 }
 
-func newSkipDecoder(trans remote.ByteBuffer) *skipDecoder {
-	sb := newSkipBuffer(trans)
-	return &skipDecoder{
-		tprot: NewBinaryProtocol(sb),
-		sb:    sb,
-	}
+func (p *skipDecoder) init() (err error) {
+	p.r = 0
+	p.buf, err = p.Peek(p.ReadableLen())
+	return
 }
 
-func (sd *skipDecoder) SkipStruct() error {
-	return sd.skip(thrift.STRUCT, thrift.DEFAULT_RECURSION_DEPTH)
-}
-
-func (sd *skipDecoder) skipString() error {
-	size, err := sd.tprot.ReadI32()
-	if err != nil {
-		return err
+func (p *skipDecoder) loadmore(n int) error {
+	// trigger underlying conn to read more
+	_, err := p.Peek(n)
+	if err == nil {
+		// read as much as possible, luckly, we will have a full buffer
+		// then we no need to call p.Peek many times
+		p.buf, err = p.Peek(p.ReadableLen())
 	}
-	if size < 0 {
-		return perrors.InvalidDataLength
-	}
-	_, err = sd.tprot.next(int(size))
 	return err
 }
 
-func (sd *skipDecoder) skipMap(maxDepth int) error {
-	keyTypeId, valTypeId, size, err := sd.tprot.ReadMapBegin()
-	if err != nil {
-		return err
-	}
-	for i := 0; i < size; i++ {
-		if err = sd.skip(keyTypeId, maxDepth); err != nil {
-			return err
+func (p *skipDecoder) next(n int) ([]byte, error) {
+	if len(p.buf)-p.r < n {
+		if err := p.loadmore(p.r + n); err != nil {
+			return nil, err
 		}
-		if err = sd.skip(valTypeId, maxDepth); err != nil {
-			return err
-		}
+		// after calling p.loadmore, p.buf MUST be at least (p.r + n) len
 	}
-	return nil
+	ret := p.buf[p.r : p.r+n]
+	p.r += n
+	return ret, nil
 }
 
-func (sd *skipDecoder) skipList(maxDepth int) error {
-	elemTypeId, size, err := sd.tprot.ReadListBegin()
-	if err != nil {
-		return err
+func (p *skipDecoder) NextStruct() (buf []byte, err error) {
+	// should be ok with init, just one less p.Peek call
+	if err := p.init(); err != nil {
+		return nil, err
 	}
-	for i := 0; i < size; i++ {
-		if err = sd.skip(elemTypeId, maxDepth); err != nil {
-			return err
-		}
+	if err := p.skip(thrift.STRUCT, thrift.DEFAULT_RECURSION_DEPTH); err != nil {
+		return nil, err
 	}
-	return nil
+	return p.Next(p.r)
 }
 
-func (sd *skipDecoder) skipSet(maxDepth int) error {
-	return sd.skipList(maxDepth)
-}
-
-func (sd *skipDecoder) skip(typeId thrift.TType, maxDepth int) (err error) {
+// skip skips bytes for a specific type.
+// After calling skip, p.r contains the len of the type.
+// Since BinaryProtocol calls Next of remote.ByteBuffer many times when reading a struct,
+// we don't use it for performance concerns
+func (p *skipDecoder) skip(typeID thrift.TType, maxDepth int) error {
 	if maxDepth <= 0 {
 		return thrift.NewTProtocolExceptionWithType(thrift.DEPTH_LIMIT, errors.New("depth limit exceeded"))
 	}
-
-	switch typeId {
+	switch typeID {
 	case thrift.BOOL, thrift.BYTE:
-		if _, err = sd.tprot.next(1); err != nil {
-			return
+		if _, err := p.next(1); err != nil {
+			return err
 		}
 	case thrift.I16:
-		if _, err = sd.tprot.next(2); err != nil {
-			return
+		if _, err := p.next(2); err != nil {
+			return err
 		}
 	case thrift.I32:
-		if _, err = sd.tprot.next(4); err != nil {
-			return
+		if _, err := p.next(4); err != nil {
+			return err
 		}
 	case thrift.I64, thrift.DOUBLE:
-		if _, err = sd.tprot.next(8); err != nil {
-			return
+		if _, err := p.next(8); err != nil {
+			return err
 		}
 	case thrift.STRING:
-		if err = sd.skipString(); err != nil {
-			return
-		}
-	case thrift.STRUCT:
-		if err = sd.skipStruct(maxDepth - 1); err != nil {
-			return
-		}
-	case thrift.MAP:
-		if err = sd.skipMap(maxDepth - 1); err != nil {
-			return
-		}
-	case thrift.SET:
-		if err = sd.skipSet(maxDepth - 1); err != nil {
-			return
-		}
-	case thrift.LIST:
-		if err = sd.skipList(maxDepth - 1); err != nil {
-			return
-		}
-	default:
-		return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("unknown data type %d", typeId))
-	}
-	return nil
-}
-
-func (sd *skipDecoder) skipStruct(maxDepth int) (err error) {
-	var fieldTypeId thrift.TType
-
-	for {
-		_, fieldTypeId, _, err = sd.tprot.ReadFieldBegin()
+		b, err := p.next(4)
 		if err != nil {
 			return err
 		}
-		if fieldTypeId == thrift.STOP {
+		sz := int(binary.BigEndian.Uint32(b))
+		if sz < 0 {
+			return perrors.InvalidDataLength
+		}
+		if _, err := p.next(sz); err != nil {
 			return err
 		}
-		if err = sd.skip(fieldTypeId, maxDepth); err != nil {
+	case thrift.STRUCT:
+		for {
+			b, err := p.next(1) // TType
+			if err != nil {
+				return err
+			}
+			tp := thrift.TType(b[0])
+			if tp == thrift.STOP {
+				break
+			}
+			if _, err := p.next(2); err != nil { // Field ID
+				return err
+			}
+			if err := p.skip(tp, maxDepth-1); err != nil {
+				return err
+			}
+		}
+	case thrift.MAP:
+		b, err := p.next(6) // 1 byte key TType, 1 byte value TType, 4 bytes Len
+		if err != nil {
 			return err
 		}
+		kt, vt, sz := thrift.TType(b[0]), thrift.TType(b[1]), int32(binary.BigEndian.Uint32(b[2:]))
+		if sz < 0 {
+			return perrors.InvalidDataLength
+		}
+		for i := int32(0); i < sz; i++ {
+			if err := p.skip(kt, maxDepth-1); err != nil {
+				return err
+			}
+			if err := p.skip(vt, maxDepth-1); err != nil {
+				return err
+			}
+		}
+	case thrift.SET, thrift.LIST:
+		b, err := p.next(5) // 1 byte value type, 4 bytes Len
+		if err != nil {
+			return err
+		}
+		vt, sz := thrift.TType(b[0]), int32(binary.BigEndian.Uint32(b[1:]))
+		if sz < 0 {
+			return perrors.InvalidDataLength
+		}
+		for i := int32(0); i < sz; i++ {
+			if err := p.skip(vt, maxDepth-1); err != nil {
+				return err
+			}
+		}
+	default:
+		return thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("unknown data type %d", typeID))
 	}
-}
-
-// Buffer returns the skipped buffer.
-// Using this buffer to feed to Frugal or FastCodec
-func (sd *skipDecoder) Buffer() ([]byte, error) {
-	return sd.sb.Buffer()
-}
-
-// Recycle recycles the internal BinaryProtocol and would not affect the buffer
-// returned by Buffer()
-func (sd *skipDecoder) Recycle() {
-	sd.tprot.Recycle()
+	return nil
 }
