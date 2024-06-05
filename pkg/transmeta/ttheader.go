@@ -19,7 +19,6 @@ package transmeta
 import (
 	"context"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"strconv"
 	"time"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
 )
