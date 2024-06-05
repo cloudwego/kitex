@@ -19,6 +19,7 @@ package transmeta
 import (
 	"context"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"strconv"
 	"time"
 
