@@ -32,6 +32,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 )
 
+// ConnectionGetter is used to get a connection based on address and connection option.
+type ConnectionGetter interface {
+	Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error)
+}
+
 var _ remote.LongConnPool = &connPool{}
 
 func poolSize() uint32 {
@@ -42,15 +47,15 @@ func poolSize() uint32 {
 }
 
 // NewConnPool ...
-func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions, underlyingPool remote.ConnPool) *connPool {
+func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions, connGetter ConnectionGetter) *connPool {
 	if size == 0 {
 		size = poolSize()
 	}
 	return &connPool{
-		remoteService:  remoteService,
-		size:           size,
-		connOpts:       connOpts,
-		underlyingPool: underlyingPool,
+		remoteService: remoteService,
+		size:          size,
+		connOpts:      connOpts,
+		connGetter:    connGetter,
 	}
 }
 
@@ -61,9 +66,7 @@ type connPool struct {
 	conns         sync.Map // key: address, value: *transports
 	remoteService string   // remote service name
 	connOpts      grpc.ConnectOptions
-
-	// pool
-	underlyingPool remote.ConnPool
+	connGetter    ConnectionGetter // use this to get a connection if specified
 }
 
 type transports struct {
@@ -111,8 +114,8 @@ func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, netwo
 		conn net.Conn
 		err  error
 	)
-	if p.underlyingPool != nil {
-		conn, err = p.underlyingPool.Get(ctx, network, address, opt)
+	if p.connGetter != nil {
+		conn, err = p.connGetter.Get(ctx, network, address, opt)
 		if err != nil {
 			return nil, err
 		}

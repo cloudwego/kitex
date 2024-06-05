@@ -109,8 +109,9 @@ type Options struct {
 	WarmUpOption   *warmup.ClientOption
 
 	// GRPC
-	GRPCConnPoolSize uint32
-	GRPCConnectOpts  *grpc.ConnectOptions
+	GRPCConnPoolSize     uint32
+	GRPCConnectOpts      *grpc.ConnectOptions
+	GRPCConnectionGetter nphttp2.ConnectionGetter
 
 	// XDS
 	XDSEnabled          bool
@@ -180,7 +181,7 @@ func (o *Options) initRemoteOpt() {
 			// grpc unary short connection
 			o.GRPCConnectOpts.ShortConn = true
 		}
-		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts, o.RemoteOpt.ConnPool)
+		o.RemoteOpt.ConnPool = nphttp2.NewConnPool(o.Svr.ServiceName, o.GRPCConnPoolSize, *o.GRPCConnectOpts, o.GRPCConnectionGetter)
 		o.RemoteOpt.CliHandlerFactory = nphttp2.NewCliTransHandlerFactory()
 	}
 	if o.RemoteOpt.ConnPool == nil {
