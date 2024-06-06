@@ -19,8 +19,11 @@ package loadbalance
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/bytedance/gopkg/lang/fastrand"
 
@@ -40,6 +43,25 @@ func getKey(ctx context.Context, request interface{}) string {
 		return val
 	}
 	return "1234"
+}
+
+func getRandomKey(ctx context.Context, request interface{}) string {
+	key, ok := ctx.Value(keyCtxKey).(string)
+	if !ok {
+		return ""
+	}
+	return key
+}
+
+func getRandomString(length int) string {
+	var resBuilder strings.Builder
+	resBuilder.Grow(length)
+	corpus := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	rand.Seed(time.Now().UnixNano() + int64(100))
+	for i := 0; i < length; i++ {
+		resBuilder.WriteByte(corpus[rand.Intn(len(corpus))])
+	}
+	return resBuilder.String()
 }
 
 func newTestConsistentHashOption() ConsistentHashOption {
@@ -346,6 +368,40 @@ func BenchmarkNewConsistPicker(bb *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
+				picker := balancer.GetPicker(e)
+				picker.Next(ctx, nil)
+				if r, ok := picker.(internal.Reusable); ok {
+					r.Recycle()
+				}
+			}
+		})
+		n *= 10
+	}
+}
+
+func BenchmarkConsistPicker_RandomDistributionKey(bb *testing.B) {
+	n := 10
+	balancer := NewConsistBalancer(NewConsistentHashOption(getRandomKey))
+
+	for i := 0; i < 4; i++ {
+		bb.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
+			inss := makeNInstances(n, 10)
+			e := discovery.Result{
+				Cacheable: true,
+				CacheKey:  "test",
+				Instances: inss,
+			}
+			picker := balancer.GetPicker(e)
+			ctx := context.WithValue(context.Background(), keyCtxKey, getRandomString(30))
+			picker.Next(ctx, nil)
+			picker.(internal.Reusable).Recycle()
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				b.Logf("round %d", i)
+				b.StopTimer()
+				ctx = context.WithValue(context.Background(), keyCtxKey, getRandomString(30))
+				b.StartTimer()
 				picker := balancer.GetPicker(e)
 				picker.Next(ctx, nil)
 				if r, ok := picker.(internal.Reusable); ok {
