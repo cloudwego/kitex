@@ -379,6 +379,15 @@ func BenchmarkNewConsistPicker(bb *testing.B) {
 	}
 }
 
+// BenchmarkConsistPicker_RandomDistributionKey
+// BenchmarkConsistPicker_RandomDistributionKey/10ins
+// BenchmarkConsistPicker_RandomDistributionKey/10ins-12         	 2417481	       508.9 ns/op	      48 B/op	       1 allocs/op
+// BenchmarkConsistPicker_RandomDistributionKey/100ins
+// BenchmarkConsistPicker_RandomDistributionKey/100ins-12        	 2140726	       534.6 ns/op	      48 B/op	       1 allocs/op
+// BenchmarkConsistPicker_RandomDistributionKey/1000ins
+// BenchmarkConsistPicker_RandomDistributionKey/1000ins-12       	 2848216.          407.7 ns/op	      48 B/op	       1 allocs/op
+// BenchmarkConsistPicker_RandomDistributionKey/10000ins
+// BenchmarkConsistPicker_RandomDistributionKey/10000ins-12      	 2701766	       492.7 ns/op	      48 B/op	       1 allocs/op
 func BenchmarkConsistPicker_RandomDistributionKey(bb *testing.B) {
 	n := 10
 	balancer := NewConsistBalancer(NewConsistentHashOption(getRandomKey))
