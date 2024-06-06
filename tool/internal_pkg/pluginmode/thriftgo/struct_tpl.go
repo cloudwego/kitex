@@ -514,6 +514,7 @@ const FieldFastReadMap = `
 		{{- $ctx := (.ValCtx.WithTarget $val).WithFieldMask $curFieldMask}}
 		{{- if $isStructVal}}
 		{{$val}} := &values[i]
+		{{$val}}.InitDefault()
 		{{- else}}
 		{{- $ctx = $ctx.WithDecl}}
 		{{- end}}
@@ -564,6 +565,7 @@ const FieldFastReadSet = `
 		{{- $ctx := (.ValCtx.WithTarget $val).WithFieldMask $curFieldMask}}
 		{{- if $isStructVal}}
 		{{$val}} := &values[i]
+		{{$val}}.InitDefault()
 		{{- else}}
 		{{- $ctx = $ctx.WithDecl}}
 		{{- end}}
@@ -614,6 +616,7 @@ const FieldFastReadList = `
 		{{- $ctx := (.ValCtx.WithTarget $val).WithFieldMask $curFieldMask}}
 		{{- if $isStructVal}}
 		{{$val}} := &values[i]
+		{{$val}}.InitDefault()
 		{{- else}}
 		{{- $ctx = $ctx.WithDecl}}
 		{{- end}}
