@@ -131,17 +131,7 @@ func TestNormal(t *testing.T) {
 			test.Assert(t, err == nil, err)
 
 			// compare Req Arg
-			sendReq := (sendMsg.Data()).(*mt.MockTestArgs).Req
-			recvReq := (recvMsg.Data()).(*mt.MockTestArgs).Req
-			test.Assert(t, sendReq.Msg == recvReq.Msg)
-			test.Assert(t, len(sendReq.StrList) == len(recvReq.StrList))
-			test.Assert(t, len(sendReq.StrMap) == len(recvReq.StrMap))
-			for i, item := range sendReq.StrList {
-				test.Assert(t, item == recvReq.StrList[i])
-			}
-			for k := range sendReq.StrMap {
-				test.Assert(t, sendReq.StrMap[k] == recvReq.StrMap[k])
-			}
+			compare(t, sendMsg, recvMsg)
 		})
 	}
 }
@@ -229,6 +219,59 @@ func TestTransErrorUnwrap(t *testing.T) {
 	test.Assert(t, uwErr2.Error() == errMsg)
 }
 
+func TestSkipDecoder(t *testing.T) {
+	testcases := []struct {
+		desc     string
+		codec    remote.PayloadCodec
+		protocol transport.Protocol
+	}{
+		{
+			desc:     "Disable SkipDecoder, fallback to Apache Thrift Codec for Buffer Protocol",
+			codec:    NewThriftCodec(),
+			protocol: transport.PurePayload,
+		},
+		{
+			desc:     "Disable SkipDecoder, using FastCodec for TTHeader Protocol",
+			codec:    NewThriftCodec(),
+			protocol: transport.TTHeader,
+		},
+		{
+			desc:     "Enable SkipDecoder, using FastCodec for Buffer Protocol",
+			codec:    NewThriftCodecWithConfig(FastRead | FastWrite | EnableSkipDecoder),
+			protocol: transport.PurePayload,
+		},
+		{
+			desc:     "Enable SkipDecoder, using FastCodec for TTHeader Protocol",
+			codec:    NewThriftCodecWithConfig(FastRead | FastWrite | EnableSkipDecoder),
+			protocol: transport.TTHeader,
+		},
+	}
+
+	for _, tc := range testcases {
+		for _, tb := range transportBuffers {
+			t.Run(tc.desc+"#"+tb.Name, func(t *testing.T) {
+				// encode client side
+				sendMsg := initSendMsg(tc.protocol)
+				buf := tb.NewBuffer()
+				err := tc.codec.Marshal(context.Background(), sendMsg, buf)
+				test.Assert(t, err == nil, err)
+				buf.Flush()
+
+				// decode server side
+				recvMsg := initRecvMsg()
+				if tc.protocol != transport.PurePayload {
+					recvMsg.SetPayloadLen(buf.ReadableLen())
+				}
+				err = tc.codec.Unmarshal(context.Background(), recvMsg, buf)
+				test.Assert(t, err == nil, err)
+
+				// compare Req Arg
+				compare(t, sendMsg, recvMsg)
+			})
+		}
+	}
+}
+
 func initSendMsg(tp transport.Protocol) remote.Message {
 	var _args mt.MockTestArgs
 	_args.Req = prepareReq()
@@ -245,6 +288,20 @@ func initRecvMsg() remote.Message {
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
 	msg := remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Server)
 	return msg
+}
+
+func compare(t *testing.T, sendMsg, recvMsg remote.Message) {
+	sendReq := (sendMsg.Data()).(*mt.MockTestArgs).Req
+	recvReq := (recvMsg.Data()).(*mt.MockTestArgs).Req
+	test.Assert(t, sendReq.Msg == recvReq.Msg)
+	test.Assert(t, len(sendReq.StrList) == len(recvReq.StrList))
+	test.Assert(t, len(sendReq.StrMap) == len(recvReq.StrMap))
+	for i, item := range sendReq.StrList {
+		test.Assert(t, item == recvReq.StrList[i])
+	}
+	for k := range sendReq.StrMap {
+		test.Assert(t, sendReq.StrMap[k] == recvReq.StrMap[k])
+	}
 }
 
 func initServerErrorMsg(tp transport.Protocol, ri rpcinfo.RPCInfo, transErr *remote.TransError) remote.Message {
