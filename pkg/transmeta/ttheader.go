@@ -75,7 +75,9 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 	if cfg.IsRPCTimeoutLocked() {
 		hd[transmeta.RPCTimeout] = strconv.Itoa(int(ri.Config().RPCTimeout().Milliseconds()))
 	}
-
+	if cfg.IsConnectTimeoutLocked() {
+		hd[transmeta.ConnectTimeout] = strconv.Itoa(int(ri.Config().ConnectTimeout().Milliseconds()))
+	}
 	transInfo.PutTransIntInfo(hd)
 	idlSvcName := ri.Invocation().ServiceName()
 	if idlSvcName != serviceinfo.GenericService {
