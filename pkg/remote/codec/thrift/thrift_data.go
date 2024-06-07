@@ -142,7 +142,7 @@ func (c thriftCodec) fastMessageUnmarshalEnabled() bool {
 }
 
 func (c thriftCodec) fastMessageUnmarshalAvailable(data interface{}, payloadLen int) bool {
-	if payloadLen <= 0 && c.CodecType&EnableSkipDecoder == 0 {
+	if payloadLen == 0 && c.CodecType&EnableSkipDecoder == 0 {
 		return false
 	}
 	_, ok := data.(ThriftMsgFastCodec)
@@ -176,7 +176,6 @@ func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, data
 // unmarshalThriftData only decodes the data (after methodName, msgType and seqId)
 // method is only used for generic calls
 func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProtocol, method string, data interface{}, dataLen int) error {
-	// Important: For the Buffered protocol, the dataLen would be negative
 	// decode with hyper unmarshal
 	if c.hyperMessageUnmarshalEnabled() && c.hyperMessageUnmarshalAvailable(data, dataLen) {
 		return c.hyperUnmarshal(tProt, data, dataLen)

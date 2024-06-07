@@ -197,6 +197,10 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	data := message.Data()
 	msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
 	dataLen := message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength()
+	// For Buffer Protocol, dataLen would be negative. Set it to zero so as not to confuse
+	if dataLen < 0 {
+		dataLen = 0
+	}
 
 	ri := message.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
