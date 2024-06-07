@@ -52,6 +52,7 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	cfg := rpcinfo.NewRPCConfig()
 	cfgMutable := rpcinfo.AsMutableRPCConfig(cfg)
 	cfgMutable.SetRPCTimeout(time.Millisecond * 100)
+	cfgMutable.SetConnectTimeout(time.Millisecond * 1000)
 	cfgMutable.LockConfig(rpcinfo.BitRPCTimeout)
 	cfgMutable.LockConfig(rpcinfo.BitConnectTimeout)
 
@@ -82,6 +83,7 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	test.Assert(t, kvs[transmeta.MsgType] == strconv.Itoa(int(remote.Call)))
 	test.Assert(t, kvs[transmeta.TransportType] == unframedTransportType)
 	test.Assert(t, kvs[transmeta.RPCTimeout] == "100")
+	test.Assert(t, kvs[transmeta.ConnectTimeout] == "1000")
 	strKvs = msg.TransInfo().TransStrInfo()
 	test.Assert(t, len(strKvs) == 1)
 	test.Assert(t, strKvs[transmeta.HeaderIDLServiceName] == "")
@@ -94,10 +96,9 @@ func TestTTHeaderServerReadMetainfo(t *testing.T) {
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
 
 	hd := map[uint16]string{
-		transmeta.FromService:    "fromService",
-		transmeta.FromMethod:     "fromMethod",
-		transmeta.RPCTimeout:     "100",
-		transmeta.ConnectTimeout: "1000",
+		transmeta.FromService: "fromService",
+		transmeta.FromMethod:  "fromMethod",
+		transmeta.RPCTimeout:  "100",
 	}
 	msg.TransInfo().PutTransIntInfo(hd)
 
@@ -114,7 +115,6 @@ func TestTTHeaderServerReadMetainfo(t *testing.T) {
 	test.Assert(t, msg.RPCInfo().From().ServiceName() == hd[transmeta.FromService])
 	test.Assert(t, msg.RPCInfo().From().Method() == hd[transmeta.FromMethod])
 	test.Assert(t, ri.Config().RPCTimeout() == 100*time.Millisecond)
-	test.Assert(t, ri.Config().ConnectTimeout() == 1000*time.Millisecond)
 }
 
 func TestTTHeaderServerWriteMetainfo(t *testing.T) {
