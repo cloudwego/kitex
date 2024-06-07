@@ -41,7 +41,8 @@ const (
 	FastWrite CodecType = 0b0001
 	FastRead  CodecType = 0b0010
 
-	FastReadWrite = FastRead | FastWrite
+	FastReadWrite               = FastRead | FastWrite
+	EnableSkipDecoder CodecType = 0b10000
 )
 
 var (
