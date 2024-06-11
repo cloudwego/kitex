@@ -21,8 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
-
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )

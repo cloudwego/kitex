@@ -22,10 +22,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/internal/mocks/thrift/fast"
 	"github.com/cloudwego/kitex/internal/test"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 

@@ -17,12 +17,11 @@
 package utils
 
 import (
-	"bytes"
-	"context"
 	"errors"
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // ThriftMessageCodec is used to codec thrift messages.
@@ -33,6 +32,7 @@ type ThriftMessageCodec struct {
 
 // NewThriftMessageCodec creates a new ThriftMessageCodec.
 func NewThriftMessageCodec() *ThriftMessageCodec {
+	// TODO: use remote.ByteBuffer & remote/codec/thrift.BinaryProtocol
 	transport := thrift.NewTMemoryBufferLen(1024)
 	tProt := thrift.NewTBinaryProtocol(transport, true, true)
 
@@ -119,38 +119,34 @@ func (t *ThriftMessageCodec) Deserialize(msg thrift.TStruct, b []byte) (err erro
 
 // MarshalError convert go error to thrift exception, and encode exception over buffered binary transport.
 func MarshalError(method string, err error) []byte {
-	e := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, err.Error())
-	var buf bytes.Buffer
-	trans := thrift.NewStreamTransportRW(&buf)
-	proto := thrift.NewTBinaryProtocol(trans, true, true)
-	if err := proto.WriteMessageBegin(method, thrift.EXCEPTION, 0); err != nil {
-		return nil
-	}
-	if err := e.Write(proto); err != nil {
-		return nil
-	}
-	if err := proto.WriteMessageEnd(); err != nil {
-		return nil
-	}
-	if err := proto.Flush(context.Background()); err != nil {
-		return nil
-	}
-	return buf.Bytes()
+	ex := bthrift.NewApplicationException(thrift.INTERNAL_ERROR, err.Error())
+	n := bthrift.Binary.MessageBeginLength(method, thrift.EXCEPTION, 0)
+	n += ex.BLength()
+	b := make([]byte, n)
+	// Write message header
+	off := bthrift.Binary.WriteMessageBegin(b, method, thrift.EXCEPTION, 0)
+	// Write Ex body
+	off += ex.FastWrite(b[off:])
+	return b[:off]
 }
 
 // UnmarshalError decode binary and return error message
 func UnmarshalError(b []byte) error {
-	trans := thrift.NewStreamTransportR(bytes.NewReader(b))
-	proto := thrift.NewTBinaryProtocolTransport(trans)
-	if _, _, _, err := proto.ReadMessageBegin(); err != nil {
-		return fmt.Errorf("read message begin error: %w", err)
+	// Read message header
+	_, tp, _, l, err := bthrift.Binary.ReadMessageBegin(b)
+	if err != nil {
+		return err
 	}
-	e := thrift.NewTApplicationException(0, "")
-	if err := e.Read(proto); err != nil {
-		return fmt.Errorf("read exception error: %w", err)
+	if tp != thrift.EXCEPTION {
+		return fmt.Errorf("expects thrift.EXCEPTION, found: %d", tp)
 	}
-	if err := proto.ReadMessageEnd(); err != nil {
-		return fmt.Errorf("read message end error: %w", err)
+	// Read Ex body
+	off := l
+	ex := bthrift.NewApplicationException(thrift.INTERNAL_ERROR, "")
+	l, err = ex.FastRead(b[off:])
+	if err != nil {
+		return err
 	}
-	return e
+	// XXX: for compatibility, consider to remove it in the future
+	return thrift.NewTApplicationException(ex.TypeID(), ex.Msg())
 }

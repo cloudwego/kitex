@@ -20,10 +20,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
-
 	mt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 func TestRPCCodec(t *testing.T) {
@@ -113,5 +112,6 @@ func TestSerializer(t *testing.T) {
 func TestException(t *testing.T) {
 	errMsg := "my error"
 	b := MarshalError("some method", errors.New(errMsg))
-	test.Assert(t, UnmarshalError(b).Error() == errMsg)
+	err := UnmarshalError(b)
+	test.Assert(t, err.Error() == errMsg, err)
 }
