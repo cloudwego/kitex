@@ -24,7 +24,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -42,9 +41,6 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 		return perrors.NewProtocolErrorWithMsg("invalid marshal data in rawThriftBinaryCodec: nil")
 	}
 	if msg.MessageType() == remote.Exception {
-		if ink, ok := msg.RPCInfo().Invocation().(rpcinfo.InvocationSetter); ok {
-			ink.SetMethodName(serviceinfo.GenericMethod)
-		}
 		if err := c.thriftCodec.Marshal(ctx, msg, out); err != nil {
 			return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("rawThriftBinaryCodec Marshal exception failed, err: %s", err.Error()))
 		}

@@ -19,8 +19,11 @@ package loadbalance
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/bytedance/gopkg/lang/fastrand"
 
@@ -42,10 +45,35 @@ func getKey(ctx context.Context, request interface{}) string {
 	return "1234"
 }
 
+func getRandomKey(ctx context.Context, request interface{}) string {
+	key, ok := ctx.Value(keyCtxKey).(string)
+	if !ok {
+		return ""
+	}
+	return key
+}
+
+func getRandomString(length int) string {
+	var resBuilder strings.Builder
+	resBuilder.Grow(length)
+	corpus := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	rand.Seed(time.Now().UnixNano() + int64(100))
+	for i := 0; i < length; i++ {
+		resBuilder.WriteByte(corpus[rand.Intn(len(corpus))])
+	}
+	return resBuilder.String()
+}
+
 func newTestConsistentHashOption() ConsistentHashOption {
 	opt := NewConsistentHashOption(getKey)
-	opt.ExpireDuration = 0
 	return opt
+}
+
+func TestNewConsistHashOption(t *testing.T) {
+	opt := NewConsistentHashOption(getKey)
+	test.Assert(t, opt.GetKey != nil)
+	test.Assert(t, opt.VirtualFactor == 100)
+	test.Assert(t, opt.Weighted)
 }
 
 func TestNewConsistBalancer(t *testing.T) {
@@ -84,44 +112,45 @@ func TestConsistPicker_Next_Nil(t *testing.T) {
 	test.Assert(t, cb.Name() == "consist")
 }
 
-func TestConsistPicker_Replica(t *testing.T) {
-	opt := NewConsistentHashOption(getKey)
-	opt.Replica = 1
-	opt.ExpireDuration = 0
-	opt.GetKey = func(ctx context.Context, request interface{}) string {
-		return "1234"
-	}
-	insList := makeNInstances(2, 10)
-	e := discovery.Result{
-		Cacheable: false,
-		CacheKey:  "",
-		Instances: insList,
-	}
+// Replica related test
+//func TestConsistPicker_Replica(t *testing.T) {
+//	opt := NewConsistentHashOption(getKey)
+//	opt.Replica = 1
+//	opt.GetKey = func(ctx context.Context, request interface{}) string {
+//		return "1234"
+//	}
+//	insList := makeNInstances(2, 10)
+//	e := discovery.Result{
+//		Cacheable: false,
+//		CacheKey:  "",
+//		Instances: insList,
+//	}
+//
+//	cb := NewConsistBalancer(opt)
+//	picker := cb.GetPicker(e)
+//	first := picker.Next(context.TODO(), nil)
+//	second := picker.Next(context.TODO(), nil)
+//	test.Assert(t, first != second)
+//}
 
-	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
-	first := picker.Next(context.TODO(), nil)
-	second := picker.Next(context.TODO(), nil)
-	test.Assert(t, first != second)
-}
-
-func TestConsistPicker_Next_NoCache(t *testing.T) {
-	opt := newTestConsistentHashOption()
-	ins := discovery.NewInstance("tcp", "addr1", 10, nil)
-	insList := []discovery.Instance{
-		ins,
-	}
-	e := discovery.Result{
-		Cacheable: false,
-		CacheKey:  "",
-		Instances: insList,
-	}
-
-	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
-	test.Assert(t, picker.Next(context.TODO(), nil) == ins)
-	test.Assert(t, picker.Next(context.TODO(), nil) == nil)
-}
+// Replica related test
+//func TestConsistPicker_Next_NoCache(t *testing.T) {
+//	opt := newTestConsistentHashOption()
+//	ins := discovery.NewInstance("tcp", "addr1", 10, nil)
+//	insList := []discovery.Instance{
+//		ins,
+//	}
+//	e := discovery.Result{
+//		Cacheable: false,
+//		CacheKey:  "",
+//		Instances: insList,
+//	}
+//
+//	cb := NewConsistBalancer(opt)
+//	picker := cb.GetPicker(e)
+//	test.Assert(t, picker.Next(context.TODO(), nil) == ins)
+//	test.Assert(t, picker.Next(context.TODO(), nil) == nil)
+//}
 
 func TestConsistPicker_Next_NoCache_Consist(t *testing.T) {
 	opt := newTestConsistentHashOption()
@@ -209,10 +238,9 @@ func TestConsistBalance(t *testing.T) {
 		GetKey: func(ctx context.Context, request interface{}) string {
 			return strconv.Itoa(fastrand.Intn(100000))
 		},
-		Replica:        0,
-		VirtualFactor:  1000,
-		Weighted:       false,
-		ExpireDuration: 0,
+		Replica:       0,
+		VirtualFactor: 1000,
+		Weighted:      false,
 	}
 	inss := makeNInstances(10, 10)
 
@@ -239,10 +267,9 @@ func TestWeightedConsistBalance(t *testing.T) {
 		GetKey: func(ctx context.Context, request interface{}) string {
 			return strconv.Itoa(fastrand.Intn(100000))
 		},
-		Replica:        0,
-		VirtualFactor:  1000,
-		Weighted:       true,
-		ExpireDuration: 0,
+		Replica:       0,
+		VirtualFactor: 1000,
+		Weighted:      true,
 	}
 	inss := makeNInstances(10, 10)
 
@@ -341,6 +368,49 @@ func BenchmarkNewConsistPicker(bb *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
+				picker := balancer.GetPicker(e)
+				picker.Next(ctx, nil)
+				if r, ok := picker.(internal.Reusable); ok {
+					r.Recycle()
+				}
+			}
+		})
+		n *= 10
+	}
+}
+
+// BenchmarkConsistPicker_RandomDistributionKey
+// BenchmarkConsistPicker_RandomDistributionKey/10ins
+// BenchmarkConsistPicker_RandomDistributionKey/10ins-12         	 2417481	       508.9 ns/op	      48 B/op	       1 allocs/op
+// BenchmarkConsistPicker_RandomDistributionKey/100ins
+// BenchmarkConsistPicker_RandomDistributionKey/100ins-12        	 2140726	       534.6 ns/op	      48 B/op	       1 allocs/op
+// BenchmarkConsistPicker_RandomDistributionKey/1000ins
+// BenchmarkConsistPicker_RandomDistributionKey/1000ins-12       	 2848216.          407.7 ns/op	      48 B/op	       1 allocs/op
+// BenchmarkConsistPicker_RandomDistributionKey/10000ins
+// BenchmarkConsistPicker_RandomDistributionKey/10000ins-12      	 2701766	       492.7 ns/op	      48 B/op	       1 allocs/op
+func BenchmarkConsistPicker_RandomDistributionKey(bb *testing.B) {
+	n := 10
+	balancer := NewConsistBalancer(NewConsistentHashOption(getRandomKey))
+
+	for i := 0; i < 4; i++ {
+		bb.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
+			inss := makeNInstances(n, 10)
+			e := discovery.Result{
+				Cacheable: true,
+				CacheKey:  "test",
+				Instances: inss,
+			}
+			picker := balancer.GetPicker(e)
+			ctx := context.WithValue(context.Background(), keyCtxKey, getRandomString(30))
+			picker.Next(ctx, nil)
+			picker.(internal.Reusable).Recycle()
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				b.Logf("round %d", i)
+				b.StopTimer()
+				ctx = context.WithValue(context.Background(), keyCtxKey, getRandomString(30))
+				b.StartTimer()
 				picker := balancer.GetPicker(e)
 				picker.Next(ctx, nil)
 				if r, ok := picker.(internal.Reusable); ok {

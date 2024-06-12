@@ -206,6 +206,9 @@ func (p *connPool) createShortConn(ctx context.Context, network, address string,
 
 // Discard implements the ConnPool interface.
 func (p *connPool) Discard(conn net.Conn) error {
+	if p.connOpts.ShortConn {
+		return p.release(conn)
+	}
 	return nil
 }
 

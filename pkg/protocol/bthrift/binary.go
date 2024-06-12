@@ -25,14 +25,19 @@ import (
 
 	"github.com/apache/thrift/lib/go/thrift"
 
+	"github.com/cloudwego/kitex/pkg/mem"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-// Binary protocol for bthrift.
-var Binary binaryProtocol
+var (
+	// Binary protocol for bthrift.
+	Binary    binaryProtocol
+	_         BTProtocol = binaryProtocol{}
+	spanCache            = mem.NewSpanCache(1024 * 1024) // 1MB
+)
 
-var _ BTProtocol = binaryProtocol{}
+const binaryInplaceThreshold = 4096 // 4k
 
 type binaryProtocol struct{}
 
@@ -146,6 +151,10 @@ func (binaryProtocol) WriteStringNocopy(buf []byte, binaryWriter BinaryWriter, v
 
 func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, value []byte) int {
 	l := Binary.WriteI32(buf, int32(len(value)))
+	if binaryWriter != nil && len(value) > binaryInplaceThreshold {
+		binaryWriter.WriteDirect(value, len(buf[l:]))
+		return l
+	}
 	copy(buf[l:], value)
 	return l + len(value)
 }
@@ -458,24 +467,25 @@ func (binaryProtocol) ReadString(buf []byte) (value string, length int, err erro
 	if size < 0 || int(size) > len(buf) {
 		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadString] the string size greater than buf length")
 	}
-	value = string(buf[length : length+int(size)])
+	data := spanCache.Copy(buf[length : length+int(size)])
+	value = utils.SliceByteToString(data)
 	length += int(size)
 	return
 }
 
 func (binaryProtocol) ReadBinary(buf []byte) (value []byte, length int, err error) {
-	size, l, e := Binary.ReadI32(buf)
+	_size, l, e := Binary.ReadI32(buf)
 	length += l
 	if e != nil {
 		err = e
 		return
 	}
-	if size < 0 || int(size) > len(buf) {
+	size := int(_size)
+	if size < 0 || size > len(buf) {
 		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadBinary] the binary size greater than buf length")
 	}
-	value = make([]byte, size)
-	copy(value, buf[length:length+int(size)])
-	length += int(size)
+	value = spanCache.Copy(buf[length : length+size])
+	length += size
 	return
 }
 

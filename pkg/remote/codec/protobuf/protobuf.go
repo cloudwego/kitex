@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 /**
@@ -48,6 +49,12 @@ const (
 // NewProtobufCodec ...
 func NewProtobufCodec() remote.PayloadCodec {
 	return &protobufCodec{}
+}
+
+// IsProtobufCodec checks if the codec is protobufCodec
+func IsProtobufCodec(c remote.PayloadCodec) bool {
+	_, ok := c.(*protobufCodec)
+	return ok
 }
 
 // protobufCodec implements  PayloadMarshaler
@@ -210,7 +217,7 @@ func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in
 }
 
 func (c protobufCodec) Name() string {
-	return "protobuf"
+	return serviceinfo.Protobuf.String()
 }
 
 // MessageWriterWithContext  writes to output bytebuffer

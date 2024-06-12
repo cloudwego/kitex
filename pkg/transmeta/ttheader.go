@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -74,9 +75,14 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 	if cfg.IsRPCTimeoutLocked() {
 		hd[transmeta.RPCTimeout] = strconv.Itoa(int(ri.Config().RPCTimeout().Milliseconds()))
 	}
-
+	if cfg.IsConnectTimeoutLocked() {
+		hd[transmeta.ConnectTimeout] = strconv.Itoa(int(ri.Config().ConnectTimeout().Milliseconds()))
+	}
 	transInfo.PutTransIntInfo(hd)
-	transInfo.PutTransStrInfo(map[string]string{transmeta.HeaderIDLServiceName: ri.Invocation().ServiceName()})
+	idlSvcName := ri.Invocation().ServiceName()
+	if idlSvcName != serviceinfo.GenericService {
+		transInfo.PutTransStrInfo(map[string]string{transmeta.HeaderIDLServiceName: idlSvcName})
+	}
 	return ctx, nil
 }
 

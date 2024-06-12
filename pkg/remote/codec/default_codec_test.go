@@ -23,231 +23,277 @@ import (
 	"testing"
 
 	"github.com/bytedance/mockey"
+	"github.com/cloudwego/netpoll"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
+	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
 )
 
+var transportBuffers = []struct {
+	Name      string
+	NewBuffer func() remote.ByteBuffer
+}{
+	{
+		Name: "BytesBuffer",
+		NewBuffer: func() remote.ByteBuffer {
+			return remote.NewReaderWriterBuffer(1024)
+		},
+	},
+	{
+		Name: "NetpollBuffer",
+		NewBuffer: func() remote.ByteBuffer {
+			return netpolltrans.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(1024))
+		},
+	},
+}
+
 func TestThriftProtocolCheck(t *testing.T) {
-	var req interface{}
-	var rbf remote.ByteBuffer
-	var ttheader bool
-	var flagBuf []byte
-	var ri rpcinfo.RPCInfo
-	var msg remote.Message
+	for _, tb := range transportBuffers {
+		t.Run(tb.Name, func(t *testing.T) {
+			var req interface{}
+			var rbf remote.ByteBuffer
+			var ttheader bool
+			var flagBuf []byte
+			var ri rpcinfo.RPCInfo
+			var msg remote.Message
 
-	resetRIAndMSG := func() {
-		ri = rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
-		msg = remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+			resetRIAndMSG := func() {
+				ri = rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+				msg = remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+			}
+
+			// 1. ttheader
+			resetRIAndMSG()
+			flagBuf = make([]byte, 8*2)
+			binary.BigEndian.PutUint32(flagBuf, uint32(10))
+			binary.BigEndian.PutUint32(flagBuf[4:8], TTHeaderMagic)
+			binary.BigEndian.PutUint32(flagBuf[8:12], ThriftV1Magic)
+			ttheader = IsTTHeader(flagBuf)
+			test.Assert(t, ttheader)
+			if ttheader {
+				flagBuf = flagBuf[8:]
+			}
+			rbf = tb.NewBuffer()
+			rbf.WriteBinary(flagBuf)
+			rbf.Flush()
+			err := checkPayload(flagBuf, msg, rbf, ttheader, 10)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, msg.ProtocolInfo().TransProto == transport.TTHeader)
+			test.Assert(t, msg.RPCInfo().Config().TransportProtocol()&transport.TTHeader == transport.TTHeader)
+			test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
+
+			// 2. ttheader framed
+			resetRIAndMSG()
+			flagBuf = make([]byte, 8*2)
+			binary.BigEndian.PutUint32(flagBuf, uint32(10))
+			binary.BigEndian.PutUint32(flagBuf[4:8], TTHeaderMagic)
+			binary.BigEndian.PutUint32(flagBuf[12:], ThriftV1Magic)
+			ttheader = IsTTHeader(flagBuf)
+			test.Assert(t, ttheader)
+			if ttheader {
+				flagBuf = flagBuf[8:]
+			}
+			rbf = tb.NewBuffer()
+			rbf.WriteBinary(flagBuf)
+			rbf.Flush()
+			err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, msg.ProtocolInfo().TransProto == transport.TTHeaderFramed)
+			test.Assert(t, msg.RPCInfo().Config().TransportProtocol()&transport.TTHeaderFramed == transport.TTHeaderFramed)
+			test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
+
+			// 3. thrift framed
+			resetRIAndMSG()
+			flagBuf = make([]byte, 8*2)
+			binary.BigEndian.PutUint32(flagBuf, uint32(10))
+			binary.BigEndian.PutUint32(flagBuf[4:8], ThriftV1Magic)
+			ttheader = IsTTHeader(flagBuf)
+			test.Assert(t, !ttheader)
+			rbf = tb.NewBuffer()
+			rbf.WriteBinary(flagBuf)
+			rbf.Flush()
+			err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
+			test.Assert(t, err == nil, err)
+			err = checkPayload(flagBuf, msg, rbf, ttheader, 9)
+			test.Assert(t, err != nil, err)
+			test.Assert(t, msg.ProtocolInfo().TransProto == transport.Framed)
+			test.Assert(t, msg.RPCInfo().Config().TransportProtocol()&transport.Framed == transport.Framed)
+			test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
+
+			// 4. thrift pure payload
+			// resetRIAndMSG() // the logic below needs to check payload length set by the front case, so we don't reset ri
+			flagBuf = make([]byte, 8*2)
+			binary.BigEndian.PutUint32(flagBuf, uint32(10))
+			binary.BigEndian.PutUint32(flagBuf[0:4], ThriftV1Magic)
+			ttheader = IsTTHeader(flagBuf)
+			test.Assert(t, !ttheader)
+			rbf = tb.NewBuffer()
+			rbf.WriteBinary(flagBuf)
+			rbf.Flush()
+			err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
+			test.Assert(t, err == nil, err)
+			err = checkPayload(flagBuf, msg, rbf, ttheader, 9)
+			test.Assert(t, err != nil, err)
+			test.Assert(t, msg.ProtocolInfo().TransProto == transport.PurePayload)
+			test.Assert(t, msg.RPCInfo().Config().TransportProtocol()&transport.PurePayload == transport.PurePayload)
+			test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
+		})
 	}
-
-	// 1. ttheader
-	resetRIAndMSG()
-	flagBuf = make([]byte, 8*2)
-	binary.BigEndian.PutUint32(flagBuf, uint32(10))
-	binary.BigEndian.PutUint32(flagBuf[4:8], TTHeaderMagic)
-	binary.BigEndian.PutUint32(flagBuf[8:12], ThriftV1Magic)
-	ttheader = IsTTHeader(flagBuf)
-	test.Assert(t, ttheader)
-	if ttheader {
-		flagBuf = flagBuf[8:]
-	}
-	rbf = remote.NewReaderBuffer(flagBuf)
-	err := checkPayload(flagBuf, msg, rbf, ttheader, 10)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, msg.ProtocolInfo().TransProto == transport.TTHeader)
-	test.Assert(t, msg.RPCInfo().Config().TransportProtocol()&transport.TTHeader == transport.TTHeader)
-	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
-
-	// 2. ttheader framed
-	resetRIAndMSG()
-	flagBuf = make([]byte, 8*2)
-	binary.BigEndian.PutUint32(flagBuf, uint32(10))
-	binary.BigEndian.PutUint32(flagBuf[4:8], TTHeaderMagic)
-	binary.BigEndian.PutUint32(flagBuf[12:], ThriftV1Magic)
-	ttheader = IsTTHeader(flagBuf)
-	test.Assert(t, ttheader)
-	if ttheader {
-		flagBuf = flagBuf[8:]
-	}
-	rbf = remote.NewReaderBuffer(flagBuf)
-	err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, msg.ProtocolInfo().TransProto == transport.TTHeaderFramed)
-	test.Assert(t, msg.RPCInfo().Config().TransportProtocol()&transport.TTHeaderFramed == transport.TTHeaderFramed)
-	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
-
-	// 3. thrift framed
-	resetRIAndMSG()
-	flagBuf = make([]byte, 8*2)
-	binary.BigEndian.PutUint32(flagBuf, uint32(10))
-	binary.BigEndian.PutUint32(flagBuf[4:8], ThriftV1Magic)
-	ttheader = IsTTHeader(flagBuf)
-	test.Assert(t, !ttheader)
-	rbf = remote.NewReaderBuffer(flagBuf)
-	err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
-	test.Assert(t, err == nil, err)
-	err = checkPayload(flagBuf, msg, rbf, ttheader, 9)
-	test.Assert(t, err != nil, err)
-	test.Assert(t, msg.ProtocolInfo().TransProto == transport.Framed)
-	test.Assert(t, msg.RPCInfo().Config().TransportProtocol()&transport.Framed == transport.Framed)
-	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
-
-	// 4. thrift pure payload
-	// resetRIAndMSG() // the logic below needs to check payload length set by the front case, so we don't reset ri
-	flagBuf = make([]byte, 8*2)
-	binary.BigEndian.PutUint32(flagBuf, uint32(10))
-	binary.BigEndian.PutUint32(flagBuf[0:4], ThriftV1Magic)
-	ttheader = IsTTHeader(flagBuf)
-	test.Assert(t, !ttheader)
-	rbf = remote.NewReaderBuffer(flagBuf)
-	err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
-	test.Assert(t, err == nil, err)
-	err = checkPayload(flagBuf, msg, rbf, ttheader, 9)
-	test.Assert(t, err != nil, err)
-	test.Assert(t, msg.ProtocolInfo().TransProto == transport.PurePayload)
-	test.Assert(t, msg.RPCInfo().Config().TransportProtocol()&transport.PurePayload == transport.PurePayload)
-	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
 }
 
 func TestProtobufProtocolCheck(t *testing.T) {
-	var req interface{}
-	var rbf remote.ByteBuffer
-	var ttheader bool
-	var flagBuf []byte
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
+	for _, tb := range transportBuffers {
+		t.Run(tb.Name, func(t *testing.T) {
+			var req interface{}
+			var rbf remote.ByteBuffer
+			var ttheader bool
+			var flagBuf []byte
+			ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+			msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
 
-	// 1. ttheader framed
-	flagBuf = make([]byte, 8*2)
-	binary.BigEndian.PutUint32(flagBuf, uint32(10))
-	binary.BigEndian.PutUint32(flagBuf[4:8], TTHeaderMagic)
-	binary.BigEndian.PutUint32(flagBuf[12:], ProtobufV1Magic)
-	ttheader = IsTTHeader(flagBuf)
-	test.Assert(t, ttheader)
-	if ttheader {
-		flagBuf = flagBuf[8:]
+			// 1. ttheader framed
+			flagBuf = make([]byte, 8*2)
+			binary.BigEndian.PutUint32(flagBuf, uint32(10))
+			binary.BigEndian.PutUint32(flagBuf[4:8], TTHeaderMagic)
+			binary.BigEndian.PutUint32(flagBuf[12:], ProtobufV1Magic)
+			ttheader = IsTTHeader(flagBuf)
+			test.Assert(t, ttheader)
+			if ttheader {
+				flagBuf = flagBuf[8:]
+			}
+			rbf = tb.NewBuffer()
+			rbf.WriteBinary(flagBuf)
+			rbf.Flush()
+			err := checkPayload(flagBuf, msg, rbf, ttheader, 10)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, msg.ProtocolInfo().TransProto == transport.TTHeaderFramed)
+			test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Protobuf)
+
+			// 2. protobuf framed
+			flagBuf = make([]byte, 8*2)
+			binary.BigEndian.PutUint32(flagBuf, uint32(10))
+			binary.BigEndian.PutUint32(flagBuf[4:8], ProtobufV1Magic)
+			ttheader = IsTTHeader(flagBuf)
+			test.Assert(t, !ttheader)
+			rbf = tb.NewBuffer()
+			rbf.WriteBinary(flagBuf)
+			rbf.Flush()
+			err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
+			test.Assert(t, err == nil, err)
+			err = checkPayload(flagBuf, msg, rbf, ttheader, 9)
+			test.Assert(t, err != nil, err)
+			test.Assert(t, msg.ProtocolInfo().TransProto == transport.Framed)
+			test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Protobuf)
+		})
 	}
-	rbf = remote.NewReaderBuffer(flagBuf)
-	err := checkPayload(flagBuf, msg, rbf, ttheader, 10)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, msg.ProtocolInfo().TransProto == transport.TTHeaderFramed)
-	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Protobuf)
-
-	// 2. protobuf framed
-	flagBuf = make([]byte, 8*2)
-	binary.BigEndian.PutUint32(flagBuf, uint32(10))
-	binary.BigEndian.PutUint32(flagBuf[4:8], ProtobufV1Magic)
-	ttheader = IsTTHeader(flagBuf)
-	test.Assert(t, !ttheader)
-	rbf = remote.NewReaderBuffer(flagBuf)
-	err = checkPayload(flagBuf, msg, rbf, ttheader, 10)
-	test.Assert(t, err == nil, err)
-	err = checkPayload(flagBuf, msg, rbf, ttheader, 9)
-	test.Assert(t, err != nil, err)
-	test.Assert(t, msg.ProtocolInfo().TransProto == transport.Framed)
-	test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Protobuf)
 }
 
 func TestDefaultCodec_Encode_Decode(t *testing.T) {
 	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
 
-	dc := NewDefaultCodec()
-	ctx := context.Background()
-	intKVInfo := prepareIntKVInfo()
-	strKVInfo := prepareStrKVInfo()
-	sendMsg := initClientSendMsg(transport.TTHeader)
-	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
-	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
+	for _, tb := range transportBuffers {
+		t.Run(tb.Name, func(t *testing.T) {
+			dc := NewDefaultCodec()
+			ctx := context.Background()
+			intKVInfo := prepareIntKVInfo()
+			strKVInfo := prepareStrKVInfo()
+			sendMsg := initClientSendMsg(transport.TTHeader)
+			sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
+			sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
 
-	// test encode err
-	out := remote.NewReaderBuffer([]byte{})
-	err := dc.Encode(ctx, sendMsg, out)
-	test.Assert(t, err != nil)
+			// encode
+			buf := tb.NewBuffer()
+			err := dc.Encode(ctx, sendMsg, buf)
+			test.Assert(t, err == nil, err)
+			buf.Flush()
 
-	// encode
-	out = remote.NewWriterBuffer(256)
-	err = dc.Encode(ctx, sendMsg, out)
-	test.Assert(t, err == nil, err)
+			// decode
+			recvMsg := initServerRecvMsg()
+			test.Assert(t, err == nil, err)
+			err = dc.Decode(ctx, recvMsg, buf)
+			test.Assert(t, err == nil, err)
 
-	// decode
-	recvMsg := initServerRecvMsg()
-	buf, err := out.Bytes()
-	test.Assert(t, err == nil, err)
-	in := remote.NewReaderBuffer(buf)
-	err = dc.Decode(ctx, recvMsg, in)
-	test.Assert(t, err == nil, err)
-
-	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
-	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
-	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
-	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
-	test.Assert(t, sendMsg.RPCInfo().Invocation().SeqID() == recvMsg.RPCInfo().Invocation().SeqID())
+			intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
+			strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
+			test.DeepEqual(t, intKVInfoRecv, intKVInfo)
+			test.DeepEqual(t, strKVInfoRecv, strKVInfo)
+			test.Assert(t, sendMsg.RPCInfo().Invocation().SeqID() == recvMsg.RPCInfo().Invocation().SeqID())
+		})
+	}
 }
 
 func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
 
-	smallDc := NewDefaultCodecWithSizeLimit(1)
-	largeDc := NewDefaultCodecWithSizeLimit(1024)
-	ctx := context.Background()
-	intKVInfo := prepareIntKVInfo()
-	strKVInfo := prepareStrKVInfo()
-	sendMsg := initClientSendMsg(transport.TTHeader)
-	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
-	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
+	for _, tb := range transportBuffers {
+		t.Run(tb.Name, func(t *testing.T) {
+			smallDc := NewDefaultCodecWithSizeLimit(1)
+			largeDc := NewDefaultCodecWithSizeLimit(1024)
+			ctx := context.Background()
+			intKVInfo := prepareIntKVInfo()
+			strKVInfo := prepareStrKVInfo()
+			sendMsg := initClientSendMsg(transport.TTHeader)
+			sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
+			sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
 
-	// encode
-	smallOut := remote.NewWriterBuffer(256)
-	largeOut := remote.NewWriterBuffer(256)
-	err := smallDc.Encode(ctx, sendMsg, smallOut)
-	test.Assert(t, err != nil, err)
-	err = largeDc.Encode(ctx, sendMsg, largeOut)
-	test.Assert(t, err == nil, err)
+			// encode
+			smallBuf := tb.NewBuffer()
+			largeBuf := tb.NewBuffer()
+			err := smallDc.Encode(ctx, sendMsg, smallBuf)
+			test.Assert(t, err != nil, err)
+			err = largeDc.Encode(ctx, sendMsg, largeBuf)
+			test.Assert(t, err == nil, err)
+			smallBuf.Flush()
+			largeBuf.Flush()
 
-	// decode
-	recvMsg := initServerRecvMsg()
-	smallBuf, _ := smallOut.Bytes()
-	largeBuf, _ := largeOut.Bytes()
-	err = smallDc.Decode(ctx, recvMsg, remote.NewReaderBuffer(smallBuf))
-	test.Assert(t, err != nil, err)
-	err = largeDc.Decode(ctx, recvMsg, remote.NewReaderBuffer(largeBuf))
-	test.Assert(t, err == nil, err)
+			// decode
+			recvMsg := initServerRecvMsg()
+			err = smallDc.Decode(ctx, recvMsg, smallBuf)
+			test.Assert(t, err != nil, err)
+			err = largeDc.Decode(ctx, recvMsg, largeBuf)
+			test.Assert(t, err == nil, err)
+		})
+	}
 }
 
 func TestCodecTypeNotMatchWithServiceInfoPayloadCodec(t *testing.T) {
-	var req interface{}
-	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
-	remote.PutPayloadCode(serviceinfo.Protobuf, mpc)
-	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
-	codec := NewDefaultCodec()
+	for _, tb := range transportBuffers {
+		t.Run(tb.Name, func(t *testing.T) {
+			var req interface{}
+			remote.PutPayloadCode(serviceinfo.Thrift, mpc)
+			remote.PutPayloadCode(serviceinfo.Protobuf, mpc)
+			ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation("", ""), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+			codec := NewDefaultCodec()
 
-	// case 1: the payloadCodec of svcInfo is Protobuf, CodecType of message is Thrift
-	svcInfo := &serviceinfo.ServiceInfo{
-		PayloadCodec: serviceinfo.Protobuf,
-	}
-	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Server)
-	msg.SetProtocolInfo(remote.ProtocolInfo{TransProto: transport.TTHeader, CodecType: serviceinfo.Thrift})
-	err := codec.Encode(context.Background(), msg, remote.NewWriterBuffer(256))
-	test.Assert(t, err == nil, err)
+			// case 1: the payloadCodec of svcInfo is Protobuf, CodecType of message is Thrift
+			svcInfo := &serviceinfo.ServiceInfo{
+				PayloadCodec: serviceinfo.Protobuf,
+			}
+			msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Server)
+			msg.SetProtocolInfo(remote.ProtocolInfo{TransProto: transport.TTHeader, CodecType: serviceinfo.Thrift})
+			err := codec.Encode(context.Background(), msg, tb.NewBuffer())
+			test.Assert(t, err == nil, err)
 
-	// case 2: the payloadCodec of svcInfo is Thrift, CodecType of message is Protobuf
-	svcInfo = &serviceinfo.ServiceInfo{
-		PayloadCodec: serviceinfo.Thrift,
+			// case 2: the payloadCodec of svcInfo is Thrift, CodecType of message is Protobuf
+			svcInfo = &serviceinfo.ServiceInfo{
+				PayloadCodec: serviceinfo.Thrift,
+			}
+			msg = remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Server)
+			msg.SetProtocolInfo(remote.ProtocolInfo{TransProto: transport.TTHeader, CodecType: serviceinfo.Protobuf})
+			err = codec.Encode(context.Background(), msg, tb.NewBuffer())
+			test.Assert(t, err != nil)
+			msg.SetProtocolInfo(remote.ProtocolInfo{TransProto: transport.Framed, CodecType: serviceinfo.Protobuf})
+			err = codec.Encode(context.Background(), msg, tb.NewBuffer())
+			test.Assert(t, err == nil)
+		})
 	}
-	msg = remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Server)
-	msg.SetProtocolInfo(remote.ProtocolInfo{TransProto: transport.TTHeader, CodecType: serviceinfo.Protobuf})
-	err = codec.Encode(context.Background(), msg, remote.NewWriterBuffer(256))
-	test.Assert(t, err != nil)
-	msg.SetProtocolInfo(remote.ProtocolInfo{TransProto: transport.Framed, CodecType: serviceinfo.Protobuf})
-	err = codec.Encode(context.Background(), msg, remote.NewWriterBuffer(256))
-	test.Assert(t, err == nil)
 }
 
 var mpc remote.PayloadCodec = mockPayloadCodec{}

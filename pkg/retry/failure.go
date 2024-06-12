@@ -17,6 +17,7 @@
 package retry
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -112,14 +113,14 @@ func (p *FailurePolicy) WithSpecifiedResultRetry(rr *ShouldResultRetry) {
 }
 
 // String prints human readable information.
-func (p FailurePolicy) String() string {
+func (p *FailurePolicy) String() string {
 	return fmt.Sprintf("{StopPolicy:%+v BackOffPolicy:%+v RetrySameNode:%+v "+
 		"ShouldResultRetry:{ErrorRetry:%t, RespRetry:%t}}", p.StopPolicy, p.BackOffPolicy, p.RetrySameNode, p.IsErrorRetryNonNil(), p.IsRespRetryNonNil())
 }
 
 // AllErrorRetry is common choice for ShouldResultRetry.
 func AllErrorRetry() *ShouldResultRetry {
-	return &ShouldResultRetry{ErrorRetry: func(err error, ri rpcinfo.RPCInfo) bool {
+	return &ShouldResultRetry{ErrorRetryWithCtx: func(ctx context.Context, err error, ri rpcinfo.RPCInfo) bool {
 		return err != nil
 	}}
 }

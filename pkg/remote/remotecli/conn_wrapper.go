@@ -34,6 +34,13 @@ func init() {
 	connWrapperPool.New = newConnWrapper
 }
 
+var _ ConnReleaser = &ConnWrapper{}
+
+// ConnReleaser helps to release the raw connection.
+type ConnReleaser interface {
+	ReleaseConn(err error, ri rpcinfo.RPCInfo)
+}
+
 // ConnWrapper wraps a connection.
 type ConnWrapper struct {
 	connPool remote.ConnPool

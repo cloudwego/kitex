@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
@@ -40,7 +41,8 @@ const (
 	FastWrite CodecType = 0b0001
 	FastRead  CodecType = 0b0010
 
-	FastReadWrite = FastRead | FastWrite
+	FastReadWrite               = FastRead | FastWrite
+	EnableSkipDecoder CodecType = 0b10000
 )
 
 var (
@@ -131,6 +133,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 
 // encodeFastThrift encode with the FastCodec way
 func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.MessageType, seqID int32, msg ThriftMsgFastCodec) error {
+	nw, _ := out.(remote.NocopyWrite)
 	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
 	msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
 	msgEndLen := bthrift.Binary.MessageEndLength()
@@ -138,10 +141,17 @@ func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.M
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
 	}
+	// If fast write enabled, the underlying buffer maybe large than the correct buffer,
+	// so we need to save the mallocLen before fast write and correct the real mallocLen after codec
+	mallocLen := out.MallocLen()
 	offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
-	offset += msg.FastWriteNocopy(buf[offset:], nil)
+	offset += msg.FastWriteNocopy(buf[offset:], nw)
 	bthrift.Binary.WriteMessageEnd(buf[offset:])
-	return nil
+	if nw == nil {
+		// if nw is nil, FastWrite will act in Copy mode.
+		return nil
+	}
+	return nw.MallocAck(mallocLen)
 }
 
 // encodeBasicThrift encode with the old thrift way (slow)
@@ -187,6 +197,10 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	data := message.Data()
 	msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, msgType, seqID)
 	dataLen := message.PayloadLen() - msgBeginLen - bthrift.Binary.MessageEndLength()
+	// For Buffer Protocol, dataLen would be negative. Set it to zero so as not to confuse
+	if dataLen < 0 {
+		dataLen = 0
+	}
 
 	ri := message.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
@@ -223,7 +237,7 @@ func validateMessageBeforeDecode(message remote.Message, seqID int32, methodName
 
 // Name implements the remote.PayloadCodec interface.
 func (c thriftCodec) Name() string {
-	return "thrift"
+	return serviceinfo.Thrift.String()
 }
 
 // MessageWriterWithContext write to thrift.TProtocol

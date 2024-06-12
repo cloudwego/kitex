@@ -52,7 +52,9 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	cfg := rpcinfo.NewRPCConfig()
 	cfgMutable := rpcinfo.AsMutableRPCConfig(cfg)
 	cfgMutable.SetRPCTimeout(time.Millisecond * 100)
+	cfgMutable.SetConnectTimeout(time.Millisecond * 1000)
 	cfgMutable.LockConfig(rpcinfo.BitRPCTimeout)
+	cfgMutable.LockConfig(rpcinfo.BitConnectTimeout)
 
 	fromInfo := rpcinfo.NewEndpointInfo("fromServiceName", "fromMethod", nil, nil)
 	toInfo := rpcinfo.NewEndpointInfo("toServiceName", "toMethod", nil, nil)
@@ -81,6 +83,7 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	test.Assert(t, kvs[transmeta.MsgType] == strconv.Itoa(int(remote.Call)))
 	test.Assert(t, kvs[transmeta.TransportType] == unframedTransportType)
 	test.Assert(t, kvs[transmeta.RPCTimeout] == "100")
+	test.Assert(t, kvs[transmeta.ConnectTimeout] == "1000")
 	strKvs = msg.TransInfo().TransStrInfo()
 	test.Assert(t, len(strKvs) == 1)
 	test.Assert(t, strKvs[transmeta.HeaderIDLServiceName] == "")

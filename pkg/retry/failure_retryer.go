@@ -138,7 +138,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			circuitbreak.RecordStat(ctx, req, nil, err, cbKey, r.cbContainer.cbCtl, r.cbContainer.cbPanel)
 		}
 		if err == nil {
-			if r.policy.IsRespRetryNonNil() && r.policy.ShouldResultRetry.RespRetry(resp, cRI) {
+			if r.policy.IsRespRetry(ctx, resp, cRI) {
 				// user specified resp to do retry
 				continue
 			}
@@ -147,7 +147,7 @@ func (r *failureRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rp
 			if i == retryTimes {
 				// stop retry then wrap error
 				err = kerrors.ErrRetry.WithCause(err)
-			} else if !r.isRetryErr(err, cRI) {
+			} else if !r.isRetryErr(ctx, err, cRI) {
 				// not timeout or user specified error won't do retry
 				break
 			}
@@ -204,8 +204,8 @@ func (r *failureRetryer) UpdatePolicy(rp Policy) (err error) {
 }
 
 // AppendErrMsgIfNeeded implements the Retryer interface.
-func (r *failureRetryer) AppendErrMsgIfNeeded(err error, ri rpcinfo.RPCInfo, msg string) {
-	if r.isRetryErr(err, ri) {
+func (r *failureRetryer) AppendErrMsgIfNeeded(ctx context.Context, err error, ri rpcinfo.RPCInfo, msg string) {
+	if r.isRetryErr(ctx, err, ri) {
 		// Add additional reason when retry is not applied.
 		appendErrMsg(err, msg)
 	}
@@ -216,7 +216,7 @@ func (r *failureRetryer) Prepare(ctx context.Context, prevRI, retryRI rpcinfo.RP
 	handleRetryInstance(r.policy.RetrySameNode, prevRI, retryRI)
 }
 
-func (r *failureRetryer) isRetryErr(err error, ri rpcinfo.RPCInfo) bool {
+func (r *failureRetryer) isRetryErr(ctx context.Context, err error, ri rpcinfo.RPCInfo) bool {
 	if err == nil {
 		return false
 	}
@@ -228,7 +228,7 @@ func (r *failureRetryer) isRetryErr(err error, ri rpcinfo.RPCInfo) bool {
 	if r.policy.IsRetryForTimeout() && kerrors.IsTimeoutError(err) {
 		return true
 	}
-	if r.policy.IsErrorRetryNonNil() && r.policy.ShouldResultRetry.ErrorRetry(err, ri) {
+	if r.policy.IsErrorRetry(ctx, err, ri) {
 		return true
 	}
 	return false
@@ -283,8 +283,11 @@ func (r *failureRetryer) Dump() map[string]interface{} {
 	dm["failure_retry"] = r.policy
 	if r.policy != nil {
 		dm["specified_result_retry"] = map[string]bool{
-			"error_retry": r.policy.IsErrorRetryNonNil(),
-			"resp_retry":  r.policy.IsRespRetryNonNil(),
+			"error_retry": r.policy.IsErrorRetryWithCtxNonNil(),
+			"resp_retry":  r.policy.IsRespRetryWithCtxNonNil(),
+			// keep it for some versions to confirm the correctness when troubleshooting
+			"old_error_retry": r.policy.IsErrorRetryNonNil(),
+			"old_resp_retry":  r.policy.IsRespRetryNonNil(),
 		}
 	}
 	if r.errMsg != "" {
@@ -298,9 +301,16 @@ func (r *failureRetryer) setSpecifiedResultRetryIfNeeded(rr *ShouldResultRetry) 
 		// save the object specified by client.WithSpecifiedResultRetry(..)
 		r.specifiedResultRetry = rr
 	}
-	if r.policy != nil && r.specifiedResultRetry != nil {
-		// The priority of client.WithSpecifiedResultRetry(..) is higher, so always update it
-		// NOTE: client.WithSpecifiedResultRetry(..) will always reject a nil object
-		r.policy.ShouldResultRetry = r.specifiedResultRetry
+	if r.policy != nil {
+		if r.specifiedResultRetry != nil {
+			// The priority of client.WithSpecifiedResultRetry(..) is higher, so always update it
+			// NOTE: client.WithSpecifiedResultRetry(..) will always reject a nil object
+			r.policy.ShouldResultRetry = r.specifiedResultRetry
+		}
+
+		// even though rr passed from this func is nil,
+		// the Policy may also have ShouldResultRetry from client.WithFailureRetry or callopt.WithRetryPolicy.
+		// convertResultRetry is used to convert 'ErrorRetry and RespRetry' to 'ErrorRetryWithCtx and RespRetryWithCtx'
+		r.policy.ConvertResultRetry()
 	}
 }

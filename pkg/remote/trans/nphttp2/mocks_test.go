@@ -354,6 +354,12 @@ func newMockDialer() *remote.SynthesizedDialer {
 	return d
 }
 
+func newMockDialerWithDialFunc(dialFunc func(network, address string, timeout time.Duration) (net.Conn, error)) *remote.SynthesizedDialer {
+	d := &remote.SynthesizedDialer{}
+	d.DialFunc = dialFunc
+	return d
+}
+
 func newMockCtxWithRPCInfo() context.Context {
 	return rpcinfo.NewCtxWithRPCInfo(context.Background(), newMockRPCInfo())
 }

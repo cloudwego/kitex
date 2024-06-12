@@ -47,7 +47,7 @@ type Retryer interface {
 
 	// Retry policy execute func. recycleRI is to decide if the firstRI can be recycled.
 	Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpcinfo.RPCInfo, request interface{}) (lastRI rpcinfo.RPCInfo, recycleRI bool, err error)
-	AppendErrMsgIfNeeded(err error, ri rpcinfo.RPCInfo, msg string)
+	AppendErrMsgIfNeeded(ctx context.Context, err error, ri rpcinfo.RPCInfo, msg string)
 
 	// Prepare to do something needed before retry call.
 	Prepare(ctx context.Context, prevRI, retryRI rpcinfo.RPCInfo)
@@ -69,8 +69,8 @@ func NewRetryContainerWithCB(cc *circuitbreak.Control, cp circuitbreaker.Panel) 
 	return NewRetryContainer(WithContainerCBControl(cc), WithContainerCBPanel(cp))
 }
 
-func newCBSuite() *circuitbreak.CBSuite {
-	return circuitbreak.NewCBSuite(circuitbreak.RPCInfo2Key)
+func newCBSuite(opts []circuitbreak.CBSuiteOption) *circuitbreak.CBSuite {
+	return circuitbreak.NewCBSuite(circuitbreak.RPCInfo2Key, opts...)
 }
 
 // NewRetryContainerWithCBStat build Container that need to do circuit breaker statistic.
@@ -101,7 +101,14 @@ func WithContainerCBSuite(cbs *circuitbreak.CBSuite) ContainerOption {
 	}
 }
 
-// WithContainerCBControl is specifies the circuitbreak.Control used in the retry circuitbreaker
+// WithContainerCBSuiteOptions specifies the circuitbreak.CBSuiteOption for initializing circuitbreak.CBSuite
+func WithContainerCBSuiteOptions(opts ...circuitbreak.CBSuiteOption) ContainerOption {
+	return func(rc *Container) {
+		rc.cbContainer.cbSuiteOptions = opts
+	}
+}
+
+// WithContainerCBControl specifies the circuitbreak.Control used in the retry circuitbreaker
 // It's user's responsibility to make sure it's paired with panel
 func WithContainerCBControl(ctrl *circuitbreak.Control) ContainerOption {
 	return func(rc *Container) {
@@ -109,7 +116,7 @@ func WithContainerCBControl(ctrl *circuitbreak.Control) ContainerOption {
 	}
 }
 
-// WithContainerCBPanel is specifies the circuitbreaker.Panel used in the retry circuitbreaker
+// WithContainerCBPanel specifies the circuitbreaker.Panel used in the retry circuitbreaker
 // It's user's responsibility to make sure it's paired with control
 func WithContainerCBPanel(panel circuitbreaker.Panel) ContainerOption {
 	return func(rc *Container) {
@@ -148,14 +155,15 @@ func NewRetryContainer(opts ...ContainerOption) *Container {
 		// ignore cbSuite/cbCtl/cbPanel options
 		rc.cbContainer = &cbContainer{
 			enablePercentageLimit: true,
-			cbSuite:               newCBSuite(),
+			cbSuite:               newCBSuite(rc.cbContainer.cbSuiteOptions),
+			cbSuiteOptions:        rc.cbContainer.cbSuiteOptions,
 		}
 	}
 
 	container := rc.cbContainer
 	if container.cbCtl == nil && container.cbPanel == nil {
 		if container.cbSuite == nil {
-			container.cbSuite = newCBSuite()
+			container.cbSuite = newCBSuite(rc.cbContainer.cbSuiteOptions)
 			container.cbStat = true
 		}
 		container.cbCtl = container.cbSuite.ServiceControl()
@@ -199,6 +207,9 @@ type cbContainer struct {
 	// If enabled, Kitex will always create a cbSuite and use its cbCtl & cbPanel, and retryer will call
 	// recordRetryStat before rpcCall, to precisely control the percentage of retry requests over all requests.
 	enablePercentageLimit bool
+
+	// for creating CBSuite inside NewRetryContainer
+	cbSuiteOptions []circuitbreak.CBSuiteOption
 }
 
 // IsValid returns true when both cbCtl & cbPanel are not nil
@@ -328,7 +339,7 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 			return ri, true, err
 		}
 		if msg != "" {
-			retryer.AppendErrMsgIfNeeded(err, ri, msg)
+			retryer.AppendErrMsgIfNeeded(ctx, err, ri, msg)
 		}
 		return ri, false, err
 	}

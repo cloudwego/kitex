@@ -14,7 +14,7 @@
 
 package thriftgo
 
-const registerHessian = `
+const RegisterHessian = `
 {{- define "register"}}
 package {{ .PkgName}}
 
@@ -136,7 +136,7 @@ func (p *{{$resType.GoName}}) Decode(d codec.Decoder) error {
 {{- end}}{{/* define RegisterHessian*/}}
 `
 
-const structLikeProtocol = `
+const StructLikeProtocol = `
 {{define "StructLikeProtocol"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) Encode(e codec.Encoder) error {
@@ -180,7 +180,7 @@ func (p *{{$TypeName}}) Decode(d codec.Decoder) error {
 {{- end}}{{/* define "StructLikeProtocol" */}}
 `
 
-const javaClassName = `
+const JavaClassName = `
 {{define "JavaClassName"}}
 {{- $TypeName := .GoName}}
 {{- $anno := .Annotations }}
