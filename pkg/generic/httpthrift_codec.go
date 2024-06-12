@@ -122,7 +122,7 @@ func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Method{function.Name, function.Oneway}, nil
+	return &Method{function.Name, function.Oneway, function.StreamingMode}, nil
 }
 
 func (c *httpThriftCodec) Name() string {

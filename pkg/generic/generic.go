@@ -23,6 +23,7 @@ import (
 	"github.com/cloudwego/dynamicgo/conv"
 
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -48,8 +49,9 @@ type Generic interface {
 
 // Method information
 type Method struct {
-	Name   string
-	Oneway bool
+	Name          string
+	Oneway        bool
+	StreamingMode serviceinfo.StreamingMode
 }
 
 // BinaryThriftGeneric raw thrift binary Generic
@@ -198,6 +200,8 @@ func EnableSetFieldsForEmptyStruct(g Generic, mode SetFieldsForEmptyStructMode) 
 
 var thriftCodec = thrift.NewThriftCodec()
 
+var pbCodec = protobuf.NewProtobufCodec()
+
 type binaryThriftGeneric struct{}
 
 func (g *binaryThriftGeneric) Framed() bool {
@@ -214,7 +218,7 @@ func (g *binaryThriftGeneric) PayloadCodec() remote.PayloadCodec {
 }
 
 func (g *binaryThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return &Method{method, false}, nil
+	return &Method{Name: method, Oneway: false}, nil
 }
 
 func (g *binaryThriftGeneric) Close() error {

@@ -108,7 +108,7 @@ func (c *jsonThriftCodec) getMethod(req interface{}, method string) (*Method, er
 	if err != nil {
 		return nil, err
 	}
-	return &Method{method, fnSvc.Oneway}, nil
+	return &Method{method, fnSvc.Oneway, fnSvc.StreamingMode}, nil
 }
 
 func (c *jsonThriftCodec) Name() string {

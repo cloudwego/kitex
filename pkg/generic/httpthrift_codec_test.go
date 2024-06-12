@@ -19,7 +19,6 @@ package generic
 import (
 	"bytes"
 	"net/http"
-	"strings"
 	"testing"
 
 	"github.com/bytedance/sonic"
@@ -27,6 +26,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var customJson = sonic.Config{
@@ -63,7 +63,7 @@ func TestHttpThriftCodec(t *testing.T) {
 	// right
 	method, err = htc.getMethod(req)
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
-<<<<<<< HEAD
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, htc.svcName == "ExampleService")
 
 	rw := htc.getMessageReaderWriter()
@@ -71,18 +71,6 @@ func TestHttpThriftCodec(t *testing.T) {
 	test.Assert(t, !ok)
 
 	rw = htc.getMessageReaderWriter()
-=======
-	test.Assert(t, htc.GetIDLServiceName() == "ExampleService")
-
-	rw := htc.GetMessageReaderWriter()
-	err, ok := rw.(error)
-	test.Assert(t, !ok)
-
-	htc.SetMethod(method.Name)
-	test.Assert(t, htc.method == "BinaryEcho")
-
-	rw = htc.GetMessageReaderWriter()
->>>>>>> a231864 (test: add and fix tests)
 	_, ok = rw.(gthrift.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(gthrift.MessageReader)
@@ -111,25 +99,11 @@ func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
 	// right
 	method, err = htc.getMethod(req)
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
-<<<<<<< HEAD
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, htc.svcName == "ExampleService")
 
 	rw := htc.getMessageReaderWriter()
 	_, ok := rw.(gthrift.MessageWriter)
-=======
-	test.Assert(t, htc.GetIDLServiceName() == "ExampleService")
-
-	rw := htc.GetMessageReaderWriter()
-	err, ok := rw.(error)
-	test.Assert(t, ok)
-	test.Assert(t, strings.Contains(err.Error(), "missing method"))
-
-	htc.SetMethod(method.Name)
-	test.Assert(t, htc.method == "BinaryEcho")
-
-	rw = htc.GetMessageReaderWriter()
-	_, ok = rw.(gthrift.MessageWriter)
->>>>>>> a231864 (test: add and fix tests)
 	test.Assert(t, ok)
 	_, ok = rw.(gthrift.MessageReader)
 	test.Assert(t, ok)
