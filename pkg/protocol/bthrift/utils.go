@@ -1,8 +1,5 @@
-//go:build !amd64 || !go1.16
-// +build !amd64 !go1.16
-
 /*
- * Copyright 2023 CloudWeGo Authors
+ * Copyright 2024 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,15 +14,25 @@
  * limitations under the License.
  */
 
-package thrift
+package bthrift
 
 import (
-	"context"
-
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	"reflect"
+	"unsafe"
 )
 
-// Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	return w.originalWrite(ctx, out, msg, requestBase)
+// from utils.SliceByteToString for fixing cyclic import
+func sliceByteToString(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
+}
+
+// from utils.StringToSliceByte for fixing cyclic import
+func stringToSliceByte(s string) []byte {
+	p := unsafe.Pointer((*reflect.StringHeader)(unsafe.Pointer(&s)).Data)
+	var b []byte
+	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	hdr.Data = uintptr(p)
+	hdr.Cap = len(s)
+	hdr.Len = len(s)
+	return b
 }

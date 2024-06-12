@@ -19,9 +19,8 @@ package thrift
 import (
 	"context"
 
-	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // NewWriteStruct ...

@@ -1,8 +1,5 @@
-//go:build !amd64 || !go1.16
-// +build !amd64 !go1.16
-
 /*
- * Copyright 2023 CloudWeGo Authors
+ * Copyright 2024 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,15 +14,11 @@
  * limitations under the License.
  */
 
-package thrift
+package apache
 
-import (
-	"context"
+// originally from github.com/apache/thrift@v0.13.0/lib/go/thrift/serializer.go
 
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
-)
-
-// Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	return w.originalWrite(ctx, out, msg, requestBase)
+type TStruct interface {
+	Write(p TProtocol) error
+	Read(p TProtocol) error
 }
