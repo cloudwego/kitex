@@ -26,10 +26,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
-const (
-	EnableSkipDecoder CodecType = 0b10000
-)
-
 // skipDecoder is used to parse the input byte-by-byte and skip the thrift payload
 // for making use of Frugal and FastCodec in standard Thrift Binary Protocol scenario.
 type skipDecoder struct {
