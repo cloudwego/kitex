@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"reflect"
 
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/thriftgo/generator/golang/extension/unknown"
+
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // UnknownField is used to describe an unknown field.

@@ -143,8 +143,7 @@ func UnmarshalError(b []byte) error {
 	// Read Ex body
 	off := l
 	ex := bthrift.NewApplicationException(thrift.INTERNAL_ERROR, "")
-	l, err = ex.FastRead(b[off:])
-	if err != nil {
+	if _, err := ex.FastRead(b[off:]); err != nil {
 		return err
 	}
 	// XXX: for compatibility, consider to remove it in the future

@@ -40,5 +40,4 @@ const (
 	LIST   = 15
 	UTF8   = 16
 	UTF16  = 17
-	//BINARY = 18   wrong and unusued
 )
