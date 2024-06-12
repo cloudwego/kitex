@@ -2,6 +2,8 @@ module github.com/cloudwego/kitex
 
 go 1.17
 
+replace github.com/cloudwego/dynamicgo => github.com/cloudwego/dynamicgo v0.2.8-0.20240610100138-4e62279d008c
+
 require (
 	github.com/apache/thrift v0.13.0
 	github.com/bytedance/gopkg v0.0.0-20240514070511-01b2cbcf35e1
