@@ -37,7 +37,7 @@ var (
 	spanCache            = mem.NewSpanCache(1024 * 1024) // 1MB
 )
 
-const binaryInplaceThreshold = 4096 // 4k
+const binaryInplaceThreshold = 2048 // 2k
 
 type binaryProtocol struct{}
 

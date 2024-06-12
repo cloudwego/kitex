@@ -19,6 +19,7 @@ package bthrift
 import (
 	"encoding/binary"
 	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -558,5 +559,49 @@ func BenchmarkBinaryProtocolReadString(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+var testBinaryInplaceThreshold int
+
+func WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, value []byte) int {
+	l := Binary.WriteI32(buf, int32(len(value)))
+	if binaryWriter != nil && len(value) > testBinaryInplaceThreshold {
+		binaryWriter.WriteDirect(value, len(buf[l:]))
+		return l
+	}
+	copy(buf[l:], value)
+	return l + len(value)
+}
+
+func BenchmarkWriteDirectly(b *testing.B) {
+	sizes := []int{256, 512, 1024, 2048, 4096}
+	for _, size := range sizes {
+		testBinaryInplaceThreshold = size - 1
+		msg := make([]byte, size)
+		var nocopy bool
+	RERUN:
+		b.Run(fmt.Sprintf("nocopy: %v, size=%d", nocopy, size), func(b *testing.B) {
+			lb := netpoll.NewLinkBuffer()
+			runtime.GC()
+			runtime.GC()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				buf, _ := lb.Malloc(size + 4)
+				if nocopy {
+					WriteBinaryNocopy(buf, lb, msg)
+				} else {
+					WriteBinaryNocopy(buf, nil, msg)
+				}
+				lb.MallocAck(len(buf))
+				lb.Flush()
+				lb.Skip(len(buf))
+				lb.Release()
+			}
+		})
+		if !nocopy {
+			nocopy = true
+			goto RERUN
+		}
 	}
 }
