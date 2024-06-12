@@ -29,6 +29,9 @@ type ApplicationException struct {
 	m string
 }
 
+// check interface only. TO BE REMOVED in the future
+var _ thrift.TApplicationException = &ApplicationException{}
+
 // NewApplicationException creates an ApplicationException instance
 func NewApplicationException(t int32, msg string) *ApplicationException {
 	return &ApplicationException{t: t, m: msg}
@@ -40,6 +43,9 @@ func (e *ApplicationException) Msg() string { return e.m }
 // TypeID ...
 func (e *ApplicationException) TypeID() int32 { return e.t }
 
+// TypeId ... for apache ApplicationException compatibility
+func (e *ApplicationException) TypeId() int32 { return e.t }
+
 // BLength returns the len of encoded buffer.
 func (e *ApplicationException) BLength() int {
 	// Msg Field: 1 (type) + 2 (id) + 4(strlen) + len(m)
@@ -48,7 +54,7 @@ func (e *ApplicationException) BLength() int {
 	return (1 + 2 + 4 + len(e.m)) + (1 + 2 + 4) + 1
 }
 
-// Read ...
+// FastRead ...
 func (e *ApplicationException) FastRead(b []byte) (off int, err error) {
 	for i := 0; i < 2; i++ {
 		_, tp, id, l, err := Binary.ReadFieldBegin(b[off:])
@@ -80,7 +86,7 @@ func (e *ApplicationException) FastRead(b []byte) (off int, err error) {
 	return off, nil
 }
 
-// Write ...
+// FastWrite ...
 func (e *ApplicationException) FastWrite(b []byte) (off int) {
 	off += Binary.WriteFieldBegin(b[off:], "", thrift.STRING, 1)
 	off += Binary.WriteString(b[off:], e.m)
@@ -93,6 +99,57 @@ func (e *ApplicationException) FastWrite(b []byte) (off int) {
 // FastWriteNocopy ... XXX: we deprecated XXXNocopy, simply using FastWrite is OK.
 func (e *ApplicationException) FastWriteNocopy(b []byte, binaryWriter BinaryWriter) int {
 	return e.FastWrite(b)
+}
+
+// Read implements Read interface of TStruct
+// it only supports binary protocol.
+// Deprecated: use FastRead instead
+func (e *ApplicationException) Read(in thrift.TProtocol) error {
+	for {
+		_, ttype, id, err := in.ReadFieldBegin()
+		if err != nil {
+			return err
+		}
+		if ttype == thrift.STOP {
+			break
+		}
+		switch {
+		case id == 1 && ttype == thrift.STRING:
+			e.m, err = in.ReadString()
+			if err != nil {
+				return err
+			}
+		case id == 2 && ttype == thrift.I32:
+			e.t, err = in.ReadI32()
+			if err != nil {
+				return err
+			}
+		default:
+			if err = thrift.SkipDefaultDepth(in, ttype); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// Write implements Write interface of TStruct
+// it only supports binary protocol.
+// Deprecated: use FastWrite instead
+func (e *ApplicationException) Write(out thrift.TProtocol) error {
+	if err := out.WriteFieldBegin("message", thrift.STRING, 1); err != nil {
+		return err
+	}
+	if err := out.WriteString(e.m); err != nil {
+		return err
+	}
+	if err := out.WriteFieldBegin("type", thrift.I32, 2); err != nil {
+		return err
+	}
+	if err := out.WriteI32(e.t); err != nil {
+		return err
+	}
+	return out.WriteFieldStop()
 }
 
 // originally from github.com/apache/thrift@v0.13.0/lib/go/thrift/exception.go
