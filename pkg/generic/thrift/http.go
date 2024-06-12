@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/dirtmake"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
@@ -29,6 +28,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"

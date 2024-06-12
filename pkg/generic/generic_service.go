@@ -20,10 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
-
 	gproto "github.com/cloudwego/kitex/pkg/generic/proto"
 	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )

@@ -34,10 +34,10 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/klog"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	dt "github.com/cloudwego/dynamicgo/thrift"
 	dg "github.com/cloudwego/dynamicgo/thrift/generic"
 )
