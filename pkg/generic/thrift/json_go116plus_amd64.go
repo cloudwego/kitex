@@ -23,7 +23,6 @@ import (
 	"context"
 	"unsafe"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
@@ -31,6 +30,7 @@ import (
 	"github.com/cloudwego/dynamicgo/thrift/base"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/utils"

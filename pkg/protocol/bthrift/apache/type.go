@@ -1,8 +1,5 @@
-//go:build !amd64 || !go1.16
-// +build !amd64 !go1.16
-
 /*
- * Copyright 2023 CloudWeGo Authors
+ * Copyright 2024 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,15 +14,30 @@
  * limitations under the License.
  */
 
-package thrift
+package apache
 
-import (
-	"context"
+import "github.com/apache/thrift/lib/go/thrift"
 
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+// originally from github.com/apache/thrift@v0.13.0/lib/go/thrift/type.go
+
+type TType = thrift.TType
+
+const (
+	STOP   = 0
+	VOID   = 1
+	BOOL   = 2
+	BYTE   = 3
+	I08    = 3
+	DOUBLE = 4
+	I16    = 6
+	I32    = 8
+	I64    = 10
+	STRING = 11
+	UTF7   = 11
+	STRUCT = 12
+	MAP    = 13
+	SET    = 14
+	LIST   = 15
+	UTF8   = 16
+	UTF16  = 17
 )
-
-// Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	return w.originalWrite(ctx, out, msg, requestBase)
-}

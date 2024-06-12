@@ -22,11 +22,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/proto"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 

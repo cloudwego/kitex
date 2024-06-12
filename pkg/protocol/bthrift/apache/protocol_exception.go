@@ -1,8 +1,5 @@
-//go:build !amd64 || !go1.16
-// +build !amd64 !go1.16
-
 /*
- * Copyright 2023 CloudWeGo Authors
+ * Copyright 2024 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,15 +14,20 @@
  * limitations under the License.
  */
 
-package thrift
+package apache
 
-import (
-	"context"
+import "github.com/apache/thrift/lib/go/thrift"
 
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+// originally from github.com/apache/thrift@v0.13.0/lib/go/thrift/protocol_exception.go
+
+var NewTProtocolExceptionWithType = thrift.NewTProtocolExceptionWithType
+
+const (
+	UNKNOWN_PROTOCOL_EXCEPTION = 0
+	INVALID_DATA               = 1
+	NEGATIVE_SIZE              = 2
+	SIZE_LIMIT                 = 3
+	BAD_VERSION                = 4
+	NOT_IMPLEMENTED            = 5
+	DEPTH_LIMIT                = 6
 )
-
-// Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	return w.originalWrite(ctx, out, msg, requestBase)
-}

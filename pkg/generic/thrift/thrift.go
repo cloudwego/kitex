@@ -20,7 +20,7 @@ package thrift
 import (
 	"context"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 const (

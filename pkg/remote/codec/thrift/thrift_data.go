@@ -20,10 +20,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/mcache"
 
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
@@ -68,6 +68,7 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 		return nil, err
 	}
 
+	// TODO: Remove the fallback code after skip decoder is stable
 	// fallback to old thrift way (slow)
 	transport := thrift.NewTMemoryBufferLen(marshalThriftBufferSize)
 	tProt := thrift.NewTBinaryProtocol(transport, true, true)
