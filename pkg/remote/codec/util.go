@@ -49,9 +49,6 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 	if err != nil {
 		return err
 	}
-	if codec := svcInfo.GenericCodec; codec != nil {
-		codec.SetMethod(methodName)
-	}
 	if ink, ok := ink.(rpcinfo.InvocationSetter); ok {
 		ink.SetMethodName(methodName)
 		ink.SetPackageName(svcInfo.GetPackageName())

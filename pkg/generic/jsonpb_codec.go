@@ -81,7 +81,7 @@ func (c *jsonPbCodec) getMethod(req interface{}, method string) (*Method, error)
 	}
 
 	// protobuf does not have oneway methods
-	return &Method{method, false}, nil
+	return &Method{method, false, getStreamingMode(fnSvc)}, nil
 }
 
 func (c *jsonPbCodec) Name() string {
@@ -122,4 +122,18 @@ func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in remo
 	msg.Data().(WithCodec).SetCodec(wm)
 
 	return pbCodec.Unmarshal(ctx, msg, in)
+}
+
+func getStreamingMode(fnSvc *dproto.MethodDescriptor) serviceinfo.StreamingMode {
+	streamingMode := serviceinfo.StreamingNone
+	isClientStreaming := fnSvc.IsClientStreaming()
+	isServerStreaming := fnSvc.IsServerStreaming()
+	if isClientStreaming && isServerStreaming {
+		streamingMode = serviceinfo.StreamingBidirectional
+	} else if isClientStreaming {
+		streamingMode = serviceinfo.StreamingClient
+	} else if isServerStreaming {
+		streamingMode = serviceinfo.StreamingServer
+	}
+	return streamingMode
 }

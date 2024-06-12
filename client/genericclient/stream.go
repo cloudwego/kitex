@@ -46,36 +46,11 @@ type BidirectionalStreaming interface {
 	Recv() (resp interface{}, err error)
 }
 
-/*
-// create a normal generic client (the following uses a binary generic as an example)
-client, err := genericclient.NewStreamingClient("destServiceName", generic.BinaryPbGeneric(), client.WithTransportProtocol(transport.GRPC))
-// create a generic client streaming client
-streamCli, err := genericclient.NewClientStreaming(context.Background(), client, "StreamRequestEcho", callOpts...)
-// send streaming requests
-
-	for i := 0; i < 10; i++ {
-	    if err = streamCli.Send(req); err != nil {
-	       klog.Fatal(err)
-	    }
-	    time.Sleep(time.Second)
-	}
-
-// receive a response
-resp, err := streamCli.CloseAndRecv()
-*/
-
-//type genericStreamingServiceClient struct {
-//	genericServiceClient
-//	serviceinfo.StreamingMode
-//	methodType serviceinfo.StreamingMode
-//}
-
 func NewStreamingClient(destService string, g generic.Generic, opts ...client.Option) (Client, error) {
 	svcInfo := generic.StreamingServiceInfo(g.PayloadCodecType(), g.CodecInfo())
 	return NewStreamingClientWithServiceInfo(destService, g, svcInfo, opts...)
 }
 
-// TODO: combine with NewClienttWithServiceInfo?
 func NewStreamingClientWithServiceInfo(destService string, g generic.Generic, svcInfo *serviceinfo.ServiceInfo, opts ...client.Option) (Client, error) {
 	var options []client.Option
 	options = append(options, client.WithGeneric(g))
@@ -87,6 +62,7 @@ func NewStreamingClientWithServiceInfo(destService string, g generic.Generic, sv
 		return nil, err
 	}
 	cli := &genericServiceClient{
+		svcInfo: svcInfo,
 		kClient: kc,
 		g:       g,
 	}
@@ -94,10 +70,14 @@ func NewStreamingClientWithServiceInfo(destService string, g generic.Generic, sv
 
 	svcInfo.GenericMethod = func(name string) serviceinfo.MethodInfo {
 		n, err := g.GetMethod(nil, name)
-		m := svcInfo.Methods[getGenericStreamingMethodInfoKey(n.StreamingMode)]
+		var key string
 		if err != nil {
-			return m
+			// TODO: support fallback solution for binary and http generic
+			key = serviceinfo.GenericMethod
+		} else {
+			key = getGenericStreamingMethodInfoKey(n.StreamingMode)
 		}
+		m := svcInfo.Methods[key]
 		return &methodInfo{
 			MethodInfo: m,
 			oneway:     n.Oneway,
@@ -126,12 +106,10 @@ type clientStreamingClient struct {
 	method  string
 }
 
-// TODO: ここでsvcInfoにモードを設定する
 func NewClientStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (ClientStreaming, error) {
 	gCli, ok := genericCli.(*genericServiceClient)
 	if !ok {
-		// TODO: error message
-		return nil, errors.New("oijpijoij")
+		return nil, errors.New("invalid generic client")
 	}
 	stream, err := getStream(ctx, genericCli, method, callOpts...)
 	if err != nil {
@@ -141,7 +119,7 @@ func NewClientStreaming(ctx context.Context, genericCli Client, method string, c
 }
 
 func (cs *clientStreamingClient) Send(req interface{}) error {
-	_args := cs.svcInfo.MethodInfo(serviceinfo.GenericClientStreamingMethod).NewArgs().(*generic.Args)
+	_args := cs.svcInfo.MethodInfo(cs.method).NewArgs().(*generic.Args)
 	_args.Method = cs.method
 	_args.Request = req
 	return cs.Stream.SendMsg(_args)
@@ -151,7 +129,7 @@ func (cs *clientStreamingClient) CloseAndRecv() (resp interface{}, err error) {
 	if err := cs.Stream.Close(); err != nil {
 		return nil, err
 	}
-	_result := cs.svcInfo.MethodInfo(serviceinfo.GenericClientStreamingMethod).NewResult().(*generic.Result)
+	_result := cs.svcInfo.MethodInfo(cs.method).NewResult().(*generic.Result)
 	if err = cs.Stream.RecvMsg(_result); err != nil {
 		return nil, err
 	}
@@ -161,21 +139,20 @@ func (cs *clientStreamingClient) CloseAndRecv() (resp interface{}, err error) {
 type serverStreamingClient struct {
 	streaming.Stream
 	svcInfo *serviceinfo.ServiceInfo
+	method  string
 }
 
-// TODO: no need servicename?
 func NewServerStreaming(ctx context.Context, genericCli Client, method string, req interface{}, callOpts ...callopt.Option) (ServerStreaming, error) {
 	gCli, ok := genericCli.(*genericServiceClient)
 	if !ok {
-		// TODO: error msg
-		return nil, errors.New("asdfasdfaf")
+		return nil, errors.New("invalid generic client")
 	}
 	stream, err := getStream(ctx, genericCli, method, callOpts...)
 	if err != nil {
 		return nil, err
 	}
-	ss := &serverStreamingClient{Stream: stream, svcInfo: gCli.svcInfo}
-	_args := gCli.svcInfo.MethodInfo(serviceinfo.GenericServerStreamingMethod).NewArgs().(*generic.Args)
+	ss := &serverStreamingClient{Stream: stream, svcInfo: gCli.svcInfo, method: method}
+	_args := gCli.svcInfo.MethodInfo(method).NewArgs().(*generic.Args)
 	_args.Method = method
 	_args.Request = req
 	if err = ss.Stream.SendMsg(_args); err != nil {
@@ -188,7 +165,7 @@ func NewServerStreaming(ctx context.Context, genericCli Client, method string, r
 }
 
 func (ss *serverStreamingClient) Recv() (resp interface{}, err error) {
-	_result := ss.svcInfo.MethodInfo(serviceinfo.GenericServerStreamingMethod).NewResult().(*generic.Result)
+	_result := ss.svcInfo.MethodInfo(ss.method).NewResult().(*generic.Result)
 	if err = ss.Stream.RecvMsg(_result); err != nil {
 		return nil, err
 	}
@@ -204,8 +181,7 @@ type bidirectionalStreamingClient struct {
 func NewBidirectionalStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (BidirectionalStreaming, error) {
 	gCli, ok := genericCli.(*genericServiceClient)
 	if !ok {
-		// TODO: err msg
-		return nil, errors.New("adsfad")
+		return nil, errors.New("invalid generic client")
 	}
 	stream, err := getStream(ctx, genericCli, method, callOpts...)
 	if err != nil {
@@ -215,21 +191,20 @@ func NewBidirectionalStreaming(ctx context.Context, genericCli Client, method st
 }
 
 func (bs *bidirectionalStreamingClient) Send(req interface{}) error {
-	_args := bs.svcInfo.MethodInfo(serviceinfo.GenericBidirectionalStreamingMethod).NewArgs().(*generic.Args)
+	_args := bs.svcInfo.MethodInfo(bs.method).NewArgs().(*generic.Args)
 	_args.Method = bs.method
 	_args.Request = req
 	return bs.Stream.SendMsg(_args)
 }
 
 func (bs *bidirectionalStreamingClient) Recv() (resp interface{}, err error) {
-	_result := bs.svcInfo.MethodInfo(serviceinfo.GenericBidirectionalStreamingMethod).NewResult().(*generic.Result)
+	_result := bs.svcInfo.MethodInfo(bs.method).NewResult().(*generic.Result)
 	if err = bs.Stream.RecvMsg(_result); err != nil {
 		return nil, err
 	}
 	return _result.GetSuccess(), nil
 }
 
-// TODO: should be an option to specify the sub-content-type
 func getStream(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (streaming.Stream, error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOpts)
 	streamClient, ok := genericCli.(*genericServiceClient).kClient.(client.Streaming)
