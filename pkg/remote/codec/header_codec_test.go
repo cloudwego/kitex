@@ -19,6 +19,7 @@ package codec
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"net"
 	"testing"
 
@@ -520,4 +521,124 @@ func TestHeaderFlags(t *testing.T) {
 	setFlags(uint16(HeaderFlagSupportOutOfOrder), msg)
 	hfs = getFlags(msg)
 	test.Assert(t, hfs == HeaderFlagSupportOutOfOrder, hfs)
+}
+
+func Test_ttHeader_encode(t *testing.T) {
+	t.Run("flag:streaming", func(t *testing.T) {
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Stream, remote.Client)
+		out := remote.NewWriterBuffer(256)
+
+		_, err := ttHeaderCodec.encode(context.Background(), msg, out)
+		test.Assert(t, err == nil, err)
+
+		bytes, err := out.Bytes()
+		test.Assert(t, err == nil, err)
+		flags := binary.BigEndian.Uint16(bytes[Size32+Size16:])
+		test.Assert(t, flags|uint16(HeaderFlagsStreaming) != 0, flags)
+	})
+	t.Run("protocol-id:streaming-thrift", func(t *testing.T) {
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Stream, remote.Client)
+		msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+		out := remote.NewWriterBuffer(256)
+		_, err := ttHeaderCodec.encode(context.Background(), msg, out)
+		test.Assert(t, err == nil, err)
+
+		bytes, err := out.Bytes()
+		test.Assert(t, err == nil, err)
+		offsetProtocolID := Size32 /*FramedSize*/ + Size32 /*Magic+Flags*/ + Size32 /*SeqID*/ + Size16 /*HeaderSize*/
+		protocolID := bytes[offsetProtocolID]
+		test.Assert(t, protocolID == byte(ProtocolIDThriftStruct), protocolID)
+	})
+}
+
+func Test_ttHeader_decode(t *testing.T) {
+	t.Run("magic-validation:ping-pong", func(t *testing.T) {
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Call, remote.Client)
+		buf := make([]byte, 14)
+		err := ttHeaderCodec.decode(context.Background(), msg, remote.NewReaderBuffer(buf))
+		test.Assert(t, errors.Is(err, errNotTTHeader), err)
+	})
+	t.Run("magic-validation:streaming", func(t *testing.T) {
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Stream, remote.Client)
+		buf := make([]byte, 14)
+		err := ttHeaderCodec.decode(context.Background(), msg, remote.NewReaderBuffer(buf))
+		test.Assert(t, errors.Is(err, errNotTTHeaderStreaming), err)
+	})
+	t.Run("protocol-id:protobuf", func(t *testing.T) {
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Stream, remote.Client)
+		msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Protobuf))
+		out := remote.NewWriterBuffer(256)
+		_, err := ttHeaderCodec.encode(context.Background(), msg, out)
+		test.Assert(t, err == nil, err)
+		bytes, _ := out.Bytes()
+
+		rMsg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Stream, remote.Client)
+		err = ttHeaderCodec.decode(context.Background(), rMsg, remote.NewReaderBuffer(bytes))
+
+		test.Assert(t, err == nil, err)
+		test.Assert(t, rMsg.ProtocolInfo().CodecType == serviceinfo.Protobuf)
+	})
+}
+
+func Test_getMessageProtocolID(t *testing.T) {
+	t.Run("Call", func(t *testing.T) {
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Call, remote.Client)
+		protocolID := getMessageProtocolID(msg)
+		test.Assert(t, protocolID == byte(ProtocolIDDefault))
+	})
+	t.Run("Stream", func(t *testing.T) {
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Stream, remote.Client)
+		protocolID := getMessageProtocolID(msg)
+		test.Assert(t, protocolID == byte(ProtocolIDThriftStruct))
+	})
+	t.Run("Stream:protobuf", func(t *testing.T) {
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Stream, remote.Client)
+		msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Protobuf))
+		protocolID := getMessageProtocolID(msg)
+		test.Assert(t, protocolID == byte(ProtocolIDProtobufStruct))
+	})
+	t.Run("Stream:NotSpecified", func(t *testing.T) {
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Stream, remote.Client)
+		msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.NotSpecified))
+		protocolID := getMessageProtocolID(msg)
+		test.Assert(t, protocolID == byte(ProtocolIDNotSpecified))
+	})
+}
+
+func Test_checkAndSetProtocolID(t *testing.T) {
+	t.Run("pingpong:thrift", func(t *testing.T) {
+		protocolID := byte(ProtocolIDThriftBinary)
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Call, remote.Client)
+		err := checkAndSetProtocolID(protocolID, msg)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
+	})
+	t.Run("pingpong:protobuf", func(t *testing.T) {
+		protocolID := byte(ProtocolIDProtobufStruct)
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Call, remote.Client)
+		err := checkAndSetProtocolID(protocolID, msg)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Protobuf)
+	})
+	t.Run("pingpong:unknown", func(t *testing.T) {
+		protocolID := byte(ProtocolIDNotSpecified) - 1 // unknown
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Call, remote.Client)
+		err := checkAndSetProtocolID(protocolID, msg)
+		test.Assert(t, err != nil, err)
+	})
+	t.Run("stream:thrift", func(t *testing.T) {
+		protocolID := byte(ProtocolIDThriftStruct)
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Stream, remote.Client)
+		err := checkAndSetProtocolID(protocolID, msg)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Thrift)
+	})
+	t.Run("stream:protobuf", func(t *testing.T) {
+		protocolID := byte(ProtocolIDProtobufStruct)
+		msg := remote.NewMessage(nil, mocks.ServiceInfo(), mockCliRPCInfo, remote.Stream, remote.Client)
+		msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Protobuf))
+		err := checkAndSetProtocolID(protocolID, msg)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, msg.ProtocolInfo().CodecType == serviceinfo.Protobuf)
+	})
 }

@@ -28,7 +28,7 @@ import (
 	mt "github.com/cloudwego/kitex/internal/mocks/thrift/fast"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
-	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll/bytebuf"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/transport"
@@ -51,7 +51,7 @@ var (
 		{
 			Name: "NetpollBuffer",
 			NewBuffer: func() remote.ByteBuffer {
-				return netpolltrans.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(1024))
+				return bytebuf.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(1024))
 			},
 		},
 	}

@@ -20,28 +20,53 @@ import (
 	"context"
 	"net"
 
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
+	kitex "github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
+)
+
+var (
+	_                    remote.ClientStreamAllocator           = (*MockCliTransHandler)(nil)
+	_                    remote.ClientTransHandlerFactory       = (*mockCliTransHandlerFactory)(nil)
+	_                    remote.ClientStreamTransHandlerFactory = (*mockCliTransHandlerFactory)(nil)
+	DefaultNewStreamFunc func(
+		ctx context.Context, svcInfo *kitex.ServiceInfo, conn net.Conn, handler remote.TransReadWriter,
+	) streaming.Stream = nil
+
+	DefaultNewStreamTransHandlerFunc func(opt *remote.ClientOption) (remote.ClientTransHandler, error) = nil
 )
 
 type mockCliTransHandlerFactory struct {
-	hdlr *MockCliTransHandler
+	hdlr                      *mocksremote.MockClientTransHandler
+	NewStreamTransHandlerFunc func(opt *remote.ClientOption) (remote.ClientTransHandler, error)
+}
+
+func (f *mockCliTransHandlerFactory) NewStreamTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, error) {
+	if f.NewStreamTransHandlerFunc != nil {
+		return f.NewStreamTransHandlerFunc(opt)
+	}
+	if DefaultNewStreamTransHandlerFunc != nil {
+		return DefaultNewStreamTransHandlerFunc(opt)
+	}
+	panic("NewStreamTransHandlerFunc is not available in mocks.mockCliTransHandlerFactory")
 }
 
 // NewMockCliTransHandlerFactory .
-func NewMockCliTransHandlerFactory(hdrl *MockCliTransHandler) remote.ClientTransHandlerFactory {
-	return &mockCliTransHandlerFactory{hdrl}
+func NewMockCliTransHandlerFactory(handler *mocksremote.MockClientTransHandler) remote.ClientTransHandlerFactory {
+	return &mockCliTransHandlerFactory{
+		hdlr: handler,
+	}
 }
 
 func (f *mockCliTransHandlerFactory) NewTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, error) {
-	f.hdlr.opt = opt
 	return f.hdlr, nil
 }
 
 // MockCliTransHandler .
 type MockCliTransHandler struct {
-	opt       *remote.ClientOption
 	transPipe *remote.TransPipeline
 
 	WriteFunc func(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error)
@@ -49,6 +74,18 @@ type MockCliTransHandler struct {
 	ReadFunc func(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error)
 
 	OnMessageFunc func(ctx context.Context, args, result remote.Message) (context.Context, error)
+
+	NewStreamFunc func(ctx context.Context, svcInfo *kitex.ServiceInfo, conn net.Conn, handler remote.TransReadWriter) (streaming.Stream, error)
+}
+
+func (t *MockCliTransHandler) NewStream(ctx context.Context, svcInfo *kitex.ServiceInfo, conn net.Conn, handler remote.TransReadWriter) (streaming.Stream, error) {
+	if t.NewStreamFunc != nil {
+		return t.NewStreamFunc(ctx, svcInfo, conn, handler)
+	}
+	if DefaultNewStreamFunc != nil {
+		return DefaultNewStreamFunc(ctx, svcInfo, conn, handler), nil
+	}
+	panic("NewStreamFunc is not available in mocks.MockCliTransHandler")
 }
 
 // Write implements the remote.TransHandler interface.

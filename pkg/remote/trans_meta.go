@@ -28,8 +28,28 @@ type MetaHandler interface {
 
 // StreamingMetaHandler reads or writes metadata through streaming header(http2 header)
 type StreamingMetaHandler interface {
-	// writes metadata before create a stream
+	// OnConnectStream writes metadata before create a stream
 	OnConnectStream(ctx context.Context) (context.Context, error)
-	// reads metadata before read first message from stream
+	// OnReadStream reads metadata before read first message from stream
 	OnReadStream(ctx context.Context) (context.Context, error)
+}
+
+// FrameMetaHandler deals with MetaFrame, HeaderFrame and TrailerFrame
+// It's used by TTHeader Streaming
+type FrameMetaHandler interface {
+	// ReadMeta is called after a MetaFrame is received by client
+	// MetaFrame is not necessary and a typical scenario is sent by a proxy which takes over service discovery,
+	// By sending the MetaFrame before server's HeaderFrame, proxy can inform the client about the real address.
+	ReadMeta(ctx context.Context, message Message) error
+	// ClientReadHeader is called after a HeaderFrame is received by client
+	ClientReadHeader(ctx context.Context, message Message) error
+	// ServerReadHeader is called after a HeaderFrame is received by server
+	// The context returned will be used to replace the stream context
+	ServerReadHeader(ctx context.Context, message Message) (context.Context, error)
+	// WriteHeader is called before a HeaderFrame is sent by client/server
+	WriteHeader(ctx context.Context, message Message) error
+	// ReadTrailer is called after a TrailerFrame is received by client/server
+	ReadTrailer(ctx context.Context, message Message) error
+	// WriteTrailer is called before a TrailerFrame is sent by client/server
+	WriteTrailer(ctx context.Context, message Message) error
 }

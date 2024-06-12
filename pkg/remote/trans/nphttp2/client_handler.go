@@ -25,7 +25,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/grpc"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	kitex "github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
+
+var _ remote.ClientStreamTransHandlerFactory = (*cliTransHandlerFactory)(nil)
 
 type cliTransHandlerFactory struct{}
 
@@ -38,6 +42,10 @@ func (f *cliTransHandlerFactory) NewTransHandler(opt *remote.ClientOption) (remo
 	return newCliTransHandler(opt)
 }
 
+func (f *cliTransHandlerFactory) NewStreamTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, error) {
+	return newCliTransHandler(opt)
+}
+
 func newCliTransHandler(opt *remote.ClientOption) (*cliTransHandler, error) {
 	return &cliTransHandler{
 		opt:   opt,
@@ -45,11 +53,20 @@ func newCliTransHandler(opt *remote.ClientOption) (*cliTransHandler, error) {
 	}, nil
 }
 
-var _ remote.ClientTransHandler = &cliTransHandler{}
+var (
+	_ remote.ClientTransHandler    = &cliTransHandler{}
+	_ remote.ClientStreamAllocator = &cliTransHandler{}
+)
 
 type cliTransHandler struct {
 	opt   *remote.ClientOption
 	codec remote.Codec
+}
+
+func (h *cliTransHandler) NewStream(
+	ctx context.Context, svcInfo *kitex.ServiceInfo, conn net.Conn, handler remote.TransReadWriter,
+) (streaming.Stream, error) {
+	return NewStream(ctx, svcInfo, conn, handler), nil
 }
 
 func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {

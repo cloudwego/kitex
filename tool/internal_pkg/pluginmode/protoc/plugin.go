@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -264,6 +265,12 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 			ServiceName:    service.GoName,
 			RawServiceName: string(service.Desc.Name()),
 		}
+		if protocol, err := parseStreamingTransport(service.Comments); err == nil {
+			si.StreamingTransport = protocol
+		} else {
+			panic(fmt.Errorf("parseStreamingTransport for service %s failed: %v", si.ServiceName, err))
+		}
+
 		si.ServiceTypeName = func() string { return si.PkgRefName + "." + si.ServiceName }
 		for _, m := range service.Methods {
 			req := pp.convertParameter(m.Input, "Req")
@@ -297,9 +304,19 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 	if pp.Config.CombineService && len(file.Services) > 0 {
 		var svcs []*generator.ServiceInfo
 		var methods []*generator.MethodInfo
+		var streamingTransport string
 		for _, s := range ss {
 			svcs = append(svcs, s)
 			methods = append(methods, s.AllMethods()...)
+			if streamingTransport == "" {
+				streamingTransport = s.StreamingTransport
+			} else if streamingTransport != s.StreamingTransport {
+				log.Warnf("[WARN] service %s has a different streaming transport %s\n",
+					s.ServiceName, s.StreamingTransport)
+			}
+		}
+		if streamingTransport == "" {
+			streamingTransport = generator.GRPC // default
 		}
 		// check method name conflict
 		mm := make(map[string]*generator.MethodInfo)
@@ -319,17 +336,31 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 		}
 		svcName := pp.getCombineServiceName("CombineService", ss)
 		si := &generator.ServiceInfo{
-			PkgInfo:         pi,
-			ServiceName:     svcName,
-			RawServiceName:  svcName,
-			CombineServices: svcs,
-			Methods:         methods,
-			HasStreaming:    hasStreaming,
+			PkgInfo:            pi,
+			ServiceName:        svcName,
+			RawServiceName:     svcName,
+			CombineServices:    svcs,
+			Methods:            methods,
+			HasStreaming:       hasStreaming,
+			StreamingTransport: streamingTransport,
 		}
 		si.ServiceTypeName = func() string { return si.ServiceName }
 		ss = append(ss, si)
 	}
 	return
+}
+
+var streamingTransportPattern = regexp.MustCompile(`@` + generator.AnnotationKeyStreamingTransport + `=(\w*)`)
+
+// Protobuf does not support annotation, so we parse it from leading comments in the format of:
+// @streaming.transport=<value>
+func parseStreamingTransport(comments protogen.CommentSet) (string, error) {
+	match := streamingTransportPattern.FindAllStringSubmatch(string(comments.Leading), 1)
+	if len(match) == 0 {
+		return generator.GRPC, nil
+	}
+	protocol := match[0][1]
+	return generator.GetStreamingTransport(protocol)
 }
 
 // BuildStreaming builds protobuf MethodInfo.Streaming as for Thrift, to simplify codegen

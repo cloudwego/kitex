@@ -18,7 +18,10 @@ package remotecli
 
 import (
 	"context"
+	"errors"
+	"net"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 
@@ -26,9 +29,13 @@ import (
 	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	kitex "github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func TestNewStream(t *testing.T) {
@@ -40,6 +47,9 @@ func TestNewStream(t *testing.T) {
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
 	hdlr := &mocks.MockCliTransHandler{}
+	hdlr.NewStreamFunc = func(ctx context.Context, svcInfo *kitex.ServiceInfo, conn net.Conn, handler remote.TransReadWriter) (streaming.Stream, error) {
+		return nphttp2.NewStream(ctx, svcInfo, conn, handler), nil
+	}
 
 	opt := newMockOption(ctrl, addr)
 	opt.Option = remote.Option{
@@ -61,5 +71,164 @@ func TestStreamConnManagerReleaseConn(t *testing.T) {
 	scr := NewStreamConnManager(cr)
 	test.Assert(t, scr != nil)
 	test.Assert(t, scr.ConnReleaser == cr)
-	scr.ReleaseConn(nil, nil)
+	ri := rpcinfo.NewRPCInfo(nil, nil, nil, rpcinfo.NewRPCConfig(), nil)
+	scr.ReleaseConn(nil, nil, ri)
+}
+
+type mockConnReleaser struct {
+	releaseConn func(err error, ri rpcinfo.RPCInfo)
+}
+
+func (m *mockConnReleaser) ReleaseConn(err error, ri rpcinfo.RPCInfo) {
+	if m.releaseConn != nil {
+		m.releaseConn(err, ri)
+	}
+}
+
+func TestStreamConnManager_AsyncCleanAndRelease(t *testing.T) {
+	t.Run("finish-without-error", func(t *testing.T) {
+		cleaner := &StreamCleaner{
+			Async:   true,
+			Timeout: time.Second,
+			Clean: func(st streaming.Stream) error {
+				return nil
+			},
+		}
+		result := make(chan error, 1)
+		scm := NewStreamConnManager(&mockConnReleaser{
+			releaseConn: func(err error, ri rpcinfo.RPCInfo) {
+				result <- err
+			},
+		})
+		scm.AsyncCleanAndRelease(cleaner, nil, nil)
+		got := <-result
+		test.Assert(t, got == nil)
+	})
+	t.Run("finish-with-error", func(t *testing.T) {
+		cleaner := &StreamCleaner{
+			Async:   true,
+			Timeout: time.Second,
+			Clean: func(st streaming.Stream) error {
+				return context.DeadlineExceeded
+			},
+		}
+		result := make(chan error, 1)
+		scm := NewStreamConnManager(&mockConnReleaser{
+			releaseConn: func(err error, ri rpcinfo.RPCInfo) {
+				result <- err
+			},
+		})
+		scm.AsyncCleanAndRelease(cleaner, nil, nil)
+		got := <-result
+		test.Assert(t, got != nil)
+	})
+	t.Run("cleaner-timeout", func(t *testing.T) {
+		cleaner := &StreamCleaner{
+			Async:   true,
+			Timeout: time.Millisecond * 10,
+			Clean: func(st streaming.Stream) error {
+				time.Sleep(time.Millisecond * 20)
+				return nil
+			},
+		}
+		result := make(chan error, 1)
+		scm := NewStreamConnManager(&mockConnReleaser{
+			releaseConn: func(err error, ri rpcinfo.RPCInfo) {
+				result <- err
+			},
+		})
+		scm.AsyncCleanAndRelease(cleaner, nil, nil)
+		got := <-result
+		test.Assert(t, got != nil)
+	})
+	t.Run("cleaner-panic", func(t *testing.T) {
+		cleaner := &StreamCleaner{
+			Async:   true,
+			Timeout: time.Second,
+			Clean: func(st streaming.Stream) error {
+				panic("cleaner panic")
+			},
+		}
+		result := make(chan error, 1)
+		scm := NewStreamConnManager(&mockConnReleaser{
+			releaseConn: func(err error, ri rpcinfo.RPCInfo) {
+				result <- err
+			},
+		})
+		scm.AsyncCleanAndRelease(cleaner, nil, nil)
+		got := <-result
+		test.Assert(t, got != nil)
+	})
+}
+
+func TestStreamConnManager_ReleaseConn(t *testing.T) {
+	t.Run("non-nil-error", func(t *testing.T) {
+		err := errors.New("error")
+		result := make(chan error, 1)
+		scm := NewStreamConnManager(&mockConnReleaser{
+			releaseConn: func(err error, ri rpcinfo.RPCInfo) {
+				result <- err
+			},
+		})
+		scm.ReleaseConn(nil, err, nil)
+		got := <-result
+		test.Assert(t, errors.Is(got, err))
+	})
+	t.Run("nil-error-without-registered-cleaner", func(t *testing.T) {
+		result := make(chan error, 1)
+		scm := NewStreamConnManager(&mockConnReleaser{
+			releaseConn: func(err error, ri rpcinfo.RPCInfo) {
+				result <- err
+			},
+		})
+		cfg := rpcinfo.NewRPCConfig()
+		_ = rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.Framed)
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, nil)
+		scm.ReleaseConn(nil, nil, ri)
+		got := <-result
+		test.Assert(t, got == nil)
+	})
+	t.Run("nil-error-with-registered-sync-cleaner", func(t *testing.T) {
+		err := errors.New("error")
+		result := make(chan error, 1)
+		scm := NewStreamConnManager(&mockConnReleaser{
+			releaseConn: func(err error, ri rpcinfo.RPCInfo) {
+				result <- err
+			},
+		})
+		cfg := rpcinfo.NewRPCConfig()
+		_ = rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.Framed)
+		RegisterCleaner(transport.Framed, &StreamCleaner{
+			Async: false,
+			Clean: func(st streaming.Stream) error {
+				return err
+			},
+		})
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, nil)
+		scm.ReleaseConn(nil, nil, ri)
+		got := <-result
+		test.Assert(t, errors.Is(got, err))
+	})
+	t.Run("nil-error-with-registered-async-cleaner", func(t *testing.T) {
+		err := errors.New("error")
+		result := make(chan error, 1)
+		scm := NewStreamConnManager(&mockConnReleaser{
+			releaseConn: func(err error, ri rpcinfo.RPCInfo) {
+				result <- err
+			},
+		})
+		cfg := rpcinfo.NewRPCConfig()
+		_ = rpcinfo.AsMutableRPCConfig(cfg).SetTransportProtocol(transport.Framed)
+		RegisterCleaner(transport.Framed, &StreamCleaner{
+			Async:   true,
+			Timeout: time.Second,
+			Clean: func(st streaming.Stream) error {
+				return err
+			},
+		})
+		ri := rpcinfo.NewRPCInfo(nil, nil, nil, cfg, nil)
+		scm.ReleaseConn(nil, nil, ri)
+		got := <-result
+		test.Assert(t, errors.Is(got, err))
+	})
 }

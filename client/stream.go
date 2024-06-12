@@ -18,17 +18,17 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync/atomic"
 
-	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
@@ -71,10 +71,16 @@ func (kc *kClient) invokeRecvEndpoint() endpoint.RecvEndpoint {
 }
 
 func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
-	handler, err := kc.opt.RemoteOpt.CliHandlerFactory.NewTransHandler(kc.opt.RemoteOpt)
+	handler, err := kc.newStreamClientTransHandler()
 	if err != nil {
-		return nil, err
+		// if a ClientTransHandler does not support streaming, the error will be returned when Kitex is used to
+		// send streaming requests. This saves the pain for each ClientTransHandler to implement the interface,
+		// with no impact on existing ClientTransHandler implementations.
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			panic(err)
+		}, nil
 	}
+
 	for _, h := range kc.opt.MetaHandlers {
 		if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
 			kc.opt.RemoteOpt.StreamingMetaHandlers = append(kc.opt.RemoteOpt.StreamingMetaHandlers, shdlr)
@@ -95,6 +101,15 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 		resp.(*streaming.Result).Stream = clientStream
 		return
 	}, nil
+}
+
+func (kc *kClient) newStreamClientTransHandler() (remote.ClientTransHandler, error) {
+	handlerFactory, ok := kc.opt.RemoteOpt.CliHandlerFactory.(remote.ClientStreamTransHandlerFactory)
+	if !ok {
+		return nil, fmt.Errorf("remote.ClientStreamTransHandlerFactory is not implement by %T",
+			kc.opt.RemoteOpt.CliHandlerFactory)
+	}
+	return handlerFactory.NewStreamTransHandler(kc.opt.RemoteOpt)
 }
 
 func (kc *kClient) getStreamingMode(ri rpcinfo.RPCInfo) serviceinfo.StreamingMode {
@@ -204,7 +219,7 @@ func (s *stream) DoFinish(err error) {
 		err = nil
 	}
 	if s.scm != nil {
-		s.scm.ReleaseConn(err, s.ri)
+		s.scm.ReleaseConn(s, err, s.ri)
 	}
 	s.kc.opt.TracerCtl.DoFinish(s.Context(), s.ri, err)
 }

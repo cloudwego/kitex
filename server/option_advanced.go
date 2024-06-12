@@ -263,3 +263,11 @@ func WithProfilerMessageTagging(tagging remote.MessageTagging) Option {
 		}
 	}}
 }
+
+// WithTTHeaderFrameMetaHandler sets the FrameMetaHandler for TTHeader Streaming
+func WithTTHeaderFrameMetaHandler(h remote.FrameMetaHandler) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithTTHeaderFrameMetaHandler(%T)", h))
+		o.RemoteOpt.TTHeaderFrameMetaHandler = h
+	}}
+}

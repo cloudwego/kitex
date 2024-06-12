@@ -46,6 +46,9 @@ const (
 )
 
 var (
+	_ remote.PayloadCodec = (*thriftCodec)(nil)
+	_ remote.StructCodec  = (*thriftCodec)(nil)
+
 	defaultCodec = NewThriftCodec().(*thriftCodec)
 
 	errEncodeMismatchMsgType = remote.NewTransErrorWithMsg(remote.InvalidProtocol,
@@ -65,7 +68,7 @@ func IsThriftCodec(c remote.PayloadCodec) bool {
 	return ok
 }
 
-// NewThriftFrugalCodec creates the thrift binary codec powered by frugal.
+// NewThriftCodecWithConfig creates the thrift binary codec powered by frugal.
 // Eg: xxxservice.NewServer(handler, server.WithPayloadCodec(thrift.NewThriftCodecWithConfig(thrift.FastWrite | thrift.FastRead)))
 func NewThriftCodecWithConfig(c CodecType) remote.PayloadCodec {
 	return &thriftCodec{c}

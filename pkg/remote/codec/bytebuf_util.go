@@ -175,3 +175,15 @@ func ReadString2BLen(bytes []byte, off int) (string, int, error) {
 	buf := bytes[off : off+strLen]
 	return string(buf), int(length) + 2, nil
 }
+
+// WriteAll ...
+func WriteAll(writer func([]byte) (int, error), buf []byte) error {
+	for idx := 0; idx < len(buf); {
+		n, err := writer(buf[idx:])
+		if err != nil {
+			return err
+		}
+		idx += n
+	}
+	return nil
+}

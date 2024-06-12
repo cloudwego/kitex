@@ -17,11 +17,14 @@
 package codec
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 const (
@@ -114,4 +117,43 @@ func NewDataIfNeeded(method string, message remote.Message) error {
 		return nil
 	}
 	return remote.NewTransErrorWithMsg(remote.InternalError, "message data for codec is nil")
+}
+
+// ProtocolIDToPayloadCodec converts ProtocolID to PayloadCodec
+func ProtocolIDToPayloadCodec(p ProtocolID) serviceinfo.PayloadCodec {
+	switch p {
+	case ProtocolIDThriftBinary, ProtocolIDThriftCompact, ProtocolIDThriftCompactV2:
+		return serviceinfo.Thrift
+	case ProtocolIDKitexProtobuf:
+		return serviceinfo.Protobuf
+	default:
+		return serviceinfo.NotSpecified
+	}
+}
+
+// PayloadCodecToProtocolID converts PayloadCodec to ProtocolID
+func PayloadCodecToProtocolID(p serviceinfo.PayloadCodec) ProtocolID {
+	switch p {
+	case serviceinfo.Thrift:
+		return ProtocolIDThriftBinary
+	case serviceinfo.Protobuf:
+		return ProtocolIDKitexProtobuf
+	default:
+		return ProtocolIDNotSpecified
+	}
+}
+
+// MessageFrameType returns the frame type of the message; the default value is "trailer" if the key is not found.
+func MessageFrameType(message remote.Message) string {
+	if ft, exists := message.TransInfo().TransIntInfo()[transmeta.FrameType]; exists {
+		return ft
+	}
+	// to be compatible with old ttheader frames containing TApplicationException
+	return FrameTypeTrailer
+}
+
+// IsTTHeaderStreaming checks whether the bytes match ttheader streaming (magic + flags with streaming bit set)
+func IsTTHeaderStreaming(bytes []byte) bool {
+	return binary.BigEndian.Uint16(bytes[Size32:]) == uint16(TTHeaderMagic>>16) &&
+		binary.BigEndian.Uint16(bytes[Size32+2:])&uint16(HeaderFlagsStreaming) != 0
 }

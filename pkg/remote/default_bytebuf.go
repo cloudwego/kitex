@@ -60,7 +60,10 @@ type defaultByteBuffer struct {
 	status   int
 }
 
-var _ ByteBuffer = &defaultByteBuffer{}
+var (
+	_ ByteBuffer = (*defaultByteBuffer)(nil)
+	_ FrameWrite = (*defaultByteBuffer)(nil)
+)
 
 func newDefaultByteBuffer() interface{} {
 	return &defaultByteBuffer{}
@@ -96,6 +99,18 @@ func newReaderWriterByteBuffer(estimatedLength int) ByteBuffer {
 	bytebuf.writeIdx = 0
 	bytebuf.status = BitReadable | BitWritable
 	return bytebuf
+}
+
+// WriteHeader implements FrameWrite
+func (b *defaultByteBuffer) WriteHeader(buf []byte) (err error) {
+	_, err = b.WriteBinary(buf)
+	return
+}
+
+// WriteData implements FrameWrite
+func (b *defaultByteBuffer) WriteData(buf []byte) (err error) {
+	_, err = b.WriteBinary(buf)
+	return
 }
 
 // Next reads n bytes sequentially, returns the original address.

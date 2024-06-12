@@ -21,11 +21,18 @@ import (
 	"net"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // ClientTransHandlerFactory to new TransHandler for client
 type ClientTransHandlerFactory interface {
 	NewTransHandler(opt *ClientOption) (ClientTransHandler, error)
+}
+
+// ClientStreamTransHandlerFactory to new StreamTransHandler for client
+type ClientStreamTransHandlerFactory interface {
+	NewStreamTransHandler(opt *ClientOption) (ClientTransHandler, error)
 }
 
 // ServerTransHandlerFactory to new TransHandler for server
@@ -52,6 +59,12 @@ type TransHandler interface {
 // ClientTransHandler is just TransHandler.
 type ClientTransHandler interface {
 	TransHandler
+}
+
+type ClientStreamAllocator interface {
+	NewStream(
+		ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn net.Conn, handler TransReadWriter,
+	) (streaming.Stream, error)
 }
 
 // ServerTransHandler have some new functions.

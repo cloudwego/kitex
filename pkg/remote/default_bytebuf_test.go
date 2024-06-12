@@ -155,3 +155,21 @@ func checkUnreadable(t *testing.T, buf ByteBuffer) {
 	test.Assert(t, err != nil)
 	test.Assert(t, n == -1, n)
 }
+
+func Test_defaultByteBuffer_WriteHeader(t *testing.T) {
+	b := newWriterByteBuffer(16)
+	fw := b.(FrameWrite)
+	err := fw.WriteHeader([]byte("hello"))
+	test.Assert(t, err == nil, err)
+	got, _ := b.Bytes()
+	test.Assert(t, string(got) == "hello", string(got))
+}
+
+func Test_defaultByteBuffer_WriteData(t *testing.T) {
+	b := newWriterByteBuffer(16)
+	fw := b.(FrameWrite)
+	err := fw.WriteData([]byte("hello"))
+	test.Assert(t, err == nil, err)
+	got, _ := b.Bytes()
+	test.Assert(t, string(got) == "hello", string(got))
+}

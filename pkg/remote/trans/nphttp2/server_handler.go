@@ -200,7 +200,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			}
 
 			rawStream := NewStream(rCtx, svcInfo, newServerConn(tr, s), t)
-			st := newStreamWithMiddleware(rawStream, t.opt.RecvEndpoint, t.opt.SendEndpoint)
+			st := endpoint.NewStreamWithMiddleware(rawStream, t.opt.RecvEndpoint, t.opt.SendEndpoint)
 
 			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
 			rCtx = streaming.NewCtxWithStream(rCtx, st)

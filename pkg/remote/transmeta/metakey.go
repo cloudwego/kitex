@@ -47,6 +47,10 @@ const (
 	HTTPContentType
 	RawRingHashKey
 	LBType
+	ClusterShardID
+	FrameType // ttheader streaming frame type
+	TransCode
+	TransMessage
 )
 
 // key of header transport

@@ -46,6 +46,11 @@ const (
 	metaInfoFixLen = 8
 )
 
+var (
+	_ remote.PayloadCodec = (*protobufCodec)(nil)
+	_ remote.StructCodec  = (*protobufCodec)(nil)
+)
+
 // NewProtobufCodec ...
 func NewProtobufCodec() remote.PayloadCodec {
 	return &protobufCodec{}
@@ -233,6 +238,11 @@ type MessageReaderWithMethodWithContext interface {
 type ProtobufMsgCodec interface {
 	Marshal(out []byte) ([]byte, error)
 	Unmarshal(in []byte) error
+}
+
+type ProtobufV2MsgCodec interface {
+	XXX_Unmarshal(b []byte) error
+	XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
 }
 
 func getValidData(methodName string, message remote.Message) (interface{}, error) {

@@ -32,12 +32,23 @@ type PayloadCodec interface {
 	Name() string
 }
 
+// StructCodec is used to serialize and deserialize a given struct.
+type StructCodec interface {
+	Serialize(ctx context.Context, data interface{}) ([]byte, error)
+	Deserialize(ctx context.Context, data interface{}, payload []byte) error
+}
+
 // GetPayloadCodec gets desired payload codec from message.
 func GetPayloadCodec(message Message) (PayloadCodec, error) {
 	if message.PayloadCodec() != nil {
 		return message.PayloadCodec(), nil
 	}
 	ct := message.ProtocolInfo().CodecType
+	return GetPayloadCodecByCodecType(ct)
+}
+
+// GetPayloadCodecByCodecType gets payload codec by codecType.
+func GetPayloadCodecByCodecType(ct serviceinfo.PayloadCodec) (PayloadCodec, error) {
 	pc := payloadCodecs[ct]
 	if pc == nil {
 		return nil, fmt.Errorf("payload codec not found with codecType=%v", ct)
@@ -48,4 +59,24 @@ func GetPayloadCodec(message Message) (PayloadCodec, error) {
 // PutPayloadCode puts the desired payload codec to message.
 func PutPayloadCode(name serviceinfo.PayloadCodec, v PayloadCodec) {
 	payloadCodecs[name] = v
+}
+
+// GetStructCodec gets desired payload struct codec from message.
+func GetStructCodec(message Message) (StructCodec, error) {
+	if codec, err := GetPayloadCodec(message); err == nil {
+		if structCodec := codec.(StructCodec); structCodec != nil {
+			return structCodec, nil
+		}
+	}
+	return nil, fmt.Errorf("payload struct codec not found with codecType=%v", message.ProtocolInfo().CodecType)
+}
+
+// GetStructCodecByCodecType gets the struct codec by codecType.
+func GetStructCodecByCodecType(ct serviceinfo.PayloadCodec) (StructCodec, error) {
+	if codec, err := GetPayloadCodecByCodecType(ct); err == nil {
+		if structCodec := codec.(StructCodec); structCodec != nil {
+			return structCodec, nil
+		}
+	}
+	return nil, fmt.Errorf("payload struct codec not found with codecType=%v", ct)
 }

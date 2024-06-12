@@ -26,7 +26,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
-	internalnetpoll "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll/bytebuf"
 )
 
 // TestWriteMessageEnd test binary WriteMessageEnd function
@@ -319,7 +319,7 @@ func TestWriteStringNocopy(t *testing.T) {
 	buf := make([]byte, 128)
 	exceptWs := "0000000c6d657373616765426567696e"
 	exceptSize := 16
-	out := internalnetpoll.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(0))
+	out := bytebuf.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(0))
 	nw, _ := out.(remote.NocopyWrite)
 	wn := Binary.WriteStringNocopy(buf, nw, "messageBegin")
 	ws := fmt.Sprintf("%x", buf[:wn])
@@ -332,7 +332,7 @@ func TestWriteBinaryNocopy(t *testing.T) {
 	buf := make([]byte, 128)
 	exceptWs := "0000000c6d657373616765426567696e"
 	exceptSize := 16
-	out := internalnetpoll.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(0))
+	out := bytebuf.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(0))
 	nw, _ := out.(remote.NocopyWrite)
 	wn := Binary.WriteBinaryNocopy(buf, nw, []byte("messageBegin"))
 	ws := fmt.Sprintf("%x", buf[:wn])

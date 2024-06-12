@@ -141,13 +141,15 @@ func testThriftNormalBinaryEcho(t *testing.T) {
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: dynamicgo
-	cli = initThriftClientByIDL(t, transport.PurePayload, addr, "./idl/binary_echo.thrift", opts, false, true)
-	resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
-	test.Assert(t, err == nil, err)
-	gr, ok = resp.(*generic.HTTPResponse)
-	test.Assert(t, ok)
-	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(string(gr.RawBody), "msg").String())
-	test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "num").String(), "0"), gjson.Get(string(gr.RawBody), "num").String())
+	// TODO: this test does not make sense since currently DynamicGo requires TTHeader/Framed for PayloadSize
+	// TODO: As we now have SkipDecoder, the compatibility of DynamicGo can be improved based on that.
+	// cli = initThriftClientByIDL(t, transport.PurePayload, addr, "./idl/binary_echo.thrift", opts, false, true)
+	// resp, err = cli.GenericCall(context.Background(), "", customReq, callopt.WithRPCTimeout(100*time.Second))
+	// test.Assert(t, err == nil, err)
+	// gr, ok = resp.(*generic.HTTPResponse)
+	// test.Assert(t, ok)
+	// test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "msg").String(), base64.StdEncoding.EncodeToString([]byte(mockMyMsg))), gjson.Get(string(gr.RawBody), "msg").String())
+	// test.Assert(t, reflect.DeepEqual(gjson.Get(string(gr.RawBody), "num").String(), "0"), gjson.Get(string(gr.RawBody), "num").String())
 
 	// write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
 	// read: fallback
