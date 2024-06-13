@@ -52,7 +52,7 @@ func newServiceInfo(pcType serviceinfo.PayloadCodec, codec serviceinfo.CodecInfo
 	var svcName string
 
 	if codec == nil {
-		// TODO: support multi-service for binary generic
+		// note: binary generic cannot be used with multi-service feature
 		svcName = serviceinfo.GenericService
 		methods = map[string]serviceinfo.MethodInfo{
 			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(callHandler, newGenericServiceCallArgs, newGenericServiceCallResult, false),
