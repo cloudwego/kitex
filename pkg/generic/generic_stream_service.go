@@ -20,12 +20,13 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-func StreamingServiceInfo(pcType serviceinfo.PayloadCodec, codec serviceinfo.CodecInfo) *serviceinfo.ServiceInfo {
-	return newClientStreamingServiceInfo(pcType, codec)
+func StreamingServiceInfo(g Generic) *serviceinfo.ServiceInfo {
+	return newClientStreamingServiceInfo(g)
 }
 
-func newClientStreamingServiceInfo(pcType serviceinfo.PayloadCodec, codec serviceinfo.CodecInfo) *serviceinfo.ServiceInfo {
-	if codec == nil {
+func newClientStreamingServiceInfo(g Generic) *serviceinfo.ServiceInfo {
+	readerWriter := g.MessageReaderWriter()
+	if readerWriter == nil {
 		// TODO: support grpc binary generic
 		return nil
 	}
@@ -33,36 +34,36 @@ func newClientStreamingServiceInfo(pcType serviceinfo.PayloadCodec, codec servic
 	methods := map[string]serviceinfo.MethodInfo{
 		serviceinfo.GenericClientStreamingMethod: serviceinfo.NewMethodInfo(
 			nil,
-			func() interface{} { return &Args{inner: codec.GetMessageReaderWriter()} },
-			func() interface{} { return &Result{inner: codec.GetMessageReaderWriter()} },
+			func() interface{} { return &Args{inner: readerWriter} },
+			func() interface{} { return &Result{inner: readerWriter} },
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingClient),
 		),
 		serviceinfo.GenericServerStreamingMethod: serviceinfo.NewMethodInfo(
 			nil,
-			func() interface{} { return &Args{inner: codec.GetMessageReaderWriter()} },
-			func() interface{} { return &Result{inner: codec.GetMessageReaderWriter()} },
+			func() interface{} { return &Args{inner: readerWriter} },
+			func() interface{} { return &Result{inner: readerWriter} },
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingServer),
 		),
 		serviceinfo.GenericBidirectionalStreamingMethod: serviceinfo.NewMethodInfo(
 			nil,
-			func() interface{} { return &Args{inner: codec.GetMessageReaderWriter()} },
-			func() interface{} { return &Result{inner: codec.GetMessageReaderWriter()} },
+			func() interface{} { return &Args{inner: readerWriter} },
+			func() interface{} { return &Result{inner: readerWriter} },
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
 		),
 		serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(
 			callHandler,
-			func() interface{} { return &Args{inner: codec.GetMessageReaderWriter()} },
-			func() interface{} { return &Result{inner: codec.GetMessageReaderWriter()} },
+			func() interface{} { return &Args{inner: readerWriter} },
+			func() interface{} { return &Result{inner: readerWriter} },
 			false,
 		),
 	}
 	svcInfo := &serviceinfo.ServiceInfo{
-		ServiceName:  codec.GetIDLServiceName(),
+		ServiceName:  g.IDLServiceName(),
 		Methods:      methods,
-		PayloadCodec: pcType,
+		PayloadCodec: g.PayloadCodecType(),
 		Extra:        make(map[string]interface{}),
 	}
 	svcInfo.Extra["generic"] = true
