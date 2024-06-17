@@ -46,9 +46,9 @@ func TestJsonPbCodec(t *testing.T) {
 	method, err := jpc.getMethod(nil, "Echo")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Echo")
-	test.Assert(t, jpc.GetIDLServiceName() == "Echo")
+	test.Assert(t, jpc.svcName == "Echo")
 
-	rw := jpc.GetMessageReaderWriter()
+	rw := jpc.getMessageReaderWriter()
 	_, ok := rw.(gproto.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(gproto.MessageReader)

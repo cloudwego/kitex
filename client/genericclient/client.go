@@ -31,7 +31,7 @@ var _ Client = &genericServiceClient{}
 
 // NewClient create a generic client
 func NewClient(destService string, g generic.Generic, opts ...client.Option) (Client, error) {
-	svcInfo := generic.ServiceInfoWithCodecInfo(g.PayloadCodecType(), g.CodecInfo())
+	svcInfo := generic.ServiceInfoWithCodec(g)
 	return NewClientWithServiceInfo(destService, g, svcInfo, opts...)
 }
 

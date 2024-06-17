@@ -62,13 +62,13 @@ func TestHttpThriftCodec(t *testing.T) {
 	// right
 	method, err = htc.getMethod(req)
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
-	test.Assert(t, htc.GetIDLServiceName() == "ExampleService")
+	test.Assert(t, htc.svcName == "ExampleService")
 
-	rw := htc.GetMessageReaderWriter()
+	rw := htc.getMessageReaderWriter()
 	_, ok := rw.(error)
 	test.Assert(t, !ok)
 
-	rw = htc.GetMessageReaderWriter()
+	rw = htc.getMessageReaderWriter()
 	_, ok = rw.(gthrift.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(gthrift.MessageReader)
@@ -97,9 +97,9 @@ func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
 	// right
 	method, err = htc.getMethod(req)
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
-	test.Assert(t, htc.GetIDLServiceName() == "ExampleService")
+	test.Assert(t, htc.svcName == "ExampleService")
 
-	rw := htc.GetMessageReaderWriter()
+	rw := htc.getMessageReaderWriter()
 	_, ok := rw.(gthrift.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(gthrift.MessageReader)

@@ -65,9 +65,9 @@ func TestHTTPPbThriftCodec(t *testing.T) {
 	method, err = htc.getMethod(hreq)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, method.Name == "Echo")
-	test.Assert(t, htc.GetIDLServiceName() == "ExampleService")
+	test.Assert(t, htc.svcName == "ExampleService")
 
-	rw := htc.GetMessageReaderWriter()
+	rw := htc.getMessageReaderWriter()
 	_, ok := rw.(gthrift.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(gthrift.MessageReader)

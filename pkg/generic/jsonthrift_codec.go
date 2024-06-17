@@ -31,10 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var (
-	_ serviceinfo.CodecInfo = &jsonThriftCodec{}
-	_ Closer                = &jsonThriftCodec{}
-)
+var _ Closer = &jsonThriftCodec{}
 
 type jsonThriftCodec struct {
 	svcDsc                 atomic.Value // *idl
@@ -80,7 +77,7 @@ func (c *jsonThriftCodec) update() {
 	}
 }
 
-func (c *jsonThriftCodec) GetMessageReaderWriter() interface{} {
+func (c *jsonThriftCodec) getMessageReaderWriter() interface{} {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return errors.New("get parser ServiceDescriptor failed")
@@ -104,10 +101,6 @@ func (c *jsonThriftCodec) configureJSONReader(reader *thrift.ReadJSON) {
 	if c.dynamicgoEnabled {
 		reader.SetDynamicGo(&c.convOpts, &c.convOptsWithException)
 	}
-}
-
-func (c *jsonThriftCodec) GetIDLServiceName() string {
-	return c.svcName
 }
 
 func (c *jsonThriftCodec) getMethod(req interface{}, method string) (*Method, error) {

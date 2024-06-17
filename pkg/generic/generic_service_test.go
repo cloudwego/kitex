@@ -127,9 +127,9 @@ func TestServiceInfo(t *testing.T) {
 
 	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
 	test.Assert(t, err == nil)
-	gOpts := &Options{dynamicgoConvOpts: DefaultJSONDynamicGoConvOpts}
-	codec := newJsonThriftCodec(p, gOpts)
-	s = ServiceInfoWithCodecInfo(serviceinfo.Thrift, codec)
+	g, err := JSONThriftGeneric(p)
+	test.Assert(t, err == nil)
+	s = ServiceInfoWithCodec(g)
 	test.Assert(t, s.ServiceName == "Mock")
 }
 

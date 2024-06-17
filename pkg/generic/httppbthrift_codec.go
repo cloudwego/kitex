@@ -35,10 +35,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var (
-	_ serviceinfo.CodecInfo = &httpPbThriftCodec{}
-	_ Closer                = &httpPbThriftCodec{}
-)
+var _ Closer = &httpPbThriftCodec{}
 
 type httpPbThriftCodec struct {
 	svcDsc     atomic.Value // *idl
@@ -92,7 +89,7 @@ func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
 	return &Method{function.Name, function.Oneway}, nil
 }
 
-func (c *httpPbThriftCodec) GetMessageReaderWriter() interface{} {
+func (c *httpPbThriftCodec) getMessageReaderWriter() interface{} {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return errors.New("get parser ServiceDescriptor failed")
@@ -103,10 +100,6 @@ func (c *httpPbThriftCodec) GetMessageReaderWriter() interface{} {
 	}
 
 	return thrift.NewHTTPPbReaderWriter(svcDsc, pbSvcDsc)
-}
-
-func (c *httpPbThriftCodec) GetIDLServiceName() string {
-	return c.svcName
 }
 
 func (c *httpPbThriftCodec) Name() string {

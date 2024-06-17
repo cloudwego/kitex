@@ -28,10 +28,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var (
-	_ serviceinfo.CodecInfo = &mapThriftCodec{}
-	_ Closer                = &mapThriftCodec{}
-)
+var _ Closer = &mapThriftCodec{}
 
 type mapThriftCodec struct {
 	svcDsc                  atomic.Value // *idl
@@ -73,7 +70,7 @@ func (c *mapThriftCodec) update() {
 	}
 }
 
-func (c *mapThriftCodec) GetMessageReaderWriter() interface{} {
+func (c *mapThriftCodec) getMessageReaderWriter() interface{} {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return errors.New("get parser ServiceDescriptor failed")
@@ -96,10 +93,6 @@ func (c *mapThriftCodec) configureStructWriter(writer *thrift.WriteStruct) {
 func (c *mapThriftCodec) configureStructReader(reader *thrift.ReadStruct) {
 	reader.SetBinaryOption(c.binaryWithBase64, c.binaryWithByteSlice)
 	reader.SetSetFieldsForEmptyStruct(c.setFieldsForEmptyStruct)
-}
-
-func (c *mapThriftCodec) GetIDLServiceName() string {
-	return c.svcName
 }
 
 func (c *mapThriftCodec) getMethod(req interface{}, method string) (*Method, error) {

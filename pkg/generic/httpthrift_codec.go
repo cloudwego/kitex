@@ -33,10 +33,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var (
-	_ serviceinfo.CodecInfo = &httpThriftCodec{}
-	_ Closer                = &httpThriftCodec{}
-)
+var _ Closer = &httpThriftCodec{}
 
 // HTTPRequest alias of descriptor HTTPRequest
 type HTTPRequest = descriptor.HTTPRequest
@@ -83,7 +80,7 @@ func (c *httpThriftCodec) update() {
 	}
 }
 
-func (c *httpThriftCodec) GetMessageReaderWriter() interface{} {
+func (c *httpThriftCodec) getMessageReaderWriter() interface{} {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return errors.New("get parser ServiceDescriptor failed")
@@ -107,10 +104,6 @@ func (c *httpThriftCodec) configureHTTPResponseReader(reader *thrift.ReadHTTPRes
 	if c.dynamicgoEnabled && c.useRawBodyForHTTPResp {
 		reader.SetDynamicGo(&c.convOptsWithThriftBase)
 	}
-}
-
-func (c *httpThriftCodec) GetIDLServiceName() string {
-	return c.svcName
 }
 
 func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {

@@ -32,10 +32,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var (
-	_ serviceinfo.CodecInfo = &jsonPbCodec{}
-	_ Closer                = &jsonPbCodec{}
-)
+var _ Closer = &jsonPbCodec{}
 
 type jsonPbCodec struct {
 	svcDsc           atomic.Value // *idl
@@ -68,17 +65,13 @@ func (c *jsonPbCodec) update() {
 	}
 }
 
-func (c *jsonPbCodec) GetMessageReaderWriter() interface{} {
+func (c *jsonPbCodec) getMessageReaderWriter() interface{} {
 	pbSvc, ok := c.svcDsc.Load().(*dproto.ServiceDescriptor)
 	if !ok {
 		return errors.New("get parser dynamicgo ServiceDescriptor failed")
 	}
 
 	return proto.NewJsonReaderWriter(pbSvc, &c.convOpts)
-}
-
-func (c *jsonPbCodec) GetIDLServiceName() string {
-	return c.svcName
 }
 
 func (c *jsonPbCodec) getMethod(req interface{}, method string) (*Method, error) {

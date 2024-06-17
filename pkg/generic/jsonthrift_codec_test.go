@@ -40,9 +40,9 @@ func TestJsonThriftCodec(t *testing.T) {
 	method, err := jtc.getMethod(nil, "Test")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Test")
-	test.Assert(t, jtc.GetIDLServiceName() == "Mock")
+	test.Assert(t, jtc.svcName == "Mock")
 
-	rw := jtc.GetMessageReaderWriter()
+	rw := jtc.getMessageReaderWriter()
 	_, ok := rw.(thrift.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(thrift.MessageReader)
@@ -70,7 +70,7 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Test")
 
-	rw := jtc.GetMessageReaderWriter()
+	rw := jtc.getMessageReaderWriter()
 	_, ok := rw.(thrift.MessageWriter)
 	test.Assert(t, ok)
 	_, ok = rw.(thrift.MessageReader)
@@ -89,7 +89,7 @@ func TestJsonThriftCodec_SelfRef(t *testing.T) {
 		test.Assert(t, err == nil)
 		test.Assert(t, method.Name == "Test")
 
-		rw := jtc.GetMessageReaderWriter()
+		rw := jtc.getMessageReaderWriter()
 		_, ok := rw.(thrift.MessageWriter)
 		test.Assert(t, ok)
 		_, ok = rw.(thrift.MessageReader)
@@ -107,9 +107,9 @@ func TestJsonThriftCodec_SelfRef(t *testing.T) {
 		method, err := jtc.getMethod(nil, "Test")
 		test.Assert(t, err == nil)
 		test.Assert(t, method.Name == "Test")
-		test.Assert(t, jtc.GetIDLServiceName() == "Mock")
+		test.Assert(t, jtc.svcName == "Mock")
 
-		rw := jtc.GetMessageReaderWriter()
+		rw := jtc.getMessageReaderWriter()
 		_, ok := rw.(thrift.MessageWriter)
 		test.Assert(t, ok)
 		_, ok = rw.(thrift.MessageReader)

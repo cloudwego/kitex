@@ -34,36 +34,36 @@ type Service interface {
 	GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error)
 }
 
-// ServiceInfoWithCodecInfo create a generic ServiceInfo with CodecInfo
-func ServiceInfoWithCodecInfo(pcType serviceinfo.PayloadCodec, codec serviceinfo.CodecInfo) *serviceinfo.ServiceInfo {
-	return newServiceInfo(pcType, codec)
+// ServiceInfoWithCodec create a generic ServiceInfo with CodecInfo
+func ServiceInfoWithCodec(g Generic) *serviceinfo.ServiceInfo {
+	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName())
 }
 
 // Deprecated: it's not used by kitex anymore.
 // ServiceInfo create a generic ServiceInfo
 func ServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
-	return newServiceInfo(pcType, nil)
+	return newServiceInfo(pcType, nil, "")
 }
 
-func newServiceInfo(pcType serviceinfo.PayloadCodec, codec serviceinfo.CodecInfo) *serviceinfo.ServiceInfo {
+func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string) *serviceinfo.ServiceInfo {
 	handlerType := (*Service)(nil)
 
 	var methods map[string]serviceinfo.MethodInfo
 	var svcName string
 
-	if codec == nil {
+	if messageReaderWriter == nil {
 		// note: binary generic cannot be used with multi-service feature
 		svcName = serviceinfo.GenericService
 		methods = map[string]serviceinfo.MethodInfo{
 			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(callHandler, newGenericServiceCallArgs, newGenericServiceCallResult, false),
 		}
 	} else {
-		svcName = codec.GetIDLServiceName()
+		svcName = serviceName
 		methods = map[string]serviceinfo.MethodInfo{
 			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(
 				callHandler,
-				func() interface{} { return &Args{inner: codec.GetMessageReaderWriter()} },
-				func() interface{} { return &Result{inner: codec.GetMessageReaderWriter()} },
+				func() interface{} { return &Args{inner: messageReaderWriter} },
+				func() interface{} { return &Result{inner: messageReaderWriter} },
 				false,
 			),
 		}
@@ -74,7 +74,6 @@ func newServiceInfo(pcType serviceinfo.PayloadCodec, codec serviceinfo.CodecInfo
 		HandlerType:  handlerType,
 		Methods:      methods,
 		PayloadCodec: pcType,
-		GenericCodec: codec,
 		Extra:        make(map[string]interface{}),
 	}
 	svcInfo.Extra["generic"] = true
