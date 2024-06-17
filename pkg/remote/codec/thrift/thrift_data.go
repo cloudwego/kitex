@@ -81,7 +81,7 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 func verifyMarshalBasicThriftDataType(data interface{}) error {
 	switch data.(type) {
 	case MessageWriter:
-	case MessageWriterWithContext:
+	case MessageWriterWithMethodWithContext:
 	default:
 		return errEncodeMismatchMsgType
 	}
@@ -96,8 +96,8 @@ func marshalBasicThriftData(ctx context.Context, tProt thrift.TProtocol, data in
 		if err := msg.Write(tProt); err != nil {
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 		}
-	case MessageWriterWithContext:
-		if err := msg.Write(ctx, method, rpcRole == remote.Client, tProt); err != nil {
+	case MessageWriterWithMethodWithContext:
+		if err := msg.Write(ctx, method, tProt); err != nil {
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 		}
 	default:
@@ -242,7 +242,7 @@ func decodeBasicThriftData(ctx context.Context, tProt thrift.TProtocol, method s
 		}
 	case MessageReaderWithMethodWithContext:
 		// methodName is necessary for generic calls to methodInfo from serviceInfo
-		if err = t.Read(ctx, method, rpcRole == remote.Client, dataLen, tProt); err != nil {
+		if err = t.Read(ctx, method, dataLen, tProt); err != nil {
 			return remote.NewTransError(remote.ProtocolError, err)
 		}
 	default:

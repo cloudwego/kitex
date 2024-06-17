@@ -240,9 +240,9 @@ func (c thriftCodec) Name() string {
 	return serviceinfo.Thrift.String()
 }
 
-// MessageWriterWithContext write to thrift.TProtocol
-type MessageWriterWithContext interface {
-	Write(ctx context.Context, method string, isClient bool, oprot thrift.TProtocol) error
+// MessageWriterWithMethodWithContext write to thrift.TProtocol
+type MessageWriterWithMethodWithContext interface {
+	Write(ctx context.Context, method string, oprot thrift.TProtocol) error
 }
 
 // MessageWriter write to thrift.TProtocol
@@ -257,7 +257,7 @@ type MessageReader interface {
 
 // MessageReaderWithMethodWithContext read from thrift.TProtocol with method
 type MessageReaderWithMethodWithContext interface {
-	Read(ctx context.Context, method string, isClient bool, dataLen int, oprot thrift.TProtocol) error
+	Read(ctx context.Context, method string, dataLen int, oprot thrift.TProtocol) error
 }
 
 type ThriftMsgFastCodec interface {

@@ -114,7 +114,7 @@ type Args struct {
 
 var (
 	_ codecThrift.MessageReaderWithMethodWithContext = (*Args)(nil)
-	_ codecThrift.MessageWriterWithContext           = (*Args)(nil)
+	_ codecThrift.MessageWriterWithMethodWithContext = (*Args)(nil)
 	_ WithCodec                                      = (*Args)(nil)
 )
 
@@ -132,12 +132,12 @@ func (g *Args) GetOrSetBase() interface{} {
 }
 
 // Write ...
-func (g *Args) Write(ctx context.Context, method string, isClient bool, out thrift.TProtocol) error {
+func (g *Args) Write(ctx context.Context, method string, out thrift.TProtocol) error {
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
 	if w, ok := g.inner.(gthrift.MessageWriter); ok {
-		return w.Write(ctx, out, g.Request, method, isClient, g.base)
+		return w.Write(ctx, out, g.Request, method, true, g.base)
 	}
 	return fmt.Errorf("unexpected Args writer type: %T", g.inner)
 }
@@ -153,14 +153,14 @@ func (g *Args) WritePb(ctx context.Context, method string, isClient bool) (inter
 }
 
 // Read ...
-func (g *Args) Read(ctx context.Context, method string, isClient bool, dataLen int, in thrift.TProtocol) error {
+func (g *Args) Read(ctx context.Context, method string, dataLen int, in thrift.TProtocol) error {
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
 	if rw, ok := g.inner.(gthrift.MessageReader); ok {
 		g.Method = method
 		var err error
-		g.Request, err = rw.Read(ctx, method, isClient, dataLen, in)
+		g.Request, err = rw.Read(ctx, method, false, dataLen, in)
 		return err
 	}
 	return fmt.Errorf("unexpected Args reader type: %T", g.inner)
@@ -192,7 +192,7 @@ type Result struct {
 
 var (
 	_ codecThrift.MessageReaderWithMethodWithContext = (*Result)(nil)
-	_ codecThrift.MessageWriterWithContext           = (*Result)(nil)
+	_ codecThrift.MessageWriterWithMethodWithContext = (*Result)(nil)
 	_ WithCodec                                      = (*Result)(nil)
 )
 
@@ -203,12 +203,12 @@ func (r *Result) SetCodec(inner interface{}) {
 }
 
 // Write ...
-func (r *Result) Write(ctx context.Context, method string, isClient bool, out thrift.TProtocol) error {
+func (r *Result) Write(ctx context.Context, method string, out thrift.TProtocol) error {
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
 	if w, ok := r.inner.(gthrift.MessageWriter); ok {
-		return w.Write(ctx, out, r.Success, method, isClient, nil)
+		return w.Write(ctx, out, r.Success, method, false, nil)
 	}
 	return fmt.Errorf("unexpected Result writer type: %T", r.inner)
 }
@@ -224,13 +224,13 @@ func (r *Result) WritePb(ctx context.Context, method string, isClient bool) (int
 }
 
 // Read ...
-func (r *Result) Read(ctx context.Context, method string, isClient bool, dataLen int, in thrift.TProtocol) error {
+func (r *Result) Read(ctx context.Context, method string, dataLen int, in thrift.TProtocol) error {
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
 	if w, ok := r.inner.(gthrift.MessageReader); ok {
 		var err error
-		r.Success, err = w.Read(ctx, method, isClient, dataLen, in)
+		r.Success, err = w.Read(ctx, method, true, dataLen, in)
 		return err
 	}
 	return fmt.Errorf("unexpected Result reader type: %T", r.inner)
