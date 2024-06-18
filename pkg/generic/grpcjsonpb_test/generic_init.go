@@ -19,7 +19,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"github.com/cloudwego/kitex/internal/mocks/proto/kitex_gen/pbapi/mock"
 	"io"
 	"net"
 	"strings"
@@ -28,6 +27,7 @@ import (
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/genericclient"
+	"github.com/cloudwego/kitex/internal/mocks/proto/kitex_gen/pbapi/mock"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/transport"
