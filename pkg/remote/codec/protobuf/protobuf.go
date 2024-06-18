@@ -92,7 +92,7 @@ func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out 
 		// Generic Case
 		genmsg, isgen := data.(MessageWriterWithContext)
 		if isgen {
-			actualMsg, err := genmsg.WritePb(ctx, methodName, message.RPCRole() == remote.Client)
+			actualMsg, err := genmsg.WritePb(ctx, methodName)
 			if err != nil {
 				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("protobuf marshal message failed: %s", err.Error()))
 			}
@@ -197,7 +197,7 @@ func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in
 
 	// Generic Case
 	if msg, ok := data.(MessageReaderWithMethodWithContext); ok {
-		err := msg.ReadPb(ctx, methodName, message.RPCRole() == remote.Client, actualMsgBuf)
+		err := msg.ReadPb(ctx, methodName, actualMsgBuf)
 		if err != nil {
 			return err
 		}
@@ -220,12 +220,12 @@ func (c protobufCodec) Name() string {
 
 // MessageWriterWithContext  writes to output bytebuffer
 type MessageWriterWithContext interface {
-	WritePb(ctx context.Context, method string, isClient bool) (interface{}, error)
+	WritePb(ctx context.Context, method string) (interface{}, error)
 }
 
 // MessageReaderWithMethodWithContext read from ActualMsgBuf with method
 type MessageReaderWithMethodWithContext interface {
-	ReadPb(ctx context.Context, method string, isClient bool, in []byte) error
+	ReadPb(ctx context.Context, method string, in []byte) error
 }
 
 type ProtobufMsgCodec interface {

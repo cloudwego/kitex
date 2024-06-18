@@ -193,6 +193,7 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 	if svcName == "" && m.refuseTrafficWithoutServiceName {
 		return nil, NewTransErrorWithMsg(NoServiceName, "no service name while the server has WithRefuseTrafficWithoutServiceName option enabled")
 	}
+	// TODO: modify logic when supporting multi-service for generic
 	var key string
 	if svcName == "" {
 		key = methodName
