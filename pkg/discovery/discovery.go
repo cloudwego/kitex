@@ -79,17 +79,20 @@ func DefaultDiff(cacheKey string, prev, next Result) (Change, bool) {
 		},
 	}
 
-	prevMap := make(map[string]struct{}, len(prev.Instances))
+	prevMap := make(map[string]Instance, len(prev.Instances))
 	for _, ins := range prev.Instances {
-		prevMap[ins.Address().String()] = struct{}{}
+		prevMap[ins.Address().String()] = ins
 	}
 
-	nextMap := make(map[string]struct{}, len(next.Instances))
+	nextMap := make(map[string]Instance, len(next.Instances))
 	for _, ins := range next.Instances {
 		addr := ins.Address().String()
-		nextMap[addr] = struct{}{}
-		if _, found := prevMap[addr]; !found {
+		nextMap[addr] = ins
+		// FIXME(jizhuozhi): tags should also be used to determine whether the instance has updated
+		if prevIns, found := prevMap[addr]; !found {
 			ch.Added = append(ch.Added, ins)
+		} else if prevIns.Weight() != ins.Weight() {
+			ch.Updated = append(ch.Updated, ins)
 		}
 	}
 
@@ -98,7 +101,7 @@ func DefaultDiff(cacheKey string, prev, next Result) (Change, bool) {
 			ch.Removed = append(ch.Removed, ins)
 		}
 	}
-	return ch, len(ch.Added)+len(ch.Removed) != 0
+	return ch, len(ch.Added)+len(ch.Updated)+len(ch.Removed) != 0
 }
 
 type instance struct {
@@ -118,6 +121,10 @@ func (i *instance) Weight() int {
 func (i *instance) Tag(key string) (value string, exist bool) {
 	value, exist = i.tags[key]
 	return
+}
+
+func (i *instance) Tags() map[string]string {
+	return i.tags
 }
 
 // NewInstance creates a Instance using the given network, address and tags
