@@ -45,9 +45,7 @@ func newGenericClient(g generic.Generic, targetIPPort string) genericclient.Clie
 }
 
 func newMockTestServer(handler mock.Mock, addr net.Addr, opts ...server.Option) server.Server {
-	var options []server.Option
 	opts = append(opts, server.WithServiceAddr(addr))
-	options = append(options, opts...)
 	svr := mock.NewServer(handler, opts...)
 	go func() {
 		err := svr.Run()
