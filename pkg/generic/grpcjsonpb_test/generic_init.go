@@ -39,7 +39,6 @@ func newGenericClient(g generic.Generic, targetIPPort string) genericclient.Clie
 		client.WithHostPorts(targetIPPort),
 	)
 	if err != nil {
-
 	}
 	return cli
 }
@@ -135,7 +134,6 @@ func (s *StreamingTestImpl) BidirectionalStreamingTest(stream mock.Mock_Bidirect
 		resp := &mock.MockResp{}
 		for i := 0; i < 3; i++ {
 			resp.Message = fmt.Sprintf("%dth response", i)
-			//msg := &pbapi.Response{Message: "server, " + strconv.Itoa(i)}
 			if sendErr := stream.Send(resp); sendErr != nil {
 				err = sendErr
 				return
