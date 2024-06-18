@@ -71,7 +71,7 @@ func TestGenericService(t *testing.T) {
 	// read ok
 	a.SetCodec(rInner)
 	err = a.Read(ctx, method, 0, tProto)
-	test.Assert(t, err == nil)
+	test.Assert(t, err == nil, err)
 
 	// Result...
 	result := newGenericServiceCallResult()
