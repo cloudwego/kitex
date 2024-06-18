@@ -39,6 +39,7 @@ func newGenericClient(g generic.Generic, targetIPPort string) genericclient.Clie
 		client.WithHostPorts(targetIPPort),
 	)
 	if err != nil {
+		panic(err)
 	}
 	return cli
 }
