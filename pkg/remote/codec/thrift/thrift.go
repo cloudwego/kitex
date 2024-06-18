@@ -118,7 +118,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	}
 
 	// fallback to old thrift way (slow)
-	if err = encodeBasicThrift(out, ctx, methodName, msgType, seqID, data); err == nil || err != errEncodeMismatchMsgType {
+	if err = encodeBasicThrift(out, ctx, methodName, msgType, seqID, data, message.RPCRole()); err == nil || err != errEncodeMismatchMsgType {
 		return err
 	}
 
@@ -155,7 +155,7 @@ func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.M
 }
 
 // encodeBasicThrift encode with the old thrift way (slow)
-func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}) error {
+func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}, rpcRole remote.RPCRole) error {
 	if err := verifyMarshalBasicThriftDataType(data); err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string
 	if err := tProt.WriteMessageBegin(method, thrift.TMessageType(msgType), seqID); err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageBegin failed: %s", err.Error()))
 	}
-	if err := marshalBasicThriftData(ctx, tProt, data); err != nil {
+	if err := marshalBasicThriftData(ctx, tProt, data, method, rpcRole); err != nil {
 		return err
 	}
 	if err := tProt.WriteMessageEnd(); err != nil {
@@ -204,7 +204,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 
 	ri := message.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
-	err = c.unmarshalThriftData(ctx, tProt, methodName, data, dataLen)
+	err = c.unmarshalThriftData(ctx, tProt, methodName, data, message.RPCRole(), dataLen)
 	rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
 	if err != nil {
 		return err
@@ -240,9 +240,9 @@ func (c thriftCodec) Name() string {
 	return serviceinfo.Thrift.String()
 }
 
-// MessageWriterWithContext write to thrift.TProtocol
-type MessageWriterWithContext interface {
-	Write(ctx context.Context, oprot thrift.TProtocol) error
+// MessageWriterWithMethodWithContext write to thrift.TProtocol
+type MessageWriterWithMethodWithContext interface {
+	Write(ctx context.Context, method string, oprot thrift.TProtocol) error
 }
 
 // MessageWriter write to thrift.TProtocol
@@ -257,7 +257,7 @@ type MessageReader interface {
 
 // MessageReaderWithMethodWithContext read from thrift.TProtocol with method
 type MessageReaderWithMethodWithContext interface {
-	Read(ctx context.Context, method string, oprot thrift.TProtocol) error
+	Read(ctx context.Context, method string, dataLen int, oprot thrift.TProtocol) error
 }
 
 type ThriftMsgFastCodec interface {

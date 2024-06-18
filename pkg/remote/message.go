@@ -183,7 +183,7 @@ func (m *message) ServiceInfo() *serviceinfo.ServiceInfo {
 }
 
 func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error) {
-	// for non-multi-service including generic server scenario
+	// for single service scenario
 	if m.targetSvcInfo != nil {
 		if mt := m.targetSvcInfo.MethodInfo(methodName); mt == nil {
 			return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
@@ -193,6 +193,7 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 	if svcName == "" && m.refuseTrafficWithoutServiceName {
 		return nil, NewTransErrorWithMsg(NoServiceName, "no service name while the server has WithRefuseTrafficWithoutServiceName option enabled")
 	}
+	// TODO: modify logic when supporting multi-service for generic
 	var key string
 	if svcName == "" {
 		key = methodName

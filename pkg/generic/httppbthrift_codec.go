@@ -19,7 +19,6 @@ package generic
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -36,22 +35,24 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
+var _ Closer = &httpPbThriftCodec{}
+
 type httpPbThriftCodec struct {
 	svcDsc     atomic.Value // *idl
 	pbSvcDsc   atomic.Value // *pbIdl
 	provider   DescriptorProvider
 	pbProvider PbDescriptorProvider
-	codec      remote.PayloadCodec
+	svcName    string
 }
 
-func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider, codec remote.PayloadCodec) (*httpPbThriftCodec, error) {
+func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider) *httpPbThriftCodec {
 	svc := <-p.Provide()
 	pbSvc := <-pbp.Provide()
-	c := &httpPbThriftCodec{codec: codec, provider: p, pbProvider: pbp}
+	c := &httpPbThriftCodec{provider: p, pbProvider: pbp, svcName: svc.Name}
 	c.svcDsc.Store(svc)
 	c.pbSvcDsc.Store(pbSvc)
 	go c.update()
-	return c, nil
+	return c
 }
 
 func (c *httpPbThriftCodec) update() {
@@ -66,6 +67,7 @@ func (c *httpPbThriftCodec) update() {
 			return
 		}
 
+		c.svcName = svc.Name
 		c.svcDsc.Store(svc)
 		c.pbSvcDsc.Store(pbSvc)
 	}
@@ -87,37 +89,17 @@ func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
 	return &Method{function.Name, function.Oneway}, nil
 }
 
-func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *httpPbThriftCodec) getMessageReaderWriter() interface{} {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
+		return errors.New("get parser ServiceDescriptor failed")
 	}
 	pbSvcDsc, ok := c.pbSvcDsc.Load().(*desc.ServiceDescriptor)
 	if !ok {
-		return fmt.Errorf("get parser PbServiceDescriptor failed")
+		return errors.New("get parser PbServiceDescriptor failed")
 	}
 
-	inner := thrift.NewWriteHTTPPbRequest(svcDsc, pbSvcDsc)
-	msg.Data().(WithCodec).SetCodec(inner)
-	return c.codec.Marshal(ctx, msg, out)
-}
-
-func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
-	}
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
-	}
-	pbSvcDsc, ok := c.pbSvcDsc.Load().(proto.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser PbServiceDescriptor failed")
-	}
-
-	inner := thrift.NewReadHTTPPbResponse(svcDsc, pbSvcDsc)
-	msg.Data().(WithCodec).SetCodec(inner)
-	return c.codec.Unmarshal(ctx, msg, in)
+	return thrift.NewHTTPPbReaderWriter(svcDsc, pbSvcDsc)
 }
 
 func (c *httpPbThriftCodec) Name() string {
@@ -138,6 +120,41 @@ func (c *httpPbThriftCodec) Close() error {
 	} else {
 		return errors.New(strings.Join(errs, ";"))
 	}
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	pbSvcDsc, ok := c.pbSvcDsc.Load().(*desc.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser PbServiceDescriptor failed")
+	}
+
+	inner := thrift.NewWriteHTTPPbRequest(svcDsc, pbSvcDsc)
+	msg.Data().(WithCodec).SetCodec(inner)
+	return thriftCodec.Marshal(ctx, msg, out)
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
+		return err
+	}
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	pbSvcDsc, ok := c.pbSvcDsc.Load().(proto.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser PbServiceDescriptor failed")
+	}
+
+	inner := thrift.NewReadHTTPPbResponse(svcDsc, pbSvcDsc)
+	msg.Data().(WithCodec).SetCodec(inner)
+	return thriftCodec.Unmarshal(ctx, msg, in)
 }
 
 // FromHTTPPbRequest parse  HTTPRequest from http.Request

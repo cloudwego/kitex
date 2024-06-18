@@ -29,38 +29,33 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+type JSONReaderWriter struct {
+	*ReadJSON
+	*WriteJSON
+}
+
+func NewJsonReaderWriter(svc *dproto.ServiceDescriptor, convOpts *conv.Options) *JSONReaderWriter {
+	return &JSONReaderWriter{ReadJSON: NewReadJSON(svc, convOpts), WriteJSON: NewWriteJSON(svc, convOpts)}
+}
+
 // NewWriteJSON build WriteJSON according to ServiceDescriptor
-func NewWriteJSON(svc *dproto.ServiceDescriptor, method string, isClient bool, convOpts *conv.Options) (*WriteJSON, error) {
-	fnDsc := svc.LookupMethodByName(method)
-	if fnDsc == nil {
-		return nil, fmt.Errorf("missing method: %s in service: %s", method, svc.Name())
-	}
-
-	// from the proto.ServiceDescriptor, get the TypeDescriptor
-	typeDescriptor := fnDsc.Input()
-	if !isClient {
-		typeDescriptor = fnDsc.Output()
-	}
-
-	ws := &WriteJSON{
+func NewWriteJSON(svc *dproto.ServiceDescriptor, convOpts *conv.Options) *WriteJSON {
+	return &WriteJSON{
+		svcDsc:            svc,
 		dynamicgoConvOpts: convOpts,
-		dynamicgoTypeDsc:  typeDescriptor,
-		isClient:          isClient,
 	}
-	return ws, nil
 }
 
 // WriteJSON implement of MessageWriter
 type WriteJSON struct {
+	svcDsc            *dproto.ServiceDescriptor
 	dynamicgoConvOpts *conv.Options
-	dynamicgoTypeDsc  *dproto.TypeDescriptor
-	isClient          bool
 }
 
 var _ MessageWriter = (*WriteJSON)(nil)
 
 // Write converts msg to protobuf wire format and returns an output bytebuffer
-func (m *WriteJSON) Write(ctx context.Context, msg interface{}) (interface{}, error) {
+func (m *WriteJSON) Write(ctx context.Context, msg interface{}, method string, isClient bool) (interface{}, error) {
 	var s string
 	if msg == nil {
 		s = "{}"
@@ -75,8 +70,19 @@ func (m *WriteJSON) Write(ctx context.Context, msg interface{}) (interface{}, er
 
 	cv := dconvj2p.NewBinaryConv(*m.dynamicgoConvOpts)
 
+	fnDsc := m.svcDsc.LookupMethodByName(method)
+	if fnDsc == nil {
+		return nil, fmt.Errorf("missing method: %s in service: %s", method, m.svcDsc.Name())
+	}
+
+	// from the proto.ServiceDescriptor, get the TypeDescriptor
+	typeDsc := fnDsc.Input()
+	if !isClient {
+		typeDsc = fnDsc.Output()
+	}
+
 	// get protobuf-encode bytes
-	actualMsgBuf, err := cv.Do(ctx, m.dynamicgoTypeDsc, utils.StringToSliceByte(s))
+	actualMsgBuf, err := cv.Do(ctx, typeDsc, utils.StringToSliceByte(s))
 	if err != nil {
 		return nil, perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("protobuf marshal message failed: %s", err.Error()))
 	}
@@ -84,26 +90,24 @@ func (m *WriteJSON) Write(ctx context.Context, msg interface{}) (interface{}, er
 }
 
 // NewReadJSON build ReadJSON according to ServiceDescriptor
-func NewReadJSON(svc *dproto.ServiceDescriptor, isClient bool, convOpts *conv.Options) (*ReadJSON, error) {
+func NewReadJSON(svc *dproto.ServiceDescriptor, convOpts *conv.Options) *ReadJSON {
 	// extract svc to be used to convert later
 	return &ReadJSON{
 		dynamicgoConvOpts: convOpts,
 		dynamicgoSvcDsc:   svc,
-		isClient:          isClient,
-	}, nil
+	}
 }
 
 // ReadJSON implement of MessageReaderWithMethod
 type ReadJSON struct {
 	dynamicgoConvOpts *conv.Options
 	dynamicgoSvcDsc   *dproto.ServiceDescriptor
-	isClient          bool
 }
 
 var _ MessageReader = (*ReadJSON)(nil)
 
 // Read reads data from actualMsgBuf and convert to json string
-func (m *ReadJSON) Read(ctx context.Context, method string, actualMsgBuf []byte) (interface{}, error) {
+func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, actualMsgBuf []byte) (interface{}, error) {
 	// create dynamic message here, once method string has been extracted
 	fnDsc := m.dynamicgoSvcDsc.LookupMethodByName(method)
 	if fnDsc == nil {
@@ -112,7 +116,7 @@ func (m *ReadJSON) Read(ctx context.Context, method string, actualMsgBuf []byte)
 
 	// from the dproto.ServiceDescriptor, get the TypeDescriptor
 	typeDescriptor := fnDsc.Output()
-	if !m.isClient {
+	if !isClient {
 		typeDescriptor = fnDsc.Input()
 	}
 

@@ -18,6 +18,7 @@ package generic
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
@@ -30,29 +31,22 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var (
-	_ remote.PayloadCodec = &jsonThriftCodec{}
-	_ Closer              = &jsonThriftCodec{}
-)
-
-// JSONRequest alias of string
-type JSONRequest = string
+var _ Closer = &jsonThriftCodec{}
 
 type jsonThriftCodec struct {
 	svcDsc                 atomic.Value // *idl
 	provider               DescriptorProvider
-	codec                  remote.PayloadCodec
 	binaryWithBase64       bool
-	opts                   *Options
+	dynamicgoEnabled       bool
 	convOpts               conv.Options // used for dynamicgo conversion
 	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
 	convOptsWithException  conv.Options // used for dynamicgo conversion with ConvertException turned on
-	dynamicgoEnabled       bool
+	svcName                string
 }
 
-func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*jsonThriftCodec, error) {
+func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
 	svc := <-p.Provide()
-	c := &jsonThriftCodec{codec: codec, provider: p, binaryWithBase64: true, opts: opts, dynamicgoEnabled: false}
+	c := &jsonThriftCodec{provider: p, binaryWithBase64: true, dynamicgoEnabled: false, svcName: svc.Name}
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoEnabled {
 		c.dynamicgoEnabled = true
 
@@ -69,7 +63,7 @@ func newJsonThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *O
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
-	return c, nil
+	return c
 }
 
 func (c *jsonThriftCodec) update() {
@@ -78,56 +72,35 @@ func (c *jsonThriftCodec) update() {
 		if !ok {
 			return
 		}
+		c.svcName = svc.Name
 		c.svcDsc.Store(svc)
 	}
 }
 
-func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	method := msg.RPCInfo().Invocation().MethodName()
-	if method == "" {
-		return perrors.NewProtocolErrorWithMsg("empty methodName in thrift Marshal")
-	}
-	if msg.MessageType() == remote.Exception {
-		return c.codec.Marshal(ctx, msg, out)
-	}
+func (c *jsonThriftCodec) getMessageReaderWriter() interface{} {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
+		return errors.New("get parser ServiceDescriptor failed")
 	}
 
-	wm, err := thrift.NewWriteJSON(svcDsc, method, msg.RPCRole() == remote.Client)
-	if err != nil {
-		return err
-	}
-	wm.SetBase64Binary(c.binaryWithBase64)
-	if c.dynamicgoEnabled {
-		if err = wm.SetDynamicGo(svcDsc, method, &c.convOpts, &c.convOptsWithThriftBase); err != nil {
-			return err
-		}
-	}
-
-	msg.Data().(WithCodec).SetCodec(wm)
-	return c.codec.Marshal(ctx, msg, out)
+	rw := thrift.NewJsonReaderWriter(svcDsc)
+	c.configureJSONWriter(rw.WriteJSON)
+	c.configureJSONReader(rw.ReadJSON)
+	return rw
 }
 
-func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
+func (c *jsonThriftCodec) configureJSONWriter(writer *thrift.WriteJSON) {
+	writer.SetBase64Binary(c.binaryWithBase64)
+	if c.dynamicgoEnabled {
+		writer.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase)
 	}
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
-	}
+}
 
-	rm := thrift.NewReadJSON(svcDsc, msg.RPCRole() == remote.Client)
-	rm.SetBinaryWithBase64(c.binaryWithBase64)
-	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
-	if c.dynamicgoEnabled && msg.PayloadLen() != 0 {
-		rm.SetDynamicGo(&c.convOpts, &c.convOptsWithException, msg)
+func (c *jsonThriftCodec) configureJSONReader(reader *thrift.ReadJSON) {
+	reader.SetBinaryWithBase64(c.binaryWithBase64)
+	if c.dynamicgoEnabled {
+		reader.SetDynamicGo(&c.convOpts, &c.convOptsWithException)
 	}
-
-	msg.Data().(WithCodec).SetCodec(rm)
-	return c.codec.Unmarshal(ctx, msg, in)
 }
 
 func (c *jsonThriftCodec) getMethod(req interface{}, method string) (*Method, error) {
@@ -144,4 +117,49 @@ func (c *jsonThriftCodec) Name() string {
 
 func (c *jsonThriftCodec) Close() error {
 	return c.provider.Close()
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	method := msg.RPCInfo().Invocation().MethodName()
+	if method == "" {
+		return perrors.NewProtocolErrorWithMsg("empty methodName in thrift Marshal")
+	}
+	if msg.MessageType() == remote.Exception {
+		return thriftCodec.Marshal(ctx, msg, out)
+	}
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
+	}
+
+	wm := thrift.NewWriteJSON(svcDsc)
+	wm.SetBase64Binary(c.binaryWithBase64)
+	if c.dynamicgoEnabled {
+		wm.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase)
+	}
+
+	msg.Data().(WithCodec).SetCodec(wm)
+	return thriftCodec.Marshal(ctx, msg, out)
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
+		return err
+	}
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return perrors.NewProtocolErrorWithMsg("get parser ServiceDescriptor failed")
+	}
+
+	rm := thrift.NewReadJSON(svcDsc)
+	rm.SetBinaryWithBase64(c.binaryWithBase64)
+	// Transport protocol should be TTHeader, Framed, or TTHeaderFramed to enable dynamicgo
+	if c.dynamicgoEnabled && msg.PayloadLen() != 0 {
+		rm.SetDynamicGo(&c.convOpts, &c.convOptsWithException)
+	}
+
+	msg.Data().(WithCodec).SetCodec(rm)
+	return thriftCodec.Unmarshal(ctx, msg, in)
 }
