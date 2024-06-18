@@ -138,7 +138,7 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 			if methodName == "" {
 				return errors.New("empty methodName in grpc Encode")
 			}
-			actualMsg, err := t.WritePb(ctx, methodName, message.RPCRole() == remote.Client)
+			actualMsg, err := t.WritePb(ctx, methodName)
 			if err != nil {
 				return err
 			}
@@ -213,7 +213,7 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 			if methodName == "" {
 				return errors.New("empty methodName in grpc Decode")
 			}
-			return t.ReadPb(ctx, methodName, message.RPCRole() == remote.Client, d)
+			return t.ReadPb(ctx, methodName, d)
 		default:
 			return ErrInvalidPayload
 		}
