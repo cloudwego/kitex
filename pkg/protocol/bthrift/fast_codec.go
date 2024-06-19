@@ -32,14 +32,14 @@ type Field struct {
 	// setter       setterFunc
 }
 
-type Fields map[int16]Field
+type Fields map[int16]*Field
 
 func NewFields(len int) Fields {
-	return make(map[int16]Field, len)
+	return make(map[int16]*Field, len)
 }
 
 func (fs Fields) Add(ID int16, TType thrift.TType, name string, required bool, fastReadFunc fastFieldFunc) Fields {
-	f := Field{
+	f := &Field{
 		id:           ID,
 		ttype:        TType,
 		name:         name,
@@ -80,16 +80,16 @@ func FastRead(buf []byte, p interface{}, fields Fields, KeepUnknownFields bool) 
 			break
 		}
 
-		var field Field
-		var isUnknownField bool
+		var field *Field
+		var isKnownField bool
 
 		if len(fields) == 0 {
-			isUnknownField = true
+			isKnownField = false
 		} else {
-			field, isUnknownField = fields[fieldId]
+			field, isKnownField = fields[fieldId]
 		}
 
-		if !isUnknownField {
+		if isKnownField {
 			fieldName = field.name
 			if fieldTypeId == field.ttype {
 				l, err = field.fastReadFunc(buf[offset:])
