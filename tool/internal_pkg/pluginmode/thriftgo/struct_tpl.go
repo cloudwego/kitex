@@ -17,7 +17,11 @@ package thriftgo
 const StructLikeCodec = `
 {{define "StructLikeCodec"}}
 {{if GenerateFastAPIs}}
+{{if ZippedCodec}}
+{{template "StructLikeZippedFastRead" .}}
+{{- else}}
 {{template "StructLikeFastRead" .}}
+{{- end}}{{/* if ZippedCodec */}}
 
 {{template "StructLikeFastReadField" .}}
 
@@ -39,6 +43,20 @@ const StructLikeCodec = `
 `
 
 const StructLikeFastRead = `
+
+
+{{define "StructLikeZippedFastRead"}}
+{{- $TypeName := .GoName}}
+{{- $fl := len .Fields}}
+func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
+	info := bthrift.NewFields({{len .Fields}}){{- if gt (len .Fields) 0}}.{{- end}}
+		{{- range $index, $element := .Fields}}
+		Add({{ $element.ID }}, thrift.{{$element.Type | GetTypeIDConstant }}, "{{ $element.GoName }}", {{ $element.Requiredness.IsRequired }}, p.FastReadField{{Str $element.ID}}){{- if ne $fl ( Increase $index )}}.{{- end}}
+		{{- end}}{{/* range .Fields */}}
+	return bthrift.FastRead(buf, p, info, false)
+}
+{{- end}}{{/* define "StructLikeZippedFastRead" */}}
+
 {{define "StructLikeFastRead"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {

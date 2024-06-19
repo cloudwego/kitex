@@ -136,6 +136,7 @@ type Config struct {
 	GenPath string
 
 	DeepCopyAPI           bool
+	UseZipCodec           bool
 	Protocol              string
 	HandlerReturnKeepResp bool
 

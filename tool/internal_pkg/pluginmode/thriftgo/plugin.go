@@ -125,6 +125,7 @@ func Run() int {
 		record:                conv.Config.Record,
 		recordCmd:             conv.Config.RecordCmd,
 		deepCopyAPI:           conv.Config.DeepCopyAPI,
+		useZipCodec:           conv.Config.UseZipCodec,
 		protocol:              conv.Config.Protocol,
 		handlerReturnKeepResp: conv.Config.HandlerReturnKeepResp,
 	}
