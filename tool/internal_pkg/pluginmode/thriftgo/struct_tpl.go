@@ -49,10 +49,11 @@ const StructLikeFastRead = `
 {{- $TypeName := .GoName}}
 {{- $fl := len .Fields}}
 func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
-	info := bthrift.NewFields({{len .Fields}}){{- if gt (len .Fields) 0}}.{{- end}}
+	info := map[int16]*bthrift.Field{
 		{{- range $index, $element := .Fields}}
-		Add({{ $element.ID }}, thrift.{{$element.Type | GetTypeIDConstant }}, "{{ $element.GoName }}", {{ $element.Requiredness.IsRequired }}, p.FastReadField{{Str $element.ID}}){{- if ne $fl ( Increase $index )}}.{{- end}}
+		{{ $element.ID }}: { {{ $element.ID }}, thrift.{{$element.Type | GetTypeIDConstant }}, {{ $element.Requiredness.IsRequired }}, p.FastReadField{{Str $element.ID}} },
 		{{- end}}{{/* range .Fields */}}
+	}
 	return bthrift.FastRead(buf, p, info, false)
 }
 {{- end}}{{/* define "StructLikeZippedFastRead" */}}
