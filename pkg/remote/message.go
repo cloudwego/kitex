@@ -194,7 +194,8 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 		return nil, NewTransErrorWithMsg(NoServiceName, "no service name while the server has WithRefuseTrafficWithoutServiceName option enabled")
 	}
 	var key string
-	if svcName == "" || svcName == "CombineService" || svcName == "CombineService_" {
+	// when client does not pass svcName or uses combine service, fallback to searching for svcInfo by method name alone
+	if svcName == "" || svcName == serviceinfo.CombineService || svcName == serviceinfo.CombineService_ {
 		key = methodName
 	} else {
 		key = BuildMultiServiceKey(svcName, methodName)
