@@ -195,7 +195,7 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 	}
 	// TODO: modify logic when supporting multi-service for generic
 	var key string
-	if svcName == "" {
+	if svcName == "" || svcName == "CombineService" || svcName == "CombineService_" {
 		key = methodName
 	} else {
 		key = BuildMultiServiceKey(svcName, methodName)
