@@ -23,18 +23,31 @@ import (
 )
 
 type Field struct {
-	ID           int16
-	TType        thrift.TType
-	Required     bool
-	FastReadFunc fastFieldFunc
-}
+	ID       int16
+	TType    thrift.TType
+	Required bool
 
-type fastFieldFunc func(buf []byte) (int, error)
+	Field_string *string
+	Field_double *float64
+	Field_i8     *int8
+	Field_i16    *int16
+	Field_i32    *int32
+	Field_i64    *int64
+	Field_bool   *bool
+	// FieldBinary ?
+
+	//FieldSetter func(v interface{})
+	//NewValues   func(size int) []interface{}
+	//NewFields_  func(size int) []interface{}
+
+	FastReadField func(buf []byte) (int, error)
+}
 
 // should be the same with struct_tpl.go - StructLikeFastRead
 // todo 入参扩展性
 // todo fields 字段拷贝开销
 // todo 相比之前，switch-case 变成了 map，会有一些劣化
+// 各种边界场景代码生成正确性测试
 
 func FastRead(buf []byte, p interface{}, fields map[int16]*Field, KeepUnknownFields bool) (int, error) {
 	var err error
@@ -69,8 +82,7 @@ func FastRead(buf []byte, p interface{}, fields map[int16]*Field, KeepUnknownFie
 
 		if isKnownField {
 			if fieldTypeId == field.TType {
-				l, err = field.FastReadFunc(buf[offset:])
-				// l, err = FastReadField(buf[offset:], field)
+				l, err = FastReadField(buf[offset:], field)
 				offset += l
 				if err != nil {
 					goto ReadFieldError
@@ -113,4 +125,104 @@ SkipFieldError:
 RequiredFieldNotSetError:
 	// todo 之前是 name，为了性能先去掉了
 	return offset, thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %d is not set", fieldId))
+}
+
+type FastReadStruct interface {
+	InitDefault()
+	FastRead(buf []byte) (int, error)
+}
+
+func FastReadField(buf []byte, field *Field) (int, error) {
+
+	switch field.TType {
+	case thrift.STRING:
+		if v, l, err := Binary.ReadString(buf); err != nil {
+			return 0, err
+		} else {
+			field.Field_string = &v
+			return l, nil
+		}
+	case thrift.DOUBLE:
+		if v, l, err := Binary.ReadDouble(buf); err != nil {
+			return 0, err
+		} else {
+			field.Field_double = &v
+			return l, nil
+		}
+	case thrift.BYTE:
+		if v, l, err := Binary.ReadByte(buf); err != nil {
+			return 0, err
+		} else {
+			field.Field_i8 = &v
+			return l, nil
+		}
+	case thrift.BOOL:
+		if v, l, err := Binary.ReadBool(buf); err != nil {
+			return 0, err
+		} else {
+			field.Field_bool = &v
+			return l, nil
+		}
+	case thrift.I32:
+		if v, l, err := Binary.ReadI32(buf); err != nil {
+			return 0, err
+		} else {
+			field.Field_i32 = &v
+			return l, nil
+		}
+	case thrift.I16:
+		if v, l, err := Binary.ReadI16(buf); err != nil {
+			return 0, err
+		} else {
+			field.Field_i16 = &v
+			return l, nil
+		}
+	case thrift.I64:
+		if v, l, err := Binary.ReadI64(buf); err != nil {
+			return 0, err
+		} else {
+			field.Field_i64 = &v
+			return l, nil
+		}
+	//case thrift.LIST:
+	//
+	//	setField := field.FieldSetter
+	//	if setField == nil {
+	//		return 0, fmt.Errorf("no field setter")
+	//	}
+	//
+	//	_, size, l, err := Binary.ReadListBegin(buf)
+	//	if err != nil {
+	//		return l, err
+	//	}
+	//
+	//	_field := field.NewFields_(size) //make([]*FastReadStruct, 0, size)
+	//	values := field.NewValues(size)  //make([]FastReadStruct, size)
+	//	offset := 0
+	//	for i := 0; i < size; i++ {
+	//		// check 这里改了指针类型
+	//		_elem := values[i].(FastReadStruct)
+	//		_elem.InitDefault()
+	//		if l, err := _elem.FastRead(buf[offset:]); err != nil {
+	//			return offset, err
+	//		} else {
+	//			offset += l
+	//		}
+	//		_field = append(_field, &_elem)
+	//	}
+	//	if l, err := Binary.ReadListEnd(buf[offset:]); err != nil {
+	//		return offset, err
+	//	} else {
+	//		offset += l
+	//	}
+	//	setField(_field)
+	//	return offset, nil
+
+	default:
+		fr := field.FastReadField
+		if fr != nil {
+			return fr(buf)
+		}
+		return 0, fmt.Errorf("no fast read")
+	}
 }
