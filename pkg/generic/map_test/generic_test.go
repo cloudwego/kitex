@@ -41,6 +41,7 @@ func TestThrift(t *testing.T) {
 	svr := initThriftServer(t, addr, new(GenericServiceImpl), false, false)
 	cli := initThriftClient(t, addr, false, false, 0)
 
+	const testString = "fwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwifwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawiofwiofjwiofjijjfawojfifjeawioofjwiofjijjfawojfifjeawio;fjaweiofjwio"
 	cases := []struct {
 		reqMsg   interface{}
 		wantResp interface{}
@@ -50,7 +51,7 @@ func TestThrift(t *testing.T) {
 				"Msg": "hello",
 				"TestList": []interface{}{
 					map[string]interface{}{
-						"Bar": "foo",
+						"Bar": testString,
 					},
 				},
 				"TestMap": map[interface{}]interface{}{
@@ -71,7 +72,7 @@ func TestThrift(t *testing.T) {
 				"Foo": int32(0),
 				"TestList": []interface{}{
 					map[string]interface{}{
-						"Bar": "foo",
+						"Bar": testString,
 					},
 				},
 				"TestMap": map[interface{}]interface{}{
@@ -255,11 +256,19 @@ func TestThrift(t *testing.T) {
 		},
 	}
 	for _, tcase := range cases {
-		resp, err := cli.GenericCall(context.Background(), "ExampleMethod", tcase.reqMsg, callopt.WithRPCTimeout(100*time.Second))
-		test.Assert(t, err == nil, err)
-		respMap, ok := resp.(map[string]interface{})
-		test.Assert(t, ok)
-		test.Assert(t, reflect.DeepEqual(respMap, tcase.wantResp), respMap)
+		// make more Call to check data consistency
+		var respBucket [100]map[string]interface{}
+		for i := 0; i < len(respBucket); i++ {
+			resp, err := cli.GenericCall(context.Background(), "ExampleMethod", tcase.reqMsg, callopt.WithRPCTimeout(100*time.Second))
+			test.Assert(t, err == nil, err)
+			respMap, ok := resp.(map[string]interface{})
+			test.Assert(t, ok)
+			respBucket[i] = respMap
+			test.DeepEqual(t, respMap, tcase.wantResp)
+		}
+		for i := 0; i < len(respBucket); i++ {
+			test.DeepEqual(t, respBucket[i], tcase.wantResp)
+		}
 	}
 	svr.Stop()
 }
