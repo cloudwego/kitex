@@ -35,7 +35,7 @@ type binaryThriftCodec struct {
 	thriftCodec remote.PayloadCodec
 }
 
-const bizErrFixedSize = 8
+const bizErrFixedSize = 12
 
 func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	data := msg.Data()
@@ -57,7 +57,7 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 		if transBinary == nil {
 			method := msg.RPCInfo().Invocation().MethodName()
 			transBuff = make([]byte, bizErrFixedSize+len(method))
-			setBizErrTransBuff(method, transBuff)
+			setBizErrTransBuff(method, msg.RPCInfo().Invocation().SeqID(), transBuff)
 		} else if transBuff, ok = transBinary.(binaryReqType); !ok {
 			return perrors.NewProtocolErrorWithMsg("invalid marshal result in rawThriftBinaryCodec: must be []byte")
 		}
@@ -185,11 +185,13 @@ func readBinaryMethod(buff []byte, msg remote.Message) error {
 	return nil
 }
 
-func setBizErrTransBuff(method string, transBuff []byte) {
+func setBizErrTransBuff(method string, seqID int32, transBuff []byte) {
 	idx := 0
 	binary.BigEndian.PutUint32(transBuff, codec.ThriftV1Magic)
 	idx += 4
 	binary.BigEndian.PutUint32(transBuff[idx:idx+4], uint32(len(method)))
 	idx += 4
 	copy(transBuff[idx:idx+len(method)], method)
+	idx += len(method)
+	binary.BigEndian.PutUint32(transBuff[idx:idx+4], uint32(seqID))
 }
