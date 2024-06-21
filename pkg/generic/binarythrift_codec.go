@@ -192,5 +192,4 @@ func setBizErrTransBuff(method string, transBuff []byte) {
 	binary.BigEndian.PutUint32(transBuff[idx:idx+4], uint32(len(method)))
 	idx += 4
 	copy(transBuff[idx:idx+len(method)], method)
-	idx += len(method)
 }
