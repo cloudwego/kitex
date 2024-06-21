@@ -35,6 +35,11 @@ type binaryThriftCodec struct {
 	thriftCodec remote.PayloadCodec
 }
 
+const (
+	size32     = 4
+	bizErrFlag = codec.ThriftV1Magic
+)
+
 func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	data := msg.Data()
 	if data == nil {
@@ -51,7 +56,11 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 	if msg.RPCRole() == remote.Server {
 		gResult := data.(*Result)
 		transBinary := gResult.Success
-		if transBuff, ok = transBinary.(binaryReqType); !ok {
+		// handle biz error
+		if transBinary == nil {
+			transBuff = make([]byte, size32)
+			binary.BigEndian.PutUint32(transBuff, bizErrFlag)
+		} else if transBuff, ok = transBinary.(binaryReqType); !ok {
 			return perrors.NewProtocolErrorWithMsg("invalid marshal result in rawThriftBinaryCodec: must be []byte")
 		}
 	} else {
@@ -81,6 +90,9 @@ func (c *binaryThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, i
 	transBuff, err := in.ReadBinary(payloadLen)
 	if err != nil {
 		return err
+	}
+	if isBizError(payloadLen, transBuff) {
+		return nil
 	}
 	if err := readBinaryMethod(transBuff, msg); err != nil {
 		return err
@@ -176,4 +188,8 @@ func readBinaryMethod(buff []byte, msg remote.Message) error {
 		return perrors.NewProtocolError(err)
 	}
 	return nil
+}
+
+func isBizError(payloadLen int, transBuff []byte) bool {
+	return payloadLen == size32 && binary.BigEndian.Uint32(transBuff) == bizErrFlag
 }
