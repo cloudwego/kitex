@@ -21,9 +21,12 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	athrift "github.com/apache/thrift/lib/go/thrift"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -34,8 +37,6 @@ type binaryReqType = []byte
 type binaryThriftCodec struct {
 	thriftCodec remote.PayloadCodec
 }
-
-const bizErrFixedSize = 12
 
 func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	data := msg.Data()
@@ -55,9 +56,15 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 		transBinary := gResult.Success
 		// handle biz error
 		if transBinary == nil {
-			method := msg.RPCInfo().Invocation().MethodName()
-			transBuff = make([]byte, bizErrFixedSize+len(method))
-			setBizErrTransBuff(method, msg.RPCInfo().Invocation().SeqID(), transBuff)
+			tProt := thrift.NewBinaryProtocol(out)
+			if err := tProt.WriteMessageBegin(msg.RPCInfo().Invocation().MethodName(), athrift.TMessageType(msg.MessageType()), msg.RPCInfo().Invocation().SeqID()); err != nil {
+				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteMessageBegin failed: %s", err.Error()))
+			}
+			if err := tProt.WriteMessageEnd(); err != nil {
+				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteMessageEnd failed: %s", err.Error()))
+			}
+			tProt.Recycle()
+			return nil
 		} else if transBuff, ok = transBinary.(binaryReqType); !ok {
 			return perrors.NewProtocolErrorWithMsg("invalid marshal result in rawThriftBinaryCodec: must be []byte")
 		}
@@ -183,15 +190,4 @@ func readBinaryMethod(buff []byte, msg remote.Message) error {
 		return perrors.NewProtocolError(err)
 	}
 	return nil
-}
-
-func setBizErrTransBuff(method string, seqID int32, transBuff []byte) {
-	idx := 0
-	binary.BigEndian.PutUint32(transBuff, codec.ThriftV1Magic)
-	idx += 4
-	binary.BigEndian.PutUint32(transBuff[idx:idx+4], uint32(len(method)))
-	idx += 4
-	copy(transBuff[idx:idx+len(method)], method)
-	idx += len(method)
-	binary.BigEndian.PutUint32(transBuff[idx:idx+4], uint32(seqID))
 }
