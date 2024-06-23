@@ -119,7 +119,7 @@ func Run() int {
 	p := &patcher{
 		noFastAPI:             conv.Config.NoFastAPI,
 		utils:                 conv.Utils,
-		module:                conv.Config.ModuleName,
+		packagePrefix:         conv.Config.PackagePrefix,
 		copyIDL:               conv.Config.CopyIDL,
 		version:               conv.Config.Version,
 		record:                conv.Config.Record,
