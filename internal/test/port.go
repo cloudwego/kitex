@@ -60,15 +60,12 @@ func GetLocalAddress() string {
 
 // tells if a net address is already in use.
 func IsAddressInUse(address string) bool {
-	// Attempt to establish a TCP connection to the address
-	conn, err := net.DialTimeout("tcp", address, time.Duration(1+rand.Intn(10))*100*time.Millisecond)
+	ln, err := net.Listen("tcp", address)
 	if err != nil {
-		// If there's an error, the address is likely not in use or not reachable
-		return false
+		return true
 	}
-	_ = conn.Close()
-	// If the connection is successful, the address is in use
-	return true
+	ln.Close()
+	return false
 }
 
 // WaitServerStart waits for server to start for at most 1 second
