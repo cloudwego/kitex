@@ -87,7 +87,7 @@ func (i *ServiceInfo) MethodInfo(name string) MethodInfo {
 	if i == nil {
 		return nil
 	}
-	if i.ServiceName == GenericService {
+	if _, ok := i.Extra["generic"]; ok {
 		if i.GenericMethod != nil {
 			return i.GenericMethod(name)
 		}
