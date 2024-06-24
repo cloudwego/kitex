@@ -29,10 +29,10 @@ const (
 
 // MessageReader read from thrift.TProtocol with method
 type MessageReader interface {
-	Read(ctx context.Context, method string, isClient bool, dataLen int, in thrift.TProtocol) (interface{}, error)
+	Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error)
 }
 
 // MessageWriter write to thrift.TProtocol
 type MessageWriter interface {
-	Write(ctx context.Context, out thrift.TProtocol, msg interface{}, method string, isClient bool, requestBase *Base) error
+	Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error
 }
