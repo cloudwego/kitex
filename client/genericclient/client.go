@@ -42,6 +42,11 @@ func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *se
 	options = append(options, client.WithDestService(destService))
 	options = append(options, opts...)
 
+	if g.PayloadCodecType() == serviceinfo.Protobuf {
+		svcInfo.Extra["grpcGeneric"] = true
+		svcInfo.ServiceName = generic.GetGrpcSvcName(g)
+	}
+
 	kc, err := client.NewClient(svcInfo, options...)
 	if err != nil {
 		return nil, err
