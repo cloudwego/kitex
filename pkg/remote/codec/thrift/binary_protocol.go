@@ -509,7 +509,7 @@ func (p *BinaryProtocol) ByteBuffer() remote.ByteBuffer {
 
 // next ...
 func (p *BinaryProtocol) next(size int) ([]byte, error) {
-	buf, err := p.trans.Next(size)
+	buf, err := p.trans.ReadBinary(size)
 	if err != nil {
 		return buf, perrors.NewProtocolError(err)
 	}
