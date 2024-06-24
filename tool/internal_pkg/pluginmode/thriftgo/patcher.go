@@ -52,7 +52,7 @@ var protectionInsertionPoint = "KitexUnusedProtection"
 type patcher struct {
 	noFastAPI             bool
 	utils                 *golang.CodeUtils
-	packagePrefix         string
+	module                string
 	copyIDL               bool
 	version               string
 	record                bool
@@ -302,7 +302,7 @@ func (p *patcher) patch(req *plugin.Request) (patches []*plugin.Generated, err e
 		for path, alias := range p.libs {
 			imps[path] = alias
 		}
-		data.Imports = util.SortImports(imps, p.packagePrefix)
+		data.Imports = util.SortImports(imps, p.module)
 		data.Includes = p.extractLocalLibs(data.Imports)
 
 		// replace imports insert-pointer with newly rendered output
@@ -384,7 +384,7 @@ func getBashPath() string {
 
 func (p *patcher) extractLocalLibs(imports []util.Import) []util.Import {
 	ret := make([]util.Import, 0)
-	prefix := p.packagePrefix + "/"
+	prefix := p.module + "/"
 	// remove std libs and thrift to prevent duplicate import.
 	for _, v := range imports {
 		// local packages

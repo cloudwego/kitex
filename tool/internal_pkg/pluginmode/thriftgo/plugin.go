@@ -119,7 +119,7 @@ func Run() int {
 	p := &patcher{
 		noFastAPI:             conv.Config.NoFastAPI,
 		utils:                 conv.Utils,
-		packagePrefix:         conv.Config.PackagePrefix,
+		module:                conv.Config.ModuleName,
 		copyIDL:               conv.Config.CopyIDL,
 		version:               conv.Config.Version,
 		record:                conv.Config.Record,
@@ -127,6 +127,10 @@ func Run() int {
 		deepCopyAPI:           conv.Config.DeepCopyAPI,
 		protocol:              conv.Config.Protocol,
 		handlerReturnKeepResp: conv.Config.HandlerReturnKeepResp,
+	}
+	// for cmd without
+	if p.module == "" {
+		p.module = conv.Config.PackagePrefix
 	}
 	patches, err := p.patch(req)
 	if err != nil {
