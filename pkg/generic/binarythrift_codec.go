@@ -60,6 +60,9 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 			if err := tProt.WriteMessageBegin(msg.RPCInfo().Invocation().MethodName(), athrift.TMessageType(msg.MessageType()), msg.RPCInfo().Invocation().SeqID()); err != nil {
 				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteMessageBegin failed: %s", err.Error()))
 			}
+			if err := tProt.WriteFieldStop(); err != nil {
+				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteFieldStop failed: %s", err.Error()))
+			}
 			if err := tProt.WriteMessageEnd(); err != nil {
 				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteMessageEnd failed: %s", err.Error()))
 			}
