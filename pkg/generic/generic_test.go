@@ -35,7 +35,6 @@ func TestBinaryThriftGeneric(t *testing.T) {
 	test.Assert(t, g.Framed() == true)
 	test.Assert(t, g.PayloadCodec().Name() == "RawThriftBinary")
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Thrift)
-	test.Assert(t, g.MessageReaderWriter() == nil)
 
 	method, err := g.GetMethod(nil, "Test")
 	test.Assert(t, err == nil)
@@ -54,8 +53,7 @@ func TestMapThriftGeneric(t *testing.T) {
 	mg, ok := g.(*mapThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
-	test.Assert(t, g.IDLServiceName() == "Mock")
+	test.Assert(t, g.PayloadCodec().Name() == "MapThrift")
 
 	err = SetBinaryWithBase64(g, true)
 	test.Assert(t, err == nil)
@@ -85,8 +83,7 @@ func TestMapThriftGenericForJSON(t *testing.T) {
 	mg, ok := g.(*mapThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
-	test.Assert(t, g.IDLServiceName() == "Mock")
+	test.Assert(t, g.PayloadCodec().Name() == "MapThrift")
 
 	err = SetBinaryWithBase64(g, true)
 	test.Assert(t, err == nil)
@@ -113,8 +110,7 @@ func TestHTTPThriftGeneric(t *testing.T) {
 	hg, ok := g.(*httpThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
-	test.Assert(t, g.IDLServiceName() == "ExampleService")
+	test.Assert(t, g.PayloadCodec().Name() == "HttpThrift")
 
 	test.Assert(t, !hg.codec.dynamicgoEnabled)
 	test.Assert(t, hg.codec.useRawBodyForHTTPResp)
@@ -160,8 +156,7 @@ func TestHTTPThriftGenericWithDynamicGo(t *testing.T) {
 	hg, ok := g.(*httpThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
-	test.Assert(t, g.IDLServiceName() == "ExampleService")
+	test.Assert(t, g.PayloadCodec().Name() == "HttpThrift")
 
 	test.Assert(t, hg.codec.dynamicgoEnabled)
 	test.Assert(t, !hg.codec.useRawBodyForHTTPResp)
@@ -207,8 +202,7 @@ func TestJSONThriftGeneric(t *testing.T) {
 	jg, ok := g.(*jsonThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
-	test.Assert(t, g.IDLServiceName() == "Mock")
+	test.Assert(t, g.PayloadCodec().Name() == "JSONThrift")
 
 	test.Assert(t, !jg.codec.dynamicgoEnabled)
 	test.Assert(t, jg.codec.binaryWithBase64)
@@ -241,8 +235,7 @@ func TestJSONThriftGenericWithDynamicGo(t *testing.T) {
 	jg, ok := g.(*jsonThriftGeneric)
 	test.Assert(t, ok)
 
-	test.Assert(t, g.PayloadCodec() == nil)
-	test.Assert(t, g.IDLServiceName() == "Mock")
+	test.Assert(t, g.PayloadCodec().Name() == "JSONThrift")
 
 	test.Assert(t, jg.codec.dynamicgoEnabled)
 	test.Assert(t, jg.codec.binaryWithBase64)
@@ -278,8 +271,7 @@ func TestJSONPbGeneric(t *testing.T) {
 	test.Assert(t, err == nil)
 	defer g.Close()
 
-	test.Assert(t, g.PayloadCodec() == nil)
-	test.Assert(t, g.IDLServiceName() == "Echo")
+	test.Assert(t, g.PayloadCodec().Name() == "JSONPb")
 
 	test.Assert(t, g.PayloadCodecType() == serviceinfo.Protobuf)
 

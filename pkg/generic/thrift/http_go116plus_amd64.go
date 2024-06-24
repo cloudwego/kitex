@@ -21,7 +21,6 @@ package thrift
 
 import (
 	"context"
-	"fmt"
 	"unsafe"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -36,7 +35,7 @@ import (
 )
 
 // Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, method string, isClient bool, requestBase *Base) error {
+func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
 	// fallback logic
 	if !w.dynamicgoEnabled {
 		return w.originalWrite(ctx, out, msg, requestBase)
@@ -45,14 +44,8 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 	// dynamicgo logic
 	req := msg.(*descriptor.HTTPRequest)
 
-	fnDsc := w.svc.DynamicGoDsc.Functions()[method]
-	if fnDsc == nil {
-		return fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, w.svc.DynamicGoDsc.Name())
-	}
-	dynamicgoTypeDsc := fnDsc.Request()
-
 	var cv j2t.BinaryConv
-	if !fnDsc.HasRequestBase() {
+	if !w.hasRequestBase {
 		requestBase = nil
 	}
 	if requestBase != nil {
@@ -63,7 +56,7 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		cv = j2t.NewBinaryConv(w.convOpts)
 	}
 
-	if err := out.WriteStructBegin(dynamicgoTypeDsc.Struct().Name()); err != nil {
+	if err := out.WriteStructBegin(w.dynamicgoTypeDsc.Struct().Name()); err != nil {
 		return err
 	}
 
@@ -72,7 +65,7 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 	dbuf := mcache.Malloc(len(body))[0:0]
 	defer mcache.Free(dbuf)
 
-	for _, field := range dynamicgoTypeDsc.Struct().Fields() {
+	for _, field := range w.dynamicgoTypeDsc.Struct().Fields() {
 		if err := out.WriteFieldBegin(field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID())); err != nil {
 			return err
 		}

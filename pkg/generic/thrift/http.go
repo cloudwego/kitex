@@ -29,25 +29,19 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
 
-type HTTPReaderWriter struct {
-	*ReadHTTPResponse
-	*WriteHTTPRequest
-}
-
-func NewHTTPReaderWriter(svc *descriptor.ServiceDescriptor) *HTTPReaderWriter {
-	return &HTTPReaderWriter{ReadHTTPResponse: NewReadHTTPResponse(svc), WriteHTTPRequest: NewWriteHTTPRequest(svc)}
-}
-
 // WriteHTTPRequest implement of MessageWriter
 type WriteHTTPRequest struct {
 	svc                    *descriptor.ServiceDescriptor
+	dynamicgoTypeDsc       *dthrift.TypeDescriptor
 	binaryWithBase64       bool
 	convOpts               conv.Options // used for dynamicgo conversion
 	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
+	hasRequestBase         bool
 	dynamicgoEnabled       bool
 }
 
@@ -72,10 +66,17 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 }
 
 // SetDynamicGo ...
-func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options) {
+func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options, method string) error {
 	w.convOpts = *convOpts
 	w.convOptsWithThriftBase = *convOptsWithThriftBase
 	w.dynamicgoEnabled = true
+	fnDsc := w.svc.DynamicGoDsc.Functions()[method]
+	if fnDsc == nil {
+		return fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, w.svc.DynamicGoDsc.Name())
+	}
+	w.hasRequestBase = fnDsc.HasRequestBase()
+	w.dynamicgoTypeDsc = fnDsc.Request()
+	return nil
 }
 
 // originalWrite ...
@@ -100,6 +101,7 @@ func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out thrift.TProtoc
 type ReadHTTPResponse struct {
 	svc                   *descriptor.ServiceDescriptor
 	base64Binary          bool
+	msg                   remote.Message
 	dynamicgoEnabled      bool
 	useRawBodyForHTTPResp bool
 	t2jBinaryConv         t2j.BinaryConv // used for dynamicgo thrift to json conversion
@@ -125,20 +127,21 @@ func (r *ReadHTTPResponse) SetUseRawBodyForHTTPResp(useRawBodyForHTTPResp bool) 
 }
 
 // SetDynamicGo ...
-func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options) {
+func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options, msg remote.Message) {
 	r.t2jBinaryConv = t2j.NewBinaryConv(*convOpts)
+	r.msg = msg
 	r.dynamicgoEnabled = true
 }
 
 // Read ...
-func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
 	// fallback logic
 	if !r.dynamicgoEnabled {
 		return r.originalRead(ctx, method, in)
 	}
 
 	// dynamicgo logic
-	if dataLen == 0 {
+	if r.msg.PayloadLen() == 0 {
 		return nil, perrors.NewProtocolErrorWithMsg("msg.PayloadLen should always be greater than zero")
 	}
 
@@ -146,6 +149,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient boo
 	if !ok {
 		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
+	mBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
 	sName, err := in.ReadStructBegin()
 	if err != nil {
 		return nil, err
@@ -157,7 +161,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient boo
 		return nil, err
 	}
 	fBeginLen := bthrift.Binary.FieldBeginLength(fName, typeId, id)
-	transBuf, err := tProt.ByteBuffer().ReadBinary(dataLen - sBeginLen - fBeginLen)
+	transBuf, err := tProt.ByteBuffer().ReadBinary(r.msg.PayloadLen() - mBeginLen - sBeginLen - fBeginLen - bthrift.Binary.MessageEndLength())
 	if err != nil {
 		return nil, err
 	}

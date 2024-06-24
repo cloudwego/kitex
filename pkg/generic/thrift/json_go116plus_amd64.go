@@ -21,7 +21,6 @@ package thrift
 
 import (
 	"context"
-	"fmt"
 	"unsafe"
 
 	"github.com/apache/thrift/lib/go/thrift"
@@ -38,25 +37,15 @@ import (
 )
 
 // Write write json string to out thrift.TProtocol
-func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, method string, isClient bool, requestBase *Base) error {
+func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
 	// fallback logic
 	if !m.dynamicgoEnabled {
-		return m.originalWrite(ctx, out, msg, method, isClient, requestBase)
+		return m.originalWrite(ctx, out, msg, requestBase)
 	}
 
 	// dynamicgo logic
-	fnDsc := m.svcDsc.DynamicGoDsc.Functions()[method]
-	if fnDsc == nil {
-		return fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, m.svcDsc.DynamicGoDsc.Name())
-	}
-	dynamicgoTypeDsc := fnDsc.Request()
-	if !isClient {
-		dynamicgoTypeDsc = fnDsc.Response()
-	}
-	hasRequestBase := fnDsc.HasRequestBase() && isClient
-
 	var cv j2t.BinaryConv
-	if !hasRequestBase {
+	if !m.hasRequestBase {
 		requestBase = nil
 	}
 	if requestBase != nil {
@@ -69,10 +58,10 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 
 	// msg is void or nil
 	if _, ok := msg.(descriptor.Void); ok || msg == nil {
-		if err := m.writeHead(out, dynamicgoTypeDsc); err != nil {
+		if err := m.writeHead(out); err != nil {
 			return err
 		}
-		if err := m.writeFields(ctx, out, dynamicgoTypeDsc, nil, nil, isClient); err != nil {
+		if err := m.writeFields(ctx, out, nil, nil); err != nil {
 			return err
 		}
 		return writeTail(out)
@@ -85,10 +74,10 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 	}
 	transBuff := utils.StringToSliceByte(s)
 
-	if err := m.writeHead(out, dynamicgoTypeDsc); err != nil {
+	if err := m.writeHead(out); err != nil {
 		return err
 	}
-	if err := m.writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient); err != nil {
+	if err := m.writeFields(ctx, out, &cv, transBuff); err != nil {
 		return err
 	}
 	return writeTail(out)
@@ -101,13 +90,13 @@ const (
 	String
 )
 
-func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient bool) error {
+func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, cv *j2t.BinaryConv, transBuff []byte) error {
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
 	defer mcache.Free(dbuf)
 
-	for _, field := range dynamicgoTypeDsc.Struct().Fields() {
+	for _, field := range m.dynamicgoTypeDsc.Struct().Fields() {
 		// Exception field
-		if !isClient && field.ID() != 0 {
+		if !m.isClient && field.ID() != 0 {
 			// generic server ignore the exception, because no description for exception
 			// generic handler just return error
 			continue
@@ -147,8 +136,8 @@ func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, dynam
 	return nil
 }
 
-func (m *WriteJSON) writeHead(out thrift.TProtocol, dynamicgoTypeDsc *dthrift.TypeDescriptor) error {
-	if err := out.WriteStructBegin(dynamicgoTypeDsc.Struct().Name()); err != nil {
+func (m *WriteJSON) writeHead(out thrift.TProtocol) error {
+	if err := out.WriteStructBegin(m.dynamicgoTypeDsc.Struct().Name()); err != nil {
 		return err
 	}
 	return nil

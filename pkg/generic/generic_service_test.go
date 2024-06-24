@@ -56,21 +56,21 @@ func TestGenericService(t *testing.T) {
 	test.Assert(t, base != nil)
 	a.SetCodec(struct{}{})
 	// write not ok
-	err := a.Write(ctx, method, tProto)
+	err := a.Write(ctx, tProto)
 	test.Assert(t, err.Error() == "unexpected Args writer type: struct {}")
 
 	// Write expect
 	argWriteInner.EXPECT().Write(ctx, tProto, a.Request, a.GetOrSetBase()).Return(nil)
 	a.SetCodec(argWriteInner)
 	// write ok
-	err = a.Write(ctx, method, tProto)
-	test.Assert(t, err == nil, err)
+	err = a.Write(ctx, tProto)
+	test.Assert(t, err == nil)
 	// read not ok
-	err = a.Read(ctx, method, 0, tProto)
+	err = a.Read(ctx, method, tProto)
 	test.Assert(t, strings.Contains(err.Error(), "unexpected Args reader type"))
 	// read ok
 	a.SetCodec(rInner)
-	err = a.Read(ctx, method, 0, tProto)
+	err = a.Read(ctx, method, tProto)
 	test.Assert(t, err == nil)
 
 	// Result...
@@ -79,20 +79,20 @@ func TestGenericService(t *testing.T) {
 	test.Assert(t, ok == true)
 
 	// write not ok
-	err = r.Write(ctx, method, tProto)
+	err = r.Write(ctx, tProto)
 	test.Assert(t, err.Error() == "unexpected Result writer type: <nil>")
 	// Write expect
 	resultWriteInner.EXPECT().Write(ctx, tProto, r.Success, (*gthrift.Base)(nil)).Return(nil).AnyTimes()
 	r.SetCodec(resultWriteInner)
 	// write ok
-	err = r.Write(ctx, method, tProto)
+	err = r.Write(ctx, tProto)
 	test.Assert(t, err == nil)
 	// read not ok
-	err = r.Read(ctx, method, 0, tProto)
+	err = r.Read(ctx, method, tProto)
 	test.Assert(t, strings.Contains(err.Error(), "unexpected Result reader type"))
 	// read ok
 	r.SetCodec(rInner)
-	err = r.Read(ctx, method, 0, tProto)
+	err = r.Read(ctx, method, tProto)
 	test.Assert(t, err == nil)
 
 	r.SetSuccess(nil)
@@ -124,13 +124,6 @@ func TestGenericService(t *testing.T) {
 func TestServiceInfo(t *testing.T) {
 	s := ServiceInfo(serviceinfo.Thrift)
 	test.Assert(t, s.ServiceName == "$GenericService")
-
-	p, err := NewThriftFileProvider("./json_test/idl/mock.thrift")
-	test.Assert(t, err == nil)
-	g, err := JSONThriftGeneric(p)
-	test.Assert(t, err == nil)
-	s = ServiceInfoWithCodec(g)
-	test.Assert(t, s.ServiceName == "Mock")
 }
 
 func TestArgsResult(t *testing.T) {

@@ -24,7 +24,6 @@ import (
 
 	gproto "github.com/cloudwego/kitex/pkg/generic/proto"
 	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
-	codecProto "github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -35,43 +34,19 @@ type Service interface {
 	GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error)
 }
 
-// ServiceInfoWithCodec create a generic ServiceInfo with CodecInfo
-func ServiceInfoWithCodec(g Generic) *serviceinfo.ServiceInfo {
-	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName())
-}
-
-// Deprecated: it's not used by kitex anymore.
 // ServiceInfo create a generic ServiceInfo
 func ServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
-	return newServiceInfo(pcType, nil, "")
+	return newServiceInfo(pcType)
 }
 
-func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string) *serviceinfo.ServiceInfo {
+func newServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
+	serviceName := serviceinfo.GenericService
 	handlerType := (*Service)(nil)
-
-	var methods map[string]serviceinfo.MethodInfo
-	var svcName string
-
-	if messageReaderWriter == nil {
-		// note: binary generic cannot be used with multi-service feature
-		svcName = serviceinfo.GenericService
-		methods = map[string]serviceinfo.MethodInfo{
-			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(callHandler, newGenericServiceCallArgs, newGenericServiceCallResult, false),
-		}
-	} else {
-		svcName = serviceName
-		methods = map[string]serviceinfo.MethodInfo{
-			serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(
-				callHandler,
-				func() interface{} { return &Args{inner: messageReaderWriter} },
-				func() interface{} { return &Result{inner: messageReaderWriter} },
-				false,
-			),
-		}
+	methods := map[string]serviceinfo.MethodInfo{
+		serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(callHandler, newGenericServiceCallArgs, newGenericServiceCallResult, false),
 	}
-
 	svcInfo := &serviceinfo.ServiceInfo{
-		ServiceName:  svcName,
+		ServiceName:  serviceName,
 		HandlerType:  handlerType,
 		Methods:      methods,
 		PayloadCodec: pcType,
@@ -115,13 +90,10 @@ type Args struct {
 
 var (
 	_ codecThrift.MessageReaderWithMethodWithContext = (*Args)(nil)
-	_ codecThrift.MessageWriterWithMethodWithContext = (*Args)(nil)
-	_ codecProto.MessageWriterWithContext            = (*Args)(nil)
-	_ codecProto.MessageReaderWithMethodWithContext  = (*Args)(nil)
+	_ codecThrift.MessageWriterWithContext           = (*Args)(nil)
 	_ WithCodec                                      = (*Args)(nil)
 )
 
-// Deprecated: it's not used by kitex anymore.
 // SetCodec ...
 func (g *Args) SetCodec(inner interface{}) {
 	g.inner = inner
@@ -135,48 +107,36 @@ func (g *Args) GetOrSetBase() interface{} {
 }
 
 // Write ...
-func (g *Args) Write(ctx context.Context, method string, out thrift.TProtocol) error {
-	if err, ok := g.inner.(error); ok {
-		return err
-	}
+func (g *Args) Write(ctx context.Context, out thrift.TProtocol) error {
 	if w, ok := g.inner.(gthrift.MessageWriter); ok {
-		return w.Write(ctx, out, g.Request, method, true, g.base)
+		return w.Write(ctx, out, g.Request, g.base)
 	}
 	return fmt.Errorf("unexpected Args writer type: %T", g.inner)
 }
 
-func (g *Args) WritePb(ctx context.Context, method string) (interface{}, error) {
-	if err, ok := g.inner.(error); ok {
-		return nil, err
-	}
+func (g *Args) WritePb(ctx context.Context) (interface{}, error) {
 	if w, ok := g.inner.(gproto.MessageWriter); ok {
-		return w.Write(ctx, g.Request, method, true)
+		return w.Write(ctx, g.Request)
 	}
 	return nil, fmt.Errorf("unexpected Args writer type: %T", g.inner)
 }
 
 // Read ...
-func (g *Args) Read(ctx context.Context, method string, dataLen int, in thrift.TProtocol) error {
-	if err, ok := g.inner.(error); ok {
-		return err
-	}
-	if rw, ok := g.inner.(gthrift.MessageReader); ok {
+func (g *Args) Read(ctx context.Context, method string, in thrift.TProtocol) error {
+	if w, ok := g.inner.(gthrift.MessageReader); ok {
 		g.Method = method
 		var err error
-		g.Request, err = rw.Read(ctx, method, false, dataLen, in)
+		g.Request, err = w.Read(ctx, method, in)
 		return err
 	}
 	return fmt.Errorf("unexpected Args reader type: %T", g.inner)
 }
 
 func (g *Args) ReadPb(ctx context.Context, method string, in []byte) error {
-	if err, ok := g.inner.(error); ok {
-		return err
-	}
 	if w, ok := g.inner.(gproto.MessageReader); ok {
 		g.Method = method
 		var err error
-		g.Request, err = w.Read(ctx, method, false, in)
+		g.Request, err = w.Read(ctx, method, in)
 		return err
 	}
 	return fmt.Errorf("unexpected Args reader type: %T", g.inner)
@@ -195,59 +155,44 @@ type Result struct {
 
 var (
 	_ codecThrift.MessageReaderWithMethodWithContext = (*Result)(nil)
-	_ codecThrift.MessageWriterWithMethodWithContext = (*Result)(nil)
-	_ codecProto.MessageWriterWithContext            = (*Result)(nil)
-	_ codecProto.MessageReaderWithMethodWithContext  = (*Result)(nil)
+	_ codecThrift.MessageWriterWithContext           = (*Result)(nil)
 	_ WithCodec                                      = (*Result)(nil)
 )
 
-// Deprecated: it's not used by kitex anymore.
 // SetCodec ...
 func (r *Result) SetCodec(inner interface{}) {
 	r.inner = inner
 }
 
 // Write ...
-func (r *Result) Write(ctx context.Context, method string, out thrift.TProtocol) error {
-	if err, ok := r.inner.(error); ok {
-		return err
-	}
+func (r *Result) Write(ctx context.Context, out thrift.TProtocol) error {
 	if w, ok := r.inner.(gthrift.MessageWriter); ok {
-		return w.Write(ctx, out, r.Success, method, false, nil)
+		return w.Write(ctx, out, r.Success, nil)
 	}
 	return fmt.Errorf("unexpected Result writer type: %T", r.inner)
 }
 
-func (r *Result) WritePb(ctx context.Context, method string) (interface{}, error) {
-	if err, ok := r.inner.(error); ok {
-		return nil, err
-	}
+func (r *Result) WritePb(ctx context.Context) (interface{}, error) {
 	if w, ok := r.inner.(gproto.MessageWriter); ok {
-		return w.Write(ctx, r.Success, method, false)
+		return w.Write(ctx, r.Success)
 	}
 	return nil, fmt.Errorf("unexpected Result writer type: %T", r.inner)
 }
 
 // Read ...
-func (r *Result) Read(ctx context.Context, method string, dataLen int, in thrift.TProtocol) error {
-	if err, ok := r.inner.(error); ok {
-		return err
-	}
+func (r *Result) Read(ctx context.Context, method string, in thrift.TProtocol) error {
 	if w, ok := r.inner.(gthrift.MessageReader); ok {
 		var err error
-		r.Success, err = w.Read(ctx, method, true, dataLen, in)
+		r.Success, err = w.Read(ctx, method, in)
 		return err
 	}
 	return fmt.Errorf("unexpected Result reader type: %T", r.inner)
 }
 
 func (r *Result) ReadPb(ctx context.Context, method string, in []byte) error {
-	if err, ok := r.inner.(error); ok {
-		return err
-	}
 	if w, ok := r.inner.(gproto.MessageReader); ok {
 		var err error
-		r.Success, err = w.Read(ctx, method, true, in)
+		r.Success, err = w.Read(ctx, method, in)
 		return err
 	}
 	return fmt.Errorf("unexpected Result reader type: %T", r.inner)

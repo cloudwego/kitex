@@ -49,6 +49,9 @@ func TestWrite(t *testing.T) {
 	svc, err := opts.NewDescriptorFromPath(context.Background(), example2IDLPath)
 	test.Assert(t, err == nil)
 
+	wm, err := NewWriteJSON(svc, method, true, &conv.Options{})
+	test.Assert(t, err == nil)
+
 	msg := getExampleReq()
 
 	// get expected json struct
@@ -56,8 +59,7 @@ func TestWrite(t *testing.T) {
 	json.Unmarshal([]byte(msg), exp)
 
 	// marshal json string into protobuf wire format using Write
-	wm := NewWriteJSON(svc, &conv.Options{})
-	out, err := wm.Write(context.Background(), msg, method, true)
+	out, err := wm.Write(context.Background(), msg)
 	test.Assert(t, err == nil)
 	buf, ok := out.([]byte)
 	test.Assert(t, ok)
@@ -96,9 +98,11 @@ func TestRead(t *testing.T) {
 	svc, err := opts.NewDescriptorFromPath(context.Background(), example2IDLPath)
 	test.Assert(t, err == nil)
 
+	rm, err := NewReadJSON(svc, false, &conv.Options{})
+	test.Assert(t, err == nil)
+
 	// unmarshal protobuf wire format into json string using Read
-	rm := NewReadJSON(svc, &conv.Options{})
-	out, err := rm.Read(context.Background(), method, false, in)
+	out, err := rm.Read(context.Background(), method, in)
 	test.Assert(t, err == nil)
 
 	// get expected json struct

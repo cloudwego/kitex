@@ -29,15 +29,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
-type HTTPPbReaderWriter struct {
-	*ReadHTTPPbResponse
-	*WriteHTTPPbRequest
-}
-
-func NewHTTPPbReaderWriter(svc *descriptor.ServiceDescriptor, pbsvc proto.ServiceDescriptor) *HTTPPbReaderWriter {
-	return &HTTPPbReaderWriter{ReadHTTPPbResponse: NewReadHTTPPbResponse(svc, pbsvc), WriteHTTPPbRequest: NewWriteHTTPPbRequest(svc, pbsvc)}
-}
-
 // WriteHTTPPbRequest implement of MessageWriter
 type WriteHTTPPbRequest struct {
 	svc   *descriptor.ServiceDescriptor
@@ -53,7 +44,7 @@ func NewWriteHTTPPbRequest(svc *descriptor.ServiceDescriptor, pbSvc *desc.Servic
 }
 
 // Write ...
-func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, method string, isClient bool, requestBase *Base) error {
+func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	fn, err := w.svc.Router.Lookup(req)
 	if err != nil {
@@ -78,22 +69,22 @@ func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, ms
 	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase})
 }
 
-// ReadHTTPPbResponse implement of MessageReaderWithMethod
+// ReadHTTPResponse implement of MessageReaderWithMethod
 type ReadHTTPPbResponse struct {
 	svc   *descriptor.ServiceDescriptor
 	pbSvc proto.ServiceDescriptor
 }
 
-var _ MessageReader = (*ReadHTTPPbResponse)(nil)
+var _ MessageReader = (*ReadHTTPResponse)(nil)
 
-// NewReadHTTPPbResponse ...
+// NewReadHTTPResponse ...
 // Base64 encoding for binary is enabled by default.
 func NewReadHTTPPbResponse(svc *descriptor.ServiceDescriptor, pbSvc proto.ServiceDescriptor) *ReadHTTPPbResponse {
 	return &ReadHTTPPbResponse{svc, pbSvc}
 }
 
 // Read ...
-func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
 	fnDsc, err := r.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err
