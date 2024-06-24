@@ -18,7 +18,6 @@ package generic
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync/atomic"
 
@@ -32,26 +31,29 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var _ Closer = &jsonPbCodec{}
+var (
+	_ remote.PayloadCodec = &jsonPbCodec{}
+	_ Closer              = &jsonPbCodec{}
+)
 
 type jsonPbCodec struct {
 	svcDsc           atomic.Value // *idl
 	provider         PbDescriptorProviderDynamicGo
+	codec            remote.PayloadCodec
 	opts             *Options
 	convOpts         conv.Options // used for dynamicgo conversion
 	dynamicgoEnabled bool         // currently set to true by default
-	svcName          string
 }
 
-func newJsonPbCodec(p PbDescriptorProviderDynamicGo, opts *Options) *jsonPbCodec {
+func newJsonPbCodec(p PbDescriptorProviderDynamicGo, codec remote.PayloadCodec, opts *Options) (*jsonPbCodec, error) {
 	svc := <-p.Provide()
-	c := &jsonPbCodec{provider: p, opts: opts, dynamicgoEnabled: true, svcName: svc.Name()}
+	c := &jsonPbCodec{codec: codec, provider: p, opts: opts, dynamicgoEnabled: true}
 	convOpts := opts.dynamicgoConvOpts
 	c.convOpts = convOpts
 
 	c.svcDsc.Store(svc)
 	go c.update()
-	return c
+	return c, nil
 }
 
 func (c *jsonPbCodec) update() {
@@ -60,18 +62,46 @@ func (c *jsonPbCodec) update() {
 		if !ok {
 			return
 		}
-		c.svcName = svc.Name()
 		c.svcDsc.Store(svc)
 	}
 }
 
-func (c *jsonPbCodec) getMessageReaderWriter() interface{} {
-	pbSvc, ok := c.svcDsc.Load().(*dproto.ServiceDescriptor)
-	if !ok {
-		return errors.New("get parser dynamicgo ServiceDescriptor failed")
+func (c *jsonPbCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	method := msg.RPCInfo().Invocation().MethodName()
+	if method == "" {
+		return perrors.NewProtocolErrorWithMsg("empty methodName in protobuf Marshal")
+	}
+	if msg.MessageType() == remote.Exception {
+		return c.codec.Marshal(ctx, msg, out)
 	}
 
-	return proto.NewJsonReaderWriter(pbSvc, &c.convOpts)
+	pbSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor)
+
+	wm, err := proto.NewWriteJSON(pbSvc, method, msg.RPCRole() == remote.Client, &c.convOpts)
+	if err != nil {
+		return err
+	}
+
+	msg.Data().(WithCodec).SetCodec(wm)
+
+	return c.codec.Marshal(ctx, msg, out)
+}
+
+func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
+		return err
+	}
+
+	pbSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor)
+
+	wm, err := proto.NewReadJSON(pbSvc, msg.RPCRole() == remote.Client, &c.convOpts)
+	if err != nil {
+		return err
+	}
+
+	msg.Data().(WithCodec).SetCodec(wm)
+
+	return c.codec.Unmarshal(ctx, msg, in)
 }
 
 func (c *jsonPbCodec) getMethod(req interface{}, method string) (*Method, error) {
@@ -90,36 +120,4 @@ func (c *jsonPbCodec) Name() string {
 
 func (c *jsonPbCodec) Close() error {
 	return c.provider.Close()
-}
-
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
-func (c *jsonPbCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	method := msg.RPCInfo().Invocation().MethodName()
-	if method == "" {
-		return perrors.NewProtocolErrorWithMsg("empty methodName in protobuf Marshal")
-	}
-	if msg.MessageType() == remote.Exception {
-		return pbCodec.Marshal(ctx, msg, out)
-	}
-
-	pbSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor)
-
-	wm := proto.NewWriteJSON(pbSvc, &c.convOpts)
-	msg.Data().(WithCodec).SetCodec(wm)
-
-	return pbCodec.Marshal(ctx, msg, out)
-}
-
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
-func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
-	}
-
-	pbSvc := c.svcDsc.Load().(*dproto.ServiceDescriptor)
-
-	wm := proto.NewReadJSON(pbSvc, &c.convOpts)
-	msg.Data().(WithCodec).SetCodec(wm)
-
-	return pbCodec.Unmarshal(ctx, msg, in)
 }
