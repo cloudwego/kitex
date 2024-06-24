@@ -128,6 +128,10 @@ func Run() int {
 		protocol:              conv.Config.Protocol,
 		handlerReturnKeepResp: conv.Config.HandlerReturnKeepResp,
 	}
+	// for cmd without setting -module
+	if p.module == "" {
+		p.module = conv.Config.PackagePrefix
+	}
 	patches, err := p.patch(req)
 	if err != nil {
 		return conv.fail(fmt.Errorf("patch: %w", err))
