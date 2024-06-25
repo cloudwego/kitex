@@ -20,16 +20,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/cloudwego/thriftgo/plugin"
+	"github.com/cloudwego/thriftgo/sdk"
+
 	"github.com/cloudwego/kitex"
 	kargs "github.com/cloudwego/kitex/tool/cmd/kitex/args"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
-	"github.com/cloudwego/thriftgo/plugin"
-	"github.com/cloudwego/thriftgo/sdk"
 )
 
 var args kargs.Arguments
 
-var exitNoError = fmt.Errorf("os.Exit(0)")
+var errExitZero = fmt.Errorf("os.Exit(0)")
 
 func init() {
 	var queryVersion bool
@@ -41,7 +42,7 @@ func init() {
 		Check: func(a *kargs.Arguments) error {
 			if queryVersion {
 				println(a.Version)
-				return exitNoError
+				return errExitZero
 			}
 			return nil
 		},
@@ -51,7 +52,7 @@ func init() {
 func RunKitexTool(wd string, plugins []plugin.SDKPlugin, kitexArgs ...string) error {
 	kitexPlugin, err := GetKiteXSDKPlugin(wd, kitexArgs)
 	if err != nil {
-		if err.Error() == "flag: help requested" || err == exitNoError {
+		if err.Error() == "flag: help requested" || err == errExitZero {
 			return nil
 		}
 		return err
@@ -60,11 +61,9 @@ func RunKitexTool(wd string, plugins []plugin.SDKPlugin, kitexArgs ...string) er
 	s = append(s, plugins...)
 
 	return sdk.RunThriftgoAsSDK(wd, s, kitexPlugin.GetThriftgoParameters()...)
-
 }
 
 func GetKiteXSDKPlugin(pwd string, rawKiteXArgs []string) (*KiteXSDKPlugin, error) {
-
 	// run as kitex
 	err := args.ParseArgs(kitex.Version, pwd, rawKiteXArgs)
 	if err != nil {
@@ -105,7 +104,6 @@ func GetKiteXSDKPlugin(pwd string, rawKiteXArgs []string) (*KiteXSDKPlugin, erro
 	kitexPlugin.Pwd = pwd
 
 	return kitexPlugin, nil
-
 }
 
 type KiteXSDKPlugin struct {

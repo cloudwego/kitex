@@ -87,7 +87,7 @@ func runJavaExtensionOption(cfg *generator.Config) error {
 			if err != nil {
 				abs = path
 			}
-			return fmt.Errorf("You can try to download again. If the download still fails, you can choose to manually download \"%s\" to the local path \"%s\".", JavaThriftAddress, abs)
+			return fmt.Errorf("you can try to download again. If the download still fails, you can choose to manually download \"%s\" to the local path \"%s\"", JavaThriftAddress, abs)
 		}
 	}
 
@@ -105,7 +105,7 @@ func patchIDLRefConfig(cfg *generator.Config) error {
 	}
 	file, err := os.OpenFile(idlRef, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
-		return fmt.Errorf("Open %s file failed: %s\n", idlRef, err.Error())
+		return fmt.Errorf("open %s file failed: %s", idlRef, err.Error())
 	}
 	defer file.Close()
 	idlRefCfg, err := loadIDLRefConfig(file.Name(), file)
@@ -118,19 +118,19 @@ func patchIDLRefConfig(cfg *generator.Config) error {
 	idlRefCfg.Ref[javaRef] = DubboCodec + "/java"
 	out, err := yaml.Marshal(idlRefCfg)
 	if err != nil {
-		return fmt.Errorf("Marshal configuration failed:", err.Error())
+		return fmt.Errorf("marshal configuration failed: %s", err.Error())
 	}
 	// clear the file content
 	if err := file.Truncate(0); err != nil {
-		return fmt.Errorf("Truncate file %s failed: %s", idlRef, err.Error())
+		return fmt.Errorf("truncate file %s failed: %s", idlRef, err.Error())
 	}
 	// set the file offset
 	if _, err := file.Seek(0, 0); err != nil {
-		return fmt.Errorf("Seek file %s failed: %s", idlRef, err.Error())
+		return fmt.Errorf("seek file %s failed: %s", idlRef, err.Error())
 	}
 	_, err = file.Write(out)
 	if err != nil {
-		return fmt.Errorf("Write to file %s failed: %s\n", idlRef, err.Error())
+		return fmt.Errorf("write to file %s failed: %s", idlRef, err.Error())
 	}
 	return nil
 }
@@ -139,7 +139,7 @@ func patchIDLRefConfig(cfg *generator.Config) error {
 func loadIDLRefConfig(fileName string, reader io.Reader) (*config.RawConfig, error) {
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
-		return nil, fmt.Errorf("Read %s file failed: %s\n", fileName, err.Error())
+		return nil, fmt.Errorf("read %s file failed: %s", fileName, err.Error())
 	}
 
 	// build idl ref config
@@ -149,8 +149,7 @@ func loadIDLRefConfig(fileName string, reader io.Reader) (*config.RawConfig, err
 	} else {
 		err := yaml.Unmarshal(data, idlRefCfg)
 		if err != nil {
-			return nil, fmt.Errorf("Parse %s file failed: %s\n"+
-				"Please check whether the idl ref configuration is correct.", fileName, err.Error())
+			return nil, fmt.Errorf("parse %s file failed: %s, Please check whether the idl ref configuration is correct", fileName, err.Error())
 		}
 	}
 
