@@ -121,7 +121,7 @@ func (c *httpPbThriftCodec) Close() error {
 	}
 }
 
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
 func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
@@ -137,7 +137,7 @@ func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 	return thriftCodec.Marshal(ctx, msg, out)
 }
 
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
 func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err

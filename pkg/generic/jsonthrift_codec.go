@@ -119,7 +119,7 @@ func (c *jsonThriftCodec) Close() error {
 	return c.provider.Close()
 }
 
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
 func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	method := msg.RPCInfo().Invocation().MethodName()
 	if method == "" {
@@ -143,7 +143,7 @@ func (c *jsonThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	return thriftCodec.Marshal(ctx, msg, out)
 }
 
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
 func (c *jsonThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
