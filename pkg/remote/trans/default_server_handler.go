@@ -170,6 +170,10 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearchMap, ri, remote.Call, remote.Server, t.opt.RefuseTrafficWithoutServiceName)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
+	if err == nil {
+		// must return err
+		err = remote.NewTransError(remote.ProtocolError, errors.New("must return err"))
+	}
 	if err != nil {
 		t.writeErrorReplyIfNeeded(ctx, recvMsg, conn, err, ri, true)
 		// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
