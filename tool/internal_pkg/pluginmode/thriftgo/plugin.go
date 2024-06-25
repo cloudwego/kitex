@@ -54,7 +54,6 @@ func (c *converter) failResp(err error) *plugin.Response {
 }
 
 func HandleRequest(req *plugin.Request) *plugin.Response {
-
 	var conv converter
 	if err := conv.init(req); err != nil {
 		return conv.failResp(err)

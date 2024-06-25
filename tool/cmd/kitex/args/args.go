@@ -188,12 +188,12 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 
 func (a *Arguments) checkIDL(files []string) error {
 	if len(files) == 0 {
-		return fmt.Errorf("No IDL file found; Please make your IDL file the last parameter, for example: " +
-			"\"kitex -service demo idl.thrift\".")
+		return fmt.Errorf("no IDL file found; Please make your IDL file the last parameter, for example: " +
+			"\"kitex -service demo idl.thrift\"")
 	}
 	if len(files) != 1 {
-		return fmt.Errorf("Require exactly 1 IDL file; Please make your IDL file the last parameter, for example: " +
-			"\"kitex -service demo idl.thrift\".")
+		return fmt.Errorf("require exactly 1 IDL file; Please make your IDL file the last parameter, for example: " +
+			"\"kitex -service demo idl.thrift\"")
 	}
 	a.IDL = files[0]
 
@@ -203,10 +203,10 @@ func (a *Arguments) checkIDL(files []string) error {
 		if typ, ok := a.guessIDLType(); ok {
 			a.IDLType = typ
 		} else {
-			return fmt.Errorf("Can not guess an IDL type from %q (unknown suffix), please specify with the '-type' flag.", a.IDL)
+			return fmt.Errorf("can not guess an IDL type from %q (unknown suffix), please specify with the '-type' flag", a.IDL)
 		}
 	default:
-		return fmt.Errorf("Unsupported IDL type:", a.IDLType)
+		return fmt.Errorf("unsupported IDL type: %s", a.IDLType)
 	}
 	return nil
 }
@@ -239,17 +239,17 @@ func (a *Arguments) checkPath(curpath string) error {
 	gosrc := util.JoinPath(gopath, "src")
 	gosrc, err = filepath.Abs(gosrc)
 	if err != nil {
-		return fmt.Errorf("Get GOPATH/src path failed:", err.Error())
+		return fmt.Errorf("get GOPATH/src path failed: %s", err.Error())
 	}
 
 	if strings.HasPrefix(curpath, gosrc) {
 		if a.PackagePrefix, err = filepath.Rel(gosrc, curpath); err != nil {
-			return fmt.Errorf("Get GOPATH/src relpath failed:", err.Error())
+			return fmt.Errorf("get GOPATH/src relpath failed: %s", err.Error())
 		}
 		a.PackagePrefix = util.JoinPath(a.PackagePrefix, a.GenPath)
 	} else {
 		if a.ModuleName == "" {
-			return fmt.Errorf("Outside of $GOPATH. Please specify a module name with the '-module' flag.")
+			return fmt.Errorf("outside of $GOPATH. Please specify a module name with the '-module' flag")
 		}
 	}
 
@@ -258,16 +258,16 @@ func (a *Arguments) checkPath(curpath string) error {
 		if ok {
 			// go.mod exists
 			if module != a.ModuleName {
-				return fmt.Errorf("The module name given by the '-module' option ('%s') is not consist with the name defined in go.mod ('%s' from %s)\n",
+				return fmt.Errorf("the module name given by the '-module' option ('%s') is not consist with the name defined in go.mod ('%s' from %s)",
 					a.ModuleName, module, path)
 			}
 			if a.PackagePrefix, err = filepath.Rel(path, curpath); err != nil {
-				return fmt.Errorf("Get package prefix failed:", err.Error())
+				return fmt.Errorf("get package prefix failed: %s", err.Error())
 			}
 			a.PackagePrefix = util.JoinPath(a.ModuleName, a.PackagePrefix, a.GenPath)
 		} else {
 			if err = initGoMod(pathToGo, a.ModuleName); err != nil {
-				return fmt.Errorf("Init go mod failed:", err.Error())
+				return fmt.Errorf("init go mod failed: %s", err.Error())
 			}
 			a.PackagePrefix = util.JoinPath(a.ModuleName, a.GenPath)
 		}
@@ -284,7 +284,7 @@ func (a *Arguments) checkPath(curpath string) error {
 func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 	exe, err := os.Executable()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to detect current executable:", err.Error())
+		return nil, fmt.Errorf("failed to detect current executable: %s", err.Error())
 	}
 
 	for i, inc := range a.Includes {
@@ -294,7 +294,7 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 				if errMsg == "" {
 					errMsg = gitErr.Error()
 				}
-				return nil, fmt.Errorf("failed to pull IDL from git:%s\nYou can execute 'rm -rf ~/.kitex' to clean the git cache and try again.", errMsg)
+				return nil, fmt.Errorf("failed to pull IDL from git:%s\nYou can execute 'rm -rf ~/.kitex' to clean the git cache and try again", errMsg)
 			}
 			a.Includes[i] = localGitPath
 		}
@@ -371,7 +371,7 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 		for _, p := range a.ProtobufPlugins {
 			pluginParams := strings.Split(p, ":")
 			if len(pluginParams) != 3 {
-				return nil, fmt.Errorf("Failed to get the correct protoc plugin parameters for %. Please specify the protoc plugin in the form of \"plugin_name:options:out_dir\"", p)
+				return nil, fmt.Errorf("failed to get the correct protoc plugin parameters for %s. Please specify the protoc plugin in the form of \"plugin_name:options:out_dir\"", p)
 			}
 			// pluginParams[0] -> plugin name, pluginParams[1] -> plugin options, pluginParams[2] -> out_dir
 			cmd.Args = append(cmd.Args,
@@ -400,11 +400,11 @@ func ValidateCMD(path, idlType string) error {
 			if err != nil {
 				return fmt.Errorf("[ERROR] %s is also unavailable, please install %s first.\n"+
 					"Refer to https://github.com/cloudwego/thriftgo, or simple run:\n"+
-					"  go install -v github.com/cloudwego/thriftgo@latest\n", path, tool)
+					"  go install -v github.com/cloudwego/thriftgo@latest", path, tool)
 			}
 		} else {
 			return fmt.Errorf("[ERROR] %s is also unavailable, please install %s first.\n"+
-				"Refer to https://github.com/protocolbuffers/protobuf\n", path, tool)
+				"Refer to https://github.com/protocolbuffers/protobuf", path, tool)
 		}
 	}
 
@@ -414,16 +414,16 @@ func ValidateCMD(path, idlType string) error {
 		cmd := exec.Command(path, "-version")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("Failed to get thriftgo version: %s\n", err.Error())
+			return fmt.Errorf("failed to get thriftgo version: %s", err.Error())
 		}
 		if !strings.HasPrefix(string(out), "thriftgo ") {
-			return fmt.Errorf("thriftgo -version returns '%s', please reinstall thriftgo first.\n", string(out))
+			return fmt.Errorf("thriftgo -version returns '%s', please reinstall thriftgo first", string(out))
 		}
 		version := strings.Replace(strings.TrimSuffix(string(out), "\n"), "thriftgo ", "", 1)
 		if !versionSatisfied(version, requiredThriftGoVersion) {
 			_, err = runCommand("go install github.com/cloudwego/thriftgo@latest")
 			if err != nil {
-				return fmt.Errorf("[ERROR] thriftgo version(%s) not satisfied, please install version >= %s\n",
+				return fmt.Errorf("[ERROR] thriftgo version(%s) not satisfied, please install version >= %s",
 					version, requiredThriftGoVersion)
 			}
 		}
