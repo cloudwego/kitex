@@ -34,6 +34,7 @@ import (
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/server"
 )
@@ -43,6 +44,7 @@ var addr = test.GetLocalAddress()
 func TestRun(t *testing.T) {
 	t.Run("RawThriftBinary", rawThriftBinary)
 	t.Run("RawThriftBinaryError", rawThriftBinaryError)
+	t.Run("RawThriftBinaryBizError", rawThriftBinaryBizError)
 	t.Run("RawThriftBinaryMockReq", rawThriftBinaryMockReq)
 	t.Run("RawThriftBinary2NormalServer", rawThriftBinary2NormalServer)
 }
@@ -75,6 +77,23 @@ func rawThriftBinaryError(t *testing.T) {
 	_, err := cli.GenericCall(context.Background(), method, buf, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err != nil)
 	test.Assert(t, strings.Contains(err.Error(), errResp), err.Error())
+}
+
+func rawThriftBinaryBizError(t *testing.T) {
+	svr := initRawThriftBinaryServer(new(GenericServiceBizErrorImpl))
+	defer svr.Stop()
+
+	cli := initRawThriftBinaryClient()
+
+	method := "myMethod"
+	buf := genBinaryReqBuf(method)
+
+	_, err := cli.GenericCall(context.Background(), method, buf)
+	test.Assert(t, err != nil)
+	bizStatusErr, ok := kerrors.FromBizStatusError(err)
+	test.Assert(t, ok)
+	test.Assert(t, bizStatusErr.BizStatusCode() == 404)
+	test.Assert(t, bizStatusErr.BizMessage() == "not found")
 }
 
 func rawThriftBinaryMockReq(t *testing.T) {
