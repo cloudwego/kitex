@@ -32,14 +32,20 @@ import (
 
 var (
 	// Binary protocol for bthrift.
-	Binary    binaryProtocol
-	_         BTProtocol = binaryProtocol{}
-	spanCache            = mem.NewSpanCache(1024 * 1024) // 1MB
+	Binary          binaryProtocol
+	_               BTProtocol = binaryProtocol{}
+	spanCache                  = mem.NewSpanCache(1024 * 1024)
+	spanCacheEnable bool       = false
 )
 
 const binaryInplaceThreshold = 4096 // 4k
 
 type binaryProtocol struct{}
+
+// SetSpanCache enable/disable binary protocol bytes/string allocator
+func SetSpanCache(enable bool) {
+	spanCacheEnable = enable
+}
 
 func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int {
 	offset := 0
@@ -467,8 +473,12 @@ func (binaryProtocol) ReadString(buf []byte) (value string, length int, err erro
 	if size < 0 || int(size) > len(buf) {
 		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadString] the string size greater than buf length")
 	}
-	data := spanCache.Copy(buf[length : length+int(size)])
-	value = utils.SliceByteToString(data)
+	if spanCacheEnable {
+		data := spanCache.Copy(buf[length : length+int(size)])
+		value = utils.SliceByteToString(data)
+	} else {
+		value = string(buf[length : length+int(size)])
+	}
 	length += int(size)
 	return
 }
@@ -484,7 +494,12 @@ func (binaryProtocol) ReadBinary(buf []byte) (value []byte, length int, err erro
 	if size < 0 || size > len(buf) {
 		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadBinary] the binary size greater than buf length")
 	}
-	value = spanCache.Copy(buf[length : length+size])
+	if spanCacheEnable {
+		value = spanCache.Copy(buf[length : length+size])
+	} else {
+		value = make([]byte, size)
+		copy(value, buf[length:length+size])
+	}
 	length += size
 	return
 }
