@@ -72,7 +72,7 @@ func NewStreamingClientWithServiceInfo(destService string, g generic.Generic, sv
 		n, err := g.GetMethod(nil, name)
 		var key string
 		if err != nil {
-			// TODO: support fallback solution for binary and http generic
+			// TODO: support fallback solution for binary
 			key = serviceinfo.GenericMethod
 		} else {
 			key = getGenericStreamingMethodInfoKey(n.StreamingMode)
