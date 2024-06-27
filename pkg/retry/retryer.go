@@ -35,7 +35,7 @@ type RPCCallFunc func(context.Context, Retryer) (rpcinfo rpcinfo.RPCInfo, resp i
 
 // GenRetryKeyFunc to generate retry key through rpcinfo.
 // You can customize the config key according to your config center.
-type GenRetryKeyFunc func(ri rpcinfo.RPCInfo) string
+type GenRetryKeyFunc func(ctx context.Context, ri rpcinfo.RPCInfo) string
 
 // Retryer is the interface for Retry implements
 type Retryer interface {
@@ -186,7 +186,7 @@ func NewRetryContainer(opts ...ContainerOption) *Container {
 	return rc
 }
 
-func defaultGenRetryKey(rpcInfo rpcinfo.RPCInfo) string {
+func defaultGenRetryKey(_ context.Context, rpcInfo rpcinfo.RPCInfo) string {
 	return rpcInfo.To().Method()
 }
 
@@ -339,7 +339,7 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 			klog.Warnf("KITEX: new callopt retryer[%s] failed, err=%w", callOptRetry.Type, err)
 		}
 	} else {
-		retryer = rc.getRetryer(ri)
+		retryer = rc.getRetryer(ctx, ri)
 	}
 
 	// case 1(default, fast path): no retry policy
@@ -377,13 +377,13 @@ func NewRetryer(p Policy, r *ShouldResultRetry, cbC *cbContainer) (retryer Retry
 	return
 }
 
-func (rc *Container) getRetryer(ri rpcinfo.RPCInfo) Retryer {
+func (rc *Container) getRetryer(ctx context.Context, ri rpcinfo.RPCInfo) Retryer {
 	keyFunc := defaultGenRetryKey
 	if rc.genRetryKey != nil {
 		keyFunc = rc.genRetryKey
 	}
 	// the priority of specific method is high
-	r, ok := rc.retryerMap.Load(keyFunc(ri))
+	r, ok := rc.retryerMap.Load(keyFunc(ctx, ri))
 	if ok {
 		return r.(Retryer)
 	}
