@@ -18,12 +18,9 @@ package generic
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net/http"
 	"reflect"
 	"testing"
-
-	"github.com/bytedance/mockey"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
@@ -31,14 +28,11 @@ import (
 // TestFromHTTPPbRequest this test is to make sure mockey can work.
 // If it fails, please run this test with `-gcflags="all=-N -l"`
 func TestFromHTTPPbRequest(t *testing.T) {
-	mockey.PatchConvey("TestFromHTTPPbRequest", t, func() {
-		req, err := http.NewRequest("POST", "/far/boo", bytes.NewBuffer([]byte("321")))
-		test.Assert(t, err == nil)
-		mockey.Mock(ioutil.ReadAll).Return([]byte("123"), nil).Build()
-		hreq, err := FromHTTPPbRequest(req)
-		test.Assert(t, err == nil)
-		test.Assert(t, reflect.DeepEqual(hreq.RawBody, []byte("123")), string(hreq.RawBody))
-		test.Assert(t, hreq.GetMethod() == "POST")
-		test.Assert(t, hreq.GetPath() == "/far/boo")
-	})
+	req, err := http.NewRequest("POST", "/far/boo", bytes.NewBuffer([]byte("321")))
+	test.Assert(t, err == nil)
+	hreq, err := FromHTTPPbRequest(req)
+	test.Assert(t, err == nil)
+	test.Assert(t, reflect.DeepEqual(hreq.RawBody, []byte("321")), string(hreq.RawBody))
+	test.Assert(t, hreq.GetMethod() == "POST")
+	test.Assert(t, hreq.GetPath() == "/far/boo")
 }

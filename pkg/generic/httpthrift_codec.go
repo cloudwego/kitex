@@ -129,7 +129,7 @@ func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in 
 	inner := thrift.NewReadHTTPResponse(svcDsc)
 	inner.SetBase64Binary(c.binaryWithBase64)
 	inner.SetUseRawBodyForHTTPResp(c.useRawBodyForHTTPResp)
-	if c.dynamicgoEnabled && c.useRawBodyForHTTPResp {
+	if c.dynamicgoEnabled && c.useRawBodyForHTTPResp && msg.PayloadLen() != 0 {
 		inner.SetDynamicGo(&c.convOpts, msg)
 	}
 

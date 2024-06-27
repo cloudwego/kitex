@@ -140,11 +140,6 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 		return r.originalRead(ctx, method, in)
 	}
 
-	// dynamicgo logic
-	if r.msg.PayloadLen() == 0 {
-		return nil, perrors.NewProtocolErrorWithMsg("msg.PayloadLen should always be greater than zero")
-	}
-
 	tProt, ok := in.(*cthrift.BinaryProtocol)
 	if !ok {
 		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
