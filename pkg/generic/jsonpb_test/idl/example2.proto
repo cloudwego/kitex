@@ -38,12 +38,12 @@ message InnerBase2 {
   uint32 Uint32 = 2;
   uint64 Uint64 = 3;
   int32 Int32 = 4;
-  int64 Int64 = 5;
+  sint64 SInt64 = 5;
   double Double = 6;
   string String = 7;
   repeated int32 ListInt32 = 8;
   map<string, string> MapStringString = 9;
-  repeated int32 SetInt32 = 10;
+  repeated sint64 ListSInt64 = 10;
   FOO Foo = 11;
   map<int32, string> MapInt32String = 12;
   bytes Binary = 13;
