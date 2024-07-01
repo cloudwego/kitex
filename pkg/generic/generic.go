@@ -59,6 +59,11 @@ func BinaryThriftGeneric() Generic {
 	return &binaryThriftGeneric{}
 }
 
+// BinaryProtobufGeneric raw protobuf binary Generic
+func BinaryProtobufGeneric() Generic {
+	return &binaryProtobufGeneric{}
+}
+
 // MapThriftGeneric map mapping generic
 // Base64 codec for binary field is disabled by default. You can change this option with SetBinaryWithBase64.
 // eg:
@@ -230,6 +235,37 @@ func (g *binaryThriftGeneric) IDLServiceName() string {
 }
 
 func (g *binaryThriftGeneric) MessageReaderWriter() interface{} {
+	return nil
+}
+
+type binaryProtobufGeneric struct{}
+
+func (g *binaryProtobufGeneric) Framed() bool {
+	return false
+}
+
+func (g *binaryProtobufGeneric) PayloadCodecType() serviceinfo.PayloadCodec {
+	return serviceinfo.Protobuf
+}
+
+func (g *binaryProtobufGeneric) PayloadCodec() remote.PayloadCodec {
+	pc := &binaryProtobufCodec{pbCodec}
+	return pc
+}
+
+func (g *binaryProtobufGeneric) GetMethod(req interface{}, method string) (*Method, error) {
+	return &Method{method, false}, nil
+}
+
+func (g *binaryProtobufGeneric) Close() error {
+	return nil
+}
+
+func (g *binaryProtobufGeneric) IDLServiceName() string {
+	return ""
+}
+
+func (g *binaryProtobufGeneric) MessageReaderWriter() interface{} {
 	return nil
 }
 
