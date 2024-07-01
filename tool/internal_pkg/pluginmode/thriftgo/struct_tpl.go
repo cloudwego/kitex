@@ -17,7 +17,15 @@ package thriftgo
 const StructLikeCodec = `
 {{define "StructLikeCodec"}}
 {{if GenerateFastAPIs}}
+{{if ZippedCodec}}
+
+{{template "StructLikeZippedFastRead" .}}
+
+{{- else}}
+
 {{template "StructLikeFastRead" .}}
+
+{{- end}}{{/* if ZippedCodec */}}
 
 {{template "StructLikeFastReadField" .}}
 
@@ -39,6 +47,22 @@ const StructLikeCodec = `
 `
 
 const StructLikeFastRead = `
+
+
+{{define "StructLikeZippedFastRead"}}
+{{- $TypeName := .GoName}}
+{{- $fl := len .Fields}}
+func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
+	info := map[int16]*bthrift.Field{
+		{{- range $index, $element := .Fields}}
+		{{- $isBaseVal := .Type | IsBaseType}}
+		{{ $element.ID }}: { ID: {{ $element.ID }}, Required: {{ $element.Requiredness.IsRequired }}, TType: thrift.{{$element.Type | GetTypeIDConstant }},{{- if or .Type.Category.IsContainerType .Type.Category.IsStructLike}}FastReadField: p.FastReadField{{Str $element.ID}}{{- else}}Field_{{ $element.Type }}: {{ if not $element.Requiredness.IsRequired }}{{else}}&{{end}}p.{{$element.GoName}}{{- end}}},
+		{{- end}}{{/* range .Fields */}}
+	}
+	return bthrift.FastRead(buf, p, info, false)
+}
+{{- end}}{{/* define "StructLikeZippedFastRead" */}}
+
 {{define "StructLikeFastRead"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
@@ -172,6 +196,9 @@ const StructLikeFastReadField = `
 {{- range .Fields}}
 {{$FieldName := .GoName}}
 {{- $isBaseVal := .Type | IsBaseType}}
+{{if and ZippedCodec $isBaseVal}}
+
+{{ else }}
 func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte) (int, error) {
 	offset := 0
 	{{- if Features.WithFieldMask}}
@@ -194,6 +221,7 @@ func (p *{{$TypeName}}) FastReadField{{Str .ID}}(buf []byte) (int, error) {
 	{{- end}}
 	return offset, nil
 }
+{{- end}}{{/* if ZippedCodec and $isBaseVal */}}
 {{- end}}{{/* range .Fields */}}
 {{- end}}{{/* define "StructLikeFastReadField" */}}
 `

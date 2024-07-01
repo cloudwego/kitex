@@ -58,6 +58,7 @@ type patcher struct {
 	record                bool
 	recordCmd             []string
 	deepCopyAPI           bool
+	useZipCodec           bool
 	protocol              string
 	handlerReturnKeepResp bool
 
@@ -85,8 +86,10 @@ func (p *patcher) buildTemplates() (err error) {
 	m["Version"] = func() string { return p.version }
 	m["GenerateFastAPIs"] = func() bool { return !p.noFastAPI && p.utils.Template() != "slim" }
 	m["GenerateDeepCopyAPIs"] = func() bool { return p.deepCopyAPI }
+	m["ZippedCodec"] = func() bool { return p.useZipCodec }
 	m["GenerateArgsResultTypes"] = func() bool { return p.utils.Template() == "slim" }
 	m["ImportPathTo"] = generator.ImportPathTo
+	m["Increase"] = func(a int) int { return a + 1 }
 	m["Str"] = func(id int32) string {
 		if id < 0 {
 			return "_" + strconv.Itoa(-int(id))
