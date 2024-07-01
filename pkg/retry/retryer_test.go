@@ -48,7 +48,7 @@ func TestNewRetryContainer(t *testing.T) {
 		BackupPolicy:  NewBackupPolicy(10),
 		FailurePolicy: NewFailurePolicy(),
 	})
-	r := rc.getRetryer(genRPCInfo())
+	r := rc.getRetryer(context.Background(), genRPCInfo())
 	_, ok := r.(*failureRetryer)
 	test.Assert(t, ok)
 
@@ -67,7 +67,7 @@ func TestNewRetryContainer(t *testing.T) {
 		BackupPolicy:  NewBackupPolicy(10),
 		FailurePolicy: NewFailurePolicy(),
 	})
-	r = rc.getRetryer(genRPCInfo())
+	r = rc.getRetryer(context.Background(), genRPCInfo())
 	_, ok = r.(*failureRetryer)
 	test.Assert(t, ok)
 	_, allow = r.AllowRetry(context.Background())
@@ -78,7 +78,7 @@ func TestNewRetryContainer(t *testing.T) {
 		Type:         1,
 		BackupPolicy: NewBackupPolicy(20),
 	})
-	r = rc.getRetryer(genRPCInfo())
+	r = rc.getRetryer(context.Background(), genRPCInfo())
 	_, ok = r.(*backupRetryer)
 	test.Assert(t, ok)
 	_, allow = r.AllowRetry(context.Background())
@@ -89,7 +89,7 @@ func TestNewRetryContainer(t *testing.T) {
 		Type:         1,
 		BackupPolicy: NewBackupPolicy(20),
 	})
-	r = rc.getRetryer(genRPCInfo())
+	r = rc.getRetryer(context.Background(), genRPCInfo())
 	_, ok = r.(*backupRetryer)
 	test.Assert(t, ok)
 	_, allow = r.AllowRetry(context.Background())
@@ -271,7 +271,7 @@ func TestNewRetryContainer(t *testing.T) {
 	test.Assert(t, err != nil, err)
 
 	rc.DeletePolicy(method)
-	r = rc.getRetryer(genRPCInfo())
+	r = rc.getRetryer(context.Background(), genRPCInfo())
 	test.Assert(t, r == nil)
 }
 
@@ -946,14 +946,14 @@ func TestResultRetryWithPolicyChange(t *testing.T) {
 
 	// case 1: first time trigger NotifyPolicyChange, the `initRetryer` will be executed, check if the ShouldResultRetry is not nil
 	rc.NotifyPolicyChange(Wildcard, BuildFailurePolicy(NewFailurePolicy()))
-	r := rc.getRetryer(genRPCInfo())
+	r := rc.getRetryer(context.Background(), genRPCInfo())
 	fr, ok := r.(*failureRetryer)
 	test.Assert(t, ok)
 	test.Assert(t, fr.policy.ShouldResultRetry == shouldResultRetry)
 
 	// case 2: second time trigger NotifyPolicyChange, the `UpdatePolicy` will be executed, check if the ShouldResultRetry is not nil
 	rc.NotifyPolicyChange(Wildcard, BuildFailurePolicy(NewFailurePolicy()))
-	r = rc.getRetryer(genRPCInfo())
+	r = rc.getRetryer(context.Background(), genRPCInfo())
 	fr, ok = r.(*failureRetryer)
 	test.Assert(t, ok)
 	test.Assert(t, fr.policy.ShouldResultRetry == shouldResultRetry)
@@ -974,14 +974,14 @@ func TestResultRetryWithCtxWhenPolicyChange(t *testing.T) {
 
 	// case 1: first time trigger NotifyPolicyChange, the `initRetryer` will be executed, check if the ShouldResultRetry is not nil
 	rc.NotifyPolicyChange(Wildcard, BuildFailurePolicy(NewFailurePolicy()))
-	r := rc.getRetryer(genRPCInfo())
+	r := rc.getRetryer(context.Background(), genRPCInfo())
 	fr, ok := r.(*failureRetryer)
 	test.Assert(t, ok)
 	test.Assert(t, fr.policy.ShouldResultRetry == shouldResultRetry)
 
 	// case 2: second time trigger NotifyPolicyChange, the `UpdatePolicy` will be executed, check if the ShouldResultRetry is not nil
 	rc.NotifyPolicyChange(Wildcard, BuildFailurePolicy(NewFailurePolicy()))
-	r = rc.getRetryer(genRPCInfo())
+	r = rc.getRetryer(context.Background(), genRPCInfo())
 	fr, ok = r.(*failureRetryer)
 	test.Assert(t, ok)
 	test.Assert(t, fr.policy.ShouldResultRetry == shouldResultRetry)

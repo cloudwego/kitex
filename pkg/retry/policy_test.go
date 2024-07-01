@@ -17,6 +17,7 @@
 package retry
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -192,6 +193,7 @@ func TestRetryPolicyBothNotNil(t *testing.T) {
 		FailurePolicy: NewFailurePolicy(),
 		BackupPolicy:  NewBackupPolicy(20),
 	}
+	ctx := context.Background()
 	jsonRet, err := jsoni.MarshalToString(p)
 	test.Assert(t, err == nil, err)
 
@@ -205,7 +207,7 @@ func TestRetryPolicyBothNotNil(t *testing.T) {
 	rc := Container{}
 	rc.NotifyPolicyChange(ri.To().Method(), p2)
 
-	r := rc.getRetryer(ri)
+	r := rc.getRetryer(ctx, ri)
 	fr, ok := r.(*failureRetryer)
 	test.Assert(t, ok)
 	test.Assert(t, fr.enable)
@@ -231,7 +233,7 @@ func TestRetryPolicyBothNil(t *testing.T) {
 	rc := Container{}
 	rc.NotifyPolicyChange(ri.To().Method(), p2)
 
-	r := rc.getRetryer(ri)
+	r := rc.getRetryer(context.Background(), ri)
 	test.Assert(t, r != nil, r)
 }
 
@@ -252,7 +254,7 @@ func TestRetryPolicyFailure(t *testing.T) {
 	ri := genRPCInfo()
 	rc := Container{}
 	rc.NotifyPolicyChange(ri.To().Method(), p2)
-	r := rc.getRetryer(ri)
+	r := rc.getRetryer(context.Background(), ri)
 	fr, ok := r.(*failureRetryer)
 	test.Assert(t, ok)
 	test.Assert(t, fr.policy.Equals(p.FailurePolicy))
@@ -277,7 +279,7 @@ func TestRetryPolicyFailure(t *testing.T) {
 
 	// 更新配置
 	rc.NotifyPolicyChange(ri.To().Method(), p3)
-	r = rc.getRetryer(ri)
+	r = rc.getRetryer(context.Background(), ri)
 	fr, ok = r.(*failureRetryer)
 	test.Assert(t, ok)
 	test.Assert(t, fr.policy.Equals(p.FailurePolicy))
