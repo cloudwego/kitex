@@ -102,8 +102,8 @@ func getGenericStreamingMethodInfoKey(streamingMode serviceinfo.StreamingMode) s
 
 type clientStreamingClient struct {
 	streaming.Stream
-	svcInfo *serviceinfo.ServiceInfo
-	method  string
+	method     string
+	methodInfo serviceinfo.MethodInfo
 }
 
 func NewClientStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (ClientStreaming, error) {
@@ -115,11 +115,11 @@ func NewClientStreaming(ctx context.Context, genericCli Client, method string, c
 	if err != nil {
 		return nil, err
 	}
-	return &clientStreamingClient{stream, gCli.svcInfo, method}, nil
+	return &clientStreamingClient{stream, method, gCli.svcInfo.MethodInfo(method)}, nil
 }
 
 func (cs *clientStreamingClient) Send(req interface{}) error {
-	_args := cs.svcInfo.MethodInfo(cs.method).NewArgs().(*generic.Args)
+	_args := cs.methodInfo.NewArgs().(*generic.Args)
 	_args.Method = cs.method
 	_args.Request = req
 	return cs.Stream.SendMsg(_args)
@@ -129,7 +129,7 @@ func (cs *clientStreamingClient) CloseAndRecv() (resp interface{}, err error) {
 	if err := cs.Stream.Close(); err != nil {
 		return nil, err
 	}
-	_result := cs.svcInfo.MethodInfo(cs.method).NewResult().(*generic.Result)
+	_result := cs.methodInfo.NewResult().(*generic.Result)
 	if err = cs.Stream.RecvMsg(_result); err != nil {
 		return nil, err
 	}
@@ -138,8 +138,7 @@ func (cs *clientStreamingClient) CloseAndRecv() (resp interface{}, err error) {
 
 type serverStreamingClient struct {
 	streaming.Stream
-	svcInfo *serviceinfo.ServiceInfo
-	method  string
+	methodInfo serviceinfo.MethodInfo
 }
 
 func NewServerStreaming(ctx context.Context, genericCli Client, method string, req interface{}, callOpts ...callopt.Option) (ServerStreaming, error) {
@@ -151,7 +150,7 @@ func NewServerStreaming(ctx context.Context, genericCli Client, method string, r
 	if err != nil {
 		return nil, err
 	}
-	ss := &serverStreamingClient{Stream: stream, svcInfo: gCli.svcInfo, method: method}
+	ss := &serverStreamingClient{stream, gCli.svcInfo.MethodInfo(method)}
 	_args := gCli.svcInfo.MethodInfo(method).NewArgs().(*generic.Args)
 	_args.Method = method
 	_args.Request = req
@@ -165,7 +164,7 @@ func NewServerStreaming(ctx context.Context, genericCli Client, method string, r
 }
 
 func (ss *serverStreamingClient) Recv() (resp interface{}, err error) {
-	_result := ss.svcInfo.MethodInfo(ss.method).NewResult().(*generic.Result)
+	_result := ss.methodInfo.NewResult().(*generic.Result)
 	if err = ss.Stream.RecvMsg(_result); err != nil {
 		return nil, err
 	}
@@ -174,8 +173,8 @@ func (ss *serverStreamingClient) Recv() (resp interface{}, err error) {
 
 type bidirectionalStreamingClient struct {
 	streaming.Stream
-	svcInfo *serviceinfo.ServiceInfo
-	method  string
+	method     string
+	methodInfo serviceinfo.MethodInfo
 }
 
 func NewBidirectionalStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (BidirectionalStreaming, error) {
@@ -187,18 +186,18 @@ func NewBidirectionalStreaming(ctx context.Context, genericCli Client, method st
 	if err != nil {
 		return nil, err
 	}
-	return &bidirectionalStreamingClient{Stream: stream, svcInfo: gCli.svcInfo, method: method}, nil
+	return &bidirectionalStreamingClient{stream, method, gCli.svcInfo.MethodInfo(method)}, nil
 }
 
 func (bs *bidirectionalStreamingClient) Send(req interface{}) error {
-	_args := bs.svcInfo.MethodInfo(bs.method).NewArgs().(*generic.Args)
+	_args := bs.methodInfo.NewArgs().(*generic.Args)
 	_args.Method = bs.method
 	_args.Request = req
 	return bs.Stream.SendMsg(_args)
 }
 
 func (bs *bidirectionalStreamingClient) Recv() (resp interface{}, err error) {
-	_result := bs.svcInfo.MethodInfo(bs.method).NewResult().(*generic.Result)
+	_result := bs.methodInfo.NewResult().(*generic.Result)
 	if err = bs.Stream.RecvMsg(_result); err != nil {
 		return nil, err
 	}
