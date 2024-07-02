@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/internal/mocks"
 	mt "github.com/cloudwego/kitex/internal/mocks/thrift/fast"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
@@ -209,13 +210,13 @@ func TestException(t *testing.T) {
 
 func TestTransErrorUnwrap(t *testing.T) {
 	errMsg := "mock err"
-	transErr := remote.NewTransError(remote.InternalError, thrift.NewTApplicationException(1000, errMsg))
-	uwErr, ok := transErr.Unwrap().(thrift.TApplicationException)
+	transErr := remote.NewTransError(remote.InternalError, bthrift.NewApplicationException(1000, errMsg))
+	uwErr, ok := transErr.Unwrap().(*bthrift.ApplicationException)
 	test.Assert(t, ok)
 	test.Assert(t, uwErr.TypeId() == 1000)
 	test.Assert(t, transErr.Error() == errMsg)
 
-	uwErr2, ok := errors.Unwrap(transErr).(thrift.TApplicationException)
+	uwErr2, ok := errors.Unwrap(transErr).(*bthrift.ApplicationException)
 	test.Assert(t, ok)
 	test.Assert(t, uwErr2.TypeId() == 1000)
 	test.Assert(t, uwErr2.Error() == errMsg)

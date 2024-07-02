@@ -24,6 +24,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/mocks/thrift/fast"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
@@ -163,7 +164,7 @@ func TestUnmarshalThriftException(t *testing.T) {
 	transport := thrift.NewTMemoryBufferLen(marshalThriftBufferSize)
 	tProt := thrift.NewTBinaryProtocol(transport, true, true)
 	errMessage := "test: invalid protocol"
-	exc := thrift.NewTApplicationException(thrift.INVALID_PROTOCOL, errMessage)
+	exc := bthrift.NewApplicationException(thrift.INVALID_PROTOCOL, errMessage)
 	err := exc.Write(tProt)
 	test.Assert(t, err == nil, err)
 

@@ -110,7 +110,7 @@ func marshalBasicThriftData(ctx context.Context, tProt thrift.TProtocol, data in
 // UnmarshalThriftException decode thrift exception from tProt
 // If your input is []byte, you can wrap it with `NewBinaryProtocol(remote.NewReaderBuffer(buf))`
 func UnmarshalThriftException(tProt thrift.TProtocol) error {
-	exception := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
+	exception := bthrift.NewApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
 	if err := exception.Read(tProt); err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal Exception failed: %s", err.Error()))
 	}
