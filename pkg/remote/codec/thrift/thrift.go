@@ -276,11 +276,11 @@ func getValidData(methodName string, message remote.Message) (interface{}, error
 	transErr, isTransErr := data.(*remote.TransError)
 	if !isTransErr {
 		if err, isError := data.(error); isError {
-			encodeErr := thrift.NewTApplicationException(remote.InternalError, err.Error())
+			encodeErr := bthrift.NewApplicationException(remote.InternalError, err.Error())
 			return encodeErr, nil
 		}
 		return nil, errors.New("exception relay need error type data")
 	}
-	encodeErr := thrift.NewTApplicationException(transErr.TypeID(), transErr.Error())
+	encodeErr := bthrift.NewApplicationException(transErr.TypeID(), transErr.Error())
 	return encodeErr, nil
 }

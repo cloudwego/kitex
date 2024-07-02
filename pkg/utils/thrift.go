@@ -75,7 +75,7 @@ func (t *ThriftMessageCodec) Decode(b []byte, msg thrift.TStruct) (method string
 		return
 	}
 	if msgType == thrift.EXCEPTION {
-		exception := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
+		exception := bthrift.NewApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
 		if err = exception.Read(t.tProt); err != nil {
 			return
 		}
@@ -146,6 +146,5 @@ func UnmarshalError(b []byte) error {
 	if _, err := ex.FastRead(b[off:]); err != nil {
 		return err
 	}
-	// XXX: for compatibility, consider to remove it in the future
-	return thrift.NewTApplicationException(ex.TypeID(), ex.Msg())
+	return ex
 }
