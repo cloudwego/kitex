@@ -22,6 +22,8 @@ import (
 	"os"
 
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
+
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var isGoTagAliasDisabled = os.Getenv("KITEX_GENERIC_GOTAG_ALIAS_DISABLED") == "True"
@@ -91,6 +93,7 @@ type FunctionDescriptor struct {
 	Request        *TypeDescriptor
 	Response       *TypeDescriptor
 	HasRequestBase bool
+	StreamingMode  serviceinfo.StreamingMode
 }
 
 // ServiceDescriptor idl service descriptor

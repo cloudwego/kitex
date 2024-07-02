@@ -120,7 +120,6 @@ var (
 	_ WithCodec                                      = (*Args)(nil)
 )
 
-// Deprecated: it's not used by kitex anymore.
 // SetCodec ...
 func (g *Args) SetCodec(inner interface{}) {
 	g.inner = inner
@@ -200,7 +199,6 @@ var (
 	_ WithCodec                                      = (*Result)(nil)
 )
 
-// Deprecated: it's not used by kitex anymore.
 // SetCodec ...
 func (r *Result) SetCodec(inner interface{}) {
 	r.inner = inner

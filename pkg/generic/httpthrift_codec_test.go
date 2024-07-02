@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var customJson = sonic.Config{
@@ -62,6 +63,7 @@ func TestHttpThriftCodec(t *testing.T) {
 	// right
 	method, err = htc.getMethod(req)
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, htc.svcName == "ExampleService")
 
 	rw := htc.getMessageReaderWriter()
@@ -97,6 +99,7 @@ func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
 	// right
 	method, err = htc.getMethod(req)
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, htc.svcName == "ExampleService")
 
 	rw := htc.getMessageReaderWriter()

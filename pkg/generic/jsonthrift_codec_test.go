@@ -23,6 +23,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 func TestJsonThriftCodec(t *testing.T) {
@@ -40,6 +41,7 @@ func TestJsonThriftCodec(t *testing.T) {
 	method, err := jtc.getMethod(nil, "Test")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Test")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, jtc.svcName == "Mock")
 
 	rw := jtc.getMessageReaderWriter()
@@ -69,6 +71,7 @@ func TestJsonThriftCodecWithDynamicGo(t *testing.T) {
 	method, err := jtc.getMethod(nil, "Test")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Test")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 
 	rw := jtc.getMessageReaderWriter()
 	_, ok := rw.(thrift.MessageWriter)
@@ -88,6 +91,7 @@ func TestJsonThriftCodec_SelfRef(t *testing.T) {
 		method, err := jtc.getMethod(nil, "Test")
 		test.Assert(t, err == nil)
 		test.Assert(t, method.Name == "Test")
+		test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 
 		rw := jtc.getMessageReaderWriter()
 		_, ok := rw.(thrift.MessageWriter)
@@ -107,6 +111,7 @@ func TestJsonThriftCodec_SelfRef(t *testing.T) {
 		method, err := jtc.getMethod(nil, "Test")
 		test.Assert(t, err == nil)
 		test.Assert(t, method.Name == "Test")
+		test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 		test.Assert(t, jtc.svcName == "Mock")
 
 		rw := jtc.getMessageReaderWriter()

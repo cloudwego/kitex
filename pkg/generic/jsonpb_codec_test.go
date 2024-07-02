@@ -25,9 +25,13 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	gproto "github.com/cloudwego/kitex/pkg/generic/proto"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var echoIDLPath = "./jsonpb_test/idl/echo.proto"
+var (
+	echoIDLPath = "./jsonpb_test/idl/echo.proto"
+	testIDLPath = "./grpcjsonpb_test/idl/pbapi.proto"
+)
 
 func TestRun(t *testing.T) {
 	t.Run("TestJsonPbCodec", TestJsonPbCodec)
@@ -46,6 +50,7 @@ func TestJsonPbCodec(t *testing.T) {
 	method, err := jpc.getMethod(nil, "Echo")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Echo")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, jpc.svcName == "Echo")
 
 	rw := jpc.getMessageReaderWriter()
@@ -53,4 +58,28 @@ func TestJsonPbCodec(t *testing.T) {
 	test.Assert(t, ok)
 	_, ok = rw.(gproto.MessageReader)
 	test.Assert(t, ok)
+
+	p, err = NewPbFileProviderWithDynamicGo(testIDLPath, context.Background(), opts)
+	test.Assert(t, err == nil)
+
+	jpc = newJsonPbCodec(p, gOpts)
+	defer jpc.Close()
+
+	method, err = jpc.getMethod(nil, "ClientStreamingTest")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "ClientStreamingTest")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingClient)
+	test.Assert(t, jpc.svcName == "Mock")
+
+	method, err = jpc.getMethod(nil, "ServerStreamingTest")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "ServerStreamingTest")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingServer)
+	test.Assert(t, jpc.svcName == "Mock")
+
+	method, err = jpc.getMethod(nil, "BidirectionalStreamingTest")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "BidirectionalStreamingTest")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingBidirectional)
+	test.Assert(t, jpc.svcName == "Mock")
 }
