@@ -14,17 +14,14 @@
  * limitations under the License.
  */
 
-package generic
+package genericclient
 
 import (
+	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-func StreamingServiceInfo(g Generic) *serviceinfo.ServiceInfo {
-	return newClientStreamingServiceInfo(g)
-}
-
-func newClientStreamingServiceInfo(g Generic) *serviceinfo.ServiceInfo {
+func newClientStreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 	readerWriter := g.MessageReaderWriter()
 	if readerWriter == nil {
 		// TODO: support grpc binary generic
@@ -34,29 +31,61 @@ func newClientStreamingServiceInfo(g Generic) *serviceinfo.ServiceInfo {
 	methods := map[string]serviceinfo.MethodInfo{
 		serviceinfo.GenericClientStreamingMethod: serviceinfo.NewMethodInfo(
 			nil,
-			func() interface{} { return &Args{inner: readerWriter} },
-			func() interface{} { return &Result{inner: readerWriter} },
+			func() interface{} {
+				args := &generic.Args{}
+				args.SetCodec(readerWriter)
+				return args
+			},
+			func() interface{} {
+				result := &generic.Result{}
+				result.SetCodec(readerWriter)
+				return result
+			},
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingClient),
 		),
 		serviceinfo.GenericServerStreamingMethod: serviceinfo.NewMethodInfo(
 			nil,
-			func() interface{} { return &Args{inner: readerWriter} },
-			func() interface{} { return &Result{inner: readerWriter} },
+			func() interface{} {
+				args := &generic.Args{}
+				args.SetCodec(readerWriter)
+				return args
+			},
+			func() interface{} {
+				result := &generic.Result{}
+				result.SetCodec(readerWriter)
+				return result
+			},
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingServer),
 		),
 		serviceinfo.GenericBidirectionalStreamingMethod: serviceinfo.NewMethodInfo(
 			nil,
-			func() interface{} { return &Args{inner: readerWriter} },
-			func() interface{} { return &Result{inner: readerWriter} },
+			func() interface{} {
+				args := &generic.Args{}
+				args.SetCodec(readerWriter)
+				return args
+			},
+			func() interface{} {
+				result := &generic.Result{}
+				result.SetCodec(readerWriter)
+				return result
+			},
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
 		),
 		serviceinfo.GenericMethod: serviceinfo.NewMethodInfo(
-			callHandler,
-			func() interface{} { return &Args{inner: readerWriter} },
-			func() interface{} { return &Result{inner: readerWriter} },
+			nil,
+			func() interface{} {
+				args := &generic.Args{}
+				args.SetCodec(readerWriter)
+				return args
+			},
+			func() interface{} {
+				result := &generic.Result{}
+				result.SetCodec(readerWriter)
+				return result
+			},
 			false,
 		),
 	}
