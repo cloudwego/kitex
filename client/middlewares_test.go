@@ -22,7 +22,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -33,6 +32,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
@@ -140,18 +140,18 @@ func TestDefaultErrorHandler(t *testing.T) {
 	reqCtx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
 	// Test TApplicationException
-	err := DefaultClientErrorHandler(context.Background(), thrift.NewTApplicationException(100, "mock"))
+	err := DefaultClientErrorHandler(context.Background(), bthrift.NewApplicationException(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error[remote]: mock", err.Error())
-	var te thrift.TApplicationException
+	var te *bthrift.ApplicationException
 	ok := errors.As(err, &te)
 	test.Assert(t, ok)
-	test.Assert(t, te.TypeId() == 100)
+	test.Assert(t, te.TypeID() == 100)
 	// Test TApplicationException with remote addr
-	err = ClientErrorHandlerWithAddr(reqCtx, thrift.NewTApplicationException(100, "mock"))
+	err = ClientErrorHandlerWithAddr(reqCtx, bthrift.NewApplicationException(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error[remote-"+tcpAddrStr+"]: mock", err.Error())
 	ok = errors.As(err, &te)
 	test.Assert(t, ok)
-	test.Assert(t, te.TypeId() == 100)
+	test.Assert(t, te.TypeID() == 100)
 
 	// Test PbError
 	err = DefaultClientErrorHandler(context.Background(), protobuf.NewPbError(100, "mock"))
@@ -159,13 +159,13 @@ func TestDefaultErrorHandler(t *testing.T) {
 	var pe protobuf.PBError
 	ok = errors.As(err, &pe)
 	test.Assert(t, ok)
-	test.Assert(t, te.TypeId() == 100)
+	test.Assert(t, te.TypeID() == 100)
 	// Test PbError with remote addr
 	err = ClientErrorHandlerWithAddr(reqCtx, protobuf.NewPbError(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error[remote-"+tcpAddrStr+"]: mock", err.Error())
 	ok = errors.As(err, &pe)
 	test.Assert(t, ok)
-	test.Assert(t, te.TypeId() == 100)
+	test.Assert(t, te.TypeID() == 100)
 
 	// Test status.Error
 	err = DefaultClientErrorHandler(context.Background(), status.Err(100, "mock"))

@@ -37,11 +37,27 @@ func TestApplicationException(t *testing.T) {
 	test.Assert(t, ex2.TypeID() == 1)
 	test.Assert(t, ex2.Msg() == "t1")
 
-	// compatibility test only, can be removed in the future
+	// =================
+	// the code below, it's for compatibility test only.
+	// it can be removed in the future along with Read/Write method
+
 	trans := thrift.NewTMemoryBufferLen(100)
 	proto := thrift.NewTBinaryProtocol(trans, true, true)
-	ex0 := thrift.NewTApplicationException(1, "t1")
-	err = ex0.Write(proto)
+	ex9 := thrift.NewTApplicationException(1, "t1")
+	err = ex9.Write(proto)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, bytes.Equal(b, trans.Bytes()))
+
+	trans = thrift.NewTMemoryBufferLen(100)
+	proto = thrift.NewTBinaryProtocol(trans, true, true)
+	ex3 := NewApplicationException(1, "t1")
+	err = ex3.Write(proto)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, bytes.Equal(b, trans.Bytes()))
+
+	ex4 := NewApplicationException(0, "")
+	err = ex4.Read(proto)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, ex4.TypeID() == 1)
+	test.Assert(t, ex4.Msg() == "t1")
 }
