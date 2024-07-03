@@ -49,6 +49,9 @@ func TestGenericStreamService(t *testing.T) {
 	mtInfo = svcInfo.MethodInfo(serviceinfo.GenericMethod)
 	test.Assert(t, !mtInfo.IsStreaming())
 
-	svcInfo = newClientStreamingServiceInfo(generic.BinaryThriftGeneric())
-	test.Assert(t, svcInfo == nil)
+	test.PanicAt(t, func() {
+		newClientStreamingServiceInfo(generic.BinaryThriftGeneric())
+	}, func(err interface{}) bool {
+		return err.(string) == "binary generic streaming is not supported"
+	})
 }

@@ -25,7 +25,7 @@ func newClientStreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 	readerWriter := g.MessageReaderWriter()
 	if readerWriter == nil {
 		// TODO: support grpc binary generic
-		return nil
+		panic("binary generic streaming is not supported")
 	}
 
 	methods := map[string]serviceinfo.MethodInfo{
