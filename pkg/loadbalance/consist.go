@@ -18,6 +18,7 @@ package loadbalance
 
 import (
 	"context"
+	"github.com/cloudwego/kitex/pkg/loadbalance/newconsist"
 	"sort"
 	"sync"
 	"time"
@@ -26,7 +27,6 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 /*
@@ -136,7 +136,7 @@ func (v *vNodeType) Swap(i, j int) {
 
 type consistPicker struct {
 	cb   *consistBalancer
-	info *consistInfo
+	info *newconsist.ConsistInfo
 	// index  int
 	// result *consistResult
 }
@@ -159,15 +159,14 @@ func (cp *consistPicker) Recycle() {
 
 // Next is not concurrency safe.
 func (cp *consistPicker) Next(ctx context.Context, request interface{}) discovery.Instance {
-	if len(cp.info.realNodes) == 0 {
+	if cp.info.IsEmpty() {
 		return nil
 	}
 	key := cp.cb.opt.GetKey(ctx, request)
 	if key == "" {
 		return nil
 	}
-	res := buildConsistResult(cp.info, xxhash3.HashString(key))
-	return res.Primary
+	return cp.info.BuildConsistentResult(xxhash3.HashString(key))
 	// Todo(DMwangnima): Optimise Replica-related logic
 	// This comment part is previous implementation considering connecting to Replica
 	// Since we would create a new picker each time, the Replica logic is unreachable, so just comment it out for now
@@ -255,7 +254,7 @@ func NewConsistBalancer(opt ConsistentHashOption) Loadbalancer {
 
 // GetPicker implements the Loadbalancer interface.
 func (cb *consistBalancer) GetPicker(e discovery.Result) Picker {
-	var ci *consistInfo
+	var ci *newconsist.ConsistInfo
 	if e.Cacheable {
 		cii, ok := cb.cachedConsistInfo.Load(e.CacheKey)
 		if !ok {
@@ -264,7 +263,7 @@ func (cb *consistBalancer) GetPicker(e discovery.Result) Picker {
 			})
 			cb.cachedConsistInfo.Store(e.CacheKey, cii)
 		}
-		ci = cii.(*consistInfo)
+		ci = cii.(*newconsist.ConsistInfo)
 	} else {
 		ci = cb.newConsistInfo(e)
 	}
@@ -274,75 +273,8 @@ func (cb *consistBalancer) GetPicker(e discovery.Result) Picker {
 	return picker
 }
 
-func (cb *consistBalancer) newConsistInfo(e discovery.Result) *consistInfo {
-	ci := &consistInfo{}
-	ci.realNodes, ci.virtualNodes = cb.buildNodes(e.Instances)
-	return ci
-}
-
-func (cb *consistBalancer) buildNodes(ins []discovery.Instance) ([]realNode, []virtualNode) {
-	ret := make([]realNode, len(ins))
-	for i := range ins {
-		ret[i].Ins = ins[i]
-	}
-	return ret, cb.buildVirtualNodes(ret)
-}
-
-func (cb *consistBalancer) buildVirtualNodes(rNodes []realNode) []virtualNode {
-	totalLen := 0
-	for i := range rNodes {
-		totalLen += cb.getVirtualNodeLen(rNodes[i])
-	}
-
-	ret := make([]virtualNode, totalLen)
-	if totalLen == 0 {
-		return ret
-	}
-	maxLen, maxSerial := 0, 0
-	for i := range rNodes {
-		if len(rNodes[i].Ins.Address().String()) > maxLen {
-			maxLen = len(rNodes[i].Ins.Address().String())
-		}
-		if vNodeLen := cb.getVirtualNodeLen(rNodes[i]); vNodeLen > maxSerial {
-			maxSerial = vNodeLen
-		}
-	}
-	l := maxLen + 1 + utils.GetUIntLen(uint64(maxSerial)) // "$address + # + itoa(i)"
-	// pre-allocate []byte here, and reuse it to prevent memory allocation.
-	b := make([]byte, l)
-
-	// record the start index.
-	cur := 0
-	for i := range rNodes {
-		bAddr := utils.StringToSliceByte(rNodes[i].Ins.Address().String())
-		// Assign the first few bits of b to string.
-		copy(b, bAddr)
-
-		// Initialize the last few bits, skipping '#'.
-		for j := len(bAddr) + 1; j < len(b); j++ {
-			b[j] = 0
-		}
-		b[len(bAddr)] = '#'
-
-		vLen := cb.getVirtualNodeLen(rNodes[i])
-		for j := 0; j < vLen; j++ {
-			k := j
-			cnt := 0
-			// Assign values to b one by one, starting with the last one.
-			for k > 0 {
-				b[l-1-cnt] = byte(k % 10)
-				k /= 10
-				cnt++
-			}
-			// At this point, the index inside ret should be cur + j.
-			index := cur + j
-			ret[index].hash = xxhash3.Hash(b)
-			ret[index].RealNode = &rNodes[i]
-		}
-		cur += vLen
-	}
-	sort.Sort(&vNodeType{s: ret})
-	return ret
+func (cb *consistBalancer) newConsistInfo(e discovery.Result) *newconsist.ConsistInfo {
+	return newconsist.NewConsistInfo(e, newconsist.ConsistInfoConfig{VirtualFactor: cb.opt.VirtualFactor, Weighted: cb.opt.Weighted})
 }
 
 // get virtual node number from one realNode.
@@ -364,9 +296,11 @@ func (cb *consistBalancer) Rebalance(change discovery.Change) {
 	if !change.Result.Cacheable {
 		return
 	}
-	// TODO: Use TreeMap to optimize performance when updating.
-	// Now, due to the lack of a good red-black tree implementation, we can only build the full amount once per update.
-	cb.updateConsistInfo(change.Result)
+	if ci, ok := cb.cachedConsistInfo.Load(change.Result.CacheKey); ok {
+		ci.(*newconsist.ConsistInfo).Rebalance(change)
+	} else {
+		cb.updateConsistInfo(change.Result)
+	}
 }
 
 // Delete implements the Rebalancer interface.

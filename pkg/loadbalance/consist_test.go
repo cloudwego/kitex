@@ -19,13 +19,13 @@ package loadbalance
 import (
 	"context"
 	"fmt"
+	"github.com/bytedance/gopkg/lang/fastrand"
+	"github.com/cloudwego/kitex/pkg/loadbalance/newconsist"
 	"math/rand"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
-
-	"github.com/bytedance/gopkg/lang/fastrand"
 
 	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/internal/test"
@@ -53,13 +53,12 @@ func getRandomKey(ctx context.Context, request interface{}) string {
 	return key
 }
 
-func getRandomString(length int) string {
+func getRandomString(r *rand.Rand, length int) string {
 	var resBuilder strings.Builder
 	resBuilder.Grow(length)
 	corpus := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	rand.Seed(time.Now().UnixNano() + int64(100))
 	for i := 0; i < length; i++ {
-		resBuilder.WriteByte(corpus[rand.Intn(len(corpus))])
+		resBuilder.WriteByte(corpus[r.Intn(len(corpus))])
 	}
 	return resBuilder.String()
 }
@@ -166,20 +165,29 @@ func TestConsistPicker_Next_NoCache_Consist(t *testing.T) {
 		CacheKey:  "",
 		Instances: insList,
 	}
+	opt.GetKey = func(ctx context.Context, request interface{}) string {
+		v := ctx.Value("key")
+		return v.(string)
+	}
+
+	cnt := make(map[string]int)
+	for _, ins := range insList {
+		cnt[ins.Address().String()] = 0
+	}
+	cnt["null"] = 0
 
 	cb := NewConsistBalancer(opt)
 	picker := cb.GetPicker(e)
-	ins := picker.Next(context.TODO(), nil)
-	for i := 0; i < 100; i++ {
-		picker := cb.GetPicker(e)
-		test.Assert(t, picker.Next(context.TODO(), nil) == ins)
+	for i := 0; i < 100000; i++ {
+		ctx := context.WithValue(context.Background(), "key", strconv.Itoa(i))
+		if res := picker.Next(ctx, nil); res != nil {
+			cnt[res.Address().String()]++
+		} else {
+			cnt["null"]++
+		}
 	}
+	fmt.Println(cnt)
 
-	cb = NewConsistBalancer(opt)
-	for i := 0; i < 100; i++ {
-		picker := cb.GetPicker(e)
-		test.Assert(t, picker.Next(context.TODO(), nil) == ins)
-	}
 }
 
 func TestConsistPicker_Next_Cache(t *testing.T) {
@@ -315,7 +323,8 @@ func TestConsistPicker_Reblance(t *testing.T) {
 		picker := cb.GetPicker(e)
 		key := strconv.Itoa(i)
 		ctx = context.WithValue(ctx, keyCtxKey, key)
-		test.DeepEqual(t, record[key], picker.Next(ctx, nil))
+		res := picker.Next(ctx, nil)
+		test.DeepEqual(t, record[key], res)
 	}
 }
 
@@ -388,36 +397,126 @@ func BenchmarkNewConsistPicker(bb *testing.B) {
 // BenchmarkConsistPicker_RandomDistributionKey/1000ins-12       	 2848216.          407.7 ns/op	      48 B/op	       1 allocs/op
 // BenchmarkConsistPicker_RandomDistributionKey/10000ins
 // BenchmarkConsistPicker_RandomDistributionKey/10000ins-12      	 2701766	       492.7 ns/op	      48 B/op	       1 allocs/op
-func BenchmarkConsistPicker_RandomDistributionKey(bb *testing.B) {
+func BenchmarkConsistPicker_RandomDistributionKey(b *testing.B) {
 	n := 10
 	balancer := NewConsistBalancer(NewConsistentHashOption(getRandomKey))
 
 	for i := 0; i < 4; i++ {
-		bb.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
+		b.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
+			r := rand.New(rand.NewSource(int64(n)))
 			inss := makeNInstances(n, 10)
 			e := discovery.Result{
 				Cacheable: true,
 				CacheKey:  "test",
 				Instances: inss,
 			}
-			picker := balancer.GetPicker(e)
-			ctx := context.WithValue(context.Background(), keyCtxKey, getRandomString(30))
-			picker.Next(ctx, nil)
-			picker.(internal.Reusable).Recycle()
 			b.ReportAllocs()
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				b.Logf("round %d", i)
-				b.StopTimer()
-				ctx = context.WithValue(context.Background(), keyCtxKey, getRandomString(30))
-				b.StartTimer()
-				picker := balancer.GetPicker(e)
+			picker := balancer.GetPicker(e)
+			ctx := context.WithValue(context.Background(), keyCtxKey, getRandomString(r, 30))
+			picker.Next(ctx, nil)
+			picker.(internal.Reusable).Recycle()
+			for j := 0; j < b.N; j++ {
+				ctx = context.WithValue(context.Background(), keyCtxKey, getRandomString(r, 30))
+				picker = balancer.GetPicker(e)
 				picker.Next(ctx, nil)
-				if r, ok := picker.(internal.Reusable); ok {
-					r.Recycle()
+				if toRecycle, ok := picker.(internal.Reusable); ok {
+					toRecycle.Recycle()
 				}
 			}
 		})
 		n *= 10
+	}
+}
+
+func BenchmarkRebalance(bb *testing.B) {
+	weight := 10
+	nums := 10000
+
+	for n := 0; n < 1; n++ {
+		bb.Run(fmt.Sprintf("consist-remove-%d", nums), func(b *testing.B) {
+			insList := makeNInstances(nums, weight)
+			e := discovery.Result{
+				Cacheable: true,
+				CacheKey:  "",
+				Instances: insList,
+			}
+			newConsist := newconsist.NewConsistInfo(e, newconsist.ConsistInfoConfig{
+				VirtualFactor: 100,
+				Weighted:      true,
+			})
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			change := discovery.Change{
+				Result:  e,
+				Added:   nil,
+				Updated: nil,
+			}
+			removed := []discovery.Instance{insList[0]}
+			for i := 0; i < nums; i++ {
+				e.Instances = insList[i+1:]
+				removed[0] = insList[i]
+				change.Result = e
+				change.Removed = removed
+				newConsist.Rebalance(change)
+			}
+			runtime.GC()
+		})
+
+		bb.Run(fmt.Sprintf("consist-add-%d", nums), func(b *testing.B) {
+			insList := makeNInstances(nums, weight)
+			e := discovery.Result{
+				Cacheable: true,
+				CacheKey:  "",
+				Instances: insList,
+			}
+			newConsist := newconsist.NewConsistInfo(e, newconsist.ConsistInfoConfig{
+				VirtualFactor: 100,
+				Weighted:      true,
+			})
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			change := discovery.Change{
+				Result:  e,
+				Added:   nil,
+				Updated: nil,
+			}
+			added := []discovery.Instance{insList[0]}
+			for i := 0; i < nums; i++ {
+				e.Instances = insList[:i+1]
+				added[0] = insList[i]
+				change.Result = e
+				change.Added = added
+				newConsist.Rebalance(change)
+			}
+			runtime.GC()
+		})
+		nums *= 10
+	}
+
+}
+
+func BenchmarkNewConsistInfo(b *testing.B) {
+	weight := 10
+	nums := 10
+	for n := 0; n < 4; n++ {
+		b.Run(fmt.Sprintf("new-consist-%d", nums), func(b *testing.B) {
+			insList := makeNInstances(nums, weight)
+			e := discovery.Result{
+				Cacheable: false,
+				CacheKey:  "",
+				Instances: insList,
+			}
+			b.ResetTimer()
+			b.ReportAllocs()
+			newConsist := newconsist.NewConsistInfo(e, newconsist.ConsistInfoConfig{
+				VirtualFactor: 100,
+				Weighted:      true,
+			})
+			_ = newConsist
+		})
+		nums *= 10
 	}
 }

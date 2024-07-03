@@ -219,7 +219,7 @@ func TestWeightedPicker_NoMoreInstance(t *testing.T) {
 
 func makeNInstances(n, weight int) (res []discovery.Instance) {
 	for i := 0; i < n; i++ {
-		res = append(res, discovery.NewInstance("tcp", fmt.Sprintf("addr[%d]-weight[%d]", i, weight), weight, nil))
+		res = append(res, discovery.NewInstance("tcp", strconv.Itoa(i), weight, nil))
 	}
 	return
 }
