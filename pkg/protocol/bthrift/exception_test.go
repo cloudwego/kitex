@@ -18,6 +18,7 @@ package bthrift
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -60,4 +61,42 @@ func TestApplicationException(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, ex4.TypeID() == 1)
 	test.Assert(t, ex4.Msg() == "t1")
+}
+
+func TestPrependError(t *testing.T) {
+	var ok bool
+	ex0 := NewTransportException(1, "world")
+	err0 := PrependError("hello ", ex0)
+	ex0, ok = err0.(*TransportException)
+	test.Assert(t, ok)
+	test.Assert(t, ex0.TypeID() == 1)
+	test.Assert(t, ex0.Error() == "hello world")
+
+	ex1 := NewProtocolException(2, "world")
+	err1 := PrependError("hello ", ex1)
+	ex1, ok = err1.(*ProtocolException)
+	test.Assert(t, ok)
+	test.Assert(t, ex1.TypeID() == 2)
+	test.Assert(t, ex1.Error() == "hello world")
+
+	ex2 := NewApplicationException(3, "world")
+	err2 := PrependError("hello ", ex2)
+	ex2, ok = err2.(*ApplicationException)
+	test.Assert(t, ok)
+	test.Assert(t, ex2.TypeID() == 3)
+	test.Assert(t, ex2.Error() == "hello world")
+
+	err3 := PrependError("hello ", errors.New("world"))
+	_, ok = err3.(tException)
+	test.Assert(t, !ok)
+	test.Assert(t, err3.Error() == "hello world")
+
+	// the code below, it's for compatibility test only.
+	// it can be removed in the future along with Read/Write method
+	ex9 := thrift.NewTApplicationException(9, "world")
+	err9 := PrependError("hello ", ex9)
+	ex, ok := err9.(tException)
+	test.Assert(t, ok)
+	test.Assert(t, ex.TypeId() == 9)
+	test.Assert(t, ex.Error() == "hello world")
 }

@@ -17,12 +17,13 @@
 package bthrift
 
 import (
+	"errors"
 	"fmt"
 
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
-// ApplicationException represents the application exception decoder for replacing apache.TApplicationException
+// ApplicationException is for replacing apache.TApplicationException
 // it implements ThriftMsgFastCodec interface.
 type ApplicationException struct {
 	t int32
@@ -176,4 +177,55 @@ func (e *ApplicationException) Error() string {
 		return m
 	}
 	return fmt.Sprintf("unknown exception type [%d]", e.t)
+}
+
+// TransportException is for replacing apache.TransportException
+// it implements ThriftMsgFastCodec interface.
+type TransportException struct {
+	ApplicationException // same implementation ...
+}
+
+// NewTransportException ...
+func NewTransportException(t int32, m string) *TransportException {
+	ret := TransportException{}
+	ret.t = t
+	ret.m = m
+	return &ret
+}
+
+// ProtocolException is for replacing apache.ProtocolException
+// it implements ThriftMsgFastCodec interface.
+type ProtocolException struct {
+	ApplicationException // same implementation ...
+}
+
+// NewTransportException ...
+func NewProtocolException(t int32, m string) *ProtocolException {
+	ret := ProtocolException{}
+	ret.t = t
+	ret.m = m
+	return &ret
+}
+
+// Generic Thrift exception with TypeId method
+type tException interface {
+	Error() string
+	TypeId() int32
+}
+
+// Prepends additional information to an error without losing the Thrift exception interface
+func PrependError(prepend string, err error) error {
+	if t, ok := err.(*TransportException); ok {
+		return NewTransportException(t.TypeID(), prepend+t.Error())
+	}
+	if t, ok := err.(*ProtocolException); ok {
+		return NewProtocolException(t.TypeID(), prepend+err.Error())
+	}
+	if t, ok := err.(*ApplicationException); ok {
+		return NewApplicationException(t.TypeID(), prepend+t.Error())
+	}
+	if t, ok := err.(tException); ok { // apache thrift exception?
+		return NewApplicationException(t.TypeId(), prepend+t.Error())
+	}
+	return errors.New(prepend + err.Error())
 }
