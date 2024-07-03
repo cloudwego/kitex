@@ -94,7 +94,8 @@ type genericServiceClient struct {
 
 func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, request interface{}, callOptions ...callopt.Option) (response interface{}, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	_args := gc.svcInfo.MethodInfo(method).NewArgs().(*generic.Args)
+	mtInfo := gc.svcInfo.MethodInfo(method)
+	_args := mtInfo.NewArgs().(*generic.Args)
 	_args.Method = method
 	_args.Request = request
 
@@ -106,7 +107,7 @@ func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, 
 		return nil, gc.kClient.Call(ctx, mt.Name, _args, nil)
 	}
 
-	_result := gc.svcInfo.MethodInfo(method).NewResult().(*generic.Result)
+	_result := mtInfo.NewResult().(*generic.Result)
 	if err = gc.kClient.Call(ctx, mt.Name, _args, _result); err != nil {
 		return
 	}
