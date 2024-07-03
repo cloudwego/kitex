@@ -119,7 +119,7 @@ func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Method{function.Name, function.Oneway}, nil
+	return &Method{function.Name, function.Oneway, function.StreamingMode}, nil
 }
 
 func (c *httpThriftCodec) Name() string {
@@ -130,7 +130,7 @@ func (c *httpThriftCodec) Close() error {
 	return c.provider.Close()
 }
 
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
 func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
@@ -147,7 +147,7 @@ func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out r
 	return thriftCodec.Marshal(ctx, msg, out)
 }
 
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
 func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err

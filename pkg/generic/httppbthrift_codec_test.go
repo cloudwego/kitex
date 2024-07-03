@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 // TestFromHTTPPbRequest this test is to make sure mockey can work.
@@ -72,6 +73,7 @@ func TestHTTPPbThriftCodec(t *testing.T) {
 	method, err = htc.getMethod(hreq)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, method.Name == "Echo")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, htc.svcName == "ExampleService")
 
 	rw := htc.getMessageReaderWriter()
