@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -86,7 +85,7 @@ func (c *httpPbThriftCodec) getMethod(req interface{}) (*Method, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Method{function.Name, function.Oneway}, nil
+	return &Method{function.Name, function.Oneway, function.StreamingMode}, nil
 }
 
 func (c *httpPbThriftCodec) getMessageReaderWriter() interface{} {
@@ -122,7 +121,7 @@ func (c *httpPbThriftCodec) Close() error {
 	}
 }
 
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
 func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
@@ -138,7 +137,7 @@ func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 	return thriftCodec.Marshal(ctx, msg, out)
 }
 
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
 func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
@@ -177,7 +176,7 @@ func FromHTTPPbRequest(req *http.Request) (*HTTPRequest, error) {
 		// body == nil if from Get request
 		return customReq, nil
 	}
-	if customReq.RawBody, err = ioutil.ReadAll(b); err != nil {
+	if customReq.RawBody, err = io.ReadAll(b); err != nil {
 		return nil, err
 	}
 	if len(customReq.RawBody) == 0 {

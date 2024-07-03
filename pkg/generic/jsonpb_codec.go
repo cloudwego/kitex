@@ -81,7 +81,7 @@ func (c *jsonPbCodec) getMethod(req interface{}, method string) (*Method, error)
 	}
 
 	// protobuf does not have oneway methods
-	return &Method{method, false}, nil
+	return &Method{method, false, getStreamingMode(fnSvc)}, nil
 }
 
 func (c *jsonPbCodec) Name() string {
@@ -92,7 +92,7 @@ func (c *jsonPbCodec) Close() error {
 	return c.provider.Close()
 }
 
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
 func (c *jsonPbCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
 	method := msg.RPCInfo().Invocation().MethodName()
 	if method == "" {
@@ -110,7 +110,7 @@ func (c *jsonPbCodec) Marshal(ctx context.Context, msg remote.Message, out remot
 	return pbCodec.Marshal(ctx, msg, out)
 }
 
-// Deprecated: it's not used by kitex anymore. replaced by GetMessageReaderWriter
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
 func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
@@ -122,4 +122,18 @@ func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in remo
 	msg.Data().(WithCodec).SetCodec(wm)
 
 	return pbCodec.Unmarshal(ctx, msg, in)
+}
+
+func getStreamingMode(fnSvc *dproto.MethodDescriptor) serviceinfo.StreamingMode {
+	streamingMode := serviceinfo.StreamingNone
+	isClientStreaming := fnSvc.IsClientStreaming()
+	isServerStreaming := fnSvc.IsServerStreaming()
+	if isClientStreaming && isServerStreaming {
+		streamingMode = serviceinfo.StreamingBidirectional
+	} else if isClientStreaming {
+		streamingMode = serviceinfo.StreamingClient
+	} else if isServerStreaming {
+		streamingMode = serviceinfo.StreamingServer
+	}
+	return streamingMode
 }

@@ -21,6 +21,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 func TestMapThriftCodec(t *testing.T) {
@@ -33,6 +34,7 @@ func TestMapThriftCodec(t *testing.T) {
 	method, err := mtc.getMethod(nil, "Test")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Test")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, mtc.svcName == "Mock")
 
 	rw := mtc.getMessageReaderWriter()
@@ -52,6 +54,7 @@ func TestMapThriftCodecSelfRef(t *testing.T) {
 	method, err := mtc.getMethod(nil, "Test")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Test")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, mtc.svcName == "Mock")
 
 	rw := mtc.getMessageReaderWriter()
@@ -71,6 +74,7 @@ func TestMapThriftCodecForJSON(t *testing.T) {
 	method, err := mtc.getMethod(nil, "Test")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Test")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, mtc.svcName == "Mock")
 
 	rw := mtc.getMessageReaderWriter()
