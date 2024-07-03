@@ -49,8 +49,9 @@ type Generic interface {
 
 // Method information
 type Method struct {
-	Name   string
-	Oneway bool
+	Name          string
+	Oneway        bool
+	StreamingMode serviceinfo.StreamingMode
 }
 
 // BinaryThriftGeneric raw thrift binary Generic
@@ -217,7 +218,7 @@ func (g *binaryThriftGeneric) PayloadCodec() remote.PayloadCodec {
 }
 
 func (g *binaryThriftGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return &Method{method, false}, nil
+	return &Method{Name: method, Oneway: false}, nil
 }
 
 func (g *binaryThriftGeneric) Close() error {

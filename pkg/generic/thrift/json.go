@@ -84,7 +84,7 @@ func (m *WriteJSON) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options)
 func (m *WriteJSON) originalWrite(ctx context.Context, out thrift.TProtocol, msg interface{}, method string, isClient bool, requestBase *Base) error {
 	fnDsc, err := m.svcDsc.LookupFunctionByMethod(method)
 	if err != nil {
-		return fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, m.svcDsc.DynamicGoDsc.Name())
+		return fmt.Errorf("missing method: %s in service: %s", method, m.svcDsc.Name)
 	}
 	typeDsc := fnDsc.Request
 	if !isClient {
