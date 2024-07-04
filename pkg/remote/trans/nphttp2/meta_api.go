@@ -129,8 +129,6 @@ func receiveHeaderAndTrailer(ctx context.Context, conn net.Conn) context.Context
 			// If using GRPCHeader(), set the value directly
 			hd := h.(*metadata.MD)
 			*hd = md
-		} else {
-			ctx = context.WithValue(ctx, headerKey{}, &md)
 		}
 	}
 	if md := conn.(hasTrailer).Trailer(); md != nil {
@@ -138,8 +136,6 @@ func receiveHeaderAndTrailer(ctx context.Context, conn net.Conn) context.Context
 			// If using GRPCTrailer(), set the value directly
 			tr := t.(*metadata.MD)
 			*tr = md
-		} else {
-			ctx = context.WithValue(ctx, trailerKey{}, &md)
 		}
 	}
 	return ctx
