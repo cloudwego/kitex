@@ -157,9 +157,8 @@ func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, v
 	return l + len(value)
 }
 
-func (binaryProtocol) MessageBeginLength(name string, typeID thrift.TMessageType, seqid int32) int {
-	version := uint32(thrift.VERSION_1) | uint32(typeID)
-	return Binary.I32Length(int32(version)) + Binary.StringLength(name) + Binary.I32Length(seqid)
+func (binaryProtocol) MessageBeginLength(name string, _ thrift.TMessageType, _ int32) int {
+	return 4 + Binary.StringLength(name) + 4
 }
 
 func (binaryProtocol) MessageEndLength() int {
