@@ -43,8 +43,6 @@ func main() {
 var MainMultipleServicesTpl string = `package main
 
 import (
-    "github.com/cloudwego/kitex/pkg/server"
-
 	{{- range $path, $aliases := .Imports}}
 		{{- if not $aliases}}
 			"{{$path}}"
