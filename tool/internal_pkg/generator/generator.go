@@ -375,7 +375,10 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		if err != nil {
 			return nil, err
 		}
-		fs = append(fs, f)
+		// when there is no new method, f would be nil
+		if f != nil {
+			fs = append(fs, f)
+		}
 	} else {
 		for _, svc := range pkg.Services {
 			// set the target service
@@ -385,7 +388,10 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 			if err != nil {
 				return nil, err
 			}
-			fs = append(fs, f)
+			// when there is no new method, f would be nil
+			if f != nil {
+				fs = append(fs, f)
+			}
 		}
 	}
 	return

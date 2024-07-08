@@ -109,6 +109,8 @@ type ServiceInfo struct {
 	UseThriftReflection   bool
 	// for multiple services scenario, the reference name for the service
 	RefName string
+	// identify whether this service would generate a corresponding handler.
+	GenerateHandler bool
 }
 
 // AllMethods returns all methods that the service have.

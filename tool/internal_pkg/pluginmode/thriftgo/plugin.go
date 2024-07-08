@@ -17,6 +17,7 @@ package thriftgo
 import (
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"os"
 
 	"github.com/cloudwego/thriftgo/plugin"
@@ -91,10 +92,14 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 			// if -multiple-services is not set, specify the last service as the target service
 			conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
 		} else {
-			conv.Package.Services = conv.Services
-			for _, svc := range conv.Package.Services {
-				svc.RefName = "service" + svc.ServiceName
+			var svcs []*generator.ServiceInfo
+			for _, svc := range conv.Services {
+				if svc.GenerateHandler {
+					svc.RefName = "service" + svc.ServiceName
+					svcs = append(svcs, svc)
+				}
 			}
+			conv.Package.Services = svcs
 		}
 		fs, err := gen.GenerateMainPackage(&conv.Package)
 		if err != nil {
@@ -119,6 +124,7 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		Warnings: conv.Warnings,
 	}
 	for _, f := range files {
+		log.Warnf("f: %+v", f)
 		res.Contents = append(res.Contents, &plugin.Generated{
 			Name:    &f.Name,
 			Content: f.Content,
