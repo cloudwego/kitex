@@ -19,8 +19,10 @@ package fastthrift
 import (
 	"testing"
 
-	mocks "github.com/cloudwego/kitex/internal/mocks/thrift/fast"
+	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 var (
@@ -47,6 +49,35 @@ func TestFastThrift(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, req1.Msg == req2.Msg)
 	test.Assert(t, len(req1.StrList) == len(req2.StrList))
+}
+
+func TestMarshalMsg(t *testing.T) {
+	// CALL and REPLY
+
+	req := &mocks.MockReq{}
+	req.Msg = "Hello"
+	b, err := MarshalMsg("Echo", CALL, 1, req)
+	test.Assert(t, err == nil, err)
+
+	resp := &mocks.MockReq{}
+	method, seq, err := UnmarshalMsg(b, resp)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, method == "Echo", method)
+	test.Assert(t, seq == 1, seq)
+	test.Assert(t, resp.Msg == req.Msg, resp.Msg)
+
+	// EXCEPTION
+
+	ex := bthrift.NewApplicationException(thrift.WRONG_METHOD_NAME, "Ex!")
+	b, err = MarshalMsg("ExMethod", EXCEPTION, 2, ex)
+	test.Assert(t, err == nil, err)
+	method, seq, err = UnmarshalMsg(b, nil)
+	test.Assert(t, err != nil)
+	test.Assert(t, method == "ExMethod")
+	test.Assert(t, seq == 2)
+	e, ok := err.(*bthrift.ApplicationException)
+	test.Assert(t, ok)
+	test.Assert(t, e.TypeID() == ex.TypeID() && e.Error() == ex.Error())
 }
 
 func BenchmarkFastUnmarshal(b *testing.B) {

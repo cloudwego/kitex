@@ -51,7 +51,7 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 
 	// encode with FastWrite
 	if c.CodecType&FastWrite != 0 {
-		if msg, ok := data.(ThriftMsgFastCodec); ok {
+		if msg, ok := data.(bthrift.ThriftFastCodec); ok {
 			payloadSize := msg.BLength()
 			payload := mcache.Malloc(payloadSize)
 			msg.FastWriteNocopy(payload, nil)
@@ -146,12 +146,12 @@ func (c thriftCodec) fastMessageUnmarshalAvailable(data interface{}, payloadLen 
 	if payloadLen == 0 && c.CodecType&EnableSkipDecoder == 0 {
 		return false
 	}
-	_, ok := data.(ThriftMsgFastCodec)
+	_, ok := data.(bthrift.ThriftFastCodec)
 	return ok
 }
 
 func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, dataLen int) error {
-	msg := data.(ThriftMsgFastCodec)
+	msg := data.(bthrift.ThriftFastCodec)
 	if dataLen > 0 {
 		buf, err := tProt.next(dataLen)
 		if err != nil {

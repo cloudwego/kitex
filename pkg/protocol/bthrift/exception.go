@@ -24,7 +24,7 @@ import (
 )
 
 // ApplicationException is for replacing apache.TApplicationException
-// it implements ThriftMsgFastCodec interface.
+// it implements ThriftFastCodec interface.
 type ApplicationException struct {
 	t int32
 	m string
@@ -180,7 +180,7 @@ func (e *ApplicationException) Error() string {
 }
 
 // TransportException is for replacing apache.TransportException
-// it implements ThriftMsgFastCodec interface.
+// it implements ThriftFastCodec interface.
 type TransportException struct {
 	ApplicationException // same implementation ...
 }
@@ -194,7 +194,7 @@ func NewTransportException(t int32, m string) *TransportException {
 }
 
 // ProtocolException is for replacing apache.ProtocolException
-// it implements ThriftMsgFastCodec interface.
+// it implements ThriftFastCodec interface.
 type ProtocolException struct {
 	ApplicationException // same implementation ...
 }

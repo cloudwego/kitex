@@ -111,7 +111,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 
 	// encode with FastWrite
 	if c.CodecType&FastWrite != 0 {
-		if msg, ok := data.(ThriftMsgFastCodec); ok {
+		if msg, ok := data.(bthrift.ThriftFastCodec); ok {
 			return encodeFastThrift(out, methodName, msgType, seqID, msg)
 		}
 	}
@@ -131,7 +131,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 }
 
 // encodeFastThrift encode with the FastCodec way
-func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.MessageType, seqID int32, msg ThriftMsgFastCodec) error {
+func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.MessageType, seqID int32, msg bthrift.ThriftFastCodec) error {
 	nw, _ := out.(remote.NocopyWrite)
 	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
 	msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
@@ -259,11 +259,9 @@ type MessageReaderWithMethodWithContext interface {
 	Read(ctx context.Context, method string, dataLen int, oprot thrift.TProtocol) error
 }
 
-type ThriftMsgFastCodec interface {
-	BLength() int
-	FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int
-	FastRead(buf []byte) (int, error)
-}
+// ThriftMsgFastCodec ...
+// Deprecated: use `bthrift.ThriftFastCodec`
+type ThriftMsgFastCodec = bthrift.ThriftFastCodec
 
 func getValidData(methodName string, message remote.Message) (interface{}, error) {
 	if err := codec.NewDataIfNeeded(methodName, message); err != nil {
