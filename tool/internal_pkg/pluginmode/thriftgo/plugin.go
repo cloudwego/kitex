@@ -17,8 +17,9 @@ package thriftgo
 import (
 	"errors"
 	"fmt"
-	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"os"
+
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 
 	"github.com/cloudwego/thriftgo/plugin"
 
