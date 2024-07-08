@@ -254,7 +254,7 @@ func (g *binaryProtobufGeneric) PayloadCodec() remote.PayloadCodec {
 }
 
 func (g *binaryProtobufGeneric) GetMethod(req interface{}, method string) (*Method, error) {
-	return &Method{method, false}, nil
+	return &Method{Name: method, Oneway: false}, nil
 }
 
 func (g *binaryProtobufGeneric) Close() error {

@@ -134,8 +134,7 @@ func readBasicExampleReqProtoBufData() []byte {
 }
 
 func constructBasicExampleReqObject() *base.BasicExample {
-	req := new(base.BasicExample)
-	req = &base.BasicExample{
+	req := &base.BasicExample{
 		Int32:        123,
 		Int64:        123,
 		Uint32:       uint32(math.MaxInt32),
