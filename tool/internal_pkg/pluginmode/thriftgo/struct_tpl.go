@@ -145,19 +145,19 @@ func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
 	{{- end}}
 	return offset, nil
 ReadStructBeginError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
 ReadFieldBeginError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 {{- if gt (len .Fields) 0}}
 ReadFieldError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_{{$TypeName}}[fieldId]), err)
+	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_{{$TypeName}}[fieldId]), err)
 {{- end}}
 SkipFieldError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+	return offset, bthrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 ReadFieldEndError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+	return offset, bthrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
 ReadStructEndError:
-	return offset, thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
 {{- if $NeedRequiredFieldNotSetError }}
 RequiredFieldNotSetError:
 	return offset, thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("required field %s is not set", fieldIDToName_{{$TypeName}}[fieldId]))

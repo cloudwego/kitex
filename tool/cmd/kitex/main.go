@@ -49,7 +49,7 @@ func init() {
 	if err := versions.RegisterMinDepVersion(
 		&versions.MinDepVersion{
 			RefPath: "github.com/cloudwego/kitex",
-			Version: "v0.9.0",
+			Version: "v0.11.0",
 		},
 	); err != nil {
 		log.Warn(err)
