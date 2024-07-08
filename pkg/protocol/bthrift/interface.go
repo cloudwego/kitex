@@ -26,6 +26,13 @@ type BinaryWriter interface {
 	WriteDirect(b []byte, remainCap int) error
 }
 
+// ThriftFastCodec represents the interface of thrift fastcodec generated structs
+type ThriftFastCodec interface {
+	BLength() int
+	FastWriteNocopy(buf []byte, binaryWriter BinaryWriter) int
+	FastRead(buf []byte) (int, error)
+}
+
 // BTProtocol .
 type BTProtocol interface {
 	WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int
