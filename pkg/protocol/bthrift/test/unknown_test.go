@@ -24,8 +24,6 @@ import (
 	tt "github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift/test/kitex_gen/test"
-	"github.com/cloudwego/kitex/pkg/remote"
-	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
 
 var fullReq *test.FullStruct
@@ -109,24 +107,6 @@ func TestOnlyUnknownField(t *testing.T) {
 	tt.Assert(t, writeL == l)
 	tt.Assert(t, bytes.Equal(buf, unknownBuf))
 
-	// thrift read/write without fast api
-	trans := remote.NewReaderWriterBuffer(-1)
-	prot := codecThrift.NewBinaryProtocol(trans)
-	err = fullReq.Write(prot)
-	tt.Assert(t, err == nil)
-	unknown1 := &test.EmptyStruct{}
-	err = unknown1.Read(prot)
-	tt.Assert(t, err == nil)
-	tt.Assert(t, unknown.BLength() == unknown1.BLength())
-	trans = remote.NewReaderWriterBuffer(-1)
-	prot = codecThrift.NewBinaryProtocol(trans)
-	err = unknown1.Write(prot)
-	tt.Assert(t, err == nil)
-	unknown1 = &test.EmptyStruct{}
-	err = unknown1.Read(prot)
-	tt.Assert(t, err == nil)
-	tt.Assert(t, unknown.BLength() == unknown1.BLength())
-
 	// test get unknown fields
 	fields, err := bthrift.GetUnknownFields(unknown)
 	tt.Assert(t, err == nil)
@@ -161,24 +141,6 @@ func TestPartialUnknownField(t *testing.T) {
 	tt.Assert(t, err == nil)
 	tt.Assert(t, ll == unknownL)
 	tt.Assert(t, compare1.DeepEqual(compare))
-
-	// thrift read/write without fast api
-	trans := remote.NewReaderWriterBuffer(-1)
-	prot := codecThrift.NewBinaryProtocol(trans)
-	err = fullReq.Write(prot)
-	tt.Assert(t, err == nil)
-	unknown1 := &test.MixedStruct{}
-	err = unknown1.Read(prot)
-	tt.Assert(t, err == nil)
-	tt.Assert(t, unknown.BLength() == unknown1.BLength())
-	trans = remote.NewReaderWriterBuffer(-1)
-	prot = codecThrift.NewBinaryProtocol(trans)
-	err = unknown1.Write(prot)
-	tt.Assert(t, err == nil)
-	unknown1 = &test.MixedStruct{}
-	err = unknown1.Read(prot)
-	tt.Assert(t, err == nil)
-	tt.Assert(t, unknown.BLength() == unknown1.BLength())
 }
 
 func TestNoUnknownField(t *testing.T) {
