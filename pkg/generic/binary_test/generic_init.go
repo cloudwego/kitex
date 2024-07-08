@@ -32,7 +32,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic"
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/pkg/utils/fastthrift"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
 )
@@ -88,11 +88,10 @@ type GenericServiceMockImpl struct{}
 
 // GenericCall ...
 func (g *GenericServiceMockImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-	rc := utils.NewThriftMessageCodec()
 	buf := request.([]byte)
 
 	var args2 kt.MockTestArgs
-	mth, seqID, err := rc.Decode(buf, &args2)
+	mth, seqID, err := fastthrift.UnmarshalMsg(buf, &args2)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +104,7 @@ func (g *GenericServiceMockImpl) GenericCall(ctx context.Context, method string,
 	result := kt.NewMockTestResult()
 	result.Success = &resp
 
-	buf, err = rc.Encode(mth, thrift.REPLY, seqID, result)
+	buf, err = fastthrift.MarshalMsg(mth, fastthrift.REPLY, seqID, result)
 	return buf, err
 }
 
