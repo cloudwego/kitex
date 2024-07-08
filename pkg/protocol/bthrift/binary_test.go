@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/kitex/pkg/mem"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -295,6 +296,24 @@ func TestWriteAndReadString(t *testing.T) {
 	test.Assert(t, v == "kitex")
 }
 
+// TestWriteAndReadStringWithAllocator test binary WriteString and ReadString with spanCache allocator
+func TestWriteAndReadStringWithAllocator(t *testing.T) {
+	buf := make([]byte, 128)
+	exceptWs := "000000056b69746578"
+	exceptSize := 9
+	wn := Binary.WriteString(buf, "kitex")
+	ws := fmt.Sprintf("%x", buf[:wn])
+	test.Assert(t, wn == exceptSize, wn, exceptSize)
+	test.Assert(t, ws == exceptWs, ws, exceptWs)
+
+	SetAllocator(mem.NewSpanCache(1024 * 1024))
+	v, length, err := Binary.ReadString(buf)
+	test.Assert(t, nil == err)
+	test.Assert(t, exceptSize == length)
+	test.Assert(t, v == "kitex")
+	SetAllocator(nil)
+}
+
 // TestWriteAndReadBinary test binary WriteBinary and ReadBinary
 func TestWriteAndReadBinary(t *testing.T) {
 	buf := make([]byte, 128)
@@ -312,6 +331,27 @@ func TestWriteAndReadBinary(t *testing.T) {
 	for i := 0; i < len(v); i++ {
 		test.Assert(t, val[i] == v[i])
 	}
+}
+
+// TestWriteAndReadBinaryWithAllocator test binary WriteBinary and ReadBinary with spanCache allocator
+func TestWriteAndReadBinaryWithAllocator(t *testing.T) {
+	buf := make([]byte, 128)
+	exceptWs := "000000056b69746578"
+	exceptSize := 9
+	val := []byte("kitex")
+	wn := Binary.WriteBinary(buf, val)
+	ws := fmt.Sprintf("%x", buf[:wn])
+	test.Assert(t, wn == exceptSize, wn, exceptSize)
+	test.Assert(t, ws == exceptWs, ws, exceptWs)
+
+	SetAllocator(mem.NewSpanCache(1024 * 1024))
+	v, length, err := Binary.ReadBinary(buf)
+	test.Assert(t, nil == err)
+	test.Assert(t, exceptSize == length)
+	for i := 0; i < len(v); i++ {
+		test.Assert(t, val[i] == v[i])
+	}
+	SetAllocator(nil)
 }
 
 // TestWriteStringNocopy test binary WriteStringNocopy with small content

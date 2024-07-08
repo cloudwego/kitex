@@ -24,27 +24,28 @@ import (
 	"math"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/gopkg/lang/dirtmake"
 
-	"github.com/cloudwego/kitex/pkg/mem"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 var (
 	// Binary protocol for bthrift.
-	Binary          binaryProtocol
-	_               BTProtocol = binaryProtocol{}
-	spanCache                  = mem.NewSpanCache(1024 * 1024)
-	spanCacheEnable bool       = false
+	Binary binaryProtocol
+	_      BTProtocol = binaryProtocol{}
 )
+
+var allocator Allocator
 
 const binaryInplaceThreshold = 4096 // 4k
 
 type binaryProtocol struct{}
 
-// SetSpanCache enable/disable binary protocol bytes/string allocator
-func SetSpanCache(enable bool) {
-	spanCacheEnable = enable
+// SetAllocator set binary protocol bytes/string allocator.
+// Note: This API is in the experiment and will be changed in the future.
+func SetAllocator(alloc Allocator) {
+	allocator = alloc
 }
 
 func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int {
@@ -473,8 +474,9 @@ func (binaryProtocol) ReadString(buf []byte) (value string, length int, err erro
 	if size < 0 || int(size) > len(buf) {
 		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadString] the string size greater than buf length")
 	}
-	if spanCacheEnable {
-		data := spanCache.Copy(buf[length : length+int(size)])
+	alloc := allocator
+	if alloc != nil {
+		data := alloc.Copy(buf[length : length+int(size)])
 		value = utils.SliceByteToString(data)
 	} else {
 		value = string(buf[length : length+int(size)])
@@ -494,10 +496,11 @@ func (binaryProtocol) ReadBinary(buf []byte) (value []byte, length int, err erro
 	if size < 0 || size > len(buf) {
 		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadBinary] the binary size greater than buf length")
 	}
-	if spanCacheEnable {
-		value = spanCache.Copy(buf[length : length+size])
+	alloc := allocator
+	if alloc != nil {
+		value = alloc.Copy(buf[length : length+size])
 	} else {
-		value = make([]byte, size)
+		value = dirtmake.Bytes(size, size)
 		copy(value, buf[length:length+size])
 	}
 	length += size
