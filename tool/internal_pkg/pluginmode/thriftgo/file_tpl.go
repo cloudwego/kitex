@@ -29,7 +29,7 @@ var (
 	_ = (*bytes.Buffer)(nil) {{- UseStdLibrary "bytes"}}
 	_ = (*strings.Builder)(nil) {{- UseStdLibrary "strings"}}
 	_ = reflect.Type(nil) {{- UseStdLibrary "reflect"}}
-	_ = thrift.TProtocol(nil) {{- UseStdLibrary "thrift"}}
+	_ = thrift.TProtocol(nil) {{- UseLib (ImportPathTo "pkg/protocol/bthrift/apache") "thrift"}}
 	{{- if GenerateFastAPIs}}
 	{{- UseLib (ImportPathTo "pkg/protocol/bthrift") ""}}
 	_ = bthrift.BinaryWriter(nil)
