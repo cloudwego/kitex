@@ -37,6 +37,7 @@ type PackageInfo struct {
 	Namespace    string            // a dot-separated string for generating service package under kitex_gen
 	Dependencies map[string]string // package name => import path, used for searching imports
 	*ServiceInfo                   // the target service
+	Services     []*ServiceInfo    // all services defined in a IDL for multiple services scenario
 
 	// the following fields will be filled and used by the generator
 	Codec            string
@@ -106,6 +107,8 @@ type ServiceInfo struct {
 	Protocol              string
 	HandlerReturnKeepResp bool
 	UseThriftReflection   bool
+	// for multiple services scenario, the reference name for the service
+	RefName string
 }
 
 // AllMethods returns all methods that the service have.
