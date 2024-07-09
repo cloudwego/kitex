@@ -280,7 +280,7 @@ func initSendMsg(tp transport.Protocol) remote.Message {
 	_args.Req = prepareReq()
 	ink := rpcinfo.NewInvocation("", "mock")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	msg := remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Client)
+	msg := remote.NewMessage(mt.ToApacheCodec(&_args), svcInfo, ri, remote.Call, remote.Client)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
 }
@@ -289,13 +289,13 @@ func initRecvMsg() remote.Message {
 	var _args mt.MockTestArgs
 	ink := rpcinfo.NewInvocation("", "mock")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	msg := remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Server)
+	msg := remote.NewMessage(mt.ToApacheCodec(&_args), svcInfo, ri, remote.Call, remote.Server)
 	return msg
 }
 
 func compare(t *testing.T, sendMsg, recvMsg remote.Message) {
-	sendReq := (sendMsg.Data()).(*mt.MockTestArgs).Req
-	recvReq := (recvMsg.Data()).(*mt.MockTestArgs).Req
+	sendReq := mt.Unpack(sendMsg.Data()).(*mt.MockTestArgs).Req
+	recvReq := mt.Unpack(recvMsg.Data()).(*mt.MockTestArgs).Req
 	test.Assert(t, sendReq.Msg == recvReq.Msg)
 	test.Assert(t, len(sendReq.StrList) == len(recvReq.StrList))
 	test.Assert(t, len(sendReq.StrMap) == len(recvReq.StrMap))
