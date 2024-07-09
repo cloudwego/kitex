@@ -100,7 +100,12 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
-		payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
+		switch message.Data().(type) {
+		case thrift.MessageWriterWithMethodWithContext:
+			payload, err = thrift.MarshalThriftDataWithMethod(ctx, c.ThriftCodec, message.Data(), message.RPCInfo().Invocation().MethodName())
+		default:
+			payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
+		}
 	case serviceinfo.Protobuf:
 		switch t := message.Data().(type) {
 		case fastpb.Writer:
@@ -188,7 +193,11 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	data := message.Data()
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
-		return thrift.UnmarshalThriftData(ctx, c.ThriftCodec, "", d, message.Data())
+		methodName := message.RPCInfo().Invocation().MethodName()
+		if methodName == "" {
+			return errors.New("empty methodName in grpc Decode")
+		}
+		return thrift.UnmarshalThriftData(ctx, c.ThriftCodec, methodName, d, message.Data())
 	case serviceinfo.Protobuf:
 		if t, ok := data.(fastpb.Reader); ok {
 			if len(d) == 0 {

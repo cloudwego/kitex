@@ -72,7 +72,7 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 		if err := m.writeHead(out, dynamicgoTypeDsc); err != nil {
 			return err
 		}
-		if err := m.writeFields(ctx, out, dynamicgoTypeDsc, nil, nil, isClient); err != nil {
+		if err := m.writeFields(ctx, out, dynamicgoTypeDsc, nil, nil, isClient, false); err != nil {
 			return err
 		}
 		return writeTail(out)
@@ -85,10 +85,16 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 	}
 	transBuff := utils.StringToSliceByte(s)
 
+	if isStreaming(m.svcDsc.Functions[method].StreamingMode) {
+		// unwrap one struct layer
+		dynamicgoTypeDsc = dynamicgoTypeDsc.Struct().FieldById(dthrift.FieldID(getStreamingFieldID(isClient, true))).Type()
+		return m.writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient, true)
+	}
+
 	if err := m.writeHead(out, dynamicgoTypeDsc); err != nil {
 		return err
 	}
-	if err := m.writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient); err != nil {
+	if err := m.writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient, false); err != nil {
 		return err
 	}
 	return writeTail(out)
@@ -101,13 +107,13 @@ const (
 	String
 )
 
-func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient bool) error {
+func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient, isStream bool) error {
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
 	defer mcache.Free(dbuf)
 
 	for _, field := range dynamicgoTypeDsc.Struct().Fields() {
 		// Exception field
-		if !isClient && field.ID() != 0 {
+		if !isStream && !isClient && field.ID() != 0 {
 			// generic server ignore the exception, because no description for exception
 			// generic handler just return error
 			continue
