@@ -24,8 +24,8 @@ import (
 	"math"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/bytedance/gopkg/lang/dirtmake"
 
+	"github.com/cloudwego/kitex/pkg/mem"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -42,8 +42,16 @@ const binaryInplaceThreshold = 4096 // 4k
 
 type binaryProtocol struct{}
 
+// SetSpanCache enable/disable binary protocol bytes/string allocator
+func SetSpanCache(enable bool) {
+	if enable {
+		SetAllocator(mem.NewSpanCache(1024 * 1024))
+	} else {
+		SetAllocator(nil)
+	}
+}
+
 // SetAllocator set binary protocol bytes/string allocator.
-// Note: This API is in the experiment and will be changed in the future.
 func SetAllocator(alloc Allocator) {
 	allocator = alloc
 }
@@ -500,7 +508,7 @@ func (binaryProtocol) ReadBinary(buf []byte) (value []byte, length int, err erro
 	if alloc != nil {
 		value = alloc.Copy(buf[length : length+size])
 	} else {
-		value = dirtmake.Bytes(size, size)
+		value = make([]byte, size)
 		copy(value, buf[length:length+size])
 	}
 	length += size
