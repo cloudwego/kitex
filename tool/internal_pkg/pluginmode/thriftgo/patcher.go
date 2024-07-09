@@ -388,7 +388,7 @@ func (p *patcher) extractLocalLibs(imports []util.Import) []util.Import {
 	kitexPkgPath := generator.ImportPathTo("pkg")
 	// remove std libs and thrift to prevent duplicate import.
 	for _, v := range imports {
-		if strings.HasPrefix(prefix, kitexPkgPath) {
+		if strings.HasPrefix(v.Path, kitexPkgPath) {
 			// fix bad the case like: `undefined: bthrift.KitexUnusedProtection`
 			// when we generate code in kitex repo.
 			// we may never ref to other generate code in kitex repo, if do fix me.
