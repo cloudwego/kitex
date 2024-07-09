@@ -99,21 +99,6 @@ func TestUnary(t *testing.T) {
 	testUnary(t, ctx, cli)
 }
 
-func TestNoneStreaming(t *testing.T) {
-	ctx := context.Background()
-	addr := test.GetLocalAddress()
-
-	svr := initMockTestServer(new(StreamingTestImpl), addr)
-	defer svr.Stop()
-
-	cli := initGenericClient(t, addr, idl, false)
-	testNoneStreaming(t, ctx, cli)
-
-	// with dynamicgo
-	cli = initGenericClient(t, addr, idl, true)
-	testNoneStreaming(t, ctx, cli)
-}
-
 func TestBizException(t *testing.T) {
 	ctx := context.Background()
 	addr := test.GetLocalAddress()
@@ -137,6 +122,21 @@ func TestBizException(t *testing.T) {
 	test.Assert(t, bizStatusErr.BizStatusCode() == 404)
 	test.Assert(t, bizStatusErr.BizMessage() == "not found")
 	test.Assert(t, resp == nil)
+}
+
+func TestNoneStreaming(t *testing.T) {
+	ctx := context.Background()
+	addr := test.GetLocalAddress()
+
+	svr := initMockTestServer(new(StreamingTestImpl), addr)
+	defer svr.Stop()
+
+	cli := initGenericClient(t, addr, idl, false)
+	testNoneStreaming(t, ctx, cli)
+
+	// with dynamicgo
+	cli = initGenericClient(t, addr, idl, true)
+	testNoneStreaming(t, ctx, cli)
 }
 
 func initStreamingClient(t *testing.T, addr, idl string, enableDynamicgo bool) genericclient.Client {
@@ -262,7 +262,7 @@ func testUnary(t *testing.T, ctx context.Context, cli genericclient.Client) {
 
 func testNoneStreaming(t *testing.T, ctx context.Context, cli genericclient.Client) {
 	resp, err := cli.GenericCall(ctx, "EchoPingPong", `{"message": "ping pong request"}`)
-	test.Assert(t, err == nil)
+	test.Assert(t, err == nil, err)
 	strResp, ok := resp.(string)
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(strResp, "message").String(), "hello ping pong request"))

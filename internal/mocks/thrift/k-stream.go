@@ -12,11 +12,6 @@ import (
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
-var (
-	_ = bthrift.KitexUnusedProtection
-	_ = thrift.KitexUnusedProtection
-)
-
 // unused protection
 var (
 	_ = fmt.Formatter(nil)
