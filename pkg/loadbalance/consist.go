@@ -18,6 +18,7 @@ package loadbalance
 
 import (
 	"context"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/loadbalance/newconsist"
 	"sort"
 	"sync"
@@ -261,6 +262,7 @@ func (cb *consistBalancer) GetPicker(e discovery.Result) Picker {
 			cii, _, _ = cb.sfg.Do(e.CacheKey, func() (interface{}, error) {
 				return cb.newConsistInfo(e), nil
 			})
+			klog.CtxInfof(context.Background(), "[KITEX-DEBUG] GetPicker, store consist info, key=%s", e.CacheKey)
 			cb.cachedConsistInfo.Store(e.CacheKey, cii)
 		}
 		ci = cii.(*newconsist.ConsistInfo)
@@ -294,11 +296,14 @@ func (cb *consistBalancer) updateConsistInfo(e discovery.Result) {
 // Rebalance implements the Rebalancer interface.
 func (cb *consistBalancer) Rebalance(change discovery.Change) {
 	if !change.Result.Cacheable {
+		klog.CtxInfof(context.Background(), "[KITEX-DEBUG] not cacheable, key=%s", change.Result.CacheKey)
 		return
 	}
 	if ci, ok := cb.cachedConsistInfo.Load(change.Result.CacheKey); ok {
+		klog.CtxInfof(context.Background(), "[KITEX-DEBUG] rebalance, key=%s", change.Result.CacheKey)
 		ci.(*newconsist.ConsistInfo).Rebalance(change)
 	} else {
+		klog.CtxInfof(context.Background(), "[KITEX-DEBUG] new consistentinfo, key=%s", change.Result.CacheKey)
 		cb.updateConsistInfo(change.Result)
 	}
 }
