@@ -1,409 +1,264 @@
-// Copyright 2024 CloudWeGo Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package args
 
 import (
+	"flag"
 	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
-
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
-	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"os"
+	"strings"
 )
 
-// Constants .
-const (
-	KitexGenPath = "kitex_gen"
-	DefaultCodec = "thrift"
-
-	BuildFileName       = "build.sh"
-	BootstrapFileName   = "bootstrap.sh"
-	ToolVersionFileName = "kitex_info.yaml"
-	HandlerFileName     = "handler.go"
-	MainFileName        = "main.go"
-	ClientFileName      = "client.go"
-	ServerFileName      = "server.go"
-	InvokerFileName     = "invoker.go"
-	ServiceFileName     = "*service.go"
-	ExtensionFilename   = "extensions.yaml"
-
-	MultipleServicesFileName = "multiple_services.go"
-)
-
-var defaultTemplates = map[string]string{
-	BuildFileName:       tpl.BuildTpl,
-	BootstrapFileName:   tpl.BootstrapTpl,
-	ToolVersionFileName: tpl.ToolVersionTpl,
-	HandlerFileName:     tpl.HandlerTpl,
-	MainFileName:        tpl.MainTpl,
-	ClientFileName:      tpl.ClientTpl,
-	ServerFileName:      tpl.ServerTpl,
-	InvokerFileName:     tpl.InvokerTpl,
-	ServiceFileName:     tpl.ServiceTpl,
-}
-
-var multipleServicesTpl = map[string]string{
-	MultipleServicesFileName: tpl.MultipleServicesTpl,
-}
-
-const (
-	DefaultType          = "default"
-	MultipleServicesType = "multiple_services"
-)
-
-type TemplateGenerator func(string) error
-
-var genTplMap = map[string]TemplateGenerator{
-	DefaultType:          GenTemplates,
-	MultipleServicesType: GenMultipleServicesTemplates,
-}
-
-// GenTemplates is the entry for command kitex template,
-// it will create the specified path
-func GenTemplates(path string) error {
-	return InitTemplates(path, defaultTemplates)
-}
-
-func GenMultipleServicesTemplates(path string) error {
-	return InitTemplates(path, multipleServicesTpl)
-}
-
-// InitTemplates creates template files.
-func InitTemplates(path string, templates map[string]string) error {
-	if err := MkdirIfNotExist(path); err != nil {
-		return err
-	}
-
-	for name, content := range templates {
-		var filePath string
-		if name == BootstrapFileName {
-			bootstrapDir := filepath.Join(path, "script")
-			if err := MkdirIfNotExist(bootstrapDir); err != nil {
-				return err
-			}
-			filePath = filepath.Join(bootstrapDir, name+".tpl")
-		} else {
-			filePath = filepath.Join(path, name+".tpl")
-		}
-		if err := createTemplate(filePath, content); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// GetTemplateDir returns the category path.
-func GetTemplateDir(category string) (string, error) {
-	home, err := filepath.Abs(".")
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, category), nil
-}
-
-// MkdirIfNotExist makes directories if the input path is not exists
-func MkdirIfNotExist(dir string) error {
-	if len(dir) == 0 {
-		return nil
-	}
-
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return os.MkdirAll(dir, os.ModePerm)
-	}
-
-	return nil
-}
-
-func createTemplate(file, content string) error {
-	if util.Exists(file) {
-		return nil
-	}
-
-	f, err := os.Create(file)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = f.WriteString(content)
-	return err
-}
-
-func (a *Arguments) Init(cmd *util.Command, args []string) error {
-	curpath, err := filepath.Abs(".")
-	if err != nil {
-		return fmt.Errorf("get current path failed: %s", err.Error())
-	}
-	path := a.InitOutputDir
-	initType := a.InitType
-	if initType == "" {
-		initType = DefaultType
-	}
-	if path == "" {
-		path = curpath
-	}
-	if err := genTplMap[initType](path); err != nil {
-		return err
-	}
-	fmt.Printf("Templates are generated in %s\n", path)
-	os.Exit(0)
-	return nil
-}
-
-func (a *Arguments) checkTplArgs() error {
-	if a.TemplateDir != "" && a.RenderTplDir != "" {
-		return fmt.Errorf("template render --dir and -template-dir cannot be used at the same time")
-	}
-	if a.RenderTplDir != "" && len(a.TemplateFiles) > 0 {
-		return fmt.Errorf("template render --dir and --file option cannot be specified at the same time")
-	}
-	return nil
-}
-
-func (a *Arguments) Root(cmd *util.Command, args []string) error {
-	curpath, err := filepath.Abs(".")
-	if err != nil {
-		return fmt.Errorf("get current path failed: %s", err.Error())
-	}
-	log.Verbose = a.Verbose
+func (a *Arguments) addBasicFlags(f *flag.FlagSet, version string) *flag.FlagSet {
+	f.BoolVar(&a.NoFastAPI, "no-fast-api", false,
+		"Generate codes without injecting fast method.")
+	f.StringVar(&a.ModuleName, "module", "",
+		"Specify the Go module name to generate go.mod.")
+	f.StringVar(&a.ServiceName, "service", "",
+		"Specify the service name to generate server side codes.")
+	f.StringVar(&a.Use, "use", "",
+		"Specify the kitex_gen package to import when generate server side codes.")
+	f.BoolVar(&a.Verbose, "v", false, "") // short for -verbose
+	f.BoolVar(&a.Verbose, "verbose", false,
+		"Turn on verbose mode.")
+	f.BoolVar(&a.GenerateInvoker, "invoker", false,
+		"Generate invoker side codes when service name is specified.")
+	f.StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")
+	f.Var(&a.Includes, "I", "Add an IDL search path for includes.")
+	f.Var(&a.ThriftOptions, "thrift", "Specify arguments for the thrift go compiler.")
+	f.Var(&a.Hessian2Options, "hessian2", "Specify arguments for the hessian2 codec.")
+	f.DurationVar(&a.ThriftPluginTimeLimit, "thrift-plugin-time-limit", generator.DefaultThriftPluginTimeLimit, "Specify thrift plugin execution time limit.")
+	f.StringVar(&a.CompilerPath, "compiler-path", "", "Specify the path of thriftgo/protoc.")
+	f.Var(&a.ThriftPlugins, "thrift-plugin", "Specify thrift plugin arguments for the thrift compiler.")
+	f.Var(&a.ProtobufOptions, "protobuf", "Specify arguments for the protobuf compiler.")
+	f.Var(&a.ProtobufPlugins, "protobuf-plugin", "Specify protobuf plugin arguments for the protobuf compiler.(plugin_name:options:out_dir)")
+	f.BoolVar(&a.CombineService, "combine-service", false,
+		"Combine services in root thrift file.")
+	f.BoolVar(&a.CopyIDL, "copy-idl", false,
+		"Copy each IDL file to the output path.")
+	f.BoolVar(&a.HandlerReturnKeepResp, "handler-return-keep-resp", false,
+		"When the server-side handler returns both err and resp, the resp return is retained for use in middleware where both err and resp can be used simultaneously. Note: At the RPC communication level, if the handler returns an err, the framework still only returns err to the client without resp.")
+	f.StringVar(&a.ExtensionFile, "template-extension", a.ExtensionFile,
+		"Specify a file for template extension.")
+	f.BoolVar(&a.FrugalPretouch, "frugal-pretouch", false,
+		"Use frugal to compile arguments and results when new clients and servers.")
+	f.BoolVar(&a.Record, "record", false,
+		"Record Kitex cmd into kitex-all.sh.")
+	f.StringVar(&a.TemplateDir, "template-dir", "",
+		"Use custom template to generate codes.")
+	f.StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
+		"Specify a code gen path.")
+	f.BoolVar(&a.DeepCopyAPI, "deep-copy-api", false,
+		"Generate codes with injecting deep copy method.")
+	f.StringVar(&a.Protocol, "protocol", "",
+		"Specify a protocol for codec")
+	f.BoolVar(&a.NoDependencyCheck, "no-dependency-check", false,
+		"Skip dependency checking.")
+	a.RecordCmd = os.Args
+	a.Version = version
+	a.ThriftOptions = append(a.ThriftOptions,
+		"naming_style=golint",
+		"ignore_initialisms",
+		"gen_setter",
+		"gen_deep_equal",
+		"compatible_names",
+		"frugal_tag",
+		"thrift_streaming",
+		"no_processor",
+	)
 
 	for _, e := range a.extends {
-		err := e.Check(a)
-		if err != nil {
-			return err
-		}
+		e.Apply(f)
 	}
-
-	err = a.checkIDL(args)
-	if err != nil {
-		return err
-	}
-	err = a.checkServiceName()
-	if err != nil {
-		return err
-	}
-	err = a.checkTplArgs()
-	if err != nil {
-		return err
-	}
-	// todo finish protobuf
-	if a.IDLType != "thrift" {
-		a.GenPath = generator.KitexGenPath
-	}
-	return a.checkPath(curpath)
+	return f
 }
 
-func (a *Arguments) Template(cmd *util.Command, args []string) error {
-	curpath, err := filepath.Abs(".")
-	if err != nil {
-		return fmt.Errorf("get current path failed: %s", err.Error())
-	}
-	log.Verbose = a.Verbose
+func (a *Arguments) buildInitFlags(version string) *flag.FlagSet {
+	f := flag.NewFlagSet("init", flag.ContinueOnError)
+	f.StringVar(&a.InitOutputDir, "o", ".", "Specify template init path (default current directory)")
+	f = a.addBasicFlags(f, version)
+	f.Usage = func() {
+		fmt.Fprintf(os.Stderr, `Version %s
+Usage: %s template init [flags]
 
-	for _, e := range a.extends {
-		err := e.Check(a)
-		if err != nil {
-			return err
-		}
-	}
+Examples:
+  %s template init -o /path/to/output
+  %s template init
 
-	err = a.checkIDL(args)
-	if err != nil {
-		return err
+Flags:
+`, version, os.Args[0], os.Args[0], os.Args[0])
+		f.PrintDefaults()
 	}
-	err = a.checkServiceName()
-	if err != nil {
-		return err
-	}
-	err = a.checkTplArgs()
-	if err != nil {
-		return err
-	}
-	// todo finish protobuf
-	if a.IDLType != "thrift" {
-		a.GenPath = generator.KitexGenPath
-	}
-	return a.checkPath(curpath)
+	return f
 }
 
-func (a *Arguments) Render(cmd *util.Command, args []string) error {
-	curpath, err := filepath.Abs(".")
-	if err != nil {
-		return fmt.Errorf("get current path failed: %s", err.Error())
-	}
-	log.Verbose = a.Verbose
+func (a *Arguments) buildRenderFlags(version string) *flag.FlagSet {
+	f := flag.NewFlagSet("render", flag.ContinueOnError)
+	f.StringVar(&a.TemplateFile, "f", "", "Specify template init path")
+	f = a.addBasicFlags(f, version)
+	f.Usage = func() {
+		fmt.Fprintf(os.Stderr, `Version %s
+Usage: %s template render [template dir_path] [flags] IDL
 
-	for _, e := range a.extends {
-		err := e.Check(a)
-		if err != nil {
-			return err
-		}
-	}
+Examples:
+  %s template render ${template dir_path} -module ${module_name} idl/hello.thrift
+  %s template render ${template dir_path} -f service.go.tpl -module ${module_name} idl/hello.thrift
+  %s template render ${template dir_path} -module ${module_name} -I xxx.git idl/hello.thrift
 
-	err = a.checkIDL(args)
-	if err != nil {
-		return err
+Flags:
+`, version, os.Args[0], os.Args[0], os.Args[0], os.Args[0])
+		f.PrintDefaults()
 	}
-	err = a.checkServiceName()
-	if err != nil {
-		return err
-	}
-	err = a.checkTplArgs()
-	if err != nil {
-		return err
-	}
-	// todo finish protobuf
-	if a.IDLType != "thrift" {
-		a.GenPath = generator.KitexGenPath
-	}
-	return a.checkPath(curpath)
+	return f
 }
 
-func (a *Arguments) Clean(cmd *util.Command, args []string) error {
-	curpath, err := filepath.Abs(".")
-	if err != nil {
-		return fmt.Errorf("get current path failed: %s", err.Error())
-	}
+func (a *Arguments) buildCleanFlags(version string) *flag.FlagSet {
+	f := flag.NewFlagSet("clean", flag.ContinueOnError)
+	f = a.addBasicFlags(f, version)
+	f.Usage = func() {
+		fmt.Fprintf(os.Stderr, `Version %s
+Usage: %s template clean
 
-	magicString := "// Kitex template debug file. use template clean to delete it."
-	err = filepath.WalkDir(curpath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("read file %s faild: %v", path, err)
-		}
-		if strings.Contains(string(content), magicString) {
-			if err := os.Remove(path); err != nil {
-				return fmt.Errorf("delete file %s failed: %v", path, err)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("error cleaning debug template files: %v", err)
+Examples:
+  %s template clean
+
+Flags:
+`, version, os.Args[0], os.Args[0])
+		f.PrintDefaults()
 	}
-	fmt.Println("clean debug template files successfully...")
-	os.Exit(0)
-	return nil
+	return f
 }
 
-func (a *Arguments) TemplateArgs(version string) error {
-	kitexCmd := &util.Command{
-		Use:   "kitex",
-		Short: "Kitex command",
-		RunE:  a.Root,
-	}
+func (a *Arguments) TemplateArgs(version, curpath string) error {
 	templateCmd := &util.Command{
 		Use:   "template",
 		Short: "Template command",
-		RunE:  a.Template,
+		RunE: func(cmd *util.Command, args []string) error {
+			fmt.Println("Template command executed")
+			return nil
+		},
 	}
 	initCmd := &util.Command{
 		Use:   "init",
 		Short: "Init command",
-		RunE:  a.Init,
+		RunE: func(cmd *util.Command, args []string) error {
+			fmt.Println("Init command executed")
+			f := a.buildInitFlags(version)
+			if err := f.Parse(args); err != nil {
+				return err
+			}
+			log.Verbose = a.Verbose
+
+			for _, e := range a.extends {
+				err := e.Check(a)
+				if err != nil {
+					return err
+				}
+			}
+
+			err := a.checkIDL(f.Args())
+			if err != nil {
+				return err
+			}
+			err = a.checkServiceName()
+			if err != nil {
+				return err
+			}
+			// todo finish protobuf
+			if a.IDLType != "thrift" {
+				a.GenPath = generator.KitexGenPath
+			}
+			return a.checkPath(curpath)
+		},
 	}
 	renderCmd := &util.Command{
 		Use:   "render",
 		Short: "Render command",
-		RunE:  a.Render,
+		RunE: func(cmd *util.Command, args []string) error {
+			fmt.Println("Render command executed")
+			if len(args) > 0 {
+				a.TplDir = args[0]
+			}
+			var tplDir string
+			for i, arg := range args {
+				if !strings.HasPrefix(arg, "-") {
+					tplDir = arg
+					args = append(args[:i], args[i+1:]...)
+					break
+				}
+			}
+			if tplDir == "" {
+				cmd.PrintUsage()
+				return fmt.Errorf("template directory is required")
+			}
+
+			f := a.buildRenderFlags(version)
+			if err := f.Parse(args); err != nil {
+				return err
+			}
+			log.Verbose = a.Verbose
+
+			for _, e := range a.extends {
+				err := e.Check(a)
+				if err != nil {
+					return err
+				}
+			}
+
+			err := a.checkIDL(f.Args())
+			if err != nil {
+				return err
+			}
+			err = a.checkServiceName()
+			if err != nil {
+				return err
+			}
+			// todo finish protobuf
+			if a.IDLType != "thrift" {
+				a.GenPath = generator.KitexGenPath
+			}
+			return a.checkPath(curpath)
+		},
 	}
 	cleanCmd := &util.Command{
 		Use:   "clean",
 		Short: "Clean command",
-		RunE:  a.Clean,
+		RunE: func(cmd *util.Command, args []string) error {
+			fmt.Println("Clean command executed")
+			f := a.buildCleanFlags(version)
+			if err := f.Parse(args); err != nil {
+				return err
+			}
+			log.Verbose = a.Verbose
+
+			for _, e := range a.extends {
+				err := e.Check(a)
+				if err != nil {
+					return err
+				}
+			}
+
+			err := a.checkIDL(f.Args())
+			if err != nil {
+				return err
+			}
+			err = a.checkServiceName()
+			if err != nil {
+				return err
+			}
+			// todo finish protobuf
+			if a.IDLType != "thrift" {
+				a.GenPath = generator.KitexGenPath
+			}
+			return a.checkPath(curpath)
+		},
 	}
-	kitexCmd.Flags().StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
-		"Specify a code gen path.")
-	templateCmd.Flags().StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
-		"Specify a code gen path.")
-	initCmd.Flags().StringVarP(&a.InitOutputDir, "output", "o", ".", "Specify template init path (default current directory)")
-	initCmd.Flags().StringVarP(&a.InitType, "type", "t", "", "Specify template init type")
-	renderCmd.Flags().StringVar(&a.RenderTplDir, "dir", "", "Use custom template to generate codes.")
-	renderCmd.Flags().StringVar(&a.ModuleName, "module", "",
-		"Specify the Go module name to generate go.mod.")
-	renderCmd.Flags().StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")
-	renderCmd.Flags().StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
-		"Specify a code gen path.")
-	renderCmd.Flags().StringArrayVar(&a.TemplateFiles, "file", []string{}, "Specify single template path")
-	renderCmd.Flags().BoolVar(&a.DebugTpl, "debug", false, "turn on debug for template")
-	renderCmd.Flags().StringVarP(&a.IncludesTpl, "Includes", "I", "", "Add IDL search path and template search path for includes.")
-	renderCmd.Flags().StringVar(&a.MetaFlags, "meta", "", "Meta data in key=value format, keys separated by ';' values separated by ',' ")
-	templateCmd.SetHelpFunc(func(*util.Command, []string) {
-		fmt.Fprintln(os.Stderr, `
-Template operation
+	templateCmd.AddCommand(initCmd)
+	templateCmd.AddCommand(renderCmd)
+	templateCmd.AddCommand(cleanCmd)
 
-Usage:
-  kitex template [command]
-
-Available Commands:
-  init        Initialize the templates according to the type
-  render      Render the template files 
-  clean       Clean the debug templates
-	`)
-	})
-	initCmd.SetHelpFunc(func(*util.Command, []string) {
-		fmt.Fprintln(os.Stderr, `
-Initialize the templates according to the type
-
-Usage:
-  kitex template init [flags]
-
-Flags:
-  -o, --output string        Output directory
-  -t, --type   string        The init type of the template
-	`)
-	})
-	renderCmd.SetHelpFunc(func(*util.Command, []string) {
-		fmt.Fprintln(os.Stderr, `
-Render the template files 
-
-Usage:
-  kitex template render [flags]
-
-Flags:
-  --dir          string         Output directory
-  --debug        bool           Turn on the debug mode
-  --file         stringArray    Specify multiple files for render
-  -I, --Includes string         Add an template git search path for includes.
-  --meta         string         Specify meta data for render
-  --module       string         Specify the Go module name to generate go.mod.
-  -t, --type     string         The init type of the template
-	`)
-	})
-	cleanCmd.SetHelpFunc(func(*util.Command, []string) {
-		fmt.Fprintln(os.Stderr, `
-Clean the debug templates
-
-Usage:
-  kitex template clean
-	`)
-	})
-	templateCmd.AddCommand(initCmd, renderCmd, cleanCmd)
-	kitexCmd.AddCommand(templateCmd)
-	if _, err := kitexCmd.ExecuteC(); err != nil {
+	if _, err := templateCmd.ExecuteC(); err != nil {
 		return err
 	}
 	return nil
