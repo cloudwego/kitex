@@ -217,11 +217,14 @@ func (a *Arguments) checkServiceName() error {
 			return fmt.Errorf("-use must be used with -service or -template-dir or template render")
 		}
 	}
+	if a.TemplateDir != "" && a.TplDir != "" {
+		return fmt.Errorf("template render and -template-dir cannot be used at the same time")
+	}
 	if a.ServiceName != "" && a.TemplateDir != "" {
 		return fmt.Errorf("-template-dir and -service cannot be specified at the same time")
 	}
 	if a.ServiceName != "" && a.TplDir != "" {
-		return fmt.Errorf("template render and -service cannot be specified at the same time")
+		return fmt.Errorf("template render and -service cannot be used at the same time")
 	}
 	if a.ServiceName != "" {
 		a.GenerateMain = true

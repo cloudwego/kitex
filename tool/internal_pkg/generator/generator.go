@@ -135,10 +135,7 @@ type Config struct {
 	TemplateDir string
 
 	// subcommand template
-	Template      bool
-	TemplateInit  bool
 	InitOutputDir string
-	TemplateClean bool
 	TplDir        string
 	TemplateFile  string
 

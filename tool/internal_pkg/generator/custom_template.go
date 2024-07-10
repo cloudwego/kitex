@@ -201,9 +201,8 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 
 func readTpls(rootDir, currentDir string, ts []*Template) ([]*Template, error) {
 	files, _ := os.ReadDir(currentDir)
-	//var ts []*Template
 	for _, f := range files {
-		// filter dir and non-yaml files
+		// filter dir and non-tpl files
 		if f.IsDir() {
 			subDir := filepath.Join(currentDir, f.Name())
 			subTemplates, err := readTpls(rootDir, subDir, ts)

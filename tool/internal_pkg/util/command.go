@@ -2,7 +2,7 @@ package util
 
 import (
 	"flag"
-	"fmt"
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"os"
 )
 
@@ -33,10 +33,10 @@ func (c *Command) Flags() *flag.FlagSet {
 
 // PrintUsage prints the usage of the Command
 func (c *Command) PrintUsage() {
-	fmt.Fprintf(os.Stderr, "Usage: %s\n\n%s\n\n", c.Use, c.Long)
+	log.Warn("Usage: %s\n\n%s\n\n", c.Use, c.Long)
 	c.flags.PrintDefaults()
 	for _, cmd := range c.commands {
-		fmt.Fprintf(os.Stderr, "  %s: %s\n", cmd.Use, cmd.Short)
+		log.Warnf("  %s: %s\n", cmd.Use, cmd.Short)
 	}
 }
 
@@ -82,14 +82,14 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 
 	cmd, flags, err := c.Find(args)
 	if err != nil {
-		fmt.Println(err)
+		log.Warn(err)
 		return c, err
 	}
 
 	if cmd.RunE != nil {
 		err = cmd.RunE(cmd, flags)
 		if err != nil {
-			fmt.Println(err)
+			log.Warn(err)
 		}
 	}
 

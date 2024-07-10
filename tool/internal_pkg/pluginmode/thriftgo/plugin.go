@@ -39,12 +39,6 @@ func Run() int {
 		println("Failed to get input:", err.Error())
 		return 1
 	}
-	//fmt.Println("data: ", string(data))
-	err = os.WriteFile("/home/shawn/Develop/dump.txt", data, os.ModePerm)
-	if err != nil {
-		println("Failed to write file dump.txt", err.Error())
-		return 1
-	}
 
 	req, err := plugin.UnmarshalRequest(data)
 	if err != nil {
