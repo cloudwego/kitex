@@ -262,11 +262,12 @@ func (cb *consistBalancer) GetPicker(e discovery.Result) Picker {
 			cii, _, _ = cb.sfg.Do(e.CacheKey, func() (interface{}, error) {
 				return cb.newConsistInfo(e), nil
 			})
-			klog.CtxInfof(context.Background(), "[KITEX-DEBUG] GetPicker, store consist info, key=%s", e.CacheKey)
+			klog.CtxInfof(context.Background(), "[KITEX-DEBUG] GetPicker, cacheable, new and store consist info, key=%s", e.CacheKey)
 			cb.cachedConsistInfo.Store(e.CacheKey, cii)
 		}
 		ci = cii.(*newconsist.ConsistInfo)
 	} else {
+		klog.CtxInfof(context.Background(), "[KITEX-DEBUG] GetPicker, not cacheable, new consist info, key=%s", e.CacheKey)
 		ci = cb.newConsistInfo(e)
 	}
 	picker := consistPickerPool.Get().(*consistPicker)
