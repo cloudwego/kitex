@@ -35,6 +35,7 @@ func (p ApacheCodecAdapter) Write(tp thrift.TProtocol) error {
 	trans := tp.Transport()
 	if t, ok := trans.(remoteByteBuffer); ok {
 		// remote.ByteBuffer not always implement io.Writer ...
+		// can only use WriteBinary
 		_, err := t.WriteBinary(b)
 		return err
 	}
@@ -68,10 +69,12 @@ func (p ApacheCodecAdapter) Read(tp thrift.TProtocol) error {
 	return err
 }
 
+// ToApacheCodec converts a bthrift.ThriftFastCodec to thrift.TStruct
 func ToApacheCodec(p bthrift.ThriftFastCodec) thrift.TStruct {
 	return ApacheCodecAdapter{p: p}
 }
 
-func Unpack(v interface{}) interface{} {
+// UnpackApacheCodec unpacks ToApacheCodec
+func UnpackApacheCodec(v interface{}) interface{} {
 	return v.(ApacheCodecAdapter).p
 }

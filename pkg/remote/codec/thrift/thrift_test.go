@@ -162,8 +162,8 @@ func BenchmarkNormalParallel(b *testing.B) {
 					test.Assert(b, err == nil, err)
 
 					// compare Req Arg
-					sendReq := (sendMsg.Data()).(*mt.MockTestArgs).Req
-					recvReq := (recvMsg.Data()).(*mt.MockTestArgs).Req
+					sendReq := mt.UnpackApacheCodec(sendMsg.Data()).(*mt.MockTestArgs).Req
+					recvReq := mt.UnpackApacheCodec(recvMsg.Data()).(*mt.MockTestArgs).Req
 					test.Assert(b, sendReq.Msg == recvReq.Msg)
 					test.Assert(b, len(sendReq.StrList) == len(recvReq.StrList))
 					test.Assert(b, len(sendReq.StrMap) == len(recvReq.StrMap))
@@ -294,8 +294,8 @@ func initRecvMsg() remote.Message {
 }
 
 func compare(t *testing.T, sendMsg, recvMsg remote.Message) {
-	sendReq := mt.Unpack(sendMsg.Data()).(*mt.MockTestArgs).Req
-	recvReq := mt.Unpack(recvMsg.Data()).(*mt.MockTestArgs).Req
+	sendReq := mt.UnpackApacheCodec(sendMsg.Data()).(*mt.MockTestArgs).Req
+	recvReq := mt.UnpackApacheCodec(recvMsg.Data()).(*mt.MockTestArgs).Req
 	test.Assert(t, sendReq.Msg == recvReq.Msg)
 	test.Assert(t, len(sendReq.StrList) == len(recvReq.StrList))
 	test.Assert(t, len(sendReq.StrMap) == len(recvReq.StrMap))

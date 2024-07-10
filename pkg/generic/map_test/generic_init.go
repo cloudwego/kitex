@@ -212,8 +212,8 @@ func newMockTestResult() interface{} {
 }
 
 func testHandler(ctx context.Context, handler, arg, result interface{}) error {
-	realArg := kt.Unpack(arg).(*kt.MockTestArgs)
-	realResult := kt.Unpack(result).(*kt.MockTestResult)
+	realArg := kt.UnpackApacheCodec(arg).(*kt.MockTestArgs)
+	realResult := kt.UnpackApacheCodec(result).(*kt.MockTestResult)
 	success, err := handler.(kt.Mock).Test(ctx, realArg.Req)
 	if err != nil {
 		return err
