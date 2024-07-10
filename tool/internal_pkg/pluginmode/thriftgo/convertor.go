@@ -56,7 +56,7 @@ func (c *converter) init(req *plugin.Request) error {
 		return fmt.Errorf("expect language to be 'go'. Encountered '%s'", req.Language)
 	}
 
-	// resotre the arguments for kitex
+	// restore the arguments for kitex
 	if err := c.Config.Unpack(req.PluginParameters); err != nil {
 		return err
 	}

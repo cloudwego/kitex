@@ -199,6 +199,80 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 	return fs, nil
 }
 
+func readTpls(rootDir, currentDir string, ts []*Template) ([]*Template, error) {
+	files, _ := os.ReadDir(currentDir)
+	//var ts []*Template
+	for _, f := range files {
+		// filter dir and non-yaml files
+		if f.IsDir() {
+			subDir := filepath.Join(currentDir, f.Name())
+			subTemplates, err := readTpls(rootDir, subDir, ts)
+			if err != nil {
+				return nil, err
+			}
+			ts = append(ts, subTemplates...)
+		} else if strings.HasSuffix(f.Name(), ".tpl") {
+			p := filepath.Join(currentDir, f.Name())
+			tplData, err := os.ReadFile(p)
+			if err != nil {
+				return nil, fmt.Errorf("read layout config from  %s failed, err: %v", p, err.Error())
+			}
+			// Remove the .tpl suffix from the Path and compute relative path
+			relativePath, err := filepath.Rel(rootDir, p)
+			if err != nil {
+				return nil, fmt.Errorf("failed to compute relative path for %s: %v", p, err)
+			}
+			trimmedPath := strings.TrimSuffix(relativePath, ".tpl")
+			t := &Template{
+				Path:           trimmedPath,
+				Body:           string(tplData),
+				UpdateBehavior: &Update{Type: string(skip)},
+			}
+			ts = append(ts, t)
+		}
+	}
+
+	return ts, nil
+}
+
+func (g *generator) GenerateCustomPackageWithTpl(pkg *PackageInfo) (fs []*File, err error) {
+	g.updatePackageInfo(pkg)
+
+	g.setImports(HandlerFileName, pkg)
+	var tpls []*Template
+	tpls, err = readTpls(g.TplDir, g.TplDir, tpls)
+	if err != nil {
+		return nil, err
+	}
+	for _, tpl := range tpls {
+		newPath := filepath.Join(g.OutputPath, tpl.Path)
+		dir := filepath.Dir(newPath)
+		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+			return nil, fmt.Errorf("failed to create directory %s: %v", dir, err)
+		}
+		if tpl.LoopService && g.CombineService {
+			svrInfo, cs := pkg.ServiceInfo, pkg.CombineServices
+
+			for i := range cs {
+				pkg.ServiceInfo = cs[i]
+				f, err := renderFile(pkg, g.OutputPath, tpl)
+				if err != nil {
+					return nil, err
+				}
+				fs = append(fs, f...)
+			}
+			pkg.ServiceInfo, pkg.CombineServices = svrInfo, cs
+		} else {
+			f, err := renderFile(pkg, g.OutputPath, tpl)
+			if err != nil {
+				return nil, err
+			}
+			fs = append(fs, f...)
+		}
+	}
+	return fs, nil
+}
+
 func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File, err error) {
 	cg := NewCustomGenerator(pkg, outputPath)
 	// special handling Methods field

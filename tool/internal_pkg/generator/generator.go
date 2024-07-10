@@ -96,6 +96,7 @@ type Generator interface {
 	GenerateService(pkg *PackageInfo) ([]*File, error)
 	GenerateMainPackage(pkg *PackageInfo) ([]*File, error)
 	GenerateCustomPackage(pkg *PackageInfo) ([]*File, error)
+	GenerateCustomPackageWithTpl(pkg *PackageInfo) ([]*File, error)
 }
 
 // Config .
@@ -132,6 +133,14 @@ type Config struct {
 	RecordCmd []string
 
 	TemplateDir string
+
+	// subcommand template
+	Template      bool
+	TemplateInit  bool
+	InitOutputDir string
+	TemplateClean bool
+	TplDir        string
+	TemplateFile  string
 
 	GenPath string
 

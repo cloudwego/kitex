@@ -76,8 +76,12 @@ func main() {
 		log.Warn("Get current path failed:", err.Error())
 		os.Exit(1)
 	}
-	// run as kitex
-	err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])
+	if os.Args[1] == "template" {
+		err = args.TemplateArgs(kitex.Version, curpath)
+	} else {
+		// run as kitex
+		err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])
+	}
 	if err != nil {
 		log.Warn(err.Error())
 		os.Exit(2)

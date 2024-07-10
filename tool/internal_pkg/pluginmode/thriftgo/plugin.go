@@ -39,6 +39,12 @@ func Run() int {
 		println("Failed to get input:", err.Error())
 		return 1
 	}
+	//fmt.Println("data: ", string(data))
+	err = os.WriteFile("/home/shawn/Develop/dump.txt", data, os.ModePerm)
+	if err != nil {
+		println("Failed to write file dump.txt", err.Error())
+		return 1
+	}
 
 	req, err := plugin.UnmarshalRequest(data)
 	if err != nil {
@@ -101,6 +107,18 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		}
 		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
 		fs, err := gen.GenerateCustomPackage(&conv.Package)
+		if err != nil {
+			return conv.failResp(err)
+		}
+		files = append(files, fs...)
+	}
+
+	if conv.Config.TplDir != "" {
+		if len(conv.Services) == 0 {
+			return conv.failResp(errors.New("no service defined in the IDL"))
+		}
+		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
+		fs, err := gen.GenerateCustomPackageWithTpl(&conv.Package)
 		if err != nil {
 			return conv.failResp(err)
 		}
