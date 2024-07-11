@@ -495,10 +495,22 @@ func (p *BinaryProtocol) Skip(fieldType thrift.TType) (err error) {
 	return thrift.SkipDefaultDepth(p, fieldType)
 }
 
+// ttransportByteBuffer ...
+// for exposing remote.ByteBuffer via p.Transport(),
+// mainly for testing purpose, see internal/mocks/thrift/utils.go
+type ttransportByteBuffer struct {
+	remote.ByteBuffer
+}
+
+func (ttransportByteBuffer) Close() error                          { panic("not implemented") }
+func (ttransportByteBuffer) Flush(ctx context.Context) (err error) { panic("not implemented") }
+func (ttransportByteBuffer) IsOpen() bool                          { panic("not implemented") }
+func (ttransportByteBuffer) Open() error                           { panic("not implemented") }
+func (ttransportByteBuffer) RemainingBytes() uint64                { panic("not implemented") }
+
 // Transport ...
 func (p *BinaryProtocol) Transport() thrift.TTransport {
-	// not support
-	return nil
+	return ttransportByteBuffer{p.trans}
 }
 
 // ByteBuffer ...
