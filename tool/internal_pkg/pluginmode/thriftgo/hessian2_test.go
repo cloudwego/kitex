@@ -59,7 +59,7 @@ debug: false`),
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			res := loadIDLRefConfig("", tc.reader)
+			res, _ := loadIDLRefConfig("", tc.reader)
 			tc.expected(t, res)
 		})
 	}

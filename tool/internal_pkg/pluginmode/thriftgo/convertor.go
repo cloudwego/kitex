@@ -98,11 +98,6 @@ func (c *converter) initLogs() backend.LogFunc {
 	return lf
 }
 
-func (c *converter) fail(err error) int {
-	res := plugin.BuildErrorResponse(err.Error(), c.Warnings...)
-	return exit(res)
-}
-
 func (c *converter) avoidIncludeConflict(ast *parser.Thrift, ref string) (*parser.Thrift, string) {
 	fn := filepath.Base(ast.Filename)
 	for _, inc := range ast.Includes {

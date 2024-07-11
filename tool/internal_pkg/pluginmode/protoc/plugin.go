@@ -423,7 +423,7 @@ func (pp *protocPlugin) adjustPath(path string) (ret string) {
 		return path
 	}
 	if pp.ModuleName == "" {
-		gopath := util.GetGOPATH()
+		gopath, _ := util.GetGOPATH()
 		path = util.JoinPath(gopath, "src", path)
 		path, _ = filepath.Rel(cur, path)
 	} else {
