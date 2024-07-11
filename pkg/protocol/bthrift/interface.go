@@ -96,3 +96,8 @@ type BTProtocol interface {
 	ReadBinary(buf []byte) (value []byte, length int, err error)
 	Skip(buf []byte, fieldType thrift.TType) (length int, err error)
 }
+
+type Allocator interface {
+	Make(n int) []byte
+	Copy(buf []byte) (p []byte)
+}
