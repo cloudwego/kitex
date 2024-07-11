@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cloudwego/kitex/tool/internal_pkg/log"
-
 	"github.com/cloudwego/thriftgo/plugin"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
@@ -125,7 +123,6 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		Warnings: conv.Warnings,
 	}
 	for _, f := range files {
-		log.Warnf("f: %+v", f)
 		res.Contents = append(res.Contents, &plugin.Generated{
 			Name:    &f.Name,
 			Content: f.Content,
