@@ -6,7 +6,9 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"math/rand"
+	"runtime"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
@@ -158,6 +160,69 @@ func TestRebalance(t *testing.T) {
 	}
 }
 
+var (
+	ciMap sync.Map
+)
+
+func TestRebalanceMemory(t *testing.T) {
+	nums := 1000
+	insList := make([]discovery.Instance, 0, nums)
+	for i := 0; i < nums; i++ {
+		insList = append(insList, discovery.NewInstance("tcp", "addr"+strconv.Itoa(i), 10, nil))
+	}
+	e := discovery.Result{
+		Cacheable: false,
+		CacheKey:  "",
+		Instances: insList,
+	}
+	newConsist := NewConsistInfo(e, ConsistInfoConfig{
+		VirtualFactor: 100,
+		Weighted:      true,
+	})
+	for i := 0; i < nums; i++ {
+		_, all := searchRealNode(newConsist, &realNode{insList[i]})
+		// should find all virtual node
+		test.Assert(t, all)
+	}
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	t.Logf("Before Delete node, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	s := newConsist.virtualNodes
+	totalCnt := 0
+	for i := 0; i < s.totalLevel; i++ {
+		currCnt := countLevel(s, i)
+		totalCnt += currCnt
+	}
+	t.Logf("Before Delete node, total node cnt: %d\n", totalCnt)
+
+	for i := 0; i < 900; i++ {
+		e.Instances = insList[i+1:]
+		change := discovery.Change{
+			Result:  e,
+			Added:   nil,
+			Removed: []discovery.Instance{insList[i]},
+			Updated: nil,
+		}
+		newConsist.Rebalance(change)
+	}
+	s = newConsist.virtualNodes
+	totalCnt = 0
+	for i := 0; i < s.totalLevel; i++ {
+		currCnt := countLevel(s, i)
+		totalCnt += currCnt
+	}
+	t.Logf("After Delete node, total node cnt: %d\n", totalCnt)
+
+	runtime.ReadMemStats(&ms)
+	t.Logf("After Delete node, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+
+	//ciMap.Store("a", newConsist)
+	runtime.GC()
+	runtime.ReadMemStats(&ms)
+	t.Logf("After GC, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+}
+
 func TestRebalanceDupilicate(t *testing.T) {
 	nums := 1000
 	duplicate := 10
@@ -200,4 +265,8 @@ func countLevel(s *skipList, level int) int {
 		cnt++
 	}
 	return cnt
+}
+
+func mb(byteSize uint64) float32 {
+	return float32(byteSize) / float32(1024*1024)
 }
