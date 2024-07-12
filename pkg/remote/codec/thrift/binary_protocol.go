@@ -506,7 +506,7 @@ func (ttransportByteBuffer) Close() error                          { panic("not 
 func (ttransportByteBuffer) Flush(ctx context.Context) (err error) { panic("not implemented") }
 func (ttransportByteBuffer) IsOpen() bool                          { panic("not implemented") }
 func (ttransportByteBuffer) Open() error                           { panic("not implemented") }
-func (ttransportByteBuffer) RemainingBytes() uint64                { panic("not implemented") }
+func (p ttransportByteBuffer) RemainingBytes() uint64              { return uint64(p.ReadableLen()) }
 
 // Transport ...
 func (p *BinaryProtocol) Transport() thrift.TTransport {

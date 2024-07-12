@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
@@ -239,11 +240,6 @@ func (c thriftCodec) Name() string {
 	return serviceinfo.Thrift.String()
 }
 
-// MessageWriterWithMethodWithContext write to thrift.TProtocol
-type MessageWriterWithMethodWithContext interface {
-	Write(ctx context.Context, method string, oprot thrift.TProtocol) error
-}
-
 // MessageWriter write to thrift.TProtocol
 type MessageWriter interface {
 	Write(oprot thrift.TProtocol) error
@@ -254,9 +250,24 @@ type MessageReader interface {
 	Read(oprot thrift.TProtocol) error
 }
 
+type genericWriter interface { // used by pkg/generic
+	Write(ctx context.Context, method string, w io.Writer) error
+}
+
+type genericReader interface { // used by pkg/generic
+	Read(ctx context.Context, method string, dataLen int, r io.Reader) error
+}
+
+// MessageWriterWithMethodWithContext write to thrift.TProtocol
+// TODO(marina.sakai): remove it after we use the new genericWriter interface
+type MessageWriterWithMethodWithContext interface {
+	Write(ctx context.Context, method string, oprot thrift.TProtocol) error
+}
+
 // MessageReaderWithMethodWithContext read from thrift.TProtocol with method
+// TODO(marina.sakai): remove it after we use the new genericReader interface
 type MessageReaderWithMethodWithContext interface {
-	Read(ctx context.Context, method string, dataLen int, oprot thrift.TProtocol) error
+	Read(ctx context.Context, method string, dataLen int, iprot thrift.TProtocol) error
 }
 
 // ThriftMsgFastCodec ...

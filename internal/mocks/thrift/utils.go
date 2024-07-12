@@ -17,6 +17,7 @@
 package thrift
 
 import (
+	"errors"
 	"io"
 
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
@@ -32,21 +33,8 @@ type ApacheCodecAdapter struct {
 func (p ApacheCodecAdapter) Write(tp thrift.TProtocol) error {
 	b := make([]byte, p.p.BLength())
 	b = b[:p.p.FastWriteNocopy(b, nil)]
-	trans := tp.Transport()
-	if t, ok := trans.(remoteByteBuffer); ok {
-		// remote.ByteBuffer not always implement io.Writer ...
-		// can only use WriteBinary
-		_, err := t.WriteBinary(b)
-		return err
-	}
 	_, err := tp.Transport().Write(b)
 	return err
-}
-
-type remoteByteBuffer interface {
-	ReadableLen() (n int)
-	Next(n int) (p []byte, err error)
-	WriteBinary(b []byte) (n int, err error)
 }
 
 // Read implements thrift.TStruct
@@ -54,15 +42,12 @@ func (p ApacheCodecAdapter) Read(tp thrift.TProtocol) error {
 	var err error
 	var b []byte
 	trans := tp.Transport()
-	if t, ok := trans.(remoteByteBuffer); ok {
-		// remote.ByteBuffer not always implement io.Reader ...
-		// can only use Next()
-		b, err = t.Next(t.ReadableLen())
-	} else {
-		n := trans.RemainingBytes()
-		b = make([]byte, n)
-		_, err = io.ReadFull(trans, b)
+	n := trans.RemainingBytes()
+	if int64(n) < 0 {
+		return errors.New("unknown buffer len")
 	}
+	b = make([]byte, n)
+	_, err = io.ReadFull(trans, b)
 	if err == nil {
 		_, err = p.p.FastRead(b)
 	}
