@@ -23,8 +23,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/grpc"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/generic"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 type cliTransHandlerFactory struct{}
@@ -53,7 +55,12 @@ type cliTransHandler struct {
 }
 
 func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
-	buf := newBuffer(conn.(*clientConn))
+	var buf remote.ByteBuffer
+	if isThriftGeneric(msg) {
+		buf = generic.NewGenericBuffer(conn.(*clientConn))
+	} else {
+		buf = newBuffer(conn.(*clientConn))
+	}
 	defer buf.Release(err)
 
 	if err = h.codec.Encode(ctx, msg, buf); err != nil {
@@ -108,4 +115,13 @@ func (h *cliTransHandler) OnMessage(ctx context.Context, args, result remote.Mes
 }
 
 func (h *cliTransHandler) SetPipeline(pipeline *remote.TransPipeline) {
+}
+
+func isThriftGeneric(msg remote.Message) bool {
+	_, isGenericData := msg.Data().(genericData)
+	return msg.ProtocolInfo().CodecType == serviceinfo.Thrift && isGenericData
+}
+
+type genericData interface {
+	IsGeneric() bool
 }

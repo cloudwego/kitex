@@ -93,7 +93,7 @@ func (s *StreamingTestImpl) Echo(stream kt.TestService_EchoServer) (err error) {
 				return
 			}
 			fmt.Printf("Echo: received message = %s\n", msg.Message)
-			time.Sleep(time.Second)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 
@@ -112,7 +112,7 @@ func (s *StreamingTestImpl) Echo(stream kt.TestService_EchoServer) (err error) {
 				return
 			}
 			fmt.Printf("Echo: sent message = %s\n", resp)
-			time.Sleep(time.Second)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 	wg.Wait()
@@ -132,7 +132,7 @@ func (s *StreamingTestImpl) EchoClient(stream kt.TestService_EchoClientServer) (
 		}
 		fmt.Printf("Recv: %s\n", req.Message)
 		msgs = append(msgs, req.Message)
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 	return stream.SendAndClose(&kt.Response{Message: "all message: " + strings.Join(msgs, ", ")})
 }
@@ -146,7 +146,7 @@ func (s *StreamingTestImpl) EchoServer(req *kt.Request, stream kt.TestService_Ec
 		if err != nil {
 			return err
 		}
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 	return
 }
@@ -176,7 +176,7 @@ func (s *StreamingTestImpl) EchoBizException(stream kt.TestService_EchoBizExcept
 			return err
 		}
 		fmt.Printf("Recv: %s\n", req.Message)
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 	return kerrors.NewBizStatusError(int32(404), "not found")
 }

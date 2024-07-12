@@ -33,6 +33,7 @@ import (
 
 // The byte count of 32 and 16 integer values.
 const (
+	Size64 = 8
 	Size32 = 4
 	Size16 = 2
 )

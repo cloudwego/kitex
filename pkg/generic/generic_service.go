@@ -185,6 +185,11 @@ func (g *Args) GetFirstArgument() interface{} {
 	return g.Request
 }
 
+// IsGeneric is only used for grpc thrift generic to
+func (g *Args) IsGeneric() bool {
+	return true
+}
+
 // Result generic response
 type Result struct {
 	Success interface{}

@@ -113,7 +113,7 @@ func TestBizException(t *testing.T) {
 		req := fmt.Sprintf(`{"message": "grpc client streaming generic %dth request"}`, i)
 		err = streamCli.Send(req)
 		test.Assert(t, err == nil, err)
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 	resp, err := streamCli.CloseAndRecv()
 	test.Assert(t, err != nil)
@@ -184,7 +184,7 @@ func testClientStreaming(t *testing.T, ctx context.Context, cli genericclient.Cl
 		req := fmt.Sprintf(`{"message": "grpc client streaming generic %dth request"}`, i)
 		err = streamCli.Send(req)
 		test.Assert(t, err == nil, err)
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 	resp, err := streamCli.CloseAndRecv()
 	test.Assert(t, err == nil, err)
@@ -210,7 +210,7 @@ func testServerStreaming(t *testing.T, ctx context.Context, cli genericclient.Cl
 			fmt.Printf("serverStreaming message received: %s\n", strResp)
 			test.Assert(t, strings.Contains(gjson.Get(strResp, "message").String(), "grpc server streaming generic request ->"))
 		}
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -246,7 +246,7 @@ func testBidirectionalStreaming(t *testing.T, ctx context.Context, cli genericcl
 				fmt.Printf("bidirectionalStreaming message received: %s\n", strResp)
 				test.Assert(t, strings.Contains(gjson.Get(strResp, "message").String(), "th response"))
 			}
-			time.Sleep(time.Second)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}()
 	wg.Wait()

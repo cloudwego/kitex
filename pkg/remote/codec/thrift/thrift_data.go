@@ -34,19 +34,12 @@ const marshalThriftBufferSize = 1024
 // It will allocate a new buffer and encode to it
 func MarshalThriftData(ctx context.Context, codec remote.PayloadCodec, data interface{}) ([]byte, error) {
 	c := getThriftCodec(codec)
-	return c.marshalThriftData(ctx, data, "")
-}
-
-// MarshalThriftDataWithMethod is for encoding the data whose type is MessageWriterWithMethodWithContext
-// only used for generic calls
-func MarshalThriftDataWithMethod(ctx context.Context, codec remote.PayloadCodec, data interface{}, method string) ([]byte, error) {
-	c := getThriftCodec(codec)
-	return c.marshalThriftData(ctx, data, method)
+	return c.marshalThriftData(ctx, data)
 }
 
 // marshalBasicThriftData only encodes the data (without the prepending method, msgType, seqId)
 // It will allocate a new buffer and encode to it
-func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}, method string) ([]byte, error) {
+func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([]byte, error) {
 	// encode with hyper codec
 	// NOTE: to ensure hyperMarshalEnabled is inlined so split the check logic, or it may cause performance loss
 	if c.hyperMarshalEnabled() && hyperMarshalAvailable(data) {
@@ -76,7 +69,7 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}, me
 	// fallback to old thrift way (slow)
 	transport := thrift.NewTMemoryBufferLen(marshalThriftBufferSize)
 	tProt := thrift.NewTBinaryProtocol(transport, true, true)
-	if err := marshalBasicThriftData(ctx, tProt, data, method); err != nil {
+	if err := marshalBasicThriftData(ctx, tProt, data, ""); err != nil {
 		return nil, err
 	}
 	return transport.Bytes(), nil

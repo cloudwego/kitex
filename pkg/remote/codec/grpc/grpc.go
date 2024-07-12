@@ -30,6 +30,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/generic"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -97,14 +98,24 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 		return err
 	}
 	isCompressed := compressor != nil
+	isThriftGeneric := false
 
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
-		switch message.Data().(type) {
+		switch msg := message.Data().(type) {
 		case thrift.MessageWriterWithMethodWithContext:
-			payload, err = thrift.MarshalThriftDataWithMethod(ctx, c.ThriftCodec, message.Data(), message.RPCInfo().Invocation().MethodName())
+			isThriftGeneric = true
+			tProt := thrift.NewBinaryProtocol(out)
+			if err = msg.Write(ctx, message.RPCInfo().Invocation().MethodName(), tProt); err != nil {
+				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Write failed: %s", err.Error()))
+			}
+			buf, ok := tProt.ByteBuffer().(*generic.Buffer)
+			if !ok {
+				return perrors.NewProtocolErrorWithMsg("ByteBuffer should be GenericBuffer")
+			}
+			payload = buf.GetData()
 		default:
-			payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
+			payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, msg)
 		}
 	case serviceinfo.Protobuf:
 		switch t := message.Data().(type) {
@@ -175,6 +186,13 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	err = writer.WriteHeader(header[:])
 	if err != nil {
 		return err
+	}
+	if isThriftGeneric {
+		buf, ok := out.(*generic.Buffer)
+		if !ok {
+			return perrors.NewProtocolErrorWithMsg("ByteBuffer should be GenericBuffer")
+		}
+		return buf.WritePayload(payload)
 	}
 	return writer.WriteData(payload)
 	// TODO: recycle payload?

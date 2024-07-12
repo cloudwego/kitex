@@ -24,6 +24,7 @@ import (
 
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
@@ -173,6 +174,9 @@ func (p *BinaryProtocol) WriteBool(value bool) error {
 
 // WriteByte ...
 func (p *BinaryProtocol) WriteByte(value int8) error {
+	if b, ok := p.trans.(remote.FrameWrite); ok {
+		return b.WriteData([]byte{byte(value)})
+	}
 	v, err := p.malloc(1)
 	if err != nil {
 		return err
@@ -183,6 +187,11 @@ func (p *BinaryProtocol) WriteByte(value int8) error {
 
 // WriteI16 ...
 func (p *BinaryProtocol) WriteI16(value int16) error {
+	if b, ok := p.trans.(remote.FrameWrite); ok {
+		buf := make([]byte, codec.Size16)
+		binary.BigEndian.PutUint16(buf, uint16(value))
+		return b.WriteData(buf)
+	}
 	v, err := p.malloc(2)
 	if err != nil {
 		return err
@@ -193,6 +202,11 @@ func (p *BinaryProtocol) WriteI16(value int16) error {
 
 // WriteI32 ...
 func (p *BinaryProtocol) WriteI32(value int32) error {
+	if b, ok := p.trans.(remote.FrameWrite); ok {
+		buf := make([]byte, codec.Size32)
+		binary.BigEndian.PutUint32(buf, uint32(value))
+		return b.WriteData(buf)
+	}
 	v, err := p.malloc(4)
 	if err != nil {
 		return err
@@ -203,6 +217,11 @@ func (p *BinaryProtocol) WriteI32(value int32) error {
 
 // WriteI64 ...
 func (p *BinaryProtocol) WriteI64(value int64) error {
+	if b, ok := p.trans.(remote.FrameWrite); ok {
+		buf := make([]byte, codec.Size64)
+		binary.BigEndian.PutUint64(buf, uint64(value))
+		return b.WriteData(buf)
+	}
 	v, err := p.malloc(8)
 	if err != nil {
 		return err
@@ -219,6 +238,12 @@ func (p *BinaryProtocol) WriteDouble(value float64) error {
 // WriteString ...
 func (p *BinaryProtocol) WriteString(value string) error {
 	len := len(value)
+	if b, ok := p.trans.(remote.FrameWrite); ok {
+		buf := make([]byte, codec.Size32+len)
+		binary.BigEndian.PutUint32(buf[:codec.Size32], uint32(len))
+		copy(buf[codec.Size32:], value)
+		return b.WriteData(buf)
+	}
 	e := p.WriteI32(int32(len))
 	if e != nil {
 		return e
@@ -229,6 +254,12 @@ func (p *BinaryProtocol) WriteString(value string) error {
 
 // WriteBinary ...
 func (p *BinaryProtocol) WriteBinary(value []byte) error {
+	if b, ok := p.trans.(remote.FrameWrite); ok {
+		buf := make([]byte, codec.Size32+len(value))
+		binary.BigEndian.PutUint32(buf[:codec.Size32], uint32(len(value)))
+		copy(buf[codec.Size32:], value)
+		return b.WriteData(buf)
+	}
 	e := p.WriteI32(int32(len(value)))
 	if e != nil {
 		return e
