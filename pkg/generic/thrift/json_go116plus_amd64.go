@@ -34,6 +34,7 @@ import (
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/generic"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -133,7 +134,22 @@ func writeFields(ctx context.Context, out thrift.TProtocol, dynamicgoTypeDsc *dt
 		// 	return err
 		// }
 	}
-	return writeFieldsBinary(dbuf, out)
+
+	tProt, ok := out.(*cthrift.BinaryProtocol)
+	if !ok {
+		return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
+	}
+	// only for streaming over http2
+	if buffer, ok := tProt.ByteBuffer().(*generic.Buffer); ok {
+		return buffer.WriteData(dbuf)
+	}
+	buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
+	if err != nil {
+		return err
+	}
+	// TODO: implement MallocAck() to achieve zero copy
+	copy(buf, dbuf)
+	return nil
 }
 
 func writeHead(out thrift.TProtocol, dynamicgoTypeDsc *dthrift.TypeDescriptor) error {
@@ -170,19 +186,13 @@ func writeStreamingContentWithDynamicgo(ctx context.Context, out thrift.TProtoco
 	if err := cv.DoInto(ctx, dynamicgoTypeDsc, transBuff, &dbuf); err != nil {
 		return err
 	}
-	return writeFieldsBinary(dbuf, out)
-}
-
-func writeFieldsBinary(buf []byte, out thrift.TProtocol) error {
 	tProt, ok := out.(*cthrift.BinaryProtocol)
 	if !ok {
 		return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
-	buf, err := tProt.ByteBuffer().Malloc(len(buf))
-	if err != nil {
-		return err
+	buf, ok := tProt.ByteBuffer().(*generic.Buffer)
+	if !ok {
+		return perrors.NewProtocolErrorWithMsg("ByteBuffer should be generic Buffer")
 	}
-	// TODO: implement MallocAck() to achieve zero copy
-	copy(buf, buf)
-	return nil
+	return buf.WriteData(dbuf)
 }
