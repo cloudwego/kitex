@@ -83,6 +83,7 @@ func verifyMarshalBasicThriftDataType(data interface{}) error {
 	switch data.(type) {
 	case MessageWriter:
 	case MessageWriterWithMethodWithContext:
+	case genericWriter:
 	default:
 		return errEncodeMismatchMsgType
 	}
@@ -92,17 +93,19 @@ func verifyMarshalBasicThriftDataType(data interface{}) error {
 // marshalBasicThriftData only encodes the data (without the prepending method, msgType, seqId)
 // It uses the old thrift way which is much slower than FastCodec and Frugal
 func marshalBasicThriftData(ctx context.Context, tProt thrift.TProtocol, data interface{}, method string, rpcRole remote.RPCRole) error {
+	var err error
 	switch msg := data.(type) {
 	case MessageWriter:
-		if err := msg.Write(tProt); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
-		}
+		err = msg.Write(tProt)
 	case MessageWriterWithMethodWithContext:
-		if err := msg.Write(ctx, method, tProt); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
-		}
+		err = msg.Write(ctx, method, tProt)
+	case genericWriter:
+		err = msg.Write(ctx, method, tProt.Transport())
 	default:
 		return errEncodeMismatchMsgType
+	}
+	if err != nil {
+		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 	}
 	return nil
 }
@@ -227,6 +230,7 @@ func verifyUnmarshalBasicThriftDataType(data interface{}) error {
 	switch data.(type) {
 	case MessageReader:
 	case MessageReaderWithMethodWithContext:
+	case genericReader:
 	default:
 		return errDecodeMismatchMsgType
 	}
@@ -238,16 +242,16 @@ func decodeBasicThriftData(ctx context.Context, tProt thrift.TProtocol, method s
 	var err error
 	switch t := data.(type) {
 	case MessageReader:
-		if err = t.Read(tProt); err != nil {
-			return remote.NewTransError(remote.ProtocolError, err)
-		}
+		err = t.Read(tProt)
 	case MessageReaderWithMethodWithContext:
-		// methodName is necessary for generic calls to methodInfo from serviceInfo
-		if err = t.Read(ctx, method, dataLen, tProt); err != nil {
-			return remote.NewTransError(remote.ProtocolError, err)
-		}
+		err = t.Read(ctx, method, dataLen, tProt)
+	case genericReader:
+		err = t.Read(ctx, method, dataLen, tProt.Transport())
 	default:
 		return errDecodeMismatchMsgType
+	}
+	if err != nil {
+		return remote.NewTransError(remote.ProtocolError, err)
 	}
 	return nil
 }
