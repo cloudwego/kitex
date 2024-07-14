@@ -33,7 +33,10 @@ const marshalThriftBufferSize = 1024
 // MarshalThriftData only encodes the data (without the prepending methodName, msgType, seqId)
 // It will allocate a new buffer and encode to it
 func MarshalThriftData(ctx context.Context, codec remote.PayloadCodec, data interface{}) ([]byte, error) {
-	c := getThriftCodec(codec)
+	c, ok := codec.(*thriftCodec)
+	if !ok {
+		c = defaultCodec
+	}
 	return c.marshalThriftData(ctx, data)
 }
 
@@ -260,12 +263,4 @@ func getSkippedStructBuffer(tProt *BinaryProtocol) ([]byte, error) {
 		return nil, remote.NewTransError(remote.ProtocolError, err).AppendMessage("caught in SkipDecoder NextStruct phase")
 	}
 	return buf, nil
-}
-
-func getThriftCodec(codec remote.PayloadCodec) *thriftCodec {
-	c, ok := codec.(*thriftCodec)
-	if !ok {
-		c = defaultCodec
-	}
-	return c
 }
