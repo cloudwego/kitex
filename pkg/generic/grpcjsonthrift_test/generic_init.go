@@ -259,7 +259,7 @@ func serviceInfo() *kitex.ServiceInfo {
 	return svcInfo
 }
 
-func echoHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+func echoHandler(ctx context.Context, handler, arg, result interface{}) error {
 	st, ok := arg.(*streaming.Args)
 	if !ok {
 		return errors.New("TestService.Echo is a thrift streaming method, please call with Kitex StreamClient")
@@ -289,7 +289,7 @@ func newTestServiceEchoResult() interface{} {
 	return kt.NewTestServiceEchoResult()
 }
 
-func echoClientHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+func echoClientHandler(ctx context.Context, handler, arg, result interface{}) error {
 	st, ok := arg.(*streaming.Args)
 	if !ok {
 		return errors.New("TestService.EchoClient is a thrift streaming method, please call with Kitex StreamClient")
@@ -319,7 +319,7 @@ func newTestServiceEchoClientResult() interface{} {
 	return kt.NewTestServiceEchoClientResult()
 }
 
-func echoServerHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+func echoServerHandler(ctx context.Context, handler, arg, result interface{}) error {
 	st, ok := arg.(*streaming.Args)
 	if !ok {
 		return errors.New("TestService.EchoServer is a thrift streaming method, please call with Kitex StreamClient")
@@ -348,7 +348,7 @@ func newTestServiceEchoServerResult() interface{} {
 	return kt.NewTestServiceEchoServerResult()
 }
 
-func echoUnaryHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+func echoUnaryHandler(ctx context.Context, handler, arg, result interface{}) error {
 	if streaming.GetStream(ctx) == nil {
 		return errors.New("TestService.EchoUnary is a thrift streaming unary method, please call with Kitex StreamClient or remove the annotation streaming.mode")
 	}
@@ -370,7 +370,7 @@ func newTestServiceEchoUnaryResult() interface{} {
 	return kt.NewTestServiceEchoUnaryResult()
 }
 
-func echoBizExceptionHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+func echoBizExceptionHandler(ctx context.Context, handler, arg, result interface{}) error {
 	st, ok := arg.(*streaming.Args)
 	if !ok {
 		return errors.New("TestService.EchoBizException is a thrift streaming method, please call with Kitex StreamClient")
@@ -400,7 +400,7 @@ func newTestServiceEchoBizExceptionResult() interface{} {
 	return kt.NewTestServiceEchoBizExceptionResult()
 }
 
-func echoPingPongHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+func echoPingPongHandler(ctx context.Context, handler, arg, result interface{}) error {
 	realArg := kt.UnpackApacheCodec(arg).(*kt.TestServiceEchoPingPongArgs)
 	realResult := kt.UnpackApacheCodec(result).(*kt.TestServiceEchoPingPongResult)
 	success, err := handler.(kt.TestService).EchoPingPong(ctx, realArg.Req)
