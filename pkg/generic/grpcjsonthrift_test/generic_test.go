@@ -174,7 +174,7 @@ func getJsonThriftGeneric(idl string, enableDynamicgo bool) (generic.Generic, er
 
 func initMockTestServer(handler kt.TestService, address string) server.Server {
 	addr, _ := net.ResolveTCPAddr("tcp", address)
-	return newMockTestServer(handler, addr)
+	return newMockServer(handler, addr)
 }
 
 func testClientStreaming(t *testing.T, ctx context.Context, cli genericclient.Client) {
