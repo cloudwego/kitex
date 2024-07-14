@@ -124,7 +124,6 @@ func (m *WriteJSON) originalWrite(ctx context.Context, out thrift.TProtocol, msg
 	if isStreaming(fnDsc.StreamingMode) {
 		// unwrap one struct layer
 		typeDsc = typeDsc.Struct.FieldsByID[int32(getStreamingFieldID(isClient, true))].Type
-		//return writeJSON(ctx, &body, out, typeDsc, opt)
 		return writeStreamingContent(ctx, &body, typeDsc, opt, out)
 	}
 	return wrapJSONWriter(ctx, &body, out, typeDsc, opt)
