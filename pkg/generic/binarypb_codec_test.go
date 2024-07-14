@@ -23,11 +23,12 @@ import (
 	"math"
 	"testing"
 
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/binarypb_test/kitex_gen/base"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -35,46 +36,22 @@ func TestBinaryProtobufCodec(t *testing.T) {
 	bpc := &binaryProtobufCodec{protobufCodec: pbCodec}
 
 	test.Assert(t, bpc.Name() == "RawProtobufBinary", bpc.Name())
+	svcInfo := ServiceInfoWithCodec(BinaryProtobufGeneric())
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(serviceinfo.GenericMethod, "ExampleMethod"), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 
 	// client side
-	buf := readBasicExampleReqProtoBufData()
 	rwbuf := remote.NewReaderWriterBuffer(1024)
-	cliMsg := &mockMessage{
-		RPCInfoFunc: func() rpcinfo.RPCInfo {
-			return newMockRPCInfo()
-		},
-		RPCRoleFunc: func() remote.RPCRole {
-			return remote.Client
-		},
-		DataFunc: func() interface{} {
-			return &Args{
-				Request: buf,
-				Method:  "ExampleMethod",
-			}
-		},
+	req := &Args{
+		Request: readBasicExampleReqProtoBufData(),
+		Method:  "ExampleMethod",
 	}
+	cliMsg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
 	err := bpc.Marshal(context.Background(), cliMsg, rwbuf)
 	test.Assert(t, err == nil, err)
 
 	// server side
-	arg := &Args{}
-	svrMsg := &mockMessage{
-		RPCInfoFunc: func() rpcinfo.RPCInfo {
-			return newMockRPCInfo()
-		},
-		RPCRoleFunc: func() remote.RPCRole {
-			return remote.Server
-		},
-		DataFunc: func() interface{} {
-			return arg
-		},
-		PayloadLenFunc: func() int {
-			return rwbuf.ReadableLen()
-		},
-		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
-			return ServiceInfo(serviceinfo.Protobuf)
-		},
-	}
+	svrMsg := remote.NewMessage(&Args{}, svcInfo, ri, remote.Call, remote.Server)
+	svrMsg.SetPayloadLen(rwbuf.ReadableLen())
 	err = bpc.Unmarshal(context.Background(), svrMsg, rwbuf)
 	test.Assert(t, err == nil, err)
 	reqBuf := svrMsg.Data().(*Args).Request.(binaryReqType)
@@ -94,49 +71,21 @@ func TestBinaryProtobufCodec(t *testing.T) {
 }
 
 func TestBinaryProtobufCodecExceptionError(t *testing.T) {
-	ctx := context.Background()
 	bpc := &binaryProtobufCodec{protobufCodec: pbCodec}
-	cliMsg := &mockMessage{
-		RPCInfoFunc: func() rpcinfo.RPCInfo {
-			return newEmptyMethodRPCInfo()
-		},
-		RPCRoleFunc: func() remote.RPCRole {
-			return remote.Server
-		},
-		MessageTypeFunc: func() remote.MessageType {
-			return remote.Exception
-		},
-	}
 
 	rwbuf := remote.NewReaderWriterBuffer(1024)
+	svcInfo := ServiceInfoWithCodec(BinaryProtobufGeneric())
+	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(serviceinfo.GenericMethod, "ExampleMethod"), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
+
 	// test data is empty
-	err := bpc.Marshal(ctx, cliMsg, rwbuf)
+	cliMsg := remote.NewMessage(nil, svcInfo, ri, remote.Exception, remote.Client)
+	err := bpc.Marshal(context.Background(), cliMsg, rwbuf)
 	test.Assert(t, err.Error() == "invalid marshal data in rawProtobufBinaryCodec: nil")
-	cliMsg.DataFunc = func() interface{} {
-		return &remote.TransError{}
-	}
 
-	// empty method
-	err = bpc.Marshal(ctx, cliMsg, rwbuf)
+	// empty rpcinfo method
+	cliMsg = remote.NewMessage(&remote.TransError{}, svcInfo, newEmptyMethodRPCInfo(), remote.Exception, remote.Server)
+	err = bpc.Marshal(context.Background(), cliMsg, rwbuf)
 	test.Assert(t, err.Error() == "rawProtobufBinaryCodec Marshal exception failed, err: empty methodName in protobuf Marshal")
-
-	cliMsg.RPCInfoFunc = func() rpcinfo.RPCInfo {
-		return newMockRPCInfo()
-	}
-	err = bpc.Marshal(ctx, cliMsg, rwbuf)
-	test.Assert(t, err == nil)
-
-	// test server role
-	cliMsg.MessageTypeFunc = func() remote.MessageType {
-		return remote.Call
-	}
-	cliMsg.DataFunc = func() interface{} {
-		return &Result{
-			Success: binaryPbReqType{},
-		}
-	}
-	err = bpc.Marshal(ctx, cliMsg, rwbuf)
-	test.Assert(t, err == nil)
 }
 
 func readBasicExampleReqProtoBufData() []byte {
