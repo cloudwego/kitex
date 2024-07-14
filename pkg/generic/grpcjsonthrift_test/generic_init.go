@@ -361,6 +361,7 @@ func echoUnaryHandler(ctx context.Context, handler interface{}, arg, result inte
 	realResult.Success = success
 	return nil
 }
+
 func newTestServiceEchoUnaryArgs() interface{} {
 	return kt.NewTestServiceEchoUnaryArgs()
 }
@@ -409,6 +410,7 @@ func echoPingPongHandler(ctx context.Context, handler interface{}, arg, result i
 	realResult.Success = success
 	return nil
 }
+
 func newTestServiceEchoPingPongArgs() interface{} {
 	return kt.ToApacheCodec(kt.NewTestServiceEchoPingPongArgs())
 }
