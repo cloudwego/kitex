@@ -47,6 +47,9 @@ const (
 	ExtensionFilename   = "extensions.yaml"
 
 	DefaultThriftPluginTimeLimit = time.Minute
+
+	// built in tpls
+	MultipleServicesTpl = "multiple_services"
 )
 
 var (
@@ -124,7 +127,7 @@ type Config struct {
 	FrugalPretouch        bool
 	ThriftPluginTimeLimit time.Duration
 	CompilerPath          string // specify the path of thriftgo or protoc
-	MultipleServices      bool
+	Tpl                   string // specify the template to use
 
 	ExtensionFile string
 	tmplExt       *TemplateExtension
@@ -289,6 +292,10 @@ func (c *Config) ApplyExtension() error {
 	return nil
 }
 
+func (c *Config) IsMultipleServicesTpl() bool {
+	return c.Tpl == MultipleServicesTpl
+}
+
 // NewGenerator .
 func NewGenerator(config *Config, middlewares []Middleware) Generator {
 	mws := append(globalMiddlewares, middlewares...)
@@ -338,7 +345,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		},
 	}
 	if !g.Config.GenerateInvoker {
-		if !g.Config.MultipleServices {
+		if !g.Config.IsMultipleServicesTpl() {
 			tasks = append(tasks, &Task{
 				Name: MainFileName,
 				Path: util.JoinPath(g.OutputPath, MainFileName),
@@ -369,7 +376,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		fs = append(fs, f)
 	}
 
-	if !g.Config.MultipleServices {
+	if !g.Config.IsMultipleServicesTpl() {
 		f, err := g.generateHandler(pkg, pkg.ServiceInfo, HandlerFileName)
 		if err != nil {
 			return nil, err
@@ -597,7 +604,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 	case MainFileName:
 		pkg.AddImport("log", "log")
-		if !g.Config.MultipleServices {
+		if !g.Config.IsMultipleServicesTpl() {
 			pkg.AddImport(pkg.PkgRefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
 		} else {
 			pkg.AddImport("server", "github.com/cloudwego/kitex/server")
