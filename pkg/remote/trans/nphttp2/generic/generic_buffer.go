@@ -97,12 +97,6 @@ func (b *Buffer) WritePayload(data []byte) (err error) {
 
 func (b *Buffer) Next(n int) (p []byte, err error) {
 	panic("implement me")
-	//b.growRbuf(n)
-	//_, err = b.conn.Read(b.rbuf[:n])
-	//if err != nil {
-	//	return nil, err
-	//}
-	//return b.rbuf[:n], nil
 }
 
 func (b *Buffer) Read(p []byte) (n int, err error) {
