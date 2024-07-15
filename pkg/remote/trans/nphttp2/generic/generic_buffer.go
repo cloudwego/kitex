@@ -36,7 +36,7 @@ type GenericConn interface {
 type Buffer struct {
 	conn       GenericConn
 	whdr, wbuf []byte        // for write
-	wSubBuf    *bytes.Buffer // for write // TODO: name
+	wSubBuf    *bytes.Buffer // for write. used to create wbuf
 }
 
 var (
