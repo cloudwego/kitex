@@ -16,7 +16,7 @@ type skipList struct {
 	// only for insert and delete
 	updateCache []*virtualNode
 	// node cache
-	nodeCache []*virtualNode
+	//nodeCache []*virtualNode
 }
 
 // newSkipList returns a new skip list
@@ -141,22 +141,8 @@ func (sl *skipList) randomLevel() int {
 	return level
 }
 
-func (sl *skipList) prepareNode(num int) {
-	if len(sl.nodeCache) < num {
-		sl.nodeCache = append(sl.nodeCache, make([]*virtualNode, num)...)
-	}
-}
-
 func (sl *skipList) makeNewVirtualNode(num int) []*virtualNode {
-	cacheLen := len(sl.nodeCache)
-	var res []*virtualNode
-	if cacheLen > num {
-		res = sl.nodeCache[:num]
-		sl.nodeCache = sl.nodeCache[num:]
-	} else {
-		res = make([]*virtualNode, num)
-	}
-	return res
+	return make([]*virtualNode, num)
 }
 
 func maxValue(a, b int) int {

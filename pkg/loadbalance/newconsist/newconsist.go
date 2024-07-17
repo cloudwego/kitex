@@ -4,7 +4,6 @@ import (
 	"github.com/bytedance/gopkg/util/xxhash3"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"math"
 	"sync"
 )
 
@@ -117,19 +116,24 @@ func (info *ConsistInfo) batchAddAllVirtual(realNode []discovery.Instance) {
 	}
 	info.prepareByteHash(maxNodeLen)
 
-	vns := make([]virtualNode, totalNode)
+	//vns := make([]virtualNode, totalNode)
 
-	var idx uint64 = 0
-	estimatedTotalNode := math.Round(nodeRatio * float64(totalNode))
-	info.virtualNodes.prepareNode(int(estimatedTotalNode))
+	//var idx uint64 = 0
+	//estimatedTotalNode := math.Round(nodeRatio * float64(totalNode))
+	//info.virtualNodes.prepareNode(int(estimatedTotalNode))
 	for i := 0; i < len(realNode); i++ {
 		vLen := info.getVirtualNodeLen(realNode[i])
 		addrByte := utils.StringToSliceByte(realNode[i].Address().String())
 		for j := 0; j < vLen; j++ {
-			vns[idx].realNode = realNode[i]
-			vns[idx].value = info.getVirtualNodeHash(addrByte, j)
-			info.virtualNodes.Insert(&vns[idx])
-			idx++
+			//vns[idx].realNode = realNode[i]
+			//vns[idx].value = info.getVirtualNodeHash(addrByte, j)
+			//info.virtualNodes.Insert(&vns[idx])
+			//idx++
+			v := &virtualNode{
+				realNode: realNode[i],
+				value:    info.getVirtualNodeHash(addrByte, j),
+			}
+			info.virtualNodes.Insert(v)
 		}
 	}
 

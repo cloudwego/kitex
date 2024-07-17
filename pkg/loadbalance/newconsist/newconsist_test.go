@@ -165,7 +165,7 @@ var (
 )
 
 func TestRebalanceMemory(t *testing.T) {
-	nums := 1000
+	nums := 10000
 	insList := make([]discovery.Instance, 0, nums)
 	for i := 0; i < nums; i++ {
 		insList = append(insList, discovery.NewInstance("tcp", "addr"+strconv.Itoa(i), 10, nil))
@@ -186,7 +186,7 @@ func TestRebalanceMemory(t *testing.T) {
 	}
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
-	t.Logf("Before Delete node, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+	t.Logf("Before Delete node, heap allocation: %f Mb, heap objects in use: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 
 	s := newConsist.virtualNodes
 	totalCnt := 0
@@ -196,7 +196,7 @@ func TestRebalanceMemory(t *testing.T) {
 	}
 	t.Logf("Before Delete node, total node cnt: %d\n", totalCnt)
 
-	for i := 0; i < 900; i++ {
+	for i := 0; i < 5000; i++ {
 		e.Instances = insList[i+1:]
 		change := discovery.Change{
 			Result:  e,
@@ -215,12 +215,12 @@ func TestRebalanceMemory(t *testing.T) {
 	t.Logf("After Delete node, total node cnt: %d\n", totalCnt)
 
 	runtime.ReadMemStats(&ms)
-	t.Logf("After Delete node, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+	t.Logf("After Delete node, heap allocation: %f Mb, heap objects in use: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 
-	//ciMap.Store("a", newConsist)
+	ciMap.Store("a", newConsist)
 	runtime.GC()
 	runtime.ReadMemStats(&ms)
-	t.Logf("After GC, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
+	t.Logf("After GC, heap allocation: %f Mb, heap objects in use: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 }
 
 func TestRebalanceDupilicate(t *testing.T) {
