@@ -3,6 +3,7 @@ package newconsist
 import (
 	"github.com/bytedance/gopkg/util/xxhash3"
 	"github.com/cloudwego/kitex/pkg/discovery"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"sync"
 )
@@ -59,8 +60,10 @@ func (info *ConsistInfo) BuildConsistentResult(value uint64) discovery.Instance 
 
 	if n := info.virtualNodes.FindGreater(value); n != nil {
 		return n.realNode
+	} else {
+		klog.Infof("[KITEX-DEBUG] BuildConsistentResult return nil, value=%d", value)
+		return nil
 	}
-	return nil
 }
 
 func (info *ConsistInfo) Rebalance(change discovery.Change) {

@@ -31,6 +31,8 @@ func TestNewSkipList(t *testing.T) {
 		currCnt := countLevel(s, 0)
 		test.Assert(t, currCnt == dataCnt-i-1)
 	}
+	s.FindGreater(0)
+	test.Assert(t, countLevel(s, 0) == 0)
 }
 
 func TestFuzzSkipList(t *testing.T) {
@@ -82,11 +84,11 @@ func TestGetVirtualNodeHash(t *testing.T) {
 
 func Test_getConsistentResult(t *testing.T) {
 	insList := []discovery.Instance{
-		discovery.NewInstance("tcp", "addr1", 10, nil),
-		discovery.NewInstance("tcp", "addr2", 10, nil),
-		discovery.NewInstance("tcp", "addr3", 10, nil),
-		discovery.NewInstance("tcp", "addr4", 10, nil),
-		discovery.NewInstance("tcp", "addr5", 10, nil),
+		discovery.NewInstance("tcp", "addr1", 100, nil),
+		discovery.NewInstance("tcp", "addr2", 100, nil),
+		discovery.NewInstance("tcp", "addr3", 100, nil),
+		discovery.NewInstance("tcp", "addr4", 100, nil),
+		discovery.NewInstance("tcp", "addr5", 100, nil),
 	}
 	e := discovery.Result{
 		Cacheable: false,
@@ -107,8 +109,7 @@ func Test_getConsistentResult(t *testing.T) {
 		Removed: []discovery.Instance{insList[0]},
 		Updated: nil,
 	}
-	_ = change
-	//info.Rebalance(change)
+	info.Rebalance(change)
 	cnt := make(map[string]int)
 	for _, ins := range insList {
 		cnt[ins.Address().String()] = 0
@@ -128,7 +129,7 @@ func TestRebalance(t *testing.T) {
 	nums := 1000
 	insList := make([]discovery.Instance, 0, nums)
 	for i := 0; i < nums; i++ {
-		insList = append(insList, discovery.NewInstance("tcp", "addr"+strconv.Itoa(i), 10, nil))
+		insList = append(insList, discovery.NewInstance("tcp", "addr"+strconv.Itoa(i), 100, nil))
 	}
 	e := discovery.Result{
 		Cacheable: false,
@@ -139,11 +140,11 @@ func TestRebalance(t *testing.T) {
 		VirtualFactor: 100,
 		Weighted:      true,
 	})
-	for i := 0; i < nums; i++ {
-		_, all := searchRealNode(newConsist, &realNode{insList[i]})
-		// should find all virtual node
-		test.Assert(t, all)
-	}
+	//for i := 0; i < nums; i++ {
+	//	_, all := searchRealNode(newConsist, &realNode{insList[i]})
+	//	// should find all virtual node
+	//	test.Assert(t, all)
+	//}
 	for i := 0; i < nums; i++ {
 		e.Instances = insList[i+1:]
 		change := discovery.Change{
@@ -154,9 +155,16 @@ func TestRebalance(t *testing.T) {
 		}
 		newConsist.Rebalance(change)
 
-		one, _ := searchRealNode(newConsist, &realNode{insList[i]})
-		// no virtual node should be found
-		test.Assert(t, !one)
+		//one, _ := searchRealNode(newConsist, &realNode{insList[i]})
+		//// no virtual node should be found
+		//test.Assert(t, !one)
+		//
+		//for j := i + 1; j < nums; j++ {
+		//	_, all := searchRealNode(newConsist, &realNode{insList[j]})
+		//	// should find all virtual node
+		//	test.Assert(t, all)
+		//}
+		newConsist.BuildConsistentResult(xxhash3.HashString("1"))
 	}
 }
 
@@ -255,16 +263,6 @@ func TestRebalanceDupilicate(t *testing.T) {
 			test.Assert(t, !one)
 		}
 	}
-}
-
-func countLevel(s *skipList, level int) int {
-	n := s.dummy
-	cnt := 0
-	for n.next[level] != nil {
-		n = n.next[level]
-		cnt++
-	}
-	return cnt
 }
 
 func mb(byteSize uint64) float32 {

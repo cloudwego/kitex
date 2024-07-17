@@ -1,9 +1,12 @@
 package newconsist
 
-import "github.com/bytedance/gopkg/lang/fastrand"
+import (
+	"github.com/bytedance/gopkg/lang/fastrand"
+	"github.com/cloudwego/kitex/pkg/klog"
+)
 
 const (
-	MAX_LEVEL = 32 // max level of skip list
+	MAX_LEVEL = 64 // max level of skip list
 )
 
 // TODO: optimize allocation
@@ -128,7 +131,12 @@ func (sl *skipList) FindGreater(value uint64) *virtualNode {
 		return res
 	} else {
 		// return the first node if not found since the skip list is treated as a ring
-		return sl.dummy.next[0]
+		res = sl.dummy.next[0]
+		if res == nil {
+			nodeCnt := countLevel(sl, 0)
+			klog.Infof("[KITEX-DEBUG] findgreater return nil, level=%d, node=%d", sl.totalLevel, nodeCnt)
+		}
+		return res
 	}
 }
 
@@ -151,4 +159,14 @@ func maxValue(a, b int) int {
 	} else {
 		return b
 	}
+}
+
+func countLevel(s *skipList, level int) int {
+	n := s.dummy
+	cnt := 0
+	for n.next[level] != nil {
+		n = n.next[level]
+		cnt++
+	}
+	return cnt
 }

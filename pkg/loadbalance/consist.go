@@ -165,6 +165,7 @@ func (cp *consistPicker) Next(ctx context.Context, request interface{}) discover
 	}
 	key := cp.cb.opt.GetKey(ctx, request)
 	if key == "" {
+		klog.CtxInfof(ctx, "KITEX-DEBUG: empty key")
 		return nil
 	}
 	return cp.info.BuildConsistentResult(xxhash3.HashString(key))
