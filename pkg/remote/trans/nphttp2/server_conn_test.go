@@ -45,7 +45,7 @@ func TestServerConn(t *testing.T) {
 	// test Read()
 	testStr := "1234567890"
 	testByte := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-	mockStreamRecv(s, testStr)
+	mockStreamRecv(s, testStr, nil)
 	n, err := serverConn.Read(testByte)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, n == len(testStr))

@@ -19,6 +19,7 @@ package nphttp2
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 	"net/url"
@@ -26,7 +27,6 @@ import (
 	"time"
 
 	"github.com/bytedance/gopkg/lang/dirtmake"
-
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
@@ -41,13 +41,16 @@ const (
 )
 
 type streamDesc struct {
-	isStreaming bool
+	interactionMode rpcinfo.InteractionMode
 }
 
 type clientConn struct {
 	tr   grpc.ClientTransport
 	s    *grpc.Stream
 	desc *streamDesc
+
+	// just for waiting status
+	tailbuf [1]byte
 }
 
 var _ GRPCConn = (*clientConn)(nil)
@@ -88,7 +91,6 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 		}
 		host = u.Host
 	}
-	isStreaming := ri.Config().InteractionMode() == rpcinfo.Streaming
 	invocation := ri.Invocation()
 	callHdr := &grpc.CallHdr{
 		Host: host,
@@ -105,7 +107,7 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 	return &clientConn{
 		tr:   tr,
 		s:    s,
-		desc: &streamDesc{isStreaming: isStreaming},
+		desc: &streamDesc{interactionMode: ri.Config().InteractionMode()},
 	}, nil
 }
 
@@ -131,6 +133,24 @@ func fullMethodName(pkg, svc, method string) string {
 // impl net.Conn
 func (c *clientConn) Read(b []byte) (n int, err error) {
 	n, err = c.s.Read(b)
+	if err == nil && !c.desc.interactionMode.IsServerStreaming() {
+		// Special handling for non-server-stream rpcs, this read expects EOF or errors.
+		_, err = c.s.Read(c.tailbuf[:])
+		// must be io.EOF
+		if err == nil {
+			err = errors.New("KITEX: grpc client streaming protocol violation: get <nil>, want <EOF>")
+			return
+		}
+		if err != io.EOF {
+			return
+		}
+		if bizStatusErr := c.s.BizStatusErr(); bizStatusErr != nil {
+			err = bizStatusErr
+		} else {
+			err = c.s.Status().Err()
+		}
+		return n, err
+	}
 	if err == io.EOF {
 		if status := c.s.Status(); status.Code() != codes.OK {
 			if bizStatusErr := c.s.BizStatusErr(); bizStatusErr != nil {
@@ -151,7 +171,7 @@ func (c *clientConn) Write(b []byte) (n int, err error) {
 }
 
 func (c *clientConn) WriteFrame(hdr, data []byte) (n int, err error) {
-	grpcConnOpt := &grpc.Options{Last: !c.desc.isStreaming}
+	grpcConnOpt := &grpc.Options{Last: !c.desc.interactionMode.IsStreaming()}
 	err = c.tr.Write(c.s, hdr, data, grpcConnOpt)
 	return len(hdr) + len(data), err
 }

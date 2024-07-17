@@ -395,11 +395,11 @@ func newMockServerTransport(npConn *mockNetpollConn) (grpc.ServerTransport, erro
 	return tr, err
 }
 
-func mockStreamRecv(s *grpc.Stream, data string) {
+func mockStreamRecv(s *grpc.Stream, data string, err error) {
 	buffer := new(bytes.Buffer)
 	buffer.Reset()
 	buffer.Write([]byte(data))
-	grpc.StreamWrite(s, buffer)
+	grpc.StreamWrite(s, buffer, err)
 }
 
 func newMockStreamRecvHelloRequest(s *grpc.Stream) {
@@ -407,7 +407,7 @@ func newMockStreamRecvHelloRequest(s *grpc.Stream) {
 	buffer := new(bytes.Buffer)
 	buffer.Reset()
 	buffer.Write(hdr)
-	grpc.StreamWrite(s, buffer)
+	grpc.StreamWrite(s, buffer, nil)
 }
 
 var _ remote.Message = &mockMessage{}

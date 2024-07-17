@@ -1771,6 +1771,45 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 	}
 }
 
+func TestReadEOF(t *testing.T) {
+	testRecvBuffer := newRecvBuffer()
+	s := &Stream{
+		ctx:         context.Background(),
+		buf:         testRecvBuffer,
+		requestRead: func(int) {},
+	}
+	s.trReader = &transportReader{
+		reader: &recvBufferReader{
+			ctx:        s.ctx,
+			ctxDone:    s.ctx.Done(),
+			recv:       s.buf,
+			freeBuffer: func(*bytes.Buffer) {},
+		},
+		windowHandler: func(int) {},
+	}
+	testData := make([]byte, 1)
+	testData[0] = 5
+	testBuffer := bytes.NewBuffer(testData)
+	s.write(recvMsg{buffer: testBuffer})
+	s.write(recvMsg{err: io.EOF})
+	inBuf := make([]byte, 1)
+	actualCount, actualErr := s.Read(inBuf)
+	if actualCount != 1 {
+		t.Errorf("actualCount, _ := s.Read(_) differs; want 1; got %v", actualCount)
+	}
+	if actualErr != nil {
+		t.Errorf("_, actualErr := s.Read(_) differs; want nil; got %v", actualErr)
+	}
+	inBuf = make([]byte, 1)
+	actualCount, actualErr = s.Read(inBuf)
+	if actualCount != 0 {
+		t.Errorf("actualCount, _ := s.Read(_) differs; want 0; got %v", actualCount)
+	}
+	if actualErr != io.EOF {
+		t.Errorf("_, actualErr := s.Read(_) differs; want io.EOF; got %v", actualErr)
+	}
+}
+
 // FIXME Test failed.
 // If the client sends an HTTP/2 request with a :method header with a value other than POST, as specified in
 // the gRPC over HTTP/2 specification, the server should close the stream.

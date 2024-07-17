@@ -17,6 +17,7 @@
 package nphttp2
 
 import (
+	"io"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -42,7 +43,8 @@ func TestClientConn(t *testing.T) {
 
 	// test Read()
 	testStr := "1234567890"
-	mockStreamRecv(clientConn.s, testStr)
+	mockStreamRecv(clientConn.s, testStr, nil)
+	mockStreamRecv(clientConn.s, testStr, io.EOF)
 	testByte := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 	n, err := clientConn.Read(testByte)
 	test.Assert(t, err == nil, err)
@@ -68,13 +70,13 @@ func TestClientConnStreamDesc(t *testing.T) {
 	ctx := newMockCtxWithRPCInfo()
 	ri := rpcinfo.GetRPCInfo(ctx)
 	test.Assert(t, ri != nil)
-	rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.Streaming)
+	rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.StreamingClient)
 	conn, err := connPool.Get(ctx, "tcp", mockAddr0, newMockConnOption())
 	test.Assert(t, err == nil, err)
 	defer conn.Close()
 	cn := conn.(*clientConn)
 	test.Assert(t, cn != nil)
-	test.Assert(t, cn.desc.isStreaming == true)
+	test.Assert(t, cn.desc.interactionMode.IsStreaming())
 
 	// pingpong
 	rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.PingPong)
@@ -83,7 +85,7 @@ func TestClientConnStreamDesc(t *testing.T) {
 	defer conn.Close()
 	cn = conn.(*clientConn)
 	test.Assert(t, cn != nil)
-	test.Assert(t, cn.desc.isStreaming == false)
+	test.Assert(t, !cn.desc.interactionMode.IsStreaming())
 }
 
 func Test_fullMethodName(t *testing.T) {

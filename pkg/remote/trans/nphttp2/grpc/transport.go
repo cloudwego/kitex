@@ -480,8 +480,8 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 }
 
 // StreamWrite only used for unit test
-func StreamWrite(s *Stream, buffer *bytes.Buffer) {
-	s.write(recvMsg{buffer: buffer})
+func StreamWrite(s *Stream, buffer *bytes.Buffer, err error) {
+	s.write(recvMsg{buffer: buffer, err: err})
 }
 
 // CreateStream only used for unit test. Create an independent stream out of http2client / http2server
