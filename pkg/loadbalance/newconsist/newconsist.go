@@ -71,6 +71,9 @@ func (info *ConsistInfo) Rebalance(change discovery.Change) {
 	defer info.mu.Unlock()
 
 	info.lastRes = change.Result
+	if len(change.Result.Instances) == 0 {
+		klog.Infof("[KITEX-DEBUG] Rebalance zero instances, key=%s", change.Result.CacheKey)
+	}
 	// update
 	// TODO: optimize update logic
 	if len(change.Updated) > 0 {
