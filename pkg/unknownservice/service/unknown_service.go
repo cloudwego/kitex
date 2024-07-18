@@ -14,18 +14,19 @@
  * limitations under the License.
  */
 
-package unknown
+package service
 
 import (
 	"context"
+
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 const (
 	// UnknownService name
 	UnknownService = "$UnknownService" // private as "$"
-	// UnknownCall name
-	UnknownMethod = "$UnknownCall"
+	// UnknownMethod name
+	UnknownMethod = "$UnknownMethod"
 )
 
 type Args struct {
@@ -41,7 +42,7 @@ type Result struct {
 }
 
 type UnknownMethodService interface {
-	UnknownMethodHandler(ctx context.Context, method string, request []byte) ([]byte, error)
+	UnknownMethodHandler(ctx context.Context, serviceName, method string, request []byte) ([]byte, error)
 }
 
 // NewServiceInfo create   serviceInfo
@@ -70,7 +71,6 @@ func SetServiceInfo(svcInfo *serviceinfo.ServiceInfo, pcType serviceinfo.Payload
 		method: serviceinfo.NewMethodInfo(callHandler, newServiceArgs, newServiceResult, false),
 	}
 	svcInfo.Methods = methods
-
 }
 
 func callHandler(ctx context.Context, handler, arg, result interface{}) error {
@@ -78,7 +78,7 @@ func callHandler(ctx context.Context, handler, arg, result interface{}) error {
 	realResult := result.(*Result)
 	realResult.Method = realArg.Method
 	realResult.ServiceName = realArg.ServiceName
-	success, err := handler.(UnknownMethodService).UnknownMethodHandler(ctx, realArg.Method, realArg.Request)
+	success, err := handler.(UnknownMethodService).UnknownMethodHandler(ctx, realArg.ServiceName, realArg.Method, realArg.Request)
 	if err != nil {
 		return err
 	}

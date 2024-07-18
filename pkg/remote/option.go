@@ -21,9 +21,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/unknownservice/service"
+
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/profiler"
-	unknown "github.com/cloudwego/kitex/pkg/remote/codec/unknown/service"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -114,7 +115,7 @@ type ServerOption struct {
 
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
 
-	UnknownMethodHandler unknown.UnknownMethodService
+	UnknownMethodService service.UnknownMethodService
 
 	// RefuseTrafficWithoutServiceName is used for a server with multi services
 	RefuseTrafficWithoutServiceName bool

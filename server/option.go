@@ -22,6 +22,8 @@ import (
 	"net"
 	"time"
 
+	service2 "github.com/cloudwego/kitex/pkg/unknownservice/service"
+
 	"github.com/cloudwego/localsession/backup"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
@@ -33,16 +35,13 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
-	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
-	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
-	"github.com/cloudwego/kitex/pkg/remote/codec/unknown"
-	unknowns "github.com/cloudwego/kitex/pkg/remote/codec/unknown/service"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/pkg/unknownservice"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -352,13 +351,14 @@ func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string
 	}}
 }
 
-// WithUnknownMethodHandler Inject an implementation of a method for handling unknown requests
-func WithUnknownMethodHandler(f unknowns.UnknownMethodService) Option {
+// WithUnknownServiceHandler Inject an implementation of a method for handling unknown requests
+// supporting only Thrift and Kitex protobuf protocols
+func WithUnknownServiceHandler(f service2.UnknownMethodService) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithUnknownMethodHandler(%+v)", utils.GetFuncName(f)))
-		o.RemoteOpt.UnknownMethodHandler = f
-		remote.PutPayloadCode(serviceinfo.Thrift, unknown.NewUnknownCodec(thrift.NewThriftCodec()))
-		remote.PutPayloadCode(serviceinfo.Protobuf, unknown.NewUnknownCodec(protobuf.NewProtobufCodec()))
+		o.RemoteOpt.UnknownMethodService = f
+		remote.PutPayloadCode(serviceinfo.Thrift, unknownservice.NewUnknownServiceCodec(thrift.NewThriftCodec()))
+		remote.PutPayloadCode(serviceinfo.Protobuf, unknownservice.NewUnknownServiceCodec(protobuf.NewProtobufCodec()))
 	}}
 }
 

@@ -21,12 +21,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	unknowns "github.com/cloudwego/kitex/pkg/remote/codec/unknown/service"
 	"net"
 	"reflect"
 	"runtime/debug"
 	"sync"
 	"time"
+
+	service2 "github.com/cloudwego/kitex/pkg/unknownservice/service"
 
 	"github.com/cloudwego/localsession/backup"
 
@@ -561,12 +562,12 @@ func (s *server) findAndSetDefaultService() {
 }
 
 func (s *server) registerUnknownMethodHandler() error {
-	if s.opt.RemoteOpt.UnknownMethodHandler != nil {
+	if s.opt.RemoteOpt.UnknownMethodService != nil {
 		if len(s.svcs.svcMap) == 1 && s.svcs.svcMap[serviceinfo.GenericService] != nil {
 			return errors.New("generic services do not support handling of unknown methods")
 		} else {
-			serviceInfo := unknowns.NewServiceInfo(serviceinfo.Thrift, unknowns.UnknownService, unknowns.UnknownMethod)
-			if err := s.RegisterService(serviceInfo, s.opt.RemoteOpt.UnknownMethodHandler); err != nil {
+			serviceInfo := service2.NewServiceInfo(serviceinfo.Thrift, service2.UnknownService, service2.UnknownMethod)
+			if err := s.RegisterService(serviceInfo, s.opt.RemoteOpt.UnknownMethodService); err != nil {
 				return err
 			}
 		}

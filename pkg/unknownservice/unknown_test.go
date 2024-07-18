@@ -14,21 +14,23 @@
  * limitations under the License.
  */
 
-package unknown
+package unknownservice
 
 import (
 	"context"
+	"testing"
+
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/internal/mocks"
-	mt "github.com/cloudwego/kitex/internal/mocks/thrift/fast"
+	mt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
-	unknown "github.com/cloudwego/kitex/pkg/remote/codec/unknown/service"
 	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/unknownservice/service"
 	"github.com/cloudwego/kitex/transport"
-	"github.com/cloudwego/netpoll"
-	"testing"
 )
 
 var (
@@ -43,14 +45,18 @@ func TestNormal(t *testing.T) {
 	ctx := context.Background()
 	err := payloadCodec.Marshal(ctx, sendMsg, buf)
 	test.Assert(t, err == nil, err)
-	buf.Flush()
+	err = buf.Flush()
+	test.Assert(t, err == nil, err)
 	recvMsg := initRecvMsg()
 	recvMsg.SetPayloadLen(buf.ReadableLen())
+	_, size, err := peekMethod(buf)
+	test.Assert(t, err == nil, err)
 	err = payloadCodec.Unmarshal(ctx, recvMsg, buf)
 	test.Assert(t, err == nil, err)
 
-	req := (sendMsg.Data()).(*unknown.Result).Success
-	resp := (recvMsg.Data()).(*unknown.Args).Request
+	req := (sendMsg.Data()).(*service.Result).Success
+	resp := (recvMsg.Data()).(*service.Args).Request
+	resp = resp[size+4:]
 	for i, item := range req {
 		test.Assert(t, item == resp[i])
 	}
@@ -76,23 +82,21 @@ func initSendMsg(tp transport.Protocol) remote.Message {
 	length := _args.BLength()
 	bytes := make([]byte, length)
 	_args.FastWriteNocopy(bytes, nil)
-	arg := unknown.Result{Success: bytes, Method: "mock", ServiceName: ""}
-
-	ink := rpcinfo.NewInvocation("", unknown.UnknownMethod)
+	arg := service.Result{Success: bytes, Method: "mock", ServiceName: ""}
+	ink := rpcinfo.NewInvocation("", service.UnknownMethod)
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
 
 	msg := remote.NewMessage(&arg, svcInfo, ri, remote.Call, remote.Client)
 
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
-
 }
 
 func initRecvMsg() remote.Message {
-	arg := unknown.Args{Request: make([]byte, 0), Method: "mock", ServiceName: ""}
-	ink := rpcinfo.NewInvocation("", unknown.UnknownMethod)
+	arg := service.Args{Request: make([]byte, 0), Method: "mock", ServiceName: ""}
+	ink := rpcinfo.NewInvocation("", service.UnknownMethod)
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	svc := unknown.NewServiceInfo(svcInfo.PayloadCodec, unknown.UnknownService, unknown.UnknownMethod)
+	svc := service.NewServiceInfo(svcInfo.PayloadCodec, service.UnknownService, service.UnknownMethod)
 	msg := remote.NewMessage(&arg, svc, ri, remote.Call, remote.Server)
 	return msg
 }
