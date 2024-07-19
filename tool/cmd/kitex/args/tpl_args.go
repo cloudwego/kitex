@@ -135,6 +135,8 @@ func (a *Arguments) TemplateArgs(version, curpath string) error {
 	renderCmd.Flags().StringVar(&a.ModuleName, "module", "",
 		"Specify the Go module name to generate go.mod.")
 	renderCmd.Flags().StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")
+	renderCmd.Flags().StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
+		"Specify a code gen path.")
 	renderCmd.Flags().StringVar(&a.TemplateFile, "f", "", "Specify template init path")
 	initCmd.SetUsageFunc(func() {
 		fmt.Fprintf(os.Stderr, `Version %s

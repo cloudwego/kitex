@@ -15,13 +15,11 @@
 package util
 
 import (
-	"bytes"
 	"errors"
 	goflag "flag"
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -118,22 +116,6 @@ type SliceValue interface {
 	GetSlice() []string
 }
 
-// sortFlags returns the flags as a slice in lexicographical sorted order.
-func sortFlags(flags map[NormalizedName]*Flag) []*Flag {
-	list := make(sort.StringSlice, len(flags))
-	i := 0
-	for k := range flags {
-		list[i] = string(k)
-		i++
-	}
-	list.Sort()
-	result := make([]*Flag, len(list))
-	for i, name := range list {
-		result[i] = flags[NormalizedName(name)]
-	}
-	return result
-}
-
 // SetNormalizeFunc allows you to add a function which can translate flag names.
 // Flags added to the FlagSet will be translated and then when anything tries to
 // look up the flag that will also be translated. So it would be possible to create
@@ -182,185 +164,6 @@ func (f *FlagSet) out() io.Writer {
 // If output is nil, os.Stderr is used.
 func (f *FlagSet) SetOutput(output io.Writer) {
 	f.output = output
-}
-
-// VisitAll visits the flags in lexicographical order or
-// in primordial order if f.SortFlags is false, calling fn for each.
-// It visits all flags, even those not set.
-func (f *FlagSet) VisitAll(fn func(*Flag)) {
-	if len(f.formal) == 0 {
-		return
-	}
-
-	var flags []*Flag
-	if f.SortFlags {
-		if len(f.formal) != len(f.sortedFormal) {
-			f.sortedFormal = sortFlags(f.formal)
-		}
-		flags = f.sortedFormal
-	} else {
-		flags = f.orderedFormal
-	}
-
-	for _, flag := range flags {
-		fn(flag)
-	}
-}
-
-// HasFlags returns a bool to indicate if the FlagSet has any flags defined.
-func (f *FlagSet) HasFlags() bool {
-	return len(f.formal) > 0
-}
-
-// HasAvailableFlags returns a bool to indicate if the FlagSet has any flags
-// that are not hidden.
-func (f *FlagSet) HasAvailableFlags() bool {
-	for _, flag := range f.formal {
-		if !flag.Hidden {
-			return true
-		}
-	}
-	return false
-}
-
-// VisitAll visits the command-line flags in lexicographical order or
-// in primordial order if f.SortFlags is false, calling fn for each.
-// It visits all flags, even those not set.
-func VisitAll(fn func(*Flag)) {
-	CommandLine.VisitAll(fn)
-}
-
-// Visit visits the flags in lexicographical order or
-// in primordial order if f.SortFlags is false, calling fn for each.
-// It visits only those flags that have been set.
-func (f *FlagSet) Visit(fn func(*Flag)) {
-	if len(f.actual) == 0 {
-		return
-	}
-
-	var flags []*Flag
-	if f.SortFlags {
-		if len(f.actual) != len(f.sortedActual) {
-			f.sortedActual = sortFlags(f.actual)
-		}
-		flags = f.sortedActual
-	} else {
-		flags = f.orderedActual
-	}
-
-	for _, flag := range flags {
-		fn(flag)
-	}
-}
-
-// Visit visits the command-line flags in lexicographical order or
-// in primordial order if f.SortFlags is false, calling fn for each.
-// It visits only those flags that have been set.
-func Visit(fn func(*Flag)) {
-	CommandLine.Visit(fn)
-}
-
-// Lookup returns the Flag structure of the named flag, returning nil if none exists.
-func (f *FlagSet) Lookup(name string) *Flag {
-	return f.lookup(f.normalizeFlagName(name))
-}
-
-// ShorthandLookup returns the Flag structure of the short handed flag,
-// returning nil if none exists.
-// It panics, if len(name) > 1.
-func (f *FlagSet) ShorthandLookup(name string) *Flag {
-	if name == "" {
-		return nil
-	}
-	if len(name) > 1 {
-		msg := fmt.Sprintf("can not look up shorthand which is more than one ASCII character: %q", name)
-		fmt.Fprintf(f.out(), msg)
-		panic(msg)
-	}
-	c := name[0]
-	return f.shorthands[c]
-}
-
-// lookup returns the Flag structure of the named flag, returning nil if none exists.
-func (f *FlagSet) lookup(name NormalizedName) *Flag {
-	return f.formal[name]
-}
-
-// func to return a given type for a given flag name
-func (f *FlagSet) getFlagType(name string, ftype string, convFunc func(sval string) (interface{}, error)) (interface{}, error) {
-	flag := f.Lookup(name)
-	if flag == nil {
-		err := fmt.Errorf("flag accessed but not defined: %s", name)
-		return nil, err
-	}
-
-	sval := flag.Value.String()
-	result, err := convFunc(sval)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
-// ArgsLenAtDash will return the length of f.Args at the moment when a -- was
-// found during arg parsing. This allows your program to know which args were
-// before the -- and which came after.
-func (f *FlagSet) ArgsLenAtDash() int {
-	return f.argsLenAtDash
-}
-
-// MarkDeprecated indicated that a flag is deprecated in your program. It will
-// continue to function but will not show up in help or usage messages. Using
-// this flag will also print the given usageMessage.
-func (f *FlagSet) MarkDeprecated(name string, usageMessage string) error {
-	flag := f.Lookup(name)
-	if flag == nil {
-		return fmt.Errorf("flag %q does not exist", name)
-	}
-	if usageMessage == "" {
-		return fmt.Errorf("deprecated message for flag %q must be set", name)
-	}
-	flag.Deprecated = usageMessage
-	flag.Hidden = true
-	return nil
-}
-
-// MarkShorthandDeprecated will mark the shorthand of a flag deprecated in your
-// program. It will continue to function but will not show up in help or usage
-// messages. Using this flag will also print the given usageMessage.
-func (f *FlagSet) MarkShorthandDeprecated(name string, usageMessage string) error {
-	flag := f.Lookup(name)
-	if flag == nil {
-		return fmt.Errorf("flag %q does not exist", name)
-	}
-	if usageMessage == "" {
-		return fmt.Errorf("deprecated message for flag %q must be set", name)
-	}
-	flag.ShorthandDeprecated = usageMessage
-	return nil
-}
-
-// MarkHidden sets a flag to 'hidden' in your program. It will continue to
-// function but will not show up in help or usage messages.
-func (f *FlagSet) MarkHidden(name string) error {
-	flag := f.Lookup(name)
-	if flag == nil {
-		return fmt.Errorf("flag %q does not exist", name)
-	}
-	flag.Hidden = true
-	return nil
-}
-
-// Lookup returns the Flag structure of the named command-line flag,
-// returning nil if none exists.
-func Lookup(name string) *Flag {
-	return CommandLine.Lookup(name)
-}
-
-// ShorthandLookup returns the Flag structure of the short handed flag,
-// returning nil if none exists.
-func ShorthandLookup(name string) *Flag {
-	return CommandLine.ShorthandLookup(name)
 }
 
 // Set sets the value of the named flag.
@@ -414,27 +217,9 @@ func (f *FlagSet) SetAnnotation(name, key string, values []string) error {
 	return nil
 }
 
-// Changed returns true if the flag was explicitly set during Parse() and false
-// otherwise
-func (f *FlagSet) Changed(name string) bool {
-	flag := f.Lookup(name)
-	// If a flag doesn't exist, it wasn't changed....
-	if flag == nil {
-		return false
-	}
-	return flag.Changed
-}
-
 // Set sets the value of the named command-line flag.
 func Set(name, value string) error {
 	return CommandLine.Set(name, value)
-}
-
-// PrintDefaults prints, to standard error unless configured
-// otherwise, the default values of all defined flags in the set.
-func (f *FlagSet) PrintDefaults() {
-	usages := f.FlagUsages()
-	fmt.Fprint(f.out(), usages)
 }
 
 // UnquoteUsage extracts a back-quoted name from the usage
@@ -528,87 +313,6 @@ func wrap(i, w int, s string) string {
 
 	return r
 
-}
-
-// FlagUsagesWrapped returns a string containing the usage information
-// for all flags in the FlagSet. Wrapped to `cols` columns (0 for no
-// wrapping)
-func (f *FlagSet) FlagUsagesWrapped(cols int) string {
-	buf := new(bytes.Buffer)
-
-	lines := make([]string, 0, len(f.formal))
-
-	maxlen := 0
-	f.VisitAll(func(flag *Flag) {
-		if flag.Hidden {
-			return
-		}
-
-		line := ""
-		if flag.Shorthand != "" && flag.ShorthandDeprecated == "" {
-			line = fmt.Sprintf("  -%s, --%s", flag.Shorthand, flag.Name)
-		} else {
-			line = fmt.Sprintf("      --%s", flag.Name)
-		}
-
-		varname, usage := UnquoteUsage(flag)
-		if varname != "" {
-			line += " " + varname
-		}
-
-		// This special character will be replaced with spacing once the
-		// correct alignment is calculated
-		line += "\x00"
-		if len(line) > maxlen {
-			maxlen = len(line)
-		}
-
-		line += usage
-		if len(flag.Deprecated) != 0 {
-			line += fmt.Sprintf(" (DEPRECATED: %s)", flag.Deprecated)
-		}
-
-		lines = append(lines, line)
-	})
-
-	for _, line := range lines {
-		sidx := strings.Index(line, "\x00")
-		spacing := strings.Repeat(" ", maxlen-sidx)
-		// maxlen + 2 comes from + 1 for the \x00 and + 1 for the (deliberate) off-by-one in maxlen-sidx
-		fmt.Fprintln(buf, line[:sidx], spacing, wrap(maxlen+2, cols, line[sidx+1:]))
-	}
-
-	return buf.String()
-}
-
-// FlagUsages returns a string containing the usage information for all flags in
-// the FlagSet
-func (f *FlagSet) FlagUsages() string {
-	return f.FlagUsagesWrapped(0)
-}
-
-// PrintDefaults prints to standard error the default values of all defined command-line flags.
-func PrintDefaults() {
-	CommandLine.PrintDefaults()
-}
-
-// defaultUsage is the default function to print a usage message.
-func defaultUsage(f *FlagSet) {
-	fmt.Fprintf(f.out(), "Usage of %s:\n", f.name)
-	f.PrintDefaults()
-}
-
-// NOTE: Usage is not just defaultUsage(CommandLine)
-// because it serves (via godoc flag Usage) as the example
-// for how to write your own usage function.
-
-// Usage prints to standard error a usage message documenting all defined command-line flags.
-// The function is a variable that may be changed to point to a custom function.
-// By default it prints a simple header and calls PrintDefaults; for details about the
-// format of the output and how to control it, see the documentation for PrintDefaults.
-var Usage = func() {
-	fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
-	PrintDefaults()
 }
 
 // NFlag returns the number of flags that have been set.
@@ -712,19 +416,6 @@ func (f *FlagSet) AddFlag(flag *Flag) {
 	f.shorthands[c] = flag
 }
 
-// AddFlagSet adds one FlagSet to another. If a flag is already present in f
-// the flag from newSet will be ignored.
-func (f *FlagSet) AddFlagSet(newSet *FlagSet) {
-	if newSet == nil {
-		return
-	}
-	newSet.VisitAll(func(flag *Flag) {
-		if f.Lookup(flag.Name) == nil {
-			f.AddFlag(flag)
-		}
-	})
-}
-
 // Var defines a flag with the specified name and usage string. The type and
 // value of the flag are represented by the first argument, of type Value, which
 // typically holds a user-defined implementation of Value. For instance, the
@@ -746,21 +437,8 @@ func (f *FlagSet) failf(format string, a ...interface{}) error {
 	err := fmt.Errorf(format, a...)
 	if f.errorHandling != ContinueOnError {
 		fmt.Fprintln(f.out(), err)
-		f.usage()
 	}
 	return err
-}
-
-// usage calls the Usage method for the flag set, or the usage function if
-// the flag set is CommandLine.
-func (f *FlagSet) usage() {
-	if f == CommandLine {
-		Usage()
-	} else if f.Usage == nil {
-		defaultUsage(f)
-	} else {
-		f.Usage()
-	}
 }
 
 // --unknown (args will be empty)
@@ -800,7 +478,6 @@ func (f *FlagSet) parseLongArg(s string, args []string, fn parseFunc) (a []strin
 	if !exists {
 		switch {
 		case name == "help":
-			f.usage()
 			return a, ErrHelp
 		case f.ParseErrorsWhitelist.UnknownFlags:
 			// --unknown=unknownval arg ...
@@ -854,7 +531,6 @@ func (f *FlagSet) parseSingleShortArg(shorthands string, args []string, fn parse
 	if !exists {
 		switch {
 		case c == 'h':
-			f.usage()
 			err = ErrHelp
 			return
 		case f.ParseErrorsWhitelist.UnknownFlags:

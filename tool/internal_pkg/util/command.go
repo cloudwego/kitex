@@ -55,7 +55,6 @@ func (c *Command) Flags() *FlagSet {
 // PrintUsage prints the usage of the Command
 func (c *Command) PrintUsage() {
 	log.Warn("Usage: %s\n\n%s\n\n", c.Use, c.Long)
-	c.flags.PrintDefaults()
 	for _, cmd := range c.commands {
 		log.Warnf("  %s: %s\n", cmd.Use, cmd.Short)
 	}
