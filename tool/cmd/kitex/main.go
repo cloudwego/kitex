@@ -78,6 +78,9 @@ func main() {
 	}
 	if os.Args[1] == "template" {
 		err = args.TemplateArgs(kitex.Version, curpath)
+	} else if os.Args[1] != "template" {
+		log.Warnf("Unknown command %q", os.Args[1])
+		os.Exit(1)
 	} else {
 		// run as kitex
 		err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])

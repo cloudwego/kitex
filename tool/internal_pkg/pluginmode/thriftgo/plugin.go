@@ -107,7 +107,7 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		files = append(files, fs...)
 	}
 
-	if conv.Config.TplDir != "" {
+	if conv.Config.RenderTplDir != "" {
 		if len(conv.Services) == 0 {
 			return conv.failResp(errors.New("no service defined in the IDL"))
 		}
