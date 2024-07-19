@@ -194,8 +194,10 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 		return nil, NewTransErrorWithMsg(NoServiceName, "no service name while the server has WithRefuseTrafficWithoutServiceName option enabled")
 	}
 	var key string
-	// when client does not pass svcName or uses combine service, fallback to searching for svcInfo by method name alone
-	if svcName == "" || svcName == serviceinfo.CombineService || svcName == serviceinfo.CombineService_ {
+	// when client does not pass svcName or passes a special service name, fallback to searching for svcInfo by method name alone
+	// note: This special name fallback logic shouldn't ideally be here, but it's needed to keep compatibility with older versions (<= v0.10.1)
+	// due to a mistake in the first release of the multi-service feature
+	if svcName == "" || isSpecialName(svcName) {
 		key = methodName
 	} else {
 		key = BuildMultiServiceKey(svcName, methodName)
@@ -286,6 +288,10 @@ func (m *message) SetPayloadCodec(pc PayloadCodec) {
 func (m *message) Recycle() {
 	m.zero()
 	messagePool.Put(m)
+}
+
+func isSpecialName(svcName string) bool {
+	return svcName == serviceinfo.GenericService || svcName == serviceinfo.CombineService || svcName == serviceinfo.CombineService_
 }
 
 // TransInfo contains transport information.
