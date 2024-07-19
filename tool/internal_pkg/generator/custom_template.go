@@ -240,7 +240,7 @@ func (g *generator) GenerateCustomPackageWithTpl(pkg *PackageInfo) (fs []*File, 
 
 	g.setImports(HandlerFileName, pkg)
 	var tpls []*Template
-	tpls, err = readTpls(g.TplDir, g.TplDir, tpls)
+	tpls, err = readTpls(g.RenderTplDir, g.RenderTplDir, tpls)
 	if err != nil {
 		return nil, err
 	}

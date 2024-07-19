@@ -51,7 +51,7 @@ func init() {
 	if err := versions.RegisterMinDepVersion(
 		&versions.MinDepVersion{
 			RefPath: "github.com/cloudwego/kitex",
-			Version: "v0.9.0",
+			Version: "v0.11.0",
 		},
 	); err != nil {
 		log.Warn(err)
@@ -78,6 +78,9 @@ func main() {
 	}
 	if os.Args[1] == "template" {
 		err = args.TemplateArgs(kitex.Version, curpath)
+	} else if !strings.HasPrefix(os.Args[1], "-") {
+		log.Warnf("Unknown command %q", os.Args[1])
+		os.Exit(1)
 	} else {
 		// run as kitex
 		err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])

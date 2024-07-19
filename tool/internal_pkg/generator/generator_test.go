@@ -59,10 +59,7 @@ func TestConfig_Pack(t *testing.T) {
 		InitOutputDir         string
 		InitType              string
 		RenderTplDir          string
-		TemplateFiles         []string
-		DebugTpl              bool
-		IncludesTpl           string
-		MetaFlags             string
+		TemplateFile          string
 		Protocol              string
 		HandlerReturnKeepResp bool
 	}
@@ -76,7 +73,7 @@ func TestConfig_Pack(t *testing.T) {
 		{
 			name:    "some",
 			fields:  fields{Features: []feature{feature(999)}, ThriftPluginTimeLimit: 30 * time.Second},
-			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "Hessian2Options=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "ProtobufPlugins=", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "CompilerPath=", "ExtensionFile=", "Record=false", "RecordCmd=", "TemplateDir=", "InitOutputDir=", "InitType=", "RenderTplDir=", "TemplateFiles=", "DebugTpl=false", "IncludesTpl=", "MetaFlags=", "GenPath=", "DeepCopyAPI=false", "Protocol=", "HandlerReturnKeepResp=false", "NoDependencyCheck=false"},
+			wantRes: []string{"Verbose=false", "GenerateMain=false", "GenerateInvoker=false", "Version=", "NoFastAPI=false", "ModuleName=", "ServiceName=", "Use=", "IDLType=", "Includes=", "ThriftOptions=", "ProtobufOptions=", "Hessian2Options=", "IDL=", "OutputPath=", "PackagePrefix=", "CombineService=false", "CopyIDL=false", "ProtobufPlugins=", "Features=999", "FrugalPretouch=false", "ThriftPluginTimeLimit=30s", "CompilerPath=", "ExtensionFile=", "Record=false", "RecordCmd=", "TemplateDir=", "InitOutputDir=", "InitType=", "RenderTplDir=", "TemplateFile=", "GenPath=", "DeepCopyAPI=false", "Protocol=", "HandlerReturnKeepResp=false", "NoDependencyCheck=false"},
 		},
 	}
 	for _, tt := range tests {
@@ -107,9 +104,7 @@ func TestConfig_Pack(t *testing.T) {
 				InitOutputDir:         tt.fields.InitOutputDir,
 				InitType:              tt.fields.InitType,
 				RenderTplDir:          tt.fields.RenderTplDir,
-				TemplateFiles:         tt.fields.TemplateFiles,
-				IncludesTpl:           tt.fields.IncludesTpl,
-				MetaFlags:             tt.fields.MetaFlags,
+				TemplateFile:          tt.fields.TemplateFile,
 				Protocol:              tt.fields.Protocol,
 			}
 			if gotRes := c.Pack(); !reflect.DeepEqual(gotRes, tt.wantRes) {
