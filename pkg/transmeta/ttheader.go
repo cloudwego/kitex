@@ -80,7 +80,12 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 	}
 	transInfo.PutTransIntInfo(hd)
 	idlSvcName := ri.Invocation().ServiceName()
-	if idlSvcName != serviceinfo.GenericService {
+	var isCombineService bool
+	val, exists := msg.ServiceInfo().Extra["combine_service"]
+	if exists {
+		isCombineService, _ = val.(bool)
+	}
+	if idlSvcName != serviceinfo.GenericService && !isCombineService {
 		transInfo.PutTransStrInfo(map[string]string{transmeta.HeaderIDLServiceName: idlSvcName})
 	}
 	return ctx, nil
