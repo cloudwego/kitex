@@ -38,36 +38,43 @@ func TestSetTransportProtocol(t *testing.T) {
 	t.Run("set-ttheader", func(t *testing.T) {
 		c := rpcinfo.NewRPCConfig()
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.TTHeader)
-		test.Assert(t, c.TransportProtocol() == transport.TTHeader, c.TransportProtocol())
+		test.Assert(t, c.TransportProtocol()&transport.TTHeader == transport.TTHeader, c.TransportProtocol())
 	})
 	t.Run("set-framed", func(t *testing.T) {
 		c := rpcinfo.NewRPCConfig()
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.Framed)
-		test.Assert(t, c.TransportProtocol() == transport.Framed, c.TransportProtocol())
+		test.Assert(t, c.TransportProtocol()&transport.Framed == transport.Framed, c.TransportProtocol())
 	})
 	t.Run("set-purepayload", func(t *testing.T) {
 		c := rpcinfo.NewRPCConfig()
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.PurePayload)
+		// PurePayload would override all the bits set before, so we use equality operations
+		// rather than bitwise operations to judge
 		test.Assert(t, c.TransportProtocol() == transport.PurePayload, c.TransportProtocol())
 	})
 	t.Run("set-ttheader-framed", func(t *testing.T) {
 		c := rpcinfo.NewRPCConfig()
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.TTHeaderFramed)
-		test.Assert(t, c.TransportProtocol() == transport.TTHeaderFramed, c.TransportProtocol())
+		test.Assert(t, c.TransportProtocol()&transport.TTHeaderFramed == transport.TTHeaderFramed, c.TransportProtocol())
+	})
+	t.Run("set-grpc", func(t *testing.T) {
+		c := rpcinfo.NewRPCConfig()
+		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.GRPC)
+		test.Assert(t, c.TransportProtocol()&transport.GRPC == transport.GRPC, c.TransportProtocol())
 	})
 	t.Run("set-ttheader-set-framed", func(t *testing.T) {
 		c := rpcinfo.NewRPCConfig()
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.TTHeader)
-		test.Assert(t, c.TransportProtocol() == transport.TTHeader, c.TransportProtocol())
+		test.Assert(t, c.TransportProtocol()&transport.TTHeader == transport.TTHeader, c.TransportProtocol())
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.Framed)
-		test.Assert(t, c.TransportProtocol() == transport.TTHeaderFramed, c.TransportProtocol())
+		test.Assert(t, c.TransportProtocol()&transport.TTHeaderFramed == transport.TTHeaderFramed, c.TransportProtocol())
 	})
 	t.Run("set-framed-set-ttheader", func(t *testing.T) {
 		c := rpcinfo.NewRPCConfig()
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.Framed)
-		test.Assert(t, c.TransportProtocol() == transport.Framed, c.TransportProtocol())
+		test.Assert(t, c.TransportProtocol()&transport.Framed == transport.Framed, c.TransportProtocol())
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.TTHeader)
-		test.Assert(t, c.TransportProtocol() == transport.TTHeaderFramed, c.TransportProtocol())
+		test.Assert(t, c.TransportProtocol()&transport.TTHeaderFramed == transport.TTHeaderFramed, c.TransportProtocol())
 	})
 	t.Run("set-framed-set-grpc", func(t *testing.T) {
 		c := rpcinfo.NewRPCConfig()
@@ -79,7 +86,7 @@ func TestSetTransportProtocol(t *testing.T) {
 	t.Run("set-framed-set-purepayload", func(t *testing.T) {
 		c := rpcinfo.NewRPCConfig()
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.Framed)
-		test.Assert(t, c.TransportProtocol() == transport.Framed, c.TransportProtocol())
+		test.Assert(t, c.TransportProtocol()&transport.Framed == transport.Framed, c.TransportProtocol())
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.PurePayload)
 		test.Assert(t, c.TransportProtocol() == transport.PurePayload, c.TransportProtocol())
 	})
@@ -99,7 +106,7 @@ func TestSetTransportProtocol(t *testing.T) {
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.TTHeader)
 		test.Assert(t, c.TransportProtocol()&transport.TTHeaderFramed == transport.TTHeaderFramed, c.TransportProtocol())
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.PurePayload)
-		test.Assert(t, c.TransportProtocol()&transport.PurePayload == transport.PurePayload, c.TransportProtocol())
+		test.Assert(t, c.TransportProtocol() == transport.PurePayload, c.TransportProtocol())
 	})
 	t.Run("set-grpc-set-framed", func(t *testing.T) {
 		c := rpcinfo.NewRPCConfig()
@@ -113,9 +120,9 @@ func TestSetTransportProtocol(t *testing.T) {
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.GRPC)
 		test.Assert(t, c.TransportProtocol()&transport.GRPC == transport.GRPC, c.TransportProtocol())
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.Framed)
-		test.Assert(t, (c.TransportProtocol()&transport.Framed == transport.Framed) && (c.TransportProtocol()&transport.GRPC == transport.GRPC), c.TransportProtocol())
+		test.Assert(t, (c.TransportProtocol()&transport.GRPC == transport.GRPC) && (c.TransportProtocol()&transport.Framed == transport.Framed), c.TransportProtocol())
 		_ = rpcinfo.AsMutableRPCConfig(c).SetTransportProtocol(transport.TTHeader)
-		test.Assert(t, (c.TransportProtocol()&transport.TTHeaderFramed == transport.TTHeaderFramed) && (c.TransportProtocol()&transport.GRPC == transport.GRPC), c.TransportProtocol())
+		test.Assert(t, (c.TransportProtocol()&transport.GRPC == transport.GRPC) && (c.TransportProtocol()&transport.TTHeaderFramed == transport.TTHeaderFramed), c.TransportProtocol())
 	})
 	t.Run("set-ttheader-set-grpc", func(t *testing.T) {
 		c := rpcinfo.NewRPCConfig()
