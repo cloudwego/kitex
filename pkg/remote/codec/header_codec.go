@@ -117,6 +117,8 @@ const (
 type ttHeader struct{}
 
 func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (totalLenField []byte, err error) {
+	mallocLenBefore := out.MallocLen()
+
 	// 1. header meta
 	var headerMeta []byte
 	headerMeta, err = out.Malloc(TTHeaderMetaSize)
@@ -153,6 +155,12 @@ func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote
 		return nil, perrors.NewProtocolErrorWithMsg(fmt.Sprintf("invalid header length[%d]", headerInfoSize))
 	}
 	binary.BigEndian.PutUint16(headerInfoSizeField, uint16(headerInfoSize/4))
+	if message.PayloadLen() != 0 {
+		// payload encoded before. set total length here.
+		headerLen := out.MallocLen() - mallocLenBefore
+		totalLen := message.PayloadLen() + headerLen - Size32
+		binary.BigEndian.PutUint32(totalLenField, uint32(totalLen))
+	}
 	return totalLenField, err
 }
 

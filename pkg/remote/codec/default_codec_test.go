@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/cloudwego/netpoll"
@@ -262,6 +264,149 @@ func TestDefaultSizedCodec_Encode_Decode(t *testing.T) {
 	}
 }
 
+func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
+	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
+
+	dc := NewDefaultCodecWithConfig(CodecConfig{CRC32Check: true})
+	ctx := context.Background()
+	intKVInfo := prepareIntKVInfo()
+	strKVInfo := prepareStrKVInfo()
+	payloadLen := 32 * 1024
+	sendMsg := initClientSendMsg(transport.TTHeaderFramed, payloadLen)
+	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
+	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
+
+	// test encode err
+	badOut := netpolltrans.NewReaderByteBuffer(netpoll.NewLinkBuffer())
+	err := dc.Encode(ctx, sendMsg, badOut)
+	test.Assert(t, err != nil)
+
+	// encode with netpollBytebuffer
+	npBuffer := netpolltrans.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer())
+	err = dc.Encode(ctx, sendMsg, npBuffer)
+	test.Assert(t, err == nil, err)
+
+	// decode, succeed
+	recvMsg := initServerRecvMsg()
+	buf, err := npBuffer.Bytes()
+	test.Assert(t, err == nil, err)
+	in := remote.NewReaderBuffer(buf)
+	err = dc.Decode(ctx, recvMsg, in)
+	test.Assert(t, err == nil, err)
+	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
+	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
+	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
+	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
+	test.Assert(t, sendMsg.RPCInfo().Invocation().SeqID() == recvMsg.RPCInfo().Invocation().SeqID())
+
+	// decode, crc32c check failed
+	test.Assert(t, err == nil, err)
+	bufLen := len(buf)
+	modifiedBuf := make([]byte, bufLen)
+	copy(modifiedBuf, buf)
+	for i := bufLen - 1; i > bufLen-10; i-- {
+		modifiedBuf[i] = 123
+	}
+	in = remote.NewReaderBuffer(modifiedBuf)
+	err = dc.Decode(ctx, recvMsg, in)
+	test.Assert(t, err != nil, err)
+}
+
+func TestDefaultCodecWithCustomizedValidator(t *testing.T) {
+	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
+
+	dc := NewDefaultCodecWithConfig(CodecConfig{PayloadValidator: &mockPayloadValidator{}})
+	ctx := context.Background()
+	intKVInfo := prepareIntKVInfo()
+	strKVInfo := prepareStrKVInfo()
+	payloadLen := 32 * 1024
+	sendMsg := initClientSendMsg(transport.TTHeaderFramed, payloadLen)
+	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
+	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
+
+	// test encode err
+	badOut := netpolltrans.NewReaderByteBuffer(netpoll.NewLinkBuffer())
+	err := dc.Encode(ctx, sendMsg, badOut)
+	test.Assert(t, err != nil)
+
+	// encode with netpollBytebuffer
+	npBuffer := netpolltrans.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer())
+	err = dc.Encode(ctx, sendMsg, npBuffer)
+	test.Assert(t, err == nil, err)
+
+	// decode, succeed
+	recvMsg := initServerRecvMsg()
+	buf, err := npBuffer.Bytes()
+	test.Assert(t, err == nil, err)
+	in := remote.NewReaderBuffer(buf)
+	err = dc.Decode(ctx, recvMsg, in)
+	test.Assert(t, err == nil, err)
+	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
+	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
+	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
+	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
+	test.Assert(t, sendMsg.RPCInfo().Invocation().SeqID() == recvMsg.RPCInfo().Invocation().SeqID())
+
+	// decode, check failed
+	test.Assert(t, err == nil, err)
+	bufLen := len(buf)
+	modifiedBuf := make([]byte, bufLen)
+	copy(modifiedBuf, buf)
+	for i := bufLen - 1; i > bufLen-10; i-- {
+		modifiedBuf[i] = 123
+	}
+	in = remote.NewReaderBuffer(modifiedBuf)
+	err = dc.Decode(ctx, recvMsg, in)
+	test.Assert(t, err != nil, err)
+}
+
+func TestDefaultCodecWithCRC32EncodeDecodeWithNonNetpollBuffer(t *testing.T) {
+	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
+
+	dc := NewDefaultCodecWithConfig(CodecConfig{CRC32Check: true})
+	ctx := context.Background()
+	intKVInfo := prepareIntKVInfo()
+	strKVInfo := prepareStrKVInfo()
+	sendMsg := initClientSendMsg(transport.TTHeaderFramed, 32*1024)
+	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
+	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
+
+	// test encode err
+	badOut := remote.NewReaderBuffer(nil)
+	err := dc.Encode(ctx, sendMsg, badOut)
+	test.Assert(t, err != nil)
+
+	// encode with defaultByteBuffer
+	byteBuffer := remote.NewWriterBuffer(0)
+	err = dc.Encode(ctx, sendMsg, byteBuffer)
+	test.Assert(t, err == nil, err)
+
+	// decode, succeed
+	recvMsg := initServerRecvMsg()
+	buf, err := byteBuffer.Bytes()
+	test.Assert(t, err == nil, err)
+	in := remote.NewReaderBuffer(buf)
+	err = dc.Decode(ctx, recvMsg, in)
+	test.Assert(t, err == nil, err)
+	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
+	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
+	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
+	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
+	test.Assert(t, sendMsg.RPCInfo().Invocation().SeqID() == recvMsg.RPCInfo().Invocation().SeqID())
+
+	// decode, crc32c check failed
+	test.Assert(t, err == nil, err)
+	bufLen := len(buf)
+	modifiedBuf := make([]byte, bufLen)
+	copy(modifiedBuf, buf)
+	for i := bufLen - 1; i > bufLen-10; i-- {
+		modifiedBuf[i] = 123
+	}
+	in = remote.NewReaderBuffer(modifiedBuf)
+	err = dc.Decode(ctx, recvMsg, in)
+	test.Assert(t, err != nil, err)
+}
+
 func TestCodecTypeNotMatchWithServiceInfoPayloadCodec(t *testing.T) {
 	for _, tb := range transportBuffers {
 		t.Run(tb.Name, func(t *testing.T) {
@@ -295,6 +440,42 @@ func TestCodecTypeNotMatchWithServiceInfoPayloadCodec(t *testing.T) {
 	}
 }
 
+func BenchmarkDefaultEncodeDecode(b *testing.B) {
+	ctx := context.Background()
+	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
+	type factory func() remote.Codec
+	testCases := map[string]factory{"normal": NewDefaultCodec, "crc32c": func() remote.Codec { return NewDefaultCodecWithConfig(CodecConfig{CRC32Check: true}) }}
+
+	for name, f := range testCases {
+		b.Run(name, func(b *testing.B) {
+			msgLen := 1
+			for i := 0; i < 6; i++ {
+				b.ReportAllocs()
+				b.ResetTimer()
+				b.Run(fmt.Sprintf("payload-%d", msgLen), func(b *testing.B) {
+					for j := 0; j < b.N; j++ {
+						codec := f()
+						sendMsg := initClientSendMsg(transport.TTHeader, msgLen)
+						// encode
+						out := remote.NewWriterBuffer(1024)
+						err := codec.Encode(ctx, sendMsg, out)
+						test.Assert(b, err == nil, err)
+
+						// decode
+						recvMsg := initServerRecvMsgWithMockMsg()
+						buf, err := out.Bytes()
+						test.Assert(b, err == nil, err)
+						in := remote.NewReaderBuffer(buf)
+						err = codec.Decode(ctx, recvMsg, in)
+						test.Assert(b, err == nil, err)
+					}
+				})
+				msgLen *= 10
+			}
+		})
+	}
+}
+
 var mpc remote.PayloadCodec = mockPayloadCodec{}
 
 type mockPayloadCodec struct{}
@@ -303,6 +484,23 @@ func (m mockPayloadCodec) Marshal(ctx context.Context, message remote.Message, o
 	WriteUint32(ThriftV1Magic+uint32(message.MessageType()), out)
 	WriteString(message.RPCInfo().Invocation().MethodName(), out)
 	WriteUint32(uint32(message.RPCInfo().Invocation().SeqID()), out)
+	var (
+		dataLen uint32
+		dataStr string
+	)
+	// write data
+	if data := message.Data(); data != nil {
+		if mm, ok := data.(*mockMsg); ok {
+			if len(mm.msg) != 0 {
+				dataStr = mm.msg
+				dataLen = uint32(len(mm.msg))
+			}
+		}
+	}
+	WriteUint32(dataLen, out)
+	if dataLen > 0 {
+		WriteString(dataStr, out)
+	}
 	return nil
 }
 
@@ -333,6 +531,18 @@ func (m mockPayloadCodec) Unmarshal(ctx context.Context, message remote.Message,
 	if err = SetOrCheckSeqID(int32(seqID), message); err != nil && msgType != uint32(remote.Exception) {
 		return err
 	}
+	// read data
+	dataLen, err := PeekUint32(in)
+	if err != nil {
+		return err
+	}
+	if dataLen == 0 {
+		// no data
+		return nil
+	}
+	if _, _, err = ReadString(in); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -352,4 +562,27 @@ func TestCornerCase(t *testing.T) {
 	buffer.EXPECT().Malloc(gomock.Any()).Return(nil, errors.New("error malloc")).AnyTimes()
 	err := (&defaultCodec{}).EncodePayload(context.Background(), sendMsg, buffer)
 	test.Assert(t, err.Error() == "error malloc")
+}
+
+func TestFlatten2DSlice(t *testing.T) {
+	var (
+		b2         [][]byte
+		expectedB1 []byte
+	)
+	row, column := 10, 10
+	for i := 0; i < row; i++ {
+		var b []byte
+		for j := 0; j < column; j++ {
+			curr := rand.Int()
+			b = append(b, byte(curr))
+			expectedB1 = append(expectedB1, byte(curr))
+		}
+		b2 = append(b2, b)
+	}
+	length := row * column
+	actualB1 := flatten2DSlice(b2, length)
+	test.Assert(t, len(actualB1) == length)
+	for i := 0; i < length; i++ {
+		test.Assert(t, actualB1[i] == expectedB1[i])
+	}
 }
