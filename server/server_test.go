@@ -732,7 +732,7 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 				svcSearcher := newServices()
 				svcSearcher.addService(svcInfo, mocks.MyServiceHandler(), &RegisterOptions{})
-				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server, false)
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
@@ -821,7 +821,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 				svcSearcher := newServices()
 				svcSearcher.addService(svcInfo, mocks.MyServiceHandler(), &RegisterOptions{})
-				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server, false)
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
@@ -886,7 +886,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 				svcSearcher := newServices()
 				svcSearcher.addService(svcInfo, mocks.MyServiceHandler(), &RegisterOptions{})
-				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server, false)
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 

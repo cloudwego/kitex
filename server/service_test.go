@@ -40,6 +40,8 @@ func TestAddService(t *testing.T) {
 	test.Assert(t, len(svcs.methodSvcMap) == 5)
 	test.Assert(t, svcs.SearchService("", "mock", false) == mocks.Service3Info())
 	test.Assert(t, svcs.SearchService("", "mock", true) == nil)
+	svcs.refuseTrafficWithoutServiceName = true
+	test.Assert(t, svcs.SearchService("", "mock", false) == nil)
 	test.Assert(t, len(svcs.conflictingMethodMap) == 1)
 	test.Assert(t, !svcs.conflictingMethodMap["mock"])
 

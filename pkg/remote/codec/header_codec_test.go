@@ -23,9 +23,9 @@ import (
 	"testing"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
-	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -316,7 +316,7 @@ var (
 func initServerRecvMsg() remote.Message {
 	svcInfo := mocks.ServiceInfo()
 	svcSearcher := mocksremote.NewDefaultSvcSearcher()
-	msg := remote.NewMessageWithNewer(svcInfo, svcSearcher, mockSvrRPCInfo, remote.Call, remote.Server, false)
+	msg := remote.NewMessageWithNewer(svcInfo, svcSearcher, mockSvrRPCInfo, remote.Call, remote.Server)
 	return msg
 }
 

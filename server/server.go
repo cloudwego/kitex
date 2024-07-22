@@ -347,7 +347,6 @@ func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
 	remoteOpt.TargetSvcInfo = s.targetSvcInfo
 	remoteOpt.SvcSearcher = s.svcs
-	remoteOpt.RefuseTrafficWithoutServiceName = s.opt.RefuseTrafficWithoutServiceName
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
@@ -436,6 +435,7 @@ func (s *server) check() error {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
 	if s.opt.RefuseTrafficWithoutServiceName {
+		s.svcs.refuseTrafficWithoutServiceName = true
 		return nil
 	}
 	for name, conflict := range s.svcs.conflictingMethodMap {

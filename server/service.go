@@ -36,6 +36,8 @@ type services struct {
 	svcMap               map[string]*service // key: service name, value: svcInfo
 	conflictingMethodMap map[string]bool
 	fallbackSvc          *service
+
+	refuseTrafficWithoutServiceName bool
 }
 
 func newServices() *services {
@@ -86,7 +88,7 @@ func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
 }
 
 func (s *services) SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo {
-	if strict {
+	if strict || s.refuseTrafficWithoutServiceName {
 		if svc := s.svcMap[svcName]; svc != nil {
 			return svc.svcInfo
 		}
@@ -97,15 +99,15 @@ func (s *services) SearchService(svcName, methodName string, strict bool) *servi
 		svc = s.methodSvcMap[methodName]
 	} else {
 		svc = s.svcMap[svcName]
+		if svc == nil {
+			if _, ok := s.conflictingMethodMap[methodName]; !ok {
+				// no conflicting method
+				svc = s.methodSvcMap[methodName]
+			}
+		}
 	}
 	if svc != nil {
 		return svc.svcInfo
-	}
-	if !s.conflictingMethodMap[methodName] {
-		// no conflicting method
-		if svc := s.methodSvcMap[methodName]; svc != nil {
-			return svc.svcInfo
-		}
 	}
 	return nil
 }

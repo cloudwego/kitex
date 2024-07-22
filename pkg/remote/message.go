@@ -80,6 +80,12 @@ func NewProtocolInfo(tp transport.Protocol, ct serviceinfo.PayloadCodec) Protoco
 	}
 }
 
+// ServiceSearcher is used to search the service info by service name and method name,
+// strict equals to true means the service name must match the registered service name.
+type ServiceSearcher interface {
+	SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo
+}
+
 // Message is the core abstraction for Kitex message.
 type Message interface {
 	RPCInfo() rpcinfo.RPCInfo
@@ -114,7 +120,7 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 }
 
 // NewMessageWithNewer creates a new Message and set data later.
-func NewMessageWithNewer(targetSvcInfo *serviceinfo.ServiceInfo, svcSearcher ServiceSearcher, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole, refuseTrafficWithoutServiceName bool) Message {
+func NewMessageWithNewer(targetSvcInfo *serviceinfo.ServiceInfo, svcSearcher ServiceSearcher, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole) Message {
 	msg := messagePool.Get().(*message)
 	msg.rpcInfo = ri
 	msg.targetSvcInfo = targetSvcInfo
@@ -122,7 +128,6 @@ func NewMessageWithNewer(targetSvcInfo *serviceinfo.ServiceInfo, svcSearcher Ser
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
 	msg.transInfo = transInfoPool.Get().(*transInfo)
-	msg.refuseTrafficWithoutServiceName = refuseTrafficWithoutServiceName
 	return msg
 }
 
@@ -138,19 +143,18 @@ func newMessage() interface{} {
 }
 
 type message struct {
-	msgType                         MessageType
-	data                            interface{}
-	rpcInfo                         rpcinfo.RPCInfo
-	targetSvcInfo                   *serviceinfo.ServiceInfo
-	svcSearcher                     ServiceSearcher
-	rpcRole                         RPCRole
-	compressType                    CompressType
-	payloadSize                     int
-	transInfo                       TransInfo
-	tags                            map[string]interface{}
-	protocol                        ProtocolInfo
-	payloadCodec                    PayloadCodec
-	refuseTrafficWithoutServiceName bool
+	msgType       MessageType
+	data          interface{}
+	rpcInfo       rpcinfo.RPCInfo
+	targetSvcInfo *serviceinfo.ServiceInfo
+	svcSearcher   ServiceSearcher
+	rpcRole       RPCRole
+	compressType  CompressType
+	payloadSize   int
+	transInfo     TransInfo
+	tags          map[string]interface{}
+	protocol      ProtocolInfo
+	payloadCodec  PayloadCodec
 }
 
 func (m *message) zero() {
@@ -188,9 +192,6 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 			return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
 		}
 		return m.targetSvcInfo, nil
-	}
-	if svcName == "" && m.refuseTrafficWithoutServiceName {
-		return nil, NewTransErrorWithMsg(NoServiceName, "no service name while the server has WithRefuseTrafficWithoutServiceName option enabled")
 	}
 	svcInfo := m.svcSearcher.SearchService(svcName, methodName, false)
 	if svcInfo == nil {

@@ -22,10 +22,10 @@ import (
 	"net"
 	"testing"
 
-	remote_mocks "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	remotemocks "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/mocks/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -36,7 +36,7 @@ import (
 
 var (
 	svcInfo     = mocks.ServiceInfo()
-	svcSearcher = remote_mocks.NewDefaultSvcSearcher()
+	svcSearcher = remotemocks.NewDefaultSvcSearcher()
 )
 
 func TestDefaultSvrTransHandler(t *testing.T) {

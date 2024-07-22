@@ -79,16 +79,31 @@ func (ch *clientTTHeaderHandler) WriteMeta(ctx context.Context, msg remote.Messa
 		hd[transmeta.ConnectTimeout] = strconv.Itoa(int(ri.Config().ConnectTimeout().Milliseconds()))
 	}
 	transInfo.PutTransIntInfo(hd)
-	idlSvcName := ri.Invocation().ServiceName()
-	var isCombineService bool
-	val, exists := msg.ServiceInfo().Extra["combine_service"]
-	if exists {
-		isCombineService, _ = val.(bool)
-	}
-	if idlSvcName != serviceinfo.GenericService && !isCombineService {
-		transInfo.PutTransStrInfo(map[string]string{transmeta.HeaderIDLServiceName: idlSvcName})
+	if idlSvcName := getIDLSvcName(msg.ServiceInfo(), ri); idlSvcName != "" {
+		if strInfo := transInfo.TransStrInfo(); strInfo != nil {
+			strInfo[transmeta.HeaderIDLServiceName] = idlSvcName
+		} else {
+			transInfo.PutTransStrInfo(map[string]string{transmeta.HeaderIDLServiceName: idlSvcName})
+		}
 	}
 	return ctx, nil
+}
+
+func getIDLSvcName(svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo) string {
+	idlSvcName := ri.Invocation().ServiceName()
+	// for combine service, idlSvcName may not be the same as server's service name
+	var isCombineService bool
+	if svcInfo != nil {
+		val, exists := svcInfo.Extra["combine_service"]
+		if exists {
+			isCombineService, _ = val.(bool)
+		}
+	}
+	// generic service name shouldn't be written to header
+	if idlSvcName != serviceinfo.GenericService && !isCombineService {
+		return idlSvcName
+	}
+	return ""
 }
 
 // ReadMeta of clientTTHeaderHandler reads headers of TTHeader protocol from transport

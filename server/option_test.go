@@ -533,7 +533,7 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 	svcInfo := mocks.ServiceInfo()
 	svcSearcher := newServices()
 	svcSearcher.addService(svcInfo, mocks.MyServiceHandler(), &RegisterOptions{})
-	msg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server, false)
+	msg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
 
 	newCtx, tags := iSvr.opt.RemoteOpt.ProfilerMessageTagging(ctx, msg)
 	test.Assert(t, len(tags) == 8)
