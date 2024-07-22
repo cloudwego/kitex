@@ -22,7 +22,6 @@ import (
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 func TestAddService(t *testing.T) {
@@ -30,59 +29,29 @@ func TestAddService(t *testing.T) {
 	err := svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler(), &RegisterOptions{})
 	test.Assert(t, err == nil)
 	test.Assert(t, len(svcs.svcMap) == 1)
-	fmt.Println(svcs.svcSearchMap)
-	test.Assert(t, len(svcs.svcSearchMap) == 10)
-	test.Assert(t, len(svcs.conflictingMethodHasFallbackSvcMap) == 0)
+	fmt.Println(svcs.methodSvcMap)
+	test.Assert(t, len(svcs.methodSvcMap) == 5)
+	test.Assert(t, len(svcs.conflictingMethodMap) == 0)
 	test.Assert(t, svcs.fallbackSvc == nil)
 
 	err = svcs.addService(mocks.Service3Info(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
 	test.Assert(t, err == nil)
 	test.Assert(t, len(svcs.svcMap) == 2)
-	test.Assert(t, len(svcs.svcSearchMap) == 11)
-	test.Assert(t, len(svcs.conflictingMethodHasFallbackSvcMap) == 1)
-	test.Assert(t, svcs.conflictingMethodHasFallbackSvcMap["mock"])
+	test.Assert(t, len(svcs.methodSvcMap) == 5)
+	test.Assert(t, svcs.SearchService("", "mock", false) == mocks.Service3Info())
+	test.Assert(t, svcs.SearchService("", "mock", true) == nil)
+	test.Assert(t, len(svcs.conflictingMethodMap) == 1)
+	test.Assert(t, !svcs.conflictingMethodMap["mock"])
 
 	err = svcs.addService(mocks.Service2Info(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "multiple fallback services cannot be registered. [MockService3] is already registered as a fallback service")
 }
 
-func TestCheckCombineServiceWithOtherService(t *testing.T) {
-	svcs := newServices()
-	combineSvcInfo := &serviceinfo.ServiceInfo{ServiceName: "CombineService"}
-	svcs.svcMap[combineSvcInfo.ServiceName] = newService(combineSvcInfo, nil)
-	err := svcs.checkCombineServiceWithOtherService(mocks.ServiceInfo())
-	test.Assert(t, err != nil)
-	test.Assert(t, err.Error() == "only one service can be registered when registering combine service")
-
-	svcs = newServices()
-	svcs.svcMap[mocks.MockServiceName] = newService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	err = svcs.checkCombineServiceWithOtherService(combineSvcInfo)
-	test.Assert(t, err != nil)
-	test.Assert(t, err.Error() == "only one service can be registered when registering combine service")
-}
-
 func TestCheckMultipleFallbackService(t *testing.T) {
 	svcs := newServices()
-	svc := newService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	registerOpts := &RegisterOptions{IsFallbackService: true}
-	err := svcs.checkMultipleFallbackService(registerOpts, svc)
-	test.Assert(t, err == nil)
-	test.Assert(t, svcs.fallbackSvc == svc)
-
-	err = svcs.checkMultipleFallbackService(registerOpts, newService(mocks.Service2Info(), nil))
+	_ = svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
+	err := svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "multiple fallback services cannot be registered. [MockService] is already registered as a fallback service", err)
-}
-
-func TestRegisterConflictingMethodHasFallbackSvcMap(t *testing.T) {
-	svcs := newServices()
-	svcFromMap := newService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	svcs.registerConflictingMethodHasFallbackSvcMap(svcFromMap, mocks.MockMethod)
-	test.Assert(t, !svcs.conflictingMethodHasFallbackSvcMap[mocks.MockMethod])
-
-	svcs = newServices()
-	svcs.fallbackSvc = svcFromMap
-	svcs.registerConflictingMethodHasFallbackSvcMap(svcFromMap, mocks.MockMethod)
-	test.Assert(t, svcs.conflictingMethodHasFallbackSvcMap[mocks.MockMethod])
 }

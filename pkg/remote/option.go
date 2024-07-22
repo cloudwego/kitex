@@ -68,11 +68,16 @@ func (o *Option) AppendBoundHandler(h BoundHandler) {
 	}
 }
 
+// ServiceSearcher is used to search the service info by service name and method name.
+type ServiceSearcher interface {
+	SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo
+}
+
 // ServerOption contains option that is used to init the remote server.
 type ServerOption struct {
 	TargetSvcInfo *serviceinfo.ServiceInfo
 
-	SvcSearchMap map[string]*serviceinfo.ServiceInfo
+	SvcSearcher ServiceSearcher
 
 	TransServerFactory TransServerFactory
 

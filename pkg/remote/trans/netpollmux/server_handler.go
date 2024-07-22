@@ -65,7 +65,7 @@ func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	svrHdlr := &svrTransHandler{
 		opt:           opt,
 		codec:         opt.Codec,
-		svcSearchMap:  opt.SvcSearchMap,
+		svcSearcher:   opt.SvcSearcher,
 		targetSvcInfo: opt.TargetSvcInfo,
 		ext:           np.NewNetpollConnExtension(),
 	}
@@ -84,7 +84,7 @@ var _ remote.ServerTransHandler = &svrTransHandler{}
 
 type svrTransHandler struct {
 	opt           *remote.ServerOption
-	svcSearchMap  map[string]*serviceinfo.ServiceInfo
+	svcSearcher   remote.ServiceSearcher
 	targetSvcInfo *serviceinfo.ServiceInfo
 	inkHdlFunc    endpoint.Endpoint
 	codec         remote.Codec
@@ -239,7 +239,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	}()
 
 	// read
-	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearchMap, rpcInfo, remote.Call, remote.Server, t.opt.RefuseTrafficWithoutServiceName)
+	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearcher, rpcInfo, remote.Call, remote.Server, t.opt.RefuseTrafficWithoutServiceName)
 	bufReader := np.NewReaderByteBuffer(reader)
 	err = t.readWithByteBuffer(ctx, bufReader, recvMsg)
 	if err != nil {
@@ -328,8 +328,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	iv.SetSeqID(0)
 	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
 	data := NewControlFrame()
-	svcInfo := t.getSvcInfo()
-	msg := remote.NewMessage(data, svcInfo, ri, remote.Reply, remote.Server)
+	msg := remote.NewMessage(data, nil, ri, remote.Reply, remote.Server)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
 	msg.TransInfo().TransStrInfo()[transmeta.HeaderConnectionReadyToReset] = "1"
 
@@ -476,17 +475,6 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	sl := ri.Stats().Level()
 	rpcStats.Reset()
 	rpcStats.SetLevel(sl)
-}
-
-// getSvcInfo is used to get one ServiceInfo
-func (t *svrTransHandler) getSvcInfo() *serviceinfo.ServiceInfo {
-	if t.targetSvcInfo != nil {
-		return t.targetSvcInfo
-	}
-	for _, svcInfo := range t.svcSearchMap {
-		return svcInfo
-	}
-	return nil
 }
 
 func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {

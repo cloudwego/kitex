@@ -35,10 +35,6 @@ const (
 	GenericService = "$GenericService" // private as "$"
 	// GenericMethod name
 	GenericMethod = "$GenericCall"
-	// CombineService name
-	CombineService = "CombineService"
-	// CombineService_ is used when idl has a service named "CombineService"
-	CombineService_ = "CombineService_"
 )
 
 // ServiceInfo to record meta info of service

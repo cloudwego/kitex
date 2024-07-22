@@ -22,7 +22,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
 )
 
@@ -115,11 +114,11 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 }
 
 // NewMessageWithNewer creates a new Message and set data later.
-func NewMessageWithNewer(targetSvcInfo *serviceinfo.ServiceInfo, svcSearchMap map[string]*serviceinfo.ServiceInfo, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole, refuseTrafficWithoutServiceName bool) Message {
+func NewMessageWithNewer(targetSvcInfo *serviceinfo.ServiceInfo, svcSearcher ServiceSearcher, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole, refuseTrafficWithoutServiceName bool) Message {
 	msg := messagePool.Get().(*message)
 	msg.rpcInfo = ri
 	msg.targetSvcInfo = targetSvcInfo
-	msg.svcSearchMap = svcSearchMap
+	msg.svcSearcher = svcSearcher
 	msg.msgType = msgType
 	msg.rpcRole = rpcRole
 	msg.transInfo = transInfoPool.Get().(*transInfo)
@@ -143,7 +142,7 @@ type message struct {
 	data                            interface{}
 	rpcInfo                         rpcinfo.RPCInfo
 	targetSvcInfo                   *serviceinfo.ServiceInfo
-	svcSearchMap                    map[string]*serviceinfo.ServiceInfo
+	svcSearcher                     ServiceSearcher
 	rpcRole                         RPCRole
 	compressType                    CompressType
 	payloadSize                     int
@@ -193,16 +192,7 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 	if svcName == "" && m.refuseTrafficWithoutServiceName {
 		return nil, NewTransErrorWithMsg(NoServiceName, "no service name while the server has WithRefuseTrafficWithoutServiceName option enabled")
 	}
-	var key string
-	// when client does not pass svcName or passes a special service name, fallback to searching for svcInfo by method name alone
-	// note: This special name fallback logic shouldn't ideally be here, but it's needed to keep compatibility with older versions (<= v0.10.1)
-	// due to a mistake in the first release of the multi-service feature
-	if svcName == "" || isSpecialName(svcName) {
-		key = methodName
-	} else {
-		key = BuildMultiServiceKey(svcName, methodName)
-	}
-	svcInfo := m.svcSearchMap[key]
+	svcInfo := m.svcSearcher.SearchService(svcName, methodName, false)
 	if svcInfo == nil {
 		return nil, NewTransErrorWithMsg(UnknownService, fmt.Sprintf("unknown service %s, method %s", svcName, methodName))
 	}
@@ -290,10 +280,6 @@ func (m *message) Recycle() {
 	messagePool.Put(m)
 }
 
-func isSpecialName(svcName string) bool {
-	return svcName == serviceinfo.GenericService || svcName == serviceinfo.CombineService || svcName == serviceinfo.CombineService_
-}
-
 // TransInfo contains transport information.
 type TransInfo interface {
 	TransStrInfo() map[string]string
@@ -372,14 +358,4 @@ func (ti *transInfo) Recycle() {
 func FillSendMsgFromRecvMsg(recvMsg, sendMsg Message) {
 	sendMsg.SetProtocolInfo(recvMsg.ProtocolInfo())
 	sendMsg.SetPayloadCodec(recvMsg.PayloadCodec())
-}
-
-// BuildMultiServiceKey is used to create a key to search svcInfo from svcSearchMap.
-func BuildMultiServiceKey(serviceName, methodName string) string {
-	var builder utils.StringBuilder
-	builder.Grow(len(serviceName) + len(methodName) + 1)
-	builder.WriteString(serviceName)
-	builder.WriteString(".")
-	builder.WriteString(methodName)
-	return builder.String()
 }

@@ -200,7 +200,7 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 }
 
 func (s *server) GetServiceInfos() map[string]*serviceinfo.ServiceInfo {
-	return s.svcs.getSvcInfoSearchMap()
+	return s.svcs.getSvcInfoMap()
 }
 
 // Run runs the server.
@@ -346,7 +346,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
 	remoteOpt.TargetSvcInfo = s.targetSvcInfo
-	remoteOpt.SvcSearchMap = s.svcs.getSvcInfoSearchMap()
+	remoteOpt.SvcSearcher = s.svcs
 	remoteOpt.RefuseTrafficWithoutServiceName = s.opt.RefuseTrafficWithoutServiceName
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
@@ -435,7 +435,15 @@ func (s *server) check() error {
 	if len(s.svcs.svcMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
-	return checkFallbackServiceForConflictingMethods(s.svcs.conflictingMethodHasFallbackSvcMap, s.opt.RefuseTrafficWithoutServiceName)
+	if s.opt.RefuseTrafficWithoutServiceName {
+		return nil
+	}
+	for name, conflict := range s.svcs.conflictingMethodMap {
+		if conflict {
+			return fmt.Errorf("method name [%s] is conflicted between services but no fallback service is specified", name)
+		}
+	}
+	return nil
 }
 
 func doAddBoundHandlerToHead(h remote.BoundHandler, opt *remote.ServerOption) {
@@ -563,18 +571,6 @@ func getDefaultSvcInfo(svcs *services) *serviceinfo.ServiceInfo {
 	}
 	for _, svc := range svcs.svcMap {
 		return svc.svcInfo
-	}
-	return nil
-}
-
-func checkFallbackServiceForConflictingMethods(conflictingMethodHasFallbackSvcMap map[string]bool, refuseTrafficWithoutServiceName bool) error {
-	if refuseTrafficWithoutServiceName {
-		return nil
-	}
-	for name, hasFallbackSvc := range conflictingMethodHasFallbackSvcMap {
-		if !hasFallbackSvc {
-			return fmt.Errorf("method name [%s] is conflicted between services but no fallback service is specified", name)
-		}
 	}
 	return nil
 }

@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -43,17 +44,8 @@ var (
 	addr      = utils.NewNetAddr("tcp", addrStr)
 	method    = "mock"
 
-	svcInfo      = mocks.ServiceInfo()
-	svcSearchMap = map[string]*serviceinfo.ServiceInfo{
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
-		mocks.MockMethod:          svcInfo,
-		mocks.MockExceptionMethod: svcInfo,
-		mocks.MockErrorMethod:     svcInfo,
-		mocks.MockOnewayMethod:    svcInfo,
-	}
+	svcInfo     = mocks.ServiceInfo()
+	svcSearcher = mocksremote.NewDefaultSvcSearcher()
 )
 
 func newTestRpcInfo() rpcinfo.RPCInfo {
@@ -91,7 +83,7 @@ func init() {
 				return err
 			},
 		},
-		SvcSearchMap:     svcSearchMap,
+		SvcSearcher:      svcSearcher,
 		TargetSvcInfo:    svcInfo,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
@@ -488,7 +480,7 @@ func TestInvokeError(t *testing.T) {
 				return err
 			},
 		},
-		SvcSearchMap:     svcSearchMap,
+		SvcSearcher:      svcSearcher,
 		TargetSvcInfo:    svcInfo,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
@@ -721,7 +713,7 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 				return err
 			},
 		},
-		SvcSearchMap:     svcSearchMap,
+		SvcSearcher:      svcSearcher,
 		TargetSvcInfo:    svcInfo,
 		TracerCtl:        &rpcinfo.TraceController{},
 		ReadWriteTimeout: rwTimeout,
