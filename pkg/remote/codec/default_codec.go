@@ -19,20 +19,14 @@ package codec
 import (
 	"context"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
-	"hash/crc32"
-	"sync"
+	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/netpoll"
 	"sync/atomic"
 
-	netpoll2 "github.com/cloudwego/netpoll"
-
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
-	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -63,12 +57,6 @@ var (
 	_ remote.MetaDecoder = (*defaultCodec)(nil)
 )
 
-// crc32cTable is used for crc32c check
-var (
-	crc32cTable    *crc32.Table
-	crc32TableOnce sync.Once
-)
-
 // NewDefaultCodec creates the default protocol sniffing codec supporting thrift and protobuf.
 func NewDefaultCodec() remote.Codec {
 	// No size limit by default
@@ -87,21 +75,34 @@ func NewDefaultCodecWithSizeLimit(maxSize int) remote.Codec {
 
 // NewDefaultCodecWithConfig creates the default protocol sniffing codec supporting thrift and protobuf with the input config.
 func NewDefaultCodecWithConfig(cfg CodecConfig) remote.Codec {
+	var p PayloadValidator
+	if cfg.PayloadValidator != nil {
+		p = cfg.PayloadValidator
+	}
 	if cfg.CRC32Check {
-		crc32TableOnce.Do(func() {
-			crc32cTable = crc32.MakeTable(crc32.Castagnoli)
-		})
+		// TODO: crc32 has higher priority now.
+		p = NewCRC32PayloadValidator()
 	}
 	return &defaultCodec{
-		maxSize:    cfg.MaxSize,
-		crc32Check: cfg.CRC32Check,
+		maxSize:          cfg.MaxSize,
+		payloadValidator: p,
+		crc32Check:       cfg.CRC32Check,
 	}
 }
 
 // CodecConfig is the config of defaultCodec
 type CodecConfig struct {
-	MaxSize    int
+	MaxSize int
+
+	// If crc32Check is true, the codec will validate the payload using crc32c.
+	// Only effective when transport is TTHeader.
+	// Payload is all the data after TTHeader.
 	CRC32Check bool
+
+	// PayloadValidator is used to validate payload with customized checksum logic.
+	// It prepares a value based on payload in sender-side and validates the value in receiver-side.
+	// It can only be used when ttheader is enabled.
+	PayloadValidator PayloadValidator
 }
 
 type defaultCodec struct {
@@ -111,6 +112,10 @@ type defaultCodec struct {
 	// Only effective when transport is TTHeader.
 	// Payload is all the data after TTHeader.
 	crc32Check bool
+	// TODO: allow multiple validators?
+	// payloadValidator prepares a value based on payload in sender-side and validates the value in receiver-side.
+	// It can only be used when ttheader is enabled.
+	payloadValidator PayloadValidator
 }
 
 // EncodePayload encode payload
@@ -162,8 +167,8 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 // EncodeMetaAndPayload encode meta and payload
 func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
 	tp := message.ProtocolInfo().TransProto
-	if c.crc32Check && tp&transport.TTHeader == transport.TTHeader {
-		return c.encodeMetaAndPayloadWithCRC32C(ctx, message, out, me)
+	if c.payloadValidator != nil && tp&transport.TTHeader == transport.TTHeader {
+		return c.encodeMetaAndPayloadWithPayloadProcessor(ctx, message, out, me)
 	}
 
 	var err error
@@ -188,58 +193,6 @@ func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.
 		binary.BigEndian.PutUint32(totalLenField, uint32(payloadLen))
 	}
 	return nil
-}
-
-// encodeMetaAndPayloadWithCRC32C encodes payload and meta with crc32c checksum of the payload.
-func (c *defaultCodec) encodeMetaAndPayloadWithCRC32C(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) (err error) {
-	var (
-		payloadOut  = netpoll.NewWriterByteBuffer(netpoll2.NewLinkBuffer())
-		needRelease = true
-	)
-	defer func() {
-		if needRelease {
-			payloadOut.Release(err)
-		}
-	}()
-	// 1. encode payload and calculate crc32c checksum
-	if err = me.EncodePayload(ctx, message, payloadOut); err != nil {
-		return err
-	}
-	// get the payload from buffer
-	payload, payloadLen, err := payloadOut.(remote.NocopyRead).GetBytesNoCopy()
-	if err != nil {
-		return err
-	}
-	crc32c := getCRC32C(payload)
-	strInfo := message.TransInfo().TransStrInfo()
-	if crc32c != "" && strInfo != nil {
-		strInfo[transmeta.HeaderCRC32C] = crc32c
-	}
-	// set payload length before encode TTHeader
-	message.SetPayloadLen(payloadLen)
-
-	// 2. encode header and return totalLenField if needed
-	// In this case, set total length during TTHeader encode
-	if _, err = ttHeaderCodec.encode(ctx, message, out); err != nil {
-		return err
-	}
-
-	// 3. write payload to the buffer after TTHeader
-	if netpoll.IsNetpollByteBuffer(out) {
-		// append buffer only if the input buffer is a netpollByteBuffer
-		// release will be executed in AppendBuffer, and thus set needRelease to false
-		err = out.AppendBuffer(payloadOut)
-		needRelease = false
-	} else {
-		// convert [][]byte to []byte
-		p := flatten2DSlice(payload, payloadLen)
-		if ncWriter, ok := out.(remote.NocopyWrite); ok {
-			err = ncWriter.WriteDirect(p, 0)
-		} else {
-			_, err = out.WriteBinary(p)
-		}
-	}
-	return err
 }
 
 // Encode implements the remote.Codec interface, it does complete message encode include header and payload.
@@ -268,9 +221,9 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 		if flagBuf, err = in.Peek(2 * Size32); err != nil {
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("ttheader read payload first 8 byte failed: %s", err.Error()))
 		}
-		if c.crc32Check && crc32cTable != nil {
-			if err = checkCRC32C(message, in); err != nil {
-				return err
+		if c.payloadValidator != nil {
+			if vErr := validate(ctx, message, in, c.payloadValidator); vErr != nil {
+				return vErr
 			}
 		}
 	} else if isMeshHeader(flagBuf) {
@@ -324,6 +277,64 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 
 func (c *defaultCodec) Name() string {
 	return "default"
+}
+
+// encodeMetaAndPayloadWithPayloadProcessor encodes payload and meta with crc32c checksum of the payload.
+func (c *defaultCodec) encodeMetaAndPayloadWithPayloadProcessor(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) (err error) {
+	var (
+		payloadOut  = netpolltrans.NewWriterByteBuffer(netpoll.NewLinkBuffer())
+		needRelease = true
+	)
+	defer func() {
+		if needRelease {
+			payloadOut.Release(err)
+		}
+	}()
+	// 1. encode payload and calculate value via payload validator
+	if err = me.EncodePayload(ctx, message, payloadOut); err != nil {
+		return err
+	}
+	// get the payload from buffer
+	payload, payloadLen, err := payloadOut.(remote.NocopyRead).GetBytesNoCopy()
+	if err != nil {
+		return err
+	}
+	if c.payloadValidator != nil {
+		key := getValidatorKey(ctx, c.payloadValidator)
+		if value, pErr := c.payloadValidator.Checksum(ctx, flatten2DSlice(payload, payloadLen)); pErr != nil {
+			return pErr
+		} else {
+			strInfo := message.TransInfo().TransStrInfo()
+			if strInfo != nil {
+				strInfo[key] = value
+			}
+		}
+	}
+	// set payload length before encode TTHeader
+	message.SetPayloadLen(payloadLen)
+
+	// 2. encode header and return totalLenField if needed
+	// In this case, set total length during TTHeader encode
+	if _, err = ttHeaderCodec.encode(ctx, message, out); err != nil {
+		return err
+	}
+
+	// 3. write payload to the buffer after TTHeader
+	if netpolltrans.IsNetpollByteBuffer(out) {
+		// append buffer only if the input buffer is a netpollByteBuffer
+		// release will be executed in AppendBuffer, and thus set needRelease to false
+		err = out.AppendBuffer(payloadOut)
+		needRelease = false
+	} else {
+		// convert [][]byte to []byte
+		p := flatten2DSlice(payload, payloadLen)
+		if ncWriter, ok := out.(remote.NocopyWrite); ok {
+			err = ncWriter.WriteDirect(p, 0)
+		} else {
+			_, err = out.WriteBinary(p)
+		}
+	}
+	return err
 }
 
 // Select to use thrift or protobuf according to the protocol.
@@ -469,57 +480,4 @@ func checkPayloadSize(payloadLen, maxSize int) error {
 		)
 	}
 	return nil
-}
-
-// getCRC32C calculates the crc32c checksum of the input bytes.
-// the checksum will be converted into big-endian format and encoded into hex string.
-func getCRC32C(payload [][]byte) string {
-	if crc32cTable == nil {
-		return ""
-	}
-	csb := make([]byte, Size32)
-	var checksum uint32
-	for i := 0; i < len(payload); i++ {
-		checksum = crc32.Update(checksum, crc32cTable, payload[i])
-	}
-	binary.BigEndian.PutUint32(csb, checksum)
-	return hex.EncodeToString(csb)
-}
-
-// checkCRC32C validates the crc32c checksum in the header.
-func checkCRC32C(message remote.Message, in remote.ByteBuffer) error {
-	strInfo := message.TransInfo().TransStrInfo()
-	if strInfo == nil {
-		return nil
-	}
-	crc32HexString := strInfo[transmeta.HeaderCRC32C]
-	if len(crc32HexString) != 0 {
-		crc32Byte, err := hex.DecodeString(crc32HexString)
-		if err != nil {
-			klog.Warnf("KITEX: crc32c key found in TTHeader, value is not a valid hex string")
-			return nil
-		}
-		expectedChecksum := binary.BigEndian.Uint32(crc32Byte)
-		payloadLen := message.PayloadLen() // total length
-		payload, err := in.Peek(payloadLen)
-		if err != nil {
-			return err
-		}
-		realChecksum := crc32.Checksum(payload, crc32cTable)
-		if realChecksum != expectedChecksum {
-			return perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("crc32c payload check failed, expected=%d, actual=%d", expectedChecksum, realChecksum))
-		}
-	}
-	return nil
-}
-
-// flatten2DSlice converts 2d slice to 1d.
-// total length should be provided.
-func flatten2DSlice(b2 [][]byte, length int) []byte {
-	b1 := make([]byte, length)
-	off := 0
-	for i := 0; i < len(b2); i++ {
-		off += copy(b1[off:], b2[i])
-	}
-	return b1
 }
