@@ -53,19 +53,7 @@ import (
 	"github.com/cloudwego/kitex/transport"
 )
 
-var (
-	svcInfo      = mocks.ServiceInfo()
-	svcSearchMap = map[string]*serviceinfo.ServiceInfo{
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
-		mocks.MockMethod:          svcInfo,
-		mocks.MockExceptionMethod: svcInfo,
-		mocks.MockErrorMethod:     svcInfo,
-		mocks.MockOnewayMethod:    svcInfo,
-	}
-)
+var svcInfo = mocks.ServiceInfo()
 
 func TestServerRun(t *testing.T) {
 	var opts []Option
@@ -529,8 +517,9 @@ func TestGRPCServerMultipleServices(t *testing.T) {
 	test.Assert(t, err == nil)
 	err = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
-	test.DeepEqual(t, svr.GetServiceInfos()[mocks.MockMethod], mocks.ServiceInfo())
-	test.DeepEqual(t, svr.GetServiceInfos()[mocks.Mock2Method], mocks.Service2Info())
+
+	test.DeepEqual(t, svr.(*server).svcs.SearchService("", mocks.MockMethod, false), mocks.ServiceInfo())
+	test.DeepEqual(t, svr.(*server).svcs.SearchService("", mocks.Mock2Method, false), mocks.Service2Info())
 	time.AfterFunc(1000*time.Millisecond, func() {
 		err := svr.Stop()
 		test.Assert(t, err == nil, err)
@@ -741,7 +730,9 @@ func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
 			{ // mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server, false)
+				svcSearcher := newServices()
+				svcSearcher.addService(svcInfo, mocks.MyServiceHandler(), &RegisterOptions{})
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
@@ -828,7 +819,9 @@ func TestInvokeHandlerExec(t *testing.T) {
 			{ // mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server, false)
+				svcSearcher := newServices()
+				svcSearcher.addService(svcInfo, mocks.MyServiceHandler(), &RegisterOptions{})
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
@@ -891,7 +884,9 @@ func TestInvokeHandlerPanic(t *testing.T) {
 				// mock server call
 				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
 				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server, false)
+				svcSearcher := newServices()
+				svcSearcher.addService(svcInfo, mocks.MyServiceHandler(), &RegisterOptions{})
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
 				recvMsg.NewData(callMethod)
 				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 

@@ -17,10 +17,8 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -34,87 +32,50 @@ func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) *service 
 }
 
 type services struct {
-	svcSearchMap                       map[string]*service // key: "svcName.methodName" and "methodName", value: svcInfo
-	svcMap                             map[string]*service // key: service name, value: svcInfo
-	conflictingMethodHasFallbackSvcMap map[string]bool
-	fallbackSvc                        *service
+	methodSvcMap         map[string]*service // key: method name, value: svcInfo
+	svcMap               map[string]*service // key: service name, value: svcInfo
+	conflictingMethodMap map[string]bool
+	fallbackSvc          *service
+
+	refuseTrafficWithoutServiceName bool
 }
 
 func newServices() *services {
 	return &services{
-		svcSearchMap:                       map[string]*service{},
-		svcMap:                             map[string]*service{},
-		conflictingMethodHasFallbackSvcMap: map[string]bool{},
+		methodSvcMap:         map[string]*service{},
+		svcMap:               map[string]*service{},
+		conflictingMethodMap: map[string]bool{},
 	}
 }
 
 func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, registerOpts *RegisterOptions) error {
 	svc := newService(svcInfo, handler)
-
-	if err := s.checkCombineServiceWithOtherService(svcInfo); err != nil {
-		return err
-	}
-
-	if err := s.checkMultipleFallbackService(registerOpts, svc); err != nil {
-		return err
-	}
-
-	s.svcMap[svcInfo.ServiceName] = svc
-	s.createSearchMap(svcInfo, svc, registerOpts)
-	return nil
-}
-
-// when registering combine service, it does not allow the registration of other services
-func (s *services) checkCombineServiceWithOtherService(svcInfo *serviceinfo.ServiceInfo) error {
-	if len(s.svcMap) > 0 {
-		if _, ok := s.svcMap["CombineService"]; ok || svcInfo.ServiceName == "CombineService" {
-			return errors.New("only one service can be registered when registering combine service")
-		}
-	}
-	return nil
-}
-
-func (s *services) checkMultipleFallbackService(registerOpts *RegisterOptions, svc *service) error {
 	if registerOpts.IsFallbackService {
 		if s.fallbackSvc != nil {
 			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)
 		}
 		s.fallbackSvc = svc
 	}
+	s.svcMap[svcInfo.ServiceName] = svc
+	// method search map
+	for methodName := range svcInfo.Methods {
+		if _, ok := s.methodSvcMap[methodName]; ok {
+			s.handleConflictingMethod(svc, methodName, registerOpts)
+		} else {
+			s.methodSvcMap[methodName] = svc
+		}
+	}
 	return nil
 }
 
-func (s *services) createSearchMap(svcInfo *serviceinfo.ServiceInfo, svc *service, registerOpts *RegisterOptions) {
-	for methodName := range svcInfo.Methods {
-		s.svcSearchMap[remote.BuildMultiServiceKey(svcInfo.ServiceName, methodName)] = svc
-		if svcFromMap, ok := s.svcSearchMap[methodName]; ok {
-			s.handleConflictingMethod(svcFromMap, svc, methodName, registerOpts)
-		} else {
-			s.svcSearchMap[methodName] = svc
-		}
+func (s *services) handleConflictingMethod(svc *service, methodName string, registerOpts *RegisterOptions) {
+	// true means has conflicting method
+	if _, ok := s.conflictingMethodMap[methodName]; !ok {
+		s.conflictingMethodMap[methodName] = true
 	}
-}
-
-func (s *services) handleConflictingMethod(svcFromMap, svc *service, methodName string, registerOpts *RegisterOptions) {
-	s.registerConflictingMethodHasFallbackSvcMap(svcFromMap, methodName)
-	s.updateWithFallbackSvc(registerOpts, svc, methodName)
-}
-
-func (s *services) registerConflictingMethodHasFallbackSvcMap(svcFromMap *service, methodName string) {
-	if _, ok := s.conflictingMethodHasFallbackSvcMap[methodName]; !ok {
-		if s.fallbackSvc != nil && svcFromMap.svcInfo.ServiceName == s.fallbackSvc.svcInfo.ServiceName {
-			// svc which is already registered is a fallback service
-			s.conflictingMethodHasFallbackSvcMap[methodName] = true
-		} else {
-			s.conflictingMethodHasFallbackSvcMap[methodName] = false
-		}
-	}
-}
-
-func (s *services) updateWithFallbackSvc(registerOpts *RegisterOptions, svc *service, methodName string) {
 	if registerOpts.IsFallbackService {
-		s.svcSearchMap[methodName] = svc
-		s.conflictingMethodHasFallbackSvcMap[methodName] = true
+		s.conflictingMethodMap[methodName] = false
+		s.methodSvcMap[methodName] = svc
 	}
 }
 
@@ -126,10 +87,27 @@ func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
 	return svcInfoMap
 }
 
-func (s *services) getSvcInfoSearchMap() map[string]*serviceinfo.ServiceInfo {
-	svcInfoSearchMap := map[string]*serviceinfo.ServiceInfo{}
-	for name, svc := range s.svcSearchMap {
-		svcInfoSearchMap[name] = svc.svcInfo
+func (s *services) SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo {
+	if strict || s.refuseTrafficWithoutServiceName {
+		if svc := s.svcMap[svcName]; svc != nil {
+			return svc.svcInfo
+		}
+		return nil
 	}
-	return svcInfoSearchMap
+	var svc *service
+	if svcName == "" {
+		svc = s.methodSvcMap[methodName]
+	} else {
+		svc = s.svcMap[svcName]
+		if svc == nil {
+			if _, ok := s.conflictingMethodMap[methodName]; !ok {
+				// no conflicting method
+				svc = s.methodSvcMap[methodName]
+			}
+		}
+	}
+	if svc != nil {
+		return svc.svcInfo
+	}
+	return nil
 }

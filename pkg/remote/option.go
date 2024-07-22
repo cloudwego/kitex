@@ -72,7 +72,7 @@ func (o *Option) AppendBoundHandler(h BoundHandler) {
 type ServerOption struct {
 	TargetSvcInfo *serviceinfo.ServiceInfo
 
-	SvcSearchMap map[string]*serviceinfo.ServiceInfo
+	SvcSearcher ServiceSearcher
 
 	TransServerFactory TransServerFactory
 
@@ -112,9 +112,6 @@ type ServerOption struct {
 	GRPCCfg *grpc.ServerConfig
 
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
-
-	// RefuseTrafficWithoutServiceName is used for a server with multi services
-	RefuseTrafficWithoutServiceName bool
 
 	Option
 

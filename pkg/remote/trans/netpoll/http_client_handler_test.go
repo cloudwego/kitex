@@ -26,11 +26,11 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	remotemocks "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var (
@@ -119,19 +119,10 @@ func TestHTTPRead(t *testing.T) {
 func TestHTTPOnMessage(t *testing.T) {
 	// 1. prepare mock data
 	svcInfo := mocks.ServiceInfo()
-	svcSearchMap := map[string]*serviceinfo.ServiceInfo{
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
-		mocks.MockMethod:          svcInfo,
-		mocks.MockExceptionMethod: svcInfo,
-		mocks.MockErrorMethod:     svcInfo,
-		mocks.MockOnewayMethod:    svcInfo,
-	}
+	svcSearcher := remotemocks.NewDefaultSvcSearcher()
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, method), nil, rpcinfo.NewRPCStats())
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
-	recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server, false)
+	recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
 	sendMsg := remote.NewMessage(svcInfo.MethodInfo(method).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
 
 	// 2. test
