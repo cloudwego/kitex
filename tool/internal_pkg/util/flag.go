@@ -216,40 +216,8 @@ func (f *FlagSet) SetAnnotation(name, key string, values []string) error {
 	return nil
 }
 
-// Set sets the value of the named command-line flag.
-func Set(name, value string) error {
-	return CommandLine.Set(name, value)
-}
-
-// UnquoteUsage extracts a back-quoted name from the usage
-// string for a flag and returns it and the un-quoted usage.
-// Given "a `name` to show" it returns ("name", "a name to show").
-// If there are no back quotes, the name is an educated guess of the
-// type of the flag's value, or the empty string if the flag is boolean.
-func UnquoteUsage(flag *Flag) (name string, usage string) {
-	// Look for a back-quoted name, but avoid the strings package.
-	usage = flag.Usage
-	for i := 0; i < len(usage); i++ {
-		if usage[i] == '`' {
-			for j := i + 1; j < len(usage); j++ {
-				if usage[j] == '`' {
-					name = usage[i+1 : j]
-					usage = usage[:i] + name + usage[j+1:]
-					return name, usage
-				}
-			}
-			break // Only one back quote; use type name.
-		}
-	}
-
-	return
-}
-
 // NFlag returns the number of flags that have been set.
 func (f *FlagSet) NFlag() int { return len(f.actual) }
-
-// NFlag returns the number of command-line flags that have been set.
-func NFlag() int { return len(CommandLine.actual) }
 
 // Arg returns the i'th argument.  Arg(0) is the first remaining argument
 // after flags have been processed.
@@ -260,23 +228,11 @@ func (f *FlagSet) Arg(i int) string {
 	return f.args[i]
 }
 
-// Arg returns the i'th command-line argument.  Arg(0) is the first remaining argument
-// after flags have been processed.
-func Arg(i int) string {
-	return CommandLine.Arg(i)
-}
-
 // NArg is the number of arguments remaining after flags have been processed.
 func (f *FlagSet) NArg() int { return len(f.args) }
 
-// NArg is the number of arguments remaining after flags have been processed.
-func NArg() int { return len(CommandLine.args) }
-
 // Args returns the non-flag arguments.
 func (f *FlagSet) Args() []string { return f.args }
-
-// Args returns the non-flag command-line arguments.
-func Args() []string { return CommandLine.args }
 
 // Var defines a flag with the specified name and usage string. The type and
 // value of the flag are represented by the first argument, of type Value, which
@@ -346,21 +302,6 @@ func (f *FlagSet) AddFlag(flag *Flag) error {
 	}
 	f.shorthands[c] = flag
 	return nil
-}
-
-// Var defines a flag with the specified name and usage string. The type and
-// value of the flag are represented by the first argument, of type Value, which
-// typically holds a user-defined implementation of Value. For instance, the
-// caller could create a flag that turns a comma-separated string into a slice
-// of strings by giving the slice the methods of Value; in particular, Set would
-// decompose the comma-separated string into the slice.
-func Var(value Value, name string, usage string) {
-	CommandLine.VarP(value, name, "", usage)
-}
-
-// VarP is like Var, but accepts a shorthand letter that can be used after a single dash.
-func VarP(value Value, name, shorthand, usage string) {
-	CommandLine.VarP(value, name, shorthand, usage)
 }
 
 // failf prints to standard error a formatted error and usage message and
@@ -700,6 +641,11 @@ func (s *stringValue) String() string { return string(*s) }
 // The argument p points to a string variable in which to store the value of the flag.
 func (f *FlagSet) StringVar(p *string, name string, value string, usage string) {
 	f.VarP(newStringValue(value, p), name, "", usage)
+}
+
+// StringVarP is like StringVar, but accepts a shorthand letter that can be used after a single dash.
+func (f *FlagSet) StringVarP(p *string, name, shorthand string, value string, usage string) {
+	f.VarP(newStringValue(value, p), name, shorthand, usage)
 }
 
 // -- bool Value

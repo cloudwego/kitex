@@ -129,14 +129,14 @@ func (a *Arguments) TemplateArgs(version, curpath string) error {
 			return a.checkPath(curpath)
 		},
 	}
-	initCmd.Flags().StringVar(&a.InitOutputDir, "o", ".", "Specify template init path (default current directory)")
-	renderCmd.Flags().StringVar(&a.ModuleName, "module", "",
+	initCmd.Flags().StringVarP(&a.InitOutputDir, "output", "o", ".", "Specify template init path (default current directory)")
+	renderCmd.Flags().StringVarP(&a.ModuleName, "module", "m", "",
 		"Specify the Go module name to generate go.mod.")
 	renderCmd.Flags().StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")
 	renderCmd.Flags().StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
 		"Specify a code gen path.")
-	renderCmd.Flags().StringVar(&a.TemplateFile, "f", "", "Specify template init path")
-	renderCmd.Flags().Var(&a.Includes, "I", "Add IDL search path and template search path for includes.")
+	renderCmd.Flags().StringVarP(&a.TemplateFile, "file", "f", "", "Specify single template path")
+	renderCmd.Flags().VarP(&a.Includes, "Includes", "I", "Add IDL search path and template search path for includes.")
 	initCmd.SetUsageFunc(func() {
 		fmt.Fprintf(os.Stderr, `Version %s
 Usage: kitex template init [flags]
