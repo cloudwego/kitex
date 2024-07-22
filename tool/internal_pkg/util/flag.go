@@ -67,7 +67,6 @@ type FlagSet struct {
 	parsed            bool
 	actual            map[NormalizedName]*Flag
 	orderedActual     []*Flag
-	sortedActual      []*Flag
 	formal            map[NormalizedName]*Flag
 	orderedFormal     []*Flag
 	sortedFormal      []*Flag
@@ -246,75 +245,6 @@ func UnquoteUsage(flag *Flag) (name string, usage string) {
 	return
 }
 
-// Splits the string `s` on whitespace into an initial substring up to
-// `i` runes in length and the remainder. Will go `slop` over `i` if
-// that encompasses the entire string (which allows the caller to
-// avoid short orphan words on the final line).
-func wrapN(i, slop int, s string) (string, string) {
-	if i+slop > len(s) {
-		return s, ""
-	}
-
-	w := strings.LastIndexAny(s[:i], " \t\n")
-	if w <= 0 {
-		return s, ""
-	}
-	nlPos := strings.LastIndex(s[:i], "\n")
-	if nlPos > 0 && nlPos < w {
-		return s[:nlPos], s[nlPos+1:]
-	}
-	return s[:w], s[w+1:]
-}
-
-// Wraps the string `s` to a maximum width `w` with leading indent
-// `i`. The first line is not indented (this is assumed to be done by
-// caller). Pass `w` == 0 to do no wrapping
-func wrap(i, w int, s string) string {
-	if w == 0 {
-		return strings.Replace(s, "\n", "\n"+strings.Repeat(" ", i), -1)
-	}
-
-	// space between indent i and end of line width w into which
-	// we should wrap the text.
-	wrap := w - i
-
-	var r, l string
-
-	// Not enough space for sensible wrapping. Wrap as a block on
-	// the next line instead.
-	if wrap < 24 {
-		i = 16
-		wrap = w - i
-		r += "\n" + strings.Repeat(" ", i)
-	}
-	// If still not enough space then don't even try to wrap.
-	if wrap < 24 {
-		return strings.Replace(s, "\n", r, -1)
-	}
-
-	// Try to avoid short orphan words on the final line, by
-	// allowing wrapN to go a bit over if that would fit in the
-	// remainder of the line.
-	slop := 5
-	wrap = wrap - slop
-
-	// Handle first line, which is indented by the caller (or the
-	// special case above)
-	l, s = wrapN(wrap, slop, s)
-	r = r + strings.Replace(l, "\n", "\n"+strings.Repeat(" ", i), -1)
-
-	// Now wrap the rest
-	for s != "" {
-		var t string
-
-		t, s = wrapN(wrap, slop, s)
-		r = r + "\n" + strings.Repeat(" ", i) + strings.Replace(t, "\n", "\n"+strings.Repeat(" ", i), -1)
-	}
-
-	return r
-
-}
-
 // NFlag returns the number of flags that have been set.
 func (f *FlagSet) NFlag() int { return len(f.actual) }
 
@@ -359,7 +289,7 @@ func (f *FlagSet) Var(value Value, name string, usage string) {
 }
 
 // VarPF is like VarP, but returns the flag created
-func (f *FlagSet) VarPF(value Value, name, shorthand, usage string) *Flag {
+func (f *FlagSet) VarPF(value Value, name, shorthand, usage string) (*Flag, error) {
 	// Remember the default value as a string; it won't change.
 	flag := &Flag{
 		Name:      name,
@@ -368,8 +298,11 @@ func (f *FlagSet) VarPF(value Value, name, shorthand, usage string) *Flag {
 		Value:     value,
 		DefValue:  value.String(),
 	}
-	f.AddFlag(flag)
-	return flag
+	err := f.AddFlag(flag)
+	if err != nil {
+		return nil, err
+	}
+	return flag, nil
 }
 
 // VarP is like Var, but accepts a shorthand letter that can be used after a single dash.
@@ -378,14 +311,14 @@ func (f *FlagSet) VarP(value Value, name, shorthand, usage string) {
 }
 
 // AddFlag will add the flag to the FlagSet
-func (f *FlagSet) AddFlag(flag *Flag) {
+func (f *FlagSet) AddFlag(flag *Flag) error {
 	normalizedFlagName := f.normalizeFlagName(flag.Name)
 
 	_, alreadyThere := f.formal[normalizedFlagName]
 	if alreadyThere {
 		msg := fmt.Sprintf("%s flag redefined: %s", f.name, flag.Name)
 		fmt.Fprintln(f.out(), msg)
-		panic(msg) // Happens only if flags are declared with identical names
+		return fmt.Errorf("%s flag redefined: %s", f.name, flag.Name)
 	}
 	if f.formal == nil {
 		f.formal = make(map[NormalizedName]*Flag)
@@ -396,12 +329,11 @@ func (f *FlagSet) AddFlag(flag *Flag) {
 	f.orderedFormal = append(f.orderedFormal, flag)
 
 	if flag.Shorthand == "" {
-		return
+		return nil
 	}
 	if len(flag.Shorthand) > 1 {
-		msg := fmt.Sprintf("%q shorthand is more than one ASCII character", flag.Shorthand)
-		fmt.Fprintf(f.out(), msg)
-		panic(msg)
+		fmt.Fprintf(f.out(), "%q shorthand is more than one ASCII character", flag.Shorthand)
+		return fmt.Errorf("%q shorthand is more than one ASCII character", flag.Shorthand)
 	}
 	if f.shorthands == nil {
 		f.shorthands = make(map[byte]*Flag)
@@ -409,11 +341,11 @@ func (f *FlagSet) AddFlag(flag *Flag) {
 	c := flag.Shorthand[0]
 	used, alreadyThere := f.shorthands[c]
 	if alreadyThere {
-		msg := fmt.Sprintf("unable to redefine %q shorthand in %q flagset: it's already used for %q flag", c, f.name, used.Name)
-		fmt.Fprintf(f.out(), msg)
-		panic(msg)
+		fmt.Fprintf(f.out(), "unable to redefine %q shorthand in %q flagset: it's already used for %q flag", c, f.name, used.Name)
+		return fmt.Errorf("unable to redefine %q shorthand in %q flagset: it's already used for %q flag", c, f.name, used.Name)
 	}
 	f.shorthands[c] = flag
+	return nil
 }
 
 // Var defines a flag with the specified name and usage string. The type and
@@ -640,10 +572,6 @@ func (f *FlagSet) Parse(arguments []string) error {
 	}
 	f.parsed = true
 
-	if len(arguments) < 0 {
-		return nil
-	}
-
 	f.args = make([]string, 0, len(arguments))
 
 	set := func(flag *Flag, value string) error {
@@ -774,13 +702,6 @@ func (f *FlagSet) StringVar(p *string, name string, value string, usage string) 
 	f.VarP(newStringValue(value, p), name, "", usage)
 }
 
-// optional interface to indicate boolean flags that can be
-// supplied without "=value" text
-type boolFlag interface {
-	Value
-	IsBoolFlag() bool
-}
-
 // -- bool Value
 type boolValue bool
 
@@ -805,12 +726,20 @@ func (b *boolValue) IsBoolFlag() bool { return true }
 
 // BoolVar defines a bool flag with specified name, default value, and usage string.
 // The argument p points to a bool variable in which to store the value of the flag.
-func (f *FlagSet) BoolVar(p *bool, name string, value bool, usage string) {
-	f.BoolVarP(p, name, "", value, usage)
+func (f *FlagSet) BoolVar(p *bool, name string, value bool, usage string) error {
+	err := f.BoolVarP(p, name, "", value, usage)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // BoolVarP is like BoolVar, but accepts a shorthand letter that can be used after a single dash.
-func (f *FlagSet) BoolVarP(p *bool, name, shorthand string, value bool, usage string) {
-	flag := f.VarPF(newBoolValue(value, p), name, shorthand, usage)
+func (f *FlagSet) BoolVarP(p *bool, name, shorthand string, value bool, usage string) error {
+	flag, err := f.VarPF(newBoolValue(value, p), name, shorthand, usage)
+	if err != nil {
+		return err
+	}
 	flag.NoOptDefVal = "true"
+	return nil
 }

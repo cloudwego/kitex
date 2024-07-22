@@ -68,15 +68,13 @@ func (a *Arguments) TemplateArgs(version, curpath string) error {
 				a.RenderTplDir = args[0]
 			}
 			var tplDir string
-			for i, arg := range args {
+			for _, arg := range args {
 				if !strings.HasPrefix(arg, "-") {
 					tplDir = arg
-					args = append(args[:i], args[i+1:]...)
 					break
 				}
 			}
 			if tplDir == "" {
-				cmd.PrintUsage()
 				return fmt.Errorf("template directory is required")
 			}
 			log.Verbose = a.Verbose
@@ -138,6 +136,7 @@ func (a *Arguments) TemplateArgs(version, curpath string) error {
 	renderCmd.Flags().StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
 		"Specify a code gen path.")
 	renderCmd.Flags().StringVar(&a.TemplateFile, "f", "", "Specify template init path")
+	renderCmd.Flags().Var(&a.Includes, "I", "Add IDL search path and template search path for includes.")
 	initCmd.SetUsageFunc(func() {
 		fmt.Fprintf(os.Stderr, `Version %s
 Usage: kitex template init [flags]

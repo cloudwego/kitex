@@ -16,7 +16,6 @@ package util
 
 import (
 	"fmt"
-	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"os"
 	"strings"
 )
@@ -50,14 +49,6 @@ func (c *Command) Flags() *FlagSet {
 		c.flags = NewFlagSet(c.Use, ContinueOnError)
 	}
 	return c.flags
-}
-
-// PrintUsage prints the usage of the Command
-func (c *Command) PrintUsage() {
-	log.Warn("Usage: %s\n\n%s\n\n", c.Use, c.Long)
-	for _, cmd := range c.commands {
-		log.Warnf("  %s: %s\n", cmd.Use, cmd.Short)
-	}
 }
 
 // Parent returns a commands parent command.
@@ -113,8 +104,6 @@ func nextArgs(args []string, x string) []string {
 	for pos := 0; pos < len(args); pos++ {
 		s := args[pos]
 		switch {
-		case s == "--":
-			break
 		case strings.HasPrefix(s, "-"):
 			pos++
 			continue
