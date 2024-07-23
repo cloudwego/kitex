@@ -19,7 +19,7 @@ package thrift
 import (
 	"fmt"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	bthrift "github.com/cloudwego/gopkg/protocol/thrift"
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 

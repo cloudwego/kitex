@@ -21,13 +21,13 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	mt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -63,18 +63,18 @@ func init() {
 }
 
 type mockWithContext struct {
-	ReadFunc  func(ctx context.Context, method string, dataLen int, oprot thrift.TProtocol) error
-	WriteFunc func(ctx context.Context, method string, oprot thrift.TProtocol) error
+	ReadFunc  func(ctx context.Context, method string, dataLen int, oprot athrift.TProtocol) error
+	WriteFunc func(ctx context.Context, method string, oprot athrift.TProtocol) error
 }
 
-func (m *mockWithContext) Read(ctx context.Context, method string, dataLen int, oprot thrift.TProtocol) error {
+func (m *mockWithContext) Read(ctx context.Context, method string, dataLen int, oprot athrift.TProtocol) error {
 	if m.ReadFunc != nil {
 		return m.ReadFunc(ctx, method, dataLen, oprot)
 	}
 	return nil
 }
 
-func (m *mockWithContext) Write(ctx context.Context, method string, oprot thrift.TProtocol) error {
+func (m *mockWithContext) Write(ctx context.Context, method string, oprot athrift.TProtocol) error {
 	if m.WriteFunc != nil {
 		return m.WriteFunc(ctx, method, oprot)
 	}
@@ -86,7 +86,7 @@ func TestWithContext(t *testing.T) {
 		t.Run(tb.Name, func(t *testing.T) {
 			ctx := context.Background()
 
-			req := &mockWithContext{WriteFunc: func(ctx context.Context, method string, oprot thrift.TProtocol) error {
+			req := &mockWithContext{WriteFunc: func(ctx context.Context, method string, oprot athrift.TProtocol) error {
 				return nil
 			}}
 			ink := rpcinfo.NewInvocation("", "mock")
@@ -99,7 +99,7 @@ func TestWithContext(t *testing.T) {
 			buf.Flush()
 
 			{
-				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, dataLen int, oprot thrift.TProtocol) error {
+				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, dataLen int, oprot athrift.TProtocol) error {
 					return nil
 				}}
 				ink := rpcinfo.NewInvocation("", "mock")
@@ -201,7 +201,7 @@ func TestException(t *testing.T) {
 			err = payloadCodec.Unmarshal(ctx, recvMsg, buf)
 			test.Assert(t, err != nil)
 			transErr, ok := err.(*remote.TransError)
-			test.Assert(t, ok)
+			test.Assert(t, ok, err)
 			test.Assert(t, err.Error() == errInfo)
 			test.Assert(t, transErr.TypeID() == remote.UnknownMethod)
 		})
@@ -210,13 +210,13 @@ func TestException(t *testing.T) {
 
 func TestTransErrorUnwrap(t *testing.T) {
 	errMsg := "mock err"
-	transErr := remote.NewTransError(remote.InternalError, bthrift.NewApplicationException(1000, errMsg))
-	uwErr, ok := transErr.Unwrap().(*bthrift.ApplicationException)
+	transErr := remote.NewTransError(remote.InternalError, thrift.NewApplicationException(1000, errMsg))
+	uwErr, ok := transErr.Unwrap().(*thrift.ApplicationException)
 	test.Assert(t, ok)
 	test.Assert(t, uwErr.TypeId() == 1000)
 	test.Assert(t, transErr.Error() == errMsg)
 
-	uwErr2, ok := errors.Unwrap(transErr).(*bthrift.ApplicationException)
+	uwErr2, ok := errors.Unwrap(transErr).(*thrift.ApplicationException)
 	test.Assert(t, ok)
 	test.Assert(t, uwErr2.TypeId() == 1000)
 	test.Assert(t, uwErr2.Error() == errMsg)

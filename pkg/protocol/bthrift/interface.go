@@ -18,20 +18,14 @@
 package bthrift
 
 import (
+	gopkgthrift "github.com/cloudwego/gopkg/protocol/thrift"
+
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // BinaryWriter .
-type BinaryWriter interface {
-	WriteDirect(b []byte, remainCap int) error
-}
-
-// ThriftFastCodec represents the interface of thrift fastcodec generated structs
-type ThriftFastCodec interface {
-	BLength() int
-	FastWriteNocopy(buf []byte, binaryWriter BinaryWriter) int
-	FastRead(buf []byte) (int, error)
-}
+// Deprecated: use `github.com/cloudwego/gopkg/protocol/thrift.NocopyWriter`
+type BinaryWriter = gopkgthrift.NocopyWriter
 
 // BTProtocol .
 type BTProtocol interface {

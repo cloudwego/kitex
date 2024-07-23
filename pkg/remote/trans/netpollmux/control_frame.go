@@ -25,8 +25,8 @@ package netpollmux
 import (
 	"fmt"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 type ControlFrame struct{}
@@ -37,8 +37,8 @@ func NewControlFrame() *ControlFrame {
 
 var fieldIDToName_ControlFrame = map[int16]string{}
 
-func (p *ControlFrame) Read(iprot thrift.TProtocol) (err error) {
-	var fieldTypeId thrift.TType
+func (p *ControlFrame) Read(iprot athrift.TProtocol) (err error) {
+	var fieldTypeId athrift.TType
 	var fieldId int16
 
 	if _, err = iprot.ReadStructBegin(); err != nil {
@@ -50,7 +50,7 @@ func (p *ControlFrame) Read(iprot thrift.TProtocol) (err error) {
 		if err != nil {
 			goto ReadFieldBeginError
 		}
-		if fieldTypeId == thrift.STOP {
+		if fieldTypeId == athrift.STOP {
 			break
 		}
 		if err = iprot.Skip(fieldTypeId); err != nil {
@@ -67,19 +67,19 @@ func (p *ControlFrame) Read(iprot thrift.TProtocol) (err error) {
 
 	return nil
 ReadStructBeginError:
-	return bthrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
 ReadFieldBeginError:
-	return bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 SkipFieldTypeError:
-	return bthrift.PrependError(fmt.Sprintf("%T skip field type %d error", p, fieldTypeId), err)
+	return thrift.PrependError(fmt.Sprintf("%T skip field type %d error", p, fieldTypeId), err)
 
 ReadFieldEndError:
-	return bthrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
 ReadStructEndError:
-	return bthrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
 }
 
-func (p *ControlFrame) Write(oprot thrift.TProtocol) (err error) {
+func (p *ControlFrame) Write(oprot athrift.TProtocol) (err error) {
 	if err = oprot.WriteStructBegin("ControlFrame"); err != nil {
 		goto WriteStructBeginError
 	}
@@ -93,11 +93,11 @@ func (p *ControlFrame) Write(oprot thrift.TProtocol) (err error) {
 	}
 	return nil
 WriteStructBeginError:
-	return bthrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 WriteFieldStopError:
-	return bthrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
 WriteStructEndError:
-	return bthrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
 }
 
 func (p *ControlFrame) String() string {
