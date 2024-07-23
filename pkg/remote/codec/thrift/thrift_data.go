@@ -43,14 +43,14 @@ func MarshalThriftData(ctx context.Context, codec remote.PayloadCodec, data inte
 // marshalBasicThriftData only encodes the data (without the prepending method, msgType, seqId)
 // It will allocate a new buffer and encode to it
 func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([]byte, error) {
+	// TODO(xiaost): Refactor the code after v0.11.0 is released. Unifying checking and fallback logic.
+
 	// encode with hyper codec
-	// NOTE: to ensure hyperMarshalEnabled is inlined so split the check logic, or it may cause performance loss
-	if c.hyperMarshalEnabled() && hyperMarshalAvailable(data) {
+	if c.IsSet(FrugalWrite) && hyperMarshalAvailable(data) {
 		return c.hyperMarshalBody(data)
 	}
 
-	// encode with FastWrite
-	if c.CodecType&FastWrite != 0 {
+	if c.IsSet(FastWrite) {
 		if msg, ok := data.(thrift.FastCodec); ok {
 			payloadSize := msg.BLength()
 			payload := mcache.Malloc(payloadSize)
@@ -68,7 +68,7 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 		return nil, err
 	}
 
-	// TODO: Remove the fallback code after skip decoder is stable
+	// TODO(xiaost): Deprecate the code by using cloudwebgo/gopkg in v0.12.0
 	// fallback to old thrift way (slow)
 	transport := athrift.NewTMemoryBufferLen(marshalThriftBufferSize)
 	tProt := athrift.NewTBinaryProtocol(transport, true, true)
@@ -143,10 +143,6 @@ func UnmarshalThriftData(ctx context.Context, codec remote.PayloadCodec, method 
 	return err
 }
 
-func (c thriftCodec) fastMessageUnmarshalEnabled() bool {
-	return c.CodecType&FastRead != 0
-}
-
 func (c thriftCodec) fastMessageUnmarshalAvailable(data interface{}, payloadLen int) bool {
 	if payloadLen == 0 && c.CodecType&EnableSkipDecoder == 0 {
 		return false
@@ -183,20 +179,25 @@ func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, data
 // method is only used for generic calls
 func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProtocol, method string, data interface{}, rpcRole remote.RPCRole, dataLen int) error {
 	// decode with hyper unmarshal
-	if c.hyperMessageUnmarshalEnabled() && c.hyperMessageUnmarshalAvailable(data, dataLen) {
+	if c.IsSet(FrugalRead) && c.hyperMessageUnmarshalAvailable(data, dataLen) {
 		return c.hyperUnmarshal(tProt, data, dataLen)
 	}
 
 	// decode with FastRead
-	if c.fastMessageUnmarshalEnabled() && c.fastMessageUnmarshalAvailable(data, dataLen) {
+	if c.IsSet(FastRead) && c.fastMessageUnmarshalAvailable(data, dataLen) {
 		return c.fastUnmarshal(tProt, data, dataLen)
 	}
 
 	if err := verifyUnmarshalBasicThriftDataType(data); err != nil {
-		// Basic can be used for disabling frugal, we need to check it
-		if c.CodecType != Basic && c.hyperMessageUnmarshalAvailable(data, dataLen) {
-			// fallback to frugal when the generated code is using slim template
-			return c.hyperUnmarshal(tProt, data, dataLen)
+		// if user only wants to use Basic we never try fallback to frugal or fastcodec
+		if c.CodecType != Basic {
+			// try FrugalRead < - > FastRead fallback
+			if c.fastMessageUnmarshalAvailable(data, dataLen) {
+				return c.fastUnmarshal(tProt, data, dataLen)
+			}
+			if c.hyperMessageUnmarshalAvailable(data, dataLen) { // slim template?
+				return c.hyperUnmarshal(tProt, data, dataLen)
+			}
 		}
 		return err
 	}

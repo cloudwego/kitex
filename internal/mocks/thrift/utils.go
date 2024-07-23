@@ -62,5 +62,9 @@ func ToApacheCodec(p thrift.FastCodec) athrift.TStruct {
 
 // UnpackApacheCodec unpacks ToApacheCodec
 func UnpackApacheCodec(v interface{}) interface{} {
-	return v.(ApacheCodecAdapter).p
+	a, ok := v.(ApacheCodecAdapter)
+	if ok {
+		return a.p
+	}
+	return v
 }

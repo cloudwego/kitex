@@ -35,18 +35,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
-const (
-	// 0b0001 and 0b0010 are used for FastWrite and FastRead, so Frugal starts from 0b0100
-	FrugalWrite CodecType = 0b0100
-	FrugalRead  CodecType = 0b1000
-
-	FrugalReadWrite = FrugalWrite | FrugalRead
-)
-
-// hyperMarshalEnabled indicates that if there are high priority message codec for current platform.
-func (c thriftCodec) hyperMarshalEnabled() bool {
-	return c.CodecType&FrugalWrite != 0
-}
+// TODO(xiaost): rename hyper -> frugal after v0.11.0 is released
 
 // hyperMarshalAvailable indicates that if high priority message codec is available.
 func hyperMarshalAvailable(data interface{}) bool {
@@ -55,11 +44,6 @@ func hyperMarshalAvailable(data interface{}) bool {
 		return false
 	}
 	return true
-}
-
-// hyperMessageUnmarshalEnabled indicates that if there are high priority message codec for current platform.
-func (c thriftCodec) hyperMessageUnmarshalEnabled() bool {
-	return c.CodecType&FrugalRead != 0
 }
 
 // hyperMessageUnmarshalAvailable indicates that if high priority message codec is available.

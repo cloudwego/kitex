@@ -86,14 +86,7 @@ func TestHyperCodecCheck(t *testing.T) {
 	msg.SetPayloadLen(0)
 	codec := &thriftCodec{}
 
-	// test CodecType check
-	test.Assert(t, codec.hyperMarshalEnabled() == false)
-	msg.SetPayloadLen(1)
-	test.Assert(t, codec.hyperMessageUnmarshalEnabled() == false)
-	msg.SetPayloadLen(0)
-
 	// test hyperMarshal check
-	codec = &thriftCodec{FrugalWrite}
 	test.Assert(t, hyperMarshalAvailable(&MockNoTagArgs{}) == false)
 	test.Assert(t, hyperMarshalAvailable(&MockFrugalTagArgs{}) == true)
 

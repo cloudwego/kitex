@@ -42,7 +42,13 @@ const (
 	FastWrite CodecType = 0b0001
 	FastRead  CodecType = 0b0010
 
-	FastReadWrite               = FastRead | FastWrite
+	FastReadWrite = FastRead | FastWrite
+
+	FrugalWrite CodecType = 0b0100
+	FrugalRead  CodecType = 0b1000
+
+	FrugalReadWrite = FrugalWrite | FrugalRead
+
 	EnableSkipDecoder CodecType = 0b10000
 )
 
@@ -90,8 +96,15 @@ type thriftCodec struct {
 	CodecType
 }
 
+// IsSet returns true if t is set
+func (c thriftCodec) IsSet(t CodecType) bool {
+	return c.CodecType&t != 0
+}
+
 // Marshal implements the remote.PayloadCodec interface.
 func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
+	// TODO(xiaost): Refactor the code after v0.11.0 is released. Unifying checking and fallback logic.
+
 	// prepare info
 	methodName := message.RPCInfo().Invocation().MethodName()
 	if methodName == "" {
@@ -100,35 +113,51 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	msgType := message.MessageType()
 	seqID := message.RPCInfo().Invocation().SeqID()
 
-	data, err := getValidData(methodName, message)
-	if err != nil {
+	// ???? for fixing resp==nil, err==nil? don't know
+	if err := codec.NewDataIfNeeded(methodName, message); err != nil {
 		return err
+	}
+	data := message.Data()
+	if message.MessageType() == remote.Exception {
+		// if remote.Exception, we always use fastcodec
+		if transErr, ok := data.(*remote.TransError); ok {
+			ex := thrift.NewApplicationException(transErr.TypeID(), transErr.Error())
+			return encodeFastThrift(out, methodName, msgType, seqID, ex)
+		} else if err, ok := data.(error); ok {
+			ex := thrift.NewApplicationException(remote.InternalError, err.Error())
+			return encodeFastThrift(out, methodName, msgType, seqID, ex)
+		} else {
+			return fmt.Errorf("got %T for remote.Exception", data)
+		}
 	}
 
 	// encode with hyper codec
-	// NOTE: to ensure hyperMarshalEnabled is inlined so split the check logic, or it may cause performance loss
-	if c.hyperMarshalEnabled() && hyperMarshalAvailable(data) {
+	if c.IsSet(FrugalWrite) && hyperMarshalAvailable(data) {
 		return c.hyperMarshal(out, methodName, msgType, seqID, data)
 	}
 
 	// encode with FastWrite
-	if c.CodecType&FastWrite != 0 {
+	if c.IsSet(FastWrite) {
 		if msg, ok := data.(thrift.FastCodec); ok {
 			return encodeFastThrift(out, methodName, msgType, seqID, msg)
 		}
 	}
 
 	// fallback to old thrift way (slow)
-	if err = encodeBasicThrift(out, ctx, methodName, msgType, seqID, data, message.RPCRole()); err == nil || err != errEncodeMismatchMsgType {
+	if err := encodeBasicThrift(out, ctx, methodName, msgType, seqID, data, message.RPCRole()); err == nil || err != errEncodeMismatchMsgType {
 		return err
 	}
 
-	// Basic can be used for disabling frugal, we need to check it
-	if c.CodecType != Basic && hyperMarshalAvailable(data) {
-		// fallback to frugal when the generated code is using slim template
-		return c.hyperMarshal(out, methodName, msgType, seqID, data)
+	// if user only wants to use Basic we never try fallback to frugal or fastcodec
+	if c.CodecType != Basic {
+		// try FrugalWrite < - > FastWrite fallback
+		if msg, ok := data.(thrift.FastCodec); ok {
+			return encodeFastThrift(out, methodName, msgType, seqID, msg)
+		}
+		if hyperMarshalAvailable(data) { // slim template?
+			return c.hyperMarshal(out, methodName, msgType, seqID, data)
+		}
 	}
-
 	return errEncodeMismatchMsgType
 }
 
@@ -174,6 +203,8 @@ func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string
 
 // Unmarshal implements the remote.PayloadCodec interface.
 func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
+	// TODO(xiaost): Refactor the code after v0.11.0 is released. Unifying checking and fallback logic.
+
 	tProt := NewBinaryProtocol(in)
 	methodName, msgType, seqID, err := tProt.ReadMessageBegin()
 	if err != nil {
@@ -208,7 +239,6 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 	if err != nil {
 		return err
 	}
-
 	if err = tProt.ReadMessageEnd(); err != nil {
 		return remote.NewTransError(remote.ProtocolError, err)
 	}
@@ -272,23 +302,3 @@ type MessageReaderWithMethodWithContext interface {
 // ThriftMsgFastCodec ...
 // Deprecated: use `github.com/cloudwego/gopkg/protocol/thrift.FastCodec`
 type ThriftMsgFastCodec = thrift.FastCodec
-
-func getValidData(methodName string, message remote.Message) (interface{}, error) {
-	if err := codec.NewDataIfNeeded(methodName, message); err != nil {
-		return nil, err
-	}
-	data := message.Data()
-	if message.MessageType() != remote.Exception {
-		return data, nil
-	}
-	transErr, isTransErr := data.(*remote.TransError)
-	if !isTransErr {
-		if err, isError := data.(error); isError {
-			encodeErr := thrift.NewApplicationException(remote.InternalError, err.Error())
-			return encodeErr, nil
-		}
-		return nil, errors.New("exception relay need error type data")
-	}
-	encodeErr := thrift.NewApplicationException(transErr.TypeID(), transErr.Error())
-	return encodeErr, nil
-}
