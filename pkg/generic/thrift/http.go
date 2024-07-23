@@ -133,7 +133,7 @@ func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options) {
 // Read ...
 func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in thrift.TProtocol) (interface{}, error) {
 	// fallback logic
-	if !r.dynamicgoEnabled {
+	if !r.dynamicgoEnabled || dataLen == 0 {
 		return r.originalRead(ctx, method, in)
 	}
 	tProt, ok := in.(*cthrift.BinaryProtocol)
