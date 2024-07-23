@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+
 	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"

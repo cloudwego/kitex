@@ -25,6 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksdiscovery "github.com/cloudwego/kitex/internal/mocks/discovery"
 	mocksproxy "github.com/cloudwego/kitex/internal/mocks/proxy"
