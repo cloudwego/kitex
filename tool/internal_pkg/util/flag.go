@@ -234,16 +234,6 @@ func (f *FlagSet) NArg() int { return len(f.args) }
 // Args returns the non-flag arguments.
 func (f *FlagSet) Args() []string { return f.args }
 
-// Var defines a flag with the specified name and usage string. The type and
-// value of the flag are represented by the first argument, of type Value, which
-// typically holds a user-defined implementation of Value. For instance, the
-// caller could create a flag that turns a comma-separated string into a slice
-// of strings by giving the slice the methods of Value; in particular, Set would
-// decompose the comma-separated string into the slice.
-func (f *FlagSet) Var(value Value, name string, usage string) {
-	f.VarP(value, name, "", usage)
-}
-
 // VarPF is like VarP, but returns the flag created
 func (f *FlagSet) VarPF(value Value, name, shorthand, usage string) (*Flag, error) {
 	// Remember the default value as a string; it won't change.
@@ -631,6 +621,7 @@ func (s *stringValue) Set(val string) error {
 	*s = stringValue(val)
 	return nil
 }
+
 func (s *stringValue) Type() string {
 	return "string"
 }
@@ -638,13 +629,12 @@ func (s *stringValue) Type() string {
 func (s *stringValue) String() string { return string(*s) }
 
 // StringVar defines a string flag with specified name, default value, and usage string.
-// The argument p points to a string variable in which to store the value of the flag.
-func (f *FlagSet) StringVar(p *string, name string, value string, usage string) {
+func (f *FlagSet) StringVar(p *string, name, value, usage string) {
 	f.VarP(newStringValue(value, p), name, "", usage)
 }
 
 // StringVarP is like StringVar, but accepts a shorthand letter that can be used after a single dash.
-func (f *FlagSet) StringVarP(p *string, name, shorthand string, value string, usage string) {
+func (f *FlagSet) StringVarP(p *string, name, shorthand, value, usage string) {
 	f.VarP(newStringValue(value, p), name, shorthand, usage)
 }
 
