@@ -16,11 +16,12 @@ package args
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
-	"os"
-	"strings"
 )
 
 func (a *Arguments) TemplateArgs(version, curpath string) error {
@@ -163,7 +164,7 @@ Examples:
 Flags:
 `, version)
 	})
-	//renderCmd.PrintUsage()
+	// renderCmd.PrintUsage()
 	templateCmd.AddCommand(initCmd, renderCmd, cleanCmd)
 	kitexCmd.AddCommand(templateCmd)
 	if _, err := kitexCmd.ExecuteC(); err != nil {
