@@ -82,16 +82,14 @@ func initFrugalTagRecvMsg() remote.Message {
 }
 
 func TestHyperCodecCheck(t *testing.T) {
-	msg := initFrugalTagRecvMsg()
-	msg.SetPayloadLen(0)
-	codec := &thriftCodec{}
-
 	// test hyperMarshal check
 	test.Assert(t, hyperMarshalAvailable(&MockNoTagArgs{}) == false)
 	test.Assert(t, hyperMarshalAvailable(&MockFrugalTagArgs{}) == true)
 
 	// test hyperMessageUnmarshal check
-	codec = &thriftCodec{FrugalRead}
+	msg := initFrugalTagRecvMsg()
+	msg.SetPayloadLen(0)
+	codec := &thriftCodec{FrugalRead}
 	test.Assert(t, codec.hyperMessageUnmarshalAvailable(&MockNoTagArgs{}, msg.PayloadLen()) == false)
 	test.Assert(t, codec.hyperMessageUnmarshalAvailable(&MockFrugalTagArgs{}, msg.PayloadLen()) == false)
 	msg.SetPayloadLen(1)
