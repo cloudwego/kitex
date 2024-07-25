@@ -108,6 +108,7 @@ func nextReader(tt descriptor.Type, t *descriptor.TypeDescriptor, opt *readerOpt
 	}
 }
 
+// TODO(marina.sakai): Optimize generic reader
 func skipStructReader(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	var v interface{}
 	for {

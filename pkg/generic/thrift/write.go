@@ -248,6 +248,7 @@ func writeEmptyValue(out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt
 	return fmt.Errorf("unsupported type:%T", t)
 }
 
+// TODO(marina.sakai): Optimize generic struct writer
 func wrapStructWriter(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	for name, field := range t.Struct.FieldsByName {
 		if field.IsException {
@@ -270,6 +271,7 @@ func wrapStructWriter(ctx context.Context, val interface{}, out *thrift.BinaryWr
 	return nil
 }
 
+// TODO(marina.sakai): Optimize generic json writer
 func wrapJSONWriter(ctx context.Context, val *gjson.Result, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	for name, field := range t.Struct.FieldsByName {
 		if field.IsException {
