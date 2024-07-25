@@ -24,6 +24,9 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: stable
+          # For self-hosted, the cache path is shared across projects
+          # and it works well without the cache of github actions
+          # Enable it if we're going to use Github only
           cache: false
 
       - uses: reviewdog/action-staticcheck@v1
@@ -46,6 +49,9 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: stable
+          # for self-hosted, the cache path is shared across projects
+          # and it works well without the cache of github actions
+          # Enable it if we're going to use Github only
           cache: false
 
       - name: Golangci Lint
