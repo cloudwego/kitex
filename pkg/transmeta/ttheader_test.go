@@ -60,6 +60,7 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	toInfo := rpcinfo.NewEndpointInfo("toServiceName", "toMethod", nil, nil)
 	ri := rpcinfo.NewRPCInfo(fromInfo, toInfo, rpcinfo.NewInvocation("", ""), cfg, rpcinfo.NewRPCStats())
 	msg := remote.NewMessage(nil, mocks.ServiceInfo(), ri, remote.Call, remote.Client)
+	ri.Invocation().(rpcinfo.InvocationSetter).SetServiceName(msg.ServiceInfo().ServiceName)
 
 	// pure paylod, no effect
 	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Thrift))
@@ -86,7 +87,7 @@ func TestTTHeaderClientWriteMetainfo(t *testing.T) {
 	test.Assert(t, kvs[transmeta.ConnectTimeout] == "1000")
 	strKvs = msg.TransInfo().TransStrInfo()
 	test.Assert(t, len(strKvs) == 1)
-	test.Assert(t, strKvs[transmeta.HeaderIDLServiceName] == "")
+	test.Assert(t, strKvs[transmeta.HeaderIDLServiceName] == msg.ServiceInfo().ServiceName)
 }
 
 func TestTTHeaderServerReadMetainfo(t *testing.T) {

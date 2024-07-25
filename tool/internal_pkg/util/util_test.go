@@ -41,7 +41,9 @@ func TestGetGOPATH(t *testing.T) {
 	}()
 
 	os.Setenv("GOPATH", "/usr/bin/go:/usr/local/bin/go")
-	test.Assert(t, GetGOPATH() == "/usr/bin/go")
+	gopath, err := GetGOPATH()
+	test.Assert(t, err == nil && gopath == "/usr/bin/go")
 	os.Setenv("GOPATH", "")
-	test.Assert(t, GetGOPATH() != "")
+	gopath, err = GetGOPATH()
+	test.Assert(t, err == nil && gopath != "")
 }

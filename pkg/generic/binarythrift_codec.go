@@ -21,9 +21,12 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	athrift "github.com/apache/thrift/lib/go/thrift"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -51,7 +54,21 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 	if msg.RPCRole() == remote.Server {
 		gResult := data.(*Result)
 		transBinary := gResult.Success
-		if transBuff, ok = transBinary.(binaryReqType); !ok {
+		// handle biz error
+		if transBinary == nil {
+			tProt := thrift.NewBinaryProtocol(out)
+			if err := tProt.WriteMessageBegin(msg.RPCInfo().Invocation().MethodName(), athrift.TMessageType(msg.MessageType()), msg.RPCInfo().Invocation().SeqID()); err != nil {
+				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteMessageBegin failed: %s", err.Error()))
+			}
+			if err := tProt.WriteFieldStop(); err != nil {
+				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteFieldStop failed: %s", err.Error()))
+			}
+			if err := tProt.WriteMessageEnd(); err != nil {
+				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteMessageEnd failed: %s", err.Error()))
+			}
+			tProt.Recycle()
+			return nil
+		} else if transBuff, ok = transBinary.(binaryReqType); !ok {
 			return perrors.NewProtocolErrorWithMsg("invalid marshal result in rawThriftBinaryCodec: must be []byte")
 		}
 	} else {

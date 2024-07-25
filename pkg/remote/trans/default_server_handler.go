@@ -37,7 +37,7 @@ func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.
 	svrHdlr := &svrTransHandler{
 		opt:           opt,
 		codec:         opt.Codec,
-		svcSearchMap:  opt.SvcSearchMap,
+		svcSearcher:   opt.SvcSearcher,
 		targetSvcInfo: opt.TargetSvcInfo,
 		ext:           ext,
 	}
@@ -50,7 +50,7 @@ func NewDefaultSvrTransHandler(opt *remote.ServerOption, ext Extension) (remote.
 
 type svrTransHandler struct {
 	opt           *remote.ServerOption
-	svcSearchMap  map[string]*serviceinfo.ServiceInfo
+	svcSearcher   remote.ServiceSearcher
 	targetSvcInfo *serviceinfo.ServiceInfo
 	inkHdlFunc    endpoint.Endpoint
 	codec         remote.Codec
@@ -167,7 +167,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	}()
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
-	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearchMap, ri, remote.Call, remote.Server, t.opt.RefuseTrafficWithoutServiceName)
+	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearcher, ri, remote.Call, remote.Server)
 	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
 	ctx, err = t.transPipe.Read(ctx, conn, recvMsg)
 	if err != nil {

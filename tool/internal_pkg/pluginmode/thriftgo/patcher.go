@@ -122,6 +122,7 @@ func (p *patcher) buildTemplates() (err error) {
 			templates.StructLikeDefault,
 			templates.FieldGetOrSet,
 			templates.FieldIsSet,
+			StructLikeDeepEqualEmpty,
 			StructLikeDeepCopy,
 			FieldDeepCopy,
 			FieldDeepCopyStructLike,
