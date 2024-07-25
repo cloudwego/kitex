@@ -567,7 +567,7 @@ func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
 	p := newLongPoolForTest(0, 2, 5, idleTime)
 	defer p.Close()
 
-	var closed bool
+	var closed uint32 // use atomic to fix data race issue
 	d := mocksremote.NewMockDialer(ctrl)
 	d.EXPECT().DialTimeout(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(func(network, address string, timeout time.Duration) (net.Conn, error) {
 		na := utils.NewNetAddr(network, address)
@@ -575,10 +575,9 @@ func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
 		conn.EXPECT().IsActive().Return(true).AnyTimes()
 		conn.EXPECT().RemoteAddr().Return(na).AnyTimes()
 		conn.EXPECT().Close().DoAndReturn(func() error {
-			if closed {
+			if !atomic.CompareAndSwapUint32(&closed, 0, 1) {
 				return errors.New("connection already closed")
 			}
-			closed = true
 			return nil
 		}).AnyTimes()
 		return conn, nil
@@ -589,18 +588,18 @@ func TestLongConnPoolCloseOnIdleTimeout(t *testing.T) {
 
 	c, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
-	test.Assert(t, !closed)
+	test.Assert(t, atomic.LoadUint32(&closed) == 0)
 
 	err = p.Put(c)
 	test.Assert(t, err == nil)
-	test.Assert(t, !closed)
+	test.Assert(t, atomic.LoadUint32(&closed) == 0)
 
 	time.Sleep(idleTime * 3)
 
 	c2, err := p.Get(context.TODO(), "tcp", addr, opt)
 	test.Assert(t, err == nil)
 	test.Assert(t, c != c2)
-	test.Assert(t, closed) // the first connection should be closed
+	test.Assert(t, atomic.LoadUint32(&closed) == 1) // the first connection should be closed
 }
 
 func TestLongConnPoolCloseOnClean(t *testing.T) {
