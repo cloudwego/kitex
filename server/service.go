@@ -59,24 +59,24 @@ func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interfac
 	s.svcMap[svcInfo.ServiceName] = svc
 	// method search map
 	for methodName := range svcInfo.Methods {
-		if _, ok := s.methodSvcMap[methodName]; ok {
-			s.handleConflictingMethod(svc, methodName, registerOpts)
-		} else {
+		_, existMethod := s.methodSvcMap[methodName]
+		if existMethod {
+			// true means has conflicting method
+			if _, ok := s.conflictingMethodMap[methodName]; !ok {
+				s.conflictingMethodMap[methodName] = true
+			}
+		}
+		if !existMethod || registerOpts.IsFallbackService {
 			s.methodSvcMap[methodName] = svc
+		}
+		if registerOpts.IsFallbackService {
+			s.conflictingMethodMap[methodName] = false
 		}
 	}
 	return nil
 }
 
 func (s *services) handleConflictingMethod(svc *service, methodName string, registerOpts *RegisterOptions) {
-	// true means has conflicting method
-	if _, ok := s.conflictingMethodMap[methodName]; !ok {
-		s.conflictingMethodMap[methodName] = true
-	}
-	if registerOpts.IsFallbackService {
-		s.conflictingMethodMap[methodName] = false
-		s.methodSvcMap[methodName] = svc
-	}
 }
 
 func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {

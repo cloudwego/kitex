@@ -17,7 +17,6 @@
 package server
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -29,7 +28,6 @@ func TestAddService(t *testing.T) {
 	err := svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler(), &RegisterOptions{})
 	test.Assert(t, err == nil)
 	test.Assert(t, len(svcs.svcMap) == 1)
-	fmt.Println(svcs.methodSvcMap)
 	test.Assert(t, len(svcs.methodSvcMap) == 5)
 	test.Assert(t, len(svcs.conflictingMethodMap) == 0)
 	test.Assert(t, svcs.fallbackSvc == nil)
@@ -48,6 +46,20 @@ func TestAddService(t *testing.T) {
 	err = svcs.addService(mocks.Service2Info(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "multiple fallback services cannot be registered. [MockService3] is already registered as a fallback service")
+
+	svcs = newServices()
+	err = svcs.addService(mocks.Service3Info(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
+	test.Assert(t, err == nil)
+	test.Assert(t, len(svcs.svcMap) == 1)
+	test.Assert(t, len(svcs.methodSvcMap) == 1)
+	test.Assert(t, len(svcs.conflictingMethodMap) == 1 && !svcs.conflictingMethodMap["mock"])
+	test.Assert(t, svcs.fallbackSvc != nil)
+
+	err = svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler(), &RegisterOptions{})
+	test.Assert(t, err == nil)
+	test.Assert(t, len(svcs.svcMap) == 2)
+	test.Assert(t, len(svcs.methodSvcMap) == 5)
+	test.Assert(t, svcs.SearchService("", "mock", false) == mocks.Service3Info())
 }
 
 func TestCheckMultipleFallbackService(t *testing.T) {
