@@ -190,9 +190,11 @@ func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.M
 func encodeGenericThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, msg genericWriter) error {
 	binaryWriter := thrift.NewBinaryWriter()
 	binaryWriter.WriteMessageBegin(method, thrift.TMessageType(msgType), seqID)
-	out.Write(binaryWriter.Bytes())
+	if _, err := out.Write(binaryWriter.Bytes()); err != nil {
+		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
+	}
 	if err := msg.Write(ctx, method, out); err != nil {
-		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("athrift marshal, Write failed: %s", err.Error()))
+		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 	}
 	return nil
 }

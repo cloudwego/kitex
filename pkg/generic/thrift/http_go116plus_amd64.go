@@ -77,9 +77,14 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interfa
 			return err
 		}
 	}
-	binaryWriter.WriteBinary(dbuf)
+	if _, err := out.Write(binaryWriter.Bytes()); err != nil {
+		return err
+	}
+	if _, err := out.Write(dbuf); err != nil {
+		return err
+	}
+	binaryWriter.Reset()
 	binaryWriter.WriteFieldStop()
-
 	_, err := out.Write(binaryWriter.Bytes())
 	return err
 }
