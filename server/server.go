@@ -431,19 +431,7 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 }
 
 func (s *server) check() error {
-	if len(s.svcs.svcMap) == 0 {
-		return errors.New("run: no service. Use RegisterService to set one")
-	}
-	if s.opt.RefuseTrafficWithoutServiceName {
-		s.svcs.refuseTrafficWithoutServiceName = true
-		return nil
-	}
-	for name, conflict := range s.svcs.conflictingMethodMap {
-		if conflict {
-			return fmt.Errorf("method name [%s] is conflicted between services but no fallback service is specified", name)
-		}
-	}
-	return nil
+	return s.svcs.check(s.opt.RefuseTrafficWithoutServiceName)
 }
 
 func doAddBoundHandlerToHead(h remote.BoundHandler, opt *remote.ServerOption) {
