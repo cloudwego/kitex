@@ -78,19 +78,21 @@ func TestMarshalThriftData(t *testing.T) {
 
 func Test_decodeBasicThriftData(t *testing.T) {
 	t.Run("empty-input", func(t *testing.T) {
+		req := &mocks.MockReq{}
 		tProt := NewBinaryProtocol(remote.NewReaderBuffer([]byte{}))
-		err := decodeBasicThriftData(tProt, 0)
+		err := decodeBasicThriftData(tProt, mocks.ToApacheCodec(req))
 		test.Assert(t, err != nil, err)
 	})
 	t.Run("invalid-input", func(t *testing.T) {
+		req := &mocks.MockReq{}
 		tProt := NewBinaryProtocol(remote.NewReaderBuffer([]byte{0xff}))
-		err := decodeBasicThriftData(tProt, 0)
+		err := decodeBasicThriftData(tProt, mocks.ToApacheCodec(req))
 		test.Assert(t, err != nil, err)
 	})
 	t.Run("normal-input", func(t *testing.T) {
 		req := &mocks.MockReq{}
 		tProt := NewBinaryProtocol(remote.NewReaderBuffer(mockReqThrift))
-		err := decodeBasicThriftData(tProt, 0)
+		err := decodeBasicThriftData(tProt, mocks.ToApacheCodec(req))
 		checkDecodeResult(t, err, req)
 	})
 }
@@ -173,18 +175,6 @@ func TestUnmarshalThriftException(t *testing.T) {
 	test.Assert(t, ok, err)
 	test.Assert(t, transErr.TypeID() == athrift.INVALID_PROTOCOL, transErr)
 	test.Assert(t, transErr.Error() == errMessage, transErr)
-}
-
-func Test_verifyMarshalBasicThriftDataType(t *testing.T) {
-	err := verifyMarshalBasicThriftDataType(&mockWithContext{})
-	test.Assert(t, err == nil, err)
-	// data that is not part of basic thrift: in thrift_frugal_amd64_test.go: Test_verifyMarshalThriftDataFrugal
-}
-
-func Test_verifyUnmarshalBasicThriftDataType(t *testing.T) {
-	err := verifyUnmarshalBasicThriftDataType(&mockWithContext{})
-	test.Assert(t, err == nil, err)
-	// data that is not part of basic thrift: in thrift_frugal_amd64_test.go: Test_verifyUnmarshalThriftDataFrugal
 }
 
 func Test_getSkippedStructBuffer(t *testing.T) {
