@@ -140,7 +140,7 @@ func TestDefaultErrorHandler(t *testing.T) {
 	reqCtx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
 	// Test TApplicationException
-	err := DefaultClientErrorHandler(context.Background(), thrift.NewTApplicationException(100, "mock"))
+	err := DefaultClientErrorHandler(reqCtx, thrift.NewTApplicationException(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error[remote]: mock", err.Error())
 	var te thrift.TApplicationException
 	ok := errors.As(err, &te)
@@ -154,7 +154,7 @@ func TestDefaultErrorHandler(t *testing.T) {
 	test.Assert(t, te.TypeId() == 100)
 
 	// Test PbError
-	err = DefaultClientErrorHandler(context.Background(), protobuf.NewPbError(100, "mock"))
+	err = DefaultClientErrorHandler(reqCtx, protobuf.NewPbError(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error[remote]: mock")
 	var pe protobuf.PBError
 	ok = errors.As(err, &pe)
@@ -168,18 +168,25 @@ func TestDefaultErrorHandler(t *testing.T) {
 	test.Assert(t, te.TypeId() == 100)
 
 	// Test status.Error
-	err = DefaultClientErrorHandler(context.Background(), status.Err(100, "mock"))
+	err = DefaultClientErrorHandler(reqCtx, status.Err(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error: rpc error: code = 100 desc = mock", err.Error())
 	// Test status.Error with remote addr
 	err = ClientErrorHandlerWithAddr(reqCtx, status.Err(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error["+tcpAddrStr+"]: rpc error: code = 100 desc = mock", err.Error())
 
 	// Test other error
-	err = DefaultClientErrorHandler(context.Background(), errors.New("mock"))
+	err = DefaultClientErrorHandler(reqCtx, errors.New("mock"))
 	test.Assert(t, err.Error() == "remote or network error: mock")
 	// Test other error with remote addr
 	err = ClientErrorHandlerWithAddr(reqCtx, errors.New("mock"))
 	test.Assert(t, err.Error() == "remote or network error["+tcpAddrStr+"]: mock")
+
+	// Test BizStatusError set
+	ri.Invocation().(rpcinfo.InvocationSetter).SetBizStatusErr(kerrors.NewBizStatusError(1024, "biz"))
+	err = DefaultClientErrorHandler(reqCtx, errors.New("mock"))
+	err, ok = kerrors.FromBizStatusError(err)
+	test.Assert(t, ok, "should return BizStatusError here")
+	test.Assert(t, err.Error() == "biz error: code=1024, msg=biz", err.Error())
 }
 
 func TestNewProxyMW(t *testing.T) {
