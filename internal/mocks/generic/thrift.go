@@ -23,9 +23,9 @@ package generic
 
 import (
 	context "context"
+	"io"
 	reflect "reflect"
 
-	thrift "github.com/apache/thrift/lib/go/thrift"
 	thrift0 "github.com/cloudwego/kitex/pkg/generic/thrift"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -54,7 +54,7 @@ func (m *MockMessageReader) EXPECT() *MockMessageReaderMockRecorder {
 }
 
 // Read mocks base method.
-func (m *MockMessageReader) Read(ctx context.Context, method string, isClient bool, dataLen int, in thrift.TProtocol) (interface{}, error) {
+func (m *MockMessageReader) Read(ctx context.Context, method string, isClient bool, dataLen int, in io.Reader) (interface{}, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Read", ctx, method, in)
 	ret0, _ := ret[0].(interface{})
@@ -92,7 +92,7 @@ func (m *MockMessageWriter) EXPECT() *MockMessageWriterMockRecorder {
 }
 
 // Write mocks base method.
-func (m *MockMessageWriter) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, method string, isClient bool, requestBase *thrift0.Base) error {
+func (m *MockMessageWriter) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *thrift0.Base) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", ctx, out, msg, requestBase)
 	ret0, _ := ret[0].(error)
