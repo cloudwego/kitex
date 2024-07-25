@@ -143,8 +143,13 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 		}
 	}
 
+	// generic call
+	if msg, ok := data.(genericWriter); ok {
+		return encodeGenericThrift(out, ctx, methodName, msgType, seqID, msg)
+	}
+
 	// fallback to old thrift way (slow)
-	if err := encodeBasicThrift(out, ctx, methodName, msgType, seqID, data, message.RPCRole()); err == nil || err != errEncodeMismatchMsgType {
+	if err := encodeBasicThrift(out, ctx, methodName, msgType, seqID, data); err == nil || err != errEncodeMismatchMsgType {
 		return err
 	}
 
@@ -182,8 +187,18 @@ func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.M
 	return nw.MallocAck(mallocLen)
 }
 
-// encodeBasicThrift encode with the old thrift way (slow)
-func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}, rpcRole remote.RPCRole) error {
+func encodeGenericThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, msg genericWriter) error {
+	binaryWriter := thrift.NewBinaryWriter()
+	binaryWriter.WriteMessageBegin(method, thrift.TMessageType(msgType), seqID)
+	out.Write(binaryWriter.Bytes())
+	if err := msg.Write(ctx, method, out); err != nil {
+		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("athrift marshal, Write failed: %s", err.Error()))
+	}
+	return nil
+}
+
+// encodeBasicThrift encode with the old athrift way (slow)
+func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}) error {
 	if err := verifyMarshalBasicThriftDataType(data); err != nil {
 		return err
 	}
@@ -191,7 +206,7 @@ func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string
 	if err := tProt.WriteMessageBegin(method, athrift.TMessageType(msgType), seqID); err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageBegin failed: %s", err.Error()))
 	}
-	if err := marshalBasicThriftData(ctx, tProt, data, method, rpcRole); err != nil {
+	if err := marshalBasicThriftData(tProt, data); err != nil {
 		return err
 	}
 	if err := tProt.WriteMessageEnd(); err != nil {
@@ -234,7 +249,14 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 
 	ri := message.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
-	err = c.unmarshalThriftData(ctx, tProt, methodName, data, message.RPCRole(), dataLen)
+	if msg, ok := data.(genericReader); ok {
+		err = msg.Read(ctx, methodName, dataLen, in)
+		if err != nil {
+			err = remote.NewTransError(remote.ProtocolError, err)
+		}
+	} else {
+		err = c.unmarshalThriftData(tProt, data, dataLen)
+	}
 	rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
 	if err != nil {
 		return err
@@ -269,12 +291,12 @@ func (c thriftCodec) Name() string {
 	return serviceinfo.Thrift.String()
 }
 
-// MessageWriter write to thrift.TProtocol
+// MessageWriter write to athrift.TProtocol
 type MessageWriter interface {
 	Write(oprot athrift.TProtocol) error
 }
 
-// MessageReader read from thrift.TProtocol
+// MessageReader read from athrift.TProtocol
 type MessageReader interface {
 	Read(oprot athrift.TProtocol) error
 }
@@ -285,18 +307,6 @@ type genericWriter interface { // used by pkg/generic
 
 type genericReader interface { // used by pkg/generic
 	Read(ctx context.Context, method string, dataLen int, r io.Reader) error
-}
-
-// MessageWriterWithMethodWithContext write to thrift.TProtocol
-// TODO(marina.sakai): remove it after we use the new genericWriter interface
-type MessageWriterWithMethodWithContext interface {
-	Write(ctx context.Context, method string, oprot athrift.TProtocol) error
-}
-
-// MessageReaderWithMethodWithContext read from thrift.TProtocol with method
-// TODO(marina.sakai): remove it after we use the new genericReader interface
-type MessageReaderWithMethodWithContext interface {
-	Read(ctx context.Context, method string, dataLen int, iprot athrift.TProtocol) error
 }
 
 // ThriftMsgFastCodec ...
