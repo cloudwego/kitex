@@ -18,7 +18,13 @@ package test
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/generic/binarypb_test/kitex_gen/api"
+	"github.com/cloudwego/kitex/pkg/generic/binarypb_test/kitex_gen/api/echo"
+	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"io/ioutil"
 	"log"
 	"math"
@@ -62,9 +68,9 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 	return svr
 }
 
-func initRawProtobufBinaryClient() genericclient.Client {
+func initRawProtobufBinaryClient(destService string) genericclient.Client {
 	g := generic.BinaryProtobufGeneric()
-	cli := newGenericClient("BasicService", g, addr)
+	cli := newGenericClient(destService, g, addr)
 	// print the addr that the client is connected to
 	fmt.Printf("Client connected to: %v\n", addr)
 	return cli
@@ -77,6 +83,21 @@ func initRawProtobufBinaryServer(handler generic.Service) server.Server {
 	return svr
 }
 
+func initEchoServer() server.Server {
+	addr, _ := net.ResolveTCPAddr("tcp", addr)
+	var opts []server.Option
+	opts = append(opts, server.WithServiceAddr(addr), server.WithExitWaitTime(time.Microsecond*10), server.WithMetaHandler(transmeta.ServerTTHeaderHandler))
+	svr := echo.NewServer(&EchoImpl{}, opts...)
+	go func() {
+		err := svr.Run()
+		if err != nil {
+			panic(err)
+		}
+	}()
+	test.WaitServerStart(addr.String())
+	return svr
+}
+
 // GenericServiceImpl ...
 type GenericServiceImpl struct{}
 
@@ -84,10 +105,12 @@ type GenericServiceImpl struct{}
 func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
 	req := request.([]byte)
 
-	exp := constructBasicExampleReqObject()
+	pbreq := req[12+len(method):]
+
+	exp := getBasicExampleReqObject()
 	var act base.BasicExample
 	// Unmarshal the binary data into the act struct
-	err = proto.Unmarshal(req, &act)
+	err = proto.Unmarshal(pbreq, &act)
 	if err != nil {
 		log.Fatalf("Failed to unmarshal Protobuf data: %v", err)
 	}
@@ -96,7 +119,7 @@ func (g *GenericServiceImpl) GenericCall(ctx context.Context, method string, req
 		log.Fatalf("Expected and actual Protobuf data are not equal")
 	}
 
-	buf := readBasicExampleReqProtoBufData()
+	buf := getBasicExampleReq()
 
 	return buf, nil
 }
@@ -108,10 +131,12 @@ type Example2ExampleMethodService struct{}
 func (g *Example2ExampleMethodService) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
 	req := request.([]byte)
 
-	exp := constructExample2ReqObject()
+	pbreq := req[12+len(method):]
+
+	exp := getExample2ReqObject()
 	var act example2.ExampleReq
 	// Unmarshal the binary data into the act struct
-	err = proto.Unmarshal(req, &act)
+	err = proto.Unmarshal(pbreq, &act)
 	if err != nil {
 		log.Fatalf("Failed to unmarshal Protobuf data: %v", err)
 	}
@@ -120,20 +145,35 @@ func (g *Example2ExampleMethodService) GenericCall(ctx context.Context, method s
 		log.Fatalf("Expected and actual Protobuf data are not equal")
 	}
 
-	buf := readExample2RespProtoBufData()
+	buf := getExample2Resp()
 
 	return buf, nil
 }
 
-func readBasicExampleReqProtoBufData() []byte {
-	out, err := ioutil.ReadFile("./data/basic_example_pb.bin")
+// NormalEchoImpl
+type EchoImpl struct{}
+
+// EchoPB implements the EchoImpl interface.
+func (s *EchoImpl) EchoPB(ctx context.Context, req *api.Request) (resp *api.Response, err error) {
+	resp = &api.Response{Message: "Hello back from Kitex!"}
+
+	if req.Message == "Return Biz Error!" {
+		return nil, kerrors.NewBizStatusError(404, "not found")
+	}
+	return resp, nil
+}
+
+func getBasicExampleReq() []byte {
+	methodName := "ExampleMethod"
+	pb, err := ioutil.ReadFile("./data/basicexamplereq_pb.bin")
 	if err != nil {
 		panic(err)
 	}
-	return out
+	buf := encodeReqMetainfo(pb, methodName)
+	return buf
 }
 
-func constructBasicExampleReqObject() *base.BasicExample {
+func getBasicExampleReqObject() *base.BasicExample {
 	req := &base.BasicExample{
 		Int32:        123,
 		Int64:        123,
@@ -266,23 +306,27 @@ func constructBasicExampleReqObject() *base.BasicExample {
 	return req
 }
 
-func readExample2ReqProtoBufData() []byte {
-	out, err := ioutil.ReadFile("./data/example2req_pb.bin")
+func getExample2Req() []byte {
+	methodName := "ExampleMethod"
+	pb, err := ioutil.ReadFile("./data/example2req_pb.bin")
 	if err != nil {
 		panic(err)
 	}
-	return out
+	buf := encodeReqMetainfo(pb, methodName)
+	return buf
 }
 
-func readExample2RespProtoBufData() []byte {
-	out, err := ioutil.ReadFile("./data/example2resp_pb.bin")
+func getExample2Resp() []byte {
+	methodName := "ExampleMethod"
+	pb, err := ioutil.ReadFile("./data/example2resp_pb.bin")
 	if err != nil {
 		panic(err)
 	}
-	return out
+	buf := encodeReqMetainfo(pb, methodName)
+	return buf
 }
 
-func constructExample2ReqObject() *example2.ExampleReq {
+func getExample2ReqObject() *example2.ExampleReq {
 	req := example2.ExampleReq{}
 	req.Msg = "hello"
 	req.Subfix = math.MaxFloat64
@@ -379,7 +423,7 @@ func constructExample2ReqObject() *example2.ExampleReq {
 	return &req
 }
 
-func constructExample2RespObject() *example2.ExampleResp {
+func getExample2RespObject() *example2.ExampleResp {
 	resp := example2.ExampleResp{}
 	resp.Msg = "messagefist"
 	resp.RequiredField = "hello"
@@ -388,4 +432,44 @@ func constructExample2RespObject() *example2.ExampleResp {
 	resp.BaseResp.StatusCode = 32
 	resp.BaseResp.Extra = map[string]string{"1b": "aaa", "2b": "bbb", "3b": "ccc", "4b": "ddd"}
 	return &resp
+}
+
+func getEchoReq() []byte {
+	methodName := "EchoPB"
+	pb, err := ioutil.ReadFile("./data/echoreq_pb.bin")
+	if err != nil {
+		panic(err)
+	}
+	buf := encodeReqMetainfo(pb, methodName)
+	return buf
+}
+
+func getEchoRespObject() *api.Response {
+	resp := api.Response{Message: "Hello back from Kitex!"}
+	return &resp
+}
+
+func getBizErrReq() []byte {
+	methodName := "EchoPB"
+	pb, err := ioutil.ReadFile("./data/bizerrreq_pb.bin")
+	if err != nil {
+		panic(err)
+	}
+	buf := encodeReqMetainfo(pb, methodName)
+	return buf
+}
+
+func encodeReqMetainfo(pb []byte, methodName string) []byte {
+	idx := 0
+	buf := make([]byte, 12+len(methodName)+len(pb))
+	binary.BigEndian.PutUint32(buf, codec.ProtobufV1Magic+uint32(remote.Call))
+	idx += 4
+	binary.BigEndian.PutUint32(buf[idx:idx+4], uint32(len(methodName)))
+	idx += 4
+	copy(buf[idx:idx+len(methodName)], methodName)
+	idx += len(methodName)
+	binary.BigEndian.PutUint32(buf[idx:idx+4], 100)
+	idx += 4
+	copy(buf[idx:idx+len(pb)], pb)
+	return buf
 }

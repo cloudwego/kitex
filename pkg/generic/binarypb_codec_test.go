@@ -18,6 +18,8 @@ package generic
 
 import (
 	"context"
+	"encoding/binary"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"io/ioutil"
 	"log"
 	"math"
@@ -42,25 +44,34 @@ func TestBinaryProtobufCodec(t *testing.T) {
 	// client side
 	rwbuf := remote.NewReaderWriterBuffer(1024)
 	req := &Args{
-		Request: readBasicExampleReqProtoBufData(),
+		Request: readBasicExampleReqProtoBufDataMetainfo(),
 		Method:  "ExampleMethod",
 	}
 	cliMsg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
 	err := bpc.Marshal(context.Background(), cliMsg, rwbuf)
 	test.Assert(t, err == nil, err)
+	// Check Seq ID
+	seqID, err := PbGetSeqID(cliMsg.Data().(*Args).Request.(binaryReqType))
+	test.Assert(t, err == nil, err)
+	test.Assert(t, seqID == 1, seqID)
 
 	// server side
 	svrMsg := remote.NewMessage(&Args{}, svcInfo, ri, remote.Call, remote.Server)
 	svrMsg.SetPayloadLen(rwbuf.ReadableLen())
 	err = bpc.Unmarshal(context.Background(), svrMsg, rwbuf)
 	test.Assert(t, err == nil, err)
+	// Check Seq ID
+	seqID, err = PbGetSeqID(cliMsg.Data().(*Args).Request.(binaryReqType))
+	test.Assert(t, err == nil, err)
+	test.Assert(t, seqID == 1, seqID)
 	reqBuf := svrMsg.Data().(*Args).Request.(binaryReqType)
+	pbReqBuf := reqBuf[12+len("ExampleMethod"):]
 
 	// Check if the binary data is unmarshalled correctly
 	exp := constructBasicExampleReqObject()
 	var act base.BasicExample
 	// Unmarshal the binary data into the act struct
-	err = proto.Unmarshal(reqBuf, &act)
+	err = proto.Unmarshal(pbReqBuf, &act)
 	if err != nil {
 		log.Fatalf("Failed to unmarshal Protobuf data: %v", err)
 	}
@@ -89,11 +100,28 @@ func TestBinaryProtobufCodecExceptionError(t *testing.T) {
 }
 
 func readBasicExampleReqProtoBufData() []byte {
-	out, err := ioutil.ReadFile("./binarypb_test/data/basic_example_pb.bin")
+	out, err := ioutil.ReadFile("./binarypb_test/data/basicexamplereq_pb.bin")
 	if err != nil {
 		panic(err)
 	}
 	return out
+}
+
+func readBasicExampleReqProtoBufDataMetainfo() []byte {
+	methodName := "ExampleMethod"
+	pb := readBasicExampleReqProtoBufData()
+	idx := 0
+	buf := make([]byte, 12+len(methodName)+len(pb))
+	binary.BigEndian.PutUint32(buf, codec.ProtobufV1Magic+uint32(remote.Call))
+	idx += 4
+	binary.BigEndian.PutUint32(buf[idx:idx+4], uint32(len(methodName)))
+	idx += 4
+	copy(buf[idx:idx+len(methodName)], methodName)
+	idx += len(methodName)
+	binary.BigEndian.PutUint32(buf[idx:idx+4], 100)
+	idx += 4
+	copy(buf[idx:idx+len(pb)], pb)
+	return buf
 }
 
 func constructBasicExampleReqObject() *base.BasicExample {

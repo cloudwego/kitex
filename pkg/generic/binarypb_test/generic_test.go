@@ -18,6 +18,8 @@ package test
 
 import (
 	"context"
+	"github.com/cloudwego/kitex/pkg/generic/binarypb_test/kitex_gen/api"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"log"
 	"testing"
 	"time"
@@ -32,28 +34,31 @@ import (
 func TestRun(t *testing.T) {
 	t.Run("TestBasicServiceExampleMethod", TestBasicServiceExampleMethod)
 	t.Run("TestExample2ExampleMethod", TestExample2ExampleMethod)
+	t.Run("TestEchoNormalServer", TestEchoNormalServer)
+	t.Run("TestBizErrReq", TestBizErrReq)
 }
 
 func TestBasicServiceExampleMethod(t *testing.T) {
-	buf := readBasicExampleReqProtoBufData()
+	buf := getBasicExampleReq()
 
 	// Create client and server
 	svr := initRawProtobufBinaryServer(new(GenericServiceImpl))
 	defer svr.Stop()
-	cli := initRawProtobufBinaryClient()
+	cli := initRawProtobufBinaryClient("BasicService")
 
 	// Make generic call
 	method := "ExampleMethod"
 	resp, err := cli.GenericCall(context.Background(), method, buf, callopt.WithRPCTimeout(1*time.Second))
 	test.Assert(t, err == nil, err)
 	respBytes, ok := resp.([]byte)
+	pbRespBytes := respBytes[12+len(method):]
 	test.Assert(t, ok)
 
 	// Check the response
 	var act base.BasicExample
-	exp := constructBasicExampleReqObject()
+	exp := getBasicExampleReqObject()
 	// Unmarshal the binary response into the act struct
-	err = proto.Unmarshal(respBytes, &act)
+	err = proto.Unmarshal(pbRespBytes, &act)
 	if err != nil {
 		log.Fatalf("Failed to unmarshal Protobuf data: %v", err)
 	}
@@ -64,25 +69,26 @@ func TestBasicServiceExampleMethod(t *testing.T) {
 }
 
 func TestExample2ExampleMethod(t *testing.T) {
-	buf := readExample2ReqProtoBufData()
+	buf := getExample2Req()
 
 	// Create client and server
 	svr := initRawProtobufBinaryServer(new(Example2ExampleMethodService))
 	defer svr.Stop()
-	cli := initRawProtobufBinaryClient()
+	cli := initRawProtobufBinaryClient("BasicService")
 
 	// Make generic call
 	method := "ExampleMethod"
 	resp, err := cli.GenericCall(context.Background(), method, buf, callopt.WithRPCTimeout(1*time.Second))
 	test.Assert(t, err == nil, err)
 	respBytes, ok := resp.([]byte)
+	pbRespBytes := respBytes[12+len(method):]
 	test.Assert(t, ok)
 
 	// Check the response
 	var act example2.ExampleResp
-	exp := constructExample2RespObject()
+	exp := getExample2RespObject()
 	// Unmarshal the binary response into the act struct
-	err = proto.Unmarshal(respBytes, &act)
+	err = proto.Unmarshal(pbRespBytes, &act)
 	if err != nil {
 		log.Fatalf("Failed to unmarshal Protobuf data: %v", err)
 	}
@@ -90,4 +96,56 @@ func TestExample2ExampleMethod(t *testing.T) {
 	if !proto.Equal(exp, &act) {
 		log.Fatalf("Expected and actual Protobuf data are not equal")
 	}
+}
+
+func TestEchoNormalServer(t *testing.T) {
+	buf := getEchoReq()
+
+	// Create client and server
+	svr := initEchoServer()
+	defer svr.Stop()
+	cli := initRawProtobufBinaryClient("Echo")
+
+	// Make generic call
+	method := "EchoPB"
+	resp, err := cli.GenericCall(context.Background(), method, buf, callopt.WithRPCTimeout(1*time.Second))
+	test.Assert(t, err == nil, err)
+	respBytes, ok := resp.([]byte)
+	pbRespBytes := respBytes[12+len(method):]
+	test.Assert(t, ok)
+
+	// Check the response
+	var act api.Response
+	exp := getEchoRespObject()
+	// Unmarshal the binary response into the act struct
+	err = proto.Unmarshal(pbRespBytes, &act)
+	if err != nil {
+		log.Fatalf("Failed to unmarshal Protobuf data: %v", err)
+	}
+	// compare exp and act structs
+	if !proto.Equal(exp, &act) {
+		log.Fatalf("Expected and actual Protobuf data are not equal")
+	}
+}
+
+func TestBizErrReq(t *testing.T) {
+	buf := getBizErrReq()
+
+	// Create client and server
+	svr := initEchoServer()
+	defer svr.Stop()
+	cli := initRawProtobufBinaryClient("Echo")
+
+	// Make generic call
+	method := "EchoPB"
+	_, err := cli.GenericCall(context.Background(), method, buf, callopt.WithRPCTimeout(1*time.Second))
+
+	// Check response is an error
+	bizerr, ok := kerrors.FromBizStatusError(err)
+	if !ok {
+		log.Fatalf("Failed to get biz status error: %v", err)
+	}
+	test.Assert(t, ok)
+	test.Assert(t, bizerr.BizStatusCode() == 404)
+	test.Assert(t, bizerr.BizMessage() == "not found")
 }
