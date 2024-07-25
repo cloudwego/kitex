@@ -19,18 +19,12 @@ jobs:
   staticcheck:
     runs-on: [ self-hosted, X64 ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
-          go-version: 1.19
-
-      - uses: actions/cache@v3
-        with:
-          path: ~/go/pkg/mod
-          key: reviewdog-${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            reviewdog-${{ runner.os }}-go-
+          go-version: stable
+          cache: false
 
       - uses: reviewdog/action-staticcheck@v1
         with:
@@ -52,6 +46,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: false
 
       - name: Golangci Lint
         # https://golangci-lint.run/
