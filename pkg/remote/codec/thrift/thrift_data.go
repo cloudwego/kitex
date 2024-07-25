@@ -72,7 +72,7 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 	// fallback to old thrift way (slow)
 	transport := thrift.NewTMemoryBufferLen(marshalThriftBufferSize)
 	tProt := thrift.NewTBinaryProtocol(transport, true, true)
-	if err := marshalBasicThriftData(ctx, tProt, data, "", -1); err != nil {
+	if err := marshalBasicThriftData(tProt, data); err != nil {
 		return nil, err
 	}
 	return transport.Bytes(), nil
@@ -82,8 +82,6 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 func verifyMarshalBasicThriftDataType(data interface{}) error {
 	switch data.(type) {
 	case MessageWriter:
-	case MessageWriterWithMethodWithContext:
-	case genericWriter:
 	default:
 		return errEncodeMismatchMsgType
 	}
@@ -92,15 +90,11 @@ func verifyMarshalBasicThriftDataType(data interface{}) error {
 
 // marshalBasicThriftData only encodes the data (without the prepending method, msgType, seqId)
 // It uses the old thrift way which is much slower than FastCodec and Frugal
-func marshalBasicThriftData(ctx context.Context, tProt thrift.TProtocol, data interface{}, method string, rpcRole remote.RPCRole) error {
+func marshalBasicThriftData(tProt thrift.TProtocol, data interface{}) error {
 	var err error
 	switch msg := data.(type) {
 	case MessageWriter:
 		err = msg.Write(tProt)
-	case MessageWriterWithMethodWithContext:
-		err = msg.Write(ctx, method, tProt)
-	case genericWriter:
-		err = msg.Write(ctx, method, tProt.Transport())
 	default:
 		return errEncodeMismatchMsgType
 	}
@@ -134,7 +128,7 @@ func UnmarshalThriftData(ctx context.Context, codec remote.PayloadCodec, method 
 		c = defaultCodec
 	}
 	tProt := NewBinaryProtocol(remote.NewReaderBuffer(buf))
-	err := c.unmarshalThriftData(ctx, tProt, method, data, -1, len(buf))
+	err := c.unmarshalThriftData(tProt, data, len(buf))
 	if err == nil {
 		tProt.Recycle()
 	}
@@ -179,7 +173,7 @@ func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, data
 
 // unmarshalThriftData only decodes the data (after methodName, msgType and seqId)
 // method is only used for generic calls
-func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProtocol, method string, data interface{}, rpcRole remote.RPCRole, dataLen int) error {
+func (c thriftCodec) unmarshalThriftData(tProt *BinaryProtocol, data interface{}, dataLen int) error {
 	// decode with hyper unmarshal
 	if c.hyperMessageUnmarshalEnabled() && c.hyperMessageUnmarshalAvailable(data, dataLen) {
 		return c.hyperUnmarshal(tProt, data, dataLen)
@@ -200,7 +194,7 @@ func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProto
 	}
 
 	// fallback to old thrift way (slow)
-	return decodeBasicThriftData(ctx, tProt, method, rpcRole, dataLen, data)
+	return decodeBasicThriftData(tProt, data)
 }
 
 func (c thriftCodec) hyperUnmarshal(tProt *BinaryProtocol, data interface{}, dataLen int) error {
@@ -229,8 +223,6 @@ func (c thriftCodec) hyperUnmarshal(tProt *BinaryProtocol, data interface{}, dat
 func verifyUnmarshalBasicThriftDataType(data interface{}) error {
 	switch data.(type) {
 	case MessageReader:
-	case MessageReaderWithMethodWithContext:
-	case genericReader:
 	default:
 		return errDecodeMismatchMsgType
 	}
@@ -238,15 +230,11 @@ func verifyUnmarshalBasicThriftDataType(data interface{}) error {
 }
 
 // decodeBasicThriftData decode thrift body the old way (slow)
-func decodeBasicThriftData(ctx context.Context, tProt thrift.TProtocol, method string, rpcRole remote.RPCRole, dataLen int, data interface{}) error {
+func decodeBasicThriftData(tProt thrift.TProtocol, data interface{}) error {
 	var err error
 	switch t := data.(type) {
 	case MessageReader:
 		err = t.Read(tProt)
-	case MessageReaderWithMethodWithContext:
-		err = t.Read(ctx, method, dataLen, tProt)
-	case genericReader:
-		err = t.Read(ctx, method, dataLen, tProt.Transport())
 	default:
 		return errDecodeMismatchMsgType
 	}
