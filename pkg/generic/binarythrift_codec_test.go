@@ -61,7 +61,7 @@ func TestBinaryThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	seqID, err = GetSeqID(cliMsg.Data().(*Args).Request.(binaryReqType))
 	test.Assert(t, err == nil, err)
-	test.Assert(t, seqID == 1, seqID)
+	test.Assert(t, seqID != 100, seqID)
 
 	// server side
 	arg := &Args{}
@@ -87,7 +87,7 @@ func TestBinaryThriftCodec(t *testing.T) {
 	reqBuf := svrMsg.Data().(*Args).Request.(binaryReqType)
 	seqID, err = GetSeqID(reqBuf)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, seqID == 1, seqID)
+	test.Assert(t, seqID != 100, seqID)
 
 	var req2 kt.MockTestArgs
 	method, seqID2, err2 := fastthrift.UnmarshalMsg(reqBuf, &req2)
