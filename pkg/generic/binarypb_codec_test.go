@@ -19,19 +19,19 @@ package generic
 import (
 	"context"
 	"encoding/binary"
-	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"io/ioutil"
 	"log"
 	"math"
 	"testing"
 
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/binarypb_test/kitex_gen/base"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"google.golang.org/protobuf/proto"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 func TestBinaryProtobufCodec(t *testing.T) {

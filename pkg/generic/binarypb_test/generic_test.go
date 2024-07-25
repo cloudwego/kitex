@@ -18,17 +18,18 @@ package test
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/pkg/generic/binarypb_test/kitex_gen/api"
-	"github.com/cloudwego/kitex/pkg/kerrors"
 	"log"
 	"testing"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic/binarypb_test/kitex_gen/api"
 	"github.com/cloudwego/kitex/pkg/generic/binarypb_test/kitex_gen/base"
 	"github.com/cloudwego/kitex/pkg/generic/binarypb_test/kitex_gen/example2"
-	"google.golang.org/protobuf/proto"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 )
 
 func TestRun(t *testing.T) {
