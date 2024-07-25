@@ -958,11 +958,6 @@ func Test_writeBinaryList(t *testing.T) {
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
-	type params struct {
-		listBeginErr error
-		writeByteErr error
-		listEndErr   error
-	}
 	commonArgs := args{
 		val: []byte(stringInput),
 		t: &descriptor.TypeDescriptor{
@@ -974,7 +969,6 @@ func Test_writeBinaryList(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		params  params
 		wantErr bool
 	}{
 		{
