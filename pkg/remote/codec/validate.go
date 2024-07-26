@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -19,23 +18,18 @@ func validate(ctx context.Context, message remote.Message, in remote.ByteBuffer,
 	if strInfo == nil {
 		return nil
 	}
-	realValue := strInfo[key]
-	if len(realValue) == 0 {
-		// if not in header, skip
-		return nil
-	}
+	expectedValue := strInfo[key]
 	payloadLen := message.PayloadLen() // total length
 	payload, err := in.Peek(payloadLen)
 	if err != nil {
 		return err
 	}
-	expectedValue, err := p.Checksum(ctx, payload)
+	pass, err := p.Validate(ctx, expectedValue, payload)
 	if err != nil {
 		return err
 	}
-	if expectedValue != realValue {
-		msg := p.ErrMsgFunc(ctx, expectedValue, realValue)
-		return perrors.NewProtocolErrorWithType(perrors.InvalidData, msg)
+	if !pass {
+		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "not pass")
 	}
 	return nil
 }
@@ -44,11 +38,15 @@ func validate(ctx context.Context, message remote.Message, in remote.ByteBuffer,
 type PayloadValidator interface {
 	// Key returns a key for your validator, which will be the key in ttheader
 	Key(ctx context.Context) string
-	// Checksum returns your checksum for the payload.
+
+	// Generate generates the checksum of the payload.
+	// The value will not be set to the request header if need is false.
 	// DO NOT modify the input payload since it might be obtained by nocopy API from the underlying buffer.
-	Checksum(ctx context.Context, payload []byte) (value string, err error)
-	// ErrMsgFunc returns the error message if the validation failed.
-	ErrMsgFunc(ctx context.Context, expectedValue, actualValue string) string
+	Generate(ctx context.Context, outPayload []byte) (need bool, value string, err error)
+
+	// Validate validates the input payload with the attached checksum.
+	// Return pass if validation succeed, or return error.
+	Validate(ctx context.Context, expectedValue string, inputPayload []byte) (pass bool, err error)
 }
 
 // NewCRC32PayloadValidator returns a new crcPayloadValidator
@@ -72,12 +70,19 @@ func (p *crcPayloadValidator) Checksum(ctx context.Context, payload []byte) (val
 	return getCRC32C([][]byte{payload}), nil
 }
 
-func (p *crcPayloadValidator) ErrMsgFunc(ctx context.Context, expected, actual string) string {
-	return fmt.Sprintf("crc32 payload check failed, expected=%s, actual=%s", expected, actual)
+func (p *crcPayloadValidator) Generate(ctx context.Context, outPayload []byte) (need bool, value string, err error) {
+	return true, getCRC32C([][]byte{outPayload}), nil
 }
 
-func (p *crcPayloadValidator) Prepare2(ctx context.Context, payload [][]byte) (value string, err error) {
-	return getCRC32C(payload), nil
+func (p *crcPayloadValidator) Validate(ctx context.Context, expectedValue string, inputPayload []byte) (pass bool, err error) {
+	_, realValue, err := p.Generate(ctx, inputPayload)
+	if err != nil {
+		return false, err
+	}
+	if realValue != expectedValue {
+		return false, perrors.NewProtocolErrorWithType(perrors.InvalidData, expectedValue)
+	}
+	return true, nil
 }
 
 // crc32cTable is used for crc32c check

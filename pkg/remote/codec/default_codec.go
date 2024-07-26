@@ -301,9 +301,11 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadProcessor(ctx context.Cont
 	}
 	if c.payloadValidator != nil {
 		key := getValidatorKey(ctx, c.payloadValidator)
-		if value, pErr := c.payloadValidator.Checksum(ctx, flatten2DSlice(payload, payloadLen)); pErr != nil {
+		need, value, pErr := c.payloadValidator.Generate(ctx, flatten2DSlice(payload, payloadLen))
+		if pErr != nil {
 			return pErr
-		} else {
+		}
+		if need {
 			strInfo := message.TransInfo().TransStrInfo()
 			if strInfo != nil {
 				strInfo[key] = value
