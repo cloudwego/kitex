@@ -22,10 +22,10 @@ package thrift
 import (
 	"context"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, method string, isClient bool, requestBase *Base) error {
 	return w.originalWrite(ctx, out, msg, requestBase)
 }

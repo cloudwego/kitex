@@ -26,8 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/client/genericclient"
@@ -35,7 +33,8 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/utils"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	"github.com/cloudwego/kitex/pkg/utils/fastthrift"
 	"github.com/cloudwego/kitex/server"
 )
 
@@ -112,8 +111,7 @@ func rawThriftBinaryMockReq(t *testing.T) {
 	args.Req = req
 
 	// encode
-	rc := utils.NewThriftMessageCodec()
-	buf, err := rc.Encode("Test", thrift.CALL, 100, args)
+	buf, err := fastthrift.MarshalMsg("Test", fastthrift.CALL, 100, args)
 	test.Assert(t, err == nil, err)
 
 	resp, err := cli.GenericCall(context.Background(), "Test", buf)
@@ -122,7 +120,7 @@ func rawThriftBinaryMockReq(t *testing.T) {
 	// decode
 	buf = resp.([]byte)
 	var result kt.MockTestResult
-	method, seqID, err := rc.Decode(buf, &result)
+	method, seqID, err := fastthrift.UnmarshalMsg(buf, &result)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, method == "Test", method)
 	test.Assert(t, seqID != 100, seqID)
@@ -149,8 +147,7 @@ func rawThriftBinary2NormalServer(t *testing.T) {
 	args.Req = req
 
 	// encode
-	rc := utils.NewThriftMessageCodec()
-	buf, err := rc.Encode("Test", thrift.CALL, 100, args)
+	buf, err := fastthrift.MarshalMsg("Test", fastthrift.CALL, 100, args)
 	test.Assert(t, err == nil, err)
 
 	resp, err := cli.GenericCall(context.Background(), "Test", buf, callopt.WithRPCTimeout(100*time.Second))
@@ -159,7 +156,7 @@ func rawThriftBinary2NormalServer(t *testing.T) {
 	// decode
 	buf = resp.([]byte)
 	var result kt.MockTestResult
-	method, seqID, err := rc.Decode(buf, &result)
+	method, seqID, err := fastthrift.UnmarshalMsg(buf, &result)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, method == "Test", method)
 	// seqID会在kitex中覆盖，避免TTHeader和Payload codec 不一致问题

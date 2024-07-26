@@ -29,7 +29,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/mocks/thrift/fast"
+	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -220,7 +220,7 @@ func TestUnmarshalThriftDataFrugal(t *testing.T) {
 	}
 	for _, codec := range successfulCodecs {
 		err := UnmarshalThriftData(context.Background(), codec, "mock", mockReqThrift, req)
-		checkDecodeResult(t, err, &fast.MockReq{
+		checkDecodeResult(t, err, &mocks.MockReq{
 			Msg:     req.Msg,
 			StrList: req.StrList,
 			StrMap:  req.StrMap,
@@ -240,8 +240,8 @@ func TestThriftCodec_unmarshalThriftDataFrugal(t *testing.T) {
 		tProt := NewBinaryProtocol(remote.NewReaderBuffer(mockReqThrift))
 		defer tProt.Recycle()
 		// specify dataLen with 0 so that skipDecoder works
-		err := codec.unmarshalThriftData(context.Background(), tProt, "mock", req, 0)
-		checkDecodeResult(t, err, &fast.MockReq{
+		err := codec.unmarshalThriftData(context.Background(), tProt, "mock", req, -1, 0)
+		checkDecodeResult(t, err, &mocks.MockReq{
 			Msg:     req.Msg,
 			StrList: req.StrList,
 			StrMap:  req.StrMap,
@@ -264,7 +264,7 @@ func TestThriftCodec_unmarshalThriftDataFrugal(t *testing.T) {
 		tProt := NewBinaryProtocol(remote.NewReaderBuffer(faultMockReqThrift))
 		defer tProt.Recycle()
 		// specify dataLen with 0 so that skipDecoder works
-		err := codec.unmarshalThriftData(context.Background(), tProt, "mock", req, 0)
+		err := codec.unmarshalThriftData(context.Background(), tProt, "mock", req, -1, 0)
 		test.Assert(t, err != nil, err)
 		test.Assert(t, strings.Contains(err.Error(), "caught in Frugal using SkipDecoder Buffer"))
 	})

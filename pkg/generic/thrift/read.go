@@ -22,11 +22,11 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/jhump/protoreflect/desc"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/proto"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 var emptyPbDsc = &desc.MessageDescriptor{}

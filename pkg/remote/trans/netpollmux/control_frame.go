@@ -25,7 +25,8 @@ package netpollmux
 import (
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 type ControlFrame struct{}
@@ -66,16 +67,16 @@ func (p *ControlFrame) Read(iprot thrift.TProtocol) (err error) {
 
 	return nil
 ReadStructBeginError:
-	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+	return bthrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
 ReadFieldBeginError:
-	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 SkipFieldTypeError:
-	return thrift.PrependError(fmt.Sprintf("%T skip field type %d error", p, fieldTypeId), err)
+	return bthrift.PrependError(fmt.Sprintf("%T skip field type %d error", p, fieldTypeId), err)
 
 ReadFieldEndError:
-	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
+	return bthrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
 ReadStructEndError:
-	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	return bthrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
 }
 
 func (p *ControlFrame) Write(oprot thrift.TProtocol) (err error) {
@@ -92,11 +93,11 @@ func (p *ControlFrame) Write(oprot thrift.TProtocol) (err error) {
 	}
 	return nil
 WriteStructBeginError:
-	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
+	return bthrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
 WriteFieldStopError:
-	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
+	return bthrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
 WriteStructEndError:
-	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
+	return bthrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
 }
 
 func (p *ControlFrame) String() string {

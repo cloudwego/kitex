@@ -20,14 +20,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
-
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/kitex/pkg/utils/fastthrift"
 )
 
 func TestBinaryThriftCodec(t *testing.T) {
@@ -35,8 +33,7 @@ func TestBinaryThriftCodec(t *testing.T) {
 	args := kt.NewMockTestArgs()
 	args.Req = req
 	// encode
-	rc := utils.NewThriftMessageCodec()
-	buf, err := rc.Encode("mock", thrift.CALL, 100, args)
+	buf, err := fastthrift.MarshalMsg("mock", fastthrift.CALL, 100, args)
 	test.Assert(t, err == nil, err)
 
 	btc := &binaryThriftCodec{thriftCodec}
@@ -93,7 +90,7 @@ func TestBinaryThriftCodec(t *testing.T) {
 	test.Assert(t, seqID == 1, seqID)
 
 	var req2 kt.MockTestArgs
-	method, seqID2, err2 := rc.Decode(reqBuf, &req2)
+	method, seqID2, err2 := fastthrift.UnmarshalMsg(reqBuf, &req2)
 	test.Assert(t, err2 == nil, err)
 	test.Assert(t, seqID2 == 1, seqID)
 	test.Assert(t, method == "mock", method)

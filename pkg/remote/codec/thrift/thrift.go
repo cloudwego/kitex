@@ -20,10 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
-	"github.com/apache/thrift/lib/go/thrift"
+	"io"
 
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -112,13 +112,13 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 
 	// encode with FastWrite
 	if c.CodecType&FastWrite != 0 {
-		if msg, ok := data.(ThriftMsgFastCodec); ok {
+		if msg, ok := data.(bthrift.ThriftFastCodec); ok {
 			return encodeFastThrift(out, methodName, msgType, seqID, msg)
 		}
 	}
 
 	// fallback to old thrift way (slow)
-	if err = encodeBasicThrift(out, ctx, methodName, msgType, seqID, data); err == nil || err != errEncodeMismatchMsgType {
+	if err = encodeBasicThrift(out, ctx, methodName, msgType, seqID, data, message.RPCRole()); err == nil || err != errEncodeMismatchMsgType {
 		return err
 	}
 
@@ -132,7 +132,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 }
 
 // encodeFastThrift encode with the FastCodec way
-func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.MessageType, seqID int32, msg ThriftMsgFastCodec) error {
+func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.MessageType, seqID int32, msg bthrift.ThriftFastCodec) error {
 	nw, _ := out.(remote.NocopyWrite)
 	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
 	msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
@@ -155,7 +155,7 @@ func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.M
 }
 
 // encodeBasicThrift encode with the old thrift way (slow)
-func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}) error {
+func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}, rpcRole remote.RPCRole) error {
 	if err := verifyMarshalBasicThriftDataType(data); err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string
 	if err := tProt.WriteMessageBegin(method, thrift.TMessageType(msgType), seqID); err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageBegin failed: %s", err.Error()))
 	}
-	if err := marshalBasicThriftData(ctx, tProt, data); err != nil {
+	if err := marshalBasicThriftData(ctx, tProt, data, method, rpcRole); err != nil {
 		return err
 	}
 	if err := tProt.WriteMessageEnd(); err != nil {
@@ -204,7 +204,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 
 	ri := message.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WaitReadStart, nil)
-	err = c.unmarshalThriftData(ctx, tProt, methodName, data, dataLen)
+	err = c.unmarshalThriftData(ctx, tProt, methodName, data, message.RPCRole(), dataLen)
 	rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
 	if err != nil {
 		return err
@@ -240,11 +240,6 @@ func (c thriftCodec) Name() string {
 	return serviceinfo.Thrift.String()
 }
 
-// MessageWriterWithContext write to thrift.TProtocol
-type MessageWriterWithContext interface {
-	Write(ctx context.Context, oprot thrift.TProtocol) error
-}
-
 // MessageWriter write to thrift.TProtocol
 type MessageWriter interface {
 	Write(oprot thrift.TProtocol) error
@@ -255,16 +250,29 @@ type MessageReader interface {
 	Read(oprot thrift.TProtocol) error
 }
 
-// MessageReaderWithMethodWithContext read from thrift.TProtocol with method
-type MessageReaderWithMethodWithContext interface {
-	Read(ctx context.Context, method string, oprot thrift.TProtocol) error
+type genericWriter interface { // used by pkg/generic
+	Write(ctx context.Context, method string, w io.Writer) error
 }
 
-type ThriftMsgFastCodec interface {
-	BLength() int
-	FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int
-	FastRead(buf []byte) (int, error)
+type genericReader interface { // used by pkg/generic
+	Read(ctx context.Context, method string, dataLen int, r io.Reader) error
 }
+
+// MessageWriterWithMethodWithContext write to thrift.TProtocol
+// TODO(marina.sakai): remove it after we use the new genericWriter interface
+type MessageWriterWithMethodWithContext interface {
+	Write(ctx context.Context, method string, oprot thrift.TProtocol) error
+}
+
+// MessageReaderWithMethodWithContext read from thrift.TProtocol with method
+// TODO(marina.sakai): remove it after we use the new genericReader interface
+type MessageReaderWithMethodWithContext interface {
+	Read(ctx context.Context, method string, dataLen int, iprot thrift.TProtocol) error
+}
+
+// ThriftMsgFastCodec ...
+// Deprecated: use `bthrift.ThriftFastCodec`
+type ThriftMsgFastCodec = bthrift.ThriftFastCodec
 
 func getValidData(methodName string, message remote.Message) (interface{}, error) {
 	if err := codec.NewDataIfNeeded(methodName, message); err != nil {
@@ -277,11 +285,11 @@ func getValidData(methodName string, message remote.Message) (interface{}, error
 	transErr, isTransErr := data.(*remote.TransError)
 	if !isTransErr {
 		if err, isError := data.(error); isError {
-			encodeErr := thrift.NewTApplicationException(remote.InternalError, err.Error())
+			encodeErr := bthrift.NewApplicationException(remote.InternalError, err.Error())
 			return encodeErr, nil
 		}
 		return nil, errors.New("exception relay need error type data")
 	}
-	encodeErr := thrift.NewTApplicationException(transErr.TypeID(), transErr.Error())
+	encodeErr := bthrift.NewApplicationException(transErr.TypeID(), transErr.Error())
 	return encodeErr, nil
 }

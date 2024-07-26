@@ -18,12 +18,19 @@
 package bthrift
 
 import (
-	"github.com/apache/thrift/lib/go/thrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // BinaryWriter .
 type BinaryWriter interface {
 	WriteDirect(b []byte, remainCap int) error
+}
+
+// ThriftFastCodec represents the interface of thrift fastcodec generated structs
+type ThriftFastCodec interface {
+	BLength() int
+	FastWriteNocopy(buf []byte, binaryWriter BinaryWriter) int
+	FastRead(buf []byte) (int, error)
 }
 
 // BTProtocol .

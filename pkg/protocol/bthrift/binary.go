@@ -23,11 +23,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/pkg/mem"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 var (
@@ -152,7 +150,7 @@ func (binaryProtocol) WriteBinary(buf, value []byte) int {
 }
 
 func (binaryProtocol) WriteStringNocopy(buf []byte, binaryWriter BinaryWriter, value string) int {
-	return Binary.WriteBinaryNocopy(buf, binaryWriter, utils.StringToSliceByte(value))
+	return Binary.WriteBinaryNocopy(buf, binaryWriter, stringToSliceByte(value))
 }
 
 func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, value []byte) int {
@@ -165,9 +163,8 @@ func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, v
 	return l + len(value)
 }
 
-func (binaryProtocol) MessageBeginLength(name string, typeID thrift.TMessageType, seqid int32) int {
-	version := uint32(thrift.VERSION_1) | uint32(typeID)
-	return Binary.I32Length(int32(version)) + Binary.StringLength(name) + Binary.I32Length(seqid)
+func (binaryProtocol) MessageBeginLength(name string, _ thrift.TMessageType, _ int32) int {
+	return 4 + Binary.StringLength(name) + 4
 }
 
 func (binaryProtocol) MessageEndLength() int {
@@ -258,7 +255,7 @@ func (binaryProtocol) BinaryLength(value []byte) int {
 }
 
 func (binaryProtocol) StringLengthNocopy(value string) int {
-	return Binary.BinaryLengthNocopy(utils.StringToSliceByte(value))
+	return Binary.BinaryLengthNocopy(stringToSliceByte(value))
 }
 
 func (binaryProtocol) BinaryLengthNocopy(value []byte) int {
@@ -475,7 +472,7 @@ func (binaryProtocol) ReadString(buf []byte) (value string, length int, err erro
 	}
 	if spanCacheEnable {
 		data := spanCache.Copy(buf[length : length+int(size)])
-		value = utils.SliceByteToString(data)
+		value = sliceByteToString(data)
 	} else {
 		value = string(buf[length : length+int(size)])
 	}

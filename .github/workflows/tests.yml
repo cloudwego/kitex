@@ -27,14 +27,14 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.18'
+          go-version: "1.22"
       - name: Benchmark
         run: go test -bench=. -benchmem -run=none ./...
 
   compatibility-test:
     strategy:
       matrix:
-        go: [ 1.17, 1.18, 1.19.12, 1.20.7, 1.21, 1.22 ]
+        go: [ "1.17", "1.18", "1.19", "1.20", "1.21", "1.22" ]
         os: [ X64, ARM64 ]
     runs-on: ${{ matrix.os }}
     steps:
@@ -54,7 +54,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.19'
+          go-version: "1.22"
       - name: Prepare
         run: |  
           go install github.com/cloudwego/thriftgo@main
@@ -82,6 +82,6 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.20"
+          go-version: "1.22"
       - name: Windows compatibility test
         run: go test -run=^$ ./...

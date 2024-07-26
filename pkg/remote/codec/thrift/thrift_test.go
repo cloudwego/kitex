@@ -21,12 +21,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
-	mt "github.com/cloudwego/kitex/internal/mocks/thrift/fast"
+	mt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -62,20 +63,20 @@ func init() {
 }
 
 type mockWithContext struct {
-	ReadFunc  func(ctx context.Context, method string, oprot thrift.TProtocol) error
-	WriteFunc func(ctx context.Context, oprot thrift.TProtocol) error
+	ReadFunc  func(ctx context.Context, method string, dataLen int, oprot thrift.TProtocol) error
+	WriteFunc func(ctx context.Context, method string, oprot thrift.TProtocol) error
 }
 
-func (m *mockWithContext) Read(ctx context.Context, method string, oprot thrift.TProtocol) error {
+func (m *mockWithContext) Read(ctx context.Context, method string, dataLen int, oprot thrift.TProtocol) error {
 	if m.ReadFunc != nil {
-		return m.ReadFunc(ctx, method, oprot)
+		return m.ReadFunc(ctx, method, dataLen, oprot)
 	}
 	return nil
 }
 
-func (m *mockWithContext) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (m *mockWithContext) Write(ctx context.Context, method string, oprot thrift.TProtocol) error {
 	if m.WriteFunc != nil {
-		return m.WriteFunc(ctx, oprot)
+		return m.WriteFunc(ctx, method, oprot)
 	}
 	return nil
 }
@@ -85,7 +86,7 @@ func TestWithContext(t *testing.T) {
 		t.Run(tb.Name, func(t *testing.T) {
 			ctx := context.Background()
 
-			req := &mockWithContext{WriteFunc: func(ctx context.Context, oprot thrift.TProtocol) error {
+			req := &mockWithContext{WriteFunc: func(ctx context.Context, method string, oprot thrift.TProtocol) error {
 				return nil
 			}}
 			ink := rpcinfo.NewInvocation("", "mock")
@@ -98,7 +99,9 @@ func TestWithContext(t *testing.T) {
 			buf.Flush()
 
 			{
-				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, oprot thrift.TProtocol) error { return nil }}
+				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, dataLen int, oprot thrift.TProtocol) error {
+					return nil
+				}}
 				ink := rpcinfo.NewInvocation("", "mock")
 				ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
 				msg := remote.NewMessage(resp, svcInfo, ri, remote.Call, remote.Client)
@@ -159,8 +162,8 @@ func BenchmarkNormalParallel(b *testing.B) {
 					test.Assert(b, err == nil, err)
 
 					// compare Req Arg
-					sendReq := (sendMsg.Data()).(*mt.MockTestArgs).Req
-					recvReq := (recvMsg.Data()).(*mt.MockTestArgs).Req
+					sendReq := mt.UnpackApacheCodec(sendMsg.Data()).(*mt.MockTestArgs).Req
+					recvReq := mt.UnpackApacheCodec(recvMsg.Data()).(*mt.MockTestArgs).Req
 					test.Assert(b, sendReq.Msg == recvReq.Msg)
 					test.Assert(b, len(sendReq.StrList) == len(recvReq.StrList))
 					test.Assert(b, len(sendReq.StrMap) == len(recvReq.StrMap))
@@ -207,13 +210,13 @@ func TestException(t *testing.T) {
 
 func TestTransErrorUnwrap(t *testing.T) {
 	errMsg := "mock err"
-	transErr := remote.NewTransError(remote.InternalError, thrift.NewTApplicationException(1000, errMsg))
-	uwErr, ok := transErr.Unwrap().(thrift.TApplicationException)
+	transErr := remote.NewTransError(remote.InternalError, bthrift.NewApplicationException(1000, errMsg))
+	uwErr, ok := transErr.Unwrap().(*bthrift.ApplicationException)
 	test.Assert(t, ok)
 	test.Assert(t, uwErr.TypeId() == 1000)
 	test.Assert(t, transErr.Error() == errMsg)
 
-	uwErr2, ok := errors.Unwrap(transErr).(thrift.TApplicationException)
+	uwErr2, ok := errors.Unwrap(transErr).(*bthrift.ApplicationException)
 	test.Assert(t, ok)
 	test.Assert(t, uwErr2.TypeId() == 1000)
 	test.Assert(t, uwErr2.Error() == errMsg)
@@ -277,7 +280,7 @@ func initSendMsg(tp transport.Protocol) remote.Message {
 	_args.Req = prepareReq()
 	ink := rpcinfo.NewInvocation("", "mock")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	msg := remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Client)
+	msg := remote.NewMessage(mt.ToApacheCodec(&_args), svcInfo, ri, remote.Call, remote.Client)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
 }
@@ -286,13 +289,13 @@ func initRecvMsg() remote.Message {
 	var _args mt.MockTestArgs
 	ink := rpcinfo.NewInvocation("", "mock")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	msg := remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Server)
+	msg := remote.NewMessage(mt.ToApacheCodec(&_args), svcInfo, ri, remote.Call, remote.Server)
 	return msg
 }
 
 func compare(t *testing.T, sendMsg, recvMsg remote.Message) {
-	sendReq := (sendMsg.Data()).(*mt.MockTestArgs).Req
-	recvReq := (recvMsg.Data()).(*mt.MockTestArgs).Req
+	sendReq := mt.UnpackApacheCodec(sendMsg.Data()).(*mt.MockTestArgs).Req
+	recvReq := mt.UnpackApacheCodec(recvMsg.Data()).(*mt.MockTestArgs).Req
 	test.Assert(t, sendReq.Msg == recvReq.Msg)
 	test.Assert(t, len(sendReq.StrList) == len(recvReq.StrList))
 	test.Assert(t, len(sendReq.StrMap) == len(recvReq.StrMap))
