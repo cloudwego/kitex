@@ -61,9 +61,9 @@ func randRead(b []byte) {
 			p = unsafe.Add(p, 8)
 		}
 		*((*uint64)(p)) = seed
-		seed <<= 13 // xorshift64
-		seed >>= 7
-		seed <<= 17
+		seed ^= seed << 13 // xorshift64
+		seed ^= seed >> 7
+		seed ^= seed << 17
 	}
 	for ; i < len(b); i++ {
 		b[i] = byte(seed)
