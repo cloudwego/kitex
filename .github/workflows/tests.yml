@@ -6,13 +6,11 @@ jobs:
   unit-scenario-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: '1.20'
-      - name: Unit Test
-        run: go test -gcflags=-l -race -covermode=atomic -coverprofile=coverage.txt ./...
       - name: Scenario Tests
         run: |
           cd ..
@@ -21,19 +19,17 @@ jobs:
           cd kitex-tests
           ./run.sh ${{github.workspace}}
           cd ${{github.workspace}}
-      - name: Codecov
-        run: bash <(curl -s https://codecov.io/bash)
 
   benchmark-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: '1.18'
       - name: Benchmark
-        run: go test -gcflags='all=-N -l' -bench=. -benchmem -run=none ./...
+        run: go test -bench=. -benchmem -run=none ./...
 
   compatibility-test:
     strategy:
@@ -42,20 +38,21 @@ jobs:
         os: [ X64, ARM64 ]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
+          cache: false # don't use cache for self-hosted runners
       - name: Unit Test
-        run: go test -gcflags=-l -race -covermode=atomic ./...
+        run: go test -race -covermode=atomic ./...
 
   codegen-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: '1.19'
       - name: Prepare
@@ -81,9 +78,9 @@ jobs:
   windows-test:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: "1.20"
       - name: Windows compatibility test
