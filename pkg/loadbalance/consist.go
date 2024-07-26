@@ -30,16 +30,6 @@ import (
 )
 
 /*
-	Benchmark results with different instance numbers when weight = 10 and virtual factor = 100:
-	BenchmarkNewConsistPicker_NoCache/10ins-16         	    6565	    160670 ns/op	  164750 B/op	       5 allocs/op
-	BenchmarkNewConsistPicker_NoCache/100ins-16        	     571	   1914666 ns/op	 1611803 B/op	       6 allocs/op
-	BenchmarkNewConsistPicker_NoCache/1000ins-16       	      45	  23485916 ns/op	16067720 B/op	      10 allocs/op
-	BenchmarkNewConsistPicker_NoCache/10000ins-16      	       4	 251160920 ns/op	160405632 B/op	      41 allocs/op
-
-	When there's 10000 instances which weight = 10 and virtual factor = 100, the time need to build is 251 ms.
-*/
-
-/*
   type hints for sync.Map：
 	consistBalancer -> sync.Map[entry.CacheKey]*consistInfo
 	consistInfo -> sync.Map[hashed key]*consistResult
