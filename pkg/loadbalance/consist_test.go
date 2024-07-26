@@ -19,11 +19,10 @@ package loadbalance
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
+	"unsafe"
 
 	"github.com/bytedance/gopkg/lang/fastrand"
 
@@ -53,15 +52,23 @@ func getRandomKey(ctx context.Context, request interface{}) string {
 	return key
 }
 
-func getRandomString(length int) string {
-	var resBuilder strings.Builder
-	resBuilder.Grow(length)
-	corpus := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	rand.Seed(time.Now().UnixNano() + int64(100))
-	for i := 0; i < length; i++ {
-		resBuilder.WriteByte(corpus[rand.Intn(len(corpus))])
+func randRead(b []byte) {
+	p := unsafe.Pointer(&b[0])
+	seed := uint64(time.Now().UnixNano())
+	i := 0
+	for ; i <= len(b)-8; i += 8 {
+		if i != 0 {
+			p = unsafe.Add(p, 8)
+		}
+		*((*uint64)(p)) = seed
+		seed <<= 13 // xorshift64
+		seed >>= 7
+		seed <<= 17
 	}
-	return resBuilder.String()
+	for ; i < len(b); i++ {
+		b[i] = byte(seed)
+		seed >>= 8
+	}
 }
 
 func newTestConsistentHashOption() ConsistentHashOption {
@@ -324,7 +331,7 @@ func BenchmarkNewConsistPicker_NoCache(bb *testing.B) {
 	balancer := NewConsistBalancer(newTestConsistentHashOption())
 	ctx := context.Background()
 
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 3; i++ { // when n=10000 it costs ~3 to run... fix me.
 		bb.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
 			inss := makeNInstances(n, 10)
 			e := discovery.Result{
@@ -379,15 +386,6 @@ func BenchmarkNewConsistPicker(bb *testing.B) {
 	}
 }
 
-// BenchmarkConsistPicker_RandomDistributionKey
-// BenchmarkConsistPicker_RandomDistributionKey/10ins
-// BenchmarkConsistPicker_RandomDistributionKey/10ins-12         	 2417481	       508.9 ns/op	      48 B/op	       1 allocs/op
-// BenchmarkConsistPicker_RandomDistributionKey/100ins
-// BenchmarkConsistPicker_RandomDistributionKey/100ins-12        	 2140726	       534.6 ns/op	      48 B/op	       1 allocs/op
-// BenchmarkConsistPicker_RandomDistributionKey/1000ins
-// BenchmarkConsistPicker_RandomDistributionKey/1000ins-12       	 2848216.          407.7 ns/op	      48 B/op	       1 allocs/op
-// BenchmarkConsistPicker_RandomDistributionKey/10000ins
-// BenchmarkConsistPicker_RandomDistributionKey/10000ins-12      	 2701766	       492.7 ns/op	      48 B/op	       1 allocs/op
 func BenchmarkConsistPicker_RandomDistributionKey(bb *testing.B) {
 	n := 10
 	balancer := NewConsistBalancer(NewConsistentHashOption(getRandomKey))
@@ -400,17 +398,17 @@ func BenchmarkConsistPicker_RandomDistributionKey(bb *testing.B) {
 				CacheKey:  "test",
 				Instances: inss,
 			}
+			buf := make([]byte, 30)
+			randRead(buf)
+			s := *(*string)(unsafe.Pointer(&buf))
 			picker := balancer.GetPicker(e)
-			ctx := context.WithValue(context.Background(), keyCtxKey, getRandomString(30))
+			ctx := context.WithValue(context.Background(), keyCtxKey, s)
 			picker.Next(ctx, nil)
 			picker.(internal.Reusable).Recycle()
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				b.Logf("round %d", i)
-				b.StopTimer()
-				ctx = context.WithValue(context.Background(), keyCtxKey, getRandomString(30))
-				b.StartTimer()
+				randRead(buf) // it changes the data of `s` in ctx
 				picker := balancer.GetPicker(e)
 				picker.Next(ctx, nil)
 				if r, ok := picker.(internal.Reusable); ok {
