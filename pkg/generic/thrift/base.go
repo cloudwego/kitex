@@ -248,7 +248,6 @@ func (p *Base) IsSetExtra() bool {
 	return p.Extra != nil
 }
 
-// TODO(marina.sakai): optimize base read
 func (p *Base) Read(iprot *thrift.BinaryReader) (err error) {
 	var fieldTypeId thrift.TType
 	var fieldId int16
@@ -409,7 +408,6 @@ func (p *Base) ReadField6(iprot *thrift.BinaryReader) error {
 	return nil
 }
 
-// TODO(marina.sakai): optimize base write
 func (p *Base) Write(oprot *thrift.BinaryWriter) (err error) {
 	var fieldId int16
 	if p != nil {
