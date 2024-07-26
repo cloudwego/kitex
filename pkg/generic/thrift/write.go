@@ -698,6 +698,7 @@ func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BinaryWr
 		}
 	}
 	out.WriteFieldBegin(field.Type.Type.ToThriftTType(), int16(field.ID))
+	// TODO(marina.sakai): repalce base with gopkg's base and remove base.go
 	if err := opt.requestBase.Write(out); err != nil {
 		return err
 	}
