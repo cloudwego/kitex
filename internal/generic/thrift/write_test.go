@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/cloudwego/kitex/internal/generic/proto"
 	"testing"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
