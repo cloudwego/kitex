@@ -29,25 +29,13 @@ import (
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/frugal"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
-const (
-	// 0b0001 and 0b0010 are used for FastWrite and FastRead, so Frugal starts from 0b0100
-	FrugalWrite CodecType = 0b0100
-	FrugalRead  CodecType = 0b1000
-
-	FrugalReadWrite = FrugalWrite | FrugalRead
-)
-
-// hyperMarshalEnabled indicates that if there are high priority message codec for current platform.
-func (c thriftCodec) hyperMarshalEnabled() bool {
-	return c.CodecType&FrugalWrite != 0
-}
+// TODO(xiaost): rename hyper -> frugal after v0.11.0 is released
 
 // hyperMarshalAvailable indicates that if high priority message codec is available.
 func hyperMarshalAvailable(data interface{}) bool {
@@ -56,11 +44,6 @@ func hyperMarshalAvailable(data interface{}) bool {
 		return false
 	}
 	return true
-}
-
-// hyperMessageUnmarshalEnabled indicates that if there are high priority message codec for current platform.
-func (c thriftCodec) hyperMessageUnmarshalEnabled() bool {
-	return c.CodecType&FrugalRead != 0
 }
 
 // hyperMessageUnmarshalAvailable indicates that if high priority message codec is available.
@@ -79,24 +62,21 @@ func (c thriftCodec) hyperMarshal(out remote.ByteBuffer, methodName string, msgT
 	seqID int32, data interface{},
 ) error {
 	// calculate and malloc message buffer
-	msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
-	msgEndLen := bthrift.Binary.MessageEndLength()
+	msgBeginLen := thrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
 	objectLen := frugal.EncodedSize(data)
-	buf, err := out.Malloc(msgBeginLen + objectLen + msgEndLen)
+	buf, err := out.Malloc(msgBeginLen + objectLen)
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
 	}
 	mallocLen := out.MallocLen()
 
 	// encode message
-	offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
+	offset := thrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
 	nw, _ := out.(remote.NocopyWrite)
-	writeLen, err := frugal.EncodeObject(buf[offset:], nw, data)
+	_, err = frugal.EncodeObject(buf[offset:], nw, data)
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Encode failed: %s", err.Error()))
 	}
-	offset += writeLen
-	bthrift.Binary.WriteMessageEnd(buf[offset:])
 	if nw != nil {
 		return nw.MallocAck(mallocLen)
 	}
