@@ -21,9 +21,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/fastpb"
+	gpkgthrift "github.com/cloudwego/gopkg/protocol/thrift"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -100,7 +102,20 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
-		payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
+		switch msg := message.Data().(type) {
+		case genericWriter:
+			methodName := message.RPCInfo().Invocation().MethodName()
+			if methodName == "" {
+				return errors.New("empty methodName in grpc generic streaming Encode")
+			}
+			bw := gpkgthrift.NewBinaryWriter()
+			if err := msg.Write(ctx, methodName, bw, out); err != nil {
+				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Write failed: %s", err.Error()))
+			}
+			payload = bw.Bytes()
+		default:
+			payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
+		}
 	case serviceinfo.Protobuf:
 		switch t := message.Data().(type) {
 		case fastpb.Writer:
@@ -188,6 +203,13 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	data := message.Data()
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
+		if t, ok := data.(genericReader); ok {
+			methodName := message.RPCInfo().Invocation().MethodName()
+			if methodName == "" {
+				return errors.New("empty methodName in grpc Decode")
+			}
+			return t.Read(ctx, methodName, len(d), remote.NewReaderBuffer(d))
+		}
 		return thrift.UnmarshalThriftData(ctx, c.ThriftCodec, "", d, message.Data())
 	case serviceinfo.Protobuf:
 		if t, ok := data.(fastpb.Reader); ok {
@@ -224,4 +246,12 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 
 func (c *grpcCodec) Name() string {
 	return "grpc"
+}
+
+type genericWriter interface { // used by pkg/generic
+	Write(ctx context.Context, method string, bw *gpkgthrift.BinaryWriter, out io.Writer) error
+}
+
+type genericReader interface { // used by pkg/generic
+	Read(ctx context.Context, method string, dataLen int, in io.Reader) error
 }

@@ -19,6 +19,7 @@ package thrift
 import (
 	"context"
 	"errors"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"io"
 	"testing"
 
@@ -64,7 +65,7 @@ func init() {
 
 type mockWithContext struct {
 	ReadFunc  func(ctx context.Context, method string, dataLen int, oprot io.Reader) error
-	WriteFunc func(ctx context.Context, method string, oprot io.Writer) error
+	WriteFunc func(ctx context.Context, method string, writer *thrift.BinaryWriter, oprot io.Writer) error
 }
 
 func (m *mockWithContext) Read(ctx context.Context, method string, dataLen int, oprot io.Reader) error {
@@ -74,9 +75,9 @@ func (m *mockWithContext) Read(ctx context.Context, method string, dataLen int, 
 	return nil
 }
 
-func (m *mockWithContext) Write(ctx context.Context, method string, oprot io.Writer) error {
+func (m *mockWithContext) Write(ctx context.Context, method string, writer *thrift.BinaryWriter, oprot io.Writer) error {
 	if m.WriteFunc != nil {
-		return m.WriteFunc(ctx, method, oprot)
+		return m.WriteFunc(ctx, method, writer, oprot)
 	}
 	return nil
 }
@@ -86,7 +87,7 @@ func TestWithContext(t *testing.T) {
 		t.Run(tb.Name, func(t *testing.T) {
 			ctx := context.Background()
 
-			req := &mockWithContext{WriteFunc: func(ctx context.Context, method string, oprot io.Writer) error {
+			req := &mockWithContext{WriteFunc: func(ctx context.Context, method string, writer *thrift.BinaryWriter, oprot io.Writer) error {
 				return nil
 			}}
 			ink := rpcinfo.NewInvocation("", "mock")
