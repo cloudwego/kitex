@@ -24,11 +24,11 @@ import (
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
@@ -79,7 +79,7 @@ func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.O
 }
 
 // originalWrite ...
-func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out athrift.TProtocol, msg interface{}, requestBase *Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	if req.Body == nil && len(req.RawBody) != 0 {
 		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {
@@ -131,7 +131,7 @@ func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options) {
 }
 
 // Read ...
-func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in athrift.TProtocol) (interface{}, error) {
 	// fallback logic
 	if !r.dynamicgoEnabled || dataLen == 0 {
 		return r.originalRead(ctx, method, in)
@@ -140,18 +140,13 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient boo
 	if !ok {
 		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
 	}
-	sName, err := in.ReadStructBegin()
-	if err != nil {
-		return nil, err
-	}
-	sBeginLen := bthrift.Binary.StructBeginLength(sName)
 	// TODO: support exception field
-	fName, typeId, id, err := in.ReadFieldBegin()
+	_, _, id, err := in.ReadFieldBegin()
 	if err != nil {
 		return nil, err
 	}
-	fBeginLen := bthrift.Binary.FieldBeginLength(fName, typeId, id)
-	transBuf, err := tProt.ByteBuffer().ReadBinary(dataLen - sBeginLen - fBeginLen)
+	fBeginLen := thrift.Binary.FieldBeginLength()
+	transBuf, err := tProt.ByteBuffer().ReadBinary(dataLen - fBeginLen)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +176,7 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient boo
 	return resp, nil
 }
 
-func (r *ReadHTTPResponse) originalRead(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPResponse) originalRead(ctx context.Context, method string, in athrift.TProtocol) (interface{}, error) {
 	fnDsc, err := r.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err

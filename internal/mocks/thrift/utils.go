@@ -20,25 +20,26 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+
+	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // ApacheCodecAdapter converts a fastcodec struct to apache codec
 type ApacheCodecAdapter struct {
-	p bthrift.ThriftFastCodec
+	p thrift.FastCodec
 }
 
-// Write implements thrift.TStruct
-func (p ApacheCodecAdapter) Write(tp thrift.TProtocol) error {
+// Write implements athrift.TStruct
+func (p ApacheCodecAdapter) Write(tp athrift.TProtocol) error {
 	b := make([]byte, p.p.BLength())
 	b = b[:p.p.FastWriteNocopy(b, nil)]
 	_, err := tp.Transport().Write(b)
 	return err
 }
 
-// Read implements thrift.TStruct
-func (p ApacheCodecAdapter) Read(tp thrift.TProtocol) error {
+// Read implements athrift.TStruct
+func (p ApacheCodecAdapter) Read(tp athrift.TProtocol) error {
 	var err error
 	var b []byte
 	trans := tp.Transport()
@@ -54,12 +55,16 @@ func (p ApacheCodecAdapter) Read(tp thrift.TProtocol) error {
 	return err
 }
 
-// ToApacheCodec converts a bthrift.ThriftFastCodec to thrift.TStruct
-func ToApacheCodec(p bthrift.ThriftFastCodec) thrift.TStruct {
+// ToApacheCodec converts a thrift.FastCodec to athrift.TStruct
+func ToApacheCodec(p thrift.FastCodec) athrift.TStruct {
 	return ApacheCodecAdapter{p: p}
 }
 
-// UnpackApacheCodec unpacks ToApacheCodec
+// UnpackApacheCodec unpacks the value returned by `ToApacheCodec`
 func UnpackApacheCodec(v interface{}) interface{} {
-	return v.(ApacheCodecAdapter).p
+	a, ok := v.(ApacheCodecAdapter)
+	if ok {
+		return a.p
+	}
+	return v
 }

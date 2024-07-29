@@ -17,13 +17,9 @@
 package bthrift
 
 import (
-	"errors"
-	"fmt"
-	"reflect"
-
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/unknownfields"
 	"github.com/cloudwego/thriftgo/generator/golang/extension/unknown"
-
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // UnknownField is used to describe an unknown field.
@@ -36,363 +32,61 @@ type UnknownField struct {
 	Value   interface{}
 }
 
-// GetUnknownFields deserialize unknownFields stored in v to a list of *UnknownFields.
+func fromGopkgUnknownFields(ff []unknownfields.UnknownField) []UnknownField {
+	if ff == nil {
+		return nil
+	}
+	ret := make([]UnknownField, len(ff))
+	for i := range ff {
+		f := &ff[i]
+		ret[i].Name = "" // this field is useless
+		ret[i].ID = f.ID
+		ret[i].Type = int(f.Type)
+		ret[i].KeyType = int(f.KeyType)
+		ret[i].ValType = int(f.ValType)
+		ret[i].Value = f.Value
+	}
+	return ret
+}
+
+func toGopkgUnknownFields(ff []UnknownField) []unknownfields.UnknownField {
+	if ff == nil {
+		return nil
+	}
+	ret := make([]unknownfields.UnknownField, len(ff))
+	for i := range ff {
+		f := &ff[i]
+		ret[i].ID = f.ID
+		ret[i].Type = thrift.TType(f.Type)
+		ret[i].KeyType = thrift.TType(f.KeyType)
+		ret[i].ValType = thrift.TType(f.ValType)
+		ret[i].Value = f.Value
+	}
+	return ret
+}
+
+// GetUnknownFields deserialize unknownfields stored in v to a list of *UnknownFields.
+// Deprecated: use the method under github.com/cloudwego/gopkg/protocol/thrift/unknownfields
 func GetUnknownFields(v interface{}) (fields []UnknownField, err error) {
-	var buf []byte
-	rv := reflect.ValueOf(v)
-	if rv.Kind() == reflect.Ptr && !rv.IsNil() {
-		rv = rv.Elem()
-	}
-	if rv.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("%T is not a struct type", v)
-	}
-	if unknownField := rv.FieldByName("_unknownFields"); !unknownField.IsValid() {
-		return nil, fmt.Errorf("%T has no field named '_unknownFields'", v)
-	} else {
-		buf = unknownField.Bytes()
-	}
-	return ConvertUnknownFields(buf)
+	ff, err := unknownfields.GetUnknownFields(v)
+	return fromGopkgUnknownFields(ff), err
 }
 
 // ConvertUnknownFields converts buf to deserialized unknown fields.
+// Deprecated: use the method under github.com/cloudwego/gopkg/protocol/thrift/unknownfields
 func ConvertUnknownFields(buf unknown.Fields) (fields []UnknownField, err error) {
-	if len(buf) == 0 {
-		return nil, errors.New("_unknownFields is empty")
-	}
-	var offset int
-	var l int
-	var name string
-	var fieldTypeId thrift.TType
-	var fieldId int16
-	var f UnknownField
-	for {
-		if offset == len(buf) {
-			return
-		}
-		name, fieldTypeId, fieldId, l, err = Binary.ReadFieldBegin(buf[offset:])
-		offset += l
-		if err != nil {
-			return nil, fmt.Errorf("read field %d begin error: %v", fieldId, err)
-		}
-		l, err = readUnknownField(&f, buf[offset:], name, fieldTypeId, fieldId)
-		offset += l
-		if err != nil {
-			return nil, fmt.Errorf("read unknown field %d error: %v", fieldId, err)
-		}
-		fields = append(fields, f)
-	}
-}
-
-func readUnknownField(f *UnknownField, buf []byte, name string, fieldType thrift.TType, id int16) (length int, err error) {
-	var size int
-	var l int
-	f.Name = name
-	f.ID = id
-	f.Type = int(fieldType)
-	switch fieldType {
-	case thrift.BOOL:
-		f.Value, l, err = Binary.ReadBool(buf[length:])
-		length += l
-	case thrift.BYTE:
-		f.Value, l, err = Binary.ReadByte(buf[length:])
-		length += l
-	case thrift.I16:
-		f.Value, l, err = Binary.ReadI16(buf[length:])
-		length += l
-	case thrift.I32:
-		f.Value, l, err = Binary.ReadI32(buf[length:])
-		length += l
-	case thrift.I64:
-		f.Value, l, err = Binary.ReadI64(buf[length:])
-		length += l
-	case thrift.DOUBLE:
-		f.Value, l, err = Binary.ReadDouble(buf[length:])
-		length += l
-	case thrift.STRING:
-		f.Value, l, err = Binary.ReadString(buf[length:])
-		length += l
-	case thrift.SET:
-		var ttype thrift.TType
-		ttype, size, l, err = Binary.ReadSetBegin(buf[length:])
-		length += l
-		if err != nil {
-			return length, fmt.Errorf("read set begin error: %w", err)
-		}
-		f.ValType = int(ttype)
-		set := make([]UnknownField, size)
-		for i := 0; i < size; i++ {
-			l, err2 := readUnknownField(&set[i], buf[length:], "", thrift.TType(f.ValType), int16(i))
-			length += l
-			if err2 != nil {
-				return length, fmt.Errorf("read set elem error: %w", err2)
-			}
-		}
-		l, err = Binary.ReadSetEnd(buf[length:])
-		length += l
-		if err != nil {
-			return length, fmt.Errorf("read set end error: %w", err)
-		}
-		f.Value = set
-	case thrift.LIST:
-		var ttype thrift.TType
-		ttype, size, l, err = Binary.ReadListBegin(buf[length:])
-		length += l
-		if err != nil {
-			return length, fmt.Errorf("read list begin error: %w", err)
-		}
-		f.ValType = int(ttype)
-		list := make([]UnknownField, size)
-		for i := 0; i < size; i++ {
-			l, err2 := readUnknownField(&list[i], buf[length:], "", thrift.TType(f.ValType), int16(i))
-			length += l
-			if err2 != nil {
-				return length, fmt.Errorf("read list elem error: %w", err2)
-			}
-		}
-		l, err = Binary.ReadListEnd(buf[length:])
-		length += l
-		if err != nil {
-			return length, fmt.Errorf("read list end error: %w", err)
-		}
-		f.Value = list
-	case thrift.MAP:
-		var kttype, vttype thrift.TType
-		kttype, vttype, size, l, err = Binary.ReadMapBegin(buf[length:])
-		length += l
-		if err != nil {
-			return length, fmt.Errorf("read map begin error: %w", err)
-		}
-		f.KeyType = int(kttype)
-		f.ValType = int(vttype)
-		flatMap := make([]UnknownField, size*2)
-		for i := 0; i < size; i++ {
-			l, err2 := readUnknownField(&flatMap[2*i], buf[length:], "", thrift.TType(f.KeyType), int16(i))
-			length += l
-			if err2 != nil {
-				return length, fmt.Errorf("read map key error: %w", err2)
-			}
-			l, err2 = readUnknownField(&flatMap[2*i+1], buf[length:], "", thrift.TType(f.ValType), int16(i))
-			length += l
-			if err2 != nil {
-				return length, fmt.Errorf("read map value error: %w", err2)
-			}
-		}
-		l, err = Binary.ReadMapEnd(buf[length:])
-		length += l
-		if err != nil {
-			return length, fmt.Errorf("read map end error: %w", err)
-		}
-		f.Value = flatMap
-	case thrift.STRUCT:
-		_, l, err = Binary.ReadStructBegin(buf[length:])
-		length += l
-		if err != nil {
-			return length, fmt.Errorf("read struct begin error: %w", err)
-		}
-		var field UnknownField
-		var fields []UnknownField
-		for {
-			name, fieldTypeID, fieldID, l, err := Binary.ReadFieldBegin(buf[length:])
-			length += l
-			if err != nil {
-				return length, fmt.Errorf("read field begin error: %w", err)
-			}
-			if fieldTypeID == thrift.STOP {
-				break
-			}
-			l, err = readUnknownField(&field, buf[length:], name, fieldTypeID, fieldID)
-			length += l
-			if err != nil {
-				return length, fmt.Errorf("read struct field error: %w", err)
-			}
-			l, err = Binary.ReadFieldEnd(buf[length:])
-			length += l
-			if err != nil {
-				return length, fmt.Errorf("read field end error: %w", err)
-			}
-			fields = append(fields, field)
-		}
-		l, err = Binary.ReadStructEnd(buf[length:])
-		length += l
-		if err != nil {
-			return length, fmt.Errorf("read struct end error: %w", err)
-		}
-		f.Value = fields
-	default:
-		return length, fmt.Errorf("unknown data type %d", f.Type)
-	}
-	if err != nil {
-		return length, err
-	}
-	return
+	ff, err := unknownfields.ConvertUnknownFields(buf)
+	return fromGopkgUnknownFields(ff), err
 }
 
 // UnknownFieldsLength returns the length of fs.
+// Deprecated: use the method under github.com/cloudwego/gopkg/protocol/thrift/unknownfields
 func UnknownFieldsLength(fs []UnknownField) (int, error) {
-	l := 0
-	for _, f := range fs {
-		l += Binary.FieldBeginLength(f.Name, thrift.TType(f.Type), f.ID)
-		ll, err := unknownFieldLength(&f)
-		l += ll
-		if err != nil {
-			return l, err
-		}
-		l += Binary.FieldEndLength()
-	}
-	return l, nil
-}
-
-func unknownFieldLength(f *UnknownField) (length int, err error) {
-	// use constants to avoid some type assert
-	switch f.Type {
-	case unknown.TBool:
-		length += Binary.BoolLength(false)
-	case unknown.TByte:
-		length += Binary.ByteLength(0)
-	case unknown.TDouble:
-		length += Binary.DoubleLength(0)
-	case unknown.TI16:
-		length += Binary.I16Length(0)
-	case unknown.TI32:
-		length += Binary.I32Length(0)
-	case unknown.TI64:
-		length += Binary.I64Length(0)
-	case unknown.TString:
-		length += Binary.StringLength(f.Value.(string))
-	case unknown.TSet:
-		vs := f.Value.([]UnknownField)
-		length += Binary.SetBeginLength(thrift.TType(f.ValType), len(vs))
-		for _, v := range vs {
-			l, err := unknownFieldLength(&v)
-			length += l
-			if err != nil {
-				return length, err
-			}
-		}
-		length += Binary.SetEndLength()
-	case unknown.TList:
-		vs := f.Value.([]UnknownField)
-		length += Binary.ListBeginLength(thrift.TType(f.ValType), len(vs))
-		for _, v := range vs {
-			l, err := unknownFieldLength(&v)
-			length += l
-			if err != nil {
-				return length, err
-			}
-		}
-		length += Binary.ListEndLength()
-	case unknown.TMap:
-		kvs := f.Value.([]UnknownField)
-		length += Binary.MapBeginLength(thrift.TType(f.KeyType), thrift.TType(f.ValType), len(kvs)/2)
-		for i := 0; i < len(kvs); i += 2 {
-			l, err := unknownFieldLength(&kvs[i])
-			length += l
-			if err != nil {
-				return length, err
-			}
-			l, err = unknownFieldLength(&kvs[i+1])
-			length += l
-			if err != nil {
-				return length, err
-			}
-		}
-		length += Binary.MapEndLength()
-	case unknown.TStruct:
-		fs := f.Value.([]UnknownField)
-		length += Binary.StructBeginLength(f.Name)
-		l, err := UnknownFieldsLength(fs)
-		length += l
-		if err != nil {
-			return length, err
-		}
-		length += Binary.FieldStopLength()
-		length += Binary.StructEndLength()
-	default:
-		return length, fmt.Errorf("unknown data type %d", f.Type)
-	}
-	return
+	return unknownfields.UnknownFieldsLength(toGopkgUnknownFields(fs))
 }
 
 // WriteUnknownFields writes fs into buf, and return written offset of the buf.
+// Deprecated: use the method under github.com/cloudwego/gopkg/protocol/thrift/unknownfields
 func WriteUnknownFields(buf []byte, fs []UnknownField) (offset int, err error) {
-	for _, f := range fs {
-		offset += Binary.WriteFieldBegin(buf[offset:], f.Name, thrift.TType(f.Type), f.ID)
-		l, err := writeUnknownField(buf[offset:], &f)
-		offset += l
-		if err != nil {
-			return offset, err
-		}
-		offset += Binary.WriteFieldEnd(buf[offset:])
-	}
-	return offset, nil
-}
-
-func writeUnknownField(buf []byte, f *UnknownField) (offset int, err error) {
-	switch f.Type {
-	case unknown.TBool:
-		offset += Binary.WriteBool(buf, f.Value.(bool))
-	case unknown.TByte:
-		offset += Binary.WriteByte(buf, f.Value.(int8))
-	case unknown.TDouble:
-		offset += Binary.WriteDouble(buf, f.Value.(float64))
-	case unknown.TI16:
-		offset += Binary.WriteI16(buf, f.Value.(int16))
-	case unknown.TI32:
-		offset += Binary.WriteI32(buf, f.Value.(int32))
-	case unknown.TI64:
-		offset += Binary.WriteI64(buf, f.Value.(int64))
-	case unknown.TString:
-		offset += Binary.WriteString(buf, f.Value.(string))
-	case unknown.TSet:
-		vs := f.Value.([]UnknownField)
-		offset += Binary.WriteSetBegin(buf, thrift.TType(f.ValType), len(vs))
-		for _, v := range vs {
-			l, err := writeUnknownField(buf[offset:], &v)
-			offset += l
-			if err != nil {
-				return offset, err
-			}
-		}
-		offset += Binary.WriteSetEnd(buf[offset:])
-	case unknown.TList:
-		vs := f.Value.([]UnknownField)
-		offset += Binary.WriteListBegin(buf, thrift.TType(f.ValType), len(vs))
-		for _, v := range vs {
-			l, err := writeUnknownField(buf[offset:], &v)
-			offset += l
-			if err != nil {
-				return offset, err
-			}
-		}
-		offset += Binary.WriteListEnd(buf[offset:])
-	case unknown.TMap:
-		kvs := f.Value.([]UnknownField)
-		offset += Binary.WriteMapBegin(buf, thrift.TType(f.KeyType), thrift.TType(f.ValType), len(kvs)/2)
-		for i := 0; i < len(kvs); i += 2 {
-			l, err := writeUnknownField(buf[offset:], &kvs[i])
-			offset += l
-			if err != nil {
-				return offset, err
-			}
-			l, err = writeUnknownField(buf[offset:], &kvs[i+1])
-			offset += l
-			if err != nil {
-				return offset, err
-			}
-		}
-		offset += Binary.WriteMapEnd(buf[offset:])
-	case unknown.TStruct:
-		fs := f.Value.([]UnknownField)
-		offset += Binary.WriteStructBegin(buf, f.Name)
-		l, err := WriteUnknownFields(buf[offset:], fs)
-		offset += l
-		if err != nil {
-			return offset, err
-		}
-		offset += Binary.WriteFieldStop(buf[offset:])
-		offset += Binary.WriteStructEnd(buf[offset:])
-	default:
-		return offset, fmt.Errorf("unknown data type %d", f.Type)
-	}
-	return
+	return unknownfields.WriteUnknownFields(buf, toGopkgUnknownFields(fs))
 }

@@ -24,8 +24,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 )
 
 // unused protection
@@ -34,8 +33,7 @@ var (
 	_ = (*bytes.Buffer)(nil)
 	_ = (*strings.Builder)(nil)
 	_ = reflect.Type(nil)
-	_ = thrift.TProtocol(nil)
-	_ = bthrift.BinaryWriter(nil)
+	_ = thrift.STOP
 )
 
 func (p *MockReq) FastRead(buf []byte) (int, error) {
@@ -44,14 +42,8 @@ func (p *MockReq) FastRead(buf []byte) (int, error) {
 	var l int
 	var fieldTypeId thrift.TType
 	var fieldId int16
-	_, l, err = bthrift.Binary.ReadStructBegin(buf)
-	offset += l
-	if err != nil {
-		goto ReadStructBeginError
-	}
-
 	for {
-		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
+		fieldTypeId, fieldId, l, err = thrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
 			goto ReadFieldBeginError
@@ -68,7 +60,7 @@ func (p *MockReq) FastRead(buf []byte) (int, error) {
 					goto ReadFieldError
 				}
 			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
 				if err != nil {
 					goto SkipFieldError
@@ -82,7 +74,7 @@ func (p *MockReq) FastRead(buf []byte) (int, error) {
 					goto ReadFieldError
 				}
 			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
 				if err != nil {
 					goto SkipFieldError
@@ -96,58 +88,39 @@ func (p *MockReq) FastRead(buf []byte) (int, error) {
 					goto ReadFieldError
 				}
 			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
 				if err != nil {
 					goto SkipFieldError
 				}
 			}
 		default:
-			l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
 			if err != nil {
 				goto SkipFieldError
 			}
 		}
-
-		l, err = bthrift.Binary.ReadFieldEnd(buf[offset:])
-		offset += l
-		if err != nil {
-			goto ReadFieldEndError
-		}
-	}
-	l, err = bthrift.Binary.ReadStructEnd(buf[offset:])
-	offset += l
-	if err != nil {
-		goto ReadStructEndError
 	}
 
 	return offset, nil
-ReadStructBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
 ReadFieldBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MockReq[fieldId]), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MockReq[fieldId]), err)
 SkipFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
-ReadFieldEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
-ReadStructEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
 func (p *MockReq) FastReadField1(buf []byte) (int, error) {
 	offset := 0
 
 	var _field string
-	if v, l, err := bthrift.Binary.ReadString(buf[offset:]); err != nil {
+	if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
-
 		_field = v
-
 	}
 	p.Msg = _field
 	return offset, nil
@@ -156,7 +129,7 @@ func (p *MockReq) FastReadField1(buf []byte) (int, error) {
 func (p *MockReq) FastReadField2(buf []byte) (int, error) {
 	offset := 0
 
-	_, _, size, l, err := bthrift.Binary.ReadMapBegin(buf[offset:])
+	_, _, size, l, err := thrift.Binary.ReadMapBegin(buf[offset:])
 	offset += l
 	if err != nil {
 		return offset, err
@@ -164,31 +137,22 @@ func (p *MockReq) FastReadField2(buf []byte) (int, error) {
 	_field := make(map[string]string, size)
 	for i := 0; i < size; i++ {
 		var _key string
-		if v, l, err := bthrift.Binary.ReadString(buf[offset:]); err != nil {
+		if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
 			return offset, err
 		} else {
 			offset += l
-
 			_key = v
-
 		}
 
 		var _val string
-		if v, l, err := bthrift.Binary.ReadString(buf[offset:]); err != nil {
+		if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
 			return offset, err
 		} else {
 			offset += l
-
 			_val = v
-
 		}
 
 		_field[_key] = _val
-	}
-	if l, err := bthrift.Binary.ReadMapEnd(buf[offset:]); err != nil {
-		return offset, err
-	} else {
-		offset += l
 	}
 	p.StrMap = _field
 	return offset, nil
@@ -197,7 +161,7 @@ func (p *MockReq) FastReadField2(buf []byte) (int, error) {
 func (p *MockReq) FastReadField3(buf []byte) (int, error) {
 	offset := 0
 
-	_, size, l, err := bthrift.Binary.ReadListBegin(buf[offset:])
+	_, size, l, err := thrift.Binary.ReadListBegin(buf[offset:])
 	offset += l
 	if err != nil {
 		return offset, err
@@ -205,21 +169,14 @@ func (p *MockReq) FastReadField3(buf []byte) (int, error) {
 	_field := make([]string, 0, size)
 	for i := 0; i < size; i++ {
 		var _elem string
-		if v, l, err := bthrift.Binary.ReadString(buf[offset:]); err != nil {
+		if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
 			return offset, err
 		} else {
 			offset += l
-
 			_elem = v
-
 		}
 
 		_field = append(_field, _elem)
-	}
-	if l, err := bthrift.Binary.ReadListEnd(buf[offset:]); err != nil {
-		return offset, err
-	} else {
-		offset += l
 	}
 	p.StrList = _field
 	return offset, nil
@@ -230,104 +187,92 @@ func (p *MockReq) FastWrite(buf []byte) int {
 	return 0
 }
 
-func (p *MockReq) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockReq) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "MockReq")
 	if p != nil {
-		offset += p.fastWriteField1(buf[offset:], binaryWriter)
-		offset += p.fastWriteField2(buf[offset:], binaryWriter)
-		offset += p.fastWriteField3(buf[offset:], binaryWriter)
+		offset += p.fastWriteField1(buf[offset:], w)
+		offset += p.fastWriteField2(buf[offset:], w)
+		offset += p.fastWriteField3(buf[offset:], w)
 	}
-	offset += bthrift.Binary.WriteFieldStop(buf[offset:])
-	offset += bthrift.Binary.WriteStructEnd(buf[offset:])
+	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
 }
 
 func (p *MockReq) BLength() int {
 	l := 0
-	l += bthrift.Binary.StructBeginLength("MockReq")
 	if p != nil {
 		l += p.field1Length()
 		l += p.field2Length()
 		l += p.field3Length()
 	}
-	l += bthrift.Binary.FieldStopLength()
-	l += bthrift.Binary.StructEndLength()
+	l += thrift.Binary.FieldStopLength()
 	return l
 }
 
-func (p *MockReq) fastWriteField1(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockReq) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "Msg", thrift.STRING, 1)
-	offset += bthrift.Binary.WriteStringNocopy(buf[offset:], binaryWriter, p.Msg)
-	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 1)
+	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Msg)
 	return offset
 }
 
-func (p *MockReq) fastWriteField2(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockReq) fastWriteField2(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "strMap", thrift.MAP, 2)
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.MAP, 2)
 	mapBeginOffset := offset
-	offset += bthrift.Binary.MapBeginLength(thrift.STRING, thrift.STRING, 0)
+	offset += thrift.Binary.MapBeginLength()
 	var length int
 	for k, v := range p.StrMap {
 		length++
-		offset += bthrift.Binary.WriteStringNocopy(buf[offset:], binaryWriter, k)
-		offset += bthrift.Binary.WriteStringNocopy(buf[offset:], binaryWriter, v)
+		offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, k)
+		offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, v)
 	}
-	bthrift.Binary.WriteMapBegin(buf[mapBeginOffset:], thrift.STRING, thrift.STRING, length)
-	offset += bthrift.Binary.WriteMapEnd(buf[offset:])
-	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	thrift.Binary.WriteMapBegin(buf[mapBeginOffset:], thrift.STRING, thrift.STRING, length)
 	return offset
 }
 
-func (p *MockReq) fastWriteField3(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockReq) fastWriteField3(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "strList", thrift.LIST, 3)
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.LIST, 3)
 	listBeginOffset := offset
-	offset += bthrift.Binary.ListBeginLength(thrift.STRING, 0)
+	offset += thrift.Binary.ListBeginLength()
 	var length int
 	for _, v := range p.StrList {
 		length++
-		offset += bthrift.Binary.WriteStringNocopy(buf[offset:], binaryWriter, v)
+		offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, v)
 	}
-	bthrift.Binary.WriteListBegin(buf[listBeginOffset:], thrift.STRING, length)
-	offset += bthrift.Binary.WriteListEnd(buf[offset:])
-	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	thrift.Binary.WriteListBegin(buf[listBeginOffset:], thrift.STRING, length)
 	return offset
 }
 
 func (p *MockReq) field1Length() int {
 	l := 0
-	l += bthrift.Binary.FieldBeginLength("Msg", thrift.STRING, 1)
-	l += bthrift.Binary.StringLengthNocopy(p.Msg)
-	l += bthrift.Binary.FieldEndLength()
+	l += thrift.Binary.FieldBeginLength()
+	l += thrift.Binary.StringLengthNocopy(p.Msg)
 	return l
 }
 
 func (p *MockReq) field2Length() int {
 	l := 0
-	l += bthrift.Binary.FieldBeginLength("strMap", thrift.MAP, 2)
-	l += bthrift.Binary.MapBeginLength(thrift.STRING, thrift.STRING, len(p.StrMap))
+	l += thrift.Binary.FieldBeginLength()
+	l += thrift.Binary.MapBeginLength()
 	for k, v := range p.StrMap {
+		_, _ = k, v
 
-		l += bthrift.Binary.StringLengthNocopy(k)
-		l += bthrift.Binary.StringLengthNocopy(v)
+		l += thrift.Binary.StringLengthNocopy(k)
+		l += thrift.Binary.StringLengthNocopy(v)
 	}
-	l += bthrift.Binary.MapEndLength()
-	l += bthrift.Binary.FieldEndLength()
 	return l
 }
 
 func (p *MockReq) field3Length() int {
 	l := 0
-	l += bthrift.Binary.FieldBeginLength("strList", thrift.LIST, 3)
-	l += bthrift.Binary.ListBeginLength(thrift.STRING, len(p.StrList))
+	l += thrift.Binary.FieldBeginLength()
+	l += thrift.Binary.ListBeginLength()
 	for _, v := range p.StrList {
-		l += bthrift.Binary.StringLengthNocopy(v)
+		_ = v
+		l += thrift.Binary.StringLengthNocopy(v)
 	}
-	l += bthrift.Binary.ListEndLength()
-	l += bthrift.Binary.FieldEndLength()
 	return l
 }
 
@@ -337,14 +282,8 @@ func (p *Exception) FastRead(buf []byte) (int, error) {
 	var l int
 	var fieldTypeId thrift.TType
 	var fieldId int16
-	_, l, err = bthrift.Binary.ReadStructBegin(buf)
-	offset += l
-	if err != nil {
-		goto ReadStructBeginError
-	}
-
 	for {
-		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
+		fieldTypeId, fieldId, l, err = thrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
 			goto ReadFieldBeginError
@@ -361,7 +300,7 @@ func (p *Exception) FastRead(buf []byte) (int, error) {
 					goto ReadFieldError
 				}
 			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
 				if err != nil {
 					goto SkipFieldError
@@ -375,58 +314,39 @@ func (p *Exception) FastRead(buf []byte) (int, error) {
 					goto ReadFieldError
 				}
 			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
 				if err != nil {
 					goto SkipFieldError
 				}
 			}
 		default:
-			l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
 			if err != nil {
 				goto SkipFieldError
 			}
 		}
-
-		l, err = bthrift.Binary.ReadFieldEnd(buf[offset:])
-		offset += l
-		if err != nil {
-			goto ReadFieldEndError
-		}
-	}
-	l, err = bthrift.Binary.ReadStructEnd(buf[offset:])
-	offset += l
-	if err != nil {
-		goto ReadStructEndError
 	}
 
 	return offset, nil
-ReadStructBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
 ReadFieldBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_Exception[fieldId]), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_Exception[fieldId]), err)
 SkipFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
-ReadFieldEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
-ReadStructEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
 func (p *Exception) FastReadField1(buf []byte) (int, error) {
 	offset := 0
 
 	var _field int32
-	if v, l, err := bthrift.Binary.ReadI32(buf[offset:]); err != nil {
+	if v, l, err := thrift.Binary.ReadI32(buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
-
 		_field = v
-
 	}
 	p.Code = _field
 	return offset, nil
@@ -436,13 +356,11 @@ func (p *Exception) FastReadField255(buf []byte) (int, error) {
 	offset := 0
 
 	var _field string
-	if v, l, err := bthrift.Binary.ReadString(buf[offset:]); err != nil {
+	if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
-
 		_field = v
-
 	}
 	p.Msg = _field
 	return offset, nil
@@ -453,59 +371,51 @@ func (p *Exception) FastWrite(buf []byte) int {
 	return 0
 }
 
-func (p *Exception) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *Exception) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "Exception")
 	if p != nil {
-		offset += p.fastWriteField1(buf[offset:], binaryWriter)
-		offset += p.fastWriteField255(buf[offset:], binaryWriter)
+		offset += p.fastWriteField1(buf[offset:], w)
+		offset += p.fastWriteField255(buf[offset:], w)
 	}
-	offset += bthrift.Binary.WriteFieldStop(buf[offset:])
-	offset += bthrift.Binary.WriteStructEnd(buf[offset:])
+	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
 }
 
 func (p *Exception) BLength() int {
 	l := 0
-	l += bthrift.Binary.StructBeginLength("Exception")
 	if p != nil {
 		l += p.field1Length()
 		l += p.field255Length()
 	}
-	l += bthrift.Binary.FieldStopLength()
-	l += bthrift.Binary.StructEndLength()
+	l += thrift.Binary.FieldStopLength()
 	return l
 }
 
-func (p *Exception) fastWriteField1(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *Exception) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "code", thrift.I32, 1)
-	offset += bthrift.Binary.WriteI32(buf[offset:], p.Code)
-	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.I32, 1)
+	offset += thrift.Binary.WriteI32(buf[offset:], p.Code)
 	return offset
 }
 
-func (p *Exception) fastWriteField255(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *Exception) fastWriteField255(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "msg", thrift.STRING, 255)
-	offset += bthrift.Binary.WriteStringNocopy(buf[offset:], binaryWriter, p.Msg)
-	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 255)
+	offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, p.Msg)
 	return offset
 }
 
 func (p *Exception) field1Length() int {
 	l := 0
-	l += bthrift.Binary.FieldBeginLength("code", thrift.I32, 1)
-	l += bthrift.Binary.I32Length(p.Code)
-	l += bthrift.Binary.FieldEndLength()
+	l += thrift.Binary.FieldBeginLength()
+	l += thrift.Binary.I32Length()
 	return l
 }
 
 func (p *Exception) field255Length() int {
 	l := 0
-	l += bthrift.Binary.FieldBeginLength("msg", thrift.STRING, 255)
-	l += bthrift.Binary.StringLengthNocopy(p.Msg)
-	l += bthrift.Binary.FieldEndLength()
+	l += thrift.Binary.FieldBeginLength()
+	l += thrift.Binary.StringLengthNocopy(p.Msg)
 	return l
 }
 
@@ -515,14 +425,8 @@ func (p *MockTestArgs) FastRead(buf []byte) (int, error) {
 	var l int
 	var fieldTypeId thrift.TType
 	var fieldId int16
-	_, l, err = bthrift.Binary.ReadStructBegin(buf)
-	offset += l
-	if err != nil {
-		goto ReadStructBeginError
-	}
-
 	for {
-		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
+		fieldTypeId, fieldId, l, err = thrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
 			goto ReadFieldBeginError
@@ -539,45 +443,28 @@ func (p *MockTestArgs) FastRead(buf []byte) (int, error) {
 					goto ReadFieldError
 				}
 			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
 				if err != nil {
 					goto SkipFieldError
 				}
 			}
 		default:
-			l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
 			if err != nil {
 				goto SkipFieldError
 			}
 		}
-
-		l, err = bthrift.Binary.ReadFieldEnd(buf[offset:])
-		offset += l
-		if err != nil {
-			goto ReadFieldEndError
-		}
-	}
-	l, err = bthrift.Binary.ReadStructEnd(buf[offset:])
-	offset += l
-	if err != nil {
-		goto ReadStructEndError
 	}
 
 	return offset, nil
-ReadStructBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
 ReadFieldBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MockTestArgs[fieldId]), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MockTestArgs[fieldId]), err)
 SkipFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
-ReadFieldEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
-ReadStructEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
 func (p *MockTestArgs) FastReadField1(buf []byte) (int, error) {
@@ -597,41 +484,35 @@ func (p *MockTestArgs) FastWrite(buf []byte) int {
 	return 0
 }
 
-func (p *MockTestArgs) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockTestArgs) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "Test_args")
 	if p != nil {
-		offset += p.fastWriteField1(buf[offset:], binaryWriter)
+		offset += p.fastWriteField1(buf[offset:], w)
 	}
-	offset += bthrift.Binary.WriteFieldStop(buf[offset:])
-	offset += bthrift.Binary.WriteStructEnd(buf[offset:])
+	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
 }
 
 func (p *MockTestArgs) BLength() int {
 	l := 0
-	l += bthrift.Binary.StructBeginLength("Test_args")
 	if p != nil {
 		l += p.field1Length()
 	}
-	l += bthrift.Binary.FieldStopLength()
-	l += bthrift.Binary.StructEndLength()
+	l += thrift.Binary.FieldStopLength()
 	return l
 }
 
-func (p *MockTestArgs) fastWriteField1(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockTestArgs) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "req", thrift.STRUCT, 1)
-	offset += p.Req.FastWriteNocopy(buf[offset:], binaryWriter)
-	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRUCT, 1)
+	offset += p.Req.FastWriteNocopy(buf[offset:], w)
 	return offset
 }
 
 func (p *MockTestArgs) field1Length() int {
 	l := 0
-	l += bthrift.Binary.FieldBeginLength("req", thrift.STRUCT, 1)
+	l += thrift.Binary.FieldBeginLength()
 	l += p.Req.BLength()
-	l += bthrift.Binary.FieldEndLength()
 	return l
 }
 
@@ -641,14 +522,8 @@ func (p *MockTestResult) FastRead(buf []byte) (int, error) {
 	var l int
 	var fieldTypeId thrift.TType
 	var fieldId int16
-	_, l, err = bthrift.Binary.ReadStructBegin(buf)
-	offset += l
-	if err != nil {
-		goto ReadStructBeginError
-	}
-
 	for {
-		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
+		fieldTypeId, fieldId, l, err = thrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
 			goto ReadFieldBeginError
@@ -665,57 +540,39 @@ func (p *MockTestResult) FastRead(buf []byte) (int, error) {
 					goto ReadFieldError
 				}
 			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
 				if err != nil {
 					goto SkipFieldError
 				}
 			}
 		default:
-			l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
 			if err != nil {
 				goto SkipFieldError
 			}
 		}
-
-		l, err = bthrift.Binary.ReadFieldEnd(buf[offset:])
-		offset += l
-		if err != nil {
-			goto ReadFieldEndError
-		}
-	}
-	l, err = bthrift.Binary.ReadStructEnd(buf[offset:])
-	offset += l
-	if err != nil {
-		goto ReadStructEndError
 	}
 
 	return offset, nil
-ReadStructBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
 ReadFieldBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MockTestResult[fieldId]), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MockTestResult[fieldId]), err)
 SkipFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
-ReadFieldEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
-ReadStructEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
 func (p *MockTestResult) FastReadField0(buf []byte) (int, error) {
 	offset := 0
 
 	var _field *string
-	if v, l, err := bthrift.Binary.ReadString(buf[offset:]); err != nil {
+	if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
 		_field = &v
-
 	}
 	p.Success = _field
 	return offset, nil
@@ -726,34 +583,29 @@ func (p *MockTestResult) FastWrite(buf []byte) int {
 	return 0
 }
 
-func (p *MockTestResult) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockTestResult) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "Test_result")
 	if p != nil {
-		offset += p.fastWriteField0(buf[offset:], binaryWriter)
+		offset += p.fastWriteField0(buf[offset:], w)
 	}
-	offset += bthrift.Binary.WriteFieldStop(buf[offset:])
-	offset += bthrift.Binary.WriteStructEnd(buf[offset:])
+	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
 }
 
 func (p *MockTestResult) BLength() int {
 	l := 0
-	l += bthrift.Binary.StructBeginLength("Test_result")
 	if p != nil {
 		l += p.field0Length()
 	}
-	l += bthrift.Binary.FieldStopLength()
-	l += bthrift.Binary.StructEndLength()
+	l += thrift.Binary.FieldStopLength()
 	return l
 }
 
-func (p *MockTestResult) fastWriteField0(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockTestResult) fastWriteField0(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p.IsSetSuccess() {
-		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "success", thrift.STRING, 0)
-		offset += bthrift.Binary.WriteStringNocopy(buf[offset:], binaryWriter, *p.Success)
-		offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 0)
+		offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, *p.Success)
 	}
 	return offset
 }
@@ -761,9 +613,8 @@ func (p *MockTestResult) fastWriteField0(buf []byte, binaryWriter bthrift.Binary
 func (p *MockTestResult) field0Length() int {
 	l := 0
 	if p.IsSetSuccess() {
-		l += bthrift.Binary.FieldBeginLength("success", thrift.STRING, 0)
-		l += bthrift.Binary.StringLengthNocopy(*p.Success)
-		l += bthrift.Binary.FieldEndLength()
+		l += thrift.Binary.FieldBeginLength()
+		l += thrift.Binary.StringLengthNocopy(*p.Success)
 	}
 	return l
 }
@@ -774,14 +625,8 @@ func (p *MockExceptionTestArgs) FastRead(buf []byte) (int, error) {
 	var l int
 	var fieldTypeId thrift.TType
 	var fieldId int16
-	_, l, err = bthrift.Binary.ReadStructBegin(buf)
-	offset += l
-	if err != nil {
-		goto ReadStructBeginError
-	}
-
 	for {
-		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
+		fieldTypeId, fieldId, l, err = thrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
 			goto ReadFieldBeginError
@@ -798,45 +643,28 @@ func (p *MockExceptionTestArgs) FastRead(buf []byte) (int, error) {
 					goto ReadFieldError
 				}
 			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
 				if err != nil {
 					goto SkipFieldError
 				}
 			}
 		default:
-			l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
 			if err != nil {
 				goto SkipFieldError
 			}
 		}
-
-		l, err = bthrift.Binary.ReadFieldEnd(buf[offset:])
-		offset += l
-		if err != nil {
-			goto ReadFieldEndError
-		}
-	}
-	l, err = bthrift.Binary.ReadStructEnd(buf[offset:])
-	offset += l
-	if err != nil {
-		goto ReadStructEndError
 	}
 
 	return offset, nil
-ReadStructBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
 ReadFieldBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MockExceptionTestArgs[fieldId]), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MockExceptionTestArgs[fieldId]), err)
 SkipFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
-ReadFieldEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
-ReadStructEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
 func (p *MockExceptionTestArgs) FastReadField1(buf []byte) (int, error) {
@@ -856,41 +684,35 @@ func (p *MockExceptionTestArgs) FastWrite(buf []byte) int {
 	return 0
 }
 
-func (p *MockExceptionTestArgs) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockExceptionTestArgs) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "ExceptionTest_args")
 	if p != nil {
-		offset += p.fastWriteField1(buf[offset:], binaryWriter)
+		offset += p.fastWriteField1(buf[offset:], w)
 	}
-	offset += bthrift.Binary.WriteFieldStop(buf[offset:])
-	offset += bthrift.Binary.WriteStructEnd(buf[offset:])
+	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
 }
 
 func (p *MockExceptionTestArgs) BLength() int {
 	l := 0
-	l += bthrift.Binary.StructBeginLength("ExceptionTest_args")
 	if p != nil {
 		l += p.field1Length()
 	}
-	l += bthrift.Binary.FieldStopLength()
-	l += bthrift.Binary.StructEndLength()
+	l += thrift.Binary.FieldStopLength()
 	return l
 }
 
-func (p *MockExceptionTestArgs) fastWriteField1(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockExceptionTestArgs) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "req", thrift.STRUCT, 1)
-	offset += p.Req.FastWriteNocopy(buf[offset:], binaryWriter)
-	offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+	offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRUCT, 1)
+	offset += p.Req.FastWriteNocopy(buf[offset:], w)
 	return offset
 }
 
 func (p *MockExceptionTestArgs) field1Length() int {
 	l := 0
-	l += bthrift.Binary.FieldBeginLength("req", thrift.STRUCT, 1)
+	l += thrift.Binary.FieldBeginLength()
 	l += p.Req.BLength()
-	l += bthrift.Binary.FieldEndLength()
 	return l
 }
 
@@ -900,14 +722,8 @@ func (p *MockExceptionTestResult) FastRead(buf []byte) (int, error) {
 	var l int
 	var fieldTypeId thrift.TType
 	var fieldId int16
-	_, l, err = bthrift.Binary.ReadStructBegin(buf)
-	offset += l
-	if err != nil {
-		goto ReadStructBeginError
-	}
-
 	for {
-		_, fieldTypeId, fieldId, l, err = bthrift.Binary.ReadFieldBegin(buf[offset:])
+		fieldTypeId, fieldId, l, err = thrift.Binary.ReadFieldBegin(buf[offset:])
 		offset += l
 		if err != nil {
 			goto ReadFieldBeginError
@@ -924,7 +740,7 @@ func (p *MockExceptionTestResult) FastRead(buf []byte) (int, error) {
 					goto ReadFieldError
 				}
 			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
 				if err != nil {
 					goto SkipFieldError
@@ -938,57 +754,39 @@ func (p *MockExceptionTestResult) FastRead(buf []byte) (int, error) {
 					goto ReadFieldError
 				}
 			} else {
-				l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 				offset += l
 				if err != nil {
 					goto SkipFieldError
 				}
 			}
 		default:
-			l, err = bthrift.Binary.Skip(buf[offset:], fieldTypeId)
+			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
 			if err != nil {
 				goto SkipFieldError
 			}
 		}
-
-		l, err = bthrift.Binary.ReadFieldEnd(buf[offset:])
-		offset += l
-		if err != nil {
-			goto ReadFieldEndError
-		}
-	}
-	l, err = bthrift.Binary.ReadStructEnd(buf[offset:])
-	offset += l
-	if err != nil {
-		goto ReadStructEndError
 	}
 
 	return offset, nil
-ReadStructBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
 ReadFieldBeginError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MockExceptionTestResult[fieldId]), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_MockExceptionTestResult[fieldId]), err)
 SkipFieldError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
-ReadFieldEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
-ReadStructEndError:
-	return offset, bthrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	return offset, thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
 func (p *MockExceptionTestResult) FastReadField0(buf []byte) (int, error) {
 	offset := 0
 
 	var _field *string
-	if v, l, err := bthrift.Binary.ReadString(buf[offset:]); err != nil {
+	if v, l, err := thrift.Binary.ReadString(buf[offset:]); err != nil {
 		return offset, err
 	} else {
 		offset += l
 		_field = &v
-
 	}
 	p.Success = _field
 	return offset, nil
@@ -1011,46 +809,40 @@ func (p *MockExceptionTestResult) FastWrite(buf []byte) int {
 	return 0
 }
 
-func (p *MockExceptionTestResult) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockExceptionTestResult) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
-	offset += bthrift.Binary.WriteStructBegin(buf[offset:], "ExceptionTest_result")
 	if p != nil {
-		offset += p.fastWriteField0(buf[offset:], binaryWriter)
-		offset += p.fastWriteField1(buf[offset:], binaryWriter)
+		offset += p.fastWriteField0(buf[offset:], w)
+		offset += p.fastWriteField1(buf[offset:], w)
 	}
-	offset += bthrift.Binary.WriteFieldStop(buf[offset:])
-	offset += bthrift.Binary.WriteStructEnd(buf[offset:])
+	offset += thrift.Binary.WriteFieldStop(buf[offset:])
 	return offset
 }
 
 func (p *MockExceptionTestResult) BLength() int {
 	l := 0
-	l += bthrift.Binary.StructBeginLength("ExceptionTest_result")
 	if p != nil {
 		l += p.field0Length()
 		l += p.field1Length()
 	}
-	l += bthrift.Binary.FieldStopLength()
-	l += bthrift.Binary.StructEndLength()
+	l += thrift.Binary.FieldStopLength()
 	return l
 }
 
-func (p *MockExceptionTestResult) fastWriteField0(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockExceptionTestResult) fastWriteField0(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p.IsSetSuccess() {
-		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "success", thrift.STRING, 0)
-		offset += bthrift.Binary.WriteStringNocopy(buf[offset:], binaryWriter, *p.Success)
-		offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRING, 0)
+		offset += thrift.Binary.WriteStringNocopy(buf[offset:], w, *p.Success)
 	}
 	return offset
 }
 
-func (p *MockExceptionTestResult) fastWriteField1(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *MockExceptionTestResult) fastWriteField1(buf []byte, w thrift.NocopyWriter) int {
 	offset := 0
 	if p.IsSetErr() {
-		offset += bthrift.Binary.WriteFieldBegin(buf[offset:], "err", thrift.STRUCT, 1)
-		offset += p.Err.FastWriteNocopy(buf[offset:], binaryWriter)
-		offset += bthrift.Binary.WriteFieldEnd(buf[offset:])
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.STRUCT, 1)
+		offset += p.Err.FastWriteNocopy(buf[offset:], w)
 	}
 	return offset
 }
@@ -1058,9 +850,8 @@ func (p *MockExceptionTestResult) fastWriteField1(buf []byte, binaryWriter bthri
 func (p *MockExceptionTestResult) field0Length() int {
 	l := 0
 	if p.IsSetSuccess() {
-		l += bthrift.Binary.FieldBeginLength("success", thrift.STRING, 0)
-		l += bthrift.Binary.StringLengthNocopy(*p.Success)
-		l += bthrift.Binary.FieldEndLength()
+		l += thrift.Binary.FieldBeginLength()
+		l += thrift.Binary.StringLengthNocopy(*p.Success)
 	}
 	return l
 }
@@ -1068,9 +859,8 @@ func (p *MockExceptionTestResult) field0Length() int {
 func (p *MockExceptionTestResult) field1Length() int {
 	l := 0
 	if p.IsSetErr() {
-		l += bthrift.Binary.FieldBeginLength("err", thrift.STRUCT, 1)
+		l += thrift.Binary.FieldBeginLength()
 		l += p.Err.BLength()
-		l += bthrift.Binary.FieldEndLength()
 	}
 	return l
 }
