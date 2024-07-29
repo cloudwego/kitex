@@ -80,7 +80,7 @@ func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.O
 }
 
 // originalWrite ...
-func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out io.Writer, msg interface{}, requestBase *base.Base) error {
+func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, msg interface{}, requestBase *base.Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	if req.Body == nil && len(req.RawBody) != 0 {
 		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {
@@ -94,11 +94,11 @@ func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out io.Writer, msg
 	if !fn.HasRequestBase {
 		requestBase = nil
 	}
-	binaryWriter := thrift.NewBinaryWriter()
-	if err = wrapStructWriter(ctx, req, binaryWriter, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64}); err != nil {
+
+	if err = wrapStructWriter(ctx, req, bw, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64}); err != nil {
 		return err
 	}
-	_, err = out.Write(binaryWriter.Bytes())
+	_, err = out.Write(bw.Bytes())
 	return err
 }
 

@@ -193,7 +193,7 @@ func encodeGenericThrift(out remote.ByteBuffer, ctx context.Context, method stri
 	if _, err := out.Write(binaryWriter.Bytes()); err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 	}
-	if err := msg.Write(ctx, method, out); err != nil {
+	if err := msg.Write(ctx, method, thrift.NewBinaryWriter(), out); err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 	}
 	return nil
@@ -291,11 +291,11 @@ func (c thriftCodec) Name() string {
 }
 
 type genericWriter interface { // used by pkg/generic
-	Write(ctx context.Context, method string, w io.Writer) error
+	Write(ctx context.Context, method string, w *thrift.BinaryWriter, out io.Writer) error
 }
 
 type genericReader interface { // used by pkg/generic
-	Read(ctx context.Context, method string, dataLen int, r io.Reader) error
+	Read(ctx context.Context, method string, dataLen int, in io.Reader) error
 }
 
 // ThriftMsgFastCodec ...
