@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"reflect"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"

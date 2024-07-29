@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"io"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
