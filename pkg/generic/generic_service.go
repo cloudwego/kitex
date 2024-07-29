@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/cloudwego/kitex/internal/generic/thrift"
 	gproto "github.com/cloudwego/kitex/pkg/generic/proto"
-	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 	codecProto "github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -107,7 +107,7 @@ type WithCodec interface {
 type Args struct {
 	Request interface{}
 	Method  string
-	base    *gthrift.Base
+	base    *thrift.Base
 	inner   interface{}
 }
 
@@ -124,7 +124,7 @@ func (g *Args) SetCodec(inner interface{}) {
 
 func (g *Args) GetOrSetBase() interface{} {
 	if g.base == nil {
-		g.base = gthrift.NewBase()
+		g.base = thrift.NewBase()
 	}
 	return g.base
 }
@@ -134,7 +134,7 @@ func (g *Args) Write(ctx context.Context, method string, out io.Writer) error {
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
-	if w, ok := g.inner.(gthrift.MessageWriter); ok {
+	if w, ok := g.inner.(thrift.MessageWriter); ok {
 		return w.Write(ctx, out, g.Request, method, true, g.base)
 	}
 	return fmt.Errorf("unexpected Args writer type: %T", g.inner)
@@ -155,7 +155,7 @@ func (g *Args) Read(ctx context.Context, method string, dataLen int, in io.Reade
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
-	if rw, ok := g.inner.(gthrift.MessageReader); ok {
+	if rw, ok := g.inner.(thrift.MessageReader); ok {
 		g.Method = method
 		var err error
 		g.Request, err = rw.Read(ctx, method, false, dataLen, in)
@@ -204,7 +204,7 @@ func (r *Result) Write(ctx context.Context, method string, out io.Writer) error 
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
-	if w, ok := r.inner.(gthrift.MessageWriter); ok {
+	if w, ok := r.inner.(thrift.MessageWriter); ok {
 		return w.Write(ctx, out, r.Success, method, false, nil)
 	}
 	return fmt.Errorf("unexpected Result writer type: %T", r.inner)
@@ -225,7 +225,7 @@ func (r *Result) Read(ctx context.Context, method string, dataLen int, in io.Rea
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
-	if w, ok := r.inner.(gthrift.MessageReader); ok {
+	if w, ok := r.inner.(thrift.MessageReader); ok {
 		var err error
 		r.Success, err = w.Read(ctx, method, true, dataLen, in)
 		return err

@@ -23,10 +23,10 @@ package generic
 
 import (
 	context "context"
+	thrift0 "github.com/cloudwego/kitex/internal/generic/thrift"
 	"io"
 	reflect "reflect"
 
-	thrift0 "github.com/cloudwego/kitex/pkg/generic/thrift"
 	gomock "github.com/golang/mock/gomock"
 )
 
