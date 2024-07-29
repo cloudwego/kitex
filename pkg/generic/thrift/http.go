@@ -59,8 +59,6 @@ var (
 	}.Froze()
 )
 
-const fBeginLen = 3
-
 // NewWriteHTTPRequest ...
 // Base64 decoding for binary is enabled by default.
 func NewWriteHTTPRequest(svc *descriptor.ServiceDescriptor) *WriteHTTPRequest {
@@ -156,7 +154,8 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient boo
 	if err != nil {
 		return nil, err
 	}
-	transBuf, err := buffer.ReadBinary(dataLen - fBeginLen)
+	bProt := &thrift.BinaryProtocol{}
+	transBuf, err := buffer.ReadBinary(dataLen - bProt.FieldBeginLength())
 	if err != nil {
 		return nil, err
 	}
