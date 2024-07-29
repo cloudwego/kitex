@@ -70,7 +70,7 @@ func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{
 
 	// msg is void or nil
 	if _, ok := msg.(descriptor.Void); ok || msg == nil {
-		return m.writeFields(ctx, out, dynamicgoTypeDsc, nil, nil, isClient)
+		return writeFields(ctx, out, dynamicgoTypeDsc, nil, nil, isClient)
 	}
 
 	// msg is string
@@ -80,12 +80,25 @@ func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{
 	}
 	transBuff := utils.StringToSliceByte(s)
 
-	return m.writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient)
+	//return writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient)
+	if isStreaming(m.svcDsc.Functions[method].StreamingMode) {
+		// unwrap one struct layer
+		dynamicgoTypeDsc = dynamicgoTypeDsc.Struct().FieldById(dthrift.FieldID(getStreamingFieldID(isClient, true))).Type()
+		return writeStreamingContentWithDynamicgo(ctx, out, dynamicgoTypeDsc, &cv, transBuff)
+	} else {
+		return writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient)
+		//if err := writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient); err != nil {
+		//	return err
+		//}
+		//bw.WriteFieldStop()
+		//_, err := out.Write(bw.Bytes())
+		//return err
+	}
 }
 
 type MsgType int
 
-func (m *WriteJSON) writeFields(ctx context.Context, out bufiox.Writer, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient bool) error {
+func writeFields(ctx context.Context, out bufiox.Writer, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient bool) error {
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
 	defer mcache.Free(dbuf)
 
@@ -123,4 +136,22 @@ func (m *WriteJSON) writeFields(ctx context.Context, out bufiox.Writer, dynamicg
 		}
 	}
 	return bw.WriteFieldStop()
+}
+
+func writeStreamingContentWithDynamicgo(ctx context.Context, out bufiox.Writer, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte) error {
+	dbuf := mcache.Malloc(len(transBuff))[0:0]
+	defer mcache.Free(dbuf)
+
+	if err := cv.DoInto(ctx, dynamicgoTypeDsc, transBuff, &dbuf); err != nil {
+		return err
+	}
+
+	bw := thrift.NewBufferWriter(out)
+	defer bw.Recycle()
+	for _, b := range dbuf {
+		if err := bw.WriteByte(int8(b)); err != nil {
+			return err
+		}
+	}
+	return nil
 }

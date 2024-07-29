@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/fastpb"
+	"github.com/cloudwego/gopkg/bufiox"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/cloudwego/kitex/internal/utils/safemcache"
@@ -100,7 +101,26 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
-		payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
+		switch msg := message.Data().(type) {
+		case genericWriter:
+			methodName := message.RPCInfo().Invocation().MethodName()
+			if methodName == "" {
+				return errors.New("empty methodName in grpc generic streaming Encode")
+			}
+			//bw := gpkgthrift.NewBinaryWriter()
+			var bs []byte
+			bw := bufiox.NewBytesWriter(&bs)
+			//w := gthrift.NewBufferWriter(bw)
+			if err = msg.Write(ctx, methodName, bw); err != nil {
+				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Write failed: %s", err.Error()))
+			}
+			payload = bw.Bytes()
+			if err = bw.Flush(); err != nil {
+				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Flush failed: %s", err.Error()))
+			}
+		default:
+			payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
+		}
 	case serviceinfo.Protobuf:
 		switch t := message.Data().(type) {
 		case fastpb.Writer:
@@ -187,6 +207,13 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	data := message.Data()
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
+		if t, ok := data.(genericReader); ok {
+			methodName := message.RPCInfo().Invocation().MethodName()
+			if methodName == "" {
+				return errors.New("empty methodName in grpc Decode")
+			}
+			return t.Read(ctx, methodName, len(d), remote.NewReaderBuffer(d))
+		}
 		return thrift.UnmarshalThriftData(ctx, c.ThriftCodec, "", d, message.Data())
 	case serviceinfo.Protobuf:
 		if t, ok := data.(fastpb.Reader); ok {
@@ -223,4 +250,12 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 
 func (c *grpcCodec) Name() string {
 	return "grpc"
+}
+
+type genericWriter interface { // used by pkg/generic
+	Write(ctx context.Context, method string, w bufiox.Writer) error
+}
+
+type genericReader interface { // used by pkg/generic
+	Read(ctx context.Context, method string, dataLen int, r bufiox.Reader) error
 }
