@@ -55,7 +55,7 @@ func NewWriteHTTPPbRequest(svc *descriptor.ServiceDescriptor, pbSvc *desc.Servic
 }
 
 // Write ...
-func (w *WriteHTTPPbRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+func (w *WriteHTTPPbRequest) Write(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	fn, err := w.svc.Router.Lookup(req)
 	if err != nil {
@@ -77,11 +77,10 @@ func (w *WriteHTTPPbRequest) Write(ctx context.Context, out io.Writer, msg inter
 	}
 	req.GeneralBody = pbMsg
 
-	binaryWriter := thrift.NewBinaryWriter()
-	if err = wrapStructWriter(ctx, req, binaryWriter, fn.Request, &writerOption{requestBase: requestBase}); err != nil {
+	if err = wrapStructWriter(ctx, req, bw, fn.Request, &writerOption{requestBase: requestBase}); err != nil {
 		return err
 	}
-	_, err = out.Write(binaryWriter.Bytes())
+	_, err = out.Write(bw.Bytes())
 	return err
 }
 

@@ -149,7 +149,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	}
 
 	// fallback to old thrift way (slow)
-	if err := encodeBasicThrift(out, ctx, methodName, msgType, seqID, data); err == nil || err != errEncodeMismatchMsgType {
+	if err := encodeBasicThrift(out, methodName, msgType, seqID, data); err == nil || err != errEncodeMismatchMsgType {
 		return err
 	}
 
@@ -193,14 +193,14 @@ func encodeGenericThrift(out remote.ByteBuffer, ctx context.Context, method stri
 	if _, err := out.Write(binaryWriter.Bytes()); err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 	}
-	if err := msg.Write(ctx, method, out); err != nil {
+	if err := msg.Write(ctx, method, thrift.NewBinaryWriter(), out); err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 	}
 	return nil
 }
 
 // encodeBasicThrift encode with the old athrift way (slow)
-func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}) error {
+func encodeBasicThrift(out remote.ByteBuffer, method string, msgType remote.MessageType, seqID int32, data interface{}) error {
 	if err := verifyMarshalBasicThriftDataType(data); err != nil {
 		return err
 	}
@@ -304,11 +304,11 @@ type MessageReader interface {
 }
 
 type genericWriter interface { // used by pkg/generic
-	Write(ctx context.Context, method string, w io.Writer) error
+	Write(ctx context.Context, method string, w *thrift.BinaryWriter, out io.Writer) error
 }
 
 type genericReader interface { // used by pkg/generic
-	Read(ctx context.Context, method string, dataLen int, r io.Reader) error
+	Read(ctx context.Context, method string, dataLen int, in io.Reader) error
 }
 
 // ThriftMsgFastCodec ...

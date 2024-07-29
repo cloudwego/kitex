@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	gbase "github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/golang/mock/gomock"
 
@@ -54,14 +55,14 @@ func TestGenericService(t *testing.T) {
 	test.Assert(t, base != nil)
 	a.SetCodec(struct{}{})
 	// write not ok
-	err := a.Write(ctx, method, buffer)
+	err := a.Write(ctx, method, thrift.NewBinaryWriter(), buffer)
 	test.Assert(t, err.Error() == "unexpected Args writer type: struct {}")
 
 	// Write expect
-	argWriteInner.EXPECT().Write(ctx, buffer, a.Request, a.GetOrSetBase()).Return(nil)
+	argWriteInner.EXPECT().Write(ctx, buffer, thrift.NewBinaryWriter(), a.Request, a.GetOrSetBase()).Return(nil)
 	a.SetCodec(argWriteInner)
 	// write ok
-	err = a.Write(ctx, method, buffer)
+	err = a.Write(ctx, method, thrift.NewBinaryWriter(), buffer)
 	test.Assert(t, err == nil, err)
 	// read not ok
 	err = a.Read(ctx, method, 0, buffer)
@@ -77,13 +78,13 @@ func TestGenericService(t *testing.T) {
 	test.Assert(t, ok == true)
 
 	// write not ok
-	err = r.Write(ctx, method, buffer)
+	err = r.Write(ctx, method, thrift.NewBinaryWriter(), buffer)
 	test.Assert(t, err.Error() == "unexpected Result writer type: <nil>")
 	// Write expect
-	resultWriteInner.EXPECT().Write(ctx, buffer, r.Success, (*gbase.Base)(nil)).Return(nil).AnyTimes()
+	resultWriteInner.EXPECT().Write(ctx, buffer, thrift.NewBinaryWriter(), r.Success, (*gbase.Base)(nil)).Return(nil).AnyTimes()
 	r.SetCodec(resultWriteInner)
 	// write ok
-	err = r.Write(ctx, method, buffer)
+	err = r.Write(ctx, method, thrift.NewBinaryWriter(), buffer)
 	test.Assert(t, err == nil)
 	// read not ok
 	err = r.Read(ctx, method, 0, buffer)

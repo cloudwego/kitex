@@ -83,7 +83,7 @@ func (m *WriteJSON) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options)
 	m.dynamicgoEnabled = true
 }
 
-func (m *WriteJSON) originalWrite(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+func (m *WriteJSON) originalWrite(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	fnDsc, err := m.svcDsc.LookupFunctionByMethod(method)
 	if err != nil {
 		return fmt.Errorf("missing method: %s in service: %s", method, m.svcDsc.Name)
@@ -98,14 +98,12 @@ func (m *WriteJSON) originalWrite(ctx context.Context, out io.Writer, msg interf
 		requestBase = nil
 	}
 
-	binaryWriter := thrift.NewBinaryWriter()
-
 	// msg is void or nil
 	if _, ok := msg.(descriptor.Void); ok || msg == nil {
-		if err = wrapStructWriter(ctx, msg, binaryWriter, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}); err != nil {
+		if err = wrapStructWriter(ctx, msg, bw, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}); err != nil {
 			return err
 		}
-		_, err = out.Write(binaryWriter.Bytes())
+		_, err = out.Write(bw.Bytes())
 		return err
 	}
 
@@ -125,10 +123,10 @@ func (m *WriteJSON) originalWrite(ctx context.Context, out io.Writer, msg interf
 			Index: 0,
 		}
 	}
-	if err = wrapJSONWriter(ctx, &body, binaryWriter, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}); err != nil {
+	if err = wrapJSONWriter(ctx, &body, bw, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}); err != nil {
 		return err
 	}
-	_, err = out.Write(binaryWriter.Bytes())
+	_, err = out.Write(bw.Bytes())
 	return err
 }
 

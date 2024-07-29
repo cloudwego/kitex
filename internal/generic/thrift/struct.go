@@ -59,7 +59,7 @@ func (m *WriteStruct) SetBinaryWithBase64(enable bool) {
 }
 
 // Write ...
-func (m *WriteStruct) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+func (m *WriteStruct) Write(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	fnDsc, err := m.svcDsc.LookupFunctionByMethod(method)
 	if err != nil {
 		return err
@@ -73,11 +73,10 @@ func (m *WriteStruct) Write(ctx context.Context, out io.Writer, msg interface{},
 	if !hasRequestBase {
 		requestBase = nil
 	}
-	binaryWriter := thrift.NewBinaryWriter()
-	if err = wrapStructWriter(ctx, msg, binaryWriter, ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.binaryWithBase64}); err != nil {
+	if err = wrapStructWriter(ctx, msg, bw, ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.binaryWithBase64}); err != nil {
 		return err
 	}
-	_, err = out.Write(binaryWriter.Bytes())
+	_, err = out.Write(bw.Bytes())
 	return err
 }
 

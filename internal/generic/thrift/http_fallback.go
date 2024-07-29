@@ -23,10 +23,11 @@ import (
 	"context"
 	"io"
 
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 )
 
 // Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
-	return w.originalWrite(ctx, out, msg, requestBase)
+func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+	return w.originalWrite(ctx, out, bw, msg, requestBase)
 }

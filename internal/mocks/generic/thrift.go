@@ -27,6 +27,7 @@ import (
 	reflect "reflect"
 
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	gomock "github.com/golang/mock/gomock"
 )
@@ -93,15 +94,15 @@ func (m *MockMessageWriter) EXPECT() *MockMessageWriterMockRecorder {
 }
 
 // Write mocks base method.
-func (m *MockMessageWriter) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+func (m *MockMessageWriter) Write(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Write", ctx, out, msg, requestBase)
+	ret := m.ctrl.Call(m, "Write", ctx, out, bw, msg, requestBase)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Write indicates an expected call of Write.
-func (mr *MockMessageWriterMockRecorder) Write(ctx, out, msg, requestBase interface{}) *gomock.Call {
+func (mr *MockMessageWriterMockRecorder) Write(ctx, out, bw, msg, requestBase interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockMessageWriter)(nil).Write), ctx, out, msg, requestBase)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockMessageWriter)(nil).Write), ctx, out, bw, msg, requestBase)
 }
