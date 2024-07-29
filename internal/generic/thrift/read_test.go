@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/cloudwego/kitex/internal/generic/proto"
 	"reflect"
 	"testing"
 
@@ -28,6 +27,7 @@ import (
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/stretchr/testify/require"
 
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote"
 )

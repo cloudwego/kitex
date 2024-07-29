@@ -20,12 +20,12 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/cloudwego/kitex/internal/generic/proto"
 	"reflect"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/jhump/protoreflect/desc"
 
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
