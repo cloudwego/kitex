@@ -20,13 +20,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/cloudwego/kitex/internal/generic/proto"
 	"testing"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/tidwall/gjson"
 
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )

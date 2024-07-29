@@ -21,11 +21,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/cloudwego/kitex/internal/generic/proto"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/tidwall/gjson"
 
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
