@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/internal/generic/thrift"
-	gproto "github.com/cloudwego/kitex/pkg/generic/proto"
 	codecProto "github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -144,7 +144,7 @@ func (g *Args) WritePb(ctx context.Context, method string) (interface{}, error) 
 	if err, ok := g.inner.(error); ok {
 		return nil, err
 	}
-	if w, ok := g.inner.(gproto.MessageWriter); ok {
+	if w, ok := g.inner.(proto.MessageWriter); ok {
 		return w.Write(ctx, g.Request, method, true)
 	}
 	return nil, fmt.Errorf("unexpected Args writer type: %T", g.inner)
@@ -168,7 +168,7 @@ func (g *Args) ReadPb(ctx context.Context, method string, in []byte) error {
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
-	if w, ok := g.inner.(gproto.MessageReader); ok {
+	if w, ok := g.inner.(proto.MessageReader); ok {
 		g.Method = method
 		var err error
 		g.Request, err = w.Read(ctx, method, false, in)
@@ -214,7 +214,7 @@ func (r *Result) WritePb(ctx context.Context, method string) (interface{}, error
 	if err, ok := r.inner.(error); ok {
 		return nil, err
 	}
-	if w, ok := r.inner.(gproto.MessageWriter); ok {
+	if w, ok := r.inner.(proto.MessageWriter); ok {
 		return w.Write(ctx, r.Success, method, false)
 	}
 	return nil, fmt.Errorf("unexpected Result writer type: %T", r.inner)
@@ -237,7 +237,7 @@ func (r *Result) ReadPb(ctx context.Context, method string, in []byte) error {
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
-	if w, ok := r.inner.(gproto.MessageReader); ok {
+	if w, ok := r.inner.(proto.MessageReader); ok {
 		var err error
 		r.Success, err = w.Read(ctx, method, true, in)
 		return err

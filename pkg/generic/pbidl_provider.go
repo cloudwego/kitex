@@ -22,9 +22,8 @@ import (
 	"sync"
 
 	dproto "github.com/cloudwego/dynamicgo/proto"
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/jhump/protoreflect/desc/protoparse"
-
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 type PbContentProvider struct {
