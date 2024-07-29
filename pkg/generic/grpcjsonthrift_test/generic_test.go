@@ -201,7 +201,7 @@ func testServerStreaming(t *testing.T, ctx context.Context, cli genericclient.Cl
 	for {
 		resp, err := streamCli.Recv()
 		if err != nil {
-			test.Assert(t, err == io.EOF)
+			test.Assert(t, err == io.EOF, err)
 			fmt.Println("serverStreaming message receive done")
 			break
 		} else {
@@ -237,7 +237,7 @@ func testBidirectionalStreaming(t *testing.T, ctx context.Context, cli genericcl
 		for {
 			resp, err := streamCli.Recv()
 			if err != nil {
-				test.Assert(t, err == io.EOF)
+				test.Assert(t, err == io.EOF, err)
 				fmt.Println("bidirectionalStreaming message receive done")
 				break
 			} else {
@@ -254,7 +254,7 @@ func testBidirectionalStreaming(t *testing.T, ctx context.Context, cli genericcl
 
 func testUnary(t *testing.T, ctx context.Context, cli genericclient.Client) {
 	resp, err := cli.GenericCall(ctx, "EchoUnary", `{"message": "unary request"}`)
-	test.Assert(t, err == nil)
+	test.Assert(t, err == nil, err)
 	strResp, ok := resp.(string)
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(strResp, "message").String(), "hello unary request"))
