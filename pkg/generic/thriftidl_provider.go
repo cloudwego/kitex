@@ -19,7 +19,6 @@ package generic
 import (
 	"context"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"path/filepath"
 	"sync"
 
@@ -28,6 +27,7 @@ import (
 	"github.com/cloudwego/thriftgo/parser"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 
