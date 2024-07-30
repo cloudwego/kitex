@@ -296,7 +296,7 @@ func newMockConnOption() remote.ConnOption {
 
 func newMockServerOption() *remote.ServerOption {
 	return &remote.ServerOption{
-		SvcSearchMap:          nil,
+		SvcSearcher:           nil,
 		TransServerFactory:    nil,
 		SvrHandlerFactory:     nil,
 		Codec:                 nil,

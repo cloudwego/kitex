@@ -35,6 +35,16 @@ const (
 	GenericService = "$GenericService" // private as "$"
 	// GenericMethod name
 	GenericMethod = "$GenericCall"
+	// CombineService name
+	CombineService = "CombineService"
+	// CombineService_ is used when idl has a service named "CombineService"
+	CombineService_ = "CombineService_"
+	// GenericClientStreamingMethod name
+	GenericClientStreamingMethod = "$GenericClientStreamingMethod"
+	// GenericServerStreamingMethod name
+	GenericServerStreamingMethod = "$GenericServerStreamingMethod"
+	// GenericBidirectionalStreamingMethod name
+	GenericBidirectionalStreamingMethod = "$GenericBidirectionalStreamingMethod"
 )
 
 // ServiceInfo to record meta info of service
@@ -83,10 +93,11 @@ func (i *ServiceInfo) MethodInfo(name string) MethodInfo {
 	if i == nil {
 		return nil
 	}
-	if i.ServiceName == GenericService {
+	if _, ok := i.Extra["generic"]; ok {
 		if i.GenericMethod != nil {
 			return i.GenericMethod(name)
 		}
+		// TODO: modify when server side supports grpc generic
 		return i.Methods[GenericMethod]
 	}
 	return i.Methods[name]

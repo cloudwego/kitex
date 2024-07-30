@@ -19,13 +19,12 @@ package test
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
 	"time"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/genericclient"
@@ -35,7 +34,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/transmeta"
-	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
 	"github.com/cloudwego/kitex/transport"
@@ -100,11 +98,10 @@ type GenericServiceMockImpl struct{}
 
 // GenericCall ...
 func (g *GenericServiceMockImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
-	rc := utils.NewThriftMessageCodec()
 	buf := request.([]byte)
 
 	var args2 kt.MockTestArgs
-	mth, seqID, err := rc.Decode(buf, &args2)
+	mth, seqID, err := thrift.UnmarshalFastMsg(buf, &args2)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +114,7 @@ func (g *GenericServiceMockImpl) GenericCall(ctx context.Context, method string,
 	result := kt.NewMockTestResult()
 	result.Success = &resp
 
-	buf, err = rc.Encode(mth, thrift.REPLY, seqID, result)
+	buf, err = thrift.MarshalFastMsg(mth, thrift.REPLY, seqID, result)
 	return buf, err
 }
 
@@ -192,16 +189,11 @@ func (m *MockImpl) ExceptionTest(ctx context.Context, req *kt.MockReq) (r string
 }
 
 func genBinaryResp(method string) []byte {
-	idx := 0
-	buf := make([]byte, 12+len(method)+len(respMsg))
-	binary.BigEndian.PutUint32(buf, thrift.VERSION_1)
-	idx += 4
-	binary.BigEndian.PutUint32(buf[idx:idx+4], uint32(len(method)))
-	idx += 4
-	copy(buf[idx:idx+len(method)], method)
-	idx += len(method)
-	binary.BigEndian.PutUint32(buf[idx:idx+4], 100)
-	idx += 4
-	copy(buf[idx:idx+len(respMsg)], respMsg)
-	return buf
+	// no idea for respMsg part, it's not binary protocol.
+	// DO NOT TOUCH IT or you may need to change the tests as well
+	n := thrift.Binary.MessageBeginLength(method, 0, 0) + len(respMsg)
+	b := make([]byte, 0, n)
+	b = thrift.Binary.AppendMessageBegin(b, method, 0, 100)
+	b = append(b, respMsg...)
+	return b
 }

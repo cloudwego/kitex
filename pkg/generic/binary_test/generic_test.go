@@ -18,7 +18,6 @@ package test
 
 import (
 	"context"
-	"encoding/binary"
 	"net"
 	"runtime"
 	"runtime/debug"
@@ -26,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
@@ -35,7 +34,6 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/server"
 )
 
@@ -112,8 +110,7 @@ func rawThriftBinaryMockReq(t *testing.T) {
 	args.Req = req
 
 	// encode
-	rc := utils.NewThriftMessageCodec()
-	buf, err := rc.Encode("Test", thrift.CALL, 100, args)
+	buf, err := thrift.MarshalFastMsg("Test", thrift.CALL, 100, args)
 	test.Assert(t, err == nil, err)
 
 	resp, err := cli.GenericCall(context.Background(), "Test", buf)
@@ -122,7 +119,7 @@ func rawThriftBinaryMockReq(t *testing.T) {
 	// decode
 	buf = resp.([]byte)
 	var result kt.MockTestResult
-	method, seqID, err := rc.Decode(buf, &result)
+	method, seqID, err := thrift.UnmarshalFastMsg(buf, &result)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, method == "Test", method)
 	test.Assert(t, seqID != 100, seqID)
@@ -149,8 +146,7 @@ func rawThriftBinary2NormalServer(t *testing.T) {
 	args.Req = req
 
 	// encode
-	rc := utils.NewThriftMessageCodec()
-	buf, err := rc.Encode("Test", thrift.CALL, 100, args)
+	buf, err := thrift.MarshalFastMsg("Test", thrift.CALL, 100, args)
 	test.Assert(t, err == nil, err)
 
 	resp, err := cli.GenericCall(context.Background(), "Test", buf, callopt.WithRPCTimeout(100*time.Second))
@@ -159,7 +155,7 @@ func rawThriftBinary2NormalServer(t *testing.T) {
 	// decode
 	buf = resp.([]byte)
 	var result kt.MockTestResult
-	method, seqID, err := rc.Decode(buf, &result)
+	method, seqID, err := thrift.UnmarshalFastMsg(buf, &result)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, method == "Test", method)
 	// seqID会在kitex中覆盖，避免TTHeader和Payload codec 不一致问题
@@ -187,18 +183,13 @@ func initMockServer(handler kt.Mock) server.Server {
 }
 
 func genBinaryReqBuf(method string) []byte {
-	idx := 0
-	buf := make([]byte, 12+len(method)+len(reqMsg))
-	binary.BigEndian.PutUint32(buf, thrift.VERSION_1)
-	idx += 4
-	binary.BigEndian.PutUint32(buf[idx:idx+4], uint32(len(method)))
-	idx += 4
-	copy(buf[idx:idx+len(method)], method)
-	idx += len(method)
-	binary.BigEndian.PutUint32(buf[idx:idx+4], 100)
-	idx += 4
-	copy(buf[idx:idx+len(reqMsg)], reqMsg)
-	return buf
+	// no idea for reqMsg part, it's not binary protocol.
+	// DO NOT TOUCH IT or you may need to change the tests as well
+	n := thrift.Binary.MessageBeginLength(method, 0, 0) + len(reqMsg)
+	b := make([]byte, 0, n)
+	b = thrift.Binary.AppendMessageBegin(b, method, 0, 100)
+	b = append(b, reqMsg...)
+	return b
 }
 
 func TestBinaryThriftGenericClientClose(t *testing.T) {

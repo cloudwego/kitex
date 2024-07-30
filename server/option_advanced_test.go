@@ -245,7 +245,8 @@ func TestWithSupportedTransportsFunc(t *testing.T) {
 		svcInfo := mocks.ServiceInfo()
 		svr.RegisterService(svcInfo, new(mockImpl))
 		svr.(*server).fillMoreServiceInfo(nil)
-		test.Assert(t, reflect.DeepEqual(svr.GetServiceInfos()[remote.BuildMultiServiceKey(svcInfo.ServiceName, mocks.MockMethod)].Extra["transports"], tcase.wantTransports))
+		svcInfo = svr.(*server).svcs.SearchService(svcInfo.ServiceName, mocks.MockMethod, false)
+		test.Assert(t, reflect.DeepEqual(svcInfo.Extra["transports"], tcase.wantTransports))
 	}
 }
 
