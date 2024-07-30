@@ -83,13 +83,27 @@ var prefaceReadAtMost = func() int {
 	return grpcTransport.ClientPrefaceLen
 }()
 
+type PeekReader interface {
+	Peek(size int) ([]byte, error)
+}
+
 func (t *svrTransHandler) ProtocolMatch(ctx context.Context, conn net.Conn) (err error) {
 	// Check the validity of client preface.
-	npReader := conn.(interface{ Reader() netpoll.Reader }).Reader()
-	// read at most avoid block
-	preface, err := npReader.Peek(prefaceReadAtMost)
-	if err != nil {
-		return err
+	var preface []byte
+	if withReader, ok := conn.(interface{ Reader() netpoll.Reader }); ok {
+		npReader := withReader.Reader()
+		// read at most avoid block
+		preface, err = npReader.Peek(prefaceReadAtMost)
+		if err != nil {
+			return err
+		}
+	} else if peekReader, ok := conn.(PeekReader); ok {
+		preface, err = peekReader.Peek(prefaceReadAtMost)
+		if err != nil {
+			return err
+		}
+	} else {
+		return errors.New("read protocol info failed")
 	}
 	if bytes.Equal(preface[:prefaceReadAtMost], grpcTransport.ClientPreface[:prefaceReadAtMost]) {
 		return nil
