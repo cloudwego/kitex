@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -79,7 +80,7 @@ func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.O
 }
 
 // originalWrite ...
-func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out io.Writer, msg interface{}, requestBase *Base) error {
+func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out io.Writer, msg interface{}, requestBase *base.Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	if req.Body == nil && len(req.RawBody) != 0 {
 		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {

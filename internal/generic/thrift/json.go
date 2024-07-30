@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/tidwall/gjson"
 
@@ -82,7 +83,7 @@ func (m *WriteJSON) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options)
 	m.dynamicgoEnabled = true
 }
 
-func (m *WriteJSON) originalWrite(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *Base) error {
+func (m *WriteJSON) originalWrite(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	fnDsc, err := m.svcDsc.LookupFunctionByMethod(method)
 	if err != nil {
 		return fmt.Errorf("missing method: %s in service: %s", method, m.svcDsc.Name)

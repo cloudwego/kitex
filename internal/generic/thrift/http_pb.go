@@ -23,6 +23,7 @@ import (
 	"io"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 
@@ -54,7 +55,7 @@ func NewWriteHTTPPbRequest(svc *descriptor.ServiceDescriptor, pbSvc *desc.Servic
 }
 
 // Write ...
-func (w *WriteHTTPPbRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *Base) error {
+func (w *WriteHTTPPbRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	fn, err := w.svc.Router.Lookup(req)
 	if err != nil {

@@ -28,14 +28,15 @@ import (
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
-	"github.com/cloudwego/dynamicgo/thrift/base"
+	dbase "github.com/cloudwego/dynamicgo/thrift/base"
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
 // Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *Base) error {
+func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	// fallback logic
 	if !w.dynamicgoEnabled {
 		return w.originalWrite(ctx, out, msg, requestBase)
@@ -55,7 +56,7 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interfa
 		requestBase = nil
 	}
 	if requestBase != nil {
-		base := (*base.Base)(unsafe.Pointer(requestBase))
+		base := (*dbase.Base)(unsafe.Pointer(requestBase))
 		ctx = context.WithValue(ctx, conv.CtxKeyThriftReqBase, base)
 		cv = j2t.NewBinaryConv(w.convOptsWithThriftBase)
 	} else {

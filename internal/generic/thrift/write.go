@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/internal/generic/proto"
@@ -31,7 +32,7 @@ import (
 )
 
 type writerOption struct {
-	requestBase *Base // request base from metahandler
+	requestBase *base.Base // request base from metahandler
 	// decoding Base64 to binary
 	binaryWithBase64 bool
 }
@@ -698,9 +699,11 @@ func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BinaryWr
 		}
 	}
 	out.WriteFieldBegin(field.Type.Type.ToThriftTType(), int16(field.ID))
-	// TODO(marina.sakai): repalce base with gopkg's base and remove base.go
-	if err := opt.requestBase.Write(out); err != nil {
-		return err
+	sz := opt.requestBase.BLength()
+	buf := make([]byte, sz)
+	opt.requestBase.FastWrite(buf)
+	for _, b := range buf {
+		out.WriteByte(int8(b))
 	}
 	return nil
 }

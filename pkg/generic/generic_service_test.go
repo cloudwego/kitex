@@ -22,9 +22,9 @@ import (
 	"strings"
 	"testing"
 
+	gbase "github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/golang/mock/gomock"
 
-	"github.com/cloudwego/kitex/internal/generic/thrift"
 	mocks "github.com/cloudwego/kitex/internal/mocks/generic"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -80,7 +80,7 @@ func TestGenericService(t *testing.T) {
 	err = r.Write(ctx, method, buffer)
 	test.Assert(t, err.Error() == "unexpected Result writer type: <nil>")
 	// Write expect
-	resultWriteInner.EXPECT().Write(ctx, buffer, r.Success, (*thrift.Base)(nil)).Return(nil).AnyTimes()
+	resultWriteInner.EXPECT().Write(ctx, buffer, r.Success, (*gbase.Base)(nil)).Return(nil).AnyTimes()
 	r.SetCodec(resultWriteInner)
 	// write ok
 	err = r.Write(ctx, method, buffer)

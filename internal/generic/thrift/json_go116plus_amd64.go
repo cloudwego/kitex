@@ -29,8 +29,9 @@ import (
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
-	"github.com/cloudwego/dynamicgo/thrift/base"
+	dbase "github.com/cloudwego/dynamicgo/thrift/base"
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -38,7 +39,7 @@ import (
 )
 
 // Write write json string to out thrift.TProtocol
-func (m *WriteJSON) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *Base) error {
+func (m *WriteJSON) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	// fallback logic
 	if !m.dynamicgoEnabled {
 		return m.originalWrite(ctx, out, msg, method, isClient, requestBase)
@@ -60,7 +61,7 @@ func (m *WriteJSON) Write(ctx context.Context, out io.Writer, msg interface{}, m
 		requestBase = nil
 	}
 	if requestBase != nil {
-		base := (*base.Base)(unsafe.Pointer(requestBase))
+		base := (*dbase.Base)(unsafe.Pointer(requestBase))
 		ctx = context.WithValue(ctx, conv.CtxKeyThriftReqBase, base)
 		cv = j2t.NewBinaryConv(m.convOptsWithThriftBase)
 	} else {
