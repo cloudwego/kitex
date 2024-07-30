@@ -131,6 +131,7 @@ func (a *Arguments) TemplateArgs(version, curpath string) error {
 		},
 	}
 	initCmd.Flags().StringVarP(&a.InitOutputDir, "output", "o", ".", "Specify template init path (default current directory)")
+	initCmd.Flags().StringVarP(&a.InitType, "type", "t", "", "Specify template init type")
 	renderCmd.Flags().StringVarP(&a.ModuleName, "module", "m", "",
 		"Specify the Go module name to generate go.mod.")
 	renderCmd.Flags().StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")

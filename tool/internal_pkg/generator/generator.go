@@ -136,6 +136,7 @@ type Config struct {
 
 	// subcommand template
 	InitOutputDir string
+	InitType      string
 	RenderTplDir  string
 	TemplateFile  string
 
