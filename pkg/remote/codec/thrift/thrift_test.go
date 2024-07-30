@@ -19,7 +19,6 @@ package thrift
 import (
 	"context"
 	"errors"
-	"github.com/cloudwego/gopkg/protocol/thrift"
 	"io"
 	"testing"
 
