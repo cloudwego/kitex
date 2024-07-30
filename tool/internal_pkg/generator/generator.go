@@ -140,6 +140,7 @@ type Config struct {
 	HandlerReturnKeepResp bool
 
 	NoDependencyCheck bool
+	Rapid             bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.

@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"github.com/cloudwego/kitex/tool/cmd/kitex/sdk"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -79,8 +80,11 @@ func main() {
 	// run as kitex
 	err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])
 	if err != nil {
-		log.Warn(err.Error())
-		os.Exit(2)
+		if err.Error() != "flag: help requested" {
+			log.Warn(err.Error())
+			os.Exit(2)
+		}
+		os.Exit(0)
 	}
 	if !args.NoDependencyCheck {
 		// check dependency compatibility between kitex cmd tool and dependency in go.mod
@@ -95,12 +99,20 @@ func main() {
 		log.Warn(err)
 		os.Exit(1)
 	}
-	err = kargs.ValidateCMD(cmd.Path, args.IDLType)
-	if err != nil {
-		log.Warn(err)
-		os.Exit(1)
+
+	if args.IDLType == "thrift" && args.Rapid {
+		// 「Thrift」场景，代替进程调用，如果用到了其他插件，这些插件还是走进程调用（因为先不在 Kitex 里固定写死插件版本）
+		// 相比进程唤起，少了 thriftgo bin 检查，因为不需要了
+		err = sdk.InvokeThriftgoBySDK(curpath, cmd)
+	} else {
+		err = kargs.ValidateCMD(cmd.Path, args.IDLType)
+		if err != nil {
+			log.Warn(err)
+			os.Exit(1)
+		}
+		err = cmd.Run()
 	}
-	err = cmd.Run()
+
 	if err != nil {
 		if args.Use != "" {
 			out := strings.TrimSpace(out.String())
@@ -108,6 +120,7 @@ func main() {
 				goto NormalExit
 			}
 		}
+		log.Warn(err)
 		os.Exit(1)
 	}
 NormalExit:
