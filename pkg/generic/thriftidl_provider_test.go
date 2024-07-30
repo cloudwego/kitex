@@ -17,13 +17,13 @@
 package generic
 
 import (
-	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"strings"
 	"testing"
 
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
 func TestAbsPath(t *testing.T) {
