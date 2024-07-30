@@ -293,7 +293,7 @@ func (c *Config) ApplyExtension() error {
 	return nil
 }
 
-func (c *Config) IsMultipleServicesTpl() bool {
+func (c *Config) IsUsingMultipleServicesTpl() bool {
 	return c.Tpl == MultipleServicesTpl
 }
 
@@ -346,7 +346,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		},
 	}
 	if !g.Config.GenerateInvoker {
-		if !g.Config.IsMultipleServicesTpl() {
+		if !g.Config.IsUsingMultipleServicesTpl() {
 			tasks = append(tasks, &Task{
 				Name: MainFileName,
 				Path: util.JoinPath(g.OutputPath, MainFileName),
@@ -377,7 +377,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		fs = append(fs, f)
 	}
 
-	if !g.Config.IsMultipleServicesTpl() {
+	if !g.Config.IsUsingMultipleServicesTpl() {
 		f, err := g.generateHandler(pkg, pkg.ServiceInfo, HandlerFileName)
 		if err != nil {
 			return nil, err
@@ -605,7 +605,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 	case MainFileName:
 		pkg.AddImport("log", "log")
-		if !g.Config.IsMultipleServicesTpl() {
+		if !g.Config.IsUsingMultipleServicesTpl() {
 			pkg.AddImport(pkg.PkgRefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
 		} else {
 			pkg.AddImport("server", "github.com/cloudwego/kitex/server")
