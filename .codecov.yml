@@ -1,4 +1,0 @@
-ignore:
-  - "images/.*"
-  - "tool"
-  - "internal/mocks"

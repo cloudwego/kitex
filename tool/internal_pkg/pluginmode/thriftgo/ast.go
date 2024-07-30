@@ -43,16 +43,15 @@ func ZeroWriter(t *parser.Type, oprot, buf, offset string) string {
 		return offsetTPL(oprot+".WriteBinary("+buf+", []byte{})", offset)
 	case parser.Category_Map:
 		return offsetTPL(oprot+".WriteMapBegin("+buf+", thrift."+golang.GetTypeIDConstant(t.GetKeyType())+
-			",thrift."+golang.GetTypeIDConstant(t.GetValueType())+",0)", offset) + offsetTPL(oprot+".WriteMapEnd("+buf+")", offset)
+			",thrift."+golang.GetTypeIDConstant(t.GetValueType())+",0)", offset)
 	case parser.Category_List:
 		return offsetTPL(oprot+".WriteListBegin("+buf+", thrift."+golang.GetTypeIDConstant(t.GetValueType())+
-			",0)", offset) + offsetTPL(oprot+".WriteListEnd("+buf+")", offset)
+			",0)", offset)
 	case parser.Category_Set:
 		return offsetTPL(oprot+".WriteSetBegin("+buf+", thrift."+golang.GetTypeIDConstant(t.GetValueType())+
-			",0)", offset) + offsetTPL(oprot+".WriteSetEnd("+buf+")", offset)
+			",0)", offset)
 	case parser.Category_Struct:
-		return offsetTPL(oprot+".WriteStructBegin("+buf+", \"\")", offset) + offsetTPL(oprot+".WriteFieldStop("+buf+")", offset) +
-			offsetTPL(oprot+".WriteStructEnd("+buf+")", offset)
+		return offsetTPL(oprot+".WriteFieldStop("+buf+")", offset)
 	default:
 		panic("unsupported type zero writer for" + t.Name)
 	}
@@ -61,33 +60,29 @@ func ZeroWriter(t *parser.Type, oprot, buf, offset string) string {
 func ZeroBLength(t *parser.Type, oprot, offset string) string {
 	switch t.GetCategory() {
 	case parser.Category_Bool:
-		return offsetTPL(oprot+".BoolLength(false)", offset)
+		return offsetTPL(oprot+".BoolLength()", offset)
 	case parser.Category_Byte:
-		return offsetTPL(oprot+".ByteLength(0)", offset)
+		return offsetTPL(oprot+".ByteLength()", offset)
 	case parser.Category_I16:
-		return offsetTPL(oprot+".I16Length(0)", offset)
+		return offsetTPL(oprot+".I16Length()", offset)
 	case parser.Category_Enum, parser.Category_I32:
-		return offsetTPL(oprot+".I32Length(0)", offset)
+		return offsetTPL(oprot+".I32Length()", offset)
 	case parser.Category_I64:
-		return offsetTPL(oprot+".I64Length(0)", offset)
+		return offsetTPL(oprot+".I64Length()", offset)
 	case parser.Category_Double:
-		return offsetTPL(oprot+".DoubleLength(0)", offset)
+		return offsetTPL(oprot+".DoubleLength()", offset)
 	case parser.Category_String:
 		return offsetTPL(oprot+".StringLength(\"\")", offset)
 	case parser.Category_Binary:
-		return offsetTPL(oprot+".BinaryLength([]byte{})", offset)
+		return offsetTPL(oprot+".BinaryLength(nil)", offset)
 	case parser.Category_Map:
-		return offsetTPL(oprot+".MapBeginLength(thrift."+golang.GetTypeIDConstant(t.GetKeyType())+
-			",thrift."+golang.GetTypeIDConstant(t.GetValueType())+", 0)", offset) + offsetTPL(oprot+".MapEndLength()", offset)
+		return offsetTPL(oprot+".MapBeginLength()", offset)
 	case parser.Category_List:
-		return offsetTPL(oprot+".ListBeginLength(thrift."+golang.GetTypeIDConstant(t.GetValueType())+
-			",0)", offset) + offsetTPL(oprot+".ListEndLength()", offset)
+		return offsetTPL(oprot+".ListBeginLength()", offset)
 	case parser.Category_Set:
-		return offsetTPL(oprot+".SetBeginLength(thrift."+golang.GetTypeIDConstant(t.GetValueType())+
-			",0)", offset) + offsetTPL(oprot+".SetEndLength()", offset)
+		return offsetTPL(oprot+".SetBeginLength()", offset)
 	case parser.Category_Struct:
-		return offsetTPL(oprot+".StructBeginLength(\"\")", offset) + offsetTPL(oprot+".FieldStopLength()", offset) +
-			offsetTPL(oprot+".StructEndLength()", offset)
+		return offsetTPL(oprot+".FieldStopLength()", offset)
 	default:
 		panic("unsupported type zero writer for" + t.Name)
 	}

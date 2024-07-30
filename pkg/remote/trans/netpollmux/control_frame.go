@@ -25,7 +25,8 @@ package netpollmux
 import (
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 type ControlFrame struct{}
@@ -36,8 +37,8 @@ func NewControlFrame() *ControlFrame {
 
 var fieldIDToName_ControlFrame = map[int16]string{}
 
-func (p *ControlFrame) Read(iprot thrift.TProtocol) (err error) {
-	var fieldTypeId thrift.TType
+func (p *ControlFrame) Read(iprot athrift.TProtocol) (err error) {
+	var fieldTypeId athrift.TType
 	var fieldId int16
 
 	if _, err = iprot.ReadStructBegin(); err != nil {
@@ -49,7 +50,7 @@ func (p *ControlFrame) Read(iprot thrift.TProtocol) (err error) {
 		if err != nil {
 			goto ReadFieldBeginError
 		}
-		if fieldTypeId == thrift.STOP {
+		if fieldTypeId == athrift.STOP {
 			break
 		}
 		if err = iprot.Skip(fieldTypeId); err != nil {
@@ -78,7 +79,7 @@ ReadStructEndError:
 	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
 }
 
-func (p *ControlFrame) Write(oprot thrift.TProtocol) (err error) {
+func (p *ControlFrame) Write(oprot athrift.TProtocol) (err error) {
 	if err = oprot.WriteStructBegin("ControlFrame"); err != nil {
 		goto WriteStructBeginError
 	}

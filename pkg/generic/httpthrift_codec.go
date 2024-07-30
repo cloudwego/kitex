@@ -19,7 +19,6 @@ package generic
 import (
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -34,10 +33,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var (
-	_ remote.PayloadCodec = &httpThriftCodec{}
-	_ Closer              = &httpThriftCodec{}
-)
+var _ Closer = &httpThriftCodec{}
 
 // HTTPRequest alias of descriptor HTTPRequest
 type HTTPRequest = descriptor.HTTPRequest
@@ -48,17 +44,17 @@ type HTTPResponse = descriptor.HTTPResponse
 type httpThriftCodec struct {
 	svcDsc                 atomic.Value // *idl
 	provider               DescriptorProvider
-	codec                  remote.PayloadCodec
 	binaryWithBase64       bool
 	convOpts               conv.Options // used for dynamicgo conversion
 	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
 	dynamicgoEnabled       bool
 	useRawBodyForHTTPResp  bool
+	svcName                string
 }
 
-func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *Options) (*httpThriftCodec, error) {
+func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
 	svc := <-p.Provide()
-	c := &httpThriftCodec{codec: codec, provider: p, binaryWithBase64: false, dynamicgoEnabled: false, useRawBodyForHTTPResp: opts.useRawBodyForHTTPResp}
+	c := &httpThriftCodec{provider: p, binaryWithBase64: false, dynamicgoEnabled: false, useRawBodyForHTTPResp: opts.useRawBodyForHTTPResp, svcName: svc.Name}
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoEnabled {
 		c.dynamicgoEnabled = true
 
@@ -70,7 +66,7 @@ func newHTTPThriftCodec(p DescriptorProvider, codec remote.PayloadCodec, opts *O
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
-	return c, nil
+	return c
 }
 
 func (c *httpThriftCodec) update() {
@@ -79,7 +75,34 @@ func (c *httpThriftCodec) update() {
 		if !ok {
 			return
 		}
+		c.svcName = svc.Name
 		c.svcDsc.Store(svc)
+	}
+}
+
+func (c *httpThriftCodec) getMessageReaderWriter() interface{} {
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	rw := thrift.NewHTTPReaderWriter(svcDsc)
+	c.configureHTTPRequestWriter(rw.WriteHTTPRequest)
+	c.configureHTTPResponseReader(rw.ReadHTTPResponse)
+	return rw
+}
+
+func (c *httpThriftCodec) configureHTTPRequestWriter(writer *thrift.WriteHTTPRequest) {
+	writer.SetBinaryWithBase64(c.binaryWithBase64)
+	if c.dynamicgoEnabled {
+		writer.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase)
+	}
+}
+
+func (c *httpThriftCodec) configureHTTPResponseReader(reader *thrift.ReadHTTPResponse) {
+	reader.SetBase64Binary(c.binaryWithBase64)
+	reader.SetUseRawBodyForHTTPResp(c.useRawBodyForHTTPResp)
+	if c.dynamicgoEnabled && c.useRawBodyForHTTPResp {
+		reader.SetDynamicGo(&c.convOptsWithThriftBase)
 	}
 }
 
@@ -96,45 +119,7 @@ func (c *httpThriftCodec) getMethod(req interface{}) (*Method, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Method{function.Name, function.Oneway}, nil
-}
-
-func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
-	}
-
-	inner := thrift.NewWriteHTTPRequest(svcDsc)
-	inner.SetBinaryWithBase64(c.binaryWithBase64)
-	if c.dynamicgoEnabled {
-		if err := inner.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase, msg.RPCInfo().Invocation().MethodName()); err != nil {
-			return err
-		}
-	}
-
-	msg.Data().(WithCodec).SetCodec(inner)
-	return c.codec.Marshal(ctx, msg, out)
-}
-
-func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
-	}
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
-	}
-
-	inner := thrift.NewReadHTTPResponse(svcDsc)
-	inner.SetBase64Binary(c.binaryWithBase64)
-	inner.SetUseRawBodyForHTTPResp(c.useRawBodyForHTTPResp)
-	if c.dynamicgoEnabled && c.useRawBodyForHTTPResp && msg.PayloadLen() != 0 {
-		inner.SetDynamicGo(&c.convOpts, msg)
-	}
-
-	msg.Data().(WithCodec).SetCodec(inner)
-	return c.codec.Unmarshal(ctx, msg, in)
+	return &Method{function.Name, function.Oneway, function.StreamingMode}, nil
 }
 
 func (c *httpThriftCodec) Name() string {
@@ -143,6 +128,44 @@ func (c *httpThriftCodec) Name() string {
 
 func (c *httpThriftCodec) Close() error {
 	return c.provider.Close()
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
+func (c *httpThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+
+	inner := thrift.NewWriteHTTPRequest(svcDsc)
+	inner.SetBinaryWithBase64(c.binaryWithBase64)
+	if c.dynamicgoEnabled {
+		inner.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase)
+	}
+
+	msg.Data().(WithCodec).SetCodec(inner)
+	return thriftCodec.Marshal(ctx, msg, out)
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
+func (c *httpThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
+		return err
+	}
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+
+	inner := thrift.NewReadHTTPResponse(svcDsc)
+	inner.SetBase64Binary(c.binaryWithBase64)
+	inner.SetUseRawBodyForHTTPResp(c.useRawBodyForHTTPResp)
+	if c.dynamicgoEnabled && c.useRawBodyForHTTPResp && msg.PayloadLen() != 0 {
+		inner.SetDynamicGo(&c.convOpts)
+	}
+
+	msg.Data().(WithCodec).SetCodec(inner)
+	return thriftCodec.Unmarshal(ctx, msg, in)
 }
 
 // FromHTTPRequest parse HTTPRequest from http.Request

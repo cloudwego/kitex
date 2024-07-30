@@ -59,19 +59,19 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 
 func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	return &svrTransHandler{
-		opt:          opt,
-		svcSearchMap: opt.SvcSearchMap,
-		codec:        grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec)),
+		opt:         opt,
+		svcSearcher: opt.SvcSearcher,
+		codec:       grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec)),
 	}, nil
 }
 
 var _ remote.ServerTransHandler = &svrTransHandler{}
 
 type svrTransHandler struct {
-	opt          *remote.ServerOption
-	svcSearchMap map[string]*serviceinfo.ServiceInfo
-	inkHdlFunc   endpoint.Endpoint
-	codec        remote.Codec
+	opt         *remote.ServerOption
+	svcSearcher remote.ServiceSearcher
+	inkHdlFunc  endpoint.Endpoint
+	codec       remote.Codec
 }
 
 var prefaceReadAtMost = func() int {
@@ -193,7 +193,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			// set send grpc compressor at server to encode reply pack
 			remote.SetSendCompressor(ri, s.SendCompress())
 
-			svcInfo := t.svcSearchMap[remote.BuildMultiServiceKey(serviceName, methodName)]
+			svcInfo := t.svcSearcher.SearchService(serviceName, methodName, true)
 			var methodInfo serviceinfo.MethodInfo
 			if svcInfo != nil {
 				methodInfo = svcInfo.MethodInfo(methodName)

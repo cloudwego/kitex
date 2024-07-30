@@ -166,7 +166,13 @@ func (r *rpcConfig) TransportProtocol() transport.Protocol {
 
 // SetTransportProtocol implements MutableRPCConfig interface.
 func (r *rpcConfig) SetTransportProtocol(tp transport.Protocol) error {
-	r.transportProtocol |= tp
+	// PurePayload would override all the bits set before
+	// since in previous implementation, r.transport |= transport.PurePayload would not take effect
+	if tp == transport.PurePayload {
+		r.transportProtocol = tp
+	} else {
+		r.transportProtocol |= tp
+	}
 	return nil
 }
 

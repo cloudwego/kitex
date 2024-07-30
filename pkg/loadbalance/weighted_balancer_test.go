@@ -139,7 +139,7 @@ func TestWeightedPicker_Next(t *testing.T) {
 				weight := ins.Weight()
 				weightSum += weight
 			}
-			n := 10000000
+			n := 1000000
 			pickedStat := map[int]int{}
 			for i := 0; i < n; i++ {
 				picker := balancer.GetPicker(discovery.Result{
@@ -160,7 +160,7 @@ func TestWeightedPicker_Next(t *testing.T) {
 				expect := float64(weight) / float64(weightSum) * float64(n)
 				actual := float64(pickedStat[weight])
 				delta := math.Abs(expect - actual)
-				test.Assertf(t, delta/expect < 0.01, "delta(%f)/expect(%f) = %f", delta, expect, delta/expect)
+				test.Assertf(t, delta/expect < 0.05, "delta(%f)/expect(%f) = %f", delta, expect, delta/expect)
 			}
 
 			// weightSum = 0

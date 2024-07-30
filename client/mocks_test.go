@@ -17,7 +17,7 @@
 package client
 
 import (
-	"github.com/apache/thrift/lib/go/thrift"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // MockTStruct implements the thrift.TStruct interface.

@@ -19,7 +19,6 @@ package generic
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -29,41 +28,35 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var (
-	_ remote.PayloadCodec = &mapThriftCodec{}
-	_ Closer              = &mapThriftCodec{}
-)
+var _ Closer = &mapThriftCodec{}
 
 type mapThriftCodec struct {
 	svcDsc                  atomic.Value // *idl
 	provider                DescriptorProvider
-	codec                   remote.PayloadCodec
 	forJSON                 bool
 	binaryWithBase64        bool
 	binaryWithByteSlice     bool
 	setFieldsForEmptyStruct uint8
+	svcName                 string
 }
 
-func newMapThriftCodec(p DescriptorProvider, codec remote.PayloadCodec) (*mapThriftCodec, error) {
+func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
 	svc := <-p.Provide()
 	c := &mapThriftCodec{
-		codec:               codec,
 		provider:            p,
 		binaryWithBase64:    false,
 		binaryWithByteSlice: false,
+		svcName:             svc.Name,
 	}
 	c.svcDsc.Store(svc)
 	go c.update()
-	return c, nil
+	return c
 }
 
-func newMapThriftCodecForJSON(p DescriptorProvider, codec remote.PayloadCodec) (*mapThriftCodec, error) {
-	c, err := newMapThriftCodec(p, codec)
-	if err != nil {
-		return nil, err
-	}
+func newMapThriftCodecForJSON(p DescriptorProvider) *mapThriftCodec {
+	c := newMapThriftCodec(p)
 	c.forJSON = true
-	return c, nil
+	return c
 }
 
 func (c *mapThriftCodec) update() {
@@ -72,49 +65,34 @@ func (c *mapThriftCodec) update() {
 		if !ok {
 			return
 		}
+		c.svcName = svc.Name
 		c.svcDsc.Store(svc)
 	}
 }
 
-func (c *mapThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
-	method := msg.RPCInfo().Invocation().MethodName()
-	if method == "" {
-		return errors.New("empty methodName in thrift Marshal")
-	}
-	if msg.MessageType() == remote.Exception {
-		return c.codec.Marshal(ctx, msg, out)
-	}
+func (c *mapThriftCodec) getMessageReaderWriter() interface{} {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
+		return errors.New("get parser ServiceDescriptor failed")
 	}
-	wm, err := thrift.NewWriteStruct(svcDsc, method, msg.RPCRole() == remote.Client)
-	if err != nil {
-		return err
+	var rw *thrift.StructReaderWriter
+	if c.forJSON {
+		rw = thrift.NewStructReaderWriterForJSON(svcDsc)
+	} else {
+		rw = thrift.NewStructReaderWriter(svcDsc)
 	}
-	wm.SetBinaryWithBase64(c.binaryWithBase64)
-	msg.Data().(WithCodec).SetCodec(wm)
-	return c.codec.Marshal(ctx, msg, out)
+	c.configureStructWriter(rw.WriteStruct)
+	c.configureStructReader(rw.ReadStruct)
+	return rw
 }
 
-func (c *mapThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
-		return err
-	}
-	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
-	if !ok {
-		return fmt.Errorf("get parser ServiceDescriptor failed")
-	}
-	var rm *thrift.ReadStruct
-	if c.forJSON {
-		rm = thrift.NewReadStructForJSON(svcDsc, msg.RPCRole() == remote.Client)
-	} else {
-		rm = thrift.NewReadStruct(svcDsc, msg.RPCRole() == remote.Client)
-	}
-	rm.SetBinaryOption(c.binaryWithBase64, c.binaryWithByteSlice)
-	rm.SetSetFieldsForEmptyStruct(c.setFieldsForEmptyStruct)
-	msg.Data().(WithCodec).SetCodec(rm)
-	return c.codec.Unmarshal(ctx, msg, in)
+func (c *mapThriftCodec) configureStructWriter(writer *thrift.WriteStruct) {
+	writer.SetBinaryWithBase64(c.binaryWithBase64)
+}
+
+func (c *mapThriftCodec) configureStructReader(reader *thrift.ReadStruct) {
+	reader.SetBinaryOption(c.binaryWithBase64, c.binaryWithByteSlice)
+	reader.SetSetFieldsForEmptyStruct(c.setFieldsForEmptyStruct)
 }
 
 func (c *mapThriftCodec) getMethod(req interface{}, method string) (*Method, error) {
@@ -122,7 +100,7 @@ func (c *mapThriftCodec) getMethod(req interface{}, method string) (*Method, err
 	if err != nil {
 		return nil, err
 	}
-	return &Method{method, fnSvc.Oneway}, nil
+	return &Method{method, fnSvc.Oneway, fnSvc.StreamingMode}, nil
 }
 
 func (c *mapThriftCodec) Name() string {
@@ -131,4 +109,44 @@ func (c *mapThriftCodec) Name() string {
 
 func (c *mapThriftCodec) Close() error {
 	return c.provider.Close()
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
+func (c *mapThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+	method := msg.RPCInfo().Invocation().MethodName()
+	if method == "" {
+		return errors.New("empty methodName in thrift Marshal")
+	}
+	if msg.MessageType() == remote.Exception {
+		return thriftCodec.Marshal(ctx, msg, out)
+	}
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	wm := thrift.NewWriteStruct(svcDsc)
+	wm.SetBinaryWithBase64(c.binaryWithBase64)
+	msg.Data().(WithCodec).SetCodec(wm)
+	return thriftCodec.Marshal(ctx, msg, out)
+}
+
+// Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
+func (c *mapThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
+		return err
+	}
+	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
+	if !ok {
+		return errors.New("get parser ServiceDescriptor failed")
+	}
+	var rm *thrift.ReadStruct
+	if c.forJSON {
+		rm = thrift.NewReadStructForJSON(svcDsc)
+	} else {
+		rm = thrift.NewReadStruct(svcDsc)
+	}
+	rm.SetBinaryOption(c.binaryWithBase64, c.binaryWithByteSlice)
+	rm.SetSetFieldsForEmptyStruct(c.setFieldsForEmptyStruct)
+	msg.Data().(WithCodec).SetCodec(rm)
+	return thriftCodec.Unmarshal(ctx, msg, in)
 }

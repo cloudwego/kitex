@@ -25,6 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	remotemocks "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/mocks/stats"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -34,17 +35,8 @@ import (
 )
 
 var (
-	svcInfo      = mocks.ServiceInfo()
-	svcSearchMap = map[string]*serviceinfo.ServiceInfo{
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
-		mocks.MockMethod:          svcInfo,
-		mocks.MockExceptionMethod: svcInfo,
-		mocks.MockErrorMethod:     svcInfo,
-		mocks.MockOnewayMethod:    svcInfo,
-	}
+	svcInfo     = mocks.ServiceInfo()
+	svcSearcher = remotemocks.NewDefaultSvcSearcher()
 )
 
 func TestDefaultSvrTransHandler(t *testing.T) {
@@ -72,7 +64,7 @@ func TestDefaultSvrTransHandler(t *testing.T) {
 				return nil
 			},
 		},
-		SvcSearchMap:  svcSearchMap,
+		SvcSearcher:   svcSearcher,
 		TargetSvcInfo: svcInfo,
 	}
 
@@ -139,7 +131,7 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 				return nil
 			},
 		},
-		SvcSearchMap:  svcSearchMap,
+		SvcSearcher:   svcSearcher,
 		TargetSvcInfo: svcInfo,
 		TracerCtl:     tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
@@ -198,7 +190,7 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 				return mockErr
 			},
 		},
-		SvcSearchMap:  svcSearchMap,
+		SvcSearcher:   svcSearcher,
 		TargetSvcInfo: svcInfo,
 		TracerCtl:     tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {
@@ -256,7 +248,7 @@ func TestSvrTransHandlerOnReadHeartbeat(t *testing.T) {
 				return nil
 			},
 		},
-		SvcSearchMap:  svcSearchMap,
+		SvcSearcher:   svcSearcher,
 		TargetSvcInfo: svcInfo,
 		TracerCtl:     tracerCtl,
 		InitOrResetRPCInfoFunc: func(ri rpcinfo.RPCInfo, addr net.Addr) rpcinfo.RPCInfo {

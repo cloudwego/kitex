@@ -24,10 +24,10 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/internal/mocks"
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -62,16 +62,7 @@ func TestMain(m *testing.M) {
 				return nil
 			},
 		},
-		SvcSearchMap: map[string]*serviceinfo.ServiceInfo{
-			remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
-			remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
-			remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
-			remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
-			mocks.MockMethod:          svcInfo,
-			mocks.MockExceptionMethod: svcInfo,
-			mocks.MockErrorMethod:     svcInfo,
-			mocks.MockOnewayMethod:    svcInfo,
-		},
+		SvcSearcher:   mocksremote.NewDefaultSvcSearcher(),
 		TargetSvcInfo: svcInfo,
 		TracerCtl:     &rpcinfo.TraceController{},
 	}

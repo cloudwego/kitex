@@ -23,7 +23,9 @@ header:
     - pkg/remote/trans/nphttp2/grpc/http2_server.go
     - pkg/remote/trans/nphttp2/grpc/http_util.go
     - pkg/remote/trans/nphttp2/grpc/keepalive.go
+    - pkg/remote/trans/nphttp2/grpc/keepalive_test.go
     - pkg/remote/trans/nphttp2/grpc/transport.go
+    - pkg/remote/trans/nphttp2/grpc/transport_test.go
     - pkg/remote/trans/nphttp2/metadata/metadata.go
     - pkg/remote/trans/nphttp2/status/status.go
     - pkg/remote/codec/protobuf/error.pb.go

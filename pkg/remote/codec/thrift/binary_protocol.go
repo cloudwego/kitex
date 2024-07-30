@@ -22,8 +22,7 @@ import (
 	"math"
 	"sync"
 
-	"github.com/apache/thrift/lib/go/thrift"
-
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
@@ -496,10 +495,22 @@ func (p *BinaryProtocol) Skip(fieldType thrift.TType) (err error) {
 	return thrift.SkipDefaultDepth(p, fieldType)
 }
 
+// ttransportByteBuffer ...
+// for exposing remote.ByteBuffer via p.Transport(),
+// mainly for testing purpose, see internal/mocks/thrift/utils.go
+type ttransportByteBuffer struct {
+	remote.ByteBuffer
+}
+
+func (ttransportByteBuffer) Close() error                          { panic("not implemented") }
+func (ttransportByteBuffer) Flush(ctx context.Context) (err error) { panic("not implemented") }
+func (ttransportByteBuffer) IsOpen() bool                          { panic("not implemented") }
+func (ttransportByteBuffer) Open() error                           { panic("not implemented") }
+func (p ttransportByteBuffer) RemainingBytes() uint64              { return uint64(p.ReadableLen()) }
+
 // Transport ...
 func (p *BinaryProtocol) Transport() thrift.TTransport {
-	// not support
-	return nil
+	return ttransportByteBuffer{p.trans}
 }
 
 // ByteBuffer ...

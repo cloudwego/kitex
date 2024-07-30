@@ -19,7 +19,7 @@ package fastthrift
 import (
 	"testing"
 
-	mocks "github.com/cloudwego/kitex/internal/mocks/thrift/fast"
+	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 )
 
@@ -47,22 +47,4 @@ func TestFastThrift(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, req1.Msg == req2.Msg)
 	test.Assert(t, len(req1.StrList) == len(req2.StrList))
-}
-
-func BenchmarkFastUnmarshal(b *testing.B) {
-	buf := FastMarshal(newRequest())
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		_ = FastUnmarshal(buf, &mocks.MockReq{})
-	}
-}
-
-func BenchmarkFastMarshal(b *testing.B) {
-	req := newRequest()
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		FastMarshal(req)
-	}
 }

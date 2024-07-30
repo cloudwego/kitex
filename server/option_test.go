@@ -531,17 +531,9 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(from, to, nil, nil, nil)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	svcInfo := mocks.ServiceInfo()
-	svcSearchMap := map[string]*serviceinfo.ServiceInfo{
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
-		mocks.MockMethod:          svcInfo,
-		mocks.MockExceptionMethod: svcInfo,
-		mocks.MockErrorMethod:     svcInfo,
-		mocks.MockOnewayMethod:    svcInfo,
-	}
-	msg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server, false)
+	svcSearcher := newServices()
+	svcSearcher.addService(svcInfo, mocks.MyServiceHandler(), &RegisterOptions{})
+	msg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
 
 	newCtx, tags := iSvr.opt.RemoteOpt.ProfilerMessageTagging(ctx, msg)
 	test.Assert(t, len(tags) == 8)

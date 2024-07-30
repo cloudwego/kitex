@@ -248,11 +248,13 @@ func TestKeepaliveServerWithResponsiveClient(t *testing.T) {
 // logic is running even without any active streams.
 func TestKeepaliveClientClosesUnresponsiveServer(t *testing.T) {
 	connCh := make(chan net.Conn, 1)
+	exitCh := make(chan struct{})
+	defer func() { close(exitCh) }()
 	client := setUpWithNoPingServer(t, ConnectOptions{KeepaliveParams: ClientKeepalive{
 		Time:                250 * time.Millisecond,
 		Timeout:             250 * time.Millisecond,
 		PermitWithoutStream: true,
-	}}, connCh)
+	}}, connCh, exitCh)
 	if client == nil {
 		t.Fatalf("setUpWithNoPingServer failed, return nil client")
 	}
@@ -282,10 +284,12 @@ func TestKeepaliveClientClosesUnresponsiveServer(t *testing.T) {
 // active streams, and therefore the transport stays open.
 func TestKeepaliveClientOpenWithUnresponsiveServer(t *testing.T) {
 	connCh := make(chan net.Conn, 1)
+	exitCh := make(chan struct{})
+	defer func() { close(exitCh) }()
 	client := setUpWithNoPingServer(t, ConnectOptions{KeepaliveParams: ClientKeepalive{
 		Time:    250 * time.Millisecond,
 		Timeout: 250 * time.Millisecond,
-	}}, connCh)
+	}}, connCh, exitCh)
 	if client == nil {
 		t.Fatalf("setUpWithNoPingServer failed, return nil client")
 	}
@@ -313,10 +317,12 @@ func TestKeepaliveClientOpenWithUnresponsiveServer(t *testing.T) {
 // transport even when there is an active stream.
 func TestKeepaliveClientClosesWithActiveStreams(t *testing.T) {
 	connCh := make(chan net.Conn, 1)
+	exitCh := make(chan struct{})
+	defer func() { close(exitCh) }()
 	client := setUpWithNoPingServer(t, ConnectOptions{KeepaliveParams: ClientKeepalive{
 		Time:    250 * time.Millisecond,
 		Timeout: 250 * time.Millisecond,
-	}}, connCh)
+	}}, connCh, exitCh)
 	if client == nil {
 		t.Fatalf("setUpWithNoPingServer failed, return nil client")
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 CloudWeGo Authors
+ * Copyright 2024 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,25 +14,19 @@
  * limitations under the License.
  */
 
-package thriftreflection
+package apache
 
-import (
-	"testing"
+import "github.com/apache/thrift/lib/go/thrift"
 
-	"github.com/cloudwego/thriftgo/reflection"
+// originally from github.com/apache/thrift@v0.13.0/lib/go/thrift/messagetype.go
 
-	"github.com/cloudwego/kitex/internal/test"
+// Message type constants in the Thrift protocol.
+type TMessageType = thrift.TMessageType
+
+const (
+	INVALID_TMESSAGE_TYPE TMessageType = 0
+	CALL                  TMessageType = 1
+	REPLY                 TMessageType = 2
+	EXCEPTION             TMessageType = 3
+	ONEWAY                TMessageType = 4
 )
-
-func TestRegistry(t *testing.T) {
-	GlobalFiles.Register(&reflection.FileDescriptor{
-		Filename: "testa",
-	})
-	test.Assert(t, GlobalFiles.GetFileDescriptors()["testa"] != nil)
-
-	f := NewFiles()
-	f.Register(&reflection.FileDescriptor{
-		Filename: "testb",
-	})
-	test.Assert(t, f.GetFileDescriptors()["testb"] != nil)
-}

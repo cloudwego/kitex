@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -34,88 +33,40 @@ func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) *service 
 }
 
 type services struct {
-	svcSearchMap                       map[string]*service // key: "svcName.methodName" and "methodName", value: svcInfo
-	svcMap                             map[string]*service // key: service name, value: svcInfo
-	conflictingMethodHasFallbackSvcMap map[string]bool
-	fallbackSvc                        *service
+	methodSvcsMap map[string][]*service // key: method name
+	svcMap        map[string]*service   // key: service name
+	fallbackSvc   *service
+
+	refuseTrafficWithoutServiceName bool
 }
 
 func newServices() *services {
 	return &services{
-		svcSearchMap:                       map[string]*service{},
-		svcMap:                             map[string]*service{},
-		conflictingMethodHasFallbackSvcMap: map[string]bool{},
+		methodSvcsMap: map[string][]*service{},
+		svcMap:        map[string]*service{},
 	}
 }
 
 func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, registerOpts *RegisterOptions) error {
 	svc := newService(svcInfo, handler)
-
-	if err := s.checkCombineServiceWithOtherService(svcInfo); err != nil {
-		return err
-	}
-
-	if err := s.checkMultipleFallbackService(registerOpts, svc); err != nil {
-		return err
-	}
-
-	s.svcMap[svcInfo.ServiceName] = svc
-	s.createSearchMap(svcInfo, svc, registerOpts)
-	return nil
-}
-
-// when registering combine service, it does not allow the registration of other services
-func (s *services) checkCombineServiceWithOtherService(svcInfo *serviceinfo.ServiceInfo) error {
-	if len(s.svcMap) > 0 {
-		if _, ok := s.svcMap["CombineService"]; ok || svcInfo.ServiceName == "CombineService" {
-			return errors.New("only one service can be registered when registering combine service")
-		}
-	}
-	return nil
-}
-
-func (s *services) checkMultipleFallbackService(registerOpts *RegisterOptions, svc *service) error {
 	if registerOpts.IsFallbackService {
 		if s.fallbackSvc != nil {
 			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)
 		}
 		s.fallbackSvc = svc
 	}
-	return nil
-}
-
-func (s *services) createSearchMap(svcInfo *serviceinfo.ServiceInfo, svc *service, registerOpts *RegisterOptions) {
+	s.svcMap[svcInfo.ServiceName] = svc
+	// method search map
 	for methodName := range svcInfo.Methods {
-		s.svcSearchMap[remote.BuildMultiServiceKey(svcInfo.ServiceName, methodName)] = svc
-		if svcFromMap, ok := s.svcSearchMap[methodName]; ok {
-			s.handleConflictingMethod(svcFromMap, svc, methodName, registerOpts)
+		svcs := s.methodSvcsMap[methodName]
+		if registerOpts.IsFallbackService {
+			svcs = append([]*service{svc}, svcs...)
 		} else {
-			s.svcSearchMap[methodName] = svc
+			svcs = append(svcs, svc)
 		}
+		s.methodSvcsMap[methodName] = svcs
 	}
-}
-
-func (s *services) handleConflictingMethod(svcFromMap, svc *service, methodName string, registerOpts *RegisterOptions) {
-	s.registerConflictingMethodHasFallbackSvcMap(svcFromMap, methodName)
-	s.updateWithFallbackSvc(registerOpts, svc, methodName)
-}
-
-func (s *services) registerConflictingMethodHasFallbackSvcMap(svcFromMap *service, methodName string) {
-	if _, ok := s.conflictingMethodHasFallbackSvcMap[methodName]; !ok {
-		if s.fallbackSvc != nil && svcFromMap.svcInfo.ServiceName == s.fallbackSvc.svcInfo.ServiceName {
-			// svc which is already registered is a fallback service
-			s.conflictingMethodHasFallbackSvcMap[methodName] = true
-		} else {
-			s.conflictingMethodHasFallbackSvcMap[methodName] = false
-		}
-	}
-}
-
-func (s *services) updateWithFallbackSvc(registerOpts *RegisterOptions, svc *service, methodName string) {
-	if registerOpts.IsFallbackService {
-		s.svcSearchMap[methodName] = svc
-		s.conflictingMethodHasFallbackSvcMap[methodName] = true
-	}
+	return nil
 }
 
 func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
@@ -126,10 +77,47 @@ func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
 	return svcInfoMap
 }
 
-func (s *services) getSvcInfoSearchMap() map[string]*serviceinfo.ServiceInfo {
-	svcInfoSearchMap := map[string]*serviceinfo.ServiceInfo{}
-	for name, svc := range s.svcSearchMap {
-		svcInfoSearchMap[name] = svc.svcInfo
+func (s *services) check(refuseTrafficWithoutServiceName bool) error {
+	if len(s.svcMap) == 0 {
+		return errors.New("run: no service. Use RegisterService to set one")
 	}
-	return svcInfoSearchMap
+	if refuseTrafficWithoutServiceName {
+		s.refuseTrafficWithoutServiceName = true
+		return nil
+	}
+	for name, svcs := range s.methodSvcsMap {
+		if len(svcs) > 1 && svcs[0] != s.fallbackSvc {
+			return fmt.Errorf("method name [%s] is conflicted between services but no fallback service is specified", name)
+		}
+	}
+	return nil
+}
+
+func (s *services) SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo {
+	if strict || s.refuseTrafficWithoutServiceName {
+		if svc := s.svcMap[svcName]; svc != nil {
+			return svc.svcInfo
+		}
+		return nil
+	}
+	var svc *service
+	if svcName == "" {
+		if svcs := s.methodSvcsMap[methodName]; len(svcs) > 0 {
+			svc = svcs[0]
+		}
+	} else {
+		svc = s.svcMap[svcName]
+		if svc == nil {
+			svcs := s.methodSvcsMap[methodName]
+			// 1. no conflicting method, allow method routing
+			// 2. $ generally means generic service, maybe mismatch the real service name
+			if len(svcs) == 1 || len(svcs) > 1 && svcName[0] == '$' {
+				svc = svcs[0]
+			}
+		}
+	}
+	if svc != nil {
+		return svc.svcInfo
+	}
+	return nil
 }

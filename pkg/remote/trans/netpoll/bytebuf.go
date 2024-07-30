@@ -18,7 +18,6 @@ package netpoll
 
 import (
 	"errors"
-	"io"
 	"sync"
 
 	"github.com/cloudwego/netpoll"
@@ -36,11 +35,6 @@ func init() {
 func NewReaderByteBuffer(r netpoll.Reader) remote.ByteBuffer {
 	bytebuf := bytebufPool.Get().(*netpollByteBuffer)
 	bytebuf.reader = r
-	// TODO(wangtieju): fix me when netpoll support netpoll.Reader
-	// and LinkBuffer not support io.Reader, type assertion would fail when r is from NewBuffer
-	if ir, ok := r.(io.Reader); ok {
-		bytebuf.ioReader = ir
-	}
 	bytebuf.status = remote.BitReadable
 	bytebuf.readSize = 0
 	return bytebuf
@@ -50,11 +44,6 @@ func NewReaderByteBuffer(r netpoll.Reader) remote.ByteBuffer {
 func NewWriterByteBuffer(w netpoll.Writer) remote.ByteBuffer {
 	bytebuf := bytebufPool.Get().(*netpollByteBuffer)
 	bytebuf.writer = w
-	// TODO(wangtieju): fix me when netpoll support netpoll.Writer
-	// and LinkBuffer not support io.Reader, type assertion would fail when w is from NewBuffer
-	if iw, ok := w.(io.Writer); ok {
-		bytebuf.ioWriter = iw
-	}
 	bytebuf.status = remote.BitWritable
 	return bytebuf
 }
@@ -64,12 +53,6 @@ func NewReaderWriterByteBuffer(rw netpoll.ReadWriter) remote.ByteBuffer {
 	bytebuf := bytebufPool.Get().(*netpollByteBuffer)
 	bytebuf.writer = rw
 	bytebuf.reader = rw
-	// TODO(wangtieju): fix me when netpoll support netpoll.ReadWriter
-	// and LinkBuffer not support io.ReadWriter, type assertion would fail when rw is from NewBuffer
-	if irw, ok := rw.(io.ReadWriter); ok {
-		bytebuf.ioReader = irw
-		bytebuf.ioWriter = irw
-	}
 	bytebuf.status = remote.BitWritable | remote.BitReadable
 	return bytebuf
 }
@@ -81,8 +64,6 @@ func newNetpollByteBuffer() interface{} {
 type netpollByteBuffer struct {
 	writer   netpoll.Writer
 	reader   netpoll.Reader
-	ioReader io.Reader
-	ioWriter io.Writer
 	status   int
 	readSize int
 }
@@ -130,10 +111,9 @@ func (b *netpollByteBuffer) Read(p []byte) (n int, err error) {
 	if b.status&remote.BitReadable == 0 {
 		return -1, errors.New("unreadable buffer, cannot support Read")
 	}
-	if b.ioReader != nil {
-		return b.ioReader.Read(p)
-	}
-	return -1, errors.New("ioReader is nil")
+	rb, err := b.reader.Next(len(p))
+	b.readSize += len(rb)
+	return copy(p, rb), err
 }
 
 // ReadString is a more efficient way to read string than Next.
@@ -188,10 +168,8 @@ func (b *netpollByteBuffer) Write(p []byte) (n int, err error) {
 	if b.status&remote.BitWritable == 0 {
 		return -1, errors.New("unwritable buffer, cannot support Write")
 	}
-	if b.ioWriter != nil {
-		return b.ioWriter.Write(p)
-	}
-	return -1, errors.New("ioWriter is nil")
+	wb, err := b.writer.Malloc(len(p))
+	return copy(wb, p), err
 }
 
 // WriteString is a more efficient way to write string, using the unsafe method to convert the string to []byte.
@@ -268,8 +246,6 @@ func (b *netpollByteBuffer) Release(e error) (err error) {
 func (b *netpollByteBuffer) zero() {
 	b.writer = nil
 	b.reader = nil
-	b.ioReader = nil
-	b.ioWriter = nil
 	b.status = 0
 	b.readSize = 0
 }

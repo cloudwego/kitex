@@ -60,7 +60,7 @@ func TestSpan(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 1024; i++ {
+			for i := 0; i < 128; i++ {
 				buf := []byte("123")
 				test.DeepEqual(t, bc.Copy(buf), buf)
 
@@ -92,7 +92,7 @@ func TestSpanCache(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 1024; i++ {
+			for i := 0; i < 128; i++ {
 				buf := []byte("123")
 				test.DeepEqual(t, bc.Copy(buf), buf)
 

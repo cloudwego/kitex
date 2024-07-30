@@ -29,11 +29,7 @@ var (
 	_ = (*bytes.Buffer)(nil) {{- UseStdLibrary "bytes"}}
 	_ = (*strings.Builder)(nil) {{- UseStdLibrary "strings"}}
 	_ = reflect.Type(nil) {{- UseStdLibrary "reflect"}}
-	_ = thrift.TProtocol(nil) {{- UseStdLibrary "thrift"}}
-	{{- if GenerateFastAPIs}}
-	{{- UseLib (ImportPathTo "pkg/protocol/bthrift") ""}}
-	_ = bthrift.BinaryWriter(nil)
-	{{- end}}
+	_ = thrift.STOP {{- UseLib "github.com/cloudwego/gopkg/protocol/thrift" ""}}
 	{{- if GenerateDeepCopyAPIs}}
 	{{- UseLib "github.com/cloudwego/kitex/pkg/utils" "kutils"}}
 	{{- end}}

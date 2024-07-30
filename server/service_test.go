@@ -17,7 +17,6 @@
 package server
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -26,63 +25,198 @@ import (
 )
 
 func TestAddService(t *testing.T) {
-	svcs := newServices()
-	err := svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler(), &RegisterOptions{})
-	test.Assert(t, err == nil)
-	test.Assert(t, len(svcs.svcMap) == 1)
-	fmt.Println(svcs.svcSearchMap)
-	test.Assert(t, len(svcs.svcSearchMap) == 10)
-	test.Assert(t, len(svcs.conflictingMethodHasFallbackSvcMap) == 0)
-	test.Assert(t, svcs.fallbackSvc == nil)
+	type svc struct {
+		svcInfo           *serviceinfo.ServiceInfo
+		isFallbackService bool
+	}
+	testcases := []struct {
+		svcs                            []svc
+		refuseTrafficWithoutServiceName bool
 
-	err = svcs.addService(mocks.Service3Info(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
-	test.Assert(t, err == nil)
-	test.Assert(t, len(svcs.svcMap) == 2)
-	test.Assert(t, len(svcs.svcSearchMap) == 11)
-	test.Assert(t, len(svcs.conflictingMethodHasFallbackSvcMap) == 1)
-	test.Assert(t, svcs.conflictingMethodHasFallbackSvcMap["mock"])
+		serviceName, methodName string
+		strict                  bool
+		expectSvcInfo           *serviceinfo.ServiceInfo
 
-	err = svcs.addService(mocks.Service2Info(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
-	test.Assert(t, err != nil)
-	test.Assert(t, err.Error() == "multiple fallback services cannot be registered. [MockService3] is already registered as a fallback service")
-}
-
-func TestCheckCombineServiceWithOtherService(t *testing.T) {
-	svcs := newServices()
-	combineSvcInfo := &serviceinfo.ServiceInfo{ServiceName: "CombineService"}
-	svcs.svcMap[combineSvcInfo.ServiceName] = newService(combineSvcInfo, nil)
-	err := svcs.checkCombineServiceWithOtherService(mocks.ServiceInfo())
-	test.Assert(t, err != nil)
-	test.Assert(t, err.Error() == "only one service can be registered when registering combine service")
-
-	svcs = newServices()
-	svcs.svcMap[mocks.MockServiceName] = newService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	err = svcs.checkCombineServiceWithOtherService(combineSvcInfo)
-	test.Assert(t, err != nil)
-	test.Assert(t, err.Error() == "only one service can be registered when registering combine service")
+		expectErr bool
+	}{
+		{
+			svcs: []svc{
+				{
+					svcInfo:           mocks.ServiceInfo(),
+					isFallbackService: false,
+				},
+				{
+					svcInfo:           mocks.Service2Info(),
+					isFallbackService: true,
+				},
+				{
+					svcInfo:           mocks.Service3Info(),
+					isFallbackService: false,
+				},
+			},
+			expectErr: true,
+		},
+		{
+			svcs: []svc{
+				{
+					svcInfo:           mocks.ServiceInfo(),
+					isFallbackService: false,
+				},
+				{
+					svcInfo:           mocks.Service3Info(),
+					isFallbackService: true,
+				},
+			},
+			expectErr:     false,
+			serviceName:   mocks.MockServiceName,
+			methodName:    mocks.MockMethod,
+			expectSvcInfo: mocks.ServiceInfo(),
+		},
+		{
+			svcs: []svc{
+				{
+					svcInfo:           mocks.ServiceInfo(),
+					isFallbackService: false,
+				},
+				{
+					svcInfo:           mocks.Service3Info(),
+					isFallbackService: true,
+				},
+			},
+			expectErr:     false,
+			serviceName:   "",
+			methodName:    mocks.MockMethod,
+			expectSvcInfo: mocks.Service3Info(),
+		},
+		{
+			svcs: []svc{
+				{
+					svcInfo:           mocks.ServiceInfo(),
+					isFallbackService: true,
+				},
+				{
+					svcInfo:           mocks.Service3Info(),
+					isFallbackService: false,
+				},
+			},
+			expectErr:     false,
+			serviceName:   mocks.MockService3Name,
+			methodName:    mocks.MockMethod,
+			expectSvcInfo: mocks.Service3Info(),
+		},
+		{
+			svcs: []svc{
+				{
+					svcInfo:           mocks.ServiceInfo(),
+					isFallbackService: true,
+				},
+				{
+					svcInfo:           mocks.Service3Info(),
+					isFallbackService: false,
+				},
+			},
+			expectErr:     false,
+			serviceName:   "",
+			methodName:    mocks.MockMethod,
+			expectSvcInfo: mocks.ServiceInfo(),
+		},
+		{
+			svcs: []svc{
+				{
+					svcInfo:           mocks.ServiceInfo(),
+					isFallbackService: false,
+				},
+				{
+					svcInfo:           mocks.Service3Info(),
+					isFallbackService: false,
+				},
+			},
+			expectErr: true,
+		},
+		{
+			svcs: []svc{
+				{
+					svcInfo:           mocks.ServiceInfo(),
+					isFallbackService: false,
+				},
+				{
+					svcInfo:           mocks.Service3Info(),
+					isFallbackService: false,
+				},
+			},
+			refuseTrafficWithoutServiceName: true,
+			expectErr:                       false,
+			serviceName:                     "",
+			methodName:                      mocks.MockMethod,
+			expectSvcInfo:                   nil,
+		},
+		{
+			svcs: []svc{
+				{
+					svcInfo:           mocks.ServiceInfo(),
+					isFallbackService: true,
+				},
+				{
+					svcInfo:           mocks.Service3Info(),
+					isFallbackService: false,
+				},
+			},
+			expectErr:     false,
+			serviceName:   serviceinfo.GenericService,
+			methodName:    mocks.MockMethod,
+			expectSvcInfo: mocks.ServiceInfo(),
+		},
+		{
+			svcs: []svc{
+				{
+					svcInfo:           mocks.ServiceInfo(),
+					isFallbackService: true,
+				},
+				{
+					svcInfo:           mocks.Service3Info(),
+					isFallbackService: false,
+				},
+			},
+			expectErr:     false,
+			serviceName:   "xxxxxx",
+			methodName:    mocks.MockExceptionMethod,
+			expectSvcInfo: mocks.ServiceInfo(),
+		},
+		{
+			svcs: []svc{
+				{
+					svcInfo:           mocks.ServiceInfo(),
+					isFallbackService: true,
+				},
+				{
+					svcInfo:           mocks.Service3Info(),
+					isFallbackService: false,
+				},
+			},
+			expectErr:     false,
+			serviceName:   "xxxxxx",
+			methodName:    mocks.MockMethod,
+			expectSvcInfo: nil,
+		},
+	}
+	for _, tcase := range testcases {
+		svcs := newServices()
+		for _, svc := range tcase.svcs {
+			svcs.addService(svc.svcInfo, mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: svc.isFallbackService})
+		}
+		if tcase.expectErr {
+			test.Assert(t, svcs.check(tcase.refuseTrafficWithoutServiceName) != nil)
+		} else {
+			test.Assert(t, svcs.check(tcase.refuseTrafficWithoutServiceName) == nil)
+			test.Assert(t, svcs.SearchService(tcase.serviceName, tcase.methodName, tcase.strict) == tcase.expectSvcInfo)
+		}
+	}
 }
 
 func TestCheckMultipleFallbackService(t *testing.T) {
 	svcs := newServices()
-	svc := newService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	registerOpts := &RegisterOptions{IsFallbackService: true}
-	err := svcs.checkMultipleFallbackService(registerOpts, svc)
-	test.Assert(t, err == nil)
-	test.Assert(t, svcs.fallbackSvc == svc)
-
-	err = svcs.checkMultipleFallbackService(registerOpts, newService(mocks.Service2Info(), nil))
+	_ = svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
+	err := svcs.addService(mocks.ServiceInfo(), mocks.MyServiceHandler(), &RegisterOptions{IsFallbackService: true})
 	test.Assert(t, err != nil)
 	test.Assert(t, err.Error() == "multiple fallback services cannot be registered. [MockService] is already registered as a fallback service", err)
-}
-
-func TestRegisterConflictingMethodHasFallbackSvcMap(t *testing.T) {
-	svcs := newServices()
-	svcFromMap := newService(mocks.ServiceInfo(), mocks.MyServiceHandler())
-	svcs.registerConflictingMethodHasFallbackSvcMap(svcFromMap, mocks.MockMethod)
-	test.Assert(t, !svcs.conflictingMethodHasFallbackSvcMap[mocks.MockMethod])
-
-	svcs = newServices()
-	svcs.fallbackSvc = svcFromMap
-	svcs.registerConflictingMethodHasFallbackSvcMap(svcFromMap, mocks.MockMethod)
-	test.Assert(t, svcs.conflictingMethodHasFallbackSvcMap[mocks.MockMethod])
 }
