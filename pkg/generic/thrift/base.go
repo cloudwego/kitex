@@ -20,8 +20,6 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
-
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 )
 
 type TrafficEnv struct {
@@ -101,11 +99,11 @@ func (p *TrafficEnv) Read(iprot *thrift.BinaryReader) (err error) {
 
 	return nil
 ReadFieldBeginError:
-	return bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return bthrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_TrafficEnv[fieldId]), err)
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_TrafficEnv[fieldId]), err)
 SkipFieldError:
-	return bthrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
 func (p *TrafficEnv) ReadField1(iprot *thrift.BinaryReader) error {
@@ -333,11 +331,11 @@ func (p *Base) Read(iprot *thrift.BinaryReader) (err error) {
 
 	return nil
 ReadFieldBeginError:
-	return bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return bthrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_Base[fieldId]), err)
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_Base[fieldId]), err)
 SkipFieldError:
-	return bthrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
 func (p *Base) ReadField1(iprot *thrift.BinaryReader) error {
@@ -442,7 +440,7 @@ func (p *Base) Write(oprot *thrift.BinaryWriter) (err error) {
 	oprot.WriteFieldStop()
 	return nil
 WriteFieldError:
-	return bthrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
+	return thrift.PrependError(fmt.Sprintf("%T write field %d error: ", p, fieldId), err)
 }
 
 func (p *Base) writeField1(oprot *thrift.BinaryWriter) (err error) {
@@ -605,11 +603,11 @@ func (p *BaseResp) Read(iprot *thrift.BinaryReader) (err error) {
 
 	return nil
 ReadFieldBeginError:
-	return bthrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
+	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
 ReadFieldError:
-	return bthrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_BaseResp[fieldId]), err)
+	return thrift.PrependError(fmt.Sprintf("%T read field %d '%s' error: ", p, fieldId, fieldIDToName_BaseResp[fieldId]), err)
 SkipFieldError:
-	return bthrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
+	return thrift.PrependError(fmt.Sprintf("%T field %d skip type %d error: ", p, fieldId, fieldTypeId), err)
 }
 
 func (p *BaseResp) ReadField1(iprot *thrift.BinaryReader) error {
