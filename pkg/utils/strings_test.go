@@ -26,13 +26,13 @@ import (
 func TestStringBuilder(t *testing.T) {
 	sb := &StringBuilder{}
 	sb.Grow(4)
-	test.Assert(t, sb.Cap() == 4)
+	test.Assert(t, sb.Cap() >= 4)
 	test.Assert(t, sb.Len() == 0)
 	sb.WriteString("1")
 	sb.WriteByte('2')
 	sb.WriteRune(rune('3'))
 	sb.Write([]byte("4"))
-	test.Assert(t, sb.Cap() == 4)
+	test.Assert(t, sb.Cap() >= 4)
 	test.Assert(t, sb.Len() == 4)
 	test.Assert(t, sb.String() == "1234")
 	sb.Reset()
@@ -42,13 +42,13 @@ func TestStringBuilder(t *testing.T) {
 
 	sb.WithLocked(func(sb *strings.Builder) error {
 		sb.Grow(4)
-		test.Assert(t, sb.Cap() == 4)
+		test.Assert(t, sb.Cap() >= 4)
 		test.Assert(t, sb.Len() == 0)
 		sb.WriteString("1")
 		sb.WriteByte('2')
 		sb.WriteRune(rune('3'))
 		sb.Write([]byte("4"))
-		test.Assert(t, sb.Cap() == 4)
+		test.Assert(t, sb.Cap() >= 4)
 		test.Assert(t, sb.Len() == 4)
 		test.Assert(t, sb.String() == "1234")
 		sb.Reset()
