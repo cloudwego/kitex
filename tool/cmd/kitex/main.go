@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -79,8 +80,7 @@ func main() {
 	if os.Args[1] == "template" {
 		err = args.TemplateArgs(kitex.Version, curpath)
 	} else if !strings.HasPrefix(os.Args[1], "-") {
-		log.Warnf("Unknown command %q", os.Args[1])
-		os.Exit(1)
+		err = fmt.Errorf("unknown command %q", os.Args[1])
 	} else {
 		// run as kitex
 		err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])

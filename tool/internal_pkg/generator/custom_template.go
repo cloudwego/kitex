@@ -15,6 +15,7 @@
 package generator
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -280,7 +281,7 @@ func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File,
 	} else {
 		err = cg.commonGenerate(tpl)
 	}
-	if err == errNoNewMethod {
+	if errors.Is(err, errNoNewMethod) {
 		err = nil
 	}
 	return cg.fs, err

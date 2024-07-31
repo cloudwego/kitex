@@ -17,7 +17,6 @@ package args
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
@@ -65,19 +64,10 @@ func (a *Arguments) TemplateArgs(version, curpath string) error {
 		Use:   "render",
 		Short: "Render command",
 		RunE: func(cmd *util.Command, args []string) error {
-			if len(args) > 0 {
-				a.RenderTplDir = args[0]
+			if len(args) < 2 {
+				return fmt.Errorf("both template directory and idl is required")
 			}
-			var tplDir string
-			for _, arg := range args {
-				if !strings.HasPrefix(arg, "-") {
-					tplDir = arg
-					break
-				}
-			}
-			if tplDir == "" {
-				return fmt.Errorf("template directory is required")
-			}
+			a.RenderTplDir = args[0]
 			log.Verbose = a.Verbose
 
 			for _, e := range a.extends {
@@ -132,6 +122,7 @@ func (a *Arguments) TemplateArgs(version, curpath string) error {
 	}
 	initCmd.Flags().StringVarP(&a.InitOutputDir, "output", "o", ".", "Specify template init path (default current directory)")
 	initCmd.Flags().StringVarP(&a.InitType, "type", "t", "", "Specify template init type")
+	initCmd.Flags().StringVarP(&a.ModuleName, "module", "m", "", "Specify the Go module name to generate go.mod.")
 	renderCmd.Flags().StringVarP(&a.ModuleName, "module", "m", "",
 		"Specify the Go module name to generate go.mod.")
 	renderCmd.Flags().StringVar(&a.IDLType, "type", "unknown", "Specify the type of IDL: 'thrift' or 'protobuf'.")

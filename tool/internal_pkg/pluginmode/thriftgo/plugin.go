@@ -119,6 +119,10 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		files = append(files, fs...)
 	}
 
+	//if conv.Config.InitType != "" {
+	//	gen.GenerateCustomPackage(&conv.Package)
+	//}
+
 	res := &plugin.Response{
 		Warnings: conv.Warnings,
 	}

@@ -30,6 +30,14 @@ type Command struct {
 	flags    *FlagSet
 	// helpFunc is help func defined by user.
 	usage func()
+	// for debug
+	args []string
+}
+
+// SetArgs sets arguments for the command. It is set to os.Args[1:] by default, if desired, can be overridden
+// particularly useful when testing.
+func (c *Command) SetArgs(a []string) {
+	c.args = a
 }
 
 func (c *Command) AddCommand(cmds ...*Command) error {
@@ -51,22 +59,9 @@ func (c *Command) Flags() *FlagSet {
 	return c.flags
 }
 
-// Parent returns a commands parent command.
-func (c *Command) Parent() *Command {
-	return c.parent
-}
-
 // HasParent determines if the command is a child command.
 func (c *Command) HasParent() bool {
 	return c.parent != nil
-}
-
-// Root finds root command.
-func (c *Command) Root() *Command {
-	if c.HasParent() {
-		return c.Parent().Root()
-	}
-	return c
 }
 
 // HasSubCommands determines if the command has children commands.
@@ -79,10 +74,16 @@ func stripFlags(args []string) []string {
 	for len(args) > 0 {
 		s := args[0]
 		args = args[1:]
-		if s != "" && !strings.HasPrefix(s, "-") {
+		if strings.HasPrefix(s, "-") {
+			// handle "-f child child" args
+			if len(args) <= 1 {
+				break
+			} else {
+				args = args[1:]
+				continue
+			}
+		} else if s != "" && !strings.HasPrefix(s, "-") {
 			commands = append(commands, s)
-		} else if strings.HasPrefix(s, "-") {
-			break
 		}
 	}
 	return commands
@@ -109,7 +110,8 @@ func nextArgs(args []string, x string) []string {
 			continue
 		case !strings.HasPrefix(s, "-"):
 			if s == x {
-				var ret []string
+				// cannot use var ret []string cause it return nil
+				ret := make([]string, 0)
 				ret = append(ret, args[:pos]...)
 				ret = append(ret, args[pos+1:]...)
 				return ret
@@ -169,8 +171,10 @@ func (c *Command) UsageFunc() func() {
 
 // ExecuteC executes the command.
 func (c *Command) ExecuteC() (cmd *Command, err error) {
-	args := os.Args[1:]
-
+	args := c.args
+	if c.args == nil {
+		args = os.Args[1:]
+	}
 	cmd, flags, err := c.Find(args)
 	if err != nil {
 		return c, err
@@ -191,8 +195,9 @@ func (c *Command) execute(a []string) error {
 	if err != nil {
 		return err
 	}
+	argWoFlags := c.Flags().Args()
 	if c.RunE != nil {
-		err := c.RunE(c, a)
+		err := c.RunE(c, argWoFlags)
 		if err != nil {
 			return err
 		}
