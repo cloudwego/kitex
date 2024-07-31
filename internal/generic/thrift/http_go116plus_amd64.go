@@ -22,21 +22,21 @@ package thrift
 import (
 	"context"
 	"fmt"
+	"io"
 	"unsafe"
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
-	"github.com/cloudwego/dynamicgo/thrift/base"
+	dbase "github.com/cloudwego/dynamicgo/thrift/base"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
 
 // Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, method string, isClient bool, requestBase *Base) error {
+func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	// fallback logic
 	if !w.dynamicgoEnabled {
 		return w.originalWrite(ctx, out, msg, requestBase)
@@ -56,16 +56,14 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 		requestBase = nil
 	}
 	if requestBase != nil {
-		base := (*base.Base)(unsafe.Pointer(requestBase))
+		base := (*dbase.Base)(unsafe.Pointer(requestBase))
 		ctx = context.WithValue(ctx, conv.CtxKeyThriftReqBase, base)
 		cv = j2t.NewBinaryConv(w.convOptsWithThriftBase)
 	} else {
 		cv = j2t.NewBinaryConv(w.convOpts)
 	}
 
-	if err := out.WriteStructBegin(dynamicgoTypeDsc.Struct().Name()); err != nil {
-		return err
-	}
+	binaryWriter := thrift.NewBinaryWriter()
 
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
 	body := req.GetBody()
@@ -73,37 +71,21 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out thrift.TProtocol, msg 
 	defer mcache.Free(dbuf)
 
 	for _, field := range dynamicgoTypeDsc.Struct().Fields() {
-		if err := out.WriteFieldBegin(field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID())); err != nil {
-			return err
-		}
+		binaryWriter.WriteFieldBegin(thrift.TType(field.Type().Type()), int16(field.ID()))
 
 		// json []byte to thrift []byte
 		if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
 			return err
 		}
-
-		// WriteFieldEnd has no content
-		// if err := out.WriteFieldEnd(); err != nil {
-		// 	return err
-		// }
 	}
-
-	tProt, ok := out.(*cthrift.BinaryProtocol)
-	if !ok {
-		return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
-	}
-	buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
-	if err != nil {
+	if _, err := out.Write(binaryWriter.Bytes()); err != nil {
 		return err
 	}
-	// TODO: implement MallocAck() to achieve zero copy
-	copy(buf, dbuf)
-
-	if err := out.WriteFieldStop(); err != nil {
+	if _, err := out.Write(dbuf); err != nil {
 		return err
 	}
-	if err := out.WriteStructEnd(); err != nil {
-		return err
-	}
-	return nil
+	binaryWriter.Reset()
+	binaryWriter.WriteFieldStop()
+	_, err := out.Write(binaryWriter.Bytes())
+	return err
 }

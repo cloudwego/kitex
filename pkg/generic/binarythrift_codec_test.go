@@ -122,7 +122,7 @@ func TestBinaryThriftCodecExceptionError(t *testing.T) {
 
 	// empty method
 	err = btc.Marshal(ctx, cliMsg, rwbuf)
-	test.Assert(t, err.Error() == "rawThriftBinaryCodec Marshal exception failed, err: empty methodName in thrift Marshal")
+	test.Assert(t, err.Error() == "rawThriftBinaryCodec Marshal exception failed, err: empty methodName in thrift Marshal", err)
 
 	cliMsg.RPCInfoFunc = func() rpcinfo.RPCInfo {
 		return newMockRPCInfo()

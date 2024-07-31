@@ -26,19 +26,19 @@ import (
 )
 
 func TestSplitType(t *testing.T) {
-	pkg, name := splitType(".A")
+	pkg, name := SplitType(".A")
 	test.Assert(t, pkg == "")
 	test.Assert(t, name == "A")
 
-	pkg, name = splitType("foo.bar.A")
+	pkg, name = SplitType("foo.bar.A")
 	test.Assert(t, pkg == "foo.bar")
 	test.Assert(t, name == "A")
 
-	pkg, name = splitType("A")
+	pkg, name = SplitType("A")
 	test.Assert(t, pkg == "")
 	test.Assert(t, name == "A")
 
-	pkg, name = splitType("")
+	pkg, name = SplitType("")
 	test.Assert(t, pkg == "")
 	test.Assert(t, name == "")
 }

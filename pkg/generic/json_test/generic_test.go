@@ -74,7 +74,7 @@ func testThrift(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	respStr, ok := resp.(string)
 	test.Assert(t, ok)
-	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), "world")
+	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), gjson.Get(respStr, "Msg").String())
 
 	// extend method
 	resp, err = cli.GenericCall(context.Background(), "ExtendMethod", reqExtendMsg, callopt.WithRPCTimeout(100*time.Second))
@@ -97,7 +97,7 @@ func testThriftWithDynamicGo(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	respStr, ok := resp.(string)
 	test.Assert(t, ok)
-	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), "world")
+	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), gjson.Get(respStr, "Msg").String())
 
 	// client without dynamicgo
 
@@ -109,7 +109,7 @@ func testThriftWithDynamicGo(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	respStr, ok = resp.(string)
 	test.Assert(t, ok)
-	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), "world")
+	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), gjson.Get(respStr, "Msg").String())
 
 	// server side:
 	//  write: dynamicgo (amd64 && go1.16), fallback (arm || !go1.16)
@@ -119,7 +119,7 @@ func testThriftWithDynamicGo(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	respStr, ok = resp.(string)
 	test.Assert(t, ok)
-	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), "world")
+	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), gjson.Get(respStr, "Msg").String())
 
 	svr.Stop()
 }

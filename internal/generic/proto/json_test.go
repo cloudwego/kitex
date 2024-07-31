@@ -32,8 +32,8 @@ import (
 )
 
 var (
-	example2IDLPath   = "../jsonpb_test/idl/example2.proto"
-	example2ProtoPath = "../jsonpb_test/data/example2_pb.bin"
+	example2IDLPath   = "../../../pkg/generic/jsonpb_test/idl/example2.proto"
+	example2ProtoPath = "../../../pkg/generic/jsonpb_test/data/example2_pb.bin"
 )
 
 func TestRun(t *testing.T) {

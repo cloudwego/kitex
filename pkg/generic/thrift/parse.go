@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/semantic"
 
+	"github.com/cloudwego/kitex/internal/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -307,7 +308,7 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 		if ty, ok := cache[t.Name]; ok {
 			return ty, nil
 		}
-		typePkg, typeName := splitType(t.Name)
+		typePkg, typeName := thrift.SplitType(t.Name)
 		if typePkg != "" {
 			ref, ok := tree.GetReference(typePkg)
 			if !ok {

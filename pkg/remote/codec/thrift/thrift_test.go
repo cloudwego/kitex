@@ -19,6 +19,7 @@ package thrift
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
@@ -27,7 +28,6 @@ import (
 	"github.com/cloudwego/kitex/internal/mocks"
 	mt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
-	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -63,18 +63,18 @@ func init() {
 }
 
 type mockWithContext struct {
-	ReadFunc  func(ctx context.Context, method string, dataLen int, oprot athrift.TProtocol) error
-	WriteFunc func(ctx context.Context, method string, oprot athrift.TProtocol) error
+	ReadFunc  func(ctx context.Context, method string, dataLen int, oprot io.Reader) error
+	WriteFunc func(ctx context.Context, method string, oprot io.Writer) error
 }
 
-func (m *mockWithContext) Read(ctx context.Context, method string, dataLen int, oprot athrift.TProtocol) error {
+func (m *mockWithContext) Read(ctx context.Context, method string, dataLen int, oprot io.Reader) error {
 	if m.ReadFunc != nil {
 		return m.ReadFunc(ctx, method, dataLen, oprot)
 	}
 	return nil
 }
 
-func (m *mockWithContext) Write(ctx context.Context, method string, oprot athrift.TProtocol) error {
+func (m *mockWithContext) Write(ctx context.Context, method string, oprot io.Writer) error {
 	if m.WriteFunc != nil {
 		return m.WriteFunc(ctx, method, oprot)
 	}
@@ -86,7 +86,7 @@ func TestWithContext(t *testing.T) {
 		t.Run(tb.Name, func(t *testing.T) {
 			ctx := context.Background()
 
-			req := &mockWithContext{WriteFunc: func(ctx context.Context, method string, oprot athrift.TProtocol) error {
+			req := &mockWithContext{WriteFunc: func(ctx context.Context, method string, oprot io.Writer) error {
 				return nil
 			}}
 			ink := rpcinfo.NewInvocation("", "mock")
@@ -99,7 +99,7 @@ func TestWithContext(t *testing.T) {
 			buf.Flush()
 
 			{
-				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, dataLen int, oprot athrift.TProtocol) error {
+				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, dataLen int, oprot io.Reader) error {
 					return nil
 				}}
 				ink := rpcinfo.NewInvocation("", "mock")

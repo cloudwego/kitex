@@ -19,12 +19,13 @@ package generic
 import (
 	"context"
 	"fmt"
+	"io"
 
-	gproto "github.com/cloudwego/kitex/pkg/generic/proto"
-	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
+
+	"github.com/cloudwego/kitex/internal/generic/proto"
+	"github.com/cloudwego/kitex/internal/generic/thrift"
 	codecProto "github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
-	codecThrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -108,16 +109,14 @@ type WithCodec interface {
 type Args struct {
 	Request interface{}
 	Method  string
-	base    *gthrift.Base
+	base    *base.Base
 	inner   interface{}
 }
 
 var (
-	_ codecThrift.MessageReaderWithMethodWithContext = (*Args)(nil)
-	_ codecThrift.MessageWriterWithMethodWithContext = (*Args)(nil)
-	_ codecProto.MessageWriterWithContext            = (*Args)(nil)
-	_ codecProto.MessageReaderWithMethodWithContext  = (*Args)(nil)
-	_ WithCodec                                      = (*Args)(nil)
+	_ codecProto.MessageWriterWithContext           = (*Args)(nil)
+	_ codecProto.MessageReaderWithMethodWithContext = (*Args)(nil)
+	_ WithCodec                                     = (*Args)(nil)
 )
 
 // SetCodec ...
@@ -127,17 +126,17 @@ func (g *Args) SetCodec(inner interface{}) {
 
 func (g *Args) GetOrSetBase() interface{} {
 	if g.base == nil {
-		g.base = gthrift.NewBase()
+		g.base = base.NewBase()
 	}
 	return g.base
 }
 
 // Write ...
-func (g *Args) Write(ctx context.Context, method string, out thrift.TProtocol) error {
+func (g *Args) Write(ctx context.Context, method string, out io.Writer) error {
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
-	if w, ok := g.inner.(gthrift.MessageWriter); ok {
+	if w, ok := g.inner.(thrift.MessageWriter); ok {
 		return w.Write(ctx, out, g.Request, method, true, g.base)
 	}
 	return fmt.Errorf("unexpected Args writer type: %T", g.inner)
@@ -147,18 +146,18 @@ func (g *Args) WritePb(ctx context.Context, method string) (interface{}, error) 
 	if err, ok := g.inner.(error); ok {
 		return nil, err
 	}
-	if w, ok := g.inner.(gproto.MessageWriter); ok {
+	if w, ok := g.inner.(proto.MessageWriter); ok {
 		return w.Write(ctx, g.Request, method, true)
 	}
 	return nil, fmt.Errorf("unexpected Args writer type: %T", g.inner)
 }
 
 // Read ...
-func (g *Args) Read(ctx context.Context, method string, dataLen int, in thrift.TProtocol) error {
+func (g *Args) Read(ctx context.Context, method string, dataLen int, in io.Reader) error {
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
-	if rw, ok := g.inner.(gthrift.MessageReader); ok {
+	if rw, ok := g.inner.(thrift.MessageReader); ok {
 		g.Method = method
 		var err error
 		g.Request, err = rw.Read(ctx, method, false, dataLen, in)
@@ -171,7 +170,7 @@ func (g *Args) ReadPb(ctx context.Context, method string, in []byte) error {
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
-	if w, ok := g.inner.(gproto.MessageReader); ok {
+	if w, ok := g.inner.(proto.MessageReader); ok {
 		g.Method = method
 		var err error
 		g.Request, err = w.Read(ctx, method, false, in)
@@ -192,11 +191,9 @@ type Result struct {
 }
 
 var (
-	_ codecThrift.MessageReaderWithMethodWithContext = (*Result)(nil)
-	_ codecThrift.MessageWriterWithMethodWithContext = (*Result)(nil)
-	_ codecProto.MessageWriterWithContext            = (*Result)(nil)
-	_ codecProto.MessageReaderWithMethodWithContext  = (*Result)(nil)
-	_ WithCodec                                      = (*Result)(nil)
+	_ codecProto.MessageWriterWithContext           = (*Result)(nil)
+	_ codecProto.MessageReaderWithMethodWithContext = (*Result)(nil)
+	_ WithCodec                                     = (*Result)(nil)
 )
 
 // SetCodec ...
@@ -205,11 +202,11 @@ func (r *Result) SetCodec(inner interface{}) {
 }
 
 // Write ...
-func (r *Result) Write(ctx context.Context, method string, out thrift.TProtocol) error {
+func (r *Result) Write(ctx context.Context, method string, out io.Writer) error {
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
-	if w, ok := r.inner.(gthrift.MessageWriter); ok {
+	if w, ok := r.inner.(thrift.MessageWriter); ok {
 		return w.Write(ctx, out, r.Success, method, false, nil)
 	}
 	return fmt.Errorf("unexpected Result writer type: %T", r.inner)
@@ -219,18 +216,18 @@ func (r *Result) WritePb(ctx context.Context, method string) (interface{}, error
 	if err, ok := r.inner.(error); ok {
 		return nil, err
 	}
-	if w, ok := r.inner.(gproto.MessageWriter); ok {
+	if w, ok := r.inner.(proto.MessageWriter); ok {
 		return w.Write(ctx, r.Success, method, false)
 	}
 	return nil, fmt.Errorf("unexpected Result writer type: %T", r.inner)
 }
 
 // Read ...
-func (r *Result) Read(ctx context.Context, method string, dataLen int, in thrift.TProtocol) error {
+func (r *Result) Read(ctx context.Context, method string, dataLen int, in io.Reader) error {
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
-	if w, ok := r.inner.(gthrift.MessageReader); ok {
+	if w, ok := r.inner.(thrift.MessageReader); ok {
 		var err error
 		r.Success, err = w.Read(ctx, method, true, dataLen, in)
 		return err
@@ -242,7 +239,7 @@ func (r *Result) ReadPb(ctx context.Context, method string, in []byte) error {
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
-	if w, ok := r.inner.(gproto.MessageReader); ok {
+	if w, ok := r.inner.(proto.MessageReader); ok {
 		var err error
 		r.Success, err = w.Read(ctx, method, true, in)
 		return err

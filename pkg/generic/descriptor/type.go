@@ -16,7 +16,7 @@
 
 package descriptor
 
-import thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+import "github.com/cloudwego/gopkg/protocol/thrift"
 
 // Type constants in the Thrift protocol
 type Type byte

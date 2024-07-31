@@ -20,13 +20,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 type HTTPPbReaderWriter struct {
@@ -53,7 +55,7 @@ func NewWriteHTTPPbRequest(svc *descriptor.ServiceDescriptor, pbSvc *desc.Servic
 }
 
 // Write ...
-func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, method string, isClient bool, requestBase *Base) error {
+func (w *WriteHTTPPbRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	fn, err := w.svc.Router.Lookup(req)
 	if err != nil {
@@ -75,7 +77,12 @@ func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, ms
 	}
 	req.GeneralBody = pbMsg
 
-	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase})
+	binaryWriter := thrift.NewBinaryWriter()
+	if err = wrapStructWriter(ctx, req, binaryWriter, fn.Request, &writerOption{requestBase: requestBase}); err != nil {
+		return err
+	}
+	_, err = out.Write(binaryWriter.Bytes())
+	return err
 }
 
 // ReadHTTPPbResponse implement of MessageReaderWithMethod
@@ -93,7 +100,7 @@ func NewReadHTTPPbResponse(svc *descriptor.ServiceDescriptor, pbSvc proto.Servic
 }
 
 // Read ...
-func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in io.Reader) (interface{}, error) {
 	fnDsc, err := r.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err
@@ -104,5 +111,5 @@ func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, isClient b
 		return nil, errors.New("pb method not found")
 	}
 
-	return skipStructReader(ctx, in, fDsc, &readerOption{pbDsc: mt.GetOutputType(), http: true})
+	return skipStructReader(ctx, thrift.NewBinaryReader(in), fDsc, &readerOption{pbDsc: mt.GetOutputType(), http: true})
 }
