@@ -26,7 +26,6 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
-	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 type ControlFrame struct{}
@@ -35,74 +34,45 @@ func NewControlFrame() *ControlFrame {
 	return &ControlFrame{}
 }
 
-var fieldIDToName_ControlFrame = map[int16]string{}
+func (p *ControlFrame) BLength() int {
+	return 1
+}
 
-func (p *ControlFrame) Read(iprot athrift.TProtocol) (err error) {
-	var fieldTypeId athrift.TType
-	var fieldId int16
+func (p *ControlFrame) FastWrite(b []byte) int { return p.FastWriteNocopy(b, nil) }
 
-	if _, err = iprot.ReadStructBegin(); err != nil {
-		goto ReadStructBeginError
-	}
+func (p *ControlFrame) FastWriteNocopy(b []byte, w thrift.NocopyWriter) int {
+	b[0] = 0
+	return 1
+}
 
+func (p *ControlFrame) FastRead(b []byte) (off int, err error) {
+	var ftyp thrift.TType
+	var fid int16
+	var l int
+	x := thrift.BinaryProtocol{}
 	for {
-		_, fieldTypeId, fieldId, err = iprot.ReadFieldBegin()
+		ftyp, fid, l, err = x.ReadFieldBegin(b[off:])
+		off += l
 		if err != nil {
 			goto ReadFieldBeginError
 		}
-		if fieldTypeId == athrift.STOP {
+		if ftyp == thrift.STOP {
 			break
 		}
-		if err = iprot.Skip(fieldTypeId); err != nil {
-			goto SkipFieldTypeError
-		}
-
-		if err = iprot.ReadFieldEnd(); err != nil {
-			goto ReadFieldEndError
+		switch uint32(fid)<<8 | uint32(ftyp) {
+		default:
+			l, err = x.Skip(b[off:], ftyp)
+			off += l
+			if err != nil {
+				goto SkipFieldError
+			}
 		}
 	}
-	if err = iprot.ReadStructEnd(); err != nil {
-		goto ReadStructEndError
-	}
-
-	return nil
-ReadStructBeginError:
-	return thrift.PrependError(fmt.Sprintf("%T read struct begin error: ", p), err)
+	return
 ReadFieldBeginError:
-	return thrift.PrependError(fmt.Sprintf("%T read field %d begin error: ", p, fieldId), err)
-SkipFieldTypeError:
-	return thrift.PrependError(fmt.Sprintf("%T skip field type %d error", p, fieldTypeId), err)
-
-ReadFieldEndError:
-	return thrift.PrependError(fmt.Sprintf("%T read field end error", p), err)
-ReadStructEndError:
-	return thrift.PrependError(fmt.Sprintf("%T read struct end error: ", p), err)
+	return off, thrift.PrependError(fmt.Sprintf("%T read field begin error: ", p), err)
+SkipFieldError:
+	return off, thrift.PrependError(fmt.Sprintf("%T skip field %d type %d error: ", p, fid, ftyp), err)
 }
 
-func (p *ControlFrame) Write(oprot athrift.TProtocol) (err error) {
-	if err = oprot.WriteStructBegin("ControlFrame"); err != nil {
-		goto WriteStructBeginError
-	}
-	if p != nil {
-	}
-	if err = oprot.WriteFieldStop(); err != nil {
-		goto WriteFieldStopError
-	}
-	if err = oprot.WriteStructEnd(); err != nil {
-		goto WriteStructEndError
-	}
-	return nil
-WriteStructBeginError:
-	return thrift.PrependError(fmt.Sprintf("%T write struct begin error: ", p), err)
-WriteFieldStopError:
-	return thrift.PrependError(fmt.Sprintf("%T write field stop error: ", p), err)
-WriteStructEndError:
-	return thrift.PrependError(fmt.Sprintf("%T write struct end error: ", p), err)
-}
-
-func (p *ControlFrame) String() string {
-	if p == nil {
-		return "<nil>"
-	}
-	return fmt.Sprintf("ControlFrame(%+v)", *p)
-}
+var _ thrift.FastCodec = &ControlFrame{}

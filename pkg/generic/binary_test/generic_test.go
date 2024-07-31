@@ -185,7 +185,7 @@ func initMockServer(handler kt.Mock) server.Server {
 func genBinaryReqBuf(method string) []byte {
 	// no idea for reqMsg part, it's not binary protocol.
 	// DO NOT TOUCH IT or you may need to change the tests as well
-	n := thrift.Binary.MessageBeginLength(method, 0, 0) + len(reqMsg)
+	n := thrift.Binary.MessageBeginLength(method) + len(reqMsg)
 	b := make([]byte, 0, n)
 	b = thrift.Binary.AppendMessageBegin(b, method, 0, 100)
 	b = append(b, reqMsg...)
