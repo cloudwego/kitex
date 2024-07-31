@@ -127,7 +127,7 @@ type Config struct {
 	FrugalPretouch        bool
 	ThriftPluginTimeLimit time.Duration
 	CompilerPath          string // specify the path of thriftgo or protoc
-	Tpl                   string // specify the template to use
+	BuiltinTpl            string // specify the built-in template to use
 
 	ExtensionFile string
 	tmplExt       *TemplateExtension
@@ -294,7 +294,7 @@ func (c *Config) ApplyExtension() error {
 }
 
 func (c *Config) IsUsingMultipleServicesTpl() bool {
-	return c.Tpl == MultipleServicesTpl
+	return c.BuiltinTpl == MultipleServicesTpl
 }
 
 // NewGenerator .
