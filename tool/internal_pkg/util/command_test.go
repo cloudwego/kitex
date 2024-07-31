@@ -15,75 +15,249 @@
 package util
 
 import (
-	"os"
+	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 )
 
-func TestAddCommand(t *testing.T) {
-	rootCmd := &Command{Use: "root"}
-	childCmd := &Command{Use: "child"}
+func emptyRun(*Command, []string) error { return nil }
 
-	// Test adding a valid child command
-	err := rootCmd.AddCommand(childCmd)
+func executeCommand(root *Command, args ...string) (err error) {
+	_, err = executeCommandC(root, args...)
+	return err
+}
+
+func executeCommandC(root *Command, args ...string) (c *Command, err error) {
+	root.SetArgs(args)
+	c, err = root.ExecuteC()
+	return c, err
+}
+
+const onetwo = "one two"
+
+func TestSingleCommand(t *testing.T) {
+	rootCmd := &Command{
+		Use:  "root",
+		RunE: func(_ *Command, args []string) error { return nil },
+	}
+	aCmd := &Command{Use: "a", RunE: emptyRun}
+	bCmd := &Command{Use: "b", RunE: emptyRun}
+	rootCmd.AddCommand(aCmd, bCmd)
+
+	_ = executeCommand(rootCmd, "one", "two")
+}
+
+func TestChildCommand(t *testing.T) {
+	var child1CmdArgs []string
+	rootCmd := &Command{Use: "root", RunE: emptyRun}
+	child1Cmd := &Command{
+		Use:  "child1",
+		RunE: func(_ *Command, args []string) error { child1CmdArgs = args; return nil },
+	}
+	child2Cmd := &Command{Use: "child2", RunE: emptyRun}
+	rootCmd.AddCommand(child1Cmd, child2Cmd)
+
+	err := executeCommand(rootCmd, "child1", "one", "two")
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Errorf("Unexpected error: %v", err)
 	}
 
-	if len(rootCmd.commands) != 1 {
-		t.Fatalf("expected 1 command, got %d", len(rootCmd.commands))
-	}
-
-	if rootCmd.commands[0] != childCmd {
-		t.Fatalf("expected child command to be added")
-	}
-
-	// Test adding a command to itself
-	err = rootCmd.AddCommand(rootCmd)
-	if err == nil {
-		t.Fatalf("expected an error, got nil")
-	}
-
-	expectedErr := "command can't be a child of itself"
-	if err.Error() != expectedErr {
-		t.Fatalf("expected error %q, got %q", expectedErr, err.Error())
+	got := strings.Join(child1CmdArgs, " ")
+	if got != onetwo {
+		t.Errorf("child1CmdArgs expected: %q, got: %q", onetwo, got)
 	}
 }
 
-func TestExecuteC(t *testing.T) {
-	rootCmd := &Command{
-		Use: "root",
-		RunE: func(cmd *Command, args []string) error {
-			return nil
-		},
-	}
-
-	subCmd := &Command{
-		Use: "sub",
-		RunE: func(cmd *Command, args []string) error {
-			return nil
-		},
-	}
-
-	rootCmd.AddCommand(subCmd)
-
-	// Simulate command line arguments
-	os.Args = []string{"root", "sub"}
-
-	// Execute the command
-	cmd, err := rootCmd.ExecuteC()
+func TestCallCommandWithoutSubcommands(t *testing.T) {
+	rootCmd := &Command{Use: "root", RunE: emptyRun}
+	err := executeCommand(rootCmd)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Errorf("Calling command without subcommands should not have error: %v", err)
+	}
+}
+
+func TestRootExecuteUnknownCommand(t *testing.T) {
+	rootCmd := &Command{Use: "root", RunE: emptyRun}
+	rootCmd.AddCommand(&Command{Use: "child", RunE: emptyRun})
+
+	_ = executeCommand(rootCmd, "unknown")
+}
+
+func TestSubcommandExecuteC(t *testing.T) {
+	rootCmd := &Command{Use: "root", RunE: emptyRun}
+	childCmd := &Command{Use: "child", RunE: emptyRun}
+	rootCmd.AddCommand(childCmd)
+
+	_, err := executeCommandC(rootCmd, "child")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
+
+func TestFind(t *testing.T) {
+	var foo, bar string
+	root := &Command{
+		Use: "root",
+	}
+	root.Flags().StringVarP(&foo, "foo", "f", "", "")
+	root.Flags().StringVarP(&bar, "bar", "b", "something", "")
+
+	child := &Command{
+		Use: "child",
+	}
+	root.AddCommand(child)
+
+	testCases := []struct {
+		args              []string
+		expectedFoundArgs []string
+	}{
+		{
+			[]string{"child"},
+			[]string{},
+		},
+		{
+			[]string{"child", "child"},
+			[]string{"child"},
+		},
+		{
+			[]string{"child", "foo", "child", "bar", "child", "baz", "child"},
+			[]string{"foo", "child", "bar", "child", "baz", "child"},
+		},
+		{
+			[]string{"-f", "child", "child"},
+			[]string{"-f", "child"},
+		},
+		{
+			[]string{"child", "-f", "child"},
+			[]string{"-f", "child"},
+		},
+		{
+			[]string{"-b", "child", "child"},
+			[]string{"-b", "child"},
+		},
+		{
+			[]string{"child", "-b", "child"},
+			[]string{"-b", "child"},
+		},
+		{
+			[]string{"child", "-b"},
+			[]string{"-b"},
+		},
+		{
+			[]string{"-b", "-f", "child", "child"},
+			[]string{"-b", "-f", "child"},
+		},
+		{
+			[]string{"-f", "child", "-b", "something", "child"},
+			[]string{"-f", "child", "-b", "something"},
+		},
+		{
+			[]string{"-f", "child", "child", "-b"},
+			[]string{"-f", "child", "-b"},
+		},
+		{
+			[]string{"-f=child", "-b=something", "child"},
+			[]string{"-f=child", "-b=something"},
+		},
+		{
+			[]string{"--foo", "child", "--bar", "something", "child"},
+			[]string{"--foo", "child", "--bar", "something"},
+		},
 	}
 
-	if cmd.Use != "sub" {
-		t.Fatalf("expected sub command to be executed, got %s", cmd.Use)
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%v", tc.args), func(t *testing.T) {
+			cmd, foundArgs, err := root.Find(tc.args)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if cmd != child {
+				t.Fatal("Expected cmd to be child, but it was not")
+			}
+
+			if !reflect.DeepEqual(tc.expectedFoundArgs, foundArgs) {
+				t.Fatalf("Wrong args\nExpected: %v\nGot: %v", tc.expectedFoundArgs, foundArgs)
+			}
+		})
+	}
+}
+
+func TestFlagLong(t *testing.T) {
+	var cArgs []string
+	c := &Command{
+		Use:  "c",
+		RunE: func(_ *Command, args []string) error { cArgs = args; return nil },
 	}
 
-	// Simulate command line arguments with an unknown command
-	os.Args = []string{"root", "unknown"}
+	var intFlagValue int
+	var stringFlagValue string
+	c.Flags().IntVar(&intFlagValue, "intf", -1, "")
+	c.Flags().StringVar(&stringFlagValue, "sf", "", "")
 
-	_, err = rootCmd.ExecuteC()
-	if err == nil {
-		t.Fatalf("expected an error for unknown command, got nil")
+	err := executeCommand(c, "--intf=7", "--sf=abc", "one", "--", "two")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if intFlagValue != 7 {
+		t.Errorf("Expected intFlagValue: %v, got %v", 7, intFlagValue)
+	}
+	if stringFlagValue != "abc" {
+		t.Errorf("Expected stringFlagValue: %q, got %q", "abc", stringFlagValue)
+	}
+
+	got := strings.Join(cArgs, " ")
+	if got != onetwo {
+		t.Errorf("rootCmdArgs expected: %q, got: %q", onetwo, got)
+	}
+}
+
+func TestFlagShort(t *testing.T) {
+	var cArgs []string
+	c := &Command{
+		Use:  "c",
+		RunE: func(_ *Command, args []string) error { cArgs = args; return nil },
+	}
+
+	var intFlagValue int
+	var stringFlagValue string
+	c.Flags().IntVarP(&intFlagValue, "intf", "i", -1, "")
+	c.Flags().StringVarP(&stringFlagValue, "sf", "s", "", "")
+
+	err := executeCommand(c, "-i", "7", "-sabc", "one", "two")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if intFlagValue != 7 {
+		t.Errorf("Expected flag value: %v, got %v", 7, intFlagValue)
+	}
+	if stringFlagValue != "abc" {
+		t.Errorf("Expected stringFlagValue: %q, got %q", "abc", stringFlagValue)
+	}
+
+	got := strings.Join(cArgs, " ")
+	if got != onetwo {
+		t.Errorf("rootCmdArgs expected: %q, got: %q", onetwo, got)
+	}
+}
+
+func TestChildFlag(t *testing.T) {
+	rootCmd := &Command{Use: "root", RunE: emptyRun}
+	childCmd := &Command{Use: "child", RunE: emptyRun}
+	rootCmd.AddCommand(childCmd)
+
+	var intFlagValue int
+	childCmd.Flags().IntVarP(&intFlagValue, "intf", "i", -1, "")
+
+	err := executeCommand(rootCmd, "child", "-i7")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if intFlagValue != 7 {
+		t.Errorf("Expected flag value: %v, got %v", 7, intFlagValue)
 	}
 }

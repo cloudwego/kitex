@@ -16,6 +16,7 @@
 package generator
 
 import (
+	"errors"
 	"fmt"
 	"go/token"
 	"path/filepath"
@@ -135,9 +136,9 @@ type Config struct {
 	TemplateDir string
 
 	// subcommand template
-	InitOutputDir string
+	InitOutputDir string //specify the location path of init subcommand
 	InitType      string
-	RenderTplDir  string
+	RenderTplDir  string // specify the path of template directory for render subcommand
 	TemplateFile  string
 
 	GenPath string
@@ -374,7 +375,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 			pkg.ServiceInfo.ServiceName)
 		f, err := comp.CompleteMethods()
 		if err != nil {
-			if err == errNoNewMethod {
+			if errors.Is(err, errNoNewMethod) {
 				return fs, nil
 			}
 			return nil, err
