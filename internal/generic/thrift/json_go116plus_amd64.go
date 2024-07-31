@@ -88,7 +88,7 @@ func (m *WriteJSON) Write(ctx context.Context, out io.Writer, bw *thrift.BinaryW
 	if isStreaming(m.svcDsc.Functions[method].StreamingMode) {
 		// unwrap one struct layer
 		dynamicgoTypeDsc = dynamicgoTypeDsc.Struct().FieldById(dthrift.FieldID(getStreamingFieldID(isClient, true))).Type()
-		return writeStreamingContentWithDynamicgo(ctx, out, bw, dynamicgoTypeDsc, &cv, transBuff)
+		return writeStreamingContentWithDynamicgo(ctx, bw, dynamicgoTypeDsc, &cv, transBuff)
 	} else {
 		if err := writeFields(ctx, out, bw, dynamicgoTypeDsc, &cv, transBuff, isClient); err != nil {
 			return err
@@ -136,13 +136,15 @@ func writeFields(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, dy
 	return err
 }
 
-func writeStreamingContentWithDynamicgo(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte) error {
+func writeStreamingContentWithDynamicgo(ctx context.Context, bw *thrift.BinaryWriter, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte) error {
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
 	defer mcache.Free(dbuf)
 
 	if err := cv.DoInto(ctx, dynamicgoTypeDsc, transBuff, &dbuf); err != nil {
 		return err
 	}
-	_, err := out.Write(dbuf)
-	return err
+	for _, b := range dbuf {
+		bw.WriteByte(int8(b))
+	}
+	return nil
 }
