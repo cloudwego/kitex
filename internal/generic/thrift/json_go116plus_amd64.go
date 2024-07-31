@@ -22,6 +22,7 @@ package thrift
 import (
 	"context"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"io"
 	"unsafe"
 
@@ -68,12 +69,17 @@ func (m *WriteJSON) Write(ctx context.Context, out io.Writer, bw *thrift.BinaryW
 		cv = j2t.NewBinaryConv(m.convOpts)
 	}
 
+	_, isGRPC := out.(remote.FrameWrite)
+
 	// msg is void or nil
 	if _, ok := msg.(descriptor.Void); ok || msg == nil {
-		if err := writeFields(ctx, out, bw, dynamicgoTypeDsc, nil, nil, isClient); err != nil {
+		if err := writeFields(ctx, out, bw, dynamicgoTypeDsc, nil, nil, isClient, isGRPC); err != nil {
 			return err
 		}
 		bw.WriteFieldStop()
+		if isGRPC {
+			return nil
+		}
 		_, err := out.Write(bw.Bytes())
 		return err
 	}
@@ -90,10 +96,13 @@ func (m *WriteJSON) Write(ctx context.Context, out io.Writer, bw *thrift.BinaryW
 		dynamicgoTypeDsc = dynamicgoTypeDsc.Struct().FieldById(dthrift.FieldID(getStreamingFieldID(isClient, true))).Type()
 		return writeStreamingContentWithDynamicgo(ctx, bw, dynamicgoTypeDsc, &cv, transBuff)
 	} else {
-		if err := writeFields(ctx, out, bw, dynamicgoTypeDsc, &cv, transBuff, isClient); err != nil {
+		if err := writeFields(ctx, out, bw, dynamicgoTypeDsc, &cv, transBuff, isClient, isGRPC); err != nil {
 			return err
 		}
 		bw.WriteFieldStop()
+		if isGRPC {
+			return nil
+		}
 		_, err := out.Write(bw.Bytes())
 		return err
 	}
@@ -101,7 +110,7 @@ func (m *WriteJSON) Write(ctx context.Context, out io.Writer, bw *thrift.BinaryW
 
 type MsgType int
 
-func writeFields(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient bool) error {
+func writeFields(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient, isGRPC bool) error {
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
 	defer mcache.Free(dbuf)
 
@@ -117,6 +126,9 @@ func writeFields(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, dy
 		// if the field type is void, just write void and return
 		if field.Type().Type() == dthrift.VOID {
 			bw.WriteFieldStop()
+			if isGRPC {
+				return nil
+			}
 			_, err := out.Write(bw.Bytes())
 			bw.Reset()
 			return err
@@ -127,6 +139,12 @@ func writeFields(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, dy
 				return err
 			}
 		}
+	}
+	if isGRPC {
+		for _, b := range dbuf {
+			bw.WriteByte(int8(b))
+		}
+		return nil
 	}
 	if _, err := out.Write(bw.Bytes()); err != nil {
 		return err
