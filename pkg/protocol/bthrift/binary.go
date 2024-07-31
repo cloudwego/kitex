@@ -30,11 +30,11 @@ import (
 
 var (
 	// Binary protocol for bthrift.
-	Binary binaryProtocol
-	_      BTProtocol = binaryProtocol{}
+	Binary          binaryProtocol
+	_               BTProtocol = binaryProtocol{}
+	spanCache                  = mem.NewSpanCache(1024 * 1024)
+	spanCacheEnable bool       = false
 )
-
-var allocator Allocator
 
 const binaryInplaceThreshold = 4096 // 4k
 
@@ -42,16 +42,7 @@ type binaryProtocol struct{}
 
 // SetSpanCache enable/disable binary protocol bytes/string allocator
 func SetSpanCache(enable bool) {
-	if enable {
-		SetAllocator(mem.NewSpanCache(1024 * 1024))
-	} else {
-		SetAllocator(nil)
-	}
-}
-
-// SetAllocator set binary protocol bytes/string allocator.
-func SetAllocator(alloc Allocator) {
-	allocator = alloc
+	spanCacheEnable = enable
 }
 
 func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int {
@@ -500,9 +491,8 @@ func (binaryProtocol) ReadBinary(buf []byte) (value []byte, length int, err erro
 	if size < 0 || size > len(buf) {
 		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadBinary] the binary size greater than buf length")
 	}
-	alloc := allocator
-	if alloc != nil {
-		value = alloc.Copy(buf[length : length+size])
+	if spanCacheEnable {
+		value = spanCache.Copy(buf[length : length+size])
 	} else {
 		value = make([]byte, size)
 		copy(value, buf[length:length+size])

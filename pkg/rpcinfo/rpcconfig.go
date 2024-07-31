@@ -17,7 +17,6 @@
 package rpcinfo
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
