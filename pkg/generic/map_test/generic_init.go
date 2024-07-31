@@ -53,8 +53,7 @@ var reqMsg = map[string]interface{}{
 
 var errResp = "Test Error"
 
-func newGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
-	var opts []client.Option
+func newGenericClient(destService string, g generic.Generic, targetIPPort string, opts ...client.Option) genericclient.Client {
 	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(transport.TTHeader))
 	genericCli, _ := genericclient.NewClient(destService, g, opts...)
 	return genericCli
