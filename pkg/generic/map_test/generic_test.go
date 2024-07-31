@@ -448,7 +448,6 @@ func (g *testGeneric) Close() error {
 func TestMapThriftGenericClientFinalizer(t *testing.T) {
 	debug.SetGCPercent(-1)
 	defer debug.SetGCPercent(100)
-
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	t.Logf("Before new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
