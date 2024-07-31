@@ -19,18 +19,17 @@ package thrift
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/stretchr/testify/require"
 
-	"github.com/cloudwego/kitex/internal/mocks"
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 var (
@@ -69,12 +68,10 @@ func Test_nextReader(t *testing.T) {
 
 func Test_readVoid(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
 	}
 
-	mockTTransport := &mocks.MockThriftTTransport{}
 	tests := []struct {
 		name    string
 		args    args
@@ -82,11 +79,17 @@ func Test_readVoid(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"void", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.VOID}}, descriptor.Void{}, false},
+		{"void", args{t: &descriptor.TypeDescriptor{Type: descriptor.VOID, Struct: &descriptor.StructDescriptor{}}}, descriptor.Void{}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readVoid(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeVoid(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeVoid() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readVoid(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readVoid() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -100,14 +103,8 @@ func Test_readVoid(t *testing.T) {
 
 func Test_readDouble(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadDoubleFunc: func() (value float64, err error) {
-			return 1.0, nil
-		},
 	}
 	tests := []struct {
 		name    string
@@ -116,11 +113,17 @@ func Test_readDouble(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readDouble", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.DOUBLE}}, 1.0, false},
+		{"readDouble", args{t: &descriptor.TypeDescriptor{Type: descriptor.DOUBLE}}, 1.0, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readDouble(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeFloat64(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeFloat64() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readDouble(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readDouble() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -134,12 +137,8 @@ func Test_readDouble(t *testing.T) {
 
 func Test_readBool(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadBoolFunc: func() (bool, error) { return true, nil },
 	}
 	tests := []struct {
 		name    string
@@ -148,11 +147,17 @@ func Test_readBool(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readBool", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.BOOL}}, true, false},
+		{"readBool", args{t: &descriptor.TypeDescriptor{Type: descriptor.BOOL}}, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readBool(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeBool(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeBool() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readBool(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readBool() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -166,14 +171,8 @@ func Test_readBool(t *testing.T) {
 
 func Test_readByte(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadByteFunc: func() (int8, error) {
-			return 1, nil
-		},
 	}
 	tests := []struct {
 		name    string
@@ -182,11 +181,17 @@ func Test_readByte(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readByte", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.BYTE}, opt: &readerOption{}}, int8(1), false},
+		{"readByte", args{t: &descriptor.TypeDescriptor{Type: descriptor.BYTE}, opt: &readerOption{}}, int8(1), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readByte(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeInt8(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeInt8() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readByte(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readByte() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -200,14 +205,8 @@ func Test_readByte(t *testing.T) {
 
 func Test_readInt16(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadI16Func: func() (int16, error) {
-			return 1, nil
-		},
 	}
 	tests := []struct {
 		name    string
@@ -216,11 +215,17 @@ func Test_readInt16(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readInt16", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.I16}, opt: &readerOption{}}, int16(1), false},
+		{"readInt16", args{t: &descriptor.TypeDescriptor{Type: descriptor.I16}, opt: &readerOption{}}, int16(1), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readInt16(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeInt16(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeInt16() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readInt16(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readInt16() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -234,16 +239,10 @@ func Test_readInt16(t *testing.T) {
 
 func Test_readInt32(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
 	}
 
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadI32Func: func() (int32, error) {
-			return 1, nil
-		},
-	}
 	tests := []struct {
 		name    string
 		args    args
@@ -251,11 +250,17 @@ func Test_readInt32(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readInt32", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.I32}}, int32(1), false},
+		{"readInt32", args{t: &descriptor.TypeDescriptor{Type: descriptor.I32}}, int32(1), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readInt32(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeInt32(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeInt32() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readInt32(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readInt32() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -269,14 +274,8 @@ func Test_readInt32(t *testing.T) {
 
 func Test_readInt64(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadI64Func: func() (int64, error) {
-			return 1, nil
-		},
 	}
 	tests := []struct {
 		name    string
@@ -285,11 +284,17 @@ func Test_readInt64(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readInt64", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.I64}}, int64(1), false},
+		{"readInt64", args{t: &descriptor.TypeDescriptor{Type: descriptor.I64}}, int64(1), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readInt64(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeInt64(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeInt64() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readInt64(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readInt64() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -303,17 +308,8 @@ func Test_readInt64(t *testing.T) {
 
 func Test_readString(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadStringFunc: func() (string, error) {
-			return stringInput, nil
-		},
-		ReadBinaryFunc: func() ([]byte, error) {
-			return binaryInput, nil
-		},
 	}
 	tests := []struct {
 		name    string
@@ -322,11 +318,17 @@ func Test_readString(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readString", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.STRING}}, stringInput, false},
+		{"readString", args{t: &descriptor.TypeDescriptor{Type: descriptor.STRING}}, stringInput, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readString(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeString(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeString() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readString(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readString() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -340,17 +342,8 @@ func Test_readString(t *testing.T) {
 
 func Test_readBinary64String(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadStringFunc: func() (string, error) {
-			return stringInput, nil
-		},
-		ReadBinaryFunc: func() ([]byte, error) {
-			return binaryInput, nil
-		},
 	}
 	tests := []struct {
 		name    string
@@ -359,11 +352,17 @@ func Test_readBinary64String(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readBase64Binary", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Name: "binary", Type: descriptor.STRING}}, base64.StdEncoding.EncodeToString(binaryInput), false}, // read base64 string from binary field
+		{"readBase64Binary", args{t: &descriptor.TypeDescriptor{Name: "binary", Type: descriptor.STRING}}, base64.StdEncoding.EncodeToString(binaryInput), false}, // read base64 string from binary field
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readBase64Binary(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeBase64Binary(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeBase64Binary() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readBase64Binary(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readString() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -377,17 +376,8 @@ func Test_readBinary64String(t *testing.T) {
 
 func Test_readBinary(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadStringFunc: func() (string, error) {
-			return stringInput, nil
-		},
-		ReadBinaryFunc: func() ([]byte, error) {
-			return binaryInput, nil
-		},
 	}
 	tests := []struct {
 		name    string
@@ -396,11 +386,17 @@ func Test_readBinary(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readBinary", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Name: "binary", Type: descriptor.STRING}}, binaryInput, false}, // read base64 string from binary field
+		{"readBinary", args{t: &descriptor.TypeDescriptor{Name: "binary", Type: descriptor.STRING}}, binaryInput, false}, // read base64 string from binary field
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readBinary(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeBinary(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeBinary() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readBinary(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readString() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -414,18 +410,8 @@ func Test_readBinary(t *testing.T) {
 
 func Test_readList(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadListBeginFunc: func() (elemType thrift.TType, size int, err error) {
-			return thrift.STRING, 3, nil
-		},
-
-		ReadStringFunc: func() (string, error) {
-			return stringInput, nil
-		},
 	}
 	tests := []struct {
 		name    string
@@ -434,11 +420,17 @@ func Test_readList(t *testing.T) {
 		wantErr bool
 	}{
 		// TODO: Add test cases.
-		{"readList", args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.LIST, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}}, []interface{}{stringInput, stringInput, stringInput}, false},
+		{"readList", args{t: &descriptor.TypeDescriptor{Type: descriptor.LIST, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}}, []interface{}{stringInput, stringInput, stringInput}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readList(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeList(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeList() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readList(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readList() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -452,60 +444,48 @@ func Test_readList(t *testing.T) {
 
 func Test_readMap(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	count := 0
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadMapBeginFunc: func() (keyType, valueType thrift.TType, size int, err error) {
-			return thrift.STRING, thrift.STRING, 1, nil
-		},
-		ReadStringFunc: func() (string, error) {
-			defer func() { count++ }()
-			if count%2 == 0 {
-				return "hello", nil
-			}
-			return "world", nil
-		},
-	}
-	mockTTransportWithInt16Key := &mocks.MockThriftTTransport{
-		ReadMapBeginFunc: func() (keyType, valueType thrift.TType, size int, err error) {
-			return thrift.I16, thrift.BOOL, 1, nil
-		},
-		ReadI16Func: func() (int16, error) {
-			return 16, nil
-		},
 	}
 	tests := []struct {
 		name    string
 		args    args
+		writer  func(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error
 		want    interface{}
 		wantErr bool
 	}{
 		// TODO: Add test cases.
 		{
 			"readMap",
-			args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}, opt: &readerOption{}},
+			args{t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Struct: &descriptor.StructDescriptor{}}, opt: &readerOption{}},
+			writeInterfaceMap,
 			map[interface{}]interface{}{"hello": "world"},
 			false,
 		},
 		{
 			"readJsonMap",
-			args{in: mockTTransport, t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}, opt: &readerOption{forJSON: true}},
+			args{t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Struct: &descriptor.StructDescriptor{}}, opt: &readerOption{forJSON: true}},
+			writeStringMap,
 			map[string]interface{}{"hello": "world"},
 			false,
 		},
 		{
 			"readJsonMapWithInt16Key",
-			args{in: mockTTransportWithInt16Key, t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.I16}, Elem: &descriptor.TypeDescriptor{Type: descriptor.BOOL}}, opt: &readerOption{forJSON: true}},
+			args{t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.I16}, Elem: &descriptor.TypeDescriptor{Type: descriptor.BOOL}, Struct: &descriptor.StructDescriptor{}}, opt: &readerOption{forJSON: true}},
+			writeStringMap,
 			map[string]interface{}{"16": false},
 			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readMap(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := tt.writer(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeInterfaceMap() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readMap(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readMap() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -519,66 +499,20 @@ func Test_readMap(t *testing.T) {
 
 func Test_readStruct(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	read := false
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadStructBeginFunc: func() (name string, err error) {
-			return "Demo", nil
-		},
-		ReadFieldBeginFunc: func() (name string, typeID thrift.TType, id int16, err error) {
-			if !read {
-				read = true
-				return "", thrift.STRING, 1, nil
-			}
-			return "", thrift.STOP, 0, nil
-		},
-		ReadStringFunc: func() (string, error) {
-			return "world", nil
-		},
-	}
-	mockTTransport2 := &mocks.MockThriftTTransport{
-		ReadStructBeginFunc: func() (name string, err error) {
-			return "Demo", nil
-		},
-		ReadFieldBeginFunc: func() (name string, typeID thrift.TType, id int16, err error) {
-			return "", thrift.STOP, 0, nil
-		},
-		ReadStringFunc: func() (string, error) {
-			return "world", nil
-		},
-	}
-	readError := false
-	mockTTransportError := &mocks.MockThriftTTransport{
-		ReadStructBeginFunc: func() (name string, err error) {
-			return "Demo", nil
-		},
-		ReadFieldBeginFunc: func() (name string, typeID thrift.TType, id int16, err error) {
-			if !readError {
-				readError = true
-				return "", thrift.LIST, 1, nil
-			}
-			return "", thrift.STOP, 0, nil
-		},
-		ReadListBeginFunc: func() (elemType thrift.TType, size int, err error) {
-			return thrift.STRING, 1, nil
-		},
-		ReadStringFunc: func() (string, error) {
-			return "123", errors.New("need STRING type, but got: I64")
-		},
 	}
 	tests := []struct {
 		name    string
 		args    args
+		input   interface{}
 		want    interface{}
 		wantErr bool
 	}{
 		// TODO: Add test cases.
 		{
 			"readStruct with setFieldsForEmptyStruct",
-			args{in: mockTTransport2, t: &descriptor.TypeDescriptor{
+			args{t: &descriptor.TypeDescriptor{
 				Type: descriptor.STRUCT,
 				Struct: &descriptor.StructDescriptor{
 					FieldsByID: map[int32]*descriptor.FieldDescriptor{
@@ -613,11 +547,26 @@ func Test_readStruct(t *testing.T) {
 				"list-list": [][][]byte(nil),
 				"map-list":  map[string][][]byte(nil),
 			},
+			map[string]interface{}{
+				"string":    "",
+				"byte":      byte(0),
+				"i8":        int8(0),
+				"i16":       int16(0),
+				"i32":       int32(0),
+				"i64":       int64(0),
+				"double":    float64(0),
+				"list":      [][]byte(nil),
+				"set":       []bool(nil),
+				"map":       map[string]float64(nil),
+				"struct":    map[string]interface{}(nil),
+				"list-list": [][][]byte(nil),
+				"map-list":  map[string][][]byte(nil),
+			},
 			false,
 		},
 		{
 			"readStruct with setFieldsForEmptyStruct optional",
-			args{in: mockTTransport2, t: &descriptor.TypeDescriptor{
+			args{t: &descriptor.TypeDescriptor{
 				Type: descriptor.STRUCT,
 				Struct: &descriptor.StructDescriptor{
 					FieldsByID: map[int32]*descriptor.FieldDescriptor{
@@ -646,38 +595,63 @@ func Test_readStruct(t *testing.T) {
 				"set":    []int16(nil),
 				"map":    map[int32]int64(nil),
 			},
+			map[string]interface{}{
+				"string": "",
+				"i8":     int8(0),
+				"i16":    int16(0),
+				"i32":    int32(0),
+				"i64":    int64(0),
+				"double": float64(0),
+				"list":   []int8(nil),
+				"set":    []int16(nil),
+				"map":    map[int32]int64(nil),
+			},
 			false,
 		},
 		{
 			"readStruct",
-			args{in: mockTTransport, t: &descriptor.TypeDescriptor{
+			args{t: &descriptor.TypeDescriptor{
 				Type: descriptor.STRUCT,
 				Struct: &descriptor.StructDescriptor{
 					FieldsByID: map[int32]*descriptor.FieldDescriptor{
 						1: {Name: "hello", Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
 					},
+					FieldsByName: map[string]*descriptor.FieldDescriptor{
+						"hello": {Name: "hello", ID: 1, Type: &descriptor.TypeDescriptor{Type: descriptor.STRING}},
+					},
 				},
 			}},
+			map[string]interface{}{"hello": "world"},
 			map[string]interface{}{"hello": "world"},
 			false,
 		},
 		{
 			"readStructError",
-			args{in: mockTTransportError, t: &descriptor.TypeDescriptor{
+			args{t: &descriptor.TypeDescriptor{
 				Type: descriptor.STRUCT,
 				Struct: &descriptor.StructDescriptor{
 					FieldsByID: map[int32]*descriptor.FieldDescriptor{
-						1: {Name: "strList", Type: &descriptor.TypeDescriptor{Type: descriptor.LIST, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}},
+						1: {Name: "strList", Type: &descriptor.TypeDescriptor{Type: descriptor.LIST, Elem: &descriptor.TypeDescriptor{Type: descriptor.I64}}},
+					},
+					FieldsByName: map[string]*descriptor.FieldDescriptor{
+						"strList": {Name: "strList", ID: 1, Type: &descriptor.TypeDescriptor{Type: descriptor.LIST, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}},
 					},
 				},
 			}},
+			map[string]interface{}{},
 			nil,
 			true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readStruct(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			err := writeStruct(context.Background(), tt.input, w, tt.args.t, &writerOption{})
+			if err != nil {
+				t.Errorf("writeStruct() error = %v", err)
+			}
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readStruct(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readStruct() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -689,25 +663,8 @@ func Test_readStruct(t *testing.T) {
 
 func Test_readHTTPResponse(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	read := false
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadStructBeginFunc: func() (name string, err error) {
-			return "Demo", nil
-		},
-		ReadFieldBeginFunc: func() (name string, typeID thrift.TType, id int16, err error) {
-			if !read {
-				read = true
-				return "", thrift.STRING, 1, nil
-			}
-			return "", thrift.STOP, 0, nil
-		},
-		ReadStringFunc: func() (string, error) {
-			return "world", nil
-		},
 	}
 	resp := descriptor.NewHTTPResponse()
 	resp.Body = map[string]interface{}{"hello": "world"}
@@ -720,7 +677,7 @@ func Test_readHTTPResponse(t *testing.T) {
 		// TODO: Add test cases.
 		{
 			"readHTTPResponse",
-			args{in: mockTTransport, t: &descriptor.TypeDescriptor{
+			args{t: &descriptor.TypeDescriptor{
 				Type: descriptor.STRUCT,
 				Struct: &descriptor.StructDescriptor{
 					FieldsByID: map[int32]*descriptor.FieldDescriptor{
@@ -738,7 +695,12 @@ func Test_readHTTPResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readHTTPResponse(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			w.WriteFieldBegin(thrift.TType(descriptor.STRING), 1)
+			w.WriteString("world")
+			w.WriteFieldStop()
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readHTTPResponse(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readHTTPResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -752,25 +714,8 @@ func Test_readHTTPResponse(t *testing.T) {
 
 func Test_readHTTPResponseWithPbBody(t *testing.T) {
 	type args struct {
-		in  thrift.TProtocol
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
-	}
-	read := false
-	mockTTransport := &mocks.MockThriftTTransport{
-		ReadStructBeginFunc: func() (name string, err error) {
-			return "BizResp", nil
-		},
-		ReadFieldBeginFunc: func() (name string, typeID thrift.TType, id int16, err error) {
-			if !read {
-				read = true
-				return "", thrift.STRING, 1, nil
-			}
-			return "", thrift.STOP, 0, nil
-		},
-		ReadStringFunc: func() (string, error) {
-			return "hello world", nil
-		},
 	}
 	desc, err := getRespPbDesc()
 	if err != nil {
@@ -786,7 +731,7 @@ func Test_readHTTPResponseWithPbBody(t *testing.T) {
 		// TODO: Add test cases.
 		{
 			"readHTTPResponse",
-			args{in: mockTTransport, t: &descriptor.TypeDescriptor{
+			args{t: &descriptor.TypeDescriptor{
 				Type: descriptor.STRUCT,
 				Struct: &descriptor.StructDescriptor{
 					FieldsByID: map[int32]*descriptor.FieldDescriptor{
@@ -807,7 +752,12 @@ func Test_readHTTPResponseWithPbBody(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readHTTPResponse(context.Background(), tt.args.in, tt.args.t, tt.args.opt)
+			w := thrift.NewBinaryWriter()
+			w.WriteFieldBegin(thrift.TType(descriptor.STRING), 1)
+			w.WriteString("hello world")
+			w.WriteFieldStop()
+			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			got, err := readHTTPResponse(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readHTTPResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
