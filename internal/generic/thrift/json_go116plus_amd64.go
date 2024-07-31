@@ -22,7 +22,6 @@ package thrift
 import (
 	"context"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"io"
 	"unsafe"
 
