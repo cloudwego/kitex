@@ -191,7 +191,7 @@ func (m *MockImpl) ExceptionTest(ctx context.Context, req *kt.MockReq) (r string
 func genBinaryResp(method string) []byte {
 	// no idea for respMsg part, it's not binary protocol.
 	// DO NOT TOUCH IT or you may need to change the tests as well
-	n := thrift.Binary.MessageBeginLength(method, 0, 0) + len(respMsg)
+	n := thrift.Binary.MessageBeginLength(method) + len(respMsg)
 	b := make([]byte, 0, n)
 	b = thrift.Binary.AppendMessageBegin(b, method, 0, 100)
 	b = append(b, respMsg...)

@@ -21,12 +21,11 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	athrift "github.com/apache/thrift/lib/go/thrift"
+	gthrift "github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -56,17 +55,16 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 		transBinary := gResult.Success
 		// handle biz error
 		if transBinary == nil {
-			tProt := thrift.NewBinaryProtocol(out)
-			if err := tProt.WriteMessageBegin(msg.RPCInfo().Invocation().MethodName(), athrift.TMessageType(msg.MessageType()), msg.RPCInfo().Invocation().SeqID()); err != nil {
-				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteMessageBegin failed: %s", err.Error()))
+			sz := gthrift.Binary.MessageBeginLength(msg.RPCInfo().Invocation().MethodName())
+			sz += gthrift.Binary.FieldStopLength()
+			b, err := out.Malloc(sz)
+			if err != nil {
+				return perrors.NewProtocolError(fmt.Errorf("binary thrift generic marshal, remote.ByteBuffer Malloc err: %w", err))
 			}
-			if err := tProt.WriteFieldStop(); err != nil {
-				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteFieldStop failed: %s", err.Error()))
-			}
-			if err := tProt.WriteMessageEnd(); err != nil {
-				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteMessageEnd failed: %s", err.Error()))
-			}
-			tProt.Recycle()
+			b = gthrift.Binary.AppendMessageBegin(b[:0],
+				msg.RPCInfo().Invocation().MethodName(), gthrift.TMessageType(msg.MessageType()), msg.RPCInfo().Invocation().SeqID())
+			b = gthrift.Binary.AppendFieldStop(b)
+			_ = b
 			return nil
 		} else if transBuff, ok = transBinary.(binaryReqType); !ok {
 			return perrors.NewProtocolErrorWithMsg("invalid marshal result in rawThriftBinaryCodec: must be []byte")
