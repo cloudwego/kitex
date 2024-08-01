@@ -62,7 +62,7 @@ func (c thriftCodec) hyperMarshal(out remote.ByteBuffer, methodName string, msgT
 	seqID int32, data interface{},
 ) error {
 	// calculate and malloc message buffer
-	msgBeginLen := thrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
+	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
 	objectLen := frugal.EncodedSize(data)
 	buf, err := out.Malloc(msgBeginLen + objectLen)
 	if err != nil {

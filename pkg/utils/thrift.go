@@ -76,7 +76,7 @@ func (t *ThriftMessageCodec) Decode(b []byte, msg athrift.TStruct) (method strin
 		return
 	}
 	if msgType == athrift.EXCEPTION {
-		b = b[thrift.Binary.MessageBeginLength(method, 0, 0):] // for reusing fast read
+		b = b[thrift.Binary.MessageBeginLength(method):] // for reusing fast read
 		ex := thrift.NewApplicationException(athrift.UNKNOWN_APPLICATION_EXCEPTION, "")
 		if _, err = ex.FastRead(b); err != nil {
 			return
@@ -122,7 +122,7 @@ func (t *ThriftMessageCodec) Deserialize(msg athrift.TStruct, b []byte) (err err
 // MarshalError convert go error to thrift exception, and encode exception over buffered binary transport.
 func MarshalError(method string, err error) []byte {
 	ex := thrift.NewApplicationException(athrift.INTERNAL_ERROR, err.Error())
-	n := thrift.Binary.MessageBeginLength(method, 0, 0)
+	n := thrift.Binary.MessageBeginLength(method)
 	n += ex.BLength()
 	b := make([]byte, n)
 	// Write message header

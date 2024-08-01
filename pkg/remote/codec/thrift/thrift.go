@@ -170,7 +170,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec) error {
 	nw, _ := out.(remote.NocopyWrite)
 	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
-	msgBeginLen := thrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
+	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
 	buf, err := out.Malloc(msgBeginLen + msg.BLength())
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
@@ -242,7 +242,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 
 	// decode thrift data
 	data := message.Data()
-	msgBeginLen := thrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
+	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
 	dataLen := message.PayloadLen() - msgBeginLen
 	// For Buffer Protocol, dataLen would be negative. Set it to zero so as not to confuse
 	if dataLen < 0 {
