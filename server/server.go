@@ -100,8 +100,6 @@ func (s *server) init() {
 		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
 	}
 	backup.Init(s.opt.BackupOpt)
-	s.buildInvokeChain()
-	s.buildStreamInvokeChain()
 }
 
 func fillContext(opt *internal_server.Options) context.Context {
@@ -172,7 +170,30 @@ func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinf
 
 func (s *server) buildInvokeChain() {
 	innerHandlerEp := s.invokeHandleEndpoint()
+	// TODO(DMwangnima): this is a workaround to fix ctx diverge problem temporarily,
+	// it should be removed after the new streaming api with ctx published.
+	// if there is streaming method, make sure the ctxInjectMW is the last middleware
+	s.fixStreamCtxDiverge()
 	s.eps = endpoint.Chain(s.mws...)(innerHandlerEp)
+}
+
+// buildFullInvokeChain builds the invoke chain for ping-pong and streaming
+func (s *server) buildFullInvokeChain() {
+	s.buildInvokeChain()
+	s.buildStreamInvokeChain()
+}
+
+// fixStreamCtxDiverge is a workaround to resolve stream ctx diverge problem in server side
+// when there is streaming method, add the ctxInjectMW to wrap the Stream
+func (s *server) fixStreamCtxDiverge() {
+	for _, svc := range s.svcs.svcMap {
+		for _, method := range svc.svcInfo.Methods {
+			if method.IsStreaming() {
+				s.mws = append(s.mws, newCtxInjectMW())
+				return
+			}
+		}
+	}
 }
 
 // RegisterService should not be called by users directly.
@@ -208,6 +229,8 @@ func (s *server) Run() (err error) {
 	s.Lock()
 	s.isRun = true
 	s.Unlock()
+	// build invoker chain here since we need to get some svc information to add MW
+	s.buildFullInvokeChain()
 	if err = s.check(); err != nil {
 		return err
 	}

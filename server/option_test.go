@@ -49,23 +49,18 @@ func TestOptionDebugInfo(t *testing.T) {
 	var opts []Option
 	md := newMockDiagnosis()
 	opts = append(opts, WithDiagnosisService(md))
-	buildMw := 0
 	opts = append(opts, WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
-		buildMw++
 		return func(ctx context.Context, req, resp interface{}) (err error) {
 			return next(ctx, req, resp)
 		}
 	}))
 	opts = append(opts, WithMiddlewareBuilder(func(ctx context.Context) endpoint.Middleware {
 		return func(next endpoint.Endpoint) endpoint.Endpoint {
-			buildMw++
 			return next
 		}
 	}))
 
 	svr := NewServer(opts...)
-	// check middleware build
-	test.Assert(t, buildMw == 2)
 
 	// check probe result
 	pp := md.ProbePairs()
