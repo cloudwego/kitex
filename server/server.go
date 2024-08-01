@@ -172,6 +172,8 @@ func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinf
 
 func (s *server) buildInvokeChain() {
 	innerHandlerEp := s.invokeHandleEndpoint()
+	// ensure that ctxInjectMW is the last middleware
+	s.mws = append(s.mws, newCtxInjectMW())
 	s.eps = endpoint.Chain(s.mws...)(innerHandlerEp)
 }
 
