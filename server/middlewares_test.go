@@ -24,10 +24,9 @@ import (
 	"time"
 
 	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
-	"github.com/cloudwego/kitex/pkg/streaming"
-
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 var _ context.Context = (*mockCtx)(nil)

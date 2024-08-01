@@ -19,10 +19,9 @@ package server
 import (
 	"context"
 
-	"github.com/cloudwego/kitex/pkg/streaming"
-
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 func serverTimeoutMW(initCtx context.Context) endpoint.Middleware {
