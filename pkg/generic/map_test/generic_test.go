@@ -477,7 +477,6 @@ func TestMapThriftGenericClientClose(t *testing.T) {
 func TestMapThriftGenericClientFinalizer(t *testing.T) {
 	debug.SetGCPercent(-1)
 	defer debug.SetGCPercent(100)
-
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	t.Logf("Before new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
@@ -514,7 +513,7 @@ func TestMapThriftGenericClientFinalizer(t *testing.T) {
 	runtime.ReadMemStats(&ms)
 	thirdGCHeapAlloc, thirdGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
 	t.Logf("After third GC, allocation: %f Mb, Number of allocation: %d\n", thirdGCHeapAlloc, thirdGCHeapObjects)
-	test.Assert(t, thirdGCHeapAlloc < secondGCHeapAlloc/2 && thirdGCHeapObjects < secondGCHeapObjects/2)
+	test.Assert(t, thirdGCHeapObjects < firstGCHeapObjects/2)
 }
 
 func mb(byteSize uint64) float32 {

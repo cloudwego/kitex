@@ -5,9 +5,9 @@ go 1.17
 require (
 	github.com/apache/thrift v0.13.0
 	github.com/bytedance/gopkg v0.0.0-20240711085056-a03554c296f8
-	github.com/bytedance/sonic v1.11.8
+	github.com/bytedance/sonic v1.12.0
 	github.com/cloudwego/configmanager v0.2.2
-	github.com/cloudwego/dynamicgo v0.2.9
+	github.com/cloudwego/dynamicgo v0.3.0
 	github.com/cloudwego/fastpb v0.0.4
 	github.com/cloudwego/frugal v0.1.15
 	github.com/cloudwego/gopkg v0.1.0
@@ -31,7 +31,7 @@ require (
 )
 
 require (
-	github.com/bytedance/sonic/loader v0.1.1 // indirect
+	github.com/bytedance/sonic/loader v0.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
