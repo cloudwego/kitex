@@ -88,7 +88,7 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 			return conv.failResp(errors.New("no service defined in the IDL"))
 		}
 		if !conv.Config.IsUsingMultipleServicesTpl() {
-			// if -multiple-services is not set, specify the last service as the target service
+			// if -tpl multiple_services is not set, specify the last service as the target service
 			conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
 		} else {
 			var svcs []*generator.ServiceInfo
