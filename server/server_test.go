@@ -63,6 +63,8 @@ func getAddrForListener() net.Addr {
 	return ret
 }
 
+// NewTestServer calls NewServer with a random addr
+// DO NOT USE `NewServer` and `s.Run()` without specifying addr, it listens on :8888 ...
 func NewTestServer(ops ...Option) (Server, net.Addr) {
 	addr := getAddrForListener()
 	svr := NewServer(append(ops, WithServiceAddr(addr))...)

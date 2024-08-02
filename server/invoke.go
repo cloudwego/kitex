@@ -48,9 +48,9 @@ type tInvoker struct {
 }
 
 // invokerMetaDecoder is used to update `PayloadLen` of `remote.Message`.
-// It fixes kitex returning err when apache codec is not available
-// Because users may not add transport header
-// like transport.Framed to invoke.Message when calling msg.SetRequestBytes.
+// It fixes kitex returning err when apache codec is not available due to msg.PayloadLen() == 0.
+// Because users may not add transport header like transport.Framed
+// to invoke.Message when calling msg.SetRequestBytes.
 // This is NOT expected and it's caused by kitex design fault.
 type invokerMetaDecoder struct {
 	remote.Codec
@@ -59,14 +59,18 @@ type invokerMetaDecoder struct {
 }
 
 func (d *invokerMetaDecoder) DecodeMeta(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	err := d.d.DecodeMeta(ctx, msg, in) // original decoder
+	err := d.d.DecodeMeta(ctx, msg, in)
 	if err != nil {
 		return err
 	}
-	if msg.PayloadLen() > 0 { // cool ... no need to do anything.
+	// cool ... no need to do anything.
+	// added transport header?
+	if msg.PayloadLen() > 0 {
 		return nil
 	}
-	if n := in.ReadableLen(); n > 0 { // use the whole buffer to msg
+	// use the whole buffer
+	// coz for invoker remote.ByteBuffer always contains the whole msg payload
+	if n := in.ReadableLen(); n > 0 {
 		msg.SetPayloadLen(n)
 	}
 	return nil
