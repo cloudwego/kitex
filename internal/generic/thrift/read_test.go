@@ -25,9 +25,9 @@ import (
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/jhump/protoreflect/desc/protoparse"
-	"github.com/stretchr/testify/require"
 
 	"github.com/cloudwego/kitex/internal/generic/proto"
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
@@ -656,7 +656,7 @@ func Test_readStruct(t *testing.T) {
 				t.Errorf("readStruct() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			require.Equal(t, tt.want, got)
+			test.Assert(t, reflect.DeepEqual(tt.want, got))
 		})
 	}
 }
