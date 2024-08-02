@@ -20,12 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"io/ioutil"
+	"reflect"
 	"testing"
 
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/proto"
 	"github.com/cloudwego/dynamicgo/testdata/kitex_gen/pb/example2"
-	"github.com/stretchr/testify/require"
 	goprotowire "google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -76,14 +76,13 @@ func TestWrite(t *testing.T) {
 		l += tagLen
 		buf = buf[tagLen:]
 		offset, err := act.FastRead(buf, int8(wtyp), int32(id))
-		require.Nil(t, err)
+		test.Assert(t, err == nil)
 		buf = buf[offset:]
 		l += offset
 	}
 	test.Assert(t, err == nil)
-
 	// compare exp and act struct
-	require.Equal(t, exp, act)
+	test.Assert(t, reflect.DeepEqual(exp, act))
 }
 
 // Check NewReadJSON converting protobuf wire format to JSON
@@ -114,7 +113,7 @@ func TestRead(t *testing.T) {
 		l += tagLen
 		in = in[tagLen:]
 		offset, err := exp.FastRead(in, int8(wtyp), int32(id))
-		require.Nil(t, err)
+		test.Assert(t, err == nil)
 		in = in[offset:]
 		l += offset
 	}
@@ -127,9 +126,8 @@ func TestRead(t *testing.T) {
 	str, ok := out.(string)
 	test.Assert(t, ok)
 	json.Unmarshal([]byte(str), &act)
-
 	// compare exp and act struct
-	require.Equal(t, exp, act)
+	test.Assert(t, reflect.DeepEqual(exp, act))
 }
 
 // helper methods
