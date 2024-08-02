@@ -55,10 +55,24 @@ import (
 
 var svcInfo = mocks.ServiceInfo()
 
+// NOTE: always use this method to get addr for server listening
+// should be used with `WithServiceAddr(addr)`
+func getAddrForListener() net.Addr {
+	addr := test.GetLocalAddress()
+	ret, _ := net.ResolveTCPAddr("tcp", addr)
+	return ret
+}
+
+func NewTestServer(ops ...Option) (Server, net.Addr) {
+	addr := getAddrForListener()
+	svr := NewServer(append(ops, WithServiceAddr(addr))...)
+	return svr, addr
+}
+
 func TestServerRun(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithMetaHandler(noopMetahandler{}))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 
 	time.AfterFunc(time.Millisecond*500, func() {
 		err := svr.Stop()
@@ -84,8 +98,7 @@ func TestServerRun(t *testing.T) {
 }
 
 func TestReusePortServerRun(t *testing.T) {
-	hostPort := test.GetLocalAddress()
-	addr, _ := net.ResolveTCPAddr("tcp", hostPort)
+	addr := getAddrForListener()
 	var opts []Option
 	opts = append(opts, WithReusePort(true))
 	opts = append(opts, WithServiceAddr(addr), WithExitWaitTime(time.Microsecond*10))
@@ -261,7 +274,7 @@ func TestServiceRegisterFailed(t *testing.T) {
 	}
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -287,7 +300,7 @@ func TestServiceDeregisterFailed(t *testing.T) {
 	}
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -308,7 +321,6 @@ func TestServiceRegistryInfo(t *testing.T) {
 	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
 		test.Assert(t, info.Weight == registryInfo.Weight, info.Addr)
-		test.Assert(t, info.Addr.String() == "[::]:8888", info.Addr)
 		test.Assert(t, len(info.Tags) == len(registryInfo.Tags), info.Tags)
 		test.Assert(t, info.Tags["aa"] == registryInfo.Tags["aa"], info.Tags)
 	}
@@ -329,7 +341,7 @@ func TestServiceRegistryInfo(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
 	opts = append(opts, WithRegistryInfo(registryInfo))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -346,7 +358,6 @@ func TestServiceRegistryInfo(t *testing.T) {
 func TestServiceRegistryNoInitInfo(t *testing.T) {
 	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
-		test.Assert(t, info.Addr.String() == "[::]:8888", info.Addr)
 	}
 	var rCount int
 	var drCount int
@@ -364,7 +375,7 @@ func TestServiceRegistryNoInitInfo(t *testing.T) {
 	}
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -386,7 +397,6 @@ func TestServiceRegistryInfoWithNilTags(t *testing.T) {
 	}
 	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
-		test.Assert(t, info.Addr.String() == "[::]:8888", info.Addr)
 		test.Assert(t, info.Weight == registryInfo.Weight, info.Weight)
 		test.Assert(t, info.Tags["aa"] == "bb", info.Tags)
 	}
@@ -410,7 +420,7 @@ func TestServiceRegistryInfoWithNilTags(t *testing.T) {
 	opts = append(opts, WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
 		Tags: map[string]string{"aa": "bb"},
 	}))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -453,7 +463,7 @@ func TestServiceRegistryInfoWithSkipListenAddr(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
 	opts = append(opts, WithRegistryInfo(registryInfo))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -495,7 +505,7 @@ func TestServiceRegistryInfoWithoutSkipListenAddr(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
 	opts = append(opts, WithRegistryInfo(registryInfo))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -512,7 +522,7 @@ func TestServiceRegistryInfoWithoutSkipListenAddr(t *testing.T) {
 func TestGRPCServerMultipleServices(t *testing.T) {
 	var opts []Option
 	opts = append(opts, withGRPCTransport())
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 	err = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler())
@@ -672,7 +682,7 @@ func TestServerBoundHandler(t *testing.T) {
 	}
 	for _, tcase := range cases {
 		opts := append(tcase.opts, WithExitWaitTime(time.Millisecond*10))
-		svr := NewServer(opts...)
+		svr, _ := NewTestServer(opts...)
 
 		time.AfterFunc(100*time.Millisecond, func() {
 			err := svr.Stop()
@@ -691,9 +701,9 @@ func TestServerBoundHandler(t *testing.T) {
 }
 
 func TestInvokeHandlerWithContextBackup(t *testing.T) {
-	testInvokeHandlerWithSession(t, true, ":8888")
+	testInvokeHandlerWithSession(t, true, "localhost:8888")
 	os.Setenv(localsession.SESSION_CONFIG_KEY, "true,100,1h")
-	testInvokeHandlerWithSession(t, false, ":8889")
+	testInvokeHandlerWithSession(t, false, "localhost:8889")
 }
 
 func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
@@ -840,7 +850,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 		},
 		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
 			var err error
-			ln, err = net.Listen("tcp", ":8888")
+			ln, err = net.Listen("tcp", "localhost:8888")
 			return ln, err
 		},
 	}
@@ -903,7 +913,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 		},
 		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
 			var err error
-			ln, err = net.Listen("tcp", ":8888")
+			ln, err = net.Listen("tcp", "localhost:8888")
 			return ln, err
 		},
 	}

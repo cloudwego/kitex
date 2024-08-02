@@ -35,7 +35,7 @@ func TestServerStart(t *testing.T) {
 	transSvr := &mocks.MockTransServer{
 		CreateListenerFunc: func(addr net.Addr) (listener net.Listener, err error) {
 			isCreateListener = true
-			ln, err = net.Listen("tcp", ":8888")
+			ln, err = net.Listen("tcp", "localhost:8888")
 			return ln, err
 		},
 		BootstrapServerFunc: func(net.Listener) (err error) {

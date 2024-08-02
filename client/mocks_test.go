@@ -16,28 +16,6 @@
 
 package client
 
-import (
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
-)
-
-// MockTStruct implements the thrift.TStruct interface.
-type MockTStruct struct {
-	WriteFunc func(p thrift.TProtocol) (e error)
-	ReadFunc  func(p thrift.TProtocol) (e error)
-}
-
-// Write implements the thrift.TStruct interface.
-func (m MockTStruct) Write(p thrift.TProtocol) (e error) {
-	if m.WriteFunc != nil {
-		return m.WriteFunc(p)
-	}
-	return
-}
-
-// Read implements the thrift.TStruct interface.
-func (m MockTStruct) Read(p thrift.TProtocol) (e error) {
-	if m.ReadFunc != nil {
-		return m.ReadFunc(p)
-	}
-	return
-}
+// MockTStruct was implemented the thrift.TStruct interface.
+// But actually Read/Write are not in use, so removed... only empty struct left for testing
+type MockTStruct struct{}
