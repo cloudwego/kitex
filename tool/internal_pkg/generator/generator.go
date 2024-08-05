@@ -98,6 +98,7 @@ type Generator interface {
 	GenerateMainPackage(pkg *PackageInfo) ([]*File, error)
 	GenerateCustomPackage(pkg *PackageInfo) ([]*File, error)
 	GenerateCustomPackageWithTpl(pkg *PackageInfo) ([]*File, error)
+	RenderWithMultipleFiles(pkg *PackageInfo) ([]*File, error)
 }
 
 // Config .
@@ -136,10 +137,11 @@ type Config struct {
 	TemplateDir string
 
 	// subcommand template
-	InitOutputDir string //specify the location path of init subcommand
+	InitOutputDir string // specify the location path of init subcommand
 	InitType      string
-	RenderTplDir  string // specify the path of template directory for render subcommand
-	TemplateFile  string
+	RenderTplDir  string   // specify the path of template directory for render subcommand
+	TemplateFiles []string // specify the path of single file or multiple file to render
+	DebugTpl      bool
 
 	GenPath string
 

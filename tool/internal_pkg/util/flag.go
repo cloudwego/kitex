@@ -15,6 +15,8 @@
 package util
 
 import (
+	"bytes"
+	"encoding/csv"
 	"errors"
 	goflag "flag"
 	"fmt"
@@ -22,7 +24,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // ErrHelp is the error returned if the flag -help is invoked but no such flag is defined.
@@ -624,29 +625,48 @@ func (f *FlagSet) Int(name string, value int, usage string) *int {
 	return p
 }
 
-// -- time.Duration Value
-type durationValue time.Duration
-
-func (d *durationValue) Set(s string) error {
-	v, err := time.ParseDuration(s)
-	*d = durationValue(v)
-	return err
+// -- stringArray Value
+type stringArrayValue struct {
+	value   *[]string
+	changed bool
 }
 
-func (d *durationValue) String() string { return (*time.Duration)(d).String() }
-
-func newDurationValue(val time.Duration, p *time.Duration) *durationValue {
-	*p = val
-	return (*durationValue)(p)
+func newStringArrayValue(val []string, p *[]string) *stringArrayValue {
+	ssv := new(stringArrayValue)
+	ssv.value = p
+	*ssv.value = val
+	return ssv
 }
 
-// DurationVarP is like DurationVar, but accepts a shorthand letter that can be used after a single dash.
-func (f *FlagSet) DurationVarP(p *time.Duration, name, shorthand string, value time.Duration, usage string) {
-	f.VarP(newDurationValue(value, p), name, shorthand, usage)
+func (s *stringArrayValue) Set(val string) error {
+	if !s.changed {
+		*s.value = []string{val}
+		s.changed = true
+	} else {
+		*s.value = append(*s.value, val)
+	}
+	return nil
 }
 
-func (f *FlagSet) Duration(name string, value time.Duration, usage string) *time.Duration {
-	p := new(time.Duration)
-	f.DurationVarP(p, name, "", value, usage)
-	return p
+func writeAsCSV(vals []string) (string, error) {
+	b := &bytes.Buffer{}
+	w := csv.NewWriter(b)
+	err := w.Write(vals)
+	if err != nil {
+		return "", err
+	}
+	w.Flush()
+	return strings.TrimSuffix(b.String(), "\n"), nil
+}
+
+func (s *stringArrayValue) String() string {
+	str, _ := writeAsCSV(*s.value)
+	return "[" + str + "]"
+}
+
+// StringArrayVar defines a string flag with specified name, default value, and usage string.
+// The argument p points to a []string variable in which to store the values of the multiple flags.
+// The value of each argument will not try to be separated by comma. Use a StringSlice for that.
+func (f *FlagSet) StringArrayVar(p *[]string, name string, value []string, usage string) {
+	f.VarP(newStringArrayValue(value, p), name, "", usage)
 }

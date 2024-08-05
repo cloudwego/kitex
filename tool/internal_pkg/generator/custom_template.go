@@ -200,39 +200,42 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 	return fs, nil
 }
 
-func readTpls(rootDir, currentDir string, ts []*Template) ([]*Template, error) {
-	files, _ := os.ReadDir(currentDir)
+func readTemplates(dir string) ([]*Template, error) {
+	files, _ := ioutil.ReadDir(dir)
+	var ts []*Template
 	for _, f := range files {
-		// filter dir and non-tpl files
-		if f.IsDir() {
-			subDir := filepath.Join(currentDir, f.Name())
-			subTemplates, err := readTpls(rootDir, subDir, ts)
-			if err != nil {
-				return nil, err
-			}
-			ts = append(ts, subTemplates...)
-		} else if strings.HasSuffix(f.Name(), ".tpl") {
-			p := filepath.Join(currentDir, f.Name())
-			tplData, err := os.ReadFile(p)
+		// filter dir and non-yaml files
+		if f.Name() != ExtensionFilename && !f.IsDir() && (strings.HasSuffix(f.Name(), "yaml") || strings.HasSuffix(f.Name(), "yml")) {
+			p := filepath.Join(dir, f.Name())
+			tplData, err := ioutil.ReadFile(p)
 			if err != nil {
 				return nil, fmt.Errorf("read layout config from  %s failed, err: %v", p, err.Error())
 			}
-			// Remove the .tpl suffix from the Path and compute relative path
-			relativePath, err := filepath.Rel(rootDir, p)
-			if err != nil {
-				return nil, fmt.Errorf("failed to compute relative path for %s: %v", p, err)
-			}
-			trimmedPath := strings.TrimSuffix(relativePath, ".tpl")
 			t := &Template{
-				Path:           trimmedPath,
-				Body:           string(tplData),
 				UpdateBehavior: &Update{Type: string(skip)},
+			}
+			if err = yaml.Unmarshal(tplData, t); err != nil {
+				return nil, fmt.Errorf("%s: unmarshal layout config failed, err: %s", f.Name(), err.Error())
 			}
 			ts = append(ts, t)
 		}
 	}
 
 	return ts, nil
+}
+
+func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File, err error) {
+	cg := NewCustomGenerator(pkg, outputPath)
+	// special handling Methods field
+	if tpl.LoopMethod {
+		err = cg.loopGenerate(tpl)
+	} else {
+		err = cg.commonGenerate(tpl)
+	}
+	if errors.Is(err, errNoNewMethod) {
+		err = nil
+	}
+	return cg.fs, err
 }
 
 func (g *generator) GenerateCustomPackageWithTpl(pkg *PackageInfo) (fs []*File, err error) {
@@ -273,40 +276,65 @@ func (g *generator) GenerateCustomPackageWithTpl(pkg *PackageInfo) (fs []*File, 
 	return fs, nil
 }
 
-func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File, err error) {
-	cg := NewCustomGenerator(pkg, outputPath)
-	// special handling Methods field
-	if tpl.LoopMethod {
-		err = cg.loopGenerate(tpl)
-	} else {
-		err = cg.commonGenerate(tpl)
-	}
-	if errors.Is(err, errNoNewMethod) {
-		err = nil
-	}
-	return cg.fs, err
-}
-
-func readTemplates(dir string) ([]*Template, error) {
-	files, _ := ioutil.ReadDir(dir)
-	var ts []*Template
+func readTpls(rootDir, currentDir string, ts []*Template) ([]*Template, error) {
+	files, _ := os.ReadDir(currentDir)
 	for _, f := range files {
-		// filter dir and non-yaml files
-		if f.Name() != ExtensionFilename && !f.IsDir() && (strings.HasSuffix(f.Name(), "yaml") || strings.HasSuffix(f.Name(), "yml")) {
-			p := filepath.Join(dir, f.Name())
-			tplData, err := ioutil.ReadFile(p)
+		// filter dir and non-tpl files
+		if f.IsDir() {
+			subDir := filepath.Join(currentDir, f.Name())
+			subTemplates, err := readTpls(rootDir, subDir, ts)
 			if err != nil {
-				return nil, fmt.Errorf("read layout config from  %s failed, err: %v", p, err.Error())
+				return nil, err
 			}
+			ts = append(ts, subTemplates...)
+		} else if strings.HasSuffix(f.Name(), ".tpl") {
+			p := filepath.Join(currentDir, f.Name())
+			tplData, err := os.ReadFile(p)
+			if err != nil {
+				return nil, fmt.Errorf("read file from  %s failed, err: %v", p, err.Error())
+			}
+			// Remove the .tpl suffix from the Path and compute relative path
+			relativePath, err := filepath.Rel(rootDir, p)
+			if err != nil {
+				return nil, fmt.Errorf("failed to compute relative path for %s: %v", p, err)
+			}
+			trimmedPath := strings.TrimSuffix(relativePath, ".tpl")
 			t := &Template{
+				Path:           trimmedPath,
+				Body:           string(tplData),
 				UpdateBehavior: &Update{Type: string(skip)},
-			}
-			if err = yaml.Unmarshal(tplData, t); err != nil {
-				return nil, fmt.Errorf("%s: unmarshal layout config failed, err: %s", f.Name(), err.Error())
 			}
 			ts = append(ts, t)
 		}
 	}
 
 	return ts, nil
+}
+
+func (g *generator) RenderWithMultipleFiles(pkg *PackageInfo) (fs []*File, err error) {
+	for _, file := range g.Config.TemplateFiles {
+		content, err := os.ReadFile(file)
+		if err != nil {
+			return nil, fmt.Errorf("read file from  %s failed, err: %v", file, err.Error())
+		}
+		var updatedContent string
+		if g.Config.DebugTpl {
+			// --debug时 在模板内容顶部加上一段magic string用于区分
+			updatedContent = "// Kitex template debug file. use template clean to delete it.\n\n" + string(content)
+		} else {
+			updatedContent = string(content)
+		}
+		filename := filepath.Base(strings.TrimSuffix(file, ".tpl"))
+		tpl := &Template{
+			Path:           filename,
+			Body:           updatedContent,
+			UpdateBehavior: &Update{Type: string(skip)},
+		}
+		f, err := renderFile(pkg, g.OutputPath, tpl)
+		if err != nil {
+			return nil, err
+		}
+		fs = append(fs, f...)
+	}
+	return
 }

@@ -78,7 +78,7 @@ func main() {
 		os.Exit(1)
 	}
 	if os.Args[1] == "template" {
-		err = args.TemplateArgs(kitex.Version, curpath)
+		err = args.TemplateArgs(kitex.Version)
 	} else if !strings.HasPrefix(os.Args[1], "-") {
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	} else {

@@ -18,7 +18,6 @@ import (
 	"io"
 	"os"
 	"testing"
-	"time"
 )
 
 func ResetForTesting() {
@@ -48,7 +47,6 @@ func testParse(f *FlagSet, t *testing.T) {
 	bool3Flag := f.Bool("bool3", false, "bool3 value")
 	intFlag := f.Int("int", 0, "int value")
 	stringFlag := f.String("string", "0", "string value")
-	durationFlag := f.Duration("duration", 5*time.Second, "time.Duration value")
 	optionalIntNoValueFlag := f.Int("optional-int-no-value", 0, "int value")
 	f.Lookup("optional-int-no-value").NoOptDefVal = "9"
 	optionalIntWithValueFlag := f.Int("optional-int-with-value", 0, "int value")
@@ -60,7 +58,6 @@ func testParse(f *FlagSet, t *testing.T) {
 		"--bool3=false",
 		"--int=22",
 		"--string=hello",
-		"--duration=2m",
 		"--optional-int-no-value",
 		"--optional-int-with-value=42",
 		extra,
@@ -85,9 +82,6 @@ func testParse(f *FlagSet, t *testing.T) {
 	}
 	if *stringFlag != "hello" {
 		t.Error("string flag should be `hello`, is ", *stringFlag)
-	}
-	if *durationFlag != 2*time.Minute {
-		t.Error("duration flag should be 2m, is ", *durationFlag)
 	}
 	if *optionalIntNoValueFlag != 9 {
 		t.Error("optional int flag should be the default value, is ", *optionalIntNoValueFlag)
