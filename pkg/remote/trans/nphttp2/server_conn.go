@@ -60,7 +60,17 @@ func (c *serverConn) ReadFrame() (hdr, data []byte, err error) {
 }
 
 func GetServerConn(st streaming.Stream) (GRPCConn, error) {
-	serverStream, ok := st.(*stream)
+
+	var serverStream *stream
+
+	mwStream, ok := st.(*streamWithMiddleware)
+
+	if ok {
+		serverStream, ok = mwStream.Stream.(*stream)
+	} else {
+		serverStream, ok = st.(*stream)
+	}
+
 	if !ok {
 		// err!
 		return nil, status.Errorf(codes.Internal, "failed to get server conn from stream.")
