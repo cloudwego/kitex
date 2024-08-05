@@ -276,7 +276,44 @@ func (g *generator) GenerateCustomPackageWithTpl(pkg *PackageInfo) (fs []*File, 
 	return fs, nil
 }
 
+const kitexRenderMetaFile = "kitex_render_meta.yaml"
+
+// Meta 代表kitex_render_meta.yaml文件的结构
+type Meta struct {
+	Templates []Template `yaml:"templates"`
+}
+
+func readMetaFile(rootDir string) (*Meta, error) {
+	metaPath := filepath.Join(rootDir, kitexRenderMetaFile)
+	metaData, err := os.ReadFile(metaPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read meta file from %s: %v", metaPath, err)
+	}
+
+	var meta Meta
+	err = yaml.Unmarshal(metaData, &meta)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse yaml file %s: %v", metaPath, err)
+	}
+
+	return &meta, nil
+}
+
+func getUpdateBehavior(meta *Meta, relativePath string) *Update {
+	for _, template := range meta.Templates {
+		// fmt.Println(template.Path, "==", relativePath)
+		if template.Path == relativePath {
+			return template.UpdateBehavior
+		}
+	}
+	return &Update{Type: string(skip)}
+}
+
 func readTpls(rootDir, currentDir string, ts []*Template) ([]*Template, error) {
+	meta, err := readMetaFile(rootDir)
+	if err != nil {
+		return nil, err
+	}
 	files, _ := os.ReadDir(currentDir)
 	for _, f := range files {
 		// filter dir and non-tpl files
@@ -299,10 +336,11 @@ func readTpls(rootDir, currentDir string, ts []*Template) ([]*Template, error) {
 				return nil, fmt.Errorf("failed to compute relative path for %s: %v", p, err)
 			}
 			trimmedPath := strings.TrimSuffix(relativePath, ".tpl")
+			updateBehavior := getUpdateBehavior(meta, relativePath)
 			t := &Template{
 				Path:           trimmedPath,
 				Body:           string(tplData),
-				UpdateBehavior: &Update{Type: string(skip)},
+				UpdateBehavior: updateBehavior,
 			}
 			ts = append(ts, t)
 		}
