@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/kitex/internal/mocks"
 	mt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -209,8 +210,8 @@ func BenchmarkNormalParallel(b *testing.B) {
 					test.Assert(b, err == nil, err)
 
 					// compare Req Arg
-					sendReq := mt.UnpackApacheCodec(sendMsg.Data()).(*mt.MockTestArgs).Req
-					recvReq := mt.UnpackApacheCodec(recvMsg.Data()).(*mt.MockTestArgs).Req
+					sendReq := sendMsg.Data().(*mt.MockTestArgs).Req
+					recvReq := recvMsg.Data().(*mt.MockTestArgs).Req
 					test.Assert(b, sendReq.Msg == recvReq.Msg)
 					test.Assert(b, len(sendReq.StrList) == len(recvReq.StrList))
 					test.Assert(b, len(sendReq.StrMap) == len(recvReq.StrMap))
@@ -324,7 +325,7 @@ func TestSkipDecoder(t *testing.T) {
 
 func toApacheCodec(v bool, data thrift.FastCodec) interface{} {
 	if v {
-		return mt.ToApacheCodec(data)
+		return bthrift.ToApacheCodec(data)
 	}
 	return data
 }
@@ -349,8 +350,8 @@ func initRecvMsg(basic bool) remote.Message {
 }
 
 func compare(t *testing.T, sendMsg, recvMsg remote.Message) {
-	sendReq := mt.UnpackApacheCodec(sendMsg.Data()).(*mt.MockTestArgs).Req
-	recvReq := mt.UnpackApacheCodec(recvMsg.Data()).(*mt.MockTestArgs).Req
+	sendReq := bthrift.UnpackApacheCodec(sendMsg.Data()).(*mt.MockTestArgs).Req
+	recvReq := bthrift.UnpackApacheCodec(recvMsg.Data()).(*mt.MockTestArgs).Req
 	test.Assert(t, sendReq.Msg == recvReq.Msg)
 	test.Assert(t, len(sendReq.StrList) == len(recvReq.StrList))
 	test.Assert(t, len(sendReq.StrMap) == len(recvReq.StrMap))
