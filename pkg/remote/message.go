@@ -186,7 +186,7 @@ func (m *message) ServiceInfo() *serviceinfo.ServiceInfo {
 }
 
 func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error) {
-	// for non-multi-service including generic server scenario
+	// for single service scenario
 	if m.targetSvcInfo != nil {
 		if mt := m.targetSvcInfo.MethodInfo(methodName); mt == nil {
 			return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))

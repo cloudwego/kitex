@@ -21,12 +21,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/cloudwego/netpoll"
-
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote"
-	internalnetpoll "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // TestWriteMessageEnd test binary WriteMessageEnd function
@@ -295,24 +291,6 @@ func TestWriteAndReadString(t *testing.T) {
 	test.Assert(t, v == "kitex")
 }
 
-// TestWriteAndReadStringWithSpanCache test binary WriteString and ReadString with spanCache allocator
-func TestWriteAndReadStringWithSpanCache(t *testing.T) {
-	buf := make([]byte, 128)
-	exceptWs := "000000056b69746578"
-	exceptSize := 9
-	wn := Binary.WriteString(buf, "kitex")
-	ws := fmt.Sprintf("%x", buf[:wn])
-	test.Assert(t, wn == exceptSize, wn, exceptSize)
-	test.Assert(t, ws == exceptWs, ws, exceptWs)
-
-	SetSpanCache(true)
-	v, length, err := Binary.ReadString(buf)
-	test.Assert(t, nil == err)
-	test.Assert(t, exceptSize == length)
-	test.Assert(t, v == "kitex")
-	SetSpanCache(false)
-}
-
 // TestWriteAndReadBinary test binary WriteBinary and ReadBinary
 func TestWriteAndReadBinary(t *testing.T) {
 	buf := make([]byte, 128)
@@ -332,35 +310,12 @@ func TestWriteAndReadBinary(t *testing.T) {
 	}
 }
 
-// TestWriteAndReadBinaryWithSpanCache test binary WriteBinary and ReadBinary with spanCache allocator
-func TestWriteAndReadBinaryWithSpanCache(t *testing.T) {
-	buf := make([]byte, 128)
-	exceptWs := "000000056b69746578"
-	exceptSize := 9
-	val := []byte("kitex")
-	wn := Binary.WriteBinary(buf, val)
-	ws := fmt.Sprintf("%x", buf[:wn])
-	test.Assert(t, wn == exceptSize, wn, exceptSize)
-	test.Assert(t, ws == exceptWs, ws, exceptWs)
-
-	SetSpanCache(true)
-	v, length, err := Binary.ReadBinary(buf)
-	test.Assert(t, nil == err)
-	test.Assert(t, exceptSize == length)
-	for i := 0; i < len(v); i++ {
-		test.Assert(t, val[i] == v[i])
-	}
-	SetSpanCache(false)
-}
-
 // TestWriteStringNocopy test binary WriteStringNocopy with small content
 func TestWriteStringNocopy(t *testing.T) {
 	buf := make([]byte, 128)
 	exceptWs := "0000000c6d657373616765426567696e"
 	exceptSize := 16
-	out := internalnetpoll.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(0))
-	nw, _ := out.(remote.NocopyWrite)
-	wn := Binary.WriteStringNocopy(buf, nw, "messageBegin")
+	wn := Binary.WriteStringNocopy(buf, nil, "messageBegin")
 	ws := fmt.Sprintf("%x", buf[:wn])
 	test.Assert(t, wn == exceptSize, wn, exceptSize)
 	test.Assert(t, ws == exceptWs, ws, exceptWs)
@@ -371,9 +326,7 @@ func TestWriteBinaryNocopy(t *testing.T) {
 	buf := make([]byte, 128)
 	exceptWs := "0000000c6d657373616765426567696e"
 	exceptSize := 16
-	out := internalnetpoll.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(0))
-	nw, _ := out.(remote.NocopyWrite)
-	wn := Binary.WriteBinaryNocopy(buf, nw, []byte("messageBegin"))
+	wn := Binary.WriteBinaryNocopy(buf, nil, []byte("messageBegin"))
 	ws := fmt.Sprintf("%x", buf[:wn])
 	test.Assert(t, wn == exceptSize, wn, exceptSize)
 	test.Assert(t, ws == exceptWs, ws, exceptWs)

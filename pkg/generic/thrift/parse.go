@@ -22,12 +22,15 @@ import (
 	"fmt"
 	"runtime/debug"
 
+	"github.com/cloudwego/thriftgo/generator/golang/streaming"
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/semantic"
 
+	"github.com/cloudwego/kitex/internal/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 const (
@@ -140,6 +143,11 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 	if len(fn.Arguments) == 0 {
 		return fmt.Errorf("empty arguments in function: %s", fn.Name)
 	}
+	st, err := streaming.ParseStreaming(fn)
+	if err != nil {
+		return err
+	}
+	mode := streamingMode(st)
 	// only support single argument
 	field := fn.Arguments[0]
 	req := &descriptor.TypeDescriptor{
@@ -213,6 +221,7 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		Request:        req,
 		Response:       resp,
 		HasRequestBase: hasRequestBase,
+		StreamingMode:  mode,
 	}
 	defer func() {
 		if ret := recover(); ret != nil {
@@ -232,6 +241,22 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 	}
 	sDsc.Functions[fn.Name] = fnDsc
 	return nil
+}
+
+func streamingMode(st *streaming.Streaming) serviceinfo.StreamingMode {
+	if st.BidirectionalStreaming {
+		return serviceinfo.StreamingBidirectional
+	}
+	if st.ClientStreaming {
+		return serviceinfo.StreamingClient
+	}
+	if st.ServerStreaming {
+		return serviceinfo.StreamingServer
+	}
+	if st.Unary {
+		return serviceinfo.StreamingUnary
+	}
+	return serviceinfo.StreamingNone
 }
 
 // reuse builtin types
@@ -283,7 +308,7 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 		if ty, ok := cache[t.Name]; ok {
 			return ty, nil
 		}
-		typePkg, typeName := splitType(t.Name)
+		typePkg, typeName := thrift.SplitType(t.Name)
 		if typePkg != "" {
 			ref, ok := tree.GetReference(typePkg)
 			if !ok {

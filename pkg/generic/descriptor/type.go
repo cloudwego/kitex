@@ -16,7 +16,7 @@
 
 package descriptor
 
-import "github.com/apache/thrift/lib/go/thrift"
+import "github.com/cloudwego/gopkg/protocol/thrift"
 
 // Type constants in the Thrift protocol
 type Type byte

@@ -19,13 +19,14 @@ package thrift
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
-	mt "github.com/cloudwego/kitex/internal/mocks/thrift/fast"
+	mt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
@@ -62,20 +63,20 @@ func init() {
 }
 
 type mockWithContext struct {
-	ReadFunc  func(ctx context.Context, method string, oprot thrift.TProtocol) error
-	WriteFunc func(ctx context.Context, oprot thrift.TProtocol) error
+	ReadFunc  func(ctx context.Context, method string, dataLen int, oprot io.Reader) error
+	WriteFunc func(ctx context.Context, method string, oprot io.Writer) error
 }
 
-func (m *mockWithContext) Read(ctx context.Context, method string, oprot thrift.TProtocol) error {
+func (m *mockWithContext) Read(ctx context.Context, method string, dataLen int, oprot io.Reader) error {
 	if m.ReadFunc != nil {
-		return m.ReadFunc(ctx, method, oprot)
+		return m.ReadFunc(ctx, method, dataLen, oprot)
 	}
 	return nil
 }
 
-func (m *mockWithContext) Write(ctx context.Context, oprot thrift.TProtocol) error {
+func (m *mockWithContext) Write(ctx context.Context, method string, oprot io.Writer) error {
 	if m.WriteFunc != nil {
-		return m.WriteFunc(ctx, oprot)
+		return m.WriteFunc(ctx, method, oprot)
 	}
 	return nil
 }
@@ -85,7 +86,7 @@ func TestWithContext(t *testing.T) {
 		t.Run(tb.Name, func(t *testing.T) {
 			ctx := context.Background()
 
-			req := &mockWithContext{WriteFunc: func(ctx context.Context, oprot thrift.TProtocol) error {
+			req := &mockWithContext{WriteFunc: func(ctx context.Context, method string, oprot io.Writer) error {
 				return nil
 			}}
 			ink := rpcinfo.NewInvocation("", "mock")
@@ -98,7 +99,9 @@ func TestWithContext(t *testing.T) {
 			buf.Flush()
 
 			{
-				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, oprot thrift.TProtocol) error { return nil }}
+				resp := &mockWithContext{ReadFunc: func(ctx context.Context, method string, dataLen int, oprot io.Reader) error {
+					return nil
+				}}
 				ink := rpcinfo.NewInvocation("", "mock")
 				ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
 				msg := remote.NewMessage(resp, svcInfo, ri, remote.Call, remote.Client)
@@ -112,19 +115,19 @@ func TestWithContext(t *testing.T) {
 }
 
 func TestNormal(t *testing.T) {
+	// msg only supports FastCodec
 	for _, tb := range transportBuffers {
 		t.Run(tb.Name, func(t *testing.T) {
 			ctx := context.Background()
-
 			// encode client side
-			sendMsg := initSendMsg(transport.TTHeader)
+			sendMsg := initSendMsg(transport.TTHeader, false)
 			buf := tb.NewBuffer()
 			err := payloadCodec.Marshal(ctx, sendMsg, buf)
 			test.Assert(t, err == nil, err)
 			buf.Flush()
 
 			// decode server side
-			recvMsg := initRecvMsg()
+			recvMsg := initRecvMsg(false)
 			recvMsg.SetPayloadLen(buf.ReadableLen())
 			test.Assert(t, err == nil, err)
 			err = payloadCodec.Unmarshal(ctx, recvMsg, buf)
@@ -132,6 +135,53 @@ func TestNormal(t *testing.T) {
 
 			// compare Req Arg
 			compare(t, sendMsg, recvMsg)
+		})
+	}
+
+	// msg only supports Basic codec (apache codec)
+	for _, tb := range transportBuffers {
+		t.Run(tb.Name+"Basic", func(t *testing.T) {
+			ctx := context.Background()
+			// encode client side
+			sendMsg := initSendMsg(transport.TTHeader, true)
+			buf := tb.NewBuffer()
+			err := payloadCodec.Marshal(ctx, sendMsg, buf)
+			test.Assert(t, err == nil, err)
+			buf.Flush()
+
+			// decode server side
+			recvMsg := initRecvMsg(true)
+			recvMsg.SetPayloadLen(buf.ReadableLen())
+			test.Assert(t, err == nil, err)
+			err = payloadCodec.Unmarshal(ctx, recvMsg, buf)
+			test.Assert(t, err == nil, err)
+
+			// compare Req Arg
+			compare(t, sendMsg, recvMsg)
+		})
+	}
+
+	// Exception case
+	for _, tb := range transportBuffers {
+		t.Run(tb.Name+"Ex", func(t *testing.T) {
+			ctx := context.Background()
+			// encode client side
+			sendMsg := newMsg(remote.NewTransErrorWithMsg(1, "hello"))
+			sendMsg.SetMessageType(remote.Exception)
+			buf := tb.NewBuffer()
+			err := payloadCodec.Marshal(ctx, sendMsg, buf)
+			test.Assert(t, err == nil, err)
+			buf.Flush()
+
+			// decode server side
+			recvMsg := newMsg(nil)
+			recvMsg.SetPayloadLen(buf.ReadableLen())
+			test.Assert(t, err == nil, err)
+			err = payloadCodec.Unmarshal(ctx, recvMsg, buf)
+			test.Assert(t, err != nil)
+			te, ok := err.(*remote.TransError)
+			test.Assert(t, ok)
+			test.Assert(t, te.TypeID() == 1 && te.Error() == "hello", te)
 		})
 	}
 }
@@ -145,22 +195,22 @@ func BenchmarkNormalParallel(b *testing.B) {
 			b.RunParallel(func(pb *testing.PB) {
 				for pb.Next() {
 					// encode // client side
-					sendMsg := initSendMsg(transport.TTHeader)
+					sendMsg := initSendMsg(transport.TTHeader, false)
 					buf := tb.NewBuffer()
 					err := payloadCodec.Marshal(ctx, sendMsg, buf)
 					test.Assert(b, err == nil, err)
 					buf.Flush()
 
 					// decode server side
-					recvMsg := initRecvMsg()
+					recvMsg := initRecvMsg(false)
 					recvMsg.SetPayloadLen(buf.ReadableLen())
 					test.Assert(b, err == nil, err)
 					err = payloadCodec.Unmarshal(ctx, recvMsg, buf)
 					test.Assert(b, err == nil, err)
 
 					// compare Req Arg
-					sendReq := (sendMsg.Data()).(*mt.MockTestArgs).Req
-					recvReq := (recvMsg.Data()).(*mt.MockTestArgs).Req
+					sendReq := mt.UnpackApacheCodec(sendMsg.Data()).(*mt.MockTestArgs).Req
+					recvReq := mt.UnpackApacheCodec(recvMsg.Data()).(*mt.MockTestArgs).Req
 					test.Assert(b, sendReq.Msg == recvReq.Msg)
 					test.Assert(b, len(sendReq.StrList) == len(recvReq.StrList))
 					test.Assert(b, len(sendReq.StrMap) == len(recvReq.StrMap))
@@ -198,7 +248,7 @@ func TestException(t *testing.T) {
 			err = payloadCodec.Unmarshal(ctx, recvMsg, buf)
 			test.Assert(t, err != nil)
 			transErr, ok := err.(*remote.TransError)
-			test.Assert(t, ok)
+			test.Assert(t, ok, err)
 			test.Assert(t, err.Error() == errInfo)
 			test.Assert(t, transErr.TypeID() == remote.UnknownMethod)
 		})
@@ -207,13 +257,13 @@ func TestException(t *testing.T) {
 
 func TestTransErrorUnwrap(t *testing.T) {
 	errMsg := "mock err"
-	transErr := remote.NewTransError(remote.InternalError, thrift.NewTApplicationException(1000, errMsg))
-	uwErr, ok := transErr.Unwrap().(thrift.TApplicationException)
+	transErr := remote.NewTransError(remote.InternalError, thrift.NewApplicationException(1000, errMsg))
+	uwErr, ok := transErr.Unwrap().(*thrift.ApplicationException)
 	test.Assert(t, ok)
 	test.Assert(t, uwErr.TypeId() == 1000)
 	test.Assert(t, transErr.Error() == errMsg)
 
-	uwErr2, ok := errors.Unwrap(transErr).(thrift.TApplicationException)
+	uwErr2, ok := errors.Unwrap(transErr).(*thrift.ApplicationException)
 	test.Assert(t, ok)
 	test.Assert(t, uwErr2.TypeId() == 1000)
 	test.Assert(t, uwErr2.Error() == errMsg)
@@ -251,14 +301,14 @@ func TestSkipDecoder(t *testing.T) {
 		for _, tb := range transportBuffers {
 			t.Run(tc.desc+"#"+tb.Name, func(t *testing.T) {
 				// encode client side
-				sendMsg := initSendMsg(tc.protocol)
+				sendMsg := initSendMsg(tc.protocol, true) // always use Basic to test skipdecodec
 				buf := tb.NewBuffer()
 				err := tc.codec.Marshal(context.Background(), sendMsg, buf)
 				test.Assert(t, err == nil, err)
 				buf.Flush()
 
 				// decode server side
-				recvMsg := initRecvMsg()
+				recvMsg := initRecvMsg(true)
 				if tc.protocol != transport.PurePayload {
 					recvMsg.SetPayloadLen(buf.ReadableLen())
 				}
@@ -272,27 +322,35 @@ func TestSkipDecoder(t *testing.T) {
 	}
 }
 
-func initSendMsg(tp transport.Protocol) remote.Message {
-	var _args mt.MockTestArgs
-	_args.Req = prepareReq()
+func toApacheCodec(v bool, data thrift.FastCodec) interface{} {
+	if v {
+		return mt.ToApacheCodec(data)
+	}
+	return data
+}
+
+func newMsg(data interface{}) remote.Message {
 	ink := rpcinfo.NewInvocation("", "mock")
 	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	msg := remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Client)
+	return remote.NewMessage(data, svcInfo, ri, remote.Call, remote.Client)
+}
+
+func initSendMsg(tp transport.Protocol, basic bool) remote.Message {
+	var _args mt.MockTestArgs // fastcodec only, if basic is true -> apachecodec
+	_args.Req = prepareReq()
+	msg := newMsg(toApacheCodec(basic, &_args))
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
 }
 
-func initRecvMsg() remote.Message {
-	var _args mt.MockTestArgs
-	ink := rpcinfo.NewInvocation("", "mock")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, nil)
-	msg := remote.NewMessage(&_args, svcInfo, ri, remote.Call, remote.Server)
-	return msg
+func initRecvMsg(basic bool) remote.Message {
+	var _args mt.MockTestArgs // fastcodec only, if basic is true -> apachecodec
+	return newMsg(toApacheCodec(basic, &_args))
 }
 
 func compare(t *testing.T, sendMsg, recvMsg remote.Message) {
-	sendReq := (sendMsg.Data()).(*mt.MockTestArgs).Req
-	recvReq := (recvMsg.Data()).(*mt.MockTestArgs).Req
+	sendReq := mt.UnpackApacheCodec(sendMsg.Data()).(*mt.MockTestArgs).Req
+	recvReq := mt.UnpackApacheCodec(recvMsg.Data()).(*mt.MockTestArgs).Req
 	test.Assert(t, sendReq.Msg == recvReq.Msg)
 	test.Assert(t, len(sendReq.StrList) == len(recvReq.StrList))
 	test.Assert(t, len(sendReq.StrMap) == len(recvReq.StrMap))

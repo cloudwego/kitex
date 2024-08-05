@@ -37,7 +37,6 @@ import (
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	dt "github.com/cloudwego/dynamicgo/thrift"
 	dg "github.com/cloudwego/dynamicgo/thrift/generic"
 )
@@ -205,7 +204,7 @@ func initClient(addr string) genericclient.Client {
 // Except msg, require_field and logid, which are reset everytime
 func makeExampleRespBinary(msg, require_field, logid string) ([]byte, error) {
 	dom := &dg.PathNode{
-		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+		Node: dg.NewTypedNode(dt.STRUCT, 0, 0),
 		Next: []dg.PathNode{
 			{
 				Path: dg.NewPathFieldId(1),
@@ -217,7 +216,7 @@ func makeExampleRespBinary(msg, require_field, logid string) ([]byte, error) {
 			},
 			{
 				Path: dg.NewPathFieldId(255),
-				Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+				Node: dg.NewTypedNode(dt.STRUCT, 0, 0),
 				Next: []dg.PathNode{
 					{
 						Path: dg.NewPathFieldId(1),
@@ -236,7 +235,7 @@ func makeExampleReqBinary(B bool, A, logid string) ([]byte, error) {
 	list := make([]dg.PathNode, SampleListSize+1)
 	list[0] = dg.PathNode{
 		Path: dg.NewPathIndex(0),
-		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+		Node: dg.NewTypedNode(dt.STRUCT, 0, 0),
 		Next: []dg.PathNode{
 			{
 				Path: dg.NewPathFieldId(1),
@@ -247,7 +246,7 @@ func makeExampleReqBinary(B bool, A, logid string) ([]byte, error) {
 	for i := 1; i < len(list); i++ {
 		list[i] = dg.PathNode{
 			Path: dg.NewPathIndex(i),
-			Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+			Node: dg.NewTypedNode(dt.STRUCT, 0, 0),
 			Next: []dg.PathNode{
 				{
 					Path: dg.NewPathFieldId(1),
@@ -259,7 +258,7 @@ func makeExampleReqBinary(B bool, A, logid string) ([]byte, error) {
 	m := make([]dg.PathNode, SampleListSize+1)
 	m[0] = dg.PathNode{
 		Path: dg.NewPathStrKey("a"),
-		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+		Node: dg.NewTypedNode(dt.STRUCT, 0, 0),
 		Next: []dg.PathNode{
 			{
 				Path: dg.NewPathFieldId(1),
@@ -270,7 +269,7 @@ func makeExampleReqBinary(B bool, A, logid string) ([]byte, error) {
 	for i := 1; i < len(list); i++ {
 		list[i] = dg.PathNode{
 			Path: dg.NewPathStrKey(strconv.Itoa(i)),
-			Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+			Node: dg.NewTypedNode(dt.STRUCT, 0, 0),
 			Next: []dg.PathNode{
 				{
 					Path: dg.NewPathFieldId(1),
@@ -281,7 +280,7 @@ func makeExampleReqBinary(B bool, A, logid string) ([]byte, error) {
 	}
 
 	dom := dg.PathNode{
-		Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+		Node: dg.NewTypedNode(dt.STRUCT, 0, 0),
 		Next: []dg.PathNode{
 			{
 				Path: dg.NewPathFieldId(1),
@@ -293,17 +292,17 @@ func makeExampleReqBinary(B bool, A, logid string) ([]byte, error) {
 			},
 			{
 				Path: dg.NewPathFieldId(3),
-				Node: dg.NewTypedNode(thrift.LIST, thrift.STRUCT, 0),
+				Node: dg.NewTypedNode(dt.LIST, dt.STRUCT, 0),
 				Next: list,
 			},
 			{
 				Path: dg.NewPathFieldId(4),
-				Node: dg.NewTypedNode(thrift.MAP, thrift.STRUCT, thrift.STRING),
+				Node: dg.NewTypedNode(dt.MAP, dt.STRUCT, dt.STRING),
 				Next: m,
 			},
 			{
 				Path: dg.NewPathFieldId(6),
-				Node: dg.NewTypedNode(thrift.LIST, thrift.I64, 0),
+				Node: dg.NewTypedNode(dt.LIST, dt.I64, 0),
 				Next: []dg.PathNode{
 					{
 						Path: dg.NewPathIndex(0),
@@ -325,7 +324,7 @@ func makeExampleReqBinary(B bool, A, logid string) ([]byte, error) {
 			},
 			{
 				Path: dg.NewPathFieldId(255),
-				Node: dg.NewTypedNode(thrift.STRUCT, 0, 0),
+				Node: dg.NewTypedNode(dt.STRUCT, 0, 0),
 				Next: []dg.PathNode{
 					{
 						Path: dg.NewPathFieldId(1),

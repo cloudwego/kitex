@@ -18,13 +18,14 @@
 package bthrift
 
 import (
-	"github.com/apache/thrift/lib/go/thrift"
+	gopkgthrift "github.com/cloudwego/gopkg/protocol/thrift"
+
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // BinaryWriter .
-type BinaryWriter interface {
-	WriteDirect(b []byte, remainCap int) error
-}
+// Deprecated: use `github.com/cloudwego/gopkg/protocol/thrift.NocopyWriter`
+type BinaryWriter = gopkgthrift.NocopyWriter
 
 // BTProtocol .
 type BTProtocol interface {
@@ -95,9 +96,4 @@ type BTProtocol interface {
 	ReadString(buf []byte) (value string, length int, err error)
 	ReadBinary(buf []byte) (value []byte, length int, err error)
 	Skip(buf []byte, fieldType thrift.TType) (length int, err error)
-}
-
-type Allocator interface {
-	Make(n int) []byte
-	Copy(buf []byte) (p []byte)
 }

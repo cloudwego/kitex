@@ -17,6 +17,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -32,19 +33,17 @@ func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}) *service 
 }
 
 type services struct {
-	methodSvcMap         map[string]*service // key: method name, value: svcInfo
-	svcMap               map[string]*service // key: service name, value: svcInfo
-	conflictingMethodMap map[string]bool
-	fallbackSvc          *service
+	methodSvcsMap map[string][]*service // key: method name
+	svcMap        map[string]*service   // key: service name
+	fallbackSvc   *service
 
 	refuseTrafficWithoutServiceName bool
 }
 
 func newServices() *services {
 	return &services{
-		methodSvcMap:         map[string]*service{},
-		svcMap:               map[string]*service{},
-		conflictingMethodMap: map[string]bool{},
+		methodSvcsMap: map[string][]*service{},
+		svcMap:        map[string]*service{},
 	}
 }
 
@@ -59,24 +58,15 @@ func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interfac
 	s.svcMap[svcInfo.ServiceName] = svc
 	// method search map
 	for methodName := range svcInfo.Methods {
-		if _, ok := s.methodSvcMap[methodName]; ok {
-			s.handleConflictingMethod(svc, methodName, registerOpts)
+		svcs := s.methodSvcsMap[methodName]
+		if registerOpts.IsFallbackService {
+			svcs = append([]*service{svc}, svcs...)
 		} else {
-			s.methodSvcMap[methodName] = svc
+			svcs = append(svcs, svc)
 		}
+		s.methodSvcsMap[methodName] = svcs
 	}
 	return nil
-}
-
-func (s *services) handleConflictingMethod(svc *service, methodName string, registerOpts *RegisterOptions) {
-	// true means has conflicting method
-	if _, ok := s.conflictingMethodMap[methodName]; !ok {
-		s.conflictingMethodMap[methodName] = true
-	}
-	if registerOpts.IsFallbackService {
-		s.conflictingMethodMap[methodName] = false
-		s.methodSvcMap[methodName] = svc
-	}
 }
 
 func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
@@ -85,6 +75,22 @@ func (s *services) getSvcInfoMap() map[string]*serviceinfo.ServiceInfo {
 		svcInfoMap[name] = svc.svcInfo
 	}
 	return svcInfoMap
+}
+
+func (s *services) check(refuseTrafficWithoutServiceName bool) error {
+	if len(s.svcMap) == 0 {
+		return errors.New("run: no service. Use RegisterService to set one")
+	}
+	if refuseTrafficWithoutServiceName {
+		s.refuseTrafficWithoutServiceName = true
+		return nil
+	}
+	for name, svcs := range s.methodSvcsMap {
+		if len(svcs) > 1 && svcs[0] != s.fallbackSvc {
+			return fmt.Errorf("method name [%s] is conflicted between services but no fallback service is specified", name)
+		}
+	}
+	return nil
 }
 
 func (s *services) SearchService(svcName, methodName string, strict bool) *serviceinfo.ServiceInfo {
@@ -96,13 +102,17 @@ func (s *services) SearchService(svcName, methodName string, strict bool) *servi
 	}
 	var svc *service
 	if svcName == "" {
-		svc = s.methodSvcMap[methodName]
+		if svcs := s.methodSvcsMap[methodName]; len(svcs) > 0 {
+			svc = svcs[0]
+		}
 	} else {
 		svc = s.svcMap[svcName]
 		if svc == nil {
-			if _, ok := s.conflictingMethodMap[methodName]; !ok {
-				// no conflicting method
-				svc = s.methodSvcMap[methodName]
+			svcs := s.methodSvcsMap[methodName]
+			// 1. no conflicting method, allow method routing
+			// 2. $ generally means generic service, maybe mismatch the real service name
+			if len(svcs) == 1 || len(svcs) > 1 && svcName[0] == '$' {
+				svc = svcs[0]
 			}
 		}
 	}

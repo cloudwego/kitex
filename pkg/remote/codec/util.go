@@ -75,8 +75,7 @@ func SetOrCheckSeqID(seqID int32, message remote.Message) error {
 		expectSeqID := message.RPCInfo().Invocation().SeqID()
 		if expectSeqID != seqID {
 			methodName := message.RPCInfo().Invocation().MethodName()
-			return remote.NewTransErrorWithMsg(remote.BadSequenceID, fmt.Sprintf("method[%s] "+
-				"out of order sequence response, expect[%d], receive[%d]", methodName, expectSeqID, seqID))
+			return remote.NewTransErrorWithMsg(remote.BadSequenceID, fmt.Sprintf("method[%s] out of order sequence response, expect[%d], receive[%d]", methodName, expectSeqID, seqID))
 		}
 	case remote.Exception:
 		// don't check, proxy may build Exception with seqID = 0
