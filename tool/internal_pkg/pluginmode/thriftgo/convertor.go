@@ -325,6 +325,9 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				return fmt.Errorf("%s: makeService '%s': %w", ast.Filename, svc.Name, err)
 			}
 			si.ServiceFilePath = ast.Filename
+			if ast == req.AST {
+				si.GenerateHandler = true
+			}
 			all[ast.Filename] = append(all[ast.Filename], si)
 			c.svc2ast[si] = ast
 		}
@@ -380,6 +383,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				Methods:         methods,
 				ServiceFilePath: ast.Filename,
 				HasStreaming:    hasStreaming,
+				GenerateHandler: true,
 			}
 
 			if c.IsHessian2() {
