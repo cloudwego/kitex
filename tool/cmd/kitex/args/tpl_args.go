@@ -203,11 +203,11 @@ func (a *Arguments) Clean(cmd *util.Command, args []string) error {
 	}
 
 	magicString := "// Kitex template debug file. use template clean to delete it."
-	err = filepath.WalkDir(curpath, func(path string, info fs.DirEntry, err error) error {
+	err = filepath.WalkDir(curpath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 		content, err := os.ReadFile(path)
