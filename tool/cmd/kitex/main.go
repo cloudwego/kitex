@@ -17,12 +17,13 @@ package main
 import (
 	"bytes"
 	"flag"
-	"github.com/cloudwego/kitex/tool/cmd/kitex/sdk"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/cloudwego/kitex/tool/cmd/kitex/sdk"
 
 	"github.com/cloudwego/kitex"
 	kargs "github.com/cloudwego/kitex/tool/cmd/kitex/args"

@@ -18,9 +18,10 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"os/exec"
 	"strings"
+
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 
 	"github.com/cloudwego/thriftgo/plugin"
 	"github.com/cloudwego/thriftgo/sdk"
@@ -91,7 +92,6 @@ func GetKiteXSDKPlugin(pwd string, rawKiteXArgs []string) (*KiteXSDKPlugin, erro
 
 // InvokeThriftgoBySDK is for kitex tool main.go
 func InvokeThriftgoBySDK(pwd string, cmd *exec.Cmd) (err error) {
-
 	kitexPlugin := &KiteXSDKPlugin{}
 
 	kitexPlugin.ThriftgoParams, kitexPlugin.KitexParams, err = grepParameters(cmd.Args)
