@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
-
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 

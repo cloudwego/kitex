@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/streamx"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -70,6 +71,8 @@ type kClient struct {
 	mws     []endpoint.Middleware
 	eps     endpoint.Endpoint
 	sEps    endpoint.Endpoint
+	sxEps   endpoint.Endpoint
+	sxMW    streamx.StreamMiddleware
 	opt     *client.Options
 	lbf     *lbcache.BalancerFactory
 
@@ -428,17 +431,26 @@ func (kc *kClient) richRemoteOption() {
 }
 
 func (kc *kClient) buildInvokeChain() error {
+	mwchain := endpoint.Chain(kc.mws...)
+
 	innerHandlerEp, err := kc.invokeHandleEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.eps = endpoint.Chain(kc.mws...)(innerHandlerEp)
+	kc.eps = mwchain(innerHandlerEp)
 
 	innerStreamingEp, err := kc.invokeStreamingEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.sEps = endpoint.Chain(kc.mws...)(innerStreamingEp)
+	kc.sEps = mwchain(innerStreamingEp)
+
+	innerStreamXEp, err := kc.invokeStreamXEndpoint()
+	if err != nil {
+		return err
+	}
+	kc.sxEps = mwchain(innerStreamXEp)
+	kc.sxMW = streamx.Chain(kc.opt.SMWs...)
 	return nil
 }
 
