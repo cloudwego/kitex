@@ -52,3 +52,7 @@ tool/cmd/kitex/kitex
 base1.go
 dump.txt
 base2.go
+
+# Go workspace file
+go.work
+go.work.sum

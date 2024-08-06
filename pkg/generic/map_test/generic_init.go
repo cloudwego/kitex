@@ -36,6 +36,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
+	"github.com/cloudwego/kitex/transport"
 )
 
 var reqMsg = map[string]interface{}{
@@ -54,7 +55,7 @@ var errResp = "Test Error"
 
 func newGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
 	var opts []client.Option
-	opts = append(opts, client.WithHostPorts(targetIPPort))
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(transport.TTHeader))
 	genericCli, _ := genericclient.NewClient(destService, g, opts...)
 	return genericCli
 }
@@ -204,16 +205,16 @@ func serviceInfo() *serviceinfo.ServiceInfo {
 }
 
 func newMockTestArgs() interface{} {
-	return kt.ToApacheCodec(kt.NewMockTestArgs())
+	return kt.NewMockTestArgs()
 }
 
 func newMockTestResult() interface{} {
-	return kt.ToApacheCodec(kt.NewMockTestResult())
+	return kt.NewMockTestResult()
 }
 
 func testHandler(ctx context.Context, handler, arg, result interface{}) error {
-	realArg := kt.UnpackApacheCodec(arg).(*kt.MockTestArgs)
-	realResult := kt.UnpackApacheCodec(result).(*kt.MockTestResult)
+	realArg := arg.(*kt.MockTestArgs)
+	realResult := result.(*kt.MockTestResult)
 	success, err := handler.(kt.Mock).Test(ctx, realArg.Req)
 	if err != nil {
 		return err

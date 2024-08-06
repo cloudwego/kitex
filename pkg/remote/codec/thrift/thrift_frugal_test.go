@@ -228,10 +228,9 @@ func TestThriftCodec_unmarshalThriftDataFrugal(t *testing.T) {
 	t.Run("Frugal with SkipDecoder enabled", func(t *testing.T) {
 		req := &MockFrugalTagReq{}
 		codec := &thriftCodec{FrugalRead | EnableSkipDecoder}
-		tProt := NewBinaryProtocol(remote.NewReaderBuffer(mockReqThrift))
-		defer tProt.Recycle()
+		trans := remote.NewReaderBuffer(mockReqThrift)
 		// specify dataLen with 0 so that skipDecoder works
-		err := codec.unmarshalThriftData(tProt, req, 0)
+		err := codec.unmarshalThriftData(trans, req, 0)
 		checkDecodeResult(t, err, &mocks.MockReq{
 			Msg:     req.Msg,
 			StrList: req.StrList,
@@ -252,10 +251,9 @@ func TestThriftCodec_unmarshalThriftDataFrugal(t *testing.T) {
 			15 /* list */, 0, 3 /* id=3 */, 6 /* item:I16 */, 0, 0, 0, 1 /* length=1 */, 0, 1, /* I16=1 */
 			0, /* end of struct */
 		}
-		tProt := NewBinaryProtocol(remote.NewReaderBuffer(faultMockReqThrift))
-		defer tProt.Recycle()
+		trans := remote.NewReaderBuffer(faultMockReqThrift)
 		// specify dataLen with 0 so that skipDecoder works
-		err := codec.unmarshalThriftData(tProt, req, 0)
+		err := codec.unmarshalThriftData(trans, req, 0)
 		test.Assert(t, err != nil, err)
 		test.Assert(t, strings.Contains(err.Error(), "caught in Frugal using SkipDecoder Buffer"))
 	})

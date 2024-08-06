@@ -17,13 +17,15 @@
 package thrift
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/apache"
 
-	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
@@ -68,47 +70,24 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 		return nil, err
 	}
 
-	// TODO(xiaost): Deprecate the code by using cloudwebgo/gopkg in v0.12.0
 	// fallback to old thrift way (slow)
-	transport := athrift.NewTMemoryBufferLen(marshalThriftBufferSize)
-	tProt := athrift.NewTBinaryProtocol(transport, true, true)
-	if err := marshalBasicThriftData(tProt, data); err != nil {
+	buf := bytes.NewBuffer(make([]byte, 0, marshalThriftBufferSize))
+	if err := apache.ThriftWrite(apache.NewBufferTransport(buf), data); err != nil {
 		return nil, err
 	}
-	return transport.Bytes(), nil
+	return buf.Bytes(), nil
 }
 
 // verifyMarshalBasicThriftDataType verifies whether data could be marshaled by old thrift way
 func verifyMarshalBasicThriftDataType(data interface{}) error {
-	switch data.(type) {
-	case MessageWriter:
-	default:
+	if err := apache.CheckThriftWrite(data); err != nil {
 		return errEncodeMismatchMsgType
 	}
 	return nil
 }
 
-// marshalBasicThriftData only encodes the data (without the prepending method, msgType, seqId)
-// It uses the old thrift way which is much slower than FastCodec and Frugal
-func marshalBasicThriftData(tProt athrift.TProtocol, data interface{}) error {
-	var err error
-	switch msg := data.(type) {
-	case MessageWriter:
-		err = msg.Write(tProt)
-	default:
-		return errEncodeMismatchMsgType
-	}
-	if err != nil {
-		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
-	}
-	return nil
-}
-
-// UnmarshalThriftException decode thrift exception from tProt
-// TODO: this func should be removed in the future. it's exposed accidentally.
-// Deprecated: Use `SkipDecoder` + `ApplicationException` of `cloudwego/gopkg/protocol/thrift` instead.
-func UnmarshalThriftException(tProt athrift.TProtocol) error {
-	d := thrift.NewSkipDecoder(tProt.Transport())
+func unmarshalThriftException(in io.Reader) error {
+	d := thrift.NewSkipDecoder(in)
 	defer d.Release()
 	b, err := d.Next(thrift.STRUCT)
 	if err != nil {
@@ -129,12 +108,9 @@ func UnmarshalThriftData(ctx context.Context, codec remote.PayloadCodec, method 
 	if !ok {
 		c = defaultCodec
 	}
-	tProt := NewBinaryProtocol(remote.NewReaderBuffer(buf))
-	err := c.unmarshalThriftData(tProt, data, len(buf))
-	if err == nil {
-		tProt.Recycle()
-	}
-	return err
+	trans := remote.NewReaderBuffer(buf)
+	defer trans.Release(nil)
+	return c.unmarshalThriftData(trans, data, len(buf))
 }
 
 func (c thriftCodec) fastMessageUnmarshalAvailable(data interface{}, payloadLen int) bool {
@@ -145,10 +121,10 @@ func (c thriftCodec) fastMessageUnmarshalAvailable(data interface{}, payloadLen 
 	return ok
 }
 
-func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, dataLen int) error {
+func (c thriftCodec) fastUnmarshal(trans remote.ByteBuffer, data interface{}, dataLen int) error {
 	msg := data.(thrift.FastCodec)
 	if dataLen > 0 {
-		buf, err := tProt.next(dataLen)
+		buf, err := trans.Next(dataLen)
 		if err != nil {
 			return remote.NewTransError(remote.ProtocolError, err)
 		}
@@ -158,7 +134,7 @@ func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, data
 		}
 		return nil
 	}
-	buf, err := getSkippedStructBuffer(tProt)
+	buf, err := getSkippedStructBuffer(trans)
 	if err != nil {
 		return err
 	}
@@ -171,15 +147,15 @@ func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, data
 
 // unmarshalThriftData only decodes the data (after methodName, msgType and seqId)
 // method is only used for generic calls
-func (c thriftCodec) unmarshalThriftData(tProt *BinaryProtocol, data interface{}, dataLen int) error {
+func (c thriftCodec) unmarshalThriftData(trans remote.ByteBuffer, data interface{}, dataLen int) error {
 	// decode with hyper unmarshal
 	if c.IsSet(FrugalRead) && c.hyperMessageUnmarshalAvailable(data, dataLen) {
-		return c.hyperUnmarshal(tProt, data, dataLen)
+		return c.hyperUnmarshal(trans, data, dataLen)
 	}
 
 	// decode with FastRead
 	if c.IsSet(FastRead) && c.fastMessageUnmarshalAvailable(data, dataLen) {
-		return c.fastUnmarshal(tProt, data, dataLen)
+		return c.fastUnmarshal(trans, data, dataLen)
 	}
 
 	if err := verifyUnmarshalBasicThriftDataType(data); err != nil {
@@ -187,22 +163,22 @@ func (c thriftCodec) unmarshalThriftData(tProt *BinaryProtocol, data interface{}
 		if c.CodecType != Basic {
 			// try FrugalRead < - > FastRead fallback
 			if c.fastMessageUnmarshalAvailable(data, dataLen) {
-				return c.fastUnmarshal(tProt, data, dataLen)
+				return c.fastUnmarshal(trans, data, dataLen)
 			}
 			if c.hyperMessageUnmarshalAvailable(data, dataLen) { // slim template?
-				return c.hyperUnmarshal(tProt, data, dataLen)
+				return c.hyperUnmarshal(trans, data, dataLen)
 			}
 		}
 		return err
 	}
 
 	// fallback to old thrift way (slow)
-	return decodeBasicThriftData(tProt, data)
+	return decodeBasicThriftData(trans, data)
 }
 
-func (c thriftCodec) hyperUnmarshal(tProt *BinaryProtocol, data interface{}, dataLen int) error {
+func (c thriftCodec) hyperUnmarshal(trans remote.ByteBuffer, data interface{}, dataLen int) error {
 	if dataLen > 0 {
-		buf, err := tProt.next(dataLen)
+		buf, err := trans.Next(dataLen)
 		if err != nil {
 			return remote.NewTransError(remote.ProtocolError, err)
 		}
@@ -211,7 +187,7 @@ func (c thriftCodec) hyperUnmarshal(tProt *BinaryProtocol, data interface{}, dat
 		}
 		return nil
 	}
-	buf, err := getSkippedStructBuffer(tProt)
+	buf, err := getSkippedStructBuffer(trans)
 	if err != nil {
 		return err
 	}
@@ -224,31 +200,22 @@ func (c thriftCodec) hyperUnmarshal(tProt *BinaryProtocol, data interface{}, dat
 
 // verifyUnmarshalBasicThriftDataType verifies whether data could be unmarshal by old thrift way
 func verifyUnmarshalBasicThriftDataType(data interface{}) error {
-	switch data.(type) {
-	case MessageReader:
-	default:
+	if err := apache.CheckThriftRead(data); err != nil {
 		return errDecodeMismatchMsgType
 	}
 	return nil
 }
 
 // decodeBasicThriftData decode thrift body the old way (slow)
-func decodeBasicThriftData(tProt athrift.TProtocol, data interface{}) error {
-	var err error
-	switch t := data.(type) {
-	case MessageReader:
-		err = t.Read(tProt)
-	default:
-		return errDecodeMismatchMsgType
+func decodeBasicThriftData(trans remote.ByteBuffer, data interface{}) error {
+	if err := verifyUnmarshalBasicThriftDataType(data); err != nil {
+		return err
 	}
-	if err != nil {
-		return remote.NewTransError(remote.ProtocolError, err)
-	}
-	return nil
+	return apache.ThriftRead(apache.NewDefaultTransport(trans), data)
 }
 
-func getSkippedStructBuffer(tProt *BinaryProtocol) ([]byte, error) {
-	sd := thrift.NewSkipDecoder(tProt.trans)
+func getSkippedStructBuffer(trans remote.ByteBuffer) ([]byte, error) {
+	sd := thrift.NewSkipDecoder(trans)
 	buf, err := sd.Next(thrift.STRUCT)
 	if err != nil {
 		return nil, remote.NewTransError(remote.ProtocolError, err).AppendMessage("caught in SkipDecoder Next phase")

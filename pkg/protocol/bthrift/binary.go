@@ -19,20 +19,20 @@ package bthrift
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math"
 
-	"github.com/cloudwego/kitex/pkg/mem"
+	"github.com/bytedance/gopkg/lang/span"
+	gthrift "github.com/cloudwego/gopkg/protocol/thrift"
+
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
 var (
 	// Binary protocol for bthrift.
 	Binary          binaryProtocol
 	_               BTProtocol = binaryProtocol{}
-	spanCache                  = mem.NewSpanCache(1024 * 1024)
+	spanCache                  = span.NewSpanCache(1024 * 1024)
 	spanCacheEnable bool       = false
 )
 
@@ -263,49 +263,52 @@ func (binaryProtocol) BinaryLengthNocopy(value []byte) int {
 	return l + len(value)
 }
 
+var (
+	errBadVersion     = gthrift.NewProtocolException(gthrift.BAD_VERSION, "Bad version in ReadMessageBegin")
+	errMissingVersion = gthrift.NewProtocolException(gthrift.BAD_VERSION, "Missing version in ReadMessageBegin")
+
+	errInvalidDataLength = gthrift.NewProtocolException(gthrift.INVALID_DATA, "Invalid data length")
+)
+
 func (binaryProtocol) ReadMessageBegin(buf []byte) (name string, typeID thrift.TMessageType, seqid int32, length int, err error) {
 	size, l, e := Binary.ReadI32(buf)
 	length += l
 	if e != nil {
-		err = perrors.NewProtocolError(e)
+		err = e
 		return
 	}
 	if size > 0 {
-		err = perrors.NewProtocolErrorWithType(perrors.BadVersion, "Missing version in ReadMessageBegin")
+		err = errMissingVersion
 		return
 	}
 	typeID = thrift.TMessageType(size & 0x0ff)
 	version := int64(size) & thrift.VERSION_MASK
 	if version != thrift.VERSION_1 {
-		err = perrors.NewProtocolErrorWithType(perrors.BadVersion, "Bad version in ReadMessageBegin")
+		err = errBadVersion
 		return
 	}
 	name, l, e = Binary.ReadString(buf[length:])
 	length += l
 	if e != nil {
-		err = perrors.NewProtocolError(e)
+		err = e
 		return
 	}
 	seqid, l, e = Binary.ReadI32(buf[length:])
 	length += l
 	if e != nil {
-		err = perrors.NewProtocolError(e)
+		err = e
 		return
 	}
 	return
 }
 
-func (binaryProtocol) ReadMessageEnd(buf []byte) (int, error) {
-	return 0, nil
-}
+func (binaryProtocol) ReadMessageEnd(_ []byte) (int, error) { return 0, nil }
 
-func (binaryProtocol) ReadStructBegin(buf []byte) (name string, length int, err error) {
+func (binaryProtocol) ReadStructBegin(_ []byte) (name string, length int, err error) {
 	return
 }
 
-func (binaryProtocol) ReadStructEnd(buf []byte) (int, error) {
-	return 0, nil
-}
+func (binaryProtocol) ReadStructEnd(_ []byte) (int, error) { return 0, nil }
 
 func (binaryProtocol) ReadFieldBegin(buf []byte) (name string, typeID thrift.TType, id int16, length int, err error) {
 	t, l, e := Binary.ReadByte(buf)
@@ -322,59 +325,55 @@ func (binaryProtocol) ReadFieldBegin(buf []byte) (name string, typeID thrift.TTy
 	return
 }
 
-func (binaryProtocol) ReadFieldEnd(buf []byte) (int, error) {
-	return 0, nil
-}
+func (binaryProtocol) ReadFieldEnd(_ []byte) (int, error) { return 0, nil }
 
 func (binaryProtocol) ReadMapBegin(buf []byte) (keyType, valueType thrift.TType, size, length int, err error) {
 	k, l, e := Binary.ReadByte(buf)
 	length += l
 	if e != nil {
-		err = perrors.NewProtocolError(e)
+		err = e
 		return
 	}
 	keyType = thrift.TType(k)
 	v, l, e := Binary.ReadByte(buf[length:])
 	length += l
 	if e != nil {
-		err = perrors.NewProtocolError(e)
+		err = e
 		return
 	}
 	valueType = thrift.TType(v)
 	size32, l, e := Binary.ReadI32(buf[length:])
 	length += l
 	if e != nil {
-		err = perrors.NewProtocolError(e)
+		err = e
 		return
 	}
 	if size32 < 0 {
-		err = perrors.InvalidDataLength
+		err = errInvalidDataLength
 		return
 	}
 	size = int(size32)
 	return
 }
 
-func (binaryProtocol) ReadMapEnd(buf []byte) (int, error) {
-	return 0, nil
-}
+func (binaryProtocol) ReadMapEnd(_ []byte) (int, error) { return 0, nil }
 
 func (binaryProtocol) ReadListBegin(buf []byte) (elemType thrift.TType, size, length int, err error) {
 	b, l, e := Binary.ReadByte(buf)
 	length += l
 	if e != nil {
-		err = perrors.NewProtocolError(e)
+		err = e
 		return
 	}
 	elemType = thrift.TType(b)
 	size32, l, e := Binary.ReadI32(buf[length:])
 	length += l
 	if e != nil {
-		err = perrors.NewProtocolError(e)
+		err = e
 		return
 	}
 	if size32 < 0 {
-		err = perrors.InvalidDataLength
+		err = errInvalidDataLength
 		return
 	}
 	size = int(size32)
@@ -382,35 +381,31 @@ func (binaryProtocol) ReadListBegin(buf []byte) (elemType thrift.TType, size, le
 	return
 }
 
-func (binaryProtocol) ReadListEnd(buf []byte) (int, error) {
-	return 0, nil
-}
+func (binaryProtocol) ReadListEnd(_ []byte) (int, error) { return 0, nil }
 
 func (binaryProtocol) ReadSetBegin(buf []byte) (elemType thrift.TType, size, length int, err error) {
 	b, l, e := Binary.ReadByte(buf)
 	length += l
 	if e != nil {
-		err = perrors.NewProtocolError(e)
+		err = e
 		return
 	}
 	elemType = thrift.TType(b)
 	size32, l, e := Binary.ReadI32(buf[length:])
 	length += l
 	if e != nil {
-		err = perrors.NewProtocolError(e)
+		err = e
 		return
 	}
 	if size32 < 0 {
-		err = perrors.InvalidDataLength
+		err = errInvalidDataLength
 		return
 	}
 	size = int(size32)
 	return
 }
 
-func (binaryProtocol) ReadSetEnd(buf []byte) (int, error) {
-	return 0, nil
-}
+func (binaryProtocol) ReadSetEnd(_ []byte) (int, error) { return 0, nil }
 
 func (binaryProtocol) ReadBool(buf []byte) (value bool, length int, err error) {
 	b, l, e := Binary.ReadByte(buf)
@@ -421,44 +416,57 @@ func (binaryProtocol) ReadBool(buf []byte) (value bool, length int, err error) {
 	return v, l, e
 }
 
+var errReadByte = gthrift.NewProtocolException(gthrift.INVALID_DATA, "[ReadByte] len(buf) < 1")
+
 func (binaryProtocol) ReadByte(buf []byte) (value int8, length int, err error) {
 	if len(buf) < 1 {
-		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadByte] buf length less than 1")
+		return value, length, errReadByte
 	}
 	return int8(buf[0]), 1, err
 }
 
+var errReadI16 = gthrift.NewProtocolException(gthrift.INVALID_DATA, "[ReadI16] len(buf) < 2")
+
 func (binaryProtocol) ReadI16(buf []byte) (value int16, length int, err error) {
 	if len(buf) < 2 {
-		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadI16] buf length less than 2")
+		return value, length, errReadI16
 	}
 	value = int16(binary.BigEndian.Uint16(buf))
-	return value, 2, err
+	return value, 2, nil
 }
+
+var errReadI32 = gthrift.NewProtocolException(gthrift.INVALID_DATA, "[ReadI32] len(buf) < 4")
 
 func (binaryProtocol) ReadI32(buf []byte) (value int32, length int, err error) {
 	if len(buf) < 4 {
-		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadI32] buf length less than 4")
+		return value, length, errReadI32
 	}
 	value = int32(binary.BigEndian.Uint32(buf))
-	return value, 4, err
+	return value, 4, nil
 }
+
+var errReadI64 = gthrift.NewProtocolException(gthrift.INVALID_DATA, "[ReadI64] len(buf) < 8")
 
 func (binaryProtocol) ReadI64(buf []byte) (value int64, length int, err error) {
 	if len(buf) < 8 {
-		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadI64] buf length less than 8")
+		return value, length, errReadI64
 	}
 	value = int64(binary.BigEndian.Uint64(buf))
-	return value, 8, err
+	return value, 8, nil
 }
+
+var errReadDouble = gthrift.NewProtocolException(gthrift.INVALID_DATA, "[ReadDouble] len(buf) < 8")
 
 func (binaryProtocol) ReadDouble(buf []byte) (value float64, length int, err error) {
 	if len(buf) < 8 {
-		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadDouble] buf length less than 8")
+		return value, length, errReadDouble
 	}
 	value = math.Float64frombits(binary.BigEndian.Uint64(buf))
-	return value, 8, err
+	return value, 8, nil
 }
+
+var errReadString = gthrift.NewProtocolException(
+	gthrift.INVALID_DATA, "[ReadString] the string size greater than buf length")
 
 func (binaryProtocol) ReadString(buf []byte) (value string, length int, err error) {
 	size, l, e := Binary.ReadI32(buf)
@@ -468,7 +476,7 @@ func (binaryProtocol) ReadString(buf []byte) (value string, length int, err erro
 		return
 	}
 	if size < 0 || int(size) > len(buf) {
-		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadString] the string size greater than buf length")
+		return value, length, errReadString
 	}
 	if spanCacheEnable {
 		data := spanCache.Copy(buf[length : length+int(size)])
@@ -480,6 +488,9 @@ func (binaryProtocol) ReadString(buf []byte) (value string, length int, err erro
 	return
 }
 
+var errReadBinary = gthrift.NewProtocolException(
+	gthrift.INVALID_DATA, "[ReadBinary] the binary size greater than buf length")
+
 func (binaryProtocol) ReadBinary(buf []byte) (value []byte, length int, err error) {
 	_size, l, e := Binary.ReadI32(buf)
 	length += l
@@ -489,7 +500,7 @@ func (binaryProtocol) ReadBinary(buf []byte) (value []byte, length int, err erro
 	}
 	size := int(_size)
 	if size < 0 || size > len(buf) {
-		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadBinary] the binary size greater than buf length")
+		return value, length, errReadBinary
 	}
 	if spanCacheEnable {
 		value = spanCache.Copy(buf[length : length+size])
@@ -508,13 +519,16 @@ func (binaryProtocol) Skip(buf []byte, fieldType thrift.TType) (length int, err 
 
 // SkipDefaultDepth skips over the next data element from the provided input TProtocol object.
 func SkipDefaultDepth(buf []byte, prot BTProtocol, typeID thrift.TType) (int, error) {
-	return Skip(buf, prot, typeID, thrift.DEFAULT_RECURSION_DEPTH)
+	const defaultRecursionDepth = 64 // same as thrift.DEFAULT_RECURSION_DEPTH
+	return Skip(buf, prot, typeID, defaultRecursionDepth)
 }
+
+var errSkipDepthLimit = gthrift.NewProtocolException(gthrift.DEPTH_LIMIT, "depth limit exceeded")
 
 // Skip skips over the next data element from the provided input TProtocol object.
 func Skip(buf []byte, self BTProtocol, fieldType thrift.TType, maxDepth int) (length int, err error) {
 	if maxDepth <= 0 {
-		return 0, thrift.NewTProtocolExceptionWithType(thrift.DEPTH_LIMIT, errors.New("depth limit exceeded"))
+		return 0, errSkipDepthLimit
 	}
 
 	var l int
@@ -647,6 +661,7 @@ func Skip(buf []byte, self BTProtocol, fieldType thrift.TType, maxDepth int) (le
 		}
 		return
 	default:
-		return 0, thrift.NewTProtocolExceptionWithType(thrift.INVALID_DATA, fmt.Errorf("unknown data type %d", fieldType))
+		return 0, gthrift.NewProtocolException(
+			gthrift.INVALID_DATA, fmt.Sprintf("unknown data type %d", fieldType))
 	}
 }

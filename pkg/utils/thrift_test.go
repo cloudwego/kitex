@@ -22,7 +22,8 @@ import (
 
 	mt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 func TestRPCCodec(t *testing.T) {
@@ -39,12 +40,12 @@ func TestRPCCodec(t *testing.T) {
 	args1.Req = req1
 
 	// encode
-	buf, err := rc.Encode("mockMethod", thrift.CALL, 100, mt.ToApacheCodec(args1))
+	buf, err := rc.Encode("mockMethod", athrift.CALL, 100, bthrift.ToApacheCodec(args1))
 	test.Assert(t, err == nil, err)
 
 	var argsDecode1 mt.MockTestArgs
 	// decode
-	method, seqID, err := rc.Decode(buf, mt.ToApacheCodec(&argsDecode1))
+	method, seqID, err := rc.Decode(buf, bthrift.ToApacheCodec(&argsDecode1))
 
 	test.Assert(t, err == nil)
 	test.Assert(t, method == "mockMethod")
@@ -65,12 +66,12 @@ func TestRPCCodec(t *testing.T) {
 	args2 := mt.NewMockTestArgs()
 	args2.Req = req2
 	// encode
-	buf, err = rc.Encode("mockMethod1", thrift.CALL, 101, mt.ToApacheCodec(args2))
+	buf, err = rc.Encode("mockMethod1", athrift.CALL, 101, bthrift.ToApacheCodec(args2))
 	test.Assert(t, err == nil, err)
 
 	// decode
 	var argsDecode2 mt.MockTestArgs
-	method, seqID, err = rc.Decode(buf, mt.ToApacheCodec(&argsDecode2))
+	method, seqID, err = rc.Decode(buf, bthrift.ToApacheCodec(&argsDecode2))
 
 	test.Assert(t, err == nil, err)
 	test.Assert(t, method == "mockMethod1")
@@ -95,11 +96,11 @@ func TestSerializer(t *testing.T) {
 	args := mt.NewMockTestArgs()
 	args.Req = req
 
-	b, err := rc.Serialize(mt.ToApacheCodec(args))
+	b, err := rc.Serialize(bthrift.ToApacheCodec(args))
 	test.Assert(t, err == nil, err)
 
 	var args2 mt.MockTestArgs
-	err = rc.Deserialize(mt.ToApacheCodec(&args2), b)
+	err = rc.Deserialize(bthrift.ToApacheCodec(&args2), b)
 	test.Assert(t, err == nil, err)
 
 	test.Assert(t, args2.Req.Msg == req.Msg)
