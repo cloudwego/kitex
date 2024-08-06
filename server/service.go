@@ -19,7 +19,6 @@ package server
 import (
 	"errors"
 	"fmt"
-
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 

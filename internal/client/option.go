@@ -19,6 +19,7 @@ package client
 
 import (
 	"context"
+	"github.com/cloudwego/kitex/streamx"
 	"time"
 
 	"github.com/cloudwego/localsession/backup"
@@ -84,6 +85,7 @@ type Options struct {
 
 	MWBs  []endpoint.MiddlewareBuilder
 	IMWBs []endpoint.MiddlewareBuilder
+	SMWs  []streamx.StreamMiddleware
 
 	Bus          event.Bus
 	Events       event.Queue
