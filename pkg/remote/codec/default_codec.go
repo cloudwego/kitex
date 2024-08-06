@@ -222,6 +222,7 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("ttheader read payload first 8 byte failed: %s", err.Error()))
 		}
 		if c.payloadValidator != nil {
+			fillRPCInfo(message)
 			if vErr := validate(ctx, message, in, c.payloadValidator); vErr != nil {
 				return vErr
 			}
