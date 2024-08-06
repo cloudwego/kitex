@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift/internal/test"
 )
 
 // TestWriteMessageEnd test binary WriteMessageEnd function
