@@ -81,7 +81,7 @@ func GetKiteXSDKPlugin(pwd string, rawKiteXArgs []string) (*KiteXSDKPlugin, erro
 
 	kitexPlugin := &KiteXSDKPlugin{}
 
-	kitexPlugin.ThriftgoParams, kitexPlugin.KitexParams, err = grepParameters(cmd.Args)
+	kitexPlugin.ThriftgoParams, kitexPlugin.KitexParams, err = ParseKitexCmd(cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func GetKiteXSDKPlugin(pwd string, rawKiteXArgs []string) (*KiteXSDKPlugin, erro
 func InvokeThriftgoBySDK(pwd string, cmd *exec.Cmd) (err error) {
 	kitexPlugin := &KiteXSDKPlugin{}
 
-	kitexPlugin.ThriftgoParams, kitexPlugin.KitexParams, err = grepParameters(cmd.Args)
+	kitexPlugin.ThriftgoParams, kitexPlugin.KitexParams, err = ParseKitexCmd(cmd)
 	if err != nil {
 		return err
 	}
@@ -135,20 +135,21 @@ func (k *KiteXSDKPlugin) GetThriftgoParameters() []string {
 	return k.ThriftgoParams
 }
 
-func grepParameters(args []string) (thriftgoParams, kitexParams []string, err error) {
+func ParseKitexCmd(cmd *exec.Cmd) (thriftgoParams, kitexParams []string, err error) {
+	cmdArgs := cmd.Args
 	// thriftgo -r -o kitex_gen -g go:xxx -p kitex=xxxx -p otherplugin xxx.thrift
 	// ignore first argument, and remove -p kitex=xxxx
 
 	thriftgoParams = []string{}
 	kitexParams = []string{}
-	if len(args) < 1 {
-		return nil, nil, fmt.Errorf("cmd args too short: %s", args)
+	if len(cmdArgs) < 1 {
+		return nil, nil, fmt.Errorf("cmd args too short: %s", cmdArgs)
 	}
 
-	for i := 1; i < len(args); i++ {
-		arg := args[i]
-		if arg == "-p" && i+1 < len(args) {
-			pluginArgs := args[i+1]
+	for i := 1; i < len(cmdArgs); i++ {
+		arg := cmdArgs[i]
+		if arg == "-p" && i+1 < len(cmdArgs) {
+			pluginArgs := cmdArgs[i+1]
 			if strings.HasPrefix(pluginArgs, "kitex") {
 				kitexParams = strings.Split(pluginArgs, ",")
 				i++
