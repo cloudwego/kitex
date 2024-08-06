@@ -1250,8 +1250,8 @@ func newStreamingServer(svcName string, args []streamingMethodArg, mws []endpoin
 		svcs: &services{
 			svcMap: map[string]*service{
 				svcName: {
-					svcInfo: svcInfo,
-					mw:      endpoint.Chain(mws...),
+					svcInfo:            svcInfo,
+					serviceMiddlewares: serviceMiddlewares{MW: endpoint.Chain(mws...)},
 				},
 			},
 		},
