@@ -77,9 +77,9 @@ func main() {
 		log.Warn("Get current path failed:", err.Error())
 		os.Exit(1)
 	}
-	if os.Args[1] == "template" {
+	if len(os.Args) > 1 && os.Args[1] == "template" {
 		err = args.TemplateArgs(kitex.Version)
-	} else if !strings.HasPrefix(os.Args[1], "-") {
+	} else if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
 		err = fmt.Errorf("unknown command %q", os.Args[1])
 	} else {
 		// run as kitex

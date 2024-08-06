@@ -191,19 +191,14 @@ func TestFlagLong(t *testing.T) {
 		RunE: func(_ *Command, args []string) error { cArgs = args; return nil },
 	}
 
-	var intFlagValue int
 	var stringFlagValue string
-	c.Flags().IntVar(&intFlagValue, "intf", -1, "")
 	c.Flags().StringVar(&stringFlagValue, "sf", "", "")
 
-	err := executeCommand(c, "--intf=7", "--sf=abc", "one", "--", "two")
+	err := executeCommand(c, "--sf=abc", "one", "--", "two")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	if intFlagValue != 7 {
-		t.Errorf("Expected intFlagValue: %v, got %v", 7, intFlagValue)
-	}
 	if stringFlagValue != "abc" {
 		t.Errorf("Expected stringFlagValue: %q, got %q", "abc", stringFlagValue)
 	}
@@ -221,19 +216,14 @@ func TestFlagShort(t *testing.T) {
 		RunE: func(_ *Command, args []string) error { cArgs = args; return nil },
 	}
 
-	var intFlagValue int
 	var stringFlagValue string
-	c.Flags().IntVarP(&intFlagValue, "intf", "i", -1, "")
 	c.Flags().StringVarP(&stringFlagValue, "sf", "s", "", "")
 
-	err := executeCommand(c, "-i", "7", "-sabc", "one", "two")
+	err := executeCommand(c, "-sabc", "one", "two")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
-	if intFlagValue != 7 {
-		t.Errorf("Expected flag value: %v, got %v", 7, intFlagValue)
-	}
 	if stringFlagValue != "abc" {
 		t.Errorf("Expected stringFlagValue: %q, got %q", "abc", stringFlagValue)
 	}
@@ -248,16 +238,8 @@ func TestChildFlag(t *testing.T) {
 	rootCmd := &Command{Use: "root", RunE: emptyRun}
 	childCmd := &Command{Use: "child", RunE: emptyRun}
 	rootCmd.AddCommand(childCmd)
-
-	var intFlagValue int
-	childCmd.Flags().IntVarP(&intFlagValue, "intf", "i", -1, "")
-
-	err := executeCommand(rootCmd, "child", "-i7")
+	err := executeCommand(rootCmd, "child")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
-	}
-
-	if intFlagValue != 7 {
-		t.Errorf("Expected flag value: %v, got %v", 7, intFlagValue)
 	}
 }

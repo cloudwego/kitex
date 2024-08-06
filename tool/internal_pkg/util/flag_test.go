@@ -45,21 +45,13 @@ func testParse(f *FlagSet, t *testing.T) {
 	boolFlag := f.Bool("bool", false, "bool value")
 	bool2Flag := f.Bool("bool2", false, "bool2 value")
 	bool3Flag := f.Bool("bool3", false, "bool3 value")
-	intFlag := f.Int("int", 0, "int value")
 	stringFlag := f.String("string", "0", "string value")
-	optionalIntNoValueFlag := f.Int("optional-int-no-value", 0, "int value")
-	f.Lookup("optional-int-no-value").NoOptDefVal = "9"
-	optionalIntWithValueFlag := f.Int("optional-int-with-value", 0, "int value")
-	f.Lookup("optional-int-no-value").NoOptDefVal = "9"
 	extra := "one-extra-argument"
 	args := []string{
 		"--bool",
 		"--bool2=true",
 		"--bool3=false",
-		"--int=22",
 		"--string=hello",
-		"--optional-int-no-value",
-		"--optional-int-with-value=42",
 		extra,
 	}
 	if err := f.Parse(args); err != nil {
@@ -77,17 +69,8 @@ func testParse(f *FlagSet, t *testing.T) {
 	if *bool3Flag != false {
 		t.Error("bool3 flag should be false, is ", *bool2Flag)
 	}
-	if *intFlag != 22 {
-		t.Error("int flag should be 22, is ", *intFlag)
-	}
 	if *stringFlag != "hello" {
 		t.Error("string flag should be `hello`, is ", *stringFlag)
-	}
-	if *optionalIntNoValueFlag != 9 {
-		t.Error("optional int flag should be the default value, is ", *optionalIntNoValueFlag)
-	}
-	if *optionalIntWithValueFlag != 42 {
-		t.Error("optional int flag should be 42, is ", *optionalIntWithValueFlag)
 	}
 	if len(f.Args()) != 1 {
 		t.Error("expected one argument, got", len(f.Args()))
