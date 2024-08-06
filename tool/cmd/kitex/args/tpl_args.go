@@ -167,6 +167,16 @@ func (a *Arguments) Init(cmd *util.Command, args []string) error {
 	return nil
 }
 
+func (a *Arguments) checkTplArgs() error {
+	if a.TemplateDir != "" && a.RenderTplDir != "" {
+		return fmt.Errorf("template render --dir and -template-dir cannot be used at the same time")
+	}
+	if a.RenderTplDir != "" && len(a.TemplateFiles) > 0 {
+		return fmt.Errorf("template render --dir and --file option cannot be specified at the same time")
+	}
+	return nil
+}
+
 func (a *Arguments) Render(cmd *util.Command, args []string) error {
 	curpath, err := filepath.Abs(".")
 	if err != nil {
@@ -186,6 +196,10 @@ func (a *Arguments) Render(cmd *util.Command, args []string) error {
 		return err
 	}
 	err = a.checkServiceName()
+	if err != nil {
+		return err
+	}
+	err = a.checkTplArgs()
 	if err != nil {
 		return err
 	}
@@ -263,7 +277,9 @@ func (a *Arguments) TemplateArgs(version string) error {
 		"Specify a code gen path.")
 	renderCmd.Flags().StringArrayVar(&a.TemplateFiles, "file", []string{}, "Specify single template path")
 	renderCmd.Flags().BoolVar(&a.DebugTpl, "debug", false, "turn on debug for template")
-	renderCmd.Flags().VarP(&a.Includes, "Includes", "I", "Add IDL search path and template search path for includes.")
+	renderCmd.Flags().StringVarP(&a.IncludesTpl, "Includes", "I", "", "Add IDL search path and template search path for includes.")
+	renderCmd.Flags().StringVarP(&a.IncludesTpl, "Includes", "I", "", "Add IDL search path and template search path for includes.")
+	renderCmd.Flags().StringVar(&a.MetaFlags, "meta", "", "Meta data in key=value format, keys separated by ';' values separated by ',' ")
 	initCmd.SetUsageFunc(func() {
 		fmt.Fprintf(os.Stderr, `Version %s
 Usage: kitex template init [flags]
@@ -279,7 +295,6 @@ Usage: template render --dir [template dir_path] [flags] IDL
 Usage: kitex template clean
 `, version)
 	})
-	// renderCmd.PrintUsage()
 	templateCmd.AddCommand(initCmd, renderCmd, cleanCmd)
 	kitexCmd.AddCommand(templateCmd)
 	if _, err := kitexCmd.ExecuteC(); err != nil {

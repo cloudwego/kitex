@@ -137,11 +137,13 @@ type Config struct {
 	TemplateDir string
 
 	// subcommand template
-	InitOutputDir string // specify the location path of init subcommand
-	InitType      string
+	InitOutputDir string   // specify the location path of init subcommand
+	InitType      string   // specify the type for init subcommand
 	RenderTplDir  string   // specify the path of template directory for render subcommand
 	TemplateFiles []string // specify the path of single file or multiple file to render
-	DebugTpl      bool
+	DebugTpl      bool     // turn on the debug mode
+	IncludesTpl   string   // specify the path of remote template repository for render subcommand
+	MetaFlags     string   // Metadata in key=value format, keys separated by ';' values separated by ','
 
 	GenPath string
 

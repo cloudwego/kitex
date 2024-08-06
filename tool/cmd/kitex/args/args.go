@@ -212,13 +212,10 @@ func (a *Arguments) checkIDL(files []string) error {
 }
 
 func (a *Arguments) checkServiceName() error {
-	if a.ServiceName == "" && a.TemplateDir == "" && a.RenderTplDir == "" {
+	if a.ServiceName == "" && a.TemplateDir == "" {
 		if a.Use != "" {
-			return fmt.Errorf("-use must be used with -service or -template-dir or template render")
+			return fmt.Errorf("-use must be used with -service or -template-dir")
 		}
-	}
-	if a.TemplateDir != "" && a.RenderTplDir != "" {
-		return fmt.Errorf("template render and -template-dir cannot be used at the same time")
 	}
 	if a.ServiceName != "" && a.TemplateDir != "" {
 		return fmt.Errorf("-template-dir and -service cannot be specified at the same time")

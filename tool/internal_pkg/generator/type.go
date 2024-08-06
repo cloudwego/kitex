@@ -51,6 +51,15 @@ type PackageInfo struct {
 	Protocol         transport.Protocol
 	IDLName          string
 	ServerPkg        string
+	ExtendMeta       map[string][]string // key-value metadata for render
+	MWs              []GlobalMiddleware
+}
+
+type GlobalMiddleware struct {
+	// the name of the middleware
+	Name string
+	// the content of the middleware
+	Content string
 }
 
 // AddImport .
