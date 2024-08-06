@@ -18,14 +18,32 @@ package thrift
 
 import "github.com/cloudwego/gopkg/protocol/thrift/base"
 
-type Base struct {
-	base.Base
+// TrafficEnv ...
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift/base
+type TrafficEnv = base.TrafficEnv
+
+// NewTrafficEnv ...
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift/base
+func NewTrafficEnv() *TrafficEnv {
+	return base.NewTrafficEnv()
 }
 
-type BaseResp struct {
-	base.BaseResp
-}
+// Base ...
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift/base
+type Base = base.Base
 
+// NewBase ...
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift/base
 func NewBase() *Base {
-	return &Base{}
+	return base.NewBase()
+}
+
+// BaseResp ...
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift/base
+type BaseResp = base.BaseResp
+
+// NewBaseResp ...
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift/base
+func NewBaseResp() *BaseResp {
+	return base.NewBaseResp()
 }

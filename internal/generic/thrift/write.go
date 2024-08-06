@@ -672,7 +672,7 @@ func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BinaryWr
 			case map[string]interface{}:
 				// from http json
 				for key, value := range v {
-					if _, ok := opt.requestBase.Base.Extra[key]; !ok {
+					if _, ok := opt.requestBase.Extra[key]; !ok {
 						if vStr, ok := value.(string); ok {
 							if opt.requestBase.Extra == nil {
 								opt.requestBase.Extra = map[string]string{}
@@ -685,7 +685,7 @@ func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BinaryWr
 				// from struct map
 				for key, value := range v {
 					if kStr, ok := key.(string); ok {
-						if _, ok := opt.requestBase.Base.Extra[kStr]; !ok {
+						if _, ok := opt.requestBase.Extra[kStr]; !ok {
 							if vStr, ok := value.(string); ok {
 								if opt.requestBase.Extra == nil {
 									opt.requestBase.Extra = map[string]string{}

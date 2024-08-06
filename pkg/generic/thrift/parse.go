@@ -307,7 +307,7 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 		if ty, ok := cache[t.Name]; ok {
 			return ty, nil
 		}
-		typePkg, typeName := SplitType(t.Name)
+		typePkg, typeName := splitType(t.Name)
 		if typePkg != "" {
 			ref, ok := tree.GetReference(typePkg)
 			if !ok {

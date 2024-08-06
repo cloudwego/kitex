@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
-	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/tidwall/gjson"
 
@@ -1746,10 +1745,8 @@ func Test_writeJSONBase(t *testing.T) {
 				},
 				opt: &writerOption{
 					requestBase: &gthrift.Base{
-						Base: base.Base{
-							LogID:  "logID-12345",
-							Caller: "Caller.Name",
-						},
+						LogID:  "logID-12345",
+						Caller: "Caller.Name",
 					},
 				},
 			},

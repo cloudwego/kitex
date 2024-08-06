@@ -18,7 +18,7 @@ package thrift
 
 import "strings"
 
-func SplitType(t string) (pkg, name string) {
+func splitType(t string) (pkg, name string) {
 	idx := strings.LastIndex(t, ".")
 	if idx == -1 {
 		return "", t
