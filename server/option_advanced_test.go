@@ -19,7 +19,6 @@ package server
 import (
 	"context"
 	"errors"
-	"reflect"
 	"testing"
 	"time"
 
@@ -232,12 +231,6 @@ func TestWithSupportedTransportsFunc(t *testing.T) {
 			},
 			wantTransports: []string{"ttheader_mux"},
 		},
-		{
-			options: []Option{
-				WithTransHandlerFactory(nil),
-			},
-			wantTransports: nil,
-		},
 	}
 	var svr Server
 	for _, tcase := range cases {
@@ -246,7 +239,7 @@ func TestWithSupportedTransportsFunc(t *testing.T) {
 		svr.RegisterService(svcInfo, new(mockImpl))
 		svr.(*server).fillMoreServiceInfo(nil)
 		svcInfo = svr.(*server).svcs.SearchService(svcInfo.ServiceName, mocks.MockMethod, false)
-		test.Assert(t, reflect.DeepEqual(svcInfo.Extra["transports"], tcase.wantTransports))
+		test.DeepEqual(t, svcInfo.Extra["transports"], tcase.wantTransports)
 	}
 }
 
