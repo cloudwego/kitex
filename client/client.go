@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/streamx"
 	"runtime"
 	"runtime/debug"
 	"strconv"
@@ -70,6 +71,7 @@ type kClient struct {
 	mws     []endpoint.Middleware
 	eps     endpoint.Endpoint
 	sEps    endpoint.Endpoint
+	sxEps   streamx.StreamEndpoint
 	opt     *client.Options
 	lbf     *lbcache.BalancerFactory
 
@@ -428,17 +430,34 @@ func (kc *kClient) richRemoteOption() {
 }
 
 func (kc *kClient) buildInvokeChain() error {
+	mwchain := endpoint.Chain(kc.mws...)
+
 	innerHandlerEp, err := kc.invokeHandleEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.eps = endpoint.Chain(kc.mws...)(innerHandlerEp)
+	kc.eps = mwchain(innerHandlerEp)
 
 	innerStreamingEp, err := kc.invokeStreamingEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.sEps = endpoint.Chain(kc.mws...)(innerStreamingEp)
+	kc.sEps = mwchain(innerStreamingEp)
+
+	innerStreamXEp, err := kc.invokeStreamXEndpoint()
+	if err != nil {
+		return err
+	}
+	// 把现存的中间件转化为 StreamEndpoint
+	// - plain  middleware: (ctx with stream key, reqArgs, resArgs)
+	// - stream middleware: (ctx with stream key, reqArgs, resArgs, streamArgs)
+	kc.sxEps = func(ctx context.Context, reqArgs, resArgs any, streamArgs streamx.StreamArgs) (err error) {
+		return mwchain(
+			func(interCtx context.Context, interReqArgs, interResArgs interface{}) (err error) {
+				return innerStreamXEp(interCtx, interReqArgs, interResArgs, streamArgs)
+			},
+		)(ctx, reqArgs, resArgs)
+	}
 	return nil
 }
 

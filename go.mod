@@ -1,6 +1,6 @@
 module github.com/cloudwego/kitex
 
-go 1.17
+go 1.18
 
 require (
 	github.com/apache/thrift v0.13.0
@@ -19,12 +19,14 @@ require (
 	github.com/google/pprof v0.0.0-20220608213341-c488b8fa1db3
 	github.com/jhump/protoreflect v1.8.2
 	github.com/json-iterator/go v1.1.12
+	github.com/stretchr/testify v1.9.0
 	github.com/tidwall/gjson v1.9.3
 	golang.org/x/net v0.17.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.13.0
 	golang.org/x/tools v0.6.0
 	google.golang.org/genproto v0.0.0-20210513213006-bf773b8c8384
+	google.golang.org/grpc v1.36.1
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -44,7 +46,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/oleiade/lane v1.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
