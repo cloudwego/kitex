@@ -21,7 +21,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/cloudwego/gopkg/protocol/thrift/base"
+	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
 const (
@@ -35,5 +35,5 @@ type MessageReader interface {
 
 // MessageWriter write to thrift.TProtocol
 type MessageWriter interface {
-	Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error
+	Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *gthrift.Base) error
 }

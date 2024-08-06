@@ -1,8 +1,5 @@
-//go:build !amd64 || !go1.16
-// +build !amd64 !go1.16
-
 /*
- * Copyright 2023 CloudWeGo Authors
+ * Copyright 2024 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,14 +16,12 @@
 
 package thrift
 
-import (
-	"context"
-	"io"
+import "strings"
 
-	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
-)
-
-// Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *gthrift.Base) error {
-	return w.originalWrite(ctx, out, msg, requestBase)
+func SplitType(t string) (pkg, name string) {
+	idx := strings.LastIndex(t, ".")
+	if idx == -1 {
+		return "", t
+	}
+	return t[:idx], t[idx+1:]
 }

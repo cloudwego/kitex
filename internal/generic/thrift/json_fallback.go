@@ -23,10 +23,10 @@ import (
 	"context"
 	"io"
 
-	"github.com/cloudwego/gopkg/protocol/thrift/base"
+	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
 // Write write json string to out thrift.TProtocol
-func (m *WriteJSON) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+func (m *WriteJSON) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *gthrift.Base) error {
 	return m.originalWrite(ctx, out, msg, method, isClient, requestBase)
 }

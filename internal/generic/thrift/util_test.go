@@ -25,23 +25,23 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
-func TestSplitType(t *testing.T) {
-	pkg, name := SplitType(".A")
-	test.Assert(t, pkg == "")
-	test.Assert(t, name == "A")
-
-	pkg, name = SplitType("foo.bar.A")
-	test.Assert(t, pkg == "foo.bar")
-	test.Assert(t, name == "A")
-
-	pkg, name = SplitType("A")
-	test.Assert(t, pkg == "")
-	test.Assert(t, name == "A")
-
-	pkg, name = SplitType("")
-	test.Assert(t, pkg == "")
-	test.Assert(t, name == "")
-}
+//func TestSplitType(t *testing.T) {
+//	pkg, name := SplitType(".A")
+//	test.Assert(t, pkg == "")
+//	test.Assert(t, name == "A")
+//
+//	pkg, name = SplitType("foo.bar.A")
+//	test.Assert(t, pkg == "foo.bar")
+//	test.Assert(t, name == "A")
+//
+//	pkg, name = SplitType("A")
+//	test.Assert(t, pkg == "")
+//	test.Assert(t, name == "A")
+//
+//	pkg, name = SplitType("")
+//	test.Assert(t, pkg == "")
+//	test.Assert(t, name == "")
+//}
 
 func TestRequestMappingValue(t *testing.T) {
 	httpMapping := descriptor.NewAPIBody

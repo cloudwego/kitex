@@ -20,10 +20,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
+	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 	"testing"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
-	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/tidwall/gjson"
 
@@ -57,7 +58,7 @@ func Test_nextWriter(t *testing.T) {
 					Struct: &descriptor.StructDescriptor{},
 				},
 				opt: &writerOption{
-					requestBase:      &base.Base{},
+					requestBase:      &gthrift.Base{},
 					binaryWithBase64: false,
 				},
 			},
@@ -73,7 +74,7 @@ func Test_nextWriter(t *testing.T) {
 					Struct: &descriptor.StructDescriptor{},
 				},
 				opt: &writerOption{
-					requestBase:      &base.Base{},
+					requestBase:      &gthrift.Base{},
 					binaryWithBase64: false,
 				},
 			},
@@ -89,7 +90,7 @@ func Test_nextWriter(t *testing.T) {
 					Struct: &descriptor.StructDescriptor{},
 				},
 				opt: &writerOption{
-					requestBase:      &base.Base{},
+					requestBase:      &gthrift.Base{},
 					binaryWithBase64: false,
 				},
 			},
@@ -105,7 +106,7 @@ func Test_nextWriter(t *testing.T) {
 					Struct: &descriptor.StructDescriptor{},
 				},
 				opt: &writerOption{
-					requestBase:      &base.Base{},
+					requestBase:      &gthrift.Base{},
 					binaryWithBase64: false,
 				},
 			},
@@ -121,7 +122,7 @@ func Test_nextWriter(t *testing.T) {
 					Struct: &descriptor.StructDescriptor{},
 				},
 				opt: &writerOption{
-					requestBase:      &base.Base{},
+					requestBase:      &gthrift.Base{},
 					binaryWithBase64: false,
 				},
 			},
@@ -137,7 +138,7 @@ func Test_nextWriter(t *testing.T) {
 					Struct: &descriptor.StructDescriptor{},
 				},
 				opt: &writerOption{
-					requestBase:      &base.Base{},
+					requestBase:      &gthrift.Base{},
 					binaryWithBase64: false,
 				},
 			},
@@ -153,7 +154,7 @@ func Test_nextWriter(t *testing.T) {
 					Struct: &descriptor.StructDescriptor{},
 				},
 				opt: &writerOption{
-					requestBase:      &base.Base{},
+					requestBase:      &gthrift.Base{},
 					binaryWithBase64: false,
 				},
 			},
@@ -169,7 +170,7 @@ func Test_nextWriter(t *testing.T) {
 					Struct: &descriptor.StructDescriptor{},
 				},
 				opt: &writerOption{
-					requestBase:      &base.Base{},
+					requestBase:      &gthrift.Base{},
 					binaryWithBase64: false,
 				},
 			},
@@ -185,7 +186,7 @@ func Test_nextWriter(t *testing.T) {
 					Struct: &descriptor.StructDescriptor{},
 				},
 				opt: &writerOption{
-					requestBase:      &base.Base{},
+					requestBase:      &gthrift.Base{},
 					binaryWithBase64: false,
 				},
 			},
@@ -201,7 +202,7 @@ func Test_nextWriter(t *testing.T) {
 					Struct: &descriptor.StructDescriptor{},
 				},
 				opt: &writerOption{
-					requestBase:      &base.Base{},
+					requestBase:      &gthrift.Base{},
 					binaryWithBase64: false,
 				},
 			},
@@ -1605,7 +1606,7 @@ func Test_writeRequestBase(t *testing.T) {
 					ID:   255,
 					Type: &descriptor.TypeDescriptor{Type: descriptor.STRUCT, Name: "base.Base"},
 				},
-				opt: &writerOption{requestBase: &base.Base{}},
+				opt: &writerOption{requestBase: &gthrift.Base{}},
 			},
 			false,
 		},
@@ -1744,9 +1745,11 @@ func Test_writeJSONBase(t *testing.T) {
 					},
 				},
 				opt: &writerOption{
-					requestBase: &base.Base{
-						LogID:  "logID-12345",
-						Caller: "Caller.Name",
+					requestBase: &gthrift.Base{
+						Base: base.Base{
+							LogID:  "logID-12345",
+							Caller: "Caller.Name",
+						},
 					},
 				},
 			},

@@ -23,16 +23,16 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
-	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
 type writerOption struct {
-	requestBase *base.Base // request base from metahandler
+	requestBase *gthrift.Base // request base from metahandler
 	// decoding Base64 to binary
 	binaryWithBase64 bool
 }
@@ -672,7 +672,7 @@ func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BinaryWr
 			case map[string]interface{}:
 				// from http json
 				for key, value := range v {
-					if _, ok := opt.requestBase.Extra[key]; !ok {
+					if _, ok := opt.requestBase.Base.Extra[key]; !ok {
 						if vStr, ok := value.(string); ok {
 							if opt.requestBase.Extra == nil {
 								opt.requestBase.Extra = map[string]string{}
@@ -685,7 +685,7 @@ func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BinaryWr
 				// from struct map
 				for key, value := range v {
 					if kStr, ok := key.(string); ok {
-						if _, ok := opt.requestBase.Extra[kStr]; !ok {
+						if _, ok := opt.requestBase.Base.Extra[kStr]; !ok {
 							if vStr, ok := value.(string); ok {
 								if opt.requestBase.Extra == nil {
 									opt.requestBase.Extra = map[string]string{}

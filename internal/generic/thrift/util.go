@@ -33,13 +33,14 @@ func assertType(expected, but descriptor.Type) error {
 	return fmt.Errorf("need %s type, but got: %s", expected, but)
 }
 
-func SplitType(t string) (pkg, name string) {
-	idx := strings.LastIndex(t, ".")
-	if idx == -1 {
-		return "", t
-	}
-	return t[:idx], t[idx+1:]
-}
+//
+//func SplitType(t string) (pkg, name string) {
+//	idx := strings.LastIndex(t, ".")
+//	if idx == -1 {
+//		return "", t
+//	}
+//	return t[:idx], t[idx+1:]
+//}
 
 func requestMappingValue(ctx context.Context, req *descriptor.HTTPRequest, field *descriptor.FieldDescriptor) (interface{}, error) {
 	val, ok, err := field.HTTPMapping.Request(ctx, req, field)
