@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package thrift
+package bthrift
 
 import (
 	"errors"
@@ -57,12 +57,12 @@ func (p ApacheCodecAdapter) Read(tp athrift.TProtocol) error {
 
 // ToApacheCodec converts a thrift.FastCodec to athrift.TStruct
 func ToApacheCodec(p thrift.FastCodec) athrift.TStruct {
-	return ApacheCodecAdapter{p: p}
+	return &ApacheCodecAdapter{p}
 }
 
 // UnpackApacheCodec unpacks the value returned by `ToApacheCodec`
 func UnpackApacheCodec(v interface{}) interface{} {
-	a, ok := v.(ApacheCodecAdapter)
+	a, ok := v.(*ApacheCodecAdapter)
 	if ok {
 		return a.p
 	}

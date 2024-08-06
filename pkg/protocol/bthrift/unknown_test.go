@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift/internal/test"
 )
 
 func TestUnknownFieldTypeConvert(t *testing.T) {

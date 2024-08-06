@@ -22,35 +22,50 @@ import (
 	"math"
 	"sync"
 
-	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
-// must be strict read & strict write
-var (
-	bpPool sync.Pool
-	_      thrift.TProtocol = (*BinaryProtocol)(nil)
-)
-
-func init() {
-	bpPool.New = newBP
+// MessageReader read from athrift.TProtocol
+// Deprecated: use github.com/apache/thrift/lib/go/thrift.TStruct
+type MessageReader interface {
+	Read(iprot athrift.TProtocol) error
 }
 
-func newBP() interface{} {
-	return &BinaryProtocol{}
+// MessageWriter write to athrift.TProtocol
+// Deprecated: use github.com/apache/thrift/lib/go/thrift.TStruct
+type MessageWriter interface {
+	Write(oprot athrift.TProtocol) error
 }
+
+// UnmarshalThriftException decode thrift exception from tProt
+// TODO: this func should be removed in the future. it's exposed accidentally.
+// Deprecated: Use `SkipDecoder` + `ApplicationException` of `cloudwego/gopkg/protocol/thrift` instead.
+func UnmarshalThriftException(tProt athrift.TProtocol) error {
+	return unmarshalThriftException(tProt.Transport())
+}
+
+var bpPool = sync.Pool{
+	New: func() interface{} {
+		return &BinaryProtocol{}
+	},
+}
+
+// BinaryProtocol ...
+// Deprecated: use github.com/apache/thrift/lib/go/thrift.NewTBinaryProtocol
+type BinaryProtocol struct {
+	trans remote.ByteBuffer
+}
+
+var _ athrift.TProtocol = (*BinaryProtocol)(nil)
 
 // NewBinaryProtocol ...
+// Deprecated: use github.com/apache/thrift/lib/go/thrift.NewTBinaryProtocol
 func NewBinaryProtocol(t remote.ByteBuffer) *BinaryProtocol {
 	bp := bpPool.Get().(*BinaryProtocol)
 	bp.trans = t
 	return bp
-}
-
-// BinaryProtocol ...
-type BinaryProtocol struct {
-	trans remote.ByteBuffer
 }
 
 // Recycle ...
@@ -64,8 +79,8 @@ func (p *BinaryProtocol) Recycle() {
  */
 
 // WriteMessageBegin ...
-func (p *BinaryProtocol) WriteMessageBegin(name string, typeID thrift.TMessageType, seqID int32) error {
-	version := uint32(thrift.VERSION_1) | uint32(typeID)
+func (p *BinaryProtocol) WriteMessageBegin(name string, typeID athrift.TMessageType, seqID int32) error {
+	version := uint32(athrift.VERSION_1) | uint32(typeID)
 	e := p.WriteI32(int32(version))
 	if e != nil {
 		return e
@@ -94,7 +109,7 @@ func (p *BinaryProtocol) WriteStructEnd() error {
 }
 
 // WriteFieldBegin ...
-func (p *BinaryProtocol) WriteFieldBegin(name string, typeID thrift.TType, id int16) error {
+func (p *BinaryProtocol) WriteFieldBegin(name string, typeID athrift.TType, id int16) error {
 	e := p.WriteByte(int8(typeID))
 	if e != nil {
 		return e
@@ -110,12 +125,12 @@ func (p *BinaryProtocol) WriteFieldEnd() error {
 
 // WriteFieldStop ...
 func (p *BinaryProtocol) WriteFieldStop() error {
-	e := p.WriteByte(thrift.STOP)
+	e := p.WriteByte(athrift.STOP)
 	return e
 }
 
 // WriteMapBegin ...
-func (p *BinaryProtocol) WriteMapBegin(keyType, valueType thrift.TType, size int) error {
+func (p *BinaryProtocol) WriteMapBegin(keyType, valueType athrift.TType, size int) error {
 	e := p.WriteByte(int8(keyType))
 	if e != nil {
 		return e
@@ -134,7 +149,7 @@ func (p *BinaryProtocol) WriteMapEnd() error {
 }
 
 // WriteListBegin ...
-func (p *BinaryProtocol) WriteListBegin(elemType thrift.TType, size int) error {
+func (p *BinaryProtocol) WriteListBegin(elemType athrift.TType, size int) error {
 	e := p.WriteByte(int8(elemType))
 	if e != nil {
 		return e
@@ -149,7 +164,7 @@ func (p *BinaryProtocol) WriteListEnd() error {
 }
 
 // WriteSetBegin ...
-func (p *BinaryProtocol) WriteSetBegin(elemType thrift.TType, size int) error {
+func (p *BinaryProtocol) WriteSetBegin(elemType athrift.TType, size int) error {
 	e := p.WriteByte(int8(elemType))
 	if e != nil {
 		return e
@@ -251,7 +266,7 @@ func (p *BinaryProtocol) malloc(size int) ([]byte, error) {
  */
 
 // ReadMessageBegin ...
-func (p *BinaryProtocol) ReadMessageBegin() (name string, typeID thrift.TMessageType, seqID int32, err error) {
+func (p *BinaryProtocol) ReadMessageBegin() (name string, typeID athrift.TMessageType, seqID int32, err error) {
 	size, e := p.ReadI32()
 	if e != nil {
 		return "", typeID, 0, perrors.NewProtocolError(e)
@@ -259,9 +274,9 @@ func (p *BinaryProtocol) ReadMessageBegin() (name string, typeID thrift.TMessage
 	if size > 0 {
 		return name, typeID, seqID, perrors.NewProtocolErrorWithType(perrors.BadVersion, "Missing version in ReadMessageBegin")
 	}
-	typeID = thrift.TMessageType(size & 0x0ff)
-	version := int64(int64(size) & thrift.VERSION_MASK)
-	if version != thrift.VERSION_1 {
+	typeID = athrift.TMessageType(size & 0x0ff)
+	version := int64(int64(size) & athrift.VERSION_MASK)
+	if version != athrift.VERSION_1 {
 		return name, typeID, seqID, perrors.NewProtocolErrorWithType(perrors.BadVersion, "Bad version in ReadMessageBegin")
 	}
 	name, e = p.ReadString()
@@ -291,13 +306,13 @@ func (p *BinaryProtocol) ReadStructEnd() error {
 }
 
 // ReadFieldBegin ...
-func (p *BinaryProtocol) ReadFieldBegin() (name string, typeID thrift.TType, id int16, err error) {
+func (p *BinaryProtocol) ReadFieldBegin() (name string, typeID athrift.TType, id int16, err error) {
 	t, err := p.ReadByte()
-	typeID = thrift.TType(t)
+	typeID = athrift.TType(t)
 	if err != nil {
 		return name, typeID, id, err
 	}
-	if t != thrift.STOP {
+	if t != athrift.STOP {
 		id, err = p.ReadI16()
 	}
 	return name, typeID, id, err
@@ -309,19 +324,19 @@ func (p *BinaryProtocol) ReadFieldEnd() error {
 }
 
 // ReadMapBegin ...
-func (p *BinaryProtocol) ReadMapBegin() (kType, vType thrift.TType, size int, err error) {
+func (p *BinaryProtocol) ReadMapBegin() (kType, vType athrift.TType, size int, err error) {
 	k, e := p.ReadByte()
 	if e != nil {
 		err = perrors.NewProtocolError(e)
 		return
 	}
-	kType = thrift.TType(k)
+	kType = athrift.TType(k)
 	v, e := p.ReadByte()
 	if e != nil {
 		err = perrors.NewProtocolError(e)
 		return
 	}
-	vType = thrift.TType(v)
+	vType = athrift.TType(v)
 	size32, e := p.ReadI32()
 	if e != nil {
 		err = perrors.NewProtocolError(e)
@@ -341,13 +356,13 @@ func (p *BinaryProtocol) ReadMapEnd() error {
 }
 
 // ReadListBegin ...
-func (p *BinaryProtocol) ReadListBegin() (elemType thrift.TType, size int, err error) {
+func (p *BinaryProtocol) ReadListBegin() (elemType athrift.TType, size int, err error) {
 	b, e := p.ReadByte()
 	if e != nil {
 		err = perrors.NewProtocolError(e)
 		return
 	}
-	elemType = thrift.TType(b)
+	elemType = athrift.TType(b)
 	size32, e := p.ReadI32()
 	if e != nil {
 		err = perrors.NewProtocolError(e)
@@ -368,13 +383,13 @@ func (p *BinaryProtocol) ReadListEnd() error {
 }
 
 // ReadSetBegin ...
-func (p *BinaryProtocol) ReadSetBegin() (elemType thrift.TType, size int, err error) {
+func (p *BinaryProtocol) ReadSetBegin() (elemType athrift.TType, size int, err error) {
 	b, e := p.ReadByte()
 	if e != nil {
 		err = perrors.NewProtocolError(e)
 		return
 	}
-	elemType = thrift.TType(b)
+	elemType = athrift.TType(b)
 	size32, e := p.ReadI32()
 	if e != nil {
 		err = perrors.NewProtocolError(e)
@@ -491,13 +506,13 @@ func (p *BinaryProtocol) Flush(ctx context.Context) (err error) {
 }
 
 // Skip ...
-func (p *BinaryProtocol) Skip(fieldType thrift.TType) (err error) {
-	return thrift.SkipDefaultDepth(p, fieldType)
+func (p *BinaryProtocol) Skip(fieldType athrift.TType) (err error) {
+	return athrift.SkipDefaultDepth(p, fieldType)
 }
 
 // ttransportByteBuffer ...
 // for exposing remote.ByteBuffer via p.Transport(),
-// mainly for testing purpose, see internal/mocks/thrift/utils.go
+// mainly for testing purpose, see internal/mocks/athrift/utils.go
 type ttransportByteBuffer struct {
 	remote.ByteBuffer
 }
@@ -509,7 +524,7 @@ func (ttransportByteBuffer) Open() error                           { panic("not 
 func (p ttransportByteBuffer) RemainingBytes() uint64              { return uint64(p.ReadableLen()) }
 
 // Transport ...
-func (p *BinaryProtocol) Transport() thrift.TTransport {
+func (p *BinaryProtocol) Transport() athrift.TTransport {
 	return ttransportByteBuffer{p.trans}
 }
 

@@ -23,8 +23,8 @@ import (
 	"io"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/apache"
 
-	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -149,7 +149,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	}
 
 	// fallback to old thrift way (slow)
-	if err := encodeBasicThrift(out, methodName, msgType, seqID, data); err == nil || err != errEncodeMismatchMsgType {
+	if err := encodeBasicThrift(out, ctx, methodName, msgType, seqID, data); err == nil || err != errEncodeMismatchMsgType {
 		return err
 	}
 
@@ -170,7 +170,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec) error {
 	nw, _ := out.(remote.NocopyWrite)
 	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
-	msgBeginLen := thrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
+	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
 	buf, err := out.Malloc(msgBeginLen + msg.BLength())
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
@@ -199,22 +199,21 @@ func encodeGenericThrift(out remote.ByteBuffer, ctx context.Context, method stri
 	return nil
 }
 
-// encodeBasicThrift encode with the old athrift way (slow)
-func encodeBasicThrift(out remote.ByteBuffer, method string, msgType remote.MessageType, seqID int32, data interface{}) error {
+// encodeBasicThrift encode with the old apache thrift way (slow)
+func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}) error {
 	if err := verifyMarshalBasicThriftDataType(data); err != nil {
 		return err
 	}
-	tProt := NewBinaryProtocol(out)
-	if err := tProt.WriteMessageBegin(method, athrift.TMessageType(msgType), seqID); err != nil {
-		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageBegin failed: %s", err.Error()))
-	}
-	if err := marshalBasicThriftData(tProt, data); err != nil {
+
+	b, err := out.Malloc(thrift.Binary.MessageBeginLength(method))
+	if err != nil {
 		return err
 	}
-	if err := tProt.WriteMessageEnd(); err != nil {
-		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, WriteMessageEnd failed: %s", err.Error()))
+	_ = thrift.Binary.WriteMessageBegin(b, method, thrift.TMessageType(msgType), seqID)
+
+	if err := apache.ThriftWrite(apache.NewDefaultTransport(out), data); err != nil {
+		return err
 	}
-	tProt.Recycle()
 	return nil
 }
 
@@ -222,8 +221,10 @@ func encodeBasicThrift(out remote.ByteBuffer, method string, msgType remote.Mess
 func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
 	// TODO(xiaost): Refactor the code after v0.11.0 is released. Unifying checking and fallback logic.
 
-	tProt := NewBinaryProtocol(in)
-	methodName, msgType, seqID, err := tProt.ReadMessageBegin()
+	br := thrift.NewBinaryReader(in)
+	defer br.Release()
+
+	methodName, msgType, seqID, err := br.ReadMessageBegin()
 	if err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageBegin failed: %s", err.Error()))
 	}
@@ -233,7 +234,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 
 	// exception message
 	if message.MessageType() == remote.Exception {
-		return UnmarshalThriftException(tProt)
+		return unmarshalThriftException(in)
 	}
 
 	if err = validateMessageBeforeDecode(message, seqID, methodName); err != nil {
@@ -242,7 +243,7 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 
 	// decode thrift data
 	data := message.Data()
-	msgBeginLen := thrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
+	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
 	dataLen := message.PayloadLen() - msgBeginLen
 	// For Buffer Protocol, dataLen would be negative. Set it to zero so as not to confuse
 	if dataLen < 0 {
@@ -257,16 +258,12 @@ func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in r
 			err = remote.NewTransError(remote.ProtocolError, err)
 		}
 	} else {
-		err = c.unmarshalThriftData(tProt, data, dataLen)
+		err = c.unmarshalThriftData(in, data, dataLen)
 	}
 	rpcinfo.Record(ctx, ri, stats.WaitReadFinish, err)
 	if err != nil {
 		return err
 	}
-	if err = tProt.ReadMessageEnd(); err != nil {
-		return remote.NewTransError(remote.ProtocolError, err)
-	}
-	tProt.Recycle()
 	return err
 }
 
@@ -291,16 +288,6 @@ func validateMessageBeforeDecode(message remote.Message, seqID int32, methodName
 // Name implements the remote.PayloadCodec interface.
 func (c thriftCodec) Name() string {
 	return serviceinfo.Thrift.String()
-}
-
-// MessageWriter write to athrift.TProtocol
-type MessageWriter interface {
-	Write(oprot athrift.TProtocol) error
-}
-
-// MessageReader read from athrift.TProtocol
-type MessageReader interface {
-	Read(oprot athrift.TProtocol) error
 }
 
 type genericWriter interface { // used by pkg/generic
