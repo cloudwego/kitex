@@ -52,10 +52,10 @@ type PackageInfo struct {
 	IDLName          string
 	ServerPkg        string
 	ExtendMeta       map[string][]string // key-value metadata for render
-	MWs              []GlobalMiddleware
+	MWs              []UserDefinedMiddleware
 }
 
-type GlobalMiddleware struct {
+type UserDefinedMiddleware struct {
 	// the name of the middleware
 	Name string
 	// the content of the middleware

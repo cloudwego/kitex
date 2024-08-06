@@ -15,7 +15,9 @@
 package util
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -29,7 +31,7 @@ type Command struct {
 	parent   *Command
 	flags    *FlagSet
 	// helpFunc is help func defined by user.
-	usage func()
+	helpFunc func(*Command, []string)
 	// for debug
 	args []string
 }
@@ -161,12 +163,43 @@ func (c *Command) ParseFlags(args []string) error {
 	return err
 }
 
-func (c *Command) SetUsageFunc(f func()) {
-	c.usage = f
+// SetHelpFunc sets help function. Can be defined by Application.
+func (c *Command) SetHelpFunc(f func(*Command, []string)) {
+	c.helpFunc = f
 }
 
-func (c *Command) UsageFunc() func() {
-	return c.usage
+// HelpFunc returns either the function set by SetHelpFunc for this command
+// or a parent, or it returns a function with default help behavior.
+func (c *Command) HelpFunc() func(*Command, []string) {
+	if c.helpFunc != nil {
+		return c.helpFunc
+	}
+	if c.HasParent() {
+		return c.parent.HelpFunc()
+	}
+	return nil
+}
+
+// PrintErrln is a convenience method to Println to the defined Err output, fallback to Stderr if not set.
+func (c *Command) PrintErrln(i ...interface{}) {
+	c.PrintErr(fmt.Sprintln(i...))
+}
+
+// PrintErr is a convenience method to Print to the defined Err output, fallback to Stderr if not set.
+func (c *Command) PrintErr(i ...interface{}) {
+	fmt.Fprint(c.ErrOrStderr(), i...)
+}
+
+// ErrOrStderr returns output to stderr
+func (c *Command) ErrOrStderr() io.Writer {
+	return c.getErr(os.Stderr)
+}
+
+func (c *Command) getErr(def io.Writer) io.Writer {
+	if c.HasParent() {
+		return c.parent.getErr(def)
+	}
+	return def
 }
 
 // ExecuteC executes the command.
@@ -181,8 +214,16 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 	}
 	err = cmd.execute(flags)
 	if err != nil {
-		cmd.usage()
+		// Always show help if requested, even if SilenceErrors is in
+		// effect
+		if errors.Is(err, ErrHelp) {
+			cmd.HelpFunc()(cmd, args)
+			return cmd, nil
+		}
 	}
+	//if err != nil {
+	//	cmd.usage()
+	//}
 
 	return cmd, err
 }

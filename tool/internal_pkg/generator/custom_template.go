@@ -200,6 +200,20 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 	return fs, nil
 }
 
+func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File, err error) {
+	cg := NewCustomGenerator(pkg, outputPath)
+	// special handling Methods field
+	if tpl.LoopMethod {
+		err = cg.loopGenerate(tpl)
+	} else {
+		err = cg.commonGenerate(tpl)
+	}
+	if errors.Is(err, errNoNewMethod) {
+		err = nil
+	}
+	return cg.fs, err
+}
+
 func readTemplates(dir string) ([]*Template, error) {
 	files, _ := ioutil.ReadDir(dir)
 	var ts []*Template
@@ -224,26 +238,86 @@ func readTemplates(dir string) ([]*Template, error) {
 	return ts, nil
 }
 
-func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File, err error) {
-	cg := NewCustomGenerator(pkg, outputPath)
-	// special handling Methods field
-	if tpl.LoopMethod {
-		err = cg.loopGenerate(tpl)
-	} else {
-		err = cg.commonGenerate(tpl)
+// parseMeta parses the meta flag and returns a map where the value is a slice of strings
+func parseMeta(metaFlags string) (map[string][]string, error) {
+	meta := make(map[string][]string)
+	if metaFlags == "" {
+		return meta, nil
 	}
-	if errors.Is(err, errNoNewMethod) {
-		err = nil
+
+	// split for each key=value pairs
+	pairs := strings.Split(metaFlags, ";")
+	for _, pair := range pairs {
+		kv := strings.SplitN(pair, "=", 2)
+		if len(kv) == 2 {
+			key := kv[0]
+			values := strings.Split(kv[1], ",")
+			meta[key] = values
+		} else {
+			return nil, fmt.Errorf("Invalid meta format: %s\n", pair)
+		}
 	}
-	return cg.fs, err
+	return meta, nil
+}
+
+func parseMiddlewares(middlewares []MiddlewareForResolve) ([]UserDefinedMiddleware, error) {
+	var mwList []UserDefinedMiddleware
+
+	for _, mw := range middlewares {
+		content, err := os.ReadFile(mw.Path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read middleware file %s: %v", mw.Path, err)
+		}
+		mwList = append(mwList, UserDefinedMiddleware{
+			Name:    mw.Name,
+			Content: string(content),
+		})
+	}
+	return mwList, nil
 }
 
 func (g *generator) GenerateCustomPackageWithTpl(pkg *PackageInfo) (fs []*File, err error) {
 	g.updatePackageInfo(pkg)
 
 	g.setImports(HandlerFileName, pkg)
-	var tpls []*Template
-	tpls, err = readTpls(g.RenderTplDir, g.RenderTplDir, tpls)
+	pkg.ExtendMeta, err = parseMeta(g.MetaFlags)
+	if err != nil {
+		return nil, err
+	}
+	if g.Config.IncludesTpl != "" {
+		inc := g.Config.IncludesTpl
+		if strings.HasPrefix(inc, "git@") || strings.HasPrefix(inc, "http://") || strings.HasPrefix(inc, "https://") {
+			localGitPath, errMsg, gitErr := util.RunGitCommand(inc)
+			if gitErr != nil {
+				if errMsg == "" {
+					errMsg = gitErr.Error()
+				}
+				return nil, fmt.Errorf("failed to pull IDL from git:%s\nYou can execute 'rm -rf ~/.kitex' to clean the git cache and try again", errMsg)
+			}
+			if g.RenderTplDir != "" {
+				g.RenderTplDir = filepath.Join(localGitPath, g.RenderTplDir)
+			} else {
+				g.RenderTplDir = localGitPath
+			}
+			if util.Exists(g.RenderTplDir) {
+				return nil, fmt.Errorf("the render template directory path you specified does not exists int the git path")
+			}
+		}
+	}
+	var meta *Meta
+	metaPath := filepath.Join(g.RenderTplDir, kitexRenderMetaFile)
+	if util.Exists(metaPath) {
+		meta, err = readMetaFile(metaPath)
+		if err != nil {
+			return nil, err
+		}
+		middlewares, err := parseMiddlewares(meta.MWs)
+		if err != nil {
+			return nil, err
+		}
+		pkg.MWs = middlewares
+	}
+	tpls, err := readTpls(g.RenderTplDir, g.RenderTplDir, meta)
 	if err != nil {
 		return nil, err
 	}
@@ -278,13 +352,25 @@ func (g *generator) GenerateCustomPackageWithTpl(pkg *PackageInfo) (fs []*File, 
 
 const kitexRenderMetaFile = "kitex_render_meta.yaml"
 
-// Meta 代表kitex_render_meta.yaml文件的结构
+// Meta represents the structure of the kitex_render_meta.yaml file.
 type Meta struct {
-	Templates []Template `yaml:"templates"`
+	Templates  []Template             `yaml:"templates"`
+	MWs        []MiddlewareForResolve `yaml:"middlewares"`
+	ExtendMeta []ExtendMeta           `yaml:"extend_meta"`
 }
 
-func readMetaFile(rootDir string) (*Meta, error) {
-	metaPath := filepath.Join(rootDir, kitexRenderMetaFile)
+type MiddlewareForResolve struct {
+	// name of the middleware
+	Name string `yaml:"name"`
+	// path of the middleware
+	Path string `yaml:"path"`
+}
+
+type ExtendMeta struct {
+	key string
+}
+
+func readMetaFile(metaPath string) (*Meta, error) {
 	metaData, err := os.ReadFile(metaPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read meta file from %s: %v", metaPath, err)
@@ -299,27 +385,28 @@ func readMetaFile(rootDir string) (*Meta, error) {
 	return &meta, nil
 }
 
-func getUpdateBehavior(meta *Meta, relativePath string) *Update {
-	for _, template := range meta.Templates {
-		// fmt.Println(template.Path, "==", relativePath)
-		if template.Path == relativePath {
-			return template.UpdateBehavior
+func getMetadata(meta *Meta, relativePath string) *Template {
+	for i := range meta.Templates {
+		if meta.Templates[i].Path == relativePath {
+			return &meta.Templates[i]
 		}
 	}
-	return &Update{Type: string(skip)}
+	return &Template{
+		UpdateBehavior: &Update{Type: string(skip)},
+	}
 }
 
-func readTpls(rootDir, currentDir string, ts []*Template) ([]*Template, error) {
-	meta, err := readMetaFile(rootDir)
-	if err != nil {
-		return nil, err
+func readTpls(rootDir, currentDir string, meta *Meta) (ts []*Template, error error) {
+	defaultMetadata := &Template{
+		UpdateBehavior: &Update{Type: string(skip)},
 	}
+
 	files, _ := os.ReadDir(currentDir)
 	for _, f := range files {
 		// filter dir and non-tpl files
 		if f.IsDir() {
 			subDir := filepath.Join(currentDir, f.Name())
-			subTemplates, err := readTpls(rootDir, subDir, ts)
+			subTemplates, err := readTpls(rootDir, subDir, meta)
 			if err != nil {
 				return nil, err
 			}
@@ -336,11 +423,19 @@ func readTpls(rootDir, currentDir string, ts []*Template) ([]*Template, error) {
 				return nil, fmt.Errorf("failed to compute relative path for %s: %v", p, err)
 			}
 			trimmedPath := strings.TrimSuffix(relativePath, ".tpl")
-			updateBehavior := getUpdateBehavior(meta, relativePath)
+			// If kitex_render_meta.yaml exists, get the corresponding metadata; otherwise, use the default metadata
+			var metadata *Template
+			if meta != nil {
+				metadata = getMetadata(meta, relativePath)
+			} else {
+				metadata = defaultMetadata
+			}
 			t := &Template{
 				Path:           trimmedPath,
 				Body:           string(tplData),
-				UpdateBehavior: updateBehavior,
+				UpdateBehavior: metadata.UpdateBehavior,
+				LoopMethod:     metadata.LoopMethod,
+				LoopService:    metadata.LoopService,
 			}
 			ts = append(ts, t)
 		}
@@ -357,7 +452,7 @@ func (g *generator) RenderWithMultipleFiles(pkg *PackageInfo) (fs []*File, err e
 		}
 		var updatedContent string
 		if g.Config.DebugTpl {
-			// --debug时 在模板内容顶部加上一段magic string用于区分
+			// when --debug is enabled, add a magic string at the top of the template content for distinction.
 			updatedContent = "// Kitex template debug file. use template clean to delete it.\n\n" + string(content)
 		} else {
 			updatedContent = string(content)
