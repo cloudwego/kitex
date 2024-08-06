@@ -38,8 +38,6 @@ type server struct {
 	opt      *remote.ServerOption
 	listener net.Listener
 	transSvr remote.TransServer
-
-	inkHdlFunc endpoint.Endpoint
 	sync.Mutex
 }
 
@@ -47,9 +45,8 @@ type server struct {
 func NewServer(opt *remote.ServerOption, inkHdlFunc endpoint.Endpoint, transHdlr remote.ServerTransHandler) (Server, error) {
 	transSvr := opt.TransServerFactory.NewTransServer(opt, transHdlr)
 	s := &server{
-		opt:        opt,
-		inkHdlFunc: inkHdlFunc,
-		transSvr:   transSvr,
+		opt:      opt,
+		transSvr: transSvr,
 	}
 	return s, nil
 }
