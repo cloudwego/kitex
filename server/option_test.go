@@ -32,10 +32,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
-	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
-	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpollmux"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -257,8 +254,6 @@ func TestMuxTransportOption(t *testing.T) {
 	goWaitAndStop(t, svr1)
 	err = svr1.Run()
 	test.Assert(t, err == nil, err)
-	iSvr1 := svr1.(*server)
-	test.DeepEqual(t, iSvr1.opt.RemoteOpt.SvrHandlerFactory, detection.NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()))
 
 	svr2, _ := NewTestServer(WithMuxTransport())
 	err = svr2.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
