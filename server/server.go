@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/streamx"
 	"net"
 	"reflect"
 	"runtime/debug"
@@ -62,11 +63,12 @@ type server struct {
 	targetSvcInfo *serviceinfo.ServiceInfo
 
 	// actual rpc service implement of biz
-	eps     endpoint.Endpoint
-	mws     []endpoint.Middleware
-	svr     remotesvr.Server
-	stopped sync.Once
-	isRun   bool
+	eps      endpoint.Endpoint
+	mws      []endpoint.Middleware
+	streamMW streamx.StreamMiddleware
+	svr      remotesvr.Server
+	stopped  sync.Once
+	isRun    bool
 
 	sync.Mutex
 }
@@ -348,11 +350,17 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 			// clear session
 			backup.ClearCtx()
 		}()
-		implHandlerFunc := svcInfo.MethodInfo(methodName).Handler()
+		minfo := svcInfo.MethodInfo(methodName)
+		implHandlerFunc := minfo.Handler()
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)
-		err = implHandlerFunc(ctx, svc.handler, args, resp)
+
+		handler := svc.handler
+		if minfo.IsStreaming() {
+			handler = streamx.StreamHandler{Middleware: s.streamMW, Handler: svc.handler}
+		}
+		err = implHandlerFunc(ctx, handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
 				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
