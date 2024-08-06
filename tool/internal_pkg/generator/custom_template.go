@@ -200,6 +200,20 @@ func (g *generator) GenerateCustomPackage(pkg *PackageInfo) (fs []*File, err err
 	return fs, nil
 }
 
+func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File, err error) {
+	cg := NewCustomGenerator(pkg, outputPath)
+	// special handling Methods field
+	if tpl.LoopMethod {
+		err = cg.loopGenerate(tpl)
+	} else {
+		err = cg.commonGenerate(tpl)
+	}
+	if errors.Is(err, errNoNewMethod) {
+		err = nil
+	}
+	return cg.fs, err
+}
+
 func readTemplates(dir string) ([]*Template, error) {
 	files, _ := ioutil.ReadDir(dir)
 	var ts []*Template
@@ -222,20 +236,6 @@ func readTemplates(dir string) ([]*Template, error) {
 	}
 
 	return ts, nil
-}
-
-func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File, err error) {
-	cg := NewCustomGenerator(pkg, outputPath)
-	// special handling Methods field
-	if tpl.LoopMethod {
-		err = cg.loopGenerate(tpl)
-	} else {
-		err = cg.commonGenerate(tpl)
-	}
-	if errors.Is(err, errNoNewMethod) {
-		err = nil
-	}
-	return cg.fs, err
 }
 
 // parseMeta parses the meta flag and returns a map where the value is a slice of strings

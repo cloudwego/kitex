@@ -278,7 +278,6 @@ func (a *Arguments) TemplateArgs(version string) error {
 	renderCmd.Flags().StringArrayVar(&a.TemplateFiles, "file", []string{}, "Specify single template path")
 	renderCmd.Flags().BoolVar(&a.DebugTpl, "debug", false, "turn on debug for template")
 	renderCmd.Flags().StringVarP(&a.IncludesTpl, "Includes", "I", "", "Add IDL search path and template search path for includes.")
-	renderCmd.Flags().StringVarP(&a.IncludesTpl, "Includes", "I", "", "Add IDL search path and template search path for includes.")
 	renderCmd.Flags().StringVar(&a.MetaFlags, "meta", "", "Meta data in key=value format, keys separated by ';' values separated by ',' ")
 	initCmd.SetUsageFunc(func() {
 		fmt.Fprintf(os.Stderr, `Version %s
