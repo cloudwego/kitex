@@ -26,7 +26,6 @@ import (
 	reflect "reflect"
 
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
-
 	gomock "github.com/golang/mock/gomock"
 )
 
