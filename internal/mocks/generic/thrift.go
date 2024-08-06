@@ -28,7 +28,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 
-	"github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 )
 
 // MockMessageReader is a mock of MessageReader interface.
@@ -93,7 +93,7 @@ func (m *MockMessageWriter) EXPECT() *MockMessageWriterMockRecorder {
 }
 
 // Write mocks base method.
-func (m *MockMessageWriter) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *thrift.Base) error {
+func (m *MockMessageWriter) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", ctx, out, msg, requestBase)
 	ret0, _ := ret[0].(error)

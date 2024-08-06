@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
+
 	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/internal/generic/thrift"
-	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 	codecProto "github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -108,7 +109,7 @@ type WithCodec interface {
 type Args struct {
 	Request interface{}
 	Method  string
-	base    *gthrift.Base
+	base    *base.Base
 	inner   interface{}
 }
 
@@ -125,7 +126,7 @@ func (g *Args) SetCodec(inner interface{}) {
 
 func (g *Args) GetOrSetBase() interface{} {
 	if g.base == nil {
-		g.base = gthrift.NewBase()
+		g.base = base.NewBase()
 	}
 	return g.base
 }

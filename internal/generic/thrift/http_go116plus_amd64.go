@@ -30,13 +30,13 @@ import (
 	"github.com/cloudwego/dynamicgo/conv/j2t"
 	dbase "github.com/cloudwego/dynamicgo/thrift/base"
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
 // Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *gthrift.Base) error {
+func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	// fallback logic
 	if !w.dynamicgoEnabled {
 		return w.originalWrite(ctx, out, msg, requestBase)

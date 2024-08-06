@@ -18,12 +18,12 @@ package thrift
 
 import (
 	"context"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"io"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
 type StructReaderWriter struct {
@@ -59,7 +59,7 @@ func (m *WriteStruct) SetBinaryWithBase64(enable bool) {
 }
 
 // Write ...
-func (m *WriteStruct) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *gthrift.Base) error {
+func (m *WriteStruct) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	fnDsc, err := m.svcDsc.LookupFunctionByMethod(method)
 	if err != nil {
 		return err

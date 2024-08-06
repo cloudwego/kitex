@@ -23,16 +23,16 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
 type writerOption struct {
-	requestBase *gthrift.Base // request base from metahandler
+	requestBase *base.Base // request base from metahandler
 	// decoding Base64 to binary
 	binaryWithBase64 bool
 }
