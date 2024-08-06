@@ -18,10 +18,10 @@ package thrift
 
 import (
 	"context"
-	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"io"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
