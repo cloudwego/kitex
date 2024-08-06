@@ -26,9 +26,8 @@ import (
 	"io"
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
-
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockMessageReader is a mock of MessageReader interface.
