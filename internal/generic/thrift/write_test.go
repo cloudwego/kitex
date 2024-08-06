@@ -20,17 +20,17 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/cloudwego/gopkg/protocol/thrift/base"
-	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 	"testing"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	gthrift "github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
 func Test_nextWriter(t *testing.T) {
