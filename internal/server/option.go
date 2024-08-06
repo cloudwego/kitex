@@ -23,8 +23,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/cloudwego/localsession/backup"
-
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -43,8 +41,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/localsession/backup"
 )
 
 func init() {
@@ -80,6 +80,10 @@ type Options struct {
 	Limit    Limit
 
 	MWBs []endpoint.MiddlewareBuilder
+	// streamx
+	SMWs     []streamx.StreamMiddleware
+	SRecvMWs []streamx.StreamRecvMiddleware
+	SSendMWs []streamx.StreamSendMiddleware
 
 	Bus    event.Bus
 	Events event.Queue
@@ -177,9 +181,7 @@ func DefaultSupportedTransportsFunc(option remote.ServerOption) []string {
 	if factory, ok := option.SvrHandlerFactory.(trans.MuxEnabledFlag); ok {
 		if factory.MuxEnabled() {
 			return []string{"ttheader_mux"}
-		} else {
-			return []string{"ttheader", "framed", "ttheader_framed", "grpc"}
 		}
 	}
-	return nil
+	return []string{"ttheader", "framed", "ttheader_framed", "grpc"}
 }
