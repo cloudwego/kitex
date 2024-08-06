@@ -8,6 +8,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"hash/crc32"
 	"sync"
 )
@@ -32,6 +33,31 @@ func validate(ctx context.Context, message remote.Message, in remote.ByteBuffer,
 		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "not pass")
 	}
 	return nil
+}
+
+func fillRPCInfo(message remote.Message) {
+	if ri := message.RPCInfo(); ri != nil {
+		transInfo := message.TransInfo()
+		intInfo := transInfo.TransIntInfo()
+		from := rpcinfo.AsMutableEndpointInfo(ri.From())
+		if from != nil {
+			if v := intInfo[transmeta.FromService]; v != "" {
+				from.SetServiceName(v)
+			}
+			if v := intInfo[transmeta.FromMethod]; v != "" {
+				from.SetMethod(v)
+			}
+		}
+		to := rpcinfo.AsMutableEndpointInfo(ri.To())
+		if to != nil {
+			if v := intInfo[transmeta.ToMethod]; v != "" {
+				to.SetMethod(v)
+			}
+			if v := intInfo[transmeta.ToService]; v != "" {
+				to.SetServiceName(v)
+			}
+		}
+	}
 }
 
 // PayloadValidator is the interface for validating the payload of RPC requests, which allows customized Checksum function.
