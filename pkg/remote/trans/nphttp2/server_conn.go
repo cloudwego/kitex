@@ -60,7 +60,6 @@ func (c *serverConn) ReadFrame() (hdr, data []byte, err error) {
 }
 
 func GetServerConn(st streaming.Stream) (GRPCConn, error) {
-
 	var serverStream *stream
 
 	mwStream, ok := st.(*streamWithMiddleware)
