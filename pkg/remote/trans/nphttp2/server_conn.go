@@ -59,20 +59,20 @@ func (c *serverConn) ReadFrame() (hdr, data []byte, err error) {
 	return hdr, data, nil
 }
 
+// GetServerConn gets the GRPC Connection from server stream.
+// This function is only used in server handler for grpc unknown handler proxy: https://www.cloudwego.io/docs/kitex/tutorials/advanced-feature/grpcproxy/
+// And the input stream type should always be streamWithMiddleware.
 func GetServerConn(st streaming.Stream) (GRPCConn, error) {
-	var serverStream *stream
-
 	mwStream, ok := st.(*streamWithMiddleware)
-
-	if ok {
-		serverStream, ok = mwStream.Stream.(*stream)
-	} else {
-		serverStream, ok = st.(*stream)
+	if !ok {
+		return nil, status.Errorf(codes.Internal, "failed to get streamWithMiddleware")
 	}
+
+	serverStream, ok := mwStream.Stream.(*stream)
 
 	if !ok {
 		// err!
-		return nil, status.Errorf(codes.Internal, "failed to get server conn from stream.")
+		return nil, status.Errorf(codes.Internal, "failed to get server conn from server stream.")
 	}
 	grpcServerConn, ok := serverStream.conn.(GRPCConn)
 	if !ok {
