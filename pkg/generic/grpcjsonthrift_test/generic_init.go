@@ -49,7 +49,7 @@ func newGenericStreamingClient(g generic.Generic, targetIPPort string) genericcl
 }
 
 func newGenericClient(g generic.Generic, targetIPPort string) genericclient.Client {
-	cli, err := genericclient.NewClient("destService", g, client.WithHostPorts(targetIPPort))
+	cli, err := genericclient.NewClient("destService", g, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(transport.TTHeader))
 	if err != nil {
 		panic(err)
 	}
@@ -401,8 +401,8 @@ func newTestServiceEchoBizExceptionResult() interface{} {
 }
 
 func echoPingPongHandler(ctx context.Context, handler, arg, result interface{}) error {
-	realArg := kt.UnpackApacheCodec(arg).(*kt.TestServiceEchoPingPongArgs)
-	realResult := kt.UnpackApacheCodec(result).(*kt.TestServiceEchoPingPongResult)
+	realArg := arg.(*kt.TestServiceEchoPingPongArgs)
+	realResult := result.(*kt.TestServiceEchoPingPongResult)
 	success, err := handler.(kt.TestService).EchoPingPong(ctx, realArg.Req)
 	if err != nil {
 		return err
@@ -412,9 +412,9 @@ func echoPingPongHandler(ctx context.Context, handler, arg, result interface{}) 
 }
 
 func newTestServiceEchoPingPongArgs() interface{} {
-	return kt.ToApacheCodec(kt.NewTestServiceEchoPingPongArgs())
+	return kt.NewTestServiceEchoPingPongArgs()
 }
 
 func newTestServiceEchoPingPongResult() interface{} {
-	return kt.ToApacheCodec(kt.NewTestServiceEchoPingPongResult())
+	return kt.NewTestServiceEchoPingPongResult()
 }

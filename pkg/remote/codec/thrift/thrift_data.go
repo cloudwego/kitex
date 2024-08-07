@@ -146,7 +146,6 @@ func (c thriftCodec) fastUnmarshal(trans remote.ByteBuffer, data interface{}, da
 }
 
 // unmarshalThriftData only decodes the data (after methodName, msgType and seqId)
-// method is only used for generic calls
 func (c thriftCodec) unmarshalThriftData(trans remote.ByteBuffer, data interface{}, dataLen int) error {
 	// decode with hyper unmarshal
 	if c.IsSet(FrugalRead) && c.hyperMessageUnmarshalAvailable(data, dataLen) {
