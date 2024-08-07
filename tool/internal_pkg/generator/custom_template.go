@@ -254,7 +254,7 @@ func parseMeta(metaFlags string) (map[string][]string, error) {
 			values := strings.Split(kv[1], ",")
 			meta[key] = values
 		} else {
-			return nil, fmt.Errorf("Invalid meta format: %s\n", pair)
+			return nil, fmt.Errorf("invalid meta format: %s", pair)
 		}
 	}
 	return meta, nil
@@ -354,9 +354,8 @@ const kitexRenderMetaFile = "kitex_render_meta.yaml"
 
 // Meta represents the structure of the kitex_render_meta.yaml file.
 type Meta struct {
-	Templates  []Template             `yaml:"templates"`
-	MWs        []MiddlewareForResolve `yaml:"middlewares"`
-	ExtendMeta []ExtendMeta           `yaml:"extend_meta"`
+	Templates []Template             `yaml:"templates"`
+	MWs       []MiddlewareForResolve `yaml:"middlewares"`
 }
 
 type MiddlewareForResolve struct {
@@ -364,10 +363,6 @@ type MiddlewareForResolve struct {
 	Name string `yaml:"name"`
 	// path of the middleware
 	Path string `yaml:"path"`
-}
-
-type ExtendMeta struct {
-	key string
 }
 
 func readMetaFile(metaPath string) (*Meta, error) {
