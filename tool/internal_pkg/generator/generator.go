@@ -16,6 +16,7 @@
 package generator
 
 import (
+	"errors"
 	"fmt"
 	"go/token"
 	"path/filepath"
@@ -96,6 +97,8 @@ type Generator interface {
 	GenerateService(pkg *PackageInfo) ([]*File, error)
 	GenerateMainPackage(pkg *PackageInfo) ([]*File, error)
 	GenerateCustomPackage(pkg *PackageInfo) ([]*File, error)
+	GenerateCustomPackageWithTpl(pkg *PackageInfo) ([]*File, error)
+	RenderWithMultipleFiles(pkg *PackageInfo) ([]*File, error)
 }
 
 // Config .
@@ -132,6 +135,15 @@ type Config struct {
 	RecordCmd []string
 
 	TemplateDir string
+
+	// subcommand template
+	InitOutputDir string   // specify the location path of init subcommand
+	InitType      string   // specify the type for init subcommand
+	RenderTplDir  string   // specify the path of template directory for render subcommand
+	TemplateFiles []string // specify the path of single file or multiple file to render
+	DebugTpl      bool     // turn on the debug mode
+	IncludesTpl   string   // specify the path of remote template repository for render subcommand
+	MetaFlags     string   // Metadata in key=value format, keys separated by ';' values separated by ','
 
 	GenPath string
 
@@ -367,7 +379,7 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 			pkg.ServiceInfo.ServiceName)
 		f, err := comp.CompleteMethods()
 		if err != nil {
-			if err == errNoNewMethod {
+			if errors.Is(err, errNoNewMethod) {
 				return fs, nil
 			}
 			return nil, err

@@ -88,7 +88,7 @@ func Exists(path string) bool {
 	return !fi.IsDir()
 }
 
-// LowerFirst converts the first letter to upper case for the given string.
+// LowerFirst converts the first letter to lower case for the given string.
 func LowerFirst(s string) string {
 	rs := []rune(s)
 	rs[0] = unicode.ToLower(rs[0])
@@ -125,7 +125,7 @@ func UpperFirst(s string) string {
 	return string(rs)
 }
 
-// NotPtr converts an pointer type into non-pointer type.
+// NotPtr converts a pointer type into non-pointer type.
 func NotPtr(s string) string {
 	return strings.ReplaceAll(s, "*", "")
 }

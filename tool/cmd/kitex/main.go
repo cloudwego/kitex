@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -51,7 +52,7 @@ func init() {
 	if err := versions.RegisterMinDepVersion(
 		&versions.MinDepVersion{
 			RefPath: "github.com/cloudwego/kitex",
-			Version: "v0.11.0",
+			Version: "v0.10.3",
 		},
 	); err != nil {
 		log.Warn(err)
@@ -76,8 +77,14 @@ func main() {
 		log.Warn("Get current path failed:", err.Error())
 		os.Exit(1)
 	}
-	// run as kitex
-	err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])
+	if len(os.Args) > 1 && os.Args[1] == "template" {
+		err = args.TemplateArgs(kitex.Version)
+	} else if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+		err = fmt.Errorf("unknown command %q", os.Args[1])
+	} else {
+		// run as kitex
+		err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])
+	}
 	if err != nil {
 		log.Warn(err.Error())
 		os.Exit(2)
