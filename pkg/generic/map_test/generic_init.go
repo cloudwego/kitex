@@ -205,16 +205,16 @@ func serviceInfo() *serviceinfo.ServiceInfo {
 }
 
 func newMockTestArgs() interface{} {
-	return kt.ToApacheCodec(kt.NewMockTestArgs())
+	return kt.NewMockTestArgs()
 }
 
 func newMockTestResult() interface{} {
-	return kt.ToApacheCodec(kt.NewMockTestResult())
+	return kt.NewMockTestResult()
 }
 
 func testHandler(ctx context.Context, handler, arg, result interface{}) error {
-	realArg := kt.UnpackApacheCodec(arg).(*kt.MockTestArgs)
-	realResult := kt.UnpackApacheCodec(result).(*kt.MockTestResult)
+	realArg := arg.(*kt.MockTestArgs)
+	realResult := result.(*kt.MockTestResult)
 	success, err := handler.(kt.Mock).Test(ctx, realArg.Req)
 	if err != nil {
 		return err
