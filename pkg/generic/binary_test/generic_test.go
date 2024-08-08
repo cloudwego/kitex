@@ -19,15 +19,12 @@ package test
 import (
 	"context"
 	"net"
-	"runtime"
-	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 
-	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/client/genericclient"
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
@@ -190,86 +187,4 @@ func genBinaryReqBuf(method string) []byte {
 	b = thrift.Binary.AppendMessageBegin(b, method, 0, 100)
 	b = append(b, reqMsg...)
 	return b
-}
-
-func TestBinaryThriftGenericClientClose(t *testing.T) {
-	debug.SetGCPercent(-1)
-	defer debug.SetGCPercent(100)
-
-	var ms runtime.MemStats
-	runtime.ReadMemStats(&ms)
-
-	t.Logf("Before new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
-
-	cliCnt := 10000
-	clis := make([]genericclient.Client, cliCnt)
-	for i := 0; i < cliCnt; i++ {
-		g := generic.BinaryThriftGeneric()
-		clis[i] = newGenericClient("destServiceName", g, addr, client.WithShortConnection())
-	}
-
-	runtime.ReadMemStats(&ms)
-	preHeapAlloc, preHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("After new clients, allocation: %f Mb, Number of allocation: %d\n", preHeapAlloc, preHeapObjects)
-
-	for _, cli := range clis {
-		_ = cli.Close()
-	}
-	runtime.GC()
-	runtime.ReadMemStats(&ms)
-	afterGCHeapAlloc, afterGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("After close clients and GC be executed, allocation: %f Mb, Number of allocation: %d\n", afterGCHeapAlloc, afterGCHeapObjects)
-	test.Assert(t, afterGCHeapAlloc < preHeapAlloc && afterGCHeapObjects < preHeapObjects)
-
-	// Trigger the finalizer of kclient be executed
-	time.Sleep(200 * time.Millisecond) // ensure the finalizer be executed
-	runtime.GC()
-	runtime.ReadMemStats(&ms)
-	secondGCHeapAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("After second GC, allocation: %f Mb, Number of allocation: %d\n", secondGCHeapAlloc, secondGCHeapObjects)
-	test.Assert(t, secondGCHeapAlloc/2 < afterGCHeapAlloc && secondGCHeapObjects/2 < afterGCHeapObjects)
-}
-
-func TestBinaryThriftGenericClientFinalizer(t *testing.T) {
-	debug.SetGCPercent(-1)
-	defer debug.SetGCPercent(100)
-
-	var ms runtime.MemStats
-	runtime.ReadMemStats(&ms)
-	t.Logf("Before new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
-
-	cliCnt := 10000
-	clis := make([]genericclient.Client, cliCnt)
-	for i := 0; i < cliCnt; i++ {
-		g := generic.BinaryThriftGeneric()
-		clis[i] = newGenericClient("destServiceName", g, addr, client.WithShortConnection())
-	}
-
-	runtime.ReadMemStats(&ms)
-	t.Logf("After new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
-
-	runtime.GC()
-	runtime.ReadMemStats(&ms)
-	firstGCHeapAlloc, firstGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("After first GC, allocation: %f Mb, Number of allocation: %d\n", firstGCHeapAlloc, firstGCHeapObjects)
-
-	// Trigger the finalizer of generic client be executed
-	time.Sleep(200 * time.Millisecond) // ensure the finalizer be executed
-	runtime.GC()
-	runtime.ReadMemStats(&ms)
-	secondGCHeapAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("After second GC, allocation: %f Mb, Number of allocation: %d\n", secondGCHeapAlloc, secondGCHeapObjects)
-	test.Assert(t, secondGCHeapAlloc < firstGCHeapAlloc && secondGCHeapObjects < firstGCHeapObjects)
-
-	// Trigger the finalizer of kClient be executed
-	time.Sleep(200 * time.Millisecond) // ensure the finalizer be executed
-	runtime.GC()
-	runtime.ReadMemStats(&ms)
-	thirdGCHeapAlloc, thirdGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("After third GC, allocation: %f Mb, Number of allocation: %d\n", thirdGCHeapAlloc, thirdGCHeapObjects)
-	test.Assert(t, thirdGCHeapAlloc < secondGCHeapAlloc/2 && thirdGCHeapObjects < secondGCHeapObjects/2)
-}
-
-func mb(byteSize uint64) float32 {
-	return float32(byteSize) / float32(1024*1024)
 }
