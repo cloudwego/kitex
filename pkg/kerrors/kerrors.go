@@ -46,6 +46,8 @@ var (
 	ErrRPCFinish = &basicError{"rpc call finished"}
 	// ErrRoute happens when router fail to route this call
 	ErrRoute = &basicError{"rpc route failed"}
+	// ErrPayloadValidation happens when payload validation failed
+	ErrPayloadValidation = &basicError{"payload validation error"}
 )
 
 // More detailed error types

@@ -222,7 +222,7 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("ttheader read payload first 8 byte failed: %s", err.Error()))
 		}
 		if c.payloadValidator != nil {
-			fillRPCInfo(message)
+			fillRPCInfoBeforeValidate(message)
 			if vErr := validate(ctx, message, in, c.payloadValidator); vErr != nil {
 				return vErr
 			}
@@ -303,7 +303,7 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Cont
 	if c.payloadValidator != nil {
 		need, value, pErr := c.payloadValidator.Generate(ctx, flatten2DSlice(payload, payloadLen))
 		if pErr != nil {
-			return pErr
+			return kerrors.ErrPayloadValidation.WithCause(fmt.Errorf("generate failed, err=%v", pErr))
 		}
 		if need {
 			if len(value) > maxPayloadChecksumLength {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
@@ -13,8 +15,8 @@ import (
 )
 
 const (
-	maxPayloadChecksumLength = 1024
 	PayloadValidatorPrefix   = "PV_"
+	maxPayloadChecksumLength = 1024
 )
 
 func getValidatorKey(ctx context.Context, p PayloadValidator) string {
@@ -39,35 +41,50 @@ func validate(ctx context.Context, message remote.Message, in remote.ByteBuffer,
 	}
 	pass, err := p.Validate(ctx, expectedValue, payload)
 	if err != nil {
-		return err
+		return kerrors.ErrPayloadValidation.WithCause(fmt.Errorf("validation failed, err=%v", err))
 	}
 	if !pass {
-		return perrors.NewProtocolErrorWithType(perrors.InvalidData, "not pass")
+		return kerrors.ErrPayloadValidation.WithCause(fmt.Errorf("validation failed"))
 	}
 	return nil
 }
 
-func fillRPCInfo(message remote.Message) {
-	if ri := message.RPCInfo(); ri != nil {
-		transInfo := message.TransInfo()
-		intInfo := transInfo.TransIntInfo()
-		from := rpcinfo.AsMutableEndpointInfo(ri.From())
-		if from != nil {
-			if v := intInfo[transmeta.FromService]; v != "" {
-				from.SetServiceName(v)
-			}
-			if v := intInfo[transmeta.FromMethod]; v != "" {
-				from.SetMethod(v)
-			}
+// fillRPCInfoBeforeValidate reads header and set into the RPCInfo, which allows Validate() to use RPCInfo.
+func fillRPCInfoBeforeValidate(message remote.Message) {
+	if message.RPCRole() != remote.Server {
+		// only fill when server-side reading the request header
+		// TODO: client-side can read from the response header
+		return
+	}
+	ri := message.RPCInfo()
+	if ri == nil {
+		return
+	}
+	transInfo := message.TransInfo()
+	if transInfo == nil {
+		return
+	}
+	intInfo := transInfo.TransIntInfo()
+	if intInfo == nil {
+		return
+	}
+	from := rpcinfo.AsMutableEndpointInfo(ri.From())
+	if from != nil {
+		if v := intInfo[transmeta.FromService]; v != "" {
+			from.SetServiceName(v)
 		}
-		to := rpcinfo.AsMutableEndpointInfo(ri.To())
-		if to != nil {
-			if v := intInfo[transmeta.ToMethod]; v != "" {
-				to.SetMethod(v)
-			}
-			if v := intInfo[transmeta.ToService]; v != "" {
-				to.SetServiceName(v)
-			}
+		if v := intInfo[transmeta.FromMethod]; v != "" {
+			from.SetMethod(v)
+		}
+	}
+	to := rpcinfo.AsMutableEndpointInfo(ri.To())
+	if to != nil {
+		// server-side reads "to_method" from ttheader since "method" is set in thrift payload, which has not been unmarshalled
+		if v := intInfo[transmeta.ToMethod]; v != "" {
+			to.SetMethod(v)
+		}
+		if v := intInfo[transmeta.ToService]; v != "" {
+			to.SetServiceName(v)
 		}
 	}
 }
