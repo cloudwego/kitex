@@ -126,6 +126,9 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Specify a protocol for codec")
 	f.BoolVar(&a.NoDependencyCheck, "no-dependency-check", false,
 		"Skip dependency checking.")
+	f.BoolVar(&a.Rapid, "rapid", false,
+		"Use embedded thriftgo.")
+
 	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,
@@ -139,9 +142,6 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"no_processor",
 	)
 
-	for _, e := range a.extends {
-		e.Apply(f)
-	}
 	f.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Version %s
 Usage: %s [flags] IDL
@@ -152,6 +152,11 @@ Flags:
 `, a.Version, os.Args[0], cmdExample)
 		f.PrintDefaults()
 	}
+
+	for _, e := range a.extends {
+		e.Apply(f)
+	}
+
 	return f
 }
 
