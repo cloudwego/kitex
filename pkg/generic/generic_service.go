@@ -37,21 +37,35 @@ type Service interface {
 
 // ServiceInfoWithCodec create a generic ServiceInfo with CodecInfo
 func ServiceInfoWithCodec(g Generic) *serviceinfo.ServiceInfo {
-	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName())
+	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName(), true)
 }
 
 // Deprecated: it's not used by kitex anymore.
 // ServiceInfo create a generic ServiceInfo
 func ServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
-	return newServiceInfo(pcType, nil, "")
+	return newServiceInfo(pcType, nil, "", false)
 }
 
-func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string) *serviceinfo.ServiceInfo {
+func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string, withCodec bool) *serviceinfo.ServiceInfo {
 	handlerType := (*Service)(nil)
 
-	var methods map[string]serviceinfo.MethodInfo
-	var svcName string
+	methods, svcName := GetMethodInfo(messageReaderWriter, serviceName)
 
+	svcInfo := &serviceinfo.ServiceInfo{
+		ServiceName:  svcName,
+		HandlerType:  handlerType,
+		Methods:      methods,
+		PayloadCodec: pcType,
+		Extra:        make(map[string]interface{}),
+	}
+	svcInfo.Extra["generic"] = true
+	if !withCodec {
+		svcInfo.Extra["deprecated"] = true
+	}
+	return svcInfo
+}
+
+func GetMethodInfo(messageReaderWriter interface{}, serviceName string) (methods map[string]serviceinfo.MethodInfo, svcName string) {
 	if messageReaderWriter == nil {
 		// note: binary generic cannot be used with multi-service feature
 		svcName = serviceinfo.GenericService
@@ -69,16 +83,7 @@ func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interfa
 			),
 		}
 	}
-
-	svcInfo := &serviceinfo.ServiceInfo{
-		ServiceName:  svcName,
-		HandlerType:  handlerType,
-		Methods:      methods,
-		PayloadCodec: pcType,
-		Extra:        make(map[string]interface{}),
-	}
-	svcInfo.Extra["generic"] = true
-	return svcInfo
+	return
 }
 
 func callHandler(ctx context.Context, handler, arg, result interface{}) error {
