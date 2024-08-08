@@ -168,7 +168,7 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
 	tp := message.ProtocolInfo().TransProto
 	if c.payloadValidator != nil && tp&transport.TTHeader == transport.TTHeader {
-		return c.encodeMetaAndPayloadWithPayloadProcessor(ctx, message, out, me)
+		return c.encodeMetaAndPayloadWithPayloadValidator(ctx, message, out, me)
 	}
 
 	var err error
@@ -280,8 +280,8 @@ func (c *defaultCodec) Name() string {
 	return "default"
 }
 
-// encodeMetaAndPayloadWithPayloadProcessor encodes payload and meta with crc32c checksum of the payload.
-func (c *defaultCodec) encodeMetaAndPayloadWithPayloadProcessor(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) (err error) {
+// encodeMetaAndPayloadWithPayloadValidator encodes payload and meta with checksum of the payload.
+func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) (err error) {
 	var (
 		payloadOut  = netpolltrans.NewWriterByteBuffer(netpoll.NewLinkBuffer())
 		needRelease = true
@@ -301,12 +301,15 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadProcessor(ctx context.Cont
 		return err
 	}
 	if c.payloadValidator != nil {
-		key := getValidatorKey(ctx, c.payloadValidator)
 		need, value, pErr := c.payloadValidator.Generate(ctx, flatten2DSlice(payload, payloadLen))
 		if pErr != nil {
 			return pErr
 		}
 		if need {
+			if len(value) > maxPayloadChecksumLength {
+				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("payload validator value exceeds the limit, actual length=%d, limit=%d", len(value), maxPayloadChecksumLength))
+			}
+			key := getValidatorKey(ctx, c.payloadValidator)
 			strInfo := message.TransInfo().TransStrInfo()
 			if strInfo != nil {
 				strInfo[key] = value

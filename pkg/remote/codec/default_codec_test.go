@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/cloudwego/netpoll"
@@ -329,8 +330,15 @@ func TestDefaultCodecWithCustomizedValidator(t *testing.T) {
 	err := dc.Encode(ctx, sendMsg, badOut)
 	test.Assert(t, err != nil)
 
-	// encode with netpollBytebuffer
+	// test encode err because of limit
+	exceedLimitCtx := context.WithValue(ctx, mockExceedLimitKey, "true")
 	npBuffer := netpolltrans.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer())
+	err = dc.Encode(exceedLimitCtx, sendMsg, npBuffer)
+	test.Assert(t, err != nil, err)
+	test.Assert(t, strings.Contains(err.Error(), "limit"), err)
+
+	// encode with netpollBytebuffer
+	npBuffer = netpolltrans.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer())
 	err = dc.Encode(ctx, sendMsg, npBuffer)
 	test.Assert(t, err == nil, err)
 
