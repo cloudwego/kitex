@@ -100,7 +100,6 @@ type Generator interface {
 
 // Config .
 type Config struct {
-	CmdExample            string
 	Verbose               bool
 	GenerateMain          bool // whether stuff in the main package should be generated
 	GenerateInvoker       bool // generate main.go with invoker when main package generate

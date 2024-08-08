@@ -142,12 +142,6 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"no_processor",
 	)
 
-	a.CmdExample = cmdExample
-
-	for _, e := range a.extends {
-		e.Apply(f)
-	}
-
 	f.Usage = func() {
 		fmt.Fprintf(os.Stderr, `Version %s
 Usage: %s [flags] IDL
@@ -155,8 +149,12 @@ Usage: %s [flags] IDL
 Examples:
 %s
 Flags:
-`, a.Version, os.Args[0], a.CmdExample)
+`, a.Version, os.Args[0], cmdExample)
 		f.PrintDefaults()
+	}
+
+	for _, e := range a.extends {
+		e.Apply(f)
 	}
 
 	return f
