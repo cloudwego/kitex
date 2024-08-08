@@ -20,10 +20,10 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/frugal"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 
+	"github.com/cloudwego/kitex/internal/utils/safemcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
@@ -76,9 +76,10 @@ func (c thriftCodec) hyperMarshal(out remote.ByteBuffer, methodName string, msgT
 	return nil
 }
 
+// NOTE: only used by `marshalThriftData`
 func (c thriftCodec) hyperMarshalBody(data interface{}) (buf []byte, err error) {
 	objectLen := frugal.EncodedSize(data)
-	buf = mcache.Malloc(objectLen)
+	buf = safemcache.Malloc(objectLen)
 	_, err = frugal.EncodeObject(buf, nil, data)
 	return buf, err
 }
