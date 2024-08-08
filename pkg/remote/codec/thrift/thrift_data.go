@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/apache"
 
+	"github.com/cloudwego/kitex/internal/utils/mcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )

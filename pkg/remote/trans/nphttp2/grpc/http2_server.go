@@ -219,7 +219,7 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		bufferPool:        newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.done)
-	if dynamicWindow {
+	if false && dynamicWindow {
 		t.bdpEst = &bdpEstimator{
 			bdp:               initialWindowSize,
 			updateFlowControl: t.updateFlowControl,
@@ -831,12 +831,13 @@ func (t *http2Server) Write(s *Stream, hdr, data []byte, opts *Options) error {
 			return ContextErr(s.ctx.Err())
 		}
 	}
-	df := &dataFrame{
-		streamID:    s.id,
-		h:           hdr,
-		d:           data,
-		onEachWrite: t.setResetPingStrikes,
+	df := poolDataFrame.Get().(*dataFrame)
+	*df = dataFrame{
+		streamID: s.id,
+		h:        hdr,
+		d:        data,
 	}
+	df.resetPingStrikes = &t.resetPingStrikes
 	if len(hdr) == 0 && len(data) != 0 {
 		df.dcache = data
 	}

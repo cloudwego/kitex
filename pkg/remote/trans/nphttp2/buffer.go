@@ -20,8 +20,7 @@ import (
 	"net"
 	"sync"
 
-	"github.com/bytedance/gopkg/lang/mcache"
-
+	"github.com/cloudwego/kitex/internal/utils/mcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 

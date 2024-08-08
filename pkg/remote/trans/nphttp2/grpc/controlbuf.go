@@ -27,10 +27,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/bytedance/gopkg/lang/mcache"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 
+	"github.com/cloudwego/kitex/internal/utils/mcache"
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 
@@ -46,10 +46,20 @@ type itemNode struct {
 type itemList struct {
 	head *itemNode
 	tail *itemNode
+
+	free *itemNode
 }
 
 func (il *itemList) enqueue(i interface{}) {
-	n := &itemNode{it: i}
+	var n *itemNode
+	if il.free != nil {
+		n = il.free
+		il.free = il.free.next
+		n.it = i
+		n.next = nil
+	} else {
+		n = &itemNode{it: i}
+	}
 	if il.tail == nil {
 		il.head, il.tail = n, n
 		return
@@ -68,11 +78,14 @@ func (il *itemList) dequeue() interface{} {
 	if il.head == nil {
 		return nil
 	}
-	i := il.head.it
+	head := il.head
+	i := head.it
 	il.head = il.head.next
 	if il.head == nil {
 		il.tail = nil
 	}
+	head.next = il.free
+	il.free = head
 	return i
 }
 
@@ -143,9 +156,12 @@ type dataFrame struct {
 	h      []byte
 	d      []byte
 	dcache []byte // dcache is the origin d created by mcache, this ptr is only used for kitex
-	// onEachWrite is called every time
+
+	// resetPingStrikes is stored 1 every time
 	// a part of d is written out.
-	onEachWrite func()
+	// not using setResetPingStrikes() for performance concern
+	// which will cause one allocation
+	resetPingStrikes *uint32
 }
 
 func (*dataFrame) isTransportResponseFrame() bool { return false }
@@ -848,7 +864,10 @@ func (l *loopyWriter) processData() (bool, error) {
 		if err := l.framer.WriteData(dataItem.streamID, dataItem.endStream, nil); err != nil {
 			return false, err
 		}
+
 		str.itl.dequeue() // remove the empty data item from stream
+		defer poolDataFrame.Put(dataItem)
+
 		if str.itl.isEmpty() {
 			str.state = empty
 		} else if trailer, ok := str.itl.peek().(*headerFrame); ok { // the next item is trailers.
@@ -902,8 +921,8 @@ func (l *loopyWriter) processData() (bool, error) {
 	if dataItem.endStream && len(dataItem.h)+len(dataItem.d) <= size {
 		endStream = true
 	}
-	if dataItem.onEachWrite != nil {
-		dataItem.onEachWrite()
+	if dataItem.resetPingStrikes != nil {
+		atomic.StoreUint32(dataItem.resetPingStrikes, 1)
 	}
 	if err := l.framer.WriteData(dataItem.streamID, endStream, buf[:size]); err != nil {
 		return false, err
@@ -918,6 +937,7 @@ func (l *loopyWriter) processData() (bool, error) {
 			mcache.Free(dataItem.dcache)
 		}
 		str.itl.dequeue()
+		defer poolDataFrame.Put(dataItem)
 	}
 	if str.itl.isEmpty() {
 		str.state = empty

@@ -22,10 +22,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/fastpb"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/cloudwego/kitex/internal/utils/mcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"

@@ -23,13 +23,10 @@ import (
 	"errors"
 	"io"
 
-	"github.com/bytedance/gopkg/lang/mcache"
-
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-
-	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
-
+	"github.com/cloudwego/kitex/internal/utils/mcache"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
 func getSendCompressor(ctx context.Context) (encoding.Compressor, error) {

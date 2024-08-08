@@ -191,7 +191,7 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		t.initialWindowSize = opts.InitialWindowSize
 		dynamicWindow = false
 	}
-	if dynamicWindow {
+	if false && dynamicWindow {
 		t.bdpEst = &bdpEstimator{
 			bdp:               initialWindowSize,
 			updateFlowControl: t.updateFlowControl,
@@ -656,7 +656,8 @@ func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	} else if s.getState() != streamActive {
 		return errStreamDone
 	}
-	df := &dataFrame{
+	df := poolDataFrame.Get().(*dataFrame)
+	*df = dataFrame{
 		streamID:  s.id,
 		endStream: opts.Last,
 		h:         hdr,

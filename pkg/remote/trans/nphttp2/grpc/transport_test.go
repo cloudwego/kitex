@@ -179,10 +179,9 @@ func (h *testStreamHandler) handleStreamMisbehave(t *testing.T, s *Stream) {
 			}
 		}
 		conn.controlBuf.put(&dataFrame{
-			streamID:    s.id,
-			h:           nil,
-			d:           p,
-			onEachWrite: func() {},
+			streamID: s.id,
+			h:        nil,
+			d:        p,
 		})
 		sent += len(p)
 	}
@@ -973,11 +972,10 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 		t.Fatalf("Failed to open stream: %v", err)
 	}
 	ct.controlBuf.put(&dataFrame{
-		streamID:    s.id,
-		endStream:   false,
-		h:           nil,
-		d:           make([]byte, http2MaxFrameLen),
-		onEachWrite: func() {},
+		streamID:  s.id,
+		endStream: false,
+		h:         nil,
+		d:         make([]byte, http2MaxFrameLen),
 	})
 	// Loop until the server side stream is created.
 	var ss *Stream
