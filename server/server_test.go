@@ -170,7 +170,7 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	mc.SetTransportProtocol(transport.TTHeader)
 	mc.SetConnectTimeout(10 * time.Second)
 	mc.SetRPCTimeout(20 * time.Second)
-	mc.SetInteractionMode(rpcinfo.Streaming)
+	mc.SetInteractionMode(rpcinfo.StreamingClient)
 	mc.SetIOBufferSize(1024)
 	mc.SetReadWriteTimeout(30 * time.Second)
 
@@ -200,7 +200,7 @@ func TestInitOrResetRPCInfo(t *testing.T) {
 	test.Assert(t, ri.Config().TransportProtocol() == transport.TTHeader)
 	test.Assert(t, ri.Config().ConnectTimeout() == 10*time.Second)
 	test.Assert(t, ri.Config().RPCTimeout() == 20*time.Second)
-	test.Assert(t, ri.Config().InteractionMode() == rpcinfo.Streaming)
+	test.Assert(t, ri.Config().InteractionMode().IsStreaming())
 	test.Assert(t, ri.Config().IOBufferSize() == 1024)
 	test.Assert(t, ri.Config().ReadWriteTimeout() == rwTimeout)
 

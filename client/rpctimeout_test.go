@@ -108,7 +108,7 @@ func TestNewRPCTimeoutMW(t *testing.T) {
 
 	// 7. panic with streaming, panic won't be recovered in timeout mw, but it will be recoverd in client.Call
 	m = rpcinfo.AsMutableRPCConfig(c)
-	m.SetInteractionMode(rpcinfo.Streaming)
+	m.SetInteractionMode(rpcinfo.StreamingClient)
 	mw1 = rpctimeout.MiddlewareBuilder(0)(mwCtx)
 	mw2 = rpcTimeoutMW(mwCtx)
 	test.Panic(t, func() { mw1(mw2(panicEp))(ctx, nil, nil) })

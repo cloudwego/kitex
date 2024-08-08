@@ -41,7 +41,7 @@ const (
 )
 
 type streamDesc struct {
-	isStreaming bool
+	interactionMode rpcinfo.InteractionMode
 }
 
 type clientConn struct {
@@ -88,7 +88,6 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 		}
 		host = u.Host
 	}
-	isStreaming := ri.Config().InteractionMode() == rpcinfo.Streaming
 	invocation := ri.Invocation()
 	callHdr := &grpc.CallHdr{
 		Host: host,
@@ -105,7 +104,7 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 	return &clientConn{
 		tr:   tr,
 		s:    s,
-		desc: &streamDesc{isStreaming: isStreaming},
+		desc: &streamDesc{interactionMode: ri.Config().InteractionMode()},
 	}, nil
 }
 
@@ -131,7 +130,7 @@ func fullMethodName(pkg, svc, method string) string {
 // impl net.Conn
 func (c *clientConn) Read(b []byte) (n int, err error) {
 	n, err = c.s.Read(b)
-	if err == io.EOF {
+	if err == io.EOF || err == nil && !c.desc.interactionMode.IsServerStreaming() {
 		if status := c.s.Status(); status.Code() != codes.OK {
 			if bizStatusErr := c.s.BizStatusErr(); bizStatusErr != nil {
 				err = bizStatusErr
@@ -151,7 +150,7 @@ func (c *clientConn) Write(b []byte) (n int, err error) {
 }
 
 func (c *clientConn) WriteFrame(hdr, data []byte) (n int, err error) {
-	grpcConnOpt := &grpc.Options{Last: !c.desc.isStreaming}
+	grpcConnOpt := &grpc.Options{Last: !c.desc.interactionMode.IsStreaming()}
 	err = c.tr.Write(c.s, hdr, data, grpcConnOpt)
 	return len(hdr) + len(data), err
 }

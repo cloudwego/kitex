@@ -50,11 +50,36 @@ const (
 
 type InteractionMode int32
 
+func (mode InteractionMode) IsStreaming() bool {
+	return mode == StreamingClient || mode == StreamingServer || mode == StreamingBidi
+}
+
+func (mode InteractionMode) IsServerStreaming() bool {
+	return mode == StreamingServer || mode == StreamingBidi
+}
+
 const (
-	PingPong  InteractionMode = 0
-	Oneway    InteractionMode = 1
-	Streaming InteractionMode = 2
+	PingPong        InteractionMode = 0
+	Oneway          InteractionMode = 1
+	StreamingClient InteractionMode = 2
+	StreamingServer InteractionMode = 3
+	StreamingBidi   InteractionMode = 4
 )
+
+// StreamingToInteractionMode converts streaming mode to interaction mode.
+func StreamingToInteractionMode(mode serviceinfo.StreamingMode) InteractionMode {
+	switch mode {
+	case serviceinfo.StreamingNone, serviceinfo.StreamingUnary:
+		return PingPong
+	case serviceinfo.StreamingClient:
+		return StreamingClient
+	case serviceinfo.StreamingServer:
+		return StreamingServer
+	case serviceinfo.StreamingBidirectional:
+		return StreamingBidi
+	}
+	return PingPong
+}
 
 // rpcConfig is a set of configurations used during RPC calls.
 type rpcConfig struct {

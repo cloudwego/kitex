@@ -51,7 +51,7 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	var ri rpcinfo.RPCInfo
 	ctx, ri, _ = kc.initRPCInfo(ctx, method, 0, nil)
 
-	rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.Streaming)
+	rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.StreamingToInteractionMode(kc.getStreamingMode(ri)))
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
