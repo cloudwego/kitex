@@ -3,7 +3,9 @@ package codec
 import (
 	"context"
 	"github.com/bytedance/gopkg/util/xxhash3"
+	"github.com/cloudwego/kitex/internal/test"
 	"strconv"
+	"testing"
 )
 
 var _ PayloadValidator = &mockPayloadValidator{}
@@ -34,4 +36,17 @@ func (m *mockPayloadValidator) Validate(ctx context.Context, expectedValue strin
 		return false, err
 	}
 	return value == expectedValue, nil
+}
+
+func TestPayloadValidator(t *testing.T) {
+	p := &crcPayloadValidator{}
+	payload := make([]byte, 0)
+
+	need, value, err := p.Generate(context.Background(), payload)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, need)
+
+	pass, err := p.Validate(context.Background(), value, payload)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, pass, true)
 }
