@@ -104,10 +104,6 @@ func (p *crcPayloadValidator) Key(ctx context.Context) string {
 	return transmeta.HeaderCRC32C
 }
 
-func (p *crcPayloadValidator) Checksum(ctx context.Context, payload []byte) (value string, err error) {
-	return getCRC32C([][]byte{payload}), nil
-}
-
 func (p *crcPayloadValidator) Generate(ctx context.Context, outPayload []byte) (need bool, value string, err error) {
 	return true, getCRC32C([][]byte{outPayload}), nil
 }
