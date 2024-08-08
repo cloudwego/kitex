@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
-	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
@@ -12,6 +11,19 @@ import (
 	"hash/crc32"
 	"sync"
 )
+
+const (
+	maxPayloadChecksumLength = 1024
+	PayloadValidatorPrefix   = "PV_"
+)
+
+func getValidatorKey(ctx context.Context, p PayloadValidator) string {
+	if _, ok := p.(*crcPayloadValidator); ok {
+		return p.Key(ctx)
+	}
+	key := p.Key(ctx)
+	return PayloadValidatorPrefix + key
+}
 
 func validate(ctx context.Context, message remote.Message, in remote.ByteBuffer, p PayloadValidator) error {
 	key := getValidatorKey(ctx, p)
@@ -116,15 +128,6 @@ var (
 	crc32cTable    *crc32.Table
 	crc32TableOnce sync.Once
 )
-
-func getValidatorKey(ctx context.Context, p PayloadValidator) string {
-	if _, ok := p.(*crcPayloadValidator); ok {
-		return p.Key(ctx)
-	}
-	prefix := metainfo.PrefixTransient
-	key := p.Key(ctx)
-	return prefix + key
-}
 
 // getCRC32C calculates the crc32c checksum of the input bytes.
 // the checksum will be converted into big-endian format and encoded into hex string.
