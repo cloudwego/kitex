@@ -21,10 +21,11 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
 	"github.com/cloudwego/kitex/internal/generic/proto"
-	"github.com/cloudwego/kitex/internal/generic/thrift"
+	gthrift "github.com/cloudwego/kitex/internal/generic/thrift"
 	codecProto "github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -132,12 +133,12 @@ func (g *Args) GetOrSetBase() interface{} {
 }
 
 // Write ...
-func (g *Args) Write(ctx context.Context, method string, out io.Writer) error {
+func (g *Args) Write(ctx context.Context, method string, bw *thrift.BinaryWriter, out io.Writer) error {
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
-	if w, ok := g.inner.(thrift.MessageWriter); ok {
-		return w.Write(ctx, out, g.Request, method, true, g.base)
+	if w, ok := g.inner.(gthrift.MessageWriter); ok {
+		return w.Write(ctx, out, bw, g.Request, method, true, g.base)
 	}
 	return fmt.Errorf("unexpected Args writer type: %T", g.inner)
 }
@@ -157,7 +158,7 @@ func (g *Args) Read(ctx context.Context, method string, dataLen int, in io.Reade
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
-	if rw, ok := g.inner.(thrift.MessageReader); ok {
+	if rw, ok := g.inner.(gthrift.MessageReader); ok {
 		g.Method = method
 		var err error
 		g.Request, err = rw.Read(ctx, method, false, dataLen, in)
@@ -202,12 +203,12 @@ func (r *Result) SetCodec(inner interface{}) {
 }
 
 // Write ...
-func (r *Result) Write(ctx context.Context, method string, out io.Writer) error {
+func (r *Result) Write(ctx context.Context, method string, bw *thrift.BinaryWriter, out io.Writer) error {
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
-	if w, ok := r.inner.(thrift.MessageWriter); ok {
-		return w.Write(ctx, out, r.Success, method, false, nil)
+	if w, ok := r.inner.(gthrift.MessageWriter); ok {
+		return w.Write(ctx, out, bw, r.Success, method, false, nil)
 	}
 	return fmt.Errorf("unexpected Result writer type: %T", r.inner)
 }
@@ -227,7 +228,7 @@ func (r *Result) Read(ctx context.Context, method string, dataLen int, in io.Rea
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
-	if w, ok := r.inner.(thrift.MessageReader); ok {
+	if w, ok := r.inner.(gthrift.MessageReader); ok {
 		var err error
 		r.Success, err = w.Read(ctx, method, true, dataLen, in)
 		return err
