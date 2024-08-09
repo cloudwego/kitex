@@ -1126,3 +1126,16 @@ func withGRPCTransport() Option {
 		o.RemoteOpt.SvrHandlerFactory = nphttp2.NewSvrTransHandlerFactory()
 	}}
 }
+
+func Test_server_buildInvokeChain(t *testing.T) {
+	firstMW := endpoint.DummyMiddleware
+	firstVal := reflect.ValueOf(firstMW)
+	s := &server{
+		mws: []endpoint.Middleware{firstMW},
+	}
+	s.buildInvokeChain()
+
+	test.Assert(t, len(s.mws) == 2, "buildInvokeChain does not add ctxInjectMW")
+	val := reflect.ValueOf(s.mws[0])
+	test.Assert(t, val.Pointer() == firstVal.Pointer(), "ctxInjectMW is not at the end")
+}

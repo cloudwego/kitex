@@ -23,8 +23,10 @@ import (
 	"testing"
 	"time"
 
+	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 var _ context.Context = (*mockCtx)(nil)
@@ -193,5 +195,37 @@ func Test_serverTimeoutMW(t *testing.T) {
 		// assert
 		test.Assert(t, err.Error() == "error", err)
 		<-waitFinish
+	})
+}
+
+type mockStream struct {
+	streaming.Stream
+}
+
+func Test_newCtxInjectMW(t *testing.T) {
+	ctxMW := newCtxInjectMW()
+	initCtx := context.WithValue(context.Background(), "testKey", "testVal")
+
+	t.Run("streaming middleware chain", func(t *testing.T) {
+		initStream := &mockStream{}
+		err := ctxMW(func(ctx context.Context, req, resp interface{}) (err error) {
+			args, ok := req.(*streaming.Args)
+			test.Assert(t, ok)
+			test.Assert(t, ctx == args.Stream.Context())
+			test.Assert(t, ctx == initCtx)
+			test.Assert(t, args.Stream != initStream)
+			return nil
+		})(initCtx, &streaming.Args{Stream: initStream}, nil)
+		test.Assert(t, err == nil, err)
+	})
+
+	t.Run("ping-pong middleware chain", func(t *testing.T) {
+		err := ctxMW(func(ctx context.Context, req, resp interface{}) (err error) {
+			_, ok := req.(*streaming.Args)
+			test.Assert(t, !ok)
+			test.Assert(t, ctx == initCtx)
+			return nil
+		})(initCtx, &mocks.MockTestArgs{}, &mocks.MockTestResult{})
+		test.Assert(t, err == nil, err)
 	})
 }
