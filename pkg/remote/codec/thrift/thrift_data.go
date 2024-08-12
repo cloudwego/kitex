@@ -208,10 +208,14 @@ func verifyUnmarshalBasicThriftDataType(data interface{}) error {
 
 // decodeBasicThriftData decode thrift body the old way (slow)
 func decodeBasicThriftData(trans remote.ByteBuffer, data interface{}) error {
-	if err := verifyUnmarshalBasicThriftDataType(data); err != nil {
+	var err error
+	if err = verifyUnmarshalBasicThriftDataType(data); err != nil {
 		return err
 	}
-	return apache.ThriftRead(apache.NewDefaultTransport(trans), data)
+	if err = apache.ThriftRead(apache.NewDefaultTransport(trans), data); err != nil {
+		return remote.NewTransError(remote.ProtocolError, err)
+	}
+	return nil
 }
 
 func getSkippedStructBuffer(trans remote.ByteBuffer) ([]byte, error) {
