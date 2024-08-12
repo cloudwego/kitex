@@ -40,7 +40,7 @@ func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
 	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName(), true)
 }
 
-// Deprecated: Replaced by ServiceInfoWithGeneric, this method will be removed in v0.12.0
+// Deprecated: replaced by ServiceInfoWithGeneric, this method will be removed in v0.12.0
 // ServiceInfo create a generic ServiceInfo
 func ServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
 	return newServiceInfo(pcType, nil, "", false)
