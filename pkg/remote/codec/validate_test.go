@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/bytedance/gopkg/util/xxhash3"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"strconv"
 	"testing"
 )
@@ -15,6 +16,7 @@ type mockPayloadValidator struct {
 
 const (
 	mockExceedLimitKey = "mockExceedLimit"
+	mockPreprocessKey  = "key"
 )
 
 func (m *mockPayloadValidator) Key(ctx context.Context) string {
@@ -38,15 +40,24 @@ func (m *mockPayloadValidator) Validate(ctx context.Context, expectedValue strin
 	return value == expectedValue, nil
 }
 
+func (m *mockPayloadValidator) ProcessBeforeValidate(ctx context.Context, message remote.Message) (context.Context, error) {
+	ctx = context.WithValue(ctx, mockPreprocessKey, true)
+	return ctx, nil
+}
+
 func TestPayloadValidator(t *testing.T) {
-	p := &crcPayloadValidator{}
+	p := &mockPayloadValidator{}
 	payload := make([]byte, 0)
 
 	need, value, err := p.Generate(context.Background(), payload)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, need)
 
-	pass, err := p.Validate(context.Background(), value, payload)
+	ctx, err := p.ProcessBeforeValidate(context.Background(), nil)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, ctx.Value(mockPreprocessKey) == true)
+
+	pass, err := p.Validate(ctx, value, payload)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, pass, true)
 }

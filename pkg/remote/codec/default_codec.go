@@ -222,9 +222,8 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("ttheader read payload first 8 byte failed: %s", err.Error()))
 		}
 		if c.payloadValidator != nil {
-			fillRPCInfoBeforeValidate(message)
-			if vErr := validate(ctx, message, in, c.payloadValidator); vErr != nil {
-				return vErr
+			if pErr := payloadChecksumValidate(ctx, c.payloadValidator, in, message); pErr != nil {
+				return pErr
 			}
 		}
 	} else if isMeshHeader(flagBuf) {
@@ -301,19 +300,8 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Cont
 		return err
 	}
 	if c.payloadValidator != nil {
-		need, value, pErr := c.payloadValidator.Generate(ctx, flatten2DSlice(payload, payloadLen))
-		if pErr != nil {
-			return kerrors.ErrPayloadValidation.WithCause(fmt.Errorf("generate failed, err=%v", pErr))
-		}
-		if need {
-			if len(value) > maxPayloadChecksumLength {
-				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("payload validator value exceeds the limit, actual length=%d, limit=%d", len(value), maxPayloadChecksumLength))
-			}
-			key := getValidatorKey(ctx, c.payloadValidator)
-			strInfo := message.TransInfo().TransStrInfo()
-			if strInfo != nil {
-				strInfo[key] = value
-			}
+		if err = payloadChecksumGenerate(ctx, c.payloadValidator, flatten2DSlice(payload, payloadLen), message); err != nil {
+			return err
 		}
 	}
 	// set payload length before encode TTHeader

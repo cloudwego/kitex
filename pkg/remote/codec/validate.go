@@ -5,11 +5,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/stats"
 	"hash/crc32"
 	"sync"
 )
@@ -27,8 +29,46 @@ func getValidatorKey(ctx context.Context, p PayloadValidator) string {
 	return PayloadValidatorPrefix + key
 }
 
-func validate(ctx context.Context, message remote.Message, in remote.ByteBuffer, p PayloadValidator) error {
-	key := getValidatorKey(ctx, p)
+func payloadChecksumGenerate(ctx context.Context, pv PayloadValidator, outboundPayload []byte, message remote.Message) (err error) {
+	rpcinfo.Record(ctx, message.RPCInfo(), stats.ChecksumGenerateStart, nil)
+	defer func() {
+		rpcinfo.Record(ctx, message.RPCInfo(), stats.ChecksumGenerateFinish, err)
+	}()
+
+	need, value, pErr := pv.Generate(ctx, outboundPayload)
+	if pErr != nil {
+		err = kerrors.ErrPayloadValidation.WithCause(fmt.Errorf("generate failed, err=%v", pErr))
+		return err
+	}
+	if need {
+		if len(value) > maxPayloadChecksumLength {
+			err = perrors.NewProtocolErrorWithMsg(fmt.Sprintf("payload validator value exceeds the limit, actual length=%d, limit=%d", len(value), maxPayloadChecksumLength))
+			return err
+		}
+		key := getValidatorKey(ctx, pv)
+		strInfo := message.TransInfo().TransStrInfo()
+		if strInfo != nil {
+			strInfo[key] = value
+		}
+	}
+	return nil
+}
+
+func payloadChecksumValidate(ctx context.Context, pv PayloadValidator, in remote.ByteBuffer, message remote.Message) (err error) {
+	rpcinfo.Record(ctx, message.RPCInfo(), stats.ChecksumValidateStart, nil)
+	defer func() {
+		rpcinfo.Record(ctx, message.RPCInfo(), stats.ChecksumValidateFinish, err)
+	}()
+
+	ctx = fillRPCInfoBeforeValidate(ctx, message)
+	// before validate
+	ctx, err = pv.ProcessBeforeValidate(ctx, message)
+	if err != nil {
+		return err
+	}
+
+	// get key and value
+	key := getValidatorKey(ctx, pv)
 	strInfo := message.TransInfo().TransStrInfo()
 	if strInfo == nil {
 		return nil
@@ -39,7 +79,9 @@ func validate(ctx context.Context, message remote.Message, in remote.ByteBuffer,
 	if err != nil {
 		return err
 	}
-	pass, err := p.Validate(ctx, expectedValue, payload)
+
+	// validate
+	pass, err := pv.Validate(ctx, expectedValue, payload)
 	if err != nil {
 		return kerrors.ErrPayloadValidation.WithCause(fmt.Errorf("validation failed, err=%v", err))
 	}
@@ -50,23 +92,23 @@ func validate(ctx context.Context, message remote.Message, in remote.ByteBuffer,
 }
 
 // fillRPCInfoBeforeValidate reads header and set into the RPCInfo, which allows Validate() to use RPCInfo.
-func fillRPCInfoBeforeValidate(message remote.Message) {
+func fillRPCInfoBeforeValidate(ctx context.Context, message remote.Message) context.Context {
 	if message.RPCRole() != remote.Server {
 		// only fill when server-side reading the request header
 		// TODO: client-side can read from the response header
-		return
+		return ctx
 	}
 	ri := message.RPCInfo()
 	if ri == nil {
-		return
+		return ctx
 	}
 	transInfo := message.TransInfo()
 	if transInfo == nil {
-		return
+		return ctx
 	}
 	intInfo := transInfo.TransIntInfo()
 	if intInfo == nil {
-		return
+		return ctx
 	}
 	from := rpcinfo.AsMutableEndpointInfo(ri.From())
 	if from != nil {
@@ -87,6 +129,10 @@ func fillRPCInfoBeforeValidate(message remote.Message) {
 			to.SetServiceName(v)
 		}
 	}
+	if logid := intInfo[transmeta.LogID]; logid != "" {
+		ctx = context.WithValue(ctx, consts.CtxKeyLogID, logid)
+	}
+	return ctx
 }
 
 // PayloadValidator is the interface for validating the payload of RPC requests, which allows customized Checksum function.
@@ -95,13 +141,17 @@ type PayloadValidator interface {
 	Key(ctx context.Context) string
 
 	// Generate generates the checksum of the payload.
-	// The value will not be set to the request header if need is false.
+	// The value will not be set to the request header if "need" is false.
 	// DO NOT modify the input payload since it might be obtained by nocopy API from the underlying buffer.
-	Generate(ctx context.Context, outboundPayload []byte) (need bool, value string, err error)
+	Generate(ctx context.Context, outboundPayload []byte) (need bool, checksum string, err error)
 
 	// Validate validates the input payload with the attached checksum.
 	// Return pass if validation succeed, or return error.
 	Validate(ctx context.Context, expectedValue string, inboundPayload []byte) (pass bool, err error)
+
+	// ProcessBeforeValidate is used to do some preprocess before validate.
+	// For example, you can extract some value from ttheader and set to the context, which may be useful for validation.
+	ProcessBeforeValidate(ctx context.Context, message remote.Message) (context.Context, error)
 }
 
 // NewCRC32PayloadValidator returns a new crcPayloadValidator
@@ -134,6 +184,10 @@ func (p *crcPayloadValidator) Validate(ctx context.Context, expectedValue string
 		return false, perrors.NewProtocolErrorWithType(perrors.InvalidData, expectedValue)
 	}
 	return true, nil
+}
+
+func (p *crcPayloadValidator) ProcessBeforeValidate(ctx context.Context, message remote.Message) (context.Context, error) {
+	return ctx, nil
 }
 
 // crc32cTable is used for crc32c check
