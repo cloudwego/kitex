@@ -399,6 +399,7 @@ func TestCompatible(t *testing.T) {
 	var opts []client.Option
 	opts = append(opts, client.WithHostPorts(addr), client.WithTransportProtocol(transport.TTHeader))
 	cli, err := genericclient.NewClientWithServiceInfo("destServiceName", g, svcInfo, opts...)
+	test.Assert(t, err == nil)
 
 	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
