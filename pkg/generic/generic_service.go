@@ -29,6 +29,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
+// TODO(marina.sakai): remove in v0.12.0
+const DeprecatedGenericServiceInfoAPIKey = "deprecated_generic_service_info_api"
+
 // Service generic service interface
 type Service interface {
 	// GenericCall handle the generic call
@@ -62,7 +65,7 @@ func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interfa
 	svcInfo.Extra["generic"] = true
 	// TODO(marina.sakai): remove in v0.12.0
 	if !withGeneric {
-		svcInfo.Extra["deprecated"] = true
+		svcInfo.Extra[DeprecatedGenericServiceInfoAPIKey] = true
 	}
 	return svcInfo
 }
