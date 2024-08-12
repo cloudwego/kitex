@@ -5,11 +5,11 @@ go 1.17
 require (
 	github.com/apache/thrift v0.13.0
 	github.com/bytedance/gopkg v0.1.0
-	github.com/bytedance/sonic v1.11.8
+	github.com/bytedance/sonic v1.12.0
 	github.com/cloudwego/configmanager v0.2.2
-	github.com/cloudwego/dynamicgo v0.2.9
+	github.com/cloudwego/dynamicgo v0.3.0
 	github.com/cloudwego/fastpb v0.0.4
-	github.com/cloudwego/frugal v0.1.15
+	github.com/cloudwego/frugal v0.2.0
 	github.com/cloudwego/gopkg v0.1.1-0.20240806070559-b36f09467ae8
 	github.com/cloudwego/localsession v0.0.2
 	github.com/cloudwego/netpoll v0.6.3
@@ -30,7 +30,7 @@ require (
 )
 
 require (
-	github.com/bytedance/sonic/loader v0.1.1 // indirect
+	github.com/bytedance/sonic/loader v0.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -42,7 +42,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/gls v0.0.0-20220109145502-612d0167dce5 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/oleiade/lane v1.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
