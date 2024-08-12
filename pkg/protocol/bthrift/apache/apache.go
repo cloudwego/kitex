@@ -17,11 +17,43 @@
 package apache
 
 import (
+	"errors"
+
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/apache"
 )
 
 func init() {
 	// it makes github.com/cloudwego/gopkg/protocol/thrift/apache works
-	_ = apache.RegisterNewTBinaryProtocol(thrift.NewTBinaryProtocol)
+	apache.RegisterCheckTStruct(checkTStruct)
+	apache.RegisterThriftRead(callThriftRead)
+	apache.RegisterThriftWrite(callThriftWrite)
+}
+
+var errNotThriftTStruct = errors.New("not thrift.TStruct")
+
+func checkTStruct(v interface{}) error {
+	_, ok := v.(thrift.TStruct)
+	if !ok {
+		return errNotThriftTStruct
+	}
+	return nil
+}
+
+func callThriftRead(t apache.TTransport, v interface{}) error {
+	p, ok := v.(thrift.TStruct)
+	if !ok {
+		return errNotThriftTStruct
+	}
+	in := thrift.NewTBinaryProtocol(t, true, true)
+	return p.Read(in)
+}
+
+func callThriftWrite(t apache.TTransport, v interface{}) error {
+	p, ok := v.(thrift.TStruct)
+	if !ok {
+		return errNotThriftTStruct
+	}
+	out := thrift.NewTBinaryProtocol(t, true, true)
+	return p.Write(out)
 }
