@@ -35,18 +35,19 @@ type Service interface {
 	GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error)
 }
 
-// ServiceInfoWithCodec create a generic ServiceInfo with CodecInfo
-func ServiceInfoWithCodec(g Generic) *serviceinfo.ServiceInfo {
+// ServiceInfoWithGeneric create a generic ServiceInfo
+func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
 	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName(), true)
 }
 
-// Deprecated: it's not used by kitex anymore.
+// Deprecated: Replaced by ServiceInfoWithGeneric, this method will be removed in v0.12.0
 // ServiceInfo create a generic ServiceInfo
+// TODO(marina.sakai): remove in v0.12.0
 func ServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
 	return newServiceInfo(pcType, nil, "", false)
 }
 
-func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string, withCodec bool) *serviceinfo.ServiceInfo {
+func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string, withGeneric bool) *serviceinfo.ServiceInfo {
 	handlerType := (*Service)(nil)
 
 	methods, svcName := GetMethodInfo(messageReaderWriter, serviceName)
@@ -59,12 +60,14 @@ func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interfa
 		Extra:        make(map[string]interface{}),
 	}
 	svcInfo.Extra["generic"] = true
-	if !withCodec {
+	// TODO(marina.sakai): remove in v0.12.0
+	if !withGeneric {
 		svcInfo.Extra["deprecated"] = true
 	}
 	return svcInfo
 }
 
+// GetMethodInfo is only used in kitex, please DON'T USE IT. This method may be removed in the future
 func GetMethodInfo(messageReaderWriter interface{}, serviceName string) (methods map[string]serviceinfo.MethodInfo, svcName string) {
 	if messageReaderWriter == nil {
 		// note: binary generic cannot be used with multi-service feature
