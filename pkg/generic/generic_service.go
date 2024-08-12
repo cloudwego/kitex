@@ -42,7 +42,6 @@ func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
 
 // Deprecated: Replaced by ServiceInfoWithGeneric, this method will be removed in v0.12.0
 // ServiceInfo create a generic ServiceInfo
-// TODO(marina.sakai): remove in v0.12.0
 func ServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
 	return newServiceInfo(pcType, nil, "", false)
 }
