@@ -128,7 +128,7 @@ func TestServiceInfo(t *testing.T) {
 	test.Assert(t, err == nil)
 	g, err := JSONThriftGeneric(p)
 	test.Assert(t, err == nil)
-	s = ServiceInfoWithCodec(g)
+	s = ServiceInfoWithGeneric(g)
 	test.Assert(t, s.ServiceName == "Mock")
 }
 
