@@ -707,7 +707,7 @@ func TestLargeMessageWithDelayRead(t *testing.T) {
 	select {
 	case <-ready:
 	case <-ctx.Done():
-		t.Fatalf("Client timed out waiting for server handler to be initialized.")
+		t.Fatalf("%s", "Client timed out waiting for server handler to be initialized.")
 	}
 	server.mu.Lock()
 	serviceHandler := server.h
