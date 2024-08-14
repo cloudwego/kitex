@@ -15,11 +15,11 @@ We're planning to get rid of `github.com/apache/thrift`, here are steps we have 
 	- replace `github.com/apache/thrift` with `bthrift/apache`
 		- by using `thrift_import_path` parameter of thriftgo
 
-The final step we planned to do in version v0.12.0:
+The final step we planned to do in kitex version v0.12.0:
 * Add go.mod for `bthrift`
 * Remove the last `github.com/apache/thrift` dependencies (Remove the import 'github.com/cloudwego/kitex/pkg/protocol/bthrift' and 'github.com/cloudwego/kitex/pkg/protocol/bthrift/apache')
 	* `ThriftMessageCodec` of `pkg/utils`
 	* `MessageReader` and `MessageWriter` interfaces in  `pkg/remote/codec/thrift`
 	* `BinaryProtocol` type in `pkg/remote/codec/thrift`
 	* basic codec tests in `pkg/remote/codec/thrift`
- * bthrift will only be dependent in the generated code(if has apache thrift code), kitex repository DOESN'T DEPEND bthrift
+ * kitex DOESN'T DEPEND bthrift, bthrift will only be dependent in the generated code(if has apache thrift code)
