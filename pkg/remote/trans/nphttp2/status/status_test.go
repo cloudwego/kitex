@@ -30,7 +30,7 @@ import (
 func TestStatus(t *testing.T) {
 	// test ok status
 	statusMsg := "test"
-	statusOk := Newf(codes.OK, fmt.Sprintf("%s", statusMsg))
+	statusOk := Newf(codes.OK, statusMsg)
 	test.Assert(t, statusOk.Code() == codes.OK)
 	test.Assert(t, statusOk.Message() == statusMsg)
 	test.Assert(t, statusOk.Err() == nil)
@@ -50,7 +50,7 @@ func TestStatus(t *testing.T) {
 	test.Assert(t, emptyDetail == nil)
 
 	// test error status
-	notFoundErr := Errorf(codes.NotFound, fmt.Sprintf("%s", statusMsg))
+	notFoundErr := Errorf(codes.NotFound, statusMsg)
 	statusErr, ok := FromError(notFoundErr)
 	test.Assert(t, ok)
 	test.Assert(t, statusErr.Code() == codes.NotFound)
