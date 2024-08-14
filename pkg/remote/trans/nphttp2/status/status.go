@@ -58,9 +58,6 @@ func New(c codes.Code, msg string) *Status {
 
 // Newf returns New(c, fmt.Sprintf(format, a...)).
 func Newf(c codes.Code, format string, a ...interface{}) *Status {
-	if len(a) == 0 {
-		return New(c, format)
-	}
 	return New(c, fmt.Sprintf(format, a...))
 }
 
