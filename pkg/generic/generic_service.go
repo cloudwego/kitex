@@ -29,29 +29,49 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
+// TODO(marina.sakai): remove in v0.12.0
+const DeprecatedGenericServiceInfoAPIKey = "deprecated_generic_service_info_api"
+
 // Service generic service interface
 type Service interface {
 	// GenericCall handle the generic call
 	GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error)
 }
 
-// ServiceInfoWithCodec create a generic ServiceInfo with CodecInfo
-func ServiceInfoWithCodec(g Generic) *serviceinfo.ServiceInfo {
-	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName())
+// ServiceInfoWithGeneric create a generic ServiceInfo
+func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
+	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName(), true)
 }
 
-// Deprecated: it's not used by kitex anymore.
+// Deprecated: Replaced by ServiceInfoWithGeneric, this method will be removed in v0.12.0
 // ServiceInfo create a generic ServiceInfo
+// TODO(marina.sakai): remove in v0.12.0
 func ServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
-	return newServiceInfo(pcType, nil, "")
+	return newServiceInfo(pcType, nil, "", false)
 }
 
-func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string) *serviceinfo.ServiceInfo {
+func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string, withGeneric bool) *serviceinfo.ServiceInfo {
 	handlerType := (*Service)(nil)
 
-	var methods map[string]serviceinfo.MethodInfo
-	var svcName string
+	methods, svcName := GetMethodInfo(messageReaderWriter, serviceName)
 
+	svcInfo := &serviceinfo.ServiceInfo{
+		ServiceName:  svcName,
+		HandlerType:  handlerType,
+		Methods:      methods,
+		PayloadCodec: pcType,
+		Extra:        make(map[string]interface{}),
+	}
+	svcInfo.Extra["generic"] = true
+	// TODO(marina.sakai): remove in v0.12.0
+	if !withGeneric {
+		svcInfo.Extra[DeprecatedGenericServiceInfoAPIKey] = true
+	}
+	return svcInfo
+}
+
+// GetMethodInfo is only used in kitex, please DON'T USE IT. This method may be removed in the future
+func GetMethodInfo(messageReaderWriter interface{}, serviceName string) (methods map[string]serviceinfo.MethodInfo, svcName string) {
 	if messageReaderWriter == nil {
 		// note: binary generic cannot be used with multi-service feature
 		svcName = serviceinfo.GenericService
@@ -69,16 +89,7 @@ func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interfa
 			),
 		}
 	}
-
-	svcInfo := &serviceinfo.ServiceInfo{
-		ServiceName:  svcName,
-		HandlerType:  handlerType,
-		Methods:      methods,
-		PayloadCodec: pcType,
-		Extra:        make(map[string]interface{}),
-	}
-	svcInfo.Extra["generic"] = true
-	return svcInfo
+	return
 }
 
 func callHandler(ctx context.Context, handler, arg, result interface{}) error {

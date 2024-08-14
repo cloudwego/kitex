@@ -546,7 +546,7 @@ func TestInflightStreamClosing(t *testing.T) {
 			<-timeout.C
 		}
 	case <-timeout.C:
-		t.Fatalf("Test timed out, expected a status error.")
+		t.Fatalf("%s", "Test timed out, expected a status error.")
 	}
 }
 
@@ -707,7 +707,7 @@ func TestLargeMessageWithDelayRead(t *testing.T) {
 	select {
 	case <-ready:
 	case <-ctx.Done():
-		t.Fatalf("Client timed out waiting for server handler to be initialized.")
+		t.Fatalf("%s", "Client timed out waiting for server handler to be initialized.")
 	}
 	server.mu.Lock()
 	serviceHandler := server.h
@@ -759,7 +759,7 @@ func TestLargeMessageWithDelayRead(t *testing.T) {
 	select {
 	case <-serviceHandler.notify:
 	case <-ctx.Done():
-		t.Fatalf("Client timed out")
+		t.Fatalf("%s", "Client timed out")
 	}
 	if _, err := s.Read(p); err != nil || !bytes.Equal(p, expectedResponseLarge) {
 		t.Fatalf("s.Read(_) = _, %v, want _, <nil>", err)
@@ -896,7 +896,7 @@ func TestMaxStreams(t *testing.T) {
 	for {
 		select {
 		case <-timer.C:
-			t.Fatalf("Test timeout: client didn't receive server settings.")
+			t.Fatalf("%s", "Test timeout: client didn't receive server settings.")
 		default:
 		}
 		ctx, cancel := context.WithDeadline(pctx, time.Now().Add(time.Second))
@@ -928,7 +928,7 @@ func TestMaxStreams(t *testing.T) {
 	}
 	select {
 	case <-done:
-		t.Fatalf("Test failed: didn't expect new stream to be created just yet.")
+		t.Fatalf("%s", "Test failed: didn't expect new stream to be created just yet.")
 	default:
 	}
 	// Close the first stream created so that the new stream can finally be created.
@@ -999,7 +999,7 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 			t.Fatalf("ss.Context().Err() got %v, want %v", ss.Context().Err(), context.Canceled)
 		}
 	case <-time.After(3 * time.Second):
-		t.Fatalf("Failed to cancel the context of the sever side stream.")
+		t.Fatalf("%s", "Failed to cancel the context of the sever side stream.")
 	}
 	server.stop()
 }
@@ -1244,7 +1244,7 @@ func TestServerWithMisbehavedClient(t *testing.T) {
 	for {
 		select {
 		case <-timer.C:
-			t.Fatalf("Test timed out.")
+			t.Fatalf("%s", "Test timed out.")
 		case <-success:
 			return
 		default:
@@ -1489,14 +1489,14 @@ func TestHeaderChanClosedAfterReceivingAnInvalidHeader(t *testing.T) {
 	defer cancel()
 	s, err := ct.NewStream(ctx, &CallHdr{Host: "localhost", Method: "foo"})
 	if err != nil {
-		t.Fatalf("failed to create the stream")
+		t.Fatalf("%s", "failed to create the stream")
 	}
 	timer := time.NewTimer(time.Second)
 	defer timer.Stop()
 	select {
 	case <-s.headerChan:
 	case <-timer.C:
-		t.Errorf("s.headerChan: got open, want closed")
+		t.Errorf("%s", "s.headerChan: got open, want closed")
 	}
 }
 
@@ -1711,7 +1711,7 @@ func waitWhileTrue(t *testing.T, condition func() (bool, error)) {
 		if wait {
 			select {
 			case <-timer.C:
-				t.Fatalf(err.Error())
+				t.Fatalf("%s", err.Error())
 			default:
 				time.Sleep(50 * time.Millisecond)
 				continue
@@ -1980,7 +1980,7 @@ func TestHeaderTblSize(t *testing.T) {
 		continue
 	}
 	if i == 1000 {
-		t.Fatalf("unable to create any server transport after 10s")
+		t.Fatalf("%s", "unable to create any server transport after 10s")
 	}
 
 	for st := range server.conns {
@@ -2007,7 +2007,7 @@ func TestHeaderTblSize(t *testing.T) {
 		break
 	}
 	if i == 1000 {
-		t.Fatalf("expected len(limits) = 1 within 10s, got != 1")
+		t.Fatalf("%s", "expected len(limits) = 1 within 10s, got != 1")
 	}
 
 	ct.controlBuf.put(&outgoingSettings{
@@ -2030,7 +2030,7 @@ func TestHeaderTblSize(t *testing.T) {
 		break
 	}
 	if i == 1000 {
-		t.Fatalf("expected len(limits) = 2 within 10s, got != 2")
+		t.Fatalf("%s", "expected len(limits) = 2 within 10s, got != 2")
 	}
 }
 

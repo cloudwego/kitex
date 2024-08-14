@@ -19,6 +19,7 @@ package test
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net"
 	"reflect"
 	"runtime"
@@ -35,7 +36,9 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func TestThrift(t *testing.T) {
@@ -381,6 +384,31 @@ func TestThrift2NormalServer(t *testing.T) {
 
 	_, err := cli.GenericCall(context.Background(), "Test", mockReq, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
+	svr.Stop()
+}
+
+// TODO(marina.sakai): remove this test when we remove the API generic.ServiceInfo() in v0.12.0
+func TestCompatible(t *testing.T) {
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServiceWithBase64Binary), true, false)
+	svcInfo := generic.ServiceInfo(serviceinfo.Thrift)
+	p, err := generic.NewThriftFileProvider("./idl/example.thrift")
+	test.Assert(t, err == nil)
+	g, err := generic.MapThriftGeneric(p)
+	test.Assert(t, err == nil)
+	var opts []client.Option
+	opts = append(opts, client.WithHostPorts(addr), client.WithTransportProtocol(transport.TTHeader))
+	cli, err := genericclient.NewClientWithServiceInfo("destServiceName", g, svcInfo, opts...)
+	test.Assert(t, err == nil)
+
+	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
+	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	gr, ok := resp.(map[string]interface{})
+	fmt.Println(gr)
+	test.Assert(t, ok)
+	test.Assert(t, reflect.DeepEqual(gr["BinaryMsg"], "hello"))
+
 	svr.Stop()
 }
 
