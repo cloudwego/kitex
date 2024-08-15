@@ -80,7 +80,7 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 
 // verifyMarshalBasicThriftDataType verifies whether data could be marshaled by old thrift way
 func verifyMarshalBasicThriftDataType(data interface{}) error {
-	if err := apache.CheckThriftWrite(data); err != nil {
+	if err := apache.CheckTStruct(data); err != nil {
 		return errEncodeMismatchMsgType
 	}
 	return nil
@@ -200,7 +200,7 @@ func (c thriftCodec) hyperUnmarshal(trans remote.ByteBuffer, data interface{}, d
 
 // verifyUnmarshalBasicThriftDataType verifies whether data could be unmarshal by old thrift way
 func verifyUnmarshalBasicThriftDataType(data interface{}) error {
-	if err := apache.CheckThriftRead(data); err != nil {
+	if err := apache.CheckTStruct(data); err != nil {
 		return errDecodeMismatchMsgType
 	}
 	return nil

@@ -18,16 +18,6 @@ package thrift
 
 import "github.com/cloudwego/gopkg/protocol/thrift/base"
 
-// TrafficEnv ...
-// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift/base
-type TrafficEnv = base.TrafficEnv
-
-// NewTrafficEnv ...
-// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift/base
-func NewTrafficEnv() *TrafficEnv {
-	return base.NewTrafficEnv()
-}
-
 // Base ...
 // Deprecated: use github.com/cloudwego/gopkg/protocol/thrift/base
 type Base = base.Base
