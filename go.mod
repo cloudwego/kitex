@@ -9,8 +9,8 @@ require (
 	github.com/cloudwego/configmanager v0.2.2
 	github.com/cloudwego/dynamicgo v0.2.9
 	github.com/cloudwego/fastpb v0.0.4
-	github.com/cloudwego/frugal v0.1.15
-	github.com/cloudwego/gopkg v0.1.1-0.20240806070559-b36f09467ae8
+	github.com/cloudwego/frugal v0.2.0
+	github.com/cloudwego/gopkg v0.1.1-0.20240812141034-843ef58f1234
 	github.com/cloudwego/localsession v0.0.2
 	github.com/cloudwego/netpoll v0.6.3
 	github.com/cloudwego/runtimex v0.1.0
