@@ -1,11 +1,11 @@
 module github.com/cloudwego/kitex
 
-go 1.17
+go 1.19
 
 require (
 	github.com/apache/thrift v0.13.0
 	github.com/bytedance/gopkg v0.1.0
-	github.com/bytedance/sonic v1.12.0
+	github.com/bytedance/sonic v1.12.1
 	github.com/cloudwego/configmanager v0.2.2
 	github.com/cloudwego/dynamicgo v0.3.0
 	github.com/cloudwego/fastpb v0.0.4
@@ -16,10 +16,10 @@ require (
 	github.com/cloudwego/runtimex v0.1.0
 	github.com/cloudwego/thriftgo v0.3.16-0.20240805092707-81e5f6692083
 	github.com/golang/mock v1.6.0
-	github.com/google/pprof v0.0.0-20220608213341-c488b8fa1db3
+	github.com/google/pprof v0.0.0-20240727154555-813a5fbdbec8
 	github.com/jhump/protoreflect v1.8.2
 	github.com/json-iterator/go v1.1.12
-	github.com/tidwall/gjson v1.9.3
+	github.com/tidwall/gjson v1.17.3
 	golang.org/x/net v0.17.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.13.0
