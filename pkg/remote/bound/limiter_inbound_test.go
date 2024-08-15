@@ -85,12 +85,12 @@ func TestLimiterOnActive(t *testing.T) {
 		handler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, nil, false)
 		ctx, err := handler.OnActive(ctx, invoke.NewMessage(nil, nil))
 		test.Assert(t, ctx != nil)
-		test.Assert(t, errors.Is(kerrors.ErrConnOverLimit, err))
+		test.Assert(t, errors.Is(err, kerrors.ErrConnOverLimit))
 
 		muxHandler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, nil, true)
 		ctx, err = muxHandler.OnActive(ctx, invoke.NewMessage(nil, nil))
 		test.Assert(t, ctx != nil)
-		test.Assert(t, errors.Is(kerrors.ErrConnOverLimit, err))
+		test.Assert(t, errors.Is(err, kerrors.ErrConnOverLimit))
 	})
 
 	t.Run("Test OnActive with limit acquire false and non-nil reporter", func(t *testing.T) {
@@ -109,13 +109,13 @@ func TestLimiterOnActive(t *testing.T) {
 		ctx, err := handler.OnActive(ctx, invoke.NewMessage(nil, nil))
 		test.Assert(t, ctx != nil)
 		test.Assert(t, err != nil)
-		test.Assert(t, errors.Is(kerrors.ErrConnOverLimit, err))
+		test.Assert(t, errors.Is(err, kerrors.ErrConnOverLimit))
 
 		muxHandler := NewServerLimiterHandler(concurrencyLimiter, rateLimiter, limitReporter, true)
 		ctx, err = muxHandler.OnActive(ctx, invoke.NewMessage(nil, nil))
 		test.Assert(t, ctx != nil)
 		test.Assert(t, err != nil)
-		test.Assert(t, errors.Is(kerrors.ErrConnOverLimit, err))
+		test.Assert(t, errors.Is(err, kerrors.ErrConnOverLimit))
 	})
 }
 
@@ -154,7 +154,7 @@ func TestLimiterOnRead(t *testing.T) {
 		ctx, err := handler.OnRead(ctx, invoke.NewMessage(nil, nil))
 
 		test.Assert(t, ctx != nil)
-		test.Assert(t, errors.Is(kerrors.ErrQPSOverLimit, err))
+		test.Assert(t, errors.Is(err, kerrors.ErrQPSOverLimit))
 	})
 
 	t.Run("Test OnRead with limit acquire false and non-nil reporter", func(t *testing.T) {
@@ -174,7 +174,7 @@ func TestLimiterOnRead(t *testing.T) {
 
 		test.Assert(t, ctx != nil)
 		test.Assert(t, err != nil)
-		test.Assert(t, errors.Is(kerrors.ErrQPSOverLimit, err))
+		test.Assert(t, errors.Is(err, kerrors.ErrQPSOverLimit))
 	})
 }
 
@@ -237,7 +237,7 @@ func TestLimiterOnMessage(t *testing.T) {
 		ctx, err := handler.OnMessage(ctx, req, remote.NewMessage(nil, nil, nil, remote.Reply, remote.Client))
 
 		test.Assert(t, ctx != nil)
-		test.Assert(t, errors.Is(kerrors.ErrQPSOverLimit, err))
+		test.Assert(t, errors.Is(err, kerrors.ErrQPSOverLimit))
 	})
 
 	t.Run("Test OnMessage with limit acquire false and non-nil reporter", func(t *testing.T) {
@@ -258,6 +258,6 @@ func TestLimiterOnMessage(t *testing.T) {
 
 		test.Assert(t, ctx != nil)
 		test.Assert(t, err != nil)
-		test.Assert(t, errors.Is(kerrors.ErrQPSOverLimit, err))
+		test.Assert(t, errors.Is(err, kerrors.ErrQPSOverLimit))
 	})
 }

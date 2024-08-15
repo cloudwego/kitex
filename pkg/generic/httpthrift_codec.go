@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sync/atomic"
 
@@ -188,7 +187,7 @@ func FromHTTPRequest(req *http.Request) (*HTTPRequest, error) {
 		// body == nil if from Get request
 		return customReq, nil
 	}
-	if customReq.RawBody, err = ioutil.ReadAll(b); err != nil {
+	if customReq.RawBody, err = io.ReadAll(b); err != nil {
 		return nil, err
 	}
 	return customReq, nil
