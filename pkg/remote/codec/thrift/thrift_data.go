@@ -72,7 +72,7 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 
 	// fallback to old thrift way (slow)
 	buf := bytes.NewBuffer(make([]byte, 0, marshalThriftBufferSize))
-	if err := apache.ThriftWrite(apache.NewBufferTransport(buf), data); err != nil {
+	if err := apache.ThriftWrite(buf, data); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -212,7 +212,7 @@ func decodeBasicThriftData(trans remote.ByteBuffer, data interface{}) error {
 	if err = verifyUnmarshalBasicThriftDataType(data); err != nil {
 		return err
 	}
-	if err = apache.ThriftRead(apache.NewDefaultTransport(trans), data); err != nil {
+	if err = apache.ThriftRead(trans, data); err != nil {
 		return remote.NewTransError(remote.ProtocolError, err)
 	}
 	return nil

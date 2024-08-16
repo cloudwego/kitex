@@ -47,7 +47,7 @@ func TestRPCCodec(t *testing.T) {
 	// decode
 	method, seqID, err := rc.Decode(buf, bthrift.ToApacheCodec(&argsDecode1))
 
-	test.Assert(t, err == nil)
+	test.Assert(t, err == nil, err)
 	test.Assert(t, method == "mockMethod")
 	test.Assert(t, seqID == 100)
 	test.Assert(t, argsDecode1.Req.Msg == req1.Msg)
