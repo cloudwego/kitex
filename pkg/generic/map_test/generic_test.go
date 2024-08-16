@@ -391,6 +391,7 @@ func TestThrift2NormalServer(t *testing.T) {
 func TestCompatible(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceWithBase64Binary), true, false)
+	//lint:ignore SA1019 we will remove this later
 	svcInfo := generic.ServiceInfo(serviceinfo.Thrift)
 	p, err := generic.NewThriftFileProvider("./idl/example.thrift")
 	test.Assert(t, err == nil)
