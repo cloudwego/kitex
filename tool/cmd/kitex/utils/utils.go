@@ -15,7 +15,6 @@
 package utils
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -55,7 +54,7 @@ func OnKitexToolNormalExit(args kargs.Arguments) {
 
 func DeleteKitexYaml() {
 	// try to read kitex.yaml
-	data, err := ioutil.ReadFile("kitex.yaml")
+	data, err := os.ReadFile("kitex.yaml")
 	if err != nil {
 		if !os.IsNotExist(err) {
 			log.Warn("kitex.yaml, which is used to record tool info, is deprecated, it's renamed as kitex_info.yaml, you can delete it or ignore it.")

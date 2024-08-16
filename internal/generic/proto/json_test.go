@@ -19,7 +19,7 @@ package proto
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -138,7 +138,7 @@ func getExampleReq() string {
 
 // read ProtoBuf's data in binary format from exampleProtoPath
 func readExampleReqProtoBufData() []byte {
-	out, err := ioutil.ReadFile(example2ProtoPath)
+	out, err := os.ReadFile(example2ProtoPath)
 	if err != nil {
 		panic(err)
 	}
