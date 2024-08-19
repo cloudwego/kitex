@@ -27,8 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/localsession/backup"
-
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -45,6 +43,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	unknownservice "github.com/cloudwego/kitex/pkg/unknownservice/service"
+	"github.com/cloudwego/localsession/backup"
 )
 
 // Server is an abstraction of an RPC server. It accepts connections and dispatches them to the service
@@ -102,6 +102,7 @@ func (s *server) init() {
 	backup.Init(s.opt.BackupOpt)
 	s.buildInvokeChain()
 	s.buildStreamInvokeChain()
+	s.registerUnknownServiceHandler()
 }
 
 func fillContext(opt *internal_server.Options) context.Context {
@@ -542,6 +543,19 @@ func (s *server) waitExit(errCh chan error) error {
 				return err
 			}
 			s.Unlock()
+		}
+	}
+}
+
+func (s *server) registerUnknownServiceHandler() {
+	if s.opt.RemoteOpt.UnknownServiceHandler != nil {
+		if len(s.svcs.svcMap) == 1 && s.svcs.svcMap[serviceinfo.GenericService] != nil {
+			panic(errors.New("generic services do not support handling of unknown methods"))
+		} else {
+			serviceInfo := unknownservice.NewServiceInfo(serviceinfo.Thrift, unknownservice.UnknownService, unknownservice.UnknownMethod)
+			if err := s.RegisterService(serviceInfo, s.opt.RemoteOpt.UnknownServiceHandler); err != nil {
+				panic(err)
+			}
 		}
 	}
 }

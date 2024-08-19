@@ -22,8 +22,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/cloudwego/localsession/backup"
-
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -39,7 +37,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/pkg/unknownservice"
+	unknown "github.com/cloudwego/kitex/pkg/unknownservice/service"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/localsession/backup"
 )
 
 // Option is the only way to config server.
@@ -345,6 +346,17 @@ func WithGRPCUnknownServiceHandler(f func(ctx context.Context, methodName string
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCUnknownServiceHandler(%+v)", utils.GetFuncName(f)))
 		o.RemoteOpt.GRPCUnknownServiceHandler = f
+	}}
+}
+
+// WithUnknownServiceHandler Inject an implementation of a method for handling unknown requests
+// supporting only Thrift and Kitex protobuf protocols
+func WithUnknownServiceHandler(f unknown.UnknownServiceHandler) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		di.Push(fmt.Sprintf("WithUnknownServiceHandler(%+v)", utils.GetFuncName(f)))
+		o.RemoteOpt.UnknownServiceHandler = f
+		remote.PutPayloadCode(serviceinfo.Thrift, unknownservice.NewUnknownServiceCodec(thrift.NewThriftCodec()))
+		remote.PutPayloadCode(serviceinfo.Protobuf, unknownservice.NewUnknownServiceCodec(protobuf.NewProtobufCodec()))
 	}}
 }
 

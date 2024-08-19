@@ -7,7 +7,6 @@
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
@@ -27,6 +26,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
+	"github.com/cloudwego/kitex/pkg/unknownservice/service"
 )
 
 // Option is used to pack the inbound and outbound handlers.
@@ -112,6 +112,8 @@ type ServerOption struct {
 	GRPCCfg *grpc.ServerConfig
 
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
+
+	UnknownServiceHandler service.UnknownServiceHandler
 
 	Option
 
