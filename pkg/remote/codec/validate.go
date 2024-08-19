@@ -21,6 +21,25 @@ const (
 	maxPayloadChecksumLength = 1024
 )
 
+// PayloadValidator is the interface for validating the payload of RPC requests, which allows customized Checksum function.
+type PayloadValidator interface {
+	// Key returns a key for your validator, which will be the key in ttheader
+	Key(ctx context.Context) string
+
+	// Generate generates the checksum of the payload.
+	// The value will not be set to the request header if "need" is false.
+	// DO NOT modify the input payload since it might be obtained by nocopy API from the underlying buffer.
+	Generate(ctx context.Context, outboundPayload []byte) (need bool, checksum string, err error)
+
+	// Validate validates the input payload with the attached checksum.
+	// Return pass if validation succeed, or return error.
+	Validate(ctx context.Context, expectedValue string, inboundPayload []byte) (pass bool, err error)
+
+	// ProcessBeforeValidate is used to do some preprocess before validate.
+	// For example, you can extract some value from ttheader and set to the rpcinfo, which may be useful for validation.
+	ProcessBeforeValidate(ctx context.Context, message remote.Message) (context.Context, error)
+}
+
 func getValidatorKey(ctx context.Context, p PayloadValidator) string {
 	if _, ok := p.(*crcPayloadValidator); ok {
 		return p.Key(ctx)
@@ -42,7 +61,7 @@ func payloadChecksumGenerate(ctx context.Context, pv PayloadValidator, outboundP
 	}
 	if need {
 		if len(value) > maxPayloadChecksumLength {
-			err = perrors.NewProtocolErrorWithMsg(fmt.Sprintf("payload validator value exceeds the limit, actual length=%d, limit=%d", len(value), maxPayloadChecksumLength))
+			err = kerrors.ErrPayloadValidation.WithCause(fmt.Errorf("payload checksum value exceeds the limit, actual length=%d, limit=%d", len(value), maxPayloadChecksumLength))
 			return err
 		}
 		key := getValidatorKey(ctx, pv)
@@ -133,25 +152,6 @@ func fillRPCInfoBeforeValidate(ctx context.Context, message remote.Message) cont
 		ctx = context.WithValue(ctx, consts.CtxKeyLogID, logid)
 	}
 	return ctx
-}
-
-// PayloadValidator is the interface for validating the payload of RPC requests, which allows customized Checksum function.
-type PayloadValidator interface {
-	// Key returns a key for your validator, which will be the key in ttheader
-	Key(ctx context.Context) string
-
-	// Generate generates the checksum of the payload.
-	// The value will not be set to the request header if "need" is false.
-	// DO NOT modify the input payload since it might be obtained by nocopy API from the underlying buffer.
-	Generate(ctx context.Context, outboundPayload []byte) (need bool, checksum string, err error)
-
-	// Validate validates the input payload with the attached checksum.
-	// Return pass if validation succeed, or return error.
-	Validate(ctx context.Context, expectedValue string, inboundPayload []byte) (pass bool, err error)
-
-	// ProcessBeforeValidate is used to do some preprocess before validate.
-	// For example, you can extract some value from ttheader and set to the context, which may be useful for validation.
-	ProcessBeforeValidate(ctx context.Context, message remote.Message) (context.Context, error)
 }
 
 // NewCRC32PayloadValidator returns a new crcPayloadValidator
