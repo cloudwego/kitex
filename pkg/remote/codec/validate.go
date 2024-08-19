@@ -185,10 +185,7 @@ func (p *crcPayloadValidator) Generate(ctx context.Context, outPayload []byte) (
 }
 
 func (p *crcPayloadValidator) Validate(ctx context.Context, expectedValue string, inputPayload []byte) (pass bool, err error) {
-	_, realValue, err := p.Generate(ctx, inputPayload)
-	if err != nil {
-		return false, err
-	}
+	realValue := getCRC32C(inputPayload)
 	if realValue != expectedValue {
 		return false, perrors.NewProtocolErrorWithType(perrors.InvalidData, expectedValue)
 	}

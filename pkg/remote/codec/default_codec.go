@@ -20,13 +20,14 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
-	"github.com/cloudwego/netpoll"
 	"sync/atomic"
+
+	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
