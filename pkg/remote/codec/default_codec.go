@@ -295,17 +295,18 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Cont
 		return err
 	}
 	// get the payload from buffer
-	payload, payloadLen, err := payloadOut.(remote.NocopyRead).GetBytesNoCopy()
+	// use copy api here because the payload will be used as an argument of Generate function in validator
+	payload, err := payloadOut.Bytes()
 	if err != nil {
 		return err
 	}
 	if c.payloadValidator != nil {
-		if err = payloadChecksumGenerate(ctx, c.payloadValidator, flatten2DSlice(payload, payloadLen), message); err != nil {
+		if err = payloadChecksumGenerate(ctx, c.payloadValidator, payload, message); err != nil {
 			return err
 		}
 	}
 	// set payload length before encode TTHeader
-	message.SetPayloadLen(payloadLen)
+	message.SetPayloadLen(len(payload))
 
 	// 2. encode header and return totalLenField if needed
 	// In this case, set total length during TTHeader encode
@@ -320,12 +321,10 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Cont
 		err = out.AppendBuffer(payloadOut)
 		needRelease = false
 	} else {
-		// convert [][]byte to []byte
-		p := flatten2DSlice(payload, payloadLen)
 		if ncWriter, ok := out.(remote.NocopyWrite); ok {
-			err = ncWriter.WriteDirect(p, 0)
+			err = ncWriter.WriteDirect(payload, 0)
 		} else {
-			_, err = out.WriteBinary(p)
+			_, err = out.WriteBinary(payload)
 		}
 	}
 	return err
