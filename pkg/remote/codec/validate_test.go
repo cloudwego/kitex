@@ -74,20 +74,16 @@ func TestPayloadChecksumGenerate(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, len(strInfo) != 0)
 	test.Assert(t, strInfo[getValidatorKey(ctx, pv)] != "")
-	message.Recycle()
 
 	// failed, generate error
 	message = initClientSendMsg(transport.TTHeader)
-	strInfo = message.TransInfo().TransStrInfo()
 	ctx = context.WithValue(context.Background(), mockGenerateErrorKey, "true")
 	err = payloadChecksumGenerate(ctx, pv, payload, message)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, errors.Is(err, kerrors.ErrPayloadValidation))
-	message.Recycle()
 
 	// failed, exceed limit
 	message = initClientSendMsg(transport.TTHeader)
-	strInfo = message.TransInfo().TransStrInfo()
 	ctx = context.WithValue(context.Background(), mockExceedLimitKey, "true")
 	err = payloadChecksumGenerate(ctx, pv, payload, message)
 	test.Assert(t, err != nil, err)

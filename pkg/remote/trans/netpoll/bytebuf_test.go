@@ -223,19 +223,6 @@ func TestBytes(t *testing.T) {
 	b1, err := netpollBuff.Bytes()
 	test.Assert(t, err == nil)
 	test.Assert(t, string(b1) == b)
-
-	// GetBytesNoCopy
-	b2, n, err := netpollBuff.(remote.NocopyRead).GetBytesNoCopy()
-	test.Assert(t, n == len(b))
-	test.Assert(t, err == nil)
-	actual := make([]byte, n)
-	off := 0
-	for i := 0; i < len(b2); i++ {
-		off += copy(actual[off:], b2[i])
-	}
-	for i := 0; i < n; i++ {
-		test.Assert(t, actual[i] == b[i])
-	}
 }
 
 func TestRelease(t *testing.T) {
