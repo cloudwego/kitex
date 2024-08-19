@@ -127,7 +127,6 @@ type Config struct {
 	FrugalPretouch        bool
 	ThriftPluginTimeLimit time.Duration
 	CompilerPath          string // specify the path of thriftgo or protoc
-	BuiltinTpl            string // specify the built-in template to use
 
 	ExtensionFile string
 	tmplExt       *TemplateExtension
@@ -145,6 +144,7 @@ type Config struct {
 
 	NoDependencyCheck bool
 	Rapid             bool
+	BuiltinTpl        string // specify the built-in template to use
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
