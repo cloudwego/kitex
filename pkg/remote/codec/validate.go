@@ -5,6 +5,9 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"hash/crc32"
+	"sync"
+
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -12,8 +15,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/transmeta"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
-	"hash/crc32"
-	"sync"
 )
 
 const (
@@ -34,10 +35,6 @@ type PayloadValidator interface {
 	// Validate validates the input payload with the attached checksum.
 	// Return pass if validation succeed, or return error.
 	Validate(ctx context.Context, expectedValue string, inboundPayload []byte) (pass bool, err error)
-
-	// ProcessBeforeValidate is used to do some preprocess before validate.
-	// For example, you can extract some value from ttheader and set to the rpcinfo, which may be useful for validation.
-	ProcessBeforeValidate(ctx context.Context, message remote.Message) (context.Context, error)
 }
 
 func getValidatorKey(ctx context.Context, p PayloadValidator) string {
@@ -79,12 +76,8 @@ func payloadChecksumValidate(ctx context.Context, pv PayloadValidator, in remote
 		rpcinfo.Record(ctx, message.RPCInfo(), stats.ChecksumValidateFinish, err)
 	}()
 
+	// this return ctx can only be used in Validate part since Decode has no return argument for context
 	ctx = fillRPCInfoBeforeValidate(ctx, message)
-	// before validate
-	ctx, err = pv.ProcessBeforeValidate(ctx, message)
-	if err != nil {
-		return err
-	}
 
 	// get key and value
 	key := getValidatorKey(ctx, pv)
@@ -172,7 +165,7 @@ func (p *crcPayloadValidator) Key(ctx context.Context) string {
 }
 
 func (p *crcPayloadValidator) Generate(ctx context.Context, outPayload []byte) (need bool, value string, err error) {
-	return true, getCRC32C([][]byte{outPayload}), nil
+	return true, getCRC32C(outPayload), nil
 }
 
 func (p *crcPayloadValidator) Validate(ctx context.Context, expectedValue string, inputPayload []byte) (pass bool, err error) {
@@ -186,10 +179,6 @@ func (p *crcPayloadValidator) Validate(ctx context.Context, expectedValue string
 	return true, nil
 }
 
-func (p *crcPayloadValidator) ProcessBeforeValidate(ctx context.Context, message remote.Message) (context.Context, error) {
-	return ctx, nil
-}
-
 // crc32cTable is used for crc32c check
 var (
 	crc32cTable    *crc32.Table
@@ -198,26 +187,13 @@ var (
 
 // getCRC32C calculates the crc32c checksum of the input bytes.
 // the checksum will be converted into big-endian format and encoded into hex string.
-func getCRC32C(payload [][]byte) string {
+func getCRC32C(payload []byte) string {
 	if crc32cTable == nil {
 		return ""
 	}
 	csb := make([]byte, Size32)
 	var checksum uint32
-	for i := 0; i < len(payload); i++ {
-		checksum = crc32.Update(checksum, crc32cTable, payload[i])
-	}
+	checksum = crc32.Update(checksum, crc32cTable, payload)
 	binary.BigEndian.PutUint32(csb, checksum)
 	return hex.EncodeToString(csb)
-}
-
-// flatten2DSlice converts 2d slice to 1d.
-// total length should be provided.
-func flatten2DSlice(b2 [][]byte, length int) []byte {
-	b1 := make([]byte, length)
-	off := 0
-	for i := 0; i < len(b2); i++ {
-		off += copy(b1[off:], b2[i])
-	}
-	return b1
 }

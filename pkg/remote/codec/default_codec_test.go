@@ -21,7 +21,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand"
 	"strings"
 	"testing"
 
@@ -570,27 +569,4 @@ func TestCornerCase(t *testing.T) {
 	buffer.EXPECT().Malloc(gomock.Any()).Return(nil, errors.New("error malloc")).AnyTimes()
 	err := (&defaultCodec{}).EncodePayload(context.Background(), sendMsg, buffer)
 	test.Assert(t, err.Error() == "error malloc")
-}
-
-func TestFlatten2DSlice(t *testing.T) {
-	var (
-		b2         [][]byte
-		expectedB1 []byte
-	)
-	row, column := 10, 10
-	for i := 0; i < row; i++ {
-		var b []byte
-		for j := 0; j < column; j++ {
-			curr := rand.Int()
-			b = append(b, byte(curr))
-			expectedB1 = append(expectedB1, byte(curr))
-		}
-		b2 = append(b2, b)
-	}
-	length := row * column
-	actualB1 := flatten2DSlice(b2, length)
-	test.Assert(t, len(actualB1) == length)
-	for i := 0; i < length; i++ {
-		test.Assert(t, actualB1[i] == expectedB1[i])
-	}
 }

@@ -3,30 +3,24 @@ package codec
 import (
 	"context"
 	"errors"
+	"strconv"
+	"testing"
+
 	"github.com/bytedance/gopkg/util/xxhash3"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/transport"
-	"strconv"
-	"testing"
 )
 
 var _ PayloadValidator = &mockPayloadValidator{}
 
-type mockPayloadValidator struct {
-}
+type mockPayloadValidator struct{}
 
 const (
-	mockGenerateErrorKey    = "mockGenerateError"
-	mockExceedLimitKey      = "mockExceedLimit"
-	mockPreprocessKey       = "preprocessSucceedKey"
-	mockPreprocessFailedKey = "preprocessFailed"
+	mockGenerateErrorKey = "mockGenerateError"
+	mockExceedLimitKey   = "mockExceedLimit"
 )
-
-type preprocessStruct struct {
-	value string
-}
 
 func (m *mockPayloadValidator) Key(ctx context.Context) string {
 	return "mockValidator"
@@ -52,17 +46,6 @@ func (m *mockPayloadValidator) Validate(ctx context.Context, expectedValue strin
 	return value == expectedValue, nil
 }
 
-func (m *mockPayloadValidator) ProcessBeforeValidate(ctx context.Context, message remote.Message) (context.Context, error) {
-	if l := ctx.Value(mockPreprocessFailedKey); l != nil {
-		return ctx, errors.New("mockPreprocessFailed")
-	}
-	s := ctx.Value(mockPreprocessKey)
-	if s != nil {
-		s.(*preprocessStruct).value = "123"
-	}
-	return ctx, nil
-}
-
 func TestPayloadValidator(t *testing.T) {
 	p := &mockPayloadValidator{}
 	payload := make([]byte, 0)
@@ -71,14 +54,7 @@ func TestPayloadValidator(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, need)
 
-	ctx := context.Background()
-	s := &preprocessStruct{value: "1"}
-	ctx = context.WithValue(ctx, mockPreprocessKey, s)
-	ctx, err = p.ProcessBeforeValidate(ctx, nil)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, s.value == "123")
-
-	pass, err := p.Validate(ctx, value, payload)
+	pass, err := p.Validate(context.Background(), value, payload)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, pass, true)
 }
@@ -98,6 +74,7 @@ func TestPayloadChecksumGenerate(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, len(strInfo) != 0)
 	test.Assert(t, strInfo[getValidatorKey(ctx, pv)] != "")
+	message.Recycle()
 
 	// failed, generate error
 	message = initClientSendMsg(transport.TTHeader)
@@ -106,6 +83,7 @@ func TestPayloadChecksumGenerate(t *testing.T) {
 	err = payloadChecksumGenerate(ctx, pv, payload, message)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, errors.Is(err, kerrors.ErrPayloadValidation))
+	message.Recycle()
 
 	// failed, exceed limit
 	message = initClientSendMsg(transport.TTHeader)
@@ -133,11 +111,8 @@ func TestPayloadChecksumValidate(t *testing.T) {
 	message := initClientRecvMsg()
 	message.TransInfo().PutTransStrInfo(sendMsg.TransInfo().TransStrInfo()) // put header strinfo
 	message.SetPayloadLen(len(payload))
-	s := &preprocessStruct{value: "1"}
-	ctx = context.WithValue(context.Background(), mockPreprocessKey, s)
 	err = payloadChecksumValidate(ctx, pv, in, message)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, s.value == "123")
 
 	// validate failed, checksum validation error
 	in = remote.NewReaderBuffer(payload)
@@ -146,12 +121,4 @@ func TestPayloadChecksumValidate(t *testing.T) {
 	message.SetPayloadLen(len(payload))
 	err = payloadChecksumValidate(context.Background(), pv, in, message)
 	test.Assert(t, err != nil)
-
-	// validate failed, preprocess error
-	ctx = context.WithValue(context.Background(), mockPreprocessFailedKey, true)
-	s = &preprocessStruct{value: "1"}
-	ctx = context.WithValue(ctx, mockPreprocessKey, s)
-	err = payloadChecksumValidate(ctx, pv, in, message)
-	test.Assert(t, err != nil)
-	test.Assert(t, s.value == "1") // will not be modified
 }
