@@ -459,16 +459,20 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 			Ext:  ext.ExtendServer,
 		},
 		{
-			Name: InvokerFileName,
-			Path: util.JoinPath(output, InvokerFileName),
-			Text: tpl.InvokerTpl,
-			Ext:  ext.ExtendInvoker,
-		},
-		{
 			Name: ServiceFileName,
 			Path: util.JoinPath(output, svcPkg+".go"),
 			Text: tpl.ServiceTpl,
 		},
+	}
+
+	// do not generate invoker.go in service package by default
+	if g.Config.GenerateInvoker {
+		tasks = append(tasks, &Task{
+			Name: InvokerFileName,
+			Path: util.JoinPath(output, InvokerFileName),
+			Text: tpl.InvokerTpl,
+			Ext:  ext.ExtendInvoker,
+		})
 	}
 
 	var fs []*File
