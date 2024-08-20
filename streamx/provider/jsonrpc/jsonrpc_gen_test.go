@@ -26,8 +26,8 @@ var serviceInfo = &serviceinfo.ServiceInfo{
 				gs := streamx.NewGenericServerStream[Request, Response](ss)
 				return handler.(ServerInterface).ClientStream(ctx, gs)
 			},
-			func() interface{} { return new(ClientStreamArgs) },
-			func() interface{} { return new(ClientStreamResult) },
+			nil,
+			nil,
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingClient),
 		),
@@ -44,8 +44,8 @@ var serviceInfo = &serviceinfo.ServiceInfo{
 				}
 				return handler.(ServerInterface).ServerStream(ctx, req, gs)
 			},
-			func() interface{} { return new(ServerStreamArgs) },
-			func() interface{} { return new(ServerStreamResult) },
+			nil,
+			nil,
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingServer),
 		),
@@ -58,8 +58,8 @@ var serviceInfo = &serviceinfo.ServiceInfo{
 				gs := streamx.NewGenericServerStream[Request, Response](ss)
 				return handler.(ServerInterface).BidiStream(ctx, gs)
 			},
-			func() interface{} { return new(BidiStreamArgs) },
-			func() interface{} { return new(BidiStreamResult) },
+			nil,
+			nil,
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingServer),
 		),
@@ -104,7 +104,11 @@ type Request struct {
 	Type    int32  `json:"Type"`
 	Message string `json:"Message"`
 }
-type Response = Request
+
+type Response struct {
+	Type    int32  `json:"Type"`
+	Message string `json:"Message"`
+}
 
 type ClientStreamArgs struct {
 	Req *Request
@@ -114,10 +118,21 @@ type ClientStreamResult struct {
 	Success *Response
 }
 
-type ServerStreamArgs = ClientStreamArgs
-type ServerStreamResult = ClientStreamResult
-type BidiStreamArgs = ClientStreamArgs
-type BidiStreamResult = ClientStreamResult
+type ServerStreamArgs struct {
+	Req *Request
+}
+
+type ServerStreamResult struct {
+	Success *Response
+}
+
+type BidiStreamArgs struct {
+	Req *Request
+}
+
+type BidiStreamResult struct {
+	Success *Response
+}
 
 type ServerInterface interface {
 	Unary(ctx context.Context, req *Request) (*Response, error)

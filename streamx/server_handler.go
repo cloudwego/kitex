@@ -29,6 +29,16 @@ import (
 	"sync"
 )
 
+/* 实际上 remote.ServerTransHandler 真正被 trans_server.go 使用的接口只有：
+- OnRead
+- OnActive
+- OnInactive
+- OnError
+- GracefulShutdown: assert 方式使用
+
+其他接口实际上最终是用来去组装了 transpipeline ....
+*/
+
 type svrTransHandlerFactory struct{}
 
 // NewSvrTransHandlerFactory ...
@@ -45,6 +55,7 @@ func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 	if !ok {
 		return nil, nil
 	}
+	sp = NewServerProvider(sp) // wrapped server provider
 	return &svrTransHandler{
 		opt:      opt,
 		provider: sp,
@@ -94,9 +105,9 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	// 无法在保留现有 streaming 功能的情况下，彻底弃用 endpoint.Endpoint , 所以这里依然使用 endpoint 接口
 	// 但是对用户 API ，做了单独的封装。把这部分脏逻辑仅暴露在框架中。
 	method := ss.Method()
-	minfo := t.opt.TargetSvcInfo.Methods[method]
-	args := minfo.NewArgs()
-	result := minfo.NewResult()
+	//minfo := t.opt.TargetSvcInfo.Methods[method]
+	//args := minfo.NewArgs()
+	//result := minfo.NewResult()
 	sargs := NewStreamArgs(ss)
 	ctx = WithStreamArgsContext(ctx, sargs)
 
@@ -131,7 +142,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		}
 		t.finishTracer(ctx, ri, err, panicErr)
 	}()
-	err = t.inkHdlFunc(ctx, args, result)
+	err = t.inkHdlFunc(ctx, nil, nil)
 	ctx, serr := t.provider.OnStreamFinish(ctx, ss)
 	if err == nil && serr != nil {
 		err = serr

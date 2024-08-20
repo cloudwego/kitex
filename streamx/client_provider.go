@@ -7,14 +7,23 @@ import (
 )
 
 /* Hot it works
-- NewClient 时，初始化 ClientProvider
-- 生成代码调用 client.NewStream() 方法
-- client.NewStream => clientProvider.NewStream
-- client 执行中间件逻辑
 
-后续读写都发生在 stream 提供的方法中
+clientProvider := xxx.NewClientProvider(xxx.WithXXX(...))
+client := {user_gencode}.NewClient({kitex_client}.WithClientProvider(clientProvider))
+            => {kitex_client}.NewClient(...)
+                => {kitex_client}.initMiddlewares()
+
+stream := client.ServerStreamMethod(...)
+            => {kitex_client}.NewStream(...)
+                => {kitex_client}.internalProvider.NewStream(...) : run middlewares
+                    => clientProvider.NewStream(...)
+
+res := stream.Recv(...)
+            => {kitex_client}.internalProvider.Stream.Recv(...) : run middlewares
+                => clientProvider.Stream.Recv(...)
 */
 
 type ClientProvider interface {
+	// NewStream create a stream based on rpcinfo and callOptions
 	NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callOptions ...streamxcallopt.CallOption) (ClientStream, error)
 }

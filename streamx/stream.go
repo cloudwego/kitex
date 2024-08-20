@@ -30,10 +30,10 @@ func GetStreamArgsFromContext(ctx context.Context) (args StreamArgs) {
 }
 
 type StreamArgs interface {
-	Stream() RawStream
+	Stream() Stream
 }
 
-func AsStream(args interface{}) (RawStream, error) {
+func AsStream(args interface{}) (Stream, error) {
 	s, ok := args.(StreamArgs)
 	if !ok {
 		return nil, errors.New("asStream expects StreamArgs")
@@ -42,7 +42,7 @@ func AsStream(args interface{}) (RawStream, error) {
 }
 
 type MutableStreamArgs interface {
-	SetStream(st RawStream)
+	SetStream(st Stream)
 }
 
 func AsMutableStreamArgs(args StreamArgs) MutableStreamArgs {
@@ -54,24 +54,24 @@ func AsMutableStreamArgs(args StreamArgs) MutableStreamArgs {
 }
 
 type streamArgs struct {
-	stream RawStream
+	stream Stream
 }
 
-func (s *streamArgs) Stream() RawStream {
+func (s *streamArgs) Stream() Stream {
 	return s.stream
 }
 
-func (s *streamArgs) SetStream(st RawStream) {
+func (s *streamArgs) SetStream(st Stream) {
 	s.stream = st
 }
 
-func NewStreamArgs(stream RawStream) StreamArgs {
+func NewStreamArgs(stream Stream) StreamArgs {
 	return &streamArgs{stream: stream}
 }
 
 type StreamingMode = serviceinfo.StreamingMode
 
-type RawStream interface {
+type Stream interface {
 	Mode() StreamingMode
 	Method() string
 	SendMsg(ctx context.Context, m any) error
@@ -79,12 +79,12 @@ type RawStream interface {
 }
 
 type ClientStream interface {
-	RawStream
+	Stream
 	CloseSend(ctx context.Context) error
 }
 
 type ServerStream interface {
-	RawStream
+	Stream
 }
 
 type ServerStreamingClient[Res any] interface {
@@ -174,4 +174,54 @@ func (x *GenericServerStream[Req, Res]) Recv(ctx context.Context) (*Req, error) 
 		return nil, err
 	}
 	return m, nil
+}
+
+type RawStreamGetter interface {
+	RawStream() Stream
+}
+
+var _ ServerStream = (*serverStream)(nil)
+
+type serverStream struct {
+	RawStreamGetter
+	ServerStream
+}
+
+func newServerStream(ss ServerStream) *serverStream {
+	return &serverStream{ServerStream: ss}
+}
+
+func (s serverStream) RawStream() Stream {
+	return s.ServerStream
+}
+
+func (s serverStream) SendMsg(ctx context.Context, m any) error {
+	return s.ServerStream.SendMsg(ctx, m)
+}
+
+func (s serverStream) RecvMsg(ctx context.Context, m any) error {
+	return s.ServerStream.RecvMsg(ctx, m)
+}
+
+var _ ClientStream = (*clientStream)(nil)
+
+func NewClientStream(ss ClientStream) ClientStream {
+	return &clientStream{ClientStream: ss}
+}
+
+type clientStream struct {
+	RawStreamGetter
+	ClientStream
+}
+
+func (s clientStream) RawStream() Stream {
+	return s.ClientStream
+}
+
+func (s clientStream) SendMsg(ctx context.Context, m any) error {
+	return s.ClientStream.SendMsg(ctx, m)
+}
+
+func (s clientStream) RecvMsg(ctx context.Context, m any) error {
+	return s.ClientStream.RecvMsg(ctx, m)
 }

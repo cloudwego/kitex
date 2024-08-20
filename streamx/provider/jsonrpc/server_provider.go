@@ -48,5 +48,6 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 }
 
 func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStream) (context.Context, error) {
-	return ctx, ss.(*serverStream).close()
+	rs := ss.(streamx.RawStreamGetter).RawStream()
+	return ctx, rs.(*serverStream).close()
 }

@@ -52,7 +52,13 @@ func (kc *kClient) invokeStreamXIOMiddleware() streamx.StreamMiddleware {
 // return a bottom next function
 // bottom next function will create a stream and change the streamx.Args
 func (kc *kClient) invokeStreamXEndpoint() (streamx.StreamEndpoint, error) {
+	// TODO: implement trans handler layer and use trans factory
+	//transPipl, err := newCliTransHandler(kc.opt.RemoteOpt)
+	//if err != nil {
+	//	return nil, err
+	//}
 	clientProvider, _ := kc.opt.RemoteOpt.Provider.(streamx.ClientProvider)
+	clientProvider = streamx.NewClientProvider(clientProvider) // wrap client provider
 
 	return func(ctx context.Context, req, res any, streamArgs streamx.StreamArgs) (err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
