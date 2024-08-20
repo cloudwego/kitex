@@ -2,7 +2,6 @@ package streamx
 
 import (
 	"context"
-	"errors"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -12,62 +11,6 @@ var _ BidiStreamingClient[int, int] = (*GenericClientStream[int, int])(nil)
 var _ ServerStreamingServer[int] = (*GenericServerStream[int, int])(nil)
 var _ ClientStreamingServer[int, int] = (*GenericServerStream[int, int])(nil)
 var _ BidiStreamingServer[int, int] = (*GenericServerStream[int, int])(nil)
-
-type StreamCtxKey struct{}
-
-func WithStreamArgsContext(ctx context.Context, args StreamArgs) context.Context {
-	ctx = context.WithValue(ctx, StreamCtxKey{}, args)
-	return ctx
-}
-
-func GetStreamArgsFromContext(ctx context.Context) (args StreamArgs) {
-	val := ctx.Value(StreamCtxKey{})
-	if val == nil {
-		return nil
-	}
-	args, _ = val.(StreamArgs)
-	return args
-}
-
-type StreamArgs interface {
-	Stream() Stream
-}
-
-func AsStream(args interface{}) (Stream, error) {
-	s, ok := args.(StreamArgs)
-	if !ok {
-		return nil, errors.New("asStream expects StreamArgs")
-	}
-	return s.Stream(), nil
-}
-
-type MutableStreamArgs interface {
-	SetStream(st Stream)
-}
-
-func AsMutableStreamArgs(args StreamArgs) MutableStreamArgs {
-	margs, ok := args.(MutableStreamArgs)
-	if !ok {
-		return nil
-	}
-	return margs
-}
-
-type streamArgs struct {
-	stream Stream
-}
-
-func (s *streamArgs) Stream() Stream {
-	return s.stream
-}
-
-func (s *streamArgs) SetStream(st Stream) {
-	s.stream = st
-}
-
-func NewStreamArgs(stream Stream) StreamArgs {
-	return &streamArgs{stream: stream}
-}
 
 type StreamingMode = serviceinfo.StreamingMode
 

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -48,19 +49,11 @@ func newTransport(sinfo *serviceinfo.ServiceInfo, conn net.Conn) *transport {
 
 func (t *transport) close() (err error) {
 	close(t.stop)
-	t.streams.Range(func(sid, s any) bool {
-		ss, ok := s.(interface{ close() error })
-		if !ok {
-			return true
-		}
-		_ = ss.close()
-		return true
-	})
 	return nil
 }
 
 func (t *transport) streamEnd(s *stream) (err error) {
-	f := newFrame(frameTypeEOF, s.id, s.method, []byte{})
+	f := newFrame(frameTypeEOF, s.id, s.method, []byte("EOF"))
 	t.wch <- f
 	return nil
 }
@@ -104,9 +97,12 @@ func (t *transport) loopRead() error {
 			switch frame.typ {
 			case frameTypeEOF:
 				// ack EOF
-				err = t.streamEnd(s)
+				closed, err := s.close()
 				if err != nil {
 					return err
+				}
+				if closed {
+					return nil
 				}
 			case frameTypeData:
 				// process data frame
@@ -126,14 +122,6 @@ func (t *transport) loopWrite() error {
 			if err != nil {
 				return err
 			}
-			if frame.typ == frameTypeEOF {
-				// a stream only can be closed when send EOF
-				is, _ := t.streams.Load(frame.sid)
-				s, _ := is.(*stream)
-				if s != nil {
-					err = t.streamClose(s)
-				}
-			}
 		}
 	}
 }
@@ -152,15 +140,19 @@ func (t *transport) newStream(method string) (*stream, error) {
 }
 
 func (t *transport) streamClose(s *stream) (err error) {
+	for len(t.rch[s.id]) > 0 {
+		runtime.Gosched()
+	}
 	t.streams.Delete(s.id)
 	close(t.rch[s.id])
 	return nil
 }
 
 func (t *transport) readStream() (*stream, error) {
-	s := <-t.sch
-	if s == nil {
+	select {
+	case <-t.stop:
 		return nil, io.EOF
+	case s := <-t.sch:
+		return s, nil
 	}
-	return s, nil
 }

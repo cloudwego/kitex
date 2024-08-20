@@ -142,7 +142,10 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		}
 		t.finishTracer(ctx, ri, err, panicErr)
 	}()
-	err = t.inkHdlFunc(ctx, nil, nil)
+
+	reqArgs := NewStreamReqArgs(nil)
+	resArgs := NewStreamResArgs(nil)
+	err = t.inkHdlFunc(ctx, reqArgs, resArgs)
 	ctx, serr := t.provider.OnStreamFinish(ctx, ss)
 	if err == nil && serr != nil {
 		err = serr

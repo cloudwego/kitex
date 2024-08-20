@@ -9,7 +9,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"io"
 	"net"
-	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -28,7 +28,7 @@ func TestCodec(t *testing.T) {
 	test.Assert(t, string(f2.payload) == string(f2.payload), f2.payload)
 }
 
-func TestClientAndServer(t *testing.T) {
+func TestTransport(t *testing.T) {
 	type TestRequest struct {
 		A int    `json:"A,omitempty"`
 		B string `json:"B,omitempty"`
@@ -42,8 +42,8 @@ func TestClientAndServer(t *testing.T) {
 				func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
 					return nil
 				},
-				func() interface{} { return nil },
-				func() interface{} { return nil },
+				nil,
+				nil,
 				false,
 				serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
 			),
@@ -55,57 +55,61 @@ func TestClientAndServer(t *testing.T) {
 	ln, err := net.Listen("tcp", addr)
 	test.Assert(t, err == nil, err)
 
-	var wg sync.WaitGroup
 	// Server
-	wg.Add(2)
+	var connDone int32
+	var streamDone int32
 	go func() {
-		defer wg.Done()
 		for {
 			conn, err := ln.Accept()
-			if conn == nil && err == nil || errors.Is(err, net.ErrClosed) {
+			if (conn == nil && err == nil) || errors.Is(err, net.ErrClosed) {
 				return
 			}
 			test.Assert(t, err == nil, err)
 			go func() {
-				defer wg.Done()
+				defer atomic.AddInt32(&connDone, -1)
 				server := newTransport(sinfo, conn)
 				st, nerr := server.readStream()
 				if nerr != nil {
-					if nerr != io.EOF {
+					if nerr == io.EOF {
 						return
 					}
-					panic(err)
+					t.Error(nerr)
 				}
-				for {
-					ctx := context.Background()
-					req := new(TestRequest)
-					nerr = st.RecvMsg(ctx, req)
-					if errors.Is(nerr, io.EOF) {
-						return
-					}
-					t.Logf("server recv msg: %v %v", req, nerr)
-					res := req
-					nerr = st.SendMsg(ctx, res)
-					t.Logf("server send msg: %v %v", res, nerr)
-					if nerr != nil {
-						if nerr != io.EOF {
+				go func() {
+					defer atomic.AddInt32(&streamDone, -1)
+					for {
+						ctx := context.Background()
+						req := new(TestRequest)
+						nerr = st.RecvMsg(ctx, req)
+						if errors.Is(nerr, io.EOF) {
 							return
 						}
-						panic(err)
+						t.Logf("server recv msg: %v %v", req, nerr)
+						res := req
+						nerr = st.SendMsg(ctx, res)
+						t.Logf("server send msg: %v %v", res, nerr)
+						if nerr != nil {
+							if nerr == io.EOF {
+								return
+							}
+							t.Error(nerr)
+						}
 					}
-				}
+				}()
 			}()
 		}
 	}()
 	time.Sleep(time.Millisecond * 100)
 
 	// Client
+	atomic.AddInt32(&connDone, 1)
 	conn, err := net.Dial("tcp", addr)
 	test.Assert(t, err == nil, err)
 	trans := newTransport(sinfo, conn)
 	s, err := trans.newStream(method)
 	test.Assert(t, err == nil, err)
 	cs := newClientStream(s)
+
 	req := new(TestRequest)
 	req.A = 12345
 	req.B = "hello"
@@ -120,11 +124,19 @@ func TestClientAndServer(t *testing.T) {
 	test.Assert(t, req.A == res.A, res)
 	test.Assert(t, req.B == res.B, res)
 
+	// close stream
 	err = cs.CloseSend(ctx)
+	test.Assert(t, err == nil, err)
+	for atomic.LoadInt32(&streamDone) != 0 {
+		time.Sleep(time.Millisecond * 10)
+	}
+
+	// close conn
+	err = trans.close()
 	test.Assert(t, err == nil, err)
 	err = ln.Close()
 	test.Assert(t, err == nil, err)
-	err = trans.close()
-	test.Assert(t, err == nil, err)
-	wg.Wait()
+	for atomic.LoadInt32(&connDone) != 0 {
+		time.Sleep(time.Millisecond * 10)
+	}
 }

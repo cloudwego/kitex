@@ -6,6 +6,34 @@ import (
 	"io"
 )
 
+/* JSON RPC Protocol
+
+=== client create a new stream ===
+- send {type=META, sid=1, method="xxx"}
+- send {type=DATA, sid=1, method="xxx", payload="..."}
+- recv {type=DATA, sid=1, method="xxx", payload="..."}
+- delete stream
+
+=== server accept a new stream ===
+- recv {type=META, sid=1, method="xxx"}
+- recv {type=DATA, sid=1, method="xxx", payload="..."}
+- send {type=DATA, sid=1, method="xxx", payload="..."}
+- send {type=EOF , sid=1, method="xxx"}
+- close stream
+
+=== client try to close stream ===
+- client send {type=EOF , sid=1, method="xxx"}
+- server recv {type=EOF , sid=1, method="xxx"}
+- server send {type=EOF , sid=1, method="xxx"}: server close stream
+- client recv {type=EOF , sid=1, method="xxx"}: client close stream
+
+=== server try to close stream ===
+- server send {type=EOF , sid=1, method="xxx"}
+- client recv {type=EOF , sid=1, method="xxx"}
+- client send {type=EOF , sid=1, method="xxx"}: client close stream
+- server recv {type=EOF , sid=1, method="xxx"}: server close stream
+*/
+
 const (
 	// meta: new stream
 	frameTypeMeta = 0

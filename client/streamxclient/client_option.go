@@ -24,6 +24,12 @@ func WithClientProvider(pvd streamx.ClientProvider) ClientOption {
 	}}
 }
 
+func WithMiddleware(smw streamx.StreamMiddleware) ClientOption {
+	return ClientOption{F: func(o *internal_client.Options, di *utils.Slice) {
+		o.SMWs = append(o.SMWs, smw)
+	}}
+}
+
 func convertInternalClientOption(o internal_client.Option) ClientOption {
 	return ClientOption{F: o.F}
 }

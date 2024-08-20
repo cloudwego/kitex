@@ -5,7 +5,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...ClientOption) (client.StreamNewer, error) {
+func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...ClientOption) (client.StreamX, error) {
 	iopts := make([]client.Option, 0, len(opts)+1)
 	for _, opt := range opts {
 		iopts = append(iopts, convertClientOption(opt))
@@ -14,5 +14,5 @@ func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...ClientOption) (client.S
 	if err != nil {
 		return nil, err
 	}
-	return c.(client.StreamNewer), nil
+	return c.(client.StreamX), nil
 }

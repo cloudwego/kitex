@@ -19,6 +19,7 @@ package server
 
 import (
 	"context"
+	"github.com/cloudwego/kitex/streamx"
 	"os"
 	"os/signal"
 	"syscall"
@@ -79,7 +80,8 @@ type Options struct {
 	ACLRules []acl.RejectFunc
 	Limit    Limit
 
-	MWBs []endpoint.MiddlewareBuilder
+	MWBs  []endpoint.MiddlewareBuilder
+	SMWBs []streamx.StreamMiddleware
 
 	Bus    event.Bus
 	Events event.Queue

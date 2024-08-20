@@ -71,7 +71,8 @@ type kClient struct {
 	mws     []endpoint.Middleware
 	eps     endpoint.Endpoint
 	sEps    endpoint.Endpoint
-	sxEps   streamx.StreamEndpoint
+	sxEps   endpoint.Endpoint
+	sxMW    streamx.StreamMiddleware
 	opt     *client.Options
 	lbf     *lbcache.BalancerFactory
 
@@ -448,16 +449,8 @@ func (kc *kClient) buildInvokeChain() error {
 	if err != nil {
 		return err
 	}
-	// 把现存的中间件转化为 StreamEndpoint
-	// - plain  middleware: (ctx with stream key, reqArgs, resArgs)
-	// - stream middleware: (ctx with stream key, reqArgs, resArgs, streamArgs)
-	kc.sxEps = func(ctx context.Context, reqArgs, resArgs any, streamArgs streamx.StreamArgs) (err error) {
-		return mwchain(
-			func(interCtx context.Context, interReqArgs, interResArgs interface{}) (err error) {
-				return innerStreamXEp(interCtx, interReqArgs, interResArgs, streamArgs)
-			},
-		)(ctx, reqArgs, resArgs)
-	}
+	kc.sxEps = mwchain(innerStreamXEp)
+	kc.sxMW = streamx.Chain(kc.opt.SMWs...)
 	return nil
 }
 
