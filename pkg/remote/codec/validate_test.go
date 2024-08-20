@@ -69,7 +69,7 @@ func (m *mockPayloadValidator) Validate(ctx context.Context, expectedValue strin
 
 func TestPayloadValidator(t *testing.T) {
 	p := &mockPayloadValidator{}
-	payload := make([]byte, 0)
+	payload := preparePayload()
 
 	need, value, err := p.Generate(context.Background(), payload)
 	test.Assert(t, err == nil, err)
@@ -81,10 +81,7 @@ func TestPayloadValidator(t *testing.T) {
 }
 
 func TestPayloadChecksumGenerate(t *testing.T) {
-	payload := make([]byte, 1024)
-	for i := 0; i < len(payload); i++ {
-		payload[i] = byte(i)
-	}
+	payload := preparePayload()
 	pv := &mockPayloadValidator{}
 
 	// success
@@ -121,10 +118,7 @@ func TestPayloadChecksumGenerate(t *testing.T) {
 
 func TestPayloadChecksumValidate(t *testing.T) {
 	// prepare
-	payload := make([]byte, 1024)
-	for i := 0; i < len(payload); i++ {
-		payload[i] = byte(i)
-	}
+	payload := preparePayload()
 	pv := &mockPayloadValidator{}
 	sendMsg := initClientSendMsg(transport.TTHeader)
 	ctx := context.Background()
@@ -146,4 +140,38 @@ func TestPayloadChecksumValidate(t *testing.T) {
 	message.SetPayloadLen(len(payload))
 	err = payloadChecksumValidate(context.Background(), pv, in, message)
 	test.Assert(t, err != nil)
+}
+
+func TestCRCPayloadValidator(t *testing.T) {
+	// prepare
+	payload := preparePayload()
+	p := NewCRC32PayloadValidator()
+
+	// success
+	ctx := context.Background()
+	need, value, err := p.Generate(ctx, payload)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, need)
+	pass, err := p.Validate(ctx, value, payload)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, pass == true)
+
+	// failure, checksum mismatches
+	pass, err = p.Validate(ctx, value+"0", payload)
+	test.Assert(t, err != nil, err)
+	test.Assert(t, pass == false)
+
+	// success when value is empty string, which means no checksum from sender
+	pass, err = p.Validate(ctx, "", payload)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, pass == true)
+
+}
+
+func preparePayload() []byte {
+	payload := make([]byte, 1024)
+	for i := 0; i < len(payload); i++ {
+		payload[i] = byte(i)
+	}
+	return payload
 }
