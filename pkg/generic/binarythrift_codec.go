@@ -51,7 +51,8 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 	var transBuff []byte
 	var ok bool
 	if msg.RPCRole() == remote.Server {
-		// handle biz error
+		// Business error only works properly when using TTHeader and HTTP2 transmission protocols
+		// If there is a business error, data.(*Result).Success will be nil, and an empty payload will be constructed here to return
 		if msg.RPCInfo().Invocation().BizStatusErr() != nil {
 			sz := gthrift.Binary.MessageBeginLength(msg.RPCInfo().Invocation().MethodName())
 			sz += gthrift.Binary.FieldStopLength()
