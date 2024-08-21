@@ -15,7 +15,14 @@ func (si *serviceImpl) Unary(ctx context.Context, req *Request) (*Response, erro
 	return resp, nil
 }
 
-func (si *serviceImpl) ClientStream(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) error {
+func (si *serviceImpl) ClientStream(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (err error) {
+	var msg string
+	defer log.Printf("Server ClientStream end")
+	defer func() {
+		res := new(Response)
+		res.Message = msg
+		err = stream.SendAndClose(ctx, res)
+	}()
 	for {
 		req, err := stream.Recv(ctx)
 		if err == io.EOF {
@@ -24,6 +31,7 @@ func (si *serviceImpl) ClientStream(ctx context.Context, stream streamx.ClientSt
 		if err != nil {
 			return err
 		}
+		msg = req.Message
 		log.Printf("Server ClientStream: req={%v}", req)
 	}
 }
@@ -32,6 +40,7 @@ func (si *serviceImpl) ServerStream(ctx context.Context, req *Request, stream st
 	log.Printf("Server ServerStream: req={%v}", req)
 	for i := 0; i < 3; i++ {
 		resp := new(Response)
+		resp.Type = int32(i)
 		resp.Message = req.Message
 		err := stream.Send(ctx, resp)
 		if err != nil {

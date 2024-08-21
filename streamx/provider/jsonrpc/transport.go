@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/netpoll"
 	"io"
 	"log"
 	"net"
-	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -34,7 +34,7 @@ func newTransport(sinfo *serviceinfo.ServiceInfo, conn net.Conn) *transport {
 	}
 	go func() {
 		err := t.loopRead()
-		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
+		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) && !errors.Is(err, netpoll.ErrConnClosed) {
 			log.Printf("loop read err: %v", err)
 		}
 	}()
@@ -49,12 +49,6 @@ func newTransport(sinfo *serviceinfo.ServiceInfo, conn net.Conn) *transport {
 
 func (t *transport) close() (err error) {
 	close(t.stop)
-	return nil
-}
-
-func (t *transport) streamEnd(s *stream) (err error) {
-	f := newFrame(frameTypeEOF, s.id, s.method, []byte("EOF"))
-	t.wch <- f
 	return nil
 }
 
@@ -96,14 +90,8 @@ func (t *transport) loopRead() error {
 			s := iss.(*stream)
 			switch frame.typ {
 			case frameTypeEOF:
-				// ack EOF
-				closed, err := s.close()
-				if err != nil {
-					return err
-				}
-				if closed {
-					return nil
-				}
+				err = s.recvEOF()
+				return err
 			case frameTypeData:
 				// process data frame
 				t.rch[s.id] <- frame
@@ -139,12 +127,17 @@ func (t *transport) newStream(method string) (*stream, error) {
 	return s, nil
 }
 
-func (t *transport) streamClose(s *stream) (err error) {
-	for len(t.rch[s.id]) > 0 {
-		runtime.Gosched()
-	}
-	t.streams.Delete(s.id)
+func (t *transport) streamCloseRecv(s *stream) (err error) {
+	//for len(t.rch[s.id]) > 0 {
+	//	runtime.Gosched()
+	//}
 	close(t.rch[s.id])
+	return nil
+}
+
+func (t *transport) streamCloseSend(s *stream) (err error) {
+	f := newFrame(frameTypeEOF, s.id, s.method, []byte("EOF"))
+	t.wch <- f
 	return nil
 }
 

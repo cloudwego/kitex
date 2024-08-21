@@ -3,6 +3,7 @@ package jsonrpc
 import (
 	"context"
 	"github.com/cloudwego/kitex/streamx"
+	"log"
 	"sync/atomic"
 )
 
@@ -21,11 +22,13 @@ func newStream(trans *transport, sid int, mode streamx.StreamingMode, method str
 }
 
 type stream struct {
-	id     int
-	mode   streamx.StreamingMode
-	method string
-	eof    int32 // eof handshake, eof==2 means it's time to close the whole stream
-	trans  *transport
+	id      int
+	mode    streamx.StreamingMode
+	method  string
+	eof     int32 // eof handshake, 1: wait for EOF ack 2: eof hand shacked
+	selfEOF int32
+	peerEOF int32
+	trans   *transport
 }
 
 func (s *stream) Mode() streamx.StreamingMode {
@@ -36,19 +39,20 @@ func (s *stream) Method() string {
 	return s.method
 }
 
-func (s *stream) close() (closed bool, err error) {
-	eof := atomic.AddInt32(&s.eof, 1)
-	closed = eof >= 2
-	if eof <= 2 {
-		err = s.trans.streamEnd(s)
-		if err != nil {
-			return
-		}
+func (s *stream) sendEOF() (err error) {
+	if !atomic.CompareAndSwapInt32(&s.selfEOF, 0, 1) {
+		return nil
 	}
-	if eof == 2 {
-		err = s.trans.streamClose(s)
+	log.Printf("stream[%s] send EOF", s.method)
+	return s.trans.streamCloseSend(s)
+}
+
+func (s *stream) recvEOF() (err error) {
+	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
+		return nil
 	}
-	return
+	log.Printf("stream[%s] recv EOF", s.method)
+	return s.trans.streamCloseRecv(s)
 }
 
 func (s *stream) SendMsg(ctx context.Context, res any) error {
@@ -77,8 +81,7 @@ type clientStream struct {
 }
 
 func (s *clientStream) CloseSend(ctx context.Context) error {
-	_, err := s.close()
-	return err
+	return s.sendEOF()
 }
 
 func newServerStream(s *stream) streamx.ServerStream {

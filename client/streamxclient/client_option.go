@@ -18,7 +18,7 @@ func WithDestService(destService string) ClientOption {
 	return convertInternalClientOption(client.WithDestService(destService))
 }
 
-func WithClientProvider(pvd streamx.ClientProvider) ClientOption {
+func WithProvider(pvd streamx.ClientProvider) ClientOption {
 	return ClientOption{F: func(o *internal_client.Options, di *utils.Slice) {
 		o.RemoteOpt.Provider = pvd
 	}}

@@ -2,13 +2,15 @@ package jsonrpc_test
 
 import (
 	"context"
+	"errors"
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/server/streamxserver"
 	"github.com/cloudwego/kitex/streamx"
 	"github.com/cloudwego/netpoll"
+	"io"
 	"log"
-	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,9 +26,11 @@ func TestJSONRPC(t *testing.T) {
 	var serverStreamCount int32
 	waitServerStreamDone := func() {
 		for atomic.LoadInt32(&serverStreamCount) != 0 {
-			runtime.Gosched()
+			t.Logf("waitServerStreamDone: %d", atomic.LoadInt32(&serverStreamCount))
+			time.Sleep(time.Millisecond * 100)
 		}
 	}
+	methodCount := map[string]int{}
 	svr, err := NewServer(
 		new(serviceImpl),
 		streamxserver.WithListener(ln),
@@ -36,15 +40,27 @@ func TestJSONRPC(t *testing.T) {
 				return func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
 					log.Printf("Server middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
 						reqArgs.Req(), resArgs.Res(), streamArgs)
-					err = next(ctx, reqArgs, resArgs, streamArgs)
-					log.Printf("Server middleware after next: reqArgs=%v resArgs=%v streamArgs=%v",
-						reqArgs.Req(), resArgs.Res(), streamArgs)
-					if err != nil {
-						return err
+					test.Assert(t, streamArgs.Stream() != nil)
+					switch streamArgs.Stream().Mode() {
+					case streamx.StreamingUnary:
+						test.Assert(t, reqArgs.Req() != nil, resArgs.Res() == nil)
+						err = next(ctx, reqArgs, resArgs, streamArgs)
+						test.Assert(t, reqArgs.Req() != nil, resArgs.Res() != nil)
+					case streamx.StreamingClient, streamx.StreamingBidirectional:
+						test.Assert(t, reqArgs.Req() == nil, resArgs.Res() == nil)
+						err = next(ctx, reqArgs, resArgs, streamArgs)
+						test.Assert(t, reqArgs.Req() == nil, resArgs.Res() == nil)
+					case streamx.StreamingServer:
+						test.Assert(t, reqArgs.Req() != nil, resArgs.Res() == nil)
+						err = next(ctx, reqArgs, resArgs, streamArgs)
+						test.Assert(t, reqArgs.Req() != nil, resArgs.Res() == nil)
 					}
+					test.Assert(t, err == nil, err)
+					methodCount[streamArgs.Stream().Method()]++
+
+					log.Printf("Server middleware after next: reqArgs=%v resArgs=%v streamArgs=%v",
+						reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
 					atomic.AddInt32(&serverStreamCount, 1)
-					stream := streamArgs.Stream()
-					_ = stream
 					return nil
 				}
 			},
@@ -65,6 +81,9 @@ func TestJSONRPC(t *testing.T) {
 		streamxclient.WithHostPorts(testAddr),
 		streamxclient.WithMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 			return func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
+				if reqArgs.Req() != nil {
+
+				}
 				log.Printf("Client middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
 					reqArgs.Req(), resArgs.Res(), streamArgs)
 				err = next(ctx, reqArgs, resArgs, streamArgs)
@@ -96,43 +115,66 @@ func TestJSONRPC(t *testing.T) {
 		err = cs.Send(ctx, req)
 		test.Assert(t, err == nil, err)
 	}
-	err = cs.CloseSend(ctx)
+	res, err = cs.CloseAndRecv(ctx)
 	test.Assert(t, err == nil, err)
+	test.Assert(t, res.Message == "ClientStream", res.Message)
+	t.Logf("Client ClientStream CloseAndRecv: %v", res)
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
 
 	// server stream
-	//t.Logf("=== ServerStream ===")
-	//req = new(Request)
-	//req.Message = "ServerStream"
-	//ss, err := cli.ServerStream(ctx, req)
+	t.Logf("=== ServerStream ===")
+	req = new(Request)
+	req.Message = "ServerStream"
+	ss, err := cli.ServerStream(ctx, req)
+	test.Assert(t, err == nil, err)
+	for {
+		res, err := ss.Recv(ctx)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		test.Assert(t, err == nil, err)
+		t.Logf("Client ServerStream recv: %v", res)
+	}
+	//err = ss.CloseSend(ctx)
 	//test.Assert(t, err == nil, err)
-	//for {
-	//	res, err := ss.Recv(ctx)
-	//	if errors.Is(err, io.EOF) {
-	//		break
-	//	}
-	//	test.Assert(t, err == nil, err)
-	//	t.Logf("res: %v", res)
-	//}
-	//atomic.AddInt32(&serverStreamCount, -1)
-	//waitServerStreamDone()
+	atomic.AddInt32(&serverStreamCount, -1)
+	waitServerStreamDone()
 
-	//// bidi stream
-	//bs, err := cli.BidiStream(ctx)
-	//test.Assert(t, err == nil, err)
-	//for {
-	//	req := new(Request)
-	//	req.Message = "ServerStream"
-	//
-	//	err := bs.Send(ctx, req)
-	//	test.Assert(t, err == nil, err)
-	//
-	//	res, err := ss.Recv(ctx)
-	//	if errors.Is(err, io.EOF) {
-	//		break
-	//	}
-	//	test.Assert(t, err == nil, err)
-	//	test.Assert(t, req.Message == res.Message, res)
-	//}
+	// bidi stream
+	t.Logf("=== BidiStream ===")
+	bs, err := cli.BidiStream(ctx)
+	test.Assert(t, err == nil, err)
+	round := 5
+	msg := "BidiStream"
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < round; i++ {
+			req := new(Request)
+			req.Message = msg
+			err := bs.Send(ctx, req)
+			test.Assert(t, err == nil, err)
+		}
+		err = bs.CloseSend(ctx)
+		test.Assert(t, err == nil, err)
+	}()
+	go func() {
+		defer wg.Done()
+		i := 0
+		for {
+			res, err := bs.Recv(ctx)
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			i++
+			test.Assert(t, err == nil, err)
+			test.Assert(t, msg == res.Message, res.Message)
+		}
+		test.Assert(t, i == round, i)
+	}()
+	wg.Wait()
+	atomic.AddInt32(&serverStreamCount, -1)
+	waitServerStreamDone()
 }

@@ -39,7 +39,6 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	if err != nil {
 		return nil, err
 	}
-	// TODO: 暂时使用短连接
 	trans := newTransport(c.sinfo, conn)
 	s, err := trans.newStream(method)
 	if err != nil {

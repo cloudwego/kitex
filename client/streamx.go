@@ -12,7 +12,7 @@ import (
 
 type StreamX interface {
 	NewStream(ctx context.Context, method string, req any, callOptions ...streamxcallopt.CallOption) (streamx.ClientStream, error)
-	Proxy(next streamx.StreamEndpoint) streamx.StreamEndpoint
+	StreamMiddleware(next streamx.StreamEndpoint) streamx.StreamEndpoint
 }
 
 // TODO: 使用这个中间件
@@ -106,9 +106,14 @@ func (kc *kClient) NewStream(ctx context.Context, method string, req any, callOp
 	return streamArgs.Stream().(streamx.ClientStream), nil
 }
 
-func (kc *kClient) Proxy(next streamx.StreamEndpoint) streamx.StreamEndpoint {
+func (kc *kClient) StreamMiddleware(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 	if kc.sxMW == nil {
 		return next
+	}
+	if next == nil {
+		return kc.sxMW(func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
+			return nil
+		})
 	}
 	return kc.sxMW(next)
 }

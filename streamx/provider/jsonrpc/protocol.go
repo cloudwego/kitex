@@ -12,14 +12,11 @@ import (
 - send {type=META, sid=1, method="xxx"}
 - send {type=DATA, sid=1, method="xxx", payload="..."}
 - recv {type=DATA, sid=1, method="xxx", payload="..."}
-- delete stream
 
 === server accept a new stream ===
 - recv {type=META, sid=1, method="xxx"}
 - recv {type=DATA, sid=1, method="xxx", payload="..."}
 - send {type=DATA, sid=1, method="xxx", payload="..."}
-- send {type=EOF , sid=1, method="xxx"}
-- close stream
 
 === client try to close stream ===
 - client send {type=EOF , sid=1, method="xxx"}

@@ -14,6 +14,58 @@ var _ BidiStreamingServer[int, int] = (*GenericServerStream[int, int])(nil)
 
 type StreamingMode = serviceinfo.StreamingMode
 
+/* Streaming Mode
+---------------  [Unary Streaming]  ---------------
+--------------- (Req) returns (Res) ---------------
+client.Send(req)   === req ==>   server.Recv(req)
+client.Recv(res)   <== res ===   server.Send(res)
+
+
+------------------- [Client Streaming] -------------------
+--------------- (stream Req) returns (Res) ---------------
+client.Send(req)         === req ==>       server.Recv(req)
+                             ...
+client.Send(req)         === req ==>       server.Recv(req)
+
+client.CloseSend()       === EOF ==>       server.Recv(EOF)
+client.Recv(res)         <== res ===       server.SendAndClose(res)
+** OR
+client.CloseAndRecv(res) === EOF ==>       server.Recv(EOF)
+                         <== res ===       server.SendAndClose(res)
+
+
+------------------- [Server Streaming] -------------------
+---------- (Request) returns (stream Response) ----------
+client.Send(req)   === req ==>   server.Recv(req)
+client.Recv(res)   <== res ===   server.Send(req)
+                       ...
+client.Recv(res)   <== res ===   server.Send(req)
+client.Recv(EOF)   <== EOF ===   server handler return
+
+
+----------- [Bidirectional Streaming] -----------
+--- (stream Request) returns (stream Response) ---
+* goroutine 1 *
+client.Send(req)   === req ==>   server.Recv(req)
+                       ...
+client.Send(req)   === req ==>   server.Recv(req)
+client.CloseSend() === EOF ==>   server.Recv(EOF)
+
+* goroutine 2 *
+client.Recv(res)   <== res ===   server.Send(req)
+                       ...
+client.Recv(res)   <== res ===   server.Send(req)
+client.Recv(EOF)   <== EOF ===   server handler return
+*/
+
+const (
+	StreamingNone          = serviceinfo.StreamingNone
+	StreamingUnary         = serviceinfo.StreamingUnary
+	StreamingClient        = serviceinfo.StreamingClient
+	StreamingServer        = serviceinfo.StreamingServer
+	StreamingBidirectional = serviceinfo.StreamingBidirectional
+)
+
 type Stream interface {
 	Mode() StreamingMode
 	Method() string
@@ -108,7 +160,10 @@ func (x *GenericServerStream[Req, Res]) Send(ctx context.Context, m *Res) error 
 }
 
 func (x *GenericServerStream[Req, Res]) SendAndClose(ctx context.Context, m *Res) error {
-	return x.ServerStream.SendMsg(ctx, m)
+	if err := x.ServerStream.SendMsg(ctx, m); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (x *GenericServerStream[Req, Res]) Recv(ctx context.Context) (*Req, error) {
@@ -126,8 +181,8 @@ type RawStreamGetter interface {
 var _ ServerStream = (*serverStream)(nil)
 
 type serverStream struct {
-	RawStreamGetter
 	ServerStream
+	RawStreamGetter
 }
 
 func newServerStream(ss ServerStream) *serverStream {
@@ -153,8 +208,8 @@ func NewClientStream(ss ClientStream) ClientStream {
 }
 
 type clientStream struct {
-	RawStreamGetter
 	ClientStream
+	RawStreamGetter
 }
 
 func (s clientStream) RawStream() Stream {
