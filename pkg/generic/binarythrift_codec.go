@@ -51,10 +51,8 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 	var transBuff []byte
 	var ok bool
 	if msg.RPCRole() == remote.Server {
-		gResult := data.(*Result)
-		transBinary := gResult.Success
 		// handle biz error
-		if transBinary == nil {
+		if msg.RPCInfo().Invocation().BizStatusErr() != nil {
 			sz := gthrift.Binary.MessageBeginLength(msg.RPCInfo().Invocation().MethodName())
 			sz += gthrift.Binary.FieldStopLength()
 			b, err := out.Malloc(sz)
@@ -66,7 +64,10 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 			b = gthrift.Binary.AppendFieldStop(b)
 			_ = b
 			return nil
-		} else if transBuff, ok = transBinary.(binaryReqType); !ok {
+		}
+		gResult := data.(*Result)
+		transBinary := gResult.Success
+		if transBuff, ok = transBinary.(binaryReqType); !ok {
 			return perrors.NewProtocolErrorWithMsg("invalid marshal result in rawThriftBinaryCodec: must be []byte")
 		}
 	} else {
