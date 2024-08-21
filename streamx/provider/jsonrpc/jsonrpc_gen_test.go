@@ -189,66 +189,74 @@ type kClient struct {
 }
 
 func (c *kClient) Unary(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (r *Response, err error) {
-	cs, err := c.StreamX.NewStream(ctx, "Unary", req, callOptions...)
-	if err != nil {
-		return nil, err
-	}
-	gcs := streamx.NewGenericClientStream[Request, Response](cs)
 	var res = new(Response)
 	err = c.StreamMiddleware(
 		func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
+			cs, err := c.StreamX.NewStream(ctx, "Unary", req, callOptions...)
+			if err != nil {
+				return err
+			}
+			gcs := streamx.NewGenericClientStream[Request, Response](cs)
+			streamx.AsMutableStreamArgs(streamArgs).SetStream(gcs)
 			if err = gcs.ClientStream.SendMsg(ctx, req); err != nil {
 				return err
 			}
 			if err = gcs.ClientStream.RecvMsg(ctx, res); err != nil {
 				return err
 			}
+			resArgs.SetRes(res)
 			return nil
 		},
-	)(ctx, streamx.NewStreamReqArgs(req), streamx.NewStreamResArgs(res), streamx.NewStreamArgs(cs))
+	)(ctx, streamx.NewStreamReqArgs(req), streamx.NewStreamResArgs(nil), streamx.NewStreamArgs(nil))
 	return res, nil
 }
 
 func (c *kClient) ClientStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (stream streamx.ClientStreamingClient[Request, Response], err error) {
-	cs, err := c.StreamX.NewStream(ctx, "ClientStream", nil, callOptions...)
-	if err != nil {
-		return nil, err
-	}
-	gcs := streamx.NewGenericClientStream[Request, Response](cs)
-	err = c.StreamMiddleware(nil)(ctx, streamx.NewStreamReqArgs(nil), streamx.NewStreamResArgs(nil), streamx.NewStreamArgs(cs))
-	return gcs, nil
+	err = c.StreamMiddleware(func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
+		cs, err := c.StreamX.NewStream(ctx, "ClientStream", nil, callOptions...)
+		if err != nil {
+			return err
+		}
+		streamx.AsMutableStreamArgs(streamArgs).SetStream(cs)
+		stream = streamx.NewGenericClientStream[Request, Response](cs)
+		return nil
+	})(ctx, streamx.NewStreamReqArgs(nil), streamx.NewStreamResArgs(nil), streamx.NewStreamArgs(nil))
+	return
 }
 
 func (c *kClient) ServerStream(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (stream streamx.ServerStreamingClient[Response], err error) {
-	cs, err := c.StreamX.NewStream(ctx, "ServerStream", req, callOptions...)
-	if err != nil {
-		return nil, err
-	}
-	gcs := streamx.NewGenericClientStream[Request, Response](cs)
 	err = c.StreamMiddleware(
 		func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
+			cs, err := c.StreamX.NewStream(ctx, "ServerStream", req, callOptions...)
+			if err != nil {
+				return err
+			}
+			streamx.AsMutableStreamArgs(streamArgs).SetStream(cs)
+			gcs := streamx.NewGenericClientStream[Request, Response](cs)
 			if err = gcs.ClientStream.SendMsg(ctx, req); err != nil {
 				return err
 			}
 			if err = gcs.ClientStream.CloseSend(ctx); err != nil {
 				return err
 			}
+			stream = gcs
 			return nil
 		},
-	)(ctx, streamx.NewStreamReqArgs(req), streamx.NewStreamResArgs(nil), streamx.NewStreamArgs(cs))
-	return gcs, nil
+	)(ctx, streamx.NewStreamReqArgs(req), streamx.NewStreamResArgs(nil), streamx.NewStreamArgs(nil))
+	return
 }
 
 func (c *kClient) BidiStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (stream streamx.BidiStreamingClient[Request, Response], err error) {
-	cs, err := c.StreamX.NewStream(ctx, "BidiStream", nil, callOptions...)
-	if err != nil {
-		return nil, err
-	}
-	x := streamx.NewGenericClientStream[Request, Response](cs)
 	err = c.StreamMiddleware(
 		func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
+			cs, err := c.StreamX.NewStream(ctx, "BidiStream", nil, callOptions...)
+			if err != nil {
+				return err
+			}
+			streamx.AsMutableStreamArgs(streamArgs).SetStream(cs)
+			stream = streamx.NewGenericClientStream[Request, Response](cs)
 			return nil
 		},
-	)(ctx, streamx.NewStreamReqArgs(nil), streamx.NewStreamResArgs(nil), streamx.NewStreamArgs(cs))
-	return x, nil
+	)(ctx, streamx.NewStreamReqArgs(nil), streamx.NewStreamResArgs(nil), streamx.NewStreamArgs(nil))
+	return
 }

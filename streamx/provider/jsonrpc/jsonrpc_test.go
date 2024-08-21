@@ -81,14 +81,11 @@ func TestJSONRPC(t *testing.T) {
 		streamxclient.WithHostPorts(testAddr),
 		streamxclient.WithMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 			return func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
-				if reqArgs.Req() != nil {
-
-				}
 				log.Printf("Client middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
-					reqArgs.Req(), resArgs.Res(), streamArgs)
+					reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
 				err = next(ctx, reqArgs, resArgs, streamArgs)
 				log.Printf("Client middleware after next: reqArgs=%v resArgs=%v streamArgs=%v",
-					reqArgs.Req(), resArgs.Res(), streamArgs)
+					reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
 				return err
 			}
 		}),
