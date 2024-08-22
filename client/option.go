@@ -325,12 +325,13 @@ func WithFailureRetry(p *retry.FailurePolicy) Option {
 		if p == nil {
 			return
 		}
-		di.Push(fmt.Sprintf("WithFailureRetry(%+v)", *p))
+		di.Push(fmt.Sprintf("WithFailureRetry(%+v)", p))
 		if o.RetryMethodPolicies == nil {
 			o.RetryMethodPolicies = make(map[string]retry.Policy)
 		}
-		if o.RetryMethodPolicies[retry.Wildcard].BackupPolicy != nil {
-			panic("BackupPolicy has been setup, cannot support Failure Retry at same time")
+		if o.RetryMethodPolicies[retry.Wildcard].MixedPolicy != nil ||
+			o.RetryMethodPolicies[retry.Wildcard].BackupPolicy != nil {
+			panic("MixedPolicy or BackupPolicy has been setup, cannot support Failure Retry at same time")
 		}
 		o.RetryMethodPolicies[retry.Wildcard] = retry.BuildFailurePolicy(p)
 	}}
@@ -342,14 +343,30 @@ func WithBackupRequest(p *retry.BackupPolicy) Option {
 		if p == nil {
 			return
 		}
-		di.Push(fmt.Sprintf("WithBackupRequest(%+v)", *p))
+		di.Push(fmt.Sprintf("WithBackupRequest(%+v)", p))
 		if o.RetryMethodPolicies == nil {
 			o.RetryMethodPolicies = make(map[string]retry.Policy)
 		}
-		if o.RetryMethodPolicies[retry.Wildcard].FailurePolicy != nil {
-			panic("BackupPolicy has been setup, cannot support Failure Retry at same time")
+		if o.RetryMethodPolicies[retry.Wildcard].MixedPolicy != nil ||
+			o.RetryMethodPolicies[retry.Wildcard].FailurePolicy != nil {
+			panic("MixedPolicy or BackupPolicy has been setup, cannot support Failure Retry at same time")
 		}
 		o.RetryMethodPolicies[retry.Wildcard] = retry.BuildBackupRequest(p)
+	}}
+}
+
+// WithMixedRetry sets the mixed retry policy for client, it will take effect for all methods.
+func WithMixedRetry(p *retry.MixedPolicy) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		if p == nil {
+			return
+		}
+		di.Push(fmt.Sprintf("WithMixedRetry(%+v)", p))
+		if o.RetryMethodPolicies == nil {
+			o.RetryMethodPolicies = make(map[string]retry.Policy)
+		}
+		// no need to check if BackupPolicy or FailurePolicy are been setup, just let mixed retry replace it
+		o.RetryMethodPolicies[retry.Wildcard] = retry.BuildMixedPolicy(p)
 	}}
 }
 
