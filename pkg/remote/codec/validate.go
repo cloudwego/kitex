@@ -35,7 +35,7 @@ import (
 
 const (
 	PayloadValidatorPrefix   = "PV_"
-	maxPayloadChecksumLength = 1024
+	maxPayloadChecksumLength = 4096 // maximum 4k
 )
 
 // PayloadValidator is the interface for validating the payload of RPC requests, which allows customized Checksum function.

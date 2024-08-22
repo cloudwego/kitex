@@ -165,7 +165,6 @@ func TestCRCPayloadValidator(t *testing.T) {
 	pass, err = p.Validate(ctx, "", payload)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, pass == true)
-
 }
 
 func preparePayload() []byte {
