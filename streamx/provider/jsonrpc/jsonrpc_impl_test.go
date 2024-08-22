@@ -15,21 +15,18 @@ func (si *serviceImpl) Unary(ctx context.Context, req *Request) (*Response, erro
 	return resp, nil
 }
 
-func (si *serviceImpl) ClientStream(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (err error) {
+func (si *serviceImpl) ClientStream(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (res *Response, err error) {
 	var msg string
 	defer log.Printf("Server ClientStream end")
-	defer func() {
-		res := new(Response)
-		res.Message = msg
-		err = stream.SendAndClose(ctx, res)
-	}()
 	for {
 		req, err := stream.Recv(ctx)
 		if err == io.EOF {
-			return nil
+			res = new(Response)
+			res.Message = msg
+			return res, nil
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 		msg = req.Message
 		log.Printf("Server ClientStream: req={%v}", req)

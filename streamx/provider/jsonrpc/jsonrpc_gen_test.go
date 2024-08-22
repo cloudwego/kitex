@@ -64,7 +64,16 @@ var serviceInfo = &serviceinfo.ServiceInfo{
 				shandler := handler.(streamx.StreamHandler)
 				return shandler.Middleware(
 					func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
-						return shandler.Handler.(ServerInterface).ClientStream(ctx, gs)
+						res, err := shandler.Handler.(ServerInterface).ClientStream(ctx, gs)
+						if err != nil {
+							return err
+						}
+						err = gs.SendMsg(ctx, res)
+						if err != nil {
+							return err
+						}
+						resArgs.SetRes(res)
+						return nil
 					},
 				)(ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs), streamArgs)
 			},
@@ -167,7 +176,7 @@ type Response struct {
 
 type ServerInterface interface {
 	Unary(ctx context.Context, req *Request) (*Response, error)
-	ClientStream(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) error
+	ClientStream(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (*Response, error)
 	ServerStream(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error
 	BidiStream(ctx context.Context, stream streamx.BidiStreamingServer[Request, Response]) error
 }

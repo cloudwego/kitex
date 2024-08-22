@@ -41,19 +41,32 @@ func TestJSONRPC(t *testing.T) {
 					log.Printf("Server middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
 						reqArgs.Req(), resArgs.Res(), streamArgs)
 					test.Assert(t, streamArgs.Stream() != nil)
+
 					switch streamArgs.Stream().Mode() {
 					case streamx.StreamingUnary:
-						test.Assert(t, reqArgs.Req() != nil, resArgs.Res() == nil)
+						test.Assert(t, reqArgs.Req() != nil)
+						test.Assert(t, resArgs.Res() == nil)
 						err = next(ctx, reqArgs, resArgs, streamArgs)
-						test.Assert(t, reqArgs.Req() != nil, resArgs.Res() != nil)
-					case streamx.StreamingClient, streamx.StreamingBidirectional:
-						test.Assert(t, reqArgs.Req() == nil, resArgs.Res() == nil)
+						test.Assert(t, reqArgs.Req() != nil)
+						test.Assert(t, resArgs.Res() != nil)
+					case streamx.StreamingClient:
+						test.Assert(t, reqArgs.Req() == nil)
+						test.Assert(t, resArgs.Res() == nil)
 						err = next(ctx, reqArgs, resArgs, streamArgs)
-						test.Assert(t, reqArgs.Req() == nil, resArgs.Res() == nil)
+						test.Assert(t, reqArgs.Req() == nil)
+						test.Assert(t, resArgs.Res() != nil)
 					case streamx.StreamingServer:
-						test.Assert(t, reqArgs.Req() != nil, resArgs.Res() == nil)
+						test.Assert(t, reqArgs.Req() != nil)
+						test.Assert(t, resArgs.Res() == nil)
 						err = next(ctx, reqArgs, resArgs, streamArgs)
-						test.Assert(t, reqArgs.Req() != nil, resArgs.Res() == nil)
+						test.Assert(t, reqArgs.Req() != nil)
+						test.Assert(t, resArgs.Res() == nil)
+					case streamx.StreamingBidirectional:
+						test.Assert(t, reqArgs.Req() == nil)
+						test.Assert(t, resArgs.Res() == nil)
+						err = next(ctx, reqArgs, resArgs, streamArgs)
+						test.Assert(t, reqArgs.Req() == nil)
+						test.Assert(t, resArgs.Res() == nil)
 					}
 					test.Assert(t, err == nil, err)
 					methodCount[streamArgs.Stream().Method()]++
@@ -86,6 +99,23 @@ func TestJSONRPC(t *testing.T) {
 				err = next(ctx, reqArgs, resArgs, streamArgs)
 				log.Printf("Client middleware after next: reqArgs=%v resArgs=%v streamArgs=%v",
 					reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
+
+				test.Assert(t, streamArgs.Stream() != nil)
+				switch streamArgs.Stream().Mode() {
+				case streamx.StreamingUnary:
+					test.Assert(t, reqArgs.Req() != nil)
+					test.Assert(t, resArgs.Res() != nil)
+				case streamx.StreamingClient:
+					test.Assert(t, reqArgs.Req() == nil)
+					test.Assert(t, resArgs.Res() == nil)
+				case streamx.StreamingServer:
+					test.Assert(t, reqArgs.Req() != nil)
+					test.Assert(t, resArgs.Res() == nil)
+				case streamx.StreamingBidirectional:
+					test.Assert(t, reqArgs.Req() == nil)
+					test.Assert(t, resArgs.Res() == nil)
+				}
+				test.Assert(t, err == nil, err)
 				return err
 			}
 		}),

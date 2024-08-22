@@ -100,7 +100,7 @@ type ClientStreamingClient[Req any, Res any] interface {
 
 type ClientStreamingServer[Req any, Res any] interface {
 	Recv(ctx context.Context) (*Req, error)
-	SendAndClose(ctx context.Context, res *Res) error
+	//SendAndClose(ctx context.Context, res *Res) error
 	ServerStream
 }
 
