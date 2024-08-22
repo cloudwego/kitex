@@ -197,6 +197,9 @@ func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.S
 	if svcInfo == nil {
 		return nil, NewTransErrorWithMsg(UnknownService, fmt.Sprintf("unknown service %s, method %s", svcName, methodName))
 	}
+	if _, ok := svcInfo.Methods[methodName]; !ok {
+		return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s (service %s)", methodName, svcName))
+	}
 	m.targetSvcInfo = svcInfo
 	return svcInfo, nil
 }
