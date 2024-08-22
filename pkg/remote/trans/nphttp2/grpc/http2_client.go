@@ -363,6 +363,7 @@ func (t *http2Client) createHeaderFields(ctx context.Context, callHdr *CallHdr) 
 		// Send out timeout regardless its value. The server can detect timeout context by itself.
 		// TODO(mmukhi): Perhaps this field should be updated when actually writing out to the wire.
 		timeout := time.Until(dl)
+		klog.CtxInfof(ctx, "[DEBUG-GRPC] context deadline set, method=%s, timeout=%d", callHdr.Method, timeout)
 		headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-timeout", Value: encodeTimeout(timeout)})
 	}
 	if md, added, ok := metadata.FromOutgoingContextRaw(ctx); ok {
