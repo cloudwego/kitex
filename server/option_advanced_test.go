@@ -55,7 +55,7 @@ func TestACLRulesOption(t *testing.T) {
 		return nil
 	})
 
-	svr := NewServer(WithACLRules(rules...))
+	svr, _ := NewTestServer(WithACLRules(rules...))
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -98,7 +98,7 @@ func (m *myLimitReporter) QPSOverloadReport() {
 // TestLimitReporterOption tests the creation of a server with LimitReporter option
 func TestLimitReporterOption(t *testing.T) {
 	my := &myLimitReporter{}
-	svr := NewServer(WithLimitReporter(my))
+	svr, _ := NewTestServer(WithLimitReporter(my))
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -122,7 +122,7 @@ func TestGenericOptionPanic(t *testing.T) {
 // TestGenericOption tests the creation of a server with RemoteOpt.PayloadCodec option
 func TestGenericOption(t *testing.T) {
 	g := generic.BinaryThriftGeneric()
-	svr := NewServer(WithGeneric(g))
+	svr, _ := NewTestServer(WithGeneric(g))
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -190,7 +190,7 @@ func TestWithBoundHandler(t *testing.T) {
 func TestExitSignalOption(t *testing.T) {
 	stopSignal := make(chan error, 1)
 	stopErr := errors.New("stop signal")
-	svr := NewServer(WithExitSignal(func() <-chan error {
+	svr, _ := NewTestServer(WithExitSignal(func() <-chan error {
 		return stopSignal
 	}))
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
@@ -245,7 +245,8 @@ func TestWithSupportedTransportsFunc(t *testing.T) {
 		svcInfo := mocks.ServiceInfo()
 		svr.RegisterService(svcInfo, new(mockImpl))
 		svr.(*server).fillMoreServiceInfo(nil)
-		test.Assert(t, reflect.DeepEqual(svr.GetServiceInfos()[remote.BuildMultiServiceKey(svcInfo.ServiceName, mocks.MockMethod)].Extra["transports"], tcase.wantTransports))
+		svcInfo = svr.(*server).svcs.SearchService(svcInfo.ServiceName, mocks.MockMethod, false)
+		test.Assert(t, reflect.DeepEqual(svcInfo.Extra["transports"], tcase.wantTransports))
 	}
 }
 

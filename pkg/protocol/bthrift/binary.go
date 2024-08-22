@@ -23,23 +23,27 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/apache/thrift/lib/go/thrift"
-
 	"github.com/cloudwego/kitex/pkg/mem"
+	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 var (
 	// Binary protocol for bthrift.
-	Binary    binaryProtocol
-	_         BTProtocol = binaryProtocol{}
-	spanCache            = mem.NewSpanCache(1024 * 1024) // 1MB
+	Binary          binaryProtocol
+	_               BTProtocol = binaryProtocol{}
+	spanCache                  = mem.NewSpanCache(1024 * 1024)
+	spanCacheEnable bool       = false
 )
 
 const binaryInplaceThreshold = 4096 // 4k
 
 type binaryProtocol struct{}
+
+// SetSpanCache enable/disable binary protocol bytes/string allocator
+func SetSpanCache(enable bool) {
+	spanCacheEnable = enable
+}
 
 func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int {
 	offset := 0
@@ -146,7 +150,7 @@ func (binaryProtocol) WriteBinary(buf, value []byte) int {
 }
 
 func (binaryProtocol) WriteStringNocopy(buf []byte, binaryWriter BinaryWriter, value string) int {
-	return Binary.WriteBinaryNocopy(buf, binaryWriter, utils.StringToSliceByte(value))
+	return Binary.WriteBinaryNocopy(buf, binaryWriter, stringToSliceByte(value))
 }
 
 func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, value []byte) int {
@@ -159,9 +163,8 @@ func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, v
 	return l + len(value)
 }
 
-func (binaryProtocol) MessageBeginLength(name string, typeID thrift.TMessageType, seqid int32) int {
-	version := uint32(thrift.VERSION_1) | uint32(typeID)
-	return Binary.I32Length(int32(version)) + Binary.StringLength(name) + Binary.I32Length(seqid)
+func (binaryProtocol) MessageBeginLength(name string, _ thrift.TMessageType, _ int32) int {
+	return 4 + Binary.StringLength(name) + 4
 }
 
 func (binaryProtocol) MessageEndLength() int {
@@ -252,7 +255,7 @@ func (binaryProtocol) BinaryLength(value []byte) int {
 }
 
 func (binaryProtocol) StringLengthNocopy(value string) int {
-	return Binary.BinaryLengthNocopy(utils.StringToSliceByte(value))
+	return Binary.BinaryLengthNocopy(stringToSliceByte(value))
 }
 
 func (binaryProtocol) BinaryLengthNocopy(value []byte) int {
@@ -467,8 +470,12 @@ func (binaryProtocol) ReadString(buf []byte) (value string, length int, err erro
 	if size < 0 || int(size) > len(buf) {
 		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadString] the string size greater than buf length")
 	}
-	data := spanCache.Copy(buf[length : length+int(size)])
-	value = utils.SliceByteToString(data)
+	if spanCacheEnable {
+		data := spanCache.Copy(buf[length : length+int(size)])
+		value = sliceByteToString(data)
+	} else {
+		value = string(buf[length : length+int(size)])
+	}
 	length += int(size)
 	return
 }
@@ -484,7 +491,12 @@ func (binaryProtocol) ReadBinary(buf []byte) (value []byte, length int, err erro
 	if size < 0 || size > len(buf) {
 		return value, length, perrors.NewProtocolErrorWithType(thrift.INVALID_DATA, "[ReadBinary] the binary size greater than buf length")
 	}
-	value = spanCache.Copy(buf[length : length+size])
+	if spanCacheEnable {
+		value = spanCache.Copy(buf[length : length+size])
+	} else {
+		value = make([]byte, size)
+		copy(value, buf[length:length+size])
+	}
 	length += size
 	return
 }

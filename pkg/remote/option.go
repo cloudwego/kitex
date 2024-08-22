@@ -73,7 +73,7 @@ func (o *Option) AppendBoundHandler(h BoundHandler) {
 type ServerOption struct {
 	TargetSvcInfo *serviceinfo.ServiceInfo
 
-	SvcSearchMap map[string]*serviceinfo.ServiceInfo
+	SvcSearcher ServiceSearcher
 
 	TransServerFactory TransServerFactory
 
@@ -114,9 +114,6 @@ type ServerOption struct {
 
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
 
-	// RefuseTrafficWithoutServiceName is used for a server with multi services
-	RefuseTrafficWithoutServiceName bool
-
 	Option
 
 	// invoking chain with recv/send middlewares for streaming APIs
@@ -126,6 +123,8 @@ type ServerOption struct {
 	// for thrift streaming, this is enabled by default
 	// for grpc(protobuf) streaming, it's disabled by default, enable with server.WithCompatibleMiddlewareForUnary
 	CompatibleMiddlewareForUnary bool
+
+	Provider interface{} // streamx.ServerProvider
 }
 
 // ClientOption is used to init the remote client.
@@ -146,6 +145,5 @@ type ClientOption struct {
 
 	EnableConnPoolReporter bool
 
-	TTHeaderStreamingWaitMetaFrame  bool
-	TTHeaderStreamingGRPCCompatible bool // not enabled by default for performance issue
+	Provider interface{} // streamx.ClientProvider
 }

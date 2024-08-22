@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/streamx"
 	"net"
 	"reflect"
 	"runtime/debug"
@@ -62,11 +63,12 @@ type server struct {
 	targetSvcInfo *serviceinfo.ServiceInfo
 
 	// actual rpc service implement of biz
-	eps     endpoint.Endpoint
-	mws     []endpoint.Middleware
-	svr     remotesvr.Server
-	stopped sync.Once
-	isRun   bool
+	eps      endpoint.Endpoint
+	mws      []endpoint.Middleware
+	streamMW streamx.StreamMiddleware
+	svr      remotesvr.Server
+	stopped  sync.Once
+	isRun    bool
 
 	sync.Mutex
 }
@@ -200,7 +202,7 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 }
 
 func (s *server) GetServiceInfos() map[string]*serviceinfo.ServiceInfo {
-	return s.svcs.getSvcInfoSearchMap()
+	return s.svcs.getSvcInfoMap()
 }
 
 // Run runs the server.
@@ -325,11 +327,17 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 			// clear session
 			backup.ClearCtx()
 		}()
-		implHandlerFunc := svcInfo.MethodInfo(methodName).Handler()
+		minfo := svcInfo.MethodInfo(methodName)
+		implHandlerFunc := minfo.Handler()
 		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
 		// set session
 		backup.BackupCtx(ctx)
-		err = implHandlerFunc(ctx, svc.handler, args, resp)
+
+		handler := svc.handler
+		if minfo.IsStreaming() {
+			handler = streamx.StreamHandler{Middleware: s.streamMW, Handler: svc.handler}
+		}
+		err = implHandlerFunc(ctx, handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
 				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
@@ -346,8 +354,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
 	remoteOpt.TargetSvcInfo = s.targetSvcInfo
-	remoteOpt.SvcSearchMap = s.svcs.getSvcInfoSearchMap()
-	remoteOpt.RefuseTrafficWithoutServiceName = s.opt.RefuseTrafficWithoutServiceName
+	remoteOpt.SvcSearcher = s.svcs
 	remoteOpt.InitOrResetRPCInfoFunc = s.initOrResetRPCInfoFunc()
 	remoteOpt.TracerCtl = s.opt.TracerCtl
 	remoteOpt.ReadWriteTimeout = s.opt.Configs.ReadWriteTimeout()
@@ -432,10 +439,7 @@ func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
 }
 
 func (s *server) check() error {
-	if len(s.svcs.svcMap) == 0 {
-		return errors.New("run: no service. Use RegisterService to set one")
-	}
-	return checkFallbackServiceForConflictingMethods(s.svcs.conflictingMethodHasFallbackSvcMap, s.opt.RefuseTrafficWithoutServiceName)
+	return s.svcs.check(s.opt.RefuseTrafficWithoutServiceName)
 }
 
 func doAddBoundHandlerToHead(h remote.BoundHandler, opt *remote.ServerOption) {
@@ -563,18 +567,6 @@ func getDefaultSvcInfo(svcs *services) *serviceinfo.ServiceInfo {
 	}
 	for _, svc := range svcs.svcMap {
 		return svc.svcInfo
-	}
-	return nil
-}
-
-func checkFallbackServiceForConflictingMethods(conflictingMethodHasFallbackSvcMap map[string]bool, refuseTrafficWithoutServiceName bool) error {
-	if refuseTrafficWithoutServiceName {
-		return nil
-	}
-	for name, hasFallbackSvc := range conflictingMethodHasFallbackSvcMap {
-		if !hasFallbackSvc {
-			return fmt.Errorf("method name [%s] is conflicted between services but no fallback service is specified", name)
-		}
 	}
 	return nil
 }

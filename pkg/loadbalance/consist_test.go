@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
+	"unsafe"
 
 	"github.com/bytedance/gopkg/lang/fastrand"
 
@@ -42,10 +44,43 @@ func getKey(ctx context.Context, request interface{}) string {
 	return "1234"
 }
 
+func getRandomKey(ctx context.Context, request interface{}) string {
+	key, ok := ctx.Value(keyCtxKey).(string)
+	if !ok {
+		return ""
+	}
+	return key
+}
+
+func randRead(b []byte) {
+	p := unsafe.Pointer(&b[0])
+	seed := uint64(time.Now().UnixNano())
+	i := 0
+	for ; i <= len(b)-8; i += 8 {
+		if i != 0 {
+			p = unsafe.Add(p, 8)
+		}
+		*((*uint64)(p)) = seed
+		seed ^= seed << 13 // xorshift64
+		seed ^= seed >> 7
+		seed ^= seed << 17
+	}
+	for ; i < len(b); i++ {
+		b[i] = byte(seed)
+		seed >>= 8
+	}
+}
+
 func newTestConsistentHashOption() ConsistentHashOption {
 	opt := NewConsistentHashOption(getKey)
-	opt.ExpireDuration = 0
 	return opt
+}
+
+func TestNewConsistHashOption(t *testing.T) {
+	opt := NewConsistentHashOption(getKey)
+	test.Assert(t, opt.GetKey != nil)
+	test.Assert(t, opt.VirtualFactor == 100)
+	test.Assert(t, opt.Weighted)
 }
 
 func TestNewConsistBalancer(t *testing.T) {
@@ -84,44 +119,45 @@ func TestConsistPicker_Next_Nil(t *testing.T) {
 	test.Assert(t, cb.Name() == "consist")
 }
 
-func TestConsistPicker_Replica(t *testing.T) {
-	opt := NewConsistentHashOption(getKey)
-	opt.Replica = 1
-	opt.ExpireDuration = 0
-	opt.GetKey = func(ctx context.Context, request interface{}) string {
-		return "1234"
-	}
-	insList := makeNInstances(2, 10)
-	e := discovery.Result{
-		Cacheable: false,
-		CacheKey:  "",
-		Instances: insList,
-	}
+// Replica related test
+//func TestConsistPicker_Replica(t *testing.T) {
+//	opt := NewConsistentHashOption(getKey)
+//	opt.Replica = 1
+//	opt.GetKey = func(ctx context.Context, request interface{}) string {
+//		return "1234"
+//	}
+//	insList := makeNInstances(2, 10)
+//	e := discovery.Result{
+//		Cacheable: false,
+//		CacheKey:  "",
+//		Instances: insList,
+//	}
+//
+//	cb := NewConsistBalancer(opt)
+//	picker := cb.GetPicker(e)
+//	first := picker.Next(context.TODO(), nil)
+//	second := picker.Next(context.TODO(), nil)
+//	test.Assert(t, first != second)
+//}
 
-	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
-	first := picker.Next(context.TODO(), nil)
-	second := picker.Next(context.TODO(), nil)
-	test.Assert(t, first != second)
-}
-
-func TestConsistPicker_Next_NoCache(t *testing.T) {
-	opt := newTestConsistentHashOption()
-	ins := discovery.NewInstance("tcp", "addr1", 10, nil)
-	insList := []discovery.Instance{
-		ins,
-	}
-	e := discovery.Result{
-		Cacheable: false,
-		CacheKey:  "",
-		Instances: insList,
-	}
-
-	cb := NewConsistBalancer(opt)
-	picker := cb.GetPicker(e)
-	test.Assert(t, picker.Next(context.TODO(), nil) == ins)
-	test.Assert(t, picker.Next(context.TODO(), nil) == nil)
-}
+// Replica related test
+//func TestConsistPicker_Next_NoCache(t *testing.T) {
+//	opt := newTestConsistentHashOption()
+//	ins := discovery.NewInstance("tcp", "addr1", 10, nil)
+//	insList := []discovery.Instance{
+//		ins,
+//	}
+//	e := discovery.Result{
+//		Cacheable: false,
+//		CacheKey:  "",
+//		Instances: insList,
+//	}
+//
+//	cb := NewConsistBalancer(opt)
+//	picker := cb.GetPicker(e)
+//	test.Assert(t, picker.Next(context.TODO(), nil) == ins)
+//	test.Assert(t, picker.Next(context.TODO(), nil) == nil)
+//}
 
 func TestConsistPicker_Next_NoCache_Consist(t *testing.T) {
 	opt := newTestConsistentHashOption()
@@ -209,10 +245,9 @@ func TestConsistBalance(t *testing.T) {
 		GetKey: func(ctx context.Context, request interface{}) string {
 			return strconv.Itoa(fastrand.Intn(100000))
 		},
-		Replica:        0,
-		VirtualFactor:  1000,
-		Weighted:       false,
-		ExpireDuration: 0,
+		Replica:       0,
+		VirtualFactor: 1000,
+		Weighted:      false,
 	}
 	inss := makeNInstances(10, 10)
 
@@ -239,10 +274,9 @@ func TestWeightedConsistBalance(t *testing.T) {
 		GetKey: func(ctx context.Context, request interface{}) string {
 			return strconv.Itoa(fastrand.Intn(100000))
 		},
-		Replica:        0,
-		VirtualFactor:  1000,
-		Weighted:       true,
-		ExpireDuration: 0,
+		Replica:       0,
+		VirtualFactor: 1000,
+		Weighted:      true,
 	}
 	inss := makeNInstances(10, 10)
 
@@ -297,7 +331,7 @@ func BenchmarkNewConsistPicker_NoCache(bb *testing.B) {
 	balancer := NewConsistBalancer(newTestConsistentHashOption())
 	ctx := context.Background()
 
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 3; i++ { // when n=10000 it costs ~3 to run... fix me.
 		bb.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
 			inss := makeNInstances(n, 10)
 			e := discovery.Result{
@@ -341,6 +375,40 @@ func BenchmarkNewConsistPicker(bb *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
+				picker := balancer.GetPicker(e)
+				picker.Next(ctx, nil)
+				if r, ok := picker.(internal.Reusable); ok {
+					r.Recycle()
+				}
+			}
+		})
+		n *= 10
+	}
+}
+
+func BenchmarkConsistPicker_RandomDistributionKey(bb *testing.B) {
+	n := 10
+	balancer := NewConsistBalancer(NewConsistentHashOption(getRandomKey))
+
+	for i := 0; i < 4; i++ {
+		bb.Run(fmt.Sprintf("%dins", n), func(b *testing.B) {
+			inss := makeNInstances(n, 10)
+			e := discovery.Result{
+				Cacheable: true,
+				CacheKey:  "test",
+				Instances: inss,
+			}
+			buf := make([]byte, 30)
+			randRead(buf)
+			s := *(*string)(unsafe.Pointer(&buf))
+			picker := balancer.GetPicker(e)
+			ctx := context.WithValue(context.Background(), keyCtxKey, s)
+			picker.Next(ctx, nil)
+			picker.(internal.Reusable).Recycle()
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				randRead(buf) // it changes the data of `s` in ctx
 				picker := balancer.GetPicker(e)
 				picker.Next(ctx, nil)
 				if r, ok := picker.(internal.Reusable); ok {

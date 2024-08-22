@@ -23,14 +23,15 @@ import (
 	"github.com/cloudwego/dynamicgo/conv"
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
-	"github.com/cloudwego/kitex/internal/mocks"
+	gproto "github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/transport"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var echoIDLPath = "./jsonpb_test/idl/echo.proto"
+var (
+	echoIDLPath = "./jsonpb_test/idl/echo.proto"
+	testIDLPath = "./grpcjsonpb_test/idl/pbapi.proto"
+)
 
 func TestRun(t *testing.T) {
 	t.Run("TestJsonPbCodec", TestJsonPbCodec)
@@ -42,54 +43,43 @@ func TestJsonPbCodec(t *testing.T) {
 	p, err := NewPbFileProviderWithDynamicGo(echoIDLPath, context.Background(), opts)
 	test.Assert(t, err == nil)
 
-	jpc, err := newJsonPbCodec(p, pbCodec, gOpts)
-	test.Assert(t, err == nil)
-
+	jpc := newJsonPbCodec(p, gOpts)
 	defer jpc.Close()
 
 	test.Assert(t, jpc.Name() == "JSONPb")
 	method, err := jpc.getMethod(nil, "Echo")
 	test.Assert(t, err == nil)
 	test.Assert(t, method.Name == "Echo")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
+	test.Assert(t, jpc.svcName == "Echo")
 
-	ctx := context.Background()
-	sendMsg := initJsonPbSendMsg(transport.TTHeaderFramed)
-
-	// Marshal side
-	out := remote.NewWriterBuffer(256)
-	err = jpc.Marshal(ctx, sendMsg, out)
-	test.Assert(t, err == nil)
-
-	// UnMarshal side
-	recvMsg := initJsonPbRecvMsg()
-	buf, err := out.Bytes()
-	test.Assert(t, err == nil)
-	recvMsg.SetPayloadLen(len(buf))
-	in := remote.NewReaderBuffer(buf)
-	err = jpc.Unmarshal(ctx, recvMsg, in)
-	test.Assert(t, err == nil)
-	args, ok := recvMsg.Data().(*Args)
+	rw := jpc.getMessageReaderWriter()
+	_, ok := rw.(gproto.MessageWriter)
 	test.Assert(t, ok)
-	test.Assert(t, args.Request == `{"message":"hello world!"}`)
-}
+	_, ok = rw.(gproto.MessageReader)
+	test.Assert(t, ok)
 
-func initJsonPbSendMsg(tp transport.Protocol) remote.Message {
-	req := &Args{
-		Request: `{"message":"hello world!"}`,
-		Method:  "Echo",
-	}
-	svcInfo := mocks.ServiceInfo()
-	ink := rpcinfo.NewInvocation("", "Echo")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
-	return msg
-}
+	p, err = NewPbFileProviderWithDynamicGo(testIDLPath, context.Background(), opts)
+	test.Assert(t, err == nil)
 
-func initJsonPbRecvMsg() remote.Message {
-	resp := &Args{}
-	ink := rpcinfo.NewInvocation("", "Echo")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(resp, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
-	return msg
+	jpc = newJsonPbCodec(p, gOpts)
+	defer jpc.Close()
+
+	method, err = jpc.getMethod(nil, "ClientStreamingTest")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "ClientStreamingTest")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingClient)
+	test.Assert(t, jpc.svcName == "Mock")
+
+	method, err = jpc.getMethod(nil, "ServerStreamingTest")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "ServerStreamingTest")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingServer)
+	test.Assert(t, jpc.svcName == "Mock")
+
+	method, err = jpc.getMethod(nil, "BidirectionalStreamingTest")
+	test.Assert(t, err == nil)
+	test.Assert(t, method.Name == "BidirectionalStreamingTest")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingBidirectional)
+	test.Assert(t, jpc.svcName == "Mock")
 }

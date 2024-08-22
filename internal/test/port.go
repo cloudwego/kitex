@@ -47,7 +47,7 @@ func GetLocalAddress() string {
 	for {
 		time.Sleep(time.Millisecond * time.Duration(1+rand.Intn(10)))
 		port := atomic.AddUint32(&curPort, 1+uint32(rand.Intn(10)))
-		addr := "127.0.0.1:" + strconv.Itoa(int(port))
+		addr := "localhost:" + strconv.Itoa(int(port))
 		if !IsAddressInUse(addr) {
 			trace := strings.Split(string(debug.Stack()), "\n")
 			if len(trace) > 6 {
@@ -60,15 +60,12 @@ func GetLocalAddress() string {
 
 // tells if a net address is already in use.
 func IsAddressInUse(address string) bool {
-	// Attempt to establish a TCP connection to the address
-	conn, err := net.DialTimeout("tcp", address, time.Duration(1+rand.Intn(10))*100*time.Millisecond)
+	ln, err := net.Listen("tcp", address)
 	if err != nil {
-		// If there's an error, the address is likely not in use or not reachable
-		return false
+		return true
 	}
-	_ = conn.Close()
-	// If the connection is successful, the address is in use
-	return true
+	ln.Close()
+	return false
 }
 
 // WaitServerStart waits for server to start for at most 1 second

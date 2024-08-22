@@ -122,6 +122,7 @@ func (p *patcher) buildTemplates() (err error) {
 			templates.StructLikeDefault,
 			templates.FieldGetOrSet,
 			templates.FieldIsSet,
+			StructLikeDeepEqualEmpty,
 			StructLikeDeepCopy,
 			FieldDeepCopy,
 			FieldDeepCopyStructLike,
@@ -385,8 +386,15 @@ func getBashPath() string {
 func (p *patcher) extractLocalLibs(imports []util.Import) []util.Import {
 	ret := make([]util.Import, 0)
 	prefix := p.module + "/"
+	kitexPkgPath := generator.ImportPathTo("pkg")
 	// remove std libs and thrift to prevent duplicate import.
 	for _, v := range imports {
+		if strings.HasPrefix(v.Path, kitexPkgPath) {
+			// fix bad the case like: `undefined: bthrift.KitexUnusedProtection`
+			// when we generate code in kitex repo.
+			// we may never ref to other generate code in kitex repo, if do fix me.
+			continue
+		}
 		// local packages
 		if strings.HasPrefix(v.Path, prefix) {
 			ret = append(ret, v)

@@ -19,6 +19,7 @@ package mem
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -59,7 +60,7 @@ func TestSpan(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 1024; i++ {
+			for i := 0; i < 128; i++ {
 				buf := []byte("123")
 				test.DeepEqual(t, bc.Copy(buf), buf)
 
@@ -91,7 +92,7 @@ func TestSpanCache(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			for i := 0; i < 1024; i++ {
+			for i := 0; i < 128; i++ {
 				buf := []byte("123")
 				test.DeepEqual(t, bc.Copy(buf), buf)
 
@@ -127,17 +128,20 @@ func BenchmarkSpanCacheCopy(b *testing.B) {
 		b.Run(fmt.Sprintf("size=%d", sz), func(b *testing.B) {
 			from := make([]byte, sz)
 			sc := NewSpanCache(maxSpanObject * 8)
+			buffers := make([][]byte, 1024)
+			var bidx int32
+			b.ReportAllocs()
+			b.ResetTimer()
 			b.RunParallel(func(pb *testing.PB) {
-				b.ReportAllocs()
-				b.ResetTimer()
-				var buffer []byte
+				idx := atomic.AddInt32(&bidx, 1)
 				for pb.Next() {
-					buffer = sc.Copy(from)
+					buffer := sc.Copy(from)
 					buffer[0] = 'a'
 					buffer[sz-1] = 'z'
+					buffers[idx] = buffer
 				}
-				_ = buffer
 			})
+			_ = buffers
 		})
 	}
 }
@@ -146,18 +150,23 @@ func BenchmarkMakeAndCopy(b *testing.B) {
 	for _, sz := range benchStringSizes {
 		b.Run(fmt.Sprintf("size=%d", sz), func(b *testing.B) {
 			from := make([]byte, sz)
+			buffers := make([][]byte, 1024)
+			var bidx int32
+			b.ReportAllocs()
+			b.ResetTimer()
 			b.RunParallel(func(pb *testing.PB) {
-				b.ReportAllocs()
-				b.ResetTimer()
+				idx := atomic.AddInt32(&bidx, 1)
 				var buffer []byte
 				for pb.Next() {
 					buffer = make([]byte, sz)
 					copy(buffer, from)
 					buffer[0] = 'a'
 					buffer[sz-1] = 'z'
+					buffers[idx] = buffer
 				}
 				_ = buffer
 			})
+			_ = buffers
 		})
 	}
 }

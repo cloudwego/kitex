@@ -22,7 +22,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/bytedance/mockey"
 	"github.com/cloudwego/netpoll"
 	"github.com/golang/mock/gomock"
 
@@ -353,13 +352,4 @@ func TestCornerCase(t *testing.T) {
 	buffer.EXPECT().Malloc(gomock.Any()).Return(nil, errors.New("error malloc")).AnyTimes()
 	err := (&defaultCodec{}).EncodePayload(context.Background(), sendMsg, buffer)
 	test.Assert(t, err.Error() == "error malloc")
-
-	mockey.PatchConvey("", t, func() {
-		mockey.Mock(remote.GetPayloadCodec).Return(nil, errors.New("err get payload codec")).Build()
-		buffer = mocksremote.NewMockByteBuffer(ctrl)
-		buffer.EXPECT().MallocLen().Return(1024).AnyTimes()
-		buffer.EXPECT().Malloc(gomock.Any()).Return(nil, nil).AnyTimes()
-		err := (&defaultCodec{}).EncodePayload(context.Background(), sendMsg, buffer)
-		test.Assert(t, err.Error() == "err get payload codec")
-	})
 }

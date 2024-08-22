@@ -15,6 +15,7 @@
 package thriftgo
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -39,15 +40,19 @@ const (
 )
 
 // Hessian2PreHook Hook before building cmd
-func Hessian2PreHook(cfg *generator.Config) {
+func Hessian2PreHook(cfg *generator.Config) error {
 	// add thrift option
 	cfg.ThriftOptions = append(cfg.ThriftOptions, "template=slim,with_reflection,code_ref")
 	cfg.ThriftOptions = append(cfg.ThriftOptions, "enable_nested_struct")
 
 	// run hessian2 options
 	for _, opt := range cfg.Hessian2Options {
-		runOption(cfg, opt)
+		err := runOption(cfg, opt)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func IsHessian2(a generator.Config) bool {
@@ -64,15 +69,16 @@ func EnableJavaExtension(a generator.Config) bool {
 }
 
 // runOption Execute the corresponding function according to the option
-func runOption(cfg *generator.Config, opt string) {
+func runOption(cfg *generator.Config, opt string) error {
 	switch opt {
 	case JavaExtensionOption:
-		runJavaExtensionOption(cfg)
+		return runJavaExtensionOption(cfg)
 	}
+	return nil
 }
 
 // runJavaExtensionOption Pull the extension file of java class from remote
-func runJavaExtensionOption(cfg *generator.Config) {
+func runJavaExtensionOption(cfg *generator.Config) error {
 	// get java.thrift, we assume java.thrift and IDL in the same directory so that IDL just needs to include "java.thrift"
 	if path := util.JoinPath(filepath.Dir(cfg.IDL), JavaThrift); !util.Exists(path) {
 		if err := util.DownloadFile(JavaThriftAddress, path); err != nil {
@@ -81,17 +87,16 @@ func runJavaExtensionOption(cfg *generator.Config) {
 			if err != nil {
 				abs = path
 			}
-			log.Warnf("You can try to download again. If the download still fails, you can choose to manually download \"%s\" to the local path \"%s\".", JavaThriftAddress, abs)
-			os.Exit(1)
+			return fmt.Errorf("you can try to download again. If the download still fails, you can choose to manually download \"%s\" to the local path \"%s\"", JavaThriftAddress, abs)
 		}
 	}
 
 	// merge idl-ref configuration patch
-	patchIDLRefConfig(cfg)
+	return patchIDLRefConfig(cfg)
 }
 
 // patchIDLRefConfig merge idl-ref configuration patch
-func patchIDLRefConfig(cfg *generator.Config) {
+func patchIDLRefConfig(cfg *generator.Config) error {
 	// load the idl-ref config file (create it first if it does not exist)
 	// for making use of idl-ref of thriftgo, we need to check the project root directory
 	idlRef := filepath.Join(cfg.OutputPath, "idl-ref.yaml")
@@ -100,43 +105,41 @@ func patchIDLRefConfig(cfg *generator.Config) {
 	}
 	file, err := os.OpenFile(idlRef, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
-		log.Warnf("Open %s file failed: %s\n", idlRef, err.Error())
-		os.Exit(1)
+		return fmt.Errorf("open %s file failed: %s", idlRef, err.Error())
 	}
 	defer file.Close()
-	idlRefCfg := loadIDLRefConfig(file.Name(), file)
+	idlRefCfg, err := loadIDLRefConfig(file.Name(), file)
+	if err != nil {
+		return err
+	}
 
 	// assume java.thrift and IDL are in the same directory
 	javaRef := filepath.Join(filepath.Dir(cfg.IDL), JavaThrift)
 	idlRefCfg.Ref[javaRef] = DubboCodec + "/java"
 	out, err := yaml.Marshal(idlRefCfg)
 	if err != nil {
-		log.Warn("Marshal configuration failed:", err.Error())
-		os.Exit(1)
+		return fmt.Errorf("marshal configuration failed: %s", err.Error())
 	}
 	// clear the file content
 	if err := file.Truncate(0); err != nil {
-		log.Warnf("Truncate file %s failed: %s", idlRef, err.Error())
-		os.Exit(1)
+		return fmt.Errorf("truncate file %s failed: %s", idlRef, err.Error())
 	}
 	// set the file offset
 	if _, err := file.Seek(0, 0); err != nil {
-		log.Warnf("Seek file %s failed: %s", idlRef, err.Error())
-		os.Exit(1)
+		return fmt.Errorf("seek file %s failed: %s", idlRef, err.Error())
 	}
 	_, err = file.Write(out)
 	if err != nil {
-		log.Warnf("Write to file %s failed: %s\n", idlRef, err.Error())
-		os.Exit(1)
+		return fmt.Errorf("write to file %s failed: %s", idlRef, err.Error())
 	}
+	return nil
 }
 
 // loadIDLRefConfig load idl-ref config from file object
-func loadIDLRefConfig(fileName string, reader io.Reader) *config.RawConfig {
+func loadIDLRefConfig(fileName string, reader io.Reader) (*config.RawConfig, error) {
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
-		log.Warnf("Read %s file failed: %s\n", fileName, err.Error())
-		os.Exit(1)
+		return nil, fmt.Errorf("read %s file failed: %s", fileName, err.Error())
 	}
 
 	// build idl ref config
@@ -146,13 +149,11 @@ func loadIDLRefConfig(fileName string, reader io.Reader) *config.RawConfig {
 	} else {
 		err := yaml.Unmarshal(data, idlRefCfg)
 		if err != nil {
-			log.Warnf("Parse %s file failed: %s\n", fileName, err.Error())
-			log.Warn("Please check whether the idl ref configuration is correct.")
-			os.Exit(2)
+			return nil, fmt.Errorf("parse %s file failed: %s, Please check whether the idl ref configuration is correct", fileName, err.Error())
 		}
 	}
 
-	return idlRefCfg
+	return idlRefCfg, nil
 }
 
 var (

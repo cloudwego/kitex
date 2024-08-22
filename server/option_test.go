@@ -88,7 +88,7 @@ func TestOptionDebugInfo(t *testing.T) {
 // TestProxyOption tests the creation of a server with Proxy option
 func TestProxyOption(t *testing.T) {
 	var opts []Option
-	addr, err := net.ResolveTCPAddr("tcp", ":8888")
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:8888")
 	test.Assert(t, err == nil, err)
 	opts = append(opts, WithServiceAddr(addr))
 	opts = append(opts, WithProxy(&proxyMock{}))
@@ -136,7 +136,7 @@ func (m *mockDiagnosis) ProbePairs() map[diagnosis.ProbeName]diagnosis.ProbeFunc
 func TestExitWaitTimeOption(t *testing.T) {
 	// random timeout value
 	testTimeOut := time.Duration(time.Now().Unix()) * time.Microsecond
-	svr := NewServer(WithExitWaitTime(testTimeOut))
+	svr, _ := NewTestServer(WithExitWaitTime(testTimeOut))
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -153,7 +153,7 @@ func TestExitWaitTimeOption(t *testing.T) {
 func TestMaxConnIdleTimeOption(t *testing.T) {
 	// random timeout value
 	testTimeOut := time.Duration(time.Now().Unix())
-	svr := NewServer(WithMaxConnIdleTime(testTimeOut))
+	svr, _ := NewTestServer(WithMaxConnIdleTime(testTimeOut))
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -177,7 +177,7 @@ func (t *myTracer) Finish(ctx context.Context) {
 
 // TestTracerOption tests the creation of a server with TracerCtl option
 func TestTracerOption(t *testing.T) {
-	svr1 := NewServer()
+	svr1, _ := NewTestServer()
 	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -191,7 +191,7 @@ func TestTracerOption(t *testing.T) {
 	test.Assert(t, iSvr1.opt.TracerCtl.HasTracer() != true)
 
 	tracer := &myTracer{}
-	svr2 := NewServer(WithTracer(tracer))
+	svr2, _ := NewTestServer(WithTracer(tracer))
 	err = svr2.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -207,7 +207,7 @@ func TestTracerOption(t *testing.T) {
 
 // TestStatsLevelOption tests the creation of a server with StatsLevel option
 func TestStatsLevelOption(t *testing.T) {
-	svr1 := NewServer()
+	svr1, _ := NewTestServer()
 	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -220,7 +220,7 @@ func TestStatsLevelOption(t *testing.T) {
 	test.Assert(t, iSvr1.opt.StatsLevel != nil)
 	test.Assert(t, *iSvr1.opt.StatsLevel == stats.LevelDisabled)
 
-	svr2 := NewServer(WithStatsLevel(stats.LevelDetailed))
+	svr2, _ := NewTestServer(WithStatsLevel(stats.LevelDetailed))
 	err = svr2.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -243,7 +243,7 @@ func (s *mySuiteOption) Options() []Option {
 
 // TestSuiteOption tests the creation of a server with SuiteOption option
 func TestSuiteOption(t *testing.T) {
-	svr1 := NewServer()
+	svr1, _ := NewTestServer()
 	time.AfterFunc(100*time.Millisecond, func() {
 		err := svr1.Stop()
 		test.Assert(t, err == nil, err)
@@ -264,7 +264,7 @@ func TestSuiteOption(t *testing.T) {
 		WithExitWaitTime(tmpWaitTime),
 		WithMaxConnIdleTime(tmpConnIdleTime),
 	}}
-	svr2 := NewServer(WithSuite(suiteOpt))
+	svr2, _ := NewTestServer(WithSuite(suiteOpt))
 	time.AfterFunc(100*time.Millisecond, func() {
 		err := svr2.Stop()
 		test.Assert(t, err == nil, err)
@@ -283,7 +283,7 @@ func TestSuiteOption(t *testing.T) {
 
 // TestMuxTransportOption tests the creation of a server,with netpollmux remote.ServerTransHandlerFactory option,
 func TestMuxTransportOption(t *testing.T) {
-	svr1 := NewServer()
+	svr1, _ := NewTestServer()
 	time.AfterFunc(100*time.Millisecond, func() {
 		err := svr1.Stop()
 		test.Assert(t, err == nil, err)
@@ -298,7 +298,7 @@ func TestMuxTransportOption(t *testing.T) {
 			netpoll.NewTTHeaderStreamingSvrTransHandlerFactory(),
 			nphttp2.NewSvrTransHandlerFactory()))
 
-	svr2 := NewServer(WithMuxTransport())
+	svr2, _ := NewTestServer(WithMuxTransport())
 	time.AfterFunc(100*time.Millisecond, func() {
 		err := svr2.Stop()
 		test.Assert(t, err == nil, err)
@@ -315,7 +315,7 @@ func TestMuxTransportOption(t *testing.T) {
 // TestPayloadCodecOption tests the creation of a server with RemoteOpt.PayloadCodec option
 func TestPayloadCodecOption(t *testing.T) {
 	t.Run("NotSetPayloadCodec", func(t *testing.T) {
-		svr := NewServer()
+		svr, _ := NewTestServer()
 		time.AfterFunc(100*time.Millisecond, func() {
 			err := svr.Stop()
 			test.Assert(t, err == nil, err)
@@ -340,7 +340,7 @@ func TestPayloadCodecOption(t *testing.T) {
 		test.Assert(t, protobuf.IsProtobufCodec(pc))
 	})
 	t.Run("SetPreRegisteredProtobufCodec", func(t *testing.T) {
-		svr := NewServer(WithPayloadCodec(protobuf.NewProtobufCodec()))
+		svr, _ := NewTestServer(WithPayloadCodec(protobuf.NewProtobufCodec()))
 		time.AfterFunc(100*time.Millisecond, func() {
 			err := svr.Stop()
 			test.Assert(t, err == nil, err)
@@ -367,7 +367,7 @@ func TestPayloadCodecOption(t *testing.T) {
 
 	t.Run("SetPreRegisteredThriftCodec", func(t *testing.T) {
 		thriftCodec := thrift.NewThriftCodecDisableFastMode(false, true)
-		svr := NewServer(WithPayloadCodec(thriftCodec))
+		svr, _ := NewTestServer(WithPayloadCodec(thriftCodec))
 		time.AfterFunc(100*time.Millisecond, func() {
 			err := svr.Stop()
 			test.Assert(t, err == nil, err)
@@ -396,7 +396,7 @@ func TestPayloadCodecOption(t *testing.T) {
 	t.Run("SetNonPreRegisteredCodec", func(t *testing.T) {
 		// generic.BinaryThriftGeneric().PayloadCodec() is not the pre registered codec, RemoteOpt.PayloadCodec won't be nil
 		binaryThriftCodec := generic.BinaryThriftGeneric().PayloadCodec()
-		svr := NewServer(WithPayloadCodec(binaryThriftCodec))
+		svr, _ := NewTestServer(WithPayloadCodec(binaryThriftCodec))
 		time.AfterFunc(100*time.Millisecond, func() {
 			err := svr.Stop()
 			test.Assert(t, err == nil, err)
@@ -434,7 +434,7 @@ func TestRemoteOptGRPCCfgUintValueOption(t *testing.T) {
 	randUint3 := uint32(rand.Int31n(100)) + 1
 	randUint4 := uint32(rand.Int31n(100)) + 1
 
-	svr1 := NewServer(
+	svr1, _ := NewTestServer(
 		WithGRPCInitialWindowSize(randUint1),
 		WithGRPCInitialConnWindowSize(randUint2),
 		WithGRPCMaxConcurrentStreams(randUint3),
@@ -465,7 +465,7 @@ func TestGRPCKeepaliveEnforcementPolicyOption(t *testing.T) {
 		MinTime:             time.Duration(randInt) * time.Second,
 		PermitWithoutStream: true,
 	}
-	svr1 := NewServer(
+	svr1, _ := NewTestServer(
 		WithGRPCKeepaliveEnforcementPolicy(kep),
 	)
 
@@ -496,7 +496,7 @@ func TestGRPCKeepaliveParamsOption(t *testing.T) {
 		Time:                  randTimeDuration4,
 		Timeout:               randTimeDuration5,
 	}
-	svr1 := NewServer(
+	svr1, _ := NewTestServer(
 		WithGRPCKeepaliveParams(kp),
 	)
 
@@ -519,7 +519,7 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 	var msgTagging2 remote.MessageTagging = func(ctx context.Context, msg remote.Message) (context.Context, []string) {
 		return context.WithValue(ctx, "ctx2", 2), []string{"b", "2", "c", "2"}
 	}
-	svr := NewServer(WithProfilerMessageTagging(msgTagging1), WithProfilerMessageTagging(msgTagging2))
+	svr, _ := NewTestServer(WithProfilerMessageTagging(msgTagging1), WithProfilerMessageTagging(msgTagging2))
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {
@@ -534,17 +534,9 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 	ri := rpcinfo.NewRPCInfo(from, to, nil, nil, nil)
 	ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	svcInfo := mocks.ServiceInfo()
-	svcSearchMap := map[string]*serviceinfo.ServiceInfo{
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockMethod):          svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockExceptionMethod): svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockErrorMethod):     svcInfo,
-		remote.BuildMultiServiceKey(mocks.MockServiceName, mocks.MockOnewayMethod):    svcInfo,
-		mocks.MockMethod:          svcInfo,
-		mocks.MockExceptionMethod: svcInfo,
-		mocks.MockErrorMethod:     svcInfo,
-		mocks.MockOnewayMethod:    svcInfo,
-	}
-	msg := remote.NewMessageWithNewer(svcInfo, svcSearchMap, ri, remote.Call, remote.Server, false)
+	svcSearcher := newServices()
+	svcSearcher.addService(svcInfo, mocks.MyServiceHandler(), &RegisterOptions{})
+	msg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
 
 	newCtx, tags := iSvr.opt.RemoteOpt.ProfilerMessageTagging(ctx, msg)
 	test.Assert(t, len(tags) == 8)
@@ -554,7 +546,7 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 }
 
 func TestRefuseTrafficWithoutServiceNamOption(t *testing.T) {
-	svr := NewServer(WithRefuseTrafficWithoutServiceName())
+	svr, _ := NewTestServer(WithRefuseTrafficWithoutServiceName())
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
 	time.AfterFunc(100*time.Millisecond, func() {

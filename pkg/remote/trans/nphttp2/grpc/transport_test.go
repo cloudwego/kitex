@@ -465,55 +465,47 @@ func setUpWithOptions(t *testing.T, port int, serverConfig *ServerConfig, ht hTy
 	return server, ct.(*http2Client)
 }
 
-func setUpWithNoPingServer(t *testing.T, copts ConnectOptions, connCh chan net.Conn) *http2Client {
+func setUpWithNoPingServer(t *testing.T, copts ConnectOptions, connCh chan net.Conn, exitCh chan struct{}) *http2Client {
 	lis, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		fmt.Printf("Failed to listen: %v", err)
-		return nil
+		t.Fatalf("Failed to listen: %v", err)
+	}
+	// Launch a non responsive server and save the conn.
+	eventLoop, err := netpoll.NewEventLoop(
+		func(ctx context.Context, connection netpoll.Connection) error { return nil },
+		netpoll.WithOnConnect(func(ctx context.Context, connection netpoll.Connection) context.Context {
+			connCh <- connection.(netpoll.Conn)
+			t.Logf("event loop on connect: %s", connection.RemoteAddr().String())
+			return ctx
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Create netpoll event-loop failed: %v", err)
 	}
 	go func() {
-		exitCh := make(chan struct{}, 1)
-		// Launch a non responsive server.
-		eventLoop, err := netpoll.NewEventLoop(func(ctx context.Context, connection netpoll.Connection) error {
-			defer lis.Close()
-			connCh <- connection.(net.Conn)
-			exitCh <- struct{}{}
-			return nil
-		})
-		if err != nil {
-			fmt.Printf("Create netpoll event-loop failed")
-		}
-
 		go func() {
 			err = eventLoop.Serve(lis)
 			if err != nil {
-				fmt.Printf("netpoll server exit failed, err=%v", err)
+				t.Errorf("netpoll server exit failed, err=%v", err)
+				return
 			}
 		}()
-
-		select {
-		case <-exitCh:
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			defer cancel()
-			if err := eventLoop.Shutdown(ctx); err != nil {
-				fmt.Printf("netpoll server exit failed, err=%v", err)
-			}
-		default:
-		}
+		<-exitCh
+		// shutdown will called lis.Close()
+		_ = eventLoop.Shutdown(context.Background())
 	}()
 
 	conn, err := netpoll.NewDialer().DialTimeout("tcp", lis.Addr().String(), time.Second)
 	if err != nil {
-		fmt.Printf("Failed to dial: %v", err)
+		t.Fatalf("Failed to dial: %v", err)
 	}
 	tr, err := NewClientTransport(context.Background(), conn.(netpoll.Connection), copts, "mockDestService", func(GoAwayReason) {}, func() {})
 	if err != nil {
 		// Server clean-up.
-		lis.Close()
 		if conn, ok := <-connCh; ok {
 			conn.Close()
 		}
-		fmt.Printf("Failed to dial: %v", err)
+		t.Fatalf("Failed to dial: %v", err)
 	}
 	return tr.(*http2Client)
 }

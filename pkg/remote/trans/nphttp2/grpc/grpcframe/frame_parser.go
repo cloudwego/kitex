@@ -170,7 +170,8 @@ func parseHeadersFrame(_ *frameCache, fh http2.FrameHeader, p []byte) (_ http2.F
 			return nil, err
 		}
 	}
-	if len(p)-int(padLength) <= 0 {
+	// note: len(p)-int(padLength) == 0 is valid
+	if len(p)-int(padLength) < 0 {
 		return nil, http2.StreamError{StreamID: fh.StreamID, Code: http2.ErrCodeProtocol}
 	}
 	hf.headerFragBuf = p[:len(p)-int(padLength)]
