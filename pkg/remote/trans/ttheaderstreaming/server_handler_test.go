@@ -19,6 +19,8 @@ package ttheaderstreaming
 import (
 	"context"
 	"errors"
+	mocks_remote "github.com/cloudwego/kitex/internal/mocks/remote"
+	"github.com/cloudwego/kitex/pkg/utils"
 	"net"
 	"reflect"
 	"strings"
@@ -193,14 +195,14 @@ func Test_ttheaderStreamingTransHandler_finishTracer(t *testing.T) {
 
 func Test_ttheaderStreamingTransHandler_retrieveServiceMethodInfo(t *testing.T) {
 	h, _ := NewSvrTransHandler(&remote.ServerOption{
-		SvcSearchMap: map[string]*serviceinfo.ServiceInfo{
-			remote.BuildMultiServiceKey("service", "method"): {
+		SvcSearcher: mocks_remote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+			"service": {
 				ServiceName: "service",
 				Methods: map[string]serviceinfo.MethodInfo{
 					"method": serviceinfo.NewMethodInfo(nil, nil, nil, false),
 				},
 			},
-		},
+		}, nil),
 	}, nil)
 	svrHandler := h.(*ttheaderStreamingTransHandler)
 	ivk := rpcinfo.NewInvocation("service", "method")
@@ -490,7 +492,7 @@ func Test_ttheaderStreamingTransHandler_OnRead(t *testing.T) {
 	toMethodName := "to-method"
 	addr, _ := net.ResolveTCPAddr("tcp", "127.0.0.1:8888")
 	svcInfo := &serviceinfo.ServiceInfo{
-		ServiceName:  "xxx",
+		ServiceName:  idlServiceName,
 		PayloadCodec: serviceinfo.Protobuf,
 		Methods: map[string]serviceinfo.MethodInfo{
 			toMethodName: serviceinfo.NewMethodInfo(
@@ -510,9 +512,9 @@ func Test_ttheaderStreamingTransHandler_OnRead(t *testing.T) {
 				return rpcinfo.NewRPCInfo(from, to.ImmutableView(), ivk, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 			},
 			TracerCtl: &rpcinfo.TraceController{},
-			SvcSearchMap: map[string]*serviceinfo.ServiceInfo{
-				remote.BuildMultiServiceKey(idlServiceName, toMethodName): svcInfo,
-			},
+			SvcSearcher: mocks_remote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+				idlServiceName: svcInfo,
+			}, nil),
 		}
 		ext := &mockExtension{}
 		h, err := NewSvrTransHandler(opt, ext)
@@ -580,9 +582,9 @@ func Test_ttheaderStreamingTransHandler_OnRead(t *testing.T) {
 				return rpcinfo.NewRPCInfo(from, to.ImmutableView(), ivk, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 			},
 			TracerCtl: &rpcinfo.TraceController{},
-			SvcSearchMap: map[string]*serviceinfo.ServiceInfo{
-				remote.BuildMultiServiceKey(idlServiceName, toMethodName): svcInfo,
-			},
+			SvcSearcher: mocks_remote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+				buildMultiServiceKey(idlServiceName, toMethodName): svcInfo,
+			}, nil),
 		}
 		ext := &mockExtension{}
 		h, err := NewSvrTransHandler(opt, ext)
@@ -630,9 +632,9 @@ func Test_ttheaderStreamingTransHandler_OnRead(t *testing.T) {
 				return rpcinfo.NewRPCInfo(from, to.ImmutableView(), ivk, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 			},
 			TracerCtl: &rpcinfo.TraceController{},
-			SvcSearchMap: map[string]*serviceinfo.ServiceInfo{
-				remote.BuildMultiServiceKey(idlServiceName, toMethodName): svcInfo,
-			},
+			SvcSearcher: mocks_remote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+				buildMultiServiceKey(idlServiceName, toMethodName): svcInfo,
+			}, nil),
 		}
 		ext := &mockExtension{}
 		h, err := NewSvrTransHandler(opt, ext)
@@ -681,9 +683,9 @@ func Test_ttheaderStreamingTransHandler_OnRead(t *testing.T) {
 				return rpcinfo.NewRPCInfo(from, to.ImmutableView(), ivk, rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 			},
 			TracerCtl: &rpcinfo.TraceController{},
-			SvcSearchMap: map[string]*serviceinfo.ServiceInfo{
-				remote.BuildMultiServiceKey(idlServiceName, toMethodName): svcInfo,
-			},
+			SvcSearcher: mocks_remote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+				buildMultiServiceKey(idlServiceName, toMethodName): svcInfo,
+			}, nil),
 			GRPCUnknownServiceHandler: func(ctx context.Context, method string, stream streaming.Stream) error {
 				unknownMethodCalled = true
 				return nil
@@ -745,4 +747,13 @@ func Test_ttheaderStreamingTransHandler_OnRead(t *testing.T) {
 		test.Assert(t, unknownMethodCalled, unknownMethodCalled)
 		test.Assert(t, writeCnt == 2, writeCnt)
 	})
+}
+
+func buildMultiServiceKey(serviceName, methodName string) string {
+	var builder utils.StringBuilder
+	builder.Grow(len(serviceName) + len(methodName) + 1)
+	builder.WriteString(serviceName)
+	builder.WriteString(".")
+	builder.WriteString(methodName)
+	return builder.String()
 }

@@ -19,13 +19,13 @@ package remotecli
 import (
 	"context"
 	"errors"
+	"github.com/cloudwego/kitex/internal/mocks"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/golang/mock/gomock"
 
-	"github.com/cloudwego/kitex/internal/mocks"
 	mock_remote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"

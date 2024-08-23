@@ -113,7 +113,11 @@ func newMockCliTransHandlerFactory(ctrl *gomock.Controller) remote.ClientTransHa
 	handler.EXPECT().SetPipeline(gomock.Any()).AnyTimes()
 	handler.EXPECT().OnError(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	handler.EXPECT().OnInactive(gomock.Any(), gomock.Any()).AnyTimes()
-	return mocks.NewMockCliTransHandlerFactory(handler)
+	factory := mocksremote.NewMockClientTransHandlerFactory(ctrl)
+	factory.EXPECT().NewTransHandler(gomock.Any()).DoAndReturn(func(opt *remote.ClientOption) (remote.ClientTransHandler, error) {
+		return handler, nil
+	}).AnyTimes()
+	return factory
 }
 
 func newMockClient(tb testing.TB, ctrl *gomock.Controller, extra ...Option) Client {
