@@ -115,7 +115,6 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 	return ctx, err
 }
 
-// 只 return write err
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	svrTrans := ctx.Value(ctxKeySvrTransport).(*SvrTrans)
 	tr := svrTrans.tr
@@ -200,7 +199,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			}
 
 			rawStream := NewStream(rCtx, svcInfo, newServerConn(tr, s), t)
-			st := endpoint.NewStreamWithMiddleware(rawStream, t.opt.RecvEndpoint, t.opt.SendEndpoint)
+			st := newStreamWithMiddleware(rawStream, t.opt.RecvEndpoint, t.opt.SendEndpoint)
 
 			// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
 			rCtx = streaming.NewCtxWithStream(rCtx, st)

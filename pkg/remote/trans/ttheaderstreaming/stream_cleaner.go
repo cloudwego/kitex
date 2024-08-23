@@ -40,6 +40,11 @@ func init() {
 		Timeout: cleanConnectionTimeout,
 		Clean:   streamCleaner,
 	})
+	remotecli.RegisterCleaner(transport.TTHeaderFramed, &remotecli.StreamCleaner{
+		Async:   true,
+		Timeout: cleanConnectionTimeout,
+		Clean:   streamCleaner,
+	})
 }
 
 // streamCleaner discards remaining frames of the stream by reading until TrailerFrame (or an error),

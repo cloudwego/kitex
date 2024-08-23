@@ -32,10 +32,12 @@ func (c thriftCodec) Serialize(ctx context.Context, data interface{}) ([]byte, e
 // Deserialize implements the remote.StructCodec interface.
 // It's only for decoding bytes to thrift struct (`method`, `msgType` and `seqID` are not required here)
 func (c thriftCodec) Deserialize(ctx context.Context, data interface{}, payload []byte) (err error) {
-	tProt := NewBinaryProtocol(remote.NewReaderBuffer(payload))
-	if err = c.unmarshalThriftData(ctx, tProt, "", data, len(payload)); err != nil {
-		return perrors.NewProtocolError(err)
+	buf := remote.NewReaderBuffer(payload)
+	defer buf.Release(err)
+	if err = c.unmarshalThriftData(buf, data, len(payload)); err != nil {
+		err = perrors.NewProtocolError(err)
+		return
 	}
-	tProt.Recycle()
+
 	return nil
 }

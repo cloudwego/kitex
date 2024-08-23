@@ -176,7 +176,7 @@ func (t *ttheaderStreamingTransHandler) OnRead(ctx context.Context, conn net.Con
 		err = t.onEndStream(ctx, conn, ri, panicErr, err, rawStream)
 	}()
 
-	st := endpoint.NewStreamWithMiddleware(rawStream, t.opt.RecvEndpoint, t.opt.SendEndpoint)
+	st := newStreamWithMiddleware(rawStream, t.opt.RecvEndpoint, t.opt.SendEndpoint)
 	// bind stream into ctx, for user to set grpc style metadata(headers/trailers) by provided api in meta_api.go
 	ctx = streaming.NewCtxWithStream(ctx, st)
 
@@ -281,7 +281,7 @@ func (t *ttheaderStreamingTransHandler) unknownMethodWithRecover(
 
 func (t *ttheaderStreamingTransHandler) retrieveServiceMethodInfo(ri rpcinfo.RPCInfo) (*serviceinfo.ServiceInfo, serviceinfo.MethodInfo) {
 	svc, method := ri.Invocation().ServiceName(), ri.Invocation().MethodName()
-	svcInfo := t.opt.SvcSearchMap[remote.BuildMultiServiceKey(svc, method)]
+	svcInfo := t.opt.SvcSearcher.SearchService(svc, method, true)
 	if svcInfo == nil {
 		return nil, nil
 	}

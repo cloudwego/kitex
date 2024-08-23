@@ -145,6 +145,8 @@ type ClientOption struct {
 
 	EnableConnPoolReporter bool
 
+	Provider interface{} // streamx.ClientProvider
+
 	TTHeaderStreamingWaitMetaFrame  bool
 	TTHeaderStreamingGRPCCompatible bool // not enabled by default for performance issue
 }

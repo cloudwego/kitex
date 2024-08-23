@@ -20,7 +20,6 @@ import (
 	"context"
 	"net"
 
-	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -40,7 +39,7 @@ var (
 )
 
 type mockCliTransHandlerFactory struct {
-	hdlr                      *mocksremote.MockClientTransHandler
+	hdlr                      *MockCliTransHandler
 	NewStreamTransHandlerFunc func(opt *remote.ClientOption) (remote.ClientTransHandler, error)
 }
 
@@ -55,7 +54,7 @@ func (f *mockCliTransHandlerFactory) NewStreamTransHandler(opt *remote.ClientOpt
 }
 
 // NewMockCliTransHandlerFactory .
-func NewMockCliTransHandlerFactory(handler *mocksremote.MockClientTransHandler) remote.ClientTransHandlerFactory {
+func NewMockCliTransHandlerFactory(handler *MockCliTransHandler) remote.ClientTransHandlerFactory {
 	return &mockCliTransHandlerFactory{
 		hdlr: handler,
 	}
