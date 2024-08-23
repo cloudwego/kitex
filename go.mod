@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/apache/thrift v0.13.0
-	github.com/bytedance/gopkg v0.1.0
+	github.com/bytedance/gopkg v0.1.1-0.20240822091137-ff3e2edbc319
 	github.com/bytedance/sonic v1.12.1
 	github.com/cloudwego/configmanager v0.2.2
 	github.com/cloudwego/dynamicgo v0.3.0

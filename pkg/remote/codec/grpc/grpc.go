@@ -22,10 +22,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/fastpb"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/cloudwego/kitex/internal/utils/safemcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
@@ -74,7 +74,7 @@ func NewGRPCCodec(opts ...CodecOption) remote.Codec {
 }
 
 func mallocWithFirstByteZeroed(size int) []byte {
-	data := mcache.Malloc(size)
+	data := safemcache.Malloc(size)
 	data[0] = 0 // compressed flag = false
 	return data
 }
@@ -111,7 +111,7 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 				binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(size))
 				return writer.WriteData(payload)
 			}
-			payload = mcache.Malloc(size)
+			payload = safemcache.Malloc(size)
 			t.FastWrite(payload)
 		case marshaler:
 			size := t.Size()
@@ -123,7 +123,7 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 				binary.BigEndian.PutUint32(payload[1:dataFrameHeaderLen], uint32(size))
 				return writer.WriteData(payload)
 			}
-			payload = mcache.Malloc(size)
+			payload = safemcache.Malloc(size)
 			if _, err = t.MarshalTo(payload); err != nil {
 				return err
 			}
@@ -156,9 +156,9 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	if err != nil {
 		return err
 	}
-	var header [dataFrameHeaderLen]byte
+	header := safemcache.Malloc(dataFrameHeaderLen)
 	if isCompressed {
-		payload, err = compress(compressor, payload)
+		payload, err = compress(compressor, payload) // compress will `Free` payload
 		if err != nil {
 			return err
 		}
@@ -167,12 +167,11 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 		header[0] = 0
 	}
 	binary.BigEndian.PutUint32(header[1:dataFrameHeaderLen], uint32(len(payload)))
-	err = writer.WriteHeader(header[:])
+	err = writer.WriteHeader(header)
 	if err != nil {
 		return err
 	}
 	return writer.WriteData(payload)
-	// TODO: recycle payload?
 }
 
 func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {

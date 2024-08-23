@@ -219,7 +219,9 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		bufferPool:        newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.done)
-	if dynamicWindow {
+	if false && dynamicWindow {
+		// we force disable dynamic window here coz it's sending too many ping frames...
+		// and it may not work as expected when running on top of netpoll.
 		t.bdpEst = &bdpEstimator{
 			bdp:               initialWindowSize,
 			updateFlowControl: t.updateFlowControl,
@@ -716,6 +718,8 @@ func (t *http2Server) WriteHeader(s *Stream, md metadata.MD) error {
 }
 
 func (t *http2Server) setResetPingStrikes() {
+	// NOTE: if you're going to change this func
+	// update `resetPingStrikes` logic of `dataFrame` as well
 	atomic.StoreUint32(&t.resetPingStrikes, 1)
 }
 
@@ -831,15 +835,13 @@ func (t *http2Server) Write(s *Stream, hdr, data []byte, opts *Options) error {
 			return ContextErr(s.ctx.Err())
 		}
 	}
-	df := &dataFrame{
-		streamID:    s.id,
-		h:           hdr,
-		d:           data,
-		onEachWrite: t.setResetPingStrikes,
-	}
-	if len(hdr) == 0 && len(data) != 0 {
-		df.dcache = data
-	}
+	df := newDataFrame()
+	df.streamID = s.id
+	df.h = hdr
+	df.d = data
+	df.originH = df.h
+	df.originD = df.d
+	df.resetPingStrikes = &t.resetPingStrikes
 	if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
 		select {
 		case <-t.done:

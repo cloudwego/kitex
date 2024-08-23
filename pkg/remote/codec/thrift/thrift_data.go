@@ -22,10 +22,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/apache"
 
+	"github.com/cloudwego/kitex/internal/utils/safemcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
@@ -33,7 +33,17 @@ import (
 const marshalThriftBufferSize = 1024
 
 // MarshalThriftData only encodes the data (without the prepending methodName, msgType, seqId)
-// It will allocate a new buffer and encode to it
+// NOTE:
+// it's used by grpc only,
+// coz kitex grpc doesn't implements remote.Message and remote.ByteBuffer for rpc.
+//
+// for `FastWrite` or `FrugalWrite`,
+// the buf is created by `github.com/bytedance/gopkg/lang/mcache`, `Free` it at your own risk.
+//
+// for internals, actually,
+// coz it's hard to control the lifecycle of a returned buf, we use a safe version of `mcache` which is
+// compatible with `mcache` to make sure `Free` would not have any side effects.
+// see `github.com/cloudwego/kitex/internal/utils/safemcache` for details.
 func MarshalThriftData(ctx context.Context, codec remote.PayloadCodec, data interface{}) ([]byte, error) {
 	c, ok := codec.(*thriftCodec)
 	if !ok {
@@ -42,8 +52,7 @@ func MarshalThriftData(ctx context.Context, codec remote.PayloadCodec, data inte
 	return c.marshalThriftData(ctx, data)
 }
 
-// marshalBasicThriftData only encodes the data (without the prepending method, msgType, seqId)
-// It will allocate a new buffer and encode to it
+// NOTE: only used by `MarshalThriftData`
 func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([]byte, error) {
 	// TODO(xiaost): Refactor the code after v0.11.0 is released. Unifying checking and fallback logic.
 
@@ -55,7 +64,7 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 	if c.IsSet(FastWrite) {
 		if msg, ok := data.(thrift.FastCodec); ok {
 			payloadSize := msg.BLength()
-			payload := mcache.Malloc(payloadSize)
+			payload := safemcache.Malloc(payloadSize)
 			msg.FastWriteNocopy(payload, nil)
 			return payload, nil
 		}

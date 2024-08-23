@@ -191,7 +191,9 @@ func newHTTP2Client(ctx context.Context, conn net.Conn, opts ConnectOptions,
 		t.initialWindowSize = opts.InitialWindowSize
 		dynamicWindow = false
 	}
-	if dynamicWindow {
+	if false && dynamicWindow {
+		// we force disable dynamic window here coz it's sending too many ping frames...
+		// and it may not work as expected when running on top of netpoll.
 		t.bdpEst = &bdpEstimator{
 			bdp:               initialWindowSize,
 			updateFlowControl: t.updateFlowControl,
@@ -656,15 +658,13 @@ func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	} else if s.getState() != streamActive {
 		return errStreamDone
 	}
-	df := &dataFrame{
-		streamID:  s.id,
-		endStream: opts.Last,
-		h:         hdr,
-		d:         data,
-	}
-	if len(hdr) == 0 && len(data) != 0 {
-		df.dcache = data
-	}
+	df := newDataFrame()
+	df.streamID = s.id
+	df.endStream = opts.Last
+	df.h = hdr
+	df.d = data
+	df.originH = df.h
+	df.originD = df.d
 	if hdr != nil || data != nil { // If it's not an empty data frame, check quota.
 		if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
 			return err
