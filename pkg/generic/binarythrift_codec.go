@@ -21,6 +21,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/bytedance/gopkg/lang/dirtmake"
+	"github.com/cloudwego/gopkg/bufiox"
 	gthrift "github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -37,7 +39,7 @@ type binaryThriftCodec struct {
 	thriftCodec remote.PayloadCodec
 }
 
-func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 	data := msg.Data()
 	if data == nil {
 		return perrors.NewProtocolErrorWithMsg("invalid marshal data in rawThriftBinaryCodec: nil")
@@ -79,11 +81,11 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 			return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("rawThriftBinaryCodec set seqID failed, err: %s", err.Error()))
 		}
 	}
-	out.WriteBinary(transBuff)
-	return nil
+	_, err := out.WriteBinary(transBuff)
+	return err
 }
 
-func (c *binaryThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (c *binaryThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 	magicAndMsgType, err := codec.PeekUint32(in)
 	if err != nil {
 		return err
@@ -93,7 +95,8 @@ func (c *binaryThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, i
 		return c.thriftCodec.Unmarshal(ctx, msg, in)
 	}
 	payloadLen := msg.PayloadLen()
-	transBuff, err := in.ReadBinary(payloadLen)
+	transBuff := dirtmake.Bytes(payloadLen, payloadLen)
+	_, err = in.ReadBinary(transBuff)
 	if err != nil {
 		return err
 	}

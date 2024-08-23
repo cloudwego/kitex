@@ -17,14 +17,10 @@
 package invoke
 
 import (
-	"errors"
 	"net"
 	"time"
 
-	"github.com/cloudwego/netpoll"
-
-	"github.com/cloudwego/kitex/pkg/remote"
-	internal_netpoll "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/gopkg/bufiox"
 )
 
 var _ Message = &message{}
@@ -33,8 +29,8 @@ var _ Message = &message{}
 type PayloadHandler interface {
 	SetRequestBytes(buf []byte) error
 	GetResponseBytes() ([]byte, error)
-	GetRequestReaderByteBuffer() remote.ByteBuffer
-	GetResponseWriterByteBuffer() remote.ByteBuffer
+	GetRequestReaderByteBuffer() bufiox.Reader
+	GetResponseWriterByteBuffer() bufiox.Writer
 	Release() error
 }
 
@@ -47,8 +43,9 @@ type Message interface {
 type message struct {
 	localAddr  net.Addr
 	remoteAddr net.Addr
-	request    remote.ByteBuffer
-	response   remote.ByteBuffer
+	request    bufiox.Reader
+	writeBytes []byte
+	response   bufiox.Writer
 }
 
 // NewMessage creates a new Message using the given net.addr.
@@ -101,27 +98,24 @@ func (f *message) SetWriteDeadline(t time.Time) error {
 
 // SetRequestBytes implements the Message interface.
 func (f *message) SetRequestBytes(buf []byte) error {
-	f.request = remote.NewReaderBuffer(buf)
+	f.request = bufiox.NewBytesReader(buf)
 	return nil
 }
 
 // GetResponseBytes implements the Message interface.
 func (f *message) GetResponseBytes() ([]byte, error) {
-	if f.response == nil {
-		return nil, errors.New("response not init yet")
-	}
-	return f.response.Peek(f.response.ReadableLen())
+	return f.writeBytes, nil
 }
 
 // GetRequestReaderByteBuffer implements the Message interface.
-func (f *message) GetRequestReaderByteBuffer() remote.ByteBuffer {
+func (f *message) GetRequestReaderByteBuffer() bufiox.Reader {
 	return f.request
 }
 
 // GetResponseWriterByteBuffer implements the Message interface.
-func (f *message) GetResponseWriterByteBuffer() remote.ByteBuffer {
+func (f *message) GetResponseWriterByteBuffer() bufiox.Writer {
 	if f.response == nil {
-		f.response = internal_netpoll.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer(0))
+		f.response = bufiox.NewBytesWriter(&f.writeBytes)
 	}
 	return f.response
 }
@@ -129,10 +123,7 @@ func (f *message) GetResponseWriterByteBuffer() remote.ByteBuffer {
 // Release implements the Message interface.
 func (f *message) Release() error {
 	if f.request != nil {
-		f.request.Release(nil)
-	}
-	if f.response != nil {
-		f.response.Release(nil)
+		return f.request.Release(nil)
 	}
 	return nil
 }

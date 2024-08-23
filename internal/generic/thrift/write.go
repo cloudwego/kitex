@@ -37,7 +37,7 @@ type writerOption struct {
 	binaryWithBase64 bool
 }
 
-type writer func(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error
+type writer func(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error
 
 type fieldGetter func(val interface{}, field *descriptor.FieldDescriptor) (interface{}, bool)
 
@@ -207,7 +207,7 @@ func nextJSONWriter(data *gjson.Result, t *descriptor.TypeDescriptor, opt *write
 	return v, fn, nil
 }
 
-func writeEmptyValue(out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeEmptyValue(out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	switch t.Type {
 	case descriptor.BOOL:
 		out.WriteBool(false)
@@ -250,7 +250,7 @@ func writeEmptyValue(out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt
 }
 
 // TODO(marina.sakai): Optimize generic struct writer
-func wrapStructWriter(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func wrapStructWriter(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	for name, field := range t.Struct.FieldsByName {
 		if field.IsException {
 			// generic server ignore the exception, because no description for exception
@@ -273,7 +273,7 @@ func wrapStructWriter(ctx context.Context, val interface{}, out *thrift.BinaryWr
 }
 
 // TODO(marina.sakai): Optimize generic json writer
-func wrapJSONWriter(ctx context.Context, val *gjson.Result, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func wrapJSONWriter(ctx context.Context, val *gjson.Result, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	for name, field := range t.Struct.FieldsByName {
 		if field.IsException {
 			// generic server ignore the exception, because no description for exception
@@ -293,16 +293,16 @@ func wrapJSONWriter(ctx context.Context, val *gjson.Result, out *thrift.BinaryWr
 	return nil
 }
 
-func writeVoid(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeVoid(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	return writeStruct(ctx, map[string]interface{}{}, out, t, opt)
 }
 
-func writeBool(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeBool(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	out.WriteBool(val.(bool))
 	return nil
 }
 
-func writeInt8(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeInt8(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	var i int8
 	switch val := val.(type) {
 	case int8:
@@ -330,7 +330,7 @@ func writeInt8(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t
 	return fmt.Errorf("need int type, but got: %s", t.Type)
 }
 
-func writeInt16(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeInt16(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	// compatible with lossless conversion
 	i := val.(int16)
 	switch t.Type {
@@ -353,7 +353,7 @@ func writeInt16(ctx context.Context, val interface{}, out *thrift.BinaryWriter, 
 	return fmt.Errorf("need int type, but got: %s", t.Type)
 }
 
-func writeInt32(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeInt32(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	// compatible with lossless conversion
 	i := val.(int32)
 	switch t.Type {
@@ -379,7 +379,7 @@ func writeInt32(ctx context.Context, val interface{}, out *thrift.BinaryWriter, 
 	return fmt.Errorf("need int type, but got: %s", t.Type)
 }
 
-func writeInt64(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeInt64(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	// compatible with lossless conversion
 	i := val.(int64)
 	switch t.Type {
@@ -408,7 +408,7 @@ func writeInt64(ctx context.Context, val interface{}, out *thrift.BinaryWriter, 
 	return fmt.Errorf("need int type, but got: %s", t.Type)
 }
 
-func writeJSONNumber(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeJSONNumber(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	jn := val.(json.Number)
 	switch t.Type {
 	case descriptor.I08:
@@ -445,7 +445,7 @@ func writeJSONNumber(ctx context.Context, val interface{}, out *thrift.BinaryWri
 	return nil
 }
 
-func writeJSONFloat64(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeJSONFloat64(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	i := val.(float64)
 	switch t.Type {
 	case descriptor.I08:
@@ -462,17 +462,17 @@ func writeJSONFloat64(ctx context.Context, val interface{}, out *thrift.BinaryWr
 	return fmt.Errorf("need number type, but got: %s", t.Type)
 }
 
-func writeFloat64(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeFloat64(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	out.WriteDouble(val.(float64))
 	return nil
 }
 
-func writeString(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeString(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	out.WriteString(val.(string))
 	return nil
 }
 
-func writeBase64Binary(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeBase64Binary(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	bytes, err := base64.StdEncoding.DecodeString(val.(string))
 	if err != nil {
 		return err
@@ -481,12 +481,12 @@ func writeBase64Binary(ctx context.Context, val interface{}, out *thrift.BinaryW
 	return nil
 }
 
-func writeBinary(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeBinary(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	out.WriteBinary(val.([]byte))
 	return nil
 }
 
-func writeBinaryList(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeBinaryList(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	l := val.([]byte)
 	length := len(l)
 	out.WriteListBegin(t.Elem.Type.ToThriftTType(), length)
@@ -496,7 +496,7 @@ func writeBinaryList(ctx context.Context, val interface{}, out *thrift.BinaryWri
 	return nil
 }
 
-func writeList(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeList(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	l := val.([]interface{})
 	length := len(l)
 	out.WriteListBegin(t.Elem.Type.ToThriftTType(), length)
@@ -526,7 +526,7 @@ func writeList(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t
 	return nil
 }
 
-func writeJSONList(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeJSONList(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	l := val.([]gjson.Result)
 	length := len(l)
 	out.WriteListBegin(t.Elem.Type.ToThriftTType(), length)
@@ -545,7 +545,7 @@ func writeJSONList(ctx context.Context, val interface{}, out *thrift.BinaryWrite
 	return nil
 }
 
-func writeInterfaceMap(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeInterfaceMap(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	m := val.(map[interface{}]interface{})
 	length := len(m)
 	out.WriteMapBegin(t.Key.Type.ToThriftTType(), t.Elem.Type.ToThriftTType(), length)
@@ -584,7 +584,7 @@ func writeInterfaceMap(ctx context.Context, val interface{}, out *thrift.BinaryW
 	return nil
 }
 
-func writeStringMap(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeStringMap(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	m := val.(map[string]interface{})
 	length := len(m)
 	out.WriteMapBegin(t.Key.Type.ToThriftTType(), t.Elem.Type.ToThriftTType(), length)
@@ -627,7 +627,7 @@ func writeStringMap(ctx context.Context, val interface{}, out *thrift.BinaryWrit
 	return nil
 }
 
-func writeStringJSONMap(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeStringJSONMap(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	m := val.(map[string]gjson.Result)
 	length := len(m)
 	out.WriteMapBegin(t.Key.Type.ToThriftTType(), t.Elem.Type.ToThriftTType(), length)
@@ -664,7 +664,7 @@ func writeStringJSONMap(ctx context.Context, val interface{}, out *thrift.Binary
 	return nil
 }
 
-func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BinaryWriter, field *descriptor.FieldDescriptor, opt *writerOption) error {
+func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BufferWriter, field *descriptor.FieldDescriptor, opt *writerOption) error {
 	if st, ok := val.(map[string]interface{}); ok {
 		// copy from user's Extra
 		if ext, ok := st["Extra"]; ok {
@@ -709,7 +709,7 @@ func writeRequestBase(ctx context.Context, val interface{}, out *thrift.BinaryWr
 }
 
 // writeStruct iter with Descriptor, can check the field's required and others
-func writeStruct(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeStruct(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	var fg fieldGetter
 	switch val.(type) {
 	case map[string]interface{}:
@@ -759,7 +759,7 @@ func writeStruct(ctx context.Context, val interface{}, out *thrift.BinaryWriter,
 	return nil
 }
 
-func writeHTTPRequest(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeHTTPRequest(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	req := val.(*descriptor.HTTPRequest)
 	defer func() {
 		if req.Params != nil {
@@ -807,7 +807,7 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out *thrift.BinaryWr
 	return nil
 }
 
-func writeJSON(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
+func writeJSON(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error {
 	data := val.(*gjson.Result)
 	for name, field := range t.Struct.FieldsByName {
 		elem := data.Get(name)

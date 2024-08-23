@@ -25,6 +25,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	bufiox "github.com/cloudwego/gopkg/bufiox"
 	remote "github.com/cloudwego/kitex/pkg/remote"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -53,7 +54,7 @@ func (m *MockCodec) EXPECT() *MockCodecMockRecorder {
 }
 
 // Decode mocks base method.
-func (m *MockCodec) Decode(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (m *MockCodec) Decode(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Decode", ctx, msg, in)
 	ret0, _ := ret[0].(error)
@@ -67,7 +68,7 @@ func (mr *MockCodecMockRecorder) Decode(ctx, msg, in interface{}) *gomock.Call {
 }
 
 // Encode mocks base method.
-func (m *MockCodec) Encode(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (m *MockCodec) Encode(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Encode", ctx, msg, out)
 	ret0, _ := ret[0].(error)
@@ -118,7 +119,7 @@ func (m *MockMetaEncoder) EXPECT() *MockMetaEncoderMockRecorder {
 }
 
 // EncodeMetaAndPayload mocks base method.
-func (m *MockMetaEncoder) EncodeMetaAndPayload(ctx context.Context, msg remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
+func (m *MockMetaEncoder) EncodeMetaAndPayload(ctx context.Context, msg remote.Message, out bufiox.Writer, me remote.MetaEncoder) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EncodeMetaAndPayload", ctx, msg, out, me)
 	ret0, _ := ret[0].(error)
@@ -132,7 +133,7 @@ func (mr *MockMetaEncoderMockRecorder) EncodeMetaAndPayload(ctx, msg, out, me in
 }
 
 // EncodePayload mocks base method.
-func (m *MockMetaEncoder) EncodePayload(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (m *MockMetaEncoder) EncodePayload(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EncodePayload", ctx, msg, out)
 	ret0, _ := ret[0].(error)
@@ -169,7 +170,7 @@ func (m *MockMetaDecoder) EXPECT() *MockMetaDecoderMockRecorder {
 }
 
 // DecodeMeta mocks base method.
-func (m *MockMetaDecoder) DecodeMeta(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (m *MockMetaDecoder) DecodeMeta(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DecodeMeta", ctx, msg, in)
 	ret0, _ := ret[0].(error)
@@ -183,7 +184,7 @@ func (mr *MockMetaDecoderMockRecorder) DecodeMeta(ctx, msg, in interface{}) *gom
 }
 
 // DecodePayload mocks base method.
-func (m *MockMetaDecoder) DecodePayload(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (m *MockMetaDecoder) DecodePayload(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DecodePayload", ctx, msg, in)
 	ret0, _ := ret[0].(error)

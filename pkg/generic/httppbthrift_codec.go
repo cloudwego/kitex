@@ -24,6 +24,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/jhump/protoreflect/desc"
 
 	"github.com/cloudwego/kitex/internal/generic/proto"
@@ -122,7 +123,7 @@ func (c *httpPbThriftCodec) Close() error {
 }
 
 // Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
-func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 	svcDsc, ok := c.svcDsc.Load().(*descriptor.ServiceDescriptor)
 	if !ok {
 		return errors.New("get parser ServiceDescriptor failed")
@@ -138,7 +139,7 @@ func (c *httpPbThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 }
 
 // Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
-func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (c *httpPbThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
 	}

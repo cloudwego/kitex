@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -98,10 +100,10 @@ func TestFrugalCodec(t *testing.T) {
 
 				// MockNoTagArgs cannot be marshaled
 				sendMsg := initNoTagSendMsg(transport.TTHeader)
-				out := tb.NewBuffer()
-				err := codec.Marshal(ctx, sendMsg, out)
+				bw, _ := tb.NewBuffer()
+				err := codec.Marshal(ctx, sendMsg, bw)
 				test.Assert(t, err != nil)
-				out.Flush()
+				bw.Flush()
 			})
 			t.Run("configure frugal and data has tag", func(t *testing.T) {
 				ctx := context.Background()
@@ -121,9 +123,9 @@ func TestFrugalCodec(t *testing.T) {
 
 				// MockNoTagArgs cannot be marshaled
 				sendMsg := initNoTagSendMsg(transport.TTHeader)
-				out := tb.NewBuffer()
-				err := codec.Marshal(ctx, sendMsg, out)
-				out.Flush()
+				bw, _ := tb.NewBuffer()
+				err := codec.Marshal(ctx, sendMsg, bw)
+				bw.Flush()
 				test.Assert(t, err != nil)
 			})
 			t.Run("configure frugal and SkipDecoder for Buffer Protocol", func(t *testing.T) {
@@ -141,18 +143,19 @@ func testFrugalDataConversion(t *testing.T, ctx context.Context, codec remote.Pa
 		t.Run(tb.Name, func(t *testing.T) {
 			// encode client side
 			sendMsg := initFrugalTagSendMsg(protocol)
-			buf := tb.NewBuffer()
-			err := codec.Marshal(ctx, sendMsg, buf)
+			bw, br := tb.NewBuffer()
+			err := codec.Marshal(ctx, sendMsg, bw)
 			test.Assert(t, err == nil, err)
-			buf.Flush()
+			wl := bw.WrittenLen()
+			bw.Flush()
 
 			// decode server side
 			recvMsg := initFrugalTagRecvMsg()
 			if protocol != transport.PurePayload {
-				recvMsg.SetPayloadLen(buf.ReadableLen())
+				recvMsg.SetPayloadLen(wl)
 			}
 			test.Assert(t, err == nil, err)
-			err = codec.Unmarshal(ctx, recvMsg, buf)
+			err = codec.Unmarshal(ctx, recvMsg, br)
 			test.Assert(t, err == nil, err)
 
 			// compare Args
@@ -221,7 +224,7 @@ func TestThriftCodec_unmarshalThriftDataFrugal(t *testing.T) {
 	t.Run("Frugal with SkipDecoder enabled", func(t *testing.T) {
 		req := &MockFrugalTagReq{}
 		codec := &thriftCodec{FrugalRead | EnableSkipDecoder}
-		trans := remote.NewReaderBuffer(mockReqThrift)
+		trans := bufiox.NewBytesReader(mockReqThrift)
 		// specify dataLen with 0 so that skipDecoder works
 		err := codec.unmarshalThriftData(trans, req, 0)
 		checkDecodeResult(t, err, &mocks.MockReq{
@@ -244,7 +247,7 @@ func TestThriftCodec_unmarshalThriftDataFrugal(t *testing.T) {
 			15 /* list */, 0, 3 /* id=3 */, 6 /* item:I16 */, 0, 0, 0, 1 /* length=1 */, 0, 1, /* I16=1 */
 			0, /* end of struct */
 		}
-		trans := remote.NewReaderBuffer(faultMockReqThrift)
+		trans := bufiox.NewBytesReader(faultMockReqThrift)
 		// specify dataLen with 0 so that skipDecoder works
 		err := codec.unmarshalThriftData(trans, req, 0)
 		test.Assert(t, err != nil, err)

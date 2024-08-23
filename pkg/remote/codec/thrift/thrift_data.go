@@ -17,12 +17,11 @@
 package thrift
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/bytedance/gopkg/lang/mcache"
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/apache"
 
@@ -71,11 +70,13 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 	}
 
 	// fallback to old thrift way (slow)
-	buf := bytes.NewBuffer(make([]byte, 0, marshalThriftBufferSize))
-	if err := apache.ThriftWrite(buf, data); err != nil {
+	buf := make([]byte, 0, marshalThriftBufferSize)
+	bw := bufiox.NewBytesWriter(&buf)
+	if err := apache.ThriftWrite(bw, data); err != nil {
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	_ = bw.Flush()
+	return buf, nil
 }
 
 // verifyMarshalBasicThriftDataType verifies whether data could be marshaled by old thrift way
@@ -86,7 +87,7 @@ func verifyMarshalBasicThriftDataType(data interface{}) error {
 	return nil
 }
 
-func unmarshalThriftException(in io.Reader) error {
+func unmarshalThriftException(in bufiox.Reader) error {
 	d := thrift.NewSkipDecoder(in)
 	defer d.Release()
 	b, err := d.Next(thrift.STRUCT)
@@ -108,7 +109,7 @@ func UnmarshalThriftData(ctx context.Context, codec remote.PayloadCodec, method 
 	if !ok {
 		c = defaultCodec
 	}
-	trans := remote.NewReaderBuffer(buf)
+	trans := bufiox.NewBytesReader(buf)
 	defer trans.Release(nil)
 	return c.unmarshalThriftData(trans, data, len(buf))
 }
@@ -121,7 +122,7 @@ func (c thriftCodec) fastMessageUnmarshalAvailable(data interface{}, payloadLen 
 	return ok
 }
 
-func (c thriftCodec) fastUnmarshal(trans remote.ByteBuffer, data interface{}, dataLen int) error {
+func (c thriftCodec) fastUnmarshal(trans bufiox.Reader, data interface{}, dataLen int) error {
 	msg := data.(thrift.FastCodec)
 	if dataLen > 0 {
 		buf, err := trans.Next(dataLen)
@@ -147,7 +148,7 @@ func (c thriftCodec) fastUnmarshal(trans remote.ByteBuffer, data interface{}, da
 
 // unmarshalThriftData only decodes the data (after methodName, msgType and seqId)
 // method is only used for generic calls
-func (c thriftCodec) unmarshalThriftData(trans remote.ByteBuffer, data interface{}, dataLen int) error {
+func (c thriftCodec) unmarshalThriftData(trans bufiox.Reader, data interface{}, dataLen int) error {
 	// decode with hyper unmarshal
 	if c.IsSet(FrugalRead) && c.hyperMessageUnmarshalAvailable(data, dataLen) {
 		return c.hyperUnmarshal(trans, data, dataLen)
@@ -176,7 +177,7 @@ func (c thriftCodec) unmarshalThriftData(trans remote.ByteBuffer, data interface
 	return decodeBasicThriftData(trans, data)
 }
 
-func (c thriftCodec) hyperUnmarshal(trans remote.ByteBuffer, data interface{}, dataLen int) error {
+func (c thriftCodec) hyperUnmarshal(trans bufiox.Reader, data interface{}, dataLen int) error {
 	if dataLen > 0 {
 		buf, err := trans.Next(dataLen)
 		if err != nil {
@@ -207,7 +208,7 @@ func verifyUnmarshalBasicThriftDataType(data interface{}) error {
 }
 
 // decodeBasicThriftData decode thrift body the old way (slow)
-func decodeBasicThriftData(trans remote.ByteBuffer, data interface{}) error {
+func decodeBasicThriftData(trans bufiox.Reader, data interface{}) error {
 	var err error
 	if err = verifyUnmarshalBasicThriftDataType(data); err != nil {
 		return err
@@ -218,7 +219,7 @@ func decodeBasicThriftData(trans remote.ByteBuffer, data interface{}) error {
 	return nil
 }
 
-func getSkippedStructBuffer(trans remote.ByteBuffer) ([]byte, error) {
+func getSkippedStructBuffer(trans bufiox.Reader) ([]byte, error) {
 	sd := thrift.NewSkipDecoder(trans)
 	buf, err := sd.Next(thrift.STRUCT)
 	if err != nil {

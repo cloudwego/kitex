@@ -23,6 +23,7 @@ import (
 	"net"
 	"sync/atomic"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -71,11 +72,10 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	ri := sendMsg.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
 	buf := netpoll.NewLinkBuffer()
-	bufWriter := np.NewWriterByteBuffer(buf)
+	bufWriter := np.NewBufioxWriter(buf)
 	defer func() {
 		if err != nil {
 			buf.Close()
-			bufWriter.Release(err)
 		}
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, nil)
 	}()
@@ -149,9 +149,10 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 		if err != nil && errors.Is(err, netpoll.ErrReadTimeout) {
 			err = kerrors.ErrRPCTimeout.WithCause(err)
 		}
-		if l := bufReader.ReadableLen(); l > 0 {
-			bufReader.Skip(l)
-		}
+		// skip is just for reusing buffer, so it's safe to remove the codes below
+		//if l := bufReader.ReadableLen(); l > 0 {
+		//	bufReader.Skip(l)
+		//}
 		bufReader.Release(nil)
 		rpcinfo.Record(ctx, ri, stats.ReadFinish, err)
 		return ctx, err
@@ -185,21 +186,21 @@ func (t *cliTransHandler) SetPipeline(p *remote.TransPipeline) {
 
 type asyncCallback struct {
 	wbuf       *netpoll.LinkBuffer
-	bufWriter  remote.ByteBuffer
-	notifyChan chan remote.ByteBuffer // notify recv reader
-	closed     int32                  // 1 is closed, 2 means wbuf has been flush
+	bufWriter  bufiox.Writer
+	notifyChan chan bufiox.Reader // notify recv reader
+	closed     int32              // 1 is closed, 2 means wbuf has been flush
 }
 
-func newAsyncCallback(wbuf *netpoll.LinkBuffer, bufWriter remote.ByteBuffer) *asyncCallback {
+func newAsyncCallback(wbuf *netpoll.LinkBuffer, bufWriter bufiox.Writer) *asyncCallback {
 	return &asyncCallback{
 		wbuf:       wbuf,
 		bufWriter:  bufWriter,
-		notifyChan: make(chan remote.ByteBuffer, 1),
+		notifyChan: make(chan bufiox.Reader, 1),
 	}
 }
 
 // Recv is called when receive a message.
-func (c *asyncCallback) Recv(bufReader remote.ByteBuffer, err error) error {
+func (c *asyncCallback) Recv(bufReader bufiox.Reader, err error) error {
 	c.notify(bufReader)
 	return nil
 }
@@ -208,12 +209,11 @@ func (c *asyncCallback) Recv(bufReader remote.ByteBuffer, err error) error {
 func (c *asyncCallback) Close() error {
 	if atomic.CompareAndSwapInt32(&c.closed, 0, 1) {
 		c.wbuf.Close()
-		c.bufWriter.Release(nil)
 	}
 	return nil
 }
 
-func (c *asyncCallback) notify(bufReader remote.ByteBuffer) {
+func (c *asyncCallback) notify(bufReader bufiox.Reader) {
 	select {
 	case c.notifyChan <- bufReader:
 	default:

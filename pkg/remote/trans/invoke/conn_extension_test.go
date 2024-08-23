@@ -44,9 +44,8 @@ func Test_ivkConnExtension_ReleaseBuffer(t *testing.T) {
 	msg.GetRequestReaderByteBuffer()
 	ext := newIvkConnExtension()
 	bufWriter := ext.NewWriteByteBuffer(context.Background(), msg, nil)
-	bufWriter.WriteString("any")
+	bufWriter.WriteBinary([]byte("any"))
 	bufWriter.Flush()
-	ext.ReleaseBuffer(bufWriter, nil)
 	b, err := msg.GetResponseBytes()
 	if err != nil {
 		t.Fatal(err)

@@ -25,6 +25,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	bufiox "github.com/cloudwego/gopkg/bufiox"
 	remote "github.com/cloudwego/kitex/pkg/remote"
 	gomock "github.com/golang/mock/gomock"
 )
@@ -53,7 +54,7 @@ func (m *MockPayloadCodec) EXPECT() *MockPayloadCodecMockRecorder {
 }
 
 // Marshal mocks base method.
-func (m *MockPayloadCodec) Marshal(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
+func (m *MockPayloadCodec) Marshal(ctx context.Context, message remote.Message, out bufiox.Writer) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Marshal", ctx, message, out)
 	ret0, _ := ret[0].(error)
@@ -81,7 +82,7 @@ func (mr *MockPayloadCodecMockRecorder) Name() *gomock.Call {
 }
 
 // Unmarshal mocks base method.
-func (m *MockPayloadCodec) Unmarshal(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
+func (m *MockPayloadCodec) Unmarshal(ctx context.Context, message remote.Message, in bufiox.Reader) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Unmarshal", ctx, message, in)
 	ret0, _ := ret[0].(error)

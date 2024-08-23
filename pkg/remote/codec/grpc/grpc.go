@@ -24,6 +24,7 @@ import (
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/fastpb"
+	"github.com/cloudwego/gopkg/bufiox"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -79,7 +80,7 @@ func mallocWithFirstByteZeroed(size int) []byte {
 	return data
 }
 
-func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
+func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out bufiox.Writer) (err error) {
 	var payload []byte
 	defer func() {
 		// record send size, even when err != nil (0 is recorded to the lastSendSize)
@@ -175,7 +176,7 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	// TODO: recycle payload?
 }
 
-func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
+func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in bufiox.Reader) (err error) {
 	d, err := decodeGRPCFrame(ctx, in)
 	if rpcStats := rpcinfo.AsMutableRPCStats(message.RPCInfo().Stats()); rpcStats != nil {
 		// record recv size, even when err != nil (0 is recorded to the lastRecvSize)

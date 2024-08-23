@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/localsession"
 	"github.com/cloudwego/localsession/backup"
 	"github.com/golang/mock/gomock"
@@ -1037,21 +1038,19 @@ func (f *mockSvrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (
 	return f.hdlr, nil
 }
 
-type mockExtension struct{}
+type mockExtension struct {
+	writeBuf []byte
+}
 
 func (m mockExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cfg rpcinfo.RPCConfig, role remote.RPCRole) {
 }
 
-func (m mockExtension) NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-	return remote.NewWriterBuffer(0)
+func (m mockExtension) NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Writer {
+	return bufiox.NewBytesWriter(&m.writeBuf)
 }
 
-func (m mockExtension) NewReadByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-	return remote.NewReaderBuffer(nil)
-}
-
-func (m mockExtension) ReleaseBuffer(buffer remote.ByteBuffer, err error) error {
-	return nil
+func (m mockExtension) NewReadByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Reader {
+	return bufiox.NewBytesReader(nil)
 }
 
 func (m mockExtension) IsTimeoutErr(err error) bool {
@@ -1063,22 +1062,22 @@ func (m mockExtension) IsRemoteClosedErr(err error) bool {
 }
 
 type mockCodec struct {
-	EncodeFunc func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error
-	DecodeFunc func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error
+	EncodeFunc func(ctx context.Context, msg remote.Message, out bufiox.Writer) error
+	DecodeFunc func(ctx context.Context, msg remote.Message, in bufiox.Reader) error
 }
 
 func (m *mockCodec) Name() string {
 	return "Mock"
 }
 
-func (m *mockCodec) Encode(ctx context.Context, msg remote.Message, out remote.ByteBuffer) (err error) {
+func (m *mockCodec) Encode(ctx context.Context, msg remote.Message, out bufiox.Writer) (err error) {
 	if m.EncodeFunc != nil {
 		return m.EncodeFunc(ctx, msg, out)
 	}
 	return
 }
 
-func (m *mockCodec) Decode(ctx context.Context, msg remote.Message, in remote.ByteBuffer) (err error) {
+func (m *mockCodec) Decode(ctx context.Context, msg remote.Message, in bufiox.Reader) (err error) {
 	if m.DecodeFunc != nil {
 		return m.DecodeFunc(ctx, msg, in)
 	}

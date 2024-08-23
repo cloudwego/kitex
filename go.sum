@@ -24,8 +24,8 @@ github.com/cloudwego/fastpb v0.0.4 h1:/ROVVfoFtpfc+1pkQLzGs+azjxUbSOsAqSY4tAAx4m
 github.com/cloudwego/fastpb v0.0.4/go.mod h1:/V13XFTq2TUkxj2qWReV8MwfPC4NnPcy6FsrojnsSG0=
 github.com/cloudwego/frugal v0.2.0 h1:0ETSzQYoYqVvdl7EKjqJ9aJnDoG6TzvNKV3PMQiQTS8=
 github.com/cloudwego/frugal v0.2.0/go.mod h1:cpnV6kdRMjN3ylxRo63RNbZ9rBK6oxs70Zk6QZ4Enj4=
-github.com/cloudwego/gopkg v0.1.1-0.20240816085453-9fbe8155005d h1:QBV/89XA0Mwlk6LQgLIDIf1vDMWSn9O2Xx1lJX7PRGI=
-github.com/cloudwego/gopkg v0.1.1-0.20240816085453-9fbe8155005d/go.mod h1:32yKw2zkpTMtuX6amJR0EMK79f0vGPr67UcArCOlZLU=
+github.com/cloudwego/gopkg v0.1.1-0.20240823093944-201936868bcd h1:XsP/YyZn4cNlEGnB/km7VjHIDw8tS7pV6C7VjE6h4Ho=
+github.com/cloudwego/gopkg v0.1.1-0.20240823093944-201936868bcd/go.mod h1:T/IX/0zcJM1iWErpx92ris1KN9utc2oJnVE/mvcRa6Y=
 github.com/cloudwego/iasm v0.2.0 h1:1KNIy1I1H9hNNFEEH3DVnI4UujN+1zjpuk6gwHLTssg=
 github.com/cloudwego/iasm v0.2.0/go.mod h1:8rXZaNYT2n95jn+zTI1sDr+IgcD2GVs0nlbbQPiEFhY=
 github.com/cloudwego/localsession v0.0.2 h1:N9/IDtCPj1fCL9bCTP+DbXx3f40YjVYWcwkJG0YhQkY=

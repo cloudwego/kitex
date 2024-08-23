@@ -24,6 +24,7 @@ import (
 	"io"
 
 	"github.com/bytedance/gopkg/lang/mcache"
+	"github.com/cloudwego/gopkg/bufiox"
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 
@@ -37,7 +38,7 @@ func getSendCompressor(ctx context.Context) (encoding.Compressor, error) {
 	return encoding.FindCompressor(remote.GetSendCompressor(ri))
 }
 
-func decodeGRPCFrame(ctx context.Context, in remote.ByteBuffer) ([]byte, error) {
+func decodeGRPCFrame(ctx context.Context, in bufiox.Reader) ([]byte, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	compressor, err := encoding.FindCompressor(remote.GetRecvCompressor(ri))
 	if err != nil {

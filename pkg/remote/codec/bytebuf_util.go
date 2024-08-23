@@ -21,11 +21,14 @@ import (
 	"errors"
 	"io"
 
-	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/bytedance/gopkg/lang/dirtmake"
+	"github.com/cloudwego/gopkg/bufiox"
+
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 // ReadUint32 ...
-func ReadUint32(in remote.ByteBuffer) (uint32, error) {
+func ReadUint32(in bufiox.Reader) (uint32, error) {
 	var buf []byte
 	var err error
 	if buf, err = in.Next(Size32); err != nil {
@@ -35,7 +38,7 @@ func ReadUint32(in remote.ByteBuffer) (uint32, error) {
 }
 
 // PeekUint32 ...
-func PeekUint32(in remote.ByteBuffer) (uint32, error) {
+func PeekUint32(in bufiox.Reader) (uint32, error) {
 	var buf []byte
 	var err error
 	if buf, err = in.Peek(Size32); err != nil {
@@ -45,7 +48,7 @@ func PeekUint32(in remote.ByteBuffer) (uint32, error) {
 }
 
 // ReadUint16 ...
-func ReadUint16(in remote.ByteBuffer) (uint16, error) {
+func ReadUint16(in bufiox.Reader) (uint16, error) {
 	buf, err := in.Next(Size16)
 	if err != nil {
 		return 0, err
@@ -55,7 +58,7 @@ func ReadUint16(in remote.ByteBuffer) (uint16, error) {
 }
 
 // WriteUint32 ...
-func WriteUint32(val uint32, out remote.ByteBuffer) error {
+func WriteUint32(val uint32, out bufiox.Writer) error {
 	var buf []byte
 	var err error
 	if buf, err = out.Malloc(Size32); err != nil {
@@ -66,7 +69,7 @@ func WriteUint32(val uint32, out remote.ByteBuffer) error {
 }
 
 // WriteUint16 ...
-func WriteUint16(val uint16, out remote.ByteBuffer) error {
+func WriteUint16(val uint16, out bufiox.Writer) error {
 	var buf []byte
 	var err error
 	if buf, err = out.Malloc(Size16); err != nil {
@@ -77,7 +80,7 @@ func WriteUint16(val uint16, out remote.ByteBuffer) error {
 }
 
 // WriteByte ...
-func WriteByte(val byte, out remote.ByteBuffer) error {
+func WriteByte(val byte, out bufiox.Writer) error {
 	var buf []byte
 	var err error
 	if buf, err = out.Malloc(1); err != nil {
@@ -122,7 +125,7 @@ func Bytes2Uint8(bytes []byte, off int) (uint8, error) {
 }
 
 // ReadString ...
-func ReadString(in remote.ByteBuffer) (string, int, error) {
+func ReadString(in bufiox.Reader) (string, int, error) {
 	strLen, err := ReadUint32(in)
 	if err != nil {
 		return "", 0, err
@@ -130,17 +133,20 @@ func ReadString(in remote.ByteBuffer) (string, int, error) {
 	if strLen == 0 {
 		return "", 0, errors.New("invalid string length in ReadString")
 	}
-	str, err := in.ReadString(int(strLen))
-	return str, int(strLen) + Size32, err
+	bs := dirtmake.Bytes(int(strLen), int(strLen))
+	if _, err = in.ReadBinary(bs); err != nil {
+		return "", 0, err
+	}
+	return utils.SliceByteToString(bs), int(strLen) + Size32, nil
 }
 
 // WriteString ...
-func WriteString(val string, out remote.ByteBuffer) (int, error) {
+func WriteString(val string, out bufiox.Writer) (int, error) {
 	strLen := len(val)
 	if err := WriteUint32(uint32(strLen), out); err != nil {
 		return 0, err
 	}
-	n, err := out.WriteString(val)
+	n, err := out.WriteBinary(utils.StringToSliceByte(val))
 	if err != nil {
 		return 0, err
 	}
@@ -148,12 +154,12 @@ func WriteString(val string, out remote.ByteBuffer) (int, error) {
 }
 
 // WriteString2BLen ...
-func WriteString2BLen(val string, out remote.ByteBuffer) (int, error) {
+func WriteString2BLen(val string, out bufiox.Writer) (int, error) {
 	strLen := len(val)
 	if err := WriteUint16(uint16(strLen), out); err != nil {
 		return 0, err
 	}
-	n, err := out.WriteString(val)
+	n, err := out.WriteBinary(utils.StringToSliceByte(val))
 	if err != nil {
 		return 0, err
 	}

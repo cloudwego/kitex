@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -116,7 +118,7 @@ const (
 
 type ttHeader struct{}
 
-func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (totalLenField []byte, err error) {
+func (t ttHeader) encode(ctx context.Context, message remote.Message, out bufiox.Writer) (totalLenField []byte, err error) {
 	// 1. header meta
 	var headerMeta []byte
 	headerMeta, err = out.Malloc(TTHeaderMetaSize)
@@ -156,7 +158,7 @@ func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote
 	return totalLenField, err
 }
 
-func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
+func (t ttHeader) decode(ctx context.Context, message remote.Message, in bufiox.Reader) error {
 	headerMeta, err := in.Next(TTHeaderMetaSize)
 	if err != nil {
 		return perrors.NewProtocolError(err)
@@ -207,7 +209,7 @@ func (t ttHeader) decode(ctx context.Context, message remote.Message, in remote.
 	return err
 }
 
-func writeKVInfo(writtenSize int, message remote.Message, out remote.ByteBuffer) (writeSize int, err error) {
+func writeKVInfo(writtenSize int, message remote.Message, out bufiox.Writer) (writeSize int, err error) {
 	writeSize = writtenSize
 	tm := message.TransInfo()
 	// str kv info
@@ -450,12 +452,12 @@ func checkProtocolID(protoID uint8, message remote.Message) error {
 type meshHeader struct{}
 
 //lint:ignore U1000 until encode is used
-func (m meshHeader) encode(ctx context.Context, message remote.Message, payloadBuf, out remote.ByteBuffer) error {
+func (m meshHeader) encode(ctx context.Context, message remote.Message, payloadBuf, out bufiox.Writer) error {
 	// do nothing, kitex just support decode meshHeader, encode protocol depend on the payload
 	return nil
 }
 
-func (m meshHeader) decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
+func (m meshHeader) decode(ctx context.Context, message remote.Message, in bufiox.Reader) error {
 	headerMeta, err := in.Next(Size32)
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("meshHeader read header meta failed, %s", err.Error()))

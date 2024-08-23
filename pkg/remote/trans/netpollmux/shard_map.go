@@ -19,12 +19,12 @@ package netpollmux
 import (
 	"sync"
 
-	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/gopkg/bufiox"
 )
 
 // EventHandler is used to handle events
 type EventHandler interface {
-	Recv(bufReader remote.ByteBuffer, err error) error
+	Recv(bufReader bufiox.Reader, err error) error
 }
 
 // A concurrent safe <seqID,EventHandler> map

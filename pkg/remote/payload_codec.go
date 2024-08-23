@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -27,8 +29,8 @@ var payloadCodecs = make(map[serviceinfo.PayloadCodec]PayloadCodec)
 
 // PayloadCodec is used to marshal and unmarshal payload.
 type PayloadCodec interface {
-	Marshal(ctx context.Context, message Message, out ByteBuffer) error
-	Unmarshal(ctx context.Context, message Message, in ByteBuffer) error
+	Marshal(ctx context.Context, message Message, out bufiox.Writer) error
+	Unmarshal(ctx context.Context, message Message, in bufiox.Reader) error
 	Name() string
 }
 

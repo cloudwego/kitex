@@ -84,7 +84,7 @@ func (c *muxCliConn) OnRequest(ctx context.Context, connection netpoll.Connectio
 		ctl := NewControlFrame()
 		msg := remote.NewMessage(ctl, nil, ri, remote.Reply, remote.Client)
 
-		bufReader := np.NewReaderByteBuffer(reader)
+		bufReader := np.NewBufioxReader(reader)
 		if err = defaultCodec.Decode(ctx, msg, bufReader); err != nil {
 			return
 		}
@@ -106,7 +106,7 @@ func (c *muxCliConn) OnRequest(ctx context.Context, connection netpoll.Connectio
 		reader.(io.Closer).Close()
 		return
 	}
-	bufReader := np.NewReaderByteBuffer(reader)
+	bufReader := np.NewBufioxReader(reader)
 	callback.Recv(bufReader, nil)
 	return nil
 }

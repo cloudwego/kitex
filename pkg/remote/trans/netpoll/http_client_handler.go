@@ -18,6 +18,7 @@ package netpoll
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -28,7 +29,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cloudwego/netpoll"
+	"github.com/cloudwego/gopkg/bufiox"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -55,26 +56,22 @@ type httpCliTransHandler struct {
 
 // Write implements the remote.ClientTransHandler interface.
 func (t *httpCliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
-	var bufWriter remote.ByteBuffer
 	ri := sendMsg.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
 	defer func() {
-		t.ext.ReleaseBuffer(bufWriter, err)
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
 	}()
 
-	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
-	buffer := netpoll.NewLinkBuffer(0)
-	bodyReaderWriter := NewReaderWriterByteBuffer(buffer)
-	defer bodyReaderWriter.Release(err)
+	var buf []byte
+	bw := bufiox.NewBytesWriter(&buf)
 	if err != nil {
 		return ctx, err
 	}
-	err = t.codec.Encode(ctx, sendMsg, bodyReaderWriter)
+	err = t.codec.Encode(ctx, sendMsg, bw)
 	if err != nil {
 		return ctx, err
 	}
-	err = bodyReaderWriter.Flush()
+	err = bw.Flush()
 	if err != nil {
 		return ctx, err
 	}
@@ -84,7 +81,7 @@ func (t *httpCliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg 
 	} else {
 		url = path.Join("/", ri.Invocation().MethodName())
 	}
-	req, err := http.NewRequest("POST", url, netpoll.NewIOReader(buffer))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(buf))
 	if err != nil {
 		return ctx, err
 	}
@@ -92,34 +89,25 @@ func (t *httpCliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg 
 	if err != nil {
 		return ctx, err
 	}
-	err = req.Write(bufWriter)
-	if err != nil {
-		return ctx, err
-	}
-	return ctx, bufWriter.Flush()
+	err = req.Write(conn)
+	return ctx, err
 }
 
 // Read implements the remote.ClientTransHandler interface. Read is blocked.
 func (t *httpCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
-	var bufReader remote.ByteBuffer
 	rpcinfo.Record(ctx, msg.RPCInfo(), stats.ReadStart, nil)
 	defer func() {
-		t.ext.ReleaseBuffer(bufReader, err)
 		rpcinfo.Record(ctx, msg.RPCInfo(), stats.ReadFinish, err)
 	}()
 
 	t.ext.SetReadTimeout(ctx, conn, msg.RPCInfo().Config(), remote.Client)
-	bufReader = t.ext.NewReadByteBuffer(ctx, conn, msg)
-	bodyReader, err := getBodyBufReader(bufReader)
+	bodyReader, err := getBodyBufReader(conn)
 	if err != nil {
 		return ctx, fmt.Errorf("get body bufreader error:%w", err)
 	}
 	err = t.codec.Decode(ctx, msg, bodyReader)
 	if err != nil {
 		return ctx, err
-	}
-	if left := bufReader.ReadableLen(); left > 0 {
-		bufReader.Skip(left)
 	}
 	return ctx, nil
 }
@@ -165,7 +153,7 @@ func addMetaInfo(msg remote.Message, h http.Header) error {
 	return nil
 }
 
-func readLine(buffer remote.ByteBuffer) ([]byte, error) {
+func readLine(buffer bufiox.Reader) ([]byte, error) {
 	var buf []byte
 	for {
 		buf0, err := buffer.Next(1)
@@ -191,7 +179,7 @@ func readLine(buffer remote.ByteBuffer) ([]byte, error) {
 }
 
 // return n bytes skipped ('\r\n' not included)
-func skipLine(buffer remote.ByteBuffer) (n int, err error) {
+func skipLine(buffer bufiox.Reader) (n int, err error) {
 	for {
 		buf0, err := buffer.Next(1)
 		if err != nil {
@@ -241,7 +229,7 @@ func parseHTTPResponseHead(line string) (protoMajor, protoMinor, statusCodeInt i
 	return
 }
 
-func skipToBody(buffer remote.ByteBuffer) error {
+func skipToBody(buffer bufiox.Reader) error {
 	head, err := readLine(buffer)
 	if err != nil {
 		return err
@@ -251,11 +239,7 @@ func skipToBody(buffer remote.ByteBuffer) error {
 		return err
 	}
 	if statusCode != 200 {
-		s, err := buffer.ReadString(buffer.ReadableLen())
-		if err != nil {
-			return fmt.Errorf("http code: %d, read request error:\n%w", statusCode, err)
-		}
-		return fmt.Errorf("http code: %d, error:\n%s", statusCode, s)
+		return fmt.Errorf("http code: %d", statusCode)
 	}
 	for {
 		n, err := skipLine(buffer)
@@ -268,8 +252,8 @@ func skipToBody(buffer remote.ByteBuffer) error {
 	}
 }
 
-func getBodyBufReader(buf remote.ByteBuffer) (remote.ByteBuffer, error) {
-	br := bufio.NewReader(buf)
+func getBodyBufReader(rd io.Reader) (bufiox.Reader, error) {
+	br := bufio.NewReader(rd)
 	hr, err := http.ReadResponse(br, nil)
 	if err != nil {
 		return nil, fmt.Errorf("read http response error:%w", err)
@@ -282,5 +266,5 @@ func getBodyBufReader(buf remote.ByteBuffer) (remote.ByteBuffer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read http response body error:%w", err)
 	}
-	return remote.NewReaderBuffer(b), nil
+	return bufiox.NewBytesReader(b), nil
 }

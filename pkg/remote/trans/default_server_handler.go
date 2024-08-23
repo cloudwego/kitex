@@ -23,6 +23,8 @@ import (
 	"net"
 	"runtime/debug"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -60,11 +62,10 @@ type svrTransHandler struct {
 
 // Write implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
-	var bufWriter remote.ByteBuffer
+	var bufWriter bufiox.Writer
 	ri := sendMsg.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
 	defer func() {
-		t.ext.ReleaseBuffer(bufWriter, err)
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
 	}()
 
@@ -87,9 +88,11 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 
 // Read implements the remote.ServerTransHandler interface.
 func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remote.Message) (nctx context.Context, err error) {
-	var bufReader remote.ByteBuffer
+	var bufReader bufiox.Reader
 	defer func() {
-		t.ext.ReleaseBuffer(bufReader, err)
+		if bufReader != nil {
+			_ = bufReader.Release(err)
+		}
 		rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadFinish, err)
 	}()
 	rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadStart, nil)

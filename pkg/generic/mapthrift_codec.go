@@ -21,6 +21,8 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/kitex/internal/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -112,7 +114,7 @@ func (c *mapThriftCodec) Close() error {
 }
 
 // Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
-func (c *mapThriftCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *mapThriftCodec) Marshal(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 	method := msg.RPCInfo().Invocation().MethodName()
 	if method == "" {
 		return errors.New("empty methodName in thrift Marshal")
@@ -131,7 +133,7 @@ func (c *mapThriftCodec) Marshal(ctx context.Context, msg remote.Message, out re
 }
 
 // Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
-func (c *mapThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (c *mapThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
 	}

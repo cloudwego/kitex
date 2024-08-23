@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/fastpb"
+	"github.com/cloudwego/gopkg/bufiox"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
@@ -61,7 +62,7 @@ func IsProtobufCodec(c remote.PayloadCodec) bool {
 type protobufCodec struct{}
 
 // Len encode outside not here
-func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
+func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out bufiox.Writer) error {
 	// 1. prepare info
 	methodName := message.RPCInfo().Invocation().MethodName()
 	if methodName == "" {
@@ -132,7 +133,7 @@ func (c protobufCodec) Marshal(ctx context.Context, message remote.Message, out 
 	return nil
 }
 
-func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
+func (c protobufCodec) Unmarshal(ctx context.Context, message remote.Message, in bufiox.Reader) error {
 	payloadLen := message.PayloadLen()
 	magicAndMsgType, err := codec.ReadUint32(in)
 	if err != nil {

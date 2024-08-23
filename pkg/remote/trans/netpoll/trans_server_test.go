@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -61,7 +62,7 @@ func TestMain(m *testing.M) {
 		},
 		Codec: &MockCodec{
 			EncodeFunc: nil,
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
 				return nil
 			},

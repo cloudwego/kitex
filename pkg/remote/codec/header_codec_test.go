@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/gopkg/bufiox"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
@@ -46,16 +47,16 @@ func TestTTHeaderCodec(t *testing.T) {
 			sendMsg := initClientSendMsg(transport.TTHeader)
 
 			// encode
-			buf := tb.NewBuffer()
-			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, buf)
-			binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+			bw, br := tb.NewBuffer()
+			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, bw)
+			binary.BigEndian.PutUint32(totalLenField, uint32(bw.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(t, err == nil, err)
-			buf.Flush()
+			bw.Flush()
 
 			// decode
 			recvMsg := initServerRecvMsg()
 			test.Assert(t, err == nil, err)
-			err = ttHeaderCodec.decode(ctx, recvMsg, buf)
+			err = ttHeaderCodec.decode(ctx, recvMsg, br)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
 		})
@@ -74,15 +75,15 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 			sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
 
 			// encode
-			buf := tb.NewBuffer()
-			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, buf)
-			binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+			bw, br := tb.NewBuffer()
+			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, bw)
+			binary.BigEndian.PutUint32(totalLenField, uint32(bw.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(t, err == nil, err)
-			buf.Flush()
+			bw.Flush()
 
 			// decode
 			recvMsg := initServerRecvMsg()
-			err = ttHeaderCodec.decode(ctx, recvMsg, buf)
+			err = ttHeaderCodec.decode(ctx, recvMsg, br)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
 
@@ -109,15 +110,15 @@ func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
 			sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
 
 			// encode
-			buf := tb.NewBuffer()
-			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, buf)
-			binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+			bw, br := tb.NewBuffer()
+			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, bw)
+			binary.BigEndian.PutUint32(totalLenField, uint32(bw.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(t, err == nil, err)
-			buf.Flush()
+			bw.Flush()
 
 			// decode
 			recvMsg := initServerRecvMsg()
-			err = ttHeaderCodec.decode(ctx, recvMsg, buf)
+			err = ttHeaderCodec.decode(ctx, recvMsg, br)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
 
@@ -145,15 +146,15 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 			sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
 
 			// encode
-			buf := tb.NewBuffer()
-			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, buf)
-			binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+			bw, br := tb.NewBuffer()
+			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, bw)
+			binary.BigEndian.PutUint32(totalLenField, uint32(bw.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(t, err == nil, err)
-			buf.Flush()
+			bw.Flush()
 
 			// decode
 			recvMsg := initServerRecvMsg()
-			err = ttHeaderCodec.decode(ctx, recvMsg, buf)
+			err = ttHeaderCodec.decode(ctx, recvMsg, br)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
 
@@ -177,14 +178,14 @@ func TestFillBasicInfoOfTTHeader(t *testing.T) {
 		sendMsg := initClientSendMsg(transport.TTHeader)
 		sendMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr] = mockAddr
 		sendMsg.TransInfo().TransIntInfo()[transmeta.FromService] = mockServiceName
-		buf := tb.NewBuffer()
-		totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, buf)
-		binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+		bw, br := tb.NewBuffer()
+		totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, bw)
+		binary.BigEndian.PutUint32(totalLenField, uint32(bw.WrittenLen()-Size32+mockPayloadLen))
 		test.Assert(t, err == nil, err)
-		buf.Flush()
+		bw.Flush()
 		// decode
 		recvMsg := initServerRecvMsg()
-		err = ttHeaderCodec.decode(ctx, recvMsg, buf)
+		err = ttHeaderCodec.decode(ctx, recvMsg, br)
 		test.Assert(t, err == nil, err)
 		test.Assert(t, recvMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr] == mockAddr)
 		test.Assert(t, recvMsg.RPCInfo().From().Address().String() == mockAddr)
@@ -194,16 +195,16 @@ func TestFillBasicInfoOfTTHeader(t *testing.T) {
 		// encode
 		sendMsg = initServerSendMsg(transport.TTHeader)
 		sendMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr] = mockAddr
-		buf = tb.NewBuffer()
-		totalLenField, err = ttHeaderCodec.encode(ctx, sendMsg, buf)
-		binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+		bw, br = tb.NewBuffer()
+		totalLenField, err = ttHeaderCodec.encode(ctx, sendMsg, bw)
+		binary.BigEndian.PutUint32(totalLenField, uint32(bw.WrittenLen()-Size32+mockPayloadLen))
 		test.Assert(t, err == nil, err)
-		buf.Flush()
+		bw.Flush()
 		// decode
 		recvMsg = initClientRecvMsg()
 		toInfo := remoteinfo.AsRemoteInfo(recvMsg.RPCInfo().To())
 		toInfo.SetInstance(&mockInst{})
-		err = ttHeaderCodec.decode(ctx, recvMsg, buf)
+		err = ttHeaderCodec.decode(ctx, recvMsg, br)
 		test.Assert(t, err == nil, err)
 		test.Assert(t, recvMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr] == mockAddr)
 		test.Assert(t, toInfo.Address().String() == mockAddr, toInfo.Address())
@@ -217,16 +218,17 @@ func BenchmarkTTHeaderCodec(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		sendMsg := initClientSendMsg(transport.TTHeader)
 		// encode
-		out := remote.NewWriterBuffer(256)
+		var buf []byte
+		out := bufiox.NewBytesWriter(&buf)
 		totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, out)
-		binary.BigEndian.PutUint32(totalLenField, uint32(out.MallocLen()-Size32+mockPayloadLen))
+		binary.BigEndian.PutUint32(totalLenField, uint32(out.WrittenLen()-Size32+mockPayloadLen))
 		test.Assert(b, err == nil, err)
 
 		// decode
 		recvMsg := initServerRecvMsg()
-		buf, err := out.Bytes()
+		out.Flush()
 		test.Assert(b, err == nil, err)
-		in := remote.NewReaderBuffer(buf)
+		in := bufiox.NewBytesReader(buf)
 		err = ttHeaderCodec.decode(ctx, recvMsg, in)
 		test.Assert(b, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
 		test.Assert(b, err == nil, err)
@@ -247,16 +249,17 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 			sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
 
 			// encode
-			out := remote.NewWriterBuffer(256)
+			var buf []byte
+			out := bufiox.NewBytesWriter(&buf)
 			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, out)
-			binary.BigEndian.PutUint32(totalLenField, uint32(out.MallocLen()-Size32+mockPayloadLen))
+			binary.BigEndian.PutUint32(totalLenField, uint32(out.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(b, err == nil, err)
 
 			// decode
 			recvMsg := initServerRecvMsg()
-			buf, err := out.Bytes()
+			out.Flush()
 			test.Assert(b, err == nil, err)
-			in := remote.NewReaderBuffer(buf)
+			in := bufiox.NewBytesReader(buf)
 			err = ttHeaderCodec.decode(ctx, recvMsg, in)
 			test.Assert(b, err == nil, err)
 			test.Assert(b, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
@@ -280,16 +283,17 @@ func BenchmarkTTHeaderCodecParallel(b *testing.B) {
 		for pb.Next() {
 			sendMsg := initClientSendMsg(transport.TTHeader)
 			// encode
-			out := remote.NewWriterBuffer(256)
+			var buf []byte
+			out := bufiox.NewBytesWriter(&buf)
 			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, out)
-			binary.BigEndian.PutUint32(totalLenField, uint32(out.MallocLen()-Size32+mockPayloadLen))
+			binary.BigEndian.PutUint32(totalLenField, uint32(out.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(b, err == nil, err)
 
 			// decode
 			recvMsg := initServerRecvMsg()
-			buf, err := out.Bytes()
+			out.Flush()
 			test.Assert(b, err == nil, err)
-			in := remote.NewReaderBuffer(buf)
+			in := bufiox.NewBytesReader(buf)
 			err = ttHeaderCodec.decode(ctx, recvMsg, in)
 			test.Assert(b, err == nil, err)
 			test.Assert(b, recvMsg.PayloadLen() == mockPayloadLen, recvMsg.PayloadLen())
@@ -393,7 +397,7 @@ func prepareStrKVInfoWithGDPRToken() map[string]string {
 // 暂时不删除，测试一次malloc, 和多次malloc差异
 //
 //lint:ignore U1000 until encode2 is used
-func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBuf, out remote.ByteBuffer) error {
+func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBuf, out bufiox.Writer) error {
 	tm := message.TransInfo()
 
 	// 1. header meta
@@ -432,7 +436,7 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	padding := (4 - headerInfoSize%4) % 4
 	headerInfoSize += padding
 	binary.BigEndian.PutUint16(headerSizeField, uint16(headerInfoSize/4))
-	totalLen := TTHeaderMetaSize - Size32 + headerInfoSize + payloadBuf.MallocLen()
+	totalLen := TTHeaderMetaSize - Size32 + headerInfoSize + payloadBuf.WrittenLen()
 	binary.BigEndian.PutUint32(totalLenField, uint32(totalLen))
 
 	// 3.  header info, malloc and write
@@ -485,10 +489,6 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	}
 	if hdIdx != headerInfoSize {
 		return perrors.NewProtocolErrorWithMsg("the size that header info write is not equal with malloc size")
-	}
-
-	if err := out.AppendBuffer(payloadBuf); err != nil {
-		return perrors.NewProtocolError(err)
 	}
 	return err
 }

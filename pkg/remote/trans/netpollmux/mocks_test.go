@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -41,19 +42,19 @@ func newMockRPCInfo() rpcinfo.RPCInfo {
 var _ remote.Codec = &MockCodec{}
 
 type MockCodec struct {
-	EncodeFunc func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error
-	DecodeFunc func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error
+	EncodeFunc func(ctx context.Context, msg remote.Message, out bufiox.Writer) error
+	DecodeFunc func(ctx context.Context, msg remote.Message, in bufiox.Reader) error
 	NameFunc   func() string
 }
 
-func (m *MockCodec) Encode(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (m *MockCodec) Encode(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 	if m.EncodeFunc != nil {
 		return m.EncodeFunc(ctx, msg, out)
 	}
 	return nil
 }
 
-func (m *MockCodec) Decode(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (m *MockCodec) Decode(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 	if m.DecodeFunc != nil {
 		return m.DecodeFunc(ctx, msg, in)
 	}

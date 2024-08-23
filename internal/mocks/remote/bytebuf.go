@@ -22,50 +22,10 @@
 package remote
 
 import (
-	net "net"
 	reflect "reflect"
 
-	remote "github.com/cloudwego/kitex/pkg/remote"
 	gomock "github.com/golang/mock/gomock"
 )
-
-// MockByteBufferFactory is a mock of ByteBufferFactory interface.
-type MockByteBufferFactory struct {
-	ctrl     *gomock.Controller
-	recorder *MockByteBufferFactoryMockRecorder
-}
-
-// MockByteBufferFactoryMockRecorder is the mock recorder for MockByteBufferFactory.
-type MockByteBufferFactoryMockRecorder struct {
-	mock *MockByteBufferFactory
-}
-
-// NewMockByteBufferFactory creates a new mock instance.
-func NewMockByteBufferFactory(ctrl *gomock.Controller) *MockByteBufferFactory {
-	mock := &MockByteBufferFactory{ctrl: ctrl}
-	mock.recorder = &MockByteBufferFactoryMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockByteBufferFactory) EXPECT() *MockByteBufferFactoryMockRecorder {
-	return m.recorder
-}
-
-// NewByteBuffer mocks base method.
-func (m *MockByteBufferFactory) NewByteBuffer(conn net.Conn) (remote.ByteBuffer, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewByteBuffer", conn)
-	ret0, _ := ret[0].(remote.ByteBuffer)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// NewByteBuffer indicates an expected call of NewByteBuffer.
-func (mr *MockByteBufferFactoryMockRecorder) NewByteBuffer(conn interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewByteBuffer", reflect.TypeOf((*MockByteBufferFactory)(nil).NewByteBuffer), conn)
-}
 
 // MockNocopyWrite is a mock of NocopyWrite interface.
 type MockNocopyWrite struct {
@@ -88,6 +48,20 @@ func NewMockNocopyWrite(ctrl *gomock.Controller) *MockNocopyWrite {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockNocopyWrite) EXPECT() *MockNocopyWriteMockRecorder {
 	return m.recorder
+}
+
+// MallocAck mocks base method.
+func (m *MockNocopyWrite) MallocAck(n int) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MallocAck", n)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MallocAck indicates an expected call of MallocAck.
+func (mr *MockNocopyWriteMockRecorder) MallocAck(n interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MallocAck", reflect.TypeOf((*MockNocopyWrite)(nil).MallocAck), n)
 }
 
 // WriteDirect mocks base method.
@@ -178,35 +152,6 @@ func (m *MockByteBuffer) EXPECT() *MockByteBufferMockRecorder {
 	return m.recorder
 }
 
-// AppendBuffer mocks base method.
-func (m *MockByteBuffer) AppendBuffer(buf remote.ByteBuffer) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppendBuffer", buf)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// AppendBuffer indicates an expected call of AppendBuffer.
-func (mr *MockByteBufferMockRecorder) AppendBuffer(buf interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppendBuffer", reflect.TypeOf((*MockByteBuffer)(nil).AppendBuffer), buf)
-}
-
-// Bytes mocks base method.
-func (m *MockByteBuffer) Bytes() ([]byte, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Bytes")
-	ret0, _ := ret[0].([]byte)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Bytes indicates an expected call of Bytes.
-func (mr *MockByteBufferMockRecorder) Bytes() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Bytes", reflect.TypeOf((*MockByteBuffer)(nil).Bytes))
-}
-
 // Flush mocks base method.
 func (m *MockByteBuffer) Flush() error {
 	m.ctrl.T.Helper()
@@ -234,34 +179,6 @@ func (m *MockByteBuffer) Malloc(n int) ([]byte, error) {
 func (mr *MockByteBufferMockRecorder) Malloc(n interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Malloc", reflect.TypeOf((*MockByteBuffer)(nil).Malloc), n)
-}
-
-// MallocLen mocks base method.
-func (m *MockByteBuffer) MallocLen() int {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MallocLen")
-	ret0, _ := ret[0].(int)
-	return ret0
-}
-
-// MallocLen indicates an expected call of MallocLen.
-func (mr *MockByteBufferMockRecorder) MallocLen() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MallocLen", reflect.TypeOf((*MockByteBuffer)(nil).MallocLen))
-}
-
-// NewBuffer mocks base method.
-func (m *MockByteBuffer) NewBuffer() remote.ByteBuffer {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewBuffer")
-	ret0, _ := ret[0].(remote.ByteBuffer)
-	return ret0
-}
-
-// NewBuffer indicates an expected call of NewBuffer.
-func (mr *MockByteBufferMockRecorder) NewBuffer() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBuffer", reflect.TypeOf((*MockByteBuffer)(nil).NewBuffer))
 }
 
 // Next mocks base method.
@@ -310,18 +227,18 @@ func (mr *MockByteBufferMockRecorder) Read(p interface{}) *gomock.Call {
 }
 
 // ReadBinary mocks base method.
-func (m *MockByteBuffer) ReadBinary(n int) ([]byte, error) {
+func (m *MockByteBuffer) ReadBinary(bs []byte) (int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReadBinary", n)
-	ret0, _ := ret[0].([]byte)
+	ret := m.ctrl.Call(m, "ReadBinary", bs)
+	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ReadBinary indicates an expected call of ReadBinary.
-func (mr *MockByteBufferMockRecorder) ReadBinary(n interface{}) *gomock.Call {
+func (mr *MockByteBufferMockRecorder) ReadBinary(bs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadBinary", reflect.TypeOf((*MockByteBuffer)(nil).ReadBinary), n)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadBinary", reflect.TypeOf((*MockByteBuffer)(nil).ReadBinary), bs)
 }
 
 // ReadLen mocks base method.
@@ -411,18 +328,18 @@ func (mr *MockByteBufferMockRecorder) Write(p interface{}) *gomock.Call {
 }
 
 // WriteBinary mocks base method.
-func (m *MockByteBuffer) WriteBinary(b []byte) (int, error) {
+func (m *MockByteBuffer) WriteBinary(bs []byte) (int, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WriteBinary", b)
+	ret := m.ctrl.Call(m, "WriteBinary", bs)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // WriteBinary indicates an expected call of WriteBinary.
-func (mr *MockByteBufferMockRecorder) WriteBinary(b interface{}) *gomock.Call {
+func (mr *MockByteBufferMockRecorder) WriteBinary(bs interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteBinary", reflect.TypeOf((*MockByteBuffer)(nil).WriteBinary), b)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteBinary", reflect.TypeOf((*MockByteBuffer)(nil).WriteBinary), bs)
 }
 
 // WriteString mocks base method.
@@ -438,4 +355,18 @@ func (m *MockByteBuffer) WriteString(s string) (int, error) {
 func (mr *MockByteBufferMockRecorder) WriteString(s interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteString", reflect.TypeOf((*MockByteBuffer)(nil).WriteString), s)
+}
+
+// WrittenLen mocks base method.
+func (m *MockByteBuffer) WrittenLen() int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WrittenLen")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// WrittenLen indicates an expected call of WrittenLen.
+func (mr *MockByteBufferMockRecorder) WrittenLen() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WrittenLen", reflect.TypeOf((*MockByteBuffer)(nil).WrittenLen))
 }

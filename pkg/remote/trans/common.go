@@ -22,6 +22,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -36,9 +38,8 @@ var readMoreTimeout = 5 * time.Millisecond
 // The default common trans implement is in default_client_handler.go and default_server_handler.go.
 type Extension interface {
 	SetReadTimeout(ctx context.Context, conn net.Conn, cfg rpcinfo.RPCConfig, role remote.RPCRole)
-	NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer
-	NewReadByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer
-	ReleaseBuffer(remote.ByteBuffer, error) error
+	NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Writer
+	NewReadByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Reader
 	IsTimeoutErr(error) bool
 	// IsRemoteClosedErr is to check if the error caused by connection closed when output log or report metric
 	IsRemoteClosedErr(error) bool

@@ -17,189 +17,50 @@
 package netpoll
 
 import (
-	"bufio"
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/utils"
+
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 // TestByteBuffer test bytebuf write and read success
 func TestByteBuffer(t *testing.T) {
 	// 1. prepare mock data
 	msg := "hello world"
-	reader := bufio.NewReader(strings.NewReader(msg + msg + msg + msg + msg))
-	writer := bufio.NewWriter(bytes.NewBufferString(msg + msg + msg + msg + msg))
-	bufRW := bufio.NewReadWriter(reader, writer)
 
+	buf := &bytes.Buffer{}
 	// 2. test
-	rw := netpoll.NewReadWriter(bufRW)
+	rw := netpoll.NewReadWriter(buf)
 
-	buf1 := NewReaderWriterByteBuffer(rw)
-	// check writable
-	checkWritable(t, buf1)
-	// check readable
-	checkReadable(t, buf1)
+	bw := NewBufioxWriter(rw)
+	br := NewBufioxReader(rw)
 
-	buf2 := buf1.NewBuffer()
-	// check writable
-	checkWritable(t, buf2)
-	// check unreadable
-	checkUnreadable(t, buf2)
-
-	err := buf1.AppendBuffer(buf2)
-	test.Assert(t, err == nil)
-}
-
-// TestWriterBuffer test writerbytebufferr return writedirect err
-func TestWriterBuffer(t *testing.T) {
-	// 1. prepare mock data
-	msg := "hello world"
-	wi := bytes.NewBufferString(msg + msg + msg + msg + msg)
-	nbp := &netpollByteBuffer{}
-
-	// 2. test
-	w := netpoll.NewWriter(wi)
-
-	buf := NewWriterByteBuffer(w)
-	// check writable
-	checkWritable(t, buf)
-	// check unreadable
-	checkUnreadable(t, buf)
-
-	err := nbp.WriteDirect([]byte(msg), 11)
-	// check err not nil
-	test.Assert(t, err != nil, err)
-}
-
-// TestReaderBuffer test readerbytebufferr success
-func TestReaderBuffer(t *testing.T) {
-	// 1. prepare mock data
-	msg := "hello world"
-	ri := strings.NewReader(msg + msg + msg + msg + msg)
-	r := netpoll.NewReader(ri)
-
-	buf := NewReaderByteBuffer(r)
-	// check unwritable
-	checkUnwritable(t, buf)
-	// check readable
-	checkReadable(t, buf)
-}
-
-func checkWritable(t *testing.T, buf remote.ByteBuffer) {
-	msg := "hello world"
-
-	p, err := buf.Malloc(len(msg))
+	firstw, err := bw.Malloc(len(msg) * 2)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, len(p) == len(msg))
-	copy(p, msg)
-
-	l := buf.MallocLen()
-	test.Assert(t, l == len(msg))
-
-	l, err = buf.WriteString(msg)
-	test.Assert(t, err == nil, err)
-	test.Assert(t, l == len(msg))
-
-	l, err = buf.WriteBinary([]byte(msg))
-	test.Assert(t, err == nil, err)
-	test.Assert(t, l == len(msg))
-
-	err = buf.Flush()
-	test.Assert(t, err == nil, err)
-}
-
-func checkReadable(t *testing.T, buf remote.ByteBuffer) {
-	msg := "hello world"
-	var s string
-
-	p, err := buf.Peek(len(msg))
-	test.Assert(t, err == nil, err)
-	test.Assert(t, string(p) == msg)
-
-	err = buf.Skip(1 + len(msg))
+	copy(firstw, msg)
+	copy(firstw[len(msg):], msg)
+	_, err = bw.WriteBinary(utils.StringToSliceByte(msg + msg + msg))
 	test.Assert(t, err == nil, err)
 
-	p, err = buf.Next(len(msg) - 1)
+	test.Assert(t, bw.WrittenLen() == len(msg)*5)
+	err = bw.Flush()
 	test.Assert(t, err == nil, err)
-	test.Assert(t, string(p) == msg[1:])
+	test.Assert(t, bw.WrittenLen() == 0)
 
-	n := buf.ReadableLen()
-	test.Assert(t, n == 3*len(msg), n)
-
-	n = buf.ReadLen()
-	test.Assert(t, n == len(msg)-1, n)
-
-	s, err = buf.ReadString(len(msg))
+	firstr, err := br.Next(len(msg) * 2)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, s == msg)
-
-	p, err = buf.ReadBinary(len(msg))
+	test.Assert(t, string(firstr) == msg+msg)
+	p := make([]byte, len(msg)*3)
+	_, err = br.ReadBinary(p)
 	test.Assert(t, err == nil, err)
-	test.Assert(t, string(p) == msg)
-}
+	test.Assert(t, string(p) == msg+msg+msg)
 
-func checkUnwritable(t *testing.T, buf remote.ByteBuffer) {
-	msg := "hello world"
-	var n int
+	test.Assert(t, br.ReadLen() == len(msg)*5)
 
-	_, err := buf.Malloc(len(msg))
-	test.Assert(t, err != nil)
-
-	l := buf.MallocLen()
-	test.Assert(t, l == -1, l)
-
-	_, err = buf.WriteString(msg)
-	test.Assert(t, err != nil)
-
-	_, err = buf.WriteBinary([]byte(msg))
-	test.Assert(t, err != nil)
-
-	err = buf.Flush()
-	test.Assert(t, err != nil)
-
-	n, err = buf.Write([]byte(msg))
-	test.Assert(t, err != nil)
-	test.Assert(t, n == -1, n)
-
-	_, err = buf.Write(nil)
-	test.Assert(t, err != nil)
-}
-
-func checkUnreadable(t *testing.T, buf remote.ByteBuffer) {
-	msg := "hello world"
-	p := make([]byte, len(msg))
-	var n int
-
-	_, err := buf.Peek(len(msg))
-	test.Assert(t, err != nil)
-
-	err = buf.Skip(1)
-	test.Assert(t, err != nil)
-
-	_, err = buf.Next(len(msg) - 1)
-	test.Assert(t, err != nil)
-
-	n = buf.ReadableLen()
-	test.Assert(t, n == -1)
-
-	n = buf.ReadLen()
-	test.Assert(t, n == 0)
-
-	_, err = buf.ReadString(len(msg))
-	test.Assert(t, err != nil)
-
-	_, err = buf.ReadBinary(len(msg))
-	test.Assert(t, err != nil)
-
-	n, err = buf.Read(p)
-	test.Assert(t, err != nil)
-	test.Assert(t, n == -1, n)
-
-	_, err = buf.Read(nil)
-	test.Assert(t, err != nil)
+	_ = br.Release(nil)
+	test.Assert(t, br.ReadLen() == 0)
 }

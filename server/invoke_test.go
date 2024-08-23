@@ -18,6 +18,7 @@ package server
 
 import (
 	"context"
+	"encoding/binary"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -49,9 +50,11 @@ func TestInvokerCall(t *testing.T) {
 	args := mocks.NewMockArgs()
 
 	// call success
+	hl := make([]byte, 4)
 	b, _ := thrift.MarshalFastMsg("mock", thrift.CALL, 0, args.(thrift.FastCodec))
+	binary.BigEndian.PutUint32(hl, uint32(len(b)))
 	msg := invoke.NewMessage(nil, nil)
-	err = msg.SetRequestBytes(b)
+	err = msg.SetRequestBytes(append(hl, b...))
 	test.Assert(t, err == nil)
 	err = invoker.Call(msg)
 	if err != nil {
@@ -65,9 +68,11 @@ func TestInvokerCall(t *testing.T) {
 	test.Assert(t, gotErr.Load() == nil)
 
 	// call fails
+	hl = make([]byte, 4)
 	b, _ = thrift.MarshalFastMsg("mockError", thrift.CALL, 0, args.(thrift.FastCodec))
+	binary.BigEndian.PutUint32(hl, uint32(len(b)))
 	msg = invoke.NewMessage(nil, nil)
-	err = msg.SetRequestBytes(b)
+	err = msg.SetRequestBytes(append(hl, b...))
 	test.Assert(t, err == nil)
 	err = invoker.Call(msg)
 	if err != nil {

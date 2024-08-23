@@ -22,6 +22,7 @@ import (
 	"net"
 	"syscall"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -47,21 +48,13 @@ func (e *netpollConnExtension) SetReadTimeout(ctx context.Context, conn net.Conn
 }
 
 // NewWriteByteBuffer implements the trans.Extension interface.
-func (e *netpollConnExtension) NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-	return NewWriterByteBuffer(conn.(netpoll.Connection).Writer())
+func (e *netpollConnExtension) NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Writer {
+	return NewBufioxWriter(conn.(netpoll.Connection).Writer())
 }
 
 // NewReadByteBuffer implements the trans.Extension interface.
-func (e *netpollConnExtension) NewReadByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-	return NewReaderByteBuffer(conn.(netpoll.Connection).Reader())
-}
-
-// ReleaseBuffer implements the trans.Extension interface.
-func (e *netpollConnExtension) ReleaseBuffer(buffer remote.ByteBuffer, err error) error {
-	if buffer != nil {
-		return buffer.Release(err)
-	}
-	return nil
+func (e *netpollConnExtension) NewReadByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Reader {
+	return NewBufioxReader(conn.(netpoll.Connection).Reader())
 }
 
 // IsTimeoutErr implements the trans.Extension interface.

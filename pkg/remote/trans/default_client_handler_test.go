@@ -21,6 +21,8 @@ import (
 	"net"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -29,27 +31,32 @@ import (
 )
 
 func TestDefaultCliTransHandler(t *testing.T) {
-	buf := remote.NewReaderWriterBuffer(1024)
+	conn := mocks.NewIOConn()
 	ext := &MockExtension{
-		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
+		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Writer {
+			return bufiox.NewDefaultWriter(conn)
 		},
-		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
+		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Reader {
+			return bufiox.NewDefaultReader(conn)
 		},
 	}
 
 	tagEncode, tagDecode := 0, 0
 	opt := &remote.ClientOption{
 		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 				tagEncode++
-				test.Assert(t, out == buf)
-				return nil
+				_, err := out.WriteBinary([]byte("hello world"))
+				return err
 			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				tagDecode++
-				test.Assert(t, in == buf)
+				hw := make([]byte, 11)
+				_, err := in.ReadBinary(hw)
+				if err != nil {
+					return err
+				}
+				test.Assert(t, string(hw) == "hello world")
 				return nil
 			},
 		},
@@ -60,7 +67,6 @@ func TestDefaultCliTransHandler(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	ctx := context.Background()
-	conn := &mocks.Conn{}
 	msg := &MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return newMockRPCInfo()

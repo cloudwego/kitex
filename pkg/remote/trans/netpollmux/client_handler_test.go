@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -36,14 +37,14 @@ import (
 func newTestRemoteClientOptionWithInStr(s string) *remote.ClientOption {
 	opt := &remote.ClientOption{
 		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), s)
 				_, err := out.WriteBinary(r.Bytes())
 				return err
 			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				in.Skip(3 * codec.Size32)
-				_, err := in.ReadString(len(s))
+				err := in.Skip(len(s))
 				return err
 			},
 		},
@@ -69,20 +70,18 @@ func TestCliTransHandler(t *testing.T) {
 	s := "hello world"
 	opt := &remote.ClientOption{
 		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), s)
 				n, err := out.WriteBinary(r.Bytes())
 				test.Assert(t, err == nil, err)
 				test.Assert(t, n == r.Len(), n, r.Len())
 				return err
 			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				l := in.ReadableLen()
-				test.Assert(t, l == 3*codec.Size32+len(s))
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				in.Skip(3 * codec.Size32)
-				got, err := in.ReadString(len(s))
+				got, err := in.Next(len(s))
 				test.Assert(t, err == nil, err)
-				test.Assert(t, got == s, got, s)
+				test.Assert(t, string(got) == s, got, s)
 				return err
 			},
 		},
@@ -301,7 +300,7 @@ func TestReadTimeout(t *testing.T) {
 // TestCallbackClose test asyncCallback Close
 func TestCallbackClose(t *testing.T) {
 	buf := netpoll.NewLinkBuffer()
-	bufWriter := np.NewWriterByteBuffer(buf)
+	bufWriter := np.NewBufioxWriter(buf)
 	callback := newAsyncCallback(buf, bufWriter)
 	callback.Close()
 }

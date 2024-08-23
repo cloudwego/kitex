@@ -22,13 +22,13 @@ package thrift
 import (
 	"context"
 	"fmt"
-	"io"
 	"unsafe"
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
 	dbase "github.com/cloudwego/dynamicgo/thrift/base"
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
@@ -36,11 +36,14 @@ import (
 )
 
 // Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+func (w *WriteHTTPRequest) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	// fallback logic
 	if !w.dynamicgoEnabled {
 		return w.originalWrite(ctx, out, msg, requestBase)
 	}
+
+	binaryWriter := thrift.NewBufferWriter(out)
+	defer binaryWriter.Recycle()
 
 	// dynamicgo logic
 	req := msg.(*descriptor.HTTPRequest)
@@ -63,29 +66,24 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interfa
 		cv = j2t.NewBinaryConv(w.convOpts)
 	}
 
-	binaryWriter := thrift.NewBinaryWriter()
-
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
 	body := req.GetBody()
 	dbuf := mcache.Malloc(len(body))[0:0]
 	defer mcache.Free(dbuf)
 
 	for _, field := range dynamicgoTypeDsc.Struct().Fields() {
-		binaryWriter.WriteFieldBegin(thrift.TType(field.Type().Type()), int16(field.ID()))
-
+		if err := binaryWriter.WriteFieldBegin(thrift.TType(field.Type().Type()), int16(field.ID())); err != nil {
+			return err
+		}
 		// json []byte to thrift []byte
 		if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
 			return err
 		}
+		if wb, err := out.Malloc(len(dbuf)); err != nil {
+			return err
+		} else {
+			copy(wb, dbuf)
+		}
 	}
-	if _, err := out.Write(binaryWriter.Bytes()); err != nil {
-		return err
-	}
-	if _, err := out.Write(dbuf); err != nil {
-		return err
-	}
-	binaryWriter.Reset()
-	binaryWriter.WriteFieldStop()
-	_, err := out.Write(binaryWriter.Bytes())
-	return err
+	return binaryWriter.WriteFieldStop()
 }

@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -77,18 +79,18 @@ type defaultCodec struct {
 }
 
 // EncodePayload encode payload
-func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
+func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message, out bufiox.Writer) error {
 	defer func() {
 		// notice: mallocLen() must exec before flush, or it will be reset
 		if ri := message.RPCInfo(); ri != nil {
 			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {
-				ms.SetSendSize(uint64(out.MallocLen()))
+				ms.SetSendSize(uint64(out.WrittenLen()))
 			}
 		}
 	}()
 	var err error
 	var framedLenField []byte
-	headerLen := out.MallocLen()
+	headerLen := out.WrittenLen()
 	tp := message.ProtocolInfo().TransProto
 
 	// 1. malloc framed field if needed
@@ -110,20 +112,20 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 		if framedLenField == nil {
 			return perrors.NewProtocolErrorWithMsg("no buffer allocated for the framed length field")
 		}
-		payloadLen = out.MallocLen() - headerLen
+		payloadLen = out.WrittenLen() - headerLen
 		binary.BigEndian.PutUint32(framedLenField, uint32(payloadLen))
 	} else if message.ProtocolInfo().CodecType == serviceinfo.Protobuf {
 		return perrors.NewProtocolErrorWithMsg("protobuf just support 'framed' trans proto")
 	}
 	if tp&transport.TTHeader == transport.TTHeader {
-		payloadLen = out.MallocLen() - Size32
+		payloadLen = out.WrittenLen() - Size32
 	}
 	err = checkPayloadSize(payloadLen, c.maxSize)
 	return err
 }
 
 // EncodeMetaAndPayload encode meta and payload
-func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
+func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.Message, out bufiox.Writer, me remote.MetaEncoder) error {
 	var err error
 	var totalLenField []byte
 	tp := message.ProtocolInfo().TransProto
@@ -144,19 +146,19 @@ func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.
 		if totalLenField == nil {
 			return perrors.NewProtocolErrorWithMsg("no buffer allocated for the header length field")
 		}
-		payloadLen := out.MallocLen() - Size32
+		payloadLen := out.WrittenLen() - Size32
 		binary.BigEndian.PutUint32(totalLenField, uint32(payloadLen))
 	}
 	return nil
 }
 
 // Encode implements the remote.Codec interface, it does complete message encode include header and payload.
-func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out remote.ByteBuffer) (err error) {
+func (c *defaultCodec) Encode(ctx context.Context, message remote.Message, out bufiox.Writer) (err error) {
 	return c.EncodeMetaAndPayload(ctx, message, out, c)
 }
 
 // DecodeMeta decode header
-func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
+func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, in bufiox.Reader) (err error) {
 	var flagBuf []byte
 	if flagBuf, err = in.Peek(2 * Size32); err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("default codec read failed: %s", err.Error()))
@@ -190,7 +192,7 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 }
 
 // DecodePayload decode payload
-func (c *defaultCodec) DecodePayload(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
+func (c *defaultCodec) DecodePayload(ctx context.Context, message remote.Message, in bufiox.Reader) error {
 	defer func() {
 		if ri := message.RPCInfo(); ri != nil {
 			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {
@@ -215,7 +217,7 @@ func (c *defaultCodec) DecodePayload(ctx context.Context, message remote.Message
 }
 
 // Decode implements the remote.Codec interface, it does complete message decode include header and payload.
-func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
+func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in bufiox.Reader) (err error) {
 	// 1. decode meta
 	if err = c.DecodeMeta(ctx, message, in); err != nil {
 		return err
@@ -230,7 +232,7 @@ func (c *defaultCodec) Name() string {
 }
 
 // Select to use thrift or protobuf according to the protocol.
-func (c *defaultCodec) encodePayload(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
+func (c *defaultCodec) encodePayload(ctx context.Context, message remote.Message, out bufiox.Writer) error {
 	pCodec, err := remote.GetPayloadCodec(message)
 	if err != nil {
 		return err
@@ -311,7 +313,7 @@ func checkRPCState(ctx context.Context, message remote.Message) error {
 	return nil
 }
 
-func checkPayload(flagBuf []byte, message remote.Message, in remote.ByteBuffer, isTTHeader bool, maxPayloadSize int) error {
+func checkPayload(flagBuf []byte, message remote.Message, in bufiox.Reader, isTTHeader bool, maxPayloadSize int) error {
 	var transProto transport.Protocol
 	var codecType serviceinfo.PayloadCodec
 	if isThriftBinary(flagBuf) {

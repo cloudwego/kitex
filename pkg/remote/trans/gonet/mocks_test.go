@@ -21,6 +21,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -28,22 +29,22 @@ import (
 )
 
 type MockCodec struct {
-	EncodeFunc func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error
-	DecodeFunc func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error
+	EncodeFunc func(ctx context.Context, msg remote.Message, out bufiox.Writer) error
+	DecodeFunc func(ctx context.Context, msg remote.Message, in bufiox.Reader) error
 }
 
 func (m *MockCodec) Name() string {
 	return "Mock"
 }
 
-func (m *MockCodec) Encode(ctx context.Context, msg remote.Message, out remote.ByteBuffer) (err error) {
+func (m *MockCodec) Encode(ctx context.Context, msg remote.Message, out bufiox.Writer) (err error) {
 	if m.EncodeFunc != nil {
 		return m.EncodeFunc(ctx, msg, out)
 	}
 	return
 }
 
-func (m *MockCodec) Decode(ctx context.Context, msg remote.Message, in remote.ByteBuffer) (err error) {
+func (m *MockCodec) Decode(ctx context.Context, msg remote.Message, in bufiox.Reader) (err error) {
 	if m.DecodeFunc != nil {
 		return m.DecodeFunc(ctx, msg, in)
 	}

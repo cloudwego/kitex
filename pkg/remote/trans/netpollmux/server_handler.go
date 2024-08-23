@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -113,9 +114,8 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	}
 
 	wbuf := netpoll.NewLinkBuffer()
-	bufWriter := np.NewWriterByteBuffer(wbuf)
+	bufWriter := np.NewBufioxWriter(wbuf)
 	err = t.codec.Encode(ctx, sendMsg, bufWriter)
-	bufWriter.Release(err)
 	if err != nil {
 		return ctx, err
 	}
@@ -130,12 +130,13 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 	return ctx, nil
 }
 
-func (t *svrTransHandler) readWithByteBuffer(ctx context.Context, bufReader remote.ByteBuffer, msg remote.Message) (err error) {
+func (t *svrTransHandler) readWithByteBuffer(ctx context.Context, bufReader bufiox.Reader, msg remote.Message) (err error) {
 	defer func() {
 		if bufReader != nil {
-			if err != nil {
-				bufReader.Skip(bufReader.ReadableLen())
-			}
+			// skip is just for reusing buffer, so it's safe to remove the codes below
+			//if err != nil {
+			//	bufReader.Skip(bufReader.ReadableLen())
+			//}
 			bufReader.Release(err)
 		}
 		rpcinfo.Record(ctx, msg.RPCInfo(), stats.ReadFinish, err)
@@ -240,7 +241,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 
 	// read
 	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearcher, rpcInfo, remote.Call, remote.Server)
-	bufReader := np.NewReaderByteBuffer(reader)
+	bufReader := np.NewBufioxReader(reader)
 	err = t.readWithByteBuffer(ctx, bufReader, recvMsg)
 	if err != nil {
 		// No need to close the connection when read failed in mux case, because it had finished reads.
@@ -342,9 +343,8 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 				return true
 			}
 			wbuf := netpoll.NewLinkBuffer()
-			bufWriter := np.NewWriterByteBuffer(wbuf)
+			bufWriter := np.NewBufioxWriter(wbuf)
 			err := t.codec.Encode(ctx, msg, bufWriter)
-			bufWriter.Release(err)
 			if err == nil {
 				sconn.Put(func() (buf netpoll.Writer, isNil bool) {
 					return wbuf, false

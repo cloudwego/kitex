@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -56,20 +57,18 @@ func TestOnRequest(t *testing.T) {
 
 	opt := &remote.ClientOption{
 		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), s)
 				n, err := out.WriteBinary(r.Bytes())
 				test.Assert(t, err == nil, err)
 				test.Assert(t, n == r.Len(), n, r.Len())
 				return err
 			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-				l := in.ReadableLen()
-				test.Assert(t, l == 3*codec.Size32+len(s))
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				in.Skip(3 * codec.Size32)
-				got, err := in.ReadString(len(s))
+				got, err := in.Next(len(s))
 				test.Assert(t, err == nil, err)
-				test.Assert(t, got == s, got, s)
+				test.Assert(t, string(got) == s, got, s)
 				return err
 			},
 		},

@@ -21,6 +21,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -45,16 +46,17 @@ func TestNormal(t *testing.T) {
 
 	// encode // client side
 	sendMsg := initSendMsg(transport.TTHeader)
-	out := remote.NewWriterBuffer(256)
+	var buf []byte
+	out := bufiox.NewBytesWriter(&buf)
 	err := payloadCodec.Marshal(ctx, sendMsg, out)
 	test.Assert(t, err == nil, err)
+	out.Flush()
 
 	// decode server side
 	recvMsg := initRecvMsg()
-	buf, err := out.Bytes()
 	recvMsg.SetPayloadLen(len(buf))
 	test.Assert(t, err == nil, err)
-	in := remote.NewReaderBuffer(buf)
+	in := bufiox.NewBytesReader(buf)
 	err = payloadCodec.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err == nil, err)
 
@@ -80,16 +82,17 @@ func TestException(t *testing.T) {
 	transErr := remote.NewTransErrorWithMsg(remote.UnknownMethod, errInfo)
 	// encode server side
 	errMsg := initServerErrorMsg(transport.TTHeader, ri, transErr)
-	out := remote.NewWriterBuffer(256)
+	var buf []byte
+	out := bufiox.NewBytesWriter(&buf)
 	err := payloadCodec.Marshal(ctx, errMsg, out)
 	test.Assert(t, err == nil, err)
+	out.Flush()
 
 	// decode client side
 	recvMsg := initClientRecvMsg(ri)
-	buf, err := out.Bytes()
 	recvMsg.SetPayloadLen(len(buf))
 	test.Assert(t, err == nil, err)
-	in := remote.NewReaderBuffer(buf)
+	in := bufiox.NewBytesReader(buf)
 	err = payloadCodec.Unmarshal(ctx, recvMsg, in)
 	test.Assert(t, err != nil)
 	transErr, ok := err.(*remote.TransError)
@@ -121,16 +124,17 @@ func BenchmarkNormalParallel(b *testing.B) {
 		for pb.Next() {
 			// encode // client side
 			sendMsg := initSendMsg(transport.TTHeader)
-			out := remote.NewWriterBuffer(256)
+			var buf []byte
+			out := bufiox.NewBytesWriter(&buf)
 			err := payloadCodec.Marshal(ctx, sendMsg, out)
 			test.Assert(b, err == nil, err)
+			out.Flush()
 
 			// decode server side
 			recvMsg := initRecvMsg()
-			buf, err := out.Bytes()
 			recvMsg.SetPayloadLen(len(buf))
 			test.Assert(b, err == nil, err)
-			in := remote.NewReaderBuffer(buf)
+			in := bufiox.NewBytesReader(buf)
 			err = payloadCodec.Unmarshal(ctx, recvMsg, in)
 			test.Assert(b, err == nil, err)
 

@@ -25,6 +25,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -71,14 +72,14 @@ func init() {
 			return rpcInfo
 		},
 		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), body)
 				_, err := out.WriteBinary(r.Bytes())
 				return err
 			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				in.Skip(3 * codec.Size32)
-				_, err := in.ReadString(len(body))
+				err := in.Skip(len(body))
 				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
 				return err
 			},
@@ -468,14 +469,14 @@ func TestInvokeError(t *testing.T) {
 			return nri
 		},
 		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 				r := mockHeader(msg.RPCInfo().Invocation().SeqID(), body)
 				_, err := out.WriteBinary(r.Bytes())
 				return err
 			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				in.Skip(3 * codec.Size32)
-				_, err := in.ReadString(len(body))
+				err := in.Skip(len(body))
 				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
 				return err
 			},
@@ -692,7 +693,7 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 			return rpcInfo
 		},
 		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 				if heartbeatFlag {
 					if msg.MessageType() != remote.Heartbeat {
 						return errors.New("response is not of MessageType Heartbeat")
@@ -703,13 +704,13 @@ func TestMuxSvrOnReadHeartbeat(t *testing.T) {
 				_, err := out.WriteBinary(r.Bytes())
 				return err
 			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				if heartbeatFlag {
 					msg.SetMessageType(remote.Heartbeat)
 					return nil
 				}
 				in.Skip(3 * codec.Size32)
-				_, err := in.ReadString(len(body))
+				err := in.Skip(len(body))
 				return err
 			},
 		},

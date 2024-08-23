@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -62,15 +64,15 @@ func TestClientHandler(t *testing.T) {
 
 type mockCodec struct {
 	remote.Codec
-	encode func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error
-	decode func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error
+	encode func(ctx context.Context, msg remote.Message, out bufiox.Writer) error
+	decode func(ctx context.Context, msg remote.Message, in bufiox.Reader) error
 }
 
-func (c *mockCodec) Encode(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *mockCodec) Encode(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 	return c.encode(ctx, msg, out)
 }
 
-func (c *mockCodec) Decode(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (c *mockCodec) Decode(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 	return c.decode(ctx, msg, in)
 }
 
@@ -109,7 +111,7 @@ func Test_cliTransHandler_Read(t *testing.T) {
 	t.Run("no error", func(t *testing.T) {
 		h := &cliTransHandler{
 			codec: &mockCodec{
-				decode: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				decode: func(ctx context.Context, msg remote.Message, out bufiox.Reader) error {
 					return nil
 				},
 			},
@@ -128,7 +130,7 @@ func Test_cliTransHandler_Read(t *testing.T) {
 	t.Run("biz error", func(t *testing.T) {
 		h := &cliTransHandler{
 			codec: &mockCodec{
-				decode: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+				decode: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 					return kerrors.NewBizStatusError(100, "biz error")
 				},
 			},

@@ -20,6 +20,8 @@ import (
 	"context"
 	"net"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -36,19 +38,19 @@ func newMockRPCInfo() rpcinfo.RPCInfo {
 var _ remote.Codec = &MockCodec{}
 
 type MockCodec struct {
-	EncodeFunc func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error
-	DecodeFunc func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error
+	EncodeFunc func(ctx context.Context, msg remote.Message, out bufiox.Writer) error
+	DecodeFunc func(ctx context.Context, msg remote.Message, in bufiox.Reader) error
 	NameFunc   func() string
 }
 
-func (m *MockCodec) Encode(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (m *MockCodec) Encode(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 	if m.EncodeFunc != nil {
 		return m.EncodeFunc(ctx, msg, out)
 	}
 	return nil
 }
 
-func (m *MockCodec) Decode(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (m *MockCodec) Decode(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 	if m.DecodeFunc != nil {
 		return m.DecodeFunc(ctx, msg, in)
 	}
@@ -66,9 +68,8 @@ var _ Extension = &MockExtension{}
 
 type MockExtension struct {
 	SetReadTimeoutFunc     func(ctx context.Context, conn net.Conn, cfg rpcinfo.RPCConfig, role remote.RPCRole)
-	NewWriteByteBufferFunc func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer
-	NewReadByteBufferFunc  func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer
-	ReleaseBufferFunc      func(remote.ByteBuffer, error) error
+	NewWriteByteBufferFunc func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Writer
+	NewReadByteBufferFunc  func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Reader
 	IsTimeoutErrFunc       func(error) bool
 	IsRemoteClosedErrFunc  func(error) bool
 }
@@ -80,23 +81,16 @@ func (m *MockExtension) SetReadTimeout(ctx context.Context, conn net.Conn, cfg r
 	}
 }
 
-func (m *MockExtension) NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
+func (m *MockExtension) NewWriteByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Writer {
 	if m.NewWriteByteBufferFunc != nil {
 		return m.NewWriteByteBufferFunc(ctx, conn, msg)
 	}
 	return nil
 }
 
-func (m *MockExtension) NewReadByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
+func (m *MockExtension) NewReadByteBuffer(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Reader {
 	if m.NewReadByteBufferFunc != nil {
 		return m.NewReadByteBufferFunc(ctx, conn, msg)
-	}
-	return nil
-}
-
-func (m *MockExtension) ReleaseBuffer(buf remote.ByteBuffer, err error) error {
-	if m.ReleaseBufferFunc != nil {
-		return m.ReleaseBufferFunc(buf, err)
 	}
 	return nil
 }

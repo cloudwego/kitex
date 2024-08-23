@@ -24,6 +24,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -61,6 +62,11 @@ func TestHTTPWrite(t *testing.T) {
 		WriterFunc: func() netpoll.Writer {
 			return netpoll.NewWriter(&bytes.Buffer{})
 		},
+		Conn: mocks.Conn{
+			WriteFunc: func(b []byte) (n int, err error) {
+				return len(b), nil
+			},
+		},
 	}
 	rwTimeout := time.Second
 	cfg := rpcinfo.NewRPCConfig()
@@ -85,20 +91,19 @@ func TestHTTPRead(t *testing.T) {
 	rwTimeout := time.Second
 
 	var readTimeout time.Duration
-	var isReaderBufReleased bool
 	conn := &MockNetpollConn{
 		SetReadTimeoutFunc: func(timeout time.Duration) (e error) {
 			readTimeout = timeout
 			return nil
 		},
 		ReaderFunc: func() (r netpoll.Reader) {
-			reader := &MockNetpollReader{
-				ReleaseFunc: func() (err error) {
-					isReaderBufReleased = true
-					return nil
-				},
-			}
+			reader := &MockNetpollReader{}
 			return reader
+		},
+		Conn: mocks.Conn{
+			ReadFunc: func(b []byte) (n int, err error) {
+				return 0, nil
+			},
 		},
 	}
 
@@ -117,7 +122,6 @@ func TestHTTPRead(t *testing.T) {
 	rpcinfo.AsMutableRPCConfig(cfg).SetRPCTimeout(rwTimeout)
 	httpCilTransHdlr.OnError(ctx, err, conn)
 	test.Assert(t, readTimeout == trans.GetReadTimeout(ri.Config()))
-	test.Assert(t, isReaderBufReleased)
 }
 
 // TestHTTPPanicAfterRead test http_client_handler OnMessage success
@@ -161,7 +165,7 @@ func TestReadLine(t *testing.T) {
 	wantHead := "HTTP/1.1 200 OK"
 	body := "{\"code\":0,\"data\":[\"mobile\",\"xxxxxxx\"],\"msg\":\"ok\"}"
 	resp := []byte(wantHead + "\r\nDate: Thu, 16 Aug 2018 03:10:03 GMT\r\nKeep-Alive: timeout=5, max=100\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n" + body)
-	reader := remote.NewReaderBuffer(resp)
+	reader := bufiox.NewBytesReader(resp)
 
 	// 2. test
 	getHead, _ := readLine(reader)
@@ -174,13 +178,14 @@ func TestSkipToBody(t *testing.T) {
 	head := "HTTP/1.1 200 OK"
 	wantBody := "{\"code\":0,\"data\":[\"mobile\",\"xxxxxxx\"],\"msg\":\"ok\"}"
 	resp := []byte(head + "\r\nDate: Thu, 16 Aug 2018 03:10:03 GMT\r\nKeep-Alive: timeout=5, max=100\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n" + wantBody)
-	reader := remote.NewReaderBuffer(resp)
+	reader := bufiox.NewBytesReader(resp)
 
 	// 2. test
 	err := skipToBody(reader)
 	test.Assert(t, err == nil)
 
-	getBody, err := reader.ReadBinary(reader.ReadableLen())
+	getBody := make([]byte, len(wantBody))
+	_, err = reader.ReadBinary(getBody)
 	test.Assert(t, err == nil)
 	test.Assert(t, strings.Compare(string(getBody), wantBody) == 0)
 }
@@ -202,10 +207,9 @@ func TestGetBodyBufReader(t *testing.T) {
 	head := "HTTP/1.1 200 OK"
 	body := "{\"code\":0,\"data\":[\"mobile\",\"xxxxxxx\"],\"msg\":\"ok\"}"
 	resp := []byte(head + "\r\nDate: Thu, 16 Aug 2018 03:10:03 GMT\r\nKeep-Alive: timeout=5, max=100\r\nConnection: Keep-Alive\r\nTransfer-Encoding: chunked\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n" + body)
-	reader := remote.NewReaderBuffer(resp)
 
 	// 2. test
-	_, err := getBodyBufReader(reader)
+	_, err := getBodyBufReader(bytes.NewBuffer(resp))
 	// check err not nil
 	test.Assert(t, err != nil)
 }

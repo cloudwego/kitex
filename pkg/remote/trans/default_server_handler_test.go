@@ -22,6 +22,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/golang/mock/gomock"
 
 	"github.com/cloudwego/kitex/internal/mocks"
@@ -40,27 +41,28 @@ var (
 )
 
 func TestDefaultSvrTransHandler(t *testing.T) {
-	buf := remote.NewReaderWriterBuffer(1024)
+	conn := mocks.NewIOConn()
+	bw, br := bufiox.NewDefaultWriter(conn), bufiox.NewDefaultReader(conn)
 	ext := &MockExtension{
-		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
+		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Writer {
+			return bw
 		},
-		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
+		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Reader {
+			return br
 		},
 	}
 
 	tagEncode, tagDecode := 0, 0
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 				tagEncode++
-				test.Assert(t, out == buf)
+				test.Assert(t, out == bw)
 				return nil
 			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				tagDecode++
-				test.Assert(t, in == buf)
+				test.Assert(t, in == br)
 				return nil
 			},
 		},
@@ -72,7 +74,6 @@ func TestDefaultSvrTransHandler(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	ctx := context.Background()
-	conn := &mocks.Conn{}
 	msg := &MockMessage{
 		RPCInfoFunc: func() rpcinfo.RPCInfo {
 			return newMockRPCInfo()
@@ -109,13 +110,14 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 		test.Assert(t, err != nil)
 	}).AnyTimes()
 
-	buf := remote.NewReaderWriterBuffer(1024)
+	conn := mocks.NewIOConn()
+	bw, br := bufiox.NewDefaultWriter(conn), bufiox.NewDefaultReader(conn)
 	ext := &MockExtension{
-		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
+		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Writer {
+			return bw
 		},
-		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
+		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Reader {
+			return br
 		},
 	}
 
@@ -123,10 +125,10 @@ func TestSvrTransHandlerBizError(t *testing.T) {
 	tracerCtl.Append(mockTracer)
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 				return nil
 			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
 				return nil
 			},
@@ -167,13 +169,14 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 		test.Assert(t, err != nil)
 	}).AnyTimes()
 
-	buf := remote.NewReaderWriterBuffer(1024)
+	conn := mocks.NewIOConn()
+	bw, br := bufiox.NewDefaultWriter(conn), bufiox.NewDefaultReader(conn)
 	ext := &MockExtension{
-		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
+		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Writer {
+			return bw
 		},
-		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
+		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Reader {
+			return br
 		},
 	}
 
@@ -182,10 +185,10 @@ func TestSvrTransHandlerReadErr(t *testing.T) {
 	tracerCtl.Append(mockTracer)
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 				return nil
 			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
 				return mockErr
 			},
@@ -222,13 +225,14 @@ func TestSvrTransHandlerOnReadHeartbeat(t *testing.T) {
 		test.Assert(t, err == nil)
 	}).AnyTimes()
 
-	buf := remote.NewReaderWriterBuffer(1024)
+	conn := mocks.NewIOConn()
+	bw, br := bufiox.NewDefaultWriter(conn), bufiox.NewDefaultReader(conn)
 	ext := &MockExtension{
-		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
+		NewWriteByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Writer {
+			return bw
 		},
-		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) remote.ByteBuffer {
-			return buf
+		NewReadByteBufferFunc: func(ctx context.Context, conn net.Conn, msg remote.Message) bufiox.Reader {
+			return br
 		},
 	}
 
@@ -236,13 +240,13 @@ func TestSvrTransHandlerOnReadHeartbeat(t *testing.T) {
 	tracerCtl.Append(mockTracer)
 	opt := &remote.ServerOption{
 		Codec: &MockCodec{
-			EncodeFunc: func(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+			EncodeFunc: func(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 				if msg.MessageType() != remote.Heartbeat {
 					return errors.New("response is not of MessageType Heartbeat")
 				}
 				return nil
 			},
-			DecodeFunc: func(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+			DecodeFunc: func(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 				msg.SetMessageType(remote.Heartbeat)
 				msg.SpecifyServiceInfo(mocks.MockServiceName, mocks.MockMethod)
 				return nil

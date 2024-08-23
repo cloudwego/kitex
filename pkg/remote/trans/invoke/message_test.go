@@ -41,10 +41,14 @@ func Test_message_Request(t *testing.T) {
 	}
 	rb := msg.GetRequestReaderByteBuffer()
 	test.Assert(t, rb != nil)
-	got, err := rb.ReadBinary(len(want))
+	got := make([]byte, len(want))
+	_, err = rb.ReadBinary(got)
 	if err != nil {
 		t.Fatal(err)
 	}
+	test.Assert(t, rb.ReadLen() == len(want))
+	rb.Release(nil)
+	test.Assert(t, rb.ReadLen() == 0)
 	test.Assert(t, bytes.Equal(want, got))
 }
 
@@ -59,19 +63,4 @@ func Test_message_Response(t *testing.T) {
 		t.Fatal(err)
 	}
 	test.Assert(t, bytes.Equal(want, got))
-}
-
-func Test_message_Release(t *testing.T) {
-	msg := NewMessage(nil, nil)
-	any := []byte("anything")
-	msg.SetRequestBytes(any)
-	rb := msg.GetRequestReaderByteBuffer()
-	msg.Release()
-	_, err := rb.Write(any)
-	test.Assert(t, err != nil)
-	msg = NewMessage(nil, nil)
-	rb = msg.GetResponseWriterByteBuffer()
-	msg.Release()
-	_, err = rb.Write(any)
-	test.Assert(t, err != nil)
 }

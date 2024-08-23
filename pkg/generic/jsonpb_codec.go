@@ -24,6 +24,7 @@ import (
 
 	"github.com/cloudwego/dynamicgo/conv"
 	dproto "github.com/cloudwego/dynamicgo/proto"
+	"github.com/cloudwego/gopkg/bufiox"
 
 	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -93,7 +94,7 @@ func (c *jsonPbCodec) Close() error {
 }
 
 // Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
-func (c *jsonPbCodec) Marshal(ctx context.Context, msg remote.Message, out remote.ByteBuffer) error {
+func (c *jsonPbCodec) Marshal(ctx context.Context, msg remote.Message, out bufiox.Writer) error {
 	method := msg.RPCInfo().Invocation().MethodName()
 	if method == "" {
 		return perrors.NewProtocolErrorWithMsg("empty methodName in protobuf Marshal")
@@ -111,7 +112,7 @@ func (c *jsonPbCodec) Marshal(ctx context.Context, msg remote.Message, out remot
 }
 
 // Deprecated: it's not used by kitex anymore. replaced by generic.MessageReaderWriter
-func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
+func (c *jsonPbCodec) Unmarshal(ctx context.Context, msg remote.Message, in bufiox.Reader) error {
 	if err := codec.NewDataIfNeeded(serviceinfo.GenericMethod, msg); err != nil {
 		return err
 	}
