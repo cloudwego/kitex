@@ -28,7 +28,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var _ remote.PayloadCodec = &binaryThriftCodec{}
+var (
+	_  remote.PayloadCodec = &binaryThriftCodec{}
+	wb                     = thrift.NewWriteBinary()
+)
 
 type binaryReqType = []byte
 
@@ -53,7 +56,6 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 		// Business error only works properly when using TTHeader and HTTP2 transmission protocols
 		// If there is a business error, data.(*Result).Success will be nil, and an empty payload will be constructed here to return
 		if msg.RPCInfo().Invocation().BizStatusErr() != nil {
-			wb := thrift.NewWriteBinary()
 			msg.Data().(WithCodec).SetCodec(wb)
 			return thriftCodec.Marshal(ctx, msg, out)
 		}
