@@ -88,6 +88,7 @@ func (s *server) init() {
 		s.opt.MWBs = append([]endpoint.MiddlewareBuilder{serverTimeoutMW}, s.opt.MWBs...)
 	}
 	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)
+	s.mws = append(s.mws, s.buildServiceMiddleware())
 	s.mws = append(s.mws, acl.NewACLMiddleware(s.opt.ACLRules))
 	s.initStreamMiddlewares(ctx)
 	if s.opt.ErrHandle != nil {
@@ -322,6 +323,23 @@ func (s *server) Stop() (err error) {
 		}
 	})
 	return
+}
+
+func (s *server) buildServiceMiddleware() endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			ri := rpcinfo.GetRPCInfo(ctx)
+			if ri == nil || ri.Invocation() == nil {
+				return next(ctx, req, resp)
+			}
+			serviceName := ri.Invocation().ServiceName()
+			svc := s.svcs.svcMap[serviceName]
+			if svc == nil || svc.mw == nil {
+				return next(ctx, req, resp)
+			}
+			return svc.mw(next)(ctx, req, resp)
+		}
+	}
 }
 
 func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
