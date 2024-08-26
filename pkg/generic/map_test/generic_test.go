@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/cloudwego/kitex/client"
 	"net"
 	"reflect"
 	"runtime"
