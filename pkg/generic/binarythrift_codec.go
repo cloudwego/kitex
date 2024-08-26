@@ -21,8 +21,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	gthrift "github.com/cloudwego/gopkg/protocol/thrift"
-
+	"github.com/cloudwego/kitex/internal/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -54,17 +53,9 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 		// Business error only works properly when using TTHeader and HTTP2 transmission protocols
 		// If there is a business error, data.(*Result).Success will be nil, and an empty payload will be constructed here to return
 		if msg.RPCInfo().Invocation().BizStatusErr() != nil {
-			sz := gthrift.Binary.MessageBeginLength(msg.RPCInfo().Invocation().MethodName())
-			sz += gthrift.Binary.FieldStopLength()
-			b, err := out.Malloc(sz)
-			if err != nil {
-				return perrors.NewProtocolError(fmt.Errorf("binary thrift generic marshal, remote.ByteBuffer Malloc err: %w", err))
-			}
-			b = gthrift.Binary.AppendMessageBegin(b[:0],
-				msg.RPCInfo().Invocation().MethodName(), gthrift.TMessageType(msg.MessageType()), msg.RPCInfo().Invocation().SeqID())
-			b = gthrift.Binary.AppendFieldStop(b)
-			_ = b
-			return nil
+			wb := thrift.NewWriteBinary()
+			msg.Data().(WithCodec).SetCodec(wb)
+			return thriftCodec.Marshal(ctx, msg, out)
 		}
 		gResult := data.(*Result)
 		transBinary := gResult.Success
