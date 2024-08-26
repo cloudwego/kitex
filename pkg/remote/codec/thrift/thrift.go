@@ -211,7 +211,7 @@ func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string
 	}
 	_ = thrift.Binary.WriteMessageBegin(b, method, thrift.TMessageType(msgType), seqID)
 
-	if err := apache.ThriftWrite(apache.NewDefaultTransport(out), data); err != nil {
+	if err := apache.ThriftWrite(out, data); err != nil {
 		return err
 	}
 	return nil
