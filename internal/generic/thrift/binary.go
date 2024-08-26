@@ -18,9 +18,9 @@ package thrift
 
 import (
 	"context"
-	"github.com/cloudwego/gopkg/protocol/thrift"
 	"io"
 
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 )
 
