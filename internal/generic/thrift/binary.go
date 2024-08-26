@@ -24,8 +24,7 @@ import (
 )
 
 // WriteBinary implement of MessageWriter
-type WriteBinary struct {
-}
+type WriteBinary struct{}
 
 func NewWriteBinary() *WriteBinary {
 	return &WriteBinary{}
