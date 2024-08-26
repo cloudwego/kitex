@@ -128,8 +128,7 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Skip dependency checking.")
 	f.BoolVar(&a.Rapid, "rapid", false,
 		"Use embedded thriftgo.")
-	f.StringVar(&a.BuiltinTpl, "tpl", "",
-		"Specify a kitex built-in template.")
+	f.Var(&a.BuiltinTpl, "tpl", "Specify kitex built-in template.")
 
 	a.RecordCmd = os.Args
 	a.Version = version

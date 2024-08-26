@@ -144,7 +144,7 @@ type Config struct {
 
 	NoDependencyCheck bool
 	Rapid             bool
-	BuiltinTpl        string // specify the built-in template to use
+	BuiltinTpl        util.StringSlice // specify the built-in template to use
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -294,7 +294,12 @@ func (c *Config) ApplyExtension() error {
 }
 
 func (c *Config) IsUsingMultipleServicesTpl() bool {
-	return c.BuiltinTpl == MultipleServicesTpl
+	for _, part := range c.BuiltinTpl {
+		if part == MultipleServicesTpl {
+			return true
+		}
+	}
+	return false
 }
 
 // NewGenerator .
