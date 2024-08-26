@@ -217,7 +217,19 @@ func (pp *protocPlugin) process(gen *protogen.Plugin) {
 			gen.Error(errors.New("no service defined"))
 			return
 		}
-		pp.ServiceInfo = pp.Services[len(pp.Services)-1]
+		if !pp.IsUsingMultipleServicesTpl() {
+			// if -tpl multiple_services is not set, specify the last service as the target service
+			pp.ServiceInfo = pp.Services[len(pp.Services)-1]
+		} else {
+			var svcs []*generator.ServiceInfo
+			for _, svc := range pp.Services {
+				if svc.GenerateHandler {
+					svc.RefName = "service" + svc.ServiceName
+					svcs = append(svcs, svc)
+				}
+			}
+			pp.PackageInfo.Services = svcs
+		}
 		fs, err := pp.kg.GenerateMainPackage(&pp.PackageInfo)
 		if err != nil {
 			pp.err = err
@@ -290,6 +302,9 @@ func (pp *protocPlugin) convertTypes(file *protogen.File) (ss []*generator.Servi
 		}
 		for _, m := range si.Methods {
 			BuildStreaming(m, si.HasStreaming)
+		}
+		if file.Generate {
+			si.GenerateHandler = true
 		}
 		ss = append(ss, si)
 	}

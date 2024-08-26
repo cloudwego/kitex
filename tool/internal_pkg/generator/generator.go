@@ -47,6 +47,9 @@ const (
 	ExtensionFilename   = "extensions.yaml"
 
 	DefaultThriftPluginTimeLimit = time.Minute
+
+	// built in tpls
+	MultipleServicesTpl = "multiple_services"
 )
 
 var (
@@ -141,6 +144,7 @@ type Config struct {
 
 	NoDependencyCheck bool
 	Rapid             bool
+	BuiltinTpl        util.StringSlice // specify the built-in template to use
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -289,6 +293,15 @@ func (c *Config) ApplyExtension() error {
 	return nil
 }
 
+func (c *Config) IsUsingMultipleServicesTpl() bool {
+	for _, part := range c.BuiltinTpl {
+		if part == MultipleServicesTpl {
+			return true
+		}
+	}
+	return false
+}
+
 // NewGenerator .
 func NewGenerator(config *Config, middlewares []Middleware) Generator {
 	mws := append(globalMiddlewares, middlewares...)
@@ -338,11 +351,20 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		},
 	}
 	if !g.Config.GenerateInvoker {
-		tasks = append(tasks, &Task{
-			Name: MainFileName,
-			Path: util.JoinPath(g.OutputPath, MainFileName),
-			Text: tpl.MainTpl,
-		})
+		if !g.Config.IsUsingMultipleServicesTpl() {
+			tasks = append(tasks, &Task{
+				Name: MainFileName,
+				Path: util.JoinPath(g.OutputPath, MainFileName),
+				Text: tpl.MainTpl,
+			})
+		} else {
+			// using multiple services main.go template
+			tasks = append(tasks, &Task{
+				Name: MainFileName,
+				Path: util.JoinPath(g.OutputPath, MainFileName),
+				Text: tpl.MainMultipleServicesTpl,
+			})
+		}
 	}
 	for _, t := range tasks {
 		if util.Exists(t.Path) {
@@ -360,37 +382,62 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 		fs = append(fs, f)
 	}
 
-	handlerFilePath := filepath.Join(g.OutputPath, HandlerFileName)
-	if util.Exists(handlerFilePath) {
-		comp := newCompleter(
-			pkg.ServiceInfo.AllMethods(),
-			handlerFilePath,
-			pkg.ServiceInfo.ServiceName)
-		f, err := comp.CompleteMethods()
+	if !g.Config.IsUsingMultipleServicesTpl() {
+		f, err := g.generateHandler(pkg, pkg.ServiceInfo, HandlerFileName)
 		if err != nil {
-			if err == errNoNewMethod {
-				return fs, nil
-			}
 			return nil, err
 		}
-		fs = append(fs, f)
+		// when there is no new method, f would be nil
+		if f != nil {
+			fs = append(fs, f)
+		}
 	} else {
-		task := Task{
-			Name: HandlerFileName,
-			Path: handlerFilePath,
-			Text: tpl.HandlerTpl + "\n" + tpl.HandlerMethodsTpl,
+		for _, svc := range pkg.Services {
+			// set the target service
+			pkg.ServiceInfo = svc
+			handlerFileName := "handler_" + svc.ServiceName + ".go"
+			f, err := g.generateHandler(pkg, svc, handlerFileName)
+			if err != nil {
+				return nil, err
+			}
+			// when there is no new method, f would be nil
+			if f != nil {
+				fs = append(fs, f)
+			}
 		}
-		g.setImports(task.Name, pkg)
-		handle := func(task *Task, pkg *PackageInfo) (*File, error) {
-			return task.Render(pkg)
-		}
-		f, err := g.chainMWs(handle)(&task, pkg)
-		if err != nil {
-			return nil, err
-		}
-		fs = append(fs, f)
 	}
 	return
+}
+
+// generateHandler generates the handler file based on the pkg and the target service
+func (g *generator) generateHandler(pkg *PackageInfo, svc *ServiceInfo, handlerFileName string) (*File, error) {
+	handlerFilePath := filepath.Join(g.OutputPath, handlerFileName)
+	if util.Exists(handlerFilePath) {
+		comp := newCompleter(
+			svc.AllMethods(),
+			handlerFilePath,
+			svc.ServiceName)
+		f, err := comp.CompleteMethods()
+		if err != nil && err != errNoNewMethod {
+			return nil, err
+		}
+		return f, nil
+	}
+
+	task := Task{
+		Name: HandlerFileName,
+		Path: handlerFilePath,
+		Text: tpl.HandlerTpl + "\n" + tpl.HandlerMethodsTpl,
+	}
+	g.setImports(task.Name, pkg)
+	handle := func(task *Task, pkg *PackageInfo) (*File, error) {
+		return task.Render(pkg)
+	}
+	f, err := g.chainMWs(handle)(&task, pkg)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
 func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
@@ -417,16 +464,20 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 			Ext:  ext.ExtendServer,
 		},
 		{
-			Name: InvokerFileName,
-			Path: util.JoinPath(output, InvokerFileName),
-			Text: tpl.InvokerTpl,
-			Ext:  ext.ExtendInvoker,
-		},
-		{
 			Name: ServiceFileName,
 			Path: util.JoinPath(output, svcPkg+".go"),
 			Text: tpl.ServiceTpl,
 		},
+	}
+
+	// do not generate invoker.go in service package by default
+	if g.Config.GenerateInvoker {
+		tasks = append(tasks, &Task{
+			Name: InvokerFileName,
+			Path: util.JoinPath(output, InvokerFileName),
+			Text: tpl.InvokerTpl,
+			Ext:  ext.ExtendInvoker,
+		})
 	}
 
 	var fs []*File
@@ -563,7 +614,14 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 	case MainFileName:
 		pkg.AddImport("log", "log")
-		pkg.AddImport(pkg.PkgRefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
+		if !g.Config.IsUsingMultipleServicesTpl() {
+			pkg.AddImport(pkg.PkgRefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
+		} else {
+			pkg.AddImport("server", "github.com/cloudwego/kitex/server")
+			for _, svc := range pkg.Services {
+				pkg.AddImport(svc.RefName, util.JoinPath(pkg.ImportPath, strings.ToLower(svc.ServiceName)))
+			}
+		}
 	}
 }
 
