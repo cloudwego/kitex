@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/apache/thrift v0.13.0
-	github.com/bytedance/gopkg v0.1.1-0.20240822091137-ff3e2edbc319
+	github.com/bytedance/gopkg v0.1.1
 	github.com/bytedance/sonic v1.12.1
 	github.com/cloudwego/configmanager v0.2.2
 	github.com/cloudwego/dynamicgo v0.3.0
@@ -20,9 +20,9 @@ require (
 	github.com/jhump/protoreflect v1.8.2
 	github.com/json-iterator/go v1.1.12
 	github.com/tidwall/gjson v1.17.3
-	golang.org/x/net v0.17.0
-	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.13.0
+	golang.org/x/net v0.24.0
+	golang.org/x/sync v0.8.0
+	golang.org/x/sys v0.19.0
 	golang.org/x/tools v0.6.0
 	google.golang.org/genproto v0.0.0-20210513213006-bf773b8c8384
 	google.golang.org/protobuf v1.28.1
@@ -48,5 +48,5 @@ require (
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	golang.org/x/arch v0.2.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 )
