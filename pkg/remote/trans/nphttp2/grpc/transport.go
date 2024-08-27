@@ -233,13 +233,13 @@ const (
 // Stream represents an RPC in the transport layer.
 type Stream struct {
 	id           uint32
-	st           ServerTransport    // nil for client side Stream
-	ct           *http2Client       // nil for server side Stream
-	ctx          context.Context    // the associated context of the stream
-	cancel       context.CancelFunc // always nil for client side Stream
-	done         chan struct{}      // closed at the end of stream to unblock writers. On the client side.
-	ctxDone      <-chan struct{}    // same as done chan but for server side. Cache of ctx.Done() (for performance)
-	method       string             // the associated RPC method of the stream
+	st           ServerTransport  // nil for client side Stream
+	ct           *http2Client     // nil for server side Stream
+	ctx          context.Context  // the associated context of the stream
+	cancel       cancelWithReason // always nil for client side Stream
+	done         chan struct{}    // closed at the end of stream to unblock writers. On the client side.
+	ctxDone      <-chan struct{}  // same as done chan but for server side. Cache of ctx.Done() (for performance)
+	method       string           // the associated RPC method of the stream
 	recvCompress string
 	sendCompress string
 	buf          *recvBuffer
@@ -797,6 +797,10 @@ func ContextErr(err error) error {
 		return status.New(codes.DeadlineExceeded, err.Error()).Err()
 	case context.Canceled:
 		return status.New(codes.Canceled, err.Error()).Err()
+	}
+	statusErr, ok := err.(*status.Error)
+	if ok { // only returned by contextWithCancelReason
+		return statusErr
 	}
 	return status.Errorf(codes.Internal, "Unexpected error from context packet: %v", err)
 }
