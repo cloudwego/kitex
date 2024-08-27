@@ -17,7 +17,7 @@ files=(
 ../../pkg/remote/payload_codec.go remote/payload_codec.go remote
 ../../pkg/generic/generic_service.go generic/generic_service.go generic
 ../../pkg/klog/log.go klog/log.go klog
-../../pkg/generic/thrift/thrift.go generic/thrift.go generic
+../../internal/generic/thrift/thrift.go generic/thrift.go generic
 ../../pkg/discovery/discovery.go discovery/discovery.go discovery
 ../../pkg/loadbalance/loadbalancer.go loadbalance/loadbalancer.go loadbalance
 ../../pkg/proxy/proxy.go proxy/proxy.go proxy

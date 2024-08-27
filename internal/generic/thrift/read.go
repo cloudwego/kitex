@@ -48,7 +48,7 @@ type readerOption struct {
 	pbDsc proto.MessageDescriptor
 }
 
-type reader func(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error)
+type reader func(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error)
 
 type fieldSetter func(field *descriptor.FieldDescriptor, val interface{}) error
 
@@ -109,7 +109,7 @@ func nextReader(tt descriptor.Type, t *descriptor.TypeDescriptor, opt *readerOpt
 }
 
 // TODO(marina.sakai): Optimize generic reader
-func skipStructReader(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func skipStructReader(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	var v interface{}
 	for {
 		fieldType, fieldID, err := in.ReadFieldBegin()
@@ -152,20 +152,20 @@ func skipStructReader(ctx context.Context, in *thrift.BinaryReader, t *descripto
 	return v, nil
 }
 
-func readVoid(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readVoid(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	_, err := readStruct(ctx, in, t, opt)
 	return descriptor.Void{}, err
 }
 
-func readDouble(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readDouble(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	return in.ReadDouble()
 }
 
-func readBool(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readBool(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	return in.ReadBool()
 }
 
-func readByte(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readByte(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	res, err := in.ReadByte()
 	if err != nil {
 		return nil, err
@@ -176,7 +176,7 @@ func readByte(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDe
 	return res, nil
 }
 
-func readInt16(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readInt16(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	res, err := in.ReadI16()
 	if err != nil {
 		return nil, err
@@ -187,19 +187,19 @@ func readInt16(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeD
 	return res, nil
 }
 
-func readInt32(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readInt32(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	return in.ReadI32()
 }
 
-func readInt64(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readInt64(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	return in.ReadI64()
 }
 
-func readString(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readString(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	return in.ReadString()
 }
 
-func readBinary(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readBinary(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	bytes, err := in.ReadBinary()
 	if err != nil {
 		return "", err
@@ -207,7 +207,7 @@ func readBinary(ctx context.Context, in *thrift.BinaryReader, t *descriptor.Type
 	return bytes, nil
 }
 
-func readBase64Binary(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readBase64Binary(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	bytes, err := in.ReadBinary()
 	if err != nil {
 		return "", err
@@ -215,7 +215,7 @@ func readBase64Binary(ctx context.Context, in *thrift.BinaryReader, t *descripto
 	return base64.StdEncoding.EncodeToString(bytes), nil
 }
 
-func readList(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readList(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	elemType, length, err := in.ReadListBegin()
 	if err != nil {
 		return nil, err
@@ -236,14 +236,14 @@ func readList(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDe
 	return l, nil
 }
 
-func readMap(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readMap(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	if opt != nil && opt.forJSON {
 		return readStringMap(ctx, in, t, opt)
 	}
 	return readInterfaceMap(ctx, in, t, opt)
 }
 
-func readInterfaceMap(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readInterfaceMap(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	keyType, elemType, length, err := in.ReadMapBegin()
 	if err != nil {
 		return nil, err
@@ -280,7 +280,7 @@ func readInterfaceMap(ctx context.Context, in *thrift.BinaryReader, t *descripto
 	return m, nil
 }
 
-func readStringMap(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readStringMap(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	keyType, elemType, length, err := in.ReadMapBegin()
 	if err != nil {
 		return nil, err
@@ -313,7 +313,7 @@ func readStringMap(ctx context.Context, in *thrift.BinaryReader, t *descriptor.T
 	return m, nil
 }
 
-func readStruct(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readStruct(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	var fs fieldSetter
 	var st interface{}
 	if opt == nil || opt.pbDsc == nil {
@@ -411,7 +411,7 @@ func readStruct(ctx context.Context, in *thrift.BinaryReader, t *descriptor.Type
 	}
 }
 
-func readHTTPResponse(ctx context.Context, in *thrift.BinaryReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
+func readHTTPResponse(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error) {
 	var resp *descriptor.HTTPResponse
 	if opt == nil || opt.pbDsc == nil {
 		if opt == nil {

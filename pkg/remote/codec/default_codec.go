@@ -106,16 +106,16 @@ type defaultCodec struct {
 // EncodePayload encode payload
 func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
 	defer func() {
-		// notice: mallocLen() must exec before flush, or it will be reset
+		// notice: WrittenLen() must exec before flush, or it will be reset
 		if ri := message.RPCInfo(); ri != nil {
 			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {
-				ms.SetSendSize(uint64(out.MallocLen()))
+				ms.SetSendSize(uint64(out.WrittenLen()))
 			}
 		}
 	}()
 	var err error
 	var framedLenField []byte
-	headerLen := out.MallocLen()
+	headerLen := out.WrittenLen()
 	tp := message.ProtocolInfo().TransProto
 
 	// 1. malloc framed field if needed
@@ -137,14 +137,14 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 		if framedLenField == nil {
 			return perrors.NewProtocolErrorWithMsg("no buffer allocated for the framed length field")
 		}
-		payloadLen = out.MallocLen() - headerLen
+		payloadLen = out.WrittenLen() - headerLen
 		// FIXME: if the `out` buffer using copy to grow when the capacity is not enough, setting the pre-allocated `framedLenField` may not take effect.
 		binary.BigEndian.PutUint32(framedLenField, uint32(payloadLen))
 	} else if message.ProtocolInfo().CodecType == serviceinfo.Protobuf {
 		return perrors.NewProtocolErrorWithMsg("protobuf just support 'framed' trans proto")
 	}
 	if tp&transport.TTHeader == transport.TTHeader {
-		payloadLen = out.MallocLen() - Size32
+		payloadLen = out.WrittenLen() - Size32
 	}
 	err = checkPayloadSize(payloadLen, c.MaxSize)
 	return err
@@ -176,7 +176,7 @@ func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.
 			return perrors.NewProtocolErrorWithMsg("no buffer allocated for the header length field")
 		}
 		// FIXME: if the `out` buffer using copy to grow when the capacity is not enough, setting the pre-allocated `totalLenField` may not take effect.
-		payloadLen := out.MallocLen() - Size32
+		payloadLen := out.WrittenLen() - Size32
 		binary.BigEndian.PutUint32(totalLenField, uint32(payloadLen))
 	}
 	return nil
@@ -310,7 +310,7 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Cont
 	if totalLenField == nil {
 		return perrors.NewProtocolErrorWithMsg("no buffer allocated for the header length field")
 	}
-	payloadLen := out.MallocLen() - Size32
+	payloadLen := out.WrittenLen() - Size32
 	binary.BigEndian.PutUint32(totalLenField, uint32(payloadLen))
 	return err
 }

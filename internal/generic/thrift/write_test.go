@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/jhump/protoreflect/desc/protoparse"
@@ -36,7 +37,6 @@ func Test_nextWriter(t *testing.T) {
 	// add some testcases
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -51,7 +51,6 @@ func Test_nextWriter(t *testing.T) {
 			"nextWriteri8 Success",
 			args{
 				val: int8(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -67,7 +66,6 @@ func Test_nextWriter(t *testing.T) {
 			"nextWriteri16 Success",
 			args{
 				val: int16(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I16,
 					Struct: &descriptor.StructDescriptor{},
@@ -83,7 +81,6 @@ func Test_nextWriter(t *testing.T) {
 			"nextWriteri32 Success",
 			args{
 				val: int32(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I32,
 					Struct: &descriptor.StructDescriptor{},
@@ -99,7 +96,6 @@ func Test_nextWriter(t *testing.T) {
 			"nextWriteri64 Success",
 			args{
 				val: int64(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I64,
 					Struct: &descriptor.StructDescriptor{},
@@ -115,7 +111,6 @@ func Test_nextWriter(t *testing.T) {
 			"nextWriterbool Success",
 			args{
 				val: true,
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.BOOL,
 					Struct: &descriptor.StructDescriptor{},
@@ -131,7 +126,6 @@ func Test_nextWriter(t *testing.T) {
 			"nextWriterdouble Success",
 			args{
 				val: float64(1.0),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.DOUBLE,
 					Struct: &descriptor.StructDescriptor{},
@@ -147,7 +141,6 @@ func Test_nextWriter(t *testing.T) {
 			"nextWriteri8 Failed",
 			args{
 				val: 10000000,
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -163,7 +156,6 @@ func Test_nextWriter(t *testing.T) {
 			"nextWriteri16 Failed",
 			args{
 				val: 10000000,
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I16,
 					Struct: &descriptor.StructDescriptor{},
@@ -179,7 +171,6 @@ func Test_nextWriter(t *testing.T) {
 			"nextWriteri32 Failed",
 			args{
 				val: 10000000,
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I32,
 					Struct: &descriptor.StructDescriptor{},
@@ -195,7 +186,6 @@ func Test_nextWriter(t *testing.T) {
 			"nextWriteri64 Failed",
 			args{
 				val: "10000000",
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I64,
 					Struct: &descriptor.StructDescriptor{},
@@ -222,79 +212,8 @@ func Test_nextWriter(t *testing.T) {
 				t.Error("nextWriter() error = nil, but writerfunc == nil")
 				return
 			}
-			if err := writerfunc(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writerfunc(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writerfunc() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_writeVoid(t *testing.T) {
-	type args struct {
-		val interface{}
-		out *thrift.BinaryWriter
-		t   *descriptor.TypeDescriptor
-		opt *writerOption
-	}
-
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{
-			"writeVoid",
-			args{
-				val: 1,
-				out: thrift.NewBinaryWriter(),
-				t: &descriptor.TypeDescriptor{
-					Type:   descriptor.VOID,
-					Struct: &descriptor.StructDescriptor{},
-				},
-			},
-			false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := writeVoid(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
-				t.Errorf("writeVoid() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_writeBool(t *testing.T) {
-	type args struct {
-		val interface{}
-		out *thrift.BinaryWriter
-		t   *descriptor.TypeDescriptor
-		opt *writerOption
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{
-			"writeBool",
-			args{
-				val: true,
-				out: thrift.NewBinaryWriter(),
-				t: &descriptor.TypeDescriptor{
-					Type:   descriptor.BOOL,
-					Struct: &descriptor.StructDescriptor{},
-				},
-			},
-			false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := writeBool(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
-				t.Errorf("writeBool() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -303,7 +222,6 @@ func Test_writeBool(t *testing.T) {
 func Test_writeInt8(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -317,7 +235,6 @@ func Test_writeInt8(t *testing.T) {
 			"writeInt8",
 			args{
 				val: int8(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -329,7 +246,6 @@ func Test_writeInt8(t *testing.T) {
 			name: "writeInt8 byte",
 			args: args{
 				val: byte(128), // overflow
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -341,7 +257,6 @@ func Test_writeInt8(t *testing.T) {
 			name: "writeInt8 error",
 			args: args{
 				val: int16(2),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I16,
 					Struct: &descriptor.StructDescriptor{},
@@ -353,7 +268,6 @@ func Test_writeInt8(t *testing.T) {
 			name: "writeInt8 to i16",
 			args: args{
 				val: int8(2),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I16,
 					Struct: &descriptor.StructDescriptor{},
@@ -365,7 +279,6 @@ func Test_writeInt8(t *testing.T) {
 			name: "writeInt8 to i32",
 			args: args{
 				val: int8(2),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I32,
 					Struct: &descriptor.StructDescriptor{},
@@ -377,7 +290,6 @@ func Test_writeInt8(t *testing.T) {
 			name: "writeInt8 to i64",
 			args: args{
 				val: int8(2),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I64,
 					Struct: &descriptor.StructDescriptor{},
@@ -389,7 +301,6 @@ func Test_writeInt8(t *testing.T) {
 			name: "writeInt8 to i64",
 			args: args{
 				val: int8(2),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.DOUBLE,
 					Struct: &descriptor.StructDescriptor{},
@@ -400,7 +311,7 @@ func Test_writeInt8(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeInt8(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeInt8(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeInt8() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -410,7 +321,6 @@ func Test_writeInt8(t *testing.T) {
 func Test_writeJSONNumber(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -424,7 +334,6 @@ func Test_writeJSONNumber(t *testing.T) {
 			"writeJSONNumber",
 			args{
 				val: json.Number("1"),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -435,7 +344,7 @@ func Test_writeJSONNumber(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeJSONNumber(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeJSONNumber(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeJSONNumber() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -445,7 +354,6 @@ func Test_writeJSONNumber(t *testing.T) {
 func Test_writeJSONFloat64(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -459,7 +367,6 @@ func Test_writeJSONFloat64(t *testing.T) {
 			"writeJSONFloat64",
 			args{
 				val: 1.0,
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -471,7 +378,6 @@ func Test_writeJSONFloat64(t *testing.T) {
 			"writeJSONFloat64 bool Failed",
 			args{
 				val: 1.0,
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.BOOL,
 					Struct: &descriptor.StructDescriptor{},
@@ -482,7 +388,7 @@ func Test_writeJSONFloat64(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeJSONFloat64(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeJSONFloat64(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeJSONFloat64() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -492,7 +398,6 @@ func Test_writeJSONFloat64(t *testing.T) {
 func Test_writeInt16(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -506,7 +411,6 @@ func Test_writeInt16(t *testing.T) {
 			"writeInt16",
 			args{
 				val: int16(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I16,
 					Struct: &descriptor.StructDescriptor{},
@@ -518,7 +422,6 @@ func Test_writeInt16(t *testing.T) {
 			"writeInt16toInt8 Success",
 			args{
 				val: int16(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -530,7 +433,6 @@ func Test_writeInt16(t *testing.T) {
 			"writeInt16toInt8 Failed",
 			args{
 				val: int16(10000),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -542,7 +444,6 @@ func Test_writeInt16(t *testing.T) {
 			"writeInt16toInt32 Success",
 			args{
 				val: int16(10000),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I32,
 					Struct: &descriptor.StructDescriptor{},
@@ -554,7 +455,6 @@ func Test_writeInt16(t *testing.T) {
 			"writeInt16toInt64 Success",
 			args{
 				val: int16(10000),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I64,
 					Struct: &descriptor.StructDescriptor{},
@@ -566,7 +466,6 @@ func Test_writeInt16(t *testing.T) {
 			"writeInt16 Failed",
 			args{
 				val: int16(10000),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.DOUBLE,
 					Struct: &descriptor.StructDescriptor{},
@@ -577,7 +476,7 @@ func Test_writeInt16(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeInt16(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeInt16(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeInt16() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -587,7 +486,6 @@ func Test_writeInt16(t *testing.T) {
 func Test_writeInt32(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -602,7 +500,6 @@ func Test_writeInt32(t *testing.T) {
 			"writeInt32 Success",
 			args{
 				val: int32(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I32,
 					Struct: &descriptor.StructDescriptor{},
@@ -614,7 +511,6 @@ func Test_writeInt32(t *testing.T) {
 			"writeInt32 Failed",
 			args{
 				val: int32(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.DOUBLE,
 					Struct: &descriptor.StructDescriptor{},
@@ -626,7 +522,6 @@ func Test_writeInt32(t *testing.T) {
 			"writeInt32ToInt8 Success",
 			args{
 				val: int32(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -638,7 +533,6 @@ func Test_writeInt32(t *testing.T) {
 			"writeInt32ToInt8 Failed",
 			args{
 				val: int32(100000),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -650,7 +544,6 @@ func Test_writeInt32(t *testing.T) {
 			"writeInt32ToInt16 success",
 			args{
 				val: int32(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I16,
 					Struct: &descriptor.StructDescriptor{},
@@ -662,7 +555,6 @@ func Test_writeInt32(t *testing.T) {
 			"writeInt32ToInt16 Failed",
 			args{
 				val: int32(100000),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I16,
 					Struct: &descriptor.StructDescriptor{},
@@ -674,7 +566,6 @@ func Test_writeInt32(t *testing.T) {
 			"writeInt32ToInt64 Success",
 			args{
 				val: int32(10000000),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I64,
 					Struct: &descriptor.StructDescriptor{},
@@ -685,7 +576,7 @@ func Test_writeInt32(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeInt32(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeInt32(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeInt32() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -695,7 +586,6 @@ func Test_writeInt32(t *testing.T) {
 func Test_writeInt64(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -709,7 +599,6 @@ func Test_writeInt64(t *testing.T) {
 			"writeInt64 Success",
 			args{
 				val: int64(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I64,
 					Struct: &descriptor.StructDescriptor{},
@@ -721,7 +610,6 @@ func Test_writeInt64(t *testing.T) {
 			"writeInt64 Failed",
 			args{
 				val: int64(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.DOUBLE,
 					Struct: &descriptor.StructDescriptor{},
@@ -733,7 +621,6 @@ func Test_writeInt64(t *testing.T) {
 			"writeInt64ToInt8 Success",
 			args{
 				val: int64(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -745,7 +632,6 @@ func Test_writeInt64(t *testing.T) {
 			"writeInt64ToInt8 failed",
 			args{
 				val: int64(1000),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I08,
 					Struct: &descriptor.StructDescriptor{},
@@ -757,7 +643,6 @@ func Test_writeInt64(t *testing.T) {
 			"writeInt64ToInt16 Success",
 			args{
 				val: int64(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I16,
 					Struct: &descriptor.StructDescriptor{},
@@ -769,7 +654,6 @@ func Test_writeInt64(t *testing.T) {
 			"writeInt64ToInt16 failed",
 			args{
 				val: int64(100000000000),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I16,
 					Struct: &descriptor.StructDescriptor{},
@@ -781,7 +665,6 @@ func Test_writeInt64(t *testing.T) {
 			"writeInt64ToInt32 Success",
 			args{
 				val: int64(1),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I32,
 					Struct: &descriptor.StructDescriptor{},
@@ -793,7 +676,6 @@ func Test_writeInt64(t *testing.T) {
 			"writeInt64ToInt32 failed",
 			args{
 				val: int64(100000000000),
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.I32,
 					Struct: &descriptor.StructDescriptor{},
@@ -804,7 +686,7 @@ func Test_writeInt64(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeInt64(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeInt64(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeInt64() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -814,7 +696,6 @@ func Test_writeInt64(t *testing.T) {
 func Test_writeFloat64(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -828,7 +709,6 @@ func Test_writeFloat64(t *testing.T) {
 			"writeFloat64",
 			args{
 				val: 1.0,
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.DOUBLE,
 					Struct: &descriptor.StructDescriptor{},
@@ -839,7 +719,7 @@ func Test_writeFloat64(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeFloat64(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeFloat64(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeFloat64() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -849,7 +729,6 @@ func Test_writeFloat64(t *testing.T) {
 func Test_writeString(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -863,7 +742,6 @@ func Test_writeString(t *testing.T) {
 			"writeString",
 			args{
 				val: stringInput,
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.STRING,
 					Struct: &descriptor.StructDescriptor{},
@@ -874,7 +752,7 @@ func Test_writeString(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeString(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeString(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeString() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -884,7 +762,7 @@ func Test_writeString(t *testing.T) {
 func Test_writeBase64String(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
+
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -898,7 +776,7 @@ func Test_writeBase64String(t *testing.T) {
 			"writeBase64Binary", // write to binary field with base64 string
 			args{
 				val: base64.StdEncoding.EncodeToString(binaryInput),
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Name:   "binary",
 					Type:   descriptor.STRING,
@@ -910,7 +788,7 @@ func Test_writeBase64String(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeBase64Binary(context.Background(), tt.args.val, tt.args.out, tt.args.t,
+			if err := writeBase64Binary(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t,
 				tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeString() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -921,7 +799,7 @@ func Test_writeBase64String(t *testing.T) {
 func Test_writeBinary(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
+
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -935,7 +813,7 @@ func Test_writeBinary(t *testing.T) {
 			"writeBinary",
 			args{
 				val: []byte(stringInput),
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.STRING,
 					Struct: &descriptor.StructDescriptor{},
@@ -946,7 +824,7 @@ func Test_writeBinary(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeBinary(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeBinary(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeBinary() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -992,13 +870,16 @@ func Test_writeBinaryList(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			binaryWriter := thrift.NewBinaryWriter()
-			if err := writeBinaryList(context.Background(), tt.args.val, binaryWriter, tt.args.t,
+			var bs []byte
+			bw := bufiox.NewBytesWriter(&bs)
+			w := thrift.NewBufferWriter(bw)
+			if err := writeBinaryList(context.Background(), tt.args.val, w, tt.args.t,
 				tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeBinary() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !tt.wantErr {
-				test.Assert(t, len(tt.args.val)+5 == len(binaryWriter.Bytes()))
+				bw.Flush()
+				test.Assert(t, len(tt.args.val)+5 == len(bs))
 			}
 		})
 	}
@@ -1007,7 +888,7 @@ func Test_writeBinaryList(t *testing.T) {
 func Test_writeList(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
+
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -1021,7 +902,7 @@ func Test_writeList(t *testing.T) {
 			"writeList",
 			args{
 				val: []interface{}{stringInput},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.LIST,
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1034,7 +915,7 @@ func Test_writeList(t *testing.T) {
 			"writeListWithNil",
 			args{
 				val: []interface{}{stringInput, nil, stringInput},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.LIST,
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1047,7 +928,7 @@ func Test_writeList(t *testing.T) {
 			"writeListWithNilOnly",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.LIST,
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1060,7 +941,7 @@ func Test_writeList(t *testing.T) {
 			"writeListWithNextWriterError",
 			args{
 				val: []interface{}{stringInput},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.LIST,
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.I08},
@@ -1072,7 +953,7 @@ func Test_writeList(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeList(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeList(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeList() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -1082,7 +963,7 @@ func Test_writeList(t *testing.T) {
 func Test_writeInterfaceMap(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
+
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -1096,7 +977,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 			"writeInterfaceMap",
 			args{
 				val: map[interface{}]interface{}{"hello": "world"},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.MAP,
 					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1110,7 +991,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 			"writeInterfaceMapWithNil",
 			args{
 				val: map[interface{}]interface{}{"hello": "world", "hi": nil, "hey": "kitex"},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.MAP,
 					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1124,7 +1005,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 			"writeInterfaceMapWithNilOnly",
 			args{
 				val: map[interface{}]interface{}{"hello": nil},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.MAP,
 					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1138,7 +1019,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 			"writeInterfaceMapWithElemNextWriterError",
 			args{
 				val: map[interface{}]interface{}{"hello": "world"},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.MAP,
 					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1152,7 +1033,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 			"writeInterfaceMapWithKeyWriterError",
 			args{
 				val: map[interface{}]interface{}{"hello": "world"},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.MAP,
 					Key:    &descriptor.TypeDescriptor{Type: descriptor.I08},
@@ -1165,7 +1046,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeInterfaceMap(context.Background(), tt.args.val, tt.args.out, tt.args.t,
+			if err := writeInterfaceMap(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t,
 				tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeInterfaceMap() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -1176,7 +1057,7 @@ func Test_writeInterfaceMap(t *testing.T) {
 func Test_writeStringMap(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
+
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -1190,7 +1071,7 @@ func Test_writeStringMap(t *testing.T) {
 			"writeStringMap",
 			args{
 				val: map[string]interface{}{"hello": "world"},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.MAP,
 					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1204,7 +1085,7 @@ func Test_writeStringMap(t *testing.T) {
 			"writeStringMapWithNil",
 			args{
 				val: map[string]interface{}{"hello": "world", "hi": nil, "hey": "kitex"},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.MAP,
 					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1218,7 +1099,7 @@ func Test_writeStringMap(t *testing.T) {
 			"writeStringMapWithNilOnly",
 			args{
 				val: map[string]interface{}{"hello": nil},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.MAP,
 					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1232,7 +1113,7 @@ func Test_writeStringMap(t *testing.T) {
 			"writeStringMapWithElemNextWriterError",
 			args{
 				val: map[string]interface{}{"hello": "world"},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.MAP,
 					Key:    &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1245,7 +1126,7 @@ func Test_writeStringMap(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeStringMap(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeStringMap(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeStringMap() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -1255,7 +1136,7 @@ func Test_writeStringMap(t *testing.T) {
 func Test_writeStruct(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
+
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -1269,7 +1150,7 @@ func Test_writeStruct(t *testing.T) {
 			"writeStruct",
 			args{
 				val: map[string]interface{}{"hello": "world"},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1291,7 +1172,7 @@ func Test_writeStruct(t *testing.T) {
 			"writeStructRequired",
 			args{
 				val: map[string]interface{}{"hello": nil},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1313,7 +1194,7 @@ func Test_writeStruct(t *testing.T) {
 			"writeStructOptional",
 			args{
 				val: map[string]interface{}{},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1332,7 +1213,7 @@ func Test_writeStruct(t *testing.T) {
 			"writeStructError",
 			args{
 				val: map[string]interface{}{"strList": []interface{}{int64(123)}},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1350,7 +1231,7 @@ func Test_writeStruct(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeStruct(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeStruct(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeStruct() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -1360,7 +1241,7 @@ func Test_writeStruct(t *testing.T) {
 func Test_writeHTTPRequest(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
+
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -1376,7 +1257,7 @@ func Test_writeHTTPRequest(t *testing.T) {
 				val: &descriptor.HTTPRequest{
 					Body: map[string]interface{}{"hello": "world"},
 				},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1402,7 +1283,7 @@ func Test_writeHTTPRequest(t *testing.T) {
 				val: &descriptor.HTTPRequest{
 					Body: map[string]interface{}{"hello": nil},
 				},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1429,7 +1310,7 @@ func Test_writeHTTPRequest(t *testing.T) {
 				val: &descriptor.HTTPRequest{
 					Body: map[string]interface{}{"hello": nil},
 				},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1456,7 +1337,7 @@ func Test_writeHTTPRequest(t *testing.T) {
 				val: &descriptor.HTTPRequest{
 					Body: map[string]interface{}{},
 				},
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1480,7 +1361,7 @@ func Test_writeHTTPRequest(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeHTTPRequest(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeHTTPRequest(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeHTTPRequest() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -1490,7 +1371,7 @@ func Test_writeHTTPRequest(t *testing.T) {
 func Test_writeHTTPRequestWithPbBody(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
+
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -1534,15 +1415,15 @@ func Test_writeHTTPRequestWithPbBody(t *testing.T) {
 			"writeStructSuccess",
 			args{
 				val: req,
-				out: thrift.NewBinaryWriter(),
-				t:   typeDescriptor,
+
+				t: typeDescriptor,
 			},
 			false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeHTTPRequest(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeHTTPRequest(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeHTTPRequest() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -1584,7 +1465,6 @@ func Test_writeRequestBase(t *testing.T) {
 	type args struct {
 		ctx   context.Context
 		val   interface{}
-		out   *thrift.BinaryWriter
 		field *descriptor.FieldDescriptor
 		opt   *writerOption
 	}
@@ -1599,7 +1479,7 @@ func Test_writeRequestBase(t *testing.T) {
 			"writeStruct",
 			args{
 				val: map[string]interface{}{"Extra": map[string]interface{}{"hello": "world"}},
-				out: thrift.NewBinaryWriter(),
+
 				field: &descriptor.FieldDescriptor{
 					Name: "base",
 					ID:   255,
@@ -1612,7 +1492,7 @@ func Test_writeRequestBase(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeRequestBase(tt.args.ctx, tt.args.val, tt.args.out, tt.args.field, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeRequestBase(tt.args.ctx, tt.args.val, getBufferWriter(nil), tt.args.field, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeRequestBase() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -1622,7 +1502,7 @@ func Test_writeRequestBase(t *testing.T) {
 func Test_writeJSON(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
+
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -1638,7 +1518,7 @@ func Test_writeJSON(t *testing.T) {
 			"writeJSON",
 			args{
 				val: &data,
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1660,7 +1540,7 @@ func Test_writeJSON(t *testing.T) {
 			"writeJSONRequired",
 			args{
 				val: &dataEmpty,
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1682,7 +1562,7 @@ func Test_writeJSON(t *testing.T) {
 			"writeJSONOptional",
 			args{
 				val: &dataEmpty,
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1700,7 +1580,7 @@ func Test_writeJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeJSON(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeJSON(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -1710,7 +1590,7 @@ func Test_writeJSON(t *testing.T) {
 func Test_writeJSONBase(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
+
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -1724,7 +1604,7 @@ func Test_writeJSONBase(t *testing.T) {
 			"writeJSONBase",
 			args{
 				val: &data,
-				out: thrift.NewBinaryWriter(),
+
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.STRUCT,
 					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1755,7 +1635,7 @@ func Test_writeJSONBase(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeJSON(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeJSON(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			test.DeepEqual(t, tt.args.opt.requestBase.Extra, map[string]string{"hello": "world"})
@@ -1766,7 +1646,6 @@ func Test_writeJSONBase(t *testing.T) {
 func Test_getDefaultValueAndWriter(t *testing.T) {
 	type args struct {
 		val interface{}
-		out *thrift.BinaryWriter
 		t   *descriptor.TypeDescriptor
 		opt *writerOption
 	}
@@ -1780,7 +1659,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"bool",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.LIST,
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.BOOL},
@@ -1793,7 +1671,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"i08",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.LIST,
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.I08},
@@ -1806,7 +1683,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"i16",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.LIST,
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.I16},
@@ -1819,7 +1695,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"i32",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.LIST,
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.I32},
@@ -1832,7 +1707,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"i64",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.LIST,
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.I64},
@@ -1845,7 +1719,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"double",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.LIST,
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.DOUBLE},
@@ -1858,7 +1731,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"stringBinary",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				opt: &writerOption{
 					binaryWithBase64: true,
 				},
@@ -1877,7 +1749,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"stringNonBinary",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type:   descriptor.LIST,
 					Elem:   &descriptor.TypeDescriptor{Type: descriptor.STRING},
@@ -1890,7 +1761,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"list",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.LIST,
 					Elem: &descriptor.TypeDescriptor{
@@ -1906,7 +1776,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"set",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.LIST,
 					Elem: &descriptor.TypeDescriptor{
@@ -1922,7 +1791,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"map",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.LIST,
 					Elem: &descriptor.TypeDescriptor{
@@ -1939,7 +1807,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"struct",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.LIST,
 					Elem: &descriptor.TypeDescriptor{
@@ -1965,7 +1832,6 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 			"void",
 			args{
 				val: []interface{}{nil},
-				out: thrift.NewBinaryWriter(),
 				t: &descriptor.TypeDescriptor{
 					Type: descriptor.LIST,
 					Elem: &descriptor.TypeDescriptor{
@@ -1980,9 +1846,15 @@ func Test_getDefaultValueAndWriter(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := writeList(context.Background(), tt.args.val, tt.args.out, tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
+			if err := writeList(context.Background(), tt.args.val, getBufferWriter(nil), tt.args.t, tt.args.opt); (err != nil) != tt.wantErr {
 				t.Errorf("writeList() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
+}
+
+func getBufferWriter(bs []byte) *thrift.BufferWriter {
+	bw := bufiox.NewBytesWriter(&bs)
+	w := thrift.NewBufferWriter(bw)
+	return w
 }

@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"github.com/cloudwego/frugal"
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/internal/utils/safemcache"
@@ -51,7 +52,7 @@ func (c thriftCodec) hyperMessageUnmarshalAvailable(data interface{}, payloadLen
 	return true
 }
 
-func (c thriftCodec) hyperMarshal(out remote.ByteBuffer, methodName string, msgType remote.MessageType,
+func (c thriftCodec) hyperMarshal(out bufiox.Writer, methodName string, msgType remote.MessageType,
 	seqID int32, data interface{},
 ) error {
 	// calculate and malloc message buffer
@@ -61,7 +62,7 @@ func (c thriftCodec) hyperMarshal(out remote.ByteBuffer, methodName string, msgT
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
 	}
-	mallocLen := out.MallocLen()
+	mallocLen := out.WrittenLen()
 
 	// encode message
 	offset := thrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)

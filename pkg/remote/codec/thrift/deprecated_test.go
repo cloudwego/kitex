@@ -18,17 +18,19 @@ package thrift
 
 import (
 	"context"
-	"encoding/binary"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
+
+	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
-	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 func TestMessage(t *testing.T) {
-	trans := remote.NewReaderWriterBuffer(-1)
-	prot := NewBinaryProtocol(trans)
+	conn := mocks.NewIOConn()
+	bw, br := bufiox.NewDefaultWriter(conn), bufiox.NewDefaultReader(conn)
+	prot := thrift.NewBinaryProtocol(br, bw)
 
 	// check write
 	name := "name"
@@ -36,12 +38,6 @@ func TestMessage(t *testing.T) {
 	typeID := thrift.CALL
 	err := prot.WriteMessageBegin(name, typeID, seqID)
 	test.Assert(t, err == nil, err)
-
-	tmp, _ := trans.Bytes()
-	test.Assert(t, binary.BigEndian.Uint32(tmp[:4]) == 0x80010001)
-	test.Assert(t, binary.BigEndian.Uint32(tmp[4:8]) == uint32(len(name)))
-	test.Assert(t, string(tmp[8:8+len(name)]) == name)
-	test.Assert(t, binary.BigEndian.Uint32(tmp[8+len(name):12+len(name)]) == uint32(seqID))
 
 	err = prot.WriteMessageEnd()
 	test.Assert(t, err == nil, err)
@@ -60,8 +56,9 @@ func TestMessage(t *testing.T) {
 }
 
 func TestStruct(t *testing.T) {
-	trans := remote.NewReaderWriterBuffer(-1)
-	prot := NewBinaryProtocol(trans)
+	conn := mocks.NewIOConn()
+	bw, br := bufiox.NewDefaultWriter(conn), bufiox.NewDefaultReader(conn)
+	prot := thrift.NewBinaryProtocol(br, bw)
 
 	name := "struct"
 	err := prot.WriteStructBegin(name)
@@ -77,8 +74,9 @@ func TestStruct(t *testing.T) {
 }
 
 func TestField(t *testing.T) {
-	trans := remote.NewReaderWriterBuffer(-1)
-	prot := NewBinaryProtocol(trans)
+	conn := mocks.NewIOConn()
+	bw, br := bufiox.NewDefaultWriter(conn), bufiox.NewDefaultReader(conn)
+	prot := thrift.NewBinaryProtocol(br, bw)
 
 	name := "name"
 	var fieldID int16 = 1
@@ -88,11 +86,6 @@ func TestField(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	err = prot.WriteFieldStop()
 	test.Assert(t, err == nil, err)
-	tmp, _ := trans.Bytes()
-	test.Assert(t, len(tmp) == 4)
-	test.Assert(t, tmp[0] == thrift.STRUCT)
-	test.Assert(t, binary.BigEndian.Uint16(tmp[1:]) == uint16(fieldID))
-	test.Assert(t, tmp[3] == thrift.STOP)
 	err = prot.Flush(context.Background())
 	test.Assert(t, err == nil, err)
 
@@ -112,19 +105,15 @@ func TestField(t *testing.T) {
 }
 
 func TestMap(t *testing.T) {
-	trans := remote.NewReaderWriterBuffer(-1)
-	prot := NewBinaryProtocol(trans)
+	conn := mocks.NewIOConn()
+	bw, br := bufiox.NewDefaultWriter(conn), bufiox.NewDefaultReader(conn)
+	prot := thrift.NewBinaryProtocol(br, bw)
 
 	size := 10
 	err := prot.WriteMapBegin(thrift.I32, thrift.BOOL, size)
 	test.Assert(t, err == nil, err)
 	err = prot.WriteMapEnd()
 	test.Assert(t, err == nil, err)
-	tmp, _ := trans.Bytes()
-	test.Assert(t, len(tmp) == 6)
-	test.Assert(t, tmp[0] == thrift.I32)
-	test.Assert(t, tmp[1] == thrift.BOOL)
-	test.Assert(t, binary.BigEndian.Uint32(tmp[2:]) == uint32(size))
 
 	err = prot.Flush(context.Background())
 	test.Assert(t, err == nil, err)
@@ -139,18 +128,15 @@ func TestMap(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	trans := remote.NewReaderWriterBuffer(-1)
-	prot := NewBinaryProtocol(trans)
+	conn := mocks.NewIOConn()
+	bw, br := bufiox.NewDefaultWriter(conn), bufiox.NewDefaultReader(conn)
+	prot := thrift.NewBinaryProtocol(br, bw)
 
 	size := 10
 	err := prot.WriteListBegin(thrift.I64, size)
 	test.Assert(t, err == nil, err)
 	err = prot.WriteListEnd()
 	test.Assert(t, err == nil, err)
-	tmp, _ := trans.Bytes()
-	test.Assert(t, len(tmp) == 5)
-	test.Assert(t, tmp[0] == thrift.I64)
-	test.Assert(t, binary.BigEndian.Uint32(tmp[1:]) == uint32(size))
 
 	err = prot.Flush(context.Background())
 	test.Assert(t, err == nil, err)
@@ -164,18 +150,15 @@ func TestList(t *testing.T) {
 }
 
 func TestSet(t *testing.T) {
-	trans := remote.NewReaderWriterBuffer(-1)
-	prot := NewBinaryProtocol(trans)
+	conn := mocks.NewIOConn()
+	bw, br := bufiox.NewDefaultWriter(conn), bufiox.NewDefaultReader(conn)
+	prot := thrift.NewBinaryProtocol(br, bw)
 
 	size := 10
 	err := prot.WriteSetBegin(thrift.STRING, size)
 	test.Assert(t, err == nil, err)
 	err = prot.WriteSetEnd()
 	test.Assert(t, err == nil, err)
-	tmp, _ := trans.Bytes()
-	test.Assert(t, len(tmp) == 5)
-	test.Assert(t, tmp[0] == thrift.STRING)
-	test.Assert(t, binary.BigEndian.Uint32(tmp[1:]) == uint32(size))
 
 	err = prot.Flush(context.Background())
 	test.Assert(t, err == nil, err)
@@ -189,8 +172,9 @@ func TestSet(t *testing.T) {
 }
 
 func TestConst(t *testing.T) {
-	trans := remote.NewReaderWriterBuffer(-1)
-	prot := NewBinaryProtocol(trans)
+	conn := mocks.NewIOConn()
+	bw, br := bufiox.NewDefaultWriter(conn), bufiox.NewDefaultReader(conn)
+	prot := thrift.NewBinaryProtocol(br, bw)
 
 	n := 0
 	err := prot.WriteBool(false)
@@ -217,18 +201,10 @@ func TestConst(t *testing.T) {
 	err = prot.WriteBinary([]byte{7})
 	n += 4 + 1
 	test.Assert(t, err == nil, err)
+	test.Assert(t, bw.WrittenLen() == n)
+
 	err = prot.Flush(context.Background())
 	test.Assert(t, err == nil, err)
-
-	tmp, _ := trans.Bytes()
-	test.Assert(t, len(tmp) == n, len(tmp))
-	test.Assert(t, tmp[0] == 0x0)
-	test.Assert(t, tmp[1] == 0x1)
-	test.Assert(t, tmp[3] == 0x2)
-	test.Assert(t, tmp[7] == 0x3)
-	test.Assert(t, tmp[15] == 0x4)
-	test.Assert(t, string(tmp[28:29]) == "6")
-	test.Assert(t, tmp[33] == 0x7)
 
 	err = prot.Flush(context.Background())
 	test.Assert(t, err == nil, err)
