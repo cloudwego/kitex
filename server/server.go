@@ -341,7 +341,7 @@ func (s *server) buildCoreMiddleware() endpoint.Middleware {
 
 			// --- After Next ---
 			// error handler only catches the server handler's error.
-			if s.opt.ErrHandle != nil {
+			if s.opt.ErrHandle != nil && err != nil {
 				err = s.opt.ErrHandle(ctx, err)
 			}
 
