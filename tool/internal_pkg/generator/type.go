@@ -83,7 +83,7 @@ func (p *PackageInfo) AddImports(pkgs ...string) {
 	}
 }
 
-// UpdateImport changed the mapping between alias -> import path
+// UpdateImportPath changed the mapping between alias -> import path
 // For instance:
 //
 //	Original import: alias "original_path"
@@ -95,7 +95,7 @@ func (p *PackageInfo) AddImports(pkgs ...string) {
 //		Original import: context "path/to/custom/context"
 //	 Invocation:      UpdateImport("context", "context")
 //	 New import:      context
-func (p *PackageInfo) UpdateImport(pkg, newPath string) {
+func (p *PackageInfo) UpdateImportPath(pkg, newPath string) {
 	if p.Imports == nil || pkg == "" || newPath == "" {
 		return
 	}

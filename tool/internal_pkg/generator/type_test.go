@@ -109,7 +109,7 @@ func TestServiceInfo_FixHasStreamingForExtendedService(t *testing.T) {
 	})
 }
 
-func TestPkgInfo_UpdateImport(t *testing.T) {
+func TestPkgInfo_UpdateImportPath(t *testing.T) {
 	testcases := []struct {
 		desc    string
 		imports map[string]map[string]bool
@@ -153,7 +153,7 @@ func TestPkgInfo_UpdateImport(t *testing.T) {
 			pkgInfo := &PackageInfo{
 				Imports: tc.imports,
 			}
-			pkgInfo.UpdateImport(tc.pkg, tc.newPath)
+			pkgInfo.UpdateImportPath(tc.pkg, tc.newPath)
 			tc.expect(t, pkgInfo, tc.pkg, tc.newPath)
 		})
 	}
