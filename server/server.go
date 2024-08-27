@@ -27,10 +27,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/acl"
+
 	"github.com/cloudwego/localsession/backup"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
-	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -87,15 +88,17 @@ func (s *server) init() {
 		// prepend for adding timeout to the context for all middlewares and the handler
 		s.opt.MWBs = append([]endpoint.MiddlewareBuilder{serverTimeoutMW}, s.opt.MWBs...)
 	}
-	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)
-	s.mws = append(s.mws, s.buildServiceMiddleware())
-	s.mws = append(s.mws, acl.NewACLMiddleware(s.opt.ACLRules))
-	s.initStreamMiddlewares(ctx)
-	if s.opt.ErrHandle != nil {
-		// errorHandleMW must be the last middleware,
-		// to ensure it only catches the server handler's error.
-		s.mws = append(s.mws, newErrorHandleMW(s.opt.ErrHandle))
+	// register server middlewares
+	for i := range s.opt.MWBs {
+		s.mws = append(s.mws, s.opt.MWBs[i](ctx))
 	}
+	// register services middlewares
+	s.mws = append(s.mws, s.buildServiceMiddleware())
+	// register core middleware,
+	// core middleware MUST be the last middleware
+	s.mws = append(s.mws, s.buildCoreMiddleware())
+	// register stream recv/send middlewares
+	s.initStreamMiddlewares(ctx)
 	if ds := s.opt.DebugService; ds != nil {
 		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(s.opt.DebugInfo))
 		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
@@ -108,26 +111,6 @@ func fillContext(opt *internal_server.Options) context.Context {
 	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
 	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, opt.Events)
 	return ctx
-}
-
-func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder, ks *server) []endpoint.Middleware {
-	for i := range mwBs {
-		ks.mws = append(ks.mws, mwBs[i](ctx))
-	}
-	return ks.mws
-}
-
-// newErrorHandleMW provides a hook point for server error handling.
-func newErrorHandleMW(errHandle func(context.Context, error) error) endpoint.Middleware {
-	return func(next endpoint.Endpoint) endpoint.Endpoint {
-		return func(ctx context.Context, request, response interface{}) error {
-			err := next(ctx, request, response)
-			if err == nil {
-				return nil
-			}
-			return errHandle(ctx, err)
-		}
-	}
 }
 
 func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinfo.RPCInfo {
@@ -329,15 +312,40 @@ func (s *server) buildServiceMiddleware() endpoint.Middleware {
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, resp interface{}) (err error) {
 			ri := rpcinfo.GetRPCInfo(ctx)
-			if ri == nil || ri.Invocation() == nil {
-				return next(ctx, req, resp)
-			}
 			serviceName := ri.Invocation().ServiceName()
 			svc := s.svcs.svcMap[serviceName]
-			if svc == nil || svc.mw == nil {
-				return next(ctx, req, resp)
+			if svc != nil && svc.mw != nil {
+				next = svc.mw(next)
 			}
-			return svc.mw(next)(ctx, req, resp)
+			return next(ctx, req, resp)
+		}
+	}
+}
+
+// buildCoreMiddleware build the core middleware that include some default framework logic like error handler and ACL.
+// the `next` function for core middleware should be the service handler itself without any wrapped middleware.
+func (s *server) buildCoreMiddleware() endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		serviceHandler := next
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			// --- Before Next ---
+			if len(s.opt.ACLRules) > 0 {
+				if err = acl.ApplyRules(ctx, req, s.opt.ACLRules); err != nil {
+					return err
+				}
+			}
+
+			// --- Run Next ---
+			// run service handler
+			err = serviceHandler(ctx, req, resp)
+
+			// --- After Next ---
+			// error handler only catches the server handler's error.
+			if s.opt.ErrHandle != nil {
+				err = s.opt.ErrHandle(ctx, err)
+			}
+
+			return err
 		}
 	}
 }
