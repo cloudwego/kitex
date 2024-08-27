@@ -99,6 +99,7 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 
 	// notice: buff num of chan is very important here, it cannot less than call times, or the below chan receive will block
 	callDone := make(chan *resultWrapper, retryTimes+1)
+	var nonFinishedErrRes *resultWrapper
 	timer := time.NewTimer(retryDelay)
 	maxDurationTimer := time.NewTimer(maxDuration)
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
@@ -112,15 +113,15 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 	startTime := time.Now()
 	// include first call, max loop is retryTimes + 1
 	doCall := true
-	for i := 0; ; {
+	for callCount := 0; ; {
 		if doCall {
 			doCall = false
-			if i > 0 {
+			if callCount > 0 {
 				if ret, e := isExceedMaxDuration(ctx, startTime, maxDuration, atomic.LoadInt32(&callTimes)); ret {
 					return firstRI, false, e
 				}
 			}
-			i++
+			callCount++
 			gofunc.GoFunc(ctx, func() {
 				if atomic.LoadInt32(&abort) == 1 {
 					return
@@ -152,37 +153,50 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 		select {
 		case <-timer.C:
 			// backup retry
-			if _, ok := r.ShouldRetry(ctx, nil, i, req, cbKey); ok && i <= retryTimes {
+			if _, ok := r.ShouldRetry(ctx, nil, callCount, req, cbKey); ok && callCount < retryTimes+1 {
 				doCall = true
 				timer.Reset(retryDelay)
 			}
 		case res := <-callDone:
 			// result retry
-			doneCount++
-			if res.err != nil && errors.Is(res.err, kerrors.ErrRPCFinish) {
-				// There will be only one request (goroutine) pass the `checkRPCState`, others will skip decoding
-				// and return `ErrRPCFinish`, to avoid concurrent write to response and save the cost of decoding.
-				// We can safely ignore this error and wait for the response of the passed goroutine.
-				if finishedErrCount++; finishedErrCount >= retryTimes+1 {
-					// But if all requests return this error, it must be a bug, preventive panic to avoid dead loop
-					panic(errUnexpectedFinish)
-				}
-				continue
+			if respOp, ok := ctx.Value(CtxRespOp).(*int32); ok {
+				// must set as OpNo, or the new resp cannot be decoded
+				atomic.StoreInt32(respOp, OpNo)
 			}
-			if i <= retryTimes {
-				if _, ok := r.ShouldRetry(ctx, nil, i, req, cbKey); ok {
-					if r.isRetryResult(ctx, res.ri, res.resp, res.err, &r.policy.FailurePolicy) {
-						doCall = true
-						timer.Reset(retryDelay)
-						continue
+			doneCount++
+			isFinishErr := res.err != nil && errors.Is(res.err, kerrors.ErrRPCFinish)
+			if doneCount < retryTimes+1 {
+				if isFinishErr {
+					// There will be only one request (goroutine) pass the `checkRPCState`, others will skip decoding
+					// and return `ErrRPCFinish`, to avoid concurrent write to response and save the cost of decoding.
+					// We can safely ignore this error and wait for the response of the passed goroutine.
+					if finishedErrCount++; finishedErrCount >= retryTimes+1 {
+						// But if all requests return this error, it must be a bug, preventive panic to avoid dead loop
+						panic(errUnexpectedFinish)
 					}
+					continue
 				}
-			} else if doneCount <= retryTimes && r.isRetryResult(ctx, res.ri, res.resp, res.err, &r.policy.FailurePolicy) {
-				continue
+				if callCount < retryTimes+1 {
+					if msg, ok := r.ShouldRetry(ctx, nil, callCount, req, cbKey); ok {
+						if r.isRetryResult(ctx, res.ri, res.resp, res.err, &r.policy.FailurePolicy) {
+							doCall = true
+							timer.Reset(retryDelay)
+							continue
+						}
+					} else if msg != "" {
+						appendMsg := fmt.Sprintf("retried %d, %s", callCount-1, msg)
+						appendErrMsg(res.err, appendMsg)
+					}
+				} else if r.isRetryResult(ctx, res.ri, res.resp, res.err, &r.policy.FailurePolicy) {
+					continue
+				}
+			}
+			if nonFinishedErrRes == nil || !isFinishErr {
+				nonFinishedErrRes = res
 			}
 			atomic.StoreInt32(&abort, 1)
-			recordRetryInfo(res.ri, atomic.LoadInt32(&callTimes), callCosts.String())
-			return res.ri, false, res.err
+			recordRetryInfo(nonFinishedErrRes.ri, atomic.LoadInt32(&callTimes), callCosts.String())
+			return nonFinishedErrRes.ri, false, nonFinishedErrRes.err
 		}
 	}
 }
