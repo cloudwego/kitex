@@ -51,8 +51,11 @@ func newServices() *services {
 }
 
 func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, registerOpts *RegisterOptions) error {
-	mw := endpoint.Chain(registerOpts.Middlewares...)
-	svc := newService(svcInfo, handler, mw)
+	var serviceMW endpoint.Middleware
+	if len(registerOpts.Middlewares) > 0 {
+		serviceMW = endpoint.Chain(registerOpts.Middlewares...)
+	}
+	svc := newService(svcInfo, handler, serviceMW)
 	if registerOpts.IsFallbackService {
 		if s.fallbackSvc != nil {
 			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)

@@ -1054,15 +1054,19 @@ func TestRegisterServiceWithMiddleware(t *testing.T) {
 		},
 	}
 	serverMW := 0
-	serviceMW := 0
+	serviceMW1 := 0
+	serviceMW2 := 0
+	serviceHandler := 0
 	opts = append(opts, WithTransServerFactory(mocks.NewMockTransServerFactory(transSvr)))
 	opts = append(opts, WithTransHandlerFactory(transHdlrFact))
+	// server middleware
 	opts = append(opts, WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, req, resp interface{}) (err error) {
-			test.Assert(t, serverMW == 0 && serviceMW == 0)
-			serverMW = 1
+			test.Assert(t, serverMW == 0 && serviceMW1 == 0 && serviceMW2 == 0 && serviceHandler == 0)
+			serverMW++
 			err = next(ctx, req, resp)
-			test.Assert(t, serverMW == 1 && serviceMW == 1)
+			test.Assert(t, serverMW == 1 && serviceMW1 == 2 && serviceMW2 == 2 && serviceHandler == 2)
+			serverMW++
 			return err
 		}
 	}))
@@ -1074,15 +1078,29 @@ func TestRegisterServiceWithMiddleware(t *testing.T) {
 	err := svr.RegisterService(
 		mocks.ServiceInfo(),
 		mocks.MockFuncHandler(func(ctx context.Context, req *mocks.MyRequest) (r *mocks.MyResponse, err error) {
-			test.Assert(t, serverMW == 1 && serviceMW == 1)
+			test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 1 && serviceHandler == 0)
+			serviceHandler += 2
 			return &mocks.MyResponse{}, nil
 		}),
+		// service middleware 1
 		WithServiceMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
 			return func(ctx context.Context, req, resp interface{}) (err error) {
-				test.Assert(t, serverMW == 1 && serviceMW == 0)
-				serviceMW = 1
+				test.Assert(t, serverMW == 1 && serviceMW1 == 0 && serviceMW2 == 0 && serviceHandler == 0)
+				serviceMW1++
 				err = next(ctx, req, resp)
-				test.Assert(t, serverMW == 1 && serviceMW == 1)
+				test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 2 && serviceHandler == 2)
+				serviceMW1++
+				return err
+			}
+		}),
+		// service middleware 2
+		WithServiceMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
+			return func(ctx context.Context, req, resp interface{}) (err error) {
+				test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 0 && serviceHandler == 0)
+				serviceMW2++
+				err = next(ctx, req, resp)
+				test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 1 && serviceHandler == 2)
+				serviceMW2++
 				return err
 			}
 		}),
@@ -1090,7 +1108,7 @@ func TestRegisterServiceWithMiddleware(t *testing.T) {
 	test.Assert(t, err == nil)
 	err = svr.Run()
 	test.Assert(t, err == nil, err)
-	test.Assert(t, serverMW == 1 && serviceMW == 1)
+	test.Assert(t, serverMW == 2 && serviceMW1 == 2 && serviceMW2 == 2 && serviceHandler == 2)
 }
 
 type noopMetahandler struct{}
