@@ -92,9 +92,9 @@ func (p *PackageInfo) AddImports(pkgs ...string) {
 //
 // if pkg == newPath, then alias would be removed in import sentence:
 //
-//		Original import: context "path/to/custom/context"
-//	 Invocation:      UpdateImport("context", "context")
-//	 New import:      context
+//	Original import: context "path/to/custom/context"
+//	Invocation:      UpdateImport("context", "context")
+//	New import:      context
 func (p *PackageInfo) UpdateImportPath(pkg, newPath string) {
 	if p.Imports == nil || pkg == "" || newPath == "" {
 		return
