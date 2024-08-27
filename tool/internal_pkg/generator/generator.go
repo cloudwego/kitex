@@ -617,7 +617,7 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		if !g.Config.IsUsingMultipleServicesTpl() {
 			pkg.AddImport(pkg.PkgRefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
 		} else {
-			pkg.AddImport("server", "github.com/cloudwego/kitex/server")
+			pkg.AddImports("server")
 			for _, svc := range pkg.Services {
 				pkg.AddImport(svc.RefName, util.JoinPath(pkg.ImportPath, strings.ToLower(svc.ServiceName)))
 			}
