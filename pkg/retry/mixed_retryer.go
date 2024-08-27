@@ -165,6 +165,9 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 			}
 			doneCount++
 			isFinishErr := res.err != nil && errors.Is(res.err, kerrors.ErrRPCFinish)
+			if nonFinishedErrRes == nil || !isFinishErr {
+				nonFinishedErrRes = res
+			}
 			if doneCount < retryTimes+1 {
 				if isFinishErr {
 					// There will be only one request (goroutine) pass the `checkRPCState`, others will skip decoding
@@ -190,9 +193,6 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 				} else if r.isRetryResult(ctx, res.ri, res.resp, res.err, &r.policy.FailurePolicy) {
 					continue
 				}
-			}
-			if nonFinishedErrRes == nil || !isFinishErr {
-				nonFinishedErrRes = res
 			}
 			atomic.StoreInt32(&abort, 1)
 			recordRetryInfo(nonFinishedErrRes.ri, atomic.LoadInt32(&callTimes), callCosts.String())
