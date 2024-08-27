@@ -60,10 +60,7 @@ func (p *PackageInfo) AddImport(pkg, path string) {
 		p.Imports = make(map[string]map[string]bool)
 	}
 	if pkg != "" {
-		if p.ExternalKitexGen != "" && strings.Contains(path, KitexGenPath) {
-			parts := strings.Split(path, KitexGenPath)
-			path = util.JoinPath(p.ExternalKitexGen, parts[len(parts)-1])
-		}
+		path = p.toExternalGenPath(path)
 		if path == pkg {
 			p.Imports[path] = nil
 		} else {
@@ -84,6 +81,57 @@ func (p *PackageInfo) AddImports(pkgs ...string) {
 			p.AddImport(pkg, pkg)
 		}
 	}
+}
+
+// UpdateImport changed the mapping between alias -> import path
+// For instance:
+//
+//	Original import: alias "original_path"
+//	Invocation:      UpdateImport("alias", "new_path")
+//	New import:      alias "new_path"
+//
+// if pkg == newPath, then alias would be removed in import sentence:
+//
+//		Original import: context "path/to/custom/context"
+//	 Invocation:      UpdateImport("context", "context")
+//	 New import:      context
+func (p *PackageInfo) UpdateImport(pkg, newPath string) {
+	if p.Imports == nil || pkg == "" || newPath == "" {
+		return
+	}
+
+	newPath = p.toExternalGenPath(newPath)
+	var prevPath string
+OutLoop:
+	for path, pkgSet := range p.Imports {
+		for pkgKey := range pkgSet {
+			if pkgKey == pkg {
+				prevPath = path
+				break OutLoop
+			}
+		}
+	}
+	if prevPath == "" {
+		return
+	}
+
+	delete(p.Imports, prevPath)
+	if newPath == pkg { // remove the alias
+		p.Imports[newPath] = nil
+	} else { // change the path -> alias mapping
+		p.Imports[newPath] = map[string]bool{
+			pkg: true,
+		}
+	}
+}
+
+func (p *PackageInfo) toExternalGenPath(path string) string {
+	if p.ExternalKitexGen == "" || !strings.Contains(path, KitexGenPath) {
+		return path
+	}
+	parts := strings.Split(path, KitexGenPath)
+	newPath := util.JoinPath(p.ExternalKitexGen, parts[len(parts)-1])
+	return newPath
 }
 
 // PkgInfo .
