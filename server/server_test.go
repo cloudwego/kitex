@@ -1251,10 +1251,10 @@ func newStreamingServer(svcName string, args []streamingMethodArg, mws []endpoin
 			svcMap: map[string]*service{
 				svcName: {
 					svcInfo: svcInfo,
+					mw:      endpoint.Chain(mws...),
 				},
 			},
 		},
-		mws: mws,
 		opt: internal_server.NewOptions(nil),
 	}
 	return svr
@@ -1310,7 +1310,7 @@ func TestStreamCtxDiverge(t *testing.T) {
 		},
 	}
 	svr := newStreamingServer(testService, args, mws)
-	svr.buildInvokeChain()
+	svr.buildInvokeChain(context.Background())
 
 	for _, tc := range testcases {
 		t.Run(tc.methodName, func(t *testing.T) {
@@ -1325,107 +1325,6 @@ func TestStreamCtxDiverge(t *testing.T) {
 			}
 			err := svr.eps(ctx, &streaming.Args{Stream: mock}, nil)
 			test.Assert(t, err == nil, err)
-		})
-	}
-}
-
-func Test_server_fixStreamCtxDiverge(t *testing.T) {
-	methodInfoFunc := func(mode serviceinfo.StreamingMode) serviceinfo.MethodInfo {
-		return serviceinfo.NewMethodInfo(nil, nil, nil, false, serviceinfo.WithStreamingMode(mode))
-	}
-	testcases := []struct {
-		desc           string
-		svcMap         map[string]*service
-		expectInjectMW bool
-	}{
-		{
-			desc: "single service without streaming method",
-			svcMap: map[string]*service{
-				"service": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"nonStreamingMethod": methodInfoFunc(serviceinfo.StreamingNone),
-						},
-					},
-				},
-			},
-		},
-		{
-			desc: "single service with streaming methods",
-			svcMap: map[string]*service{
-				"service": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"ClientStreamingMethod": methodInfoFunc(serviceinfo.StreamingClient),
-							"ServerStreamingMethod": methodInfoFunc(serviceinfo.StreamingServer),
-							"BidiStreamingMethod":   methodInfoFunc(serviceinfo.StreamingBidirectional),
-						},
-					},
-				},
-			},
-			expectInjectMW: true,
-		},
-		{
-			desc: "multiple services without streaming method",
-			svcMap: map[string]*service{
-				"service0": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service0",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"nonStreamingMethod0": methodInfoFunc(serviceinfo.StreamingNone),
-						},
-					},
-				},
-				"service1": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service1",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"nonStreamingMethod1": methodInfoFunc(serviceinfo.StreamingNone),
-						},
-					},
-				},
-			},
-		},
-		{
-			desc: "multiple services with streaming methods",
-			svcMap: map[string]*service{
-				"service0": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service0",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"ClientStreamingMethod": methodInfoFunc(serviceinfo.StreamingClient),
-							"ServerStreamingMethod": methodInfoFunc(serviceinfo.StreamingServer),
-						},
-					},
-				},
-				"service1": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service1",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"BidiStreamingMethod": methodInfoFunc(serviceinfo.StreamingBidirectional),
-						},
-					},
-				},
-			},
-			expectInjectMW: true,
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.desc, func(t *testing.T) {
-			svr := &server{
-				svcs: &services{
-					svcMap: tc.svcMap,
-				},
-			}
-			svr.fixStreamCtxDiverge()
-			if tc.expectInjectMW {
-				test.Assert(t, len(svr.mws) == 1)
-			} else {
-				test.Assert(t, len(svr.mws) == 0)
-			}
 		})
 	}
 }

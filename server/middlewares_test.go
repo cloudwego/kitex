@@ -63,14 +63,13 @@ func Test_serverTimeoutMW(t *testing.T) {
 		ri := rpcinfo.NewRPCInfo(from, to, nil, cfg, nil)
 		return rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 	}
-	timeoutMW := serverTimeoutMW(context.Background())
 
 	t.Run("no_timeout(fastPath)", func(t *testing.T) {
 		// prepare
 		ctx := newCtxWithRPCInfo(0)
 
 		// test
-		err := timeoutMW(func(ctx context.Context, req, resp interface{}) (err error) {
+		err := serverTimeoutMW(func(ctx context.Context, req, resp interface{}) (err error) {
 			ddl, ok := ctx.Deadline()
 			test.Assert(t, !ok)
 			test.Assert(t, ddl.IsZero())
@@ -87,7 +86,7 @@ func Test_serverTimeoutMW(t *testing.T) {
 		waitFinish := make(chan struct{})
 
 		// test
-		err := timeoutMW(func(ctx context.Context, req, resp interface{}) (err error) {
+		err := serverTimeoutMW(func(ctx context.Context, req, resp interface{}) (err error) {
 			go func() {
 				timer := time.NewTimer(time.Millisecond * 20)
 				select {
@@ -112,7 +111,7 @@ func Test_serverTimeoutMW(t *testing.T) {
 		waitFinish := make(chan struct{})
 
 		// test
-		err := timeoutMW(func(ctx context.Context, req, resp interface{}) (err error) {
+		err := serverTimeoutMW(func(ctx context.Context, req, resp interface{}) (err error) {
 			go func() {
 				timer := time.NewTimer(time.Millisecond * 20)
 				select {
@@ -141,7 +140,7 @@ func Test_serverTimeoutMW(t *testing.T) {
 		waitFinish := make(chan struct{})
 
 		// test
-		err := timeoutMW(func(ctx context.Context, req, resp interface{}) (err error) {
+		err := serverTimeoutMW(func(ctx context.Context, req, resp interface{}) (err error) {
 			go func() {
 				timer := time.NewTimer(time.Millisecond * 60)
 				select {
@@ -171,7 +170,7 @@ func Test_serverTimeoutMW(t *testing.T) {
 		waitFinish := make(chan struct{})
 
 		// test
-		err := timeoutMW(func(ctx context.Context, req, resp interface{}) (err error) {
+		err := serverTimeoutMW(func(ctx context.Context, req, resp interface{}) (err error) {
 			go func() {
 				timer := time.NewTimer(time.Millisecond * 60)
 				select {
