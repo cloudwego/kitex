@@ -138,8 +138,7 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 			return perrors.NewProtocolErrorWithMsg("no buffer allocated for the framed length field")
 		}
 		payloadLen = out.MallocLen() - headerLen
-		// Be careful here. The `frameLenField` was malloced before encoding payload
-		// If the `out` buffer using copy to grow when the capacity is not enough, setting the pre-allocated `frameLenField` will be invalid.
+		// FIXME: if the `out` buffer using copy to grow when the capacity is not enough, setting the pre-allocated `framedLenField` may not take effect.
 		binary.BigEndian.PutUint32(framedLenField, uint32(payloadLen))
 	} else if message.ProtocolInfo().CodecType == serviceinfo.Protobuf {
 		return perrors.NewProtocolErrorWithMsg("protobuf just support 'framed' trans proto")
@@ -176,6 +175,7 @@ func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.
 		if totalLenField == nil {
 			return perrors.NewProtocolErrorWithMsg("no buffer allocated for the header length field")
 		}
+		// FIXME: if the `out` buffer using copy to grow when the capacity is not enough, setting the pre-allocated `totalLenField` may not take effect.
 		payloadLen := out.MallocLen() - Size32
 		binary.BigEndian.PutUint32(totalLenField, uint32(payloadLen))
 	}
@@ -292,8 +292,8 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Cont
 	message.SetPayloadLen(len(payload))
 
 	// 2. encode header and return totalLenField if needed
-	// In this case, set total length during TTHeader encode
-	if _, err = ttHeaderCodec.encode(ctx, message, out); err != nil {
+	totalLenField, err := ttHeaderCodec.encode(ctx, message, out)
+	if err != nil {
 		return err
 	}
 
@@ -303,6 +303,14 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Cont
 	} else {
 		_, err = out.WriteBinary(payload)
 	}
+
+	// 4. fill totalLen field for header if needed
+	// FIXME: if the `out` buffer using copy to grow when the capacity is not enough, setting the pre-allocated `totalLenField` may not take effect.
+	if totalLenField == nil {
+		return perrors.NewProtocolErrorWithMsg("no buffer allocated for the header length field")
+	}
+	payloadLen := out.MallocLen() - Size32
+	binary.BigEndian.PutUint32(totalLenField, uint32(payloadLen))
 	return err
 }
 

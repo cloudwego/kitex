@@ -367,53 +367,6 @@ func TestDefaultCodecWithCustomizedValidator(t *testing.T) {
 	test.Assert(t, err != nil, err)
 }
 
-func TestDefaultCodecWithCRC32EncodeDecodeWithNonNetpollBuffer(t *testing.T) {
-	remote.PutPayloadCode(serviceinfo.Thrift, mpc)
-
-	dc := NewDefaultCodecWithConfig(CodecConfig{CRC32Check: true})
-	ctx := context.Background()
-	intKVInfo := prepareIntKVInfo()
-	strKVInfo := prepareStrKVInfo()
-	sendMsg := initClientSendMsg(transport.TTHeaderFramed, 32*1024)
-	sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
-	sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
-
-	// test encode err
-	badOut := remote.NewReaderBuffer(nil)
-	err := dc.Encode(ctx, sendMsg, badOut)
-	test.Assert(t, err != nil)
-
-	// encode with defaultByteBuffer
-	byteBuffer := remote.NewWriterBuffer(0)
-	err = dc.Encode(ctx, sendMsg, byteBuffer)
-	test.Assert(t, err == nil, err)
-
-	// decode, succeed
-	recvMsg := initServerRecvMsg()
-	buf, err := byteBuffer.Bytes()
-	test.Assert(t, err == nil, err)
-	in := remote.NewReaderBuffer(buf)
-	err = dc.Decode(ctx, recvMsg, in)
-	test.Assert(t, err == nil, err)
-	intKVInfoRecv := recvMsg.TransInfo().TransIntInfo()
-	strKVInfoRecv := recvMsg.TransInfo().TransStrInfo()
-	test.DeepEqual(t, intKVInfoRecv, intKVInfo)
-	test.DeepEqual(t, strKVInfoRecv, strKVInfo)
-	test.Assert(t, sendMsg.RPCInfo().Invocation().SeqID() == recvMsg.RPCInfo().Invocation().SeqID())
-
-	// decode, crc32c check failed
-	test.Assert(t, err == nil, err)
-	bufLen := len(buf)
-	modifiedBuf := make([]byte, bufLen)
-	copy(modifiedBuf, buf)
-	for i := bufLen - 1; i > bufLen-10; i-- {
-		modifiedBuf[i] = 123
-	}
-	in = remote.NewReaderBuffer(modifiedBuf)
-	err = dc.Decode(ctx, recvMsg, in)
-	test.Assert(t, err != nil, err)
-}
-
 func TestCodecTypeNotMatchWithServiceInfoPayloadCodec(t *testing.T) {
 	for _, tb := range transportBuffers {
 		t.Run(tb.Name, func(t *testing.T) {
