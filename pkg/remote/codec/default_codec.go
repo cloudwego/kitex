@@ -268,7 +268,8 @@ func (c *defaultCodec) Name() string {
 
 // encodeMetaAndPayloadWithPayloadValidator encodes payload and meta with checksum of the payload.
 func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) (err error) {
-	payloadOut := netpolltrans.NewWriterByteBuffer(netpoll.NewLinkBuffer())
+	writer := netpoll.NewLinkBuffer()
+	payloadOut := netpolltrans.NewWriterByteBuffer(writer)
 	defer func() {
 		payloadOut.Release(err)
 	}()
@@ -279,7 +280,7 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Cont
 	}
 	// get the payload from buffer
 	// use copy api here because the payload will be used as an argument of Generate function in validator
-	payload, err := payloadOut.Bytes()
+	payload, err := getWrittenBytes(writer)
 	if err != nil {
 		return err
 	}
@@ -457,4 +458,12 @@ func checkPayloadSize(payloadLen, maxSize int) error {
 		)
 	}
 	return nil
+}
+
+// getWrittenBytes gets all written bytes from linkbuffer.
+func getWrittenBytes(lb *netpoll.LinkBuffer) (buf []byte, err error) {
+	if err = lb.Flush(); err != nil {
+		return nil, err
+	}
+	return lb.Bytes(), nil
 }

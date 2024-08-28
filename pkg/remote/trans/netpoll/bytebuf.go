@@ -223,13 +223,12 @@ func (b *netpollByteBuffer) AppendBuffer(buf remote.ByteBuffer) (err error) {
 	return
 }
 
-// Bytes gets all written bytes.
+// Bytes are not supported in netpoll bytebuf.
 func (b *netpollByteBuffer) Bytes() (buf []byte, err error) {
-	lb := b.writer.(*netpoll.LinkBuffer)
-	if err = lb.Flush(); err != nil {
-		return nil, err
+	if b.reader != nil {
+		return b.reader.Peek(b.reader.Len())
 	}
-	return lb.Bytes(), nil
+	return nil, errors.New("method Bytes() not support in netpoll bytebuf")
 }
 
 // Release will free the buffer already read.
@@ -249,4 +248,12 @@ func (b *netpollByteBuffer) zero() {
 	b.reader = nil
 	b.status = 0
 	b.readSize = 0
+}
+
+// GetWrittenBytes gets all written bytes from linkbuffer.
+func GetWrittenBytes(lb *netpoll.LinkBuffer) (buf []byte, err error) {
+	if err = lb.Flush(); err != nil {
+		return nil, err
+	}
+	return lb.Bytes(), nil
 }

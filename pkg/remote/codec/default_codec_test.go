@@ -282,13 +282,14 @@ func TestDefaultCodecWithCRC32_Encode_Decode(t *testing.T) {
 	test.Assert(t, err != nil)
 
 	// encode with netpollBytebuffer
-	npBuffer := netpolltrans.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer())
+	writer := netpoll.NewLinkBuffer()
+	npBuffer := netpolltrans.NewReaderWriterByteBuffer(writer)
 	err = dc.Encode(ctx, sendMsg, npBuffer)
 	test.Assert(t, err == nil, err)
 
 	// decode, succeed
 	recvMsg := initServerRecvMsg()
-	buf, err := npBuffer.Bytes()
+	buf, err := getWrittenBytes(writer)
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
 	err = dc.Decode(ctx, recvMsg, in)
@@ -337,13 +338,14 @@ func TestDefaultCodecWithCustomizedValidator(t *testing.T) {
 	test.Assert(t, strings.Contains(err.Error(), "limit"), err)
 
 	// encode with netpollBytebuffer
-	npBuffer = netpolltrans.NewReaderWriterByteBuffer(netpoll.NewLinkBuffer())
+	writer := netpoll.NewLinkBuffer()
+	npBuffer = netpolltrans.NewReaderWriterByteBuffer(writer)
 	err = dc.Encode(ctx, sendMsg, npBuffer)
 	test.Assert(t, err == nil, err)
 
 	// decode, succeed
 	recvMsg := initServerRecvMsg()
-	buf, err := npBuffer.Bytes()
+	buf, err := getWrittenBytes(writer)
 	test.Assert(t, err == nil, err)
 	in := remote.NewReaderBuffer(buf)
 	err = dc.Decode(ctx, recvMsg, in)
@@ -417,13 +419,14 @@ func BenchmarkDefaultEncodeDecode(b *testing.B) {
 						codec := f()
 						sendMsg := initClientSendMsg(transport.TTHeader, msgLen)
 						// encode
-						out := remote.NewWriterBuffer(1024)
+						writer := netpoll.NewLinkBuffer()
+						out := netpolltrans.NewWriterByteBuffer(writer)
 						err := codec.Encode(ctx, sendMsg, out)
 						test.Assert(b, err == nil, err)
 
 						// decode
 						recvMsg := initServerRecvMsgWithMockMsg()
-						buf, err := out.Bytes()
+						buf, err := getWrittenBytes(writer)
 						test.Assert(b, err == nil, err)
 						in := remote.NewReaderBuffer(buf)
 						err = codec.Decode(ctx, recvMsg, in)
