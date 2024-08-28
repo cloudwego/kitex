@@ -108,7 +108,6 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 			err = panicToErr(ctx, panicInfo, firstRI)
 		}
 		timer.Stop()
-		maxDurationTimer.Stop()
 	}()
 	startTime := time.Now()
 	// include first call, max loop is retryTimes + 1
