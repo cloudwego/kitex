@@ -30,6 +30,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
+type serverConnKey struct{}
+
 type serverConn struct {
 	tr grpc.ServerTransport
 	s  *grpc.Stream
@@ -61,25 +63,12 @@ func (c *serverConn) ReadFrame() (hdr, data []byte, err error) {
 
 // GetServerConn gets the GRPC Connection from server stream.
 // This function is only used in server handler for grpc unknown handler proxy: https://www.cloudwego.io/docs/kitex/tutorials/advanced-feature/grpcproxy/
-// And the input stream type should always be streamWithMiddleware.
 func GetServerConn(st streaming.Stream) (GRPCConn, error) {
-	mwStream, ok := st.(*streamWithMiddleware)
+	rawStream, ok := st.Context().Value(serverConnKey{}).(*stream)
 	if !ok {
-		return nil, status.Errorf(codes.Internal, "failed to get streamWithMiddleware")
+		return nil, status.Errorf(codes.Internal, "the ctx of Stream is not provided by Kitex Server")
 	}
-
-	serverStream, ok := mwStream.Stream.(*stream)
-
-	if !ok {
-		// err!
-		return nil, status.Errorf(codes.Internal, "failed to get server conn from server stream.")
-	}
-	grpcServerConn, ok := serverStream.conn.(GRPCConn)
-	if !ok {
-		// err!
-		return nil, status.Errorf(codes.Internal, "failed to trans conn to grpc conn.")
-	}
-	return grpcServerConn, nil
+	return rawStream.conn.(GRPCConn), nil
 }
 
 // impl net.Conn

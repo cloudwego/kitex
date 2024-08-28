@@ -21,6 +21,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 func serverTimeoutMW(initCtx context.Context) endpoint.Middleware {
@@ -41,6 +42,25 @@ func serverTimeoutMW(initCtx context.Context) endpoint.Middleware {
 					cancel()
 				}
 			}()
+			return next(ctx, request, response)
+		}
+	}
+}
+
+// newCtxInjectMW must be placed at the end
+func newCtxInjectMW() endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, request, response interface{}) (err error) {
+			args, ok := request.(*streaming.Args)
+			if !ok {
+				return next(ctx, request, response)
+			}
+			// use contextStream to wrap the original Stream and rewrite Context()
+			// so that we can get this ctx by Stream.Context()
+			args.Stream = contextStream{
+				Stream: args.Stream,
+				ctx:    ctx,
+			}
 			return next(ctx, request, response)
 		}
 	}

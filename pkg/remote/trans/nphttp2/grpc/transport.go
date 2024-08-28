@@ -485,7 +485,7 @@ func StreamWrite(s *Stream, buffer *bytes.Buffer) {
 }
 
 // CreateStream only used for unit test. Create an independent stream out of http2client / http2server
-func CreateStream(id uint32, requestRead func(i int)) *Stream {
+func CreateStream(ctx context.Context, id uint32, requestRead func(i int), method string) *Stream {
 	recvBuffer := newRecvBuffer()
 	trReader := &transportReader{
 		reader: &recvBufferReader{
@@ -499,6 +499,8 @@ func CreateStream(id uint32, requestRead func(i int)) *Stream {
 
 	stream := &Stream{
 		id:          id,
+		ctx:         ctx,
+		method:      method,
 		buf:         recvBuffer,
 		trReader:    trReader,
 		wq:          newWriteQuota(defaultWriteQuota, nil),

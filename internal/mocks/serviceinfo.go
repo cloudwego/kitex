@@ -36,6 +36,7 @@ const (
 	MockExceptionMethod string = "mockException"
 	MockErrorMethod     string = "mockError"
 	MockOnewayMethod    string = "mockOneway"
+	MockStreamingMethod string = "mockStreaming"
 )
 
 // ServiceInfo return mock serviceInfo
