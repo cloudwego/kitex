@@ -1003,8 +1003,8 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 	ct.Close()
 	select {
 	case <-ss.Context().Done():
-		if ss.Context().Err() != context.Canceled {
-			t.Fatalf("ss.Context().Err() got %v, want %v", ss.Context().Err(), context.Canceled)
+		if ss.Context().Err() != errConnectionEOF {
+			t.Fatalf("ss.Context().Err() got %v, want %v", ss.Context().Err(), errConnectionEOF)
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatalf("Failed to cancel the context of the sever side stream.")
