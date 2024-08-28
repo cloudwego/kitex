@@ -249,3 +249,11 @@ func (b *netpollByteBuffer) zero() {
 	b.status = 0
 	b.readSize = 0
 }
+
+// GetWrittenBytes gets all written bytes from linkbuffer.
+func GetWrittenBytes(lb *netpoll.LinkBuffer) (buf []byte, err error) {
+	if err = lb.Flush(); err != nil {
+		return nil, err
+	}
+	return lb.Bytes(), nil
+}
