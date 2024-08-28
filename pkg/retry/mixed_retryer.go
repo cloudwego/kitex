@@ -101,7 +101,6 @@ func (r *mixedRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpci
 	callDone := make(chan *resultWrapper, retryTimes+1)
 	var nonFinishedErrRes *resultWrapper
 	timer := time.NewTimer(retryDelay)
-	maxDurationTimer := time.NewTimer(maxDuration)
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
 	defer func() {
 		if panicInfo := recover(); panicInfo != nil {
