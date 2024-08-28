@@ -47,7 +47,7 @@ func TestMaxConnectionIdle(t *testing.T) {
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, ConnectOptions{})
 	defer func() {
-		client.Close()
+		client.Close(errSelfCloseForTest)
 		server.stop()
 	}()
 
@@ -85,7 +85,7 @@ func TestMaxConnectionIdleBusyClient(t *testing.T) {
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, ConnectOptions{})
 	defer func() {
-		client.Close()
+		client.Close(errSelfCloseForTest)
 		server.stop()
 	}()
 
@@ -162,7 +162,7 @@ func TestKeepaliveServerClosesUnresponsiveClient(t *testing.T) {
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, ConnectOptions{})
 	defer func() {
-		client.Close()
+		client.Close(errSelfCloseForTest)
 		server.stop()
 	}()
 
@@ -226,7 +226,7 @@ func TestKeepaliveServerWithResponsiveClient(t *testing.T) {
 		},
 	})
 	defer func() {
-		client.Close()
+		client.Close(errSelfCloseForTest)
 		server.stop()
 	}()
 
@@ -256,7 +256,7 @@ func TestKeepaliveClientClosesUnresponsiveServer(t *testing.T) {
 	if client == nil {
 		t.Fatalf("setUpWithNoPingServer failed, return nil client")
 	}
-	defer client.Close()
+	defer client.Close(errSelfCloseForTest)
 
 	conn, ok := <-connCh
 	if !ok {
@@ -289,7 +289,7 @@ func TestKeepaliveClientOpenWithUnresponsiveServer(t *testing.T) {
 	if client == nil {
 		t.Fatalf("setUpWithNoPingServer failed, return nil client")
 	}
-	defer client.Close()
+	defer client.Close(errSelfCloseForTest)
 
 	conn, ok := <-connCh
 	if !ok {
@@ -320,7 +320,7 @@ func TestKeepaliveClientClosesWithActiveStreams(t *testing.T) {
 	if client == nil {
 		t.Fatalf("setUpWithNoPingServer failed, return nil client")
 	}
-	defer client.Close()
+	defer client.Close(errSelfCloseForTest)
 
 	conn, ok := <-connCh
 	if !ok {
@@ -356,7 +356,7 @@ func TestKeepaliveClientStaysHealthyWithResponsiveServer(t *testing.T) {
 		},
 	})
 	defer func() {
-		client.Close()
+		client.Close(errSelfCloseForTest)
 		server.stop()
 	}()
 
@@ -394,7 +394,7 @@ func TestKeepaliveClientFrequency(t *testing.T) {
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, normal, clientOptions)
 	defer func() {
-		client.Close()
+		client.Close(errSelfCloseForTest)
 		server.stop()
 	}()
 
@@ -438,7 +438,7 @@ func TestKeepaliveServerEnforcementWithAbusiveClientNoRPC(t *testing.T) {
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, normal, clientOptions)
 	defer func() {
-		client.Close()
+		client.Close(errSelfCloseForTest)
 		server.stop()
 	}()
 
@@ -481,7 +481,7 @@ func TestKeepaliveServerEnforcementWithAbusiveClientWithRPC(t *testing.T) {
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, clientOptions)
 	defer func() {
-		client.Close()
+		client.Close(errSelfCloseForTest)
 		server.stop()
 	}()
 
@@ -530,7 +530,7 @@ func TestKeepaliveServerEnforcementWithObeyingClientNoRPC(t *testing.T) {
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, normal, clientOptions)
 	defer func() {
-		client.Close()
+		client.Close(errSelfCloseForTest)
 		server.stop()
 	}()
 
@@ -563,7 +563,7 @@ func TestKeepaliveServerEnforcementWithObeyingClientWithRPC(t *testing.T) {
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, clientOptions)
 	defer func() {
-		client.Close()
+		client.Close(errSelfCloseForTest)
 		server.stop()
 	}()
 
@@ -602,7 +602,7 @@ func TestKeepaliveServerEnforcementWithDormantKeepaliveOnClient(t *testing.T) {
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, normal, clientOptions)
 	defer func() {
-		client.Close()
+		client.Close(errSelfCloseForTest)
 		server.stop()
 	}()
 

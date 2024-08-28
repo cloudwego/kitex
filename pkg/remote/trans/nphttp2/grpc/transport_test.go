@@ -65,6 +65,7 @@ var (
 	expectedRequestLarge       = make([]byte, initialWindowSize*2)
 	expectedResponseLarge      = make([]byte, initialWindowSize*2)
 	expectedInvalidHeaderField = "invalid/content-type"
+	errSelfCloseForTest        = errors.New("self-close in test")
 )
 
 func init() {
@@ -524,7 +525,7 @@ func TestInflightStreamClosing(t *testing.T) {
 	serverConfig := &ServerConfig{}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, ConnectOptions{})
 	defer server.stop()
-	defer client.Close()
+	defer client.Close(fmt.Errorf("self-close in test"))
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer cancel()
@@ -593,7 +594,7 @@ func TestClientSendAndReceive(t *testing.T) {
 	if recvErr != io.EOF {
 		t.Fatalf("Error: %v; want <EOF>", recvErr)
 	}
-	ct.Close()
+	ct.Close(errSelfCloseForTest)
 	server.stop()
 }
 
@@ -606,7 +607,7 @@ func TestClientErrorNotify(t *testing.T) {
 	}()
 	// ct.reader should detect the error and activate ct.Error().
 	<-ct.Error()
-	ct.Close()
+	ct.Close(nil)
 }
 
 func performOneRPC(ct ClientTransport) {
@@ -642,7 +643,7 @@ func TestClientMix(t *testing.T) {
 	}(s)
 	go func(ct ClientTransport) {
 		<-ct.Error()
-		ct.Close()
+		ct.Close(errSelfCloseForTest)
 	}(ct)
 	for i := 0; i < 1000; i++ {
 		time.Sleep(1 * time.Millisecond)
@@ -680,7 +681,7 @@ func TestLargeMessage(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	ct.Close()
+	ct.Close(errSelfCloseForTest)
 	server.stop()
 }
 
@@ -696,7 +697,7 @@ func TestLargeMessageWithDelayRead(t *testing.T) {
 	}
 	server, ct := setUpWithOptions(t, 0, sc, delayRead, co)
 	defer server.stop()
-	defer ct.Close()
+	defer ct.Close(errSelfCloseForTest)
 	server.mu.Lock()
 	ready := server.ready
 	server.mu.Unlock()
@@ -873,7 +874,7 @@ func TestLargeMessageSuspension(t *testing.T) {
 	if _, err := s.Read(make([]byte, 8)); err.Error() != expectedErr.Error() {
 		t.Fatalf("Read got %v of type %T, want %v", err, err, expectedErr)
 	}
-	ct.Close()
+	ct.Close(errSelfCloseForTest)
 	server.stop()
 }
 
@@ -882,7 +883,7 @@ func TestMaxStreams(t *testing.T) {
 		MaxStreams: 1,
 	}
 	server, ct := setUpWithOptions(t, 0, serverConfig, suspended, ConnectOptions{})
-	defer ct.Close()
+	defer ct.Close(errSelfCloseForTest)
 	defer server.stop()
 	callHdr := &CallHdr{
 		Host:   "localhost",
@@ -942,7 +943,7 @@ func TestMaxStreams(t *testing.T) {
 	// Close the first stream created so that the new stream can finally be created.
 	ct.CloseStream(s, nil)
 	<-done
-	ct.Close()
+	ct.Close(errSelfCloseForTest)
 	<-ct.writerDone
 	if ct.maxConcurrentStreams != 1 {
 		t.Fatalf("ct.maxConcurrentStreams: %d, want 1", ct.maxConcurrentStreams)
@@ -1000,7 +1001,7 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 		sc.mu.Unlock()
 		break
 	}
-	ct.Close()
+	ct.Close(errSelfCloseForTest)
 	select {
 	case <-ss.Context().Done():
 		if ss.Context().Err() != errConnectionEOF {
@@ -1020,7 +1021,7 @@ func TestClientConnDecoupledFromApplicationRead(t *testing.T) {
 	}
 	server, client := setUpWithOptions(t, 0, &ServerConfig{}, notifyCall, connectOptions)
 	defer server.stop()
-	defer client.Close()
+	defer client.Close(errSelfCloseForTest)
 
 	waitWhileTrue(t, func() (bool, error) {
 		server.mu.Lock()
@@ -1108,7 +1109,7 @@ func TestServerConnDecoupledFromApplicationRead(t *testing.T) {
 	}
 	server, client := setUpWithOptions(t, 0, serverConfig, suspended, ConnectOptions{})
 	defer server.stop()
-	defer client.Close()
+	defer client.Close(errSelfCloseForTest)
 	waitWhileTrue(t, func() (bool, error) {
 		server.mu.Lock()
 		defer server.mu.Unlock()
@@ -1464,7 +1465,7 @@ func TestEncodingRequiredStatus(t *testing.T) {
 	if !testutils.StatusErrEqual(s.Status().Err(), encodingTestStatus.Err()) {
 		t.Fatalf("stream with status %v, want %v", s.Status(), encodingTestStatus)
 	}
-	ct.Close()
+	ct.Close(errSelfCloseForTest)
 	server.stop()
 }
 
@@ -1485,14 +1486,14 @@ func TestInvalidHeaderField(t *testing.T) {
 	if se, ok := status.FromError(err); !ok || se.Code() != codes.Internal || !strings.Contains(err.Error(), expectedInvalidHeaderField) {
 		t.Fatalf("Read got error %v, want error with code %v and contains %q", err, codes.Internal, expectedInvalidHeaderField)
 	}
-	ct.Close()
+	ct.Close(errSelfCloseForTest)
 	server.stop()
 }
 
 func TestHeaderChanClosedAfterReceivingAnInvalidHeader(t *testing.T) {
 	server, ct := setUp(t, 0, math.MaxUint32, invalidHeaderField)
 	defer server.stop()
-	defer ct.Close()
+	defer ct.Close(errSelfCloseForTest)
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer cancel()
 	s, err := ct.NewStream(ctx, &CallHdr{Host: "localhost", Method: "foo"})
@@ -1598,7 +1599,7 @@ func testFlowControlAccountCheck(t *testing.T, msgSize int, wc windowSizeConfig)
 	}
 	server, client := setUpWithOptions(t, 0, sc, pingpong, co)
 	defer server.stop()
-	defer client.Close()
+	defer client.Close(errSelfCloseForTest)
 	waitWhileTrue(t, func() (bool, error) {
 		server.mu.Lock()
 		defer server.mu.Unlock()
@@ -1680,7 +1681,7 @@ func testFlowControlAccountCheck(t *testing.T, msgSize int, wc windowSizeConfig)
 	}
 	// Close down both server and client so that their internals can be read without data
 	// races.
-	client.Close()
+	client.Close(errSelfCloseForTest)
 	st.Close()
 	<-st.readerDone
 	<-st.writerDone
@@ -1879,7 +1880,7 @@ func TestPingPong1MB(t *testing.T) {
 func runPingPongTest(t *testing.T, msgSize int) {
 	server, client := setUp(t, 0, 0, pingpong)
 	defer server.stop()
-	defer client.Close()
+	defer client.Close(errSelfCloseForTest)
 	waitWhileTrue(t, func() (bool, error) {
 		server.mu.Lock()
 		defer server.mu.Unlock()
@@ -1966,7 +1967,7 @@ func TestHeaderTblSize(t *testing.T) {
 	}()
 
 	server, ct := setUp(t, 0, math.MaxUint32, normal)
-	defer ct.Close()
+	defer ct.Close(errSelfCloseForTest)
 	defer server.stop()
 	ctx, ctxCancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer ctxCancel()
