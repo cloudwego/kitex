@@ -62,7 +62,7 @@ var (
 func NewDefaultCodec() remote.Codec {
 	// No size limit by default
 	return &defaultCodec{
-		maxSize: 0,
+		CodecConfig{MaxSize: 0},
 	}
 }
 
@@ -70,29 +70,22 @@ func NewDefaultCodec() remote.Codec {
 // maxSize is in bytes
 func NewDefaultCodecWithSizeLimit(maxSize int) remote.Codec {
 	return &defaultCodec{
-		maxSize: maxSize,
+		CodecConfig{MaxSize: maxSize},
 	}
 }
 
 // NewDefaultCodecWithConfig creates the default protocol sniffing codec supporting thrift and protobuf with the input config.
 func NewDefaultCodecWithConfig(cfg CodecConfig) remote.Codec {
-	var p PayloadValidator
-	if cfg.PayloadValidator != nil {
-		p = cfg.PayloadValidator
-	}
 	if cfg.CRC32Check {
 		// TODO: crc32 has higher priority now.
-		p = NewCRC32PayloadValidator()
+		cfg.PayloadValidator = NewCRC32PayloadValidator()
 	}
-	return &defaultCodec{
-		maxSize:          cfg.MaxSize,
-		payloadValidator: p,
-		crc32Check:       cfg.CRC32Check,
-	}
+	return &defaultCodec{cfg}
 }
 
 // CodecConfig is the config of defaultCodec
 type CodecConfig struct {
+	// maxSize limits the max size of the payload
 	MaxSize int
 
 	// If crc32Check is true, the codec will validate the payload using crc32c.
@@ -107,15 +100,7 @@ type CodecConfig struct {
 }
 
 type defaultCodec struct {
-	// maxSize limits the max size of the payload
-	maxSize int
-	// If crc32Check is true, the codec will validate the payload using crc32c.
-	// Only effective when transport is TTHeader.
-	// Payload is all the data after TTHeader.
-	crc32Check bool
-	// payloadValidator prepares a value based on payload in sender-side and validates the value in receiver-side.
-	// It can only be used when ttheader is enabled.
-	payloadValidator PayloadValidator
+	CodecConfig
 }
 
 // EncodePayload encode payload
@@ -162,14 +147,14 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 	if tp&transport.TTHeader == transport.TTHeader {
 		payloadLen = out.MallocLen() - Size32
 	}
-	err = checkPayloadSize(payloadLen, c.maxSize)
+	err = checkPayloadSize(payloadLen, c.MaxSize)
 	return err
 }
 
 // EncodeMetaAndPayload encode meta and payload
 func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
 	tp := message.ProtocolInfo().TransProto
-	if c.payloadValidator != nil && tp&transport.TTHeader == transport.TTHeader {
+	if c.PayloadValidator != nil && tp&transport.TTHeader == transport.TTHeader {
 		return c.encodeMetaAndPayloadWithPayloadValidator(ctx, message, out, me)
 	}
 
@@ -223,8 +208,8 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 		if flagBuf, err = in.Peek(2 * Size32); err != nil {
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("ttheader read payload first 8 byte failed: %s", err.Error()))
 		}
-		if c.payloadValidator != nil {
-			if pErr := payloadChecksumValidate(ctx, c.payloadValidator, in, message); pErr != nil {
+		if c.PayloadValidator != nil {
+			if pErr := payloadChecksumValidate(ctx, c.PayloadValidator, in, message); pErr != nil {
 				return pErr
 			}
 		}
@@ -238,7 +223,7 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("meshHeader read payload first 8 byte failed: %s", err.Error()))
 		}
 	}
-	return checkPayload(flagBuf, message, in, isTTHeader, c.maxSize)
+	return checkPayload(flagBuf, message, in, isTTHeader, c.MaxSize)
 }
 
 // DecodePayload decode payload
@@ -298,8 +283,8 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Cont
 	if err != nil {
 		return err
 	}
-	if c.payloadValidator != nil {
-		if err = payloadChecksumGenerate(ctx, c.payloadValidator, payload, message); err != nil {
+	if c.PayloadValidator != nil {
+		if err = payloadChecksumGenerate(ctx, c.PayloadValidator, payload, message); err != nil {
 			return err
 		}
 	}

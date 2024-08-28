@@ -232,16 +232,6 @@ func (b *netpollByteBuffer) Bytes() (buf []byte, err error) {
 	return lb.Bytes(), nil
 }
 
-// GetBytesNoCopy gets all written bytes and return 2d slice.
-// It uses GetBytes() of link buffer.
-func (b *netpollByteBuffer) GetBytesNoCopy() ([][]byte, int, error) {
-	lb := b.writer.(*netpoll.LinkBuffer)
-	if err := lb.Flush(); err != nil {
-		return nil, 0, err
-	}
-	return lb.GetBytes(nil), lb.Len(), nil
-}
-
 // Release will free the buffer already read.
 // After release, buffer read by Next/Skip/Peek is invalid.
 func (b *netpollByteBuffer) Release(e error) (err error) {
