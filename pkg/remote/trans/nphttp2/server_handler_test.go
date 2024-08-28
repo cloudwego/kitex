@@ -74,7 +74,7 @@ func TestServerHandler(t *testing.T) {
 	npConn.mockSettingFrame()
 	tr, err := newMockServerTransport(npConn)
 	test.Assert(t, err == nil, err)
-	s := grpc.CreateStream(1, func(i int) {})
+	s := grpc.CreateStream(context.Background(), 1, func(i int) {}, "")
 	serverConn := newServerConn(tr, s)
 	defer serverConn.Close()
 
