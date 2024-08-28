@@ -36,10 +36,10 @@ import (
 )
 
 // Write ...
-func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, bw *thrift.BinaryWriter, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	// fallback logic
 	if !w.dynamicgoEnabled {
-		return w.originalWrite(ctx, out, msg, requestBase)
+		return w.originalWrite(ctx, out, bw, msg, requestBase)
 	}
 
 	// dynamicgo logic
@@ -63,29 +63,27 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out io.Writer, msg interfa
 		cv = j2t.NewBinaryConv(w.convOpts)
 	}
 
-	binaryWriter := thrift.NewBinaryWriter()
-
 	ctx = context.WithValue(ctx, conv.CtxKeyHTTPRequest, req)
 	body := req.GetBody()
 	dbuf := mcache.Malloc(len(body))[0:0]
 	defer mcache.Free(dbuf)
 
 	for _, field := range dynamicgoTypeDsc.Struct().Fields() {
-		binaryWriter.WriteFieldBegin(thrift.TType(field.Type().Type()), int16(field.ID()))
+		bw.WriteFieldBegin(thrift.TType(field.Type().Type()), int16(field.ID()))
 
 		// json []byte to thrift []byte
 		if err := cv.DoInto(ctx, field.Type(), body, &dbuf); err != nil {
 			return err
 		}
 	}
-	if _, err := out.Write(binaryWriter.Bytes()); err != nil {
+	if _, err := out.Write(bw.Bytes()); err != nil {
 		return err
 	}
 	if _, err := out.Write(dbuf); err != nil {
 		return err
 	}
-	binaryWriter.Reset()
-	binaryWriter.WriteFieldStop()
-	_, err := out.Write(binaryWriter.Bytes())
+	bw.Reset()
+	bw.WriteFieldStop()
+	_, err := out.Write(bw.Bytes())
 	return err
 }
