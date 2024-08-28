@@ -24,7 +24,6 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/internal/mocks"
-
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
