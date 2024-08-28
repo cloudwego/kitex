@@ -57,12 +57,6 @@ func NewReaderWriterByteBuffer(rw netpoll.ReadWriter) remote.ByteBuffer {
 	return bytebuf
 }
 
-// IsNetpollByteBuffer checks if b is a netpollByteBuffer
-func IsNetpollByteBuffer(b remote.ByteBuffer) bool {
-	_, ok := b.(*netpollByteBuffer)
-	return ok
-}
-
 func newNetpollByteBuffer() interface{} {
 	return &netpollByteBuffer{}
 }

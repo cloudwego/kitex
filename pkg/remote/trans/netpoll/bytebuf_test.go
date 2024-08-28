@@ -204,14 +204,6 @@ func checkUnreadable(t *testing.T, buf remote.ByteBuffer) {
 	test.Assert(t, err != nil)
 }
 
-func TestIsNetpollByteBuffer(t *testing.T) {
-	defaultBuff := remote.NewReaderWriterBuffer(0)
-	test.Assert(t, IsNetpollByteBuffer(defaultBuff) == false)
-
-	netpollBuff := NewReaderWriterByteBuffer(netpoll.NewLinkBuffer())
-	test.Assert(t, IsNetpollByteBuffer(netpollBuff) == true)
-}
-
 func TestBytes(t *testing.T) {
 	netpollBuff := NewReaderWriterByteBuffer(netpoll.NewLinkBuffer())
 	b := "testBytes"

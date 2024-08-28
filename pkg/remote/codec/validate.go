@@ -50,6 +50,7 @@ type PayloadValidator interface {
 
 	// Validate validates the input payload with the attached checksum.
 	// Return pass if validation succeed, or return error.
+	// DO NOT modify the input payload since it might be obtained by nocopy API from the underlying buffer.
 	Validate(ctx context.Context, expectedValue string, inboundPayload []byte) (pass bool, err error)
 }
 
@@ -175,7 +176,6 @@ type crcPayloadValidator struct{}
 
 var _ PayloadValidator = &crcPayloadValidator{}
 
-// TODO: 2d slice
 func (p *crcPayloadValidator) Key(ctx context.Context) string {
 	return transmeta.HeaderCRC32C
 }

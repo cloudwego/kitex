@@ -113,7 +113,6 @@ type defaultCodec struct {
 	// Only effective when transport is TTHeader.
 	// Payload is all the data after TTHeader.
 	crc32Check bool
-	// TODO: allow multiple validators?
 	// payloadValidator prepares a value based on payload in sender-side and validates the value in receiver-side.
 	// It can only be used when ttheader is enabled.
 	payloadValidator PayloadValidator
@@ -154,6 +153,8 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 			return perrors.NewProtocolErrorWithMsg("no buffer allocated for the framed length field")
 		}
 		payloadLen = out.MallocLen() - headerLen
+		// Be careful here. The `frameLenField` was malloced before encoding payload
+		// If the `out` buffer using copy to grow when the capacity is not enough, setting the pre-allocated `frameLenField` will be invalid.
 		binary.BigEndian.PutUint32(framedLenField, uint32(payloadLen))
 	} else if message.ProtocolInfo().CodecType == serviceinfo.Protobuf {
 		return perrors.NewProtocolErrorWithMsg("protobuf just support 'framed' trans proto")
@@ -282,15 +283,11 @@ func (c *defaultCodec) Name() string {
 
 // encodeMetaAndPayloadWithPayloadValidator encodes payload and meta with checksum of the payload.
 func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) (err error) {
-	var (
-		payloadOut  = netpolltrans.NewWriterByteBuffer(netpoll.NewLinkBuffer())
-		needRelease = true
-	)
+	payloadOut := netpolltrans.NewWriterByteBuffer(netpoll.NewLinkBuffer())
 	defer func() {
-		if needRelease {
-			payloadOut.Release(err)
-		}
+		payloadOut.Release(err)
 	}()
+
 	// 1. encode payload and calculate value via payload validator
 	if err = me.EncodePayload(ctx, message, payloadOut); err != nil {
 		return err
@@ -316,17 +313,10 @@ func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Cont
 	}
 
 	// 3. write payload to the buffer after TTHeader
-	if netpolltrans.IsNetpollByteBuffer(out) {
-		// append buffer only if the input buffer is a netpollByteBuffer
-		// release will be executed in AppendBuffer, and thus set needRelease to false
-		err = out.AppendBuffer(payloadOut)
-		needRelease = false
+	if ncWriter, ok := out.(remote.NocopyWrite); ok {
+		err = ncWriter.WriteDirect(payload, 0)
 	} else {
-		if ncWriter, ok := out.(remote.NocopyWrite); ok {
-			err = ncWriter.WriteDirect(payload, 0)
-		} else {
-			_, err = out.WriteBinary(payload)
-		}
+		_, err = out.WriteBinary(payload)
 	}
 	return err
 }
