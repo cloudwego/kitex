@@ -127,7 +127,7 @@ func makeRetryErr(ctx context.Context, msg string, callTimes int32) error {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	to := ri.To()
 
-	errMsg := fmt.Sprintf("retry[%d] failed, %s, to=%s, method=%s", callTimes-1, msg, to.ServiceName(), to.Method())
+	errMsg := fmt.Sprintf("retry[%d] failed, %s, toService=%s, method=%s", callTimes-1, msg, to.ServiceName(), to.Method())
 	target := to.Address()
 	if target != nil {
 		errMsg = fmt.Sprintf("%s, remote=%s", errMsg, target.String())

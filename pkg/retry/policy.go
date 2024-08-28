@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
@@ -30,6 +31,7 @@ type Type int
 const (
 	FailureType Type = iota
 	BackupType
+	MixedType
 )
 
 // String prints human readable information.
@@ -39,6 +41,8 @@ func (t Type) String() string {
 		return "Failure"
 	case BackupType:
 		return "Backup"
+	case MixedType:
+		return "Mixed"
 	}
 	return ""
 }
@@ -59,6 +63,14 @@ func BuildBackupRequest(p *BackupPolicy) Policy {
 	return Policy{Enable: true, Type: BackupType, BackupPolicy: p}
 }
 
+// BuildMixedPolicy is used to build Policy with *MixedPolicy
+func BuildMixedPolicy(p *MixedPolicy) Policy {
+	if p == nil {
+		return Policy{}
+	}
+	return Policy{Enable: true, Type: MixedType, MixedPolicy: p}
+}
+
 // Policy contains all retry policies
 // DON'T FORGET to update Equals() and DeepCopy() if you add new fields
 type Policy struct {
@@ -68,6 +80,7 @@ type Policy struct {
 	// notice: only one retry policy can be enabled, which one depend on Policy.Type
 	FailurePolicy *FailurePolicy `json:"failure_policy,omitempty"`
 	BackupPolicy  *BackupPolicy  `json:"backup_policy,omitempty"`
+	MixedPolicy   *MixedPolicy   `json:"mixed_policy,omitempty"`
 }
 
 func (p *Policy) DeepCopy() *Policy {
@@ -79,6 +92,7 @@ func (p *Policy) DeepCopy() *Policy {
 		Type:          p.Type,
 		FailurePolicy: p.FailurePolicy.DeepCopy(),
 		BackupPolicy:  p.BackupPolicy.DeepCopy(),
+		MixedPolicy:   p.MixedPolicy.DeepCopy(),
 	}
 }
 
@@ -102,6 +116,13 @@ type BackupPolicy struct {
 	RetryDelayMS  uint32     `json:"retry_delay_ms"`
 	StopPolicy    StopPolicy `json:"stop_policy"`
 	RetrySameNode bool       `json:"retry_same_node"`
+}
+
+// MixedPolicy for failure retry
+// DON'T FORGET to update Equals() and DeepCopy() if you add new fields
+type MixedPolicy struct {
+	RetryDelayMS uint32 `json:"retry_delay_ms"`
+	FailurePolicy
 }
 
 // StopPolicy is a group policies to decide when stop retry
@@ -185,135 +206,6 @@ func (p Policy) Equals(np Policy) bool {
 	return true
 }
 
-// Equals to check if FailurePolicy is equal
-func (p *FailurePolicy) Equals(np *FailurePolicy) bool {
-	if p == nil {
-		return np == nil
-	}
-	if np == nil {
-		return false
-	}
-	if p.StopPolicy != np.StopPolicy {
-		return false
-	}
-	if !p.BackOffPolicy.Equals(np.BackOffPolicy) {
-		return false
-	}
-	if p.RetrySameNode != np.RetrySameNode {
-		return false
-	}
-	if p.Extra != np.Extra {
-		return false
-	}
-	// don't need to check `ShouldResultRetry`, ShouldResultRetry is only setup by option
-	// in remote config case will always return false if check it
-	return true
-}
-
-func (p *FailurePolicy) DeepCopy() *FailurePolicy {
-	if p == nil {
-		return nil
-	}
-	return &FailurePolicy{
-		StopPolicy:        p.StopPolicy,
-		BackOffPolicy:     p.BackOffPolicy.DeepCopy(),
-		RetrySameNode:     p.RetrySameNode,
-		ShouldResultRetry: p.ShouldResultRetry, // don't need DeepCopy
-		Extra:             p.Extra,
-	}
-}
-
-// IsRespRetryWithCtxNonNil is used to check if RespRetryWithCtx is nil.
-func (p *FailurePolicy) IsRespRetryWithCtxNonNil() bool {
-	return p.ShouldResultRetry != nil && p.ShouldResultRetry.RespRetryWithCtx != nil
-}
-
-// IsErrorRetryWithCtxNonNil is used to check if ErrorRetryWithCtx is nil
-func (p *FailurePolicy) IsErrorRetryWithCtxNonNil() bool {
-	return p.ShouldResultRetry != nil && p.ShouldResultRetry.ErrorRetryWithCtx != nil
-}
-
-// IsRespRetryNonNil is used to check if RespRetry is nil.
-// Deprecated: please use IsRespRetryWithCtxNonNil instead of IsRespRetryNonNil.
-func (p *FailurePolicy) IsRespRetryNonNil() bool {
-	return p.ShouldResultRetry != nil && p.ShouldResultRetry.RespRetry != nil
-}
-
-// IsErrorRetryNonNil is used to check if ErrorRetry is nil.
-// Deprecated: please use IsErrorRetryWithCtxNonNil instead of IsErrorRetryNonNil.
-func (p *FailurePolicy) IsErrorRetryNonNil() bool {
-	return p.ShouldResultRetry != nil && p.ShouldResultRetry.ErrorRetry != nil
-}
-
-// IsRetryForTimeout is used to check if timeout error need to retry
-func (p *FailurePolicy) IsRetryForTimeout() bool {
-	return p.ShouldResultRetry == nil || !p.ShouldResultRetry.NotRetryForTimeout
-}
-
-// IsRespRetry is used to check if the resp need to do retry.
-func (p *FailurePolicy) IsRespRetry(ctx context.Context, resp interface{}, ri rpcinfo.RPCInfo) bool {
-	// note: actually, it is better to check IsRespRetry to ignore the bad cases,
-	// but IsRespRetry is a deprecated definition and here will be executed for every call, depends on ConvertResultRetry to ensure the compatibility
-	return p.IsRespRetryWithCtxNonNil() && p.ShouldResultRetry.RespRetryWithCtx(ctx, resp, ri)
-}
-
-// IsErrorRetry is used to check if the error need to do retry.
-func (p *FailurePolicy) IsErrorRetry(ctx context.Context, err error, ri rpcinfo.RPCInfo) bool {
-	// note: actually, it is better to check IsErrorRetry to ignore the bad cases,
-	// but IsErrorRetry is a deprecated definition and here will be executed for every call, depends on ConvertResultRetry to ensure the compatibility
-	return p.IsErrorRetryWithCtxNonNil() && p.ShouldResultRetry.ErrorRetryWithCtx(ctx, err, ri)
-}
-
-// ConvertResultRetry is used to convert 'ErrorRetry and RespRetry' to 'ErrorRetryWithCtx and RespRetryWithCtx'
-func (p *FailurePolicy) ConvertResultRetry() {
-	if p == nil || p.ShouldResultRetry == nil {
-		return
-	}
-	rr := p.ShouldResultRetry
-	if rr.ErrorRetry != nil && rr.ErrorRetryWithCtx == nil {
-		rr.ErrorRetryWithCtx = func(ctx context.Context, err error, ri rpcinfo.RPCInfo) bool {
-			return rr.ErrorRetry(err, ri)
-		}
-	}
-	if rr.RespRetry != nil && rr.RespRetryWithCtx == nil {
-		rr.RespRetryWithCtx = func(ctx context.Context, resp interface{}, ri rpcinfo.RPCInfo) bool {
-			return rr.RespRetry(resp, ri)
-		}
-	}
-}
-
-// Equals to check if BackupPolicy is equal
-func (p *BackupPolicy) Equals(np *BackupPolicy) bool {
-	if p == nil {
-		return np == nil
-	}
-	if np == nil {
-		return false
-	}
-	if p.RetryDelayMS != np.RetryDelayMS {
-		return false
-	}
-	if p.StopPolicy != np.StopPolicy {
-		return false
-	}
-	if p.RetrySameNode != np.RetrySameNode {
-		return false
-	}
-
-	return true
-}
-
-func (p *BackupPolicy) DeepCopy() *BackupPolicy {
-	if p == nil {
-		return nil
-	}
-	return &BackupPolicy{
-		RetryDelayMS:  p.RetryDelayMS,
-		StopPolicy:    p.StopPolicy, // not a pointer, will copy the value here
-		RetrySameNode: p.RetrySameNode,
-	}
-}
-
 // Equals to check if BackOffPolicy is equal.
 func (p *BackOffPolicy) Equals(np *BackOffPolicy) bool {
 	if p == nil {
@@ -365,6 +257,19 @@ func (rr *ShouldResultRetry) IsValid() bool {
 func checkCBErrorRate(p *CBPolicy) error {
 	if p.ErrorRate <= 0 || p.ErrorRate > 0.3 {
 		return fmt.Errorf("invalid retry circuit breaker rate, errRate=%0.2f", p.ErrorRate)
+	}
+	return nil
+}
+
+func checkStopPolicy(sp *StopPolicy, maxRetryTimes int, retryer Retryer) error {
+	rt := sp.MaxRetryTimes
+	// 0 is valid, it means stop retry
+	if rt < 0 || rt > maxRetryTimes {
+		return fmt.Errorf("invalid MaxRetryTimes[%d]", rt)
+	}
+	if e := checkCBErrorRate(&sp.CBPolicy); e != nil {
+		sp.CBPolicy.ErrorRate = defaultCBErrRate
+		klog.Warnf("KITEX: %s retry - %s, use default %0.2f", retryer.Type(), e.Error(), defaultCBErrRate)
 	}
 	return nil
 }
