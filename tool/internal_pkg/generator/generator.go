@@ -16,7 +16,6 @@
 package generator
 
 import (
-	"errors"
 	"fmt"
 	"go/token"
 	"path/filepath"
@@ -395,10 +394,6 @@ func (g *generator) GenerateMainPackage(pkg *PackageInfo) (fs []*File, err error
 	if !g.Config.IsUsingMultipleServicesTpl() {
 		f, err := g.generateHandler(pkg, pkg.ServiceInfo, HandlerFileName)
 		if err != nil {
-			if errors.Is(err, errNoNewMethod) {
-				return fs, nil
-			}
-
 			return nil, err
 		}
 		// when there is no new method, f would be nil

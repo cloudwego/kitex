@@ -17,10 +17,7 @@ package main
 import (
 	"bytes"
 	"flag"
-
 	"fmt"
-	"io/ioutil"
-
 	"os"
 	"path/filepath"
 	"strings"
