@@ -33,6 +33,7 @@ var (
 type binaryProtocol struct{}
 
 // SetSpanCache enable/disable binary protocol bytes/string allocator
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift.SetSpanCache
 func SetSpanCache(enable bool) {
 	gthrift.SetSpanCache(enable)
 }

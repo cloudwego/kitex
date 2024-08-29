@@ -50,6 +50,7 @@ type BinaryProtocol struct {
 }
 
 // NewBinaryProtocol ...
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift.NewBufferReader|NewBufferWriter
 func NewBinaryProtocol(r bufiox.Reader, w bufiox.Writer) *BinaryProtocol {
 	bp := bpPool.Get().(*BinaryProtocol)
 	if r != nil {
