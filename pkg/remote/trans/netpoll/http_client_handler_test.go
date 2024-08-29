@@ -180,7 +180,8 @@ func TestSkipToBody(t *testing.T) {
 	err := skipToBody(reader)
 	test.Assert(t, err == nil)
 
-	getBody, err := reader.ReadBinary(reader.ReadableLen())
+	getBody := make([]byte, reader.ReadableLen())
+	_, err = reader.ReadBinary(getBody)
 	test.Assert(t, err == nil)
 	test.Assert(t, strings.Compare(string(getBody), wantBody) == 0)
 }

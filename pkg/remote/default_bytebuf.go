@@ -182,17 +182,17 @@ func (b *defaultByteBuffer) ReadString(n int) (s string, err error) {
 
 // ReadBinary like ReadString.
 // Returns a copy of original buffer.
-func (b *defaultByteBuffer) ReadBinary(n int) (p []byte, err error) {
+func (b *defaultByteBuffer) ReadBinary(p []byte) (n int, err error) {
 	if b.status&BitReadable == 0 {
-		return p, errors.New("unreadable buffer, cannot support ReadBinary")
+		return 0, errors.New("unreadable buffer, cannot support ReadBinary")
 	}
+	n = len(p)
 	var buf []byte
 	if buf, err = b.Next(n); err != nil {
-		return p, err
+		return 0, err
 	}
-	p = dirtmake.Bytes(n, n)
 	copy(p, buf)
-	return p, nil
+	return n, nil
 }
 
 // Malloc n bytes sequentially in the writer buffer.
@@ -206,8 +206,8 @@ func (b *defaultByteBuffer) Malloc(n int) (buf []byte, err error) {
 	return b.buff[currWIdx:b.writeIdx], nil
 }
 
-// MallocLen returns the total length of the buffer malloced.
-func (b *defaultByteBuffer) MallocLen() (length int) {
+// WrittenLen returns the total length of the buffer written.
+func (b *defaultByteBuffer) WrittenLen() (length int) {
 	if b.status&BitWritable == 0 {
 		return -1
 	}

@@ -18,40 +18,28 @@
 package bthrift
 
 import (
-	"encoding/binary"
-	"fmt"
-	"math"
-
-	"github.com/bytedance/gopkg/lang/span"
 	gthrift "github.com/cloudwego/gopkg/protocol/thrift"
 
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 var (
 	// Binary protocol for bthrift.
-	Binary          binaryProtocol
-	_               BTProtocol = binaryProtocol{}
-	spanCache                  = span.NewSpanCache(1024 * 1024)
-	spanCacheEnable bool       = false
+	Binary binaryProtocol
+	_      BTProtocol = binaryProtocol{}
 )
-
-const binaryInplaceThreshold = 4096 // 4k
 
 type binaryProtocol struct{}
 
 // SetSpanCache enable/disable binary protocol bytes/string allocator
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift.SetSpanCache
 func SetSpanCache(enable bool) {
-	spanCacheEnable = enable
+	gthrift.SetSpanCache(enable)
 }
 
 func (binaryProtocol) WriteMessageBegin(buf []byte, name string, typeID thrift.TMessageType, seqid int32) int {
-	offset := 0
-	version := uint32(thrift.VERSION_1) | uint32(typeID)
-	offset += Binary.WriteI32(buf, int32(version))
-	offset += Binary.WriteString(buf[offset:], name)
-	offset += Binary.WriteI32(buf[offset:], seqid)
-	return offset
+	return gthrift.Binary.WriteMessageBegin(buf, name, gthrift.TMessageType(typeID), seqid)
 }
 
 func (binaryProtocol) WriteMessageEnd(buf []byte) int {
@@ -67,7 +55,7 @@ func (binaryProtocol) WriteStructEnd(buf []byte) int {
 }
 
 func (binaryProtocol) WriteFieldBegin(buf []byte, name string, typeID thrift.TType, id int16) int {
-	return Binary.WriteByte(buf, int8(typeID)) + Binary.WriteI16(buf[1:], id)
+	return gthrift.Binary.WriteFieldBegin(buf, gthrift.TType(typeID), id)
 }
 
 func (binaryProtocol) WriteFieldEnd(buf []byte) int {
@@ -75,13 +63,11 @@ func (binaryProtocol) WriteFieldEnd(buf []byte) int {
 }
 
 func (binaryProtocol) WriteFieldStop(buf []byte) int {
-	return Binary.WriteByte(buf, thrift.STOP)
+	return gthrift.Binary.WriteFieldStop(buf)
 }
 
 func (binaryProtocol) WriteMapBegin(buf []byte, keyType, valueType thrift.TType, size int) int {
-	return Binary.WriteByte(buf, int8(keyType)) +
-		Binary.WriteByte(buf[1:], int8(valueType)) +
-		Binary.WriteI32(buf[2:], int32(size))
+	return gthrift.Binary.WriteMapBegin(buf, gthrift.TType(keyType), gthrift.TType(valueType), size)
 }
 
 func (binaryProtocol) WriteMapEnd(buf []byte) int {
@@ -89,8 +75,7 @@ func (binaryProtocol) WriteMapEnd(buf []byte) int {
 }
 
 func (binaryProtocol) WriteListBegin(buf []byte, elemType thrift.TType, size int) int {
-	return Binary.WriteByte(buf, int8(elemType)) +
-		Binary.WriteI32(buf[1:], int32(size))
+	return gthrift.Binary.WriteListBegin(buf, gthrift.TType(elemType), size)
 }
 
 func (binaryProtocol) WriteListEnd(buf []byte) int {
@@ -98,8 +83,7 @@ func (binaryProtocol) WriteListEnd(buf []byte) int {
 }
 
 func (binaryProtocol) WriteSetBegin(buf []byte, elemType thrift.TType, size int) int {
-	return Binary.WriteByte(buf, int8(elemType)) +
-		Binary.WriteI32(buf[1:], int32(size))
+	return gthrift.Binary.WriteSetBegin(buf, gthrift.TType(elemType), size)
 }
 
 func (binaryProtocol) WriteSetEnd(buf []byte) int {
@@ -107,64 +91,49 @@ func (binaryProtocol) WriteSetEnd(buf []byte) int {
 }
 
 func (binaryProtocol) WriteBool(buf []byte, value bool) int {
-	if value {
-		return Binary.WriteByte(buf, 1)
-	}
-	return Binary.WriteByte(buf, 0)
+	return gthrift.Binary.WriteBool(buf, value)
 }
 
 func (binaryProtocol) WriteByte(buf []byte, value int8) int {
-	buf[0] = byte(value)
-	return 1
+	return gthrift.Binary.WriteByte(buf, int8(value))
 }
 
 func (binaryProtocol) WriteI16(buf []byte, value int16) int {
-	binary.BigEndian.PutUint16(buf, uint16(value))
-	return 2
+	return gthrift.Binary.WriteI16(buf, value)
 }
 
 func (binaryProtocol) WriteI32(buf []byte, value int32) int {
-	binary.BigEndian.PutUint32(buf, uint32(value))
-	return 4
+	return gthrift.Binary.WriteI32(buf, value)
 }
 
 func (binaryProtocol) WriteI64(buf []byte, value int64) int {
-	binary.BigEndian.PutUint64(buf, uint64(value))
-	return 8
+	return gthrift.Binary.WriteI64(buf, value)
 }
 
 func (binaryProtocol) WriteDouble(buf []byte, value float64) int {
-	return Binary.WriteI64(buf, int64(math.Float64bits(value)))
+	return gthrift.Binary.WriteDouble(buf, value)
 }
 
 func (binaryProtocol) WriteString(buf []byte, value string) int {
-	l := Binary.WriteI32(buf, int32(len(value)))
-	copy(buf[l:], value)
-	return l + len(value)
+	return gthrift.Binary.WriteString(buf, value)
 }
 
 func (binaryProtocol) WriteBinary(buf, value []byte) int {
-	l := Binary.WriteI32(buf, int32(len(value)))
-	copy(buf[l:], value)
-	return l + len(value)
+	return gthrift.Binary.WriteBinary(buf, value)
 }
 
 func (binaryProtocol) WriteStringNocopy(buf []byte, binaryWriter BinaryWriter, value string) int {
-	return Binary.WriteBinaryNocopy(buf, binaryWriter, stringToSliceByte(value))
+	// can not inline
+	return gthrift.Binary.WriteBinaryNocopy(buf, binaryWriter, utils.StringToSliceByte(value))
 }
 
 func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, value []byte) int {
-	l := Binary.WriteI32(buf, int32(len(value)))
-	if binaryWriter != nil && len(value) > binaryInplaceThreshold {
-		binaryWriter.WriteDirect(value, len(buf[l:]))
-		return l
-	}
-	copy(buf[l:], value)
-	return l + len(value)
+	// can not inline
+	return gthrift.Binary.WriteBinaryNocopy(buf, binaryWriter, value)
 }
 
 func (binaryProtocol) MessageBeginLength(name string, _ thrift.TMessageType, _ int32) int {
-	return 4 + Binary.StringLength(name) + 4
+	return gthrift.Binary.MessageBeginLength(name)
 }
 
 func (binaryProtocol) MessageEndLength() int {
@@ -180,7 +149,7 @@ func (binaryProtocol) StructEndLength() int {
 }
 
 func (binaryProtocol) FieldBeginLength(name string, typeID thrift.TType, id int16) int {
-	return Binary.ByteLength(int8(typeID)) + Binary.I16Length(id)
+	return gthrift.Binary.FieldBeginLength()
 }
 
 func (binaryProtocol) FieldEndLength() int {
@@ -188,13 +157,11 @@ func (binaryProtocol) FieldEndLength() int {
 }
 
 func (binaryProtocol) FieldStopLength() int {
-	return Binary.ByteLength(thrift.STOP)
+	return gthrift.Binary.FieldStopLength()
 }
 
 func (binaryProtocol) MapBeginLength(keyType, valueType thrift.TType, size int) int {
-	return Binary.ByteLength(int8(keyType)) +
-		Binary.ByteLength(int8(valueType)) +
-		Binary.I32Length(int32(size))
+	return gthrift.Binary.MapBeginLength()
 }
 
 func (binaryProtocol) MapEndLength() int {
@@ -202,8 +169,7 @@ func (binaryProtocol) MapEndLength() int {
 }
 
 func (binaryProtocol) ListBeginLength(elemType thrift.TType, size int) int {
-	return Binary.ByteLength(int8(elemType)) +
-		Binary.I32Length(int32(size))
+	return gthrift.Binary.ListBeginLength()
 }
 
 func (binaryProtocol) ListEndLength() int {
@@ -211,8 +177,7 @@ func (binaryProtocol) ListEndLength() int {
 }
 
 func (binaryProtocol) SetBeginLength(elemType thrift.TType, size int) int {
-	return Binary.ByteLength(int8(elemType)) +
-		Binary.I32Length(int32(size))
+	return gthrift.Binary.SetBeginLength()
 }
 
 func (binaryProtocol) SetEndLength() int {
@@ -220,85 +185,50 @@ func (binaryProtocol) SetEndLength() int {
 }
 
 func (binaryProtocol) BoolLength(value bool) int {
-	if value {
-		return Binary.ByteLength(1)
-	}
-	return Binary.ByteLength(0)
+	return gthrift.Binary.BoolLength()
 }
 
 func (binaryProtocol) ByteLength(value int8) int {
-	return 1
+	return gthrift.Binary.ByteLength()
 }
 
 func (binaryProtocol) I16Length(value int16) int {
-	return 2
+	return gthrift.Binary.I16Length()
 }
 
 func (binaryProtocol) I32Length(value int32) int {
-	return 4
+	return gthrift.Binary.I32Length()
 }
 
 func (binaryProtocol) I64Length(value int64) int {
-	return 8
+	return gthrift.Binary.I64Length()
 }
 
 func (binaryProtocol) DoubleLength(value float64) int {
-	return Binary.I64Length(int64(math.Float64bits(value)))
+	return gthrift.Binary.DoubleLength()
 }
 
 func (binaryProtocol) StringLength(value string) int {
-	return Binary.I32Length(int32(len(value))) + len(value)
+	return gthrift.Binary.StringLength(value)
 }
 
 func (binaryProtocol) BinaryLength(value []byte) int {
-	return Binary.I32Length(int32(len(value))) + len(value)
+	return gthrift.Binary.BinaryLength(value)
 }
 
 func (binaryProtocol) StringLengthNocopy(value string) int {
-	return Binary.BinaryLengthNocopy(stringToSliceByte(value))
+	return gthrift.Binary.StringLengthNocopy(value)
 }
 
 func (binaryProtocol) BinaryLengthNocopy(value []byte) int {
-	l := Binary.I32Length(int32(len(value)))
-	return l + len(value)
+	return gthrift.Binary.BinaryLengthNocopy(value)
 }
 
-var (
-	errBadVersion     = gthrift.NewProtocolException(gthrift.BAD_VERSION, "Bad version in ReadMessageBegin")
-	errMissingVersion = gthrift.NewProtocolException(gthrift.BAD_VERSION, "Missing version in ReadMessageBegin")
-
-	errInvalidDataLength = gthrift.NewProtocolException(gthrift.INVALID_DATA, "Invalid data length")
-)
-
 func (binaryProtocol) ReadMessageBegin(buf []byte) (name string, typeID thrift.TMessageType, seqid int32, length int, err error) {
-	size, l, e := Binary.ReadI32(buf)
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
-	if size > 0 {
-		err = errMissingVersion
-		return
-	}
-	typeID = thrift.TMessageType(size & 0x0ff)
-	version := int64(size) & thrift.VERSION_MASK
-	if version != thrift.VERSION_1 {
-		err = errBadVersion
-		return
-	}
-	name, l, e = Binary.ReadString(buf[length:])
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
-	seqid, l, e = Binary.ReadI32(buf[length:])
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
+	var tid gthrift.TMessageType
+	// can not inline
+	name, tid, seqid, length, err = gthrift.Binary.ReadMessageBegin(buf)
+	typeID = thrift.TMessageType(tid)
 	return
 }
 
@@ -311,357 +241,87 @@ func (binaryProtocol) ReadStructBegin(_ []byte) (name string, length int, err er
 func (binaryProtocol) ReadStructEnd(_ []byte) (int, error) { return 0, nil }
 
 func (binaryProtocol) ReadFieldBegin(buf []byte) (name string, typeID thrift.TType, id int16, length int, err error) {
-	t, l, e := Binary.ReadByte(buf)
-	length += l
-	typeID = thrift.TType(t)
-	if e != nil {
-		err = e
-		return
-	}
-	if t != thrift.STOP {
-		id, l, err = Binary.ReadI16(buf[length:])
-		length += l
-	}
+	var tid gthrift.TType
+	tid, id, length, err = gthrift.Binary.ReadFieldBegin(buf)
+	typeID = thrift.TType(tid)
 	return
 }
 
 func (binaryProtocol) ReadFieldEnd(_ []byte) (int, error) { return 0, nil }
 
 func (binaryProtocol) ReadMapBegin(buf []byte) (keyType, valueType thrift.TType, size, length int, err error) {
-	k, l, e := Binary.ReadByte(buf)
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
-	keyType = thrift.TType(k)
-	v, l, e := Binary.ReadByte(buf[length:])
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
-	valueType = thrift.TType(v)
-	size32, l, e := Binary.ReadI32(buf[length:])
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
-	if size32 < 0 {
-		err = errInvalidDataLength
-		return
-	}
-	size = int(size32)
+	var ktid, vtid gthrift.TType
+	ktid, vtid, size, length, err = gthrift.Binary.ReadMapBegin(buf)
+	keyType = thrift.TType(ktid)
+	valueType = thrift.TType(vtid)
 	return
 }
 
 func (binaryProtocol) ReadMapEnd(_ []byte) (int, error) { return 0, nil }
 
 func (binaryProtocol) ReadListBegin(buf []byte) (elemType thrift.TType, size, length int, err error) {
-	b, l, e := Binary.ReadByte(buf)
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
-	elemType = thrift.TType(b)
-	size32, l, e := Binary.ReadI32(buf[length:])
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
-	if size32 < 0 {
-		err = errInvalidDataLength
-		return
-	}
-	size = int(size32)
-
+	var tid gthrift.TType
+	tid, size, length, err = gthrift.Binary.ReadListBegin(buf)
+	elemType = thrift.TType(tid)
 	return
 }
 
 func (binaryProtocol) ReadListEnd(_ []byte) (int, error) { return 0, nil }
 
 func (binaryProtocol) ReadSetBegin(buf []byte) (elemType thrift.TType, size, length int, err error) {
-	b, l, e := Binary.ReadByte(buf)
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
-	elemType = thrift.TType(b)
-	size32, l, e := Binary.ReadI32(buf[length:])
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
-	if size32 < 0 {
-		err = errInvalidDataLength
-		return
-	}
-	size = int(size32)
+	var tid gthrift.TType
+	tid, size, length, err = gthrift.Binary.ReadSetBegin(buf)
+	elemType = thrift.TType(tid)
 	return
 }
 
 func (binaryProtocol) ReadSetEnd(_ []byte) (int, error) { return 0, nil }
 
 func (binaryProtocol) ReadBool(buf []byte) (value bool, length int, err error) {
-	b, l, e := Binary.ReadByte(buf)
-	v := true
-	if b != 1 {
-		v = false
-	}
-	return v, l, e
-}
-
-var errReadByte = gthrift.NewProtocolException(gthrift.INVALID_DATA, "[ReadByte] len(buf) < 1")
-
-func (binaryProtocol) ReadByte(buf []byte) (value int8, length int, err error) {
-	if len(buf) < 1 {
-		return value, length, errReadByte
-	}
-	return int8(buf[0]), 1, err
-}
-
-var errReadI16 = gthrift.NewProtocolException(gthrift.INVALID_DATA, "[ReadI16] len(buf) < 2")
-
-func (binaryProtocol) ReadI16(buf []byte) (value int16, length int, err error) {
-	if len(buf) < 2 {
-		return value, length, errReadI16
-	}
-	value = int16(binary.BigEndian.Uint16(buf))
-	return value, 2, nil
-}
-
-var errReadI32 = gthrift.NewProtocolException(gthrift.INVALID_DATA, "[ReadI32] len(buf) < 4")
-
-func (binaryProtocol) ReadI32(buf []byte) (value int32, length int, err error) {
-	if len(buf) < 4 {
-		return value, length, errReadI32
-	}
-	value = int32(binary.BigEndian.Uint32(buf))
-	return value, 4, nil
-}
-
-var errReadI64 = gthrift.NewProtocolException(gthrift.INVALID_DATA, "[ReadI64] len(buf) < 8")
-
-func (binaryProtocol) ReadI64(buf []byte) (value int64, length int, err error) {
-	if len(buf) < 8 {
-		return value, length, errReadI64
-	}
-	value = int64(binary.BigEndian.Uint64(buf))
-	return value, 8, nil
-}
-
-var errReadDouble = gthrift.NewProtocolException(gthrift.INVALID_DATA, "[ReadDouble] len(buf) < 8")
-
-func (binaryProtocol) ReadDouble(buf []byte) (value float64, length int, err error) {
-	if len(buf) < 8 {
-		return value, length, errReadDouble
-	}
-	value = math.Float64frombits(binary.BigEndian.Uint64(buf))
-	return value, 8, nil
-}
-
-var errReadString = gthrift.NewProtocolException(
-	gthrift.INVALID_DATA, "[ReadString] the string size greater than buf length")
-
-func (binaryProtocol) ReadString(buf []byte) (value string, length int, err error) {
-	size, l, e := Binary.ReadI32(buf)
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
-	if size < 0 || int(size) > len(buf) {
-		return value, length, errReadString
-	}
-	if spanCacheEnable {
-		data := spanCache.Copy(buf[length : length+int(size)])
-		value = sliceByteToString(data)
-	} else {
-		value = string(buf[length : length+int(size)])
-	}
-	length += int(size)
+	value, length, err = gthrift.Binary.ReadBool(buf)
 	return
 }
 
-var errReadBinary = gthrift.NewProtocolException(
-	gthrift.INVALID_DATA, "[ReadBinary] the binary size greater than buf length")
+func (binaryProtocol) ReadByte(buf []byte) (value int8, length int, err error) {
+	value, length, err = gthrift.Binary.ReadByte(buf)
+	return
+}
+
+func (binaryProtocol) ReadI16(buf []byte) (value int16, length int, err error) {
+	value, length, err = gthrift.Binary.ReadI16(buf)
+	return
+}
+
+func (binaryProtocol) ReadI32(buf []byte) (value int32, length int, err error) {
+	value, length, err = gthrift.Binary.ReadI32(buf)
+	return
+}
+
+func (binaryProtocol) ReadI64(buf []byte) (value int64, length int, err error) {
+	value, length, err = gthrift.Binary.ReadI64(buf)
+	return
+}
+
+func (binaryProtocol) ReadDouble(buf []byte) (value float64, length int, err error) {
+	value, length, err = gthrift.Binary.ReadDouble(buf)
+	return
+}
+
+func (binaryProtocol) ReadString(buf []byte) (value string, length int, err error) {
+	// can not inline
+	value, length, err = gthrift.Binary.ReadString(buf)
+	return
+}
 
 func (binaryProtocol) ReadBinary(buf []byte) (value []byte, length int, err error) {
-	_size, l, e := Binary.ReadI32(buf)
-	length += l
-	if e != nil {
-		err = e
-		return
-	}
-	size := int(_size)
-	if size < 0 || size > len(buf) {
-		return value, length, errReadBinary
-	}
-	if spanCacheEnable {
-		value = spanCache.Copy(buf[length : length+size])
-	} else {
-		value = make([]byte, size)
-		copy(value, buf[length:length+size])
-	}
-	length += size
+	// can not inline
+	value, length, err = gthrift.Binary.ReadBinary(buf)
 	return
 }
 
 // Skip .
 func (binaryProtocol) Skip(buf []byte, fieldType thrift.TType) (length int, err error) {
-	return SkipDefaultDepth(buf, Binary, fieldType)
-}
-
-// SkipDefaultDepth skips over the next data element from the provided input TProtocol object.
-func SkipDefaultDepth(buf []byte, prot BTProtocol, typeID thrift.TType) (int, error) {
-	const defaultRecursionDepth = 64 // same as thrift.DEFAULT_RECURSION_DEPTH
-	return Skip(buf, prot, typeID, defaultRecursionDepth)
-}
-
-var errSkipDepthLimit = gthrift.NewProtocolException(gthrift.DEPTH_LIMIT, "depth limit exceeded")
-
-// Skip skips over the next data element from the provided input TProtocol object.
-func Skip(buf []byte, self BTProtocol, fieldType thrift.TType, maxDepth int) (length int, err error) {
-	if maxDepth <= 0 {
-		return 0, errSkipDepthLimit
-	}
-
-	var l int
-	switch fieldType {
-	case thrift.BOOL:
-		length += 1
-		return
-	case thrift.BYTE:
-		length += 1
-		return
-	case thrift.I16:
-		length += 2
-		return
-	case thrift.I32:
-		length += 4
-		return
-	case thrift.I64:
-		length += 8
-		return
-	case thrift.DOUBLE:
-		length += 8
-		return
-	case thrift.STRING:
-		var sl int32
-		sl, l, err = self.ReadI32(buf)
-		length += l + int(sl)
-		return
-	case thrift.STRUCT:
-		_, l, err = self.ReadStructBegin(buf)
-		length += l
-		if err != nil {
-			return
-		}
-		for {
-			_, typeID, _, l, e := self.ReadFieldBegin(buf[length:])
-			length += l
-			if e != nil {
-				err = e
-				return
-			}
-			if typeID == thrift.STOP {
-				break
-			}
-			l, e = Skip(buf[length:], self, typeID, maxDepth-1)
-			length += l
-			if e != nil {
-				err = e
-				return
-			}
-			l, e = self.ReadFieldEnd(buf[length:])
-			length += l
-			if e != nil {
-				err = e
-				return
-			}
-		}
-		l, e := self.ReadStructEnd(buf[length:])
-		length += l
-		if e != nil {
-			err = e
-		}
-		return
-	case thrift.MAP:
-		keyType, valueType, size, l, e := self.ReadMapBegin(buf)
-		length += l
-		if e != nil {
-			err = e
-			return
-		}
-		for i := 0; i < size; i++ {
-			l, e := Skip(buf[length:], self, keyType, maxDepth-1)
-			length += l
-			if e != nil {
-				err = e
-				return
-			}
-			l, e = Skip(buf[length:], self, valueType, maxDepth-1)
-			length += l
-			if e != nil {
-				err = e
-				return
-			}
-		}
-		l, e = self.ReadMapEnd(buf[length:])
-		length += l
-		if e != nil {
-			err = e
-		}
-		return
-	case thrift.SET:
-		elemType, size, l, e := self.ReadSetBegin(buf)
-		length += l
-		if e != nil {
-			err = e
-			return
-		}
-		for i := 0; i < size; i++ {
-			l, e = Skip(buf[length:], self, elemType, maxDepth-1)
-			length += l
-			if e != nil {
-				err = e
-				return
-			}
-		}
-		l, e = self.ReadSetEnd(buf[length:])
-		length += l
-		if e != nil {
-			err = e
-		}
-		return
-	case thrift.LIST:
-		elemType, size, l, e := self.ReadListBegin(buf)
-		length += l
-		if e != nil {
-			err = e
-			return
-		}
-		for i := 0; i < size; i++ {
-			l, e = Skip(buf[length:], self, elemType, maxDepth-1)
-			length += l
-			if e != nil {
-				err = e
-				return
-			}
-		}
-		l, e = self.ReadListEnd(buf[length:])
-		length += l
-		if e != nil {
-			err = e
-		}
-		return
-	default:
-		return 0, gthrift.NewProtocolException(
-			gthrift.INVALID_DATA, fmt.Sprintf("unknown data type %d", fieldType))
-	}
+	// can not inline
+	length, err = gthrift.Binary.Skip(buf, gthrift.TType(fieldType))
+	return
 }

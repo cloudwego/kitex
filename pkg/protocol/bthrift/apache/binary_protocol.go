@@ -18,10 +18,10 @@ package apache
 
 import (
 	"context"
-	"encoding/binary"
-	"io"
-	"math"
 	"sync"
+
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
@@ -40,56 +40,39 @@ var (
 	}
 )
 
-// byteBuffer is sub interfaces of remote.ByteBuffer
-// the repeated definition here is to avoid dependency on remote packages
-type byteBuffer interface {
-	io.ReadWriter
-
-	// WriteString is a more efficient way to write string, using the unsafe method to convert the string to []byte.
-	WriteString(s string) (n int, err error)
-
-	// WriteBinary writes the []byte directly. Callers must guarantee that the []byte doesn't change.
-	WriteBinary(b []byte) (n int, err error)
-
-	// Malloc n bytes sequentially in the writer buffer.
-	Malloc(n int) (buf []byte, err error)
-
-	// Next reads the next n bytes sequentially and returns the original buffer.
-	Next(n int) (p []byte, err error)
-
-	// ReadString is a more efficient way to read string than Next.
-	ReadString(n int) (s string, err error)
-
-	// ReadBinary like ReadString.
-	// Returns a copy of original buffer.
-	ReadBinary(n int) (p []byte, err error)
-
-	// ReadableLen returns the total length of readable buffer.
-	// Return: -1 means unreadable.
-	ReadableLen() (n int)
-
-	// Flush writes any malloc data to the underlying io.Writer.
-	// The malloced buffer must be set correctly.
-	Flush() (err error)
-}
-
 // BinaryProtocol was moved from cloudwego/kitex/pkg/remote/codec/thrift
-// Deprecated: use github.com/apache/thrift/lib/go/thrift.NewTBinaryProtocol
 type BinaryProtocol struct {
-	trans byteBuffer
+	r *thrift.BufferReader
+	w *thrift.BufferWriter
+
+	br bufiox.Reader
+	bw bufiox.Writer
 }
 
 // NewBinaryProtocol ...
-// Deprecated: use github.com/apache/thrift/lib/go/thrift.NewTBinaryProtocol
-func NewBinaryProtocol(t byteBuffer) *BinaryProtocol {
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift.NewBufferReader|NewBufferWriter
+func NewBinaryProtocol(r bufiox.Reader, w bufiox.Writer) *BinaryProtocol {
 	bp := bpPool.Get().(*BinaryProtocol)
-	bp.trans = t
+	if r != nil {
+		bp.r = thrift.NewBufferReader(r)
+		bp.br = r
+	}
+	if w != nil {
+		bp.w = thrift.NewBufferWriter(w)
+		bp.bw = w
+	}
 	return bp
 }
 
 // Recycle ...
 func (p *BinaryProtocol) Recycle() {
-	p.trans = nil
+	if p.r != nil {
+		p.r.Recycle()
+	}
+	if p.w != nil {
+		p.w.Recycle()
+	}
+	*p = BinaryProtocol{}
 	bpPool.Put(p)
 }
 
@@ -99,17 +82,7 @@ func (p *BinaryProtocol) Recycle() {
 
 // WriteMessageBegin ...
 func (p *BinaryProtocol) WriteMessageBegin(name string, typeID TMessageType, seqID int32) error {
-	version := uint32(VERSION_1) | uint32(typeID)
-	e := p.WriteI32(int32(version))
-	if e != nil {
-		return e
-	}
-	e = p.WriteString(name)
-	if e != nil {
-		return e
-	}
-	e = p.WriteI32(seqID)
-	return e
+	return p.w.WriteMessageBegin(name, thrift.TMessageType(typeID), seqID)
 }
 
 // WriteMessageEnd ...
@@ -129,12 +102,7 @@ func (p *BinaryProtocol) WriteStructEnd() error {
 
 // WriteFieldBegin ...
 func (p *BinaryProtocol) WriteFieldBegin(name string, typeID TType, id int16) error {
-	e := p.WriteByte(int8(typeID))
-	if e != nil {
-		return e
-	}
-	e = p.WriteI16(id)
-	return e
+	return p.w.WriteFieldBegin(thrift.TType(typeID), id)
 }
 
 // WriteFieldEnd ...
@@ -144,22 +112,12 @@ func (p *BinaryProtocol) WriteFieldEnd() error {
 
 // WriteFieldStop ...
 func (p *BinaryProtocol) WriteFieldStop() error {
-	e := p.WriteByte(STOP)
-	return e
+	return p.w.WriteFieldStop()
 }
 
 // WriteMapBegin ...
 func (p *BinaryProtocol) WriteMapBegin(keyType, valueType TType, size int) error {
-	e := p.WriteByte(int8(keyType))
-	if e != nil {
-		return e
-	}
-	e = p.WriteByte(int8(valueType))
-	if e != nil {
-		return e
-	}
-	e = p.WriteI32(int32(size))
-	return e
+	return p.w.WriteMapBegin(thrift.TType(keyType), thrift.TType(valueType), size)
 }
 
 // WriteMapEnd ...
@@ -169,12 +127,7 @@ func (p *BinaryProtocol) WriteMapEnd() error {
 
 // WriteListBegin ...
 func (p *BinaryProtocol) WriteListBegin(elemType TType, size int) error {
-	e := p.WriteByte(int8(elemType))
-	if e != nil {
-		return e
-	}
-	e = p.WriteI32(int32(size))
-	return e
+	return p.w.WriteListBegin(thrift.TType(elemType), size)
 }
 
 // WriteListEnd ...
@@ -184,12 +137,7 @@ func (p *BinaryProtocol) WriteListEnd() error {
 
 // WriteSetBegin ...
 func (p *BinaryProtocol) WriteSetBegin(elemType TType, size int) error {
-	e := p.WriteByte(int8(elemType))
-	if e != nil {
-		return e
-	}
-	e = p.WriteI32(int32(size))
-	return e
+	return p.w.WriteSetBegin(thrift.TType(elemType), size)
 }
 
 // WriteSetEnd ...
@@ -199,85 +147,42 @@ func (p *BinaryProtocol) WriteSetEnd() error {
 
 // WriteBool ...
 func (p *BinaryProtocol) WriteBool(value bool) error {
-	if value {
-		return p.WriteByte(1)
-	}
-	return p.WriteByte(0)
+	return p.w.WriteBool(value)
 }
 
 // WriteByte ...
 func (p *BinaryProtocol) WriteByte(value int8) error {
-	v, err := p.malloc(1)
-	if err != nil {
-		return err
-	}
-	v[0] = byte(value)
-	return err
+	return p.w.WriteByte(value)
 }
 
 // WriteI16 ...
 func (p *BinaryProtocol) WriteI16(value int16) error {
-	v, err := p.malloc(2)
-	if err != nil {
-		return err
-	}
-	binary.BigEndian.PutUint16(v, uint16(value))
-	return err
+	return p.w.WriteI16(value)
 }
 
 // WriteI32 ...
 func (p *BinaryProtocol) WriteI32(value int32) error {
-	v, err := p.malloc(4)
-	if err != nil {
-		return err
-	}
-	binary.BigEndian.PutUint32(v, uint32(value))
-	return err
+	return p.w.WriteI32(value)
 }
 
 // WriteI64 ...
 func (p *BinaryProtocol) WriteI64(value int64) error {
-	v, err := p.malloc(8)
-	if err != nil {
-		return err
-	}
-	binary.BigEndian.PutUint64(v, uint64(value))
-	return err
+	return p.w.WriteI64(value)
 }
 
 // WriteDouble ...
 func (p *BinaryProtocol) WriteDouble(value float64) error {
-	return p.WriteI64(int64(math.Float64bits(value)))
+	return p.w.WriteDouble(value)
 }
 
 // WriteString ...
 func (p *BinaryProtocol) WriteString(value string) error {
-	len := len(value)
-	e := p.WriteI32(int32(len))
-	if e != nil {
-		return e
-	}
-	_, e = p.trans.WriteString(value)
-	return e
+	return p.w.WriteString(value)
 }
 
 // WriteBinary ...
 func (p *BinaryProtocol) WriteBinary(value []byte) error {
-	e := p.WriteI32(int32(len(value)))
-	if e != nil {
-		return e
-	}
-	_, e = p.trans.WriteBinary(value)
-	return e
-}
-
-// malloc ...
-func (p *BinaryProtocol) malloc(size int) ([]byte, error) {
-	buf, err := p.trans.Malloc(size)
-	if err != nil {
-		return buf, perrors.NewProtocolError(err)
-	}
-	return buf, nil
+	return p.w.WriteBinary(value)
 }
 
 /**
@@ -286,27 +191,10 @@ func (p *BinaryProtocol) malloc(size int) ([]byte, error) {
 
 // ReadMessageBegin ...
 func (p *BinaryProtocol) ReadMessageBegin() (name string, typeID TMessageType, seqID int32, err error) {
-	size, e := p.ReadI32()
-	if e != nil {
-		return "", typeID, 0, perrors.NewProtocolError(e)
-	}
-	if size > 0 {
-		return name, typeID, seqID, perrors.NewProtocolErrorWithType(perrors.BadVersion, "Missing version in ReadMessageBegin")
-	}
-	typeID = TMessageType(size & 0x0ff)
-	version := int64(int64(size) & VERSION_MASK)
-	if version != VERSION_1 {
-		return name, typeID, seqID, perrors.NewProtocolErrorWithType(perrors.BadVersion, "Bad version in ReadMessageBegin")
-	}
-	name, e = p.ReadString()
-	if e != nil {
-		return name, typeID, seqID, perrors.NewProtocolError(e)
-	}
-	seqID, e = p.ReadI32()
-	if e != nil {
-		return name, typeID, seqID, perrors.NewProtocolError(e)
-	}
-	return name, typeID, seqID, nil
+	var tid thrift.TMessageType
+	name, tid, seqID, err = p.r.ReadMessageBegin()
+	typeID = TMessageType(tid)
+	return
 }
 
 // ReadMessageEnd ...
@@ -326,15 +214,10 @@ func (p *BinaryProtocol) ReadStructEnd() error {
 
 // ReadFieldBegin ...
 func (p *BinaryProtocol) ReadFieldBegin() (name string, typeID TType, id int16, err error) {
-	t, err := p.ReadByte()
-	typeID = TType(t)
-	if err != nil {
-		return name, typeID, id, err
-	}
-	if t != STOP {
-		id, err = p.ReadI16()
-	}
-	return name, typeID, id, err
+	var tid thrift.TType
+	tid, id, err = p.r.ReadFieldBegin()
+	typeID = TType(tid)
+	return
 }
 
 // ReadFieldEnd ...
@@ -344,29 +227,11 @@ func (p *BinaryProtocol) ReadFieldEnd() error {
 
 // ReadMapBegin ...
 func (p *BinaryProtocol) ReadMapBegin() (kType, vType TType, size int, err error) {
-	k, e := p.ReadByte()
-	if e != nil {
-		err = perrors.NewProtocolError(e)
-		return
-	}
-	kType = TType(k)
-	v, e := p.ReadByte()
-	if e != nil {
-		err = perrors.NewProtocolError(e)
-		return
-	}
-	vType = TType(v)
-	size32, e := p.ReadI32()
-	if e != nil {
-		err = perrors.NewProtocolError(e)
-		return
-	}
-	if size32 < 0 {
-		err = perrors.InvalidDataLength
-		return
-	}
-	size = int(size32)
-	return kType, vType, size, nil
+	var ktype, vtype thrift.TType
+	ktype, vtype, size, err = p.r.ReadMapBegin()
+	kType = TType(ktype)
+	vType = TType(vtype)
+	return
 }
 
 // ReadMapEnd ...
@@ -376,23 +241,9 @@ func (p *BinaryProtocol) ReadMapEnd() error {
 
 // ReadListBegin ...
 func (p *BinaryProtocol) ReadListBegin() (elemType TType, size int, err error) {
-	b, e := p.ReadByte()
-	if e != nil {
-		err = perrors.NewProtocolError(e)
-		return
-	}
-	elemType = TType(b)
-	size32, e := p.ReadI32()
-	if e != nil {
-		err = perrors.NewProtocolError(e)
-		return
-	}
-	if size32 < 0 {
-		err = perrors.InvalidDataLength
-		return
-	}
-	size = int(size32)
-
+	var etype thrift.TType
+	etype, size, err = p.r.ReadListBegin()
+	elemType = TType(etype)
 	return
 }
 
@@ -403,23 +254,10 @@ func (p *BinaryProtocol) ReadListEnd() error {
 
 // ReadSetBegin ...
 func (p *BinaryProtocol) ReadSetBegin() (elemType TType, size int, err error) {
-	b, e := p.ReadByte()
-	if e != nil {
-		err = perrors.NewProtocolError(e)
-		return
-	}
-	elemType = TType(b)
-	size32, e := p.ReadI32()
-	if e != nil {
-		err = perrors.NewProtocolError(e)
-		return
-	}
-	if size32 < 0 {
-		err = perrors.InvalidDataLength
-		return
-	}
-	size = int(size32)
-	return elemType, size, nil
+	var etype thrift.TType
+	etype, size, err = p.r.ReadSetBegin()
+	elemType = TType(etype)
+	return
 }
 
 // ReadSetEnd ...
@@ -429,95 +267,47 @@ func (p *BinaryProtocol) ReadSetEnd() error {
 
 // ReadBool ...
 func (p *BinaryProtocol) ReadBool() (bool, error) {
-	b, e := p.ReadByte()
-	v := true
-	if b != 1 {
-		v = false
-	}
-	return v, e
+	return p.r.ReadBool()
 }
 
 // ReadByte ...
 func (p *BinaryProtocol) ReadByte() (value int8, err error) {
-	buf, err := p.next(1)
-	if err != nil {
-		return value, err
-	}
-	return int8(buf[0]), err
+	return p.r.ReadByte()
 }
 
 // ReadI16 ...
 func (p *BinaryProtocol) ReadI16() (value int16, err error) {
-	buf, err := p.next(2)
-	if err != nil {
-		return value, err
-	}
-	value = int16(binary.BigEndian.Uint16(buf))
-	return value, err
+	return p.r.ReadI16()
 }
 
 // ReadI32 ...
 func (p *BinaryProtocol) ReadI32() (value int32, err error) {
-	buf, err := p.next(4)
-	if err != nil {
-		return value, err
-	}
-	value = int32(binary.BigEndian.Uint32(buf))
-	return value, err
+	return p.r.ReadI32()
 }
 
 // ReadI64 ...
 func (p *BinaryProtocol) ReadI64() (value int64, err error) {
-	buf, err := p.next(8)
-	if err != nil {
-		return value, err
-	}
-	value = int64(binary.BigEndian.Uint64(buf))
-	return value, err
+	return p.r.ReadI64()
 }
 
 // ReadDouble ...
 func (p *BinaryProtocol) ReadDouble() (value float64, err error) {
-	buf, err := p.next(8)
-	if err != nil {
-		return value, err
-	}
-	value = math.Float64frombits(binary.BigEndian.Uint64(buf))
-	return value, err
+	return p.r.ReadDouble()
 }
 
 // ReadString ...
 func (p *BinaryProtocol) ReadString() (value string, err error) {
-	size, e := p.ReadI32()
-	if e != nil {
-		return "", e
-	}
-	if size < 0 {
-		err = perrors.InvalidDataLength
-		return
-	}
-	value, err = p.trans.ReadString(int(size))
-	if err != nil {
-		return value, perrors.NewProtocolError(err)
-	}
-	return value, nil
+	return p.r.ReadString()
 }
 
 // ReadBinary ...
 func (p *BinaryProtocol) ReadBinary() ([]byte, error) {
-	size, e := p.ReadI32()
-	if e != nil {
-		return nil, e
-	}
-	if size < 0 {
-		return nil, perrors.InvalidDataLength
-	}
-	return p.trans.ReadBinary(int(size))
+	return p.r.ReadBinary()
 }
 
 // Flush ...
 func (p *BinaryProtocol) Flush(ctx context.Context) (err error) {
-	err = p.trans.Flush()
+	err = p.bw.Flush()
 	if err != nil {
 		return perrors.NewProtocolError(err)
 	}
@@ -531,32 +321,18 @@ func (p *BinaryProtocol) Skip(fieldType TType) (err error) {
 
 // Transport ...
 func (p *BinaryProtocol) Transport() TTransport {
-	return ttransportByteBuffer{p.trans}
-}
-
-// ByteBuffer ...
-func (p *BinaryProtocol) ByteBuffer() byteBuffer {
-	return p.trans
-}
-
-// next ...
-func (p *BinaryProtocol) next(size int) ([]byte, error) {
-	buf, err := p.trans.Next(size)
-	if err != nil {
-		return buf, perrors.NewProtocolError(err)
-	}
-	return buf, nil
+	return ttransportByteBuffer{}
 }
 
 // ttransportByteBuffer ...
 // for exposing remote.ByteBuffer via p.Transport(),
 // mainly for testing purpose, see internal/mocks/athrift/utils.go
-type ttransportByteBuffer struct {
-	byteBuffer
-}
+type ttransportByteBuffer struct{}
 
 func (ttransportByteBuffer) Close() error                          { panic("not implemented") }
 func (ttransportByteBuffer) Flush(ctx context.Context) (err error) { panic("not implemented") }
 func (ttransportByteBuffer) IsOpen() bool                          { panic("not implemented") }
 func (ttransportByteBuffer) Open() error                           { panic("not implemented") }
-func (p ttransportByteBuffer) RemainingBytes() uint64              { return uint64(p.ReadableLen()) }
+func (p ttransportByteBuffer) RemainingBytes() uint64              { panic("not implemented") }
+func (ttransportByteBuffer) Read(p []byte) (n int, err error)      { panic("not implemented") }
+func (ttransportByteBuffer) Write(p []byte) (n int, err error)     { panic("not implemented") }

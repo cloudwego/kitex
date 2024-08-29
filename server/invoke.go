@@ -19,7 +19,6 @@ package server
 // Invoker is for calling handler function wrapped by Kitex suites without connection.
 
 import (
-	"context"
 	"errors"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
@@ -42,42 +41,8 @@ type Invoker interface {
 }
 
 type tInvoker struct {
+	invoke.Handler
 	*server
-
-	h invoke.Handler
-}
-
-// invokerMetaDecoder is used to update `PayloadLen` of `remote.Message`.
-// It fixes kitex returning err when apache codec is not available due to msg.PayloadLen() == 0.
-// Because users may not add transport header like transport.Framed
-// to invoke.Message when calling msg.SetRequestBytes.
-// This is NOT expected and it's caused by kitex design fault.
-type invokerMetaDecoder struct {
-	remote.Codec
-
-	d remote.MetaDecoder
-}
-
-func (d *invokerMetaDecoder) DecodeMeta(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	err := d.d.DecodeMeta(ctx, msg, in)
-	if err != nil {
-		return err
-	}
-	// cool ... no need to do anything.
-	// added transport header?
-	if msg.PayloadLen() > 0 {
-		return nil
-	}
-	// use the whole buffer
-	// coz for invoker remote.ByteBuffer always contains the whole msg payload
-	if n := in.ReadableLen(); n > 0 {
-		msg.SetPayloadLen(n)
-	}
-	return nil
-}
-
-func (d *invokerMetaDecoder) DecodePayload(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
-	return d.d.DecodePayload(ctx, msg, in)
 }
 
 // NewInvoker creates new Invoker.
@@ -85,13 +50,6 @@ func NewInvoker(opts ...Option) Invoker {
 	s := &server{
 		opt:  internal_server.NewOptions(opts),
 		svcs: newServices(),
-	}
-	if codec, ok := s.opt.RemoteOpt.Codec.(remote.MetaDecoder); ok {
-		// see comment on type `invokerMetaDecoder`
-		s.opt.RemoteOpt.Codec = &invokerMetaDecoder{
-			Codec: s.opt.RemoteOpt.Codec,
-			d:     codec,
-		}
 	}
 	s.init()
 	return &tInvoker{
@@ -112,7 +70,7 @@ func (s *tInvoker) Init() (err error) {
 		doAddBoundHandler(transInfoHdlr, s.server.opt.RemoteOpt)
 	}
 	s.Lock()
-	s.h, err = s.newInvokeHandler()
+	s.Handler, err = s.newInvokeHandler()
 	s.Unlock()
 	if err != nil {
 		return err
@@ -125,7 +83,7 @@ func (s *tInvoker) Init() (err error) {
 
 // Call implements the InvokeCaller interface.
 func (s *tInvoker) Call(msg invoke.Message) error {
-	return s.h.Call(msg)
+	return s.Handler.Call(msg)
 }
 
 func (s *tInvoker) newInvokeHandler() (handler invoke.Handler, err error) {

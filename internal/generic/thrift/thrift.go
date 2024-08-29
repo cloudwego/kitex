@@ -19,8 +19,8 @@ package thrift
 
 import (
 	"context"
-	"io"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 )
 
@@ -30,10 +30,10 @@ const (
 
 // MessageReader read from thrift.TProtocol with method
 type MessageReader interface {
-	Read(ctx context.Context, method string, isClient bool, dataLen int, in io.Reader) (interface{}, error)
+	Read(ctx context.Context, method string, isClient bool, dataLen int, in bufiox.Reader) (interface{}, error)
 }
 
 // MessageWriter write to thrift.TProtocol
 type MessageWriter interface {
-	Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error
+	Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error
 }

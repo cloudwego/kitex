@@ -22,7 +22,6 @@ package thrift
 import (
 	"context"
 	"fmt"
-	"io"
 	"unsafe"
 
 	"github.com/bytedance/gopkg/lang/mcache"
@@ -30,6 +29,7 @@ import (
 	"github.com/cloudwego/dynamicgo/conv/j2t"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	dbase "github.com/cloudwego/dynamicgo/thrift/base"
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
@@ -39,7 +39,7 @@ import (
 )
 
 // Write write json string to out thrift.TProtocol
-func (m *WriteJSON) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	// fallback logic
 	if !m.dynamicgoEnabled {
 		return m.originalWrite(ctx, out, msg, method, isClient, requestBase)
@@ -68,16 +68,9 @@ func (m *WriteJSON) Write(ctx context.Context, out io.Writer, msg interface{}, m
 		cv = j2t.NewBinaryConv(m.convOpts)
 	}
 
-	binaryWriter := thrift.NewBinaryWriter()
-
 	// msg is void or nil
 	if _, ok := msg.(descriptor.Void); ok || msg == nil {
-		if err := m.writeFields(ctx, out, dynamicgoTypeDsc, nil, nil, isClient); err != nil {
-			return err
-		}
-		binaryWriter.WriteFieldStop()
-		_, err := out.Write(binaryWriter.Bytes())
-		return err
+		return m.writeFields(ctx, out, dynamicgoTypeDsc, nil, nil, isClient)
 	}
 
 	// msg is string
@@ -87,22 +80,17 @@ func (m *WriteJSON) Write(ctx context.Context, out io.Writer, msg interface{}, m
 	}
 	transBuff := utils.StringToSliceByte(s)
 
-	if err := m.writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient); err != nil {
-		return err
-	}
-	binaryWriter.WriteFieldStop()
-	_, err := out.Write(binaryWriter.Bytes())
-	return err
+	return m.writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient)
 }
 
 type MsgType int
 
-func (m *WriteJSON) writeFields(ctx context.Context, out io.Writer, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient bool) error {
+func (m *WriteJSON) writeFields(ctx context.Context, out bufiox.Writer, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient bool) error {
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
 	defer mcache.Free(dbuf)
 
-	binaryWriter := thrift.NewBinaryWriter()
-
+	bw := thrift.NewBufferWriter(out)
+	defer bw.Recycle()
 	for _, field := range dynamicgoTypeDsc.Struct().Fields() {
 		// Exception field
 		if !isClient && field.ID() != 0 {
@@ -111,23 +99,28 @@ func (m *WriteJSON) writeFields(ctx context.Context, out io.Writer, dynamicgoTyp
 			continue
 		}
 
-		binaryWriter.WriteFieldBegin(thrift.TType(field.Type().Type()), int16(field.ID()))
-		// if the field type is void, just write void and return
-		if field.Type().Type() == dthrift.VOID {
-			binaryWriter.WriteFieldStop()
-			_, err := out.Write(binaryWriter.Bytes())
+		if err := bw.WriteFieldBegin(thrift.TType(field.Type().Type()), int16(field.ID())); err != nil {
 			return err
+		}
+		// if the field type is void, break
+		if field.Type().Type() == dthrift.VOID {
+			if err := bw.WriteFieldStop(); err != nil {
+				return err
+			}
+			break
 		} else {
 			// encode using dynamicgo
 			// json []byte to thrift []byte
 			if err := cv.DoInto(ctx, field.Type(), transBuff, &dbuf); err != nil {
 				return err
 			}
+			if wb, err := out.Malloc(len(dbuf)); err != nil {
+				return err
+			} else {
+				copy(wb, dbuf)
+			}
+			dbuf = dbuf[:0]
 		}
 	}
-	if _, err := out.Write(binaryWriter.Bytes()); err != nil {
-		return err
-	}
-	_, err := out.Write(dbuf)
-	return err
+	return bw.WriteFieldStop()
 }

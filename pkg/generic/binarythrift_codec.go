@@ -21,6 +21,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/bytedance/gopkg/lang/dirtmake"
+
 	"github.com/cloudwego/kitex/internal/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
@@ -74,8 +76,8 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 			return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("rawThriftBinaryCodec set seqID failed, err: %s", err.Error()))
 		}
 	}
-	out.WriteBinary(transBuff)
-	return nil
+	_, err := out.WriteBinary(transBuff)
+	return err
 }
 
 func (c *binaryThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
@@ -88,7 +90,8 @@ func (c *binaryThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, i
 		return c.thriftCodec.Unmarshal(ctx, msg, in)
 	}
 	payloadLen := msg.PayloadLen()
-	transBuff, err := in.ReadBinary(payloadLen)
+	transBuff := dirtmake.Bytes(payloadLen, payloadLen)
+	_, err = in.ReadBinary(transBuff)
 	if err != nil {
 		return err
 	}

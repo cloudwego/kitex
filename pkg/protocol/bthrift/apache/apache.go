@@ -18,9 +18,9 @@ package apache
 
 import (
 	"errors"
-	"io"
 
 	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift/apache"
 )
 
@@ -41,30 +41,24 @@ func checkTStruct(v interface{}) error {
 	return nil
 }
 
-func callThriftRead(r io.ReadWriter, v interface{}) error {
+func callThriftRead(r bufiox.Reader, v interface{}) error {
 	p, ok := v.(thrift.TStruct)
 	if !ok {
 		return errNotThriftTStruct
 	}
-	t, ok := r.(byteBuffer)
-	if ok {
-		in := NewBinaryProtocol(t)
-		return p.Read(in)
-	}
-	in := thrift.NewTBinaryProtocol(apache.NewDefaultTransport(r), true, true)
-	return p.Read(in)
+	bp := NewBinaryProtocol(r, nil)
+	err := p.Read(bp)
+	bp.Recycle()
+	return err
 }
 
-func callThriftWrite(w io.ReadWriter, v interface{}) error {
+func callThriftWrite(w bufiox.Writer, v interface{}) error {
 	p, ok := v.(thrift.TStruct)
 	if !ok {
 		return errNotThriftTStruct
 	}
-	t, ok := w.(byteBuffer)
-	if ok {
-		out := NewBinaryProtocol(t)
-		return p.Write(out)
-	}
-	out := thrift.NewTBinaryProtocol(apache.NewDefaultTransport(w), true, true)
-	return p.Write(out)
+	bp := NewBinaryProtocol(nil, w)
+	err := p.Write(bp)
+	bp.Recycle()
+	return err
 }

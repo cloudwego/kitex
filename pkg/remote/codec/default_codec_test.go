@@ -521,7 +521,7 @@ func TestCornerCase(t *testing.T) {
 	sendMsg.SetProtocolInfo(remote.NewProtocolInfo(transport.Framed, serviceinfo.Thrift))
 
 	buffer := mocksremote.NewMockByteBuffer(ctrl)
-	buffer.EXPECT().MallocLen().Return(1024).AnyTimes()
+	buffer.EXPECT().WrittenLen().Return(1024).AnyTimes()
 	buffer.EXPECT().Malloc(gomock.Any()).Return(nil, errors.New("error malloc")).AnyTimes()
 	err := (&defaultCodec{}).EncodePayload(context.Background(), sendMsg, buffer)
 	test.Assert(t, err.Error() == "error malloc")

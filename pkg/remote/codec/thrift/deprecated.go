@@ -37,7 +37,29 @@ type MessageWriter interface {
 // TODO: this func should be removed in the future. it's exposed accidentally.
 // Deprecated: Use `SkipDecoder` + `ApplicationException` of `cloudwego/gopkg/protocol/thrift` instead.
 func UnmarshalThriftException(tProt athrift.TProtocol) error {
-	return unmarshalThriftException(tProt.Transport())
+	var m string
+	var t int32
+	for {
+		_, tp, id, err := tProt.ReadFieldBegin()
+		if err != nil {
+			return err
+		}
+		if tp == athrift.STOP {
+			break
+		}
+		switch {
+		case id == 1 && tp == athrift.STRING: // Msg
+			m, err = tProt.ReadString()
+		case id == 2 && tp == athrift.I32: // TypeID
+			t, err = tProt.ReadI32()
+		default:
+			err = tProt.Skip(tp)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return remote.NewTransErrorWithMsg(t, m)
 }
 
 // BinaryProtocol ...
@@ -47,5 +69,5 @@ type BinaryProtocol = athrift.BinaryProtocol
 // NewBinaryProtocol ...
 // Deprecated: use github.com/apache/thrift/lib/go/thrift.NewTBinaryProtocol
 func NewBinaryProtocol(t remote.ByteBuffer) *athrift.BinaryProtocol {
-	return athrift.NewBinaryProtocol(t)
+	return athrift.NewBinaryProtocol(t, t)
 }
