@@ -19,8 +19,8 @@ package generic
 import (
 	"context"
 	"fmt"
-	"io"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
 	"github.com/cloudwego/kitex/internal/generic/proto"
@@ -143,7 +143,7 @@ func (g *Args) GetOrSetBase() interface{} {
 }
 
 // Write ...
-func (g *Args) Write(ctx context.Context, method string, out io.Writer) error {
+func (g *Args) Write(ctx context.Context, method string, out bufiox.Writer) error {
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
@@ -164,7 +164,7 @@ func (g *Args) WritePb(ctx context.Context, method string) (interface{}, error) 
 }
 
 // Read ...
-func (g *Args) Read(ctx context.Context, method string, dataLen int, in io.Reader) error {
+func (g *Args) Read(ctx context.Context, method string, dataLen int, in bufiox.Reader) error {
 	if err, ok := g.inner.(error); ok {
 		return err
 	}
@@ -213,7 +213,7 @@ func (r *Result) SetCodec(inner interface{}) {
 }
 
 // Write ...
-func (r *Result) Write(ctx context.Context, method string, out io.Writer) error {
+func (r *Result) Write(ctx context.Context, method string, out bufiox.Writer) error {
 	if err, ok := r.inner.(error); ok {
 		return err
 	}
@@ -234,7 +234,7 @@ func (r *Result) WritePb(ctx context.Context, method string) (interface{}, error
 }
 
 // Read ...
-func (r *Result) Read(ctx context.Context, method string, dataLen int, in io.Reader) error {
+func (r *Result) Read(ctx context.Context, method string, dataLen int, in bufiox.Reader) error {
 	if err, ok := r.inner.(error); ok {
 		return err
 	}

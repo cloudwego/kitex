@@ -23,13 +23,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/jhump/protoreflect/desc/protoparse"
 
 	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 var (
@@ -66,30 +66,61 @@ func Test_nextReader(t *testing.T) {
 	}
 }
 
-func Test_readVoid(t *testing.T) {
+func TestReadSimple(t *testing.T) {
 	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
+		t         *descriptor.TypeDescriptor
+		writeFunc func(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error
+		readFunc  func(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDescriptor, opt *readerOption) (interface{}, error)
+		opt       *readerOption
 	}
-
 	tests := []struct {
 		name    string
 		args    args
 		want    interface{}
 		wantErr bool
 	}{
-		// TODO: Add test cases.
-		{"void", args{t: &descriptor.TypeDescriptor{Type: descriptor.VOID, Struct: &descriptor.StructDescriptor{}}}, descriptor.Void{}, false},
+		{"void", args{readFunc: readVoid, writeFunc: writeVoid, t: &descriptor.TypeDescriptor{Type: descriptor.VOID, Struct: &descriptor.StructDescriptor{}}}, descriptor.Void{}, false},
+		{"readDouble", args{readFunc: readDouble, writeFunc: writeFloat64, t: &descriptor.TypeDescriptor{Type: descriptor.DOUBLE}}, 1.0, false},
+		{"readBool", args{readFunc: readBool, writeFunc: writeBool, t: &descriptor.TypeDescriptor{Type: descriptor.BOOL}}, true, false},
+		{"readByte", args{readFunc: readByte, writeFunc: writeInt8, t: &descriptor.TypeDescriptor{Type: descriptor.BYTE}, opt: &readerOption{}}, int8(1), false},
+		{"readInt16", args{readFunc: readInt16, writeFunc: writeInt16, t: &descriptor.TypeDescriptor{Type: descriptor.I16}, opt: &readerOption{}}, int16(1), false},
+		{"readInt32", args{readFunc: readInt32, writeFunc: writeInt32, t: &descriptor.TypeDescriptor{Type: descriptor.I32}}, int32(1), false},
+		{"readInt64", args{readFunc: readInt64, writeFunc: writeInt64, t: &descriptor.TypeDescriptor{Type: descriptor.I64}}, int64(1), false},
+		{"readString", args{readFunc: readString, writeFunc: writeString, t: &descriptor.TypeDescriptor{Type: descriptor.STRING}}, stringInput, false},
+		{"readBase64Binary", args{readFunc: readBase64Binary, writeFunc: writeBase64Binary, t: &descriptor.TypeDescriptor{Name: "binary", Type: descriptor.STRING}}, base64.StdEncoding.EncodeToString(binaryInput), false}, // read base64 string from binary field
+		{"readBinary", args{readFunc: readBinary, writeFunc: writeBinary, t: &descriptor.TypeDescriptor{Name: "binary", Type: descriptor.STRING}}, binaryInput, false},                                                      // read base64 string from binary field
+		{"readList", args{readFunc: readList, writeFunc: writeList, t: &descriptor.TypeDescriptor{Type: descriptor.LIST, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}}, []interface{}{stringInput, stringInput, stringInput}, false},
+		{
+			"readMap",
+			args{readFunc: readMap, writeFunc: writeInterfaceMap, t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Struct: &descriptor.StructDescriptor{}}, opt: &readerOption{}},
+			map[interface{}]interface{}{"hello": "world"},
+			false,
+		},
+		{
+			"readJsonMap",
+			args{readFunc: readMap, writeFunc: writeStringMap, t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Struct: &descriptor.StructDescriptor{}}, opt: &readerOption{forJSON: true}},
+			map[string]interface{}{"hello": "world"},
+			false,
+		},
+		{
+			"readJsonMapWithInt16Key",
+			args{readFunc: readMap, writeFunc: writeStringMap, t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.I16}, Elem: &descriptor.TypeDescriptor{Type: descriptor.BOOL}, Struct: &descriptor.StructDescriptor{}}, opt: &readerOption{forJSON: true}},
+			map[string]interface{}{"16": false},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := writeVoid(context.Background(), tt.want, w, tt.args.t, &writerOption{})
+			var bs []byte
+			bw := bufiox.NewBytesWriter(&bs)
+			w := thrift.NewBufferWriter(bw)
+			err := tt.args.writeFunc(context.Background(), tt.want, w, tt.args.t, &writerOption{})
 			if err != nil {
-				t.Errorf("writeVoid() error = %v", err)
+				t.Errorf("writeFloat64() error = %v", err)
 			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readVoid(context.Background(), in, tt.args.t, tt.args.opt)
+			_ = bw.Flush()
+			in := thrift.NewBufferReader(bufiox.NewBytesReader(bs))
+			got, err := tt.args.readFunc(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readVoid() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -101,403 +132,7 @@ func Test_readVoid(t *testing.T) {
 	}
 }
 
-func Test_readDouble(t *testing.T) {
-	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{"readDouble", args{t: &descriptor.TypeDescriptor{Type: descriptor.DOUBLE}}, 1.0, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := writeFloat64(context.Background(), tt.want, w, tt.args.t, &writerOption{})
-			if err != nil {
-				t.Errorf("writeFloat64() error = %v", err)
-			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readDouble(context.Background(), in, tt.args.t, tt.args.opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readDouble() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readDouble() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readBool(t *testing.T) {
-	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{"readBool", args{t: &descriptor.TypeDescriptor{Type: descriptor.BOOL}}, true, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := writeBool(context.Background(), tt.want, w, tt.args.t, &writerOption{})
-			if err != nil {
-				t.Errorf("writeBool() error = %v", err)
-			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readBool(context.Background(), in, tt.args.t, tt.args.opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readBool() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readBool() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readByte(t *testing.T) {
-	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{"readByte", args{t: &descriptor.TypeDescriptor{Type: descriptor.BYTE}, opt: &readerOption{}}, int8(1), false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := writeInt8(context.Background(), tt.want, w, tt.args.t, &writerOption{})
-			if err != nil {
-				t.Errorf("writeInt8() error = %v", err)
-			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readByte(context.Background(), in, tt.args.t, tt.args.opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readByte() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readByte() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readInt16(t *testing.T) {
-	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{"readInt16", args{t: &descriptor.TypeDescriptor{Type: descriptor.I16}, opt: &readerOption{}}, int16(1), false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := writeInt16(context.Background(), tt.want, w, tt.args.t, &writerOption{})
-			if err != nil {
-				t.Errorf("writeInt16() error = %v", err)
-			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readInt16(context.Background(), in, tt.args.t, tt.args.opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readInt16() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readInt16() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readInt32(t *testing.T) {
-	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
-	}
-
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{"readInt32", args{t: &descriptor.TypeDescriptor{Type: descriptor.I32}}, int32(1), false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := writeInt32(context.Background(), tt.want, w, tt.args.t, &writerOption{})
-			if err != nil {
-				t.Errorf("writeInt32() error = %v", err)
-			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readInt32(context.Background(), in, tt.args.t, tt.args.opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readInt32() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readInt32() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readInt64(t *testing.T) {
-	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{"readInt64", args{t: &descriptor.TypeDescriptor{Type: descriptor.I64}}, int64(1), false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := writeInt64(context.Background(), tt.want, w, tt.args.t, &writerOption{})
-			if err != nil {
-				t.Errorf("writeInt64() error = %v", err)
-			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readInt64(context.Background(), in, tt.args.t, tt.args.opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readInt64() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readInt64() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readString(t *testing.T) {
-	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{"readString", args{t: &descriptor.TypeDescriptor{Type: descriptor.STRING}}, stringInput, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := writeString(context.Background(), tt.want, w, tt.args.t, &writerOption{})
-			if err != nil {
-				t.Errorf("writeString() error = %v", err)
-			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readString(context.Background(), in, tt.args.t, tt.args.opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readString() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readString() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readBinary64String(t *testing.T) {
-	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{"readBase64Binary", args{t: &descriptor.TypeDescriptor{Name: "binary", Type: descriptor.STRING}}, base64.StdEncoding.EncodeToString(binaryInput), false}, // read base64 string from binary field
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := writeBase64Binary(context.Background(), tt.want, w, tt.args.t, &writerOption{})
-			if err != nil {
-				t.Errorf("writeBase64Binary() error = %v", err)
-			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readBase64Binary(context.Background(), in, tt.args.t, tt.args.opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readString() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readString() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readBinary(t *testing.T) {
-	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{"readBinary", args{t: &descriptor.TypeDescriptor{Name: "binary", Type: descriptor.STRING}}, binaryInput, false}, // read base64 string from binary field
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := writeBinary(context.Background(), tt.want, w, tt.args.t, &writerOption{})
-			if err != nil {
-				t.Errorf("writeBinary() error = %v", err)
-			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readBinary(context.Background(), in, tt.args.t, tt.args.opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readString() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readString() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readList(t *testing.T) {
-	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{"readList", args{t: &descriptor.TypeDescriptor{Type: descriptor.LIST, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}}}, []interface{}{stringInput, stringInput, stringInput}, false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := writeList(context.Background(), tt.want, w, tt.args.t, &writerOption{})
-			if err != nil {
-				t.Errorf("writeList() error = %v", err)
-			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readList(context.Background(), in, tt.args.t, tt.args.opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readList() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readList() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readMap(t *testing.T) {
-	type args struct {
-		t   *descriptor.TypeDescriptor
-		opt *readerOption
-	}
-	tests := []struct {
-		name    string
-		args    args
-		writer  func(ctx context.Context, val interface{}, out *thrift.BinaryWriter, t *descriptor.TypeDescriptor, opt *writerOption) error
-		want    interface{}
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-		{
-			"readMap",
-			args{t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Struct: &descriptor.StructDescriptor{}}, opt: &readerOption{}},
-			writeInterfaceMap,
-			map[interface{}]interface{}{"hello": "world"},
-			false,
-		},
-		{
-			"readJsonMap",
-			args{t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING}, Struct: &descriptor.StructDescriptor{}}, opt: &readerOption{forJSON: true}},
-			writeStringMap,
-			map[string]interface{}{"hello": "world"},
-			false,
-		},
-		{
-			"readJsonMapWithInt16Key",
-			args{t: &descriptor.TypeDescriptor{Type: descriptor.MAP, Key: &descriptor.TypeDescriptor{Type: descriptor.I16}, Elem: &descriptor.TypeDescriptor{Type: descriptor.BOOL}, Struct: &descriptor.StructDescriptor{}}, opt: &readerOption{forJSON: true}},
-			writeStringMap,
-			map[string]interface{}{"16": false},
-			false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
-			err := tt.writer(context.Background(), tt.want, w, tt.args.t, &writerOption{})
-			if err != nil {
-				t.Errorf("writeInterfaceMap() error = %v", err)
-			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
-			got, err := readMap(context.Background(), in, tt.args.t, tt.args.opt)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readMap() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readMap() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readStruct(t *testing.T) {
+func TestReadStruct(t *testing.T) {
 	type args struct {
 		t   *descriptor.TypeDescriptor
 		opt *readerOption
@@ -645,12 +280,15 @@ func Test_readStruct(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
+			var bs []byte
+			bw := bufiox.NewBytesWriter(&bs)
+			w := thrift.NewBufferWriter(bw)
 			err := writeStruct(context.Background(), tt.input, w, tt.args.t, &writerOption{})
 			if err != nil {
 				t.Errorf("writeStruct() error = %v", err)
 			}
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			_ = bw.Flush()
+			in := thrift.NewBufferReader(bufiox.NewBytesReader(bs))
 			got, err := readStruct(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readStruct() error = %v, wantErr %v", err, tt.wantErr)
@@ -695,11 +333,14 @@ func Test_readHTTPResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
+			var bs []byte
+			bw := bufiox.NewBytesWriter(&bs)
+			w := thrift.NewBufferWriter(bw)
 			w.WriteFieldBegin(thrift.TType(descriptor.STRING), 1)
 			w.WriteString("world")
 			w.WriteFieldStop()
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			_ = bw.Flush()
+			in := thrift.NewBufferReader(bufiox.NewBytesReader(bs))
 			got, err := readHTTPResponse(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readHTTPResponse() error = %v, wantErr %v", err, tt.wantErr)
@@ -752,11 +393,14 @@ func Test_readHTTPResponseWithPbBody(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := thrift.NewBinaryWriter()
+			var bs []byte
+			bw := bufiox.NewBytesWriter(&bs)
+			w := thrift.NewBufferWriter(bw)
 			w.WriteFieldBegin(thrift.TType(descriptor.STRING), 1)
 			w.WriteString("hello world")
 			w.WriteFieldStop()
-			in := thrift.NewBinaryReader(remote.NewReaderBuffer(w.Bytes()))
+			_ = bw.Flush()
+			in := thrift.NewBufferReader(bufiox.NewBytesReader(bs))
 			got, err := readHTTPResponse(context.Background(), in, tt.args.t, tt.args.opt)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readHTTPResponse() error = %v, wantErr %v", err, tt.wantErr)

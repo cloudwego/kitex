@@ -110,7 +110,8 @@ func testRead(t *testing.T, buf remote.ByteBuffer) {
 	}
 	test.Assert(t, s == msg)
 
-	p, err = buf.ReadBinary(msgLen)
+	p = make([]byte, msgLen)
+	_, err = buf.ReadBinary(p)
 	if err != nil {
 		t.Logf("ReadBinary failed, err=%s", err.Error())
 		t.FailNow()
@@ -140,7 +141,8 @@ func testReadFailed(t *testing.T, buf remote.ByteBuffer) {
 	_, err = buf.ReadString(len(msg))
 	test.Assert(t, err != nil)
 
-	_, err = buf.ReadBinary(len(msg))
+	b := make([]byte, len(msg))
+	_, err = buf.ReadBinary(b)
 	test.Assert(t, err != nil)
 
 	n, err = buf.Read(p)
@@ -160,7 +162,7 @@ func testWrite(t *testing.T, buf remote.ByteBuffer) {
 	test.Assert(t, len(p) == msgLen)
 	copy(p, msg)
 
-	l := buf.MallocLen()
+	l := buf.WrittenLen()
 	test.Assert(t, l == msgLen)
 
 	l, err = buf.WriteString(msg)
@@ -188,7 +190,7 @@ func testWriteFailed(t *testing.T, buf remote.ByteBuffer) {
 	_, err := buf.Malloc(len(msg))
 	test.Assert(t, err != nil)
 
-	l := buf.MallocLen()
+	l := buf.WrittenLen()
 	test.Assert(t, l == -1)
 
 	_, err = buf.WriteString(msg)

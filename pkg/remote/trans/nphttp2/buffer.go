@@ -145,7 +145,7 @@ func (b *buffer) ReadString(n int) (s string, err error) {
 	panic("implement me")
 }
 
-func (b *buffer) ReadBinary(n int) (p []byte, err error) {
+func (b *buffer) ReadBinary(p []byte) (n int, err error) {
 	panic("implement me")
 }
 
@@ -153,7 +153,7 @@ func (b *buffer) Malloc(n int) (buf []byte, err error) {
 	panic("implement me")
 }
 
-func (b *buffer) MallocLen() (length int) {
+func (b *buffer) WrittenLen() (length int) {
 	panic("implement me")
 }
 

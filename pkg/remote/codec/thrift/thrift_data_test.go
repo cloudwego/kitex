@@ -22,11 +22,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
+
+	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 
 	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
@@ -54,32 +56,11 @@ func TestMarshalThriftData(t *testing.T) {
 		test.Assert(t, reflect.DeepEqual(buf, mockReqThrift), buf)
 	})
 	t.Run("BasicCodec", func(t *testing.T) {
-		buf, err := MarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), bthrift.ToApacheCodec(mockReq))
-		test.Assert(t, err == nil, err)
-		test.Assert(t, reflect.DeepEqual(buf, mockReqThrift), buf)
+		_, err := MarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), mockReq)
+		test.Assert(t, err != nil, err)
+		// test.Assert(t, reflect.DeepEqual(buf, mockReqThrift), buf)
 	})
 	// FrugalCodec: in thrift_frugal_amd64_test.go: TestMarshalThriftDataFrugal
-}
-
-func Test_decodeBasicThriftData(t *testing.T) {
-	t.Run("empty-input", func(t *testing.T) {
-		req := &mocks.MockReq{}
-		trans := remote.NewReaderBuffer([]byte{})
-		err := decodeBasicThriftData(trans, bthrift.ToApacheCodec(req))
-		test.Assert(t, err != nil, err)
-	})
-	t.Run("invalid-input", func(t *testing.T) {
-		req := &mocks.MockReq{}
-		trans := remote.NewReaderBuffer([]byte{0xff})
-		err := decodeBasicThriftData(trans, bthrift.ToApacheCodec(req))
-		test.Assert(t, err != nil, err)
-	})
-	t.Run("normal-input", func(t *testing.T) {
-		req := &mocks.MockReq{}
-		trans := remote.NewReaderBuffer(mockReqThrift)
-		err := decodeBasicThriftData(trans, bthrift.ToApacheCodec(req))
-		checkDecodeResult(t, err, req)
-	})
 }
 
 func checkDecodeResult(t *testing.T, err error, req *mocks.MockReq) {
@@ -103,8 +84,8 @@ func TestUnmarshalThriftData(t *testing.T) {
 	})
 	t.Run("BasicCodec", func(t *testing.T) {
 		req := &mocks.MockReq{}
-		err := UnmarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), "mock", mockReqThrift, bthrift.ToApacheCodec(req))
-		checkDecodeResult(t, err, req)
+		err := UnmarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), "mock", mockReqThrift, req)
+		test.Assert(t, err != nil, err)
 	})
 	// FrugalCodec: in thrift_frugal_amd64_test.go: TestUnmarshalThriftDataFrugal
 }
@@ -113,7 +94,7 @@ func TestThriftCodec_unmarshalThriftData(t *testing.T) {
 	t.Run("FastCodec with SkipDecoder enabled", func(t *testing.T) {
 		req := &mocks.MockReq{}
 		codec := &thriftCodec{FastRead | EnableSkipDecoder}
-		trans := remote.NewReaderBuffer(mockReqThrift)
+		trans := bufiox.NewBytesReader(mockReqThrift)
 		// specify dataLen with 0 so that skipDecoder works
 		err := codec.unmarshalThriftData(trans, req, 0)
 		checkDecodeResult(t, err, &mocks.MockReq{
@@ -136,7 +117,7 @@ func TestThriftCodec_unmarshalThriftData(t *testing.T) {
 			15 /* list */, 0, 3 /* id=3 */, 6 /* item:I16 */, 0, 0, 0, 1 /* length=1 */, 0, 1, /* I16=1 */
 			0, /* end of struct */
 		}
-		trans := remote.NewReaderBuffer(faultMockReqThrift)
+		trans := bufiox.NewBytesReader(faultMockReqThrift)
 		// specify dataLen with 0 so that skipDecoder works
 		err := codec.unmarshalThriftData(trans, req, 0)
 		test.Assert(t, err != nil, err)
@@ -153,7 +134,7 @@ func TestUnmarshalThriftException(t *testing.T) {
 	test.Assert(t, n == len(b), n)
 
 	// unmarshal
-	tProtRead := NewBinaryProtocol(remote.NewReaderBuffer(b))
+	tProtRead := athrift.NewBinaryProtocol(bufiox.NewBytesReader(b), nil)
 	err := UnmarshalThriftException(tProtRead)
 	transErr, ok := err.(*remote.TransError)
 	test.Assert(t, ok, err)
@@ -166,7 +147,7 @@ func Test_getSkippedStructBuffer(t *testing.T) {
 	faultThrift := []byte{
 		11 /* string */, 0, 1 /* id=1 */, 0, 0, 0, 6 /* length=6 */, 104, 101, 108, 108, 111, /* "hello" */
 	}
-	trans := remote.NewReaderBuffer(faultThrift)
+	trans := bufiox.NewBytesReader(faultThrift)
 	_, err := getSkippedStructBuffer(trans)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, strings.Contains(err.Error(), "caught in SkipDecoder Next phase"))

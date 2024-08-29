@@ -18,8 +18,8 @@ package thrift
 
 import (
 	"context"
-	"io"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
@@ -59,7 +59,7 @@ func (m *WriteStruct) SetBinaryWithBase64(enable bool) {
 }
 
 // Write ...
-func (m *WriteStruct) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+func (m *WriteStruct) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	fnDsc, err := m.svcDsc.LookupFunctionByMethod(method)
 	if err != nil {
 		return err
@@ -73,11 +73,9 @@ func (m *WriteStruct) Write(ctx context.Context, out io.Writer, msg interface{},
 	if !hasRequestBase {
 		requestBase = nil
 	}
-	binaryWriter := thrift.NewBinaryWriter()
-	if err = wrapStructWriter(ctx, msg, binaryWriter, ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.binaryWithBase64}); err != nil {
-		return err
-	}
-	_, err = out.Write(binaryWriter.Bytes())
+	binaryWriter := thrift.NewBufferWriter(out)
+	err = wrapStructWriter(ctx, msg, binaryWriter, ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.binaryWithBase64})
+	binaryWriter.Recycle()
 	return err
 }
 
@@ -121,7 +119,7 @@ func (m *ReadStruct) SetSetFieldsForEmptyStruct(mode uint8) {
 }
 
 // Read ...
-func (m *ReadStruct) Read(ctx context.Context, method string, isClient bool, dataLen int, in io.Reader) (interface{}, error) {
+func (m *ReadStruct) Read(ctx context.Context, method string, isClient bool, dataLen int, in bufiox.Reader) (interface{}, error) {
 	fnDsc, err := m.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err
@@ -130,5 +128,8 @@ func (m *ReadStruct) Read(ctx context.Context, method string, isClient bool, dat
 	if !isClient {
 		fDsc = fnDsc.Request
 	}
-	return skipStructReader(ctx, thrift.NewBinaryReader(in), fDsc, &readerOption{throwException: true, forJSON: m.forJSON, binaryWithBase64: m.binaryWithBase64, binaryWithByteSlice: m.binaryWithByteSlice, setFieldsForEmptyStruct: m.setFieldsForEmptyStruct})
+	br := thrift.NewBufferReader(in)
+	str, err := skipStructReader(ctx, br, fDsc, &readerOption{throwException: true, forJSON: m.forJSON, binaryWithBase64: m.binaryWithBase64, binaryWithByteSlice: m.binaryWithByteSlice, setFieldsForEmptyStruct: m.setFieldsForEmptyStruct})
+	br.Recycle()
+	return str, err
 }

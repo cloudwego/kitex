@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -63,6 +64,15 @@ func TestServerHandler(t *testing.T) {
 			return ctx, nil
 		},
 	})
+	opt.SvcSearcher = mocksremote.NewMockSvcSearcher(map[string]*serviceinfo.ServiceInfo{
+		"Greeter": {
+			Methods: map[string]serviceinfo.MethodInfo{
+				"SayHello": serviceinfo.NewMethodInfo(func(ctx context.Context, handler, args, result interface{}) error {
+					return nil
+				}, func() interface{} { return nil }, func() interface{} { return nil }, false),
+			},
+		},
+	}, nil)
 	msg := newMockNewMessage()
 	msg.ProtocolInfoFunc = func() remote.ProtocolInfo {
 		return remote.NewProtocolInfo(transport.PurePayload, serviceinfo.Protobuf)
@@ -95,8 +105,9 @@ func TestServerHandler(t *testing.T) {
 	test.Assert(t, err == nil, err)
 
 	// test SetInvokeHandleFunc()
-	svrHdl := handler.(*svrTransHandler)
-	svrHdl.SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+	var calledInvoke int32
+	handler.(remote.InvokeHandleFuncSetter).SetInvokeHandleFunc(func(ctx context.Context, req, resp interface{}) (err error) {
+		atomic.StoreInt32(&calledInvoke, 1)
 		return nil
 	})
 
@@ -120,6 +131,7 @@ func TestServerHandler(t *testing.T) {
 	time.Sleep(time.Millisecond * 50)
 	test.Assert(t, serviceName.Load().(string) == "Greeter", serviceName.Load())
 	test.Assert(t, methodName.Load().(string) == "SayHello", methodName.Load())
+	test.Assert(t, atomic.LoadInt32(&calledInvoke) == 1)
 
 	// test OnError()
 	handler.OnError(context.Background(), context.Canceled, npConn)

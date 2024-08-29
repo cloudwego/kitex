@@ -17,6 +17,7 @@
 package mocks
 
 import (
+	bytes2 "bytes"
 	"net"
 	"time"
 )
@@ -97,4 +98,16 @@ func (m Conn) SetWriteDeadline(t time.Time) (e error) {
 		return m.SetWriteDeadlineFunc(t)
 	}
 	return
+}
+
+func NewIOConn() *Conn {
+	var bytes bytes2.Buffer
+	return &Conn{
+		ReadFunc: func(b []byte) (n int, err error) {
+			return bytes.Read(b)
+		},
+		WriteFunc: func(b []byte) (n int, err error) {
+			return bytes.Write(b)
+		},
+	}
 }

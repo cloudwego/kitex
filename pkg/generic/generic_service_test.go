@@ -22,12 +22,12 @@ import (
 	"strings"
 	"testing"
 
-	gbase "github.com/cloudwego/gopkg/protocol/thrift/base"
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/golang/mock/gomock"
 
+	mocksn "github.com/cloudwego/kitex/internal/mocks"
 	mocks "github.com/cloudwego/kitex/internal/mocks/generic"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -35,7 +35,11 @@ import (
 func TestGenericService(t *testing.T) {
 	ctx := context.Background()
 	method := "test"
-	buffer := remote.NewReaderWriterBuffer(256)
+
+	conn := mocksn.NewIOConn()
+
+	wb := bufiox.NewDefaultWriter(conn)
+	rb := bufiox.NewDefaultReader(conn)
 
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -43,7 +47,7 @@ func TestGenericService(t *testing.T) {
 	argWriteInner, resultWriteInner := mocks.NewMockMessageWriter(ctrl), mocks.NewMockMessageWriter(ctrl)
 	rInner := mocks.NewMockMessageReader(ctrl)
 	// Read expect
-	rInner.EXPECT().Read(ctx, method, buffer).Return("test", nil).AnyTimes()
+	rInner.EXPECT().Read(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("test", nil).AnyTimes()
 
 	// Args...
 	arg := newGenericServiceCallArgs()
@@ -54,21 +58,21 @@ func TestGenericService(t *testing.T) {
 	test.Assert(t, base != nil)
 	a.SetCodec(struct{}{})
 	// write not ok
-	err := a.Write(ctx, method, buffer)
+	err := a.Write(ctx, method, wb)
 	test.Assert(t, err.Error() == "unexpected Args writer type: struct {}")
 
 	// Write expect
-	argWriteInner.EXPECT().Write(ctx, buffer, a.Request, a.GetOrSetBase()).Return(nil)
+	argWriteInner.EXPECT().Write(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	a.SetCodec(argWriteInner)
 	// write ok
-	err = a.Write(ctx, method, buffer)
+	err = a.Write(ctx, method, wb)
 	test.Assert(t, err == nil, err)
 	// read not ok
-	err = a.Read(ctx, method, 0, buffer)
+	err = a.Read(ctx, method, 0, rb)
 	test.Assert(t, strings.Contains(err.Error(), "unexpected Args reader type"))
 	// read ok
 	a.SetCodec(rInner)
-	err = a.Read(ctx, method, 0, buffer)
+	err = a.Read(ctx, method, 0, rb)
 	test.Assert(t, err == nil, err)
 
 	// Result...
@@ -77,20 +81,20 @@ func TestGenericService(t *testing.T) {
 	test.Assert(t, ok == true)
 
 	// write not ok
-	err = r.Write(ctx, method, buffer)
+	err = r.Write(ctx, method, wb)
 	test.Assert(t, err.Error() == "unexpected Result writer type: <nil>")
 	// Write expect
-	resultWriteInner.EXPECT().Write(ctx, buffer, r.Success, (*gbase.Base)(nil)).Return(nil).AnyTimes()
+	resultWriteInner.EXPECT().Write(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 	r.SetCodec(resultWriteInner)
 	// write ok
-	err = r.Write(ctx, method, buffer)
+	err = r.Write(ctx, method, wb)
 	test.Assert(t, err == nil)
 	// read not ok
-	err = r.Read(ctx, method, 0, buffer)
+	err = r.Read(ctx, method, 0, rb)
 	test.Assert(t, strings.Contains(err.Error(), "unexpected Result reader type"))
 	// read ok
 	r.SetCodec(rInner)
-	err = r.Read(ctx, method, 0, buffer)
+	err = r.Read(ctx, method, 0, rb)
 	test.Assert(t, err == nil)
 
 	r.SetSuccess(nil)

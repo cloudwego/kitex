@@ -19,20 +19,19 @@ package thrift
 import (
 	"context"
 	"fmt"
-	"io"
 	"strconv"
 
 	"github.com/bytedance/gopkg/lang/dirtmake"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -83,7 +82,7 @@ func (m *WriteJSON) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options)
 	m.dynamicgoEnabled = true
 }
 
-func (m *WriteJSON) originalWrite(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+func (m *WriteJSON) originalWrite(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	fnDsc, err := m.svcDsc.LookupFunctionByMethod(method)
 	if err != nil {
 		return fmt.Errorf("missing method: %s in service: %s", method, m.svcDsc.Name)
@@ -98,14 +97,14 @@ func (m *WriteJSON) originalWrite(ctx context.Context, out io.Writer, msg interf
 		requestBase = nil
 	}
 
-	binaryWriter := thrift.NewBinaryWriter()
+	bw := thrift.NewBufferWriter(out)
+	defer bw.Recycle()
 
 	// msg is void or nil
 	if _, ok := msg.(descriptor.Void); ok || msg == nil {
-		if err = wrapStructWriter(ctx, msg, binaryWriter, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}); err != nil {
+		if err = wrapStructWriter(ctx, msg, bw, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}); err != nil {
 			return err
 		}
-		_, err = out.Write(binaryWriter.Bytes())
 		return err
 	}
 
@@ -125,10 +124,9 @@ func (m *WriteJSON) originalWrite(ctx context.Context, out io.Writer, msg interf
 			Index: 0,
 		}
 	}
-	if err = wrapJSONWriter(ctx, &body, binaryWriter, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}); err != nil {
+	if err = wrapJSONWriter(ctx, &body, bw, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}); err != nil {
 		return err
 	}
-	_, err = out.Write(binaryWriter.Bytes())
 	return err
 }
 
@@ -166,16 +164,10 @@ func (m *ReadJSON) SetDynamicGo(convOpts, convOptsWithException *conv.Options) {
 }
 
 // Read read data from in thrift.TProtocol and convert to json string
-func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, dataLen int, in io.Reader) (interface{}, error) {
-	buffer, ok := in.(remote.ByteBuffer)
-	if !ok {
-		return nil, perrors.NewProtocolErrorWithMsg("io.Reader should be ByteBuffer")
-	}
-	binaryReader := thrift.NewBinaryReader(in)
-
+func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, dataLen int, in bufiox.Reader) (interface{}, error) {
 	// fallback logic
 	if !m.dynamicgoEnabled || dataLen <= 0 {
-		return m.originalRead(ctx, method, isClient, binaryReader)
+		return m.originalRead(ctx, method, isClient, in)
 	}
 
 	fnDsc := m.svc.DynamicGoDsc.Functions()[method]
@@ -189,12 +181,13 @@ func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, dataL
 
 	var resp interface{}
 	if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.VOID {
-		if _, err := buffer.ReadBinary(voidWholeLen); err != nil {
+		if err := in.Skip(voidWholeLen); err != nil {
 			return nil, err
 		}
 		resp = descriptor.Void{}
 	} else {
-		transBuff, err := buffer.ReadBinary(dataLen)
+		transBuff := dirtmake.Bytes(dataLen, dataLen)
+		_, err := in.ReadBinary(transBuff)
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +218,7 @@ func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, dataL
 	return resp, nil
 }
 
-func (m *ReadJSON) originalRead(ctx context.Context, method string, isClient bool, in *thrift.BinaryReader) (interface{}, error) {
+func (m *ReadJSON) originalRead(ctx context.Context, method string, isClient bool, in bufiox.Reader) (interface{}, error) {
 	fnDsc, err := m.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err
@@ -234,7 +227,9 @@ func (m *ReadJSON) originalRead(ctx context.Context, method string, isClient boo
 	if !isClient {
 		fDsc = fnDsc.Request
 	}
-	resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
+	br := thrift.NewBufferReader(in)
+	defer br.Recycle()
+	resp, err := skipStructReader(ctx, br, fDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
 	if err != nil {
 		return nil, err
 	}
