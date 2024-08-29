@@ -28,7 +28,7 @@ import (
 )
 
 // ErrHelp is the error returned if the flag -help is invoked but no such flag is defined.
-var ErrHelp = errors.New("pflag: help requested")
+var ErrHelp = errors.New("flag: help requested")
 
 // ErrorHandling defines how to handle flag parsing errors.
 type ErrorHandling int

@@ -21,6 +21,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/cloudwego/kitex/tool/internal_pkg/generator"
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
@@ -91,16 +93,16 @@ func InitTemplates(path string, templates map[string]string) error {
 	}
 
 	for name, content := range templates {
-		var filePath string
+		var dir string
 		if name == BootstrapFileName {
-			bootstrapDir := filepath.Join(path, "script")
-			if err := MkdirIfNotExist(bootstrapDir); err != nil {
-				return err
-			}
-			filePath = filepath.Join(bootstrapDir, name+".tpl")
+			dir = filepath.Join(path, "script")
 		} else {
-			filePath = filepath.Join(path, name+".tpl")
+			dir = path
 		}
+		if err := MkdirIfNotExist(dir); err != nil {
+			return err
+		}
+		filePath := filepath.Join(dir, fmt.Sprintf("%s.tpl", name))
 		if err := createTemplate(filePath, content); err != nil {
 			return err
 		}
@@ -151,8 +153,8 @@ func (a *Arguments) Init(cmd *util.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("get current path failed: %s", err.Error())
 	}
-	path := a.InitOutputDir
-	initType := a.InitType
+	path := InitOutputDir
+	initType := InitType
 	if initType == "" {
 		initType = DefaultType
 	}
@@ -211,6 +213,9 @@ func (a *Arguments) Root(cmd *util.Command, args []string) error {
 }
 
 func (a *Arguments) Template(cmd *util.Command, args []string) error {
+	if len(args) == 0 {
+		return util.ErrHelp
+	}
 	curpath, err := filepath.Abs(".")
 	if err != nil {
 		return fmt.Errorf("get current path failed: %s", err.Error())
@@ -243,7 +248,84 @@ func (a *Arguments) Template(cmd *util.Command, args []string) error {
 	return a.checkPath(curpath)
 }
 
+func parseYAMLFiles(directory string) ([]generator.Template, error) {
+	var templates []generator.Template
+	files, err := os.ReadDir(directory)
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range files {
+		if filepath.Ext(file.Name()) == ".yaml" {
+			data, err := os.ReadFile(filepath.Join(directory, file.Name()))
+			if err != nil {
+				return nil, err
+			}
+			var template generator.Template
+			err = yaml.Unmarshal(data, &template)
+			if err != nil {
+				return nil, err
+			}
+			templates = append(templates, template)
+		}
+	}
+	return templates, nil
+}
+
+func createFilesFromTemplates(templates []generator.Template, baseDirectory string) error {
+	for _, template := range templates {
+		fullPath := filepath.Join(baseDirectory, template.Path)
+		dir := filepath.Dir(fullPath)
+		err := os.MkdirAll(dir, os.ModePerm)
+		if err != nil {
+			return err
+		}
+		err = os.WriteFile(fullPath, []byte(template.Body), 0o644)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func generateMetadata(templates []generator.Template, outputFile string) error {
+	var metadata generator.Meta
+	for _, template := range templates {
+		meta := generator.Template{
+			Path:           template.Path,
+			Body:           template.Body,
+			UpdateBehavior: template.UpdateBehavior,
+			LoopMethod:     template.LoopMethod,
+			LoopService:    template.LoopService,
+		}
+		metadata.Templates = append(metadata.Templates, meta)
+	}
+	data, err := yaml.Marshal(&metadata)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(outputFile, data, 0o644)
+}
+
 func (a *Arguments) Render(cmd *util.Command, args []string) error {
+	if len(args) == 0 {
+		return util.ErrHelp
+	}
+	if MigratePath != "" {
+		templates, err := parseYAMLFiles(MigratePath)
+		if err != nil {
+			return err
+		}
+		err = createFilesFromTemplates(templates, MigratePath)
+		if err != nil {
+			return err
+		}
+		err = generateMetadata(templates, generator.KitexRenderMetaFile)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Migrate successfully...")
+		os.Exit(0)
+	}
 	curpath, err := filepath.Abs(".")
 	if err != nil {
 		return fmt.Errorf("get current path failed: %s", err.Error())
@@ -292,7 +374,7 @@ func (a *Arguments) Clean(cmd *util.Command, args []string) error {
 		}
 		content, err := os.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("read file %s faild: %v", path, err)
+			return fmt.Errorf("read file %s failed: %v", path, err)
 		}
 		if strings.Contains(string(content), magicString) {
 			if err := os.Remove(path); err != nil {
@@ -308,6 +390,12 @@ func (a *Arguments) Clean(cmd *util.Command, args []string) error {
 	os.Exit(0)
 	return nil
 }
+
+var (
+	InitOutputDir string // specify the location path of init subcommand
+	InitType      string // specify the type for init subcommand
+	MigratePath   string // specify the path old-style template to new-style template
+)
 
 func (a *Arguments) TemplateArgs(version string) error {
 	kitexCmd := &util.Command{
@@ -339,8 +427,8 @@ func (a *Arguments) TemplateArgs(version string) error {
 		"Specify a code gen path.")
 	templateCmd.Flags().StringVar(&a.GenPath, "gen-path", generator.KitexGenPath,
 		"Specify a code gen path.")
-	initCmd.Flags().StringVarP(&a.InitOutputDir, "output", "o", ".", "Specify template init path (default current directory)")
-	initCmd.Flags().StringVarP(&a.InitType, "type", "t", "", "Specify template init type")
+	initCmd.Flags().StringVarP(&InitOutputDir, "output", "o", ".", "Specify template init path (default current directory)")
+	initCmd.Flags().StringVarP(&InitType, "type", "t", "", "Specify template init type")
 	renderCmd.Flags().StringVar(&a.RenderTplDir, "dir", "", "Use custom template to generate codes.")
 	renderCmd.Flags().StringVar(&a.ModuleName, "module", "",
 		"Specify the Go module name to generate go.mod.")
@@ -351,6 +439,7 @@ func (a *Arguments) TemplateArgs(version string) error {
 	renderCmd.Flags().BoolVar(&a.DebugTpl, "debug", false, "turn on debug for template")
 	renderCmd.Flags().StringVarP(&a.IncludesTpl, "Includes", "I", "", "Add IDL search path and template search path for includes.")
 	renderCmd.Flags().StringVar(&a.MetaFlags, "meta", "", "Meta data in key=value format, keys separated by ';' values separated by ',' ")
+	renderCmd.Flags().StringVar(&MigratePath, "migrate", "", "Migrate path for old-style template")
 	templateCmd.SetHelpFunc(func(*util.Command, []string) {
 		fmt.Fprintln(os.Stderr, `
 Template operation

@@ -305,7 +305,7 @@ func (g *generator) GenerateCustomPackageWithTpl(pkg *PackageInfo) (fs []*File, 
 		}
 	}
 	var meta *Meta
-	metaPath := filepath.Join(g.RenderTplDir, kitexRenderMetaFile)
+	metaPath := filepath.Join(g.RenderTplDir, KitexRenderMetaFile)
 	if util.Exists(metaPath) {
 		meta, err = readMetaFile(metaPath)
 		if err != nil {
@@ -350,7 +350,7 @@ func (g *generator) GenerateCustomPackageWithTpl(pkg *PackageInfo) (fs []*File, 
 	return fs, nil
 }
 
-const kitexRenderMetaFile = "kitex_render_meta.yaml"
+const KitexRenderMetaFile = "kitex_render_meta.yaml"
 
 // Meta represents the structure of the kitex_render_meta.yaml file.
 type Meta struct {

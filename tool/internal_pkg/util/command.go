@@ -218,7 +218,7 @@ func (c *Command) ExecuteC() (cmd *Command, err error) {
 		// effect
 		if errors.Is(err, ErrHelp) {
 			cmd.HelpFunc()(cmd, args)
-			return cmd, nil
+			return cmd, err
 		}
 	}
 	//if err != nil {
