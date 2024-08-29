@@ -273,7 +273,7 @@ func parseYAMLFiles(directory string) ([]generator.Template, error) {
 
 func createFilesFromTemplates(templates []generator.Template, baseDirectory string) error {
 	for _, template := range templates {
-		fullPath := filepath.Join(baseDirectory, template.Path)
+		fullPath := filepath.Join(baseDirectory, fmt.Sprintf("%s.tpl", template.Path))
 		dir := filepath.Dir(fullPath)
 		err := os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
@@ -292,7 +292,6 @@ func generateMetadata(templates []generator.Template, outputFile string) error {
 	for _, template := range templates {
 		meta := generator.Template{
 			Path:           template.Path,
-			Body:           template.Body,
 			UpdateBehavior: template.UpdateBehavior,
 			LoopMethod:     template.LoopMethod,
 			LoopService:    template.LoopService,
@@ -307,15 +306,16 @@ func generateMetadata(templates []generator.Template, outputFile string) error {
 }
 
 func (a *Arguments) Render(cmd *util.Command, args []string) error {
-	if len(args) == 0 {
-		return util.ErrHelp
+	curpath, err := filepath.Abs(".")
+	if err != nil {
+		return fmt.Errorf("get current path failed: %s", err.Error())
 	}
 	if MigratePath != "" {
 		templates, err := parseYAMLFiles(MigratePath)
 		if err != nil {
 			return err
 		}
-		err = createFilesFromTemplates(templates, MigratePath)
+		err = createFilesFromTemplates(templates, curpath)
 		if err != nil {
 			return err
 		}
@@ -326,9 +326,8 @@ func (a *Arguments) Render(cmd *util.Command, args []string) error {
 		fmt.Println("Migrate successfully...")
 		os.Exit(0)
 	}
-	curpath, err := filepath.Abs(".")
-	if err != nil {
-		return fmt.Errorf("get current path failed: %s", err.Error())
+	if len(args) == 0 {
+		return util.ErrHelp
 	}
 	log.Verbose = a.Verbose
 
