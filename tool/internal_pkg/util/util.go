@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"go/build"
 	"go/format"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -135,7 +135,7 @@ func NotPtr(s string) string {
 func SearchGoMod(cwd string) (moduleName, path string, found bool) {
 	for {
 		path = filepath.Join(cwd, "go.mod")
-		data, err := ioutil.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err == nil {
 			re := regexp.MustCompile(`^\s*module\s+(\S+)\s*`)
 			for _, line := range strings.Split(string(data), "\n") {
@@ -261,11 +261,11 @@ func DownloadFile(remotePath, localPath string) error {
 		return fmt.Errorf("failed to download file, http status: %s", resp.Status)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-	err = ioutil.WriteFile(localPath, body, 0o644)
+	err = os.WriteFile(localPath, body, 0o644)
 	if err != nil {
 		return err
 	}

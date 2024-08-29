@@ -17,10 +17,10 @@
 package utils
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/apache"
 
@@ -46,12 +46,12 @@ func (t *ThriftMessageCodec) Encode(method string, msgType athrift.TMessageType,
 	}
 	b := make([]byte, thrift.Binary.MessageBeginLength(method))
 	_ = thrift.Binary.WriteMessageBegin(b, method, thrift.TMessageType(msgType), seqID)
-	buf := &bytes.Buffer{}
-	buf.Write(b)
-	if err := apache.ThriftWrite(apache.NewBufferTransport(buf), msg); err != nil {
+	buf := bufiox.NewBytesWriter(&b)
+	if err := apache.ThriftWrite(buf, msg); err != nil {
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	_ = buf.Flush()
+	return b, nil
 }
 
 // Decode do thrift message decode, notice: msg must be XXXArgs/XXXResult that the wrap struct for args and result, not the actual args or result
@@ -71,25 +71,25 @@ func (t *ThriftMessageCodec) Decode(b []byte, msg athrift.TStruct) (method strin
 		}
 		return
 	}
-	err = apache.ThriftRead(apache.NewBufferTransport(bytes.NewBuffer(b)), msg)
+	err = apache.ThriftRead(bufiox.NewBytesReader(b), msg)
 	return
 }
 
 // Serialize serialize message into bytes. This is normal thrift serialize func.
 // Notice: Binary generic use Encode instead of Serialize.
-func (t *ThriftMessageCodec) Serialize(msg athrift.TStruct) ([]byte, error) {
-	buf := &bytes.Buffer{}
-	if err := apache.ThriftWrite(apache.NewBufferTransport(buf), msg); err != nil {
+func (t *ThriftMessageCodec) Serialize(msg athrift.TStruct) (b []byte, err error) {
+	buf := bufiox.NewBytesWriter(&b)
+	if err = apache.ThriftWrite(buf, msg); err != nil {
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	_ = buf.Flush()
+	return b, nil
 }
 
 // Deserialize deserialize bytes into message. This is normal thrift deserialize func.
 // Notice: Binary generic use Decode instead of Deserialize.
 func (t *ThriftMessageCodec) Deserialize(msg athrift.TStruct, b []byte) (err error) {
-	buf := bytes.NewBuffer(b)
-	return apache.ThriftRead(apache.NewBufferTransport(buf), msg)
+	return apache.ThriftRead(bufiox.NewBytesReader(b), msg)
 }
 
 // MarshalError convert go error to thrift exception, and encode exception over buffered binary transport.

@@ -37,6 +37,7 @@ type PackageInfo struct {
 	Namespace    string            // a dot-separated string for generating service package under kitex_gen
 	Dependencies map[string]string // package name => import path, used for searching imports
 	*ServiceInfo                   // the target service
+	Services     []*ServiceInfo    // all services defined in a IDL for multiple services scenario
 
 	// the following fields will be filled and used by the generator
 	Codec            string
@@ -68,10 +69,7 @@ func (p *PackageInfo) AddImport(pkg, path string) {
 		p.Imports = make(map[string]map[string]bool)
 	}
 	if pkg != "" {
-		if p.ExternalKitexGen != "" && strings.Contains(path, KitexGenPath) {
-			parts := strings.Split(path, KitexGenPath)
-			path = util.JoinPath(p.ExternalKitexGen, parts[len(parts)-1])
-		}
+		path = p.toExternalGenPath(path)
 		if path == pkg {
 			p.Imports[path] = nil
 		} else {
@@ -92,6 +90,57 @@ func (p *PackageInfo) AddImports(pkgs ...string) {
 			p.AddImport(pkg, pkg)
 		}
 	}
+}
+
+// UpdateImportPath changed the mapping between alias -> import path
+// For instance:
+//
+//	Original import: alias "original_path"
+//	Invocation:      UpdateImport("alias", "new_path")
+//	New import:      alias "new_path"
+//
+// if pkg == newPath, then alias would be removed in import sentence:
+//
+//	Original import: context "path/to/custom/context"
+//	Invocation:      UpdateImport("context", "context")
+//	New import:      context
+func (p *PackageInfo) UpdateImportPath(pkg, newPath string) {
+	if p.Imports == nil || pkg == "" || newPath == "" {
+		return
+	}
+
+	newPath = p.toExternalGenPath(newPath)
+	var prevPath string
+OutLoop:
+	for path, pkgSet := range p.Imports {
+		for pkgKey := range pkgSet {
+			if pkgKey == pkg {
+				prevPath = path
+				break OutLoop
+			}
+		}
+	}
+	if prevPath == "" {
+		return
+	}
+
+	delete(p.Imports, prevPath)
+	if newPath == pkg { // remove the alias
+		p.Imports[newPath] = nil
+	} else { // change the path -> alias mapping
+		p.Imports[newPath] = map[string]bool{
+			pkg: true,
+		}
+	}
+}
+
+func (p *PackageInfo) toExternalGenPath(path string) string {
+	if p.ExternalKitexGen == "" || !strings.Contains(path, KitexGenPath) {
+		return path
+	}
+	parts := strings.Split(path, KitexGenPath)
+	newPath := util.JoinPath(p.ExternalKitexGen, parts[len(parts)-1])
+	return newPath
 }
 
 // PkgInfo .
@@ -115,6 +164,10 @@ type ServiceInfo struct {
 	Protocol              string
 	HandlerReturnKeepResp bool
 	UseThriftReflection   bool
+	// for multiple services scenario, the reference name for the service
+	RefName string
+	// identify whether this service would generate a corresponding handler.
+	GenerateHandler bool
 }
 
 // AllMethods returns all methods that the service have.

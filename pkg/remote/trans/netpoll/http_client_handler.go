@@ -21,7 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"path"
@@ -139,10 +139,9 @@ func (t *httpCliTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 // OnError implements the remote.ClientTransHandler interface.
 // This is called when panic happens.
 func (t *httpCliTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
-	if pe, ok := err.(*kerrors.DetailedError); ok {
+	var pe *kerrors.DetailedError
+	if errors.As(err, &pe) {
 		klog.CtxErrorf(ctx, "KITEX: send http request error, remote=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
-	} else {
-		klog.CtxErrorf(ctx, "KITEX: send http request error, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
 	}
 }
 
@@ -278,7 +277,7 @@ func getBodyBufReader(buf remote.ByteBuffer) (remote.ByteBuffer, error) {
 	if hr.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("http response not OK, StatusCode: %d", hr.StatusCode)
 	}
-	b, err := ioutil.ReadAll(hr.Body)
+	b, err := io.ReadAll(hr.Body)
 	hr.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf("read http response body error:%w", err)

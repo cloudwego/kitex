@@ -20,8 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/apache"
 
@@ -167,7 +167,7 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 }
 
 // encodeFastThrift encode with the FastCodec way
-func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec) error {
+func encodeFastThrift(out bufiox.Writer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec) error {
 	nw, _ := out.(remote.NocopyWrite)
 	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
 	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
@@ -177,7 +177,7 @@ func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.M
 	}
 	// If fast write enabled, the underlying buffer maybe large than the correct buffer,
 	// so we need to save the mallocLen before fast write and correct the real mallocLen after codec
-	mallocLen := out.MallocLen()
+	mallocLen := out.WrittenLen()
 	offset := thrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
 	_ = msg.FastWriteNocopy(buf[offset:], nw)
 	if nw == nil {
@@ -187,12 +187,12 @@ func encodeFastThrift(out remote.ByteBuffer, methodName string, msgType remote.M
 	return nw.MallocAck(mallocLen)
 }
 
-func encodeGenericThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, msg genericWriter) error {
-	binaryWriter := thrift.NewBinaryWriter()
-	binaryWriter.WriteMessageBegin(method, thrift.TMessageType(msgType), seqID)
-	if _, err := out.Write(binaryWriter.Bytes()); err != nil {
+func encodeGenericThrift(out bufiox.Writer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, msg genericWriter) error {
+	binaryWriter := thrift.NewBufferWriter(out)
+	if err := binaryWriter.WriteMessageBegin(method, thrift.TMessageType(msgType), seqID); err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 	}
+	binaryWriter.Recycle()
 	if err := msg.Write(ctx, method, out); err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
 	}
@@ -200,7 +200,7 @@ func encodeGenericThrift(out remote.ByteBuffer, ctx context.Context, method stri
 }
 
 // encodeBasicThrift encode with the old apache thrift way (slow)
-func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}) error {
+func encodeBasicThrift(out bufiox.Writer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}) error {
 	if err := verifyMarshalBasicThriftDataType(data); err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string
 	}
 	_ = thrift.Binary.WriteMessageBegin(b, method, thrift.TMessageType(msgType), seqID)
 
-	if err := apache.ThriftWrite(apache.NewDefaultTransport(out), data); err != nil {
+	if err := apache.ThriftWrite(out, data); err != nil {
 		return err
 	}
 	return nil
@@ -221,8 +221,8 @@ func encodeBasicThrift(out remote.ByteBuffer, ctx context.Context, method string
 func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
 	// TODO(xiaost): Refactor the code after v0.11.0 is released. Unifying checking and fallback logic.
 
-	br := thrift.NewBinaryReader(in)
-	defer br.Release()
+	br := thrift.NewBufferReader(in)
+	defer br.Recycle()
 
 	methodName, msgType, seqID, err := br.ReadMessageBegin()
 	if err != nil {
@@ -291,11 +291,11 @@ func (c thriftCodec) Name() string {
 }
 
 type genericWriter interface { // used by pkg/generic
-	Write(ctx context.Context, method string, w io.Writer) error
+	Write(ctx context.Context, method string, w bufiox.Writer) error
 }
 
 type genericReader interface { // used by pkg/generic
-	Read(ctx context.Context, method string, dataLen int, r io.Reader) error
+	Read(ctx context.Context, method string, dataLen int, r bufiox.Reader) error
 }
 
 // ThriftMsgFastCodec ...

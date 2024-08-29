@@ -17,7 +17,6 @@ package generator
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -215,13 +214,13 @@ func renderFile(pkg *PackageInfo, outputPath string, tpl *Template) (fs []*File,
 }
 
 func readTemplates(dir string) ([]*Template, error) {
-	files, _ := ioutil.ReadDir(dir)
+	files, _ := os.ReadDir(dir)
 	var ts []*Template
 	for _, f := range files {
 		// filter dir and non-yaml files
 		if f.Name() != ExtensionFilename && !f.IsDir() && (strings.HasSuffix(f.Name(), "yaml") || strings.HasSuffix(f.Name(), "yml")) {
 			p := filepath.Join(dir, f.Name())
-			tplData, err := ioutil.ReadFile(p)
+			tplData, err := os.ReadFile(p)
 			if err != nil {
 				return nil, fmt.Errorf("read layout config from  %s failed, err: %v", p, err.Error())
 			}

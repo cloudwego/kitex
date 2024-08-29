@@ -17,12 +17,17 @@ package main
 import (
 	"bytes"
 	"flag"
+
 	"fmt"
 	"io/ioutil"
+
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/cloudwego/kitex/tool/cmd/kitex/utils"
+
+	"github.com/cloudwego/kitex/tool/cmd/kitex/sdk"
 
 	"github.com/cloudwego/kitex"
 	kargs "github.com/cloudwego/kitex/tool/cmd/kitex/args"
@@ -86,8 +91,11 @@ func main() {
 		err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])
 	}
 	if err != nil {
-		log.Warn(err.Error())
-		os.Exit(2)
+		if err.Error() != "flag: help requested" {
+			log.Warn(err.Error())
+			os.Exit(2)
+		}
+		os.Exit(0)
 	}
 	if !args.NoDependencyCheck {
 		// check dependency compatibility between kitex cmd tool and dependency in go.mod
@@ -102,12 +110,18 @@ func main() {
 		log.Warn(err)
 		os.Exit(1)
 	}
-	err = kargs.ValidateCMD(cmd.Path, args.IDLType)
-	if err != nil {
-		log.Warn(err)
-		os.Exit(1)
+
+	if args.IDLType == "thrift" && args.Rapid {
+		err = sdk.InvokeThriftgoBySDK(curpath, cmd)
+	} else {
+		err = kargs.ValidateCMD(cmd.Path, args.IDLType)
+		if err != nil {
+			log.Warn(err)
+			os.Exit(1)
+		}
+		err = cmd.Run()
 	}
-	err = cmd.Run()
+
 	if err != nil {
 		if args.Use != "" {
 			out := strings.TrimSpace(out.String())
@@ -115,50 +129,9 @@ func main() {
 				goto NormalExit
 			}
 		}
+		log.Warn(err)
 		os.Exit(1)
 	}
 NormalExit:
-	if args.IDLType == "thrift" {
-		cmd := "go mod edit -replace github.com/apache/thrift=github.com/apache/thrift@v0.13.0"
-		argv := strings.Split(cmd, " ")
-		err := exec.Command(argv[0], argv[1:]...).Run()
-
-		res := "Done"
-		if err != nil {
-			res = err.Error()
-		}
-		log.Warn("Adding apache/thrift@v0.13.0 to go.mod for generated code ..........", res)
-	}
-
-	// remove kitex.yaml generated from v0.4.4 which is renamed as kitex_info.yaml
-	if args.ServiceName != "" {
-		DeleteKitexYaml()
-	}
-
-	// If hessian option is java_extension, replace *java.Object to java.Object
-	if thriftgo.EnableJavaExtension(args.Config) {
-		if err = thriftgo.Hessian2PatchByReplace(args.Config, ""); err != nil {
-			log.Warn("replace java object fail, you can fix it then regenerate", err)
-		}
-	}
-}
-
-func DeleteKitexYaml() {
-	// try to read kitex.yaml
-	data, err := ioutil.ReadFile("kitex.yaml")
-	if err != nil {
-		if !os.IsNotExist(err) {
-			log.Warn("kitex.yaml, which is used to record tool info, is deprecated, it's renamed as kitex_info.yaml, you can delete it or ignore it.")
-		}
-		return
-	}
-	// if kitex.yaml exists, check content and delete it.
-	if strings.HasPrefix(string(data), "kitexinfo:") {
-		err = os.Remove("kitex.yaml")
-		if err != nil {
-			log.Warn("kitex.yaml, which is used to record tool info, is deprecated, it's renamed as kitex_info.yaml, you can delete it or ignore it.")
-		} else {
-			log.Warn("kitex.yaml, which is used to record tool info, is deprecated, it's renamed as kitex_info.yaml, so it's automatically deleted now.")
-		}
-	}
+	utils.OnKitexToolNormalExit(args)
 }

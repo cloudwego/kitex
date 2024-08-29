@@ -138,7 +138,7 @@ func (ts *transServer) ConnCount() utils.AtomicInt {
 // 2. Doesn't need to init RPCInfo if it's not RPC request, such as heartbeat.
 func (ts *transServer) onConnActive(conn netpoll.Connection) context.Context {
 	ctx := context.Background()
-	defer transRecover(ctx, conn, "OnActive")
+	defer transRecover(ctx, conn, "OnActive", false)
 	conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		ts.onConnInactive(ctx, conn)
 		return nil
@@ -154,6 +154,10 @@ func (ts *transServer) onConnActive(conn netpoll.Connection) context.Context {
 }
 
 func (ts *transServer) onConnRead(ctx context.Context, conn netpoll.Connection) error {
+	// in case it's panicked, it may caused by framework,
+	// try to propagate the err and let it crash.
+	// we mainly use transRecover for logging
+	defer transRecover(ctx, conn, "onConnRead", true)
 	err := ts.transHdlr.OnRead(ctx, conn)
 	if err != nil {
 		ts.onError(ctx, err, conn)
@@ -166,7 +170,7 @@ func (ts *transServer) onConnRead(ctx context.Context, conn netpoll.Connection) 
 }
 
 func (ts *transServer) onConnInactive(ctx context.Context, conn netpoll.Connection) {
-	defer transRecover(ctx, conn, "OnInactive")
+	defer transRecover(ctx, conn, "OnInactive", false)
 	ts.connCount.Dec()
 	ts.transHdlr.OnInactive(ctx, conn)
 }
@@ -175,13 +179,16 @@ func (ts *transServer) onError(ctx context.Context, err error, conn netpoll.Conn
 	ts.transHdlr.OnError(ctx, err, conn)
 }
 
-func transRecover(ctx context.Context, conn netpoll.Connection, funcName string) {
+func transRecover(ctx context.Context, conn netpoll.Connection, funcName string, propagatePanic bool) {
 	panicErr := recover()
 	if panicErr != nil {
 		if conn != nil {
 			klog.CtxErrorf(ctx, "KITEX: panic happened in %s, remoteAddress=%s, error=%v\nstack=%s", funcName, conn.RemoteAddr(), panicErr, string(debug.Stack()))
 		} else {
 			klog.CtxErrorf(ctx, "KITEX: panic happened in %s, error=%v\nstack=%s", funcName, panicErr, string(debug.Stack()))
+		}
+		if propagatePanic {
+			panic(panicErr)
 		}
 	}
 }

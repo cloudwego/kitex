@@ -18,7 +18,10 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"os/exec"
 	"strings"
+
+	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 
 	"github.com/cloudwego/thriftgo/plugin"
 	"github.com/cloudwego/thriftgo/sdk"
@@ -78,32 +81,36 @@ func GetKiteXSDKPlugin(pwd string, rawKiteXArgs []string) (*KiteXSDKPlugin, erro
 
 	kitexPlugin := &KiteXSDKPlugin{}
 
-	thriftgoParams := []string{}
-	findKitex := false
-	kitexParams := []string{}
-
-	for i, arg := range cmd.Args {
-		if i == 0 {
-			continue
-		}
-		if arg == "-p" {
-			findKitex = true
-			continue
-		}
-		if findKitex {
-			kitexParams = strings.Split(arg, ",")
-			findKitex = false
-		} else {
-			thriftgoParams = append(thriftgoParams, arg)
-		}
+	kitexPlugin.ThriftgoParams, kitexPlugin.KitexParams, err = ParseKitexCmd(cmd)
+	if err != nil {
+		return nil, err
 	}
-
-	kitexPlugin.ThriftgoParams = thriftgoParams
-	kitexPlugin.KitexParams = kitexParams
-
 	kitexPlugin.Pwd = pwd
 
 	return kitexPlugin, nil
+}
+
+// InvokeThriftgoBySDK is for kitex tool main.go
+func InvokeThriftgoBySDK(pwd string, cmd *exec.Cmd) (err error) {
+	kitexPlugin := &KiteXSDKPlugin{}
+
+	kitexPlugin.ThriftgoParams, kitexPlugin.KitexParams, err = ParseKitexCmd(cmd)
+	if err != nil {
+		return err
+	}
+
+	kitexPlugin.Pwd = pwd
+
+	s := []plugin.SDKPlugin{kitexPlugin}
+
+	err = sdk.RunThriftgoAsSDK(pwd, s, kitexPlugin.GetThriftgoParameters()...)
+	// when execute thriftgo as function, log will be unexpectedly replaced (for old code by design), so we have to change it back.
+	log.SetDefaultLogger(log.Logger{
+		Println: fmt.Fprintln,
+		Printf:  fmt.Fprintf,
+	})
+
+	return err
 }
 
 type KiteXSDKPlugin struct {
@@ -126,4 +133,30 @@ func (k *KiteXSDKPlugin) GetPluginParameters() []string {
 
 func (k *KiteXSDKPlugin) GetThriftgoParameters() []string {
 	return k.ThriftgoParams
+}
+
+func ParseKitexCmd(cmd *exec.Cmd) (thriftgoParams, kitexParams []string, err error) {
+	cmdArgs := cmd.Args
+	// thriftgo -r -o kitex_gen -g go:xxx -p kitex=xxxx -p otherplugin xxx.thrift
+	// ignore first argument, and remove -p kitex=xxxx
+
+	thriftgoParams = []string{}
+	kitexParams = []string{}
+	if len(cmdArgs) < 1 {
+		return nil, nil, fmt.Errorf("cmd args too short: %s", cmdArgs)
+	}
+
+	for i := 1; i < len(cmdArgs); i++ {
+		arg := cmdArgs[i]
+		if arg == "-p" && i+1 < len(cmdArgs) {
+			pluginArgs := cmdArgs[i+1]
+			if strings.HasPrefix(pluginArgs, "kitex") {
+				kitexParams = strings.Split(pluginArgs, ",")
+				i++
+				continue
+			}
+		}
+		thriftgoParams = append(thriftgoParams, arg)
+	}
+	return thriftgoParams, kitexParams, nil
 }

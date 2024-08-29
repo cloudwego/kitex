@@ -70,9 +70,11 @@ func discoveryEventHandler(name string, bus event.Bus, queue event.Queue) func(d
 			Name: name,
 			Time: now,
 			Extra: map[string]interface{}{
-				"Added":   wrapInstances(d.Added),
-				"Updated": wrapInstances(d.Updated),
-				"Removed": wrapInstances(d.Removed),
+				"Cacheable": d.Result.Cacheable,
+				"CacheKey":  d.Result.CacheKey,
+				"Added":     wrapInstances(d.Added),
+				"Updated":   wrapInstances(d.Updated),
+				"Removed":   wrapInstances(d.Removed),
 			},
 		})
 	}

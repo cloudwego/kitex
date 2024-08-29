@@ -129,13 +129,17 @@ func (b *netpollByteBuffer) ReadString(n int) (s string, err error) {
 
 // ReadBinary like ReadString.
 // Returns a copy of original buffer.
-func (b *netpollByteBuffer) ReadBinary(n int) (p []byte, err error) {
+func (b *netpollByteBuffer) ReadBinary(p []byte) (n int, err error) {
 	if b.status&remote.BitReadable == 0 {
-		return p, errors.New("unreadable buffer, cannot support ReadBinary")
+		return 0, errors.New("unreadable buffer, cannot support ReadBinary")
 	}
-	if p, err = b.reader.ReadBinary(n); err == nil {
-		b.readSize += n
+	n = len(p)
+	var buf []byte
+	if buf, err = b.reader.Next(n); err != nil {
+		return 0, err
 	}
+	copy(p, buf)
+	b.readSize += n
 	return
 }
 
@@ -155,8 +159,8 @@ func (b *netpollByteBuffer) MallocAck(n int) (err error) {
 	return b.writer.MallocAck(n)
 }
 
-// MallocLen returns the total length of the buffer malloced.
-func (b *netpollByteBuffer) MallocLen() (length int) {
+// WrittenLen returns the total length of the buffer written.
+func (b *netpollByteBuffer) WrittenLen() (length int) {
 	if b.status&remote.BitWritable == 0 {
 		return -1
 	}
@@ -248,4 +252,12 @@ func (b *netpollByteBuffer) zero() {
 	b.reader = nil
 	b.status = 0
 	b.readSize = 0
+}
+
+// GetWrittenBytes gets all written bytes from linkbuffer.
+func GetWrittenBytes(lb *netpoll.LinkBuffer) (buf []byte, err error) {
+	if err = lb.Flush(); err != nil {
+		return nil, err
+	}
+	return lb.Bytes(), nil
 }

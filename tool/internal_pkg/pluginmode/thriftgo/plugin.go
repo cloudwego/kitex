@@ -87,7 +87,19 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		if len(conv.Services) == 0 {
 			return conv.failResp(errors.New("no service defined in the IDL"))
 		}
-		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
+		if !conv.Config.IsUsingMultipleServicesTpl() {
+			// if -tpl multiple_services is not set, specify the last service as the target service
+			conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
+		} else {
+			var svcs []*generator.ServiceInfo
+			for _, svc := range conv.Services {
+				if svc.GenerateHandler {
+					svc.RefName = "service" + svc.ServiceName
+					svcs = append(svcs, svc)
+				}
+			}
+			conv.Package.Services = svcs
+		}
 		fs, err := gen.GenerateMainPackage(&conv.Package)
 		if err != nil {
 			return conv.failResp(err)

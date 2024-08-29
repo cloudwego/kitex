@@ -47,8 +47,7 @@ type BidirectionalStreaming interface {
 }
 
 func NewStreamingClient(destService string, g generic.Generic, opts ...client.Option) (Client, error) {
-	svcInfo := newClientStreamingServiceInfo(g)
-	return NewStreamingClientWithServiceInfo(destService, g, svcInfo, opts...)
+	return NewStreamingClientWithServiceInfo(destService, g, StreamingServiceInfo(g), opts...)
 }
 
 func NewStreamingClientWithServiceInfo(destService string, g generic.Generic, svcInfo *serviceinfo.ServiceInfo, opts ...client.Option) (Client, error) {

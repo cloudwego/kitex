@@ -43,6 +43,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
@@ -53,9 +54,19 @@ var (
 	// ErrIllegalHeaderWrite indicates that setting header is illegal because of
 	// the stream's state.
 	ErrIllegalHeaderWrite = errors.New("transport: the stream is done or WriteHeader was already called")
+
 	// ErrHeaderListSizeLimitViolation indicates that the header list size is larger
 	// than the limit set by peer.
 	ErrHeaderListSizeLimitViolation = errors.New("transport: trying to send header list size larger than the limit set by peer")
+
+	// errors used for cancelling stream.
+	// the code should be codes.Canceled coz it's NOT returned from remote
+	errConnectionEOF      = status.New(codes.Canceled, "transport: connection EOF").Err()
+	errStreamClosing      = status.New(codes.Canceled, "transport: stream is closing").Err()
+	errMaxStreamsExceeded = status.New(codes.Canceled, "transport: max streams exceeded").Err()
+	errNotReachable       = status.New(codes.Canceled, "transport: server not reachable").Err()
+	errMaxAgeClosing      = status.New(codes.Canceled, "transport: closing server transport due to maximum connection age").Err()
+	errIdleClosing        = status.New(codes.Canceled, "transport: closing server transport due to idleness").Err()
 )
 
 func init() {
@@ -219,7 +230,9 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		bufferPool:        newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.done)
-	if dynamicWindow {
+	if false && dynamicWindow {
+		// we force disable dynamic window here coz it's sending too many ping frames...
+		// and it may not work as expected when running on top of netpoll.
 		t.bdpEst = &bdpEstimator{
 			bdp:               initialWindowSize,
 			updateFlowControl: t.updateFlowControl,
@@ -230,7 +243,7 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 
 	defer func() {
 		if err != nil {
-			t.Close()
+			t.closeWithErr(err)
 		}
 	}()
 
@@ -279,8 +292,9 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 	return t, nil
 }
 
-// operateHeader takes action on the decoded headers.
-func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle func(*Stream), traceCtx func(context.Context, string) context.Context) (fatal bool) {
+// operateHeaders takes action on the decoded headers. Returns an error if fatal
+// error encountered and transport needs to close, otherwise returns nil.
+func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle func(*Stream), traceCtx func(context.Context, string) context.Context) error {
 	streamID := frame.Header().StreamID
 	state := &decodeState{
 		serverSide: true,
@@ -294,7 +308,7 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 				onWrite:  func() {},
 			})
 		}
-		return false
+		return nil
 	}
 
 	buf := newRecvBuffer()
@@ -312,11 +326,13 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 		// s is just created by the caller. No lock needed.
 		s.state = streamReadDone
 	}
+	var cancel context.CancelFunc
 	if state.data.timeoutSet {
-		s.ctx, s.cancel = context.WithTimeout(t.ctx, state.data.timeout)
+		s.ctx, cancel = context.WithTimeout(t.ctx, state.data.timeout)
 	} else {
-		s.ctx, s.cancel = context.WithCancel(t.ctx)
+		s.ctx, cancel = context.WithCancel(t.ctx)
 	}
+	s.ctx, s.cancel = newContextWithCancelReason(s.ctx, cancel)
 	// Attach the received metadata to the context.
 	if len(state.data.mdata) > 0 {
 		s.ctx = metadata.NewIncomingContext(s.ctx, state.data.mdata)
@@ -325,8 +341,8 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 	t.mu.Lock()
 	if t.state != reachable {
 		t.mu.Unlock()
-		s.cancel()
-		return false
+		s.cancel(errNotReachable)
+		return nil
 	}
 	if uint32(len(t.activeStreams)) >= t.maxStreams {
 		t.mu.Unlock()
@@ -336,15 +352,12 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 			rstCode:  http2.ErrCodeRefusedStream,
 			onWrite:  func() {},
 		})
-		s.cancel()
-		return false
+		s.cancel(errMaxStreamsExceeded)
+		return nil
 	}
 	if streamID%2 != 1 || streamID <= t.maxStreamID {
 		t.mu.Unlock()
-		// illegal gRPC stream id.
-		klog.CtxErrorf(s.ctx, "transport: http2Server.HandleStreams received an illegal stream id: %v", streamID)
-		s.cancel()
-		return true
+		return fmt.Errorf("received an illegal stream id: %v. headers frame: %+v", streamID, frame)
 	}
 	t.maxStreamID = streamID
 	t.activeStreams[streamID] = s
@@ -375,7 +388,7 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 		wq:       s.wq,
 	})
 	handle(s)
-	return false
+	return nil
 }
 
 // HandleStreams receives incoming streams using the given handler. This is
@@ -394,6 +407,9 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				s := t.activeStreams[se.StreamID]
 				t.mu.Unlock()
 				if s != nil {
+					// it will be codes.Internal error for GRPC
+					// TODO: map http2.StreamError to status.Error?
+					s.cancel(err)
 					t.closeStream(s, true, se.Code, false)
 				} else {
 					t.controlBuf.put(&cleanupStream{
@@ -406,17 +422,18 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				continue
 			}
 			if err == io.EOF || err == io.ErrUnexpectedEOF || errors.Is(err, netpoll.ErrEOF) {
-				t.Close()
+				t.closeWithErr(errConnectionEOF)
 				return
 			}
 			klog.CtxWarnf(t.ctx, "transport: http2Server.HandleStreams failed to read frame: %v", err)
-			t.Close()
+			t.closeWithErr(err)
 			return
 		}
 		switch frame := frame.(type) {
 		case *grpcframe.MetaHeadersFrame:
-			if t.operateHeaders(frame, handle, traceCtx) {
-				t.Close()
+			if err := t.operateHeaders(frame, handle, traceCtx); err != nil {
+				klog.CtxErrorf(t.ctx, "transport: http2Server.HandleStreams fatal err: %v", err)
+				t.closeWithErr(err)
 				break
 			}
 		case *grpcframe.DataFrame:
@@ -716,6 +733,8 @@ func (t *http2Server) WriteHeader(s *Stream, md metadata.MD) error {
 }
 
 func (t *http2Server) setResetPingStrikes() {
+	// NOTE: if you're going to change this func
+	// update `resetPingStrikes` logic of `dataFrame` as well
 	atomic.StoreUint32(&t.resetPingStrikes, 1)
 }
 
@@ -822,7 +841,7 @@ func (t *http2Server) Write(s *Stream, hdr, data []byte, opts *Options) error {
 		// Writing headers checks for this condition.
 		if s.getState() == streamDone {
 			// TODO(mmukhi, dfawley): Should the server write also return io.EOF?
-			s.cancel()
+			s.cancel(errStreamClosing)
 			select {
 			case <-t.done:
 				return ErrConnClosing
@@ -831,15 +850,13 @@ func (t *http2Server) Write(s *Stream, hdr, data []byte, opts *Options) error {
 			return ContextErr(s.ctx.Err())
 		}
 	}
-	df := &dataFrame{
-		streamID:    s.id,
-		h:           hdr,
-		d:           data,
-		onEachWrite: t.setResetPingStrikes,
-	}
-	if len(hdr) == 0 && len(data) != 0 {
-		df.dcache = data
-	}
+	df := newDataFrame()
+	df.streamID = s.id
+	df.h = hdr
+	df.d = data
+	df.originH = df.h
+	df.originD = df.d
+	df.resetPingStrikes = &t.resetPingStrikes
 	if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
 		select {
 		case <-t.done:
@@ -906,7 +923,7 @@ func (t *http2Server) keepalive() {
 			case <-ageTimer.C:
 				// Close the connection after grace period.
 				klog.Infof("transport: closing server transport due to maximum connection age.")
-				t.Close()
+				t.closeWithErr(errMaxAgeClosing)
 			case <-t.done:
 			}
 			return
@@ -923,7 +940,7 @@ func (t *http2Server) keepalive() {
 			}
 			if outstandingPing && kpTimeoutLeft <= 0 {
 				klog.Infof("transport: closing server transport due to idleness.")
-				t.Close()
+				t.closeWithErr(errIdleClosing)
 				return
 			}
 			if !outstandingPing {
@@ -948,6 +965,10 @@ func (t *http2Server) keepalive() {
 // TODO(zhaoq): Now the destruction is not blocked on any pending streams. This
 // could cause some resource issue. Revisit this later.
 func (t *http2Server) Close() error {
+	return t.closeWithErr(nil)
+}
+
+func (t *http2Server) closeWithErr(reason error) error {
 	t.mu.Lock()
 	if t.state == closing {
 		t.mu.Unlock()
@@ -960,10 +981,12 @@ func (t *http2Server) Close() error {
 	t.controlBuf.finish()
 	close(t.done)
 	err := t.conn.Close()
+
 	// Cancel all active streams.
 	for _, s := range streams {
-		s.cancel()
+		s.cancel(reason)
 	}
+
 	return err
 }
 
@@ -972,7 +995,7 @@ func (t *http2Server) deleteStream(s *Stream, eosReceived bool) {
 	// In case stream sending and receiving are invoked in separate
 	// goroutines (e.g., bi-directional streaming), cancel needs to be
 	// called to interrupt the potential blocking on other goroutines.
-	s.cancel()
+	s.cancel(nil) // more details about the reason?
 
 	t.mu.Lock()
 	if _, ok := t.activeStreams[s.id]; ok {

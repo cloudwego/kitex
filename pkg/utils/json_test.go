@@ -25,12 +25,10 @@ import (
 	"testing"
 	"unsafe"
 
-	jsoniter "github.com/json-iterator/go"
+	"github.com/bytedance/sonic"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
-
-var jsoni = jsoniter.ConfigCompatibleWithStandardLibrary
 
 var samples = []struct {
 	name string
@@ -56,7 +54,7 @@ func BenchmarkMap2JSONStr(b *testing.B) {
 func BenchmarkJSONStr2Map(b *testing.B) {
 	for _, s := range samples {
 		b.Run(s.name, func(b *testing.B) {
-			j, _ := jsoni.MarshalToString(s.m)
+			j, _ := sonic.MarshalString(s.m)
 			_, _ = JSONStr2Map(j)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -77,32 +75,12 @@ func BenchmarkJSONMarshal(b *testing.B) {
 
 func BenchmarkJSONUnmarshal(b *testing.B) {
 	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.MarshalToString(mapInfo)
+	jsonRet, _ := sonic.MarshalString(mapInfo)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		var map1 map[string]string
 		json.Unmarshal([]byte(jsonRet), &map1)
-	}
-}
-
-func BenchmarkJSONIterMarshal(b *testing.B) {
-	mapInfo := prepareMap()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		jsoni.MarshalToString(mapInfo)
-	}
-}
-
-func BenchmarkJSONIterUnmarshal(b *testing.B) {
-	mapInfo := prepareMap()
-	jsonRet, _ := Map2JSONStr(mapInfo)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		var map1 map[string]string
-		jsoni.UnmarshalFromString(jsonRet, &map1)
 	}
 }
 
@@ -238,11 +216,11 @@ func TestJSONStr2Map(t *testing.T) {
 	test.Assert(t, htmlEscapeCharMapRet["&<>\u2028\u2029"] == "&<>\u2028\u2029", fmt.Sprintf("%+v", htmlEscapeCharMapRet))
 }
 
-// TestJSONUtil compare return between encoding/json, json-iterator and json.go
+// TestJSONUtil compare return between encoding/json, sonic and json.go
 func TestJSONUtil(t *testing.T) {
 	mapInfo := prepareMap()
 	jsonRet1, _ := json.Marshal(mapInfo)
-	jsonRet2, _ := jsoni.MarshalToString(mapInfo)
+	jsonRet2, _ := sonic.MarshalString(mapInfo)
 	jsonRet, _ := Map2JSONStr(mapInfo)
 	jsonRet3, _ := _Map2JSONStr(mapInfo)
 
@@ -264,7 +242,7 @@ func TestJSONUtil(t *testing.T) {
 	}
 
 	mapRetIter := make(map[string]string)
-	jsoni.UnmarshalFromString(string(jsonRet1), &mapRetIter)
+	sonic.UnmarshalString(string(jsonRet1), &mapRetIter)
 	mapRet, err := JSONStr2Map(string(jsonRet1))
 	test.Assert(t, err == nil)
 

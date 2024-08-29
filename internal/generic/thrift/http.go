@@ -19,19 +19,17 @@ package thrift
 import (
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/bytedance/gopkg/lang/dirtmake"
+	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
-	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
 type HTTPReaderWriter struct {
@@ -54,7 +52,7 @@ type WriteHTTPRequest struct {
 
 var (
 	_          MessageWriter = (*WriteHTTPRequest)(nil)
-	customJson               = jsoniter.Config{
+	customJson               = sonic.Config{
 		EscapeHTML: true,
 		UseNumber:  true,
 	}.Froze()
@@ -80,7 +78,7 @@ func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.O
 }
 
 // originalWrite ...
-func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out io.Writer, msg interface{}, requestBase *base.Base) error {
+func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out bufiox.Writer, msg interface{}, requestBase *base.Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	if req.Body == nil && len(req.RawBody) != 0 {
 		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {
@@ -94,11 +92,9 @@ func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out io.Writer, msg
 	if !fn.HasRequestBase {
 		requestBase = nil
 	}
-	binaryWriter := thrift.NewBinaryWriter()
-	if err = wrapStructWriter(ctx, req, binaryWriter, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64}); err != nil {
-		return err
-	}
-	_, err = out.Write(binaryWriter.Bytes())
+	bw := thrift.NewBufferWriter(out)
+	err = wrapStructWriter(ctx, req, bw, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
+	bw.Recycle()
 	return err
 }
 
@@ -137,17 +133,14 @@ func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options) {
 }
 
 // Read ...
-func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in io.Reader) (interface{}, error) {
-	buffer, ok := in.(remote.ByteBuffer)
-	if !ok {
-		return nil, perrors.NewProtocolErrorWithMsg("io.Reader should be ByteBuffer")
-	}
-	binaryReader := thrift.NewBinaryReader(buffer)
-
+func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in bufiox.Reader) (interface{}, error) {
 	// fallback logic
 	if !r.dynamicgoEnabled || dataLen == 0 {
-		return r.originalRead(ctx, method, binaryReader)
+		return r.originalRead(ctx, method, in)
 	}
+
+	binaryReader := thrift.NewBufferReader(in)
+	defer binaryReader.Recycle()
 
 	// dynamicgo logic
 	// TODO: support exception field
@@ -156,7 +149,9 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient boo
 		return nil, err
 	}
 	bProt := &thrift.BinaryProtocol{}
-	transBuf, err := buffer.ReadBinary(dataLen - bProt.FieldBeginLength())
+	l := dataLen - bProt.FieldBeginLength()
+	transBuf := dirtmake.Bytes(l, l)
+	_, err = in.ReadBinary(transBuf)
 	if err != nil {
 		return nil, err
 	}
@@ -186,13 +181,15 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient boo
 	return resp, nil
 }
 
-func (r *ReadHTTPResponse) originalRead(ctx context.Context, method string, in *thrift.BinaryReader) (interface{}, error) {
+func (r *ReadHTTPResponse) originalRead(ctx context.Context, method string, in bufiox.Reader) (interface{}, error) {
 	fnDsc, err := r.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err
 	}
 	fDsc := fnDsc.Response
-	resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
+	br := thrift.NewBufferReader(in)
+	defer br.Recycle()
+	resp, err := skipStructReader(ctx, br, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
 	if r.useRawBodyForHTTPResp {
 		if httpResp, ok := resp.(*descriptor.HTTPResponse); ok && httpResp.Body != nil {
 			rawBody, err := customJson.Marshal(httpResp.Body)

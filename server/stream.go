@@ -44,3 +44,15 @@ func (s *server) invokeSendEndpoint() endpoint.SendEndpoint {
 		return stream.SendMsg(req)
 	}
 }
+
+// contextStream is responsible for solving ctx diverge in server side streaming.
+// it receives the ctx from previous middlewares and the Stream that exposed to users，then rewrite
+// Context() method so that users could call Stream.Context() in handler to get the processed ctx.
+type contextStream struct {
+	streaming.Stream
+	ctx context.Context
+}
+
+func (cs contextStream) Context() context.Context {
+	return cs.ctx
+}
