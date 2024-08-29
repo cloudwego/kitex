@@ -21,13 +21,13 @@ import (
 	"fmt"
 
 	"github.com/bytedance/gopkg/lang/dirtmake"
+	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
-	jsoniter "github.com/json-iterator/go"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
@@ -52,7 +52,7 @@ type WriteHTTPRequest struct {
 
 var (
 	_          MessageWriter = (*WriteHTTPRequest)(nil)
-	customJson               = jsoniter.Config{
+	customJson               = sonic.Config{
 		EscapeHTML: true,
 		UseNumber:  true,
 	}.Froze()

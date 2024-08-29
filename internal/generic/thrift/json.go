@@ -22,13 +22,13 @@ import (
 	"strconv"
 
 	"github.com/bytedance/gopkg/lang/dirtmake"
+	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -245,7 +245,7 @@ func (m *ReadJSON) originalRead(ctx context.Context, method string, isClient boo
 	}
 
 	// resp is map
-	respNode, err := jsoniter.Marshal(resp)
+	respNode, err := sonic.Marshal(resp)
 	if err != nil {
 		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v", err))
 	}
