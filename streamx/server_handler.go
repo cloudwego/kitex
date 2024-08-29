@@ -85,21 +85,39 @@ func (t *svrTransHandler) ProtocolMatch(ctx context.Context, conn net.Conn) (err
 }
 
 func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
-	return t.provider.OnActive(ctx, conn)
+	var err error
+	ctx, err = t.provider.OnActive(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		for {
+			nctx, ss, nerr := t.provider.OnStream(ctx, conn)
+			if nerr != nil {
+				klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)
+				return
+			}
+			go func() {
+				nerr = t.OnStream(nctx, conn, ss)
+				if nerr != nil {
+					klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", err)
+					return
+				}
+			}()
+		}
+	}()
+	return ctx, nil
 }
 
-/*
-	OnRead a Stream
-
-- create  server stream
-- process server stream
-- close   server stream
-*/
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
-	ctx, ss, err := t.provider.OnStream(ctx, conn)
-	if err != nil {
-		return err
-	}
+	return nil
+}
+
+// OnStream
+// - create  server stream
+// - process server stream
+// - close   server stream
+func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss ServerStream) (err error) {
 	// inkHdlFunc 包含了所有中间件 + 用户 serviceInfo.methodHandler
 	// 这里 streamx 依然会复用原本的 server endpoint.Endpoint 中间件，因为他们都不会单独去取 req/res 的值
 	// 无法在保留现有 streaming 功能的情况下，彻底弃用 endpoint.Endpoint , 所以这里依然使用 endpoint 接口
@@ -145,8 +163,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 
 	reqArgs := NewStreamReqArgs(nil)
 	resArgs := NewStreamResArgs(nil)
-	err = t.inkHdlFunc(ctx, reqArgs, resArgs)
-	ctx, serr := t.provider.OnStreamFinish(ctx, ss)
+	serr := t.inkHdlFunc(ctx, reqArgs, resArgs)
+	ctx, err = t.provider.OnStreamFinish(ctx, ss)
 	if err == nil && serr != nil {
 		err = serr
 	}
