@@ -28,7 +28,6 @@ import (
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
-	jsoniter "github.com/json-iterator/go"
 	"github.com/tidwall/gjson"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
@@ -245,7 +244,7 @@ func (m *ReadJSON) originalRead(ctx context.Context, method string, isClient boo
 	}
 
 	// resp is map
-	respNode, err := jsoniter.Marshal(resp)
+	respNode, err := customJson.Marshal(resp)
 	if err != nil {
 		return nil, perrors.NewProtocolErrorWithType(perrors.InvalidData, fmt.Sprintf("response marshal failed. err:%#v", err))
 	}

@@ -29,10 +29,10 @@ import (
 
 func FuzzJSONStr2Map(f *testing.F) {
 	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.MarshalToString(mapInfo)
+	jsonRet, _ := json.Marshal(mapInfo)
 	f.Add(`{}`)
 	f.Add(`{"":""}`)
-	f.Add(jsonRet)
+	f.Add(string(jsonRet))
 	f.Add(`{"\u4f60\u597d": "\u5468\u6770\u4f26"}`)
 	f.Add(`{"aaa\u4f60\u597daaa": ":\\\u5468\u6770\u4f26"  ,  "加油 \u52a0\u6cb9" : "Come on \u52a0\u6cb9"}`)
 	f.Add(`{"\u4F60\u597D": "\uDFFF\uD800"}`)
@@ -51,10 +51,10 @@ func FuzzJSONStr2Map(f *testing.F) {
 
 func FuzzMap2JSON(f *testing.F) {
 	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.MarshalToString(mapInfo)
+	jsonRet, _ := json.Marshal(mapInfo)
 	f.Add(`{}`)
 	f.Add(`{"":""}`)
-	f.Add(jsonRet)
+	f.Add(string(jsonRet))
 	f.Add(`{"\u4f60\u597d": "\u5468\u6770\u4f26"}`)
 	f.Add(`{"aaa\u4f60\u597daaa": ":\\\u5468\u6770\u4f26"  ,  "加油 \u52a0\u6cb9" : "Come on \u52a0\u6cb9"}`)
 	f.Add(`{"\u4F60\u597D": "\uDFFF\uD800"}`)
