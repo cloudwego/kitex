@@ -17,8 +17,6 @@
 package thrift
 
 import (
-	"github.com/cloudwego/gopkg/protocol/thrift"
-
 	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
@@ -61,8 +59,7 @@ func UnmarshalThriftException(tProt athrift.TProtocol) error {
 			return err
 		}
 	}
-	ex := thrift.NewApplicationException(t, m)
-	return remote.NewTransError(ex.TypeId(), ex)
+	return remote.NewTransErrorWithMsg(t, m)
 }
 
 // BinaryProtocol ...
