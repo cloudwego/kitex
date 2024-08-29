@@ -84,6 +84,7 @@ func (w *WriteHTTPRequest) Write(ctx context.Context, out bufiox.Writer, msg int
 		} else {
 			copy(wb, dbuf)
 		}
+		dbuf = dbuf[:0]
 	}
 	return binaryWriter.WriteFieldStop()
 }

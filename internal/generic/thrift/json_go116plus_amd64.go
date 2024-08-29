@@ -119,6 +119,7 @@ func (m *WriteJSON) writeFields(ctx context.Context, out bufiox.Writer, dynamicg
 			} else {
 				copy(wb, dbuf)
 			}
+			dbuf = dbuf[:0]
 		}
 	}
 	return bw.WriteFieldStop()
