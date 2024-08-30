@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+// NOTE: The basic generic streaming functions have been completed, but the interface needs adjustments. The feature is expected to be released later.
+
 package genericclient
 
 import (
