@@ -36,10 +36,10 @@ func (si *serviceImpl) ClientStream(ctx context.Context, stream streamx.ClientSt
 
 func (si *serviceImpl) ServerStream(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error {
 	log.Printf("Server ServerStream: req={%v}", req)
-	err := ttstream.SendHeader(stream, map[string]string{})
-	if err != nil {
-		return err
-	}
+	_ = ttstream.SetHeader(stream, map[string]string{"key1": "val1"})
+	_ = ttstream.SendHeader(stream, map[string]string{"key2": "val2"})
+	_ = ttstream.SetTrailer(stream, map[string]string{"key1": "val1"})
+	_ = ttstream.SetTrailer(stream, map[string]string{"key2": "val2"})
 
 	for i := 0; i < 3; i++ {
 		resp := new(Response)

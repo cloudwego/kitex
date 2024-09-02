@@ -41,7 +41,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	if err != nil {
 		return nil, err
 	}
-	trans := newTransport(c.sinfo, conn)
+	trans := newTransport(clientTransport, c.sinfo, conn)
 	s, err := trans.newStream(ctx, method)
 	if err != nil {
 		return nil, err
