@@ -55,6 +55,7 @@ var (
 	customJson               = sonic.Config{
 		EscapeHTML: true,
 		UseNumber:  true,
+		CopyString: true,
 	}.Froze()
 )
 
