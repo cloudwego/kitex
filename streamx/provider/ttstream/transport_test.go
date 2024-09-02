@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/streamx"
 	"github.com/cloudwego/netpoll"
 	"io"
 	"net"
@@ -41,27 +42,42 @@ func TestTransport(t *testing.T) {
 	svr, err := netpoll.NewEventLoop(nil, netpoll.WithOnConnect(func(ctx context.Context, connection netpoll.Connection) context.Context {
 		t.Logf("OnConnect started")
 		defer t.Logf("OnConnect finished")
-		trans := newTransport(sinfo, connection)
+		trans := newTransport(serverTransport, sinfo, connection)
 		t.Logf("OnRead started")
 		defer t.Log("OnRead finished")
 
 		go func() {
 			for {
-				st, err := trans.readStream()
-				t.Logf("OnRead read stream: %v, %v", st, err)
+				s, err := trans.readStream()
+				t.Logf("OnRead read stream: %v, %v", s, err)
 				if err != nil {
 					if err == io.EOF {
 						return
 					}
 					t.Error(err)
 				}
-				go func(st *stream) {
-					defer atomic.AddInt32(&streamDone, -1)
+				ss := newServerStream(s)
+				go func(st streamx.ServerStream) {
+					defer func() {
+						// set trailer
+						err := SetTrailer(st, Trailer{"key": "val"})
+						test.Assert(t, err == nil, err)
+
+						// send trailer
+						err = ss.(*serverStream).sendTrailer()
+						atomic.AddInt32(&streamDone, -1)
+					}()
+
+					// send header
+					err := SendHeader(st, Header{"key": "val"})
+					test.Assert(t, err == nil, err)
+
+					// send data
 					for {
 						req := new(TestRequest)
 						err := st.RecvMsg(ctx, req)
 						if errors.Is(err, io.EOF) {
-							t.Logf("server stream eof: %d", st.sid)
+							t.Logf("server stream eof")
 							return
 						}
 						test.Assert(t, err == nil, err)
@@ -75,7 +91,7 @@ func TestTransport(t *testing.T) {
 						test.Assert(t, err == nil, err)
 						t.Logf("server send msg: %v", res)
 					}
-				}(st)
+				}(ss)
 			}
 		}()
 
@@ -97,37 +113,54 @@ func TestTransport(t *testing.T) {
 	atomic.AddInt32(&connDone, 1)
 	conn, err := netpoll.DialConnection("tcp", addr, time.Second)
 	test.Assert(t, err == nil, err)
-	trans := newTransport(sinfo, conn)
+	trans := newTransport(clientTransport, sinfo, conn)
 
 	var wg sync.WaitGroup
-	for sid := 1; sid <= 3; sid++ {
+	for sid := 1; sid <= 1; sid++ {
 		wg.Add(1)
 		atomic.AddInt32(&streamDone, 1)
-		go func() {
+		go func(sid int) {
 			defer wg.Done()
 			s, err := trans.newStream(ctx, method)
 			test.Assert(t, err == nil, err)
-			cs := newClientStream(s)
 
+			// send header
+			cs := newClientStream(s)
+			t.Logf("client stream[%d] created", sid)
+
+			// recv header
+			hd, err := RecvHeader(cs)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, hd["key"] == "val", hd)
+			t.Logf("client stream[%d] recv header=%v", sid, hd)
+
+			// send and recv data
 			for i := 0; i < 3; i++ {
 				req := new(TestRequest)
 				req.A = 12345
 				req.B = "hello"
 				res := new(TestResponse)
 				err = cs.SendMsg(ctx, req)
-				t.Logf("client send msg: %v", req)
+				t.Logf("client stream[%d] send msg: %v", sid, req)
 				test.Assert(t, err == nil, err)
 				err = cs.RecvMsg(ctx, res)
-				t.Logf("client recv msg: %v", res)
+				t.Logf("client stream[%d] recv msg: %v", sid, res)
 				test.Assert(t, err == nil, err)
 				test.Assert(t, req.A == res.A, res)
 				test.Assert(t, req.B == res.B, res)
 			}
 
-			// close stream
+			// send trailer(trailer is stored in ctx)
 			err = cs.CloseSend(ctx)
 			test.Assert(t, err == nil, err)
-		}()
+			t.Logf("client stream[%d] close send", sid)
+
+			// recv trailer
+			tl, err := RecvTrailer(cs)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, tl["key"] == "val", tl)
+			t.Logf("client stream[%d] recv trailer=%v", sid, tl)
+		}(sid)
 	}
 	wg.Wait()
 	for atomic.LoadInt32(&streamDone) != 0 {

@@ -11,10 +11,9 @@ func TestFrameCodec(t *testing.T) {
 	rw := remote.NewReaderWriterBuffer(1024)
 
 	wframe := newFrame(streamMeta{
-		sid:     1,
-		service: "p.s.m",
-		method:  "method",
-		header:  map[string]string{"key": "value"},
+		sid:    1,
+		method: "method",
+		header: map[string]string{"key": "value"},
 	}, headerFrameType, []byte("hello world"))
 	err := EncodeFrame(context.Background(), rw, wframe)
 	test.Assert(t, err == nil, err)

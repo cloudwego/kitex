@@ -3,6 +3,7 @@ package ttstream
 import (
 	"context"
 	"fmt"
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/pkg/remote"
 	nepolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -18,7 +19,13 @@ type streamIO struct {
 	rch    chan Frame
 }
 
+const (
+	clientTransport int32 = 1
+	serverTransport int32 = 2
+)
+
 type transport struct {
+	kind    int32
 	sinfo   *serviceinfo.ServiceInfo
 	conn    netpoll.Connection
 	reader  remote.ByteBuffer
@@ -29,10 +36,11 @@ type transport struct {
 	stop    chan struct{}
 }
 
-func newTransport(sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
+func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
 	reader := nepolltrans.NewReaderByteBuffer(conn.Reader())
 	writer := nepolltrans.NewWriterByteBuffer(conn.Writer())
 	t := &transport{
+		kind:    kind,
 		sinfo:   sinfo,
 		conn:    conn,
 		reader:  reader,
@@ -82,10 +90,23 @@ func (t *transport) loopRead() error {
 		switch fr.typ {
 		case metaFrameType:
 		case headerFrameType:
-			// Header Frame: new stream
-			smode := t.sinfo.MethodInfo(fr.method).StreamingMode()
-			s := newStream(t, smode, fr.streamMeta)
-			t.sch <- s
+			switch t.kind {
+			case serverTransport:
+				// Header Frame: server recv a new stream
+				smode := t.sinfo.MethodInfo(fr.method).StreamingMode()
+				s := newStream(t, smode, fr.streamMeta)
+				t.sch <- s
+			case clientTransport:
+				// Header Frame: client recv header
+				sio, ok := t.loadStreamIO(fr.sid)
+				if !ok {
+					return fmt.Errorf("stream not found in stream map: sid=%d", fr.sid)
+				}
+				err = sio.stream.readHeader(fr.header)
+				if err != nil {
+					return err
+				}
+			}
 		case dataFrameType:
 			// Data Frame: decode and distribute data
 			sio, ok := t.loadStreamIO(fr.sid)
@@ -94,13 +115,12 @@ func (t *transport) loopRead() error {
 			}
 			sio.rch <- fr
 		case trailerFrameType:
-			// Data Frame: decode and distribute data
+			// Trailer Frame: recv trailer, close read direction
 			sio, ok := t.loadStreamIO(fr.sid)
 			if !ok {
 				return fmt.Errorf("stream not found in stream map: sid=%d", fr.sid)
 			}
-			err = sio.stream.recvEOF()
-			if err != nil {
+			if err = sio.stream.readTrailer(fr.trailer); err != nil {
 				return err
 			}
 		}
@@ -145,6 +165,22 @@ func (t *transport) streamSend(s streamMeta, payload []byte) (err error) {
 	return nil
 }
 
+func (t *transport) streamSendHeader(s streamMeta, header Header) (err error) {
+	s.header = header
+	s.trailer = nil
+	f := newFrame(s, headerFrameType, []byte{})
+	t.wch <- f
+	return nil
+}
+
+func (t *transport) streamSendTrailer(s streamMeta, trailer Trailer) (err error) {
+	s.header = nil
+	s.trailer = trailer
+	f := newFrame(s, trailerFrameType, []byte{})
+	t.wch <- f
+	return nil
+}
+
 func (t *transport) streamRecv(s streamMeta) (payload []byte, err error) {
 	sio, ok := t.loadStreamIO(s.sid)
 	if !ok {
@@ -163,13 +199,17 @@ var clientStreamID int32
 // newStream create new stream on current connection
 // it's typically used by client side
 func (t *transport) newStream(ctx context.Context, method string) (*stream, error) {
+	if t.kind != clientTransport {
+		return nil, fmt.Errorf("transport already be used as other kind")
+	}
 	sid := atomic.AddInt32(&clientStreamID, 1)
 	smode := t.sinfo.MethodInfo(method).StreamingMode()
 	smeta := streamMeta{
-		sid:     sid,
-		service: t.sinfo.ServiceName,
-		method:  method,
-		header:  map[string]string{},
+		sid:    sid,
+		method: method,
+		header: map[string]string{
+			ttheader.HeaderIDLServiceName: t.sinfo.ServiceName,
+		},
 	}
 	f := newFrame(smeta, headerFrameType, []byte{})
 	s := newStream(t, smode, smeta)
@@ -180,6 +220,9 @@ func (t *transport) newStream(ctx context.Context, method string) (*stream, erro
 // readStream wait for a new incoming stream on current connection
 // it's typically used by server side
 func (t *transport) readStream() (*stream, error) {
+	if t.kind != serverTransport {
+		return nil, fmt.Errorf("transport already be used as other kind")
+	}
 	select {
 	case <-t.stop:
 		return nil, io.EOF
@@ -194,11 +237,5 @@ func (t *transport) streamCloseRecv(s *stream) (err error) {
 		return fmt.Errorf("stream not found in stream map: sid=%d", s.sid)
 	}
 	close(sio.rch)
-	return nil
-}
-
-func (t *transport) streamCloseSend(s *stream) (err error) {
-	f := newFrame(s.streamMeta, trailerFrameType, []byte{})
-	t.wch <- f
 	return nil
 }

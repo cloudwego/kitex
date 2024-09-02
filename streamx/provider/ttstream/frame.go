@@ -39,10 +39,6 @@ func newFrame(meta streamMeta, typ int32, payload []byte) Frame {
 }
 
 func EncodeFrame(ctx context.Context, writer remote.ByteBuffer, fr Frame) (err error) {
-	// if there is no service in frame header, we should set it first
-	if fr.header[ttheader.HeaderIDLServiceName] != fr.service {
-		fr.header[ttheader.HeaderIDLServiceName] = fr.service
-	}
 	param := ttheader.EncodeParam{
 		Flags:      ttheader.HeaderFlagsStreaming,
 		SeqID:      fr.sid,
@@ -51,8 +47,14 @@ func EncodeFrame(ctx context.Context, writer remote.ByteBuffer, fr Frame) (err e
 			ttheader.FrameType: frameTypeToString[fr.typ],
 			ttheader.ToMethod:  fr.method,
 		},
-		StrInfo: fr.header,
 	}
+	switch fr.typ {
+	case headerFrameType:
+		param.StrInfo = fr.header
+	case trailerFrameType:
+		param.StrInfo = fr.trailer
+	}
+
 	totalLenField, err := ttheader.Encode(ctx, param, writer)
 	if err != nil {
 		return err
@@ -86,19 +88,19 @@ func DecodeFrame(ctx context.Context, reader remote.ByteBuffer) (fr Frame, err e
 		fr.typ = metaFrameType
 	case ttheader.FrameTypeHeader:
 		fr.typ = headerFrameType
+		fr.header = dp.StrInfo
 	case ttheader.FrameTypeData:
 		fr.typ = dataFrameType
 	case ttheader.FrameTypeTrailer:
 		fr.typ = trailerFrameType
+		fr.trailer = dp.StrInfo
 	default:
 		err = fmt.Errorf("unexpected frame type: %v", dp.IntInfo[ttheader.FrameType])
 		return
 	}
 	// stream meta
 	fr.sid = dp.SeqID
-	fr.service = dp.StrInfo[ttheader.HeaderIDLServiceName]
 	fr.method = dp.IntInfo[ttheader.ToMethod]
-	fr.header = dp.StrInfo
 
 	// frame payload
 	log.Printf("payload len: %d", dp.PayloadLen)

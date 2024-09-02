@@ -7,6 +7,7 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/server/streamxserver"
 	"github.com/cloudwego/kitex/streamx"
+	"github.com/cloudwego/kitex/streamx/provider/ttstream"
 	"github.com/cloudwego/netpoll"
 	"io"
 	"log"
@@ -155,6 +156,11 @@ func TestTTHeaderStreaming(t *testing.T) {
 	req.Message = "ServerStream"
 	ss, err := cli.ServerStream(ctx, req)
 	test.Assert(t, err == nil, err)
+	// server stream recv header
+	hd, err := ttstream.RecvHeader(ss)
+	test.Assert(t, err == nil, err)
+	test.DeepEqual(t, hd["key1"], "val1")
+	test.DeepEqual(t, hd["key2"], "val2")
 	for {
 		res, err := ss.Recv(ctx)
 		if errors.Is(err, io.EOF) {
@@ -163,8 +169,13 @@ func TestTTHeaderStreaming(t *testing.T) {
 		test.Assert(t, err == nil, err)
 		t.Logf("Client ServerStream recv: %v", res)
 	}
-	//err = ss.CloseSend(ctx)
-	//test.Assert(t, err == nil, err)
+	err = ss.CloseSend(ctx)
+	test.Assert(t, err == nil, err)
+	// server stream recv trailer
+	tl, err := ttstream.RecvTrailer(ss)
+	test.Assert(t, err == nil, err)
+	test.DeepEqual(t, tl["key1"], "val1")
+	test.DeepEqual(t, tl["key2"], "val2")
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
 

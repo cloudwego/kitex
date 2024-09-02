@@ -31,7 +31,7 @@ func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
 }
 
 func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
-	trans := newTransport(s.sinfo, conn.(netpoll.Connection))
+	trans := newTransport(serverTransport, s.sinfo, conn.(netpoll.Connection))
 	return context.WithValue(ctx, serverTransCtxKey{}, trans), nil
 }
 
@@ -51,6 +51,6 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStream) (context.Context, error) {
 	rs := ss.(streamx.RawStreamGetter).RawStream()
 	sst := rs.(*serverStream)
-	err := sst.sendEOF()
+	err := sst.sendTrailer()
 	return ctx, err
 }
