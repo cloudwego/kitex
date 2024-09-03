@@ -3,12 +3,12 @@ package ttstream
 var _ ClientStreamMeta = (*clientStream)(nil)
 var _ ServerStreamMeta = (*serverStream)(nil)
 
-func (s *clientStream) RecvHeader() (Header, error) {
+func (s *clientStream) Header() (Header, error) {
 	<-s.headerSig
 	return s.header, nil
 }
 
-func (s *clientStream) RecvTrailer() (Trailer, error) {
+func (s *clientStream) Trailer() (Trailer, error) {
 	<-s.trailerSig
 	return s.trailer, nil
 }

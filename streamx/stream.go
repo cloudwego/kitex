@@ -5,12 +5,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var _ ServerStreamingClient[int] = (*GenericClientStream[int, int])(nil)
-var _ ClientStreamingClient[int, int] = (*GenericClientStream[int, int])(nil)
-var _ BidiStreamingClient[int, int] = (*GenericClientStream[int, int])(nil)
-var _ ServerStreamingServer[int] = (*GenericServerStream[int, int])(nil)
-var _ ClientStreamingServer[int, int] = (*GenericServerStream[int, int])(nil)
-var _ BidiStreamingServer[int, int] = (*GenericServerStream[int, int])(nil)
+var _ ServerStreamingClient[int, int, int] = (*GenericClientStream[int, int, int, int])(nil)
+var _ ClientStreamingClient[int, int, int, int] = (*GenericClientStream[int, int, int, int])(nil)
+var _ BidiStreamingClient[int, int, int, int] = (*GenericClientStream[int, int, int, int])(nil)
+var _ ServerStreamingServer[int, int, int] = (*GenericServerStream[int, int, int, int])(nil)
+var _ ClientStreamingServer[int, int, int, int] = (*GenericServerStream[int, int, int, int])(nil)
+var _ BidiStreamingServer[int, int, int, int] = (*GenericServerStream[int, int, int, int])(nil)
 
 type StreamingMode = serviceinfo.StreamingMode
 
@@ -82,53 +82,74 @@ type ServerStream interface {
 	Stream
 }
 
-type ServerStreamingClient[Res any] interface {
+type ClientStreamContext[Header, Trailer any] interface {
+	Header() (Header, error)
+	Trailer() (Trailer, error)
+}
+
+type ServerStreamContext[Header, Trailer any] interface {
+	SetHeader(hd Header) error
+	SendHeader(hd Header) error
+	SetTrailer(hd Trailer) error
+}
+
+type ServerStreamingClient[Header, Trailer, Res any] interface {
 	Recv(ctx context.Context) (*Res, error)
 	ClientStream
+	ClientStreamContext[Header, Trailer]
 }
 
-type ServerStreamingServer[Res any] interface {
+type ServerStreamingServer[Header, Trailer, Res any] interface {
 	Send(ctx context.Context, res *Res) error
 	ServerStream
+	ServerStreamContext[Header, Trailer]
 }
 
-type ClientStreamingClient[Req any, Res any] interface {
+type ClientStreamingClient[Header, Trailer, Req, Res any] interface {
 	Send(ctx context.Context, req *Req) error
 	CloseAndRecv(ctx context.Context) (*Res, error)
 	ClientStream
+	ClientStreamContext[Header, Trailer]
 }
 
-type ClientStreamingServer[Req any, Res any] interface {
+type ClientStreamingServer[Header, Trailer, Req, Res any] interface {
 	Recv(ctx context.Context) (*Req, error)
 	//SendAndClose(ctx context.Context, res *Res) error
 	ServerStream
+	ServerStreamContext[Header, Trailer]
 }
 
-type BidiStreamingClient[Req any, Res any] interface {
+type BidiStreamingClient[Header, Trailer, Req, Res any] interface {
 	Send(ctx context.Context, req *Req) error
 	Recv(ctx context.Context) (*Res, error)
 	ClientStream
+	ClientStreamContext[Header, Trailer]
 }
 
-type BidiStreamingServer[Req any, Res any] interface {
+type BidiStreamingServer[Header, Trailer, Req, Res any] interface {
 	Recv(ctx context.Context) (*Req, error)
 	Send(ctx context.Context, res *Res) error
 	ServerStream
+	ServerStreamContext[Header, Trailer]
 }
 
-func NewGenericClientStream[Req any, Res any](cs ClientStream) *GenericClientStream[Req, Res] {
-	return &GenericClientStream[Req, Res]{ClientStream: cs}
+func NewGenericClientStream[Header, Trailer, Req, Res any](cs ClientStream) *GenericClientStream[Header, Trailer, Req, Res] {
+	return &GenericClientStream[Header, Trailer, Req, Res]{
+		ClientStream:        cs,
+		ClientStreamContext: cs.(ClientStreamContext[Header, Trailer]),
+	}
 }
 
-type GenericClientStream[Req any, Res any] struct {
+type GenericClientStream[Header, Trailer, Req, Res any] struct {
 	ClientStream
+	ClientStreamContext[Header, Trailer]
 }
 
-func (x *GenericClientStream[Req, Res]) Send(ctx context.Context, m *Req) error {
+func (x *GenericClientStream[Header, Trailer, Req, Res]) Send(ctx context.Context, m *Req) error {
 	return x.ClientStream.SendMsg(ctx, m)
 }
 
-func (x *GenericClientStream[Req, Res]) Recv(ctx context.Context) (*Res, error) {
+func (x *GenericClientStream[Header, Trailer, Req, Res]) Recv(ctx context.Context) (*Res, error) {
 	m := new(Res)
 	if err := x.ClientStream.RecvMsg(ctx, m); err != nil {
 		return nil, err
@@ -136,7 +157,7 @@ func (x *GenericClientStream[Req, Res]) Recv(ctx context.Context) (*Res, error) 
 	return m, nil
 }
 
-func (x *GenericClientStream[Req, Res]) CloseAndRecv(ctx context.Context) (*Res, error) {
+func (x *GenericClientStream[Header, Trailer, Req, Res]) CloseAndRecv(ctx context.Context) (*Res, error) {
 	if err := x.ClientStream.CloseSend(ctx); err != nil {
 		return nil, err
 	}
@@ -147,26 +168,30 @@ func (x *GenericClientStream[Req, Res]) CloseAndRecv(ctx context.Context) (*Res,
 	return m, nil
 }
 
-func NewGenericServerStream[Req any, Res any](ss ServerStream) *GenericServerStream[Req, Res] {
-	return &GenericServerStream[Req, Res]{ServerStream: ss}
+func NewGenericServerStream[Header, Trailer, Req, Res any](ss ServerStream) *GenericServerStream[Header, Trailer, Req, Res] {
+	return &GenericServerStream[Header, Trailer, Req, Res]{
+		ServerStream:        ss,
+		ServerStreamContext: ss.(ServerStreamContext[Header, Trailer]),
+	}
 }
 
-type GenericServerStream[Req any, Res any] struct {
+type GenericServerStream[Header, Trailer, Req, Res any] struct {
 	ServerStream
+	ServerStreamContext[Header, Trailer]
 }
 
-func (x *GenericServerStream[Req, Res]) Send(ctx context.Context, m *Res) error {
+func (x *GenericServerStream[Header, Trailer, Req, Res]) Send(ctx context.Context, m *Res) error {
 	return x.ServerStream.SendMsg(ctx, m)
 }
 
-func (x *GenericServerStream[Req, Res]) SendAndClose(ctx context.Context, m *Res) error {
+func (x *GenericServerStream[Header, Trailer, Req, Res]) SendAndClose(ctx context.Context, m *Res) error {
 	if err := x.ServerStream.SendMsg(ctx, m); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (x *GenericServerStream[Req, Res]) Recv(ctx context.Context) (*Req, error) {
+func (x *GenericServerStream[Header, Trailer, Req, Res]) Recv(ctx context.Context) (*Req, error) {
 	m := new(Req)
 	if err := x.ServerStream.RecvMsg(ctx, m); err != nil {
 		return nil, err
@@ -203,8 +228,8 @@ func (s serverStream) RecvMsg(ctx context.Context, m any) error {
 
 var _ ClientStream = (*clientStream)(nil)
 
-func NewClientStream(ss ClientStream) ClientStream {
-	return &clientStream{ClientStream: ss}
+func NewClientStream(cs ClientStream) ClientStream {
+	return &clientStream{ClientStream: cs}
 }
 
 type clientStream struct {
@@ -213,6 +238,9 @@ type clientStream struct {
 }
 
 func (s clientStream) RawStream() Stream {
+	if rs, ok := s.ClientStream.(RawStreamGetter); ok {
+		return rs.RawStream()
+	}
 	return s.ClientStream
 }
 

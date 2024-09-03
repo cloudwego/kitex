@@ -7,21 +7,27 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/server/streamxserver"
 	"github.com/cloudwego/kitex/streamx"
-	"github.com/cloudwego/kitex/streamx/provider/ttstream"
 	"github.com/cloudwego/netpoll"
 	"io"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
-const testAddr = "127.0.0.1:12345"
-
 func TestTTHeaderStreaming(t *testing.T) {
-	ln, err := netpoll.CreateListener("tcp", testAddr)
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
+	const addr = "127.0.0.1:12345"
+	ln, err := netpoll.CreateListener("tcp", addr)
 	test.Assert(t, err == nil, err)
+	defer ln.Close()
 
 	// create server
 	var serverStreamCount int32
@@ -43,6 +49,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 						reqArgs.Req(), resArgs.Res(), streamArgs)
 					test.Assert(t, streamArgs.Stream() != nil)
 
+					log.Printf("Server handler start")
 					switch streamArgs.Stream().Mode() {
 					case streamx.StreamingUnary:
 						test.Assert(t, reqArgs.Req() != nil)
@@ -71,6 +78,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 					}
 					test.Assert(t, err == nil, err)
 					methodCount[streamArgs.Stream().Method()]++
+					log.Printf("Server handler end")
 
 					log.Printf("Server middleware after next: reqArgs=%v resArgs=%v streamArgs=%v",
 						reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
@@ -86,18 +94,19 @@ func TestTTHeaderStreaming(t *testing.T) {
 		test.Assert(t, err == nil, err)
 	}()
 	defer svr.Stop()
-	time.Sleep(time.Millisecond * 100)
+	test.WaitServerStart(addr)
 
 	// create client
 	ctx := context.Background()
 	cli, err := NewClient(
 		"a.b.c",
-		streamxclient.WithHostPorts(testAddr),
+		streamxclient.WithHostPorts(addr),
 		streamxclient.WithMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 			return func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
 				log.Printf("Client middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
 					reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
 				err = next(ctx, reqArgs, resArgs, streamArgs)
+				test.Assert(t, err == nil, err)
 				log.Printf("Client middleware after next: reqArgs=%v resArgs=%v streamArgs=%v",
 					reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
 
@@ -116,7 +125,6 @@ func TestTTHeaderStreaming(t *testing.T) {
 					test.Assert(t, reqArgs.Req() == nil)
 					test.Assert(t, resArgs.Res() == nil)
 				}
-				test.Assert(t, err == nil, err)
 				return err
 			}
 		}),
@@ -125,9 +133,11 @@ func TestTTHeaderStreaming(t *testing.T) {
 
 	t.Logf("=== Unary ===")
 	req := new(Request)
+	req.Type = 10000
 	req.Message = "Unary"
 	res, err := cli.Unary(ctx, req)
 	test.Assert(t, err == nil, err)
+	test.Assert(t, req.Type == res.Type, res.Type)
 	test.Assert(t, req.Message == res.Message, res.Message)
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
@@ -149,6 +159,8 @@ func TestTTHeaderStreaming(t *testing.T) {
 	t.Logf("Client ClientStream CloseAndRecv: %v", res)
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
+	cs = nil
+	runtime.GC()
 
 	// server stream
 	t.Logf("=== ServerStream ===")
@@ -157,8 +169,9 @@ func TestTTHeaderStreaming(t *testing.T) {
 	ss, err := cli.ServerStream(ctx, req)
 	test.Assert(t, err == nil, err)
 	// server stream recv header
-	hd, err := ttstream.RecvHeader(ss)
+	hd, err := ss.Header()
 	test.Assert(t, err == nil, err)
+	t.Logf("Client ServerStream recv header: %v", hd)
 	test.DeepEqual(t, hd["key1"], "val1")
 	test.DeepEqual(t, hd["key2"], "val2")
 	for {
@@ -172,12 +185,15 @@ func TestTTHeaderStreaming(t *testing.T) {
 	err = ss.CloseSend(ctx)
 	test.Assert(t, err == nil, err)
 	// server stream recv trailer
-	tl, err := ttstream.RecvTrailer(ss)
+	tl, err := ss.Trailer()
 	test.Assert(t, err == nil, err)
+	t.Logf("Client ServerStream recv trailer: %v", tl)
 	test.DeepEqual(t, tl["key1"], "val1")
 	test.DeepEqual(t, tl["key2"], "val2")
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
+	ss = nil
+	runtime.GC()
 
 	// bidi stream
 	t.Logf("=== BidiStream ===")
@@ -215,4 +231,12 @@ func TestTTHeaderStreaming(t *testing.T) {
 	wg.Wait()
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
+	bs = nil
+	runtime.GC()
+
+	cli = nil
+	for {
+		time.Sleep(time.Second)
+		runtime.GC()
+	}
 }

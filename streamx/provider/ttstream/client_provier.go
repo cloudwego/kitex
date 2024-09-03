@@ -9,6 +9,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/streamx"
 	"github.com/cloudwego/netpoll"
+	"log"
+	"runtime"
 	"time"
 )
 
@@ -41,11 +43,19 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	if err != nil {
 		return nil, err
 	}
+	_ = conn.SetDeadline(time.Now().Add(time.Hour))
+	_ = conn.SetReadTimeout(time.Hour)
 	trans := newTransport(clientTransport, c.sinfo, conn)
 	s, err := trans.newStream(ctx, method)
 	if err != nil {
 		return nil, err
 	}
 	cs := newClientStream(s)
+	runtime.SetFinalizer(cs, func(cs *clientStream) {
+		log.Printf("client stream[%v] closing", cs.sid)
+		_ = cs.close()
+		// TODO: current using one conn one stream
+		_ = trans.close()
+	})
 	return cs, err
 }

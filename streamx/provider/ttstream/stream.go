@@ -63,6 +63,10 @@ func (s *stream) Method() string {
 	return s.method
 }
 
+func (s *stream) close() error {
+	return s.sendTrailer()
+}
+
 func (s *stream) readHeader(hd Header) (err error) {
 	s.header = hd
 	select {
@@ -86,10 +90,14 @@ func (s *stream) writeHeader(hd Header) (err error) {
 }
 
 func (s *stream) sendHeader() (err error) {
-	err = s.trans.streamSendHeader(s.streamMeta, s.wheader)
+	wheader := s.wheader
+	s.wheader = nil
+	err = s.trans.streamSendHeader(s.streamMeta, wheader)
 	return err
 }
 
+// readTrailer by client: unblock recv function and return EOF if no unread frame
+// readTrailer by server: unblock recv function and return EOF if no unread frame
 func (s *stream) readTrailer(tl Trailer) (err error) {
 	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
 		return nil
@@ -103,7 +111,7 @@ func (s *stream) readTrailer(tl Trailer) (err error) {
 		close(s.trailerSig)
 	}
 
-	log.Printf("stream[%s] recv trailer: %v", s.method, tl)
+	log.Printf("stream[%d] recv trailer: %v", s.sid, tl)
 	return s.trans.streamCloseRecv(s)
 }
 
@@ -121,13 +129,15 @@ func (s *stream) sendTrailer() (err error) {
 	if !atomic.CompareAndSwapInt32(&s.selfEOF, 0, 1) {
 		return nil
 	}
-	log.Printf("stream[%s] send trialer", s.method)
+	log.Printf("stream[%d] send trialer", s.sid)
 	return s.trans.streamSendTrailer(s.streamMeta, s.wtrailer)
 }
 
 func (s *stream) SendMsg(ctx context.Context, res any) error {
+	defer log.Printf("send msg=%v", res)
 	payload, err := EncodePayload(ctx, res)
 	if err != nil {
+		println("EncodePayload err", err)
 		return err
 	}
 	return s.trans.streamSend(s.streamMeta, payload)
@@ -157,6 +167,10 @@ func (s *clientStream) CloseSend(ctx context.Context) error {
 	return s.sendTrailer()
 }
 
+func (s *clientStream) close() error {
+	return s.trans.streamClose(s.stream)
+}
+
 func newServerStream(s *stream) streamx.ServerStream {
 	ss := &serverStream{stream: s}
 	return ss
@@ -164,4 +178,18 @@ func newServerStream(s *stream) streamx.ServerStream {
 
 type serverStream struct {
 	*stream
+}
+
+func (s *serverStream) close() error {
+	return s.trans.streamClose(s.stream)
+}
+
+// serverStream should send left header first
+func (s *serverStream) SendMsg(ctx context.Context, res any) error {
+	if len(s.wheader) > 0 {
+		if err := s.sendHeader(); err != nil {
+			return err
+		}
+	}
+	return s.stream.SendMsg(ctx, res)
 }

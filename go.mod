@@ -47,6 +47,7 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
+	go.uber.org/goleak v1.3.0 // indirect
 	golang.org/x/arch v0.2.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )

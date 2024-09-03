@@ -2,8 +2,6 @@ package ttstream_test
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/streamx"
-	"github.com/cloudwego/kitex/streamx/provider/ttstream"
 	"io"
 	"log"
 )
@@ -11,12 +9,12 @@ import (
 type serviceImpl struct{}
 
 func (si *serviceImpl) Unary(ctx context.Context, req *Request) (*Response, error) {
-	resp := &Response{Message: req.Message}
+	resp := &Response{Type: req.Type, Message: req.Message}
 	log.Printf("Server Unary: req={%v} resp={%v}", req, resp)
 	return resp, nil
 }
 
-func (si *serviceImpl) ClientStream(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (res *Response, err error) {
+func (si *serviceImpl) ClientStream(ctx context.Context, stream ClientStreamingServer[Request, Response]) (res *Response, err error) {
 	var msg string
 	defer log.Printf("Server ClientStream end")
 	for {
@@ -34,12 +32,12 @@ func (si *serviceImpl) ClientStream(ctx context.Context, stream streamx.ClientSt
 	}
 }
 
-func (si *serviceImpl) ServerStream(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error {
+func (si *serviceImpl) ServerStream(ctx context.Context, req *Request, stream ServerStreamingServer[Response]) error {
 	log.Printf("Server ServerStream: req={%v}", req)
-	_ = ttstream.SetHeader(stream, map[string]string{"key1": "val1"})
-	_ = ttstream.SendHeader(stream, map[string]string{"key2": "val2"})
-	_ = ttstream.SetTrailer(stream, map[string]string{"key1": "val1"})
-	_ = ttstream.SetTrailer(stream, map[string]string{"key2": "val2"})
+	_ = stream.SetHeader(map[string]string{"key1": "val1"})
+	_ = stream.SendHeader(map[string]string{"key2": "val2"})
+	_ = stream.SetTrailer(map[string]string{"key1": "val1"})
+	_ = stream.SetTrailer(map[string]string{"key2": "val2"})
 
 	for i := 0; i < 3; i++ {
 		resp := new(Response)
@@ -49,12 +47,12 @@ func (si *serviceImpl) ServerStream(ctx context.Context, req *Request, stream st
 		if err != nil {
 			return err
 		}
-		log.Printf("Server ServerStream: resp={%v}", resp)
+		log.Printf("Server ServerStream: send resp={%v}", resp)
 	}
 	return nil
 }
 
-func (si *serviceImpl) BidiStream(ctx context.Context, stream streamx.BidiStreamingServer[Request, Response]) error {
+func (si *serviceImpl) BidiStream(ctx context.Context, stream BidiStreamingServer[Request, Response]) error {
 	for {
 		req, err := stream.Recv(ctx)
 		if err == io.EOF {

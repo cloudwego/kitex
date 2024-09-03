@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"log"
 )
 
@@ -38,7 +38,7 @@ func newFrame(meta streamMeta, typ int32, payload []byte) Frame {
 	}
 }
 
-func EncodeFrame(ctx context.Context, writer remote.ByteBuffer, fr Frame) (err error) {
+func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr Frame) (err error) {
 	param := ttheader.EncodeParam{
 		Flags:      ttheader.HeaderFlagsStreaming,
 		SeqID:      fr.sid,
@@ -72,7 +72,7 @@ func EncodeFrame(ctx context.Context, writer remote.ByteBuffer, fr Frame) (err e
 	return err
 }
 
-func DecodeFrame(ctx context.Context, reader remote.ByteBuffer) (fr Frame, err error) {
+func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr Frame, err error) {
 	var dp ttheader.DecodeParam
 	dp, err = ttheader.Decode(ctx, reader)
 	if err != nil {
@@ -103,8 +103,14 @@ func DecodeFrame(ctx context.Context, reader remote.ByteBuffer) (fr Frame, err e
 	fr.method = dp.IntInfo[ttheader.ToMethod]
 
 	// frame payload
-	log.Printf("payload len: %d", dp.PayloadLen)
-	fr.payload, err = reader.Next(dp.PayloadLen)
+	if dp.PayloadLen == 0 {
+		return fr, nil
+	}
+	log.Printf("DecodeFrame read next start")
+	fr.payload = make([]byte, dp.PayloadLen)
+	_, err = reader.ReadBinary(fr.payload)
+	reader.Release(err)
+	log.Printf("DecodeFrame read next: payload=%v", fr.payload)
 	if err != nil {
 		return
 	}

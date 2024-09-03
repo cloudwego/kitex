@@ -18,5 +18,5 @@ func (p internalServerProvider) OnStream(ctx context.Context, conn net.Conn) (co
 	if err != nil {
 		return nil, nil, err
 	}
-	return ctx, newServerStream(ss), nil
+	return ctx, ss, nil
 }

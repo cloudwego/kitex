@@ -2,7 +2,6 @@ package jsonrpc_test
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/streamx"
 	"io"
 	"log"
 )
@@ -15,7 +14,7 @@ func (si *serviceImpl) Unary(ctx context.Context, req *Request) (*Response, erro
 	return resp, nil
 }
 
-func (si *serviceImpl) ClientStream(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (res *Response, err error) {
+func (si *serviceImpl) ClientStream(ctx context.Context, stream ClientStreamingServer[Request, Response]) (res *Response, err error) {
 	var msg string
 	defer log.Printf("Server ClientStream end")
 	for {
@@ -33,7 +32,7 @@ func (si *serviceImpl) ClientStream(ctx context.Context, stream streamx.ClientSt
 	}
 }
 
-func (si *serviceImpl) ServerStream(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error {
+func (si *serviceImpl) ServerStream(ctx context.Context, req *Request, stream ServerStreamingServer[Response]) error {
 	log.Printf("Server ServerStream: req={%v}", req)
 	for i := 0; i < 3; i++ {
 		resp := new(Response)
@@ -48,7 +47,7 @@ func (si *serviceImpl) ServerStream(ctx context.Context, req *Request, stream st
 	return nil
 }
 
-func (si *serviceImpl) BidiStream(ctx context.Context, stream streamx.BidiStreamingServer[Request, Response]) error {
+func (si *serviceImpl) BidiStream(ctx context.Context, stream BidiStreamingServer[Request, Response]) error {
 	for {
 		req, err := stream.Recv(ctx)
 		if err == io.EOF {
