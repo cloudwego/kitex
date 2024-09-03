@@ -23,6 +23,7 @@ import (
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
@@ -251,6 +252,24 @@ func TestFallback(t *testing.T) {
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Functions["BinaryEcho"].Request.Struct.FieldsByName["req"].Type.Struct.FieldsByID[int32(1)].Alias == "STR")
 	test.Assert(t, tree.DynamicGoDsc != nil)
+}
+
+func TestDisableGoTag(t *testing.T) {
+	path := "http_test/idl/binary_echo.thrift"
+	p, err := NewThriftFileProvider(path)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Functions["BinaryEcho"].Request.Struct.FieldsByName["req"].Type.Struct.FieldsByID[4].FieldName() == "STR")
+
+	descriptor.RemoveAnnotation(descriptor.GoTagAnnatition)
+	p, err = NewThriftFileProvider(path)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Functions["BinaryEcho"].Request.Struct.FieldsByName["req"].Type.Struct.FieldsByID[4].FieldName() == "str")
 }
 
 func TestDisableGoTagForDynamicGo(t *testing.T) {

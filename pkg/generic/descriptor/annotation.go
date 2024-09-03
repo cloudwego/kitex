@@ -31,6 +31,16 @@ func RegisterAnnotation(an Annotation) {
 	annotations = append(annotations, an)
 }
 
+// RemoveAnnotation removes an annotation for parser
+func RemoveAnnotation(an Annotation) {
+	for i, v := range annotations {
+		if v == an {
+			annotations = append(annotations[:i], annotations[i+1:]...)
+			return
+		}
+	}
+}
+
 func init() {
 	// HttpMapping
 	RegisterAnnotation(APIQueryAnnotation)

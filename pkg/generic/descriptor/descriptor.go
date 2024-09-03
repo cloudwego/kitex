@@ -30,7 +30,7 @@ var isGoTagAliasDisabled = os.Getenv("KITEX_GENERIC_GOTAG_ALIAS_DISABLED") == "T
 
 func init() {
 	if isGoTagAliasDisabled {
-		// disable go.tag for dynamicgo
+		RemoveAnnotation(GoTagAnnatition)
 		dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
 	}
 }
