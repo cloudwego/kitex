@@ -31,25 +31,25 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
-type ClientStreaming interface {
+type clientStreaming interface {
 	streaming.Stream
 	Send(req interface{}) error
 	CloseAndRecv() (resp interface{}, err error)
 }
 
-type ServerStreaming interface {
+type serverStreaming interface {
 	streaming.Stream
 	Recv() (resp interface{}, err error)
 }
 
-type BidirectionalStreaming interface {
+type bidirectionalStreaming interface {
 	streaming.Stream
 	Send(req interface{}) error
 	Recv() (resp interface{}, err error)
 }
 
 func newStreamingClient(destService string, g generic.Generic, opts ...client.Option) (Client, error) {
-	return newStreamingClientWithServiceInfo(destService, g, StreamingServiceInfo(g), opts...)
+	return newStreamingClientWithServiceInfo(destService, g, streamingServiceInfo(g), opts...)
 }
 
 func newStreamingClientWithServiceInfo(destService string, g generic.Generic, svcInfo *serviceinfo.ServiceInfo, opts ...client.Option) (Client, error) {
@@ -107,7 +107,7 @@ type clientStreamingClient struct {
 	methodInfo serviceinfo.MethodInfo
 }
 
-func newClientStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (ClientStreaming, error) {
+func newClientStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (clientStreaming, error) {
 	gCli, ok := genericCli.(*genericServiceClient)
 	if !ok {
 		return nil, errors.New("invalid generic client")
@@ -142,7 +142,7 @@ type serverStreamingClient struct {
 	methodInfo serviceinfo.MethodInfo
 }
 
-func newServerStreaming(ctx context.Context, genericCli Client, method string, req interface{}, callOpts ...callopt.Option) (ServerStreaming, error) {
+func newServerStreaming(ctx context.Context, genericCli Client, method string, req interface{}, callOpts ...callopt.Option) (serverStreaming, error) {
 	gCli, ok := genericCli.(*genericServiceClient)
 	if !ok {
 		return nil, errors.New("invalid generic client")
@@ -178,7 +178,7 @@ type bidirectionalStreamingClient struct {
 	methodInfo serviceinfo.MethodInfo
 }
 
-func newBidirectionalStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (BidirectionalStreaming, error) {
+func newBidirectionalStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (bidirectionalStreaming, error) {
 	gCli, ok := genericCli.(*genericServiceClient)
 	if !ok {
 		return nil, errors.New("invalid generic client")

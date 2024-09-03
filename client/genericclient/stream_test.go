@@ -1,0 +1,81 @@
+/*
+ * Copyright 2024 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package genericclient
+
+import (
+	"context"
+	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic"
+)
+
+func TestStreamingClient(t *testing.T) {
+	test.PanicAt(t, func() {
+		newStreamingClient("destService", generic.BinaryThriftGeneric())
+	}, func(err interface{}) bool {
+		return err.(string) == "binary generic streaming is not supported"
+	})
+
+	g, err := getJSONThriftGeneric()
+	test.Assert(t, err == nil)
+	sCli, err := newStreamingClient("destService", g)
+	test.Assert(t, err == nil)
+	_, ok := sCli.(Client)
+	test.Assert(t, ok)
+}
+
+func TestClientStreaming(t *testing.T) {
+	g, err := getJSONThriftGeneric()
+	test.Assert(t, err == nil)
+	sCli, err := newStreamingClient("destService", g)
+	test.Assert(t, err == nil)
+	cStr, err := newClientStreaming(context.Background(), sCli, "ExampleMethod")
+	test.Assert(t, err == nil)
+	_, ok := cStr.(clientStreaming)
+	test.Assert(t, ok)
+}
+
+func TestServerStreaming(t *testing.T) {
+	g, err := getJSONThriftGeneric()
+	test.Assert(t, err == nil)
+	sCli, err := newStreamingClient("destService", g)
+	test.Assert(t, err == nil)
+	sStr, err := newServerStreaming(context.Background(), sCli, "ExampleMethod", `{"Msg": "message"}`)
+	test.Assert(t, err == nil)
+	_, ok := sStr.(serverStreaming)
+	test.Assert(t, ok)
+}
+
+func TestBidirectionalStreaming(t *testing.T) {
+	g, err := getJSONThriftGeneric()
+	test.Assert(t, err == nil)
+	sCli, err := newStreamingClient("destService", g)
+	test.Assert(t, err == nil)
+	bStr, err := newBidirectionalStreaming(context.Background(), sCli, "ExampleMethod")
+	test.Assert(t, err == nil)
+	_, ok := bStr.(bidirectionalStreaming)
+	test.Assert(t, ok)
+}
+
+func getJSONThriftGeneric() (generic.Generic, error) {
+	p, err := generic.NewThriftFileProvider("../../pkg/generic/json_test/idl/example.thrift")
+	if err != nil {
+		return nil, err
+	}
+	return generic.JSONThriftGeneric(p)
+}
