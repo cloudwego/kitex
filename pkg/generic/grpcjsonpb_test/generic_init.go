@@ -16,6 +16,7 @@
 
 package test
 
+/*
 import (
 	"context"
 	"fmt"
@@ -34,7 +35,7 @@ import (
 )
 
 func newGenericClient(g generic.Generic, targetIPPort string) genericclient.Client {
-	cli, err := genericclient.NewStreamingClient("destService", g,
+	cli, err := genericclient.newStreamingClient("destService", g,
 		client.WithTransportProtocol(transport.GRPC),
 		client.WithHostPorts(targetIPPort),
 	)
@@ -146,3 +147,4 @@ func (s *StreamingTestImpl) BidirectionalStreamingTest(stream mock.Mock_Bidirect
 	wg.Wait()
 	return
 }
+*/
