@@ -18,10 +18,12 @@ package genericclient
 
 import (
 	"context"
-	"testing"
-
+	dproto "github.com/cloudwego/dynamicgo/proto"
+	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
+	"github.com/cloudwego/kitex/transport"
+	"testing"
 )
 
 func TestStreamingClient(t *testing.T) {
@@ -31,43 +33,44 @@ func TestStreamingClient(t *testing.T) {
 		return err.(string) == "binary generic streaming is not supported"
 	})
 
-	g, err := getJSONThriftGeneric()
+	g, err := getJSONPbGeneric()
 	test.Assert(t, err == nil)
-	_, err = newStreamingClient("destService", g)
+	_, err = newStreamingClient("destService", g, client.WithTransportProtocol(transport.GRPC), client.WithHostPorts(test.GetLocalAddress()))
 	test.Assert(t, err == nil)
 }
 
 func TestClientStreaming(t *testing.T) {
-	g, err := getJSONThriftGeneric()
+	g, err := getJSONPbGeneric()
 	test.Assert(t, err == nil)
-	sCli, err := newStreamingClient("destService", g)
+	sCli, err := newStreamingClient("destService", g, client.WithTransportProtocol(transport.GRPC), client.WithHostPorts(test.GetLocalAddress()))
 	test.Assert(t, err == nil)
-	_, err = newClientStreaming(context.Background(), sCli, "ExampleMethod")
-	test.Assert(t, err == nil)
+	_, err = newClientStreaming(context.Background(), sCli, "ClientStreamingTest")
+	test.Assert(t, err != nil)
 }
 
 func TestServerStreaming(t *testing.T) {
-	g, err := getJSONThriftGeneric()
+	g, err := getJSONPbGeneric()
 	test.Assert(t, err == nil)
-	sCli, err := newStreamingClient("destService", g)
+	sCli, err := newStreamingClient("destService", g, client.WithTransportProtocol(transport.GRPC), client.WithHostPorts(test.GetLocalAddress()))
 	test.Assert(t, err == nil)
-	_, err = newServerStreaming(context.Background(), sCli, "ExampleMethod", `{"Msg": "message"}`)
-	test.Assert(t, err == nil)
+	_, err = newServerStreaming(context.Background(), sCli, "ServerStreamingTest", `{"Msg": "message"}`)
+	test.Assert(t, err != nil)
 }
 
 func TestBidirectionalStreaming(t *testing.T) {
-	g, err := getJSONThriftGeneric()
+	g, err := getJSONPbGeneric()
 	test.Assert(t, err == nil)
-	sCli, err := newStreamingClient("destService", g)
+	sCli, err := newStreamingClient("destService", g, client.WithTransportProtocol(transport.GRPC), client.WithHostPorts(test.GetLocalAddress()))
 	test.Assert(t, err == nil)
-	_, err = newBidirectionalStreaming(context.Background(), sCli, "ExampleMethod")
-	test.Assert(t, err == nil)
+	_, err = newBidirectionalStreaming(context.Background(), sCli, "BidirectionalStreamingTest")
+	test.Assert(t, err != nil)
 }
 
-func getJSONThriftGeneric() (generic.Generic, error) {
-	p, err := generic.NewThriftFileProvider("../../pkg/generic/json_test/idl/example.thrift")
+func getJSONPbGeneric() (generic.Generic, error) {
+	dOpts := dproto.Options{}
+	p, err := generic.NewPbFileProviderWithDynamicGo("../../pkg/generic/grpcjsonpb_test/idl/pbapi.proto", context.Background(), dOpts)
 	if err != nil {
 		return nil, err
 	}
-	return generic.JSONThriftGeneric(p)
+	return generic.JSONPbGeneric(p)
 }
