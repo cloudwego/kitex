@@ -33,10 +33,8 @@ func TestStreamingClient(t *testing.T) {
 
 	g, err := getJSONThriftGeneric()
 	test.Assert(t, err == nil)
-	sCli, err := newStreamingClient("destService", g)
+	_, err = newStreamingClient("destService", g)
 	test.Assert(t, err == nil)
-	_, ok := sCli.(Client)
-	test.Assert(t, ok)
 }
 
 func TestClientStreaming(t *testing.T) {
@@ -44,10 +42,8 @@ func TestClientStreaming(t *testing.T) {
 	test.Assert(t, err == nil)
 	sCli, err := newStreamingClient("destService", g)
 	test.Assert(t, err == nil)
-	cStr, err := newClientStreaming(context.Background(), sCli, "ExampleMethod")
+	_, err = newClientStreaming(context.Background(), sCli, "ExampleMethod")
 	test.Assert(t, err == nil)
-	_, ok := cStr.(clientStreaming)
-	test.Assert(t, ok)
 }
 
 func TestServerStreaming(t *testing.T) {
@@ -55,10 +51,8 @@ func TestServerStreaming(t *testing.T) {
 	test.Assert(t, err == nil)
 	sCli, err := newStreamingClient("destService", g)
 	test.Assert(t, err == nil)
-	sStr, err := newServerStreaming(context.Background(), sCli, "ExampleMethod", `{"Msg": "message"}`)
+	_, err = newServerStreaming(context.Background(), sCli, "ExampleMethod", `{"Msg": "message"}`)
 	test.Assert(t, err == nil)
-	_, ok := sStr.(serverStreaming)
-	test.Assert(t, ok)
 }
 
 func TestBidirectionalStreaming(t *testing.T) {
@@ -66,10 +60,8 @@ func TestBidirectionalStreaming(t *testing.T) {
 	test.Assert(t, err == nil)
 	sCli, err := newStreamingClient("destService", g)
 	test.Assert(t, err == nil)
-	bStr, err := newBidirectionalStreaming(context.Background(), sCli, "ExampleMethod")
+	_, err = newBidirectionalStreaming(context.Background(), sCli, "ExampleMethod")
 	test.Assert(t, err == nil)
-	_, ok := bStr.(bidirectionalStreaming)
-	test.Assert(t, ok)
 }
 
 func getJSONThriftGeneric() (generic.Generic, error) {
