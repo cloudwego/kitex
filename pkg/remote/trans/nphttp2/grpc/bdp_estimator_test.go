@@ -18,11 +18,16 @@ package grpc
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestBdp(t *testing.T) {
+	oribdpPingInterval := bdpPingInterval
+	defer func() { bdpPingInterval = oribdpPingInterval }()
+	bdpPingInterval = 10 * time.Millisecond // shorter time for testing
+
 	// init bdp estimator
 	bdpEst := &bdpEstimator{
 		bdp:               initialWindowSize,
@@ -50,11 +55,14 @@ func TestBdp(t *testing.T) {
 	// receive normal ping
 	bdpEst.calculate([8]byte{0, 0, 0, 0, 0, 0, 0, 0})
 
+	test.Assert(t, false == bdpEst.add(0)) // due to bdpPingInterval
+	time.Sleep(2 * bdpPingInterval)
+
 	size = 10000
 	// calculate 15 times
 	for c := 0; c < 15; c++ {
 		sent = bdpEst.add(uint32(size))
-		test.Assert(t, sent)
+		test.Assert(t, sent, c)
 		bdpEst.timesnap(bdpPing.data)
 
 		// mock the situation that network delay is very long and data is very big
@@ -65,6 +73,6 @@ func TestBdp(t *testing.T) {
 
 		// receive bdp ack and calculate again
 		bdpEst.calculate(bdpPing.data)
-
+		bdpEst.sentAt = time.Time{} // reset for bdpPingInterval
 	}
 }

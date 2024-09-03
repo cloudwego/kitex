@@ -230,9 +230,7 @@ func newHTTP2Server(ctx context.Context, conn net.Conn, config *ServerConfig) (_
 		bufferPool:        newBufferPool(),
 	}
 	t.controlBuf = newControlBuffer(t.done)
-	if false && dynamicWindow {
-		// we force disable dynamic window here coz it's sending too many ping frames...
-		// and it may not work as expected when running on top of netpoll.
+	if dynamicWindow {
 		t.bdpEst = &bdpEstimator{
 			bdp:               initialWindowSize,
 			updateFlowControl: t.updateFlowControl,
