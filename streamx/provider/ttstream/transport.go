@@ -3,9 +3,8 @@ package ttstream
 import (
 	"context"
 	"fmt"
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
-	"github.com/cloudwego/kitex/pkg/remote"
-	nepolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/netpoll"
 	"io"
@@ -13,11 +12,6 @@ import (
 	"sync"
 	"sync/atomic"
 )
-
-type streamIO struct {
-	stream *stream
-	rch    chan Frame
-}
 
 const (
 	clientTransport int32 = 1
@@ -28,8 +22,8 @@ type transport struct {
 	kind    int32
 	sinfo   *serviceinfo.ServiceInfo
 	conn    netpoll.Connection
-	reader  remote.ByteBuffer
-	writer  remote.ByteBuffer
+	reader  bufiox.Reader
+	writer  bufiox.Writer
 	streams sync.Map     // key=streamID val=streamIO
 	sch     chan *stream // in-coming stream channel
 	wch     chan Frame   // out-coming frame channel
@@ -37,8 +31,8 @@ type transport struct {
 }
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
-	reader := nepolltrans.NewReaderByteBuffer(conn.Reader())
-	writer := nepolltrans.NewWriterByteBuffer(conn.Writer())
+	reader := bufiox.NewDefaultReader(conn)
+	writer := bufiox.NewDefaultWriter(conn)
 	t := &transport{
 		kind:    kind,
 		sinfo:   sinfo,
@@ -46,41 +40,44 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		reader:  reader,
 		writer:  writer,
 		streams: sync.Map{},
-		sch:     make(chan *stream),
-		wch:     make(chan Frame),
+		sch:     make(chan *stream, 8),
+		wch:     make(chan Frame, 8),
 		stop:    make(chan struct{}),
 	}
 	go func() {
 		err := t.loopRead()
 		if err != nil {
 			log.Printf("loop read err: %v", err)
+			return
 		}
 	}()
 	go func() {
 		err := t.loopWrite()
 		if err != nil {
 			log.Printf("loop write err: %v", err)
+			return
 		}
 	}()
 	return t
 }
 
 func (t *transport) storeStreamIO(s *stream) {
-	t.streams.Store(s.sid, streamIO{stream: s, rch: make(chan Frame, 1024)})
+	t.streams.Store(s.sid, newStreamIO(s))
 }
 
-func (t *transport) loadStreamIO(sid int32) (sio streamIO, ok bool) {
+func (t *transport) loadStreamIO(sid int32) (sio *streamIO, ok bool) {
 	val, ok := t.streams.Load(sid)
 	if !ok {
 		return sio, false
 	}
-	sio = val.(streamIO)
+	sio = val.(*streamIO)
 	return sio, true
 }
 
 func (t *transport) loopRead() error {
 	for {
 		// decode frame
+		log.Printf("loop read frame start")
 		fr, err := DecodeFrame(context.Background(), t.reader)
 		log.Printf("loop read frame=%v err=%v", fr, err)
 		if err != nil {
@@ -95,12 +92,13 @@ func (t *transport) loopRead() error {
 				// Header Frame: server recv a new stream
 				smode := t.sinfo.MethodInfo(fr.method).StreamingMode()
 				s := newStream(t, smode, fr.streamMeta)
+				log.Printf("transport[%d] read a new stream: sid=%d", t.kind, s.sid)
 				t.sch <- s
 			case clientTransport:
 				// Header Frame: client recv header
 				sio, ok := t.loadStreamIO(fr.sid)
 				if !ok {
-					return fmt.Errorf("stream not found in stream map: sid=%d", fr.sid)
+					return fmt.Errorf("transport[%d] read a unknown stream header: sid=%d", t.kind, fr.sid)
 				}
 				err = sio.stream.readHeader(fr.header)
 				if err != nil {
@@ -111,14 +109,14 @@ func (t *transport) loopRead() error {
 			// Data Frame: decode and distribute data
 			sio, ok := t.loadStreamIO(fr.sid)
 			if !ok {
-				return fmt.Errorf("stream not found in stream map: sid=%d", fr.sid)
+				return fmt.Errorf("transport[%d] read a unknown stream data: sid=%d", t.kind, fr.sid)
 			}
-			sio.rch <- fr
+			sio.input(fr)
 		case trailerFrameType:
 			// Trailer Frame: recv trailer, close read direction
 			sio, ok := t.loadStreamIO(fr.sid)
 			if !ok {
-				return fmt.Errorf("stream not found in stream map: sid=%d", fr.sid)
+				return fmt.Errorf("transport[%d] read a unknown stream trailer: sid=%d", t.kind, fr.sid)
 			}
 			if err = sio.stream.readTrailer(fr.trailer); err != nil {
 				return err
@@ -127,23 +125,31 @@ func (t *transport) loopRead() error {
 	}
 }
 
+func (t *transport) writeFrame(frame Frame) error {
+	log.Printf("loop stop and write frame start: %v", frame)
+	err := EncodeFrame(context.Background(), t.writer, frame)
+	log.Printf("loop stop and write frame end: %v", err)
+	return err
+}
+
 func (t *transport) loopWrite() error {
+	defer func() {
+		log.Printf("loop write end: %s", t.conn.LocalAddr())
+	}()
 	for {
 		select {
 		case <-t.stop:
-			// re check wch queue
+			// re-check wch queue
 			select {
 			case frame := <-t.wch:
-				err := EncodeFrame(context.Background(), t.writer, frame)
-				if err != nil {
+				if err := t.writeFrame(frame); err != nil {
 					return err
 				}
 			default:
-				return t.conn.Close()
+				return nil
 			}
 		case frame := <-t.wch:
-			err := EncodeFrame(context.Background(), t.writer, frame)
-			if err != nil {
+			if err := t.writeFrame(frame); err != nil {
 				return err
 			}
 		}
@@ -154,7 +160,9 @@ func (t *transport) close() (err error) {
 	select {
 	case <-t.stop:
 	default:
+		log.Printf("transport[%s] closeing", t.conn.LocalAddr())
 		close(t.stop)
+		t.conn.Close()
 	}
 	return nil
 }
@@ -186,12 +194,27 @@ func (t *transport) streamRecv(s streamMeta) (payload []byte, err error) {
 	if !ok {
 		return nil, io.EOF
 	}
-	f := <-sio.rch
-	log.Printf("trans stream recv: %v", f)
-	if f.sid != s.sid { // f.sid == 0 means it's a empty frame
-		return nil, io.EOF
+	f, err := sio.output()
+	if err != nil {
+		return nil, err
 	}
+	log.Printf("trans stream recv: %v", f)
 	return f.payload, nil
+}
+
+func (t *transport) streamCloseRecv(s *stream) (err error) {
+	sio, ok := t.loadStreamIO(s.sid)
+	if !ok {
+		return fmt.Errorf("stream not found in stream map: sid=%d", s.sid)
+	}
+	sio.eof()
+	return nil
+}
+
+func (t *transport) streamClose(s *stream) (err error) {
+	// remove stream from transport
+	t.streams.Delete(s.sid)
+	return nil
 }
 
 var clientStreamID int32
@@ -225,17 +248,12 @@ func (t *transport) readStream() (*stream, error) {
 	}
 	select {
 	case <-t.stop:
+		println("transport return")
 		return nil, io.EOF
 	case s := <-t.sch:
+		if s == nil {
+			return nil, io.EOF
+		}
 		return s, nil
 	}
-}
-
-func (t *transport) streamCloseRecv(s *stream) (err error) {
-	sio, ok := t.loadStreamIO(s.sid)
-	if !ok {
-		return fmt.Errorf("stream not found in stream map: sid=%d", s.sid)
-	}
-	close(sio.rch)
-	return nil
 }

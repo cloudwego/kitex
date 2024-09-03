@@ -43,6 +43,7 @@ type ServerProvider interface {
 	Available(ctx context.Context, conn net.Conn) bool // ProtocolMath
 	// OnActive called when conn connected
 	OnActive(ctx context.Context, conn net.Conn) (context.Context, error)
+	OnInactive(ctx context.Context, conn net.Conn) (context.Context, error)
 	// OnStream should read conn data and return a server stream
 	OnStream(ctx context.Context, conn net.Conn) (context.Context, ServerStream, error)
 	// OnStreamFinish should be called when user server handler returned, typically provide should close the stream

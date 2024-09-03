@@ -24,6 +24,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/transport"
+	"io"
 	"net"
 	"runtime/debug"
 	"sync"
@@ -90,17 +91,23 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	if err != nil {
 		return nil, err
 	}
+	// connection level goroutine
 	go func() {
 		for {
 			nctx, ss, nerr := t.provider.OnStream(ctx, conn)
 			if nerr != nil {
-				klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)
+				if !errors.Is(nerr, io.EOF) {
+					klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)
+				}
 				return
 			}
+			// stream level goroutine
 			go func() {
 				nerr = t.OnStream(nctx, conn, ss)
 				if nerr != nil {
-					klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", err)
+					if !errors.Is(nerr, io.EOF) {
+						klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", err)
+					}
 					return
 				}
 			}()
@@ -153,9 +160,9 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss Server
 		panicErr := recover()
 		if panicErr != nil {
 			if conn != nil {
-				klog.CtxErrorf(ctx, "KITEX: jsonRPC panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
+				klog.CtxErrorf(ctx, "KITEX: streamx panic happened, close conn, remoteAddress=%s, error=%s\nstack=%s", conn.RemoteAddr(), panicErr, string(debug.Stack()))
 			} else {
-				klog.CtxErrorf(ctx, "KITEX: jsonRPC panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
+				klog.CtxErrorf(ctx, "KITEX: streamx panic happened, error=%v\nstack=%s", panicErr, string(debug.Stack()))
 			}
 		}
 		t.finishTracer(ctx, ri, err, panicErr)
@@ -180,6 +187,7 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 }
 
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
+	_, _ = t.provider.OnInactive(ctx, conn)
 	return
 }
 

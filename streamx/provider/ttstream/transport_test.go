@@ -60,7 +60,7 @@ func TestTransport(t *testing.T) {
 				go func(st streamx.ServerStream) {
 					defer func() {
 						// set trailer
-						err := SetTrailer(st, Trailer{"key": "val"})
+						err := st.(ServerStreamMeta).SetTrailer(Trailer{"key": "val"})
 						test.Assert(t, err == nil, err)
 
 						// send trailer
@@ -69,7 +69,7 @@ func TestTransport(t *testing.T) {
 					}()
 
 					// send header
-					err := SendHeader(st, Header{"key": "val"})
+					err := st.(ServerStreamMeta).SendHeader(Header{"key": "val"})
 					test.Assert(t, err == nil, err)
 
 					// send data
@@ -106,7 +106,7 @@ func TestTransport(t *testing.T) {
 		err = svr.Serve(ln)
 		test.Assert(t, err == nil, err)
 	}()
-	time.Sleep(time.Millisecond * 100)
+	test.WaitServerStart(addr)
 
 	// Client
 	ctx := context.Background()
@@ -129,7 +129,7 @@ func TestTransport(t *testing.T) {
 			t.Logf("client stream[%d] created", sid)
 
 			// recv header
-			hd, err := RecvHeader(cs)
+			hd, err := cs.Header()
 			test.Assert(t, err == nil, err)
 			test.Assert(t, hd["key"] == "val", hd)
 			t.Logf("client stream[%d] recv header=%v", sid, hd)
@@ -156,7 +156,7 @@ func TestTransport(t *testing.T) {
 			t.Logf("client stream[%d] close send", sid)
 
 			// recv trailer
-			tl, err := RecvTrailer(cs)
+			tl, err := cs.Trailer()
 			test.Assert(t, err == nil, err)
 			test.Assert(t, tl["key"] == "val", tl)
 			t.Logf("client stream[%d] recv trailer=%v", sid, tl)

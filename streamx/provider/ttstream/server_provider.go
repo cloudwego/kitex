@@ -27,12 +27,27 @@ type serverProvider struct {
 }
 
 func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
+	_, _ = conn.(netpoll.Connection).Reader().Peek(4)
 	return true
 }
 
 func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	trans := newTransport(serverTransport, s.sinfo, conn.(netpoll.Connection))
 	return context.WithValue(ctx, serverTransCtxKey{}, trans), nil
+}
+
+func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.Context, error) {
+	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
+	if trans == nil {
+		return ctx, nil
+	}
+	println("serverProvider closed")
+	// server should close transport
+	err := trans.close()
+	if err != nil {
+		return nil, err
+	}
+	return ctx, nil
 }
 
 func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Context, streamx.ServerStream, error) {
@@ -49,8 +64,12 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 }
 
 func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStream) (context.Context, error) {
-	rs := ss.(streamx.RawStreamGetter).RawStream()
-	sst := rs.(*serverStream)
-	err := sst.sendTrailer()
-	return ctx, err
+	sst := ss.(*serverStream)
+	if err := sst.sendTrailer(); err != nil {
+		return nil, err
+	}
+	if err := sst.close(); err != nil {
+		return nil, err
+	}
+	return ctx, nil
 }
