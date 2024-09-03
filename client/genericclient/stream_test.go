@@ -18,12 +18,13 @@ package genericclient
 
 import (
 	"context"
+	"testing"
+
 	dproto "github.com/cloudwego/dynamicgo/proto"
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/transport"
-	"testing"
 )
 
 func TestStreamingClient(t *testing.T) {
@@ -46,6 +47,7 @@ func TestClientStreaming(t *testing.T) {
 	test.Assert(t, err == nil)
 	_, err = newClientStreaming(context.Background(), sCli, "ClientStreamingTest")
 	test.Assert(t, err != nil)
+	sCli.Close()
 }
 
 func TestServerStreaming(t *testing.T) {
@@ -55,6 +57,7 @@ func TestServerStreaming(t *testing.T) {
 	test.Assert(t, err == nil)
 	_, err = newServerStreaming(context.Background(), sCli, "ServerStreamingTest", `{"Msg": "message"}`)
 	test.Assert(t, err != nil)
+	sCli.Close()
 }
 
 func TestBidirectionalStreaming(t *testing.T) {
@@ -64,6 +67,7 @@ func TestBidirectionalStreaming(t *testing.T) {
 	test.Assert(t, err == nil)
 	_, err = newBidirectionalStreaming(context.Background(), sCli, "BidirectionalStreamingTest")
 	test.Assert(t, err != nil)
+	sCli.Close()
 }
 
 func getJSONPbGeneric() (generic.Generic, error) {
