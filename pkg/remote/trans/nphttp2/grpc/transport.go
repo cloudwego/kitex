@@ -260,6 +260,9 @@ type Stream struct {
 
 	// hdrMu protects header and trailer metadata on the server-side.
 	hdrMu sync.Mutex
+	// cliTlrMu protects trailer metadata on the client-side
+	cliTlrMu sync.RWMutex
+
 	// On client side, header keeps the received header metadata.
 	//
 	// On server side, header keeps the header set by SetHeader(). The complete
@@ -388,7 +391,9 @@ func (s *Stream) TrailersOnly() bool {
 // It can be safely read only after stream has ended that is either read
 // or write have returned io.EOF.
 func (s *Stream) Trailer() metadata.MD {
+	s.cliTlrMu.RLock()
 	c := s.trailer.Copy()
+	s.cliTlrMu.RUnlock()
 	return c
 }
 
