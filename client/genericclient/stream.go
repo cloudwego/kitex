@@ -31,6 +31,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
+// NOTE: this is a temporary adjustment for ci check. remove it after fully completing the generic streaming support
 var (
 	_ clientStreaming        = nil
 	_ serverStreaming        = nil
