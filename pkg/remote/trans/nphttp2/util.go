@@ -24,7 +24,7 @@ import (
 func isClientStreaming(ri rpcinfo.RPCInfo, svcInfo *serviceinfo.ServiceInfo) bool {
 	methodInfo := svcInfo.MethodInfo(ri.Invocation().MethodName())
 	// is there possibility that methodInfo is nil?
-	if methodInfo != nil {
+	if methodInfo == nil {
 		return false
 	}
 	mode := methodInfo.StreamingMode()
