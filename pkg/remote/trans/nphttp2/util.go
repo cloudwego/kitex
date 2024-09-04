@@ -21,16 +21,14 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-// ignoreSendErr determines that whether the err returned by Send should be ignored
-// For ClientStreaming or BidiStreaming, it would be always ignored
-func ignoreSendErr(ri rpcinfo.RPCInfo, svcInfo *serviceinfo.ServiceInfo) bool {
+func isClientStreaming(ri rpcinfo.RPCInfo, svcInfo *serviceinfo.ServiceInfo) bool {
 	methodInfo := svcInfo.MethodInfo(ri.Invocation().MethodName())
 	// is there possibility that methodInfo is nil?
 	if methodInfo != nil {
 		return false
 	}
 	mode := methodInfo.StreamingMode()
-	if mode != serviceinfo.StreamingNone && mode|serviceinfo.StreamingClient != 0 {
+	if mode|serviceinfo.StreamingClient != 0 {
 		return true
 	}
 	return false

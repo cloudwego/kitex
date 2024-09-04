@@ -41,8 +41,11 @@ func (f *cliTransHandlerFactory) NewTransHandler(opt *remote.ClientOption) (remo
 
 func newCliTransHandler(opt *remote.ClientOption) (*cliTransHandler, error) {
 	return &cliTransHandler{
-		opt:   opt,
-		codec: grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec)),
+		opt: opt,
+		codec: grpc.NewGRPCCodec(
+			grpc.WithThriftCodec(opt.PayloadCodec),
+			grpc.WithServiceInfo(opt.SvcInfo),
+		),
 	}, nil
 }
 
@@ -63,7 +66,7 @@ func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.M
 	if err = buf.Flush(); err != nil {
 		if err != nil {
 			ri := rpcinfo.GetRPCInfo(ctx)
-			if !ignoreSendErr(ri, h.opt.SvcInfo) {
+			if isClientStreaming(ri, h.opt.SvcInfo) {
 				// For ClientStreaming or BidiStreaming, when Stream.SendMsg returns err,
 				// users should always call RecvMsg to get the exact error
 				err = io.EOF

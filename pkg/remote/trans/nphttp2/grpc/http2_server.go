@@ -61,15 +61,15 @@ var (
 
 	// errors used for cancelling stream.
 	// the code should be codes.Canceled coz it's NOT returned from remote
-	errConnectionEOF      = status.New(codes.Canceled, "transport: connection EOF").Err()
-	errStreamClosing      = status.New(codes.Canceled, "transport: stream is closing").Err()
-	errMaxStreamsExceeded = status.New(codes.Canceled, "transport: max streams exceeded").Err()
-	errNotReachable       = status.New(codes.Canceled, "transport: server not reachable").Err()
-	errMaxAgeClosing      = status.New(codes.Canceled, "transport: closing server transport due to maximum connection age").Err()
-	errIdleClosing        = status.New(codes.Canceled, "transport: closing server transport due to idleness").Err()
+	errConnectionEOF      = status.Err(codes.Canceled, "transport: connection EOF")
+	errStreamClosing      = status.Err(codes.Canceled, "transport: stream is closing")
+	errMaxStreamsExceeded = status.Err(codes.Canceled, "transport: max streams exceeded")
+	errNotReachable       = status.Err(codes.Canceled, "transport: server not reachable")
+	errMaxAgeClosing      = status.Err(codes.Canceled, "transport: closing server transport due to maximum connection age")
+	errIdleClosing        = status.Err(codes.Canceled, "transport: closing server transport due to idleness")
 
-	errRSTStreamRecv                = status.New(codes.Canceled, "transport: RSTStream Frame received").Err()
-	errHeaderListSizeLimitViolation = status.New(codes.Canceled, ErrHeaderListSizeLimitViolation.Error()).Err()
+	errRSTStreamRecv                = status.Err(codes.Canceled, "transport: RSTStream Frame received")
+	errHeaderListSizeLimitViolation = status.Err(codes.Canceled, ErrHeaderListSizeLimitViolation.Error())
 )
 
 func init() {
