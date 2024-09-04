@@ -66,6 +66,7 @@ type rpcConfig struct {
 	transportProtocol transport.Protocol
 	interactionMode   InteractionMode
 	payloadCodec      serviceinfo.PayloadCodec
+	streamingMode     serviceinfo.StreamingMode
 }
 
 func init() {
@@ -191,6 +192,14 @@ func (r *rpcConfig) SetPayloadCodec(codec serviceinfo.PayloadCodec) {
 
 func (r *rpcConfig) PayloadCodec() serviceinfo.PayloadCodec {
 	return r.payloadCodec
+}
+
+func (r *rpcConfig) SetStreamingMode(mode serviceinfo.StreamingMode) {
+	r.streamingMode = mode
+}
+
+func (r *rpcConfig) StreamingMode() serviceinfo.StreamingMode {
+	return r.streamingMode
 }
 
 // Clone returns a copy of the current rpcConfig.
