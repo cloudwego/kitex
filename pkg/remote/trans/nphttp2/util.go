@@ -28,7 +28,7 @@ func isClientStreaming(ri rpcinfo.RPCInfo, svcInfo *serviceinfo.ServiceInfo) boo
 		return false
 	}
 	mode := methodInfo.StreamingMode()
-	if mode|serviceinfo.StreamingClient != 0 {
+	if mode&serviceinfo.StreamingClient != 0 {
 		return true
 	}
 	return false
