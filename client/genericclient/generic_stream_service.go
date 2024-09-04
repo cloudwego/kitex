@@ -21,7 +21,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-func StreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
+func streamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 	return newClientStreamingServiceInfo(g)
 }
 
