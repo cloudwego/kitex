@@ -546,9 +546,7 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 		<-s.done
 		return
 	}
-	// status and trailers can be updated here without any synchronization because the stream goroutine will
-	// only read it after it sees an io.EOF error from read or write and we'll write those errors
-	// only after updating this.
+	// status and trailers should be updated here with synchronization because Trailer() function may be called concurrently
 	s.status = st
 	if len(mdata) > 0 {
 		s.cliTlrMu.Lock()

@@ -21,11 +21,12 @@ import (
 	"math"
 	"testing"
 
+	"golang.org/x/net/http2"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-	"golang.org/x/net/http2"
 )
 
 func TestHttp2ClientTrailerRace(t *testing.T) {
