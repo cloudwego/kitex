@@ -31,6 +31,16 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
+var (
+	_ clientStreaming        = nil
+	_ serverStreaming        = nil
+	_ bidirectionalStreaming = nil
+	_                        = newStreamingClient
+	_                        = newClientStreaming
+	_                        = newServerStreaming
+	_                        = newBidirectionalStreaming
+)
+
 type clientStreaming interface {
 	streaming.Stream
 	Send(req interface{}) error
