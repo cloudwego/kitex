@@ -1430,7 +1430,8 @@ func Test_writeHTTPRequestWithPbBody(t *testing.T) {
 	}
 }
 
-func getReqPbBody() (proto.Message, error) { //lint:ignore SA1019 static check
+//lint:ignore SA1019 static check
+func getReqPbBody() (proto.Message, error) {
 	path := "main.proto"
 	content := `
 	package kitex.test.server;

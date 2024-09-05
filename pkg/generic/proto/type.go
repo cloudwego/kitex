@@ -34,6 +34,8 @@ type Message interface {
 }
 
 // Deprecated: this API will be removed in v0.12.0
-func NewMessage(descriptor MessageDescriptor) Message { //lint:ignore SA1019 static check
+//
+//lint:ignore SA1019 static check
+func NewMessage(descriptor MessageDescriptor) Message {
 	return dynamic.NewMessage(descriptor)
 }

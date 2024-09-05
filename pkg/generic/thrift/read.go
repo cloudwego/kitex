@@ -59,7 +59,8 @@ func getMapFieldSetter(st map[string]interface{}) fieldSetter {
 	}
 }
 
-func getPbFieldSetter(st proto.Message) fieldSetter { //lint:ignore SA1019 static check
+//lint:ignore SA1019 static check
+func getPbFieldSetter(st proto.Message) fieldSetter {
 	return func(field *descriptor.FieldDescriptor, val interface{}) error {
 		return st.TrySetFieldByNumber(int(field.ID), val)
 	}
