@@ -33,7 +33,7 @@ type Message interface {
 	TrySetFieldByNumber(fieldNumber int, val interface{}) error
 }
 
-// TODO(marina.sakai): remove this
+// TODO(marina.sakai): modify this
 func NewMessage(descriptor MessageDescriptor) Message {
 	return dynamic.NewMessage(descriptor)
 }
