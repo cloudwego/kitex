@@ -26,12 +26,14 @@ type (
 	MessageDescriptor = *desc.MessageDescriptor
 )
 
+// TODO(marina.sakai): remove this
 type Message interface {
 	Marshal() ([]byte, error)
 	TryGetFieldByNumber(fieldNumber int) (interface{}, error)
 	TrySetFieldByNumber(fieldNumber int, val interface{}) error
 }
 
+// TODO(marina.sakai): remove this
 func NewMessage(descriptor MessageDescriptor) Message {
 	return dynamic.NewMessage(descriptor)
 }
