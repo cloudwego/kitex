@@ -24,7 +24,6 @@ import (
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/dynamic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/proto"
@@ -60,7 +59,7 @@ func getMapFieldSetter(st map[string]interface{}) fieldSetter {
 	}
 }
 
-func getPbFieldSetter(st dynamic.Message) fieldSetter {
+func getPbFieldSetter(st proto.Message) fieldSetter {
 	return func(field *descriptor.FieldDescriptor, val interface{}) error {
 		return st.TrySetFieldByNumber(int(field.ID), val)
 	}

@@ -18,13 +18,13 @@ package generic
 
 import (
 	"context"
-	gproto "github.com/cloudwego/kitex/pkg/generic/proto"
 	"testing"
 
 	"github.com/cloudwego/dynamicgo/conv"
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/internal/test"
+	gproto "github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 

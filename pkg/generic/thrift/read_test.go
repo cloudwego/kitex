@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"reflect"
 	"testing"
 
@@ -30,6 +29,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 var (

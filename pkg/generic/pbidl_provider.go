@@ -19,11 +19,12 @@ package generic
 import (
 	"context"
 	"errors"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"sync"
 
 	dproto "github.com/cloudwego/dynamicgo/proto"
 	"github.com/jhump/protoreflect/desc/protoparse"
+
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 type PbContentProvider struct {

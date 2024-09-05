@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"testing"
 
 	"github.com/cloudwego/gopkg/bufiox"
@@ -31,6 +30,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 func Test_nextWriter(t *testing.T) {

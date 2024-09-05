@@ -18,7 +18,6 @@ package generic
 
 import (
 	"bytes"
-	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"io"
 	"net/http"
 	"os"
@@ -26,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 

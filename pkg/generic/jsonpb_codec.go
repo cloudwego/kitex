@@ -20,12 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
