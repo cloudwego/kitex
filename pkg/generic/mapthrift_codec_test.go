@@ -17,9 +17,9 @@
 package generic
 
 import (
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/generic/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )

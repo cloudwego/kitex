@@ -19,9 +19,9 @@ package generic
 import (
 	"context"
 	"errors"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"sync/atomic"
 
-	"github.com/cloudwego/kitex/internal/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"

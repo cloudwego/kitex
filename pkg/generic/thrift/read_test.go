@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"reflect"
 	"testing"
 
@@ -27,7 +28,6 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/jhump/protoreflect/desc/protoparse"
 
-	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
