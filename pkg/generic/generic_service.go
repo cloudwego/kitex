@@ -23,8 +23,8 @@ import (
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
-	"github.com/cloudwego/kitex/internal/generic/proto"
-	"github.com/cloudwego/kitex/internal/generic/thrift"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	codecProto "github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )

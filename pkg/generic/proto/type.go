@@ -14,24 +14,26 @@
  * limitations under the License.
  */
 
-package generic
+package proto
 
 import (
-	dproto "github.com/cloudwego/dynamicgo/proto"
-
-	"github.com/cloudwego/kitex/pkg/generic/proto"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
 )
 
-// PbDescriptorProvider provide service descriptor
-type PbDescriptorProvider interface {
-	Closer
-	// Provide return a channel for provide service descriptors
-	Provide() <-chan proto.ServiceDescriptor
+type (
+	ServiceDescriptor = *desc.ServiceDescriptor
+	MessageDescriptor = *desc.MessageDescriptor
+)
+
+// Deprecated: this interface will be removed in v0.12.0
+type Message interface {
+	Marshal() ([]byte, error)
+	TryGetFieldByNumber(fieldNumber int) (interface{}, error)
+	TrySetFieldByNumber(fieldNumber int, val interface{}) error
 }
 
-// PbDescriptorProvider provide service descriptor
-type PbDescriptorProviderDynamicGo interface {
-	Closer
-	// Provide return a channel for provide service descriptors
-	Provide() <-chan *dproto.ServiceDescriptor
+// Deprecated: this API will be removed in v0.12.0
+func NewMessage(descriptor MessageDescriptor) Message {
+	return dynamic.NewMessage(descriptor)
 }

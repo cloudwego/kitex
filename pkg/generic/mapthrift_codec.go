@@ -21,8 +21,8 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"github.com/cloudwego/kitex/internal/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"

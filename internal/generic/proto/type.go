@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2024 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,12 +26,14 @@ type (
 	MessageDescriptor = *desc.MessageDescriptor
 )
 
+// TODO(marina.sakai): remove this
 type Message interface {
 	Marshal() ([]byte, error)
 	TryGetFieldByNumber(fieldNumber int) (interface{}, error)
 	TrySetFieldByNumber(fieldNumber int, val interface{}) error
 }
 
+// TODO(marina.sakai): modify this
 func NewMessage(descriptor MessageDescriptor) Message {
 	return dynamic.NewMessage(descriptor)
 }

@@ -27,8 +27,8 @@ import (
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 
-	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 type HTTPPbReaderWriter struct {
