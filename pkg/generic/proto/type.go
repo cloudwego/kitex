@@ -28,7 +28,7 @@ type (
 
 // Deprecated: this interface will be removed in v0.12.0
 //
-//nolint:depchecker
+// nolint
 type Message interface {
 	Marshal() ([]byte, error)
 	TryGetFieldByNumber(fieldNumber int) (interface{}, error)
@@ -37,7 +37,7 @@ type Message interface {
 
 // Deprecated: this API will be removed in v0.12.0
 //
-//nolint:depchecker
+// nolint
 func NewMessage(descriptor MessageDescriptor) Message {
 	return dynamic.NewMessage(descriptor)
 }
