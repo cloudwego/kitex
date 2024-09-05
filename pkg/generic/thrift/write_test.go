@@ -1430,7 +1430,7 @@ func Test_writeHTTPRequestWithPbBody(t *testing.T) {
 	}
 }
 
-func getReqPbBody() (proto.Message, error) {
+func getReqPbBody() (proto.Message, error) { //lint:ignore SA1019 static check
 	path := "main.proto"
 	content := `
 	package kitex.test.server;
@@ -1449,7 +1449,7 @@ func getReqPbBody() (proto.Message, error) {
 	}
 
 	md := fds[0].GetMessageTypes()[0]
-	msg := proto.NewMessage(md)
+	msg := proto.NewMessage(md) //lint:ignore SA1019 static check
 	items := map[int]interface{}{1: int32(1234), 2: "John"}
 	for id, value := range items {
 		err = msg.TrySetFieldByNumber(id, value)

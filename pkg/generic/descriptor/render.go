@@ -41,7 +41,7 @@ func (j JsonRenderer) WriteContentType(w http.ResponseWriter) {
 type PbRenderer struct{}
 
 func (p PbRenderer) Render(w http.ResponseWriter, body interface{}) error {
-	bytes, err := body.(proto.Message).Marshal()
+	bytes, err := body.(proto.Message).Marshal() //lint:ignore SA1019 static check
 	if err != nil {
 		return err
 	}

@@ -59,7 +59,7 @@ func getMapFieldSetter(st map[string]interface{}) fieldSetter {
 	}
 }
 
-func getPbFieldSetter(st proto.Message) fieldSetter {
+func getPbFieldSetter(st proto.Message) fieldSetter { //lint:ignore SA1019 static check
 	return func(field *descriptor.FieldDescriptor, val interface{}) error {
 		return st.TrySetFieldByNumber(int(field.ID), val)
 	}
@@ -324,7 +324,7 @@ func readStruct(ctx context.Context, in *thrift.BufferReader, t *descriptor.Type
 		fs = getMapFieldSetter(holder)
 		st = holder
 	} else {
-		holder := proto.NewMessage(opt.pbDsc)
+		holder := proto.NewMessage(opt.pbDsc) //lint:ignore SA1019 static check
 		fs = getPbFieldSetter(holder)
 		st = holder
 	}
@@ -419,7 +419,7 @@ func readHTTPResponse(ctx context.Context, in *thrift.BufferReader, t *descripto
 		}
 		resp = descriptor.NewHTTPResponse()
 	} else {
-		resp = descriptor.NewHTTPPbResponse(proto.NewMessage(opt.pbDsc))
+		resp = descriptor.NewHTTPPbResponse(proto.NewMessage(opt.pbDsc)) //lint:ignore SA1019 static check
 	}
 
 	var err error

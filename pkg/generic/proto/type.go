@@ -27,8 +27,6 @@ type (
 )
 
 // Deprecated: this interface will be removed in v0.12.0
-//
-//lint:ignore SA1019 statick check error
 type Message interface {
 	Marshal() ([]byte, error)
 	TryGetFieldByNumber(fieldNumber int) (interface{}, error)
@@ -36,8 +34,6 @@ type Message interface {
 }
 
 // Deprecated: this API will be removed in v0.12.0
-//
-//lint:ignore SA1019 static check error
-func NewMessage(descriptor MessageDescriptor) Message {
+func NewMessage(descriptor MessageDescriptor) Message { //lint:ignore SA1019 static check
 	return dynamic.NewMessage(descriptor)
 }

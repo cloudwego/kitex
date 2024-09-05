@@ -410,7 +410,7 @@ func Test_readHTTPResponseWithPbBody(t *testing.T) {
 			if respGot.ContentType != descriptor.MIMEApplicationProtobuf {
 				t.Errorf("expected content type: %v, got: %v", descriptor.MIMEApplicationProtobuf, respGot.ContentType)
 			}
-			body := respGot.GeneralBody.(proto.Message)
+			body := respGot.GeneralBody.(proto.Message) //lint:ignore SA1019 static check
 			for fieldID, expectedVal := range tt.want {
 				val, err := body.TryGetFieldByNumber(fieldID)
 				if err != nil {
