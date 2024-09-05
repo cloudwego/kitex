@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/cloudwego/kitex/pkg/generic/proto"
+	"github.com/cloudwego/kitex/internal/generic/proto"
 )
 
 // HTTPMapping http mapping annotation
@@ -153,7 +153,7 @@ func (m *apiBody) Request(ctx context.Context, req *HTTPRequest, field *FieldDes
 		val, ok := req.Body[m.value]
 		return val, ok, nil
 	case MIMEApplicationProtobuf:
-		msg := req.GeneralBody.(proto.Message) //lint:ignore SA1019 static check
+		msg := req.GeneralBody.(proto.Message)
 		val, err := msg.TryGetFieldByNumber(int(field.ID))
 		return val, err == nil, nil
 	default:
@@ -167,7 +167,7 @@ func (m *apiBody) Response(ctx context.Context, resp *HTTPResponse, field *Field
 		resp.Body[m.value] = val
 		return nil
 	case MIMEApplicationProtobuf:
-		msg := resp.GeneralBody.(proto.Message) //lint:ignore SA1019 static check
+		msg := resp.GeneralBody.(proto.Message)
 		return msg.TrySetFieldByNumber(int(field.ID), val)
 	default:
 		return errors.New("unsupported response content type")

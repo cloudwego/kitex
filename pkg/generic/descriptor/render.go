@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/cloudwego/kitex/pkg/generic/proto"
+	"github.com/cloudwego/kitex/internal/generic/proto"
 )
 
 type Renderer interface {
@@ -41,7 +41,7 @@ func (j JsonRenderer) WriteContentType(w http.ResponseWriter) {
 type PbRenderer struct{}
 
 func (p PbRenderer) Render(w http.ResponseWriter, body interface{}) error {
-	bytes, err := body.(proto.Message).Marshal() //lint:ignore SA1019 static check
+	bytes, err := body.(proto.Message).Marshal()
 	if err != nil {
 		return err
 	}

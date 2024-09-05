@@ -27,9 +27,9 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/jhump/protoreflect/desc/protoparse"
 
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 var (
@@ -410,7 +410,7 @@ func Test_readHTTPResponseWithPbBody(t *testing.T) {
 			if respGot.ContentType != descriptor.MIMEApplicationProtobuf {
 				t.Errorf("expected content type: %v, got: %v", descriptor.MIMEApplicationProtobuf, respGot.ContentType)
 			}
-			body := respGot.GeneralBody.(proto.Message) //lint:ignore SA1019 static check
+			body := respGot.GeneralBody.(proto.Message)
 			for fieldID, expectedVal := range tt.want {
 				val, err := body.TryGetFieldByNumber(fieldID)
 				if err != nil {

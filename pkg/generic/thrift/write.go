@@ -26,8 +26,8 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/tidwall/gjson"
 
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
@@ -48,7 +48,7 @@ var mapGetter fieldGetter = func(val interface{}, field *descriptor.FieldDescrip
 }
 
 var pbGetter fieldGetter = func(val interface{}, field *descriptor.FieldDescriptor) (interface{}, bool) {
-	st := val.(proto.Message) //lint:ignore SA1019 static check
+	st := val.(proto.Message)
 	ret, err := st.TryGetFieldByNumber(int(field.ID))
 	return ret, err == nil
 }
@@ -114,7 +114,7 @@ func typeOf(sample interface{}, t *descriptor.TypeDescriptor, opt *writerOption)
 		case descriptor.MAP:
 			return descriptor.MAP, writeStringMap, nil
 		}
-	case proto.Message: //lint:ignore SA1019 static check
+	case proto.Message:
 		return descriptor.STRUCT, writeStruct, nil
 	case *descriptor.HTTPRequest:
 		return descriptor.STRUCT, writeHTTPRequest, nil
@@ -709,7 +709,7 @@ func writeStruct(ctx context.Context, val interface{}, out *thrift.BufferWriter,
 	switch val.(type) {
 	case map[string]interface{}:
 		fg = mapGetter
-	case proto.Message: //lint:ignore SA1019 static check
+	case proto.Message:
 		fg = pbGetter
 	}
 

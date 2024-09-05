@@ -28,9 +28,9 @@ import (
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"github.com/tidwall/gjson"
 
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 func Test_nextWriter(t *testing.T) {
@@ -1430,7 +1430,6 @@ func Test_writeHTTPRequestWithPbBody(t *testing.T) {
 	}
 }
 
-//lint:ignore SA1019 static check
 func getReqPbBody() (proto.Message, error) {
 	path := "main.proto"
 	content := `
@@ -1450,7 +1449,7 @@ func getReqPbBody() (proto.Message, error) {
 	}
 
 	md := fds[0].GetMessageTypes()[0]
-	msg := proto.NewMessage(md) //lint:ignore SA1019 static check
+	msg := proto.NewMessage(md)
 	items := map[int]interface{}{1: int32(1234), 2: "John"}
 	for id, value := range items {
 		err = msg.TrySetFieldByNumber(id, value)

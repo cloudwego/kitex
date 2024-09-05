@@ -25,8 +25,8 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/jhump/protoreflect/desc"
 
+	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 var emptyPbDsc = &desc.MessageDescriptor{}
@@ -59,7 +59,6 @@ func getMapFieldSetter(st map[string]interface{}) fieldSetter {
 	}
 }
 
-//lint:ignore SA1019 static check
 func getPbFieldSetter(st proto.Message) fieldSetter {
 	return func(field *descriptor.FieldDescriptor, val interface{}) error {
 		return st.TrySetFieldByNumber(int(field.ID), val)
@@ -325,7 +324,7 @@ func readStruct(ctx context.Context, in *thrift.BufferReader, t *descriptor.Type
 		fs = getMapFieldSetter(holder)
 		st = holder
 	} else {
-		holder := proto.NewMessage(opt.pbDsc) //lint:ignore SA1019 static check
+		holder := proto.NewMessage(opt.pbDsc)
 		fs = getPbFieldSetter(holder)
 		st = holder
 	}
@@ -420,7 +419,7 @@ func readHTTPResponse(ctx context.Context, in *thrift.BufferReader, t *descripto
 		}
 		resp = descriptor.NewHTTPResponse()
 	} else {
-		resp = descriptor.NewHTTPPbResponse(proto.NewMessage(opt.pbDsc)) //lint:ignore SA1019 static check
+		resp = descriptor.NewHTTPPbResponse(proto.NewMessage(opt.pbDsc))
 	}
 
 	var err error
