@@ -99,6 +99,8 @@ func (kc *kClient) NewStream(ctx context.Context, method string, req any, callOp
 
 	streamArgs := streamx.NewStreamArgs(nil)
 	// put streamArgs into response arg
+	// it's an ugly trick but if we don't want to refactor too much,
+	// this is the only way to compatible with current endpoint design
 	err = kc.sxEps(ctx, req, streamArgs)
 	if err != nil {
 		return nil, err

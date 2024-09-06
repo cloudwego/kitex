@@ -121,7 +121,7 @@ func TestTransport(t *testing.T) {
 		atomic.AddInt32(&streamDone, 1)
 		go func(sid int) {
 			defer wg.Done()
-			s, err := trans.newStream(ctx, method)
+			s, err := trans.newStream(ctx, method, map[string]string{})
 			test.Assert(t, err == nil, err)
 
 			// send header

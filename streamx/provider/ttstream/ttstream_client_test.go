@@ -48,6 +48,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 					log.Printf("Server middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
 						reqArgs.Req(), resArgs.Res(), streamArgs)
 					test.Assert(t, streamArgs.Stream() != nil)
+					test.Assert(t, ValidateMetadata(ctx))
 
 					log.Printf("Server handler start")
 					switch streamArgs.Stream().Mode() {
@@ -97,12 +98,14 @@ func TestTTHeaderStreaming(t *testing.T) {
 	test.WaitServerStart(addr)
 
 	// create client
-	ctx := context.Background()
 	cli, err := NewClient(
 		"a.b.c",
 		streamxclient.WithHostPorts(addr),
 		streamxclient.WithMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 			return func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
+				// validate ctx
+				test.Assert(t, ValidateMetadata(ctx))
+
 				log.Printf("Client middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
 					reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
 				err = next(ctx, reqArgs, resArgs, streamArgs)
@@ -116,7 +119,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 					test.Assert(t, reqArgs.Req() != nil)
 					test.Assert(t, resArgs.Res() != nil)
 				case streamx.StreamingClient:
-					test.Assert(t, reqArgs.Req() == nil)
+					test.Assert(t, reqArgs.Req() == nil, reqArgs.Req())
 					test.Assert(t, resArgs.Res() == nil)
 				case streamx.StreamingServer:
 					test.Assert(t, reqArgs.Req() != nil)
@@ -130,6 +133,10 @@ func TestTTHeaderStreaming(t *testing.T) {
 		}),
 	)
 	test.Assert(t, err == nil, err)
+
+	// prepare metainfo
+	ctx := context.Background()
+	ctx = SetMetadata(ctx)
 
 	t.Logf("=== Unary ===")
 	req := new(Request)
@@ -235,8 +242,8 @@ func TestTTHeaderStreaming(t *testing.T) {
 	runtime.GC()
 
 	cli = nil
-	for {
-		time.Sleep(time.Second)
-		runtime.GC()
-	}
+	//for {
+	//	time.Sleep(time.Second)
+	//	runtime.GC()
+	//}
 }

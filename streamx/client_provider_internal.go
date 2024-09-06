@@ -20,5 +20,4 @@ func (p internalClientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInf
 		return nil, err
 	}
 	return cs, nil
-	//return NewClientStream(cs), nil
 }

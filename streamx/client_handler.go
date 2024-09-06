@@ -36,13 +36,11 @@ type clientTransHandler struct {
 }
 
 func (c *clientTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error) {
-	//return c.provider.Write(ctx, conn, send)
 	return ctx, nil
 }
 
 func (c *clientTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
 	return ctx, nil
-	//return c.provider.Read(ctx, conn, msg)
 }
 
 func (c *clientTransHandler) OnInactive(ctx context.Context, conn net.Conn) {

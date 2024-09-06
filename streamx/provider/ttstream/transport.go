@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/cloudwego/gopkg/bufiox"
-	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/netpoll"
 	"io"
@@ -221,7 +220,7 @@ var clientStreamID int32
 
 // newStream create new stream on current connection
 // it's typically used by client side
-func (t *transport) newStream(ctx context.Context, method string) (*stream, error) {
+func (t *transport) newStream(ctx context.Context, method string, header map[string]string) (*stream, error) {
 	if t.kind != clientTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
@@ -230,9 +229,7 @@ func (t *transport) newStream(ctx context.Context, method string) (*stream, erro
 	smeta := streamMeta{
 		sid:    sid,
 		method: method,
-		header: map[string]string{
-			ttheader.HeaderIDLServiceName: t.sinfo.ServiceName,
-		},
+		header: header,
 	}
 	f := newFrame(smeta, headerFrameType, []byte{})
 	s := newStream(t, smode, smeta)

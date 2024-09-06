@@ -2,6 +2,7 @@ package ttstream
 
 import (
 	"context"
+	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/streamx"
 	"github.com/cloudwego/netpoll"
@@ -41,7 +42,6 @@ func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.
 	if trans == nil {
 		return ctx, nil
 	}
-	println("serverProvider closed")
 	// server should close transport
 	err := trans.close()
 	if err != nil {
@@ -59,6 +59,7 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 	if err != nil {
 		return nil, nil, err
 	}
+	ctx = metainfo.SetMetaInfoFromMap(ctx, st.header)
 	ss := newServerStream(st)
 	return ctx, ss, nil
 }
