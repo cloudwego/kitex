@@ -4,13 +4,9 @@ import (
 	"context"
 )
 
-func Chain(mws ...StreamMiddleware) StreamMiddleware {
-	return func(next StreamEndpoint) StreamEndpoint {
-		for i := len(mws) - 1; i >= 0; i-- {
-			next = mws[i](next)
-		}
-		return next
-	}
+type StreamHandler struct {
+	Middleware StreamMiddleware
+	Handler    any
 }
 
 type StreamEndpoint func(ctx context.Context, reqArgs StreamReqArgs, resArgs StreamResArgs, streamArgs StreamArgs) (err error)
@@ -21,3 +17,12 @@ type StreamSendEndpoint func(ctx context.Context, msg StreamReqArgs, streamArgs 
 
 type StreamRecvMiddleware func(next StreamRecvEndpoint) StreamRecvEndpoint
 type StreamSendMiddleware func(next StreamSendEndpoint) StreamSendEndpoint
+
+func Chain(mws ...StreamMiddleware) StreamMiddleware {
+	return func(next StreamEndpoint) StreamEndpoint {
+		for i := len(mws) - 1; i >= 0; i-- {
+			next = mws[i](next)
+		}
+		return next
+	}
+}

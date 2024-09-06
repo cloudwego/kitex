@@ -34,6 +34,7 @@ func (si *serviceImpl) ClientStream(ctx context.Context, stream ClientStreamingS
 
 func (si *serviceImpl) ServerStream(ctx context.Context, req *Request, stream ServerStreamingServer[Response]) error {
 	log.Printf("Server ServerStream: req={%v}", req)
+
 	_ = stream.SetHeader(map[string]string{"key1": "val1"})
 	_ = stream.SendHeader(map[string]string{"key2": "val2"})
 	_ = stream.SetTrailer(map[string]string{"key1": "val1"})

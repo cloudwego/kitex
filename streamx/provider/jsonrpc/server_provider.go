@@ -34,6 +34,10 @@ func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Co
 	return context.WithValue(ctx, serverTransCtxKey{}, trans), nil
 }
 
+func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.Context, error) {
+	return ctx, nil
+}
+
 func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Context, streamx.ServerStream, error) {
 	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
 	if trans == nil {

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cloudwego/kitex/streamx"
+	"log"
 	"net"
 	"reflect"
 	"runtime/debug"
@@ -343,6 +344,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 						"[happened in biz handler, method=%s.%s, please check the panic at the server side] %s",
 						svcInfo.ServiceName, methodName, handlerErr),
 					string(debug.Stack()))
+				log.Println(err)
 				rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
 				rpcStats.SetPanicked(err)
 			}

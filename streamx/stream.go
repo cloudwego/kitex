@@ -82,11 +82,15 @@ type ServerStream interface {
 	Stream
 }
 
+// client 必须通过 metainfo.WithValue(ctx, ..) 给下游传递信息
+// client 必须通过 metainfo.GetValue(ctx, ..) 拿到当前 server 的透传信息
+// client 必须通过 Header() 拿到下游 server 的透传信息
 type ClientStreamContext[Header, Trailer any] interface {
 	Header() (Header, error)
 	Trailer() (Trailer, error)
 }
 
+// server 可以通过 Set/SendXXX 给上游回传信息
 type ServerStreamContext[Header, Trailer any] interface {
 	SetHeader(hd Header) error
 	SendHeader(hd Header) error

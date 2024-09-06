@@ -2,6 +2,8 @@ package ttstream
 
 import (
 	"context"
+	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -46,7 +48,12 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	_ = conn.SetDeadline(time.Now().Add(time.Hour))
 	_ = conn.SetReadTimeout(time.Hour)
 	trans := newTransport(clientTransport, c.sinfo, conn)
-	s, err := trans.newStream(ctx, method)
+
+	header := map[string]string{
+		ttheader.HeaderIDLServiceName: c.sinfo.ServiceName,
+	}
+	metainfo.SaveMetaInfoToMap(ctx, header)
+	s, err := trans.newStream(ctx, method, header)
 	if err != nil {
 		return nil, err
 	}
