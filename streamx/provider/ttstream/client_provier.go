@@ -20,6 +20,7 @@ var _ streamx.ClientProvider = (*clientProvider)(nil)
 
 func NewClientProvider(sinfo *serviceinfo.ServiceInfo, opts ...ClientProviderOption) (streamx.ClientProvider, error) {
 	cp := new(clientProvider)
+	cp.transPool = newTransPool(sinfo)
 	cp.sinfo = sinfo
 	for _, opt := range opts {
 		opt(cp)
@@ -28,9 +29,14 @@ func NewClientProvider(sinfo *serviceinfo.ServiceInfo, opts ...ClientProviderOpt
 }
 
 type clientProvider struct {
-	connPool     remote.ConnPool
+	transPool    *transPool
 	sinfo        *serviceinfo.ServiceInfo
 	payloadLimit int
+}
+
+var connOpt = remote.ConnOption{
+	Dialer:         netpoll.NewDialer(),
+	ConnectTimeout: time.Second,
 }
 
 func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callOptions ...streamxcallopt.CallOption) (streamx.ClientStream, error) {
@@ -41,13 +47,10 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 		return nil, kerrors.ErrNoDestAddress
 	}
 
-	conn, err := netpoll.DialConnection(addr.Network(), addr.String(), time.Second)
+	trans, err := c.transPool.Get(addr.Network(), addr.String())
 	if err != nil {
 		return nil, err
 	}
-	_ = conn.SetDeadline(time.Now().Add(time.Hour))
-	_ = conn.SetReadTimeout(time.Hour)
-	trans := newTransport(clientTransport, c.sinfo, conn)
 
 	header := map[string]string{
 		ttheader.HeaderIDLServiceName: c.sinfo.ServiceName,
@@ -62,7 +65,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 		log.Printf("client stream[%v] closing", cs.sid)
 		_ = cs.close()
 		// TODO: current using one conn one stream
-		_ = trans.close()
+		c.transPool.Put(trans)
 	})
 	return cs, err
 }

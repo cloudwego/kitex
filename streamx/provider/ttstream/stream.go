@@ -20,8 +20,6 @@ func newStream(trans *transport, mode streamx.StreamingMode, smeta streamMeta) (
 	s.streamMeta = smeta
 	s.trans = trans
 	s.mode = mode
-	s.header = make(Header)
-	s.trailer = make(Trailer)
 	s.headerSig = make(chan struct{})
 	s.trailerSig = make(chan struct{})
 	trans.storeStreamIO(s)

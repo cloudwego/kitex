@@ -61,7 +61,7 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr Frame) (err error
 	}
 	payload := fr.payload
 	if len(payload) == 0 {
-		payload = []byte{}
+		return nil
 	}
 	_, err = writer.WriteBinary(payload)
 	if err != nil {
