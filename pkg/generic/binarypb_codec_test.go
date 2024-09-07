@@ -24,8 +24,10 @@ import (
 	"math"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/binarypb_test/kitex_gen/base"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -38,27 +40,33 @@ func TestBinaryProtobufCodec(t *testing.T) {
 	bpc := &binaryProtobufCodec{protobufCodec: pbCodec}
 
 	test.Assert(t, bpc.Name() == "RawProtobufBinary", bpc.Name())
-	svcInfo := ServiceInfoWithCodec(BinaryProtobufGeneric())
+	svcInfo := ServiceInfoWithGeneric(BinaryProtobufGeneric())
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(serviceinfo.GenericMethod, "ExampleMethod"), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 
 	// client side
-	rwbuf := remote.NewReaderWriterBuffer(1024)
+	conn := mocks.NewIOConn()
+	bw := bufiox.NewDefaultWriter(conn)
+	br := bufiox.NewDefaultReader(conn)
+	bb := remote.NewByteBufferFromBufiox(bw, br)
 	req := &Args{
 		Request: readBasicExampleReqProtoBufDataMetainfo(),
 		Method:  "ExampleMethod",
 	}
 	cliMsg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
-	err := bpc.Marshal(context.Background(), cliMsg, rwbuf)
+	err := bpc.Marshal(context.Background(), cliMsg, bb)
 	test.Assert(t, err == nil, err)
 	// Check Seq ID
 	seqID, err := PbGetSeqID(cliMsg.Data().(*Args).Request.(binaryReqType))
 	test.Assert(t, err == nil, err)
 	test.Assert(t, seqID == 1, seqID)
 
+	wl := bw.WrittenLen()
+	bw.Flush()
+
 	// server side
 	svrMsg := remote.NewMessage(&Args{}, svcInfo, ri, remote.Call, remote.Server)
-	svrMsg.SetPayloadLen(rwbuf.ReadableLen())
-	err = bpc.Unmarshal(context.Background(), svrMsg, rwbuf)
+	svrMsg.SetPayloadLen(wl)
+	err = bpc.Unmarshal(context.Background(), svrMsg, bb)
 	test.Assert(t, err == nil, err)
 	// Check Seq ID
 	seqID, err = PbGetSeqID(cliMsg.Data().(*Args).Request.(binaryReqType))
@@ -84,18 +92,23 @@ func TestBinaryProtobufCodec(t *testing.T) {
 func TestBinaryProtobufCodecExceptionError(t *testing.T) {
 	bpc := &binaryProtobufCodec{protobufCodec: pbCodec}
 
-	rwbuf := remote.NewReaderWriterBuffer(1024)
-	svcInfo := ServiceInfoWithCodec(BinaryProtobufGeneric())
+	conn := mocks.NewIOConn()
+	bw := bufiox.NewDefaultWriter(conn)
+	br := bufiox.NewDefaultReader(conn)
+	bb := remote.NewByteBufferFromBufiox(bw, br)
+	svcInfo := ServiceInfoWithGeneric(BinaryProtobufGeneric())
 	ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(serviceinfo.GenericMethod, "ExampleMethod"), rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 
 	// test data is empty
 	cliMsg := remote.NewMessage(nil, svcInfo, ri, remote.Exception, remote.Client)
-	err := bpc.Marshal(context.Background(), cliMsg, rwbuf)
+	err := bpc.Marshal(context.Background(), cliMsg, bb)
 	test.Assert(t, err.Error() == "invalid marshal data in rawProtobufBinaryCodec: nil")
+
+	bw.Flush()
 
 	// empty rpcinfo method
 	cliMsg = remote.NewMessage(&remote.TransError{}, svcInfo, newEmptyMethodRPCInfo(), remote.Exception, remote.Server)
-	err = bpc.Marshal(context.Background(), cliMsg, rwbuf)
+	err = bpc.Marshal(context.Background(), cliMsg, bb)
 	test.Assert(t, err.Error() == "rawProtobufBinaryCodec Marshal exception failed, err: empty methodName in protobuf Marshal")
 }
 

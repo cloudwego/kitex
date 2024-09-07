@@ -21,6 +21,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/bytedance/gopkg/lang/dirtmake"
+
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
@@ -78,7 +80,8 @@ func (c *binaryProtobufCodec) Unmarshal(ctx context.Context, msg remote.Message,
 		return c.protobufCodec.Unmarshal(ctx, msg, in)
 	}
 	payloadLen := msg.PayloadLen()
-	transBuff, err := in.ReadBinary(payloadLen)
+	transBuff := dirtmake.Bytes(payloadLen, payloadLen)
+	_, err = in.ReadBinary(transBuff)
 	if err != nil {
 		return err
 	}
