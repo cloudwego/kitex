@@ -30,6 +30,8 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
+type serverConnKey struct{}
+
 type serverConn struct {
 	tr grpc.ServerTransport
 	s  *grpc.Stream
@@ -59,18 +61,14 @@ func (c *serverConn) ReadFrame() (hdr, data []byte, err error) {
 	return hdr, data, nil
 }
 
+// GetServerConn gets the GRPC Connection from server stream.
+// This function is only used in server handler for grpc unknown handler proxy: https://www.cloudwego.io/docs/kitex/tutorials/advanced-feature/grpcproxy/
 func GetServerConn(st streaming.Stream) (GRPCConn, error) {
-	serverStream, ok := st.(*stream)
+	rawStream, ok := st.Context().Value(serverConnKey{}).(*stream)
 	if !ok {
-		// err!
-		return nil, status.Errorf(codes.Internal, "failed to get server conn from stream.")
+		return nil, status.Errorf(codes.Internal, "the ctx of Stream is not provided by Kitex Server")
 	}
-	grpcServerConn, ok := serverStream.conn.(GRPCConn)
-	if !ok {
-		// err!
-		return nil, status.Errorf(codes.Internal, "failed to trans conn to grpc conn.")
-	}
-	return grpcServerConn, nil
+	return rawStream.conn.(GRPCConn), nil
 }
 
 // impl net.Conn
@@ -88,7 +86,7 @@ func (c *serverConn) Write(b []byte) (n int, err error) {
 
 func (c *serverConn) WriteFrame(hdr, data []byte) (n int, err error) {
 	// server sets the END_STREAM flag in trailer when writeStatus
-	err = c.tr.Write(c.s, hdr, data, &grpc.Options{})
+	err = c.tr.Write(c.s, hdr, data, nil)
 	return len(hdr) + len(data), err
 }
 

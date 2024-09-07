@@ -14,26 +14,26 @@
  * limitations under the License.
  */
 
-// Package thrift provides thrift idl parser and codec for generic call
-package thrift
+package proto
 
 import (
-	"context"
-	"io"
-
-	"github.com/cloudwego/gopkg/protocol/thrift/base"
+	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/dynamic"
 )
 
-const (
-	structWrapLen = 4
+type (
+	ServiceDescriptor = *desc.ServiceDescriptor
+	MessageDescriptor = *desc.MessageDescriptor
 )
 
-// MessageReader read from thrift.TProtocol with method
-type MessageReader interface {
-	Read(ctx context.Context, method string, isClient bool, dataLen int, in io.Reader) (interface{}, error)
+// Deprecated: this interface will be removed in v0.12.0
+type Message interface {
+	Marshal() ([]byte, error)
+	TryGetFieldByNumber(fieldNumber int) (interface{}, error)
+	TrySetFieldByNumber(fieldNumber int, val interface{}) error
 }
 
-// MessageWriter write to thrift.TProtocol
-type MessageWriter interface {
-	Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error
+// Deprecated: this API will be removed in v0.12.0
+func NewMessage(descriptor MessageDescriptor) Message {
+	return dynamic.NewMessage(descriptor)
 }

@@ -233,13 +233,13 @@ const (
 // Stream represents an RPC in the transport layer.
 type Stream struct {
 	id           uint32
-	st           ServerTransport    // nil for client side Stream
-	ct           *http2Client       // nil for server side Stream
-	ctx          context.Context    // the associated context of the stream
-	cancel       context.CancelFunc // always nil for client side Stream
-	done         chan struct{}      // closed at the end of stream to unblock writers. On the client side.
-	ctxDone      <-chan struct{}    // same as done chan but for server side. Cache of ctx.Done() (for performance)
-	method       string             // the associated RPC method of the stream
+	st           ServerTransport  // nil for client side Stream
+	ct           *http2Client     // nil for server side Stream
+	ctx          context.Context  // the associated context of the stream
+	cancel       cancelWithReason // always nil for client side Stream
+	done         chan struct{}    // closed at the end of stream to unblock writers. On the client side.
+	ctxDone      <-chan struct{}  // same as done chan but for server side. Cache of ctx.Done() (for performance)
+	method       string           // the associated RPC method of the stream
 	recvCompress string
 	sendCompress string
 	buf          *recvBuffer
@@ -485,7 +485,7 @@ func StreamWrite(s *Stream, buffer *bytes.Buffer) {
 }
 
 // CreateStream only used for unit test. Create an independent stream out of http2client / http2server
-func CreateStream(id uint32, requestRead func(i int)) *Stream {
+func CreateStream(ctx context.Context, id uint32, requestRead func(i int), method string) *Stream {
 	recvBuffer := newRecvBuffer()
 	trReader := &transportReader{
 		reader: &recvBufferReader{
@@ -499,6 +499,8 @@ func CreateStream(id uint32, requestRead func(i int)) *Stream {
 
 	stream := &Stream{
 		id:          id,
+		ctx:         ctx,
+		method:      method,
 		buf:         recvBuffer,
 		trReader:    trReader,
 		wq:          newWriteQuota(defaultWriteQuota, nil),
@@ -646,7 +648,7 @@ type ClientTransport interface {
 	// Close tears down this transport. Once it returns, the transport
 	// should not be accessed any more. The caller must make sure this
 	// is called only once.
-	Close() error
+	Close(err error) error
 
 	// GracefulClose starts to tear down the transport: the transport will stop
 	// accepting new RPCs and NewStream will return error. Once all streams are
@@ -797,6 +799,10 @@ func ContextErr(err error) error {
 		return status.New(codes.DeadlineExceeded, err.Error()).Err()
 	case context.Canceled:
 		return status.New(codes.Canceled, err.Error()).Err()
+	}
+	statusErr, ok := err.(*status.Error)
+	if ok { // only returned by contextWithCancelReason
+		return statusErr
 	}
 	return status.Errorf(codes.Internal, "Unexpected error from context packet: %v", err)
 }

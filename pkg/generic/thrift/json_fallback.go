@@ -1,5 +1,8 @@
+//go:build !amd64 || !go1.16
+// +build !amd64 !go1.16
+
 /*
- * Copyright 2024 CloudWeGo Authors
+ * Copyright 2023 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,25 +17,17 @@
  * limitations under the License.
  */
 
-package bthrift
+package thrift
 
 import (
-	"reflect"
-	"unsafe"
+	"context"
+
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 )
 
-// from utils.SliceByteToString for fixing cyclic import
-func sliceByteToString(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
-}
-
-// from utils.StringToSliceByte for fixing cyclic import
-func stringToSliceByte(s string) []byte {
-	p := unsafe.Pointer((*reflect.StringHeader)(unsafe.Pointer(&s)).Data)
-	var b []byte
-	hdr := (*reflect.SliceHeader)(unsafe.Pointer(&b))
-	hdr.Data = uintptr(p)
-	hdr.Cap = len(s)
-	hdr.Len = len(s)
-	return b
+// Write write json string to out thrift.TProtocol
+func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+	err := m.originalWrite(ctx, out, msg, method, isClient, requestBase)
+	return err
 }

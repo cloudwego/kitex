@@ -20,14 +20,13 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sync/atomic"
 
 	"github.com/cloudwego/dynamicgo/conv"
 
-	"github.com/cloudwego/kitex/internal/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -188,7 +187,7 @@ func FromHTTPRequest(req *http.Request) (*HTTPRequest, error) {
 		// body == nil if from Get request
 		return customReq, nil
 	}
-	if customReq.RawBody, err = ioutil.ReadAll(b); err != nil {
+	if customReq.RawBody, err = io.ReadAll(b); err != nil {
 		return nil, err
 	}
 	return customReq, nil

@@ -24,12 +24,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/bytedance/sonic"
+
 	"github.com/cloudwego/kitex/internal/test"
 )
 
 func FuzzJSONStr2Map(f *testing.F) {
 	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.MarshalToString(mapInfo)
+	jsonRet, _ := sonic.MarshalString(mapInfo)
 	f.Add(`{}`)
 	f.Add(`{"":""}`)
 	f.Add(jsonRet)
@@ -51,7 +53,7 @@ func FuzzJSONStr2Map(f *testing.F) {
 
 func FuzzMap2JSON(f *testing.F) {
 	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.MarshalToString(mapInfo)
+	jsonRet, _ := sonic.MarshalString(mapInfo)
 	f.Add(`{}`)
 	f.Add(`{"":""}`)
 	f.Add(jsonRet)

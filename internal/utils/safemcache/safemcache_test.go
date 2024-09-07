@@ -1,8 +1,5 @@
-//go:build !amd64 || !go1.16
-// +build !amd64 !go1.16
-
 /*
- * Copyright 2023 CloudWeGo Authors
+ * Copyright 2024 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +14,33 @@
  * limitations under the License.
  */
 
-package thrift
+package safemcache
 
 import (
-	"context"
-	"io"
+	"testing"
+	"unsafe"
 
-	"github.com/cloudwego/gopkg/protocol/thrift/base"
+	"github.com/cloudwego/kitex/internal/test"
 )
 
-// Write write json string to out thrift.TProtocol
-func (m *WriteJSON) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
-	return m.originalWrite(ctx, out, msg, method, isClient, requestBase)
+func TestMallocFree(t *testing.T) {
+	// case: normal
+	b := Malloc(1)
+	test.Assert(t, len(b) == 1)
+
+	h := (*sliceHeader)(unsafe.Pointer(&b))
+	test.Assert(t, h.Footer() == footerMagic)
+
+	Free(b)
+	test.Assert(t, h.Footer() == 0)
+
+	// case: magic not match
+	b = Malloc(1)
+	test.Assert(t, len(b) == 1)
+	h = (*sliceHeader)(unsafe.Pointer(&b))
+	test.Assert(t, h.Footer() == footerMagic)
+
+	h.SetFooter(2)
+	Free(b) // it will not work
+	test.Assert(t, h.Footer() == 2)
 }

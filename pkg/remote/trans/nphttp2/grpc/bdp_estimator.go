@@ -48,6 +48,9 @@ const (
 // Easter-egg: what does the ping message say?
 var bdpPing = &ping{data: [8]byte{2, 4, 16, 16, 9, 14, 7, 7}}
 
+// allow only one bdpPing per bdpPingInterval
+var bdpPingInterval = time.Second
+
 type bdpEstimator struct {
 	// sentAt is the time when the ping was sent.
 	sentAt time.Time
@@ -94,7 +97,7 @@ func (b *bdpEstimator) add(n uint32) bool {
 	if b.bdp == bdpLimit {
 		return false
 	}
-	if !b.isSent {
+	if !b.isSent && time.Since(b.sentAt) >= bdpPingInterval {
 		b.isSent = true
 		b.sample = n
 		b.sentAt = time.Time{}

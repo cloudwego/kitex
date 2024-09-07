@@ -41,7 +41,8 @@ func Test_message_Request(t *testing.T) {
 	}
 	rb := msg.GetRequestReaderByteBuffer()
 	test.Assert(t, rb != nil)
-	got, err := rb.ReadBinary(len(want))
+	got := make([]byte, len(want))
+	_, err = rb.ReadBinary(got)
 	if err != nil {
 		t.Fatal(err)
 	}

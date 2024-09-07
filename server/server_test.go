@@ -48,6 +48,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
@@ -1125,4 +1126,212 @@ func withGRPCTransport() Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		o.RemoteOpt.SvrHandlerFactory = nphttp2.NewSvrTransHandlerFactory()
 	}}
+}
+
+type mockStream struct {
+	streaming.Stream
+	ctx context.Context
+}
+
+func (s *mockStream) Context() context.Context {
+	return s.ctx
+}
+
+type streamingMethodArg struct {
+	methodName string
+	mode       serviceinfo.StreamingMode
+	streamHdlr serviceinfo.MethodHandler
+}
+
+func newStreamingServer(svcName string, args []streamingMethodArg, mws []endpoint.Middleware) *server {
+	methods := make(map[string]serviceinfo.MethodInfo)
+	for _, arg := range args {
+		methods[arg.methodName] = serviceinfo.NewMethodInfo(arg.streamHdlr, nil, nil, false, serviceinfo.WithStreamingMode(arg.mode))
+	}
+	svcInfo := &serviceinfo.ServiceInfo{
+		ServiceName: svcName,
+		Methods:     methods,
+	}
+	svr := &server{
+		svcs: &services{
+			svcMap: map[string]*service{
+				svcName: {
+					svcInfo: svcInfo,
+				},
+			},
+		},
+		mws: mws,
+		opt: internal_server.NewOptions(nil),
+	}
+	return svr
+}
+
+func TestStreamCtxDiverge(t *testing.T) {
+	testcases := []struct {
+		methodName string
+		mode       serviceinfo.StreamingMode
+	}{
+		{
+			methodName: "ClientStreaming",
+			mode:       serviceinfo.StreamingClient,
+		},
+		{
+			methodName: "ServerStreaming",
+			mode:       serviceinfo.StreamingServer,
+		},
+		{
+			methodName: "BidiStreaming",
+			mode:       serviceinfo.StreamingBidirectional,
+		},
+	}
+
+	testKey := "key"
+	testVal := "val"
+	testService := "test"
+	streamHdlr := func(ctx context.Context, handler, arg, result interface{}) error {
+		st, ok := arg.(*streaming.Args)
+		test.Assert(t, ok)
+		val, ok := st.Stream.Context().Value(testKey).(string)
+		test.Assert(t, ok)
+		test.Assert(t, val == testVal)
+		return nil
+	}
+
+	var args []streamingMethodArg
+	for _, tc := range testcases {
+		args = append(args, streamingMethodArg{
+			methodName: tc.methodName,
+			mode:       tc.mode,
+			streamHdlr: streamHdlr,
+		})
+	}
+	mws := []endpoint.Middleware{
+		// treat it as user middleware
+		// user would modify the ctx here
+		func(next endpoint.Endpoint) endpoint.Endpoint {
+			return func(ctx context.Context, req, resp interface{}) (err error) {
+				ctx = context.WithValue(ctx, testKey, testVal)
+				return next(ctx, req, resp)
+			}
+		},
+	}
+	svr := newStreamingServer(testService, args, mws)
+	svr.buildInvokeChain()
+
+	for _, tc := range testcases {
+		t.Run(tc.methodName, func(t *testing.T) {
+			ri := svr.initOrResetRPCInfoFunc()(nil, nil)
+			ink, ok := ri.Invocation().(rpcinfo.InvocationSetter)
+			test.Assert(t, ok)
+			ink.SetServiceName(testService)
+			ink.SetMethodName(tc.methodName)
+			ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+			mock := &mockStream{
+				ctx: ctx,
+			}
+			err := svr.eps(ctx, &streaming.Args{Stream: mock}, nil)
+			test.Assert(t, err == nil, err)
+		})
+	}
+}
+
+func Test_server_fixStreamCtxDiverge(t *testing.T) {
+	methodInfoFunc := func(mode serviceinfo.StreamingMode) serviceinfo.MethodInfo {
+		return serviceinfo.NewMethodInfo(nil, nil, nil, false, serviceinfo.WithStreamingMode(mode))
+	}
+	testcases := []struct {
+		desc           string
+		svcMap         map[string]*service
+		expectInjectMW bool
+	}{
+		{
+			desc: "single service without streaming method",
+			svcMap: map[string]*service{
+				"service": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"nonStreamingMethod": methodInfoFunc(serviceinfo.StreamingNone),
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "single service with streaming methods",
+			svcMap: map[string]*service{
+				"service": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"ClientStreamingMethod": methodInfoFunc(serviceinfo.StreamingClient),
+							"ServerStreamingMethod": methodInfoFunc(serviceinfo.StreamingServer),
+							"BidiStreamingMethod":   methodInfoFunc(serviceinfo.StreamingBidirectional),
+						},
+					},
+				},
+			},
+			expectInjectMW: true,
+		},
+		{
+			desc: "multiple services without streaming method",
+			svcMap: map[string]*service{
+				"service0": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service0",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"nonStreamingMethod0": methodInfoFunc(serviceinfo.StreamingNone),
+						},
+					},
+				},
+				"service1": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service1",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"nonStreamingMethod1": methodInfoFunc(serviceinfo.StreamingNone),
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "multiple services with streaming methods",
+			svcMap: map[string]*service{
+				"service0": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service0",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"ClientStreamingMethod": methodInfoFunc(serviceinfo.StreamingClient),
+							"ServerStreamingMethod": methodInfoFunc(serviceinfo.StreamingServer),
+						},
+					},
+				},
+				"service1": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service1",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"BidiStreamingMethod": methodInfoFunc(serviceinfo.StreamingBidirectional),
+						},
+					},
+				},
+			},
+			expectInjectMW: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.desc, func(t *testing.T) {
+			svr := &server{
+				svcs: &services{
+					svcMap: tc.svcMap,
+				},
+			}
+			svr.fixStreamCtxDiverge()
+			if tc.expectInjectMW {
+				test.Assert(t, len(svr.mws) == 1)
+			} else {
+				test.Assert(t, len(svr.mws) == 0)
+			}
+		})
+	}
 }

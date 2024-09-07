@@ -20,15 +20,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 
-	"github.com/cloudwego/kitex/internal/generic/proto"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
 
 type HTTPPbReaderWriter struct {
@@ -55,7 +55,7 @@ func NewWriteHTTPPbRequest(svc *descriptor.ServiceDescriptor, pbSvc *desc.Servic
 }
 
 // Write ...
-func (w *WriteHTTPPbRequest) Write(ctx context.Context, out io.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+func (w *WriteHTTPPbRequest) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	fn, err := w.svc.Router.Lookup(req)
 	if err != nil {
@@ -77,11 +77,9 @@ func (w *WriteHTTPPbRequest) Write(ctx context.Context, out io.Writer, msg inter
 	}
 	req.GeneralBody = pbMsg
 
-	binaryWriter := thrift.NewBinaryWriter()
-	if err = wrapStructWriter(ctx, req, binaryWriter, fn.Request, &writerOption{requestBase: requestBase}); err != nil {
-		return err
-	}
-	_, err = out.Write(binaryWriter.Bytes())
+	binaryWriter := thrift.NewBufferWriter(out)
+	err = wrapStructWriter(ctx, req, binaryWriter, fn.Request, &writerOption{requestBase: requestBase})
+	binaryWriter.Recycle()
 	return err
 }
 
@@ -100,7 +98,7 @@ func NewReadHTTPPbResponse(svc *descriptor.ServiceDescriptor, pbSvc proto.Servic
 }
 
 // Read ...
-func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in io.Reader) (interface{}, error) {
+func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in bufiox.Reader) (interface{}, error) {
 	fnDsc, err := r.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err
@@ -111,5 +109,8 @@ func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, isClient b
 		return nil, errors.New("pb method not found")
 	}
 
-	return skipStructReader(ctx, thrift.NewBinaryReader(in), fDsc, &readerOption{pbDsc: mt.GetOutputType(), http: true})
+	br := thrift.NewBufferReader(in)
+	resp, err := skipStructReader(ctx, br, fDsc, &readerOption{pbDsc: mt.GetOutputType(), http: true})
+	br.Recycle()
+	return resp, err
 }

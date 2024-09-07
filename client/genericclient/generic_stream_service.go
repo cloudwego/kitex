@@ -21,6 +21,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
+func streamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
+	return newClientStreamingServiceInfo(g)
+}
+
 func newClientStreamingServiceInfo(g generic.Generic) *serviceinfo.ServiceInfo {
 	readerWriter := g.MessageReaderWriter()
 	if readerWriter == nil {

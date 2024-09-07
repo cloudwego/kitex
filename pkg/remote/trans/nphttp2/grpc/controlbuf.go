@@ -27,10 +27,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/bytedance/gopkg/lang/mcache"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 
+	"github.com/cloudwego/kitex/internal/utils/safemcache"
 	"github.com/cloudwego/kitex/pkg/klog"
 )
 
@@ -43,13 +43,26 @@ type itemNode struct {
 	next *itemNode
 }
 
+const maxFreeItemNodes = 100
+
 type itemList struct {
 	head *itemNode
 	tail *itemNode
+
+	free  *itemNode
+	nfree int
 }
 
 func (il *itemList) enqueue(i interface{}) {
-	n := &itemNode{it: i}
+	var n *itemNode
+	if il.free != nil {
+		// pop the 1st free item
+		n, il.free = il.free, il.free.next
+		*n = itemNode{it: i}
+		il.nfree--
+	} else {
+		n = &itemNode{it: i}
+	}
 	if il.tail == nil {
 		il.head, il.tail = n, n
 		return
@@ -68,10 +81,17 @@ func (il *itemList) dequeue() interface{} {
 	if il.head == nil {
 		return nil
 	}
-	i := il.head.it
+	unused := il.head
+	i := unused.it
 	il.head = il.head.next
 	if il.head == nil {
 		il.tail = nil
+	}
+
+	if il.nfree < maxFreeItemNodes {
+		// add to head of free list
+		il.free, unused.next = unused, il.free
+		il.nfree++
 	}
 	return i
 }
@@ -140,12 +160,39 @@ type dataFrame struct {
 	// you can assign the header to h and the payload to the d;
 	// or just assign the header + payload together to the d.
 	// In other words, h = nil means d = header + payload.
-	h      []byte
-	d      []byte
-	dcache []byte // dcache is the origin d created by mcache, this ptr is only used for kitex
-	// onEachWrite is called every time
-	// a part of d is written out.
-	onEachWrite func()
+	h []byte
+	d []byte
+
+	// the header and data are most likely from pkg/remote/codec/grpc which created by `safemcache`.
+	// we keep original []byte for mcache recycling coz h and d will move forward when writes.
+	// make sure only use `safemcache.Free` to recycle the buffers,
+	// coz it's NOT always created by `safemcache.Malloc` or `mcache.Malloc`.
+	originH []byte
+	originD []byte
+
+	// resetPingStrikes is stored 1 every time a part of d is written out.
+	// not holding setResetPingStrikes() for performance concern,
+	// coz it will cause one closure allocation for each dataFrame.
+	// it replaces the original impl of `onEachWrite` which calls `setResetPingStrikes` of `http2Server`
+	resetPingStrikes *uint32
+}
+
+var poolDataFrame = sync.Pool{
+	New: func() interface{} {
+		return &dataFrame{}
+	},
+}
+
+func newDataFrame() *dataFrame {
+	p := poolDataFrame.Get().(*dataFrame)
+	*p = dataFrame{} // reset all fields
+	return p
+}
+
+func (p *dataFrame) Release() {
+	safemcache.Free(p.originH)
+	safemcache.Free(p.originD)
+	poolDataFrame.Put(p)
 }
 
 func (*dataFrame) isTransportResponseFrame() bool { return false }
@@ -848,7 +895,10 @@ func (l *loopyWriter) processData() (bool, error) {
 		if err := l.framer.WriteData(dataItem.streamID, dataItem.endStream, nil); err != nil {
 			return false, err
 		}
+
 		str.itl.dequeue() // remove the empty data item from stream
+		dataItem.Release()
+
 		if str.itl.isEmpty() {
 			str.state = empty
 		} else if trailer, ok := str.itl.peek().(*headerFrame); ok { // the next item is trailers.
@@ -902,8 +952,8 @@ func (l *loopyWriter) processData() (bool, error) {
 	if dataItem.endStream && len(dataItem.h)+len(dataItem.d) <= size {
 		endStream = true
 	}
-	if dataItem.onEachWrite != nil {
-		dataItem.onEachWrite()
+	if dataItem.resetPingStrikes != nil {
+		atomic.StoreUint32(dataItem.resetPingStrikes, 1)
 	}
 	if err := l.framer.WriteData(dataItem.streamID, endStream, buf[:size]); err != nil {
 		return false, err
@@ -914,10 +964,8 @@ func (l *loopyWriter) processData() (bool, error) {
 	dataItem.d = dataItem.d[dSize:]
 
 	if len(dataItem.h) == 0 && len(dataItem.d) == 0 { // All the data from that message was written out.
-		if len(dataItem.dcache) > 0 {
-			mcache.Free(dataItem.dcache)
-		}
 		str.itl.dequeue()
+		dataItem.Release()
 	}
 	if str.itl.isEmpty() {
 		str.state = empty

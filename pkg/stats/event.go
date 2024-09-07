@@ -72,6 +72,10 @@ const (
 	writeFinish
 	streamRecv
 	streamSend
+	checksumGenerateStart
+	checksumGenerateFinish
+	checksumValidateStart
+	checksumValidateFinish
 
 	// NOTE: add new events before this line
 	predefinedEventNum
@@ -82,16 +86,20 @@ var (
 	RPCStart  = newEvent(rpcStart, LevelBase)
 	RPCFinish = newEvent(rpcFinish, LevelBase)
 
-	ServerHandleStart  = newEvent(serverHandleStart, LevelDetailed)
-	ServerHandleFinish = newEvent(serverHandleFinish, LevelDetailed)
-	ClientConnStart    = newEvent(clientConnStart, LevelDetailed)
-	ClientConnFinish   = newEvent(clientConnFinish, LevelDetailed)
-	ReadStart          = newEvent(readStart, LevelDetailed)
-	ReadFinish         = newEvent(readFinish, LevelDetailed)
-	WaitReadStart      = newEvent(waitReadStart, LevelDetailed)
-	WaitReadFinish     = newEvent(waitReadFinish, LevelDetailed)
-	WriteStart         = newEvent(writeStart, LevelDetailed)
-	WriteFinish        = newEvent(writeFinish, LevelDetailed)
+	ServerHandleStart      = newEvent(serverHandleStart, LevelDetailed)
+	ServerHandleFinish     = newEvent(serverHandleFinish, LevelDetailed)
+	ClientConnStart        = newEvent(clientConnStart, LevelDetailed)
+	ClientConnFinish       = newEvent(clientConnFinish, LevelDetailed)
+	ReadStart              = newEvent(readStart, LevelDetailed)
+	ReadFinish             = newEvent(readFinish, LevelDetailed)
+	WaitReadStart          = newEvent(waitReadStart, LevelDetailed)
+	WaitReadFinish         = newEvent(waitReadFinish, LevelDetailed)
+	WriteStart             = newEvent(writeStart, LevelDetailed)
+	WriteFinish            = newEvent(writeFinish, LevelDetailed)
+	ChecksumValidateStart  = newEvent(checksumValidateStart, LevelDetailed)
+	ChecksumValidateFinish = newEvent(checksumValidateFinish, LevelDetailed)
+	ChecksumGenerateStart  = newEvent(checksumGenerateStart, LevelDetailed)
+	ChecksumGenerateFinish = newEvent(checksumGenerateFinish, LevelDetailed)
 
 	// Streaming Events
 	StreamRecv = newEvent(streamRecv, LevelDetailed)
