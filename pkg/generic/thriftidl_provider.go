@@ -79,7 +79,6 @@ func NewThriftFileProviderWithDynamicgoWithOption(path string, opts []ThriftIDLP
 	}
 
 	// ServiceDescriptor of dynamicgo
-	// TODO: extract the same part
 	dOpts := dthrift.Options{EnableThriftBase: true, ParseServiceMode: meta.ParseServiceMode(parseMode)}
 	dsvc, err := dOpts.NewDescritorFromPath(context.Background(), path, includeDirs...)
 	if err != nil {
