@@ -125,9 +125,9 @@ func (t *transport) loopRead() error {
 }
 
 func (t *transport) writeFrame(frame Frame) error {
-	log.Printf("loop stop and write frame start: %v", frame)
+	log.Printf("trans write frame start: %v", frame)
 	err := EncodeFrame(context.Background(), t.writer, frame)
-	log.Printf("loop stop and write frame end: %v", err)
+	log.Printf("trans write frame end: %v", err)
 	return err
 }
 

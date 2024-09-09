@@ -5,9 +5,9 @@ import (
 	"github.com/cloudwego/kitex/streamx"
 )
 
-type Server server.Server
+type Server = server.Server
 
-func NewServer(opts ...ServerOption) Server {
+func NewServer(opts ...ServerOption) server.Server {
 	iopts := make([]server.Option, 0, len(opts)+1)
 	iopts = append(iopts, server.WithTransHandlerFactory(streamx.NewSvrTransHandlerFactory()))
 	for _, opt := range opts {

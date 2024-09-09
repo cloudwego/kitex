@@ -85,13 +85,13 @@ type ServerStream interface {
 // client 必须通过 metainfo.WithValue(ctx, ..) 给下游传递信息
 // client 必须通过 metainfo.GetValue(ctx, ..) 拿到当前 server 的透传信息
 // client 必须通过 Header() 拿到下游 server 的透传信息
-type ClientStreamContext[Header, Trailer any] interface {
+type ClientStreamMetadata[Header, Trailer any] interface {
 	Header() (Header, error)
 	Trailer() (Trailer, error)
 }
 
 // server 可以通过 Set/SendXXX 给上游回传信息
-type ServerStreamContext[Header, Trailer any] interface {
+type ServerStreamMetadata[Header, Trailer any] interface {
 	SetHeader(hd Header) error
 	SendHeader(hd Header) error
 	SetTrailer(hd Trailer) error
@@ -100,62 +100,93 @@ type ServerStreamContext[Header, Trailer any] interface {
 type ServerStreamingClient[Header, Trailer, Res any] interface {
 	Recv(ctx context.Context) (*Res, error)
 	ClientStream
-	ClientStreamContext[Header, Trailer]
+	ClientStreamMetadata[Header, Trailer]
 }
 
 type ServerStreamingServer[Header, Trailer, Res any] interface {
 	Send(ctx context.Context, res *Res) error
 	ServerStream
-	ServerStreamContext[Header, Trailer]
+	ServerStreamMetadata[Header, Trailer]
 }
 
 type ClientStreamingClient[Header, Trailer, Req, Res any] interface {
 	Send(ctx context.Context, req *Req) error
 	CloseAndRecv(ctx context.Context) (*Res, error)
 	ClientStream
-	ClientStreamContext[Header, Trailer]
+	ClientStreamMetadata[Header, Trailer]
 }
 
 type ClientStreamingServer[Header, Trailer, Req, Res any] interface {
 	Recv(ctx context.Context) (*Req, error)
 	//SendAndClose(ctx context.Context, res *Res) error
 	ServerStream
-	ServerStreamContext[Header, Trailer]
+	ServerStreamMetadata[Header, Trailer]
 }
 
 type BidiStreamingClient[Header, Trailer, Req, Res any] interface {
 	Send(ctx context.Context, req *Req) error
 	Recv(ctx context.Context) (*Res, error)
 	ClientStream
-	ClientStreamContext[Header, Trailer]
+	ClientStreamMetadata[Header, Trailer]
 }
 
 type BidiStreamingServer[Header, Trailer, Req, Res any] interface {
 	Recv(ctx context.Context) (*Req, error)
 	Send(ctx context.Context, res *Res) error
 	ServerStream
-	ServerStreamContext[Header, Trailer]
+	ServerStreamMetadata[Header, Trailer]
+}
+
+type GenericStreamIOMiddlewareSetter interface {
+	SetStreamSendEndpoint(e StreamSendEndpoint)
+	SetStreamRecvEndpoint(e StreamSendEndpoint)
 }
 
 func NewGenericClientStream[Header, Trailer, Req, Res any](cs ClientStream) *GenericClientStream[Header, Trailer, Req, Res] {
 	return &GenericClientStream[Header, Trailer, Req, Res]{
-		ClientStream:        cs,
-		ClientStreamContext: cs.(ClientStreamContext[Header, Trailer]),
+		ClientStream:         cs,
+		ClientStreamMetadata: cs.(ClientStreamMetadata[Header, Trailer]),
 	}
 }
 
 type GenericClientStream[Header, Trailer, Req, Res any] struct {
 	ClientStream
-	ClientStreamContext[Header, Trailer]
+	ClientStreamMetadata[Header, Trailer]
+	StreamSendMiddleware
+	StreamRecvMiddleware
 }
 
-func (x *GenericClientStream[Header, Trailer, Req, Res]) Send(ctx context.Context, m *Req) error {
+func (x *GenericClientStream[Header, Trailer, Req, Res]) SetStreamSendMiddleware(e StreamSendMiddleware) {
+	x.StreamSendMiddleware = e
+}
+
+func (x *GenericClientStream[Header, Trailer, Req, Res]) SetStreamRecvMiddleware(e StreamRecvMiddleware) {
+	x.StreamRecvMiddleware = e
+}
+
+func (x *GenericClientStream[Header, Trailer, Req, Res]) SendMsg(ctx context.Context, m any) error {
+	if x.StreamSendMiddleware != nil {
+		return x.StreamSendMiddleware(streamSendNext)(ctx, x.ClientStream, m)
+	}
 	return x.ClientStream.SendMsg(ctx, m)
 }
 
-func (x *GenericClientStream[Header, Trailer, Req, Res]) Recv(ctx context.Context) (*Res, error) {
-	m := new(Res)
-	if err := x.ClientStream.RecvMsg(ctx, m); err != nil {
+func (x *GenericClientStream[Header, Trailer, Req, Res]) RecvMsg(ctx context.Context, m any) (err error) {
+	if x.StreamRecvMiddleware != nil {
+		err = x.StreamRecvMiddleware(streamRecvNext)(ctx, x.ClientStream, m)
+	} else {
+		err = x.ClientStream.RecvMsg(ctx, m)
+	}
+	return err
+}
+
+func (x *GenericClientStream[Header, Trailer, Req, Res]) Send(ctx context.Context, m *Req) error {
+	return x.SendMsg(ctx, m)
+}
+
+func (x *GenericClientStream[Header, Trailer, Req, Res]) Recv(ctx context.Context) (m *Res, err error) {
+	m = new(Res)
+	if err = x.RecvMsg(ctx, m); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -165,39 +196,66 @@ func (x *GenericClientStream[Header, Trailer, Req, Res]) CloseAndRecv(ctx contex
 	if err := x.ClientStream.CloseSend(ctx); err != nil {
 		return nil, err
 	}
-	m := new(Res)
-	if err := x.ClientStream.RecvMsg(ctx, m); err != nil {
-		return nil, err
-	}
-	return m, nil
+	return x.Recv(ctx)
 }
 
 func NewGenericServerStream[Header, Trailer, Req, Res any](ss ServerStream) *GenericServerStream[Header, Trailer, Req, Res] {
 	return &GenericServerStream[Header, Trailer, Req, Res]{
-		ServerStream:        ss,
-		ServerStreamContext: ss.(ServerStreamContext[Header, Trailer]),
+		ServerStream:         ss,
+		ServerStreamMetadata: ss.(ServerStreamMetadata[Header, Trailer]),
 	}
 }
 
 type GenericServerStream[Header, Trailer, Req, Res any] struct {
 	ServerStream
-	ServerStreamContext[Header, Trailer]
+	ServerStreamMetadata[Header, Trailer]
+	StreamSendMiddleware
+	StreamRecvMiddleware
+}
+
+func (x *GenericServerStream[Header, Trailer, Req, Res]) SetStreamSendMiddleware(e StreamSendMiddleware) {
+	x.StreamSendMiddleware = e
+}
+
+func (x *GenericServerStream[Header, Trailer, Req, Res]) SetStreamRecvMiddleware(e StreamRecvMiddleware) {
+	x.StreamRecvMiddleware = e
+}
+
+func (x *GenericServerStream[Header, Trailer, Req, Res]) SendMsg(ctx context.Context, m any) error {
+	if x.StreamSendMiddleware != nil {
+		return x.StreamSendMiddleware(streamSendNext)(ctx, x.ServerStream, m)
+	}
+	return x.ServerStream.SendMsg(ctx, m)
+}
+
+func (x *GenericServerStream[Header, Trailer, Req, Res]) RecvMsg(ctx context.Context, m any) (err error) {
+	if x.StreamRecvMiddleware != nil {
+		err = x.StreamRecvMiddleware(streamRecvNext)(ctx, x.ServerStream, m)
+	} else {
+		err = x.ServerStream.RecvMsg(ctx, m)
+	}
+	return err
 }
 
 func (x *GenericServerStream[Header, Trailer, Req, Res]) Send(ctx context.Context, m *Res) error {
+	if x.StreamSendMiddleware != nil {
+		return x.StreamSendMiddleware(streamSendNext)(ctx, x.ServerStream, m)
+	}
 	return x.ServerStream.SendMsg(ctx, m)
 }
 
 func (x *GenericServerStream[Header, Trailer, Req, Res]) SendAndClose(ctx context.Context, m *Res) error {
-	if err := x.ServerStream.SendMsg(ctx, m); err != nil {
-		return err
-	}
-	return nil
+	return x.Send(ctx, m)
 }
 
-func (x *GenericServerStream[Header, Trailer, Req, Res]) Recv(ctx context.Context) (*Req, error) {
-	m := new(Req)
-	if err := x.ServerStream.RecvMsg(ctx, m); err != nil {
+func (x *GenericServerStream[Header, Trailer, Req, Res]) Recv(ctx context.Context) (m *Req, err error) {
+	m = new(Req)
+	if x.StreamRecvMiddleware != nil {
+		err = x.StreamRecvMiddleware(streamRecvNext)(ctx, x.ServerStream, m)
+	} else {
+		err = x.ServerStream.RecvMsg(ctx, m)
+	}
+	if err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -254,4 +312,12 @@ func (s clientStream) SendMsg(ctx context.Context, m any) error {
 
 func (s clientStream) RecvMsg(ctx context.Context, m any) error {
 	return s.ClientStream.RecvMsg(ctx, m)
+}
+
+func streamSendNext(ctx context.Context, stream Stream, msg any) (err error) {
+	return stream.SendMsg(ctx, msg)
+}
+
+func streamRecvNext(ctx context.Context, stream Stream, msg any) (err error) {
+	return stream.RecvMsg(ctx, msg)
 }

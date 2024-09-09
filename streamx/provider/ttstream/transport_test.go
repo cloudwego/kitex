@@ -121,10 +121,11 @@ func TestTransport(t *testing.T) {
 		atomic.AddInt32(&streamDone, 1)
 		go func(sid int) {
 			defer wg.Done()
+
+			// send header
 			s, err := trans.newStream(ctx, method, map[string]string{})
 			test.Assert(t, err == nil, err)
 
-			// send header
 			cs := newClientStream(s)
 			t.Logf("client stream[%d] created", sid)
 

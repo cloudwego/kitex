@@ -24,6 +24,18 @@ func TestFrameCodec(t *testing.T) {
 	test.DeepEqual(t, wframe, rframe)
 }
 
+func TestFrameWithoutPayloadCodec(t *testing.T) {
+	rmsg := new(TestRequest)
+	rmsg.A = 1
+	payload, err := EncodePayload(context.Background(), rmsg)
+	test.Assert(t, err == nil, err)
+
+	wmsg := new(TestRequest)
+	err = DecodePayload(context.Background(), payload, wmsg)
+	test.Assert(t, err == nil, err)
+	test.DeepEqual(t, wmsg, rmsg)
+}
+
 func TestPayloadCodec(t *testing.T) {
 	rmsg := new(TestRequest)
 	rmsg.A = 1

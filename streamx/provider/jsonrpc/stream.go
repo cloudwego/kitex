@@ -8,8 +8,10 @@ import (
 )
 
 var (
-	_ streamx.ClientStream = (*clientStream)(nil)
-	_ streamx.ServerStream = (*serverStream)(nil)
+	_ streamx.ClientStream                          = (*clientStream)(nil)
+	_ streamx.ServerStream                          = (*serverStream)(nil)
+	_ streamx.ClientStreamMetadata[Header, Trailer] = (*clientStream)(nil)
+	_ streamx.ServerStreamMetadata[Header, Trailer] = (*serverStream)(nil)
 )
 
 func newStream(trans *transport, sid int, mode streamx.StreamingMode, method string) (s *stream) {
@@ -29,6 +31,14 @@ type stream struct {
 	selfEOF int32
 	peerEOF int32
 	trans   *transport
+}
+
+func (s *stream) Header() (Header, error) {
+	return make(Header), nil
+}
+
+func (s *stream) Trailer() (Trailer, error) {
+	return make(Trailer), nil
 }
 
 func (s *stream) Mode() streamx.StreamingMode {
@@ -91,4 +101,16 @@ func newServerStream(s *stream) streamx.ServerStream {
 
 type serverStream struct {
 	*stream
+}
+
+func (s *serverStream) SetHeader(hd Header) error {
+	return nil
+}
+
+func (s *serverStream) SendHeader(hd Header) error {
+	return nil
+}
+
+func (s *serverStream) SetTrailer(hd Trailer) error {
+	return nil
 }

@@ -27,8 +27,3 @@ type ClientProvider interface {
 	// NewStream create a stream based on rpcinfo and callOptions
 	NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callOptions ...streamxcallopt.CallOption) (ClientStream, error)
 }
-
-type ClientStreamProvider interface {
-	NewStream(ctx context.Context, method string, req any, callOptions ...streamxcallopt.CallOption) (ClientStream, error)
-	StreamMiddleware(next StreamEndpoint) StreamEndpoint
-}

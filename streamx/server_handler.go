@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/transport"
 	"io"
+	"log"
 	"net"
 	"runtime/debug"
 	"sync"
@@ -157,6 +158,9 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss Server
 
 	ctx = t.startTracer(ctx, ri)
 	defer func() {
+		if err != nil {
+			log.Println("OnStream failed: ", err)
+		}
 		panicErr := recover()
 		if panicErr != nil {
 			if conn != nil {
@@ -170,6 +174,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss Server
 
 	reqArgs := NewStreamReqArgs(nil)
 	resArgs := NewStreamResArgs(nil)
+	// server handler (which will call streamxserver.InvokeStream inside)
 	serr := t.inkHdlFunc(ctx, reqArgs, resArgs)
 	ctx, err = t.provider.OnStreamFinish(ctx, ss)
 	if err == nil && serr != nil {

@@ -71,10 +71,15 @@ type kClient struct {
 	mws     []endpoint.Middleware
 	eps     endpoint.Endpoint
 	sEps    endpoint.Endpoint
-	sxEps   endpoint.Endpoint
-	sxMW    streamx.StreamMiddleware
-	opt     *client.Options
-	lbf     *lbcache.BalancerFactory
+
+	// streamx
+	sxEps          endpoint.Endpoint
+	sxStreamMW     streamx.StreamMiddleware
+	sxStreamRecvMW streamx.StreamRecvMiddleware
+	sxStreamSendMW streamx.StreamSendMiddleware
+
+	opt *client.Options
+	lbf *lbcache.BalancerFactory
 
 	inited bool
 	closed bool
@@ -94,12 +99,17 @@ func (kf *kcFinalizerClient) Call(ctx context.Context, method string, request, r
 
 // NewClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
 func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error) {
+	nopts := client.NewOptions(opts)
+	return NewClientWithOptions(svcInfo, nopts)
+}
+
+func NewClientWithOptions(svcInfo *serviceinfo.ServiceInfo, opts *Options) (Client, error) {
 	if svcInfo == nil {
 		return nil, errors.New("NewClient: no service info")
 	}
 	kc := &kcFinalizerClient{kClient: &kClient{}}
 	kc.svcInfo = svcInfo
-	kc.opt = client.NewOptions(opts)
+	kc.opt = opts
 	if err := kc.init(); err != nil {
 		_ = kc.Close()
 		return nil, err
@@ -445,12 +455,16 @@ func (kc *kClient) buildInvokeChain() error {
 	}
 	kc.sEps = mwchain(innerStreamingEp)
 
+	// streamx NewStream
 	innerStreamXEp, err := kc.invokeStreamXEndpoint()
 	if err != nil {
 		return err
 	}
 	kc.sxEps = mwchain(innerStreamXEp)
-	kc.sxMW = streamx.Chain(kc.opt.SMWs...)
+	// streamx stream call
+	kc.sxStreamMW = streamx.StreamMiddlewareChain(kc.opt.SMWs...)
+	kc.sxStreamRecvMW = streamx.StreamRecvMiddlewareChain(kc.opt.SRecvMWs...)
+	kc.sxStreamSendMW = streamx.StreamSendMiddlewareChain(kc.opt.SSendMWs...)
 	return nil
 }
 

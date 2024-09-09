@@ -7,3 +7,9 @@ func WithClientPayloadLimit(limit int) ClientProviderOption {
 		cp.payloadLimit = limit
 	}
 }
+
+func WithClientMetaHandler(limit int) ClientProviderOption {
+	return func(cp *clientProvider) {
+		cp.payloadLimit = limit
+	}
+}

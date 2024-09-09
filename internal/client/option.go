@@ -83,9 +83,11 @@ type Options struct {
 
 	ACLRules []acl.RejectFunc
 
-	MWBs  []endpoint.MiddlewareBuilder
-	IMWBs []endpoint.MiddlewareBuilder
-	SMWs  []streamx.StreamMiddleware
+	MWBs     []endpoint.MiddlewareBuilder
+	IMWBs    []endpoint.MiddlewareBuilder
+	SMWs     []streamx.StreamMiddleware
+	SRecvMWs []streamx.StreamRecvMiddleware
+	SSendMWs []streamx.StreamSendMiddleware
 
 	Bus          event.Bus
 	Events       event.Queue
