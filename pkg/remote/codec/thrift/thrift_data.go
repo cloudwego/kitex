@@ -20,10 +20,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/bytedance/gopkg/lang/mcache"
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/apache"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	"github.com/cloudwego/kitex/internal/utils/safemcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
@@ -31,7 +32,17 @@ import (
 const marshalThriftBufferSize = 1024
 
 // MarshalThriftData only encodes the data (without the prepending methodName, msgType, seqId)
-// It will allocate a new buffer and encode to it
+// NOTE:
+// it's used by grpc only,
+// coz kitex grpc doesn't implements remote.Message and remote.ByteBuffer for rpc.
+//
+// for `FastWrite` or `FrugalWrite`,
+// the buf is created by `github.com/bytedance/gopkg/lang/mcache`, `Free` it at your own risk.
+//
+// for internals, actually,
+// coz it's hard to control the lifecycle of a returned buf, we use a safe version of `mcache` which is
+// compatible with `mcache` to make sure `Free` would not have any side effects.
+// see `github.com/cloudwego/kitex/internal/utils/safemcache` for details.
 func MarshalThriftData(ctx context.Context, codec remote.PayloadCodec, data interface{}) ([]byte, error) {
 	c, ok := codec.(*thriftCodec)
 	if !ok {
@@ -40,20 +51,19 @@ func MarshalThriftData(ctx context.Context, codec remote.PayloadCodec, data inte
 	return c.marshalThriftData(ctx, data)
 }
 
-// marshalBasicThriftData only encodes the data (without the prepending method, msgType, seqId)
-// It will allocate a new buffer and encode to it
+// NOTE: only used by `MarshalThriftData`
 func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([]byte, error) {
+	// TODO(xiaost): Refactor the code after v0.11.0 is released. Unifying checking and fallback logic.
+
 	// encode with hyper codec
-	// NOTE: to ensure hyperMarshalEnabled is inlined so split the check logic, or it may cause performance loss
-	if c.hyperMarshalEnabled() && hyperMarshalAvailable(data) {
+	if c.IsSet(FrugalWrite) && hyperMarshalAvailable(data) {
 		return c.hyperMarshalBody(data)
 	}
 
-	// encode with FastWrite
-	if c.CodecType&FastWrite != 0 {
-		if msg, ok := data.(ThriftMsgFastCodec); ok {
+	if c.IsSet(FastWrite) {
+		if msg, ok := data.(thrift.FastCodec); ok {
 			payloadSize := msg.BLength()
-			payload := mcache.Malloc(payloadSize)
+			payload := safemcache.Malloc(payloadSize)
 			msg.FastWriteNocopy(payload, nil)
 			return payload, nil
 		}
@@ -69,90 +79,62 @@ func (c thriftCodec) marshalThriftData(ctx context.Context, data interface{}) ([
 	}
 
 	// fallback to old thrift way (slow)
-	transport := thrift.NewTMemoryBufferLen(marshalThriftBufferSize)
-	tProt := thrift.NewTBinaryProtocol(transport, true, true)
-	if err := marshalBasicThriftData(ctx, tProt, data); err != nil {
+	buf := make([]byte, 0, marshalThriftBufferSize)
+	bw := bufiox.NewBytesWriter(&buf)
+	if err := apache.ThriftWrite(bw, data); err != nil {
 		return nil, err
 	}
-	return transport.Bytes(), nil
+	_ = bw.Flush()
+	return buf, nil
 }
 
 // verifyMarshalBasicThriftDataType verifies whether data could be marshaled by old thrift way
 func verifyMarshalBasicThriftDataType(data interface{}) error {
-	switch data.(type) {
-	case MessageWriter:
-	case MessageWriterWithContext:
-	default:
+	if err := apache.CheckTStruct(data); err != nil {
 		return errEncodeMismatchMsgType
 	}
 	return nil
 }
 
-// marshalBasicThriftData only encodes the data (without the prepending method, msgType, seqId)
-// It uses the old thrift way which is much slower than FastCodec and Frugal
-func marshalBasicThriftData(ctx context.Context, tProt thrift.TProtocol, data interface{}) error {
-	switch msg := data.(type) {
-	case MessageWriter:
-		if err := msg.Write(tProt); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
-		}
-	case MessageWriterWithContext:
-		if err := msg.Write(ctx, tProt); err != nil {
-			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift marshal, Write failed: %s", err.Error()))
-		}
-	default:
-		return errEncodeMismatchMsgType
+func unmarshalThriftException(in bufiox.Reader) error {
+	d := thrift.NewSkipDecoder(in)
+	defer d.Release()
+	b, err := d.Next(thrift.STRUCT)
+	if err != nil {
+		return err
 	}
-	return nil
-}
-
-// UnmarshalThriftException decode thrift exception from tProt
-// If your input is []byte, you can wrap it with `NewBinaryProtocol(remote.NewReaderBuffer(buf))`
-func UnmarshalThriftException(tProt thrift.TProtocol) error {
-	exception := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
-	if err := exception.Read(tProt); err != nil {
+	ex := thrift.NewApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
+	if _, err := ex.FastRead(b); err != nil {
 		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal Exception failed: %s", err.Error()))
 	}
-	if err := tProt.ReadMessageEnd(); err != nil {
-		return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("thrift unmarshal, ReadMessageEnd failed: %s", err.Error()))
-	}
-	return remote.NewTransError(exception.TypeId(), exception)
+	return remote.NewTransError(ex.TypeId(), ex)
 }
 
 // UnmarshalThriftData only decodes the data (after methodName, msgType and seqId)
 // It will decode from the given buffer.
-// Note:
-// 1. `method` is only used for generic calls
-// 2. if the buf contains an exception, you should call UnmarshalThriftException instead.
+// NOTE: `method` is required for generic calls
 func UnmarshalThriftData(ctx context.Context, codec remote.PayloadCodec, method string, buf []byte, data interface{}) error {
 	c, ok := codec.(*thriftCodec)
 	if !ok {
 		c = defaultCodec
 	}
-	tProt := NewBinaryProtocol(remote.NewReaderBuffer(buf))
-	err := c.unmarshalThriftData(ctx, tProt, method, data, len(buf))
-	if err == nil {
-		tProt.Recycle()
-	}
-	return err
-}
-
-func (c thriftCodec) fastMessageUnmarshalEnabled() bool {
-	return c.CodecType&FastRead != 0
+	trans := bufiox.NewBytesReader(buf)
+	defer trans.Release(nil)
+	return c.unmarshalThriftData(trans, data, len(buf))
 }
 
 func (c thriftCodec) fastMessageUnmarshalAvailable(data interface{}, payloadLen int) bool {
 	if payloadLen == 0 && c.CodecType&EnableSkipDecoder == 0 {
 		return false
 	}
-	_, ok := data.(ThriftMsgFastCodec)
+	_, ok := data.(thrift.FastCodec)
 	return ok
 }
 
-func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, dataLen int) error {
-	msg := data.(ThriftMsgFastCodec)
+func (c thriftCodec) fastUnmarshal(trans bufiox.Reader, data interface{}, dataLen int) error {
+	msg := data.(thrift.FastCodec)
 	if dataLen > 0 {
-		buf, err := tProt.next(dataLen)
+		buf, err := trans.Next(dataLen)
 		if err != nil {
 			return remote.NewTransError(remote.ProtocolError, err)
 		}
@@ -162,7 +144,7 @@ func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, data
 		}
 		return nil
 	}
-	buf, err := getSkippedStructBuffer(tProt)
+	buf, err := getSkippedStructBuffer(trans)
 	if err != nil {
 		return err
 	}
@@ -175,33 +157,38 @@ func (c thriftCodec) fastUnmarshal(tProt *BinaryProtocol, data interface{}, data
 
 // unmarshalThriftData only decodes the data (after methodName, msgType and seqId)
 // method is only used for generic calls
-func (c thriftCodec) unmarshalThriftData(ctx context.Context, tProt *BinaryProtocol, method string, data interface{}, dataLen int) error {
+func (c thriftCodec) unmarshalThriftData(trans bufiox.Reader, data interface{}, dataLen int) error {
 	// decode with hyper unmarshal
-	if c.hyperMessageUnmarshalEnabled() && c.hyperMessageUnmarshalAvailable(data, dataLen) {
-		return c.hyperUnmarshal(tProt, data, dataLen)
+	if c.IsSet(FrugalRead) && c.hyperMessageUnmarshalAvailable(data, dataLen) {
+		return c.hyperUnmarshal(trans, data, dataLen)
 	}
 
 	// decode with FastRead
-	if c.fastMessageUnmarshalEnabled() && c.fastMessageUnmarshalAvailable(data, dataLen) {
-		return c.fastUnmarshal(tProt, data, dataLen)
+	if c.IsSet(FastRead) && c.fastMessageUnmarshalAvailable(data, dataLen) {
+		return c.fastUnmarshal(trans, data, dataLen)
 	}
 
 	if err := verifyUnmarshalBasicThriftDataType(data); err != nil {
-		// Basic can be used for disabling frugal, we need to check it
-		if c.CodecType != Basic && c.hyperMessageUnmarshalAvailable(data, dataLen) {
-			// fallback to frugal when the generated code is using slim template
-			return c.hyperUnmarshal(tProt, data, dataLen)
+		// if user only wants to use Basic we never try fallback to frugal or fastcodec
+		if c.CodecType != Basic {
+			// try FrugalRead < - > FastRead fallback
+			if c.fastMessageUnmarshalAvailable(data, dataLen) {
+				return c.fastUnmarshal(trans, data, dataLen)
+			}
+			if c.hyperMessageUnmarshalAvailable(data, dataLen) { // slim template?
+				return c.hyperUnmarshal(trans, data, dataLen)
+			}
 		}
 		return err
 	}
 
 	// fallback to old thrift way (slow)
-	return decodeBasicThriftData(ctx, tProt, method, data)
+	return decodeBasicThriftData(trans, data)
 }
 
-func (c thriftCodec) hyperUnmarshal(tProt *BinaryProtocol, data interface{}, dataLen int) error {
+func (c thriftCodec) hyperUnmarshal(trans bufiox.Reader, data interface{}, dataLen int) error {
 	if dataLen > 0 {
-		buf, err := tProt.next(dataLen - bthrift.Binary.MessageEndLength())
+		buf, err := trans.Next(dataLen)
 		if err != nil {
 			return remote.NewTransError(remote.ProtocolError, err)
 		}
@@ -210,7 +197,7 @@ func (c thriftCodec) hyperUnmarshal(tProt *BinaryProtocol, data interface{}, dat
 		}
 		return nil
 	}
-	buf, err := getSkippedStructBuffer(tProt)
+	buf, err := getSkippedStructBuffer(trans)
 	if err != nil {
 		return err
 	}
@@ -223,39 +210,29 @@ func (c thriftCodec) hyperUnmarshal(tProt *BinaryProtocol, data interface{}, dat
 
 // verifyUnmarshalBasicThriftDataType verifies whether data could be unmarshal by old thrift way
 func verifyUnmarshalBasicThriftDataType(data interface{}) error {
-	switch data.(type) {
-	case MessageReader:
-	case MessageReaderWithMethodWithContext:
-	default:
+	if err := apache.CheckTStruct(data); err != nil {
 		return errDecodeMismatchMsgType
 	}
 	return nil
 }
 
 // decodeBasicThriftData decode thrift body the old way (slow)
-func decodeBasicThriftData(ctx context.Context, tProt thrift.TProtocol, method string, data interface{}) error {
+func decodeBasicThriftData(trans bufiox.Reader, data interface{}) error {
 	var err error
-	switch t := data.(type) {
-	case MessageReader:
-		if err = t.Read(tProt); err != nil {
-			return remote.NewTransError(remote.ProtocolError, err)
-		}
-	case MessageReaderWithMethodWithContext:
-		// methodName is necessary for generic calls to methodInfo from serviceInfo
-		if err = t.Read(ctx, method, tProt); err != nil {
-			return remote.NewTransError(remote.ProtocolError, err)
-		}
-	default:
-		return errDecodeMismatchMsgType
+	if err = verifyUnmarshalBasicThriftDataType(data); err != nil {
+		return err
+	}
+	if err = apache.ThriftRead(trans, data); err != nil {
+		return remote.NewTransError(remote.ProtocolError, err)
 	}
 	return nil
 }
 
-func getSkippedStructBuffer(tProt *BinaryProtocol) ([]byte, error) {
-	sd := skipDecoder{ByteBuffer: tProt.trans}
-	buf, err := sd.NextStruct()
+func getSkippedStructBuffer(trans bufiox.Reader) ([]byte, error) {
+	sd := thrift.NewSkipDecoder(trans)
+	buf, err := sd.Next(thrift.STRUCT)
 	if err != nil {
-		return nil, remote.NewTransError(remote.ProtocolError, err).AppendMessage("caught in SkipDecoder NextStruct phase")
+		return nil, remote.NewTransError(remote.ProtocolError, err).AppendMessage("caught in SkipDecoder Next phase")
 	}
 	return buf, nil
 }

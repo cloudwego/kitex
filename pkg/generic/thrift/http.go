@@ -20,36 +20,42 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/dirtmake"
+	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/t2j"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
-	jsoniter "github.com/json-iterator/go"
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 )
+
+type HTTPReaderWriter struct {
+	*ReadHTTPResponse
+	*WriteHTTPRequest
+}
+
+func NewHTTPReaderWriter(svc *descriptor.ServiceDescriptor) *HTTPReaderWriter {
+	return &HTTPReaderWriter{ReadHTTPResponse: NewReadHTTPResponse(svc), WriteHTTPRequest: NewWriteHTTPRequest(svc)}
+}
 
 // WriteHTTPRequest implement of MessageWriter
 type WriteHTTPRequest struct {
 	svc                    *descriptor.ServiceDescriptor
-	dynamicgoTypeDsc       *dthrift.TypeDescriptor
 	binaryWithBase64       bool
 	convOpts               conv.Options // used for dynamicgo conversion
 	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
-	hasRequestBase         bool
 	dynamicgoEnabled       bool
 }
 
 var (
 	_          MessageWriter = (*WriteHTTPRequest)(nil)
-	customJson               = jsoniter.Config{
+	customJson               = sonic.Config{
 		EscapeHTML: true,
 		UseNumber:  true,
+		CopyString: true,
 	}.Froze()
 )
 
@@ -66,21 +72,14 @@ func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 }
 
 // SetDynamicGo ...
-func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options, method string) error {
+func (w *WriteHTTPRequest) SetDynamicGo(convOpts, convOptsWithThriftBase *conv.Options) {
 	w.convOpts = *convOpts
 	w.convOptsWithThriftBase = *convOptsWithThriftBase
 	w.dynamicgoEnabled = true
-	fnDsc := w.svc.DynamicGoDsc.Functions()[method]
-	if fnDsc == nil {
-		return fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, w.svc.DynamicGoDsc.Name())
-	}
-	w.hasRequestBase = fnDsc.HasRequestBase()
-	w.dynamicgoTypeDsc = fnDsc.Request()
-	return nil
 }
 
 // originalWrite ...
-func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out bufiox.Writer, msg interface{}, requestBase *base.Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	if req.Body == nil && len(req.RawBody) != 0 {
 		if err := customJson.Unmarshal(req.RawBody, &req.Body); err != nil {
@@ -94,14 +93,16 @@ func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out thrift.TProtoc
 	if !fn.HasRequestBase {
 		requestBase = nil
 	}
-	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
+	bw := thrift.NewBufferWriter(out)
+	err = wrapStructWriter(ctx, req, bw, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
+	bw.Recycle()
+	return err
 }
 
 // ReadHTTPResponse implement of MessageReaderWithMethod
 type ReadHTTPResponse struct {
 	svc                   *descriptor.ServiceDescriptor
 	base64Binary          bool
-	msg                   remote.Message
 	dynamicgoEnabled      bool
 	useRawBodyForHTTPResp bool
 	t2jBinaryConv         t2j.BinaryConv // used for dynamicgo thrift to json conversion
@@ -127,36 +128,31 @@ func (r *ReadHTTPResponse) SetUseRawBodyForHTTPResp(useRawBodyForHTTPResp bool) 
 }
 
 // SetDynamicGo ...
-func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options, msg remote.Message) {
+func (r *ReadHTTPResponse) SetDynamicGo(convOpts *conv.Options) {
 	r.t2jBinaryConv = t2j.NewBinaryConv(*convOpts)
-	r.msg = msg
 	r.dynamicgoEnabled = true
 }
 
 // Read ...
-func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in bufiox.Reader) (interface{}, error) {
 	// fallback logic
-	if !r.dynamicgoEnabled {
+	if !r.dynamicgoEnabled || dataLen == 0 {
 		return r.originalRead(ctx, method, in)
 	}
 
-	tProt, ok := in.(*cthrift.BinaryProtocol)
-	if !ok {
-		return nil, perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
-	}
-	mBeginLen := bthrift.Binary.MessageBeginLength(method, thrift.TMessageType(r.msg.MessageType()), r.msg.RPCInfo().Invocation().SeqID())
-	sName, err := in.ReadStructBegin()
-	if err != nil {
-		return nil, err
-	}
-	sBeginLen := bthrift.Binary.StructBeginLength(sName)
+	binaryReader := thrift.NewBufferReader(in)
+	defer binaryReader.Recycle()
+
+	// dynamicgo logic
 	// TODO: support exception field
-	fName, typeId, id, err := in.ReadFieldBegin()
+	_, id, err := binaryReader.ReadFieldBegin()
 	if err != nil {
 		return nil, err
 	}
-	fBeginLen := bthrift.Binary.FieldBeginLength(fName, typeId, id)
-	transBuf, err := tProt.ByteBuffer().ReadBinary(r.msg.PayloadLen() - mBeginLen - sBeginLen - fBeginLen - bthrift.Binary.MessageEndLength())
+	bProt := &thrift.BinaryProtocol{}
+	l := dataLen - bProt.FieldBeginLength()
+	transBuf := dirtmake.Bytes(l, l)
+	_, err = in.ReadBinary(transBuf)
 	if err != nil {
 		return nil, err
 	}
@@ -186,13 +182,15 @@ func (r *ReadHTTPResponse) Read(ctx context.Context, method string, in thrift.TP
 	return resp, nil
 }
 
-func (r *ReadHTTPResponse) originalRead(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPResponse) originalRead(ctx context.Context, method string, in bufiox.Reader) (interface{}, error) {
 	fnDsc, err := r.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err
 	}
 	fDsc := fnDsc.Response
-	resp, err := skipStructReader(ctx, in, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
+	br := thrift.NewBufferReader(in)
+	defer br.Recycle()
+	resp, err := skipStructReader(ctx, br, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
 	if r.useRawBodyForHTTPResp {
 		if httpResp, ok := resp.(*descriptor.HTTPResponse); ok && httpResp.Body != nil {
 			rawBody, err := customJson.Marshal(httpResp.Body)

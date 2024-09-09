@@ -190,7 +190,7 @@ func TestConnOnActiveAndOnInactivePanic(t *testing.T) {
 
 // TestOnConnRead test trans_server onConnRead success
 func TestConnOnRead(t *testing.T) {
-	// 1. prepare mock data
+	// prepare mock data
 	var isClosed bool
 	conn := &MockNetpollConn{
 		Conn: mocks.Conn{
@@ -203,6 +203,8 @@ func TestConnOnRead(t *testing.T) {
 			},
 		},
 	}
+
+	// case return err
 	mockErr := errors.New("mock error")
 	transSvr.transHdlr = &mocks.MockSvrTransHandler{
 		OnReadFunc: func(ctx context.Context, conn net.Conn) error {
@@ -210,9 +212,18 @@ func TestConnOnRead(t *testing.T) {
 		},
 		Opt: transSvr.opt,
 	}
-
-	// 2. test
 	err := transSvr.onConnRead(context.Background(), conn)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, isClosed)
+
+	// case panic
+	transSvr.transHdlr = &mocks.MockSvrTransHandler{
+		OnReadFunc: func(ctx context.Context, conn net.Conn) error {
+			panic("case panic")
+		},
+		Opt: transSvr.opt,
+	}
+	test.Panic(t, func() {
+		_ = transSvr.onConnRead(context.Background(), conn)
+	})
 }

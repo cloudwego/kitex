@@ -20,7 +20,10 @@ import (
 	"fmt"
 )
 
-const maxBackupRetryTimes = 2
+const (
+	maxBackupRetryTimes     = 2
+	defaultBackupRetryTimes = 1
+)
 
 // NewBackupPolicy init backup request policy
 // the param delayMS is suggested to set as TP99
@@ -31,7 +34,7 @@ func NewBackupPolicy(delayMS uint32) *BackupPolicy {
 	p := &BackupPolicy{
 		RetryDelayMS: delayMS,
 		StopPolicy: StopPolicy{
-			MaxRetryTimes:    1,
+			MaxRetryTimes:    defaultBackupRetryTimes,
 			DisableChainStop: false,
 			CBPolicy: CBPolicy{
 				ErrorRate: defaultCBErrRate,
@@ -70,4 +73,36 @@ func (p *BackupPolicy) WithRetrySameNode() {
 // String is used to print human readable debug info.
 func (p *BackupPolicy) String() string {
 	return fmt.Sprintf("{RetryDelayMS:%+v StopPolicy:%+v RetrySameNode:%+v}", p.RetryDelayMS, p.StopPolicy, p.RetrySameNode)
+}
+
+// Equals to check if BackupPolicy is equal
+func (p *BackupPolicy) Equals(np *BackupPolicy) bool {
+	if p == nil {
+		return np == nil
+	}
+	if np == nil {
+		return false
+	}
+	if p.RetryDelayMS != np.RetryDelayMS {
+		return false
+	}
+	if p.StopPolicy != np.StopPolicy {
+		return false
+	}
+	if p.RetrySameNode != np.RetrySameNode {
+		return false
+	}
+
+	return true
+}
+
+func (p *BackupPolicy) DeepCopy() *BackupPolicy {
+	if p == nil {
+		return nil
+	}
+	return &BackupPolicy{
+		RetryDelayMS:  p.RetryDelayMS,
+		StopPolicy:    p.StopPolicy, // not a pointer, will copy the value here
+		RetrySameNode: p.RetrySameNode,
+	}
 }

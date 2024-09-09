@@ -17,140 +17,109 @@
 package utils
 
 import (
-	"bytes"
-	"context"
 	"errors"
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/apache"
+
+	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
 )
 
 // ThriftMessageCodec is used to codec thrift messages.
-type ThriftMessageCodec struct {
-	tb    *thrift.TMemoryBuffer
-	tProt thrift.TProtocol
-}
+type ThriftMessageCodec struct{}
 
 // NewThriftMessageCodec creates a new ThriftMessageCodec.
 func NewThriftMessageCodec() *ThriftMessageCodec {
-	transport := thrift.NewTMemoryBufferLen(1024)
-	tProt := thrift.NewTBinaryProtocol(transport, true, true)
-
-	return &ThriftMessageCodec{
-		tb:    transport,
-		tProt: tProt,
-	}
+	return &ThriftMessageCodec{}
 }
 
 // Encode do thrift message encode.
 // Notice! msg must be XXXArgs/XXXResult that the wrap struct for args and result, not the actual args or result
 // Notice! seqID will be reset in kitex if the buffer is used for generic call in client side, set seqID=0 is suggested
 // when you call this method as client.
-func (t *ThriftMessageCodec) Encode(method string, msgType thrift.TMessageType, seqID int32, msg thrift.TStruct) (b []byte, err error) {
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift.MarshalFastMsg
+func (t *ThriftMessageCodec) Encode(method string, msgType athrift.TMessageType, seqID int32, msg athrift.TStruct) ([]byte, error) {
 	if method == "" {
 		return nil, errors.New("empty methodName in thrift RPCEncode")
 	}
-	t.tb.Reset()
-	if err = t.tProt.WriteMessageBegin(method, msgType, seqID); err != nil {
-		return
+	b := make([]byte, thrift.Binary.MessageBeginLength(method))
+	_ = thrift.Binary.WriteMessageBegin(b, method, thrift.TMessageType(msgType), seqID)
+	buf := bufiox.NewBytesWriter(&b)
+	if err := apache.ThriftWrite(buf, msg); err != nil {
+		return nil, err
 	}
-	if err = msg.Write(t.tProt); err != nil {
-		return
-	}
-	if err = t.tProt.WriteMessageEnd(); err != nil {
-		return
-	}
-	b = append(b, t.tb.Bytes()...)
-	return
+	_ = buf.Flush()
+	return b, nil
 }
 
 // Decode do thrift message decode, notice: msg must be XXXArgs/XXXResult that the wrap struct for args and result, not the actual args or result
-func (t *ThriftMessageCodec) Decode(b []byte, msg thrift.TStruct) (method string, seqID int32, err error) {
-	t.tb.Reset()
-	if _, err = t.tb.Write(b); err != nil {
-		return
-	}
+// Deprecated: use github.com/cloudwego/gopkg/protocol/thrift.UnmarshalFastMsg
+func (t *ThriftMessageCodec) Decode(b []byte, msg athrift.TStruct) (method string, seqID int32, err error) {
+	var l int
 	var msgType thrift.TMessageType
-	if method, msgType, seqID, err = t.tProt.ReadMessageBegin(); err != nil {
+	method, msgType, seqID, l, err = thrift.Binary.ReadMessageBegin(b)
+	if err != nil {
 		return
 	}
+	b = b[l:]
 	if msgType == thrift.EXCEPTION {
-		exception := thrift.NewTApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
-		if err = exception.Read(t.tProt); err != nil {
-			return
+		ex := thrift.NewApplicationException(thrift.UNKNOWN_APPLICATION_EXCEPTION, "")
+		if _, err = ex.FastRead(b); err == nil {
+			err = ex // ApplicationException as err
 		}
-		if err = t.tProt.ReadMessageEnd(); err != nil {
-			return
-		}
-		err = exception
 		return
 	}
-	if err = msg.Read(t.tProt); err != nil {
-		return
-	}
-	t.tProt.ReadMessageEnd()
+	err = apache.ThriftRead(bufiox.NewBytesReader(b), msg)
 	return
 }
 
 // Serialize serialize message into bytes. This is normal thrift serialize func.
 // Notice: Binary generic use Encode instead of Serialize.
-func (t *ThriftMessageCodec) Serialize(msg thrift.TStruct) (b []byte, err error) {
-	t.tb.Reset()
-
-	if err = msg.Write(t.tProt); err != nil {
-		return
+func (t *ThriftMessageCodec) Serialize(msg athrift.TStruct) (b []byte, err error) {
+	buf := bufiox.NewBytesWriter(&b)
+	if err = apache.ThriftWrite(buf, msg); err != nil {
+		return nil, err
 	}
-	b = append(b, t.tb.Bytes()...)
-	return
+	_ = buf.Flush()
+	return b, nil
 }
 
 // Deserialize deserialize bytes into message. This is normal thrift deserialize func.
 // Notice: Binary generic use Decode instead of Deserialize.
-func (t *ThriftMessageCodec) Deserialize(msg thrift.TStruct, b []byte) (err error) {
-	t.tb.Reset()
-	if _, err = t.tb.Write(b); err != nil {
-		return
-	}
-	if err = msg.Read(t.tProt); err != nil {
-		return
-	}
-	return nil
+func (t *ThriftMessageCodec) Deserialize(msg athrift.TStruct, b []byte) (err error) {
+	return apache.ThriftRead(bufiox.NewBytesReader(b), msg)
 }
 
 // MarshalError convert go error to thrift exception, and encode exception over buffered binary transport.
 func MarshalError(method string, err error) []byte {
-	e := thrift.NewTApplicationException(thrift.INTERNAL_ERROR, err.Error())
-	var buf bytes.Buffer
-	trans := thrift.NewStreamTransportRW(&buf)
-	proto := thrift.NewTBinaryProtocol(trans, true, true)
-	if err := proto.WriteMessageBegin(method, thrift.EXCEPTION, 0); err != nil {
-		return nil
-	}
-	if err := e.Write(proto); err != nil {
-		return nil
-	}
-	if err := proto.WriteMessageEnd(); err != nil {
-		return nil
-	}
-	if err := proto.Flush(context.Background()); err != nil {
-		return nil
-	}
-	return buf.Bytes()
+	ex := thrift.NewApplicationException(thrift.INTERNAL_ERROR, err.Error())
+	n := thrift.Binary.MessageBeginLength(method)
+	n += ex.BLength()
+	b := make([]byte, n)
+	// Write message header
+	off := thrift.Binary.WriteMessageBegin(b, method, thrift.EXCEPTION, 0)
+	// Write Ex body
+	off += ex.FastWrite(b[off:])
+	return b[:off]
 }
 
 // UnmarshalError decode binary and return error message
 func UnmarshalError(b []byte) error {
-	trans := thrift.NewStreamTransportR(bytes.NewReader(b))
-	proto := thrift.NewTBinaryProtocolTransport(trans)
-	if _, _, _, err := proto.ReadMessageBegin(); err != nil {
-		return fmt.Errorf("read message begin error: %w", err)
+	// Read message header
+	_, tp, _, l, err := thrift.Binary.ReadMessageBegin(b)
+	if err != nil {
+		return err
 	}
-	e := thrift.NewTApplicationException(0, "")
-	if err := e.Read(proto); err != nil {
-		return fmt.Errorf("read exception error: %w", err)
+	if tp != thrift.EXCEPTION {
+		return fmt.Errorf("expects thrift.EXCEPTION, found: %d", tp)
 	}
-	if err := proto.ReadMessageEnd(); err != nil {
-		return fmt.Errorf("read message end error: %w", err)
+	// Read Ex body
+	off := l
+	ex := thrift.NewApplicationException(thrift.INTERNAL_ERROR, "")
+	if _, err := ex.FastRead(b[off:]); err != nil {
+		return err
 	}
-	return e
+	return ex
 }

@@ -19,32 +19,34 @@ package thrift
 import (
 	"context"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 )
 
+type StructReaderWriter struct {
+	*ReadStruct
+	*WriteStruct
+}
+
+func NewStructReaderWriter(svc *descriptor.ServiceDescriptor) *StructReaderWriter {
+	return &StructReaderWriter{ReadStruct: NewReadStruct(svc), WriteStruct: NewWriteStruct(svc)}
+}
+
+func NewStructReaderWriterForJSON(svc *descriptor.ServiceDescriptor) *StructReaderWriter {
+	return &StructReaderWriter{ReadStruct: NewReadStructForJSON(svc), WriteStruct: NewWriteStruct(svc)}
+}
+
 // NewWriteStruct ...
-func NewWriteStruct(svc *descriptor.ServiceDescriptor, method string, isClient bool) (*WriteStruct, error) {
-	fnDsc, err := svc.LookupFunctionByMethod(method)
-	if err != nil {
-		return nil, err
-	}
-	ty := fnDsc.Request
-	if !isClient {
-		ty = fnDsc.Response
-	}
-	ws := &WriteStruct{
-		ty:             ty,
-		hasRequestBase: fnDsc.HasRequestBase && isClient,
-	}
-	return ws, nil
+func NewWriteStruct(svc *descriptor.ServiceDescriptor) *WriteStruct {
+	return &WriteStruct{svcDsc: svc}
 }
 
 // WriteStruct implement of MessageWriter
 type WriteStruct struct {
-	ty               *descriptor.TypeDescriptor
-	hasRequestBase   bool
+	svcDsc           *descriptor.ServiceDescriptor
 	binaryWithBase64 bool
 }
 
@@ -57,33 +59,41 @@ func (m *WriteStruct) SetBinaryWithBase64(enable bool) {
 }
 
 // Write ...
-func (m *WriteStruct) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
-	if !m.hasRequestBase {
+func (m *WriteStruct) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
+	fnDsc, err := m.svcDsc.LookupFunctionByMethod(method)
+	if err != nil {
+		return err
+	}
+	ty := fnDsc.Request
+	if !isClient {
+		ty = fnDsc.Response
+	}
+	hasRequestBase := fnDsc.HasRequestBase && isClient
+
+	if !hasRequestBase {
 		requestBase = nil
 	}
-	return wrapStructWriter(ctx, msg, out, m.ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.binaryWithBase64})
+	binaryWriter := thrift.NewBufferWriter(out)
+	err = wrapStructWriter(ctx, msg, binaryWriter, ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.binaryWithBase64})
+	binaryWriter.Recycle()
+	return err
 }
 
 // NewReadStruct ...
-func NewReadStruct(svc *descriptor.ServiceDescriptor, isClient bool) *ReadStruct {
-	return &ReadStruct{
-		svc:      svc,
-		isClient: isClient,
-	}
+func NewReadStruct(svc *descriptor.ServiceDescriptor) *ReadStruct {
+	return &ReadStruct{svc: svc}
 }
 
-func NewReadStructForJSON(svc *descriptor.ServiceDescriptor, isClient bool) *ReadStruct {
+func NewReadStructForJSON(svc *descriptor.ServiceDescriptor) *ReadStruct {
 	return &ReadStruct{
-		svc:      svc,
-		isClient: isClient,
-		forJSON:  true,
+		svc:     svc,
+		forJSON: true,
 	}
 }
 
 // ReadStruct implement of MessageReaderWithMethod
 type ReadStruct struct {
 	svc                     *descriptor.ServiceDescriptor
-	isClient                bool
 	forJSON                 bool
 	binaryWithBase64        bool
 	binaryWithByteSlice     bool
@@ -109,14 +119,17 @@ func (m *ReadStruct) SetSetFieldsForEmptyStruct(mode uint8) {
 }
 
 // Read ...
-func (m *ReadStruct) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+func (m *ReadStruct) Read(ctx context.Context, method string, isClient bool, dataLen int, in bufiox.Reader) (interface{}, error) {
 	fnDsc, err := m.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err
 	}
 	fDsc := fnDsc.Response
-	if !m.isClient {
+	if !isClient {
 		fDsc = fnDsc.Request
 	}
-	return skipStructReader(ctx, in, fDsc, &readerOption{throwException: true, forJSON: m.forJSON, binaryWithBase64: m.binaryWithBase64, binaryWithByteSlice: m.binaryWithByteSlice, setFieldsForEmptyStruct: m.setFieldsForEmptyStruct})
+	br := thrift.NewBufferReader(in)
+	str, err := skipStructReader(ctx, br, fDsc, &readerOption{throwException: true, forJSON: m.forJSON, binaryWithBase64: m.binaryWithBase64, binaryWithByteSlice: m.binaryWithByteSlice, setFieldsForEmptyStruct: m.setFieldsForEmptyStruct})
+	br.Recycle()
+	return str, err
 }

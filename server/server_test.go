@@ -48,6 +48,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/transport"
@@ -55,10 +56,26 @@ import (
 
 var svcInfo = mocks.ServiceInfo()
 
+// NOTE: always use this method to get addr for server listening
+// should be used with `WithServiceAddr(addr)`
+func getAddrForListener() net.Addr {
+	addr := test.GetLocalAddress()
+	ret, _ := net.ResolveTCPAddr("tcp", addr)
+	return ret
+}
+
+// NewTestServer calls NewServer with a random addr
+// DO NOT USE `NewServer` and `s.Run()` without specifying addr, it listens on :8888 ...
+func NewTestServer(ops ...Option) (Server, net.Addr) {
+	addr := getAddrForListener()
+	svr := NewServer(append(ops, WithServiceAddr(addr))...)
+	return svr, addr
+}
+
 func TestServerRun(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithMetaHandler(noopMetahandler{}))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 
 	time.AfterFunc(time.Millisecond*500, func() {
 		err := svr.Stop()
@@ -84,8 +101,7 @@ func TestServerRun(t *testing.T) {
 }
 
 func TestReusePortServerRun(t *testing.T) {
-	hostPort := test.GetLocalAddress()
-	addr, _ := net.ResolveTCPAddr("tcp", hostPort)
+	addr := getAddrForListener()
 	var opts []Option
 	opts = append(opts, WithReusePort(true))
 	opts = append(opts, WithServiceAddr(addr), WithExitWaitTime(time.Microsecond*10))
@@ -261,7 +277,7 @@ func TestServiceRegisterFailed(t *testing.T) {
 	}
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -287,7 +303,7 @@ func TestServiceDeregisterFailed(t *testing.T) {
 	}
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -308,7 +324,6 @@ func TestServiceRegistryInfo(t *testing.T) {
 	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
 		test.Assert(t, info.Weight == registryInfo.Weight, info.Addr)
-		test.Assert(t, info.Addr.String() == "[::]:8888", info.Addr)
 		test.Assert(t, len(info.Tags) == len(registryInfo.Tags), info.Tags)
 		test.Assert(t, info.Tags["aa"] == registryInfo.Tags["aa"], info.Tags)
 	}
@@ -329,7 +344,7 @@ func TestServiceRegistryInfo(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
 	opts = append(opts, WithRegistryInfo(registryInfo))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -346,7 +361,6 @@ func TestServiceRegistryInfo(t *testing.T) {
 func TestServiceRegistryNoInitInfo(t *testing.T) {
 	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
-		test.Assert(t, info.Addr.String() == "[::]:8888", info.Addr)
 	}
 	var rCount int
 	var drCount int
@@ -364,7 +378,7 @@ func TestServiceRegistryNoInitInfo(t *testing.T) {
 	}
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -386,7 +400,6 @@ func TestServiceRegistryInfoWithNilTags(t *testing.T) {
 	}
 	checkInfo := func(info *registry.Info) {
 		test.Assert(t, info.PayloadCodec == serviceinfo.Thrift.String(), info.PayloadCodec)
-		test.Assert(t, info.Addr.String() == "[::]:8888", info.Addr)
 		test.Assert(t, info.Weight == registryInfo.Weight, info.Weight)
 		test.Assert(t, info.Tags["aa"] == "bb", info.Tags)
 	}
@@ -410,7 +423,7 @@ func TestServiceRegistryInfoWithNilTags(t *testing.T) {
 	opts = append(opts, WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
 		Tags: map[string]string{"aa": "bb"},
 	}))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -453,7 +466,7 @@ func TestServiceRegistryInfoWithSkipListenAddr(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
 	opts = append(opts, WithRegistryInfo(registryInfo))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -495,7 +508,7 @@ func TestServiceRegistryInfoWithoutSkipListenAddr(t *testing.T) {
 	var opts []Option
 	opts = append(opts, WithRegistry(mockRegistry))
 	opts = append(opts, WithRegistryInfo(registryInfo))
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 
@@ -512,7 +525,7 @@ func TestServiceRegistryInfoWithoutSkipListenAddr(t *testing.T) {
 func TestGRPCServerMultipleServices(t *testing.T) {
 	var opts []Option
 	opts = append(opts, withGRPCTransport())
-	svr := NewServer(opts...)
+	svr, _ := NewTestServer(opts...)
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
 	err = svr.RegisterService(mocks.Service2Info(), mocks.MyServiceHandler())
@@ -672,7 +685,7 @@ func TestServerBoundHandler(t *testing.T) {
 	}
 	for _, tcase := range cases {
 		opts := append(tcase.opts, WithExitWaitTime(time.Millisecond*10))
-		svr := NewServer(opts...)
+		svr, _ := NewTestServer(opts...)
 
 		time.AfterFunc(100*time.Millisecond, func() {
 			err := svr.Stop()
@@ -691,9 +704,9 @@ func TestServerBoundHandler(t *testing.T) {
 }
 
 func TestInvokeHandlerWithContextBackup(t *testing.T) {
-	testInvokeHandlerWithSession(t, true, ":8888")
+	testInvokeHandlerWithSession(t, true, "localhost:8888")
 	os.Setenv(localsession.SESSION_CONFIG_KEY, "true,100,1h")
-	testInvokeHandlerWithSession(t, false, ":8889")
+	testInvokeHandlerWithSession(t, false, "localhost:8889")
 }
 
 func testInvokeHandlerWithSession(t *testing.T, fail bool, ad string) {
@@ -840,7 +853,7 @@ func TestInvokeHandlerExec(t *testing.T) {
 		},
 		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
 			var err error
-			ln, err = net.Listen("tcp", ":8888")
+			ln, err = net.Listen("tcp", "localhost:8888")
 			return ln, err
 		},
 	}
@@ -903,7 +916,7 @@ func TestInvokeHandlerPanic(t *testing.T) {
 		},
 		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
 			var err error
-			ln, err = net.Listen("tcp", ":8888")
+			ln, err = net.Listen("tcp", "localhost:8888")
 			return ln, err
 		},
 	}
@@ -1113,4 +1126,212 @@ func withGRPCTransport() Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		o.RemoteOpt.SvrHandlerFactory = nphttp2.NewSvrTransHandlerFactory()
 	}}
+}
+
+type mockStream struct {
+	streaming.Stream
+	ctx context.Context
+}
+
+func (s *mockStream) Context() context.Context {
+	return s.ctx
+}
+
+type streamingMethodArg struct {
+	methodName string
+	mode       serviceinfo.StreamingMode
+	streamHdlr serviceinfo.MethodHandler
+}
+
+func newStreamingServer(svcName string, args []streamingMethodArg, mws []endpoint.Middleware) *server {
+	methods := make(map[string]serviceinfo.MethodInfo)
+	for _, arg := range args {
+		methods[arg.methodName] = serviceinfo.NewMethodInfo(arg.streamHdlr, nil, nil, false, serviceinfo.WithStreamingMode(arg.mode))
+	}
+	svcInfo := &serviceinfo.ServiceInfo{
+		ServiceName: svcName,
+		Methods:     methods,
+	}
+	svr := &server{
+		svcs: &services{
+			svcMap: map[string]*service{
+				svcName: {
+					svcInfo: svcInfo,
+				},
+			},
+		},
+		mws: mws,
+		opt: internal_server.NewOptions(nil),
+	}
+	return svr
+}
+
+func TestStreamCtxDiverge(t *testing.T) {
+	testcases := []struct {
+		methodName string
+		mode       serviceinfo.StreamingMode
+	}{
+		{
+			methodName: "ClientStreaming",
+			mode:       serviceinfo.StreamingClient,
+		},
+		{
+			methodName: "ServerStreaming",
+			mode:       serviceinfo.StreamingServer,
+		},
+		{
+			methodName: "BidiStreaming",
+			mode:       serviceinfo.StreamingBidirectional,
+		},
+	}
+
+	testKey := "key"
+	testVal := "val"
+	testService := "test"
+	streamHdlr := func(ctx context.Context, handler, arg, result interface{}) error {
+		st, ok := arg.(*streaming.Args)
+		test.Assert(t, ok)
+		val, ok := st.Stream.Context().Value(testKey).(string)
+		test.Assert(t, ok)
+		test.Assert(t, val == testVal)
+		return nil
+	}
+
+	var args []streamingMethodArg
+	for _, tc := range testcases {
+		args = append(args, streamingMethodArg{
+			methodName: tc.methodName,
+			mode:       tc.mode,
+			streamHdlr: streamHdlr,
+		})
+	}
+	mws := []endpoint.Middleware{
+		// treat it as user middleware
+		// user would modify the ctx here
+		func(next endpoint.Endpoint) endpoint.Endpoint {
+			return func(ctx context.Context, req, resp interface{}) (err error) {
+				ctx = context.WithValue(ctx, testKey, testVal)
+				return next(ctx, req, resp)
+			}
+		},
+	}
+	svr := newStreamingServer(testService, args, mws)
+	svr.buildInvokeChain()
+
+	for _, tc := range testcases {
+		t.Run(tc.methodName, func(t *testing.T) {
+			ri := svr.initOrResetRPCInfoFunc()(nil, nil)
+			ink, ok := ri.Invocation().(rpcinfo.InvocationSetter)
+			test.Assert(t, ok)
+			ink.SetServiceName(testService)
+			ink.SetMethodName(tc.methodName)
+			ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+			mock := &mockStream{
+				ctx: ctx,
+			}
+			err := svr.eps(ctx, &streaming.Args{Stream: mock}, nil)
+			test.Assert(t, err == nil, err)
+		})
+	}
+}
+
+func Test_server_fixStreamCtxDiverge(t *testing.T) {
+	methodInfoFunc := func(mode serviceinfo.StreamingMode) serviceinfo.MethodInfo {
+		return serviceinfo.NewMethodInfo(nil, nil, nil, false, serviceinfo.WithStreamingMode(mode))
+	}
+	testcases := []struct {
+		desc           string
+		svcMap         map[string]*service
+		expectInjectMW bool
+	}{
+		{
+			desc: "single service without streaming method",
+			svcMap: map[string]*service{
+				"service": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"nonStreamingMethod": methodInfoFunc(serviceinfo.StreamingNone),
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "single service with streaming methods",
+			svcMap: map[string]*service{
+				"service": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"ClientStreamingMethod": methodInfoFunc(serviceinfo.StreamingClient),
+							"ServerStreamingMethod": methodInfoFunc(serviceinfo.StreamingServer),
+							"BidiStreamingMethod":   methodInfoFunc(serviceinfo.StreamingBidirectional),
+						},
+					},
+				},
+			},
+			expectInjectMW: true,
+		},
+		{
+			desc: "multiple services without streaming method",
+			svcMap: map[string]*service{
+				"service0": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service0",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"nonStreamingMethod0": methodInfoFunc(serviceinfo.StreamingNone),
+						},
+					},
+				},
+				"service1": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service1",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"nonStreamingMethod1": methodInfoFunc(serviceinfo.StreamingNone),
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "multiple services with streaming methods",
+			svcMap: map[string]*service{
+				"service0": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service0",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"ClientStreamingMethod": methodInfoFunc(serviceinfo.StreamingClient),
+							"ServerStreamingMethod": methodInfoFunc(serviceinfo.StreamingServer),
+						},
+					},
+				},
+				"service1": {
+					svcInfo: &serviceinfo.ServiceInfo{
+						ServiceName: "service1",
+						Methods: map[string]serviceinfo.MethodInfo{
+							"BidiStreamingMethod": methodInfoFunc(serviceinfo.StreamingBidirectional),
+						},
+					},
+				},
+			},
+			expectInjectMW: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.desc, func(t *testing.T) {
+			svr := &server{
+				svcs: &services{
+					svcMap: tc.svcMap,
+				},
+			}
+			svr.fixStreamCtxDiverge()
+			if tc.expectInjectMW {
+				test.Assert(t, len(svr.mws) == 1)
+			} else {
+				test.Assert(t, len(svr.mws) == 0)
+			}
+		})
+	}
 }

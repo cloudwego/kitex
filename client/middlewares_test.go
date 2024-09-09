@@ -22,8 +22,9 @@ import (
 	"net"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/golang/mock/gomock"
+
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksdiscovery "github.com/cloudwego/kitex/internal/mocks/discovery"
@@ -140,18 +141,18 @@ func TestDefaultErrorHandler(t *testing.T) {
 	reqCtx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
 
 	// Test TApplicationException
-	err := DefaultClientErrorHandler(context.Background(), thrift.NewTApplicationException(100, "mock"))
+	err := DefaultClientErrorHandler(context.Background(), thrift.NewApplicationException(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error[remote]: mock", err.Error())
-	var te thrift.TApplicationException
+	var te *thrift.ApplicationException
 	ok := errors.As(err, &te)
 	test.Assert(t, ok)
-	test.Assert(t, te.TypeId() == 100)
+	test.Assert(t, te.TypeID() == 100)
 	// Test TApplicationException with remote addr
-	err = ClientErrorHandlerWithAddr(reqCtx, thrift.NewTApplicationException(100, "mock"))
+	err = ClientErrorHandlerWithAddr(reqCtx, thrift.NewApplicationException(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error[remote-"+tcpAddrStr+"]: mock", err.Error())
 	ok = errors.As(err, &te)
 	test.Assert(t, ok)
-	test.Assert(t, te.TypeId() == 100)
+	test.Assert(t, te.TypeID() == 100)
 
 	// Test PbError
 	err = DefaultClientErrorHandler(context.Background(), protobuf.NewPbError(100, "mock"))
@@ -159,13 +160,13 @@ func TestDefaultErrorHandler(t *testing.T) {
 	var pe protobuf.PBError
 	ok = errors.As(err, &pe)
 	test.Assert(t, ok)
-	test.Assert(t, te.TypeId() == 100)
+	test.Assert(t, te.TypeID() == 100)
 	// Test PbError with remote addr
 	err = ClientErrorHandlerWithAddr(reqCtx, protobuf.NewPbError(100, "mock"))
 	test.Assert(t, err.Error() == "remote or network error[remote-"+tcpAddrStr+"]: mock", err.Error())
 	ok = errors.As(err, &pe)
 	test.Assert(t, ok)
-	test.Assert(t, te.TypeId() == 100)
+	test.Assert(t, te.TypeID() == 100)
 
 	// Test status.Error
 	err = DefaultClientErrorHandler(context.Background(), status.Err(100, "mock"))
@@ -254,4 +255,27 @@ func BenchmarkResolverMWParallel(b *testing.B) {
 			mw(ep)(ctx, req, res)
 		}
 	})
+}
+
+func TestDiscoveryEventHandler(t *testing.T) {
+	bus, queue := event.NewEventBus(), event.NewQueue(200)
+	h := discoveryEventHandler(discovery.ChangeEventName, bus, queue)
+	ins := []discovery.Instance{discovery.NewInstance("tcp", "addr", 10, nil)}
+	cacheKey := "testCacheKey"
+	c := &discovery.Change{
+		Result: discovery.Result{
+			Cacheable: true,
+			CacheKey:  cacheKey,
+		},
+		Added: ins,
+	}
+	h(c)
+	events := queue.Dump().([]*event.Event)
+	test.Assert(t, len(events) == 1)
+	extra, ok := events[0].Extra.(map[string]interface{})
+	test.Assert(t, ok)
+	test.Assert(t, extra["Cacheable"] == true)
+	test.Assert(t, extra["CacheKey"] == cacheKey)
+	added := extra["Added"].([]*instInfo)
+	test.Assert(t, len(added) == 1)
 }

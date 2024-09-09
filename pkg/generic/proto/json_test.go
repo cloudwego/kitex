@@ -19,21 +19,21 @@ package proto
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"os"
+	"reflect"
 	"testing"
 
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/proto"
 	"github.com/cloudwego/dynamicgo/testdata/kitex_gen/pb/example2"
-	"github.com/stretchr/testify/require"
 	goprotowire "google.golang.org/protobuf/encoding/protowire"
 
 	"github.com/cloudwego/kitex/internal/test"
 )
 
 var (
-	example2IDLPath   = "../jsonpb_test/idl/example2.proto"
-	example2ProtoPath = "../jsonpb_test/data/example2_pb.bin"
+	example2IDLPath   = "../../../pkg/generic/jsonpb_test/idl/example2.proto"
+	example2ProtoPath = "../../../pkg/generic/jsonpb_test/data/example2_pb.bin"
 )
 
 func TestRun(t *testing.T) {
@@ -49,9 +49,6 @@ func TestWrite(t *testing.T) {
 	svc, err := opts.NewDescriptorFromPath(context.Background(), example2IDLPath)
 	test.Assert(t, err == nil)
 
-	wm, err := NewWriteJSON(svc, method, true, &conv.Options{})
-	test.Assert(t, err == nil)
-
 	msg := getExampleReq()
 
 	// get expected json struct
@@ -59,7 +56,8 @@ func TestWrite(t *testing.T) {
 	json.Unmarshal([]byte(msg), exp)
 
 	// marshal json string into protobuf wire format using Write
-	out, err := wm.Write(context.Background(), msg)
+	wm := NewWriteJSON(svc, &conv.Options{})
+	out, err := wm.Write(context.Background(), msg, method, true)
 	test.Assert(t, err == nil)
 	buf, ok := out.([]byte)
 	test.Assert(t, ok)
@@ -78,14 +76,13 @@ func TestWrite(t *testing.T) {
 		l += tagLen
 		buf = buf[tagLen:]
 		offset, err := act.FastRead(buf, int8(wtyp), int32(id))
-		require.Nil(t, err)
+		test.Assert(t, err == nil)
 		buf = buf[offset:]
 		l += offset
 	}
 	test.Assert(t, err == nil)
-
 	// compare exp and act struct
-	require.Equal(t, exp, act)
+	test.Assert(t, reflect.DeepEqual(exp, act))
 }
 
 // Check NewReadJSON converting protobuf wire format to JSON
@@ -98,11 +95,9 @@ func TestRead(t *testing.T) {
 	svc, err := opts.NewDescriptorFromPath(context.Background(), example2IDLPath)
 	test.Assert(t, err == nil)
 
-	rm, err := NewReadJSON(svc, false, &conv.Options{})
-	test.Assert(t, err == nil)
-
 	// unmarshal protobuf wire format into json string using Read
-	out, err := rm.Read(context.Background(), method, in)
+	rm := NewReadJSON(svc, &conv.Options{})
+	out, err := rm.Read(context.Background(), method, false, in)
 	test.Assert(t, err == nil)
 
 	// get expected json struct
@@ -118,7 +113,7 @@ func TestRead(t *testing.T) {
 		l += tagLen
 		in = in[tagLen:]
 		offset, err := exp.FastRead(in, int8(wtyp), int32(id))
-		require.Nil(t, err)
+		test.Assert(t, err == nil)
 		in = in[offset:]
 		l += offset
 	}
@@ -131,9 +126,8 @@ func TestRead(t *testing.T) {
 	str, ok := out.(string)
 	test.Assert(t, ok)
 	json.Unmarshal([]byte(str), &act)
-
 	// compare exp and act struct
-	require.Equal(t, exp, act)
+	test.Assert(t, reflect.DeepEqual(exp, act))
 }
 
 // helper methods
@@ -144,7 +138,7 @@ func getExampleReq() string {
 
 // read ProtoBuf's data in binary format from exampleProtoPath
 func readExampleReqProtoBufData() []byte {
-	out, err := ioutil.ReadFile(example2ProtoPath)
+	out, err := os.ReadFile(example2ProtoPath)
 	if err != nil {
 		panic(err)
 	}

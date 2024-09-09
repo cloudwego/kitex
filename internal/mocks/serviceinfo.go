@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
@@ -36,6 +36,7 @@ const (
 	MockExceptionMethod string = "mockException"
 	MockErrorMethod     string = "mockError"
 	MockOnewayMethod    string = "mockOneway"
+	MockStreamingMethod string = "mockStreaming"
 )
 
 // ServiceInfo return mock serviceInfo
@@ -195,13 +196,9 @@ type myServiceMockArgs struct {
 	Req *MyRequest `thrift:"req,1" json:"req"`
 }
 
-func (p *myServiceMockArgs) Read(iprot thrift.TProtocol) error {
-	return nil
-}
-
-func (p *myServiceMockArgs) Write(oprot thrift.TProtocol) error {
-	return nil
-}
+func (p *myServiceMockArgs) BLength() int                                           { return 1 }
+func (p *myServiceMockArgs) FastWriteNocopy(buf []byte, bw thrift.NocopyWriter) int { return 1 }
+func (p *myServiceMockArgs) FastRead(buf []byte) (int, error)                       { return 1, nil }
 
 // MyRequest .
 type MyRequest struct {
@@ -212,13 +209,9 @@ type myServiceMockResult struct {
 	Success *MyResponse `thrift:"success,0" json:"success,omitempty"`
 }
 
-func (p *myServiceMockResult) Read(iprot thrift.TProtocol) error {
-	return nil
-}
-
-func (p *myServiceMockResult) Write(oprot thrift.TProtocol) error {
-	return nil
-}
+func (p *myServiceMockResult) BLength() int                                           { return 1 }
+func (p *myServiceMockResult) FastWriteNocopy(buf []byte, bw thrift.NocopyWriter) int { return 1 }
+func (p *myServiceMockResult) FastRead(buf []byte) (int, error)                       { return 1, nil }
 
 // MyResponse .
 type MyResponse struct {
@@ -230,13 +223,11 @@ type myServiceMockExceptionResult struct {
 	MyException *MyException `thrift:"stException,1" json:"stException,omitempty"`
 }
 
-func (p *myServiceMockExceptionResult) Read(iprot thrift.TProtocol) error {
-	return nil
+func (p *myServiceMockExceptionResult) BLength() int { return 1 }
+func (p *myServiceMockExceptionResult) FastWriteNocopy(buf []byte, bw thrift.NocopyWriter) int {
+	return 1
 }
-
-func (p *myServiceMockExceptionResult) Write(oprot thrift.TProtocol) error {
-	return nil
-}
+func (p *myServiceMockExceptionResult) FastRead(buf []byte) (int, error) { return 1, nil }
 
 // MyException .
 type MyException struct {

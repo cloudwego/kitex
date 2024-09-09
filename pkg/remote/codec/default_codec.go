@@ -22,9 +22,12 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
+	netpolltrans "github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -59,7 +62,7 @@ var (
 func NewDefaultCodec() remote.Codec {
 	// No size limit by default
 	return &defaultCodec{
-		maxSize: 0,
+		CodecConfig{MaxSize: 0},
 	}
 }
 
@@ -67,28 +70,52 @@ func NewDefaultCodec() remote.Codec {
 // maxSize is in bytes
 func NewDefaultCodecWithSizeLimit(maxSize int) remote.Codec {
 	return &defaultCodec{
-		maxSize: maxSize,
+		CodecConfig{MaxSize: maxSize},
 	}
 }
 
-type defaultCodec struct {
+// NewDefaultCodecWithConfig creates the default protocol sniffing codec supporting thrift and protobuf with the input config.
+func NewDefaultCodecWithConfig(cfg CodecConfig) remote.Codec {
+	if cfg.CRC32Check {
+		// TODO: crc32 has higher priority now.
+		cfg.PayloadValidator = NewCRC32PayloadValidator()
+	}
+	return &defaultCodec{cfg}
+}
+
+// CodecConfig is the config of defaultCodec
+type CodecConfig struct {
 	// maxSize limits the max size of the payload
-	maxSize int
+	MaxSize int
+
+	// If crc32Check is true, the codec will validate the payload using crc32c.
+	// Only effective when transport is TTHeader.
+	// Payload is all the data after TTHeader.
+	CRC32Check bool
+
+	// PayloadValidator is used to validate payload with customized checksum logic.
+	// It prepares a value based on payload in sender-side and validates the value in receiver-side.
+	// It can only be used when ttheader is enabled.
+	PayloadValidator PayloadValidator
+}
+
+type defaultCodec struct {
+	CodecConfig
 }
 
 // EncodePayload encode payload
 func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
 	defer func() {
-		// notice: mallocLen() must exec before flush, or it will be reset
+		// notice: WrittenLen() must exec before flush, or it will be reset
 		if ri := message.RPCInfo(); ri != nil {
 			if ms := rpcinfo.AsMutableRPCStats(ri.Stats()); ms != nil {
-				ms.SetSendSize(uint64(out.MallocLen()))
+				ms.SetSendSize(uint64(out.WrittenLen()))
 			}
 		}
 	}()
 	var err error
 	var framedLenField []byte
-	headerLen := out.MallocLen()
+	headerLen := out.WrittenLen()
 	tp := message.ProtocolInfo().TransProto
 
 	// 1. malloc framed field if needed
@@ -110,24 +137,28 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 		if framedLenField == nil {
 			return perrors.NewProtocolErrorWithMsg("no buffer allocated for the framed length field")
 		}
-		payloadLen = out.MallocLen() - headerLen
+		payloadLen = out.WrittenLen() - headerLen
+		// FIXME: if the `out` buffer using copy to grow when the capacity is not enough, setting the pre-allocated `framedLenField` may not take effect.
 		binary.BigEndian.PutUint32(framedLenField, uint32(payloadLen))
 	} else if message.ProtocolInfo().CodecType == serviceinfo.Protobuf {
 		return perrors.NewProtocolErrorWithMsg("protobuf just support 'framed' trans proto")
 	}
 	if tp&transport.TTHeader == transport.TTHeader {
-		payloadLen = out.MallocLen() - Size32
+		payloadLen = out.WrittenLen() - Size32
 	}
-	err = checkPayloadSize(payloadLen, c.maxSize)
+	err = checkPayloadSize(payloadLen, c.MaxSize)
 	return err
 }
 
 // EncodeMetaAndPayload encode meta and payload
 func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
+	tp := message.ProtocolInfo().TransProto
+	if c.PayloadValidator != nil && tp&transport.TTHeader == transport.TTHeader {
+		return c.encodeMetaAndPayloadWithPayloadValidator(ctx, message, out, me)
+	}
+
 	var err error
 	var totalLenField []byte
-	tp := message.ProtocolInfo().TransProto
-
 	// 1. encode header and return totalLenField if needed
 	// totalLenField will be filled after payload encoded
 	if tp&transport.TTHeader == transport.TTHeader {
@@ -144,7 +175,8 @@ func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.
 		if totalLenField == nil {
 			return perrors.NewProtocolErrorWithMsg("no buffer allocated for the header length field")
 		}
-		payloadLen := out.MallocLen() - Size32
+		// FIXME: if the `out` buffer using copy to grow when the capacity is not enough, setting the pre-allocated `totalLenField` may not take effect.
+		payloadLen := out.WrittenLen() - Size32
 		binary.BigEndian.PutUint32(totalLenField, uint32(payloadLen))
 	}
 	return nil
@@ -176,6 +208,11 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 		if flagBuf, err = in.Peek(2 * Size32); err != nil {
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("ttheader read payload first 8 byte failed: %s", err.Error()))
 		}
+		if c.PayloadValidator != nil {
+			if pErr := payloadChecksumValidate(ctx, c.PayloadValidator, in, message); pErr != nil {
+				return pErr
+			}
+		}
 	} else if isMeshHeader(flagBuf) {
 		message.Tags()[remote.MeshHeader] = true
 		// MeshHeader
@@ -186,7 +223,7 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("meshHeader read payload first 8 byte failed: %s", err.Error()))
 		}
 	}
-	return checkPayload(flagBuf, message, in, isTTHeader, c.maxSize)
+	return checkPayload(flagBuf, message, in, isTTHeader, c.MaxSize)
 }
 
 // DecodePayload decode payload
@@ -227,6 +264,55 @@ func (c *defaultCodec) Decode(ctx context.Context, message remote.Message, in re
 
 func (c *defaultCodec) Name() string {
 	return "default"
+}
+
+// encodeMetaAndPayloadWithPayloadValidator encodes payload and meta with checksum of the payload.
+func (c *defaultCodec) encodeMetaAndPayloadWithPayloadValidator(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) (err error) {
+	writer := netpoll.NewLinkBuffer()
+	payloadOut := netpolltrans.NewWriterByteBuffer(writer)
+	defer func() {
+		payloadOut.Release(err)
+	}()
+
+	// 1. encode payload and calculate value via payload validator
+	if err = me.EncodePayload(ctx, message, payloadOut); err != nil {
+		return err
+	}
+	// get the payload from buffer
+	// use copy api here because the payload will be used as an argument of Generate function in validator
+	payload, err := getWrittenBytes(writer)
+	if err != nil {
+		return err
+	}
+	if c.PayloadValidator != nil {
+		if err = payloadChecksumGenerate(ctx, c.PayloadValidator, payload, message); err != nil {
+			return err
+		}
+	}
+	// set payload length before encode TTHeader
+	message.SetPayloadLen(len(payload))
+
+	// 2. encode header and return totalLenField if needed
+	totalLenField, err := ttHeaderCodec.encode(ctx, message, out)
+	if err != nil {
+		return err
+	}
+
+	// 3. write payload to the buffer after TTHeader
+	if ncWriter, ok := out.(remote.NocopyWrite); ok {
+		err = ncWriter.WriteDirect(payload, 0)
+	} else {
+		_, err = out.WriteBinary(payload)
+	}
+
+	// 4. fill totalLen field for header if needed
+	// FIXME: if the `out` buffer using copy to grow when the capacity is not enough, setting the pre-allocated `totalLenField` may not take effect.
+	if totalLenField == nil {
+		return perrors.NewProtocolErrorWithMsg("no buffer allocated for the header length field")
+	}
+	payloadLen := out.WrittenLen() - Size32
+	binary.BigEndian.PutUint32(totalLenField, uint32(payloadLen))
+	return err
 }
 
 // Select to use thrift or protobuf according to the protocol.
@@ -372,4 +458,12 @@ func checkPayloadSize(payloadLen, maxSize int) error {
 		)
 	}
 	return nil
+}
+
+// getWrittenBytes gets all written bytes from linkbuffer.
+func getWrittenBytes(lb *netpoll.LinkBuffer) (buf []byte, err error) {
+	if err = lb.Flush(); err != nil {
+		return nil, err
+	}
+	return lb.Bytes(), nil
 }

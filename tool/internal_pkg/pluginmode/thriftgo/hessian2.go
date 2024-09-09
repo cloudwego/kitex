@@ -17,7 +17,6 @@ package thriftgo
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -137,7 +136,7 @@ func patchIDLRefConfig(cfg *generator.Config) error {
 
 // loadIDLRefConfig load idl-ref config from file object
 func loadIDLRefConfig(fileName string, reader io.Reader) (*config.RawConfig, error) {
-	data, err := ioutil.ReadAll(reader)
+	data, err := io.ReadAll(reader)
 	if err != nil {
 		return nil, fmt.Errorf("read %s file failed: %s", fileName, err.Error())
 	}
@@ -166,7 +165,7 @@ var (
 func Hessian2PatchByReplace(args generator.Config, subDirPath string) error {
 	output := args.OutputPath
 	newPath := util.JoinPath(output, args.GenPath, subDirPath)
-	fs, err := ioutil.ReadDir(newPath)
+	fs, err := os.ReadDir(newPath)
 	if err != nil {
 		return err
 	}
@@ -179,7 +178,7 @@ func Hessian2PatchByReplace(args generator.Config, subDirPath string) error {
 				return err
 			}
 		} else if strings.HasSuffix(f.Name(), ".go") {
-			data, err := ioutil.ReadFile(fileName)
+			data, err := os.ReadFile(fileName)
 			if err != nil {
 				return err
 			}
@@ -187,7 +186,7 @@ func Hessian2PatchByReplace(args generator.Config, subDirPath string) error {
 			data = replaceJavaObject(data)
 			data = replaceJavaException(data)
 			data = replaceJavaExceptionEmptyVerification(data)
-			if err = ioutil.WriteFile(fileName, data, 0o644); err != nil {
+			if err = os.WriteFile(fileName, data, 0o644); err != nil {
 				return err
 			}
 		}
@@ -199,13 +198,13 @@ func Hessian2PatchByReplace(args generator.Config, subDirPath string) error {
 	}
 
 	handlerName := util.JoinPath(output, "handler.go")
-	handler, err := ioutil.ReadFile(handlerName)
+	handler, err := os.ReadFile(handlerName)
 	if err != nil {
 		return err
 	}
 
 	handler = replaceJavaObject(handler)
-	return ioutil.WriteFile(handlerName, handler, 0o644)
+	return os.WriteFile(handlerName, handler, 0o644)
 }
 
 func replaceJavaObject(content []byte) []byte {

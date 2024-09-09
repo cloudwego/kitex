@@ -30,7 +30,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/circuitbreak"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
@@ -48,16 +47,17 @@ func newBackupRetryer(policy Policy, cbC *cbContainer) (Retryer, error) {
 
 type backupRetryer struct {
 	enable      bool
+	retryDelay  time.Duration
 	policy      *BackupPolicy
 	cbContainer *cbContainer
-	retryDelay  time.Duration
 	sync.RWMutex
 	errMsg string
 }
 
 type resultWrapper struct {
-	ri  rpcinfo.RPCInfo
-	err error
+	ri   rpcinfo.RPCInfo
+	resp interface{}
+	err  error
 }
 
 // ShouldRetry implements the Retryer interface.
@@ -92,12 +92,13 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 	retryTimes := r.policy.StopPolicy.MaxRetryTimes
 	retryDelay := r.retryDelay
 	r.RUnlock()
+
 	var callTimes int32 = 0
 	var callCosts utils.StringBuilder
 	callCosts.RawStringBuilder().Grow(32)
 	var recordCostDoing int32 = 0
 	var abort int32 = 0
-	finishedCount := 0
+	finishedErrCount := 0
 	// notice: buff num of chan is very important here, it cannot less than call times, or the below chan receive will block
 	done := make(chan *resultWrapper, retryTimes+1)
 	cbKey, _ := r.cbContainer.cbCtl.GetKey(ctx, req)
@@ -126,7 +127,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 					if panicInfo := recover(); panicInfo != nil {
 						e = panicToErr(ctx, panicInfo, firstRI)
 					}
-					done <- &resultWrapper{cRI, e}
+					done <- &resultWrapper{ri: cRI, err: e}
 				}()
 				ct := atomic.AddInt32(&callTimes, 1)
 				callStart := time.Now()
@@ -152,7 +153,7 @@ func (r *backupRetryer) Do(ctx context.Context, rpcCall RPCCallFunc, firstRI rpc
 				// There will be only one request (goroutine) pass the `checkRPCState`, others will skip decoding
 				// and return `ErrRPCFinish`, to avoid concurrent write to response and save the cost of decoding.
 				// We can safely ignore this error and wait for the response of the passed goroutine.
-				if finishedCount++; finishedCount >= retryTimes+1 {
+				if finishedErrCount++; finishedErrCount >= retryTimes+1 {
 					// But if all requests return this error, it must be a bug, preventive panic to avoid dead loop
 					panic(errUnexpectedFinish)
 				}
@@ -178,29 +179,21 @@ func (r *backupRetryer) UpdatePolicy(rp Policy) (err error) {
 		r.Unlock()
 		return nil
 	}
-	var errMsg string
 	if rp.BackupPolicy == nil || rp.Type != BackupType {
-		errMsg = "BackupPolicy is nil or retry type not match, cannot do update in backupRetryer"
-		err = errors.New(errMsg)
+		err = errors.New("BackupPolicy is nil or retry type not match, cannot do update in backupRetryer")
 	}
-	if errMsg == "" && (rp.BackupPolicy.RetryDelayMS == 0 || rp.BackupPolicy.StopPolicy.MaxRetryTimes < 0 ||
-		rp.BackupPolicy.StopPolicy.MaxRetryTimes > maxBackupRetryTimes) {
-		errMsg = "invalid backup request delay duration or retryTimes"
-		err = errors.New(errMsg)
+	if err == nil && rp.BackupPolicy.RetryDelayMS == 0 {
+		err = errors.New("invalid retry delay duration in backupRetryer")
 	}
-	if errMsg == "" {
-		if e := checkCBErrorRate(&rp.BackupPolicy.StopPolicy.CBPolicy); e != nil {
-			rp.BackupPolicy.StopPolicy.CBPolicy.ErrorRate = defaultCBErrRate
-			errMsg = fmt.Sprintf("backupRetryer %s, use default %0.2f", e.Error(), defaultCBErrRate)
-			klog.Warnf(errMsg)
-		}
+	if err == nil {
+		err = checkStopPolicy(&rp.BackupPolicy.StopPolicy, maxBackupRetryTimes, r)
 	}
 
 	r.Lock()
 	defer r.Unlock()
 	r.enable = rp.Enable
 	if err != nil {
-		r.errMsg = errMsg
+		r.errMsg = err.Error()
 		return err
 	}
 	r.policy = rp.BackupPolicy
@@ -220,14 +213,11 @@ func (r *backupRetryer) AppendErrMsgIfNeeded(ctx context.Context, err error, ri 
 func (r *backupRetryer) Dump() map[string]interface{} {
 	r.RLock()
 	defer r.RUnlock()
+	dm := map[string]interface{}{"enable": r.enable, "backup_request": r.policy}
 	if r.errMsg != "" {
-		return map[string]interface{}{
-			"enable":        r.enable,
-			"backupRequest": r.policy,
-			"errMsg":        r.errMsg,
-		}
+		dm["err_msg"] = r.errMsg
 	}
-	return map[string]interface{}{"enable": r.enable, "backupRequest": r.policy}
+	return dm
 }
 
 // Type implements the Retryer interface.

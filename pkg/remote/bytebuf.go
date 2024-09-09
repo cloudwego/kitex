@@ -75,13 +75,13 @@ type ByteBuffer interface {
 
 	// ReadBinary like ReadString.
 	// Returns a copy of original buffer.
-	ReadBinary(n int) (p []byte, err error)
+	ReadBinary(p []byte) (n int, err error)
 
 	// Malloc n bytes sequentially in the writer buffer.
 	Malloc(n int) (buf []byte, err error)
 
-	// MallocLen returns the total length of the buffer malloced.
-	MallocLen() (length int)
+	// WrittenLen returns the total length of the buffer writtenLen.
+	WrittenLen() (length int)
 
 	// WriteString is a more efficient way to write string, using the unsafe method to convert the string to []byte.
 	WriteString(s string) (n int, err error)

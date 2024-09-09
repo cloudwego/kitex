@@ -25,7 +25,7 @@ import (
 
 // NewServer creates a generic server with the given handler and options.
 func NewServer(handler generic.Service, g generic.Generic, opts ...server.Option) server.Server {
-	svcInfo := generic.ServiceInfo(g.PayloadCodecType())
+	svcInfo := generic.ServiceInfoWithGeneric(g)
 	return NewServerWithServiceInfo(handler, g, svcInfo, opts...)
 }
 

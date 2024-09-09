@@ -14,5 +14,4 @@
 
 package args
 
-// todo thriftgo sdk 功能 v0.3.13 发布打 tag
-var requiredThriftGoVersion = "v0.3.6"
+var requiredThriftGoVersion = "v0.3.15"

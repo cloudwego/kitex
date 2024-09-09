@@ -20,14 +20,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
+	"github.com/cloudwego/kitex/internal/mocks"
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 func TestBinaryThriftCodec(t *testing.T) {
@@ -35,8 +36,7 @@ func TestBinaryThriftCodec(t *testing.T) {
 	args := kt.NewMockTestArgs()
 	args.Req = req
 	// encode
-	rc := utils.NewThriftMessageCodec()
-	buf, err := rc.Encode("mock", thrift.CALL, 100, args)
+	buf, err := thrift.MarshalFastMsg("mock", thrift.CALL, 100, args)
 	test.Assert(t, err == nil, err)
 
 	btc := &binaryThriftCodec{thriftCodec}
@@ -58,13 +58,20 @@ func TestBinaryThriftCodec(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, seqID == 100, seqID)
 
-	rwbuf := remote.NewReaderWriterBuffer(1024)
+	conn := mocks.NewIOConn()
+	bw := bufiox.NewDefaultWriter(conn)
+	br := bufiox.NewDefaultReader(conn)
+	bb := remote.NewByteBufferFromBufiox(bw, br)
+
 	// change seqID to 1
-	err = btc.Marshal(context.Background(), cliMsg, rwbuf)
+	err = btc.Marshal(context.Background(), cliMsg, bb)
 	test.Assert(t, err == nil, err)
 	seqID, err = GetSeqID(cliMsg.Data().(*Args).Request.(binaryReqType))
 	test.Assert(t, err == nil, err)
 	test.Assert(t, seqID == 1, seqID)
+
+	wl := bw.WrittenLen()
+	bw.Flush()
 
 	// server side
 	arg := &Args{}
@@ -79,13 +86,13 @@ func TestBinaryThriftCodec(t *testing.T) {
 			return arg
 		},
 		PayloadLenFunc: func() int {
-			return rwbuf.ReadableLen()
+			return wl
 		},
 		ServiceInfoFunc: func() *serviceinfo.ServiceInfo {
 			return ServiceInfo(serviceinfo.Thrift)
 		},
 	}
-	err = btc.Unmarshal(context.Background(), svrMsg, rwbuf)
+	err = btc.Unmarshal(context.Background(), svrMsg, bb)
 	test.Assert(t, err == nil, err)
 	reqBuf := svrMsg.Data().(*Args).Request.(binaryReqType)
 	seqID, err = GetSeqID(reqBuf)
@@ -93,7 +100,7 @@ func TestBinaryThriftCodec(t *testing.T) {
 	test.Assert(t, seqID == 1, seqID)
 
 	var req2 kt.MockTestArgs
-	method, seqID2, err2 := rc.Decode(reqBuf, &req2)
+	method, seqID2, err2 := thrift.UnmarshalFastMsg(reqBuf, &req2)
 	test.Assert(t, err2 == nil, err)
 	test.Assert(t, seqID2 == 1, seqID)
 	test.Assert(t, method == "mock", method)
@@ -114,24 +121,28 @@ func TestBinaryThriftCodecExceptionError(t *testing.T) {
 		},
 	}
 
-	rwbuf := remote.NewReaderWriterBuffer(1024)
+	conn := mocks.NewIOConn()
+	bw := bufiox.NewDefaultWriter(conn)
+	br := bufiox.NewDefaultReader(conn)
+	bb := remote.NewByteBufferFromBufiox(bw, br)
 	// test data is empty
-	err := btc.Marshal(ctx, cliMsg, rwbuf)
+	err := btc.Marshal(ctx, cliMsg, bb)
 	test.Assert(t, err.Error() == "invalid marshal data in rawThriftBinaryCodec: nil")
 	cliMsg.DataFunc = func() interface{} {
 		return &remote.TransError{}
 	}
 
 	// empty method
-	err = btc.Marshal(ctx, cliMsg, rwbuf)
-	test.Assert(t, err.Error() == "rawThriftBinaryCodec Marshal exception failed, err: empty methodName in thrift Marshal")
+	err = btc.Marshal(ctx, cliMsg, bb)
+	test.Assert(t, err.Error() == "rawThriftBinaryCodec Marshal exception failed, err: empty methodName in thrift Marshal", err)
 
 	cliMsg.RPCInfoFunc = func() rpcinfo.RPCInfo {
 		return newMockRPCInfo()
 	}
-	err = btc.Marshal(ctx, cliMsg, rwbuf)
+	err = btc.Marshal(ctx, cliMsg, bb)
 	test.Assert(t, err == nil)
-	err = btc.Unmarshal(ctx, cliMsg, rwbuf)
+	bw.Flush()
+	err = btc.Unmarshal(ctx, cliMsg, bb)
 	test.Assert(t, err.Error() == "unknown application exception")
 
 	// test server role
@@ -143,7 +154,7 @@ func TestBinaryThriftCodecExceptionError(t *testing.T) {
 			Success: binaryReqType{},
 		}
 	}
-	err = btc.Marshal(ctx, cliMsg, rwbuf)
+	err = btc.Marshal(ctx, cliMsg, bb)
 	test.Assert(t, err == nil)
 }
 

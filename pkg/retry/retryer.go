@@ -43,10 +43,6 @@ type Retryer interface {
 	// If not satisfy won't execute Retryer.Do and return the reason message
 	// Execute anyway for the first time regardless of able to retry.
 	AllowRetry(ctx context.Context) (msg string, ok bool)
-
-	// ShouldRetry to check if retry request can be called, it is checked in retryer.Do.
-	// If not satisfy will return the reason message
-	ShouldRetry(ctx context.Context, err error, callTimes int, req interface{}, cbKey string) (msg string, ok bool)
 	UpdatePolicy(policy Policy) error
 
 	// Retry policy execute func. recycleRI is to decide if the firstRI can be recycled.
@@ -369,9 +365,12 @@ func (rc *Container) WithRetryIfNeeded(ctx context.Context, callOptRetry *Policy
 // NewRetryer build a retryer with policy
 func NewRetryer(p Policy, r *ShouldResultRetry, cbC *cbContainer) (retryer Retryer, err error) {
 	// just one retry policy can be enabled at same time
-	if p.Type == BackupType {
+	switch p.Type {
+	case MixedType:
+		retryer, err = newMixedRetryer(p, r, cbC)
+	case BackupType:
 		retryer, err = newBackupRetryer(p, cbC)
-	} else {
+	default:
 		retryer, err = newFailureRetryer(p, r, cbC)
 	}
 	return
@@ -437,8 +436,11 @@ func (rc *Container) updateRetryer(rr *ShouldResultRetry) {
 	rc.shouldResultRetry = rr
 	if rc.shouldResultRetry != nil {
 		rc.retryerMap.Range(func(key, value interface{}) bool {
-			if fr, ok := value.(*failureRetryer); ok {
-				fr.setSpecifiedResultRetryIfNeeded(rc.shouldResultRetry)
+			switch r := value.(type) {
+			case *failureRetryer:
+				r.setSpecifiedResultRetryIfNeeded(rc.shouldResultRetry, r.policy)
+			case *mixedRetryer:
+				r.setSpecifiedResultRetryIfNeeded(rc.shouldResultRetry, &r.policy.FailurePolicy)
 			}
 			return true
 		})

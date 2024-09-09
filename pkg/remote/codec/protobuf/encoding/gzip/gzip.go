@@ -32,7 +32,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"sync"
 
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf/encoding"
@@ -44,7 +43,7 @@ const Name = "gzip"
 func init() {
 	c := &compressor{}
 	c.poolCompressor.New = func() interface{} {
-		return &writer{Writer: gzip.NewWriter(ioutil.Discard), pool: &c.poolCompressor}
+		return &writer{Writer: gzip.NewWriter(io.Discard), pool: &c.poolCompressor}
 	}
 	encoding.RegisterCompressor(c)
 }
@@ -65,7 +64,7 @@ func SetLevel(level int) error {
 	}
 	c := encoding.GetCompressor(Name).(*compressor)
 	c.poolCompressor.New = func() interface{} {
-		w, err := gzip.NewWriterLevel(ioutil.Discard, level)
+		w, err := gzip.NewWriterLevel(io.Discard, level)
 		if err != nil {
 			panic(err)
 		}

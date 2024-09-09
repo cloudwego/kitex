@@ -23,7 +23,7 @@ import (
 	"reflect"
 	"testing"
 
-	mocks "github.com/cloudwego/kitex/internal/mocks/thrift/fast"
+	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/utils"
@@ -75,6 +75,33 @@ func TestGetCaller(t *testing.T) {
 			}
 			if got1 != tt.want1 {
 				t.Errorf("GetCaller() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func TestGetCallee(t *testing.T) {
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  string
+		want1 bool
+	}{
+		{name: "Success", args: args{testCtx}, want: callee, want1: true},
+		{name: "Failure", args: args{context.Background()}, want: "", want1: false},
+		{name: "Panic recovered", args: args{panicCtx}, want: "", want1: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := GetCallee(tt.args.ctx)
+			if got != tt.want {
+				t.Errorf("GetCallee() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("GetCallee() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}

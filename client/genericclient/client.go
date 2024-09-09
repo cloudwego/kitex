@@ -31,12 +31,15 @@ var _ Client = &genericServiceClient{}
 
 // NewClient create a generic client
 func NewClient(destService string, g generic.Generic, opts ...client.Option) (Client, error) {
-	svcInfo := generic.ServiceInfo(g.PayloadCodecType())
+	svcInfo := generic.ServiceInfoWithGeneric(g)
 	return NewClientWithServiceInfo(destService, g, svcInfo, opts...)
 }
 
 // NewClientWithServiceInfo create a generic client with serviceInfo
 func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *serviceinfo.ServiceInfo, opts ...client.Option) (Client, error) {
+	if isDeprecated, ok := svcInfo.Extra[generic.DeprecatedGenericServiceInfoAPIKey].(bool); ok && isDeprecated {
+		svcInfo.Methods, svcInfo.ServiceName = generic.GetMethodInfo(g.MessageReaderWriter(), g.IDLServiceName())
+	}
 	var options []client.Option
 	options = append(options, client.WithGeneric(g))
 	options = append(options, client.WithDestService(destService))
@@ -47,6 +50,7 @@ func NewClientWithServiceInfo(destService string, g generic.Generic, svcInfo *se
 		return nil, err
 	}
 	cli := &genericServiceClient{
+		svcInfo: svcInfo,
 		kClient: kc,
 		g:       g,
 	}
@@ -86,24 +90,27 @@ type Client interface {
 }
 
 type genericServiceClient struct {
+	svcInfo *serviceinfo.ServiceInfo
 	kClient client.Client
 	g       generic.Generic
 }
 
 func (gc *genericServiceClient) GenericCall(ctx context.Context, method string, request interface{}, callOptions ...callopt.Option) (response interface{}, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
-	var _args generic.Args
+	_args := gc.svcInfo.MethodInfo(method).NewArgs().(*generic.Args)
 	_args.Method = method
 	_args.Request = request
+
 	mt, err := gc.g.GetMethod(request, method)
 	if err != nil {
 		return nil, err
 	}
 	if mt.Oneway {
-		return nil, gc.kClient.Call(ctx, mt.Name, &_args, nil)
+		return nil, gc.kClient.Call(ctx, mt.Name, _args, nil)
 	}
-	var _result generic.Result
-	if err = gc.kClient.Call(ctx, mt.Name, &_args, &_result); err != nil {
+
+	_result := gc.svcInfo.MethodInfo(method).NewResult().(*generic.Result)
+	if err = gc.kClient.Call(ctx, mt.Name, _args, _result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

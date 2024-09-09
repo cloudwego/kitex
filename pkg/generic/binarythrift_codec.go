@@ -21,16 +21,19 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	athrift "github.com/apache/thrift/lib/go/thrift"
+	"github.com/bytedance/gopkg/lang/dirtmake"
 
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var _ remote.PayloadCodec = &binaryThriftCodec{}
+var (
+	_  remote.PayloadCodec = &binaryThriftCodec{}
+	wb                     = thrift.NewWriteBinary()
+)
 
 type binaryReqType = []byte
 
@@ -52,23 +55,15 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 	var transBuff []byte
 	var ok bool
 	if msg.RPCRole() == remote.Server {
+		// Business error only works properly when using TTHeader and HTTP2 transmission protocols
+		// If there is a business error, data.(*Result).Success will be nil, and an empty payload will be constructed here to return
+		if msg.RPCInfo().Invocation().BizStatusErr() != nil {
+			msg.Data().(WithCodec).SetCodec(wb)
+			return thriftCodec.Marshal(ctx, msg, out)
+		}
 		gResult := data.(*Result)
 		transBinary := gResult.Success
-		// handle biz error
-		if transBinary == nil {
-			tProt := thrift.NewBinaryProtocol(out)
-			if err := tProt.WriteMessageBegin(msg.RPCInfo().Invocation().MethodName(), athrift.TMessageType(msg.MessageType()), msg.RPCInfo().Invocation().SeqID()); err != nil {
-				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteMessageBegin failed: %s", err.Error()))
-			}
-			if err := tProt.WriteFieldStop(); err != nil {
-				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteFieldStop failed: %s", err.Error()))
-			}
-			if err := tProt.WriteMessageEnd(); err != nil {
-				return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("binary thrift generic marshal, WriteMessageEnd failed: %s", err.Error()))
-			}
-			tProt.Recycle()
-			return nil
-		} else if transBuff, ok = transBinary.(binaryReqType); !ok {
+		if transBuff, ok = transBinary.(binaryReqType); !ok {
 			return perrors.NewProtocolErrorWithMsg("invalid marshal result in rawThriftBinaryCodec: must be []byte")
 		}
 	} else {
@@ -81,8 +76,8 @@ func (c *binaryThriftCodec) Marshal(ctx context.Context, msg remote.Message, out
 			return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("rawThriftBinaryCodec set seqID failed, err: %s", err.Error()))
 		}
 	}
-	out.WriteBinary(transBuff)
-	return nil
+	_, err := out.WriteBinary(transBuff)
+	return err
 }
 
 func (c *binaryThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, in remote.ByteBuffer) error {
@@ -95,7 +90,8 @@ func (c *binaryThriftCodec) Unmarshal(ctx context.Context, msg remote.Message, i
 		return c.thriftCodec.Unmarshal(ctx, msg, in)
 	}
 	payloadLen := msg.PayloadLen()
-	transBuff, err := in.ReadBinary(payloadLen)
+	transBuff := dirtmake.Bytes(payloadLen, payloadLen)
+	_, err = in.ReadBinary(transBuff)
 	if err != nil {
 		return err
 	}

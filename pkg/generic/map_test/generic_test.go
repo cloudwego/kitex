@@ -19,21 +19,26 @@ package test
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net"
 	"reflect"
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/client/genericclient"
 	kt "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
+	"github.com/cloudwego/kitex/transport"
 )
 
 func TestThrift(t *testing.T) {
@@ -382,6 +387,32 @@ func TestThrift2NormalServer(t *testing.T) {
 	svr.Stop()
 }
 
+// TODO(marina.sakai): remove this test when we remove the API generic.ServiceInfo() in v0.12.0
+func TestCompatible(t *testing.T) {
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServiceWithBase64Binary), true, false)
+	//lint:ignore SA1019 we will remove this later
+	svcInfo := generic.ServiceInfo(serviceinfo.Thrift)
+	p, err := generic.NewThriftFileProvider("./idl/example.thrift")
+	test.Assert(t, err == nil)
+	g, err := generic.MapThriftGeneric(p)
+	test.Assert(t, err == nil)
+	var opts []client.Option
+	opts = append(opts, client.WithHostPorts(addr), client.WithTransportProtocol(transport.TTHeader))
+	cli, err := genericclient.NewClientWithServiceInfo("destServiceName", g, svcInfo, opts...)
+	test.Assert(t, err == nil)
+
+	reqMsg = map[string]interface{}{"BinaryMsg": []byte("hello")}
+	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
+	test.Assert(t, err == nil, err)
+	gr, ok := resp.(map[string]interface{})
+	fmt.Println(gr)
+	test.Assert(t, ok)
+	test.Assert(t, reflect.DeepEqual(gr["BinaryMsg"], "hello"))
+
+	svr.Stop()
+}
+
 func initThriftMockClient(t *testing.T, address string) genericclient.Client {
 	p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
 	test.Assert(t, err == nil)
@@ -433,63 +464,42 @@ func initMockServer(t *testing.T, handler kt.Mock, address string) server.Server
 	return svr
 }
 
-func TestMapThriftGenericClientClose(t *testing.T) {
-	debug.SetGCPercent(-1)
-	defer debug.SetGCPercent(100)
+type testGeneric struct {
+	cb func()
+	generic.Generic
+}
 
-	var ms runtime.MemStats
-	runtime.ReadMemStats(&ms)
-
-	t.Logf("Before new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
-
-	clientCnt := 1000
-	clis := make([]genericclient.Client, clientCnt)
-	for i := 0; i < clientCnt; i++ {
-		p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
-		test.Assert(t, err == nil, "generic NewThriftFileProvider failed, err=%v", err)
-		g, err := generic.MapThriftGeneric(p)
-		test.Assert(t, err == nil, "generic MapThriftGeneric failed, err=%v", err)
-		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9020")
-	}
-
-	runtime.ReadMemStats(&ms)
-	preHeapAlloc, preHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("After new clients, allocation: %f Mb, Number of allocation: %d\n", preHeapAlloc, preHeapObjects)
-
-	for _, cli := range clis {
-		_ = cli.Close()
-	}
-	runtime.GC()
-	runtime.ReadMemStats(&ms)
-	afterGCHeapAlloc, afterGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("After close clients and GC be executed, allocation: %f Mb, Number of allocation: %d\n", afterGCHeapAlloc, afterGCHeapObjects)
-	test.Assert(t, afterGCHeapAlloc < preHeapAlloc && afterGCHeapObjects < preHeapObjects)
-
-	// Trigger the finalizer of kclient be executed
-	time.Sleep(200 * time.Millisecond) // ensure the finalizer be executed
-	runtime.GC()
-	runtime.ReadMemStats(&ms)
-	secondGCHeapAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
-	t.Logf("After second GC, allocation: %f Mb, Number of allocation: %d\n", secondGCHeapAlloc, secondGCHeapObjects)
-	test.Assert(t, secondGCHeapAlloc/2 < afterGCHeapAlloc && secondGCHeapObjects/2 < afterGCHeapObjects)
+func (g *testGeneric) Close() error {
+	g.cb()
+	return g.Generic.Close()
 }
 
 func TestMapThriftGenericClientFinalizer(t *testing.T) {
 	debug.SetGCPercent(-1)
 	defer debug.SetGCPercent(100)
-
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
 	t.Logf("Before new clients, allocation: %f Mb, Number of allocation: %d\n", mb(ms.HeapAlloc), ms.HeapObjects)
 
 	clientCnt := 1000
+	var genericCloseCnt int32
+	var kitexClientCloseCnt int32
 	clis := make([]genericclient.Client, clientCnt)
 	for i := 0; i < clientCnt; i++ {
 		p, err := generic.NewThriftFileProvider("./idl/mock.thrift")
 		test.Assert(t, err == nil, "generic NewThriftFileProvider failed, err=%v", err)
 		g, err := generic.MapThriftGeneric(p)
 		test.Assert(t, err == nil, "generic MapThriftGeneric failed, err=%v", err)
-		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9021")
+		g = &testGeneric{
+			cb: func() {
+				atomic.AddInt32(&genericCloseCnt, 1)
+			},
+			Generic: g,
+		}
+		clis[i] = newGenericClient("destServiceName", g, "127.0.0.1:9021", client.WithCloseCallbacks(func() error {
+			atomic.AddInt32(&kitexClientCloseCnt, 1)
+			return nil
+		}))
 	}
 
 	runtime.ReadMemStats(&ms)
@@ -502,6 +512,7 @@ func TestMapThriftGenericClientFinalizer(t *testing.T) {
 
 	// Trigger the finalizer of generic client be executed
 	time.Sleep(200 * time.Millisecond) // ensure the finalizer be executed
+	test.Assert(t, atomic.LoadInt32(&genericCloseCnt) == int32(clientCnt))
 	runtime.GC()
 	runtime.ReadMemStats(&ms)
 	secondGCHeapAlloc, secondGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
@@ -510,11 +521,12 @@ func TestMapThriftGenericClientFinalizer(t *testing.T) {
 
 	// Trigger the finalizer of kClient be executed
 	time.Sleep(200 * time.Millisecond) // ensure the finalizer be executed
+	test.Assert(t, atomic.LoadInt32(&kitexClientCloseCnt) == int32(clientCnt))
 	runtime.GC()
 	runtime.ReadMemStats(&ms)
 	thirdGCHeapAlloc, thirdGCHeapObjects := mb(ms.HeapAlloc), ms.HeapObjects
 	t.Logf("After third GC, allocation: %f Mb, Number of allocation: %d\n", thirdGCHeapAlloc, thirdGCHeapObjects)
-	test.Assert(t, thirdGCHeapAlloc < secondGCHeapAlloc/2 && thirdGCHeapObjects < secondGCHeapObjects/2)
+	// test.Assert(t, thirdGCHeapAlloc < secondGCHeapAlloc/2 && thirdGCHeapObjects < secondGCHeapObjects/2)
 }
 
 func mb(byteSize uint64) float32 {

@@ -17,6 +17,7 @@
 package nphttp2
 
 import (
+	"context"
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -31,7 +32,7 @@ func TestStream(t *testing.T) {
 	conn.mockSettingFrame()
 	tr, err := newMockServerTransport(conn)
 	test.Assert(t, err == nil, err)
-	s := grpc.CreateStream(1, func(i int) {})
+	s := grpc.CreateStream(context.Background(), 1, func(i int) {}, "")
 	serverConn := newServerConn(tr, s)
 	defer serverConn.Close()
 

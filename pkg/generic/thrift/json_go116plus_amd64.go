@@ -21,35 +21,47 @@ package thrift
 
 import (
 	"context"
+	"fmt"
 	"unsafe"
 
-	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/dynamicgo/conv"
 	"github.com/cloudwego/dynamicgo/conv/j2t"
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
-	"github.com/cloudwego/dynamicgo/thrift/base"
+	dbase "github.com/cloudwego/dynamicgo/thrift/base"
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
-	cthrift "github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 // Write write json string to out thrift.TProtocol
-func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	// fallback logic
 	if !m.dynamicgoEnabled {
-		return m.originalWrite(ctx, out, msg, requestBase)
+		return m.originalWrite(ctx, out, msg, method, isClient, requestBase)
 	}
 
 	// dynamicgo logic
+	fnDsc := m.svcDsc.DynamicGoDsc.Functions()[method]
+	if fnDsc == nil {
+		return fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, m.svcDsc.DynamicGoDsc.Name())
+	}
+	dynamicgoTypeDsc := fnDsc.Request()
+	if !isClient {
+		dynamicgoTypeDsc = fnDsc.Response()
+	}
+	hasRequestBase := fnDsc.HasRequestBase() && isClient
+
 	var cv j2t.BinaryConv
-	if !m.hasRequestBase {
+	if !hasRequestBase {
 		requestBase = nil
 	}
 	if requestBase != nil {
-		base := (*base.Base)(unsafe.Pointer(requestBase))
+		base := (*dbase.Base)(unsafe.Pointer(requestBase))
 		ctx = context.WithValue(ctx, conv.CtxKeyThriftReqBase, base)
 		cv = j2t.NewBinaryConv(m.convOptsWithThriftBase)
 	} else {
@@ -58,13 +70,7 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 
 	// msg is void or nil
 	if _, ok := msg.(descriptor.Void); ok || msg == nil {
-		if err := m.writeHead(out); err != nil {
-			return err
-		}
-		if err := m.writeFields(ctx, out, nil, nil); err != nil {
-			return err
-		}
-		return writeTail(out)
+		return m.writeFields(ctx, out, dynamicgoTypeDsc, nil, nil, isClient)
 	}
 
 	// msg is string
@@ -74,91 +80,47 @@ func (m *WriteJSON) Write(ctx context.Context, out thrift.TProtocol, msg interfa
 	}
 	transBuff := utils.StringToSliceByte(s)
 
-	if err := m.writeHead(out); err != nil {
-		return err
-	}
-	if err := m.writeFields(ctx, out, &cv, transBuff); err != nil {
-		return err
-	}
-	return writeTail(out)
+	return m.writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient)
 }
 
 type MsgType int
 
-const (
-	Void MsgType = iota
-	String
-)
-
-func (m *WriteJSON) writeFields(ctx context.Context, out thrift.TProtocol, cv *j2t.BinaryConv, transBuff []byte) error {
+func (m *WriteJSON) writeFields(ctx context.Context, out bufiox.Writer, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte, isClient bool) error {
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
 	defer mcache.Free(dbuf)
 
-	for _, field := range m.dynamicgoTypeDsc.Struct().Fields() {
+	bw := thrift.NewBufferWriter(out)
+	defer bw.Recycle()
+	for _, field := range dynamicgoTypeDsc.Struct().Fields() {
 		// Exception field
-		if !m.isClient && field.ID() != 0 {
+		if !isClient && field.ID() != 0 {
 			// generic server ignore the exception, because no description for exception
 			// generic handler just return error
 			continue
 		}
 
-		if err := out.WriteFieldBegin(field.Name(), field.Type().Type().ToThriftTType(), int16(field.ID())); err != nil {
+		if err := bw.WriteFieldBegin(thrift.TType(field.Type().Type()), int16(field.ID())); err != nil {
 			return err
 		}
-		// if the field type is void, just write void and return
+		// if the field type is void, break
 		if field.Type().Type() == dthrift.VOID {
-			if err := writeFieldForVoid(field.Name(), out); err != nil {
+			if err := bw.WriteFieldStop(); err != nil {
 				return err
 			}
-			return nil
+			break
 		} else {
 			// encode using dynamicgo
 			// json []byte to thrift []byte
 			if err := cv.DoInto(ctx, field.Type(), transBuff, &dbuf); err != nil {
 				return err
 			}
+			if wb, err := out.Malloc(len(dbuf)); err != nil {
+				return err
+			} else {
+				copy(wb, dbuf)
+			}
+			dbuf = dbuf[:0]
 		}
-		// WriteFieldEnd has no content
-		// if err := out.WriteFieldEnd(); err != nil {
-		// 	return err
-		// }
 	}
-	tProt, ok := out.(*cthrift.BinaryProtocol)
-	if !ok {
-		return perrors.NewProtocolErrorWithMsg("TProtocol should be BinaryProtocol")
-	}
-	buf, err := tProt.ByteBuffer().Malloc(len(dbuf))
-	if err != nil {
-		return err
-	}
-	// TODO: implement MallocAck() to achieve zero copy
-	copy(buf, dbuf)
-	return nil
-}
-
-func (m *WriteJSON) writeHead(out thrift.TProtocol) error {
-	if err := out.WriteStructBegin(m.dynamicgoTypeDsc.Struct().Name()); err != nil {
-		return err
-	}
-	return nil
-}
-
-func writeTail(out thrift.TProtocol) error {
-	if err := out.WriteFieldStop(); err != nil {
-		return err
-	}
-	return out.WriteStructEnd()
-}
-
-func writeFieldForVoid(name string, out thrift.TProtocol) error {
-	if err := out.WriteStructBegin(name); err != nil {
-		return err
-	}
-	if err := out.WriteFieldStop(); err != nil {
-		return err
-	}
-	if err := out.WriteStructEnd(); err != nil {
-		return err
-	}
-	return nil
+	return bw.WriteFieldStop()
 }

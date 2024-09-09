@@ -18,20 +18,15 @@ package generic
 
 import (
 	"bytes"
-	"context"
-	"io/ioutil"
 	"net/http"
 	"testing"
 
 	"github.com/bytedance/sonic"
 	"github.com/cloudwego/dynamicgo/conv"
 
-	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/generic/descriptor"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/transport"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var customJson = sonic.Config{
@@ -53,8 +48,7 @@ func TestHttpThriftCodec(t *testing.T) {
 	p, err := NewThriftFileProvider("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
 	gOpts := &Options{dynamicgoConvOpts: DefaultHTTPDynamicGoConvOpts}
-	htc, err := newHTTPThriftCodec(p, thriftCodec, gOpts)
-	test.Assert(t, err == nil)
+	htc := newHTTPThriftCodec(p, gOpts)
 	test.Assert(t, !htc.dynamicgoEnabled)
 	test.Assert(t, !htc.useRawBodyForHTTPResp)
 	test.DeepEqual(t, htc.convOpts, conv.Options{})
@@ -69,23 +63,18 @@ func TestHttpThriftCodec(t *testing.T) {
 	// right
 	method, err = htc.getMethod(req)
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
+	test.Assert(t, htc.svcName == "ExampleService")
 
-	ctx := context.Background()
-	sendMsg := initHttpSendMsg()
+	rw := htc.getMessageReaderWriter()
+	_, ok := rw.(error)
+	test.Assert(t, !ok)
 
-	// Marshal side
-	out := remote.NewWriterBuffer(256)
-	err = htc.Marshal(ctx, sendMsg, out)
-	test.Assert(t, err == nil)
-
-	// Unmarshal side
-	recvMsg := initHttpRecvMsg()
-	buf, err := out.Bytes()
-	test.Assert(t, err == nil)
-	recvMsg.SetPayloadLen(len(buf))
-	in := remote.NewReaderBuffer(buf)
-	err = htc.Unmarshal(ctx, recvMsg, in)
-	test.Assert(t, err == nil)
+	rw = htc.getMessageReaderWriter()
+	_, ok = rw.(thrift.MessageWriter)
+	test.Assert(t, ok)
+	_, ok = rw.(thrift.MessageReader)
+	test.Assert(t, ok)
 }
 
 func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
@@ -93,8 +82,7 @@ func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
 	p, err := NewThriftFileProviderWithDynamicGo("./http_test/idl/binary_echo.thrift")
 	test.Assert(t, err == nil)
 	gOpts := &Options{dynamicgoConvOpts: DefaultHTTPDynamicGoConvOpts, useRawBodyForHTTPResp: true}
-	htc, err := newHTTPThriftCodec(p, thriftCodec, gOpts)
-	test.Assert(t, err == nil)
+	htc := newHTTPThriftCodec(p, gOpts)
 	test.Assert(t, htc.dynamicgoEnabled)
 	test.Assert(t, htc.useRawBodyForHTTPResp)
 	test.DeepEqual(t, htc.convOpts, DefaultHTTPDynamicGoConvOpts)
@@ -111,59 +99,14 @@ func TestHttpThriftCodecWithDynamicGo(t *testing.T) {
 	// right
 	method, err = htc.getMethod(req)
 	test.Assert(t, err == nil && method.Name == "BinaryEcho")
+	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
+	test.Assert(t, htc.svcName == "ExampleService")
 
-	ctx := context.Background()
-	sendMsg := initHttpSendMsg()
-
-	// Marshal side
-	out := remote.NewWriterBuffer(256)
-	err = htc.Marshal(ctx, sendMsg, out)
-	test.Assert(t, err == nil)
-
-	// Unmarshal side
-	recvMsg := initHttpRecvMsg()
-	buf, err := out.Bytes()
-	test.Assert(t, err == nil)
-	recvMsg.SetPayloadLen(len(buf))
-	in := remote.NewReaderBuffer(buf)
-	err = htc.Unmarshal(ctx, recvMsg, in)
-	test.Assert(t, err == nil)
-}
-
-func initHttpSendMsg() remote.Message {
-	stdReq := getStdHttpRequest()
-	b, err := stdReq.GetBody()
-	if err != nil {
-		panic(err)
-	}
-	rawBody, err := ioutil.ReadAll(b)
-	if err != nil {
-		panic(err)
-	}
-	req := &Args{
-		Request: &descriptor.HTTPRequest{
-			Request: stdReq,
-			RawBody: rawBody,
-		},
-		Method: "BinaryEcho",
-	}
-	svcInfo := mocks.ServiceInfo()
-	ink := rpcinfo.NewInvocation("", "BinaryEcho")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, svcInfo.PayloadCodec))
-	return msg
-}
-
-func initHttpRecvMsg() remote.Message {
-	req := &Args{
-		Request: "Test",
-		Method:  "BinaryEcho",
-	}
-	ink := rpcinfo.NewInvocation("", "BinaryEcho")
-	ri := rpcinfo.NewRPCInfo(nil, nil, ink, nil, rpcinfo.NewRPCStats())
-	msg := remote.NewMessage(req, mocks.ServiceInfo(), ri, remote.Call, remote.Server)
-	return msg
+	rw := htc.getMessageReaderWriter()
+	_, ok := rw.(thrift.MessageWriter)
+	test.Assert(t, ok)
+	_, ok = rw.(thrift.MessageReader)
+	test.Assert(t, ok)
 }
 
 func getStdHttpRequest() *http.Request {

@@ -10,9 +10,8 @@
 [![ClosedIssue](https://img.shields.io/github/issues-closed/cloudwego/kitex)](https://github.com/cloudwego/kitex/issues?q=is%3Aissue+is%3Aclosed)
 ![Stars](https://img.shields.io/github/stars/cloudwego/kitex)
 ![Forks](https://img.shields.io/github/forks/cloudwego/kitex)
-[![Slack](https://img.shields.io/badge/slack-join_chat-success.svg?logo=slack)](https://cloudwego.slack.com/join/shared_invite/zt-tmcbzewn-UjXMF3ZQsPhl7W3tEDZboA)
 
-Kitex[kaɪt'eks] 字节跳动内部的 Golang 微服务 RPC 框架，具有**高性能**、**强可扩展**的特点，在字节内部已广泛使用。如今越来越多的微服务选择使用 Golang，如果对微服务性能有要求，又希望定制扩展融入自己的治理体系，Kitex 会是一个不错的选择。
+Kitex[kaɪt'eks] 字节跳动内部的 Go 微服务 RPC 框架，具有**高性能**、**强可扩展**的特点，在字节内部已广泛使用。如今越来越多的微服务选择使用 Go，如果对微服务性能有要求，又希望定制扩展融入自己的治理体系，Kitex 会是一个不错的选择。
 
 ## 框架特点
 
@@ -112,7 +111,7 @@ Kitex 基于[Apache License 2.0](LICENSE) 许可证，其依赖的三方组件�
 - Email: conduct@cloudwego.io
 - 如何成为 member: [COMMUNITY MEMBERSHIP](https://github.com/cloudwego/community/blob/main/COMMUNITY_MEMBERSHIP.md)
 - Issues: [Issues](https://github.com/cloudwego/kitex/issues)
-- Slack: 加入我们的 [Slack 频道](https://join.slack.com/t/cloudwego/shared_invite/zt-tmcbzewn-UjXMF3ZQsPhl7W3tEDZboA)
+- Discord: 加入我们的 [Discord 频道](https://discord.gg/jceZSE7DsW)
 - 飞书用户群（[注册飞书](https://www.feishu.cn/)后扫码进群）
 
   ![LarkGroup](images/lark_group_cn.png)

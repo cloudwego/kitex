@@ -21,14 +21,17 @@ package utils
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/bytedance/sonic"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func FuzzJSONStr2Map(f *testing.F) {
 	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.MarshalToString(mapInfo)
+	jsonRet, _ := sonic.MarshalString(mapInfo)
 	f.Add(`{}`)
 	f.Add(`{"":""}`)
 	f.Add(jsonRet)
@@ -42,16 +45,15 @@ func FuzzJSONStr2Map(f *testing.F) {
 		}
 		map1, err1 := JSONStr2Map(data)
 		map2, err2 := _JSONStr2Map(data)
-		require.Equal(t, err2 == nil, err1 == nil, "json:%v", data)
-		if err2 == nil {
-			require.Equal(t, map2, map1, "json:%v", data)
-		}
+		test.Assert(t, err1 == nil, data)
+		test.Assert(t, err2 == nil, data)
+		test.Assert(t, reflect.DeepEqual(map1, map2), data)
 	})
 }
 
 func FuzzMap2JSON(f *testing.F) {
 	mapInfo := prepareMap()
-	jsonRet, _ := jsoni.MarshalToString(mapInfo)
+	jsonRet, _ := sonic.MarshalString(mapInfo)
 	f.Add(`{}`)
 	f.Add(`{"":""}`)
 	f.Add(jsonRet)
@@ -64,13 +66,14 @@ func FuzzMap2JSON(f *testing.F) {
 		if err := json.Unmarshal([]byte(data), &m); err != nil {
 			return
 		}
-		map1, err1 := Map2JSONStr(m)
-		map2, err2 := _Map2JSONStr(m)
-		require.Equal(t, err2 == nil, err1 == nil, "json:%v", data)
-		require.Equal(t, len(map2), len(map1), "json:%v", data)
+		str1, err1 := Map2JSONStr(m)
+		str2, err2 := _Map2JSONStr(m)
+		test.Assert(t, err1 == nil, data)
+		test.Assert(t, err2 == nil, data)
+		test.Assert(t, len(str1) == len(str2))
 		var m1, m2 map[string]string
-		require.NoError(t, json.Unmarshal([]byte(map1), &m1))
-		require.NoError(t, json.Unmarshal([]byte(map2), &m2))
-		require.Equal(t, m2, m1)
+		test.Assert(t, json.Unmarshal([]byte(str1), &m1) == nil)
+		test.Assert(t, json.Unmarshal([]byte(str2), &m2) == nil)
+		test.Assert(t, reflect.DeepEqual(m1, m2))
 	})
 }

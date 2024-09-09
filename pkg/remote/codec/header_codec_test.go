@@ -48,7 +48,7 @@ func TestTTHeaderCodec(t *testing.T) {
 			// encode
 			buf := tb.NewBuffer()
 			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, buf)
-			binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+			binary.BigEndian.PutUint32(totalLenField, uint32(buf.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(t, err == nil, err)
 			buf.Flush()
 
@@ -76,7 +76,7 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 			// encode
 			buf := tb.NewBuffer()
 			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, buf)
-			binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+			binary.BigEndian.PutUint32(totalLenField, uint32(buf.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(t, err == nil, err)
 			buf.Flush()
 
@@ -111,7 +111,7 @@ func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
 			// encode
 			buf := tb.NewBuffer()
 			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, buf)
-			binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+			binary.BigEndian.PutUint32(totalLenField, uint32(buf.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(t, err == nil, err)
 			buf.Flush()
 
@@ -147,7 +147,7 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 			// encode
 			buf := tb.NewBuffer()
 			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, buf)
-			binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+			binary.BigEndian.PutUint32(totalLenField, uint32(buf.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(t, err == nil, err)
 			buf.Flush()
 
@@ -179,7 +179,7 @@ func TestFillBasicInfoOfTTHeader(t *testing.T) {
 		sendMsg.TransInfo().TransIntInfo()[transmeta.FromService] = mockServiceName
 		buf := tb.NewBuffer()
 		totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, buf)
-		binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+		binary.BigEndian.PutUint32(totalLenField, uint32(buf.WrittenLen()-Size32+mockPayloadLen))
 		test.Assert(t, err == nil, err)
 		buf.Flush()
 		// decode
@@ -196,7 +196,7 @@ func TestFillBasicInfoOfTTHeader(t *testing.T) {
 		sendMsg.TransInfo().TransStrInfo()[transmeta.HeaderTransRemoteAddr] = mockAddr
 		buf = tb.NewBuffer()
 		totalLenField, err = ttHeaderCodec.encode(ctx, sendMsg, buf)
-		binary.BigEndian.PutUint32(totalLenField, uint32(buf.MallocLen()-Size32+mockPayloadLen))
+		binary.BigEndian.PutUint32(totalLenField, uint32(buf.WrittenLen()-Size32+mockPayloadLen))
 		test.Assert(t, err == nil, err)
 		buf.Flush()
 		// decode
@@ -219,7 +219,7 @@ func BenchmarkTTHeaderCodec(b *testing.B) {
 		// encode
 		out := remote.NewWriterBuffer(256)
 		totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, out)
-		binary.BigEndian.PutUint32(totalLenField, uint32(out.MallocLen()-Size32+mockPayloadLen))
+		binary.BigEndian.PutUint32(totalLenField, uint32(out.WrittenLen()-Size32+mockPayloadLen))
 		test.Assert(b, err == nil, err)
 
 		// decode
@@ -249,7 +249,7 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 			// encode
 			out := remote.NewWriterBuffer(256)
 			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, out)
-			binary.BigEndian.PutUint32(totalLenField, uint32(out.MallocLen()-Size32+mockPayloadLen))
+			binary.BigEndian.PutUint32(totalLenField, uint32(out.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(b, err == nil, err)
 
 			// decode
@@ -282,7 +282,7 @@ func BenchmarkTTHeaderCodecParallel(b *testing.B) {
 			// encode
 			out := remote.NewWriterBuffer(256)
 			totalLenField, err := ttHeaderCodec.encode(ctx, sendMsg, out)
-			binary.BigEndian.PutUint32(totalLenField, uint32(out.MallocLen()-Size32+mockPayloadLen))
+			binary.BigEndian.PutUint32(totalLenField, uint32(out.WrittenLen()-Size32+mockPayloadLen))
 			test.Assert(b, err == nil, err)
 
 			// decode
@@ -313,6 +313,15 @@ var (
 		rpcinfo.NewRPCConfig(), rpcinfo.NewRPCStats())
 )
 
+type mockMsg struct {
+	msg string
+}
+
+func initServerRecvMsgWithMockMsg() remote.Message {
+	req := &mockMsg{}
+	return remote.NewMessage(req, mocks.ServiceInfo(), mockSvrRPCInfo, remote.Call, remote.Server)
+}
+
 func initServerRecvMsg() remote.Message {
 	svcInfo := mocks.ServiceInfo()
 	svcSearcher := mocksremote.NewDefaultSvcSearcher()
@@ -320,23 +329,32 @@ func initServerRecvMsg() remote.Message {
 	return msg
 }
 
-func initClientSendMsg(tp transport.Protocol) remote.Message {
-	var req interface{}
+func initClientSendMsg(tp transport.Protocol, payloadLen ...int) remote.Message {
+	req := &mockMsg{}
+	if len(payloadLen) != 0 {
+		req.msg = string(make([]byte, payloadLen[0]))
+	}
+
 	svcInfo := mocks.ServiceInfo()
+	mi := svcInfo.MethodInfo(mockCliRPCInfo.Invocation().MethodName())
+	mi.NewArgs()
 	msg := remote.NewMessage(req, svcInfo, mockCliRPCInfo, remote.Call, remote.Client)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, svcInfo.PayloadCodec))
 	return msg
 }
 
-func initServerSendMsg(tp transport.Protocol) remote.Message {
-	var resp interface{}
+func initServerSendMsg(tp transport.Protocol, payloadLen ...int) remote.Message {
+	resp := &mockMsg{}
+	if len(payloadLen) != 0 {
+		resp.msg = string(make([]byte, payloadLen[0]))
+	}
 	msg := remote.NewMessage(resp, mocks.ServiceInfo(), mockSvrRPCInfo, remote.Reply, remote.Server)
 	msg.SetProtocolInfo(remote.NewProtocolInfo(tp, mocks.ServiceInfo().PayloadCodec))
 	return msg
 }
 
 func initClientRecvMsg() remote.Message {
-	var resp interface{}
+	resp := &mockMsg{}
 	svcInfo := mocks.ServiceInfo()
 	msg := remote.NewMessage(resp, svcInfo, mockCliRPCInfo, remote.Reply, remote.Client)
 	return msg
@@ -432,7 +450,7 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	padding := (4 - headerInfoSize%4) % 4
 	headerInfoSize += padding
 	binary.BigEndian.PutUint16(headerSizeField, uint16(headerInfoSize/4))
-	totalLen := TTHeaderMetaSize - Size32 + headerInfoSize + payloadBuf.MallocLen()
+	totalLen := TTHeaderMetaSize - Size32 + headerInfoSize + payloadBuf.WrittenLen()
 	binary.BigEndian.PutUint32(totalLenField, uint32(totalLen))
 
 	// 3.  header info, malloc and write

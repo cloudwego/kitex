@@ -21,13 +21,24 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift/base"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
 
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/proto"
 )
+
+type HTTPPbReaderWriter struct {
+	*ReadHTTPPbResponse
+	*WriteHTTPPbRequest
+}
+
+func NewHTTPPbReaderWriter(svc *descriptor.ServiceDescriptor, pbsvc proto.ServiceDescriptor) *HTTPPbReaderWriter {
+	return &HTTPPbReaderWriter{ReadHTTPPbResponse: NewReadHTTPPbResponse(svc, pbsvc), WriteHTTPPbRequest: NewWriteHTTPPbRequest(svc, pbsvc)}
+}
 
 // WriteHTTPPbRequest implement of MessageWriter
 type WriteHTTPPbRequest struct {
@@ -44,7 +55,7 @@ func NewWriteHTTPPbRequest(svc *descriptor.ServiceDescriptor, pbSvc *desc.Servic
 }
 
 // Write ...
-func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, msg interface{}, requestBase *Base) error {
+func (w *WriteHTTPPbRequest) Write(ctx context.Context, out bufiox.Writer, msg interface{}, method string, isClient bool, requestBase *base.Base) error {
 	req := msg.(*descriptor.HTTPRequest)
 	fn, err := w.svc.Router.Lookup(req)
 	if err != nil {
@@ -66,25 +77,28 @@ func (w *WriteHTTPPbRequest) Write(ctx context.Context, out thrift.TProtocol, ms
 	}
 	req.GeneralBody = pbMsg
 
-	return wrapStructWriter(ctx, req, out, fn.Request, &writerOption{requestBase: requestBase})
+	binaryWriter := thrift.NewBufferWriter(out)
+	err = wrapStructWriter(ctx, req, binaryWriter, fn.Request, &writerOption{requestBase: requestBase})
+	binaryWriter.Recycle()
+	return err
 }
 
-// ReadHTTPResponse implement of MessageReaderWithMethod
+// ReadHTTPPbResponse implement of MessageReaderWithMethod
 type ReadHTTPPbResponse struct {
 	svc   *descriptor.ServiceDescriptor
 	pbSvc proto.ServiceDescriptor
 }
 
-var _ MessageReader = (*ReadHTTPResponse)(nil)
+var _ MessageReader = (*ReadHTTPPbResponse)(nil)
 
-// NewReadHTTPResponse ...
+// NewReadHTTPPbResponse ...
 // Base64 encoding for binary is enabled by default.
 func NewReadHTTPPbResponse(svc *descriptor.ServiceDescriptor, pbSvc proto.ServiceDescriptor) *ReadHTTPPbResponse {
 	return &ReadHTTPPbResponse{svc, pbSvc}
 }
 
 // Read ...
-func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, in thrift.TProtocol) (interface{}, error) {
+func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, isClient bool, dataLen int, in bufiox.Reader) (interface{}, error) {
 	fnDsc, err := r.svc.LookupFunctionByMethod(method)
 	if err != nil {
 		return nil, err
@@ -95,5 +109,8 @@ func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, in thrift.
 		return nil, errors.New("pb method not found")
 	}
 
-	return skipStructReader(ctx, in, fDsc, &readerOption{pbDsc: mt.GetOutputType(), http: true})
+	br := thrift.NewBufferReader(in)
+	resp, err := skipStructReader(ctx, br, fDsc, &readerOption{pbDsc: mt.GetOutputType(), http: true})
+	br.Recycle()
+	return resp, err
 }

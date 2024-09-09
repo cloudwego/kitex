@@ -18,16 +18,16 @@ package server
 
 import (
 	"context"
+	"encoding/binary"
 	"strings"
 	"sync/atomic"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/trans/invoke"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 // TestInvokerCall tests Invoker, call Kitex server just like SDK.
@@ -48,12 +48,13 @@ func TestInvokerCall(t *testing.T) {
 	}
 
 	args := mocks.NewMockArgs()
-	codec := utils.NewThriftMessageCodec()
 
 	// call success
-	b, _ := codec.Encode("mock", thrift.CALL, 0, args.(thrift.TStruct))
+	hl := make([]byte, 4)
+	b, _ := thrift.MarshalFastMsg("mock", thrift.CALL, 0, args.(thrift.FastCodec))
+	binary.BigEndian.PutUint32(hl, uint32(len(b)))
 	msg := invoke.NewMessage(nil, nil)
-	err = msg.SetRequestBytes(b)
+	err = msg.SetRequestBytes(append(hl, b...))
 	test.Assert(t, err == nil)
 	err = invoker.Call(msg)
 	if err != nil {
@@ -67,9 +68,11 @@ func TestInvokerCall(t *testing.T) {
 	test.Assert(t, gotErr.Load() == nil)
 
 	// call fails
-	b, _ = codec.Encode("mockError", thrift.CALL, 0, args.(thrift.TStruct))
+	hl = make([]byte, 4)
+	b, _ = thrift.MarshalFastMsg("mockError", thrift.CALL, 0, args.(thrift.FastCodec))
+	binary.BigEndian.PutUint32(hl, uint32(len(b)))
 	msg = invoke.NewMessage(nil, nil)
-	err = msg.SetRequestBytes(b)
+	err = msg.SetRequestBytes(append(hl, b...))
 	test.Assert(t, err == nil)
 	err = invoker.Call(msg)
 	if err != nil {

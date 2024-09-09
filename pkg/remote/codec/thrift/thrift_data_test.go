@@ -22,15 +22,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/apache/thrift/lib/go/thrift"
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
-	"github.com/cloudwego/kitex/internal/mocks/thrift/fast"
+	athrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
+
+	mocks "github.com/cloudwego/kitex/internal/mocks/thrift"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 var (
-	mockReq = &fast.MockReq{
+	mockReq = &mocks.MockReq{
 		Msg: "hello",
 	}
 	mockReqThrift = []byte{
@@ -40,21 +43,6 @@ var (
 		0, /* end of struct */
 	}
 )
-
-func TestMarshalBasicThriftData(t *testing.T) {
-	t.Run("invalid-data", func(t *testing.T) {
-		err := marshalBasicThriftData(context.Background(), nil, 0)
-		test.Assert(t, err == errEncodeMismatchMsgType, err)
-	})
-	t.Run("valid-data", func(t *testing.T) {
-		transport := thrift.NewTMemoryBufferLen(1024)
-		tProt := thrift.NewTBinaryProtocol(transport, true, true)
-		err := marshalBasicThriftData(context.Background(), tProt, mockReq)
-		test.Assert(t, err == nil, err)
-		result := transport.Bytes()
-		test.Assert(t, reflect.DeepEqual(result, mockReqThrift), result)
-	})
-}
 
 func TestMarshalThriftData(t *testing.T) {
 	t.Run("NoCodec(=FastCodec)", func(t *testing.T) {
@@ -68,35 +56,15 @@ func TestMarshalThriftData(t *testing.T) {
 		test.Assert(t, reflect.DeepEqual(buf, mockReqThrift), buf)
 	})
 	t.Run("BasicCodec", func(t *testing.T) {
-		buf, err := MarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), mockReq)
-		test.Assert(t, err == nil, err)
-		test.Assert(t, reflect.DeepEqual(buf, mockReqThrift), buf)
+		_, err := MarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), mockReq)
+		test.Assert(t, err != nil, err)
+		// test.Assert(t, reflect.DeepEqual(buf, mockReqThrift), buf)
 	})
 	// FrugalCodec: in thrift_frugal_amd64_test.go: TestMarshalThriftDataFrugal
 }
 
-func Test_decodeBasicThriftData(t *testing.T) {
-	t.Run("empty-input", func(t *testing.T) {
-		req := &fast.MockReq{}
-		tProt := NewBinaryProtocol(remote.NewReaderBuffer([]byte{}))
-		err := decodeBasicThriftData(context.Background(), tProt, "mock", req)
-		test.Assert(t, err != nil, err)
-	})
-	t.Run("invalid-input", func(t *testing.T) {
-		req := &fast.MockReq{}
-		tProt := NewBinaryProtocol(remote.NewReaderBuffer([]byte{0xff}))
-		err := decodeBasicThriftData(context.Background(), tProt, "mock", req)
-		test.Assert(t, err != nil, err)
-	})
-	t.Run("normal-input", func(t *testing.T) {
-		req := &fast.MockReq{}
-		tProt := NewBinaryProtocol(remote.NewReaderBuffer(mockReqThrift))
-		err := decodeBasicThriftData(context.Background(), tProt, "mock", req)
-		checkDecodeResult(t, err, req)
-	})
-}
-
-func checkDecodeResult(t *testing.T, err error, req *fast.MockReq) {
+func checkDecodeResult(t *testing.T, err error, req *mocks.MockReq) {
+	t.Helper()
 	test.Assert(t, err == nil, err)
 	test.Assert(t, req.Msg == mockReq.Msg, req.Msg, mockReq.Msg)
 	test.Assert(t, len(req.StrMap) == 0, req.StrMap)
@@ -105,32 +73,31 @@ func checkDecodeResult(t *testing.T, err error, req *fast.MockReq) {
 
 func TestUnmarshalThriftData(t *testing.T) {
 	t.Run("NoCodec(=FastCodec)", func(t *testing.T) {
-		req := &fast.MockReq{}
+		req := &mocks.MockReq{}
 		err := UnmarshalThriftData(context.Background(), nil, "mock", mockReqThrift, req)
 		checkDecodeResult(t, err, req)
 	})
 	t.Run("FastCodec", func(t *testing.T) {
-		req := &fast.MockReq{}
+		req := &mocks.MockReq{}
 		err := UnmarshalThriftData(context.Background(), NewThriftCodecWithConfig(FastRead|FastWrite), "mock", mockReqThrift, req)
 		checkDecodeResult(t, err, req)
 	})
 	t.Run("BasicCodec", func(t *testing.T) {
-		req := &fast.MockReq{}
+		req := &mocks.MockReq{}
 		err := UnmarshalThriftData(context.Background(), NewThriftCodecWithConfig(Basic), "mock", mockReqThrift, req)
-		checkDecodeResult(t, err, req)
+		test.Assert(t, err != nil, err)
 	})
 	// FrugalCodec: in thrift_frugal_amd64_test.go: TestUnmarshalThriftDataFrugal
 }
 
 func TestThriftCodec_unmarshalThriftData(t *testing.T) {
 	t.Run("FastCodec with SkipDecoder enabled", func(t *testing.T) {
-		req := &fast.MockReq{}
+		req := &mocks.MockReq{}
 		codec := &thriftCodec{FastRead | EnableSkipDecoder}
-		tProt := NewBinaryProtocol(remote.NewReaderBuffer(mockReqThrift))
-		defer tProt.Recycle()
+		trans := bufiox.NewBytesReader(mockReqThrift)
 		// specify dataLen with 0 so that skipDecoder works
-		err := codec.unmarshalThriftData(context.Background(), tProt, "mock", req, 0)
-		checkDecodeResult(t, err, &fast.MockReq{
+		err := codec.unmarshalThriftData(trans, req, 0)
+		checkDecodeResult(t, err, &mocks.MockReq{
 			Msg:     req.Msg,
 			StrList: req.StrList,
 			StrMap:  req.StrMap,
@@ -138,7 +105,7 @@ func TestThriftCodec_unmarshalThriftData(t *testing.T) {
 	})
 
 	t.Run("FastCodec with SkipDecoder enabled, failed in using SkipDecoder Buffer", func(t *testing.T) {
-		req := &fast.MockReq{}
+		req := &mocks.MockReq{}
 		codec := &thriftCodec{FastRead | EnableSkipDecoder}
 		// these bytes are mapped to
 		//  Msg     string            `thrift:"Msg,1" json:"Msg"`
@@ -150,10 +117,9 @@ func TestThriftCodec_unmarshalThriftData(t *testing.T) {
 			15 /* list */, 0, 3 /* id=3 */, 6 /* item:I16 */, 0, 0, 0, 1 /* length=1 */, 0, 1, /* I16=1 */
 			0, /* end of struct */
 		}
-		tProt := NewBinaryProtocol(remote.NewReaderBuffer(faultMockReqThrift))
-		defer tProt.Recycle()
+		trans := bufiox.NewBytesReader(faultMockReqThrift)
 		// specify dataLen with 0 so that skipDecoder works
-		err := codec.unmarshalThriftData(context.Background(), tProt, "mock", req, 0)
+		err := codec.unmarshalThriftData(trans, req, 0)
 		test.Assert(t, err != nil, err)
 		test.Assert(t, strings.Contains(err.Error(), "caught in FastCodec using SkipDecoder Buffer"))
 	})
@@ -161,32 +127,19 @@ func TestThriftCodec_unmarshalThriftData(t *testing.T) {
 
 func TestUnmarshalThriftException(t *testing.T) {
 	// prepare exception thrift binary
-	transport := thrift.NewTMemoryBufferLen(marshalThriftBufferSize)
-	tProt := thrift.NewTBinaryProtocol(transport, true, true)
 	errMessage := "test: invalid protocol"
-	exc := thrift.NewTApplicationException(thrift.INVALID_PROTOCOL, errMessage)
-	err := exc.Write(tProt)
-	test.Assert(t, err == nil, err)
+	exc := thrift.NewApplicationException(thrift.INVALID_PROTOCOL, errMessage)
+	b := make([]byte, exc.BLength())
+	n := exc.FastWrite(b)
+	test.Assert(t, n == len(b), n)
 
 	// unmarshal
-	tProtRead := NewBinaryProtocol(remote.NewReaderBuffer(transport.Bytes()))
-	err = UnmarshalThriftException(tProtRead)
+	tProtRead := athrift.NewBinaryProtocol(bufiox.NewBytesReader(b), nil)
+	err := UnmarshalThriftException(tProtRead)
 	transErr, ok := err.(*remote.TransError)
 	test.Assert(t, ok, err)
 	test.Assert(t, transErr.TypeID() == thrift.INVALID_PROTOCOL, transErr)
 	test.Assert(t, transErr.Error() == errMessage, transErr)
-}
-
-func Test_verifyMarshalBasicThriftDataType(t *testing.T) {
-	err := verifyMarshalBasicThriftDataType(&mockWithContext{})
-	test.Assert(t, err == nil, err)
-	// data that is not part of basic thrift: in thrift_frugal_amd64_test.go: Test_verifyMarshalThriftDataFrugal
-}
-
-func Test_verifyUnmarshalBasicThriftDataType(t *testing.T) {
-	err := verifyUnmarshalBasicThriftDataType(&mockWithContext{})
-	test.Assert(t, err == nil, err)
-	// data that is not part of basic thrift: in thrift_frugal_amd64_test.go: Test_verifyUnmarshalThriftDataFrugal
 }
 
 func Test_getSkippedStructBuffer(t *testing.T) {
@@ -194,8 +147,8 @@ func Test_getSkippedStructBuffer(t *testing.T) {
 	faultThrift := []byte{
 		11 /* string */, 0, 1 /* id=1 */, 0, 0, 0, 6 /* length=6 */, 104, 101, 108, 108, 111, /* "hello" */
 	}
-	tProt := NewBinaryProtocol(remote.NewReaderBuffer(faultThrift))
-	_, err := getSkippedStructBuffer(tProt)
+	trans := bufiox.NewBytesReader(faultThrift)
+	_, err := getSkippedStructBuffer(trans)
 	test.Assert(t, err != nil, err)
-	test.Assert(t, strings.Contains(err.Error(), "caught in SkipDecoder NextStruct phase"))
+	test.Assert(t, strings.Contains(err.Error(), "caught in SkipDecoder Next phase"))
 }

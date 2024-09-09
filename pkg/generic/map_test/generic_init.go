@@ -36,6 +36,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/genericserver"
+	"github.com/cloudwego/kitex/transport"
 )
 
 var reqMsg = map[string]interface{}{
@@ -52,9 +53,8 @@ var reqMsg = map[string]interface{}{
 
 var errResp = "Test Error"
 
-func newGenericClient(destService string, g generic.Generic, targetIPPort string) genericclient.Client {
-	var opts []client.Option
-	opts = append(opts, client.WithHostPorts(targetIPPort))
+func newGenericClient(destService string, g generic.Generic, targetIPPort string, opts ...client.Option) genericclient.Client {
+	opts = append(opts, client.WithHostPorts(targetIPPort), client.WithTransportProtocol(transport.TTHeader))
 	genericCli, _ := genericclient.NewClient(destService, g, opts...)
 	return genericCli
 }

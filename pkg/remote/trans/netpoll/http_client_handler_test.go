@@ -17,6 +17,7 @@
 package netpoll
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"strings"
@@ -56,7 +57,11 @@ func init() {
 // TestHTTPWrite test http_client_handler Write return err
 func TestHTTPWrite(t *testing.T) {
 	// 1. prepare mock data
-	conn := &MockNetpollConn{}
+	conn := &MockNetpollConn{
+		WriterFunc: func() netpoll.Writer {
+			return netpoll.NewWriter(&bytes.Buffer{})
+		},
+	}
 	rwTimeout := time.Second
 	cfg := rpcinfo.NewRPCConfig()
 	rpcinfo.AsMutableRPCConfig(cfg).SetReadWriteTimeout(rwTimeout)
@@ -70,8 +75,8 @@ func TestHTTPWrite(t *testing.T) {
 	// 2. test
 	ctx, err := httpCilTransHdlr.Write(ctx, conn, msg)
 	// check ctx/err not nil
+	test.Assert(t, err == nil, err)
 	test.Assert(t, ctx != nil)
-	test.Assert(t, err != nil)
 }
 
 // TestHTTPRead test http_client_handler Read return err
@@ -175,7 +180,8 @@ func TestSkipToBody(t *testing.T) {
 	err := skipToBody(reader)
 	test.Assert(t, err == nil)
 
-	getBody, err := reader.ReadBinary(reader.ReadableLen())
+	getBody := make([]byte, reader.ReadableLen())
+	_, err = reader.ReadBinary(getBody)
 	test.Assert(t, err == nil)
 	test.Assert(t, strings.Compare(string(getBody), wantBody) == 0)
 }

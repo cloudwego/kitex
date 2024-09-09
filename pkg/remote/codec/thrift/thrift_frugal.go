@@ -1,10 +1,3 @@
-//go:build (amd64 || arm64) && !windows && go1.16 && !go1.23 && !disablefrugal
-// +build amd64 arm64
-// +build !windows
-// +build go1.16
-// +build !go1.23
-// +build !disablefrugal
-
 /*
  * Copyright 2021 CloudWeGo Authors
  *
@@ -27,27 +20,16 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/frugal"
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
+	"github.com/cloudwego/kitex/internal/utils/safemcache"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
-const (
-	// 0b0001 and 0b0010 are used for FastWrite and FastRead, so Frugal starts from 0b0100
-	FrugalWrite CodecType = 0b0100
-	FrugalRead  CodecType = 0b1000
-
-	FrugalReadWrite = FrugalWrite | FrugalRead
-)
-
-// hyperMarshalEnabled indicates that if there are high priority message codec for current platform.
-func (c thriftCodec) hyperMarshalEnabled() bool {
-	return c.CodecType&FrugalWrite != 0
-}
+// TODO(xiaost): rename hyper -> frugal after v0.11.0 is released
 
 // hyperMarshalAvailable indicates that if high priority message codec is available.
 func hyperMarshalAvailable(data interface{}) bool {
@@ -56,11 +38,6 @@ func hyperMarshalAvailable(data interface{}) bool {
 		return false
 	}
 	return true
-}
-
-// hyperMessageUnmarshalEnabled indicates that if there are high priority message codec for current platform.
-func (c thriftCodec) hyperMessageUnmarshalEnabled() bool {
-	return c.CodecType&FrugalRead != 0
 }
 
 // hyperMessageUnmarshalAvailable indicates that if high priority message codec is available.
@@ -75,37 +52,35 @@ func (c thriftCodec) hyperMessageUnmarshalAvailable(data interface{}, payloadLen
 	return true
 }
 
-func (c thriftCodec) hyperMarshal(out remote.ByteBuffer, methodName string, msgType remote.MessageType,
+func (c thriftCodec) hyperMarshal(out bufiox.Writer, methodName string, msgType remote.MessageType,
 	seqID int32, data interface{},
 ) error {
 	// calculate and malloc message buffer
-	msgBeginLen := bthrift.Binary.MessageBeginLength(methodName, thrift.TMessageType(msgType), seqID)
-	msgEndLen := bthrift.Binary.MessageEndLength()
+	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
 	objectLen := frugal.EncodedSize(data)
-	buf, err := out.Malloc(msgBeginLen + objectLen + msgEndLen)
+	buf, err := out.Malloc(msgBeginLen + objectLen)
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
 	}
-	mallocLen := out.MallocLen()
+	mallocLen := out.WrittenLen()
 
 	// encode message
-	offset := bthrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
+	offset := thrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
 	nw, _ := out.(remote.NocopyWrite)
-	writeLen, err := frugal.EncodeObject(buf[offset:], nw, data)
+	_, err = frugal.EncodeObject(buf[offset:], nw, data)
 	if err != nil {
 		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Encode failed: %s", err.Error()))
 	}
-	offset += writeLen
-	bthrift.Binary.WriteMessageEnd(buf[offset:])
 	if nw != nil {
 		return nw.MallocAck(mallocLen)
 	}
 	return nil
 }
 
+// NOTE: only used by `marshalThriftData`
 func (c thriftCodec) hyperMarshalBody(data interface{}) (buf []byte, err error) {
 	objectLen := frugal.EncodedSize(data)
-	buf = mcache.Malloc(objectLen)
+	buf = safemcache.Malloc(objectLen)
 	_, err = frugal.EncodeObject(buf, nil, data)
 	return buf, err
 }

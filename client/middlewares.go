@@ -20,9 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 	"time"
-
-	"github.com/apache/thrift/lib/go/thrift"
 
 	"github.com/cloudwego/kitex/internal"
 	"github.com/cloudwego/kitex/pkg/discovery"
@@ -70,9 +70,11 @@ func discoveryEventHandler(name string, bus event.Bus, queue event.Queue) func(d
 			Name: name,
 			Time: now,
 			Extra: map[string]interface{}{
-				"Added":   wrapInstances(d.Added),
-				"Updated": wrapInstances(d.Updated),
-				"Removed": wrapInstances(d.Removed),
+				"Cacheable": d.Result.Cacheable,
+				"CacheKey":  d.Result.CacheKey,
+				"Added":     wrapInstances(d.Added),
+				"Updated":   wrapInstances(d.Updated),
+				"Removed":   wrapInstances(d.Removed),
 			},
 		})
 	}
@@ -159,13 +161,27 @@ func newIOErrorHandleMW(errHandle func(context.Context, error) error) endpoint.M
 	}
 }
 
+func isRemoteErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	switch err.(type) {
+	// for thrift、KitexProtobuf, actually check *remote.TransError is enough
+	case *remote.TransError, protobuf.PBError:
+		return true
+	default:
+		// case thrift.TApplicationException ?
+		// XXX: we'd like to get rid of apache pkg, should be ok to check by type name
+		// for thrift v0.13.0, it's "*thrift.tApplicationException"
+	}
+	return strings.HasSuffix(reflect.TypeOf(err).String(), "ApplicationException")
+}
+
 // DefaultClientErrorHandler is Default ErrorHandler for client
 // when no ErrorHandler is specified with Option `client.WithErrorHandler`, this ErrorHandler will be injected.
 // for thrift、KitexProtobuf, >= v0.4.0 wrap protocol error to TransError, which will be more friendly.
 func DefaultClientErrorHandler(ctx context.Context, err error) error {
-	switch err.(type) {
-	// for thrift、KitexProtobuf, actually check *remote.TransError is enough
-	case *remote.TransError, thrift.TApplicationException, protobuf.PBError:
+	if isRemoteErr(err) {
 		// Add 'remote' prefix to distinguish with local err.
 		// Because it cannot make sure which side err when decode err happen
 		return kerrors.ErrRemoteOrNetwork.WithCauseAndExtraMsg(err, "remote")
@@ -176,9 +192,7 @@ func DefaultClientErrorHandler(ctx context.Context, err error) error {
 // ClientErrorHandlerWithAddr is ErrorHandler for client, which will add remote addr info into error
 func ClientErrorHandlerWithAddr(ctx context.Context, err error) error {
 	addrStr := getRemoteAddr(ctx)
-	switch err.(type) {
-	// for thrift、KitexProtobuf, actually check *remote.TransError is enough
-	case *remote.TransError, thrift.TApplicationException, protobuf.PBError:
+	if isRemoteErr(err) {
 		// Add 'remote' prefix to distinguish with local err.
 		// Because it cannot make sure which side err when decode err happen
 		extraMsg := "remote"
