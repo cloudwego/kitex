@@ -24,7 +24,6 @@ type thriftIDLProviderOptions struct {
 
 type parseModeOpt struct {
 	parseMode thrift.ParseMode
-	isSet     bool
 }
 
 type ThriftIDLProviderOption struct {
@@ -39,9 +38,6 @@ func (o *thriftIDLProviderOptions) apply(opts []ThriftIDLProviderOption) {
 
 func WithParseMode(parseMode thrift.ParseMode) ThriftIDLProviderOption {
 	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
-		opt.parseMode = &parseModeOpt{
-			parseMode,
-			true,
-		}
+		opt.parseMode = &parseModeOpt{parseMode}
 	}}
 }
