@@ -64,12 +64,16 @@ type server struct {
 	targetSvcInfo *serviceinfo.ServiceInfo
 
 	// actual rpc service implement of biz
-	eps      endpoint.Endpoint
-	mws      []endpoint.Middleware
-	streamMW streamx.StreamMiddleware
-	svr      remotesvr.Server
-	stopped  sync.Once
-	isRun    bool
+	eps endpoint.Endpoint
+	mws []endpoint.Middleware
+
+	streamxMW     streamx.StreamMiddleware
+	streamxRecvMW streamx.StreamRecvMiddleware
+	streamxSendMW streamx.StreamSendMiddleware
+
+	svr     remotesvr.Server
+	stopped sync.Once
+	isRun   bool
 
 	sync.Mutex
 }
@@ -360,7 +364,12 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 
 		handler := svc.handler
 		if minfo.IsStreaming() {
-			handler = streamx.StreamHandler{Middleware: s.streamMW, Handler: svc.handler}
+			handler = streamx.StreamHandler{
+				Handler:              svc.handler,
+				StreamMiddleware:     s.streamxMW,
+				StreamRecvMiddleware: s.streamxRecvMW,
+				StreamSendMiddleware: s.streamxSendMW,
+			}
 		}
 		err = implHandlerFunc(ctx, handler, args, resp)
 		if err != nil {

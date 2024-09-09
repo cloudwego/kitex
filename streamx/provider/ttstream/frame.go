@@ -59,13 +59,11 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr Frame) (err error
 	if err != nil {
 		return err
 	}
-	payload := fr.payload
-	if len(payload) == 0 {
-		return nil
-	}
-	_, err = writer.WriteBinary(payload)
-	if err != nil {
-		return err
+	if len(fr.payload) > 0 {
+		_, err = writer.WriteBinary(fr.payload)
+		if err != nil {
+			return err
+		}
 	}
 	binary.BigEndian.PutUint32(totalLenField, uint32(writer.WrittenLen()-4))
 	err = writer.Flush()

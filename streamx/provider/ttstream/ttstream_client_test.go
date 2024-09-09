@@ -38,13 +38,37 @@ func TestTTHeaderStreaming(t *testing.T) {
 		}
 	}
 	methodCount := map[string]int{}
+	serverRecvCount := map[string]int{}
+	serverSendCount := map[string]int{}
 	svr, err := NewServer(
 		new(serviceImpl),
 		streamxserver.WithListener(ln),
-		streamxserver.WithMiddleware(
+		streamxserver.WithStreamRecvMiddleware(func(next streamx.StreamRecvEndpoint) streamx.StreamRecvEndpoint {
+			return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
+				err = next(ctx, stream, res)
+				if err == nil {
+					serverRecvCount[stream.Method()]++
+				} else {
+					log.Printf("server recv middleware err=%v", err)
+				}
+				return err
+			}
+		}),
+		streamxserver.WithStreamSendMiddleware(func(next streamx.StreamSendEndpoint) streamx.StreamSendEndpoint {
+			return func(ctx context.Context, stream streamx.Stream, req any) (err error) {
+				err = next(ctx, stream, req)
+				if err == nil {
+					serverSendCount[stream.Method()]++
+				} else {
+					log.Printf("server send middleware err=%v", err)
+				}
+				return err
+			}
+		}),
+		streamxserver.WithStreamMiddleware(
 			// middleware example: server streaming mode
 			func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
-				return func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
+				return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
 					log.Printf("Server middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
 						reqArgs.Req(), resArgs.Res(), streamArgs)
 					test.Assert(t, streamArgs.Stream() != nil)
@@ -55,25 +79,25 @@ func TestTTHeaderStreaming(t *testing.T) {
 					case streamx.StreamingUnary:
 						test.Assert(t, reqArgs.Req() != nil)
 						test.Assert(t, resArgs.Res() == nil)
-						err = next(ctx, reqArgs, resArgs, streamArgs)
+						err = next(ctx, streamArgs, reqArgs, resArgs)
 						test.Assert(t, reqArgs.Req() != nil)
 						test.Assert(t, resArgs.Res() != nil)
 					case streamx.StreamingClient:
 						test.Assert(t, reqArgs.Req() == nil)
 						test.Assert(t, resArgs.Res() == nil)
-						err = next(ctx, reqArgs, resArgs, streamArgs)
+						err = next(ctx, streamArgs, reqArgs, resArgs)
 						test.Assert(t, reqArgs.Req() == nil)
 						test.Assert(t, resArgs.Res() != nil)
 					case streamx.StreamingServer:
 						test.Assert(t, reqArgs.Req() != nil)
 						test.Assert(t, resArgs.Res() == nil)
-						err = next(ctx, reqArgs, resArgs, streamArgs)
+						err = next(ctx, streamArgs, reqArgs, resArgs)
 						test.Assert(t, reqArgs.Req() != nil)
 						test.Assert(t, resArgs.Res() == nil)
 					case streamx.StreamingBidirectional:
 						test.Assert(t, reqArgs.Req() == nil)
 						test.Assert(t, resArgs.Res() == nil)
-						err = next(ctx, reqArgs, resArgs, streamArgs)
+						err = next(ctx, streamArgs, reqArgs, resArgs)
 						test.Assert(t, reqArgs.Req() == nil)
 						test.Assert(t, resArgs.Res() == nil)
 					}
@@ -101,14 +125,28 @@ func TestTTHeaderStreaming(t *testing.T) {
 	cli, err := NewClient(
 		"a.b.c",
 		streamxclient.WithHostPorts(addr),
-		streamxclient.WithMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
-			return func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
+		streamxclient.WithStreamRecvMiddleware(func(next streamx.StreamRecvEndpoint) streamx.StreamRecvEndpoint {
+			return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
+				err = next(ctx, stream, res)
+				log.Printf("Client recv middleware %v", res)
+				return err
+			}
+		}),
+		streamxclient.WithStreamSendMiddleware(func(next streamx.StreamSendEndpoint) streamx.StreamSendEndpoint {
+			return func(ctx context.Context, stream streamx.Stream, req any) (err error) {
+				err = next(ctx, stream, req)
+				log.Printf("Client send middleware %v", req)
+				return err
+			}
+		}),
+		streamxclient.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
+			return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
 				// validate ctx
 				test.Assert(t, ValidateMetadata(ctx))
 
 				log.Printf("Client middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
 					reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
-				err = next(ctx, reqArgs, resArgs, streamArgs)
+				err = next(ctx, streamArgs, reqArgs, resArgs)
 				test.Assert(t, err == nil, err)
 				log.Printf("Client middleware after next: reqArgs=%v resArgs=%v streamArgs=%v",
 					reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
@@ -146,14 +184,17 @@ func TestTTHeaderStreaming(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, req.Type == res.Type, res.Type)
 	test.Assert(t, req.Message == res.Message, res.Message)
+	test.Assert(t, serverRecvCount["Unary"] == 1, serverRecvCount)
+	test.Assert(t, serverSendCount["Unary"] == 1, serverSendCount)
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
 
 	// client stream
+	round := 5
 	t.Logf("=== ClientStream ===")
 	cs, err := cli.ClientStream(ctx)
 	test.Assert(t, err == nil, err)
-	for i := 0; i < 3; i++ {
+	for i := 0; i < round; i++ {
 		req := new(Request)
 		req.Type = int32(i)
 		req.Message = "ClientStream"
@@ -166,6 +207,8 @@ func TestTTHeaderStreaming(t *testing.T) {
 	t.Logf("Client ClientStream CloseAndRecv: %v", res)
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
+	test.Assert(t, serverRecvCount["ClientStream"] == round, serverRecvCount)
+	test.Assert(t, serverSendCount["ClientStream"] == 1, serverSendCount)
 	cs = nil
 	runtime.GC()
 
@@ -181,12 +224,14 @@ func TestTTHeaderStreaming(t *testing.T) {
 	t.Logf("Client ServerStream recv header: %v", hd)
 	test.DeepEqual(t, hd["key1"], "val1")
 	test.DeepEqual(t, hd["key2"], "val2")
+	received := 0
 	for {
 		res, err := ss.Recv(ctx)
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		test.Assert(t, err == nil, err)
+		received++
 		t.Logf("Client ServerStream recv: %v", res)
 	}
 	err = ss.CloseSend(ctx)
@@ -199,14 +244,16 @@ func TestTTHeaderStreaming(t *testing.T) {
 	test.DeepEqual(t, tl["key2"], "val2")
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
+	test.Assert(t, serverRecvCount["ServerStream"] == 1, serverRecvCount)
+	test.Assert(t, serverSendCount["ServerStream"] == received, serverSendCount)
 	ss = nil
 	runtime.GC()
 
 	// bidi stream
+	round = 5
 	t.Logf("=== BidiStream ===")
 	bs, err := cli.BidiStream(ctx)
 	test.Assert(t, err == nil, err)
-	round := 5
 	msg := "BidiStream"
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -238,6 +285,8 @@ func TestTTHeaderStreaming(t *testing.T) {
 	wg.Wait()
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
+	test.Assert(t, serverRecvCount["BidiStream"] == round, serverRecvCount)
+	test.Assert(t, serverSendCount["BidiStream"] == round, serverSendCount)
 	bs = nil
 	runtime.GC()
 

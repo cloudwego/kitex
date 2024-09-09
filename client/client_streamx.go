@@ -2,54 +2,19 @@ package client
 
 import (
 	"context"
-	"errors"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/streamx"
 )
 
 type StreamX interface {
 	NewStream(ctx context.Context, method string, req any, callOptions ...streamxcallopt.CallOption) (streamx.ClientStream, error)
-	StreamMiddleware(next streamx.StreamEndpoint) streamx.StreamEndpoint
+	Middlewares() (streamMW streamx.StreamMiddleware, recvMW streamx.StreamRecvMiddleware, sendMW streamx.StreamSendMiddleware)
 }
 
-// TODO: 使用这个中间件
-func (kc *kClient) invokeStreamXIOMiddleware() streamx.StreamMiddleware {
-	return func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
-		return func(ctx context.Context, req streamx.StreamReqArgs, res streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
-			// 这个函数要放到最开始，也就是说所有其他中间件都调用完了，这个才能调用
-			if streamArgs == nil {
-				return errors.New("stream cannot be nil")
-			}
-			st := streamArgs.Stream()
-			ri := rpcinfo.GetRPCInfo(ctx)
-			method := ri.Invocation().MethodName()
-			switch kc.svcInfo.Methods[method].StreamingMode() {
-			case serviceinfo.StreamingUnary:
-				if req == nil || res == nil {
-					return errors.New("req or res is nil")
-				}
-				err = st.SendMsg(ctx, req)
-				if err != nil {
-					return err
-				}
-				err = st.RecvMsg(ctx, res)
-				if err != nil {
-					return err
-				}
-			case serviceinfo.StreamingServer:
-				err = st.SendMsg(ctx, req)
-				if err != nil {
-					return err
-				}
-			case serviceinfo.StreamingClient: // do nothing
-			case serviceinfo.StreamingBidirectional: // do nothing
-			}
-			return next(ctx, req, res, streamArgs)
-		}
-	}
+func (kc *kClient) Middlewares() (streamMW streamx.StreamMiddleware, recvMW streamx.StreamRecvMiddleware, sendMW streamx.StreamSendMiddleware) {
+	return kc.sxStreamMW, kc.sxStreamRecvMW, kc.sxStreamSendMW
 }
 
 // return a bottom next function
@@ -106,16 +71,4 @@ func (kc *kClient) NewStream(ctx context.Context, method string, req any, callOp
 		return nil, err
 	}
 	return streamArgs.Stream().(streamx.ClientStream), nil
-}
-
-func (kc *kClient) StreamMiddleware(next streamx.StreamEndpoint) streamx.StreamEndpoint {
-	if kc.sxMW == nil {
-		return next
-	}
-	if next == nil {
-		return kc.sxMW(func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
-			return nil
-		})
-	}
-	return kc.sxMW(next)
 }

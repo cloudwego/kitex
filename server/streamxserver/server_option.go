@@ -26,9 +26,21 @@ func WithServerTransHandlerFactory(f remote.ServerTransHandlerFactory) ServerOpt
 	return convertInternalServerOption(server.WithTransHandlerFactory(f))
 }
 
-func WithMiddleware(smw streamx.StreamMiddleware) ServerOption {
+func WithStreamMiddleware(smw streamx.StreamMiddleware) ServerOption {
 	return ServerOption{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.SMWBs = append(o.SMWBs, smw)
+		o.SMWs = append(o.SMWs, smw)
+	}}
+}
+
+func WithStreamRecvMiddleware(smw streamx.StreamRecvMiddleware) ServerOption {
+	return ServerOption{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.SRecvMWs = append(o.SRecvMWs, smw)
+	}}
+}
+
+func WithStreamSendMiddleware(smw streamx.StreamSendMiddleware) ServerOption {
+	return ServerOption{F: func(o *internal_server.Options, di *utils.Slice) {
+		o.SSendMWs = append(o.SSendMWs, smw)
 	}}
 }
 
@@ -39,57 +51,3 @@ func convertInternalServerOption(o internal_server.Option) ServerOption {
 func convertServerOption(o ServerOption) internal_server.Option {
 	return internal_server.Option{F: o.F}
 }
-
-//
-//func convertStreamMiddleware[Endpoint streamx.StreamEndpoint | streamx.UnaryEndpoint | streamx.ClientStreamEndpoint | streamx.ServerStreamEndpoint | streamx.BidiStreamEndpoint](
-//	gmw streamx.GenericMiddleware[Endpoint]) endpoint.Middleware {
-//	switch tmw := any(gmw).(type) {
-//	case streamx.GenericMiddleware[streamx.StreamEndpoint]:
-//		return func(next endpoint.Endpoint) endpoint.Endpoint {
-//			return func(ctx context.Context, reqArgs, resArgs any) (err error) {
-//				stream, err := streamx.AsStream(reqArgs)
-//				if err != nil {
-//					return err
-//				}
-//				_ = stream
-//				return tmw(func(ctx context.Context, reqArgs, resArgs any, streamArgs streamx.StreamArgs) (err error) {
-//					return next(ctx, reqArgs, resArgs)
-//				})(ctx, reqArgs, resArgs, nil)
-//			}
-//		}
-//	case streamx.GenericMiddleware[streamx.UnaryEndpoint]:
-//		return func(next endpoint.Endpoint) endpoint.Endpoint {
-//			return func(ctx context.Context, reqArgs, resArgs any) (err error) {
-//				return tmw(func(ctx context.Context, reqArgs, resArgs any) error {
-//					return next(ctx, reqArgs, resArgs)
-//				})(ctx, reqArgs, resArgs)
-//			}
-//		}
-//	case streamx.GenericMiddleware[streamx.ClientStreamEndpoint]:
-//		return func(next endpoint.Endpoint) endpoint.Endpoint {
-//			return func(ctx context.Context, reqArgs, resArgs any) (err error) {
-//				return tmw(func(ctx context.Context, streamArgs streamx.StreamArgs) error {
-//					return next(ctx, nil, nil)
-//				})(ctx, nil)
-//			}
-//		}
-//	case streamx.GenericMiddleware[streamx.ServerStreamEndpoint]:
-//		return func(next endpoint.Endpoint) endpoint.Endpoint {
-//			return func(ctx context.Context, reqArgs, resArgs any) (err error) {
-//				return tmw(func(ctx context.Context, reqArgs any, streamArgs streamx.StreamArgs) error {
-//					return next(ctx, nil, nil)
-//				})(ctx, nil, nil)
-//			}
-//		}
-//	case streamx.GenericMiddleware[streamx.BidiStreamEndpoint]:
-//		return func(next endpoint.Endpoint) endpoint.Endpoint {
-//			return func(ctx context.Context, reqArgs, resArgs any) (err error) {
-//				return tmw(func(ctx context.Context, streamArgs streamx.StreamArgs) error {
-//					return next(ctx, nil, nil)
-//				})(ctx, nil)
-//			}
-//		}
-//	default:
-//		panic(fmt.Sprintf("Unknow Middleware Type: %T", tmw))
-//	}
-//}

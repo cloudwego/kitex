@@ -34,10 +34,10 @@ func TestJSONRPC(t *testing.T) {
 	svr, err := NewServer(
 		new(serviceImpl),
 		streamxserver.WithListener(ln),
-		streamxserver.WithMiddleware(
+		streamxserver.WithStreamMiddleware(
 			// middleware example: server streaming mode
 			func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
-				return func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
+				return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
 					log.Printf("Server middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
 						reqArgs.Req(), resArgs.Res(), streamArgs)
 					test.Assert(t, streamArgs.Stream() != nil)
@@ -46,25 +46,25 @@ func TestJSONRPC(t *testing.T) {
 					case streamx.StreamingUnary:
 						test.Assert(t, reqArgs.Req() != nil)
 						test.Assert(t, resArgs.Res() == nil)
-						err = next(ctx, reqArgs, resArgs, streamArgs)
+						err = next(ctx, streamArgs, reqArgs, resArgs)
 						test.Assert(t, reqArgs.Req() != nil)
 						test.Assert(t, resArgs.Res() != nil)
 					case streamx.StreamingClient:
 						test.Assert(t, reqArgs.Req() == nil)
 						test.Assert(t, resArgs.Res() == nil)
-						err = next(ctx, reqArgs, resArgs, streamArgs)
+						err = next(ctx, streamArgs, reqArgs, resArgs)
 						test.Assert(t, reqArgs.Req() == nil)
 						test.Assert(t, resArgs.Res() != nil)
 					case streamx.StreamingServer:
 						test.Assert(t, reqArgs.Req() != nil)
 						test.Assert(t, resArgs.Res() == nil)
-						err = next(ctx, reqArgs, resArgs, streamArgs)
+						err = next(ctx, streamArgs, reqArgs, resArgs)
 						test.Assert(t, reqArgs.Req() != nil)
 						test.Assert(t, resArgs.Res() == nil)
 					case streamx.StreamingBidirectional:
 						test.Assert(t, reqArgs.Req() == nil)
 						test.Assert(t, resArgs.Res() == nil)
-						err = next(ctx, reqArgs, resArgs, streamArgs)
+						err = next(ctx, streamArgs, reqArgs, resArgs)
 						test.Assert(t, reqArgs.Req() == nil)
 						test.Assert(t, resArgs.Res() == nil)
 					}
@@ -92,11 +92,17 @@ func TestJSONRPC(t *testing.T) {
 	cli, err := NewClient(
 		"a.b.c",
 		streamxclient.WithHostPorts(testAddr),
-		streamxclient.WithMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
-			return func(ctx context.Context, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs, streamArgs streamx.StreamArgs) (err error) {
+		//streamxclient.WithStreamRecvMiddleware(func(next streamx.StreamRecvEndpoint) streamx.StreamRecvEndpoint {
+		//	return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
+		//		log.Println("xxx")
+		//		return next(ctx, stream, res)
+		//	}
+		//}),
+		streamxclient.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
+			return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
 				log.Printf("Client middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
 					reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
-				err = next(ctx, reqArgs, resArgs, streamArgs)
+				err = next(ctx, streamArgs, reqArgs, resArgs)
 				log.Printf("Client middleware after next: reqArgs=%v resArgs=%v streamArgs=%v",
 					reqArgs.Req(), resArgs.Res(), streamArgs.Stream())
 

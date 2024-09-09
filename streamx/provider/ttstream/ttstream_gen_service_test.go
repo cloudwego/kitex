@@ -27,7 +27,7 @@ var serviceInfo = &serviceinfo.ServiceInfo{
 	Methods: map[string]serviceinfo.MethodInfo{
 		"Unary": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamx.ServerInvoke[ttstream.Header, ttstream.Trailer, Request, Response](
+				return streamxserver.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
 					ctx, serviceinfo.StreamingUnary, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
 			},
 			nil,
@@ -37,7 +37,7 @@ var serviceInfo = &serviceinfo.ServiceInfo{
 		),
 		"ClientStream": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamx.ServerInvoke[ttstream.Header, ttstream.Trailer, Request, Response](
+				return streamxserver.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
 					ctx, serviceinfo.StreamingClient, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
 			},
 			nil,
@@ -47,7 +47,7 @@ var serviceInfo = &serviceinfo.ServiceInfo{
 		),
 		"ServerStream": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamx.ServerInvoke[ttstream.Header, ttstream.Trailer, Request, Response](
+				return streamxserver.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
 					ctx, serviceinfo.StreamingServer, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
 			},
 			nil,
@@ -57,7 +57,7 @@ var serviceInfo = &serviceinfo.ServiceInfo{
 		),
 		"BidiStream": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamx.ServerInvoke[ttstream.Header, ttstream.Trailer, Request, Response](
+				return streamxserver.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
 					ctx, serviceinfo.StreamingBidirectional, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
 			},
 			nil,
@@ -83,7 +83,7 @@ func NewClient(destService string, opts ...streamxclient.ClientOption) (ClientIn
 	if err != nil {
 		return nil, err
 	}
-	kc := &kClient{ClientStreamProvider: cli}
+	kc := &kClient{Client: cli}
 	return kc, nil
 }
 
@@ -128,13 +128,13 @@ type ClientInterface interface {
 var _ ClientInterface = (*kClient)(nil)
 
 type kClient struct {
-	streamx.ClientStreamProvider
+	streamxclient.Client
 }
 
 func (c *kClient) Unary(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (*Response, error) {
 	res := new(Response)
-	_, err := streamx.ClientInvoke[ttstream.Header, ttstream.Trailer, Request, Response](
-		ctx, c, serviceinfo.StreamingUnary, "Unary", req, res, callOptions...)
+	_, err := streamxclient.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
+		ctx, c.Client, serviceinfo.StreamingUnary, "Unary", req, res, callOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -142,18 +142,18 @@ func (c *kClient) Unary(ctx context.Context, req *Request, callOptions ...stream
 }
 
 func (c *kClient) ClientStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (stream ClientStreamingClient[Request, Response], err error) {
-	return streamx.ClientInvoke[ttstream.Header, ttstream.Trailer, Request, Response](
-		ctx, c, serviceinfo.StreamingClient, "ClientStream", nil, nil, callOptions...)
+	return streamxclient.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
+		ctx, c.Client, serviceinfo.StreamingClient, "ClientStream", nil, nil, callOptions...)
 }
 
 func (c *kClient) ServerStream(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (
 	stream ServerStreamingClient[Response], err error) {
-	return streamx.ClientInvoke[ttstream.Header, ttstream.Trailer, Request, Response](
-		ctx, c, serviceinfo.StreamingServer, "ServerStream", req, nil, callOptions...)
+	return streamxclient.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
+		ctx, c.Client, serviceinfo.StreamingServer, "ServerStream", req, nil, callOptions...)
 }
 
 func (c *kClient) BidiStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
 	stream BidiStreamingClient[Request, Response], err error) {
-	return streamx.ClientInvoke[ttstream.Header, ttstream.Trailer, Request, Response](
-		ctx, c, serviceinfo.StreamingBidirectional, "BidiStream", nil, nil, callOptions...)
+	return streamxclient.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
+		ctx, c.Client, serviceinfo.StreamingBidirectional, "BidiStream", nil, nil, callOptions...)
 }

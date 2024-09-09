@@ -65,6 +65,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 		log.Printf("client stream[%v] closing", cs.sid)
 		_ = cs.close()
 		// TODO: current using one conn one stream
+		//_ = trans.close()
 		c.transPool.Put(trans)
 	})
 	return cs, err

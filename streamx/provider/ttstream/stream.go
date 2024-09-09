@@ -11,8 +11,10 @@ import (
 )
 
 var (
-	_ streamx.ClientStream = (*clientStream)(nil)
-	_ streamx.ServerStream = (*serverStream)(nil)
+	_ streamx.ClientStream                          = (*clientStream)(nil)
+	_ streamx.ServerStream                          = (*serverStream)(nil)
+	_ streamx.ClientStreamMetadata[Header, Trailer] = (*clientStream)(nil)
+	_ streamx.ServerStreamMetadata[Header, Trailer] = (*serverStream)(nil)
 )
 
 func newStream(trans *transport, mode streamx.StreamingMode, smeta streamMeta) (s *stream) {

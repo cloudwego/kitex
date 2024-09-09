@@ -24,9 +24,21 @@ func WithProvider(pvd streamx.ClientProvider) ClientOption {
 	}}
 }
 
-func WithMiddleware(smw streamx.StreamMiddleware) ClientOption {
+func WithStreamMiddleware(smw streamx.StreamMiddleware) ClientOption {
 	return ClientOption{F: func(o *internal_client.Options, di *utils.Slice) {
 		o.SMWs = append(o.SMWs, smw)
+	}}
+}
+
+func WithStreamRecvMiddleware(smw streamx.StreamRecvMiddleware) ClientOption {
+	return ClientOption{F: func(o *internal_client.Options, di *utils.Slice) {
+		o.SRecvMWs = append(o.SRecvMWs, smw)
+	}}
+}
+
+func WithStreamSendMiddleware(smw streamx.StreamSendMiddleware) ClientOption {
+	return ClientOption{F: func(o *internal_client.Options, di *utils.Slice) {
+		o.SSendMWs = append(o.SSendMWs, smw)
 	}}
 }
 
