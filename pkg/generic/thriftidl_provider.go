@@ -391,7 +391,7 @@ func getParseMode(opts ...ThriftIDLProviderOption) thrift.ParseMode {
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
 	parseMode := thrift.DefaultParseMode()
-	if tOpts.parseMode != nil && tOpts.parseMode.isSet {
+	if tOpts.parseMode != nil {
 		parseMode = tOpts.parseMode.parseMode
 	}
 	return parseMode
