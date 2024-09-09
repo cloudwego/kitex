@@ -26,6 +26,44 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
+var (
+	multiServiceContent = `
+		namespace go kitex.test.server
+		
+		enum FOO {
+		A = 1;
+		}
+		
+		struct ExampleReq {
+		1: required string Msg,
+		2: FOO Foo,
+		4: optional i8 I8,
+		5: optional i16 I16,
+		6: optional i32 I32,
+		7: optional i64 I64,
+		8: optional double Double,
+		}
+		struct ExampleResp {
+		1: required string Msg,
+		2: string required_field,
+		3: optional i64 num (api.js_conv="true"),
+		4: optional i8 I8,
+		5: optional i16 I16,
+		6: optional i32 I32,
+		7: optional i64 I64,
+		8: optional double Double,
+		}
+		
+		service ExampleService {
+		ExampleResp ExampleMethod(1: ExampleReq req),
+		}
+		
+		service Example2Service {
+		ExampleResp Example2Method(1: ExampleReq req)
+		}
+	`
+)
+
 func TestAbsPath(t *testing.T) {
 	t.Run("relative include path", func(t *testing.T) {
 		path := "/a/b/c.thrift"
@@ -237,8 +275,37 @@ func TestDisableGoTagForDynamicGo(t *testing.T) {
 	test.Assert(t, tree.DynamicGoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "str")
 }
 
-func TestParseMode(t *testing.T) {
+func TestFileProviderParseMode(t *testing.T) {
 	path := "json_test/idl/example_multi_service.thrift"
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
+	p, err := NewThriftFileProvider(path)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "Example2Service")
+
+	thrift.SetDefaultParseMode(thrift.CombineServices)
+	test.Assert(t, thrift.DefaultParseMode() == thrift.CombineServices)
+	p, err = NewThriftFileProvider(path)
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "CombinedServices")
+
+	opts := []ThriftIDLProviderOption{WithParseMode(thrift.FirstServiceOnly)}
+	p, err = NewThriftFileProviderWithOption(path, opts)
+	// global var isn't affected by the option
+	test.Assert(t, thrift.DefaultParseMode() == thrift.CombineServices)
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "ExampleService")
+}
+
+func TestFileProviderParseModeWithDynamicGo(t *testing.T) {
+	path := "json_test/idl/example_multi_service.thrift"
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
 	p, err := NewThriftFileProviderWithDynamicGo(path)
 	test.Assert(t, err == nil)
 	defer p.Close()
@@ -248,7 +315,132 @@ func TestParseMode(t *testing.T) {
 	test.Assert(t, tree.DynamicGoDsc.Name() == "Example2Service")
 
 	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
+	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
 	p, err = NewThriftFileProviderWithDynamicGo(path)
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "ExampleService")
+	test.Assert(t, tree.DynamicGoDsc.Name() == "ExampleService")
+
+	opts := []ThriftIDLProviderOption{WithParseMode(thrift.LastServiceOnly)}
+	p, err = NewThriftFileProviderWithDynamicgoWithOption(path, opts)
+	// global var isn't affected by the option
+	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "Example2Service")
+	test.Assert(t, tree.DynamicGoDsc.Name() == "Example2Service")
+}
+
+func TestContentProviderParseMode(t *testing.T) {
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
+	p, err := NewThriftContentProvider(multiServiceContent, nil)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "Example2Service")
+
+	p, err = NewThriftContentProvider(multiServiceContent, nil, WithParseMode(thrift.CombineServices))
+	test.Assert(t, err == nil)
+	// global var isn't affected by the option
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "CombinedServices")
+
+	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
+	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
+	p, err = NewThriftContentProvider(multiServiceContent, nil)
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "ExampleService")
+}
+
+func TestContentProviderParseModeWithDynamicGo(t *testing.T) {
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
+	p, err := NewThriftContentProviderWithDynamicGo(multiServiceContent, nil)
+	test.Assert(t, err == nil)
+	defer p.Close()
+	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "Example2Service")
+	test.Assert(t, tree.DynamicGoDsc.Name() == "Example2Service")
+
+	p, err = NewThriftContentProviderWithDynamicGo(multiServiceContent, nil, WithParseMode(thrift.CombineServices))
+	test.Assert(t, err == nil)
+	// global var isn't affected by the option
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "CombinedServices")
+	test.Assert(t, tree.DynamicGoDsc.Name() == "CombinedServices")
+
+	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
+	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
+	p, err = NewThriftContentProviderWithDynamicGo(multiServiceContent, nil)
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "ExampleService")
+	test.Assert(t, tree.DynamicGoDsc.Name() == "ExampleService")
+}
+
+func TestContentWithAbsIncludePathProviderParseMode(t *testing.T) {
+	path := "json_test/idl/example_multi_service.thrift"
+	includes := map[string]string{path: multiServiceContent}
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
+	p, err := NewThriftContentWithAbsIncludePathProvider(path, includes)
+	test.Assert(t, err == nil, err)
+	defer p.Close()
+	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "Example2Service")
+
+	p, err = NewThriftContentWithAbsIncludePathProvider(path, includes, WithParseMode(thrift.CombineServices))
+	test.Assert(t, err == nil)
+	// global var isn't affected by the option
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "CombinedServices")
+
+	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
+	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
+	p, err = NewThriftContentWithAbsIncludePathProvider(path, includes)
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "ExampleService")
+}
+
+func TestContentWithAbsIncludePathProviderParseModeWithDynamicGo(t *testing.T) {
+	path := "json_test/idl/example_multi_service.thrift"
+	includes := map[string]string{path: multiServiceContent}
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
+	p, err := NewThriftContentWithAbsIncludePathProviderWithDynamicGo(path, includes)
+	test.Assert(t, err == nil, err)
+	defer p.Close()
+	tree := <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "Example2Service")
+	test.Assert(t, tree.DynamicGoDsc.Name() == "Example2Service")
+
+	p, err = NewThriftContentWithAbsIncludePathProviderWithDynamicGo(path, includes, WithParseMode(thrift.CombineServices))
+	test.Assert(t, err == nil)
+	// global var isn't affected by the option
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.Name == "CombinedServices")
+	test.Assert(t, tree.DynamicGoDsc.Name() == "CombinedServices")
+
+	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
+	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
+	p, err = NewThriftContentWithAbsIncludePathProviderWithDynamicGo(path, includes)
 	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
