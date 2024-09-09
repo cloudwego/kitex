@@ -17,6 +17,7 @@ package generator
 
 import (
 	"fmt"
+	"github.com/cloudwego/kitex/tool/internal_pkg/tpl/stream_v2"
 	"go/token"
 	"path/filepath"
 	"reflect"
@@ -145,6 +146,7 @@ type Config struct {
 	NoDependencyCheck bool
 	Rapid             bool
 	BuiltinTpl        util.StringSlice // specify the built-in template to use
+	StreamV2          bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -294,6 +296,9 @@ func (c *Config) ApplyExtension() error {
 }
 
 func (c *Config) IsUsingMultipleServicesTpl() bool {
+	if c.StreamV2 {
+		return true
+	}
 	for _, part := range c.BuiltinTpl {
 		if part == MultipleServicesTpl {
 			return true
@@ -450,25 +455,29 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 		ext = new(TemplateExtension)
 	}
 
-	tasks := []*Task{
-		{
-			Name: ClientFileName,
-			Path: util.JoinPath(output, ClientFileName),
-			Text: tpl.ClientTpl,
-			Ext:  ext.ExtendClient,
-		},
-		{
-			Name: ServerFileName,
-			Path: util.JoinPath(output, ServerFileName),
-			Text: tpl.ServerTpl,
-			Ext:  ext.ExtendServer,
-		},
-		{
-			Name: ServiceFileName,
-			Path: util.JoinPath(output, svcPkg+".go"),
-			Text: tpl.ServiceTpl,
-		},
+	cliTask := &Task{
+		Name: ClientFileName,
+		Path: util.JoinPath(output, ClientFileName),
+		Text: tpl.ClientTpl,
+		Ext:  ext.ExtendClient,
 	}
+	svrTask := &Task{
+		Name: ServerFileName,
+		Path: util.JoinPath(output, ServerFileName),
+		Text: tpl.ServerTpl,
+		Ext:  ext.ExtendServer,
+	}
+	svcTask := &Task{
+		Name: ServiceFileName,
+		Path: util.JoinPath(output, svcPkg+".go"),
+		Text: tpl.ServiceTpl,
+	}
+	if g.StreamV2 && pkg.ServiceInfo.HasStreaming {
+		cliTask.Text = stream_v2.ClientTpl
+		svrTask.Text = stream_v2.ServerTpl
+		svcTask.Text = stream_v2.ServiceTpl
+	}
+	tasks := []*Task{cliTask, svrTask, svcTask}
 
 	// do not generate invoker.go in service package by default
 	if g.Config.GenerateInvoker {
