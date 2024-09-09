@@ -18,6 +18,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/cloudwego/kitex/transport"
 	"io"
 	"os"
 	"os/exec"
@@ -129,6 +130,9 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.BoolVar(&a.Rapid, "rapid", false,
 		"Use embedded thriftgo.")
 	f.Var(&a.BuiltinTpl, "tpl", "Specify kitex built-in template.")
+	f.BoolVar(&a.StreamV2, "stream-v2", false,
+		"Generate streaming code with stream-v2 interface",
+	)
 
 	a.RecordCmd = os.Args
 	a.Version = version
@@ -185,6 +189,10 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 	if err != nil {
 		return err
 	}
+	err = a.checkStreamingV2()
+	if err != nil {
+		return err
+	}
 	// todo finish protobuf
 	if a.IDLType != "thrift" {
 		a.GenPath = generator.KitexGenPath
@@ -229,6 +237,18 @@ func (a *Arguments) checkServiceName() error {
 	if a.ServiceName != "" {
 		a.GenerateMain = true
 	}
+	return nil
+}
+
+func (a *Arguments) checkStreamingV2() error {
+	if !a.StreamV2 {
+		return nil
+	}
+	if a.IDLType == "thrift" {
+		// set TTHeader Streaming by default
+		a.Protocol = transport.TTHeader.String()
+	}
+	// todo: process pb and gRPC
 	return nil
 }
 
