@@ -26,8 +26,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 )
 
-var (
-	multiServiceContent = `
+var multiServiceContent = `
 		namespace go kitex.test.server
 		
 		enum FOO {
@@ -62,7 +61,6 @@ var (
 		ExampleResp Example2Method(1: ExampleReq req)
 		}
 	`
-)
 
 func TestAbsPath(t *testing.T) {
 	t.Run("relative include path", func(t *testing.T) {
