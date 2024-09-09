@@ -277,6 +277,7 @@ func TestDisableGoTagForDynamicGo(t *testing.T) {
 
 func TestFileProviderParseMode(t *testing.T) {
 	path := "json_test/idl/example_multi_service.thrift"
+	thrift.SetDefaultParseMode(thrift.LastServiceOnly)
 	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
 	p, err := NewThriftFileProvider(path)
 	test.Assert(t, err == nil)
@@ -285,26 +286,19 @@ func TestFileProviderParseMode(t *testing.T) {
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "Example2Service")
 
-	thrift.SetDefaultParseMode(thrift.CombineServices)
-	test.Assert(t, thrift.DefaultParseMode() == thrift.CombineServices)
-	p, err = NewThriftFileProvider(path)
+	opts := []ThriftIDLProviderOption{WithParseMode(thrift.CombineServices)}
+	p, err = NewThriftFileProviderWithOption(path, opts)
+	// global var isn't affected by the option
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
 	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "CombinedServices")
-
-	opts := []ThriftIDLProviderOption{WithParseMode(thrift.FirstServiceOnly)}
-	p, err = NewThriftFileProviderWithOption(path, opts)
-	// global var isn't affected by the option
-	test.Assert(t, thrift.DefaultParseMode() == thrift.CombineServices)
-	test.Assert(t, err == nil)
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "ExampleService")
 }
 
 func TestFileProviderParseModeWithDynamicGo(t *testing.T) {
 	path := "json_test/idl/example_multi_service.thrift"
+	thrift.SetDefaultParseMode(thrift.LastServiceOnly)
 	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
 	p, err := NewThriftFileProviderWithDynamicGo(path)
 	test.Assert(t, err == nil)
@@ -314,27 +308,19 @@ func TestFileProviderParseModeWithDynamicGo(t *testing.T) {
 	test.Assert(t, tree.Name == "Example2Service")
 	test.Assert(t, tree.DynamicGoDsc.Name() == "Example2Service")
 
-	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
-	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
-	p, err = NewThriftFileProviderWithDynamicGo(path)
+	opts := []ThriftIDLProviderOption{WithParseMode(thrift.FirstServiceOnly)}
+	p, err = NewThriftFileProviderWithDynamicgoWithOption(path, opts)
+	// global var isn't affected by the option
+	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
 	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "ExampleService")
 	test.Assert(t, tree.DynamicGoDsc.Name() == "ExampleService")
-
-	opts := []ThriftIDLProviderOption{WithParseMode(thrift.LastServiceOnly)}
-	p, err = NewThriftFileProviderWithDynamicgoWithOption(path, opts)
-	// global var isn't affected by the option
-	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
-	test.Assert(t, err == nil)
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "Example2Service")
-	test.Assert(t, tree.DynamicGoDsc.Name() == "Example2Service")
 }
 
 func TestContentProviderParseMode(t *testing.T) {
+	thrift.SetDefaultParseMode(thrift.LastServiceOnly)
 	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
 	p, err := NewThriftContentProvider(multiServiceContent, nil)
 	test.Assert(t, err == nil)
@@ -350,17 +336,10 @@ func TestContentProviderParseMode(t *testing.T) {
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "CombinedServices")
-
-	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
-	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
-	p, err = NewThriftContentProvider(multiServiceContent, nil)
-	test.Assert(t, err == nil)
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "ExampleService")
 }
 
 func TestContentProviderParseModeWithDynamicGo(t *testing.T) {
+	thrift.SetDefaultParseMode(thrift.LastServiceOnly)
 	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
 	p, err := NewThriftContentProviderWithDynamicGo(multiServiceContent, nil)
 	test.Assert(t, err == nil)
@@ -378,20 +357,12 @@ func TestContentProviderParseModeWithDynamicGo(t *testing.T) {
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "CombinedServices")
 	test.Assert(t, tree.DynamicGoDsc.Name() == "CombinedServices")
-
-	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
-	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
-	p, err = NewThriftContentProviderWithDynamicGo(multiServiceContent, nil)
-	test.Assert(t, err == nil)
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "ExampleService")
-	test.Assert(t, tree.DynamicGoDsc.Name() == "ExampleService")
 }
 
 func TestContentWithAbsIncludePathProviderParseMode(t *testing.T) {
 	path := "json_test/idl/example_multi_service.thrift"
 	includes := map[string]string{path: multiServiceContent}
+	thrift.SetDefaultParseMode(thrift.LastServiceOnly)
 	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
 	p, err := NewThriftContentWithAbsIncludePathProvider(path, includes)
 	test.Assert(t, err == nil, err)
@@ -400,18 +371,10 @@ func TestContentWithAbsIncludePathProviderParseMode(t *testing.T) {
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "Example2Service")
 
-	p, err = NewThriftContentWithAbsIncludePathProvider(path, includes, WithParseMode(thrift.CombineServices))
+	p, err = NewThriftContentWithAbsIncludePathProvider(path, includes, WithParseMode(thrift.FirstServiceOnly))
 	test.Assert(t, err == nil)
 	// global var isn't affected by the option
 	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "CombinedServices")
-
-	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
-	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
-	p, err = NewThriftContentWithAbsIncludePathProvider(path, includes)
-	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "ExampleService")
@@ -420,6 +383,7 @@ func TestContentWithAbsIncludePathProviderParseMode(t *testing.T) {
 func TestContentWithAbsIncludePathProviderParseModeWithDynamicGo(t *testing.T) {
 	path := "json_test/idl/example_multi_service.thrift"
 	includes := map[string]string{path: multiServiceContent}
+	thrift.SetDefaultParseMode(thrift.LastServiceOnly)
 	test.Assert(t, thrift.DefaultParseMode() == thrift.LastServiceOnly)
 	p, err := NewThriftContentWithAbsIncludePathProviderWithDynamicGo(path, includes)
 	test.Assert(t, err == nil, err)
@@ -437,13 +401,4 @@ func TestContentWithAbsIncludePathProviderParseModeWithDynamicGo(t *testing.T) {
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "CombinedServices")
 	test.Assert(t, tree.DynamicGoDsc.Name() == "CombinedServices")
-
-	thrift.SetDefaultParseMode(thrift.FirstServiceOnly)
-	test.Assert(t, thrift.DefaultParseMode() == thrift.FirstServiceOnly)
-	p, err = NewThriftContentWithAbsIncludePathProviderWithDynamicGo(path, includes)
-	test.Assert(t, err == nil)
-	tree = <-p.Provide()
-	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Name == "ExampleService")
-	test.Assert(t, tree.DynamicGoDsc.Name() == "ExampleService")
 }
