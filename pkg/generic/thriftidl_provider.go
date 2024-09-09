@@ -54,7 +54,7 @@ func NewThriftFileProviderWithOption(path string, opts []ThriftIDLProviderOption
 	}
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
-	svc, err := newServiceDescriptorFromPath(path, getParseMode(opts...), includeDirs...)
+	svc, err := newServiceDescriptorFromPath(path, getParseMode(tOpts), includeDirs...)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,9 @@ func NewThriftFileProviderWithDynamicgoWithOption(path string, opts []ThriftIDLP
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
 		opts: &ProviderOption{DynamicGoEnabled: true},
 	}
-	parseMode := getParseMode(opts...)
+	tOpts := &thriftIDLProviderOptions{}
+	tOpts.apply(opts)
+	parseMode := getParseMode(tOpts)
 	svc, err := newServiceDescriptorFromPath(path, parseMode, includeDirs...)
 	if err != nil {
 		return nil, err
@@ -143,7 +145,9 @@ func NewThriftContentProvider(main string, includes map[string]string, opts ...T
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
 		opts: &ProviderOption{DynamicGoEnabled: false},
 	}
-	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false, getParseMode(opts...))
+	tOpts := &thriftIDLProviderOptions{}
+	tOpts.apply(opts)
+	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false, getParseMode(tOpts))
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +162,9 @@ func NewThriftContentProviderWithDynamicGo(main string, includes map[string]stri
 		svcs: make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
 		opts: &ProviderOption{DynamicGoEnabled: true},
 	}
-	parseMode := getParseMode(opts...)
+	tOpts := &thriftIDLProviderOptions{}
+	tOpts.apply(opts)
+	parseMode := getParseMode(tOpts)
 	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false, parseMode)
 	if err != nil {
 		return nil, err
@@ -177,7 +183,9 @@ func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]strin
 	if err != nil {
 		return err
 	}
-	parseMode := getParseMode(opts...)
+	tOpts := &thriftIDLProviderOptions{}
+	tOpts.apply(opts)
+	parseMode := getParseMode(tOpts)
 	svc, err = thrift.Parse(tree, parseMode)
 	if err != nil {
 		return err
@@ -298,7 +306,9 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	if !ok {
 		return nil, fmt.Errorf("miss main IDL content for main IDL path: %s", mainIDLPath)
 	}
-	svc, err := newServiceDescriptorFromContent(mainIDLPath, mainIDLContent, includes, true, getParseMode(opts...))
+	tOpts := &thriftIDLProviderOptions{}
+	tOpts.apply(opts)
+	svc, err := newServiceDescriptorFromContent(mainIDLPath, mainIDLContent, includes, true, getParseMode(tOpts))
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +327,9 @@ func NewThriftContentWithAbsIncludePathProviderWithDynamicGo(mainIDLPath string,
 	if !ok {
 		return nil, fmt.Errorf("miss main IDL content for main IDL path: %s", mainIDLPath)
 	}
-	parseMode := getParseMode(opts...)
+	tOpts := &thriftIDLProviderOptions{}
+	tOpts.apply(opts)
+	parseMode := getParseMode(tOpts)
 	svc, err := newServiceDescriptorFromContent(mainIDLPath, mainIDLContent, includes, true, parseMode)
 	if err != nil {
 		return nil, err
@@ -340,7 +352,9 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 	if err != nil {
 		return err
 	}
-	parseMode := getParseMode(opts...)
+	tOpts := &thriftIDLProviderOptions{}
+	tOpts.apply(opts)
+	parseMode := getParseMode(tOpts)
 	svc, err = thrift.Parse(tree, parseMode)
 	if err != nil {
 		return err
@@ -386,12 +400,10 @@ func (p *ThriftContentWithAbsIncludePathProvider) newDynamicGoDsc(svc *descripto
 	}
 }
 
-func getParseMode(opts ...ThriftIDLProviderOption) thrift.ParseMode {
-	tOpts := &thriftIDLProviderOptions{}
-	tOpts.apply(opts)
+func getParseMode(opt *thriftIDLProviderOptions) thrift.ParseMode {
 	parseMode := thrift.DefaultParseMode()
-	if tOpts.parseMode != nil {
-		parseMode = tOpts.parseMode.parseMode
+	if opt.parseMode != nil {
+		parseMode = opt.parseMode.parseMode
 	}
 	return parseMode
 }
