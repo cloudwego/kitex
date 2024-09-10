@@ -2,18 +2,16 @@ package ttstream
 
 import (
 	"context"
+	"log"
+	"runtime"
+
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/streamx"
-	"github.com/cloudwego/netpoll"
-	"log"
-	"runtime"
-	"time"
 )
 
 var _ streamx.ClientProvider = (*clientProvider)(nil)
@@ -32,11 +30,6 @@ type clientProvider struct {
 	transPool    *transPool
 	sinfo        *serviceinfo.ServiceInfo
 	payloadLimit int
-}
-
-var connOpt = remote.ConnOption{
-	Dialer:         netpoll.NewDialer(),
-	ConnectTimeout: time.Second,
 }
 
 func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callOptions ...streamxcallopt.CallOption) (streamx.ClientStream, error) {

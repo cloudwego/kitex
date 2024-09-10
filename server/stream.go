@@ -18,17 +18,12 @@ package server
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/streamx"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 func (s *server) initStreamMiddlewares(ctx context.Context) {
-	s.streamxMW = streamx.StreamMiddlewareChain(s.opt.SMWs...)
-	s.streamxRecvMW = streamx.StreamRecvMiddlewareChain(s.opt.SRecvMWs...)
-	s.streamxSendMW = streamx.StreamSendMiddlewareChain(s.opt.SSendMWs...)
-
 	// for old version streaming
 	s.opt.Streaming.EventHandler = s.opt.TracerCtl.GetStreamEventHandler()
 	s.opt.Streaming.InitMiddlewares(ctx)

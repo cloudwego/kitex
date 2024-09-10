@@ -2,9 +2,12 @@ package ttstream_test
 
 import (
 	"context"
+
+	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/streamxserver"
 	"github.com/cloudwego/kitex/streamx"
 	"github.com/cloudwego/kitex/streamx/provider/ttstream"
@@ -22,8 +25,33 @@ type ServerStreamingClient[Res any] streamx.ServerStreamingClient[ttstream.Heade
 type BidiStreamingClient[Req, Res any] streamx.BidiStreamingClient[ttstream.Header, ttstream.Trailer, Req, Res]
 
 // --- Define Service Method handler ---
-var serviceInfo = &serviceinfo.ServiceInfo{
-	ServiceName: "a.b.c",
+var pingpongServiceInfo = &serviceinfo.ServiceInfo{
+	ServiceName:  "kitex.service.pingpong",
+	PayloadCodec: serviceinfo.Thrift,
+	HandlerType:  (*PingPongServerInterface)(nil),
+	Methods: map[string]serviceinfo.MethodInfo{
+		"PingPong": serviceinfo.NewMethodInfo(
+			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
+				realArg := reqArgs.(*ServerPingPongArgs)
+				realResult := resArgs.(*ServerPingPongResult)
+				success, err := handler.(PingPongServerInterface).PingPong(ctx, realArg.Req)
+				if err != nil {
+					return err
+				}
+				realResult.Success = success
+				return nil
+			},
+			func() interface{} { return NewServerPingPongArgs() },
+			func() interface{} { return NewServerPingPongResult() },
+			false,
+			serviceinfo.WithStreamingMode(serviceinfo.StreamingNone),
+		),
+	},
+	Extra: map[string]interface{}{"streaming": false},
+}
+
+var streamingServiceInfo = &serviceinfo.ServiceInfo{
+	ServiceName: "kitex.service.streaming",
 	Methods: map[string]serviceinfo.MethodInfo{
 		"Unary": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
@@ -69,43 +97,46 @@ var serviceInfo = &serviceinfo.ServiceInfo{
 	Extra: map[string]interface{}{"streaming": true},
 }
 
+// --- Define RegisterService  interface ---
+func RegisterService(svr server.Server, handler StreamingServerInterface, opts ...server.RegisterOption) error {
+	return svr.RegisterService(streamingServiceInfo, handler, opts...)
+}
+
 // --- Define New Client interface ---
-func NewClient(destService string, opts ...streamxclient.ClientOption) (ClientInterface, error) {
-	var options []streamxclient.ClientOption
+func NewPingPongClient(destService string, opts ...client.Option) (PingPongClientInterface, error) {
+	var options []client.Option
+	options = append(options, client.WithDestService(destService))
+	options = append(options, opts...)
+	cli, err := client.NewClient(pingpongServiceInfo, options...)
+	if err != nil {
+		return nil, err
+	}
+	kc := &kClient{caller: cli}
+	return kc, nil
+}
+
+func NewStreamingClient(destService string, opts ...streamxclient.Option) (StreamingClientInterface, error) {
+	var options []streamxclient.Option
 	options = append(options, streamxclient.WithDestService(destService))
 	options = append(options, opts...)
-	cp, err := ttstream.NewClientProvider(serviceInfo)
+	cp, err := ttstream.NewClientProvider(streamingServiceInfo)
 	if err != nil {
 		return nil, err
 	}
 	options = append(options, streamxclient.WithProvider(cp))
-	cli, err := streamxclient.NewClient(serviceInfo, options...)
+	cli, err := streamxclient.NewClient(streamingServiceInfo, options...)
 	if err != nil {
 		return nil, err
 	}
-	kc := &kClient{Client: cli}
+	kc := &kClient{streamer: cli, caller: cli.(client.Client)}
 	return kc, nil
 }
 
-// --- Define New Server interface ---
-func NewServer(handler ServerInterface, opts ...streamxserver.ServerOption) (streamxserver.Server, error) {
-	var options []streamxserver.ServerOption
-	options = append(options, opts...)
-
-	sp, err := ttstream.NewServerProvider(serviceInfo)
-	if err != nil {
-		return nil, err
-	}
-	options = append(options, streamxserver.WithProvider(sp))
-	svr := streamxserver.NewServer(options...)
-	if err := svr.RegisterService(serviceInfo, handler); err != nil {
-		return nil, err
-	}
-	return svr, nil
-}
-
 // --- Define Server Implementation Interface ---
-type ServerInterface interface {
+type PingPongServerInterface interface {
+	PingPong(ctx context.Context, req *Request) (*Response, error)
+}
+type StreamingServerInterface interface {
 	Unary(ctx context.Context, req *Request) (*Response, error)
 	ClientStream(ctx context.Context, stream ClientStreamingServer[Request, Response]) (*Response, error)
 	ServerStream(ctx context.Context, req *Request, stream ServerStreamingServer[Response]) error
@@ -113,7 +144,11 @@ type ServerInterface interface {
 }
 
 // --- Define Client Implementation Interface ---
-type ClientInterface interface {
+type PingPongClientInterface interface {
+	PingPong(ctx context.Context, req *Request) (r *Response, err error)
+}
+
+type StreamingClientInterface interface {
 	Unary(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (r *Response, err error)
 	ClientStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
 		stream ClientStreamingClient[Request, Response], err error)
@@ -124,17 +159,28 @@ type ClientInterface interface {
 }
 
 // --- Define Client Implementation ---
-
-var _ ClientInterface = (*kClient)(nil)
+var _ StreamingClientInterface = (*kClient)(nil)
+var _ PingPongClientInterface = (*kClient)(nil)
 
 type kClient struct {
-	streamxclient.Client
+	caller   client.Client
+	streamer streamxclient.Client
+}
+
+func (c *kClient) PingPong(ctx context.Context, req *Request) (r *Response, err error) {
+	var _args ServerPingPongArgs
+	_args.Req = req
+	var _result ServerPingPongResult
+	if err = c.caller.Call(ctx, "PingPong", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
 }
 
 func (c *kClient) Unary(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (*Response, error) {
 	res := new(Response)
 	_, err := streamxclient.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
-		ctx, c.Client, serviceinfo.StreamingUnary, "Unary", req, res, callOptions...)
+		ctx, c.streamer, serviceinfo.StreamingUnary, "Unary", req, res, callOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -143,17 +189,17 @@ func (c *kClient) Unary(ctx context.Context, req *Request, callOptions ...stream
 
 func (c *kClient) ClientStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (stream ClientStreamingClient[Request, Response], err error) {
 	return streamxclient.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
-		ctx, c.Client, serviceinfo.StreamingClient, "ClientStream", nil, nil, callOptions...)
+		ctx, c.streamer, serviceinfo.StreamingClient, "ClientStream", nil, nil, callOptions...)
 }
 
 func (c *kClient) ServerStream(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (
 	stream ServerStreamingClient[Response], err error) {
 	return streamxclient.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
-		ctx, c.Client, serviceinfo.StreamingServer, "ServerStream", req, nil, callOptions...)
+		ctx, c.streamer, serviceinfo.StreamingServer, "ServerStream", req, nil, callOptions...)
 }
 
 func (c *kClient) BidiStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
 	stream BidiStreamingClient[Request, Response], err error) {
 	return streamxclient.InvokeStream[ttstream.Header, ttstream.Trailer, Request, Response](
-		ctx, c.Client, serviceinfo.StreamingBidirectional, "BidiStream", nil, nil, callOptions...)
+		ctx, c.streamer, serviceinfo.StreamingBidirectional, "BidiStream", nil, nil, callOptions...)
 }

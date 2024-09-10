@@ -3,11 +3,12 @@ package ttstream
 import (
 	"context"
 	"errors"
+	"log"
+	"sync/atomic"
+
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/streamx"
-	"log"
-	"sync/atomic"
 )
 
 var (
@@ -52,7 +53,7 @@ func (s *stream) Mode() streamx.StreamingMode {
 	return s.mode
 }
 
-func (s *stream) ServiceName() string {
+func (s *stream) Service() string {
 	if len(s.header) == 0 {
 		return ""
 	}

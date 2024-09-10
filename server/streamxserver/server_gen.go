@@ -3,9 +3,10 @@ package streamxserver
 import (
 	"context"
 	"errors"
+	"reflect"
+
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/streamx"
-	"reflect"
 )
 
 func InvokeStream[Header, Trailer, Req, Res any](
@@ -30,7 +31,7 @@ func InvokeStream[Header, Trailer, Req, Res any](
 		if err != nil {
 			return err
 		}
-		reqArgs.(streamx.StreamReqArgs).SetReq(req)
+		reqArgs.SetReq(req)
 	default:
 	}
 
@@ -91,5 +92,5 @@ func InvokeStream[Header, Trailer, Req, Res any](
 			}
 			return nil
 		},
-	)(ctx, sArgs, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
+	)(ctx, sArgs, reqArgs, resArgs)
 }

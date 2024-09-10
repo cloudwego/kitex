@@ -5,19 +5,20 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"io"
 	"net"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 func TestCodec(t *testing.T) {
 	var buf bytes.Buffer
 	writer := bufio.NewWriter(&buf)
-	f1 := newFrame(0, 1, "test", []byte("12345"))
+	f1 := newFrame(0, 1, "a.b.c", "test", []byte("12345"))
 	err := EncodeFrame(writer, f1)
 	test.Assert(t, err == nil, err)
 	_ = writer.Flush()
@@ -51,7 +52,7 @@ func TestTransport(t *testing.T) {
 		Extra: map[string]interface{}{"streaming": true},
 	}
 
-	addr := "127.0.0.1:12345"
+	var addr = test.GetLocalAddress()
 	ln, err := net.Listen("tcp", addr)
 	test.Assert(t, err == nil, err)
 

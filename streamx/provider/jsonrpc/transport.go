@@ -3,13 +3,14 @@ package jsonrpc
 import (
 	"errors"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/netpoll"
 	"io"
 	"log"
 	"net"
 	"sync"
 	"sync/atomic"
+
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/netpoll"
 )
 
 type transport struct {
@@ -53,7 +54,7 @@ func (t *transport) close() (err error) {
 }
 
 func (t *transport) streamSend(s *stream, payload []byte) (err error) {
-	f := newFrame(frameTypeData, s.id, s.method, payload)
+	f := newFrame(frameTypeData, s.id, s.service, s.method, payload)
 	t.wch <- f
 	return nil
 }
@@ -78,7 +79,7 @@ func (t *transport) loopRead() error {
 		switch frame.typ {
 		case frameTypeMeta: // new stream
 			smode := t.sinfo.MethodInfo(frame.method).StreamingMode()
-			s := newStream(t, frame.sid, smode, frame.method)
+			s := newStream(t, frame.sid, smode, frame.service, frame.method)
 			t.streams.Store(s.id, s)
 			t.rch[s.id] = make(chan Frame, 1024)
 			t.sch <- s
@@ -119,8 +120,9 @@ var clientStreamID uint32
 func (t *transport) newStream(method string) (*stream, error) {
 	sid := int(atomic.AddUint32(&clientStreamID, 1))
 	smode := t.sinfo.MethodInfo(method).StreamingMode()
-	f := newFrame(frameTypeMeta, sid, method, []byte{})
-	s := newStream(t, sid, smode, method)
+	service := t.sinfo.ServiceName
+	f := newFrame(frameTypeMeta, sid, service, method, []byte{})
+	s := newStream(t, sid, smode, service, method)
 	t.streams.Store(s.id, s)
 	t.rch[s.id] = make(chan Frame, 1024)
 	t.wch <- f // create stream
@@ -136,7 +138,7 @@ func (t *transport) streamCloseRecv(s *stream) (err error) {
 }
 
 func (t *transport) streamCloseSend(s *stream) (err error) {
-	f := newFrame(frameTypeEOF, s.id, s.method, []byte("EOF"))
+	f := newFrame(frameTypeEOF, s.id, s.service, s.method, []byte("EOF"))
 	t.wch <- f
 	return nil
 }

@@ -3,23 +3,24 @@ package jsonrpc_test
 import (
 	"context"
 	"errors"
-	"github.com/cloudwego/kitex/client/streamxclient"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/server/streamxserver"
-	"github.com/cloudwego/kitex/streamx"
-	"github.com/cloudwego/netpoll"
 	"io"
 	"log"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/kitex/client/streamxclient"
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/server/streamxserver"
+	"github.com/cloudwego/kitex/streamx"
+	"github.com/cloudwego/kitex/streamx/provider/jsonrpc"
+	"github.com/cloudwego/netpoll"
 )
 
-const testAddr = "127.0.0.1:12345"
-
 func TestJSONRPC(t *testing.T) {
-	ln, err := netpoll.CreateListener("tcp", testAddr)
+	var addr = test.GetLocalAddress()
+	ln, err := netpoll.CreateListener("tcp", addr)
 	test.Assert(t, err == nil, err)
 
 	// create server
@@ -31,9 +32,11 @@ func TestJSONRPC(t *testing.T) {
 		}
 	}
 	methodCount := map[string]int{}
-	svr, err := NewServer(
-		new(serviceImpl),
-		streamxserver.WithListener(ln),
+	sp, err := jsonrpc.NewServerProvider(serviceInfo)
+	test.Assert(t, err == nil, err)
+	svr := streamxserver.NewServer(streamxserver.WithListener(ln))
+	err = svr.RegisterService(serviceInfo, new(serviceImpl),
+		streamxserver.WithProvider(sp),
 		streamxserver.WithStreamMiddleware(
 			// middleware example: server streaming mode
 			func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
@@ -91,13 +94,12 @@ func TestJSONRPC(t *testing.T) {
 	ctx := context.Background()
 	cli, err := NewClient(
 		"a.b.c",
-		streamxclient.WithHostPorts(testAddr),
-		//streamxclient.WithStreamRecvMiddleware(func(next streamx.StreamRecvEndpoint) streamx.StreamRecvEndpoint {
-		//	return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
-		//		log.Println("xxx")
-		//		return next(ctx, stream, res)
-		//	}
-		//}),
+		streamxclient.WithHostPorts(addr),
+		streamxclient.WithStreamRecvMiddleware(func(next streamx.StreamRecvEndpoint) streamx.StreamRecvEndpoint {
+			return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
+				return next(ctx, stream, res)
+			}
+		}),
 		streamxclient.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 			return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
 				log.Printf("Client middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",

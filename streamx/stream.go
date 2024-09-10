@@ -2,6 +2,7 @@ package streamx
 
 import (
 	"context"
+
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -68,6 +69,7 @@ const (
 
 type Stream interface {
 	Mode() StreamingMode
+	Service() string
 	Method() string
 	SendMsg(ctx context.Context, m any) error
 	RecvMsg(ctx context.Context, m any) error

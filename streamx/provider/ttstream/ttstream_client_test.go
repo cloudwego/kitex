@@ -3,11 +3,6 @@ package ttstream_test
 import (
 	"context"
 	"errors"
-	"github.com/cloudwego/kitex/client/streamxclient"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/server/streamxserver"
-	"github.com/cloudwego/kitex/streamx"
-	"github.com/cloudwego/netpoll"
 	"io"
 	"log"
 	"net/http"
@@ -17,6 +12,17 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/kitex/client"
+	"github.com/cloudwego/kitex/client/streamxclient"
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/server"
+	"github.com/cloudwego/kitex/server/streamxserver"
+	"github.com/cloudwego/kitex/streamx"
+	"github.com/cloudwego/kitex/streamx/provider/ttstream"
+	"github.com/cloudwego/kitex/transport"
+	"github.com/cloudwego/netpoll"
 )
 
 func TestTTHeaderStreaming(t *testing.T) {
@@ -24,7 +30,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	const addr = "127.0.0.1:12345"
+	var addr = test.GetLocalAddress()
 	ln, err := netpoll.CreateListener("tcp", addr)
 	test.Assert(t, err == nil, err)
 	defer ln.Close()
@@ -40,9 +46,17 @@ func TestTTHeaderStreaming(t *testing.T) {
 	methodCount := map[string]int{}
 	serverRecvCount := map[string]int{}
 	serverSendCount := map[string]int{}
-	svr, err := NewServer(
-		new(serviceImpl),
-		streamxserver.WithListener(ln),
+	svr := server.NewServer(server.WithListener(ln))
+	// register pingpong service
+	err = svr.RegisterService(pingpongServiceInfo, new(pingpongService))
+	test.Assert(t, err == nil, err)
+	// register streamingService as ttstreaam provider
+	sp, err := ttstream.NewServerProvider(streamingServiceInfo)
+	test.Assert(t, err == nil, err)
+	err = svr.RegisterService(
+		streamingServiceInfo,
+		new(streamingService),
+		streamxserver.WithProvider(sp),
 		streamxserver.WithStreamRecvMiddleware(func(next streamx.StreamRecvEndpoint) streamx.StreamRecvEndpoint {
 			return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
 				err = next(ctx, stream, res)
@@ -122,8 +136,15 @@ func TestTTHeaderStreaming(t *testing.T) {
 	test.WaitServerStart(addr)
 
 	// create client
-	cli, err := NewClient(
-		"a.b.c",
+	pingpongClient, err := NewPingPongClient(
+		"kitex.service.pingpong",
+		client.WithHostPorts(addr),
+		client.WithTransportProtocol(transport.TTHeaderFramed),
+		client.WithPayloadCodec(thrift.NewThriftCodecWithConfig(thrift.FastRead|thrift.FastWrite|thrift.EnableSkipDecoder)),
+	)
+	test.Assert(t, err == nil, err)
+	streamClient, err := NewStreamingClient(
+		"kitex.service.streaming",
 		streamxclient.WithHostPorts(addr),
 		streamxclient.WithStreamRecvMiddleware(func(next streamx.StreamRecvEndpoint) streamx.StreamRecvEndpoint {
 			return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
@@ -176,11 +197,18 @@ func TestTTHeaderStreaming(t *testing.T) {
 	ctx := context.Background()
 	ctx = SetMetadata(ctx)
 
-	t.Logf("=== Unary ===")
+	t.Logf("=== PingPong ===")
 	req := new(Request)
+	req.Message = "PingPong"
+	res, err := pingpongClient.PingPong(ctx, req)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, req.Message == res.Message, res)
+
+	t.Logf("=== Unary ===")
+	req = new(Request)
 	req.Type = 10000
 	req.Message = "Unary"
-	res, err := cli.Unary(ctx, req)
+	res, err = streamClient.Unary(ctx, req)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, req.Type == res.Type, res.Type)
 	test.Assert(t, req.Message == res.Message, res.Message)
@@ -192,7 +220,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 	// client stream
 	round := 5
 	t.Logf("=== ClientStream ===")
-	cs, err := cli.ClientStream(ctx)
+	cs, err := streamClient.ClientStream(ctx)
 	test.Assert(t, err == nil, err)
 	for i := 0; i < round; i++ {
 		req := new(Request)
@@ -216,7 +244,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 	t.Logf("=== ServerStream ===")
 	req = new(Request)
 	req.Message = "ServerStream"
-	ss, err := cli.ServerStream(ctx, req)
+	ss, err := streamClient.ServerStream(ctx, req)
 	test.Assert(t, err == nil, err)
 	// server stream recv header
 	hd, err := ss.Header()
@@ -252,7 +280,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 	// bidi stream
 	round = 5
 	t.Logf("=== BidiStream ===")
-	bs, err := cli.BidiStream(ctx)
+	bs, err := streamClient.BidiStream(ctx)
 	test.Assert(t, err == nil, err)
 	msg := "BidiStream"
 	var wg sync.WaitGroup
@@ -290,7 +318,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 	bs = nil
 	runtime.GC()
 
-	cli = nil
+	streamClient = nil
 	//for {
 	//	time.Sleep(time.Second)
 	//	runtime.GC()

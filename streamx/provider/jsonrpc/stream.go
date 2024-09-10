@@ -2,9 +2,10 @@ package jsonrpc
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/streamx"
 	"log"
 	"sync/atomic"
+
+	"github.com/cloudwego/kitex/streamx"
 )
 
 var (
@@ -14,10 +15,11 @@ var (
 	_ streamx.ServerStreamMetadata[Header, Trailer] = (*serverStream)(nil)
 )
 
-func newStream(trans *transport, sid int, mode streamx.StreamingMode, method string) (s *stream) {
+func newStream(trans *transport, sid int, mode streamx.StreamingMode, service, method string) (s *stream) {
 	s = new(stream)
 	s.id = sid
 	s.mode = mode
+	s.service = service
 	s.method = method
 	s.trans = trans
 	return s
@@ -26,8 +28,8 @@ func newStream(trans *transport, sid int, mode streamx.StreamingMode, method str
 type stream struct {
 	id      int
 	mode    streamx.StreamingMode
+	service string
 	method  string
-	eof     int32 // eof handshake, 1: wait for EOF ack 2: eof hand shacked
 	selfEOF int32
 	peerEOF int32
 	trans   *transport
@@ -43,6 +45,10 @@ func (s *stream) Trailer() (Trailer, error) {
 
 func (s *stream) Mode() streamx.StreamingMode {
 	return s.mode
+}
+
+func (s *stream) Service() string {
+	return s.service
 }
 
 func (s *stream) Method() string {

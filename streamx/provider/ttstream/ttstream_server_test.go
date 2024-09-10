@@ -6,15 +6,22 @@ import (
 	"log"
 )
 
-type serviceImpl struct{}
+type pingpongService struct{}
+type streamingService struct{}
 
-func (si *serviceImpl) Unary(ctx context.Context, req *Request) (*Response, error) {
+func (si *pingpongService) PingPong(ctx context.Context, req *Request) (*Response, error) {
+	resp := &Response{Type: req.Type, Message: req.Message}
+	log.Printf("Server PingPong: req={%v} resp={%v}", req, resp)
+	return resp, nil
+}
+
+func (si *streamingService) Unary(ctx context.Context, req *Request) (*Response, error) {
 	resp := &Response{Type: req.Type, Message: req.Message}
 	log.Printf("Server Unary: req={%v} resp={%v}", req, resp)
 	return resp, nil
 }
 
-func (si *serviceImpl) ClientStream(ctx context.Context, stream ClientStreamingServer[Request, Response]) (res *Response, err error) {
+func (si *streamingService) ClientStream(ctx context.Context, stream ClientStreamingServer[Request, Response]) (res *Response, err error) {
 	var msg string
 	defer log.Printf("Server ClientStream end")
 	for {
@@ -32,7 +39,7 @@ func (si *serviceImpl) ClientStream(ctx context.Context, stream ClientStreamingS
 	}
 }
 
-func (si *serviceImpl) ServerStream(ctx context.Context, req *Request, stream ServerStreamingServer[Response]) error {
+func (si *streamingService) ServerStream(ctx context.Context, req *Request, stream ServerStreamingServer[Response]) error {
 	log.Printf("Server ServerStream: req={%v}", req)
 
 	_ = stream.SetHeader(map[string]string{"key1": "val1"})
@@ -53,7 +60,7 @@ func (si *serviceImpl) ServerStream(ctx context.Context, req *Request, stream Se
 	return nil
 }
 
-func (si *serviceImpl) BidiStream(ctx context.Context, stream BidiStreamingServer[Request, Response]) error {
+func (si *streamingService) BidiStream(ctx context.Context, stream BidiStreamingServer[Request, Response]) error {
 	for {
 		req, err := stream.Recv(ctx)
 		if err == io.EOF {

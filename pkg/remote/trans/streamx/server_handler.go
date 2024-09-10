@@ -19,16 +19,16 @@ package streamx
 import (
 	"context"
 	"errors"
-	"github.com/cloudwego/kitex/pkg/endpoint"
-	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/transport"
 	"io"
 	"log"
 	"net"
 	"runtime/debug"
-	"sync"
+
+	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/streamx"
 )
 
 /* 实际上 remote.ServerTransHandler 真正被 trans_server.go 使用的接口只有：
@@ -41,26 +41,20 @@ import (
 其他接口实际上最终是用来去组装了 transpipeline ....
 */
 
-type svrTransHandlerFactory struct{}
+type svrTransHandlerFactory struct {
+	provider streamx.ServerProvider
+}
 
 // NewSvrTransHandlerFactory ...
-func NewSvrTransHandlerFactory() remote.ServerTransHandlerFactory {
-	return &svrTransHandlerFactory{}
+func NewSvrTransHandlerFactory(provider streamx.ServerProvider) remote.ServerTransHandlerFactory {
+	sp := streamx.NewServerProvider(provider) // wrapped server provider
+	return &svrTransHandlerFactory{provider: sp}
 }
 
 func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remote.ServerTransHandler, error) {
-	return newSvrTransHandler(opt)
-}
-
-func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
-	sp, ok := opt.Provider.(ServerProvider)
-	if !ok {
-		return nil, nil
-	}
-	sp = NewServerProvider(sp) // wrapped server provider
 	return &svrTransHandler{
 		opt:      opt,
-		provider: sp,
+		provider: f.provider,
 	}, nil
 }
 
@@ -68,11 +62,9 @@ var _ remote.ServerTransHandler = &svrTransHandler{}
 var errProtocolNotMatch = errors.New("protocol not match")
 
 type svrTransHandler struct {
-	opt         *remote.ServerOption
-	provider    ServerProvider
-	inkHdlFunc  endpoint.Endpoint
-	svcSearcher remote.ServiceSearcher
-	streamMap   sync.Map
+	opt        *remote.ServerOption
+	provider   streamx.ServerProvider
+	inkHdlFunc endpoint.Endpoint
 }
 
 func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
@@ -125,17 +117,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 // - create  server stream
 // - process server stream
 // - close   server stream
-func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss ServerStream) (err error) {
+func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss streamx.ServerStream) (err error) {
 	// inkHdlFunc 包含了所有中间件 + 用户 serviceInfo.methodHandler
 	// 这里 streamx 依然会复用原本的 server endpoint.Endpoint 中间件，因为他们都不会单独去取 req/res 的值
 	// 无法在保留现有 streaming 功能的情况下，彻底弃用 endpoint.Endpoint , 所以这里依然使用 endpoint 接口
 	// 但是对用户 API ，做了单独的封装。把这部分脏逻辑仅暴露在框架中。
-	method := ss.Method()
-	//minfo := t.opt.TargetSvcInfo.Methods[method]
-	//args := minfo.NewArgs()
-	//result := minfo.NewResult()
-	sargs := NewStreamArgs(ss)
-	ctx = WithStreamArgsContext(ctx, sargs)
+	sargs := streamx.NewStreamArgs(ss)
+	ctx = streamx.WithStreamArgsContext(ctx, sargs)
 
 	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
@@ -147,14 +135,12 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss Server
 	}()
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
-	ink.SetServiceName(t.opt.TargetSvcInfo.ServiceName)
-	ink.SetMethodName(method)
+	ink.SetServiceName(ss.Service())
+	ink.SetMethodName(ss.Method())
 	if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
-		_ = mutableTo.SetMethod(method)
+		_ = mutableTo.SetMethod(ss.Method())
 	}
-
-	// set grpc transport flag before execute metahandler
-	_ = rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(transport.JSONRPC)
+	//_ = rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(transport.JSONRPC)
 
 	ctx = t.startTracer(ctx, ri)
 	defer func() {
@@ -172,8 +158,8 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss Server
 		t.finishTracer(ctx, ri, err, panicErr)
 	}()
 
-	reqArgs := NewStreamReqArgs(nil)
-	resArgs := NewStreamResArgs(nil)
+	reqArgs := streamx.NewStreamReqArgs(nil)
+	resArgs := streamx.NewStreamResArgs(nil)
 	// server handler (which will call streamxserver.InvokeStream inside)
 	serr := t.inkHdlFunc(ctx, reqArgs, resArgs)
 	ctx, err = t.provider.OnStreamFinish(ctx, ss)

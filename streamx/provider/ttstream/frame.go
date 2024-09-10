@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"log"
+
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
-	"log"
 )
 
 const (

@@ -2,6 +2,7 @@ package jsonrpc_test
 
 import (
 	"context"
+
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -66,8 +67,8 @@ var serviceInfo = &serviceinfo.ServiceInfo{
 	Extra: map[string]interface{}{"streaming": true},
 }
 
-func NewClient(destService string, opts ...streamxclient.ClientOption) (ClientInterface, error) {
-	var options []streamxclient.ClientOption
+func NewClient(destService string, opts ...streamxclient.Option) (ClientInterface, error) {
+	var options []streamxclient.Option
 	options = append(options, streamxclient.WithDestService(destService))
 	options = append(options, opts...)
 	cp, err := jsonrpc.NewClientProvider(serviceInfo)
@@ -83,17 +84,15 @@ func NewClient(destService string, opts ...streamxclient.ClientOption) (ClientIn
 	return kc, nil
 }
 
-func NewServer(handler ServerInterface, opts ...streamxserver.ServerOption) (streamxserver.Server, error) {
-	var options []streamxserver.ServerOption
+func NewServer(handler ServerInterface, opts ...streamxserver.Option) (streamxserver.Server, error) {
+	var options []streamxserver.Option
 	options = append(options, opts...)
-
 	sp, err := jsonrpc.NewServerProvider(serviceInfo)
 	if err != nil {
 		return nil, err
 	}
-	options = append(options, streamxserver.WithProvider(sp))
 	svr := streamxserver.NewServer(options...)
-	if err := svr.RegisterService(serviceInfo, handler); err != nil {
+	if err := svr.RegisterService(serviceInfo, handler, streamxserver.WithProvider(sp)); err != nil {
 		return nil, err
 	}
 	return svr, nil
