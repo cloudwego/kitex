@@ -62,7 +62,6 @@ func (s *tInvoker) Init() (err error) {
 	if len(s.server.svcs.svcMap) == 0 {
 		return errors.New("run: no service. Use RegisterService to set one")
 	}
-	s.buildFullInvokeChain()
 	s.initBasicRemoteOption()
 	// for server trans info handler
 	if len(s.server.opt.MetaHandlers) > 0 {

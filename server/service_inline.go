@@ -76,6 +76,9 @@ func (s *server) constructServerRPCInfo(svrCtx context.Context, cliRPCInfo rpcin
 }
 
 func (s *server) BuildServiceInlineInvokeChain() endpoint.Endpoint {
+	// service inline will not call server.Run, so we should init server here
+	s.init()
+
 	svrTraceCtl := s.opt.TracerCtl
 	if svrTraceCtl == nil {
 		svrTraceCtl = &rpcinfo.TraceController{}
@@ -126,6 +129,7 @@ func (s *server) BuildServiceInlineInvokeChain() endpoint.Endpoint {
 		}
 	}
 	mws := []endpoint.Middleware{mw}
-	mws = append(mws, s.mws...)
+	smws := s.buildMiddlewares(context.Background())
+	mws = append(mws, smws...)
 	return endpoint.Chain(mws...)(innerHandlerEp)
 }
