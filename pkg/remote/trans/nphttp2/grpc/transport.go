@@ -497,9 +497,12 @@ func CreateStream(ctx context.Context, id uint32, requestRead func(i int), metho
 		windowHandler: func(i int) {},
 	}
 
+	ctx, cancelFunc := context.WithCancel(ctx)
+	ctx, cancel := newContextWithCancelReason(ctx, cancelFunc)
 	stream := &Stream{
 		id:          id,
 		ctx:         ctx,
+		cancel:      cancel,
 		method:      method,
 		buf:         recvBuffer,
 		trReader:    trReader,
@@ -762,7 +765,8 @@ func (e ConnectionError) Origin() error {
 
 var (
 	// ErrConnClosing indicates that the transport is closing.
-	ErrConnClosing = connectionErrorf(true, nil, "transport is closing")
+	ErrConnClosing       = connectionErrorf(true, nil, "transport is closing")
+	statusErrConnClosing = status.Err(codes.Unavailable, ErrConnClosing.Desc)
 
 	// errStreamDone is returned from write at the client side to indicate application
 	// layer of an error.

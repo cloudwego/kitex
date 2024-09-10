@@ -599,6 +599,13 @@ func (t *http2Client) closeStream(s *Stream, err error, rst bool, rstCode http2.
 // re-connected. This happens because t.onClose() begins reconnect logic at the
 // addrConn level and blocks until the addrConn is successfully connected.
 func (t *http2Client) Close(err error) error {
+	if err != nil {
+		if connErr, ok := err.(ConnectionError); ok {
+			err = status.Err(codes.Unavailable, connErr.Desc)
+		} else {
+			err = status.Err(codes.Unavailable, err.Error())
+		}
+	}
 	t.mu.Lock()
 	// Make sure we only Close once.
 	if t.state == closing {
@@ -619,6 +626,7 @@ func (t *http2Client) Close(err error) error {
 		t.kpDormancyCond.Signal()
 	}
 	t.mu.Unlock()
+	// t.controlBuf.finish(err)
 	t.controlBuf.finish()
 	t.cancel()
 	cErr := t.conn.Close()
@@ -658,10 +666,10 @@ func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	if opts.Last {
 		// If it's the last message, update stream state.
 		if !s.compareAndSwapState(streamActive, streamWriteDone) {
-			return errStreamDone
+			return s.status.Err()
 		}
 	} else if s.getState() != streamActive {
-		return errStreamDone
+		return s.status.Err()
 	}
 	df := newDataFrame()
 	df.streamID = s.id
@@ -672,10 +680,17 @@ func (t *http2Client) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	df.originD = df.d
 	if hdr != nil || data != nil { // If it's not an empty data frame, check quota.
 		if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
-			return err
+			// when writeQuota returns error, the stream is done
+			// we can retrieve the status safely
+			return s.status.Err()
 		}
 	}
+	if err := t.controlBuf.put(df); err != nil {
+		// transport is closed
+		return statusErrConnClosing
+	}
 	return t.controlBuf.put(df)
+	return nil
 }
 
 func (t *http2Client) getStream(f http2.Frame) *Stream {

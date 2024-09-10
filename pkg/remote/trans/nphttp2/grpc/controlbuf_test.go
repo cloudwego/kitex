@@ -71,5 +71,6 @@ func TestControlBuf(t *testing.T) {
 	cb.throttle()
 
 	// test finish()
+	// cb.finish(nil)
 	cb.finish()
 }

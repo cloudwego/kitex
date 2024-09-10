@@ -451,11 +451,35 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 		select {
 		case <-c.ch:
 		case <-c.done:
+			// c.finish(ErrConnClosing)
+			// return nil, c.err
 			c.finish()
 			return nil, ErrConnClosing
 		}
 	}
 }
+
+//func (c *controlBuffer) finish(reason error) {
+//	c.mu.Lock()
+//	if c.err != nil {
+//		c.mu.Unlock()
+//		return
+//	}
+//	c.err = reason
+//	// There may be headers for streams in the control buffer.
+//	// These streams need to be cleaned out since the transport
+//	// is still not aware of these yet.
+//	for head := c.list.dequeueAll(); head != nil; head = head.next {
+//		hdr, ok := head.it.(*headerFrame)
+//		if !ok {
+//			continue
+//		}
+//		if hdr.onOrphaned != nil { // It will be nil on the server-side.
+//			hdr.onOrphaned(ErrConnClosing)
+//		}
+//	}
+//	c.mu.Unlock()
+//}
 
 func (c *controlBuffer) finish() {
 	c.mu.Lock()
@@ -927,7 +951,9 @@ func (l *loopyWriter) processData() (bool, error) {
 	}
 	// Compute how much of the header and data we can send within quota and max frame length
 	hSize := min(maxSize, len(dataItem.h))
+	fmt.Printf("previous hSize: %d\n", hSize)
 	dSize := min(maxSize-hSize, len(dataItem.d))
+	fmt.Printf("previous dSize: %d\n", dSize)
 	if hSize != 0 {
 		if dSize == 0 {
 			buf = dataItem.h
@@ -960,7 +986,12 @@ func (l *loopyWriter) processData() (bool, error) {
 	}
 	str.bytesOutStanding += size
 	l.sendQuota -= uint32(size)
+	fmt.Printf("h len: %d h size: %d\n", len(dataItem.h), hSize)
 	dataItem.h = dataItem.h[hSize:]
+	if len(dataItem.d) < dSize {
+		fmt.Println("small")
+	}
+	fmt.Printf("d len: %d d size: %d\n", len(dataItem.d), dSize)
 	dataItem.d = dataItem.d[dSize:]
 
 	if len(dataItem.h) == 0 && len(dataItem.d) == 0 { // All the data from that message was written out.
