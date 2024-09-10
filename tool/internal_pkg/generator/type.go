@@ -232,6 +232,7 @@ var funcs = map[string]interface{}{
 	"HasFeature":    HasFeature,
 	"FilterImports": FilterImports,
 	"backquoted":    BackQuoted,
+	"ToString":      util.ToString,
 }
 
 func AddTemplateFunc(key string, f interface{}) {

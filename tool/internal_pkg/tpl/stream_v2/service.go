@@ -14,7 +14,7 @@ import (
 		{{- end}}
 	{{- end}}
 )
-{{- $protocol := .Protocol}}
+{{- $protocol := .Protocol | ToString | ToLower}}
 
 var serviceInfo = &serviceinfo.ServiceInfo{
     ServiceName: "{{.RawServiceName}}",
@@ -24,6 +24,7 @@ var serviceInfo = &serviceinfo.ServiceInfo{
         {{- $clientSide := and .ClientStreaming (not .ServerStreaming)}}
         {{- $serverSide := and (not .ClientStreaming) .ServerStreaming}}
         {{- $bidiSide := and .ClientStreaming .ServerStreaming}}
+        {{- $arg := index .Args 0}}
         {{- $mode := ""}}
             {{- if $bidiSide -}} {{- $mode = "serviceinfo.StreamingBidirectional" }}
             {{- else if $serverSide -}} {{- $mode = "serviceinfo.StreamingServer" }}
@@ -32,13 +33,13 @@ var serviceInfo = &serviceinfo.ServiceInfo{
             {{- end}}
 		"{{.RawName}}": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamx.ServerInvoke[{{$protocol}}.Header, {{$protocol}}.Trailer, {{.PkgRefName}}.{{.ArgStructName}}, {{.PkgRefName}}.{{.ResStructName}}](
-					ctx, {{$mode}}, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
+				return streamxserver.InvokeStream[{{$protocol}}.Header, {{$protocol}}.Trailer, {{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
+					ctx, {{$mode}}, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
 			},
 			nil,
 			nil,
 			false,
-			serviceinfo.NewStreamingMode({{$mode}}),
+			serviceinfo.WithStreamingMode({{$mode}}),
 		),
         {{- end}}
     },

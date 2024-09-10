@@ -14,10 +14,11 @@ import (
 		{{- end}}
 	{{- end}}
 )
+{{- $protocol := .Protocol | ToString | ToLower}}
 
-type ClientStreamingServer[Req, Res any] streamx.ClientStreamingServer[{{.Protocol}}.Header, {{.Protocol}}.Trailer, Req, Res]
-type ServerStreamingServer[Res any] streamx.ServerStreamingServer[{{.Protocol}}.Header, {{.Protocol}}.Trailer, Res]
-type BidiStreamingServer[Req, Res any] streamx.BidiStreamingServer[{{.Protocol}}.Header, {{.Protocol}}.Trailer, Req, Res]
+type ClientStreamingServer[Req, Res any] streamx.ClientStreamingServer[{{$protocol}}.Header, {{$protocol}}.Trailer, Req, Res]
+type ServerStreamingServer[Res any] streamx.ServerStreamingServer[{{$protocol}}.Header, {{$protocol}}.Trailer, Res]
+type BidiStreamingServer[Req, Res any] streamx.BidiStreamingServer[{{$protocol}}.Header, {{$protocol}}.Trailer, Req, Res]
 
 type ServerInterface interface {
 {{- range .AllMethods}}
@@ -38,7 +39,7 @@ func NewServer(handler ServerInterface, opts ...streamxserver.ServerOption) (str
 	var options []streamxserver.ServerOption
 	options = append(options, opts...)
 
-	sp, err := {{.Protocol}}.NewServerProvider(serviceInfo)
+	sp, err := {{$protocol}}.NewServerProvider(serviceInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -48,5 +49,9 @@ func NewServer(handler ServerInterface, opts ...streamxserver.ServerOption) (str
 		return nil, err
 	}
 	return svr, nil
+}
+
+func RegisterService(svr server.Server, handler {{call .ServiceTypeName}}, opts ...server.RegisterOption) error {
+	return svr.RegisterService(serviceInfo, handler, opts...)
 }
 `
