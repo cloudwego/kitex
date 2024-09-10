@@ -18,7 +18,6 @@ package nphttp2
 
 import (
 	"context"
-	"io"
 	"net"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -63,20 +62,7 @@ func (h *cliTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.M
 	if err = h.codec.Encode(ctx, msg, buf); err != nil {
 		return ctx, err
 	}
-	if err = buf.Flush(); err != nil {
-		if err != nil {
-			ri := rpcinfo.GetRPCInfo(ctx)
-			if isClientStreaming(ri, h.opt.SvcInfo) {
-				// For ClientStreaming or BidiStreaming, when Stream.SendMsg returns err,
-				// users should always call RecvMsg to get the exact error
-				err = io.EOF
-			}
-			// For ServerStreaming or Unary, Stream.RecvMsg is required to be called,
-			// so we set it to nil
-			err = nil
-		}
-	}
-	return ctx, err
+	return ctx, buf.Flush()
 }
 
 func (h *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
