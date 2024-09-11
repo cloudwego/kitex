@@ -7,6 +7,7 @@ import (
 	"log"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -31,6 +32,7 @@ type transport struct {
 }
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
+	_ = conn.SetDeadline(time.Now().Add(time.Hour))
 	reader := bufiox.NewDefaultReader(conn)
 	writer := bufiox.NewDefaultWriter(conn)
 	t := &transport{
@@ -86,12 +88,20 @@ func (t *transport) loopRead() error {
 
 		switch fr.typ {
 		case metaFrameType:
+			sio, ok := t.loadStreamIO(fr.sid)
+			if !ok {
+				return fmt.Errorf("transport[%d] read a unknown stream meta: sid=%d", t.kind, fr.sid)
+			}
+			err = sio.stream.readMetaFrame(fr.meta, fr.header, fr.payload)
+			if err != nil {
+				return err
+			}
 		case headerFrameType:
 			switch t.kind {
 			case serverTransport:
 				// Header Frame: server recv a new stream
 				smode := t.sinfo.MethodInfo(fr.method).StreamingMode()
-				s := newStream(t, smode, fr.streamMeta)
+				s := newStream(t, smode, fr.streamFrame)
 				log.Printf("transport[%d] read a new stream: sid=%d", t.kind, s.sid)
 				t.sch <- s
 			case clientTransport:
@@ -174,19 +184,19 @@ func (t *transport) streamSend(sid int32, method string, wheader Header, payload
 			return err
 		}
 	}
-	f := newFrame(streamMeta{sid: sid, method: method}, dataFrameType, payload)
+	f := newFrame(streamFrame{sid: sid, method: method}, dataFrameType, payload)
 	t.wch <- f
 	return nil
 }
 
 func (t *transport) streamSendHeader(sid int32, method string, header Header) (err error) {
-	f := newFrame(streamMeta{sid: sid, method: method, header: header}, headerFrameType, []byte{})
+	f := newFrame(streamFrame{sid: sid, method: method, header: header}, headerFrameType, []byte{})
 	t.wch <- f
 	return nil
 }
 
 func (t *transport) streamSendTrailer(sid int32, method string, trailer Trailer) (err error) {
-	f := newFrame(streamMeta{sid: sid, method: method, trailer: trailer}, trailerFrameType, []byte{})
+	f := newFrame(streamFrame{sid: sid, method: method, trailer: trailer}, trailerFrameType, []byte{})
 	t.wch <- f
 	return nil
 }
@@ -223,13 +233,14 @@ var clientStreamID int32
 
 // newStream create new stream on current connection
 // it's typically used by client side
-func (t *transport) newStream(ctx context.Context, method string, header map[string]string) (*stream, error) {
+func (t *transport) newStream(
+	ctx context.Context, method string, header map[string]string) (*stream, error) {
 	if t.kind != clientTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
 	sid := atomic.AddInt32(&clientStreamID, 1)
 	smode := t.sinfo.MethodInfo(method).StreamingMode()
-	smeta := streamMeta{
+	smeta := streamFrame{
 		sid:    sid,
 		method: method,
 		header: header,

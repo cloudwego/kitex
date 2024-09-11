@@ -16,20 +16,22 @@ var (
 	_ streamx.ServerStream                          = (*serverStream)(nil)
 	_ streamx.ClientStreamMetadata[Header, Trailer] = (*clientStream)(nil)
 	_ streamx.ServerStreamMetadata[Header, Trailer] = (*serverStream)(nil)
+	_ StreamMeta                                    = (*stream)(nil)
 )
 
-func newStream(trans *transport, mode streamx.StreamingMode, smeta streamMeta) (s *stream) {
+func newStream(trans *transport, mode streamx.StreamingMode, smeta streamFrame) (s *stream) {
 	s = new(stream)
-	s.streamMeta = smeta
+	s.streamFrame = smeta
 	s.trans = trans
 	s.mode = mode
 	s.headerSig = make(chan struct{})
 	s.trailerSig = make(chan struct{})
+	s.StreamMeta = newStreamMeta()
 	trans.storeStreamIO(s)
 	return s
 }
 
-type streamMeta struct {
+type streamFrame struct {
 	sid     int32
 	method  string
 	header  Header // key:value, key is full name
@@ -37,7 +39,7 @@ type streamMeta struct {
 }
 
 type stream struct {
-	streamMeta
+	streamFrame
 	trans      *transport
 	mode       streamx.StreamingMode
 	wheader    Header
@@ -46,6 +48,9 @@ type stream struct {
 	peerEOF    int32
 	headerSig  chan struct{}
 	trailerSig chan struct{}
+
+	StreamMeta
+	metaHandler MetaFrameHandler
 }
 
 func (s *stream) Mode() streamx.StreamingMode {
@@ -61,6 +66,17 @@ func (s *stream) Service() string {
 
 func (s *stream) Method() string {
 	return s.method
+}
+
+func (s *stream) setMetaFrameHandler(h MetaFrameHandler) {
+	s.metaHandler = h
+}
+
+func (s *stream) readMetaFrame(intHeader IntHeader, header Header, payload []byte) (err error) {
+	if s.metaHandler == nil {
+		return nil
+	}
+	return s.metaHandler.OnMetaFrame(s.StreamMeta, intHeader, header, payload)
 }
 
 func (s *stream) readHeader(hd Header) (err error) {

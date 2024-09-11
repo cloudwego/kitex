@@ -2,15 +2,16 @@ package ttstream
 
 import (
 	"context"
+	"testing"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"testing"
 )
 
 func TestFrameCodec(t *testing.T) {
 	rw := remote.NewReaderWriterBuffer(1024)
 
-	wframe := newFrame(streamMeta{
+	wframe := newFrame(streamFrame{
 		sid:    1,
 		method: "method",
 		header: map[string]string{"key": "value"},
