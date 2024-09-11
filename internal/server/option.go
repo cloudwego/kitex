@@ -181,9 +181,7 @@ func DefaultSupportedTransportsFunc(option remote.ServerOption) []string {
 	if factory, ok := option.SvrHandlerFactory.(trans.MuxEnabledFlag); ok {
 		if factory.MuxEnabled() {
 			return []string{"ttheader_mux"}
-		} else {
-			return []string{"ttheader", "framed", "ttheader_framed", "grpc"}
 		}
 	}
-	return nil
+	return []string{"ttheader", "framed", "ttheader_framed", "grpc"}
 }

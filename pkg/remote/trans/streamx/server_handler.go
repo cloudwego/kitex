@@ -84,33 +84,30 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	if err != nil {
 		return nil, err
 	}
-	// connection level goroutine
-	go func() {
-		for {
-			nctx, ss, nerr := t.provider.OnStream(ctx, conn)
-			if nerr != nil {
-				if !errors.Is(nerr, io.EOF) {
-					klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)
-				}
-				return
-			}
-			// stream level goroutine
-			go func() {
-				nerr = t.OnStream(nctx, conn, ss)
-				if nerr != nil {
-					if !errors.Is(nerr, io.EOF) {
-						klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", err)
-					}
-					return
-				}
-			}()
-		}
-	}()
 	return ctx, nil
 }
 
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
-	return nil
+	// connection level goroutine
+	for {
+		nctx, ss, nerr := t.provider.OnStream(ctx, conn)
+		if nerr != nil {
+			if !errors.Is(nerr, io.EOF) {
+				klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)
+			}
+			return nerr
+		}
+		// stream level goroutine
+		go func() {
+			nerr = t.OnStream(nctx, conn, ss)
+			if nerr != nil {
+				if !errors.Is(nerr, io.EOF) {
+					klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", nerr)
+				}
+				return
+			}
+		}()
+	}
 }
 
 // OnStream
