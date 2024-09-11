@@ -89,8 +89,6 @@ func (c *transPool) Get(network string, addr string) (trans *transport, err erro
 	if err != nil {
 		return nil, err
 	}
-	_ = conn.SetDeadline(time.Now().Add(time.Hour))
-	_ = conn.SetReadTimeout(time.Hour)
 	trans = newTransport(clientTransport, c.sinfo, conn)
 	runtime.SetFinalizer(trans, func(t *transport) { t.close() })
 	return trans, nil

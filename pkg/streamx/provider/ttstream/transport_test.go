@@ -37,77 +37,80 @@ func TestTransport(t *testing.T) {
 	addr := test.GetLocalAddress()
 	ln, err := net.Listen("tcp", addr)
 	test.Assert(t, err == nil, err)
+	defer ln.Close()
 
 	var connDone int32
 	var streamDone int32
-	svr, err := netpoll.NewEventLoop(nil, netpoll.WithOnConnect(func(ctx context.Context, connection netpoll.Connection) context.Context {
-		t.Logf("OnConnect started")
-		defer t.Logf("OnConnect finished")
-		trans := newTransport(serverTransport, sinfo, connection)
-		t.Logf("OnRead started")
-		defer t.Log("OnRead finished")
+	svr, err := netpoll.NewEventLoop(nil,
+		netpoll.WithOnConnect(func(ctx context.Context, connection netpoll.Connection) context.Context {
+			t.Logf("OnConnect started")
+			defer t.Logf("OnConnect finished")
+			trans := newTransport(serverTransport, sinfo, connection)
+			t.Logf("OnRead started")
+			defer t.Log("OnRead finished")
 
-		go func() {
-			for {
-				s, err := trans.readStream()
-				t.Logf("OnRead read stream: %v, %v", s, err)
-				if err != nil {
-					if err == io.EOF {
-						return
+			go func() {
+				for {
+					s, err := trans.readStream()
+					t.Logf("OnRead read stream: %v, %v", s, err)
+					if err != nil {
+						if err == io.EOF {
+							return
+						}
+						t.Error(err)
 					}
-					t.Error(err)
+					ss := newServerStream(s)
+					go func(st streamx.ServerStream) {
+						defer func() {
+							// set trailer
+							err := st.(ServerStreamMeta).SetTrailer(Trailer{"key": "val"})
+							test.Assert(t, err == nil, err)
+
+							// send trailer
+							err = ss.(*serverStream).sendTrailer()
+							test.Assert(t, err == nil, err)
+							atomic.AddInt32(&streamDone, -1)
+						}()
+
+						// send header
+						err := st.(ServerStreamMeta).SendHeader(Header{"key": "val"})
+						test.Assert(t, err == nil, err)
+
+						// send data
+						for {
+							req := new(TestRequest)
+							err := st.RecvMsg(ctx, req)
+							if errors.Is(err, io.EOF) {
+								t.Logf("server stream eof")
+								return
+							}
+							test.Assert(t, err == nil, err)
+							t.Logf("server recv msg: %v", req)
+
+							res := req
+							err = st.SendMsg(ctx, res)
+							if errors.Is(err, io.EOF) {
+								return
+							}
+							test.Assert(t, err == nil, err)
+							t.Logf("server send msg: %v", res)
+						}
+					}(ss)
 				}
-				ss := newServerStream(s)
-				go func(st streamx.ServerStream) {
-					defer func() {
-						// set trailer
-						err := st.(ServerStreamMeta).SetTrailer(Trailer{"key": "val"})
-						test.Assert(t, err == nil, err)
+			}()
 
-						// send trailer
-						err = ss.(*serverStream).sendTrailer()
-						test.Assert(t, err == nil, err)
-						atomic.AddInt32(&streamDone, -1)
-					}()
+			return context.WithValue(ctx, "trans", trans)
+		}), netpoll.WithOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
+			t.Logf("OnDisconnect started")
+			defer t.Logf("OnDisconnect finished")
 
-					// send header
-					err := st.(ServerStreamMeta).SendHeader(Header{"key": "val"})
-					test.Assert(t, err == nil, err)
-
-					// send data
-					for {
-						req := new(TestRequest)
-						err := st.RecvMsg(ctx, req)
-						if errors.Is(err, io.EOF) {
-							t.Logf("server stream eof")
-							return
-						}
-						test.Assert(t, err == nil, err)
-						t.Logf("server recv msg: %v", req)
-
-						res := req
-						err = st.SendMsg(ctx, res)
-						if errors.Is(err, io.EOF) {
-							return
-						}
-						test.Assert(t, err == nil, err)
-						t.Logf("server send msg: %v", res)
-					}
-				}(ss)
-			}
-		}()
-
-		return context.WithValue(ctx, "trans", trans)
-	}), netpoll.WithOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
-		t.Logf("OnDisconnect started")
-		defer t.Logf("OnDisconnect finished")
-
-		atomic.AddInt32(&connDone, -1)
-	}))
+			atomic.AddInt32(&connDone, -1)
+		}))
 	go func() {
 		err = svr.Serve(ln)
 		test.Assert(t, err == nil, err)
 	}()
+	defer svr.Shutdown(context.Background())
 	test.WaitServerStart(addr)
 
 	// Client

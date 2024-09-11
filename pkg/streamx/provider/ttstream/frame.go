@@ -26,16 +26,17 @@ var frameTypeToString = map[int32]string{
 }
 
 type Frame struct {
-	streamMeta
+	streamFrame
+	meta    IntHeader
 	typ     int32
 	payload []byte
 }
 
-func newFrame(meta streamMeta, typ int32, payload []byte) Frame {
+func newFrame(meta streamFrame, typ int32, payload []byte) Frame {
 	return Frame{
-		streamMeta: meta,
-		typ:        typ,
-		payload:    payload,
+		streamFrame: meta,
+		typ:         typ,
+		payload:     payload,
 	}
 }
 
@@ -44,11 +45,15 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr Frame) (err error
 		Flags:      ttheader.HeaderFlagsStreaming,
 		SeqID:      fr.sid,
 		ProtocolID: ttheader.ProtocolIDThriftStruct,
-		IntInfo: map[uint16]string{
-			ttheader.FrameType: frameTypeToString[fr.typ],
-			ttheader.ToMethod:  fr.method,
-		},
 	}
+
+	param.IntInfo = fr.meta
+	if param.IntInfo == nil {
+		param.IntInfo = make(IntHeader)
+	}
+	param.IntInfo[ttheader.FrameType] = frameTypeToString[fr.typ]
+	param.IntInfo[ttheader.ToMethod] = fr.method
+
 	switch fr.typ {
 	case headerFrameType:
 		param.StrInfo = fr.header
@@ -81,7 +86,9 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr Frame, err error
 		err = fmt.Errorf("unexpected header flags: %d", dp.Flags)
 		return
 	}
-	frtype := dp.IntInfo[ttheader.FrameType]
+
+	fr.meta = dp.IntInfo
+	frtype := fr.meta[ttheader.FrameType]
 	switch frtype {
 	case ttheader.FrameTypeMeta:
 		fr.typ = metaFrameType
@@ -94,12 +101,12 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr Frame, err error
 		fr.typ = trailerFrameType
 		fr.trailer = dp.StrInfo
 	default:
-		err = fmt.Errorf("unexpected frame type: %v", dp.IntInfo[ttheader.FrameType])
+		err = fmt.Errorf("unexpected frame type: %v", fr.meta[ttheader.FrameType])
 		return
 	}
 	// stream meta
 	fr.sid = dp.SeqID
-	fr.method = dp.IntInfo[ttheader.ToMethod]
+	fr.method = fr.meta[ttheader.ToMethod]
 
 	// frame payload
 	if dp.PayloadLen == 0 {

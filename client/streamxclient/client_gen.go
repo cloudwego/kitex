@@ -2,11 +2,12 @@ package streamxclient
 
 import (
 	"context"
+	"log"
+
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"log"
 )
 
 func InvokeStream[Header, Trailer, Req, Res any](
@@ -37,34 +38,38 @@ func InvokeStream[Header, Trailer, Req, Res any](
 	stream.SetStreamRecvMiddleware(recvMW)
 	stream.SetStreamSendMiddleware(sendMW)
 
-	err = streamMW(
-		func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
-			// assemble streaming args depend on each stream mode
-			switch smode {
-			case serviceinfo.StreamingUnary:
-				if err = stream.SendMsg(ctx, req); err != nil {
-					return err
-				}
-				if err = stream.RecvMsg(ctx, res); err != nil {
-					return err
-				}
-				resArgs.SetRes(res)
-				if err = stream.CloseSend(ctx); err != nil {
-					return err
-				}
-			case serviceinfo.StreamingClient:
-			case serviceinfo.StreamingServer:
-				if err = stream.SendMsg(ctx, req); err != nil {
-					return err
-				}
-				if err = stream.CloseSend(ctx); err != nil {
-					return err
-				}
-			case serviceinfo.StreamingBidirectional:
-			default:
+	streamInvoke := func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+		// assemble streaming args depend on each stream mode
+		switch smode {
+		case serviceinfo.StreamingUnary:
+			if err = stream.SendMsg(ctx, req); err != nil {
+				return err
 			}
-			return nil
-		})(ctx, streamArgs, reqArgs, resArgs)
+			if err = stream.RecvMsg(ctx, res); err != nil {
+				return err
+			}
+			resArgs.SetRes(res)
+			if err = stream.CloseSend(ctx); err != nil {
+				return err
+			}
+		case serviceinfo.StreamingClient:
+		case serviceinfo.StreamingServer:
+			if err = stream.SendMsg(ctx, req); err != nil {
+				return err
+			}
+			if err = stream.CloseSend(ctx); err != nil {
+				return err
+			}
+		case serviceinfo.StreamingBidirectional:
+		default:
+		}
+		return nil
+	}
+	if streamMW != nil {
+		err = streamMW(streamInvoke)(ctx, streamArgs, reqArgs, resArgs)
+	} else {
+		err = streamInvoke(ctx, streamArgs, reqArgs, resArgs)
+	}
 	if err != nil {
 		return nil, err
 	}

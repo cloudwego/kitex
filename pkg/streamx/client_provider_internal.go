@@ -2,6 +2,7 @@ package streamx
 
 import (
 	"context"
+
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )

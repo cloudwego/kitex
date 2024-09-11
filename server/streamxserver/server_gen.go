@@ -39,58 +39,62 @@ func InvokeStream[Header, Trailer, Req, Res any](
 	// TODO: cache handler
 	rhandler := reflect.ValueOf(shandler.Handler)
 	mhandler := rhandler.MethodByName(sArgs.Stream().Method())
-	return shandler.StreamMiddleware(
-		func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
-			switch smode {
-			case serviceinfo.StreamingUnary:
-				called := mhandler.Call([]reflect.Value{
-					reflect.ValueOf(ctx),
-					reflect.ValueOf(req),
-				})
-				_res, _err := called[0].Interface(), called[1].Interface()
-				if _err != nil {
-					return _err.(error)
-				}
-				res = _res.(*Res)
-				if err = gs.SendAndClose(ctx, res); err != nil {
-					return err
-				}
-				resArgs.SetRes(res)
-			case serviceinfo.StreamingClient:
-				called := mhandler.Call([]reflect.Value{
-					reflect.ValueOf(ctx),
-					reflect.ValueOf(gs),
-				})
-				_res, _err := called[0].Interface(), called[1].Interface()
-				if _err != nil {
-					return _err.(error)
-				}
-				res = _res.(*Res)
-				if err = gs.Send(ctx, res); err != nil {
-					return err
-				}
-				resArgs.SetRes(res)
-			case serviceinfo.StreamingServer:
-				called := mhandler.Call([]reflect.Value{
-					reflect.ValueOf(ctx),
-					reflect.ValueOf(req),
-					reflect.ValueOf(gs),
-				})
-				_err := called[0].Interface()
-				if _err != nil {
-					return _err.(error)
-				}
-			case serviceinfo.StreamingBidirectional:
-				called := mhandler.Call([]reflect.Value{
-					reflect.ValueOf(ctx),
-					reflect.ValueOf(gs),
-				})
-				_err := called[0].Interface()
-				if _err != nil {
-					return _err.(error)
-				}
+	streamInvoke := func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+		switch smode {
+		case serviceinfo.StreamingUnary:
+			called := mhandler.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				reflect.ValueOf(req),
+			})
+			_res, _err := called[0].Interface(), called[1].Interface()
+			if _err != nil {
+				return _err.(error)
 			}
-			return nil
-		},
-	)(ctx, sArgs, reqArgs, resArgs)
+			res = _res.(*Res)
+			if err = gs.SendAndClose(ctx, res); err != nil {
+				return err
+			}
+			resArgs.SetRes(res)
+		case serviceinfo.StreamingClient:
+			called := mhandler.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				reflect.ValueOf(gs),
+			})
+			_res, _err := called[0].Interface(), called[1].Interface()
+			if _err != nil {
+				return _err.(error)
+			}
+			res = _res.(*Res)
+			if err = gs.Send(ctx, res); err != nil {
+				return err
+			}
+			resArgs.SetRes(res)
+		case serviceinfo.StreamingServer:
+			called := mhandler.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				reflect.ValueOf(req),
+				reflect.ValueOf(gs),
+			})
+			_err := called[0].Interface()
+			if _err != nil {
+				return _err.(error)
+			}
+		case serviceinfo.StreamingBidirectional:
+			called := mhandler.Call([]reflect.Value{
+				reflect.ValueOf(ctx),
+				reflect.ValueOf(gs),
+			})
+			_err := called[0].Interface()
+			if _err != nil {
+				return _err.(error)
+			}
+		}
+		return nil
+	}
+	if shandler.StreamMiddleware != nil {
+		err = shandler.StreamMiddleware(streamInvoke)(ctx, sArgs, reqArgs, resArgs)
+	} else {
+		err = streamInvoke(ctx, sArgs, reqArgs, resArgs)
+	}
+	return err
 }

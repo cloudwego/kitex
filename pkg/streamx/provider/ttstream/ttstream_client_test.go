@@ -46,7 +46,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 	methodCount := map[string]int{}
 	serverRecvCount := map[string]int{}
 	serverSendCount := map[string]int{}
-	svr := server.NewServer(server.WithListener(ln))
+	svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
 	// register pingpong service
 	err = svr.RegisterService(pingpongServiceInfo, new(pingpongService))
 	test.Assert(t, err == nil, err)
@@ -319,8 +319,4 @@ func TestTTHeaderStreaming(t *testing.T) {
 	runtime.GC()
 
 	streamClient = nil
-	//for {
-	//	time.Sleep(time.Second)
-	//	runtime.GC()
-	//}
 }
