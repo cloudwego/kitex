@@ -19,11 +19,7 @@ package generic
 import "github.com/cloudwego/kitex/pkg/generic/thrift"
 
 type thriftIDLProviderOptions struct {
-	parseMode *parseModeOpt
-}
-
-type parseModeOpt struct {
-	parseMode thrift.ParseMode
+	parseMode *thrift.ParseMode
 }
 
 type ThriftIDLProviderOption struct {
@@ -38,6 +34,6 @@ func (o *thriftIDLProviderOptions) apply(opts []ThriftIDLProviderOption) {
 
 func WithParseMode(parseMode thrift.ParseMode) ThriftIDLProviderOption {
 	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
-		opt.parseMode = &parseModeOpt{parseMode}
+		opt.parseMode = &parseMode
 	}}
 }
