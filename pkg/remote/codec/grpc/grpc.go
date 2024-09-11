@@ -51,7 +51,6 @@ type protobufV2MsgCodec interface {
 
 type grpcCodec struct {
 	ThriftCodec remote.PayloadCodec
-	ServiceInfo *serviceinfo.ServiceInfo
 }
 
 type CodecOption func(c *grpcCodec)
@@ -59,12 +58,6 @@ type CodecOption func(c *grpcCodec)
 func WithThriftCodec(t remote.PayloadCodec) CodecOption {
 	return func(c *grpcCodec) {
 		c.ThriftCodec = t
-	}
-}
-
-func WithServiceInfo(info *serviceinfo.ServiceInfo) CodecOption {
-	return func(c *grpcCodec) {
-		c.ServiceInfo = info
 	}
 }
 
@@ -182,20 +175,13 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 }
 
 func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
-	ri := rpcinfo.GetRPCInfo(ctx)
 	d, err := decodeGRPCFrame(ctx, in)
-	if !isServerStreaming(ri, c.ServiceInfo) && err == nil {
-		_, err = decodeGRPCFrame(ctx, in)
-		if err == nil {
-			return errors.New("KITEX: grpc client streaming protocol violation: get <nil>, want <EOF>")
-		}
-	}
-	if err != nil {
-		return err
-	}
 	if rpcStats := rpcinfo.AsMutableRPCStats(message.RPCInfo().Stats()); rpcStats != nil {
 		// record recv size, even when err != nil (0 is recorded to the lastRecvSize)
 		rpcStats.IncrRecvSize(uint64(len(d)))
+	}
+	if err != nil {
+		return err
 	}
 	message.SetPayloadLen(len(d))
 	data := message.Data()
@@ -237,17 +223,4 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 
 func (c *grpcCodec) Name() string {
 	return "grpc"
-}
-
-func isServerStreaming(ri rpcinfo.RPCInfo, svcInfo *serviceinfo.ServiceInfo) bool {
-	methodInfo := svcInfo.MethodInfo(ri.Invocation().MethodName())
-	// is there possibility that methodInfo is nil?
-	if methodInfo == nil {
-		return false
-	}
-	mode := methodInfo.StreamingMode()
-	if mode&serviceinfo.StreamingServer != 0 {
-		return true
-	}
-	return false
 }

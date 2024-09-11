@@ -951,9 +951,9 @@ func (l *loopyWriter) processData() (bool, error) {
 	}
 	// Compute how much of the header and data we can send within quota and max frame length
 	hSize := min(maxSize, len(dataItem.h))
-	fmt.Printf("previous hSize: %d\n", hSize)
+	// fmt.Printf("previous hSize: %d\n", hSize)
 	dSize := min(maxSize-hSize, len(dataItem.d))
-	fmt.Printf("previous dSize: %d\n", dSize)
+	// fmt.Printf("previous dSize: %d\n", dSize)
 	if hSize != 0 {
 		if dSize == 0 {
 			buf = dataItem.h
@@ -986,12 +986,12 @@ func (l *loopyWriter) processData() (bool, error) {
 	}
 	str.bytesOutStanding += size
 	l.sendQuota -= uint32(size)
-	fmt.Printf("h len: %d h size: %d\n", len(dataItem.h), hSize)
+	// fmt.Printf("h len: %d h size: %d\n", len(dataItem.h), hSize)
 	dataItem.h = dataItem.h[hSize:]
 	if len(dataItem.d) < dSize {
 		fmt.Println("small")
 	}
-	fmt.Printf("d len: %d d size: %d\n", len(dataItem.d), dSize)
+	// fmt.Printf("d len: %d d size: %d\n", len(dataItem.d), dSize)
 	dataItem.d = dataItem.d[dSize:]
 
 	if len(dataItem.h) == 0 && len(dataItem.d) == 0 { // All the data from that message was written out.

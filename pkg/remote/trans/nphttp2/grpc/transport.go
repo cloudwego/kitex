@@ -179,6 +179,8 @@ func (r *recvBufferReader) read(p []byte) (n int, err error) {
 	}
 }
 
+var count int
+
 func (r *recvBufferReader) readClient(p []byte) (n int, err error) {
 	// If the context is canceled, then closes the stream with nil metadata.
 	// closeStream writes its error parameter to r.recv as a recvMsg.
@@ -202,6 +204,13 @@ func (r *recvBufferReader) readClient(p []byte) (n int, err error) {
 		m := <-r.recv.get()
 		return r.readAdditional(m, p)
 	case m := <-r.recv.get():
+		count++
+		if m.buffer != nil {
+			fmt.Printf("Recv msg: <bufferLen: %d, err: %s>, count: %d\n", m.buffer.Len(), m.err, count)
+		}
+		if m.buffer == nil {
+			fmt.Printf("Recv empty buffer, err: %s, count: %d\n", m.err, count)
+		}
 		return r.readAdditional(m, p)
 	}
 }

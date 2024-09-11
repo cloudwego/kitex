@@ -642,47 +642,39 @@ func TestClientMix(t *testing.T) {
 	}
 }
 
-//func TestLargeMessage(t *testing.T) {
-//	server, ct := setUp(t, 18889, math.MaxUint32, normal)
-//	callHdr := &CallHdr{
-//		Host:   "localhost",
-//		Method: "foo.Large",
-//	}
-//	ctx, ctxCancel := context.WithTimeout(context.Background(), 10000000*time.Second)
-//	defer ctxCancel()
-//	var wg sync.WaitGroup
-//	for i := 0; i < 2; i++ {
-//		wg.Add(1)
-//		go func(num int) {
-//			defer wg.Done()
-//			s, err := ct.NewStream(ctx, callHdr)
-//			if err != nil {
-//				t.Errorf("%v.NewStream(_, _) = _, %v, want _, <nil>", ct, err)
-//			}
-//			if err := ct.Write(s, []byte{}, expectedRequestLarge, &Options{Last: true}); err != nil && err != io.EOF {
-//				t.Errorf("%v.write(_, _, _) = %v, want  <nil>", ct, err)
-//			}
-//			p := make([]byte, len(expectedResponseLarge))
-//			if num == 1 {
-//				if _, err := s.Read(p); err != nil || !bytes.Equal(p, expectedResponseLarge) {
-//					t.Logf("the %d times: %v", num, err)
-//					t.Errorf("s.Read(%v) = _, %v, want %v, <nil>", err, p, expectedResponse)
-//				}
-//			} else {
-//				if _, err := s.Read(p); err != nil || !bytes.Equal(p, expectedResponseLarge) {
-//					t.Logf("the %d times: %v", num, err)
-//					t.Errorf("s.Read(%v) = _, %v, want %v, <nil>", err, p, expectedResponse)
-//				}
-//			}
-//			if _, err = s.Read(p); err != io.EOF {
-//				t.Errorf("Failed to complete the stream %v; want <EOF>", err)
-//			}
-//		}(i)
-//	}
-//	wg.Wait()
-//	ct.Close(errSelfCloseForTest)
-//	server.stop()
-//}
+func TestLargeMessage(t *testing.T) {
+	server, ct := setUp(t, 0, math.MaxUint32, normal)
+	callHdr := &CallHdr{
+		Host:   "localhost",
+		Method: "foo.Large",
+	}
+	ctx, ctxCancel := context.WithTimeout(context.Background(), 1000000*time.Second)
+	defer ctxCancel()
+	var wg sync.WaitGroup
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s, err := ct.NewStream(ctx, callHdr)
+			if err != nil {
+				t.Errorf("%v.NewStream(_, _) = _, %v, want _, <nil>", ct, err)
+			}
+			if err := ct.Write(s, []byte{}, expectedRequestLarge, &Options{Last: true}); err != nil && err != io.EOF {
+				t.Errorf("%v.write(_, _, _) = %v, want  <nil>", ct, err)
+			}
+			p := make([]byte, len(expectedResponseLarge))
+			if _, err := s.Read(p); err != nil || !bytes.Equal(p, expectedResponseLarge) {
+				t.Errorf("s.Read(%v) = _, %v, want %v, <nil>", err, p, expectedResponse)
+			}
+			if _, err = s.Read(p); err != io.EOF {
+				t.Errorf("Failed to complete the stream %v; want <EOF>", err)
+			}
+		}()
+	}
+	wg.Wait()
+	ct.Close(errSelfCloseForTest)
+	server.stop()
+}
 
 func TestLargeMessageWithDelayRead(t *testing.T) {
 	// Disable dynamic flow control.
