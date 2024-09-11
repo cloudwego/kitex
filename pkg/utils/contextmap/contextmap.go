@@ -25,7 +25,7 @@ type contextMapKey struct{}
 
 // WithContextMap returns a new context that carries a sync.Map
 // It's useful if you want to share a sync.Map between middlewares, especially for
-// Middleware and RecvMiddleware/SendMiddleware, since in recv/send middlewares,
+// StreamMiddleware and RecvMiddleware/SendMiddleware, since in recv/send middlewares,
 // we can only get the stream.Context() which is a fixed node in the context tree.
 //
 // Note: it's not added to context by default, and you should add it yourself if needed.

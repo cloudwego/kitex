@@ -19,6 +19,7 @@ package client
 
 import (
 	"context"
+	"github.com/cloudwego/kitex/pkg/streamx"
 	"time"
 
 	"github.com/cloudwego/localsession/backup"
@@ -82,8 +83,11 @@ type Options struct {
 
 	ACLRules []acl.RejectFunc
 
-	MWBs  []endpoint.MiddlewareBuilder
-	IMWBs []endpoint.MiddlewareBuilder
+	MWBs     []endpoint.MiddlewareBuilder
+	IMWBs    []endpoint.MiddlewareBuilder
+	SMWs     []streamx.StreamMiddleware
+	SRecvMWs []streamx.StreamRecvMiddleware
+	SSendMWs []streamx.StreamSendMiddleware
 
 	Bus          event.Bus
 	Events       event.Queue
