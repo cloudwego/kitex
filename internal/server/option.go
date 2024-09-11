@@ -19,12 +19,9 @@ package server
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/streamx"
 	"os"
 	"os/signal"
 	"syscall"
-
-	"github.com/cloudwego/localsession/backup"
 
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/internal/stream"
@@ -44,8 +41,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
+	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
+	"github.com/cloudwego/localsession/backup"
 )
 
 func init() {

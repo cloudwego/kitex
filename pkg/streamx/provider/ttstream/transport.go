@@ -3,13 +3,14 @@ package ttstream
 import (
 	"context"
 	"fmt"
-	"github.com/cloudwego/gopkg/bufiox"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/netpoll"
 	"io"
 	"log"
 	"sync"
 	"sync/atomic"
+
+	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/netpoll"
 )
 
 const (
@@ -166,30 +167,32 @@ func (t *transport) close() (err error) {
 	return nil
 }
 
-func (t *transport) streamSend(s streamMeta, payload []byte) (err error) {
-	f := newFrame(s, dataFrameType, payload)
+func (t *transport) streamSend(sid int32, method string, wheader Header, payload []byte) (err error) {
+	if len(wheader) > 0 {
+		err = t.streamSendHeader(sid, method, wheader)
+		if err != nil {
+			return err
+		}
+	}
+	f := newFrame(streamMeta{sid: sid, method: method}, dataFrameType, payload)
 	t.wch <- f
 	return nil
 }
 
-func (t *transport) streamSendHeader(s streamMeta, header Header) (err error) {
-	s.header = header
-	s.trailer = nil
-	f := newFrame(s, headerFrameType, []byte{})
+func (t *transport) streamSendHeader(sid int32, method string, header Header) (err error) {
+	f := newFrame(streamMeta{sid: sid, method: method, header: header}, headerFrameType, []byte{})
 	t.wch <- f
 	return nil
 }
 
-func (t *transport) streamSendTrailer(s streamMeta, trailer Trailer) (err error) {
-	s.header = nil
-	s.trailer = trailer
-	f := newFrame(s, trailerFrameType, []byte{})
+func (t *transport) streamSendTrailer(sid int32, method string, trailer Trailer) (err error) {
+	f := newFrame(streamMeta{sid: sid, method: method, trailer: trailer}, trailerFrameType, []byte{})
 	t.wch <- f
 	return nil
 }
 
-func (t *transport) streamRecv(s streamMeta) (payload []byte, err error) {
-	sio, ok := t.loadStreamIO(s.sid)
+func (t *transport) streamRecv(sid int32) (payload []byte, err error) {
+	sio, ok := t.loadStreamIO(sid)
 	if !ok {
 		return nil, io.EOF
 	}

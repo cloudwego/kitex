@@ -6,6 +6,9 @@ import (
 )
 
 func NewServerProvider(ss ServerProvider) ServerProvider {
+	if _, ok := ss.(*internalServerProvider); ok {
+		return ss
+	}
 	return internalServerProvider{ServerProvider: ss}
 }
 

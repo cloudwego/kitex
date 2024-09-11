@@ -2,7 +2,7 @@ package ttstream
 
 import (
 	"errors"
-	"github.com/cloudwego/kitex/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 var ErrInvalidStreamKind = errors.New("invalid stream kind")

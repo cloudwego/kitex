@@ -8,7 +8,7 @@ import (
 
 type Client = client.StreamX
 
-func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...ClientOption) (Client, error) {
+func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error) {
 	iopts := make([]client.Option, 0, len(opts)+1)
 	for _, opt := range opts {
 		iopts = append(iopts, convertClientOption(opt))

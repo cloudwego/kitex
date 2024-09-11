@@ -20,7 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/cloudwego/kitex/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx"
 	"runtime"
 	"runtime/debug"
 	"strconv"

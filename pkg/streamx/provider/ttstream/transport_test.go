@@ -3,16 +3,17 @@ package ttstream
 import (
 	"context"
 	"errors"
-	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/streamx"
-	"github.com/cloudwego/netpoll"
 	"io"
 	"net"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/netpoll"
 )
 
 func TestTransport(t *testing.T) {
@@ -33,7 +34,7 @@ func TestTransport(t *testing.T) {
 		Extra: map[string]interface{}{"streaming": true},
 	}
 
-	addr := "127.0.0.1:12345"
+	addr := test.GetLocalAddress()
 	ln, err := net.Listen("tcp", addr)
 	test.Assert(t, err == nil, err)
 
@@ -65,6 +66,7 @@ func TestTransport(t *testing.T) {
 
 						// send trailer
 						err = ss.(*serverStream).sendTrailer()
+						test.Assert(t, err == nil, err)
 						atomic.AddInt32(&streamDone, -1)
 					}()
 

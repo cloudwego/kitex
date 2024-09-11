@@ -1,14 +1,13 @@
 package ttstream
 
 import (
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/netpoll"
 	"runtime"
 	"sync"
 	"time"
-)
 
-const maxStreamsPerConn = 1
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/netpoll"
+)
 
 // TODO: it's to complex for users implement idle check
 // so let's implement it in netpoll
@@ -78,7 +77,7 @@ func (c *transPool) Get(network string, addr string) (trans *transport, err erro
 	if !ok {
 		// TODO: here may have a race problem
 		cstack = newTransStack()
-		val, _ = c.pool.LoadOrStore(addr, cstack)
+		_, _ = c.pool.LoadOrStore(addr, cstack)
 	} else {
 		cstack = val.(*transStack)
 	}

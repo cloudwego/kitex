@@ -5,7 +5,7 @@ import (
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 type StreamX interface {

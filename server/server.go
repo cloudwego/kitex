@@ -21,13 +21,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/cloudwego/kitex/streamx"
 	"log"
 	"net"
 	"reflect"
 	"runtime/debug"
 	"sync"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
+	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
+	"github.com/cloudwego/kitex/pkg/streamx"
 
 	"github.com/cloudwego/localsession/backup"
 
@@ -44,6 +48,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
 	"github.com/cloudwego/kitex/pkg/remote/remotesvr"
+	streamxstrans "github.com/cloudwego/kitex/pkg/remote/trans/streamx"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
@@ -64,13 +69,7 @@ type server struct {
 	targetSvcInfo *serviceinfo.ServiceInfo
 
 	// actual rpc service implement of biz
-	eps endpoint.Endpoint
-	mws []endpoint.Middleware
-
-	streamxMW     streamx.StreamMiddleware
-	streamxRecvMW streamx.StreamRecvMiddleware
-	streamxSendMW streamx.StreamSendMiddleware
-
+	eps     endpoint.Endpoint
 	svr     remotesvr.Server
 	stopped sync.Once
 	isInit  bool
@@ -330,7 +329,7 @@ func (s *server) Stop() (err error) {
 func (s *server) buildServiceMiddleware() endpoint.Middleware {
 	hasServiceMW := false
 	for _, svc := range s.svcs.svcMap {
-		if svc.mw != nil {
+		if svc.MW != nil {
 			hasServiceMW = true
 			break
 		}
@@ -343,8 +342,8 @@ func (s *server) buildServiceMiddleware() endpoint.Middleware {
 			ri := rpcinfo.GetRPCInfo(ctx)
 			serviceName := ri.Invocation().ServiceName()
 			svc := s.svcs.svcMap[serviceName]
-			if svc != nil && svc.mw != nil {
-				next = svc.mw(next)
+			if svc != nil && svc.MW != nil {
+				next = svc.MW(next)
 			}
 			return next(ctx, req, resp)
 		}
@@ -414,9 +413,9 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		if minfo.IsStreaming() {
 			handler = streamx.StreamHandler{
 				Handler:              svc.handler,
-				StreamMiddleware:     s.streamxMW,
-				StreamRecvMiddleware: s.streamxRecvMW,
-				StreamSendMiddleware: s.streamxSendMW,
+				StreamMiddleware:     svc.SMW,
+				StreamRecvMiddleware: svc.SRecvMW,
+				StreamSendMiddleware: svc.SSendMW,
 			}
 		}
 		err = implHandlerFunc(ctx, handler, args, resp)
@@ -558,6 +557,23 @@ func doAddBoundHandler(h remote.BoundHandler, opt *remote.ServerOption) {
 
 func (s *server) newSvrTransHandler() (handler remote.ServerTransHandler, err error) {
 	transHdlrFactory := s.opt.RemoteOpt.SvrHandlerFactory
+	if transHdlrFactory == nil {
+		candidateFactories := make([]remote.ServerTransHandlerFactory, 0)
+		for _, svc := range s.svcs.svcMap {
+			if svc.streamingProvider != nil {
+				candidateFactories = append(candidateFactories,
+					streamxstrans.NewSvrTransHandlerFactory(svc.streamingProvider),
+				)
+			}
+		}
+		candidateFactories = append(candidateFactories,
+			nphttp2.NewSvrTransHandlerFactory(),
+		)
+		transHdlrFactory = detection.NewSvrTransHandlerFactory(
+			netpoll.NewSvrTransHandlerFactory(),
+			candidateFactories...,
+		)
+	}
 	transHdlr, err := transHdlrFactory.NewTransHandler(s.opt.RemoteOpt)
 	if err != nil {
 		return nil, err

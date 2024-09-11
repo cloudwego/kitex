@@ -2,6 +2,7 @@ package streamx
 
 import (
 	"context"
+
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -68,6 +69,7 @@ const (
 
 type Stream interface {
 	Mode() StreamingMode
+	Service() string
 	Method() string
 	SendMsg(ctx context.Context, m any) error
 	RecvMsg(ctx context.Context, m any) error
@@ -259,59 +261,6 @@ func (x *GenericServerStream[Header, Trailer, Req, Res]) Recv(ctx context.Contex
 		return nil, err
 	}
 	return m, nil
-}
-
-type RawStreamGetter interface {
-	RawStream() Stream
-}
-
-var _ ServerStream = (*serverStream)(nil)
-
-type serverStream struct {
-	ServerStream
-	RawStreamGetter
-}
-
-func newServerStream(ss ServerStream) *serverStream {
-	return &serverStream{ServerStream: ss}
-}
-
-func (s serverStream) RawStream() Stream {
-	return s.ServerStream
-}
-
-func (s serverStream) SendMsg(ctx context.Context, m any) error {
-	return s.ServerStream.SendMsg(ctx, m)
-}
-
-func (s serverStream) RecvMsg(ctx context.Context, m any) error {
-	return s.ServerStream.RecvMsg(ctx, m)
-}
-
-var _ ClientStream = (*clientStream)(nil)
-
-func NewClientStream(cs ClientStream) ClientStream {
-	return &clientStream{ClientStream: cs}
-}
-
-type clientStream struct {
-	ClientStream
-	RawStreamGetter
-}
-
-func (s clientStream) RawStream() Stream {
-	if rs, ok := s.ClientStream.(RawStreamGetter); ok {
-		return rs.RawStream()
-	}
-	return s.ClientStream
-}
-
-func (s clientStream) SendMsg(ctx context.Context, m any) error {
-	return s.ClientStream.SendMsg(ctx, m)
-}
-
-func (s clientStream) RecvMsg(ctx context.Context, m any) error {
-	return s.ClientStream.RecvMsg(ctx, m)
 }
 
 func streamSendNext(ctx context.Context, stream Stream, msg any) (err error) {

@@ -2,9 +2,11 @@ package jsonrpc
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/streamx"
 	"net"
+
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/netpoll"
 )
 
 type serverTransCtxKey struct{}
@@ -26,7 +28,8 @@ type serverProvider struct {
 }
 
 func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
-	return true
+	err := checkFrame(conn.(netpoll.Connection))
+	return err == nil
 }
 
 func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {

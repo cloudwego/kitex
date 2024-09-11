@@ -3,11 +3,12 @@ package ttstream
 import (
 	"context"
 	"errors"
-	"github.com/cloudwego/gopkg/protocol/thrift"
-	"github.com/cloudwego/gopkg/protocol/ttheader"
-	"github.com/cloudwego/kitex/streamx"
 	"log"
 	"sync/atomic"
+
+	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/gopkg/protocol/ttheader"
+	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 var (
@@ -41,7 +42,6 @@ type stream struct {
 	mode       streamx.StreamingMode
 	wheader    Header
 	wtrailer   Trailer
-	eof        int32 // eof handshake, 1: wait for EOF ack 2: eof hand shacked
 	selfEOF    int32
 	peerEOF    int32
 	headerSig  chan struct{}
@@ -52,7 +52,7 @@ func (s *stream) Mode() streamx.StreamingMode {
 	return s.mode
 }
 
-func (s *stream) ServiceName() string {
+func (s *stream) Service() string {
 	if len(s.header) == 0 {
 		return ""
 	}
@@ -61,10 +61,6 @@ func (s *stream) ServiceName() string {
 
 func (s *stream) Method() string {
 	return s.method
-}
-
-func (s *stream) close() error {
-	return s.sendTrailer()
 }
 
 func (s *stream) readHeader(hd Header) (err error) {
@@ -92,7 +88,7 @@ func (s *stream) writeHeader(hd Header) (err error) {
 func (s *stream) sendHeader() (err error) {
 	wheader := s.wheader
 	s.wheader = nil
-	err = s.trans.streamSendHeader(s.streamMeta, wheader)
+	err = s.trans.streamSendHeader(s.sid, s.method, wheader)
 	return err
 }
 
@@ -130,7 +126,7 @@ func (s *stream) sendTrailer() (err error) {
 		return nil
 	}
 	log.Printf("stream[%d] send trialer", s.sid)
-	return s.trans.streamSendTrailer(s.streamMeta, s.wtrailer)
+	return s.trans.streamSendTrailer(s.sid, s.method, s.wtrailer)
 }
 
 func (s *stream) SendMsg(ctx context.Context, res any) error {
@@ -140,11 +136,11 @@ func (s *stream) SendMsg(ctx context.Context, res any) error {
 		println("EncodePayload err", err)
 		return err
 	}
-	return s.trans.streamSend(s.streamMeta, payload)
+	return s.trans.streamSend(s.sid, s.method, s.wheader, payload)
 }
 
 func (s *stream) RecvMsg(ctx context.Context, req any) error {
-	payload, err := s.trans.streamRecv(s.streamMeta)
+	payload, err := s.trans.streamRecv(s.sid)
 	if err != nil {
 		return err
 	}

@@ -1,53 +1,48 @@
 package streamxserver
 
 import (
-	internal_server "github.com/cloudwego/kitex/internal/server"
-	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/kitex/server"
-	"github.com/cloudwego/kitex/streamx"
 	"net"
+
+	internal_server "github.com/cloudwego/kitex/internal/server"
+	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/server"
 )
 
-type ServerOption internal_server.Option
-type ServerOptions = internal_server.Options
+type Option internal_server.Option
+type Options = internal_server.Options
 
-func WithListener(ln net.Listener) ServerOption {
+func WithListener(ln net.Listener) Option {
 	return convertInternalServerOption(server.WithListener(ln))
 }
 
-func WithProvider(pvd streamx.ServerProvider) ServerOption {
-	return ServerOption{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.RemoteOpt.Provider = pvd
+func WithStreamMiddleware(mw streamx.StreamMiddleware) server.RegisterOption {
+	return server.RegisterOption{F: func(o *internal_server.RegisterOptions) {
+		o.StreamMiddlewares = append(o.StreamMiddlewares, mw)
 	}}
 }
 
-func WithServerTransHandlerFactory(f remote.ServerTransHandlerFactory) ServerOption {
-	return convertInternalServerOption(server.WithTransHandlerFactory(f))
-}
-
-func WithStreamMiddleware(smw streamx.StreamMiddleware) ServerOption {
-	return ServerOption{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.SMWs = append(o.SMWs, smw)
+func WithStreamRecvMiddleware(mw streamx.StreamRecvMiddleware) server.RegisterOption {
+	return server.RegisterOption{F: func(o *internal_server.RegisterOptions) {
+		o.StreamRecvMiddlewares = append(o.StreamRecvMiddlewares, mw)
 	}}
 }
 
-func WithStreamRecvMiddleware(smw streamx.StreamRecvMiddleware) ServerOption {
-	return ServerOption{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.SRecvMWs = append(o.SRecvMWs, smw)
+func WithStreamSendMiddleware(mw streamx.StreamSendMiddleware) server.RegisterOption {
+	return server.RegisterOption{F: func(o *internal_server.RegisterOptions) {
+		o.StreamSendMiddlewares = append(o.StreamSendMiddlewares, mw)
 	}}
 }
 
-func WithStreamSendMiddleware(smw streamx.StreamSendMiddleware) ServerOption {
-	return ServerOption{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.SSendMWs = append(o.SSendMWs, smw)
+func WithProvider(provider streamx.ServerProvider) server.RegisterOption {
+	return server.RegisterOption{F: func(o *internal_server.RegisterOptions) {
+		o.Provider = provider
 	}}
 }
 
-func convertInternalServerOption(o internal_server.Option) ServerOption {
-	return ServerOption{F: o.F}
+func convertInternalServerOption(o internal_server.Option) Option {
+	return Option{F: o.F}
 }
 
-func convertServerOption(o ServerOption) internal_server.Option {
+func convertServerOption(o Option) internal_server.Option {
 	return internal_server.Option{F: o.F}
 }

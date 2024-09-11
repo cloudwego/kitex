@@ -2,11 +2,13 @@ package ttstream
 
 import (
 	"context"
-	"github.com/bytedance/gopkg/cloud/metainfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/streamx"
-	"github.com/cloudwego/netpoll"
 	"net"
+
+	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/gopkg/protocol/ttheader"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/netpoll"
 )
 
 type serverTransCtxKey struct{}
@@ -28,8 +30,11 @@ type serverProvider struct {
 }
 
 func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
-	_, _ = conn.(netpoll.Connection).Reader().Peek(4)
-	return true
+	data, err := conn.(netpoll.Connection).Reader().Peek(8)
+	if err != nil {
+		return false
+	}
+	return ttheader.IsStreaming(data)
 }
 
 func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
