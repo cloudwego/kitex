@@ -63,9 +63,9 @@ type server struct {
 
 	// actual rpc service implement of biz
 	eps     endpoint.Endpoint
-	mws     []endpoint.Middleware
 	svr     remotesvr.Server
 	stopped sync.Once
+	isInit  bool
 	isRun   bool
 
 	sync.Mutex
@@ -77,29 +77,26 @@ func NewServer(ops ...Option) Server {
 		opt:  internal_server.NewOptions(ops),
 		svcs: newServices(),
 	}
-	s.init()
 	return s
 }
 
 func (s *server) init() {
+	if s.isInit {
+		return
+	}
+	s.isInit = true
 	ctx := fillContext(s.opt)
-	if s.opt.EnableContextTimeout {
-		// prepend for adding timeout to the context for all middlewares and the handler
-		s.opt.MWBs = append([]endpoint.MiddlewareBuilder{serverTimeoutMW}, s.opt.MWBs...)
-	}
-	s.mws = richMWsWithBuilder(ctx, s.opt.MWBs, s)
-	s.mws = append(s.mws, acl.NewACLMiddleware(s.opt.ACLRules))
-	s.initStreamMiddlewares(ctx)
-	if s.opt.ErrHandle != nil {
-		// errorHandleMW must be the last middleware,
-		// to ensure it only catches the server handler's error.
-		s.mws = append(s.mws, newErrorHandleMW(s.opt.ErrHandle))
-	}
 	if ds := s.opt.DebugService; ds != nil {
 		ds.RegisterProbeFunc(diagnosis.OptionsKey, diagnosis.WrapAsProbeFunc(s.opt.DebugInfo))
 		ds.RegisterProbeFunc(diagnosis.ChangeEventsKey, s.opt.Events.Dump)
 	}
 	backup.Init(s.opt.BackupOpt)
+
+	// init invoker chain here since we need to get some svc information to add MW
+	// register stream recv/send middlewares
+	s.buildInvokeChain(ctx)
+	s.initStreamMiddlewares(ctx)
+	s.buildStreamInvokeChain()
 }
 
 func fillContext(opt *internal_server.Options) context.Context {
@@ -107,26 +104,6 @@ func fillContext(opt *internal_server.Options) context.Context {
 	ctx = context.WithValue(ctx, endpoint.CtxEventBusKey, opt.Bus)
 	ctx = context.WithValue(ctx, endpoint.CtxEventQueueKey, opt.Events)
 	return ctx
-}
-
-func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder, ks *server) []endpoint.Middleware {
-	for i := range mwBs {
-		ks.mws = append(ks.mws, mwBs[i](ctx))
-	}
-	return ks.mws
-}
-
-// newErrorHandleMW provides a hook point for server error handling.
-func newErrorHandleMW(errHandle func(context.Context, error) error) endpoint.Middleware {
-	return func(next endpoint.Endpoint) endpoint.Endpoint {
-		return func(ctx context.Context, request, response interface{}) error {
-			err := next(ctx, request, response)
-			if err == nil {
-				return nil
-			}
-			return errHandle(ctx, err)
-		}
-	}
 }
 
 func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinfo.RPCInfo {
@@ -168,32 +145,51 @@ func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinf
 	}
 }
 
-func (s *server) buildInvokeChain() {
-	innerHandlerEp := s.invokeHandleEndpoint()
+func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
+	var mws []endpoint.Middleware
+	// register server timeout middleware
+	// prepend for adding timeout to the context for all middlewares and the handler
+	if s.opt.EnableContextTimeout {
+		mws = append(mws, serverTimeoutMW)
+	}
+	// register server middlewares
+	for i := range s.opt.MWBs {
+		mws = append(mws, s.opt.MWBs[i](ctx))
+	}
+	// register services middlewares
+	if mw := s.buildServiceMiddleware(); mw != nil {
+		mws = append(mws, mw)
+	}
+	// register stream context inject middleware
 	// TODO(DMwangnima): this is a workaround to fix ctx diverge problem temporarily,
 	// it should be removed after the new streaming api with ctx published.
-	// if there is streaming method, make sure the ctxInjectMW is the last middleware
-	s.fixStreamCtxDiverge()
-	s.eps = endpoint.Chain(s.mws...)(innerHandlerEp)
+	// if there is streaming method, make sure the ctxInjectMW is the last middleware before core middleware
+	if mw := s.buildStreamCtxInjectMiddleware(); mw != nil {
+		mws = append(mws, mw)
+	}
+	// register core middleware,
+	// core middleware MUST be the last middleware
+	mws = append(mws, s.buildCoreMiddleware())
+	return mws
 }
 
-// buildFullInvokeChain builds the invoke chain for ping-pong and streaming
-func (s *server) buildFullInvokeChain() {
-	s.buildInvokeChain()
-	s.buildStreamInvokeChain()
+func (s *server) buildInvokeChain(ctx context.Context) {
+	mws := s.buildMiddlewares(ctx)
+	innerHandlerEp := s.invokeHandleEndpoint()
+	s.eps = endpoint.Chain(mws...)(innerHandlerEp)
 }
 
-// fixStreamCtxDiverge is a workaround to resolve stream ctx diverge problem in server side
+// buildStreamCtxInjectMiddleware is a workaround to resolve stream ctx diverge problem in server side
 // when there is streaming method, add the ctxInjectMW to wrap the Stream
-func (s *server) fixStreamCtxDiverge() {
+func (s *server) buildStreamCtxInjectMiddleware() endpoint.Middleware {
 	for _, svc := range s.svcs.svcMap {
 		for _, method := range svc.svcInfo.Methods {
 			if method.IsStreaming() {
-				s.mws = append(s.mws, newCtxInjectMW())
-				return
+				return newCtxInjectMW()
 			}
 		}
 	}
+	return nil
 }
 
 // RegisterService should not be called by users directly.
@@ -229,8 +225,7 @@ func (s *server) Run() (err error) {
 	s.Lock()
 	s.isRun = true
 	s.Unlock()
-	// build invoker chain here since we need to get some svc information to add MW
-	s.buildFullInvokeChain()
+	s.init()
 	if err = s.check(); err != nil {
 		return err
 	}
@@ -322,6 +317,58 @@ func (s *server) Stop() (err error) {
 		}
 	})
 	return
+}
+
+func (s *server) buildServiceMiddleware() endpoint.Middleware {
+	hasServiceMW := false
+	for _, svc := range s.svcs.svcMap {
+		if svc.mw != nil {
+			hasServiceMW = true
+			break
+		}
+	}
+	if !hasServiceMW {
+		return nil
+	}
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			ri := rpcinfo.GetRPCInfo(ctx)
+			serviceName := ri.Invocation().ServiceName()
+			svc := s.svcs.svcMap[serviceName]
+			if svc != nil && svc.mw != nil {
+				next = svc.mw(next)
+			}
+			return next(ctx, req, resp)
+		}
+	}
+}
+
+// buildCoreMiddleware build the core middleware that include some default framework logic like error handler and ACL.
+// the `next` function for core middleware should be the service handler itself without any wrapped middleware.
+func (s *server) buildCoreMiddleware() endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		serviceHandler := next
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			// --- Before Next ---
+			if len(s.opt.ACLRules) > 0 {
+				if err = acl.ApplyRules(ctx, req, s.opt.ACLRules); err != nil {
+					return err
+				}
+			}
+
+			// --- Run Next ---
+			// run service handler
+			err = serviceHandler(ctx, req, resp)
+
+			// --- After Next ---
+			// error handler only catches the server handler's error.
+			if s.opt.ErrHandle != nil && err != nil {
+				err = s.opt.ErrHandle(ctx, err)
+			}
+
+			return err
+		}
+	}
 }
 
 func (s *server) invokeHandleEndpoint() endpoint.Endpoint {

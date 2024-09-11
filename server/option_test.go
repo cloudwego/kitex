@@ -61,6 +61,7 @@ func TestOptionDebugInfo(t *testing.T) {
 	}))
 
 	svr := NewServer(opts...)
+	svr.(*server).init()
 
 	// check probe result
 	pp := md.ProbePairs()

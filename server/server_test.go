@@ -1017,6 +1017,100 @@ func TestRegisterService(t *testing.T) {
 	svr.Stop()
 }
 
+func TestRegisterServiceWithMiddleware(t *testing.T) {
+	callMethod := "mock"
+	var opts []Option
+	opts = append(opts, WithCodec(&mockCodec{}))
+	transHdlrFact := &mockSvrTransHandlerFactory{}
+	exitCh := make(chan bool)
+	var ln net.Listener
+	transSvr := &mocks.MockTransServer{
+		BootstrapServerFunc: func(net.Listener) error {
+			{
+				// mock server call
+				ri := rpcinfo.NewRPCInfo(nil, nil, rpcinfo.NewInvocation(svcInfo.ServiceName, callMethod), nil, rpcinfo.NewRPCStats())
+				ctx := rpcinfo.NewCtxWithRPCInfo(context.Background(), ri)
+				svcSearcher := newServices()
+				svcSearcher.addService(svcInfo, mocks.MyServiceHandler(), &RegisterOptions{})
+				recvMsg := remote.NewMessageWithNewer(svcInfo, svcSearcher, ri, remote.Call, remote.Server)
+				recvMsg.NewData(callMethod)
+				sendMsg := remote.NewMessage(svcInfo.MethodInfo(callMethod).NewResult(), svcInfo, ri, remote.Reply, remote.Server)
+
+				_, err := transHdlrFact.hdlr.OnMessage(ctx, recvMsg, sendMsg)
+				test.Assert(t, err == nil)
+			}
+			<-exitCh
+			return nil
+		},
+		ShutdownFunc: func() error {
+			ln.Close()
+			exitCh <- true
+			return nil
+		},
+		CreateListenerFunc: func(addr net.Addr) (net.Listener, error) {
+			var err error
+			ln, err = net.Listen("tcp", "localhost:8888")
+			return ln, err
+		},
+	}
+	serverMW := 0
+	serviceMW1 := 0
+	serviceMW2 := 0
+	serviceHandler := 0
+	opts = append(opts, WithTransServerFactory(mocks.NewMockTransServerFactory(transSvr)))
+	opts = append(opts, WithTransHandlerFactory(transHdlrFact))
+	// server middleware
+	opts = append(opts, WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			test.Assert(t, serverMW == 0 && serviceMW1 == 0 && serviceMW2 == 0 && serviceHandler == 0)
+			serverMW++
+			err = next(ctx, req, resp)
+			test.Assert(t, serverMW == 1 && serviceMW1 == 2 && serviceMW2 == 2 && serviceHandler == 2)
+			serverMW++
+			return err
+		}
+	}))
+	svr := NewServer(opts...)
+	time.AfterFunc(100*time.Millisecond, func() {
+		err := svr.Stop()
+		test.Assert(t, err == nil, err)
+	})
+	err := svr.RegisterService(
+		mocks.ServiceInfo(),
+		mocks.MockFuncHandler(func(ctx context.Context, req *mocks.MyRequest) (r *mocks.MyResponse, err error) {
+			test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 1 && serviceHandler == 0)
+			serviceHandler += 2
+			return &mocks.MyResponse{}, nil
+		}),
+		// service middleware 1
+		WithServiceMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
+			return func(ctx context.Context, req, resp interface{}) (err error) {
+				test.Assert(t, serverMW == 1 && serviceMW1 == 0 && serviceMW2 == 0 && serviceHandler == 0)
+				serviceMW1++
+				err = next(ctx, req, resp)
+				test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 2 && serviceHandler == 2)
+				serviceMW1++
+				return err
+			}
+		}),
+		// service middleware 2
+		WithServiceMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
+			return func(ctx context.Context, req, resp interface{}) (err error) {
+				test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 0 && serviceHandler == 0)
+				serviceMW2++
+				err = next(ctx, req, resp)
+				test.Assert(t, serverMW == 1 && serviceMW1 == 1 && serviceMW2 == 1 && serviceHandler == 2)
+				serviceMW2++
+				return err
+			}
+		}),
+	)
+	test.Assert(t, err == nil)
+	err = svr.Run()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, serverMW == 2 && serviceMW1 == 2 && serviceMW2 == 2 && serviceHandler == 2)
+}
+
 type noopMetahandler struct{}
 
 func (noopMetahandler) WriteMeta(ctx context.Context, msg remote.Message) (context.Context, error) {
@@ -1157,10 +1251,10 @@ func newStreamingServer(svcName string, args []streamingMethodArg, mws []endpoin
 			svcMap: map[string]*service{
 				svcName: {
 					svcInfo: svcInfo,
+					mw:      endpoint.Chain(mws...),
 				},
 			},
 		},
-		mws: mws,
 		opt: internal_server.NewOptions(nil),
 	}
 	return svr
@@ -1216,7 +1310,7 @@ func TestStreamCtxDiverge(t *testing.T) {
 		},
 	}
 	svr := newStreamingServer(testService, args, mws)
-	svr.buildInvokeChain()
+	svr.buildInvokeChain(context.Background())
 
 	for _, tc := range testcases {
 		t.Run(tc.methodName, func(t *testing.T) {
@@ -1231,107 +1325,6 @@ func TestStreamCtxDiverge(t *testing.T) {
 			}
 			err := svr.eps(ctx, &streaming.Args{Stream: mock}, nil)
 			test.Assert(t, err == nil, err)
-		})
-	}
-}
-
-func Test_server_fixStreamCtxDiverge(t *testing.T) {
-	methodInfoFunc := func(mode serviceinfo.StreamingMode) serviceinfo.MethodInfo {
-		return serviceinfo.NewMethodInfo(nil, nil, nil, false, serviceinfo.WithStreamingMode(mode))
-	}
-	testcases := []struct {
-		desc           string
-		svcMap         map[string]*service
-		expectInjectMW bool
-	}{
-		{
-			desc: "single service without streaming method",
-			svcMap: map[string]*service{
-				"service": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"nonStreamingMethod": methodInfoFunc(serviceinfo.StreamingNone),
-						},
-					},
-				},
-			},
-		},
-		{
-			desc: "single service with streaming methods",
-			svcMap: map[string]*service{
-				"service": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"ClientStreamingMethod": methodInfoFunc(serviceinfo.StreamingClient),
-							"ServerStreamingMethod": methodInfoFunc(serviceinfo.StreamingServer),
-							"BidiStreamingMethod":   methodInfoFunc(serviceinfo.StreamingBidirectional),
-						},
-					},
-				},
-			},
-			expectInjectMW: true,
-		},
-		{
-			desc: "multiple services without streaming method",
-			svcMap: map[string]*service{
-				"service0": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service0",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"nonStreamingMethod0": methodInfoFunc(serviceinfo.StreamingNone),
-						},
-					},
-				},
-				"service1": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service1",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"nonStreamingMethod1": methodInfoFunc(serviceinfo.StreamingNone),
-						},
-					},
-				},
-			},
-		},
-		{
-			desc: "multiple services with streaming methods",
-			svcMap: map[string]*service{
-				"service0": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service0",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"ClientStreamingMethod": methodInfoFunc(serviceinfo.StreamingClient),
-							"ServerStreamingMethod": methodInfoFunc(serviceinfo.StreamingServer),
-						},
-					},
-				},
-				"service1": {
-					svcInfo: &serviceinfo.ServiceInfo{
-						ServiceName: "service1",
-						Methods: map[string]serviceinfo.MethodInfo{
-							"BidiStreamingMethod": methodInfoFunc(serviceinfo.StreamingBidirectional),
-						},
-					},
-				},
-			},
-			expectInjectMW: true,
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.desc, func(t *testing.T) {
-			svr := &server{
-				svcs: &services{
-					svcMap: tc.svcMap,
-				},
-			}
-			svr.fixStreamCtxDiverge()
-			if tc.expectInjectMW {
-				test.Assert(t, len(svr.mws) == 1)
-			} else {
-				test.Assert(t, len(svr.mws) == 0)
-			}
 		})
 	}
 }

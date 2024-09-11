@@ -18,6 +18,7 @@ package server
 
 import (
 	internal_server "github.com/cloudwego/kitex/internal/server"
+	"github.com/cloudwego/kitex/pkg/endpoint"
 )
 
 // RegisterOption is the only way to config service registration.
@@ -25,6 +26,17 @@ type RegisterOption = internal_server.RegisterOption
 
 // RegisterOptions is used to config service registration.
 type RegisterOptions = internal_server.RegisterOptions
+
+// WithServiceMiddleware add middleware for a single service
+// The execution order of middlewares follows:
+// - server middlewares
+// - service middlewares
+// - service handler
+func WithServiceMiddleware(mw endpoint.Middleware) RegisterOption {
+	return RegisterOption{F: func(o *internal_server.RegisterOptions) {
+		o.Middlewares = append(o.Middlewares, mw)
+	}}
+}
 
 func WithFallbackService() RegisterOption {
 	return RegisterOption{F: func(o *internal_server.RegisterOptions) {

@@ -29,6 +29,18 @@ import (
 // Returns a reason if rejected, otherwise returns nil.
 type RejectFunc func(ctx context.Context, request interface{}) (reason error)
 
+func ApplyRules(ctx context.Context, request interface{}, rules []RejectFunc) error {
+	for _, r := range rules {
+		if err := r(ctx, request); err != nil {
+			if !errors.Is(err, kerrors.ErrACL) {
+				err = kerrors.ErrACL.WithCause(err)
+			}
+			return err
+		}
+	}
+	return nil
+}
+
 // NewACLMiddleware creates a new ACL middleware using the provided reject funcs.
 func NewACLMiddleware(rules []RejectFunc) endpoint.Middleware {
 	if len(rules) == 0 {
@@ -36,13 +48,8 @@ func NewACLMiddleware(rules []RejectFunc) endpoint.Middleware {
 	}
 	return func(next endpoint.Endpoint) endpoint.Endpoint {
 		return func(ctx context.Context, request, response interface{}) error {
-			for _, r := range rules {
-				if e := r(ctx, request); e != nil {
-					if !errors.Is(e, kerrors.ErrACL) {
-						e = kerrors.ErrACL.WithCause(e)
-					}
-					return e
-				}
+			if err := ApplyRules(ctx, request, rules); err != nil {
+				return err
 			}
 			return next(ctx, request, response)
 		}
