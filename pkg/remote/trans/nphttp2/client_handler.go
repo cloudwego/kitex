@@ -40,11 +40,8 @@ func (f *cliTransHandlerFactory) NewTransHandler(opt *remote.ClientOption) (remo
 
 func newCliTransHandler(opt *remote.ClientOption) (*cliTransHandler, error) {
 	return &cliTransHandler{
-		opt: opt,
-		codec: grpc.NewGRPCCodec(
-			grpc.WithThriftCodec(opt.PayloadCodec),
-			grpc.WithServiceInfo(opt.SvcInfo),
-		),
+		opt:   opt,
+		codec: grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec)),
 	}, nil
 }
 
