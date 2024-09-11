@@ -10,7 +10,7 @@ require (
 	github.com/cloudwego/dynamicgo v0.4.0
 	github.com/cloudwego/fastpb v0.0.5
 	github.com/cloudwego/frugal v0.2.0
-	github.com/cloudwego/gopkg v0.1.1
+	github.com/cloudwego/gopkg v0.1.2
 	github.com/cloudwego/localsession v0.0.2
 	github.com/cloudwego/netpoll v0.6.4
 	github.com/cloudwego/runtimex v0.1.0
