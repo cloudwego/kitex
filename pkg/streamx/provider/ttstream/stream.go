@@ -8,7 +8,7 @@ import (
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
-	"github.com/cloudwego/kitex/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 var (

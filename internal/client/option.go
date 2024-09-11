@@ -19,7 +19,7 @@ package client
 
 import (
 	"context"
-	"github.com/cloudwego/kitex/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx"
 	"time"
 
 	"github.com/cloudwego/localsession/backup"

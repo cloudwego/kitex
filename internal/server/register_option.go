@@ -18,7 +18,7 @@ package server
 
 import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
-	"github.com/cloudwego/kitex/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 // RegisterOption is the only way to config service registration.

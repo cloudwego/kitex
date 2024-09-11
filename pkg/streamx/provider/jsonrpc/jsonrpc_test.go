@@ -12,9 +12,9 @@ import (
 
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/jsonrpc"
 	"github.com/cloudwego/kitex/server/streamxserver"
-	"github.com/cloudwego/kitex/streamx"
-	"github.com/cloudwego/kitex/streamx/provider/jsonrpc"
 	"github.com/cloudwego/netpoll"
 )
 

@@ -17,10 +17,10 @@ import (
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/streamxserver"
-	"github.com/cloudwego/kitex/streamx"
-	"github.com/cloudwego/kitex/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/transport"
 	"github.com/cloudwego/netpoll"
 )

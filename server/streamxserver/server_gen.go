@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 func InvokeStream[Header, Trailer, Req, Res any](

@@ -7,10 +7,10 @@ import (
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/streamxserver"
-	"github.com/cloudwego/kitex/streamx"
-	"github.com/cloudwego/kitex/streamx/provider/ttstream"
 )
 
 // === gen code ===

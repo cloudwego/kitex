@@ -4,8 +4,8 @@ import (
 	"net"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
+	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/server"
-	"github.com/cloudwego/kitex/streamx"
 )
 
 type Option internal_server.Option

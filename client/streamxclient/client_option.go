@@ -3,8 +3,8 @@ package streamxclient
 import (
 	"github.com/cloudwego/kitex/client"
 	internal_client "github.com/cloudwego/kitex/internal/client"
+	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/utils"
-	"github.com/cloudwego/kitex/streamx"
 )
 
 type Option internal_client.Option
