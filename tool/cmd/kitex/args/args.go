@@ -18,7 +18,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/cloudwego/kitex/transport"
 	"io"
 	"os"
 	"os/exec"
@@ -34,6 +33,7 @@ import (
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/cloudwego/kitex/transport"
 )
 
 // EnvPluginMode is an environment that kitex uses to distinguish run modes.

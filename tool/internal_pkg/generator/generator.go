@@ -24,10 +24,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudwego/kitex/tool/internal_pkg/tpl/stream_v2"
-
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
+	"github.com/cloudwego/kitex/tool/internal_pkg/tpl/stream_v2"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/transport"
 )
