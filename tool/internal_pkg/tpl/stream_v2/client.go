@@ -36,27 +36,28 @@ type ClientInterface interface {
 {{- end}}
 }
 
-func NewClient(destService string, opts ...streamxclient.ClientOption) (ClientInterface, error) {
-	var options []streamxclient.ClientOption
+func NewClient(destService string, opts ...streamxclient.Option) (ClientInterface, error) {
+	var options []streamxclient.Option
 	options = append(options, streamxclient.WithDestService(destService))
 	options = append(options, opts...)
-	cp, err := {{$protocol}}.NewClientProvider(serviceInfo)
+	cp, err := {{$protocol}}.NewClientProvider(svcInfo)
 	if err != nil {
 		return nil, err
 	}
 	options = append(options, streamxclient.WithProvider(cp))
-	cli, err := streamxclient.NewClient(serviceInfo, options...)
+	cli, err := streamxclient.NewClient(svcInfo, options...)
 	if err != nil {
 		return nil, err
 	}
-	kc := &kClient{Client: cli}
+	kc := &kClient{streamer: cli, caller: cli.(client.Client)}
 	return kc, nil
 }
 
 var _ ClientInterface = (*kClient)(nil)
 
 type kClient struct {
-    streamxclient.Client
+    caller client.Client
+    streamer streamxclient.Client
 }
 
 {{- range .AllMethods}}
@@ -74,20 +75,20 @@ type kClient struct {
 func (c *kClient) {{.Name}}{{- if $unary}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) ({{.Resp.Type}}, error) {
     res := new({{NotPtr .Resp.Type}})
     _, err := streamxclient.InvokeStream[{{$protocol}}.Header, {{$protocol}}.Trailer, {{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
-        ctx, c.Client, {{$mode}}, "{{.RawName}}", req, res, callOptions...)
+        ctx, c.streamer, {{$mode}}, "{{.RawName}}", req, res, callOptions...)
     if err != nil {
         return nil, err
     }
     return res, nil
 {{- else if $clientSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (stream ClientStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], err error) {
     return streamxclient.InvokeStream[{{$protocol}}.Header, {{$protocol}}.Trailer, {{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
-        ctx, c.Client, {{$mode}}, "{{.RawName}}", nil, nil, callOptions...)
+        ctx, c.streamer, {{$mode}}, "{{.RawName}}", nil, nil, callOptions...)
 {{- else if $serverSide}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (stream ServerStreamingClient[{{NotPtr .Resp.Type}}], err error) {
     return streamxclient.InvokeStream[{{$protocol}}.Header, {{$protocol}}.Trailer, {{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
-        ctx, c.Client, {{$mode}}, "{{.RawName}}", req, nil, callOptions...)
+        ctx, c.streamer, {{$mode}}, "{{.RawName}}", req, nil, callOptions...)
 {{- else if $bidiSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (stream BidiStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], err error) {
     return streamxclient.InvokeStream[{{$protocol}}.Header, {{$protocol}}.Trailer, {{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
-        ctx, c.Client, {{$mode}}, "{{.RawName}}", nil, nil, callOptions...)
+        ctx, c.streamer, {{$mode}}, "{{.RawName}}", nil, nil, callOptions...)
 {{- end}}
 }
 {{- end}}

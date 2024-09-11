@@ -35,23 +35,7 @@ type ServerInterface interface {
 {{- end}}
 }
 
-func NewServer(handler ServerInterface, opts ...streamxserver.ServerOption) (streamxserver.Server, error) {
-	var options []streamxserver.ServerOption
-	options = append(options, opts...)
-
-	sp, err := {{$protocol}}.NewServerProvider(serviceInfo)
-	if err != nil {
-		return nil, err
-	}
-	options = append(options, streamxserver.WithProvider(sp))
-	svr := streamxserver.NewServer(options...)
-	if err := svr.RegisterService(serviceInfo, handler); err != nil {
-		return nil, err
-	}
-	return svr, nil
-}
-
-func RegisterService(svr server.Server, handler {{call .ServiceTypeName}}, opts ...server.RegisterOption) error {
-	return svr.RegisterService(serviceInfo, handler, opts...)
+func RegisterService(svr server.Server, handler ServerInterface, opts ...server.RegisterOption) error {
+	return svr.RegisterService(svcInfo, handler, opts...)
 }
 `

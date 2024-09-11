@@ -16,7 +16,7 @@ import (
 )
 {{- $protocol := .Protocol | ToString | ToLower}}
 
-var serviceInfo = &serviceinfo.ServiceInfo{
+var svcInfo = &serviceinfo.ServiceInfo{
     ServiceName: "{{.RawServiceName}}",
     Methods: map[string]serviceinfo.MethodInfo{
         {{- range .AllMethods}}
@@ -46,6 +46,10 @@ var serviceInfo = &serviceinfo.ServiceInfo{
     Extra: map[string]interface{}{
         "streaming": true,
     },
+}
+
+func ServiceInfo() *serviceinfo.ServiceInfo {
+    return svcInfo
 }
 
 `

@@ -17,13 +17,14 @@ package generator
 
 import (
 	"fmt"
-	"github.com/cloudwego/kitex/tool/internal_pkg/tpl/stream_v2"
 	"go/token"
 	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/cloudwego/kitex/tool/internal_pkg/tpl/stream_v2"
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
@@ -429,10 +430,19 @@ func (g *generator) generateHandler(pkg *PackageInfo, svc *ServiceInfo, handlerF
 		return f, nil
 	}
 
-	task := Task{
-		Name: HandlerFileName,
-		Path: handlerFilePath,
-		Text: tpl.HandlerTpl + "\n" + tpl.HandlerMethodsTpl,
+	var task Task
+	if g.StreamV2 && svc.HasStreaming {
+		task = Task{
+			Name: HandlerFileName,
+			Path: handlerFilePath,
+			Text: tpl.HandlerTpl + "\n" + stream_v2.HandlerMethodsTpl,
+		}
+	} else {
+		task = Task{
+			Name: HandlerFileName,
+			Path: handlerFilePath,
+			Text: tpl.HandlerTpl + "\n" + tpl.HandlerMethodsTpl,
+		}
 	}
 	g.setImports(task.Name, pkg)
 	handle := func(task *Task, pkg *PackageInfo) (*File, error) {
@@ -563,6 +573,10 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 		}
 		fallthrough
 	case HandlerFileName:
+		if g.StreamV2 && pkg.HasStreaming {
+			g.setStreamV2HandlerImports(pkg)
+			return
+		}
 		for _, m := range pkg.ServiceInfo.AllMethods() {
 			if !m.ServerStreaming && !m.ClientStreaming {
 				pkg.AddImports("context")
@@ -667,24 +681,24 @@ func needCallOpt(pkg *PackageInfo) bool {
 }
 
 func (g *generator) setStreamV2ClientImports(pkg *PackageInfo) {
+	pkg.AddImports("client")
 	pkg.AddImports("github.com/cloudwego/kitex/client/streamxclient")
 	if len(pkg.AllMethods()) > 0 {
 		pkg.AddImports("context")
 		pkg.AddImports("github.com/cloudwego/kitex/client/streamxclient/streamxcallopt")
 		pkg.AddImports("github.com/cloudwego/kitex/pkg/serviceinfo")
 	}
-	pkg.AddImports("github.com/cloudwego/kitex/streamx")
+	pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
 	if g.IDLType == "thrift" {
-		pkg.AddImport(strings.ToLower(pkg.Protocol.String()), "github.com/cloudwego/kitex/streamx/provider/ttstream")
+		pkg.AddImport(strings.ToLower(pkg.Protocol.String()), "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream")
 	}
 }
 
 func (g *generator) setStreamV2ServerImports(pkg *PackageInfo) {
-	pkg.AddImports("github.com/cloudwego/kitex/server/streamxserver")
-	pkg.AddImports("github.com/cloudwego/kitex/streamx")
+	pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
 	pkg.AddImports("server")
 	if g.IDLType == "thrift" {
-		pkg.AddImport(strings.ToLower(pkg.Protocol.String()), "github.com/cloudwego/kitex/streamx/provider/ttstream")
+		pkg.AddImport(strings.ToLower(pkg.Protocol.String()), "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream")
 	}
 	for _, m := range pkg.AllMethods() {
 		pkg.AddImports("context")
@@ -705,11 +719,28 @@ func (g *generator) setStreamV2ServiceImports(pkg *PackageInfo) {
 	pkg.AddImports("github.com/cloudwego/kitex/pkg/serviceinfo")
 	for _, m := range pkg.AllMethods() {
 		pkg.AddImports("context")
-		pkg.AddImports("github.com/cloudwego/kitex/streamx")
+		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
 		pkg.AddImports("github.com/cloudwego/kitex/server/streamxserver")
 		if g.IDLType == "thrift" {
-			pkg.AddImport(strings.ToLower(pkg.Protocol.String()), "github.com/cloudwego/kitex/streamx/provider/ttstream")
+			pkg.AddImport(strings.ToLower(pkg.Protocol.String()), "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream")
 		}
+		for _, a := range m.Args {
+			for _, dep := range a.Deps {
+				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
+			}
+		}
+		if !m.Void && m.Resp != nil {
+			for _, dep := range m.Resp.Deps {
+				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
+			}
+		}
+	}
+}
+
+func (g *generator) setStreamV2HandlerImports(pkg *PackageInfo) {
+	for _, m := range pkg.ServiceInfo.AllMethods() {
+		pkg.AddImports("context")
+		pkg.AddImport(pkg.RefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
 		for _, a := range m.Args {
 			for _, dep := range a.Deps {
 				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
