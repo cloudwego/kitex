@@ -319,8 +319,4 @@ func TestTTHeaderStreaming(t *testing.T) {
 	runtime.GC()
 
 	streamClient = nil
-	//for {
-	//	time.Sleep(time.Second)
-	//	runtime.GC()
-	//}
 }
