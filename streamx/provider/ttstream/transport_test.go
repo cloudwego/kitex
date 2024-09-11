@@ -66,6 +66,7 @@ func TestTransport(t *testing.T) {
 
 						// send trailer
 						err = ss.(*serverStream).sendTrailer()
+						test.Assert(t, err == nil, err)
 						atomic.AddInt32(&streamDone, -1)
 					}()
 

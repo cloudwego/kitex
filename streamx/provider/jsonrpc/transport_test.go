@@ -26,7 +26,7 @@ func TestCodec(t *testing.T) {
 	f2, err := DecodeFrame(reader)
 	test.Assert(t, err == nil, err)
 	test.Assert(t, f2.method == f1.method, f2.method)
-	test.Assert(t, string(f2.payload) == string(f2.payload), f2.payload)
+	test.Assert(t, string(f2.payload) == string(f1.payload), f2.payload)
 }
 
 func TestTransport(t *testing.T) {

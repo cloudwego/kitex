@@ -179,11 +179,9 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	_, _ = t.provider.OnInactive(ctx, conn)
-	return
 }
 
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
-	return
 }
 
 func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
@@ -191,7 +189,6 @@ func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Mes
 }
 
 func (t *svrTransHandler) SetPipeline(pipeline *remote.TransPipeline) {
-	return
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {
