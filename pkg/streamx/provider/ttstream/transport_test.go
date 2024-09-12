@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ttstream
 
 import (
@@ -51,7 +67,7 @@ func TestTransport(t *testing.T) {
 
 			go func() {
 				for {
-					s, err := trans.readStream()
+					s, err := trans.readStream(ctx)
 					t.Logf("OnRead read stream: %v, %v", s, err)
 					if err != nil {
 						if err == io.EOF {
@@ -63,7 +79,7 @@ func TestTransport(t *testing.T) {
 					go func(st streamx.ServerStream) {
 						defer func() {
 							// set trailer
-							err := st.(ServerStreamMeta).SetTrailer(Trailer{"key": "val"})
+							err := st.(ServerStreamMeta).SetTrailer(streamx.Trailer{"key": "val"})
 							test.Assert(t, err == nil, err)
 
 							// send trailer
@@ -73,7 +89,7 @@ func TestTransport(t *testing.T) {
 						}()
 
 						// send header
-						err := st.(ServerStreamMeta).SendHeader(Header{"key": "val"})
+						err := st.(ServerStreamMeta).SendHeader(streamx.Header{"key": "val"})
 						test.Assert(t, err == nil, err)
 
 						// send data
@@ -81,7 +97,7 @@ func TestTransport(t *testing.T) {
 							req := new(TestRequest)
 							err := st.RecvMsg(ctx, req)
 							if errors.Is(err, io.EOF) {
-								t.Logf("server stream eof")
+								t.Logf("server stream closeRecv")
 								return
 							}
 							test.Assert(t, err == nil, err)
@@ -128,10 +144,10 @@ func TestTransport(t *testing.T) {
 			defer wg.Done()
 
 			// send header
-			s, err := trans.newStream(ctx, method, map[string]string{})
+			sio, err := trans.newStreamIO(ctx, method, IntHeader{}, map[string]string{})
 			test.Assert(t, err == nil, err)
 
-			cs := newClientStream(s)
+			cs := newClientStream(sio.stream)
 			t.Logf("client stream[%d] created", sid)
 
 			// recv header

@@ -9,7 +9,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
-func InvokeStream[Header, Trailer, Req, Res any](
+func InvokeStream[Req, Res any](
 	ctx context.Context, smode serviceinfo.StreamingMode,
 	handler any, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
 	// prepare args
@@ -18,7 +18,7 @@ func InvokeStream[Header, Trailer, Req, Res any](
 		return errors.New("server stream is nil")
 	}
 	shandler := handler.(streamx.StreamHandler)
-	gs := streamx.NewGenericServerStream[Header, Trailer, Req, Res](sArgs.Stream())
+	gs := streamx.NewGenericServerStream[Req, Res](sArgs.Stream())
 	gs.SetStreamRecvMiddleware(shandler.StreamRecvMiddleware)
 	gs.SetStreamSendMiddleware(shandler.StreamSendMiddleware)
 

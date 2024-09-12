@@ -12,7 +12,7 @@ type Option internal_server.Option
 type Options = internal_server.Options
 
 func WithListener(ln net.Listener) Option {
-	return convertInternalServerOption(server.WithListener(ln))
+	return ConvertNativeServerOption(server.WithListener(ln))
 }
 
 func WithStreamMiddleware(mw streamx.StreamMiddleware) server.RegisterOption {
@@ -39,10 +39,10 @@ func WithProvider(provider streamx.ServerProvider) server.RegisterOption {
 	}}
 }
 
-func convertInternalServerOption(o internal_server.Option) Option {
+func ConvertNativeServerOption(o internal_server.Option) Option {
 	return Option{F: o.F}
 }
 
-func convertServerOption(o Option) internal_server.Option {
+func ConvertStreamXServerOption(o Option) internal_server.Option {
 	return internal_server.Option{F: o.F}
 }
