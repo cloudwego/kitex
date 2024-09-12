@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -39,17 +40,16 @@ type transport struct {
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
 	_ = conn.SetDeadline(time.Now().Add(time.Hour))
-	reader := bufiox.NewDefaultReader(conn)
-	writer := bufiox.NewDefaultWriter(conn)
+	cbuffer := newConnBuffer(conn)
 	t := &transport{
 		kind:    kind,
 		sinfo:   sinfo,
 		conn:    conn,
-		reader:  reader,
-		writer:  writer,
+		reader:  cbuffer,
+		writer:  cbuffer,
 		streams: sync.Map{},
-		sch:     make(chan *stream, 8),
-		wch:     make(chan Frame, 8),
+		sch:     make(chan *stream, 1024),
+		wch:     make(chan Frame, 1024),
 		stop:    make(chan struct{}),
 	}
 	go func() {
@@ -141,9 +141,15 @@ func (t *transport) loopRead() error {
 	}
 }
 
-func (t *transport) writeFrame(frame Frame) error {
+func (t *transport) writeFrame(frame Frame, directly bool) error {
 	err := EncodeFrame(context.Background(), t.writer, frame)
-	return err
+	if err != nil {
+		return err
+	}
+	if !directly {
+		return nil
+	}
+	return t.writer.Flush()
 }
 
 func (t *transport) loopWrite() error {
@@ -156,16 +162,34 @@ func (t *transport) loopWrite() error {
 			// re-check wch queue
 			select {
 			case frame := <-t.wch:
-				if err := t.writeFrame(frame); err != nil {
+				if err := t.writeFrame(frame, true); err != nil {
 					return err
 				}
 			default:
 				return nil
 			}
 		case frame := <-t.wch:
-			if err := t.writeFrame(frame); err != nil {
+			if err := t.writeFrame(frame, true); err != nil {
 				return err
 			}
+			runtime.Gosched()
+			// batch write optimization
+			batchWrite := true
+			for batchWrite {
+				select {
+				case frame := <-t.wch:
+					if err := t.writeFrame(frame, false); err != nil {
+						return err
+					}
+					klog.Debugf("batch write frame")
+				default:
+					batchWrite = false
+				}
+			}
+			if err := t.writer.Flush(); err != nil {
+				return err
+			}
+			klog.Debugf("batch flush")
 		}
 	}
 }

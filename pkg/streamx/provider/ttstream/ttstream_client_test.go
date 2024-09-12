@@ -16,6 +16,7 @@ import (
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
@@ -30,6 +31,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
+	klog.SetLevel(klog.LevelDebug)
 	var addr = test.GetLocalAddress()
 	ln, err := netpoll.CreateListener("tcp", addr)
 	test.Assert(t, err == nil, err)

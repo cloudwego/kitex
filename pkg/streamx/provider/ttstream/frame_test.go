@@ -1,28 +1,38 @@
 package ttstream
 
 import (
+	"bytes"
 	"context"
 	"testing"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/remote"
 )
 
 func TestFrameCodec(t *testing.T) {
-	rw := remote.NewReaderWriterBuffer(1024)
-
+	var buf bytes.Buffer
+	writer := bufiox.NewDefaultWriter(&buf)
+	reader := bufiox.NewDefaultReader(&buf)
 	wframe := newFrame(streamFrame{
-		sid:    1,
+		sid:    0,
 		method: "method",
 		header: map[string]string{"key": "value"},
 	}, headerFrameType, []byte("hello world"))
-	err := EncodeFrame(context.Background(), rw, wframe)
+
+	for i := 0; i < 10; i++ {
+		wframe.sid = int32(i)
+		err := EncodeFrame(context.Background(), writer, wframe)
+		test.Assert(t, err == nil, err)
+	}
+	err := writer.Flush()
 	test.Assert(t, err == nil, err)
 
-	rframe, err := DecodeFrame(context.Background(), rw)
-	test.Assert(t, err == nil, err)
-	test.DeepEqual(t, string(wframe.payload), string(rframe.payload))
-	test.DeepEqual(t, wframe, rframe)
+	for i := 0; i < 10; i++ {
+		rframe, err := DecodeFrame(context.Background(), reader)
+		test.Assert(t, err == nil, err)
+		test.DeepEqual(t, string(wframe.payload), string(rframe.payload))
+		test.DeepEqual(t, wframe.header, rframe.header)
+	}
 }
 
 func TestFrameWithoutPayloadCodec(t *testing.T) {

@@ -39,7 +39,9 @@ func newFrame(meta streamFrame, typ int32, payload []byte) Frame {
 	}
 }
 
+// EncodeFrame will not call Flush!
 func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr Frame) (err error) {
+	written := writer.WrittenLen()
 	param := ttheader.EncodeParam{
 		Flags:      ttheader.HeaderFlagsStreaming,
 		SeqID:      fr.sid,
@@ -65,14 +67,14 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr Frame) (err error
 		return err
 	}
 	if len(fr.payload) > 0 {
-		_, err = writer.WriteBinary(fr.payload)
+		_, err := writer.WriteBinary(fr.payload)
 		if err != nil {
 			return err
 		}
 	}
-	binary.BigEndian.PutUint32(totalLenField, uint32(writer.WrittenLen()-4))
-	err = writer.Flush()
-	return err
+	written = writer.WrittenLen() - written
+	binary.BigEndian.PutUint32(totalLenField, uint32(written-4))
+	return nil
 }
 
 func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr Frame, err error) {
