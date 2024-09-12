@@ -20,11 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/cloudwego/kitex/pkg/streamx"
 	"runtime"
 	"runtime/debug"
 	"strconv"
 	"sync/atomic"
+
+	"github.com/cloudwego/kitex/pkg/streamx"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession/backup"
@@ -437,6 +438,13 @@ func (kc *kClient) richRemoteOption() {
 		// (newClientStreamer: call WriteMeta before remotecli.NewClient)
 		transInfoHdlr := bound.NewTransMetaHandler(kc.opt.MetaHandlers)
 		kc.opt.RemoteOpt.PrependBoundHandler(transInfoHdlr)
+
+		// add meta handlers into streaming meta handlers
+		for _, h := range kc.opt.MetaHandlers {
+			if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
+				kc.opt.RemoteOpt.StreamingMetaHandlers = append(kc.opt.RemoteOpt.StreamingMetaHandlers, shdlr)
+			}
+		}
 	}
 }
 
@@ -454,17 +462,6 @@ func (kc *kClient) buildInvokeChain() error {
 		return err
 	}
 	kc.sEps = mwchain(innerStreamingEp)
-
-	// streamx NewStream
-	innerStreamXEp, err := kc.invokeStreamXEndpoint()
-	if err != nil {
-		return err
-	}
-	kc.sxEps = mwchain(innerStreamXEp)
-	// streamx stream call
-	kc.sxStreamMW = streamx.StreamMiddlewareChain(kc.opt.SMWs...)
-	kc.sxStreamRecvMW = streamx.StreamRecvMiddlewareChain(kc.opt.SRecvMWs...)
-	kc.sxStreamSendMW = streamx.StreamSendMiddlewareChain(kc.opt.SSendMWs...)
 	return nil
 }
 
@@ -756,6 +753,12 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 			_ = cfg.SetConnectTimeout(c.ConnectTimeout())
 			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
 		}
+	}
+
+	// streamx config
+	sopt := opt.StreamXOptions
+	if sopt.RecvTimeout > 0 {
+		cfg.SetStreamRecvTimeout(sopt.RecvTimeout)
 	}
 
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)

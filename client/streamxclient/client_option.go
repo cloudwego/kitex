@@ -1,6 +1,8 @@
 package streamxclient
 
 import (
+	"time"
+
 	"github.com/cloudwego/kitex/client"
 	internal_client "github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -8,14 +10,19 @@ import (
 )
 
 type Option internal_client.Option
-type Options = internal_client.Options
 
 func WithHostPorts(hostports ...string) Option {
-	return convertInternalClientOption(client.WithHostPorts(hostports...))
+	return ConvertNativeClientOption(client.WithHostPorts(hostports...))
+}
+
+func WithRecvTimeout(timeout time.Duration) Option {
+	return Option{F: func(o *internal_client.Options, di *utils.Slice) {
+		o.StreamXOptions.RecvTimeout = timeout
+	}}
 }
 
 func WithDestService(destService string) Option {
-	return convertInternalClientOption(client.WithDestService(destService))
+	return ConvertNativeClientOption(client.WithDestService(destService))
 }
 
 func WithProvider(pvd streamx.ClientProvider) Option {
@@ -26,26 +33,26 @@ func WithProvider(pvd streamx.ClientProvider) Option {
 
 func WithStreamMiddleware(smw streamx.StreamMiddleware) Option {
 	return Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.SMWs = append(o.SMWs, smw)
+		o.StreamXOptions.StreamMWs = append(o.StreamXOptions.StreamMWs, smw)
 	}}
 }
 
 func WithStreamRecvMiddleware(smw streamx.StreamRecvMiddleware) Option {
 	return Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.SRecvMWs = append(o.SRecvMWs, smw)
+		o.StreamXOptions.StreamRecvMWs = append(o.StreamXOptions.StreamRecvMWs, smw)
 	}}
 }
 
 func WithStreamSendMiddleware(smw streamx.StreamSendMiddleware) Option {
 	return Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.SSendMWs = append(o.SSendMWs, smw)
+		o.StreamXOptions.StreamSendMWs = append(o.StreamXOptions.StreamSendMWs, smw)
 	}}
 }
 
-func convertInternalClientOption(o internal_client.Option) Option {
+func ConvertNativeClientOption(o internal_client.Option) Option {
 	return Option{F: o.F}
 }
 
-func convertClientOption(o Option) internal_client.Option {
+func ConvertStreamXClientOption(o Option) internal_client.Option {
 	return internal_client.Option{F: o.F}
 }

@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-package jsonrpc
+package ttstream
 
-type ServerProviderOption func(pc *serverProvider)
+import (
+	"context"
 
-func WithServerPayloadLimit(limit int) ServerProviderOption {
-	return func(s *serverProvider) {
-		s.payloadLimit = limit
-	}
+	"github.com/cloudwego/kitex/pkg/streamx"
+)
+
+type HeaderFrameHandler interface {
+	OnStream(ctx context.Context) (IntHeader, streamx.Header, error)
 }

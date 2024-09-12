@@ -16,10 +16,30 @@
 
 package ttstream
 
-type ServerProviderOption func(pc *serverProvider)
+import (
+	"time"
 
-func WithServerPayloadLimit(limit int) ServerProviderOption {
-	return func(s *serverProvider) {
-		s.payloadLimit = limit
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/netpoll"
+)
+
+func newShortConnTransPool() transPool {
+	return &shortConnTransPool{}
+}
+
+type shortConnTransPool struct{}
+
+func (c *shortConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (*transport, error) {
+	// create new connection
+	conn, err := netpoll.DialConnection(network, addr, time.Second)
+	if err != nil {
+		return nil, err
 	}
+	// create new transport
+	trans := newTransport(clientTransport, sinfo, conn)
+	return trans, nil
+}
+
+func (c *shortConnTransPool) Put(trans *transport) {
+	_ = trans.Close()
 }
