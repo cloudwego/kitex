@@ -14,12 +14,28 @@
  * limitations under the License.
  */
 
-package jsonrpc
+package ktx
 
-type ServerProviderOption func(pc *serverProvider)
+import (
+	"context"
+	"testing"
+)
 
-func WithServerPayloadLimit(limit int) ServerProviderOption {
-	return func(s *serverProvider) {
-		s.payloadLimit = limit
+func TestKtx(t *testing.T) {
+	ctx := context.Background()
+
+	// server start
+	ctx, cancelFunc := WithCancel(ctx)
+
+	// client call
+	var clientCanceled int32
+	RegisterCancelCallback(ctx, func() {
+		clientCanceled++
+	})
+
+	// server recv exception
+	cancelFunc()
+	if clientCanceled != 1 {
+		t.Fatal()
 	}
 }

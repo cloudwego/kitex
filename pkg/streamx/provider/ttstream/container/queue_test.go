@@ -14,12 +14,32 @@
  * limitations under the License.
  */
 
-package jsonrpc
+package container
 
-type ServerProviderOption func(pc *serverProvider)
+import (
+	"sync"
+	"testing"
 
-func WithServerPayloadLimit(limit int) ServerProviderOption {
-	return func(s *serverProvider) {
-		s.payloadLimit = limit
+	"github.com/cloudwego/kitex/internal/test"
+)
+
+func TestQueue(t *testing.T) {
+	q := NewQueue[int]()
+	round := 100000
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for i := 0; i < round; i++ {
+			q.Add(1)
+		}
+	}()
+	sum := 0
+	for sum < round {
+		v, ok := q.Get()
+		if ok {
+			sum += v
+		}
 	}
+	test.DeepEqual(t, sum, round)
+	test.DeepEqual(t, q.Size(), 0)
 }
