@@ -26,6 +26,7 @@ import (
 
 	"github.com/cloudwego/kitex/tool/internal_pkg/log"
 	"github.com/cloudwego/kitex/tool/internal_pkg/tpl"
+	"github.com/cloudwego/kitex/tool/internal_pkg/tpl/streamx"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
 	"github.com/cloudwego/kitex/transport"
 )
@@ -50,6 +51,8 @@ const (
 
 	// built in tpls
 	MultipleServicesTpl = "multiple_services"
+
+	streamxTTHeaderRef = "ttstream"
 )
 
 var (
@@ -145,8 +148,8 @@ type Config struct {
 	NoDependencyCheck bool
 	Rapid             bool
 	LocalThriftgo     bool
-
-	BuiltinTpl util.StringSlice // specify the built-in template to use
+	BuiltinTpl        util.StringSlice // specify the built-in template to use
+	StreamX           bool
 }
 
 // Pack packs the Config into a slice of "key=val" strings.
@@ -296,6 +299,9 @@ func (c *Config) ApplyExtension() error {
 }
 
 func (c *Config) IsUsingMultipleServicesTpl() bool {
+	if c.StreamX {
+		return true
+	}
 	for _, part := range c.BuiltinTpl {
 		if part == MultipleServicesTpl {
 			return true
@@ -426,10 +432,19 @@ func (g *generator) generateHandler(pkg *PackageInfo, svc *ServiceInfo, handlerF
 		return f, nil
 	}
 
-	task := Task{
-		Name: HandlerFileName,
-		Path: handlerFilePath,
-		Text: tpl.HandlerTpl + "\n" + tpl.HandlerMethodsTpl,
+	var task Task
+	if g.StreamX && svc.HasStreaming {
+		task = Task{
+			Name: HandlerFileName,
+			Path: handlerFilePath,
+			Text: tpl.HandlerTpl + "\n" + streamx.HandlerMethodsTpl,
+		}
+	} else {
+		task = Task{
+			Name: HandlerFileName,
+			Path: handlerFilePath,
+			Text: tpl.HandlerTpl + "\n" + tpl.HandlerMethodsTpl,
+		}
 	}
 	g.setImports(task.Name, pkg)
 	handle := func(task *Task, pkg *PackageInfo) (*File, error) {
@@ -452,25 +467,29 @@ func (g *generator) GenerateService(pkg *PackageInfo) ([]*File, error) {
 		ext = new(TemplateExtension)
 	}
 
-	tasks := []*Task{
-		{
-			Name: ClientFileName,
-			Path: util.JoinPath(output, ClientFileName),
-			Text: tpl.ClientTpl,
-			Ext:  ext.ExtendClient,
-		},
-		{
-			Name: ServerFileName,
-			Path: util.JoinPath(output, ServerFileName),
-			Text: tpl.ServerTpl,
-			Ext:  ext.ExtendServer,
-		},
-		{
-			Name: ServiceFileName,
-			Path: util.JoinPath(output, svcPkg+".go"),
-			Text: tpl.ServiceTpl,
-		},
+	cliTask := &Task{
+		Name: ClientFileName,
+		Path: util.JoinPath(output, ClientFileName),
+		Text: tpl.ClientTpl,
+		Ext:  ext.ExtendClient,
 	}
+	svrTask := &Task{
+		Name: ServerFileName,
+		Path: util.JoinPath(output, ServerFileName),
+		Text: tpl.ServerTpl,
+		Ext:  ext.ExtendServer,
+	}
+	svcTask := &Task{
+		Name: ServiceFileName,
+		Path: util.JoinPath(output, svcPkg+".go"),
+		Text: tpl.ServiceTpl,
+	}
+	if g.StreamX && pkg.ServiceInfo.HasStreaming {
+		cliTask.Text = streamx.ClientTpl
+		svrTask.Text = streamx.ServerTpl
+		svcTask.Text = streamx.ServiceTpl
+	}
+	tasks := []*Task{cliTask, svrTask, svcTask}
 
 	// do not generate invoker.go in service package by default
 	if g.Config.GenerateInvoker {
@@ -521,6 +540,9 @@ func (g *generator) updatePackageInfo(pkg *PackageInfo) {
 	if strings.EqualFold(g.Protocol, transport.HESSIAN2.String()) {
 		pkg.Protocol = transport.HESSIAN2
 	}
+	if strings.EqualFold(g.Protocol, transport.TTHeader.String()) {
+		pkg.Protocol = transport.TTHeader
+	}
 	if pkg.Dependencies == nil {
 		pkg.Dependencies = make(map[string]string)
 	}
@@ -536,19 +558,27 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 	pkg.Imports = make(map[string]map[string]bool)
 	switch name {
 	case ClientFileName:
-		pkg.AddImports("client")
-		if pkg.HasStreaming {
-			pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
-			pkg.AddImport("transport", "github.com/cloudwego/kitex/transport")
-		}
-		if len(pkg.AllMethods()) > 0 {
-			if needCallOpt(pkg) {
-				pkg.AddImports("callopt")
+		if g.StreamX && pkg.HasStreaming {
+			g.setStreamXClientImports(pkg)
+		} else {
+			pkg.AddImports("client")
+			if pkg.HasStreaming {
+				pkg.AddImport("streaming", "github.com/cloudwego/kitex/pkg/streaming")
+				pkg.AddImport("transport", "github.com/cloudwego/kitex/transport")
 			}
-			pkg.AddImports("context")
+			if len(pkg.AllMethods()) > 0 {
+				if needCallOpt(pkg) {
+					pkg.AddImports("callopt")
+				}
+				pkg.AddImports("context")
+			}
 		}
 		fallthrough
 	case HandlerFileName:
+		if g.StreamX && pkg.HasStreaming {
+			g.setStreamXHandlerImports(pkg)
+			return
+		}
 		for _, m := range pkg.ServiceInfo.AllMethods() {
 			if !m.ServerStreaming && !m.ClientStreaming {
 				pkg.AddImports("context")
@@ -565,11 +595,19 @@ func (g *generator) setImports(name string, pkg *PackageInfo) {
 			}
 		}
 	case ServerFileName, InvokerFileName:
+		if g.StreamX && pkg.HasStreaming {
+			g.setStreamXServerImports(pkg)
+			return
+		}
 		if len(pkg.CombineServices) == 0 {
 			pkg.AddImport(pkg.ServiceInfo.PkgRefName, pkg.ServiceInfo.ImportPath)
 		}
 		pkg.AddImports("server")
 	case ServiceFileName:
+		if g.StreamX && pkg.HasStreaming {
+			g.setStreamXServiceImports(pkg)
+			return
+		}
 		pkg.AddImports("errors")
 		pkg.AddImports("client")
 		pkg.AddImport("kitex", "github.com/cloudwego/kitex/pkg/serviceinfo")
@@ -642,4 +680,82 @@ func needCallOpt(pkg *PackageInfo) bool {
 		needCallOpt = true
 	}
 	return needCallOpt
+}
+
+func (g *generator) setStreamXClientImports(pkg *PackageInfo) {
+	pkg.AddImports("client")
+	pkg.AddImports("github.com/cloudwego/kitex/client/streamxclient")
+	if len(pkg.AllMethods()) > 0 {
+		pkg.AddImports("context")
+		pkg.AddImports("github.com/cloudwego/kitex/client/streamxclient/streamxcallopt")
+		pkg.AddImports("github.com/cloudwego/kitex/pkg/serviceinfo")
+	}
+	pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
+	if g.IDLType == "thrift" {
+		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
+	}
+}
+
+func (g *generator) setStreamXServerImports(pkg *PackageInfo) {
+	pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
+	pkg.AddImports("server")
+	pkg.AddImports("github.com/cloudwego/kitex/server/streamxserver")
+	if g.IDLType == "thrift" {
+		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
+	}
+	for _, m := range pkg.AllMethods() {
+		pkg.AddImports("context")
+		for _, a := range m.Args {
+			for _, dep := range a.Deps {
+				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
+			}
+		}
+		if !m.Void && m.Resp != nil {
+			for _, dep := range m.Resp.Deps {
+				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
+			}
+		}
+	}
+}
+
+func (g *generator) setStreamXServiceImports(pkg *PackageInfo) {
+	pkg.AddImports("github.com/cloudwego/kitex/pkg/serviceinfo")
+	for _, m := range pkg.AllMethods() {
+		pkg.AddImports("context")
+		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
+		pkg.AddImports("github.com/cloudwego/kitex/server/streamxserver")
+		if g.IDLType == "thrift" {
+			pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
+		}
+		for _, a := range m.Args {
+			for _, dep := range a.Deps {
+				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
+			}
+		}
+		if !m.Void && m.Resp != nil {
+			for _, dep := range m.Resp.Deps {
+				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
+			}
+		}
+	}
+}
+
+func (g *generator) setStreamXHandlerImports(pkg *PackageInfo) {
+	for _, m := range pkg.ServiceInfo.AllMethods() {
+		pkg.AddImports("context")
+		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
+		if g.IDLType == "thrift" {
+			pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
+		}
+		for _, a := range m.Args {
+			for _, dep := range a.Deps {
+				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
+			}
+		}
+		if !m.Void && m.Resp != nil {
+			for _, dep := range m.Resp.Deps {
+				pkg.AddImport(dep.PkgRefName, dep.ImportPath)
+			}
+		}
+	}
 }

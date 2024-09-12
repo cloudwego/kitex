@@ -232,6 +232,7 @@ var funcs = map[string]interface{}{
 	"HasFeature":    HasFeature,
 	"FilterImports": FilterImports,
 	"backquoted":    BackQuoted,
+	"getStreamxRef": ToStreamxRef,
 }
 
 func AddTemplateFunc(key string, f interface{}) {
@@ -394,4 +395,13 @@ func FilterImports(Imports map[string]map[string]bool, ms []*MethodInfo) map[str
 
 func BackQuoted(s string) string {
 	return "`" + s + "`"
+}
+
+func ToStreamxRef(protocol transport.Protocol) string {
+	switch protocol {
+	case transport.TTHeader:
+		return streamxTTHeaderRef
+	default:
+		return ""
+	}
 }
