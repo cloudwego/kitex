@@ -2,13 +2,13 @@ package ttstream
 
 import (
 	"context"
-	"log"
 	"runtime"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -57,7 +57,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	s.setMetaFrameHandler(c.metaHandler)
 	cs := newClientStream(s)
 	runtime.SetFinalizer(cs, func(cs *clientStream) {
-		log.Printf("client stream[%v] closing", cs.sid)
+		klog.Debugf("client stream[%v] closing", cs.sid)
 		_ = cs.close()
 		// TODO: currently using one conn one stream at same time
 		//_ = trans.close()

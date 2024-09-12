@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"log"
 
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
@@ -112,11 +111,9 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr Frame, err error
 	if dp.PayloadLen == 0 {
 		return fr, nil
 	}
-	log.Printf("DecodeFrame read next start")
 	fr.payload = make([]byte, dp.PayloadLen)
 	_, err = reader.ReadBinary(fr.payload)
 	reader.Release(err)
-	log.Printf("DecodeFrame read next: payload=%v", fr.payload)
 	if err != nil {
 		return
 	}

@@ -2,7 +2,6 @@ package streamxclient
 
 import (
 	"context"
-	"log"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
@@ -25,9 +24,7 @@ func InvokeStream[Header, Trailer, Req, Res any](
 		resArgs.SetRes(res)
 	}
 
-	log.Printf("Client invoke new stream start: method=%s", method)
 	cs, err := cli.NewStream(ctx, method, req, callOptions...)
-	log.Printf("Client invoke new stream end: method=%s", method)
 	if err != nil {
 		return nil, err
 	}

@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"sync/atomic"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/netpoll"
 )
@@ -36,13 +36,13 @@ func newTransport(sinfo *serviceinfo.ServiceInfo, conn net.Conn) *transport {
 	go func() {
 		err := t.loopRead()
 		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) && !errors.Is(err, netpoll.ErrConnClosed) {
-			log.Printf("loop read err: %v", err)
+			klog.Debugf("transport loop read err: %v", err)
 		}
 	}()
 	go func() {
 		err := t.loopWrite()
 		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
-			log.Printf("loop write err: %v", err)
+			klog.Debugf("transport loop write err: %v", err)
 		}
 	}()
 	return t

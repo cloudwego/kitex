@@ -2,14 +2,15 @@ package ttstream
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/gopkg/bufiox"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/netpoll"
 )
@@ -48,15 +49,14 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 	}
 	go func() {
 		err := t.loopRead()
-		if err != nil {
-			log.Printf("loop read err: %v", err)
-			return
+		if err != nil && errors.Is(err, io.EOF) {
+			klog.Warnf("trans loop read err: %v", err)
 		}
 	}()
 	go func() {
 		err := t.loopWrite()
-		if err != nil {
-			log.Printf("loop write err: %v", err)
+		if err != nil && errors.Is(err, io.EOF) {
+			klog.Warnf("trans loop write err: %v", err)
 			return
 		}
 	}()
@@ -79,9 +79,7 @@ func (t *transport) loadStreamIO(sid int32) (sio *streamIO, ok bool) {
 func (t *transport) loopRead() error {
 	for {
 		// decode frame
-		log.Printf("loop read frame start")
 		fr, err := DecodeFrame(context.Background(), t.reader)
-		log.Printf("loop read frame=%v err=%v", fr, err)
 		if err != nil {
 			return err
 		}
@@ -102,7 +100,7 @@ func (t *transport) loopRead() error {
 				// Header Frame: server recv a new stream
 				smode := t.sinfo.MethodInfo(fr.method).StreamingMode()
 				s := newStream(t, smode, fr.streamFrame)
-				log.Printf("transport[%d] read a new stream: sid=%d", t.kind, s.sid)
+				klog.Debugf("transport[%d] read a new stream: sid=%d", t.kind, s.sid)
 				t.sch <- s
 			case clientTransport:
 				// Header Frame: client recv header
@@ -136,16 +134,11 @@ func (t *transport) loopRead() error {
 }
 
 func (t *transport) writeFrame(frame Frame) error {
-	log.Printf("trans write frame start: %v", frame)
 	err := EncodeFrame(context.Background(), t.writer, frame)
-	log.Printf("trans write frame end: %v", err)
 	return err
 }
 
 func (t *transport) loopWrite() error {
-	defer func() {
-		log.Printf("loop write end: %s", t.conn.LocalAddr())
-	}()
 	for {
 		select {
 		case <-t.stop:
@@ -170,7 +163,7 @@ func (t *transport) close() (err error) {
 	select {
 	case <-t.stop:
 	default:
-		log.Printf("transport[%s] closeing", t.conn.LocalAddr())
+		klog.Warnf("transport[%s] is closing", t.conn.LocalAddr())
 		close(t.stop)
 		t.conn.Close()
 	}
@@ -210,7 +203,6 @@ func (t *transport) streamRecv(sid int32) (payload []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("trans stream recv: %v", f)
 	return f.payload, nil
 }
 
@@ -259,7 +251,6 @@ func (t *transport) readStream() (*stream, error) {
 	}
 	select {
 	case <-t.stop:
-		println("transport return")
 		return nil, io.EOF
 	case s := <-t.sch:
 		if s == nil {

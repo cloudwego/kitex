@@ -3,11 +3,11 @@ package ttstream
 import (
 	"context"
 	"errors"
-	"log"
 	"sync/atomic"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
@@ -87,7 +87,7 @@ func (s *stream) readHeader(hd Header) (err error) {
 	default:
 		close(s.headerSig)
 	}
-	log.Printf("stream[%s] read header: %v", s.method, hd)
+	klog.Debugf("stream[%s] read header: %v", s.method, hd)
 	return nil
 }
 
@@ -123,7 +123,7 @@ func (s *stream) readTrailer(tl Trailer) (err error) {
 		close(s.trailerSig)
 	}
 
-	log.Printf("stream[%d] recv trailer: %v", s.sid, tl)
+	klog.Debugf("stream[%d] recv trailer: %v", s.sid, tl)
 	return s.trans.streamCloseRecv(s)
 }
 
@@ -141,15 +141,13 @@ func (s *stream) sendTrailer() (err error) {
 	if !atomic.CompareAndSwapInt32(&s.selfEOF, 0, 1) {
 		return nil
 	}
-	log.Printf("stream[%d] send trialer", s.sid)
+	klog.Debugf("stream[%d] send trialer", s.sid)
 	return s.trans.streamSendTrailer(s.sid, s.method, s.wtrailer)
 }
 
 func (s *stream) SendMsg(ctx context.Context, res any) error {
-	defer log.Printf("send msg=%v", res)
 	payload, err := EncodePayload(ctx, res)
 	if err != nil {
-		println("EncodePayload err", err)
 		return err
 	}
 	return s.trans.streamSend(s.sid, s.method, s.wheader, payload)
@@ -160,9 +158,7 @@ func (s *stream) RecvMsg(ctx context.Context, req any) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("stream[%s] recv payload %v", s.method, payload)
 	err = DecodePayload(ctx, payload, req.(thrift.FastCodec))
-	log.Printf("stream[%s] decode payload %v", s.method, req)
 	return err
 }
 
@@ -196,7 +192,7 @@ func (s *serverStream) close() error {
 	return s.trans.streamClose(s.stream)
 }
 
-// serverStream should send left header first
+// SendMsg should send left header first
 func (s *serverStream) SendMsg(ctx context.Context, res any) error {
 	if len(s.wheader) > 0 {
 		if err := s.sendHeader(); err != nil {
