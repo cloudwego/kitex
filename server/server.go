@@ -408,7 +408,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		backup.BackupCtx(ctx)
 
 		handler := svc.handler
-		if minfo.IsStreaming() {
+		if minfo.IsStreaming() && svcInfo.Extra["streamx"] != nil {
 			handler = streamx.StreamHandler{
 				Handler:              svc.handler,
 				StreamMiddleware:     svc.SMW,

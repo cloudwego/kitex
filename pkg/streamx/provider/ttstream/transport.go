@@ -20,6 +20,8 @@ const (
 	serverTransport int32 = 2
 )
 
+var _ Object = (*transport)(nil)
+
 type transport struct {
 	kind    int32
 	sinfo   *serviceinfo.ServiceInfo
@@ -30,6 +32,9 @@ type transport struct {
 	sch     chan *stream // in-coming stream channel
 	wch     chan Frame   // out-coming frame channel
 	stop    chan struct{}
+
+	// for scavenger check
+	lastActive atomic.Value // time.Time
 }
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
@@ -78,6 +83,9 @@ func (t *transport) loadStreamIO(sid int32) (sio *streamIO, ok bool) {
 
 func (t *transport) loopRead() error {
 	for {
+		now := time.Now()
+		t.lastActive.Store(now)
+
 		// decode frame
 		fr, err := DecodeFrame(context.Background(), t.reader)
 		if err != nil {
@@ -121,7 +129,7 @@ func (t *transport) loopRead() error {
 			}
 			sio.input(fr)
 		case trailerFrameType:
-			// Trailer Frame: recv trailer, close read direction
+			// Trailer Frame: recv trailer, Close read direction
 			sio, ok := t.loadStreamIO(fr.sid)
 			if !ok {
 				return fmt.Errorf("transport[%d] read a unknown stream trailer: sid=%d", t.kind, fr.sid)
@@ -140,6 +148,9 @@ func (t *transport) writeFrame(frame Frame) error {
 
 func (t *transport) loopWrite() error {
 	for {
+		now := time.Now()
+		t.lastActive.Store(now)
+
 		select {
 		case <-t.stop:
 			// re-check wch queue
@@ -159,7 +170,17 @@ func (t *transport) loopWrite() error {
 	}
 }
 
-func (t *transport) close() (err error) {
+func (t *transport) Available() bool {
+	v := t.lastActive.Load()
+	if v == nil {
+		return true
+	}
+	lastActive := v.(time.Time)
+	// let unavailable time configurable
+	return time.Now().Sub(lastActive) < time.Minute*10
+}
+
+func (t *transport) Close() (err error) {
 	select {
 	case <-t.stop:
 	default:
@@ -225,6 +246,7 @@ var clientStreamID int32
 
 // newStream create new stream on current connection
 // it's typically used by client side
+// newStream is concurrency safe
 func (t *transport) newStream(
 	ctx context.Context, method string, header map[string]string) (*stream, error) {
 	if t.kind != clientTransport {
