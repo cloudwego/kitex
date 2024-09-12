@@ -64,7 +64,7 @@ var serviceInfo = &serviceinfo.ServiceInfo{
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
 		),
 	},
-	Extra: map[string]interface{}{"streaming": true},
+	Extra: map[string]interface{}{"streaming": true, "streamx": true},
 }
 
 func NewClient(destService string, opts ...streamxclient.Option) (ClientInterface, error) {

@@ -47,8 +47,8 @@ func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.
 	if trans == nil {
 		return ctx, nil
 	}
-	// server should close transport
-	err := trans.close()
+	// server should Close transport
+	err := trans.Close()
 	if err != nil {
 		return nil, err
 	}
