@@ -130,8 +130,8 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.BoolVar(&a.Rapid, "rapid", false,
 		"Use embedded thriftgo.")
 	f.Var(&a.BuiltinTpl, "tpl", "Specify kitex built-in template.")
-	f.BoolVar(&a.StreamV2, "stream-v2", false,
-		"Generate streaming code with stream-v2 interface",
+	f.BoolVar(&a.StreamX, "streamx", false,
+		"Generate streaming code with streamx interface",
 	)
 
 	a.RecordCmd = os.Args
@@ -241,7 +241,7 @@ func (a *Arguments) checkServiceName() error {
 }
 
 func (a *Arguments) checkStreamingV2() error {
-	if !a.StreamV2 {
+	if !a.StreamX {
 		return nil
 	}
 	if a.IDLType == "thrift" {

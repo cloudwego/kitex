@@ -1,4 +1,4 @@
-package stream_v2
+package streamx
 
 var HandlerMethodsTpl = `{{define "HandlerMethod"}}
 {{- $protocol := .Protocol | getStreamxRef}}
