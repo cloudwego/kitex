@@ -33,6 +33,7 @@ import (
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/protoc"
 	"github.com/cloudwego/kitex/tool/internal_pkg/pluginmode/thriftgo"
 	"github.com/cloudwego/kitex/tool/internal_pkg/util"
+	"github.com/cloudwego/kitex/transport"
 )
 
 // EnvPluginMode is an environment that kitex uses to distinguish run modes.
@@ -129,6 +130,9 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.BoolVar(&a.Rapid, "rapid", false,
 		"Use embedded thriftgo.")
 	f.Var(&a.BuiltinTpl, "tpl", "Specify kitex built-in template.")
+	f.BoolVar(&a.StreamX, "streamx", false,
+		"Generate streaming code with streamx interface",
+	)
 
 	a.RecordCmd = os.Args
 	a.Version = version
@@ -185,6 +189,10 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 	if err != nil {
 		return err
 	}
+	err = a.checkStreamX()
+	if err != nil {
+		return err
+	}
 	// todo finish protobuf
 	if a.IDLType != "thrift" {
 		a.GenPath = generator.KitexGenPath
@@ -229,6 +237,18 @@ func (a *Arguments) checkServiceName() error {
 	if a.ServiceName != "" {
 		a.GenerateMain = true
 	}
+	return nil
+}
+
+func (a *Arguments) checkStreamX() error {
+	if !a.StreamX {
+		return nil
+	}
+	if a.IDLType == "thrift" {
+		// set TTHeader Streaming by default
+		a.Protocol = transport.TTHeader.String()
+	}
+	// todo: process pb and gRPC
 	return nil
 }
 
