@@ -189,7 +189,7 @@ func (a *Arguments) ParseArgs(version, curpath string, kitexArgs []string) (err 
 	if err != nil {
 		return err
 	}
-	err = a.checkStreamingV2()
+	err = a.checkStreamX()
 	if err != nil {
 		return err
 	}
@@ -240,7 +240,7 @@ func (a *Arguments) checkServiceName() error {
 	return nil
 }
 
-func (a *Arguments) checkStreamingV2() error {
+func (a *Arguments) checkStreamX() error {
 	if !a.StreamX {
 		return nil
 	}
