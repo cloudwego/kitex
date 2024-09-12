@@ -22,12 +22,12 @@ func NewClientProvider(sinfo *serviceinfo.ServiceInfo, opts ...ClientProviderOpt
 	for _, opt := range opts {
 		opt(cp)
 	}
-	cp.transPool = newTransPool(sinfo)
+	cp.transPool = newMuxTransPool(sinfo)
 	return cp, nil
 }
 
 type clientProvider struct {
-	transPool   *transPool
+	transPool   transPool
 	sinfo       *serviceinfo.ServiceInfo
 	metaHandler MetaFrameHandler
 }
@@ -59,8 +59,6 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	runtime.SetFinalizer(cs, func(cs *clientStream) {
 		klog.Debugf("client stream[%v] closing", cs.sid)
 		_ = cs.close()
-		// TODO: currently using one conn one stream at same time
-		//_ = trans.close()
 		c.transPool.Put(trans)
 	})
 	return cs, err

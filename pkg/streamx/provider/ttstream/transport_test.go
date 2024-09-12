@@ -159,7 +159,7 @@ func TestTransport(t *testing.T) {
 			// send trailer(trailer is stored in ctx)
 			err = cs.CloseSend(ctx)
 			test.Assert(t, err == nil, err)
-			t.Logf("client stream[%d] close send", sid)
+			t.Logf("client stream[%d] Close send", sid)
 
 			// recv trailer
 			tl, err := cs.Trailer()
@@ -174,8 +174,8 @@ func TestTransport(t *testing.T) {
 		time.Sleep(time.Millisecond * 10)
 	}
 
-	// close conn
-	err = trans.close()
+	// Close conn
+	err = trans.Close()
 	test.Assert(t, err == nil, err)
 	err = ln.Close()
 	test.Assert(t, err == nil, err)
