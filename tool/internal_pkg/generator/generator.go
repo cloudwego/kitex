@@ -51,6 +51,8 @@ const (
 
 	// built in tpls
 	MultipleServicesTpl = "multiple_services"
+
+	streamxTTHeaderRef = "ttstream"
 )
 
 var (
@@ -689,15 +691,16 @@ func (g *generator) setStreamV2ClientImports(pkg *PackageInfo) {
 	}
 	pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
 	if g.IDLType == "thrift" {
-		pkg.AddImport(strings.ToLower(pkg.Protocol.String()), "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream")
+		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
 	}
 }
 
 func (g *generator) setStreamV2ServerImports(pkg *PackageInfo) {
 	pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
 	pkg.AddImports("server")
+	pkg.AddImports("github.com/cloudwego/kitex/server/streamxserver")
 	if g.IDLType == "thrift" {
-		pkg.AddImport(strings.ToLower(pkg.Protocol.String()), "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream")
+		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
 	}
 	for _, m := range pkg.AllMethods() {
 		pkg.AddImports("context")
@@ -721,7 +724,7 @@ func (g *generator) setStreamV2ServiceImports(pkg *PackageInfo) {
 		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
 		pkg.AddImports("github.com/cloudwego/kitex/server/streamxserver")
 		if g.IDLType == "thrift" {
-			pkg.AddImport(strings.ToLower(pkg.Protocol.String()), "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream")
+			pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
 		}
 		for _, a := range m.Args {
 			for _, dep := range a.Deps {
@@ -739,7 +742,10 @@ func (g *generator) setStreamV2ServiceImports(pkg *PackageInfo) {
 func (g *generator) setStreamV2HandlerImports(pkg *PackageInfo) {
 	for _, m := range pkg.ServiceInfo.AllMethods() {
 		pkg.AddImports("context")
-		pkg.AddImport(pkg.RefName, util.JoinPath(pkg.ImportPath, strings.ToLower(pkg.ServiceName)))
+		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
+		if g.IDLType == "thrift" {
+			pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
+		}
 		for _, a := range m.Args {
 			for _, dep := range a.Deps {
 				pkg.AddImport(dep.PkgRefName, dep.ImportPath)

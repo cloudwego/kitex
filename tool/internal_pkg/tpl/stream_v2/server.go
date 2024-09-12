@@ -14,13 +14,9 @@ import (
 		{{- end}}
 	{{- end}}
 )
-{{- $protocol := .Protocol | ToString | ToLower}}
+{{- $protocol := .Protocol | getStreamxRef}}
 
-type ClientStreamingServer[Req, Res any] streamx.ClientStreamingServer[{{$protocol}}.Header, {{$protocol}}.Trailer, Req, Res]
-type ServerStreamingServer[Res any] streamx.ServerStreamingServer[{{$protocol}}.Header, {{$protocol}}.Trailer, Res]
-type BidiStreamingServer[Req, Res any] streamx.BidiStreamingServer[{{$protocol}}.Header, {{$protocol}}.Trailer, Req, Res]
-
-type ServerInterface interface {
+type Server interface {
 {{- range .AllMethods}}
 {{- $unary := and (not .ServerStreaming) (not .ClientStreaming)}}
 {{- $clientSide := and .ClientStreaming (not .ServerStreaming)}}
@@ -28,14 +24,22 @@ type ServerInterface interface {
 {{- $bidiSide := and .ClientStreaming .ServerStreaming}}
 {{- $arg := index .Args 0}}
     {{.Name}}{{- if $unary}}(ctx context.Context, req {{$arg.Type}}) ({{.Resp.Type}}, error)
-             {{- else if $clientSide}}(ctx context.Context, stream ClientStreamingServer[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}]) ({{.Resp.Type}}, error)
-             {{- else if $serverSide}}(ctx context.Context, req {{$arg.Type}}, stream ServerStreamingServer[{{NotPtr .Resp.Type}}]) error
-             {{- else if $bidiSide}}(ctx context.Context, stream BidiStreamingServer[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}]) error
+             {{- else if $clientSide}}(ctx context.Context, stream streamx.ClientStreamingServer[{{$protocol}}.Header, {{$protocol}}.Trailer, {{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}]) ({{.Resp.Type}}, error)
+             {{- else if $serverSide}}(ctx context.Context, req {{$arg.Type}}, stream streamx.ServerStreamingServer[{{$protocol}}.Header, {{$protocol}}.Trailer, {{NotPtr .Resp.Type}}]) error
+             {{- else if $bidiSide}}(ctx context.Context, stream streamx.BidiStreamingServer[{{$protocol}}.Header, {{$protocol}}.Trailer, {{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}]) error
              {{- end}}
 {{- end}}
 }
 
-func RegisterService(svr server.Server, handler ServerInterface, opts ...server.RegisterOption) error {
-	return svr.RegisterService(svcInfo, handler, opts...)
+func RegisterService(svr server.Server, handler Server, opts ...server.RegisterOption) error {
+    sp, err := {{$protocol}}.NewServerProvider(svcInfo)
+    if err != nil {
+        return err
+    }
+    nopts := []server.RegisterOption{
+        streamxserver.WithProvider(sp),
+    }
+    nopts = append(nopts, opts...)
+	return svr.RegisterService(svcInfo, handler, nopts...)
 }
 `

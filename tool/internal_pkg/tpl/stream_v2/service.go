@@ -14,7 +14,7 @@ import (
 		{{- end}}
 	{{- end}}
 )
-{{- $protocol := .Protocol | ToString | ToLower}}
+{{- $protocol := .Protocol | getStreamxRef}}
 
 var svcInfo = &serviceinfo.ServiceInfo{
     ServiceName: "{{.RawServiceName}}",
@@ -46,10 +46,6 @@ var svcInfo = &serviceinfo.ServiceInfo{
     Extra: map[string]interface{}{
         "streaming": true,
     },
-}
-
-func ServiceInfo() *serviceinfo.ServiceInfo {
-    return svcInfo
 }
 
 `
