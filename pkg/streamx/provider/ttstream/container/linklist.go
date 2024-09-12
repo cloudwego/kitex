@@ -14,12 +14,28 @@
  * limitations under the License.
  */
 
-package jsonrpc
+package container
 
-type ServerProviderOption func(pc *serverProvider)
+type linkNode[ValueType any] struct {
+	val  ValueType
+	next *linkNode[ValueType]
+}
 
-func WithServerPayloadLimit(limit int) ServerProviderOption {
-	return func(s *serverProvider) {
-		s.payloadLimit = limit
-	}
+func (n *linkNode[ValueType]) reset() {
+	var nilVal ValueType
+	n.val = nilVal
+	n.next = nil
+}
+
+type doubleLinkNode[ValueType any] struct {
+	val  ValueType
+	next *doubleLinkNode[ValueType]
+	last *doubleLinkNode[ValueType]
+}
+
+func (n *doubleLinkNode[ValueType]) reset() {
+	var nilVal ValueType
+	n.val = nilVal
+	n.next = nil
+	n.last = nil
 }

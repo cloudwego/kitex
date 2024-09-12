@@ -45,6 +45,7 @@ var svcInfo = &serviceinfo.ServiceInfo{
     },
     Extra: map[string]interface{}{
         "streaming": true,
+        "streamx": true,
     },
 }
 

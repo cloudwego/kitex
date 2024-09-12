@@ -47,7 +47,7 @@ func GetLocalAddress() string {
 	for {
 		time.Sleep(time.Millisecond * time.Duration(1+rand.Intn(10)))
 		port := atomic.AddUint32(&curPort, 1+uint32(rand.Intn(10)))
-		addr := "localhost:" + strconv.Itoa(int(port))
+		addr := "127.0.0.1:" + strconv.Itoa(int(port))
 		if !IsAddressInUse(addr) {
 			trace := strings.Split(string(debug.Stack()), "\n")
 			if len(trace) > 6 {

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ttstream_test
 
 import (
@@ -16,6 +32,7 @@ import (
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
@@ -25,11 +42,23 @@ import (
 	"github.com/cloudwego/netpoll"
 )
 
+func init() {
+	klog.SetLevel(klog.LevelDebug)
+}
+
+func testHeaderAndTrailer(t *testing.T, stream streamx.ClientStreamMetadata) {
+	hd, err := stream.Header()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, hd[headerKey] == headerVal, hd)
+	tl, err := stream.Trailer()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, tl[trailerKey] == trailerVal, tl)
+}
+
 func TestTTHeaderStreaming(t *testing.T) {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
-
 	var addr = test.GetLocalAddress()
 	ln, err := netpoll.CreateListener("tcp", addr)
 	test.Assert(t, err == nil, err)
@@ -43,9 +72,8 @@ func TestTTHeaderStreaming(t *testing.T) {
 			time.Sleep(time.Millisecond * 100)
 		}
 	}
-	methodCount := map[string]int{}
-	serverRecvCount := map[string]int{}
-	serverSendCount := map[string]int{}
+	var serverRecvCount int32
+	var serverSendCount int32
 	svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
 	// register pingpong service
 	err = svr.RegisterService(pingpongServiceInfo, new(pingpongService))
@@ -61,7 +89,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 			return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
 				err = next(ctx, stream, res)
 				if err == nil {
-					serverRecvCount[stream.Method()]++
+					atomic.AddInt32(&serverRecvCount, 1)
 				} else {
 					log.Printf("server recv middleware err=%v", err)
 				}
@@ -72,7 +100,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 			return func(ctx context.Context, stream streamx.Stream, req any) (err error) {
 				err = next(ctx, stream, req)
 				if err == nil {
-					serverSendCount[stream.Method()]++
+					atomic.AddInt32(&serverSendCount, 1)
 				} else {
 					log.Printf("server send middleware err=%v", err)
 				}
@@ -116,7 +144,6 @@ func TestTTHeaderStreaming(t *testing.T) {
 						test.Assert(t, resArgs.Res() == nil)
 					}
 					test.Assert(t, err == nil, err)
-					methodCount[streamArgs.Stream().Method()]++
 					log.Printf("Server handler end")
 
 					log.Printf("Server middleware after next: reqArgs=%v resArgs=%v streamArgs=%v",
@@ -143,8 +170,14 @@ func TestTTHeaderStreaming(t *testing.T) {
 		client.WithPayloadCodec(thrift.NewThriftCodecWithConfig(thrift.FastRead|thrift.FastWrite|thrift.EnableSkipDecoder)),
 	)
 	test.Assert(t, err == nil, err)
+	// create streaming client
+	cp, _ := ttstream.NewClientProvider(
+		streamingServiceInfo,
+		ttstream.WithClientLongConnPool(ttstream.DefaultLongConnConfig),
+	)
 	streamClient, err := NewStreamingClient(
 		"kitex.service.streaming",
+		streamxclient.WithProvider(cp),
 		streamxclient.WithHostPorts(addr),
 		streamxclient.WithStreamRecvMiddleware(func(next streamx.StreamRecvEndpoint) streamx.StreamRecvEndpoint {
 			return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
@@ -212,10 +245,12 @@ func TestTTHeaderStreaming(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, req.Type == res.Type, res.Type)
 	test.Assert(t, req.Message == res.Message, res.Message)
-	test.Assert(t, serverRecvCount["Unary"] == 1, serverRecvCount)
-	test.Assert(t, serverSendCount["Unary"] == 1, serverSendCount)
+	test.Assert(t, serverRecvCount == 1, serverRecvCount)
+	test.Assert(t, serverSendCount == 1, serverSendCount)
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
+	serverRecvCount = 0
+	serverSendCount = 0
 
 	// client stream
 	round := 5
@@ -235,9 +270,12 @@ func TestTTHeaderStreaming(t *testing.T) {
 	t.Logf("Client ClientStream CloseAndRecv: %v", res)
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
-	test.Assert(t, serverRecvCount["ClientStream"] == round, serverRecvCount)
-	test.Assert(t, serverSendCount["ClientStream"] == 1, serverSendCount)
+	test.Assert(t, serverRecvCount == int32(round), serverRecvCount)
+	test.Assert(t, serverSendCount == 1, serverSendCount)
+	testHeaderAndTrailer(t, cs)
 	cs = nil
+	serverRecvCount = 0
+	serverSendCount = 0
 	runtime.GC()
 
 	// server stream
@@ -246,12 +284,6 @@ func TestTTHeaderStreaming(t *testing.T) {
 	req.Message = "ServerStream"
 	ss, err := streamClient.ServerStream(ctx, req)
 	test.Assert(t, err == nil, err)
-	// server stream recv header
-	hd, err := ss.Header()
-	test.Assert(t, err == nil, err)
-	t.Logf("Client ServerStream recv header: %v", hd)
-	test.DeepEqual(t, hd["key1"], "val1")
-	test.DeepEqual(t, hd["key2"], "val2")
 	received := 0
 	for {
 		res, err := ss.Recv(ctx)
@@ -264,59 +296,275 @@ func TestTTHeaderStreaming(t *testing.T) {
 	}
 	err = ss.CloseSend(ctx)
 	test.Assert(t, err == nil, err)
-	// server stream recv trailer
-	tl, err := ss.Trailer()
-	test.Assert(t, err == nil, err)
-	t.Logf("Client ServerStream recv trailer: %v", tl)
-	test.DeepEqual(t, tl["key1"], "val1")
-	test.DeepEqual(t, tl["key2"], "val2")
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
-	test.Assert(t, serverRecvCount["ServerStream"] == 1, serverRecvCount)
-	test.Assert(t, serverSendCount["ServerStream"] == received, serverSendCount)
+	test.Assert(t, serverRecvCount == 1, serverRecvCount)
+	test.Assert(t, serverSendCount == int32(received), serverSendCount, received)
+	testHeaderAndTrailer(t, ss)
 	ss = nil
+	serverRecvCount = 0
+	serverSendCount = 0
 	runtime.GC()
 
 	// bidi stream
-	round = 5
 	t.Logf("=== BidiStream ===")
-	bs, err := streamClient.BidiStream(ctx)
-	test.Assert(t, err == nil, err)
-	msg := "BidiStream"
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < round; i++ {
-			req := new(Request)
-			req.Message = msg
-			err := bs.Send(ctx, req)
+	concurrent := 1
+	round = 5
+	for c := 0; c < concurrent; c++ {
+		atomic.AddInt32(&serverStreamCount, -1)
+		go func() {
+			bs, err := streamClient.BidiStream(ctx)
 			test.Assert(t, err == nil, err)
-		}
-		err = bs.CloseSend(ctx)
-		test.Assert(t, err == nil, err)
-	}()
-	go func() {
-		defer wg.Done()
-		i := 0
-		for {
-			res, err := bs.Recv(ctx)
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			i++
-			test.Assert(t, err == nil, err)
-			test.Assert(t, msg == res.Message, res.Message)
-		}
-		test.Assert(t, i == round, i)
-	}()
-	wg.Wait()
-	atomic.AddInt32(&serverStreamCount, -1)
+			msg := "BidiStream"
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				for i := 0; i < round; i++ {
+					req := new(Request)
+					req.Message = msg
+					err := bs.Send(ctx, req)
+					test.Assert(t, err == nil, err)
+				}
+				err = bs.CloseSend(ctx)
+				test.Assert(t, err == nil, err)
+			}()
+			go func() {
+				defer wg.Done()
+				i := 0
+				for {
+					res, err := bs.Recv(ctx)
+					t.Log(res, err)
+					if errors.Is(err, io.EOF) {
+						break
+					}
+					i++
+					test.Assert(t, err == nil, err)
+					test.Assert(t, msg == res.Message, res.Message)
+				}
+				test.Assert(t, i == round, i)
+			}()
+			testHeaderAndTrailer(t, bs)
+		}()
+	}
 	waitServerStreamDone()
-	test.Assert(t, serverRecvCount["BidiStream"] == round, serverRecvCount)
-	test.Assert(t, serverSendCount["BidiStream"] == round, serverSendCount)
-	bs = nil
+	test.Assert(t, serverRecvCount == int32(concurrent*round), serverRecvCount)
+	test.Assert(t, serverSendCount == int32(concurrent*round), serverSendCount)
+	serverRecvCount = 0
+	serverSendCount = 0
 	runtime.GC()
 
 	streamClient = nil
+}
+
+func TestTTHeaderStreamingLongConn(t *testing.T) {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
+	var addr = test.GetLocalAddress()
+	ln, _ := netpoll.CreateListener("tcp", addr)
+	defer ln.Close()
+
+	// create server
+	svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
+	// register streamingService as ttstreaam provider
+	sp, _ := ttstream.NewServerProvider(streamingServiceInfo)
+	_ = svr.RegisterService(
+		streamingServiceInfo,
+		new(streamingService),
+		streamxserver.WithProvider(sp),
+	)
+	go func() {
+		_ = svr.Run()
+	}()
+	defer svr.Stop()
+	test.WaitServerStart(addr)
+
+	numGoroutine := runtime.NumGoroutine()
+	cp, _ := ttstream.NewClientProvider(
+		streamingServiceInfo,
+		ttstream.WithClientLongConnPool(
+			ttstream.LongConnConfig{MaxIdleTimeout: time.Second},
+		),
+	)
+	streamClient, _ := NewStreamingClient(
+		"kitex.service.streaming",
+		streamxclient.WithHostPorts(addr),
+		streamxclient.WithProvider(cp),
+	)
+	ctx := context.Background()
+	msg := "BidiStream"
+
+	t.Logf("checking only one connection be reused")
+	var wg sync.WaitGroup
+	for i := 0; i < 12; i++ {
+		wg.Add(1)
+		bs, err := streamClient.BidiStream(ctx)
+		test.Assert(t, err == nil, err)
+		req := new(Request)
+		req.Message = string(make([]byte, 1024))
+		err = bs.Send(ctx, req)
+		test.Assert(t, err == nil, err)
+		res, err := bs.Recv(ctx)
+		test.Assert(t, err == nil, err)
+		err = bs.CloseSend(ctx)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, res.Message == req.Message, res.Message)
+		runtime.SetFinalizer(bs, func(_ any) {
+			wg.Done()
+			t.Logf("stream is finalized")
+		})
+		bs = nil
+		runtime.GC()
+		wg.Wait()
+	}
+
+	t.Logf("checking goroutines destroy")
+	// checking streaming goroutines
+	streams := 500
+	for i := 0; i < streams; i++ {
+		wg.Add(1)
+		go func() {
+			bs, err := streamClient.BidiStream(ctx)
+			test.Assert(t, err == nil, err)
+			req := new(Request)
+			req.Message = msg
+			err = bs.Send(ctx, req)
+			test.Assert(t, err == nil, err)
+			go func() {
+				defer wg.Done()
+				res, err := bs.Recv(ctx)
+				test.Assert(t, err == nil, err)
+				err = bs.CloseSend(ctx)
+				test.Assert(t, err == nil, err)
+				test.Assert(t, res.Message == msg, res.Message)
+
+				testHeaderAndTrailer(t, bs)
+			}()
+		}()
+	}
+	wg.Wait()
+	for {
+		ng := runtime.NumGoroutine()
+		if ng-numGoroutine < 10 {
+			break
+		}
+		runtime.GC()
+		time.Sleep(time.Second)
+		t.Logf("current goroutines=%d, before =%d", ng, numGoroutine)
+	}
+}
+
+func TestTTHeaderStreamingRecvTimeout(t *testing.T) {
+	var addr = test.GetLocalAddress()
+	ln, _ := netpoll.CreateListener("tcp", addr)
+	defer ln.Close()
+
+	// create server
+	svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
+	// register streamingService as ttstreaam provider
+	sp, _ := ttstream.NewServerProvider(streamingServiceInfo)
+	_ = svr.RegisterService(
+		streamingServiceInfo,
+		new(streamingService),
+		streamxserver.WithProvider(sp),
+	)
+	go func() {
+		_ = svr.Run()
+	}()
+	defer svr.Stop()
+	test.WaitServerStart(addr)
+
+	cp, _ := ttstream.NewClientProvider(
+		streamingServiceInfo,
+		ttstream.WithClientLongConnPool(
+			ttstream.LongConnConfig{MaxIdleTimeout: time.Second},
+		),
+	)
+
+	// timeout by ctx itself
+	streamClient, _ := NewStreamingClient(
+		"kitex.service.streaming",
+		streamxclient.WithHostPorts(addr),
+		streamxclient.WithProvider(cp),
+	)
+	ctx := context.Background()
+	bs, err := streamClient.BidiStream(ctx)
+	test.Assert(t, err == nil, err)
+	req := new(Request)
+	req.Message = string(make([]byte, 1024))
+	err = bs.Send(ctx, req)
+	test.Assert(t, err == nil, err)
+	ctx, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err = bs.Recv(ctx)
+	test.Assert(t, err != nil, err)
+	t.Logf("recv timeout error: %v", err)
+	err = bs.CloseSend(ctx)
+	test.Assert(t, err == nil, err)
+
+	// timeout by client WithRecvTimeout
+	streamClient, _ = NewStreamingClient(
+		"kitex.service.streaming",
+		streamxclient.WithHostPorts(addr),
+		streamxclient.WithProvider(cp),
+		streamxclient.WithRecvTimeout(time.Nanosecond),
+	)
+	ctx = context.Background()
+	bs, err = streamClient.BidiStream(ctx)
+	test.Assert(t, err == nil, err)
+	req = new(Request)
+	req.Message = string(make([]byte, 1024))
+	err = bs.Send(ctx, req)
+	test.Assert(t, err == nil, err)
+	_, err = bs.Recv(ctx)
+	test.Assert(t, err != nil, err)
+	t.Logf("recv timeout error: %v", err)
+	err = bs.CloseSend(ctx)
+	test.Assert(t, err == nil, err)
+}
+
+func BenchmarkTTHeaderStreaming(b *testing.B) {
+	klog.SetLevel(klog.LevelWarn)
+	var addr = test.GetLocalAddress()
+	ln, _ := netpoll.CreateListener("tcp", addr)
+	defer ln.Close()
+
+	// create server
+	svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
+	// register streamingService as ttstreaam provider
+	sp, _ := ttstream.NewServerProvider(streamingServiceInfo)
+	_ = svr.RegisterService(streamingServiceInfo, new(streamingService), streamxserver.WithProvider(sp))
+	go func() {
+		_ = svr.Run()
+	}()
+	defer svr.Stop()
+	test.WaitServerStart(addr)
+
+	streamClient, _ := NewStreamingClient("kitex.service.streaming", streamxclient.WithHostPorts(addr))
+	ctx := context.Background()
+	bs, err := streamClient.BidiStream(ctx)
+	if err != nil {
+		b.Fatal(err)
+	}
+	msg := "BidiStream"
+	var wg sync.WaitGroup
+	wg.Add(1)
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		req := new(Request)
+		req.Message = msg
+		err := bs.Send(ctx, req)
+		if err != nil {
+			b.Fatal(err)
+		}
+		res, err := bs.Recv(ctx)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		_ = res
+	}
+	err = bs.CloseSend(ctx)
 }
