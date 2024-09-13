@@ -25,6 +25,7 @@ import (
 	"runtime/debug"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -92,21 +93,19 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	for {
 		nctx, ss, nerr := t.provider.OnStream(ctx, conn)
 		if nerr != nil {
-			if !errors.Is(nerr, io.EOF) {
-				klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)
+			if errors.Is(nerr, io.EOF) {
+				return nil
 			}
+			klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)
 			return nerr
 		}
 		// stream level goroutine
-		go func() {
+		gofunc.GoFunc(ctx, func() {
 			nerr = t.OnStream(nctx, conn, ss)
-			if nerr != nil {
-				if !errors.Is(nerr, io.EOF) {
-					klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", nerr)
-				}
-				return
+			if !errors.Is(nerr, io.EOF) {
+				klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", nerr)
 			}
-		}()
+		})
 	}
 }
 
@@ -157,7 +156,6 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 
 	reqArgs := streamx.NewStreamReqArgs(nil)
 	resArgs := streamx.NewStreamResArgs(nil)
-	// server handler (which will call streamxserver.InvokeStream inside)
 	serr := t.inkHdlFunc(ctx, reqArgs, resArgs)
 	ctx, err = t.provider.OnStreamFinish(ctx, ss)
 	if err == nil && serr != nil {

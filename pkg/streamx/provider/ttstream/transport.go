@@ -23,15 +23,18 @@ const (
 
 var _ Object = (*transport)(nil)
 
+const streamCacheSize = 32
+
 type transport struct {
 	kind    int32
 	sinfo   *serviceinfo.ServiceInfo
 	conn    netpoll.Connection
 	reader  bufiox.Reader
 	writer  bufiox.Writer
-	streams sync.Map     // key=streamID val=streamIO
-	sch     chan *stream // in-coming stream channel
-	wch     chan Frame   // out-coming frame channel
+	streams sync.Map       // key=streamID val=streamIO
+	spipe   *Pipe[*stream] // in-coming stream channel
+	scache  []*stream      // size is streamCacheSize
+	wpipe   *Pipe[*Frame]  // out-coming frame channel
 	stop    chan struct{}
 
 	// for scavenger check
@@ -48,8 +51,9 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		reader:  cbuffer,
 		writer:  cbuffer,
 		streams: sync.Map{},
-		sch:     make(chan *stream, 1024),
-		wch:     make(chan Frame, 1024),
+		spipe:   NewPipe[*stream](),
+		scache:  make([]*stream, 0, streamCacheSize),
+		wpipe:   NewPipe[*Frame](),
 		stop:    make(chan struct{}),
 	}
 	go func() {
@@ -109,7 +113,7 @@ func (t *transport) loopRead() error {
 				smode := t.sinfo.MethodInfo(fr.method).StreamingMode()
 				s := newStream(t, smode, fr.streamFrame)
 				klog.Debugf("transport[%d] read a new stream: sid=%d", t.kind, s.sid)
-				t.sch <- s
+				t.spipe.Write(s)
 			case clientTransport:
 				// Header Frame: client recv header
 				sio, ok := t.loadStreamIO(fr.sid)
@@ -153,43 +157,31 @@ func (t *transport) writeFrame(frame Frame, directly bool) error {
 }
 
 func (t *transport) loopWrite() error {
+	frames := make([]*Frame, 32)
 	for {
 		now := time.Now()
 		t.lastActive.Store(now)
 
-		select {
-		case <-t.stop:
-			// re-check wch queue
-			select {
-			case frame := <-t.wch:
-				if err := t.writeFrame(frame, true); err != nil {
-					return err
-				}
-			default:
+		n, err := t.wpipe.Read(frames)
+		if err != nil {
+			if errors.Is(err, PipeEOF) {
 				return nil
 			}
-		case frame := <-t.wch:
-			if err := t.writeFrame(frame, true); err != nil {
+			return err
+		}
+		// if n > 1, we should use batch writes
+		writeDirectly := n == 1
+		for i := 0; i < n; i++ {
+			if err := t.writeFrame(*frames[i], writeDirectly); err != nil {
 				return err
 			}
+		}
+		if writeDirectly {
 			runtime.Gosched()
-			// batch write optimization
-			batchWrite := true
-			for batchWrite {
-				select {
-				case frame := <-t.wch:
-					if err := t.writeFrame(frame, false); err != nil {
-						return err
-					}
-					klog.Debugf("batch write frame")
-				default:
-					batchWrite = false
-				}
-			}
+		} else {
 			if err := t.writer.Flush(); err != nil {
 				return err
 			}
-			klog.Debugf("batch flush")
 		}
 	}
 }
@@ -210,6 +202,8 @@ func (t *transport) Close() (err error) {
 	default:
 		klog.Warnf("transport[%s] is closing", t.conn.LocalAddr())
 		close(t.stop)
+		t.spipe.Close()
+		t.wpipe.Close()
 		t.conn.Close()
 	}
 	return nil
@@ -223,19 +217,19 @@ func (t *transport) streamSend(sid int32, method string, wheader Header, payload
 		}
 	}
 	f := newFrame(streamFrame{sid: sid, method: method}, dataFrameType, payload)
-	t.wch <- f
+	t.wpipe.Write(&f)
 	return nil
 }
 
 func (t *transport) streamSendHeader(sid int32, method string, header Header) (err error) {
 	f := newFrame(streamFrame{sid: sid, method: method, header: header}, headerFrameType, []byte{})
-	t.wch <- f
+	t.wpipe.Write(&f)
 	return nil
 }
 
 func (t *transport) streamSendTrailer(sid int32, method string, trailer Trailer) (err error) {
 	f := newFrame(streamFrame{sid: sid, method: method, trailer: trailer}, trailerFrameType, []byte{})
-	t.wch <- f
+	t.wpipe.Write(&f)
 	return nil
 }
 
@@ -285,7 +279,7 @@ func (t *transport) newStream(
 	}
 	f := newFrame(smeta, headerFrameType, []byte{})
 	s := newStream(t, smode, smeta)
-	t.wch <- f // create stream
+	t.wpipe.Write(&f) // create stream
 	return s, nil
 }
 
@@ -295,13 +289,22 @@ func (t *transport) readStream() (*stream, error) {
 	if t.kind != serverTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
-	select {
-	case <-t.stop:
-		return nil, io.EOF
-	case s := <-t.sch:
-		if s == nil {
-			return nil, io.EOF
-		}
+READ:
+	if len(t.scache) > 0 {
+		s := t.scache[len(t.scache)-1]
+		t.scache = t.scache[:len(t.scache)-1]
 		return s, nil
 	}
+	n, err := t.spipe.Read(t.scache[0:streamCacheSize])
+	if err != nil {
+		if errors.Is(err, PipeEOF) {
+			return nil, io.EOF
+		}
+		return nil, err
+	}
+	if n == 0 {
+		panic("Assert: N == 0 !")
+	}
+	t.scache = t.scache[:n]
+	goto READ
 }
