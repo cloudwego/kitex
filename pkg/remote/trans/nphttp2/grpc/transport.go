@@ -505,6 +505,8 @@ func CreateStream(id uint32, requestRead func(i int)) *Stream {
 		requestRead: requestRead,
 		hdrMu:       sync.Mutex{},
 	}
+	ctx, cancel := context.WithCancel(context.Background())
+	stream.ctx, stream.cancel = newContextWithCancelReason(ctx, cancel)
 
 	return stream
 }
