@@ -453,7 +453,7 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 		select {
 		case <-c.ch:
 		case <-c.done:
-			return nil, c.finish(ErrConnClosing)
+			return nil, c.finish(errStatusControlBufFinished)
 		}
 	}
 }
@@ -704,7 +704,7 @@ func (l *loopyWriter) originateStream(str *outStream) error {
 		if err == ErrConnClosing {
 			return err
 		}
-		// Other errors(errStreamDrain) need not close transport.
+		// Other errors(errStatusStreamDrain) need not close transport.
 		return nil
 	}
 	if err := l.writeHeader(str.id, hdr.endStream, hdr.hf, hdr.onWrite); err != nil {

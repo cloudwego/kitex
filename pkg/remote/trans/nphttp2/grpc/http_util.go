@@ -36,11 +36,11 @@ import (
 	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/proto"
 
+	istatus "github.com/cloudwego/kitex/internal/remote/trans/grpc/status"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
@@ -112,8 +112,8 @@ type parsedHeaderData struct {
 	acceptEncoding string
 	// statusGen caches the stream status received from the trailer the server
 	// sent.  Client side only.  Do not access directly.  After all trailers are
-	// parsed, use the status method to retrieve the status.
-	statusGen    *status.Status
+	// parsed, use the status method to retrieve the istatus.
+	statusGen    *istatus.Status
 	bizStatusErr kerrors.BizStatusErrorIface
 	// rawStatusCode and rawStatusMsg are set from the raw trailer fields and are not
 	// intended for direct access outside of parsing.
@@ -142,8 +142,8 @@ type parsedHeaderData struct {
 	// Otherwise (i.e. a content-type string starts without "application/grpc", or does not exist), we
 	// are in HTTP fallback mode, and should handle error specific to HTTP.
 	isGRPC         bool
-	grpcErr        error
-	httpErr        error
+	grpcStatus     *istatus.Status
+	httpErrStatus  *istatus.Status
 	contentTypeErr string
 }
 
@@ -234,10 +234,10 @@ func contentType(contentSubtype string) string {
 	return baseContentType + "+" + contentSubtype
 }
 
-func (d *decodeState) status() *status.Status {
+func (d *decodeState) status() *istatus.Status {
 	if d.data.statusGen == nil {
 		// No status-details were provided; generate status using code/msg.
-		d.data.statusGen = status.New(codes.Code(safeCastInt32(*(d.data.rawStatusCode))), d.data.rawStatusMsg)
+		d.data.statusGen = istatus.New(codes.Code(safeCastInt32(*(d.data.rawStatusCode))), d.data.rawStatusMsg)
 	}
 	return d.data.statusGen
 }
@@ -290,11 +290,11 @@ func decodeMetadataHeader(k, v string) (string, error) {
 	return v, nil
 }
 
-func (d *decodeState) decodeHeader(frame *grpcframe.MetaHeadersFrame) error {
+func (d *decodeState) decodeHeader(frame *grpcframe.MetaHeadersFrame) *istatus.Status {
 	// frame.Truncated is set to true when framer detects that the current header
 	// list size hits MaxHeaderListSize limit.
 	if frame.Truncated {
-		return status.New(codes.Internal, "peer header list size exceeded limit").Err()
+		return istatus.New(codes.Internal, "peer header list size exceeded limit")
 	}
 
 	for _, hf := range frame.Fields {
@@ -302,8 +302,8 @@ func (d *decodeState) decodeHeader(frame *grpcframe.MetaHeadersFrame) error {
 	}
 
 	if d.data.isGRPC {
-		if d.data.grpcErr != nil {
-			return d.data.grpcErr
+		if d.data.grpcStatus != nil {
+			return d.data.grpcStatus
 		}
 		if d.serverSide {
 			return nil
@@ -322,8 +322,8 @@ func (d *decodeState) decodeHeader(frame *grpcframe.MetaHeadersFrame) error {
 	}
 
 	// HTTP fallback mode
-	if d.data.httpErr != nil {
-		return d.data.httpErr
+	if d.data.httpErrStatus != nil {
+		return d.data.httpErrStatus
 	}
 
 	var (
@@ -338,7 +338,7 @@ func (d *decodeState) decodeHeader(frame *grpcframe.MetaHeadersFrame) error {
 		}
 	}
 
-	return status.New(code, d.constructHTTPErrMsg()).Err()
+	return istatus.New(code, d.constructHTTPErrMsg())
 }
 
 // constructErrMsg constructs error message to be returned in HTTP fallback mode.
@@ -390,7 +390,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 	case "grpc-status":
 		code, err := strconv.Atoi(f.Value)
 		if err != nil {
-			d.data.grpcErr = status.Errorf(codes.Internal, "transport: malformed grpc-status: %v", err)
+			d.data.grpcStatus = istatus.Newf(codes.Internal, "transport: malformed grpc-status: %v", err)
 			return
 		}
 		d.data.rawStatusCode = &code
@@ -399,48 +399,48 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 	case "biz-status":
 		code, err := strconv.Atoi(f.Value)
 		if err != nil {
-			d.data.grpcErr = status.Errorf(codes.Internal, "transport: malformed biz-status: %v", err)
+			d.data.grpcStatus = istatus.Newf(codes.Internal, "transport: malformed biz-status: %v", err)
 			return
 		}
 		d.data.bizStatusCode = &code
 	case "biz-extra":
 		extra, err := utils.JSONStr2Map(f.Value)
 		if err != nil {
-			d.data.grpcErr = status.Errorf(codes.Internal, "transport: malformed biz-extra: %v", err)
+			d.data.grpcStatus = istatus.Newf(codes.Internal, "transport: malformed biz-extra: %v", err)
 			return
 		}
 		d.data.bizStatusExtra = extra
 	case "grpc-status-details-bin":
 		v, err := decodeBinHeader(f.Value)
 		if err != nil {
-			d.data.grpcErr = status.Errorf(codes.Internal, "transport: malformed grpc-status-details-bin: %v", err)
+			d.data.grpcStatus = istatus.Newf(codes.Internal, "transport: malformed grpc-status-details-bin: %v", err)
 			return
 		}
 		s := &spb.Status{}
 		if err := proto.Unmarshal(v, s); err != nil {
-			d.data.grpcErr = status.Errorf(codes.Internal, "transport: malformed grpc-status-details-bin: %v", err)
+			d.data.grpcStatus = istatus.Newf(codes.Internal, "transport: malformed grpc-status-details-bin: %v", err)
 			return
 		}
-		d.data.statusGen = status.FromProto(s)
+		d.data.statusGen = istatus.FromProto(s)
 	case "grpc-timeout":
 		d.data.timeoutSet = true
 		var err error
 		if d.data.timeout, err = decodeTimeout(f.Value); err != nil {
-			d.data.grpcErr = status.Errorf(codes.Internal, "transport: malformed time-out: %v", err)
+			d.data.grpcStatus = istatus.Newf(codes.Internal, "transport: malformed time-out: %v", err)
 		}
 	case ":path":
 		d.data.method = f.Value
 	case ":status":
 		code, err := strconv.Atoi(f.Value)
 		if err != nil {
-			d.data.httpErr = status.Errorf(codes.Internal, "transport: malformed http-status: %v", err)
+			d.data.httpErrStatus = istatus.Newf(codes.Internal, "transport: malformed http-status: %v", err)
 			return
 		}
 		d.data.httpStatus = &code
 	case "grpc-tags-bin":
 		v, err := decodeBinHeader(f.Value)
 		if err != nil {
-			d.data.grpcErr = status.Errorf(codes.Internal, "transport: malformed grpc-tags-bin: %v", err)
+			d.data.grpcStatus = istatus.Newf(codes.Internal, "transport: malformed grpc-tags-bin: %v", err)
 			return
 		}
 		d.data.statsTags = v
@@ -448,7 +448,7 @@ func (d *decodeState) processHeaderField(f hpack.HeaderField) {
 	case "grpc-trace-bin":
 		v, err := decodeBinHeader(f.Value)
 		if err != nil {
-			d.data.grpcErr = status.Errorf(codes.Internal, "transport: malformed grpc-trace-bin: %v", err)
+			d.data.grpcStatus = istatus.Newf(codes.Internal, "transport: malformed grpc-trace-bin: %v", err)
 			return
 		}
 		d.data.statsTrace = v

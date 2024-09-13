@@ -30,6 +30,7 @@ import (
 	"io"
 	"math"
 	"net"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -41,7 +42,9 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 
+	istatus "github.com/cloudwego/kitex/internal/remote/trans/grpc/status"
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/testutils"
@@ -128,13 +131,13 @@ func (h *testStreamHandler) handleStream(t *testing.T, s *Stream) {
 	}
 	if !bytes.Equal(p, req) {
 		t.Errorf("handleStream got %v, want %v", p, req)
-		h.t.WriteStatus(s, status.New(codes.Internal, "panic"))
+		h.t.WriteStatus(s, istatus.New(codes.Internal, "panic"))
 		return
 	}
 	// send a response back to the client.
 	h.t.Write(s, nil, resp, &Options{})
 	// send the trailer to end the stream.
-	h.t.WriteStatus(s, status.New(codes.OK, ""))
+	h.t.WriteStatus(s, istatus.New(codes.OK, ""))
 }
 
 func (h *testStreamHandler) handleStreamPingPong(t *testing.T, s *Stream) {
@@ -142,18 +145,18 @@ func (h *testStreamHandler) handleStreamPingPong(t *testing.T, s *Stream) {
 	for {
 		if _, err := s.Read(header); err != nil {
 			if err == io.EOF {
-				h.t.WriteStatus(s, status.New(codes.OK, ""))
+				h.t.WriteStatus(s, istatus.New(codes.OK, ""))
 				return
 			}
 			t.Errorf("Error on server while reading data header: %v", err)
-			h.t.WriteStatus(s, status.New(codes.Internal, "panic"))
+			h.t.WriteStatus(s, istatus.New(codes.Internal, "panic"))
 			return
 		}
 		sz := binary.BigEndian.Uint32(header[1:])
 		msg := make([]byte, int(sz))
 		if _, err := s.Read(msg); err != nil {
 			t.Errorf("Error on server while reading message: %v", err)
-			h.t.WriteStatus(s, status.New(codes.Internal, "panic"))
+			h.t.WriteStatus(s, istatus.New(codes.Internal, "panic"))
 			return
 		}
 		buf := make([]byte, sz+5)
@@ -168,7 +171,7 @@ func (h *testStreamHandler) handleStreamMisbehave(t *testing.T, s *Stream) {
 	conn, ok := s.st.(*http2Server)
 	if !ok {
 		t.Errorf("Failed to convert %v to *http2Server", s.st)
-		h.t.WriteStatus(s, status.New(codes.Internal, ""))
+		h.t.WriteStatus(s, istatus.New(codes.Internal, ""))
 		return
 	}
 	var sent int
@@ -293,7 +296,7 @@ func (h *testStreamHandler) handleStreamDelayRead(t *testing.T, s *Stream) {
 		return
 	}
 	// send the trailer to end the stream.
-	if err := h.t.WriteStatus(s, status.New(codes.OK, "")); err != nil {
+	if err := h.t.WriteStatus(s, istatus.New(codes.OK, "")); err != nil {
 		t.Errorf("server WriteStatus got %v, want <nil>", err)
 		return
 	}
@@ -610,8 +613,8 @@ func TestInflightStreamClosing(t *testing.T) {
 	}
 
 	donec := make(chan struct{})
-	// serr := &status.Error{e: s.Proto()}
-	serr := status.Err(codes.Internal, "client connection is closing")
+	// serr := &istatus.Error{e: s.Proto()}
+	serr := istatus.Err(codes.Internal, "client connection is closing")
 	go func() {
 		defer close(donec)
 		if _, err := stream.Read(make([]byte, defaultWindowSize)); err != serr {
@@ -906,8 +909,8 @@ func TestLargeMessageWithDelayRead(t *testing.T) {
 //				return
 //			}
 //			ct.write(str, nil, nil, &Options{Last: true})
-//			if _, err := str.Read(make([]byte, 8)); err != errStreamDrain && err != ErrConnClosing {
-//				t.Errorf("_.Read(_) = _, %v, want _, %v or %v", err, errStreamDrain, ErrConnClosing)
+//			if _, err := str.Read(make([]byte, 8)); err != errStatusStreamDrain && err != ErrConnClosing {
+//				t.Errorf("_.Read(_) = _, %v, want _, %v or %v", err, errStatusStreamDrain, ErrConnClosing)
 //			}
 //		}()
 //	}
@@ -942,11 +945,9 @@ func TestLargeMessageSuspension(t *testing.T) {
 	msg := make([]byte, initialWindowSize*8)
 	ct.Write(s, nil, msg, &Options{})
 	err = ct.Write(s, nil, msg, &Options{Last: true})
-	if err != errStreamDone {
-		t.Fatalf("write got %v, want io.EOF", err)
-	}
-	expectedErr := status.Err(codes.DeadlineExceeded, context.DeadlineExceeded.Error())
-	if _, err := s.Read(make([]byte, 8)); err.Error() != expectedErr.Error() {
+	test.Assert(t, errors.Is(err, ContextErr(ctx.Err())), err)
+	expectedErr := newStatus(codes.DeadlineExceeded, kerrors.ErrStreamTimeout, context.DeadlineExceeded.Error())
+	if _, err := s.Read(make([]byte, 8)); reflect.DeepEqual(err, expectedErr) {
 		t.Fatalf("Read got %v of type %T, want %v", err, err, expectedErr)
 	}
 	ct.Close(errSelfCloseForTest)
@@ -976,7 +977,7 @@ func TestMaxStreams(t *testing.T) {
 	pctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	timer := time.NewTimer(time.Second * 10)
-	expectedErr := status.Err(codes.DeadlineExceeded, context.DeadlineExceeded.Error())
+	expectedErr := newStatus(codes.DeadlineExceeded, kerrors.ErrStreamTimeout, context.DeadlineExceeded.Error())
 	for {
 		select {
 		case <-timer.C:
@@ -990,7 +991,7 @@ func TestMaxStreams(t *testing.T) {
 		if str, err := ct.NewStream(ctx, callHdr); err == nil {
 			slist = append(slist, str)
 			continue
-		} else if err.Error() != expectedErr.Error() {
+		} else if reflect.DeepEqual(err, expectedErr) {
 			t.Fatalf("ct.NewStream(_,_) = _, %v, want _, %v", err, expectedErr)
 		}
 		timer.Stop()
@@ -1078,8 +1079,9 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 	ct.Close(errSelfCloseForTest)
 	select {
 	case <-ss.Context().Done():
-		if ss.Context().Err() != errConnectionEOF {
-			t.Fatalf("ss.Context().Err() got %v, want %v", ss.Context().Err(), errConnectionEOF)
+		cErr := ss.Context().Err()
+		if !errors.Is(cErr, errHTTP2Connection) {
+			t.Fatalf("ss.Context().Err() got %v, want %v", ss.Context().Err(), errStatusConnectionEOF)
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatalf("%s", "Failed to cancel the context of the sever side stream.")
@@ -1514,7 +1516,7 @@ func TestServerWithMisbehavedClient(t *testing.T) {
 //	}
 //}
 
-var encodingTestStatus = status.New(codes.Internal, "\n")
+var encodingTestStatus = istatus.New(codes.Internal, "\n")
 
 func TestEncodingRequiredStatus(t *testing.T) {
 	server, ct := setUp(t, 0, math.MaxUint32, encodingRequiredStatus)
@@ -1615,8 +1617,8 @@ func TestContextErr(t *testing.T) {
 		// outputs
 		errOut error
 	}{
-		{context.DeadlineExceeded, status.Err(codes.DeadlineExceeded, context.DeadlineExceeded.Error())},
-		{context.Canceled, status.Err(codes.Canceled, context.Canceled.Error())},
+		{context.DeadlineExceeded, newStatus(codes.DeadlineExceeded, kerrors.ErrStreamTimeout, context.DeadlineExceeded.Error()).Err()},
+		{context.Canceled, newStatus(codes.Canceled, kerrors.ErrBizCanceled, context.Canceled.Error()).Err()},
 	} {
 		err := ContextErr(test.errIn)
 		if err.Error() != test.errOut.Error() {
@@ -2126,4 +2128,60 @@ func TestTlsAppendH2ToALPNProtocols(t *testing.T) {
 	test.Assert(t, appended[0] == alpnProtoStrH2)
 	appended = tlsAppendH2ToALPNProtocols(appended)
 	test.Assert(t, len(appended) == 1)
+}
+
+func Test_clientContextErr(t *testing.T) {
+	testcases := []struct {
+		desc   string
+		input  error
+		target error
+	}{
+		{
+			desc:   "user invokes cancel()",
+			input:  context.Canceled,
+			target: kerrors.ErrBizCanceled,
+		},
+		{
+			desc:   "ctx timeout",
+			input:  context.DeadlineExceeded,
+			target: kerrors.ErrStreamTimeout,
+		},
+		{
+			desc:   "kerrors.ErrGracefulShutdown pass through",
+			input:  newStatus(codes.Internal, kerrors.ErrGracefulShutdown, "pass through").Err(),
+			target: kerrors.ErrGracefulShutdown,
+		},
+		{
+			desc:   "kerrors.ErrBizCanceled pass through",
+			input:  newStatus(codes.Internal, kerrors.ErrBizCanceled, "pass through").Err(),
+			target: kerrors.ErrBizCanceled,
+		},
+		{
+			desc:   "kerrors.ErrServerStreamFinished pass through",
+			input:  newStatus(codes.Internal, kerrors.ErrServerStreamFinished, "pass through").Err(),
+			target: kerrors.ErrServerStreamFinished,
+		},
+		{
+			desc:   "kerrors.ErrStreamingCanceled pass through",
+			input:  newStatus(codes.Internal, kerrors.ErrStreamingCanceled, "pass through").Err(),
+			target: kerrors.ErrStreamingCanceled,
+		},
+		{
+			desc:   "errRecvUpstreamRstStream pass through",
+			input:  newStatus(codes.Internal, errRecvUpstreamRstStream, "pass through").Err(),
+			target: errRecvUpstreamRstStream,
+		},
+		{
+			desc:   "non-pass through",
+			input:  newStatus(codes.Internal, errStreamFlowControl, "non-pass through").Err(),
+			target: kerrors.ErrStreamingCanceled,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.desc, func(t *testing.T) {
+			err := clientContextErr(tc.input)
+			test.Assert(t, errors.Is(err, tc.target), err)
+		})
+	}
 }

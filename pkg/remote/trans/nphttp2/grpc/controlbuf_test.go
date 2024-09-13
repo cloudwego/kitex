@@ -18,6 +18,7 @@ package grpc
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ import (
 )
 
 func TestControlBuf(t *testing.T) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 	cb := newControlBuffer(ctx.Done())
 
 	// test put()
@@ -52,7 +53,8 @@ func TestControlBuf(t *testing.T) {
 	test.Assert(t, !success, err)
 
 	// test throttle() mock a lot of response frame so throttle() will block current goroutine
-	for i := 0; i < maxQueuedTransportResponseFrames+5; i++ {
+	exceedSize := 5
+	for i := 0; i < maxQueuedTransportResponseFrames+exceedSize; i++ {
 		err := cb.put(&ping{})
 		test.Assert(t, err == nil, err)
 	}
@@ -60,16 +62,44 @@ func TestControlBuf(t *testing.T) {
 	// start a new goroutine to consume response frame
 	go func() {
 		time.Sleep(time.Millisecond * 100)
-		for {
+		for i := 0; i < exceedSize+1; i++ {
 			it, err := cb.get(false)
-			if err != nil || it == nil {
-				break
-			}
+			test.Assert(t, err == nil, err)
+			test.Assert(t, it != nil)
 		}
 	}()
 
 	cb.throttle()
+	// consumes all of the frames
+	for {
+		it, err := cb.get(false)
+		if err != nil || it == nil {
+			break
+		}
+	}
 
-	// test finish()
-	cb.finish(ErrConnClosing)
+	finishErr := errors.New("finish")
+	go func() {
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+		for range ticker.C {
+			var block bool
+			cb.mu.Lock()
+			block = cb.consumerWaiting
+			cb.mu.Unlock()
+			if block {
+				cb.finish(finishErr)
+				cancel()
+				return
+			}
+		}
+	}()
+	item, err = cb.get(true)
+	test.Assert(t, err == finishErr, err)
+	test.Assert(t, item == nil, item)
+
+	err = cb.put(testItem)
+	test.Assert(t, err == finishErr, err)
+	_, err = cb.get(false)
+	test.Assert(t, err == finishErr, err)
 }

@@ -18,7 +18,10 @@ package status
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 
 	spb "google.golang.org/genproto/googleapis/rpc/status"
@@ -63,6 +66,22 @@ func TestStatus(t *testing.T) {
 	statusNilErr, ok := FromError(nil)
 	test.Assert(t, ok)
 	test.Assert(t, statusNilErr == nil)
+
+	mappingErr := errors.New("mappingErr")
+	oriSt := NewWithMappingErr(codes.Internal, mappingErr, "withMappingErr test")
+	rawStErr := oriSt.Err()
+	test.Assert(t, strings.Contains(rawStErr.Error(), mappingErr.Error()), rawStErr)
+	test.Assert(t, errors.Is(rawStErr, mappingErr), rawStErr)
+	stErr, ok := rawStErr.(*Error)
+	test.Assert(t, ok)
+	test.Assert(t, stErr.kerr == mappingErr, stErr.kerr)
+	st0 := stErr.GRPCStatus()
+	test.Assert(t, reflect.DeepEqual(st0, oriSt), st0)
+	st1, ok := FromError(rawStErr)
+	test.Assert(t, ok)
+	test.Assert(t, reflect.DeepEqual(st1, oriSt), st1)
+	st2 := Convert(rawStErr)
+	test.Assert(t, reflect.DeepEqual(st2, oriSt), st1)
 }
 
 func TestError(t *testing.T) {
@@ -70,17 +89,19 @@ func TestError(t *testing.T) {
 	s.Code = 1
 	s.Message = "test err"
 
-	er := &Error{s}
+	kerr := errors.New("kerr")
+	er := &Error{e: s, kerr: kerr}
 	test.Assert(t, len(er.Error()) > 0)
+	test.Assert(t, strings.Contains(er.Error(), s.Message), er.Error())
+	test.Assert(t, strings.Contains(er.Error(), kerr.Error()), er.Error())
 
 	status := er.GRPCStatus()
 	test.Assert(t, status.Message() == s.Message)
 
-	is := er.Is(context.Canceled)
-	test.Assert(t, !is)
+	test.Assert(t, !er.Is(context.Canceled))
 
-	is = er.Is(er)
-	test.Assert(t, is)
+	test.Assert(t, er.Is(er))
+	test.Assert(t, er.Is(kerr))
 }
 
 func TestFromContextError(t *testing.T) {
@@ -101,7 +122,7 @@ func TestFromContextError(t *testing.T) {
 	s := new(spb.Status)
 	s.Code = 1
 	s.Message = "test err"
-	grpcErr := &Error{s}
+	grpcErr := &Error{e: s}
 	// grpc err
 	codeGrpcErr := Code(grpcErr)
 	test.Assert(t, codeGrpcErr == codes.Canceled)
