@@ -1004,12 +1004,12 @@ func (t *http2Server) deleteStream(s *Stream, eosReceived bool) {
 
 // finishStream closes the stream and puts the trailing headerFrame into controlbuf.
 func (t *http2Server) finishStream(s *Stream, rst bool, rstCode http2.ErrCode, hdr *headerFrame, eosReceived bool) {
-	s.cancel(nil)
 	oldState := s.swapState(streamDone)
 	if oldState == streamDone {
 		// If the stream was already done, return.
 		return
 	}
+	s.cancel(nil)
 
 	hdr.cleanup = &cleanupStream{
 		streamID: s.id,
