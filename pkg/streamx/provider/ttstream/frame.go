@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
@@ -113,7 +114,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr Frame, err error
 	if dp.PayloadLen == 0 {
 		return fr, nil
 	}
-	fr.payload = make([]byte, dp.PayloadLen)
+	fr.payload = mcache.Malloc(dp.PayloadLen)
 	_, err = reader.ReadBinary(fr.payload)
 	reader.Release(err)
 	if err != nil {

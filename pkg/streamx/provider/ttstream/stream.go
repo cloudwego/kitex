@@ -5,6 +5,7 @@ import (
 	"errors"
 	"sync/atomic"
 
+	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -159,6 +160,8 @@ func (s *stream) RecvMsg(ctx context.Context, req any) error {
 		return err
 	}
 	err = DecodePayload(ctx, payload, req.(thrift.FastCodec))
+	// payload will not be access after decode
+	mcache.Free(payload)
 	return err
 }
 

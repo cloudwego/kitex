@@ -23,7 +23,7 @@ const (
 
 var _ Object = (*transport)(nil)
 
-const streamCacheSize = 32
+const streamCacheSize = 64
 
 type transport struct {
 	kind    int32
