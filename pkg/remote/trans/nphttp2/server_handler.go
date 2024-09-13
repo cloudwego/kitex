@@ -193,6 +193,7 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 			return
 		}
 	}
+	s.SetServiceMeta(grpcTransport.SourceServiceMetaKey, ri.From().ServiceName())
 	rCtx = t.startTracer(rCtx, ri)
 	defer func() {
 		panicErr := recover()

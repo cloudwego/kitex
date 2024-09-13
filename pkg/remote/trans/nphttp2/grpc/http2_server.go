@@ -58,20 +58,21 @@ const (
 var (
 	// ErrIllegalHeaderWrite indicates that setting header is illegal because of
 	// the stream's state.
-	ErrIllegalHeaderWrite = errors.New("transport: the stream is done or WriteHeader was already called")
+	ErrIllegalHeaderWrite       = errors.New("transport: WriteHeader was already called")
+	errStatusIllegalHeaderWrite = status.Err(codes.Internal, ErrIllegalHeaderWrite.Error()+triggeredByHandlerSideSuffix)
 
 	// ErrHeaderListSizeLimitViolation indicates that the header list size is larger
 	// than the limit set by peer.
-	ErrHeaderListSizeLimitViolation = errors.New("transport: trying to send header list size larger than the limit set by peer")
+	ErrHeaderListSizeLimitViolation       = errors.New("transport: trying to send header list size larger than the limit set by peer")
+	errStatusHeaderListSizeLimitViolation = status.Err(codes.Internal, ErrHeaderListSizeLimitViolation.Error()+triggeredByHandlerSideSuffix)
 
 	// errors used for cancelling stream.
 	// the code should be codes.Canceled coz it's NOT returned from remote
-	errConnectionEOF      = status.New(codes.Canceled, "transport: connection EOF").Err()
-	errStreamClosing      = status.New(codes.Canceled, "transport: stream is closing").Err()
-	errMaxStreamsExceeded = status.New(codes.Canceled, "transport: max streams exceeded").Err()
-	errNotReachable       = status.New(codes.Canceled, "transport: server not reachable").Err()
-	errMaxAgeClosing      = status.New(codes.Canceled, "transport: closing server transport due to maximum connection age").Err()
-	errIdleClosing        = status.New(codes.Canceled, "transport: closing server transport due to idleness").Err()
+	errConnectionEOF      = status.Err(codes.Canceled, "transport: connection EOF"+triggeredByRemoteServiceSuffix)
+	errMaxStreamsExceeded = status.Err(codes.Canceled, "transport: max streams exceeded"+triggeredByRemoteServiceSuffix)
+	errNotReachable       = status.Err(codes.Canceled, "transport: server not reachable"+triggeredByRemoteServiceSuffix)
+	errMaxAgeClosing      = status.Err(codes.Canceled, "transport: closing server transport due to maximum connection age"+triggeredByRemoteServiceSuffix)
+	errIdleClosing        = status.Err(codes.Canceled, "transport: closing server transport due to idleness"+triggeredByRemoteServiceSuffix)
 
 	errGracefulShutdown = status.Err(codes.Unavailable, gracefulShutdownMsg)
 )
@@ -306,10 +307,12 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 	}
 	if err := state.decodeHeader(frame); err != nil {
 		if se, ok := status.FromError(err); ok {
+			rstCode := statusCodeConvTab[se.Code()]
+			klog.CtxErrorf(t.ctx, "KITEX: http2Server.operateHeaders failed to decode header frame, err=%v, code: %d"+sendRSTStreamFrameSuffix, err, rstCode)
 			t.controlBuf.put(&cleanupStream{
 				streamID: streamID,
 				rst:      true,
-				rstCode:  statusCodeConvTab[se.Code()],
+				rstCode:  rstCode,
 				onWrite:  func() {},
 			})
 		}
@@ -351,6 +354,7 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 	}
 	if uint32(len(t.activeStreams)) >= t.maxStreams {
 		t.mu.Unlock()
+		klog.CtxErrorf(t.ctx, "KITEX: http2Server.operateHeaders failed to create stream, err=%v, code: %d"+sendRSTStreamFrameSuffix, errMaxStreamsExceeded, http2.ErrCodeRefusedStream)
 		t.controlBuf.put(&cleanupStream{
 			streamID: streamID,
 			rst:      true,
@@ -412,11 +416,10 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				s := t.activeStreams[se.StreamID]
 				t.mu.Unlock()
 				if s != nil {
-					// it will be codes.Internal error for GRPC
-					// TODO: map http2.StreamError to status.Error?
-					s.cancel(err)
-					t.closeStream(s, true, se.Code, false)
+					klog.CtxErrorf(s.ctx, "KITEX: http2Server.HandleStreams encountered http2.StreamError, err=%v, code: %d"+sendRSTStreamFrameSuffix, err, se.Code)
+					t.closeStream(s, status.Errorf(codes.Canceled, "transport: ReadFrame encountered http2.StreamError: %v [triggered by %s]", err, s.getSourceService()), true, se.Code, false)
 				} else {
+					klog.CtxErrorf(t.ctx, "KITEX: http2Server.HandleStreams failed to ReadFrame, err=%v, code: %d"+sendRSTStreamFrameSuffix, err, se.Code)
 					t.controlBuf.put(&cleanupStream{
 						streamID: se.StreamID,
 						rst:      true,
@@ -431,7 +434,7 @@ func (t *http2Server) HandleStreams(handle func(*Stream), traceCtx func(context.
 				return
 			}
 			klog.CtxWarnf(t.ctx, "transport: http2Server.HandleStreams failed to read frame: %v", err)
-			t.closeWithErr(err)
+			t.closeWithErr(status.Errorf(codes.Canceled, "transport: ReadFrame encountered err: %v"+triggeredByRemoteServiceSuffix, err))
 			return
 		}
 		switch frame := frame.(type) {
@@ -558,7 +561,8 @@ func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 	}
 	if size > 0 {
 		if err := s.fc.onData(size); err != nil {
-			t.closeStream(s, true, http2.ErrCodeFlowControl, false)
+			klog.CtxErrorf(s.ctx, "KITEX: http2Server.handleData inflow control err: %v, code: %d"+sendRSTStreamFrameSuffix, err, http2.ErrCodeFlowControl)
+			t.closeStream(s, status.Errorf(codes.Canceled, "transport: inflow control err: %v [triggered by %s]", err, s.getSourceService()), true, http2.ErrCodeFlowControl, false)
 			return
 		}
 		if f.Header().Flags.Has(http2.FlagDataPadded) {
@@ -586,7 +590,7 @@ func (t *http2Server) handleData(f *grpcframe.DataFrame) {
 func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
 	// If the stream is not deleted from the transport's active streams map, then do a regular close stream.
 	if s, ok := t.getStream(f); ok {
-		t.closeStream(s, false, 0, false)
+		t.closeStream(s, status.Errorf(codes.Canceled, "transport: RSTStream Frame received with error code: %v [triggered by %s]", f.ErrCode, s.getSourceService()), false, 0, false)
 		return
 	}
 	// If the stream is already deleted from the active streams map, then put a cleanupStream item into controlbuf to delete the stream from loopy writer's established streams map.
@@ -596,6 +600,7 @@ func (t *http2Server) handleRSTStream(f *http2.RSTStreamFrame) {
 		rstCode:  0,
 		onWrite:  func() {},
 	})
+	// since we do not need to send RstStream Frame, do not add log here
 }
 
 func (t *http2Server) handleSettings(f *grpcframe.SettingsFrame) {
@@ -718,8 +723,11 @@ func (t *http2Server) checkForHeaderListSize(it interface{}) bool {
 
 // WriteHeader sends the header metadata md back to the client.
 func (t *http2Server) WriteHeader(s *Stream, md metadata.MD) error {
-	if s.updateHeaderSent() || s.getState() == streamDone {
-		return ErrIllegalHeaderWrite
+	if s.updateHeaderSent() {
+		return errStatusIllegalHeaderWrite
+	}
+	if s.getState() == streamDone {
+		return ContextErr(s.ctx.Err())
 	}
 	s.hdrMu.Lock()
 	if md.Len() > 0 {
@@ -763,8 +771,9 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 		if err != nil {
 			return err
 		}
-		t.closeStream(s, true, http2.ErrCodeInternal, false)
-		return ErrHeaderListSizeLimitViolation
+		klog.CtxErrorf(s.ctx, "KITEX: http2Server.writeHeaderLocked checkForHeaderListSize failed, code: %d"+sendRSTStreamFrameSuffix, http2.ErrCodeInternal)
+		t.closeStream(s, errStatusHeaderListSizeLimitViolation, true, http2.ErrCodeInternal, false)
+		return errStatusHeaderListSizeLimitViolation
 	}
 	return nil
 }
@@ -826,7 +835,7 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 		if err != nil {
 			return err
 		}
-		t.closeStream(s, true, http2.ErrCodeInternal, false)
+		t.closeStream(s, errStatusHeaderListSizeLimitViolation, true, http2.ErrCodeInternal, false)
 		return ErrHeaderListSizeLimitViolation
 	}
 	// Send a RST_STREAM after the trailers if the client has not already half-closed.
@@ -845,13 +854,6 @@ func (t *http2Server) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	} else {
 		// Writing headers checks for this condition.
 		if s.getState() == streamDone {
-			// TODO(mmukhi, dfawley): Should the server write also return io.EOF?
-			s.cancel(errStreamClosing)
-			select {
-			case <-t.done:
-				return ErrConnClosing
-			default:
-			}
 			return ContextErr(s.ctx.Err())
 		}
 	}
@@ -863,11 +865,6 @@ func (t *http2Server) Write(s *Stream, hdr, data []byte, opts *Options) error {
 	df.originD = df.d
 	df.resetPingStrikes = &t.resetPingStrikes
 	if err := s.wq.get(int32(len(hdr) + len(data))); err != nil {
-		select {
-		case <-t.done:
-			return ErrConnClosing
-		default:
-		}
 		return ContextErr(s.ctx.Err())
 	}
 	return t.controlBuf.put(df)
@@ -1006,7 +1003,7 @@ func (t *http2Server) GracefulClose() {
 	wg.Wait()
 	// make sure all RSTStream Frames are sent out
 	t.framer.writer.Flush()
-	t.controlBuf.finish()
+	t.controlBuf.finish(errGracefulShutdown)
 	close(t.done)
 	t.conn.Close()
 }
@@ -1021,7 +1018,7 @@ func (t *http2Server) closeWithErr(reason error) error {
 	streams := t.activeStreams
 	t.activeStreams = nil
 	t.mu.Unlock()
-	t.controlBuf.finish()
+	t.controlBuf.finish(reason)
 	close(t.done)
 	err := t.conn.Close()
 
@@ -1035,11 +1032,6 @@ func (t *http2Server) closeWithErr(reason error) error {
 
 // deleteStream deletes the stream s from transport's active streams.
 func (t *http2Server) deleteStream(s *Stream, eosReceived bool) {
-	// In case stream sending and receiving are invoked in separate
-	// goroutines (e.g., bi-directional streaming), cancel needs to be
-	// called to interrupt the potential blocking on other goroutines.
-	s.cancel(nil) // more details about the reason?
-
 	t.mu.Lock()
 	if _, ok := t.activeStreams[s.id]; ok {
 		delete(t.activeStreams, s.id)
@@ -1057,6 +1049,7 @@ func (t *http2Server) finishStream(s *Stream, rst bool, rstCode http2.ErrCode, h
 		// If the stream was already done, return.
 		return
 	}
+	s.cancel(nil)
 
 	hdr.cleanup = &cleanupStream{
 		streamID: s.id,
@@ -1070,7 +1063,11 @@ func (t *http2Server) finishStream(s *Stream, rst bool, rstCode http2.ErrCode, h
 }
 
 // closeStream clears the footprint of a stream when the stream is not needed any more.
-func (t *http2Server) closeStream(s *Stream, rst bool, rstCode http2.ErrCode, eosReceived bool) {
+func (t *http2Server) closeStream(s *Stream, err error, rst bool, rstCode http2.ErrCode, eosReceived bool) {
+	// In case stream sending and receiving are invoked in separate
+	// goroutines (e.g., bi-directional streaming), cancel needs to be
+	// called to interrupt the potential blocking on other goroutines.
+	s.cancel(err)
 	s.swapState(streamDone)
 	t.deleteStream(s, eosReceived)
 
