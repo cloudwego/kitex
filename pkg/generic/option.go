@@ -41,6 +41,8 @@ type Options struct {
 	dynamicgoConvOpts conv.Options
 	// flag to set whether to store http resp body into HTTPResponse.RawBody
 	useRawBodyForHTTPResp bool
+	// will return error when field is required but input value is nil
+	failOnNilValueForRequiredField bool
 }
 
 type Option struct {
@@ -66,5 +68,12 @@ func WithCustomDynamicGoConvOpts(opts *conv.Options) Option {
 func UseRawBodyForHTTPResp(enable bool) Option {
 	return Option{F: func(opt *Options) {
 		opt.useRawBodyForHTTPResp = enable
+	}}
+}
+
+// will return error when field is required but input value is nil
+func WithFailOnNilValueForRequiredField(enable bool) Option {
+	return Option{F: func(opt *Options) {
+		opt.failOnNilValueForRequiredField = enable
 	}}
 }
