@@ -35,6 +35,8 @@ type writerOption struct {
 	requestBase *base.Base // request base from metahandler
 	// decoding Base64 to binary
 	binaryWithBase64 bool
+	// will return error when field is required but input value is nil
+	failOnNilValueForRequiredField bool
 }
 
 type writer func(ctx context.Context, val interface{}, out *thrift.BufferWriter, t *descriptor.TypeDescriptor, opt *writerOption) error
@@ -778,6 +780,9 @@ func writeHTTPRequest(ctx context.Context, val interface{}, out *thrift.BufferWr
 
 		if v == nil {
 			if !field.Optional {
+				if opt != nil && opt.failOnNilValueForRequiredField {
+					return fmt.Errorf("value of field [%s] is nil", name)
+				}
 				if err := out.WriteFieldBegin(field.Type.Type.ToThriftTType(), int16(field.ID)); err != nil {
 					return err
 				}

@@ -41,19 +41,20 @@ type HTTPRequest = descriptor.HTTPRequest
 type HTTPResponse = descriptor.HTTPResponse
 
 type httpThriftCodec struct {
-	svcDsc                 atomic.Value // *idl
-	provider               DescriptorProvider
-	binaryWithBase64       bool
-	convOpts               conv.Options // used for dynamicgo conversion
-	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
-	dynamicgoEnabled       bool
-	useRawBodyForHTTPResp  bool
-	svcName                string
+	svcDsc                         atomic.Value // *idl
+	provider                       DescriptorProvider
+	binaryWithBase64               bool
+	convOpts                       conv.Options // used for dynamicgo conversion
+	convOptsWithThriftBase         conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
+	dynamicgoEnabled               bool
+	useRawBodyForHTTPResp          bool
+	failOnNilValueForRequiredField bool
+	svcName                        string
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
 	svc := <-p.Provide()
-	c := &httpThriftCodec{provider: p, binaryWithBase64: false, dynamicgoEnabled: false, useRawBodyForHTTPResp: opts.useRawBodyForHTTPResp, svcName: svc.Name}
+	c := &httpThriftCodec{provider: p, binaryWithBase64: false, dynamicgoEnabled: false, useRawBodyForHTTPResp: opts.useRawBodyForHTTPResp, failOnNilValueForRequiredField: opts.failOnNilValueForRequiredField, svcName: svc.Name}
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoEnabled {
 		c.dynamicgoEnabled = true
 
@@ -95,6 +96,7 @@ func (c *httpThriftCodec) configureHTTPRequestWriter(writer *thrift.WriteHTTPReq
 	if c.dynamicgoEnabled {
 		writer.SetDynamicGo(&c.convOpts, &c.convOptsWithThriftBase)
 	}
+	writer.SetFailOnNilValueForRequiredField(c.failOnNilValueForRequiredField)
 }
 
 func (c *httpThriftCodec) configureHTTPResponseReader(reader *thrift.ReadHTTPResponse) {

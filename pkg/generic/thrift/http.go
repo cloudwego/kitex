@@ -43,11 +43,12 @@ func NewHTTPReaderWriter(svc *descriptor.ServiceDescriptor) *HTTPReaderWriter {
 
 // WriteHTTPRequest implement of MessageWriter
 type WriteHTTPRequest struct {
-	svc                    *descriptor.ServiceDescriptor
-	binaryWithBase64       bool
-	convOpts               conv.Options // used for dynamicgo conversion
-	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
-	dynamicgoEnabled       bool
+	svc                            *descriptor.ServiceDescriptor
+	binaryWithBase64               bool
+	convOpts                       conv.Options // used for dynamicgo conversion
+	convOptsWithThriftBase         conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
+	dynamicgoEnabled               bool
+	failOnNilValueForRequiredField bool // will return error when field is required but input value is nil
 }
 
 var (
@@ -69,6 +70,10 @@ func NewWriteHTTPRequest(svc *descriptor.ServiceDescriptor) *WriteHTTPRequest {
 // Note that this method is not concurrent-safe.
 func (w *WriteHTTPRequest) SetBinaryWithBase64(enable bool) {
 	w.binaryWithBase64 = enable
+}
+
+func (w *WriteHTTPRequest) SetFailOnNilValueForRequiredField(enable bool) {
+	w.failOnNilValueForRequiredField = enable
 }
 
 // SetDynamicGo ...
@@ -94,7 +99,7 @@ func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out bufiox.Writer,
 		requestBase = nil
 	}
 	bw := thrift.NewBufferWriter(out)
-	err = wrapStructWriter(ctx, req, bw, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
+	err = wrapStructWriter(ctx, req, bw, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64, failOnNilValueForRequiredField: w.failOnNilValueForRequiredField})
 	bw.Recycle()
 	return err
 }

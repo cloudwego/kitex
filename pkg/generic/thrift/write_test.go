@@ -1358,6 +1358,36 @@ func Test_writeHTTPRequest(t *testing.T) {
 			},
 			false,
 		},
+		{
+			"writeStructRequiredFail",
+			args{
+				val: &descriptor.HTTPRequest{
+					Body: map[string]interface{}{"hello": nil},
+				},
+
+				t: &descriptor.TypeDescriptor{
+					Type: descriptor.STRUCT,
+					Key:  &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Elem: &descriptor.TypeDescriptor{Type: descriptor.STRING},
+					Struct: &descriptor.StructDescriptor{
+						Name: "Demo",
+						FieldsByName: map[string]*descriptor.FieldDescriptor{
+							"hello": {
+								Name:        "hello",
+								ID:          1,
+								Required:    true,
+								Type:        &descriptor.TypeDescriptor{Type: descriptor.STRING},
+								HTTPMapping: descriptor.DefaultNewMapping("hello"),
+							},
+						},
+					},
+				},
+				opt: &writerOption{
+					failOnNilValueForRequiredField: true,
+				},
+			},
+			true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1434,7 +1464,7 @@ func getReqPbBody() (proto.Message, error) {
 	path := "main.proto"
 	content := `
 	package kitex.test.server;
-	
+
 	message BizReq {
 		optional int32 user_id = 1;
 		optional string user_name = 2;
