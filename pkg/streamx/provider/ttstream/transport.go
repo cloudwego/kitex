@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,17 +12,19 @@ import (
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 	"github.com/cloudwego/netpoll"
 )
 
 const (
 	clientTransport int32 = 1
 	serverTransport int32 = 2
+
+	streamCacheSize = 32
+	frameCacheSize  = 32
 )
 
 var _ Object = (*transport)(nil)
-
-const streamCacheSize = 64
 
 type transport struct {
 	kind    int32
@@ -31,10 +32,10 @@ type transport struct {
 	conn    netpoll.Connection
 	reader  bufiox.Reader
 	writer  bufiox.Writer
-	streams sync.Map       // key=streamID val=streamIO
-	spipe   *Pipe[*stream] // in-coming stream channel
-	scache  []*stream      // size is streamCacheSize
-	wpipe   *Pipe[*Frame]  // out-coming frame channel
+	streams sync.Map                 // key=streamID val=streamIO
+	spipe   *container.Pipe[*stream] // in-coming stream channel
+	scache  []*stream                // size is streamCacheSize
+	wpipe   *container.Pipe[*Frame]  // out-coming frame channel
 	stop    chan struct{}
 
 	// for scavenger check
@@ -51,9 +52,9 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		reader:  cbuffer,
 		writer:  cbuffer,
 		streams: sync.Map{},
-		spipe:   NewPipe[*stream](),
+		spipe:   container.NewPipe[*stream](),
 		scache:  make([]*stream, 0, streamCacheSize),
-		wpipe:   NewPipe[*Frame](),
+		wpipe:   container.NewPipe[*Frame](),
 		stop:    make(chan struct{}),
 	}
 	go func() {
@@ -145,40 +146,38 @@ func (t *transport) loopRead() error {
 	}
 }
 
-func (t *transport) writeFrame(frame Frame, directly bool) error {
+func (t *transport) writeFrame(frame Frame, batchFlush bool) error {
 	err := EncodeFrame(context.Background(), t.writer, frame)
 	if err != nil {
 		return err
 	}
-	if !directly {
+	if batchFlush {
 		return nil
 	}
 	return t.writer.Flush()
 }
 
 func (t *transport) loopWrite() error {
-	frames := make([]*Frame, 32)
+	frames := make([]*Frame, frameCacheSize)
 	for {
 		now := time.Now()
 		t.lastActive.Store(now)
 
 		n, err := t.wpipe.Read(frames)
 		if err != nil {
-			if errors.Is(err, PipeEOF) {
+			if errors.Is(err, container.PipeEOF) {
 				return nil
 			}
 			return err
 		}
 		// if n > 1, we should use batch writes
-		writeDirectly := n == 1
+		batchFlush := n > 1
 		for i := 0; i < n; i++ {
-			if err := t.writeFrame(*frames[i], writeDirectly); err != nil {
+			if err := t.writeFrame(*frames[i], batchFlush); err != nil {
 				return err
 			}
 		}
-		if writeDirectly {
-			runtime.Gosched()
-		} else {
+		if batchFlush {
 			if err := t.writer.Flush(); err != nil {
 				return err
 			}
@@ -297,7 +296,7 @@ READ:
 	}
 	n, err := t.spipe.Read(t.scache[0:streamCacheSize])
 	if err != nil {
-		if errors.Is(err, PipeEOF) {
+		if errors.Is(err, container.PipeEOF) {
 			return nil, io.EOF
 		}
 		return nil, err
