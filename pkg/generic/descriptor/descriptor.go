@@ -28,12 +28,6 @@ import (
 
 var isGoTagAliasDisabled = os.Getenv("KITEX_GENERIC_GOTAG_ALIAS_DISABLED") == "True"
 
-func init() {
-	if isGoTagAliasDisabled {
-		dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
-	}
-}
-
 // FieldDescriptor idl field descriptor
 type FieldDescriptor struct {
 	Name                 string // field name

@@ -20,8 +20,6 @@ import (
 	"strings"
 	"testing"
 
-	dthrift "github.com/cloudwego/dynamicgo/thrift"
-
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 )
@@ -318,20 +316,71 @@ func TestDisableGoTagForDynamicGo(t *testing.T) {
 	path := "http_test/idl/binary_echo.thrift"
 	p, err := NewThriftFileProviderWithDynamicGo(path)
 	test.Assert(t, err == nil)
-	defer p.Close()
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.DynamicGoDsc != nil)
 	test.Assert(t, tree.DynamicGoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "STR")
+	p.Close()
 
-	dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
-	p, err = NewThriftFileProviderWithDynamicGo(path)
+	p, err = NewThriftFileProviderWithDynamicgoWithOption(path, []ThriftIDLProviderOption{WithGoTagDisabled(true)})
 	test.Assert(t, err == nil)
-	defer p.Close()
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.DynamicGoDsc != nil)
 	test.Assert(t, tree.DynamicGoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "str")
+	p.Close()
+
+	p, err = NewThriftFileProviderWithDynamicgoWithOption(path, []ThriftIDLProviderOption{WithGoTagDisabled(false)})
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Functions()["BinaryEcho"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(4).Alias() == "STR")
+	p.Close()
+
+	p, err = NewThriftContentProviderWithDynamicGo(testServiceContent, nil, WithGoTagDisabled(true))
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Functions()["Example2Method"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(1).Alias() == "Msg")
+	p.Close()
+
+	p, err = NewThriftContentProviderWithDynamicGo(testServiceContent, nil)
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Functions()["Example2Method"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(1).Alias() == "message")
+	p.Close()
+
+	p, err = NewThriftContentProviderWithDynamicGo(testServiceContent, nil, WithGoTagDisabled(true))
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Functions()["Example2Method"].Request().Struct().FieldByKey("req").Type().Struct().FieldById(1).Alias() == "Msg")
+	p.Close()
+
+	path = "json_test/idl/example_multi_service.thrift"
+	includes := map[string]string{path: testServiceContent}
+	p, err = NewThriftContentWithAbsIncludePathProviderWithDynamicGo(path, includes)
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Functions()["Example2Method"].Response().Struct().FieldById(0).Type().Struct().FieldById(1).Alias() == "message")
+	test.Assert(t, tree.DynamicGoDsc.Functions()["Example2Method"].Response().Struct().FieldById(1).Type().Struct().FieldById(255).Alias() == "excMsg")
+	p.Close()
+
+	p, err = NewThriftContentWithAbsIncludePathProviderWithDynamicGo(path, includes, WithGoTagDisabled(true))
+	test.Assert(t, err == nil)
+	tree = <-p.Provide()
+	test.Assert(t, tree != nil)
+	test.Assert(t, tree.DynamicGoDsc != nil)
+	test.Assert(t, tree.DynamicGoDsc.Functions()["Example2Method"].Response().Struct().FieldById(0).Type().Struct().FieldById(1).Alias() == "Msg")
+	test.Assert(t, tree.DynamicGoDsc.Functions()["Example2Method"].Response().Struct().FieldById(1).Type().Struct().FieldById(255).Alias() == "msg")
+	p.Close()
 }
 
 func TestFileProviderParseMode(t *testing.T) {
