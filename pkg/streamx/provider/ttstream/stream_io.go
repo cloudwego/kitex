@@ -8,7 +8,7 @@ import (
 type streamIO struct {
 	stream *stream
 	cond   *sync.Cond
-	frames []Frame // TODO: using link list
+	frames []*Frame
 	end    bool
 }
 
@@ -18,14 +18,14 @@ func newStreamIO(s *stream) *streamIO {
 	return &streamIO{stream: s, cond: cond}
 }
 
-func (s *streamIO) input(f Frame) {
+func (s *streamIO) input(f *Frame) {
 	s.cond.L.Lock()
 	s.frames = append(s.frames, f)
 	s.cond.L.Unlock()
 	s.cond.Signal()
 }
 
-func (s *streamIO) output() (f Frame, err error) {
+func (s *streamIO) output() (f *Frame, err error) {
 	s.cond.L.Lock()
 	for len(s.frames) == 0 && !s.end {
 		s.cond.Wait()

@@ -101,8 +101,8 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		}
 		// stream level goroutine
 		gofunc.GoFunc(ctx, func() {
-			nerr = t.OnStream(nctx, conn, ss)
-			if !errors.Is(nerr, io.EOF) {
+			err := t.OnStream(nctx, conn, ss)
+			if err != nil && !errors.Is(err, io.EOF) {
 				klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", nerr)
 			}
 		})

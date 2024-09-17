@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -146,7 +147,7 @@ func (t *transport) loopRead() error {
 	}
 }
 
-func (t *transport) writeFrame(frame Frame, batchFlush bool) error {
+func (t *transport) writeFrame(frame *Frame, batchFlush bool) error {
 	err := EncodeFrame(context.Background(), t.writer, frame)
 	if err != nil {
 		return err
@@ -173,7 +174,7 @@ func (t *transport) loopWrite() error {
 		// if n > 1, we should use batch writes
 		batchFlush := n > 1
 		for i := 0; i < n; i++ {
-			if err := t.writeFrame(*frames[i], batchFlush); err != nil {
+			if err := t.writeFrame(frames[i], batchFlush); err != nil {
 				return err
 			}
 		}
@@ -181,6 +182,9 @@ func (t *transport) loopWrite() error {
 			if err := t.writer.Flush(); err != nil {
 				return err
 			}
+		} else {
+			// wait for write happens
+			runtime.Gosched()
 		}
 	}
 }
@@ -216,19 +220,19 @@ func (t *transport) streamSend(sid int32, method string, wheader Header, payload
 		}
 	}
 	f := newFrame(streamFrame{sid: sid, method: method}, dataFrameType, payload)
-	t.wpipe.Write(&f)
+	t.wpipe.Write(f)
 	return nil
 }
 
 func (t *transport) streamSendHeader(sid int32, method string, header Header) (err error) {
 	f := newFrame(streamFrame{sid: sid, method: method, header: header}, headerFrameType, []byte{})
-	t.wpipe.Write(&f)
+	t.wpipe.Write(f)
 	return nil
 }
 
 func (t *transport) streamSendTrailer(sid int32, method string, trailer Trailer) (err error) {
 	f := newFrame(streamFrame{sid: sid, method: method, trailer: trailer}, trailerFrameType, []byte{})
-	t.wpipe.Write(&f)
+	t.wpipe.Write(f)
 	return nil
 }
 
@@ -241,7 +245,9 @@ func (t *transport) streamRecv(sid int32) (payload []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-	return f.payload, nil
+	payload = f.payload
+	recycleFrame(f)
+	return payload, nil
 }
 
 func (t *transport) streamCloseRecv(s *stream) (err error) {
@@ -278,7 +284,7 @@ func (t *transport) newStream(
 	}
 	f := newFrame(smeta, headerFrameType, []byte{})
 	s := newStream(t, smode, smeta)
-	t.wpipe.Write(&f) // create stream
+	t.wpipe.Write(f) // create stream
 	return s, nil
 }
 

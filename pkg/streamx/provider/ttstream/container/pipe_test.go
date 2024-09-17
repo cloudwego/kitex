@@ -34,3 +34,20 @@ func TestPipeline(t *testing.T) {
 		t.Fatalf("expect %d items, got %d", len(itemsPerRound)*round, recv)
 	}
 }
+
+func BenchmarkPipeline(b *testing.B) {
+	pipe := NewPipe[int]()
+	readCache := make([]int, 8)
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		for j := 0; j < len(readCache); j++ {
+			go pipe.Write(1)
+		}
+		total := 0
+		for total < len(readCache) {
+			n, _ := pipe.Read(readCache)
+			total += n
+		}
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"sync"
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
@@ -25,6 +26,8 @@ var frameTypeToString = map[int32]string{
 	trailerFrameType: ttheader.FrameTypeTrailer,
 }
 
+var framePool sync.Pool
+
 type Frame struct {
 	streamFrame
 	meta    IntHeader
@@ -32,16 +35,29 @@ type Frame struct {
 	payload []byte
 }
 
-func newFrame(meta streamFrame, typ int32, payload []byte) Frame {
-	return Frame{
-		streamFrame: meta,
-		typ:         typ,
-		payload:     payload,
+func newFrame(meta streamFrame, typ int32, payload []byte) (fr *Frame) {
+	v := framePool.Get()
+	if v == nil {
+		fr = new(Frame)
+	} else {
+		fr = v.(*Frame)
 	}
+	fr.streamFrame = meta
+	fr.typ = typ
+	fr.payload = payload
+	return fr
+}
+
+func recycleFrame(frame *Frame) {
+	frame.streamFrame = streamFrame{}
+	frame.meta = nil
+	frame.typ = 0
+	frame.payload = nil
+	framePool.Put(frame)
 }
 
 // EncodeFrame will not call Flush!
-func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr Frame) (err error) {
+func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr *Frame) (err error) {
 	written := writer.WrittenLen()
 	param := ttheader.EncodeParam{
 		Flags:      ttheader.HeaderFlagsStreaming,
@@ -68,8 +84,7 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr Frame) (err error
 		return err
 	}
 	if len(fr.payload) > 0 {
-		_, err := writer.WriteBinary(fr.payload)
-		if err != nil {
+		if _, err = writer.WriteBinary(fr.payload); err != nil {
 			return err
 		}
 	}
@@ -78,7 +93,7 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr Frame) (err error
 	return nil
 }
 
-func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr Frame, err error) {
+func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err error) {
 	var dp ttheader.DecodeParam
 	dp, err = ttheader.Decode(ctx, reader)
 	if err != nil {
@@ -89,37 +104,40 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr Frame, err error
 		return
 	}
 
-	fr.meta = dp.IntInfo
-	frtype := fr.meta[ttheader.FrameType]
-	switch frtype {
+	var ftype int32
+	var fheader Header
+	var ftrailer Trailer
+	switch dp.IntInfo[ttheader.FrameType] {
 	case ttheader.FrameTypeMeta:
-		fr.typ = metaFrameType
+		ftype = metaFrameType
 	case ttheader.FrameTypeHeader:
-		fr.typ = headerFrameType
-		fr.header = dp.StrInfo
+		ftype = headerFrameType
+		fheader = dp.StrInfo
 	case ttheader.FrameTypeData:
-		fr.typ = dataFrameType
+		ftype = dataFrameType
 	case ttheader.FrameTypeTrailer:
-		fr.typ = trailerFrameType
-		fr.trailer = dp.StrInfo
+		ftype = trailerFrameType
+		ftrailer = dp.StrInfo
 	default:
-		err = fmt.Errorf("unexpected frame type: %v", fr.meta[ttheader.FrameType])
+		err = fmt.Errorf("unexpected frame type: %v", dp.IntInfo[ttheader.FrameType])
 		return
 	}
-	// stream meta
-	fr.sid = dp.SeqID
-	fr.method = fr.meta[ttheader.ToMethod]
+	fmethod := dp.IntInfo[ttheader.ToMethod]
+	fsid := dp.SeqID
 
 	// frame payload
-	if dp.PayloadLen == 0 {
-		return fr, nil
+	var fpayload []byte
+	if dp.PayloadLen > 0 {
+		fpayload = mcache.Malloc(dp.PayloadLen)
+		_, err = reader.ReadBinary(fpayload) // copy read
+		_ = reader.Release(err)
+		if err != nil {
+			return
+		}
 	}
-	fr.payload = mcache.Malloc(dp.PayloadLen)
-	_, err = reader.ReadBinary(fr.payload)
-	reader.Release(err)
-	if err != nil {
-		return
-	}
+
+	fr = newFrame(streamFrame{sid: fsid, method: fmethod, header: fheader, trailer: ftrailer}, ftype, fpayload)
+	fr.meta = dp.IntInfo
 	return fr, nil
 }
 

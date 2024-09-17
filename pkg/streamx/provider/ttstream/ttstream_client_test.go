@@ -322,3 +322,47 @@ func TestTTHeaderStreaming(t *testing.T) {
 
 	streamClient = nil
 }
+
+func BenchmarkTTHeaderStreaming(b *testing.B) {
+	klog.SetLevel(klog.LevelWarn)
+	var addr = test.GetLocalAddress()
+	ln, _ := netpoll.CreateListener("tcp", addr)
+	defer ln.Close()
+
+	// create server
+	svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
+	// register streamingService as ttstreaam provider
+	sp, _ := ttstream.NewServerProvider(streamingServiceInfo)
+	_ = svr.RegisterService(streamingServiceInfo, new(streamingService), streamxserver.WithProvider(sp))
+	go func() {
+		_ = svr.Run()
+	}()
+	defer svr.Stop()
+	test.WaitServerStart(addr)
+
+	streamClient, _ := NewStreamingClient("kitex.service.streaming", streamxclient.WithHostPorts(addr))
+	ctx := context.Background()
+	bs, err := streamClient.BidiStream(ctx)
+	if err != nil {
+		b.Fatal(err)
+	}
+	msg := "BidiStream"
+	var wg sync.WaitGroup
+	wg.Add(1)
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		req := new(Request)
+		req.Message = msg
+		err := bs.Send(ctx, req)
+		if err != nil {
+			b.Fatal(err)
+		}
+		res, err := bs.Recv(ctx)
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		_ = res
+	}
+	err = bs.CloseSend(ctx)
+}

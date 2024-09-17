@@ -22,12 +22,20 @@ type queueNode[ValueType any] struct {
 	next *queueNode[ValueType]
 }
 
+func (n *queueNode[ValueType]) reset() {
+	var nilVal ValueType
+	n.val = nilVal
+	n.next = nil
+}
+
 type Queue[ValueType any] struct {
 	L    sync.Locker
 	read *queueNode[ValueType]
 	head *queueNode[ValueType]
 	tail *queueNode[ValueType]
 	size int64
+
+	nodePool sync.Pool
 }
 
 func (q *Queue[ValueType]) Size() int {
@@ -38,9 +46,14 @@ func (q *Queue[ValueType]) Get() (val ValueType, ok bool) {
 Start:
 	// fast path
 	if q.read != nil {
-		val = q.read.val
-		q.read = q.read.next
+		node := q.read
+		val = node.val
+		q.read = node.next
 		atomic.AddInt64(&q.size, -1)
+
+		// recycle node
+		node.reset()
+		q.nodePool.Put(node)
 		return val, true
 	}
 	// slow path
@@ -51,11 +64,16 @@ Start:
 	}
 	// single read
 	if q.head == q.tail {
-		val = q.head.val
+		node := q.head
+		val = node.val
 		q.head = nil
 		q.tail = nil
 		atomic.AddInt64(&q.size, -1)
 		q.L.Unlock()
+
+		// recycle node
+		node.reset()
+		q.nodePool.Put(node)
 		return val, true
 	}
 	// batch read into q.read
@@ -68,7 +86,15 @@ Start:
 
 func (q *Queue[ValueType]) Add(val ValueType) {
 	q.L.Lock()
-	node := &queueNode[ValueType]{val: val}
+
+	var node *queueNode[ValueType]
+	v := q.nodePool.Get()
+	if v == nil {
+		node = new(queueNode[ValueType])
+	} else {
+		node = v.(*queueNode[ValueType])
+	}
+	node.val = val
 	if q.tail == nil {
 		q.head = node
 		q.tail = node

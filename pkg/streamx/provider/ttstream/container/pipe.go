@@ -2,6 +2,7 @@ package container
 
 import (
 	"io"
+	"runtime"
 	"sync"
 )
 
@@ -23,14 +24,25 @@ func NewPipe[Item any]() *Pipe[Item] {
 }
 
 // Read will block if there is nothing to read
-func (p *Pipe[Item]) Read(items []Item) (n int, err error) {
+func (p *Pipe[Item]) Read(items []Item) (int, error) {
 READ:
-	for n = 0; n < len(items); n++ {
+	var n int
+	for i := 0; i < len(items); i++ {
 		val, ok := p.queue.Get()
 		if !ok {
-			break
+			if i > 0 {
+				break
+			}
+			// let other goroutine read first, and then try again
+			runtime.Gosched()
+			val, ok = p.queue.Get()
+			if !ok {
+				break
+			}
+			// continue
 		}
-		items[n] = val
+		items[i] = val
+		n++
 	}
 	if n > 0 {
 		return n, nil
