@@ -181,7 +181,7 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		Type: reqType,
 	}
 	if opt != nil {
-		reqField.IsGoTagAliasDisabled = opt.IsGoTagAliasDisabled
+		reqField.IsGoTagAliasDisabledFromOpt = opt.IsGoTagAliasDisabled
 	}
 	req.Struct.FieldsByID[field.ID] = reqField
 	req.Struct.FieldsByName[field.Name] = reqField
@@ -202,7 +202,7 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		Type: respType,
 	}
 	if opt != nil {
-		respField.IsGoTagAliasDisabled = opt.IsGoTagAliasDisabled
+		respField.IsGoTagAliasDisabledFromOpt = opt.IsGoTagAliasDisabled
 	}
 	// response has no name or id
 	resp.Struct.FieldsByID[0] = respField
@@ -223,7 +223,7 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 			Type:        exceptionType,
 		}
 		if opt != nil {
-			exceptionField.IsGoTagAliasDisabled = opt.IsGoTagAliasDisabled
+			exceptionField.IsGoTagAliasDisabledFromOpt = opt.IsGoTagAliasDisabled
 		}
 		resp.Struct.FieldsByID[field.ID] = exceptionField
 		resp.Struct.FieldsByName[field.Name] = exceptionField
@@ -374,7 +374,7 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 				Optional: field.Requiredness == parser.FieldType_Optional,
 			}
 			if opt != nil {
-				_f.IsGoTagAliasDisabled = opt.IsGoTagAliasDisabled
+				_f.IsGoTagAliasDisabledFromOpt = opt.IsGoTagAliasDisabled
 			}
 			for _, ann := range field.Annotations {
 				for _, v := range ann.GetValues() {
