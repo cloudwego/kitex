@@ -298,6 +298,7 @@ func TestDisableGoTag(t *testing.T) {
 	path = "json_test/idl/example_multi_service.thrift"
 	includes := map[string]string{path: testServiceContent}
 	p, err = NewThriftContentWithAbsIncludePathProvider(path, includes)
+	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Functions["Example2Method"].Response.Struct.FieldsByID[0].Type.Struct.FieldsByID[1].FieldName() == "message")
@@ -305,6 +306,7 @@ func TestDisableGoTag(t *testing.T) {
 	p.Close()
 
 	p, err = NewThriftContentWithAbsIncludePathProvider(path, includes, WithGoTagDisabled(true))
+	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Functions["Example2Method"].Response.Struct.FieldsByID[0].Type.Struct.FieldsByID[1].FieldName() == "Msg")
