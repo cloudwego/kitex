@@ -19,7 +19,6 @@ package container
 import (
 	"fmt"
 	"io"
-	"runtime"
 	"sync"
 )
 
@@ -54,16 +53,7 @@ READ:
 	for i := 0; i < len(items); i++ {
 		val, ok := p.queue.Get()
 		if !ok {
-			if i > 0 {
-				break
-			}
-			// let other goroutine read first, and then try again
-			runtime.Gosched()
-			val, ok = p.queue.Get()
-			if !ok {
-				break
-			}
-			// continue
+			break
 		}
 		items[i] = val
 		n++

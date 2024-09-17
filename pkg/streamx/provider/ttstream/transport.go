@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -163,13 +162,10 @@ func (t *transport) loopRead() error {
 	}
 }
 
-func (t *transport) writeFrame(frame *Frame, batchFlush bool) error {
+func (t *transport) writeFrame(frame *Frame) error {
 	err := EncodeFrame(context.Background(), t.writer, frame)
 	if err != nil {
 		return err
-	}
-	if batchFlush {
-		return nil
 	}
 	return t.writer.Flush()
 }
@@ -187,20 +183,10 @@ func (t *transport) loopWrite() error {
 			}
 			return err
 		}
-		// if n > 1, we should use batch writes
-		batchFlush := n > 1
 		for i := 0; i < n; i++ {
-			if err := t.writeFrame(frames[i], batchFlush); err != nil {
+			if err := t.writeFrame(frames[i]); err != nil {
 				return err
 			}
-		}
-		if batchFlush {
-			if err := t.writer.Flush(); err != nil {
-				return err
-			}
-		} else {
-			// wait for write happens
-			runtime.Gosched()
 		}
 	}
 }

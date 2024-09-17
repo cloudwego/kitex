@@ -17,32 +17,46 @@
 package ttstream
 
 import (
+	"runtime"
+
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
+	"github.com/cloudwego/netpoll/mux"
 )
 
 var _ bufiox.Reader = (*connBuffer)(nil)
 var _ bufiox.Writer = (*connBuffer)(nil)
+var gomaxprocs = runtime.GOMAXPROCS(0)
 
 func newConnBuffer(conn netpoll.Connection) *connBuffer {
-	return &connBuffer{conn: conn}
+	queue := mux.NewShardQueue(gomaxprocs, conn)
+	return &connBuffer{
+		readBuffer:  conn.Reader(),
+		writeQueue:  queue,
+		writeBuffer: netpoll.NewLinkBuffer(),
+	}
 }
 
 type connBuffer struct {
-	conn      netpoll.Connection
-	readSize  int
-	writeSize int
+	readBuffer netpoll.Reader
+	readSize   int
+
+	writeQueue  *mux.ShardQueue
+	writeBuffer netpoll.Writer
+	writeSize   int
 }
 
+// === Read ===
+
 func (c *connBuffer) Next(n int) (p []byte, err error) {
-	p, err = c.conn.Reader().Next(n)
+	p, err = c.readBuffer.Next(n)
 	c.readSize += len(p)
 	return p, err
 }
 
 func (c *connBuffer) ReadBinary(bs []byte) (n int, err error) {
 	n = len(bs)
-	buf, err := c.conn.Reader().Next(n)
+	buf, err := c.readBuffer.Next(n)
 	if err != nil {
 		return 0, err
 	}
@@ -52,11 +66,11 @@ func (c *connBuffer) ReadBinary(bs []byte) (n int, err error) {
 }
 
 func (c *connBuffer) Peek(n int) (buf []byte, err error) {
-	return c.conn.Reader().Peek(n)
+	return c.readBuffer.Peek(n)
 }
 
 func (c *connBuffer) Skip(n int) (err error) {
-	err = c.conn.Reader().Skip(n)
+	err = c.readBuffer.Skip(n)
 	if err != nil {
 		return err
 	}
@@ -70,16 +84,18 @@ func (c *connBuffer) ReadLen() (n int) {
 
 func (c *connBuffer) Release(e error) (err error) {
 	c.readSize = 0
-	return c.conn.Reader().Release()
+	return c.readBuffer.Release()
 }
+
+// === Write ===
 
 func (c *connBuffer) Malloc(n int) (buf []byte, err error) {
 	c.writeSize += n
-	return c.conn.Writer().Malloc(n)
+	return c.writeBuffer.Malloc(n)
 }
 
 func (c *connBuffer) WriteBinary(bs []byte) (n int, err error) {
-	n, err = c.conn.Writer().WriteBinary(bs)
+	n, err = c.writeBuffer.WriteBinary(bs)
 	c.writeSize += n
 	return n, err
 }
@@ -90,5 +106,10 @@ func (c *connBuffer) WrittenLen() (length int) {
 
 func (c *connBuffer) Flush() (err error) {
 	c.writeSize = 0
-	return c.conn.Writer().Flush()
+	writeBuffer := c.writeBuffer
+	c.writeBuffer = netpoll.NewLinkBuffer()
+	c.writeQueue.Add(func() (netpoll.Writer, bool) {
+		return writeBuffer, false
+	})
+	return nil
 }
