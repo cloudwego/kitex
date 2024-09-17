@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ttstream
 
 import (
@@ -8,10 +24,12 @@ import (
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 	"github.com/cloudwego/netpoll"
 )
 
 type serverTransCtxKey struct{}
+type serverStreamCancelCtxKey struct{}
 
 func NewServerProvider(sinfo *serviceinfo.ServiceInfo, opts ...ServerProviderOption) (streamx.ServerProvider, error) {
 	sp := new(serverProvider)
@@ -66,6 +84,9 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 	}
 	ctx = metainfo.SetMetaInfoFromMap(ctx, st.header)
 	ss := newServerStream(st)
+
+	ctx, cancelFunc := ktx.WithCancel(ctx)
+	ctx = context.WithValue(ctx, serverStreamCancelCtxKey{}, cancelFunc)
 	return ctx, ss, nil
 }
 
@@ -77,5 +98,11 @@ func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStr
 	if err := sst.close(); err != nil {
 		return nil, err
 	}
+
+	cancelFunc, _ := ctx.Value(serverStreamCancelCtxKey{}).(context.CancelFunc)
+	if cancelFunc != nil {
+		cancelFunc()
+	}
+
 	return ctx, nil
 }

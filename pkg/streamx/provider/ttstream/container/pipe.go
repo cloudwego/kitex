@@ -1,18 +1,42 @@
+/*
+ * Copyright 2024 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package container
 
 import (
+	"fmt"
 	"io"
 	"runtime"
 	"sync"
 )
 
-var PipeEOF = io.EOF
+var ErrPipeEOF = io.EOF
+var ErrPipeCanceled = fmt.Errorf("pipe canceled")
+
+const (
+	pipeStateActive   = 0
+	pipeStateClosed   = 1
+	pipeStateCanceled = 2
+)
 
 type Pipe[Item any] struct {
 	locker sync.Locker
 	cond   sync.Cond
 	queue  *Queue[Item]
-	closed bool
+	state  int
 }
 
 func NewPipe[Item any]() *Pipe[Item] {
@@ -50,16 +74,20 @@ READ:
 
 	// no data to read, waiting writes
 	p.cond.L.Lock()
-	var empty, closed bool
 	for {
-		empty, closed = p.queue.Size() == 0, p.closed
-		// Important: check empty first and then check EOF
+		empty, state := p.queue.Size() == 0, p.state
+		// Important: check empty first and then check state
 		if !empty {
 			break
 		}
-		if closed {
+		switch state {
+		case pipeStateActive:
+		case pipeStateClosed:
 			p.cond.L.Unlock()
-			return 0, PipeEOF
+			return 0, ErrPipeEOF
+		case pipeStateCanceled:
+			p.cond.L.Unlock()
+			return 0, ErrPipeCanceled
 		}
 		p.cond.Wait()
 		// when call Close(), cond.Wait will be wake up,
@@ -69,16 +97,24 @@ READ:
 	goto READ
 }
 
-func (p *Pipe[Item]) Write(items ...Item) {
+func (p *Pipe[Item]) Write(items ...Item) error {
 	for _, item := range items {
 		p.queue.Add(item)
 	}
 	p.cond.Signal()
+	return nil
 }
 
 func (p *Pipe[Item]) Close() {
 	p.cond.L.Lock()
-	p.closed = true
+	p.state = pipeStateClosed
+	p.cond.L.Unlock()
+	p.cond.Signal()
+}
+
+func (p *Pipe[Item]) Cancel() {
+	p.cond.L.Lock()
+	p.state = pipeStateCanceled
 	p.cond.L.Unlock()
 	p.cond.Signal()
 }
