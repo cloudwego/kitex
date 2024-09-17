@@ -29,30 +29,12 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 )
 
-// TODO(xiaost): rename hyper -> frugal after v0.11.0 is released
-
-// hyperMarshalAvailable indicates that if high priority message codec is available.
-func hyperMarshalAvailable(data interface{}) bool {
-	dt := reflect.TypeOf(data).Elem()
-	if dt.NumField() > 0 && dt.Field(0).Tag.Get("frugal") == "" {
-		return false
-	}
-	return true
+func frugalAvailable(data interface{}) bool {
+	rt := reflect.TypeOf(data).Elem()
+	return rt.NumField() <= 0 || rt.Field(0).Tag.Get("frugal") != ""
 }
 
-// hyperMessageUnmarshalAvailable indicates that if high priority message codec is available.
-func (c thriftCodec) hyperMessageUnmarshalAvailable(data interface{}, payloadLen int) bool {
-	if payloadLen == 0 && c.CodecType&EnableSkipDecoder == 0 {
-		return false
-	}
-	dt := reflect.TypeOf(data).Elem()
-	if dt.NumField() > 0 && dt.Field(0).Tag.Get("frugal") == "" {
-		return false
-	}
-	return true
-}
-
-func (c thriftCodec) hyperMarshal(out bufiox.Writer, methodName string, msgType remote.MessageType,
+func frugalMarshal(out bufiox.Writer, methodName string, msgType remote.MessageType,
 	seqID int32, data interface{},
 ) error {
 	// calculate and malloc message buffer
@@ -77,18 +59,32 @@ func (c thriftCodec) hyperMarshal(out bufiox.Writer, methodName string, msgType 
 	return nil
 }
 
-// NOTE: only used by `marshalThriftData`
-func (c thriftCodec) hyperMarshalBody(data interface{}) (buf []byte, err error) {
-	objectLen := frugal.EncodedSize(data)
-	buf = safemcache.Malloc(objectLen)
-	_, err = frugal.EncodeObject(buf, nil, data)
-	return buf, err
-}
-
-func (c thriftCodec) hyperMessageUnmarshal(buf []byte, data interface{}) error {
-	_, err := frugal.DecodeObject(buf, data)
+func frugalUnmarshal(trans bufiox.Reader, data interface{}, dataLen int) error {
+	if dataLen > 0 {
+		buf, err := trans.Next(dataLen)
+		if err != nil {
+			return remote.NewTransError(remote.ProtocolError, err)
+		}
+		if _, err = frugal.DecodeObject(buf, data); err != nil {
+			return remote.NewTransError(remote.ProtocolError, err)
+		}
+		return nil
+	}
+	buf, err := skipThriftStruct(trans)
 	if err != nil {
 		return err
 	}
+	if _, err = frugal.DecodeObject(buf, data); err != nil {
+		return remote.NewTransError(remote.ProtocolError, err).AppendMessage("caught in Frugal using SkipDecoder Buffer")
+	}
+
 	return nil
+}
+
+// NOTE: only used by `marshalThriftData`
+func frugalMarshalData(data interface{}) (buf []byte, err error) {
+	objectLen := frugal.EncodedSize(data)
+	buf = safemcache.Malloc(objectLen) // see comment of MarshalThriftData
+	_, err = frugal.EncodeObject(buf, nil, data)
+	return buf, err
 }
