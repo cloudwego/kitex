@@ -12,6 +12,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 )
 
 var _ streamx.ClientProvider = (*clientProvider)(nil)
@@ -55,6 +56,13 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	}
 	// only client can set meta frame handler
 	s.setMetaFrameHandler(c.metaHandler)
+
+	// if ctx from server side, we should cancel the stream when server handler already returned
+	// TODO: this canceling transmit should be configurable
+	ktx.RegisterCancelCallback(ctx, func() {
+		s.cancel()
+	})
+
 	cs := newClientStream(s)
 	runtime.SetFinalizer(cs, func(cs *clientStream) {
 		klog.Debugf("client stream[%v] closing", cs.sid)

@@ -20,7 +20,7 @@ var (
 	_ StreamMeta                                    = (*stream)(nil)
 )
 
-func newStream(trans *transport, mode streamx.StreamingMode, smeta streamFrame) (s *stream) {
+func newStream(ctx context.Context, trans *transport, mode streamx.StreamingMode, smeta streamFrame) (s *stream) {
 	s = new(stream)
 	s.streamFrame = smeta
 	s.trans = trans
@@ -28,7 +28,7 @@ func newStream(trans *transport, mode streamx.StreamingMode, smeta streamFrame) 
 	s.headerSig = make(chan struct{})
 	s.trailerSig = make(chan struct{})
 	s.StreamMeta = newStreamMeta()
-	trans.storeStreamIO(s)
+	trans.storeStreamIO(ctx, s)
 	return s
 }
 
@@ -163,6 +163,10 @@ func (s *stream) RecvMsg(ctx context.Context, req any) error {
 	// payload will not be access after decode
 	mcache.Free(payload)
 	return err
+}
+
+func (s *stream) cancel() {
+	_ = s.trans.streamCancel(s)
 }
 
 func newClientStream(s *stream) *clientStream {

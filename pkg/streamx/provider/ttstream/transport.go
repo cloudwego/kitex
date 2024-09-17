@@ -74,8 +74,8 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 	return t
 }
 
-func (t *transport) storeStreamIO(s *stream) {
-	t.streams.Store(s.sid, newStreamIO(s))
+func (t *transport) storeStreamIO(ctx context.Context, s *stream) {
+	t.streams.Store(s.sid, newStreamIO(ctx, s))
 }
 
 func (t *transport) loadStreamIO(sid int32) (sio *streamIO, ok bool) {
@@ -113,7 +113,7 @@ func (t *transport) loopRead() error {
 			case serverTransport:
 				// Header Frame: server recv a new stream
 				smode := t.sinfo.MethodInfo(fr.method).StreamingMode()
-				s := newStream(t, smode, fr.streamFrame)
+				s := newStream(context.Background(), t, smode, fr.streamFrame)
 				klog.Debugf("transport[%d] read a new stream: sid=%d", t.kind, s.sid)
 				t.spipe.Write(s)
 			case clientTransport:
@@ -166,7 +166,7 @@ func (t *transport) loopWrite() error {
 
 		n, err := t.wpipe.Read(frames)
 		if err != nil {
-			if errors.Is(err, container.PipeEOF) {
+			if errors.Is(err, container.ErrPipeEOF) {
 				return nil
 			}
 			return err
@@ -259,6 +259,15 @@ func (t *transport) streamCloseRecv(s *stream) (err error) {
 	return nil
 }
 
+func (t *transport) streamCancel(s *stream) (err error) {
+	sio, ok := t.loadStreamIO(s.sid)
+	if !ok {
+		return fmt.Errorf("stream not found in stream map: sid=%d", s.sid)
+	}
+	sio.cancel()
+	return nil
+}
+
 func (t *transport) streamClose(s *stream) (err error) {
 	// remove stream from transport
 	t.streams.Delete(s.sid)
@@ -283,8 +292,11 @@ func (t *transport) newStream(
 		header: header,
 	}
 	f := newFrame(smeta, headerFrameType, []byte{})
-	s := newStream(t, smode, smeta)
-	t.wpipe.Write(f) // create stream
+	s := newStream(ctx, t, smode, smeta)
+	err := t.wpipe.Write(f) // create stream
+	if err != nil {
+		return nil, err
+	}
 	return s, nil
 }
 
@@ -302,7 +314,7 @@ READ:
 	}
 	n, err := t.spipe.Read(t.scache[0:streamCacheSize])
 	if err != nil {
-		if errors.Is(err, container.PipeEOF) {
+		if errors.Is(err, container.ErrPipeEOF) {
 			return nil, io.EOF
 		}
 		return nil, err
