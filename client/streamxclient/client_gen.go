@@ -9,10 +9,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
-func InvokeStream[Header, Trailer, Req, Res any](
+func InvokeStream[Req, Res any](
 	ctx context.Context, cli client.StreamX, smode serviceinfo.StreamingMode, method string,
 	req *Req, res *Res, callOptions ...streamxcallopt.CallOption,
-) (stream *streamx.GenericClientStream[Header, Trailer, Req, Res], err error) {
+) (stream *streamx.GenericClientStream[Req, Res], err error) {
 	reqArgs, resArgs := streamx.NewStreamReqArgs(nil), streamx.NewStreamResArgs(nil)
 	streamArgs := streamx.NewStreamArgs(nil)
 	// important notes: please don't set a typed nil value into interface arg like NewStreamReqArgs({typ: *Res, ptr: nil})
@@ -28,7 +28,7 @@ func InvokeStream[Header, Trailer, Req, Res any](
 	if err != nil {
 		return nil, err
 	}
-	stream = streamx.NewGenericClientStream[Header, Trailer, Req, Res](cs)
+	stream = streamx.NewGenericClientStream[Req, Res](cs)
 	streamx.AsMutableStreamArgs(streamArgs).SetStream(stream)
 
 	streamMW, recvMW, sendMW := cli.Middlewares()

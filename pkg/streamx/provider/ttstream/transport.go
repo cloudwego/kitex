@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 	"github.com/cloudwego/netpoll"
 )
@@ -43,16 +44,17 @@ const (
 var _ Object = (*transport)(nil)
 
 type transport struct {
-	kind    int32
-	sinfo   *serviceinfo.ServiceInfo
-	conn    netpoll.Connection
-	reader  bufiox.Reader
-	writer  bufiox.Writer
-	streams sync.Map                 // key=streamID val=streamIO
-	spipe   *container.Pipe[*stream] // in-coming stream channel
-	scache  []*stream                // size is streamCacheSize
-	wpipe   *container.Pipe[*Frame]  // out-coming frame channel
-	stop    chan struct{}
+	kind     int32
+	sinfo    *serviceinfo.ServiceInfo
+	conn     netpoll.Connection
+	reader   bufiox.Reader
+	writer   bufiox.Writer
+	streams  sync.Map                 // key=streamID val=streamIO
+	scache   []*stream                // size is streamCacheSize
+	spipe    *container.Pipe[*stream] // in-coming stream channel
+	fpipe    *container.Pipe[*Frame]  // out-coming frame channel
+	fcache   []*Frame
+	ftrigger int32
 
 	// for scavenger check
 	lastActive atomic.Value // time.Time
@@ -70,8 +72,8 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		streams: sync.Map{},
 		spipe:   container.NewPipe[*stream](),
 		scache:  make([]*stream, 0, streamCacheSize),
-		wpipe:   container.NewPipe[*Frame](),
-		stop:    make(chan struct{}),
+		fpipe:   container.NewPipe[*Frame](),
+		fcache:  make([]*Frame, 0, frameCacheSize),
 	}
 	go func() {
 		err := t.loopRead()
@@ -170,13 +172,20 @@ func (t *transport) writeFrame(frame *Frame) error {
 	return t.writer.Flush()
 }
 
+func (t *transport) writeTrigger() {
+	if !atomic.CompareAndSwapInt32(&t.ftrigger, 0, 1) {
+		return
+	}
+	go t.loopWrite()
+}
+
 func (t *transport) loopWrite() error {
 	frames := make([]*Frame, frameCacheSize)
 	for {
 		now := time.Now()
 		t.lastActive.Store(now)
 
-		n, err := t.wpipe.Read(frames)
+		n, err := t.fpipe.Read(frames)
 		if err != nil {
 			if errors.Is(err, container.ErrPipeEOF) {
 				return nil
@@ -202,19 +211,14 @@ func (t *transport) Available() bool {
 }
 
 func (t *transport) Close() (err error) {
-	select {
-	case <-t.stop:
-	default:
-		klog.Warnf("transport[%s] is closing", t.conn.LocalAddr())
-		close(t.stop)
-		t.spipe.Close()
-		t.wpipe.Close()
-		t.conn.Close()
-	}
-	return nil
+	klog.Warnf("transport[%s] is closing", t.conn.LocalAddr())
+	t.spipe.Close()
+	t.fpipe.Close()
+	err = t.conn.Close()
+	return err
 }
 
-func (t *transport) streamSend(sid int32, method string, wheader Header, payload []byte) (err error) {
+func (t *transport) streamSend(sid int32, method string, wheader streamx.Header, payload []byte) (err error) {
 	if len(wheader) > 0 {
 		err = t.streamSendHeader(sid, method, wheader)
 		if err != nil {
@@ -222,20 +226,20 @@ func (t *transport) streamSend(sid int32, method string, wheader Header, payload
 		}
 	}
 	f := newFrame(streamFrame{sid: sid, method: method}, dataFrameType, payload)
-	t.wpipe.Write(f)
-	return nil
+	err = t.fpipe.Write(f)
+	return err
 }
 
-func (t *transport) streamSendHeader(sid int32, method string, header Header) (err error) {
+func (t *transport) streamSendHeader(sid int32, method string, header streamx.Header) (err error) {
 	f := newFrame(streamFrame{sid: sid, method: method, header: header}, headerFrameType, []byte{})
-	t.wpipe.Write(f)
-	return nil
+	err = t.fpipe.Write(f)
+	return err
 }
 
-func (t *transport) streamSendTrailer(sid int32, method string, trailer Trailer) (err error) {
+func (t *transport) streamSendTrailer(sid int32, method string, trailer streamx.Trailer) (err error) {
 	f := newFrame(streamFrame{sid: sid, method: method, trailer: trailer}, trailerFrameType, []byte{})
-	t.wpipe.Write(f)
-	return nil
+	err = t.fpipe.Write(f)
+	return err
 }
 
 func (t *transport) streamRecv(sid int32) (payload []byte, err error) {
@@ -282,7 +286,7 @@ var clientStreamID int32
 // it's typically used by client side
 // newStream is concurrency safe
 func (t *transport) newStream(
-	ctx context.Context, method string, header map[string]string) (*stream, error) {
+	ctx context.Context, method string, header streamx.Header) (*stream, error) {
 	if t.kind != clientTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
@@ -295,7 +299,7 @@ func (t *transport) newStream(
 	}
 	f := newFrame(smeta, headerFrameType, []byte{})
 	s := newStream(ctx, t, smode, smeta)
-	err := t.wpipe.Write(f) // create stream
+	err := t.fpipe.Write(f) // create stream
 	if err != nil {
 		return nil, err
 	}

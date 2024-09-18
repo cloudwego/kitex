@@ -16,24 +16,26 @@
 
 package ttstream
 
+import "github.com/cloudwego/kitex/pkg/streamx"
+
 var _ ClientStreamMeta = (*clientStream)(nil)
 var _ ServerStreamMeta = (*serverStream)(nil)
 
-func (s *clientStream) Header() (Header, error) {
+func (s *clientStream) Header() (streamx.Header, error) {
 	<-s.headerSig
 	return s.header, nil
 }
 
-func (s *clientStream) Trailer() (Trailer, error) {
+func (s *clientStream) Trailer() (streamx.Trailer, error) {
 	<-s.trailerSig
 	return s.trailer, nil
 }
 
-func (s *serverStream) SetHeader(hd Header) error {
+func (s *serverStream) SetHeader(hd streamx.Header) error {
 	return s.writeHeader(hd)
 }
 
-func (s *serverStream) SendHeader(hd Header) error {
+func (s *serverStream) SendHeader(hd streamx.Header) error {
 	err := s.writeHeader(hd)
 	if err != nil {
 		return err
@@ -41,6 +43,6 @@ func (s *serverStream) SendHeader(hd Header) error {
 	return s.stream.sendHeader()
 }
 
-func (s *serverStream) SetTrailer(tl Trailer) error {
+func (s *serverStream) SetTrailer(tl streamx.Trailer) error {
 	return s.writeTrailer(tl)
 }
