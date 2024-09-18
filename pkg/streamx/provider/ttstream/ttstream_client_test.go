@@ -64,8 +64,8 @@ func TestTTHeaderStreaming(t *testing.T) {
 		}
 	}
 	methodCount := map[string]int{}
-	serverRecvCount := map[string]int{}
-	serverSendCount := map[string]int{}
+	var serverRecvCount int32
+	var serverSendCount int32
 	svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
 	// register pingpong service
 	err = svr.RegisterService(pingpongServiceInfo, new(pingpongService))
@@ -81,7 +81,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 			return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
 				err = next(ctx, stream, res)
 				if err == nil {
-					serverRecvCount[stream.Method()]++
+					atomic.AddInt32(&serverRecvCount, 1)
 				} else {
 					log.Printf("server recv middleware err=%v", err)
 				}
@@ -92,7 +92,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 			return func(ctx context.Context, stream streamx.Stream, req any) (err error) {
 				err = next(ctx, stream, req)
 				if err == nil {
-					serverSendCount[stream.Method()]++
+					atomic.AddInt32(&serverSendCount, 1)
 				} else {
 					log.Printf("server send middleware err=%v", err)
 				}
@@ -232,10 +232,12 @@ func TestTTHeaderStreaming(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	test.Assert(t, req.Type == res.Type, res.Type)
 	test.Assert(t, req.Message == res.Message, res.Message)
-	test.Assert(t, serverRecvCount["Unary"] == 1, serverRecvCount)
-	test.Assert(t, serverSendCount["Unary"] == 1, serverSendCount)
+	test.Assert(t, serverRecvCount == 1, serverRecvCount)
+	test.Assert(t, serverSendCount == 1, serverSendCount)
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
+	serverRecvCount = 0
+	serverSendCount = 0
 
 	// client stream
 	round := 5
@@ -255,9 +257,11 @@ func TestTTHeaderStreaming(t *testing.T) {
 	t.Logf("Client ClientStream CloseAndRecv: %v", res)
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
-	test.Assert(t, serverRecvCount["ClientStream"] == round, serverRecvCount)
-	test.Assert(t, serverSendCount["ClientStream"] == 1, serverSendCount)
+	test.Assert(t, serverRecvCount == int32(round), serverRecvCount)
+	test.Assert(t, serverSendCount == 1, serverSendCount)
 	cs = nil
+	serverRecvCount = 0
+	serverSendCount = 0
 	runtime.GC()
 
 	// server stream
@@ -292,9 +296,11 @@ func TestTTHeaderStreaming(t *testing.T) {
 	test.DeepEqual(t, tl["key2"], "val2")
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
-	test.Assert(t, serverRecvCount["ServerStream"] == 1, serverRecvCount)
-	test.Assert(t, serverSendCount["ServerStream"] == received, serverSendCount)
+	test.Assert(t, serverRecvCount == 1, serverRecvCount)
+	test.Assert(t, serverSendCount == int32(received), serverSendCount)
 	ss = nil
+	serverRecvCount = 0
+	serverSendCount = 0
 	runtime.GC()
 
 	// bidi stream
@@ -302,6 +308,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 	concurrent := 32
 	round = 5
 	for c := 0; c < concurrent; c++ {
+		atomic.AddInt32(&serverStreamCount, -1)
 		go func() {
 			bs, err := streamClient.BidiStream(ctx)
 			test.Assert(t, err == nil, err)
@@ -333,13 +340,13 @@ func TestTTHeaderStreaming(t *testing.T) {
 				}
 				test.Assert(t, i == round, i)
 			}()
-			atomic.AddInt32(&serverStreamCount, -1)
-			bs = nil
 		}()
 	}
 	waitServerStreamDone()
-	test.Assert(t, serverRecvCount["BidiStream"] == round, serverRecvCount)
-	test.Assert(t, serverSendCount["BidiStream"] == round, serverSendCount)
+	test.Assert(t, serverRecvCount == int32(concurrent*round), serverRecvCount)
+	test.Assert(t, serverSendCount == int32(concurrent*round), serverSendCount)
+	serverRecvCount = 0
+	serverSendCount = 0
 	runtime.GC()
 
 	streamClient = nil

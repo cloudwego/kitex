@@ -100,12 +100,14 @@ func (t *transport) loopRead() error {
 		if err != nil {
 			return err
 		}
+		klog.Debugf("transport[%d] DecodeFrame: fr=%v", t.kind, fr)
 
 		switch fr.typ {
 		case metaFrameType:
 			sio, ok := t.loadStreamIO(fr.sid)
 			if !ok {
-				return fmt.Errorf("transport[%d] read a unknown stream meta: sid=%d", t.kind, fr.sid)
+				klog.Errorf("transport[%d] read a unknown stream meta: sid=%d", t.kind, fr.sid)
+				continue
 			}
 			err = sio.stream.readMetaFrame(fr.meta, fr.header, fr.payload)
 			if err != nil {
@@ -123,7 +125,8 @@ func (t *transport) loopRead() error {
 				// Header Frame: client recv header
 				sio, ok := t.loadStreamIO(fr.sid)
 				if !ok {
-					return fmt.Errorf("transport[%d] read a unknown stream header: sid=%d", t.kind, fr.sid)
+					klog.Errorf("transport[%d] read a unknown stream header: sid=%d", t.kind, fr.sid)
+					continue
 				}
 				err = sio.stream.readHeader(fr.header)
 				if err != nil {
@@ -134,14 +137,16 @@ func (t *transport) loopRead() error {
 			// Data Frame: decode and distribute data
 			sio, ok := t.loadStreamIO(fr.sid)
 			if !ok {
-				return fmt.Errorf("transport[%d] read a unknown stream data: sid=%d", t.kind, fr.sid)
+				klog.Errorf("transport[%d] read a unknown stream data: sid=%d", t.kind, fr.sid)
+				continue
 			}
 			sio.input(fr)
 		case trailerFrameType:
 			// Trailer Frame: recv trailer, Close read direction
 			sio, ok := t.loadStreamIO(fr.sid)
 			if !ok {
-				return fmt.Errorf("transport[%d] read a unknown stream trailer: sid=%d", t.kind, fr.sid)
+				klog.Errorf("transport[%d] read a unknown stream trailer: sid=%d", t.kind, fr.sid)
+				continue
 			}
 			if err = sio.stream.readTrailer(fr.trailer); err != nil {
 				return err
@@ -150,6 +155,7 @@ func (t *transport) loopRead() error {
 	}
 }
 
+// writeFrame is concurrent safe
 func (t *transport) writeFrame(frame *Frame) error {
 	buf := netpoll.NewLinkBuffer(len(frame.payload) + 128)
 	writer := newWriterBuffer(buf)
@@ -178,6 +184,7 @@ func (t *transport) Available() bool {
 func (t *transport) Close() (err error) {
 	klog.Warnf("transport[%s] is closing", t.conn.LocalAddr())
 	t.spipe.Close()
+	_ = t.fqueue.Close()
 	err = t.conn.Close()
 	return err
 }

@@ -95,9 +95,6 @@ func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStr
 	if err := sst.sendTrailer(); err != nil {
 		return nil, err
 	}
-	if err := sst.close(); err != nil {
-		return nil, err
-	}
 
 	cancelFunc, _ := ctx.Value(serverStreamCancelCtxKey{}).(context.CancelFunc)
 	if cancelFunc != nil {

@@ -214,10 +214,6 @@ type serverStream struct {
 	*stream
 }
 
-func (s *serverStream) close() error {
-	return s.trans.streamClose(s.stream)
-}
-
 // SendMsg should send left header first
 func (s *serverStream) SendMsg(ctx context.Context, res any) error {
 	if len(s.wheader) > 0 {
