@@ -42,12 +42,14 @@ import (
 	"github.com/cloudwego/netpoll"
 )
 
+func init() {
+	klog.SetLevel(klog.LevelDebug)
+}
+
 func TestTTHeaderStreaming(t *testing.T) {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
-
-	klog.SetLevel(klog.LevelDebug)
 	var addr = test.GetLocalAddress()
 	ln, err := netpoll.CreateListener("tcp", addr)
 	test.Assert(t, err == nil, err)
@@ -296,44 +298,48 @@ func TestTTHeaderStreaming(t *testing.T) {
 	runtime.GC()
 
 	// bidi stream
-	round = 5
 	t.Logf("=== BidiStream ===")
-	bs, err := streamClient.BidiStream(ctx)
-	test.Assert(t, err == nil, err)
-	msg := "BidiStream"
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		for i := 0; i < round; i++ {
-			req := new(Request)
-			req.Message = msg
-			err := bs.Send(ctx, req)
+	concurrent := 32
+	round = 5
+	for c := 0; c < concurrent; c++ {
+		go func() {
+			bs, err := streamClient.BidiStream(ctx)
 			test.Assert(t, err == nil, err)
-		}
-		err = bs.CloseSend(ctx)
-		test.Assert(t, err == nil, err)
-	}()
-	go func() {
-		defer wg.Done()
-		i := 0
-		for {
-			res, err := bs.Recv(ctx)
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			i++
-			test.Assert(t, err == nil, err)
-			test.Assert(t, msg == res.Message, res.Message)
-		}
-		test.Assert(t, i == round, i)
-	}()
-	wg.Wait()
-	atomic.AddInt32(&serverStreamCount, -1)
+			msg := "BidiStream"
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				for i := 0; i < round; i++ {
+					req := new(Request)
+					req.Message = msg
+					err := bs.Send(ctx, req)
+					test.Assert(t, err == nil, err)
+				}
+				err = bs.CloseSend(ctx)
+				test.Assert(t, err == nil, err)
+			}()
+			go func() {
+				defer wg.Done()
+				i := 0
+				for {
+					res, err := bs.Recv(ctx)
+					if errors.Is(err, io.EOF) {
+						break
+					}
+					i++
+					test.Assert(t, err == nil, err)
+					test.Assert(t, msg == res.Message, res.Message)
+				}
+				test.Assert(t, i == round, i)
+			}()
+			atomic.AddInt32(&serverStreamCount, -1)
+			bs = nil
+		}()
+	}
 	waitServerStreamDone()
 	test.Assert(t, serverRecvCount["BidiStream"] == round, serverRecvCount)
 	test.Assert(t, serverSendCount["BidiStream"] == round, serverSendCount)
-	bs = nil
 	runtime.GC()
 
 	streamClient = nil

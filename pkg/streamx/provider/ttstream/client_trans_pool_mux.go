@@ -36,7 +36,7 @@ func newMuxTransPool(sinfo *serviceinfo.ServiceInfo) transPool {
 
 type muxTransPool struct {
 	sinfo     *serviceinfo.ServiceInfo
-	pool      sync.Map // addr:netpoll.Connection
+	pool      sync.Map // addr:*transport
 	scavenger *scavenger
 	sflight   singleflight.Group
 }
@@ -53,6 +53,7 @@ func (m *muxTransPool) Get(network string, addr string) (trans *transport, err e
 		}
 		trans = newTransport(clientTransport, m.sinfo, conn)
 		m.scavenger.Add(trans)
+		m.pool.Store(addr, trans)
 		return trans, nil
 	})
 	if err != nil {

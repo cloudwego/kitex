@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -51,7 +50,7 @@ type transport struct {
 	streams sync.Map                 // key=streamID val=streamIO
 	scache  []*stream                // size is streamCacheSize
 	spipe   *container.Pipe[*stream] // in-coming stream channel
-	fqueue  *mux.ShardQueue
+	fqueue  *mux.ShardQueue          // out-coming frame queue
 
 	// for scavenger check
 	lastActive atomic.Value // time.Time
@@ -66,7 +65,7 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		streams: sync.Map{},
 		spipe:   container.NewPipe[*stream](),
 		scache:  make([]*stream, 0, streamCacheSize),
-		fqueue:  mux.NewShardQueue(runtime.GOMAXPROCS(0), conn),
+		fqueue:  mux.NewShardQueue(1, conn),
 	}
 	go func() {
 		err := t.loopRead()
