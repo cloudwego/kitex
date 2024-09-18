@@ -21,16 +21,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 	"github.com/cloudwego/netpoll"
+	"github.com/cloudwego/netpoll/mux"
 )
 
 const (
@@ -44,17 +45,13 @@ const (
 var _ Object = (*transport)(nil)
 
 type transport struct {
-	kind     int32
-	sinfo    *serviceinfo.ServiceInfo
-	conn     netpoll.Connection
-	reader   bufiox.Reader
-	writer   bufiox.Writer
-	streams  sync.Map                 // key=streamID val=streamIO
-	scache   []*stream                // size is streamCacheSize
-	spipe    *container.Pipe[*stream] // in-coming stream channel
-	fpipe    *container.Pipe[*Frame]  // out-coming frame channel
-	fcache   []*Frame
-	ftrigger int32
+	kind    int32
+	sinfo   *serviceinfo.ServiceInfo
+	conn    netpoll.Connection
+	streams sync.Map                 // key=streamID val=streamIO
+	scache  []*stream                // size is streamCacheSize
+	spipe   *container.Pipe[*stream] // in-coming stream channel
+	fqueue  *mux.ShardQueue
 
 	// for scavenger check
 	lastActive atomic.Value // time.Time
@@ -62,30 +59,19 @@ type transport struct {
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
 	_ = conn.SetDeadline(time.Now().Add(time.Hour))
-	cbuffer := newConnBuffer(conn)
 	t := &transport{
 		kind:    kind,
 		sinfo:   sinfo,
 		conn:    conn,
-		reader:  cbuffer,
-		writer:  cbuffer,
 		streams: sync.Map{},
 		spipe:   container.NewPipe[*stream](),
 		scache:  make([]*stream, 0, streamCacheSize),
-		fpipe:   container.NewPipe[*Frame](),
-		fcache:  make([]*Frame, 0, frameCacheSize),
+		fqueue:  mux.NewShardQueue(runtime.GOMAXPROCS(0), conn),
 	}
 	go func() {
 		err := t.loopRead()
 		if err != nil && errors.Is(err, io.EOF) {
 			klog.Warnf("trans loop read err: %v", err)
-		}
-	}()
-	go func() {
-		err := t.loopWrite()
-		if err != nil && errors.Is(err, io.EOF) {
-			klog.Warnf("trans loop write err: %v", err)
-			return
 		}
 	}()
 	return t
@@ -105,12 +91,13 @@ func (t *transport) loadStreamIO(sid int32) (sio *streamIO, ok bool) {
 }
 
 func (t *transport) loopRead() error {
+	reader := newReaderBuffer(t.conn.Reader())
 	for {
 		now := time.Now()
 		t.lastActive.Store(now)
 
 		// decode frame
-		fr, err := DecodeFrame(context.Background(), t.reader)
+		fr, err := DecodeFrame(context.Background(), reader)
 		if err != nil {
 			return err
 		}
@@ -165,39 +152,18 @@ func (t *transport) loopRead() error {
 }
 
 func (t *transport) writeFrame(frame *Frame) error {
-	err := EncodeFrame(context.Background(), t.writer, frame)
-	if err != nil {
+	buf := netpoll.NewLinkBuffer(len(frame.payload) + 128)
+	writer := newWriterBuffer(buf)
+	if err := EncodeFrame(context.Background(), writer, frame); err != nil {
 		return err
 	}
-	return t.writer.Flush()
-}
-
-func (t *transport) writeTrigger() {
-	if !atomic.CompareAndSwapInt32(&t.ftrigger, 0, 1) {
-		return
+	if err := writer.Flush(); err != nil {
+		return err
 	}
-	go t.loopWrite()
-}
-
-func (t *transport) loopWrite() error {
-	frames := make([]*Frame, frameCacheSize)
-	for {
-		now := time.Now()
-		t.lastActive.Store(now)
-
-		n, err := t.fpipe.Read(frames)
-		if err != nil {
-			if errors.Is(err, container.ErrPipeEOF) {
-				return nil
-			}
-			return err
-		}
-		for i := 0; i < n; i++ {
-			if err := t.writeFrame(frames[i]); err != nil {
-				return err
-			}
-		}
-	}
+	t.fqueue.Add(func() (netpoll.Writer, bool) {
+		return buf, false
+	})
+	return nil
 }
 
 func (t *transport) Available() bool {
@@ -206,14 +172,13 @@ func (t *transport) Available() bool {
 		return true
 	}
 	lastActive := v.(time.Time)
-	// let unavailable time configurable
+	// TODO: let unavailable time configurable
 	return time.Now().Sub(lastActive) < time.Minute*10
 }
 
 func (t *transport) Close() (err error) {
 	klog.Warnf("transport[%s] is closing", t.conn.LocalAddr())
 	t.spipe.Close()
-	t.fpipe.Close()
 	err = t.conn.Close()
 	return err
 }
@@ -226,20 +191,17 @@ func (t *transport) streamSend(sid int32, method string, wheader streamx.Header,
 		}
 	}
 	f := newFrame(streamFrame{sid: sid, method: method}, dataFrameType, payload)
-	err = t.fpipe.Write(f)
-	return err
+	return t.writeFrame(f)
 }
 
 func (t *transport) streamSendHeader(sid int32, method string, header streamx.Header) (err error) {
 	f := newFrame(streamFrame{sid: sid, method: method, header: header}, headerFrameType, []byte{})
-	err = t.fpipe.Write(f)
-	return err
+	return t.writeFrame(f)
 }
 
 func (t *transport) streamSendTrailer(sid int32, method string, trailer streamx.Trailer) (err error) {
 	f := newFrame(streamFrame{sid: sid, method: method, trailer: trailer}, trailerFrameType, []byte{})
-	err = t.fpipe.Write(f)
-	return err
+	return t.writeFrame(f)
 }
 
 func (t *transport) streamRecv(sid int32) (payload []byte, err error) {
@@ -299,7 +261,7 @@ func (t *transport) newStream(
 	}
 	f := newFrame(smeta, headerFrameType, []byte{})
 	s := newStream(ctx, t, smode, smeta)
-	err := t.fpipe.Write(f) // create stream
+	err := t.writeFrame(f) // create stream
 	if err != nil {
 		return nil, err
 	}
