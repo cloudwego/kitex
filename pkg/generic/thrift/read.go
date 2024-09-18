@@ -116,7 +116,7 @@ func skipStructReader(ctx context.Context, in *thrift.BufferReader, t *descripto
 		if err != nil {
 			return nil, err
 		}
-		if fieldType == descriptor.STOP.ToThriftTType() {
+		if fieldType == thrift.STOP {
 			break
 		}
 		field, ok := t.Struct.FieldsByID[int32(fieldID)]
@@ -126,7 +126,7 @@ func skipStructReader(ctx context.Context, in *thrift.BufferReader, t *descripto
 				return nil, err
 			}
 		} else {
-			_fieldType := descriptor.FromThriftTType(fieldType)
+			_fieldType := descriptor.Type(fieldType)
 			reader, err := nextReader(_fieldType, field.Type, opt)
 			if err != nil {
 				return nil, fmt.Errorf("nextReader of %s/%d error %w", field.Name, fieldID, err)
@@ -220,7 +220,7 @@ func readList(ctx context.Context, in *thrift.BufferReader, t *descriptor.TypeDe
 	if err != nil {
 		return nil, err
 	}
-	_elemType := descriptor.FromThriftTType(elemType)
+	_elemType := descriptor.Type(elemType)
 	reader, err := nextReader(_elemType, t.Elem, opt)
 	if err != nil {
 		return nil, err
@@ -252,12 +252,12 @@ func readInterfaceMap(ctx context.Context, in *thrift.BufferReader, t *descripto
 	if length == 0 {
 		return m, nil
 	}
-	_keyType := descriptor.FromThriftTType(keyType)
+	_keyType := descriptor.Type(keyType)
 	keyReader, err := nextReader(_keyType, t.Key, opt)
 	if err != nil {
 		return nil, err
 	}
-	_elemType := descriptor.FromThriftTType(elemType)
+	_elemType := descriptor.Type(elemType)
 	elemReader, err := nextReader(_elemType, t.Elem, opt)
 	if err != nil {
 		return nil, err
@@ -289,12 +289,12 @@ func readStringMap(ctx context.Context, in *thrift.BufferReader, t *descriptor.T
 	if length == 0 {
 		return m, nil
 	}
-	_keyType := descriptor.FromThriftTType(keyType)
+	_keyType := descriptor.Type(keyType)
 	keyReader, err := nextReader(_keyType, t.Key, opt)
 	if err != nil {
 		return nil, err
 	}
-	_elemType := descriptor.FromThriftTType(elemType)
+	_elemType := descriptor.Type(elemType)
 	elemReader, err := nextReader(_elemType, t.Elem, opt)
 	if err != nil {
 		return nil, err
@@ -369,7 +369,7 @@ func readStruct(ctx context.Context, in *thrift.BufferReader, t *descriptor.Type
 		if err != nil {
 			return nil, err
 		}
-		if fieldType == descriptor.STOP.ToThriftTType() {
+		if fieldType == thrift.STOP {
 			// check required
 			// void is nil struct
 			if t.Struct != nil {
@@ -387,7 +387,7 @@ func readStruct(ctx context.Context, in *thrift.BufferReader, t *descriptor.Type
 			}
 		} else {
 			nest := unnestPb(opt, field.ID)
-			_fieldType := descriptor.FromThriftTType(fieldType)
+			_fieldType := descriptor.Type(fieldType)
 			reader, err := nextReader(_fieldType, field.Type, opt)
 			if err != nil {
 				return nil, fmt.Errorf("nextReader of %s/%s/%d error %w", t.Name, field.Name, fieldID, err)
@@ -442,7 +442,7 @@ func readHTTPResponse(ctx context.Context, in *thrift.BufferReader, t *descripto
 		if err != nil {
 			return nil, err
 		}
-		if fieldType == descriptor.STOP.ToThriftTType() {
+		if fieldType == thrift.STOP {
 			// check required
 			if err := t.Struct.CheckRequired(readFields); err != nil {
 				return nil, err
@@ -460,7 +460,7 @@ func readHTTPResponse(ctx context.Context, in *thrift.BufferReader, t *descripto
 			nest := unnestPb(opt, field.ID)
 
 			// check required
-			_fieldType := descriptor.FromThriftTType(fieldType)
+			_fieldType := descriptor.Type(fieldType)
 			reader, err := nextReader(_fieldType, field.Type, opt)
 			if err != nil {
 				return nil, fmt.Errorf("nextReader of %s/%s/%d error %w", t.Name, field.Name, fieldID, err)
