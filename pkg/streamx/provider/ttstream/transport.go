@@ -189,12 +189,16 @@ func (t *transport) Close() (err error) {
 	return err
 }
 
-func (t *transport) streamSend(sid int32, method string, wheader streamx.Header, payload []byte) (err error) {
+func (t *transport) streamSend(sid int32, method string, wheader streamx.Header, res any) (err error) {
 	if len(wheader) > 0 {
 		err = t.streamSendHeader(sid, method, wheader)
 		if err != nil {
 			return err
 		}
+	}
+	payload, err := EncodePayload(context.Background(), res)
+	if err != nil {
+		return err
 	}
 	f := newFrame(streamFrame{sid: sid, method: method}, dataFrameType, payload)
 	return t.writeFrame(f)

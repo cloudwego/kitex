@@ -44,6 +44,7 @@ func (n *queueNode[ValueType]) reset() {
 	n.next = nil
 }
 
+// Queue implement a queue that never block Add but block on Get if there is nothing to read
 type Queue[ValueType any] struct {
 	L    sync.Locker
 	read *queueNode[ValueType]

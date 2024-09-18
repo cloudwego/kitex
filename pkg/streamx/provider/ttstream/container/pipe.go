@@ -31,6 +31,7 @@ const (
 	pipeStateCanceled = 2
 )
 
+// Pipe implement a queue that never block on Write but block on Read if there is nothing to read
 type Pipe[Item any] struct {
 	locker sync.Locker
 	cond   sync.Cond

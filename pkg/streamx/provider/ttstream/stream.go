@@ -163,13 +163,7 @@ func (s *stream) sendTrailer() (err error) {
 }
 
 func (s *stream) SendMsg(ctx context.Context, res any) (err error) {
-	payload, err := EncodePayload(ctx, res)
-	if err != nil {
-		return err
-	}
-	err = s.trans.streamSend(s.sid, s.method, s.wheader, payload)
-	// payload will not be access after encode
-	mcache.Free(payload)
+	err = s.trans.streamSend(s.sid, s.method, s.wheader, res)
 	return err
 }
 

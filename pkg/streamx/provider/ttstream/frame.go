@@ -24,8 +24,8 @@ import (
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
-	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
@@ -158,11 +158,13 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	return fr, nil
 }
 
+var thriftCodec = thrift.NewThriftCodec()
+
 func EncodePayload(ctx context.Context, msg any) ([]byte, error) {
-	return thrift.FastMarshal(msg.(thrift.FastCodec)), nil
+	payload, err := thrift.MarshalThriftData(ctx, thriftCodec, msg)
+	return payload, err
 }
 
 func DecodePayload(ctx context.Context, payload []byte, msg any) error {
-	err := thrift.FastUnmarshal(payload, msg.(thrift.FastCodec))
-	return err
+	return thrift.UnmarshalThriftData(ctx, thriftCodec, "", payload, msg)
 }
