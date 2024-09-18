@@ -17,11 +17,13 @@
 package ttstream
 
 import (
+	"runtime"
 	"time"
+
+	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
-	"github.com/cloudwego/netpoll"
 )
 
 var DefaultLongConnConfig = LongConnConfig{
@@ -60,6 +62,11 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, 
 	}
 	// create new transport
 	trans = newTransport(clientTransport, sinfo, conn)
+	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
+		_ = trans.Close()
+		return nil
+	})
+	runtime.SetFinalizer(trans, func(t *transport) { t.Close() })
 	return trans, nil
 }
 

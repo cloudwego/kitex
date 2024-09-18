@@ -19,13 +19,19 @@ package ttstream
 import (
 	"context"
 	"net"
+	"strconv"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+	"github.com/cloudwego/netpoll"
+
+	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
-	"github.com/cloudwego/netpoll"
+	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 type serverTransCtxKey struct{}
@@ -66,6 +72,15 @@ func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Co
 }
 
 func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.Context, error) {
+	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
+	if trans == nil {
+		return ctx, nil
+	}
+	// server should Close transport
+	err := trans.Close()
+	if err != nil {
+		return nil, err
+	}
 	return ctx, nil
 }
 
@@ -86,9 +101,30 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 	return ctx, ss, nil
 }
 
-func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStream) (context.Context, error) {
+func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStream, err error) (context.Context, error) {
 	sst := ss.(*serverStream)
-	_ = sst.close()
+	var exception tException
+	if err != nil {
+		switch err.(type) {
+		case tException:
+			exception = err.(tException)
+		case kerrors.BizStatusErrorIface:
+			bizErr := err.(kerrors.BizStatusErrorIface)
+			sst.appendTrailer(
+				"biz-status", strconv.Itoa(int(bizErr.BizStatusCode())),
+				"biz-message", bizErr.BizMessage(),
+			)
+			if bizErr.BizExtra() != nil {
+				extra, _ := utils.Map2JSONStr(bizErr.BizExtra())
+				sst.appendTrailer("biz-extra", extra)
+			}
+		default:
+			exception = thrift.NewApplicationException(remote.InternalError, err.Error())
+		}
+	}
+	if err := sst.close(exception); err != nil {
+		return nil, err
+	}
 
 	cancelFunc, _ := ctx.Value(serverStreamCancelCtxKey{}).(context.CancelFunc)
 	if cancelFunc != nil {

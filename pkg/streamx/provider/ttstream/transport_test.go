@@ -26,10 +26,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/netpoll"
 )
 
 func TestTransport(t *testing.T) {
@@ -83,7 +84,7 @@ func TestTransport(t *testing.T) {
 							test.Assert(t, err == nil, err)
 
 							// send trailer
-							err = ss.(*serverStream).sendTrailer()
+							err = ss.(*serverStream).sendTrailer(ctx, nil)
 							test.Assert(t, err == nil, err)
 							atomic.AddInt32(&streamDone, -1)
 						}()

@@ -19,12 +19,16 @@ package ttstream
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
 var (
@@ -64,6 +68,7 @@ type stream struct {
 	peerEOF    int32
 	headerSig  chan struct{}
 	trailerSig chan struct{}
+	err        error
 
 	StreamMeta
 	metaHandler MetaFrameHandler
@@ -146,19 +151,31 @@ func (s *stream) sendHeader() (err error) {
 
 // readTrailer by client: unblock recv function and return EOF if no unread frame
 // readTrailer by server: unblock recv function and return EOF if no unread frame
-func (s *stream) readTrailer(tl streamx.Trailer) (err error) {
+func (s *stream) readTrailerFrame(fr *Frame) (err error) {
 	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
 		return nil
 	}
 
-	s.trailer = tl
+	if len(fr.payload) > 0 {
+		_, _, ex := thrift.UnmarshalFastMsg(fr.payload, nil)
+		s.err = ex.(*thrift.ApplicationException)
+	} else {
+		bizErr, err := transmeta.ParseBizStatusErr(fr.trailer)
+		if err != nil {
+			s.err = err
+		} else if bizErr != nil {
+			s.err = bizErr
+		}
+	}
+	s.trailer = fr.trailer
 	select {
 	case <-s.trailerSig:
 		return errors.New("already set trailer")
 	default:
 		close(s.trailerSig)
 	}
-	klog.Debugf("stream[%d] recv trailer: %v", s.sid, tl)
+
+	klog.Debugf("stream[%d] recv trailer: %v, err: %v", s.sid, s.trailer, s.err)
 	return s.trans.streamCloseRecv(s)
 }
 
@@ -172,12 +189,30 @@ func (s *stream) writeTrailer(tl streamx.Trailer) (err error) {
 	return nil
 }
 
-func (s *stream) sendTrailer() (err error) {
+func (s *stream) appendTrailer(kvs ...string) (err error) {
+	if len(kvs)%2 != 0 {
+		return fmt.Errorf("got the odd number of input kvs for Trailer: %d", len(kvs))
+	}
+	if s.wtrailer == nil {
+		s.wtrailer = make(streamx.Trailer)
+	}
+	var key string
+	for i, str := range kvs {
+		if i%2 == 0 {
+			key = str
+			continue
+		}
+		s.wtrailer[key] = str
+	}
+	return nil
+}
+
+func (s *stream) sendTrailer(ctx context.Context, ex tException) (err error) {
 	if !atomic.CompareAndSwapInt32(&s.selfEOF, 0, 1) {
 		return nil
 	}
 	klog.Debugf("stream[%d] send trialer", s.sid)
-	return s.trans.streamCloseSend(s.sid, s.method, s.wtrailer)
+	return s.trans.streamCloseSend(s.sid, s.method, s.wtrailer, ex)
 }
 
 func (s *stream) finished() bool {
@@ -224,13 +259,13 @@ func (s *clientStream) RecvMsg(ctx context.Context, req any) error {
 }
 
 func (s *clientStream) CloseSend(ctx context.Context) error {
-	return s.sendTrailer()
+	return s.sendTrailer(ctx, nil)
 }
 
 // after close stream cannot be access again
 func (s *clientStream) close() error {
 	// client should CloseSend first and then close stream
-	err := s.sendTrailer()
+	err := s.sendTrailer(context.Background(), nil)
 	if err != nil {
 		return err
 	}
@@ -264,9 +299,9 @@ func (s *serverStream) SendMsg(ctx context.Context, res any) error {
 
 // close will be called after server handler returned
 // after close stream cannot be access again
-func (s *serverStream) close() error {
+func (s *serverStream) close(ex tException) error {
 	// write loop should help to delete stream
-	err := s.sendTrailer()
+	err := s.sendTrailer(context.Background(), ex)
 	if err != nil {
 		return err
 	}

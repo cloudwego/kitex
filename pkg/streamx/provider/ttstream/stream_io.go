@@ -31,6 +31,7 @@ type streamIO struct {
 	stream  *stream
 	fpipe   *container.Pipe[*Frame]
 	fcache  [1]*Frame
+	err     error
 }
 
 func newStreamIO(ctx context.Context, s *stream) *streamIO {
@@ -50,17 +51,27 @@ func (s *streamIO) input(ctx context.Context, f *Frame) {
 }
 
 func (s *streamIO) output(ctx context.Context) (f *Frame, err error) {
+	if s.err != nil {
+		return nil, s.err
+	}
 	n, err := s.fpipe.Read(ctx, s.fcache[:])
 	if err != nil {
 		if errors.Is(err, container.ErrPipeEOF) {
-			return nil, io.EOF
+			err = io.EOF
 		}
-		return nil, err
+		s.err = err
+		return nil, s.err
 	}
 	if n == 0 {
-		return nil, io.EOF
+		s.err = io.EOF
+		return nil, s.err
 	}
-	return s.fcache[0], nil
+	f = s.fcache[0]
+	if f.err != nil {
+		s.err = f.err
+		return nil, s.err
+	}
+	return f, nil
 }
 
 func (s *streamIO) closeRecv() {
