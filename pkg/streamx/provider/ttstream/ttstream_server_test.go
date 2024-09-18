@@ -22,7 +22,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 )
 
@@ -42,7 +41,7 @@ func (si *streamingService) Unary(ctx context.Context, req *Request) (*Response,
 }
 
 func (si *streamingService) ClientStream(ctx context.Context,
-	stream streamx.ClientStreamingServer[ttstream.Header, ttstream.Trailer, Request, Response]) (res *Response, err error) {
+	stream streamx.ClientStreamingServer[Request, Response]) (res *Response, err error) {
 	var msg string
 	klog.Infof("Server ClientStream start")
 	defer klog.Infof("Server ClientStream end")
@@ -62,7 +61,7 @@ func (si *streamingService) ClientStream(ctx context.Context,
 }
 
 func (si *streamingService) ServerStream(ctx context.Context, req *Request,
-	stream streamx.ServerStreamingServer[ttstream.Header, ttstream.Trailer, Response]) error {
+	stream streamx.ServerStreamingServer[Response]) error {
 	klog.Infof("Server ServerStream: req={%v}", req)
 
 	_ = stream.SetHeader(map[string]string{"key1": "val1"})
@@ -84,7 +83,7 @@ func (si *streamingService) ServerStream(ctx context.Context, req *Request,
 }
 
 func (si *streamingService) BidiStream(ctx context.Context,
-	stream streamx.BidiStreamingServer[ttstream.Header, ttstream.Trailer, Request, Response]) error {
+	stream streamx.BidiStreamingServer[Request, Response]) error {
 	ktx.RegisterCancelCallback(ctx, func() {
 		klog.Warnf("RegisterCancelCallback work!")
 	})

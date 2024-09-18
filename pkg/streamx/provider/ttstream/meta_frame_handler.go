@@ -16,7 +16,11 @@
 
 package ttstream
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/cloudwego/kitex/pkg/streamx"
+)
 
 type StreamMeta interface {
 	Meta() map[string]string
@@ -25,7 +29,7 @@ type StreamMeta interface {
 }
 
 type MetaFrameHandler interface {
-	OnMetaFrame(smeta StreamMeta, intHeader IntHeader, header Header, payload []byte) error
+	OnMetaFrame(smeta StreamMeta, intHeader IntHeader, header streamx.Header, payload []byte) error
 }
 
 var _ StreamMeta = (*streamMeta)(nil)

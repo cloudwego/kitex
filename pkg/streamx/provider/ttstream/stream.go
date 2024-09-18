@@ -29,11 +29,11 @@ import (
 )
 
 var (
-	_ streamx.ClientStream                          = (*clientStream)(nil)
-	_ streamx.ServerStream                          = (*serverStream)(nil)
-	_ streamx.ClientStreamMetadata[Header, Trailer] = (*clientStream)(nil)
-	_ streamx.ServerStreamMetadata[Header, Trailer] = (*serverStream)(nil)
-	_ StreamMeta                                    = (*stream)(nil)
+	_ streamx.ClientStream         = (*clientStream)(nil)
+	_ streamx.ServerStream         = (*serverStream)(nil)
+	_ streamx.ClientStreamMetadata = (*clientStream)(nil)
+	_ streamx.ServerStreamMetadata = (*serverStream)(nil)
+	_ StreamMeta                   = (*stream)(nil)
 )
 
 func newStream(ctx context.Context, trans *transport, mode streamx.StreamingMode, smeta streamFrame) (s *stream) {
@@ -51,16 +51,16 @@ func newStream(ctx context.Context, trans *transport, mode streamx.StreamingMode
 type streamFrame struct {
 	sid     int32
 	method  string
-	header  Header // key:value, key is full name
-	trailer Trailer
+	header  streamx.Header // key:value, key is full name
+	trailer streamx.Trailer
 }
 
 type stream struct {
 	streamFrame
 	trans      *transport
 	mode       streamx.StreamingMode
-	wheader    Header
-	wtrailer   Trailer
+	wheader    streamx.Header
+	wtrailer   streamx.Trailer
 	selfEOF    int32
 	peerEOF    int32
 	headerSig  chan struct{}
@@ -89,14 +89,14 @@ func (s *stream) setMetaFrameHandler(h MetaFrameHandler) {
 	s.metaHandler = h
 }
 
-func (s *stream) readMetaFrame(intHeader IntHeader, header Header, payload []byte) (err error) {
+func (s *stream) readMetaFrame(intHeader IntHeader, header streamx.Header, payload []byte) (err error) {
 	if s.metaHandler == nil {
 		return nil
 	}
 	return s.metaHandler.OnMetaFrame(s.StreamMeta, intHeader, header, payload)
 }
 
-func (s *stream) readHeader(hd Header) (err error) {
+func (s *stream) readHeader(hd streamx.Header) (err error) {
 	s.header = hd
 	select {
 	case <-s.headerSig:
@@ -108,9 +108,9 @@ func (s *stream) readHeader(hd Header) (err error) {
 	return nil
 }
 
-func (s *stream) writeHeader(hd Header) (err error) {
+func (s *stream) writeHeader(hd streamx.Header) (err error) {
 	if s.wheader == nil {
-		s.wheader = make(Header)
+		s.wheader = make(streamx.Header)
 	}
 	for k, v := range hd {
 		s.wheader[k] = v
@@ -127,7 +127,7 @@ func (s *stream) sendHeader() (err error) {
 
 // readTrailer by client: unblock recv function and return EOF if no unread frame
 // readTrailer by server: unblock recv function and return EOF if no unread frame
-func (s *stream) readTrailer(tl Trailer) (err error) {
+func (s *stream) readTrailer(tl streamx.Trailer) (err error) {
 	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
 		return nil
 	}
@@ -144,9 +144,9 @@ func (s *stream) readTrailer(tl Trailer) (err error) {
 	return s.trans.streamCloseRecv(s)
 }
 
-func (s *stream) writeTrailer(tl Trailer) (err error) {
+func (s *stream) writeTrailer(tl streamx.Trailer) (err error) {
 	if s.wtrailer == nil {
-		s.wtrailer = make(Trailer)
+		s.wtrailer = make(streamx.Trailer)
 	}
 	for k, v := range tl {
 		s.wtrailer[k] = v

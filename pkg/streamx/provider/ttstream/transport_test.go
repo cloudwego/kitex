@@ -79,7 +79,7 @@ func TestTransport(t *testing.T) {
 					go func(st streamx.ServerStream) {
 						defer func() {
 							// set trailer
-							err := st.(ServerStreamMeta).SetTrailer(Trailer{"key": "val"})
+							err := st.(ServerStreamMeta).SetTrailer(streamx.Trailer{"key": "val"})
 							test.Assert(t, err == nil, err)
 
 							// send trailer
@@ -89,7 +89,7 @@ func TestTransport(t *testing.T) {
 						}()
 
 						// send header
-						err := st.(ServerStreamMeta).SendHeader(Header{"key": "val"})
+						err := st.(ServerStreamMeta).SendHeader(streamx.Header{"key": "val"})
 						test.Assert(t, err == nil, err)
 
 						// send data

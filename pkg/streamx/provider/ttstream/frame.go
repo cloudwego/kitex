@@ -26,6 +26,7 @@ import (
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 const (
@@ -121,8 +122,8 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	}
 
 	var ftype int32
-	var fheader Header
-	var ftrailer Trailer
+	var fheader streamx.Header
+	var ftrailer streamx.Trailer
 	switch dp.IntInfo[ttheader.FrameType] {
 	case ttheader.FrameTypeMeta:
 		ftype = metaFrameType

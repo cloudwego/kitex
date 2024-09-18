@@ -25,10 +25,10 @@ import (
 )
 
 var (
-	_ streamx.ClientStream                          = (*clientStream)(nil)
-	_ streamx.ServerStream                          = (*serverStream)(nil)
-	_ streamx.ClientStreamMetadata[Header, Trailer] = (*clientStream)(nil)
-	_ streamx.ServerStreamMetadata[Header, Trailer] = (*serverStream)(nil)
+	_ streamx.ClientStream         = (*clientStream)(nil)
+	_ streamx.ServerStream         = (*serverStream)(nil)
+	_ streamx.ClientStreamMetadata = (*clientStream)(nil)
+	_ streamx.ServerStreamMetadata = (*serverStream)(nil)
 )
 
 func newStream(trans *transport, sid int, mode streamx.StreamingMode, service, method string) (s *stream) {
@@ -51,12 +51,12 @@ type stream struct {
 	trans   *transport
 }
 
-func (s *stream) Header() (Header, error) {
-	return make(Header), nil
+func (s *stream) Header() (streamx.Header, error) {
+	return make(streamx.Header), nil
 }
 
-func (s *stream) Trailer() (Trailer, error) {
-	return make(Trailer), nil
+func (s *stream) Trailer() (streamx.Trailer, error) {
+	return make(streamx.Trailer), nil
 }
 
 func (s *stream) Mode() streamx.StreamingMode {
@@ -125,14 +125,14 @@ type serverStream struct {
 	*stream
 }
 
-func (s *serverStream) SetHeader(hd Header) error {
+func (s *serverStream) SetHeader(hd streamx.Header) error {
 	return nil
 }
 
-func (s *serverStream) SendHeader(hd Header) error {
+func (s *serverStream) SendHeader(hd streamx.Header) error {
 	return nil
 }
 
-func (s *serverStream) SetTrailer(hd Trailer) error {
+func (s *serverStream) SetTrailer(hd streamx.Trailer) error {
 	return nil
 }
