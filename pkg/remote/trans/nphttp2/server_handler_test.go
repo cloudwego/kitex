@@ -303,3 +303,26 @@ func Test_invokeStreamUnaryHandler(t *testing.T) {
 		test.Assert(t, sendCalled)
 	})
 }
+
+func Test_parseGraceAndPollTime(t *testing.T) {
+	// without timeout in ctx
+	ctx := context.Background()
+	graceTime, pollTime := parseGraceAndPollTime(ctx)
+	test.Assert(t, graceTime == defaultGraceTime, graceTime)
+	test.Assert(t, pollTime == defaultPollTime, pollTime)
+
+	// with timeout longer than default timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	graceTime, pollTime = parseGraceAndPollTime(ctx)
+	test.Assert(t, graceTime > defaultGraceTime, graceTime)
+	// defaultPollTime is the max poll time
+	test.Assert(t, pollTime == defaultPollTime, pollTime)
+
+	// with timeout shorter than default timeout
+	ctx, cancel = context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	graceTime, pollTime = parseGraceAndPollTime(ctx)
+	test.Assert(t, graceTime < defaultGraceTime, graceTime)
+	test.Assert(t, pollTime < defaultPollTime, pollTime)
+}

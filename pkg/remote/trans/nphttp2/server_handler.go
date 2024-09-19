@@ -18,6 +18,7 @@ package nphttp2
 
 import (
 	"bytes"
+	"container/list"
 	"context"
 	"errors"
 	"fmt"
@@ -25,6 +26,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/netpoll"
@@ -62,6 +64,7 @@ func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 		opt:         opt,
 		svcSearcher: opt.SvcSearcher,
 		codec:       grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec)),
+		li:          list.New(),
 	}, nil
 }
 
@@ -72,6 +75,10 @@ type svrTransHandler struct {
 	svcSearcher remote.ServiceSearcher
 	inkHdlFunc  endpoint.Endpoint
 	codec       remote.Codec
+
+	mu sync.Mutex
+	// maintain all active server transports
+	li *list.List
 }
 
 var prefaceReadAtMost = func() int {
@@ -119,10 +126,11 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	svrTrans := ctx.Value(ctxKeySvrTransport).(*SvrTrans)
 	tr := svrTrans.tr
-
 	tr.HandleStreams(func(s *grpcTransport.Stream) {
+		atomic.AddInt32(&svrTrans.handlerNum, 1)
 		gofunc.GoFunc(ctx, func() {
 			t.handleFunc(s, svrTrans, conn)
+			atomic.AddInt32(&svrTrans.handlerNum, -1)
 		})
 	}, func(ctx context.Context, method string) context.Context {
 		return ctx
@@ -294,11 +302,20 @@ func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Mes
 
 type svrTransKey int
 
-const ctxKeySvrTransport svrTransKey = 1
+const (
+	ctxKeySvrTransport svrTransKey = 1
+	// align with default exitWaitTime
+	defaultGraceTime time.Duration = 5 * time.Second
+	// max poll time to check whether all the transports have finished
+	defaultPollTime = 500 * time.Millisecond
+)
 
 type SvrTrans struct {
 	tr   grpcTransport.ServerTransport
 	pool *sync.Pool // value is rpcInfo
+	elem *list.Element
+	// num of active handlers
+	handlerNum int32
 }
 
 // 新连接建立时触发，主要用于服务端，对应 netpoll onPrepare
@@ -322,13 +339,22 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 			return ri
 		},
 	}
-	ctx = context.WithValue(ctx, ctxKeySvrTransport, &SvrTrans{tr: tr, pool: pool})
+	svrTrans := &SvrTrans{tr: tr, pool: pool}
+	t.mu.Lock()
+	elem := t.li.PushBack(svrTrans)
+	t.mu.Unlock()
+	svrTrans.elem = elem
+	ctx = context.WithValue(ctx, ctxKeySvrTransport, svrTrans)
 	return ctx, nil
 }
 
 // 连接关闭时回调
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
-	tr := ctx.Value(ctxKeySvrTransport).(*SvrTrans).tr
+	svrTrans := ctx.Value(ctxKeySvrTransport).(*SvrTrans)
+	tr := svrTrans.tr
+	t.mu.Lock()
+	t.li.Remove(svrTrans.elem)
+	t.mu.Unlock()
 	tr.Close()
 }
 
@@ -347,6 +373,73 @@ func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
 }
 
 func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
+}
+
+func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
+	klog.Info("KITEX: gRPC GracefulShutdown starts")
+	t.mu.Lock()
+	for elem := t.li.Front(); elem != nil; elem = elem.Next() {
+		svrTrans := elem.Value.(*SvrTrans)
+		svrTrans.tr.Drain()
+	}
+	t.mu.Unlock()
+	graceTime, pollTime := parseGraceAndPollTime(ctx)
+	graceTimer := time.NewTimer(graceTime)
+	defer graceTimer.Stop()
+	pollTick := time.NewTicker(pollTime)
+	defer pollTick.Stop()
+Loop:
+	for {
+		select {
+		case <-pollTick.C:
+			t.mu.Lock()
+			for elem := t.li.Front(); elem != nil; {
+				svrTrans := elem.Value.(*SvrTrans)
+				// remove the svrTrans from list if no active handlers
+				if atomic.LoadInt32(&svrTrans.handlerNum) == 0 {
+					next := elem.Next()
+					t.li.Remove(elem)
+					elem = next
+				} else {
+					elem = elem.Next()
+				}
+			}
+			// all active handlers have exited
+			if t.li.Len() <= 0 {
+				t.mu.Unlock()
+				break Loop
+			}
+			t.mu.Unlock()
+		case <-graceTimer.C:
+			klog.Info("KITEX: gRPC triggers Close")
+			t.mu.Lock()
+			for elem := t.li.Front(); elem != nil; elem = elem.Next() {
+				svrTrans := elem.Value.(*SvrTrans)
+				svrTrans.tr.Close()
+			}
+			t.mu.Unlock()
+			break Loop
+		}
+	}
+	klog.Info("KITEX: gRPC GracefulShutdown ends")
+
+	return nil
+}
+
+func parseGraceAndPollTime(ctx context.Context) (graceTime time.Duration, pollTime time.Duration) {
+	graceTime = defaultGraceTime
+	deadline, ok := ctx.Deadline()
+	if ok {
+		if customTime := time.Until(deadline); customTime > 0 {
+			graceTime = customTime
+		}
+	}
+
+	pollTime = graceTime / 10
+	if pollTime > defaultPollTime {
+		pollTime = defaultPollTime
+	}
+	return
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {

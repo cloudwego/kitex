@@ -22,6 +22,8 @@ package grpc
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -468,9 +470,10 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr) (_ *Strea
 		s.id = h.streamID
 		s.fc = &inFlow{limit: uint32(t.initialWindowSize)}
 		t.mu.Lock()
-		if t.activeStreams == nil { // Can be niled from Close().
+		// Don't create a stream if the transport is in a state of graceful shutdown or already closed
+		if t.state == draining || t.activeStreams == nil { // Can be niled from Close().
 			t.mu.Unlock()
-			return false // Don't create a stream if the transport is already closed.
+			return false
 		}
 		t.activeStreams[s.id] = s
 		t.mu.Unlock()
@@ -533,7 +536,11 @@ func (t *http2Client) CloseStream(s *Stream, err error) {
 	)
 	if err != nil {
 		rst = true
-		rstCode = http2.ErrCodeCancel
+		if errors.Is(err, errGracefulShutdown) {
+			rstCode = gracefulShutdownCode
+		} else {
+			rstCode = http2.ErrCodeCancel
+		}
 	}
 	t.closeStream(s, err, rst, rstCode, status.Convert(err), nil, false)
 }
@@ -812,7 +819,13 @@ func (t *http2Client) handleRSTStream(f *http2.RSTStreamFrame) {
 			statusCode = codes.DeadlineExceeded
 		}
 	}
-	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.Newf(statusCode, "stream terminated by RST_STREAM with error code: %v", f.ErrCode), nil, false)
+	var msg string
+	if f.ErrCode == gracefulShutdownCode {
+		msg = gracefulShutdownMsg
+	} else {
+		msg = fmt.Sprintf("stream terminated by RST_STREAM with error code: %v", f.ErrCode)
+	}
+	t.closeStream(s, io.EOF, false, http2.ErrCodeNo, status.New(statusCode, msg), nil, false)
 }
 
 func (t *http2Client) handleSettings(f *grpcframe.SettingsFrame, isFirst bool) {
@@ -917,10 +930,12 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 		// Notify the clientconn about the GOAWAY before we set the state to
 		// draining, to allow the client to stop attempting to create streams
 		// before disallowing new streams on this connection.
-		if t.onGoAway != nil {
-			t.onGoAway(t.goAwayReason)
+		if t.state != draining {
+			if t.onGoAway != nil {
+				t.onGoAway(t.goAwayReason)
+			}
+			t.state = draining
 		}
-		t.state = draining
 	}
 	// All streams with IDs greater than the GoAwayId
 	// and smaller than the previous GoAway ID should be killed.
@@ -928,18 +943,29 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 	if upperLimit == 0 { // This is the first GoAway Frame.
 		upperLimit = math.MaxUint32 // Kill all streams after the GoAway ID.
 	}
+	t.prevGoAwayID = id
+	active := len(t.activeStreams)
+	if active <= 0 {
+		t.mu.Unlock()
+		t.Close(connectionErrorf(true, nil, "received goaway and there are no active streams"))
+		return
+	}
+
+	var unprocessedStream []*Stream
 	for streamID, stream := range t.activeStreams {
 		if streamID > id && streamID <= upperLimit {
 			// The stream was unprocessed by the server.
 			atomic.StoreUint32(&stream.unprocessed, 1)
-			t.closeStream(stream, errStreamDrain, false, http2.ErrCodeNo, statusGoAway, nil, false)
+			unprocessedStream = append(unprocessedStream, stream)
 		}
 	}
-	t.prevGoAwayID = id
-	active := len(t.activeStreams)
 	t.mu.Unlock()
-	if active == 0 {
-		t.Close(connectionErrorf(true, nil, "received goaway and there are no active streams"))
+
+	// we should not access controlBuf with t.mu held since it will cause deadlock.
+	// Pls refer to checkForStreamQuota in NewStream, it gets the controlbuf.mu and
+	// wants to get the t.mu.
+	for _, stream := range unprocessedStream {
+		t.closeStream(stream, errStreamDrain, false, http2.ErrCodeNo, statusGoAway, nil, false)
 	}
 }
 

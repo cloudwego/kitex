@@ -145,10 +145,11 @@ func (h *headerFrame) isTransportResponseFrame() bool {
 }
 
 type cleanupStream struct {
-	streamID uint32
-	rst      bool
-	rstCode  http2.ErrCode
-	onWrite  func()
+	streamID      uint32
+	rst           bool
+	rstCode       http2.ErrCode
+	onWrite       func()
+	onFinishWrite func()
 }
 
 func (c *cleanupStream) isTransportResponseFrame() bool { return c.rst } // Results in a RST_STREAM
@@ -778,6 +779,11 @@ func (l *loopyWriter) outFlowControlSizeRequestHandler(o *outFlowControlSizeRequ
 }
 
 func (l *loopyWriter) cleanupStreamHandler(c *cleanupStream) error {
+	if c.onFinishWrite != nil {
+		defer func() {
+			c.onFinishWrite()
+		}()
+	}
 	c.onWrite()
 	if str, ok := l.estdStreams[c.streamID]; ok {
 		// On the server side it could be a trailers-only response or
