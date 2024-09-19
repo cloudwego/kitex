@@ -164,6 +164,7 @@ func (t *transport) loopRead() error {
 
 func (t *transport) loopWrite() (err error) {
 	writer := newWriterBuffer(t.conn.Writer())
+	delay := 0
 	for {
 		select {
 		case frame, ok := <-t.wchannel:
@@ -174,10 +175,13 @@ func (t *transport) loopWrite() (err error) {
 			if err = EncodeFrame(context.Background(), writer, frame); err != nil {
 				return err
 			}
-			if len(t.wchannel) == 0 {
+			if delay >= 8 || len(t.wchannel) == 0 {
+				delay = 0
 				if err = t.conn.Writer().Flush(); err != nil {
 					return err
 				}
+			} else {
+				delay++
 			}
 		}
 	}
