@@ -103,18 +103,10 @@ func (p *Pipe[Item]) Write(items ...Item) error {
 
 func (p *Pipe[Item]) Close() {
 	atomic.StoreInt32(&p.state, pipeStateClosed)
-	select {
-	case <-p.trigger:
-	default:
-		close(p.trigger)
-	}
+	close(p.trigger)
 }
 
 func (p *Pipe[Item]) Cancel() {
 	atomic.StoreInt32(&p.state, pipeStateCanceled)
-	select {
-	case <-p.trigger:
-	default:
-		close(p.trigger)
-	}
+	close(p.trigger)
 }
