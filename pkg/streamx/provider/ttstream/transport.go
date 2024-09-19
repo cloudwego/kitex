@@ -156,13 +156,23 @@ func (t *transport) loopRead() error {
 }
 
 // writeFrame is concurrent safe
-func (t *transport) writeFrame(frame *Frame) error {
-	buf := netpoll.NewLinkBuffer(len(frame.payload) + 128)
+func (t *transport) writeFrame(meta streamFrame, ftype int32, data any) (err error) {
+	var payload []byte
+	if data != nil {
+		// payload should be written nocopy
+		payload, err = EncodePayload(context.Background(), data)
+		if err != nil {
+			return err
+		}
+	}
+	buf := netpoll.NewLinkBuffer(len(payload) + 128)
 	writer := newWriterBuffer(buf)
-	if err := EncodeFrame(context.Background(), writer, frame); err != nil {
+
+	frame := newFrame(meta, ftype, payload)
+	if err = EncodeFrame(context.Background(), writer, frame); err != nil {
 		return err
 	}
-	if err := writer.Flush(); err != nil {
+	if err = writer.Flush(); err != nil {
 		return err
 	}
 	t.fqueue.Add(func() (netpoll.Writer, bool) {
@@ -196,22 +206,15 @@ func (t *transport) streamSend(sid int32, method string, wheader streamx.Header,
 			return err
 		}
 	}
-	payload, err := EncodePayload(context.Background(), res)
-	if err != nil {
-		return err
-	}
-	f := newFrame(streamFrame{sid: sid, method: method}, dataFrameType, payload)
-	return t.writeFrame(f)
+	return t.writeFrame(streamFrame{sid: sid, method: method}, dataFrameType, res)
 }
 
 func (t *transport) streamSendHeader(sid int32, method string, header streamx.Header) (err error) {
-	f := newFrame(streamFrame{sid: sid, method: method, header: header}, headerFrameType, []byte{})
-	return t.writeFrame(f)
+	return t.writeFrame(streamFrame{sid: sid, method: method, header: header}, headerFrameType, nil)
 }
 
 func (t *transport) streamSendTrailer(sid int32, method string, trailer streamx.Trailer) (err error) {
-	f := newFrame(streamFrame{sid: sid, method: method, trailer: trailer}, trailerFrameType, []byte{})
-	return t.writeFrame(f)
+	return t.writeFrame(streamFrame{sid: sid, method: method, trailer: trailer}, trailerFrameType, nil)
 }
 
 func (t *transport) streamRecv(sid int32) (payload []byte, err error) {
@@ -269,9 +272,8 @@ func (t *transport) newStream(
 		method: method,
 		header: header,
 	}
-	f := newFrame(smeta, headerFrameType, []byte{})
 	s := newStream(ctx, t, smode, smeta)
-	err := t.writeFrame(f) // create stream
+	err := t.writeFrame(smeta, headerFrameType, nil) // create stream
 	if err != nil {
 		return nil, err
 	}

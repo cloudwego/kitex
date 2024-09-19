@@ -20,11 +20,13 @@ import (
 	"sync"
 
 	"github.com/cloudwego/gopkg/bufiox"
+	gopkgthrift "github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/netpoll"
 )
 
 var _ bufiox.Reader = (*readerBuffer)(nil)
 var _ bufiox.Writer = (*writerBuffer)(nil)
+var _ gopkgthrift.NocopyWriter = (*writerBuffer)(nil)
 
 var readerBufferPool sync.Pool
 var writerBufferPool sync.Pool
@@ -109,6 +111,13 @@ func (c *writerBuffer) WriteBinary(bs []byte) (n int, err error) {
 	n, err = c.writer.WriteBinary(bs)
 	c.writeSize += n
 	return n, err
+}
+
+func (c *writerBuffer) WriteDirect(b []byte, remainCap int) (err error) {
+	println("WriteDirect")
+	err = c.writer.WriteDirect(b, remainCap)
+	c.writeSize += len(b)
+	return err
 }
 
 func (c *writerBuffer) WrittenLen() (length int) {

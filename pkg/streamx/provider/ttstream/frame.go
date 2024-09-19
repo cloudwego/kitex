@@ -24,6 +24,7 @@ import (
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
+	gopkgthrift "github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -101,7 +102,14 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr *Frame) (err erro
 		return err
 	}
 	if len(fr.payload) > 0 {
-		if _, err = writer.WriteBinary(fr.payload); err != nil {
+		if nw, ok := writer.(gopkgthrift.NocopyWriter); ok {
+			//err = nw.WriteDirect(fr.payload, 0)
+			_, err = writer.WriteBinary(fr.payload)
+			_ = nw
+		} else {
+			_, err = writer.WriteBinary(fr.payload)
+		}
+		if err != nil {
 			return err
 		}
 	}
