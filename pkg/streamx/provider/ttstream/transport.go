@@ -32,7 +32,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 	"github.com/cloudwego/netpoll"
-	"github.com/cloudwego/netpoll/mux"
 )
 
 const (
@@ -40,19 +39,19 @@ const (
 	serverTransport int32 = 2
 
 	streamCacheSize = 32
-	frameCacheSize  = 32
+	frameChanSize   = 32
 )
 
 var _ Object = (*transport)(nil)
 
 type transport struct {
-	kind    int32
-	sinfo   *serviceinfo.ServiceInfo
-	conn    netpoll.Connection
-	streams sync.Map                 // key=streamID val=streamIO
-	scache  []*stream                // size is streamCacheSize
-	spipe   *container.Pipe[*stream] // in-coming stream channel
-	fqueue  *mux.ShardQueue          // out-coming frame queue
+	kind     int32
+	sinfo    *serviceinfo.ServiceInfo
+	conn     netpoll.Connection
+	streams  sync.Map                 // key=streamID val=streamIO
+	scache   []*stream                // size is streamCacheSize
+	spipe    *container.Pipe[*stream] // in-coming stream channel
+	wchannel chan *Frame
 
 	// for scavenger check
 	lastActive atomic.Value // time.Time
@@ -61,18 +60,24 @@ type transport struct {
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
 	_ = conn.SetDeadline(time.Now().Add(time.Hour))
 	t := &transport{
-		kind:    kind,
-		sinfo:   sinfo,
-		conn:    conn,
-		streams: sync.Map{},
-		spipe:   container.NewPipe[*stream](),
-		scache:  make([]*stream, 0, streamCacheSize),
-		fqueue:  mux.NewShardQueue(1, conn),
+		kind:     kind,
+		sinfo:    sinfo,
+		conn:     conn,
+		streams:  sync.Map{},
+		spipe:    container.NewPipe[*stream](),
+		scache:   make([]*stream, 0, streamCacheSize),
+		wchannel: make(chan *Frame, frameChanSize),
 	}
 	go func() {
 		err := t.loopRead()
 		if err != nil && errors.Is(err, io.EOF) {
 			klog.Warnf("trans loop read err: %v", err)
+		}
+	}()
+	go func() {
+		err := t.loopWrite()
+		if err != nil && errors.Is(err, io.EOF) {
+			klog.Warnf("trans loop write err: %v", err)
 		}
 	}()
 	return t
@@ -157,6 +162,27 @@ func (t *transport) loopRead() error {
 	}
 }
 
+func (t *transport) loopWrite() (err error) {
+	writer := newWriterBuffer(t.conn.Writer())
+	for {
+		select {
+		case frame, ok := <-t.wchannel:
+			if !ok {
+				// closed
+				return nil
+			}
+			if err = EncodeFrame(context.Background(), writer, frame); err != nil {
+				return err
+			}
+			if len(t.wchannel) == 0 {
+				if err = t.conn.Writer().Flush(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+}
+
 // writeFrame is concurrent safe
 func (t *transport) writeFrame(meta streamFrame, ftype int32, data any) (err error) {
 	var payload []byte
@@ -167,19 +193,8 @@ func (t *transport) writeFrame(meta streamFrame, ftype int32, data any) (err err
 			return err
 		}
 	}
-	buf := netpoll.NewLinkBuffer(len(payload) + 128)
-	writer := newWriterBuffer(buf)
-
 	frame := newFrame(meta, ftype, payload)
-	if err = EncodeFrame(context.Background(), writer, frame); err != nil {
-		return err
-	}
-	if err = writer.Flush(); err != nil {
-		return err
-	}
-	t.fqueue.Add(func() (netpoll.Writer, bool) {
-		return buf, false
-	})
+	t.wchannel <- frame
 	return nil
 }
 
@@ -196,7 +211,7 @@ func (t *transport) Available() bool {
 func (t *transport) Close() (err error) {
 	klog.Warnf("transport[%s] is closing", t.conn.LocalAddr())
 	t.spipe.Close()
-	_ = t.fqueue.Close()
+	close(t.wchannel)
 	err = t.conn.Close()
 	return err
 }
