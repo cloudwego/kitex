@@ -50,6 +50,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
+const (
+	gracefulShutdownCode = http2.ErrCode(20)
+	gracefulShutdownMsg  = "graceful shutdown"
+)
+
 var (
 	// ErrIllegalHeaderWrite indicates that setting header is illegal because of
 	// the stream's state.
@@ -67,6 +72,8 @@ var (
 	errNotReachable       = status.New(codes.Canceled, "transport: server not reachable").Err()
 	errMaxAgeClosing      = status.New(codes.Canceled, "transport: closing server transport due to maximum connection age").Err()
 	errIdleClosing        = status.New(codes.Canceled, "transport: closing server transport due to idleness").Err()
+
+	errGracefulShutdown = status.Err(codes.Unavailable, gracefulShutdownMsg)
 )
 
 func init() {
@@ -966,6 +973,45 @@ func (t *http2Server) Close() error {
 	return t.closeWithErr(nil)
 }
 
+func (t *http2Server) GracefulClose() {
+	t.gracefulClose()
+}
+
+func (t *http2Server) gracefulClose() {
+	t.mu.Lock()
+	if t.state == closing {
+		t.mu.Unlock()
+		return
+	}
+	t.state = closing
+	streams := t.activeStreams
+	t.activeStreams = nil
+	t.mu.Unlock()
+
+	var wg sync.WaitGroup
+	for _, s := range streams {
+		oldState := s.swapState(streamDone)
+		if oldState == streamDone {
+			// If the stream was already done, continue
+			continue
+		}
+		wg.Add(1)
+		s.cancel(errGracefulShutdown)
+		t.controlBuf.put(&cleanupStream{
+			streamID: s.id,
+			rst:      true,
+			rstCode:  gracefulShutdownCode,
+			onWrite:  func() {},
+			onFinishWrite: func() {
+				wg.Done()
+			},
+		})
+	}
+	wg.Wait()
+	t.controlBuf.finish()
+	close(t.done)
+}
+
 func (t *http2Server) closeWithErr(reason error) error {
 	t.mu.Lock()
 	if t.state == closing {
@@ -1081,10 +1127,8 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 		if err := t.framer.WriteGoAway(sid, g.code, g.debugData); err != nil {
 			return false, err
 		}
+		t.framer.writer.Flush()
 		if g.closeConn {
-			// Abruptly close the connection following the GoAway (via
-			// loopywriter).  But flush out what's inside the buffer first.
-			t.framer.writer.Flush()
 			return false, fmt.Errorf("transport: Connection closing")
 		}
 		return true, nil
@@ -1096,7 +1140,7 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 	// originated before the GoAway reaches the client.
 	// After getting the ack or timer expiration send out another GoAway this
 	// time with an ID of the max stream server intends to process.
-	if err := t.framer.WriteGoAway(math.MaxUint32, http2.ErrCodeNo, []byte{}); err != nil {
+	if err := t.framer.WriteGoAway(math.MaxUint32, http2.ErrCodeNo, g.debugData); err != nil {
 		return false, err
 	}
 	if err := t.framer.WritePing(false, goAwayPing.data); err != nil {
@@ -1104,7 +1148,7 @@ func (t *http2Server) outgoingGoAwayHandler(g *goAway) (bool, error) {
 	}
 
 	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
-		timer := time.NewTimer(time.Minute)
+		timer := time.NewTimer(10 * time.Second)
 		defer timer.Stop()
 		select {
 		case <-t.drainChan:

@@ -715,6 +715,7 @@ type ServerTransport interface {
 	// should not be accessed any more. All the pending streams and their
 	// handlers will be terminated asynchronously.
 	Close() error
+	GracefulClose()
 
 	// RemoteAddr returns the remote network address.
 	RemoteAddr() net.Addr
