@@ -25,6 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/bytedance/gopkg/lang/mcache"
+	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -217,18 +219,20 @@ func (t *transport) streamSendTrailer(sid int32, method string, trailer streamx.
 	return t.writeFrame(streamFrame{sid: sid, method: method, trailer: trailer}, trailerFrameType, nil)
 }
 
-func (t *transport) streamRecv(sid int32) (payload []byte, err error) {
+func (t *transport) streamRecv(sid int32, data any) (err error) {
 	sio, ok := t.loadStreamIO(sid)
 	if !ok {
-		return nil, io.EOF
+		return io.EOF
 	}
 	f, err := sio.output()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	payload = f.payload
+	err = DecodePayload(context.Background(), f.payload, data.(thrift.FastCodec))
+	// payload will not be access after decode
+	mcache.Free(f.payload)
 	recycleFrame(f)
-	return payload, nil
+	return nil
 }
 
 func (t *transport) streamCloseRecv(s *stream) (err error) {

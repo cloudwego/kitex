@@ -21,8 +21,6 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"github.com/bytedance/gopkg/lang/mcache"
-	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -168,14 +166,7 @@ func (s *stream) SendMsg(ctx context.Context, res any) (err error) {
 }
 
 func (s *stream) RecvMsg(ctx context.Context, req any) error {
-	payload, err := s.trans.streamRecv(s.sid)
-	if err != nil {
-		return err
-	}
-	err = DecodePayload(ctx, payload, req.(thrift.FastCodec))
-	// payload will not be access after decode
-	mcache.Free(payload)
-	return err
+	return s.trans.streamRecv(s.sid, req)
 }
 
 func (s *stream) cancel() {

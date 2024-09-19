@@ -41,4 +41,5 @@ func TestQueue(t *testing.T) {
 		}
 	}
 	test.DeepEqual(t, sum, round)
+	test.DeepEqual(t, q.Size(), 0)
 }

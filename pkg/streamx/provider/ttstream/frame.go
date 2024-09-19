@@ -103,9 +103,7 @@ func EncodeFrame(ctx context.Context, writer bufiox.Writer, fr *Frame) (err erro
 	}
 	if len(fr.payload) > 0 {
 		if nw, ok := writer.(gopkgthrift.NocopyWriter); ok {
-			//err = nw.WriteDirect(fr.payload, 0)
-			_, err = writer.WriteBinary(fr.payload)
-			_ = nw
+			err = nw.WriteDirect(fr.payload, 0)
 		} else {
 			_, err = writer.WriteBinary(fr.payload)
 		}
