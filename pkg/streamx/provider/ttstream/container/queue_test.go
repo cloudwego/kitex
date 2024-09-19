@@ -19,23 +19,26 @@ package container
 import (
 	"sync"
 	"testing"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestQueue(t *testing.T) {
-	locker := sync.RWMutex{}
-	q := NewQueueWithLocker[int](&locker)
+	q := NewQueue[int]()
 	round := 100000
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		for i := 0; i < round; i++ {
 			q.Add(1)
 		}
 	}()
-	for sum := 0; sum < round; {
+	sum := 0
+	for sum < round {
 		v, ok := q.Get()
 		if ok {
 			sum += v
 		}
 	}
+	test.DeepEqual(t, sum, round)
 }

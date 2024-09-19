@@ -47,7 +47,7 @@ func (s *streamIO) input(f *Frame) {
 }
 
 func (s *streamIO) output() (f *Frame, err error) {
-	n, err := s.fpipe.Read(s.fcache[0:1])
+	n, err := s.fpipe.Read(s.fcache[:])
 	if err != nil {
 		if errors.Is(err, container.ErrPipeEOF) {
 			return nil, io.EOF

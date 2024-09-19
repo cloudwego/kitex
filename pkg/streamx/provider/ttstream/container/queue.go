@@ -17,20 +17,13 @@
 package container
 
 import (
+	"runtime"
 	"sync"
 	"sync/atomic"
 )
 
 func NewQueue[ValueType any]() *Queue[ValueType] {
-	return &Queue[ValueType]{
-		L: &sync.Mutex{},
-	}
-}
-
-func NewQueueWithLocker[ValueType any](locker sync.Locker) *Queue[ValueType] {
-	return &Queue[ValueType]{
-		L: locker,
-	}
+	return &Queue[ValueType]{}
 }
 
 type queueNode[ValueType any] struct {
@@ -44,19 +37,29 @@ func (n *queueNode[ValueType]) reset() {
 	n.next = nil
 }
 
-// Queue implement a queue that never block Add but block on Get if there is nothing to read
+// Queue implement a concurrent-safe queue
 type Queue[ValueType any] struct {
-	L    sync.Locker
-	read *queueNode[ValueType]
-	head *queueNode[ValueType]
-	tail *queueNode[ValueType]
-	size int64
+	head   *queueNode[ValueType] // head will be protected by Locker
+	tail   *queueNode[ValueType] // tail will be protected by Locker
+	read   *queueNode[ValueType] // read can only access by func Get()
+	safety int32
+	size   int32
 
 	nodePool sync.Pool
 }
 
+func (q *Queue[ValueType]) lock() {
+	for !atomic.CompareAndSwapInt32(&q.safety, 0, 1) {
+		runtime.Gosched()
+	}
+}
+
+func (q *Queue[ValueType]) unlock() {
+	atomic.StoreInt32(&q.safety, 0)
+}
+
 func (q *Queue[ValueType]) Size() int {
-	return int(atomic.LoadInt64(&q.size))
+	return int(atomic.LoadInt32(&q.size))
 }
 
 func (q *Queue[ValueType]) Get() (val ValueType, ok bool) {
@@ -66,44 +69,43 @@ Start:
 		node := q.read
 		val = node.val
 		q.read = node.next
-		atomic.AddInt64(&q.size, -1)
+		atomic.AddInt32(&q.size, -1)
 
-		// recycle node
+		// reset node
 		node.reset()
 		q.nodePool.Put(node)
 		return val, true
 	}
+
 	// slow path
-	q.L.Lock()
+	q.lock()
 	if q.head == nil {
-		q.L.Unlock()
+		q.unlock()
 		return val, false
 	}
 	// single read
-	if q.head == q.tail {
+	if q.head.next == nil {
 		node := q.head
 		val = node.val
 		q.head = nil
 		q.tail = nil
-		atomic.AddInt64(&q.size, -1)
-		q.L.Unlock()
+		atomic.AddInt32(&q.size, -1)
+		q.unlock()
 
-		// recycle node
+		// reset node
 		node.reset()
 		q.nodePool.Put(node)
 		return val, true
 	}
-	// batch read into q.read
+	// transfer main linklist into q.read list and clear main linklist
 	q.read = q.head
 	q.head = nil
 	q.tail = nil
-	q.L.Unlock()
+	q.unlock()
 	goto Start
 }
 
 func (q *Queue[ValueType]) Add(val ValueType) {
-	q.L.Lock()
-
 	var node *queueNode[ValueType]
 	v := q.nodePool.Get()
 	if v == nil {
@@ -112,6 +114,8 @@ func (q *Queue[ValueType]) Add(val ValueType) {
 		node = v.(*queueNode[ValueType])
 	}
 	node.val = val
+
+	q.lock()
 	if q.tail == nil {
 		q.head = node
 		q.tail = node
@@ -119,6 +123,6 @@ func (q *Queue[ValueType]) Add(val ValueType) {
 		q.tail.next = node
 		q.tail = q.tail.next
 	}
-	atomic.AddInt64(&q.size, 1)
-	q.L.Unlock()
+	atomic.AddInt32(&q.size, 1)
+	q.unlock()
 }

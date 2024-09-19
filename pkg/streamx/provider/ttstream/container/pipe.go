@@ -19,31 +19,36 @@ package container
 import (
 	"fmt"
 	"io"
-	"sync"
+	"sync/atomic"
+)
+
+type pipeState = int32
+
+const (
+	pipeStateInactive pipeState = 0
+	pipeStateActive   pipeState = 1
+	pipeStateClosed   pipeState = 2
+	pipeStateCanceled pipeState = 3
 )
 
 var ErrPipeEOF = io.EOF
 var ErrPipeCanceled = fmt.Errorf("pipe canceled")
-
-const (
-	pipeStateActive   = 0
-	pipeStateClosed   = 1
-	pipeStateCanceled = 2
-)
+var stateErrors map[pipeState]error = map[pipeState]error{
+	pipeStateClosed:   ErrPipeEOF,
+	pipeStateCanceled: ErrPipeCanceled,
+}
 
 // Pipe implement a queue that never block on Write but block on Read if there is nothing to read
 type Pipe[Item any] struct {
-	locker sync.Locker
-	cond   sync.Cond
-	queue  *Queue[Item]
-	state  int
+	queue   *Queue[Item]
+	trigger chan struct{}
+	state   pipeState
 }
 
 func NewPipe[Item any]() *Pipe[Item] {
 	p := new(Pipe[Item])
-	p.locker = new(sync.Mutex)
-	p.cond = sync.Cond{L: p.locker}
-	p.queue = NewQueueWithLocker[Item](p.locker)
+	p.queue = NewQueue[Item]()
+	p.trigger = make(chan struct{}, 1)
 	return p
 }
 
@@ -64,48 +69,52 @@ READ:
 	}
 
 	// no data to read, waiting writes
-	p.cond.L.Lock()
 	for {
-		empty, state := p.queue.Size() == 0, p.state
-		// Important: check empty first and then check state
-		if !empty {
-			break
+		<-p.trigger
+		if p.queue.Size() == 0 {
+			err := stateErrors[atomic.LoadInt32(&p.state)]
+			if err != nil {
+				return 0, err
+			}
 		}
-		switch state {
-		case pipeStateActive:
-		case pipeStateClosed:
-			p.cond.L.Unlock()
-			return 0, ErrPipeEOF
-		case pipeStateCanceled:
-			p.cond.L.Unlock()
-			return 0, ErrPipeCanceled
-		}
-		p.cond.Wait()
-		// when call Close(), cond.Wait will be wake up,
-		// and then break the loop
+		goto READ
 	}
-	p.cond.L.Unlock()
-	goto READ
 }
 
 func (p *Pipe[Item]) Write(items ...Item) error {
+	if !atomic.CompareAndSwapInt32(&p.state, pipeStateInactive, pipeStateActive) && atomic.LoadInt32(&p.state) != pipeStateActive {
+		err := stateErrors[atomic.LoadInt32(&p.state)]
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("unknown state error")
+	}
+
 	for _, item := range items {
 		p.queue.Add(item)
 	}
-	p.cond.Signal()
+	// wake up
+	select {
+	case p.trigger <- struct{}{}:
+	default:
+	}
 	return nil
 }
 
 func (p *Pipe[Item]) Close() {
-	p.cond.L.Lock()
-	p.state = pipeStateClosed
-	p.cond.L.Unlock()
-	p.cond.Signal()
+	atomic.StoreInt32(&p.state, pipeStateClosed)
+	select {
+	case <-p.trigger:
+	default:
+		close(p.trigger)
+	}
 }
 
 func (p *Pipe[Item]) Cancel() {
-	p.cond.L.Lock()
-	p.state = pipeStateCanceled
-	p.cond.L.Unlock()
-	p.cond.Signal()
+	atomic.StoreInt32(&p.state, pipeStateCanceled)
+	select {
+	case <-p.trigger:
+	default:
+		close(p.trigger)
+	}
 }
