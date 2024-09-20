@@ -11,7 +11,7 @@ type Client = client.StreamX
 func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error) {
 	iopts := make([]client.Option, 0, len(opts)+1)
 	for _, opt := range opts {
-		iopts = append(iopts, convertClientOption(opt))
+		iopts = append(iopts, ConvertStreamXClientOption(opt))
 	}
 	nopts := iclient.NewOptions(iopts)
 	c, err := client.NewClientWithOptions(svcInfo, nopts)

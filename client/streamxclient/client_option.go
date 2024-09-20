@@ -11,11 +11,11 @@ type Option internal_client.Option
 type Options = internal_client.Options
 
 func WithHostPorts(hostports ...string) Option {
-	return convertInternalClientOption(client.WithHostPorts(hostports...))
+	return ConvertNativeClientOption(client.WithHostPorts(hostports...))
 }
 
 func WithDestService(destService string) Option {
-	return convertInternalClientOption(client.WithDestService(destService))
+	return ConvertNativeClientOption(client.WithDestService(destService))
 }
 
 func WithProvider(pvd streamx.ClientProvider) Option {
@@ -42,10 +42,10 @@ func WithStreamSendMiddleware(smw streamx.StreamSendMiddleware) Option {
 	}}
 }
 
-func convertInternalClientOption(o internal_client.Option) Option {
+func ConvertNativeClientOption(o internal_client.Option) Option {
 	return Option{F: o.F}
 }
 
-func convertClientOption(o Option) internal_client.Option {
+func ConvertStreamXClientOption(o Option) internal_client.Option {
 	return internal_client.Option{F: o.F}
 }
