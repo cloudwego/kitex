@@ -14,26 +14,28 @@
  * limitations under the License.
  */
 
-package ttstream
+package container
 
-import "github.com/cloudwego/kitex/pkg/serviceinfo"
-
-type ClientProviderOption func(cp *clientProvider)
-
-func WithClientMetaHandler(metaHandler MetaFrameHandler) ClientProviderOption {
-	return func(cp *clientProvider) {
-		cp.metaHandler = metaHandler
-	}
+type linkNode[ValueType any] struct {
+	val  ValueType
+	next *linkNode[ValueType]
 }
 
-func WithClientLongConnPool() ClientProviderOption {
-	return func(cp *clientProvider) {
-		cp.transPool = newLongConnTransPool()
-	}
+func (n *linkNode[ValueType]) reset() {
+	var nilVal ValueType
+	n.val = nilVal
+	n.next = nil
 }
 
-func WithClientMuxConnPool(sinfo *serviceinfo.ServiceInfo) ClientProviderOption {
-	return func(cp *clientProvider) {
-		cp.transPool = newMuxTransPool()
-	}
+type doubleLinkNode[ValueType any] struct {
+	val  ValueType
+	next *doubleLinkNode[ValueType]
+	last *doubleLinkNode[ValueType]
+}
+
+func (n *doubleLinkNode[ValueType]) reset() {
+	var nilVal ValueType
+	n.val = nilVal
+	n.next = nil
+	n.last = nil
 }

@@ -163,8 +163,11 @@ func TestTTHeaderStreaming(t *testing.T) {
 		client.WithPayloadCodec(thrift.NewThriftCodecWithConfig(thrift.FastRead|thrift.FastWrite|thrift.EnableSkipDecoder)),
 	)
 	test.Assert(t, err == nil, err)
+	// create streaming client
+	cp, _ := ttstream.NewClientProvider(streamingServiceInfo, ttstream.WithClientLongConnPool())
 	streamClient, err := NewStreamingClient(
 		"kitex.service.streaming",
+		streamxclient.WithProvider(cp),
 		streamxclient.WithHostPorts(addr),
 		streamxclient.WithStreamRecvMiddleware(func(next streamx.StreamRecvEndpoint) streamx.StreamRecvEndpoint {
 			return func(ctx context.Context, stream streamx.Stream, res any) (err error) {

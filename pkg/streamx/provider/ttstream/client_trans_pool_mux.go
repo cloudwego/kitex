@@ -27,21 +27,19 @@ import (
 
 var _ transPool = (*muxTransPool)(nil)
 
-func newMuxTransPool(sinfo *serviceinfo.ServiceInfo) transPool {
+func newMuxTransPool() transPool {
 	t := new(muxTransPool)
-	t.sinfo = sinfo
 	t.scavenger = newScavenger()
 	return t
 }
 
 type muxTransPool struct {
-	sinfo     *serviceinfo.ServiceInfo
 	pool      sync.Map // addr:*transport
 	scavenger *scavenger
 	sflight   singleflight.Group
 }
 
-func (m *muxTransPool) Get(network string, addr string) (trans *transport, err error) {
+func (m *muxTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error) {
 	v, ok := m.pool.Load(addr)
 	if ok {
 		return v.(*transport), nil
@@ -51,7 +49,12 @@ func (m *muxTransPool) Get(network string, addr string) (trans *transport, err e
 		if err != nil {
 			return nil, err
 		}
-		trans = newTransport(clientTransport, m.sinfo, conn)
+		trans = newTransport(clientTransport, sinfo, conn)
+		_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
+			_ = trans.Close()
+			return nil
+		})
+
 		m.scavenger.Add(trans)
 		m.pool.Store(addr, trans)
 		return trans, nil

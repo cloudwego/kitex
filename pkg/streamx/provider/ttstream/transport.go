@@ -52,6 +52,7 @@ type transport struct {
 	scache   []*stream                // size is streamCacheSize
 	spipe    *container.Pipe[*stream] // in-coming stream channel
 	wchannel chan *Frame
+	closed   int32
 
 	// for scavenger check
 	lastActive atomic.Value // time.Time
@@ -172,6 +173,9 @@ func (t *transport) loopWrite() (err error) {
 				// closed
 				return nil
 			}
+			now := time.Now()
+			t.lastActive.Store(now)
+
 			if err = EncodeFrame(context.Background(), writer, frame); err != nil {
 				return err
 			}
@@ -212,7 +216,11 @@ func (t *transport) Available() bool {
 	return time.Now().Sub(lastActive) < time.Minute*10
 }
 
+// Close may be called twice
 func (t *transport) Close() (err error) {
+	if !atomic.CompareAndSwapInt32(&t.closed, 0, 1) {
+		return nil
+	}
 	klog.Warnf("transport[%s] is closing", t.conn.LocalAddr())
 	t.spipe.Close()
 	close(t.wchannel)

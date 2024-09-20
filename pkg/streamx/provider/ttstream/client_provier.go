@@ -36,10 +36,10 @@ var _ streamx.ClientProvider = (*clientProvider)(nil)
 func NewClientProvider(sinfo *serviceinfo.ServiceInfo, opts ...ClientProviderOption) (streamx.ClientProvider, error) {
 	cp := new(clientProvider)
 	cp.sinfo = sinfo
+	cp.transPool = newMuxTransPool()
 	for _, opt := range opts {
 		opt(cp)
 	}
-	cp.transPool = newMuxTransPool(sinfo)
 	return cp, nil
 }
 
@@ -57,7 +57,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 		return nil, kerrors.ErrNoDestAddress
 	}
 
-	trans, err := c.transPool.Get(addr.Network(), addr.String())
+	trans, err := c.transPool.Get(c.sinfo, addr.Network(), addr.String())
 	if err != nil {
 		return nil, err
 	}

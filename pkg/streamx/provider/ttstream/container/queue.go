@@ -26,22 +26,11 @@ func NewQueue[ValueType any]() *Queue[ValueType] {
 	return &Queue[ValueType]{}
 }
 
-type queueNode[ValueType any] struct {
-	val  ValueType
-	next *queueNode[ValueType]
-}
-
-func (n *queueNode[ValueType]) reset() {
-	var nilVal ValueType
-	n.val = nilVal
-	n.next = nil
-}
-
 // Queue implement a concurrent-safe queue
 type Queue[ValueType any] struct {
-	head   *queueNode[ValueType] // head will be protected by Locker
-	tail   *queueNode[ValueType] // tail will be protected by Locker
-	read   *queueNode[ValueType] // read can only access by func Get()
+	head   *linkNode[ValueType] // head will be protected by Locker
+	tail   *linkNode[ValueType] // tail will be protected by Locker
+	read   *linkNode[ValueType] // read can only access by func Get()
 	safety int32
 	size   int32
 
@@ -106,12 +95,12 @@ Start:
 }
 
 func (q *Queue[ValueType]) Add(val ValueType) {
-	var node *queueNode[ValueType]
+	var node *linkNode[ValueType]
 	v := q.nodePool.Get()
 	if v == nil {
-		node = new(queueNode[ValueType])
+		node = new(linkNode[ValueType])
 	} else {
-		node = v.(*queueNode[ValueType])
+		node = v.(*linkNode[ValueType])
 	}
 	node.val = val
 

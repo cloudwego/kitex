@@ -134,12 +134,12 @@ func NewPingPongClient(destService string, opts ...client.Option) (PingPongClien
 func NewStreamingClient(destService string, opts ...streamxclient.Option) (StreamingClientInterface, error) {
 	var options []streamxclient.Option
 	options = append(options, streamxclient.WithDestService(destService))
-	options = append(options, opts...)
 	cp, err := ttstream.NewClientProvider(streamingServiceInfo)
 	if err != nil {
 		return nil, err
 	}
 	options = append(options, streamxclient.WithProvider(cp))
+	options = append(options, opts...)
 	cli, err := streamxclient.NewClient(streamingServiceInfo, options...)
 	if err != nil {
 		return nil, err
