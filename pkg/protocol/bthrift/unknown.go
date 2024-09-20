@@ -44,7 +44,11 @@ func fromGopkgUnknownFields(ff []unknownfields.UnknownField) []UnknownField {
 		ret[i].Type = int(f.Type)
 		ret[i].KeyType = int(f.KeyType)
 		ret[i].ValType = int(f.ValType)
-		ret[i].Value = f.Value
+		if vv, ok := f.Value.([]unknownfields.UnknownField); ok {
+			ret[i].Value = fromGopkgUnknownFields(vv)
+		} else {
+			ret[i].Value = f.Value
+		}
 	}
 	return ret
 }
@@ -60,7 +64,11 @@ func toGopkgUnknownFields(ff []UnknownField) []unknownfields.UnknownField {
 		ret[i].Type = thrift.TType(f.Type)
 		ret[i].KeyType = thrift.TType(f.KeyType)
 		ret[i].ValType = thrift.TType(f.ValType)
-		ret[i].Value = f.Value
+		if vv, ok := f.Value.([]UnknownField); ok {
+			ret[i].Value = toGopkgUnknownFields(vv)
+		} else {
+			ret[i].Value = f.Value
+		}
 	}
 	return ret
 }
