@@ -94,7 +94,6 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		nctx, ss, nerr := t.provider.OnStream(ctx, conn)
 		if nerr != nil {
 			if errors.Is(nerr, io.EOF) {
-				klog.CtxInfof(ctx, "KITEX: OnStream EOF")
 				return nil
 			}
 			klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)

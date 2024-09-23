@@ -85,9 +85,9 @@ func (si *streamingService) ServerStream(ctx context.Context, req *Request,
 func (si *streamingService) BidiStream(ctx context.Context,
 	stream streamx.BidiStreamingServer[Request, Response]) error {
 	ktx.RegisterCancelCallback(ctx, func() {
-		klog.Warnf("RegisterCancelCallback work!")
+		klog.Debugf("RegisterCancelCallback work!")
 	})
-	klog.Warnf("RegisterCancelCallback registered!")
+	klog.Debugf("RegisterCancelCallback registered!")
 	for {
 		req, err := stream.Recv(ctx)
 		if err == io.EOF {
@@ -103,6 +103,6 @@ func (si *streamingService) BidiStream(ctx context.Context,
 		if err != nil {
 			return err
 		}
-		klog.Infof("Server BidiStream: req={%v} resp={%v}", req, resp)
+		klog.Debugf("Server BidiStream: req={%v} resp={%v}", req, resp)
 	}
 }

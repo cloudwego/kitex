@@ -29,7 +29,7 @@ var _ transPool = (*muxTransPool)(nil)
 
 func newMuxTransPool() transPool {
 	t := new(muxTransPool)
-	t.scavenger = newScavenger()
+	t.scavenger = newScavenger(time.Minute * 5)
 	return t
 }
 

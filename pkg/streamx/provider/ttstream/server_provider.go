@@ -56,7 +56,12 @@ func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
 }
 
 func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
-	trans := newTransport(serverTransport, s.sinfo, conn.(netpoll.Connection))
+	nconn := conn.(netpoll.Connection)
+	trans := newTransport(serverTransport, s.sinfo, nconn)
+	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
+		// server only close transport when peer connection closed
+		_ = trans.Close()
+	})
 	return context.WithValue(ctx, serverTransCtxKey{}, trans), nil
 }
 
@@ -102,4 +107,8 @@ func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStr
 	}
 
 	return ctx, nil
+}
+
+type onDisConnectSetter interface {
+	SetOnDisconnect(onDisconnect netpoll.OnDisconnect) error
 }

@@ -80,9 +80,9 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	})
 
 	cs := newClientStream(s)
-	runtime.SetFinalizer(cs, func(cs *clientStream) {
-		klog.Debugf("client stream[%v] closing", cs.sid)
-		_ = cs.close()
+	runtime.SetFinalizer(cs, func(cstream *clientStream) {
+		klog.Debugf("client stream[%v] closing", cstream.sid)
+		_ = cstream.close()
 		c.transPool.Put(trans)
 	})
 	return cs, err

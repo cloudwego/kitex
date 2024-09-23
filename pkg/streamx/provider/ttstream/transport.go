@@ -209,14 +209,13 @@ func (t *transport) writeFrame(meta streamFrame, ftype int32, data any) (err err
 	return nil
 }
 
-func (t *transport) Available() bool {
+func (t *transport) LastActive() time.Time {
 	v := t.lastActive.Load()
 	if v == nil {
-		return true
+		return time.Now()
 	}
 	lastActive := v.(time.Time)
-	// TODO: let unavailable time configurable
-	return time.Now().Sub(lastActive) < time.Minute*10
+	return lastActive
 }
 
 // Close may be called twice
@@ -227,7 +226,7 @@ func (t *transport) Close() (err error) {
 	default:
 		close(t.closed)
 	}
-	klog.Warnf("transport[%s] is closing", t.conn.LocalAddr())
+	klog.Debugf("transport[%s] is closing", t.conn.LocalAddr())
 	t.spipe.Close()
 	err = t.conn.Close()
 	return err

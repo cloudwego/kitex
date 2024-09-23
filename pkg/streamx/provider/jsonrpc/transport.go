@@ -65,7 +65,11 @@ func newTransport(sinfo *serviceinfo.ServiceInfo, conn net.Conn) *transport {
 }
 
 func (t *transport) close() (err error) {
-	close(t.stop)
+	select {
+	case <-t.stop:
+	default:
+		close(t.stop)
+	}
 	return nil
 }
 

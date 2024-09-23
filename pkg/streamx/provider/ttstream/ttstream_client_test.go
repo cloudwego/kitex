@@ -164,7 +164,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 	)
 	test.Assert(t, err == nil, err)
 	// create streaming client
-	cp, _ := ttstream.NewClientProvider(streamingServiceInfo, ttstream.WithClientLongConnPool())
+	cp, _ := ttstream.NewClientProvider(streamingServiceInfo, ttstream.WithClientLongConnPool(ttstream.DefaultLongConnConfig))
 	streamClient, err := NewStreamingClient(
 		"kitex.service.streaming",
 		streamxclient.WithProvider(cp),
@@ -353,6 +353,76 @@ func TestTTHeaderStreaming(t *testing.T) {
 	runtime.GC()
 
 	streamClient = nil
+}
+
+func TestTTHeaderStreamingLongConn(t *testing.T) {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
+	var addr = test.GetLocalAddress()
+	ln, _ := netpoll.CreateListener("tcp", addr)
+	defer ln.Close()
+
+	// create server
+	svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
+	// register streamingService as ttstreaam provider
+	sp, _ := ttstream.NewServerProvider(streamingServiceInfo)
+	_ = svr.RegisterService(
+		streamingServiceInfo,
+		new(streamingService),
+		streamxserver.WithProvider(sp),
+	)
+	go func() {
+		_ = svr.Run()
+	}()
+	defer svr.Stop()
+	test.WaitServerStart(addr)
+
+	numGoroutine := runtime.NumGoroutine()
+	cp, _ := ttstream.NewClientProvider(
+		streamingServiceInfo,
+		ttstream.WithClientLongConnPool(
+			ttstream.LongConnConfig{IdleTimeout: time.Second},
+		),
+	)
+	streamClient, _ := NewStreamingClient(
+		"kitex.service.streaming",
+		streamxclient.WithHostPorts(addr),
+		streamxclient.WithProvider(cp),
+	)
+	ctx := context.Background()
+
+	msg := "BidiStream"
+	streams := 500
+	var wg sync.WaitGroup
+	for i := 0; i < streams; i++ {
+		wg.Add(1)
+		bs, err := streamClient.BidiStream(ctx)
+		test.Assert(t, err == nil, err)
+		req := new(Request)
+		req.Message = msg
+		err = bs.Send(ctx, req)
+		test.Assert(t, err == nil, err)
+		go func() {
+			res, err := bs.Recv(ctx)
+			test.Assert(t, err == nil, err)
+			err = bs.CloseSend(ctx)
+			test.Assert(t, err == nil, err)
+			test.Assert(t, res.Message == msg, res.Message)
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	for {
+		ng := runtime.NumGoroutine()
+		if ng-numGoroutine < 100 {
+			break
+		}
+		runtime.GC()
+		time.Sleep(time.Second)
+		t.Logf("current goroutines=%d, before =%d", ng, numGoroutine)
+	}
 }
 
 func BenchmarkTTHeaderStreaming(b *testing.B) {

@@ -17,7 +17,7 @@
 package ttstream
 
 import (
-	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,20 +27,35 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-const connIdleTimeout = time.Minute * 10
+var DefaultLongConnConfig = LongConnConfig{
+	IdleTimeout: time.Minute,
+}
 
-func newLongConnTransPool() transPool {
-	tp := &longConnTransPool{}
-	// TODO: idle conn clear
+type LongConnConfig struct {
+	IdleTimeout time.Duration
+}
+
+func newLongConnTransPool(config LongConnConfig) transPool {
+	tp := new(longConnTransPool)
+	if config.IdleTimeout == 0 {
+		config.IdleTimeout = DefaultLongConnConfig.IdleTimeout
+	}
+	tp.scavenger = newScavenger(config.IdleTimeout)
 	return tp
 }
 
 type longConnTransPool struct {
-	pool sync.Map // {"addr":*transStack}
-	sg   singleflight.Group
+	pool      sync.Map // {"addr":*transStack}
+	scavenger *scavenger
+	sg        singleflight.Group
 }
 
+const localhost = "localhost"
+
 func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error) {
+	if strings.HasPrefix(addr, localhost) {
+		addr = "127.0.0.1" + addr[len(localhost):]
+	}
 	var cstack *transStack
 	val, ok := c.pool.Load(addr)
 	if ok {
@@ -69,13 +84,13 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, 
 		_ = trans.Close()
 		return nil
 	})
-	runtime.SetFinalizer(trans, func(t *transport) { t.Close() })
+	c.scavenger.Add(trans)
 	return trans, nil
 }
 
 func (c *longConnTransPool) Put(trans *transport) {
 	var cstack *transStack
-	val, ok := c.pool.Load(trans.conn.RemoteAddr())
+	val, ok := c.pool.Load(trans.conn.RemoteAddr().String())
 	if !ok {
 		return
 	}

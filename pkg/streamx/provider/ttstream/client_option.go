@@ -26,9 +26,9 @@ func WithClientMetaHandler(metaHandler MetaFrameHandler) ClientProviderOption {
 	}
 }
 
-func WithClientLongConnPool() ClientProviderOption {
+func WithClientLongConnPool(config LongConnConfig) ClientProviderOption {
 	return func(cp *clientProvider) {
-		cp.transPool = newLongConnTransPool()
+		cp.transPool = newLongConnTransPool(config)
 	}
 }
 
