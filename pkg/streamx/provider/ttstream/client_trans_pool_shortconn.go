@@ -16,28 +16,31 @@
 
 package ttstream
 
-type ClientProviderOption func(cp *clientProvider)
+import (
+	"time"
 
-func WithClientMetaHandler(metaHandler MetaFrameHandler) ClientProviderOption {
-	return func(cp *clientProvider) {
-		cp.metaHandler = metaHandler
-	}
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/netpoll"
+)
+
+func newShortConnTransPool() transPool {
+	return &shortConnTransPool{}
 }
 
-func WithClientLongConnPool(config LongConnConfig) ClientProviderOption {
-	return func(cp *clientProvider) {
-		cp.transPool = newLongConnTransPool(config)
-	}
+type shortConnTransPool struct {
 }
 
-func WithClientShortConnPool() ClientProviderOption {
-	return func(cp *clientProvider) {
-		cp.transPool = newShortConnTransPool()
+func (c *shortConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (*transport, error) {
+	// create new connection
+	conn, err := netpoll.DialConnection(network, addr, time.Second)
+	if err != nil {
+		return nil, err
 	}
+	// create new transport
+	trans := newTransport(clientTransport, sinfo, conn)
+	return trans, nil
 }
 
-func WithClientMuxConnPool() ClientProviderOption {
-	return func(cp *clientProvider) {
-		cp.transPool = newMuxTransPool()
-	}
+func (c *shortConnTransPool) Put(trans *transport) {
+	_ = trans.Close()
 }
