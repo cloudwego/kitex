@@ -52,7 +52,7 @@ type transport struct {
 	scache   []*stream                // size is streamCacheSize
 	spipe    *container.Pipe[*stream] // in-coming stream channel
 	wchannel chan *Frame
-	closed   int32
+	closed   chan struct{}
 
 	// for scavenger check
 	lastActive atomic.Value // time.Time
@@ -68,6 +68,7 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		spipe:    container.NewPipe[*stream](),
 		scache:   make([]*stream, 0, streamCacheSize),
 		wchannel: make(chan *Frame, frameChanSize),
+		closed:   make(chan struct{}),
 	}
 	go func() {
 		err := t.loopRead()
@@ -168,6 +169,8 @@ func (t *transport) loopWrite() (err error) {
 	delay := 0
 	for {
 		select {
+		case <-t.closed:
+			return nil
 		case frame, ok := <-t.wchannel:
 			if !ok {
 				// closed
@@ -218,12 +221,14 @@ func (t *transport) Available() bool {
 
 // Close may be called twice
 func (t *transport) Close() (err error) {
-	if !atomic.CompareAndSwapInt32(&t.closed, 0, 1) {
+	select {
+	case <-t.closed:
 		return nil
+	default:
+		close(t.closed)
 	}
 	klog.Warnf("transport[%s] is closing", t.conn.LocalAddr())
 	t.spipe.Close()
-	close(t.wchannel)
 	err = t.conn.Close()
 	return err
 }
