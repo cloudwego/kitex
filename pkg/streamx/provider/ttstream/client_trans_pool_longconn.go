@@ -45,7 +45,7 @@ func newLongConnTransPool(config LongConnConfig) transPool {
 	if config.MaxIdleTimeout == 0 {
 		config.MaxIdleTimeout = DefaultLongConnConfig.MaxIdleTimeout
 	}
-	tp.scavenger = newScavenger(config.MaxIdleTimeout)
+	tp.scavenger = newScavenger()
 	tp.config = config
 	return tp
 }
@@ -59,7 +59,7 @@ type longConnTransPool struct {
 
 const localhost = "localhost"
 
-func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error) {
+func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (*transport, error) {
 	if strings.HasPrefix(addr, localhost) {
 		addr = "127.0.0.1" + addr[len(localhost):]
 	}
@@ -78,20 +78,29 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, 
 		}
 		cstack = v.(*transStack)
 	}
-	trans = cstack.Pop()
-	if trans != nil {
-		return trans, nil
+	for {
+		tw, _ := cstack.Pop()
+		if tw != nil {
+			trans := tw.transport
+			tw.release()
+			return trans, nil
+		}
+		break
 	}
+
+	// create new connection
 	conn, err := netpoll.DialConnection(network, addr, time.Second)
 	if err != nil {
 		return nil, err
 	}
-	trans = newTransport(clientTransport, sinfo, conn)
-	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
-		_ = trans.Close()
-		return nil
-	})
-	c.scavenger.Add(trans)
+	// create new transport
+	trans := newTransport(clientTransport, sinfo, conn)
+	tw := newTransWrapper()
+	tw.transport = trans
+	tw.lastActive = time.Now()
+	tw.idleTimeout = c.config.MaxIdleTimeout
+	// register into scavenger
+	c.scavenger.Add(tw)
 	return trans, nil
 }
 
@@ -103,34 +112,44 @@ func (c *longConnTransPool) Put(trans *transport) {
 	}
 	cstack = val.(*transStack)
 	if cstack.Size() >= c.config.MaxIdlePerAddress {
+		// discard transport
+		_ = trans.Close()
 		return
 	}
-	cstack.Push(trans)
+	tw := newTransWrapper()
+	tw.transport = trans
+	tw.lastActive = time.Now()
+	tw.idleTimeout = c.config.MaxIdleTimeout
+	cstack.Push(tw)
 }
 
 func newTransStack() *transStack {
-	return &transStack{stack: container.NewStack[*transport]()}
+	return container.NewStack[*transWrapper]()
 }
 
-// FILO
-type transStack struct {
-	stack *container.Stack[*transport]
+var transWrapperPool sync.Pool
+
+func newTransWrapper() *transWrapper {
+	tw := transWrapperPool.Get()
+	if tw == nil {
+		return new(transWrapper)
+	}
+	return tw.(*transWrapper)
 }
 
-func (s *transStack) Size() int {
-	return s.stack.Size()
+type transWrapper struct {
+	*transport
+	lastActive  time.Time
+	idleTimeout time.Duration
 }
 
-func (s *transStack) Pop() *transport {
-	trans, _ := s.stack.Pop()
-	return trans
+func (t *transWrapper) release() {
+	t.transport = nil
+	transWrapperPool.Put(t)
 }
 
-func (s *transStack) PopBottom() *transport {
-	trans, _ := s.stack.PopBottom()
-	return trans
+func (t *transWrapper) IsInvalid() bool {
+	return !(t.transport.IsActive() && time.Now().Sub(t.lastActive) < t.idleTimeout)
 }
 
-func (s *transStack) Push(trans *transport) {
-	s.stack.Push(trans)
-}
+type transStack = container.Stack[*transWrapper]

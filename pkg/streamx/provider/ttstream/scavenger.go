@@ -22,21 +22,19 @@ import (
 )
 
 type Object interface {
-	LastActive() time.Time
+	IsInvalid() bool
 	Close() error
 }
 
-func newScavenger(idleTimeout time.Duration) *scavenger {
+func newScavenger() *scavenger {
 	s := new(scavenger)
-	s.idleTimeout = idleTimeout
 	go s.Cleaning()
 	return s
 }
 
 type scavenger struct {
 	sync.RWMutex
-	objects     []Object
-	idleTimeout time.Duration
+	objects []Object
 }
 
 func (s *scavenger) Add(o Object) {
@@ -49,10 +47,9 @@ func (s *scavenger) Cleaning() {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
-		now := time.Now()
 		s.RLock()
 		for _, o := range s.objects {
-			if now.Sub(o.LastActive()) > s.idleTimeout {
+			if o.IsInvalid() {
 				_ = o.Close()
 			}
 		}

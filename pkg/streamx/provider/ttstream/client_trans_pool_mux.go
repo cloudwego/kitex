@@ -17,6 +17,7 @@
 package ttstream
 
 import (
+	"runtime"
 	"sync"
 	"time"
 
@@ -29,14 +30,12 @@ var _ transPool = (*muxTransPool)(nil)
 
 func newMuxTransPool() transPool {
 	t := new(muxTransPool)
-	t.scavenger = newScavenger(time.Minute * 5)
 	return t
 }
 
 type muxTransPool struct {
-	pool      sync.Map // addr:*transport
-	scavenger *scavenger
-	sflight   singleflight.Group
+	pool    sync.Map // addr:*transport
+	sflight singleflight.Group
 }
 
 func (m *muxTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error) {
@@ -51,12 +50,15 @@ func (m *muxTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr 
 		}
 		trans = newTransport(clientTransport, sinfo, conn)
 		_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
+			// peer close
 			_ = trans.Close()
 			return nil
 		})
-
-		m.scavenger.Add(trans)
 		m.pool.Store(addr, trans)
+		runtime.SetFinalizer(trans, func(trans *transport) {
+			// self close when not hold by user
+			_ = trans.Close()
+		})
 		return trans, nil
 	})
 	if err != nil {

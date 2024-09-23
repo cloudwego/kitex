@@ -42,8 +42,6 @@ const (
 	frameChanSize   = 32
 )
 
-var _ Object = (*transport)(nil)
-
 type transport struct {
 	kind     int32
 	sinfo    *serviceinfo.ServiceInfo
@@ -54,8 +52,7 @@ type transport struct {
 	wchannel chan *Frame
 	closed   chan struct{}
 
-	// for scavenger check
-	lastActive atomic.Value // time.Time
+	streaming int32
 }
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
@@ -101,9 +98,6 @@ func (t *transport) loadStreamIO(sid int32) (sio *streamIO, ok bool) {
 func (t *transport) loopRead() error {
 	reader := newReaderBuffer(t.conn.Reader())
 	for {
-		now := time.Now()
-		t.lastActive.Store(now)
-
 		// decode frame
 		fr, err := DecodeFrame(context.Background(), reader)
 		if err != nil {
@@ -176,8 +170,6 @@ func (t *transport) loopWrite() (err error) {
 				// closed
 				return nil
 			}
-			now := time.Now()
-			t.lastActive.Store(now)
 
 			if err = EncodeFrame(context.Background(), writer, frame); err != nil {
 				return err
@@ -207,15 +199,6 @@ func (t *transport) writeFrame(meta streamFrame, ftype int32, data any) (err err
 	frame := newFrame(meta, ftype, payload)
 	t.wchannel <- frame
 	return nil
-}
-
-func (t *transport) LastActive() time.Time {
-	v := t.lastActive.Load()
-	if v == nil {
-		return time.Now()
-	}
-	lastActive := v.(time.Time)
-	return lastActive
 }
 
 // Close may be called twice
@@ -287,7 +270,15 @@ func (t *transport) streamCancel(s *stream) (err error) {
 func (t *transport) streamClose(s *stream) (err error) {
 	// remove stream from transport
 	t.streams.Delete(s.sid)
+	atomic.AddInt32(&t.streaming, -1)
 	return nil
+}
+
+func (t *transport) IsActive() bool {
+	if !t.conn.IsActive() {
+		return false
+	}
+	return atomic.LoadInt32(&t.streaming) > 0
 }
 
 var clientStreamID int32
@@ -312,6 +303,7 @@ func (t *transport) newStream(
 	if err != nil {
 		return nil, err
 	}
+	atomic.AddInt32(&t.streaming, 1)
 	return s, nil
 }
 
@@ -325,6 +317,7 @@ READ:
 	if len(t.scache) > 0 {
 		s := t.scache[len(t.scache)-1]
 		t.scache = t.scache[:len(t.scache)-1]
+		atomic.AddInt32(&t.streaming, 1)
 		return s, nil
 	}
 	n, err := t.spipe.Read(t.scache[0:streamCacheSize])

@@ -208,3 +208,10 @@ func (s *serverStream) SendMsg(ctx context.Context, res any) error {
 	}
 	return s.stream.SendMsg(ctx, res)
 }
+
+func (s *serverStream) close() error {
+	if err := s.sendTrailer(); err != nil {
+		return err
+	}
+	return s.trans.streamClose(s.stream)
+}

@@ -97,7 +97,7 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 
 func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStream) (context.Context, error) {
 	sst := ss.(*serverStream)
-	if err := sst.sendTrailer(); err != nil {
+	if err := sst.close(); err != nil {
 		return nil, err
 	}
 
