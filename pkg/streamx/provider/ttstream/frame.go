@@ -157,6 +157,8 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 		if err != nil {
 			return
 		}
+	} else {
+		_ = reader.Release(nil)
 	}
 
 	fr = newFrame(streamFrame{sid: fsid, method: fmethod, header: fheader, trailer: ftrailer}, ftype, fpayload)
