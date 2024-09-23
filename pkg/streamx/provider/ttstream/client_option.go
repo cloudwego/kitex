@@ -16,8 +16,6 @@
 
 package ttstream
 
-import "github.com/cloudwego/kitex/pkg/serviceinfo"
-
 type ClientProviderOption func(cp *clientProvider)
 
 func WithClientMetaHandler(metaHandler MetaFrameHandler) ClientProviderOption {
@@ -32,7 +30,7 @@ func WithClientLongConnPool(config LongConnConfig) ClientProviderOption {
 	}
 }
 
-func WithClientMuxConnPool(sinfo *serviceinfo.ServiceInfo) ClientProviderOption {
+func WithClientMuxConnPool() ClientProviderOption {
 	return func(cp *clientProvider) {
 		cp.transPool = newMuxTransPool()
 	}

@@ -211,6 +211,7 @@ func (t *transport) Close() (err error) {
 	}
 	klog.Debugf("transport[%s] is closing", t.conn.LocalAddr())
 	t.spipe.Close()
+	t.streams.Clear()
 	err = t.conn.Close()
 	return err
 }

@@ -416,7 +416,7 @@ func TestTTHeaderStreamingLongConn(t *testing.T) {
 	wg.Wait()
 	for {
 		ng := runtime.NumGoroutine()
-		if ng-numGoroutine < 100 {
+		if ng-numGoroutine < 10 {
 			break
 		}
 		runtime.GC()

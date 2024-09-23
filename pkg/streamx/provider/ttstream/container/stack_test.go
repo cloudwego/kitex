@@ -18,8 +18,14 @@ func TestStack(t *testing.T) {
 		}
 	}()
 	sum := 0
+	var v int
+	var ok bool
 	for sum < round {
-		v, ok := stk.Pop()
+		if sum%2 == 0 {
+			v, ok = stk.Pop()
+		} else {
+			v, ok = stk.PopBottom()
+		}
 		if ok {
 			sum += v
 		}

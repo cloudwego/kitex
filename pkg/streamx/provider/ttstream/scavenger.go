@@ -19,6 +19,8 @@ package ttstream
 import (
 	"sync"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 type Object interface {
@@ -44,12 +46,13 @@ func (s *scavenger) Add(o Object) {
 }
 
 func (s *scavenger) Cleaning() {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
+	for {
+		time.Sleep(time.Second)
+
 		s.RLock()
 		for _, o := range s.objects {
 			if o.IsInvalid() {
+				klog.Debugf("object is invalid: %v, closing", o)
 				_ = o.Close()
 			}
 		}
