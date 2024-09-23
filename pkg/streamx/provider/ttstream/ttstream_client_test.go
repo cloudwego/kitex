@@ -383,7 +383,7 @@ func TestTTHeaderStreamingLongConn(t *testing.T) {
 	cp, _ := ttstream.NewClientProvider(
 		streamingServiceInfo,
 		ttstream.WithClientLongConnPool(
-			ttstream.LongConnConfig{IdleTimeout: time.Second},
+			ttstream.LongConnConfig{MaxIdleTimeout: time.Second},
 		),
 	)
 	streamClient, _ := NewStreamingClient(

@@ -25,10 +25,18 @@ func NewStack[ValueType any]() *Stack[ValueType] {
 }
 
 type Stack[ValueType any] struct {
-	L        sync.Mutex
+	L        sync.RWMutex
 	head     *doubleLinkNode[ValueType] // head will be protected by Locker
 	tail     *doubleLinkNode[ValueType] // tail will be protected by Locker
+	size     int
 	nodePool sync.Pool
+}
+
+func (s *Stack[ValueType]) Size() (size int) {
+	s.L.RLock()
+	size = s.size
+	s.L.RUnlock()
+	return size
 }
 
 func (s *Stack[ValueType]) Pop() (value ValueType, ok bool) {
@@ -45,6 +53,7 @@ func (s *Stack[ValueType]) Pop() (value ValueType, ok bool) {
 	} else {
 		s.tail.next = nil
 	}
+	s.size--
 	s.L.Unlock()
 
 	value = node.val
@@ -68,6 +77,7 @@ func (s *Stack[ValueType]) PopBottom() (value ValueType, ok bool) {
 	if s.tail == node {
 		s.tail = nil
 	}
+	s.size--
 	s.L.Unlock()
 	value = node.val
 	node.reset()
@@ -97,5 +107,6 @@ func (s *Stack[ValueType]) Push(value ValueType) {
 		s.tail.next = node
 		s.tail = s.tail.next
 	}
+	s.size++
 	s.L.Unlock()
 }

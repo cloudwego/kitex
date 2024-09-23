@@ -28,19 +28,25 @@ import (
 )
 
 var DefaultLongConnConfig = LongConnConfig{
-	IdleTimeout: time.Minute,
+	MaxIdlePerAddress: 100,
+	MaxIdleTimeout:    time.Minute,
 }
 
 type LongConnConfig struct {
-	IdleTimeout time.Duration
+	MaxIdlePerAddress int
+	MaxIdleTimeout    time.Duration
 }
 
 func newLongConnTransPool(config LongConnConfig) transPool {
 	tp := new(longConnTransPool)
-	if config.IdleTimeout == 0 {
-		config.IdleTimeout = DefaultLongConnConfig.IdleTimeout
+	if config.MaxIdlePerAddress == 0 {
+		config.MaxIdlePerAddress = DefaultLongConnConfig.MaxIdlePerAddress
 	}
-	tp.scavenger = newScavenger(config.IdleTimeout)
+	if config.MaxIdleTimeout == 0 {
+		config.MaxIdleTimeout = DefaultLongConnConfig.MaxIdleTimeout
+	}
+	tp.scavenger = newScavenger(config.MaxIdleTimeout)
+	tp.config = config
 	return tp
 }
 
@@ -48,6 +54,7 @@ type longConnTransPool struct {
 	pool      sync.Map // {"addr":*transStack}
 	scavenger *scavenger
 	sg        singleflight.Group
+	config    LongConnConfig
 }
 
 const localhost = "localhost"
@@ -95,6 +102,9 @@ func (c *longConnTransPool) Put(trans *transport) {
 		return
 	}
 	cstack = val.(*transStack)
+	if cstack.Size() >= c.config.MaxIdlePerAddress {
+		return
+	}
 	cstack.Push(trans)
 }
 
@@ -105,6 +115,10 @@ func newTransStack() *transStack {
 // FILO
 type transStack struct {
 	stack *container.Stack[*transport]
+}
+
+func (s *transStack) Size() int {
+	return s.stack.Size()
 }
 
 func (s *transStack) Pop() *transport {
