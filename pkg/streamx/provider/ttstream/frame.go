@@ -53,14 +53,15 @@ type Frame struct {
 	payload []byte
 }
 
-func newFrame(meta streamFrame, typ int32, payload []byte) (fr *Frame) {
+func newFrame(sframe streamFrame, meta IntHeader, typ int32, payload []byte) (fr *Frame) {
 	v := framePool.Get()
 	if v == nil {
 		fr = new(Frame)
 	} else {
 		fr = v.(*Frame)
 	}
-	fr.streamFrame = meta
+	fr.streamFrame = sframe
+	fr.meta = meta
 	fr.typ = typ
 	fr.payload = payload
 	return fr
@@ -161,8 +162,11 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 		_ = reader.Release(nil)
 	}
 
-	fr = newFrame(streamFrame{sid: fsid, method: fmethod, header: fheader, trailer: ftrailer}, ftype, fpayload)
-	fr.meta = dp.IntInfo
+	fr = newFrame(
+		streamFrame{sid: fsid, method: fmethod, header: fheader, trailer: ftrailer},
+		dp.IntInfo,
+		ftype, fpayload,
+	)
 	return fr, nil
 }
 

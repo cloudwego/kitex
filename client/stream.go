@@ -24,9 +24,9 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streamx"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
@@ -75,14 +75,15 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, h := range kc.opt.MetaHandlers {
-		if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
-			kc.opt.RemoteOpt.StreamingMetaHandlers = append(kc.opt.RemoteOpt.StreamingMetaHandlers, shdlr)
-		}
-	}
 
+	// old version streaming mw
 	recvEndpoint := kc.opt.Streaming.BuildRecvInvokeChain(kc.invokeRecvEndpoint())
 	sendEndpoint := kc.opt.Streaming.BuildSendInvokeChain(kc.invokeSendEndpoint())
+
+	// streamx version streaming mw
+	kc.sxStreamMW = streamx.StreamMiddlewareChain(kc.opt.SMWs...)
+	kc.sxStreamRecvMW = streamx.StreamRecvMiddlewareChain(kc.opt.SRecvMWs...)
+	kc.sxStreamSendMW = streamx.StreamSendMiddlewareChain(kc.opt.SSendMWs...)
 
 	return func(ctx context.Context, req, resp interface{}) (err error) {
 		// req and resp as &streaming.Stream
@@ -91,8 +92,20 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 		if err != nil {
 			return
 		}
-		clientStream := newStream(st, scm, kc, ri, kc.getStreamingMode(ri), sendEndpoint, recvEndpoint)
-		resp.(*streaming.Result).Stream = clientStream
+
+		// streamx API
+		if cs, ok := st.(streamx.Stream); ok {
+			streamArgs := resp.(streamx.StreamArgs)
+			// 此后的中间件才会有 Stream
+			streamx.AsMutableStreamArgs(streamArgs).SetStream(cs)
+			return nil
+		}
+
+		// old version streaming
+		if cs, ok := st.(streaming.Stream); ok {
+			clientStream := newStream(cs, scm, kc, ri, kc.getStreamingMode(ri), sendEndpoint, recvEndpoint)
+			resp.(*streaming.Result).Stream = clientStream
+		}
 		return
 	}, nil
 }

@@ -28,6 +28,7 @@ import (
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
@@ -187,7 +188,7 @@ func (t *transport) loopWrite() (err error) {
 }
 
 // writeFrame is concurrent safe
-func (t *transport) writeFrame(meta streamFrame, ftype int32, data any) (err error) {
+func (t *transport) writeFrame(sframe streamFrame, meta IntHeader, ftype int32, data any) (err error) {
 	var payload []byte
 	if data != nil {
 		// payload should be written nocopy
@@ -196,7 +197,7 @@ func (t *transport) writeFrame(meta streamFrame, ftype int32, data any) (err err
 			return err
 		}
 	}
-	frame := newFrame(meta, ftype, payload)
+	frame := newFrame(sframe, meta, ftype, payload)
 	t.wchannel <- frame
 	return nil
 }
@@ -222,15 +223,23 @@ func (t *transport) streamSend(sid int32, method string, wheader streamx.Header,
 			return err
 		}
 	}
-	return t.writeFrame(streamFrame{sid: sid, method: method}, dataFrameType, res)
+	return t.writeFrame(
+		streamFrame{sid: sid, method: method},
+		nil, dataFrameType, res,
+	)
 }
 
 func (t *transport) streamSendHeader(sid int32, method string, header streamx.Header) (err error) {
-	return t.writeFrame(streamFrame{sid: sid, method: method, header: header}, headerFrameType, nil)
+	return t.writeFrame(
+		streamFrame{sid: sid, method: method, header: header},
+		nil, headerFrameType, nil)
 }
 
 func (t *transport) streamSendTrailer(sid int32, method string, trailer streamx.Trailer) (err error) {
-	return t.writeFrame(streamFrame{sid: sid, method: method, trailer: trailer}, trailerFrameType, nil)
+	return t.writeFrame(
+		streamFrame{sid: sid, method: method, trailer: trailer},
+		nil, trailerFrameType, nil,
+	)
 }
 
 func (t *transport) streamRecv(sid int32, data any) (err error) {
@@ -284,19 +293,24 @@ var clientStreamID int32
 // it's typically used by client side
 // newStream is concurrency safe
 func (t *transport) newStream(
-	ctx context.Context, method string, header streamx.Header) (*stream, error) {
+	ctx context.Context, method string, meta IntHeader, header streamx.Header) (*stream, error) {
 	if t.kind != clientTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri.From() == nil || ri.To() == nil {
+		return nil, fmt.Errorf("invalid RPC info")
+	}
+
 	sid := atomic.AddInt32(&clientStreamID, 1)
 	smode := t.sinfo.MethodInfo(method).StreamingMode()
-	smeta := streamFrame{
+	sfr := streamFrame{
 		sid:    sid,
 		method: method,
 		header: header,
 	}
-	s := newStream(ctx, t, smode, smeta)
-	err := t.writeFrame(smeta, headerFrameType, nil) // create stream
+	s := newStream(ctx, t, smode, sfr)
+	err := t.writeFrame(sfr, meta, headerFrameType, nil) // create stream
 	if err != nil {
 		return nil, err
 	}

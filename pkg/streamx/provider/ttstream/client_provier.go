@@ -44,9 +44,10 @@ func NewClientProvider(sinfo *serviceinfo.ServiceInfo, opts ...ClientProviderOpt
 }
 
 type clientProvider struct {
-	transPool   transPool
-	sinfo       *serviceinfo.ServiceInfo
-	metaHandler MetaFrameHandler
+	transPool     transPool
+	sinfo         *serviceinfo.ServiceInfo
+	metaHandler   MetaFrameHandler
+	headerHandler HeaderFrameHandler
 }
 
 func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callOptions ...streamxcallopt.CallOption) (streamx.ClientStream, error) {
@@ -57,16 +58,27 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 		return nil, kerrors.ErrNoDestAddress
 	}
 
+	var strHeader streamx.Header
+	var intHeader IntHeader
+	var err error
+	if c.headerHandler != nil {
+		intHeader, strHeader, err = c.headerHandler.OnStream(ctx)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		intHeader = IntHeader{}
+		strHeader = map[string]string{}
+	}
+	strHeader[ttheader.HeaderIDLServiceName] = c.sinfo.ServiceName
+	metainfo.SaveMetaInfoToMap(ctx, strHeader)
+
 	trans, err := c.transPool.Get(c.sinfo, addr.Network(), addr.String())
 	if err != nil {
 		return nil, err
 	}
 
-	header := map[string]string{
-		ttheader.HeaderIDLServiceName: c.sinfo.ServiceName,
-	}
-	metainfo.SaveMetaInfoToMap(ctx, header)
-	s, err := trans.newStream(ctx, method, header)
+	s, err := trans.newStream(ctx, method, intHeader, strHeader)
 	if err != nil {
 		return nil, err
 	}

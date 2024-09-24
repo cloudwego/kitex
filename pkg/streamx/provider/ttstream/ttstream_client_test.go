@@ -63,7 +63,6 @@ func TestTTHeaderStreaming(t *testing.T) {
 			time.Sleep(time.Millisecond * 100)
 		}
 	}
-	methodCount := map[string]int{}
 	var serverRecvCount int32
 	var serverSendCount int32
 	svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
@@ -136,7 +135,6 @@ func TestTTHeaderStreaming(t *testing.T) {
 						test.Assert(t, resArgs.Res() == nil)
 					}
 					test.Assert(t, err == nil, err)
-					methodCount[streamArgs.Stream().Method()]++
 					log.Printf("Server handler end")
 
 					log.Printf("Server middleware after next: reqArgs=%v resArgs=%v streamArgs=%v",
@@ -423,19 +421,20 @@ func TestTTHeaderStreamingLongConn(t *testing.T) {
 	for i := 0; i < streams; i++ {
 		wg.Add(1)
 		go func() {
-			defer wg.Done()
-
 			bs, err := streamClient.BidiStream(ctx)
 			test.Assert(t, err == nil, err)
 			req := new(Request)
 			req.Message = msg
 			err = bs.Send(ctx, req)
 			test.Assert(t, err == nil, err)
-			res, err := bs.Recv(ctx)
-			test.Assert(t, err == nil, err)
-			err = bs.CloseSend(ctx)
-			test.Assert(t, err == nil, err)
-			test.Assert(t, res.Message == msg, res.Message)
+			go func() {
+				defer wg.Done()
+				res, err := bs.Recv(ctx)
+				test.Assert(t, err == nil, err)
+				err = bs.CloseSend(ctx)
+				test.Assert(t, err == nil, err)
+				test.Assert(t, res.Message == msg, res.Message)
+			}()
 		}()
 	}
 	wg.Wait()

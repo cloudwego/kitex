@@ -33,7 +33,7 @@ func TestFrameCodec(t *testing.T) {
 		sid:    0,
 		method: "method",
 		header: map[string]string{"key": "value"},
-	}, headerFrameType, []byte("hello world"))
+	}, nil, headerFrameType, []byte("hello world"))
 
 	for i := 0; i < 10; i++ {
 		wframe.sid = int32(i)
