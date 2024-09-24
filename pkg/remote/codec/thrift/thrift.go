@@ -23,7 +23,6 @@ import (
 
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
-	"github.com/cloudwego/gopkg/protocol/thrift/apache"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
@@ -53,8 +52,6 @@ const (
 )
 
 var (
-	defaultCodec = NewThriftCodec().(*thriftCodec)
-
 	errEncodeMismatchMsgType = remote.NewTransErrorWithMsg(remote.InvalidProtocol,
 		"encode failed, codec msg type not match with thriftCodec")
 	errDecodeMismatchMsgType = remote.NewTransErrorWithMsg(remote.InvalidProtocol,
@@ -101,10 +98,13 @@ func (c thriftCodec) IsSet(t CodecType) bool {
 	return c.CodecType&t != 0
 }
 
+// IsDataLenDeterministic return true if dataLen > 0 or we can use SkipDecoder
+func (c thriftCodec) IsDataLenDeterministic(dataLen int) bool {
+	return dataLen > 0 || c.IsSet(EnableSkipDecoder)
+}
+
 // Marshal implements the remote.PayloadCodec interface.
 func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out remote.ByteBuffer) error {
-	// TODO(xiaost): Refactor the code after v0.11.0 is released. Unifying checking and fallback logic.
-
 	// prepare info
 	methodName := message.RPCInfo().Invocation().MethodName()
 	if methodName == "" {
@@ -122,25 +122,25 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 		// if remote.Exception, we always use fastcodec
 		if transErr, ok := data.(*remote.TransError); ok {
 			ex := thrift.NewApplicationException(transErr.TypeID(), transErr.Error())
-			return encodeFastThrift(out, methodName, msgType, seqID, ex)
+			return fastMarshal(out, methodName, msgType, seqID, ex)
 		} else if err, ok := data.(error); ok {
 			ex := thrift.NewApplicationException(remote.InternalError, err.Error())
-			return encodeFastThrift(out, methodName, msgType, seqID, ex)
+			return fastMarshal(out, methodName, msgType, seqID, ex)
 		} else {
 			return fmt.Errorf("got %T for remote.Exception", data)
 		}
 	}
 
-	// encode with hyper codec
-	if c.IsSet(FrugalWrite) && hyperMarshalAvailable(data) {
-		return c.hyperMarshal(out, methodName, msgType, seqID, data)
+	typecodec := getTypeCodec(data)
+
+	// encode with frugal codec
+	if c.IsSet(FrugalWrite) && typecodec.Frugal {
+		return frugalMarshal(out, methodName, msgType, seqID, data)
 	}
 
 	// encode with FastWrite
-	if c.IsSet(FastWrite) {
-		if msg, ok := data.(thrift.FastCodec); ok {
-			return encodeFastThrift(out, methodName, msgType, seqID, msg)
-		}
+	if c.IsSet(FastWrite) && typecodec.FastCodec {
+		return fastMarshal(out, methodName, msgType, seqID, data.(thrift.FastCodec))
 	}
 
 	// generic call
@@ -149,42 +149,21 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 	}
 
 	// fallback to old thrift way (slow)
-	if err := encodeBasicThrift(out, ctx, methodName, msgType, seqID, data); err == nil || err != errEncodeMismatchMsgType {
-		return err
+	if typecodec.Apache {
+		return apacheMarshal(out, ctx, methodName, msgType, seqID, data)
 	}
 
 	// if user only wants to use Basic we never try fallback to frugal or fastcodec
 	if c.CodecType != Basic {
 		// try FrugalWrite < - > FastWrite fallback
-		if msg, ok := data.(thrift.FastCodec); ok {
-			return encodeFastThrift(out, methodName, msgType, seqID, msg)
+		if typecodec.FastCodec {
+			return fastMarshal(out, methodName, msgType, seqID, data.(thrift.FastCodec))
 		}
-		if hyperMarshalAvailable(data) { // slim template?
-			return c.hyperMarshal(out, methodName, msgType, seqID, data)
+		if typecodec.Frugal {
+			return frugalMarshal(out, methodName, msgType, seqID, data)
 		}
 	}
 	return errEncodeMismatchMsgType
-}
-
-// encodeFastThrift encode with the FastCodec way
-func encodeFastThrift(out bufiox.Writer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec) error {
-	nw, _ := out.(remote.NocopyWrite)
-	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
-	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
-	buf, err := out.Malloc(msgBeginLen + msg.BLength())
-	if err != nil {
-		return perrors.NewProtocolErrorWithMsg(fmt.Sprintf("thrift marshal, Malloc failed: %s", err.Error()))
-	}
-	// If fast write enabled, the underlying buffer maybe large than the correct buffer,
-	// so we need to save the mallocLen before fast write and correct the real mallocLen after codec
-	mallocLen := out.WrittenLen()
-	offset := thrift.Binary.WriteMessageBegin(buf, methodName, thrift.TMessageType(msgType), seqID)
-	_ = msg.FastWriteNocopy(buf[offset:], nw)
-	if nw == nil {
-		// if nw is nil, FastWrite will act in Copy mode.
-		return nil
-	}
-	return nw.MallocAck(mallocLen)
 }
 
 func encodeGenericThrift(out bufiox.Writer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, msg genericWriter) error {
@@ -199,28 +178,8 @@ func encodeGenericThrift(out bufiox.Writer, ctx context.Context, method string, 
 	return nil
 }
 
-// encodeBasicThrift encode with the old apache thrift way (slow)
-func encodeBasicThrift(out bufiox.Writer, ctx context.Context, method string, msgType remote.MessageType, seqID int32, data interface{}) error {
-	if err := verifyMarshalBasicThriftDataType(data); err != nil {
-		return err
-	}
-
-	b, err := out.Malloc(thrift.Binary.MessageBeginLength(method))
-	if err != nil {
-		return err
-	}
-	_ = thrift.Binary.WriteMessageBegin(b, method, thrift.TMessageType(msgType), seqID)
-
-	if err := apache.ThriftWrite(out, data); err != nil {
-		return err
-	}
-	return nil
-}
-
 // Unmarshal implements the remote.PayloadCodec interface.
 func (c thriftCodec) Unmarshal(ctx context.Context, message remote.Message, in remote.ByteBuffer) error {
-	// TODO(xiaost): Refactor the code after v0.11.0 is released. Unifying checking and fallback logic.
-
 	br := thrift.NewBufferReader(in)
 	defer br.Recycle()
 
@@ -297,7 +256,3 @@ type genericWriter interface { // used by pkg/generic
 type genericReader interface { // used by pkg/generic
 	Read(ctx context.Context, method string, dataLen int, r bufiox.Reader) error
 }
-
-// ThriftMsgFastCodec ...
-// Deprecated: use `github.com/cloudwego/gopkg/protocol/thrift.FastCodec`
-type ThriftMsgFastCodec = thrift.FastCodec

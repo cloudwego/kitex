@@ -141,14 +141,3 @@ func TestUnmarshalThriftException(t *testing.T) {
 	test.Assert(t, transErr.TypeID() == thrift.INVALID_PROTOCOL, transErr)
 	test.Assert(t, transErr.Error() == errMessage, transErr)
 }
-
-func Test_getSkippedStructBuffer(t *testing.T) {
-	// string length is 6 but only got "hello"
-	faultThrift := []byte{
-		11 /* string */, 0, 1 /* id=1 */, 0, 0, 0, 6 /* length=6 */, 104, 101, 108, 108, 111, /* "hello" */
-	}
-	trans := bufiox.NewBytesReader(faultThrift)
-	_, err := getSkippedStructBuffer(trans)
-	test.Assert(t, err != nil, err)
-	test.Assert(t, strings.Contains(err.Error(), "caught in SkipDecoder Next phase"))
-}
