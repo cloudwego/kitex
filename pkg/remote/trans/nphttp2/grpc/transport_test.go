@@ -312,7 +312,6 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 	}
 	s.port = p
 	s.conns = make(map[ServerTransport]bool)
-	s.startedErr <- nil
 
 	// handle: 连接读数据和处理逻辑
 	var onConnect netpoll.OnConnect = func(ctx context.Context, connection netpoll.Connection) context.Context {
@@ -400,6 +399,7 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 	if err != nil {
 		panic("create netpoll event-loop fail")
 	}
+	s.startedErr <- nil
 
 	// 运行 Server
 	err = s.eventLoop.Serve(s.lis)
