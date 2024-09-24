@@ -4,13 +4,14 @@ on: [ push, pull_request ]
 
 jobs:
   unit-scenario-test:
-    runs-on: ubuntu-latest
+    runs-on: [ self-hosted, X64 ]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: stable
+          cache: false
       - name: Scenario Tests
         run: |
           cd ..
@@ -79,6 +80,9 @@ jobs:
 
   windows-test:
     runs-on: windows-latest
+    env: # Fixes https://github.com/actions/setup-go/issues/240
+      GOMODCACHE: 'D:\go\pkg\mod'
+      GOCACHE: 'D:\go\go-build'
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go

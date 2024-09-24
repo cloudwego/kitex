@@ -4,9 +4,9 @@ on: [ pull_request ]
 
 jobs:
   compliant:
-    runs-on: [ self-hosted, X64 ]
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Check License Header
         uses: apache/skywalking-eyes/header@v0.4.0
@@ -16,32 +16,7 @@ jobs:
       - name: Check Spell
         uses: crate-ci/typos@v1.13.14
 
-  staticcheck:
-    runs-on: [ self-hosted, X64 ]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: stable
-          # For self-hosted, the cache path is shared across projects
-          # and it works well without the cache of github actions
-          # Enable it if we're going to use Github only
-          cache: false
-
-      - uses: reviewdog/action-staticcheck@v1
-        with:
-          github_token: ${{ secrets.github_token }}
-          # Change reviewdog reporter if you need [github-pr-check,github-check,github-pr-review].
-          reporter: github-pr-review
-          # Report all results.
-          filter_mode: nofilter
-          # Exit with 1 when it finds at least one finding.
-          fail_on_error: true
-          # Set staticcheck flags
-          staticcheck_flags: -checks=inherit,-SA1029
-
-  lint:
+  golangci-lint:
     runs-on: [ self-hosted, X64 ]
     steps:
       - uses: actions/checkout@v4
