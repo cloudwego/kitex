@@ -35,27 +35,30 @@ func newScavenger() *scavenger {
 }
 
 type scavenger struct {
-	sync.RWMutex
-	objects []Object
+	objects sync.Map
 }
 
-func (s *scavenger) Add(o Object) {
-	s.Lock()
-	s.objects = append(s.objects, o)
-	s.Unlock()
+func (s *scavenger) Add(key string, o Object) {
+	old, loaded := s.objects.LoadOrStore(key, o)
+	if loaded {
+		_ = old.(Object).Close()
+		s.objects.Store(key, o)
+	}
 }
 
 func (s *scavenger) Cleaning() {
 	for {
 		time.Sleep(time.Second)
 
-		s.RLock()
-		for _, o := range s.objects {
-			if o.IsInvalid() {
-				klog.Debugf("object is invalid: %v, closing", o)
-				_ = o.Close()
+		s.objects.Range(func(key, value any) bool {
+			o := value.(Object)
+			if !o.IsInvalid() {
+				return false
 			}
-		}
-		s.RUnlock()
+			klog.Debugf("object is invalid: %v, closing", o)
+			_ = o.Close()
+			s.objects.Delete(key)
+			return true
+		})
 	}
 }

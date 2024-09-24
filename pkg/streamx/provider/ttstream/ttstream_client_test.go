@@ -392,25 +392,50 @@ func TestTTHeaderStreamingLongConn(t *testing.T) {
 		streamxclient.WithProvider(cp),
 	)
 	ctx := context.Background()
-
 	msg := "BidiStream"
-	streams := 500
+
+	// ensure there only one connection
 	var wg sync.WaitGroup
-	for i := 0; i < streams; i++ {
+	for i := 0; i < 12; i++ {
 		wg.Add(1)
 		bs, err := streamClient.BidiStream(ctx)
 		test.Assert(t, err == nil, err)
 		req := new(Request)
-		req.Message = msg
+		req.Message = string(make([]byte, 1024))
 		err = bs.Send(ctx, req)
 		test.Assert(t, err == nil, err)
+		res, err := bs.Recv(ctx)
+		test.Assert(t, err == nil, err)
+		err = bs.CloseSend(ctx)
+		test.Assert(t, err == nil, err)
+		test.Assert(t, res.Message == req.Message, res.Message)
+		runtime.SetFinalizer(bs, func(_ any) {
+			wg.Done()
+			t.Logf("stream is finalized")
+		})
+		bs = nil
+		runtime.GC()
+		wg.Wait()
+	}
+
+	// checking streaming goroutines
+	streams := 500
+	for i := 0; i < streams; i++ {
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
+
+			bs, err := streamClient.BidiStream(ctx)
+			test.Assert(t, err == nil, err)
+			req := new(Request)
+			req.Message = msg
+			err = bs.Send(ctx, req)
+			test.Assert(t, err == nil, err)
 			res, err := bs.Recv(ctx)
 			test.Assert(t, err == nil, err)
 			err = bs.CloseSend(ctx)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, res.Message == msg, res.Message)
-			wg.Done()
 		}()
 	}
 	wg.Wait()

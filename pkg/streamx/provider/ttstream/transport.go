@@ -274,10 +274,7 @@ func (t *transport) streamClose(s *stream) (err error) {
 	return nil
 }
 
-func (t *transport) IsActive() bool {
-	if !t.conn.IsActive() {
-		return false
-	}
+func (t *transport) IsStreaming() bool {
 	return atomic.LoadInt32(&t.streaming) > 0
 }
 

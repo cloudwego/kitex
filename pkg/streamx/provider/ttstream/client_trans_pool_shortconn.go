@@ -27,8 +27,7 @@ func newShortConnTransPool() transPool {
 	return &shortConnTransPool{}
 }
 
-type shortConnTransPool struct {
-}
+type shortConnTransPool struct{}
 
 func (c *shortConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (*transport, error) {
 	// create new connection

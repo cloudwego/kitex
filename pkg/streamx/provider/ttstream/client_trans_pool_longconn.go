@@ -84,10 +84,11 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, 
 			break
 		}
 		trans := tw.transport
-		tw.release()
 		if !tw.IsInvalid() {
+			tw.release()
 			return trans, nil
 		}
+		tw.release()
 		// continue to find a valid transport
 	}
 
@@ -100,7 +101,7 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, 
 	trans := newTransport(clientTransport, sinfo, conn)
 	tw := newTransWrapper(trans, c.config.MaxIdleTimeout)
 	// register into scavenger
-	c.scavenger.Add(tw)
+	c.scavenger.Add(conn.LocalAddr().String(), tw)
 	return trans, nil
 }
 
@@ -111,11 +112,11 @@ func (c *longConnTransPool) Put(trans *transport) {
 		return
 	}
 	cstack = val.(*transStack)
-	//if cstack.Size() >= c.config.MaxIdlePerAddress {
-	//	// discard transport
-	//	_ = trans.Close()
-	//	return
-	//}
+	if cstack.Size() >= c.config.MaxIdlePerAddress {
+		// discard transport
+		_ = trans.Close()
+		return
+	}
 	tw := newTransWrapper(trans, c.config.MaxIdleTimeout)
 	cstack.Push(tw)
 }
@@ -151,7 +152,7 @@ func (t *transWrapper) release() {
 }
 
 func (t *transWrapper) IsInvalid() bool {
-	return !(t.transport.IsActive() && time.Now().Sub(t.lastActive) < t.idleTimeout)
+	return time.Now().Sub(t.lastActive) > t.idleTimeout
 }
 
 type transStack = container.Stack[*transWrapper]
