@@ -82,6 +82,17 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 	return t
 }
 
+// Close will close transport and destroy all resource and goroutines
+// server close transport when connection is disconnected
+// client close transport when transPool discard the transport
+func (t *transport) Close() (err error) {
+	close(t.closed)
+	klog.Debugf("transport[%s] is closing", t.conn.LocalAddr())
+	t.spipe.Close()
+	err = t.conn.Close()
+	return err
+}
+
 func (t *transport) storeStreamIO(ctx context.Context, s *stream) {
 	t.streams.Store(s.sid, newStreamIO(ctx, s))
 }
@@ -148,7 +159,10 @@ func (t *transport) loopRead() error {
 			// Trailer Frame: recv trailer, Close read direction
 			sio, ok := t.loadStreamIO(fr.sid)
 			if !ok {
-				klog.Errorf("transport[%d] read a unknown stream trailer: sid=%d", t.kind, fr.sid)
+				// client recv an unknown trailer is in exception,
+				// because the client stream may already be GCed,
+				// but the connection is still active so peer server can send a trailer
+				klog.Debugf("transport[%d] read a unknown stream trailer: sid=%d", t.kind, fr.sid)
 				continue
 			}
 			if err = sio.stream.readTrailer(fr.trailer); err != nil {
@@ -201,20 +215,6 @@ func (t *transport) writeFrame(sframe streamFrame, meta IntHeader, ftype int32, 
 	frame := newFrame(sframe, meta, ftype, payload)
 	t.wchannel <- frame
 	return nil
-}
-
-// Close may be called twice
-func (t *transport) Close() (err error) {
-	select {
-	case <-t.closed:
-		return nil
-	default:
-		close(t.closed)
-	}
-	klog.Debugf("transport[%s] is closing", t.conn.LocalAddr())
-	t.spipe.Close()
-	err = t.conn.Close()
-	return err
 }
 
 func (t *transport) streamSend(sid int32, method string, wheader streamx.Header, res any) (err error) {

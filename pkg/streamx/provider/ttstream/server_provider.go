@@ -66,15 +66,6 @@ func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Co
 }
 
 func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.Context, error) {
-	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
-	if trans == nil {
-		return ctx, nil
-	}
-	// server should Close transport
-	err := trans.Close()
-	if err != nil {
-		return nil, err
-	}
 	return ctx, nil
 }
 

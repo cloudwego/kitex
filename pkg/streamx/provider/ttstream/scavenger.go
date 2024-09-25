@@ -30,19 +30,24 @@ type Object interface {
 
 func newScavenger() *scavenger {
 	s := new(scavenger)
+	s.objects = make(map[string]Object)
 	go s.Cleaning()
 	return s
 }
 
 type scavenger struct {
-	objects sync.Map
+	L       sync.Mutex
+	objects map[string]Object
 }
 
 func (s *scavenger) Add(key string, o Object) {
-	old, loaded := s.objects.LoadOrStore(key, o)
-	if loaded {
-		_ = old.(Object).Close()
-		s.objects.Store(key, o)
+	var old Object
+	s.L.Lock()
+	old = s.objects[key]
+	s.objects[key] = o
+	s.L.Unlock()
+	if old != nil {
+		_ = old.Close()
 	}
 }
 
@@ -50,15 +55,14 @@ func (s *scavenger) Cleaning() {
 	for {
 		time.Sleep(time.Second)
 
-		s.objects.Range(func(key, value any) bool {
-			o := value.(Object)
-			if !o.IsInvalid() {
-				return false
+		s.L.Lock()
+		for key, o := range s.objects {
+			if o.IsInvalid() {
+				klog.Debugf("object is invalid: %v, closing", o)
+				_ = o.Close()
+				delete(s.objects, key)
 			}
-			klog.Debugf("object is invalid: %v, closing", o)
-			_ = o.Close()
-			s.objects.Delete(key)
-			return true
-		})
+		}
+		s.L.Unlock()
 	}
 }

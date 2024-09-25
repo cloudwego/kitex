@@ -114,7 +114,7 @@ func (c *longConnTransPool) Put(trans *transport) {
 	cstack = val.(*transStack)
 	if cstack.Size() >= c.config.MaxIdlePerAddress {
 		// discard transport
-		_ = trans.Close()
+		// let scavenger clean the transport
 		return
 	}
 	tw := newTransWrapper(trans, c.config.MaxIdleTimeout)
