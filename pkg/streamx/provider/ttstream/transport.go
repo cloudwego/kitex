@@ -89,7 +89,6 @@ func (t *transport) Close() (err error) {
 	close(t.closed)
 	klog.Debugf("transport[%s] is closing", t.conn.LocalAddr())
 	t.spipe.Close()
-	err = t.conn.Close()
 	return err
 }
 
@@ -180,11 +179,19 @@ func (t *transport) loopWrite() (err error) {
 	for {
 		select {
 		case <-t.closed:
+			err = t.conn.Close()
 			return nil
 		case fr, ok := <-t.wchannel:
 			if !ok {
 				// closed
 				return nil
+			}
+			select {
+			case <-t.closed:
+				// double check closed
+				err = t.conn.Close()
+				return nil
+			default:
 			}
 
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
