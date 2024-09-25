@@ -39,6 +39,7 @@ func (s *Stack[ValueType]) Size() (size int) {
 	return size
 }
 
+// RangeDelete range from the stack bottom
 func (s *Stack[ValueType]) RangeDelete(checking func(v ValueType) (deleteNode bool, continueRange bool)) {
 	s.L.RLock()
 	node := s.head
@@ -46,14 +47,30 @@ func (s *Stack[ValueType]) RangeDelete(checking func(v ValueType) (deleteNode bo
 	continueRange := true
 	for node != nil && continueRange {
 		deleteNode, continueRange = checking(node.val)
-		if deleteNode {
-			// skip current node
-			if s.tail == s.head {
-				s.tail = node.next
-			}
-			s.head = node.next
+		if !deleteNode {
+			node = node.next
+			continue
+		}
+		// skip current node
+		last := node.last
+		next := node.next
+		// modify last node
+		if last == nil {
+			// cur node is head node
+			s.head = next
+		} else {
+			// change last next ptr
+			last.next = next
+		}
+		// modify next node
+		if next != nil {
+			next.last = last
+		}
+		if node == s.tail {
+			s.tail = last
 		}
 		node = node.next
+		s.size -= 1
 	}
 	s.L.RUnlock()
 }

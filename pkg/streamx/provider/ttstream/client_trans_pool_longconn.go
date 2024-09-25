@@ -23,24 +23,18 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 	"github.com/cloudwego/netpoll"
-	"golang.org/x/sync/singleflight"
 )
 
 var DefaultLongConnConfig = LongConnConfig{
-	MaxIdlePerAddress: 100,
-	MaxIdleTimeout:    time.Minute,
+	MaxIdleTimeout: time.Minute,
 }
 
 type LongConnConfig struct {
-	MaxIdlePerAddress int
-	MaxIdleTimeout    time.Duration
+	MaxIdleTimeout time.Duration
 }
 
 func newLongConnTransPool(config LongConnConfig) transPool {
 	tp := new(longConnTransPool)
-	if config.MaxIdlePerAddress == 0 {
-		config.MaxIdlePerAddress = DefaultLongConnConfig.MaxIdlePerAddress
-	}
 	if config.MaxIdleTimeout == 0 {
 		config.MaxIdleTimeout = DefaultLongConnConfig.MaxIdleTimeout
 	}
@@ -51,7 +45,6 @@ func newLongConnTransPool(config LongConnConfig) transPool {
 
 type longConnTransPool struct {
 	transPool *container.ObjectPool
-	sg        singleflight.Group
 	config    LongConnConfig
 }
 

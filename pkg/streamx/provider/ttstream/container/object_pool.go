@@ -61,12 +61,16 @@ func (s *ObjectPool) cleaning() {
 		s.L.Lock()
 		for _, stk := range s.objects {
 			stk.RangeDelete(func(o Object) (deleteNode bool, continueRange bool) {
+				if o == nil {
+					return true, true
+				}
+
 				// RangeDelete start from the stack bottom
 				// we assume that the values on the top of last valid value are all valid
 				if !o.IsInvalid() {
 					return false, false
 				}
-				klog.Debugf("object is invalid: %v, closing", o)
+				klog.Infof("object is invalid: %v, closing", o)
 				_ = o.Close()
 				return true, true
 			})
