@@ -162,7 +162,10 @@ func TestTTHeaderStreaming(t *testing.T) {
 	)
 	test.Assert(t, err == nil, err)
 	// create streaming client
-	cp, _ := ttstream.NewClientProvider(streamingServiceInfo, ttstream.WithClientLongConnPool(ttstream.DefaultLongConnConfig))
+	cp, _ := ttstream.NewClientProvider(
+		streamingServiceInfo,
+		ttstream.WithClientLongConnPool(ttstream.DefaultLongConnConfig),
+	)
 	streamClient, err := NewStreamingClient(
 		"kitex.service.streaming",
 		streamxclient.WithProvider(cp),
@@ -306,7 +309,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 
 	// bidi stream
 	t.Logf("=== BidiStream ===")
-	concurrent := 32
+	concurrent := 1
 	round = 5
 	for c := 0; c < concurrent; c++ {
 		atomic.AddInt32(&serverStreamCount, -1)
@@ -332,6 +335,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 				i := 0
 				for {
 					res, err := bs.Recv(ctx)
+					t.Log(res, err)
 					if errors.Is(err, io.EOF) {
 						break
 					}

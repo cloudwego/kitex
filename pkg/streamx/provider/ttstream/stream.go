@@ -137,7 +137,6 @@ func (s *stream) readTrailer(tl streamx.Trailer) (err error) {
 	default:
 		close(s.trailerSig)
 	}
-
 	klog.Debugf("stream[%d] recv trailer: %v", s.sid, tl)
 	return s.trans.streamCloseRecv(s)
 }
@@ -157,7 +156,12 @@ func (s *stream) sendTrailer() (err error) {
 		return nil
 	}
 	klog.Debugf("stream[%d] send trialer", s.sid)
-	return s.trans.streamSendTrailer(s.sid, s.method, s.wtrailer)
+	return s.trans.streamCloseSend(s.sid, s.method, s.wtrailer)
+}
+
+func (s *stream) finished() bool {
+	return atomic.LoadInt32(&s.peerEOF) == 1 &&
+		atomic.LoadInt32(&s.selfEOF) == 1
 }
 
 func (s *stream) SendMsg(ctx context.Context, res any) (err error) {
@@ -186,8 +190,14 @@ func (s *clientStream) CloseSend(ctx context.Context) error {
 	return s.sendTrailer()
 }
 
+// after close stream cannot be access again
 func (s *clientStream) close() error {
-	return s.trans.streamClose(s.stream)
+	// client should CloseSend first and then close stream
+	err := s.sendTrailer()
+	if err != nil {
+		return err
+	}
+	return s.trans.streamClose(s.sid)
 }
 
 func newServerStream(s *stream) streamx.ServerStream {
@@ -209,9 +219,13 @@ func (s *serverStream) SendMsg(ctx context.Context, res any) error {
 	return s.stream.SendMsg(ctx, res)
 }
 
+// close will be called after server handler returned
+// after close stream cannot be access again
 func (s *serverStream) close() error {
-	if err := s.sendTrailer(); err != nil {
+	// write loop should help to delete stream
+	err := s.sendTrailer()
+	if err != nil {
 		return err
 	}
-	return s.trans.streamClose(s.stream)
+	return s.trans.streamClose(s.sid)
 }

@@ -28,7 +28,6 @@ import (
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/kitex/pkg/klog"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
@@ -162,17 +161,19 @@ func (t *transport) loopRead() error {
 func (t *transport) loopWrite() (err error) {
 	writer := newWriterBuffer(t.conn.Writer())
 	delay := 0
+	// Important note:
+	// loopWrite may cannot find stream by sid since it may send trailer and delete sid from streams
 	for {
 		select {
 		case <-t.closed:
 			return nil
-		case frame, ok := <-t.wchannel:
+		case fr, ok := <-t.wchannel:
 			if !ok {
 				// closed
 				return nil
 			}
 
-			if err = EncodeFrame(context.Background(), writer, frame); err != nil {
+			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}
 			if delay >= 8 || len(t.wchannel) == 0 {
@@ -235,11 +236,20 @@ func (t *transport) streamSendHeader(sid int32, method string, header streamx.He
 		nil, headerFrameType, nil)
 }
 
-func (t *transport) streamSendTrailer(sid int32, method string, trailer streamx.Trailer) (err error) {
-	return t.writeFrame(
+func (t *transport) streamCloseSend(sid int32, method string, trailer streamx.Trailer) (err error) {
+	err = t.writeFrame(
 		streamFrame{sid: sid, method: method, trailer: trailer},
 		nil, trailerFrameType, nil,
 	)
+	if err != nil {
+		return err
+	}
+	sio, ok := t.loadStreamIO(sid)
+	if !ok {
+		return nil
+	}
+	sio.closeSend()
+	return nil
 }
 
 func (t *transport) streamRecv(sid int32, data any) (err error) {
@@ -263,7 +273,7 @@ func (t *transport) streamCloseRecv(s *stream) (err error) {
 	if !ok {
 		return fmt.Errorf("stream not found in stream map: sid=%d", s.sid)
 	}
-	sio.eof()
+	sio.closeRecv()
 	return nil
 }
 
@@ -276,9 +286,9 @@ func (t *transport) streamCancel(s *stream) (err error) {
 	return nil
 }
 
-func (t *transport) streamClose(s *stream) (err error) {
+func (t *transport) streamClose(sid int32) (err error) {
 	// remove stream from transport
-	t.streams.Delete(s.sid)
+	t.streams.Delete(sid)
 	atomic.AddInt32(&t.streaming, -1)
 	return nil
 }
@@ -296,10 +306,6 @@ func (t *transport) newStream(
 	ctx context.Context, method string, meta IntHeader, header streamx.Header) (*stream, error) {
 	if t.kind != clientTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")
-	}
-	ri := rpcinfo.GetRPCInfo(ctx)
-	if ri.From() == nil || ri.To() == nil {
-		return nil, fmt.Errorf("invalid RPC info")
 	}
 
 	sid := atomic.AddInt32(&clientStreamID, 1)

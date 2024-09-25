@@ -97,7 +97,7 @@ func TestTransport(t *testing.T) {
 							req := new(TestRequest)
 							err := st.RecvMsg(ctx, req)
 							if errors.Is(err, io.EOF) {
-								t.Logf("server stream eof")
+								t.Logf("server stream closeRecv")
 								return
 							}
 							test.Assert(t, err == nil, err)

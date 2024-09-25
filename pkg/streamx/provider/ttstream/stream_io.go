@@ -21,6 +21,7 @@ import (
 	"errors"
 	"io"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 )
 
@@ -30,7 +31,6 @@ type streamIO struct {
 	stream  *stream
 	fpipe   *container.Pipe[*Frame]
 	fcache  [1]*Frame
-	end     bool
 }
 
 func newStreamIO(ctx context.Context, s *stream) *streamIO {
@@ -43,7 +43,10 @@ func newStreamIO(ctx context.Context, s *stream) *streamIO {
 }
 
 func (s *streamIO) input(f *Frame) {
-	_ = s.fpipe.Write(f)
+	err := s.fpipe.Write(f)
+	if err != nil {
+		klog.Error("fpipe write error", err)
+	}
 }
 
 func (s *streamIO) output() (f *Frame, err error) {
@@ -60,8 +63,11 @@ func (s *streamIO) output() (f *Frame, err error) {
 	return s.fcache[0], nil
 }
 
-func (s *streamIO) eof() {
+func (s *streamIO) closeRecv() {
 	s.fpipe.Close()
+}
+
+func (s *streamIO) closeSend() {
 }
 
 func (s *streamIO) cancel() {
