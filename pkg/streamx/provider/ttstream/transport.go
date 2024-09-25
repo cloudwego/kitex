@@ -18,6 +18,7 @@ package ttstream
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -43,16 +44,15 @@ const (
 )
 
 type transport struct {
-	kind     int32
-	sinfo    *serviceinfo.ServiceInfo
-	conn     netpoll.Connection
-	streams  sync.Map                 // key=streamID val=streamIO
-	scache   []*stream                // size is streamCacheSize
-	spipe    *container.Pipe[*stream] // in-coming stream channel
-	wchannel chan *Frame
-	closed   chan struct{}
-
-	streaming int32
+	kind          int32
+	sinfo         *serviceinfo.ServiceInfo
+	conn          netpoll.Connection
+	streams       sync.Map                 // key=streamID val=streamIO
+	scache        []*stream                // size is streamCacheSize
+	spipe         *container.Pipe[*stream] // in-coming stream channel
+	wchannel      chan *Frame
+	closed        chan struct{}
+	streamingFlag int32 // flag == 0 means there is no active stream on transport
 }
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
@@ -106,9 +106,18 @@ func (t *transport) loadStreamIO(sid int32) (sio *streamIO, ok bool) {
 }
 
 func (t *transport) loopRead() error {
-	reader := newReaderBuffer(t.conn.Reader())
 	for {
 		// decode frame
+		sizeBuf, err := t.conn.Reader().Peek(4)
+		if err != nil {
+			return err
+		}
+		size := binary.BigEndian.Uint32(sizeBuf)
+		slice, err := t.conn.Reader().Slice(int(size + 4))
+		if err != nil {
+			return err
+		}
+		reader := newReaderBuffer(slice)
 		fr, err := DecodeFrame(context.Background(), reader)
 		if err != nil {
 			return err
@@ -180,7 +189,7 @@ func (t *transport) loopWrite() (err error) {
 		select {
 		case <-t.closed:
 			err = t.conn.Close()
-			return nil
+			return err
 		case fr, ok := <-t.wchannel:
 			if !ok {
 				// closed
@@ -189,7 +198,6 @@ func (t *transport) loopWrite() (err error) {
 			select {
 			case <-t.closed:
 				// double check closed
-				err = t.conn.Close()
 				return nil
 			default:
 			}
@@ -296,12 +304,12 @@ func (t *transport) streamCancel(s *stream) (err error) {
 func (t *transport) streamClose(sid int32) (err error) {
 	// remove stream from transport
 	t.streams.Delete(sid)
-	atomic.AddInt32(&t.streaming, -1)
+	atomic.AddInt32(&t.streamingFlag, -1)
 	return nil
 }
 
 func (t *transport) IsStreaming() bool {
-	return atomic.LoadInt32(&t.streaming) > 0
+	return atomic.LoadInt32(&t.streamingFlag) > 0
 }
 
 var clientStreamID int32
@@ -327,7 +335,7 @@ func (t *transport) newStream(
 	if err != nil {
 		return nil, err
 	}
-	atomic.AddInt32(&t.streaming, 1)
+	atomic.AddInt32(&t.streamingFlag, 1)
 	return s, nil
 }
 
@@ -341,7 +349,7 @@ READ:
 	if len(t.scache) > 0 {
 		s := t.scache[len(t.scache)-1]
 		t.scache = t.scache[:len(t.scache)-1]
-		atomic.AddInt32(&t.streaming, 1)
+		atomic.AddInt32(&t.streamingFlag, 1)
 		return s, nil
 	}
 	n, err := t.spipe.Read(t.scache[0:streamCacheSize])

@@ -396,7 +396,7 @@ func TestTTHeaderStreamingLongConn(t *testing.T) {
 	ctx := context.Background()
 	msg := "BidiStream"
 
-	// ensure there only one connection
+	t.Logf("checking only one connection be reused")
 	var wg sync.WaitGroup
 	for i := 0; i < 12; i++ {
 		wg.Add(1)
@@ -420,6 +420,7 @@ func TestTTHeaderStreamingLongConn(t *testing.T) {
 		wg.Wait()
 	}
 
+	t.Logf("checking goroutines destroy")
 	// checking streaming goroutines
 	streams := 500
 	for i := 0; i < streams; i++ {
