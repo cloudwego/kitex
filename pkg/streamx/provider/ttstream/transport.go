@@ -52,6 +52,7 @@ type transport struct {
 	spipe         *container.Pipe[*stream] // in-coming stream channel
 	wchannel      chan *Frame
 	closed        chan struct{}
+	closedFlag    int32
 	streamingFlag int32 // flag == 0 means there is no active stream on transport
 }
 
@@ -69,14 +70,22 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 	}
 	go func() {
 		err := t.loopRead()
-		if err != nil && errors.Is(err, io.EOF) {
-			klog.Warnf("trans loop read err: %v", err)
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				klog.Warnf("trans loop read err: %v", err)
+			}
+			_ = t.Close()
 		}
 	}()
 	go func() {
 		err := t.loopWrite()
-		if err != nil && errors.Is(err, io.EOF) {
-			klog.Warnf("trans loop write err: %v", err)
+		if err != nil {
+			if !errors.Is(err, io.EOF) {
+				klog.Warnf("trans loop write err: %v", err)
+			}
+			_ = t.Close()
+			// because loopWrite function return, we should close conn actively
+			_ = t.conn.Close()
 		}
 	}()
 	return t
@@ -86,6 +95,9 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 // server close transport when connection is disconnected
 // client close transport when transPool discard the transport
 func (t *transport) Close() (err error) {
+	if !atomic.CompareAndSwapInt32(&t.closedFlag, 0, 1) {
+		return nil
+	}
 	close(t.closed)
 	klog.Debugf("transport[%s] is closing", t.conn.LocalAddr())
 	t.spipe.Close()
@@ -188,8 +200,8 @@ func (t *transport) loopWrite() (err error) {
 	for {
 		select {
 		case <-t.closed:
-			err = t.conn.Close()
-			return err
+			_ = t.conn.Close()
+			return nil
 		case fr, ok := <-t.wchannel:
 			if !ok {
 				// closed
