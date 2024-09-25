@@ -17,7 +17,6 @@
 package ttstream
 
 import (
-	"strings"
 	"sync"
 	"time"
 
@@ -45,51 +44,24 @@ func newLongConnTransPool(config LongConnConfig) transPool {
 	if config.MaxIdleTimeout == 0 {
 		config.MaxIdleTimeout = DefaultLongConnConfig.MaxIdleTimeout
 	}
-	tp.scavenger = newScavenger()
+	tp.transPool = container.NewObjectPool(time.Second * 10)
 	tp.config = config
 	return tp
 }
 
 type longConnTransPool struct {
-	pool      sync.Map // {"addr":*transStack}
-	scavenger *scavenger
+	transPool *container.ObjectPool
 	sg        singleflight.Group
 	config    LongConnConfig
 }
 
-const localhost = "localhost"
-
-func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (*transport, error) {
-	if strings.HasPrefix(addr, localhost) {
-		addr = "127.0.0.1" + addr[len(localhost):]
-	}
-	var cstack *transStack
-	val, ok := c.pool.Load(addr)
-	if ok {
-		cstack = val.(*transStack)
-	} else {
-		v, err, _ := c.sg.Do(addr, func() (interface{}, error) {
-			cstack = newTransStack()
-			c.pool.Store(addr, cstack)
-			return cstack, nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		cstack = v.(*transStack)
-	}
-	for {
-		tw, _ := cstack.Pop()
-		if tw == nil {
-			break
-		}
-		trans := tw.transport
-		if !tw.IsInvalid() {
-			tw.release()
-			return trans, nil
-		}
+func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error) {
+	o := c.transPool.Pop(addr)
+	if o != nil {
+		tw := o.(*transWrapper)
+		trans = tw.transport
 		tw.release()
-		// continue to find a valid transport
+		return trans, nil
 	}
 
 	// create new connection
@@ -98,31 +70,14 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, 
 		return nil, err
 	}
 	// create new transport
-	trans := newTransport(clientTransport, sinfo, conn)
-	tw := newTransWrapper(trans, c.config.MaxIdleTimeout)
-	// register into scavenger
-	c.scavenger.Add(conn.LocalAddr().String(), tw)
+	trans = newTransport(clientTransport, sinfo, conn)
 	return trans, nil
 }
 
 func (c *longConnTransPool) Put(trans *transport) {
-	var cstack *transStack
-	val, ok := c.pool.Load(trans.conn.RemoteAddr().String())
-	if !ok {
-		return
-	}
-	cstack = val.(*transStack)
-	if cstack.Size() >= c.config.MaxIdlePerAddress {
-		// discard transport
-		// let scavenger clean the transport
-		return
-	}
+	addr := trans.conn.RemoteAddr().String()
 	tw := newTransWrapper(trans, c.config.MaxIdleTimeout)
-	cstack.Push(tw)
-}
-
-func newTransStack() *transStack {
-	return container.NewStack[*transWrapper]()
+	c.transPool.Push(addr, tw)
 }
 
 var transWrapperPool sync.Pool
@@ -154,5 +109,3 @@ func (t *transWrapper) release() {
 func (t *transWrapper) IsInvalid() bool {
 	return time.Now().Sub(t.lastActive) > t.idleTimeout
 }
-
-type transStack = container.Stack[*transWrapper]
