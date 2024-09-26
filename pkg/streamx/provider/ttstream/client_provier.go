@@ -24,7 +24,6 @@ import (
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -95,7 +94,6 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 
 	cs := newClientStream(s)
 	runtime.SetFinalizer(cs, func(cstream *clientStream) {
-		klog.Infof("client stream[%v] closing", cstream.sid)
 		_ = cstream.close()
 		c.transPool.Put(trans)
 	})

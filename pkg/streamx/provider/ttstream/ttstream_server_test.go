@@ -88,6 +88,12 @@ func (si *streamingService) BidiStream(ctx context.Context,
 		klog.Debugf("RegisterCancelCallback work!")
 	})
 	klog.Debugf("RegisterCancelCallback registered!")
+
+	_ = stream.SetHeader(map[string]string{"key1": "val1"})
+	_ = stream.SendHeader(map[string]string{"key2": "val2"})
+	_ = stream.SetTrailer(map[string]string{"key1": "val1"})
+	_ = stream.SetTrailer(map[string]string{"key2": "val2"})
+
 	for {
 		req, err := stream.Recv(ctx)
 		if err == io.EOF {

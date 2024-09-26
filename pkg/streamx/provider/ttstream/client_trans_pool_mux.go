@@ -48,7 +48,7 @@ func (m *muxTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr 
 		if err != nil {
 			return nil, err
 		}
-		trans = newTransport(clientTransport, sinfo, conn)
+		trans = newClientTransport(sinfo, conn)
 		_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 			// peer close
 			_ = trans.Close()

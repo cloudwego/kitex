@@ -18,13 +18,14 @@ package jsonrpc
 
 import (
 	"context"
-	"net"
+	"time"
 
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/netpoll"
 )
 
 var _ streamx.ClientProvider = (*clientProvider)(nil)
@@ -50,11 +51,15 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	if addr == nil {
 		return nil, kerrors.ErrNoDestAddress
 	}
-	conn, err := net.Dial(addr.Network(), addr.String())
+	conn, err := netpoll.DialConnection(addr.Network(), addr.String(), time.Second)
 	if err != nil {
 		return nil, err
 	}
 	trans := newTransport(c.sinfo, conn)
+	_ = conn.SetOnRequest(func(ctx context.Context, connection netpoll.Connection) error {
+		err := trans.onRead()
+		return err
+	})
 	s, err := trans.newStream(method)
 	if err != nil {
 		return nil, err

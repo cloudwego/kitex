@@ -449,9 +449,10 @@ func TestTTHeaderStreamingLongConn(t *testing.T) {
 			break
 		}
 		runtime.GC()
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond * 100)
 		t.Logf("current goroutines=%d, before =%d", ng, numGoroutine)
 	}
+	t.Logf("current goroutines=%d, before =%d", runtime.NumGoroutine(), numGoroutine)
 }
 
 func TestTTHeaderStreamingRecvTimeout(t *testing.T) {

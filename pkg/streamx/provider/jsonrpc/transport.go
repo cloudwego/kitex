@@ -26,7 +26,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/netpoll"
 )
 
 type transport struct {
@@ -49,12 +48,6 @@ func newTransport(sinfo *serviceinfo.ServiceInfo, conn net.Conn) *transport {
 		wch:     make(chan Frame),
 		stop:    make(chan struct{}),
 	}
-	go func() {
-		err := t.loopRead()
-		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) && !errors.Is(err, netpoll.ErrConnClosed) {
-			klog.Debugf("transport loop read err: %v", err)
-		}
-	}()
 	go func() {
 		err := t.loopWrite()
 		if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
@@ -87,38 +80,37 @@ func (t *transport) streamRecv(s *stream) (payload []byte, err error) {
 	return f.payload, nil
 }
 
-func (t *transport) loopRead() error {
-	for {
-		// decode frame
-		frame, err := DecodeFrame(t.conn)
-		if err != nil {
-			return err
-		}
+func (t *transport) onRead() error {
+	// decode frame
+	frame, err := DecodeFrame(t.conn)
+	if err != nil {
+		return err
+	}
 
-		// prepare stream
+	// prepare stream
+	switch frame.typ {
+	case frameTypeMeta: // new stream
+		smode := t.sinfo.MethodInfo(frame.method).StreamingMode()
+		s := newStream(t, frame.sid, smode, frame.service, frame.method)
+		t.streams.Store(s.id, s)
+		t.rch[s.id] = make(chan Frame, 1024)
+		t.sch <- s
+	case frameTypeData, frameTypeEOF: // stream streamRecv/close
+		iss, ok := t.streams.Load(frame.sid)
+		if !ok {
+			return fmt.Errorf("stream not found in stream map: sid=%d", frame.sid)
+		}
+		s := iss.(*stream)
 		switch frame.typ {
-		case frameTypeMeta: // new stream
-			smode := t.sinfo.MethodInfo(frame.method).StreamingMode()
-			s := newStream(t, frame.sid, smode, frame.service, frame.method)
-			t.streams.Store(s.id, s)
-			t.rch[s.id] = make(chan Frame, 1024)
-			t.sch <- s
-		case frameTypeData, frameTypeEOF: // stream streamRecv/close
-			iss, ok := t.streams.Load(frame.sid)
-			if !ok {
-				return fmt.Errorf("stream not found in stream map: sid=%d", frame.sid)
-			}
-			s := iss.(*stream)
-			switch frame.typ {
-			case frameTypeEOF:
-				err = s.recvEOF()
-				return err
-			case frameTypeData:
-				// process data frame
-				t.rch[s.id] <- frame
-			}
+		case frameTypeEOF:
+			err = s.recvEOF()
+			return err
+		case frameTypeData:
+			// process data frame
+			t.rch[s.id] <- frame
 		}
 	}
+	return nil
 }
 
 func (t *transport) loopWrite() error {

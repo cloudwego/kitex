@@ -19,6 +19,7 @@ package ttstream
 import (
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 	"github.com/cloudwego/netpoll"
@@ -27,7 +28,7 @@ import (
 const idleCheckInternal = time.Second * 10
 
 var DefaultLongConnConfig = LongConnConfig{
-	MaxIdleTimeout: time.Minute,
+	MaxIdleTimeout: time.Second * 10,
 }
 
 type LongConnConfig struct {
@@ -61,11 +62,12 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, 
 		return nil, err
 	}
 	// create new transport
-	trans = newTransport(clientTransport, sinfo, conn)
+	trans = newClientTransport(sinfo, conn)
 	return trans, nil
 }
 
 func (c *longConnTransPool) Put(trans *transport) {
 	addr := trans.conn.RemoteAddr().String()
+	klog.Infof("reuse transport[%s]: %v", addr, trans)
 	c.transPool.Push(addr, trans)
 }

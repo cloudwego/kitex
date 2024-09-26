@@ -121,8 +121,7 @@ func (s *stream) writeHeader(hd streamx.Header) (err error) {
 func (s *stream) sendHeader() (err error) {
 	wheader := s.wheader
 	s.wheader = nil
-	err = s.trans.streamSendHeader(s.sid, s.method, wheader)
-	return err
+	return s.trans.streamSendHeader(s.sid, s.method, wheader)
 }
 
 // readTrailer by client: unblock recv function and return EOF if no unread frame

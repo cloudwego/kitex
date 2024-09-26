@@ -33,9 +33,9 @@ server := {user_gencode}.NewServer({kitex_server}.WithServerProvider(serverProvi
 {kitex_server}.ServerTransHandler.OnRead
 => serverProvider.Available(conn)
 => serverProvider.OnActive(conn)
-=> stream := serverProvider.OnStream(conn)
-                => {kitex_server}.internalProvider.OnStream(conn)
-                    => serverProvider.OnStream(conn)
+=> stream := serverProvider.onStream(conn)
+                => {kitex_server}.internalProvider.onStream(conn)
+                    => serverProvider.onStream(conn)
 
 res := stream.Recv(...)
             => {kitex_server}.internalProvider.Stream.Recv(...) : run middlewares
@@ -59,8 +59,10 @@ type ServerProvider interface {
 	Available(ctx context.Context, conn net.Conn) bool // ProtocolMath
 	// OnActive called when conn connected
 	OnActive(ctx context.Context, conn net.Conn) (context.Context, error)
-	OnInactive(ctx context.Context, conn net.Conn) (context.Context, error)
-	// OnStream should read conn data and return a server stream
+	// OnRead called when conn have something to read
+	OnRead(ctx context.Context, conn net.Conn) error
+
+	// OnStream should return the available ServerStream or block
 	OnStream(ctx context.Context, conn net.Conn) (context.Context, ServerStream, error)
 	// OnStreamFinish should be called when user server handler returned, typically provide should close the stream
 	OnStreamFinish(ctx context.Context, ss ServerStream) (context.Context, error)

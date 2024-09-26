@@ -83,37 +83,42 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	var err error
 	ctx, err = t.provider.OnActive(ctx, conn)
 	if err != nil {
+		klog.CtxErrorf(ctx, "server OnActive error: %v", err)
 		return nil, err
 	}
+	// connection level goroutine
+	go func() {
+		for {
+			nctx, ss, nerr := t.provider.OnStream(ctx, conn)
+			if nerr != nil {
+				if !errors.Is(nerr, io.EOF) {
+					klog.CtxErrorf(ctx, "server onStream error: %v", nerr)
+				}
+				return
+			}
+			// stream level goroutine
+			klog.Infof("server onStream[%s]", ss.Method())
+			gofunc.GoFunc(ctx, func() {
+				err := t.onStream(nctx, conn, ss)
+				if err != nil && !errors.Is(err, io.EOF) {
+					klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", nerr)
+				}
+			})
+		}
+	}()
 	return ctx, nil
 }
 
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
-	// connection level goroutine
-	for {
-		nctx, ss, nerr := t.provider.OnStream(ctx, conn)
-		if nerr != nil {
-			if errors.Is(nerr, io.EOF) {
-				return nil
-			}
-			klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)
-			return nerr
-		}
-		// stream level goroutine
-		gofunc.GoFunc(ctx, func() {
-			err := t.OnStream(nctx, conn, ss)
-			if err != nil && !errors.Is(err, io.EOF) {
-				klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", nerr)
-			}
-		})
-	}
+	err := t.provider.OnRead(ctx, conn)
+	return err
 }
 
-// OnStream
+// onStream
 // - create  server stream
 // - process server stream
 // - close   server stream
-func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss streamx.ServerStream) (err error) {
+func (t *svrTransHandler) onStream(ctx context.Context, conn net.Conn, ss streamx.ServerStream) (err error) {
 	// inkHdlFunc 包含了所有中间件 + 用户 serviceInfo.methodHandler
 	// 这里 streamx 依然会复用原本的 server endpoint.Endpoint 中间件，因为他们都不会单独去取 req/res 的值
 	// 无法在保留现有 streaming 功能的情况下，彻底弃用 endpoint.Endpoint , 所以这里依然使用 endpoint 接口
@@ -141,7 +146,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 	ctx = t.startTracer(ctx, ri)
 	defer func() {
 		if err != nil {
-			log.Println("OnStream failed: ", err)
+			log.Println("onStream failed: ", err)
 		}
 		panicErr := recover()
 		if panicErr != nil {
@@ -173,7 +178,7 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 }
 
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
-	_, _ = t.provider.OnInactive(ctx, conn)
+	return
 }
 
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {

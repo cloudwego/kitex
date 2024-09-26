@@ -18,10 +18,12 @@ package ttstream
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
@@ -43,8 +45,7 @@ func NewServerProvider(sinfo *serviceinfo.ServiceInfo, opts ...ServerProviderOpt
 var _ streamx.ServerProvider = (*serverProvider)(nil)
 
 type serverProvider struct {
-	sinfo        *serviceinfo.ServiceInfo
-	payloadLimit int
+	sinfo *serviceinfo.ServiceInfo
 }
 
 func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
@@ -57,22 +58,32 @@ func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
 
 func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
-	trans := newTransport(serverTransport, s.sinfo, nconn)
+	trans := newServerTransport(s.sinfo, nconn)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
+		klog.Info("server provider on disconnect: %v", connection.RemoteAddr().String())
 		_ = trans.Close()
 	})
 	return context.WithValue(ctx, serverTransCtxKey{}, trans), nil
 }
 
-func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.Context, error) {
-	return ctx, nil
+func (s serverProvider) OnRead(ctx context.Context, conn net.Conn) error {
+	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
+	if trans == nil {
+		return fmt.Errorf("server provider on read: no transport conn")
+	}
+	err := trans.onRead()
+	if err != nil {
+		klog.Errorf("server onRead err: %v", err)
+		return err
+	}
+	return nil
 }
 
 func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Context, streamx.ServerStream, error) {
 	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
 	if trans == nil {
-		return nil, nil, nil
+		return ctx, nil, fmt.Errorf("server provider onStream: server transport is nil")
 	}
 	st, err := trans.readStream(ctx)
 	if err != nil {
@@ -83,6 +94,7 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 
 	ctx, cancelFunc := ktx.WithCancel(ctx)
 	ctx = context.WithValue(ctx, serverStreamCancelCtxKey{}, cancelFunc)
+
 	return ctx, ss, nil
 }
 

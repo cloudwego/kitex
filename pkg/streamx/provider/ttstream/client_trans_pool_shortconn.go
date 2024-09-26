@@ -36,7 +36,7 @@ func (c *shortConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string,
 		return nil, err
 	}
 	// create new transport
-	trans := newTransport(clientTransport, sinfo, conn)
+	trans := newClientTransport(sinfo, conn)
 	return trans, nil
 }
 

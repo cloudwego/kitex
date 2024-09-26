@@ -18,6 +18,7 @@ package jsonrpc
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -53,8 +54,12 @@ func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Co
 	return context.WithValue(ctx, serverTransCtxKey{}, trans), nil
 }
 
-func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.Context, error) {
-	return ctx, nil
+func (s serverProvider) OnRead(ctx context.Context, conn net.Conn) error {
+	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
+	if trans == nil {
+		return fmt.Errorf("transport not exists")
+	}
+	return trans.onRead()
 }
 
 func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Context, streamx.ServerStream, error) {
