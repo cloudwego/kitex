@@ -80,8 +80,8 @@ func (s *ObjectPool) cleaning() {
 				if now.Sub(o.lastActive) < s.idleTimeout {
 					return false, false
 				}
-				klog.Infof("object is invalid: %v, closing", o)
-				_ = o.object.Close()
+				err := o.object.Close()
+				klog.Infof("object is invalid: lastActive=%s, closedErr=%v", o.lastActive, err)
 				return true, true
 			})
 		}

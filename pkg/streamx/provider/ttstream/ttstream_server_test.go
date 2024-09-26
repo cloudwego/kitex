@@ -28,6 +28,26 @@ import (
 type pingpongService struct{}
 type streamingService struct{}
 
+const (
+	headerKey  = "header1"
+	headerVal  = "value1"
+	trailerKey = "trailer1"
+	trailerVal = "value1"
+)
+
+func (si *streamingService) setHeaderAndTrailer(stream streamx.ServerStreamMetadata) error {
+	err := stream.SetTrailer(streamx.Trailer{trailerKey: trailerVal})
+	if err != nil {
+		return err
+	}
+	err = stream.SendHeader(streamx.Header{headerKey: headerVal})
+	if err != nil {
+		klog.Errorf("send header failed: %v", err)
+		return err
+	}
+	return nil
+}
+
 func (si *pingpongService) PingPong(ctx context.Context, req *Request) (*Response, error) {
 	resp := &Response{Type: req.Type, Message: req.Message}
 	klog.Infof("Server PingPong: req={%v} resp={%v}", req, resp)
@@ -41,14 +61,18 @@ func (si *streamingService) Unary(ctx context.Context, req *Request) (*Response,
 }
 
 func (si *streamingService) ClientStream(ctx context.Context,
-	stream streamx.ClientStreamingServer[Request, Response]) (res *Response, err error) {
+	stream streamx.ClientStreamingServer[Request, Response]) (*Response, error) {
 	var msg string
 	klog.Infof("Server ClientStream start")
 	defer klog.Infof("Server ClientStream end")
+
+	if err := si.setHeaderAndTrailer(stream); err != nil {
+		return nil, err
+	}
 	for {
 		req, err := stream.Recv(ctx)
 		if err == io.EOF {
-			res = new(Response)
+			res := new(Response)
 			res.Message = msg
 			return res, nil
 		}
@@ -64,10 +88,9 @@ func (si *streamingService) ServerStream(ctx context.Context, req *Request,
 	stream streamx.ServerStreamingServer[Response]) error {
 	klog.Infof("Server ServerStream: req={%v}", req)
 
-	_ = stream.SetHeader(map[string]string{"key1": "val1"})
-	_ = stream.SendHeader(map[string]string{"key2": "val2"})
-	_ = stream.SetTrailer(map[string]string{"key1": "val1"})
-	_ = stream.SetTrailer(map[string]string{"key2": "val2"})
+	if err := si.setHeaderAndTrailer(stream); err != nil {
+		return err
+	}
 
 	for i := 0; i < 3; i++ {
 		resp := new(Response)
@@ -88,6 +111,11 @@ func (si *streamingService) BidiStream(ctx context.Context,
 		klog.Debugf("RegisterCancelCallback work!")
 	})
 	klog.Debugf("RegisterCancelCallback registered!")
+
+	if err := si.setHeaderAndTrailer(stream); err != nil {
+		return err
+	}
+
 	for {
 		req, err := stream.Recv(ctx)
 		if err == io.EOF {

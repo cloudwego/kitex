@@ -46,6 +46,15 @@ func init() {
 	klog.SetLevel(klog.LevelDebug)
 }
 
+func testHeaderAndTrailer(t *testing.T, stream streamx.ClientStreamMetadata) {
+	hd, err := stream.Header()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, hd[headerKey] == headerVal, hd)
+	tl, err := stream.Trailer()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, tl[trailerKey] == trailerVal, tl)
+}
+
 func TestTTHeaderStreaming(t *testing.T) {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
@@ -263,6 +272,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 	waitServerStreamDone()
 	test.Assert(t, serverRecvCount == int32(round), serverRecvCount)
 	test.Assert(t, serverSendCount == 1, serverSendCount)
+	testHeaderAndTrailer(t, cs)
 	cs = nil
 	serverRecvCount = 0
 	serverSendCount = 0
@@ -274,12 +284,6 @@ func TestTTHeaderStreaming(t *testing.T) {
 	req.Message = "ServerStream"
 	ss, err := streamClient.ServerStream(ctx, req)
 	test.Assert(t, err == nil, err)
-	// server stream recv header
-	hd, err := ss.Header()
-	test.Assert(t, err == nil, err)
-	t.Logf("Client ServerStream recv header: %v", hd)
-	test.DeepEqual(t, hd["key1"], "val1")
-	test.DeepEqual(t, hd["key2"], "val2")
 	received := 0
 	for {
 		res, err := ss.Recv(ctx)
@@ -292,16 +296,11 @@ func TestTTHeaderStreaming(t *testing.T) {
 	}
 	err = ss.CloseSend(ctx)
 	test.Assert(t, err == nil, err)
-	// server stream recv trailer
-	tl, err := ss.Trailer()
-	test.Assert(t, err == nil, err)
-	t.Logf("Client ServerStream recv trailer: %v", tl)
-	test.DeepEqual(t, tl["key1"], "val1")
-	test.DeepEqual(t, tl["key2"], "val2")
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
 	test.Assert(t, serverRecvCount == 1, serverRecvCount)
 	test.Assert(t, serverSendCount == int32(received), serverSendCount)
+	testHeaderAndTrailer(t, ss)
 	ss = nil
 	serverRecvCount = 0
 	serverSendCount = 0
@@ -345,6 +344,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 				}
 				test.Assert(t, i == round, i)
 			}()
+			testHeaderAndTrailer(t, bs)
 		}()
 	}
 	waitServerStreamDone()
