@@ -9,21 +9,27 @@ import (
 )
 
 type Object interface {
-	IsInvalid() bool
 	Close() error
 }
 
-func NewObjectPool(cleanInternal time.Duration) *ObjectPool {
+type objectItem struct {
+	object     Object
+	lastActive time.Time
+}
+
+func NewObjectPool(idleTimeout, cleanInternal time.Duration) *ObjectPool {
 	s := new(ObjectPool)
-	s.objects = map[string]*Stack[Object]{}
+	s.idleTimeout = idleTimeout
 	s.cleanInternal = cleanInternal
+	s.objects = make(map[string]*Stack[objectItem])
 	go s.cleaning()
 	return s
 }
 
 type ObjectPool struct {
 	L             sync.Mutex // STW
-	objects       map[string]*Stack[Object]
+	objects       map[string]*Stack[objectItem]
+	idleTimeout   time.Duration
 	cleanInternal time.Duration
 	closed        int32
 }
@@ -32,11 +38,11 @@ func (s *ObjectPool) Push(key string, o Object) {
 	s.L.Lock()
 	stk := s.objects[key]
 	if stk == nil {
-		stk = NewStack[Object]()
+		stk = NewStack[objectItem]()
 		s.objects[key] = stk
 	}
 	s.L.Unlock()
-	stk.Push(o)
+	stk.Push(objectItem{object: o, lastActive: time.Now()})
 }
 
 func (s *ObjectPool) Pop(key string) Object {
@@ -46,8 +52,11 @@ func (s *ObjectPool) Pop(key string) Object {
 	if stk == nil {
 		return nil
 	}
-	o, _ := stk.Pop()
-	return o
+	o, ok := stk.Pop()
+	if !ok {
+		return nil
+	}
+	return o.object
 }
 
 func (s *ObjectPool) Close() {
@@ -58,20 +67,21 @@ func (s *ObjectPool) cleaning() {
 	for atomic.LoadInt32(&s.closed) == 0 {
 		time.Sleep(s.cleanInternal)
 
+		now := time.Now()
 		s.L.Lock()
 		for _, stk := range s.objects {
-			stk.RangeDelete(func(o Object) (deleteNode bool, continueRange bool) {
-				if o == nil {
+			stk.RangeDelete(func(o objectItem) (deleteNode bool, continueRange bool) {
+				if o.object == nil {
 					return true, true
 				}
 
 				// RangeDelete start from the stack bottom
 				// we assume that the values on the top of last valid value are all valid
-				if !o.IsInvalid() {
+				if now.Sub(o.lastActive) < s.idleTimeout {
 					return false, false
 				}
 				klog.Infof("object is invalid: %v, closing", o)
-				_ = o.Close()
+				_ = o.object.Close()
 				return true, true
 			})
 		}

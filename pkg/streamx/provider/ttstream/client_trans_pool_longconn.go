@@ -17,13 +17,14 @@
 package ttstream
 
 import (
-	"sync"
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 	"github.com/cloudwego/netpoll"
 )
+
+const idleCheckInternal = time.Second * 10
 
 var DefaultLongConnConfig = LongConnConfig{
 	MaxIdleTimeout: time.Minute,
@@ -35,11 +36,11 @@ type LongConnConfig struct {
 
 func newLongConnTransPool(config LongConnConfig) transPool {
 	tp := new(longConnTransPool)
-	if config.MaxIdleTimeout == 0 {
-		config.MaxIdleTimeout = DefaultLongConnConfig.MaxIdleTimeout
+	tp.config = DefaultLongConnConfig
+	if config.MaxIdleTimeout > 0 {
+		tp.config.MaxIdleTimeout = config.MaxIdleTimeout
 	}
-	tp.transPool = container.NewObjectPool(time.Second * 10)
-	tp.config = config
+	tp.transPool = container.NewObjectPool(tp.config.MaxIdleTimeout, idleCheckInternal)
 	return tp
 }
 
@@ -51,10 +52,7 @@ type longConnTransPool struct {
 func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error) {
 	o := c.transPool.Pop(addr)
 	if o != nil {
-		tw := o.(*transWrapper)
-		trans = tw.transport
-		tw.release()
-		return trans, nil
+		return o.(*transport), nil
 	}
 
 	// create new connection
@@ -69,36 +67,5 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, 
 
 func (c *longConnTransPool) Put(trans *transport) {
 	addr := trans.conn.RemoteAddr().String()
-	tw := newTransWrapper(trans, c.config.MaxIdleTimeout)
-	c.transPool.Push(addr, tw)
-}
-
-var transWrapperPool sync.Pool
-
-func newTransWrapper(t *transport, idleTimeout time.Duration) (tw *transWrapper) {
-	v := transWrapperPool.Get()
-	if v == nil {
-		tw = new(transWrapper)
-	} else {
-		tw = v.(*transWrapper)
-	}
-	tw.transport = t
-	tw.lastActive = time.Now()
-	tw.idleTimeout = idleTimeout
-	return tw
-}
-
-type transWrapper struct {
-	*transport
-	lastActive  time.Time
-	idleTimeout time.Duration
-}
-
-func (t *transWrapper) release() {
-	t.transport = nil
-	transWrapperPool.Put(t)
-}
-
-func (t *transWrapper) IsInvalid() bool {
-	return time.Now().Sub(t.lastActive) > t.idleTimeout
+	c.transPool.Push(addr, trans)
 }
