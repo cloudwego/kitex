@@ -101,6 +101,11 @@ func (t *transport) Close() (err error) {
 	close(t.closed)
 	klog.Debugf("transport[%s] is closing", t.conn.LocalAddr())
 	t.spipe.Close()
+	t.streams.Range(func(key, value any) bool {
+		sio := value.(*streamIO)
+		_ = t.streamClose(sio.stream.sid)
+		return true
+	})
 	return err
 }
 
@@ -315,7 +320,9 @@ func (t *transport) streamCancel(s *stream) (err error) {
 
 func (t *transport) streamClose(sid int32) (err error) {
 	// remove stream from transport
-	t.streams.Delete(sid)
+	if _, ok := t.streams.LoadAndDelete(sid); !ok {
+		return nil
+	}
 	atomic.AddInt32(&t.streamingFlag, -1)
 	return nil
 }

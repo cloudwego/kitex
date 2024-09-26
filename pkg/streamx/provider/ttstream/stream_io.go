@@ -45,7 +45,7 @@ func newStreamIO(ctx context.Context, s *stream) *streamIO {
 func (s *streamIO) input(ctx context.Context, f *Frame) {
 	err := s.fpipe.Write(ctx, f)
 	if err != nil {
-		klog.Error("fpipe write error", err)
+		klog.Errorf("fpipe write failed: %v", err)
 	}
 }
 

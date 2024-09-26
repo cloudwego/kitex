@@ -232,11 +232,7 @@ type serverStream struct {
 }
 
 func (s *serverStream) RecvMsg(ctx context.Context, req any) error {
-	err := s.stream.RecvMsg(ctx, req)
-	if err != nil {
-		_ = s.close()
-	}
-	return err
+	return s.stream.RecvMsg(ctx, req)
 }
 
 // SendMsg should send left header first
