@@ -200,6 +200,14 @@ type clientStream struct {
 	*stream
 }
 
+func (s *clientStream) RecvMsg(ctx context.Context, req any) error {
+	err := s.stream.RecvMsg(ctx, req)
+	if err != nil {
+		_ = s.close()
+	}
+	return err
+}
+
 func (s *clientStream) CloseSend(ctx context.Context) error {
 	return s.sendTrailer()
 }
@@ -221,6 +229,14 @@ func newServerStream(s *stream) streamx.ServerStream {
 
 type serverStream struct {
 	*stream
+}
+
+func (s *serverStream) RecvMsg(ctx context.Context, req any) error {
+	err := s.stream.RecvMsg(ctx, req)
+	if err != nil {
+		_ = s.close()
+	}
+	return err
 }
 
 // SendMsg should send left header first
