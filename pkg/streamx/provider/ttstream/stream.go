@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -66,6 +67,7 @@ type stream struct {
 
 	StreamMeta
 	metaHandler MetaFrameHandler
+	recvTimeout time.Duration
 }
 
 func (s *stream) Mode() streamx.StreamingMode {
@@ -164,13 +166,25 @@ func (s *stream) finished() bool {
 		atomic.LoadInt32(&s.selfEOF) == 1
 }
 
+func (s *stream) setRecvTimeout(timeout time.Duration) {
+	if timeout <= 0 {
+		return
+	}
+	s.recvTimeout = timeout
+}
+
 func (s *stream) SendMsg(ctx context.Context, res any) (err error) {
-	err = s.trans.streamSend(s.sid, s.method, s.wheader, res)
+	err = s.trans.streamSend(ctx, s.sid, s.method, s.wheader, res)
 	return err
 }
 
 func (s *stream) RecvMsg(ctx context.Context, req any) error {
-	return s.trans.streamRecv(s.sid, req)
+	if s.recvTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.recvTimeout)
+		defer cancel()
+	}
+	return s.trans.streamRecv(ctx, s.sid, req)
 }
 
 func (s *stream) cancel() {

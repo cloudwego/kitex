@@ -454,6 +454,75 @@ func TestTTHeaderStreamingLongConn(t *testing.T) {
 	}
 }
 
+func TestTTHeaderStreamingRecvTimeout(t *testing.T) {
+	var addr = test.GetLocalAddress()
+	ln, _ := netpoll.CreateListener("tcp", addr)
+	defer ln.Close()
+
+	// create server
+	svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
+	// register streamingService as ttstreaam provider
+	sp, _ := ttstream.NewServerProvider(streamingServiceInfo)
+	_ = svr.RegisterService(
+		streamingServiceInfo,
+		new(streamingService),
+		streamxserver.WithProvider(sp),
+	)
+	go func() {
+		_ = svr.Run()
+	}()
+	defer svr.Stop()
+	test.WaitServerStart(addr)
+
+	cp, _ := ttstream.NewClientProvider(
+		streamingServiceInfo,
+		ttstream.WithClientLongConnPool(
+			ttstream.LongConnConfig{MaxIdleTimeout: time.Second},
+		),
+	)
+
+	// timeout by ctx itself
+	streamClient, _ := NewStreamingClient(
+		"kitex.service.streaming",
+		streamxclient.WithHostPorts(addr),
+		streamxclient.WithProvider(cp),
+	)
+	ctx := context.Background()
+	bs, err := streamClient.BidiStream(ctx)
+	test.Assert(t, err == nil, err)
+	req := new(Request)
+	req.Message = string(make([]byte, 1024))
+	err = bs.Send(ctx, req)
+	test.Assert(t, err == nil, err)
+	ctx, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err = bs.Recv(ctx)
+	test.Assert(t, err != nil, err)
+	t.Logf("recv timeout error: %v", err)
+	err = bs.CloseSend(ctx)
+	test.Assert(t, err == nil, err)
+
+	// timeout by client WithRecvTimeout
+	streamClient, _ = NewStreamingClient(
+		"kitex.service.streaming",
+		streamxclient.WithHostPorts(addr),
+		streamxclient.WithProvider(cp),
+		streamxclient.WithRecvTimeout(time.Nanosecond),
+	)
+	ctx = context.Background()
+	bs, err = streamClient.BidiStream(ctx)
+	test.Assert(t, err == nil, err)
+	req = new(Request)
+	req.Message = string(make([]byte, 1024))
+	err = bs.Send(ctx, req)
+	test.Assert(t, err == nil, err)
+	_, err = bs.Recv(ctx)
+	test.Assert(t, err != nil, err)
+	t.Logf("recv timeout error: %v", err)
+	err = bs.CloseSend(ctx)
+	test.Assert(t, err == nil, err)
+}
+
 func BenchmarkTTHeaderStreaming(b *testing.B) {
 	klog.SetLevel(klog.LevelWarn)
 	var addr = test.GetLocalAddress()

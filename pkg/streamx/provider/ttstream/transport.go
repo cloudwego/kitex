@@ -154,7 +154,7 @@ func (t *transport) loopRead() error {
 				smode := t.sinfo.MethodInfo(fr.method).StreamingMode()
 				s := newStream(context.Background(), t, smode, fr.streamFrame)
 				klog.Debugf("transport[%d] read a new stream: sid=%d", t.kind, s.sid)
-				t.spipe.Write(s)
+				t.spipe.Write(context.Background(), s)
 			case clientTransport:
 				// Header Frame: client recv header
 				sio, ok := t.loadStreamIO(fr.sid)
@@ -174,7 +174,7 @@ func (t *transport) loopRead() error {
 				klog.Errorf("transport[%d] read a unknown stream data: sid=%d", t.kind, fr.sid)
 				continue
 			}
-			sio.input(fr)
+			sio.input(context.Background(), fr)
 		case trailerFrameType:
 			// Trailer Frame: recv trailer, Close read direction
 			sio, ok := t.loadStreamIO(fr.sid)
@@ -244,7 +244,7 @@ func (t *transport) writeFrame(sframe streamFrame, meta IntHeader, ftype int32, 
 	return nil
 }
 
-func (t *transport) streamSend(sid int32, method string, wheader streamx.Header, res any) (err error) {
+func (t *transport) streamSend(ctx context.Context, sid int32, method string, wheader streamx.Header, res any) (err error) {
 	if len(wheader) > 0 {
 		err = t.streamSendHeader(sid, method, wheader)
 		if err != nil {
@@ -279,12 +279,12 @@ func (t *transport) streamCloseSend(sid int32, method string, trailer streamx.Tr
 	return nil
 }
 
-func (t *transport) streamRecv(sid int32, data any) (err error) {
+func (t *transport) streamRecv(ctx context.Context, sid int32, data any) (err error) {
 	sio, ok := t.loadStreamIO(sid)
 	if !ok {
 		return io.EOF
 	}
-	f, err := sio.output()
+	f, err := sio.output(ctx)
 	if err != nil {
 		return err
 	}
@@ -353,7 +353,7 @@ func (t *transport) newStream(
 
 // readStream wait for a new incoming stream on current connection
 // it's typically used by server side
-func (t *transport) readStream() (*stream, error) {
+func (t *transport) readStream(ctx context.Context) (*stream, error) {
 	if t.kind != serverTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
@@ -364,7 +364,7 @@ READ:
 		atomic.AddInt32(&t.streamingFlag, 1)
 		return s, nil
 	}
-	n, err := t.spipe.Read(t.scache[0:streamCacheSize])
+	n, err := t.spipe.Read(ctx, t.scache[0:streamCacheSize])
 	if err != nil {
 		if errors.Is(err, container.ErrPipeEOF) {
 			return nil, io.EOF

@@ -67,7 +67,7 @@ func TestTransport(t *testing.T) {
 
 			go func() {
 				for {
-					s, err := trans.readStream()
+					s, err := trans.readStream(ctx)
 					t.Logf("OnRead read stream: %v, %v", s, err)
 					if err != nil {
 						if err == io.EOF {

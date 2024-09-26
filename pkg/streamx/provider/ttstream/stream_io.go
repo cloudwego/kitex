@@ -42,15 +42,15 @@ func newStreamIO(ctx context.Context, s *stream) *streamIO {
 	return sio
 }
 
-func (s *streamIO) input(f *Frame) {
-	err := s.fpipe.Write(f)
+func (s *streamIO) input(ctx context.Context, f *Frame) {
+	err := s.fpipe.Write(ctx, f)
 	if err != nil {
 		klog.Error("fpipe write error", err)
 	}
 }
 
-func (s *streamIO) output() (f *Frame, err error) {
-	n, err := s.fpipe.Read(s.fcache[:])
+func (s *streamIO) output(ctx context.Context) (f *Frame, err error) {
+	n, err := s.fpipe.Read(ctx, s.fcache[:])
 	if err != nil {
 		if errors.Is(err, container.ErrPipeEOF) {
 			return nil, io.EOF

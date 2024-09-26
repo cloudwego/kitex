@@ -17,6 +17,7 @@
 package container
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync/atomic"
@@ -53,7 +54,7 @@ func NewPipe[Item any]() *Pipe[Item] {
 }
 
 // Read will block if there is nothing to read
-func (p *Pipe[Item]) Read(items []Item) (int, error) {
+func (p *Pipe[Item]) Read(ctx context.Context, items []Item) (int, error) {
 READ:
 	var n int
 	for i := 0; i < len(items); i++ {
@@ -70,7 +71,16 @@ READ:
 
 	// no data to read, waiting writes
 	for {
-		<-p.trigger
+		if ctx.Done() != nil {
+			select {
+			case <-ctx.Done():
+				return 0, ctx.Err()
+			case <-p.trigger:
+			}
+		} else {
+			<-p.trigger
+		}
+
 		if p.queue.Size() == 0 {
 			err := stateErrors[atomic.LoadInt32(&p.state)]
 			if err != nil {
@@ -81,7 +91,7 @@ READ:
 	}
 }
 
-func (p *Pipe[Item]) Write(items ...Item) error {
+func (p *Pipe[Item]) Write(ctx context.Context, items ...Item) error {
 	if !atomic.CompareAndSwapInt32(&p.state, pipeStateInactive, pipeStateActive) && atomic.LoadInt32(&p.state) != pipeStateActive {
 		err := stateErrors[atomic.LoadInt32(&p.state)]
 		if err != nil {

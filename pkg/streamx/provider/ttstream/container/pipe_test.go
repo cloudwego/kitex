@@ -17,11 +17,13 @@
 package container
 
 import (
+	"context"
 	"sync"
 	"testing"
 )
 
 func TestPipeline(t *testing.T) {
+	ctx := context.Background()
 	pipe := NewPipe[int]()
 	var recv int
 	var wg sync.WaitGroup
@@ -30,7 +32,7 @@ func TestPipeline(t *testing.T) {
 		defer wg.Done()
 		items := make([]int, 10)
 		for {
-			n, err := pipe.Read(items)
+			n, err := pipe.Read(ctx, items)
 			if err != nil {
 				return
 			}
@@ -42,7 +44,7 @@ func TestPipeline(t *testing.T) {
 	round := 10000
 	itemsPerRound := []int{1, 1, 1, 1, 1}
 	for i := 0; i < round; i++ {
-		pipe.Write(itemsPerRound...)
+		_ = pipe.Write(ctx, itemsPerRound...)
 	}
 	pipe.Close()
 	wg.Wait()
@@ -52,17 +54,18 @@ func TestPipeline(t *testing.T) {
 }
 
 func BenchmarkPipeline(b *testing.B) {
+	ctx := context.Background()
 	pipe := NewPipe[int]()
 	readCache := make([]int, 8)
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < len(readCache); j++ {
-			go pipe.Write(1)
+			go pipe.Write(ctx, 1)
 		}
 		total := 0
 		for total < len(readCache) {
-			n, _ := pipe.Read(readCache)
+			n, _ := pipe.Read(ctx, readCache)
 			total += n
 		}
 	}

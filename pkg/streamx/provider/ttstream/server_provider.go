@@ -74,7 +74,7 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 	if trans == nil {
 		return nil, nil, nil
 	}
-	st, err := trans.readStream()
+	st, err := trans.readStream(ctx)
 	if err != nil {
 		return nil, nil, err
 	}

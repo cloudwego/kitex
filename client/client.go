@@ -755,6 +755,12 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		}
 	}
 
+	// streamx config
+	sopt := opt.StreamXOptions
+	if sopt.RecvTimeout > 0 {
+		cfg.SetStreamRecvTimeout(sopt.RecvTimeout)
+	}
+
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 
 	if callOpts != nil && callOpts.CompressorName != "" {

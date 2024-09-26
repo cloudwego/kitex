@@ -51,6 +51,7 @@ type clientProvider struct {
 }
 
 func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callOptions ...streamxcallopt.CallOption) (streamx.ClientStream, error) {
+	rconfig := ri.Config()
 	invocation := ri.Invocation()
 	method := invocation.MethodName()
 	addr := ri.To().Address()
@@ -82,6 +83,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	if err != nil {
 		return nil, err
 	}
+	s.setRecvTimeout(rconfig.StreamRecvTimeout())
 	// only client can set meta frame handler
 	s.setMetaFrameHandler(c.metaHandler)
 
@@ -93,7 +95,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 
 	cs := newClientStream(s)
 	runtime.SetFinalizer(cs, func(cstream *clientStream) {
-		klog.Info("client stream[%v] closing", cstream.sid)
+		klog.Infof("client stream[%v] closing", cstream.sid)
 		_ = cstream.close()
 		c.transPool.Put(trans)
 	})

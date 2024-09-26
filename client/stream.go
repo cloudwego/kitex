@@ -81,9 +81,9 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 	sendEndpoint := kc.opt.Streaming.BuildSendInvokeChain(kc.invokeSendEndpoint())
 
 	// streamx version streaming mw
-	kc.sxStreamMW = streamx.StreamMiddlewareChain(kc.opt.SMWs...)
-	kc.sxStreamRecvMW = streamx.StreamRecvMiddlewareChain(kc.opt.SRecvMWs...)
-	kc.sxStreamSendMW = streamx.StreamSendMiddlewareChain(kc.opt.SSendMWs...)
+	kc.sxStreamMW = streamx.StreamMiddlewareChain(kc.opt.StreamXOptions.StreamMWs...)
+	kc.sxStreamRecvMW = streamx.StreamRecvMiddlewareChain(kc.opt.StreamXOptions.StreamRecvMWs...)
+	kc.sxStreamSendMW = streamx.StreamSendMiddlewareChain(kc.opt.StreamXOptions.StreamSendMWs...)
 
 	return func(ctx context.Context, req, resp interface{}) (err error) {
 		// req and resp as &streaming.Stream
