@@ -73,9 +73,16 @@ func (s *ObjectPool) cleaning() {
 		if cleanInternal > time.Second*10 {
 			cleanInternal = time.Second * 10
 		}
-		for _, stk := range s.objects {
+		for key, stk := range s.objects {
+			deleted := 0
+			var oldest *time.Time
+			klog.Infof("object[%s] pool cleaning %d objects", key, stk.Size())
 			stk.RangeDelete(func(o objectItem) (deleteNode bool, continueRange bool) {
+				if oldest == nil {
+					oldest = &o.lastActive
+				}
 				if o.object == nil {
+					deleted++
 					return true, true
 				}
 
@@ -84,10 +91,14 @@ func (s *ObjectPool) cleaning() {
 				if now.Sub(o.lastActive) < s.idleTimeout {
 					return false, false
 				}
+				deleted++
 				err := o.object.Close()
-				klog.Infof("object is invalid: lastActive=%s, closedErr=%v", o.lastActive, err)
+				klog.Infof("object is invalid: lastActive=%s, closedErr=%v", o.lastActive.String(), err)
 				return true, true
 			})
+			if oldest != nil {
+				klog.Infof("object[%s] pool delete %d objects", key, deleted)
+			}
 		}
 		s.L.Unlock()
 	}
