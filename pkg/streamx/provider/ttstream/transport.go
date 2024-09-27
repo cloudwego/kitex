@@ -342,23 +342,22 @@ var clientStreamID int32
 // it's typically used by client side
 // newStream is concurrency safe
 func (t *transport) newStream(
-	ctx context.Context, method string, meta IntHeader, header streamx.Header) (*stream, error) {
+	ctx context.Context, method string, intHeader IntHeader, strHeader streamx.Header) (*stream, error) {
 	if t.kind != clientTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
 
 	sid := atomic.AddInt32(&clientStreamID, 1)
 	smode := t.sinfo.MethodInfo(method).StreamingMode()
-	sfr := streamFrame{
-		sid:    sid,
-		method: method,
-		header: header,
-	}
-	s := newStream(ctx, t, smode, sfr)
-	err := t.writeFrame(sfr, meta, headerFrameType, nil) // create stream
+	// create stream
+	err := t.writeFrame(
+		streamFrame{sid: sid, method: method, header: strHeader},
+		intHeader, headerFrameType, nil,
+	)
 	if err != nil {
 		return nil, err
 	}
+	s := newStream(ctx, t, smode, streamFrame{sid: sid, method: method})
 	atomic.AddInt32(&t.streamingFlag, 1)
 	return s, nil
 }

@@ -108,14 +108,20 @@ func (s *stream) readHeader(hd streamx.Header) (err error) {
 	return nil
 }
 
-func (s *stream) writeHeader(hd streamx.Header) (err error) {
+// setHeader use the hd as the underlying header
+func (s *stream) setHeader(hd streamx.Header) {
+	s.wheader = hd
+	return
+}
+
+// writeHeader copy kvs into s.wheader
+func (s *stream) writeHeader(hd streamx.Header) {
 	if s.wheader == nil {
 		s.wheader = make(streamx.Header)
 	}
 	for k, v := range hd {
 		s.wheader[k] = v
 	}
-	return nil
 }
 
 func (s *stream) sendHeader() (err error) {
