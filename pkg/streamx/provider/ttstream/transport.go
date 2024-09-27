@@ -43,6 +43,8 @@ const (
 	frameChanSize   = 32
 )
 
+var transIgnoreError = errors.Join(netpoll.ErrEOF, io.EOF, netpoll.ErrConnClosed)
+
 type transport struct {
 	kind          int32
 	sinfo         *serviceinfo.ServiceInfo
@@ -71,8 +73,8 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 	go func() {
 		err := t.loopRead()
 		if err != nil {
-			if !errors.Is(err, io.EOF) {
-				klog.Warnf("trans loop read err: %v", err)
+			if !errors.Is(err, transIgnoreError) {
+				klog.Warnf("transport[%d] loop read err: %v", t.kind, err)
 			}
 			_ = t.Close()
 		}
@@ -80,8 +82,8 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 	go func() {
 		err := t.loopWrite()
 		if err != nil {
-			if !errors.Is(err, io.EOF) {
-				klog.Warnf("trans loop write err: %v", err)
+			if !errors.Is(err, transIgnoreError) {
+				klog.Warnf("transport[%d] loop write err: %v", t.kind, err)
 			}
 			_ = t.Close()
 			// because loopWrite function return, we should close conn actively
@@ -198,6 +200,10 @@ func (t *transport) loopRead() error {
 }
 
 func (t *transport) loopWrite() (err error) {
+	defer func() {
+		// loop write should help to close connection
+		_ = t.conn.Close()
+	}()
 	writer := newWriterBuffer(t.conn.Writer())
 	delay := 0
 	// Important note:
@@ -205,7 +211,6 @@ func (t *transport) loopWrite() (err error) {
 	for {
 		select {
 		case <-t.closed:
-			_ = t.conn.Close()
 			return nil
 		case fr, ok := <-t.wchannel:
 			if !ok {

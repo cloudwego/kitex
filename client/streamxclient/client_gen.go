@@ -39,6 +39,7 @@ func InvokeStream[Req, Res any](
 		// assemble streaming args depend on each stream mode
 		switch smode {
 		case serviceinfo.StreamingUnary:
+			// client should call CloseSend and server should call SendAndClose
 			if err = stream.SendMsg(ctx, req); err != nil {
 				return err
 			}

@@ -17,21 +17,19 @@ type objectItem struct {
 	lastActive time.Time
 }
 
-func NewObjectPool(idleTimeout, cleanInternal time.Duration) *ObjectPool {
+func NewObjectPool(idleTimeout time.Duration) *ObjectPool {
 	s := new(ObjectPool)
 	s.idleTimeout = idleTimeout
-	s.cleanInternal = cleanInternal
 	s.objects = make(map[string]*Stack[objectItem])
 	go s.cleaning()
 	return s
 }
 
 type ObjectPool struct {
-	L             sync.Mutex // STW
-	objects       map[string]*Stack[objectItem]
-	idleTimeout   time.Duration
-	cleanInternal time.Duration
-	closed        int32
+	L           sync.Mutex // STW
+	objects     map[string]*Stack[objectItem]
+	idleTimeout time.Duration
+	closed      int32
 }
 
 func (s *ObjectPool) Push(key string, o Object) {
@@ -64,11 +62,17 @@ func (s *ObjectPool) Close() {
 }
 
 func (s *ObjectPool) cleaning() {
+	cleanInternal := time.Second
 	for atomic.LoadInt32(&s.closed) == 0 {
-		time.Sleep(s.cleanInternal)
+		time.Sleep(cleanInternal)
 
 		now := time.Now()
 		s.L.Lock()
+		objSize := len(s.objects)
+		cleanInternal = time.Second + time.Duration(objSize)*time.Millisecond*10
+		if cleanInternal > time.Second*10 {
+			cleanInternal = time.Second * 10
+		}
 		for _, stk := range s.objects {
 			stk.RangeDelete(func(o objectItem) (deleteNode bool, continueRange bool) {
 				if o.object == nil {

@@ -439,6 +439,8 @@ func TestTTHeaderStreamingLongConn(t *testing.T) {
 				err = bs.CloseSend(ctx)
 				test.Assert(t, err == nil, err)
 				test.Assert(t, res.Message == msg, res.Message)
+
+				testHeaderAndTrailer(t, bs)
 			}()
 		}()
 	}

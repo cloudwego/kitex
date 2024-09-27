@@ -24,8 +24,6 @@ import (
 	"github.com/cloudwego/netpoll"
 )
 
-const idleCheckInternal = time.Second * 10
-
 var DefaultLongConnConfig = LongConnConfig{
 	MaxIdleTimeout: time.Minute,
 }
@@ -40,7 +38,7 @@ func newLongConnTransPool(config LongConnConfig) transPool {
 	if config.MaxIdleTimeout > 0 {
 		tp.config.MaxIdleTimeout = config.MaxIdleTimeout
 	}
-	tp.transPool = container.NewObjectPool(tp.config.MaxIdleTimeout, idleCheckInternal)
+	tp.transPool = container.NewObjectPool(tp.config.MaxIdleTimeout)
 	return tp
 }
 
