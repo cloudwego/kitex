@@ -85,6 +85,19 @@ func (s *stream) Method() string {
 	return s.method
 }
 
+func (s *stream) close() {
+	select {
+	case <-s.headerSig:
+	default:
+		close(s.headerSig)
+	}
+	select {
+	case <-s.trailerSig:
+	default:
+		close(s.trailerSig)
+	}
+}
+
 func (s *stream) setMetaFrameHandler(h MetaFrameHandler) {
 	s.metaHandler = h
 }
@@ -221,7 +234,9 @@ func (s *clientStream) close() error {
 	if err != nil {
 		return err
 	}
-	return s.trans.streamClose(s.sid)
+	err = s.trans.streamClose(s.sid)
+	s.stream.close()
+	return err
 }
 
 func newServerStream(s *stream) streamx.ServerStream {
@@ -255,5 +270,7 @@ func (s *serverStream) close() error {
 	if err != nil {
 		return err
 	}
-	return s.trans.streamClose(s.sid)
+	err = s.trans.streamClose(s.sid)
+	s.stream.close()
+	return err
 }
