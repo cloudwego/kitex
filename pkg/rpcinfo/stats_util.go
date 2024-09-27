@@ -27,13 +27,17 @@ import (
 
 // Record records the event to RPCStats.
 func Record(ctx context.Context, ri RPCInfo, event stats.Event, err error) {
-	if ctx == nil || ri.Stats() == nil {
+	if ctx == nil {
+		return
+	}
+	st := ri.Stats()
+	if st == nil {
 		return
 	}
 	if err != nil {
-		ri.Stats().Record(ctx, event, stats.StatusError, err.Error())
+		st.Record(ctx, event, stats.StatusError, err.Error())
 	} else {
-		ri.Stats().Record(ctx, event, stats.StatusInfo, "")
+		st.Record(ctx, event, stats.StatusInfo, "")
 	}
 }
 
