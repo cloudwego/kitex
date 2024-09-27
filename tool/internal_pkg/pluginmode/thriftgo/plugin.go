@@ -119,6 +119,30 @@ func HandleRequest(req *plugin.Request) *plugin.Response {
 		files = append(files, fs...)
 	}
 
+	if len(conv.Config.TemplateFiles) > 0 {
+		if len(conv.Services) == 0 {
+			return conv.failResp(errors.New("no service defined in the IDL"))
+		}
+		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
+		fs, err := gen.RenderWithMultipleFiles(&conv.Package)
+		if err != nil {
+			return conv.failResp(err)
+		}
+		files = append(files, fs...)
+	}
+
+	if conv.Config.RenderTplDir != "" {
+		if len(conv.Services) == 0 {
+			return conv.failResp(errors.New("no service defined in the IDL"))
+		}
+		conv.Package.ServiceInfo = conv.Services[len(conv.Services)-1]
+		fs, err := gen.GenerateCustomPackageWithTpl(&conv.Package)
+		if err != nil {
+			return conv.failResp(err)
+		}
+		files = append(files, fs...)
+	}
+
 	res := &plugin.Response{
 		Warnings: conv.Warnings,
 	}
