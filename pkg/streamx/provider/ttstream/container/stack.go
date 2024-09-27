@@ -25,7 +25,7 @@ func NewStack[ValueType any]() *Stack[ValueType] {
 }
 
 type Stack[ValueType any] struct {
-	L        sync.RWMutex
+	L        sync.Mutex
 	head     *doubleLinkNode[ValueType] // head will be protected by Locker
 	tail     *doubleLinkNode[ValueType] // tail will be protected by Locker
 	size     int
@@ -33,15 +33,16 @@ type Stack[ValueType any] struct {
 }
 
 func (s *Stack[ValueType]) Size() (size int) {
-	s.L.RLock()
+	s.L.Lock()
 	size = s.size
-	s.L.RUnlock()
+	s.L.Unlock()
 	return size
 }
 
 // RangeDelete range from the stack bottom
 func (s *Stack[ValueType]) RangeDelete(checking func(v ValueType) (deleteNode bool, continueRange bool)) {
-	s.L.RLock()
+	// Stop the world!
+	s.L.Lock()
 	node := s.head
 	deleteNode := false
 	continueRange := true
@@ -72,7 +73,7 @@ func (s *Stack[ValueType]) RangeDelete(checking func(v ValueType) (deleteNode bo
 		node = node.next
 		s.size -= 1
 	}
-	s.L.RUnlock()
+	s.L.Unlock()
 }
 
 func (s *Stack[ValueType]) Pop() (value ValueType, ok bool) {
@@ -83,11 +84,13 @@ func (s *Stack[ValueType]) Pop() (value ValueType, ok bool) {
 		return value, false
 	}
 	node = s.tail
-	s.tail = node.last
-	if s.tail == nil {
+	if node.last == nil {
+		// first node
 		s.head = nil
+		s.tail = nil
 	} else {
-		s.tail.next = nil
+		node.last.next = nil
+		s.tail = node.last
 	}
 	s.size--
 	s.L.Unlock()
@@ -141,7 +144,7 @@ func (s *Stack[ValueType]) Push(value ValueType) {
 	} else {
 		node.last = s.tail
 		s.tail.next = node
-		s.tail = s.tail.next
+		s.tail = node
 	}
 	s.size++
 	s.L.Unlock()
