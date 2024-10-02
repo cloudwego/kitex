@@ -69,7 +69,7 @@ jobs:
           go mod init codegen-test
           go mod edit -replace=github.com/apache/thrift=github.com/apache/thrift@v0.13.0
 #          go mod edit -replace github.com/cloudwego/kitex=${LOCAL_REPO}
-          GOPROXY=direct go mod edit -replace github.com/cloudwego/kitex=github.com/Marina-Sakai/kitex@fix/combine_services_parse_mode
+          go mod edit -replace github.com/cloudwego/kitex=github.com/Marina-Sakai/kitex@310cdada822ff5983023eb21a3b2101b0433a74b
           go mod tidy
           bash -version
           bash ./codegen_install_check.sh
