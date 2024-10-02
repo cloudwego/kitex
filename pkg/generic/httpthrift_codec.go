@@ -49,11 +49,19 @@ type httpThriftCodec struct {
 	dynamicgoEnabled       bool
 	useRawBodyForHTTPResp  bool
 	svcName                string
+	isCombinedServices     bool
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
 	svc := <-p.Provide()
-	c := &httpThriftCodec{provider: p, binaryWithBase64: false, dynamicgoEnabled: false, useRawBodyForHTTPResp: opts.useRawBodyForHTTPResp, svcName: svc.Name}
+	c := &httpThriftCodec{
+		provider:              p,
+		binaryWithBase64:      false,
+		dynamicgoEnabled:      false,
+		useRawBodyForHTTPResp: opts.useRawBodyForHTTPResp,
+		svcName:               svc.Name,
+		isCombinedServices:    svc.IsCombinedServices,
+	}
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoEnabled {
 		c.dynamicgoEnabled = true
 
@@ -75,6 +83,7 @@ func (c *httpThriftCodec) update() {
 			return
 		}
 		c.svcName = svc.Name
+		c.isCombinedServices = svc.IsCombinedServices
 		c.svcDsc.Store(svc)
 	}
 }
