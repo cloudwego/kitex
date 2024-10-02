@@ -27,7 +27,6 @@ import (
 	dthrift "github.com/cloudwego/dynamicgo/thrift"
 	"github.com/cloudwego/thriftgo/parser"
 
-	ithrift "github.com/cloudwego/kitex/internal/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -475,10 +474,10 @@ func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content
 	return nil
 }
 
-func getParseOption(isGoTagAliasDisabledFromOpt *bool) *ithrift.ParseOption {
-	var pOpts *ithrift.ParseOption
+func getParseOption(isGoTagAliasDisabledFromOpt *bool) *thrift.ParseOption {
+	var pOpts *thrift.ParseOption
 	if isGoTagAliasDisabledFromOpt != nil {
-		pOpts = &ithrift.ParseOption{
+		pOpts = &thrift.ParseOption{
 			IsGoTagAliasDisabled: isGoTagAliasDisabledFromOpt,
 		}
 	}

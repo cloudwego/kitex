@@ -26,7 +26,6 @@ import (
 	"github.com/cloudwego/thriftgo/parser"
 	"github.com/cloudwego/thriftgo/semantic"
 
-	ithrift "github.com/cloudwego/kitex/internal/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/generic/descriptor"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -65,7 +64,7 @@ func SetDefaultParseMode(m ParseMode) {
 }
 
 // Parse descriptor from parser.Thrift
-func Parse(tree *parser.Thrift, mode ParseMode, opts ...*ithrift.ParseOption) (*descriptor.ServiceDescriptor, error) {
+func Parse(tree *parser.Thrift, mode ParseMode, opts ...*ParseOption) (*descriptor.ServiceDescriptor, error) {
 	if len(tree.Services) == 0 {
 		return nil, errors.New("empty serverce from idls")
 	}
@@ -97,7 +96,7 @@ func Parse(tree *parser.Thrift, mode ParseMode, opts ...*ithrift.ParseOption) (*
 			svc := p.data.(*parser.Service)
 			structsCache := map[string]*descriptor.TypeDescriptor{}
 			for _, fn := range svc.Functions {
-				var opt *ithrift.ParseOption
+				var opt *ParseOption
 				if opts != nil {
 					opt = opts[0]
 				}
@@ -140,7 +139,7 @@ func getAllSvcs(svc *parser.Service, tree *parser.Thrift, visitedSvcs map[*parse
 	return svcs
 }
 
-func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.ServiceDescriptor, structsCache map[string]*descriptor.TypeDescriptor, opt *ithrift.ParseOption) (err error) {
+func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.ServiceDescriptor, structsCache map[string]*descriptor.TypeDescriptor, opt *ParseOption) (err error) {
 	if sDsc.Functions[fn.Name] != nil {
 		return fmt.Errorf("duplicate method name: %s", fn.Name)
 	}
@@ -289,7 +288,7 @@ var builtinTypes = map[string]*descriptor.TypeDescriptor{
 // arg cache:
 // only support self reference on the same file
 // cross file self reference complicate matters
-func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor.TypeDescriptor, recursionDepth int, opt *ithrift.ParseOption) (*descriptor.TypeDescriptor, error) {
+func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor.TypeDescriptor, recursionDepth int, opt *ParseOption) (*descriptor.TypeDescriptor, error) {
 	if ty, ok := builtinTypes[t.Name]; ok {
 		return ty, nil
 	}
