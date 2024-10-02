@@ -19,13 +19,13 @@ package generic
 import (
 	"bytes"
 	"context"
-	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"net/http"
 	"testing"
 
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/generic/thrift"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
