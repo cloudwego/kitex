@@ -45,6 +45,8 @@ type Generic interface {
 	// MessageReaderWriter returns reader and writer
 	// this is used for generic which needs IDL
 	MessageReaderWriter() interface{}
+	// IsCombinedServices returns whether the IDL was parsed in CombineServices mode
+	IsCombinedServices() bool
 }
 
 // Method information
@@ -233,6 +235,10 @@ func (g *binaryThriftGeneric) MessageReaderWriter() interface{} {
 	return nil
 }
 
+func (g *binaryThriftGeneric) IsCombinedServices() bool {
+	return false
+}
+
 type mapThriftGeneric struct {
 	codec *mapThriftCodec
 }
@@ -263,6 +269,10 @@ func (g *mapThriftGeneric) IDLServiceName() string {
 
 func (g *mapThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
+}
+
+func (g *mapThriftGeneric) IsCombinedServices() bool {
+	return g.codec.isCombinedServices
 }
 
 type jsonThriftGeneric struct {
@@ -297,6 +307,10 @@ func (g *jsonThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
 }
 
+func (g *jsonThriftGeneric) IsCombinedServices() bool {
+	return g.codec.isCombinedServices
+}
+
 type jsonPbGeneric struct {
 	codec *jsonPbCodec
 }
@@ -327,6 +341,11 @@ func (g *jsonPbGeneric) IDLServiceName() string {
 
 func (g *jsonPbGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
+}
+
+func (g *jsonPbGeneric) IsCombinedServices() bool {
+	// TODO: support parse mode for pb
+	return false
 }
 
 type httpThriftGeneric struct {
@@ -361,6 +380,10 @@ func (g *httpThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
 }
 
+func (g *httpThriftGeneric) IsCombinedServices() bool {
+	return g.codec.isCombinedServices
+}
+
 type httpPbThriftGeneric struct {
 	codec *httpPbThriftCodec
 }
@@ -391,4 +414,8 @@ func (g *httpPbThriftGeneric) IDLServiceName() string {
 
 func (g *httpPbThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
+}
+
+func (g *httpPbThriftGeneric) IsCombinedServices() bool {
+	return g.codec.isCombinedServices
 }

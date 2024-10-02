@@ -94,6 +94,7 @@ func parseProto(main string, includes map[string]string) (proto.ServiceDescripto
 		return nil, errors.New("no service descriptor found")
 	}
 
+	// TODO: support parse mode. now only support first service
 	return services[0], nil
 }
 
