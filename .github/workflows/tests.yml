@@ -68,8 +68,8 @@ jobs:
           cd kitex-tests/codegen
           go mod init codegen-test
           go mod edit -replace=github.com/apache/thrift=github.com/apache/thrift@v0.13.0
-          go mod edit -replace github.com/cloudwego/kitex=github.com/Marina-Sakai/kitex@a2be5468d187dd5c6b6ac91c8deb9d57464cdce8
-          go mod edit -replace github.com/cloudwego/dynamicgo=github.com/Marina-Sakai/dynamicgo@60ab1216f62bdcd1371371b5b0a33731dff5b1a8
+          GOPROXY=direct go mod edit -replace github.com/cloudwego/kitex=github.com/Marina-Sakai/kitex@fix/combine_services_parse_mode
+          GOPROXY=direct go mod edit -replace github.com/cloudwego/dynamicgo=github.com/Marina-Sakai/dynamicgo@feat/support_isCombineServices
           go mod tidy
           bash -version
           bash ./codegen_install_check.sh
