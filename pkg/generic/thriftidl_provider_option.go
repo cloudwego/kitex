@@ -19,8 +19,13 @@ package generic
 import "github.com/cloudwego/kitex/pkg/generic/thrift"
 
 type thriftIDLProviderOptions struct {
-	parseMode            *thrift.ParseMode
-	isGoTagAliasDisabled *bool
+	parseMode *thrift.ParseMode
+	goTag     *goTagOption
+}
+
+type goTagOption struct {
+	isSetByUser          bool
+	isGoTagAliasDisabled bool
 }
 
 type ThriftIDLProviderOption struct {
@@ -41,6 +46,9 @@ func WithParseMode(parseMode thrift.ParseMode) ThriftIDLProviderOption {
 
 func WithGoTagDisabled(disable bool) ThriftIDLProviderOption {
 	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
-		opt.isGoTagAliasDisabled = &disable
+		opt.goTag = &goTagOption{
+			isSetByUser:          true,
+			isGoTagAliasDisabled: disable,
+		}
 	}}
 }

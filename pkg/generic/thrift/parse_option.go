@@ -16,6 +16,27 @@
 
 package thrift
 
+import "github.com/cloudwego/kitex/pkg/generic/descriptor"
+
+type parseOptions struct {
+	goTag *descriptor.GoTagOption
+}
+
 type ParseOption struct {
-	IsGoTagAliasDisabled *bool
+	F func(opt *parseOptions)
+}
+
+func (o *parseOptions) apply(opts []ParseOption) {
+	for _, op := range opts {
+		op.F(o)
+	}
+}
+
+func WithGoTagDisabled(disable bool) ParseOption {
+	return ParseOption{F: func(opt *parseOptions) {
+		opt.goTag = &descriptor.GoTagOption{
+			IsSetByUser:       true,
+			IsGoAliasDisabled: disable,
+		}
+	}}
 }

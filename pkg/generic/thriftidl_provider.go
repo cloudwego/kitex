@@ -58,7 +58,7 @@ func NewThriftFileProviderWithOption(path string, opts []ThriftIDLProviderOption
 	}
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
-	svc, err := newServiceDescriptorFromPath(path, getParseMode(tOpts), tOpts.isGoTagAliasDisabled, includeDirs...)
+	svc, err := newServiceDescriptorFromPath(path, getParseMode(tOpts), tOpts.goTag, includeDirs...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func NewThriftFileProviderWithDynamicgoWithOption(path string, opts []ThriftIDLP
 	tOpts := &thriftIDLProviderOptions{}
 	tOpts.apply(opts)
 	parseMode := getParseMode(tOpts)
-	svc, err := newServiceDescriptorFromPath(path, parseMode, tOpts.isGoTagAliasDisabled, includeDirs...)
+	svc, err := newServiceDescriptorFromPath(path, parseMode, tOpts.goTag, includeDirs...)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func NewThriftFileProviderWithDynamicgoWithOption(path string, opts []ThriftIDLP
 	if err != nil {
 		return nil, err
 	}
-	handleGoTagForDynamicGo(tOpts.isGoTagAliasDisabled)
+	handleGoTagForDynamicGo(tOpts.goTag)
 	dOpts := dthrift.Options{EnableThriftBase: true, ParseServiceMode: dParseMode}
 	dsvc, err := dOpts.NewDescritorFromPath(context.Background(), path, includeDirs...)
 	if err != nil {
@@ -105,12 +105,16 @@ func NewThriftFileProviderWithDynamicgoWithOption(path string, opts []ThriftIDLP
 	return p, nil
 }
 
-func newServiceDescriptorFromPath(path string, parseMode thrift.ParseMode, isGoTagAliasDisabledFromOpt *bool, includeDirs ...string) (*descriptor.ServiceDescriptor, error) {
+func newServiceDescriptorFromPath(path string, parseMode thrift.ParseMode, goTagOpt *goTagOption, includeDirs ...string) (*descriptor.ServiceDescriptor, error) {
 	tree, err := parser.ParseFile(path, includeDirs, true)
 	if err != nil {
 		return nil, err
 	}
-	svc, err := thrift.Parse(tree, parseMode, getParseOption(isGoTagAliasDisabledFromOpt))
+	var parseOpts []thrift.ParseOption
+	if goTagOpt != nil && goTagOpt.isSetByUser {
+		parseOpts = append(parseOpts, thrift.WithGoTagDisabled(goTagOpt.isGoTagAliasDisabled))
+	}
+	svc, err := thrift.Parse(tree, parseMode, parseOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -139,11 +143,11 @@ func (p *thriftFileProvider) Option() ProviderOption {
 
 // ThriftContentProvider provide descriptor from contents
 type ThriftContentProvider struct {
-	closeOnce            sync.Once
-	svcs                 chan *descriptor.ServiceDescriptor
-	opts                 *ProviderOption
-	parseMode            thrift.ParseMode
-	isGoTagAliasDisabled *bool
+	closeOnce sync.Once
+	svcs      chan *descriptor.ServiceDescriptor
+	opts      *ProviderOption
+	parseMode thrift.ParseMode
+	goTagOpt  *goTagOption
 }
 
 var _ DescriptorProvider = (*ThriftContentProvider)(nil)
@@ -157,12 +161,12 @@ func NewThriftContentProvider(main string, includes map[string]string, opts ...T
 	parseMode := getParseMode(tOpts)
 
 	p := &ThriftContentProvider{
-		svcs:                 make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-		opts:                 &ProviderOption{DynamicGoEnabled: false},
-		parseMode:            parseMode,
-		isGoTagAliasDisabled: tOpts.isGoTagAliasDisabled,
+		svcs:      make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
+		opts:      &ProviderOption{DynamicGoEnabled: false},
+		parseMode: parseMode,
+		goTagOpt:  tOpts.goTag,
 	}
-	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false, parseMode, tOpts.isGoTagAliasDisabled)
+	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false, parseMode, tOpts.goTag)
 	if err != nil {
 		return nil, err
 	}
@@ -178,18 +182,18 @@ func NewThriftContentProviderWithDynamicGo(main string, includes map[string]stri
 	parseMode := getParseMode(tOpts)
 
 	p := &ThriftContentProvider{
-		svcs:                 make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-		opts:                 &ProviderOption{DynamicGoEnabled: true},
-		parseMode:            parseMode,
-		isGoTagAliasDisabled: tOpts.isGoTagAliasDisabled,
+		svcs:      make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
+		opts:      &ProviderOption{DynamicGoEnabled: true},
+		parseMode: parseMode,
+		goTagOpt:  tOpts.goTag,
 	}
 
-	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false, parseMode, tOpts.isGoTagAliasDisabled)
+	svc, err := newServiceDescriptorFromContent(defaultMainIDLPath, main, includes, false, parseMode, tOpts.goTag)
 	if err != nil {
 		return nil, err
 	}
 
-	p.newDynamicGoDsc(svc, defaultMainIDLPath, main, includes, parseMode, tOpts.isGoTagAliasDisabled)
+	p.newDynamicGoDsc(svc, defaultMainIDLPath, main, includes, parseMode, tOpts.goTag)
 
 	p.svcs <- svc
 	return p, nil
@@ -202,13 +206,17 @@ func (p *ThriftContentProvider) UpdateIDL(main string, includes map[string]strin
 	if err != nil {
 		return err
 	}
-	svc, err = thrift.Parse(tree, p.parseMode, getParseOption(p.isGoTagAliasDisabled))
+	var parseOpts []thrift.ParseOption
+	if p.goTagOpt != nil && p.goTagOpt.isSetByUser {
+		parseOpts = append(parseOpts, thrift.WithGoTagDisabled(p.goTagOpt.isGoTagAliasDisabled))
+	}
+	svc, err = thrift.Parse(tree, p.parseMode, parseOpts...)
 	if err != nil {
 		return err
 	}
 
 	if p.opts.DynamicGoEnabled {
-		p.newDynamicGoDsc(svc, defaultMainIDLPath, main, includes, p.parseMode, p.isGoTagAliasDisabled)
+		p.newDynamicGoDsc(svc, defaultMainIDLPath, main, includes, p.parseMode, p.goTagOpt)
 	}
 
 	select {
@@ -240,8 +248,8 @@ func (p *ThriftContentProvider) Option() ProviderOption {
 	return *p.opts
 }
 
-func (p *ThriftContentProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, parseMode thrift.ParseMode, isGoTagAliasDisabledFromOpt *bool) {
-	if err := newDynamicGoDscFromContent(svc, path, content, includes, false, parseMode, isGoTagAliasDisabledFromOpt); err != nil {
+func (p *ThriftContentProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, parseMode thrift.ParseMode, goTag *goTagOption) {
+	if err := newDynamicGoDscFromContent(svc, path, content, includes, false, parseMode, goTag); err != nil {
 		p.opts.DynamicGoEnabled = false
 	}
 }
@@ -305,11 +313,11 @@ func ParseContent(path, content string, includes map[string]string, isAbsInclude
 
 // ThriftContentWithAbsIncludePathProvider ...
 type ThriftContentWithAbsIncludePathProvider struct {
-	closeOnce            sync.Once
-	svcs                 chan *descriptor.ServiceDescriptor
-	opts                 *ProviderOption
-	parseMode            thrift.ParseMode
-	isGoTagAliasDisabled *bool
+	closeOnce sync.Once
+	svcs      chan *descriptor.ServiceDescriptor
+	opts      *ProviderOption
+	parseMode thrift.ParseMode
+	goTagOpt  *goTagOption
 }
 
 var _ DescriptorProvider = (*ThriftContentWithAbsIncludePathProvider)(nil)
@@ -321,17 +329,17 @@ func NewThriftContentWithAbsIncludePathProvider(mainIDLPath string, includes map
 	parseMode := getParseMode(tOpts)
 
 	p := &ThriftContentWithAbsIncludePathProvider{
-		svcs:                 make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-		opts:                 &ProviderOption{DynamicGoEnabled: false},
-		parseMode:            parseMode,
-		isGoTagAliasDisabled: tOpts.isGoTagAliasDisabled,
+		svcs:      make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
+		opts:      &ProviderOption{DynamicGoEnabled: false},
+		parseMode: parseMode,
+		goTagOpt:  tOpts.goTag,
 	}
 	mainIDLContent, ok := includes[mainIDLPath]
 	if !ok {
 		return nil, fmt.Errorf("miss main IDL content for main IDL path: %s", mainIDLPath)
 	}
 
-	svc, err := newServiceDescriptorFromContent(mainIDLPath, mainIDLContent, includes, true, parseMode, tOpts.isGoTagAliasDisabled)
+	svc, err := newServiceDescriptorFromContent(mainIDLPath, mainIDLContent, includes, true, parseMode, tOpts.goTag)
 	if err != nil {
 		return nil, err
 	}
@@ -347,22 +355,22 @@ func NewThriftContentWithAbsIncludePathProviderWithDynamicGo(mainIDLPath string,
 	parseMode := getParseMode(tOpts)
 
 	p := &ThriftContentWithAbsIncludePathProvider{
-		svcs:                 make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
-		opts:                 &ProviderOption{DynamicGoEnabled: true},
-		parseMode:            parseMode,
-		isGoTagAliasDisabled: tOpts.isGoTagAliasDisabled,
+		svcs:      make(chan *descriptor.ServiceDescriptor, 1), // unblock with buffered channel
+		opts:      &ProviderOption{DynamicGoEnabled: true},
+		parseMode: parseMode,
+		goTagOpt:  tOpts.goTag,
 	}
 	mainIDLContent, ok := includes[mainIDLPath]
 	if !ok {
 		return nil, fmt.Errorf("miss main IDL content for main IDL path: %s", mainIDLPath)
 	}
 
-	svc, err := newServiceDescriptorFromContent(mainIDLPath, mainIDLContent, includes, true, parseMode, tOpts.isGoTagAliasDisabled)
+	svc, err := newServiceDescriptorFromContent(mainIDLPath, mainIDLContent, includes, true, parseMode, tOpts.goTag)
 	if err != nil {
 		return nil, err
 	}
 
-	p.newDynamicGoDsc(svc, mainIDLPath, mainIDLContent, includes, parseMode, tOpts.isGoTagAliasDisabled)
+	p.newDynamicGoDsc(svc, mainIDLPath, mainIDLContent, includes, parseMode, tOpts.goTag)
 
 	p.svcs <- svc
 	return p, nil
@@ -379,13 +387,17 @@ func (p *ThriftContentWithAbsIncludePathProvider) UpdateIDL(mainIDLPath string, 
 	if err != nil {
 		return err
 	}
-	svc, err = thrift.Parse(tree, p.parseMode, getParseOption(p.isGoTagAliasDisabled))
+	var parseOpts []thrift.ParseOption
+	if p.goTagOpt != nil && p.goTagOpt.isSetByUser {
+		parseOpts = append(parseOpts, thrift.WithGoTagDisabled(p.goTagOpt.isGoTagAliasDisabled))
+	}
+	svc, err = thrift.Parse(tree, p.parseMode, parseOpts...)
 	if err != nil {
 		return err
 	}
 
 	if p.opts.DynamicGoEnabled {
-		p.newDynamicGoDsc(svc, mainIDLPath, mainIDLContent, includes, p.parseMode, p.isGoTagAliasDisabled)
+		p.newDynamicGoDsc(svc, mainIDLPath, mainIDLContent, includes, p.parseMode, p.goTagOpt)
 	}
 
 	// drain the channel
@@ -418,8 +430,8 @@ func (p *ThriftContentWithAbsIncludePathProvider) Option() ProviderOption {
 	return *p.opts
 }
 
-func (p *ThriftContentWithAbsIncludePathProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, parseMode thrift.ParseMode, isGoTagAliasDisabledFromOpt *bool) {
-	if err := newDynamicGoDscFromContent(svc, path, content, includes, true, parseMode, isGoTagAliasDisabledFromOpt); err != nil {
+func (p *ThriftContentWithAbsIncludePathProvider) newDynamicGoDsc(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, parseMode thrift.ParseMode, goTag *goTagOption) {
+	if err := newDynamicGoDscFromContent(svc, path, content, includes, true, parseMode, goTag); err != nil {
 		p.opts.DynamicGoEnabled = false
 	}
 }
@@ -445,20 +457,24 @@ func getDynamicGoParseMode(parseMode thrift.ParseMode) (meta.ParseServiceMode, e
 	}
 }
 
-func newServiceDescriptorFromContent(path, content string, includes map[string]string, isAbsIncludePath bool, parseMode thrift.ParseMode, isGoTagAliasDisabledFromOpt *bool) (*descriptor.ServiceDescriptor, error) {
+func newServiceDescriptorFromContent(path, content string, includes map[string]string, isAbsIncludePath bool, parseMode thrift.ParseMode, goTagOpt *goTagOption) (*descriptor.ServiceDescriptor, error) {
 	tree, err := ParseContent(path, content, includes, isAbsIncludePath)
 	if err != nil {
 		return nil, err
 	}
-	svc, err := thrift.Parse(tree, parseMode, getParseOption(isGoTagAliasDisabledFromOpt))
+	var parseOpts []thrift.ParseOption
+	if goTagOpt != nil && goTagOpt.isSetByUser {
+		parseOpts = append(parseOpts, thrift.WithGoTagDisabled(goTagOpt.isGoTagAliasDisabled))
+	}
+	svc, err := thrift.Parse(tree, parseMode, parseOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return svc, nil
 }
 
-func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, isAbsIncludePath bool, parseMode thrift.ParseMode, isGoTagAliasDisabledFromOpt *bool) error {
-	handleGoTagForDynamicGo(isGoTagAliasDisabledFromOpt)
+func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content string, includes map[string]string, isAbsIncludePath bool, parseMode thrift.ParseMode, goTag *goTagOption) error {
+	handleGoTagForDynamicGo(goTag)
 	// ServiceDescriptor of dynamicgo
 	dParseMode, err := getDynamicGoParseMode(parseMode)
 	if err != nil {
@@ -474,20 +490,10 @@ func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content
 	return nil
 }
 
-func getParseOption(isGoTagAliasDisabledFromOpt *bool) *thrift.ParseOption {
-	var pOpts *thrift.ParseOption
-	if isGoTagAliasDisabledFromOpt != nil {
-		pOpts = &thrift.ParseOption{
-			IsGoTagAliasDisabled: isGoTagAliasDisabledFromOpt,
-		}
-	}
-	return pOpts
-}
-
-func handleGoTagForDynamicGo(isGoTagAliasDisabledFromOpt *bool) {
+func handleGoTagForDynamicGo(goTagOpt *goTagOption) {
 	shouldRemove := isGoTagAliasDisabled
-	if isGoTagAliasDisabledFromOpt != nil {
-		shouldRemove = *isGoTagAliasDisabledFromOpt
+	if goTagOpt != nil && goTagOpt.isSetByUser {
+		shouldRemove = goTagOpt.isGoTagAliasDisabled
 	}
 	if shouldRemove {
 		dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
