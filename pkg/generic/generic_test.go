@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/cloudwego/dynamicgo/meta"
 	dproto "github.com/cloudwego/dynamicgo/proto"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -307,6 +308,8 @@ func TestJSONPbGeneric(t *testing.T) {
 
 func TestIsCombinedServices(t *testing.T) {
 	path := "./json_test/idl/example_multi_service.thrift"
+
+	// normal thrift
 	opts := []ThriftIDLProviderOption{WithParseMode(thrift.CombineServices)}
 	p, err := NewThriftFileProviderWithOption(path, opts)
 	test.Assert(t, err == nil)
@@ -315,8 +318,9 @@ func TestIsCombinedServices(t *testing.T) {
 	test.Assert(t, err == nil)
 	g.Close()
 
-	test.Assert(t, g.IsCombinedServices() == true)
+	test.Assert(t, g.IsCombinedServices())
 
+	// thrift with dynamicgo
 	p, err = NewThriftFileProviderWithDynamicgoWithOption(path, opts)
 	test.Assert(t, err == nil)
 
@@ -324,9 +328,21 @@ func TestIsCombinedServices(t *testing.T) {
 	test.Assert(t, err == nil)
 	g.Close()
 
-	test.Assert(t, g.IsCombinedServices() == true)
+	test.Assert(t, g.IsCombinedServices())
 
-	// TODO: test thrift with dynamicgo
-	// TODO: test pb
-	// TODO: test pb with dynamicgo
+	// pb with dynamicgo
+	pbp, err := NewPbFileProviderWithDynamicGo(
+		"./grpcjsonpb_test/idl/pbapi_multi_service.proto",
+		context.Background(),
+		dproto.Options{ParseServiceMode: meta.CombineServices},
+	)
+	test.Assert(t, err == nil)
+
+	g, err = JSONPbGeneric(pbp)
+	test.Assert(t, err == nil)
+	g.Close()
+
+	test.Assert(t, g.IsCombinedServices())
+
+	// TODO: test pb after supporting parse mode
 }

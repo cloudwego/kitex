@@ -344,8 +344,7 @@ func (g *jsonPbGeneric) MessageReaderWriter() interface{} {
 }
 
 func (g *jsonPbGeneric) IsCombinedServices() bool {
-	// TODO: support parse mode for pb
-	return false
+	return g.codec.isCombinedServices
 }
 
 type httpThriftGeneric struct {
