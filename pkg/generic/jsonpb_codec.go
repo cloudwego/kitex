@@ -35,17 +35,24 @@ import (
 var _ Closer = &jsonPbCodec{}
 
 type jsonPbCodec struct {
-	svcDsc           atomic.Value // *idl
-	provider         PbDescriptorProviderDynamicGo
-	opts             *Options
-	convOpts         conv.Options // used for dynamicgo conversion
-	dynamicgoEnabled bool         // currently set to true by default
-	svcName          string
+	svcDsc             atomic.Value // *idl
+	provider           PbDescriptorProviderDynamicGo
+	opts               *Options
+	convOpts           conv.Options // used for dynamicgo conversion
+	dynamicgoEnabled   bool         // currently set to true by default
+	svcName            string
+	isCombinedServices bool
 }
 
 func newJsonPbCodec(p PbDescriptorProviderDynamicGo, opts *Options) *jsonPbCodec {
 	svc := <-p.Provide()
-	c := &jsonPbCodec{provider: p, opts: opts, dynamicgoEnabled: true, svcName: svc.Name()}
+	c := &jsonPbCodec{
+		provider:           p,
+		opts:               opts,
+		dynamicgoEnabled:   true,
+		svcName:            svc.Name(),
+		isCombinedServices: svc.IsCombinedServices(),
+	}
 	convOpts := opts.dynamicgoConvOpts
 	c.convOpts = convOpts
 
@@ -61,6 +68,7 @@ func (c *jsonPbCodec) update() {
 			return
 		}
 		c.svcName = svc.Name()
+		c.isCombinedServices = svc.IsCombinedServices()
 		c.svcDsc.Store(svc)
 	}
 }

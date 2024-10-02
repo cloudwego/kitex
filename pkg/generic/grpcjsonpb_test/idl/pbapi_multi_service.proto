@@ -1,0 +1,23 @@
+syntax = "proto3";
+package pbapi_multi_service;
+
+option go_package = "pbapi_multi_service";
+
+message MockReq {
+  string message = 1;
+}
+
+message MockResp {
+  string message = 1;
+}
+
+service Mock {
+  rpc UnaryTest (MockReq) returns (MockResp) {}
+  rpc ClientStreamingTest (stream MockReq) returns (MockResp) {}
+  rpc ServerStreamingTest (MockReq) returns (stream MockResp) {}
+  rpc BidirectionalStreamingTest (stream MockReq) returns (stream MockResp) {}
+}
+
+service Mock2 {
+  rpc ClientStreamingTest2 (stream MockReq) returns (MockResp) {}
+}
