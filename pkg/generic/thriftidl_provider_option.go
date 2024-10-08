@@ -24,7 +24,6 @@ type thriftIDLProviderOptions struct {
 }
 
 type goTagOption struct {
-	isSetByUser          bool
 	isGoTagAliasDisabled bool
 }
 
@@ -47,7 +46,7 @@ func WithParseMode(parseMode thrift.ParseMode) ThriftIDLProviderOption {
 func WithGoTagDisabled(disable bool) ThriftIDLProviderOption {
 	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
 		opt.goTag = &goTagOption{
-			isSetByUser:          true,
+			//isSetByUser:          true,
 			isGoTagAliasDisabled: disable,
 		}
 	}}
