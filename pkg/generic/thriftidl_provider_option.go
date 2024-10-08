@@ -46,7 +46,6 @@ func WithParseMode(parseMode thrift.ParseMode) ThriftIDLProviderOption {
 func WithGoTagDisabled(disable bool) ThriftIDLProviderOption {
 	return ThriftIDLProviderOption{F: func(opt *thriftIDLProviderOptions) {
 		opt.goTag = &goTagOption{
-			//isSetByUser:          true,
 			isGoTagAliasDisabled: disable,
 		}
 	}}
