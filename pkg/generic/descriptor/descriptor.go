@@ -44,14 +44,14 @@ type FieldDescriptor struct {
 }
 
 type GoTagOption struct {
-	IsSetByUser       bool
-	IsGoAliasDisabled bool
+	IsGoAliasDisabledSetByUser bool
+	IsGoAliasDisabled          bool
 }
 
 // FieldName return field name maybe with an alias
 func (d *FieldDescriptor) FieldName() string {
 	aliasDisabled := isGoTagAliasDisabled
-	if d.GoTagOpt != nil && d.GoTagOpt.IsSetByUser {
+	if d.GoTagOpt != nil && d.GoTagOpt.IsGoAliasDisabledSetByUser {
 		aliasDisabled = d.GoTagOpt.IsGoAliasDisabled
 	}
 

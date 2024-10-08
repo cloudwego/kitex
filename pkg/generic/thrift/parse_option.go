@@ -35,8 +35,8 @@ func (o *parseOptions) apply(opts []ParseOption) {
 func WithGoTagDisabled(disable bool) ParseOption {
 	return ParseOption{F: func(opt *parseOptions) {
 		opt.goTag = &descriptor.GoTagOption{
-			IsSetByUser:       true,
-			IsGoAliasDisabled: disable,
+			IsGoAliasDisabledSetByUser: true,
+			IsGoAliasDisabled:          disable,
 		}
 	}}
 }

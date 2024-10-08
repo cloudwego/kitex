@@ -90,13 +90,16 @@ func Parse(tree *parser.Thrift, mode ParseMode, opts ...ParseOption) (*descripto
 		sDsc.Name = "CombinedServices"
 	}
 
+	pOpts := &parseOptions{}
+	pOpts.apply(opts)
+
 	visitedSvcs := make(map[*parser.Service]bool, len(tree.Services))
 	for _, svc := range svcs {
 		for p := range getAllSvcs(svc, tree, visitedSvcs) {
 			svc := p.data.(*parser.Service)
 			structsCache := map[string]*descriptor.TypeDescriptor{}
 			for _, fn := range svc.Functions {
-				if err := addFunction(fn, p.tree, sDsc, structsCache, opts...); err != nil {
+				if err := addFunction(fn, p.tree, sDsc, structsCache, pOpts); err != nil {
 					return nil, err
 				}
 			}
@@ -135,7 +138,7 @@ func getAllSvcs(svc *parser.Service, tree *parser.Thrift, visitedSvcs map[*parse
 	return svcs
 }
 
-func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.ServiceDescriptor, structsCache map[string]*descriptor.TypeDescriptor, opts ...ParseOption) (err error) {
+func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.ServiceDescriptor, structsCache map[string]*descriptor.TypeDescriptor, opts *parseOptions) (err error) {
 	if sDsc.Functions[fn.Name] != nil {
 		return fmt.Errorf("duplicate method name: %s", fn.Name)
 	}
@@ -157,11 +160,8 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		},
 	}
 
-	pOpts := &parseOptions{}
-	pOpts.apply(opts)
-
 	var reqType *descriptor.TypeDescriptor
-	reqType, err = parseType(field.Type, tree, structsCache, initRecursionDepth, pOpts)
+	reqType, err = parseType(field.Type, tree, structsCache, initRecursionDepth, opts)
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		Name:     field.Name,
 		ID:       field.ID,
 		Type:     reqType,
-		GoTagOpt: pOpts.goTag,
+		GoTagOpt: opts.goTag,
 	}
 	req.Struct.FieldsByID[field.ID] = reqField
 	req.Struct.FieldsByName[field.Name] = reqField
@@ -191,13 +191,13 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		},
 	}
 	var respType *descriptor.TypeDescriptor
-	respType, err = parseType(fn.FunctionType, tree, structsCache, initRecursionDepth, pOpts)
+	respType, err = parseType(fn.FunctionType, tree, structsCache, initRecursionDepth, opts)
 	if err != nil {
 		return err
 	}
 	respField := &descriptor.FieldDescriptor{
 		Type:     respType,
-		GoTagOpt: pOpts.goTag,
+		GoTagOpt: opts.goTag,
 	}
 	// response has no name or id
 	resp.Struct.FieldsByID[0] = respField
@@ -207,7 +207,7 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		// only support single exception
 		field := fn.Throws[0]
 		var exceptionType *descriptor.TypeDescriptor
-		exceptionType, err = parseType(field.Type, tree, structsCache, initRecursionDepth, pOpts)
+		exceptionType, err = parseType(field.Type, tree, structsCache, initRecursionDepth, opts)
 		if err != nil {
 			return err
 		}
@@ -216,7 +216,7 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 			ID:          field.ID,
 			IsException: true,
 			Type:        exceptionType,
-			GoTagOpt:    pOpts.goTag,
+			GoTagOpt:    opts.goTag,
 		}
 		resp.Struct.FieldsByID[field.ID] = exceptionField
 		resp.Struct.FieldsByName[field.Name] = exceptionField
