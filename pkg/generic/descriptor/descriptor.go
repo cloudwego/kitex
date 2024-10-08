@@ -44,8 +44,8 @@ type FieldDescriptor struct {
 }
 
 type GoTagOption struct {
-	IsGoAliasDisabledSetByUser bool
-	IsGoAliasDisabled          bool
+	IsGoAliasDisabledSetByUser bool // distinguish whether this option was explicitly set by the user or not
+	IsGoAliasDisabled          bool // indicate if go.tag is disabled or not
 }
 
 // FieldName return field name maybe with an alias
