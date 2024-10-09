@@ -32,6 +32,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 )
 
+// ConnectionGetter is used to get a connection based on address and connection option.
+type ConnectionGetter interface {
+	Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error)
+}
+
 var _ remote.LongConnPool = &connPool{}
 
 func poolSize() uint32 {
@@ -42,7 +47,7 @@ func poolSize() uint32 {
 }
 
 // NewConnPool ...
-func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions) *connPool {
+func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions, connGetter ConnectionGetter) *connPool {
 	if size == 0 {
 		size = poolSize()
 	}
@@ -50,6 +55,7 @@ func NewConnPool(remoteService string, size uint32, connOpts grpc.ConnectOptions
 		remoteService: remoteService,
 		size:          size,
 		connOpts:      connOpts,
+		connGetter:    connGetter,
 	}
 }
 
@@ -60,6 +66,7 @@ type connPool struct {
 	conns         sync.Map // key: address, value: *transports
 	remoteService string   // remote service name
 	connOpts      grpc.ConnectOptions
+	connGetter    ConnectionGetter // use this to get a connection if specified
 }
 
 type transports struct {
@@ -102,18 +109,28 @@ func (t *transports) close() {
 var _ remote.LongConnPool = (*connPool)(nil)
 
 func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, network, address string,
-	connectTimeout time.Duration, opts grpc.ConnectOptions,
-) (grpc.ClientTransport, error) {
-	conn, err := dialer.DialTimeout(network, address, connectTimeout)
-	if err != nil {
-		return nil, err
-	}
-	if opts.TLSConfig != nil {
-		tlsConn, err := newTLSConn(conn, opts.TLSConfig)
+	connectTimeout time.Duration, opts grpc.ConnectOptions, opt remote.ConnOption) (grpc.ClientTransport, error) {
+	var (
+		conn net.Conn
+		err  error
+	)
+	if p.connGetter != nil {
+		conn, err = p.connGetter.Get(ctx, network, address, opt)
 		if err != nil {
 			return nil, err
 		}
-		conn = tlsConn
+	} else {
+		conn, err = dialer.DialTimeout(network, address, connectTimeout)
+		if err != nil {
+			return nil, err
+		}
+		if opts.TLSConfig != nil {
+			tlsConn, err := newTLSConn(conn, opts.TLSConfig)
+			if err != nil {
+				return nil, err
+			}
+			conn = tlsConn
+		}
 	}
 	return grpc.NewClientTransport(
 		ctx,
@@ -158,7 +175,7 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 	tr, err, _ := p.sfg.Do(address, func() (i interface{}, e error) {
 		// Notice: newTransport means new a connection, the timeout of connection cannot be set,
 		// so using context.Background() but not the ctx passed in as the parameter.
-		tr, err := p.newTransport(context.Background(), opt.Dialer, network, address, opt.ConnectTimeout, p.connOpts)
+		tr, err := p.newTransport(context.Background(), opt.Dialer, network, address, opt.ConnectTimeout, p.connOpts, opt)
 		if err != nil {
 			return nil, err
 		}
@@ -197,7 +214,7 @@ func (p *connPool) release(conn net.Conn) error {
 func (p *connPool) createShortConn(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
 	// Notice: newTransport means new a connection, the timeout of connection cannot be set,
 	// so using context.Background() but not the ctx passed in as the parameter.
-	tr, err := p.newTransport(context.Background(), opt.Dialer, network, address, opt.ConnectTimeout, p.connOpts)
+	tr, err := p.newTransport(context.Background(), opt.Dialer, network, address, opt.ConnectTimeout, p.connOpts, opt)
 	if err != nil {
 		return nil, err
 	}

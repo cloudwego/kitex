@@ -19,6 +19,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
 	"net"
 	"reflect"
 	"strings"
@@ -511,6 +512,14 @@ func WithGRPCKeepaliveParams(kp grpc.ClientKeepalive) Option {
 	return Option{F: func(o *client.Options, di *utils.Slice) {
 		di.Push(fmt.Sprintf("WithGRPCKeepaliveParams(%+v)", kp))
 		o.GRPCConnectOpts.KeepaliveParams = kp
+	}}
+}
+
+// WithGRPCConnectionGetter configures the way to get a connection in gRPC transport
+func WithGRPCConnectionGetter(getter nphttp2.ConnectionGetter) Option {
+	return Option{F: func(o *client.Options, di *utils.Slice) {
+		di.Push("WithGRPCConnectionGetter")
+		o.GRPCConnectionGetter = getter
 	}}
 }
 
