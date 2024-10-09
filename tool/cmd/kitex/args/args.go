@@ -314,10 +314,6 @@ func (a *Arguments) BuildCmd(out io.Writer) (*exec.Cmd, error) {
 		Stderr: io.MultiWriter(out, os.Stderr),
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
 	if a.IDLType == "thrift" {
 		os.Setenv(EnvPluginMode, thriftgo.PluginName)
 		cmd.Args = append(cmd.Args, "thriftgo")
