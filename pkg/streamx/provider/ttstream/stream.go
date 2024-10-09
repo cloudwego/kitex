@@ -54,6 +54,12 @@ type streamFrame struct {
 	trailer streamx.Trailer
 }
 
+const (
+	streamSigNone     int32 = 0
+	streamSigActive   int32 = 1
+	streamSigInactive int32 = -1
+)
+
 type stream struct {
 	streamFrame
 	trans      *transport
@@ -87,11 +93,11 @@ func (s *stream) Method() string {
 
 func (s *stream) close() {
 	select {
-	case s.headerSig <- -1:
+	case s.headerSig <- streamSigInactive:
 	default:
 	}
 	select {
-	case s.trailerSig <- -1:
+	case s.trailerSig <- streamSigInactive:
 	default:
 	}
 }
@@ -110,7 +116,7 @@ func (s *stream) readMetaFrame(intHeader IntHeader, header streamx.Header, paylo
 func (s *stream) readHeader(hd streamx.Header) (err error) {
 	s.header = hd
 	select {
-	case s.headerSig <- 1:
+	case s.headerSig <- streamSigActive:
 	default:
 		return errors.New("already set header")
 	}
@@ -150,9 +156,14 @@ func (s *stream) readTrailer(tl streamx.Trailer) (err error) {
 
 	s.trailer = tl
 	select {
-	case s.trailerSig <- 1:
+	case s.trailerSig <- streamSigActive:
 	default:
 		return errors.New("already set trailer")
+	}
+	select {
+	case s.headerSig <- streamSigNone:
+		// if trailer arrived, we should return unblock stream.Header()
+	default:
 	}
 	klog.Debugf("stream[%d] recv trailer: %v", s.sid, tl)
 	return s.trans.streamCloseRecv(s)
