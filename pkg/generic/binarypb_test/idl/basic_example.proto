@@ -1,0 +1,61 @@
+syntax = "proto3";
+package pb3;
+option go_package = "pb/base";
+
+message BasicExample {
+    int32 Int32 = 1;
+    int64 Int64 = 2;
+    uint32 Uint32 = 3;
+    uint64 Uint64 = 4;
+    sint32 Sint32 = 5;
+    sint64 Sint64 = 6;
+    sfixed32 Sfixed32 = 7;
+    sfixed64 Sfixed64 = 8;
+    fixed32 Fixed32 = 9;
+    fixed64 Fixed64 = 10;
+    float Float = 11;
+    double Double = 12;
+    bool Bool = 13;
+    string Str = 14;
+    bytes Bytes = 15;
+    repeated int32 ListInt32 = 16;
+    repeated int64 ListInt64 = 17;
+    repeated uint32 ListUint32 = 18;
+    repeated uint64 ListUint64 = 19;
+    repeated sint32 ListSint32 = 20;
+    repeated sint64 ListSint64 = 21;
+    repeated sfixed32 ListSfixed32 = 22;
+    repeated sfixed64 ListSfixed64 = 23;
+    repeated fixed32 ListFixed32 = 24;
+    repeated fixed64 ListFixed64 = 25;
+    repeated float ListFloat = 26;
+    repeated double ListDouble = 27;
+    repeated bool ListBool = 28;
+    repeated string ListString = 29;
+    repeated bytes ListBytes = 30;
+    map<int64, sint32> MapInt64SINT32 = 31;
+    map<int64, sfixed32> MapInt64Sfixed32 = 32;
+    map<int64, fixed32> MapInt64Fixed32 = 33;
+    map<int64, uint32> MapInt64Uint32 = 34;
+    map<int64, double> MapInt64Double = 35;
+    map<int64, bool> MapInt64Bool = 36;
+    map<int64, string> MapInt64String = 37;
+    map<int64, bytes> MapInt64Bytes = 38;
+    map<int64, float> MapInt64Float = 39;
+    map<int64, int32> MapInt64Int32 = 40;
+    map<string, sint64> MapstringSINT64 = 41;
+    map<string, sfixed64> MapstringSfixed64 = 42;
+    map<string, fixed64> MapstringFixed64 = 43;
+    map<string, uint64> MapstringUint64 = 44;
+    map<string, double> MapstringDouble = 45;
+    map<string, bool> MapstringBool = 46;
+    map<string, string> MapstringString = 47;
+    map<string, bytes> MapstringBytes = 48;
+    map<string, float> MapstringFloat = 49;
+    map<string, int64> MapstringInt64 = 50;
+}
+
+// Test that RPC services work.
+service BasicService {
+    rpc ExampleMethod(BasicExample) returns (BasicExample);
+}
