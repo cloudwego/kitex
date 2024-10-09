@@ -43,6 +43,7 @@ func (s *Stack[ValueType]) Size() (size int) {
 func (s *Stack[ValueType]) RangeDelete(checking func(v ValueType) (deleteNode bool, continueRange bool)) {
 	// Stop the world!
 	s.L.Lock()
+	// range from the stack bottom(oldest item)
 	node := s.head
 	deleteNode := false
 	continueRange := true
@@ -56,10 +57,7 @@ func (s *Stack[ValueType]) RangeDelete(checking func(v ValueType) (deleteNode bo
 		last := node.last
 		next := node.next
 		// modify last node
-		if last == nil {
-			// cur node is head node
-			s.head = next
-		} else {
+		if last != nil {
 			// change last next ptr
 			last.next = next
 		}
@@ -67,7 +65,11 @@ func (s *Stack[ValueType]) RangeDelete(checking func(v ValueType) (deleteNode bo
 		if next != nil {
 			next.last = last
 		}
-		if node == s.tail {
+		// modify link list
+		if s.head == node {
+			s.head = next
+		}
+		if s.tail == node {
 			s.tail = last
 		}
 		node = node.next
@@ -76,24 +78,31 @@ func (s *Stack[ValueType]) RangeDelete(checking func(v ValueType) (deleteNode bo
 	s.L.Unlock()
 }
 
-func (s *Stack[ValueType]) Pop() (value ValueType, ok bool) {
-	var node *doubleLinkNode[ValueType]
-	s.L.Lock()
+func (s *Stack[ValueType]) pop() (node *doubleLinkNode[ValueType]) {
 	if s.tail == nil {
-		s.L.Unlock()
-		return value, false
+		return nil
 	}
 	node = s.tail
 	if node.last == nil {
-		// first node
+		// if node is the only node in the list, clear the whole linklist
 		s.head = nil
 		s.tail = nil
 	} else {
-		node.last.next = nil
+		// if node is not the only node in the list, only modify the list's tail
 		s.tail = node.last
+		s.tail.next = nil
 	}
 	s.size--
+	return node
+}
+
+func (s *Stack[ValueType]) Pop() (value ValueType, ok bool) {
+	s.L.Lock()
+	node := s.pop()
 	s.L.Unlock()
+	if node == nil {
+		return value, false
+	}
 
 	value = node.val
 	node.reset()
@@ -101,23 +110,32 @@ func (s *Stack[ValueType]) Pop() (value ValueType, ok bool) {
 	return value, true
 }
 
-func (s *Stack[ValueType]) PopBottom() (value ValueType, ok bool) {
-	var node *doubleLinkNode[ValueType]
-	s.L.Lock()
+func (s *Stack[ValueType]) popBottom() (node *doubleLinkNode[ValueType]) {
 	if s.head == nil {
-		s.L.Unlock()
-		return value, false
+		return nil
 	}
 	node = s.head
-	s.head = s.head.next
-	if s.head != nil {
+	if node.next == nil {
+		// if node is the only node in the list, clear the whole linklist
+		s.head = nil
+		s.tail = nil
+	} else {
+		// if node is not the only node in the list, only modify the list's head
+		s.head = s.head.next
 		s.head.last = nil
 	}
-	if s.tail == node {
-		s.tail = nil
-	}
 	s.size--
+	return node
+}
+
+func (s *Stack[ValueType]) PopBottom() (value ValueType, ok bool) {
+	s.L.Lock()
+	node := s.popBottom()
 	s.L.Unlock()
+	if node == nil {
+		return value, false
+	}
+
 	value = node.val
 	node.reset()
 	s.nodePool.Put(node)
@@ -142,6 +160,7 @@ func (s *Stack[ValueType]) Push(value ValueType) {
 		s.head = node
 		s.tail = node
 	} else {
+		// not first node
 		node.last = s.tail
 		s.tail.next = node
 		s.tail = node
