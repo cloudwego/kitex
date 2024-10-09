@@ -28,13 +28,6 @@ import (
 
 var isGoTagAliasDisabled = os.Getenv("KITEX_GENERIC_GOTAG_ALIAS_DISABLED") == "True"
 
-func init() {
-	if isGoTagAliasDisabled {
-		// disable go.tag for dynamicgo
-		dthrift.RemoveAnnotationMapper(dthrift.AnnoScopeField, "go.tag")
-	}
-}
-
 // FieldDescriptor idl field descriptor
 type FieldDescriptor struct {
 	Name         string // field name
@@ -47,11 +40,21 @@ type FieldDescriptor struct {
 	Type         *TypeDescriptor
 	HTTPMapping  HTTPMapping
 	ValueMapping ValueMapping
+	GoTagOpt     *GoTagOption
+}
+
+type GoTagOption struct {
+	IsGoAliasDisabled bool
 }
 
 // FieldName return field name maybe with an alias
 func (d *FieldDescriptor) FieldName() string {
-	if d.Alias != "" && !isGoTagAliasDisabled {
+	aliasDisabled := isGoTagAliasDisabled
+	if d.GoTagOpt != nil {
+		aliasDisabled = d.GoTagOpt.IsGoAliasDisabled
+	}
+
+	if d.Alias != "" && !aliasDisabled {
 		return d.Alias
 	}
 	return d.Name
