@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
@@ -29,8 +30,13 @@ type streamIO struct {
 	ctx     context.Context
 	trigger chan struct{}
 	stream  *stream
-	fpipe   *container.Pipe[*Frame]
-	fcache  [1]*Frame
+	// eofFlag == 2 when both parties send trailers
+	eofFlag int32
+	// eofCallback will be called when eofFlag == 2
+	// eofCallback will not be called if stream is not be ended in a normal way
+	eofCallback func()
+	fpipe       *container.Pipe[*Frame]
+	fcache      [1]*Frame
 }
 
 func newStreamIO(ctx context.Context, s *stream) *streamIO {
@@ -40,6 +46,10 @@ func newStreamIO(ctx context.Context, s *stream) *streamIO {
 	sio.stream = s
 	sio.fpipe = container.NewPipe[*Frame]()
 	return sio
+}
+
+func (s *streamIO) setEOFCallback(f func()) {
+	s.eofCallback = f
 }
 
 func (s *streamIO) input(ctx context.Context, f *Frame) {
@@ -65,9 +75,15 @@ func (s *streamIO) output(ctx context.Context) (f *Frame, err error) {
 
 func (s *streamIO) closeRecv() {
 	s.fpipe.Close()
+	if atomic.AddInt32(&s.eofFlag, 1) == 2 && s.eofCallback != nil {
+		s.eofCallback()
+	}
 }
 
 func (s *streamIO) closeSend() {
+	if atomic.AddInt32(&s.eofFlag, 1) == 2 && s.eofCallback != nil {
+		s.eofCallback()
+	}
 }
 
 func (s *streamIO) cancel() {

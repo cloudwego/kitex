@@ -19,6 +19,7 @@ package ttstream
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -35,15 +36,16 @@ var (
 	_ StreamMeta                   = (*stream)(nil)
 )
 
-func newStream(ctx context.Context, trans *transport, mode streamx.StreamingMode, smeta streamFrame) (s *stream) {
-	s = new(stream)
+func newStream(trans *transport, mode streamx.StreamingMode, smeta streamFrame) *stream {
+	s := new(stream)
 	s.streamFrame = smeta
 	s.trans = trans
 	s.mode = mode
+	s.wheader = make(streamx.Header)
+	s.wtrailer = make(streamx.Trailer)
 	s.headerSig = make(chan int32, 1)
 	s.trailerSig = make(chan int32, 1)
 	s.StreamMeta = newStreamMeta()
-	trans.storeStreamIO(ctx, s)
 	return s
 }
 
@@ -64,8 +66,8 @@ type stream struct {
 	streamFrame
 	trans      *transport
 	mode       streamx.StreamingMode
-	wheader    streamx.Header
-	wtrailer   streamx.Trailer
+	wheader    streamx.Header  // wheader == nil means it already be sent
+	wtrailer   streamx.Trailer // wtrailer == nil means it already be sent
 	selfEOF    int32
 	peerEOF    int32
 	headerSig  chan int32
@@ -126,23 +128,29 @@ func (s *stream) readHeader(hd streamx.Header) (err error) {
 
 // setHeader use the hd as the underlying header
 func (s *stream) setHeader(hd streamx.Header) {
-	s.wheader = hd
+	if hd != nil {
+		s.wheader = hd
+	}
 	return
 }
 
 // writeHeader copy kvs into s.wheader
-func (s *stream) writeHeader(hd streamx.Header) {
+func (s *stream) writeHeader(hd streamx.Header) error {
 	if s.wheader == nil {
-		s.wheader = make(streamx.Header)
+		return fmt.Errorf("stream header already sent")
 	}
 	for k, v := range hd {
 		s.wheader[k] = v
 	}
+	return nil
 }
 
 func (s *stream) sendHeader() (err error) {
 	wheader := s.wheader
 	s.wheader = nil
+	if wheader == nil {
+		return fmt.Errorf("stream header already sent")
+	}
 	err = s.trans.streamSendHeader(s.sid, s.method, wheader)
 	return err
 }
@@ -151,7 +159,7 @@ func (s *stream) sendHeader() (err error) {
 // readTrailer by server: unblock recv function and return EOF if no unread frame
 func (s *stream) readTrailer(tl streamx.Trailer) (err error) {
 	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
-		return nil
+		return fmt.Errorf("stream read a unexcept trailer")
 	}
 
 	s.trailer = tl
@@ -171,7 +179,7 @@ func (s *stream) readTrailer(tl streamx.Trailer) (err error) {
 
 func (s *stream) writeTrailer(tl streamx.Trailer) (err error) {
 	if s.wtrailer == nil {
-		s.wtrailer = make(streamx.Trailer)
+		return fmt.Errorf("stream trailer already sent")
 	}
 	for k, v := range tl {
 		s.wtrailer[k] = v
@@ -183,8 +191,13 @@ func (s *stream) sendTrailer() (err error) {
 	if !atomic.CompareAndSwapInt32(&s.selfEOF, 0, 1) {
 		return nil
 	}
-	klog.Debugf("stream[%d] send trialer", s.sid)
-	return s.trans.streamCloseSend(s.sid, s.method, s.wtrailer)
+	wtrailer := s.wtrailer
+	s.wtrailer = nil
+	if wtrailer == nil {
+		return fmt.Errorf("stream trailer already sent")
+	}
+	klog.Debugf("transport[%d]-stream[%d] send trialer", s.trans.kind, s.sid)
+	return s.trans.streamCloseSend(s.sid, s.method, wtrailer)
 }
 
 func (s *stream) finished() bool {
@@ -234,18 +247,6 @@ func (s *clientStream) CloseSend(ctx context.Context) error {
 	return s.sendTrailer()
 }
 
-// after close stream cannot be access again
-func (s *clientStream) close() error {
-	// client should CloseSend first and then close stream
-	err := s.sendTrailer()
-	if err != nil {
-		return err
-	}
-	err = s.trans.streamClose(s.sid)
-	s.stream.close()
-	return err
-}
-
 func newServerStream(s *stream) streamx.ServerStream {
 	ss := &serverStream{stream: s}
 	return ss
@@ -277,7 +278,7 @@ func (s *serverStream) close() error {
 	if err != nil {
 		return err
 	}
-	err = s.trans.streamClose(s.sid)
+	err = s.trans.streamDelete(s.sid)
 	s.stream.close()
 	return err
 }

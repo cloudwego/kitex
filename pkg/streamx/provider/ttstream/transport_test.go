@@ -144,10 +144,10 @@ func TestTransport(t *testing.T) {
 			defer wg.Done()
 
 			// send header
-			s, err := trans.newStream(ctx, method, IntHeader{}, map[string]string{})
+			sio, err := trans.newStreamIO(ctx, method, IntHeader{}, map[string]string{})
 			test.Assert(t, err == nil, err)
 
-			cs := newClientStream(s)
+			cs := newClientStream(sio.stream)
 			t.Logf("client stream[%d] created", sid)
 
 			// recv header

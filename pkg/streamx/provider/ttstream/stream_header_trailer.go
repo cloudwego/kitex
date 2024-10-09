@@ -52,12 +52,13 @@ func (s *clientStream) Trailer() (streamx.Trailer, error) {
 }
 
 func (s *serverStream) SetHeader(hd streamx.Header) error {
-	s.writeHeader(hd)
-	return nil
+	return s.writeHeader(hd)
 }
 
 func (s *serverStream) SendHeader(hd streamx.Header) error {
-	s.writeHeader(hd)
+	if err := s.writeHeader(hd); err != nil {
+		return err
+	}
 	return s.stream.sendHeader()
 }
 

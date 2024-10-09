@@ -19,6 +19,7 @@ package ttstream
 import (
 	"context"
 	"runtime"
+	"sync/atomic"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
@@ -78,24 +79,40 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 		return nil, err
 	}
 
-	s, err := trans.newStream(ctx, method, intHeader, strHeader)
+	sio, err := trans.newStreamIO(ctx, method, intHeader, strHeader)
 	if err != nil {
 		return nil, err
 	}
-	s.setRecvTimeout(rconfig.StreamRecvTimeout())
+	sio.stream.setRecvTimeout(rconfig.StreamRecvTimeout())
 	// only client can set meta frame handler
-	s.setMetaFrameHandler(c.metaHandler)
+	sio.stream.setMetaFrameHandler(c.metaHandler)
 
 	// if ctx from server side, we should cancel the stream when server handler already returned
 	// TODO: this canceling transmit should be configurable
 	ktx.RegisterCancelCallback(ctx, func() {
-		s.cancel()
+		sio.stream.cancel()
 	})
 
-	cs := newClientStream(s)
+	cs := newClientStream(sio.stream)
+	// the END of a client stream means it should send and recv trailer and not hold by user anymore
+	var ended uint32
+	sio.setEOFCallback(func() {
+		// if stream is ended by both parties, put the transport back to pool
+		sio.stream.close()
+		if atomic.AddUint32(&ended, 1) == 2 {
+			c.transPool.Put(trans)
+			err = trans.streamDelete(sio.stream.sid)
+		}
+	})
 	runtime.SetFinalizer(cs, func(cstream *clientStream) {
-		_ = cstream.close()
-		c.transPool.Put(trans)
+		// it's safe to call CloseSend twice
+		// we do repeated CloseSend here to ensure stream can be closed normally
+		_ = cstream.CloseSend(ctx)
+		// only delete stream when clientStream be finalized
+		if atomic.AddUint32(&ended, 1) == 2 {
+			c.transPool.Put(trans)
+			err = trans.streamDelete(sio.stream.sid)
+		}
 	})
 	return cs, err
 }

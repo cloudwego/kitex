@@ -43,7 +43,9 @@ const (
 	frameChanSize   = 32
 )
 
-var transIgnoreError = errors.Join(netpoll.ErrEOF, io.EOF, netpoll.ErrConnClosed)
+func isIgnoreError(err error) bool {
+	return errors.Is(err, netpoll.ErrEOF) || errors.Is(err, io.EOF) || errors.Is(err, netpoll.ErrConnClosed)
+}
 
 type transport struct {
 	kind          int32
@@ -75,7 +77,7 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 	go func() {
 		err := t.loopRead()
 		if err != nil {
-			if !errors.Is(err, transIgnoreError) {
+			if !isIgnoreError(err) {
 				klog.Warnf("transport[%d] loop read err: %v", t.kind, err)
 			}
 			// if connection is closed by peer, loop read should return ErrConnClosed error, so we should close transport here
@@ -85,12 +87,10 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 	go func() {
 		err := t.loopWrite()
 		if err != nil {
-			if !errors.Is(err, transIgnoreError) {
+			if !isIgnoreError(err) {
 				klog.Warnf("transport[%d] loop write err: %v", t.kind, err)
 			}
 			_ = t.Close()
-			// because loopWrite function return, we should close conn actively
-			_ = t.conn.Close()
 		}
 	}()
 	return t
@@ -109,7 +109,7 @@ func (t *transport) Close() (err error) {
 	t.streams.Range(func(key, value any) bool {
 		sio := value.(*streamIO)
 		sio.stream.close()
-		_ = t.streamClose(sio.stream.sid)
+		_ = t.streamDelete(sio.stream.sid)
 		return true
 	})
 	return err
@@ -119,8 +119,10 @@ func (t *transport) IsActive() bool {
 	return atomic.LoadInt32(&t.closedFlag) == 0 && t.conn.IsActive()
 }
 
-func (t *transport) storeStreamIO(ctx context.Context, s *stream) {
-	t.streams.Store(s.sid, newStreamIO(ctx, s))
+func (t *transport) storeStreamIO(ctx context.Context, s *stream) *streamIO {
+	sio := newStreamIO(ctx, s)
+	t.streams.Store(s.sid, sio)
+	return sio
 }
 
 func (t *transport) loadStreamIO(sid int32) (sio *streamIO, ok bool) {
@@ -167,8 +169,8 @@ func (t *transport) loopRead() error {
 			case serverTransport:
 				// Header Frame: server recv a new stream
 				smode := t.sinfo.MethodInfo(fr.method).StreamingMode()
-				s := newStream(context.Background(), t, smode, fr.streamFrame)
-				klog.Debugf("transport[%d] read a new stream: sid=%d", t.kind, s.sid)
+				s := newStream(t, smode, fr.streamFrame)
+				t.storeStreamIO(context.Background(), s)
 				t.spipe.Write(context.Background(), s)
 			case clientTransport:
 				// Header Frame: client recv header
@@ -333,7 +335,7 @@ func (t *transport) streamCancel(s *stream) (err error) {
 	return nil
 }
 
-func (t *transport) streamClose(sid int32) (err error) {
+func (t *transport) streamDelete(sid int32) (err error) {
 	// remove stream from transport
 	_, ok := t.streams.LoadAndDelete(sid)
 	if !ok {
@@ -349,11 +351,11 @@ func (t *transport) IsStreaming() bool {
 
 var clientStreamID int32
 
-// newStream create new stream on current connection
+// newStreamIO create new stream on current connection
 // it's typically used by client side
-// newStream is concurrency safe
-func (t *transport) newStream(
-	ctx context.Context, method string, intHeader IntHeader, strHeader streamx.Header) (*stream, error) {
+// newStreamIO is concurrency safe
+func (t *transport) newStreamIO(
+	ctx context.Context, method string, intHeader IntHeader, strHeader streamx.Header) (*streamIO, error) {
 	if t.kind != clientTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
@@ -368,9 +370,10 @@ func (t *transport) newStream(
 	if err != nil {
 		return nil, err
 	}
-	s := newStream(ctx, t, smode, streamFrame{sid: sid, method: method})
+	s := newStream(t, smode, streamFrame{sid: sid, method: method})
+	sio := t.storeStreamIO(ctx, s)
 	atomic.AddInt32(&t.streamingFlag, 1)
-	return s, nil
+	return sio, nil
 }
 
 // readStream wait for a new incoming stream on current connection
