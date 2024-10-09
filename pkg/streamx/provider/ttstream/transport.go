@@ -59,7 +59,9 @@ type transport struct {
 }
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
-	_ = conn.SetDeadline(time.Now().Add(time.Hour))
+	// stream max idle session is 10 minutes.
+	// TODO: let it configurable
+	_ = conn.SetReadTimeout(time.Minute * 10)
 	t := &transport{
 		kind:     kind,
 		sinfo:    sinfo,
@@ -172,7 +174,8 @@ func (t *transport) loopRead() error {
 				// Header Frame: client recv header
 				sio, ok := t.loadStreamIO(fr.sid)
 				if !ok {
-					klog.Errorf("transport[%d] read a unknown stream header: sid=%d", t.kind, fr.sid)
+					klog.Errorf("transport[%d] read a unknown stream header: sid=%d header=%v",
+						t.kind, fr.sid, fr.header)
 					continue
 				}
 				err = sio.stream.readHeader(fr.header)
@@ -195,7 +198,8 @@ func (t *transport) loopRead() error {
 				// client recv an unknown trailer is in exception,
 				// because the client stream may already be GCed,
 				// but the connection is still active so peer server can send a trailer
-				klog.Debugf("transport[%d] read a unknown stream trailer: sid=%d", t.kind, fr.sid)
+				klog.Errorf("transport[%d] read a unknown stream trailer: sid=%d trailer=%v",
+					t.kind, fr.sid, fr.trailer)
 				continue
 			}
 			if err = sio.stream.readTrailer(fr.trailer); err != nil {
