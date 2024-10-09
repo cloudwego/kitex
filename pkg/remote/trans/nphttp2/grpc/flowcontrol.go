@@ -93,7 +93,7 @@ type ctxWriteQuota struct {
 	// replenish is called by loopyWriter to give quota back to.
 	// It is implemented as a field so that it can be updated
 	// by tests.
-	replenish func(n int)
+	replenish func(n int) bool
 }
 
 func newCtxWriteQuota(ctx context.Context, sz int32, done <-chan struct{}) *ctxWriteQuota {
@@ -124,17 +124,23 @@ func (w *ctxWriteQuota) get(sz int32) error {
 	}
 }
 
-func (w *ctxWriteQuota) realReplenish(n int) {
+func (w *ctxWriteQuota) realReplenish(n int) bool {
 	sz := int32(n)
 	a := atomic.AddInt32(&w.quota, sz)
 	b := a - sz
-	if b <= 0 && a > 0 {
-		select {
-		case w.ch <- struct{}{}:
-			klog.CtxInfof(w.ctx, "replenish quota success, curQuota: %d, oriQuota: %d", a, b)
-		default:
+	if b <= 0 {
+		if a > 0 {
+			select {
+			case w.ch <- struct{}{}:
+				klog.CtxInfof(w.ctx, "replenish quota success, curQuota: %d, oriQuota: %d", a, b)
+			default:
+			}
+		} else {
+			klog.CtxInfof(w.ctx, "replenish quota failed, curQuota: %d, oriQuota: %d", a, b)
+			return false
 		}
 	}
+	return true
 }
 
 type trInFlow struct {
