@@ -22,12 +22,18 @@ var _ ClientStreamMeta = (*clientStream)(nil)
 var _ ServerStreamMeta = (*serverStream)(nil)
 
 func (s *clientStream) Header() (streamx.Header, error) {
-	<-s.headerSig
+	sig := <-s.headerSig
+	if sig < 0 {
+		return nil, ErrClosedStream
+	}
 	return s.header, nil
 }
 
 func (s *clientStream) Trailer() (streamx.Trailer, error) {
-	<-s.trailerSig
+	sig := <-s.trailerSig
+	if sig < 0 {
+		return nil, ErrClosedStream
+	}
 	return s.trailer, nil
 }
 

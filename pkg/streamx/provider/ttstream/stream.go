@@ -40,8 +40,8 @@ func newStream(ctx context.Context, trans *transport, mode streamx.StreamingMode
 	s.streamFrame = smeta
 	s.trans = trans
 	s.mode = mode
-	s.headerSig = make(chan struct{})
-	s.trailerSig = make(chan struct{})
+	s.headerSig = make(chan int32, 1)
+	s.trailerSig = make(chan int32, 1)
 	s.StreamMeta = newStreamMeta()
 	trans.storeStreamIO(ctx, s)
 	return s
@@ -62,8 +62,8 @@ type stream struct {
 	wtrailer   streamx.Trailer
 	selfEOF    int32
 	peerEOF    int32
-	headerSig  chan struct{}
-	trailerSig chan struct{}
+	headerSig  chan int32
+	trailerSig chan int32
 
 	StreamMeta
 	metaHandler MetaFrameHandler
@@ -87,14 +87,12 @@ func (s *stream) Method() string {
 
 func (s *stream) close() {
 	select {
-	case <-s.headerSig:
+	case s.headerSig <- -1:
 	default:
-		close(s.headerSig)
 	}
 	select {
-	case <-s.trailerSig:
+	case s.trailerSig <- -1:
 	default:
-		close(s.trailerSig)
 	}
 }
 
@@ -112,10 +110,9 @@ func (s *stream) readMetaFrame(intHeader IntHeader, header streamx.Header, paylo
 func (s *stream) readHeader(hd streamx.Header) (err error) {
 	s.header = hd
 	select {
-	case <-s.headerSig:
-		return errors.New("already set header")
+	case s.headerSig <- 1:
 	default:
-		close(s.headerSig)
+		return errors.New("already set header")
 	}
 	klog.Debugf("stream[%s] read header: %v", s.method, hd)
 	return nil
@@ -153,10 +150,9 @@ func (s *stream) readTrailer(tl streamx.Trailer) (err error) {
 
 	s.trailer = tl
 	select {
-	case <-s.trailerSig:
-		return errors.New("already set trailer")
+	case s.trailerSig <- 1:
 	default:
-		close(s.trailerSig)
+		return errors.New("already set trailer")
 	}
 	klog.Debugf("stream[%d] recv trailer: %v", s.sid, tl)
 	return s.trans.streamCloseRecv(s)

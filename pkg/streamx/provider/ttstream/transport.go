@@ -76,6 +76,7 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 			if !errors.Is(err, transIgnoreError) {
 				klog.Warnf("transport[%d] loop read err: %v", t.kind, err)
 			}
+			// if connection is closed by peer, loop read should return ErrConnClosed error, so we should close transport here
 			_ = t.Close()
 		}
 	}()
@@ -105,10 +106,15 @@ func (t *transport) Close() (err error) {
 	t.spipe.Close()
 	t.streams.Range(func(key, value any) bool {
 		sio := value.(*streamIO)
+		sio.stream.close()
 		_ = t.streamClose(sio.stream.sid)
 		return true
 	})
 	return err
+}
+
+func (t *transport) IsActive() bool {
+	return atomic.LoadInt32(&t.closedFlag) == 0 && t.conn.IsActive()
 }
 
 func (t *transport) storeStreamIO(ctx context.Context, s *stream) {
@@ -325,7 +331,8 @@ func (t *transport) streamCancel(s *stream) (err error) {
 
 func (t *transport) streamClose(sid int32) (err error) {
 	// remove stream from transport
-	if _, ok := t.streams.LoadAndDelete(sid); !ok {
+	_, ok := t.streams.LoadAndDelete(sid)
+	if !ok {
 		return nil
 	}
 	atomic.AddInt32(&t.streamingFlag, -1)

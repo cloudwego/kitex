@@ -97,7 +97,7 @@ func (s *ObjectPool) cleaning() {
 				return true, true
 			})
 			if oldest != nil {
-				klog.Infof("object[%s] pool delete %d objects", key, deleted)
+				klog.Infof("object[%s] pool deleted %d objects, oldest=%s", key, deleted, oldest.String())
 			}
 		}
 		s.L.Unlock()
