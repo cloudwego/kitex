@@ -19,9 +19,10 @@ package ttstream
 import (
 	"time"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
-	"github.com/cloudwego/netpoll"
 )
 
 var DefaultLongConnConfig = LongConnConfig{

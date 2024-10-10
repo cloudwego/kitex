@@ -21,9 +21,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/sync/singleflight"
+
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var _ transPool = (*muxTransPool)(nil)
