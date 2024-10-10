@@ -271,7 +271,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 	t.Logf("Client ClientStream CloseAndRecv: %v", res)
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
-	test.Assert(t, serverRecvCount == int32(round), serverRecvCount)
+	test.DeepEqual(t, serverRecvCount, int32(round))
 	test.Assert(t, serverSendCount == 1, serverSendCount)
 	testHeaderAndTrailer(t, cs)
 	cs = nil
