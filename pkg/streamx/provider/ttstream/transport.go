@@ -42,6 +42,7 @@ const (
 
 	streamCacheSize = 32
 	frameChanSize   = 32
+	batchWriteSize  = 0
 )
 
 func isIgnoreError(err error) bool {
@@ -245,7 +246,7 @@ func (t *transport) loopWrite() (err error) {
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}
-			if delay >= 8 || len(t.wchannel) == 0 {
+			if delay >= batchWriteSize || len(t.wchannel) == 0 {
 				delay = 0
 				if err = t.conn.Writer().Flush(); err != nil {
 					return err
