@@ -159,7 +159,7 @@ func (si *streamingService) UnaryWithErr(ctx context.Context, req *Request) (*Re
 func (si *streamingService) ClientStreamWithErr(ctx context.Context, stream ClientStreamingServer[Request, Response]) (res *Response, err error) {
 	req, err := stream.Recv(ctx)
 	if err != nil {
-		klog.Errorf("Server ClientStreamWithErr Recv failed, err={%v}", err)
+		klog.Errorf("Server ClientStreamWithErr Recv failed, exception={%v}", err)
 		return nil, err
 	}
 	err = buildErr(req)
@@ -176,7 +176,7 @@ func (si *streamingService) ServerStreamWithErr(ctx context.Context, req *Reques
 func (si *streamingService) BidiStreamWithErr(ctx context.Context, stream BidiStreamingServer[Request, Response]) error {
 	req, err := stream.Recv(ctx)
 	if err != nil {
-		klog.Errorf("Server BidiStreamWithErr Recv failed, err={%v}", err)
+		klog.Errorf("Server BidiStreamWithErr Recv failed, exception={%v}", err)
 		return err
 	}
 	err = buildErr(req)
