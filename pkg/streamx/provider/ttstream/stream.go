@@ -75,7 +75,6 @@ type stream struct {
 	peerEOF    int32
 	headerSig  chan int32
 	trailerSig chan int32
-	err        error
 
 	StreamMeta
 	metaHandler MetaFrameHandler
@@ -166,16 +165,18 @@ func (s *stream) readTrailerFrame(fr *Frame) (err error) {
 		return fmt.Errorf("stream read a unexcept trailer")
 	}
 
+	var exception error
 	// when server-side returns non-biz error, it will be wrapped as ApplicationException stored in trailer frame payload
 	if len(fr.payload) > 0 {
-		_, _, ex := thrift.UnmarshalFastMsg(fr.payload, nil)
-		s.err = ex.(*thrift.ApplicationException)
-	} else { // when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header
+		// exception is type of (*thrift.ApplicationException)
+		_, _, exception = thrift.UnmarshalFastMsg(fr.payload, nil)
+	} else {
+		// when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header
 		bizErr, err := transmeta.ParseBizStatusErr(fr.trailer)
 		if err != nil {
-			s.err = err
+			exception = err
 		} else if bizErr != nil {
-			s.err = bizErr
+			exception = bizErr
 		}
 	}
 	s.trailer = fr.trailer
@@ -190,8 +191,8 @@ func (s *stream) readTrailerFrame(fr *Frame) (err error) {
 	default:
 	}
 
-	klog.Debugf("stream[%d] recv trailer: %v, err: %v", s.sid, s.trailer, s.err)
-	return s.trans.streamCloseRecv(s)
+	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, exception)
+	return s.trans.streamCloseRecv(s, exception)
 }
 
 func (s *stream) writeTrailer(tl streamx.Trailer) (err error) {

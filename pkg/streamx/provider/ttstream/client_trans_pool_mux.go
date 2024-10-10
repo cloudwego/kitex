@@ -19,6 +19,7 @@ package ttstream
 import (
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/netpoll"
@@ -29,43 +30,76 @@ import (
 
 var _ transPool = (*muxTransPool)(nil)
 
+type muxTransList struct {
+	L          sync.RWMutex
+	size       int
+	cursor     uint32
+	transports []*transport
+}
+
+func newMuxTransList(size int) *muxTransList {
+	tl := new(muxTransList)
+	tl.size = size
+	tl.transports = make([]*transport, size)
+	return tl
+}
+
+func (tl *muxTransList) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (*transport, error) {
+	idx := atomic.AddUint32(&tl.cursor, 1) % uint32(tl.size)
+	tl.L.RLock()
+	trans := tl.transports[idx]
+	tl.L.RUnlock()
+	if trans != nil && trans.IsActive() {
+		return trans, nil
+	}
+
+	conn, err := netpoll.DialConnection(network, addr, time.Second)
+	if err != nil {
+		return nil, err
+	}
+	trans = newTransport(clientTransport, sinfo, conn)
+	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
+		// peer close
+		_ = trans.Close()
+		return nil
+	})
+	runtime.SetFinalizer(trans, func(trans *transport) {
+		// self close when not hold by user
+		_ = trans.Close()
+	})
+	tl.L.Lock()
+	tl.transports[idx] = trans
+	tl.L.Unlock()
+	return trans, nil
+}
+
 func newMuxTransPool() transPool {
 	t := new(muxTransPool)
+	t.poolSize = runtime.GOMAXPROCS(0)
 	return t
 }
 
 type muxTransPool struct {
-	pool    sync.Map // addr:*transport
-	sflight singleflight.Group
+	poolSize int
+	pool     sync.Map // addr:*muxTransList
+	sflight  singleflight.Group
 }
 
 func (m *muxTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error) {
 	v, ok := m.pool.Load(addr)
 	if ok {
-		return v.(*transport), nil
+		return v.(*muxTransList).Get(sinfo, network, addr)
 	}
+
 	v, err, _ = m.sflight.Do(addr, func() (interface{}, error) {
-		conn, err := netpoll.DialConnection(network, addr, time.Second)
-		if err != nil {
-			return nil, err
-		}
-		trans = newTransport(clientTransport, sinfo, conn)
-		_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
-			// peer close
-			_ = trans.Close()
-			return nil
-		})
-		m.pool.Store(addr, trans)
-		runtime.SetFinalizer(trans, func(trans *transport) {
-			// self close when not hold by user
-			_ = trans.Close()
-		})
-		return trans, nil
+		transList := newMuxTransList(m.poolSize)
+		m.pool.Store(addr, transList)
+		return transList, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	return v.(*transport), nil
+	return v.(*muxTransList).Get(sinfo, network, addr)
 }
 
 func (m *muxTransPool) Put(trans *transport) {
