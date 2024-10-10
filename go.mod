@@ -2,7 +2,7 @@ module github.com/cloudwego/kitex
 
 go 1.18
 
-replace github.com/cloudwego/dynamicgo => github.com/Marina-Sakai/dynamicgo v0.0.0-20241002090505-60ab1216f62b
+replace github.com/cloudwego/dynamicgo => github.com/cloudwego/dynamicgo v0.4.3-0.20241009082247-81665bf11089
 
 require (
 	github.com/apache/thrift v0.13.0
