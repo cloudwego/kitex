@@ -724,9 +724,6 @@ func (g *generator) setStreamXServiceImports(pkg *PackageInfo) {
 		pkg.AddImports("context")
 		pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx")
 		pkg.AddImports("github.com/cloudwego/kitex/server/streamxserver")
-		if g.IDLType == "thrift" {
-			pkg.AddImports("github.com/cloudwego/kitex/pkg/streamx/provider/" + streamxTTHeaderRef)
-		}
 		for _, a := range m.Args {
 			for _, dep := range a.Deps {
 				pkg.AddImport(dep.PkgRefName, dep.ImportPath)

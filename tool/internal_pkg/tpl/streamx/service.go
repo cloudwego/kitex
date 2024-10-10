@@ -33,7 +33,7 @@ var svcInfo = &serviceinfo.ServiceInfo{
             {{- end}}
 		"{{.RawName}}": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeStream[{{$protocol}}.Header, {{$protocol}}.Trailer, {{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
+				return streamxserver.InvokeStream[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}](
 					ctx, {{$mode}}, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
 			},
 			nil,

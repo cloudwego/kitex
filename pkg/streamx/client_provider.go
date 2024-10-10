@@ -23,7 +23,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
-/* Hot it works
+/* How it works
 
 clientProvider := xxx.NewClientProvider(xxx.WithXXX(...))
 client := {user_gencode}.NewClient({kitex_client}.WithClientProvider(clientProvider))
