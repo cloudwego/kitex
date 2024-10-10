@@ -22,7 +22,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
-var ErrInvalidStreamKind = errors.New("invalid stream kind")
+var (
+	ErrInvalidStreamKind = errors.New("invalid stream kind")
+	ErrClosedStream      = errors.New("stream is closed")
+)
 
 // only for meta frame handler
 type IntHeader map[uint16]string

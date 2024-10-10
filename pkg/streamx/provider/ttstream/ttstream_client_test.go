@@ -300,7 +300,7 @@ func TestTTHeaderStreaming(t *testing.T) {
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
 	test.Assert(t, serverRecvCount == 1, serverRecvCount)
-	test.Assert(t, serverSendCount == int32(received), serverSendCount)
+	test.Assert(t, serverSendCount == int32(received), serverSendCount, received)
 	testHeaderAndTrailer(t, ss)
 	ss = nil
 	serverRecvCount = 0

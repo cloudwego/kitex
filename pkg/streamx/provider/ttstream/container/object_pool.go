@@ -68,11 +68,16 @@ func (s *ObjectPool) cleaning() {
 
 		now := time.Now()
 		s.L.Lock()
-		objSize := len(s.objects)
+		// update cleanInternal
+		objSize := 0
+		for _, stk := range s.objects {
+			objSize += stk.Size()
+		}
 		cleanInternal = time.Second + time.Duration(objSize)*time.Millisecond*10
 		if cleanInternal > time.Second*10 {
 			cleanInternal = time.Second * 10
 		}
+		// clean objects
 		for key, stk := range s.objects {
 			deleted := 0
 			var oldest *time.Time
@@ -97,7 +102,7 @@ func (s *ObjectPool) cleaning() {
 				return true, true
 			})
 			if oldest != nil {
-				klog.Infof("object[%s] pool delete %d objects", key, deleted)
+				klog.Infof("object[%s] pool deleted %d objects, oldest=%s", key, deleted, oldest.String())
 			}
 		}
 		s.L.Unlock()

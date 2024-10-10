@@ -16,28 +16,49 @@
 
 package ttstream
 
-import "github.com/cloudwego/kitex/pkg/streamx"
+import (
+	"errors"
+
+	"github.com/cloudwego/kitex/pkg/streamx"
+)
 
 var _ ClientStreamMeta = (*clientStream)(nil)
 var _ ServerStreamMeta = (*serverStream)(nil)
 
 func (s *clientStream) Header() (streamx.Header, error) {
-	<-s.headerSig
-	return s.header, nil
+	sig := <-s.headerSig
+	switch sig {
+	case streamSigActive:
+		return s.header, nil
+	case streamSigNone:
+		return make(streamx.Header), nil
+	case streamSigInactive:
+		return nil, ErrClosedStream
+	}
+	return nil, errors.New("invalid stream signal")
 }
 
 func (s *clientStream) Trailer() (streamx.Trailer, error) {
-	<-s.trailerSig
-	return s.trailer, nil
+	sig := <-s.trailerSig
+	switch sig {
+	case streamSigActive:
+		return s.trailer, nil
+	case streamSigNone:
+		return make(streamx.Trailer), nil
+	case streamSigInactive:
+		return nil, ErrClosedStream
+	}
+	return nil, errors.New("invalid stream signal")
 }
 
 func (s *serverStream) SetHeader(hd streamx.Header) error {
-	s.writeHeader(hd)
-	return nil
+	return s.writeHeader(hd)
 }
 
 func (s *serverStream) SendHeader(hd streamx.Header) error {
-	s.writeHeader(hd)
+	if err := s.writeHeader(hd); err != nil {
+		return err
+	}
 	return s.stream.sendHeader()
 }
 

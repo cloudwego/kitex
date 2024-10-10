@@ -50,9 +50,15 @@ type longConnTransPool struct {
 }
 
 func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error) {
-	o := c.transPool.Pop(addr)
-	if o != nil {
-		return o.(*transport), nil
+	for {
+		o := c.transPool.Pop(addr)
+		if o == nil {
+			break
+		}
+		trans = o.(*transport)
+		if trans.IsActive() {
+			return trans, nil
+		}
 	}
 
 	// create new connection
@@ -60,13 +66,8 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, 
 	if err != nil {
 		return nil, err
 	}
-	// create new transport
 	trans = newTransport(clientTransport, sinfo, conn)
-	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
-		_ = trans.Close()
-		return nil
-	})
-	runtime.SetFinalizer(trans, func(t *transport) { t.Close() })
+	// create new transport
 	return trans, nil
 }
 
