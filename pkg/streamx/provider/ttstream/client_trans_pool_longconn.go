@@ -17,7 +17,6 @@
 package ttstream
 
 import (
-	"runtime"
 	"time"
 
 	"github.com/cloudwego/netpoll"
