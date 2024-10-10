@@ -120,7 +120,7 @@ func (s *stream) readHeader(hd streamx.Header) (err error) {
 	select {
 	case s.headerSig <- streamSigActive:
 	default:
-		return errors.New("already set header")
+		return fmt.Errorf("stream[%d] already set header", s.sid)
 	}
 	klog.Debugf("stream[%s] read header: %v", s.method, hd)
 	return nil

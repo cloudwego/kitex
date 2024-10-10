@@ -123,7 +123,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	if err != nil {
 		return
 	}
-	if dp.Flags != ttheader.HeaderFlagsStreaming {
+	if dp.Flags&ttheader.HeaderFlagsStreaming == 0 {
 		err = fmt.Errorf("unexpected header flags: %d", dp.Flags)
 		return
 	}

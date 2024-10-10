@@ -80,7 +80,8 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 			if !isIgnoreError(err) {
 				klog.Warnf("transport[%d] loop read err: %v", t.kind, err)
 			}
-			// if connection is closed by peer, loop read should return ErrConnClosed error, so we should close transport here
+			// if connection is closed by peer, loop read should return ErrConnClosed error,
+			// so we should close transport here
 			_ = t.Close()
 		}
 	}()
@@ -135,6 +136,10 @@ func (t *transport) loadStreamIO(sid int32) (sio *streamIO, ok bool) {
 }
 
 func (t *transport) loopRead() error {
+	addr := t.conn.RemoteAddr().String()
+	if t.kind == clientTransport {
+		addr = t.conn.LocalAddr().String()
+	}
 	for {
 		// decode frame
 		sizeBuf, err := t.conn.Reader().Peek(4)
@@ -151,13 +156,13 @@ func (t *transport) loopRead() error {
 		if err != nil {
 			return err
 		}
-		klog.Debugf("transport[%d] DecodeFrame: fr=%v", t.kind, fr)
+		klog.Debugf("transport[%d-%s] DecodeFrame: fr=%v", t.kind, addr, fr)
 
 		switch fr.typ {
 		case metaFrameType:
 			sio, ok := t.loadStreamIO(fr.sid)
 			if !ok {
-				klog.Errorf("transport[%d] read a unknown stream meta: sid=%d", t.kind, fr.sid)
+				klog.Errorf("transport[%d-%s] read a unknown stream meta: sid=%d", t.kind, addr, fr.sid)
 				continue
 			}
 			err = sio.stream.readMetaFrame(fr.meta, fr.header, fr.payload)
@@ -176,8 +181,8 @@ func (t *transport) loopRead() error {
 				// Header Frame: client recv header
 				sio, ok := t.loadStreamIO(fr.sid)
 				if !ok {
-					klog.Errorf("transport[%d] read a unknown stream header: sid=%d header=%v",
-						t.kind, fr.sid, fr.header)
+					klog.Errorf("transport[%d-%s] read a unknown stream header: sid=%d header=%v",
+						t.kind, addr, fr.sid, fr.header)
 					continue
 				}
 				err = sio.stream.readHeader(fr.header)
@@ -189,7 +194,7 @@ func (t *transport) loopRead() error {
 			// Data Frame: decode and distribute data
 			sio, ok := t.loadStreamIO(fr.sid)
 			if !ok {
-				klog.Errorf("transport[%d] read a unknown stream data: sid=%d", t.kind, fr.sid)
+				klog.Errorf("transport[%d-%s] read a unknown stream data: sid=%d", t.kind, addr, fr.sid)
 				continue
 			}
 			sio.input(context.Background(), fr)
@@ -200,8 +205,8 @@ func (t *transport) loopRead() error {
 				// client recv an unknown trailer is in exception,
 				// because the client stream may already be GCed,
 				// but the connection is still active so peer server can send a trailer
-				klog.Errorf("transport[%d] read a unknown stream trailer: sid=%d trailer=%v",
-					t.kind, fr.sid, fr.trailer)
+				klog.Errorf("transport[%d-%s] read a unknown stream trailer: sid=%d trailer=%v",
+					t.kind, addr, fr.sid, fr.trailer)
 				continue
 			}
 			if err = sio.stream.readTrailer(fr.trailer); err != nil {

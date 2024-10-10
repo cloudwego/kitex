@@ -100,7 +100,9 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 		// if stream is ended by both parties, put the transport back to pool
 		sio.stream.close()
 		if atomic.AddUint32(&ended, 1) == 2 {
-			c.transPool.Put(trans)
+			if trans.IsActive() {
+				c.transPool.Put(trans)
+			}
 			err = trans.streamDelete(sio.stream.sid)
 		}
 	})
@@ -110,7 +112,9 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 		_ = cstream.CloseSend(ctx)
 		// only delete stream when clientStream be finalized
 		if atomic.AddUint32(&ended, 1) == 2 {
-			c.transPool.Put(trans)
+			if trans.IsActive() {
+				c.transPool.Put(trans)
+			}
 			err = trans.streamDelete(sio.stream.sid)
 		}
 	})
