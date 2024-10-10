@@ -17,6 +17,7 @@
 package wpool
 
 import (
+	"context"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -54,4 +55,16 @@ func TestWPool(t *testing.T) {
 		time.Sleep(maxIdleTime)
 	}
 	test.Assert(t, p.Size() == 0)
+}
+
+func BenchmarkWPool(b *testing.B) {
+	maxIdleWorkers := runtime.GOMAXPROCS(0)
+	ctx := context.Background()
+	p := New(maxIdleWorkers, 10*time.Millisecond)
+	for i := 0; i < b.N; i++ {
+		p.GoCtx(ctx, func() {})
+		for int(p.Size()) > maxIdleWorkers {
+			runtime.Gosched()
+		}
+	}
 }
