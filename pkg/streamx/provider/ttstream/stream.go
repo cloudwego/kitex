@@ -158,28 +158,28 @@ func (s *stream) sendHeader() (err error) {
 	return err
 }
 
-// readTrailer by client: unblock recv function and return EOF if no unread frame
-// readTrailer by server: unblock recv function and return EOF if no unread frame
-func (s *stream) readTrailerFrame(fr *Frame) (err error) {
+// readTrailerFrame by client: unblock recv function and return EOF if no unread frame
+// readTrailerFrame by server: unblock recv function and return EOF if no unread frame
+func (s *stream) readTrailerFrame(payload []byte, trailer streamx.Trailer) (err error) {
 	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
 		return fmt.Errorf("stream read a unexcept trailer")
 	}
 
 	var exception error
 	// when server-side returns non-biz error, it will be wrapped as ApplicationException stored in trailer frame payload
-	if len(fr.payload) > 0 {
+	if len(payload) > 0 {
 		// exception is type of (*thrift.ApplicationException)
-		_, _, exception = thrift.UnmarshalFastMsg(fr.payload, nil)
+		_, _, exception = thrift.UnmarshalFastMsg(payload, nil)
 	} else {
 		// when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header
-		bizErr, err := transmeta.ParseBizStatusErr(fr.trailer)
+		bizErr, err := transmeta.ParseBizStatusErr(trailer)
 		if err != nil {
 			exception = err
 		} else if bizErr != nil {
 			exception = bizErr
 		}
 	}
-	s.trailer = fr.trailer
+	s.trailer = trailer
 	select {
 	case s.trailerSig <- streamSigActive:
 	default:
