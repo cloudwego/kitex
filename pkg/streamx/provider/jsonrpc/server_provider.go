@@ -20,9 +20,10 @@ import (
 	"context"
 	"net"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/netpoll"
 )
 
 type serverTransCtxKey struct{}
@@ -70,8 +71,7 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 	return ctx, ss, nil
 }
 
-func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStream) (context.Context, error) {
+func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStream, err error) (context.Context, error) {
 	sst := ss.(*serverStream)
-	err := sst.sendEOF()
-	return ctx, err
+	return ctx, sst.sendEOF()
 }

@@ -21,7 +21,7 @@ import (
 	"net"
 )
 
-/* Hot it works
+/* How it works
 
 serverProvider := xxx.NewServerProvider(xxx.WithXXX()...)
 server := {user_gencode}.NewServer({kitex_server}.WithServerProvider(serverProvider))
@@ -44,7 +44,7 @@ res := stream.Recv(...)
 stream.Close() - server handler return
 */
 
-/* Hot it works
+/* How it works
 - NewServer 时，初始化 ServerProvider，并注册 streamx.ServerTransHandler
 - 连接进来的时候，detection trans handler 会转发调用 streamx.ServerTransHandler
 - streamx.ServerTransHandler 负责调用 ServerProvider 的相关方法
@@ -63,5 +63,5 @@ type ServerProvider interface {
 	// OnStream should read conn data and return a server stream
 	OnStream(ctx context.Context, conn net.Conn) (context.Context, ServerStream, error)
 	// OnStreamFinish should be called when user server handler returned, typically provide should close the stream
-	OnStreamFinish(ctx context.Context, ss ServerStream) (context.Context, error)
+	OnStreamFinish(ctx context.Context, ss ServerStream, err error) (context.Context, error)
 }

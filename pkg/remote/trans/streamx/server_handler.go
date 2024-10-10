@@ -157,7 +157,12 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 	reqArgs := streamx.NewStreamReqArgs(nil)
 	resArgs := streamx.NewStreamResArgs(nil)
 	serr := t.inkHdlFunc(ctx, reqArgs, resArgs)
-	ctx, err = t.provider.OnStreamFinish(ctx, ss)
+	if serr == nil {
+		if bizErr := ri.Invocation().BizStatusErr(); bizErr != nil {
+			serr = bizErr
+		}
+	}
+	ctx, err = t.provider.OnStreamFinish(ctx, ss, serr)
 	if err == nil && serr != nil {
 		err = serr
 	}
