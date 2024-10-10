@@ -42,7 +42,7 @@ const (
 
 	streamCacheSize = 32
 	frameChanSize   = 32
-	batchWriteSize  = 0
+	batchWriteSize  = 32
 )
 
 func isIgnoreError(err error) bool {
