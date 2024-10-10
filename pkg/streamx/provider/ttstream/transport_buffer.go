@@ -83,7 +83,9 @@ func (c *readerBuffer) ReadLen() (n int) {
 
 func (c *readerBuffer) Release(e error) (err error) {
 	c.readSize = 0
-	return c.reader.Release()
+	err = c.reader.Release()
+	readerBufferPool.Put(c)
+	return err
 }
 
 func newWriterBuffer(writer netpoll.Writer) (wb *writerBuffer) {

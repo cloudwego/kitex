@@ -18,6 +18,7 @@ package ttstream
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -25,7 +26,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/netpoll"
@@ -139,10 +139,16 @@ func (t *transport) loadStreamIO(sid int32) (sio *streamIO, ok bool) {
 
 func (t *transport) readFrame(reader bufiox.Reader) error {
 	fr, err := DecodeFrame(context.Background(), reader)
+	shouldRelease := true
+	defer func() {
+		recycleFrame(fr)
+		if shouldRelease {
+			_ = reader.Release(err)
+		}
+	}()
 	if err != nil {
 		return err
 	}
-	defer recycleFrame(fr)
 	klog.Debugf("transport[%d] DecodeFrame: fr=%v", t.kind, fr)
 
 	switch fr.typ {
@@ -175,7 +181,9 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		// Data Frame: decode and distribute data
 		sio, ok := t.loadStreamIO(fr.sid)
 		if ok {
-			sio.input(context.Background(), streamIOMsg{payload: fr.payload})
+			// we should release reader when output finish decode work
+			shouldRelease = false
+			sio.input(context.Background(), streamIOMsg{reader: reader, payload: fr.payload})
 		} else {
 			klog.Errorf("transport[%d] read a unknown stream data: sid=%d", t.kind, fr.sid)
 		}
@@ -183,7 +191,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		// Trailer Frame: recv trailer, Close read direction
 		sio, ok := t.loadStreamIO(fr.sid)
 		if ok {
-			err = sio.stream.readTrailerFrame(fr)
+			err = sio.stream.readTrailerFrame(fr.payload, fr.trailer)
 		} else {
 			// client recv an unknown trailer is in exception,
 			// because the client stream may already be GCed,
@@ -196,9 +204,19 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 }
 
 func (t *transport) loopRead() error {
-	reader := newReaderBuffer(t.conn.Reader())
 	for {
-		err := t.readFrame(reader)
+		sizeBuf, err := t.conn.Reader().Peek(4)
+		if err != nil {
+			return err
+		}
+		size := binary.BigEndian.Uint32(sizeBuf)
+		slice, err := t.conn.Reader().Slice(int(size) + 4)
+		if err != nil {
+			return err
+		}
+		reader := newReaderBuffer(slice)
+
+		err = t.readFrame(reader)
 		// read frame return an un-recovered error, so we should close the transport
 		if err != nil {
 			return err
@@ -311,7 +329,9 @@ func (t *transport) streamRecv(ctx context.Context, sid int32, data any) (err er
 	}
 	err = DecodePayload(context.Background(), msg.payload, data.(thrift.FastCodec))
 	// payload will not be access after decode
-	mcache.Free(msg.payload)
+	if msg.reader != nil {
+		_ = msg.reader.Release(err)
+	}
 	return err
 }
 

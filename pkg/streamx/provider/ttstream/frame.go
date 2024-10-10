@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
 	gopkgthrift "github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
@@ -68,6 +67,9 @@ func newFrame(sframe streamFrame, meta IntHeader, typ int32, payload []byte) (fr
 }
 
 func recycleFrame(frame *Frame) {
+	if frame == nil {
+		return
+	}
 	frame.streamFrame = streamFrame{}
 	frame.meta = nil
 	frame.typ = 0
@@ -152,14 +154,11 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	// frame payload
 	var fpayload []byte
 	if dp.PayloadLen > 0 {
-		fpayload = mcache.Malloc(dp.PayloadLen)
-		_, err = reader.ReadBinary(fpayload) // copy read
-		_ = reader.Release(err)
+		// nocopy read
+		fpayload, err = reader.Next(dp.PayloadLen)
 		if err != nil {
 			return
 		}
-	} else {
-		_ = reader.Release(nil)
 	}
 
 	fr = newFrame(

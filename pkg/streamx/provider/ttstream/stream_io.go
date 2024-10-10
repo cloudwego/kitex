@@ -22,11 +22,13 @@ import (
 	"io"
 	"sync/atomic"
 
+	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 )
 
 type streamIOMsg struct {
+	reader    bufiox.Reader
 	payload   []byte
 	exception error
 }
