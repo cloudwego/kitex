@@ -142,6 +142,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 	if err != nil {
 		return err
 	}
+	defer recycleFrame(fr)
 	klog.Debugf("transport[%d] DecodeFrame: fr=%v", t.kind, fr)
 
 	switch fr.typ {
@@ -174,7 +175,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		// Data Frame: decode and distribute data
 		sio, ok := t.loadStreamIO(fr.sid)
 		if ok {
-			sio.input(context.Background(), fr)
+			sio.input(context.Background(), streamIOMsg{payload: fr.payload})
 		} else {
 			klog.Errorf("transport[%d] read a unknown stream data: sid=%d", t.kind, fr.sid)
 		}
@@ -233,6 +234,7 @@ func (t *transport) loopWrite() (err error) {
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}
+			recycleFrame(fr)
 			if delay >= batchWriteSize || len(t.wchannel) == 0 {
 				delay = 0
 				if err = t.conn.Writer().Flush(); err != nil {
@@ -303,24 +305,23 @@ func (t *transport) streamRecv(ctx context.Context, sid int32, data any) (err er
 	if !ok {
 		return io.EOF
 	}
-	f, err := sio.output(ctx)
+	msg, err := sio.output(ctx)
 	if err != nil {
 		return err
 	}
-	err = DecodePayload(context.Background(), f.payload, data.(thrift.FastCodec))
+	err = DecodePayload(context.Background(), msg.payload, data.(thrift.FastCodec))
 	// payload will not be access after decode
-	mcache.Free(f.payload)
-	recycleFrame(f)
+	mcache.Free(msg.payload)
 	return err
 }
 
-func (t *transport) streamCloseRecv(s *stream) error {
+func (t *transport) streamCloseRecv(s *stream, exception error) error {
 	sio, ok := t.loadStreamIO(s.sid)
 	if !ok {
 		return fmt.Errorf("stream not found in stream map: sid=%d", s.sid)
 	}
-	if s.err != nil {
-		sio.input(context.Background(), newErrFrame(s.err))
+	if exception != nil {
+		sio.input(context.Background(), streamIOMsg{exception: exception})
 	}
 	sio.closeRecv()
 	return nil
