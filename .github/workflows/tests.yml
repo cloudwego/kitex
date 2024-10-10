@@ -69,7 +69,7 @@ jobs:
           go mod init codegen-test
           go mod edit -replace=github.com/apache/thrift=github.com/apache/thrift@v0.13.0
           GOPROXY=direct go mod edit -replace github.com/cloudwego/kitex=github.com/Marina-Sakai/kitex@fix/combine_services_parse_mode
-          GOPROXY=direct go mod edit -replace github.com/cloudwego/dynamicgo=github.com/Marina-Sakai/dynamicgo@feat/support_isCombineServices
+          go mod edit -replace github.com/cloudwego/dynamicgo=github.com/cloudwego/dynamicgo@main
           go mod tidy
           bash -version
           bash ./codegen_install_check.sh
