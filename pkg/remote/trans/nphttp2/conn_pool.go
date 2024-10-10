@@ -121,7 +121,7 @@ func (p *connPool) newTransport(ctx context.Context, dialer remote.Dialer, netwo
 		opts,
 		p.remoteService,
 		func(grpc.GoAwayReason) {
-			// do nothing
+			p.Clean(network, address)
 		},
 		func() {
 			// do nothing
