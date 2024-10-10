@@ -18,8 +18,10 @@ package ttstream_test
 
 import (
 	"context"
+	"errors"
 	"io"
 
+	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
@@ -133,4 +135,51 @@ func (si *streamingService) BidiStream(ctx context.Context,
 		}
 		klog.Debugf("Server BidiStream: req={%v} resp={%v}", req, resp)
 	}
+}
+
+func buildErr(req *Request) error {
+	var err error
+	switch req.Type {
+	case normalErr:
+		err = errors.New(normalErrMsg)
+	case bizErr:
+		err = kerrors.NewBizStatusErrorWithExtra(testCode, testMsg, testExtra)
+	default:
+		klog.Fatalf("Unsupported Err Type: %d", req.Type)
+	}
+	return err
+}
+
+func (si *streamingService) UnaryWithErr(ctx context.Context, req *Request) (*Response, error) {
+	err := buildErr(req)
+	klog.Infof("Server UnaryWithErr: req={%v} err={%v}", req, err)
+	return nil, err
+}
+
+func (si *streamingService) ClientStreamWithErr(ctx context.Context, stream ClientStreamingServer[Request, Response]) (res *Response, err error) {
+	req, err := stream.Recv(ctx)
+	if err != nil {
+		klog.Errorf("Server ClientStreamWithErr Recv failed, err={%v}", err)
+		return nil, err
+	}
+	err = buildErr(req)
+	klog.Infof("Server ClientStreamWithErr: req={%v} err={%v}", req, err)
+	return nil, err
+}
+
+func (si *streamingService) ServerStreamWithErr(ctx context.Context, req *Request, stream ServerStreamingServer[Response]) error {
+	err := buildErr(req)
+	klog.Infof("Server ServerStreamWithErr: req={%v} err={%v}", req, err)
+	return err
+}
+
+func (si *streamingService) BidiStreamWithErr(ctx context.Context, stream BidiStreamingServer[Request, Response]) error {
+	req, err := stream.Recv(ctx)
+	if err != nil {
+		klog.Errorf("Server BidiStreamWithErr Recv failed, err={%v}", err)
+		return err
+	}
+	err = buildErr(req)
+	klog.Infof("Server BidiStreamWithErr: req={%v} err={%v}", req, err)
+	return err
 }

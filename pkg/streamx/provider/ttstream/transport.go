@@ -28,11 +28,12 @@ import (
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
-	"github.com/cloudwego/netpoll"
 )
 
 const (
@@ -209,7 +210,7 @@ func (t *transport) loopRead() error {
 					t.kind, addr, fr.sid, fr.trailer)
 				continue
 			}
-			if err = sio.stream.readTrailer(fr.trailer); err != nil {
+			if err = sio.stream.readTrailerFrame(fr); err != nil {
 				return err
 			}
 		}
@@ -257,15 +258,7 @@ func (t *transport) loopWrite() (err error) {
 }
 
 // writeFrame is concurrent safe
-func (t *transport) writeFrame(sframe streamFrame, meta IntHeader, ftype int32, data any) (err error) {
-	var payload []byte
-	if data != nil {
-		// payload should be written nocopy
-		payload, err = EncodePayload(context.Background(), data)
-		if err != nil {
-			return err
-		}
-	}
+func (t *transport) writeFrame(sframe streamFrame, meta IntHeader, ftype int32, payload []byte) (err error) {
 	frame := newFrame(sframe, meta, ftype, payload)
 	t.wchannel <- frame
 	return nil
@@ -278,9 +271,13 @@ func (t *transport) streamSend(ctx context.Context, sid int32, method string, wh
 			return err
 		}
 	}
+	payload, err := EncodePayload(ctx, res)
+	if err != nil {
+		return err
+	}
 	return t.writeFrame(
 		streamFrame{sid: sid, method: method},
-		nil, dataFrameType, res,
+		nil, dataFrameType, payload,
 	)
 }
 
@@ -290,10 +287,17 @@ func (t *transport) streamSendHeader(sid int32, method string, header streamx.He
 		nil, headerFrameType, nil)
 }
 
-func (t *transport) streamCloseSend(sid int32, method string, trailer streamx.Trailer) (err error) {
+func (t *transport) streamCloseSend(sid int32, method string, trailer streamx.Trailer, ex tException) (err error) {
+	var payload []byte
+	if ex != nil {
+		payload, err = EncodeException(context.Background(), method, sid, ex)
+		if err != nil {
+			return err
+		}
+	}
 	err = t.writeFrame(
 		streamFrame{sid: sid, method: method, trailer: trailer},
-		nil, trailerFrameType, nil,
+		nil, trailerFrameType, payload,
 	)
 	if err != nil {
 		return err
@@ -322,10 +326,13 @@ func (t *transport) streamRecv(ctx context.Context, sid int32, data any) (err er
 	return nil
 }
 
-func (t *transport) streamCloseRecv(s *stream) (err error) {
+func (t *transport) streamCloseRecv(s *stream) error {
 	sio, ok := t.loadStreamIO(s.sid)
 	if !ok {
 		return fmt.Errorf("stream not found in stream map: sid=%d", s.sid)
+	}
+	if s.err != nil {
+		sio.input(context.Background(), newErrFrame(s.err))
 	}
 	sio.closeRecv()
 	return nil
