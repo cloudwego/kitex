@@ -47,6 +47,10 @@ testdata/
 # kitex binary
 tool/cmd/kitex/kitex
 
+# benchmark comparision
+old.txt
+new.txt
+
 # remote dump file
 *.json
 base1.go

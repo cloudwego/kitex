@@ -114,22 +114,16 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 				return next(ctx, request, response)
 			}
 
-			var err error
 			start := time.Now()
-			done := make(chan error, 1)
+			done := make(chan error)
 			workerPool.GoCtx(ctx, func() {
 				defer func() {
 					if panicInfo := recover(); panicInfo != nil {
-						e := rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, true)
-						done <- e
+						done <- rpcinfo.ClientPanicToErr(ctx, panicInfo, ri, true)
 					}
-					if err == nil || !errors.Is(err, kerrors.ErrRPCFinish) {
-						// Don't regards ErrRPCFinish as normal error, it happens in retry scene,
-						// ErrRPCFinish means previous call returns first but is decoding.
-						close(done)
-					}
+					close(done)
 				}()
-				err = next(ctx, request, response)
+				err := next(ctx, request, response)
 				if err != nil && ctx.Err() != nil &&
 					!kerrors.IsTimeoutError(err) && !errors.Is(err, kerrors.ErrRPCFinish) {
 					// error occurs after the wait goroutine returns(RPCTimeout happens),
@@ -147,13 +141,11 @@ func rpcTimeoutMW(mwCtx context.Context) endpoint.Middleware {
 					}
 					klog.CtxErrorf(ctx, "%s", errMsg)
 				}
+				done <- err
 			})
 
 			select {
-			case panicErr := <-done:
-				if panicErr != nil {
-					return panicErr
-				}
+			case err := <-done:
 				return err
 			case <-ctx.Done():
 				return makeTimeoutErr(ctx, start, tm)
