@@ -68,6 +68,7 @@ jobs:
           cd kitex-tests/codegen
           go mod init codegen-test
           go mod edit -replace=github.com/apache/thrift=github.com/apache/thrift@v0.13.0
+          go mod edit -replace github.com/cloudwego/kitex=${LOCAL_REPO}
           go mod tidy
           bash -version
           bash ./codegen_install_check.sh
