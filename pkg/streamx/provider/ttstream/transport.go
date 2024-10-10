@@ -311,7 +311,7 @@ func (t *transport) streamRecv(ctx context.Context, sid int32, data any) (err er
 	// payload will not be access after decode
 	mcache.Free(f.payload)
 	recycleFrame(f)
-	return nil
+	return err
 }
 
 func (t *transport) streamCloseRecv(s *stream) error {

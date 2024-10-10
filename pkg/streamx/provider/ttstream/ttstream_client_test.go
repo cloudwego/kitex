@@ -568,4 +568,7 @@ func BenchmarkTTHeaderStreaming(b *testing.B) {
 		_ = res
 	}
 	err = bs.CloseSend(ctx)
+	if err != nil {
+		b.Fatal(err)
+	}
 }
