@@ -75,7 +75,7 @@ type stream struct {
 	peerEOF    int32
 	headerSig  chan int32
 	trailerSig chan int32
-  err        error
+	err        error
 
 	StreamMeta
 	metaHandler MetaFrameHandler

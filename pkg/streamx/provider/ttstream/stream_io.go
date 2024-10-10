@@ -37,7 +37,7 @@ type streamIO struct {
 	eofCallback func()
 	fpipe       *container.Pipe[*Frame]
 	fcache      [1]*Frame
-  err         error
+	err         error
 }
 
 func newStreamIO(ctx context.Context, s *stream) *streamIO {
