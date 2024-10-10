@@ -27,7 +27,6 @@ import (
 	gopkgthrift "github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
 
-	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
@@ -52,7 +51,6 @@ type Frame struct {
 	meta    IntHeader
 	typ     int32
 	payload []byte
-	err     error
 }
 
 func newFrame(sframe streamFrame, meta IntHeader, typ int32, payload []byte) (fr *Frame) {
@@ -69,23 +67,11 @@ func newFrame(sframe streamFrame, meta IntHeader, typ int32, payload []byte) (fr
 	return fr
 }
 
-func newErrFrame(err error) (fr *Frame) {
-	v := framePool.Get()
-	if v == nil {
-		fr = new(Frame)
-	} else {
-		fr = v.(*Frame)
-	}
-	fr.err = err
-	return fr
-}
-
 func recycleFrame(frame *Frame) {
 	frame.streamFrame = streamFrame{}
 	frame.meta = nil
 	frame.typ = 0
 	frame.payload = nil
-	frame.err = nil
 	framePool.Put(frame)
 }
 
@@ -184,15 +170,13 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	return fr, nil
 }
 
-var thriftCodec = thrift.NewThriftCodec()
-
 func EncodePayload(ctx context.Context, msg any) ([]byte, error) {
-	payload, err := thrift.MarshalThriftData(ctx, thriftCodec, msg)
-	return payload, err
+	payload := gopkgthrift.FastMarshal(msg.(gopkgthrift.FastCodec))
+	return payload, nil
 }
 
 func DecodePayload(ctx context.Context, payload []byte, msg any) error {
-	return thrift.UnmarshalThriftData(ctx, thriftCodec, "", payload, msg)
+	return gopkgthrift.FastUnmarshal(payload, msg.(gopkgthrift.FastCodec))
 }
 
 func EncodeException(ctx context.Context, method string, seq int32, ex tException) ([]byte, error) {
