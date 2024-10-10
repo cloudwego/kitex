@@ -166,10 +166,11 @@ func (s *stream) readTrailerFrame(fr *Frame) (err error) {
 		return fmt.Errorf("stream read a unexcept trailer")
 	}
 
+	// when server-side returns non-biz error, it will be wrapped as ApplicationException stored in trailer frame payload
 	if len(fr.payload) > 0 {
 		_, _, ex := thrift.UnmarshalFastMsg(fr.payload, nil)
 		s.err = ex.(*thrift.ApplicationException)
-	} else {
+	} else { // when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header
 		bizErr, err := transmeta.ParseBizStatusErr(fr.trailer)
 		if err != nil {
 			s.err = err
@@ -206,9 +207,6 @@ func (s *stream) writeTrailer(tl streamx.Trailer) (err error) {
 func (s *stream) appendTrailer(kvs ...string) (err error) {
 	if len(kvs)%2 != 0 {
 		return fmt.Errorf("got the odd number of input kvs for Trailer: %d", len(kvs))
-	}
-	if s.wtrailer == nil {
-		s.wtrailer = make(streamx.Trailer)
 	}
 	var key string
 	for i, str := range kvs {
