@@ -26,18 +26,23 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 )
 
+type streamIOMsg struct {
+	payload   []byte
+	exception error
+}
+
 type streamIO struct {
-	ctx     context.Context
-	trigger chan struct{}
-	stream  *stream
+	ctx       context.Context
+	trigger   chan struct{}
+	stream    *stream
+	pipe      *container.Pipe[streamIOMsg]
+	cache     [1]streamIOMsg
+	exception error // once has exception, the stream should not work normally again
 	// eofFlag == 2 when both parties send trailers
 	eofFlag int32
 	// eofCallback will be called when eofFlag == 2
 	// eofCallback will not be called if stream is not be ended in a normal way
 	eofCallback func()
-	fpipe       *container.Pipe[*Frame]
-	fcache      [1]*Frame
-	err         error
 }
 
 func newStreamIO(ctx context.Context, s *stream) *streamIO {
@@ -45,7 +50,7 @@ func newStreamIO(ctx context.Context, s *stream) *streamIO {
 	sio.ctx = ctx
 	sio.trigger = make(chan struct{})
 	sio.stream = s
-	sio.fpipe = container.NewPipe[*Frame]()
+	sio.pipe = container.NewPipe[streamIOMsg]()
 	return sio
 }
 
@@ -53,39 +58,40 @@ func (s *streamIO) setEOFCallback(f func()) {
 	s.eofCallback = f
 }
 
-func (s *streamIO) input(ctx context.Context, f *Frame) {
-	err := s.fpipe.Write(ctx, f)
+func (s *streamIO) input(ctx context.Context, msg streamIOMsg) {
+	err := s.pipe.Write(ctx, msg)
 	if err != nil {
-		klog.Errorf("fpipe write failed: %v", err)
+		klog.Errorf("pipe write failed: %v", err)
 	}
 }
 
-func (s *streamIO) output(ctx context.Context) (f *Frame, err error) {
-	if s.err != nil {
-		return nil, s.err
+func (s *streamIO) output(ctx context.Context) (msg streamIOMsg, err error) {
+	if s.exception != nil {
+		return msg, s.exception
 	}
-	n, err := s.fpipe.Read(ctx, s.fcache[:])
+
+	n, err := s.pipe.Read(ctx, s.cache[:])
 	if err != nil {
 		if errors.Is(err, container.ErrPipeEOF) {
 			err = io.EOF
 		}
-		s.err = err
-		return nil, s.err
+		s.exception = err
+		return msg, s.exception
 	}
 	if n == 0 {
-		s.err = io.EOF
-		return nil, s.err
+		s.exception = io.EOF
+		return msg, s.exception
 	}
-	f = s.fcache[0]
-	if f.err != nil {
-		s.err = f.err
-		return nil, s.err
+	msg = s.cache[0]
+	if msg.exception != nil {
+		s.exception = msg.exception
+		return msg, s.exception
 	}
-	return f, nil
+	return msg, nil
 }
 
 func (s *streamIO) closeRecv() {
-	s.fpipe.Close()
+	s.pipe.Close()
 	if atomic.AddInt32(&s.eofFlag, 1) == 2 && s.eofCallback != nil {
 		s.eofCallback()
 	}
@@ -98,5 +104,5 @@ func (s *streamIO) closeSend() {
 }
 
 func (s *streamIO) cancel() {
-	s.fpipe.Cancel()
+	s.pipe.Cancel()
 }
