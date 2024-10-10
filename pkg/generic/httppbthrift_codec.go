@@ -37,17 +37,18 @@ import (
 var _ Closer = &httpPbThriftCodec{}
 
 type httpPbThriftCodec struct {
-	svcDsc     atomic.Value // *idl
-	pbSvcDsc   atomic.Value // *pbIdl
-	provider   DescriptorProvider
-	pbProvider PbDescriptorProvider
-	svcName    string
+	svcDsc             atomic.Value // *idl
+	pbSvcDsc           atomic.Value // *pbIdl
+	provider           DescriptorProvider
+	pbProvider         PbDescriptorProvider
+	svcName            string
+	isCombinedServices bool
 }
 
 func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider) *httpPbThriftCodec {
 	svc := <-p.Provide()
 	pbSvc := <-pbp.Provide()
-	c := &httpPbThriftCodec{provider: p, pbProvider: pbp, svcName: svc.Name}
+	c := &httpPbThriftCodec{provider: p, pbProvider: pbp, svcName: svc.Name, isCombinedServices: svc.IsCombinedServices}
 	c.svcDsc.Store(svc)
 	c.pbSvcDsc.Store(pbSvc)
 	go c.update()
@@ -67,6 +68,7 @@ func (c *httpPbThriftCodec) update() {
 		}
 
 		c.svcName = svc.Name
+		c.isCombinedServices = svc.IsCombinedServices
 		c.svcDsc.Store(svc)
 		c.pbSvcDsc.Store(pbSvc)
 	}

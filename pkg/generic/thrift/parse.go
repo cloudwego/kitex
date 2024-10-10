@@ -88,6 +88,7 @@ func Parse(tree *parser.Thrift, mode ParseMode, opts ...ParseOption) (*descripto
 		sDsc.Name = svcs[0].Name
 	case CombineServices:
 		sDsc.Name = "CombinedServices"
+		sDsc.IsCombinedServices = true
 	}
 
 	pOpts := &parseOptions{}

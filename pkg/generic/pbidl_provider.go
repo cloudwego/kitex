@@ -94,6 +94,7 @@ func parseProto(main string, includes map[string]string) (proto.ServiceDescripto
 		return nil, errors.New("no service descriptor found")
 	}
 
+	// TODO: support parse mode. now only support first service
 	return services[0], nil
 }
 
@@ -108,7 +109,7 @@ func (p *PbContentProvider) Close() error {
 	return nil
 }
 
-// PbFileProviderWithDynamicGo
+// NewPbFileProviderWithDynamicGo ..
 func NewPbFileProviderWithDynamicGo(main string, ctx context.Context, options dproto.Options, importDirs ...string) (PbDescriptorProviderDynamicGo, error) {
 	p := &PbFileProviderWithDynamicGo{
 		svcs: make(chan *dproto.ServiceDescriptor, 1),

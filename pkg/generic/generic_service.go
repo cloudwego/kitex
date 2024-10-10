@@ -40,17 +40,17 @@ type Service interface {
 
 // ServiceInfoWithGeneric create a generic ServiceInfo
 func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
-	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName(), true)
+	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName(), g.IsCombinedServices(), true)
 }
 
 // Deprecated: Replaced by ServiceInfoWithGeneric, this method will be removed in v0.12.0
 // ServiceInfo create a generic ServiceInfo
 // TODO(marina.sakai): remove in v0.12.0
 func ServiceInfo(pcType serviceinfo.PayloadCodec) *serviceinfo.ServiceInfo {
-	return newServiceInfo(pcType, nil, "", false)
+	return newServiceInfo(pcType, nil, "", false, false)
 }
 
-func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string, withGeneric bool) *serviceinfo.ServiceInfo {
+func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interface{}, serviceName string, isCombinedServices, withGeneric bool) *serviceinfo.ServiceInfo {
 	handlerType := (*Service)(nil)
 
 	methods, svcName := GetMethodInfo(messageReaderWriter, serviceName)
@@ -63,6 +63,9 @@ func newServiceInfo(pcType serviceinfo.PayloadCodec, messageReaderWriter interfa
 		Extra:        make(map[string]interface{}),
 	}
 	svcInfo.Extra["generic"] = true
+	if isCombinedServices {
+		svcInfo.Extra["combine_service"] = true
+	}
 	// TODO(marina.sakai): remove in v0.12.0
 	if !withGeneric {
 		svcInfo.Extra[DeprecatedGenericServiceInfoAPIKey] = true
