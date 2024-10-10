@@ -41,7 +41,7 @@ const (
 	serverTransport int32 = 2
 
 	streamCacheSize = 32
-	frameChanSize   = 32
+	frameCacheSize  = 1024
 	batchWriteSize  = 32
 )
 
@@ -73,7 +73,7 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		streams:  sync.Map{},
 		spipe:    container.NewPipe[*stream](),
 		scache:   make([]*stream, 0, streamCacheSize),
-		wchannel: make(chan *Frame, frameChanSize),
+		wchannel: make(chan *Frame, frameCacheSize),
 		closed:   make(chan struct{}),
 	}
 	go func() {
