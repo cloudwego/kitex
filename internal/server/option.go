@@ -100,7 +100,8 @@ type Options struct {
 
 	BackupOpt backup.Options
 
-	Streaming stream.StreamingConfig
+	Streaming      stream.StreamingConfig
+	StreamXOptions streamx.ServerOptions
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool
