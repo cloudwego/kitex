@@ -49,7 +49,7 @@ type httpThriftCodec struct {
 	dynamicgoEnabled       bool
 	useRawBodyForHTTPResp  bool
 	svcName                string
-	isCombinedServices     bool
+	extra                  map[string]string
 }
 
 func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
@@ -60,7 +60,7 @@ func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
 		dynamicgoEnabled:      false,
 		useRawBodyForHTTPResp: opts.useRawBodyForHTTPResp,
 		svcName:               svc.Name,
-		isCombinedServices:    svc.IsCombinedServices,
+		extra:                 make(map[string]string),
 	}
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoEnabled {
 		c.dynamicgoEnabled = true
@@ -71,6 +71,7 @@ func newHTTPThriftCodec(p DescriptorProvider, opts *Options) *httpThriftCodec {
 		convOpts.EnableThriftBase = true
 		c.convOptsWithThriftBase = convOpts
 	}
+	c.setCombinedServices(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
 	go c.update()
 	return c
@@ -83,8 +84,16 @@ func (c *httpThriftCodec) update() {
 			return
 		}
 		c.svcName = svc.Name
-		c.isCombinedServices = svc.IsCombinedServices
+		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
+	}
+}
+
+func (c *httpThriftCodec) setCombinedServices(isCombinedServices bool) {
+	if isCombinedServices {
+		c.extra[CombineServiceKey] = "true"
+	} else {
+		c.extra[CombineServiceKey] = "false"
 	}
 }
 

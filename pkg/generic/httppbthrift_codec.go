@@ -37,18 +37,24 @@ import (
 var _ Closer = &httpPbThriftCodec{}
 
 type httpPbThriftCodec struct {
-	svcDsc             atomic.Value // *idl
-	pbSvcDsc           atomic.Value // *pbIdl
-	provider           DescriptorProvider
-	pbProvider         PbDescriptorProvider
-	svcName            string
-	isCombinedServices bool
+	svcDsc     atomic.Value // *idl
+	pbSvcDsc   atomic.Value // *pbIdl
+	provider   DescriptorProvider
+	pbProvider PbDescriptorProvider
+	svcName    string
+	extra      map[string]string
 }
 
 func newHTTPPbThriftCodec(p DescriptorProvider, pbp PbDescriptorProvider) *httpPbThriftCodec {
 	svc := <-p.Provide()
 	pbSvc := <-pbp.Provide()
-	c := &httpPbThriftCodec{provider: p, pbProvider: pbp, svcName: svc.Name, isCombinedServices: svc.IsCombinedServices}
+	c := &httpPbThriftCodec{
+		provider:   p,
+		pbProvider: pbp,
+		svcName:    svc.Name,
+		extra:      make(map[string]string),
+	}
+	c.setCombinedServices(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
 	c.pbSvcDsc.Store(pbSvc)
 	go c.update()
@@ -68,9 +74,17 @@ func (c *httpPbThriftCodec) update() {
 		}
 
 		c.svcName = svc.Name
-		c.isCombinedServices = svc.IsCombinedServices
+		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
 		c.pbSvcDsc.Store(pbSvc)
+	}
+}
+
+func (c *httpPbThriftCodec) setCombinedServices(isCombinedServices bool) {
+	if isCombinedServices {
+		c.extra[CombineServiceKey] = "true"
+	} else {
+		c.extra[CombineServiceKey] = "false"
 	}
 }
 

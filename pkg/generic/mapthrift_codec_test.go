@@ -36,6 +36,7 @@ func TestMapThriftCodec(t *testing.T) {
 	test.Assert(t, method.Name == "Test")
 	test.Assert(t, method.StreamingMode == serviceinfo.StreamingNone)
 	test.Assert(t, mtc.svcName == "Mock")
+	test.Assert(t, mtc.extra[CombineServiceKey] == "false")
 
 	rw := mtc.getMessageReaderWriter()
 	_, ok := rw.(thrift.MessageWriter)

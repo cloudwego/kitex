@@ -40,7 +40,17 @@ type Service interface {
 
 // ServiceInfoWithGeneric create a generic ServiceInfo
 func ServiceInfoWithGeneric(g Generic) *serviceinfo.ServiceInfo {
-	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName(), g.IsCombinedServices(), true)
+	isCombinedServices := getIsCombinedServices(g)
+	return newServiceInfo(g.PayloadCodecType(), g.MessageReaderWriter(), g.IDLServiceName(), isCombinedServices, true)
+}
+
+func getIsCombinedServices(g Generic) bool {
+	if extra, ok := g.(ExtraProvider); ok {
+		if extra.GetExtra(CombineServiceKey) == "true" {
+			return true
+		}
+	}
+	return false
 }
 
 // Deprecated: Replaced by ServiceInfoWithGeneric, this method will be removed in v0.12.0

@@ -45,8 +45,6 @@ type Generic interface {
 	// MessageReaderWriter returns reader and writer
 	// this is used for generic which needs IDL
 	MessageReaderWriter() interface{}
-	// IsCombinedServices returns whether the IDL was parsed in CombineServices mode
-	IsCombinedServices() bool
 }
 
 // Method information
@@ -55,6 +53,13 @@ type Method struct {
 	Oneway        bool
 	StreamingMode serviceinfo.StreamingMode
 }
+
+// ExtraProvider provides extra info for generic
+type ExtraProvider interface {
+	GetExtra(key string) string
+}
+
+const CombineServiceKey = "combine_service"
 
 // BinaryThriftGeneric raw thrift binary Generic
 func BinaryThriftGeneric() Generic {
@@ -235,10 +240,6 @@ func (g *binaryThriftGeneric) MessageReaderWriter() interface{} {
 	return nil
 }
 
-func (g *binaryThriftGeneric) IsCombinedServices() bool {
-	return false
-}
-
 type mapThriftGeneric struct {
 	codec *mapThriftCodec
 }
@@ -271,8 +272,8 @@ func (g *mapThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
 }
 
-func (g *mapThriftGeneric) IsCombinedServices() bool {
-	return g.codec.isCombinedServices
+func (g *mapThriftGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
 }
 
 type jsonThriftGeneric struct {
@@ -307,8 +308,8 @@ func (g *jsonThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
 }
 
-func (g *jsonThriftGeneric) IsCombinedServices() bool {
-	return g.codec.isCombinedServices
+func (g *jsonThriftGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
 }
 
 type jsonPbGeneric struct {
@@ -343,8 +344,8 @@ func (g *jsonPbGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
 }
 
-func (g *jsonPbGeneric) IsCombinedServices() bool {
-	return g.codec.isCombinedServices
+func (g *jsonPbGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
 }
 
 type httpThriftGeneric struct {
@@ -379,8 +380,8 @@ func (g *httpThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
 }
 
-func (g *httpThriftGeneric) IsCombinedServices() bool {
-	return g.codec.isCombinedServices
+func (g *httpThriftGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
 }
 
 type httpPbThriftGeneric struct {
@@ -415,6 +416,6 @@ func (g *httpPbThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
 }
 
-func (g *httpPbThriftGeneric) IsCombinedServices() bool {
-	return g.codec.isCombinedServices
+func (g *httpPbThriftGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
 }
