@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
+
+var invokerCache sync.Map
 
 func InvokeStream[Req, Res any](
 	ctx context.Context, smode serviceinfo.StreamingMode,
@@ -36,9 +39,16 @@ func InvokeStream[Req, Res any](
 	}
 
 	// handler call
-	// TODO: cache handler
-	rhandler := reflect.ValueOf(shandler.Handler)
-	mhandler := rhandler.MethodByName(sArgs.Stream().Method())
+	cacheKey := reflect.TypeOf(shandler.Handler).String() + sArgs.Stream().Method()
+	var mhandler reflect.Value
+	if v, ok := invokerCache.Load(cacheKey); ok {
+		mhandler = v.(reflect.Value)
+	} else {
+		rhandler := reflect.ValueOf(shandler.Handler)
+		mhandler = rhandler.MethodByName(sArgs.Stream().Method())
+		invokerCache.Store(cacheKey, mhandler)
+	}
+
 	streamInvoke := func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
 		switch smode {
 		case serviceinfo.StreamingUnary:
