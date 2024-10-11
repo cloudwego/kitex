@@ -101,10 +101,11 @@ type FunctionDescriptor struct {
 
 // ServiceDescriptor idl service descriptor
 type ServiceDescriptor struct {
-	Name         string
-	Functions    map[string]*FunctionDescriptor
-	Router       Router
-	DynamicGoDsc *dthrift.ServiceDescriptor
+	Name               string
+	Functions          map[string]*FunctionDescriptor
+	Router             Router
+	DynamicGoDsc       *dthrift.ServiceDescriptor
+	IsCombinedServices bool
 }
 
 // LookupFunctionByMethod lookup function by method
