@@ -24,7 +24,7 @@ import (
 )
 
 // StreamEventHandler is used to handle stream events
-type StreamEventHandler func(ctx context.Context, evt stats.Event, err error)
+type StreamEventHandler = func(ctx context.Context, evt stats.Event, err error)
 
 type StreamingConfig struct {
 	RecvMiddlewareBuilders []endpoint.RecvMiddlewareBuilder

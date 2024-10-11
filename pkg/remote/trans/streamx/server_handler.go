@@ -23,9 +23,10 @@ import (
 	"log"
 	"net"
 	"runtime/debug"
+	"time"
 
+	"github.com/cloudwego/kitex/internal/wpool"
 	"github.com/cloudwego/kitex/pkg/endpoint"
-	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -41,6 +42,8 @@ import (
 
 其他接口实际上最终是用来去组装了 transpipeline ....
 */
+
+var streamWorkerPool = wpool.New(128, time.Minute)
 
 type svrTransHandlerFactory struct {
 	provider streamx.ServerProvider
@@ -100,7 +103,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			return nerr
 		}
 		// stream level goroutine
-		gofunc.GoFunc(ctx, func() {
+		streamWorkerPool.GoCtx(ctx, func() {
 			err := t.OnStream(nctx, conn, ss)
 			if err != nil && !errors.Is(err, io.EOF) {
 				klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", nerr)

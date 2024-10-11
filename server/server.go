@@ -216,6 +216,18 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	}
 
 	registerOpts := internal_server.NewRegisterOptions(opts)
+	// add trace middlewares
+	ehandler := s.opt.TracerCtl.GetStreamEventHandler()
+	if ehandler != nil {
+		registerOpts.StreamRecvMiddlewares = append(
+			registerOpts.StreamRecvMiddlewares, streamx.NewStreamRecvStatMiddleware(ehandler),
+		)
+		registerOpts.StreamSendMiddlewares = append(
+			registerOpts.StreamSendMiddlewares, streamx.NewStreamSendStatMiddleware(ehandler),
+		)
+	}
+
+	// register service
 	if err := s.svcs.addService(svcInfo, handler, registerOpts); err != nil {
 		panic(err.Error())
 	}
