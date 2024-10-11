@@ -35,6 +35,7 @@ func TestGenericStreamService(t *testing.T) {
 
 	svcInfo := newClientStreamingServiceInfo(g)
 	test.Assert(t, svcInfo.Extra["generic"] == true)
+	test.Assert(t, svcInfo.Extra["combine_service"] == nil)
 	svcInfo.GenericMethod = func(name string) serviceinfo.MethodInfo {
 		return svcInfo.Methods[name]
 	}

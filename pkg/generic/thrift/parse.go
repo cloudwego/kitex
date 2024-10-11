@@ -88,6 +88,7 @@ func Parse(tree *parser.Thrift, mode ParseMode) (*descriptor.ServiceDescriptor, 
 		sDsc.Name = svcs[0].Name
 	case CombineServices:
 		sDsc.Name = "CombinedServices"
+		sDsc.IsCombinedServices = true
 	}
 
 	visitedSvcs := make(map[*parser.Service]bool, len(tree.Services))

@@ -42,11 +42,21 @@ type jsonThriftCodec struct {
 	convOptsWithThriftBase conv.Options // used for dynamicgo conversion with EnableThriftBase turned on
 	convOptsWithException  conv.Options // used for dynamicgo conversion with ConvertException turned on
 	svcName                string
+	extra                  map[string]string
 }
 
 func newJsonThriftCodec(p DescriptorProvider, opts *Options) *jsonThriftCodec {
 	svc := <-p.Provide()
-	c := &jsonThriftCodec{provider: p, binaryWithBase64: true, dynamicgoEnabled: false, svcName: svc.Name}
+	c := &jsonThriftCodec{
+		provider:         p,
+		binaryWithBase64: true,
+		dynamicgoEnabled: false,
+		svcName:          svc.Name,
+		extra:            make(map[string]string),
+	}
+
+	c.setCombinedServices(svc.IsCombinedServices)
+
 	if dp, ok := p.(GetProviderOption); ok && dp.Option().DynamicGoEnabled {
 		c.dynamicgoEnabled = true
 
@@ -73,7 +83,16 @@ func (c *jsonThriftCodec) update() {
 			return
 		}
 		c.svcName = svc.Name
+		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
+	}
+}
+
+func (c *jsonThriftCodec) setCombinedServices(isCombinedServices bool) {
+	if isCombinedServices {
+		c.extra[CombineServiceKey] = "true"
+	} else {
+		c.extra[CombineServiceKey] = "false"
 	}
 }
 
