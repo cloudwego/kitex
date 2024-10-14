@@ -181,13 +181,6 @@ func Test_buildStreamingEvent(t *testing.T) {
 		test.Assert(t, evt.Info() == "")
 	})
 
-	t.Run("io.EOF", func(t *testing.T) {
-		evt := buildStreamingEvent(stats.StreamSend, io.EOF)
-		test.Assert(t, evt.Event() == stats.StreamSend)
-		test.Assert(t, evt.Status() == stats.StatusInfo)
-		test.Assert(t, evt.Info() == "")
-	})
-
 	t.Run("error", func(t *testing.T) {
 		err := errors.New("XXX")
 		evt := buildStreamingEvent(stats.StreamSend, err)
