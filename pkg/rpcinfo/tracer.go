@@ -18,6 +18,7 @@ package rpcinfo
 
 import (
 	"context"
+	"errors"
 	"io"
 	"runtime/debug"
 
@@ -75,7 +76,7 @@ func (c *TraceController) DoFinish(ctx context.Context, ri RPCInfo, err error) {
 }
 
 func buildStreamingEvent(statsEvent stats.Event, err error) Event {
-	if err == nil || err == io.EOF {
+	if err == nil {
 		return NewEvent(statsEvent, stats.StatusInfo, "")
 	} else {
 		return NewEvent(statsEvent, stats.StatusError, err.Error())
@@ -85,6 +86,11 @@ func buildStreamingEvent(statsEvent stats.Event, err error) Event {
 // ReportStreamEvent is for collecting Recv/Send events on stream
 func (c *TraceController) ReportStreamEvent(ctx context.Context, statsEvent stats.Event, err error) {
 	if !c.HasStreamEventReporter() {
+		return
+	}
+	// we should ignore event if stream.RecvMsg return EOF
+	// because it means there is no data incoming and stream closed by peer normally
+	if errors.Is(err, io.EOF) {
 		return
 	}
 	defer c.tryRecover(ctx)
