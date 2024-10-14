@@ -18,7 +18,6 @@ package rpcinfo
 
 import (
 	"context"
-	"errors"
 	"io"
 	"runtime/debug"
 
@@ -90,7 +89,7 @@ func (c *TraceController) ReportStreamEvent(ctx context.Context, statsEvent stat
 	}
 	// we should ignore event if stream.RecvMsg return EOF
 	// because it means there is no data incoming and stream closed by peer normally
-	if errors.Is(err, io.EOF) {
+	if err == io.EOF {
 		return
 	}
 	defer c.tryRecover(ctx)
