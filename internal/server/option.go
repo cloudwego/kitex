@@ -41,7 +41,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/stats"
-	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/localsession/backup"
@@ -80,10 +79,6 @@ type Options struct {
 	Limit    Limit
 
 	MWBs []endpoint.MiddlewareBuilder
-	// streamx
-	SMWs     []streamx.StreamMiddleware
-	SRecvMWs []streamx.StreamRecvMiddleware
-	SSendMWs []streamx.StreamSendMiddleware
 
 	Bus    event.Bus
 	Events event.Queue
@@ -100,8 +95,7 @@ type Options struct {
 
 	BackupOpt backup.Options
 
-	Streaming      stream.StreamingConfig
-	StreamXOptions streamx.ServerOptions
+	Streaming stream.StreamingConfig
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool
