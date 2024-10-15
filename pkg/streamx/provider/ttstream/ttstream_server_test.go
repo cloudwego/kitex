@@ -156,7 +156,7 @@ func (si *streamingService) UnaryWithErr(ctx context.Context, req *Request) (*Re
 	return nil, err
 }
 
-func (si *streamingService) ClientStreamWithErr(ctx context.Context, stream ClientStreamingServer[Request, Response]) (res *Response, err error) {
+func (si *streamingService) ClientStreamWithErr(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (res *Response, err error) {
 	req, err := stream.Recv(ctx)
 	if err != nil {
 		klog.Errorf("Server ClientStreamWithErr Recv failed, exception={%v}", err)
@@ -167,13 +167,13 @@ func (si *streamingService) ClientStreamWithErr(ctx context.Context, stream Clie
 	return nil, err
 }
 
-func (si *streamingService) ServerStreamWithErr(ctx context.Context, req *Request, stream ServerStreamingServer[Response]) error {
+func (si *streamingService) ServerStreamWithErr(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error {
 	err := buildErr(req)
 	klog.Infof("Server ServerStreamWithErr: req={%v} err={%v}", req, err)
 	return err
 }
 
-func (si *streamingService) BidiStreamWithErr(ctx context.Context, stream BidiStreamingServer[Request, Response]) error {
+func (si *streamingService) BidiStreamWithErr(ctx context.Context, stream streamx.BidiStreamingServer[Request, Response]) error {
 	req, err := stream.Recv(ctx)
 	if err != nil {
 		klog.Errorf("Server BidiStreamWithErr Recv failed, exception={%v}", err)
