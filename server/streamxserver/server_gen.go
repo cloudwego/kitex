@@ -14,7 +14,8 @@ var invokerCache sync.Map
 
 func InvokeStream[Req, Res any](
 	ctx context.Context, smode serviceinfo.StreamingMode,
-	handler any, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+	handler any, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs,
+) (err error) {
 	// prepare args
 	sArgs := streamx.GetStreamArgsFromContext(ctx)
 	if sArgs == nil {

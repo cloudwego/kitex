@@ -34,8 +34,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-type serverTransCtxKey struct{}
-type serverStreamCancelCtxKey struct{}
+type (
+	serverTransCtxKey        struct{}
+	serverStreamCancelCtxKey struct{}
+)
 
 func NewServerProvider(sinfo *serviceinfo.ServiceInfo, opts ...ServerProviderOption) (streamx.ServerProvider, error) {
 	sp := new(serverProvider)

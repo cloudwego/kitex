@@ -29,12 +29,14 @@ import (
 
 // === gen code ===
 
-type ClientStreamingServer[Req, Res any] streamx.ClientStreamingServer[Req, Res]
-type ServerStreamingServer[Res any] streamx.ServerStreamingServer[Res]
-type BidiStreamingServer[Req, Res any] streamx.BidiStreamingServer[Req, Res]
-type ClientStreamingClient[Req, Res any] streamx.ClientStreamingClient[Req, Res]
-type ServerStreamingClient[Res any] streamx.ServerStreamingClient[Res]
-type BidiStreamingClient[Req, Res any] streamx.BidiStreamingClient[Req, Res]
+type (
+	ClientStreamingServer[Req, Res any] streamx.ClientStreamingServer[Req, Res]
+	ServerStreamingServer[Res any]      streamx.ServerStreamingServer[Res]
+	BidiStreamingServer[Req, Res any]   streamx.BidiStreamingServer[Req, Res]
+	ClientStreamingClient[Req, Res any] streamx.ClientStreamingClient[Req, Res]
+	ServerStreamingClient[Res any]      streamx.ServerStreamingClient[Res]
+	BidiStreamingClient[Req, Res any]   streamx.BidiStreamingClient[Req, Res]
+)
 
 var serviceInfo = &serviceinfo.ServiceInfo{
 	ServiceName: "a.b.c",
@@ -165,13 +167,15 @@ func (c *kClient) ClientStream(ctx context.Context, callOptions ...streamxcallop
 }
 
 func (c *kClient) ServerStream(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (
-	stream ServerStreamingClient[Response], err error) {
+	stream ServerStreamingClient[Response], err error,
+) {
 	return streamxclient.InvokeStream[Request, Response](
 		ctx, c.Client, serviceinfo.StreamingServer, "ServerStream", req, nil, callOptions...)
 }
 
 func (c *kClient) BidiStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
-	stream BidiStreamingClient[Request, Response], err error) {
+	stream BidiStreamingClient[Request, Response], err error,
+) {
 	return streamxclient.InvokeStream[Request, Response](
 		ctx, c.Client, serviceinfo.StreamingBidirectional, "BidiStream", nil, nil, callOptions...)
 }

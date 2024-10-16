@@ -32,12 +32,14 @@ const (
 	pipeStateCanceled pipeState = 3
 )
 
-var ErrPipeEOF = io.EOF
-var ErrPipeCanceled = fmt.Errorf("pipe canceled")
-var stateErrors map[pipeState]error = map[pipeState]error{
-	pipeStateClosed:   ErrPipeEOF,
-	pipeStateCanceled: ErrPipeCanceled,
-}
+var (
+	ErrPipeEOF                          = io.EOF
+	ErrPipeCanceled                     = fmt.Errorf("pipe canceled")
+	stateErrors     map[pipeState]error = map[pipeState]error{
+		pipeStateClosed:   ErrPipeEOF,
+		pipeStateCanceled: ErrPipeCanceled,
+	}
+)
 
 // Pipe implement a queue that never block on Write but block on Read if there is nothing to read
 type Pipe[Item any] struct {

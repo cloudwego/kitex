@@ -1,4 +1,6 @@
 package streamx
 
-type Header map[string]string
-type Trailer map[string]string
+type (
+	Header  map[string]string
+	Trailer map[string]string
+)

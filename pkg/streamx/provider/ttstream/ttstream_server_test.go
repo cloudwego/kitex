@@ -27,8 +27,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 )
 
-type pingpongService struct{}
-type streamingService struct{}
+type (
+	pingpongService  struct{}
+	streamingService struct{}
+)
 
 const (
 	headerKey  = "header1"
@@ -63,7 +65,8 @@ func (si *streamingService) Unary(ctx context.Context, req *Request) (*Response,
 }
 
 func (si *streamingService) ClientStream(ctx context.Context,
-	stream streamx.ClientStreamingServer[Request, Response]) (*Response, error) {
+	stream streamx.ClientStreamingServer[Request, Response],
+) (*Response, error) {
 	var msg string
 	klog.Infof("Server ClientStream start")
 	defer klog.Infof("Server ClientStream end")
@@ -87,7 +90,8 @@ func (si *streamingService) ClientStream(ctx context.Context,
 }
 
 func (si *streamingService) ServerStream(ctx context.Context, req *Request,
-	stream streamx.ServerStreamingServer[Response]) error {
+	stream streamx.ServerStreamingServer[Response],
+) error {
 	klog.Infof("Server ServerStream: req={%v}", req)
 
 	if err := si.setHeaderAndTrailer(stream); err != nil {
@@ -108,7 +112,8 @@ func (si *streamingService) ServerStream(ctx context.Context, req *Request,
 }
 
 func (si *streamingService) BidiStream(ctx context.Context,
-	stream streamx.BidiStreamingServer[Request, Response]) error {
+	stream streamx.BidiStreamingServer[Request, Response],
+) error {
 	ktx.RegisterCancelCallback(ctx, func() {
 		klog.Debugf("RegisterCancelCallback work!")
 	})

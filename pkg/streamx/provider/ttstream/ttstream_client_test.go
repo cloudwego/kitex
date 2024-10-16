@@ -64,7 +64,7 @@ func TestMain(m *testing.M) {
 }
 
 func TestTTHeaderStreaming(t *testing.T) {
-	var addr = test.GetLocalAddress()
+	addr := test.GetLocalAddress()
 	ln, err := netpoll.CreateListener("tcp", addr)
 	test.Assert(t, err == nil, err)
 	defer ln.Close()
@@ -367,7 +367,7 @@ func TestTTHeaderStreamingLongConn(t *testing.T) {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	var addr = test.GetLocalAddress()
+	addr := test.GetLocalAddress()
 	ln, _ := netpoll.CreateListener("tcp", addr)
 	defer ln.Close()
 
@@ -462,7 +462,7 @@ func TestTTHeaderStreamingLongConn(t *testing.T) {
 }
 
 func TestTTHeaderStreamingRecvTimeout(t *testing.T) {
-	var addr = test.GetLocalAddress()
+	addr := test.GetLocalAddress()
 	ln, _ := netpoll.CreateListener("tcp", addr)
 	defer ln.Close()
 
@@ -531,7 +531,7 @@ func TestTTHeaderStreamingRecvTimeout(t *testing.T) {
 }
 
 func TestTTHeaderStreamingServerGoroutines(t *testing.T) {
-	var addr = test.GetLocalAddress()
+	addr := test.GetLocalAddress()
 	ln, _ := netpoll.CreateListener("tcp", addr)
 	defer ln.Close()
 
@@ -583,7 +583,7 @@ func TestTTHeaderStreamingServerGoroutines(t *testing.T) {
 
 func BenchmarkTTHeaderStreaming(b *testing.B) {
 	klog.SetLevel(klog.LevelWarn)
-	var addr = test.GetLocalAddress()
+	addr := test.GetLocalAddress()
 	ln, _ := netpoll.CreateListener("tcp", addr)
 	defer ln.Close()
 

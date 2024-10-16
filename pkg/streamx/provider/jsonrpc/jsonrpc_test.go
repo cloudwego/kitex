@@ -35,7 +35,7 @@ import (
 )
 
 func TestJSONRPC(t *testing.T) {
-	var addr = test.GetLocalAddress()
+	addr := test.GetLocalAddress()
 	ln, err := netpoll.CreateListener("tcp", addr)
 	test.Assert(t, err == nil, err)
 
@@ -187,8 +187,8 @@ func TestJSONRPC(t *testing.T) {
 		test.Assert(t, err == nil, err)
 		t.Logf("Client ServerStream recv: %v", res)
 	}
-	//err = ss.CloseSend(ctx)
-	//test.Assert(t, err == nil, err)
+	// err = ss.CloseSend(ctx)
+	// test.Assert(t, err == nil, err)
 	atomic.AddInt32(&serverStreamCount, -1)
 	waitServerStreamDone()
 

@@ -8,8 +8,10 @@ import (
 	"github.com/cloudwego/kitex/server"
 )
 
-type Option internal_server.Option
-type Options = internal_server.Options
+type (
+	Option  internal_server.Option
+	Options = internal_server.Options
+)
 
 func WithListener(ln net.Listener) Option {
 	return ConvertNativeServerOption(server.WithListener(ln))

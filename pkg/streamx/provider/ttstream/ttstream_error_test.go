@@ -47,7 +47,7 @@ func assertBizErr(t *testing.T, err error) {
 }
 
 func TestTTHeaderStreamingErrorHandling(t *testing.T) {
-	var addr = test.GetLocalAddress()
+	addr := test.GetLocalAddress()
 	ln, err := netpoll.CreateListener("tcp", addr)
 	test.Assert(t, err == nil, err)
 	defer ln.Close()

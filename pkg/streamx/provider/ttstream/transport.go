@@ -332,7 +332,8 @@ var clientStreamID int32
 // it's typically used by client side
 // newStreamIO is concurrency safe
 func (t *transport) newStreamIO(
-	ctx context.Context, method string, intHeader IntHeader, strHeader streamx.Header) (*streamIO, error) {
+	ctx context.Context, method string, intHeader IntHeader, strHeader streamx.Header,
+) (*streamIO, error) {
 	if t.kind != clientTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
