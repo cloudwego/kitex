@@ -11,7 +11,6 @@ import (
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/server"
@@ -48,7 +47,6 @@ func assertBizErr(t *testing.T, err error) {
 }
 
 func TestTTHeaderStreamingErrorHandling(t *testing.T) {
-	klog.SetLevel(klog.LevelDebug)
 	var addr = test.GetLocalAddress()
 	ln, err := netpoll.CreateListener("tcp", addr)
 	test.Assert(t, err == nil, err)

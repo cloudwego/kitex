@@ -19,8 +19,6 @@ package ttstream
 import (
 	"time"
 
-	"github.com/cloudwego/netpoll"
-
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 )
@@ -61,7 +59,7 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, 
 	}
 
 	// create new connection
-	conn, err := netpoll.DialConnection(network, addr, time.Second)
+	conn, err := dialer.DialConnection(network, addr, time.Second)
 	if err != nil {
 		return nil, err
 	}

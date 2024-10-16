@@ -53,7 +53,7 @@ func (tl *muxTransList) Get(sinfo *serviceinfo.ServiceInfo, network string, addr
 		return trans, nil
 	}
 
-	conn, err := netpoll.DialConnection(network, addr, time.Second)
+	conn, err := dialer.DialConnection(network, addr, time.Second)
 	if err != nil {
 		return nil, err
 	}

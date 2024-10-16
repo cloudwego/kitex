@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/netpoll"
 )
 
 func newShortConnTransPool() transPool {
@@ -31,7 +30,7 @@ type shortConnTransPool struct{}
 
 func (c *shortConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (*transport, error) {
 	// create new connection
-	conn, err := netpoll.DialConnection(network, addr, time.Second)
+	conn, err := dialer.DialConnection(network, addr, time.Second)
 	if err != nil {
 		return nil, err
 	}

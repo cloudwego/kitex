@@ -16,7 +16,12 @@
 
 package ttstream
 
-import "github.com/cloudwego/kitex/pkg/serviceinfo"
+import (
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/netpoll"
+)
+
+var dialer = netpoll.NewDialer()
 
 type transPool interface {
 	Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error)
