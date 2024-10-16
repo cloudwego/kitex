@@ -49,7 +49,7 @@ type Pipe[Item any] struct {
 func NewPipe[Item any]() *Pipe[Item] {
 	p := new(Pipe[Item])
 	p.queue = NewQueue[Item]()
-	p.trigger = make(chan struct{}, 1)
+	p.trigger = make(chan struct{})
 	return p
 }
 
@@ -86,6 +86,7 @@ READ:
 			if err != nil {
 				return 0, err
 			}
+			return 0, fmt.Errorf("unknown err")
 		}
 		goto READ
 	}
@@ -112,11 +113,19 @@ func (p *Pipe[Item]) Write(ctx context.Context, items ...Item) error {
 }
 
 func (p *Pipe[Item]) Close() {
-	atomic.StoreInt32(&p.state, pipeStateClosed)
-	close(p.trigger)
+	select {
+	case <-p.trigger:
+	default:
+		atomic.StoreInt32(&p.state, pipeStateClosed)
+		close(p.trigger)
+	}
 }
 
 func (p *Pipe[Item]) Cancel() {
-	atomic.StoreInt32(&p.state, pipeStateCanceled)
-	close(p.trigger)
+	select {
+	case <-p.trigger:
+	default:
+		atomic.StoreInt32(&p.state, pipeStateCanceled)
+		close(p.trigger)
+	}
 }

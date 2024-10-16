@@ -108,7 +108,7 @@ func (t *transport) Close() (err error) {
 	t.fpipe.Close()
 	t.streams.Range(func(key, value any) bool {
 		sio := value.(*streamIO)
-		sio.stream.close()
+		sio.close()
 		_ = t.streamDelete(sio.stream.sid)
 		return true
 	})
@@ -309,15 +309,6 @@ func (t *transport) streamCloseRecv(s *stream, exception error) error {
 		sio.input(context.Background(), streamIOMsg{exception: exception})
 	}
 	sio.closeRecv()
-	return nil
-}
-
-func (t *transport) streamCancel(s *stream) (err error) {
-	sio, ok := t.loadStreamIO(s.sid)
-	if !ok {
-		return fmt.Errorf("stream not found in stream map: sid=%d", s.sid)
-	}
-	sio.cancel()
 	return nil
 }
 

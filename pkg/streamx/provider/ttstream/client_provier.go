@@ -90,7 +90,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	// if ctx from server side, we should cancel the stream when server handler already returned
 	// TODO: this canceling transmit should be configurable
 	ktx.RegisterCancelCallback(ctx, func() {
-		sio.stream.cancel()
+		sio.cancel()
 	})
 
 	cs := newClientStream(sio.stream)
@@ -98,12 +98,8 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	var ended uint32
 	sio.setEOFCallback(func() {
 		// if stream is ended by both parties, put the transport back to pool
-		sio.stream.close()
 		if atomic.AddUint32(&ended, 1) == 2 {
-			if trans.IsActive() {
-				c.transPool.Put(trans)
-			}
-			err = trans.streamDelete(sio.stream.sid)
+			_ = c.streamFinalize(sio, trans)
 		}
 	})
 	runtime.SetFinalizer(cs, func(cstream *clientStream) {
@@ -112,11 +108,17 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 		_ = cstream.CloseSend(ctx)
 		// only delete stream when clientStream be finalized
 		if atomic.AddUint32(&ended, 1) == 2 {
-			if trans.IsActive() {
-				c.transPool.Put(trans)
-			}
-			err = trans.streamDelete(sio.stream.sid)
+			_ = c.streamFinalize(sio, trans)
 		}
 	})
 	return cs, err
+}
+
+func (c clientProvider) streamFinalize(sio *streamIO, trans *transport) error {
+	sio.close()
+	err := trans.streamDelete(sio.stream.sid)
+	if trans.IsActive() {
+		c.transPool.Put(trans)
+	}
+	return err
 }
