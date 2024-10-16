@@ -61,8 +61,10 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 	}, nil
 }
 
-var _ remote.ServerTransHandler = &svrTransHandler{}
-var errProtocolNotMatch = errors.New("protocol not match")
+var (
+	_                   remote.ServerTransHandler = &svrTransHandler{}
+	errProtocolNotMatch                           = errors.New("protocol not match")
+)
 
 type svrTransHandler struct {
 	opt        *remote.ServerOption
