@@ -137,10 +137,10 @@ func (w *ctxWriteQuota) realReplenish(n int) bool {
 			}
 		} else {
 			klog.CtxInfof(w.ctx, "replenish quota failed, curQuota: %d, oriQuota: %d", a, b)
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 type trInFlow struct {

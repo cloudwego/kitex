@@ -572,6 +572,7 @@ func (l *loopyWriter) outgoingWindowUpdateHandler(w *outgoingWindowUpdate) error
 func (l *loopyWriter) incomingWindowUpdateHandler(w *incomingWindowUpdate) error {
 	// Otherwise update the quota.
 	if w.streamID == 0 {
+		klog.Infof("Recv WindowUpdate Frame, increment: %d", w.increment)
 		l.sendQuota += w.increment
 		return nil
 	}
