@@ -56,10 +56,14 @@ func testHeaderAndTrailer(t *testing.T, stream streamx.ClientStreamMetadata) {
 	test.Assert(t, tl[trailerKey] == trailerVal, tl)
 }
 
-func TestTTHeaderStreaming(t *testing.T) {
+func TestMain(m *testing.M) {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
+	m.Run()
+}
+
+func TestTTHeaderStreaming(t *testing.T) {
 	var addr = test.GetLocalAddress()
 	ln, err := netpoll.CreateListener("tcp", addr)
 	test.Assert(t, err == nil, err)
@@ -524,6 +528,58 @@ func TestTTHeaderStreamingRecvTimeout(t *testing.T) {
 	t.Logf("recv timeout error: %v", err)
 	err = bs.CloseSend(ctx)
 	test.Assert(t, err == nil, err)
+}
+
+func TestTTHeaderStreamingServerGoroutines(t *testing.T) {
+	var addr = test.GetLocalAddress()
+	ln, _ := netpoll.CreateListener("tcp", addr)
+	defer ln.Close()
+
+	// create server
+	svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
+	// register streamingService as ttstreaam provider
+	sp, _ := ttstream.NewServerProvider(streamingServiceInfo)
+	_ = svr.RegisterService(
+		streamingServiceInfo,
+		new(streamingService),
+		streamxserver.WithProvider(sp),
+	)
+	go func() {
+		_ = svr.Run()
+	}()
+	defer svr.Stop()
+	test.WaitServerStart(addr)
+
+	cp, _ := ttstream.NewClientProvider(
+		streamingServiceInfo,
+		ttstream.WithClientLongConnPool(ttstream.LongConnConfig{MaxIdleTimeout: time.Second}),
+	)
+	streamClient, _ := NewStreamingClient(
+		"kitex.service.streaming",
+		streamxclient.WithHostPorts(addr),
+		streamxclient.WithProvider(cp),
+	)
+
+	oldNGs := runtime.NumGoroutine()
+	streams := 100
+	streamList := make([]streamx.ServerStream, streams)
+	for i := 0; i < streams; i++ {
+		ctx := context.Background()
+		bs, err := streamClient.BidiStream(ctx)
+		test.Assert(t, err == nil, err)
+		streamList[i] = bs
+	}
+	ngs := runtime.NumGoroutine()
+	test.Assert(t, ngs > streams, ngs)
+	for i := 0; i < streams; i++ {
+		streamList[i] = nil
+	}
+	streamList = nil
+	for ngs-oldNGs > 10 {
+		runtime.GC()
+		ngs = runtime.NumGoroutine()
+		time.Sleep(time.Millisecond * 100)
+	}
 }
 
 func BenchmarkTTHeaderStreaming(b *testing.B) {

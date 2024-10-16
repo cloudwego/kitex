@@ -259,10 +259,6 @@ func (s *stream) RecvMsg(ctx context.Context, req any) error {
 	return s.trans.streamRecv(ctx, s.sid, req)
 }
 
-func (s *stream) cancel() {
-	_ = s.trans.streamCancel(s)
-}
-
 func newClientStream(s *stream) *clientStream {
 	cs := &clientStream{stream: s}
 	return cs

@@ -103,6 +103,12 @@ func (s *streamIO) closeSend() {
 	}
 }
 
+func (s *streamIO) close() {
+	s.stream.close()
+	s.pipe.Close()
+}
+
 func (s *streamIO) cancel() {
 	s.pipe.Cancel()
+	s.stream.close()
 }
