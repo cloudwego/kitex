@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
 	"net"
 	"runtime/debug"
 	"time"
@@ -139,13 +138,9 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 	if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
 		_ = mutableTo.SetMethod(ss.Method())
 	}
-	//_ = rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(transport.JSONRPC)
 
 	ctx = t.startTracer(ctx, ri)
 	defer func() {
-		if err != nil {
-			log.Println("OnStream failed: ", err)
-		}
 		panicErr := recover()
 		if panicErr != nil {
 			if conn != nil {

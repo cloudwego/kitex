@@ -129,14 +129,6 @@ func (s *stream) readHeader(hd streamx.Header) (err error) {
 	return nil
 }
 
-// setHeader use the hd as the underlying header
-func (s *stream) setHeader(hd streamx.Header) {
-	if hd != nil {
-		s.wheader = hd
-	}
-	return
-}
-
 // writeHeader copy kvs into s.wheader
 func (s *stream) writeHeader(hd streamx.Header) error {
 	if s.wheader == nil {
@@ -205,21 +197,6 @@ func (s *stream) writeTrailer(tl streamx.Trailer) (err error) {
 	return nil
 }
 
-func (s *stream) appendTrailer(kvs ...string) (err error) {
-	if len(kvs)%2 != 0 {
-		return fmt.Errorf("got the odd number of input kvs for Trailer: %d", len(kvs))
-	}
-	var key string
-	for i, str := range kvs {
-		if i%2 == 0 {
-			key = str
-			continue
-		}
-		s.wtrailer[key] = str
-	}
-	return nil
-}
-
 func (s *stream) sendTrailer(ctx context.Context, ex tException) (err error) {
 	if !atomic.CompareAndSwapInt32(&s.selfEOF, 0, 1) {
 		return nil
@@ -231,11 +208,6 @@ func (s *stream) sendTrailer(ctx context.Context, ex tException) (err error) {
 	}
 	klog.Debugf("transport[%d]-stream[%d] send trialer", s.trans.kind, s.sid)
 	return s.trans.streamCloseSend(s.sid, s.method, wtrailer, ex)
-}
-
-func (s *stream) finished() bool {
-	return atomic.LoadInt32(&s.peerEOF) == 1 &&
-		atomic.LoadInt32(&s.selfEOF) == 1
 }
 
 func (s *stream) setRecvTimeout(timeout time.Duration) {

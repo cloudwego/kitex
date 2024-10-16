@@ -115,6 +115,7 @@ func EncodeFrame(writer io.Writer, frame Frame) (err error) {
 	offset += len(frame.method)
 	copy(data[offset:offset+len(frame.payload)], frame.payload)
 	offset += len(frame.payload)
+	_ = offset
 
 	idx := 0
 	for idx < len(data) {

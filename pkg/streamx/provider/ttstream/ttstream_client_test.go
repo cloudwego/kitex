@@ -574,7 +574,6 @@ func TestTTHeaderStreamingServerGoroutines(t *testing.T) {
 	for i := 0; i < streams; i++ {
 		streamList[i] = nil
 	}
-	streamList = nil
 	for ngs-oldNGs > 10 {
 		runtime.GC()
 		ngs = runtime.NumGoroutine()
