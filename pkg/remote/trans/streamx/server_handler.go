@@ -43,7 +43,7 @@ import (
 其他接口实际上最终是用来去组装了 transpipeline ....
 */
 
-var streamWorkerPool = wpool.New(128, time.Minute)
+var streamWorkerPool = wpool.New(128, time.Second)
 
 type svrTransHandlerFactory struct {
 	provider streamx.ServerProvider
