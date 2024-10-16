@@ -107,11 +107,25 @@ func (b *netpollByteBuffer) ReadableLen() (n int) {
 }
 
 // Read implement io.Reader
-func (b *netpollByteBuffer) Read(p []byte) (n int, err error) {
+func (b *netpollByteBuffer) Read(p []byte) (int, error) {
 	if b.status&remote.BitReadable == 0 {
 		return -1, errors.New("unreadable buffer, cannot support Read")
 	}
-	rb, err := b.reader.Next(len(p))
+	// make sure we have at least one byte to read,
+	// or Next call may block till timeout
+	m := b.reader.Len()
+	if m == 0 {
+		_, err := b.reader.Peek(1)
+		if err != nil {
+			return 0, err
+		}
+		m = b.reader.Len() // must >= 1
+	}
+	n := len(p)
+	if n > m {
+		n = m
+	}
+	rb, err := b.reader.Next(n)
 	b.readSize += len(rb)
 	return copy(p, rb), err
 }
