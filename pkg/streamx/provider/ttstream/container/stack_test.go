@@ -91,12 +91,12 @@ func TestStackRangeDelete(t *testing.T) {
 	for i := 1; i <= round; i++ {
 		stk.Push(i)
 	}
-	stk.RangeDelete(func(v int) (deleteNode bool, continueRange bool) {
+	stk.RangeDelete(func(v int) (deleteNode, continueRange bool) {
 		return v%2 == 0, true
 	})
 	test.Assert(t, stk.Size() == round/2, stk.Size())
 	size := 0
-	stk.RangeDelete(func(v int) (deleteNode bool, continueRange bool) {
+	stk.RangeDelete(func(v int) (deleteNode, continueRange bool) {
 		size++
 		return false, true
 	})

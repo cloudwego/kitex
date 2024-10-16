@@ -46,7 +46,7 @@ type longConnTransPool struct {
 	config    LongConnConfig
 }
 
-func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error) {
+func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (trans *transport, err error) {
 	for {
 		o := c.transPool.Pop(addr)
 		if o == nil {

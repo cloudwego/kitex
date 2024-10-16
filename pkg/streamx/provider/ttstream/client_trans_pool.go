@@ -24,6 +24,6 @@ import (
 var dialer = netpoll.NewDialer()
 
 type transPool interface {
-	Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error)
+	Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (trans *transport, err error)
 	Put(trans *transport)
 }

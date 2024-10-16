@@ -98,7 +98,7 @@ func (s *ObjectPool) cleaning() {
 			deleted := 0
 			var oldest *time.Time
 			klog.Infof("object[%s] pool cleaning %d objects", key, stk.Size())
-			stk.RangeDelete(func(o objectItem) (deleteNode bool, continueRange bool) {
+			stk.RangeDelete(func(o objectItem) (deleteNode, continueRange bool) {
 				if oldest == nil {
 					oldest = &o.lastActive
 				}

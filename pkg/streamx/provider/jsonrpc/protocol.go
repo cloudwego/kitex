@@ -78,7 +78,7 @@ type Frame struct {
 	payload []byte
 }
 
-func newFrame(typ int, sid int, service, method string, payload []byte) Frame {
+func newFrame(typ, sid int, service, method string, payload []byte) Frame {
 	return Frame{
 		typ:     typ,
 		sid:     sid,

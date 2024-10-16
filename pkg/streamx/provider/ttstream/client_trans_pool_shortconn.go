@@ -28,7 +28,7 @@ func newShortConnTransPool() transPool {
 
 type shortConnTransPool struct{}
 
-func (c *shortConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (*transport, error) {
+func (c *shortConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (*transport, error) {
 	// create new connection
 	conn, err := dialer.DialConnection(network, addr, time.Second)
 	if err != nil {

@@ -44,7 +44,7 @@ func newMuxTransList(size int) *muxTransList {
 	return tl
 }
 
-func (tl *muxTransList) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (*transport, error) {
+func (tl *muxTransList) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (*transport, error) {
 	idx := atomic.AddUint32(&tl.cursor, 1) % uint32(tl.size)
 	tl.L.RLock()
 	trans := tl.transports[idx]
@@ -85,7 +85,7 @@ type muxTransPool struct {
 	sflight  singleflight.Group
 }
 
-func (m *muxTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string, addr string) (trans *transport, err error) {
+func (m *muxTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (trans *transport, err error) {
 	v, ok := m.pool.Load(addr)
 	if ok {
 		return v.(*muxTransList).Get(sinfo, network, addr)
