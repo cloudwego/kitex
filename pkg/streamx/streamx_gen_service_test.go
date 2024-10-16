@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ttstream_test
+package streamx_test
 
 import (
 	"context"
@@ -30,19 +30,6 @@ import (
 )
 
 // === gen code ===
-
-// --- Define Header and Trailer type ---
-type (
-	ClientStreamingServer[Req, Res any] streamx.ClientStreamingServer[Req, Res]
-	ServerStreamingServer[Res any]      streamx.ServerStreamingServer[Res]
-	BidiStreamingServer[Req, Res any]   streamx.BidiStreamingServer[Req, Res]
-)
-
-type (
-	ClientStreamingClient[Req, Res any] streamx.ClientStreamingClient[Req, Res]
-	ServerStreamingClient[Res any]      streamx.ServerStreamingClient[Res]
-	BidiStreamingClient[Req, Res any]   streamx.BidiStreamingClient[Req, Res]
-)
 
 // --- Define Service Method handler ---
 var pingpongServiceInfo = &serviceinfo.ServiceInfo{
@@ -198,13 +185,13 @@ type PingPongServerInterface interface {
 }
 type StreamingServerInterface interface {
 	Unary(ctx context.Context, req *Request) (*Response, error)
-	ClientStream(ctx context.Context, stream ClientStreamingServer[Request, Response]) (*Response, error)
-	ServerStream(ctx context.Context, req *Request, stream ServerStreamingServer[Response]) error
-	BidiStream(ctx context.Context, stream BidiStreamingServer[Request, Response]) error
+	ClientStream(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (*Response, error)
+	ServerStream(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error
+	BidiStream(ctx context.Context, stream streamx.BidiStreamingServer[Request, Response]) error
 	UnaryWithErr(ctx context.Context, req *Request) (*Response, error)
-	ClientStreamWithErr(ctx context.Context, stream ClientStreamingServer[Request, Response]) (*Response, error)
-	ServerStreamWithErr(ctx context.Context, req *Request, stream ServerStreamingServer[Response]) error
-	BidiStreamWithErr(ctx context.Context, stream BidiStreamingServer[Request, Response]) error
+	ClientStreamWithErr(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (*Response, error)
+	ServerStreamWithErr(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error
+	BidiStreamWithErr(ctx context.Context, stream streamx.BidiStreamingServer[Request, Response]) error
 }
 
 // --- Define Client Implementation Interface ---
@@ -215,18 +202,18 @@ type PingPongClientInterface interface {
 type StreamingClientInterface interface {
 	Unary(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (r *Response, err error)
 	ClientStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
-		stream ClientStreamingClient[Request, Response], err error)
+		stream streamx.ClientStreamingClient[Request, Response], err error)
 	ServerStream(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (
-		stream ServerStreamingClient[Response], err error)
+		stream streamx.ServerStreamingClient[Response], err error)
 	BidiStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
-		stream BidiStreamingClient[Request, Response], err error)
+		stream streamx.BidiStreamingClient[Request, Response], err error)
 	UnaryWithErr(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (r *Response, err error)
 	ClientStreamWithErr(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
-		stream ClientStreamingClient[Request, Response], err error)
+		stream streamx.ClientStreamingClient[Request, Response], err error)
 	ServerStreamWithErr(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (
-		stream ServerStreamingClient[Response], err error)
+		stream streamx.ServerStreamingClient[Response], err error)
 	BidiStreamWithErr(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
-		stream BidiStreamingClient[Request, Response], err error)
+		stream streamx.BidiStreamingClient[Request, Response], err error)
 }
 
 // --- Define Client Implementation ---
@@ -260,20 +247,22 @@ func (c *kClient) Unary(ctx context.Context, req *Request, callOptions ...stream
 	return res, nil
 }
 
-func (c *kClient) ClientStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (stream ClientStreamingClient[Request, Response], err error) {
+func (c *kClient) ClientStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
+	stream streamx.ClientStreamingClient[Request, Response], err error,
+) {
 	return streamxclient.InvokeStream[Request, Response](
 		ctx, c.streamer, serviceinfo.StreamingClient, "ClientStream", nil, nil, callOptions...)
 }
 
 func (c *kClient) ServerStream(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (
-	stream ServerStreamingClient[Response], err error,
+	stream streamx.ServerStreamingClient[Response], err error,
 ) {
 	return streamxclient.InvokeStream[Request, Response](
 		ctx, c.streamer, serviceinfo.StreamingServer, "ServerStream", req, nil, callOptions...)
 }
 
 func (c *kClient) BidiStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
-	stream BidiStreamingClient[Request, Response], err error,
+	stream streamx.BidiStreamingClient[Request, Response], err error,
 ) {
 	return streamxclient.InvokeStream[Request, Response](
 		ctx, c.streamer, serviceinfo.StreamingBidirectional, "BidiStream", nil, nil, callOptions...)
@@ -289,20 +278,22 @@ func (c *kClient) UnaryWithErr(ctx context.Context, req *Request, callOptions ..
 	return res, nil
 }
 
-func (c *kClient) ClientStreamWithErr(ctx context.Context, callOptions ...streamxcallopt.CallOption) (stream ClientStreamingClient[Request, Response], err error) {
+func (c *kClient) ClientStreamWithErr(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
+	stream streamx.ClientStreamingClient[Request, Response], err error,
+) {
 	return streamxclient.InvokeStream[Request, Response](
 		ctx, c.streamer, serviceinfo.StreamingClient, "ClientStreamWithErr", nil, nil, callOptions...)
 }
 
 func (c *kClient) ServerStreamWithErr(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (
-	stream ServerStreamingClient[Response], err error,
+	stream streamx.ServerStreamingClient[Response], err error,
 ) {
 	return streamxclient.InvokeStream[Request, Response](
 		ctx, c.streamer, serviceinfo.StreamingServer, "ServerStreamWithErr", req, nil, callOptions...)
 }
 
 func (c *kClient) BidiStreamWithErr(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
-	stream BidiStreamingClient[Request, Response], err error,
+	stream streamx.BidiStreamingClient[Request, Response], err error,
 ) {
 	return streamxclient.InvokeStream[Request, Response](
 		ctx, c.streamer, serviceinfo.StreamingBidirectional, "BidiStreamWithErr", nil, nil, callOptions...)

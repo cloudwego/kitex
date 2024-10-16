@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package ttstream_test
+package streamx_test
 
 import (
 	"bytes"

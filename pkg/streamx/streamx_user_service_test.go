@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
-package ttstream_test
+package streamx_test
 
 import (
 	"context"
 	"errors"
 	"io"
+	"testing"
 
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -38,6 +40,15 @@ const (
 	trailerKey = "trailer1"
 	trailerVal = "value1"
 )
+
+func testHeaderAndTrailer(t *testing.T, stream streamx.ClientStreamMetadata) {
+	hd, err := stream.Header()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, hd[headerKey] == headerVal, hd)
+	tl, err := stream.Trailer()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, tl[trailerKey] == trailerVal, tl)
+}
 
 func (si *streamingService) setHeaderAndTrailer(stream streamx.ServerStreamMetadata) error {
 	err := stream.SetTrailer(streamx.Trailer{trailerKey: trailerVal})

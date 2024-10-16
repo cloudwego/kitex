@@ -222,6 +222,7 @@ func (t *transport) loopWrite() error {
 		}
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
+			klog.Debugf("transport[%d] EncodeFrame: fr=%v", t.kind, fr)
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}
