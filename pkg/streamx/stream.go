@@ -22,12 +22,14 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
-var _ ServerStreamingClient[int] = (*GenericClientStream[int, int])(nil)
-var _ ClientStreamingClient[int, int] = (*GenericClientStream[int, int])(nil)
-var _ BidiStreamingClient[int, int] = (*GenericClientStream[int, int])(nil)
-var _ ServerStreamingServer[int] = (*GenericServerStream[int, int])(nil)
-var _ ClientStreamingServer[int, int] = (*GenericServerStream[int, int])(nil)
-var _ BidiStreamingServer[int, int] = (*GenericServerStream[int, int])(nil)
+var (
+	_ ServerStreamingClient[int]      = (*GenericClientStream[int, int])(nil)
+	_ ClientStreamingClient[int, int] = (*GenericClientStream[int, int])(nil)
+	_ BidiStreamingClient[int, int]   = (*GenericClientStream[int, int])(nil)
+	_ ServerStreamingServer[int]      = (*GenericServerStream[int, int])(nil)
+	_ ClientStreamingServer[int, int] = (*GenericServerStream[int, int])(nil)
+	_ BidiStreamingServer[int, int]   = (*GenericServerStream[int, int])(nil)
+)
 
 type StreamingMode = serviceinfo.StreamingMode
 
@@ -136,7 +138,7 @@ type ClientStreamingClient[Req, Res any] interface {
 
 type ClientStreamingServer[Req, Res any] interface {
 	Recv(ctx context.Context) (*Req, error)
-	//SendAndClose(ctx context.Context, res *Res) error
+	// SendAndClose(ctx context.Context, res *Res) error
 	ServerStream
 	ServerStreamMetadata
 }

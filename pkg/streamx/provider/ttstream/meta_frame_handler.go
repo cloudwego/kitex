@@ -25,7 +25,7 @@ import (
 type StreamMeta interface {
 	Meta() map[string]string
 	GetMeta(k string) (string, bool)
-	SetMeta(k string, v string, kvs ...string)
+	SetMeta(k, v string, kvs ...string)
 }
 
 type MetaFrameHandler interface {
@@ -60,7 +60,7 @@ func (s *streamMeta) GetMeta(k string) (string, bool) {
 	return v, ok
 }
 
-func (s *streamMeta) SetMeta(k string, v string, kvs ...string) {
+func (s *streamMeta) SetMeta(k, v string, kvs ...string) {
 	s.sync.RLock()
 	s.data[k] = v
 	for i := 0; i < len(kvs); i += 2 {

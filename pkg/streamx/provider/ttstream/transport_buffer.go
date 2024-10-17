@@ -24,12 +24,16 @@ import (
 	"github.com/cloudwego/netpoll"
 )
 
-var _ bufiox.Reader = (*readerBuffer)(nil)
-var _ bufiox.Writer = (*writerBuffer)(nil)
-var _ gopkgthrift.NocopyWriter = (*writerBuffer)(nil)
+var (
+	_ bufiox.Reader            = (*readerBuffer)(nil)
+	_ bufiox.Writer            = (*writerBuffer)(nil)
+	_ gopkgthrift.NocopyWriter = (*writerBuffer)(nil)
+)
 
-var readerBufferPool sync.Pool
-var writerBufferPool sync.Pool
+var (
+	readerBufferPool sync.Pool
+	writerBufferPool sync.Pool
+)
 
 func newReaderBuffer(reader netpoll.Reader) (rb *readerBuffer) {
 	if v := readerBufferPool.Get(); v != nil {
