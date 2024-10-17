@@ -145,10 +145,11 @@ func (h *headerFrame) isTransportResponseFrame() bool {
 }
 
 type cleanupStream struct {
-	streamID uint32
-	rst      bool
-	rstCode  http2.ErrCode
-	onWrite  func()
+	streamID      uint32
+	rst           bool
+	rstCode       http2.ErrCode
+	onWrite       func()
+	onFinishWrite func()
 }
 
 func (c *cleanupStream) isTransportResponseFrame() bool { return c.rst } // Results in a RST_STREAM
@@ -451,19 +452,23 @@ func (c *controlBuffer) get(block bool) (interface{}, error) {
 		select {
 		case <-c.ch:
 		case <-c.done:
-			c.finish()
-			return nil, ErrConnClosing
+			var err error
+			c.finish(errStatusConnClosing)
+			c.mu.Lock()
+			err = c.err
+			c.mu.Unlock()
+			return nil, err
 		}
 	}
 }
 
-func (c *controlBuffer) finish() {
+func (c *controlBuffer) finish(err error) {
 	c.mu.Lock()
 	if c.err != nil {
 		c.mu.Unlock()
 		return
 	}
-	c.err = ErrConnClosing
+	c.err = err
 	// There may be headers for streams in the control buffer.
 	// These streams need to be cleaned out since the transport
 	// is still not aware of these yet.
@@ -473,7 +478,7 @@ func (c *controlBuffer) finish() {
 			continue
 		}
 		if hdr.onOrphaned != nil { // It will be nil on the server-side.
-			hdr.onOrphaned(ErrConnClosing)
+			hdr.onOrphaned(err)
 		}
 	}
 	c.mu.Unlock()
@@ -778,6 +783,11 @@ func (l *loopyWriter) outFlowControlSizeRequestHandler(o *outFlowControlSizeRequ
 }
 
 func (l *loopyWriter) cleanupStreamHandler(c *cleanupStream) error {
+	defer func() {
+		if c.onFinishWrite != nil {
+			c.onFinishWrite()
+		}
+	}()
 	c.onWrite()
 	if str, ok := l.estdStreams[c.streamID]; ok {
 		// On the server side it could be a trailers-only response or

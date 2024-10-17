@@ -62,6 +62,7 @@ func newSvrTransHandler(opt *remote.ServerOption) (*svrTransHandler, error) {
 		opt:         opt,
 		svcSearcher: opt.SvcSearcher,
 		codec:       grpc.NewGRPCCodec(grpc.WithThriftCodec(opt.PayloadCodec)),
+		transports:  make(map[grpcTransport.ServerTransport]struct{}),
 	}, nil
 }
 
@@ -72,6 +73,11 @@ type svrTransHandler struct {
 	svcSearcher remote.ServiceSearcher
 	inkHdlFunc  endpoint.Endpoint
 	codec       remote.Codec
+	mu          sync.Mutex
+	transports  map[grpcTransport.ServerTransport]struct{}
+
+	hdlWG   sync.WaitGroup
+	transWG sync.WaitGroup
 }
 
 var prefaceReadAtMost = func() int {
@@ -119,9 +125,11 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 	svrTrans := ctx.Value(ctxKeySvrTransport).(*SvrTrans)
 	tr := svrTrans.tr
-
+	defer t.transWG.Done()
 	tr.HandleStreams(func(s *grpcTransport.Stream) {
+		t.hdlWG.Add(1)
 		gofunc.GoFunc(ctx, func() {
+			defer t.hdlWG.Done()
 			t.handleFunc(s, svrTrans, conn)
 		})
 	}, func(ctx context.Context, method string) context.Context {
@@ -185,6 +193,7 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 			return
 		}
 	}
+	s.SetServiceMeta(grpcTransport.SourceServiceMetaKey, ri.From().ServiceName())
 	rCtx = t.startTracer(rCtx, ri)
 	defer func() {
 		panicErr := recover()
@@ -315,6 +324,10 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	if err != nil {
 		return nil, err
 	}
+	t.transWG.Add(1)
+	t.mu.Lock()
+	t.transports[tr] = struct{}{}
+	t.mu.Unlock()
 	pool := &sync.Pool{
 		New: func() interface{} {
 			// init rpcinfo
@@ -329,6 +342,9 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 // 连接关闭时回调
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	tr := ctx.Value(ctxKeySvrTransport).(*SvrTrans).tr
+	t.mu.Lock()
+	delete(t.transports, tr)
+	t.mu.Unlock()
 	tr.Close()
 }
 
@@ -347,6 +363,44 @@ func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
 }
 
 func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
+}
+
+func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
+	klog.Info("Start to GracefulShutdown")
+	t.mu.Lock()
+	for trans := range t.transports {
+		trans.Drain()
+	}
+	t.mu.Unlock()
+
+	exitCh := make(chan struct{})
+	// todo: think about a better grace time duration
+	graceTime := time.Minute * 3
+	exitTimeout, ok := ctx.Deadline()
+	if ok {
+		graceTime = time.Until(exitTimeout)
+	}
+	graceTimer := time.NewTimer(graceTime)
+	gofunc.GoFunc(ctx, func() {
+		select {
+		case <-graceTimer.C:
+			klog.Info("Trigger GracefulClose")
+			t.mu.Lock()
+			for trans := range t.transports {
+				trans.GracefulClose()
+			}
+			t.mu.Unlock()
+			return
+		case <-exitCh:
+			return
+		}
+	})
+
+	t.hdlWG.Wait()
+	t.transWG.Wait()
+	close(exitCh)
+
+	return nil
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {
