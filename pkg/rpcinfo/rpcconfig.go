@@ -66,6 +66,9 @@ type rpcConfig struct {
 	transportProtocol transport.Protocol
 	interactionMode   InteractionMode
 	payloadCodec      serviceinfo.PayloadCodec
+
+	// stream config
+	streamRecvTimeout time.Duration
 }
 
 func init() {
@@ -191,6 +194,14 @@ func (r *rpcConfig) SetPayloadCodec(codec serviceinfo.PayloadCodec) {
 
 func (r *rpcConfig) PayloadCodec() serviceinfo.PayloadCodec {
 	return r.payloadCodec
+}
+
+func (r *rpcConfig) SetStreamRecvTimeout(timeout time.Duration) {
+	r.streamRecvTimeout = timeout
+}
+
+func (r *rpcConfig) StreamRecvTimeout() time.Duration {
+	return r.streamRecvTimeout
 }
 
 // Clone returns a copy of the current rpcConfig.

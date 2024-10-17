@@ -52,6 +52,8 @@ type MutableRPCConfig interface {
 	CopyFrom(from RPCConfig)
 	ImmutableView() RPCConfig
 	SetPayloadCodec(codec serviceinfo.PayloadCodec)
+
+	SetStreamRecvTimeout(timeout time.Duration)
 }
 
 // MutableRPCStats is used to change the information in the RPCStats.

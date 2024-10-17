@@ -24,6 +24,7 @@ import (
 )
 
 func (s *server) initStreamMiddlewares(ctx context.Context) {
+	// for old version streaming
 	s.opt.Streaming.EventHandler = s.opt.TracerCtl.GetStreamEventHandler()
 	s.opt.Streaming.InitMiddlewares(ctx)
 }

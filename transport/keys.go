@@ -29,6 +29,7 @@ const (
 	HTTP
 	GRPC
 	HESSIAN2
+	JSONRPC
 
 	TTHeaderFramed = TTHeader | Framed
 )

@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"sync/atomic"
 
+	"github.com/cloudwego/kitex/pkg/streamx"
+
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession/backup"
 
@@ -70,8 +72,14 @@ type kClient struct {
 	mws     []endpoint.Middleware
 	eps     endpoint.Endpoint
 	sEps    endpoint.Endpoint
-	opt     *client.Options
-	lbf     *lbcache.BalancerFactory
+
+	// streamx
+	sxStreamMW     streamx.StreamMiddleware
+	sxStreamRecvMW streamx.StreamRecvMiddleware
+	sxStreamSendMW streamx.StreamSendMiddleware
+
+	opt *client.Options
+	lbf *lbcache.BalancerFactory
 
 	inited bool
 	closed bool
@@ -91,12 +99,17 @@ func (kf *kcFinalizerClient) Call(ctx context.Context, method string, request, r
 
 // NewClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
 func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error) {
+	nopts := client.NewOptions(opts)
+	return NewClientWithOptions(svcInfo, nopts)
+}
+
+func NewClientWithOptions(svcInfo *serviceinfo.ServiceInfo, opts *Options) (Client, error) {
 	if svcInfo == nil {
 		return nil, errors.New("NewClient: no service info")
 	}
 	kc := &kcFinalizerClient{kClient: &kClient{}}
 	kc.svcInfo = svcInfo
-	kc.opt = client.NewOptions(opts)
+	kc.opt = opts
 	if err := kc.init(); err != nil {
 		_ = kc.Close()
 		return nil, err
@@ -424,21 +437,30 @@ func (kc *kClient) richRemoteOption() {
 		// (newClientStreamer: call WriteMeta before remotecli.NewClient)
 		transInfoHdlr := bound.NewTransMetaHandler(kc.opt.MetaHandlers)
 		kc.opt.RemoteOpt.PrependBoundHandler(transInfoHdlr)
+
+		// add meta handlers into streaming meta handlers
+		for _, h := range kc.opt.MetaHandlers {
+			if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
+				kc.opt.RemoteOpt.StreamingMetaHandlers = append(kc.opt.RemoteOpt.StreamingMetaHandlers, shdlr)
+			}
+		}
 	}
 }
 
 func (kc *kClient) buildInvokeChain() error {
+	mwchain := endpoint.Chain(kc.mws...)
+
 	innerHandlerEp, err := kc.invokeHandleEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.eps = endpoint.Chain(kc.mws...)(innerHandlerEp)
+	kc.eps = mwchain(innerHandlerEp)
 
 	innerStreamingEp, err := kc.invokeStreamingEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.sEps = endpoint.Chain(kc.mws...)(innerStreamingEp)
+	kc.sEps = mwchain(innerStreamingEp)
 	return nil
 }
 
@@ -730,6 +752,12 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 			_ = cfg.SetConnectTimeout(c.ConnectTimeout())
 			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
 		}
+	}
+
+	// streamx config
+	sopt := opt.StreamXOptions
+	if sopt.RecvTimeout > 0 {
+		cfg.SetStreamRecvTimeout(sopt.RecvTimeout)
 	}
 
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)

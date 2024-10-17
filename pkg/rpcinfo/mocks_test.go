@@ -90,6 +90,10 @@ func (m *MockRPCConfig) TransportProtocol() (r transport.Protocol) {
 	return
 }
 
+func (m *MockRPCConfig) StreamRecvTimeout() time.Duration {
+	return time.Duration(0)
+}
+
 type MockRPCStats struct{}
 
 func (m *MockRPCStats) Record(context.Context, stats.Event, stats.Status, string) {}

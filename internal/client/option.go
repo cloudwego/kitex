@@ -21,6 +21,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/streamx"
+
 	"github.com/cloudwego/localsession/backup"
 
 	"github.com/cloudwego/kitex/internal/configutil"
@@ -119,7 +121,8 @@ type Options struct {
 	// Context backup
 	CtxBackupHandler backup.BackupHandler
 
-	Streaming stream.StreamingConfig
+	Streaming      stream.StreamingConfig
+	StreamXOptions streamx.ClientOptions
 }
 
 // Apply applies all options.

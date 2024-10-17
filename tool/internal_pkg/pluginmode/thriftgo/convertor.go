@@ -388,6 +388,9 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 			if c.IsHessian2() {
 				si.Protocol = transport.HESSIAN2.String()
 			}
+			if c.IsTTHeader() {
+				si.Protocol = transport.TTHeader.String()
+			}
 
 			si.HandlerReturnKeepResp = c.Config.HandlerReturnKeepResp
 			si.UseThriftReflection = c.Utils.Features().WithReflection
@@ -434,6 +437,9 @@ func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*ge
 
 	if c.IsHessian2() {
 		si.Protocol = transport.HESSIAN2.String()
+	}
+	if c.IsTTHeader() {
+		si.Protocol = transport.TTHeader.String()
 	}
 	si.HandlerReturnKeepResp = c.Config.HandlerReturnKeepResp
 	si.UseThriftReflection = c.Utils.Features().WithReflection
@@ -531,6 +537,10 @@ func (c *converter) getCombineServiceName(name string, svcs []*generator.Service
 
 func (c *converter) IsHessian2() bool {
 	return strings.EqualFold(c.Config.Protocol, transport.HESSIAN2.String())
+}
+
+func (c *converter) IsTTHeader() bool {
+	return strings.EqualFold(c.Config.Protocol, transport.TTHeader.String())
 }
 
 func (c *converter) copyAnnotations(annotations parser.Annotations) parser.Annotations {

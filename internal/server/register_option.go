@@ -16,7 +16,10 @@
 
 package server
 
-import "github.com/cloudwego/kitex/pkg/endpoint"
+import (
+	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/streamx"
+)
 
 // RegisterOption is the only way to config service registration.
 type RegisterOption struct {
@@ -25,8 +28,12 @@ type RegisterOption struct {
 
 // RegisterOptions is used to config service registration.
 type RegisterOptions struct {
-	IsFallbackService bool
-	Middlewares       []endpoint.Middleware
+	IsFallbackService     bool
+	Middlewares           []endpoint.Middleware
+	StreamMiddlewares     []streamx.StreamMiddleware
+	StreamRecvMiddlewares []streamx.StreamRecvMiddleware
+	StreamSendMiddlewares []streamx.StreamSendMiddleware
+	Provider              streamx.ServerProvider
 }
 
 // NewRegisterOptions creates a register options.
