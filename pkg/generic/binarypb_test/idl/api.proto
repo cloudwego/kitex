@@ -1,0 +1,16 @@
+syntax = "proto3";
+package api;
+// The greeting service definition.
+option go_package = "api";
+
+message Request {
+  string message = 1;
+}
+
+message Response {
+  string message = 1;
+}
+
+service Echo {
+  rpc EchoPB (Request) returns (Response) {}
+}
