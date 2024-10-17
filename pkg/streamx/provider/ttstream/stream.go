@@ -206,7 +206,7 @@ func (s *stream) sendTrailer(ctx context.Context, ex tException) (err error) {
 	if wtrailer == nil {
 		return fmt.Errorf("stream trailer already sent")
 	}
-	klog.Debugf("transport[%d]-stream[%d] send trialer", s.trans.kind, s.sid)
+	klog.Debugf("transport[%d]-stream[%d] send trailer", s.trans.kind, s.sid)
 	return s.trans.streamCloseSend(s.sid, s.method, wtrailer, ex)
 }
 
