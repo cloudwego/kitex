@@ -486,10 +486,14 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			// create server
 			svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
 			var streamStarted int32
-			waitStreamStarted := func(waitStreams int) {
-				for atomic.LoadInt32(&streamStarted) < int32(waitStreams) {
+			waitStreamStarted := func(streamWaited int) {
+				for {
+					stated, waited := atomic.LoadInt32(&streamStarted), int32(streamWaited)
+					if stated >= waited {
+						return
+					}
+					t.Logf("streamStarted=%d < streamWaited=%d", stated, waited)
 					time.Sleep(time.Millisecond * 10)
-					t.Logf("streamStarted=%d < waitStreams=%d", atomic.LoadInt32(&streamStarted), waitStreams)
 				}
 			}
 			_ = svr.RegisterService(
@@ -539,10 +543,10 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 				wg.Wait()
 			}
 
-			t.Logf("=== Checking Streams GCed ===")
-			oldNGs := runtime.NumGoroutine()
+			t.Logf("=== Checking streams GCed ===")
 			streams := 100
 			streamList := make([]streamx.ServerStream, streams)
+			ngBefore := runtime.NumGoroutine()
 			atomic.StoreInt32(&streamStarted, 0)
 			for i := 0; i < streams; i++ {
 				ctx := context.Background()
@@ -551,18 +555,21 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 				streamList[i] = bs
 			}
 			waitStreamStarted(streams)
-			ngs := runtime.NumGoroutine()
-			test.Assert(t, ngs > streams, ngs)
+			// before GC
+			test.Assert(t, runtime.NumGoroutine() > streams, runtime.NumGoroutine())
+			// after GC
 			for i := 0; i < streams; i++ {
 				streamList[i] = nil
 			}
-			for ngs-oldNGs > 10 {
+			// the goroutines diff should < 10
+			for runtime.NumGoroutine()-ngBefore > 10 {
+				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
 				runtime.GC()
-				ngs = runtime.NumGoroutine()
 				time.Sleep(time.Millisecond * 50)
 			}
 
 			t.Logf("=== Checking Streams Called and GCed ===")
+			ngBefore = runtime.NumGoroutine()
 			streams = 100
 			for i := 0; i < streams; i++ {
 				wg.Add(1)
@@ -586,10 +593,10 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 				}()
 			}
 			wg.Wait()
-			ngs = runtime.NumGoroutine()
-			for ngs-oldNGs > 10 {
+			// the goroutines diff should < 10
+			for runtime.NumGoroutine()-ngBefore > 10 {
+				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
 				runtime.GC()
-				ngs = runtime.NumGoroutine()
 				time.Sleep(time.Millisecond * 50)
 			}
 		})
