@@ -52,7 +52,7 @@ type testCase struct {
 }
 
 func init() {
-	klog.SetLevel(klog.LevelDebug)
+	klog.SetLevel(klog.LevelWarn)
 
 	sp, _ := ttstream.NewServerProvider(streamingServiceInfo)
 	cp, _ := ttstream.NewClientProvider(streamingServiceInfo, ttstream.WithClientLongConnPool(ttstream.LongConnConfig{MaxIdleTimeout: time.Millisecond * 100}))
@@ -538,7 +538,6 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 				test.Assert(t, res.Message == req.Message, res.Message)
 				runtime.SetFinalizer(bs, func(_ any) {
 					wg.Done()
-					t.Logf("stream is finalized")
 				})
 				bs = nil
 				runtime.GC()
