@@ -32,12 +32,14 @@ const (
 	pipeStateCanceled pipeState = 3
 )
 
-var ErrPipeEOF = io.EOF
-var ErrPipeCanceled = fmt.Errorf("pipe canceled")
-var stateErrors map[pipeState]error = map[pipeState]error{
-	pipeStateClosed:   ErrPipeEOF,
-	pipeStateCanceled: ErrPipeCanceled,
-}
+var (
+	ErrPipeEOF      = io.EOF
+	ErrPipeCanceled = fmt.Errorf("pipe canceled")
+	stateErrors     = map[pipeState]error{
+		pipeStateClosed:   ErrPipeEOF,
+		pipeStateCanceled: ErrPipeCanceled,
+	}
+)
 
 // Pipe implement a queue that never block on Write but block on Read if there is nothing to read
 type Pipe[Item any] struct {
@@ -49,14 +51,13 @@ type Pipe[Item any] struct {
 func NewPipe[Item any]() *Pipe[Item] {
 	p := new(Pipe[Item])
 	p.queue = NewQueue[Item]()
-	p.trigger = make(chan struct{})
+	p.trigger = make(chan struct{}, 1)
 	return p
 }
 
 // Read will block if there is nothing to read
-func (p *Pipe[Item]) Read(ctx context.Context, items []Item) (int, error) {
+func (p *Pipe[Item]) Read(ctx context.Context, items []Item) (n int, err error) {
 READ:
-	var n int
 	for i := 0; i < len(items); i++ {
 		val, ok := p.queue.Get()
 		if !ok {
@@ -82,22 +83,22 @@ READ:
 		}
 
 		if p.queue.Size() == 0 {
-			err := stateErrors[atomic.LoadInt32(&p.state)]
+			err = stateErrors[atomic.LoadInt32(&p.state)]
 			if err != nil {
 				return 0, err
 			}
-			return 0, fmt.Errorf("unknown err")
 		}
 		goto READ
 	}
 }
 
-func (p *Pipe[Item]) Write(ctx context.Context, items ...Item) error {
+func (p *Pipe[Item]) Write(ctx context.Context, items ...Item) (err error) {
 	if !atomic.CompareAndSwapInt32(&p.state, pipeStateInactive, pipeStateActive) && atomic.LoadInt32(&p.state) != pipeStateActive {
-		err := stateErrors[atomic.LoadInt32(&p.state)]
+		err = stateErrors[atomic.LoadInt32(&p.state)]
 		if err != nil {
 			return err
 		}
+		// never happen error
 		return fmt.Errorf("unknown state error")
 	}
 
@@ -113,19 +114,21 @@ func (p *Pipe[Item]) Write(ctx context.Context, items ...Item) error {
 }
 
 func (p *Pipe[Item]) Close() {
-	select {
-	case <-p.trigger:
-	default:
+	if atomic.LoadInt32(&p.state) != pipeStateClosed {
 		atomic.StoreInt32(&p.state, pipeStateClosed)
-		close(p.trigger)
+		select {
+		case p.trigger <- struct{}{}:
+		default:
+		}
 	}
 }
 
 func (p *Pipe[Item]) Cancel() {
-	select {
-	case <-p.trigger:
-	default:
+	if atomic.LoadInt32(&p.state) != pipeStateCanceled {
 		atomic.StoreInt32(&p.state, pipeStateCanceled)
-		close(p.trigger)
+		select {
+		case p.trigger <- struct{}{}:
+		default:
+		}
 	}
 }

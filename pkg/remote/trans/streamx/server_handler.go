@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
 	"net"
 	"runtime/debug"
 	"time"
@@ -62,8 +61,10 @@ func (f *svrTransHandlerFactory) NewTransHandler(opt *remote.ServerOption) (remo
 	}, nil
 }
 
-var _ remote.ServerTransHandler = &svrTransHandler{}
-var errProtocolNotMatch = errors.New("protocol not match")
+var (
+	_                   remote.ServerTransHandler = &svrTransHandler{}
+	errProtocolNotMatch                           = errors.New("protocol not match")
+)
 
 type svrTransHandler struct {
 	opt        *remote.ServerOption
@@ -106,7 +107,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		streamWorkerPool.GoCtx(ctx, func() {
 			err := t.OnStream(nctx, conn, ss)
 			if err != nil && !errors.Is(err, io.EOF) {
-				klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", nerr)
+				klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", err)
 			}
 		})
 	}
@@ -139,13 +140,9 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 	if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
 		_ = mutableTo.SetMethod(ss.Method())
 	}
-	//_ = rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(transport.JSONRPC)
 
 	ctx = t.startTracer(ctx, ri)
 	defer func() {
-		if err != nil {
-			log.Println("OnStream failed: ", err)
-		}
 		panicErr := recover()
 		if panicErr != nil {
 			if conn != nil {

@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/gopkg/bufiox"
+
 	"github.com/cloudwego/kitex/internal/test"
 )
 

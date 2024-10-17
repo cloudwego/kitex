@@ -18,6 +18,7 @@ package container
 
 import (
 	"context"
+	"io"
 	"sync"
 	"testing"
 )
@@ -34,6 +35,9 @@ func TestPipeline(t *testing.T) {
 		for {
 			n, err := pipe.Read(ctx, items)
 			if err != nil {
+				if err != io.EOF {
+					t.Error(err)
+				}
 				return
 			}
 			for i := 0; i < n; i++ {
@@ -44,12 +48,17 @@ func TestPipeline(t *testing.T) {
 	round := 10000
 	itemsPerRound := []int{1, 1, 1, 1, 1}
 	for i := 0; i < round; i++ {
-		_ = pipe.Write(ctx, itemsPerRound...)
+		err := pipe.Write(ctx, itemsPerRound...)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
+	t.Logf("Pipe closing")
 	pipe.Close()
+	t.Logf("Pipe closed")
 	wg.Wait()
 	if recv != len(itemsPerRound)*round {
-		t.Fatalf("expect %d items, got %d", len(itemsPerRound)*round, recv)
+		t.Fatalf("Pipe expect %d items, got %d", len(itemsPerRound)*round, recv)
 	}
 }
 
