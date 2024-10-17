@@ -74,7 +74,6 @@ type kClient struct {
 	sEps    endpoint.Endpoint
 
 	// streamx
-	sxEps          endpoint.Endpoint
 	sxStreamMW     streamx.StreamMiddleware
 	sxStreamRecvMW streamx.StreamRecvMiddleware
 	sxStreamSendMW streamx.StreamSendMiddleware

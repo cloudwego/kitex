@@ -1,11 +1,25 @@
+/*
+ * Copyright 2024 CloudWeGo Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package container
 
 import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 type Object interface {
@@ -78,14 +92,9 @@ func (s *ObjectPool) cleaning() {
 			cleanInternal = time.Second * 10
 		}
 		// clean objects
-		for key, stk := range s.objects {
+		for _, stk := range s.objects {
 			deleted := 0
-			var oldest *time.Time
-			klog.Infof("object[%s] pool cleaning %d objects", key, stk.Size())
-			stk.RangeDelete(func(o objectItem) (deleteNode bool, continueRange bool) {
-				if oldest == nil {
-					oldest = &o.lastActive
-				}
+			stk.RangeDelete(func(o objectItem) (deleteNode, continueRange bool) {
 				if o.object == nil {
 					deleted++
 					return true, true
@@ -97,13 +106,9 @@ func (s *ObjectPool) cleaning() {
 					return false, false
 				}
 				deleted++
-				err := o.object.Close()
-				klog.Infof("object is invalid: lastActive=%s, closedErr=%v", o.lastActive.String(), err)
+				_ = o.object.Close()
 				return true, true
 			})
-			if oldest != nil {
-				klog.Infof("object[%s] pool deleted %d objects, oldest=%s", key, deleted, oldest.String())
-			}
 		}
 		s.L.Unlock()
 	}

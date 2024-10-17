@@ -27,14 +27,20 @@ type StreamHandler struct {
 	StreamSendMiddleware StreamSendMiddleware
 }
 
-type StreamEndpoint func(ctx context.Context, streamArgs StreamArgs, reqArgs StreamReqArgs, resArgs StreamResArgs) (err error)
-type StreamMiddleware func(next StreamEndpoint) StreamEndpoint
+type (
+	StreamEndpoint   func(ctx context.Context, streamArgs StreamArgs, reqArgs StreamReqArgs, resArgs StreamResArgs) (err error)
+	StreamMiddleware func(next StreamEndpoint) StreamEndpoint
+)
 
-type StreamRecvEndpoint func(ctx context.Context, stream Stream, res any) (err error)
-type StreamSendEndpoint func(ctx context.Context, stream Stream, req any) (err error)
+type (
+	StreamRecvEndpoint func(ctx context.Context, stream Stream, res any) (err error)
+	StreamSendEndpoint func(ctx context.Context, stream Stream, req any) (err error)
+)
 
-type StreamRecvMiddleware func(next StreamRecvEndpoint) StreamRecvEndpoint
-type StreamSendMiddleware func(next StreamSendEndpoint) StreamSendEndpoint
+type (
+	StreamRecvMiddleware func(next StreamRecvEndpoint) StreamRecvEndpoint
+	StreamSendMiddleware func(next StreamSendEndpoint) StreamSendEndpoint
+)
 
 func StreamMiddlewareChain(mws ...StreamMiddleware) StreamMiddleware {
 	return func(next StreamEndpoint) StreamEndpoint {
