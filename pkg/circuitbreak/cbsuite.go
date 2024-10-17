@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/bytedance/gopkg/cloud/circuitbreaker"
+	"github.com/bytedance/gopkg/collection/skipmap"
 
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
@@ -38,11 +39,11 @@ const (
 	cbConfig      = "cb_config"
 )
 
-var defaultCBConfig = CBConfig{Enable: true, ErrRate: 0.5, MinSample: 200}
+var defaultCBConfig = &CBConfig{Enable: true, ErrRate: 0.5, MinSample: 200}
 
 // GetDefaultCBConfig return defaultConfig of CircuitBreaker.
 func GetDefaultCBConfig() CBConfig {
-	return defaultCBConfig
+	return *defaultCBConfig
 }
 
 // CBConfig is policy config of CircuitBreaker.
@@ -96,7 +97,7 @@ type CBSuite struct {
 	instanceControl *Control
 
 	genServiceCBKey GenServiceCBKeyFunc
-	serviceCBConfig sync.Map // map[serviceCBKey]CBConfig
+	serviceCBConfig *skipmap.StringMap // map[serviceCBKey]*CBConfig
 
 	instanceCBConfig instanceCBConfig
 
@@ -112,8 +113,9 @@ func NewCBSuite(genKey GenServiceCBKeyFunc, options ...CBSuiteOption) *CBSuite {
 	s := &CBSuite{
 		genServiceCBKey: genKey,
 		instanceCBConfig: instanceCBConfig{
-			CBConfig: defaultCBConfig,
+			CBConfig: GetDefaultCBConfig(),
 		},
+		serviceCBConfig: skipmap.NewString(),
 		config: CBSuiteConfig{
 			serviceGetErrorTypeFunc:  ErrorTypeOnServiceLevel,
 			instanceGetErrorTypeFunc: ErrorTypeOnInstanceLevel,
@@ -162,7 +164,7 @@ func (s *CBSuite) ServiceControl() *Control {
 // UpdateServiceCBConfig is to update service CircuitBreaker config.
 // This func is suggested to be called in remote config module.
 func (s *CBSuite) UpdateServiceCBConfig(key string, cfg CBConfig) {
-	s.serviceCBConfig.Store(key, cfg)
+	s.serviceCBConfig.Store(key, &cfg)
 }
 
 // UpdateInstanceCBConfig is to update instance CircuitBreaker param.
@@ -221,7 +223,7 @@ func (s *CBSuite) initServiceCB() {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		serviceCBKey = s.genServiceCBKey(ri)
 		cbConfig, _ := s.serviceCBConfig.LoadOrStore(serviceCBKey, defaultCBConfig)
-		enabled = cbConfig.(CBConfig).Enable
+		enabled = cbConfig.(*CBConfig).Enable
 		return
 	}
 	s.serviceControl = &Control{
@@ -297,7 +299,7 @@ func (s *CBSuite) discoveryChangeHandler(e *event.Event) {
 
 func (s *CBSuite) svcTripFunc(key string) circuitbreaker.TripFunc {
 	pi, _ := s.serviceCBConfig.LoadOrStore(key, defaultCBConfig)
-	p := pi.(CBConfig)
+	p := pi.(*CBConfig)
 	return circuitbreaker.RateTripFunc(p.ErrRate, p.MinSample)
 }
 
@@ -338,18 +340,17 @@ func cbDebugInfo(panel circuitbreaker.Panel) map[string]interface{} {
 
 func (s *CBSuite) configInfo() map[string]interface{} {
 	svcCBMap := make(map[string]interface{})
-	s.serviceCBConfig.Range(func(key, value interface{}) bool {
-		svcCBMap[key.(string)] = value
+	s.serviceCBConfig.Range(func(key string, value interface{}) bool {
+		svcCBMap[key] = *value.(*CBConfig)
 		return true
 	})
 	s.instanceCBConfig.RLock()
 	instCBConfig := s.instanceCBConfig.CBConfig
 	s.instanceCBConfig.RUnlock()
-
-	cbMap := make(map[string]interface{}, 2)
-	cbMap[serviceCBKey] = svcCBMap
-	cbMap[instanceCBKey] = instCBConfig
-	return cbMap
+	return map[string]interface{}{
+		serviceCBKey:  svcCBMap,
+		instanceCBKey: instCBConfig,
+	}
 }
 
 // RPCInfo2Key is to generate circuit breaker key through rpcinfo
