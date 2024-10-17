@@ -285,6 +285,11 @@ type Stream struct {
 	// contentSubtype is the content-subtype for requests.
 	// this must be lowercase or the behavior is undefined.
 	contentSubtype string
+
+	// closeStreamErr is used to store the error when stream is closed
+	closeStreamErr atomic.Value
+	// sourceService is the source service name of this stream
+	sourceService atomic.Value
 }
 
 // isHeaderSent is only valid on the server-side.
@@ -479,6 +484,47 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 	return io.ReadFull(s.trReader, p)
 }
 
+func (s *Stream) getCloseStreamErr() error {
+	rawErr := s.closeStreamErr.Load()
+	if rawErr != nil {
+		return rawErr.(error)
+	}
+	return errStatusStreamDone
+}
+
+type svcMetaKey string
+
+const (
+	SourceServiceMetaKey svcMetaKey = "source_service"
+)
+
+// SetServiceMeta is used to inject service-related metadata
+func (s *Stream) SetServiceMeta(key svcMetaKey, val interface{}) error {
+	switch key {
+	case SourceServiceMetaKey:
+		svc, ok := val.(string)
+		if !ok {
+			return fmt.Errorf("%s expect string val, but got %v", SourceServiceMetaKey, val)
+		}
+		s.setSourceService(svc)
+	default:
+		return fmt.Errorf("unknown svcMetaKey: %s", key)
+	}
+	return nil
+}
+
+func (s *Stream) setSourceService(svc string) {
+	s.sourceService.Store(svc)
+}
+
+func (s *Stream) getSourceService() string {
+	rawSvc := s.sourceService.Load()
+	if rawSvc != nil {
+		return rawSvc.(string)
+	}
+	return "remote service"
+}
+
 // StreamWrite only used for unit test
 func StreamWrite(s *Stream, buffer *bytes.Buffer) {
 	s.write(recvMsg{buffer: buffer})
@@ -496,10 +542,8 @@ func CreateStream(ctx context.Context, id uint32, requestRead func(i int), metho
 		},
 		windowHandler: func(i int) {},
 	}
-
 	stream := &Stream{
 		id:          id,
-		ctx:         ctx,
 		method:      method,
 		buf:         recvBuffer,
 		trReader:    trReader,
@@ -507,6 +551,9 @@ func CreateStream(ctx context.Context, id uint32, requestRead func(i int), metho
 		requestRead: requestRead,
 		hdrMu:       sync.Mutex{},
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	stream.ctx, stream.cancel = newContextWithCancelReason(ctx, cancel)
 
 	return stream
 }
@@ -762,11 +809,13 @@ func (e ConnectionError) Origin() error {
 
 var (
 	// ErrConnClosing indicates that the transport is closing.
-	ErrConnClosing = connectionErrorf(true, nil, "transport is closing")
+	ErrConnClosing       = connectionErrorf(true, nil, "transport is closing")
+	errStatusConnClosing = status.Err(codes.Unavailable, ErrConnClosing.Desc)
 
 	// errStreamDone is returned from write at the client side to indicate application
 	// layer of an error.
-	errStreamDone = errors.New("the stream is done")
+	errStreamDone       = errors.New("the stream is done")
+	errStatusStreamDone = status.Err(codes.Internal, errStreamDone.Error())
 
 	// errStreamDrain indicates that the stream is rejected because the
 	// connection is draining. This could be caused by goaway or balancer
@@ -840,3 +889,9 @@ func tlsAppendH2ToALPNProtocols(ps []string) []string {
 	ret = append(ret, ps...)
 	return append(ret, alpnProtoStrH2)
 }
+
+var (
+	sendRSTStreamFrameSuffix       = " [send RSTStream Frame]"
+	triggeredByRemoteServiceSuffix = " [triggered by remote service]"
+	triggeredByHandlerSideSuffix   = " [triggered by handler side]"
+)
