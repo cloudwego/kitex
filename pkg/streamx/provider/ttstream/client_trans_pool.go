@@ -17,8 +17,9 @@
 package ttstream
 
 import (
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/netpoll"
+
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var dialer = netpoll.NewDialer()

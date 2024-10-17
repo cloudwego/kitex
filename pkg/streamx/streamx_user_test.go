@@ -29,8 +29,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/client"
@@ -38,6 +36,8 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/streamxserver"
 	"github.com/cloudwego/kitex/transport"

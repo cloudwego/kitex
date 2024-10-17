@@ -22,9 +22,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
-
 	"github.com/apache/thrift/lib/go/thrift"
+
+	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	kutils "github.com/cloudwego/kitex/pkg/utils"
 )
 
