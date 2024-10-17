@@ -21,6 +21,9 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
+	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -530,6 +533,26 @@ func TestWithGRPCKeepaliveParams(t *testing.T) {
 	test.Assert(t, opts.GRPCConnectOpts.KeepaliveParams.Timeout == 20*time.Second,
 		opts.GRPCConnectOpts.KeepaliveParams.Timeout)
 	test.Assert(t, opts.GRPCConnectOpts.KeepaliveParams.PermitWithoutStream)
+}
+
+type mockConnGetter struct{}
+
+func (mg *mockConnGetter) Get(ctx context.Context, network, address string, opt remote.ConnOption) (net.Conn, error) {
+	return nil, nil
+}
+
+func TestWithGRPCConnectionGetter(t *testing.T) {
+	var connGetter nphttp2.ConnectionGetter = &mockConnGetter{}
+	cliOpt := []client.Option{
+		WithGRPCConnectionGetter(connGetter),
+	}
+	opts := client.NewOptions(cliOpt)
+	test.Assert(t, opts.GRPCConnectionGetter == connGetter)
+
+	// no configuration
+	cliOpt = []client.Option{}
+	opts = client.NewOptions(cliOpt)
+	test.Assert(t, opts.GRPCConnectionGetter == nil)
 }
 
 func TestWithHTTPConnection(t *testing.T) {
