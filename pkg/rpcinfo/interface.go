@@ -80,6 +80,7 @@ type RPCConfig interface {
 	TransportProtocol() transport.Protocol
 	InteractionMode() InteractionMode
 	PayloadCodec() serviceinfo.PayloadCodec
+	StreamingMode() serviceinfo.StreamingMode
 }
 
 // Invocation contains specific information about the call.
