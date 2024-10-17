@@ -107,7 +107,7 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 		streamWorkerPool.GoCtx(ctx, func() {
 			err := t.OnStream(nctx, conn, ss)
 			if err != nil && !errors.Is(err, io.EOF) {
-				klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", nerr)
+				klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", err)
 			}
 		})
 	}
