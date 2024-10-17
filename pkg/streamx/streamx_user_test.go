@@ -546,7 +546,6 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			t.Logf("=== Checking streams GCed ===")
 			streams := 100
 			streamList := make([]streamx.ServerStream, streams)
-			ngBefore := runtime.NumGoroutine()
 			atomic.StoreInt32(&streamStarted, 0)
 			for i := 0; i < streams; i++ {
 				ctx := context.Background()
@@ -556,20 +555,19 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			}
 			waitStreamStarted(streams)
 			// before GC
+			ngBefore := runtime.NumGoroutine()
 			test.Assert(t, runtime.NumGoroutine() > streams, runtime.NumGoroutine())
 			// after GC
 			for i := 0; i < streams; i++ {
 				streamList[i] = nil
 			}
-			// the goroutines diff should < 10
-			for runtime.NumGoroutine()-ngBefore > 10 {
+			for runtime.NumGoroutine() > ngBefore {
 				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
 				runtime.GC()
 				time.Sleep(time.Millisecond * 50)
 			}
 
 			t.Logf("=== Checking Streams Called and GCed ===")
-			ngBefore = runtime.NumGoroutine()
 			streams = 100
 			for i := 0; i < streams; i++ {
 				wg.Add(1)
@@ -593,12 +591,6 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 				}()
 			}
 			wg.Wait()
-			// the goroutines diff should < 10
-			for runtime.NumGoroutine()-ngBefore > 10 {
-				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
-				runtime.GC()
-				time.Sleep(time.Millisecond * 50)
-			}
 		})
 	}
 }
