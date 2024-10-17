@@ -40,7 +40,7 @@ func (s *Stack[ValueType]) Size() (size int) {
 }
 
 // RangeDelete range from the stack bottom
-func (s *Stack[ValueType]) RangeDelete(checking func(v ValueType) (deleteNode bool, continueRange bool)) {
+func (s *Stack[ValueType]) RangeDelete(checking func(v ValueType) (deleteNode, continueRange bool)) {
 	// Stop the world!
 	s.L.Lock()
 	// range from the stack bottom(oldest item)

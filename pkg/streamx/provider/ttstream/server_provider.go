@@ -34,8 +34,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-type serverTransCtxKey struct{}
-type serverStreamCancelCtxKey struct{}
+type (
+	serverTransCtxKey        struct{}
+	serverStreamCancelCtxKey struct{}
+)
 
 func NewServerProvider(sinfo *serviceinfo.ServiceInfo, opts ...ServerProviderOption) (streamx.ServerProvider, error) {
 	sp := new(serverProvider)
@@ -96,24 +98,33 @@ func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStr
 	sst := ss.(*serverStream)
 	var exception tException
 	if err != nil {
-		switch err.(type) {
-		case tException:
-			exception = err.(tException)
+		switch terr := err.(type) {
 		case kerrors.BizStatusErrorIface:
-			bizErr := err.(kerrors.BizStatusErrorIface)
-			sst.appendTrailer(
-				"biz-status", strconv.Itoa(int(bizErr.BizStatusCode())),
-				"biz-message", bizErr.BizMessage(),
-			)
-			if bizErr.BizExtra() != nil {
-				extra, _ := utils.Map2JSONStr(bizErr.BizExtra())
-				sst.appendTrailer("biz-extra", extra)
+			bizStatus := strconv.Itoa(int(terr.BizStatusCode()))
+			bizMsg := terr.BizMessage()
+			if terr.BizExtra() == nil {
+				err = sst.writeTrailer(streamx.Trailer{
+					"biz-status":  bizStatus,
+					"biz-message": bizMsg,
+				})
+			} else {
+				bizExtra, _ := utils.Map2JSONStr(terr.BizExtra())
+				err = sst.writeTrailer(streamx.Trailer{
+					"biz-status":  bizStatus,
+					"biz-message": bizMsg,
+					"biz-extra":   bizExtra,
+				})
 			}
+			if err != nil {
+				return nil, err
+			}
+		case tException:
+			exception = terr
 		default:
-			exception = thrift.NewApplicationException(remote.InternalError, err.Error())
+			exception = thrift.NewApplicationException(remote.InternalError, terr.Error())
 		}
 	}
-	if err := sst.close(exception); err != nil {
+	if err = sst.close(exception); err != nil {
 		return nil, err
 	}
 

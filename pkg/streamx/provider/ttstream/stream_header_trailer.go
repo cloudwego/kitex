@@ -22,8 +22,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
-var _ ClientStreamMeta = (*clientStream)(nil)
-var _ ServerStreamMeta = (*serverStream)(nil)
+var (
+	_ ClientStreamMeta = (*clientStream)(nil)
+	_ ServerStreamMeta = (*serverStream)(nil)
+)
 
 func (s *clientStream) Header() (streamx.Header, error) {
 	sig := <-s.headerSig

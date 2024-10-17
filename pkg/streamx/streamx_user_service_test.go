@@ -14,21 +14,25 @@
  * limitations under the License.
  */
 
-package ttstream_test
+package streamx_test
 
 import (
 	"context"
 	"errors"
 	"io"
+	"testing"
 
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 )
 
-type pingpongService struct{}
-type streamingService struct{}
+type (
+	pingpongService  struct{}
+	streamingService struct{}
+)
 
 const (
 	headerKey  = "header1"
@@ -36,6 +40,15 @@ const (
 	trailerKey = "trailer1"
 	trailerVal = "value1"
 )
+
+func testHeaderAndTrailer(t *testing.T, stream streamx.ClientStreamMetadata) {
+	hd, err := stream.Header()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, hd[headerKey] == headerVal, hd)
+	tl, err := stream.Trailer()
+	test.Assert(t, err == nil, err)
+	test.Assert(t, tl[trailerKey] == trailerVal, tl)
+}
 
 func (si *streamingService) setHeaderAndTrailer(stream streamx.ServerStreamMetadata) error {
 	err := stream.SetTrailer(streamx.Trailer{trailerKey: trailerVal})
@@ -63,7 +76,8 @@ func (si *streamingService) Unary(ctx context.Context, req *Request) (*Response,
 }
 
 func (si *streamingService) ClientStream(ctx context.Context,
-	stream streamx.ClientStreamingServer[Request, Response]) (*Response, error) {
+	stream streamx.ClientStreamingServer[Request, Response],
+) (*Response, error) {
 	var msg string
 	klog.Infof("Server ClientStream start")
 	defer klog.Infof("Server ClientStream end")
@@ -87,7 +101,8 @@ func (si *streamingService) ClientStream(ctx context.Context,
 }
 
 func (si *streamingService) ServerStream(ctx context.Context, req *Request,
-	stream streamx.ServerStreamingServer[Response]) error {
+	stream streamx.ServerStreamingServer[Response],
+) error {
 	klog.Infof("Server ServerStream: req={%v}", req)
 
 	if err := si.setHeaderAndTrailer(stream); err != nil {
@@ -108,7 +123,8 @@ func (si *streamingService) ServerStream(ctx context.Context, req *Request,
 }
 
 func (si *streamingService) BidiStream(ctx context.Context,
-	stream streamx.BidiStreamingServer[Request, Response]) error {
+	stream streamx.BidiStreamingServer[Request, Response],
+) error {
 	ktx.RegisterCancelCallback(ctx, func() {
 		klog.Debugf("RegisterCancelCallback work!")
 	})

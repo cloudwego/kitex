@@ -68,7 +68,7 @@ func TestTransport(t *testing.T) {
 		Extra: map[string]interface{}{"streaming": true},
 	}
 
-	var addr = test.GetLocalAddress()
+	addr := test.GetLocalAddress()
 	ln, err := net.Listen("tcp", addr)
 	test.Assert(t, err == nil, err)
 
