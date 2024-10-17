@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,8 +79,14 @@ func main() {
 		log.Warn("Get current path failed:", err.Error())
 		os.Exit(1)
 	}
-	// run as kitex
-	err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])
+	if len(os.Args) > 1 && os.Args[1] == "template" {
+		err = args.TemplateArgs(kitex.Version)
+	} else if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+		err = fmt.Errorf("unknown command %q", os.Args[1])
+	} else {
+		// run as kitex
+		err = args.ParseArgs(kitex.Version, curpath, os.Args[1:])
+	}
 	if err != nil {
 		if err.Error() != "flag: help requested" {
 			log.Warn(err.Error())
