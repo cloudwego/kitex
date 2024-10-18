@@ -32,17 +32,15 @@ type streamIOMsg struct {
 }
 
 type streamIO struct {
-	ctx       context.Context
-	trigger   chan struct{}
-	stream    *stream
-	pipe      *container.Pipe[streamIOMsg]
-	cache     [1]streamIOMsg
-	exception error // once has exception, the stream should not work normally again
-	// eofFlag == 2 when both parties send trailers
-	eofFlag int32
-	// eofCallback will be called when eofFlag == 2
-	// eofCallback will not be called if stream is not be ended in a normal way
-	eofCallback func()
+	ctx           context.Context
+	trigger       chan struct{}
+	stream        *stream
+	pipe          *container.Pipe[streamIOMsg]
+	cache         [1]streamIOMsg
+	exception     error // once has exception, the stream should not work normally again
+	eofFlag       int32
+	callbackFlag  int32
+	closeCallback func(ctx context.Context)
 }
 
 func newStreamIO(ctx context.Context, s *stream) *streamIO {
@@ -52,10 +50,6 @@ func newStreamIO(ctx context.Context, s *stream) *streamIO {
 	sio.stream = s
 	sio.pipe = container.NewPipe[streamIOMsg]()
 	return sio
-}
-
-func (s *streamIO) setEOFCallback(f func()) {
-	s.eofCallback = f
 }
 
 func (s *streamIO) input(ctx context.Context, msg streamIOMsg) {
@@ -90,25 +84,33 @@ func (s *streamIO) output(ctx context.Context) (msg streamIOMsg, err error) {
 	return msg, nil
 }
 
+func (s *streamIO) runCloseCallback() {
+	if s.closeCallback != nil && atomic.CompareAndSwapInt32(&s.callbackFlag, 0, 1) {
+		s.closeCallback(s.ctx)
+	}
+}
+
 func (s *streamIO) closeRecv() {
 	s.pipe.Close()
-	if atomic.AddInt32(&s.eofFlag, 1) == 2 && s.eofCallback != nil {
-		s.eofCallback()
+	if s.closeCallback != nil && atomic.AddInt32(&s.eofFlag, 1) == 2 {
+		s.runCloseCallback()
 	}
 }
 
 func (s *streamIO) closeSend() {
-	if atomic.AddInt32(&s.eofFlag, 1) == 2 && s.eofCallback != nil {
-		s.eofCallback()
+	if s.closeCallback != nil && atomic.AddInt32(&s.eofFlag, 1) == 2 {
+		s.runCloseCallback()
 	}
 }
 
 func (s *streamIO) close() {
-	s.stream.close()
 	s.pipe.Close()
+	s.stream.close()
+	s.runCloseCallback()
 }
 
 func (s *streamIO) cancel() {
 	s.pipe.Cancel()
 	s.stream.close()
+	s.runCloseCallback()
 }

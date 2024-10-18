@@ -279,7 +279,7 @@ func (s *serverStream) close(ex tException) error {
 	if err != nil {
 		return err
 	}
-	err = s.trans.streamDelete(s.sid)
+	s.trans.streamDelete(s.sid)
 	s.stream.close()
-	return err
+	return nil
 }

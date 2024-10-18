@@ -52,14 +52,20 @@ func (kc *kClient) NewStream(ctx context.Context, method string, req any, callOp
 		return nil, err
 	}
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+
+	// tracing
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
+	ctx, copts := streamxcallopt.NewCtxWithCallOptions(ctx)
+	callOptions = append(callOptions, streamxcallopt.WithStreamCloseCallback(func(ctx context.Context) {
+		kc.opt.TracerCtl.DoFinish(ctx, ri, err)
+	}))
+	copts.Apply(callOptions)
 
 	streamArgs := streamx.NewStreamArgs(nil)
 	// put streamArgs into response arg
 	// it's an ugly trick but if we don't want to refactor too much,
 	// this is the only way to compatible with current endpoint design
 	err = kc.sEps(ctx, req, streamArgs)
-	kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 	if err != nil {
 		return nil, err
 	}
