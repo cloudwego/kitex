@@ -28,8 +28,9 @@ import (
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
-	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/netpoll"
+
+	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -344,7 +345,6 @@ func (t *transport) streamDelete(sid int32) {
 		return
 	}
 	atomic.AddInt32(&t.streamingFlag, -1)
-	return
 }
 
 func (t *transport) IsStreaming() bool {

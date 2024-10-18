@@ -22,6 +22,7 @@ import (
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
