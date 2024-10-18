@@ -17,24 +17,48 @@
 package streamxcallopt
 
 import (
-	"fmt"
-	"strings"
-	"time"
+	"context"
 )
 
+type StreamCloseCallback func(ctx context.Context)
+
 type CallOptions struct {
-	RPCTimeout time.Duration
+	StreamCloseCallbacks []StreamCloseCallback
 }
 
 type CallOption struct {
-	f func(o *CallOptions, di *strings.Builder)
+	f func(o *CallOptions)
 }
 
 type WithCallOption func(o *CallOption)
 
-func WithRPCTimeout(rpcTimeout time.Duration) CallOption {
-	return CallOption{f: func(o *CallOptions, di *strings.Builder) {
-		di.WriteString(fmt.Sprintf("WithRPCTimeout(%d)", rpcTimeout))
-		o.RPCTimeout = rpcTimeout
+type ctxKeyCallOptions struct{}
+
+func NewCtxWithCallOptions(ctx context.Context) (context.Context, *CallOptions) {
+	copts := new(CallOptions)
+	return context.WithValue(ctx, ctxKeyCallOptions{}, copts), copts
+}
+
+func GetCallOptionsFromCtx(ctx context.Context) *CallOptions {
+	v := ctx.Value(ctxKeyCallOptions{})
+	if v == nil {
+		return nil
+	}
+	copts, ok := v.(*CallOptions)
+	if !ok {
+		return nil
+	}
+	return copts
+}
+
+func (copts *CallOptions) Apply(opts []CallOption) {
+	for _, opt := range opts {
+		opt.f(copts)
+	}
+}
+
+func WithStreamCloseCallback(callback StreamCloseCallback) CallOption {
+	return CallOption{f: func(o *CallOptions) {
+		o.StreamCloseCallbacks = append(o.StreamCloseCallbacks, callback)
 	}}
 }

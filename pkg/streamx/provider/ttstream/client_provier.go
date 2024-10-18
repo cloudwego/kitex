@@ -19,11 +19,9 @@ package ttstream
 import (
 	"context"
 	"runtime"
-	"sync/atomic"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
-
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -51,7 +49,7 @@ type clientProvider struct {
 	headerHandler HeaderFrameHandler
 }
 
-func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callOptions ...streamxcallopt.CallOption) (streamx.ClientStream, error) {
+func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (streamx.ClientStream, error) {
 	rconfig := ri.Config()
 	invocation := ri.Invocation()
 	method := invocation.MethodName()
@@ -95,31 +93,23 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 	})
 
 	cs := newClientStream(sio.stream)
-	// the END of a client stream means it should send and recv trailer and not hold by user anymore
-	var ended uint32
-	sio.setEOFCallback(func() {
-		// if stream is ended by both parties, put the transport back to pool
-		if atomic.AddUint32(&ended, 1) == 2 {
-			_ = c.streamFinalize(sio, trans)
-		}
-	})
 	runtime.SetFinalizer(cs, func(cstream *clientStream) {
 		// it's safe to call CloseSend twice
-		// we do repeated CloseSend here to ensure stream can be closed normally
+		// we do CloseSend here to ensure stream can be closed normally
 		_ = cstream.CloseSend(ctx)
-		// only delete stream when clientStream be finalized
-		if atomic.AddUint32(&ended, 1) == 2 {
-			_ = c.streamFinalize(sio, trans)
+
+		copts := streamxcallopt.GetCallOptionsFromCtx(ctx)
+		if copts != nil && len(copts.StreamCloseCallbacks) > 0 {
+			for _, callback := range copts.StreamCloseCallbacks {
+				callback(ctx)
+			}
+		}
+
+		sio.close()
+		trans.streamDelete(sio.stream.sid)
+		if trans.IsActive() {
+			c.transPool.Put(trans)
 		}
 	})
 	return cs, err
-}
-
-func (c clientProvider) streamFinalize(sio *streamIO, trans *transport) error {
-	sio.close()
-	err := trans.streamDelete(sio.stream.sid)
-	if trans.IsActive() {
-		c.transPool.Put(trans)
-	}
-	return err
 }

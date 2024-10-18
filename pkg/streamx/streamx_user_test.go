@@ -34,7 +34,6 @@ import (
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
@@ -52,8 +51,6 @@ type testCase struct {
 }
 
 func init() {
-	klog.SetLevel(klog.LevelWarn)
-
 	sp, _ := ttstream.NewServerProvider(streamingServiceInfo)
 	cp, _ := ttstream.NewClientProvider(streamingServiceInfo, ttstream.WithClientLongConnPool(ttstream.LongConnConfig{MaxIdleTimeout: time.Millisecond * 100}))
 	providerTestCases = append(providerTestCases, testCase{Name: "TTHeader_LongConn", ClientProvider: cp, ServerProvider: sp})
@@ -67,6 +64,7 @@ func TestMain(m *testing.M) {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
+	//klog.SetLevel(klog.LevelDebug)
 	m.Run()
 }
 
@@ -572,22 +570,22 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			for i := 0; i < streams; i++ {
 				wg.Add(1)
 				go func() {
+					defer wg.Done()
+
 					bs, err := streamClient.BidiStream(ctx)
 					test.Assert(t, err == nil, err)
 					req := new(Request)
 					req.Message = msg
 					err = bs.Send(ctx, req)
 					test.Assert(t, err == nil, err)
-					go func() {
-						defer wg.Done()
-						res, err := bs.Recv(ctx)
-						test.Assert(t, err == nil, err)
-						err = bs.CloseSend(ctx)
-						test.Assert(t, err == nil, err)
-						test.Assert(t, res.Message == msg, res.Message)
 
-						testHeaderAndTrailer(t, bs)
-					}()
+					res, err := bs.Recv(ctx)
+					test.Assert(t, err == nil, err)
+					err = bs.CloseSend(ctx)
+					test.Assert(t, err == nil, err)
+					test.Assert(t, res.Message == msg, res.Message)
+
+					testHeaderAndTrailer(t, bs)
 				}()
 			}
 			wg.Wait()

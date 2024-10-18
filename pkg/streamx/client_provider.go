@@ -19,7 +19,6 @@ package streamx
 import (
 	"context"
 
-	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
@@ -42,5 +41,5 @@ res := stream.Recv(...)
 
 type ClientProvider interface {
 	// NewStream create a stream based on rpcinfo and callOptions
-	NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callOptions ...streamxcallopt.CallOption) (ClientStream, error)
+	NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (ClientStream, error)
 }
