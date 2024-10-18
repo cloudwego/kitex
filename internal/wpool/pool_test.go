@@ -28,8 +28,9 @@ import (
 )
 
 func TestWPool(t *testing.T) {
-	maxIdle := 1
-	maxIdleTime := time.Millisecond * 500
+	ctx := context.Background()
+	maxIdle := 2
+	maxIdleTime := 100 * time.Millisecond
 	p := New(maxIdle, maxIdleTime)
 	var (
 		sum  int32
@@ -39,32 +40,35 @@ func TestWPool(t *testing.T) {
 	test.Assert(t, p.Size() == 0)
 	for i := int32(0); i < size; i++ {
 		wg.Add(1)
-		p.Go(func() {
-			defer wg.Done()
-			atomic.AddInt32(&sum, 1)
-		})
+		go func() {
+			ctx, err := p.RunTask(ctx, time.Second,
+				nil, nil, func(ctx context.Context, req, resp interface{}) error {
+					defer wg.Done()
+					atomic.AddInt32(&sum, 1)
+					return nil
+				})
+			test.Assert(t, err == nil && ctx.Err() == nil)
+		}()
 	}
-	test.Assert(t, p.Size() != 0)
-
 	wg.Wait()
 	test.Assert(t, atomic.LoadInt32(&sum) == size)
-	for p.Size() != int32(maxIdle) { // waiting for workers finished and idle workers left
-		runtime.Gosched()
-	}
-	for p.Size() > 0 { // waiting for idle workers timeout
-		time.Sleep(maxIdleTime)
-	}
-	test.Assert(t, p.Size() == 0)
+	test.Assert(t, p.Size() != 0)
+	time.Sleep(2 * maxIdleTime)
+	test.Assert(t, p.Size() == 0, p.Size())
 }
+
+func noop(ctx context.Context, req, resp interface{}) error { return nil }
 
 func BenchmarkWPool(b *testing.B) {
 	maxIdleWorkers := runtime.GOMAXPROCS(0)
 	ctx := context.Background()
 	p := New(maxIdleWorkers, 10*time.Millisecond)
-	for i := 0; i < b.N; i++ {
-		p.GoCtx(ctx, func() {})
-		for int(p.Size()) > maxIdleWorkers {
-			runtime.Gosched()
+	b.RunParallel(func(b *testing.PB) {
+		for b.Next() {
+			p.RunTask(ctx, time.Second, nil, nil, noop)
+			for int(p.Size()) > maxIdleWorkers {
+				runtime.Gosched()
+			}
 		}
-	}
+	})
 }
