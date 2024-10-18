@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
@@ -31,12 +32,15 @@ type streamIOMsg struct {
 }
 
 type streamIO struct {
-	ctx       context.Context
-	trigger   chan struct{}
-	stream    *stream
-	pipe      *container.Pipe[streamIOMsg]
-	cache     [1]streamIOMsg
-	exception error // once has exception, the stream should not work normally again
+	ctx           context.Context
+	trigger       chan struct{}
+	stream        *stream
+	pipe          *container.Pipe[streamIOMsg]
+	cache         [1]streamIOMsg
+	exception     error // once has exception, the stream should not work normally again
+	eofFlag       int32
+	callbackFlag  int32
+	closeCallback func(ctx context.Context)
 }
 
 func newStreamIO(ctx context.Context, s *stream) *streamIO {
@@ -80,19 +84,33 @@ func (s *streamIO) output(ctx context.Context) (msg streamIOMsg, err error) {
 	return msg, nil
 }
 
+func (s *streamIO) runCloseCallback() {
+	if s.closeCallback != nil && atomic.CompareAndSwapInt32(&s.callbackFlag, 0, 1) {
+		s.closeCallback(s.ctx)
+	}
+}
+
 func (s *streamIO) closeRecv() {
 	s.pipe.Close()
+	if s.closeCallback != nil && atomic.AddInt32(&s.eofFlag, 1) == 2 {
+		s.runCloseCallback()
+	}
 }
 
 func (s *streamIO) closeSend() {
+	if s.closeCallback != nil && atomic.AddInt32(&s.eofFlag, 1) == 2 {
+		s.runCloseCallback()
+	}
 }
 
 func (s *streamIO) close() {
 	s.pipe.Close()
 	s.stream.close()
+	s.runCloseCallback()
 }
 
 func (s *streamIO) cancel() {
 	s.pipe.Cancel()
 	s.stream.close()
+	s.runCloseCallback()
 }

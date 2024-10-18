@@ -28,6 +28,7 @@ import (
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -140,6 +141,11 @@ func (t *transport) IsActive() bool {
 func (t *transport) storeStreamIO(ctx context.Context, s *stream) *streamIO {
 	sio := newStreamIO(ctx, s)
 	t.streams.Store(s.sid, sio)
+
+	copts := streamxcallopt.GetCallOptionsFromCtx(ctx)
+	if copts != nil && copts.StreamCloseCallback != nil {
+		sio.closeCallback = copts.StreamCloseCallback
+	}
 	return sio
 }
 

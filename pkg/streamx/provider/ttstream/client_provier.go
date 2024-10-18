@@ -22,7 +22,6 @@ import (
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
-	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -97,13 +96,6 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 		// it's safe to call CloseSend twice
 		// we do CloseSend here to ensure stream can be closed normally
 		_ = cstream.CloseSend(ctx)
-
-		copts := streamxcallopt.GetCallOptionsFromCtx(ctx)
-		if copts != nil && len(copts.StreamCloseCallbacks) > 0 {
-			for _, callback := range copts.StreamCloseCallbacks {
-				callback(ctx)
-			}
-		}
 
 		sio.close()
 		trans.streamDelete(sio.stream.sid)
