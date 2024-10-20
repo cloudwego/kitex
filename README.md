@@ -1,6 +1,6 @@
 # CloudWeGo-Kitex
 
-English | [中文](README_cn.md)
+English | [中文](README_cn.md) | [Português Brasil](README_ptbr.md)
 
 [![Release](https://img.shields.io/github/v/release/cloudwego/kitex)](https://github.com/cloudwego/kitex/releases)
 [![WebSite](https://img.shields.io/website?up_message=cloudwego&url=https%3A%2F%2Fwww.cloudwego.io%2F)](https://www.cloudwego.io/)
