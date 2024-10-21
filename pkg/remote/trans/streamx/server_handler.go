@@ -93,7 +93,7 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	return ctx, nil
 }
 
-// OnRead control the connnection level lifecycle.
+// OnRead control the connection level lifecycle.
 // only when OnRead return, netpoll can close the connection buffer
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
 	var wg sync.WaitGroup

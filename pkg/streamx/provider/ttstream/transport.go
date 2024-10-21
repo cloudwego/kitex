@@ -28,8 +28,9 @@ import (
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/netpoll"
+
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 
