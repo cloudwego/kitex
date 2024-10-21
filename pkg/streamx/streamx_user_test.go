@@ -219,13 +219,12 @@ func TestStreamingBasic(t *testing.T) {
 			test.Assert(t, err == nil, err)
 
 			// prepare metainfo
-			ctx := context.Background()
-			ctx = setMetadata(ctx)
+			octx := setMetadata(context.Background())
 
 			t.Logf("=== PingPong ===")
 			req := new(Request)
 			req.Message = "PingPong"
-			res, err := pingpongClient.PingPong(ctx, req)
+			res, err := pingpongClient.PingPong(octx, req)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, req.Message == res.Message, res)
 
@@ -233,7 +232,7 @@ func TestStreamingBasic(t *testing.T) {
 			req = new(Request)
 			req.Type = 10000
 			req.Message = "Unary"
-			res, err = streamClient.Unary(ctx, req)
+			res, err = streamClient.Unary(octx, req)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, req.Type == res.Type, res.Type)
 			test.Assert(t, req.Message == res.Message, res.Message)
@@ -247,7 +246,7 @@ func TestStreamingBasic(t *testing.T) {
 			// client stream
 			round := 5
 			t.Logf("=== ClientStream ===")
-			cs, err := streamClient.ClientStream(ctx)
+			ctx, cs, err := streamClient.ClientStream(octx)
 			test.Assert(t, err == nil, err)
 			for i := 0; i < round; i++ {
 				req := new(Request)
@@ -273,7 +272,7 @@ func TestStreamingBasic(t *testing.T) {
 			t.Logf("=== ServerStream ===")
 			req = new(Request)
 			req.Message = "ServerStream"
-			ss, err := streamClient.ServerStream(ctx, req)
+			ctx, ss, err := streamClient.ServerStream(octx, req)
 			test.Assert(t, err == nil, err)
 			received := 0
 			for {
@@ -304,7 +303,7 @@ func TestStreamingBasic(t *testing.T) {
 			for c := 0; c < concurrent; c++ {
 				atomic.AddInt32(&serverStreamCount, -1)
 				go func() {
-					bs, err := streamClient.BidiStream(ctx)
+					ctx, bs, err := streamClient.BidiStream(octx)
 					test.Assert(t, err == nil, err)
 					msg := "BidiStream"
 					var wg sync.WaitGroup
@@ -361,7 +360,7 @@ func TestStreamingBasic(t *testing.T) {
 			assertBizErr(t, err)
 
 			t.Logf("=== ClientStreamWithErr normalErr ===")
-			cliStream, err := streamClient.ClientStreamWithErr(ctx)
+			ctx, cliStream, err := streamClient.ClientStreamWithErr(octx)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, cliStream != nil, cliStream)
 			req = new(Request)
@@ -374,7 +373,7 @@ func TestStreamingBasic(t *testing.T) {
 			assertNormalErr(t, err)
 
 			t.Logf("=== ClientStreamWithErr bizErr ===")
-			cliStream, err = streamClient.ClientStreamWithErr(ctx)
+			ctx, cliStream, err = streamClient.ClientStreamWithErr(octx)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, cliStream != nil, cliStream)
 			req = new(Request)
@@ -389,7 +388,7 @@ func TestStreamingBasic(t *testing.T) {
 			t.Logf("=== ServerStreamWithErr normalErr ===")
 			req = new(Request)
 			req.Type = normalErr
-			svrStream, err := streamClient.ServerStreamWithErr(ctx, req)
+			ctx, svrStream, err := streamClient.ServerStreamWithErr(octx, req)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, svrStream != nil, svrStream)
 			res, err = svrStream.Recv(ctx)
@@ -400,7 +399,7 @@ func TestStreamingBasic(t *testing.T) {
 			t.Logf("=== ServerStreamWithErr bizErr ===")
 			req = new(Request)
 			req.Type = bizErr
-			svrStream, err = streamClient.ServerStreamWithErr(ctx, req)
+			ctx, svrStream, err = streamClient.ServerStreamWithErr(octx, req)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, svrStream != nil, svrStream)
 			res, err = svrStream.Recv(ctx)
@@ -409,7 +408,7 @@ func TestStreamingBasic(t *testing.T) {
 			assertBizErr(t, err)
 
 			t.Logf("=== BidiStreamWithErr normalErr ===")
-			bidiStream, err := streamClient.BidiStreamWithErr(ctx)
+			ctx, bidiStream, err := streamClient.BidiStreamWithErr(octx)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, bidiStream != nil, bidiStream)
 			req = new(Request)
@@ -422,7 +421,7 @@ func TestStreamingBasic(t *testing.T) {
 			assertNormalErr(t, err)
 
 			t.Logf("=== BidiStreamWithErr bizErr ===")
-			bidiStream, err = streamClient.BidiStreamWithErr(ctx)
+			ctx, bidiStream, err = streamClient.BidiStreamWithErr(octx)
 			test.Assert(t, err == nil, err)
 			test.Assert(t, bidiStream != nil, bidiStream)
 			req = new(Request)
@@ -435,7 +434,7 @@ func TestStreamingBasic(t *testing.T) {
 			assertBizErr(t, err)
 
 			t.Logf("=== Timeout by Ctx ===")
-			bs, err := streamClient.BidiStream(ctx)
+			ctx, bs, err := streamClient.BidiStream(octx)
 			test.Assert(t, err == nil, err)
 			req = new(Request)
 			req.Message = string(make([]byte, 1024))
@@ -457,7 +456,7 @@ func TestStreamingBasic(t *testing.T) {
 				streamxclient.WithProvider(tc.ClientProvider),
 				streamxclient.WithRecvTimeout(time.Nanosecond),
 			)
-			bs, err = streamClient.BidiStream(ctx)
+			ctx, bs, err = streamClient.BidiStream(octx)
 			test.Assert(t, err == nil, err)
 			req = new(Request)
 			req.Message = string(make([]byte, 1024))
@@ -515,14 +514,14 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 				streamxclient.WithHostPorts(addr),
 				streamxclient.WithProvider(tc.ClientProvider),
 			)
-			ctx := context.Background()
+			octx := context.Background()
 			msg := "BidiStream"
 
 			t.Logf("=== Checking only one connection be reused ===")
 			var wg sync.WaitGroup
 			for i := 0; i < 12; i++ {
 				wg.Add(1)
-				bs, err := streamClient.BidiStream(ctx)
+				ctx, bs, err := streamClient.BidiStream(octx)
 				test.Assert(t, err == nil, err)
 				req := new(Request)
 				req.Message = string(make([]byte, 1024))
@@ -546,8 +545,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			streamList := make([]streamx.ServerStream, streams)
 			atomic.StoreInt32(&streamStarted, 0)
 			for i := 0; i < streams; i++ {
-				ctx := context.Background()
-				bs, err := streamClient.BidiStream(ctx)
+				_, bs, err := streamClient.BidiStream(octx)
 				test.Assert(t, err == nil, err)
 				streamList[i] = bs
 			}
@@ -572,7 +570,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 				go func() {
 					defer wg.Done()
 
-					bs, err := streamClient.BidiStream(ctx)
+					ctx, bs, err := streamClient.BidiStream(octx)
 					test.Assert(t, err == nil, err)
 					req := new(Request)
 					req.Message = msg
