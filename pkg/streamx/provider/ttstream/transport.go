@@ -28,6 +28,7 @@ import (
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
@@ -276,6 +277,13 @@ func (t *transport) streamSend(ctx context.Context, sid int32, method string, wh
 	if err != nil {
 		return err
 	}
+	// tracing
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri != nil && ri.Stats() != nil {
+		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
+			rpcStats.IncrSendSize(uint64(len(payload)))
+		}
+	}
 	return t.writeFrame(
 		streamFrame{sid: sid, method: method},
 		nil, dataFrameType, payload,
@@ -323,6 +331,14 @@ func (t *transport) streamRecv(ctx context.Context, sid int32, data any) (err er
 	err = DecodePayload(context.Background(), msg.payload, data.(thrift.FastCodec))
 	// payload will not be access after decode
 	mcache.Free(msg.payload)
+
+	// tracing
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri != nil && ri.Stats() != nil {
+		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
+			rpcStats.IncrRecvSize(uint64(len(msg.payload)))
+		}
+	}
 	return err
 }
 
