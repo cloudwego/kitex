@@ -90,7 +90,7 @@ func NewThriftFileProviderWithDynamicgoWithOption(path string, opts []ThriftIDLP
 		return nil, err
 	}
 	handleGoTagForDynamicGo(tOpts.goTag)
-	dOpts := dthrift.Options{EnableThriftBase: true, ParseServiceMode: dParseMode, UseDefaultValue: true}
+	dOpts := dthrift.Options{EnableThriftBase: true, ParseServiceMode: dParseMode, UseDefaultValue: true, SetOptionalBitmap: true}
 	dsvc, err := dOpts.NewDescritorFromPath(context.Background(), path, includeDirs...)
 	if err != nil {
 		// fall back to the original way (without dynamicgo)
@@ -480,7 +480,7 @@ func newDynamicGoDscFromContent(svc *descriptor.ServiceDescriptor, path, content
 	if err != nil {
 		return err
 	}
-	dOpts := dthrift.Options{EnableThriftBase: true, ParseServiceMode: dParseMode, UseDefaultValue: true}
+	dOpts := dthrift.Options{EnableThriftBase: true, ParseServiceMode: dParseMode, UseDefaultValue: true, SetOptionalBitmap: true}
 	dsvc, err := dOpts.NewDescritorFromContent(context.Background(), path, content, includes, isAbsIncludePath)
 	if err != nil {
 		klog.CtxWarnf(context.Background(), "KITEX: failed to get dynamicgo service descriptor, fall back to the original way, error=%s", err)

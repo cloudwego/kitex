@@ -159,6 +159,12 @@ func newGenericServer(g generic.Generic, addr net.Addr, handler generic.Service)
 	return svr
 }
 
+type OptionalImpl struct{}
+
+func (g *OptionalImpl) GenericCall(ctx context.Context, method string, request interface{}) (response interface{}, err error) {
+	return `{"Msg": "world"}`, nil
+}
+
 // GenericServiceImpl ...
 type GenericServiceImpl struct{}
 

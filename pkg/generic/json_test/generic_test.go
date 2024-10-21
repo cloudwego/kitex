@@ -60,6 +60,32 @@ func TestRun(t *testing.T) {
 	t.Run("TestParseModeWithDynamicGo", testParseModeWithDynamicGo)
 }
 
+func TestOptional(t *testing.T) {
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServiceImpl), "./idl/optional.thrift", nil, nil, false)
+
+	// normal generic
+	cli := initThriftClient(transport.TTHeader, t, addr, "./idl/optional.thrift", nil, nil, false)
+	resp, err := cli.GenericCall(context.Background(), "Echo", `{"Msg": "hello"}`)
+	test.Assert(t, err == nil, err)
+	fmt.Println("RESP:", resp)
+
+	svr.Stop()
+}
+
+func TestOptionalWithDynamicgo(t *testing.T) {
+	addr := test.GetLocalAddress()
+	svr := initThriftServer(t, addr, new(GenericServiceImpl), "./idl/optional.thrift", nil, nil, true)
+
+	// normal generic
+	cli := initThriftClient(transport.TTHeader, t, addr, "./idl/optional.thrift", nil, nil, true)
+	resp, err := cli.GenericCall(context.Background(), "Echo", `{"Msg": "hello"}`)
+	test.Assert(t, err == nil, err)
+	fmt.Println("RESP:", resp)
+
+	svr.Stop()
+}
+
 func testThrift(t *testing.T) {
 	addr := test.GetLocalAddress()
 	svr := initThriftServer(t, addr, new(GenericServiceImpl), "./idl/example.thrift", nil, nil, false)
@@ -92,8 +118,10 @@ func testThriftWithDynamicGo(t *testing.T) {
 	resp, err := cli.GenericCall(context.Background(), "ExampleMethod", reqMsg, callopt.WithRPCTimeout(100*time.Second))
 	test.Assert(t, err == nil, err)
 	respStr, ok := resp.(string)
+	fmt.Println("🌞", respStr)
 	test.Assert(t, ok)
 	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "Msg").String(), "world"), gjson.Get(respStr, "Msg").String())
+	test.Assert(t, reflect.DeepEqual(gjson.Get(respStr, "I8").String(), "8"), gjson.Get(respStr, "I8").String())
 
 	// client without dynamicgo
 
@@ -613,7 +641,7 @@ func initThriftServer(t *testing.T, address string, handler generic.Service, idl
 	} else {
 		p, err = generic.NewThriftFileProvider(idlPath)
 	}
-	test.Assert(t, err == nil)
+	test.Assert(t, err == nil, err)
 	g, err := generic.JSONThriftGeneric(p, opts...)
 	test.Assert(t, err == nil)
 	if base64Binary != nil {
