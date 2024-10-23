@@ -22,7 +22,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/transport"
 )
 
 var (
@@ -64,22 +63,6 @@ const (
 	MeshHeader string = "mHeader"
 )
 
-var emptyProtocolInfo ProtocolInfo
-
-// ProtocolInfo is used to indicate the transport protocol and payload codec information.
-type ProtocolInfo struct {
-	TransProto transport.Protocol
-	CodecType  serviceinfo.PayloadCodec
-}
-
-// NewProtocolInfo creates a new ProtocolInfo using the given tp and ct.
-func NewProtocolInfo(tp transport.Protocol, ct serviceinfo.PayloadCodec) ProtocolInfo {
-	return ProtocolInfo{
-		TransProto: tp,
-		CodecType:  ct,
-	}
-}
-
 // ServiceSearcher is used to search the service info by service name and method name,
 // strict equals to true means the service name must match the registered service name.
 type ServiceSearcher interface {
@@ -89,8 +72,6 @@ type ServiceSearcher interface {
 // Message is the core abstraction for Kitex message.
 type Message interface {
 	RPCInfo() rpcinfo.RPCInfo
-	ServiceInfo() *serviceinfo.ServiceInfo
-	SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error)
 	Data() interface{}
 	NewData(method string) (ok bool)
 	MessageType() MessageType
@@ -100,8 +81,6 @@ type Message interface {
 	SetPayloadLen(size int)
 	TransInfo() TransInfo
 	Tags() map[string]interface{}
-	ProtocolInfo() ProtocolInfo
-	SetProtocolInfo(ProtocolInfo)
 	PayloadCodec() PayloadCodec
 	SetPayloadCodec(pc PayloadCodec)
 	Recycle()
@@ -153,7 +132,6 @@ type message struct {
 	payloadSize   int
 	transInfo     TransInfo
 	tags          map[string]interface{}
-	protocol      ProtocolInfo
 	payloadCodec  PayloadCodec
 }
 
@@ -172,17 +150,11 @@ func (m *message) zero() {
 	for k := range m.tags {
 		delete(m.tags, k)
 	}
-	m.protocol = emptyProtocolInfo
 }
 
 // RPCInfo implements the Message interface.
 func (m *message) RPCInfo() rpcinfo.RPCInfo {
 	return m.rpcInfo
-}
-
-// ServiceInfo implements the Message interface.
-func (m *message) ServiceInfo() *serviceinfo.ServiceInfo {
-	return m.targetSvcInfo
 }
 
 func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error) {
@@ -256,16 +228,6 @@ func (m *message) PayloadLen() int {
 // SetPayloadLen implements the Message interface.
 func (m *message) SetPayloadLen(size int) {
 	m.payloadSize = size
-}
-
-// ProtocolInfo implements the Message interface.
-func (m *message) ProtocolInfo() ProtocolInfo {
-	return m.protocol
-}
-
-// SetProtocolInfo implements the Message interface.
-func (m *message) SetProtocolInfo(pt ProtocolInfo) {
-	m.protocol = pt
 }
 
 // PayloadCodec implements the Message interface.
@@ -356,10 +318,4 @@ func (ti *transInfo) PutTransStrInfo(kvInfo map[string]string) {
 func (ti *transInfo) Recycle() {
 	ti.zero()
 	transInfoPool.Put(ti)
-}
-
-// FillSendMsgFromRecvMsg is used to fill the transport information to the message to be sent.
-func FillSendMsgFromRecvMsg(recvMsg, sendMsg Message) {
-	sendMsg.SetProtocolInfo(recvMsg.ProtocolInfo())
-	sendMsg.SetPayloadCodec(recvMsg.PayloadCodec())
 }

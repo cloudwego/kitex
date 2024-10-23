@@ -28,31 +28,65 @@ func (s *server) initStreamMiddlewares(ctx context.Context) {
 	s.opt.Streaming.InitMiddlewares(ctx)
 }
 
-func (s *server) buildStreamInvokeChain() {
-	s.opt.RemoteOpt.RecvEndpoint = s.opt.Streaming.BuildRecvInvokeChain(s.invokeRecvEndpoint())
-	s.opt.RemoteOpt.SendEndpoint = s.opt.Streaming.BuildSendInvokeChain(s.invokeSendEndpoint())
+func newStream(ctx context.Context, ss streaming.ServerStream, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint) *stream {
+	st := &stream{
+		ServerStream: ss,
+	}
+	if grpcStreamGetter, ok := ss.(streaming.GRPCStreamGetter); ok {
+		grpcStream := grpcStreamGetter.GetGRPCStream()
+		st.grpcStream = newGRPCStream(ctx, grpcStream, sendEP, recvEP)
+	}
+	return st
 }
 
-func (s *server) invokeRecvEndpoint() endpoint.RecvEndpoint {
+type stream struct {
+	streaming.ServerStream
+	grpcStream grpcStream
+}
+
+func (s *stream) GetGRPCStream() streaming.Stream {
+	return &s.grpcStream
+}
+
+func newGRPCStream(ctx context.Context, st streaming.Stream, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint) grpcStream {
+	return grpcStream{
+		Stream:       st,
+		ctx:          ctx,
+		sendEndpoint: sendEP,
+		recvEndpoint: recvEP,
+	}
+}
+
+type grpcStream struct {
+	streaming.Stream
+	// it receives the ctx from previous middlewares and the Stream that exposed to users，then rewrite
+	// Context() method so that users could call Stream.Context() in handler to get the processed ctx.
+	ctx context.Context
+
+	sendEndpoint endpoint.SendEndpoint
+	recvEndpoint endpoint.RecvEndpoint
+}
+
+func (s *grpcStream) Context() context.Context {
+	return s.ctx
+}
+
+func (s *grpcStream) RecvMsg(m interface{}) (err error) {
+	return s.recvEndpoint(s.Stream, m)
+}
+
+func (s *grpcStream) SendMsg(m interface{}) (err error) {
+	return s.sendEndpoint(s.Stream, m)
+}
+
+func invokeRecvEndpoint() endpoint.RecvEndpoint {
 	return func(stream streaming.Stream, resp interface{}) (err error) {
 		return stream.RecvMsg(resp)
 	}
 }
 
-func (s *server) invokeSendEndpoint() endpoint.SendEndpoint {
+func invokeSendEndpoint() endpoint.SendEndpoint {
 	return func(stream streaming.Stream, req interface{}) (err error) {
 		return stream.SendMsg(req)
 	}
-}
-
-// contextStream is responsible for solving ctx diverge in server side streaming.
-// it receives the ctx from previous middlewares and the Stream that exposed to users，then rewrite
-// Context() method so that users could call Stream.Context() in handler to get the processed ctx.
-type contextStream struct {
-	streaming.Stream
-	ctx context.Context
-}
-
-func (cs contextStream) Context() context.Context {
-	return cs.ctx
 }

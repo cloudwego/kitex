@@ -20,13 +20,13 @@ import (
 	"context"
 	"io"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
-	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/remotecli"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
@@ -35,6 +35,7 @@ import (
 // Streaming client streaming interface for code generate
 type Streaming interface {
 	Stream(ctx context.Context, method string, request, response interface{}) error
+	StreamX(ctx context.Context, method string) (streaming.ClientStream, error)
 }
 
 // Stream implements the Streaming interface
@@ -55,44 +56,61 @@ func (kc *kClient) Stream(ctx context.Context, method string, request, response 
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
 
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
-	return kc.sEps(ctx, request, response)
-}
-
-func (kc *kClient) invokeSendEndpoint() endpoint.SendEndpoint {
-	return func(stream streaming.Stream, req interface{}) (err error) {
-		return stream.SendMsg(req)
+	cs, err := kc.sEps(ctx)
+	if err != nil {
+		return err
 	}
-}
-
-func (kc *kClient) invokeRecvEndpoint() endpoint.RecvEndpoint {
-	return func(stream streaming.Stream, resp interface{}) (err error) {
-		return stream.RecvMsg(resp)
+	result := response.(*streaming.Result)
+	result.ClientStream = cs
+	if getter, ok := cs.(streaming.GRPCStreamGetter); ok {
+		result.Stream = getter.GetGRPCStream()
 	}
+	return nil
 }
 
-func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
-	handler, err := kc.opt.RemoteOpt.CliHandlerFactory.NewTransHandler(kc.opt.RemoteOpt)
+// StreamX implements the Streaming interface
+func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.ClientStream, error) {
+	if !kc.inited {
+		panic("client not initialized")
+	}
+	if kc.closed {
+		panic("client is already closed")
+	}
+	if ctx == nil {
+		panic("ctx is nil")
+	}
+	var ri rpcinfo.RPCInfo
+	ctx, ri, _ = kc.initRPCInfo(ctx, method, 0, nil)
+
+	rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.Streaming)
+	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+
+	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
+	return kc.sEps(ctx)
+}
+
+func (kc *kClient) invokeStreamingEndpoint() (InnerEndpoint, error) {
+	transPipl, err := newCliTransHandler(kc.opt.RemoteOpt)
 	if err != nil {
 		return nil, err
 	}
-	for _, h := range kc.opt.MetaHandlers {
-		if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
-			kc.opt.RemoteOpt.StreamingMetaHandlers = append(kc.opt.RemoteOpt.StreamingMetaHandlers, shdlr)
-		}
-	}
 
-	recvEndpoint := kc.opt.Streaming.BuildRecvInvokeChain(kc.invokeRecvEndpoint())
-	sendEndpoint := kc.opt.Streaming.BuildSendInvokeChain(kc.invokeSendEndpoint())
+	recvEndpoint := kc.opt.Streaming.BuildRecvInvokeChain(invokeRecvEndpoint())
+	sendEndpoint := kc.opt.Streaming.BuildSendInvokeChain(invokeSendEndpoint())
 
-	return func(ctx context.Context, req, resp interface{}) (err error) {
-		// req and resp as &streaming.Stream
+	return func(ctx context.Context) (st streaming.ClientStream, err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
-		st, scm, err := remotecli.NewStream(ctx, ri, handler, kc.opt.RemoteOpt)
+		var cr remotecli.ConnReleaser
+		st, cr, err = remotecli.NewStream(ctx, ri, transPipl, kc.opt.RemoteOpt)
 		if err != nil {
 			return
 		}
-		clientStream := newStream(st, scm, kc, ri, kc.getStreamingMode(ri), sendEndpoint, recvEndpoint)
-		resp.(*streaming.Result).Stream = clientStream
+		stMode := ri.Invocation().MethodInfo().StreamingMode()
+		if stMode == serviceinfo.StreamingNone || stMode == serviceinfo.StreamingUnary {
+			st = newUnary(st, cr)
+		} else {
+			st = newStream(ctx, st, cr, kc, ri, kc.getStreamingMode(ri), sendEndpoint, recvEndpoint)
+		}
 		return
 	}, nil
 }
@@ -105,11 +123,48 @@ func (kc *kClient) getStreamingMode(ri rpcinfo.RPCInfo) serviceinfo.StreamingMod
 	return methodInfo.StreamingMode()
 }
 
+type unary struct {
+	streaming.ClientStream
+
+	cr remotecli.ConnReleaser
+}
+
+func newUnary(st streaming.ClientStream, cr remotecli.ConnReleaser) streaming.ClientStream {
+	return &unary{
+		ClientStream: st,
+		cr:           cr,
+	}
+}
+
+func (u *unary) SendMsg(ctx context.Context, m interface{}) (err error) {
+	err = u.ClientStream.SendMsg(ctx, m)
+	if err != nil {
+		ri := rpcinfo.GetRPCInfo(ctx)
+		u.cr.ReleaseConn(err, ri)
+	}
+	return err
+}
+
+func (u *unary) RecvMsg(ctx context.Context, m interface{}) (err error) {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri.Invocation().MethodInfo().OneWay() {
+		// Wait for the request to be flushed out before closing the connection.
+		// 500us is an acceptable duration to keep a minimal loss rate at best effort.
+		time.Sleep(time.Millisecond / 2)
+	} else {
+		err = u.ClientStream.RecvMsg(ctx, m)
+	}
+	u.cr.ReleaseConn(err, ri)
+	return err
+}
+
 type stream struct {
-	stream streaming.Stream
-	scm    *remotecli.StreamConnManager
-	kc     *kClient
-	ri     rpcinfo.RPCInfo
+	streaming.ClientStream
+	grpcStream grpcStream
+	ctx        context.Context
+	sr         remotecli.ConnReleaser
+	kc         *kClient
+	ri         rpcinfo.RPCInfo
 
 	streamingMode serviceinfo.StreamingMode
 	sendEndpoint  endpoint.SendEndpoint
@@ -119,53 +174,31 @@ type stream struct {
 
 var _ streaming.WithDoFinish = (*stream)(nil)
 
-func newStream(s streaming.Stream, scm *remotecli.StreamConnManager, kc *kClient, ri rpcinfo.RPCInfo,
+func newStream(ctx context.Context, s streaming.ClientStream, sr remotecli.ConnReleaser, kc *kClient, ri rpcinfo.RPCInfo,
 	mode serviceinfo.StreamingMode, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint,
 ) *stream {
-	return &stream{
-		stream:        s,
-		scm:           scm,
+	st := &stream{
+		ClientStream:  s,
+		ctx:           ctx,
+		sr:            sr,
 		kc:            kc,
 		ri:            ri,
 		streamingMode: mode,
 		sendEndpoint:  sendEP,
 		recvEndpoint:  recvEP,
 	}
-}
-
-func (s *stream) SetTrailer(metadata.MD) {
-	panic("this method should only be used in server side stream!")
-}
-
-func (s *stream) SetHeader(metadata.MD) error {
-	panic("this method should only be used in server side stream!")
-}
-
-func (s *stream) SendHeader(metadata.MD) error {
-	panic("this method should only be used in server side stream!")
-}
-
-// Header returns the header metadata sent by the server if any.
-// If a non-nil error is returned, stream.DoFinish() will be called to record the EndOfStream
-func (s *stream) Header() (md metadata.MD, err error) {
-	if md, err = s.stream.Header(); err != nil {
-		s.DoFinish(err)
+	if grpcStreamGetter, ok := s.(streaming.GRPCStreamGetter); ok {
+		grpcStream := grpcStreamGetter.GetGRPCStream()
+		st.grpcStream = newGRPCStream(grpcStream, sendEP, recvEP)
+		st.grpcStream.st = st
 	}
-	return
-}
-
-func (s *stream) Trailer() metadata.MD {
-	return s.stream.Trailer()
-}
-
-func (s *stream) Context() context.Context {
-	return s.stream.Context()
+	return st
 }
 
 // RecvMsg receives a message from the server.
 // If an error is returned, stream.DoFinish() will be called to record the end of stream
-func (s *stream) RecvMsg(m interface{}) (err error) {
-	err = s.recvEndpoint(s.stream, m)
+func (s *stream) RecvMsg(ctx context.Context, m interface{}) (err error) {
+	err = s.ClientStream.RecvMsg(ctx, m)
 	if err == nil {
 		// BizStatusErr is returned by the server handle, meaning the stream is ended;
 		// And it should be returned to the calling business code for error handling
@@ -179,17 +212,11 @@ func (s *stream) RecvMsg(m interface{}) (err error) {
 
 // SendMsg sends a message to the server.
 // If an error is returned, stream.DoFinish() will be called to record the end of stream
-func (s *stream) SendMsg(m interface{}) (err error) {
-	if err = s.sendEndpoint(s.stream, m); err != nil {
+func (s *stream) SendMsg(ctx context.Context, m interface{}) (err error) {
+	if err = s.ClientStream.SendMsg(ctx, m); err != nil {
 		s.DoFinish(err)
 	}
 	return
-}
-
-// Close will send a frame with EndStream=true to the server.
-// It will always return a nil
-func (s *stream) Close() error {
-	return s.stream.Close()
 }
 
 // DoFinish implements the streaming.WithDoFinish interface, and it records the end of stream
@@ -203,10 +230,72 @@ func (s *stream) DoFinish(err error) {
 		// only rpc errors are reported
 		err = nil
 	}
-	if s.scm != nil {
-		s.scm.ReleaseConn(err, s.ri)
+	if s.sr != nil {
+		s.sr.ReleaseConn(err, s.ri)
 	}
-	s.kc.opt.TracerCtl.DoFinish(s.Context(), s.ri, err)
+	s.kc.opt.TracerCtl.DoFinish(s.ctx, s.ri, err)
+}
+
+func (s *stream) GetGRPCStream() streaming.Stream {
+	return &s.grpcStream
+}
+
+func newGRPCStream(st streaming.Stream, sendEP endpoint.SendEndpoint, recvEP endpoint.RecvEndpoint) grpcStream {
+	return grpcStream{
+		Stream:       st,
+		sendEndpoint: sendEP,
+		recvEndpoint: recvEP,
+	}
+}
+
+type grpcStream struct {
+	streaming.Stream
+
+	st *stream
+
+	sendEndpoint endpoint.SendEndpoint
+	recvEndpoint endpoint.RecvEndpoint
+}
+
+// Header returns the header metadata sent by the server if any.
+// If a non-nil error is returned, stream.DoFinish() will be called to record the EndOfStream
+func (s *grpcStream) Header() (md metadata.MD, err error) {
+	if md, err = s.Stream.Header(); err != nil {
+		s.st.DoFinish(err)
+	}
+	return
+}
+
+func (s *grpcStream) RecvMsg(m interface{}) (err error) {
+	err = s.recvEndpoint(s.Stream, m)
+	if err == nil {
+		// BizStatusErr is returned by the server handle, meaning the stream is ended;
+		// And it should be returned to the calling business code for error handling
+		err = s.st.ri.Invocation().BizStatusErr()
+	}
+	if err != nil || s.st.streamingMode == serviceinfo.StreamingClient {
+		s.st.DoFinish(err)
+	}
+	return
+}
+
+func (s *grpcStream) SendMsg(m interface{}) (err error) {
+	if err = s.sendEndpoint(s.Stream, m); err != nil {
+		s.st.DoFinish(err)
+	}
+	return
+}
+
+func invokeRecvEndpoint() endpoint.RecvEndpoint {
+	return func(stream streaming.Stream, resp interface{}) (err error) {
+		return stream.RecvMsg(resp)
+	}
+}
+
+func invokeSendEndpoint() endpoint.SendEndpoint {
+	return func(stream streaming.Stream, req interface{}) (err error) {
+		return stream.SendMsg(req)
+	}
 }
 
 func isRPCError(err error) bool {

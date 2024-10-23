@@ -28,6 +28,8 @@ import (
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession/backup"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -44,7 +46,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/proxy"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/bound"
-	"github.com/cloudwego/kitex/pkg/remote/remotecli"
 	"github.com/cloudwego/kitex/pkg/retry"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
@@ -68,8 +69,8 @@ type Client interface {
 type kClient struct {
 	svcInfo *serviceinfo.ServiceInfo
 	mws     []endpoint.Middleware
-	eps     endpoint.Endpoint
-	sEps    endpoint.Endpoint
+	eps     UnaryEndpoint
+	sEps    StreamEndpoint
 	opt     *client.Options
 	lbf     *lbcache.BalancerFactory
 
@@ -422,73 +423,76 @@ func (kc *kClient) richRemoteOption() {
 		// TODO in stream situations, meta is only assembled when the stream creates
 		// metaHandler needs to be called separately.
 		// (newClientStreamer: call WriteMeta before remotecli.NewClient)
-		transInfoHdlr := bound.NewTransMetaHandler(kc.opt.MetaHandlers)
-		kc.opt.RemoteOpt.PrependBoundHandler(transInfoHdlr)
+		transInfoHdlr := bound.NewClientMetaHandler(kc.opt.MetaHandlers)
+		kc.opt.RemoteOpt.PrependPipelineHandler(transInfoHdlr)
 	}
 }
 
 func (kc *kClient) buildInvokeChain() error {
-	innerHandlerEp, err := kc.invokeHandleEndpoint()
-	if err != nil {
+	if uep, err := kc.finalUnaryEndpoint(); err != nil {
 		return err
+	} else {
+		kc.eps = UnaryChain(nil)(uep)
 	}
-	kc.eps = endpoint.Chain(kc.mws...)(innerHandlerEp)
-
-	innerStreamingEp, err := kc.invokeStreamingEndpoint()
-	if err != nil {
+	if sep, err := kc.finalStreamEndpoint(); err != nil {
 		return err
+	} else {
+		kc.sEps = StreamChain(nil)(sep)
 	}
-	kc.sEps = endpoint.Chain(kc.mws...)(innerStreamingEp)
 	return nil
 }
 
-func (kc *kClient) invokeHandleEndpoint() (endpoint.Endpoint, error) {
-	transPipl, err := newCliTransHandler(kc.opt.RemoteOpt)
+func (kc *kClient) compatibleEndpoint() (endpoint.Endpoint, error) {
+	invokeStreamEp, err := kc.invokeStreamingEndpoint()
+	if err != nil {
+		return nil, err
+	}
+	ep := InnerChain(nil)(invokeStreamEp)
+	return func(ctx context.Context, req, resp interface{}) error {
+		cs, err := ep(ctx)
+		if err != nil {
+			return err
+		}
+		ri := rpcinfo.GetRPCInfo(ctx)
+		stMode := ri.Invocation().MethodInfo().StreamingMode()
+		if stMode == serviceinfo.StreamingNone || stMode == serviceinfo.StreamingUnary {
+			if err := cs.SendMsg(ctx, req); err != nil {
+				return err
+			}
+			return cs.RecvMsg(ctx, resp)
+		} else {
+			result := resp.(*streaming.Result)
+			result.ClientStream = cs
+			if getter, ok := cs.(streaming.GRPCStreamGetter); ok {
+				result.Stream = getter.GetGRPCStream()
+			}
+			return nil
+		}
+	}, nil
+}
+
+func (kc *kClient) finalUnaryEndpoint() (UnaryEndpoint, error) {
+	ep, err := kc.compatibleEndpoint()
 	if err != nil {
 		return nil, err
 	}
 	return func(ctx context.Context, req, resp interface{}) (err error) {
-		var sendMsg remote.Message
-		var recvMsg remote.Message
-		defer func() {
-			remote.RecycleMessage(sendMsg)
-			// Notice, recycle and decode may race if decode exec in another goroutine.
-			// No race now, it is ok to recycle. Or recvMsg recycle depend on recv err
-			remote.RecycleMessage(recvMsg)
-		}()
-		ri := rpcinfo.GetRPCInfo(ctx)
-		methodName := ri.Invocation().MethodName()
+		return ep(ctx, req, resp)
+	}, nil
+}
 
-		cli, err := remotecli.NewClient(ctx, ri, transPipl, kc.opt.RemoteOpt)
+func (kc *kClient) finalStreamEndpoint() (StreamEndpoint, error) {
+	ep, err := kc.compatibleEndpoint()
+	if err != nil {
+		return nil, err
+	}
+	return func(ctx context.Context) (st streaming.ClientStream, err error) {
+		resp := &streaming.Result{}
+		err = ep(ctx, nil, resp)
 		if err != nil {
-			return
+			return nil, err
 		}
-
-		defer cli.Recycle()
-		config := ri.Config()
-		m := kc.svcInfo.MethodInfo(methodName)
-		if m == nil {
-			return fmt.Errorf("method info is nil, methodName=%s, serviceInfo=%+v", methodName, kc.svcInfo)
-		} else if m.OneWay() {
-			sendMsg = remote.NewMessage(req, kc.svcInfo, ri, remote.Oneway, remote.Client)
-		} else {
-			sendMsg = remote.NewMessage(req, kc.svcInfo, ri, remote.Call, remote.Client)
-		}
-		protocolInfo := remote.NewProtocolInfo(config.TransportProtocol(), kc.svcInfo.PayloadCodec)
-		sendMsg.SetProtocolInfo(protocolInfo)
-
-		if err = cli.Send(ctx, ri, sendMsg); err != nil {
-			return
-		}
-		if m.OneWay() {
-			cli.Recv(ctx, ri, nil)
-			return nil
-		}
-
-		recvMsg = remote.NewMessage(resp, kc.opt.RemoteOpt.SvcInfo, ri, remote.Reply, remote.Client)
-		recvMsg.SetProtocolInfo(protocolInfo)
-		err = cli.Recv(ctx, ri, recvMsg)
-		return err
+		return resp.ClientStream, nil
 	}, nil
 }
 
@@ -525,13 +529,11 @@ func newCliTransHandler(opt *remote.ClientOption) (remote.ClientTransHandler, er
 	if err != nil {
 		return nil, err
 	}
-	transPl := remote.NewTransPipeline(handler)
-	for _, ib := range opt.Inbounds {
-		transPl.AddInboundHandler(ib)
+	transPl := remote.NewClientTransPipeline(handler)
+	for _, h := range opt.ClientPipelineHandlers {
+		transPl.AddHandler(h)
 	}
-	for _, ob := range opt.Outbounds {
-		transPl.AddOutboundHandler(ob)
-	}
+	handler.SetPipeline(transPl)
 	return transPl, nil
 }
 

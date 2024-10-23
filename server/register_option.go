@@ -17,29 +17,62 @@
 package server
 
 import (
-	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 )
 
 // RegisterOption is the only way to config service registration.
-type RegisterOption = internal_server.RegisterOption
+type RegisterOption struct {
+	F func(o *RegisterOptions)
+}
 
 // RegisterOptions is used to config service registration.
-type RegisterOptions = internal_server.RegisterOptions
+type RegisterOptions struct {
+	IsFallbackService bool
+	UnaryMiddlewares  []UnaryMiddleware
+	StreamMiddlewares []StreamMiddleware
+	Middlewares       []endpoint.Middleware
+}
+
+// NewRegisterOptions creates a register options.
+func NewRegisterOptions(opts []RegisterOption) *RegisterOptions {
+	o := &RegisterOptions{}
+	ApplyRegisterOptions(opts, o)
+	return o
+}
+
+// ApplyRegisterOptions applies the given register options.
+func ApplyRegisterOptions(opts []RegisterOption, o *RegisterOptions) {
+	for _, op := range opts {
+		op.F(o)
+	}
+}
+
+func WithServiceUnaryMiddleware(mw UnaryMiddleware) RegisterOption {
+	return RegisterOption{F: func(o *RegisterOptions) {
+		o.UnaryMiddlewares = append(o.UnaryMiddlewares, mw)
+	}}
+}
+
+func WithServiceStreamMiddleware(mw StreamMiddleware) RegisterOption {
+	return RegisterOption{F: func(o *RegisterOptions) {
+		o.StreamMiddlewares = append(o.StreamMiddlewares, mw)
+	}}
+}
 
 // WithServiceMiddleware add middleware for a single service
 // The execution order of middlewares follows:
 // - server middlewares
 // - service middlewares
 // - service handler
+// Deprecated: use WithServiceUnaryMiddleware or WithServiceStreamMiddleware instead.
 func WithServiceMiddleware(mw endpoint.Middleware) RegisterOption {
-	return RegisterOption{F: func(o *internal_server.RegisterOptions) {
+	return RegisterOption{F: func(o *RegisterOptions) {
 		o.Middlewares = append(o.Middlewares, mw)
 	}}
 }
 
 func WithFallbackService() RegisterOption {
-	return RegisterOption{F: func(o *internal_server.RegisterOptions) {
+	return RegisterOption{F: func(o *RegisterOptions) {
 		o.IsFallbackService = true
 	}}
 }

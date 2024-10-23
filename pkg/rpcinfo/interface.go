@@ -87,6 +87,8 @@ type Invocation interface {
 	PackageName() string
 	ServiceName() string
 	MethodName() string
+	ServiceInfo() *serviceinfo.ServiceInfo
+	MethodInfo() serviceinfo.MethodInfo
 	SeqID() int32
 	BizStatusErr() kerrors.BizStatusErrorIface
 	Extra(key string) interface{}
@@ -99,4 +101,8 @@ type RPCInfo interface {
 	Invocation() Invocation
 	Config() RPCConfig
 	Stats() RPCStats
+}
+
+type ServiceInfoSpecifier interface {
+	SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error)
 }

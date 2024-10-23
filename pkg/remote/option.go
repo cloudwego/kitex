@@ -21,52 +21,12 @@ import (
 	"net"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/profiler"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
-
-// Option is used to pack the inbound and outbound handlers.
-type Option struct {
-	Outbounds []OutboundHandler
-
-	Inbounds []InboundHandler
-
-	StreamingMetaHandlers []StreamingMetaHandler
-}
-
-// PrependBoundHandler adds a BoundHandler to the head.
-func (o *Option) PrependBoundHandler(h BoundHandler) {
-	switch v := h.(type) {
-	case DuplexBoundHandler:
-		o.Inbounds = append([]InboundHandler{v}, o.Inbounds...)
-		o.Outbounds = append([]OutboundHandler{v}, o.Outbounds...)
-	case InboundHandler:
-		o.Inbounds = append([]InboundHandler{v}, o.Inbounds...)
-	case OutboundHandler:
-		o.Outbounds = append([]OutboundHandler{v}, o.Outbounds...)
-	default:
-		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
-	}
-}
-
-// AppendBoundHandler adds a BoundHandler to the end.
-func (o *Option) AppendBoundHandler(h BoundHandler) {
-	switch v := h.(type) {
-	case DuplexBoundHandler:
-		o.Inbounds = append(o.Inbounds, v)
-		o.Outbounds = append(o.Outbounds, v)
-	case InboundHandler:
-		o.Inbounds = append(o.Inbounds, v)
-	case OutboundHandler:
-		o.Outbounds = append(o.Outbounds, v)
-	default:
-		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
-	}
-}
 
 // ServerOption contains option that is used to init the remote server.
 type ServerOption struct {
@@ -113,15 +73,19 @@ type ServerOption struct {
 
 	GRPCUnknownServiceHandler func(ctx context.Context, method string, stream streaming.Stream) error
 
-	Option
-
-	// invoking chain with recv/send middlewares for streaming APIs
-	RecvEndpoint endpoint.RecvEndpoint
-	SendEndpoint endpoint.SendEndpoint
+	ServerPipelineHandlers []ServerPipelineHandler
 
 	// for thrift streaming, this is enabled by default
 	// for grpc(protobuf) streaming, it's disabled by default, enable with server.WithCompatibleMiddlewareForUnary
 	CompatibleMiddlewareForUnary bool
+}
+
+func (o *ServerOption) PrependPipelineHandler(h ServerPipelineHandler) {
+	o.ServerPipelineHandlers = append([]ServerPipelineHandler{h}, o.ServerPipelineHandlers...)
+}
+
+func (o *ServerOption) AppendPipelineHandler(h ServerPipelineHandler) {
+	o.ServerPipelineHandlers = append(o.ServerPipelineHandlers, h)
 }
 
 // ClientOption is used to init the remote client.
@@ -138,7 +102,15 @@ type ClientOption struct {
 
 	Dialer Dialer
 
-	Option
+	ClientPipelineHandlers []ClientPipelineHandler
 
 	EnableConnPoolReporter bool
+}
+
+func (o *ClientOption) PrependPipelineHandler(h ClientPipelineHandler) {
+	o.ClientPipelineHandlers = append([]ClientPipelineHandler{h}, o.ClientPipelineHandlers...)
+}
+
+func (o *ClientOption) AppendPipelineHandler(h ClientPipelineHandler) {
+	o.ClientPipelineHandlers = append(o.ClientPipelineHandlers, h)
 }

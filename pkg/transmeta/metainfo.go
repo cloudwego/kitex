@@ -21,6 +21,8 @@ import (
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 
+	"github.com/cloudwego/kitex/pkg/consts"
+
 	"github.com/cloudwego/kitex/pkg/logid"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
@@ -33,20 +35,18 @@ var (
 	MetainfoClientHandler = new(metainfoClientHandler)
 	MetainfoServerHandler = new(metainfoServerHandler)
 
-	_ remote.MetaHandler          = MetainfoClientHandler
-	_ remote.StreamingMetaHandler = MetainfoClientHandler
-	_ remote.MetaHandler          = MetainfoServerHandler
-	_ remote.StreamingMetaHandler = MetainfoServerHandler
+	_ remote.MetaHandler = MetainfoClientHandler
+	_ remote.MetaHandler = MetainfoServerHandler
 )
 
 type metainfoClientHandler struct{}
 
 func (mi *metainfoClientHandler) OnConnectStream(ctx context.Context) (context.Context, error) {
-	// gRPC send meta when connection is establishing
-	// so put metainfo into metadata before sending http2 headers
 	ri := rpcinfo.GetRPCInfo(ctx)
 	if isGRPC(ri) {
-		// append kitex metainfo into metadata list
+		// gRPC send meta when connection is establishing
+		// so put metainfo into metadata before sending http2 headers.
+		// Append kitex metainfo into metadata list
 		// kitex metainfo key starts with " rpc-transit-xxx "
 		md, ok := metadata.FromOutgoingContext(ctx)
 		if !ok {
@@ -66,18 +66,22 @@ func (mi *metainfoClientHandler) OnReadStream(ctx context.Context) (context.Cont
 }
 
 func (mi *metainfoClientHandler) WriteMeta(ctx context.Context, sendMsg remote.Message) (context.Context, error) {
-	if metainfo.HasMetaInfo(ctx) {
-		kvs := make(map[string]string)
-		metainfo.SaveMetaInfoToMap(ctx, kvs)
-		sendMsg.TransInfo().PutTransStrInfo(kvs)
+	if isTTHeader(sendMsg) {
+		if metainfo.HasMetaInfo(ctx) {
+			kvs := make(map[string]string)
+			metainfo.SaveMetaInfoToMap(ctx, kvs)
+			sendMsg.TransInfo().PutTransStrInfo(kvs)
+		}
 	}
 	return ctx, nil
 }
 
 func (mi *metainfoClientHandler) ReadMeta(ctx context.Context, recvMsg remote.Message) (context.Context, error) {
-	if info := recvMsg.TransInfo(); info != nil {
-		if kvs := info.TransStrInfo(); len(kvs) > 0 {
-			metainfo.SetBackwardValuesFromMap(ctx, kvs)
+	if isTTHeader(recvMsg) {
+		if info := recvMsg.TransInfo(); info != nil {
+			if kvs := info.TransStrInfo(); len(kvs) > 0 {
+				metainfo.SetBackwardValuesFromMap(ctx, kvs)
+			}
 		}
 	}
 	return ctx, nil
@@ -86,10 +90,19 @@ func (mi *metainfoClientHandler) ReadMeta(ctx context.Context, recvMsg remote.Me
 type metainfoServerHandler struct{}
 
 func (mi *metainfoServerHandler) ReadMeta(ctx context.Context, recvMsg remote.Message) (context.Context, error) {
-	if kvs := recvMsg.TransInfo().TransStrInfo(); len(kvs) > 0 {
-		ctx = metainfo.SetMetaInfoFromMap(ctx, kvs)
+	if isTTHeader(recvMsg) {
+		if kvs := recvMsg.TransInfo().TransStrInfo(); len(kvs) > 0 {
+			ctx = metainfo.SetMetaInfoFromMap(ctx, kvs)
+		}
+		ctx = metainfo.WithBackwardValuesToSend(ctx)
+		// Pass through method name using ctx, the method name will be used as from method in the client.
+		ctx = context.WithValue(ctx, consts.CtxKeyMethod, recvMsg.RPCInfo().To().Method())
+		// TransferForward converts transient values to transient-upstream values and filters out original transient-upstream values.
+		// It should be used before the context is passing from server to client.
+		// reference https://github.com/bytedance/gopkg/tree/main/cloud/metainfo
+		// Notice, it should be after ReadMeta().
+		ctx = metainfo.TransferForward(ctx)
 	}
-	ctx = metainfo.WithBackwardValuesToSend(ctx)
 	return ctx, nil
 }
 
@@ -124,8 +137,10 @@ func addStreamIDToContext(ctx context.Context, md metadata.MD) context.Context {
 }
 
 func (mi *metainfoServerHandler) WriteMeta(ctx context.Context, sendMsg remote.Message) (context.Context, error) {
-	if kvs := metainfo.AllBackwardValuesToSend(ctx); len(kvs) > 0 {
-		sendMsg.TransInfo().PutTransStrInfo(kvs)
+	if isTTHeader(sendMsg) {
+		if kvs := metainfo.AllBackwardValuesToSend(ctx); len(kvs) > 0 {
+			sendMsg.TransInfo().PutTransStrInfo(kvs)
+		}
 	}
 
 	return ctx, nil

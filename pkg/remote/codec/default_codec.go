@@ -116,7 +116,7 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 	var err error
 	var framedLenField []byte
 	headerLen := out.WrittenLen()
-	tp := message.ProtocolInfo().TransProto
+	tp := message.RPCInfo().Config().TransportProtocol()
 
 	// 1. malloc framed field if needed
 	if tp&transport.Framed == transport.Framed {
@@ -140,7 +140,7 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 		payloadLen = out.WrittenLen() - headerLen
 		// FIXME: if the `out` buffer using copy to grow when the capacity is not enough, setting the pre-allocated `framedLenField` may not take effect.
 		binary.BigEndian.PutUint32(framedLenField, uint32(payloadLen))
-	} else if message.ProtocolInfo().CodecType == serviceinfo.Protobuf {
+	} else if message.RPCInfo().Config().PayloadCodec() == serviceinfo.Protobuf {
 		return perrors.NewProtocolErrorWithMsg("protobuf just support 'framed' trans proto")
 	}
 	if tp&transport.TTHeader == transport.TTHeader {
@@ -152,7 +152,7 @@ func (c *defaultCodec) EncodePayload(ctx context.Context, message remote.Message
 
 // EncodeMetaAndPayload encode meta and payload
 func (c *defaultCodec) EncodeMetaAndPayload(ctx context.Context, message remote.Message, out remote.ByteBuffer, me remote.MetaEncoder) error {
-	tp := message.ProtocolInfo().TransProto
+	tp := message.RPCInfo().Config().TransportProtocol()
 	if c.PayloadValidator != nil && tp&transport.TTHeader == transport.TTHeader {
 		return c.encodeMetaAndPayloadWithPayloadValidator(ctx, message, out, me)
 	}
@@ -441,11 +441,10 @@ func checkPayload(flagBuf []byte, message remote.Message, in remote.ByteBuffer, 
 	if err := checkPayloadSize(message.PayloadLen(), maxPayloadSize); err != nil {
 		return err
 	}
-	message.SetProtocolInfo(remote.NewProtocolInfo(transProto, codecType))
 	cfg := rpcinfo.AsMutableRPCConfig(message.RPCInfo().Config())
 	if cfg != nil {
-		tp := message.ProtocolInfo().TransProto
-		cfg.SetTransportProtocol(tp)
+		cfg.SetTransportProtocol(transProto)
+		cfg.SetPayloadCodec(codecType)
 	}
 	return nil
 }

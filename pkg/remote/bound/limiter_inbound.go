@@ -25,10 +25,11 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // NewServerLimiterHandler creates a new server limiter handler.
-func NewServerLimiterHandler(conLimit limiter.ConcurrencyLimiter, qpsLimit limiter.RateLimiter, reporter limiter.LimitReporter, qpsLimitPostDecode bool) remote.InboundHandler {
+func NewServerLimiterHandler(conLimit limiter.ConcurrencyLimiter, qpsLimit limiter.RateLimiter, reporter limiter.LimitReporter, qpsLimitPostDecode bool) remote.ServerPipelineHandler {
 	return &serverLimiterHandler{conLimit, qpsLimit, reporter, qpsLimitPostDecode}
 }
 
@@ -64,14 +65,18 @@ func (l *serverLimiterHandler) OnRead(ctx context.Context, conn net.Conn) (conte
 	return ctx, nil
 }
 
+func (l *serverLimiterHandler) OnStream(ctx context.Context, stream streaming.ServerStream) (context.Context, error) {
+	return ctx, nil
+}
+
 // OnInactive implements the remote.InboundHandler interface.
 func (l *serverLimiterHandler) OnInactive(ctx context.Context, conn net.Conn) context.Context {
 	l.connLimit.Release(ctx)
 	return ctx
 }
 
-// OnMessage implements the remote.InboundHandler interface.
-func (l *serverLimiterHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
+// OnStreamRead implements the remote.InboundHandler interface.
+func (l *serverLimiterHandler) OnStreamRead(ctx context.Context, args remote.Message) (context.Context, error) {
 	if l.qpsLimitPostDecode {
 		if l.qpsLimit.Acquire(ctx) {
 			return ctx, nil
@@ -84,7 +89,11 @@ func (l *serverLimiterHandler) OnMessage(ctx context.Context, args, result remot
 	return ctx, nil
 }
 
-func DeepEqual(bound1, bound2 remote.InboundHandler) bool {
+func (l *serverLimiterHandler) OnStreamWrite(ctx context.Context, args remote.Message) (context.Context, error) {
+	return ctx, nil
+}
+
+func DeepEqual(bound1, bound2 remote.ServerPipelineHandler) bool {
 	switch b1 := bound1.(type) {
 	case *serverLimiterHandler:
 		b2, ok := bound2.(*serverLimiterHandler)

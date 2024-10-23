@@ -32,10 +32,7 @@ var ClientHTTP2Handler = &clientHTTP2Handler{}
 
 type clientHTTP2Handler struct{}
 
-var (
-	_ remote.MetaHandler          = ClientHTTP2Handler
-	_ remote.StreamingMetaHandler = ClientHTTP2Handler
-)
+var _ remote.MetaHandler = ClientHTTP2Handler
 
 func (*clientHTTP2Handler) OnConnectStream(ctx context.Context) (context.Context, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)

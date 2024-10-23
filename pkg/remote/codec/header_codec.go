@@ -131,7 +131,7 @@ func (t ttHeader) encode(ctx context.Context, message remote.Message, out remote
 
 	var transformIDs []uint8 // transformIDs not support TODO compress
 	// 2.  header info, malloc and write
-	if err = WriteByte(byte(getProtocolID(message.ProtocolInfo())), out); err != nil {
+	if err = WriteByte(byte(getProtocolID(message.RPCInfo().Config().PayloadCodec())), out); err != nil {
 		return nil, perrors.NewProtocolErrorWithMsg(fmt.Sprintf("ttHeader write protocol id failed, %s", err.Error()))
 	}
 	if err = WriteByte(byte(len(transformIDs)), out); err != nil {
@@ -409,8 +409,8 @@ func setFlags(flags uint16, message remote.Message) {
 }
 
 // protoID just for ttheader
-func getProtocolID(pi remote.ProtocolInfo) ProtocolID {
-	switch pi.CodecType {
+func getProtocolID(ct serviceinfo.PayloadCodec) ProtocolID {
+	switch ct {
 	case serviceinfo.Protobuf:
 		// ProtocolIDKitexProtobuf is 0x03 at old version(<=v1.9.1) , but it conflicts with ThriftCompactV2.
 		// Change the ProtocolIDKitexProtobuf to 0x04 from v1.9.2. But notice! that it is an incompatible change of protocol.

@@ -50,12 +50,18 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 		return errors.New("the interface Invocation doesn't implement InvocationSetter")
 	}
 	inkSetter.SetMethodName(methodName)
-	svcInfo, err := message.SpecifyServiceInfo(ink.ServiceName(), methodName)
+	specifier, ok := ri.(rpcinfo.ServiceInfoSpecifier)
+	if !ok {
+		return errors.New("the interface RPCInfo doesn't implement ServiceInfoSpecifier")
+	}
+	svcInfo, err := specifier.SpecifyServiceInfo(ink.ServiceName(), methodName)
 	if err != nil {
 		return err
 	}
 	inkSetter.SetPackageName(svcInfo.GetPackageName())
 	inkSetter.SetServiceName(svcInfo.ServiceName)
+	inkSetter.SetServiceInfo(svcInfo)
+	inkSetter.SetMethodInfo(svcInfo.MethodInfo(methodName))
 
 	// unknown method doesn't set methodName for RPCInfo.To(), or lead inconsistent with old version
 	rpcinfo.AsMutableEndpointInfo(ri.To()).SetMethod(methodName)

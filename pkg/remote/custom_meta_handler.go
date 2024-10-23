@@ -20,10 +20,7 @@ import (
 	"context"
 )
 
-var (
-	_ MetaHandler          = (*customMetaHandler)(nil)
-	_ StreamingMetaHandler = (*customMetaHandler)(nil)
-)
+var _ MetaHandler = (*customMetaHandler)(nil)
 
 // CustomMetaHandlerOption is the option for initializing customMetaHandler
 type CustomMetaHandlerOption func(*customMetaHandler)

@@ -16,15 +16,17 @@
 
 package endpoint
 
-import "context"
+import (
+	"context"
+)
 
-// Endpoint represent one method for calling from remote.
+// Deprecated, Endpoint represent one method for calling from remote.
 type Endpoint func(ctx context.Context, req, resp interface{}) (err error)
 
-// Middleware deal with input Endpoint and output Endpoint.
+// Deprecated, Middleware deal with input Endpoint and output Endpoint.
 type Middleware func(Endpoint) Endpoint
 
-// MiddlewareBuilder builds a middleware with information from a context.
+// Deprecated, MiddlewareBuilder builds a middleware with information from a context.
 type MiddlewareBuilder func(ctx context.Context) Middleware
 
 // Chain connect middlewares into one middleware.

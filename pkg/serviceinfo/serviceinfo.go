@@ -186,6 +186,19 @@ func (m methodInfo) StreamingMode() StreamingMode {
 	return m.streamingMode
 }
 
+type PingPongCompatibleMethodInfo struct {
+	MethodInfo
+}
+
+type PingPongCompatibleMethodArgs struct {
+	Data interface{}
+}
+
+func (*PingPongCompatibleMethodInfo) NewArgs() interface{} {
+	args := &PingPongCompatibleMethodArgs{}
+	return args
+}
+
 // String prints human-readable information.
 func (p PayloadCodec) String() string {
 	switch p {

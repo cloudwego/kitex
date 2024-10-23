@@ -29,7 +29,6 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
-	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -70,8 +69,9 @@ var _ remote.ServerTransHandler = &svrTransHandler{}
 type svrTransHandler struct {
 	opt         *remote.ServerOption
 	svcSearcher remote.ServiceSearcher
-	inkHdlFunc  endpoint.Endpoint
+	inkHdlFunc  remote.InnerServerEndpoint
 	codec       remote.Codec
+	transPipe   *remote.ServerTransPipeline
 }
 
 var prefaceReadAtMost = func() int {
@@ -97,22 +97,8 @@ func (t *svrTransHandler) ProtocolMatch(ctx context.Context, conn net.Conn) (err
 	return errors.New("error protocol not match")
 }
 
-func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
-	buf := newBuffer(conn.(*serverConn))
-	defer buf.Release(err)
-
-	if err = t.codec.Encode(ctx, msg, buf); err != nil {
-		return ctx, err
-	}
-	return ctx, buf.Flush()
-}
-
-func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
-	buf := newBuffer(conn.(*serverConn))
-	defer buf.Release(err)
-
-	err = t.codec.Decode(ctx, msg, buf)
-	return ctx, err
+func (t *svrTransHandler) SetPipeline(p *remote.ServerTransPipeline) {
+	t.transPipe = p
 }
 
 // 只 return write err
@@ -176,15 +162,10 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	ink.SetServiceName(serviceName)
 
 	// set grpc transport flag before execute metahandler
-	rpcinfo.AsMutableRPCConfig(ri.Config()).SetTransportProtocol(transport.GRPC)
+	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	cfg.SetTransportProtocol(transport.GRPC)
+	cfg.SetPayloadCodec(getPayloadCodecFromContentType(s))
 	var err error
-	for _, shdlr := range t.opt.StreamingMetaHandlers {
-		rCtx, err = shdlr.OnReadStream(rCtx)
-		if err != nil {
-			tr.WriteStatus(s, convertStatus(err))
-			return
-		}
-	}
 	rCtx = t.startTracer(rCtx, ri)
 	defer func() {
 		panicErr := recover()
@@ -204,30 +185,33 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	remote.SetSendCompressor(ri, s.SendCompress())
 
 	svcInfo := t.svcSearcher.SearchService(serviceName, methodName, true)
+	streamx := newServerStream(rCtx, svcInfo, newServerConn(tr, s), t, conn)
+	streamx.SetPipeline(remote.NewServerStreamPipeline(streamx, t.transPipe))
+	// inject streamx so that GetServerConn only relies on it
+	rCtx = context.WithValue(rCtx, serverConnKey{}, streamx)
+	// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
+	rCtx = streaming.NewCtxWithStream(rCtx, streamx.GetGRPCStream())
+	// GetServerConn could retrieve streamx by Stream.Context().Value(serverConnKey{})
+	streamx.ctx = rCtx
+	_ = t.transPipe.OnStream(rCtx, streamx)
+}
+
+func (t *svrTransHandler) OnStream(ctx context.Context, st streaming.ServerStream) error {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	methodName := ri.Invocation().MethodName()
+	serviceName := ri.Invocation().ServiceName()
+	streamx := st.(*serverStreamX)
+	svcInfo := streamx.svcInfo
 	var methodInfo serviceinfo.MethodInfo
 	if svcInfo != nil {
 		methodInfo = svcInfo.MethodInfo(methodName)
 	}
-
-	rawStream := &stream{
-		ctx:     rCtx,
-		svcInfo: svcInfo,
-		conn:    newServerConn(tr, s),
-		handler: t,
-	}
-	// inject rawStream so that GetServerConn only relies on it
-	rCtx = context.WithValue(rCtx, serverConnKey{}, rawStream)
-	st := newStreamWithMiddleware(rawStream, t.opt.RecvEndpoint, t.opt.SendEndpoint)
-	// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
-	rCtx = streaming.NewCtxWithStream(rCtx, st)
-	// GetServerConn could retrieve rawStream by Stream.Context().Value(serverConnKey{})
-	rawStream.ctx = rCtx
-
+	var err error
 	if methodInfo == nil {
 		unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
 		if unknownServiceHandlerFunc != nil {
-			rpcinfo.Record(rCtx, ri, stats.ServerHandleStart, nil)
-			err = unknownServiceHandlerFunc(rCtx, methodName, st)
+			rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
+			err = unknownServiceHandlerFunc(ctx, methodName, streamx.GetGRPCStream())
 			if err != nil {
 				err = kerrors.ErrBiz.WithCause(err)
 			}
@@ -239,57 +223,15 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 			}
 		}
 	} else {
-		if streaming.UnaryCompatibleMiddleware(methodInfo.StreamingMode(), t.opt.CompatibleMiddlewareForUnary) {
-			// making streaming unary APIs capable of using the same server middleware as non-streaming APIs
-			// note: rawStream skips recv/send middleware for unary API requests to avoid confusion
-			err = invokeStreamUnaryHandler(rCtx, rawStream, methodInfo, t.inkHdlFunc, ri)
-		} else {
-			err = t.inkHdlFunc(rCtx, &streaming.Args{Stream: st}, nil)
-		}
+		err = t.inkHdlFunc(ctx, streamx)
 	}
-
 	if err != nil {
-		tr.WriteStatus(s, convertStatus(err))
-		t.OnError(rCtx, err, conn)
-		return
-	}
-	if bizStatusErr := ri.Invocation().BizStatusErr(); bizStatusErr != nil {
-		var st *status.Status
-		if sterr, ok := bizStatusErr.(status.Iface); ok {
-			st = sterr.GRPCStatus()
-		} else {
-			st = status.New(codes.Internal, bizStatusErr.BizMessage())
-		}
-		s.SetBizStatusErr(bizStatusErr)
-		tr.WriteStatus(s, st)
-		return
-	}
-	tr.WriteStatus(s, status.New(codes.OK, ""))
-}
-
-// invokeStreamUnaryHandler allows unary APIs over HTTP2 to use the same server middleware as non-streaming APIs.
-// For thrift unary APIs over HTTP2, it's enabled by default.
-// For grpc(protobuf) unary APIs, it's disabled by default to keep backward compatibility.
-func invokeStreamUnaryHandler(ctx context.Context, st streaming.Stream, mi serviceinfo.MethodInfo,
-	handler endpoint.Endpoint, ri rpcinfo.RPCInfo,
-) (err error) {
-	realArgs, realResp := mi.NewArgs(), mi.NewResult()
-	if err = st.RecvMsg(realArgs); err != nil {
-		return err
-	}
-	if err = handler(ctx, realArgs, realResp); err != nil {
-		return err
-	}
-	if ri != nil && ri.Invocation().BizStatusErr() != nil {
-		// BizError: do not send the message
+		streamx.conn.tr.WriteStatus(streamx.conn.s, convertStatus(err))
+		t.OnError(ctx, err, streamx.rawConn)
 		return nil
 	}
-	return st.SendMsg(realResp)
-}
-
-// msg 是解码后的实例，如 Arg 或 Result, 触发上层处理，用于异步 和 服务端处理
-func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
-	panic("unimplemented")
+	streamx.conn.tr.WriteStatus(streamx.conn.s, status.New(codes.OK, ""))
+	return nil
 }
 
 type svrTransKey int
@@ -342,11 +284,8 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 	}
 }
 
-func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
+func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc remote.InnerServerEndpoint) {
 	t.inkHdlFunc = inkHdlFunc
-}
-
-func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {
@@ -364,4 +303,15 @@ func (t *svrTransHandler) finishTracer(ctx context.Context, ri rpcinfo.RPCInfo, 
 	}
 	t.opt.TracerCtl.DoFinish(ctx, ri, err)
 	rpcStats.Reset()
+}
+
+func getPayloadCodecFromContentType(s *grpcTransport.Stream) serviceinfo.PayloadCodec {
+	// TODO: handle other protocols in the future. currently only supports grpc
+	subType := s.ContentSubtype()
+	switch subType {
+	case contentSubTypeThrift:
+		return serviceinfo.Thrift
+	default:
+		return serviceinfo.Protobuf
+	}
 }

@@ -697,8 +697,8 @@ func TestServerBoundHandler(t *testing.T) {
 		test.Assert(t, err == nil, err)
 
 		iSvr := svr.(*server)
-		test.Assert(t, inboundDeepEqual(iSvr.opt.RemoteOpt.Inbounds, tcase.wantInbounds))
-		test.Assert(t, reflect.DeepEqual(iSvr.opt.RemoteOpt.Outbounds, tcase.wantOutbounds))
+		test.Assert(t, inboundDeepEqual(iSvr.opt.RemoteOpt.ServerPipelineHandlers, tcase.wantInbounds))
+		test.Assert(t, reflect.DeepEqual(iSvr.opt.RemoteOpt.ServerPipelineHandlers, tcase.wantOutbounds))
 		svr.Stop()
 	}
 }
@@ -1204,7 +1204,7 @@ func TestRunServiceWithoutSvcInfo(t *testing.T) {
 	test.Assert(t, strings.Contains(err.Error(), "no service"))
 }
 
-func inboundDeepEqual(inbound1, inbound2 []remote.InboundHandler) bool {
+func inboundDeepEqual(inbound1, inbound2 []remote.ServerPipelineHandler) bool {
 	if len(inbound1) != len(inbound2) {
 		return false
 	}

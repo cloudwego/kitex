@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var (
@@ -39,15 +40,20 @@ type InvocationSetter interface {
 	SetPackageName(name string)
 	SetServiceName(name string)
 	SetMethodName(name string)
+	SetServiceInfo(info *serviceinfo.ServiceInfo)
+	SetMethodInfo(info serviceinfo.MethodInfo)
 	SetSeqID(seqID int32)
 	SetBizStatusErr(err kerrors.BizStatusErrorIface)
 	SetExtra(key string, value interface{})
 	Reset()
 }
+
 type invocation struct {
 	packageName string
 	serviceName string
 	methodName  string
+	svcInfo     *serviceinfo.ServiceInfo
+	methodInfo  serviceinfo.MethodInfo
 	seqID       int32
 	bizErr      kerrors.BizStatusErrorIface
 	extra       map[string]interface{}
@@ -114,6 +120,26 @@ func (i *invocation) SetServiceName(name string) {
 // MethodName implements the Invocation interface.
 func (i *invocation) MethodName() string {
 	return i.methodName
+}
+
+// ServiceInfo implements the Invocation interface.
+func (i *invocation) ServiceInfo() *serviceinfo.ServiceInfo {
+	return i.svcInfo
+}
+
+// MethodInfo implements the Invocation interface.
+func (i *invocation) MethodInfo() serviceinfo.MethodInfo {
+	return i.methodInfo
+}
+
+// SetServiceInfo implements the InvocationSetter interface.
+func (i *invocation) SetServiceInfo(svcInfo *serviceinfo.ServiceInfo) {
+	i.svcInfo = svcInfo
+}
+
+// SetMethodName implements the InvocationSetter interface.
+func (i *invocation) SetMethodInfo(methodInfo serviceinfo.MethodInfo) {
+	i.methodInfo = methodInfo
 }
 
 // SetMethodName implements the InvocationSetter interface.

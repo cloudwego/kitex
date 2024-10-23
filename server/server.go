@@ -29,6 +29,10 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
+	"github.com/cloudwego/kitex/pkg/remote/trans"
+
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
@@ -62,7 +66,7 @@ type server struct {
 	targetSvcInfo *serviceinfo.ServiceInfo
 
 	// actual rpc service implement of biz
-	eps     endpoint.Endpoint
+	eps     InnerEndpoint
 	svr     remotesvr.Server
 	stopped sync.Once
 	isInit  bool
@@ -96,7 +100,6 @@ func (s *server) init() {
 	// register stream recv/send middlewares
 	s.buildInvokeChain(ctx)
 	s.initStreamMiddlewares(ctx)
-	s.buildStreamInvokeChain()
 }
 
 func fillContext(opt *internal_server.Options) context.Context {
@@ -145,8 +148,27 @@ func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinf
 	}
 }
 
+func (s *server) buildInnerMiddlewares(ctx context.Context) []InnerMiddleware {
+	// register server inner middlewares
+	return nil
+}
+
+func pingpongArgsCompatibleMW() endpoint.Middleware {
+	return func(next endpoint.Endpoint) endpoint.Endpoint {
+		return func(ctx context.Context, req, resp interface{}) (err error) {
+			if request, ok := req.(*serviceinfo.PingPongCompatibleMethodArgs); ok {
+				return next(ctx, request.Data, resp)
+			} else {
+				return next(ctx, req, resp)
+			}
+		}
+	}
+}
+
 func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 	var mws []endpoint.Middleware
+	// must be the first middleware
+	mws = append(mws, pingpongArgsCompatibleMW())
 	// register server timeout middleware
 	// prepend for adding timeout to the context for all middlewares and the handler
 	if s.opt.EnableContextTimeout {
@@ -160,13 +182,6 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 	if mw := s.buildServiceMiddleware(); mw != nil {
 		mws = append(mws, mw)
 	}
-	// register stream context inject middleware
-	// TODO(DMwangnima): this is a workaround to fix ctx diverge problem temporarily,
-	// it should be removed after the new streaming api with ctx published.
-	// if there is streaming method, make sure the ctxInjectMW is the last middleware before core middleware
-	if mw := s.buildStreamCtxInjectMiddleware(); mw != nil {
-		mws = append(mws, mw)
-	}
 	// register core middleware,
 	// core middleware MUST be the last middleware
 	mws = append(mws, s.buildCoreMiddleware())
@@ -174,22 +189,9 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 }
 
 func (s *server) buildInvokeChain(ctx context.Context) {
-	mws := s.buildMiddlewares(ctx)
-	innerHandlerEp := s.invokeHandleEndpoint()
-	s.eps = endpoint.Chain(mws...)(innerHandlerEp)
-}
-
-// buildStreamCtxInjectMiddleware is a workaround to resolve stream ctx diverge problem in server side
-// when there is streaming method, add the ctxInjectMW to wrap the Stream
-func (s *server) buildStreamCtxInjectMiddleware() endpoint.Middleware {
-	for _, svc := range s.svcs.svcMap {
-		for _, method := range svc.svcInfo.Methods {
-			if method.IsStreaming() {
-				return newCtxInjectMW()
-			}
-		}
-	}
-	return nil
+	imws := s.buildInnerMiddlewares(ctx)
+	compatibleEp := s.compatibleEndpoint(ctx)
+	s.eps = InnerChain(imws...)(compatibleEp)
 }
 
 // RegisterService should not be called by users directly.
@@ -209,7 +211,7 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 		panic(fmt.Sprintf("Service[%s] is already defined", svcInfo.ServiceName))
 	}
 
-	registerOpts := internal_server.NewRegisterOptions(opts)
+	registerOpts := NewRegisterOptions(opts)
 	if err := s.svcs.addService(svcInfo, handler, registerOpts); err != nil {
 		panic(err.Error())
 	}
@@ -250,7 +252,7 @@ func (s *server) Run() (err error) {
 		return err
 	}
 	s.Lock()
-	s.svr, err = remotesvr.NewServer(s.opt.RemoteOpt, s.eps, transHdlr)
+	s.svr, err = remotesvr.NewServer(s.opt.RemoteOpt, transHdlr)
 	s.Unlock()
 	if err != nil {
 		return err
@@ -371,7 +373,76 @@ func (s *server) buildCoreMiddleware() endpoint.Middleware {
 	}
 }
 
-func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
+func (s *server) upperLayerEndpoint(ctx context.Context) endpoint.Endpoint {
+	unaryMw := s.buildUnaryMiddlewares()
+	unaryEp := UnaryChain(unaryMw...)(s.invokeHandleEndpoint())
+
+	sgteamMw := s.buildStreamMiddlewares()
+	streamEp := StreamChain(sgteamMw...)(s.streamHandleEndpoint())
+
+	return func(ctx context.Context, req, resp interface{}) (err error) {
+		ri := rpcinfo.GetRPCInfo(ctx)
+		if st, ok := req.(streaming.Args); ok {
+			if ri.Invocation().MethodInfo().StreamingMode() == serviceinfo.StreamingUnary {
+				return unaryEp(ctx, req, resp)
+			} else {
+				return streamEp(ctx, st.ServerStream)
+			}
+		} else {
+			return unaryEp(ctx, req, resp)
+		}
+	}
+}
+
+// todo: add MethodInfo to rpcinfo
+func (s *server) serviceAndMethodInfo(ri rpcinfo.RPCInfo) (svcInfo *serviceinfo.ServiceInfo, methodInfo serviceinfo.MethodInfo, err error) {
+	svcName := ri.Invocation().ServiceName()
+	methodName := ri.Invocation().MethodName()
+	if s.svcs.SearchService(svcName, methodName, true); svcInfo != nil {
+		methodInfo, err = trans.GetMethodInfo(ri, svcInfo)
+		if err != nil {
+			return nil, nil, err
+		}
+		return svcInfo, methodInfo, nil
+	}
+	return nil, nil, nil
+}
+
+func (s *server) compatibleEndpoint(ctx context.Context) InnerEndpoint {
+	upperLayerEp := s.upperLayerEndpoint(ctx)
+	mws := s.buildMiddlewares(ctx)
+	ep := endpoint.Chain(mws...)(upperLayerEp)
+	recvEndpoint := s.opt.Streaming.BuildRecvInvokeChain(invokeRecvEndpoint())
+	sendEndpoint := s.opt.Streaming.BuildSendInvokeChain(invokeSendEndpoint())
+	return func(ctx context.Context, st streaming.ServerStream) (err error) {
+		ri := rpcinfo.GetRPCInfo(ctx)
+		stMode := ri.Invocation().MethodInfo().StreamingMode()
+		if stMode == serviceinfo.StreamingNone ||
+			streaming.UnaryCompatibleMiddleware(stMode, s.opt.RemoteOpt.CompatibleMiddlewareForUnary) {
+			// unary mode
+			args := ri.Invocation().MethodInfo().NewArgs()
+			err = st.RecvMsg(ctx, args)
+			if err != nil {
+				return err
+			}
+			result := ri.Invocation().MethodInfo().NewResult()
+			err = ep(ctx, args, result)
+			if err != nil {
+				return err
+			}
+			return st.SendMsg(ctx, result)
+		}
+		st = newStream(ctx, st, sendEndpoint, recvEndpoint)
+		args := &streaming.Args{ServerStream: st}
+		if grpcStreamGetter, ok := st.(streaming.GRPCStreamGetter); ok {
+			// for compatible with gRPC
+			args.Stream = grpcStreamGetter.GetGRPCStream()
+		}
+		return ep(ctx, args, nil)
+	}
+}
+
+func (s *server) invokeHandleEndpoint() UnaryEndpoint {
 	return func(ctx context.Context, args, resp interface{}) (err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()
@@ -413,6 +484,63 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 	}
 }
 
+func (s *server) streamHandleEndpoint() StreamEndpoint {
+	return func(ctx context.Context, st streaming.ServerStream) (err error) {
+		ri := rpcinfo.GetRPCInfo(ctx)
+		methodName := ri.Invocation().MethodName()
+		serviceName := ri.Invocation().ServiceName()
+		svc := s.svcs.svcMap[serviceName]
+		svcInfo := svc.svcInfo
+		if methodName == "" && svcInfo.ServiceName != serviceinfo.GenericService {
+			return errors.New("method name is empty in rpcinfo, should not happen")
+		}
+		defer func() {
+			if handlerErr := recover(); handlerErr != nil {
+				err = kerrors.ErrPanic.WithCauseAndStack(
+					fmt.Errorf(
+						"[happened in biz handler, method=%s.%s, please check the panic at the server side] %s",
+						svcInfo.ServiceName, methodName, handlerErr),
+					string(debug.Stack()))
+				rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats())
+				rpcStats.SetPanicked(err)
+			}
+			rpcinfo.Record(ctx, ri, stats.ServerHandleFinish, err)
+			// clear session
+			backup.ClearCtx()
+		}()
+		implHandlerFunc := svcInfo.MethodInfo(methodName).Handler()
+		rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
+		// set session
+		backup.BackupCtx(ctx)
+		args := &streaming.Args{ServerStream: st}
+		if grpcStreamGetter, ok := st.(streaming.GRPCStreamGetter); ok {
+			// for compatible with gRPC
+			args.Stream = grpcStreamGetter.GetGRPCStream()
+		}
+		err = implHandlerFunc(ctx, svc.handler, args, nil)
+		if err != nil {
+			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
+				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
+					setter.SetBizStatusErr(bizErr)
+					return nil
+				}
+			}
+			err = kerrors.ErrBiz.WithCause(err)
+		}
+		return err
+	}
+}
+
+func (s *server) buildUnaryMiddlewares() []UnaryMiddleware {
+	// todo
+	return nil
+}
+
+func (s *server) buildStreamMiddlewares() []StreamMiddleware {
+	// todo
+	return nil
+}
+
 func (s *server) initBasicRemoteOption() {
 	remoteOpt := s.opt.RemoteOpt
 	remoteOpt.TargetSvcInfo = s.targetSvcInfo
@@ -425,10 +553,10 @@ func (s *server) initBasicRemoteOption() {
 func (s *server) richRemoteOption() {
 	s.initBasicRemoteOption()
 
-	s.addBoundHandlers(s.opt.RemoteOpt)
+	s.addPipelineHandlers(s.opt.RemoteOpt)
 }
 
-func (s *server) addBoundHandlers(opt *remote.ServerOption) {
+func (s *server) addPipelineHandlers(opt *remote.ServerOption) {
 	// add profiler meta handler, which should be exec after other MetaHandlers
 	if opt.Profiler != nil && opt.ProfilerMessageTagging != nil {
 		s.opt.MetaHandlers = append(s.opt.MetaHandlers,
@@ -437,19 +565,14 @@ func (s *server) addBoundHandlers(opt *remote.ServerOption) {
 	}
 	// for server trans info handler
 	if len(s.opt.MetaHandlers) > 0 {
-		transInfoHdlr := bound.NewTransMetaHandler(s.opt.MetaHandlers)
+		transInfoHdlr := bound.NewServerMetaHandler(s.opt.MetaHandlers)
 		// meta handler exec before boundHandlers which add with option
-		doAddBoundHandlerToHead(transInfoHdlr, opt)
-		for _, h := range s.opt.MetaHandlers {
-			if shdlr, ok := h.(remote.StreamingMetaHandler); ok {
-				opt.StreamingMetaHandlers = append(opt.StreamingMetaHandlers, shdlr)
-			}
-		}
+		opt.PrependPipelineHandler(transInfoHdlr)
 	}
 
 	limitHdlr := s.buildLimiterWithOpt()
 	if limitHdlr != nil {
-		doAddBoundHandler(limitHdlr, opt)
+		opt.AppendPipelineHandler(limitHdlr)
 	}
 }
 
@@ -463,7 +586,7 @@ func (s *server) addBoundHandlers(opt *remote.ServerOption) {
  * service, use the `serverLimiterOnReadHandler` whose rate limiting takes effect in the OnRead
  * callback.
  */
-func (s *server) buildLimiterWithOpt() (handler remote.InboundHandler) {
+func (s *server) buildLimiterWithOpt() (handler remote.ServerPipelineHandler) {
 	limits := s.opt.Limit.Limits
 	connLimit := s.opt.Limit.ConLimit
 	qpsLimit := s.opt.Limit.QPSLimit
@@ -504,38 +627,6 @@ func (s *server) check() error {
 	return s.svcs.check(s.opt.RefuseTrafficWithoutServiceName)
 }
 
-func doAddBoundHandlerToHead(h remote.BoundHandler, opt *remote.ServerOption) {
-	add := false
-	if ih, ok := h.(remote.InboundHandler); ok {
-		handlers := []remote.InboundHandler{ih}
-		opt.Inbounds = append(handlers, opt.Inbounds...)
-		add = true
-	}
-	if oh, ok := h.(remote.OutboundHandler); ok {
-		handlers := []remote.OutboundHandler{oh}
-		opt.Outbounds = append(handlers, opt.Outbounds...)
-		add = true
-	}
-	if !add {
-		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
-	}
-}
-
-func doAddBoundHandler(h remote.BoundHandler, opt *remote.ServerOption) {
-	add := false
-	if ih, ok := h.(remote.InboundHandler); ok {
-		opt.Inbounds = append(opt.Inbounds, ih)
-		add = true
-	}
-	if oh, ok := h.(remote.OutboundHandler); ok {
-		opt.Outbounds = append(opt.Outbounds, oh)
-		add = true
-	}
-	if !add {
-		panic("invalid BoundHandler: must implement InboundHandler or OutboundHandler")
-	}
-}
-
 func (s *server) newSvrTransHandler() (handler remote.ServerTransHandler, err error) {
 	transHdlrFactory := s.opt.RemoteOpt.SvrHandlerFactory
 	transHdlr, err := transHdlrFactory.NewTransHandler(s.opt.RemoteOpt)
@@ -543,15 +634,12 @@ func (s *server) newSvrTransHandler() (handler remote.ServerTransHandler, err er
 		return nil, err
 	}
 	if setter, ok := transHdlr.(remote.InvokeHandleFuncSetter); ok {
-		setter.SetInvokeHandleFunc(s.eps)
+		setter.SetInvokeHandleFunc(remote.InnerServerEndpoint(s.eps))
 	}
-	transPl := remote.NewTransPipeline(transHdlr)
+	transPl := remote.NewServerTransPipeline(transHdlr)
 
-	for _, ib := range s.opt.RemoteOpt.Inbounds {
-		transPl.AddInboundHandler(ib)
-	}
-	for _, ob := range s.opt.RemoteOpt.Outbounds {
-		transPl.AddOutboundHandler(ob)
+	for _, ib := range s.opt.RemoteOpt.ServerPipelineHandlers {
+		transPl.AddHandler(ib)
 	}
 	return transPl, nil
 }

@@ -25,8 +25,9 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
-	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/internal/stream"
+
+	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
