@@ -30,13 +30,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/server"
@@ -631,7 +631,7 @@ func TestStreamingException(t *testing.T) {
 			)
 			octx := context.Background()
 
-			//assert circuitBreaker error
+			// assert circuitBreaker error
 			atomic.StoreInt32(&circuitBreaker, 1)
 			ctx, bs, err := streamClient.BidiStream(octx)
 			test.Assert(t, errors.Is(err, circuitBreakerErr), err)
