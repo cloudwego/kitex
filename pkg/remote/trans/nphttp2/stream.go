@@ -96,11 +96,11 @@ func (s *serverStream) SetTrailer(md metadata.MD) {
 }
 
 func (s *serverStream) RecvMsg(m interface{}) error {
-	return s.sx.RecvMsg(s.sx.ctx, m)
+	return s.sx.RecvMsg(m)
 }
 
 func (s *serverStream) SendMsg(m interface{}) error {
-	return s.sx.SendMsg(s.sx.ctx, m)
+	return s.sx.SendMsg(m)
 }
 
 func (s *serverStream) Close() error {
@@ -150,19 +150,19 @@ func (s *serverStreamX) SetTrailer(tl streaming.Trailer) error {
 	return s.conn.s.SetTrailer(streamingTrailerToHTTP2MD(tl))
 }
 
-func (s *serverStreamX) RecvMsg(ctx context.Context, m interface{}) error {
+func (s *serverStreamX) RecvMsg(m interface{}) error {
 	msg := remote.NewMessage(m, s.ri.Invocation().ServiceInfo(), s.ri, remote.Stream, remote.Server)
 	defer msg.Recycle()
 
-	_, err := s.pipe.Read(ctx, msg)
+	_, err := s.pipe.Read(s.ctx, msg)
 	return err
 }
 
-func (s *serverStreamX) SendMsg(ctx context.Context, m interface{}) error {
+func (s *serverStreamX) SendMsg(m interface{}) error {
 	msg := remote.NewMessage(m, s.ri.Invocation().ServiceInfo(), s.ri, remote.Stream, remote.Server)
 	defer msg.Recycle()
 
-	_, err := s.pipe.Write(ctx, msg)
+	_, err := s.pipe.Write(s.ctx, msg)
 	return err
 }
 
@@ -229,11 +229,11 @@ func (s *clientStream) SetTrailer(md metadata.MD) {
 }
 
 func (s *clientStream) RecvMsg(m interface{}) error {
-	return s.sx.RecvMsg(s.sx.ctx, m)
+	return s.sx.RecvMsg(m)
 }
 
 func (s *clientStream) SendMsg(m interface{}) error {
-	return s.sx.SendMsg(s.sx.ctx, m)
+	return s.sx.SendMsg(m)
 }
 
 func (s *clientStreamX) SetPipeline(pipe *remote.ClientStreamPipeline) {
@@ -253,19 +253,19 @@ func (s *clientStreamX) Trailer() (streaming.Trailer, error) {
 	return http2MDToStreamingTrailer(tl), nil
 }
 
-func (s *clientStreamX) RecvMsg(ctx context.Context, m interface{}) error {
+func (s *clientStreamX) RecvMsg(m interface{}) error {
 	msg := remote.NewMessage(m, s.ri.Invocation().ServiceInfo(), s.ri, remote.Stream, remote.Client)
 	defer msg.Recycle()
 
-	_, err := s.pipe.Read(ctx, msg)
+	_, err := s.pipe.Read(s.ctx, msg)
 	return err
 }
 
-func (s *clientStreamX) SendMsg(ctx context.Context, m interface{}) error {
+func (s *clientStreamX) SendMsg(m interface{}) error {
 	msg := remote.NewMessage(m, s.ri.Invocation().ServiceInfo(), s.ri, remote.Stream, remote.Client)
 	defer msg.Recycle()
 
-	_, err := s.pipe.Write(ctx, msg)
+	_, err := s.pipe.Write(s.ctx, msg)
 	return err
 }
 

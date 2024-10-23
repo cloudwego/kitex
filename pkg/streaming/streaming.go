@@ -63,16 +63,16 @@ type ClientStream interface {
 	Header() (Header, error)
 	Trailer() (Trailer, error)
 	CloseSend() error
-	RecvMsg(ctx context.Context, m interface{}) error
-	SendMsg(ctx context.Context, m interface{}) error
+	RecvMsg(m interface{}) error
+	SendMsg(m interface{}) error
 }
 
 type ServerStream interface {
 	SetHeader(Header) error
 	SendHeader(Header) error
 	SetTrailer(Trailer) error
-	RecvMsg(ctx context.Context, m interface{}) error
-	SendMsg(ctx context.Context, m interface{}) error
+	RecvMsg(m interface{}) error
+	SendMsg(m interface{}) error
 }
 
 type GRPCStreamGetter interface {

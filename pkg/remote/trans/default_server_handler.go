@@ -79,7 +79,8 @@ func (t *serverTransHandler) newCtxWithRPCInfo(ctx context.Context, conn net.Con
 // OnRead implements the remote.ServerTransHandler interface.
 // The connection should be closed after returning error.
 func (t *serverTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
-	st := newServerStream(conn, t)
+	ctx, ri := t.newCtxWithRPCInfo(ctx, conn)
+	st := newServerStream(ctx, conn, t, ri)
 	streamPipe := remote.NewServerStreamPipeline(st, t.transPipe)
 	st.SetPipeline(streamPipe)
 	return t.transPipe.OnStream(ctx, st)
@@ -88,7 +89,7 @@ func (t *serverTransHandler) OnRead(ctx context.Context, conn net.Conn) (err err
 func (t *serverTransHandler) OnStream(ctx context.Context, stream streaming.ServerStream) (err error) {
 	st := stream.(*svrStream)
 	conn := st.conn
-	ctx, ri := t.newCtxWithRPCInfo(ctx, conn)
+	ri := st.ri
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	closeConnOutsideIfErr := true
 	defer func() {
@@ -125,7 +126,7 @@ func (t *serverTransHandler) OnStream(ctx context.Context, stream streaming.Serv
 	ctx = t.startTracer(ctx, ri)
 	ctx = t.startProfiler(ctx)
 	args := &serviceinfo.PingPongCompatibleMethodArgs{}
-	err = st.RecvMsg(ctx, args)
+	err = st.RecvMsg(args)
 	if err != nil {
 		if errors.Is(err, errHeartbeatMessage) {
 			sendMsg := remote.NewMessage(nil, nil, ri, remote.Heartbeat, remote.Server)
@@ -153,7 +154,7 @@ func (t *serverTransHandler) OnStream(ctx context.Context, stream streaming.Serv
 		closeConnOutsideIfErr = false
 		return
 	}
-	if err = st.SendMsg(ctx, res); err != nil {
+	if err = st.SendMsg(res); err != nil {
 		// t.OnError(ctx, err, conn) will be executed at outer function when transServer close the conn
 		return err
 	}
@@ -274,14 +275,18 @@ func (t *serverTransHandler) finishProfiler(ctx context.Context) {
 
 type svrStream struct {
 	conn net.Conn
+	ctx  context.Context
 	t    *serverTransHandler
+	ri   rpcinfo.RPCInfo
 	pipe *remote.ServerStreamPipeline
 }
 
-func newServerStream(conn net.Conn, t *serverTransHandler) *svrStream {
+func newServerStream(ctx context.Context, conn net.Conn, t *serverTransHandler, ri rpcinfo.RPCInfo) *svrStream {
 	return &svrStream{
 		conn: conn,
+		ctx:  ctx,
 		t:    t,
+		ri:   ri,
 	}
 }
 
@@ -348,30 +353,28 @@ func (s *svrStream) Read(ctx context.Context, recvMsg remote.Message) (nctx cont
 }
 
 // TODO: splitting meta and payload codec.
-func (s *svrStream) RecvMsg(ctx context.Context, m interface{}) (err error) {
+func (s *svrStream) RecvMsg(m interface{}) (err error) {
 	var recvMsg remote.Message
 	defer func() {
 		remote.RecycleMessage(recvMsg)
 	}()
-	ri := rpcinfo.GetRPCInfo(ctx)
-	recvMsg = remote.NewMessage(nil, nil, ri, remote.Call, remote.Server)
+	recvMsg = remote.NewMessage(nil, nil, s.ri, remote.Call, remote.Server)
 	recvMsg.SetPayloadCodec(s.t.opt.PayloadCodec)
-	ctx, err = s.pipe.Read(ctx, recvMsg)
+	_, err = s.pipe.Read(s.ctx, recvMsg)
 	rm := m.(*serviceinfo.PingPongCompatibleMethodArgs)
 	rm.Data = recvMsg.Data()
 	return
 }
 
-func (s *svrStream) SendMsg(ctx context.Context, m interface{}) (err error) {
+func (s *svrStream) SendMsg(m interface{}) (err error) {
 	var sendMsg remote.Message
 	defer func() {
 		remote.RecycleMessage(sendMsg)
 	}()
-	ri := rpcinfo.GetRPCInfo(ctx)
-	svcInfo := ri.Invocation().ServiceInfo()
-	sendMsg = remote.NewMessage(m, svcInfo, ri, remote.Reply, remote.Server)
+	svcInfo := s.ri.Invocation().ServiceInfo()
+	sendMsg = remote.NewMessage(m, svcInfo, s.ri, remote.Reply, remote.Server)
 	sendMsg.SetPayloadCodec(s.t.opt.PayloadCodec)
-	ctx, err = s.pipe.Write(ctx, sendMsg)
+	_, err = s.pipe.Write(s.ctx, sendMsg)
 	return
 }
 

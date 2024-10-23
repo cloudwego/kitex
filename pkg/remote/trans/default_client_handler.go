@@ -47,14 +47,16 @@ type cliTransHandler struct {
 
 type cliStream struct {
 	conn net.Conn
+	ctx  context.Context
 	t    *cliTransHandler
 	ri   rpcinfo.RPCInfo
 	pipe *remote.ClientStreamPipeline
 }
 
-func newCliStream(conn net.Conn, t *cliTransHandler, ri rpcinfo.RPCInfo) *cliStream {
+func newCliStream(ctx context.Context, conn net.Conn, t *cliTransHandler, ri rpcinfo.RPCInfo) *cliStream {
 	return &cliStream{
 		conn: conn,
+		ctx:  ctx,
 		t:    t,
 		ri:   ri,
 	}
@@ -115,17 +117,17 @@ func (s *cliStream) CloseSend() error {
 	return nil
 }
 
-func (s *cliStream) RecvMsg(ctx context.Context, resp interface{}) (err error) {
+func (s *cliStream) RecvMsg(resp interface{}) (err error) {
 	ri := s.ri
 	recvMsg := remote.NewMessage(resp, ri.Invocation().ServiceInfo(), ri, remote.Reply, remote.Client)
 	defer func() {
 		remote.RecycleMessage(recvMsg)
 	}()
-	ctx, err = s.pipe.Read(ctx, recvMsg)
+	_, err = s.pipe.Read(s.ctx, recvMsg)
 	return err
 }
 
-func (s *cliStream) SendMsg(ctx context.Context, req interface{}) (err error) {
+func (s *cliStream) SendMsg(req interface{}) (err error) {
 	ri := s.ri
 	methodName := ri.Invocation().MethodName()
 	svcInfo := ri.Invocation().ServiceInfo()
@@ -141,13 +143,13 @@ func (s *cliStream) SendMsg(ctx context.Context, req interface{}) (err error) {
 	defer func() {
 		remote.RecycleMessage(sendMsg)
 	}()
-	ctx, err = s.pipe.Write(ctx, sendMsg)
+	_, err = s.pipe.Write(s.ctx, sendMsg)
 	return err
 }
 
 func (t *cliTransHandler) NewStream(ctx context.Context, conn net.Conn) (streaming.ClientStream, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
-	cs := newCliStream(conn, t, ri)
+	cs := newCliStream(ctx, conn, t, ri)
 	cs.SetPipeline(remote.NewClientStreamPipeline(cs, t.transPipe))
 	return cs, nil
 }
