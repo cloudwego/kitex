@@ -38,6 +38,7 @@ type mapThriftCodec struct {
 	binaryWithByteSlice     bool
 	setFieldsForEmptyStruct uint8
 	svcName                 string
+	extra                   map[string]string
 }
 
 func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
@@ -47,7 +48,9 @@ func newMapThriftCodec(p DescriptorProvider) *mapThriftCodec {
 		binaryWithBase64:    false,
 		binaryWithByteSlice: false,
 		svcName:             svc.Name,
+		extra:               make(map[string]string),
 	}
+	c.setCombinedServices(svc.IsCombinedServices)
 	c.svcDsc.Store(svc)
 	go c.update()
 	return c
@@ -66,7 +69,16 @@ func (c *mapThriftCodec) update() {
 			return
 		}
 		c.svcName = svc.Name
+		c.setCombinedServices(svc.IsCombinedServices)
 		c.svcDsc.Store(svc)
+	}
+}
+
+func (c *mapThriftCodec) setCombinedServices(isCombinedServices bool) {
+	if isCombinedServices {
+		c.extra[CombineServiceKey] = "true"
+	} else {
+		c.extra[CombineServiceKey] = "false"
 	}
 }
 

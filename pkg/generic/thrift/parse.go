@@ -64,7 +64,7 @@ func SetDefaultParseMode(m ParseMode) {
 }
 
 // Parse descriptor from parser.Thrift
-func Parse(tree *parser.Thrift, mode ParseMode) (*descriptor.ServiceDescriptor, error) {
+func Parse(tree *parser.Thrift, mode ParseMode, opts ...ParseOption) (*descriptor.ServiceDescriptor, error) {
 	if len(tree.Services) == 0 {
 		return nil, errors.New("empty serverce from idls")
 	}
@@ -88,7 +88,11 @@ func Parse(tree *parser.Thrift, mode ParseMode) (*descriptor.ServiceDescriptor, 
 		sDsc.Name = svcs[0].Name
 	case CombineServices:
 		sDsc.Name = "CombinedServices"
+		sDsc.IsCombinedServices = true
 	}
+
+	pOpts := &parseOptions{}
+	pOpts.apply(opts)
 
 	visitedSvcs := make(map[*parser.Service]bool, len(tree.Services))
 	for _, svc := range svcs {
@@ -96,7 +100,7 @@ func Parse(tree *parser.Thrift, mode ParseMode) (*descriptor.ServiceDescriptor, 
 			svc := p.data.(*parser.Service)
 			structsCache := map[string]*descriptor.TypeDescriptor{}
 			for _, fn := range svc.Functions {
-				if err := addFunction(fn, p.tree, sDsc, structsCache); err != nil {
+				if err := addFunction(fn, p.tree, sDsc, structsCache, pOpts); err != nil {
 					return nil, err
 				}
 			}
@@ -135,7 +139,7 @@ func getAllSvcs(svc *parser.Service, tree *parser.Thrift, visitedSvcs map[*parse
 	return svcs
 }
 
-func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.ServiceDescriptor, structsCache map[string]*descriptor.TypeDescriptor) (err error) {
+func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.ServiceDescriptor, structsCache map[string]*descriptor.TypeDescriptor, opts *parseOptions) (err error) {
 	if sDsc.Functions[fn.Name] != nil {
 		return fmt.Errorf("duplicate method name: %s", fn.Name)
 	}
@@ -156,8 +160,9 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 			FieldsByName: map[string]*descriptor.FieldDescriptor{},
 		},
 	}
+
 	var reqType *descriptor.TypeDescriptor
-	reqType, err = parseType(field.Type, tree, structsCache, initRecursionDepth)
+	reqType, err = parseType(field.Type, tree, structsCache, initRecursionDepth, opts)
 	if err != nil {
 		return err
 	}
@@ -171,9 +176,10 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		}
 	}
 	reqField := &descriptor.FieldDescriptor{
-		Name: field.Name,
-		ID:   field.ID,
-		Type: reqType,
+		Name:     field.Name,
+		ID:       field.ID,
+		Type:     reqType,
+		GoTagOpt: opts.goTag,
 	}
 	req.Struct.FieldsByID[field.ID] = reqField
 	req.Struct.FieldsByName[field.Name] = reqField
@@ -186,12 +192,13 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		},
 	}
 	var respType *descriptor.TypeDescriptor
-	respType, err = parseType(fn.FunctionType, tree, structsCache, initRecursionDepth)
+	respType, err = parseType(fn.FunctionType, tree, structsCache, initRecursionDepth, opts)
 	if err != nil {
 		return err
 	}
 	respField := &descriptor.FieldDescriptor{
-		Type: respType,
+		Type:     respType,
+		GoTagOpt: opts.goTag,
 	}
 	// response has no name or id
 	resp.Struct.FieldsByID[0] = respField
@@ -201,7 +208,7 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 		// only support single exception
 		field := fn.Throws[0]
 		var exceptionType *descriptor.TypeDescriptor
-		exceptionType, err = parseType(field.Type, tree, structsCache, initRecursionDepth)
+		exceptionType, err = parseType(field.Type, tree, structsCache, initRecursionDepth, opts)
 		if err != nil {
 			return err
 		}
@@ -210,6 +217,7 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 			ID:          field.ID,
 			IsException: true,
 			Type:        exceptionType,
+			GoTagOpt:    opts.goTag,
 		}
 		resp.Struct.FieldsByID[field.ID] = exceptionField
 		resp.Struct.FieldsByName[field.Name] = exceptionField
@@ -275,7 +283,7 @@ var builtinTypes = map[string]*descriptor.TypeDescriptor{
 // arg cache:
 // only support self reference on the same file
 // cross file self reference complicate matters
-func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor.TypeDescriptor, recursionDepth int) (*descriptor.TypeDescriptor, error) {
+func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor.TypeDescriptor, recursionDepth int, opt *parseOptions) (*descriptor.TypeDescriptor, error) {
 	if ty, ok := builtinTypes[t.Name]; ok {
 		return ty, nil
 	}
@@ -287,20 +295,20 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 	case "list":
 		ty := &descriptor.TypeDescriptor{Name: t.Name}
 		ty.Type = descriptor.LIST
-		ty.Elem, err = parseType(t.ValueType, tree, cache, nextRecursionDepth)
+		ty.Elem, err = parseType(t.ValueType, tree, cache, nextRecursionDepth, opt)
 		return ty, err
 	case "set":
 		ty := &descriptor.TypeDescriptor{Name: t.Name}
 		ty.Type = descriptor.SET
-		ty.Elem, err = parseType(t.ValueType, tree, cache, nextRecursionDepth)
+		ty.Elem, err = parseType(t.ValueType, tree, cache, nextRecursionDepth, opt)
 		return ty, err
 	case "map":
 		ty := &descriptor.TypeDescriptor{Name: t.Name}
 		ty.Type = descriptor.MAP
-		if ty.Key, err = parseType(t.KeyType, tree, cache, nextRecursionDepth); err != nil {
+		if ty.Key, err = parseType(t.KeyType, tree, cache, nextRecursionDepth, opt); err != nil {
 			return nil, err
 		}
-		ty.Elem, err = parseType(t.ValueType, tree, cache, nextRecursionDepth)
+		ty.Elem, err = parseType(t.ValueType, tree, cache, nextRecursionDepth, opt)
 		return ty, err
 	default:
 		// check the cache
@@ -318,7 +326,7 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 			cache = map[string]*descriptor.TypeDescriptor{}
 		}
 		if typDef, ok := tree.GetTypedef(typeName); ok {
-			return parseType(typDef.Type, tree, cache, nextRecursionDepth)
+			return parseType(typDef.Type, tree, cache, nextRecursionDepth, opt)
 		}
 		if _, ok := tree.GetEnum(typeName); ok {
 			return builtinTypes["i32"], nil
@@ -359,7 +367,9 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 				Required: field.Requiredness == parser.FieldType_Required,
 				Optional: field.Requiredness == parser.FieldType_Optional,
 			}
-
+			if opt != nil {
+				_f.GoTagOpt = opt.goTag
+			}
 			for _, ann := range field.Annotations {
 				for _, v := range ann.GetValues() {
 					if handle, ok := descriptor.FindAnnotation(ann.GetKey(), v); ok {
@@ -383,7 +393,7 @@ func parseType(t *parser.Type, tree *parser.Thrift, cache map[string]*descriptor
 			if _f.HTTPMapping == nil {
 				_f.HTTPMapping = descriptor.DefaultNewMapping(_f.FieldName())
 			}
-			if _f.Type, err = parseType(field.Type, tree, cache, nextRecursionDepth); err != nil {
+			if _f.Type, err = parseType(field.Type, tree, cache, nextRecursionDepth, opt); err != nil {
 				return nil, err
 			}
 			// set default value

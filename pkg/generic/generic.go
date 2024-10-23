@@ -54,6 +54,13 @@ type Method struct {
 	StreamingMode serviceinfo.StreamingMode
 }
 
+// ExtraProvider provides extra info for generic
+type ExtraProvider interface {
+	GetExtra(key string) string
+}
+
+const CombineServiceKey = "combine_service"
+
 // BinaryThriftGeneric raw thrift binary Generic
 func BinaryThriftGeneric() Generic {
 	return &binaryThriftGeneric{}
@@ -265,6 +272,10 @@ func (g *mapThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
 }
 
+func (g *mapThriftGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
+}
+
 type jsonThriftGeneric struct {
 	codec *jsonThriftCodec
 }
@@ -295,6 +306,10 @@ func (g *jsonThriftGeneric) IDLServiceName() string {
 
 func (g *jsonThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
+}
+
+func (g *jsonThriftGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
 }
 
 type jsonPbGeneric struct {
@@ -329,6 +344,10 @@ func (g *jsonPbGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
 }
 
+func (g *jsonPbGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
+}
+
 type httpThriftGeneric struct {
 	codec *httpThriftCodec
 }
@@ -361,6 +380,10 @@ func (g *httpThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
 }
 
+func (g *httpThriftGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
+}
+
 type httpPbThriftGeneric struct {
 	codec *httpPbThriftCodec
 }
@@ -391,4 +414,8 @@ func (g *httpPbThriftGeneric) IDLServiceName() string {
 
 func (g *httpPbThriftGeneric) MessageReaderWriter() interface{} {
 	return g.codec.getMessageReaderWriter()
+}
+
+func (g *httpPbThriftGeneric) GetExtra(key string) string {
+	return g.codec.extra[key]
 }
