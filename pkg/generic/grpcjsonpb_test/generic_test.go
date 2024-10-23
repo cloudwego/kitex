@@ -16,7 +16,6 @@
 
 package test
 
-/*
 import (
 	"context"
 	"fmt"
@@ -162,4 +161,3 @@ func initMockTestServer(handler mock.Mock, address string) server.Server {
 	addr, _ := net.ResolveTCPAddr("tcp", address)
 	return newMockTestServer(handler, addr)
 }
-*/

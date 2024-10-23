@@ -33,37 +33,37 @@ import (
 
 // NOTE: this is a temporary adjustment for ci check. remove it after fully completing the generic streaming support
 var (
-	_ clientStreaming        = nil
-	_ serverStreaming        = nil
-	_ bidirectionalStreaming = nil
-	_                        = newStreamingClient
-	_                        = newClientStreaming
-	_                        = newServerStreaming
-	_                        = newBidirectionalStreaming
+	_ ClientStreaming        = nil
+	_ ServerStreaming        = nil
+	_ BidirectionalStreaming = nil
+	_                        = NewStreamingClient
+	_                        = NewClientStreaming
+	_                        = NewServerStreaming
+	_                        = NewBidirectionalStreaming
 )
 
-type clientStreaming interface {
+type ClientStreaming interface {
 	streaming.Stream
 	Send(req interface{}) error
 	CloseAndRecv() (resp interface{}, err error)
 }
 
-type serverStreaming interface {
+type ServerStreaming interface {
 	streaming.Stream
 	Recv() (resp interface{}, err error)
 }
 
-type bidirectionalStreaming interface {
+type BidirectionalStreaming interface {
 	streaming.Stream
 	Send(req interface{}) error
 	Recv() (resp interface{}, err error)
 }
 
-func newStreamingClient(destService string, g generic.Generic, opts ...client.Option) (Client, error) {
-	return newStreamingClientWithServiceInfo(destService, g, streamingServiceInfo(g), opts...)
+func NewStreamingClient(destService string, g generic.Generic, opts ...client.Option) (Client, error) {
+	return NewStreamingClientWithServiceInfo(destService, g, streamingServiceInfo(g), opts...)
 }
 
-func newStreamingClientWithServiceInfo(destService string, g generic.Generic, svcInfo *serviceinfo.ServiceInfo, opts ...client.Option) (Client, error) {
+func NewStreamingClientWithServiceInfo(destService string, g generic.Generic, svcInfo *serviceinfo.ServiceInfo, opts ...client.Option) (Client, error) {
 	var options []client.Option
 	options = append(options, client.WithGeneric(g))
 	options = append(options, client.WithDestService(destService))
@@ -118,7 +118,7 @@ type clientStreamingClient struct {
 	methodInfo serviceinfo.MethodInfo
 }
 
-func newClientStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (clientStreaming, error) {
+func NewClientStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (ClientStreaming, error) {
 	gCli, ok := genericCli.(*genericServiceClient)
 	if !ok {
 		return nil, errors.New("invalid generic client")
@@ -153,7 +153,7 @@ type serverStreamingClient struct {
 	methodInfo serviceinfo.MethodInfo
 }
 
-func newServerStreaming(ctx context.Context, genericCli Client, method string, req interface{}, callOpts ...callopt.Option) (serverStreaming, error) {
+func NewServerStreaming(ctx context.Context, genericCli Client, method string, req interface{}, callOpts ...callopt.Option) (ServerStreaming, error) {
 	gCli, ok := genericCli.(*genericServiceClient)
 	if !ok {
 		return nil, errors.New("invalid generic client")
@@ -189,7 +189,7 @@ type bidirectionalStreamingClient struct {
 	methodInfo serviceinfo.MethodInfo
 }
 
-func newBidirectionalStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (bidirectionalStreaming, error) {
+func NewBidirectionalStreaming(ctx context.Context, genericCli Client, method string, callOpts ...callopt.Option) (BidirectionalStreaming, error) {
 	gCli, ok := genericCli.(*genericServiceClient)
 	if !ok {
 		return nil, errors.New("invalid generic client")
