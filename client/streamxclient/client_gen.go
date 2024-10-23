@@ -28,7 +28,7 @@ import (
 func InvokeStream[Req, Res any](
 	ctx context.Context, cli client.StreamX, smode serviceinfo.StreamingMode, method string,
 	req *Req, res *Res, callOptions ...streamxcallopt.CallOption,
-) (stream *streamx.GenericClientStream[Req, Res], err error) {
+) (context.Context, *streamx.GenericClientStream[Req, Res], error) {
 	reqArgs, resArgs := streamx.NewStreamReqArgs(nil), streamx.NewStreamResArgs(nil)
 	streamArgs := streamx.NewStreamArgs(nil)
 	// important notes: please don't set a typed nil value into interface arg like NewStreamReqArgs({typ: *Res, ptr: nil})
@@ -40,11 +40,11 @@ func InvokeStream[Req, Res any](
 		resArgs.SetRes(res)
 	}
 
-	cs, err := cli.NewStream(ctx, method, req, callOptions...)
+	ctx, cs, err := cli.NewStream(ctx, method, req, callOptions...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	stream = streamx.NewGenericClientStream[Req, Res](cs)
+	stream := streamx.NewGenericClientStream[Req, Res](cs)
 	streamx.AsMutableStreamArgs(streamArgs).SetStream(stream)
 
 	streamMW, recvMW, sendMW := cli.Middlewares()
@@ -85,7 +85,7 @@ func InvokeStream[Req, Res any](
 		err = streamInvoke(ctx, streamArgs, reqArgs, resArgs)
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return stream, nil
+	return ctx, stream, nil
 }

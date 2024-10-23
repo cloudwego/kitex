@@ -20,7 +20,6 @@ import (
 	"context"
 	"net"
 
-	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -43,7 +42,7 @@ type clientProvider struct {
 	payloadLimit int
 }
 
-func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callOptions ...streamxcallopt.CallOption) (streamx.ClientStream, error) {
+func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (streamx.ClientStream, error) {
 	invocation := ri.Invocation()
 	method := invocation.MethodName()
 	addr := ri.To().Address()

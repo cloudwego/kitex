@@ -19,7 +19,6 @@ package streamx
 import (
 	"context"
 
-	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 )
 
@@ -31,8 +30,8 @@ type internalClientProvider struct {
 	ClientProvider
 }
 
-func (p internalClientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callOptions ...streamxcallopt.CallOption) (ClientStream, error) {
-	cs, err := p.ClientProvider.NewStream(ctx, ri, callOptions...)
+func (p internalClientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (ClientStream, error) {
+	cs, err := p.ClientProvider.NewStream(ctx, ri)
 	if err != nil {
 		return nil, err
 	}
