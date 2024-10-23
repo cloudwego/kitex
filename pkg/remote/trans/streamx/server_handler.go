@@ -22,6 +22,7 @@ import (
 	"io"
 	"net"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/cloudwego/kitex/internal/wpool"
@@ -92,7 +93,18 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 	return ctx, nil
 }
 
-func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
+// OnRead control the connection level lifecycle.
+// only when OnRead return, netpoll can close the connection buffer
+func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
+	var wg sync.WaitGroup
+	defer func() {
+		wg.Wait()
+		klog.CtxErrorf(ctx, "KITEX: stream OnRead return: err=%v", err)
+		_, nerr := t.provider.OnInactive(ctx, conn)
+		if err == nil && nerr != nil {
+			err = nerr
+		}
+	}()
 	// connection level goroutine
 	for {
 		nctx, ss, nerr := t.provider.OnStream(ctx, conn)
@@ -103,8 +115,10 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
 			klog.CtxErrorf(ctx, "KITEX: OnStream failed: err=%v", nerr)
 			return nerr
 		}
+		wg.Add(1)
 		// stream level goroutine
 		streamWorkerPool.GoCtx(ctx, func() {
+			defer wg.Done()
 			err := t.OnStream(nctx, conn, ss)
 			if err != nil && !errors.Is(err, io.EOF) {
 				klog.CtxErrorf(ctx, "KITEX: stream ReadStream failed: err=%v", err)
@@ -178,7 +192,6 @@ func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 }
 
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
-	_, _ = t.provider.OnInactive(ctx, conn)
 }
 
 func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
