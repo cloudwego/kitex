@@ -25,7 +25,7 @@ import (
 )
 
 type StreamX interface {
-	NewStream(ctx context.Context, method string, req any, callOptions ...streamxcallopt.CallOption) (streamx.ClientStream, error)
+	NewStream(ctx context.Context, method string, req any, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error)
 	Middlewares() (streamMW streamx.StreamMiddleware, recvMW streamx.StreamRecvMiddleware, sendMW streamx.StreamSendMiddleware)
 }
 
@@ -34,7 +34,7 @@ func (kc *kClient) Middlewares() (streamMW streamx.StreamMiddleware, recvMW stre
 }
 
 // NewStream create stream for streamx mode
-func (kc *kClient) NewStream(ctx context.Context, method string, req any, callOptions ...streamxcallopt.CallOption) (streamx.ClientStream, error) {
+func (kc *kClient) NewStream(ctx context.Context, method string, req any, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error) {
 	if !kc.inited {
 		panic("client not initialized")
 	}
@@ -49,19 +49,25 @@ func (kc *kClient) NewStream(ctx context.Context, method string, req any, callOp
 
 	err := rpcinfo.AsMutableRPCConfig(ri.Config()).SetInteractionMode(rpcinfo.Streaming)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	ctx = rpcinfo.NewCtxWithRPCInfo(ctx, ri)
+
+	// tracing
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
+	ctx, copts := streamxcallopt.NewCtxWithCallOptions(ctx)
+	callOptions = append(callOptions, streamxcallopt.WithStreamCloseCallback(func(ctx context.Context) {
+		kc.opt.TracerCtl.DoFinish(ctx, ri, err)
+	}))
+	copts.Apply(callOptions)
 
 	streamArgs := streamx.NewStreamArgs(nil)
 	// put streamArgs into response arg
 	// it's an ugly trick but if we don't want to refactor too much,
 	// this is the only way to compatible with current endpoint design
 	err = kc.sEps(ctx, req, streamArgs)
-	kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return streamArgs.Stream().(streamx.ClientStream), nil
+	return ctx, streamArgs.Stream().(streamx.ClientStream), nil
 }
