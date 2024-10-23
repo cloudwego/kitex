@@ -31,17 +31,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
-// NOTE: this is a temporary adjustment for ci check. remove it after fully completing the generic streaming support
-var (
-	_ ClientStreaming        = nil
-	_ ServerStreaming        = nil
-	_ BidirectionalStreaming = nil
-	_                        = NewStreamingClient
-	_                        = NewClientStreaming
-	_                        = NewServerStreaming
-	_                        = NewBidirectionalStreaming
-)
-
 type ClientStreaming interface {
 	streaming.Stream
 	Send(req interface{}) error
