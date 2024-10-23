@@ -30,6 +30,10 @@ import (
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+
+	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
+
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -58,6 +62,7 @@ type transport struct {
 	fpipe         *container.Pipe[*Frame]  // out-coming frame pipe
 	closedFlag    int32
 	streamingFlag int32 // flag == 0 means there is no active stream on transport
+	closedTrigger chan struct{}
 }
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
@@ -65,15 +70,19 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 	// TODO: let it configurable
 	_ = conn.SetReadTimeout(time.Minute * 10)
 	t := &transport{
-		kind:    kind,
-		sinfo:   sinfo,
-		conn:    conn,
-		streams: sync.Map{},
-		spipe:   container.NewPipe[*stream](),
-		scache:  make([]*stream, 0, streamCacheSize),
-		fpipe:   container.NewPipe[*Frame](),
+		kind:          kind,
+		sinfo:         sinfo,
+		conn:          conn,
+		streams:       sync.Map{},
+		spipe:         container.NewPipe[*stream](),
+		scache:        make([]*stream, 0, streamCacheSize),
+		fpipe:         container.NewPipe[*Frame](),
+		closedTrigger: make(chan struct{}, 2),
 	}
 	go func() {
+		defer func() {
+			t.closedTrigger <- struct{}{}
+		}()
 		err := t.loopRead()
 		if err != nil {
 			if !isIgnoreError(err) {
@@ -85,6 +94,9 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		}
 	}()
 	go func() {
+		defer func() {
+			t.closedTrigger <- struct{}{}
+		}()
 		err := t.loopWrite()
 		if err != nil {
 			if !isIgnoreError(err) {
@@ -103,16 +115,26 @@ func (t *transport) Close() (err error) {
 	if !atomic.CompareAndSwapInt32(&t.closedFlag, 0, 1) {
 		return nil
 	}
-	klog.Debugf("transport[%s] is closing", t.conn.LocalAddr())
+	switch t.kind {
+	case clientTransport:
+		klog.Debugf("transport[%d-%s] is closing", t.kind, t.conn.LocalAddr())
+	case serverTransport:
+		klog.Debugf("transport[%d-%s] is closing", t.kind, t.conn.RemoteAddr())
+	}
 	t.spipe.Close()
 	t.fpipe.Close()
 	t.streams.Range(func(key, value any) bool {
 		sio := value.(*streamIO)
 		sio.close()
-		_ = t.streamDelete(sio.stream.sid)
+		t.streamDelete(sio.stream.sid)
 		return true
 	})
 	return err
+}
+
+func (t *transport) WaitClosed() {
+	<-t.closedTrigger
+	<-t.closedTrigger
 }
 
 func (t *transport) IsActive() bool {
@@ -122,6 +144,11 @@ func (t *transport) IsActive() bool {
 func (t *transport) storeStreamIO(ctx context.Context, s *stream) *streamIO {
 	sio := newStreamIO(ctx, s)
 	t.streams.Store(s.sid, sio)
+
+	copts := streamxcallopt.GetCallOptionsFromCtx(ctx)
+	if copts != nil && copts.StreamCloseCallback != nil {
+		sio.closeCallback = copts.StreamCloseCallback
+	}
 	return sio
 }
 
@@ -222,7 +249,7 @@ func (t *transport) loopWrite() error {
 		}
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
-			klog.Debugf("transport[%d] EncodeFrame: fr=%v", t.kind, fr)
+			klog.Debugf("transport[%d] EncodeFrame: fr=%v IsActive=%v", t.kind, fr, t.conn.IsActive())
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}
@@ -250,6 +277,13 @@ func (t *transport) streamSend(ctx context.Context, sid int32, method string, wh
 	payload, err := EncodePayload(ctx, res)
 	if err != nil {
 		return err
+	}
+	// tracing
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri != nil && ri.Stats() != nil {
+		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
+			rpcStats.IncrSendSize(uint64(len(payload)))
+		}
 	}
 	return t.writeFrame(
 		streamFrame{sid: sid, method: method},
@@ -298,6 +332,14 @@ func (t *transport) streamRecv(ctx context.Context, sid int32, data any) (err er
 	err = DecodePayload(context.Background(), msg.payload, data.(thrift.FastCodec))
 	// payload will not be access after decode
 	mcache.Free(msg.payload)
+
+	// tracing
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri != nil && ri.Stats() != nil {
+		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
+			rpcStats.IncrRecvSize(uint64(len(msg.payload)))
+		}
+	}
 	return err
 }
 
@@ -313,14 +355,13 @@ func (t *transport) streamCloseRecv(s *stream, exception error) error {
 	return nil
 }
 
-func (t *transport) streamDelete(sid int32) (err error) {
+func (t *transport) streamDelete(sid int32) {
 	// remove stream from transport
 	_, ok := t.streams.LoadAndDelete(sid)
 	if !ok {
-		return nil
+		return
 	}
 	atomic.AddInt32(&t.streamingFlag, -1)
-	return nil
 }
 
 func (t *transport) IsStreaming() bool {
