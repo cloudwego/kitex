@@ -48,7 +48,7 @@ func TestNewCBSuite(t *testing.T) {
 	cb := NewCBSuite(RPCInfo2Key)
 	test.Assert(t, cb.servicePanel == nil)
 	test.Assert(t, cb.instancePanel == nil)
-	test.Assert(t, cb.instanceCBConfig.CBConfig == defaultCBConfig)
+	test.Assert(t, cb.instanceCBConfig.CBConfig == GetDefaultCBConfig())
 	test.Assert(t, sameFuncPointer(cb.genServiceCBKey, RPCInfo2Key))
 	test.Assert(t, sameFuncPointer(cb.config.instanceGetErrorTypeFunc, ErrorTypeOnInstanceLevel))
 	test.Assert(t, sameFuncPointer(cb.config.serviceGetErrorTypeFunc, ErrorTypeOnServiceLevel))
@@ -659,5 +659,16 @@ func TestCBConfig_Equals(t *testing.T) {
 				t.Errorf("Equals() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func BenchmarkCBSuiteMW(b *testing.B) {
+	ctx := prepareCtx()
+	p := NewCBSuite(func(ri rpcinfo.RPCInfo) string { return "BenchmarkCBSuite" })
+	smw := p.ServiceCBMW()
+	noop := func(ctx context.Context, req, resp interface{}) (err error) { return nil }
+	ep := smw(noop)
+	for i := 0; i < b.N; i++ {
+		ep(ctx, b, b)
 	}
 }
