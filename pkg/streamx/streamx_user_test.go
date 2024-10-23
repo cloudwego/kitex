@@ -19,6 +19,7 @@ package streamx_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -29,6 +30,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/client"
@@ -587,6 +589,63 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 				}()
 			}
 			wg.Wait()
+		})
+	}
+}
+
+func TestStreamingException(t *testing.T) {
+	for _, tc := range providerTestCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			addr := test.GetLocalAddress()
+			ln, _ := netpoll.CreateListener("tcp", addr)
+			defer ln.Close()
+
+			// create server
+			svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
+			_ = svr.RegisterService(
+				streamingServiceInfo, new(streamingService),
+				streamxserver.WithProvider(tc.ServerProvider),
+			)
+			go func() {
+				_ = svr.Run()
+			}()
+			defer svr.Stop()
+			test.WaitServerStart(addr)
+
+			var circuitBreaker int32
+			circuitBreakerErr := fmt.Errorf("circuitBreaker on")
+			streamClient, _ := NewStreamingClient(
+				"kitex.service.streaming",
+				streamxclient.WithHostPorts(addr),
+				streamxclient.WithProvider(tc.ClientProvider),
+				streamxclient.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
+					return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+						ri := rpcinfo.GetRPCInfo(ctx)
+						test.Assert(t, ri.To().Address() != nil)
+						if atomic.LoadInt32(&circuitBreaker) > 0 {
+							return circuitBreakerErr
+						}
+						return next(ctx, streamArgs, reqArgs, resArgs)
+					}
+				}),
+			)
+			octx := context.Background()
+
+			//assert circuitBreaker error
+			atomic.StoreInt32(&circuitBreaker, 1)
+			ctx, bs, err := streamClient.BidiStream(octx)
+			test.Assert(t, errors.Is(err, circuitBreakerErr), err)
+			atomic.StoreInt32(&circuitBreaker, 0)
+
+			// assert context deadline error
+			ctx, cancel := context.WithTimeout(octx, time.Millisecond)
+			ctx, bs, err = streamClient.BidiStream(ctx)
+			test.Assert(t, err == nil, err)
+			res, err := bs.Recv(ctx)
+			cancel()
+			test.Assert(t, res == nil && err != nil, res, err)
+			test.Assert(t, errors.Is(err, ctx.Err()), err)
+			test.Assert(t, errors.Is(err, context.DeadlineExceeded), err)
 		})
 	}
 }
