@@ -23,21 +23,18 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
-var noopHandler = noopSvrTransHandler{}
+var noopHandler remote.ServerTransHandler = noopSvrTransHandler{}
 
 type noopSvrTransHandler struct{}
 
-func (noopSvrTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error) {
-	return ctx, nil
-}
-
-func (noopSvrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
-	return ctx, nil
-}
-
 func (noopSvrTransHandler) OnRead(ctx context.Context, conn net.Conn) error {
+	return nil
+}
+
+func (noopSvrTransHandler) OnStream(ctx context.Context, st streaming.ServerStream) error {
 	return nil
 }
 func (noopSvrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {}
@@ -52,7 +49,7 @@ func (noopSvrTransHandler) OnError(ctx context.Context, err error, conn net.Conn
 func (noopSvrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
 	return ctx, nil
 }
-func (noopSvrTransHandler) SetPipeline(pipeline *remote.TransPipeline)       {}
+func (noopSvrTransHandler) SetPipeline(pipeline *remote.ServerTransPipeline) {}
 func (noopSvrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {}
 func (noopSvrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	return ctx, nil

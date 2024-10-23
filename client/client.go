@@ -725,6 +725,9 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
 	}
+	inkSetter := ri.Invocation().(rpcinfo.InvocationSetter)
+	inkSetter.SetServiceInfo(svcInfo)
+	inkSetter.SetMethodInfo(mi)
 
 	if p := opt.Timeouts; p != nil {
 		if c := p.Timeouts(ri); c != nil {

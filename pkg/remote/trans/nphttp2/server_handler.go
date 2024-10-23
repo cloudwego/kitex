@@ -160,7 +160,13 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 		serviceName = sm[idx+1 : pos]
 	}
 	ink.SetServiceName(serviceName)
-
+	svcInfo := t.svcSearcher.SearchService(serviceName, methodName, true)
+	var methodInfo serviceinfo.MethodInfo
+	if svcInfo != nil {
+		ink.SetServiceInfo(svcInfo)
+		methodInfo = svcInfo.MethodInfo(methodName)
+		ink.SetMethodInfo(methodInfo)
+	}
 	// set grpc transport flag before execute metahandler
 	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())
 	cfg.SetTransportProtocol(transport.GRPC)
@@ -184,8 +190,7 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	// set send grpc compressor at server to encode reply pack
 	remote.SetSendCompressor(ri, s.SendCompress())
 
-	svcInfo := t.svcSearcher.SearchService(serviceName, methodName, true)
-	streamx := newServerStream(rCtx, svcInfo, newServerConn(tr, s), t, conn)
+	streamx := newServerStream(rCtx, ri, newServerConn(tr, s), t, conn)
 	streamx.SetPipeline(remote.NewServerStreamPipeline(streamx, t.transPipe))
 	// inject streamx so that GetServerConn only relies on it
 	rCtx = context.WithValue(rCtx, serverConnKey{}, streamx)
@@ -197,17 +202,12 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 }
 
 func (t *svrTransHandler) OnStream(ctx context.Context, st streaming.ServerStream) error {
-	ri := rpcinfo.GetRPCInfo(ctx)
+	streamx := st.(*serverStreamX)
+	ri := streamx.ri
 	methodName := ri.Invocation().MethodName()
 	serviceName := ri.Invocation().ServiceName()
-	streamx := st.(*serverStreamX)
-	svcInfo := streamx.svcInfo
-	var methodInfo serviceinfo.MethodInfo
-	if svcInfo != nil {
-		methodInfo = svcInfo.MethodInfo(methodName)
-	}
 	var err error
-	if methodInfo == nil {
+	if ri.Invocation().MethodInfo() == nil {
 		unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
 		if unknownServiceHandlerFunc != nil {
 			rpcinfo.Record(ctx, ri, stats.ServerHandleStart, nil)
@@ -216,7 +216,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, st streaming.ServerStrea
 				err = kerrors.ErrBiz.WithCause(err)
 			}
 		} else {
-			if svcInfo == nil {
+			if ri.Invocation().ServiceInfo() == nil {
 				err = remote.NewTransErrorWithMsg(remote.UnknownService, fmt.Sprintf("unknown service %s", serviceName))
 			} else {
 				err = remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))

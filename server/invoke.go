@@ -65,8 +65,8 @@ func (s *tInvoker) Init() (err error) {
 	s.initBasicRemoteOption()
 	// for server trans info handler
 	if len(s.server.opt.MetaHandlers) > 0 {
-		transInfoHdlr := bound.NewTransMetaHandler(s.server.opt.MetaHandlers)
-		doAddBoundHandler(transInfoHdlr, s.server.opt.RemoteOpt)
+		transInfoHdlr := bound.NewServerMetaHandler(s.server.opt.MetaHandlers)
+		s.server.opt.RemoteOpt.AppendPipelineHandler(transInfoHdlr)
 	}
 	s.Lock()
 	s.Handler, err = s.newInvokeHandler()
@@ -92,14 +92,12 @@ func (s *tInvoker) newInvokeHandler() (handler invoke.Handler, err error) {
 	if err != nil {
 		return nil, err
 	}
-	hdlr.(remote.InvokeHandleFuncSetter).SetInvokeHandleFunc(s.eps)
-	pl := remote.NewTransPipeline(hdlr)
+	hdlr.(remote.InvokeHandleFuncSetter).SetInvokeHandleFunc(remote.InnerServerEndpoint(s.eps), s.unaryEps)
+
+	pl := remote.NewServerTransPipeline(hdlr)
 	hdlr.SetPipeline(pl)
-	for _, ib := range opt.Inbounds {
-		pl.AddInboundHandler(ib)
-	}
-	for _, ob := range opt.Outbounds {
-		pl.AddOutboundHandler(ob)
+	for _, hdlr := range opt.ServerPipelineHandlers {
+		pl.AddHandler(hdlr)
 	}
 	return invoke.NewIvkHandler(opt, pl)
 }

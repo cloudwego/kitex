@@ -27,7 +27,6 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
@@ -37,7 +36,7 @@ type serverStream struct {
 
 type serverStreamX struct {
 	ctx     context.Context
-	svcInfo *serviceinfo.ServiceInfo
+	ri      rpcinfo.RPCInfo
 	conn    *serverConn
 	pipe    *remote.ServerStreamPipeline
 	t       *svrTransHandler
@@ -55,10 +54,10 @@ func (s *serverStreamX) SetPipeline(pipe *remote.ServerStreamPipeline) {
 }
 
 // newServerStream ...
-func newServerStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn *serverConn, t *svrTransHandler, rawConn net.Conn) *serverStreamX {
+func newServerStream(ctx context.Context, ri rpcinfo.RPCInfo, conn *serverConn, t *svrTransHandler, rawConn net.Conn) *serverStreamX {
 	sx := &serverStreamX{
 		ctx:     ctx,
-		svcInfo: svcInfo,
+		ri:      ri,
 		conn:    conn,
 		t:       t,
 		rawConn: rawConn,
@@ -109,8 +108,7 @@ func (s *serverStream) Close() error {
 }
 
 func (s *serverStreamX) Write(ctx context.Context, msg remote.Message) (nctx context.Context, err error) {
-	ri := rpcinfo.GetRPCInfo(ctx)
-	if bizStatusErr := ri.Invocation().BizStatusErr(); bizStatusErr != nil {
+	if bizStatusErr := s.ri.Invocation().BizStatusErr(); bizStatusErr != nil {
 		// BizError: do not send the message
 		var st *status.Status
 		if sterr, ok := bizStatusErr.(status.Iface); ok {
@@ -153,9 +151,7 @@ func (s *serverStreamX) SetTrailer(tl streaming.Trailer) error {
 }
 
 func (s *serverStreamX) RecvMsg(ctx context.Context, m interface{}) error {
-	ri := rpcinfo.GetRPCInfo(ctx)
-
-	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Server)
+	msg := remote.NewMessage(m, s.ri.Invocation().ServiceInfo(), s.ri, remote.Stream, remote.Server)
 	defer msg.Recycle()
 
 	_, err := s.pipe.Read(ctx, msg)
@@ -163,9 +159,7 @@ func (s *serverStreamX) RecvMsg(ctx context.Context, m interface{}) error {
 }
 
 func (s *serverStreamX) SendMsg(ctx context.Context, m interface{}) error {
-	ri := rpcinfo.GetRPCInfo(ctx)
-
-	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Server)
+	msg := remote.NewMessage(m, s.ri.Invocation().ServiceInfo(), s.ri, remote.Stream, remote.Server)
 	defer msg.Recycle()
 
 	_, err := s.pipe.Write(ctx, msg)
@@ -177,11 +171,11 @@ type clientStream struct {
 }
 
 type clientStreamX struct {
-	ctx     context.Context
-	svcInfo *serviceinfo.ServiceInfo
-	conn    *clientConn
-	pipe    *remote.ClientStreamPipeline
-	t       *cliTransHandler
+	ctx  context.Context
+	ri   rpcinfo.RPCInfo
+	conn *clientConn
+	pipe *remote.ClientStreamPipeline
+	t    *cliTransHandler
 	// for grpc compatibility
 	grpcStream *clientStream
 }
@@ -191,12 +185,12 @@ func (s *clientStreamX) GetGRPCStream() streaming.Stream {
 }
 
 // newClientStream ...
-func newClientStream(ctx context.Context, svcInfo *serviceinfo.ServiceInfo, conn *clientConn, t *cliTransHandler) *clientStreamX {
+func newClientStream(ctx context.Context, ri rpcinfo.RPCInfo, conn *clientConn, t *cliTransHandler) *clientStreamX {
 	sx := &clientStreamX{
-		ctx:     ctx,
-		svcInfo: svcInfo,
-		conn:    conn,
-		t:       t,
+		ctx:  ctx,
+		ri:   ri,
+		conn: conn,
+		t:    t,
 	}
 	sx.grpcStream = &clientStream{
 		sx: sx,
@@ -260,9 +254,7 @@ func (s *clientStreamX) Trailer() (streaming.Trailer, error) {
 }
 
 func (s *clientStreamX) RecvMsg(ctx context.Context, m interface{}) error {
-	ri := rpcinfo.GetRPCInfo(ctx)
-
-	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
+	msg := remote.NewMessage(m, s.ri.Invocation().ServiceInfo(), s.ri, remote.Stream, remote.Client)
 	defer msg.Recycle()
 
 	_, err := s.pipe.Read(ctx, msg)
@@ -270,9 +262,7 @@ func (s *clientStreamX) RecvMsg(ctx context.Context, m interface{}) error {
 }
 
 func (s *clientStreamX) SendMsg(ctx context.Context, m interface{}) error {
-	ri := rpcinfo.GetRPCInfo(ctx)
-
-	msg := remote.NewMessage(m, s.svcInfo, ri, remote.Stream, remote.Client)
+	msg := remote.NewMessage(m, s.ri.Invocation().ServiceInfo(), s.ri, remote.Stream, remote.Client)
 	defer msg.Recycle()
 
 	_, err := s.pipe.Write(ctx, msg)

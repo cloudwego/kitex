@@ -55,7 +55,7 @@ type cliTransHandler struct {
 func (h *cliTransHandler) NewStream(ctx context.Context, conn net.Conn) (streaming.ClientStream, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	clientConn := conn.(*clientConn)
-	streamx := newClientStream(ctx, ri.Invocation().ServiceInfo(), clientConn, h)
+	streamx := newClientStream(ctx, ri, clientConn, h)
 	streamx.SetPipeline(remote.NewClientStreamPipeline(streamx, h.transPipe))
 	return streamx, nil
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // DetectableServerTransHandler implements an additional method ProtocolMatch to help
@@ -80,14 +81,6 @@ type svrTransHandler struct {
 	registered     []DetectableServerTransHandler
 }
 
-func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, send remote.Message) (nctx context.Context, err error) {
-	return t.which(ctx).Write(ctx, conn, send)
-}
-
-func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
-	return t.which(ctx).Read(ctx, conn, msg)
-}
-
 func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
 	// only need detect once when connection is reused
 	r := ctx.Value(handlerKey{}).(*handlerWrapper)
@@ -114,6 +107,10 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	return which.OnRead(ctx, conn)
 }
 
+func (t *svrTransHandler) OnStream(ctx context.Context, st streaming.ServerStream) error {
+	return t.which(ctx).OnStream(ctx, st)
+}
+
 func (t *svrTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
 	// Should use the ctx returned by OnActive in r.ctx
 	if r, ok := ctx.Value(handlerKey{}).(*handlerWrapper); ok && r.ctx != nil {
@@ -126,10 +123,6 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 	t.which(ctx).OnError(ctx, err, conn)
 }
 
-func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
-	return t.which(ctx).OnMessage(ctx, args, result)
-}
-
 func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
 	if r, ok := ctx.Value(handlerKey{}).(*handlerWrapper); ok && r.handler != nil {
 		return r.handler
@@ -138,21 +131,21 @@ func (t *svrTransHandler) which(ctx context.Context) remote.ServerTransHandler {
 	return noopHandler
 }
 
-func (t *svrTransHandler) SetPipeline(pipeline *remote.TransPipeline) {
+func (t *svrTransHandler) SetPipeline(pipeline *remote.ServerTransPipeline) {
 	for i := range t.registered {
 		t.registered[i].SetPipeline(pipeline)
 	}
 	t.defaultHandler.SetPipeline(pipeline)
 }
 
-func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
+func (t *svrTransHandler) SetInvokeHandleFunc(streamHdlFunc remote.InnerServerEndpoint, unaryHdlFunc endpoint.Endpoint) {
 	for i := range t.registered {
 		if s, ok := t.registered[i].(remote.InvokeHandleFuncSetter); ok {
-			s.SetInvokeHandleFunc(inkHdlFunc)
+			s.SetInvokeHandleFunc(streamHdlFunc, unaryHdlFunc)
 		}
 	}
 	if t, ok := t.defaultHandler.(remote.InvokeHandleFuncSetter); ok {
-		t.SetInvokeHandleFunc(inkHdlFunc)
+		t.SetInvokeHandleFunc(streamHdlFunc, unaryHdlFunc)
 	}
 }
 

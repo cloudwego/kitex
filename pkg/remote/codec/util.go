@@ -22,6 +22,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 const (
@@ -50,13 +51,18 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 		return errors.New("the interface Invocation doesn't implement InvocationSetter")
 	}
 	inkSetter.SetMethodName(methodName)
-	specifier, ok := ri.(rpcinfo.ServiceInfoSpecifier)
-	if !ok {
-		return errors.New("the interface RPCInfo doesn't implement ServiceInfoSpecifier")
-	}
-	svcInfo, err := specifier.SpecifyServiceInfo(ink.ServiceName(), methodName)
-	if err != nil {
-		return err
+	var svcInfo *serviceinfo.ServiceInfo
+	if svcInfo = ink.ServiceInfo(); svcInfo == nil {
+		// for ping pong server, svc info is nil until the request decoded
+		specifier, ok := ri.(rpcinfo.ServiceInfoSpecifier)
+		if !ok {
+			return errors.New("the interface RPCInfo doesn't implement ServiceInfoSpecifier")
+		}
+		var err error
+		svcInfo, err = specifier.SpecifyServiceInfo(ink.ServiceName(), methodName)
+		if err != nil {
+			return err
+		}
 	}
 	inkSetter.SetPackageName(svcInfo.GetPackageName())
 	inkSetter.SetServiceName(svcInfo.ServiceName)

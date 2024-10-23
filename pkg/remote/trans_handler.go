@@ -20,6 +20,7 @@ import (
 	"context"
 	"net"
 
+	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
@@ -70,5 +71,5 @@ type InnerServerEndpoint func(ctx context.Context, st streaming.ServerStream) (e
 
 // InvokeHandleFuncSetter is used to set invoke handle func.
 type InvokeHandleFuncSetter interface {
-	SetInvokeHandleFunc(inkHdlFunc InnerServerEndpoint)
+	SetInvokeHandleFunc(streamHdlFunc InnerServerEndpoint, unaryHdlFunc endpoint.Endpoint)
 }

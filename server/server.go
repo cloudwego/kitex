@@ -66,11 +66,12 @@ type server struct {
 	targetSvcInfo *serviceinfo.ServiceInfo
 
 	// actual rpc service implement of biz
-	eps     InnerEndpoint
-	svr     remotesvr.Server
-	stopped sync.Once
-	isInit  bool
-	isRun   bool
+	eps      InnerEndpoint
+	unaryEps endpoint.Endpoint
+	svr      remotesvr.Server
+	stopped  sync.Once
+	isInit   bool
+	isRun    bool
 
 	sync.Mutex
 }
@@ -153,22 +154,8 @@ func (s *server) buildInnerMiddlewares(ctx context.Context) []InnerMiddleware {
 	return nil
 }
 
-func pingpongArgsCompatibleMW() endpoint.Middleware {
-	return func(next endpoint.Endpoint) endpoint.Endpoint {
-		return func(ctx context.Context, req, resp interface{}) (err error) {
-			if request, ok := req.(*serviceinfo.PingPongCompatibleMethodArgs); ok {
-				return next(ctx, request.Data, resp)
-			} else {
-				return next(ctx, req, resp)
-			}
-		}
-	}
-}
-
 func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 	var mws []endpoint.Middleware
-	// must be the first middleware
-	mws = append(mws, pingpongArgsCompatibleMW())
 	// register server timeout middleware
 	// prepend for adding timeout to the context for all middlewares and the handler
 	if s.opt.EnableContextTimeout {
@@ -381,13 +368,8 @@ func (s *server) upperLayerEndpoint(ctx context.Context) endpoint.Endpoint {
 	streamEp := StreamChain(sgteamMw...)(s.streamHandleEndpoint())
 
 	return func(ctx context.Context, req, resp interface{}) (err error) {
-		ri := rpcinfo.GetRPCInfo(ctx)
 		if st, ok := req.(streaming.Args); ok {
-			if ri.Invocation().MethodInfo().StreamingMode() == serviceinfo.StreamingUnary {
-				return unaryEp(ctx, req, resp)
-			} else {
-				return streamEp(ctx, st.ServerStream)
-			}
+			return streamEp(ctx, st.ServerStream)
 		} else {
 			return unaryEp(ctx, req, resp)
 		}
@@ -412,6 +394,7 @@ func (s *server) compatibleEndpoint(ctx context.Context) InnerEndpoint {
 	upperLayerEp := s.upperLayerEndpoint(ctx)
 	mws := s.buildMiddlewares(ctx)
 	ep := endpoint.Chain(mws...)(upperLayerEp)
+	s.unaryEps = ep
 	recvEndpoint := s.opt.Streaming.BuildRecvInvokeChain(invokeRecvEndpoint())
 	sendEndpoint := s.opt.Streaming.BuildSendInvokeChain(invokeSendEndpoint())
 	return func(ctx context.Context, st streaming.ServerStream) (err error) {
@@ -634,10 +617,9 @@ func (s *server) newSvrTransHandler() (handler remote.ServerTransHandler, err er
 		return nil, err
 	}
 	if setter, ok := transHdlr.(remote.InvokeHandleFuncSetter); ok {
-		setter.SetInvokeHandleFunc(remote.InnerServerEndpoint(s.eps))
+		setter.SetInvokeHandleFunc(remote.InnerServerEndpoint(s.eps), s.unaryEps)
 	}
 	transPl := remote.NewServerTransPipeline(transHdlr)
-
 	for _, ib := range s.opt.RemoteOpt.ServerPipelineHandlers {
 		transPl.AddHandler(ib)
 	}
