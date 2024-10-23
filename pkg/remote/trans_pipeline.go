@@ -28,15 +28,15 @@ type ServerPipelineHandler interface {
 	OnInactive(ctx context.Context, conn net.Conn) context.Context
 	OnRead(ctx context.Context, conn net.Conn) (context.Context, error)
 	OnStream(ctx context.Context, st streaming.ServerStream) (context.Context, error)
-	OnStreamRead(ctx context.Context, msg Message) (nctx context.Context, err error)
-	OnStreamWrite(ctx context.Context, send Message) (nctx context.Context, err error)
+	OnStreamRead(ctx context.Context, st ServerStream, msg Message) (nctx context.Context, err error)
+	OnStreamWrite(ctx context.Context, st ServerStream, send Message) (nctx context.Context, err error)
 }
 
 type ClientPipelineHandler interface {
 	OnInactive(ctx context.Context, conn net.Conn) context.Context
 	OnConnectStream(ctx context.Context) (nctx context.Context, err error)
-	OnStreamRead(ctx context.Context, msg Message) (nctx context.Context, err error)
-	OnStreamWrite(ctx context.Context, send Message) (nctx context.Context, err error)
+	OnStreamRead(ctx context.Context, st ClientStream, msg Message) (nctx context.Context, err error)
+	OnStreamWrite(ctx context.Context, st ClientStream, send Message) (nctx context.Context, err error)
 }
 
 // ServerTransPipeline contains TransHandlers.
@@ -175,7 +175,7 @@ type ServerStreamPipeline struct {
 
 func (p *ServerStreamPipeline) Write(ctx context.Context, sendMsg Message) (nctx context.Context, err error) {
 	for _, h := range p.pipeline.svrHdrls {
-		ctx, err = h.OnStreamWrite(ctx, sendMsg)
+		ctx, err = h.OnStreamWrite(ctx, p.ServerStream, sendMsg)
 		if err != nil {
 			return ctx, err
 		}
@@ -190,7 +190,7 @@ func (p *ServerStreamPipeline) Read(ctx context.Context, msg Message) (context.C
 		return ctx, err
 	}
 	for _, h := range p.pipeline.svrHdrls {
-		ctx, err = h.OnStreamRead(ctx, msg)
+		ctx, err = h.OnStreamRead(ctx, p.ServerStream, msg)
 		if err != nil {
 			return ctx, err
 		}
@@ -210,7 +210,7 @@ type ClientStreamPipeline struct {
 
 func (p *ClientStreamPipeline) Write(ctx context.Context, sendMsg Message) (nctx context.Context, err error) {
 	for _, h := range p.pipeline.cliHdrls {
-		ctx, err = h.OnStreamWrite(ctx, sendMsg)
+		ctx, err = h.OnStreamWrite(ctx, p.ClientStream, sendMsg)
 		if err != nil {
 			return ctx, err
 		}
@@ -225,7 +225,7 @@ func (p *ClientStreamPipeline) Read(ctx context.Context, msg Message) (context.C
 		return ctx, err
 	}
 	for _, h := range p.pipeline.cliHdrls {
-		ctx, err = h.OnStreamRead(ctx, msg)
+		ctx, err = h.OnStreamRead(ctx, p.ClientStream, msg)
 		if err != nil {
 			return ctx, err
 		}

@@ -25,7 +25,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/remote"
-	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // NewServerLimiterHandler creates a new server limiter handler.
@@ -65,7 +64,7 @@ func (l *serverLimiterHandler) OnRead(ctx context.Context, conn net.Conn) (conte
 	return ctx, nil
 }
 
-func (l *serverLimiterHandler) OnStream(ctx context.Context, stream streaming.ServerStream) (context.Context, error) {
+func (l *serverLimiterHandler) OnStream(ctx context.Context, stream remote.ServerStream) (context.Context, error) {
 	return ctx, nil
 }
 
@@ -76,7 +75,7 @@ func (l *serverLimiterHandler) OnInactive(ctx context.Context, conn net.Conn) co
 }
 
 // OnStreamRead implements the remote.InboundHandler interface.
-func (l *serverLimiterHandler) OnStreamRead(ctx context.Context, args remote.Message) (context.Context, error) {
+func (l *serverLimiterHandler) OnStreamRead(ctx context.Context, st remote.ServerStream, args remote.Message) (context.Context, error) {
 	if l.qpsLimitPostDecode {
 		if l.qpsLimit.Acquire(ctx) {
 			return ctx, nil
@@ -89,7 +88,7 @@ func (l *serverLimiterHandler) OnStreamRead(ctx context.Context, args remote.Mes
 	return ctx, nil
 }
 
-func (l *serverLimiterHandler) OnStreamWrite(ctx context.Context, args remote.Message) (context.Context, error) {
+func (l *serverLimiterHandler) OnStreamWrite(ctx context.Context, st remote.ServerStream, args remote.Message) (context.Context, error) {
 	return ctx, nil
 }
 

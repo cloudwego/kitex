@@ -45,57 +45,18 @@ type cliTransHandler struct {
 	ext       Extension
 }
 
-// Write implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
-	var bufWriter remote.ByteBuffer
-	rpcinfo.Record(ctx, sendMsg.RPCInfo(), stats.WriteStart, nil)
-	defer func() {
-		t.ext.ReleaseBuffer(bufWriter, err)
-		rpcinfo.Record(ctx, sendMsg.RPCInfo(), stats.WriteFinish, err)
-	}()
-
-	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
-	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
-	err = t.codec.Encode(ctx, sendMsg, bufWriter)
-	if err != nil {
-		return ctx, err
-	}
-	return ctx, bufWriter.Flush()
-}
-
-// Read implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, recvMsg remote.Message) (nctx context.Context, err error) {
-	var bufReader remote.ByteBuffer
-	rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadStart, nil)
-	defer func() {
-		t.ext.ReleaseBuffer(bufReader, err)
-		rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadFinish, err)
-	}()
-
-	t.ext.SetReadTimeout(ctx, conn, recvMsg.RPCInfo().Config(), recvMsg.RPCRole())
-	bufReader = t.ext.NewReadByteBuffer(ctx, conn, recvMsg)
-	recvMsg.SetPayloadCodec(t.opt.PayloadCodec)
-	err = t.codec.Decode(ctx, recvMsg, bufReader)
-	if err != nil {
-		if t.ext.IsTimeoutErr(err) {
-			err = kerrors.ErrRPCTimeout.WithCause(err)
-		}
-		return ctx, err
-	}
-
-	return ctx, nil
-}
-
 type cliStream struct {
 	conn net.Conn
 	t    *cliTransHandler
+	ri   rpcinfo.RPCInfo
 	pipe *remote.ClientStreamPipeline
 }
 
-func newCliStream(conn net.Conn, t *cliTransHandler) *cliStream {
+func newCliStream(conn net.Conn, t *cliTransHandler, ri rpcinfo.RPCInfo) *cliStream {
 	return &cliStream{
 		conn: conn,
 		t:    t,
+		ri:   ri,
 	}
 }
 
@@ -155,7 +116,7 @@ func (s *cliStream) CloseSend() error {
 }
 
 func (s *cliStream) RecvMsg(ctx context.Context, resp interface{}) (err error) {
-	ri := rpcinfo.GetRPCInfo(ctx)
+	ri := s.ri
 	recvMsg := remote.NewMessage(resp, ri.Invocation().ServiceInfo(), ri, remote.Reply, remote.Client)
 	defer func() {
 		remote.RecycleMessage(recvMsg)
@@ -165,7 +126,7 @@ func (s *cliStream) RecvMsg(ctx context.Context, resp interface{}) (err error) {
 }
 
 func (s *cliStream) SendMsg(ctx context.Context, req interface{}) (err error) {
-	ri := rpcinfo.GetRPCInfo(ctx)
+	ri := s.ri
 	methodName := ri.Invocation().MethodName()
 	svcInfo := ri.Invocation().ServiceInfo()
 	m := ri.Invocation().MethodInfo()
@@ -185,7 +146,8 @@ func (s *cliStream) SendMsg(ctx context.Context, req interface{}) (err error) {
 }
 
 func (t *cliTransHandler) NewStream(ctx context.Context, conn net.Conn) (streaming.ClientStream, error) {
-	cs := newCliStream(conn, t)
+	ri := rpcinfo.GetRPCInfo(ctx)
+	cs := newCliStream(conn, t, ri)
 	cs.SetPipeline(remote.NewClientStreamPipeline(cs, t.transPipe))
 	return cs, nil
 }

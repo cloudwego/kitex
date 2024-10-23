@@ -36,7 +36,7 @@ type svrMetaHandler struct {
 }
 
 // OnStreamWrite exec before encode
-func (h *svrMetaHandler) OnStreamWrite(ctx context.Context, sendMsg remote.Message) (context.Context, error) {
+func (h *svrMetaHandler) OnStreamWrite(ctx context.Context, st remote.ServerStream, sendMsg remote.Message) (context.Context, error) {
 	var err error
 	for _, hdlr := range h.mhs {
 		ctx, err = hdlr.WriteMeta(ctx, sendMsg)
@@ -47,7 +47,7 @@ func (h *svrMetaHandler) OnStreamWrite(ctx context.Context, sendMsg remote.Messa
 	return ctx, nil
 }
 
-func (h *svrMetaHandler) OnStreamRead(ctx context.Context, msg remote.Message) (nctx context.Context, err error) {
+func (h *svrMetaHandler) OnStreamRead(ctx context.Context, st remote.ServerStream, msg remote.Message) (nctx context.Context, err error) {
 	for _, hdlr := range h.mhs {
 		ctx, err = hdlr.ReadMeta(ctx, msg)
 		if err != nil {
@@ -110,7 +110,7 @@ func (h *cliMetaHandler) OnInactive(ctx context.Context, conn net.Conn) context.
 	return ctx
 }
 
-func (h *cliMetaHandler) OnStreamWrite(ctx context.Context, sendMsg remote.Message) (context.Context, error) {
+func (h *cliMetaHandler) OnStreamWrite(ctx context.Context, st remote.ClientStream, sendMsg remote.Message) (context.Context, error) {
 	var err error
 	for _, hdlr := range h.mhs {
 		ctx, err = hdlr.WriteMeta(ctx, sendMsg)
@@ -121,7 +121,7 @@ func (h *cliMetaHandler) OnStreamWrite(ctx context.Context, sendMsg remote.Messa
 	return ctx, nil
 }
 
-func (h *cliMetaHandler) OnStreamRead(ctx context.Context, msg remote.Message) (nctx context.Context, err error) {
+func (h *cliMetaHandler) OnStreamRead(ctx context.Context, st remote.ClientStream, msg remote.Message) (nctx context.Context, err error) {
 	for _, hdlr := range h.mhs {
 		ctx, err = hdlr.ReadMeta(ctx, msg)
 		if err != nil {

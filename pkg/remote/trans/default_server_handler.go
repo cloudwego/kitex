@@ -79,14 +79,15 @@ func (t *serverTransHandler) newCtxWithRPCInfo(ctx context.Context, conn net.Con
 // OnRead implements the remote.ServerTransHandler interface.
 // The connection should be closed after returning error.
 func (t *serverTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
-	return t.transPipe.OnStream(ctx, newServerStream(conn, t))
+	st := newServerStream(conn, t)
+	streamPipe := remote.NewServerStreamPipeline(st, t.transPipe)
+	st.SetPipeline(streamPipe)
+	return t.transPipe.OnStream(ctx, st)
 }
 
 func (t *serverTransHandler) OnStream(ctx context.Context, stream streaming.ServerStream) (err error) {
 	st := stream.(*svrStream)
 	conn := st.conn
-	streamPipe := remote.NewServerStreamPipeline(st, t.transPipe)
-	st.SetPipeline(streamPipe)
 	ctx, ri := t.newCtxWithRPCInfo(ctx, conn)
 	t.ext.SetReadTimeout(ctx, conn, ri.Config(), remote.Server)
 	closeConnOutsideIfErr := true
@@ -128,7 +129,7 @@ func (t *serverTransHandler) OnStream(ctx context.Context, stream streaming.Serv
 	if err != nil {
 		if errors.Is(err, errHeartbeatMessage) {
 			sendMsg := remote.NewMessage(nil, nil, ri, remote.Heartbeat, remote.Server)
-			ctx, err = streamPipe.Write(ctx, sendMsg)
+			ctx, err = st.pipe.Write(ctx, sendMsg)
 			return err
 		}
 		t.writeErrorReplyIfNeeded(ctx, conn, st, err, ri)
