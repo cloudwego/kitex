@@ -66,7 +66,8 @@ type server struct {
 	targetSvcInfo *serviceinfo.ServiceInfo
 
 	// actual rpc service implement of biz
-	eps      InnerEndpoint
+	eps InnerEndpoint
+	// for compatible with ping pong server
 	unaryEps endpoint.Endpoint
 	svr      remotesvr.Server
 	stopped  sync.Once

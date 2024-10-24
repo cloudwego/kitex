@@ -442,11 +442,11 @@ func (kc *kClient) buildInvokeChain(ctx context.Context) error {
 }
 
 func (kc *kClient) lastCompatibleEndpoint() (endpoint.Endpoint, error) {
-	invokeStreamEp, err := kc.invokeStreamingEndpoint()
+	connectStreamEp, err := kc.connectStreamEndpoint()
 	if err != nil {
 		return nil, err
 	}
-	ep := InnerChain()(invokeStreamEp)
+	ep := InnerChain()(connectStreamEp)
 	return func(ctx context.Context, req, resp interface{}) error {
 		cs, err := ep(ctx)
 		if err != nil {

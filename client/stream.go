@@ -89,7 +89,7 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.Client
 	return kc.sEps(ctx)
 }
 
-func (kc *kClient) invokeStreamingEndpoint() (InnerEndpoint, error) {
+func (kc *kClient) connectStreamEndpoint() (InnerEndpoint, error) {
 	transPipl, err := newCliTransHandler(kc.opt.RemoteOpt)
 	if err != nil {
 		return nil, err
