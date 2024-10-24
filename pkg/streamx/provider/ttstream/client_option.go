@@ -18,15 +18,21 @@ package ttstream
 
 type ClientProviderOption func(cp *clientProvider)
 
-func WithClientMetaHandler(metaHandler MetaFrameHandler) ClientProviderOption {
+func WithClientMetaFrameHandler(handler MetaFrameHandler) ClientProviderOption {
 	return func(cp *clientProvider) {
-		cp.metaHandler = metaHandler
+		cp.metaHandler = handler
 	}
 }
 
-func WithClientHeaderHandler(handler HeaderFrameHandler) ClientProviderOption {
+func WithClientHeaderFrameHandler(handler HeaderFrameWriteHandler) ClientProviderOption {
 	return func(cp *clientProvider) {
 		cp.headerHandler = handler
+	}
+}
+
+func WithClientDisableCancelingTransmit() ClientProviderOption {
+	return func(cp *clientProvider) {
+		cp.disableCancelingTransmit = true
 	}
 }
 

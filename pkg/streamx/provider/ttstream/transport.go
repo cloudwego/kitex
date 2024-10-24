@@ -262,8 +262,8 @@ func (t *transport) loopWrite() error {
 }
 
 // writeFrame is concurrent safe
-func (t *transport) writeFrame(sframe streamFrame, meta IntHeader, ftype int32, payload []byte) (err error) {
-	frame := newFrame(sframe, meta, ftype, payload)
+func (t *transport) writeFrame(sframe streamFrame, ftype int32, payload []byte) (err error) {
+	frame := newFrame(sframe, ftype, payload)
 	return t.fpipe.Write(context.Background(), frame)
 }
 
@@ -285,16 +285,11 @@ func (t *transport) streamSend(ctx context.Context, sid int32, method string, wh
 			rpcStats.IncrSendSize(uint64(len(payload)))
 		}
 	}
-	return t.writeFrame(
-		streamFrame{sid: sid, method: method},
-		nil, dataFrameType, payload,
-	)
+	return t.writeFrame(streamFrame{sid: sid, method: method}, dataFrameType, payload)
 }
 
 func (t *transport) streamSendHeader(sid int32, method string, header streamx.Header) (err error) {
-	return t.writeFrame(
-		streamFrame{sid: sid, method: method, header: header},
-		nil, headerFrameType, nil)
+	return t.writeFrame(streamFrame{sid: sid, method: method, header: header}, headerFrameType, nil)
 }
 
 func (t *transport) streamCloseSend(sid int32, method string, trailer streamx.Trailer, ex tException) (err error) {
@@ -305,10 +300,7 @@ func (t *transport) streamCloseSend(sid int32, method string, trailer streamx.Tr
 			return err
 		}
 	}
-	err = t.writeFrame(
-		streamFrame{sid: sid, method: method, trailer: trailer},
-		nil, trailerFrameType, payload,
-	)
+	err = t.writeFrame(streamFrame{sid: sid, method: method, trailer: trailer}, trailerFrameType, payload)
 	if err != nil {
 		return err
 	}
@@ -384,8 +376,7 @@ func (t *transport) newStreamIO(
 	smode := t.sinfo.MethodInfo(method).StreamingMode()
 	// create stream
 	err := t.writeFrame(
-		streamFrame{sid: sid, method: method, header: strHeader},
-		intHeader, headerFrameType, nil,
+		streamFrame{sid: sid, method: method, meta: intHeader, header: strHeader}, headerFrameType, nil,
 	)
 	if err != nil {
 		return nil, err

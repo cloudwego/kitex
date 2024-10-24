@@ -51,8 +51,9 @@ func NewServerProvider(sinfo *serviceinfo.ServiceInfo, opts ...ServerProviderOpt
 var _ streamx.ServerProvider = (*serverProvider)(nil)
 
 type serverProvider struct {
-	sinfo        *serviceinfo.ServiceInfo
-	payloadLimit int
+	sinfo         *serviceinfo.ServiceInfo
+	metaHandler   MetaFrameHandler
+	headerHandler HeaderFrameReadHandler
 }
 
 func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
@@ -90,6 +91,13 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 	st, err := trans.readStream(ctx)
 	if err != nil {
 		return nil, nil, err
+	}
+	st.setMetaFrameHandler(s.metaHandler)
+	if s.headerHandler != nil {
+		ctx, err = s.headerHandler.OnReadStream(ctx, st.meta, st.header)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	ctx = metainfo.SetMetaInfoFromMap(ctx, st.header)
 	ss := newServerStream(st)

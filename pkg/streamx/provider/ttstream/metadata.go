@@ -29,6 +29,7 @@ var (
 
 // only for meta frame handler
 type IntHeader map[uint16]string
+type StrHeader = streamx.Header
 
 // ClientStreamMeta cannot send header directly, should send from ctx
 type ClientStreamMeta interface {

@@ -48,12 +48,11 @@ var framePool sync.Pool
 
 type Frame struct {
 	streamFrame
-	meta    IntHeader
 	typ     int32
 	payload []byte
 }
 
-func newFrame(sframe streamFrame, meta IntHeader, typ int32, payload []byte) (fr *Frame) {
+func newFrame(sframe streamFrame, typ int32, payload []byte) (fr *Frame) {
 	v := framePool.Get()
 	if v == nil {
 		fr = new(Frame)
@@ -61,7 +60,6 @@ func newFrame(sframe streamFrame, meta IntHeader, typ int32, payload []byte) (fr
 		fr = v.(*Frame)
 	}
 	fr.streamFrame = sframe
-	fr.meta = meta
 	fr.typ = typ
 	fr.payload = payload
 	return fr
@@ -69,7 +67,6 @@ func newFrame(sframe streamFrame, meta IntHeader, typ int32, payload []byte) (fr
 
 func recycleFrame(frame *Frame) {
 	frame.streamFrame = streamFrame{}
-	frame.meta = nil
 	frame.typ = 0
 	frame.payload = nil
 	framePool.Put(frame)
@@ -131,6 +128,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	var ftype int32
 	var fheader streamx.Header
 	var ftrailer streamx.Trailer
+	var fmeta = dp.IntInfo
 	switch dp.IntInfo[ttheader.FrameType] {
 	case ttheader.FrameTypeMeta:
 		ftype = metaFrameType
@@ -163,8 +161,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	}
 
 	fr = newFrame(
-		streamFrame{sid: fsid, method: fmethod, header: fheader, trailer: ftrailer},
-		dp.IntInfo,
+		streamFrame{sid: fsid, method: fmethod, meta: fmeta, header: fheader, trailer: ftrailer},
 		ftype, fpayload,
 	)
 	return fr, nil

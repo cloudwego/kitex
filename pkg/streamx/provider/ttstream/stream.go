@@ -55,6 +55,7 @@ func newStream(trans *transport, mode streamx.StreamingMode, smeta streamFrame) 
 type streamFrame struct {
 	sid     int32
 	method  string
+	meta    IntHeader
 	header  streamx.Header // key:value, key is full name
 	trailer streamx.Trailer
 }

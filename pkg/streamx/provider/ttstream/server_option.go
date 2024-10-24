@@ -18,8 +18,14 @@ package ttstream
 
 type ServerProviderOption func(pc *serverProvider)
 
-func WithServerPayloadLimit(limit int) ServerProviderOption {
-	return func(s *serverProvider) {
-		s.payloadLimit = limit
+func WithServerMetaFrameHandler(handler MetaFrameHandler) ServerProviderOption {
+	return func(cp *serverProvider) {
+		cp.metaHandler = handler
+	}
+}
+
+func WithServerHeaderFrameHandler(handler HeaderFrameReadHandler) ServerProviderOption {
+	return func(cp *serverProvider) {
+		cp.headerHandler = handler
 	}
 }

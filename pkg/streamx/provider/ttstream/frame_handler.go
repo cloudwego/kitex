@@ -18,10 +18,17 @@ package ttstream
 
 import (
 	"context"
-
-	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 type HeaderFrameHandler interface {
-	OnStream(ctx context.Context) (IntHeader, streamx.Header, error)
+	HeaderFrameReadHandler
+	HeaderFrameWriteHandler
+}
+
+type HeaderFrameWriteHandler interface {
+	OnWriteStream(ctx context.Context) (ihd IntHeader, shd StrHeader, err error)
+}
+
+type HeaderFrameReadHandler interface {
+	OnReadStream(ctx context.Context, ihd IntHeader, shd StrHeader) (context.Context, error)
 }
