@@ -100,6 +100,7 @@ type svrTransHandler struct {
 }
 
 type svrStream struct {
+	streaming.ServerStream
 	conn   net.Conn
 	reader netpoll.Reader
 	ctx    context.Context
@@ -172,43 +173,6 @@ func (s *svrStream) Read(ctx context.Context, msg remote.Message) (nctx context.
 	return ctx, nil
 }
 
-func (s *svrStream) RecvMsg(m interface{}) (err error) {
-	var recvMsg remote.Message
-	defer func() {
-		remote.RecycleMessage(recvMsg)
-	}()
-	recvMsg = remote.NewMessage(nil, nil, s.ri, remote.Call, remote.Server)
-	recvMsg.SetPayloadCodec(s.t.opt.PayloadCodec)
-	_, err = s.pipe.Read(s.ctx, recvMsg)
-	rm := m.(*serviceinfo.PingPongCompatibleMethodArgs)
-	rm.Data = recvMsg.Data()
-	return
-}
-
-func (s *svrStream) SendMsg(m interface{}) (err error) {
-	var sendMsg remote.Message
-	defer func() {
-		remote.RecycleMessage(sendMsg)
-	}()
-	svcInfo := s.ri.Invocation().ServiceInfo()
-	sendMsg = remote.NewMessage(m, svcInfo, s.ri, remote.Reply, remote.Server)
-	sendMsg.SetPayloadCodec(s.t.opt.PayloadCodec)
-	_, err = s.pipe.Write(s.ctx, sendMsg)
-	return
-}
-
-func (s *svrStream) SetHeader(streaming.Header) error {
-	panic("not implemented streaming method for default server handler")
-}
-
-func (s *svrStream) SendHeader(streaming.Header) error {
-	panic("not implemented streaming method for default server handler")
-}
-
-func (s *svrStream) SetTrailer(streaming.Trailer) error {
-	panic("not implemented streaming method for default server handler")
-}
-
 // OnRead implements the remote.ServerTransHandler interface.
 // Returns write err only.
 func (t *svrTransHandler) OnRead(muxSvrConnCtx context.Context, conn net.Conn) error {
@@ -268,7 +232,8 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	}
 	rpcInfoCtx := rpcinfo.NewCtxWithRPCInfo(muxSvrConnCtx, rpcInfo)
 	st := newSvrStream(conn, reader, rpcInfoCtx, t, rpcInfo)
-	st.pipe.Initialize(st, t.transPipe)
+	dst := trans.NewDefaultServerStream(rpcInfoCtx, rpcInfo, remote.NewServerStreamPipeline(st, t.transPipe))
+	st.ServerStream = dst
 	// finish error handling inside OnStream
 	_ = t.transPipe.OnStream(rpcInfoCtx, st)
 }

@@ -45,28 +45,12 @@ type cliTransHandler struct {
 	ext       Extension
 }
 
-type cliStream struct {
+type cliRemoteStream struct {
 	conn net.Conn
-	ctx  context.Context
 	t    *cliTransHandler
-	ri   rpcinfo.RPCInfo
-	pipe remote.ClientStreamPipeline
 }
 
-func newCliStream(ctx context.Context, conn net.Conn, t *cliTransHandler, ri rpcinfo.RPCInfo) *cliStream {
-	return &cliStream{
-		conn: conn,
-		ctx:  ctx,
-		t:    t,
-		ri:   ri,
-	}
-}
-
-func (s *cliStream) SetRemoteStream(cs remote.ClientStream) {
-	s.pipe.ResetStream(cs)
-}
-
-func (s *cliStream) Write(ctx context.Context, sendMsg remote.Message) (nctx context.Context, err error) {
+func (s *cliRemoteStream) Write(ctx context.Context, sendMsg remote.Message) (nctx context.Context, err error) {
 	var bufWriter remote.ByteBuffer
 	rpcinfo.Record(ctx, sendMsg.RPCInfo(), stats.WriteStart, nil)
 	defer func() {
@@ -83,7 +67,7 @@ func (s *cliStream) Write(ctx context.Context, sendMsg remote.Message) (nctx con
 	return ctx, bufWriter.Flush()
 }
 
-func (s *cliStream) Read(ctx context.Context, recvMsg remote.Message) (nctx context.Context, err error) {
+func (s *cliRemoteStream) Read(ctx context.Context, recvMsg remote.Message) (nctx context.Context, err error) {
 	var bufReader remote.ByteBuffer
 	rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadStart, nil)
 	defer func() {
@@ -103,6 +87,32 @@ func (s *cliStream) Read(ctx context.Context, recvMsg remote.Message) (nctx cont
 	}
 
 	return ctx, nil
+}
+
+type cliStream struct {
+	cliRemoteStream
+	ctx  context.Context
+	ri   rpcinfo.RPCInfo
+	pipe remote.ClientStreamPipeline
+}
+
+func newCliStream(ctx context.Context, ri rpcinfo.RPCInfo, conn net.Conn, t *cliTransHandler) *cliStream {
+	return &cliStream{
+		ctx: ctx,
+		ri:  ri,
+		cliRemoteStream: cliRemoteStream{
+			conn: conn,
+			t:    t,
+		},
+	}
+}
+
+func NewDefaultClientStream(ctx context.Context, ri rpcinfo.RPCInfo, pipe remote.ClientStreamPipeline) streaming.ClientStream {
+	return &cliStream{
+		ctx:  ctx,
+		ri:   ri,
+		pipe: pipe,
+	}
 }
 
 func (s *cliStream) Header() (streaming.Header, error) {
@@ -149,7 +159,7 @@ func (s *cliStream) SendMsg(req interface{}) (err error) {
 
 func (t *cliTransHandler) NewStream(ctx context.Context, conn net.Conn) (streaming.ClientStream, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
-	cs := newCliStream(ctx, conn, t, ri)
+	cs := newCliStream(ctx, ri, conn, t)
 	cs.pipe.Initialize(cs, t.transPipe)
 	return cs, nil
 }

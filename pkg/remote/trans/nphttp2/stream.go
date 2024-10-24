@@ -49,10 +49,6 @@ func (s *serverStreamX) GetGRPCStream() streaming.Stream {
 	return s.grpcStream
 }
 
-func (s *serverStreamX) SetRemoteStream(ss remote.ServerStream) {
-	s.pipe.ResetStream(ss)
-}
-
 // newServerStream ...
 func newServerStream(ctx context.Context, ri rpcinfo.RPCInfo, conn *serverConn, t *svrTransHandler, rawConn net.Conn) *serverStreamX {
 	sx := &serverStreamX{
@@ -234,10 +230,6 @@ func (s *clientStream) RecvMsg(m interface{}) error {
 
 func (s *clientStream) SendMsg(m interface{}) error {
 	return s.sx.SendMsg(m)
-}
-
-func (s *clientStreamX) SetRemoteStream(cs remote.ClientStream) {
-	s.pipe.ResetStream(cs)
 }
 
 func (s *clientStreamX) Header() (streaming.Header, error) {

@@ -163,6 +163,10 @@ func (p *ClientTransPipeline) NewStream(ctx context.Context, conn net.Conn) (st 
 	return p.ClientTransHandler.NewStream(ctx, conn)
 }
 
+func NewServerStreamPipeline(st ServerStream, pipeline *ServerTransPipeline) ServerStreamPipeline {
+	return ServerStreamPipeline{ServerStream: st, pipeline: pipeline}
+}
+
 type ServerStreamPipeline struct {
 	ServerStream
 
@@ -172,10 +176,6 @@ type ServerStreamPipeline struct {
 func (p *ServerStreamPipeline) Initialize(ss ServerStream, pipeline *ServerTransPipeline) {
 	p.ServerStream = ss
 	p.pipeline = pipeline
-}
-
-func (p *ServerStreamPipeline) ResetStream(ss ServerStream) {
-	p.ServerStream = ss
 }
 
 func (p *ServerStreamPipeline) Write(ctx context.Context, sendMsg Message) (nctx context.Context, err error) {
@@ -216,10 +216,6 @@ type ClientStreamPipeline struct {
 func (p *ClientStreamPipeline) Initialize(st ClientStream, pipeline *ClientTransPipeline) {
 	p.ClientStream = st
 	p.pipeline = pipeline
-}
-
-func (p *ClientStreamPipeline) ResetStream(st ClientStream) {
-	p.ClientStream = st
 }
 
 func (p *ClientStreamPipeline) Write(ctx context.Context, sendMsg Message) (nctx context.Context, err error) {

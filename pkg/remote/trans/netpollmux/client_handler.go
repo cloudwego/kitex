@@ -70,9 +70,9 @@ type cliTransHandler struct {
 
 func (t *cliTransHandler) NewStream(ctx context.Context, conn net.Conn) (streaming.ClientStream, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
-	cs := newCliStream(ctx, conn, t, ri)
-	cs.pipe.Initialize(cs, t.transPipe)
-	return cs, nil
+	cs := newCliStream(ctx, conn, t)
+	dcs := trans.NewDefaultClientStream(ctx, ri, remote.NewClientStreamPipeline(cs, t.transPipe))
+	return dcs, nil
 }
 
 // OnInactive implements the remote.ClientTransHandler interface.
@@ -98,16 +98,14 @@ type cliStream struct {
 	conn net.Conn
 	ctx  context.Context
 	t    *cliTransHandler
-	ri   rpcinfo.RPCInfo
 	pipe remote.ClientStreamPipeline
 }
 
-func newCliStream(ctx context.Context, conn net.Conn, t *cliTransHandler, ri rpcinfo.RPCInfo) *cliStream {
+func newCliStream(ctx context.Context, conn net.Conn, t *cliTransHandler) *cliStream {
 	return &cliStream{
 		conn: conn,
 		ctx:  ctx,
 		t:    t,
-		ri:   ri,
 	}
 }
 
@@ -199,48 +197,6 @@ func (s *cliStream) Read(ctx context.Context, msg remote.Message) (nctx context.
 		rpcinfo.Record(ctx, ri, stats.ReadFinish, err)
 		return ctx, err
 	}
-}
-
-func (s *cliStream) Header() (streaming.Header, error) {
-	panic("not implemented streaming method for default client handler")
-}
-
-func (s *cliStream) Trailer() (streaming.Trailer, error) {
-	panic("not implemented streaming method for default client handler")
-}
-
-func (s *cliStream) CloseSend() error {
-	return nil
-}
-
-func (s *cliStream) RecvMsg(resp interface{}) (err error) {
-	ri := s.ri
-	recvMsg := remote.NewMessage(resp, ri.Invocation().ServiceInfo(), ri, remote.Reply, remote.Client)
-	defer func() {
-		remote.RecycleMessage(recvMsg)
-	}()
-	_, err = s.pipe.Read(s.ctx, recvMsg)
-	return err
-}
-
-func (s *cliStream) SendMsg(req interface{}) (err error) {
-	ri := s.ri
-	ink := ri.Invocation()
-	svcInfo := ink.ServiceInfo()
-	m := ink.MethodInfo()
-	var sendMsg remote.Message
-	if m == nil {
-		return fmt.Errorf("method info is nil, methodName=%s, serviceInfo=%+v", ink.MethodName(), svcInfo)
-	} else if m.OneWay() {
-		sendMsg = remote.NewMessage(req, svcInfo, ri, remote.Oneway, remote.Client)
-	} else {
-		sendMsg = remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
-	}
-	defer func() {
-		remote.RecycleMessage(sendMsg)
-	}()
-	_, err = s.pipe.Write(s.ctx, sendMsg)
-	return err
 }
 
 type asyncCallback struct {

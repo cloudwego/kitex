@@ -54,21 +54,15 @@ func newHTTPCliTransHandler(opt *remote.ClientOption, ext trans.Extension) (remo
 
 type httpCliTransHandler struct {
 	remote.ClientTransHandler
-	codec remote.Codec
-	ext   trans.Extension
+	codec     remote.Codec
+	ext       trans.Extension
+	transPipe *remote.ClientTransPipeline
 }
 
 func (t *httpCliTransHandler) NewStream(ctx context.Context, conn net.Conn) (streaming.ClientStream, error) {
-	stream, err := t.ClientTransHandler.NewStream(ctx, conn)
-	if err != nil {
-		return nil, err
-	}
-	setter, ok := stream.(remote.ClientStreamSetter)
-	if !ok {
-		return nil, fmt.Errorf("stream[%T] not implement remote.ClientStreamSetter", stream)
-	}
-	setter.SetRemoteStream(newHttpCliStream(conn, t))
-	return stream, nil
+	ri := rpcinfo.GetRPCInfo(ctx)
+	st := trans.NewDefaultClientStream(ctx, ri, remote.NewClientStreamPipeline(newHttpCliStream(conn, t), t.transPipe))
+	return st, nil
 }
 
 // OnError implements the remote.ClientTransHandler interface.
@@ -78,6 +72,11 @@ func (t *httpCliTransHandler) OnError(ctx context.Context, err error, conn net.C
 	if errors.As(err, &pe) {
 		klog.CtxErrorf(ctx, "KITEX: send http request error, remote=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
 	}
+}
+
+func (t *httpCliTransHandler) SetPipeline(pipeline *remote.ClientTransPipeline) {
+	t.transPipe = pipeline
+	t.ClientTransHandler.SetPipeline(pipeline)
 }
 
 func newHttpCliStream(conn net.Conn, t *httpCliTransHandler) *httpClientStream {
