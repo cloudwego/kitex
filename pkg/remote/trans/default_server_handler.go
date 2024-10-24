@@ -365,64 +365,6 @@ func NewDefaultServerStream(ctx context.Context, ri rpcinfo.RPCInfo, pipeline re
 	}
 }
 
-func (s *svrStream) Write(ctx context.Context, sendMsg remote.Message) (nctx context.Context, err error) {
-	var bufWriter remote.ByteBuffer
-	ri := sendMsg.RPCInfo()
-	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
-	defer func() {
-		s.t.ext.ReleaseBuffer(bufWriter, err)
-		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
-	}()
-
-	svcInfo := ri.Invocation().ServiceInfo()
-	if svcInfo != nil {
-		if methodInfo, _ := GetMethodInfo(ri, svcInfo); methodInfo != nil {
-			if methodInfo.OneWay() {
-				return ctx, nil
-			}
-		}
-	}
-
-	bufWriter = s.t.ext.NewWriteByteBuffer(ctx, s.conn, sendMsg)
-	err = s.t.codec.Encode(ctx, sendMsg, bufWriter)
-	if err != nil {
-		return ctx, err
-	}
-	return ctx, bufWriter.Flush()
-}
-
-func (s *svrStream) Read(ctx context.Context, recvMsg remote.Message) (nctx context.Context, err error) {
-	var bufReader remote.ByteBuffer
-	defer func() {
-		s.t.ext.ReleaseBuffer(bufReader, err)
-		rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadFinish, err)
-	}()
-	rpcinfo.Record(ctx, recvMsg.RPCInfo(), stats.ReadStart, nil)
-
-	bufReader = s.t.ext.NewReadByteBuffer(ctx, s.conn, recvMsg)
-	if codec, ok := s.t.codec.(remote.MetaDecoder); ok {
-		if err = codec.DecodeMeta(ctx, recvMsg, bufReader); err == nil {
-			if s.t.opt.Profiler != nil && s.t.opt.ProfilerTransInfoTagging != nil && recvMsg.TransInfo() != nil {
-				var tags []string
-				ctx, tags = s.t.opt.ProfilerTransInfoTagging(ctx, recvMsg)
-				ctx = s.t.opt.Profiler.Tag(ctx, tags...)
-			}
-			err = codec.DecodePayload(ctx, recvMsg, bufReader)
-		}
-	} else {
-		err = s.t.codec.Decode(ctx, recvMsg, bufReader)
-	}
-	if err != nil {
-		recvMsg.Tags()[remote.ReadFailed] = true
-		return ctx, err
-	}
-	if recvMsg.MessageType() == remote.Heartbeat {
-		// for heartbeat protocols, not graceful, need to be adjusted
-		return ctx, errHeartbeatMessage
-	}
-	return ctx, nil
-}
-
 // TODO: splitting meta and payload codec.
 func (s *svrStream) RecvMsg(m interface{}) (err error) {
 	var recvMsg remote.Message
