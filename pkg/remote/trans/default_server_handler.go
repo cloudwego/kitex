@@ -68,9 +68,7 @@ func (t *serverTransHandler) newCtxWithRPCInfo(ctx context.Context, conn net.Con
 	}
 	// new rpcinfo if reuse is disabled
 	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
-	if t.targetSvcInfo != nil {
-		ri.Invocation().(rpcinfo.InvocationSetter).SetServiceInfo(t.targetSvcInfo)
-	} else {
+	if t.targetSvcInfo == nil {
 		ri = NewPingPongRPCInfo(ri, t.targetSvcInfo, t.svcSearcher)
 	}
 	return rpcinfo.NewCtxWithRPCInfo(ctx, ri), ri
@@ -80,6 +78,9 @@ func (t *serverTransHandler) newCtxWithRPCInfo(ctx context.Context, conn net.Con
 // The connection should be closed after returning error.
 func (t *serverTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
 	ctx, ri := t.newCtxWithRPCInfo(ctx, conn)
+	if t.targetSvcInfo != nil {
+		ri.Invocation().(rpcinfo.InvocationSetter).SetServiceInfo(t.targetSvcInfo)
+	}
 	st := newServerStream(ctx, conn, t, ri)
 	st.pipe.Initialize(st, t.transPipe)
 	return t.transPipe.OnStream(ctx, st)
@@ -164,6 +165,9 @@ func (t *serverTransHandler) OnStream(ctx context.Context, stream streaming.Serv
 func (t *serverTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	// init rpcinfo
 	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
+	if t.targetSvcInfo == nil {
+		ri = NewPingPongRPCInfo(ri, t.targetSvcInfo, t.svcSearcher)
+	}
 	return rpcinfo.NewCtxWithRPCInfo(ctx, ri), nil
 }
 

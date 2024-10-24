@@ -68,7 +68,6 @@ type Client interface {
 
 type kClient struct {
 	svcInfo *serviceinfo.ServiceInfo
-	mws     []endpoint.Middleware
 	eps     UnaryEndpoint
 	sEps    StreamEndpoint
 	opt     *client.Options
@@ -130,11 +129,10 @@ func (kc *kClient) init() (err error) {
 		return err
 	}
 	ctx := kc.initContext()
-	kc.initMiddlewares(ctx)
 	kc.initStreamMiddlewares(ctx)
 	kc.initDebugService()
 	kc.richRemoteOption()
-	if err = kc.buildInvokeChain(); err != nil {
+	if err = kc.buildInvokeChain(ctx); err != nil {
 		return err
 	}
 	if err = kc.warmingUp(); err != nil {
@@ -274,26 +272,27 @@ func (kc *kClient) initLBCache() error {
 	return nil
 }
 
-func (kc *kClient) initMiddlewares(ctx context.Context) {
+func (kc *kClient) initCompatibleMiddlewares(ctx context.Context) (mws []endpoint.Middleware) {
 	builderMWs := richMWsWithBuilder(ctx, kc.opt.MWBs)
 	// integrate xds if enabled
 	if kc.opt.XDSEnabled && kc.opt.XDSRouterMiddleware != nil && kc.opt.Proxy == nil {
-		kc.mws = append(kc.mws, kc.opt.XDSRouterMiddleware)
+		mws = append(mws, kc.opt.XDSRouterMiddleware)
 	}
-	kc.mws = append(kc.mws, kc.opt.CBSuite.ServiceCBMW(), rpcTimeoutMW(ctx), contextMW)
-	kc.mws = append(kc.mws, builderMWs...)
-	kc.mws = append(kc.mws, acl.NewACLMiddleware(kc.opt.ACLRules))
+	mws = append(mws, kc.opt.CBSuite.ServiceCBMW(), rpcTimeoutMW(ctx), contextMW)
+	mws = append(mws, builderMWs...)
+	mws = append(mws, acl.NewACLMiddleware(kc.opt.ACLRules))
 	if kc.opt.Proxy == nil {
-		kc.mws = append(kc.mws, newResolveMWBuilder(kc.lbf)(ctx))
-		kc.mws = append(kc.mws, kc.opt.CBSuite.InstanceCBMW())
-		kc.mws = append(kc.mws, richMWsWithBuilder(ctx, kc.opt.IMWBs)...)
+		mws = append(mws, newResolveMWBuilder(kc.lbf)(ctx))
+		mws = append(mws, kc.opt.CBSuite.InstanceCBMW())
+		mws = append(mws, richMWsWithBuilder(ctx, kc.opt.IMWBs)...)
 	} else {
 		if kc.opt.Resolver != nil { // customized service discovery
-			kc.mws = append(kc.mws, newResolveMWBuilder(kc.lbf)(ctx))
+			mws = append(mws, newResolveMWBuilder(kc.lbf)(ctx))
 		}
-		kc.mws = append(kc.mws, newProxyMW(kc.opt.Proxy))
+		mws = append(mws, newProxyMW(kc.opt.Proxy))
 	}
-	kc.mws = append(kc.mws, newIOErrorHandleMW(kc.opt.ErrHandle))
+	mws = append(mws, newIOErrorHandleMW(kc.opt.ErrHandle))
+	return
 }
 
 func (kc *kClient) initStreamMiddlewares(ctx context.Context) {
@@ -428,26 +427,26 @@ func (kc *kClient) richRemoteOption() {
 	}
 }
 
-func (kc *kClient) buildInvokeChain() error {
-	if uep, err := kc.finalUnaryEndpoint(); err != nil {
+func (kc *kClient) buildInvokeChain(ctx context.Context) error {
+	if uep, err := kc.finalUnaryEndpoint(ctx); err != nil {
 		return err
 	} else {
-		kc.eps = UnaryChain(nil)(uep)
+		kc.eps = UnaryChain()(uep)
 	}
-	if sep, err := kc.finalStreamEndpoint(); err != nil {
+	if sep, err := kc.finalStreamEndpoint(ctx); err != nil {
 		return err
 	} else {
-		kc.sEps = StreamChain(nil)(sep)
+		kc.sEps = StreamChain()(sep)
 	}
 	return nil
 }
 
-func (kc *kClient) compatibleEndpoint() (endpoint.Endpoint, error) {
+func (kc *kClient) lastCompatibleEndpoint() (endpoint.Endpoint, error) {
 	invokeStreamEp, err := kc.invokeStreamingEndpoint()
 	if err != nil {
 		return nil, err
 	}
-	ep := InnerChain(nil)(invokeStreamEp)
+	ep := InnerChain()(invokeStreamEp)
 	return func(ctx context.Context, req, resp interface{}) error {
 		cs, err := ep(ctx)
 		if err != nil {
@@ -471,21 +470,23 @@ func (kc *kClient) compatibleEndpoint() (endpoint.Endpoint, error) {
 	}, nil
 }
 
-func (kc *kClient) finalUnaryEndpoint() (UnaryEndpoint, error) {
-	ep, err := kc.compatibleEndpoint()
+func (kc *kClient) finalUnaryEndpoint(ctx context.Context) (UnaryEndpoint, error) {
+	lep, err := kc.lastCompatibleEndpoint()
 	if err != nil {
 		return nil, err
 	}
-	return func(ctx context.Context, req, resp interface{}) (err error) {
-		return ep(ctx, req, resp)
-	}, nil
+	mws := kc.initCompatibleMiddlewares(ctx)
+	ep := endpoint.Chain(mws...)(lep)
+	return UnaryEndpoint(ep), nil
 }
 
-func (kc *kClient) finalStreamEndpoint() (StreamEndpoint, error) {
-	ep, err := kc.compatibleEndpoint()
+func (kc *kClient) finalStreamEndpoint(ctx context.Context) (StreamEndpoint, error) {
+	lep, err := kc.lastCompatibleEndpoint()
 	if err != nil {
 		return nil, err
 	}
+	mws := kc.initCompatibleMiddlewares(ctx)
+	ep := endpoint.Chain(mws...)(lep)
 	return func(ctx context.Context) (st streaming.ClientStream, err error) {
 		resp := &streaming.Result{}
 		err = ep(ctx, nil, resp)

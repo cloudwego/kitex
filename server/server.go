@@ -154,7 +154,7 @@ func (s *server) buildInnerMiddlewares(ctx context.Context) []InnerMiddleware {
 	return nil
 }
 
-func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
+func (s *server) compatibleMiddlewares(ctx context.Context) []endpoint.Middleware {
 	var mws []endpoint.Middleware
 	// register server timeout middleware
 	// prepend for adding timeout to the context for all middlewares and the handler
@@ -177,8 +177,8 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 
 func (s *server) buildInvokeChain(ctx context.Context) {
 	imws := s.buildInnerMiddlewares(ctx)
-	compatibleEp := s.compatibleEndpoint(ctx)
-	s.eps = InnerChain(imws...)(compatibleEp)
+	iep := s.lastInnerEndpoint(ctx)
+	s.eps = InnerChain(imws...)(iep)
 }
 
 // RegisterService should not be called by users directly.
@@ -360,7 +360,7 @@ func (s *server) buildCoreMiddleware() endpoint.Middleware {
 	}
 }
 
-func (s *server) upperLayerEndpoint(ctx context.Context) endpoint.Endpoint {
+func (s *server) lastCompatibleEndpoint(ctx context.Context) endpoint.Endpoint {
 	unaryMw := s.buildUnaryMiddlewares()
 	unaryEp := UnaryChain(unaryMw...)(s.invokeHandleEndpoint())
 
@@ -390,10 +390,10 @@ func (s *server) serviceAndMethodInfo(ri rpcinfo.RPCInfo) (svcInfo *serviceinfo.
 	return nil, nil, nil
 }
 
-func (s *server) compatibleEndpoint(ctx context.Context) InnerEndpoint {
-	upperLayerEp := s.upperLayerEndpoint(ctx)
-	mws := s.buildMiddlewares(ctx)
-	ep := endpoint.Chain(mws...)(upperLayerEp)
+func (s *server) lastInnerEndpoint(ctx context.Context) InnerEndpoint {
+	cep := s.lastCompatibleEndpoint(ctx)
+	mws := s.compatibleMiddlewares(ctx)
+	ep := endpoint.Chain(mws...)(cep)
 	s.unaryEps = ep
 	recvEndpoint := s.opt.Streaming.BuildRecvInvokeChain(invokeRecvEndpoint())
 	sendEndpoint := s.opt.Streaming.BuildSendInvokeChain(invokeSendEndpoint())

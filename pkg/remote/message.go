@@ -17,7 +17,6 @@
 package remote
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -98,18 +97,6 @@ func NewMessage(data interface{}, svcInfo *serviceinfo.ServiceInfo, ri rpcinfo.R
 	return msg
 }
 
-// NewMessageWithNewer creates a new Message and set data later.
-func NewMessageWithNewer(targetSvcInfo *serviceinfo.ServiceInfo, svcSearcher ServiceSearcher, ri rpcinfo.RPCInfo, msgType MessageType, rpcRole RPCRole) Message {
-	msg := messagePool.Get().(*message)
-	msg.rpcInfo = ri
-	msg.targetSvcInfo = targetSvcInfo
-	msg.svcSearcher = svcSearcher
-	msg.msgType = msgType
-	msg.rpcRole = rpcRole
-	msg.transInfo = transInfoPool.Get().(*transInfo)
-	return msg
-}
-
 // RecycleMessage is used to recycle message.
 func RecycleMessage(msg Message) {
 	if msg != nil {
@@ -126,7 +113,6 @@ type message struct {
 	data          interface{}
 	rpcInfo       rpcinfo.RPCInfo
 	targetSvcInfo *serviceinfo.ServiceInfo
-	svcSearcher   ServiceSearcher
 	rpcRole       RPCRole
 	compressType  CompressType
 	payloadSize   int
@@ -157,25 +143,6 @@ func (m *message) RPCInfo() rpcinfo.RPCInfo {
 	return m.rpcInfo
 }
 
-func (m *message) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error) {
-	// for single service scenario
-	if m.targetSvcInfo != nil {
-		if mt := m.targetSvcInfo.MethodInfo(methodName); mt == nil {
-			return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
-		}
-		return m.targetSvcInfo, nil
-	}
-	svcInfo := m.svcSearcher.SearchService(svcName, methodName, false)
-	if svcInfo == nil {
-		return nil, NewTransErrorWithMsg(UnknownService, fmt.Sprintf("unknown service %s, method %s", svcName, methodName))
-	}
-	if _, ok := svcInfo.Methods[methodName]; !ok {
-		return nil, NewTransErrorWithMsg(UnknownMethod, fmt.Sprintf("unknown method %s (service %s)", methodName, svcName))
-	}
-	m.targetSvcInfo = svcInfo
-	return svcInfo, nil
-}
-
 // Data implements the Message interface.
 func (m *message) Data() interface{} {
 	return m.data
@@ -186,7 +153,7 @@ func (m *message) NewData(method string) (ok bool) {
 	if m.data != nil {
 		return false
 	}
-	if mt := m.targetSvcInfo.MethodInfo(method); mt != nil {
+	if mt := m.rpcInfo.Invocation().MethodInfo(); mt != nil {
 		m.data = mt.NewArgs()
 	}
 	if m.data == nil {
