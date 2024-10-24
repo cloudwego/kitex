@@ -404,7 +404,7 @@ func (s *server) compatibleEndpoint(ctx context.Context) InnerEndpoint {
 			streaming.UnaryCompatibleMiddleware(stMode, s.opt.RemoteOpt.CompatibleMiddlewareForUnary) {
 			// unary mode
 			args := ri.Invocation().MethodInfo().NewArgs()
-			err = st.RecvMsg(ctx, args)
+			err = st.RecvMsg(args)
 			if err != nil {
 				return err
 			}
@@ -413,7 +413,7 @@ func (s *server) compatibleEndpoint(ctx context.Context) InnerEndpoint {
 			if err != nil {
 				return err
 			}
-			return st.SendMsg(ctx, result)
+			return st.SendMsg(result)
 		}
 		st = newStream(ctx, st, sendEndpoint, recvEndpoint)
 		args := &streaming.Args{ServerStream: st}

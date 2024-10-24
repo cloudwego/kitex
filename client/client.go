@@ -456,10 +456,10 @@ func (kc *kClient) compatibleEndpoint() (endpoint.Endpoint, error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		stMode := ri.Invocation().MethodInfo().StreamingMode()
 		if stMode == serviceinfo.StreamingNone || stMode == serviceinfo.StreamingUnary {
-			if err := cs.SendMsg(ctx, req); err != nil {
+			if err := cs.SendMsg(req); err != nil {
 				return err
 			}
-			return cs.RecvMsg(ctx, resp)
+			return cs.RecvMsg(resp)
 		} else {
 			result := resp.(*streaming.Result)
 			result.ClientStream = cs

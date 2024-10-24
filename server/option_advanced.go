@@ -148,31 +148,18 @@ func WithErrorHandler(f func(context.Context, error) error) Option {
 	}}
 }
 
-// WithBoundHandler adds remote.BoundHandler for server.
-func WithBoundHandler(h remote.BoundHandler) Option {
+// WithPipelineHandler adds remote.BoundHandler for server.
+func WithPipelineHandler(h remote.ServerPipelineHandler) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		di.Push(fmt.Sprintf("AddBoundHandler(%T)", h))
-
-		exist := false
-		switch handler := h.(type) {
-		case remote.InboundHandler:
-			for _, inboundHandler := range o.RemoteOpt.Inbounds {
-				if reflect.DeepEqual(inboundHandler, handler) {
-					exist = true
-					break
-				}
-			}
-		case remote.OutboundHandler:
-			for _, outboundHandler := range o.RemoteOpt.Outbounds {
-				if reflect.DeepEqual(outboundHandler, handler) {
-					exist = true
-					break
-				}
+		di.Push(fmt.Sprintf("WithPipelineHandler(%T)", h))
+		var exist bool
+		for _, handler := range o.RemoteOpt.ServerPipelineHandlers {
+			if reflect.DeepEqual(handler, h) {
+				exist = true
 			}
 		}
-		// prevent duplication
 		if !exist {
-			doAddBoundHandler(h, o.RemoteOpt)
+			o.RemoteOpt.AppendPipelineHandler(h)
 		} else {
 			klog.Warnf("KITEX: BoundHandler already exists, BoundHandler=%v", h)
 		}

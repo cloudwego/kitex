@@ -50,7 +50,7 @@ type cliStream struct {
 	ctx  context.Context
 	t    *cliTransHandler
 	ri   rpcinfo.RPCInfo
-	pipe *remote.ClientStreamPipeline
+	pipe remote.ClientStreamPipeline
 }
 
 func newCliStream(ctx context.Context, conn net.Conn, t *cliTransHandler, ri rpcinfo.RPCInfo) *cliStream {
@@ -62,8 +62,8 @@ func newCliStream(ctx context.Context, conn net.Conn, t *cliTransHandler, ri rpc
 	}
 }
 
-func (s *cliStream) SetPipeline(pipe *remote.ClientStreamPipeline) {
-	s.pipe = pipe
+func (s *cliStream) SetRemoteStream(cs remote.ClientStream) {
+	s.pipe.ResetStream(cs)
 }
 
 func (s *cliStream) Write(ctx context.Context, sendMsg remote.Message) (nctx context.Context, err error) {
@@ -150,7 +150,7 @@ func (s *cliStream) SendMsg(req interface{}) (err error) {
 func (t *cliTransHandler) NewStream(ctx context.Context, conn net.Conn) (streaming.ClientStream, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	cs := newCliStream(ctx, conn, t, ri)
-	cs.SetPipeline(remote.NewClientStreamPipeline(cs, t.transPipe))
+	cs.pipe.Initialize(cs, t.transPipe)
 	return cs, nil
 }
 

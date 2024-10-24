@@ -98,7 +98,7 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	}
 	isCompressed := compressor != nil
 
-	switch message.ProtocolInfo().CodecType {
+	switch message.RPCInfo().Config().PayloadCodec() {
 	case serviceinfo.Thrift:
 		payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
 	case serviceinfo.Protobuf:
@@ -185,7 +185,7 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	}
 	message.SetPayloadLen(len(d))
 	data := message.Data()
-	switch message.ProtocolInfo().CodecType {
+	switch message.RPCInfo().Config().PayloadCodec() {
 	case serviceinfo.Thrift:
 		return thrift.UnmarshalThriftData(ctx, c.ThriftCodec, "", d, message.Data())
 	case serviceinfo.Protobuf:

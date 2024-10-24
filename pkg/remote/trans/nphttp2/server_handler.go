@@ -191,7 +191,7 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	remote.SetSendCompressor(ri, s.SendCompress())
 
 	streamx := newServerStream(rCtx, ri, newServerConn(tr, s), t, conn)
-	streamx.SetPipeline(remote.NewServerStreamPipeline(streamx, t.transPipe))
+	streamx.pipe.Initialize(streamx, t.transPipe)
 	// inject streamx so that GetServerConn only relies on it
 	rCtx = context.WithValue(rCtx, serverConnKey{}, streamx)
 	// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go

@@ -52,3 +52,11 @@ func (p *profilerMetaHandler) ReadMeta(ctx context.Context, msg Message) (contex
 	ctx, tags := p.tagging(ctx, msg)
 	return p.profiler.Tag(ctx, tags...), nil
 }
+
+func (p *profilerMetaHandler) OnConnectStream(ctx context.Context) (context.Context, error) {
+	return ctx, nil
+}
+
+func (p *profilerMetaHandler) OnReadStream(ctx context.Context) (context.Context, error) {
+	return ctx, nil
+}

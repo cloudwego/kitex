@@ -71,7 +71,7 @@ func (t *serverTransHandler) newCtxWithRPCInfo(ctx context.Context, conn net.Con
 	if t.targetSvcInfo != nil {
 		ri.Invocation().(rpcinfo.InvocationSetter).SetServiceInfo(t.targetSvcInfo)
 	} else {
-		ri = &PingPongRPCInfo{RPCInfo: ri, svcSearcher: t.svcSearcher}
+		ri = NewPingPongRPCInfo(ri, t.targetSvcInfo, t.svcSearcher)
 	}
 	return rpcinfo.NewCtxWithRPCInfo(ctx, ri), ri
 }
@@ -81,8 +81,7 @@ func (t *serverTransHandler) newCtxWithRPCInfo(ctx context.Context, conn net.Con
 func (t *serverTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error) {
 	ctx, ri := t.newCtxWithRPCInfo(ctx, conn)
 	st := newServerStream(ctx, conn, t, ri)
-	streamPipe := remote.NewServerStreamPipeline(st, t.transPipe)
-	st.SetPipeline(streamPipe)
+	st.pipe.Initialize(st, t.transPipe)
 	return t.transPipe.OnStream(ctx, st)
 }
 
@@ -278,7 +277,7 @@ type svrStream struct {
 	ctx  context.Context
 	t    *serverTransHandler
 	ri   rpcinfo.RPCInfo
-	pipe *remote.ServerStreamPipeline
+	pipe remote.ServerStreamPipeline
 }
 
 func newServerStream(ctx context.Context, conn net.Conn, t *serverTransHandler, ri rpcinfo.RPCInfo) *svrStream {
@@ -290,8 +289,8 @@ func newServerStream(ctx context.Context, conn net.Conn, t *serverTransHandler, 
 	}
 }
 
-func (s *svrStream) SetPipeline(pipe *remote.ServerStreamPipeline) {
-	s.pipe = pipe
+func (s *svrStream) SetRemoteStream(ss remote.ServerStream) {
+	s.pipe.ResetStream(ss)
 }
 
 func (s *svrStream) Write(ctx context.Context, sendMsg remote.Message) (nctx context.Context, err error) {
@@ -403,13 +402,21 @@ func getRemoteInfo(ri rpcinfo.RPCInfo, conn net.Conn) (string, net.Addr) {
 	return ri.From().ServiceName(), rAddr
 }
 
-type PingPongRPCInfo struct {
+func NewPingPongRPCInfo(ri rpcinfo.RPCInfo, targetSvcInfo *serviceinfo.ServiceInfo, svcSearcher remote.ServiceSearcher) rpcinfo.RPCInfo {
+	return &pingPongRPCInfo{
+		RPCInfo:       ri,
+		targetSvcInfo: targetSvcInfo,
+		svcSearcher:   svcSearcher,
+	}
+}
+
+type pingPongRPCInfo struct {
 	rpcinfo.RPCInfo
 	targetSvcInfo *serviceinfo.ServiceInfo
 	svcSearcher   remote.ServiceSearcher
 }
 
-func (p *PingPongRPCInfo) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error) {
+func (p *pingPongRPCInfo) SpecifyServiceInfo(svcName, methodName string) (*serviceinfo.ServiceInfo, error) {
 	// for single service scenario
 	if p.targetSvcInfo != nil {
 		if mt := p.targetSvcInfo.MethodInfo(methodName); mt == nil {

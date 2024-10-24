@@ -27,6 +27,8 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -42,6 +44,8 @@ import (
 )
 
 const defaultExitWaitGracefulShutdownTime = 1 * time.Second
+
+var errHeartbeatMessage = errors.New("heartbeat message")
 
 type svrTransHandlerFactory struct{}
 
@@ -88,22 +92,40 @@ type svrTransHandler struct {
 	targetSvcInfo *serviceinfo.ServiceInfo
 	inkHdlFunc    endpoint.Endpoint
 	codec         remote.Codec
-	transPipe     *remote.TransPipeline
+	transPipe     *remote.ServerTransPipeline
 	ext           trans.Extension
 	funcPool      sync.Pool
 	conns         sync.Map
 	tasks         sync.WaitGroup
 }
 
-// Write implements the remote.ServerTransHandler interface.
-func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
-	ri := rpcinfo.GetRPCInfo(ctx)
+type svrStream struct {
+	conn   net.Conn
+	reader netpoll.Reader
+	ctx    context.Context
+	t      *svrTransHandler
+	ri     rpcinfo.RPCInfo
+	pipe   remote.ServerStreamPipeline
+}
+
+func newSvrStream(conn net.Conn, reader netpoll.Reader, ctx context.Context, t *svrTransHandler, ri rpcinfo.RPCInfo) *svrStream {
+	return &svrStream{
+		conn:   conn,
+		reader: reader,
+		ctx:    ctx,
+		t:      t,
+		ri:     ri,
+	}
+}
+
+func (s *svrStream) Write(ctx context.Context, sendMsg remote.Message) (nctx context.Context, err error) {
+	ri := s.ri
 	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
 	defer func() {
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, nil)
 	}()
 
-	svcInfo := sendMsg.ServiceInfo()
+	svcInfo := ri.Invocation().ServiceInfo()
 	if svcInfo != nil {
 		if methodInfo, _ := trans.GetMethodInfo(ri, svcInfo); methodInfo != nil {
 			if methodInfo.OneWay() {
@@ -114,23 +136,19 @@ func (t *svrTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 
 	wbuf := netpoll.NewLinkBuffer()
 	bufWriter := np.NewWriterByteBuffer(wbuf)
-	err = t.codec.Encode(ctx, sendMsg, bufWriter)
+	err = s.t.codec.Encode(ctx, sendMsg, bufWriter)
 	bufWriter.Release(err)
 	if err != nil {
 		return ctx, err
 	}
-	conn.(*muxSvrConn).Put(func() (buf netpoll.Writer, isNil bool) {
+	s.conn.(*muxSvrConn).Put(func() (buf netpoll.Writer, isNil bool) {
 		return wbuf, false
 	})
 	return ctx, nil
 }
 
-// Read implements the remote.ServerTransHandler interface.
-func (t *svrTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
-	return ctx, nil
-}
-
-func (t *svrTransHandler) readWithByteBuffer(ctx context.Context, bufReader remote.ByteBuffer, msg remote.Message) (err error) {
+func (s *svrStream) Read(ctx context.Context, msg remote.Message) (nctx context.Context, err error) {
+	bufReader := np.NewReaderByteBuffer(s.reader)
 	defer func() {
 		if bufReader != nil {
 			if err != nil {
@@ -142,12 +160,53 @@ func (t *svrTransHandler) readWithByteBuffer(ctx context.Context, bufReader remo
 	}()
 	rpcinfo.Record(ctx, msg.RPCInfo(), stats.ReadStart, nil)
 
-	err = t.codec.Decode(ctx, msg, bufReader)
+	err = s.t.codec.Decode(ctx, msg, bufReader)
 	if err != nil {
 		msg.Tags()[remote.ReadFailed] = true
-		return err
+		return ctx, err
 	}
-	return nil
+	if msg.MessageType() == remote.Heartbeat {
+		// for heartbeat protocols, not graceful, need to be adjusted
+		return ctx, errHeartbeatMessage
+	}
+	return ctx, nil
+}
+
+func (s *svrStream) RecvMsg(m interface{}) (err error) {
+	var recvMsg remote.Message
+	defer func() {
+		remote.RecycleMessage(recvMsg)
+	}()
+	recvMsg = remote.NewMessage(nil, nil, s.ri, remote.Call, remote.Server)
+	recvMsg.SetPayloadCodec(s.t.opt.PayloadCodec)
+	_, err = s.pipe.Read(s.ctx, recvMsg)
+	rm := m.(*serviceinfo.PingPongCompatibleMethodArgs)
+	rm.Data = recvMsg.Data()
+	return
+}
+
+func (s *svrStream) SendMsg(m interface{}) (err error) {
+	var sendMsg remote.Message
+	defer func() {
+		remote.RecycleMessage(sendMsg)
+	}()
+	svcInfo := s.ri.Invocation().ServiceInfo()
+	sendMsg = remote.NewMessage(m, svcInfo, s.ri, remote.Reply, remote.Server)
+	sendMsg.SetPayloadCodec(s.t.opt.PayloadCodec)
+	_, err = s.pipe.Write(s.ctx, sendMsg)
+	return
+}
+
+func (s *svrStream) SetHeader(streaming.Header) error {
+	panic("not implemented streaming method for default server handler")
+}
+
+func (s *svrStream) SendHeader(streaming.Header) error {
+	panic("not implemented streaming method for default server handler")
+}
+
+func (s *svrStream) SetTrailer(streaming.Trailer) error {
+	panic("not implemented streaming method for default server handler")
 }
 
 // OnRead implements the remote.ServerTransHandler interface.
@@ -204,12 +263,24 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	// it's recycled in defer.
 	muxSvrConn, _ := muxSvrConnCtx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
 	rpcInfo := muxSvrConn.pool.Get().(rpcinfo.RPCInfo)
+	if t.targetSvcInfo != nil {
+		rpcInfo.Invocation().(rpcinfo.InvocationSetter).SetServiceInfo(t.targetSvcInfo)
+	}
 	rpcInfoCtx := rpcinfo.NewCtxWithRPCInfo(muxSvrConnCtx, rpcInfo)
+	st := newSvrStream(conn, reader, rpcInfoCtx, t, rpcInfo)
+	st.pipe.Initialize(st, t.transPipe)
+	// finish error handling inside OnStream
+	_ = t.transPipe.OnStream(rpcInfoCtx, st)
+}
 
+func (t *svrTransHandler) OnStream(ctx context.Context, stream streaming.ServerStream) (err error) {
+	muxSvrConn, _ := ctx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
+	st := stream.(*svrStream)
+	rpcInfo := st.ri
+	conn := st.conn
 	// This is the request-level, one-shot ctx.
 	// It adds the tracer principally, thus do not recycle.
-	ctx := t.startTracer(rpcInfoCtx, rpcInfo)
-	var err error
+	ctx = t.startTracer(ctx, rpcInfo)
 	var recvMsg remote.Message
 	var sendMsg remote.Message
 	var closeConn bool
@@ -239,58 +310,43 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 	}()
 
 	// read
-	recvMsg = remote.NewMessageWithNewer(t.targetSvcInfo, t.svcSearcher, rpcInfo, remote.Call, remote.Server)
-	bufReader := np.NewReaderByteBuffer(reader)
-	err = t.readWithByteBuffer(ctx, bufReader, recvMsg)
+	args := &serviceinfo.PingPongCompatibleMethodArgs{}
+	err = st.RecvMsg(args)
 	if err != nil {
+		if errors.Is(err, errHeartbeatMessage) {
+			sendMsg := remote.NewMessage(nil, nil, rpcInfo, remote.Heartbeat, remote.Server)
+			ctx, err = st.pipe.Write(ctx, sendMsg)
+			t.OnError(ctx, err, muxSvrConn)
+			closeConn = true
+			return
+		}
 		// No need to close the connection when read failed in mux case, because it had finished reads.
 		// But still need to close conn if write failed
-		closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, true)
+		closeConn = t.writeErrorReplyIfNeeded(ctx, conn, st, rpcInfo, err)
 		// for proxy case, need read actual remoteAddr, error print must exec after writeErrorReplyIfNeeded
 		t.OnError(ctx, err, muxSvrConn)
 		return
 	}
 
-	svcInfo := recvMsg.ServiceInfo()
-	if recvMsg.MessageType() == remote.Heartbeat {
-		sendMsg = remote.NewMessage(nil, svcInfo, rpcInfo, remote.Heartbeat, remote.Server)
-	} else {
-		var methodInfo serviceinfo.MethodInfo
-		if methodInfo, err = trans.GetMethodInfo(rpcInfo, svcInfo); err != nil {
-			closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, true)
-			t.OnError(ctx, err, muxSvrConn)
-			return
-		}
-		if methodInfo.OneWay() {
-			sendMsg = remote.NewMessage(nil, svcInfo, rpcInfo, remote.Reply, remote.Server)
-		} else {
-			sendMsg = remote.NewMessage(methodInfo.NewResult(), svcInfo, rpcInfo, remote.Reply, remote.Server)
-		}
-
-		ctx, err = t.transPipe.OnMessage(ctx, recvMsg, sendMsg)
-		if err != nil {
-			// error cannot be wrapped to print here, so it must exec before NewTransError
-			t.OnError(ctx, err, muxSvrConn)
-			err = remote.NewTransError(remote.InternalError, err)
-			closeConn = t.writeErrorReplyIfNeeded(ctx, recvMsg, muxSvrConn, rpcInfo, err, false)
-			return
-		}
+	methodInfo := rpcInfo.Invocation().MethodInfo()
+	var res interface{}
+	if !methodInfo.OneWay() {
+		res = methodInfo.NewResult()
 	}
-
-	remote.FillSendMsgFromRecvMsg(recvMsg, sendMsg)
-	if ctx, err = t.transPipe.Write(ctx, muxSvrConn, sendMsg); err != nil {
+	err = t.inkHdlFunc(ctx, args.Data, res)
+	if err != nil {
+		// error cannot be wrapped to print here, so it must exec before NewTransError
+		t.OnError(ctx, err, muxSvrConn)
+		err = remote.NewTransError(remote.InternalError, err)
+		closeConn = t.writeErrorReplyIfNeeded(ctx, conn, st, rpcInfo, err)
+		return
+	}
+	if err = st.SendMsg(res); err != nil {
 		t.OnError(ctx, err, muxSvrConn)
 		closeConn = true
 		return
 	}
-}
-
-// OnMessage implements the remote.ServerTransHandler interface.
-// msg is the decoded instance, such as Arg or Result.
-// OnMessage notifies the higher level to process. It's used in async and server-side logic.
-func (t *svrTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
-	err := t.inkHdlFunc(ctx, args.Data(), result.Data())
-	return ctx, err
+	return
 }
 
 type ctxKeyMuxSvrConn struct{}
@@ -308,6 +364,9 @@ func (t *svrTransHandler) OnActive(ctx context.Context, conn net.Conn) (context.
 		New: func() interface{} {
 			// init rpcinfo
 			ri := t.opt.InitOrResetRPCInfoFunc(nil, connection.RemoteAddr())
+			if t.targetSvcInfo == nil {
+				ri = trans.NewPingPongRPCInfo(ri, t.targetSvcInfo, t.svcSearcher)
+			}
 			return ri
 		},
 	}
@@ -329,7 +388,9 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
 	data := NewControlFrame()
 	msg := remote.NewMessage(data, nil, ri, remote.Reply, remote.Server)
-	msg.SetProtocolInfo(remote.NewProtocolInfo(transport.TTHeader, serviceinfo.Thrift))
+	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())
+	cfg.SetTransportProtocol(transport.TTHeader)
+	cfg.SetPayloadCodec(serviceinfo.Thrift)
 	msg.TransInfo().TransStrInfo()[transmeta.HeaderConnectionReadyToReset] = "1"
 
 	// wait until all notifications are sent and clients stop using those connections
@@ -399,19 +460,19 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 }
 
 // SetInvokeHandleFunc implements the remote.InvokeHandleFuncSetter interface.
-func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc endpoint.Endpoint) {
-	t.inkHdlFunc = inkHdlFunc
+func (t *svrTransHandler) SetInvokeHandleFunc(streamHdlFunc remote.InnerServerEndpoint, unaryHdlFunc endpoint.Endpoint) {
+	t.inkHdlFunc = unaryHdlFunc
 }
 
 // SetPipeline implements the remote.ServerTransHandler interface.
-func (t *svrTransHandler) SetPipeline(p *remote.TransPipeline) {
+func (t *svrTransHandler) SetPipeline(p *remote.ServerTransPipeline) {
 	t.transPipe = p
 }
 
 func (t *svrTransHandler) writeErrorReplyIfNeeded(
-	ctx context.Context, recvMsg remote.Message, conn net.Conn, ri rpcinfo.RPCInfo, err error, doOnMessage bool,
+	ctx context.Context, conn net.Conn, st remote.ServerStream, ri rpcinfo.RPCInfo, err error,
 ) (shouldCloseConn bool) {
-	svcInfo := recvMsg.ServiceInfo()
+	svcInfo := ri.Invocation().ServiceInfo()
 	if svcInfo != nil {
 		if methodInfo, _ := trans.GetMethodInfo(ri, svcInfo); methodInfo != nil {
 			if methodInfo.OneWay() {
@@ -423,13 +484,10 @@ func (t *svrTransHandler) writeErrorReplyIfNeeded(
 	if !isTransErr {
 		return
 	}
+
 	errMsg := remote.NewMessage(transErr, svcInfo, ri, remote.Exception, remote.Server)
-	remote.FillSendMsgFromRecvMsg(recvMsg, errMsg)
-	if doOnMessage {
-		// if error happen before normal OnMessage, exec it to transfer header trans info into rpcinfo
-		t.transPipe.OnMessage(ctx, recvMsg, errMsg)
-	}
-	ctx, err = t.transPipe.Write(ctx, conn, errMsg)
+	errMsg.SetPayloadCodec(t.opt.PayloadCodec)
+	ctx, err = st.Write(ctx, errMsg)
 	if err != nil {
 		klog.CtxErrorf(ctx, "KITEX: write error reply failed, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
 		return true

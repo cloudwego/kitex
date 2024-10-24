@@ -25,6 +25,8 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -63,11 +65,53 @@ var _ remote.ClientTransHandler = &cliTransHandler{}
 type cliTransHandler struct {
 	opt       *remote.ClientOption
 	codec     remote.Codec
-	transPipe *remote.TransPipeline
+	transPipe *remote.ClientTransPipeline
 }
 
-// Write implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
+func (t *cliTransHandler) NewStream(ctx context.Context, conn net.Conn) (streaming.ClientStream, error) {
+	ri := rpcinfo.GetRPCInfo(ctx)
+	cs := newCliStream(ctx, conn, t, ri)
+	cs.pipe.Initialize(cs, t.transPipe)
+	return cs, nil
+}
+
+// OnInactive implements the remote.ClientTransHandler interface.
+func (t *cliTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
+	// ineffective now and do nothing
+}
+
+// OnError implements the remote.ClientTransHandler interface.
+func (t *cliTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
+	if pe, ok := err.(*kerrors.DetailedError); ok {
+		klog.CtxErrorf(ctx, "KITEX: send request error, remote=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+	} else {
+		klog.CtxErrorf(ctx, "KITEX: send request error, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
+	}
+}
+
+// SetPipeline implements the remote.ClientTransHandler interface.
+func (t *cliTransHandler) SetPipeline(p *remote.ClientTransPipeline) {
+	t.transPipe = p
+}
+
+type cliStream struct {
+	conn net.Conn
+	ctx  context.Context
+	t    *cliTransHandler
+	ri   rpcinfo.RPCInfo
+	pipe remote.ClientStreamPipeline
+}
+
+func newCliStream(ctx context.Context, conn net.Conn, t *cliTransHandler, ri rpcinfo.RPCInfo) *cliStream {
+	return &cliStream{
+		conn: conn,
+		ctx:  ctx,
+		t:    t,
+		ri:   ri,
+	}
+}
+
+func (s *cliStream) Write(ctx context.Context, sendMsg remote.Message) (nctx context.Context, err error) {
 	ri := sendMsg.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
 	buf := netpoll.NewLinkBuffer()
@@ -88,17 +132,17 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	tags[codec.HeaderFlagsKey] = codec.HeaderFlagSupportOutOfOrder
 
 	// encode
-	sendMsg.SetPayloadCodec(t.opt.PayloadCodec)
-	err = t.codec.Encode(ctx, sendMsg, bufWriter)
+	sendMsg.SetPayloadCodec(s.t.opt.PayloadCodec)
+	err = s.t.codec.Encode(ctx, sendMsg, bufWriter)
 	if err != nil {
 		return ctx, err
 	}
 
-	mc, _ := conn.(*muxCliConn)
+	mc, _ := s.conn.(*muxCliConn)
 
 	// if oneway
 	var methodInfo serviceinfo.MethodInfo
-	if methodInfo, err = trans.GetMethodInfo(ri, sendMsg.ServiceInfo()); err != nil {
+	if methodInfo, err = trans.GetMethodInfo(ri, ri.Invocation().ServiceInfo()); err != nil {
 		return ctx, err
 	}
 	if methodInfo.OneWay() {
@@ -116,10 +160,9 @@ func (t *cliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remo
 	return ctx, err
 }
 
-// Read implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
+func (s *cliStream) Read(ctx context.Context, msg remote.Message) (nctx context.Context, err error) {
 	ri := msg.RPCInfo()
-	mc, _ := conn.(*muxCliConn)
+	mc, _ := s.conn.(*muxCliConn)
 	seqID := ri.Invocation().SeqID()
 	// load & delete before return
 	event, _ := mc.seqIDMap.load(seqID)
@@ -144,8 +187,8 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 			return ctx, ErrConnClosed
 		}
 		rpcinfo.Record(ctx, ri, stats.ReadStart, nil)
-		msg.SetPayloadCodec(t.opt.PayloadCodec)
-		err := t.codec.Decode(ctx, msg, bufReader)
+		msg.SetPayloadCodec(s.t.opt.PayloadCodec)
+		err := s.t.codec.Decode(ctx, msg, bufReader)
 		if err != nil && errors.Is(err, netpoll.ErrReadTimeout) {
 			err = kerrors.ErrRPCTimeout.WithCause(err)
 		}
@@ -158,29 +201,46 @@ func (t *cliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Me
 	}
 }
 
-// OnMessage implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
-	// do nothing
-	return ctx, nil
+func (s *cliStream) Header() (streaming.Header, error) {
+	panic("not implemented streaming method for default client handler")
 }
 
-// OnInactive implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
-	// ineffective now and do nothing
+func (s *cliStream) Trailer() (streaming.Trailer, error) {
+	panic("not implemented streaming method for default client handler")
 }
 
-// OnError implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
-	if pe, ok := err.(*kerrors.DetailedError); ok {
-		klog.CtxErrorf(ctx, "KITEX: send request error, remote=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+func (s *cliStream) CloseSend() error {
+	return nil
+}
+
+func (s *cliStream) RecvMsg(resp interface{}) (err error) {
+	ri := s.ri
+	recvMsg := remote.NewMessage(resp, ri.Invocation().ServiceInfo(), ri, remote.Reply, remote.Client)
+	defer func() {
+		remote.RecycleMessage(recvMsg)
+	}()
+	_, err = s.pipe.Read(s.ctx, recvMsg)
+	return err
+}
+
+func (s *cliStream) SendMsg(req interface{}) (err error) {
+	ri := s.ri
+	ink := ri.Invocation()
+	svcInfo := ink.ServiceInfo()
+	m := ink.MethodInfo()
+	var sendMsg remote.Message
+	if m == nil {
+		return fmt.Errorf("method info is nil, methodName=%s, serviceInfo=%+v", ink.MethodName(), svcInfo)
+	} else if m.OneWay() {
+		sendMsg = remote.NewMessage(req, svcInfo, ri, remote.Oneway, remote.Client)
 	} else {
-		klog.CtxErrorf(ctx, "KITEX: send request error, remote=%s, error=%s", conn.RemoteAddr(), err.Error())
+		sendMsg = remote.NewMessage(req, svcInfo, ri, remote.Call, remote.Client)
 	}
-}
-
-// SetPipeline implements the remote.ClientTransHandler interface.
-func (t *cliTransHandler) SetPipeline(p *remote.TransPipeline) {
-	t.transPipe = p
+	defer func() {
+		remote.RecycleMessage(sendMsg)
+	}()
+	_, err = s.pipe.Write(s.ctx, sendMsg)
+	return err
 }
 
 type asyncCallback struct {

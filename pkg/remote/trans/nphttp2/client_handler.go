@@ -56,7 +56,7 @@ func (h *cliTransHandler) NewStream(ctx context.Context, conn net.Conn) (streami
 	ri := rpcinfo.GetRPCInfo(ctx)
 	clientConn := conn.(*clientConn)
 	streamx := newClientStream(ctx, ri, clientConn, h)
-	streamx.SetPipeline(remote.NewClientStreamPipeline(streamx, h.transPipe))
+	streamx.pipe.Initialize(streamx, h.transPipe)
 	return streamx, nil
 }
 

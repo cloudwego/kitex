@@ -130,6 +130,7 @@ func (s *server) BuildServiceInlineInvokeChain() endpoint.Endpoint {
 	}
 	mws := []endpoint.Middleware{mw}
 	smws := s.buildMiddlewares(context.Background())
+	unaryMw := s.buildUnaryMiddlewares()
 	mws = append(mws, smws...)
-	return endpoint.Chain(mws...)(innerHandlerEp)
+	return endpoint.Chain(mws...)(endpoint.Endpoint(UnaryChain(unaryMw...)(innerHandlerEp)))
 }

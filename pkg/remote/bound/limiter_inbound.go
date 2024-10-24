@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/limiter"
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/streaming"
 )
 
 // NewServerLimiterHandler creates a new server limiter handler.
@@ -64,7 +65,7 @@ func (l *serverLimiterHandler) OnRead(ctx context.Context, conn net.Conn) (conte
 	return ctx, nil
 }
 
-func (l *serverLimiterHandler) OnStream(ctx context.Context, stream remote.ServerStream) (context.Context, error) {
+func (l *serverLimiterHandler) OnStream(ctx context.Context, stream streaming.ServerStream) (context.Context, error) {
 	return ctx, nil
 }
 

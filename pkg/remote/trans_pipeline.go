@@ -163,14 +163,19 @@ func (p *ClientTransPipeline) NewStream(ctx context.Context, conn net.Conn) (st 
 	return p.ClientTransHandler.NewStream(ctx, conn)
 }
 
-func NewServerStreamPipeline(st ServerStream, pipeline *ServerTransPipeline) *ServerStreamPipeline {
-	return &ServerStreamPipeline{ServerStream: st, pipeline: pipeline}
-}
-
 type ServerStreamPipeline struct {
 	ServerStream
 
 	pipeline *ServerTransPipeline
+}
+
+func (p *ServerStreamPipeline) Initialize(ss ServerStream, pipeline *ServerTransPipeline) {
+	p.ServerStream = ss
+	p.pipeline = pipeline
+}
+
+func (p *ServerStreamPipeline) ResetStream(ss ServerStream) {
+	p.ServerStream = ss
 }
 
 func (p *ServerStreamPipeline) Write(ctx context.Context, sendMsg Message) (nctx context.Context, err error) {
@@ -198,14 +203,23 @@ func (p *ServerStreamPipeline) Read(ctx context.Context, msg Message) (context.C
 	return ctx, nil
 }
 
-func NewClientStreamPipeline(st ClientStream, pipeline *ClientTransPipeline) *ClientStreamPipeline {
-	return &ClientStreamPipeline{ClientStream: st, pipeline: pipeline}
+func NewClientStreamPipeline(st ClientStream, pipeline *ClientTransPipeline) ClientStreamPipeline {
+	return ClientStreamPipeline{ClientStream: st, pipeline: pipeline}
 }
 
 type ClientStreamPipeline struct {
 	ClientStream
 
 	pipeline *ClientTransPipeline
+}
+
+func (p *ClientStreamPipeline) Initialize(st ClientStream, pipeline *ClientTransPipeline) {
+	p.ClientStream = st
+	p.pipeline = pipeline
+}
+
+func (p *ClientStreamPipeline) ResetStream(st ClientStream) {
+	p.ClientStream = st
 }
 
 func (p *ClientStreamPipeline) Write(ctx context.Context, sendMsg Message) (nctx context.Context, err error) {

@@ -39,6 +39,10 @@ type ClientStream interface {
 	Read(ctx context.Context, msg Message) (nctx context.Context, err error)
 }
 
+type ClientStreamSetter interface {
+	SetRemoteStream(cs ClientStream)
+}
+
 // ClientTransHandler is just TransHandler.
 type ClientTransHandler interface {
 	OnInactive(ctx context.Context, conn net.Conn)
@@ -50,6 +54,10 @@ type ClientTransHandler interface {
 type ServerStream interface {
 	Write(ctx context.Context, send Message) (nctx context.Context, err error)
 	Read(ctx context.Context, msg Message) (nctx context.Context, err error)
+}
+
+type ServerStreamSetter interface {
+	SetRemoteStream(ss ServerStream)
 }
 
 // ServerTransHandler have some new functions.

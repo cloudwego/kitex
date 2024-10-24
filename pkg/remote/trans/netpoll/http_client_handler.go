@@ -30,6 +30,8 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -39,38 +41,75 @@ import (
 )
 
 func newHTTPCliTransHandler(opt *remote.ClientOption, ext trans.Extension) (remote.ClientTransHandler, error) {
+	hdlr, err := trans.NewDefaultCliTransHandler(opt, ext)
+	if err != nil {
+		return nil, err
+	}
 	return &httpCliTransHandler{
-		opt:   opt,
-		codec: opt.Codec,
-		ext:   ext,
+		ClientTransHandler: hdlr,
+		codec:              opt.Codec,
+		ext:                ext,
 	}, nil
 }
 
 type httpCliTransHandler struct {
-	opt       *remote.ClientOption
-	codec     remote.Codec
-	transPipe *remote.TransPipeline
-	ext       trans.Extension
+	remote.ClientTransHandler
+	codec remote.Codec
+	ext   trans.Extension
+}
+
+func (t *httpCliTransHandler) NewStream(ctx context.Context, conn net.Conn) (streaming.ClientStream, error) {
+	stream, err := t.ClientTransHandler.NewStream(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
+	setter, ok := stream.(remote.ClientStreamSetter)
+	if !ok {
+		return nil, fmt.Errorf("stream[%T] not implement remote.ClientStreamSetter", stream)
+	}
+	setter.SetRemoteStream(newHttpCliStream(conn, t))
+	return stream, nil
+}
+
+// OnError implements the remote.ClientTransHandler interface.
+// This is called when panic happens.
+func (t *httpCliTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
+	var pe *kerrors.DetailedError
+	if errors.As(err, &pe) {
+		klog.CtxErrorf(ctx, "KITEX: send http request error, remote=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
+	}
+}
+
+func newHttpCliStream(conn net.Conn, t *httpCliTransHandler) *httpClientStream {
+	return &httpClientStream{
+		conn: conn,
+		t:    t,
+	}
+}
+
+type httpClientStream struct {
+	conn net.Conn
+	t    *httpCliTransHandler
 }
 
 // Write implements the remote.ClientTransHandler interface.
-func (t *httpCliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg remote.Message) (nctx context.Context, err error) {
+func (s *httpClientStream) Write(ctx context.Context, sendMsg remote.Message) (nctx context.Context, err error) {
 	var bufWriter remote.ByteBuffer
 	ri := sendMsg.RPCInfo()
 	rpcinfo.Record(ctx, ri, stats.WriteStart, nil)
 	defer func() {
-		t.ext.ReleaseBuffer(bufWriter, err)
+		s.t.ext.ReleaseBuffer(bufWriter, err)
 		rpcinfo.Record(ctx, ri, stats.WriteFinish, err)
 	}()
 
-	bufWriter = t.ext.NewWriteByteBuffer(ctx, conn, sendMsg)
+	bufWriter = s.t.ext.NewWriteByteBuffer(ctx, s.conn, sendMsg)
 	buffer := netpoll.NewLinkBuffer(0)
 	bodyReaderWriter := NewReaderWriterByteBuffer(buffer)
 	defer bodyReaderWriter.Release(err)
 	if err != nil {
 		return ctx, err
 	}
-	err = t.codec.Encode(ctx, sendMsg, bodyReaderWriter)
+	err = s.t.codec.Encode(ctx, sendMsg, bodyReaderWriter)
 	if err != nil {
 		return ctx, err
 	}
@@ -100,21 +139,21 @@ func (t *httpCliTransHandler) Write(ctx context.Context, conn net.Conn, sendMsg 
 }
 
 // Read implements the remote.ClientTransHandler interface. Read is blocked.
-func (t *httpCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remote.Message) (nctx context.Context, err error) {
+func (s *httpClientStream) Read(ctx context.Context, msg remote.Message) (nctx context.Context, err error) {
 	var bufReader remote.ByteBuffer
 	rpcinfo.Record(ctx, msg.RPCInfo(), stats.ReadStart, nil)
 	defer func() {
-		t.ext.ReleaseBuffer(bufReader, err)
+		s.t.ext.ReleaseBuffer(bufReader, err)
 		rpcinfo.Record(ctx, msg.RPCInfo(), stats.ReadFinish, err)
 	}()
 
-	t.ext.SetReadTimeout(ctx, conn, msg.RPCInfo().Config(), remote.Client)
-	bufReader = t.ext.NewReadByteBuffer(ctx, conn, msg)
+	s.t.ext.SetReadTimeout(ctx, s.conn, msg.RPCInfo().Config(), remote.Client)
+	bufReader = s.t.ext.NewReadByteBuffer(ctx, s.conn, msg)
 	bodyReader, err := getBodyBufReader(bufReader)
 	if err != nil {
 		return ctx, fmt.Errorf("get body bufreader error:%w", err)
 	}
-	err = t.codec.Decode(ctx, msg, bodyReader)
+	err = s.t.codec.Decode(ctx, msg, bodyReader)
 	if err != nil {
 		return ctx, err
 	}
@@ -122,32 +161,6 @@ func (t *httpCliTransHandler) Read(ctx context.Context, conn net.Conn, msg remot
 		bufReader.Skip(left)
 	}
 	return ctx, nil
-}
-
-// OnMessage implements the remote.ClientTransHandler interface.
-func (t *httpCliTransHandler) OnMessage(ctx context.Context, args, result remote.Message) (context.Context, error) {
-	// do nothing
-	return ctx, nil
-}
-
-// OnInactive implements the remote.ClientTransHandler interface.
-// This is called when connection is closed.
-func (t *httpCliTransHandler) OnInactive(ctx context.Context, conn net.Conn) {
-	// ineffective now and do nothing
-}
-
-// OnError implements the remote.ClientTransHandler interface.
-// This is called when panic happens.
-func (t *httpCliTransHandler) OnError(ctx context.Context, err error, conn net.Conn) {
-	var pe *kerrors.DetailedError
-	if errors.As(err, &pe) {
-		klog.CtxErrorf(ctx, "KITEX: send http request error, remote=%s, error=%s\nstack=%s", conn.RemoteAddr(), err.Error(), pe.Stack())
-	}
-}
-
-// SetPipeline implements the remote.ClientTransHandler interface.
-func (t *httpCliTransHandler) SetPipeline(p *remote.TransPipeline) {
-	t.transPipe = p
 }
 
 func addMetaInfo(msg remote.Message, h http.Header) error {
