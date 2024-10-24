@@ -21,13 +21,10 @@
 package grpc
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"sync"
 	"sync/atomic"
-
-	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 // writeQuota is a soft limit on the amount of data a stream can
@@ -82,66 +79,66 @@ func (w *writeQuota) realReplenish(n int) {
 	}
 }
 
-type ctxWriteQuota struct {
-	ctx   context.Context
-	quota int32
-	// get waits on read from when quota goes less than or equal to zero.
-	// replenish writes on it when quota goes positive again.
-	ch chan struct{}
-	// done is triggered in error case.
-	done <-chan struct{}
-	// replenish is called by loopyWriter to give quota back to.
-	// It is implemented as a field so that it can be updated
-	// by tests.
-	replenish func(n int) bool
-}
-
-func newCtxWriteQuota(ctx context.Context, sz int32, done <-chan struct{}) *ctxWriteQuota {
-	w := &ctxWriteQuota{
-		ctx:   ctx,
-		quota: sz,
-		ch:    make(chan struct{}, 1),
-		done:  done,
-	}
-	w.replenish = w.realReplenish
-	return w
-}
-
-func (w *ctxWriteQuota) get(sz int32) error {
-	for {
-		curSize := atomic.LoadInt32(&w.quota)
-		if curSize > 0 {
-			atomic.AddInt32(&w.quota, -sz)
-			return nil
-		}
-		klog.CtxInfof(w.ctx, "get quota failed, curSize: %d, request sz: %d", curSize, sz)
-		select {
-		case <-w.ch:
-			continue
-		case <-w.done:
-			return errStreamDone
-		}
-	}
-}
-
-func (w *ctxWriteQuota) realReplenish(n int) bool {
-	sz := int32(n)
-	a := atomic.AddInt32(&w.quota, sz)
-	b := a - sz
-	if b <= 0 {
-		if a > 0 {
-			select {
-			case w.ch <- struct{}{}:
-				klog.CtxInfof(w.ctx, "replenish quota success, curQuota: %d, oriQuota: %d", a, b)
-			default:
-			}
-		} else {
-			klog.CtxInfof(w.ctx, "replenish quota failed, curQuota: %d, oriQuota: %d", a, b)
-			return true
-		}
-	}
-	return false
-}
+//type ctxWriteQuota struct {
+//	ctx   context.Context
+//	quota int32
+//	// get waits on read from when quota goes less than or equal to zero.
+//	// replenish writes on it when quota goes positive again.
+//	ch chan struct{}
+//	// done is triggered in error case.
+//	done <-chan struct{}
+//	// replenish is called by loopyWriter to give quota back to.
+//	// It is implemented as a field so that it can be updated
+//	// by tests.
+//	replenish func(n int) bool
+//}
+//
+//func newCtxWriteQuota(ctx context.Context, sz int32, done <-chan struct{}) *ctxWriteQuota {
+//	w := &ctxWriteQuota{
+//		ctx:   ctx,
+//		quota: sz,
+//		ch:    make(chan struct{}, 1),
+//		done:  done,
+//	}
+//	w.replenish = w.realReplenish
+//	return w
+//}
+//
+//func (w *ctxWriteQuota) get(sz int32) error {
+//	for {
+//		curSize := atomic.LoadInt32(&w.quota)
+//		if curSize > 0 {
+//			atomic.AddInt32(&w.quota, -sz)
+//			return nil
+//		}
+//		klog.CtxInfof(w.ctx, "get quota failed, curSize: %d, request sz: %d", curSize, sz)
+//		select {
+//		case <-w.ch:
+//			continue
+//		case <-w.done:
+//			return errStreamDone
+//		}
+//	}
+//}
+//
+//func (w *ctxWriteQuota) realReplenish(n int) bool {
+//	sz := int32(n)
+//	a := atomic.AddInt32(&w.quota, sz)
+//	b := a - sz
+//	if b <= 0 {
+//		if a > 0 {
+//			select {
+//			case w.ch <- struct{}{}:
+//				klog.CtxInfof(w.ctx, "replenish quota success, curQuota: %d, oriQuota: %d", a, b)
+//			default:
+//			}
+//		} else {
+//			klog.CtxInfof(w.ctx, "replenish quota failed, curQuota: %d, oriQuota: %d", a, b)
+//			return true
+//		}
+//	}
+//	return false
+//}
 
 type trInFlow struct {
 	limit               uint32

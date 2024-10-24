@@ -357,7 +357,7 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 	}
 	s.ctx = traceCtx(s.ctx, s.method)
 	s.ctxDone = s.ctx.Done()
-	s.wq = newCtxWriteQuota(s.ctx, defaultWriteQuota, s.ctxDone)
+	s.wq = newWriteQuota(defaultWriteQuota, s.ctxDone)
 	s.trReader = &transportReader{
 		reader: &recvBufferReader{
 			ctx:        s.ctx,

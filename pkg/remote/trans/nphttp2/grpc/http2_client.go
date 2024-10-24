@@ -287,7 +287,7 @@ func fillStreamFields(s *Stream) {
 		fields = allocateStreamFields()
 	}
 	s.buf = fields.recvBuffer
-	s.wq = newCtxWriteQuota(s.ctx, defaultWriteQuota, nil)
+	s.wq = newWriteQuota(defaultWriteQuota, nil)
 	s.wq.done = s.done
 }
 

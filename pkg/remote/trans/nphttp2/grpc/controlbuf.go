@@ -103,7 +103,7 @@ type cbItem interface {
 // registerStream is used to register an incoming stream with loopy writer.
 type registerStream struct {
 	streamID uint32
-	wq       *ctxWriteQuota
+	wq       *writeQuota
 }
 
 func (*registerStream) isTransportResponseFrame() bool { return false }
@@ -115,7 +115,7 @@ type headerFrame struct {
 	endStream  bool               // Valid on server side.
 	initStream func(uint32) error // Used only on the client side.
 	onWrite    func()
-	wq         *ctxWriteQuota // write quota for the stream created.
+	wq         *writeQuota    // write quota for the stream created.
 	cleanup    *cleanupStream // Valid on the server side.
 	onOrphaned func(error)    // Valid on client-side
 }
@@ -217,7 +217,7 @@ type outStream struct {
 	state            outStreamState
 	itl              *itemList
 	bytesOutStanding int
-	wq               *ctxWriteQuota
+	wq               *writeQuota
 
 	next *outStream
 	prev *outStream
@@ -836,7 +836,6 @@ func (l *loopyWriter) processData() (bool, error) {
 	}
 	str := l.activeStreams.dequeue() // Remove the first stream.
 	if str == nil {
-		klog.Infof("stream is nil, connection quota: %d, stream window: %d", l.sendQuota, l.oiws)
 		return true, nil
 	}
 	dataItem := str.itl.peek().(*dataFrame) // Peek at the first data item this stream.
@@ -871,7 +870,6 @@ func (l *loopyWriter) processData() (bool, error) {
 	maxSize := http2MaxFrameLen
 	if strQuota := int(l.oiws) - str.bytesOutStanding; strQuota <= 0 { // stream-level flow control.
 		str.state = waitingOnStreamQuota
-		klog.CtxInfof(str.wq.ctx, "stream flow control, connection quota: %d, stream window: %d, bytesOutstanding: %d", l.sendQuota, l.oiws, str.bytesOutStanding)
 		return false, nil
 	} else if maxSize > strQuota {
 		maxSize = strQuota
@@ -900,9 +898,7 @@ func (l *loopyWriter) processData() (bool, error) {
 	size := hSize + dSize
 
 	// Now that outgoing flow controls are checked we can replenish str's write quota
-	if stillBlock := str.wq.replenish(size); stillBlock {
-		klog.CtxInfof(str.wq.ctx, "stream still blocked, connection quota: %d, stream window: %d, bytesOutstanding: %d", l.sendQuota, l.oiws, str.bytesOutStanding)
-	}
+	str.wq.replenish(size)
 	var endStream bool
 	// If this is the last data message on this stream and all of it can be written in this iteration.
 	if dataItem.endStream && len(dataItem.h)+len(dataItem.d) <= size {
@@ -935,7 +931,6 @@ func (l *loopyWriter) processData() (bool, error) {
 			return false, err
 		}
 	} else if int(l.oiws)-str.bytesOutStanding <= 0 { // Ran out of stream quota.
-		klog.CtxInfof(str.wq.ctx, "ran out ot stream quota, connection quota: %d, stream window: %d, bytesOutstanding: %d", l.sendQuota, l.oiws, str.bytesOutStanding)
 		str.state = waitingOnStreamQuota
 	} else { // Otherwise add it back to the list of active streams.
 		l.activeStreams.enqueue(str)
