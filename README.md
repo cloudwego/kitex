@@ -10,6 +10,7 @@ English | [中文](README_cn.md)
 [![ClosedIssue](https://img.shields.io/github/issues-closed/cloudwego/kitex)](https://github.com/cloudwego/kitex/issues?q=is%3Aissue+is%3Aclosed)
 ![Stars](https://img.shields.io/github/stars/cloudwego/kitex)
 ![Forks](https://img.shields.io/github/forks/cloudwego/kitex)
+[![Gurubase](https://img.shields.io/badge/Gurubase-Ask%20Kitex%20Guru-006BFF)](https://gurubase.io/g/kitex)
 
 Kitex [kaɪt'eks] is a **high-performance** and **strong-extensibility** Go RPC framework that helps developers build microservices. If the performance and extensibility are the main concerns when you develop microservices, Kitex can be a good choice.
 
