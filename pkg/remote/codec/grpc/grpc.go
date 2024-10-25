@@ -21,6 +21,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/cloudwego/fastpb"
 	"google.golang.org/protobuf/proto"
@@ -176,6 +177,24 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 
 func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remote.ByteBuffer) (err error) {
 	d, err := decodeGRPCFrame(ctx, in)
+	// For ClientStreaming, server may return an err(e.g. status) as trailer frame after calling SendAndClose.
+	// We need to receive this trailer frame.
+	stMode := message.RPCInfo().Invocation().MethodInfo().StreamingMode()
+	if (stMode == serviceinfo.StreamingUnary || stMode == serviceinfo.StreamingNone || stMode == serviceinfo.StreamingClient) &&
+		message.RPCRole() == remote.Client && err == nil {
+		// Receive trailer frame
+		// If err == nil, wrong gRPC protocol implementation.
+		// If err == io.EOF, it means server returns nil, just ignore io.EOF.
+		// If err != io.EOF, it means server returns status err or BizStatusErr, or other gRPC transport error came out,
+		// we need to throw it to users.
+		_, err = decodeGRPCFrame(ctx, in)
+		if err == nil {
+			return errors.New("grpc client streaming protocol violation: get <nil>, want <EOF>")
+		}
+		if err == io.EOF {
+			err = nil
+		}
+	}
 	if rpcStats := rpcinfo.AsMutableRPCStats(message.RPCInfo().Stats()); rpcStats != nil {
 		// record recv size, even when err != nil (0 is recorded to the lastRecvSize)
 		rpcStats.IncrRecvSize(uint64(len(d)))

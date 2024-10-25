@@ -100,8 +100,8 @@ func (s *server) init() {
 
 	// init invoker chain here since we need to get some svc information to add MW
 	// register stream recv/send middlewares
-	s.buildInvokeChain(ctx)
 	s.initStreamMiddlewares(ctx)
+	s.buildInvokeChain(ctx)
 }
 
 func fillContext(opt *internal_server.Options) context.Context {

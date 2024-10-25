@@ -147,7 +147,7 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 		if tr := trans.get(); tr != nil {
 			if tr.(grpc.IsActive).IsActive() {
 				// Actually new a stream, reuse the connection (grpc.ClientTransport)
-				conn, err = newClientConn(ctx, tr, address)
+				conn, err = newClientConn(tr, address)
 				if err == nil {
 					return conn, nil
 				}
@@ -177,7 +177,7 @@ func (p *connPool) Get(ctx context.Context, network, address string, opt remote.
 		return nil, err
 	}
 	klog.CtxDebugf(ctx, "KITEX: New grpc client connection succeed, network=%s, address=%s", network, address)
-	return newClientConn(ctx, tr.(grpc.ClientTransport), address)
+	return newClientConn(tr.(grpc.ClientTransport), address)
 }
 
 // Put implements the ConnPool interface.
@@ -201,7 +201,7 @@ func (p *connPool) createShortConn(ctx context.Context, network, address string,
 	if err != nil {
 		return nil, err
 	}
-	return newClientConn(ctx, tr, address)
+	return newClientConn(tr, address)
 }
 
 // Discard implements the ConnPool interface.

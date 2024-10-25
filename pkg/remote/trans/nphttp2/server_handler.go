@@ -29,6 +29,8 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/endpoint"
+
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -196,13 +198,12 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 	rCtx = context.WithValue(rCtx, serverConnKey{}, streamx)
 	// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
 	rCtx = streaming.NewCtxWithStream(rCtx, streamx.GetGRPCStream())
-	// GetServerConn could retrieve streamx by Stream.Context().Value(serverConnKey{})
-	streamx.ctx = rCtx
 	_ = t.transPipe.OnStream(rCtx, streamx)
 }
 
 func (t *svrTransHandler) OnStream(ctx context.Context, st streaming.ServerStream) error {
 	streamx := st.(*serverStreamX)
+	streamx.ctx = ctx
 	ri := streamx.ri
 	methodName := ri.Invocation().MethodName()
 	serviceName := ri.Invocation().ServiceName()
@@ -228,6 +229,18 @@ func (t *svrTransHandler) OnStream(ctx context.Context, st streaming.ServerStrea
 	if err != nil {
 		streamx.conn.tr.WriteStatus(streamx.conn.s, convertStatus(err))
 		t.OnError(ctx, err, streamx.rawConn)
+		return nil
+	}
+	if bizStatusErr := streamx.ri.Invocation().BizStatusErr(); bizStatusErr != nil {
+		var st *status.Status
+		if sterr, ok := bizStatusErr.(status.Iface); ok {
+			st = sterr.GRPCStatus()
+		} else {
+			st = status.New(codes.Internal, bizStatusErr.BizMessage())
+		}
+		grpcStream := streamx.conn.s
+		grpcStream.SetBizStatusErr(bizStatusErr)
+		streamx.conn.tr.WriteStatus(grpcStream, st)
 		return nil
 	}
 	streamx.conn.tr.WriteStatus(streamx.conn.s, status.New(codes.OK, ""))
@@ -284,8 +297,8 @@ func (t *svrTransHandler) OnError(ctx context.Context, err error, conn net.Conn)
 	}
 }
 
-func (t *svrTransHandler) SetInvokeHandleFunc(inkHdlFunc remote.InnerServerEndpoint) {
-	t.inkHdlFunc = inkHdlFunc
+func (t *svrTransHandler) SetInvokeHandleFunc(streamHdlFunc remote.InnerServerEndpoint, unaryHdlFunc endpoint.Endpoint) {
+	t.inkHdlFunc = streamHdlFunc
 }
 
 func (t *svrTransHandler) startTracer(ctx context.Context, ri rpcinfo.RPCInfo) context.Context {

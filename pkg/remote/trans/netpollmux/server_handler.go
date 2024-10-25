@@ -100,22 +100,22 @@ type svrTransHandler struct {
 }
 
 type svrStream struct {
-	streaming.ServerStream
-	conn   net.Conn
-	reader netpoll.Reader
-	ctx    context.Context
-	t      *svrTransHandler
-	ri     rpcinfo.RPCInfo
-	pipe   remote.ServerStreamPipeline
+	ctx        context.Context
+	conn       net.Conn
+	muxSvrConn *muxSvrConn
+	reader     netpoll.Reader
+	t          *svrTransHandler
+	ri         rpcinfo.RPCInfo
+	pipe       remote.ServerStreamPipeline
 }
 
-func newSvrStream(conn net.Conn, reader netpoll.Reader, ctx context.Context, t *svrTransHandler, ri rpcinfo.RPCInfo) *svrStream {
+func newSvrStream(conn net.Conn, reader netpoll.Reader, t *svrTransHandler, ri rpcinfo.RPCInfo, muxSvrConn *muxSvrConn) *svrStream {
 	return &svrStream{
-		conn:   conn,
-		reader: reader,
-		ctx:    ctx,
-		t:      t,
-		ri:     ri,
+		conn:       conn,
+		reader:     reader,
+		t:          t,
+		ri:         ri,
+		muxSvrConn: muxSvrConn,
 	}
 }
 
@@ -137,12 +137,13 @@ func (s *svrStream) Write(ctx context.Context, sendMsg remote.Message) (nctx con
 
 	wbuf := netpoll.NewLinkBuffer()
 	bufWriter := np.NewWriterByteBuffer(wbuf)
+	sendMsg.SetPayloadCodec(s.t.opt.PayloadCodec)
 	err = s.t.codec.Encode(ctx, sendMsg, bufWriter)
 	bufWriter.Release(err)
 	if err != nil {
 		return ctx, err
 	}
-	s.conn.(*muxSvrConn).Put(func() (buf netpoll.Writer, isNil bool) {
+	s.muxSvrConn.Put(func() (buf netpoll.Writer, isNil bool) {
 		return wbuf, false
 	})
 	return ctx, nil
@@ -161,6 +162,7 @@ func (s *svrStream) Read(ctx context.Context, msg remote.Message) (nctx context.
 	}()
 	rpcinfo.Record(ctx, msg.RPCInfo(), stats.ReadStart, nil)
 
+	msg.SetPayloadCodec(s.t.opt.PayloadCodec)
 	err = s.t.codec.Decode(ctx, msg, bufReader)
 	if err != nil {
 		msg.Tags()[remote.ReadFailed] = true
@@ -171,6 +173,41 @@ func (s *svrStream) Read(ctx context.Context, msg remote.Message) (nctx context.
 		return ctx, errHeartbeatMessage
 	}
 	return ctx, nil
+}
+
+func (s *svrStream) RecvMsg(m interface{}) (err error) {
+	var recvMsg remote.Message
+	defer func() {
+		remote.RecycleMessage(recvMsg)
+	}()
+	recvMsg = remote.NewMessage(nil, nil, s.ri, remote.Call, remote.Server)
+	s.ctx, err = s.pipe.Read(s.ctx, recvMsg)
+	rm := m.(*serviceinfo.PingPongCompatibleMethodArgs)
+	rm.Data = recvMsg.Data()
+	return
+}
+
+func (s *svrStream) SendMsg(m interface{}) (err error) {
+	var sendMsg remote.Message
+	defer func() {
+		remote.RecycleMessage(sendMsg)
+	}()
+	svcInfo := s.ri.Invocation().ServiceInfo()
+	sendMsg = remote.NewMessage(m, svcInfo, s.ri, remote.Reply, remote.Server)
+	_, err = s.pipe.Write(s.ctx, sendMsg)
+	return
+}
+
+func (s *svrStream) SetHeader(streaming.Header) error {
+	panic("not implemented streaming method for default server handler")
+}
+
+func (s *svrStream) SendHeader(streaming.Header) error {
+	panic("not implemented streaming method for default server handler")
+}
+
+func (s *svrStream) SetTrailer(streaming.Trailer) error {
+	panic("not implemented streaming method for default server handler")
 }
 
 // OnRead implements the remote.ServerTransHandler interface.
@@ -231,9 +268,8 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 		rpcInfo.Invocation().(rpcinfo.InvocationSetter).SetServiceInfo(t.targetSvcInfo)
 	}
 	rpcInfoCtx := rpcinfo.NewCtxWithRPCInfo(muxSvrConnCtx, rpcInfo)
-	st := newSvrStream(conn, reader, rpcInfoCtx, t, rpcInfo)
-	dst := trans.NewDefaultServerStream(rpcInfoCtx, rpcInfo, remote.NewServerStreamPipeline(st, t.transPipe))
-	st.ServerStream = dst
+	st := newSvrStream(conn, reader, t, rpcInfo, muxSvrConn)
+	st.pipe.Initialize(st, t.transPipe)
 	// finish error handling inside OnStream
 	_ = t.transPipe.OnStream(rpcInfoCtx, st)
 }
@@ -241,6 +277,7 @@ func (t *svrTransHandler) task(muxSvrConnCtx context.Context, conn net.Conn, rea
 func (t *svrTransHandler) OnStream(ctx context.Context, stream streaming.ServerStream) (err error) {
 	muxSvrConn, _ := ctx.Value(ctxKeyMuxSvrConn{}).(*muxSvrConn)
 	st := stream.(*svrStream)
+	st.ctx = ctx
 	rpcInfo := st.ri
 	conn := st.conn
 	// This is the request-level, one-shot ctx.
@@ -277,6 +314,7 @@ func (t *svrTransHandler) OnStream(ctx context.Context, stream streaming.ServerS
 	// read
 	args := &serviceinfo.PingPongCompatibleMethodArgs{}
 	err = st.RecvMsg(args)
+	ctx = st.ctx
 	if err != nil {
 		if errors.Is(err, errHeartbeatMessage) {
 			sendMsg := remote.NewMessage(nil, nil, rpcInfo, remote.Heartbeat, remote.Server)
@@ -350,7 +388,7 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 	// end to close the connection or prevent further operation on it.
 	iv := rpcinfo.NewInvocation("none", "none")
 	iv.SetSeqID(0)
-	ri := rpcinfo.NewRPCInfo(nil, nil, iv, nil, nil)
+	ri := rpcinfo.NewRPCInfo(nil, nil, iv, rpcinfo.NewRPCConfig(), nil)
 	data := NewControlFrame()
 	msg := remote.NewMessage(data, nil, ri, remote.Reply, remote.Server)
 	cfg := rpcinfo.AsMutableRPCConfig(ri.Config())

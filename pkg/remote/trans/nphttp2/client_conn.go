@@ -78,13 +78,19 @@ func getContentSubType(codec serviceinfo.PayloadCodec) string {
 	}
 }
 
-func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*clientConn, error) {
+func newClientConn(tr grpc.ClientTransport, addr string) (*clientConn, error) {
+	return &clientConn{
+		tr: tr,
+	}, nil
+}
+
+func (c *clientConn) initStream(ctx context.Context) error {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	host := ri.To().ServiceName()
 	if rawURL, ok := ri.To().Tag(rpcinfo.HTTPURL); ok {
 		u, err := url.Parse(rawURL)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		host = u.Host
 	}
@@ -98,15 +104,13 @@ func newClientConn(ctx context.Context, tr grpc.ClientTransport, addr string) (*
 		ContentSubtype: getContentSubType(ri.Config().PayloadCodec()),
 	}
 
-	s, err := tr.NewStream(ctx, callHdr)
+	s, err := c.tr.NewStream(ctx, callHdr)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return &clientConn{
-		tr:   tr,
-		s:    s,
-		desc: &streamDesc{isStreaming: isStreaming},
-	}, nil
+	c.s = s
+	c.desc = &streamDesc{isStreaming: isStreaming}
+	return nil
 }
 
 // fullMethodName returns in the format of "/[$pkg.]$svc/$methodName".

@@ -55,6 +55,9 @@ type cliTransHandler struct {
 func (h *cliTransHandler) NewStream(ctx context.Context, conn net.Conn) (streaming.ClientStream, error) {
 	ri := rpcinfo.GetRPCInfo(ctx)
 	clientConn := conn.(*clientConn)
+	if err := clientConn.initStream(ctx); err != nil {
+		return nil, err
+	}
 	streamx := newClientStream(ctx, ri, clientConn, h)
 	streamx.pipe.Initialize(streamx, h.transPipe)
 	return streamx, nil

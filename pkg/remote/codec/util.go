@@ -52,6 +52,7 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 	}
 	inkSetter.SetMethodName(methodName)
 	var svcInfo *serviceinfo.ServiceInfo
+	var methodInfo serviceinfo.MethodInfo
 	if svcInfo = ink.ServiceInfo(); svcInfo == nil {
 		// for ping pong server, svc info is nil until the request decoded
 		specifier, ok := ri.(rpcinfo.ServiceInfoSpecifier)
@@ -64,10 +65,13 @@ func SetOrCheckMethodName(methodName string, message remote.Message) error {
 			return err
 		}
 	}
+	if methodInfo = svcInfo.MethodInfo(methodName); methodInfo == nil {
+		return remote.NewTransErrorWithMsg(remote.UnknownMethod, fmt.Sprintf("unknown method %s", methodName))
+	}
 	inkSetter.SetPackageName(svcInfo.GetPackageName())
 	inkSetter.SetServiceName(svcInfo.ServiceName)
 	inkSetter.SetServiceInfo(svcInfo)
-	inkSetter.SetMethodInfo(svcInfo.MethodInfo(methodName))
+	inkSetter.SetMethodInfo(methodInfo)
 
 	// unknown method doesn't set methodName for RPCInfo.To(), or lead inconsistent with old version
 	rpcinfo.AsMutableEndpointInfo(ri.To()).SetMethod(methodName)

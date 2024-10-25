@@ -282,6 +282,10 @@ func (s *grpcStream) SendMsg(m interface{}) (err error) {
 	return
 }
 
+func (s *grpcStream) DoFinish(err error) {
+	s.st.DoFinish(err)
+}
+
 func invokeRecvEndpoint() endpoint.RecvEndpoint {
 	return func(stream streaming.Stream, resp interface{}) (err error) {
 		return stream.RecvMsg(resp)

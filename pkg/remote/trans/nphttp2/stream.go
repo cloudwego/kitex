@@ -21,11 +21,8 @@ import (
 	"net"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
-	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
-
 	"github.com/cloudwego/kitex/pkg/remote"
+	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streaming"
 )
@@ -104,19 +101,6 @@ func (s *serverStream) Close() error {
 }
 
 func (s *serverStreamX) Write(ctx context.Context, msg remote.Message) (nctx context.Context, err error) {
-	if bizStatusErr := s.ri.Invocation().BizStatusErr(); bizStatusErr != nil {
-		// BizError: do not send the message
-		var st *status.Status
-		if sterr, ok := bizStatusErr.(status.Iface); ok {
-			st = sterr.GRPCStatus()
-		} else {
-			st = status.New(codes.Internal, bizStatusErr.BizMessage())
-		}
-		grpcStream := s.conn.s
-		grpcStream.SetBizStatusErr(bizStatusErr)
-		s.conn.tr.WriteStatus(grpcStream, st)
-		return ctx, nil
-	}
 	buf := newBuffer(s.conn)
 	defer buf.Release(err)
 
