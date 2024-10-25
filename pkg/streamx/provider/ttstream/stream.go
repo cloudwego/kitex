@@ -28,6 +28,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
+	terrors "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/errors"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
@@ -39,7 +40,7 @@ var (
 	_ StreamMeta                   = (*stream)(nil)
 )
 
-func newStream(trans *transport, mode streamx.StreamingMode, smeta streamFrame) *stream {
+func newStream(ctx context.Context, trans *transport, mode streamx.StreamingMode, smeta streamFrame) *stream {
 	s := new(stream)
 	s.streamFrame = smeta
 	s.trans = trans
@@ -49,6 +50,7 @@ func newStream(trans *transport, mode streamx.StreamingMode, smeta streamFrame) 
 	s.headerSig = make(chan int32, 1)
 	s.trailerSig = make(chan int32, 1)
 	s.StreamMeta = newStreamMeta()
+	s.sio = newStreamIO(ctx)
 	return s
 }
 
@@ -75,6 +77,8 @@ type stream struct {
 	peerEOF    int32
 	headerSig  chan int32
 	trailerSig chan int32
+	sio        *streamIO
+	closeFlag  int32 // 1 means stream is closed in exception sceanario
 
 	StreamMeta
 	metaHandler MetaFrameHandler
@@ -96,7 +100,11 @@ func (s *stream) Method() string {
 	return s.method
 }
 
-func (s *stream) close() {
+// close stream in exception scenario
+func (s *stream) close(exception error) {
+	if !atomic.CompareAndSwapInt32(&s.closeFlag, 0, 1) {
+		return
+	}
 	select {
 	case s.headerSig <- streamSigInactive:
 	default:
@@ -105,6 +113,12 @@ func (s *stream) close() {
 	case s.trailerSig <- streamSigInactive:
 	default:
 	}
+	s.sio.finish(exception)
+	s.trans.streamDelete(s.sid)
+}
+
+func (s *stream) isClosed() bool {
+	return atomic.LoadInt32(&s.closeFlag) == 1
 }
 
 func (s *stream) setMetaFrameHandler(h MetaFrameHandler) {
@@ -119,11 +133,14 @@ func (s *stream) readMetaFrame(intHeader IntHeader, header streamx.Header, paylo
 }
 
 func (s *stream) readHeader(hd streamx.Header) (err error) {
+	if s.header != nil {
+		return terrors.ErrUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
+	}
 	s.header = hd
 	select {
 	case s.headerSig <- streamSigActive:
 	default:
-		return fmt.Errorf("stream[%d] already set header", s.sid)
+		return terrors.ErrUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
 	}
 	klog.Debugf("stream[%s] read header: %v", s.method, hd)
 	return nil
@@ -154,7 +171,7 @@ func (s *stream) sendHeader() (err error) {
 	if wheader == nil {
 		return fmt.Errorf("stream header already sent")
 	}
-	err = s.trans.streamSendHeader(s.sid, s.method, wheader)
+	err = s.trans.streamSendHeader(s, s.method, wheader)
 	return err
 }
 
@@ -162,20 +179,22 @@ func (s *stream) sendHeader() (err error) {
 // readTrailer by server: unblock recv function and return EOF if no unread frame
 func (s *stream) readTrailerFrame(fr *Frame) (err error) {
 	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
-		return fmt.Errorf("stream read a unexcept trailer")
+		return terrors.ErrUnexpectedTrailer.WithCause(fmt.Errorf("unexpected frame: %v", fr))
 	}
 
 	var exception error
 	// when server-side returns non-biz error, it will be wrapped as ApplicationException stored in trailer frame payload
 	if len(fr.payload) > 0 {
 		// exception is type of (*thrift.ApplicationException)
-		_, _, exception = thrift.UnmarshalFastMsg(fr.payload, nil)
+		_, _, err = thrift.UnmarshalFastMsg(fr.payload, nil)
+		exception = terrors.ErrApplicationException.WithCause(err)
 	} else {
 		// when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header
 		bizErr, err := transmeta.ParseBizStatusErr(fr.trailer)
 		if err != nil {
-			exception = err
+			exception = terrors.ErrIllegalBizErr.WithCause(err)
 		} else if bizErr != nil {
+			// bizErr is independent of rpc exception handling
 			exception = bizErr
 		}
 	}
@@ -230,7 +249,7 @@ func (s *stream) sendTrailer(ctx context.Context, ex tException) (err error) {
 		return fmt.Errorf("stream trailer already sent")
 	}
 	klog.Debugf("transport[%d]-stream[%d] send trialer", s.trans.kind, s.sid)
-	return s.trans.streamCloseSend(s.sid, s.method, wtrailer, ex)
+	return s.trans.streamCloseSend(s, s.method, wtrailer, ex)
 }
 
 func (s *stream) finished() bool {
@@ -246,7 +265,7 @@ func (s *stream) setRecvTimeout(timeout time.Duration) {
 }
 
 func (s *stream) SendMsg(ctx context.Context, res any) (err error) {
-	err = s.trans.streamSend(ctx, s.sid, s.method, s.wheader, res)
+	err = s.trans.streamSend(ctx, s, s.method, s.wheader, res)
 	return err
 }
 
@@ -256,7 +275,7 @@ func (s *stream) RecvMsg(ctx context.Context, req any) error {
 		ctx, cancel = context.WithTimeout(ctx, s.recvTimeout)
 		defer cancel()
 	}
-	return s.trans.streamRecv(ctx, s.sid, req)
+	return s.trans.streamRecv(ctx, s, req)
 }
 
 func (s *stream) cancel() {
@@ -311,7 +330,6 @@ func (s *serverStream) close(ex tException) error {
 	if err != nil {
 		return err
 	}
-	err = s.trans.streamDelete(s.sid)
-	s.stream.close()
+	s.stream.close(ex)
 	return err
 }

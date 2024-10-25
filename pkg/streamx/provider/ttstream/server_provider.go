@@ -27,6 +27,7 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/kerrors"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -34,8 +35,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-type serverTransCtxKey struct{}
-type serverStreamCancelCtxKey struct{}
+type (
+	serverTransCtxKey        struct{}
+	serverStreamCancelCtxKey struct{}
+)
 
 func NewServerProvider(sinfo *serviceinfo.ServiceInfo, opts ...ServerProviderOption) (streamx.ServerProvider, error) {
 	sp := new(serverProvider)
@@ -66,7 +69,7 @@ func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Co
 	trans := newTransport(serverTransport, s.sinfo, nconn)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
-		_ = trans.Close()
+		_ = trans.Close(nil)
 	})
 	return context.WithValue(ctx, serverTransCtxKey{}, trans), nil
 }
@@ -81,6 +84,7 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 		return nil, nil, nil
 	}
 	st, err := trans.readStream(ctx)
+	klog.Infof("OnStream readStream, st: %v, err: %v", st, err)
 	if err != nil {
 		return nil, nil, err
 	}

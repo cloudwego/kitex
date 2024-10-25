@@ -23,6 +23,7 @@ import (
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -79,31 +80,30 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 		return nil, err
 	}
 
-	sio, err := trans.newStreamIO(ctx, method, intHeader, strHeader)
+	s, err := trans.newStream(ctx, method, intHeader, strHeader)
 	if err != nil {
 		return nil, err
 	}
-	sio.stream.setRecvTimeout(rconfig.StreamRecvTimeout())
+	s.setRecvTimeout(rconfig.StreamRecvTimeout())
 	// only client can set meta frame handler
-	sio.stream.setMetaFrameHandler(c.metaHandler)
+	s.setMetaFrameHandler(c.metaHandler)
 
 	// if ctx from server side, we should cancel the stream when server handler already returned
 	// TODO: this canceling transmit should be configurable
 	ktx.RegisterCancelCallback(ctx, func() {
-		sio.stream.cancel()
+		s.cancel()
 	})
 
-	cs := newClientStream(sio.stream)
+	cs := newClientStream(s)
 	// the END of a client stream means it should send and recv trailer and not hold by user anymore
 	var ended uint32
-	sio.setEOFCallback(func() {
+	s.sio.setEOFCallback(func() {
 		// if stream is ended by both parties, put the transport back to pool
-		sio.stream.close()
+		s.close(nil)
 		if atomic.AddUint32(&ended, 1) == 2 {
 			if trans.IsActive() {
 				c.transPool.Put(trans)
 			}
-			err = trans.streamDelete(sio.stream.sid)
 		}
 	})
 	runtime.SetFinalizer(cs, func(cstream *clientStream) {
@@ -115,7 +115,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo, callO
 			if trans.IsActive() {
 				c.transPool.Put(trans)
 			}
-			err = trans.streamDelete(sio.stream.sid)
+			err = trans.streamDelete(s.sid)
 		}
 	})
 	return cs, err

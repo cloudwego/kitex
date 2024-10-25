@@ -26,28 +26,28 @@ import (
 
 // Basic error types
 var (
-	ErrInternalException  = &basicError{"internal exception"}
-	ErrServiceDiscovery   = &basicError{"service discovery error"}
-	ErrGetConnection      = &basicError{"get connection error"}
-	ErrLoadbalance        = &basicError{"loadbalance error"}
-	ErrNoMoreInstance     = &basicError{"no more instances to retry"}
-	ErrRPCTimeout         = &basicError{"rpc timeout"}
-	ErrCanceledByBusiness = &basicError{"canceled by business"}
-	ErrTimeoutByBusiness  = &basicError{"timeout by business"}
-	ErrACL                = &basicError{"request forbidden"}
-	ErrCircuitBreak       = &basicError{"forbidden by circuitbreaker"}
-	ErrRemoteOrNetwork    = &basicError{"remote or network error"}
-	ErrOverlimit          = &basicError{"request over limit"}
-	ErrPanic              = &basicError{"panic"}
-	ErrBiz                = &basicError{"biz error"}
+	ErrInternalException  = &basicError{message: "internal exception"}
+	ErrServiceDiscovery   = &basicError{message: "service discovery error"}
+	ErrGetConnection      = &basicError{message: "get connection error"}
+	ErrLoadbalance        = &basicError{message: "loadbalance error"}
+	ErrNoMoreInstance     = &basicError{message: "no more instances to retry"}
+	ErrRPCTimeout         = &basicError{message: "rpc timeout"}
+	ErrCanceledByBusiness = &basicError{message: "canceled by business"}
+	ErrTimeoutByBusiness  = &basicError{message: "timeout by business"}
+	ErrACL                = &basicError{message: "request forbidden"}
+	ErrCircuitBreak       = &basicError{message: "forbidden by circuitbreaker"}
+	ErrRemoteOrNetwork    = &basicError{message: "remote or network error"}
+	ErrOverlimit          = &basicError{message: "request over limit"}
+	ErrPanic              = &basicError{message: "panic"}
+	ErrBiz                = &basicError{message: "biz error"}
 
-	ErrRetry = &basicError{"retry error"}
+	ErrRetry = &basicError{message: "retry error"}
 	// ErrRPCFinish happens when retry enabled and there is one call has finished
-	ErrRPCFinish = &basicError{"rpc call finished"}
+	ErrRPCFinish = &basicError{message: "rpc call finished"}
 	// ErrRoute happens when router fail to route this call
-	ErrRoute = &basicError{"rpc route failed"}
+	ErrRoute = &basicError{message: "rpc route failed"}
 	// ErrPayloadValidation happens when payload validation failed
-	ErrPayloadValidation = &basicError{"payload validation error"}
+	ErrPayloadValidation = &basicError{message: "payload validation error"}
 )
 
 // More detailed error types
@@ -67,11 +67,16 @@ var (
 
 type basicError struct {
 	message string
+	parent  error
 }
 
 // Error implements the error interface.
 func (be *basicError) Error() string {
-	return be.message
+	if be.parent == nil {
+		return be.message
+	}
+	// todo: optimize
+	return "[" + be.parent.Error() + "] " + be.message
 }
 
 // WithCause creates a detailed error which attach the given cause to current error.
@@ -89,9 +94,23 @@ func (be *basicError) WithCauseAndExtraMsg(cause error, extraMsg string) error {
 	return &DetailedError{basic: be, cause: cause, extraMsg: extraMsg}
 }
 
+func (be *basicError) WithChild(msg string) *basicError {
+	return &basicError{parent: be, message: msg}
+}
+
 // Timeout supports the os.IsTimeout checking.
 func (be *basicError) Timeout() bool {
 	return be == ErrRPCTimeout
+}
+
+// Unwrap returns the parent of basic error if it has.
+func (be *basicError) Unwrap() error {
+	return be.parent
+}
+
+// Is returns if the given error matches the current error.
+func (be *basicError) Is(target error) bool {
+	return be == target || be.parent == target || errors.Is(be.parent, target)
 }
 
 // DetailedError contains more information.
@@ -141,7 +160,7 @@ func (de *DetailedError) Unwrap() error {
 
 // Is returns if the given error matches the current error.
 func (de *DetailedError) Is(target error) bool {
-	return de == target || de.basic == target || errors.Is(de.cause, target)
+	return de == target || errors.Is(de.basic, target) || errors.Is(de.cause, target)
 }
 
 // As returns if the given target matches the current error, if so sets

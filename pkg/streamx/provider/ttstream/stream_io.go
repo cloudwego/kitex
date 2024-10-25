@@ -33,8 +33,6 @@ type streamIOMsg struct {
 
 type streamIO struct {
 	ctx       context.Context
-	trigger   chan struct{}
-	stream    *stream
 	pipe      *container.Pipe[streamIOMsg]
 	cache     [1]streamIOMsg
 	exception error // once has exception, the stream should not work normally again
@@ -45,11 +43,9 @@ type streamIO struct {
 	eofCallback func()
 }
 
-func newStreamIO(ctx context.Context, s *stream) *streamIO {
+func newStreamIO(ctx context.Context) *streamIO {
 	sio := new(streamIO)
 	sio.ctx = ctx
-	sio.trigger = make(chan struct{})
-	sio.stream = s
 	sio.pipe = container.NewPipe[streamIOMsg]()
 	return sio
 }
@@ -105,4 +101,15 @@ func (s *streamIO) closeSend() {
 
 func (s *streamIO) cancel() {
 	s.pipe.Cancel()
+}
+
+// finish is used to inject exception
+func (s *streamIO) finish(exception error) {
+	if exception != nil {
+		s.input(context.Background(), streamIOMsg{exception: exception})
+	}
+	// s.pipe.Close()
+	if flag := atomic.AddInt32(&s.eofFlag, 2); (flag == 2 || flag == 3) && s.eofCallback != nil {
+		s.eofCallback()
+	}
 }

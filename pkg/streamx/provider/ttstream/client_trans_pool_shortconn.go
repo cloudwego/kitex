@@ -19,8 +19,9 @@ package ttstream
 import (
 	"time"
 
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/netpoll"
+
+	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 func newShortConnTransPool() transPool {
@@ -41,5 +42,5 @@ func (c *shortConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network string,
 }
 
 func (c *shortConnTransPool) Put(trans *transport) {
-	_ = trans.Close()
+	_ = trans.Close(nil)
 }

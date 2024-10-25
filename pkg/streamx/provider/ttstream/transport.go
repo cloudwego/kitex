@@ -34,6 +34,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
+	terrors "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/errors"
 )
 
 const (
@@ -81,7 +82,7 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 			}
 			// if connection is closed by peer, loop read should return ErrConnClosed error,
 			// so we should close transport here
-			_ = t.Close()
+			_ = t.Close(err)
 		}
 	}()
 	go func() {
@@ -90,7 +91,7 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 			if !isIgnoreError(err) {
 				klog.Warnf("transport[%d] loop write err: %v", t.kind, err)
 			}
-			_ = t.Close()
+			_ = t.Close(err)
 		}
 	}()
 	return t
@@ -99,7 +100,7 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 // Close will close transport and destroy all resource and goroutines
 // server close transport when connection is disconnected
 // client close transport when transPool discard the transport
-func (t *transport) Close() (err error) {
+func (t *transport) Close(ex error) (err error) {
 	if !atomic.CompareAndSwapInt32(&t.closedFlag, 0, 1) {
 		return nil
 	}
@@ -107,9 +108,8 @@ func (t *transport) Close() (err error) {
 	t.spipe.Close()
 	t.fpipe.Close()
 	t.streams.Range(func(key, value any) bool {
-		sio := value.(*streamIO)
-		sio.stream.close()
-		_ = t.streamDelete(sio.stream.sid)
+		s := value.(*stream)
+		s.close(ex)
 		return true
 	})
 	return err
@@ -119,24 +119,23 @@ func (t *transport) IsActive() bool {
 	return atomic.LoadInt32(&t.closedFlag) == 0 && t.conn.IsActive()
 }
 
-func (t *transport) storeStreamIO(ctx context.Context, s *stream) *streamIO {
-	sio := newStreamIO(ctx, s)
-	t.streams.Store(s.sid, sio)
-	return sio
+func (t *transport) storeStream(ctx context.Context, s *stream) {
+	t.streams.Store(s.sid, s)
 }
 
-func (t *transport) loadStreamIO(sid int32) (sio *streamIO, ok bool) {
+func (t *transport) loadStream(sid int32) (s *stream, ok bool) {
 	val, ok := t.streams.Load(sid)
 	if !ok {
-		return sio, false
+		return s, false
 	}
-	sio = val.(*streamIO)
-	return sio, true
+	s = val.(*stream)
+	return s, true
 }
 
 func (t *transport) readFrame(reader bufiox.Reader) error {
 	fr, err := DecodeFrame(context.Background(), reader)
 	if err != nil {
+		// 加上地址信息
 		return err
 	}
 	defer recycleFrame(fr)
@@ -144,9 +143,9 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 
 	switch fr.typ {
 	case metaFrameType:
-		sio, ok := t.loadStreamIO(fr.sid)
+		s, ok := t.loadStream(fr.sid)
 		if ok {
-			err = sio.stream.readMetaFrame(fr.meta, fr.header, fr.payload)
+			err = s.readMetaFrame(fr.meta, fr.header, fr.payload)
 		} else {
 			klog.Errorf("transport[%d] read a unknown stream meta: sid=%d", t.kind, fr.sid)
 		}
@@ -155,14 +154,18 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		case serverTransport:
 			// Header Frame: server recv a new stream
 			smode := t.sinfo.MethodInfo(fr.method).StreamingMode()
-			s := newStream(t, smode, fr.streamFrame)
-			t.storeStreamIO(context.Background(), s)
+			s := newStream(context.Background(), t, smode, fr.streamFrame)
+			t.storeStream(context.Background(), s)
+			// spipe 也应该支持透传 err，否则被 close 掉后拿不到 err
+			klog.Infof("server transport write stream to spipe, s: %v", s)
 			err = t.spipe.Write(context.Background(), s)
 		case clientTransport:
 			// Header Frame: client recv header
-			sio, ok := t.loadStreamIO(fr.sid)
+			s, ok := t.loadStream(fr.sid)
 			if ok {
-				err = sio.stream.readHeader(fr.header)
+				if sErr := s.readHeader(fr.header); sErr != nil {
+					s.close(sErr)
+				}
 			} else {
 				klog.Errorf("transport[%d] read a unknown stream header: sid=%d header=%v",
 					t.kind, fr.sid, fr.header)
@@ -170,17 +173,19 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		}
 	case dataFrameType:
 		// Data Frame: decode and distribute data
-		sio, ok := t.loadStreamIO(fr.sid)
+		s, ok := t.loadStream(fr.sid)
 		if ok {
-			sio.input(context.Background(), streamIOMsg{payload: fr.payload})
+			s.sio.input(context.Background(), streamIOMsg{payload: fr.payload})
 		} else {
 			klog.Errorf("transport[%d] read a unknown stream data: sid=%d", t.kind, fr.sid)
 		}
 	case trailerFrameType:
 		// Trailer Frame: recv trailer, Close read direction
-		sio, ok := t.loadStreamIO(fr.sid)
+		s, ok := t.loadStream(fr.sid)
 		if ok {
-			err = sio.stream.readTrailerFrame(fr)
+			if sErr := s.readTrailerFrame(fr); sErr != nil {
+				s.close(sErr)
+			}
 		} else {
 			// client recv an unknown trailer is in exception,
 			// because the client stream may already be GCed,
@@ -196,6 +201,9 @@ func (t *transport) loopRead() error {
 	reader := newReaderBuffer(t.conn.Reader())
 	for {
 		err := t.readFrame(reader)
+		if errors.Is(err, terrors.ErrConnection) {
+			return err
+		}
 		// read frame return an un-recovered error, so we should close the transport
 		if err != nil {
 			return err
@@ -222,6 +230,7 @@ func (t *transport) loopWrite() error {
 		}
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
+			klog.Infof("%d transport write frame: %v", t.kind, fr)
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}
@@ -239,9 +248,13 @@ func (t *transport) writeFrame(sframe streamFrame, meta IntHeader, ftype int32, 
 	return t.fpipe.Write(context.Background(), frame)
 }
 
-func (t *transport) streamSend(ctx context.Context, sid int32, method string, wheader streamx.Header, res any) (err error) {
+func (t *transport) streamSend(ctx context.Context, s *stream, method string, wheader streamx.Header, res any) (err error) {
+	if s.isClosed() || s.finished() {
+		// todo: 考虑并发安全问题
+		return s.sio.exception
+	}
 	if len(wheader) > 0 {
-		err = t.streamSendHeader(sid, method, wheader)
+		err = t.streamSendHeader(s, method, wheader)
 		if err != nil {
 			return err
 		}
@@ -251,46 +264,38 @@ func (t *transport) streamSend(ctx context.Context, sid int32, method string, wh
 		return err
 	}
 	return t.writeFrame(
-		streamFrame{sid: sid, method: method},
+		streamFrame{sid: s.sid, method: method},
 		nil, dataFrameType, payload,
 	)
 }
 
-func (t *transport) streamSendHeader(sid int32, method string, header streamx.Header) (err error) {
+func (t *transport) streamSendHeader(s *stream, method string, header streamx.Header) (err error) {
 	return t.writeFrame(
-		streamFrame{sid: sid, method: method, header: header},
+		streamFrame{sid: s.sid, method: method, header: header},
 		nil, headerFrameType, nil)
 }
 
-func (t *transport) streamCloseSend(sid int32, method string, trailer streamx.Trailer, ex tException) (err error) {
+func (t *transport) streamCloseSend(s *stream, method string, trailer streamx.Trailer, ex tException) (err error) {
 	var payload []byte
 	if ex != nil {
-		payload, err = EncodeException(context.Background(), method, sid, ex)
+		payload, err = EncodeException(context.Background(), method, s.sid, ex)
 		if err != nil {
 			return err
 		}
 	}
 	err = t.writeFrame(
-		streamFrame{sid: sid, method: method, trailer: trailer},
+		streamFrame{sid: s.sid, method: method, trailer: trailer},
 		nil, trailerFrameType, payload,
 	)
 	if err != nil {
 		return err
 	}
-	sio, ok := t.loadStreamIO(sid)
-	if !ok {
-		return nil
-	}
-	sio.closeSend()
+	s.sio.closeSend()
 	return nil
 }
 
-func (t *transport) streamRecv(ctx context.Context, sid int32, data any) (err error) {
-	sio, ok := t.loadStreamIO(sid)
-	if !ok {
-		return io.EOF
-	}
-	msg, err := sio.output(ctx)
+func (t *transport) streamRecv(ctx context.Context, s *stream, data any) (err error) {
+	msg, err := s.sio.output(ctx)
 	if err != nil {
 		return err
 	}
@@ -301,23 +306,20 @@ func (t *transport) streamRecv(ctx context.Context, sid int32, data any) (err er
 }
 
 func (t *transport) streamCloseRecv(s *stream, exception error) error {
-	sio, ok := t.loadStreamIO(s.sid)
-	if !ok {
-		return fmt.Errorf("stream not found in stream map: sid=%d", s.sid)
-	}
 	if exception != nil {
-		sio.input(context.Background(), streamIOMsg{exception: exception})
+		s.close(exception)
+	} else {
+		s.sio.closeRecv()
 	}
-	sio.closeRecv()
 	return nil
 }
 
 func (t *transport) streamCancel(s *stream) (err error) {
-	sio, ok := t.loadStreamIO(s.sid)
-	if !ok {
-		return fmt.Errorf("stream not found in stream map: sid=%d", s.sid)
-	}
-	sio.cancel()
+	//sio, ok := t.loadStream(s.sid)
+	//if !ok {
+	//	return terrors.ErrStreamNotFound.WithCause(fmt.Errorf("in stream map: sid=%d", s.sid))
+	//}
+	s.sio.cancel()
 	return nil
 }
 
@@ -340,8 +342,9 @@ var clientStreamID int32
 // newStreamIO create new stream on current connection
 // it's typically used by client side
 // newStreamIO is concurrency safe
-func (t *transport) newStreamIO(
-	ctx context.Context, method string, intHeader IntHeader, strHeader streamx.Header) (*streamIO, error) {
+func (t *transport) newStream(
+	ctx context.Context, method string, intHeader IntHeader, strHeader streamx.Header,
+) (*stream, error) {
 	if t.kind != clientTransport {
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
@@ -356,10 +359,10 @@ func (t *transport) newStreamIO(
 	if err != nil {
 		return nil, err
 	}
-	s := newStream(t, smode, streamFrame{sid: sid, method: method})
-	sio := t.storeStreamIO(ctx, s)
+	s := newStream(ctx, t, smode, streamFrame{sid: sid, method: method})
+	t.storeStream(ctx, s)
 	atomic.AddInt32(&t.streamingFlag, 1)
-	return sio, nil
+	return s, nil
 }
 
 // readStream wait for a new incoming stream on current connection
@@ -376,6 +379,7 @@ READ:
 		return s, nil
 	}
 	n, err := t.spipe.Read(ctx, t.scache[0:streamCacheSize])
+	klog.Infof("[%d] transport readStream result: n: %d, err: %v", t.kind, n, err)
 	if err != nil {
 		if errors.Is(err, container.ErrPipeEOF) {
 			return nil, io.EOF

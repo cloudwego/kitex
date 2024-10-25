@@ -9,7 +9,7 @@ import (
 )
 
 type Object interface {
-	Close() error
+	Close(exception error) error
 }
 
 type objectItem struct {
@@ -97,7 +97,7 @@ func (s *ObjectPool) cleaning() {
 					return false, false
 				}
 				deleted++
-				err := o.object.Close()
+				err := o.object.Close(nil)
 				klog.Infof("object is invalid: lastActive=%s, closedErr=%v", o.lastActive.String(), err)
 				return true, true
 			})

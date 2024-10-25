@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/netpoll"
 	"golang.org/x/sync/singleflight"
 
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
@@ -57,15 +58,16 @@ func (tl *muxTransList) Get(sinfo *serviceinfo.ServiceInfo, network string, addr
 	if err != nil {
 		return nil, err
 	}
+	klog.Infof("Dial connection, addr: %s", addr)
 	trans = newTransport(clientTransport, sinfo, conn)
 	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		// peer close
-		_ = trans.Close()
+		_ = trans.Close(nil)
 		return nil
 	})
 	runtime.SetFinalizer(trans, func(trans *transport) {
 		// self close when not hold by user
-		_ = trans.Close()
+		_ = trans.Close(nil)
 	})
 	tl.L.Lock()
 	tl.transports[idx] = trans
