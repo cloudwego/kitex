@@ -380,7 +380,11 @@ func (kc *kClient) Call(ctx context.Context, method string, request, response in
 	}
 
 	// do fallback if with setup
-	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, kc.opt.Fallback, callOpts)
+	fb := kc.opt.Fallback
+	if fb == nil {
+		fb = getContextFallback(ctx)
+	}
+	err, reportErr = doFallbackIfNeeded(ctx, ri, request, response, err, fb, callOpts)
 	return err
 }
 
