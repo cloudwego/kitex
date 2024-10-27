@@ -120,6 +120,9 @@ type Options struct {
 	CtxBackupHandler backup.BackupHandler
 
 	Streaming stream.StreamingConfig
+
+	// for sections
+	SectionConfigs map[string]interface{}
 }
 
 // Apply applies all options.
