@@ -302,7 +302,9 @@ func (kc *kClient) initStreamMiddlewares(ctx context.Context) {
 
 func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) (mws []endpoint.Middleware) {
 	for i := range mwBs {
-		mws = append(mws, mwBs[i](ctx))
+		if mw := mwBs[i](ctx); mw != nil {
+			mws = append(mws, mw)
+		}
 	}
 	return
 }
