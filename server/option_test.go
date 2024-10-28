@@ -89,14 +89,9 @@ func TestProxyOption(t *testing.T) {
 	opts = append(opts, WithServiceAddr(addr))
 	opts = append(opts, WithProxy(&proxyMock{}))
 	svr := NewServer(opts...)
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
-
 	err = svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil)
-
+	goWaitAndStop(t, svr)
 	err = svr.Run()
 	test.Assert(t, err == nil, err)
 	iSvr := svr.(*server)
@@ -135,10 +130,7 @@ func TestExitWaitTimeOption(t *testing.T) {
 	svr, _ := NewTestServer(WithExitWaitTime(testTimeOut))
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
+	goWaitAndStop(t, svr)
 	err = svr.Run()
 	test.Assert(t, err == nil, err)
 	iSvr := svr.(*server)
@@ -152,10 +144,7 @@ func TestMaxConnIdleTimeOption(t *testing.T) {
 	svr, _ := NewTestServer(WithMaxConnIdleTime(testTimeOut))
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
+	goWaitAndStop(t, svr)
 	err = svr.Run()
 	test.Assert(t, err == nil, err)
 	iSvr := svr.(*server)
@@ -176,10 +165,7 @@ func TestTracerOption(t *testing.T) {
 	svr1, _ := NewTestServer()
 	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr1.Stop()
-		test.Assert(t, err == nil, err)
-	})
+	goWaitAndStop(t, svr1)
 	err = svr1.Run()
 	test.Assert(t, err == nil, err)
 	iSvr1 := svr1.(*server)
@@ -190,10 +176,7 @@ func TestTracerOption(t *testing.T) {
 	svr2, _ := NewTestServer(WithTracer(tracer))
 	err = svr2.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr2.Stop()
-		test.Assert(t, err == nil, err)
-	})
+	goWaitAndStop(t, svr2)
 	err = svr2.Run()
 	test.Assert(t, err == nil, err)
 	iSvr2 := svr2.(*server)
@@ -206,10 +189,7 @@ func TestStatsLevelOption(t *testing.T) {
 	svr1, _ := NewTestServer()
 	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr1.Stop()
-		test.Assert(t, err == nil, err)
-	})
+	goWaitAndStop(t, svr1)
 	err = svr1.Run()
 	test.Assert(t, err == nil, err)
 	iSvr1 := svr1.(*server)
@@ -219,10 +199,7 @@ func TestStatsLevelOption(t *testing.T) {
 	svr2, _ := NewTestServer(WithStatsLevel(stats.LevelDetailed))
 	err = svr2.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr2.Stop()
-		test.Assert(t, err == nil, err)
-	})
+	goWaitAndStop(t, svr2)
 	err = svr2.Run()
 	test.Assert(t, err == nil, err)
 	iSvr2 := svr2.(*server)
@@ -240,12 +217,9 @@ func (s *mySuiteOption) Options() []Option {
 // TestSuiteOption tests the creation of a server with SuiteOption option
 func TestSuiteOption(t *testing.T) {
 	svr1, _ := NewTestServer()
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr1.Stop()
-		test.Assert(t, err == nil, err)
-	})
 	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
+	goWaitAndStop(t, svr1)
 	err = svr1.Run()
 	test.Assert(t, err == nil, err)
 	iSvr1 := svr1.(*server)
@@ -261,14 +235,12 @@ func TestSuiteOption(t *testing.T) {
 		WithMaxConnIdleTime(tmpConnIdleTime),
 	}}
 	svr2, _ := NewTestServer(WithSuite(suiteOpt))
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr2.Stop()
-		test.Assert(t, err == nil, err)
-	})
 	err = svr2.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
+	goWaitAndStop(t, svr2)
 	err = svr2.Run()
 	test.Assert(t, err == nil, err)
+
 	iSvr2 := svr2.(*server)
 	test.Assert(t, iSvr2.opt.RemoteOpt.ExitWaitTime != defaultExitWaitTime, iSvr2.opt.RemoteOpt.ExitWaitTime)
 	test.Assert(t, iSvr2.opt.RemoteOpt.MaxConnectionIdleTime != defaultConnectionIdleTime, iSvr2.opt.RemoteOpt.ExitWaitTime)
@@ -280,24 +252,18 @@ func TestSuiteOption(t *testing.T) {
 // TestMuxTransportOption tests the creation of a server,with netpollmux remote.ServerTransHandlerFactory option,
 func TestMuxTransportOption(t *testing.T) {
 	svr1, _ := NewTestServer()
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr1.Stop()
-		test.Assert(t, err == nil, err)
-	})
 	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
+	goWaitAndStop(t, svr1)
 	err = svr1.Run()
 	test.Assert(t, err == nil, err)
 	iSvr1 := svr1.(*server)
 	test.DeepEqual(t, iSvr1.opt.RemoteOpt.SvrHandlerFactory, detection.NewSvrTransHandlerFactory(netpoll.NewSvrTransHandlerFactory(), nphttp2.NewSvrTransHandlerFactory()))
 
 	svr2, _ := NewTestServer(WithMuxTransport())
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr2.Stop()
-		test.Assert(t, err == nil, err)
-	})
 	err = svr2.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
+	goWaitAndStop(t, svr2)
 	err = svr2.Run()
 	test.Assert(t, err == nil, err)
 	iSvr2 := svr2.(*server)
@@ -309,12 +275,10 @@ func TestMuxTransportOption(t *testing.T) {
 func TestPayloadCodecOption(t *testing.T) {
 	t.Run("NotSetPayloadCodec", func(t *testing.T) {
 		svr, _ := NewTestServer()
-		time.AfterFunc(100*time.Millisecond, func() {
-			err := svr.Stop()
-			test.Assert(t, err == nil, err)
-		})
 		err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 		test.Assert(t, err == nil, err)
+
+		goWaitAndStop(t, svr)
 		err = svr.Run()
 		test.Assert(t, err == nil, err)
 		iSvr := svr.(*server)
@@ -334,12 +298,10 @@ func TestPayloadCodecOption(t *testing.T) {
 	})
 	t.Run("SetPreRegisteredProtobufCodec", func(t *testing.T) {
 		svr, _ := NewTestServer(WithPayloadCodec(protobuf.NewProtobufCodec()))
-		time.AfterFunc(100*time.Millisecond, func() {
-			err := svr.Stop()
-			test.Assert(t, err == nil, err)
-		})
 		err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 		test.Assert(t, err == nil, err)
+
+		goWaitAndStop(t, svr)
 		err = svr.Run()
 		test.Assert(t, err == nil, err)
 		iSvr := svr.(*server)
@@ -361,12 +323,9 @@ func TestPayloadCodecOption(t *testing.T) {
 	t.Run("SetPreRegisteredThriftCodec", func(t *testing.T) {
 		thriftCodec := thrift.NewThriftCodecDisableFastMode(false, true)
 		svr, _ := NewTestServer(WithPayloadCodec(thriftCodec))
-		time.AfterFunc(100*time.Millisecond, func() {
-			err := svr.Stop()
-			test.Assert(t, err == nil, err)
-		})
 		err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 		test.Assert(t, err == nil, err)
+		goWaitAndStop(t, svr)
 		err = svr.Run()
 		test.Assert(t, err == nil, err)
 		iSvr := svr.(*server)
@@ -390,12 +349,9 @@ func TestPayloadCodecOption(t *testing.T) {
 		// generic.BinaryThriftGeneric().PayloadCodec() is not the pre registered codec, RemoteOpt.PayloadCodec won't be nil
 		binaryThriftCodec := generic.BinaryThriftGeneric().PayloadCodec()
 		svr, _ := NewTestServer(WithPayloadCodec(binaryThriftCodec))
-		time.AfterFunc(100*time.Millisecond, func() {
-			err := svr.Stop()
-			test.Assert(t, err == nil, err)
-		})
 		err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 		test.Assert(t, err == nil, err)
+		goWaitAndStop(t, svr)
 		err = svr.Run()
 		test.Assert(t, err == nil, err)
 		iSvr := svr.(*server)
@@ -433,13 +389,9 @@ func TestRemoteOptGRPCCfgUintValueOption(t *testing.T) {
 		WithGRPCMaxConcurrentStreams(randUint3),
 		WithGRPCMaxHeaderListSize(randUint4),
 	)
-
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr1.Stop()
-		test.Assert(t, err == nil, err)
-	})
 	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
+	goWaitAndStop(t, svr1)
 	err = svr1.Run()
 	test.Assert(t, err == nil, err)
 	iSvr1 := svr1.(*server)
@@ -461,13 +413,9 @@ func TestGRPCKeepaliveEnforcementPolicyOption(t *testing.T) {
 	svr1, _ := NewTestServer(
 		WithGRPCKeepaliveEnforcementPolicy(kep),
 	)
-
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr1.Stop()
-		test.Assert(t, err == nil, err)
-	})
 	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
+	goWaitAndStop(t, svr1)
 	err = svr1.Run()
 	test.Assert(t, err == nil, err)
 	iSvr1 := svr1.(*server)
@@ -492,13 +440,9 @@ func TestGRPCKeepaliveParamsOption(t *testing.T) {
 	svr1, _ := NewTestServer(
 		WithGRPCKeepaliveParams(kp),
 	)
-
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr1.Stop()
-		test.Assert(t, err == nil, err)
-	})
 	err := svr1.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
+	goWaitAndStop(t, svr1)
 	err = svr1.Run()
 	test.Assert(t, err == nil, err)
 	iSvr1 := svr1.(*server)
@@ -515,10 +459,7 @@ func TestWithProfilerMessageTagging(t *testing.T) {
 	svr, _ := NewTestServer(WithProfilerMessageTagging(msgTagging1), WithProfilerMessageTagging(msgTagging2))
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
+	goWaitAndStop(t, svr)
 	err = svr.Run()
 	test.Assert(t, err == nil, err)
 	iSvr := svr.(*server)
@@ -542,10 +483,7 @@ func TestRefuseTrafficWithoutServiceNamOption(t *testing.T) {
 	svr, _ := NewTestServer(WithRefuseTrafficWithoutServiceName())
 	err := svr.RegisterService(mocks.ServiceInfo(), mocks.MyServiceHandler())
 	test.Assert(t, err == nil, err)
-	time.AfterFunc(100*time.Millisecond, func() {
-		err := svr.Stop()
-		test.Assert(t, err == nil, err)
-	})
+	goWaitAndStop(t, svr)
 	err = svr.Run()
 	test.Assert(t, err == nil, err)
 	iSvr := svr.(*server)

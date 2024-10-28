@@ -161,6 +161,9 @@ func TestConsistPicker_Next_Nil(t *testing.T) {
 
 func TestConsistPicker_Next_NoCache_Consist(t *testing.T) {
 	opt := newTestConsistentHashOption()
+	// large VirtualFactor value may have performance issue in this test
+	// coz Cacheable=false
+	opt.VirtualFactor = 10
 	insList := []discovery.Instance{
 		discovery.NewInstance("tcp", "addr1", 10, nil),
 		discovery.NewInstance("tcp", "addr2", 10, nil),
@@ -275,7 +278,7 @@ func TestWeightedConsistBalance(t *testing.T) {
 			return strconv.Itoa(fastrand.Intn(100000))
 		},
 		Replica:       0,
-		VirtualFactor: 1000,
+		VirtualFactor: 100,
 		Weighted:      true,
 	}
 	inss := makeNInstances(10, 10)

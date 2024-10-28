@@ -48,7 +48,7 @@ jobs:
           go-version: ${{ matrix.go }}
           cache: false # don't use cache for self-hosted runners
       - name: Unit Test
-        run: go test -race -covermode=atomic ./...
+        run: go test -race ./...
 
   codegen-test:
     runs-on: ubuntu-latest
