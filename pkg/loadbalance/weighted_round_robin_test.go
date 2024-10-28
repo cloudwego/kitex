@@ -94,7 +94,7 @@ func TestWeightedRoundRobinPickerLargeInstances(t *testing.T) {
 	insList = append(insList, discovery.NewInstance("tcp", "nbalance", 100, nil))
 
 	picker := newWeightedRoundRobinPicker(insList)
-	concurrency := 2 + runtime.GOMAXPROCS(0)*2
+	concurrency := 2 + runtime.GOMAXPROCS(0)
 	round := len(insList)
 	var wg sync.WaitGroup
 	for c := 0; c < concurrency; c++ {

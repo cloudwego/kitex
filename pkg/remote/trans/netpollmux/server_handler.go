@@ -366,8 +366,22 @@ func (t *svrTransHandler) GracefulShutdown(ctx context.Context) error {
 			return true
 		})
 		// 4. waiting all crrst packets received by client
-		time.Sleep(defaultExitWaitGracefulShutdownTime)
-		close(done)
+		deadline := time.Now().Add(defaultExitWaitGracefulShutdownTime)
+		ticker := time.NewTicker(defaultExitWaitGracefulShutdownTime / 10)
+		defer ticker.Stop()
+		for now := range ticker.C {
+			active := 0
+			t.conns.Range(func(_, v interface{}) bool {
+				if c := v.(*muxSvrConn); c.IsActive() {
+					active++
+				}
+				return true
+			})
+			if active == 0 || now.After(deadline) {
+				close(done)
+				return
+			}
+		}
 	})
 	select {
 	case <-ctx.Done():
