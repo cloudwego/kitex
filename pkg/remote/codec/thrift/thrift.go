@@ -17,13 +17,16 @@
 package thrift
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/thrift/apache"
+	"github.com/cloudwego/kitex/pkg/klog"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec"
@@ -168,6 +171,17 @@ func (c thriftCodec) Marshal(ctx context.Context, message remote.Message, out re
 
 // encodeFastThrift encode with the FastCodec way
 func encodeFastThrift(out bufiox.Writer, methodName string, msgType remote.MessageType, seqID int32, msg thrift.FastCodec) error {
+	debug := methodName == "BatchGetUserCoupon"
+	if debug {
+		before, _ := json.Marshal(msg)
+		defer func() {
+			if paniced := recover(); paniced != nil {
+				after, _ := json.Marshal(msg)
+				equal := bytes.Equal(before, after)
+				klog.Errorf("fast thrift codec panic: equal=%v before=%s after=%s", equal, string(before), string(after))
+			}
+		}()
+	}
 	nw, _ := out.(remote.NocopyWrite)
 	// nocopy write is a special implementation of linked buffer, only bytebuffer implement NocopyWrite do FastWrite
 	msgBeginLen := thrift.Binary.MessageBeginLength(methodName)
