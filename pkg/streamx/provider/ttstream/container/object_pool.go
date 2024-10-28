@@ -23,7 +23,7 @@ import (
 )
 
 type Object interface {
-	Close() error
+	Close(exception error) error
 }
 
 type objectItem struct {
@@ -106,7 +106,7 @@ func (s *ObjectPool) cleaning() {
 					return false, false
 				}
 				deleted++
-				_ = o.object.Close()
+				_ = o.object.Close(nil)
 				return true, true
 			})
 		}

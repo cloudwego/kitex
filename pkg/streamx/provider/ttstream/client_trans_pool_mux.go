@@ -17,6 +17,7 @@
 package ttstream
 
 import (
+	"errors"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -26,6 +27,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	terrors "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/errors"
 )
 
 var _ transPool = (*muxTransPool)(nil)
@@ -60,12 +62,13 @@ func (tl *muxTransList) Get(sinfo *serviceinfo.ServiceInfo, network, addr string
 	trans = newTransport(clientTransport, sinfo, conn)
 	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 		// peer close
-		_ = trans.Close()
+		_ = trans.Close(terrors.ErrTransport.WithCause(errors.New("netpoll connection closed")))
 		return nil
 	})
 	runtime.SetFinalizer(trans, func(trans *transport) {
 		// self close when not hold by user
-		_ = trans.Close()
+		// todo: think about a more ideal error
+		_ = trans.Close(nil)
 	})
 	tl.L.Lock()
 	tl.transports[idx] = trans

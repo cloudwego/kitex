@@ -18,14 +18,14 @@ package streamx_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
-	"github.com/cloudwego/gopkg/protocol/thrift"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	"github.com/cloudwego/kitex/pkg/remote"
+	terrors "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/errors"
 )
 
 const (
@@ -80,10 +80,7 @@ func validateMetadata(ctx context.Context) bool {
 }
 
 func assertNormalErr(t *testing.T, err error) {
-	ex, ok := err.(*thrift.ApplicationException)
-	test.Assert(t, ok, err)
-	test.Assert(t, ex.TypeID() == remote.InternalError, ex.TypeID())
-	test.Assert(t, ex.Msg() == "biz error: "+normalErrMsg, ex.Msg())
+	test.Assert(t, errors.Is(err, terrors.ErrApplicationException), err)
 }
 
 func assertBizErr(t *testing.T, err error) {
