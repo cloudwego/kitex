@@ -36,6 +36,8 @@ func (s *clientStream) Header() (streamx.Header, error) {
 		return make(streamx.Header), nil
 	case streamSigInactive:
 		return nil, ErrClosedStream
+	case streamSigCancel:
+		return nil, ErrCanceledStream
 	}
 	return nil, errors.New("invalid stream signal")
 }
@@ -49,6 +51,8 @@ func (s *clientStream) Trailer() (streamx.Trailer, error) {
 		return make(streamx.Trailer), nil
 	case streamSigInactive:
 		return nil, ErrClosedStream
+	case streamSigCancel:
+		return nil, ErrCanceledStream
 	}
 	return nil, errors.New("invalid stream signal")
 }

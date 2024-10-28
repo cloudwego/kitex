@@ -128,7 +128,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	var ftype int32
 	var fheader streamx.Header
 	var ftrailer streamx.Trailer
-	var fmeta = dp.IntInfo
+	fmeta := dp.IntInfo
 	switch dp.IntInfo[ttheader.FrameType] {
 	case ttheader.FrameTypeMeta:
 		ftype = metaFrameType

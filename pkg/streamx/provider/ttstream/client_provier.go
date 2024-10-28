@@ -80,30 +80,29 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 	if err != nil {
 		return nil, err
 	}
+	trans.setMetaFrameHandler(c.metaHandler)
 
-	sio, err := trans.newStreamIO(ctx, method, intHeader, strHeader)
+	s, err := trans.newStream(ctx, method, intHeader, strHeader)
 	if err != nil {
 		return nil, err
 	}
-	sio.stream.setRecvTimeout(rconfig.StreamRecvTimeout())
-	// only client can set meta frame handler
-	sio.stream.setMetaFrameHandler(c.metaHandler)
+	s.setRecvTimeout(rconfig.StreamRecvTimeout())
 
 	// if ctx from server side, we should cancel the stream when server handler already returned
 	if !c.disableCancelingTransmit {
 		ktx.RegisterCancelCallback(ctx, func() {
-			sio.cancel()
+			s.cancel()
 		})
 	}
 
-	cs := newClientStream(sio.stream)
+	cs := newClientStream(s)
 	runtime.SetFinalizer(cs, func(cstream *clientStream) {
 		// it's safe to call CloseSend twice
 		// we do CloseSend here to ensure stream can be closed normally
 		_ = cstream.CloseSend(ctx)
 
-		sio.close()
-		trans.streamDelete(sio.stream.sid)
+		s.close()
+		trans.deleteStream(s.sid)
 		if trans.IsActive() {
 			c.transPool.Put(trans)
 		}

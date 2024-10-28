@@ -34,7 +34,6 @@ type streamIOMsg struct {
 type streamIO struct {
 	ctx           context.Context
 	trigger       chan struct{}
-	stream        *stream
 	pipe          *container.Pipe[streamIOMsg]
 	cache         [1]streamIOMsg
 	exception     error // once has exception, the stream should not work normally again
@@ -43,11 +42,10 @@ type streamIO struct {
 	closeCallback func(ctx context.Context)
 }
 
-func newStreamIO(ctx context.Context, s *stream) *streamIO {
+func newStreamIO(ctx context.Context) *streamIO {
 	sio := new(streamIO)
 	sio.ctx = ctx
 	sio.trigger = make(chan struct{})
-	sio.stream = s
 	sio.pipe = container.NewPipe[streamIOMsg]()
 	return sio
 }
@@ -105,12 +103,10 @@ func (s *streamIO) closeSend() {
 
 func (s *streamIO) close() {
 	s.pipe.Close()
-	s.stream.close()
 	s.runCloseCallback()
 }
 
 func (s *streamIO) cancel() {
 	s.pipe.Cancel()
-	s.stream.close()
 	s.runCloseCallback()
 }

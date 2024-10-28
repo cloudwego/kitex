@@ -67,6 +67,7 @@ func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
 func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
 	trans := newTransport(serverTransport, s.sinfo, nconn)
+	trans.setMetaFrameHandler(s.metaHandler)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
 		_ = trans.Close()
@@ -92,7 +93,6 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 	if err != nil {
 		return nil, nil, err
 	}
-	st.setMetaFrameHandler(s.metaHandler)
 	if s.headerHandler != nil {
 		ctx, err = s.headerHandler.OnReadStream(ctx, st.meta, st.header)
 		if err != nil {

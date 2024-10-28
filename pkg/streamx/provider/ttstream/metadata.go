@@ -25,11 +25,14 @@ import (
 var (
 	ErrInvalidStreamKind = errors.New("invalid stream kind")
 	ErrClosedStream      = errors.New("stream is closed")
+	ErrCanceledStream    = errors.New("stream is canceled")
 )
 
 // only for meta frame handler
-type IntHeader map[uint16]string
-type StrHeader = streamx.Header
+type (
+	IntHeader map[uint16]string
+	StrHeader = streamx.Header
+)
 
 // ClientStreamMeta cannot send header directly, should send from ctx
 type ClientStreamMeta interface {

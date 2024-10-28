@@ -41,10 +41,13 @@ const (
 	trailerVal = "value1"
 )
 
-func testHeaderAndTrailer(t *testing.T, stream streamx.ClientStreamMetadata) {
+func testHeader(t *testing.T, stream streamx.ClientStreamMetadata) {
 	hd, err := stream.Header()
 	test.Assert(t, err == nil, err)
 	test.Assert(t, hd[headerKey] == headerVal, hd)
+}
+
+func testTrailer(t *testing.T, stream streamx.ClientStreamMetadata) {
 	tl, err := stream.Trailer()
 	test.Assert(t, err == nil, err)
 	test.Assert(t, tl[trailerKey] == trailerVal, tl)

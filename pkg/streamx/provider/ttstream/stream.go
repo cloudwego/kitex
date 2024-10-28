@@ -23,8 +23,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -39,8 +42,15 @@ var (
 	_ StreamMeta                   = (*stream)(nil)
 )
 
-func newStream(trans *transport, mode streamx.StreamingMode, smeta streamFrame) *stream {
+func newStream(ctx context.Context, trans *transport, mode streamx.StreamingMode, smeta streamFrame) *stream {
+	sio := newStreamIO(ctx)
+	copts := streamxcallopt.GetCallOptionsFromCtx(ctx)
+	if copts != nil && copts.StreamCloseCallback != nil {
+		sio.closeCallback = copts.StreamCloseCallback
+	}
+
 	s := new(stream)
+	s.sio = sio
 	s.streamFrame = smeta
 	s.trans = trans
 	s.mode = mode
@@ -64,10 +74,12 @@ const (
 	streamSigNone     int32 = 0
 	streamSigActive   int32 = 1
 	streamSigInactive int32 = -1
+	streamSigCancel   int32 = -2
 )
 
 type stream struct {
 	streamFrame
+	sio        *streamIO
 	trans      *transport
 	mode       streamx.StreamingMode
 	wheader    streamx.Header  // wheader == nil means it already be sent
@@ -78,7 +90,6 @@ type stream struct {
 	trailerSig chan int32
 
 	StreamMeta
-	metaHandler MetaFrameHandler
 	recvTimeout time.Duration
 }
 
@@ -97,6 +108,18 @@ func (s *stream) Method() string {
 	return s.method
 }
 
+func (s *stream) cancel() {
+	select {
+	case s.headerSig <- streamSigCancel:
+	default:
+	}
+	select {
+	case s.trailerSig <- streamSigCancel:
+	default:
+	}
+	s.sio.cancel()
+}
+
 func (s *stream) close() {
 	select {
 	case s.headerSig <- streamSigInactive:
@@ -106,53 +129,27 @@ func (s *stream) close() {
 	case s.trailerSig <- streamSigInactive:
 	default:
 	}
+	s.sio.close()
 }
 
-func (s *stream) setMetaFrameHandler(h MetaFrameHandler) {
-	s.metaHandler = h
-}
-
-func (s *stream) readMetaFrame(intHeader IntHeader, header streamx.Header, payload []byte) (err error) {
-	if s.metaHandler == nil {
-		return nil
-	}
-	return s.metaHandler.OnMetaFrame(s.StreamMeta, intHeader, header, payload)
-}
-
-func (s *stream) readHeader(hd streamx.Header) (err error) {
-	s.header = hd
+func (s *stream) readHeaderFrame(fr *Frame) (err error) {
+	s.header = fr.header
 	select {
 	case s.headerSig <- streamSigActive:
 	default:
 		return fmt.Errorf("stream[%d] already set header", s.sid)
 	}
-	klog.Debugf("stream[%s] read header: %v", s.method, hd)
+	klog.Debugf("stream[%s] read header: %v", s.method, fr.header)
 	return nil
 }
 
-// writeHeader copy kvs into s.wheader
-func (s *stream) writeHeader(hd streamx.Header) error {
-	if s.wheader == nil {
-		return fmt.Errorf("stream header already sent")
-	}
-	for k, v := range hd {
-		s.wheader[k] = v
-	}
+func (s *stream) readDataFrame(fr *Frame) (err error) {
+	s.sio.input(context.Background(), streamIOMsg{payload: fr.payload})
 	return nil
 }
 
-func (s *stream) sendHeader() (err error) {
-	wheader := s.wheader
-	s.wheader = nil
-	if wheader == nil {
-		return fmt.Errorf("stream header already sent")
-	}
-	err = s.trans.streamSendHeader(s.sid, s.method, wheader)
-	return err
-}
-
-// readTrailer by client: unblock recv function and return EOF if no unread frame
-// readTrailer by server: unblock recv function and return EOF if no unread frame
+// readTrailerFrame by client: unblock recv function and return EOF if no unread frame
+// readTrailerFrame by server: unblock recv function and return EOF if no unread frame
 func (s *stream) readTrailerFrame(fr *Frame) (err error) {
 	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
 		return fmt.Errorf("stream read a unexcept trailer")
@@ -185,7 +182,32 @@ func (s *stream) readTrailerFrame(fr *Frame) (err error) {
 	}
 
 	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, exception)
-	return s.trans.streamCloseRecv(s, exception)
+	if exception != nil {
+		s.sio.input(context.Background(), streamIOMsg{exception: exception})
+	}
+	s.sio.closeRecv()
+	return nil
+}
+
+// writeHeader copy kvs into s.wheader
+func (s *stream) writeHeader(hd streamx.Header) error {
+	if s.wheader == nil {
+		return fmt.Errorf("stream header already sent")
+	}
+	for k, v := range hd {
+		s.wheader[k] = v
+	}
+	return nil
+}
+
+func (s *stream) sendHeader() (err error) {
+	wheader := s.wheader
+	s.wheader = nil
+	if wheader == nil {
+		return fmt.Errorf("stream header already sent")
+	}
+	err = s.trans.writeFrame(streamFrame{sid: s.sid, method: s.method, header: wheader}, headerFrameType, nil)
+	return err
 }
 
 func (s *stream) writeTrailer(tl streamx.Trailer) (err error) {
@@ -208,7 +230,19 @@ func (s *stream) sendTrailer(ctx context.Context, ex tException) (err error) {
 		return fmt.Errorf("stream trailer already sent")
 	}
 	klog.Debugf("transport[%d]-stream[%d] send trailer", s.trans.kind, s.sid)
-	return s.trans.streamCloseSend(s.sid, s.method, wtrailer, ex)
+	var payload []byte
+	if ex != nil {
+		payload, err = EncodeException(context.Background(), s.method, s.sid, ex)
+		if err != nil {
+			return err
+		}
+	}
+	err = s.trans.writeFrame(streamFrame{sid: s.sid, method: s.method, trailer: wtrailer}, trailerFrameType, payload)
+	if err != nil {
+		return err
+	}
+	s.sio.closeSend()
+	return nil
 }
 
 func (s *stream) setRecvTimeout(timeout time.Duration) {
@@ -219,17 +253,51 @@ func (s *stream) setRecvTimeout(timeout time.Duration) {
 }
 
 func (s *stream) SendMsg(ctx context.Context, res any) (err error) {
-	err = s.trans.streamSend(ctx, s.sid, s.method, s.wheader, res)
-	return err
+	if len(s.wheader) > 0 {
+		err = s.trans.writeFrame(
+			streamFrame{sid: s.sid, method: s.method, header: s.wheader}, headerFrameType, nil,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	payload, err := EncodePayload(ctx, res)
+	if err != nil {
+		return err
+	}
+	// tracing
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri != nil && ri.Stats() != nil {
+		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
+			rpcStats.IncrSendSize(uint64(len(payload)))
+		}
+	}
+	return s.trans.writeFrame(streamFrame{sid: s.sid, method: s.method}, dataFrameType, payload)
 }
 
-func (s *stream) RecvMsg(ctx context.Context, req any) error {
+func (s *stream) RecvMsg(ctx context.Context, data any) error {
 	if s.recvTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, s.recvTimeout)
 		defer cancel()
 	}
-	return s.trans.streamRecv(ctx, s.sid, req)
+
+	msg, err := s.sio.output(ctx)
+	if err != nil {
+		return err
+	}
+	err = DecodePayload(context.Background(), msg.payload, data.(thrift.FastCodec))
+	// payload will not be access after decode
+	mcache.Free(msg.payload)
+
+	// tracing
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri != nil && ri.Stats() != nil {
+		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
+			rpcStats.IncrRecvSize(uint64(len(msg.payload)))
+		}
+	}
+	return nil
 }
 
 func newClientStream(s *stream) *clientStream {
@@ -280,7 +348,7 @@ func (s *serverStream) close(ex tException) error {
 	if err != nil {
 		return err
 	}
-	s.trans.streamDelete(s.sid)
+	s.trans.deleteStream(s.sid)
 	s.stream.close()
 	return nil
 }

@@ -250,6 +250,7 @@ func TestStreamingBasic(t *testing.T) {
 			t.Logf("=== ClientStream ===")
 			ctx, cs, err := streamClient.ClientStream(octx)
 			test.Assert(t, err == nil, err)
+			testHeader(t, cs)
 			for i := 0; i < round; i++ {
 				req := new(Request)
 				req.Type = int32(i)
@@ -262,7 +263,7 @@ func TestStreamingBasic(t *testing.T) {
 			test.Assert(t, res.Message == "ClientStream", res.Message)
 			atomic.AddInt32(&serverStreamCount, -1)
 			waitServerStreamDone()
-			testHeaderAndTrailer(t, cs)
+			testTrailer(t, cs)
 			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(round))
 			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(1))
 			atomic.StoreInt32(&serverRecvCount, 0)
@@ -276,6 +277,9 @@ func TestStreamingBasic(t *testing.T) {
 			req.Message = "ServerStream"
 			ctx, ss, err := streamClient.ServerStream(octx, req)
 			test.Assert(t, err == nil, err)
+			testHeader(t, ss)
+			err = ss.CloseSend(ctx)
+			test.Assert(t, err == nil, err)
 			received := 0
 			for {
 				res, err := ss.Recv(ctx)
@@ -286,11 +290,9 @@ func TestStreamingBasic(t *testing.T) {
 				received++
 				t.Logf("Client ServerStream recv: %v", res)
 			}
-			err = ss.CloseSend(ctx)
-			test.Assert(t, err == nil, err)
 			atomic.AddInt32(&serverStreamCount, -1)
 			waitServerStreamDone()
-			testHeaderAndTrailer(t, ss)
+			testTrailer(t, ss)
 			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(1))
 			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(received))
 			atomic.StoreInt32(&serverRecvCount, 0)
@@ -307,6 +309,7 @@ func TestStreamingBasic(t *testing.T) {
 				go func() {
 					ctx, bs, err := streamClient.BidiStream(octx)
 					test.Assert(t, err == nil, err)
+					testHeader(t, bs)
 					msg := "BidiStream"
 					var wg sync.WaitGroup
 					wg.Add(2)
@@ -335,7 +338,7 @@ func TestStreamingBasic(t *testing.T) {
 						}
 						test.Assert(t, i == round, i)
 					}()
-					testHeaderAndTrailer(t, bs)
+					testTrailer(t, bs)
 				}()
 			}
 			waitServerStreamDone()
@@ -574,6 +577,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 
 					ctx, bs, err := streamClient.BidiStream(octx)
 					test.Assert(t, err == nil, err)
+					testHeader(t, bs)
 					req := new(Request)
 					req.Message = msg
 					err = bs.Send(ctx, req)
@@ -584,8 +588,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 					err = bs.CloseSend(ctx)
 					test.Assert(t, err == nil, err)
 					test.Assert(t, res.Message == msg, res.Message)
-
-					testHeaderAndTrailer(t, bs)
+					testTrailer(t, bs)
 				}()
 			}
 			wg.Wait()
