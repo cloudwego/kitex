@@ -16,7 +16,9 @@
 
 package errors
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	ErrUnexpectedHeader     = &errType{message: "unexpected header frame"}
@@ -34,7 +36,7 @@ type errType struct {
 }
 
 func (e *errType) WithCause(err error) error {
-	return &errType{basic: e, cause: err}
+	return &errType{message: e.message, basic: e, cause: err}
 }
 
 func (e *errType) Error() string {

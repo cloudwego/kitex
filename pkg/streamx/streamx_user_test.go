@@ -32,13 +32,15 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/klog"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
+
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote/codec/thrift"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/streamxserver"
 	"github.com/cloudwego/kitex/transport"
@@ -58,7 +60,7 @@ func init() {
 	providerTestCases = append(providerTestCases, testCase{Name: "TTHeader_LongConn", ClientProvider: cp, ServerProvider: sp})
 	cp, _ = ttstream.NewClientProvider(streamingServiceInfo, ttstream.WithClientShortConnPool())
 	providerTestCases = append(providerTestCases, testCase{Name: "TTHeader_ShortConn", ClientProvider: cp, ServerProvider: sp})
-	cp, _ = ttstream.NewClientProvider(streamingServiceInfo, ttstream.WithClientMuxConnPool())
+	cp, _ = ttstream.NewClientProvider(streamingServiceInfo, ttstream.WithClientMuxConnPool(ttstream.MuxConnConfig{PoolSize: 8, MaxIdleTimeout: time.Millisecond * 1000}))
 	providerTestCases = append(providerTestCases, testCase{Name: "TTHeader_Mux", ClientProvider: cp, ServerProvider: sp})
 }
 
@@ -66,7 +68,7 @@ func TestMain(m *testing.M) {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
-	// klog.SetLevel(klog.LevelDebug)
+	klog.SetLevel(klog.LevelDebug)
 	m.Run()
 }
 
@@ -543,8 +545,9 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			}
 
 			t.Logf("=== Checking streams GCed ===")
+			ngBefore := runtime.NumGoroutine()
 			streams := 100
-			streamList := make([]streamx.ServerStream, streams)
+			streamList := make([]streamx.ClientStream, streams)
 			atomic.StoreInt32(&streamStarted, 0)
 			for i := 0; i < streams; i++ {
 				_, bs, err := streamClient.BidiStream(octx)
@@ -553,7 +556,6 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			}
 			waitStreamStarted(streams)
 			// before GC
-			ngBefore := runtime.NumGoroutine()
 			test.Assert(t, runtime.NumGoroutine() > streams, runtime.NumGoroutine())
 			// after GC
 			for i := 0; i < streams; i++ {
@@ -567,6 +569,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 
 			t.Logf("=== Checking Streams Called and GCed ===")
 			streams = 100
+			ngBefore = runtime.NumGoroutine()
 			for i := 0; i < streams; i++ {
 				wg.Add(1)
 				go func() {
@@ -589,6 +592,42 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 				}()
 			}
 			wg.Wait()
+			for runtime.NumGoroutine() > ngBefore {
+				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
+				runtime.GC()
+				time.Sleep(time.Millisecond * 50)
+			}
+
+			t.Logf("=== Checking Server Streaming ===")
+			streams = 100
+			ngBefore = runtime.NumGoroutine()
+			for i := 0; i < streams; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+
+					req := new(Request)
+					req.Message = msg
+					ctx, ss, err := streamClient.ServerStream(octx, req)
+					test.Assert(t, err == nil, err)
+
+					for {
+						res, err := ss.Recv(ctx)
+						if err == io.EOF {
+							break
+						}
+						test.Assert(t, err == nil, err)
+						test.Assert(t, res.Message == msg, res.Message)
+					}
+					testHeaderAndTrailer(t, ss)
+				}()
+			}
+			wg.Wait()
+			for runtime.NumGoroutine() > ngBefore {
+				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
+				runtime.GC()
+				time.Sleep(time.Millisecond * 50)
+			}
 		})
 	}
 }

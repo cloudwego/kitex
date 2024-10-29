@@ -20,44 +20,39 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sync/atomic"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 )
+
+// streamIO is an abstraction layer for stream level IO operations
+type streamIO struct {
+	pipe      *container.Pipe[streamIOMsg]
+	cache     [1]streamIOMsg
+	exception error // once has exception, the stream should not work normally again
+}
 
 type streamIOMsg struct {
 	payload   []byte
 	exception error
 }
 
-type streamIO struct {
-	ctx           context.Context
-	pipe          *container.Pipe[streamIOMsg]
-	cache         [1]streamIOMsg
-	exception     error // once has exception, the stream should not work normally again
-	eofFlag       int32
-	callbackFlag  int32
-	closeCallback func(ctx context.Context)
-}
-
-func newStreamIO(ctx context.Context) *streamIO {
+func newStreamIO() *streamIO {
 	sio := new(streamIO)
-	sio.ctx = ctx
 	sio.pipe = container.NewPipe[streamIOMsg]()
 	return sio
 }
 
-func (s *streamIO) input(ctx context.Context, msg streamIOMsg) {
-	err := s.pipe.Write(ctx, msg)
+func (s *streamIO) input(ctx context.Context, payload []byte) {
+	err := s.pipe.Write(ctx, streamIOMsg{payload: payload})
 	if err != nil {
 		klog.Errorf("pipe write failed: %v", err)
 	}
 }
 
-func (s *streamIO) output(ctx context.Context) (msg streamIOMsg, err error) {
+func (s *streamIO) output(ctx context.Context) (payload []byte, err error) {
 	if s.exception != nil {
-		return msg, s.exception
+		return nil, s.exception
 	}
 
 	n, err := s.pipe.Read(ctx, s.cache[:])
@@ -66,50 +61,27 @@ func (s *streamIO) output(ctx context.Context) (msg streamIOMsg, err error) {
 			err = io.EOF
 		}
 		s.exception = err
-		return msg, s.exception
+		return nil, s.exception
 	}
 	if n == 0 {
 		s.exception = io.EOF
-		return msg, s.exception
+		return nil, s.exception
 	}
-	msg = s.cache[0]
+	msg := s.cache[0]
 	if msg.exception != nil {
 		s.exception = msg.exception
-		return msg, s.exception
+		return nil, s.exception
 	}
-	return msg, nil
-}
-
-func (s *streamIO) runCloseCallback() {
-	if s.closeCallback != nil && atomic.CompareAndSwapInt32(&s.callbackFlag, 0, 1) {
-		s.closeCallback(s.ctx)
-	}
-}
-
-func (s *streamIO) closeRecv() {
-	s.pipe.Close()
-	if s.closeCallback != nil && atomic.AddInt32(&s.eofFlag, 1) == 2 {
-		s.runCloseCallback()
-	}
-}
-
-func (s *streamIO) closeSend() {
-	if s.closeCallback != nil && atomic.AddInt32(&s.eofFlag, 1) == 2 {
-		s.runCloseCallback()
-	}
+	return msg.payload, nil
 }
 
 func (s *streamIO) cancel() {
 	s.pipe.Cancel()
-	s.runCloseCallback()
 }
 
 func (s *streamIO) close(exception error) {
 	if exception != nil {
-		s.input(context.Background(), streamIOMsg{exception: exception})
+		_ = s.pipe.Write(context.Background(), streamIOMsg{exception: exception})
 	}
 	s.pipe.Close()
-	if flag := atomic.AddInt32(&s.eofFlag, 2); (flag == 2 || flag == 3) && s.closeCallback != nil {
-		s.runCloseCallback()
-	}
 }

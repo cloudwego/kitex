@@ -23,8 +23,10 @@ import (
 	"github.com/cloudwego/kitex/pkg/stats"
 )
 
+// EventHandler define stats event handler
 type EventHandler func(ctx context.Context, evt stats.Event, err error)
 
+// ClientOptions define the client options
 type ClientOptions struct {
 	RecvTimeout   time.Duration
 	StreamMWs     []StreamMiddleware

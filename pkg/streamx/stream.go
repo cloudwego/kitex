@@ -85,6 +85,7 @@ const (
 	StreamingBidirectional = serviceinfo.StreamingBidirectional
 )
 
+// Stream define stream APIs
 type Stream interface {
 	Mode() StreamingMode
 	Service() string
@@ -93,85 +94,85 @@ type Stream interface {
 	RecvMsg(ctx context.Context, m any) error
 }
 
+// ClientStream define client stream APIs
 type ClientStream interface {
 	Stream
+	ClientStreamMetadata
 	CloseSend(ctx context.Context) error
 }
 
+// ServerStream define server stream APIs
 type ServerStream interface {
 	Stream
+	ServerStreamMetadata
 }
 
-// client 必须通过 metainfo.WithValue(ctx, ..) 给下游传递信息
-// client 必须通过 metainfo.GetValue(ctx, ..) 拿到当前 server 的透传信息
-// client 必须通过 Header() 拿到下游 server 的透传信息
+// ClientStreamMetadata define metainfo getter API
+// client should use metainfo.WithValue(ctx, ..) to transmit metainfo to server
+// client should use Header() to get metainfo from server
+// client should use metainfo.GetValue(ctx, ..) get current server handler's metainfo
 type ClientStreamMetadata interface {
 	Header() (Header, error)
 	Trailer() (Trailer, error)
 }
 
-// server 可以通过 Set/SendXXX 给上游回传信息
+// ServerStreamMetadata define metainfo setter API
+// server should use SetHeader/SendHeader/SetTrailer to transmit metainfo to client
 type ServerStreamMetadata interface {
 	SetHeader(hd Header) error
 	SendHeader(hd Header) error
 	SetTrailer(hd Trailer) error
 }
 
+// ServerStreamingClient define client side server streaming APIs
 type ServerStreamingClient[Res any] interface {
 	Recv(ctx context.Context) (*Res, error)
 	ClientStream
-	ClientStreamMetadata
 }
 
+// ServerStreamingServer define server side server streaming APIs
 type ServerStreamingServer[Res any] interface {
 	Send(ctx context.Context, res *Res) error
 	ServerStream
-	ServerStreamMetadata
 }
 
+// ClientStreamingClient define client side client streaming APIs
 type ClientStreamingClient[Req, Res any] interface {
 	Send(ctx context.Context, req *Req) error
 	CloseAndRecv(ctx context.Context) (*Res, error)
 	ClientStream
-	ClientStreamMetadata
 }
 
+// ClientStreamingServer define server side client streaming APIs
 type ClientStreamingServer[Req, Res any] interface {
 	Recv(ctx context.Context) (*Req, error)
-	// SendAndClose(ctx context.Context, res *Res) error
 	ServerStream
-	ServerStreamMetadata
 }
 
+// BidiStreamingClient define client side bidi streaming APIs
 type BidiStreamingClient[Req, Res any] interface {
 	Send(ctx context.Context, req *Req) error
 	Recv(ctx context.Context) (*Res, error)
 	ClientStream
-	ClientStreamMetadata
 }
 
+// BidiStreamingServer define server side bidi streaming APIs
 type BidiStreamingServer[Req, Res any] interface {
 	Recv(ctx context.Context) (*Req, error)
 	Send(ctx context.Context, res *Res) error
 	ServerStream
-	ServerStreamMetadata
 }
 
-type GenericStreamIOMiddlewareSetter interface {
-	SetStreamSendEndpoint(e StreamSendEndpoint)
-	SetStreamRecvEndpoint(e StreamSendEndpoint)
-}
-
+// NewGenericClientStream return a generic client stream
 func NewGenericClientStream[Req, Res any](cs ClientStream) *GenericClientStream[Req, Res] {
 	return &GenericClientStream[Req, Res]{
-		ClientStream:         cs,
-		ClientStreamMetadata: cs.(ClientStreamMetadata),
+		ClientStream: cs,
 	}
 }
 
+// GenericClientStream wrap stream IO with Send/Recv middlewares
 type GenericClientStream[Req, Res any] struct {
 	ClientStream
-	ClientStreamMetadata
 	StreamSendMiddleware
 	StreamRecvMiddleware
 }
@@ -219,16 +220,16 @@ func (x *GenericClientStream[Req, Res]) CloseAndRecv(ctx context.Context) (*Res,
 	return x.Recv(ctx)
 }
 
+// NewGenericServerStream return generic server stream
 func NewGenericServerStream[Req, Res any](ss ServerStream) *GenericServerStream[Req, Res] {
 	return &GenericServerStream[Req, Res]{
-		ServerStream:         ss,
-		ServerStreamMetadata: ss.(ServerStreamMetadata),
+		ServerStream: ss,
 	}
 }
 
+// GenericServerStream wrap stream IO with Send/Recv middlewares
 type GenericServerStream[Req, Res any] struct {
 	ServerStream
-	ServerStreamMetadata
 	StreamSendMiddleware
 	StreamRecvMiddleware
 }

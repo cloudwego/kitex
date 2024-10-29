@@ -20,7 +20,7 @@ import (
 	"context"
 )
 
-type StreamCloseCallback func(ctx context.Context)
+type StreamCloseCallback func()
 
 type CallOptions struct {
 	StreamCloseCallback StreamCloseCallback

@@ -17,25 +17,35 @@
 package ttstream
 
 import (
+	"context"
 	"errors"
 
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
-var (
-	_ ClientStreamMeta = (*clientStream)(nil)
-	_ ServerStreamMeta = (*serverStream)(nil)
-)
+var _ ClientStreamMeta = (*clientStream)(nil)
+
+func newClientStream(s *stream, pool transPool) *clientStream {
+	cs := &clientStream{stream: s, pool: pool}
+	return cs
+}
+
+type clientStream struct {
+	*stream
+	pool transPool
+}
 
 func (s *clientStream) Header() (streamx.Header, error) {
 	sig := <-s.headerSig
 	switch sig {
-	case streamSigActive:
-		return s.header, nil
 	case streamSigNone:
 		return make(streamx.Header), nil
+	case streamSigActive:
+		return s.header, nil
 	case streamSigInactive:
 		return nil, ErrClosedStream
+	case streamSigCancel:
+		return nil, ErrCanceledStream
 	}
 	return nil, errors.New("invalid stream signal")
 }
@@ -43,27 +53,32 @@ func (s *clientStream) Header() (streamx.Header, error) {
 func (s *clientStream) Trailer() (streamx.Trailer, error) {
 	sig := <-s.trailerSig
 	switch sig {
-	case streamSigActive:
-		return s.trailer, nil
 	case streamSigNone:
 		return make(streamx.Trailer), nil
+	case streamSigActive:
+		return s.trailer, nil
 	case streamSigInactive:
 		return nil, ErrClosedStream
+	case streamSigCancel:
+		return nil, ErrCanceledStream
 	}
 	return nil, errors.New("invalid stream signal")
 }
 
-func (s *serverStream) SetHeader(hd streamx.Header) error {
-	return s.writeHeader(hd)
+func (s *clientStream) RecvMsg(ctx context.Context, req any) error {
+	return s.stream.RecvMsg(ctx, req)
 }
 
-func (s *serverStream) SendHeader(hd streamx.Header) error {
-	if err := s.writeHeader(hd); err != nil {
-		return err
+// CloseSend by clientStream only send trailer frame and will not close the stream
+func (s *clientStream) CloseSend(ctx context.Context) error {
+	return s.closeSend(nil)
+}
+
+func clientStreamFinalizer(s *clientStream) {
+	// it's safe to call CloseSend twice
+	// we do CloseSend here to ensure stream can be closed normally
+	_ = s.CloseSend(context.Background())
+	if s.pool != nil && s.stream.trans != nil {
+		s.pool.Put(s.stream.trans)
 	}
-	return s.stream.sendHeader()
-}
-
-func (s *serverStream) SetTrailer(tl streamx.Trailer) error {
-	return s.writeTrailer(tl)
 }

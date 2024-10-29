@@ -34,7 +34,7 @@ func TestFrameCodec(t *testing.T) {
 		sid:    0,
 		method: "method",
 		header: map[string]string{"key": "value"},
-	}, nil, headerFrameType, []byte("hello world"))
+	}, headerFrameType, []byte("hello world"))
 
 	for i := 0; i < 10; i++ {
 		wframe.sid = int32(i)
@@ -53,25 +53,25 @@ func TestFrameCodec(t *testing.T) {
 }
 
 func TestFrameWithoutPayloadCodec(t *testing.T) {
-	rmsg := new(TestRequest)
+	rmsg := new(testRequest)
 	rmsg.A = 1
 	payload, err := EncodePayload(context.Background(), rmsg)
 	test.Assert(t, err == nil, err)
 
-	wmsg := new(TestRequest)
+	wmsg := new(testRequest)
 	err = DecodePayload(context.Background(), payload, wmsg)
 	test.Assert(t, err == nil, err)
 	test.DeepEqual(t, wmsg, rmsg)
 }
 
 func TestPayloadCodec(t *testing.T) {
-	rmsg := new(TestRequest)
+	rmsg := new(testRequest)
 	rmsg.A = 1
 	rmsg.B = "hello world"
 	payload, err := EncodePayload(context.Background(), rmsg)
 	test.Assert(t, err == nil, err)
 
-	wmsg := new(TestRequest)
+	wmsg := new(testRequest)
 	err = DecodePayload(context.Background(), payload, wmsg)
 	test.Assert(t, err == nil, err)
 	test.DeepEqual(t, wmsg, rmsg)
