@@ -68,7 +68,7 @@ func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Co
 	trans := newTransport(serverTransport, s.sinfo, nconn)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
-		_ = trans.Close()
+		_ = trans.Close(nil)
 	})
 	return context.WithValue(ctx, serverTransCtxKey{}, trans), nil
 }
