@@ -208,9 +208,8 @@ func (p *{{$TypeName}}) DeepCopy(s interface{}) error {
 const StructLikeFastWrite = `
 {{define "StructLikeFastWrite"}}
 {{- $TypeName := .GoName}}
-// for compatibility
 func (p *{{$TypeName}}) FastWrite(buf []byte) int {
-	return 0
+	return p.FastWriteNocopy(buf, nil)
 }
 {{- end}}{{/* define "StructLikeFastWrite" */}}
 `
