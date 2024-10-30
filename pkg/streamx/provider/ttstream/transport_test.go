@@ -1,3 +1,5 @@
+//go:build !windows
+
 /*
  * Copyright 2024 CloudWeGo Authors
  *
