@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/cloudwego/kitex/pkg/endpoint/client"
 	"github.com/cloudwego/kitex/pkg/kerrors"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -89,7 +90,7 @@ func (kc *kClient) StreamX(ctx context.Context, method string) (streaming.Client
 	return kc.sEps(ctx)
 }
 
-func (kc *kClient) connectStreamEndpoint() (InnerEndpoint, error) {
+func (kc *kClient) connectStreamEndpoint() (client.InnerEndpoint, error) {
 	transPipl, err := newCliTransHandler(kc.opt.RemoteOpt)
 	if err != nil {
 		return nil, err

@@ -18,6 +18,11 @@ type StreamEndpoint func(ctx context.Context, st streaming.ServerStream) (err er
 
 type StreamMiddleware func(next StreamEndpoint) StreamEndpoint
 
+type StreamRecvEndpoint func(stream streaming.ServerStream, message interface{}) (err error)
+
+// RecvMiddleware deal with input Endpoint and output Endpoint.
+type StreamRecvMiddleware func(next StreamRecvEndpoint) StreamRecvEndpoint
+
 func InnerChain(mws ...InnerMiddleware) InnerMiddleware {
 	return func(next InnerEndpoint) InnerEndpoint {
 		for i := len(mws) - 1; i >= 0; i-- {

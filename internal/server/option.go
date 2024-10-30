@@ -22,7 +22,9 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
 	"github.com/cloudwego/localsession/backup"
 
 	"github.com/cloudwego/kitex/internal/stream"
@@ -53,6 +55,24 @@ func init() {
 	remote.PutPayloadCode(serviceinfo.Protobuf, protobuf.NewProtobufCodec())
 }
 
+type UnaryOption struct {
+	F func(o *UnaryOptions, di *utils.Slice)
+}
+
+type UnaryOptions struct {
+	RPCTimeout       time.Duration
+	UnaryMiddlewares []sep.UnaryMiddleware
+}
+
+type StreamOption struct {
+	F func(o *StreamOptions, di *utils.Slice)
+}
+
+type StreamOptions struct {
+	StreamMiddlewares     []sep.StreamMiddleware
+	StreamRecvMiddlewares []sep.StreamRecvMiddleware
+}
+
 // Option is the only way to config a server.
 type Option struct {
 	F func(o *Options, di *utils.Slice)
@@ -64,6 +84,9 @@ type Options struct {
 	Configs  rpcinfo.RPCConfig
 	LockBits int
 	Once     *configutil.OptionOnce
+
+	UnaryOptions  *UnaryOptions
+	StreamOptions *StreamOptions
 
 	MetaHandlers []remote.MetaHandler
 

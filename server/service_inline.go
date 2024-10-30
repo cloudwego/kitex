@@ -23,6 +23,8 @@ import (
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
 
+	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
+
 	"github.com/cloudwego/kitex/pkg/consts"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -132,5 +134,5 @@ func (s *server) BuildServiceInlineInvokeChain() endpoint.Endpoint {
 	smws := s.compatibleMiddlewares(context.Background())
 	unaryMw := s.buildUnaryMiddlewares()
 	mws = append(mws, smws...)
-	return endpoint.Chain(mws...)(endpoint.Endpoint(UnaryChain(unaryMw...)(innerHandlerEp)))
+	return endpoint.Chain(mws...)(endpoint.Endpoint(sep.UnaryChain(unaryMw...)(innerHandlerEp)))
 }

@@ -24,6 +24,8 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
+	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
+
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -53,6 +55,14 @@ type Options = internal_server.Options
 type Suite interface {
 	Options() []Option
 }
+
+type UnaryOption = internal_server.UnaryOption
+
+type UnaryOptions = internal_server.UnaryOptions
+
+type StreamOption = internal_server.StreamOption
+
+type StreamOptions = internal_server.StreamOptions
 
 // WithSuite adds an option suite for server.
 func WithSuite(suite Suite) Option {
@@ -400,5 +410,28 @@ func WithRefuseTrafficWithoutServiceName() Option {
 func WithEnableContextTimeout(enable bool) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
 		o.EnableContextTimeout = enable
+	}}
+}
+
+func WithUnaryOptions(opts ...UnaryOption) Option {
+	return Option{F: func(o *internal_server.Options, di *utils.Slice) {
+		if o.UnaryOptions == nil {
+			o.UnaryOptions = &UnaryOptions{}
+		}
+		for _, opt := range opts {
+			opt.F(o.UnaryOptions, nil)
+		}
+	}}
+}
+
+func WithUnaryMiddleware(mw sep.UnaryMiddleware) UnaryOption {
+	return UnaryOption{F: func(o *UnaryOptions, di *utils.Slice) {
+		o.UnaryMiddlewares = append(o.UnaryMiddlewares, mw)
+	}}
+}
+
+func WithUnaryRPCTimeout(t time.Duration) UnaryOption {
+	return UnaryOption{F: func(o *internal_server.UnaryOptions, di *utils.Slice) {
+		o.RPCTimeout = t
 	}}
 }

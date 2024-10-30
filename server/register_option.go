@@ -28,8 +28,6 @@ type RegisterOption struct {
 // RegisterOptions is used to config service registration.
 type RegisterOptions struct {
 	IsFallbackService bool
-	UnaryMiddlewares  []UnaryMiddleware
-	StreamMiddlewares []StreamMiddleware
 	Middlewares       []endpoint.Middleware
 }
 
@@ -45,18 +43,6 @@ func ApplyRegisterOptions(opts []RegisterOption, o *RegisterOptions) {
 	for _, op := range opts {
 		op.F(o)
 	}
-}
-
-func WithServiceUnaryMiddleware(mw UnaryMiddleware) RegisterOption {
-	return RegisterOption{F: func(o *RegisterOptions) {
-		o.UnaryMiddlewares = append(o.UnaryMiddlewares, mw)
-	}}
-}
-
-func WithServiceStreamMiddleware(mw StreamMiddleware) RegisterOption {
-	return RegisterOption{F: func(o *RegisterOptions) {
-		o.StreamMiddlewares = append(o.StreamMiddlewares, mw)
-	}}
 }
 
 // WithServiceMiddleware add middleware for a single service

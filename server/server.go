@@ -29,6 +29,8 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
+	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
+
 	"github.com/cloudwego/kitex/pkg/streaming"
 
 	"github.com/cloudwego/kitex/pkg/remote/trans"
@@ -66,7 +68,7 @@ type server struct {
 	targetSvcInfo *serviceinfo.ServiceInfo
 
 	// actual rpc service implement of biz
-	eps InnerEndpoint
+	eps sep.InnerEndpoint
 	// for compatible with ping pong server
 	unaryEps endpoint.Endpoint
 	svr      remotesvr.Server
@@ -150,7 +152,7 @@ func (s *server) initOrResetRPCInfoFunc() func(rpcinfo.RPCInfo, net.Addr) rpcinf
 	}
 }
 
-func (s *server) buildInnerMiddlewares(ctx context.Context) []InnerMiddleware {
+func (s *server) buildInnerMiddlewares(ctx context.Context) []sep.InnerMiddleware {
 	// register server inner middlewares
 	return nil
 }
@@ -179,7 +181,7 @@ func (s *server) compatibleMiddlewares(ctx context.Context) []endpoint.Middlewar
 func (s *server) buildInvokeChain(ctx context.Context) {
 	imws := s.buildInnerMiddlewares(ctx)
 	iep := s.lastInnerEndpoint(ctx)
-	s.eps = InnerChain(imws...)(iep)
+	s.eps = sep.InnerChain(imws...)(iep)
 }
 
 // RegisterService should not be called by users directly.
@@ -363,10 +365,10 @@ func (s *server) buildCoreMiddleware() endpoint.Middleware {
 
 func (s *server) lastCompatibleEndpoint(ctx context.Context) endpoint.Endpoint {
 	unaryMw := s.buildUnaryMiddlewares()
-	unaryEp := UnaryChain(unaryMw...)(s.invokeHandleEndpoint())
+	unaryEp := sep.UnaryChain(unaryMw...)(s.invokeHandleEndpoint())
 
 	sgteamMw := s.buildStreamMiddlewares()
-	streamEp := StreamChain(sgteamMw...)(s.streamHandleEndpoint())
+	streamEp := sep.StreamChain(sgteamMw...)(s.streamHandleEndpoint())
 
 	return func(ctx context.Context, req, resp interface{}) (err error) {
 		if st, ok := req.(streaming.Args); ok {
@@ -391,7 +393,7 @@ func (s *server) serviceAndMethodInfo(ri rpcinfo.RPCInfo) (svcInfo *serviceinfo.
 	return nil, nil, nil
 }
 
-func (s *server) lastInnerEndpoint(ctx context.Context) InnerEndpoint {
+func (s *server) lastInnerEndpoint(ctx context.Context) sep.InnerEndpoint {
 	cep := s.lastCompatibleEndpoint(ctx)
 	mws := s.compatibleMiddlewares(ctx)
 	ep := endpoint.Chain(mws...)(cep)
@@ -426,7 +428,7 @@ func (s *server) lastInnerEndpoint(ctx context.Context) InnerEndpoint {
 	}
 }
 
-func (s *server) invokeHandleEndpoint() UnaryEndpoint {
+func (s *server) invokeHandleEndpoint() sep.UnaryEndpoint {
 	return func(ctx context.Context, args, resp interface{}) (err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()
@@ -468,7 +470,7 @@ func (s *server) invokeHandleEndpoint() UnaryEndpoint {
 	}
 }
 
-func (s *server) streamHandleEndpoint() StreamEndpoint {
+func (s *server) streamHandleEndpoint() sep.StreamEndpoint {
 	return func(ctx context.Context, st streaming.ServerStream) (err error) {
 		ri := rpcinfo.GetRPCInfo(ctx)
 		methodName := ri.Invocation().MethodName()
@@ -515,14 +517,12 @@ func (s *server) streamHandleEndpoint() StreamEndpoint {
 	}
 }
 
-func (s *server) buildUnaryMiddlewares() []UnaryMiddleware {
-	// todo
-	return nil
+func (s *server) buildUnaryMiddlewares() []sep.UnaryMiddleware {
+	return s.opt.UnaryOptions.UnaryMiddlewares
 }
 
-func (s *server) buildStreamMiddlewares() []StreamMiddleware {
-	// todo
-	return nil
+func (s *server) buildStreamMiddlewares() []sep.StreamMiddleware {
+	return s.opt.StreamOptions.StreamMiddlewares
 }
 
 func (s *server) initBasicRemoteOption() {

@@ -28,8 +28,6 @@ import (
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession/backup"
 
-	"github.com/cloudwego/kitex/pkg/streaming"
-
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -37,6 +35,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -51,6 +50,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo/remoteinfo"
 	"github.com/cloudwego/kitex/pkg/rpctimeout"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"github.com/cloudwego/kitex/pkg/streaming"
 	"github.com/cloudwego/kitex/pkg/utils"
 	"github.com/cloudwego/kitex/pkg/warmup"
 	"github.com/cloudwego/kitex/transport"
@@ -68,8 +68,8 @@ type Client interface {
 
 type kClient struct {
 	svcInfo *serviceinfo.ServiceInfo
-	eps     UnaryEndpoint
-	sEps    StreamEndpoint
+	eps     cep.UnaryEndpoint
+	sEps    cep.StreamEndpoint
 	opt     *client.Options
 	lbf     *lbcache.BalancerFactory
 
@@ -431,12 +431,12 @@ func (kc *kClient) buildInvokeChain(ctx context.Context) error {
 	if uep, err := kc.finalUnaryEndpoint(ctx); err != nil {
 		return err
 	} else {
-		kc.eps = UnaryChain()(uep)
+		kc.eps = cep.UnaryChain()(uep)
 	}
 	if sep, err := kc.finalStreamEndpoint(ctx); err != nil {
 		return err
 	} else {
-		kc.sEps = StreamChain()(sep)
+		kc.sEps = cep.StreamChain()(sep)
 	}
 	return nil
 }
@@ -446,7 +446,7 @@ func (kc *kClient) lastCompatibleEndpoint() (endpoint.Endpoint, error) {
 	if err != nil {
 		return nil, err
 	}
-	ep := InnerChain()(connectStreamEp)
+	ep := cep.InnerChain()(connectStreamEp)
 	return func(ctx context.Context, req, resp interface{}) error {
 		cs, err := ep(ctx)
 		if err != nil {
@@ -470,17 +470,17 @@ func (kc *kClient) lastCompatibleEndpoint() (endpoint.Endpoint, error) {
 	}, nil
 }
 
-func (kc *kClient) finalUnaryEndpoint(ctx context.Context) (UnaryEndpoint, error) {
+func (kc *kClient) finalUnaryEndpoint(ctx context.Context) (cep.UnaryEndpoint, error) {
 	lep, err := kc.lastCompatibleEndpoint()
 	if err != nil {
 		return nil, err
 	}
 	mws := kc.initCompatibleMiddlewares(ctx)
 	ep := endpoint.Chain(mws...)(lep)
-	return UnaryEndpoint(ep), nil
+	return cep.UnaryEndpoint(ep), nil
 }
 
-func (kc *kClient) finalStreamEndpoint(ctx context.Context) (StreamEndpoint, error) {
+func (kc *kClient) finalStreamEndpoint(ctx context.Context) (cep.StreamEndpoint, error) {
 	lep, err := kc.lastCompatibleEndpoint()
 	if err != nil {
 		return nil, err
