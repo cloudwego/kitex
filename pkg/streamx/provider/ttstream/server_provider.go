@@ -74,7 +74,7 @@ func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
 // OnActive will be called when a connection accepted
 func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
-	trans := newTransport(serverTransport, s.sinfo, nconn)
+	trans := newTransport(serverTransport, s.sinfo, nconn, nil)
 	trans.setMetaFrameHandler(s.metaHandler)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed

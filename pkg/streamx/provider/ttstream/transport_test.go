@@ -67,10 +67,10 @@ func TestTransport(t *testing.T) {
 	intHeader[0] = "test"
 	strHeader := make(streamx.Header)
 	strHeader["key"] = "val"
-	ctrans := newTransport(clientTransport, testServiceInfo, cconn)
+	ctrans := newTransport(clientTransport, testServiceInfo, cconn, nil)
 	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", intHeader, strHeader)
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, testServiceInfo, sconn)
+	strans := newTransport(serverTransport, testServiceInfo, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 
@@ -79,7 +79,7 @@ func TestTransport(t *testing.T) {
 	// client
 	go func() {
 		defer wg.Done()
-		cs := newClientStream(rawClientStream, nil)
+		cs := newClientStream(rawClientStream)
 		req := new(testRequest)
 		req.B = "hello"
 		err = cs.SendMsg(context.Background(), req)
@@ -131,10 +131,10 @@ func TestTransportException(t *testing.T) {
 	sconn, err := netpoll.NewFDConnection(sfd)
 	test.Assert(t, err == nil, err)
 
-	ctrans := newTransport(clientTransport, testServiceInfo, cconn)
+	ctrans := newTransport(clientTransport, testServiceInfo, cconn, nil)
 	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", make(IntHeader), make(streamx.Header))
 	test.Assert(t, err == nil, err)
-	strans := newTransport(serverTransport, testServiceInfo, sconn)
+	strans := newTransport(serverTransport, testServiceInfo, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 
@@ -144,7 +144,7 @@ func TestTransportException(t *testing.T) {
 	err = ss.CloseSend(targetException)
 	test.Assert(t, err == nil, err)
 	// client recv exception
-	cs := newClientStream(rawClientStream, nil)
+	cs := newClientStream(rawClientStream)
 	res := new(testResponse)
 	err = cs.RecvMsg(context.Background(), res)
 	test.Assert(t, err != nil, err)
@@ -158,7 +158,7 @@ func TestTransportException(t *testing.T) {
 	test.Assert(t, rawServerStream != nil, rawServerStream)
 	_, err = sconn.Write([]byte("helloxxxxxxxxxxxxxxxxxxxxxx"))
 	test.Assert(t, err == nil, err)
-	cs = newClientStream(rawClientStream, nil)
+	cs = newClientStream(rawClientStream)
 	err = cs.RecvMsg(context.Background(), res)
 	test.Assert(t, err != nil, err)
 	t.Logf("client stream send msg: %v %v", err, errors.Is(err, terrors.ErrIllegalFrame))

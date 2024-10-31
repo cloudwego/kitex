@@ -18,6 +18,7 @@ package ttstream
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -55,8 +56,8 @@ func newStream(ctx context.Context, trans *transport, mode streamx.StreamingMode
 
 	// register close callback
 	copts := streamxcallopt.GetCallOptionsFromCtx(ctx)
-	if copts != nil && copts.StreamCloseCallback != nil {
-		s.closeCallback = copts.StreamCloseCallback
+	if copts != nil && len(copts.StreamCloseCallback) > 0 {
+		s.closeCallback = append(s.closeCallback, copts.StreamCloseCallback...)
 	}
 	return s
 }
@@ -92,10 +93,10 @@ type stream struct {
 
 	selfEOF int32
 	peerEOF int32
+	eofFlag int32
 
 	recvTimeout   time.Duration
-	closeFlag     int32
-	closeCallback streamxcallopt.StreamCloseCallback
+	closeCallback []streamxcallopt.StreamCloseCallback
 }
 
 func (s *stream) Mode() streamx.StreamingMode {
@@ -114,6 +115,9 @@ func (s *stream) Method() string {
 }
 
 func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
+	if atomic.LoadInt32(&s.selfEOF) != 0 {
+		return terrors.ErrIllegalOperation.WithCause(errors.New("stream is close send"))
+	}
 	// encode payload
 	payload, err := EncodePayload(ctx, msg)
 	if err != nil {
@@ -218,11 +222,14 @@ func (s *stream) setRecvTimeout(timeout time.Duration) {
 }
 
 func (s *stream) tryRunCloseCallback() {
-	if atomic.AddInt32(&s.closeFlag, 1) == 2 {
-		s.trans.deleteStream(s.sid)
-		if s.closeCallback != nil {
-			s.closeCallback()
+	if atomic.AddInt32(&s.eofFlag, 1) == 2 {
+		if len(s.closeCallback) > 0 {
+			for _, cb := range s.closeCallback {
+				cb()
+			}
 		}
+		s.trans.deleteStream(s.sid)
+		s.trans.recycle()
 	}
 }
 

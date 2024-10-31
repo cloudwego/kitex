@@ -51,6 +51,7 @@ type transport struct {
 	kind  int32
 	sinfo *serviceinfo.ServiceInfo
 	conn  netpoll.Connection
+	pool  transPool
 	// transport should operate directly on stream
 	streams       sync.Map                 // key=streamID val=stream
 	scache        []*stream                // size is streamCacheSize
@@ -62,7 +63,7 @@ type transport struct {
 	metaHandler MetaFrameHandler
 }
 
-func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection) *transport {
+func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection, pool transPool) *transport {
 	// stream max idle session is 10 minutes.
 	// TODO: let it configurable
 	_ = conn.SetReadTimeout(time.Minute * 10)
@@ -70,6 +71,7 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		kind:          kind,
 		sinfo:         sinfo,
 		conn:          conn,
+		pool:          pool,
 		streams:       sync.Map{},
 		spipe:         container.NewPipe[*stream](),
 		scache:        make([]*stream, 0, streamCacheSize),
@@ -161,6 +163,12 @@ func (t *transport) loadStream(sid int32) (s *stream, ok bool) {
 func (t *transport) deleteStream(sid int32) {
 	// remove stream from transport
 	t.streams.Delete(sid)
+}
+
+func (t *transport) recycle() {
+	if t.pool != nil {
+		t.pool.Put(t)
+	}
 }
 
 func (t *transport) readFrame(reader bufiox.Reader) error {

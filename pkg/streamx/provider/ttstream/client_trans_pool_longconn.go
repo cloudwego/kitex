@@ -63,7 +63,7 @@ func (c *longConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr st
 	if err != nil {
 		return nil, err
 	}
-	trans = newTransport(clientTransport, sinfo, conn)
+	trans = newTransport(clientTransport, sinfo, conn, c)
 	// create new transport
 	return trans, nil
 }

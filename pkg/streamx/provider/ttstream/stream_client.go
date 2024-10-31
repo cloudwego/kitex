@@ -25,14 +25,13 @@ import (
 
 var _ ClientStreamMeta = (*clientStream)(nil)
 
-func newClientStream(s *stream, pool transPool) *clientStream {
-	cs := &clientStream{stream: s, pool: pool}
+func newClientStream(s *stream) *clientStream {
+	cs := &clientStream{stream: s}
 	return cs
 }
 
 type clientStream struct {
 	*stream
-	pool transPool
 }
 
 func (s *clientStream) Header() (streamx.Header, error) {
@@ -78,7 +77,4 @@ func clientStreamFinalizer(s *clientStream) {
 	// it's safe to call CloseSend twice
 	// we do CloseSend here to ensure stream can be closed normally
 	_ = s.CloseSend(context.Background())
-	if s.pool != nil && s.stream.trans != nil {
-		s.pool.Put(s.stream.trans)
-	}
 }

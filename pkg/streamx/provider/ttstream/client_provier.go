@@ -97,7 +97,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 		})
 	}
 
-	cs := newClientStream(s, c.transPool)
+	cs := newClientStream(s)
 	runtime.SetFinalizer(cs, clientStreamFinalizer)
 	return cs, err
 }

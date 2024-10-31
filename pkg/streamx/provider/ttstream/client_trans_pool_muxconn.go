@@ -48,16 +48,18 @@ type muxConnTransList struct {
 	size       int
 	cursor     uint32
 	transports []*transport
+	pool       transPool
 	sf         singleflight.Group
 }
 
-func newMuxConnTransList(size int) *muxConnTransList {
+func newMuxConnTransList(size int, pool transPool) *muxConnTransList {
 	tl := new(muxConnTransList)
 	if size == 0 {
 		size = runtime.GOMAXPROCS(0)
 	}
 	tl.size = size
 	tl.transports = make([]*transport, size)
+	tl.pool = pool
 	return tl
 }
 
@@ -84,7 +86,7 @@ func (tl *muxConnTransList) Get(sinfo *serviceinfo.ServiceInfo, network, addr st
 		if err != nil {
 			return nil, err
 		}
-		trans := newTransport(clientTransport, sinfo, conn)
+		trans := newTransport(clientTransport, sinfo, conn, tl.pool)
 		_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
 			// peer close
 			_ = trans.Close(terrors.ErrTransport.WithCause(errors.New("connection closed by peer")))
@@ -120,15 +122,15 @@ type muxConnTransPool struct {
 	cleanerOnce sync.Once
 }
 
-func (m *muxConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (trans *transport, err error) {
-	v, ok := m.pool.Load(addr)
+func (p *muxConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (trans *transport, err error) {
+	v, ok := p.pool.Load(addr)
 	if ok {
 		return v.(*muxConnTransList).Get(sinfo, network, addr)
 	}
 
-	v, err, _ = m.sflight.Do(addr, func() (interface{}, error) {
-		transList := newMuxConnTransList(m.config.PoolSize)
-		m.pool.Store(addr, transList)
+	v, err, _ = p.sflight.Do(addr, func() (interface{}, error) {
+		transList := newMuxConnTransList(p.config.PoolSize, p)
+		p.pool.Store(addr, transList)
 		return transList, nil
 	})
 	if err != nil {
@@ -137,10 +139,10 @@ func (m *muxConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr str
 	return v.(*muxConnTransList).Get(sinfo, network, addr)
 }
 
-func (m *muxConnTransPool) Put(trans *transport) {
-	m.activity.Store(trans.conn.RemoteAddr().String(), time.Now())
-	m.cleanerOnce.Do(func() {
-		internal := m.config.MaxIdleTimeout
+func (p *muxConnTransPool) Put(trans *transport) {
+	p.activity.Store(trans.conn.RemoteAddr().String(), time.Now())
+	p.cleanerOnce.Do(func() {
+		internal := p.config.MaxIdleTimeout
 		if internal == 0 {
 			return
 		}
@@ -148,19 +150,19 @@ func (m *muxConnTransPool) Put(trans *transport) {
 			for {
 				now := time.Now()
 				count := 0
-				m.activity.Range(func(addr, value interface{}) bool {
+				p.activity.Range(func(addr, value interface{}) bool {
 					count++
 					lastActive := value.(time.Time)
-					if lastActive.IsZero() || now.Sub(lastActive) < m.config.MaxIdleTimeout {
+					if lastActive.IsZero() || now.Sub(lastActive) < p.config.MaxIdleTimeout {
 						return true
 					}
-					v, _ := m.pool.Load(addr)
+					v, _ := p.pool.Load(addr)
 					if v == nil {
 						return true
 					}
 					transList := v.(*muxConnTransList)
-					m.pool.Delete(addr)
-					m.activity.Delete(addr)
+					p.pool.Delete(addr)
+					p.activity.Delete(addr)
 					transList.Close()
 					return true
 				})

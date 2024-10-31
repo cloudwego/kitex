@@ -26,6 +26,7 @@ var (
 	ErrApplicationException = &errType{message: "application exception"}
 	ErrIllegalBizErr        = &errType{message: "illegal bizErr"}
 	ErrIllegalFrame         = &errType{message: "illegal frame"}
+	ErrIllegalOperation     = &errType{message: "illegal operation"}
 	ErrTransport            = &errType{message: "transport is closing"}
 )
 
