@@ -93,7 +93,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 	// if ctx from server side, we should cancel the stream when server handler already returned
 	if !c.disableCancelingTransmit {
 		ktx.RegisterCancelCallback(ctx, func() {
-			s.cancel()
+			_ = s.cancel()
 		})
 	}
 

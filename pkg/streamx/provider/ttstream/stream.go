@@ -222,15 +222,18 @@ func (s *stream) setRecvTimeout(timeout time.Duration) {
 }
 
 func (s *stream) tryRunCloseCallback() {
-	if atomic.AddInt32(&s.eofFlag, 1) == 2 {
-		if len(s.closeCallback) > 0 {
-			for _, cb := range s.closeCallback {
-				cb()
-			}
-		}
-		s.trans.deleteStream(s.sid)
-		s.trans.recycle()
+	if atomic.AddInt32(&s.eofFlag, 1) != 2 {
+		return
 	}
+	if len(s.closeCallback) > 0 {
+		for _, cb := range s.closeCallback {
+			cb()
+		}
+	}
+	s.trans.deleteStream(s.sid)
+	// transport can be recycled only when send a trailer to peer
+	// and received the trailer from peer
+	s.trans.recycle()
 }
 
 func (s *stream) writeFrame(ftype int32, header streamx.Header, trailer streamx.Trailer, payload []byte) (err error) {

@@ -120,6 +120,9 @@ func TestTransport(t *testing.T) {
 	err = ss.RecvMsg(context.Background(), req)
 	test.Assert(t, err == io.EOF, err)
 	t.Logf("server stream recv msg: %v", res)
+	err = ss.CloseSend(nil)
+	test.Assert(t, err == nil, err)
+	t.Log("server handler return")
 	wg.Wait()
 }
 

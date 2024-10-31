@@ -283,15 +283,16 @@ func (t *transport) WriteStream(
 
 	sid := atomic.AddInt32(&clientStreamID, 1)
 	smode := t.sinfo.MethodInfo(method).StreamingMode()
-	// create stream
+	// new stream first
+	s := newStream(ctx, t, smode, streamFrame{sid: sid, method: method})
+	t.storeStream(s)
+	// send create stream request for server
 	err := t.writeFrame(
 		streamFrame{sid: sid, method: method, header: strHeader, meta: intHeader}, headerFrameType, nil,
 	)
 	if err != nil {
 		return nil, err
 	}
-	s := newStream(ctx, t, smode, streamFrame{sid: sid, method: method})
-	t.storeStream(s)
 	return s, nil
 }
 
