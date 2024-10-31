@@ -937,7 +937,7 @@ func (t *http2Server) keepalive() {
 				continue
 			}
 			if outstandingPing && kpTimeoutLeft <= 0 {
-				klog.Infof("transport: closing server transport due to idleness.")
+				klog.CtxInfof(t.ctx, "transport: closing server transport due to idleness.")
 				t.closeWithErr(errIdleClosing)
 				return
 			}

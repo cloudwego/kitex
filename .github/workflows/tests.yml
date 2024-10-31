@@ -48,7 +48,7 @@ jobs:
           go-version: ${{ matrix.go }}
           cache: false # don't use cache for self-hosted runners
       - name: Unit Test
-        run: go test -race ./...
+        run: bash ./grpc_testing.sh
 
   codegen-test:
     runs-on: ubuntu-latest

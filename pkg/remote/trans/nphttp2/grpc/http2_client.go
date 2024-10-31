@@ -884,7 +884,7 @@ func (t *http2Client) handleGoAway(f *grpcframe.GoAwayFrame) {
 		return
 	}
 	if f.ErrCode == http2.ErrCodeEnhanceYourCalm {
-		klog.Infof("Client received GoAway with http2.ErrCodeEnhanceYourCalm.")
+		klog.CtxInfof(t.ctx, "Client received GoAway with http2.ErrCodeEnhanceYourCalm.")
 	}
 	id := f.LastStreamID
 	if id > 0 && id%2 != 1 {

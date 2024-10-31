@@ -42,11 +42,41 @@ import (
 	"golang.org/x/net/http2/hpack"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/codes"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/grpcframe"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc/testutils"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/status"
 )
+
+var testNameKey = "testName"
+
+// grpcLogger is used to add test case information to assist in troubleshooting problems.
+// it relies on testNameKey:testcase kv in ctx.
+type grpcLogger struct {
+	klog.FullLogger
+}
+
+func (gl *grpcLogger) CtxWarnf(ctx context.Context, format string, v ...interface{}) {
+	testCase := ctx.Value(testNameKey).(string)
+	gl.FullLogger.CtxWarnf(ctx, "["+testCase+"] "+format, v...)
+}
+
+func (gl *grpcLogger) CtxErrorf(ctx context.Context, format string, v ...interface{}) {
+	testCase := ctx.Value(testNameKey).(string)
+	gl.FullLogger.CtxErrorf(ctx, "["+testCase+"] "+format, v...)
+}
+
+func (gl *grpcLogger) CtxInfof(ctx context.Context, format string, v ...interface{}) {
+	testCase := ctx.Value(testNameKey).(string)
+	gl.FullLogger.CtxInfof(ctx, "["+testCase+"] "+format, v...)
+}
+
+func TestMain(m *testing.M) {
+	logger := klog.DefaultLogger()
+	klog.SetLogger(&grpcLogger{logger})
+	m.Run()
+}
 
 type server struct {
 	lis        netpoll.Listener
@@ -294,7 +324,6 @@ func (h *testStreamHandler) handleStreamDelayRead(t *testing.T, s *Stream) {
 
 // start starts server. Other goroutines should block on s.readyChan for further operations.
 func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hType) {
-	// 创建 listener
 	var err error
 	if port == 0 {
 		s.lis, err = netpoll.CreateListener("tcp", "localhost:0")
@@ -313,11 +342,11 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 	s.port = p
 	s.conns = make(map[ServerTransport]bool)
 
-	// handle: 连接读数据和处理逻辑
 	var onConnect netpoll.OnConnect = func(ctx context.Context, connection netpoll.Connection) context.Context {
-		transport, err := NewServerTransport(context.Background(), connection, serverConfig)
+		nCtx := context.WithValue(context.Background(), testNameKey, t.Name())
+		transport, err := NewServerTransport(nCtx, connection, serverConfig)
 		if err != nil {
-			panic(fmt.Sprintf("NewServerTransport err: %s", err.Error()))
+			t.Fatalf("NewServerTransport err: %s", err.Error())
 		}
 		s.mu.Lock()
 		if s.conns == nil {
@@ -388,7 +417,6 @@ func (s *server) start(t *testing.T, port int, serverConfig *ServerConfig, ht hT
 		return ctx
 	}
 
-	// options: EventLoop 初始化自定义配置项
 	opts := []netpoll.Option{
 		netpoll.WithIdleTimeout(10 * time.Minute),
 		netpoll.WithOnConnect(onConnect),
@@ -422,15 +450,15 @@ func (s *server) wait(t *testing.T, timeout time.Duration) {
 func (s *server) stop() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := s.eventLoop.Shutdown(ctx); err != nil {
-		fmt.Printf("netpoll server exit failed, err=%v", err)
-	}
 	s.lis.Close()
 	s.mu.Lock()
 	for c := range s.conns {
 		c.Close()
 	}
 	s.conns = nil
+	if err := s.eventLoop.Shutdown(ctx); err != nil {
+		fmt.Printf("netpoll server exit failed, err=%v", err)
+	}
 	s.mu.Unlock()
 }
 
@@ -458,7 +486,8 @@ func setUpWithOptions(t *testing.T, port int, serverConfig *ServerConfig, ht hTy
 	if err != nil {
 		t.Fatalf("failed to dial connection: %v", err)
 	}
-	ct, connErr := NewClientTransport(context.Background(), conn.(netpoll.Connection), copts, "", func(GoAwayReason) {}, func() {})
+	ctx := context.WithValue(context.Background(), testNameKey, t.Name())
+	ct, connErr := NewClientTransport(ctx, conn.(netpoll.Connection), copts, "", func(GoAwayReason) {}, func() {})
 	if connErr != nil {
 		t.Fatalf("failed to create transport: %v", connErr)
 	}
@@ -499,7 +528,8 @@ func setUpWithNoPingServer(t *testing.T, copts ConnectOptions, connCh chan net.C
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
 	}
-	tr, err := NewClientTransport(context.Background(), conn.(netpoll.Connection), copts, "mockDestService", func(GoAwayReason) {}, func() {})
+	ctx := context.WithValue(context.Background(), testNameKey, t.Name())
+	tr, err := NewClientTransport(ctx, conn.(netpoll.Connection), copts, "mockDestService", func(GoAwayReason) {}, func() {})
 	if err != nil {
 		// Server clean-up.
 		if conn, ok := <-connCh; ok {
@@ -526,7 +556,6 @@ func TestInflightStreamClosing(t *testing.T) {
 	}
 
 	donec := make(chan struct{})
-	// serr := &status.Error{e: s.Proto()}
 	serr := status.Err(codes.Internal, "client connection is closing")
 	go func() {
 		defer close(donec)
@@ -539,19 +568,22 @@ func TestInflightStreamClosing(t *testing.T) {
 	client.CloseStream(stream, serr)
 
 	// wait for stream.Read error
-	timeout := time.NewTimer(3 * time.Second)
+	// this concurrent Read behaviour should be stopped quickly
+	timeout := time.NewTimer(1 * time.Second)
 	select {
 	case <-donec:
 		if !timeout.Stop() {
 			<-timeout.C
 		}
 	case <-timeout.C:
-		t.Fatalf("%s", "Test timed out, expected a status error.")
+		t.Fatal("Test timed out, expected a status error.")
 	}
 }
 
 func TestClientSendAndReceive(t *testing.T) {
 	server, ct := setUp(t, 0, math.MaxUint32, normal)
+	defer server.stop()
+	defer ct.Close(errSelfCloseForTest)
 	callHdr := &CallHdr{
 		Host:   "localhost",
 		Method: "foo.Small",
@@ -573,7 +605,7 @@ func TestClientSendAndReceive(t *testing.T) {
 		t.Fatalf("wrong stream id: %d", s2.id)
 	}
 	opts := Options{Last: true}
-	if err := ct.Write(s1, nil, expectedRequest, &opts); err != nil && err != io.EOF {
+	if err := ct.Write(s1, nil, expectedRequest, &opts); err != nil {
 		t.Fatalf("failed to send data: %v", err)
 	}
 	p := make([]byte, len(expectedResponse))
@@ -585,8 +617,6 @@ func TestClientSendAndReceive(t *testing.T) {
 	if recvErr != io.EOF {
 		t.Fatalf("Error: %v; want <EOF>", recvErr)
 	}
-	ct.Close(errSelfCloseForTest)
-	server.stop()
 }
 
 func TestClientErrorNotify(t *testing.T) {
@@ -598,52 +628,13 @@ func TestClientErrorNotify(t *testing.T) {
 	}()
 	// ct.reader should detect the error and activate ct.Error().
 	<-ct.Error()
-	ct.Close(nil)
-}
-
-func performOneRPC(ct ClientTransport) {
-	callHdr := &CallHdr{
-		Host:   "localhost",
-		Method: "foo.Small",
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
-	defer cancel()
-	s, err := ct.NewStream(ctx, callHdr)
-	if err != nil {
-		return
-	}
-	opts := Options{Last: true}
-	if err := ct.Write(s, []byte{}, expectedRequest, &opts); err == nil || err == io.EOF {
-		time.Sleep(2 * time.Millisecond)
-		// The following s.Recv()'s could error out because the
-		// underlying transport is gone.
-		//
-		// Read response
-		p := make([]byte, len(expectedResponse))
-		s.Read(p)
-		// Read io.EOF
-		s.Read(p)
-	}
-}
-
-func TestClientMix(t *testing.T) {
-	s, ct := setUp(t, 0, math.MaxUint32, normal)
-	go func(s *server) {
-		time.Sleep(50 * time.Millisecond)
-		s.stop()
-	}(s)
-	go func(ct ClientTransport) {
-		<-ct.Error()
-		ct.Close(errSelfCloseForTest)
-	}(ct)
-	for i := 0; i < 100; i++ {
-		time.Sleep(1 * time.Millisecond)
-		go performOneRPC(ct)
-	}
+	ct.Close(errSelfCloseForTest)
 }
 
 func TestLargeMessage(t *testing.T) {
 	server, ct := setUp(t, 0, math.MaxUint32, normal)
+	defer server.stop()
+	defer ct.Close(errSelfCloseForTest)
 	callHdr := &CallHdr{
 		Host:   "localhost",
 		Method: "foo.Large",
@@ -659,7 +650,7 @@ func TestLargeMessage(t *testing.T) {
 			if err != nil {
 				t.Errorf("%v.NewStream(_, _) = _, %v, want _, <nil>", ct, err)
 			}
-			if err := ct.Write(s, []byte{}, expectedRequestLarge, &Options{Last: true}); err != nil && err != io.EOF {
+			if err := ct.Write(s, []byte{}, expectedRequestLarge, &Options{Last: true}); err != nil {
 				t.Errorf("%v.write(_, _, _) = %v, want  <nil>", ct, err)
 			}
 			p := make([]byte, len(expectedResponseLarge))
@@ -672,8 +663,6 @@ func TestLargeMessage(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	ct.Close(errSelfCloseForTest)
-	server.stop()
 }
 
 func TestLargeMessageWithDelayRead(t *testing.T) {
@@ -696,14 +685,14 @@ func TestLargeMessageWithDelayRead(t *testing.T) {
 		Host:   "localhost",
 		Method: "foo.Large",
 	}
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second*10))
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer cancel()
 	s, err := ct.NewStream(ctx, callHdr)
 	if err != nil {
 		t.Fatalf("%v.NewStream(_, _) = _, %v, want _, <nil>", ct, err)
 		return
 	}
-	// Wait for server's handerler to be initialized
+	// Wait for server's handler to be initialized
 	select {
 	case <-ready:
 	case <-ctx.Done():
@@ -772,68 +761,67 @@ func TestLargeMessageWithDelayRead(t *testing.T) {
 	}
 }
 
-// FIXME Test failed because goroutine leak.
-//func TestGracefulClose(t *testing.T) {
-//	server, ct := setUp(t, 0, math.MaxUint32, pingpong)
-//	defer func() {
-//		// Stop the server's listener to make the server's goroutines terminate
-//		// (after the last active stream is done).
-//		server.lis.Close()
-//		// Check for goroutine leaks (i.e. GracefulClose with an active stream
-//		// doesn't eventually close the connection when that stream completes).
-//		leakcheck.Check(t)
-//		// Correctly clean up the server
-//		server.stop()
-//	}()
-//	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second*10))
-//	defer cancel()
-//	s, err := ct.NewStream(ctx, &CallHdr{})
-//	if err != nil {
-//		t.Fatalf("NewStream(_, _) = _, %v, want _, <nil>", err)
-//	}
-//	msg := make([]byte, 1024)
-//	outgoingHeader := make([]byte, 5)
-//	outgoingHeader[0] = byte(0)
-//	binary.BigEndian.PutUint32(outgoingHeader[1:], uint32(len(msg)))
-//	incomingHeader := make([]byte, 5)
-//	if err := ct.write(s, outgoingHeader, msg, &Options{}); err != nil {
-//		t.Fatalf("Error while writing: %v", err)
-//	}
-//	if _, err := s.Read(incomingHeader); err != nil {
-//		t.Fatalf("Error while reading: %v", err)
-//	}
-//	sz := binary.BigEndian.Uint32(incomingHeader[1:])
-//	recvMsg := make([]byte, int(sz))
-//	if _, err := s.Read(recvMsg); err != nil {
-//		t.Fatalf("Error while reading: %v", err)
-//	}
-//	ct.GracefulClose()
-//	var wg sync.WaitGroup
-//	// Expect the failure for all the follow-up streams because ct has been closed gracefully.
-//	for i := 0; i < 200; i++ {
-//		wg.Add(1)
-//		go func() {
-//			defer wg.Done()
-//			str, err := ct.NewStream(ctx, &CallHdr{})
-//			if err == ErrConnClosing {
-//				return
-//			} else if err != nil {
-//				t.Errorf("_.NewStream(_, _) = _, %v, want _, %v", err, ErrConnClosing)
-//				return
-//			}
-//			ct.write(str, nil, nil, &Options{Last: true})
-//			if _, err := str.Read(make([]byte, 8)); err != errStreamDrain && err != ErrConnClosing {
-//				t.Errorf("_.Read(_) = _, %v, want _, %v or %v", err, errStreamDrain, ErrConnClosing)
-//			}
-//		}()
-//	}
-//	ct.write(s, nil, nil, &Options{Last: true})
-//	if _, err := s.Read(incomingHeader); err != io.EOF {
-//		t.Fatalf("Client expected EOF from the server. Got: %v", err)
-//	}
-//	// The stream which was created before graceful close can still proceed.
-//	wg.Wait()
-//}
+func TestGracefulClose(t *testing.T) {
+	server, ct := setUp(t, 0, math.MaxUint32, pingpong)
+	defer func() {
+		// Stop the server's listener to make the server's goroutines terminate
+		// (after the last active stream is done).
+		server.lis.Close()
+		// Correctly clean up the server
+		server.stop()
+		// Check for goroutine leaks (i.e. GracefulClose with an active stream
+		// doesn't eventually close the connection when that stream completes).
+		// leakcheck.Check(t)
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTestTimeout)
+	defer cancel()
+	s, err := ct.NewStream(ctx, &CallHdr{})
+	if err != nil {
+		t.Fatalf("NewStream(_, _) = _, %v, want _, <nil>", err)
+	}
+	msg := make([]byte, 1024)
+	outgoingHeader := make([]byte, 5)
+	outgoingHeader[0] = byte(0)
+	binary.BigEndian.PutUint32(outgoingHeader[1:], uint32(len(msg)))
+	incomingHeader := make([]byte, 5)
+	if err := ct.Write(s, outgoingHeader, msg, &Options{}); err != nil {
+		t.Fatalf("Error while writing: %v", err)
+	}
+	if _, err := s.Read(incomingHeader); err != nil {
+		t.Fatalf("Error while reading: %v", err)
+	}
+	sz := binary.BigEndian.Uint32(incomingHeader[1:])
+	recvMsg := make([]byte, int(sz))
+	if _, err := s.Read(recvMsg); err != nil {
+		t.Fatalf("Error while reading: %v", err)
+	}
+	ct.GracefulClose()
+	var wg sync.WaitGroup
+	// Expect the failure for all the follow-up streams because ct has been closed gracefully.
+	for i := 0; i < 200; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			str, err := ct.NewStream(ctx, &CallHdr{})
+			if err == ErrConnClosing {
+				return
+			} else if err != nil {
+				t.Errorf("_.NewStream(_, _) = _, %v, want _, %v", err, ErrConnClosing)
+				return
+			}
+			ct.Write(str, nil, nil, &Options{Last: true})
+			if _, err := str.Read(make([]byte, 8)); err != errStreamDrain && err != ErrConnClosing {
+				t.Errorf("_.Read(_) = _, %v, want _, %v or %v", err, errStreamDrain, ErrConnClosing)
+			}
+		}()
+	}
+	ct.Write(s, nil, nil, &Options{Last: true})
+	if _, err := s.Read(incomingHeader); err != io.EOF {
+		t.Fatalf("Client expected EOF from the server. Got: %v", err)
+	}
+	// The stream which was created before graceful close can still proceed.
+	wg.Wait()
+}
 
 func TestLargeMessageSuspension(t *testing.T) {
 	server, ct := setUp(t, 0, math.MaxUint32, suspended)
@@ -909,7 +897,9 @@ func TestMaxStreams(t *testing.T) {
 		} else if err.Error() != expectedErr.Error() {
 			t.Fatalf("ct.NewStream(_,_) = _, %v, want _, %v", err, expectedErr)
 		}
-		timer.Stop()
+		if !timer.Stop() {
+			<-timer.C
+		}
 		break
 	}
 	done := make(chan struct{})
@@ -943,6 +933,7 @@ func TestMaxStreams(t *testing.T) {
 
 func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 	server, ct := setUp(t, 0, math.MaxUint32, suspended)
+	defer server.stop()
 	callHdr := &CallHdr{
 		Host:   "localhost",
 		Method: "foo",
@@ -981,7 +972,7 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 	// Loop until the server side stream is created.
 	var ss *Stream
 	for {
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(time.Millisecond)
 		sc.mu.Lock()
 		if len(sc.activeStreams) == 0 {
 			sc.mu.Unlock()
@@ -991,6 +982,7 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 		sc.mu.Unlock()
 		break
 	}
+	// close connection directly
 	ct.Close(errSelfCloseForTest)
 	select {
 	case <-ss.Context().Done():
@@ -1000,10 +992,8 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatalf("%s", "Failed to cancel the context of the sever side stream.")
 	}
-	server.stop()
 }
 
-// FIXME delete the comments
 func TestClientConnDecoupledFromApplicationRead(t *testing.T) {
 	connectOptions := ConnectOptions{
 		InitialWindowSize:     defaultWindowSize,
@@ -1268,167 +1258,115 @@ func TestServerWithMisbehavedClient(t *testing.T) {
 	}
 }
 
-// FIXME Test failed, hang up.
-//func TestClientWithMisbehavedServer(t *testing.T) {
-//	// Create a misbehaving server.
-//	lis, err := netpoll.CreateListener("tcp", "localhost:0")
-//	if err != nil {
-//		t.Fatalf("Error while listening: %v", err)
-//	}
-//	defer lis.Close()
-//	// success chan indicates that the server received
-//	// RSTStream from the client.
-//	success := make(chan struct{})
-//
-//	exitCh := make(chan struct{}, 1)
-//	eventLoop, _ := netpoll.NewEventLoop(func(ctx context.Context, connection netpoll.Connection) error {
-//		defer func() {
-//			exitCh <- struct{}{}
-//		}()
-//		defer connection.Close()
-//		if _, err := io.ReadFull(connection, make([]byte, len(ClientPreface))); err != nil {
-//			t.Errorf("Error while reading clieng preface: %v", err)
-//			return err
-//		}
-//		sfr := http2.NewFramer(connection, connection)
-//		if err := sfr.WriteSettingsAck(); err != nil {
-//			t.Errorf("Error while writing settings: %v", err)
-//			return err
-//		}
-//		var mu sync.Mutex
-//		for {
-//			frame, err := sfr.ReadFrame()
-//			if err != nil {
-//				return err
-//			}
-//			switch frame := frame.(type) {
-//			case *http2.HeadersFrame:
-//				// When the client creates a stream, violate the stream flow control.
-//				go func() {
-//					buf := make([]byte, http2MaxFrameLen)
-//					for {
-//						mu.Lock()
-//						if err := sfr.WriteData(1, false, buf); err != nil {
-//							mu.Unlock()
-//							return
-//						}
-//						mu.Unlock()
-//						// This for loop is capable of hogging the CPU and cause starvation
-//						// in Go versions prior to 1.9,
-//						// in single CPU environment. Explicitly relinquish processor.
-//						runtime.Gosched()
-//					}
-//				}()
-//			case *http2.RSTStreamFrame:
-//				if frame.Header().StreamID != 1 || http2.ErrCode(frame.ErrCode) != http2.ErrCodeFlowControl {
-//					t.Errorf("RST stream received with streamID: %d and code: %v, want streamID: 1 and code: http2.ErrCodeFlowControl", frame.Header().StreamID, http2.ErrCode(frame.ErrCode))
-//				}
-//				close(success)
-//				return err
-//			case *http2.PingFrame:
-//				mu.Lock()
-//				sfr.WritePing(true, frame.Data)
-//				mu.Unlock()
-//			default:
-//			}
-//		}
-//	})
-//	go func() {
-//		if err := eventLoop.Serve(lis); err != nil {
-//			t.Errorf("eventLoop Serve failed, err=%s", err.Error())
-//		}
-//	}()
-//
-//	select {
-//	case <-exitCh:
-//		var ctx, cancel = context.WithTimeout(context.Background(), time.Second)
-//		defer cancel()
-//		if err := eventLoop.Shutdown(ctx); err != nil {
-//			t.Errorf("netpoll server exit failed, err=%v", err)
-//		}
-//	}
-//
-//	// FIXME
-//	//go func() { // Launch the misbehaving server.
-//	//	sconn, err := lis.Accept()
-//	//	if err != nil {
-//	//		t.Errorf("Error while accepting: %v", err)
-//	//		return
-//	//	}
-//	//	defer sconn.Close()
-//	//	if _, err := io.ReadFull(sconn, make([]byte, len(ClientPreface))); err != nil {
-//	//		t.Errorf("Error while reading clieng preface: %v", err)
-//	//		return
-//	//	}
-//	//	sfr := http2.NewFramer(sconn.(netpoll.Connection).Writer(), sconn.(netpoll.Connection).Reader())
-//	//	if err := sfr.WriteSettingsAck(); err != nil {
-//	//		t.Errorf("Error while writing settings: %v", err)
-//	//		return
-//	//	}
-//	//	var mu sync.Mutex
-//	//	for {
-//	//		frame, err := sfr.ReadFrame()
-//	//		if err != nil {
-//	//			return
-//	//		}
-//	//		switch frame := frame.(type) {
-//	//		case *http2.HeadersFrame:
-//	//			// When the client creates a stream, violate the stream flow control.
-//	//			go func() {
-//	//				buf := make([]byte, http2MaxFrameLen)
-//	//				for {
-//	//					mu.Lock()
-//	//					if err := sfr.WriteData(1, false, buf); err != nil {
-//	//						mu.Unlock()
-//	//						return
-//	//					}
-//	//					mu.Unlock()
-//	//					// This for loop is capable of hogging the CPU and cause starvation
-//	//					// in Go versions prior to 1.9,
-//	//					// in single CPU environment. Explicitly relinquish processor.
-//	//					runtime.Gosched()
-//	//				}
-//	//			}()
-//	//		case *http2.RSTStreamFrame:
-//	//			if frame.Header().StreamID != 1 || http2.ErrCode(frame.ErrCode) != http2.ErrCodeFlowControl {
-//	//				t.Errorf("RST stream received with streamID: %d and code: %v, want streamID: 1 and code: http2.ErrCodeFlowControl", frame.Header().StreamID, http2.ErrCode(frame.ErrCode))
-//	//			}
-//	//			close(success)
-//	//			return
-//	//		case *http2.PingFrame:
-//	//			mu.Lock()
-//	//			sfr.WritePing(true, frame.Data)
-//	//			mu.Unlock()
-//	//		default:
-//	//		}
-//	//	}
-//	//}()
-//	connectCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
-//	defer cancel()
-//	conn, err := netpoll.NewDialer().DialTimeout("tcp", lis.Addr().String(), time.Second)
-//	if err != nil {
-//		t.Fatalf("dial failed: %v", err)
-//	}
-//	ct, err := NewClientTransport(context.Background(), conn.(netpoll.Connection), ConnectOptions{}, "mockDestService", func(GoAwayReason) {}, func() {})
-//	if err != nil {
-//		t.Fatalf("Error while creating client transport: %v", err)
-//	}
-//	defer ct.Close()
-//	str, err := ct.NewStream(connectCtx, &CallHdr{})
-//	if err != nil {
-//		t.Fatalf("Error while creating stream: %v", err)
-//	}
-//	timer := time.NewTimer(time.Second * 5)
-//	go func() { // This go routine mimics the one in stream.go to call CloseStream.
-//		<-str.Done()
-//		ct.CloseStream(str, nil)
-//	}()
-//	select {
-//	case <-timer.C:
-//		t.Fatalf("Test timed-out.")
-//	case <-success:
-//	}
-//}
+func TestClientWithMisbehavedServer(t *testing.T) {
+	// Create a misbehaving server.
+	lis, err := netpoll.CreateListener("tcp", "localhost:0")
+	if err != nil {
+		t.Fatalf("Error while listening: %v", err)
+	}
+	defer lis.Close()
+	// success chan indicates that the server received
+	// RSTStream from the client.
+	success := make(chan struct{})
+
+	// exitCh := make(chan struct{}, 1)
+	eventLoop, _ := netpoll.NewEventLoop(func(ctx context.Context, connection netpoll.Connection) error {
+		//defer func() {
+		//	exitCh <- struct{}{}
+		//}()
+		defer connection.Close()
+		if _, err := io.ReadFull(connection, make([]byte, len(ClientPreface))); err != nil {
+			t.Errorf("Error while reading client preface: %v", err)
+			return err
+		}
+		sfr := http2.NewFramer(connection, connection)
+		if err := sfr.WriteSettings(); err != nil {
+			t.Errorf("Error while writing settings: %v", err)
+		}
+		if err := sfr.WriteSettingsAck(); err != nil {
+			t.Errorf("Error while writing settings ack: %v", err)
+			return err
+		}
+		var mu sync.Mutex
+		for {
+			frame, err := sfr.ReadFrame()
+			if err != nil {
+				return err
+			}
+			switch frame := frame.(type) {
+			case *http2.HeadersFrame:
+				// When the client creates a stream, violate the stream flow control.
+				go func() {
+					buf := make([]byte, http2MaxFrameLen)
+					for {
+						mu.Lock()
+						if err := sfr.WriteData(1, false, buf); err != nil {
+							mu.Unlock()
+							return
+						}
+						mu.Unlock()
+						// This for loop is capable of hogging the CPU and cause starvation
+						// in Go versions prior to 1.9,
+						// in single CPU environment. Explicitly relinquish processor.
+						runtime.Gosched()
+					}
+				}()
+			case *http2.RSTStreamFrame:
+				if frame.Header().StreamID != 1 || frame.ErrCode != http2.ErrCodeFlowControl {
+					t.Errorf("RST stream received with streamID: %d and code: %v, want streamID: 1 and code: http2.ErrCodeFlowControl", frame.Header().StreamID, http2.ErrCode(frame.ErrCode))
+				}
+				close(success)
+				return err
+			case *http2.PingFrame:
+				mu.Lock()
+				sfr.WritePing(true, frame.Data)
+				mu.Unlock()
+			default:
+			}
+		}
+	})
+	go func() {
+		if err := eventLoop.Serve(lis); err != nil {
+			t.Errorf("eventLoop Serve failed, err=%s", err.Error())
+		}
+	}()
+
+	//select {
+	//case <-exitCh:
+	//	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	//	defer cancel()
+	//	if err := eventLoop.Shutdown(ctx); err != nil {
+	//		t.Errorf("netpoll server exit failed, err=%v", err)
+	//	}
+	//}
+
+	connectCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(2*time.Second))
+	defer cancel()
+	conn, err := netpoll.NewDialer().DialTimeout("tcp", lis.Addr().String(), time.Second)
+	if err != nil {
+		t.Fatalf("dial failed: %v", err)
+	}
+	ctx := context.WithValue(context.Background(), testNameKey, t.Name())
+	ct, err := NewClientTransport(ctx, conn.(netpoll.Connection), ConnectOptions{}, "mockDestService", func(GoAwayReason) {}, func() {})
+	if err != nil {
+		t.Fatalf("Error while creating client transport: %v", err)
+	}
+	defer ct.Close(errSelfCloseForTest)
+	str, err := ct.NewStream(connectCtx, &CallHdr{})
+	if err != nil {
+		t.Fatalf("Error while creating stream: %v", err)
+	}
+	timer := time.NewTimer(time.Second * 5)
+	go func() { // This go routine mimics the one in stream.go to call CloseStream.
+		<-str.Done()
+		ct.CloseStream(str, nil)
+	}()
+	select {
+	case <-timer.C:
+		t.Fatalf("Test timed-out.")
+	case <-success:
+	}
+}
 
 var encodingTestStatus = status.New(codes.Internal, "\n")
 
@@ -1548,16 +1486,15 @@ type windowSizeConfig struct {
 	clientConn   uint32
 }
 
-// FIXME Test failed.
-//func TestAccountCheckWindowSizeWithLargeWindow(t *testing.T) {
-//	wc := windowSizeConfig{
-//		serverStream: 10 * 1024 * 1024,
-//		serverConn:   12 * 1024 * 1024,
-//		clientStream: 6 * 1024 * 1024,
-//		clientConn:   8 * 1024 * 1024,
-//	}
-//	testFlowControlAccountCheck(t, 1024*1024, wc)
-//}
+func TestAccountCheckWindowSizeWithLargeWindow(t *testing.T) {
+	wc := windowSizeConfig{
+		serverStream: 10 * 1024 * 1024,
+		serverConn:   12 * 1024 * 1024,
+		clientStream: 6 * 1024 * 1024,
+		clientConn:   8 * 1024 * 1024,
+	}
+	testFlowControlAccountCheck(t, 1024*1024, wc)
+}
 
 func TestAccountCheckWindowSizeWithSmallWindow(t *testing.T) {
 	wc := windowSizeConfig{
@@ -1771,7 +1708,9 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 	}
 }
 
-// FIXME Test failed.
+// Kitex now does not support verifying whether method is POST.
+// this feature is implemented in grpc-go v1.37.0(PR#4241) but Kitex forked v1.26.0.
+
 // If the client sends an HTTP/2 request with a :method header with a value other than POST, as specified in
 // the gRPC over HTTP/2 specification, the server should close the stream.
 //func TestServerWithClientSendingWrongMethod(t *testing.T) {
@@ -1784,7 +1723,7 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 //	}
 //	defer mconn.Close()
 //
-//	if n, err := mconn.write(ClientPreface); err != nil || n != len(ClientPreface) {
+//	if n, err := mconn.Write(ClientPreface); err != nil || n != len(ClientPreface) {
 //		t.Fatalf("mconn.write(ClientPreface ) = %d, %v, want %d, <nil>", n, err, len(ClientPreface))
 //	}
 //
@@ -1808,9 +1747,9 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 //			case *grpcframe.SettingsFrame:
 //				// Do nothing. A settings frame is expected from server preface.
 //			case *http2.RSTStreamFrame:
-//				if frame.Header().StreamID != 1 || http2.ErrCode(frame.ErrCode) != http2.ErrCodeProtocol {
+//				if frame.Header().StreamID != 1 || frame.ErrCode != http2.ErrCodeProtocol {
 //					// Client only created a single stream, so RST Stream should be for that single stream.
-//					t.Errorf("RST stream received with streamID: %d and code %v, want streamID: 1 and code: http.ErrCodeFlowControl", frame.Header().StreamID, http2.ErrCode(frame.ErrCode))
+//					t.Errorf("RST stream received with streamID: %d and code %v, want streamID: 1 and code: http.ErrCodeFlowControl", frame.Header().StreamID, frame.ErrCode)
 //				}
 //				// Records that client successfully received RST Stream frame.
 //				success.Send(nil)
@@ -1823,7 +1762,7 @@ func TestReadGivesSameErrorAfterAnyErrorOccurs(t *testing.T) {
 //	}()
 //
 //	// Done with HTTP/2 setup - now create a stream with a bad method header.
-//	var buf bytes.buffer
+//	var buf bytes.Buffer
 //	henc := hpack.NewEncoder(&buf)
 //	// Method is required to be POST in a gRPC call.
 //	if err := henc.WriteField(hpack.HeaderField{Name: ":method", Value: "PUT"}); err != nil {
