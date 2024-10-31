@@ -170,8 +170,9 @@ func (s *stream) closeSend(exception error) error {
 	if !atomic.CompareAndSwapInt32(&s.selfEOF, 0, 1) {
 		return nil
 	}
+	err := s.sendTrailer(exception)
 	s.tryRunCloseCallback()
-	return s.sendTrailer(exception)
+	return err
 }
 
 // closeRecv should be called when following cases happen:
@@ -185,7 +186,6 @@ func (s *stream) closeRecv(exception error) error {
 	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
 		return nil
 	}
-	s.tryRunCloseCallback()
 	select {
 	case s.headerSig <- streamSigInactive:
 	default:
@@ -195,6 +195,7 @@ func (s *stream) closeRecv(exception error) error {
 	default:
 	}
 	s.sio.close(exception)
+	s.tryRunCloseCallback()
 	return nil
 }
 
