@@ -218,9 +218,11 @@ func (s *stream) setRecvTimeout(timeout time.Duration) {
 }
 
 func (s *stream) tryRunCloseCallback() {
-	if s.closeCallback != nil && atomic.AddInt32(&s.closeFlag, 1) == 2 {
+	if atomic.AddInt32(&s.closeFlag, 1) == 2 {
 		s.trans.deleteStream(s.sid)
-		s.closeCallback()
+		if s.closeCallback != nil {
+			s.closeCallback()
+		}
 	}
 }
 

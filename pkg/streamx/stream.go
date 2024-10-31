@@ -56,6 +56,7 @@ client.CloseAndRecv(res) === EOF ==>       server.Recv(EOF)
 ------------------- [Server Streaming] -------------------
 ---------- (Request) returns (stream Response) ----------
 client.Send(req)   === req ==>   server.Recv(req)
+client.CloseSend() === EOF ==>   server.Recv(EOF)
 client.Recv(res)   <== res ===   server.Send(req)
                        ...
 client.Recv(res)   <== res ===   server.Send(req)
