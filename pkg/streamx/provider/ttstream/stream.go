@@ -237,6 +237,7 @@ func (s *stream) tryRunCloseCallback() {
 		}
 	}
 	s.trans.deleteStream(s.sid)
+	s.trans.recycle()
 }
 
 func (s *stream) writeFrame(ftype int32, header streamx.Header, trailer streamx.Trailer, payload []byte) (err error) {

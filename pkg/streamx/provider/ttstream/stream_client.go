@@ -77,7 +77,4 @@ func clientStreamFinalizer(s *clientStream) {
 	// it's safe to call CloseSend twice
 	// we do CloseSend here to ensure stream can be closed normally
 	_ = s.CloseSend(context.Background())
-
-	// transport can be recycled only when client stream is GCed
-	s.trans.recycle()
 }
