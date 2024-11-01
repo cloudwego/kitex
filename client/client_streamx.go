@@ -56,7 +56,7 @@ func (kc *kClient) NewStream(ctx context.Context, method string, req any, callOp
 	// tracing
 	ctx = kc.opt.TracerCtl.DoStart(ctx, ri)
 	ctx, copts := streamxcallopt.NewCtxWithCallOptions(ctx)
-	callOptions = append(callOptions, streamxcallopt.WithStreamCloseCallback(func(ctx context.Context) {
+	callOptions = append(callOptions, streamxcallopt.WithStreamCloseCallback(func() {
 		kc.opt.TracerCtl.DoFinish(ctx, ri, err)
 	}))
 	copts.Apply(callOptions)

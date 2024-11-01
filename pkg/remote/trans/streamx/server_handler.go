@@ -99,10 +99,12 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 	var wg sync.WaitGroup
 	defer func() {
 		wg.Wait()
-		klog.CtxErrorf(ctx, "KITEX: stream OnRead return: err=%v", err)
 		_, nerr := t.provider.OnInactive(ctx, conn)
 		if err == nil && nerr != nil {
 			err = nerr
+		}
+		if err != nil {
+			klog.CtxErrorf(ctx, "KITEX: stream OnRead return: err=%v", err)
 		}
 	}()
 	// connection level goroutine

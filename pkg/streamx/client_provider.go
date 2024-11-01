@@ -39,6 +39,7 @@ res := stream.Recv(...)
                 => clientProvider.Stream.Recv(...)
 */
 
+// ClientProvider define client provider API
 type ClientProvider interface {
 	// NewStream create a stream based on rpcinfo and callOptions
 	NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (ClientStream, error)

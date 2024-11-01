@@ -14,27 +14,21 @@
  * limitations under the License.
  */
 
-package streamx
+package errors
 
 import (
-	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
 
-	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/internal/test"
 )
 
-// NewClientProvider wrap specific client provider
-func NewClientProvider(cs ClientProvider) ClientProvider {
-	return internalClientProvider{ClientProvider: cs}
-}
-
-type internalClientProvider struct {
-	ClientProvider
-}
-
-func (p internalClientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (ClientStream, error) {
-	cs, err := p.ClientProvider.NewStream(ctx, ri)
-	if err != nil {
-		return nil, err
-	}
-	return cs, nil
+func TestErrors(t *testing.T) {
+	causeErr := fmt.Errorf("test1")
+	newErr := ErrIllegalFrame.WithCause(causeErr)
+	test.Assert(t, errors.Is(newErr, ErrIllegalFrame), newErr)
+	test.Assert(t, strings.Contains(newErr.Error(), ErrIllegalFrame.Error()))
+	test.Assert(t, strings.Contains(newErr.Error(), causeErr.Error()))
 }
