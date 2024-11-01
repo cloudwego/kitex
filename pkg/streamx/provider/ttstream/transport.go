@@ -60,8 +60,6 @@ type transport struct {
 	fpipe         *container.Pipe[*Frame]  // out-coming frame pipe
 	closedFlag    int32
 	closedTrigger chan struct{}
-
-	metaHandler MetaFrameHandler
 }
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection, pool transPool) *transport {
@@ -120,10 +118,6 @@ func (t *transport) Addr() net.Addr {
 		return t.conn.RemoteAddr()
 	}
 	return nil
-}
-
-func (t *transport) setMetaFrameHandler(h MetaFrameHandler) {
-	t.metaHandler = h
 }
 
 // Close will close transport and destroy all resource and goroutines
@@ -212,10 +206,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 			// process different frames
 			switch fr.typ {
 			case metaFrameType:
-				// process meta frame if metaHandler registered
-				if t.metaHandler != nil {
-					err = t.metaHandler.OnMetaFrame(s, fr.meta, fr.header, fr.payload)
-				}
+				err = s.onReadMetaFrame(fr)
 			case headerFrameType:
 				// process header frame for client transport
 				err = s.onReadHeaderFrame(fr)

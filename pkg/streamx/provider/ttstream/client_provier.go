@@ -82,13 +82,13 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 	if err != nil {
 		return nil, err
 	}
-	trans.setMetaFrameHandler(c.metaHandler)
 
 	s, err := trans.WriteStream(ctx, method, intHeader, strHeader)
 	if err != nil {
 		return nil, err
 	}
 	s.setRecvTimeout(rconfig.StreamRecvTimeout())
+	s.setMetaFrameHandler(c.metaHandler)
 
 	// if ctx from server side, we should cancel the stream when server handler already returned
 	if !c.disableCancelingTransmit {

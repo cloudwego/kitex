@@ -44,13 +44,13 @@ func TestGenericStreaming(t *testing.T) {
 
 	// map generic
 	// client side
-	//reqJSON := `{"A":123, "b":"hello"}`
-	//err = cs.SendMsg(ctx, reqJSON)
-	//test.Assert(t, err == nil, err)
+	// reqJSON := `{"A":123, "b":"hello"}`
+	// err = cs.SendMsg(ctx, reqJSON)
+	// test.Assert(t, err == nil, err)
 	// server side
-	//res = new(testResponse)
-	//err = ss.RecvMsg(ctx, res)
-	//test.Assert(t, err == nil, err)
-	//test.Assert(t, res.A == req.A)
-	//test.Assert(t, res.B == req.B)
+	// res = new(testResponse)
+	// err = ss.RecvMsg(ctx, res)
+	// test.Assert(t, err == nil, err)
+	// test.Assert(t, res.A == req.A)
+	// test.Assert(t, res.B == req.B)
 }

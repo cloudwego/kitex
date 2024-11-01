@@ -95,8 +95,9 @@ type stream struct {
 	peerEOF int32
 	eofFlag int32
 
-	recvTimeout   time.Duration
-	closeCallback []streamxcallopt.StreamCloseCallback
+	recvTimeout      time.Duration
+	metaFrameHandler MetaFrameHandler
+	closeCallback    []streamxcallopt.StreamCloseCallback
 }
 
 func (s *stream) Mode() streamx.StreamingMode {
@@ -222,6 +223,10 @@ func (s *stream) setRecvTimeout(timeout time.Duration) {
 	s.recvTimeout = timeout
 }
 
+func (s *stream) setMetaFrameHandler(metaHandler MetaFrameHandler) {
+	s.metaFrameHandler = metaHandler
+}
+
 func (s *stream) tryRunCloseCallback() {
 	if atomic.AddInt32(&s.eofFlag, 1) != 2 {
 		return
@@ -295,6 +300,13 @@ func (s *stream) sendTrailer(exception error) (err error) {
 }
 
 // === Frame OnRead callback
+
+func (s *stream) onReadMetaFrame(fr *Frame) (err error) {
+	if s.metaFrameHandler == nil {
+		return nil
+	}
+	return s.metaFrameHandler.OnMetaFrame(s.StreamMeta, fr.meta, fr.header, fr.payload)
+}
 
 func (s *stream) onReadHeaderFrame(fr *Frame) (err error) {
 	if s.header != nil {
