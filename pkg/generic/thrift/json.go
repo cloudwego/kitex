@@ -172,11 +172,6 @@ func (m *ReadJSON) SetDynamicGo(convOpts, convOptsWithException *conv.Options) {
 
 // Read read data from in thrift.TProtocol and convert to json string
 func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, dataLen int, in bufiox.Reader) (interface{}, error) {
-	//buffer, ok := in.(remote.ByteBuffer)
-	//if !ok {
-	//	return nil, perrors.NewProtocolErrorWithMsg("bufiox.Reader should be ByteBuffer")
-	//}
-
 	// fallback logic
 	if !m.dynamicgoEnabled || dataLen <= 0 {
 		return m.originalRead(ctx, method, isClient, in)
@@ -191,35 +186,18 @@ func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, dataL
 		tyDsc = fnDsc.Request()
 	}
 
-	//_, isGRPC := buffer.(remote.FrameWrite)
-
 	var resp interface{}
 	var err error
 	if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.VOID {
 		if err = in.Skip(voidWholeLen); err != nil {
 			return nil, err
 		}
-		//if isGRPC {
-		//	in.
-		//	_, err = buffer.Next(voidWholeLen)
-		//} else {
-		//	_, err =
-		//	_, err = buffer.ReadBinary(voidWholeLen)
-		//}
-		//if err != nil {
-		//	return nil, err
-		//}
 		resp = descriptor.Void{}
 	} else {
 		transBuff := dirtmake.Bytes(dataLen, dataLen)
 		if _, err = in.ReadBinary(transBuff); err != nil {
 			return nil, err
 		}
-		//if isGRPC {
-		//	transBuff, err = buffer.Next(dataLen)
-		//} else {
-		//	transBuff, err = buffer.ReadBinary(dataLen)
-		//}
 
 		isStream := isStreaming(m.svc.Functions[method].StreamingMode)
 		if isStream {

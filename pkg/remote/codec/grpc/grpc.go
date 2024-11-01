@@ -107,17 +107,15 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 			if methodName == "" {
 				return errors.New("empty methodName in grpc generic streaming Encode")
 			}
-			//bw := gpkgthrift.NewBinaryWriter()
 			var bs []byte
 			bw := bufiox.NewBytesWriter(&bs)
-			//w := gthrift.NewBufferWriter(bw)
 			if err = msg.Write(ctx, methodName, bw); err != nil {
 				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Write failed: %s", err.Error()))
 			}
-			payload = bw.Bytes()
 			if err = bw.Flush(); err != nil {
 				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Flush failed: %s", err.Error()))
 			}
+			payload = bs
 		default:
 			payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
 		}

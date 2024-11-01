@@ -87,12 +87,6 @@ func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{
 		return writeStreamingContentWithDynamicgo(ctx, out, dynamicgoTypeDsc, &cv, transBuff)
 	} else {
 		return writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient)
-		//if err := writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient); err != nil {
-		//	return err
-		//}
-		//bw.WriteFieldStop()
-		//_, err := out.Write(bw.Bytes())
-		//return err
 	}
 }
 
