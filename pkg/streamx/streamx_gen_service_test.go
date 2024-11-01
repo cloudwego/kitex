@@ -141,7 +141,7 @@ var streamingServiceInfo = &serviceinfo.ServiceInfo{
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
 		),
 	},
-	Extra: map[string]interface{}{"streamingFlag": true, "streamx": true},
+	Extra: map[string]interface{}{"streaming": true, "streamx": true},
 }
 
 // --- Define RegisterService  interface ---

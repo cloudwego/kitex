@@ -16,34 +16,47 @@
 
 package ttstream
 
+// ClientProviderOption define client provider options
 type ClientProviderOption func(cp *clientProvider)
 
-func WithClientMetaHandler(metaHandler MetaFrameHandler) ClientProviderOption {
+// WithClientMetaFrameHandler register TTHeader Streaming meta frame handler
+func WithClientMetaFrameHandler(handler MetaFrameHandler) ClientProviderOption {
 	return func(cp *clientProvider) {
-		cp.metaHandler = metaHandler
+		cp.metaHandler = handler
 	}
 }
 
-func WithClientHeaderHandler(handler HeaderFrameHandler) ClientProviderOption {
+// WithClientHeaderFrameHandler register TTHeader Streaming header frame handler
+func WithClientHeaderFrameHandler(handler HeaderFrameWriteHandler) ClientProviderOption {
 	return func(cp *clientProvider) {
 		cp.headerHandler = handler
 	}
 }
 
+// WithClientDisableCancelingTransmit disable canceling transmit from upstream
+func WithClientDisableCancelingTransmit() ClientProviderOption {
+	return func(cp *clientProvider) {
+		cp.disableCancelingTransmit = true
+	}
+}
+
+// WithClientLongConnPool using long connection pool for client
 func WithClientLongConnPool(config LongConnConfig) ClientProviderOption {
 	return func(cp *clientProvider) {
 		cp.transPool = newLongConnTransPool(config)
 	}
 }
 
+// WithClientShortConnPool using short connection pool for client
 func WithClientShortConnPool() ClientProviderOption {
 	return func(cp *clientProvider) {
 		cp.transPool = newShortConnTransPool()
 	}
 }
 
-func WithClientMuxConnPool() ClientProviderOption {
+// WithClientMuxConnPool using mux connection pool for client
+func WithClientMuxConnPool(config MuxConnConfig) ClientProviderOption {
 	return func(cp *clientProvider) {
-		cp.transPool = newMuxTransPool()
+		cp.transPool = newMuxConnTransPool(config)
 	}
 }

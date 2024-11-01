@@ -54,11 +54,13 @@ stream.Close() - server handler return
 
 */
 
+// ServerProvider define server provider API
 type ServerProvider interface {
 	// Available detect if provider can process conn from its first N bytes
 	Available(ctx context.Context, conn net.Conn) bool // ProtocolMath
-	// OnActive called when conn connected
+	// OnActive called when conn accepted
 	OnActive(ctx context.Context, conn net.Conn) (context.Context, error)
+	// OnInactive called then conn disconnect
 	OnInactive(ctx context.Context, conn net.Conn) (context.Context, error)
 	// OnStream should read conn data and return a server stream
 	OnStream(ctx context.Context, conn net.Conn) (context.Context, ServerStream, error)

@@ -38,7 +38,7 @@ func InvokeStream[Req, Res any](
 		return errors.New("server stream is nil")
 	}
 	shandler := handler.(streamx.StreamHandler)
-	gs := streamx.NewGenericServerStream[Req, Res](sArgs.Stream())
+	gs := streamx.NewGenericServerStream[Req, Res](sArgs.Stream().(streamx.ServerStream))
 	gs.SetStreamRecvMiddleware(shandler.StreamRecvMiddleware)
 	gs.SetStreamSendMiddleware(shandler.StreamSendMiddleware)
 
