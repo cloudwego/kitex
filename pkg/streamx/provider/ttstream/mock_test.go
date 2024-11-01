@@ -24,12 +24,12 @@ import (
 	kutils "github.com/cloudwego/kitex/pkg/utils"
 )
 
-type TestRequest struct {
+type testRequest struct {
 	A int32  `thrift:"A,1" frugal:"1,default,i32" json:"A"`
 	B string `thrift:"B,2" frugal:"2,default,string" json:"B"`
 }
 
-func (p *TestRequest) FastRead(buf []byte) (int, error) {
+func (p *testRequest) FastRead(buf []byte) (int, error) {
 	err := json.Unmarshal(buf, p)
 	if err != nil {
 		return 0, err
@@ -37,19 +37,19 @@ func (p *TestRequest) FastRead(buf []byte) (int, error) {
 	return len(buf), nil
 }
 
-func (p *TestRequest) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
+func (p *testRequest) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
 	data, _ := json.Marshal(p)
 	copy(buf, data)
 	return len(data)
 }
 
-func (p *TestRequest) BLength() int {
+func (p *testRequest) BLength() int {
 	data, _ := json.Marshal(p)
 	return len(data)
 }
 
-func (p *TestRequest) DeepCopy(s interface{}) error {
-	src, ok := s.(*TestRequest)
+func (p *testRequest) DeepCopy(s interface{}) error {
+	src, ok := s.(*testRequest)
 	if !ok {
 		return fmt.Errorf("%T's type not matched %T", s, p)
 	}
@@ -63,4 +63,4 @@ func (p *TestRequest) DeepCopy(s interface{}) error {
 	return nil
 }
 
-type TestResponse = TestRequest
+type testResponse = testRequest

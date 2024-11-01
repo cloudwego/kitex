@@ -76,21 +76,12 @@ func (s *ObjectPool) Close() {
 }
 
 func (s *ObjectPool) cleaning() {
-	cleanInternal := time.Second
+	cleanInternal := s.idleTimeout
 	for atomic.LoadInt32(&s.closed) == 0 {
 		time.Sleep(cleanInternal)
 
 		now := time.Now()
 		s.L.Lock()
-		// update cleanInternal
-		objSize := 0
-		for _, stk := range s.objects {
-			objSize += stk.Size()
-		}
-		cleanInternal = time.Second + time.Duration(objSize)*time.Millisecond*10
-		if cleanInternal > time.Second*10 {
-			cleanInternal = time.Second * 10
-		}
 		// clean objects
 		for _, stk := range s.objects {
 			deleted := 0

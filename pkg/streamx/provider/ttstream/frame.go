@@ -19,13 +19,17 @@ package ttstream
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
+	"io"
 	"sync"
 
 	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/bufiox"
 	gopkgthrift "github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+
+	"github.com/cloudwego/kitex/pkg/remote"
 
 	"github.com/cloudwego/kitex/pkg/streamx"
 	terrors "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/errors"
@@ -47,14 +51,18 @@ var frameTypeToString = map[int32]string{
 
 var framePool sync.Pool
 
+// Frame define a TTHeader Streaming Frame
 type Frame struct {
 	streamFrame
-	meta    IntHeader
 	typ     int32
 	payload []byte
 }
 
-func newFrame(sframe streamFrame, meta IntHeader, typ int32, payload []byte) (fr *Frame) {
+func (f *Frame) String() string {
+	return fmt.Sprintf("[sid=%d ftype=%d fmethod=%s]", f.sid, f.typ, f.method)
+}
+
+func newFrame(sframe streamFrame, typ int32, payload []byte) (fr *Frame) {
 	v := framePool.Get()
 	if v == nil {
 		fr = new(Frame)
@@ -62,7 +70,6 @@ func newFrame(sframe streamFrame, meta IntHeader, typ int32, payload []byte) (fr
 		fr = v.(*Frame)
 	}
 	fr.streamFrame = sframe
-	fr.meta = meta
 	fr.typ = typ
 	fr.payload = payload
 	return fr
@@ -70,7 +77,6 @@ func newFrame(sframe streamFrame, meta IntHeader, typ int32, payload []byte) (fr
 
 func recycleFrame(frame *Frame) {
 	frame.streamFrame = streamFrame{}
-	frame.meta = nil
 	frame.typ = 0
 	frame.payload = nil
 	framePool.Put(frame)
@@ -122,6 +128,9 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	var dp ttheader.DecodeParam
 	dp, err = ttheader.Decode(ctx, reader)
 	if err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, err
+		}
 		return nil, terrors.ErrIllegalFrame.WithCause(err)
 	}
 	if dp.Flags&ttheader.HeaderFlagsStreaming == 0 {
@@ -131,6 +140,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	var ftype int32
 	var fheader streamx.Header
 	var ftrailer streamx.Trailer
+	fmeta := dp.IntInfo
 	switch dp.IntInfo[ttheader.FrameType] {
 	case ttheader.FrameTypeMeta:
 		ftype = metaFrameType
@@ -162,8 +172,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	}
 
 	fr = newFrame(
-		streamFrame{sid: fsid, method: fmethod, header: fheader, trailer: ftrailer},
-		dp.IntInfo,
+		streamFrame{sid: fsid, method: fmethod, meta: fmeta, header: fheader, trailer: ftrailer},
 		ftype, fpayload,
 	)
 	return fr, nil
@@ -174,10 +183,18 @@ func EncodePayload(ctx context.Context, msg any) ([]byte, error) {
 	return payload, nil
 }
 
+func EncodeGenericPayload(ctx context.Context, msg any) ([]byte, error) {
+	return nil, nil
+}
+
 func DecodePayload(ctx context.Context, payload []byte, msg any) error {
 	return gopkgthrift.FastUnmarshal(payload, msg.(gopkgthrift.FastCodec))
 }
 
-func EncodeException(ctx context.Context, method string, seq int32, ex tException) ([]byte, error) {
-	return gopkgthrift.MarshalFastMsg(method, gopkgthrift.EXCEPTION, seq, ex.(gopkgthrift.FastCodec))
+func EncodeException(ctx context.Context, method string, seq int32, ex error) ([]byte, error) {
+	exception, ok := ex.(gopkgthrift.FastCodec)
+	if !ok {
+		exception = gopkgthrift.NewApplicationException(remote.InternalError, ex.Error())
+	}
+	return gopkgthrift.MarshalFastMsg(method, gopkgthrift.EXCEPTION, seq, exception)
 }

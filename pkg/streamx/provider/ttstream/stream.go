@@ -23,8 +23,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/bytedance/gopkg/lang/mcache"
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+
+	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -33,29 +37,36 @@ import (
 )
 
 var (
-	_ streamx.ClientStream         = (*clientStream)(nil)
-	_ streamx.ServerStream         = (*serverStream)(nil)
-	_ streamx.ClientStreamMetadata = (*clientStream)(nil)
-	_ streamx.ServerStreamMetadata = (*serverStream)(nil)
-	_ StreamMeta                   = (*stream)(nil)
+	_ streamx.ClientStream = (*clientStream)(nil)
+	_ streamx.ServerStream = (*serverStream)(nil)
+	_ StreamMeta           = (*stream)(nil)
 )
 
-func newStream(trans *transport, mode streamx.StreamingMode, smeta streamFrame) *stream {
+func newStream(ctx context.Context, trans *transport, mode streamx.StreamingMode, smeta streamFrame) *stream {
 	s := new(stream)
 	s.streamFrame = smeta
+	s.StreamMeta = newStreamMeta()
+	s.reader = newStreamReader()
 	s.trans = trans
 	s.mode = mode
 	s.wheader = make(streamx.Header)
 	s.wtrailer = make(streamx.Trailer)
 	s.headerSig = make(chan int32, 1)
 	s.trailerSig = make(chan int32, 1)
-	s.StreamMeta = newStreamMeta()
+
+	// register close callback
+	copts := streamxcallopt.GetCallOptionsFromCtx(ctx)
+	if copts != nil && len(copts.StreamCloseCallback) > 0 {
+		s.closeCallback = append(s.closeCallback, copts.StreamCloseCallback...)
+	}
 	return s
 }
 
+// streamFrame define a basic stream frame
 type streamFrame struct {
 	sid     int32
 	method  string
+	meta    IntHeader
 	header  streamx.Header // key:value, key is full name
 	trailer streamx.Trailer
 }
@@ -64,24 +75,29 @@ const (
 	streamSigNone     int32 = 0
 	streamSigActive   int32 = 1
 	streamSigInactive int32 = -1
+	streamSigCancel   int32 = -2
 )
 
+// stream is used to process frames and expose user APIs
 type stream struct {
 	streamFrame
-	trans      *transport
-	mode       streamx.StreamingMode
-	wheader    streamx.Header  // wheader == nil means it already be sent
-	wtrailer   streamx.Trailer // wtrailer == nil means it already be sent
-	selfEOF    int32
-	peerEOF    int32
+	StreamMeta
+	reader   *streamReader
+	trans    *transport
+	mode     streamx.StreamingMode
+	wheader  streamx.Header  // wheader == nil means it already be sent
+	wtrailer streamx.Trailer // wtrailer == nil means it already be sent
+
 	headerSig  chan int32
 	trailerSig chan int32
-	sio        *streamIO
-	closedFlag int32 // 1 means stream is closed in exception scenario
 
-	StreamMeta
-	metaHandler MetaFrameHandler
-	recvTimeout time.Duration
+	selfEOF int32
+	peerEOF int32
+	eofFlag int32
+
+	recvTimeout      time.Duration
+	metaFrameHandler MetaFrameHandler
+	closeCallback    []streamxcallopt.StreamCloseCallback
 }
 
 func (s *stream) Mode() streamx.StreamingMode {
@@ -99,10 +115,77 @@ func (s *stream) Method() string {
 	return s.method
 }
 
-// close stream in exception scenario
-func (s *stream) close(exception error) {
-	if !atomic.CompareAndSwapInt32(&s.closedFlag, 0, 1) {
-		return
+func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
+	if atomic.LoadInt32(&s.selfEOF) != 0 {
+		return terrors.ErrIllegalOperation.WithCause(errors.New("stream is close send"))
+	}
+	// encode payload
+	payload, err := EncodePayload(ctx, msg)
+	if err != nil {
+		return err
+	}
+	// tracing
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri != nil && ri.Stats() != nil {
+		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
+			rpcStats.IncrSendSize(uint64(len(payload)))
+		}
+	}
+	// send data frame
+	return s.writeFrame(dataFrameType, nil, nil, payload)
+}
+
+func (s *stream) RecvMsg(ctx context.Context, data any) error {
+	if s.recvTimeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, s.recvTimeout)
+		defer cancel()
+	}
+	payload, err := s.reader.output(ctx)
+	if err != nil {
+		return err
+	}
+	err = DecodePayload(context.Background(), payload, data)
+	// payload will not be access after decode
+	mcache.Free(payload)
+
+	// tracing
+	ri := rpcinfo.GetRPCInfo(ctx)
+	if ri != nil && ri.Stats() != nil {
+		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
+			rpcStats.IncrRecvSize(uint64(len(payload)))
+		}
+	}
+	return err
+}
+
+// closeSend should be called when following cases happen:
+// client:
+// - user call CloseSend
+// - client recv a trailer
+// - transport layer exception
+// server:
+// - server handler return
+// - transport layer exception
+func (s *stream) closeSend(exception error) error {
+	if !atomic.CompareAndSwapInt32(&s.selfEOF, 0, 1) {
+		return nil
+	}
+	err := s.sendTrailer(exception)
+	s.tryRunCloseCallback()
+	return err
+}
+
+// closeRecv should be called when following cases happen:
+// client:
+// - transport layer exception
+// - client stream is GCed
+// server:
+// - transport layer exception
+// - server handler return
+func (s *stream) closeRecv(exception error) error {
+	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
+		return nil
 	}
 	select {
 	case s.headerSig <- streamSigInactive:
@@ -112,45 +195,55 @@ func (s *stream) close(exception error) {
 	case s.trailerSig <- streamSigInactive:
 	default:
 	}
-	s.sio.close(exception)
-	s.trans.streamDelete(s.sid)
+	s.reader.close(exception)
+	s.tryRunCloseCallback()
+	return nil
 }
 
-func (s *stream) isClosed() bool {
-	return atomic.LoadInt32(&s.closedFlag) == 1
-}
-
-func (s *stream) isSendFinished() bool {
-	return atomic.LoadInt32(&s.selfEOF) == 1
-}
-
-func (s *stream) cancel() {
-	s.sio.cancel()
-}
-
-func (s *stream) setMetaFrameHandler(h MetaFrameHandler) {
-	s.metaHandler = h
-}
-
-func (s *stream) readMetaFrame(intHeader IntHeader, header streamx.Header, payload []byte) (err error) {
-	if s.metaHandler == nil {
+func (s *stream) cancel() error {
+	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
 		return nil
 	}
-	return s.metaHandler.OnMetaFrame(s.StreamMeta, intHeader, header, payload)
+	select {
+	case s.headerSig <- streamSigCancel:
+	default:
+	}
+	select {
+	case s.trailerSig <- streamSigCancel:
+	default:
+	}
+	s.reader.cancel()
+	return nil
 }
 
-func (s *stream) readHeader(hd streamx.Header) (err error) {
-	if s.header != nil {
-		return terrors.ErrUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
+func (s *stream) setRecvTimeout(timeout time.Duration) {
+	if timeout <= 0 {
+		return
 	}
-	s.header = hd
-	select {
-	case s.headerSig <- streamSigActive:
-	default:
-		return terrors.ErrUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
+	s.recvTimeout = timeout
+}
+
+func (s *stream) setMetaFrameHandler(metaHandler MetaFrameHandler) {
+	s.metaFrameHandler = metaHandler
+}
+
+func (s *stream) tryRunCloseCallback() {
+	if atomic.AddInt32(&s.eofFlag, 1) != 2 {
+		return
 	}
-	klog.Debugf("stream[%s] read header: %v", s.method, hd)
-	return nil
+	if len(s.closeCallback) > 0 {
+		for _, cb := range s.closeCallback {
+			cb()
+		}
+	}
+	s.trans.deleteStream(s.sid)
+	s.trans.recycle()
+}
+
+func (s *stream) writeFrame(ftype int32, header streamx.Header, trailer streamx.Trailer, payload []byte) (err error) {
+	return s.trans.writeFrame(
+		streamFrame{sid: s.sid, method: s.method, header: header, trailer: trailer}, ftype, payload,
+	)
 }
 
 // writeHeader copy kvs into s.wheader
@@ -164,30 +257,87 @@ func (s *stream) writeHeader(hd streamx.Header) error {
 	return nil
 }
 
+// sendHeader send header to peer
 func (s *stream) sendHeader() (err error) {
 	wheader := s.wheader
 	s.wheader = nil
 	if wheader == nil {
 		return fmt.Errorf("stream header already sent")
 	}
-	err = s.trans.streamSendHeader(s, wheader)
+	err = s.writeFrame(headerFrameType, wheader, nil, nil)
 	return err
 }
 
-// readTrailer by client: unblock recv function and return EOF if no unread frame
-// readTrailer by server: unblock recv function and return EOF if no unread frame
-func (s *stream) readTrailerFrame(fr *Frame) (err error) {
-	if !atomic.CompareAndSwapInt32(&s.peerEOF, 0, 1) {
-		return terrors.ErrUnexpectedTrailer.WithCause(fmt.Errorf("content: %v", fr))
+// writeTrailer write trailer to peer
+func (s *stream) writeTrailer(tl streamx.Trailer) (err error) {
+	if s.wtrailer == nil {
+		return fmt.Errorf("stream trailer already sent")
 	}
+	for k, v := range tl {
+		s.wtrailer[k] = v
+	}
+	return nil
+}
 
+// writeTrailer send trailer to peer
+// if exception is not nil, trailer frame should carry a payload
+func (s *stream) sendTrailer(exception error) (err error) {
+	wtrailer := s.wtrailer
+	s.wtrailer = nil
+	if wtrailer == nil {
+		return fmt.Errorf("stream trailer already sent")
+	}
+	klog.Debugf("transport[%d]-stream[%d] send trailer: err=%v", s.trans.kind, s.sid, exception)
+
+	var payload []byte
+	if exception != nil {
+		payload, err = EncodeException(context.Background(), s.method, s.sid, exception)
+		if err != nil {
+			return err
+		}
+	}
+	err = s.writeFrame(trailerFrameType, nil, wtrailer, payload)
+	return err
+}
+
+// === Frame OnRead callback
+
+func (s *stream) onReadMetaFrame(fr *Frame) (err error) {
+	if s.metaFrameHandler == nil {
+		return nil
+	}
+	return s.metaFrameHandler.OnMetaFrame(s.StreamMeta, fr.meta, fr.header, fr.payload)
+}
+
+func (s *stream) onReadHeaderFrame(fr *Frame) (err error) {
+	if s.header != nil {
+		return terrors.ErrUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
+	}
+	s.header = fr.header
+	select {
+	case s.headerSig <- streamSigActive:
+	default:
+		return terrors.ErrUnexpectedHeader.WithCause(fmt.Errorf("stream[%d] already set header", s.sid))
+	}
+	klog.Debugf("stream[%s] read header: %v", s.method, fr.header)
+	return nil
+}
+
+func (s *stream) onReadDataFrame(fr *Frame) (err error) {
+	s.reader.input(context.Background(), fr.payload)
+	return nil
+}
+
+// onReadTrailerFrame by client: unblock recv function and return EOF if no unread frame
+// onReadTrailerFrame by server: unblock recv function and return EOF if no unread frame
+func (s *stream) onReadTrailerFrame(fr *Frame) (err error) {
 	var exception error
 	// when server-side returns non-biz error, it will be wrapped as ApplicationException stored in trailer frame payload
 	if len(fr.payload) > 0 {
 		// exception is type of (*thrift.ApplicationException)
 		_, _, err = thrift.UnmarshalFastMsg(fr.payload, nil)
 		exception = terrors.ErrApplicationException.WithCause(err)
-	} else {
+	} else if len(fr.trailer) > 0 {
 		// when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header
 		bizErr, err := transmeta.ParseBizStatusErr(fr.trailer)
 		if err != nil {
@@ -201,7 +351,6 @@ func (s *stream) readTrailerFrame(fr *Frame) (err error) {
 	select {
 	case s.trailerSig <- streamSigActive:
 	default:
-		return terrors.ErrUnexpectedTrailer.WithCause(errors.New("already set trailer"))
 	}
 	select {
 	case s.headerSig <- streamSigNone:
@@ -210,101 +359,14 @@ func (s *stream) readTrailerFrame(fr *Frame) (err error) {
 	}
 
 	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, exception)
-	return s.trans.streamCloseRecv(s, exception)
-}
-
-func (s *stream) writeTrailer(tl streamx.Trailer) (err error) {
-	if s.wtrailer == nil {
-		return fmt.Errorf("stream trailer already sent")
+	switch s.trans.kind {
+	case clientTransport:
+		// if client recv trailer, server handler must be return,
+		// so we don't need to send data anymore
+		err = s.closeRecv(exception)
+	case serverTransport:
+		// if server recv trailer, we only need to close recv but still can send data
+		err = s.closeRecv(exception)
 	}
-	for k, v := range tl {
-		s.wtrailer[k] = v
-	}
-	return nil
-}
-
-func (s *stream) sendTrailer(ctx context.Context, ex tException) (err error) {
-	if !atomic.CompareAndSwapInt32(&s.selfEOF, 0, 1) {
-		return nil
-	}
-	wtrailer := s.wtrailer
-	s.wtrailer = nil
-	if wtrailer == nil {
-		return fmt.Errorf("stream trailer already sent")
-	}
-	klog.Debugf("transport[%d]-stream[%d] send trailer", s.trans.kind, s.sid)
-	return s.trans.streamCloseSend(s, wtrailer, ex)
-}
-
-func (s *stream) setRecvTimeout(timeout time.Duration) {
-	if timeout <= 0 {
-		return
-	}
-	s.recvTimeout = timeout
-}
-
-func (s *stream) SendMsg(ctx context.Context, res any) (err error) {
-	err = s.trans.streamSend(ctx, s, res)
 	return err
-}
-
-func (s *stream) RecvMsg(ctx context.Context, req any) error {
-	if s.recvTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, s.recvTimeout)
-		defer cancel()
-	}
-	return s.trans.streamRecv(ctx, s, req)
-}
-
-func newClientStream(s *stream) *clientStream {
-	cs := &clientStream{stream: s}
-	return cs
-}
-
-type clientStream struct {
-	*stream
-}
-
-func (s *clientStream) RecvMsg(ctx context.Context, req any) error {
-	return s.stream.RecvMsg(ctx, req)
-}
-
-func (s *clientStream) CloseSend(ctx context.Context) error {
-	return s.sendTrailer(ctx, nil)
-}
-
-func newServerStream(s *stream) streamx.ServerStream {
-	ss := &serverStream{stream: s}
-	return ss
-}
-
-type serverStream struct {
-	*stream
-}
-
-func (s *serverStream) RecvMsg(ctx context.Context, req any) error {
-	return s.stream.RecvMsg(ctx, req)
-}
-
-// SendMsg should send left header first
-func (s *serverStream) SendMsg(ctx context.Context, res any) error {
-	if len(s.wheader) > 0 {
-		if err := s.sendHeader(); err != nil {
-			return err
-		}
-	}
-	return s.stream.SendMsg(ctx, res)
-}
-
-// close will be called after server handler returned
-// after close stream cannot be access again
-func (s *serverStream) close(ex tException) error {
-	// write loop should help to delete stream
-	err := s.sendTrailer(context.Background(), ex)
-	if err != nil {
-		return err
-	}
-	s.stream.close(ex)
-	return nil
 }

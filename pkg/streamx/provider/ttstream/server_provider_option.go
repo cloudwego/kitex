@@ -16,10 +16,19 @@
 
 package ttstream
 
+// ServerProviderOption define server provider options
 type ServerProviderOption func(pc *serverProvider)
 
-func WithServerPayloadLimit(limit int) ServerProviderOption {
-	return func(s *serverProvider) {
-		s.payloadLimit = limit
+// WithServerMetaFrameHandler register TTHeader Streaming meta frame handler
+func WithServerMetaFrameHandler(handler MetaFrameHandler) ServerProviderOption {
+	return func(sp *serverProvider) {
+		sp.metaHandler = handler
+	}
+}
+
+// WithServerHeaderFrameHandler register TTHeader Streaming header frame handler
+func WithServerHeaderFrameHandler(handler HeaderFrameReadHandler) ServerProviderOption {
+	return func(sp *serverProvider) {
+		sp.headerHandler = handler
 	}
 }
