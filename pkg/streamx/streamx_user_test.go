@@ -75,6 +75,9 @@ func TestMain(m *testing.M) {
 func TestStreamingBasic(t *testing.T) {
 	for _, tc := range providerTestCases {
 		t.Run(tc.Name, func(t *testing.T) {
+			concurrency := 100
+			round := 5
+
 			// === prepare test environment ===
 			addr := test.GetLocalAddress()
 			ln, err := netpoll.CreateListener("tcp", addr)
@@ -226,92 +229,110 @@ func TestStreamingBasic(t *testing.T) {
 			octx := setMetadata(context.Background())
 
 			t.Logf("=== PingPong ===")
-			req := new(Request)
-			req.Message = "PingPong"
-			res, err := pingpongClient.PingPong(octx, req)
-			test.Assert(t, err == nil, err)
-			test.Assert(t, req.Message == res.Message, res)
+			var wg sync.WaitGroup
+			for i := 0; i < concurrency; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					req := new(Request)
+					req.Message = "PingPong"
+					res, err := pingpongClient.PingPong(octx, req)
+					test.Assert(t, err == nil, err)
+					test.Assert(t, req.Message == res.Message, res)
+				}()
+			}
+			wg.Wait()
 
 			t.Logf("=== Unary ===")
-			req = new(Request)
-			req.Type = 10000
-			req.Message = "Unary"
-			res, err = streamClient.Unary(octx, req)
-			test.Assert(t, err == nil, err)
-			test.Assert(t, req.Type == res.Type, res.Type)
-			test.Assert(t, req.Message == res.Message, res.Message)
-			atomic.AddInt32(&serverStreamCount, -1)
+			for i := 0; i < concurrency; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					req := new(Request)
+					req.Type = 10000
+					req.Message = "Unary"
+					res, err := streamClient.Unary(octx, req)
+					test.Assert(t, err == nil, err)
+					test.Assert(t, req.Type == res.Type, res.Type)
+					test.Assert(t, req.Message == res.Message, res.Message)
+					atomic.AddInt32(&serverStreamCount, -1)
+				}()
+			}
+			wg.Wait()
 			waitServerStreamDone()
-			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(1))
-			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(1))
+			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(concurrency))
+			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(concurrency))
 			atomic.StoreInt32(&serverRecvCount, 0)
 			atomic.StoreInt32(&serverSendCount, 0)
 
 			// client stream
-			round := 5
 			t.Logf("=== ClientStream ===")
-			ctx, cs, err := streamClient.ClientStream(octx)
-			test.Assert(t, err == nil, err)
-			for i := 0; i < round; i++ {
-				req := new(Request)
-				req.Type = int32(i)
-				req.Message = "ClientStream"
-				err = cs.Send(ctx, req)
-				test.Assert(t, err == nil, err)
+			for i := 0; i < concurrency; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					ctx, cs, err := streamClient.ClientStream(octx)
+					test.Assert(t, err == nil, err)
+					for i := 0; i < round; i++ {
+						req := new(Request)
+						req.Type = int32(i)
+						req.Message = "ClientStream"
+						err = cs.Send(ctx, req)
+						test.Assert(t, err == nil, err)
+					}
+					res, err := cs.CloseAndRecv(ctx)
+					test.Assert(t, err == nil, err)
+					test.Assert(t, res.Message == "ClientStream", res.Message)
+					atomic.AddInt32(&serverStreamCount, -1)
+					testHeaderAndTrailer(t, cs)
+				}()
 			}
-			res, err = cs.CloseAndRecv(ctx)
-			test.Assert(t, err == nil, err)
-			test.Assert(t, res.Message == "ClientStream", res.Message)
-			atomic.AddInt32(&serverStreamCount, -1)
+			wg.Wait()
 			waitServerStreamDone()
-			testHeaderAndTrailer(t, cs)
-			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(round))
-			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(1))
+			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(round)*int32(concurrency))
+			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(concurrency))
 			atomic.StoreInt32(&serverRecvCount, 0)
 			atomic.StoreInt32(&serverSendCount, 0)
-			cs = nil
-			runtime.GC()
 
 			// server stream
 			t.Logf("=== ServerStream ===")
-			req = new(Request)
-			req.Message = "ServerStream"
-			ctx, ss, err := streamClient.ServerStream(octx, req)
-			test.Assert(t, err == nil, err)
-			received := 0
-			for {
-				res, err := ss.Recv(ctx)
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				test.Assert(t, err == nil, err)
-				received++
-				t.Logf("Client ServerStream recv: %v", res)
+			for i := 0; i < concurrency; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					req := new(Request)
+					req.Message = "ServerStream"
+					ctx, ss, err := streamClient.ServerStream(octx, req)
+					test.Assert(t, err == nil, err)
+					received := 0
+					for {
+						res, err := ss.Recv(ctx)
+						if errors.Is(err, io.EOF) {
+							break
+						}
+						test.Assert(t, err == nil, err)
+						received++
+						t.Logf("Client ServerStream recv: %v", res)
+					}
+					testHeaderAndTrailer(t, ss)
+					atomic.AddInt32(&serverStreamCount, -1)
+				}()
 			}
-			err = ss.CloseSend(ctx)
-			test.Assert(t, err == nil, err)
-			atomic.AddInt32(&serverStreamCount, -1)
+			wg.Wait()
 			waitServerStreamDone()
-			testHeaderAndTrailer(t, ss)
-			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(1))
-			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(received))
+			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(concurrency))
 			atomic.StoreInt32(&serverRecvCount, 0)
 			atomic.StoreInt32(&serverSendCount, 0)
-			ss = nil
-			runtime.GC()
 
 			// bidi stream
 			t.Logf("=== BidiStream ===")
-			concurrent := 32
-			round = 5
-			for c := 0; c < concurrent; c++ {
-				atomic.AddInt32(&serverStreamCount, -1)
+			for i := 0; i < concurrency; i++ {
+				wg.Add(3)
 				go func() {
+					defer wg.Done()
 					ctx, bs, err := streamClient.BidiStream(octx)
 					test.Assert(t, err == nil, err)
 					msg := "BidiStream"
-					var wg sync.WaitGroup
-					wg.Add(2)
 					go func() {
 						defer wg.Done()
 						for i := 0; i < round; i++ {
@@ -338,19 +359,20 @@ func TestStreamingBasic(t *testing.T) {
 						test.Assert(t, i == round, i)
 					}()
 					testHeaderAndTrailer(t, bs)
+					atomic.AddInt32(&serverStreamCount, -1)
 				}()
 			}
+			wg.Wait()
 			waitServerStreamDone()
-			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(concurrent*round))
-			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(concurrent*round))
+			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(round*concurrency))
+			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(round*concurrency))
 			atomic.StoreInt32(&serverRecvCount, 0)
 			atomic.StoreInt32(&serverSendCount, 0)
-			runtime.GC()
 
 			t.Logf("=== UnaryWithErr normalErr ===")
-			req = new(Request)
+			req := new(Request)
 			req.Type = normalErr
-			res, err = streamClient.UnaryWithErr(ctx, req)
+			res, err := streamClient.UnaryWithErr(octx, req)
 			test.Assert(t, res == nil, res)
 			test.Assert(t, err != nil, err)
 			assertNormalErr(t, err)
@@ -358,7 +380,7 @@ func TestStreamingBasic(t *testing.T) {
 			t.Logf("=== UnaryWithErr bizErr ===")
 			req = new(Request)
 			req.Type = bizErr
-			res, err = streamClient.UnaryWithErr(ctx, req)
+			res, err = streamClient.UnaryWithErr(octx, req)
 			test.Assert(t, res == nil, res)
 			test.Assert(t, err != nil, err)
 			assertBizErr(t, err)
