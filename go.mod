@@ -49,5 +49,3 @@ require (
 	golang.org/x/arch v0.2.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 )
-
-replace github.com/apache/thrift => github.com/apache/thrift v0.13.0
