@@ -335,6 +335,9 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 	if len(state.data.mdata) > 0 {
 		s.ctx = metadata.NewIncomingContext(s.ctx, state.data.mdata)
 	}
+	// put this operation before storing stream in activeStreams
+	// to avoid unit test TestServerContextCanceledOnClosedConnection data race
+	s.ctx = traceCtx(s.ctx, s.method)
 
 	t.mu.Lock()
 	if t.state != reachable {
@@ -366,7 +369,6 @@ func (t *http2Server) operateHeaders(frame *grpcframe.MetaHeadersFrame, handle f
 	s.requestRead = func(n int) {
 		t.adjustWindow(s, uint32(n))
 	}
-	s.ctx = traceCtx(s.ctx, s.method)
 	s.ctxDone = s.ctx.Done()
 	s.wq = newWriteQuota(defaultWriteQuota, s.ctxDone)
 	s.trReader = &transportReader{

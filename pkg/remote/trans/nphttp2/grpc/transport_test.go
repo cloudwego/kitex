@@ -985,6 +985,8 @@ func TestServerContextCanceledOnClosedConnection(t *testing.T) {
 	// close connection directly
 	ct.Close(errSelfCloseForTest)
 	select {
+	// after retrieving stream ins activeStreams, http2Server should not modify stream.ctx anymore.
+	// otherwise there would be a Data Race problem.
 	case <-ss.Context().Done():
 		if ss.Context().Err() != errConnectionEOF {
 			t.Fatalf("ss.Context().Err() got %v, want %v", ss.Context().Err(), errConnectionEOF)
