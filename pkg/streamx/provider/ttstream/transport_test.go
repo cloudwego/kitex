@@ -80,7 +80,7 @@ func TestTransportBasic(t *testing.T) {
 		cs := newClientStream(rawClientStream)
 		req := new(testRequest)
 		req.B = "hello"
-		err = cs.SendMsg(context.Background(), req)
+		err := cs.SendMsg(context.Background(), req)
 		test.Assert(t, err == nil, err)
 		t.Logf("client stream send msg: %v", req)
 
@@ -148,7 +148,7 @@ func TestTransportServerStreaming(t *testing.T) {
 		cs := newClientStream(rawClientStream)
 		req := new(testRequest)
 		req.B = "hello"
-		err = cs.SendMsg(context.Background(), req)
+		err := cs.SendMsg(context.Background(), req)
 		test.Assert(t, err == nil, err)
 		t.Logf("client stream send msg: %v", req)
 
