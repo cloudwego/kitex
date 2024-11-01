@@ -327,7 +327,7 @@ func (s *stream) onReadTrailerFrame(fr *Frame) (err error) {
 		// exception is type of (*thrift.ApplicationException)
 		_, _, err = thrift.UnmarshalFastMsg(fr.payload, nil)
 		exception = terrors.ErrApplicationException.WithCause(err)
-	} else {
+	} else if len(fr.trailer) > 0 {
 		// when server-side returns biz error, payload is empty and biz error information is stored in trailer frame header
 		bizErr, err := transmeta.ParseBizStatusErr(fr.trailer)
 		if err != nil {

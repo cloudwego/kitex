@@ -179,6 +179,10 @@ func EncodePayload(ctx context.Context, msg any) ([]byte, error) {
 	return payload, nil
 }
 
+func EncodeGenericPayload(ctx context.Context, msg any) ([]byte, error) {
+	return nil, nil
+}
+
 func DecodePayload(ctx context.Context, payload []byte, msg any) error {
 	return gopkgthrift.FastUnmarshal(payload, msg.(gopkgthrift.FastCodec))
 }

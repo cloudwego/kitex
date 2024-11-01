@@ -55,7 +55,7 @@ var testServiceInfo = &serviceinfo.ServiceInfo{
 	Extra: map[string]interface{}{"streaming": true, "streamx": true},
 }
 
-func TestTransport(t *testing.T) {
+func TestTransportBasic(t *testing.T) {
 	klog.SetLevel(klog.LevelDebug)
 	cfd, sfd := netpoll.GetSysFdPairs()
 	cconn, err := netpoll.NewFDConnection(cfd)
@@ -120,6 +120,72 @@ func TestTransport(t *testing.T) {
 	err = ss.RecvMsg(context.Background(), req)
 	test.Assert(t, err == io.EOF, err)
 	t.Logf("server stream recv msg: %v", res)
+	err = ss.CloseSend(nil)
+	test.Assert(t, err == nil, err)
+	t.Log("server handler return")
+	wg.Wait()
+}
+
+func TestTransportServerStreaming(t *testing.T) {
+	klog.SetLevel(klog.LevelDebug)
+	cfd, sfd := netpoll.GetSysFdPairs()
+	cconn, err := netpoll.NewFDConnection(cfd)
+	test.Assert(t, err == nil, err)
+	sconn, err := netpoll.NewFDConnection(sfd)
+	test.Assert(t, err == nil, err)
+
+	intHeader := make(IntHeader)
+	strHeader := make(streamx.Header)
+	ctrans := newTransport(clientTransport, testServiceInfo, cconn, nil)
+	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", intHeader, strHeader)
+	test.Assert(t, err == nil, err)
+	strans := newTransport(serverTransport, testServiceInfo, sconn, nil)
+	rawServerStream, err := strans.ReadStream(context.Background())
+	test.Assert(t, err == nil, err)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	// client
+	go func() {
+		defer wg.Done()
+		cs := newClientStream(rawClientStream)
+		req := new(testRequest)
+		req.B = "hello"
+		err = cs.SendMsg(context.Background(), req)
+		test.Assert(t, err == nil, err)
+		t.Logf("client stream send msg: %v", req)
+
+		err = cs.CloseSend(context.Background())
+		test.Assert(t, err == nil, err)
+		t.Logf("client stream close send")
+
+		res := new(testResponse)
+		for {
+			err = cs.RecvMsg(context.Background(), res)
+			if err == io.EOF {
+				break
+			}
+			test.Assert(t, err == nil, err)
+		}
+	}()
+
+	// server
+	ss := newServerStream(rawServerStream)
+	err = ss.SendHeader(strHeader)
+	test.Assert(t, err == nil, err)
+	t.Logf("server stream send header: %v", strHeader)
+
+	req := new(testRequest)
+	err = ss.RecvMsg(context.Background(), req)
+	test.Assert(t, err == nil, err)
+	t.Logf("server stream recv msg: %v", req)
+	for i := 0; i < 3; i++ {
+		res := new(testResponse)
+		res.B = req.B
+		err = ss.SendMsg(context.Background(), res)
+		test.Assert(t, err == nil, err)
+		t.Logf("server stream send msg: %v", req)
+	}
 	err = ss.CloseSend(nil)
 	test.Assert(t, err == nil, err)
 	t.Log("server handler return")
