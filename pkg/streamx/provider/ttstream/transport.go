@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -85,9 +86,9 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		err := t.loopRead()
 		if err != nil {
 			if !isIgnoreError(err) {
-				klog.Warnf("transport[%d] loop read err: %v", t.kind, err)
+				klog.Warnf("transport[%d-%s] loop read err: %v", t.kind, t.Addr(), err)
 			} else {
-				klog.Debugf("transport[%d] loop read err: %v", t.kind, err)
+				klog.Debugf("transport[%d-%s] loop read err: %v", t.kind, t.Addr(), err)
 			}
 			// if connection is closed by peer, loop read should return ErrConnClosed error,
 			// so we should close transport here
@@ -101,14 +102,24 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		err := t.loopWrite()
 		if err != nil {
 			if !isIgnoreError(err) {
-				klog.Warnf("transport[%d] loop write err: %v", t.kind, err)
+				klog.Warnf("transport[%d-%s] loop write err: %v", t.kind, t.Addr(), err)
 			} else {
-				klog.Debugf("transport[%d] loop write err: %v", t.kind, err)
+				klog.Debugf("transport[%d-%s] loop write err: %v", t.kind, t.Addr(), err)
 			}
 			_ = t.Close(err)
 		}
 	}()
 	return t
+}
+
+func (t *transport) Addr() net.Addr {
+	switch t.kind {
+	case clientTransport:
+		return t.conn.LocalAddr()
+	case serverTransport:
+		return t.conn.RemoteAddr()
+	}
+	return nil
 }
 
 func (t *transport) setMetaFrameHandler(h MetaFrameHandler) {
@@ -124,12 +135,7 @@ func (t *transport) Close(exception error) (err error) {
 	if !atomic.CompareAndSwapInt32(&t.closedFlag, 0, 1) {
 		return nil
 	}
-	switch t.kind {
-	case clientTransport:
-		klog.Debugf("transport[%d-%s] is closing", t.kind, t.conn.LocalAddr())
-	case serverTransport:
-		klog.Debugf("transport[%d-%s] is closing", t.kind, t.conn.RemoteAddr())
-	}
+	klog.Debugf("transport[%d-%s] is closing", t.kind, t.Addr())
 	t.spipe.Close()
 	t.fpipe.Close()
 	t.streams.Range(func(key, value any) bool {
@@ -151,7 +157,7 @@ func (t *transport) IsActive() bool {
 }
 
 func (t *transport) storeStream(s *stream) {
-	klog.Debugf("transport[%d] store stream: sid=%d", t.kind, s.sid)
+	klog.Debugf("transport[%d-%s] store stream: sid=%d", t.kind, t.Addr(), s.sid)
 	t.streams.Store(s.sid, s)
 }
 
@@ -165,7 +171,7 @@ func (t *transport) loadStream(sid int32) (s *stream, ok bool) {
 }
 
 func (t *transport) deleteStream(sid int32) {
-	klog.Debugf("transport[%d] delete stream: sid=%d", t.kind, sid)
+	klog.Debugf("transport[%d-%s] delete stream: sid=%d", t.kind, t.Addr(), sid)
 	// remove stream from transport
 	t.streams.Delete(sid)
 }
