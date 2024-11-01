@@ -26,13 +26,13 @@ import (
 	"github.com/cloudwego/kitex/internal/test"
 )
 
-func TestStreamIO(t *testing.T) {
+func TestStreamReader(t *testing.T) {
 	ctx := context.Background()
 	msg := []byte("hello world")
 	round := 10000
 
 	// basic IOs
-	sio := newStreamIO()
+	sio := newStreamReader()
 	var done int32
 	go func() {
 		for i := 0; i < round; i++ {
@@ -60,7 +60,7 @@ func TestStreamIO(t *testing.T) {
 
 	// ctx canceled IOs
 	ctx, cancel := context.WithCancel(ctx)
-	sio = newStreamIO()
+	sio = newStreamReader()
 	sio.input(ctx, msg)
 	go func() {
 		time.Sleep(time.Millisecond * 10)

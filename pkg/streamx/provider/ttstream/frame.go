@@ -58,6 +58,10 @@ type Frame struct {
 	payload []byte
 }
 
+func (f *Frame) String() string {
+	return fmt.Sprintf("sid=%d ftype=%s fmethod=%s", f.sid, f.typ, f.method)
+}
+
 func newFrame(sframe streamFrame, typ int32, payload []byte) (fr *Frame) {
 	v := framePool.Get()
 	if v == nil {

@@ -177,7 +177,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		return err
 	}
 	defer recycleFrame(fr)
-	klog.Debugf("transport[%d] DecodeFrame: fr=%v", t.kind, fr)
+	klog.Debugf("transport[%d] DecodeFrame: frame[%s]", t.kind, fr.String())
 
 	var s *stream
 	if fr.typ == headerFrameType && t.kind == serverTransport {
@@ -192,8 +192,8 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		s, ok = t.loadStream(fr.sid)
 		if !ok {
 			klog.Errorf(
-				"transport[%d] read a unknown stream: ftype=%d sid=%d fmethod=%s ",
-				t.kind, fr.typ, fr.sid, fr.method,
+				"transport[%d] read a unknown stream: frame[%s]",
+				t.kind, fr.String(),
 			)
 			// ignore unknown stream error
 			err = nil
@@ -251,8 +251,11 @@ func (t *transport) loopWrite() error {
 		}
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
-			klog.Debugf("transport[%d] EncodeFrame: fr=%v IsActive=%v", t.kind, fr, t.conn.IsActive())
+			klog.Debugf("transport[%d] EncodeFrame: fr=%s", t.kind, fr.String())
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
+				return err
+			}
+			if err = t.conn.Writer().Flush(); err != nil {
 				return err
 			}
 			recycleFrame(fr)

@@ -46,7 +46,7 @@ func newStream(ctx context.Context, trans *transport, mode streamx.StreamingMode
 	s := new(stream)
 	s.streamFrame = smeta
 	s.StreamMeta = newStreamMeta()
-	s.sio = newStreamIO()
+	s.reader = newStreamReader()
 	s.trans = trans
 	s.mode = mode
 	s.wheader = make(streamx.Header)
@@ -82,7 +82,7 @@ const (
 type stream struct {
 	streamFrame
 	StreamMeta
-	sio      *streamIO
+	reader   *streamReader
 	trans    *transport
 	mode     streamx.StreamingMode
 	wheader  streamx.Header  // wheader == nil means it already be sent
@@ -140,7 +140,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 		ctx, cancel = context.WithTimeout(ctx, s.recvTimeout)
 		defer cancel()
 	}
-	payload, err := s.sio.output(ctx)
+	payload, err := s.reader.output(ctx)
 	if err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func (s *stream) closeRecv(exception error) error {
 	case s.trailerSig <- streamSigInactive:
 	default:
 	}
-	s.sio.close(exception)
+	s.reader.close(exception)
 	s.tryRunCloseCallback()
 	return nil
 }
@@ -211,7 +211,7 @@ func (s *stream) cancel() error {
 	case s.trailerSig <- streamSigCancel:
 	default:
 	}
-	s.sio.cancel()
+	s.reader.cancel()
 	return nil
 }
 
@@ -232,9 +232,6 @@ func (s *stream) tryRunCloseCallback() {
 		}
 	}
 	s.trans.deleteStream(s.sid)
-	// transport can be recycled only when send a trailer to peer
-	// and received the trailer from peer
-	s.trans.recycle()
 }
 
 func (s *stream) writeFrame(ftype int32, header streamx.Header, trailer streamx.Trailer, payload []byte) (err error) {
@@ -314,7 +311,7 @@ func (s *stream) onReadHeaderFrame(fr *Frame) (err error) {
 }
 
 func (s *stream) onReadDataFrame(fr *Frame) (err error) {
-	s.sio.input(context.Background(), fr.payload)
+	s.reader.input(context.Background(), fr.payload)
 	return nil
 }
 
@@ -354,10 +351,6 @@ func (s *stream) onReadTrailerFrame(fr *Frame) (err error) {
 		// if client recv trailer, server handler must be return,
 		// so we don't need to send data anymore
 		err = s.closeRecv(exception)
-		if err != nil {
-			return err
-		}
-		err = s.closeSend(exception)
 	case serverTransport:
 		// if server recv trailer, we only need to close recv but still can send data
 		err = s.closeRecv(exception)

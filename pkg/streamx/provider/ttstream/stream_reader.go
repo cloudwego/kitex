@@ -25,32 +25,32 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/container"
 )
 
-// streamIO is an abstraction layer for stream level IO operations
-type streamIO struct {
-	pipe      *container.Pipe[streamIOMsg]
-	cache     [1]streamIOMsg
+// streamReader is an abstraction layer for stream level IO operations
+type streamReader struct {
+	pipe      *container.Pipe[streamMsg]
+	cache     [1]streamMsg
 	exception error // once has exception, the stream should not work normally again
 }
 
-type streamIOMsg struct {
+type streamMsg struct {
 	payload   []byte
 	exception error
 }
 
-func newStreamIO() *streamIO {
-	sio := new(streamIO)
-	sio.pipe = container.NewPipe[streamIOMsg]()
+func newStreamReader() *streamReader {
+	sio := new(streamReader)
+	sio.pipe = container.NewPipe[streamMsg]()
 	return sio
 }
 
-func (s *streamIO) input(ctx context.Context, payload []byte) {
-	err := s.pipe.Write(ctx, streamIOMsg{payload: payload})
+func (s *streamReader) input(ctx context.Context, payload []byte) {
+	err := s.pipe.Write(ctx, streamMsg{payload: payload})
 	if err != nil {
 		klog.Errorf("pipe write failed: %v", err)
 	}
 }
 
-func (s *streamIO) output(ctx context.Context) (payload []byte, err error) {
+func (s *streamReader) output(ctx context.Context) (payload []byte, err error) {
 	if s.exception != nil {
 		return nil, s.exception
 	}
@@ -75,13 +75,13 @@ func (s *streamIO) output(ctx context.Context) (payload []byte, err error) {
 	return msg.payload, nil
 }
 
-func (s *streamIO) cancel() {
+func (s *streamReader) cancel() {
 	s.pipe.Cancel()
 }
 
-func (s *streamIO) close(exception error) {
+func (s *streamReader) close(exception error) {
 	if exception != nil {
-		_ = s.pipe.Write(context.Background(), streamIOMsg{exception: exception})
+		_ = s.pipe.Write(context.Background(), streamMsg{exception: exception})
 	}
 	s.pipe.Close()
 }
