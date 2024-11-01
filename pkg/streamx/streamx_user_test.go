@@ -320,7 +320,7 @@ func TestStreamingBasic(t *testing.T) {
 							err := bs.Send(ctx, req)
 							test.Assert(t, err == nil, err)
 						}
-						err = bs.CloseSend(ctx)
+						err := bs.CloseSend(ctx)
 						test.Assert(t, err == nil, err)
 					}()
 					go func() {
@@ -672,7 +672,7 @@ func TestStreamingException(t *testing.T) {
 
 			// assert circuitBreaker error
 			atomic.StoreInt32(&circuitBreaker, 1)
-			ctx, bs, err := streamClient.BidiStream(octx)
+			_, bs, err := streamClient.BidiStream(octx)
 			test.Assert(t, errors.Is(err, circuitBreakerErr), err)
 			atomic.StoreInt32(&circuitBreaker, 0)
 
