@@ -672,13 +672,13 @@ func TestStreamingException(t *testing.T) {
 
 			// assert circuitBreaker error
 			atomic.StoreInt32(&circuitBreaker, 1)
-			_, bs, err := streamClient.BidiStream(octx)
+			_, _, err := streamClient.BidiStream(octx)
 			test.Assert(t, errors.Is(err, circuitBreakerErr), err)
 			atomic.StoreInt32(&circuitBreaker, 0)
 
 			// assert context deadline error
 			ctx, cancel := context.WithTimeout(octx, time.Millisecond)
-			ctx, bs, err = streamClient.BidiStream(ctx)
+			ctx, bs, err := streamClient.BidiStream(ctx)
 			test.Assert(t, err == nil, err)
 			res, err := bs.Recv(ctx)
 			cancel()
