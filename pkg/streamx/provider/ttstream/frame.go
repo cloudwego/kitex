@@ -59,7 +59,7 @@ type Frame struct {
 }
 
 func (f *Frame) String() string {
-	return fmt.Sprintf("sid=%d ftype=%s fmethod=%s", f.sid, f.typ, f.method)
+	return fmt.Sprintf("[sid=%d ftype=%d fmethod=%s]", f.sid, f.typ, f.method)
 }
 
 func newFrame(sframe streamFrame, typ int32, payload []byte) (fr *Frame) {

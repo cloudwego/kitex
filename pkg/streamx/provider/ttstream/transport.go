@@ -86,6 +86,8 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		if err != nil {
 			if !isIgnoreError(err) {
 				klog.Warnf("transport[%d] loop read err: %v", t.kind, err)
+			} else {
+				klog.Debugf("transport[%d] loop read err: %v", t.kind, err)
 			}
 			// if connection is closed by peer, loop read should return ErrConnClosed error,
 			// so we should close transport here
@@ -100,6 +102,8 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		if err != nil {
 			if !isIgnoreError(err) {
 				klog.Warnf("transport[%d] loop write err: %v", t.kind, err)
+			} else {
+				klog.Debugf("transport[%d] loop write err: %v", t.kind, err)
 			}
 			_ = t.Close(err)
 		}
@@ -148,6 +152,7 @@ func (t *transport) IsActive() bool {
 }
 
 func (t *transport) storeStream(s *stream) {
+	klog.Debugf("transport[%d] store stream: sid=%d", t.kind, s.sid)
 	t.streams.Store(s.sid, s)
 }
 
@@ -161,6 +166,7 @@ func (t *transport) loadStream(sid int32) (s *stream, ok bool) {
 }
 
 func (t *transport) deleteStream(sid int32) {
+	klog.Debugf("transport[%d] delete stream: sid=%d", t.kind, sid)
 	// remove stream from transport
 	t.streams.Delete(sid)
 }
@@ -177,7 +183,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		return err
 	}
 	defer recycleFrame(fr)
-	klog.Debugf("transport[%d] DecodeFrame: frame[%s]", t.kind, fr.String())
+	klog.Debugf("transport[%d] DecodeFrame: frame=%s", t.kind, fr)
 
 	var s *stream
 	if fr.typ == headerFrameType && t.kind == serverTransport {
@@ -251,7 +257,7 @@ func (t *transport) loopWrite() error {
 		}
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
-			klog.Debugf("transport[%d] EncodeFrame: fr=%s", t.kind, fr.String())
+			klog.Debugf("transport[%d] EncodeFrame: fr=%s", t.kind, fr)
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}
