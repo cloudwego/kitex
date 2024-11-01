@@ -139,12 +139,11 @@ func writeStreamingContentWithDynamicgo(ctx context.Context, out bufiox.Writer, 
 		return err
 	}
 
-	bw := thrift.NewBufferWriter(out)
-	defer bw.Recycle()
-	for _, b := range dbuf {
-		if err := bw.WriteByte(int8(b)); err != nil {
-			return err
-		}
+	if wb, err := out.Malloc(len(dbuf)); err != nil {
+		return err
+	} else {
+		copy(wb, dbuf)
 	}
+	dbuf = dbuf[:0]
 	return nil
 }
