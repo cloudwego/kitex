@@ -21,6 +21,7 @@ import (
 	"net"
 )
 
+// NewServerProvider wrap specific server provider
 func NewServerProvider(ss ServerProvider) ServerProvider {
 	if _, ok := ss.(*internalServerProvider); ok {
 		return ss

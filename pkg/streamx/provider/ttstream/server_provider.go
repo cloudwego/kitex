@@ -18,6 +18,7 @@ package ttstream
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strconv"
 
@@ -39,6 +40,9 @@ type (
 	serverStreamCancelCtxKey struct{}
 )
 
+var _ streamx.ServerProvider = (*serverProvider)(nil)
+
+// NewServerProvider return a server provider
 func NewServerProvider(sinfo *serviceinfo.ServiceInfo, opts ...ServerProviderOption) (streamx.ServerProvider, error) {
 	sp := new(serverProvider)
 	sp.sinfo = sinfo
@@ -48,24 +52,29 @@ func NewServerProvider(sinfo *serviceinfo.ServiceInfo, opts ...ServerProviderOpt
 	return sp, nil
 }
 
-var _ streamx.ServerProvider = (*serverProvider)(nil)
-
 type serverProvider struct {
-	sinfo        *serviceinfo.ServiceInfo
-	payloadLimit int
+	sinfo         *serviceinfo.ServiceInfo
+	metaHandler   MetaFrameHandler
+	headerHandler HeaderFrameReadHandler
 }
 
+// Available sniff the conn if provider can process
 func (s serverProvider) Available(ctx context.Context, conn net.Conn) bool {
-	data, err := conn.(netpoll.Connection).Reader().Peek(8)
+	nconn, ok := conn.(netpoll.Connection)
+	if !ok {
+		return false
+	}
+	data, err := nconn.Reader().Peek(8)
 	if err != nil {
 		return false
 	}
 	return ttheader.IsStreaming(data)
 }
 
+// OnActive will be called when a connection accepted
 func (s serverProvider) OnActive(ctx context.Context, conn net.Conn) (context.Context, error) {
 	nconn := conn.(netpoll.Connection)
-	trans := newTransport(serverTransport, s.sinfo, nconn)
+	trans := newTransport(serverTransport, s.sinfo, nconn, nil)
 	_ = nconn.(onDisConnectSetter).SetOnDisconnect(func(ctx context.Context, connection netpoll.Connection) {
 		// server only close transport when peer connection closed
 		_ = trans.Close(nil)
@@ -85,15 +94,28 @@ func (s serverProvider) OnInactive(ctx context.Context, conn net.Conn) (context.
 func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Context, streamx.ServerStream, error) {
 	trans, _ := ctx.Value(serverTransCtxKey{}).(*transport)
 	if trans == nil {
-		return nil, nil, nil
+		return nil, nil, fmt.Errorf("server transport is nil")
 	}
-	st, err := trans.readStream(ctx)
+
+	// ReadStream will block until a stream coming or conn return error
+	st, err := trans.ReadStream(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
+	st.setMetaFrameHandler(s.metaHandler)
+
+	// headerHandler return a new stream level ctx
+	if s.headerHandler != nil {
+		ctx, err = s.headerHandler.OnReadStream(ctx, st.meta, st.header)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	// register metainfo into ctx
 	ctx = metainfo.SetMetaInfoFromMap(ctx, st.header)
 	ss := newServerStream(st)
 
+	// cancel ctx when OnStreamFinish
 	ctx, cancelFunc := ktx.WithCancel(ctx)
 	ctx = context.WithValue(ctx, serverStreamCancelCtxKey{}, cancelFunc)
 	return ctx, ss, nil
@@ -101,7 +123,7 @@ func (s serverProvider) OnStream(ctx context.Context, conn net.Conn) (context.Co
 
 func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStream, err error) (context.Context, error) {
 	sst := ss.(*serverStream)
-	var exception tException
+	var exception error
 	if err != nil {
 		switch terr := err.(type) {
 		case kerrors.BizStatusErrorIface:
@@ -123,13 +145,17 @@ func (s serverProvider) OnStreamFinish(ctx context.Context, ss streamx.ServerStr
 			if err != nil {
 				return nil, err
 			}
-		case tException:
+			exception = nil
+		case *thrift.ApplicationException:
 			exception = terr
+		case tException:
+			exception = thrift.NewApplicationException(terr.TypeId(), terr.Error())
 		default:
 			exception = thrift.NewApplicationException(remote.InternalError, terr.Error())
 		}
 	}
-	if err = sst.close(exception); err != nil {
+	// server stream CloseSend will send the trailer with payload
+	if err = sst.CloseSend(exception); err != nil {
 		return nil, err
 	}
 

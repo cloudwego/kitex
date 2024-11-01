@@ -30,17 +30,17 @@ func newShortConnTransPool() transPool {
 
 type shortConnTransPool struct{}
 
-func (c *shortConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (*transport, error) {
+func (p *shortConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (*transport, error) {
 	// create new connection
 	conn, err := dialer.DialConnection(network, addr, time.Second)
 	if err != nil {
 		return nil, err
 	}
 	// create new transport
-	trans := newTransport(clientTransport, sinfo, conn)
+	trans := newTransport(clientTransport, sinfo, conn, p)
 	return trans, nil
 }
 
-func (c *shortConnTransPool) Put(trans *transport) {
+func (p *shortConnTransPool) Put(trans *transport) {
 	_ = trans.Close(terrors.ErrTransport.WithCause(errors.New("short connection closed")))
 }
