@@ -20,10 +20,10 @@ import (
 	"context"
 )
 
-type StreamCloseCallback func(ctx context.Context)
+type StreamCloseCallback func()
 
 type CallOptions struct {
-	StreamCloseCallback StreamCloseCallback
+	StreamCloseCallback []StreamCloseCallback
 }
 
 type CallOption struct {
@@ -59,6 +59,6 @@ func (copts *CallOptions) Apply(opts []CallOption) {
 
 func WithStreamCloseCallback(callback StreamCloseCallback) CallOption {
 	return CallOption{f: func(o *CallOptions) {
-		o.StreamCloseCallback = callback
+		o.StreamCloseCallback = append(o.StreamCloseCallback, callback)
 	}}
 }

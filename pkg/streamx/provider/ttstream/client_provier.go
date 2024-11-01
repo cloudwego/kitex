@@ -32,10 +32,11 @@ import (
 
 var _ streamx.ClientProvider = (*clientProvider)(nil)
 
+// NewClientProvider return a client provider
 func NewClientProvider(sinfo *serviceinfo.ServiceInfo, opts ...ClientProviderOption) (streamx.ClientProvider, error) {
 	cp := new(clientProvider)
 	cp.sinfo = sinfo
-	cp.transPool = newMuxTransPool()
+	cp.transPool = newMuxConnTransPool(DefaultMuxConnConfig)
 	for _, opt := range opts {
 		opt(cp)
 	}
@@ -46,9 +47,13 @@ type clientProvider struct {
 	transPool     transPool
 	sinfo         *serviceinfo.ServiceInfo
 	metaHandler   MetaFrameHandler
-	headerHandler HeaderFrameHandler
+	headerHandler HeaderFrameWriteHandler
+
+	// options
+	disableCancelingTransmit bool
 }
 
+// NewStream return a client stream
 func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (streamx.ClientStream, error) {
 	rconfig := ri.Config()
 	invocation := ri.Invocation()
@@ -62,7 +67,7 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 	var intHeader IntHeader
 	var err error
 	if c.headerHandler != nil {
-		intHeader, strHeader, err = c.headerHandler.OnStream(ctx)
+		intHeader, strHeader, err = c.headerHandler.OnWriteStream(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -78,30 +83,21 @@ func (c clientProvider) NewStream(ctx context.Context, ri rpcinfo.RPCInfo) (stre
 		return nil, err
 	}
 
-	s, err := trans.newStream(ctx, method, intHeader, strHeader)
+	s, err := trans.WriteStream(ctx, method, intHeader, strHeader)
 	if err != nil {
 		return nil, err
 	}
 	s.setRecvTimeout(rconfig.StreamRecvTimeout())
-	// only client can set meta frame handler
 	s.setMetaFrameHandler(c.metaHandler)
 
 	// if ctx from server side, we should cancel the stream when server handler already returned
-	// TODO: this canceling transmit should be configurable
-	ktx.RegisterCancelCallback(ctx, func() {
-		s.cancel()
-	})
+	if !c.disableCancelingTransmit {
+		ktx.RegisterCancelCallback(ctx, func() {
+			_ = s.cancel()
+		})
+	}
 
 	cs := newClientStream(s)
-	runtime.SetFinalizer(cs, func(cstream *clientStream) {
-		// it's safe to call CloseSend twice
-		// we do CloseSend here to ensure stream can be closed normally
-		_ = cstream.CloseSend(ctx)
-
-		s.close(nil)
-		if trans.IsActive() {
-			c.transPool.Put(trans)
-		}
-	})
+	runtime.SetFinalizer(cs, clientStreamFinalizer)
 	return cs, err
 }
