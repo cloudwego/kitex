@@ -281,7 +281,7 @@ func (s *stream) sendTrailer(exception error) (err error) {
 	if wtrailer == nil {
 		return fmt.Errorf("stream trailer already sent")
 	}
-	klog.Debugf("transport[%d]-stream[%d] send trailer", s.trans.kind, s.sid)
+	klog.Debugf("transport[%d]-stream[%d] send trailer: err=%v", s.trans.kind, s.sid, exception)
 
 	var payload []byte
 	if exception != nil {

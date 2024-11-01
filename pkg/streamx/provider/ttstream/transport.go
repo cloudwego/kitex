@@ -136,7 +136,6 @@ func (t *transport) Close(exception error) (err error) {
 		s := value.(*stream)
 		_ = s.closeSend(exception)
 		_ = s.closeRecv(exception)
-		t.streams.Delete(key)
 		return true
 	})
 	return err
