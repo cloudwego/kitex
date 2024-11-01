@@ -80,7 +80,6 @@ func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{
 	}
 	transBuff := utils.StringToSliceByte(s)
 
-	//return writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient)
 	if isStreaming(m.svcDsc.Functions[method].StreamingMode) {
 		// unwrap one struct layer
 		dynamicgoTypeDsc = dynamicgoTypeDsc.Struct().FieldById(dthrift.FieldID(getStreamingFieldID(isClient, true))).Type()
