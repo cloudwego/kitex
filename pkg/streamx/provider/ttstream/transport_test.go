@@ -30,7 +30,6 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -56,7 +55,6 @@ var testServiceInfo = &serviceinfo.ServiceInfo{
 }
 
 func TestTransportBasic(t *testing.T) {
-	klog.SetLevel(klog.LevelDebug)
 	cfd, sfd := netpoll.GetSysFdPairs()
 	cconn, err := netpoll.NewFDConnection(cfd)
 	test.Assert(t, err == nil, err)
@@ -127,7 +125,6 @@ func TestTransportBasic(t *testing.T) {
 }
 
 func TestTransportServerStreaming(t *testing.T) {
-	klog.SetLevel(klog.LevelDebug)
 	cfd, sfd := netpoll.GetSysFdPairs()
 	cconn, err := netpoll.NewFDConnection(cfd)
 	test.Assert(t, err == nil, err)
@@ -193,7 +190,6 @@ func TestTransportServerStreaming(t *testing.T) {
 }
 
 func TestTransportException(t *testing.T) {
-	klog.SetLevel(klog.LevelDebug)
 	cfd, sfd := netpoll.GetSysFdPairs()
 	cconn, err := netpoll.NewFDConnection(cfd)
 	test.Assert(t, err == nil, err)

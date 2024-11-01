@@ -24,7 +24,7 @@ import (
 )
 
 var DefaultLongConnConfig = LongConnConfig{
-	MaxIdleTimeout: time.Hour,
+	MaxIdleTimeout: time.Minute,
 }
 
 type LongConnConfig struct {
