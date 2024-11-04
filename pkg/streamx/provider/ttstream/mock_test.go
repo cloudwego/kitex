@@ -17,9 +17,9 @@
 package ttstream
 
 import (
-	"encoding/json"
 	"fmt"
 
+	"github.com/cloudwego/frugal"
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	kutils "github.com/cloudwego/kitex/pkg/utils"
 )
@@ -30,22 +30,16 @@ type testRequest struct {
 }
 
 func (p *testRequest) FastRead(buf []byte) (int, error) {
-	err := json.Unmarshal(buf, p)
-	if err != nil {
-		return 0, err
-	}
-	return len(buf), nil
+	return frugal.DecodeObject(buf, p)
 }
 
 func (p *testRequest) FastWriteNocopy(buf []byte, binaryWriter bthrift.BinaryWriter) int {
-	data, _ := json.Marshal(p)
-	copy(buf, data)
-	return len(data)
+	n, _ := frugal.EncodeObject(buf, binaryWriter, p)
+	return n
 }
 
 func (p *testRequest) BLength() int {
-	data, _ := json.Marshal(p)
-	return len(data)
+	return frugal.EncodedSize(p)
 }
 
 func (p *testRequest) DeepCopy(s interface{}) error {
