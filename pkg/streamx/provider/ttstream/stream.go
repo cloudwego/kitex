@@ -32,7 +32,7 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	terrors "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/errors"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 

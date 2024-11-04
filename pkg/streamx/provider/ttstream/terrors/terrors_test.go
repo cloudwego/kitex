@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package errors
+package terrors
 
 import (
 	"errors"
@@ -23,12 +23,28 @@ import (
 	"testing"
 
 	"github.com/cloudwego/kitex/internal/test"
+	"github.com/cloudwego/kitex/pkg/kerrors"
 )
 
 func TestErrors(t *testing.T) {
 	causeErr := fmt.Errorf("test1")
 	newErr := ErrIllegalFrame.WithCause(causeErr)
 	test.Assert(t, errors.Is(newErr, ErrIllegalFrame), newErr)
+	test.Assert(t, errors.Is(newErr, kerrors.ErrStreamingProtocol), newErr)
 	test.Assert(t, strings.Contains(newErr.Error(), ErrIllegalFrame.Error()))
 	test.Assert(t, strings.Contains(newErr.Error(), causeErr.Error()))
+}
+
+func TestCommonParentKerror(t *testing.T) {
+	errs := []error{
+		ErrUnexpectedHeader,
+		ErrApplicationException,
+		ErrIllegalBizErr,
+		ErrIllegalFrame,
+		ErrIllegalOperation,
+		ErrTransport,
+	}
+	for _, err := range errs {
+		test.Assert(t, errors.Is(err, kerrors.ErrStreamingProtocol), err)
+	}
 }
