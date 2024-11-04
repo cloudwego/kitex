@@ -160,13 +160,6 @@ func (s *server) buildMiddlewares(ctx context.Context) []endpoint.Middleware {
 	if mw := s.buildServiceMiddleware(); mw != nil {
 		mws = append(mws, mw)
 	}
-	// register stream context inject middleware
-	// TODO(DMwangnima): this is a workaround to fix ctx diverge problem temporarily,
-	// it should be removed after the new streaming api with ctx published.
-	// if there is streaming method, make sure the ctxInjectMW is the last middleware before core middleware
-	if mw := s.buildStreamCtxInjectMiddleware(); mw != nil {
-		mws = append(mws, mw)
-	}
 	// register core middleware,
 	// core middleware MUST be the last middleware
 	mws = append(mws, s.buildCoreMiddleware())
@@ -177,19 +170,6 @@ func (s *server) buildInvokeChain(ctx context.Context) {
 	mws := s.buildMiddlewares(ctx)
 	innerHandlerEp := s.invokeHandleEndpoint()
 	s.eps = endpoint.Chain(mws...)(innerHandlerEp)
-}
-
-// buildStreamCtxInjectMiddleware is a workaround to resolve stream ctx diverge problem in server side
-// when there is streaming method, add the ctxInjectMW to wrap the Stream
-func (s *server) buildStreamCtxInjectMiddleware() endpoint.Middleware {
-	for _, svc := range s.svcs.svcMap {
-		for _, method := range svc.svcInfo.Methods {
-			if method.IsStreaming() {
-				return newCtxInjectMW()
-			}
-		}
-	}
-	return nil
 }
 
 // RegisterService should not be called by users directly.
