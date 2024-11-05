@@ -85,8 +85,6 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		if err != nil {
 			if !isIgnoreError(err) {
 				klog.Warnf("transport[%d-%s] loop read err: %v", t.kind, t.Addr(), err)
-			} else {
-				klog.Debugf("transport[%d-%s] loop read err: %v", t.kind, t.Addr(), err)
 			}
 			// if connection is closed by peer, loop read should return ErrConnClosed error,
 			// so we should close transport here
@@ -101,8 +99,6 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		if err != nil {
 			if !isIgnoreError(err) {
 				klog.Warnf("transport[%d-%s] loop write err: %v", t.kind, t.Addr(), err)
-			} else {
-				klog.Debugf("transport[%d-%s] loop write err: %v", t.kind, t.Addr(), err)
 			}
 			_ = t.Close(err)
 		}
@@ -170,12 +166,6 @@ func (t *transport) deleteStream(sid int32) {
 	t.streams.Delete(sid)
 }
 
-func (t *transport) recycle() {
-	if t.pool != nil {
-		t.pool.Put(t)
-	}
-}
-
 func (t *transport) readFrame(reader bufiox.Reader) error {
 	fr, err := DecodeFrame(context.Background(), reader)
 	if err != nil {
@@ -196,10 +186,7 @@ func (t *transport) readFrame(reader bufiox.Reader) error {
 		var ok bool
 		s, ok = t.loadStream(fr.sid)
 		if !ok {
-			klog.Errorf(
-				"transport[%d] read a unknown stream: frame[%s]",
-				t.kind, fr.String(),
-			)
+			klog.Errorf("transport[%d] read a unknown stream: frame[%s]", t.kind, fr.String())
 			// ignore unknown stream error
 			err = nil
 		} else {
@@ -253,7 +240,7 @@ func (t *transport) loopWrite() error {
 		}
 		for i := 0; i < n; i++ {
 			fr := fcache[i]
-			klog.Debugf("transport[%d] EncodeFrame: fr=%s", t.kind, fr)
+			klog.Debugf("transport[%d] EncodeFrame: frame=%s", t.kind, fr)
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}
@@ -262,19 +249,39 @@ func (t *transport) loopWrite() error {
 			}
 			recycleFrame(fr)
 		}
-		if err = t.conn.Writer().Flush(); err != nil {
+		if err = writer.Flush(); err != nil {
 			return err
 		}
 	}
 }
 
-// writeFrame is concurrent safe
-func (t *transport) writeFrame(sframe streamFrame, ftype int32, payload []byte) (err error) {
-	frame := newFrame(sframe, ftype, payload)
-	return t.fpipe.Write(context.Background(), frame)
+// WriteFrame is concurrent safe
+func (t *transport) WriteFrame(fr *Frame) (err error) {
+	return t.fpipe.Write(context.Background(), fr)
+}
+
+func (t *transport) CloseStream(sid int32) (err error) {
+	t.deleteStream(sid)
+	// clientTransport may require to return the transport to transPool
+	if t.pool != nil {
+		t.pool.Put(t)
+	}
+	return nil
 }
 
 var clientStreamID int32
+
+// stream id can be negative
+func genStreamID() int32 {
+	// here have a really rare case that one connection get two same stream id when exist (2*max_int32) streams,
+	// but it just happens in theory because in real world, no service can process soo many streams in the same time.
+	sid := atomic.AddInt32(&clientStreamID, 1)
+	// we preserve streamId=0 for connection level control frame in the future.
+	if sid == 0 {
+		sid = atomic.AddInt32(&clientStreamID, 1)
+	}
+	return sid
+}
 
 // WriteStream create new stream on current connection
 // it's typically used by client side
@@ -286,15 +293,14 @@ func (t *transport) WriteStream(
 		return nil, fmt.Errorf("transport already be used as other kind")
 	}
 
-	sid := atomic.AddInt32(&clientStreamID, 1)
+	sid := genStreamID()
 	smode := t.sinfo.MethodInfo(method).StreamingMode()
 	// new stream first
 	s := newStream(ctx, t, smode, streamFrame{sid: sid, method: method})
 	t.storeStream(s)
 	// send create stream request for server
-	err := t.writeFrame(
-		streamFrame{sid: sid, method: method, header: strHeader, meta: intHeader}, headerFrameType, nil,
-	)
+	fr := newFrame(streamFrame{sid: sid, method: method, header: strHeader, meta: intHeader}, headerFrameType, nil)
+	err := t.WriteFrame(fr)
 	if err != nil {
 		return nil, err
 	}

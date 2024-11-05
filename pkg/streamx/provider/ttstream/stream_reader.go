@@ -46,7 +46,7 @@ func newStreamReader() *streamReader {
 func (s *streamReader) input(ctx context.Context, payload []byte) {
 	err := s.pipe.Write(ctx, streamMsg{payload: payload})
 	if err != nil {
-		klog.Errorf("pipe write failed: %v", err)
+		klog.Errorf("stream pipe input failed: %v", err)
 	}
 }
 
