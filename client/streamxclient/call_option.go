@@ -1,45 +1,22 @@
-/*
- * Copyright 2024 CloudWeGo Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package streamxclient
 
 import "context"
 
-// This file contains the CallOptions related structs and functions
-// because they are not ready to be exposed to users.
-
 // StreamCloseCallback define close callback of the stream
-type StreamCloseCallback func(err error)
+type StreamCloseCallback func()
 
 // CallOptions define stream call level options
 type CallOptions struct {
 	StreamCloseCallback []StreamCloseCallback
 }
 
-// Apply call options
-func (copts *CallOptions) Apply(opts []CallOption) {
-	for _, opt := range opts {
-		opt.f(copts)
-	}
-}
-
 // CallOption define stream call level option
 type CallOption struct {
 	f func(o *CallOptions)
 }
+
+// WithCallOption add call option
+type WithCallOption func(o *CallOption)
 
 type ctxKeyCallOptions struct{}
 
@@ -60,6 +37,13 @@ func GetCallOptionsFromCtx(ctx context.Context) *CallOptions {
 		return nil
 	}
 	return copts
+}
+
+// Apply call options
+func (copts *CallOptions) Apply(opts []CallOption) {
+	for _, opt := range opts {
+		opt.f(copts)
+	}
 }
 
 // WithStreamCloseCallback register StreamCloseCallback

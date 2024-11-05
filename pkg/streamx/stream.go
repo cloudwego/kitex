@@ -18,8 +18,6 @@ package streamx
 
 import (
 	"context"
-
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
 
 var (
@@ -30,8 +28,6 @@ var (
 	_ ClientStreamingServer[int, int] = (*GenericServerStream[int, int])(nil)
 	_ BidiStreamingServer[int, int]   = (*GenericServerStream[int, int])(nil)
 )
-
-type StreamingMode = serviceinfo.StreamingMode
 
 /* Streaming Mode
 ---------------  [Unary Streaming]  ---------------
@@ -78,12 +74,9 @@ client.Recv(res)   <== res ===   server.Send(req)
 client.Recv(EOF)   <== EOF ===   server handler return
 */
 
-const (
-	StreamingNone          = serviceinfo.StreamingNone
-	StreamingUnary         = serviceinfo.StreamingUnary
-	StreamingClient        = serviceinfo.StreamingClient
-	StreamingServer        = serviceinfo.StreamingServer
-	StreamingBidirectional = serviceinfo.StreamingBidirectional
+type (
+	Header  map[string]string
+	Trailer map[string]string
 )
 
 // Stream define stream APIs
@@ -95,28 +88,14 @@ type Stream interface {
 // ClientStream define client stream APIs
 type ClientStream interface {
 	Stream
-	ClientStreamMetadata
+	Header() (Header, error)
+	Trailer() (Trailer, error)
 	CloseSend(ctx context.Context) error
 }
 
 // ServerStream define server stream APIs
 type ServerStream interface {
 	Stream
-	ServerStreamMetadata
-}
-
-// ClientStreamMetadata define metainfo getter API
-// client should use metainfo.WithValue(ctx, ..) to transmit metainfo to server
-// client should use Header() to get metainfo from server
-// client should use metainfo.GetValue(ctx, ..) get current server handler's metainfo
-type ClientStreamMetadata interface {
-	Header() (Header, error)
-	Trailer() (Trailer, error)
-}
-
-// ServerStreamMetadata define metainfo setter API
-// server should use SetHeader/SendHeader/SetTrailer to transmit metainfo to client
-type ServerStreamMetadata interface {
 	SetHeader(hd Header) error
 	SendHeader(hd Header) error
 	SetTrailer(hd Trailer) error
@@ -171,32 +150,14 @@ func NewGenericClientStream[Req, Res any](cs ClientStream) *GenericClientStream[
 // GenericClientStream wrap stream IO with Send/Recv middlewares
 type GenericClientStream[Req, Res any] struct {
 	ClientStream
-	StreamSendMiddleware
-	StreamRecvMiddleware
-}
-
-func (x *GenericClientStream[Req, Res]) SetStreamSendMiddleware(e StreamSendMiddleware) {
-	x.StreamSendMiddleware = e
-}
-
-func (x *GenericClientStream[Req, Res]) SetStreamRecvMiddleware(e StreamRecvMiddleware) {
-	x.StreamRecvMiddleware = e
 }
 
 func (x *GenericClientStream[Req, Res]) SendMsg(ctx context.Context, m any) error {
-	if x.StreamSendMiddleware != nil {
-		return x.StreamSendMiddleware(streamSendNext)(ctx, x.ClientStream, m)
-	}
 	return x.ClientStream.SendMsg(ctx, m)
 }
 
 func (x *GenericClientStream[Req, Res]) RecvMsg(ctx context.Context, m any) (err error) {
-	if x.StreamRecvMiddleware != nil {
-		err = x.StreamRecvMiddleware(streamRecvNext)(ctx, x.ClientStream, m)
-	} else {
-		err = x.ClientStream.RecvMsg(ctx, m)
-	}
-	return err
+	return x.ClientStream.RecvMsg(ctx, m)
 }
 
 func (x *GenericClientStream[Req, Res]) Send(ctx context.Context, m *Req) error {
@@ -228,38 +189,17 @@ func NewGenericServerStream[Req, Res any](ss ServerStream) *GenericServerStream[
 // GenericServerStream wrap stream IO with Send/Recv middlewares
 type GenericServerStream[Req, Res any] struct {
 	ServerStream
-	StreamSendMiddleware
-	StreamRecvMiddleware
-}
-
-func (x *GenericServerStream[Req, Res]) SetStreamSendMiddleware(e StreamSendMiddleware) {
-	x.StreamSendMiddleware = e
-}
-
-func (x *GenericServerStream[Req, Res]) SetStreamRecvMiddleware(e StreamRecvMiddleware) {
-	x.StreamRecvMiddleware = e
 }
 
 func (x *GenericServerStream[Req, Res]) SendMsg(ctx context.Context, m any) error {
-	if x.StreamSendMiddleware != nil {
-		return x.StreamSendMiddleware(streamSendNext)(ctx, x.ServerStream, m)
-	}
 	return x.ServerStream.SendMsg(ctx, m)
 }
 
 func (x *GenericServerStream[Req, Res]) RecvMsg(ctx context.Context, m any) (err error) {
-	if x.StreamRecvMiddleware != nil {
-		err = x.StreamRecvMiddleware(streamRecvNext)(ctx, x.ServerStream, m)
-	} else {
-		err = x.ServerStream.RecvMsg(ctx, m)
-	}
-	return err
+	return x.ServerStream.RecvMsg(ctx, m)
 }
 
 func (x *GenericServerStream[Req, Res]) Send(ctx context.Context, m *Res) error {
-	if x.StreamSendMiddleware != nil {
-		return x.StreamSendMiddleware(streamSendNext)(ctx, x.ServerStream, m)
-	}
 	return x.ServerStream.SendMsg(ctx, m)
 }
 
@@ -269,21 +209,25 @@ func (x *GenericServerStream[Req, Res]) SendAndClose(ctx context.Context, m *Res
 
 func (x *GenericServerStream[Req, Res]) Recv(ctx context.Context) (m *Req, err error) {
 	m = new(Req)
-	if x.StreamRecvMiddleware != nil {
-		err = x.StreamRecvMiddleware(streamRecvNext)(ctx, x.ServerStream, m)
-	} else {
-		err = x.ServerStream.RecvMsg(ctx, m)
-	}
+	err = x.ServerStream.RecvMsg(ctx, m)
 	if err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
-func streamSendNext(ctx context.Context, stream Stream, msg any) (err error) {
-	return stream.SendMsg(ctx, msg)
+type (
+	serverStreamKey struct{}
+	clientStreamKey struct{}
+)
+
+func NewCtxWithServerStream(ctx context.Context, stream ServerStream) context.Context {
+	return context.WithValue(ctx, serverStreamKey{}, stream)
 }
 
-func streamRecvNext(ctx context.Context, stream Stream, msg any) (err error) {
-	return stream.RecvMsg(ctx, msg)
+func GetServerStream(ctx context.Context) ServerStream {
+	if s, ok := ctx.Value(serverStreamKey{}).(ServerStream); ok {
+		return s
+	}
+	return nil
 }

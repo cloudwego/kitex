@@ -30,6 +30,8 @@ import (
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession/backup"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -37,6 +39,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -70,13 +73,8 @@ type Client interface {
 type kClient struct {
 	svcInfo *serviceinfo.ServiceInfo
 	mws     []endpoint.Middleware
-	eps     endpoint.Endpoint
-	sEps    endpoint.Endpoint
-
-	// streamx
-	sxStreamMW     streamx.StreamMiddleware
-	sxStreamRecvMW streamx.StreamRecvMiddleware
-	sxStreamSendMW streamx.StreamSendMiddleware
+	eps     cep.UnaryEndpoint
+	sEps    cep.StreamEndpoint
 
 	opt *client.Options
 	lbf *lbcache.BalancerFactory
@@ -304,8 +302,9 @@ func (kc *kClient) initMiddlewares(ctx context.Context) {
 }
 
 func (kc *kClient) initStreamMiddlewares(ctx context.Context) {
-	kc.opt.Streaming.EventHandler = kc.opt.TracerCtl.GetStreamEventHandler()
 	kc.opt.Streaming.InitMiddlewares(ctx)
+	kc.opt.StreamOptions.EventHandler = kc.opt.TracerCtl.GetStreamEventHandler()
+	kc.opt.StreamOptions.InitMiddlewares(ctx)
 }
 
 func richMWsWithBuilder(ctx context.Context, mwBs []endpoint.MiddlewareBuilder) (mws []endpoint.Middleware) {
@@ -451,13 +450,25 @@ func (kc *kClient) buildInvokeChain() error {
 	if err != nil {
 		return err
 	}
-	kc.eps = mwchain(innerHandlerEp)
+	eps := mwchain(innerHandlerEp)
+
+	kc.eps = cep.UnaryChain(kc.opt.UnaryOptions.UnaryMiddlewares...)(func(ctx context.Context, req, resp interface{}) (err error) {
+		return eps(ctx, req, resp)
+	})
 
 	innerStreamingEp, err := kc.invokeStreamingEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.sEps = mwchain(innerStreamingEp)
+	sEps := mwchain(innerStreamingEp)
+	kc.sEps = cep.StreamChain(kc.opt.StreamOptions.StreamMiddlewares...)(func(ctx context.Context) (st streamx.ClientStream, err error) {
+		resp := &streaming.Result{}
+		err = sEps(ctx, nil, resp)
+		if err != nil {
+			return nil, err
+		}
+		return resp.ClientStream, nil
+	})
 	return nil
 }
 
@@ -753,9 +764,7 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 			_ = cfg.SetReadWriteTimeout(c.ReadWriteTimeout())
 		}
 	}
-
-	// streamx config
-	sopt := opt.StreamX
+	sopt := opt.StreamOptions
 	if sopt.RecvTimeout > 0 {
 		cfg.SetStreamRecvTimeout(sopt.RecvTimeout)
 	}

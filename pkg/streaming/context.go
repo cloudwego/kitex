@@ -16,14 +16,20 @@
 
 package streaming
 
-import "context"
+import (
+	"context"
+)
 
-type streamKey struct{}
+type (
+	streamKey struct{}
+)
 
+// Deprecated, use streamx.NewCtxWithServerStream instead.
 func NewCtxWithStream(ctx context.Context, stream Stream) context.Context {
 	return context.WithValue(ctx, streamKey{}, stream)
 }
 
+// Deprecated, use streamx.GetServerStream instead.
 func GetStream(ctx context.Context) Stream {
 	if s, ok := ctx.Value(streamKey{}).(Stream); ok {
 		return s
