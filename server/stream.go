@@ -43,7 +43,12 @@ func (s *server) initStreamMiddlewares(ctx context.Context) {
 }
 
 func (s *server) buildStreamInvokeChain() {
+<<<<<<< HEAD
 	// === for old version streaming ===
+=======
+	s.opt.RemoteOpt.StreamRecvEndpoint = s.opt.StreamOptions.BuildRecvChain()
+	s.opt.RemoteOpt.StreamSendEndpoint = s.opt.StreamOptions.BuildSendChain()
+>>>>>>> 18bce99e (feat: refactor: stream api)
 	s.opt.RemoteOpt.RecvEndpoint = s.opt.Streaming.BuildRecvInvokeChain(s.invokeRecvEndpoint())
 	s.opt.RemoteOpt.SendEndpoint = s.opt.Streaming.BuildSendInvokeChain(s.invokeSendEndpoint())
 
