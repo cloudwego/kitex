@@ -25,6 +25,7 @@ import (
 )
 
 // Stream both client and server stream
+// Deprecated: It's only for gRPC, use ClientStream/ServerStream instead.
 type Stream interface {
 	// SetHeader sets the header metadata. It may be called multiple times.
 	// When call multiple times, all the provided metadata will be merged.
@@ -58,6 +59,31 @@ type Stream interface {
 	io.Closer
 }
 
+type ClientStream interface {
+	Header() (Header, error)
+	Trailer() (Trailer, error)
+	CloseSend() error
+	RecvMsg(ctx context.Context, m interface{}) error
+	SendMsg(ctx context.Context, m interface{}) error
+}
+
+type ServerStream interface {
+	SetHeader(Header) error
+	SendHeader(Header) error
+	SetTrailer(Trailer) error
+	RecvMsg(ctx context.Context, m interface{}) error
+	SendMsg(ctx context.Context, m interface{}) error
+}
+
+type GRPCStreamGetter interface {
+	GetGRPCStream() Stream
+}
+
+type (
+	Header  map[string]string
+	Trailer map[string]string
+)
+
 // WithDoFinish should be implemented when:
 // (1) you want to wrap a stream in client middleware, and
 // (2) you want to manually call streaming.FinishStream(stream, error) to record the end of stream
@@ -68,10 +94,16 @@ type WithDoFinish interface {
 
 // Args endpoint request
 type Args struct {
+	ServerStream ServerStream
+	ClientStream ClientStream
+	// for gRPC compatible
 	Stream Stream
 }
 
 // Result endpoint response
 type Result struct {
+	ServerStream ServerStream
+	ClientStream ClientStream
+	// for gRPC compatible
 	Stream Stream
 }

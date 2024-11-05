@@ -54,6 +54,14 @@ type Suite interface {
 	Options() []Option
 }
 
+type UnaryOption = internal_server.UnaryOption
+
+type UnaryOptions = internal_server.UnaryOptions
+
+type StreamOption = internal_server.StreamOption
+
+type StreamOptions = internal_server.StreamOptions
+
 // WithSuite adds an option suite for server.
 func WithSuite(suite Suite) Option {
 	return Option{F: func(o *internal_server.Options, di *utils.Slice) {

@@ -25,11 +25,14 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/acl"
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/limit"
@@ -52,6 +55,36 @@ func init() {
 	remote.PutPayloadCode(serviceinfo.Protobuf, protobuf.NewProtobufCodec())
 }
 
+type UnaryOption struct {
+	F func(o *UnaryOptions, di *utils.Slice)
+}
+
+type UnaryOptions struct {
+	UnaryMiddlewares []sep.UnaryMiddleware
+}
+
+type StreamOption struct {
+	F func(o *StreamOptions, di *utils.Slice)
+}
+
+type StreamOptions struct {
+	StreamMiddlewares     []sep.StreamMiddleware
+	StreamRecvMiddlewares []sep.StreamRecvMiddleware
+	StreamSendMiddlewares []sep.StreamSendMiddleware
+}
+
+func (o *StreamOptions) BuildRecvChain() sep.StreamRecvEndpoint {
+	return sep.StreamRecvChain(o.StreamRecvMiddlewares...)(func(ctx context.Context, stream streaming.ServerStream, message interface{}) (err error) {
+		return stream.RecvMsg(ctx, message)
+	})
+}
+
+func (o *StreamOptions) BuildSendChain() sep.StreamSendEndpoint {
+	return sep.StreamSendChain(o.StreamSendMiddlewares...)(func(ctx context.Context, stream streaming.ServerStream, message interface{}) (err error) {
+		return stream.SendMsg(ctx, message)
+	})
+}
+
 // Option is the only way to config a server.
 type Option struct {
 	F func(o *Options, di *utils.Slice)
@@ -63,6 +96,9 @@ type Options struct {
 	Configs  rpcinfo.RPCConfig
 	LockBits int
 	Once     *configutil.OptionOnce
+
+	UnaryOptions  *UnaryOptions
+	StreamOptions *StreamOptions
 
 	MetaHandlers []remote.MetaHandler
 

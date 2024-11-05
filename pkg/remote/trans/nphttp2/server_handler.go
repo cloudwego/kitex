@@ -209,17 +209,13 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 		methodInfo = svcInfo.MethodInfo(methodName)
 	}
 
-	rawStream := &stream{
-		ctx:     rCtx,
-		svcInfo: svcInfo,
-		conn:    newServerConn(tr, s),
-		handler: t,
-	}
+	rawStream := newServerStream(rCtx, svcInfo, newServerConn(tr, s), t)
 	// inject rawStream so that GetServerConn only relies on it
 	rCtx = context.WithValue(rCtx, serverConnKey{}, rawStream)
-	st := newStreamWithMiddleware(rawStream, t.opt.RecvEndpoint, t.opt.SendEndpoint)
+	st := newStreamWithMiddleware(rawStream, t.opt.StreamRecvEndpoint, t.opt.StreamSendEndpoint, t.opt.RecvEndpoint, t.opt.SendEndpoint)
 	// bind stream into ctx, in order to let user set header and trailer by provided api in meta_api.go
-	rCtx = streaming.NewCtxWithStream(rCtx, st)
+	rCtx = streaming.NewCtxWithStream(rCtx, st.grpcStream)
+	rCtx = streaming.NewCtxWithServerStream(rCtx, st)
 	// GetServerConn could retrieve rawStream by Stream.Context().Value(serverConnKey{})
 	rawStream.ctx = rCtx
 
@@ -227,7 +223,7 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 		unknownServiceHandlerFunc := t.opt.GRPCUnknownServiceHandler
 		if unknownServiceHandlerFunc != nil {
 			rpcinfo.Record(rCtx, ri, stats.ServerHandleStart, nil)
-			err = unknownServiceHandlerFunc(rCtx, methodName, st)
+			err = unknownServiceHandlerFunc(rCtx, methodName, st.grpcStream)
 			if err != nil {
 				err = kerrors.ErrBiz.WithCause(err)
 			}
@@ -244,7 +240,11 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 			// note: rawStream skips recv/send middleware for unary API requests to avoid confusion
 			err = invokeStreamUnaryHandler(rCtx, rawStream, methodInfo, t.inkHdlFunc, ri)
 		} else {
-			err = t.inkHdlFunc(rCtx, &streaming.Args{Stream: st}, nil)
+			args := &streaming.Args{
+				ServerStream: st,
+				Stream:       st.grpcStream,
+			}
+			err = t.inkHdlFunc(rCtx, args, nil)
 		}
 	}
 
@@ -270,11 +270,11 @@ func (t *svrTransHandler) handleFunc(s *grpcTransport.Stream, svrTrans *SvrTrans
 // invokeStreamUnaryHandler allows unary APIs over HTTP2 to use the same server middleware as non-streaming APIs.
 // For thrift unary APIs over HTTP2, it's enabled by default.
 // For grpc(protobuf) unary APIs, it's disabled by default to keep backward compatibility.
-func invokeStreamUnaryHandler(ctx context.Context, st streaming.Stream, mi serviceinfo.MethodInfo,
+func invokeStreamUnaryHandler(ctx context.Context, st streaming.ServerStream, mi serviceinfo.MethodInfo,
 	handler endpoint.Endpoint, ri rpcinfo.RPCInfo,
 ) (err error) {
 	realArgs, realResp := mi.NewArgs(), mi.NewResult()
-	if err = st.RecvMsg(realArgs); err != nil {
+	if err = st.RecvMsg(ctx, realArgs); err != nil {
 		return err
 	}
 	if err = handler(ctx, realArgs, realResp); err != nil {
@@ -284,7 +284,7 @@ func invokeStreamUnaryHandler(ctx context.Context, st streaming.Stream, mi servi
 		// BizError: do not send the message
 		return nil
 	}
-	return st.SendMsg(realResp)
+	return st.SendMsg(ctx, realResp)
 }
 
 // msg 是解码后的实例，如 Arg 或 Result, 触发上层处理，用于异步 和 服务端处理

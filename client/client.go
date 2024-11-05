@@ -28,6 +28,8 @@ import (
 	"github.com/bytedance/gopkg/cloud/metainfo"
 	"github.com/cloudwego/localsession/backup"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
 	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -35,6 +37,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/diagnosis"
 	"github.com/cloudwego/kitex/pkg/discovery"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
 	"github.com/cloudwego/kitex/pkg/event"
 	"github.com/cloudwego/kitex/pkg/fallback"
 	"github.com/cloudwego/kitex/pkg/kerrors"
@@ -68,8 +71,8 @@ type Client interface {
 type kClient struct {
 	svcInfo *serviceinfo.ServiceInfo
 	mws     []endpoint.Middleware
-	eps     endpoint.Endpoint
-	sEps    endpoint.Endpoint
+	eps     cep.UnaryEndpoint
+	sEps    cep.StreamEndpoint
 	opt     *client.Options
 	lbf     *lbcache.BalancerFactory
 
@@ -432,13 +435,25 @@ func (kc *kClient) buildInvokeChain() error {
 	if err != nil {
 		return err
 	}
-	kc.eps = endpoint.Chain(kc.mws...)(innerHandlerEp)
+	eps := endpoint.Chain(kc.mws...)(innerHandlerEp)
+
+	kc.eps = cep.UnaryChain(kc.opt.UnaryOptions.UnaryMiddlewares...)(func(ctx context.Context, req, resp interface{}) (err error) {
+		return eps(ctx, req, resp)
+	})
 
 	innerStreamingEp, err := kc.invokeStreamingEndpoint()
 	if err != nil {
 		return err
 	}
-	kc.sEps = endpoint.Chain(kc.mws...)(innerStreamingEp)
+	sEps := endpoint.Chain(kc.mws...)(innerStreamingEp)
+	kc.sEps = cep.StreamChain(kc.opt.StreamOptions.StreamMiddlewares...)(func(ctx context.Context) (st streaming.ClientStream, err error) {
+		resp := &streaming.Result{}
+		err = sEps(ctx, nil, resp)
+		if err != nil {
+			return nil, err
+		}
+		return resp.ClientStream, nil
+	})
 	return nil
 }
 

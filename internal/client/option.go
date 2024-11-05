@@ -23,6 +23,10 @@ import (
 
 	"github.com/cloudwego/localsession/backup"
 
+	"github.com/cloudwego/kitex/pkg/streaming"
+
+	cep "github.com/cloudwego/kitex/pkg/endpoint/client"
+
 	"github.com/cloudwego/kitex/internal/configutil"
 	"github.com/cloudwego/kitex/internal/stream"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -58,6 +62,36 @@ func init() {
 	remote.PutPayloadCode(serviceinfo.Protobuf, protobuf.NewProtobufCodec())
 }
 
+type UnaryOption struct {
+	F func(o *UnaryOptions, di *utils.Slice)
+}
+
+type UnaryOptions struct {
+	UnaryMiddlewares []cep.UnaryMiddleware
+}
+
+type StreamOption struct {
+	F func(o *StreamOptions, di *utils.Slice)
+}
+
+type StreamOptions struct {
+	StreamMiddlewares     []cep.StreamMiddleware
+	StreamRecvMiddlewares []cep.StreamRecvMiddleware
+	StreamSendMiddlewares []cep.StreamSendMiddleware
+}
+
+func (o *StreamOptions) BuildRecvChain() cep.StreamRecvEndpoint {
+	return cep.StreamRecvChain(o.StreamRecvMiddlewares...)(func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error) {
+		return stream.RecvMsg(ctx, message)
+	})
+}
+
+func (o *StreamOptions) BuildSendChain() cep.StreamSendEndpoint {
+	return cep.StreamSendChain(o.StreamSendMiddlewares...)(func(ctx context.Context, stream streaming.ClientStream, message interface{}) (err error) {
+		return stream.SendMsg(ctx, message)
+	})
+}
+
 // Options is used to initialize a client.
 type Options struct {
 	Cli     *rpcinfo.EndpointBasicInfo
@@ -65,6 +99,9 @@ type Options struct {
 	Configs rpcinfo.RPCConfig
 	Locks   *ConfigLocks
 	Once    *configutil.OptionOnce
+
+	UnaryOptions  *UnaryOptions
+	StreamOptions *StreamOptions
 
 	MetaHandlers []remote.MetaHandler
 

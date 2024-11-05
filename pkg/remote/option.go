@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	sep "github.com/cloudwego/kitex/pkg/endpoint/server"
 	"github.com/cloudwego/kitex/pkg/profiler"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/grpc"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -116,6 +117,9 @@ type ServerOption struct {
 	Option
 
 	// invoking chain with recv/send middlewares for streaming APIs
+	StreamRecvEndpoint sep.StreamRecvEndpoint
+	StreamSendEndpoint sep.StreamSendEndpoint
+	// for grpc compatibility
 	RecvEndpoint endpoint.RecvEndpoint
 	SendEndpoint endpoint.SendEndpoint
 

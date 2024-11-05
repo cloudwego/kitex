@@ -29,6 +29,8 @@ func (s *server) initStreamMiddlewares(ctx context.Context) {
 }
 
 func (s *server) buildStreamInvokeChain() {
+	s.opt.RemoteOpt.StreamRecvEndpoint = s.opt.StreamOptions.BuildRecvChain()
+	s.opt.RemoteOpt.StreamSendEndpoint = s.opt.StreamOptions.BuildSendChain()
 	s.opt.RemoteOpt.RecvEndpoint = s.opt.Streaming.BuildRecvInvokeChain(s.invokeRecvEndpoint())
 	s.opt.RemoteOpt.SendEndpoint = s.opt.Streaming.BuildSendInvokeChain(s.invokeSendEndpoint())
 }
