@@ -145,7 +145,7 @@ var streamingServiceInfo = &serviceinfo.ServiceInfo{
 }
 
 // --- Define RegisterService  interface ---
-func RegisterService(svr server.Server, handler StreamingServerInterface, opts ...server.RegisterOption) error {
+func RegisterStreamingService(svr server.Server, handler StreamingServerInterface, opts ...server.RegisterOption) error {
 	return svr.RegisterService(streamingServiceInfo, handler, opts...)
 }
 
