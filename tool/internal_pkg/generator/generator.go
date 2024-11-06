@@ -144,7 +144,9 @@ type Config struct {
 
 	NoDependencyCheck bool
 	Rapid             bool
-	BuiltinTpl        util.StringSlice // specify the built-in template to use
+	LocalThriftgo     bool
+
+	BuiltinTpl util.StringSlice // specify the built-in template to use
 }
 
 // Pack packs the Config into a slice of "key=val" strings.

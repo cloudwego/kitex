@@ -127,7 +127,9 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 	f.BoolVar(&a.NoDependencyCheck, "no-dependency-check", false,
 		"Skip dependency checking.")
 	f.BoolVar(&a.Rapid, "rapid", false,
-		"Use embedded thriftgo.")
+		"Try some experimental features to generate code faster.")
+	f.BoolVar(&a.LocalThriftgo, "local_thriftgo", false,
+		"Use local thriftgo exec instead of kitex embedded thriftgo.")
 	f.Var(&a.BuiltinTpl, "tpl", "Specify kitex built-in template.")
 
 	a.RecordCmd = os.Args

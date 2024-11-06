@@ -15,7 +15,6 @@
 package utils
 
 import (
-	"os"
 	"os/exec"
 	"strings"
 
@@ -29,45 +28,17 @@ func OnKitexToolNormalExit(args kargs.Arguments) {
 		cmd := "go mod edit -replace github.com/apache/thrift=github.com/apache/thrift@v0.13.0"
 		argv := strings.Split(cmd, " ")
 		err := exec.Command(argv[0], argv[1:]...).Run()
-
-		res := "Done"
 		if err != nil {
-			res = err.Error()
+			log.Warn("Adding apache/thrift@v0.13.0 to go.mod failed:%s\n please execute the following command manually:\n%s", err.Error(), cmd)
 		}
-		log.Warn("Adding apache/thrift@v0.13.0 to go.mod for generated code ..........", res)
 	}
 
 	log.Warn("Code Generation is Done!")
-
-	// remove kitex.yaml generated from v0.4.4 which is renamed as kitex_info.yaml
-	if args.ServiceName != "" {
-		DeleteKitexYaml()
-	}
 
 	// If hessian option is java_extension, replace *java.Object to java.Object
 	if thriftgo.EnableJavaExtension(args.Config) {
 		if err := thriftgo.Hessian2PatchByReplace(args.Config, ""); err != nil {
 			log.Warn("replace java object fail, you can fix it then regenerate", err)
-		}
-	}
-}
-
-func DeleteKitexYaml() {
-	// try to read kitex.yaml
-	data, err := os.ReadFile("kitex.yaml")
-	if err != nil {
-		if !os.IsNotExist(err) {
-			log.Warn("kitex.yaml, which is used to record tool info, is deprecated, it's renamed as kitex_info.yaml, you can delete it or ignore it.")
-		}
-		return
-	}
-	// if kitex.yaml exists, check content and delete it.
-	if strings.HasPrefix(string(data), "kitexinfo:") {
-		err = os.Remove("kitex.yaml")
-		if err != nil {
-			log.Warn("kitex.yaml, which is used to record tool info, is deprecated, it's renamed as kitex_info.yaml, you can delete it or ignore it.")
-		} else {
-			log.Warn("kitex.yaml, which is used to record tool info, is deprecated, it's renamed as kitex_info.yaml, so it's automatically deleted now.")
 		}
 	}
 }
