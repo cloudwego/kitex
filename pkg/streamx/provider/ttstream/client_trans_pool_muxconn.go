@@ -28,7 +28,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	terrors "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/errors"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
 
 var DefaultMuxConnConfig = MuxConnConfig{

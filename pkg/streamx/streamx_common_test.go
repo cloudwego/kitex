@@ -25,7 +25,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	terrors "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/errors"
+	terrors "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
 
 const (
@@ -81,6 +81,7 @@ func validateMetadata(ctx context.Context) bool {
 
 func assertNormalErr(t *testing.T, err error) {
 	test.Assert(t, errors.Is(err, terrors.ErrApplicationException), err)
+	test.Assert(t, errors.Is(err, kerrors.ErrStreamingProtocol), err)
 }
 
 func assertBizErr(t *testing.T, err error) {
