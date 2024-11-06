@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	terrors "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/errors"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
 
 func newShortConnTransPool() transPool {

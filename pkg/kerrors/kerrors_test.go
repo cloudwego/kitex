@@ -47,6 +47,8 @@ func TestIsKitexError(t *testing.T) {
 		ErrNoMoreInstance,
 		ErrConnOverLimit,
 		ErrQPSOverLimit,
+		// streaming errors
+		ErrStreamingProtocol,
 	}
 	for _, e := range errs {
 		test.Assert(t, IsKitexError(e))
