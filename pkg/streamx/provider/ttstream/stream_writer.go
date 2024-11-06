@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package jsonrpc
+package ttstream
 
-type ServerProviderOption func(pc *serverProvider)
+var _ streamWriter = (*transport)(nil)
 
-func WithServerPayloadLimit(limit int) ServerProviderOption {
-	return func(s *serverProvider) {
-		s.payloadLimit = limit
-	}
+type streamWriter interface {
+	WriteFrame(f *Frame) error
+	CloseStream(sid int32) error
 }
