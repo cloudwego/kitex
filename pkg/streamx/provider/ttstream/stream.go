@@ -42,12 +42,12 @@ var (
 	_ StreamMeta           = (*stream)(nil)
 )
 
-func newStream(ctx context.Context, trans *transport, mode streamx.StreamingMode, smeta streamFrame) *stream {
+func newStream(ctx context.Context, writer streamWriter, mode streamx.StreamingMode, smeta streamFrame) *stream {
 	s := new(stream)
 	s.streamFrame = smeta
 	s.StreamMeta = newStreamMeta()
 	s.reader = newStreamReader()
-	s.trans = trans
+	s.writer = writer
 	s.mode = mode
 	s.wheader = make(streamx.Header)
 	s.wtrailer = make(streamx.Trailer)
@@ -83,7 +83,7 @@ type stream struct {
 	streamFrame
 	StreamMeta
 	reader   *streamReader
-	trans    *transport
+	writer   streamWriter
 	mode     streamx.StreamingMode
 	wheader  streamx.Header  // wheader == nil means it already be sent
 	wtrailer streamx.Trailer // wtrailer == nil means it already be sent
@@ -117,14 +117,14 @@ func (s *stream) Method() string {
 
 func (s *stream) SendMsg(ctx context.Context, msg any) (err error) {
 	if atomic.LoadInt32(&s.selfEOF) != 0 {
-		return terrors.ErrIllegalOperation.WithCause(errors.New("stream is close send"))
+		return terrors.ErrIllegalOperation.WithCause(errors.New("stream is closed send"))
 	}
 	// encode payload
 	payload, err := EncodePayload(ctx, msg)
 	if err != nil {
 		return err
 	}
-	// tracing
+	// tracing send size
 	ri := rpcinfo.GetRPCInfo(ctx)
 	if ri != nil && ri.Stats() != nil {
 		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
@@ -149,7 +149,7 @@ func (s *stream) RecvMsg(ctx context.Context, data any) error {
 	// payload will not be access after decode
 	mcache.Free(payload)
 
-	// tracing
+	// tracing recv size
 	ri := rpcinfo.GetRPCInfo(ctx)
 	if ri != nil && ri.Stats() != nil {
 		if rpcStats := rpcinfo.AsMutableRPCStats(ri.Stats()); rpcStats != nil {
@@ -236,14 +236,12 @@ func (s *stream) tryRunCloseCallback() {
 			cb()
 		}
 	}
-	s.trans.deleteStream(s.sid)
-	s.trans.recycle()
+	_ = s.writer.CloseStream(s.sid)
 }
 
 func (s *stream) writeFrame(ftype int32, header streamx.Header, trailer streamx.Trailer, payload []byte) (err error) {
-	return s.trans.writeFrame(
-		streamFrame{sid: s.sid, method: s.method, header: header, trailer: trailer}, ftype, payload,
-	)
+	fr := newFrame(streamFrame{sid: s.sid, method: s.method, header: header, trailer: trailer}, ftype, payload)
+	return s.writer.WriteFrame(fr)
 }
 
 // writeHeader copy kvs into s.wheader
@@ -287,7 +285,7 @@ func (s *stream) sendTrailer(exception error) (err error) {
 	if wtrailer == nil {
 		return fmt.Errorf("stream trailer already sent")
 	}
-	klog.Debugf("transport[%d]-stream[%d] send trailer: err=%v", s.trans.kind, s.sid, exception)
+	klog.Debugf("stream[%d] send trailer: err=%v", s.sid, exception)
 
 	var payload []byte
 	if exception != nil {
@@ -359,14 +357,9 @@ func (s *stream) onReadTrailerFrame(fr *Frame) (err error) {
 	}
 
 	klog.Debugf("stream[%d] recv trailer: %v, exception: %v", s.sid, s.trailer, exception)
-	switch s.trans.kind {
-	case clientTransport:
-		// if client recv trailer, server handler must be return,
-		// so we don't need to send data anymore
-		err = s.closeRecv(exception)
-	case serverTransport:
-		// if server recv trailer, we only need to close recv but still can send data
-		err = s.closeRecv(exception)
-	}
+	// if client recv trailer, server handler must be return,
+	// so we don't need to send data anymore
+	// if server recv trailer, we only need to close recv but still can send data
+	err = s.closeRecv(exception)
 	return err
 }
