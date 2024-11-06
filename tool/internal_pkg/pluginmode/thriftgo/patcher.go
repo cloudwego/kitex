@@ -65,6 +65,10 @@ type patcher struct {
 	libs    map[string]string
 }
 
+func (p *patcher) UseFrugalForStruct(st *golang.StructLike) bool {
+	return strings.Contains(st.ReservedComments, "@UseFrugal")
+}
+
 func (p *patcher) UseLib(path, alias string) string {
 	if p.libs == nil {
 		p.libs = make(map[string]string)
@@ -77,6 +81,7 @@ func (p *patcher) buildTemplates() (err error) {
 	m := p.utils.BuildFuncMap()
 	m["PrintImports"] = util.PrintlImports
 	m["UseLib"] = p.UseLib
+	m["UseFrugalForStruct"] = p.UseFrugalForStruct
 	m["ZeroWriter"] = ZeroWriter
 	m["ZeroBLength"] = ZeroBLength
 	m["ReorderStructFields"] = p.reorderStructFields
