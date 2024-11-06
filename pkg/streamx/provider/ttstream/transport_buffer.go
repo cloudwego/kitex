@@ -129,8 +129,6 @@ func (c *writerBuffer) WrittenLen() (length int) {
 
 func (c *writerBuffer) Flush() (err error) {
 	err = c.writer.Flush()
-	c.writer = nil
 	c.writeSize = 0
-	writerBufferPool.Put(c)
 	return err
 }

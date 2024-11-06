@@ -22,8 +22,10 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
@@ -227,4 +229,12 @@ func TestTransportException(t *testing.T) {
 	err = cs.RecvMsg(context.Background(), res)
 	test.Assert(t, err != nil, err)
 	t.Logf("client stream send msg: %v %v", err, errors.Is(err, terrors.ErrIllegalFrame))
+}
+
+func TestStreamID(t *testing.T) {
+	atomic.StoreInt32(&clientStreamID, math.MaxInt32-1)
+	id := genStreamID()
+	test.Assert(t, id == math.MaxInt32)
+	id = genStreamID()
+	test.Assert(t, id == math.MinInt32)
 }
