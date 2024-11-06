@@ -63,9 +63,9 @@ type transport struct {
 }
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection, pool transPool) *transport {
-	// stream max idle session is 10 minutes.
+	// stream max idle session is 24h .
 	// TODO: let it configurable
-	_ = conn.SetReadTimeout(time.Minute * 10)
+	_ = conn.SetReadTimeout(time.Hour * 24)
 	t := &transport{
 		kind:          kind,
 		sinfo:         sinfo,
