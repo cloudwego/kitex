@@ -78,7 +78,7 @@ func InvokeStream[Req, Res any](
 				return _err.(error)
 			}
 			res = _res.(*Res)
-			if err = gs.SendAndClose(ctx, res); err != nil {
+			if err = gs.Send(ctx, res); err != nil {
 				return err
 			}
 			resArgs.SetRes(res)

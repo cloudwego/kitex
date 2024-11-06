@@ -28,6 +28,7 @@ import (
 	"github.com/cloudwego/gopkg/bufiox"
 	gopkgthrift "github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/gopkg/protocol/ttheader"
+	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/remote"
 
@@ -128,7 +129,7 @@ func DecodeFrame(ctx context.Context, reader bufiox.Reader) (fr *Frame, err erro
 	var dp ttheader.DecodeParam
 	dp, err = ttheader.Decode(ctx, reader)
 	if err != nil {
-		if errors.Is(err, io.EOF) {
+		if errors.Is(err, io.EOF) || errors.Is(err, netpoll.ErrConnClosed) {
 			return nil, err
 		}
 		return nil, terrors.ErrIllegalFrame.WithCause(err)

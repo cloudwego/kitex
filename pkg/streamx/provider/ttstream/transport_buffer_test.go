@@ -21,8 +21,9 @@ package ttstream
 import (
 	"testing"
 
-	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/netpoll"
+
+	"github.com/cloudwego/kitex/internal/test"
 )
 
 func TestTransportBuffer(t *testing.T) {
