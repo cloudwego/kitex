@@ -41,6 +41,10 @@ type StreamArgs interface {
 	Stream() Stream
 }
 
+type StreamMiddlewaresArgs interface {
+	Middlewares() (StreamMiddleware, StreamRecvMiddleware, StreamSendMiddleware)
+}
+
 func AsStream(args interface{}) (Stream, error) {
 	s, ok := args.(StreamArgs)
 	if !ok {
@@ -51,6 +55,9 @@ func AsStream(args interface{}) (Stream, error) {
 
 type MutableStreamArgs interface {
 	SetStream(st Stream)
+	SetStreamMiddleware(mw StreamMiddleware)
+	SetStreamRecvMiddleware(mw StreamRecvMiddleware)
+	SetStreamSendMiddleware(mw StreamSendMiddleware)
 }
 
 func AsMutableStreamArgs(args StreamArgs) MutableStreamArgs {
@@ -62,15 +69,34 @@ func AsMutableStreamArgs(args StreamArgs) MutableStreamArgs {
 }
 
 type streamArgs struct {
-	stream Stream
+	stream   Stream
+	streamMW StreamMiddleware
+	recvMW   StreamRecvMiddleware
+	sendMW   StreamSendMiddleware
 }
 
 func (s *streamArgs) Stream() Stream {
 	return s.stream
 }
 
+func (s *streamArgs) Middlewares() (StreamMiddleware, StreamRecvMiddleware, StreamSendMiddleware) {
+	return s.streamMW, s.recvMW, s.sendMW
+}
+
 func (s *streamArgs) SetStream(st Stream) {
 	s.stream = st
+}
+
+func (s *streamArgs) SetStreamMiddleware(mw StreamMiddleware) {
+	s.streamMW = mw
+}
+
+func (s *streamArgs) SetStreamRecvMiddleware(mw StreamRecvMiddleware) {
+	s.recvMW = mw
+}
+
+func (s *streamArgs) SetStreamSendMiddleware(mw StreamSendMiddleware) {
+	s.sendMW = mw
 }
 
 func NewStreamArgs(stream Stream) StreamArgs {

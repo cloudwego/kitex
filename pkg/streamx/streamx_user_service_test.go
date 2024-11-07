@@ -29,10 +29,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/ktx"
 )
 
-type (
-	pingpongService  struct{}
-	streamingService struct{}
-)
+type testService struct{}
 
 const (
 	headerKey  = "header1"
@@ -50,7 +47,7 @@ func testHeaderAndTrailer(t *testing.T, stream streamx.ClientStreamMetadata) {
 	test.Assert(t, tl[trailerKey] == trailerVal, tl)
 }
 
-func (si *streamingService) setHeaderAndTrailer(stream streamx.ServerStreamMetadata) error {
+func (si *testService) setHeaderAndTrailer(stream streamx.ServerStreamMetadata) error {
 	err := stream.SetTrailer(streamx.Trailer{trailerKey: trailerVal})
 	if err != nil {
 		return err
@@ -63,19 +60,19 @@ func (si *streamingService) setHeaderAndTrailer(stream streamx.ServerStreamMetad
 	return nil
 }
 
-func (si *pingpongService) PingPong(ctx context.Context, req *Request) (*Response, error) {
+func (si *testService) PingPong(ctx context.Context, req *Request) (*Response, error) {
 	resp := &Response{Type: req.Type, Message: req.Message}
 	klog.Infof("Server PingPong: req={%v} resp={%v}", req, resp)
 	return resp, nil
 }
 
-func (si *streamingService) Unary(ctx context.Context, req *Request) (*Response, error) {
+func (si *testService) Unary(ctx context.Context, req *Request) (*Response, error) {
 	resp := &Response{Type: req.Type, Message: req.Message}
 	klog.Infof("Server Unary: req={%v} resp={%v}", req, resp)
 	return resp, nil
 }
 
-func (si *streamingService) ClientStream(ctx context.Context,
+func (si *testService) ClientStream(ctx context.Context,
 	stream streamx.ClientStreamingServer[Request, Response],
 ) (*Response, error) {
 	var msg string
@@ -100,7 +97,7 @@ func (si *streamingService) ClientStream(ctx context.Context,
 	}
 }
 
-func (si *streamingService) ServerStream(ctx context.Context, req *Request,
+func (si *testService) ServerStream(ctx context.Context, req *Request,
 	stream streamx.ServerStreamingServer[Response],
 ) error {
 	klog.Infof("Server ServerStream: req={%v}", req)
@@ -109,7 +106,7 @@ func (si *streamingService) ServerStream(ctx context.Context, req *Request,
 		return err
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 5; i++ {
 		resp := new(Response)
 		resp.Type = int32(i)
 		resp.Message = req.Message
@@ -122,7 +119,7 @@ func (si *streamingService) ServerStream(ctx context.Context, req *Request,
 	return nil
 }
 
-func (si *streamingService) BidiStream(ctx context.Context,
+func (si *testService) BidiStream(ctx context.Context,
 	stream streamx.BidiStreamingServer[Request, Response],
 ) error {
 	ktx.RegisterCancelCallback(ctx, func() {
@@ -166,13 +163,13 @@ func buildErr(req *Request) error {
 	return err
 }
 
-func (si *streamingService) UnaryWithErr(ctx context.Context, req *Request) (*Response, error) {
+func (si *testService) UnaryWithErr(ctx context.Context, req *Request) (*Response, error) {
 	err := buildErr(req)
 	klog.Infof("Server UnaryWithErr: req={%v} err={%v}", req, err)
 	return nil, err
 }
 
-func (si *streamingService) ClientStreamWithErr(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (res *Response, err error) {
+func (si *testService) ClientStreamWithErr(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (res *Response, err error) {
 	req, err := stream.Recv(ctx)
 	if err != nil {
 		klog.Errorf("Server ClientStreamWithErr Recv failed, exception={%v}", err)
@@ -183,13 +180,13 @@ func (si *streamingService) ClientStreamWithErr(ctx context.Context, stream stre
 	return nil, err
 }
 
-func (si *streamingService) ServerStreamWithErr(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error {
+func (si *testService) ServerStreamWithErr(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error {
 	err := buildErr(req)
 	klog.Infof("Server ServerStreamWithErr: req={%v} err={%v}", req, err)
 	return err
 }
 
-func (si *streamingService) BidiStreamWithErr(ctx context.Context, stream streamx.BidiStreamingServer[Request, Response]) error {
+func (si *testService) BidiStreamWithErr(ctx context.Context, stream streamx.BidiStreamingServer[Request, Response]) error {
 	req, err := stream.Recv(ctx)
 	if err != nil {
 		klog.Errorf("Server BidiStreamWithErr Recv failed, exception={%v}", err)

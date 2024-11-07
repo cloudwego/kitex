@@ -14,19 +14,15 @@
  * limitations under the License.
  */
 
-package streamxserver
+package streamx
 
 import (
-	"github.com/cloudwego/kitex/server"
+	"context"
 )
 
-type Server = server.Server
-
-func NewServer(opts ...Option) server.Server {
-	iopts := make([]server.Option, 0, len(opts)+1)
-	for _, opt := range opts {
-		iopts = append(iopts, ConvertStreamXServerOption(opt))
-	}
-	s := server.NewServer(iopts...)
-	return s
-}
+type (
+	UnaryHandler[Req, Res any]           func(ctx context.Context, req *Req) (*Res, error)
+	ClientStreamingHandler[Req, Res any] func(ctx context.Context, stream ClientStreamingServer[Req, Res]) (*Res, error)
+	ServerStreamingHandler[Req, Res any] func(ctx context.Context, req *Req, stream ServerStreamingServer[Res]) error
+	BidiStreamingHandler[Req, Res any]   func(ctx context.Context, stream BidiStreamingServer[Req, Res]) error
+)
