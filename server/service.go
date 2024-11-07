@@ -22,25 +22,20 @@ import (
 
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
-	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 type serviceMiddlewares struct {
-	MW      endpoint.Middleware
-	SMW     streamx.StreamMiddleware
-	SRecvMW streamx.StreamRecvMiddleware
-	SSendMW streamx.StreamSendMiddleware
+	MW endpoint.Middleware
 }
 
 type service struct {
-	svcInfo           *serviceinfo.ServiceInfo
-	handler           interface{}
-	streamingProvider streamx.ServerProvider
+	svcInfo *serviceinfo.ServiceInfo
+	handler interface{}
 	serviceMiddlewares
 }
 
-func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, provider streamx.ServerProvider, smw serviceMiddlewares) *service {
-	return &service{svcInfo: svcInfo, handler: handler, streamingProvider: provider, serviceMiddlewares: smw}
+func newService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, smw serviceMiddlewares) *service {
+	return &service{svcInfo: svcInfo, handler: handler, serviceMiddlewares: smw}
 }
 
 type services struct {
@@ -59,25 +54,13 @@ func newServices() *services {
 }
 
 func (s *services) addService(svcInfo *serviceinfo.ServiceInfo, handler interface{}, registerOpts *RegisterOptions) error {
-	// prepare service provider
-	serviceProvider := registerOpts.Provider
-
 	// prepare serviceMiddlewares
 	var serviceMWs serviceMiddlewares
 	if len(registerOpts.Middlewares) > 0 {
 		serviceMWs.MW = endpoint.Chain(registerOpts.Middlewares...)
 	}
-	if len(registerOpts.StreamMiddlewares) > 0 {
-		serviceMWs.SMW = streamx.StreamMiddlewareChain(registerOpts.StreamMiddlewares...)
-	}
-	if len(registerOpts.StreamRecvMiddlewares) > 0 {
-		serviceMWs.SRecvMW = streamx.StreamRecvMiddlewareChain(registerOpts.StreamRecvMiddlewares...)
-	}
-	if len(registerOpts.StreamSendMiddlewares) > 0 {
-		serviceMWs.SSendMW = streamx.StreamSendMiddlewareChain(registerOpts.StreamSendMiddlewares...)
-	}
 
-	svc := newService(svcInfo, handler, serviceProvider, serviceMWs)
+	svc := newService(svcInfo, handler, serviceMWs)
 	if registerOpts.IsFallbackService {
 		if s.fallbackSvc != nil {
 			return fmt.Errorf("multiple fallback services cannot be registered. [%s] is already registered as a fallback service", s.fallbackSvc.svcInfo.ServiceName)

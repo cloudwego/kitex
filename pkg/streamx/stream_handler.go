@@ -14,25 +14,13 @@
  * limitations under the License.
  */
 
-package streamxclient
+package streamx
 
 import (
-	"github.com/cloudwego/kitex/client"
-	iclient "github.com/cloudwego/kitex/internal/client"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
+	"context"
 )
 
-type Client = client.StreamX
-
-func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error) {
-	iopts := make([]client.Option, 0, len(opts)+1)
-	for _, opt := range opts {
-		iopts = append(iopts, ConvertStreamXClientOption(opt))
-	}
-	nopts := iclient.NewOptions(iopts)
-	c, err := client.NewClientWithOptions(svcInfo, nopts)
-	if err != nil {
-		return nil, err
-	}
-	return c.(client.StreamX), nil
-}
+type UnaryHandler[Req, Res any] func(ctx context.Context, req *Req) (*Res, error)
+type ClientStreamingHandler[Req, Res any] func(ctx context.Context, stream ClientStreamingServer[Req, Res]) (*Res, error)
+type ServerStreamingHandler[Req, Res any] func(ctx context.Context, stream ServerStreamingServer[Res], req *Req) error
+type BidiStreamingHandler[Req, Res any] func(ctx context.Context, stream BidiStreamingServer[Req, Res]) error

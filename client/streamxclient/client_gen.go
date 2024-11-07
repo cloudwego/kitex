@@ -40,16 +40,21 @@ func InvokeStream[Req, Res any](
 		resArgs.SetRes(res)
 	}
 
+	ctx = streamx.WithStreamArgsContext(ctx, streamArgs)
+	// NewStream should register client middlewares into stream Args
 	ctx, cs, err := cli.NewStream(ctx, method, req, callOptions...)
 	if err != nil {
 		return nil, nil, err
 	}
 	stream := streamx.NewGenericClientStream[Req, Res](cs)
-	streamx.AsMutableStreamArgs(streamArgs).SetStream(stream)
-
-	streamMW, recvMW, sendMW := cli.Middlewares()
-	stream.SetStreamRecvMiddleware(recvMW)
-	stream.SetStreamSendMiddleware(sendMW)
+	var streamMW streamx.StreamMiddleware
+	if streamMWs, ok := streamArgs.(streamx.StreamMiddlewaresArgs); ok {
+		var recvMW streamx.StreamRecvMiddleware
+		var sendMW streamx.StreamSendMiddleware
+		streamMW, recvMW, sendMW = streamMWs.Middlewares()
+		stream.SetStreamRecvMiddleware(recvMW)
+		stream.SetStreamSendMiddleware(sendMW)
+	}
 
 	streamInvoke := func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
 		// assemble streaming args depend on each stream mode

@@ -29,6 +29,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/kitex/server/streamxserver"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/internal/test"
@@ -36,7 +37,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
-	"github.com/cloudwego/kitex/server/streamxserver"
 )
 
 var testServiceInfo = &serviceinfo.ServiceInfo{
@@ -44,8 +44,12 @@ var testServiceInfo = &serviceinfo.ServiceInfo{
 	Methods: map[string]serviceinfo.MethodInfo{
 		"Bidi": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeStream[testRequest, testResponse](
-					ctx, serviceinfo.StreamingBidirectional, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
+				return streamxserver.InvokeBidiStreamHandler[testRequest, testResponse](
+					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
+					func(ctx context.Context, stream streamx.BidiStreamingServer[testRequest, testResponse]) error {
+						return nil
+					},
+				)
 			},
 			nil,
 			nil,
@@ -53,7 +57,6 @@ var testServiceInfo = &serviceinfo.ServiceInfo{
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
 		),
 	},
-	Extra: map[string]interface{}{"streaming": true, "streamx": true},
 }
 
 func TestTransportBasic(t *testing.T) {

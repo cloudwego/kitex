@@ -1,127 +1,136 @@
-/*
- * Copyright 2024 CloudWeGo Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package streamxserver
 
 import (
 	"context"
 	"errors"
-	"reflect"
-	"sync"
 
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
-var invokerCache sync.Map
+var errServerStreamArgsNotFound = errors.New("stream args not found")
 
-func InvokeStream[Req, Res any](
-	ctx context.Context, smode serviceinfo.StreamingMode,
-	handler any, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs,
-) (err error) {
-	// prepare args
+func prepareInvokeStream[Req, Res any](sArgs streamx.StreamArgs) (*streamx.GenericServerStream[Req, Res], streamx.StreamMiddleware) {
+	gs := streamx.NewGenericServerStream[Req, Res](sArgs.Stream().(streamx.ServerStream))
+	swArgs, ok := sArgs.(streamx.StreamMiddlewaresArgs)
+	if !ok {
+		return gs, nil
+	}
+	sMW, recvMW, sendMW := swArgs.Middlewares()
+	gs.SetStreamRecvMiddleware(recvMW)
+	gs.SetStreamSendMiddleware(sendMW)
+	return gs, sMW
+}
+
+func InvokeUnaryHandler[Req, Res any](
+	ctx context.Context,
+	reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs,
+	methodHandler streamx.UnaryHandler[Req, Res],
+) error {
 	sArgs := streamx.GetStreamArgsFromContext(ctx)
 	if sArgs == nil {
-		return errors.New("server stream is nil")
+		return errServerStreamArgsNotFound
 	}
-	shandler := handler.(streamx.StreamHandler)
-	gs := streamx.NewGenericServerStream[Req, Res](sArgs.Stream().(streamx.ServerStream))
-	gs.SetStreamRecvMiddleware(shandler.StreamRecvMiddleware)
-	gs.SetStreamSendMiddleware(shandler.StreamSendMiddleware)
+	gs, sMW := prepareInvokeStream[Req, Res](sArgs)
 
-	// before handler
-	var req *Req
-	var res *Res
-	switch smode {
-	case serviceinfo.StreamingUnary, serviceinfo.StreamingServer:
-		req, err = gs.Recv(ctx)
+	// before handler call
+	req, err := gs.Recv(ctx)
+	if err != nil {
+		return err
+	}
+	reqArgs.SetReq(req)
+
+	// handler call
+	invoke := func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+		res, err := methodHandler(ctx, req)
 		if err != nil {
 			return err
 		}
-		reqArgs.SetReq(req)
-	default:
+		resArgs.SetRes(res)
+		return gs.Send(ctx, res)
 	}
+	if sMW != nil {
+		err = sMW(invoke)(ctx, sArgs, reqArgs, resArgs)
+	} else {
+		err = invoke(ctx, sArgs, reqArgs, resArgs)
+	}
+	return err
+}
+
+func InvokeClientStreamHandler[Req, Res any](
+	ctx context.Context,
+	reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs,
+	methodHandler streamx.ClientStreamingHandler[Req, Res],
+) (err error) {
+	sArgs := streamx.GetStreamArgsFromContext(ctx)
+	if sArgs == nil {
+		return errServerStreamArgsNotFound
+	}
+	gs, sMW := prepareInvokeStream[Req, Res](sArgs)
+	invoke := func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+		res, err := methodHandler(ctx, gs)
+		if err != nil {
+			return err
+		}
+		resArgs.SetRes(res)
+		return gs.Send(ctx, res)
+	}
+	if sMW != nil {
+		err = sMW(invoke)(ctx, sArgs, reqArgs, resArgs)
+	} else {
+		err = invoke(ctx, sArgs, reqArgs, resArgs)
+	}
+	return err
+}
+
+func InvokeServerStreamHandler[Req, Res any](
+	ctx context.Context,
+	reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs,
+	methodHandler streamx.ServerStreamingHandler[Req, Res],
+) (err error) {
+	sArgs := streamx.GetStreamArgsFromContext(ctx)
+	if sArgs == nil {
+		return errServerStreamArgsNotFound
+	}
+	gs, sMW := prepareInvokeStream[Req, Res](sArgs)
+
+	// before handler call
+	req, err := gs.Recv(ctx)
+	if err != nil {
+		return err
+	}
+	reqArgs.SetReq(req)
 
 	// handler call
-	cacheKey := reflect.TypeOf(shandler.Handler).String() + sArgs.Stream().Method()
-	var mhandler reflect.Value
-	if v, ok := invokerCache.Load(cacheKey); ok {
-		mhandler = v.(reflect.Value)
-	} else {
-		rhandler := reflect.ValueOf(shandler.Handler)
-		mhandler = rhandler.MethodByName(sArgs.Stream().Method())
-		invokerCache.Store(cacheKey, mhandler)
+	invoke := func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+		return methodHandler(ctx, gs, req)
 	}
+	if sMW != nil {
+		err = sMW(invoke)(ctx, sArgs, reqArgs, resArgs)
+	} else {
+		err = invoke(ctx, sArgs, reqArgs, resArgs)
+	}
+	return err
+}
 
-	streamInvoke := func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
-		switch smode {
-		case serviceinfo.StreamingUnary:
-			called := mhandler.Call([]reflect.Value{
-				reflect.ValueOf(ctx),
-				reflect.ValueOf(req),
-			})
-			_res, _err := called[0].Interface(), called[1].Interface()
-			if _err != nil {
-				return _err.(error)
-			}
-			res = _res.(*Res)
-			if err = gs.SendAndClose(ctx, res); err != nil {
-				return err
-			}
-			resArgs.SetRes(res)
-		case serviceinfo.StreamingClient:
-			called := mhandler.Call([]reflect.Value{
-				reflect.ValueOf(ctx),
-				reflect.ValueOf(gs),
-			})
-			_res, _err := called[0].Interface(), called[1].Interface()
-			if _err != nil {
-				return _err.(error)
-			}
-			res = _res.(*Res)
-			if err = gs.Send(ctx, res); err != nil {
-				return err
-			}
-			resArgs.SetRes(res)
-		case serviceinfo.StreamingServer:
-			called := mhandler.Call([]reflect.Value{
-				reflect.ValueOf(ctx),
-				reflect.ValueOf(req),
-				reflect.ValueOf(gs),
-			})
-			_err := called[0].Interface()
-			if _err != nil {
-				return _err.(error)
-			}
-		case serviceinfo.StreamingBidirectional:
-			called := mhandler.Call([]reflect.Value{
-				reflect.ValueOf(ctx),
-				reflect.ValueOf(gs),
-			})
-			_err := called[0].Interface()
-			if _err != nil {
-				return _err.(error)
-			}
-		}
-		return nil
+func InvokeBidiStreamHandler[Req, Res any](
+	ctx context.Context,
+	reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs,
+	methodHandler streamx.BidiStreamingHandler[Req, Res],
+) (err error) {
+	sArgs := streamx.GetStreamArgsFromContext(ctx)
+	if sArgs == nil {
+		return errServerStreamArgsNotFound
 	}
-	if shandler.StreamMiddleware != nil {
-		err = shandler.StreamMiddleware(streamInvoke)(ctx, sArgs, reqArgs, resArgs)
+	gs, sMW := prepareInvokeStream[Req, Res](sArgs)
+
+	// handler call
+	invoke := func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+		return methodHandler(ctx, gs)
+	}
+	if sMW != nil {
+		err = sMW(invoke)(ctx, sArgs, reqArgs, resArgs)
 	} else {
-		err = streamInvoke(ctx, sArgs, reqArgs, resArgs)
+		err = invoke(ctx, sArgs, reqArgs, resArgs)
 	}
 	return err
 }

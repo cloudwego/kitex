@@ -14,19 +14,13 @@
  * limitations under the License.
  */
 
-package streamxserver
+package server
 
-import (
-	"github.com/cloudwego/kitex/server"
-)
+import "github.com/cloudwego/kitex/pkg/streamx"
 
-type Server = server.Server
-
-func NewServer(opts ...Option) server.Server {
-	iopts := make([]server.Option, 0, len(opts)+1)
-	for _, opt := range opts {
-		iopts = append(iopts, ConvertStreamXServerOption(opt))
-	}
-	s := server.NewServer(iopts...)
-	return s
+type StreamXConfig struct {
+	StreamMiddlewares     []streamx.StreamMiddleware
+	StreamRecvMiddlewares []streamx.StreamRecvMiddleware
+	StreamSendMiddlewares []streamx.StreamSendMiddleware
+	Provider              streamx.ServerProvider
 }
