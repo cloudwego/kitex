@@ -27,12 +27,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/localsession/backup"
+
 	"github.com/cloudwego/kitex/pkg/remote/trans/detection"
 	"github.com/cloudwego/kitex/pkg/remote/trans/netpoll"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2"
-	"github.com/cloudwego/kitex/pkg/streamx"
-
-	"github.com/cloudwego/localsession/backup"
 
 	internal_server "github.com/cloudwego/kitex/internal/server"
 	"github.com/cloudwego/kitex/pkg/acl"
@@ -216,17 +215,6 @@ func (s *server) RegisterService(svcInfo *serviceinfo.ServiceInfo, handler inter
 	}
 
 	registerOpts := internal_server.NewRegisterOptions(opts)
-	// add trace middlewares
-	ehandler := s.opt.TracerCtl.GetStreamEventHandler()
-	if ehandler != nil {
-		registerOpts.StreamRecvMiddlewares = append(
-			registerOpts.StreamRecvMiddlewares, streamx.NewStreamRecvStatMiddleware(ehandler),
-		)
-		registerOpts.StreamSendMiddlewares = append(
-			registerOpts.StreamSendMiddlewares, streamx.NewStreamSendStatMiddleware(ehandler),
-		)
-	}
-
 	// register service
 	if err := s.svcs.addService(svcInfo, handler, registerOpts); err != nil {
 		panic(err.Error())
@@ -419,16 +407,7 @@ func (s *server) invokeHandleEndpoint() endpoint.Endpoint {
 		// set session
 		backup.BackupCtx(ctx)
 
-		handler := svc.handler
-		if minfo.IsStreaming() && svcInfo.Extra["streamx"] != nil {
-			handler = streamx.StreamHandler{
-				Handler:              svc.handler,
-				StreamMiddleware:     svc.SMW,
-				StreamRecvMiddleware: svc.SRecvMW,
-				StreamSendMiddleware: svc.SSendMW,
-			}
-		}
-		err = implHandlerFunc(ctx, handler, args, resp)
+		err = implHandlerFunc(ctx, svc.handler, args, resp)
 		if err != nil {
 			if bizErr, ok := kerrors.FromBizStatusError(err); ok {
 				if setter, ok := ri.Invocation().(rpcinfo.InvocationSetter); ok {
@@ -569,12 +548,10 @@ func (s *server) newSvrTransHandler() (handler remote.ServerTransHandler, err er
 	transHdlrFactory := s.opt.RemoteOpt.SvrHandlerFactory
 	if transHdlrFactory == nil {
 		candidateFactories := make([]remote.ServerTransHandlerFactory, 0)
-		for _, svc := range s.svcs.svcMap {
-			if svc.streamingProvider != nil {
-				candidateFactories = append(candidateFactories,
-					streamxstrans.NewSvrTransHandlerFactory(svc.streamingProvider),
-				)
-			}
+		if s.opt.StreamX.Provider != nil {
+			candidateFactories = append(candidateFactories,
+				streamxstrans.NewSvrTransHandlerFactory(s.opt.StreamX.Provider),
+			)
 		}
 		candidateFactories = append(candidateFactories,
 			nphttp2.NewSvrTransHandlerFactory(),

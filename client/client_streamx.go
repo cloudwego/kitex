@@ -25,16 +25,11 @@ import (
 )
 
 type StreamX interface {
-	NewStream(ctx context.Context, method string, req any, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error)
-	Middlewares() (streamMW streamx.StreamMiddleware, recvMW streamx.StreamRecvMiddleware, sendMW streamx.StreamSendMiddleware)
-}
-
-func (kc *kClient) Middlewares() (streamMW streamx.StreamMiddleware, recvMW streamx.StreamRecvMiddleware, sendMW streamx.StreamSendMiddleware) {
-	return kc.sxStreamMW, kc.sxStreamRecvMW, kc.sxStreamSendMW
+	NewStream(ctx context.Context, method string, req any, streamArgs streamx.StreamArgs, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error)
 }
 
 // NewStream create stream for streamx mode
-func (kc *kClient) NewStream(ctx context.Context, method string, req any, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error) {
+func (kc *kClient) NewStream(ctx context.Context, method string, req any, streamArgs streamx.StreamArgs, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error) {
 	if !kc.inited {
 		panic("client not initialized")
 	}
@@ -61,7 +56,11 @@ func (kc *kClient) NewStream(ctx context.Context, method string, req any, callOp
 	}))
 	copts.Apply(callOptions)
 
-	streamArgs := streamx.NewStreamArgs(nil)
+	if msargs := streamx.AsMutableStreamArgs(streamArgs); msargs != nil {
+		msargs.SetStreamMiddleware(kc.sxStreamMW)
+		msargs.SetStreamRecvMiddleware(kc.sxStreamRecvMW)
+		msargs.SetStreamSendMiddleware(kc.sxStreamSendMW)
+	}
 	// put streamArgs into response arg
 	// it's an ugly trick but if we don't want to refactor too much,
 	// this is the only way to compatible with current endpoint design

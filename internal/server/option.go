@@ -96,7 +96,9 @@ type Options struct {
 
 	BackupOpt backup.Options
 
-	Streaming stream.StreamingConfig
+	// Streaming
+	Streaming stream.StreamingConfig // old version streaming API config
+	StreamX   StreamXConfig          // new version streaming API config
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool

@@ -14,25 +14,13 @@
  * limitations under the License.
  */
 
-package streamxclient
+package server
 
-import (
-	"github.com/cloudwego/kitex/client"
-	iclient "github.com/cloudwego/kitex/internal/client"
-	"github.com/cloudwego/kitex/pkg/serviceinfo"
-)
+import "github.com/cloudwego/kitex/pkg/streamx"
 
-type Client = client.StreamX
-
-func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error) {
-	iopts := make([]client.Option, 0, len(opts)+1)
-	for _, opt := range opts {
-		iopts = append(iopts, ConvertStreamXClientOption(opt))
-	}
-	nopts := iclient.NewOptions(iopts)
-	c, err := client.NewClientWithOptions(svcInfo, nopts)
-	if err != nil {
-		return nil, err
-	}
-	return c.(client.StreamX), nil
+type StreamXConfig struct {
+	StreamMiddlewares     []streamx.StreamMiddleware
+	StreamRecvMiddlewares []streamx.StreamRecvMiddleware
+	StreamSendMiddlewares []streamx.StreamSendMiddleware
+	Provider              streamx.ServerProvider
 }

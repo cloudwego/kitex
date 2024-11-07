@@ -66,6 +66,9 @@ func newMuxConnTransList(size int, pool transPool) *muxConnTransList {
 func (tl *muxConnTransList) Close() {
 	tl.L.Lock()
 	for i, t := range tl.transports {
+		if t == nil {
+			continue
+		}
 		_ = t.Close(nil)
 		tl.transports[i] = nil
 	}

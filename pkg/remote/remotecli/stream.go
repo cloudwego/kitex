@@ -36,6 +36,7 @@ func NewStream(ctx context.Context, ri rpcinfo.RPCInfo, handler remote.ClientTra
 		}
 	}
 
+	// streamx provider
 	clientProvider, ok := opt.Provider.(streamx.ClientProvider)
 	if ok {
 		// wrap client provider

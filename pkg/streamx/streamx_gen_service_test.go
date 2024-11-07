@@ -24,7 +24,6 @@ import (
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/streamxserver"
 )
@@ -32,16 +31,16 @@ import (
 // === gen code ===
 
 // --- Define Service Method handler ---
-var pingpongServiceInfo = &serviceinfo.ServiceInfo{
-	ServiceName:  "kitex.service.pingpong",
+var testServiceInfo = &serviceinfo.ServiceInfo{
+	ServiceName:  "kitex.echo.service",
 	PayloadCodec: serviceinfo.Thrift,
-	HandlerType:  (*PingPongServerInterface)(nil),
+	HandlerType:  (*TestService)(nil),
 	Methods: map[string]serviceinfo.MethodInfo{
 		"PingPong": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
 				realArg := reqArgs.(*ServerPingPongArgs)
 				realResult := resArgs.(*ServerPingPongResult)
-				success, err := handler.(PingPongServerInterface).PingPong(ctx, realArg.Req)
+				success, err := handler.(TestService).PingPong(ctx, realArg.Req)
 				if err != nil {
 					return err
 				}
@@ -53,137 +52,157 @@ var pingpongServiceInfo = &serviceinfo.ServiceInfo{
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingNone),
 		),
-	},
-	Extra: map[string]interface{}{"streaming": false},
-}
-
-var streamingServiceInfo = &serviceinfo.ServiceInfo{
-	ServiceName: "kitex.service.streaming",
-	Methods: map[string]serviceinfo.MethodInfo{
 		"Unary": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeStream[Request, Response](
-					ctx, serviceinfo.StreamingUnary, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
+				return streamxserver.InvokeUnaryHandler[Request, Response](
+					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
+					func(ctx context.Context, req *Request) (*Response, error) {
+						return handler.(TestService).Unary(ctx, req)
+					},
+				)
 			},
 			nil,
 			nil,
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingUnary),
+			serviceinfo.WithMethodExtra("streamx", "true"),
 		),
 		"ClientStream": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeStream[Request, Response](
-					ctx, serviceinfo.StreamingClient, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
+				return streamxserver.InvokeClientStreamHandler[Request, Response](
+					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
+					func(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (*Response, error) {
+						return handler.(TestService).ClientStream(ctx, stream)
+					},
+				)
 			},
 			nil,
 			nil,
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingClient),
+			serviceinfo.WithMethodExtra("streamx", "true"),
 		),
 		"ServerStream": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeStream[Request, Response](
-					ctx, serviceinfo.StreamingServer, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
+				return streamxserver.InvokeServerStreamHandler(
+					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
+					func(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error {
+						return handler.(TestService).ServerStream(ctx, req, stream)
+					},
+				)
 			},
 			nil,
 			nil,
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingServer),
+			serviceinfo.WithMethodExtra("streamx", "true"),
 		),
 		"BidiStream": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeStream[Request, Response](
-					ctx, serviceinfo.StreamingBidirectional, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
+				return streamxserver.InvokeBidiStreamHandler[Request, Response](
+					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
+					func(ctx context.Context, stream streamx.BidiStreamingServer[Request, Response]) error {
+						return handler.(TestService).BidiStream(ctx, stream)
+					},
+				)
 			},
 			nil,
 			nil,
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
+			serviceinfo.WithMethodExtra("streamx", "true"),
 		),
 		"UnaryWithErr": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeStream[Request, Response](
-					ctx, serviceinfo.StreamingUnary, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
+				return streamxserver.InvokeUnaryHandler[Request, Response](
+					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
+					func(ctx context.Context, req *Request) (*Response, error) {
+						return handler.(TestService).UnaryWithErr(ctx, req)
+					},
+				)
 			},
 			nil,
 			nil,
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingUnary),
+			serviceinfo.WithMethodExtra("streamx", "true"),
 		),
 		"ClientStreamWithErr": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeStream[Request, Response](
-					ctx, serviceinfo.StreamingClient, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
+				return streamxserver.InvokeClientStreamHandler[Request, Response](
+					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
+					func(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (*Response, error) {
+						return handler.(TestService).ClientStreamWithErr(ctx, stream)
+					},
+				)
 			},
 			nil,
 			nil,
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingClient),
+			serviceinfo.WithMethodExtra("streamx", "true"),
 		),
 		"ServerStreamWithErr": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeStream[Request, Response](
-					ctx, serviceinfo.StreamingServer, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
+				return streamxserver.InvokeServerStreamHandler[Request, Response](
+					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
+					func(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error {
+						return handler.(TestService).ServerStreamWithErr(ctx, req, stream)
+					},
+				)
 			},
 			nil,
 			nil,
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingServer),
+			serviceinfo.WithMethodExtra("streamx", "true"),
 		),
 		"BidiStreamWithErr": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeStream[Request, Response](
-					ctx, serviceinfo.StreamingBidirectional, handler.(streamx.StreamHandler), reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs))
+				return streamxserver.InvokeBidiStreamHandler[Request, Response](
+					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
+					func(ctx context.Context, stream streamx.BidiStreamingServer[Request, Response]) error {
+						return handler.(TestService).BidiStreamWithErr(ctx, stream)
+					},
+				)
 			},
 			nil,
 			nil,
 			false,
 			serviceinfo.WithStreamingMode(serviceinfo.StreamingBidirectional),
+			serviceinfo.WithMethodExtra("streamx", "true"),
 		),
 	},
-	Extra: map[string]interface{}{"streaming": true, "streamx": true},
 }
 
-// --- Define RegisterService  interface ---
-func RegisterStreamingService(svr server.Server, handler StreamingServerInterface, opts ...server.RegisterOption) error {
-	return svr.RegisterService(streamingServiceInfo, handler, opts...)
+// --- Define NewServer  interface ---
+func NewServer(handler TestService, opts ...server.Option) server.Server {
+	var options []server.Option
+	options = append(options, opts...)
+	svr := server.NewServer(options...)
+	if err := svr.RegisterService(testServiceInfo, handler); err != nil {
+		panic(err)
+	}
+	return svr
 }
 
-// --- Define New Client interface ---
-func NewPingPongClient(destService string, opts ...client.Option) (PingPongClientInterface, error) {
+// --- Define NewClient interface ---
+func NewClient(destService string, opts ...client.Option) (TestServiceClient, error) {
 	var options []client.Option
 	options = append(options, client.WithDestService(destService))
 	options = append(options, opts...)
-	cli, err := client.NewClient(pingpongServiceInfo, options...)
+	cli, err := client.NewClient(testServiceInfo, options...)
 	if err != nil {
 		return nil, err
 	}
-	kc := &kClient{caller: cli}
-	return kc, nil
-}
-
-func NewStreamingClient(destService string, opts ...streamxclient.Option) (StreamingClientInterface, error) {
-	var options []streamxclient.Option
-	options = append(options, streamxclient.WithDestService(destService))
-	cp, err := ttstream.NewClientProvider(streamingServiceInfo)
-	if err != nil {
-		return nil, err
-	}
-	options = append(options, streamxclient.WithProvider(cp))
-	options = append(options, opts...)
-	cli, err := streamxclient.NewClient(streamingServiceInfo, options...)
-	if err != nil {
-		return nil, err
-	}
-	kc := &kClient{streamer: cli, caller: cli.(client.Client)}
+	kc := &kClient{caller: cli, streamer: cli.(client.StreamX)}
 	return kc, nil
 }
 
 // --- Define Server Implementation Interface ---
-type PingPongServerInterface interface {
+type TestService interface {
 	PingPong(ctx context.Context, req *Request) (*Response, error)
-}
-type StreamingServerInterface interface {
+
 	Unary(ctx context.Context, req *Request) (*Response, error)
 	ClientStream(ctx context.Context, stream streamx.ClientStreamingServer[Request, Response]) (*Response, error)
 	ServerStream(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error
@@ -195,11 +214,9 @@ type StreamingServerInterface interface {
 }
 
 // --- Define Client Implementation Interface ---
-type PingPongClientInterface interface {
+type TestServiceClient interface {
 	PingPong(ctx context.Context, req *Request) (r *Response, err error)
-}
 
-type StreamingClientInterface interface {
 	Unary(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (r *Response, err error)
 	ClientStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
 		context.Context, streamx.ClientStreamingClient[Request, Response], error)
@@ -217,14 +234,11 @@ type StreamingClientInterface interface {
 }
 
 // --- Define Client Implementation ---
-var (
-	_ StreamingClientInterface = (*kClient)(nil)
-	_ PingPongClientInterface  = (*kClient)(nil)
-)
+var _ TestServiceClient = (*kClient)(nil)
 
 type kClient struct {
 	caller   client.Client
-	streamer streamxclient.Client
+	streamer client.StreamX
 }
 
 func (c *kClient) PingPong(ctx context.Context, req *Request) (r *Response, err error) {
