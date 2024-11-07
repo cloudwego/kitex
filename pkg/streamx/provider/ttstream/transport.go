@@ -244,9 +244,6 @@ func (t *transport) loopWrite() error {
 			if err = EncodeFrame(context.Background(), writer, fr); err != nil {
 				return err
 			}
-			if err = t.conn.Writer().Flush(); err != nil {
-				return err
-			}
 			recycleFrame(fr)
 		}
 		if err = writer.Flush(); err != nil {

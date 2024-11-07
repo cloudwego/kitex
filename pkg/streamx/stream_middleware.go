@@ -20,24 +20,13 @@ import (
 	"context"
 )
 
-type StreamHandler struct {
-	Handler              any
-	StreamMiddleware     StreamMiddleware
-	StreamRecvMiddleware StreamRecvMiddleware
-	StreamSendMiddleware StreamSendMiddleware
-}
-
 type (
 	StreamEndpoint   func(ctx context.Context, streamArgs StreamArgs, reqArgs StreamReqArgs, resArgs StreamResArgs) (err error)
 	StreamMiddleware func(next StreamEndpoint) StreamEndpoint
-)
 
-type (
 	StreamRecvEndpoint func(ctx context.Context, stream Stream, res any) (err error)
 	StreamSendEndpoint func(ctx context.Context, stream Stream, req any) (err error)
-)
 
-type (
 	StreamRecvMiddleware func(next StreamRecvEndpoint) StreamRecvEndpoint
 	StreamSendMiddleware func(next StreamSendEndpoint) StreamSendEndpoint
 )
