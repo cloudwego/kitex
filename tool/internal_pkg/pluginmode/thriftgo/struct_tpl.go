@@ -226,7 +226,7 @@ const StructLikeFastWriteNocopy = `
 func (p *{{$TypeName}}) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 {{- if UseFrugalForStruct .}}
 	{{- UseLib "github.com/cloudwego/frugal" "frugal"}}
-	n, err := frugal.EncodeObject(buf, nil, p)
+	n, err := frugal.EncodeObject(buf, w, p)
 	if err != nil {
 		return -1
 	}
