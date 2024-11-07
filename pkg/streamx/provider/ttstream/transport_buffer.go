@@ -118,9 +118,8 @@ func (c *writerBuffer) WriteBinary(bs []byte) (n int, err error) {
 }
 
 func (c *writerBuffer) WriteDirect(b []byte, remainCap int) (err error) {
-	err = c.writer.WriteDirect(b, remainCap)
 	c.writeSize += len(b)
-	return err
+	return c.writer.WriteDirect(b, remainCap)
 }
 
 func (c *writerBuffer) WrittenLen() (length int) {
@@ -128,7 +127,6 @@ func (c *writerBuffer) WrittenLen() (length int) {
 }
 
 func (c *writerBuffer) Flush() (err error) {
-	err = c.writer.Flush()
 	c.writeSize = 0
-	return err
+	return c.writer.Flush()
 }

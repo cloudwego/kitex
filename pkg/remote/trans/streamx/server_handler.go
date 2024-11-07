@@ -33,14 +33,14 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
-/* 实际上 remote.ServerTransHandler 真正被 trans_server.go 使用的接口只有：
+/*  trans_server.go only use the following interface in remote.ServerTransHandler:
 - OnRead
 - OnActive
 - OnInactive
 - OnError
 - GracefulShutdown: assert 方式使用
 
-其他接口实际上最终是用来去组装了 transpipeline ....
+Other interface is used by trans pipeline
 */
 
 var streamWorkerPool = wpool.New(128, time.Second)
@@ -134,11 +134,13 @@ func (t *svrTransHandler) OnRead(ctx context.Context, conn net.Conn) (err error)
 // - process server stream
 // - close   server stream
 func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss streamx.ServerStream) (err error) {
-	// inkHdlFunc 包含了所有中间件 + 用户 serviceInfo.methodHandler
-	// 这里 streamx 依然会复用原本的 server endpoint.Endpoint 中间件，因为他们都不会单独去取 req/res 的值
-	// 无法在保留现有 streaming 功能的情况下，彻底弃用 endpoint.Endpoint , 所以这里依然使用 endpoint 接口
-	// 但是对用户 API ，做了单独的封装。把这部分脏逻辑仅暴露在框架中。
+	// inkHdlFunc includes all middlewares and serviceInfo.methodHandler
+	// streamx still reuse the server endpoint.Endpoint and all server level middlewares
 	sargs := streamx.NewStreamArgs(ss)
+	msargs := streamx.AsMutableStreamArgs(sargs)
+	msargs.SetStreamRecvMiddleware(t.opt.StreamRecvMiddleware)
+	msargs.SetStreamSendMiddleware(t.opt.StreamSendMiddleware)
+	msargs.SetStreamMiddleware(t.opt.StreamMiddleware)
 	ctx = streamx.WithStreamArgsContext(ctx, sargs)
 
 	ri := t.opt.InitOrResetRPCInfoFunc(nil, conn.RemoteAddr())
