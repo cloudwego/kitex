@@ -27,6 +27,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
@@ -202,24 +203,36 @@ func TestTransportException(t *testing.T) {
 	sconn, err := netpoll.NewFDConnection(sfd)
 	test.Assert(t, err == nil, err)
 
+	// server send data
 	ctrans := newTransport(clientTransport, testServiceInfo, cconn, nil)
 	rawClientStream, err := ctrans.WriteStream(context.Background(), "Bidi", make(IntHeader), make(streamx.Header))
 	test.Assert(t, err == nil, err)
 	strans := newTransport(serverTransport, testServiceInfo, sconn, nil)
 	rawServerStream, err := strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
+	cStream := newClientStream(rawClientStream)
+	sStream := newServerStream(rawServerStream)
+	res := new(testResponse)
+	res.A = 123
+	err = sStream.SendMsg(context.Background(), res)
+	test.Assert(t, err == nil, err)
+	res = new(testResponse)
+	err = cStream.RecvMsg(context.Background(), res)
+	test.Assert(t, err == nil, err)
+	test.Assert(t, res.A == 123, res)
 
 	// server send exception
-	ss := newServerStream(rawServerStream)
 	targetException := thrift.NewApplicationException(remote.InternalError, "test")
-	err = ss.CloseSend(targetException)
+	err = sStream.CloseSend(targetException)
 	test.Assert(t, err == nil, err)
 	// client recv exception
-	cs := newClientStream(rawClientStream)
-	res := new(testResponse)
-	err = cs.RecvMsg(context.Background(), res)
+	res = new(testResponse)
+	err = cStream.RecvMsg(context.Background(), res)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, strings.Contains(err.Error(), targetException.Msg()), err.Error())
+	err = cStream.CloseSend(context.Background())
+	test.Assert(t, err == nil, err)
+	time.Sleep(time.Millisecond * 50)
 
 	// server send illegal frame
 	rawClientStream, err = ctrans.WriteStream(context.Background(), "Bidi", make(IntHeader), make(streamx.Header))
@@ -231,8 +244,8 @@ func TestTransportException(t *testing.T) {
 	test.Assert(t, err == nil, err)
 	err = sconn.Writer().Flush()
 	test.Assert(t, err == nil, err)
-	cs = newClientStream(rawClientStream)
-	err = cs.RecvMsg(context.Background(), res)
+	cStream = newClientStream(rawClientStream)
+	err = cStream.RecvMsg(context.Background(), res)
 	test.Assert(t, err != nil, err)
 	test.Assert(t, errors.Is(err, terrors.ErrIllegalFrame), err)
 }
