@@ -30,15 +30,14 @@ import (
 	"time"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 	"github.com/cloudwego/netpoll"
-
-	"github.com/cloudwego/kitex/server/streamxserver"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
+	"github.com/cloudwego/kitex/server/streamxserver"
 )
 
 var testServiceInfo = &serviceinfo.ServiceInfo{

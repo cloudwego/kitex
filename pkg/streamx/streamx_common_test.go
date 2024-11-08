@@ -25,7 +25,7 @@ import (
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/kerrors"
-	terrors "github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
 
 const (
