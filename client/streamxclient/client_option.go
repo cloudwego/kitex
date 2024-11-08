@@ -24,34 +24,32 @@ import (
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-type Option = internal_client.Option
-
-func WithProvider(pvd streamx.ClientProvider) Option {
-	return Option{F: func(o *internal_client.Options, di *utils.Slice) {
+func WithProvider(pvd streamx.ClientProvider) internal_client.Option {
+	return internal_client.Option{F: func(o *internal_client.Options, di *utils.Slice) {
 		o.RemoteOpt.Provider = pvd
 	}}
 }
 
-func WithStreamRecvTimeout(timeout time.Duration) Option {
-	return Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.StreamXOptions.RecvTimeout = timeout
+func WithStreamRecvTimeout(timeout time.Duration) internal_client.Option {
+	return internal_client.Option{F: func(o *internal_client.Options, di *utils.Slice) {
+		o.StreamX.RecvTimeout = timeout
 	}}
 }
 
-func WithStreamMiddleware(smw streamx.StreamMiddleware) Option {
-	return Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.StreamXOptions.StreamMWs = append(o.StreamXOptions.StreamMWs, smw)
+func WithStreamMiddleware(smw streamx.StreamMiddleware) internal_client.Option {
+	return internal_client.Option{F: func(o *internal_client.Options, di *utils.Slice) {
+		o.StreamX.StreamMWs = append(o.StreamX.StreamMWs, smw)
 	}}
 }
 
-func WithStreamRecvMiddleware(smw streamx.StreamRecvMiddleware) Option {
-	return Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.StreamXOptions.StreamRecvMWs = append(o.StreamXOptions.StreamRecvMWs, smw)
+func WithStreamRecvMiddleware(smw streamx.StreamRecvMiddleware) internal_client.Option {
+	return internal_client.Option{F: func(o *internal_client.Options, di *utils.Slice) {
+		o.StreamX.StreamRecvMWs = append(o.StreamX.StreamRecvMWs, smw)
 	}}
 }
 
-func WithStreamSendMiddleware(smw streamx.StreamSendMiddleware) Option {
-	return Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.StreamXOptions.StreamSendMWs = append(o.StreamXOptions.StreamSendMWs, smw)
+func WithStreamSendMiddleware(smw streamx.StreamSendMiddleware) internal_client.Option {
+	return internal_client.Option{F: func(o *internal_client.Options, di *utils.Slice) {
+		o.StreamX.StreamSendMWs = append(o.StreamX.StreamSendMWs, smw)
 	}}
 }

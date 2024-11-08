@@ -148,5 +148,5 @@ type ClientOption struct {
 
 	EnableConnPoolReporter bool
 
-	Provider interface{} // streamx.ClientProvider
+	Provider streamx.ClientProvider
 }

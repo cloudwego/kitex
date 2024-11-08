@@ -42,7 +42,7 @@ func WithSuite(suite client.Suite) Option {
 
 // WithMiddleware adds middleware for client to handle request.
 // NOTE: for streaming APIs (bidirectional, client, server), req is not valid, resp is *streaming.Result
-// If you want to intercept recv/send calls, please use Recv/Send StreamMiddleware
+// If you want to intercept recv/send calls, please use Recv/Send Middleware
 func WithMiddleware(mw endpoint.Middleware) Option {
 	return ConvertOptionFrom(client.WithMiddleware(mw))
 }

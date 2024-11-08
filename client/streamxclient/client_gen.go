@@ -25,6 +25,7 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
+// InvokeStream create a new client stream and wrapped related middlewares
 func InvokeStream[Req, Res any](
 	ctx context.Context, cli client.StreamX, smode serviceinfo.StreamingMode, method string,
 	req *Req, res *Res, callOptions ...streamxcallopt.CallOption,

@@ -21,7 +21,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/remote"
@@ -42,7 +41,7 @@ type server struct {
 }
 
 // NewServer creates a remote server.
-func NewServer(opt *remote.ServerOption, inkHdlFunc endpoint.Endpoint, transHdlr remote.ServerTransHandler) (Server, error) {
+func NewServer(opt *remote.ServerOption, transHdlr remote.ServerTransHandler) (Server, error) {
 	transSvr := opt.TransServerFactory.NewTransServer(opt, transHdlr)
 	s := &server{
 		opt:      opt,
