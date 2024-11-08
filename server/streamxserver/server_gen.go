@@ -116,7 +116,7 @@ func InvokeServerStreamHandler[Req, Res any](
 
 	// handler call
 	invoke := func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
-		return methodHandler(ctx, gs, req)
+		return methodHandler(ctx, req, gs)
 	}
 	if sMW != nil {
 		err = sMW(invoke)(ctx, sArgs, reqArgs, resArgs)

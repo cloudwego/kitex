@@ -86,7 +86,7 @@ var testServiceInfo = &serviceinfo.ServiceInfo{
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
 				return streamxserver.InvokeServerStreamHandler(
 					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
-					func(ctx context.Context, stream streamx.ServerStreamingServer[Response], req *Request) error {
+					func(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error {
 						return handler.(TestService).ServerStream(ctx, req, stream)
 					},
 				)
