@@ -18,6 +18,7 @@ package generic
 
 import (
 	"context"
+
 	"github.com/cloudwego/kitex/internal/generic"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 )
