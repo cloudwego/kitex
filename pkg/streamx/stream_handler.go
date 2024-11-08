@@ -20,7 +20,9 @@ import (
 	"context"
 )
 
-type UnaryHandler[Req, Res any] func(ctx context.Context, req *Req) (*Res, error)
-type ClientStreamingHandler[Req, Res any] func(ctx context.Context, stream ClientStreamingServer[Req, Res]) (*Res, error)
-type ServerStreamingHandler[Req, Res any] func(ctx context.Context, stream ServerStreamingServer[Res], req *Req) error
-type BidiStreamingHandler[Req, Res any] func(ctx context.Context, stream BidiStreamingServer[Req, Res]) error
+type (
+	UnaryHandler[Req, Res any]           func(ctx context.Context, req *Req) (*Res, error)
+	ClientStreamingHandler[Req, Res any] func(ctx context.Context, stream ClientStreamingServer[Req, Res]) (*Res, error)
+	ServerStreamingHandler[Req, Res any] func(ctx context.Context, stream ServerStreamingServer[Res], req *Req) error
+	BidiStreamingHandler[Req, Res any]   func(ctx context.Context, stream BidiStreamingServer[Req, Res]) error
+)

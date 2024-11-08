@@ -29,8 +29,9 @@ import (
 	"testing"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
-	"github.com/cloudwego/kitex/server/streamxserver"
 	"github.com/cloudwego/netpoll"
+
+	"github.com/cloudwego/kitex/server/streamxserver"
 
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/remote"

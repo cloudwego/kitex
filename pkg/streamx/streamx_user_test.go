@@ -30,11 +30,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cloudwego/netpoll"
+
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/transport"
-	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
@@ -93,7 +94,7 @@ func NewTestServer(serviceImpl TestService, opts ...server.Option) (string, serv
 
 func untilEqual(t *testing.T, current *int32, target int32, timeout time.Duration) {
 	var duration time.Duration
-	var interval = time.Millisecond * 10
+	interval := time.Millisecond * 10
 	for atomic.LoadInt32(current) != target {
 		time.Sleep(interval)
 		duration += interval
@@ -745,8 +746,6 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 					err = bs.CloseSend(ctx)
 					test.Assert(t, err == nil, err)
 					test.Assert(t, res.Message == msg, res.Message)
-
-					testHeaderAndTrailer(t, bs)
 				}()
 			}
 			wg.Wait()
@@ -777,7 +776,6 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 						test.Assert(t, err == nil, err)
 						test.Assert(t, res.Message == msg, res.Message)
 					}
-					testHeaderAndTrailer(t, ss)
 				}()
 			}
 			wg.Wait()

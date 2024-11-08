@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/cloudwego/frugal"
+
 	"github.com/cloudwego/kitex/pkg/protocol/bthrift"
 	kutils "github.com/cloudwego/kitex/pkg/utils"
 )
