@@ -29,6 +29,7 @@ import (
 	"testing"
 
 	"github.com/cloudwego/gopkg/protocol/thrift"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/server/streamxserver"
@@ -37,7 +38,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
 
 var testServiceInfo = &serviceinfo.ServiceInfo{
@@ -227,12 +227,14 @@ func TestTransportException(t *testing.T) {
 	rawServerStream, err = strans.ReadStream(context.Background())
 	test.Assert(t, err == nil, err)
 	test.Assert(t, rawServerStream != nil, rawServerStream)
-	_, err = sconn.Write([]byte("helloxxxxxxxxxxxxxxxxxxxxxx"))
+	_, err = sconn.Writer().WriteBinary([]byte("helloxxxxxxxxxxxxxxxxxxxxxx"))
+	test.Assert(t, err == nil, err)
+	err = sconn.Writer().Flush()
 	test.Assert(t, err == nil, err)
 	cs = newClientStream(rawClientStream)
 	err = cs.RecvMsg(context.Background(), res)
 	test.Assert(t, err != nil, err)
-	t.Logf("client stream send msg: %v %v", err, errors.Is(err, terrors.ErrIllegalFrame))
+	test.Assert(t, errors.Is(err, terrors.ErrIllegalFrame), err)
 }
 
 func TestStreamID(t *testing.T) {
