@@ -81,14 +81,14 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 	sendEndpoint := kc.opt.Streaming.BuildSendInvokeChain(kc.invokeSendEndpoint())
 
 	// streamx version streaming mw
-	kc.sxStreamMW = streamx.StreamMiddlewareChain(kc.opt.StreamXOptions.StreamMWs...)
+	kc.sxStreamMW = streamx.StreamMiddlewareChain(kc.opt.StreamX.StreamMWs...)
 	eventHandler := kc.opt.TracerCtl.GetStreamEventHandler()
 	if eventHandler != nil {
-		kc.opt.StreamXOptions.StreamRecvMWs = append(kc.opt.StreamXOptions.StreamRecvMWs, streamx.NewStreamRecvStatMiddleware(eventHandler))
-		kc.opt.StreamXOptions.StreamSendMWs = append(kc.opt.StreamXOptions.StreamSendMWs, streamx.NewStreamSendStatMiddleware(eventHandler))
+		kc.opt.StreamX.StreamRecvMWs = append(kc.opt.StreamX.StreamRecvMWs, streamx.NewStreamRecvStatMiddleware(eventHandler))
+		kc.opt.StreamX.StreamSendMWs = append(kc.opt.StreamX.StreamSendMWs, streamx.NewStreamSendStatMiddleware(eventHandler))
 	}
-	kc.sxStreamRecvMW = streamx.StreamRecvMiddlewareChain(kc.opt.StreamXOptions.StreamRecvMWs...)
-	kc.sxStreamSendMW = streamx.StreamSendMiddlewareChain(kc.opt.StreamXOptions.StreamSendMWs...)
+	kc.sxStreamRecvMW = streamx.StreamRecvMiddlewareChain(kc.opt.StreamX.StreamRecvMWs...)
+	kc.sxStreamSendMW = streamx.StreamSendMiddlewareChain(kc.opt.StreamX.StreamSendMWs...)
 
 	return func(ctx context.Context, req, resp interface{}) (err error) {
 		// req and resp as &streaming.Stream
@@ -101,7 +101,7 @@ func (kc *kClient) invokeStreamingEndpoint() (endpoint.Endpoint, error) {
 		// streamx API
 		if cs, ok := st.(streamx.Stream); ok {
 			streamArgs := resp.(streamx.StreamArgs)
-			// 此后的中间件才会有 Stream
+			// the middlewares can get real Stream after set
 			streamx.AsMutableStreamArgs(streamArgs).SetStream(cs)
 			return nil
 		}

@@ -98,7 +98,7 @@ type Options struct {
 
 	// Streaming
 	Streaming stream.StreamingConfig // old version streaming API config
-	StreamX   StreamXConfig          // new version streaming API config
+	StreamX   StreamXOptions         // new version streaming API config
 
 	RefuseTrafficWithoutServiceName bool
 	EnableContextTimeout            bool

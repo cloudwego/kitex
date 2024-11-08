@@ -256,7 +256,7 @@ func (s *server) Run() (err error) {
 		return err
 	}
 	s.Lock()
-	s.svr, err = remotesvr.NewServer(s.opt.RemoteOpt, s.eps, transHdlr)
+	s.svr, err = remotesvr.NewServer(s.opt.RemoteOpt, transHdlr)
 	s.Unlock()
 	if err != nil {
 		return err

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 CloudWeGo Authors
+ * Copyright 2024 CloudWeGo Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ import (
 - OnActive
 - OnInactive
 - OnError
-- GracefulShutdown: assert 方式使用
+- GracefulShutdown: used by type assert
 
 Other interface is used by trans pipeline
 */
