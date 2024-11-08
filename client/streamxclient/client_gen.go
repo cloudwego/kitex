@@ -40,9 +40,8 @@ func InvokeStream[Req, Res any](
 		resArgs.SetRes(res)
 	}
 
-	ctx = streamx.WithStreamArgsContext(ctx, streamArgs)
 	// NewStream should register client middlewares into stream Args
-	ctx, cs, err := cli.NewStream(ctx, method, req, callOptions...)
+	ctx, cs, err := cli.NewStream(ctx, method, req, streamArgs, callOptions...)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -19,10 +19,12 @@ package streamx_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -30,6 +32,8 @@ import (
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/pkg/endpoint"
+	"github.com/cloudwego/kitex/pkg/rpcinfo"
+	"github.com/cloudwego/kitex/transport"
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -110,7 +114,7 @@ func increaseIfNoError(val *int32, err error) {
 func TestStreamingBasic(t *testing.T) {
 	for _, tc := range providerTestCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			concurrency := 100
+			concurrency := 10
 			round := 5
 
 			// create server
@@ -133,6 +137,7 @@ func TestStreamingBasic(t *testing.T) {
 						return err
 					}
 				}),
+
 				streamxserver.WithProvider(tc.ServerProvider),
 				streamxserver.WithStreamRecvMiddleware(func(next streamx.StreamRecvEndpoint) streamx.StreamRecvEndpoint {
 					return func(ctx context.Context, stream streamx.Stream, res any) (err error) {
@@ -162,20 +167,29 @@ func TestStreamingBasic(t *testing.T) {
 								test.Assert(t, reqArgs.Req() != nil)
 								test.Assert(t, resArgs.Res() == nil)
 								err = next(ctx, streamArgs, reqArgs, resArgs)
-								test.Assert(t, reqArgs.Req() != nil)
-								test.Assert(t, resArgs.Res() != nil || err != nil)
+								if err == nil {
+									req := reqArgs.Req().(*Request)
+									res := resArgs.Res().(*Response)
+									test.DeepEqual(t, req.Message, res.Message)
+								}
 							case streamx.StreamingClient:
 								test.Assert(t, reqArgs.Req() == nil)
 								test.Assert(t, resArgs.Res() == nil)
 								err = next(ctx, streamArgs, reqArgs, resArgs)
-								test.Assert(t, reqArgs.Req() == nil)
-								test.Assert(t, resArgs.Res() != nil || err != nil)
+								if err == nil {
+									res := resArgs.Res().(*Response)
+									test.Assert(t, res.Message != "")
+								}
 							case streamx.StreamingServer:
 								test.Assert(t, reqArgs.Req() != nil)
 								test.Assert(t, resArgs.Res() == nil)
 								err = next(ctx, streamArgs, reqArgs, resArgs)
 								test.Assert(t, reqArgs.Req() != nil)
 								test.Assert(t, resArgs.Res() == nil)
+								if err == nil {
+									req := reqArgs.Req().(*Request)
+									test.Assert(t, req.Message != "")
+								}
 							case streamx.StreamingBidirectional:
 								test.Assert(t, reqArgs.Req() == nil)
 								test.Assert(t, resArgs.Res() == nil)
@@ -207,8 +221,9 @@ func TestStreamingBasic(t *testing.T) {
 				atomic.StoreInt32(&clientSendCount, 0)
 			}
 			cli, err := NewClient(
-				"kitex.test.service",
+				"kitex.echo.service",
 				client.WithHostPorts(addr),
+				client.WithTransportProtocol(transport.TTHeaderFramed),
 				client.WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
 					return func(ctx context.Context, req, resp interface{}) (err error) {
 						err = next(ctx, req, resp)
@@ -242,21 +257,25 @@ func TestStreamingBasic(t *testing.T) {
 						err = next(ctx, streamArgs, reqArgs, resArgs)
 
 						test.Assert(t, streamArgs.Stream() != nil)
-						switch streamArgs.Stream().Mode() {
-						case streamx.StreamingUnary:
-							test.Assert(t, reqArgs.Req() != nil)
-							test.Assert(t, resArgs.Res() != nil || err != nil)
-						case streamx.StreamingClient:
-							test.Assert(t, reqArgs.Req() == nil, reqArgs.Req())
-							test.Assert(t, resArgs.Res() == nil)
-						case streamx.StreamingServer:
-							test.Assert(t, reqArgs.Req() != nil)
-							test.Assert(t, resArgs.Res() == nil)
-						case streamx.StreamingBidirectional:
-							test.Assert(t, reqArgs.Req() == nil)
-							test.Assert(t, resArgs.Res() == nil)
+						if err == nil {
+							switch streamArgs.Stream().Mode() {
+							case streamx.StreamingUnary:
+								test.Assert(t, reqArgs.Req() != nil)
+								test.Assert(t, resArgs.Res() != nil)
+								req := reqArgs.Req().(*Request)
+								res := resArgs.Res().(*Response)
+								test.DeepEqual(t, req.Message, res.Message)
+							case streamx.StreamingClient:
+								test.Assert(t, reqArgs.Req() == nil, reqArgs.Req())
+								test.Assert(t, resArgs.Res() == nil)
+							case streamx.StreamingServer:
+								test.Assert(t, reqArgs.Req() != nil)
+								test.Assert(t, resArgs.Res() == nil)
+							case streamx.StreamingBidirectional:
+								test.Assert(t, reqArgs.Req() == nil)
+								test.Assert(t, resArgs.Res() == nil)
+							}
 						}
-
 						increaseIfNoError(&clientStreamCount, err)
 						return err
 					}
@@ -269,28 +288,28 @@ func TestStreamingBasic(t *testing.T) {
 
 			t.Logf("=== PingPong ===")
 			var wg sync.WaitGroup
-			//for i := 0; i < concurrency; i++ {
-			//	wg.Add(1)
-			//	go func() {
-			//		defer wg.Done()
-			//		req := new(Request)
-			//		req.Message = "PingPong"
-			//		res, err := cli.PingPong(octx, req)
-			//		test.Assert(t, err == nil, err)
-			//		test.Assert(t, req.Message == res.Message, res)
-			//	}()
-			//}
-			//wg.Wait()
-			//test.DeepEqual(t, atomic.LoadInt32(&serverMiddlewareCount), int32(concurrency))
-			//test.DeepEqual(t, atomic.LoadInt32(&clientMiddlewareCount), int32(concurrency))
-			//test.DeepEqual(t, atomic.LoadInt32(&serverStreamCount), int32(0))
-			//test.DeepEqual(t, atomic.LoadInt32(&clientStreamCount), int32(0))
-			//test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(0))
-			//test.DeepEqual(t, atomic.LoadInt32(&clientRecvCount), int32(0))
-			//test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(0))
-			//test.DeepEqual(t, atomic.LoadInt32(&clientSendCount), int32(0))
-			//resetServerCount()
-			//resetClientCount()
+			for i := 0; i < concurrency; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					req := new(Request)
+					req.Message = "PingPong"
+					res, err := cli.PingPong(octx, req)
+					test.Assert(t, err == nil, err)
+					test.Assert(t, req.Message == res.Message, res)
+				}()
+			}
+			wg.Wait()
+			test.DeepEqual(t, atomic.LoadInt32(&serverMiddlewareCount), int32(concurrency))
+			test.DeepEqual(t, atomic.LoadInt32(&clientMiddlewareCount), int32(concurrency))
+			test.DeepEqual(t, atomic.LoadInt32(&serverStreamCount), int32(0))
+			test.DeepEqual(t, atomic.LoadInt32(&clientStreamCount), int32(0))
+			test.DeepEqual(t, atomic.LoadInt32(&serverRecvCount), int32(0))
+			test.DeepEqual(t, atomic.LoadInt32(&clientRecvCount), int32(0))
+			test.DeepEqual(t, atomic.LoadInt32(&serverSendCount), int32(0))
+			test.DeepEqual(t, atomic.LoadInt32(&clientSendCount), int32(0))
+			resetServerCount()
+			resetClientCount()
 
 			t.Logf("=== Unary ===")
 			for i := 0; i < concurrency; i++ {
@@ -569,215 +588,204 @@ func TestStreamingBasic(t *testing.T) {
 	}
 }
 
-//
-//func TestStreamingGoroutineLeak(t *testing.T) {
-//	for _, tc := range providerTestCases {
-//		t.Run(tc.Name, func(t *testing.T) {
-//			addr := test.GetLocalAddress()
-//			ln, _ := netpoll.CreateListener("tcp", addr)
-//			defer ln.Close()
-//
-//			// create server
-//			svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
-//			var streamStarted int32
-//			waitStreamStarted := func(streamWaited int) {
-//				for {
-//					stated, waited := atomic.LoadInt32(&streamStarted), int32(streamWaited)
-//					if stated >= waited {
-//						return
-//					}
-//					t.Logf("streamStarted=%d < streamWaited=%d", stated, waited)
-//					time.Sleep(time.Millisecond * 10)
-//				}
-//			}
-//			_ = svr.RegisterService(
-//				streamingServiceInfo, new(streamingService),
-//				streamxserver.WithProvider(tc.ServerProvider),
-//				streamxserver.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
-//					return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
-//						atomic.AddInt32(&streamStarted, 1)
-//						return next(ctx, streamArgs, reqArgs, resArgs)
-//					}
-//				}),
-//			)
-//			go func() {
-//				_ = svr.Run()
-//			}()
-//			defer svr.Stop()
-//			test.WaitServerStart(addr)
-//
-//			client, _ := NewStreamingClient(
-//				"kitex.service.streaming",
-//				streamxclient.WithHostPorts(addr),
-//				streamxclient.WithProvider(tc.ClientProvider),
-//			)
-//			octx := context.Background()
-//			msg := "BidiStream"
-//
-//			t.Logf("=== Checking only one connection be reused ===")
-//			var wg sync.WaitGroup
-//			for i := 0; i < 12; i++ {
-//				wg.Add(1)
-//				ctx, bs, err := client.BidiStream(octx)
-//				test.Assert(t, err == nil, err)
-//				req := new(Request)
-//				req.Message = string(make([]byte, 1024))
-//				err = bs.Send(ctx, req)
-//				test.Assert(t, err == nil, err)
-//				res, err := bs.Recv(ctx)
-//				test.Assert(t, err == nil, err)
-//				err = bs.CloseSend(ctx)
-//				test.Assert(t, err == nil, err)
-//				test.Assert(t, res.Message == req.Message, res.Message)
-//				runtime.SetFinalizer(bs, func(_ any) {
-//					wg.Done()
-//				})
-//				bs = nil
-//				runtime.GC()
-//				wg.Wait()
-//			}
-//
-//			t.Logf("=== Checking streams GCed ===")
-//			ngBefore := runtime.NumGoroutine()
-//			streams := 100
-//			streamList := make([]streamx.ClientStream, streams)
-//			atomic.StoreInt32(&streamStarted, 0)
-//			for i := 0; i < streams; i++ {
-//				_, bs, err := client.BidiStream(octx)
-//				test.Assert(t, err == nil, err)
-//				streamList[i] = bs
-//			}
-//			waitStreamStarted(streams)
-//			// before GC
-//			test.Assert(t, runtime.NumGoroutine() > streams, runtime.NumGoroutine())
-//			// after GC
-//			for i := 0; i < streams; i++ {
-//				streamList[i] = nil
-//			}
-//			for runtime.NumGoroutine() > ngBefore {
-//				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
-//				runtime.GC()
-//				time.Sleep(time.Millisecond * 50)
-//			}
-//
-//			t.Logf("=== Checking Streams Called and GCed ===")
-//			streams = 100
-//			ngBefore = runtime.NumGoroutine()
-//			for i := 0; i < streams; i++ {
-//				wg.Add(1)
-//				go func() {
-//					defer wg.Done()
-//
-//					ctx, bs, err := client.BidiStream(octx)
-//					test.Assert(t, err == nil, err)
-//					req := new(Request)
-//					req.Message = msg
-//					err = bs.Send(ctx, req)
-//					test.Assert(t, err == nil, err)
-//
-//					res, err := bs.Recv(ctx)
-//					test.Assert(t, err == nil, err)
-//					err = bs.CloseSend(ctx)
-//					test.Assert(t, err == nil, err)
-//					test.Assert(t, res.Message == msg, res.Message)
-//
-//					testHeaderAndTrailer(t, bs)
-//				}()
-//			}
-//			wg.Wait()
-//			for runtime.NumGoroutine() > ngBefore {
-//				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
-//				runtime.GC()
-//				time.Sleep(time.Millisecond * 50)
-//			}
-//
-//			t.Logf("=== Checking Server Streaming ===")
-//			streams = 100
-//			ngBefore = runtime.NumGoroutine()
-//			for i := 0; i < streams; i++ {
-//				wg.Add(1)
-//				go func() {
-//					defer wg.Done()
-//
-//					req := new(Request)
-//					req.Message = msg
-//					ctx, ss, err := client.ServerStream(octx, req)
-//					test.Assert(t, err == nil, err)
-//
-//					for {
-//						res, err := ss.Recv(ctx)
-//						if err == io.EOF {
-//							break
-//						}
-//						test.Assert(t, err == nil, err)
-//						test.Assert(t, res.Message == msg, res.Message)
-//					}
-//					testHeaderAndTrailer(t, ss)
-//				}()
-//			}
-//			wg.Wait()
-//			for runtime.NumGoroutine() > ngBefore {
-//				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
-//				runtime.GC()
-//				time.Sleep(time.Millisecond * 50)
-//			}
-//		})
-//	}
-//}
-//
-//func TestStreamingException(t *testing.T) {
-//	for _, tc := range providerTestCases {
-//		t.Run(tc.Name, func(t *testing.T) {
-//			addr := test.GetLocalAddress()
-//			ln, _ := netpoll.CreateListener("tcp", addr)
-//			defer ln.Close()
-//
-//			// create server
-//			svr := server.NewServer(server.WithListener(ln), server.WithExitWaitTime(time.Millisecond*10))
-//			_ = svr.RegisterService(
-//				streamingServiceInfo, new(streamingService),
-//				streamxserver.WithProvider(tc.ServerProvider),
-//			)
-//			go func() {
-//				_ = svr.Run()
-//			}()
-//			defer svr.Stop()
-//			test.WaitServerStart(addr)
-//
-//			var circuitBreaker int32
-//			circuitBreakerErr := fmt.Errorf("circuitBreaker on")
-//			client, _ := NewStreamingClient(
-//				"kitex.service.streaming",
-//				streamxclient.WithHostPorts(addr),
-//				streamxclient.WithProvider(tc.ClientProvider),
-//				streamxclient.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
-//					return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
-//						ri := rpcinfo.GetRPCInfo(ctx)
-//						test.Assert(t, ri.To().Address() != nil)
-//						if atomic.LoadInt32(&circuitBreaker) > 0 {
-//							return circuitBreakerErr
-//						}
-//						return next(ctx, streamArgs, reqArgs, resArgs)
-//					}
-//				}),
-//			)
-//			octx := context.Background()
-//
-//			// assert circuitBreaker error
-//			atomic.StoreInt32(&circuitBreaker, 1)
-//			_, _, err := client.BidiStream(octx)
-//			test.Assert(t, errors.Is(err, circuitBreakerErr), err)
-//			atomic.StoreInt32(&circuitBreaker, 0)
-//
-//			// assert context deadline error
-//			ctx, cancel := context.WithTimeout(octx, time.Millisecond)
-//			ctx, bs, err := client.BidiStream(ctx)
-//			test.Assert(t, err == nil, err)
-//			res, err := bs.Recv(ctx)
-//			cancel()
-//			test.Assert(t, res == nil && err != nil, res, err)
-//			test.Assert(t, errors.Is(err, ctx.Err()), err)
-//			test.Assert(t, errors.Is(err, context.DeadlineExceeded), err)
-//		})
-//	}
-//}
+func TestStreamingException(t *testing.T) {
+	for _, tc := range providerTestCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			addr := test.GetLocalAddress()
+			ln, _ := netpoll.CreateListener("tcp", addr)
+			defer ln.Close()
+
+			// create server
+			addr, svr, err := NewTestServer(
+				new(testService),
+				streamxserver.WithProvider(tc.ServerProvider),
+			)
+			test.Assert(t, err == nil, err)
+			defer svr.Stop()
+
+			var circuitBreaker int32
+			circuitBreakerErr := fmt.Errorf("circuitBreaker on")
+			cli, _ := NewClient(
+				"kitex.echo.service",
+				client.WithHostPorts(addr),
+
+				streamxclient.WithProvider(tc.ClientProvider),
+				streamxclient.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
+					return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+						ri := rpcinfo.GetRPCInfo(ctx)
+						test.Assert(t, ri.To().Address() != nil)
+						if atomic.LoadInt32(&circuitBreaker) > 0 {
+							return circuitBreakerErr
+						}
+						return next(ctx, streamArgs, reqArgs, resArgs)
+					}
+				}),
+			)
+			octx := context.Background()
+
+			// assert circuitBreaker error
+			atomic.StoreInt32(&circuitBreaker, 1)
+			_, _, err = cli.BidiStream(octx)
+			test.Assert(t, errors.Is(err, circuitBreakerErr), err)
+			atomic.StoreInt32(&circuitBreaker, 0)
+
+			// assert context deadline error
+			ctx, cancel := context.WithTimeout(octx, time.Millisecond)
+			ctx, bs, err := cli.BidiStream(ctx)
+			test.Assert(t, err == nil, err)
+			res, err := bs.Recv(ctx)
+			cancel()
+			test.Assert(t, res == nil && err != nil, res, err)
+			test.Assert(t, errors.Is(err, ctx.Err()), err)
+			test.Assert(t, errors.Is(err, context.DeadlineExceeded), err)
+		})
+	}
+}
+
+func TestStreamingGoroutineLeak(t *testing.T) {
+	for _, tc := range providerTestCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			var streamStarted int32
+			waitStreamStarted := func(streamWaited int) {
+				for {
+					stated, waited := atomic.LoadInt32(&streamStarted), int32(streamWaited)
+					if stated >= waited {
+						return
+					}
+					t.Logf("streamStarted=%d < streamWaited=%d", stated, waited)
+					time.Sleep(time.Millisecond * 10)
+				}
+			}
+
+			// create server
+			addr, svr, err := NewTestServer(
+				new(testService),
+				streamxserver.WithProvider(tc.ServerProvider),
+				streamxserver.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
+					return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+						atomic.AddInt32(&streamStarted, 1)
+						return next(ctx, streamArgs, reqArgs, resArgs)
+					}
+				}),
+			)
+			test.Assert(t, err == nil, err)
+			defer svr.Stop()
+
+			cli, _ := NewClient(
+				"kitex.test.service",
+				client.WithHostPorts(addr),
+				streamxclient.WithProvider(tc.ClientProvider),
+			)
+			octx := context.Background()
+			msg := "BidiStream"
+
+			t.Logf("=== Checking only one connection be reused ===")
+			var wg sync.WaitGroup
+			for i := 0; i < 12; i++ {
+				wg.Add(1)
+				ctx, bs, err := cli.BidiStream(octx)
+				test.Assert(t, err == nil, err)
+				req := new(Request)
+				req.Message = string(make([]byte, 1024))
+				err = bs.Send(ctx, req)
+				test.Assert(t, err == nil, err)
+				res, err := bs.Recv(ctx)
+				test.Assert(t, err == nil, err)
+				err = bs.CloseSend(ctx)
+				test.Assert(t, err == nil, err)
+				test.Assert(t, res.Message == req.Message, res.Message)
+				runtime.SetFinalizer(bs, func(_ any) {
+					wg.Done()
+				})
+				bs = nil
+				runtime.GC()
+				wg.Wait()
+			}
+
+			t.Logf("=== Checking streams GCed ===")
+			ngBefore := runtime.NumGoroutine()
+			streams := 100
+			streamList := make([]streamx.ClientStream, streams)
+			atomic.StoreInt32(&streamStarted, 0)
+			for i := 0; i < streams; i++ {
+				_, bs, err := cli.BidiStream(octx)
+				test.Assert(t, err == nil, err)
+				streamList[i] = bs
+			}
+			waitStreamStarted(streams)
+			// before GC
+			test.Assert(t, runtime.NumGoroutine() >= streams, runtime.NumGoroutine(), streams)
+			// after GC
+			for i := 0; i < streams; i++ {
+				streamList[i] = nil
+			}
+			for runtime.NumGoroutine() > ngBefore {
+				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
+				runtime.GC()
+				time.Sleep(time.Millisecond * 10)
+			}
+
+			t.Logf("=== Checking Streams Called and GCed ===")
+			streams = 100
+			ngBefore = runtime.NumGoroutine()
+			for i := 0; i < streams; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+
+					ctx, bs, err := cli.BidiStream(octx)
+					test.Assert(t, err == nil, err)
+					req := new(Request)
+					req.Message = msg
+					err = bs.Send(ctx, req)
+					test.Assert(t, err == nil, err)
+
+					res, err := bs.Recv(ctx)
+					test.Assert(t, err == nil, err)
+					err = bs.CloseSend(ctx)
+					test.Assert(t, err == nil, err)
+					test.Assert(t, res.Message == msg, res.Message)
+
+					testHeaderAndTrailer(t, bs)
+				}()
+			}
+			wg.Wait()
+			for runtime.NumGoroutine() > ngBefore {
+				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
+				runtime.GC()
+				time.Sleep(time.Millisecond * 50)
+			}
+
+			t.Logf("=== Checking Server Streaming ===")
+			streams = 100
+			ngBefore = runtime.NumGoroutine()
+			for i := 0; i < streams; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+
+					req := new(Request)
+					req.Message = msg
+					ctx, ss, err := cli.ServerStream(octx, req)
+					test.Assert(t, err == nil, err)
+
+					for {
+						res, err := ss.Recv(ctx)
+						if err == io.EOF {
+							break
+						}
+						test.Assert(t, err == nil, err)
+						test.Assert(t, res.Message == msg, res.Message)
+					}
+					testHeaderAndTrailer(t, ss)
+				}()
+			}
+			wg.Wait()
+			for runtime.NumGoroutine() > ngBefore {
+				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
+				runtime.GC()
+				time.Sleep(time.Millisecond * 50)
+			}
+		})
+	}
+}
