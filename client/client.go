@@ -99,17 +99,12 @@ func (kf *kcFinalizerClient) Call(ctx context.Context, method string, request, r
 
 // NewClient creates a kitex.Client with the given ServiceInfo, it is from generated code.
 func NewClient(svcInfo *serviceinfo.ServiceInfo, opts ...Option) (Client, error) {
-	nopts := client.NewOptions(opts)
-	return NewClientWithOptions(svcInfo, nopts)
-}
-
-func NewClientWithOptions(svcInfo *serviceinfo.ServiceInfo, opts *Options) (Client, error) {
 	if svcInfo == nil {
 		return nil, errors.New("NewClient: no service info")
 	}
 	kc := &kcFinalizerClient{kClient: &kClient{}}
 	kc.svcInfo = svcInfo
-	kc.opt = opts
+	kc.opt = client.NewOptions(opts)
 	if err := kc.init(); err != nil {
 		_ = kc.Close()
 		return nil, err
@@ -755,7 +750,7 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 	}
 
 	// streamx config
-	sopt := opt.StreamXOptions
+	sopt := opt.StreamX
 	if sopt.RecvTimeout > 0 {
 		cfg.SetStreamRecvTimeout(sopt.RecvTimeout)
 	}

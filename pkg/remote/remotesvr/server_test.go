@@ -17,7 +17,6 @@
 package remotesvr
 
 import (
-	"context"
 	"errors"
 	"net"
 	"testing"
@@ -53,11 +52,8 @@ func TestServerStart(t *testing.T) {
 		Address:            utils.NewNetAddr("tcp", "test"),
 		TransServerFactory: mocks.NewMockTransServerFactory(transSvr),
 	}
-	inkHdlrFunc := func(ctx context.Context, req, resp interface{}) (err error) {
-		return nil
-	}
 	transHdrl := &mocks.MockSvrTransHandler{}
-	svr, err := NewServer(opt, inkHdlrFunc, transHdrl)
+	svr, err := NewServer(opt, transHdrl)
 	test.Assert(t, err == nil, err)
 
 	err = <-svr.Start()
@@ -80,11 +76,8 @@ func TestServerStartListenErr(t *testing.T) {
 		Address:            utils.NewNetAddr("tcp", "test"),
 		TransServerFactory: mocks.NewMockTransServerFactory(transSvr),
 	}
-	inkHdlrFunc := func(ctx context.Context, req, resp interface{}) (err error) {
-		return nil
-	}
 	transHdrl := &mocks.MockSvrTransHandler{}
-	svr, err := NewServer(opt, inkHdlrFunc, transHdrl)
+	svr, err := NewServer(opt, transHdrl)
 	test.Assert(t, err == nil, err)
 
 	err = <-svr.Start()
