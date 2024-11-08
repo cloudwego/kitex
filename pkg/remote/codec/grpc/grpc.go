@@ -27,6 +27,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/cloudwego/kitex/internal/utils/safemcache"
+	"github.com/cloudwego/kitex/pkg/generic"
 	"github.com/cloudwego/kitex/pkg/remote"
 	"github.com/cloudwego/kitex/pkg/remote/codec/perrors"
 	"github.com/cloudwego/kitex/pkg/remote/codec/protobuf"
@@ -102,20 +103,12 @@ func (c *grpcCodec) Encode(ctx context.Context, message remote.Message, out remo
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
 		switch msg := message.Data().(type) {
-		case genericWriter:
+		case *generic.Args, *generic.Result:
 			methodName := message.RPCInfo().Invocation().MethodName()
 			if methodName == "" {
 				return errors.New("empty methodName in grpc generic streaming Encode")
 			}
-			var bs []byte
-			bw := bufiox.NewBytesWriter(&bs)
-			if err = msg.Write(ctx, methodName, bw); err != nil {
-				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Write failed: %s", err.Error()))
-			}
-			if err = bw.Flush(); err != nil {
-				return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Flush failed: %s", err.Error()))
-			}
-			payload = bs
+			payload, err = marshalGenericThriftData(ctx, methodName, msg)
 		default:
 			payload, err = thrift.MarshalThriftData(ctx, c.ThriftCodec, message.Data())
 		}
@@ -205,14 +198,16 @@ func (c *grpcCodec) Decode(ctx context.Context, message remote.Message, in remot
 	data := message.Data()
 	switch message.ProtocolInfo().CodecType {
 	case serviceinfo.Thrift:
-		if t, ok := data.(genericReader); ok {
+		switch data.(type) {
+		case *generic.Args, *generic.Result:
 			methodName := message.RPCInfo().Invocation().MethodName()
 			if methodName == "" {
 				return errors.New("empty methodName in grpc Decode")
 			}
-			return t.Read(ctx, methodName, len(d), remote.NewReaderBuffer(d))
+			return unmarshalGenericThriftData(ctx, methodName, data, len(d), remote.NewReaderBuffer(d))
+		default:
+			return thrift.UnmarshalThriftData(ctx, c.ThriftCodec, "", d, message.Data())
 		}
-		return thrift.UnmarshalThriftData(ctx, c.ThriftCodec, "", d, message.Data())
 	case serviceinfo.Protobuf:
 		if t, ok := data.(fastpb.Reader); ok {
 			if len(d) == 0 {
@@ -250,10 +245,29 @@ func (c *grpcCodec) Name() string {
 	return "grpc"
 }
 
-type genericWriter interface { // used by pkg/generic
-	Write(ctx context.Context, method string, w bufiox.Writer) error
+func marshalGenericThriftData(ctx context.Context, methodName string, msg interface{}) (payload []byte, err error) {
+	bw := bufiox.NewBytesWriter(&payload)
+	switch m := msg.(type) {
+	case *generic.Args:
+		err = m.Write(ctx, methodName, bw)
+	case *generic.Result:
+		err = m.Write(ctx, methodName, bw)
+	}
+	if err != nil {
+		return nil, perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Write failed: %s", err.Error()))
+	}
+	if err = bw.Flush(); err != nil {
+		return nil, perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("generic thrift streaming marshal, Flush failed: %s", err.Error()))
+	}
+	return
 }
 
-type genericReader interface { // used by pkg/generic
-	Read(ctx context.Context, method string, dataLen int, r bufiox.Reader) error
+func unmarshalGenericThriftData(ctx context.Context, methodName string, msg interface{}, size int, buf remote.ByteBuffer) (err error) {
+	switch t := msg.(type) {
+	case *generic.Args:
+		err = t.Read(ctx, methodName, size, buf)
+	case *generic.Result:
+		err = t.Read(ctx, methodName, size, buf)
+	}
+	return err
 }
