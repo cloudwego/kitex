@@ -126,14 +126,16 @@ func (t *transport) Close(exception error) (err error) {
 		return nil
 	}
 	klog.Debugf("transport[%d-%s] is closing", t.kind, t.Addr())
-	t.spipe.Close()
-	t.fpipe.Close()
+	// send trailer first
 	t.streams.Range(func(key, value any) bool {
 		s := value.(*stream)
 		_ = s.closeSend(exception)
 		_ = s.closeRecv(exception)
 		return true
 	})
+	// then close stream and frame pipes
+	t.spipe.Close()
+	t.fpipe.Close()
 	return err
 }
 
