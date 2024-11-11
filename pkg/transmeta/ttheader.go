@@ -126,7 +126,7 @@ func (ch *clientTTHeaderHandler) ReadMeta(ctx context.Context, msg remote.Messag
 }
 
 func ParseBizStatusErr(strInfo map[string]string) (kerrors.BizStatusErrorIface, error) {
-	if code, err := strconv.Atoi(strInfo[bizStatus]); err == nil && code != 0 {
+	if code, err := strconv.ParseInt(strInfo[bizStatus], 10, 32); err == nil && code != 0 {
 		if bizExtra := strInfo[bizExtra]; bizExtra != "" {
 			extra, err := utils.JSONStr2Map(bizExtra)
 			if err != nil {

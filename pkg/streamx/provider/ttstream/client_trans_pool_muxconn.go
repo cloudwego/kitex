@@ -18,14 +18,12 @@ package ttstream
 
 import (
 	"errors"
-	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/cloudwego/netpoll"
-	"golang.org/x/sync/singleflight"
 
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
@@ -49,17 +47,19 @@ type muxConnTransList struct {
 	cursor     uint32
 	transports []*transport
 	pool       transPool
-	sf         singleflight.Group
 }
 
 func newMuxConnTransList(size int, pool transPool) *muxConnTransList {
 	tl := new(muxConnTransList)
-	if size == 0 {
+	if size <= 0 {
 		size = runtime.GOMAXPROCS(0)
 	}
 	tl.size = size
 	tl.transports = make([]*transport, size)
 	tl.pool = pool
+	runtime.SetFinalizer(tl, func(tl *muxConnTransList) {
+		tl.Close()
+	})
 	return tl
 }
 
@@ -76,38 +76,44 @@ func (tl *muxConnTransList) Close() {
 }
 
 func (tl *muxConnTransList) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (*transport, error) {
+	// fast path
 	idx := atomic.AddUint32(&tl.cursor, 1) % uint32(tl.size)
 	tl.L.RLock()
 	trans := tl.transports[idx]
 	tl.L.RUnlock()
-	if trans != nil && trans.IsActive() {
-		return trans, nil
+	if trans != nil {
+		if trans.IsActive() {
+			return trans, nil
+		}
+		_ = trans.Close(nil)
 	}
 
-	v, err, _ := tl.sf.Do(fmt.Sprintf("%d", idx), func() (interface{}, error) {
-		conn, err := dialer.DialConnection(network, addr, time.Second)
-		if err != nil {
-			return nil, err
-		}
-		trans := newTransport(clientTransport, sinfo, conn, tl.pool)
-		_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
-			// peer close
-			_ = trans.Close(terrors.ErrTransport.WithCause(errors.New("connection closed by peer")))
-			return nil
-		})
-		runtime.SetFinalizer(trans, func(trans *transport) {
-			// self close when not hold by user
-			_ = trans.Close(nil)
-		})
-		tl.L.Lock()
-		tl.transports[idx] = trans
+	// slow path
+	tl.L.Lock()
+	trans = tl.transports[idx]
+	if trans != nil && trans.IsActive() {
+		// another goroutine already create the new transport
 		tl.L.Unlock()
 		return trans, nil
-	})
+	}
+	// it may create more than tl.size transport if multi client try to get transport concurrently
+	conn, err := dialer.DialConnection(network, addr, time.Second)
 	if err != nil {
 		return nil, err
 	}
-	trans = v.(*transport)
+	trans = newTransport(clientTransport, sinfo, conn, tl.pool)
+	_ = conn.AddCloseCallback(func(connection netpoll.Connection) error {
+		// peer close
+		_ = trans.Close(terrors.ErrTransport.WithCause(errors.New("connection closed by peer")))
+		return nil
+	})
+	runtime.SetFinalizer(trans, func(trans *transport) {
+		// self close when not hold by user
+		_ = trans.Close(nil)
+	})
+	tl.transports[idx] = trans
+	tl.L.Unlock()
+
 	return trans, nil
 }
 
@@ -121,56 +127,51 @@ type muxConnTransPool struct {
 	config      MuxConnConfig
 	pool        sync.Map // addr:*muxConnTransList
 	activity    sync.Map // addr:lastActive
-	sflight     singleflight.Group
-	cleanerOnce sync.Once
+	cleanerOnce int32
 }
 
 func (p *muxConnTransPool) Get(sinfo *serviceinfo.ServiceInfo, network, addr string) (trans *transport, err error) {
 	v, ok := p.pool.Load(addr)
-	if ok {
-		return v.(*muxConnTransList).Get(sinfo, network, addr)
-	}
-
-	v, err, _ = p.sflight.Do(addr, func() (interface{}, error) {
-		transList := newMuxConnTransList(p.config.PoolSize, p)
-		p.pool.Store(addr, transList)
-		return transList, nil
-	})
-	if err != nil {
-		return nil, err
+	if !ok {
+		// multi concurrent Get should get the same TransList object
+		v, _ = p.pool.LoadOrStore(addr, newMuxConnTransList(p.config.PoolSize, p))
 	}
 	return v.(*muxConnTransList).Get(sinfo, network, addr)
 }
 
 func (p *muxConnTransPool) Put(trans *transport) {
 	p.activity.Store(trans.conn.RemoteAddr().String(), time.Now())
-	p.cleanerOnce.Do(func() {
-		internal := p.config.MaxIdleTimeout
-		if internal == 0 {
-			return
-		}
-		go func() {
-			for {
-				now := time.Now()
-				count := 0
-				p.activity.Range(func(addr, value interface{}) bool {
-					count++
-					lastActive := value.(time.Time)
-					if lastActive.IsZero() || now.Sub(lastActive) < p.config.MaxIdleTimeout {
-						return true
-					}
-					v, _ := p.pool.Load(addr)
-					if v == nil {
-						return true
-					}
-					transList := v.(*muxConnTransList)
-					p.pool.Delete(addr)
-					p.activity.Delete(addr)
-					transList.Close()
+
+	idleTimeout := p.config.MaxIdleTimeout
+	if idleTimeout == 0 {
+		return
+	}
+	if !atomic.CompareAndSwapInt32(&p.cleanerOnce, 0, 1) {
+		return
+	}
+	// start cleaning background goroutine
+	go func() {
+		for {
+			now := time.Now()
+			count := 0
+			p.activity.Range(func(key, value interface{}) bool {
+				addr := key.(string)
+				count++
+				lastActive := value.(time.Time)
+				idleTime := now.Sub(lastActive)
+				if lastActive.IsZero() || idleTime < 0 || now.Sub(lastActive) < idleTimeout {
 					return true
-				})
-				time.Sleep(internal)
-			}
-		}()
-	})
+				}
+				// clean transport
+				v, _ := p.pool.Load(addr)
+				if v == nil {
+					return true
+				}
+				p.pool.Delete(addr)
+				p.activity.Delete(addr)
+				return true
+			})
+			time.Sleep(idleTimeout)
+		}
+	}()
 }
