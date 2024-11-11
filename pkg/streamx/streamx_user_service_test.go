@@ -62,13 +62,13 @@ func (si *testService) setHeaderAndTrailer(stream streamx.ServerStreamMetadata) 
 
 func (si *testService) PingPong(ctx context.Context, req *Request) (*Response, error) {
 	resp := &Response{Type: req.Type, Message: req.Message}
-	klog.Infof("Server PingPong: req={%v} resp={%v}", req, resp)
+	klog.Debugf("Server PingPong: req={%v} resp={%v}", req, resp)
 	return resp, nil
 }
 
 func (si *testService) Unary(ctx context.Context, req *Request) (*Response, error) {
 	resp := &Response{Type: req.Type, Message: req.Message}
-	klog.Infof("Server Unary: req={%v} resp={%v}", req, resp)
+	klog.Debugf("Server Unary: req={%v} resp={%v}", req, resp)
 	return resp, nil
 }
 
@@ -76,8 +76,8 @@ func (si *testService) ClientStream(ctx context.Context,
 	stream streamx.ClientStreamingServer[Request, Response],
 ) (*Response, error) {
 	var msg string
-	klog.Infof("Server ClientStream start")
-	defer klog.Infof("Server ClientStream end")
+	klog.Debugf("Server ClientStream start")
+	defer klog.Debugf("Server ClientStream end")
 
 	if err := si.setHeaderAndTrailer(stream); err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (si *testService) ClientStream(ctx context.Context,
 func (si *testService) ServerStream(ctx context.Context, req *Request,
 	stream streamx.ServerStreamingServer[Response],
 ) error {
-	klog.Infof("Server ServerStream: req={%v}", req)
+	klog.Debugf("Server ServerStream: req={%v}", req)
 
 	if err := si.setHeaderAndTrailer(stream); err != nil {
 		return err
@@ -114,7 +114,7 @@ func (si *testService) ServerStream(ctx context.Context, req *Request,
 		if err != nil {
 			return err
 		}
-		klog.Infof("Server ServerStream: send resp={%v}", resp)
+		klog.Debugf("Server ServerStream: send resp={%v}", resp)
 	}
 	return nil
 }
@@ -165,7 +165,7 @@ func buildErr(req *Request) error {
 
 func (si *testService) UnaryWithErr(ctx context.Context, req *Request) (*Response, error) {
 	err := buildErr(req)
-	klog.Infof("Server UnaryWithErr: req={%v} err={%v}", req, err)
+	klog.Debugf("Server UnaryWithErr: req={%v} err={%v}", req, err)
 	return nil, err
 }
 
@@ -176,13 +176,13 @@ func (si *testService) ClientStreamWithErr(ctx context.Context, stream streamx.C
 		return nil, err
 	}
 	err = buildErr(req)
-	klog.Infof("Server ClientStreamWithErr: req={%v} err={%v}", req, err)
+	klog.Debugf("Server ClientStreamWithErr: req={%v} err={%v}", req, err)
 	return nil, err
 }
 
 func (si *testService) ServerStreamWithErr(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error {
 	err := buildErr(req)
-	klog.Infof("Server ServerStreamWithErr: req={%v} err={%v}", req, err)
+	klog.Debugf("Server ServerStreamWithErr: req={%v} err={%v}", req, err)
 	return err
 }
 
@@ -193,6 +193,6 @@ func (si *testService) BidiStreamWithErr(ctx context.Context, stream streamx.Bid
 		return err
 	}
 	err = buildErr(req)
-	klog.Infof("Server BidiStreamWithErr: req={%v} err={%v}", req, err)
+	klog.Debugf("Server BidiStreamWithErr: req={%v} err={%v}", req, err)
 	return err
 }
