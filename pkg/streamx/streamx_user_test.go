@@ -552,10 +552,6 @@ func TestStreamingBasic(t *testing.T) {
 			t.Logf("=== Timeout by Ctx ===")
 			ctx, bs, err := cli.BidiStream(octx)
 			test.Assert(t, err == nil, err)
-			req = new(Request)
-			req.Message = string(make([]byte, 1024))
-			err = bs.Send(ctx, req)
-			test.Assert(t, err == nil, err)
 			nctx, cancel := context.WithCancel(ctx)
 			cancel()
 			_, err = bs.Recv(nctx)
@@ -573,10 +569,6 @@ func TestStreamingBasic(t *testing.T) {
 				streamxclient.WithStreamRecvTimeout(time.Nanosecond),
 			)
 			ctx, bs, err = cli.BidiStream(octx)
-			test.Assert(t, err == nil, err)
-			req = new(Request)
-			req.Message = string(make([]byte, 1024))
-			err = bs.Send(ctx, req)
 			test.Assert(t, err == nil, err)
 			_, err = bs.Recv(ctx)
 			test.Assert(t, err != nil, err)
@@ -720,7 +712,6 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			for i := 0; i < streams; i++ {
 				streamList[i] = nil
 			}
-			streamList = nil
 			for runtime.NumGoroutine() > ngBefore {
 				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
 				runtime.GC()
