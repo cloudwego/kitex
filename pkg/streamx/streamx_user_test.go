@@ -37,7 +37,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/transport"
 
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 
 	"github.com/cloudwego/kitex/client/streamxclient"
@@ -69,7 +68,6 @@ func TestMain(m *testing.M) {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
-	klog.SetLevel(klog.LevelDebug)
 	m.Run()
 }
 
