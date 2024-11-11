@@ -132,6 +132,9 @@ func (a *Arguments) buildFlags(version string) *flag.FlagSet {
 		"Use local thriftgo exec instead of kitex embedded thriftgo.")
 	f.Var(&a.BuiltinTpl, "tpl", "Specify kitex built-in template.")
 
+	f.BoolVar(&a.GenFrugal, "gen_frugal", false, `Gen frugal codec for those structs with (go.codec="frugal")`)
+	f.Var(&a.FrugalStruct, "frugal_struct", "Gen frugal codec for given struct")
+
 	a.RecordCmd = os.Args
 	a.Version = version
 	a.ThriftOptions = append(a.ThriftOptions,

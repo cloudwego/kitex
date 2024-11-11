@@ -146,6 +146,9 @@ type Config struct {
 	Rapid             bool
 	LocalThriftgo     bool
 
+	GenFrugal    bool
+	FrugalStruct util.StringSlice
+
 	BuiltinTpl util.StringSlice // specify the built-in template to use
 }
 
