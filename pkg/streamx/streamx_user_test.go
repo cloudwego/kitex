@@ -61,7 +61,7 @@ func init() {
 	providerTestCases = append(providerTestCases, testCase{Name: "TTHeader_LongConn", ClientProvider: cp, ServerProvider: sp})
 	cp, _ = ttstream.NewClientProvider(testServiceInfo, ttstream.WithClientShortConnPool())
 	providerTestCases = append(providerTestCases, testCase{Name: "TTHeader_ShortConn", ClientProvider: cp, ServerProvider: sp})
-	cp, _ = ttstream.NewClientProvider(testServiceInfo, ttstream.WithClientMuxConnPool(ttstream.MuxConnConfig{PoolSize: 8, MaxIdleTimeout: time.Millisecond * 1000}))
+	cp, _ = ttstream.NewClientProvider(testServiceInfo, ttstream.WithClientMuxConnPool(ttstream.MuxConnConfig{PoolSize: 8, MaxIdleTimeout: time.Millisecond * 100}))
 	providerTestCases = append(providerTestCases, testCase{Name: "TTHeader_Mux", ClientProvider: cp, ServerProvider: sp})
 }
 
@@ -720,6 +720,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			for i := 0; i < streams; i++ {
 				streamList[i] = nil
 			}
+			streamList = nil
 			for runtime.NumGoroutine() > ngBefore {
 				t.Logf("ngCurrent=%d > ngBefore=%d", runtime.NumGoroutine(), ngBefore)
 				runtime.GC()
