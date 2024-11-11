@@ -166,7 +166,15 @@ func (c *defaultCodec) DecodeMeta(ctx context.Context, message remote.Message, i
 			return perrors.NewProtocolErrorWithErrMsg(err, fmt.Sprintf("meshHeader read payload first 8 byte failed: %s", err.Error()))
 		}
 	}
-	return checkPayload(flagBuf, message, in, isTTHeader, c.maxSize)
+	err = checkPayload(flagBuf, message, in, isTTHeader, c.maxSize)
+	if err != nil {
+		buf, _ := in.Peek(in.ReadableLen())
+		return perrors.NewProtocolErrorWithMsg(
+			fmt.Sprintf(
+				"[%s] invalid packet: %s", err.Error(), string(buf),
+			))
+	}
+	return nil
 }
 
 // DecodePayload decode payload
