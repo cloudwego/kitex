@@ -17,6 +17,7 @@
 package ttstream
 
 import (
+	"context"
 	"errors"
 	"runtime"
 	"sync"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream/terrors"
 )
@@ -150,7 +152,7 @@ func (p *muxConnTransPool) Put(trans *transport) {
 		return
 	}
 	// start cleaning background goroutine
-	go func() {
+	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
 		for {
 			now := time.Now()
 			count := 0
@@ -173,5 +175,5 @@ func (p *muxConnTransPool) Put(trans *transport) {
 			})
 			time.Sleep(idleTimeout)
 		}
-	}()
+	}, gofunc.NewBasicInfo("", trans.Addr().String()))
 }
