@@ -24,11 +24,11 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/cloudwego/gopkg/bufiox"
 	"github.com/cloudwego/netpoll"
 
+	"github.com/cloudwego/kitex/pkg/gofunc"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
@@ -63,9 +63,8 @@ type transport struct {
 }
 
 func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Connection, pool transPool) *transport {
-	// stream max idle session is 10 minutes.
 	// TODO: let it configurable
-	_ = conn.SetReadTimeout(time.Minute * 10)
+	_ = conn.SetReadTimeout(0)
 	t := &transport{
 		kind:          kind,
 		sinfo:         sinfo,
@@ -77,32 +76,38 @@ func newTransport(kind int32, sinfo *serviceinfo.ServiceInfo, conn netpoll.Conne
 		fpipe:         container.NewPipe[*Frame](),
 		closedTrigger: make(chan struct{}, 2),
 	}
-	go func() {
+	addr := ""
+	if t.Addr() != nil {
+		addr = t.Addr().String()
+	}
+	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
+		var err error
 		defer func() {
+			if err != nil {
+				if !isIgnoreError(err) {
+					klog.Warnf("transport[%d-%s] loop read err: %v", t.kind, t.Addr(), err)
+				}
+				// if connection is closed by peer, loop read should return ErrConnClosed error,
+				// so we should close transport here
+				_ = t.Close(err)
+			}
 			t.closedTrigger <- struct{}{}
 		}()
-		err := t.loopRead()
-		if err != nil {
-			if !isIgnoreError(err) {
-				klog.Warnf("transport[%d-%s] loop read err: %v", t.kind, t.Addr(), err)
-			}
-			// if connection is closed by peer, loop read should return ErrConnClosed error,
-			// so we should close transport here
-			_ = t.Close(err)
-		}
-	}()
-	go func() {
+		err = t.loopRead()
+	}, gofunc.NewBasicInfo(sinfo.ServiceName, addr))
+	gofunc.RecoverGoFuncWithInfo(context.Background(), func() {
+		var err error
 		defer func() {
+			if err != nil {
+				if !isIgnoreError(err) {
+					klog.Warnf("transport[%d-%s] loop write err: %v", t.kind, t.Addr(), err)
+				}
+				_ = t.Close(err)
+			}
 			t.closedTrigger <- struct{}{}
 		}()
-		err := t.loopWrite()
-		if err != nil {
-			if !isIgnoreError(err) {
-				klog.Warnf("transport[%d-%s] loop write err: %v", t.kind, t.Addr(), err)
-			}
-			_ = t.Close(err)
-		}
-	}()
+		err = t.loopWrite()
+	}, gofunc.NewBasicInfo(sinfo.ServiceName, addr))
 	return t
 }
 
