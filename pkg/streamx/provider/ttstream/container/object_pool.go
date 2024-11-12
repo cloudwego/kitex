@@ -17,9 +17,12 @@
 package container
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/cloudwego/kitex/pkg/gofunc"
 )
 
 type Object interface {
@@ -35,7 +38,7 @@ func NewObjectPool(idleTimeout time.Duration) *ObjectPool {
 	s := new(ObjectPool)
 	s.idleTimeout = idleTimeout
 	s.objects = make(map[string]*Stack[objectItem])
-	go s.cleaning()
+	gofunc.RecoverGoFuncWithInfo(context.Background(), s.cleaning, gofunc.NewBasicInfo("", ""))
 	return s
 }
 
