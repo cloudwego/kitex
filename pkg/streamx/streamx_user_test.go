@@ -127,6 +127,11 @@ func TestStreamingBasic(t *testing.T) {
 				atomic.StoreInt32(&serverRecvCount, 0)
 				atomic.StoreInt32(&serverSendCount, 0)
 			}
+			waitServerStreamDone := func(streamCount int) {
+				for atomic.LoadInt32(&serverStreamCount) < int32(streamCount) {
+					runtime.Gosched()
+				}
+			}
 			addr, svr, err := NewTestServer(
 				new(testService),
 				server.WithMiddleware(func(next endpoint.Endpoint) endpoint.Endpoint {
@@ -324,6 +329,7 @@ func TestStreamingBasic(t *testing.T) {
 					test.Assert(t, req.Message == res.Message, res.Message)
 				}()
 			}
+			waitServerStreamDone(concurrency)
 			wg.Wait()
 			test.DeepEqual(t, atomic.LoadInt32(&serverMiddlewareCount), int32(concurrency))
 			test.DeepEqual(t, atomic.LoadInt32(&clientMiddlewareCount), int32(concurrency))
@@ -357,6 +363,7 @@ func TestStreamingBasic(t *testing.T) {
 					testHeaderAndTrailer(t, cs)
 				}()
 			}
+			waitServerStreamDone(concurrency)
 			wg.Wait()
 			untilEqual(t, &serverStreamCount, int32(concurrency), time.Second)
 			test.DeepEqual(t, atomic.LoadInt32(&serverMiddlewareCount), int32(concurrency))
@@ -393,6 +400,7 @@ func TestStreamingBasic(t *testing.T) {
 					testHeaderAndTrailer(t, ss)
 				}()
 			}
+			waitServerStreamDone(concurrency)
 			wg.Wait()
 			untilEqual(t, &serverStreamCount, int32(concurrency), time.Second)
 			test.DeepEqual(t, atomic.LoadInt32(&serverMiddlewareCount), int32(concurrency))
@@ -443,6 +451,7 @@ func TestStreamingBasic(t *testing.T) {
 					testHeaderAndTrailer(t, bs)
 				}()
 			}
+			waitServerStreamDone(concurrency)
 			wg.Wait()
 			untilEqual(t, &serverStreamCount, int32(concurrency), time.Second)
 			untilEqual(t, &clientStreamCount, int32(concurrency), time.Second)
