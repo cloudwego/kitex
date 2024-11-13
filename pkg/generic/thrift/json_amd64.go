@@ -50,9 +50,9 @@ func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{
 	if fnDsc == nil {
 		return fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, m.svcDsc.DynamicGoDsc.Name())
 	}
-	dynamicgoTypeDsc := fnDsc.Request()
+	dynamicgoTypeDsc := fnDsc.StructWrappedRequest()
 	if !isClient {
-		dynamicgoTypeDsc = fnDsc.Response()
+		dynamicgoTypeDsc = fnDsc.StructWrappedResponse()
 	}
 	hasRequestBase := fnDsc.HasRequestBase() && isClient
 
@@ -70,7 +70,7 @@ func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{
 
 	// msg is void or nil
 	if _, ok := msg.(descriptor.Void); ok || msg == nil {
-		return writeFields(ctx, out, dynamicgoTypeDsc, nil, nil, isClient)
+		return writeFields(ctx, out, dynamicgoTypeDsc.TypeDescriptor(), nil, nil, isClient)
 	}
 
 	// msg is string
@@ -80,12 +80,10 @@ func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{
 	}
 	transBuff := utils.StringToSliceByte(s)
 
-	if isStreaming(m.svcDsc.Functions[method].StreamingMode) {
-		// unwrap one struct layer
-		dynamicgoTypeDsc = dynamicgoTypeDsc.Struct().FieldById(dthrift.FieldID(getStreamingFieldID(isClient, true))).Type()
-		return writeStreamingContentWithDynamicgo(ctx, out, dynamicgoTypeDsc, &cv, transBuff)
+	if !dynamicgoTypeDsc.IsWrapped() {
+		return writeStreamingContentWithDynamicgo(ctx, out, dynamicgoTypeDsc.TypeDescriptor(), &cv, transBuff)
 	} else {
-		return writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient)
+		return writeFields(ctx, out, dynamicgoTypeDsc.TypeDescriptor(), &cv, transBuff, isClient)
 	}
 }
 

@@ -252,7 +252,7 @@ func TestFallback(t *testing.T) {
 	test.Assert(t, pd.Option().DynamicGoEnabled)
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Functions["BinaryEcho"].Request.Struct.FieldsByName["req"].Type.Struct.FieldsByID[int32(1)].Alias == "STR")
+	test.Assert(t, tree.Functions["BinaryEcho"].Request.TyDsc.Struct.FieldsByName["req"].Type.Struct.FieldsByID[int32(1)].Alias == "STR")
 	test.Assert(t, tree.DynamicGoDsc != nil)
 }
 
@@ -262,35 +262,35 @@ func TestDisableGoTag(t *testing.T) {
 	test.Assert(t, err == nil)
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Functions["BizMethod1"].Request.Struct.FieldsByName["req"].Type.Struct.FieldsByID[5].Type.Struct.FieldsByID[1].FieldName() == "MyID")
+	test.Assert(t, tree.Functions["BizMethod1"].Request.TyDsc.Struct.FieldsByName["req"].Type.Struct.FieldsByID[5].Type.Struct.FieldsByID[1].FieldName() == "MyID")
 	p.Close()
 
 	p, err = NewThriftFileProviderWithOption(path, []ThriftIDLProviderOption{WithGoTagDisabled(true)})
 	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Functions["BizMethod1"].Request.Struct.FieldsByName["req"].Type.Struct.FieldsByID[5].Type.Struct.FieldsByID[1].FieldName() == "id")
+	test.Assert(t, tree.Functions["BizMethod1"].Request.TyDsc.Struct.FieldsByName["req"].Type.Struct.FieldsByID[5].Type.Struct.FieldsByID[1].FieldName() == "id")
 	p.Close()
 
 	p, err = NewThriftFileProviderWithOption(path, []ThriftIDLProviderOption{WithGoTagDisabled(false)})
 	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Functions["BizMethod1"].Request.Struct.FieldsByName["req"].Type.Struct.FieldsByID[5].Type.Struct.FieldsByID[1].FieldName() == "MyID")
+	test.Assert(t, tree.Functions["BizMethod1"].Request.TyDsc.Struct.FieldsByName["req"].Type.Struct.FieldsByID[5].Type.Struct.FieldsByID[1].FieldName() == "MyID")
 	p.Close()
 
 	p, err = NewThriftContentProvider(testServiceContent, nil)
 	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Functions["Example2Method"].Request.Struct.FieldsByName["req"].Type.Struct.FieldsByID[1].FieldName() == "message")
+	test.Assert(t, tree.Functions["Example2Method"].Request.TyDsc.Struct.FieldsByName["req"].Type.Struct.FieldsByID[1].FieldName() == "message")
 	p.Close()
 
 	p, err = NewThriftContentProvider(testServiceContent, nil, WithGoTagDisabled(true))
 	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Functions["Example2Method"].Request.Struct.FieldsByName["req"].Type.Struct.FieldsByID[1].FieldName() == "Msg")
+	test.Assert(t, tree.Functions["Example2Method"].Request.TyDsc.Struct.FieldsByName["req"].Type.Struct.FieldsByID[1].FieldName() == "Msg")
 	p.Close()
 
 	path = "json_test/idl/example_multi_service.thrift"
@@ -299,16 +299,16 @@ func TestDisableGoTag(t *testing.T) {
 	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Functions["Example2Method"].Response.Struct.FieldsByID[0].Type.Struct.FieldsByID[1].FieldName() == "message")
-	test.Assert(t, tree.Functions["Example2Method"].Response.Struct.FieldsByID[1].Type.Struct.FieldsByID[255].FieldName() == "excMsg")
+	test.Assert(t, tree.Functions["Example2Method"].Response.TyDsc.Struct.FieldsByID[0].Type.Struct.FieldsByID[1].FieldName() == "message")
+	test.Assert(t, tree.Functions["Example2Method"].Response.TyDsc.Struct.FieldsByID[1].Type.Struct.FieldsByID[255].FieldName() == "excMsg")
 	p.Close()
 
 	p, err = NewThriftContentWithAbsIncludePathProvider(path, includes, WithGoTagDisabled(true))
 	test.Assert(t, err == nil)
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
-	test.Assert(t, tree.Functions["Example2Method"].Response.Struct.FieldsByID[0].Type.Struct.FieldsByID[1].FieldName() == "Msg")
-	test.Assert(t, tree.Functions["Example2Method"].Response.Struct.FieldsByID[1].Type.Struct.FieldsByID[255].FieldName() == "msg")
+	test.Assert(t, tree.Functions["Example2Method"].Response.TyDsc.Struct.FieldsByID[0].Type.Struct.FieldsByID[1].FieldName() == "Msg")
+	test.Assert(t, tree.Functions["Example2Method"].Response.TyDsc.Struct.FieldsByID[1].Type.Struct.FieldsByID[255].FieldName() == "msg")
 	p.Close()
 }
 
@@ -522,7 +522,7 @@ func TestDefaultValue(t *testing.T) {
 	tree := <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.DynamicGoDsc != nil)
-	test.Assert(t, tree.Functions["BinaryEcho"].Request.Struct.FieldsByID[1].Type.Struct.FieldsByID[4].DefaultValue == "echo")
+	test.Assert(t, tree.Functions["BinaryEcho"].Request.TyDsc.Struct.FieldsByID[1].Type.Struct.FieldsByID[4].DefaultValue == "echo")
 	test.Assert(t, tree.DynamicGoDsc.Functions()["BinaryEcho"].Request().Struct().FieldById(1).Type().Struct().FieldById(4).DefaultValue().JSONValue() == `"echo"`)
 	p.Close()
 
@@ -532,7 +532,7 @@ func TestDefaultValue(t *testing.T) {
 	tree = <-p.Provide()
 	test.Assert(t, tree != nil)
 	test.Assert(t, tree.Name == "Example2Service")
-	test.Assert(t, tree.Functions["Example2Method"].Request.Struct.FieldsByID[1].Type.Struct.FieldsByID[4].DefaultValue == uint8(8))
+	test.Assert(t, tree.Functions["Example2Method"].Request.TyDsc.Struct.FieldsByID[1].Type.Struct.FieldsByID[4].DefaultValue == uint8(8))
 	test.Assert(t, tree.DynamicGoDsc.Name() == "Example2Service")
 	test.Assert(t, tree.DynamicGoDsc.Functions()["Example2Method"].Request().Struct().FieldById(1).Type().Struct().FieldById(4).DefaultValue().JSONValue() == "8")
 	p.Close()

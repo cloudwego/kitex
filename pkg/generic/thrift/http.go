@@ -94,7 +94,7 @@ func (w *WriteHTTPRequest) originalWrite(ctx context.Context, out bufiox.Writer,
 		requestBase = nil
 	}
 	bw := thrift.NewBufferWriter(out)
-	err = wrapStructWriter(ctx, req, bw, fn.Request, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
+	err = wrapStructWriter(ctx, req, bw, fn.Request.TyDsc, &writerOption{requestBase: requestBase, binaryWithBase64: w.binaryWithBase64})
 	bw.Recycle()
 	return err
 }
@@ -190,7 +190,7 @@ func (r *ReadHTTPResponse) originalRead(ctx context.Context, method string, in b
 	fDsc := fnDsc.Response
 	br := thrift.NewBufferReader(in)
 	defer br.Recycle()
-	resp, err := skipStructReader(ctx, br, fDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
+	resp, err := skipStructReader(ctx, br, fDsc.TyDsc, &readerOption{forJSON: true, http: true, binaryWithBase64: r.base64Binary})
 	if r.useRawBodyForHTTPResp {
 		if httpResp, ok := resp.(*descriptor.HTTPResponse); ok && httpResp.Body != nil {
 			rawBody, err := customJson.Marshal(httpResp.Body)

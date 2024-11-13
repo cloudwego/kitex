@@ -93,10 +93,15 @@ func (d *StructDescriptor) CheckRequired(rw map[int32]struct{}) error {
 type FunctionDescriptor struct {
 	Name           string
 	Oneway         bool
-	Request        *TypeDescriptor
-	Response       *TypeDescriptor
+	Request        *StructWrappedTypeDescriptor
+	Response       *StructWrappedTypeDescriptor
 	HasRequestBase bool
 	StreamingMode  serviceinfo.StreamingMode
+}
+
+type StructWrappedTypeDescriptor struct {
+	TyDsc     *TypeDescriptor
+	IsWrapped bool
 }
 
 // ServiceDescriptor idl service descriptor
