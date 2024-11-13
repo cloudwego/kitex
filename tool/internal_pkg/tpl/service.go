@@ -171,7 +171,7 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 {{- $clientSide := and .ClientStreaming (not .ServerStreaming)}}
 {{- $serverSide := and (not .ClientStreaming) .ServerStreaming}}
 {{- $bidiSide := and .ClientStreaming .ServerStreaming}}
-{{- $arg := index .Args 0}}
+{{- $arg := ""}}
 {{- $handlerFunc := ""}}
 {{- $mode := ""}}
     {{- if $streamingUnary -}} {{- $mode = "serviceinfo.StreamingUnary" }} {{- $handlerFunc = "InvokeUnaryHandler" }}
@@ -179,7 +179,7 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
     {{- else if $clientSide -}} {{- $mode = "serviceinfo.StreamingClient" }} {{- $handlerFunc = "InvokeClientStreamHandler" }}
     {{- else if $bidiSide -}} {{- $mode = "serviceinfo.StreamingBidirectional" }} {{- $handlerFunc = "InvokeBidiStreamHandler" }}
     {{- end}}
-{{- if or (eq $.Codec "protobuf") ($isStreaming) }}
+{{- if or (eq $.Codec "protobuf") ($isStreaming) (.Streaming.IsStreaming) }}
 {{- $arg = index .Args 0}}{{/* streaming api only supports exactly one argument */}}
 {{- end}}
 
