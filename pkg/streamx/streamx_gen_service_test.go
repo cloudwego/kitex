@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"github.com/cloudwego/kitex/client"
+	"github.com/cloudwego/kitex/client/callopt"
 	"github.com/cloudwego/kitex/client/streamxclient"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -84,7 +85,7 @@ var testServiceInfo = &serviceinfo.ServiceInfo{
 		),
 		"ServerStream": serviceinfo.NewMethodInfo(
 			func(ctx context.Context, handler, reqArgs, resArgs interface{}) error {
-				return streamxserver.InvokeServerStreamHandler(
+				return streamxserver.InvokeServerStreamHandler[Request, Response](
 					ctx, reqArgs.(streamx.StreamReqArgs), resArgs.(streamx.StreamResArgs),
 					func(ctx context.Context, req *Request, stream streamx.ServerStreamingServer[Response]) error {
 						return handler.(TestService).ServerStream(ctx, req, stream)
@@ -215,7 +216,7 @@ type TestService interface {
 
 // --- Define Client Implementation Interface ---
 type TestServiceClient interface {
-	PingPong(ctx context.Context, req *Request) (r *Response, err error)
+	PingPong(ctx context.Context, req *Request, callOptions ...callopt.Option) (r *Response, err error)
 
 	Unary(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (r *Response, err error)
 	ClientStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
@@ -241,7 +242,7 @@ type kClient struct {
 	streamer client.StreamX
 }
 
-func (c *kClient) PingPong(ctx context.Context, req *Request) (r *Response, err error) {
+func (c *kClient) PingPong(ctx context.Context, req *Request, callOptions ...callopt.Option) (r *Response, err error) {
 	var _args ServerPingPongArgs
 	_args.Req = req
 	var _result ServerPingPongResult
