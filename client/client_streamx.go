@@ -25,11 +25,11 @@ import (
 )
 
 type StreamX interface {
-	NewStream(ctx context.Context, method string, req any, streamArgs streamx.StreamArgs, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error)
+	NewStream(ctx context.Context, method string, streamArgs streamx.StreamArgs, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error)
 }
 
 // NewStream create stream for streamx mode
-func (kc *kClient) NewStream(ctx context.Context, method string, req any, streamArgs streamx.StreamArgs, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error) {
+func (kc *kClient) NewStream(ctx context.Context, method string, streamArgs streamx.StreamArgs, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error) {
 	if !kc.inited {
 		panic("client not initialized")
 	}
@@ -61,10 +61,10 @@ func (kc *kClient) NewStream(ctx context.Context, method string, req any, stream
 		msargs.SetStreamRecvMiddleware(kc.sxStreamRecvMW)
 		msargs.SetStreamSendMiddleware(kc.sxStreamSendMW)
 	}
-	// put streamArgs into response arg
+	// with streamx mode, req is nil and resp is streamArgs
 	// it's an ugly trick but if we don't want to refactor too much,
-	// this is the only way to compatible with current endpoint design
-	err = kc.sEps(ctx, req, streamArgs)
+	// this is the only way to compatible with current endpoint API.
+	err = kc.sEps(ctx, nil, streamArgs)
 	if err != nil {
 		return nil, nil, err
 	}

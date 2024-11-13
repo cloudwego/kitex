@@ -42,7 +42,7 @@ func InvokeStream[Req, Res any](
 	}
 
 	// NewStream should register client middlewares into stream Args
-	ctx, cs, err := cli.NewStream(ctx, method, req, streamArgs, callOptions...)
+	ctx, cs, err := cli.NewStream(ctx, method, streamArgs, callOptions...)
 	if err != nil {
 		return nil, nil, err
 	}
