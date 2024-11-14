@@ -42,6 +42,11 @@ const StructLikeFastRead = `
 {{define "StructLikeFastRead"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) FastRead(buf []byte) (int, error) {
+{{- if UseFrugalForStruct .}}
+	{{- UseLib "github.com/cloudwego/frugal" "frugal"}}
+	return frugal.DecodeObject(buf, p)
+{{- else}}
+
 	var err error
 	var offset int
 	var l int
@@ -138,6 +143,7 @@ SkipFieldError:
 RequiredFieldNotSetError:
 	return offset, thrift.NewProtocolException(thrift.INVALID_DATA, fmt.Sprintf("required field %s is not set", fieldIDToName_{{$TypeName}}[fieldId]))
 {{- end}}{{/* if $NeedRequiredFieldNotSetError */}}
+{{- end}}{{/* frugal */}}
 }
 {{- end}}{{/* define "StructLikeFastRead" */}}
 `
@@ -218,6 +224,14 @@ const StructLikeFastWriteNocopy = `
 {{define "StructLikeFastWriteNocopy"}}
 {{- $TypeName := .GoName}}
 func (p *{{$TypeName}}) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
+{{- if UseFrugalForStruct .}}
+	{{- UseLib "github.com/cloudwego/frugal" "frugal"}}
+	n, err := frugal.EncodeObject(buf, w, p)
+	if err != nil {
+		return -1
+	}
+	return n
+{{- else}}
 	offset := 0
 	{{- if eq .Category "union"}}
 	var c int
@@ -242,6 +256,7 @@ func (p *{{$TypeName}}) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 CountSetFieldsError:
 	panic(fmt.Errorf("%T write union: exactly one field must be set (%d set).", p, c))
 {{- end}}
+{{- end}}{{/* frugal */}}
 }
 {{- end}}{{/* define "StructLikeFastWriteNocopy" */}}
 `
