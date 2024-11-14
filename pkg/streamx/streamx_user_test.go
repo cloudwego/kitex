@@ -35,7 +35,7 @@ import (
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient"
 	istreamxclient "github.com/cloudwego/kitex/internal/streamx/streamxclient"
-	istreamx "github.com/cloudwego/kitex/internal/streamx/streamxserver"
+	istreamxserver "github.com/cloudwego/kitex/internal/streamx/streamxserver"
 	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
@@ -157,7 +157,7 @@ func TestStreamingBasic(t *testing.T) {
 						return err
 					}
 				}),
-				istreamx.WithStreamMiddleware(
+				istreamxserver.WithStreamMiddleware(
 					// middleware example: server streaming mode
 					func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 						return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
@@ -202,6 +202,8 @@ func TestStreamingBasic(t *testing.T) {
 								err = next(ctx, streamArgs, reqArgs, resArgs)
 								test.Assert(t, reqArgs.Req() == nil)
 								test.Assert(t, resArgs.Res() == nil)
+							default:
+								t.Fatal("cannot get stream mode")
 							}
 
 							t.Logf("Server middleware after next: reqArgs=%v resArgs=%v streamArgs=%v err=%v",
@@ -281,6 +283,8 @@ func TestStreamingBasic(t *testing.T) {
 							case streamx.StreamingBidirectional:
 								test.Assert(t, reqArgs.Req() == nil)
 								test.Assert(t, resArgs.Res() == nil)
+							default:
+								t.Fatal("cannot get stream mode")
 							}
 						}
 						increaseIfNoError(&clientStreamCount, err)
@@ -664,7 +668,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			addr, svr, err := NewTestServer(
 				new(testService),
 				streamxserver.WithProvider(tc.ServerProvider),
-				istreamx.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
+				istreamxserver.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 					return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
 						atomic.AddInt32(&streamStarted, 1)
 						return next(ctx, streamArgs, reqArgs, resArgs)
