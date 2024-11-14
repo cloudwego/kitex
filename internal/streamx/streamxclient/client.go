@@ -17,33 +17,23 @@
 package streamxclient
 
 import (
-	"time"
+	"context"
 
+	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
 	internal_client "github.com/cloudwego/kitex/internal/client"
 	"github.com/cloudwego/kitex/pkg/streamx"
 	"github.com/cloudwego/kitex/pkg/utils"
 )
 
-func WithProvider(pvd streamx.ClientProvider) internal_client.Option {
-	return internal_client.Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.RemoteOpt.Provider = pvd
-	}}
+// StreamXClient implement a streamx interface client
+type StreamXClient interface {
+	NewStream(ctx context.Context, method string, streamArgs streamx.StreamArgs, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error)
 }
 
-func WithStreamRecvTimeout(timeout time.Duration) internal_client.Option {
+// WithStreamMiddleware currently is not open for users to use for now
+// so it's include in internal package
+func WithStreamMiddleware(smw streamx.StreamMiddleware) internal_client.Option {
 	return internal_client.Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.StreamX.RecvTimeout = timeout
-	}}
-}
-
-func WithStreamRecvMiddleware(smw streamx.StreamRecvMiddleware) internal_client.Option {
-	return internal_client.Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.StreamX.StreamRecvMWs = append(o.StreamX.StreamRecvMWs, smw)
-	}}
-}
-
-func WithStreamSendMiddleware(smw streamx.StreamSendMiddleware) internal_client.Option {
-	return internal_client.Option{F: func(o *internal_client.Options, di *utils.Slice) {
-		o.StreamX.StreamSendMWs = append(o.StreamX.StreamSendMWs, smw)
+		o.StreamX.StreamMWs = append(o.StreamX.StreamMWs, smw)
 	}}
 }

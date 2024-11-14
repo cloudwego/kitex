@@ -33,17 +33,17 @@ import (
 	"github.com/cloudwego/netpoll"
 
 	"github.com/cloudwego/kitex/client"
+	"github.com/cloudwego/kitex/client/streamxclient"
+	istreamxclient "github.com/cloudwego/kitex/internal/streamx/streamxclient"
+	istreamx "github.com/cloudwego/kitex/internal/streamx/streamxserver"
+	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
-	"github.com/cloudwego/kitex/transport"
-
-	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
-
-	"github.com/cloudwego/kitex/client/streamxclient"
-	"github.com/cloudwego/kitex/internal/test"
 	"github.com/cloudwego/kitex/pkg/streamx"
+	"github.com/cloudwego/kitex/pkg/streamx/provider/ttstream"
 	"github.com/cloudwego/kitex/server"
 	"github.com/cloudwego/kitex/server/streamxserver"
+	"github.com/cloudwego/kitex/transport"
 )
 
 var providerTestCases []testCase
@@ -157,16 +157,18 @@ func TestStreamingBasic(t *testing.T) {
 						return err
 					}
 				}),
-				streamxserver.WithStreamMiddleware(
+				istreamx.WithStreamMiddleware(
 					// middleware example: server streaming mode
 					func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 						return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+							ri := rpcinfo.GetRPCInfo(ctx)
+
 							t.Logf("Server middleware before next: reqArgs=%v resArgs=%v streamArgs=%v",
 								reqArgs.Req(), resArgs.Res(), streamArgs)
 							test.Assert(t, streamArgs.Stream() != nil)
 							test.Assert(t, validateMetadata(ctx))
 
-							switch streamArgs.Stream().Mode() {
+							switch ri.Invocation().StreamingMode() {
 							case streamx.StreamingUnary:
 								test.Assert(t, reqArgs.Req() != nil)
 								test.Assert(t, resArgs.Res() == nil)
@@ -253,8 +255,9 @@ func TestStreamingBasic(t *testing.T) {
 						return err
 					}
 				}),
-				streamxclient.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
+				istreamxclient.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 					return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
+						ri := rpcinfo.GetRPCInfo(ctx)
 						// validate ctx
 						test.Assert(t, validateMetadata(ctx))
 
@@ -262,7 +265,7 @@ func TestStreamingBasic(t *testing.T) {
 
 						test.Assert(t, streamArgs.Stream() != nil)
 						if err == nil {
-							switch streamArgs.Stream().Mode() {
+							switch ri.Invocation().StreamingMode() {
 							case streamx.StreamingUnary:
 								test.Assert(t, reqArgs.Req() != nil)
 								test.Assert(t, resArgs.Res() != nil)
@@ -610,7 +613,7 @@ func TestStreamingException(t *testing.T) {
 				client.WithHostPorts(addr),
 
 				streamxclient.WithProvider(tc.ClientProvider),
-				streamxclient.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
+				istreamxclient.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 					return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
 						ri := rpcinfo.GetRPCInfo(ctx)
 						test.Assert(t, ri.To().Address() != nil)
@@ -661,7 +664,7 @@ func TestStreamingGoroutineLeak(t *testing.T) {
 			addr, svr, err := NewTestServer(
 				new(testService),
 				streamxserver.WithProvider(tc.ServerProvider),
-				streamxserver.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
+				istreamx.WithStreamMiddleware(func(next streamx.StreamEndpoint) streamx.StreamEndpoint {
 					return func(ctx context.Context, streamArgs streamx.StreamArgs, reqArgs streamx.StreamReqArgs, resArgs streamx.StreamResArgs) (err error) {
 						atomic.AddInt32(&streamStarted, 1)
 						return next(ctx, streamArgs, reqArgs, resArgs)

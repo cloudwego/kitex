@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	istreamx "github.com/cloudwego/kitex/internal/streamx"
 	"github.com/cloudwego/kitex/internal/wpool"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/klog"
@@ -153,10 +154,13 @@ func (t *svrTransHandler) OnStream(ctx context.Context, conn net.Conn, ss stream
 	}()
 
 	ink := ri.Invocation().(rpcinfo.InvocationSetter)
-	ink.SetServiceName(ss.Service())
-	ink.SetMethodName(ss.Method())
-	if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
-		_ = mutableTo.SetMethod(ss.Method())
+	if si, ok := ss.(istreamx.StreamInfo); ok {
+		ink.SetServiceName(si.Service())
+		ink.SetMethodName(si.Method())
+		ink.SetStreamingMode(si.Mode())
+		if mutableTo := rpcinfo.AsMutableEndpointInfo(ri.To()); mutableTo != nil {
+			_ = mutableTo.SetMethod(si.Method())
+		}
 	}
 
 	ctx = t.startTracer(ctx, ri)

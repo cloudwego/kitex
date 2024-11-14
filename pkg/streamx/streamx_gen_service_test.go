@@ -195,7 +195,7 @@ func NewClient(destService string, opts ...client.Option) (TestServiceClient, er
 	if err != nil {
 		return nil, err
 	}
-	kc := &kClient{caller: cli, streamer: cli.(client.StreamX)}
+	kc := &kClient{caller: cli}
 	return kc, nil
 }
 
@@ -237,8 +237,7 @@ type TestServiceClient interface {
 var _ TestServiceClient = (*kClient)(nil)
 
 type kClient struct {
-	caller   client.Client
-	streamer client.StreamX
+	caller client.Client
 }
 
 func (c *kClient) PingPong(ctx context.Context, req *Request) (r *Response, err error) {
@@ -254,7 +253,7 @@ func (c *kClient) PingPong(ctx context.Context, req *Request) (r *Response, err 
 func (c *kClient) Unary(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (*Response, error) {
 	res := new(Response)
 	_, _, err := streamxclient.InvokeStream[Request, Response](
-		ctx, c.streamer, serviceinfo.StreamingUnary, "Unary", req, res, callOptions...)
+		ctx, c.caller, serviceinfo.StreamingUnary, "Unary", req, res, callOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -265,27 +264,27 @@ func (c *kClient) ClientStream(ctx context.Context, callOptions ...streamxcallop
 	context.Context, streamx.ClientStreamingClient[Request, Response], error,
 ) {
 	return streamxclient.InvokeStream[Request, Response](
-		ctx, c.streamer, serviceinfo.StreamingClient, "ClientStream", nil, nil, callOptions...)
+		ctx, c.caller, serviceinfo.StreamingClient, "ClientStream", nil, nil, callOptions...)
 }
 
 func (c *kClient) ServerStream(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (
 	context.Context, streamx.ServerStreamingClient[Response], error,
 ) {
 	return streamxclient.InvokeStream[Request, Response](
-		ctx, c.streamer, serviceinfo.StreamingServer, "ServerStream", req, nil, callOptions...)
+		ctx, c.caller, serviceinfo.StreamingServer, "ServerStream", req, nil, callOptions...)
 }
 
 func (c *kClient) BidiStream(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
 	context.Context, streamx.BidiStreamingClient[Request, Response], error,
 ) {
 	return streamxclient.InvokeStream[Request, Response](
-		ctx, c.streamer, serviceinfo.StreamingBidirectional, "BidiStream", nil, nil, callOptions...)
+		ctx, c.caller, serviceinfo.StreamingBidirectional, "BidiStream", nil, nil, callOptions...)
 }
 
 func (c *kClient) UnaryWithErr(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (*Response, error) {
 	res := new(Response)
 	_, _, err := streamxclient.InvokeStream[Request, Response](
-		ctx, c.streamer, serviceinfo.StreamingUnary, "UnaryWithErr", req, res, callOptions...)
+		ctx, c.caller, serviceinfo.StreamingUnary, "UnaryWithErr", req, res, callOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -296,19 +295,19 @@ func (c *kClient) ClientStreamWithErr(ctx context.Context, callOptions ...stream
 	context.Context, streamx.ClientStreamingClient[Request, Response], error,
 ) {
 	return streamxclient.InvokeStream[Request, Response](
-		ctx, c.streamer, serviceinfo.StreamingClient, "ClientStreamWithErr", nil, nil, callOptions...)
+		ctx, c.caller, serviceinfo.StreamingClient, "ClientStreamWithErr", nil, nil, callOptions...)
 }
 
 func (c *kClient) ServerStreamWithErr(ctx context.Context, req *Request, callOptions ...streamxcallopt.CallOption) (
 	context.Context, streamx.ServerStreamingClient[Response], error,
 ) {
 	return streamxclient.InvokeStream[Request, Response](
-		ctx, c.streamer, serviceinfo.StreamingServer, "ServerStreamWithErr", req, nil, callOptions...)
+		ctx, c.caller, serviceinfo.StreamingServer, "ServerStreamWithErr", req, nil, callOptions...)
 }
 
 func (c *kClient) BidiStreamWithErr(ctx context.Context, callOptions ...streamxcallopt.CallOption) (
 	context.Context, streamx.BidiStreamingClient[Request, Response], error,
 ) {
 	return streamxclient.InvokeStream[Request, Response](
-		ctx, c.streamer, serviceinfo.StreamingBidirectional, "BidiStreamWithErr", nil, nil, callOptions...)
+		ctx, c.caller, serviceinfo.StreamingBidirectional, "BidiStreamWithErr", nil, nil, callOptions...)
 }

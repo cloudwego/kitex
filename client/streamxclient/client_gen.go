@@ -18,16 +18,18 @@ package streamxclient
 
 import (
 	"context"
+	"errors"
 
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
+	"github.com/cloudwego/kitex/internal/streamx/streamxclient"
 	"github.com/cloudwego/kitex/pkg/serviceinfo"
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
 // InvokeStream create a new client stream and wrapped related middlewares
 func InvokeStream[Req, Res any](
-	ctx context.Context, cli client.StreamX, smode serviceinfo.StreamingMode, method string,
+	ctx context.Context, cli client.Client, smode serviceinfo.StreamingMode, method string,
 	req *Req, res *Res, callOptions ...streamxcallopt.CallOption,
 ) (context.Context, *streamx.GenericClientStream[Req, Res], error) {
 	reqArgs, resArgs := streamx.NewStreamReqArgs(nil), streamx.NewStreamResArgs(nil)
@@ -41,8 +43,12 @@ func InvokeStream[Req, Res any](
 		resArgs.SetRes(res)
 	}
 
+	scli, ok := cli.(streamxclient.StreamXClient)
+	if !ok {
+		return nil, nil, errors.New("current client is not support streamx interface")
+	}
 	// NewStream should register client middlewares into stream Args
-	ctx, cs, err := cli.NewStream(ctx, method, streamArgs, callOptions...)
+	ctx, cs, err := scli.NewStream(ctx, method, streamArgs, callOptions...)
 	if err != nil {
 		return nil, nil, err
 	}

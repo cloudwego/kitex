@@ -23,20 +23,10 @@ import (
 	"github.com/cloudwego/kitex/server"
 )
 
-func WithProvider(provider streamx.ServerProvider) server.Option {
+// WithStreamMiddleware currently is not open for users to use for now
+// so it's include in internal package
+func WithStreamMiddleware(mw streamx.StreamMiddleware) server.Option {
 	return server.Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.StreamX.Provider = provider
-	}}
-}
-
-func WithStreamRecvMiddleware(mw streamx.StreamRecvMiddleware) server.Option {
-	return server.Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.StreamX.StreamRecvMiddlewares = append(o.StreamX.StreamRecvMiddlewares, mw)
-	}}
-}
-
-func WithStreamSendMiddleware(mw streamx.StreamSendMiddleware) server.Option {
-	return server.Option{F: func(o *internal_server.Options, di *utils.Slice) {
-		o.StreamX.StreamSendMiddlewares = append(o.StreamX.StreamSendMiddlewares, mw)
+		o.StreamX.StreamMiddlewares = append(o.StreamX.StreamMiddlewares, mw)
 	}}
 }
