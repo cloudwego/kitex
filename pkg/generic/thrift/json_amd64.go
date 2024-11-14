@@ -81,7 +81,7 @@ func (m *WriteJSON) Write(ctx context.Context, out bufiox.Writer, msg interface{
 	transBuff := utils.StringToSliceByte(s)
 
 	if fnDsc.IsWithoutWrapping() {
-		return writeStreamingContentWithDynamicgo(ctx, out, dynamicgoTypeDsc, &cv, transBuff)
+		return writeUnwrappedFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff)
 	} else {
 		return writeFields(ctx, out, dynamicgoTypeDsc, &cv, transBuff, isClient)
 	}
@@ -129,7 +129,7 @@ func writeFields(ctx context.Context, out bufiox.Writer, dynamicgoTypeDsc *dthri
 	return bw.WriteFieldStop()
 }
 
-func writeStreamingContentWithDynamicgo(ctx context.Context, out bufiox.Writer, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte) error {
+func writeUnwrappedFields(ctx context.Context, out bufiox.Writer, dynamicgoTypeDsc *dthrift.TypeDescriptor, cv *j2t.BinaryConv, transBuff []byte) error {
 	dbuf := mcache.Malloc(len(transBuff))[0:0]
 	defer mcache.Free(dbuf)
 
