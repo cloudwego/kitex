@@ -103,7 +103,7 @@ func (m *WriteJSON) originalWrite(ctx context.Context, out bufiox.Writer, msg in
 
 	// msg is void or nil
 	if _, ok := msg.(descriptor.Void); ok || msg == nil {
-		if err = wrapStructWriter(ctx, msg, bw, typeDsc.TyDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}); err != nil {
+		if err = wrapStructWriter(ctx, msg, bw, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}); err != nil {
 			return err
 		}
 		return err
@@ -127,11 +127,11 @@ func (m *WriteJSON) originalWrite(ctx context.Context, out bufiox.Writer, msg in
 	}
 
 	opt := &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary}
-	if !typeDsc.IsWrapped {
-		return jsonWriter(ctx, &body, typeDsc.TyDsc, opt, bw)
+	if fnDsc.IsWithoutWrapping {
+		return jsonWriter(ctx, &body, typeDsc, opt, bw)
 	}
 
-	return wrapJSONWriter(ctx, &body, bw, typeDsc.TyDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary})
+	return wrapJSONWriter(ctx, &body, bw, typeDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.base64Binary})
 }
 
 // NewReadJSON build ReadJSON according to ServiceDescriptor
@@ -178,14 +178,14 @@ func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, dataL
 	if fnDsc == nil {
 		return nil, fmt.Errorf("missing method: %s in service: %s in dynamicgo", method, m.svc.DynamicGoDsc.Name())
 	}
-	tyDsc := fnDsc.StructWrappedResponse()
+	tyDsc := fnDsc.Response()
 	if !isClient {
-		tyDsc = fnDsc.StructWrappedRequest()
+		tyDsc = fnDsc.Request()
 	}
 
 	var resp interface{}
 	var err error
-	if tyDsc.TypeDescriptor().Struct().Fields()[0].Type().Type() == dthrift.VOID {
+	if tyDsc.Struct().Fields()[0].Type().Type() == dthrift.VOID {
 		if err = in.Skip(voidWholeLen); err != nil {
 			return nil, err
 		}
@@ -200,19 +200,19 @@ func (m *ReadJSON) Read(ctx context.Context, method string, isClient bool, dataL
 		buf := dirtmake.Bytes(0, len(transBuff)*2)
 		// thrift []byte to json []byte
 		var t2jBinaryConv t2j.BinaryConv
-		if isClient && tyDsc.IsWrapped() {
+		if isClient && !fnDsc.IsWithoutWrapping() {
 			t2jBinaryConv = t2j.NewBinaryConv(m.convOptsWithException)
 		} else {
 			t2jBinaryConv = t2j.NewBinaryConv(m.convOpts)
 		}
-		if err = t2jBinaryConv.DoInto(ctx, tyDsc.TypeDescriptor(), transBuff, &buf); err != nil {
+		if err = t2jBinaryConv.DoInto(ctx, tyDsc, transBuff, &buf); err != nil {
 			return nil, err
 		}
-		if tyDsc.IsWrapped() {
+		if !fnDsc.IsWithoutWrapping() {
 			buf = removePrefixAndSuffix(buf)
 		}
 		resp = utils.SliceByteToString(buf)
-		if tyDsc.IsWrapped() && tyDsc.TypeDescriptor().Struct().Fields()[0].Type().Type() == dthrift.STRING {
+		if !fnDsc.IsWithoutWrapping() && tyDsc.Struct().Fields()[0].Type().Type() == dthrift.STRING {
 			strresp := resp.(string)
 			resp, err = strconv.Unquote(strresp)
 			if err != nil {
@@ -236,11 +236,11 @@ func (m *ReadJSON) originalRead(ctx context.Context, method string, isClient boo
 	br := thrift.NewBufferReader(in)
 	defer br.Recycle()
 
-	if !tyDsc.IsWrapped {
-		return structReader(ctx, tyDsc.TyDsc, &readerOption{forJSON: true, binaryWithBase64: m.binaryWithBase64}, br)
+	if fnDsc.IsWithoutWrapping {
+		return structReader(ctx, tyDsc, &readerOption{forJSON: true, binaryWithBase64: m.binaryWithBase64}, br)
 	}
 
-	resp, err := skipStructReader(ctx, br, tyDsc.TyDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
+	resp, err := skipStructReader(ctx, br, tyDsc, &readerOption{forJSON: true, throwException: true, binaryWithBase64: m.binaryWithBase64})
 	if err != nil {
 		return nil, err
 	}

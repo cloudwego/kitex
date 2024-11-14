@@ -154,22 +154,25 @@ func addFunction(fn *parser.Function, tree *parser.Thrift, sDsc *descriptor.Serv
 	// only support single argument
 	field := fn.Arguments[0]
 
-	req, hasRequestBase, err := parseRequest(mode, field, tree, structsCache, opts)
+	isStream := mode != serviceinfo.StreamingNone && mode != serviceinfo.StreamingUnary
+
+	req, hasRequestBase, err := parseRequest(isStream, field, tree, structsCache, opts)
 	if err != nil {
 		return err
 	}
-	resp, err := parseResponse(mode, fn, tree, structsCache, opts)
+	resp, err := parseResponse(isStream, fn, tree, structsCache, opts)
 	if err != nil {
 		return err
 	}
 
 	fnDsc := &descriptor.FunctionDescriptor{
-		Name:           fn.Name,
-		Oneway:         fn.Oneway,
-		Request:        req,
-		Response:       resp,
-		HasRequestBase: hasRequestBase,
-		StreamingMode:  mode,
+		Name:              fn.Name,
+		Oneway:            fn.Oneway,
+		Request:           req,
+		Response:          resp,
+		HasRequestBase:    hasRequestBase,
+		IsWithoutWrapping: isStream,
+		StreamingMode:     mode,
 	}
 	defer func() {
 		if ret := recover(); ret != nil {
@@ -207,7 +210,7 @@ func streamingMode(st *streaming.Streaming) serviceinfo.StreamingMode {
 	return serviceinfo.StreamingNone
 }
 
-func parseRequest(sm serviceinfo.StreamingMode, field *parser.Field, tree *parser.Thrift, structsCache map[string]*descriptor.TypeDescriptor, opts *parseOptions) (req *descriptor.StructWrappedTypeDescriptor, hasRequestBase bool, err error) {
+func parseRequest(isStream bool, field *parser.Field, tree *parser.Thrift, structsCache map[string]*descriptor.TypeDescriptor, opts *parseOptions) (req *descriptor.TypeDescriptor, hasRequestBase bool, err error) {
 	reqType, err := parseType(field.Type, tree, structsCache, initRecursionDepth, opts)
 	if err != nil {
 		return nil, hasRequestBase, err
@@ -221,9 +224,8 @@ func parseRequest(sm serviceinfo.StreamingMode, field *parser.Field, tree *parse
 		}
 	}
 
-	// when streaming
-	if sm != serviceinfo.StreamingNone && sm != serviceinfo.StreamingUnary {
-		return &descriptor.StructWrappedTypeDescriptor{TyDsc: reqType, IsWrapped: false}, hasRequestBase, nil
+	if isStream {
+		return reqType, hasRequestBase, nil
 	}
 
 	// wrap with a struct
@@ -243,18 +245,17 @@ func parseRequest(sm serviceinfo.StreamingMode, field *parser.Field, tree *parse
 	wrappedTyDsc.Struct.FieldsByID[field.ID] = reqField
 	wrappedTyDsc.Struct.FieldsByName[field.Name] = reqField
 
-	return &descriptor.StructWrappedTypeDescriptor{TyDsc: wrappedTyDsc, IsWrapped: true}, hasRequestBase, nil
+	return wrappedTyDsc, hasRequestBase, nil
 }
 
-func parseResponse(sm serviceinfo.StreamingMode, fn *parser.Function, tree *parser.Thrift, structsCache map[string]*descriptor.TypeDescriptor, opts *parseOptions) (*descriptor.StructWrappedTypeDescriptor, error) {
+func parseResponse(isStream bool, fn *parser.Function, tree *parser.Thrift, structsCache map[string]*descriptor.TypeDescriptor, opts *parseOptions) (*descriptor.TypeDescriptor, error) {
 	respType, err := parseType(fn.FunctionType, tree, structsCache, initRecursionDepth, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	// when streaming
-	if sm != serviceinfo.StreamingNone && sm != serviceinfo.StreamingUnary {
-		return &descriptor.StructWrappedTypeDescriptor{TyDsc: respType, IsWrapped: false}, nil
+	if isStream {
+		return respType, nil
 	}
 
 	// wrap with a struct
@@ -291,7 +292,7 @@ func parseResponse(sm serviceinfo.StreamingMode, fn *parser.Function, tree *pars
 		wrappedResp.Struct.FieldsByID[field.ID] = exceptionField
 		wrappedResp.Struct.FieldsByName[field.Name] = exceptionField
 	}
-	return &descriptor.StructWrappedTypeDescriptor{TyDsc: wrappedResp, IsWrapped: true}, nil
+	return wrappedResp, nil
 }
 
 // reuse builtin types

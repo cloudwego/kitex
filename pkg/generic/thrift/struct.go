@@ -74,7 +74,7 @@ func (m *WriteStruct) Write(ctx context.Context, out bufiox.Writer, msg interfac
 		requestBase = nil
 	}
 	binaryWriter := thrift.NewBufferWriter(out)
-	err = wrapStructWriter(ctx, msg, binaryWriter, ty.TyDsc, &writerOption{requestBase: requestBase, binaryWithBase64: m.binaryWithBase64})
+	err = wrapStructWriter(ctx, msg, binaryWriter, ty, &writerOption{requestBase: requestBase, binaryWithBase64: m.binaryWithBase64})
 	binaryWriter.Recycle()
 	return err
 }
@@ -129,7 +129,7 @@ func (m *ReadStruct) Read(ctx context.Context, method string, isClient bool, dat
 		fDsc = fnDsc.Request
 	}
 	br := thrift.NewBufferReader(in)
-	str, err := skipStructReader(ctx, br, fDsc.TyDsc, &readerOption{throwException: true, forJSON: m.forJSON, binaryWithBase64: m.binaryWithBase64, binaryWithByteSlice: m.binaryWithByteSlice, setFieldsForEmptyStruct: m.setFieldsForEmptyStruct})
+	str, err := skipStructReader(ctx, br, fDsc, &readerOption{throwException: true, forJSON: m.forJSON, binaryWithBase64: m.binaryWithBase64, binaryWithByteSlice: m.binaryWithByteSlice, setFieldsForEmptyStruct: m.setFieldsForEmptyStruct})
 	br.Recycle()
 	return str, err
 }

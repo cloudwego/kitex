@@ -91,12 +91,12 @@ func TestParseHttpIDL(t *testing.T) {
 	test.Assert(t, err == nil)
 	test.Assert(t, len(svc.Functions) == 3)
 	bizMethod1 := svc.Functions["BizMethod1"]
-	test.Assert(t, bizMethod1.Request.TyDsc.Type == descriptor.STRUCT)
-	test.Assert(t, len(bizMethod1.Request.TyDsc.Struct.FieldsByName["req"].Type.Struct.RequiredFields) == 1)
-	test.Assert(t, bizMethod1.Request.TyDsc.Struct.FieldsByName["req"].Type.Struct.FieldsByName["required_filed"].Required)
-	test.Assert(t, len(bizMethod1.Request.TyDsc.Struct.FieldsByID) == 1)
-	test.Assert(t, bizMethod1.Response.TyDsc.Type == descriptor.STRUCT)
-	test.Assert(t, len(bizMethod1.Response.TyDsc.Struct.FieldsByID) == 2)
+	test.Assert(t, bizMethod1.Request.Type == descriptor.STRUCT)
+	test.Assert(t, len(bizMethod1.Request.Struct.FieldsByName["req"].Type.Struct.RequiredFields) == 1)
+	test.Assert(t, bizMethod1.Request.Struct.FieldsByName["req"].Type.Struct.FieldsByName["required_filed"].Required)
+	test.Assert(t, len(bizMethod1.Request.Struct.FieldsByID) == 1)
+	test.Assert(t, bizMethod1.Response.Type == descriptor.STRUCT)
+	test.Assert(t, len(bizMethod1.Response.Struct.FieldsByID) == 2)
 }
 
 var httpConflictPathIDL = `
@@ -144,7 +144,7 @@ func TestSelfReferenceParse(t *testing.T) {
 	svc, err := Parse(re, LastServiceOnly)
 	test.Assert(t, err == nil, err)
 	for _, fn := range svc.Functions {
-		for _, i := range fn.Request.TyDsc.Struct.FieldsByID {
+		for _, i := range fn.Request.Struct.FieldsByID {
 			_ = i
 		}
 	}
@@ -443,15 +443,15 @@ func TestDefaultValue(t *testing.T) {
 	test.Assert(t, err == nil)
 
 	defaultValueDeepEqual(t, func(name string) interface{} {
-		return fun.Request.TyDsc.Struct.FieldsByName["req"].Type.Struct.FieldsByName[name].DefaultValue
+		return fun.Request.Struct.FieldsByName["req"].Type.Struct.FieldsByName[name].DefaultValue
 	})
 
-	defaultBase := fun.Request.TyDsc.Struct.FieldsByName["req"].Type.Struct.FieldsByName["base"].DefaultValue.(map[string]interface{})
+	defaultBase := fun.Request.Struct.FieldsByName["req"].Type.Struct.FieldsByName["base"].DefaultValue.(map[string]interface{})
 	defaultValueDeepEqual(t, func(name string) interface{} {
 		return defaultBase[name]
 	})
 
-	defaultBases := fun.Request.TyDsc.Struct.FieldsByName["req"].Type.Struct.FieldsByName["bases"].DefaultValue.([]interface{})
+	defaultBases := fun.Request.Struct.FieldsByName["req"].Type.Struct.FieldsByName["bases"].DefaultValue.([]interface{})
 	for i := range defaultBases {
 		defaultBase := defaultBases[i].(map[string]interface{})
 		defaultValueDeepEqual(t, func(name string) interface{} {

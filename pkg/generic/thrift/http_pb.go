@@ -78,7 +78,7 @@ func (w *WriteHTTPPbRequest) Write(ctx context.Context, out bufiox.Writer, msg i
 	req.GeneralBody = pbMsg
 
 	binaryWriter := thrift.NewBufferWriter(out)
-	err = wrapStructWriter(ctx, req, binaryWriter, fn.Request.TyDsc, &writerOption{requestBase: requestBase})
+	err = wrapStructWriter(ctx, req, binaryWriter, fn.Request, &writerOption{requestBase: requestBase})
 	binaryWriter.Recycle()
 	return err
 }
@@ -110,7 +110,7 @@ func (r *ReadHTTPPbResponse) Read(ctx context.Context, method string, isClient b
 	}
 
 	br := thrift.NewBufferReader(in)
-	resp, err := skipStructReader(ctx, br, fDsc.TyDsc, &readerOption{pbDsc: mt.GetOutputType(), http: true})
+	resp, err := skipStructReader(ctx, br, fDsc, &readerOption{pbDsc: mt.GetOutputType(), http: true})
 	br.Recycle()
 	return resp, err
 }
