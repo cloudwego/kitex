@@ -29,8 +29,13 @@ import (
 		{{- end}}
 	{{- end}}
 	{{- if .HasStreaming}}
+    {{- if not .StreamX}}
 	"github.com/cloudwego/kitex/client/streamclient"
 	"github.com/cloudwego/kitex/client/callopt/streamcall"
+    {{- else}}
+    "github.com/cloudwego/kitex/client/streamxclient/streamxcallopt"
+    "github.com/cloudwego/kitex/pkg/streamx"
+    {{- end}}{{- /* if not .StreamX end */}}
     {{- end}}
 )
 // Client is designed to provide IDL-compatible methods with call-option parameter for kitex framework.
@@ -43,9 +48,23 @@ type Client interface {
 	{{.Name}}(ctx context.Context {{range .Args}}, {{.RawName}} {{.Type}}{{end}}, callOptions ...callopt.Option ) ({{if not .Void}}r {{.Resp.Type}}, {{end}}err error)
 	{{- end}}
 {{- end}}
+{{- /* Streamx interface for streaming method */}}
+{{- if and .StreamX (eq $.Codec "thrift") .Streaming.IsStreaming}}
+{{- $streamingUnary := (eq .Streaming.Mode "unary")}}
+{{- $clientSide := (eq .Streaming.Mode "client")}}
+{{- $serverSide := (eq .Streaming.Mode "server")}}
+{{- $bidiSide := (eq .Streaming.Mode "bidirectional")}}
+{{- $arg := index .Args 0}}
+    {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (r {{.Resp.Type}}, err error)
+             {{- else if $clientSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error)
+             {{- else if $serverSide}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ServerStreamingClient[{{NotPtr .Resp.Type}}], error)
+             {{- else if $bidiSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.BidiStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error)
+             {{- end}}
+{{- end}}{{- /* if and .StreamX (eq $.Codec "thrift") .Streaming.IsStreaming end */}}
 {{- end}}
 }
 
+{{- if not .StreamX}}
 {{- if .HasStreaming}}
 // StreamClient is designed to provide Interface for Streaming APIs.
 type StreamClient interface {
@@ -75,6 +94,7 @@ type {{.ServiceName}}_{{.RawName}}Client interface {
 }
 {{- end}}
 {{end}}
+{{- end}}{{- /* if not .StreamX end */}}
 
 // NewClient creates a client for the service defined in IDL.
 func NewClient(destService string, opts ...client.Option) (Client, error) {
@@ -87,9 +107,13 @@ func NewClient(destService string, opts ...client.Option) (Client, error) {
 	{{end}}
 	options = append(options, opts...)
 
-	kc, err := client.NewClient(
-		{{- if eq $.Codec "protobuf"}}serviceInfo(){{else}}serviceInfoForClient(){{end -}}
-		, options...)
+    {{- if and .StreamX .HasStreaming}}
+	kc, err := client.NewClient(serviceInfo(), options...)
+    {{- else}}
+    kc, err := client.NewClient(
+        {{- if eq $.Codec "protobuf"}}serviceInfo(){{else}}serviceInfoForClient(){{end -}}
+        , options...)
+    {{- end}}{{/* if .StreamX .HasStreaming end */}}
 	if err != nil {
 		return nil, err
 	}
@@ -131,8 +155,27 @@ func (p *k{{$.ServiceName}}Client) {{.Name}}(ctx context.Context {{range .Args}}
 }
 {{- end}}
 {{- end}}
+{{- /* Streamx interface for streaming method */}}
+{{- if and .StreamX (eq $.Codec "thrift") .Streaming.IsStreaming}}
+{{- $streamingUnary := (eq .Streaming.Mode "unary")}}
+{{- $clientSide := (eq .Streaming.Mode "client")}}
+{{- $serverSide := (eq .Streaming.Mode "server")}}
+{{- $bidiSide := (eq .Streaming.Mode "bidirectional")}}
+{{- $arg := index .Args 0}}
+func (p *k{{$.ServiceName}}Client) {{.Name}}{{- if $streamingUnary}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (r {{.Resp.Type}}, err error) {
+    return p.kClient.{{.Name}}(ctx, req, callOptions...)
+             {{- else if $clientSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error) {
+    return p.kClient.{{.Name}}(ctx, callOptions...)
+			 {{- else if $serverSide}}(ctx context.Context, req {{$arg.Type}}, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ServerStreamingClient[{{NotPtr .Resp.Type}}], error) {
+	return p.kClient.{{.Name}}(ctx, req, callOptions...)
+			 {{- else if $bidiSide}}(ctx context.Context, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.BidiStreamingClient[{{NotPtr $arg.Type}}, {{NotPtr .Resp.Type}}], error) {
+	return p.kClient.{{.Name}}(ctx, callOptions...)
+             {{- end}}
+}
+{{- end}}{{- /* if and .StreamX (eq $.Codec "thrift") .Streaming.IsStreaming end */}}
 {{end}}
 
+{{- if not .StreamX}}
 {{- if .HasStreaming}}
 // NewStreamClient creates a stream client for the service's streaming APIs defined in IDL.
 func NewStreamClient(destService string, opts ...streamclient.Option) (StreamClient, error) {
@@ -181,5 +224,6 @@ func (p *k{{$.ServiceName}}StreamClient) {{.Name}}(ctx context.Context {{range .
 {{- end}}
 {{end}}
 {{- end}}
+{{- end}}{{- /* if not .StreamX end */}}
 {{template "@client.go-EOF" .}}
 `
