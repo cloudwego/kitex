@@ -598,10 +598,6 @@ func TestStreamingBasic(t *testing.T) {
 func TestStreamingException(t *testing.T) {
 	for _, tc := range providerTestCases {
 		t.Run(tc.Name, func(t *testing.T) {
-			addr := test.GetLocalAddress()
-			ln, _ := netpoll.CreateListener("tcp", addr)
-			defer ln.Close()
-
 			// create server
 			addr, svr, err := NewTestServer(
 				new(testService),

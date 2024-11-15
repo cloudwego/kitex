@@ -32,7 +32,7 @@ import (
 
 // --- Define Service Method handler ---
 var testServiceInfo = &serviceinfo.ServiceInfo{
-	ServiceName:  "kitex.echo.service",
+	ServiceName:  "TestService",
 	PayloadCodec: serviceinfo.Thrift,
 	HandlerType:  (*TestService)(nil),
 	Methods: map[string]serviceinfo.MethodInfo{
