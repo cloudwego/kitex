@@ -737,6 +737,9 @@ func initRPCInfo(ctx context.Context, method string, opt *client.Options, svcInf
 		rpcStats.ImmutableView(),
 	)
 
+	if mi != nil {
+		ri.Invocation().(rpcinfo.InvocationSetter).SetStreamingMode(mi.StreamingMode())
+	}
 	if fromMethod := ctx.Value(consts.CtxKeyMethod); fromMethod != nil {
 		rpcinfo.AsMutableEndpointInfo(ri.From()).SetMethod(fromMethod.(string))
 	}

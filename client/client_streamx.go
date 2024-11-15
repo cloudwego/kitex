@@ -24,10 +24,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/streamx"
 )
 
-type StreamX interface {
-	NewStream(ctx context.Context, method string, streamArgs streamx.StreamArgs, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error)
-}
-
 // NewStream create stream for streamx mode
 func (kc *kClient) NewStream(ctx context.Context, method string, streamArgs streamx.StreamArgs, callOptions ...streamxcallopt.CallOption) (context.Context, streamx.ClientStream, error) {
 	if !kc.inited {
