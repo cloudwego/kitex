@@ -383,6 +383,7 @@ func (c *converter) convertTypes(req *plugin.Request) error {
 				ServiceFilePath: ast.Filename,
 				HasStreaming:    hasStreaming,
 				GenerateHandler: true,
+				StreamX:         c.Config.StreamX,
 			}
 
 			if c.IsHessian2() {
@@ -421,6 +422,7 @@ func (c *converter) makeService(pkg generator.PkgInfo, svc *golang.Service) (*ge
 		PkgInfo:        pkg,
 		ServiceName:    svc.GoName().String(),
 		RawServiceName: svc.Name,
+		StreamX:        c.Config.StreamX,
 	}
 	si.ServiceTypeName = func() string { return si.PkgRefName + "." + si.ServiceName }
 
@@ -464,6 +466,7 @@ func (c *converter) makeMethod(si *generator.ServiceInfo, f *golang.Function) (*
 		ClientStreaming:    st.ClientStreaming,
 		ServerStreaming:    st.ServerStreaming,
 		ArgsLength:         len(f.Arguments()),
+		StreamX:            si.StreamX,
 	}
 	if st.IsStreaming {
 		si.HasStreaming = true
