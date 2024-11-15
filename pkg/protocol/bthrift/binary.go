@@ -21,7 +21,6 @@ import (
 	gthrift "github.com/cloudwego/gopkg/protocol/thrift"
 
 	thrift "github.com/cloudwego/kitex/pkg/protocol/bthrift/apache"
-	"github.com/cloudwego/kitex/pkg/utils"
 )
 
 var (
@@ -123,12 +122,10 @@ func (binaryProtocol) WriteBinary(buf, value []byte) int {
 }
 
 func (binaryProtocol) WriteStringNocopy(buf []byte, binaryWriter BinaryWriter, value string) int {
-	// can not inline
-	return gthrift.Binary.WriteBinaryNocopy(buf, binaryWriter, utils.StringToSliceByte(value))
+	return gthrift.Binary.WriteStringNocopy(buf, binaryWriter, value)
 }
 
 func (binaryProtocol) WriteBinaryNocopy(buf []byte, binaryWriter BinaryWriter, value []byte) int {
-	// can not inline
 	return gthrift.Binary.WriteBinaryNocopy(buf, binaryWriter, value)
 }
 
