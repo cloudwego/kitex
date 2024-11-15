@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/bytedance/gopkg/cloud/metainfo"
+	"github.com/cloudwego/gopkg/protocol/ttheader"
 
 	"github.com/cloudwego/kitex/internal/mocks"
 	mocksremote "github.com/cloudwego/kitex/internal/mocks/remote"
@@ -71,7 +72,7 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 			sendMsg := initClientSendMsg(transport.TTHeader)
 			sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 			sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
-			sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
+			sendMsg.Tags()[HeaderFlagsKey] = ttheader.HeaderFlagSupportOutOfOrder
 
 			// encode
 			buf := tb.NewBuffer()
@@ -92,7 +93,7 @@ func TestTTHeaderCodecWithTransInfo(t *testing.T) {
 			test.DeepEqual(t, strKVInfoRecv, strKVInfo)
 			flag := recvMsg.Tags()[HeaderFlagsKey]
 			test.Assert(t, flag != nil)
-			test.Assert(t, flag == HeaderFlagSupportOutOfOrder)
+			test.Assert(t, flag == ttheader.HeaderFlagSupportOutOfOrder)
 		})
 	}
 }
@@ -106,7 +107,7 @@ func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
 			sendMsg := initClientSendMsg(transport.TTHeader)
 			sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 			sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
-			sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
+			sendMsg.Tags()[HeaderFlagsKey] = ttheader.HeaderFlagSupportOutOfOrder
 
 			// encode
 			buf := tb.NewBuffer()
@@ -127,7 +128,7 @@ func TestTTHeaderCodecWithTransInfoWithGDPRToken(t *testing.T) {
 			test.DeepEqual(t, strKVInfoRecv, strKVInfo)
 			flag := recvMsg.Tags()[HeaderFlagsKey]
 			test.Assert(t, flag != nil)
-			test.Assert(t, flag == HeaderFlagSupportOutOfOrder)
+			test.Assert(t, flag == ttheader.HeaderFlagSupportOutOfOrder)
 		})
 	}
 }
@@ -142,7 +143,7 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 			sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 			ctx, err := tm.MetainfoClientHandler.WriteMeta(ctx, sendMsg)
 			test.Assert(t, err == nil)
-			sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
+			sendMsg.Tags()[HeaderFlagsKey] = ttheader.HeaderFlagSupportOutOfOrder
 
 			// encode
 			buf := tb.NewBuffer()
@@ -163,7 +164,7 @@ func TestTTHeaderCodecWithTransInfoFromMetaInfoGDPRToken(t *testing.T) {
 			test.DeepEqual(t, strKVInfoRecv, map[string]string{transmeta.GDPRToken: "test token"})
 			flag := recvMsg.Tags()[HeaderFlagsKey]
 			test.Assert(t, flag != nil)
-			test.Assert(t, flag == HeaderFlagSupportOutOfOrder)
+			test.Assert(t, flag == ttheader.HeaderFlagSupportOutOfOrder)
 		})
 	}
 }
@@ -244,7 +245,7 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 			sendMsg := initClientSendMsg(transport.TTHeader)
 			sendMsg.TransInfo().PutTransIntInfo(intKVInfo)
 			sendMsg.TransInfo().PutTransStrInfo(strKVInfo)
-			sendMsg.Tags()[HeaderFlagsKey] = HeaderFlagSupportOutOfOrder
+			sendMsg.Tags()[HeaderFlagsKey] = ttheader.HeaderFlagSupportOutOfOrder
 
 			// encode
 			out := remote.NewWriterBuffer(256)
@@ -267,7 +268,7 @@ func BenchmarkTTHeaderWithTransInfoParallel(b *testing.B) {
 			test.DeepEqual(b, strKVInfoRecv, strKVInfo)
 			flag := recvMsg.Tags()[HeaderFlagsKey]
 			test.Assert(b, flag != nil)
-			test.Assert(b, flag == HeaderFlagSupportOutOfOrder)
+			test.Assert(b, flag == ttheader.HeaderFlagSupportOutOfOrder)
 		}
 	})
 }
@@ -415,7 +416,7 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	tm := message.TransInfo()
 
 	// 1. header meta
-	headerMeta, err := out.Malloc(TTHeaderMetaSize)
+	headerMeta, err := out.Malloc(ttheader.TTHeaderMetaSize)
 	if err != nil {
 		return perrors.NewProtocolError(err)
 	}
@@ -423,7 +424,7 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	totalLenField := headerMeta[0:4]
 	headerSizeField := headerMeta[12:14]
 
-	binary.BigEndian.PutUint32(headerMeta[4:8], TTHeaderMagic+uint32(getFlags(message)))
+	binary.BigEndian.PutUint32(headerMeta[4:8], ttheader.TTHeaderMagic+uint32(getFlags(message)))
 	binary.BigEndian.PutUint32(headerMeta[8:12], uint32(message.RPCInfo().Invocation().SeqID()))
 
 	var transformIDs []uint8
@@ -450,7 +451,7 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	padding := (4 - headerInfoSize%4) % 4
 	headerInfoSize += padding
 	binary.BigEndian.PutUint16(headerSizeField, uint16(headerInfoSize/4))
-	totalLen := TTHeaderMetaSize - Size32 + headerInfoSize + payloadBuf.WrittenLen()
+	totalLen := ttheader.TTHeaderMetaSize - Size32 + headerInfoSize + payloadBuf.WrittenLen()
 	binary.BigEndian.PutUint32(totalLenField, uint32(totalLen))
 
 	// 3.  header info, malloc and write
@@ -468,7 +469,7 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	// str kv info
 	if len(tm.TransStrInfo()) > 0 {
 		// INFO ID TYPE(u8) + NUM HEADERS(u16)
-		headerInfo[hdIdx] = byte(InfoIDKeyValue)
+		headerInfo[hdIdx] = byte(ttheader.InfoIDKeyValue)
 		binary.BigEndian.PutUint16(headerInfo[hdIdx+1:hdIdx+3], uint16(len(tm.TransStrInfo())))
 		hdIdx += 3
 		for key, value := range tm.TransStrInfo() {
@@ -484,7 +485,7 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 	// int kv info
 	if len(tm.TransIntInfo()) > 0 {
 		// INFO ID TYPE(u8) + NUM HEADERS(u16)
-		headerInfo[hdIdx] = byte(InfoIDIntKeyValue)
+		headerInfo[hdIdx] = byte(ttheader.InfoIDIntKeyValue)
 		binary.BigEndian.PutUint16(headerInfo[hdIdx+1:hdIdx+3], uint16(len(tm.TransIntInfo())))
 		hdIdx += 3
 		for key, value := range tm.TransIntInfo() {
@@ -514,9 +515,9 @@ func (t ttHeader) encode2(ctx context.Context, message remote.Message, payloadBu
 func TestHeaderFlags(t *testing.T) {
 	// case 1: correct HeaderFlags
 	msg := initClientSendMsg(transport.TTHeader)
-	msg.Tags()[HeaderFlagsKey] = HeaderFlagSASL | HeaderFlagSupportOutOfOrder
+	msg.Tags()[HeaderFlagsKey] = ttheader.HeaderFlagSASL | ttheader.HeaderFlagSupportOutOfOrder
 	hfs := getFlags(msg)
-	test.Assert(t, hfs == HeaderFlagSASL|HeaderFlagSupportOutOfOrder)
+	test.Assert(t, hfs == ttheader.HeaderFlagSASL|ttheader.HeaderFlagSupportOutOfOrder)
 
 	// case 2: invalid type for HeaderFlagsKey
 	msg = initClientSendMsg(transport.TTHeader)
@@ -526,7 +527,7 @@ func TestHeaderFlags(t *testing.T) {
 
 	// case 3: setFlags then get Flags
 	msg = initClientSendMsg(transport.TTHeader)
-	setFlags(uint16(HeaderFlagSupportOutOfOrder), msg)
+	setFlags(ttheader.HeaderFlagSupportOutOfOrder, msg)
 	hfs = getFlags(msg)
-	test.Assert(t, hfs == HeaderFlagSupportOutOfOrder, hfs)
+	test.Assert(t, hfs == ttheader.HeaderFlagSupportOutOfOrder, hfs)
 }
